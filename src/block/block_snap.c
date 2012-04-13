@@ -7,11 +7,11 @@
 
 #include "wt_internal.h"
 
-static int __snapshot_delete(WT_SESSION_IMPL *, WT_BLOCK *, WT_SNAPSHOT *);
-static int __snapshot_extlists(
-	WT_SESSION_IMPL *, WT_BLOCK *, WT_BLOCK_SNAPSHOT *);
+static int __snapshot_process(WT_SESSION_IMPL *, WT_BLOCK *, WT_SNAPSHOT *);
 static int __snapshot_string(
 	WT_SESSION_IMPL *, WT_BLOCK *, const uint8_t *, WT_ITEM *);
+static int __snapshot_update(
+	WT_SESSION_IMPL *, WT_BLOCK *, WT_SNAPSHOT *, WT_BLOCK_SNAPSHOT *);
 
 /*
  * __wt_block_snap_init --
@@ -192,12 +192,8 @@ __wt_block_snapshot(WT_SESSION_IMPL *session,
     WT_BLOCK *block, WT_ITEM *buf, WT_SNAPSHOT *snapbase)
 {
 	WT_BLOCK_SNAPSHOT *si;
-	WT_ITEM *tmp;
-	WT_SNAPSHOT *snap;
-	uint8_t *endp;
 	int ret;
 
-	tmp = NULL;
 	ret = 0;
 
 	si = &block->live;
@@ -220,55 +216,18 @@ __wt_block_snapshot(WT_SESSION_IMPL *session,
 		    &si->root_offset, &si->root_size, &si->root_cksum, 0));
 
 	/*
+	 * Process the list of snapshots, deleting and updating as required.
+	 *
 	 * Hold a lock so the live extent lists and the file size can't change
 	 * underneath us.  I suspect we'll tighten this if snapshots take too
 	 * much time away from real work: we could read the historic snapshot
-	 * information without a lock, and we could merge and re-write all of
-	 * the deleted snapshot information except for ranges merged into the
-	 * live tree, without a lock.
+	 * information and merge and re-write all deleted snapshot information
+	 * without a lock, except for ranges merged into the live tree.
 	 */
 	__wt_spin_lock(session, &block->live_lock);
-
-	/*
-	 * Delete any no-longer-needed snapshots: we do this first as it frees
-	 * blocks to the live lists, and the freed blocks will then be included
-	 * when writing the live extent lists.
-	 */
-	WT_ERR(__snapshot_delete(session, block, snapbase));
-
-	/* Resolve the live extent lists. */
-	WT_ERR(__snapshot_extlists(session, block, si));
-
-	/* Set the file size. */
-	WT_ERR(__wt_filesize(session, block->fh, &si->file_size));
-
-err:	__wt_spin_unlock(session, &block->live_lock);
+	ret = __snapshot_process(session, block, snapbase);
+	__wt_spin_unlock(session, &block->live_lock);
 	WT_RET(ret);
-
-	/*
-	 * Copy the snapshot information into the snapshot array's address
-	 * cookie.
-	 */
-	WT_SNAPSHOT_FOREACH(snapbase, snap)
-		if (FLD_ISSET(snap->flags, WT_SNAP_ADD))
-			break;
-	if (snap->name == NULL)
-		WT_RET_MSG(session, EINVAL, "snapshot list has no added slot");
-	WT_RET(__wt_buf_init(session, &snap->raw, WT_BTREE_MAX_ADDR_COOKIE));
-	endp = snap->raw.mem;
-	WT_RET(__wt_block_snapshot_to_buffer(session, block, &endp, si));
-	snap->raw.size = WT_PTRDIFF32(endp, snap->raw.mem);
-
-	if (WT_VERBOSE_ISSET(session, snapshot)) {
-		WT_ERR(__wt_scr_alloc(session, 0, &tmp));
-		if ((ret = __snapshot_string(
-		    session, block, snap->raw.data, tmp)) == 0)
-			WT_VERBOSE(session, snapshot,
-			    "%s: create-snapshot: %s: %s",
-			    block->name, snap->name, (char *)tmp->data);
-		__wt_scr_free(&tmp);
-		WT_RET(ret);
-	}
 
 	/*
 	 * Snapshots have to hit disk (it would be reasonable to configure for
@@ -281,44 +240,11 @@ err:	__wt_spin_unlock(session, &block->live_lock);
 }
 
 /*
- * __snapshot_extlists --
- *	Extent list handling for the snapshot.
+ * __snapshot_process --
+ *	Process the list of snapshot.
  */
 static int
-__snapshot_extlists(
-    WT_SESSION_IMPL *session, WT_BLOCK *block, WT_BLOCK_SNAPSHOT *si)
-{
-	/* Truncate the file if possible. */
-	WT_RET(__wt_block_extlist_truncate(session, block, &si->avail));
-
-#ifdef HAVE_DIAGNOSTIC
-	/*
-	 * Currently, we do not check if a freed block can be immediately put
-	 * on the avail list (that is, if it was allocated during the current
-	 * snapshot -- once that change is made, we should check for overlaps
-	 * between the alloc and discard lists.
-	 */
-	WT_RET(__wt_block_extlist_check(session, si, "snapshot", 0));
-#endif
-
-	/* Write the extent lists. */
-	WT_RET(__wt_block_extlist_write(session, block, &si->alloc));
-	WT_RET(__wt_block_extlist_write(session, block, &si->avail));
-	WT_RET(__wt_block_extlist_write(session, block, &si->discard));
-
-	/* Discard the alloc and discard extent lists. */
-	__wt_block_extlist_free(session, &si->alloc);
-	__wt_block_extlist_free(session, &si->discard);
-
-	return (0);
-}
-
-/*
- * __snapshot_delete --
- *	Delete snapshots.
- */
-static int
-__snapshot_delete(
+__snapshot_process(
     WT_SESSION_IMPL *session, WT_BLOCK *block, WT_SNAPSHOT *snapbase)
 {
 	WT_BLOCK_SNAPSHOT *a, *b, *si;
@@ -329,7 +255,11 @@ __snapshot_delete(
 	tmp = NULL;
 	ret = 0;
 
-	/* Check for snapshots scheduled for deletion. */
+	/*
+	 * Delete any no-longer-needed snapshots: we do this first as it frees
+	 * blocks to the live lists, and the freed blocks will then be included
+	 * when writing the live extent lists.
+	 */
 	found = 0;
 	WT_SNAPSHOT_FOREACH(snapbase, snap) {
 		/*
@@ -363,9 +293,8 @@ __snapshot_delete(
 		WT_ERR(__wt_block_extlist_read(session, block, &si->avail));
 		WT_ERR(__wt_block_extlist_read(session, block, &si->discard));
 	}
-
 	if (!found)
-		return (0);
+		goto live_update;
 
 	/* Delete the snapshots. */
 	WT_SNAPSHOT_FOREACH(snapbase, snap) {
@@ -395,15 +324,16 @@ __snapshot_delete(
 		 * Free the root page: there's nothing special about this free,
 		 * the root page is allocated using normal rules, that is, it
 		 * may have been taken from the avail list, and was entered on
-		 * the alloc list at that time.
+		 * the live system's alloc list at that time.
 		 */
 		if (a->root_offset != WT_BLOCK_INVALID_OFFSET)
 			WT_ERR(__wt_block_free_ext(
 			    session, block, a->root_offset, a->root_size, 0));
 
 		/*
-		 * Free the blocks used to hold the extent lists directly to the
-		 * live system's avail list, they were never on any alloc list.
+		 * Free the blocks used to hold the "from" snapshot's extent
+		 * lists directly to the live system's avail list, they were
+		 * never on any alloc list.
 		 */
 		if (a->alloc.offset != WT_BLOCK_INVALID_OFFSET)
 			WT_ERR(__wt_block_free_ext(session,
@@ -434,6 +364,15 @@ __snapshot_delete(
 			    session, &a->discard, &b->discard));
 
 		/*
+		 * If the "to" snapshot is also being deleted, we're done with
+		 * it, it's merged into some other snapshot in the next loop.
+		 * This means the extent lists may aggregate over a number of
+		 * snapshots, but that's OK, they're disjoint sets of ranges.
+		 */
+		if (FLD_ISSET((snap + 1)->flags, WT_SNAP_DELETE))
+			continue;
+
+		/*
 		 * Check for blocks we can re-use: any place the "to" snapshot's
 		 * allocate and discard lists overlap is fair game: if a range
 		 * appears on both lists, move it to the avail list, it can be
@@ -442,11 +381,30 @@ __snapshot_delete(
 		WT_ERR(__wt_block_extlist_match(session, block, b));
 
 		/*
-		 * XXX
-		 * If the next entry isn't also deleted, we have to write this
-		 * entry out in new blocks, and update the cookie, this code
-		 * only works if we end up at the live tree.
+		 * If we're updating the live system's information, we're done.
 		 */
+		if (FLD_ISSET((snap + 1)->flags, WT_SNAP_ADD))
+			continue;
+
+		/*
+		 * We have to write the "to" snapshot's extent lists out in new
+		 * blocks, and update its cookie.
+		 *
+		 * Free the blocks used to hold the "to" snapshot's extent lists
+		 * directly to the live system's avail list, they were never on
+		 * any alloc list and they're going to be re-written.
+		 */
+		if (b->alloc.offset != WT_BLOCK_INVALID_OFFSET)
+			WT_ERR(__wt_block_free_ext(session,
+			    block, b->alloc.offset, b->alloc.size, 1));
+		if (b->avail.offset != WT_BLOCK_INVALID_OFFSET)
+			WT_ERR(__wt_block_free_ext(session,
+			    block, b->avail.offset, b->avail.size, 1));
+		if (b->discard.offset != WT_BLOCK_INVALID_OFFSET)
+			WT_ERR(__wt_block_free_ext(session,
+			    block, b->discard.offset, b->discard.size, 1));
+
+		FLD_SET((snap + 1)->flags, WT_SNAP_UPDATE);
 	}
 
 #ifdef HAVE_DIAGNOSTIC
@@ -454,15 +412,109 @@ __snapshot_delete(
 	    session, &block->live, "live after merge", 1));
 #endif
 
-	/* Discard the snapshot information, we no longer need it. */
+	/* Update snapshots marked for update. */
+	WT_SNAPSHOT_FOREACH(snapbase, snap) {
+		if (!FLD_ISSET(snap->flags, WT_SNAP_UPDATE))
+			continue;
+		WT_ERR(__snapshot_update(session, block, snap, snap->bpriv));
+	}
+
+live_update:
+	/* Update the final, added snapshot based on the live system. */
+	WT_SNAPSHOT_FOREACH(snapbase, snap) {
+		if (!FLD_ISSET(snap->flags, WT_SNAP_ADD))
+			continue;
+
+		/* Truncate the file if that's possible. */
+		si = &block->live;
+		WT_RET(__wt_block_extlist_truncate(session, block, &si->avail));
+
+		/* Update the snapshot. */
+		WT_ERR(__snapshot_update(session, block, snap, si));
+
+		/*
+		 * Discard the live system's alloc and discard extent lists,
+		 * but not the avail list.
+		 */
+		__wt_block_extlist_free(session, &si->alloc);
+		__wt_block_extlist_free(session, &si->discard);
+	}
+
+	/* Discard any snapshot information we read, we no longer need it. */
 err:	WT_SNAPSHOT_FOREACH(snapbase, snap)
-		if ((a = snap->bpriv) != NULL) {
-			__wt_block_extlist_free(session, &a->alloc);
-			__wt_block_extlist_free(session, &a->discard);
-			__wt_block_extlist_free(session, &a->avail);
+		if ((si = snap->bpriv) != NULL) {
+			__wt_block_extlist_free(session, &si->alloc);
+			__wt_block_extlist_free(session, &si->discard);
+			__wt_block_extlist_free(session, &si->avail);
 		}
 
 	return (ret);
+}
+
+/*
+ * __snapshot_update --
+ *	Update a snapshot.
+ */
+static int
+__snapshot_update(WT_SESSION_IMPL *session,
+    WT_BLOCK *block, WT_SNAPSHOT *snap, WT_BLOCK_SNAPSHOT *si)
+{
+	WT_ITEM *tmp;
+	uint8_t *endp;
+	int ret;
+
+	tmp = NULL;
+	ret = 0;
+
+#ifdef HAVE_DIAGNOSTIC
+	/*
+	 * Currently, we do not check if a freed block can be immediately put
+	 * on the avail list (that is, if it was allocated during the current
+	 * snapshot -- once that change is made, we should check for overlaps
+	 * between the alloc and discard lists.
+	 */
+	WT_RET(__wt_block_extlist_check(session, si, "snapshot", 0));
+#endif
+
+	/* Write the snapshot's extent lists. */
+	WT_RET(__wt_block_extlist_write(session, block, &si->alloc));
+	WT_RET(__wt_block_extlist_write(session, block, &si->avail));
+	WT_RET(__wt_block_extlist_write(session, block, &si->discard));
+
+	/*
+	 * Set new file size.
+	 *
+	 * XXX
+	 * This is not good: imagine a snapshot that appears early in the file,
+	 * being re-written, and now the blocks the snapshot cares about are at
+	 * the end of the file, not the beginning.  If the application opens
+	 * that snapshot for writing, deleting all subsequent snapshots, we
+	 * won't truncate the file to the early chunk, we'll truncate after the
+	 * newly rewritten extent lists.   Not much we can do about it, though.
+	 */
+	WT_RET(__wt_filesize(session, block->fh, &si->file_size));
+
+	/*
+	 * Copy the snapshot information into the snapshot array's address
+	 * cookie.
+	 */
+	WT_RET(__wt_buf_init(session, &snap->raw, WT_BTREE_MAX_ADDR_COOKIE));
+	endp = snap->raw.mem;
+	WT_RET(__wt_block_snapshot_to_buffer(session, block, &endp, si));
+	snap->raw.size = WT_PTRDIFF32(endp, snap->raw.mem);
+
+	if (WT_VERBOSE_ISSET(session, snapshot)) {
+		WT_RET(__wt_scr_alloc(session, 0, &tmp));
+		if ((ret = __snapshot_string(
+		    session, block, snap->raw.data, tmp)) == 0)
+			WT_VERBOSE(session, snapshot,
+			    "%s: create-snapshot: %s: %s",
+			    block->name, snap->name, (char *)tmp->data);
+		__wt_scr_free(&tmp);
+		WT_RET(ret);
+	}
+
+	return (0);
 }
 
 /*

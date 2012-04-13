@@ -170,5 +170,6 @@ struct __wt_snapshot {
 
 #define	WT_SNAP_ADD	0x01			/* Snapshot to be added */
 #define	WT_SNAP_DELETE	0x02			/* Snapshot to be deleted */
+#define	WT_SNAP_UPDATE	0x04			/* Snapshot requires update */
 	uint32_t flags;
 };
