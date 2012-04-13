@@ -214,14 +214,14 @@ namespace mongo {
         s << "errno:" << x << ' ';
 
 #if defined(_WIN32)
-        LPTSTR errorText = NULL;
-        FormatMessage(
+        LPWSTR errorText = NULL;
+        FormatMessageW(
             FORMAT_MESSAGE_FROM_SYSTEM
             |FORMAT_MESSAGE_ALLOCATE_BUFFER
             |FORMAT_MESSAGE_IGNORE_INSERTS,
             NULL,
             x, 0,
-            (LPTSTR) &errorText,  // output
+            reinterpret_cast<LPWSTR>( &errorText ),  // output
             0, // minimum size for output buffer
             NULL);
         if( errorText ) {
