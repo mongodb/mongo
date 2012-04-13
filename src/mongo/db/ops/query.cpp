@@ -176,7 +176,7 @@ namespace mongo {
                 }
                 c->advance();
 
-                if ( ! cc->yieldSometimes( ClientCursor::MaybeCovered ) ) {
+                if ( ! cc->yieldSometimes( keyFieldsOnly ? ClientCursor::DontNeed : ClientCursor::WillNeed ) ) {
                     ClientCursor::erase(cursorid);
                     cursorid = 0;
                     cc = 0;
