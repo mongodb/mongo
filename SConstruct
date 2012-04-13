@@ -142,7 +142,9 @@ add_option( "distmod", "additional piece for full dist name" , 1 , False )
 add_option( "nostrip", "do not strip installed binaries" , 0 , False )
 
 add_option( "sharedclient", "build a libmongoclient.so/.dll" , 0 , False )
-add_option( "full", "include client and headers when doing scons install", 0 , False )
+
+# --full is breaking build on OSX 10.7 and by default scons will build it with lib, include and all bins
+#add_option( "full", "include client and headers when doing scons install", 0 , False )
 
 # linking options
 add_option( "release" , "release build" , 0 , True )
@@ -420,9 +422,9 @@ class InstallSetup:
 
 installSetup = InstallSetup()
 
-if has_option( "full" ):
-    installSetup.headers = True
-    installSetup.libraries = True
+#if has_option( "full" ):
+#    installSetup.headers = True
+#    installSetup.libraries = True
 
 # ---- other build setup -----
 
