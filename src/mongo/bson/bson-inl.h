@@ -694,7 +694,7 @@ dodouble:
 
         if ( depth > BSONObj::maxToStringRecursionDepth ) {
             // check if we want the full/complete string
-            if ( full != true ) {
+            if ( full ) {
                 StringBuilder s;
                 s << "Reached maximum recursion depth of ";
                 s << BSONObj::maxToStringRecursionDepth;
