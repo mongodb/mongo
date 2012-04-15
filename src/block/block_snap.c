@@ -226,6 +226,21 @@ __wt_block_snapshot(WT_SESSION_IMPL *session,
 }
 
 /*
+ * __snapshot_extlist_fblocks --
+ *	If an extent list was read from disk, free its space to the live avail
+ * list.
+ */
+static inline int
+__snapshot_extlist_fblocks(
+    WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el)
+{
+	if (el->offset == WT_BLOCK_INVALID_OFFSET)
+		return (0);
+	return (__wt_block_free_ext(
+	    session, el->offset, el->size, &block->live.avail));
+}
+
+/*
  * __snapshot_process --
  *	Process the list of snapshots.
  */
@@ -338,18 +353,9 @@ __snapshot_process(
 		 * lists directly to the live system's avail list, they were
 		 * never on any alloc list.
 		 */
-		if (a->alloc.offset != WT_BLOCK_INVALID_OFFSET)
-			WT_ERR(__wt_block_free_ext(session,
-			    a->alloc.offset, a->alloc.size,
-			    &block->live.avail));
-		if (a->avail.offset != WT_BLOCK_INVALID_OFFSET)
-			WT_ERR(__wt_block_free_ext(session,
-			    a->avail.offset, a->avail.size,
-			    &block->live.avail));
-		if (a->discard.offset != WT_BLOCK_INVALID_OFFSET)
-			WT_ERR(__wt_block_free_ext(session,
-			    a->discard.offset, a->discard.size,
-			    &block->live.avail));
+		WT_RET(__snapshot_extlist_fblocks(session, block, &a->alloc));
+		WT_RET(__snapshot_extlist_fblocks(session, block, &a->avail));
+		WT_RET(__snapshot_extlist_fblocks(session, block, &a->discard));
 
 		/*
 		 * Roll the "from" alloc and discard extent lists into the "to"
@@ -362,15 +368,10 @@ __snapshot_process(
 		 * subsequent snapshots might have allocated those blocks, and
 		 * the avail list is useless.
 		 */
-		if (a->alloc.offset != WT_BLOCK_INVALID_OFFSET)
+		if (a->alloc.entries != 0)
 			WT_ERR(__wt_block_extlist_merge(
 			    session, &a->alloc, &b->alloc));
-		/*
-		 * There might not have been an on-disk discard list for this
-		 * snapshot; freeing the root page above may have created one.
-		 */
-		if (a->root_offset != WT_BLOCK_INVALID_OFFSET ||
-		    a->discard.offset != WT_BLOCK_INVALID_OFFSET)
+		if (a->discard.entries != 0)
 			WT_ERR(__wt_block_extlist_merge(
 			    session, &a->discard, &b->discard));
 
@@ -405,18 +406,9 @@ __snapshot_process(
 		 * directly to the live system's avail list, they were never on
 		 * any alloc list.
 		 */
-		if (b->alloc.offset != WT_BLOCK_INVALID_OFFSET)
-			WT_ERR(__wt_block_free_ext(session,
-			    b->alloc.offset, b->alloc.size,
-			    &block->live.avail));
-		if (b->avail.offset != WT_BLOCK_INVALID_OFFSET)
-			WT_ERR(__wt_block_free_ext(session,
-			    b->avail.offset, b->avail.size,
-			    &block->live.avail));
-		if (b->discard.offset != WT_BLOCK_INVALID_OFFSET)
-			WT_ERR(__wt_block_free_ext(session,
-			    b->discard.offset, b->discard.size,
-			    &block->live.avail));
+		WT_RET(__snapshot_extlist_fblocks(session, block, &b->alloc));
+		WT_RET(__snapshot_extlist_fblocks(session, block, &b->avail));
+		WT_RET(__snapshot_extlist_fblocks(session, block, &b->discard));
 
 		FLD_SET((snap + 1)->flags, WT_SNAP_UPDATE);
 	}
