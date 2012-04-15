@@ -215,19 +215,8 @@ __wt_block_snapshot(WT_SESSION_IMPL *session,
 		WT_RET(__wt_block_write_off(session, block, buf,
 		    &si->root_offset, &si->root_size, &si->root_cksum, 0));
 
-	/*
-	 * Process the list of snapshots, deleting and updating as required.
-	 *
-	 * Hold a lock so the live extent lists and the file size can't change
-	 * underneath us.  I suspect we'll tighten this if snapshots take too
-	 * much time away from real work: we could read the historic snapshot
-	 * information and merge and re-write all deleted snapshot information
-	 * without a lock, except for ranges merged into the live tree.
-	 */
-	__wt_spin_lock(session, &block->live_lock);
-	ret = __snapshot_process(session, block, snapbase);
-	__wt_spin_unlock(session, &block->live_lock);
-	WT_RET(ret);
+	/* Process the list of snapshots, deleting and updating as required. */
+	WT_RET(__snapshot_process(session, block, snapbase));
 
 	/*
 	 * Snapshots have to hit disk (it would be reasonable to configure for
@@ -250,15 +239,14 @@ __snapshot_process(
 	WT_BLOCK_SNAPSHOT *a, *b, *si;
 	WT_ITEM *tmp;
 	WT_SNAPSHOT *snap;
-	int found, ret;
+	int found, locked, ret;
 
 	tmp = NULL;
-	ret = 0;
+	locked = ret = 0;
 
 	/*
-	 * Delete any no-longer-needed snapshots: we do this first as it frees
-	 * blocks to the live lists, and the freed blocks will then be included
-	 * when writing the live extent lists.
+	 * To delete a snapshot, we'll need snapshot information for it, and we
+	 * have to read that from the disk.
 	 */
 	found = 0;
 	WT_SNAPSHOT_FOREACH(snapbase, snap) {
@@ -293,10 +281,25 @@ __snapshot_process(
 		WT_ERR(__wt_block_extlist_read(session, block, &si->avail));
 		WT_ERR(__wt_block_extlist_read(session, block, &si->discard));
 	}
+
+	/*
+	 * Hold a lock so the live extent lists and the file size can't change
+	 * underneath us.  I suspect we'll tighten this if snapshots take too
+	 * much time away from real work: we read historic snapshot information
+	 * without a lock, but we could also merge and re-write the delete
+	 * snapshot information without a lock, except for ranges merged into
+	 * the live tree.
+	 */
+	__wt_spin_lock(session, &block->live_lock);
+	locked = 1;
 	if (!found)
 		goto live_update;
 
-	/* Delete the snapshots. */
+	/*
+	 * Delete any no-longer-needed snapshots: we do this first as it frees
+	 * blocks to the live lists, and the freed blocks will then be included
+	 * when writing the live extent lists.
+	 */
 	WT_SNAPSHOT_FOREACH(snapbase, snap) {
 		if (!FLD_ISSET(snap->flags, WT_SNAP_DELETE))
 			continue;
@@ -440,12 +443,15 @@ live_update:
 		__wt_block_extlist_free(session, &si->discard);
 	}
 
+err:	if (locked)
+		__wt_spin_unlock(session, &block->live_lock);
+
 	/* Discard any snapshot information we read, we no longer need it. */
-err:	WT_SNAPSHOT_FOREACH(snapbase, snap)
+	WT_SNAPSHOT_FOREACH(snapbase, snap)
 		if ((si = snap->bpriv) != NULL) {
 			__wt_block_extlist_free(session, &si->alloc);
-			__wt_block_extlist_free(session, &si->discard);
 			__wt_block_extlist_free(session, &si->avail);
+			__wt_block_extlist_free(session, &si->discard);
 		}
 
 	return (ret);
