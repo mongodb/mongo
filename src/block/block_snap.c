@@ -192,9 +192,6 @@ __wt_block_snapshot(WT_SESSION_IMPL *session,
     WT_BLOCK *block, WT_ITEM *buf, WT_SNAPSHOT *snapbase)
 {
 	WT_BLOCK_SNAPSHOT *si;
-	int ret;
-
-	ret = 0;
 
 	si = &block->live;
 	si->version = WT_BM_SNAPSHOT_VERSION;
@@ -327,11 +324,14 @@ __snapshot_process(
 		 * Free the root page: there's nothing special about this free,
 		 * the root page is allocated using normal rules, that is, it
 		 * may have been taken from the avail list, and was entered on
-		 * the live system's alloc list at that time.
+		 * the live system's alloc list at that time.  We free it into
+		 * the snapshot's discard list, however, not the live system's
+		 * list because it appears on the snapshot's alloc list and so
+		 * must be paired in the snapshot.
 		 */
 		if (a->root_offset != WT_BLOCK_INVALID_OFFSET)
-			WT_ERR(__wt_block_free_ext(
-			    session, block, a->root_offset, a->root_size, 0));
+			WT_ERR(__wt_block_free_ext(session,
+			    a->root_offset, a->root_size, &a->discard));
 
 		/*
 		 * Free the blocks used to hold the "from" snapshot's extent
@@ -340,13 +340,16 @@ __snapshot_process(
 		 */
 		if (a->alloc.offset != WT_BLOCK_INVALID_OFFSET)
 			WT_ERR(__wt_block_free_ext(session,
-			    block, a->alloc.offset, a->alloc.size, 1));
+			    a->alloc.offset, a->alloc.size,
+			    &block->live.avail));
 		if (a->avail.offset != WT_BLOCK_INVALID_OFFSET)
 			WT_ERR(__wt_block_free_ext(session,
-			    block, a->avail.offset, a->avail.size, 1));
+			    a->avail.offset, a->avail.size,
+			    &block->live.avail));
 		if (a->discard.offset != WT_BLOCK_INVALID_OFFSET)
 			WT_ERR(__wt_block_free_ext(session,
-			    block, a->discard.offset, a->discard.size, 1));
+			    a->discard.offset, a->discard.size,
+			    &block->live.avail));
 
 		/*
 		 * Roll the "from" alloc and discard extent lists into the "to"
@@ -362,7 +365,12 @@ __snapshot_process(
 		if (a->alloc.offset != WT_BLOCK_INVALID_OFFSET)
 			WT_ERR(__wt_block_extlist_merge(
 			    session, &a->alloc, &b->alloc));
-		if (a->discard.offset != WT_BLOCK_INVALID_OFFSET)
+		/*
+		 * There might not have been an on-disk discard list for this
+		 * snapshot; freeing the root page above may have created one.
+		 */
+		if (a->root_offset != WT_BLOCK_INVALID_OFFSET ||
+		    a->discard.offset != WT_BLOCK_INVALID_OFFSET)
 			WT_ERR(__wt_block_extlist_merge(
 			    session, &a->discard, &b->discard));
 
@@ -395,17 +403,20 @@ __snapshot_process(
 		 *
 		 * Free the blocks used to hold the "to" snapshot's extent lists
 		 * directly to the live system's avail list, they were never on
-		 * any alloc list and they're going to be re-written.
+		 * any alloc list.
 		 */
 		if (b->alloc.offset != WT_BLOCK_INVALID_OFFSET)
 			WT_ERR(__wt_block_free_ext(session,
-			    block, b->alloc.offset, b->alloc.size, 1));
+			    b->alloc.offset, b->alloc.size,
+			    &block->live.avail));
 		if (b->avail.offset != WT_BLOCK_INVALID_OFFSET)
 			WT_ERR(__wt_block_free_ext(session,
-			    block, b->avail.offset, b->avail.size, 1));
+			    b->avail.offset, b->avail.size,
+			    &block->live.avail));
 		if (b->discard.offset != WT_BLOCK_INVALID_OFFSET)
 			WT_ERR(__wt_block_free_ext(session,
-			    block, b->discard.offset, b->discard.size, 1));
+			    b->discard.offset, b->discard.size,
+			    &block->live.avail));
 
 		FLD_SET((snap + 1)->flags, WT_SNAP_UPDATE);
 	}

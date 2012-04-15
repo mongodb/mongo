@@ -355,7 +355,7 @@ __wt_block_free(WT_SESSION_IMPL *session,
 
 	/* Lock the system and free the extent. */
 	__wt_spin_lock(session, &block->live_lock);
-	ret = __wt_block_free_ext(session, block, off, size, 0);
+	ret = __wt_block_free_ext(session, off, size, &block->live.discard);
 	__wt_spin_unlock(session, &block->live_lock);
 
 	return (ret);
@@ -366,11 +366,9 @@ __wt_block_free(WT_SESSION_IMPL *session,
  *	Free a chunk of space to the underlying file.
  */
 int
-__wt_block_free_ext(WT_SESSION_IMPL *session,
-    WT_BLOCK *block, off_t off, off_t size, int free_extent)
+__wt_block_free_ext(
+    WT_SESSION_IMPL *session, off_t off, off_t size, WT_EXTLIST *el)
 {
-	WT_EXTLIST *el;
-
 	WT_BSTAT_INCR(session, free);
 	WT_VERBOSE(session, block,
 	    "free %" PRIdMAX "/%" PRIdMAX, (intmax_t)off, (intmax_t)size);
@@ -378,18 +376,7 @@ __wt_block_free_ext(WT_SESSION_IMPL *session,
 	/*
 	 * Callers of this function are expected to be holding any locks
 	 * required to free the buffer.
-	 *
-	 * If performing salvage, snapshots no longer apply, and so blocks are
-	 * immediately re-used where possible.  Free to the live system's avail
-	 * list.
-	 *
-	 * If freeing extent blocks, they were never entered onto an alloc list.
-	 * They are being freed as part of snapshot delete, so they are freed to
-	 * the live system's avail list as well.
 	 */
-	el = free_extent || block->slvg ?
-	    &block->live.avail : &block->live.discard;
-
 	return (__block_merge(session, el, off, (off_t)size));
 }
 

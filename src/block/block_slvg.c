@@ -123,9 +123,13 @@ skip:			WT_VERBOSE(session, salvage,
 			/*
 			 * Free the block and make sure we don't return it more
 			 * than once.
+			 *
+			 * If performing salvage, snapshots no longer apply so
+			 * blocks can be immediately re-used.  Free to the live
+			 * system's avail list.
 			 */
-			WT_RET(__wt_block_free_ext(
-			    session, block, offset, (off_t)allocsize, 0));
+			WT_RET(__wt_block_free_ext(session,
+			    offset, (off_t)allocsize, &block->live.avail));
 			block->slvg_off = offset += allocsize;
 			continue;
 		}
