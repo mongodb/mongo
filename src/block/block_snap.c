@@ -241,7 +241,7 @@ __wt_block_snapshot(WT_SESSION_IMPL *session,
 
 /*
  * __snapshot_process --
- *	Process the list of snapshot.
+ *	Process the list of snapshots.
  */
 static int
 __snapshot_process(
