@@ -40,11 +40,10 @@ extern int __wt_block_free(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     const uint8_t *addr,
     uint32_t addr_size);
-extern int __wt_block_free_ext(WT_SESSION_IMPL *session,
-    WT_BLOCK *block,
+extern int __wt_block_free_ext( WT_SESSION_IMPL *session,
     off_t off,
     off_t size,
-    int free_extent);
+    WT_EXTLIST *el);
 extern int __wt_block_extlist_check(WT_SESSION_IMPL *session,
     WT_BLOCK_SNAPSHOT *si,
     const char *tag,
