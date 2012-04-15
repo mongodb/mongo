@@ -169,6 +169,9 @@ __verify_snapshot_reset(WT_VSTUFF *vs)
 	 * flag value.
 	 */
 	vs->max_addr->size = 0;
+
+	/* Record total is per snapshot, reset the record count. */
+	vs->record_total = 0;
 }
 
 /*
