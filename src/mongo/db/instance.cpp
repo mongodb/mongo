@@ -585,7 +585,7 @@ namespace mongo {
         op.debug().query = pattern;
         op.setQuery(pattern);
 
-        PageFaultRetryableSection s;
+        //PageFaultRetryableSection s;
         while ( 1 ) {
             try {
                 writelock lk(ns);
@@ -604,6 +604,7 @@ namespace mongo {
                 break;
             }
             catch ( PageFaultException& e ) {
+                LOG(2) << "recordDelete got a PageFaultException" << endl;
                 e.touch();
             }
         }
