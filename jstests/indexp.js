@@ -26,7 +26,7 @@ t.ensureIndex( {a:1} );
 t.save( {a:1} );
 t.find( {a:1,x:1} ).itcount();
 t.save( {a:[1,2]} );
-expectRecordedPlan( {a:1,x:1}, "a_1" );
+expectNoRecordedPlan( {a:1,x:1} );
 
 // Multi key QueryPattern reuses index
 t.drop();
@@ -39,13 +39,13 @@ for( i = 0; i < 5; ++i ) {
 t.find( {a:{$gt:0},x:{$gt:0}} ).itcount();
 expectRecordedPlan( {a:{$gt:0,$lt:5},x:{$gt:0}}, "a_1" );
 
-// Single key QueryPattern can still be used to find best plan - at least for now.
+// Single key QueryPattern is dropped.
 t.drop();
 t.ensureIndex( {a:1} );
 t.save( {a:1} );
 t.find( {a:{$gt:0,$lt:5},x:1} ).itcount();
 t.save( {a:[1,2]} );
-expectRecordedPlan( {a:{$gt:0,$lt:5},x:1}, "a_1" );
+expectNoRecordedPlan( {a:{$gt:0,$lt:5},x:1} );
 
 // Invalid query with only valid fields used 
 // SERVER-2864
