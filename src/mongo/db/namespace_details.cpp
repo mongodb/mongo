@@ -518,6 +518,13 @@ namespace mongo {
         return e;
     }
 
+    void NamespaceDetails::setIndexIsMultikey(int i) {
+        dassert( i < NIndexesMax );
+        unsigned long long x = ((unsigned long long) 1) << i;
+        if( multiKeyIndexBits & x ) return;
+        *getDur().writing(&multiKeyIndexBits) |= x;
+    }
+
     /* you MUST call when adding an index.  see pdfile.cpp */
     IndexDetails& NamespaceDetails::addIndex(const char *thisns, bool resetTransient) {
         IndexDetails *id;
@@ -646,7 +653,7 @@ namespace mongo {
 
     NamespaceDetailsTransient::~NamespaceDetailsTransient() { 
     }
-    
+
     void NamespaceDetailsTransient::clearForPrefix(const char *prefix) {
         SimpleMutex::scoped_lock lk(_qcMutex);
         vector< string > found;

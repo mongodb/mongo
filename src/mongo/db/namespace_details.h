@@ -223,12 +223,7 @@ namespace mongo {
            for these, we have to do some dedup work on queries.
         */
         bool isMultikey(int i) const { return (multiKeyIndexBits & (((unsigned long long) 1) << i)) != 0; }
-        void setIndexIsMultikey(int i) {
-            dassert( i < NIndexesMax );
-            unsigned long long x = ((unsigned long long) 1) << i;
-            if( multiKeyIndexBits & x ) return;
-            *getDur().writing(&multiKeyIndexBits) |= x;
-        }
+        void setIndexIsMultikey(int i);
 
         /* add a new index.  does not add to system.indexes etc. - just to NamespaceDetails.
            caller must populate returned object.
