@@ -254,6 +254,7 @@ exactp
 extern
 extlist
 extlists
+fblocks
 fcntl
 ffc
 ffs
