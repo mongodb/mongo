@@ -56,7 +56,7 @@ wts_ops(void)
 		    calloc((size_t)g.c_threads, sizeof(*tinfo))) == NULL)
 			die(errno, "calloc");
 		for (i = 0; i < g.c_threads; ++i) {
-			tinfo[i].id = i + 1;
+			tinfo[i].id = (int)i + 1;
 			tinfo[i].state = TINFO_RUNNING;
 			if ((ret = pthread_create(
 			    &tinfo[i].tid, NULL, ops, &tinfo[i])) != 0)
