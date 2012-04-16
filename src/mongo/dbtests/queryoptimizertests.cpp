@@ -1061,6 +1061,7 @@ namespace QueryOptimizerTests {
                     ASSERT( qps->haveInOrderPlan() );
                     ASSERT( !qps->possibleOutOfOrderPlan() );
                     ASSERT( !qps->hasPossiblyExcludedPlans() );
+                    ASSERT( !qps->usingCachedPlan() );
                 }
                 
                 {
@@ -1070,10 +1071,23 @@ namespace QueryOptimizerTests {
                     ASSERT( qps->haveInOrderPlan() );
                     ASSERT( qps->possibleOutOfOrderPlan() );
                     ASSERT( !qps->hasPossiblyExcludedPlans() );
+                    ASSERT( !qps->usingCachedPlan() );
                 }
                 
                 NamespaceDetailsTransient &nsdt = NamespaceDetailsTransient::get( ns() );
                 
+                nsdt.registerCachedQueryPlanForPattern( makePattern( BSON( "a" << 1 ), BSONObj() ),
+                                                       CachedQueryPlan( BSON( "a" << 1 ), 1 ) );
+                {
+                    shared_ptr<QueryPlanSet> qps = makeQps( BSON( "a" << 1 ), BSONObj() );
+                    ASSERT_EQUALS( 1, qps->nPlans() );
+                    ASSERT( qps->possibleInOrderPlan() );
+                    ASSERT( qps->haveInOrderPlan() );
+                    ASSERT( !qps->possibleOutOfOrderPlan() );
+                    ASSERT( !qps->hasPossiblyExcludedPlans() );
+                    ASSERT( qps->usingCachedPlan() );
+                }
+
                 nsdt.registerCachedQueryPlanForPattern
                         ( makePattern( BSON( "a" << 1 ), BSON( "b" << 1 ) ),
                          CachedQueryPlan( BSON( "a" << 1 ), 1 ) );
@@ -1085,6 +1099,7 @@ namespace QueryOptimizerTests {
                     ASSERT( !qps->haveInOrderPlan() );
                     ASSERT( qps->possibleOutOfOrderPlan() );
                     ASSERT( qps->hasPossiblyExcludedPlans() );
+                    ASSERT( qps->usingCachedPlan() );
                 }
 
                 nsdt.registerCachedQueryPlanForPattern
@@ -1098,6 +1113,7 @@ namespace QueryOptimizerTests {
                     ASSERT( qps->haveInOrderPlan() );
                     ASSERT( qps->possibleOutOfOrderPlan() );
                     ASSERT( qps->hasPossiblyExcludedPlans() );
+                    ASSERT( qps->usingCachedPlan() );
                 }
                 
                 {
@@ -1107,6 +1123,7 @@ namespace QueryOptimizerTests {
                     ASSERT( !qps->haveInOrderPlan() );
                     ASSERT( qps->possibleOutOfOrderPlan() );
                     ASSERT( !qps->hasPossiblyExcludedPlans() );
+                    ASSERT( !qps->usingCachedPlan() );
                 }                
             }
         };
@@ -1179,7 +1196,18 @@ namespace QueryOptimizerTests {
                 }
                 
                 NamespaceDetailsTransient &nsdt = NamespaceDetailsTransient::get( ns() );
-                
+
+                nsdt.registerCachedQueryPlanForPattern( makePattern( BSON( "a" << 1 ), BSONObj() ),
+                                                       CachedQueryPlan( BSON( "a" << 1 ), 1 ) );
+                {
+                    shared_ptr<MultiPlanScanner> mps = makeMps( BSON( "a" << 1 ), BSONObj() );
+                    ASSERT_EQUALS( 1, mps->currentNPlans() );
+                    ASSERT( mps->possibleInOrderPlan() );
+                    ASSERT( mps->haveInOrderPlan() );
+                    ASSERT( !mps->possibleOutOfOrderPlan() );
+                    ASSERT( !mps->hasPossiblyExcludedPlans() );
+                }
+
                 nsdt.registerCachedQueryPlanForPattern
                         ( makePattern( BSON( "a" << 1 ), BSON( "b" << 1 ) ),
                          CachedQueryPlan( BSON( "a" << 1 ), 1 ) );

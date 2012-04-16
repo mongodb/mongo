@@ -667,6 +667,9 @@ doneCheckOrder:
         }
         if ( optimalPlan.get() ) {
             addPlan( optimalPlan, planSet );
+            // Record an optimal plan in the query cache immediately, with a small nscanned value
+            // that will be ignored.
+            optimalPlan->registerSelf( 0 );
             return;
         }
         for( PlanSet::const_iterator i = plans.begin(); i != plans.end(); ++i ) {
@@ -687,7 +690,7 @@ doneCheckOrder:
     }
 
     bool QueryPlanSet::hasPossiblyExcludedPlans() const {
-        return _usingCachedPlan;
+        return _usingCachedPlan && ( nPlans() == 1 ) && !firstPlan()->optimal();
     }
     
     QueryPlanSet::QueryPlanPtr QueryPlanSet::getBestGuess() const {
