@@ -293,15 +293,9 @@ struct __wt_page {
 #define	WT_PAGE_FREELIST	7	/* Free-list page */
 	uint8_t type;			/* Page type */
 
-	/*
-	 * The flags are divided into two sets: flags set initially, before more
-	 * than a single thread accesses the page, and the reconciliation flags.
-	 * It is important not to add other flags that can be set at run-time,
-	 * else the threads could race.
-	 */
-#define	WT_PAGE_BUILD_KEYS	0x001	/* Keys have been built in memory */
-#define	WT_PAGE_EVICT_LRU	0x002	/* Page is on the LRU queue */
-	uint8_t flags;			/* Page flags */
+#define	WT_PAGE_BUILD_KEYS	0x01	/* Keys have been built in memory */
+#define	WT_PAGE_EVICT_LRU	0x02	/* Page is on the LRU queue */
+	uint8_t flags;
 };
 
 /*
