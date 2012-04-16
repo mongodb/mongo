@@ -164,15 +164,25 @@ struct __wt_page_modify {
 	 * write them once.
 	 */
 	struct __wt_page_track {
-		__wt_pt_type_t type;	/* Type */
-
 		WT_ADDR  addr;		/* Overflow or block location */
 
 		uint8_t *data;		/* Overflow data reference */
 		uint32_t size;		/* Overflow data length */
+
+		__wt_pt_type_t type;	/* Type */
 	} *track;			/* Array of tracked objects */
 	uint32_t track_entries;		/* Total track slots */
+
+#define	WT_PM_REC_EMPTY		0x01	/* Reconciliation: page empty */
+#define	WT_PM_REC_REPLACE	0x02	/* Reconciliation: page replaced */
+#define	WT_PM_REC_SPLIT		0x04	/* Reconciliation: page split */
+#define	WT_PM_REC_SPLIT_MERGE	0x08	/* Reconciliation: page split merge */
+	uint8_t flags;			/* Page flags */
 };
+
+#define	WT_PM_REC_MASK							\
+	(WT_PM_REC_EMPTY |						\
+	    WT_PM_REC_REPLACE | WT_PM_REC_SPLIT | WT_PM_REC_SPLIT_MERGE)
 
 /*
  * WT_PAGE --
@@ -286,23 +296,13 @@ struct __wt_page {
 	/*
 	 * The flags are divided into two sets: flags set initially, before more
 	 * than a single thread accesses the page, and the reconciliation flags.
-	 * The alternative would be to move the WT_PAGE_REC_XXX flags into the
-	 * WT_PAGE_MODIFY structure, but that costs more memory.  Obviously, it
-	 * is important not to add other flags that can be set at run-time, else
-	 * the threads could race.
+	 * It is important not to add other flags that can be set at run-time,
+	 * else the threads could race.
 	 */
 #define	WT_PAGE_BUILD_KEYS	0x001	/* Keys have been built in memory */
 #define	WT_PAGE_EVICT_LRU	0x002	/* Page is on the LRU queue */
-#define	WT_PAGE_REC_EMPTY	0x004	/* Reconciliation: page empty */
-#define	WT_PAGE_REC_REPLACE	0x008	/* Reconciliation: page replaced */
-#define	WT_PAGE_REC_SPLIT	0x010	/* Reconciliation: page split */
-#define	WT_PAGE_REC_SPLIT_MERGE	0x020	/* Reconciliation: page split merge */
 	uint8_t flags;			/* Page flags */
 };
-
-#define	WT_PAGE_REC_MASK						\
-	(WT_PAGE_REC_EMPTY |						\
-	    WT_PAGE_REC_REPLACE | WT_PAGE_REC_SPLIT | WT_PAGE_REC_SPLIT_MERGE)
 
 /*
  * WT_PAGE_DISK_OFFSET, WT_PAGE_REF_OFFSET --

@@ -153,8 +153,8 @@ __wt_page_modify_set(WT_PAGE *page)
 static inline int
 __wt_page_is_modified(WT_PAGE *page)
 {
-	return (page->modify == NULL ||
-	    page->modify->write_gen == page->modify->disk_gen ? 0 : 1);
+	return (page->modify != NULL &&
+	    page->modify->write_gen != page->modify->disk_gen ? 1 : 0);
 }
 
 /*
