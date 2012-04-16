@@ -57,5 +57,5 @@ for (var i = 0; i < 1000; i++) {
 
 // should have trended somewhat higher over the above. 
 // speed of increase would be higher with more indexes.
-assert(p.stats().paddingFactor > ps + 0.03 , "now: " + p.stats().paddingFactor + " ps: " + ps );
+assert(p.stats().paddingFactor > ps + 0.02 , "now: " + p.stats().paddingFactor + " ps: " + ps );
 p.drop();
