@@ -62,17 +62,26 @@ namespace mongo {
             static int max;
             StackChecker *sc = checker.get();
             const char *p = sc->buf;
-            int i = 0;
-            for( ; i < SZ; i++ ) { 
-                if( p[i] != 42 )
+
+            int lastStackByteModifed = 0;
+            for( ; lastStackByteModifed < SZ; lastStackByteModifed++ ) { 
+                if( p[lastStackByteModifed] != 42 )
                     break;
             }
-            int z = SZ-i;
-            if( z > max ) {
-                max = z;
-                log() << "thread " << tname << " stack usage was " << z << " bytes" << endl;
+            int numberBytesUsed = SZ-lastStackByteModifed;
+            
+            if( numberBytesUsed > max ) {
+                max = numberBytesUsed;
+                log() << "thread " << tname << " stack usage was " << numberBytesUsed << " bytes, " 
+                      << " which is the most so far" << endl;
             }
-            wassert( i > 16000 );
+            
+            if ( numberBytesUsed > ( SZ - 16000 ) ) {
+                // we are within 16000 bytes of SZ
+                log() << "used " << numberBytesUsed << " bytes, max is " << (int)SZ << " exiting" << endl;
+                fassertFailed( 16151 );
+            }
+
         }
     };
 #endif
