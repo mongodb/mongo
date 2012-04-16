@@ -387,8 +387,8 @@ __snapshot_process(
 		/*
 		 * Check for blocks we can re-use: any place the "to" snapshot's
 		 * allocate and discard lists overlap is fair game: if a range
-		 * appears on both lists, move it to the avail list, it can be
-		 * re-used.
+		 * appears on both lists, move it to the live system's available
+		 * list, it can be re-used.
 		 */
 		WT_ERR(__wt_block_extlist_match(session, block, b));
 
