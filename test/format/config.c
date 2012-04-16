@@ -43,6 +43,11 @@ config_setup(void)
 	/* Reset the key count. */
 	g.key_cnt = 0;
 
+	/* Default single-threaded half of the time. */
+	cp = config_find("threads", strlen("threads"));
+	if (!(cp->flags & C_PERM))
+		*cp->v = MMRAND(0, 1) ? 1: CONF_RAND(cp);
+
 	/* Fill in random values for the rest of the run. */
 	for (cp = c; cp->name != NULL; ++cp) {
 		if (cp->flags & (C_IGNORE | C_PERM | C_TEMP))
