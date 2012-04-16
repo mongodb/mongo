@@ -673,13 +673,13 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 
 		WT_ASSERT(session, page->ref->state == WT_REF_EVICT_WALK);
 
-		/* Mark the page on the list */
-		F_SET(page, WT_PAGE_EVICT_LRU);
-
 		__evict_clr(session, evict);
 		evict->page = page;
 		evict->btree = btree;
 		++evict;
+
+		/* Mark the page on the list */
+		F_SET(page, WT_PAGE_EVICT_LRU);
 	}
 
 	*slotp += (u_int)(evict - start);
