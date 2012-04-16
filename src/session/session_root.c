@@ -159,7 +159,7 @@ __snap_set_turtle(WT_SESSION_IMPL *session, const char *v)
 	path = NULL;
 
 	WT_ERR(__wt_filename(session, WT_SCHEMA_TURTLE_SET, &path));
-	WT_ERR_TEST((fp = fopen(path, "w")) == NULL, WT_ERROR);
+	WT_ERR_TEST((fp = fopen(path, "w")) == NULL, __wt_errno());
 
 	WT_RET(__wt_scr_alloc(session, 0, &buf));
 	WT_ERR(__wt_buf_fmt(session, buf,
