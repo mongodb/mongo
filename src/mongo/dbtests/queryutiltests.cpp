@@ -1333,10 +1333,12 @@ namespace QueryUtilTests {
                 NamespaceDetailsTransient &nsdt = NamespaceDetailsTransient::get( ns() );
                 QueryPattern singleKey = FieldRangeSet( ns(), query, true ).pattern( sort );
                 nsdt.registerCachedQueryPlanForPattern( singleKey,
-                                                       CachedQueryPlan( BSON( "a" << 1 ), 1 ) );
+                                                       CachedQueryPlan( BSON( "a" << 1 ), 1,
+                                                        CandidatePlanCharacter( true, true ) ) );
                 QueryPattern multiKey = FieldRangeSet( ns(), query, false ).pattern( sort );
                 nsdt.registerCachedQueryPlanForPattern( multiKey,
-                                                       CachedQueryPlan( BSON( "a" << 1 ), 5 ) );
+                                                       CachedQueryPlan( BSON( "a" << 1 ), 5,
+                                                        CandidatePlanCharacter( true, true ) ) );
                 
                 // The single and multi key fields for this query must differ for the test to be
                 // valid.
@@ -1370,14 +1372,16 @@ namespace QueryUtilTests {
                 // A multikey index query plan is returned if recorded.
                 QueryPattern multiKey = FieldRangeSet( ns(), query, false ).pattern( sort );
                 nsdt.registerCachedQueryPlanForPattern( multiKey,
-                                                       CachedQueryPlan( BSON( "a" << 1 ), 5 ) );
+                                                       CachedQueryPlan( BSON( "a" << 1 ), 5,
+                                                        CandidatePlanCharacter( true, true ) ) );
                 ASSERT_EQUALS( BSON( "a" << 1 ),
                               QueryUtilIndexed::bestIndexForPatterns( frsp, sort ).indexKey() );
 
                 // A non multikey index query plan is preferentially returned if recorded.
                 QueryPattern singleKey = FieldRangeSet( ns(), query, true ).pattern( sort );
                 nsdt.registerCachedQueryPlanForPattern( singleKey,
-                                                       CachedQueryPlan( BSON( "b" << 1 ), 5 ) );
+                                                       CachedQueryPlan( BSON( "b" << 1 ), 5,
+                                                        CandidatePlanCharacter( true, true ) ) );
                 ASSERT_EQUALS( BSON( "b" << 1 ),
                               QueryUtilIndexed::bestIndexForPatterns( frsp, sort ).indexKey() );
                 

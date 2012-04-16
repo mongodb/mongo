@@ -1234,8 +1234,9 @@ namespace NamespaceTests {
                               nsdt().cachedQueryPlanForPattern( _pattern ).indexKey() );
             }
             void registerIndexKey( const BSONObj &indexKey ) {
-                nsdt().registerCachedQueryPlanForPattern( _pattern,
-                                                         CachedQueryPlan( indexKey, 1 ) );                
+                nsdt().registerCachedQueryPlanForPattern
+                        ( _pattern,
+                         CachedQueryPlan( indexKey, 1, CandidatePlanCharacter( true, false ) ) );                
             }
             FieldRangeSet _fieldRangeSet;
             QueryPattern _pattern;

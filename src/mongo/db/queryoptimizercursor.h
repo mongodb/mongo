@@ -25,6 +25,7 @@
 namespace mongo {
     
     class QueryPlan;
+    class CandidatePlanCharacter;
     
     /**
      * An interface for policies overriding the query optimizer's default query plan selection

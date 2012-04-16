@@ -1197,7 +1197,7 @@ namespace mongo {
         _singleKey -= scanned;
         _multiKey -= scanned;
         return *this;            
-    }    
+    }
     
     string FieldRangeSetPair::toString() const {
         return BSON(

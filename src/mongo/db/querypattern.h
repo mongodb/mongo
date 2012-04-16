@@ -18,6 +18,7 @@
 #pragma once
 
 #include "jsobj.h"
+#include "mongo/db/queryoptimizer.h"
 
 namespace mongo {
 
@@ -62,12 +63,15 @@ namespace mongo {
         CachedQueryPlan() :
         _nScanned() {
         }
-        CachedQueryPlan( const BSONObj &indexKey, long long nScanned );
+        CachedQueryPlan( const BSONObj &indexKey, long long nScanned,
+                        CandidatePlanCharacter planCharacter );
         BSONObj indexKey() const { return _indexKey; }
         long long nScanned() const { return _nScanned; }
+        CandidatePlanCharacter planCharacter() const { return _planCharacter; }
     private:
         BSONObj _indexKey;
         long long _nScanned;
+        CandidatePlanCharacter _planCharacter;
     };
 
     inline bool QueryPattern::operator<( const QueryPattern &other ) const {

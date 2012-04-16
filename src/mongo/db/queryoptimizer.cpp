@@ -262,7 +262,8 @@ doneCheckOrder:
         return _index->keyPattern();
     }
 
-    void QueryPlan::registerSelf( long long nScanned ) const {
+    void QueryPlan::registerSelf( long long nScanned,
+                                 CandidatePlanCharacter candidatePlans ) const {
         // Impossible query constraints can be detected before scanning, and we
         // don't have a reserved pattern enum value for impossible constraints.
         if ( _impossible ) {
@@ -271,9 +272,9 @@ doneCheckOrder:
 
         SimpleMutex::scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
         QueryPattern queryPattern = _frs.pattern( _order );
-        CachedQueryPlan cachedQueryPlan( indexKey(), nScanned );
+        CachedQueryPlan queryPlanToCache( indexKey(), nScanned, candidatePlans );
         NamespaceDetailsTransient &nsdt = NamespaceDetailsTransient::get_inlock( ns() );
-        nsdt.registerCachedQueryPlanForPattern( queryPattern, cachedQueryPlan );
+        nsdt.registerCachedQueryPlanForPattern( queryPattern, queryPlanToCache );
     }
     
     void QueryPlan::checkTableScanAllowed() const {
@@ -489,7 +490,6 @@ doneCheckOrder:
     void QueryPlanSet::init() {
         DEBUGQO( "QueryPlanSet::init " << ns << "\t" << _originalQuery );
         _plans.clear();
-        _fallbackPlans.clear();
         _usingCachedPlan = false;
 
         const char *ns = _frsp->ns();
@@ -572,6 +572,7 @@ doneCheckOrder:
             CachedQueryPlan best = QueryUtilIndexed::bestIndexForPatterns( *_frsp, _order );
             BSONObj bestIndex = best.indexKey();
             long long oldNScanned = best.nScanned();
+            CandidatePlanCharacter bestPlanCharacter = best.planCharacter();
             if ( !bestIndex.isEmpty() ) {
                 QueryPlanPtr p;
                 _oldNScanned = oldNScanned;
@@ -595,31 +596,29 @@ doneCheckOrder:
                 if ( !p->unhelpful() &&
                     !( _recordedPlanPolicy == UseIfInOrder && p->scanAndOrderRequired() ) ) {
                     _usingCachedPlan = true;
+                    _cachedPlanCharacter = bestPlanCharacter;
                     _plans.push_back( p );
-                    addOtherPlans( _fallbackPlans );
                     return;
                 }
             }
         }
 
-        addOtherPlans( _plans );
+        addOtherPlans( false );
     }
 
-    void QueryPlanSet::addPlan( QueryPlanPtr plan, PlanSet &planSet ) {
-        planSet.push_back( plan );
+    void QueryPlanSet::addPlan( QueryPlanPtr plan, bool checkFirst ) {
+        if ( checkFirst && plan->indexKey() == firstPlan()->indexKey() ) {
+            return;
+        }
+        _plans.push_back( plan );
     }
 
     void QueryPlanSet::addFallbackPlans() {
-        for( PlanSet::const_iterator i = _fallbackPlans.begin(); i != _fallbackPlans.end(); ++i ) {
-            if ( (*i)->indexKey() != _plans[ 0 ]->indexKey() ) {
-                _plans.push_back( *i );
-            }
-        }
-        _fallbackPlans.clear();
+        addOtherPlans( true );
         _mayRecordPlan = true;
     }
     
-    void QueryPlanSet::addOtherPlans( PlanSet &planSet ) {
+    void QueryPlanSet::addOtherPlans( bool checkFirst ) {
         const char *ns = _frsp->ns();
         NamespaceDetails *d = nsdetails( ns );
         if ( !d )
@@ -632,7 +631,7 @@ doneCheckOrder:
             QueryPlanPtr plan
             ( new QueryPlan( d, -1, *_frsp, _originalFrsp.get(), _originalQuery,
                             _order, _parsedQuery ) );
-            addPlan( plan, planSet );
+            addPlan( plan, checkFirst );
             return;
         }
 
@@ -648,7 +647,7 @@ doneCheckOrder:
             QueryPlanPtr p( new QueryPlan( d, i, *_frsp, _originalFrsp.get(), _originalQuery,
                                           _order, _parsedQuery ) );
             if ( p->impossible() ) {
-                addPlan( p, planSet );
+                addPlan( p, checkFirst );
                 return;
             }
             if ( p->optimal() ) {
@@ -666,25 +665,27 @@ doneCheckOrder:
             }
         }
         if ( optimalPlan.get() ) {
-            addPlan( optimalPlan, planSet );
+            addPlan( optimalPlan, checkFirst );
             // Record an optimal plan in the query cache immediately, with a small nscanned value
             // that will be ignored.
-            optimalPlan->registerSelf( 0 );
+            optimalPlan->registerSelf
+                    ( 0, CandidatePlanCharacter( !optimalPlan->scanAndOrderRequired(),
+                                                optimalPlan->scanAndOrderRequired() ) );
             return;
         }
         for( PlanSet::const_iterator i = plans.begin(); i != plans.end(); ++i ) {
-            addPlan( *i, planSet );
+            addPlan( *i, checkFirst );
         }
 
         // Only add a special plan if no standard btree plans have been added. SERVER-4531
         if ( plans.empty() && specialPlan ) {
-            addPlan( specialPlan, planSet );
+            addPlan( specialPlan, checkFirst );
             return;
         }
 
         // Table scan plan
         addPlan( QueryPlanPtr( new QueryPlan( d, -1, *_frsp, _originalFrsp.get(), _originalQuery,
-                                             _order, _parsedQuery ) ), planSet );
+                                             _order, _parsedQuery ) ), checkFirst );
 
         _mayRecordPlan = true;
     }
@@ -728,12 +729,7 @@ doneCheckOrder:
         if ( haveInOrderPlan() ) {
             return true;
         }
-        for( PlanSet::const_iterator i = _fallbackPlans.begin(); i != _fallbackPlans.end(); ++i ) {
-            if ( !(*i)->scanAndOrderRequired() ) {
-                return true;
-            }
-        }
-        return false;
+        return _cachedPlanCharacter.mayRunInOrderPlan();
     }
 
     bool QueryPlanSet::possibleOutOfOrderPlan() const {
@@ -742,14 +738,13 @@ doneCheckOrder:
                 return true;
             }
         }
-        for( PlanSet::const_iterator i = _fallbackPlans.begin(); i != _fallbackPlans.end(); ++i ) {
-            if ( (*i)->scanAndOrderRequired() ) {
-                return true;
-            }
-        }
-        return false;
+        return _cachedPlanCharacter.mayRunOutOfOrderPlan();
     }
 
+    CandidatePlanCharacter QueryPlanSet::characterizeCandidatePlans() const {
+        return CandidatePlanCharacter( possibleInOrderPlan(), possibleOutOfOrderPlan() );
+    }
+    
     bool QueryPlanSet::prepareToRetryQuery() {
         if ( !hasPossiblyExcludedPlans() || _plans.size() > 1 ) {
             return false;
@@ -891,7 +886,7 @@ doneCheckOrder:
         nextOp( op );
         if ( op.complete() ) {
             if ( _plans._mayRecordPlan && op.mayRecordPlan() ) {
-                op.qp().registerSelf( op.nscanned() );
+                op.qp().registerSelf( op.nscanned(), _plans.characterizeCandidatePlans() );
             }
             _done = true;
             return holder._op;

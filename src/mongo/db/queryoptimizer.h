@@ -28,9 +28,28 @@ namespace mongo {
 
     class IndexDetails;
     class IndexType;
-    
     class QueryPlanSummary;
     
+    /** Summarizes the candidate plans that may run for a query. */
+    class CandidatePlanCharacter {
+    public:
+        CandidatePlanCharacter( bool mayRunInOrderPlan, bool mayRunOutOfOrderPlan ) :
+        _mayRunInOrderPlan( mayRunInOrderPlan ),
+        _mayRunOutOfOrderPlan( mayRunOutOfOrderPlan ) {
+        }
+        CandidatePlanCharacter() :
+        _mayRunInOrderPlan(),
+        _mayRunOutOfOrderPlan() {
+        }
+        bool mayRunInOrderPlan() const { return _mayRunInOrderPlan; }
+        bool mayRunOutOfOrderPlan() const { return _mayRunOutOfOrderPlan; }
+        bool valid() const { return mayRunInOrderPlan() || mayRunOutOfOrderPlan(); }
+        bool hybridPlanSet() const { return mayRunInOrderPlan() && mayRunOutOfOrderPlan(); }
+    private:
+        bool _mayRunInOrderPlan;
+        bool _mayRunOutOfOrderPlan;
+    };
+
     /** A plan for executing a query using the given index spec and FieldRangeSet. */
     class QueryPlan : boost::noncopyable {
     public:
@@ -76,7 +95,7 @@ namespace mongo {
         /** @return a new reverse cursor if this is an unindexed plan. */
         shared_ptr<Cursor> newReverseCursor() const;
         /** Register this plan as a winner for its QueryPattern, with specified 'nscanned'. */
-        void registerSelf( long long nScanned ) const;
+        void registerSelf( long long nScanned, CandidatePlanCharacter candidatePlans ) const;
 
         int direction() const { return _direction; }
         BSONObj indexKey() const;
@@ -282,26 +301,6 @@ namespace mongo {
         }
     };
 
-    /** Summarizes the candidate plans that may run for a query. */
-    class CandidatePlanCharacter {
-    public:
-        CandidatePlanCharacter( bool mayRunInOrderPlan, bool mayRunOutOfOrderPlan ) :
-        _mayRunInOrderPlan( mayRunInOrderPlan ),
-        _mayRunOutOfOrderPlan( mayRunOutOfOrderPlan ) {
-        }
-        CandidatePlanCharacter() :
-        _mayRunInOrderPlan(),
-        _mayRunOutOfOrderPlan() {
-        }
-        bool mayRunInOrderPlan() const { return _mayRunInOrderPlan; }
-        bool mayRunOutOfOrderPlan() const { return _mayRunOutOfOrderPlan; }
-        bool valid() const { return mayRunInOrderPlan() || mayRunOutOfOrderPlan(); }
-        bool hybridPlanSet() const { return mayRunInOrderPlan() && mayRunOutOfOrderPlan(); }
-    private:
-        bool _mayRunInOrderPlan;
-        bool _mayRunOutOfOrderPlan;
-    };
-    
     /**
      * A set of candidate query plans for a query.  This class can return a best guess plan or run a
      * QueryOp on all the plans.
@@ -355,6 +354,8 @@ namespace mongo {
         /** @return true if an active or fallback plan is out of order. */
         bool possibleOutOfOrderPlan() const;
 
+        CandidatePlanCharacter characterizeCandidatePlans() const;
+        
         bool prepareToRetryQuery();
         
         string toString() const;
@@ -414,9 +415,9 @@ namespace mongo {
         };
 
     private:
-        void addOtherPlans( PlanSet &planSet );
+        void addOtherPlans( bool checkFirst );
         void addFallbackPlans();
-        void addPlan( QueryPlanPtr plan, PlanSet &planSet );
+        void addPlan( QueryPlanPtr plan, bool checkFirst );
         void init();
         void addHint( IndexDetails &id );
 
@@ -425,9 +426,9 @@ namespace mongo {
         auto_ptr<FieldRangeSetPair> _frsp;
         auto_ptr<FieldRangeSetPair> _originalFrsp;
         PlanSet _plans;
-        PlanSet _fallbackPlans;
         bool _mayRecordPlan;
         bool _usingCachedPlan;
+        CandidatePlanCharacter _cachedPlanCharacter;
         BSONObj _hint;
         BSONObj _order;
         shared_ptr<const ParsedQuery> _parsedQuery;

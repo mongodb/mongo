@@ -707,11 +707,23 @@ namespace QueryOptimizerTests {
             void run() {
                 Helpers::ensureIndex( ns(), BSON( "a" << 1 ), false, "a_1" );
                 Helpers::ensureIndex( ns(), BSON( "a" << 1 ), false, "b_2" );
-                auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), BSON( "a" << 4 ) ) );
+                BSONObj query = BSON( "a" << 4 );
+                auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), query ) );
                 auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
-                QueryPlanSet s( ns(), frsp, frspOrig, BSON( "a" << 4 ),
-                               BSONObj() );
+                QueryPlanSet s( ns(), frsp, frspOrig, query, BSONObj() );
+
+                // Only one optimal plan is added to the plan set.
                 ASSERT_EQUALS( 1, s.nPlans() );
+
+                // The optimal plan is recorded in the plan cache.
+                FieldRangeSet frs( ns(), query, true );
+                CachedQueryPlan cachedPlan =
+                        NamespaceDetailsTransient::get( ns() ).cachedQueryPlanForPattern
+                            ( QueryPattern( frs, BSONObj() ) );
+                ASSERT_EQUALS( BSON( "a" << 1 ), cachedPlan.indexKey() );
+                CandidatePlanCharacter planCharacter = cachedPlan.planCharacter();
+                ASSERT( planCharacter.mayRunInOrderPlan() );
+                ASSERT( !planCharacter.mayRunOutOfOrderPlan() );
             }
         };
 
@@ -1077,7 +1089,8 @@ namespace QueryOptimizerTests {
                 NamespaceDetailsTransient &nsdt = NamespaceDetailsTransient::get( ns() );
                 
                 nsdt.registerCachedQueryPlanForPattern( makePattern( BSON( "a" << 1 ), BSONObj() ),
-                                                       CachedQueryPlan( BSON( "a" << 1 ), 1 ) );
+                                                       CachedQueryPlan( BSON( "a" << 1 ), 1,
+                                                        CandidatePlanCharacter( true, false ) ) );
                 {
                     shared_ptr<QueryPlanSet> qps = makeQps( BSON( "a" << 1 ), BSONObj() );
                     ASSERT_EQUALS( 1, qps->nPlans() );
@@ -1090,7 +1103,8 @@ namespace QueryOptimizerTests {
 
                 nsdt.registerCachedQueryPlanForPattern
                         ( makePattern( BSON( "a" << 1 ), BSON( "b" << 1 ) ),
-                         CachedQueryPlan( BSON( "a" << 1 ), 1 ) );
+                         CachedQueryPlan( BSON( "a" << 1 ), 1,
+                                         CandidatePlanCharacter( true, true ) ) );
 
                 {
                     shared_ptr<QueryPlanSet> qps = makeQps( BSON( "a" << 1 ), BSON( "b" << 1 ) );
@@ -1104,7 +1118,8 @@ namespace QueryOptimizerTests {
 
                 nsdt.registerCachedQueryPlanForPattern
                         ( makePattern( BSON( "a" << 1 ), BSON( "b" << 1 ) ),
-                         CachedQueryPlan( BSON( "b" << 1 ), 1 ) );
+                         CachedQueryPlan( BSON( "b" << 1 ), 1,
+                                         CandidatePlanCharacter( true, true ) ) );
                 
                 {
                     shared_ptr<QueryPlanSet> qps = makeQps( BSON( "a" << 1 ), BSON( "b" << 1 ) );
@@ -1198,7 +1213,8 @@ namespace QueryOptimizerTests {
                 NamespaceDetailsTransient &nsdt = NamespaceDetailsTransient::get( ns() );
 
                 nsdt.registerCachedQueryPlanForPattern( makePattern( BSON( "a" << 1 ), BSONObj() ),
-                                                       CachedQueryPlan( BSON( "a" << 1 ), 1 ) );
+                                                       CachedQueryPlan( BSON( "a" << 1 ), 1,
+                                                        CandidatePlanCharacter( true, false ) ) );
                 {
                     shared_ptr<MultiPlanScanner> mps = makeMps( BSON( "a" << 1 ), BSONObj() );
                     ASSERT_EQUALS( 1, mps->currentNPlans() );
@@ -1210,7 +1226,8 @@ namespace QueryOptimizerTests {
 
                 nsdt.registerCachedQueryPlanForPattern
                         ( makePattern( BSON( "a" << 1 ), BSON( "b" << 1 ) ),
-                         CachedQueryPlan( BSON( "a" << 1 ), 1 ) );
+                         CachedQueryPlan( BSON( "a" << 1 ), 1,
+                                         CandidatePlanCharacter( true, true ) ) );
                 
                 {
                     shared_ptr<MultiPlanScanner> mps =
@@ -1224,7 +1241,8 @@ namespace QueryOptimizerTests {
                 
                 nsdt.registerCachedQueryPlanForPattern
                         ( makePattern( BSON( "a" << 1 ), BSON( "b" << 1 ) ),
-                         CachedQueryPlan( BSON( "b" << 1 ), 1 ) );
+                         CachedQueryPlan( BSON( "b" << 1 ), 1,
+                                         CandidatePlanCharacter( true, true ) ) );
                 
                 {
                     shared_ptr<MultiPlanScanner> mps =
@@ -1301,7 +1319,8 @@ namespace QueryOptimizerTests {
                 SimpleMutex::scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
                 NamespaceDetailsTransient::get_inlock( ns() ).
                         registerCachedQueryPlanForPattern( frs.pattern( BSON( "b" << 1 ) ),
-                                                          CachedQueryPlan( BSON( "a" << 1 ), 0 ) );
+                                                          CachedQueryPlan( BSON( "a" << 1 ), 0,
+                                                        CandidatePlanCharacter( true, true ) ) );
             }
             
             c = NamespaceDetailsTransient::bestGuessCursor( ns(), fromjson( "{a:1,$or:[{y:1}]}" ),
