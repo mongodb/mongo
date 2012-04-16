@@ -190,7 +190,7 @@ __rec_root_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page, int single)
 	mod = page->modify;
 
 	next = NULL;
-	switch (F_ISSET(page, WT_PM_REC_MASK)) {
+	switch (F_ISSET(mod, WT_PM_REC_MASK)) {
 	case WT_PM_REC_EMPTY:				/* Page is empty */
 	case WT_PM_REC_REPLACE: 			/* 1-for-1 page swap */
 		WT_VERBOSE(session, evict, "root page evicted");
