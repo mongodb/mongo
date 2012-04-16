@@ -622,8 +622,9 @@ namespace QueryOptimizerTests {
                 int idx = INDEXNO( "a" << "2d" );
                 BSONObj query = fromjson( "{ a:{ $near:[ 50, 50 ] } }" );
                 FieldRangeSetPair frsp( ns(), query );
-                QueryPlan plan( nsd(), idx, frsp, FRSP2( query ), query, shared_ptr<Projection>(),
-                               BSONObj(), BSONObj(), BSONObj(), frsp.getSpecial() );
+                QueryPlan plan( nsd(), idx, frsp, FRSP2( query ), query, BSONObj(),
+                               shared_ptr<const ParsedQuery>(), BSONObj(), BSONObj(),
+                               frsp.getSpecial() );
                 // A 'special' plan is not optimal.
                 ASSERT( !plan.optimal() );
             }

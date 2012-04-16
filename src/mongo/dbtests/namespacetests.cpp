@@ -23,6 +23,7 @@
 
 #include "../db/db.h"
 #include "../db/json.h"
+#include "mongo/db/queryutil.h"
 
 #include "dbtests.h"
 
@@ -1005,6 +1006,9 @@ namespace NamespaceTests {
             NamespaceDetails *nsd() const {
                 return nsdetails( ns() )->writingWithExtra();
             }
+            NamespaceDetailsTransient &nsdt() const {
+                return NamespaceDetailsTransient::get( ns() );
+            }
             static BSONObj bigObj(bool bGenID=false) {
                 BSONObjBuilder b;
 				if (bGenID)
@@ -1216,9 +1220,70 @@ namespace NamespaceTests {
                 ASSERT_EQUALS( 496U, sizeof( NamespaceDetails ) );
             }
         };
-
+        
+        class CachedPlanBase : public Base {
+        public:
+            CachedPlanBase() :
+                _fieldRangeSet( ns(), BSON( "a" << 1 ), true ),
+                _pattern( _fieldRangeSet, BSONObj() ) {
+                create();
+            }
+        protected:
+            void assertCachedIndexKey( const BSONObj &indexKey ) const {
+                ASSERT_EQUALS( indexKey,
+                              nsdt().cachedQueryPlanForPattern( _pattern ).indexKey() );
+            }
+            void registerIndexKey( const BSONObj &indexKey ) {
+                nsdt().registerCachedQueryPlanForPattern( _pattern,
+                                                         CachedQueryPlan( indexKey, 1 ) );                
+            }
+            FieldRangeSet _fieldRangeSet;
+            QueryPattern _pattern;
+        };
+        
+        /**
+         * setIndexIsMultikey() sets the multikey flag for an index and clears the query plan
+         * cache.
+         */
+        class SetIndexIsMultikey : public CachedPlanBase {
+        public:
+            void run() {
+                DBDirectClient client;
+                client.ensureIndex( ns(), BSON( "a" << 1 ) );
+                registerIndexKey( BSON( "a" << 1 ) );
+                
+                ASSERT( !nsd()->isMultikey( 1 ) );
+                
+                nsd()->setIndexIsMultikey( ns(), 1 );
+                ASSERT( nsd()->isMultikey( 1 ) );
+                assertCachedIndexKey( BSONObj() );
+                
+                registerIndexKey( BSON( "a" << 1 ) );
+                nsd()->setIndexIsMultikey( ns(), 1 );
+                assertCachedIndexKey( BSON( "a" << 1 ) );
+            }
+        };
+        
     } // namespace NamespaceDetailsTests
 
+    namespace NamespaceDetailsTransientTests {
+        
+        /** setIndexMultikey() clears the query plan cache. */
+        class SetIndexMultikey : public NamespaceDetailsTests::CachedPlanBase {
+        public:
+            void run() {
+                // Register a query plan in the query plan cache.
+                registerIndexKey( BSON( "a" << 1 ) );
+                assertCachedIndexKey( BSON( "a" << 1 ) );
+                
+                // The query plan is cleared.
+                nsdt().setIndexMultikey();
+                assertCachedIndexKey( BSONObj() );
+            }
+        };                                                                                         
+        
+    } // namespace NamespaceDetailsTransientTests
+                                                                                 
     class All : public Suite {
     public:
         All() : Suite( "namespace" ) {
@@ -1271,6 +1336,8 @@ namespace NamespaceTests {
             add< NamespaceDetailsTests::Migrate >();
             //            add< NamespaceDetailsTests::BigCollection >();
             add< NamespaceDetailsTests::Size >();
+            add< NamespaceDetailsTests::SetIndexIsMultikey >();
+            add< NamespaceDetailsTransientTests::SetIndexMultikey >();
         }
     } myall;
 } // namespace NamespaceTests

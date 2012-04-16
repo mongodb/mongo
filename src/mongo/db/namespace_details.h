@@ -223,7 +223,7 @@ namespace mongo {
            for these, we have to do some dedup work on queries.
         */
         bool isMultikey(int i) const { return (multiKeyIndexBits & (((unsigned long long) 1) << i)) != 0; }
-        void setIndexIsMultikey(int i);
+        void setIndexIsMultikey(const char *thisns, int i);
 
         /* add a new index.  does not add to system.indexes etc. - just to NamespaceDetails.
            caller must populate returned object.
@@ -413,6 +413,7 @@ namespace mongo {
         ~NamespaceDetailsTransient();
         void addedIndex() { reset(); }
         void deletedIndex() { reset(); }
+        void setIndexMultikey();
         /* Drop cached information on all namespaces beginning with the specified prefix.
            Can be useful as index namespaces share the same start as the regular collection.
            SLOW - sequential scan of all NamespaceDetailsTransient objects */

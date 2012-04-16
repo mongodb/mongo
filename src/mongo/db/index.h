@@ -247,6 +247,7 @@ namespace mongo {
 
     class NamespaceDetails;
     // changedId should be initialized to false
-    void getIndexChanges(vector<IndexChanges>& v, NamespaceDetails& d, BSONObj newObj, BSONObj oldObj, bool &cangedId);
+    void getIndexChanges(vector<IndexChanges>& v, const char *ns, NamespaceDetails& d,
+                         BSONObj newObj, BSONObj oldObj, bool &cangedId);
     void dupCheck(vector<IndexChanges>& v, NamespaceDetails& d, DiskLoc curObjLoc);
 } // namespace mongo
