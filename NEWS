@@ -1,3 +1,32 @@
+WiredTiger release 1.1.4, 2012-04-16
+------------------------------------
+
+Check the versions of autoconf, automake and libtool to avoid failures when
+trying to build from the github tree with versions that are too old.
+
+[#191] Create the schema table as part of creating the environment so that
+       application threads don't race trying to create it later.
+
+[#193] Split-merge pages have to be reconciled to mark their parents dirty
+
+[#194] The dump utility should only output configuration that can be passed to
+       WT_SESSION::create.
+
+Eviction fixes for out-of-cache update workloads:
+
+* Fix an unlikely bug where the EVICT_LRU flag was cleared when a page in
+  the LRU queue was overwritten with itself during a walk.  This led to an
+  assertion failure when the page was later evicted.
+
+* Clear all unused eviction queue entries while holding the lru_lock.
+
+* Split WT_PAGE->flags so that there is no possibility of racing:
+  (1) Move WT_PAGE_REC_* flags into WT_PAGE_MODIFY;
+  (2) Use atomic operations to set and clear the remaining (2) page flags.
+
+Move the test/format threads setting into the CONFIG file.
+
+
 WiredTiger release 1.1.3, 2012-04-04
 ------------------------------------
 
@@ -23,6 +52,7 @@ page.
 Typo in usage method for "wt write".
 
 Don't report range errors for config values that aren't well-formed integers.
+
 
 WiredTiger release 1.1.2, 2012-03-20
 ------------------------------------
