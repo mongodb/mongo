@@ -495,11 +495,12 @@ __snapshot_update(WT_SESSION_IMPL *session,
 	 *
 	 * XXX
 	 * This is not good: imagine a snapshot that appears early in the file,
-	 * being re-written, and now the blocks the snapshot cares about are at
-	 * the end of the file, not the beginning.  If the application opens
-	 * that snapshot for writing, deleting all subsequent snapshots, we
-	 * won't truncate the file to the early chunk, we'll truncate after the
-	 * newly rewritten extent lists.   Not much we can do about it, though.
+	 * being re-written, and now the snapshot requires blocks at the end of
+	 * the file, not the beginning.  If the application opens that snapshot
+	 * for writing, discarding all subsequent snapshots, we won't truncate
+	 * the file to the early chunk, we'll have ot truncate after the newly
+	 * rewritten extent lists.   There's not much we can do about it other
+	 * than move rewritten snapshot information out of the file.
 	 */
 	WT_RET(__wt_filesize(session, block->fh, &si->file_size));
 
