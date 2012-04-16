@@ -50,14 +50,7 @@ namespace mongo {
     ThreadLocalValue<StackChecker *> checker;
 
     struct StackChecker { 
-#ifdef _WIN32
-        // Windows Server 2003 and Windows XP give a 256 KB stack for interrupt
-        // threads that they create in our process, so if we try to allocate
-        // 256 KB for stack size checking we get an instant stack overflow
         enum { SZ = 192 * 1024 };
-#else
-        enum { SZ = 256 * 1024 };
-#endif
         char buf[SZ];
         StackChecker() { 
             checker.set(this);
