@@ -47,12 +47,14 @@ wts_ops(void)
 
 	if (g.threads == 1) {
 		memset(&total, 0, sizeof(total));
+		total.id = 1;
 		(void)ops(&total);
 	} else {
 		/* Create thread structure. */
 		if ((tinfo = calloc((size_t)g.threads, sizeof(*tinfo))) == NULL)
 			die(errno, "calloc");
 		for (i = 0; i < g.threads; ++i) {
+			tinfo[i].id = i + 1;
 			tinfo[i].state = TINFO_RUNNING;
 			if ((ret = pthread_create(
 			    &tinfo[i].tid, NULL, ops, &tinfo[i])) != 0)
@@ -109,9 +111,10 @@ ops(void *arg)
 	WT_ITEM key, value;
 	uint64_t cnt, keyno, sync_op;
 	uint32_t op;
+	uint8_t *keybuf, *valbuf;
 	u_int np;
 	int dir, insert, notfound, ret;
-	uint8_t *keybuf, *valbuf;
+	char sync_name[64];
 
 	conn = g.wts_conn;
 
@@ -146,16 +149,23 @@ ops(void *arg)
 	    WT_TABLENAME, NULL, "append", &cursor_insert)) != 0)
 		die(ret, "session.open_cursor");
 
-	/* Pick an operation where we'll do a sync instead. */
+	/* Pick an operation where we'll do a sync and create the name. */
 	sync_op = MMRAND(1, g.c_ops);
+	snprintf(sync_name, sizeof(sync_name), "snapshot=thread-%d", tinfo->id);
 
 	for (cnt = 0; cnt < g.c_ops; ++cnt) {
 		if (SINGLETHREADED && cnt % 100 == 0)
 			track("read/write ops", 0ULL, tinfo);
 
-		if (cnt == sync_op &&
-		    (ret = session->sync(session, WT_TABLENAME, NULL)) != 0)
-			die(ret, "session.sync: %s", WT_TABLENAME);
+		if (cnt == sync_op) {
+			if ((ret = session->sync(
+			    session, WT_TABLENAME, sync_name)) != 0)
+				die(ret, "session.sync: %s: %s",
+				    WT_TABLENAME, sync_name);
+
+			/* Pick the next sync operation. */
+			sync_op += wts_rand() % 1000;
+		}
 
 		insert = notfound = 0;
 

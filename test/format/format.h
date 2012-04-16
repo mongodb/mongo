@@ -96,6 +96,7 @@ typedef struct {
 	uint64_t update;
 	uint64_t remove;
 
+	int       id;					/* simple thread ID */
 	pthread_t tid;					/* thread ID */
 
 #define	TINFO_RUNNING	1				/* Running */
