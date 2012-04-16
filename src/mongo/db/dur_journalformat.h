@@ -41,7 +41,7 @@ namespace mongo {
 #else
             enum { CurrentVersion = 0x4149 };
 #endif
-            unsigned short _version;
+            little<unsigned short> _version;
 
             // these are just for diagnostic ease (make header more useful as plain text)
             char n1;          // '\n'
@@ -50,7 +50,7 @@ namespace mongo {
             char dbpath[128]; // path/filename of this file for human reading and diagnostics.  not used by code.
             char n3, n4;      // '\n', '\n'
 
-            unsigned long long fileId; // unique identifier that will be in each JSectHeader. important as we recycle prealloced files
+            little<unsigned long long> fileId; // unique identifier that will be in each JSectHeader. important as we recycle prealloced files
 
             char reserved3[8026]; // 8KB total for the file header
             char txt2[2];         // "\n\n" at the end
@@ -65,10 +65,10 @@ namespace mongo {
         */
         struct JSectHeader {
         private:
-            unsigned _sectionLen;          // unpadded length in bytes of the whole section
+            little<unsigned> _sectionLen;          // unpadded length in bytes of the whole section
         public:
-            unsigned long long seqNumber;  // sequence number that can be used on recovery to not do too much work
-            unsigned long long fileId;     // matches JHeader::fileId
+            little<unsigned long long> seqNumber;  // sequence number that can be used on recovery to not do too much work
+            little<unsigned long long> fileId;     // matches JHeader::fileId
             unsigned sectionLen() const { return _sectionLen; }
 
             // we store the unpadded length so we can use that when we uncompress. to 
@@ -94,22 +94,22 @@ namespace mongo {
                 OpCode_Min         = 0xfffff000
             };
             union {
-                unsigned len;    // length in bytes of the data of the JEntry. does not include the JEntry header
-                OpCodes opcode;
+                little_pod<unsigned> len; // length in bytes of the data of the JEntry. does not include the JEntry header
+                little_pod<OpCodes> opcode;
             };
 
-            unsigned ofs;  // offset in file
+            little<unsigned> ofs;  // offset in file
 
             // sentinel and masks for _fileNo
             enum {
                 DotNsSuffix = 0x7fffffff, // ".ns" file
                 LocalDbBit  = 0x80000000  // assuming "local" db instead of using the JDbContext
             };
-            int _fileNo;   // high bit is set to indicate it should be the <dbpath>/local database
+            little<int> _fileNo;   // high bit is set to indicate it should be the <dbpath>/local database
             // char data[len] follows
 
             const char * srcData() const {
-                const int *i = &_fileNo;
+                const little<int> *i = &_fileNo;
                 return (const char *) (i+1);
             }
 
@@ -133,9 +133,9 @@ namespace mongo {
         struct JSectFooter {
             JSectFooter();
             JSectFooter(const void* begin, int len); // needs buffer to compute hash
-            unsigned sentinel;
+            little<unsigned> sentinel;
             unsigned char hash[16];
-            unsigned long long reserved;
+            little<unsigned long long> reserved;
             char magic[4]; // "\n\n\n\n"
 
             /** used by recovery to see if buffer is valid
@@ -157,11 +157,11 @@ namespace mongo {
 
         /** "last sequence number" */
         struct LSNFile {
-            unsigned ver;
-            unsigned reserved2;
-            unsigned long long lsn;
-            unsigned long long checkbytes;
-            unsigned long long reserved[8];
+            little<unsigned> ver;
+            little<unsigned> reserved2;
+            little<unsigned long long> lsn;
+            little<unsigned long long> checkbytes;
+            little<unsigned long long> reserved[8];
 
             void set(unsigned long long lsn);
             unsigned long long get();

@@ -171,10 +171,10 @@ namespace mongo {
     public:
 
         int lengthWithHeaders() const { _accessing(); return _lengthWithHeaders; }
-        int& lengthWithHeaders() { _accessing(); return _lengthWithHeaders; }
+        little<int>& lengthWithHeaders() { _accessing(); return _lengthWithHeaders; }
         
         int extentOfs() const { _accessing(); return _extentOfs; }
-        int& extentOfs() { _accessing(); return _extentOfs; }
+        little<int>& extentOfs() { _accessing(); return _extentOfs; }
 
         // TODO: we need to not const_cast here but problem is DiskLoc::writing
         DiskLoc& nextDeleted() const { _accessing(); return const_cast<DiskLoc&>(_nextDeleted); }
@@ -191,8 +191,8 @@ namespace mongo {
 
         void _accessing() const;
 
-        int _lengthWithHeaders;
-        int _extentOfs;
+        little<int> _lengthWithHeaders;
+        little<int> _extentOfs;
         DiskLoc _nextDeleted;
     };
 
@@ -212,16 +212,16 @@ namespace mongo {
         enum HeaderSizeValue { HeaderSize = 16 };
 
         int lengthWithHeaders() const {  _accessing(); return _lengthWithHeaders; }
-        int& lengthWithHeaders() {  _accessing(); return _lengthWithHeaders; }
+        little<int>& lengthWithHeaders() {  _accessing(); return _lengthWithHeaders; }
 
         int extentOfs() const { _accessing(); return _extentOfs; }
-        int& extentOfs() { _accessing(); return _extentOfs; }
+        little<int>& extentOfs() { _accessing(); return _extentOfs; }
         
         int nextOfs() const { _accessing(); return _nextOfs; }
-        int& nextOfs() { _accessing(); return _nextOfs; }
+        little<int>& nextOfs() { _accessing(); return _nextOfs; }
 
         int prevOfs() const {  _accessing(); return _prevOfs; }
-        int& prevOfs() {  _accessing(); return _prevOfs; }
+        little<int>& prevOfs() {  _accessing(); return _prevOfs; }
 
         const char * data() const { _accessing(); return _data; }
         char * data() { _accessing(); return _data; }
@@ -246,8 +246,8 @@ namespace mongo {
         }
 
         struct NP {
-            int nextOfs;
-            int prevOfs;
+            little<int> nextOfs;
+            little<int> prevOfs;
         };
         NP* np() { return (NP*) &_nextOfs; }
 
@@ -283,10 +283,10 @@ namespace mongo {
          */
         void _accessing() const;
 
-        int _lengthWithHeaders;
-        int _extentOfs;
-        int _nextOfs;
-        int _prevOfs;
+        little<int> _lengthWithHeaders;
+        little<int> _extentOfs;
+        little<int> _nextOfs;
+        little<int> _prevOfs;
 
         /** be careful when referencing this that your write intent was correct */
         char _data[4];
@@ -304,7 +304,7 @@ namespace mongo {
     */
     class Extent {
     public:
-        unsigned magic;
+        little<unsigned> magic;
         DiskLoc myLoc;
         DiskLoc xnext, xprev; /* next/prev extent for this namespace */
 
@@ -313,7 +313,7 @@ namespace mongo {
         */
         Namespace nsDiagnostic;
 
-        int length;   /* size of the extent, including these fields */
+        little<int> length;   /* size of the extent, including these fields */
         DiskLoc firstRecord;
         DiskLoc lastRecord;
         char _extentData[4];
@@ -405,11 +405,11 @@ namespace mongo {
     */
     class DataFileHeader {
     public:
-        int version;
-        int versionMinor;
-        int fileLength;
+        little<int> version;
+        little<int> versionMinor;
+        little<int> fileLength;
         DiskLoc unused; /* unused is the portion of the file that doesn't belong to any allocated extents. -1 = no more */
-        int unusedLength;
+        little<int> unusedLength;
         char reserved[8192 - 4*4 - 8];
 
         char data[4]; // first extent starts here

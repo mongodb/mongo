@@ -95,26 +95,6 @@ namespace mongo {
         return strcmp(p + a - b, suffix) == 0;
     }
 
-    inline unsigned long swapEndian(unsigned long x) {
-        return
-            ((x & 0xff) << 24) |
-            ((x & 0xff00) << 8) |
-            ((x & 0xff0000) >> 8) |
-            ((x & 0xff000000) >> 24);
-    }
-
-#if defined(BOOST_LITTLE_ENDIAN)
-    inline unsigned long fixEndian(unsigned long x) {
-        return x;
-    }
-#elif defined(BOOST_BIG_ENDIAN)
-    inline unsigned long fixEndian(unsigned long x) {
-        return swapEndian(x);
-    }
-#else
-#error no boost endian header defined
-#endif
-
 #if !defined(_WIN32)
     typedef int HANDLE;
     inline void strcpy_s(char *dst, unsigned len, const char *src) {

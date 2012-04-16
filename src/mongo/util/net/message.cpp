@@ -26,6 +26,7 @@
 #include "listen.h"
 
 #include "../goodies.h"
+#include "../../bson/util/atomic_int.h"
 
 
 namespace mongo {
@@ -42,7 +43,7 @@ namespace mongo {
         }
     }
 
-    MSGID NextMsgId;
+    AtomicUInt NextMsgId;
 
     /*struct MsgStart {
         MsgStart() {

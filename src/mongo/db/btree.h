@@ -147,10 +147,10 @@ namespace mongo {
         /** Given that there are n keys, this is the n index child. */
         DiskLoc nextChild;
         /** can be reused, value is 8192 in current pdfile version Apr2010 */
-        unsigned short _wasSize;
+        little<unsigned short> _wasSize;
         /** zero */
-        unsigned short _reserved1;
-        int flags;
+        little<unsigned short> _reserved1;
+        little<int> flags;
 
         void _init() {
             _reserved1 = 0;
@@ -167,7 +167,7 @@ namespace mongo {
         /* Number of keys in the bucket. */
         little<int> n;
 
-        int reserved;
+        little<int> reserved;
         /* Beginning of the bucket's body */
         char data[4];
 

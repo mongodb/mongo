@@ -52,32 +52,40 @@ namespace mongo {
         /** if buffer grows pointer no longer valid */
         char* cur() { return _p._data + _len; }
 
+    private:
+        /* 
+         *  Wrap all primitive types in an endian/alignment insensitive way.
+         */
+        template<class T> void append( T j ) {
+            little<T>::ref( grow( sizeof( T ) ) ) = j;
+        }
+    public:
         void appendChar(char j) {
-            *((char*)grow(sizeof(char))) = j;
+            append<char>( j );
         }
         void appendNum(char j) {
-            *((char*)grow(sizeof(char))) = j;
+            append<char>( j );
         }
         void appendNum(short j) {
-            *((short*)grow(sizeof(short))) = j;
+            append<short>( j );
         }
         void appendNum(int j) {
-            *((int*)grow(sizeof(int))) = j;
+            append<int>( j );
         }
         void appendNum(unsigned j) {
-            *((unsigned*)grow(sizeof(unsigned))) = j;
+            append<unsigned>( j );
         }
         void appendNum(bool j) {
-            *((bool*)grow(sizeof(bool))) = j;
+            append<char>( j );
         }
         void appendNum(double j) {
-            *((double*)grow(sizeof(double))) = j;
+            append<double>( j );
         }
         void appendNum(long long j) {
-            *((long long*)grow(sizeof(long long))) = j;
+            append<long long>( j );
         }
         void appendNum(unsigned long long j) {
-            *((unsigned long long*)grow(sizeof(unsigned long long))) = j;
+            append<unsigned long long>( j );
         }
 
         void appendBuf(const void *src, size_t len) { memcpy(grow((unsigned) len), src, len); }

@@ -711,7 +711,7 @@ int main(int argc, char* argv[]) {
     {
         unsigned x = 0x12345678;
         unsigned char& b = (unsigned char&) x;
-        if ( b != 0x78 ) {
+        if ( 0 && b != 0x78 ) {
             out() << "big endian cpus not yet supported" << endl;
             return 33;
         }

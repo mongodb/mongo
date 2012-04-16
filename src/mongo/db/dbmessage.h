@@ -82,11 +82,11 @@ namespace mongo {
 
 #pragma pack(1)
     struct QueryResult : public MsgData {
-        long long cursorId;
-        int startingFrom;
-        int nReturned;
+        little<long long> cursorId;
+        little<int> startingFrom;
+        little<int> nReturned;
         const char *data() {
-            return (char *) (((int *)&nReturned)+1);
+            return reinterpret_cast<char*>( &nReturned ) + 4;
         }
         int resultFlags() {
             return dataAsInt();

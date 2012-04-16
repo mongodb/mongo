@@ -400,7 +400,7 @@ namespace mongo {
                         }
                         else{
                             // data could be on more than one shard. must send to all
-                            int * x = (int*)(r.d().afterNS());
+                            little<int> * x = &little<int>::ref( const_cast<char*>( r.d().afterNS() ) );
                             x[0] |= UpdateOption_Broadcast; // this means don't check shard version in mongod
                             broadcastWrite(dbUpdate, r);
                             return;
@@ -455,7 +455,7 @@ namespace mongo {
                         if ( justOne && ! pattern.hasField( "_id" ) )
                             throw UserException( 8015 , "can only delete with a non-shard key pattern if can delete as many as we find" );
 
-                        int * x = (int*)(r.d().afterNS());
+                        little<int>* x = &little<int>::ref( const_cast<char*>( r.d().afterNS() ) );
                         x[0] |= RemoveOption_Broadcast; // this means don't check shard version in mongod
                         broadcastWrite(dbUpdate, r);
                         return;

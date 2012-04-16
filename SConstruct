@@ -320,7 +320,7 @@ elif has_option("clang"):
 if has_option( "cc" ):
     env["CC"] = get_option( "cc" )
 
-if env['PYSYSPLATFORM'] == 'linux2':
+if env['PYSYSPLATFORM'] == 'linux2' or env['PYSYSPLATFORM'].startswith( 'freebsd' ):
     env['LINK_LIBGROUP_START'] = '-Wl,--start-group'
     env['LINK_LIBGROUP_END'] = '-Wl,--end-group'
     env['RELOBJ_LIBDEPS_START'] = '--whole-archive'
@@ -514,6 +514,7 @@ elif os.sys.platform.startswith( "freebsd" ):
     env.Append( EXTRACPPPATH=[ "/usr/local/include" ] )
     env.Append( EXTRALIBPATH=[ "/usr/local/lib" ] )
     env.Append( CPPDEFINES=[ "__freebsd__" ] )
+    env.Append( LIBS=['m'] )
 
 elif os.sys.platform.startswith( "openbsd" ):
     nix = True
@@ -649,6 +650,7 @@ if nix:
     # -Winvalid-pch Warn if a precompiled header (see Precompiled Headers) is found in the search path but can't be used.
     env.Append( CCFLAGS=["-fPIC",
                          "-fno-strict-aliasing",
+                         "-Wstrict-aliasing",
                          "-ggdb",
                          "-pthread",
                          "-Wall",
@@ -1130,7 +1132,7 @@ Export("testEnv")
 Export("has_option use_system_version_of_library")
 Export("installSetup")
 Export("usesm usev8")
-Export("darwin windows solaris linux nix")
+Export("darwin windows solaris linux nix freebsd")
 
 env.SConscript( 'src/SConscript', variant_dir='$BUILD_DIR', duplicate=False )
 env.SConscript( 'src/SConscript.client', variant_dir='$BUILD_DIR/client_build', duplicate=False )

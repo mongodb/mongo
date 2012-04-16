@@ -32,7 +32,7 @@ namespace mongo {
        Wrapping the double in a packed struct forces gcc to generate code that works with unaligned values too.
        The generated code for other architectures (which already allow unaligned accesses) is the same as if
        there was a direct pointer access.
-       Should be replaced by little<double>
+       Should be replaced by little<double>, which does the same thing and more.
     */
     struct PackedDouble {
         double d;

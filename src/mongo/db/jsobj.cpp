@@ -938,7 +938,7 @@ namespace mongo {
                 totsize = 5;
                 eoo = EOO;
             }
-            int totsize;
+            little<int> totsize;
             char eoo;
         } js0;
     */

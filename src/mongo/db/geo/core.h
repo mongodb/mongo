@@ -135,14 +135,15 @@ namespace mongo {
         void unhash_fast( unsigned& x , unsigned& y ) const {
             x = 0;
             y = 0;
-            char * c = (char*)(&_hash);
             for ( int i=0; i<8; i++ ) {
-                unsigned t = (unsigned)(c[i]) & 0x55;
+                unsigned char c_i = _hash >> ( i * 8 );
+                unsigned t = c_i & 0x55;
                 y |= ( geoBitSets.hashedToNormal[t] << (4*(i)) );
-
-                t = ( (unsigned)(c[i]) >> 1 ) & 0x55;
+                
+                t = ( c_i >> 1 ) & 0x55;
                 x |= ( geoBitSets.hashedToNormal[t] << (4*(i)) );
             }
+
         }
 
         void unhash_slow( unsigned& x , unsigned& y ) const {

@@ -476,7 +476,7 @@ namespace mongo {
     } /* assembleResponse() */
 
     void receivedKillCursors(Message& m) {
-        int *x = (int *) m.singleData()->_data;
+        little<int> *x = &little<int>::ref( m.singleData()->_data );
         x++; // reserved
         int n = *x++;
 
@@ -489,7 +489,15 @@ namespace mongo {
             verify( n < 30000 );
         }
 
-        int found = ClientCursor::erase(n, (long long *) x);
+        
+        // Byteswap (maybe) and align the cursors
+        boost::scoped_array<long long> cursors( new long long[n] );
+        little<long long>* in_cursors = &little<long long>::ref( x );
+        for ( int i = 0; i < n; ++i ) {
+            cursors[i] = in_cursors[i];
+        }
+        
+        int found = ClientCursor::erase(n, &cursors[0] );
 
         if ( logLevel > 0 || found != n ) {
             log( found == n ) << "killcursors: found " << found << " of " << n << endl;
