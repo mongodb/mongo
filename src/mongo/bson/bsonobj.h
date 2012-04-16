@@ -138,7 +138,7 @@ namespace mongo {
         /** Readable representation of a BSON object in an extended JSON-style notation.
             This is an abbreviated representation which might be used for logging.
         */
-        enum { maxToStringRecursionDepth = 500 };
+        enum { maxToStringRecursionDepth = 100 };
 
         std::string toString( bool isArray = false, bool full=false ) const;
         void toString( StringBuilder& s, bool isArray = false, bool full=false, int depth=0 ) const;
