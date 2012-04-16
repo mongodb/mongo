@@ -54,7 +54,7 @@ __evict_clr(WT_SESSION_IMPL *session, WT_EVICT_LIST *e)
  *	Clear all entries in the eviction list.
  */
 static inline void
-__evict_clr_all(WT_SESSION_IMPL *session)
+__evict_clr_all(WT_SESSION_IMPL *session, u_int start)
 {
 	WT_CACHE *cache;
 	WT_EVICT_LIST *evict;
@@ -63,7 +63,7 @@ __evict_clr_all(WT_SESSION_IMPL *session)
 	cache = S2C(session)->cache;
 
 	elem = cache->evict_entries;
-	for (evict = cache->evict, i = 0; i < elem; i++, evict++)
+	for (i = start, evict = cache->evict + i; i < elem; i++, evict++)
 		__evict_clr(session, evict);
 }
 
@@ -79,6 +79,10 @@ __wt_evict_clr_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_CACHE *cache;
 	WT_EVICT_LIST *evict;
 	int i, elem;
+
+	WT_ASSERT(session, WT_PAGE_IS_ROOT(page) ||
+	    page->ref->page != page ||
+	    page->ref->state == WT_REF_LOCKED);
 
 	/* Fast path: if the page isn't on the queue, don't bother searching. */
 	if (!F_ISSET(page, WT_PAGE_EVICT_LRU))
@@ -406,7 +410,7 @@ __evict_request_walk(WT_SESSION_IMPL *session)
 		 * The eviction candidate list might reference pages we are
 		 * about to discard; clear it.
 		 */
-		__evict_clr_all(session);
+		__evict_clr_all(session, 0);
 
 		if (F_ISSET(er, WT_EVICT_REQ_PAGE)) {
 			ref = er->page->ref;
@@ -525,8 +529,8 @@ __evict_file(WT_SESSION_IMPL *session, WT_EVICT_REQ *er)
 		 * can't be merged into anything, it must be written.
 		 */
 		if (WT_PAGE_IS_ROOT(page) ||
-		    !F_ISSET(page, WT_PAGE_REC_EMPTY |
-		    WT_PAGE_REC_SPLIT | WT_PAGE_REC_SPLIT_MERGE))
+		    page->modify == NULL || !F_ISSET(page->modify,
+		    WT_PM_REC_EMPTY | WT_PM_REC_SPLIT | WT_PM_REC_SPLIT_MERGE))
 			WT_RET(__wt_rec_evict(session, page, WT_REC_SINGLE));
 	}
 
@@ -550,6 +554,7 @@ __evict_lru(WT_SESSION_IMPL *session)
 	/* Sort the list into LRU order and restart. */
 	__wt_spin_lock(session, &cache->lru_lock);
 	__evict_lru_sort(session);
+	__evict_clr_all(session, WT_EVICT_WALK_BASE);
 
 	cache->evict_current = cache->evict;
 	__wt_spin_unlock(session, &cache->lru_lock);
@@ -659,27 +664,29 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 		 * merged into their parents.  Use the EVICT_LRU flag to avoid
 		 * putting pages onto the list multiple times.
 		 *
-		 * Don't skip pages marked WT_PAGE_REC_EMPTY or SPLIT: updates
+		 * Don't skip pages marked WT_PM_REC_EMPTY or SPLIT: updates
 		 * after their last reconciliation may have changed their state
 		 * and only the reconciliation/eviction code can confirm if they
 		 * should really be skipped.
 		 */
 		if (WT_PAGE_IS_ROOT(page) ||
-		    F_ISSET(page, WT_PAGE_EVICT_LRU | WT_PAGE_REC_SPLIT_MERGE))
+		    F_ISSET(page, WT_PAGE_EVICT_LRU) ||
+		    (page->modify != NULL &&
+		    F_ISSET(page->modify, WT_PM_REC_SPLIT_MERGE)))
 			continue;
 
 		WT_VERBOSE(session, evictserver,
 		    "select: %p, size %" PRIu32, page, page->memory_footprint);
 
 		WT_ASSERT(session, page->ref->state == WT_REF_EVICT_WALK);
+		WT_ASSERT(session, evict->page == NULL);
 
-		/* Mark the page on the list */
-		F_SET(page, WT_PAGE_EVICT_LRU);
-
-		__evict_clr(session, evict);
 		evict->page = page;
 		evict->btree = btree;
 		++evict;
+
+		/* Mark the page on the list */
+		F_SET(page, WT_PAGE_EVICT_LRU);
 	}
 
 	*slotp += (u_int)(evict - start);

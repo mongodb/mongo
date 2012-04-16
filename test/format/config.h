@@ -114,6 +114,10 @@ static CONFIG c[] = {
 	  "the number of runs",
 	  0, C_IGNORE, 0, UINT_MAX, &g.c_runs },
 
+	{ "threads",
+	  "the number of threads",
+	  0, C_IGNORE, 1, 32, &g.c_threads },
+
 	{ "value_max",
 	  "maximum size of values",
 	  C_ROW|C_VAR, 0, 32, 4096, &g.c_value_max },

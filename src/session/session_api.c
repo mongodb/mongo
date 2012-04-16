@@ -126,10 +126,10 @@ err:	API_END_NOTFOUND_MAP(session, ret);
  */
 int
 __wt_session_create_strip(
-    WT_SESSION *session, const char *value, const char **value_ret)
+    WT_SESSION *session, const char *v1, const char *v2, const char **value_ret)
 {
 	WT_SESSION_IMPL *session_impl = (WT_SESSION_IMPL *)session;
-	const char *cfg[] = { __wt_confdfl_session_create, value, NULL };
+	const char *cfg[] = { __wt_confdfl_session_create, v1, v2, NULL };
 
 	return (__wt_config_collapse(session_impl, cfg, value_ret));
 }

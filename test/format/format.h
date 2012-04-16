@@ -37,7 +37,7 @@
 
 #define	WT_TABLENAME	"file:__wt"
 
-#define	SINGLETHREADED	(g.threads == 1)
+#define	SINGLETHREADED	(g.c_threads == 1)
 
 typedef struct {
 	char *progname;				/* Program name */
@@ -59,7 +59,6 @@ typedef struct {
 
 	int replay;				/* Replaying a run. */
 	int track;				/* Track progress */
-	int threads;				/* Threads doing operations */
 
 	char *config_open;			/* Command-line configuration */
 
@@ -80,6 +79,7 @@ typedef struct {
 	uint32_t c_reverse;
 	uint32_t c_rows;
 	uint32_t c_runs;
+	uint32_t c_threads;
 	uint32_t c_value_max;
 	uint32_t c_value_min;
 	uint32_t c_write_pct;

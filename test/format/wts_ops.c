@@ -29,7 +29,8 @@ wts_ops(void)
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
 	time_t now;
-	int i, ret, running;
+	int ret, running;
+	uint32_t i;
 
 	conn = g.wts_conn;
 
@@ -45,15 +46,16 @@ wts_ops(void)
 		    ctime(&now));
 	}
 
-	if (g.threads == 1) {
+	if (SINGLETHREADED) {
 		memset(&total, 0, sizeof(total));
 		total.id = 1;
 		(void)ops(&total);
 	} else {
 		/* Create thread structure. */
-		if ((tinfo = calloc((size_t)g.threads, sizeof(*tinfo))) == NULL)
+		if ((tinfo =
+		    calloc((size_t)g.c_threads, sizeof(*tinfo))) == NULL)
 			die(errno, "calloc");
-		for (i = 0; i < g.threads; ++i) {
+		for (i = 0; i < g.c_threads; ++i) {
 			tinfo[i].id = i + 1;
 			tinfo[i].state = TINFO_RUNNING;
 			if ((ret = pthread_create(
@@ -65,7 +67,7 @@ wts_ops(void)
 		for (;;) {
 			total.search =
 			    total.insert = total.remove = total.update = 0;
-			for (i = running = 0; i < g.threads; ++i) {
+			for (i = running = 0; i < g.c_threads; ++i) {
 				total.search += tinfo[i].search;
 				total.insert += tinfo[i].insert;
 				total.remove += tinfo[i].remove;

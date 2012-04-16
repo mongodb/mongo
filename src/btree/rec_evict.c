@@ -56,7 +56,7 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 		WT_STAT_INCR(conn->stats, cache_evict_internal);
 
 	/* Update the parent and discard the page. */
-	if (F_ISSET(page, WT_PAGE_REC_MASK) == 0) {
+	if (page->modify == NULL || !F_ISSET(page->modify, WT_PM_REC_MASK)) {
 		WT_STAT_INCR(conn->stats, cache_evict_unmodified);
 
 		if (WT_PAGE_IS_ROOT(page))
@@ -126,8 +126,8 @@ __rec_page_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page, int single)
 	mod = page->modify;
 	parent_ref = page->ref;
 
-	switch (F_ISSET(page, WT_PAGE_REC_MASK)) {
-	case WT_PAGE_REC_REPLACE: 			/* 1-for-1 page swap */
+	switch (F_ISSET(mod, WT_PM_REC_MASK)) {
+	case WT_PM_REC_REPLACE: 			/* 1-for-1 page swap */
 		if (parent_ref->addr != NULL &&
 		    __wt_off_page(page->parent, parent_ref->addr)) {
 			__wt_free(session, ((WT_ADDR *)parent_ref->addr)->addr);
@@ -144,10 +144,10 @@ __rec_page_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page, int single)
 		    session, 1, sizeof(WT_ADDR), &parent_ref->addr));
 		((WT_ADDR *)parent_ref->addr)->addr = mod->u.replace.addr;
 		((WT_ADDR *)parent_ref->addr)->size = mod->u.replace.size;
-		WT_PUBLISH(parent_ref->state, WT_REF_DISK);
 		parent_ref->page = NULL;
+		WT_PUBLISH(parent_ref->state, WT_REF_DISK);
 		break;
-	case WT_PAGE_REC_SPLIT:				/* Page split */
+	case WT_PM_REC_SPLIT:				/* Page split */
 		/*
 		 * Update the parent to reference new internal page(s).
 		 *
@@ -160,7 +160,7 @@ __rec_page_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page, int single)
 		/* Clear the reference else discarding the page will free it. */
 		mod->u.split = NULL;
 		break;
-	case WT_PAGE_REC_EMPTY:				/* Page is empty */
+	case WT_PM_REC_EMPTY:				/* Page is empty */
 		/* We checked if the page was empty when we reviewed it. */
 		/* FALLTHROUGH */
 	WT_ILLEGAL_VALUE(session);
@@ -190,13 +190,13 @@ __rec_root_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page, int single)
 	mod = page->modify;
 
 	next = NULL;
-	switch (F_ISSET(page, WT_PAGE_REC_MASK)) {
-	case WT_PAGE_REC_EMPTY:				/* Page is empty */
-	case WT_PAGE_REC_REPLACE: 			/* 1-for-1 page swap */
+	switch (F_ISSET(page, WT_PM_REC_MASK)) {
+	case WT_PM_REC_EMPTY:				/* Page is empty */
+	case WT_PM_REC_REPLACE: 			/* 1-for-1 page swap */
 		WT_VERBOSE(session, evict, "root page evicted");
 		btree->root_page = NULL;
 		break;
-	case WT_PAGE_REC_SPLIT:				/* Page split */
+	case WT_PM_REC_SPLIT:				/* Page split */
 		WT_VERBOSE(session, evict,
 		    "root page split %p -> %p", page, mod->u.split);
 
@@ -234,7 +234,7 @@ __rec_root_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page, int single)
 	 */
 	WT_RET(__wt_page_modify_init(session, next));
 	__wt_page_modify_set(next);
-	F_CLR(next, WT_PAGE_REC_MASK);
+	F_CLR(next->modify, WT_PM_REC_MASK);
 
 	WT_RET(__wt_rec_write(session, next, NULL));
 
@@ -295,7 +295,7 @@ __rec_discard_page(WT_SESSION_IMPL *session, WT_PAGE *page, int single)
 		 * If the page was split and eventually merged into the parent,
 		 * discard the split page.
 		 */
-		if (F_ISSET(page, WT_PAGE_REC_MASK) == WT_PAGE_REC_SPLIT &&
+		if (F_ISSET(mod, WT_PM_REC_MASK) == WT_PM_REC_SPLIT &&
 		    mod->u.split != NULL)
 			__wt_page_out(session, mod->u.split, 0);
 	}
@@ -327,6 +327,7 @@ static int
 __rec_review(WT_SESSION_IMPL *session,
     WT_REF *ref, WT_PAGE *page, uint32_t flags, int top)
 {
+	WT_PAGE_MODIFY *mod;
 	uint32_t i;
 
 	/*
@@ -397,13 +398,14 @@ __rec_review(WT_SESSION_IMPL *session,
 	 * for eviction, it must have had reason, probably the empty page got
 	 * really, really full and is being forced out of the cache.
 	 */
-	if (!top && !F_ISSET(page,
-	    WT_PAGE_REC_EMPTY | WT_PAGE_REC_SPLIT | WT_PAGE_REC_SPLIT_MERGE))
+	mod = page->modify;
+	if (!top && (mod == NULL || !F_ISSET(mod,
+	    WT_PM_REC_EMPTY | WT_PM_REC_SPLIT | WT_PM_REC_SPLIT_MERGE)))
 		return (EBUSY);
 
 	/* If the page is dirty, write it so we know the final state. */
 	if (__wt_page_is_modified(page) &&
-	    !F_ISSET(page, WT_PAGE_REC_SPLIT_MERGE))
+	    !F_ISSET(mod, WT_PM_REC_SPLIT_MERGE))
 		WT_RET(__wt_rec_write(session, page, NULL));
 
 	/*
@@ -420,14 +422,16 @@ __rec_review(WT_SESSION_IMPL *session,
 		 * We never get a top-level split-merge page to evict, they are
 		 * ignored by the eviction thread.  Check out of sheer paranoia.
 		 */
-		if (F_ISSET(page, WT_PAGE_REC_SPLIT_MERGE))
-			return (EBUSY);
-		if (F_ISSET(page, WT_PAGE_REC_EMPTY) && !WT_PAGE_IS_ROOT(page))
-			return (EBUSY);
-	} else
-		if (!F_ISSET(page, WT_PAGE_REC_EMPTY |
-		    WT_PAGE_REC_SPLIT | WT_PAGE_REC_SPLIT_MERGE))
-			return (EBUSY);
+		if (mod != NULL) {
+			if (F_ISSET(mod, WT_PM_REC_SPLIT_MERGE))
+				return (EBUSY);
+			if (F_ISSET(mod, WT_PM_REC_EMPTY) &&
+			    !WT_PAGE_IS_ROOT(page))
+				return (EBUSY);
+		}
+	} else if (mod == NULL || !F_ISSET(mod,
+	    WT_PM_REC_EMPTY | WT_PM_REC_SPLIT | WT_PM_REC_SPLIT_MERGE))
+		return (EBUSY);
 	return (0);
 }
 

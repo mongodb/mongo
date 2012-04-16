@@ -47,26 +47,27 @@ class test_util01(wttest.WiredTigerTestCase, suite_subprocess):
     nentries = 1000
     stringclass = ''.__class__
 
-    # python has a filecmp.cmp function, but different versions
-    # of python approach file comparison differently.  To make
-    # sure we really get byte for byte comparison, we define it here.
+    def compare_config(self, expected_cfg, actual_cfg):
+        da = dict(kv.split('=') for kv in actual_cfg.strip().split(','))
+        de = da.copy()
+        de.update(kv.split('=') for kv in expected_cfg.strip().split(','))
+        return da == de
 
     def compare_files(self, filename1, filename2):
-        bufsize = 4096
-        if os.path.getsize(filename1) != os.path.getsize(filename2):
-            print filename1 + ' size = ' + str(os.path.getsize(filename1))
-            print filename2 + ' size = ' + str(os.path.getsize(filename2))
-            return False
-        with open(filename1, "rb") as fp1:
-            with open(filename2, "rb") as fp2:
-                while True:
-                    b1 = fp1.read(bufsize)
-                    b2 = fp2.read(bufsize)
-                    if b1 != b2:
-                        return False
-                    # files are identical size
-                    if not b1:
-                        return True
+        inheader = isconfig = False
+        for l1, l2 in zip(open(filename1, "rb"), open(filename2, "rb")):
+            if isconfig:
+                if not self.compare_config(l1, l2):
+                    return False
+            elif l1 != l2:
+                return False
+            if inheader:
+                isconfig = not isconfig
+            if l1.strip() == 'Header':
+                inheader = True
+            if l1.strip() == 'Data':
+                inheader = isconfig = False
+        return True
 
     def get_string(self, i, len):
         """

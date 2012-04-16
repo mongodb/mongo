@@ -37,7 +37,7 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	/* If not a split merged into its parent, the page must be clean. */
 	WT_ASSERT(session,
 	    !__wt_page_is_modified(page) ||
-	    F_ISSET(page, WT_PAGE_REC_SPLIT_MERGE));
+	    F_ISSET(page->modify, WT_PM_REC_SPLIT_MERGE));
 
 #ifdef HAVE_DIAGNOSTIC
 	__wt_hazard_validate(session, page);

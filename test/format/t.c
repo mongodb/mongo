@@ -30,9 +30,6 @@ main(int argc, char *argv[])
 	if (access("CONFIG", R_OK) == 0)
 		config_file("CONFIG");
 
-	/* Default to a single thread. */
-	g.threads = 1;
-
 	/* Track progress unless we're re-directing output to a file. */
 	g.track = isatty(STDOUT_FILENO) ? 1 : 0;
 
@@ -66,15 +63,12 @@ main(int argc, char *argv[])
 			g.replay = 1;
 			g.c_runs = 1;
 			break;
-		case 't':			/* Threads */
-			g.threads = atoi(optarg);
-			break;
 		default:
 			usage();
 		}
 
 	/* Multi-threaded runs cannot be replayed. */
-	if (g.threads != 1 && g.replay) {
+	if (g.c_threads != 1 && g.replay) {
 		fprintf(stderr,
 		    "%s: -r and -t are mutually exclusive\n", g.progname);
 		return (EXIT_FAILURE);
@@ -253,7 +247,7 @@ usage(void)
 	fprintf(stderr,
 	    "usage: %s [-1Llqr]\n    "
 	    "[-C wiredtiger-config] [-c config-file] "
-	    "[-t threads] [name=value ...]\n",
+	    "[name=value ...]\n",
 	    g.progname);
 	fprintf(stderr, "%s",
 	    "\t-1 run once\n"
@@ -262,8 +256,7 @@ usage(void)
 	    "\t-L output to a log file\n"
 	    "\t-l log operations (implies -L)\n"
 	    "\t-q run quietly\n"
-	    "\t-r replay the last run\n"
-	    "\t-t threads\n");
+	    "\t-r replay the last run\n");
 
 	fprintf(stderr, "\n");
 
