@@ -54,7 +54,7 @@ __evict_clr(WT_SESSION_IMPL *session, WT_EVICT_LIST *e)
  *	Clear all entries in the eviction list.
  */
 static inline void
-__evict_clr_all(WT_SESSION_IMPL *session)
+__evict_clr_all(WT_SESSION_IMPL *session, u_int start)
 {
 	WT_CACHE *cache;
 	WT_EVICT_LIST *evict;
@@ -63,7 +63,7 @@ __evict_clr_all(WT_SESSION_IMPL *session)
 	cache = S2C(session)->cache;
 
 	elem = cache->evict_entries;
-	for (evict = cache->evict, i = 0; i < elem; i++, evict++)
+	for (i = start, evict = cache->evict + i; i < elem; i++, evict++)
 		__evict_clr(session, evict);
 }
 
@@ -79,6 +79,10 @@ __wt_evict_clr_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_CACHE *cache;
 	WT_EVICT_LIST *evict;
 	int i, elem;
+
+	WT_ASSERT(session, WT_PAGE_IS_ROOT(page) ||
+	    page->ref->page != page ||
+	    page->ref->state == WT_REF_LOCKED);
 
 	/* Fast path: if the page isn't on the queue, don't bother searching. */
 	if (!F_ISSET(page, WT_PAGE_EVICT_LRU))
@@ -406,7 +410,7 @@ __evict_request_walk(WT_SESSION_IMPL *session)
 		 * The eviction candidate list might reference pages we are
 		 * about to discard; clear it.
 		 */
-		__evict_clr_all(session);
+		__evict_clr_all(session, 0);
 
 		if (F_ISSET(er, WT_EVICT_REQ_PAGE)) {
 			ref = er->page->ref;
@@ -550,6 +554,7 @@ __evict_lru(WT_SESSION_IMPL *session)
 	/* Sort the list into LRU order and restart. */
 	__wt_spin_lock(session, &cache->lru_lock);
 	__evict_lru_sort(session);
+	__evict_clr_all(session, WT_EVICT_WALK_BASE);
 
 	cache->evict_current = cache->evict;
 	__wt_spin_unlock(session, &cache->lru_lock);
@@ -672,8 +677,8 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 		    "select: %p, size %" PRIu32, page, page->memory_footprint);
 
 		WT_ASSERT(session, page->ref->state == WT_REF_EVICT_WALK);
+		WT_ASSERT(session, evict->page == NULL);
 
-		__evict_clr(session, evict);
 		evict->page = page;
 		evict->btree = btree;
 		++evict;

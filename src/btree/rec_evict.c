@@ -145,8 +145,8 @@ __rec_page_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page, int single)
 		    session, 1, sizeof(WT_ADDR), &parent_ref->addr));
 		((WT_ADDR *)parent_ref->addr)->addr = mod->u.replace.addr;
 		((WT_ADDR *)parent_ref->addr)->size = mod->u.replace.size;
-		WT_PUBLISH(parent_ref->state, WT_REF_DISK);
 		parent_ref->page = NULL;
+		WT_PUBLISH(parent_ref->state, WT_REF_DISK);
 		break;
 	case WT_PAGE_REC_SPLIT:				/* Page split */
 		/*
