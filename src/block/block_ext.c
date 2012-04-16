@@ -386,8 +386,7 @@ __wt_block_free_ext(
  *	Fail if any of the extent lists overlap.
  */
 static int
-__block_extlist_check2(
-    WT_SESSION_IMPL *session, WT_EXTLIST *al, WT_EXTLIST *bl, const char *tag)
+__block_extlist_check2(WT_SESSION_IMPL *session, WT_EXTLIST *al, WT_EXTLIST *bl)
 {
 	WT_EXT *a, *b;
 
@@ -409,23 +408,19 @@ __block_extlist_check2(
 			continue;
 		}
 		WT_RET_MSG(session, EINVAL,
-		    "%s: %s list overlaps the %s list",
-		    tag, al->name, bl->name);
+		    "snapshot merge check: %s list overlaps the %s list",
+		    al->name, bl->name);
 	}
 	return (0);
 }
 
 int
-__wt_block_extlist_check(WT_SESSION_IMPL *session,
-    WT_BLOCK_SNAPSHOT *si, const char *tag, int alloc_discard)
+__wt_block_extlist_check(WT_SESSION_IMPL *session, WT_BLOCK_SNAPSHOT *si)
 {
 	/* Check the extent list combinations for overlaps. */
-	WT_RET(__block_extlist_check2(session, &si->alloc, &si->avail, tag));
-	WT_RET(__block_extlist_check2(session, &si->discard, &si->avail, tag));
-
-	if (alloc_discard)
-		WT_RET(__block_extlist_check2(
-		    session, &si->alloc, &si->discard, tag));
+	WT_RET(__block_extlist_check2(session, &si->alloc, &si->avail));
+	WT_RET(__block_extlist_check2(session, &si->discard, &si->avail));
+	WT_RET(__block_extlist_check2(session, &si->alloc, &si->discard));
 	return (0);
 }
 #endif

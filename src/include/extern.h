@@ -45,9 +45,7 @@ extern int __wt_block_free_ext( WT_SESSION_IMPL *session,
     off_t size,
     WT_EXTLIST *el);
 extern int __wt_block_extlist_check(WT_SESSION_IMPL *session,
-    WT_BLOCK_SNAPSHOT *si,
-    const char *tag,
-    int alloc_discard);
+    WT_BLOCK_SNAPSHOT *si);
 extern int __wt_block_extlist_match( WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     WT_BLOCK_SNAPSHOT *si);

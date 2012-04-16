@@ -251,10 +251,10 @@ __snapshot_process(
 	WT_BLOCK_SNAPSHOT *a, *b, *si;
 	WT_ITEM *tmp;
 	WT_SNAPSHOT *snap;
-	int found, locked, ret;
+	int found, live_merge, locked, ret;
 
 	tmp = NULL;
-	locked = ret = 0;
+	live_merge = locked = ret = 0;
 
 	/*
 	 * To delete a snapshot, we'll need snapshot information for it, and we
@@ -332,8 +332,11 @@ __snapshot_process(
 		 * may be the live tree.
 		 */
 		a = snap->bpriv;
-		b = FLD_ISSET((snap + 1)->flags,
-		    WT_SNAP_ADD) ? &block->live : (snap + 1)->bpriv;
+		if (FLD_ISSET((snap + 1)->flags, WT_SNAP_ADD)) {
+			live_merge = 1;
+			b = &block->live;
+		} else
+			b = (snap + 1)->bpriv;
 
 		/*
 		 * Free the root page: there's nothing special about this free,
@@ -413,11 +416,6 @@ __snapshot_process(
 		FLD_SET((snap + 1)->flags, WT_SNAP_UPDATE);
 	}
 
-#ifdef HAVE_DIAGNOSTIC
-	WT_RET(__wt_block_extlist_check(
-	    session, &block->live, "live after merge", 1));
-#endif
-
 	/* Update snapshots marked for update. */
 	WT_SNAPSHOT_FOREACH(snapbase, snap) {
 		if (!FLD_ISSET(snap->flags, WT_SNAP_UPDATE))
@@ -426,6 +424,13 @@ __snapshot_process(
 	}
 
 live_update:
+	/*
+	 * If we didn't review the live snapshot's allocation and discard lists
+	 * as part of delete processing, do it now.
+	 */
+	if (!live_merge)
+		WT_ERR(__wt_block_extlist_match(session, block, &block->live));
+
 	/* Update the final, added snapshot based on the live system. */
 	WT_SNAPSHOT_FOREACH(snapbase, snap) {
 		if (!FLD_ISSET(snap->flags, WT_SNAP_ADD))
@@ -476,13 +481,7 @@ __snapshot_update(WT_SESSION_IMPL *session,
 	ret = 0;
 
 #ifdef HAVE_DIAGNOSTIC
-	/*
-	 * Currently, we do not check if a freed block can be immediately put
-	 * on the avail list (that is, if it was allocated during the current
-	 * snapshot -- once that change is made, we should check for overlaps
-	 * between the alloc and discard lists.
-	 */
-	WT_RET(__wt_block_extlist_check(session, si, "snapshot", 0));
+	WT_RET(__wt_block_extlist_check(session, si));
 #endif
 
 	/* Write the snapshot's extent lists. */
