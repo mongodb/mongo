@@ -116,7 +116,7 @@ namespace mongo {
             formattedWrite( fd , "===\n" );
         }
 
-        ::exit( EXIT_ABRUPT );
+        ::_exit( EXIT_ABRUPT );
     }
 
 } // namespace mongo

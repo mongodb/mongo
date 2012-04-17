@@ -149,7 +149,7 @@ namespace mongo {
     void my_new_handler() {
         rawOut( "out of memory, printing stack and exiting:" );
         printStackTrace();
-        ::exit(EXIT_ABRUPT);
+        ::_exit(EXIT_ABRUPT);
     }
 
     void setupSignals( bool inFork ) {

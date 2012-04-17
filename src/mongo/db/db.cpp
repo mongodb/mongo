@@ -1130,7 +1130,7 @@ namespace mongo {
         rawOut( oss.str() );
 
         // Don't go through normal shutdown procedure. It may make things worse.
-        ::exit(EXIT_ABRUPT);
+        ::_exit(EXIT_ABRUPT);
 
     }
 
@@ -1171,7 +1171,7 @@ namespace mongo {
     void my_new_handler() {
         rawOut( "out of memory, printing stack and exiting:" );
         printStackTrace();
-        ::exit(EXIT_ABRUPT);
+        ::_exit(EXIT_ABRUPT);
     }
 
     void setupSignals_ignoreHelper( int signal ) {}
