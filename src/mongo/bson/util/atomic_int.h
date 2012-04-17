@@ -93,7 +93,7 @@ namespace mongo {
 #elif defined(__GNUC__)  && (defined(__i386__) || defined(__x86_64__))
     inline void AtomicUInt::set(unsigned newX) {
         asm volatile("mfence" ::: "memory");
-        x = 0;
+        x = newX;
     }
 
     // from boost 1.39 interprocess/detail/atomic.hpp
