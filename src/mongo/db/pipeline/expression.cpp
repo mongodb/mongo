@@ -219,6 +219,7 @@ namespace mongo {
         {"$or", ExpressionOr::create, 0},
         {"$second", ExpressionSecond::create, OpDesc::FIXED_COUNT, 1},
         {"$strcasecmp", ExpressionStrcasecmp::create, OpDesc::FIXED_COUNT, 2},
+	{"$strlen", ExpressionStrlen::create, OpDesc::FIXED_COUNT, 1},
         {"$substr", ExpressionSubstr::create, OpDesc::FIXED_COUNT, 3},
         {"$subtract", ExpressionSubtract::create, OpDesc::FIXED_COUNT, 2},
         {"$toLower", ExpressionToLower::create, OpDesc::FIXED_COUNT, 1},
@@ -2863,6 +2864,42 @@ namespace mongo {
 
     const char *ExpressionStrcasecmp::getOpName() const {
         return "$strcasecmp";
+    }
+
+    /* ----------------------- ExpressionStrlen ---------------------------- */
+
+    ExpressionStrlen::~ExpressionStrlen() {
+    }
+
+    intrusive_ptr<ExpressionNary> ExpressionStrlen::create() {
+        intrusive_ptr<ExpressionStrlen> pExpression(new ExpressionStrlen());
+        return pExpression;
+    }
+
+    ExpressionStrlen::ExpressionStrlen():
+        ExpressionNary() {
+    }
+
+    void ExpressionStrlen::addOperand(
+        const intrusive_ptr<Expression> &pExpression) {
+        checkArgLimit(1);
+        ExpressionNary::addOperand(pExpression);
+    }
+
+    intrusive_ptr<const Value> ExpressionStrlen::evaluate(
+        const intrusive_ptr<Document> &pDocument) const {
+        checkArgCount(1);
+        intrusive_ptr<const Value> pString(vpOperand[0]->evaluate(pDocument));
+
+        uassert(16145, str::stream() << getOpName() <<
+                ": input must be a string", pString->getType() == String);
+        string str = pString->coerceToString();
+
+        return Value::createInt(str.length());
+    }
+
+    const char *ExpressionStrlen::getOpName() const {
+        return "$strlen";
     }
 
     /* ----------------------- ExpressionSubstr ---------------------------- */

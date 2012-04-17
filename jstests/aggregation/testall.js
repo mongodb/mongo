@@ -1054,6 +1054,49 @@ var p18result = [
 
 assert(arrayEq(p18.result, p18result), 'p18 failed');
 
+// strlen tests
+var slen = db.runCommand({aggregate : "article", pipeline : [
+    { $project : {
+        "authorlen": {$strlen: "$author"},
+        _id : 0
+    }}
+]});
+
+var slenresult = [
+    {
+        "authorlen" : 3
+    },
+    {
+        "authorlen" : 4
+    },
+    {
+        "authorlen" : 4
+    }
+];
+
+assert(arrayEq(slen.result, slenresult), 'strlen1 failed');
+
+// $strlen on nonexistent field should return a "not a string"
+// error
+var slen2 = db.runCommand({aggregate : "article", pipeline : [
+    { $project : {
+        "authorlen": {$strlen: "$cake"},
+        _id : 0
+    }}
+]});
+
+assert((slen2.ok == 0), 'strlen2 failed');
+
+
+// $strlen on non-string field should return an error
+var slen3 = db.runCommand({aggregate : "article", pipeline : [
+    { $project : {
+        "authorlen": {$strlen: "$pageViews"},
+        _id : 0
+    }}
+]});
+
+assert((slen3.ok == 0), 'strlen3 failed');
 
 // date tests
 var p19 = db.runCommand({aggregate : "article", pipeline : [
