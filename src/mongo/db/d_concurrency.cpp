@@ -703,6 +703,7 @@ namespace mongo {
     }
 
     void Lock::DBWrite::lockDB(const string& ns) {
+        verify( ns.size() );
         Acquiring a( 'w' );
         locked_W=false;
         locked_w=false; weLocked=0; ourCounter = 0;
@@ -731,6 +732,7 @@ namespace mongo {
         }
     }
     void Lock::DBRead::lockDB(const string& ns) {
+        verify( ns.size() );
         Acquiring a( 'r' );
         locked_r=false; weLocked=0; ourCounter = 0;
         LockState& ls = lockState();
