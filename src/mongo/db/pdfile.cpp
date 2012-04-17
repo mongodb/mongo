@@ -1615,8 +1615,8 @@ namespace mongo {
             )
         }
     private:
-        int &nIndexes() { return getDur().writingInt( _d->nIndexes ); }
-        int &indexBuildInProgress() { return getDur().writingInt( _d->indexBuildInProgress ); }
+        little<int> &nIndexes() { return getDur().writingInt( _d->nIndexes ); }
+        little<int> &indexBuildInProgress() { return getDur().writingInt( _d->indexBuildInProgress ); }
         NamespaceDetails *_d;
     };
 
