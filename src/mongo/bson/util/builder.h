@@ -57,6 +57,9 @@ namespace mongo {
 
     void msgasserted(int msgid, const char *msg);
 
+    template <typename Allocator>
+    class StringBuilderImpl;
+
     class TrivialAllocator { 
     public:
         void* Malloc(size_t sz) { return malloc(sz); }
@@ -225,8 +228,7 @@ namespace mongo {
         int l;
         int size;
 
-        template <typename>
-        friend class StringBuilderImpl;
+        friend class StringBuilderImpl<Allocator>;
     };
 
     typedef _BufBuilder<TrivialAllocator> BufBuilder;
