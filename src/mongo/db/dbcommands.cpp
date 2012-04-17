@@ -421,13 +421,16 @@ namespace mongo {
     } cmdProfile;
 
     void reportLockStats(BSONObjBuilder& result);
-
+    
     class CmdServerStatus : public Command {
+        unsigned long long _started;
     public:
         virtual bool slaveOk() const {
             return true;
         }
-        CmdServerStatus() : Command("serverStatus", true) {}
+        CmdServerStatus() : Command("serverStatus", true) {
+            _started = curTimeMillis64();
+        }
 
         virtual LockType locktype() const { return NONE; }
 
@@ -447,6 +450,7 @@ namespace mongo {
             result.append("process","mongod");
             result.append("pid", (int)getpid());
             result.append("uptime",(double) (time(0)-cmdLine.started));
+            result.append("uptimeMillis", (long long)(curTimeMillis64()-_started));
             result.append("uptimeEstimate",(double) (start/1000));
             result.appendDate( "localTime" , jsTime() );
 
