@@ -237,6 +237,7 @@ namespace mongo {
             _a[0] = _a[1] = _a[2] = 0;
         }
         string toString() const { return DiskLoc(*this).toString(); }
+
         void operator=(const DiskLoc& loc) {
             ofs = loc.getOfs();
             int la = loc.a();
@@ -249,7 +250,8 @@ namespace mongo {
                 la = 0;
                 ofs = OurNullOfs;
             }
-            memcpy(_a, &la, 3); // endian
+            little<int> lila = la;
+            memcpy(_a, &lila, 3); // endian
             dassert( ofs != 0 );
         }
         DiskLoc56Bit& writing() const { 
