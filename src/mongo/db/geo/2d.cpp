@@ -3031,7 +3031,7 @@ namespace mongo {
                 cout << "\t" << h.toString()
                      << "\t" << c.current()[g->_geo]
                      << "\t" << hex << h.getHash()
-                     << "\t" << hex << ((long long*)c.currKey().firstElement().binData(len))[0]
+                     << "\t" << hex << little<long long>::ref( c.currKey().firstElement().binData(len) )
                      << "\t" << c.current()["_id"]
                      << endl;
                 c.advance();

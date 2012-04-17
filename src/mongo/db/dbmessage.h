@@ -19,6 +19,7 @@
 #pragma once
 
 #include "jsobj.h"
+#include "../bson/util/bswap.h"
 #include "namespace-inl.h"
 #include "../util/net/message.h"
 #include "../client/constants.h"
@@ -81,16 +82,16 @@ namespace mongo {
 
 #pragma pack(1)
     struct QueryResult : public MsgData {
-        long long cursorId;
-        int startingFrom;
-        int nReturned;
+        little<long long> cursorId;
+        little<int> startingFrom;
+        little<int> nReturned;
         const char *data() {
-            return (char *) (((int *)&nReturned)+1);
+            return reinterpret_cast<char*>( &nReturned ) + 4;
         }
         int resultFlags() {
             return dataAsInt();
         }
-        int& _resultFlags() {
+        little<int>& _resultFlags() {
             return dataAsInt();
         }
         void setResultFlagsToOk() {
@@ -114,7 +115,7 @@ namespace mongo {
             // for received messages, Message has only one buffer
             theEnd = _m.singleData()->_data + _m.header()->dataLen();
             char *r = _m.singleData()->_data;
-            reserved = (int *) r;
+            reserved = &little<int>::ref( r );
             data = r + 4;
             nextjsobj = data;
         }
@@ -124,7 +125,7 @@ namespace mongo {
          * 0: InsertOption_ContinueOnError
          * 1: fromWriteback
          */
-        int& reservedField() { return *reserved; }
+        little<int>& reservedField() { return *reserved; }
 
         const char * getns() const {
             return data;
@@ -138,7 +139,7 @@ namespace mongo {
         }
 
         int getInt( int num ) const {
-            const int * foo = (const int*)afterNS();
+            const little<int>* foo = &little<int>::ref( afterNS() );
             return foo[num];
         }
 
@@ -150,28 +151,24 @@ namespace mongo {
          * get an int64 at specified offsetBytes after ns
          */
         long long getInt64( int offsetBytes ) const {
-            const char * x = afterNS();
-            x += offsetBytes;
-            const long long * ll = (const long long*)x;
-            return ll[0];
+            return little<long long>::ref( afterNS() + offsetBytes );
         }
 
         void resetPull() { nextjsobj = data; }
         int pullInt() const { return pullInt(); }
-        int& pullInt() {
+
+        const little<int>& pullInt() {
             if ( nextjsobj == data )
                 nextjsobj += strlen(data) + 1; // skip namespace
-            int& i = *((int *)nextjsobj);
+            const little<int>& i = little<int>::ref( nextjsobj );
             nextjsobj += 4;
             return i;
         }
-        long long pullInt64() const {
-            return pullInt64();
-        }
-        long long &pullInt64() {
+
+        little<long long>& pullInt64() {
             if ( nextjsobj == data )
                 nextjsobj += strlen(data) + 1; // skip namespace
-            long long &i = *((long long *)nextjsobj);
+            little<long long>& i = little<long long>::ref( const_cast<char*>( nextjsobj ) );
             nextjsobj += 8;
             return i;
         }
@@ -181,10 +178,9 @@ namespace mongo {
         }
 
         void getQueryStuff(const char *&query, int& ntoreturn) {
-            int *i = (int *) (data + strlen(data) + 1);
-            ntoreturn = *i;
-            i++;
-            query = (const char *) i;
+            const char* tmp = data + strlen(data) + 1;
+            ntoreturn = little<int>::ref( tmp );
+            query = tmp + 4;
         }
 
         /* for insert and update msgs */
@@ -223,7 +219,7 @@ namespace mongo {
 
     private:
         const Message& m;
-        int* reserved;
+        little<int>* reserved;
         const char *data;
         const char *nextjsobj;
         const char *theEnd;

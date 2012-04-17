@@ -43,7 +43,7 @@ namespace mongo {
 
     inline OpTime BSONElement::_opTime() const {
         if( type() == mongo::Date || type() == Timestamp )
-            return OpTime( *reinterpret_cast< const unsigned long long* >( value() ) );
+            return OpTime( little<unsigned long long>::ref( value() ) );
         return OpTime();
     }
 
@@ -53,7 +53,7 @@ namespace mongo {
         case Code:
             return std::string(valuestr(), valuestrsize()-1);
         case CodeWScope:
-            return std::string(codeWScopeCode(), *(int*)(valuestr())-1);
+            return std::string(codeWScopeCode(), little<int>::ref(valuestr()) - 1 );
         default:
             log() << "can't convert type: " << (int)(type()) << " to code" << std::endl;
         }

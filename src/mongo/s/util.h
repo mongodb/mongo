@@ -30,14 +30,20 @@ namespace mongo {
     struct ShardChunkVersion {
         union {
             struct {
+#ifdef BOOST_LITTLE_ENDIAN
                 int _minor;
                 int _major;
+#else
+                int _major;
+                int _minor;
+#endif
             };
             unsigned long long _combined;
         };
 
-        ShardChunkVersion( int major=0, int minor=0 )
-            : _minor(minor),_major(major) {
+        ShardChunkVersion( int major=0, int minor=0 ) {
+            _minor = minor;
+            _major = major;
         }
 
         ShardChunkVersion( unsigned long long ll )

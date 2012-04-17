@@ -96,6 +96,17 @@ namespace mongo {
         }
     };
 
+    /*
+    template<> struct storage_type<Date_t> {
+        typedef unsigned long long t;
+
+        static t toStorage( Date_t src ) { return src; }
+        static Date_t fromStorage( t stored ) { return stored; }
+
+    };
+    */
+
+
     // Like strlen, but only scans up to n bytes.
     // Returns -1 if no '0' found.
     inline int strnlen( const char *s, int n ) {

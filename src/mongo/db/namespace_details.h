@@ -69,48 +69,48 @@ namespace mongo {
         // ofs 168 (8 byte aligned)
         struct Stats {
             // datasize and nrecords MUST Be adjacent code assumes!
-            long long datasize; // this includes padding, but not record headers
-            long long nrecords;
+            little<long long> datasize; // this includes padding, but not record headers
+            little<long long> nrecords;
         } stats;
-        int lastExtentSize;
-        int nIndexes;
+        little<int> lastExtentSize;
+        little<int> nIndexes;
     private:
         // ofs 192
         IndexDetails _indexes[NIndexesBase];
 
         // ofs 352 (16 byte aligned)
-        int _isCapped;                         // there is wasted space here if I'm right (ERH)
-        int _maxDocsInCapped;                  // max # of objects for a capped table.  TODO: should this be 64 bit?
+        little<int> _isCapped;                         // there is wasted space here if I'm right (ERH)
+        little<int> _maxDocsInCapped;                  // max # of objects for a capped table.  TODO: should this be 64 bit?
 
-        double _paddingFactor;                 // 1.0 = no padding.
+        little<double> _paddingFactor;                 // 1.0 = no padding.
         // ofs 386 (16)
-        int _systemFlags; // things that the system sets/cares about
+        little<int> _systemFlags; // things that the system sets/cares about
     public:
         DiskLoc capExtent;
         DiskLoc capFirstNewRecord;
-        unsigned short dataFileVersion;       // NamespaceDetails version.  So we can do backward compatibility in the future. See filever.h
-        unsigned short indexFileVersion;
-        unsigned long long multiKeyIndexBits;
+        little<unsigned short> dataFileVersion;       // NamespaceDetails version.  So we can do backward compatibility in the future. See filever.h
+        little<unsigned short> indexFileVersion;
+        little<unsigned long long> multiKeyIndexBits;
     private:
         // ofs 400 (16)
-        unsigned long long reservedA;
-        long long extraOffset;                // where the $extra info is located (bytes relative to this)
+        little<unsigned long long> reservedA;
+        little<long long> extraOffset;                // where the $extra info is located (bytes relative to this)
     public:
-        int indexBuildInProgress;             // 1 if in prog
+        little<int> indexBuildInProgress;             // 1 if in prog
     private:
-        int _userFlags;
+        little<int> _userFlags;
         char reserved[72];
         /*-------- end data 496 bytes */
     public:
         explicit NamespaceDetails( const DiskLoc &loc, bool _capped );
 
         class Extra {
-            long long _next;
+            little<long long> _next;
         public:
             IndexDetails details[NIndexesExtra];
         private:
-            unsigned reserved2;
-            unsigned reserved3;
+            little<unsigned> reserved2;
+            little<unsigned> reserved3;
             Extra(const Extra&) { verify(false); }
             Extra& operator=(const Extra& r) { verify(false); return *this; }
         public:
@@ -287,7 +287,7 @@ namespace mongo {
                    can pushes this down considerably. further tweaking will be a good idea but 
                    this should be an adequate starting point.
                 */
-                double N = min(nIndexes,7) + 3;
+                double N = min( nIndexes + 0, 7 ) + 3;
                 double x = _paddingFactor + (0.001 * N);
                 if ( x <= 2.0 ) {
                     setPaddingFactor( x );

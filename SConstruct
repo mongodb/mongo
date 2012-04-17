@@ -320,7 +320,7 @@ elif has_option("clang"):
 if has_option( "cc" ):
     env["CC"] = get_option( "cc" )
 
-if env['PYSYSPLATFORM'] == 'linux2':
+if env['PYSYSPLATFORM'] == 'linux2' or env['PYSYSPLATFORM'].startswith( 'freebsd' ):
     env['LINK_LIBGROUP_START'] = '-Wl,--start-group'
     env['LINK_LIBGROUP_END'] = '-Wl,--end-group'
     env['RELOBJ_LIBDEPS_START'] = '--whole-archive'
@@ -514,6 +514,7 @@ elif os.sys.platform.startswith( "freebsd" ):
     env.Append( EXTRACPPPATH=[ "/usr/local/include" ] )
     env.Append( EXTRALIBPATH=[ "/usr/local/lib" ] )
     env.Append( CPPDEFINES=[ "__freebsd__" ] )
+    env.Append( LIBS=['m'] )
 
 elif os.sys.platform.startswith( "openbsd" ):
     nix = True
@@ -649,14 +650,16 @@ if nix:
     # -Winvalid-pch Warn if a precompiled header (see Precompiled Headers) is found in the search path but can't be used.
     env.Append( CCFLAGS=["-fPIC",
                          "-fno-strict-aliasing",
+                         "-Wstrict-aliasing",
                          "-ggdb",
                          "-pthread",
                          "-Wall",
                          "-Wsign-compare",
                          "-Wno-unknown-pragmas",
+                         "-Wcast-align",
                          "-Winvalid-pch"] )
     # env.Append( " -Wconversion" ) TODO: this doesn't really work yet
-    if linux:
+    if linux and ( processor == "i386" or processor == "x86_64" ):
         env.Append( CCFLAGS=["-Werror", "-pipe"] )
         if not has_option('clang'):
             env.Append( CCFLAGS=["-fno-builtin-memcmp"] ) # glibc's memcmp is faster than gcc's
@@ -755,8 +758,70 @@ env.Append( CPPPATH=['$EXTRACPPPATH'],
 
 # --- check system ---
 
+def CheckFetchAndAdd( context ):
+    context.Message( 'Checking for __sync_fetch_and_add ...' )
+    res = context.TryLink( """
+          int main() 
+          { 
+            int x; 
+            __sync_fetch_and_add(&x, 1); 
+            __sync_add_and_fetch(&x, 1);
+            return 0; 
+          }
+""", ".cc" )
+    context.Result( res )
+    return res
+
+def CheckSwap32( context ):
+    context.Message( 'Checking for inline __builtin_bswap32 ...' )
+    res = context.TryCompile( """
+           int foo( int x ) {
+               return __builtin_bswap32( x );
+           }
+""", ".cc" )
+    
+    res = res and not 'bswap' in context.lastTarget.get_contents()
+    
+    context.Result( res )
+    return res
+
+def CheckSwap64( context ):
+    context.Message( 'Checking for inline __builtin_bswap64 ...' )
+    res = context.TryCompile( """
+           long long foo( long long x ) {
+               return __builtin_bswap64( x );
+           }
+""", ".cc" )
+    
+    res = res and not 'bswap' in context.lastTarget.get_contents()
+    
+    context.Result( res )
+    return res
+
+def CheckAlignment( context ):
+    oldCFLAGS = context.env['CFLAGS']
+    context.env['CFLAGS'] = context.env['CFLAGS'] + " -Wcast-align -Werror "
+    context.Message( 'Checking if alignment is important ...' )
+    res = context.TryLink( """
+          int main(int argc, char** argv)
+          {
+              int* y = (int*)argv[0];
+              return *y;
+          }
+""", ".c" )
+    context.env['CFLAGS'] = oldCFLAGS
+    res = not res
+    context.Result( res )
+    return res
+   
+
 def doConfigure(myenv):
-    conf = Configure(myenv)
+    conf = Configure(myenv, custom_tests = {
+        'CheckFetchAndAdd' : CheckFetchAndAdd,
+        'CheckAlignment' : CheckAlignment,
+        'CheckSwap32' : CheckSwap32,
+        'CheckSwap64' : CheckSwap64
+        })
 
     if 'CheckCXX' in dir( conf ):
         if  not conf.CheckCXX():
@@ -804,6 +869,18 @@ def doConfigure(myenv):
         if not conf.CheckLib("execinfo"):
             Exit(1)
 
+    # Look for __sync_add_and_fetch and __sync_fetch_and_add
+    if conf.CheckFetchAndAdd():
+        env.Append( CPPDEFINES = ["HAVE_SYNC_FETCH_AND_ADD"] )
+    # Check if natural alignment is important
+    if conf.CheckAlignment():
+        env.Append( CPPDEFINES = ["ALIGNMENT_IMPORTANT"] )
+    # Look for inline __builtin_bswap32
+    if conf.CheckSwap32():
+        env.Append( CPPDEFINES = ["HAVE_BSWAP32"] )
+    if conf.CheckSwap64():
+        env.Append( CPPDEFINES = ["HAVE_BSWAP64"] )
+       
     # 'tcmalloc' needs to be the last library linked. Please, add new libraries before this 
     # point.
     if has_option("tcmalloc") or has_option("heapcheck"):
@@ -1055,7 +1132,7 @@ Export("testEnv")
 Export("has_option use_system_version_of_library")
 Export("installSetup")
 Export("usesm usev8")
-Export("darwin windows solaris linux nix")
+Export("darwin windows solaris linux nix freebsd")
 
 env.SConscript( 'src/SConscript', variant_dir='$BUILD_DIR', duplicate=False )
 env.SConscript( 'src/SConscript.client', variant_dir='$BUILD_DIR/client_build', duplicate=False )

@@ -53,7 +53,7 @@ namespace mongo {
 
     inline int Namespace::hash() const {
         unsigned x = 0;
-        const char *p = buf;
+        const signed char *p = (signed char*)buf;
         while ( *p ) {
             x = x * 131 + *p;
             p++;

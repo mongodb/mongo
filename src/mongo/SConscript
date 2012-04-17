@@ -11,7 +11,7 @@ Import("testEnv")
 Import("has_option")
 Import("usesm usev8")
 Import("installSetup")
-Import("darwin windows solaris linux nix")
+Import("darwin windows solaris linux nix freebsd")
 
 env.SConscript('unittest/SConscript')
 

@@ -221,7 +221,7 @@ namespace mongo {
             Record *r = (Record *) getDur().writingPtr(d, sizeof(Record));
             d = &r->asDeleted();
             // defensive code: try to make us notice if we reference a deleted record
-            reinterpret_cast<unsigned*>( r->data() )[0] = 0xeeeeeeee;
+            little<unsigned>::ref( r->data() ) = 0xeeeeeeee; 
         }
         DEBUGGING log() << "TEMP: add deleted rec " << dloc.toString() << ' ' << hex << d->extentOfs() << endl;
         if ( isCapped() ) {

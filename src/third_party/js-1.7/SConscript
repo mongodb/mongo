@@ -1,6 +1,6 @@
 # -*- mode: python -*-
 
-Import("env windows linux darwin solaris")
+Import("env windows linux darwin solaris freebsd")
 
 def removeIfPresent(lst, item):
     try:
@@ -20,7 +20,7 @@ if windows:
 
 removeIfPresent(env['CPPDEFINES'], 'NDEBUG')
 
-if linux or darwin:
+if linux or darwin or freebsd:
     env.Append(CPPDEFINES=['HAVE_VA_COPY', 'VA_COPY=va_copy'])
 elif solaris:
     env.Append(CPPDEFINES=['SOLARIS', 'HAVE_VA_LIST_AS_ARRAY', 'SVR4', 'SYSV', 'HAVE_LOCALTIME_R'])

@@ -72,7 +72,7 @@ namespace mongo {
         InterlockedAdd((volatile long *)&x,by);
     }
 # endif
-#elif defined(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_4)
+#elif defined(HAVE_SYNC_FETCH_AND_ADD)
     // this is in GCC >= 4.1
     inline void AtomicUInt::set(unsigned newX) { __sync_synchronize(); x = newX; }
     AtomicUInt AtomicUInt::operator++() {
