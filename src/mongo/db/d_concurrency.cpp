@@ -926,17 +926,7 @@ namespace mongo {
     }
     readlocktry::~readlocktry() { 
     }
-    readlock::readlock() {
-        lk1.reset( new Lock::GlobalRead() );
-    }
-    readlock::readlock(const string& ns) {
-        if( ns.empty() ) { 
-            lk1.reset( new Lock::GlobalRead() );
-        }
-        else {
-            lk2.reset( new Lock::DBRead(ns) );
-        }
-    }
+
     /* backward compatible glue. it could be that the assumption was that 
        it's a global read lock, so 'r' and 'w' don't qualify.
        */ 

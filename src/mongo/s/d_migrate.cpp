@@ -248,7 +248,7 @@ namespace mongo {
         }
 
         void done() {
-            readlock lk( _ns );
+            Lock::DBRead lk( _ns );
 
             {
                 scoped_spinlock lk( _trackerLocks );
@@ -369,8 +369,7 @@ namespace mongo {
             long long size = 0;
 
             {
-                readlock rl( _ns );
-                Client::Context cx( _ns );
+                Client::ReadContext cx( _ns );
 
                 xfer( &_deleted , b , "deleted" , size , false );
                 xfer( &_reload , b , "reload" , size , true );
@@ -389,8 +388,7 @@ namespace mongo {
          * @return false if approximate chunk size is too big to move or true otherwise
          */
         bool storeCurrentLocs( long long maxChunkSize , string& errmsg , BSONObjBuilder& result ) {
-            readlock l( _ns );
-            Client::Context ctx( _ns );
+            Client::ReadContext ctx( _ns );
             NamespaceDetails *d = nsdetails( _ns.c_str() );
             if ( ! d ) {
                 errmsg = "ns not found, should be impossible";
@@ -479,8 +477,7 @@ namespace mongo {
 
             int allocSize;
             {
-                readlock l(_ns);
-                Client::Context ctx( _ns );
+                Client::ReadContext ctx( _ns );
                 NamespaceDetails *d = nsdetails( _ns.c_str() );
                 verify( d );
                 scoped_spinlock lk( _trackerLocks );

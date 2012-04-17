@@ -1026,7 +1026,7 @@ namespace mongo {
             // TODO: erh 1/1/2010 I think this is broken where path != dbpath ??
             set<string> allShortNames;
             {
-                readlock lk;
+                Lock::GlobalRead lk;
                 dbHolder().getAllShortNames( false, allShortNames );
             }
             
@@ -1041,9 +1041,8 @@ namespace mongo {
                 b.append( "sizeOnDisk" , (double)1.0 );
 
                 {
-                    readlock lk( name );
-                    Client::Context ctx( name );
-                    b.appendBool( "empty", ctx.db()->isEmpty() );
+                    Client::ReadContext ctx( name );
+                    b.appendBool( "empty", ctx.ctx().db()->isEmpty() );
                 }
 
                 dbInfos.push_back( b.obj() );
@@ -1760,11 +1759,11 @@ namespace mongo {
             if ( cmdObj["secs"].isNumber() )
                 secs = cmdObj["secs"].numberInt();
             if( cmdObj.getBoolField("w") ) {
-                writelock lk("");
+                Lock::GlobalWrite lk;
                 sleepsecs(secs);
             }
             else {
-                readlock lk("");
+                Lock::GlobalRead lk;
                 sleepsecs(secs);
             }
             return true;

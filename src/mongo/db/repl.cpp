@@ -174,8 +174,7 @@ namespace mongo {
             int n = 0;
             list<BSONObj> src;
             {
-                readlock lk( "local.sources" );
-                Client::Context ctx( "local.sources", dbpath, authed );
+                Client::ReadContext ctx( "local.sources", dbpath, authed );
                 shared_ptr<Cursor> c = findTableScan("local.sources", BSONObj());
                 while ( c->ok() ) {
                     src.push_back(c->current());

@@ -832,7 +832,7 @@ namespace mongo {
                 return true;
             // we have a local database.  return true if oplog isn't empty
             {
-                readlock lk(rsoplog);
+                Lock::DBRead lk(rsoplog);
                 BSONObj o;
                 if( Helpers::getFirst(rsoplog, o) )
                     return true;

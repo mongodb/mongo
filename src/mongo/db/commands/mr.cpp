@@ -1062,7 +1062,7 @@ namespace mongo {
                         // We've got a cursor preventing migrations off, now re-establish our useful cursor
 
                         // Need lock and context to use it
-                        readlock lock( config.ns );
+                        Lock::DBRead lock( config.ns );
                         // This context does no version check, safe b/c we checked earlier and have an
                         // open cursor
                         Client::Context ctx( config.ns, dbpath, true, false );

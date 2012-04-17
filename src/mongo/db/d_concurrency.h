@@ -126,15 +126,6 @@ namespace mongo {
         };
     };
 
-    // the below are for backward compatibility.  use Lock classes above instead.
-    class readlock {
-        scoped_ptr<Lock::GlobalRead> lk1;
-        scoped_ptr<Lock::DBRead> lk2;
-    public:
-        readlock(const string& ns);
-        readlock();
-    };
-
     // writelock is an old helper the code has used for a long time.
     // it now DBWrite locks if ns parm is specified. otherwise global W locks
     class writelock {
@@ -173,15 +164,15 @@ namespace mongo {
 
     /** parameterized choice of read or write locking */
     class mongolock {
-        scoped_ptr<readlock> r;
-        scoped_ptr<writelock> w;
+        scoped_ptr<Lock::GlobalRead> r;
+        scoped_ptr<Lock::GlobalWrite> w;
     public:
         mongolock(bool write) {
             if( write ) {
-                w.reset( new writelock() );
+                w.reset( new Lock::GlobalWrite() );
             }
             else {
-                r.reset( new readlock() );
+                r.reset( new Lock::GlobalRead() );
             }
         }
     };

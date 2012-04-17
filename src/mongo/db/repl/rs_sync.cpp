@@ -247,7 +247,7 @@ namespace mongo {
         }
 
         {
-            readlock lk("local.replset.minvalid");
+            Lock::DBRead lk("local.replset.minvalid");
             BSONObj mv;
             if( Helpers::getSingleton("local.replset.minvalid", mv) ) {
                 minvalid = mv["ts"]._opTime();

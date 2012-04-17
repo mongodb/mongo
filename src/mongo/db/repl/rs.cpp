@@ -374,7 +374,7 @@ namespace mongo {
     void newReplUp();
 
     void ReplSetImpl::loadLastOpTimeWritten(bool quiet) {
-        readlock lk(rsoplog);
+        Lock::DBRead lk(rsoplog);
         BSONObj o;
         if( Helpers::getLast(rsoplog, o) ) {
             lastH = o["h"].numberLong();
