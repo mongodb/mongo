@@ -195,9 +195,9 @@ namespace mongo {
     DBClientBase *BenchRunConfig::createConnection() const {
         std::string errorMessage;
         ConnectionString connectionString = ConnectionString::parse( host, errorMessage  );
-        uassert( 16149, errorMessage, connectionString.isValid() );
+        uassert( 16157, errorMessage, connectionString.isValid() );
         DBClientBase *connection = connectionString.connect(errorMessage);
-        uassert( 16150, errorMessage, connection != NULL );
+        uassert( 16158, errorMessage, connection != NULL );
         return connection;
     }
 
