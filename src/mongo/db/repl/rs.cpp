@@ -130,7 +130,7 @@ namespace mongo {
         LOG(2) << "replSet attempting to relinquish" << endl;
         if( box.getState().primary() ) {
             {
-                writelock lk("admin."); // so we are synchronized with _logOp()
+                Lock::DBWrite lk("admin."); // so we are synchronized with _logOp()
             
                 log() << "replSet relinquishing primary state" << rsLog;
                 changeState(MemberState::RS_SECONDARY);

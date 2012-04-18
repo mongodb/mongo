@@ -1951,7 +1951,9 @@ namespace mongo {
                     log() << "need glboal W lock but already have w on command : " << cmdObj.toString() << endl;
                 }
             }
-            writelock lk( global ? "" : dbname );
+            scoped_ptr<Lock::ScopedLock> lk( global ? 
+                                             static_cast<Lock::ScopedLock*>( new Lock::GlobalWrite() ) :
+                                             static_cast<Lock::ScopedLock*>( new Lock::DBWrite( dbname ) ) );
             client.curop()->ensureStarted();
             Client::Context ctx( dbname , dbpath , c->requiresAuth() );
             retval = _execCommand(c, dbname , cmdObj , queryOptions, result , fromRepl );

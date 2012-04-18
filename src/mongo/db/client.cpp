@@ -229,7 +229,7 @@ namespace mongo {
             else if( !Lock::nested() ) { 
                 lk.reset(0);
                 {
-                    writelock w;
+                    Lock::GlobalWrite w;
                     Context c(ns, path, doauth);
                 }
                 // db could be closed at this interim point -- that is ok, we will throw, and don't mind throwing.
@@ -245,6 +245,12 @@ namespace mongo {
         //       cause of bad performance due to the write lock acquisition above?  let's fix that.
         //       it would be easy to first check that there is at least a .ns file, or something similar.
     }
+
+    Client::WriteContext::WriteContext(const string& ns, string path , bool doauth ) 
+        : lk( ns ) {
+        c.reset( new Context( ns , path , doauth ) );
+    }
+
 
     void Client::Context::checkNotStale() const { 
         switch ( _client->_curOp->getOp() ) {

@@ -78,7 +78,7 @@ namespace mongo {
             virtual ~GlobalRead();
         };
         // lock this database. do not shared_lock globally first, that is handledin herein. 
-        class DBWrite : private ScopedLock {
+        class DBWrite : public ScopedLock {
             bool isW(LockState&) const;
             void lockTop(LockState&);
             void lockNestable(Nestable db);
@@ -98,7 +98,7 @@ namespace mongo {
             virtual ~DBWrite();
         };
         // lock this database for reading. do not shared_lock globally first, that is handledin herein. 
-        class DBRead : private ScopedLock {
+        class DBRead : public ScopedLock {
             bool isRW(LockState&) const;
             void lockTop(LockState&);
             void lockNestable(Nestable db);
@@ -125,16 +125,6 @@ namespace mongo {
             static void unsetR(); // reverts to greedy
             static void handoffR(); // doesn't unlock, but changes my thread state back to ''
         };
-    };
-
-    // writelock is an old helper the code has used for a long time.
-    // it now DBWrite locks if ns parm is specified. otherwise global W locks
-    class writelock {
-        scoped_ptr<Lock::GlobalWrite> lk1;
-        scoped_ptr<Lock::DBWrite> lk2;
-    public:
-        writelock(const string& ns);
-        writelock();
     };
 
     class readlocktry : boost::noncopyable {

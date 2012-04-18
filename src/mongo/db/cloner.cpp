@@ -269,12 +269,12 @@ namespace mongo {
     bool Cloner::copyCollection( const string& ns, const BSONObj& query, string& errmsg,
                                  bool mayYield, bool mayBeInterrupted, bool copyIndexes, bool logForRepl ) {
 
-        writelock lk(ns); // TODO: make this lower down
-        Client::Context ctx(ns);
+        // TODO: make this lower down
+        Client::WriteContext ctx(ns);
 
         {
             // config
-            string temp = ctx.db()->name + ".system.namespaces";
+            string temp = ctx.ctx().db()->name + ".system.namespaces";
             BSONObj config = conn->findOne( temp , BSON( "name" << ns ) );
             if ( config["options"].isABSONObj() )
                 if ( ! userCreateNS( ns.c_str() , config["options"].Obj() , errmsg, logForRepl , 0 ) )
@@ -293,7 +293,7 @@ namespace mongo {
 
         {
             // indexes
-            string temp = ctx.db()->name + ".system.indexes";
+            string temp = ctx.ctx().db()->name + ".system.indexes";
             copy( temp.c_str() , temp.c_str() , /*isindex*/true , logForRepl , false , true , mayYield, mayBeInterrupted, BSON( "ns" << ns ) );
         }
         getDur().commitIfNeeded();
@@ -691,7 +691,9 @@ namespace mongo {
             }
 
             // SERVER-4328 todo lock just the two db's not everything for the fromself case
-            writelock lk( fromSelf ? "" : todb );
+            scoped_ptr<Lock::ScopedLock> lk( fromSelf ? 
+                                             static_cast<Lock::ScopedLock*>( new Lock::GlobalWrite() ) : 
+                                             static_cast<Lock::ScopedLock*>( new Lock::DBWrite( todb ) ) );
 
             Cloner c;
             string username = cmdObj.getStringField( "username" );

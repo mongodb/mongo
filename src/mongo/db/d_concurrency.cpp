@@ -883,21 +883,8 @@ namespace mongo {
         ls.otherLock->lock_shared();
         weLocked = ls.otherLock;
     }
-}
 
-// legacy hooks and glue
-namespace mongo { 
-    writelock::writelock() { 
-        lk1.reset( new Lock::GlobalWrite() );
-    }
-    writelock::writelock(const string& ns) { 
-        if( ns.empty() ) { 
-            lk1.reset( new Lock::GlobalWrite() );
-        }
-        else {
-            lk2.reset( new Lock::DBWrite(ns) );
-        }
-    }
+
     writelocktry::writelocktry( int tryms ) : 
         _got( false ),
         _dbwlock( NULL )

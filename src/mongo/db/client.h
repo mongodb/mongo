@@ -179,6 +179,16 @@ namespace mongo {
             scoped_ptr<Context> c;
         };
 
+        class WriteContext : boost::noncopyable {
+        public:
+            WriteContext(const string& ns, string path=dbpath, bool doauth=true );
+            Context& ctx() { return *c.get(); }
+        private:
+            Lock::DBWrite lk;
+            scoped_ptr<Context> c;
+            
+        };
+
         /* Set database we want to use, then, restores when we finish (are out of scope)
            Note this is also helpful if an exception happens as the state if fixed up.
         */

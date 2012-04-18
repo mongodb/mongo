@@ -66,8 +66,7 @@ namespace mongo {
     void _logOpObjRS(const BSONObj& op);
 
     static void emptyOplog() {
-        writelock lk(rsoplog);
-        Client::Context ctx(rsoplog);
+        Client::WriteContext ctx(rsoplog);
         NamespaceDetails *d = nsdetails(rsoplog);
 
         // temp
@@ -212,8 +211,7 @@ namespace mongo {
                     sethbmsg( str::stream() << "initial sync cloning db: " << db , 0);
                     bool ok;
                     {
-                        writelock lk(db);
-                        Client::Context ctx(db);
+                        Client::WriteContext ctx(db);
                         ok = clone(sourceHostname.c_str(), db);
                     }
                     if( !ok ) {
@@ -267,9 +265,8 @@ namespace mongo {
                 
                 log() << "replSet cleaning up [1]" << rsLog;
                 {
-                    writelock lk("local.");
-                    Client::Context cx( "local." );
-                    cx.db()->flushFiles(true);
+                    Client::WriteContext cx( "local." );
+                    cx.ctx().db()->flushFiles(true);
                 }
                 log() << "replSet cleaning up [2]" << rsLog;
 
@@ -285,15 +282,14 @@ namespace mongo {
         verify( !box.getState().primary() ); // wouldn't make sense if we were.
 
         {
-            writelock lk("local.");
-            Client::Context cx( "local." );
-            cx.db()->flushFiles(true);
+            Client::WriteContext cx( "local." );
+            cx.ctx().db()->flushFiles(true);
             try {
                 log() << "replSet set minValid=" << minValid["ts"]._opTime().toString() << rsLog;
             }
             catch(...) { }
             Helpers::putSingleton("local.replset.minvalid", minValid);
-            cx.db()->flushFiles(true);
+            cx.ctx().db()->flushFiles(true);
         }
 
         sethbmsg("initial sync done",0);

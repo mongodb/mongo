@@ -340,8 +340,7 @@ namespace mongo {
                 // create the inc collection and make sure we have index on "0" key
                 _db.dropCollection( _config.incLong );
                 {
-                    writelock l( _config.incLong );
-                    Client::Context ctx( _config.incLong );
+                    Client::WriteContext ctx( _config.incLong );
                     string err;
                     if ( ! userCreateNS( _config.incLong.c_str() , BSON( "autoIndexId" << 0 << "temp" << true ) , err , false ) ) {
                         uasserted( 13631 , str::stream() << "userCreateNS failed for mr incLong ns: " << _config.incLong << " err: " << err );
@@ -355,8 +354,7 @@ namespace mongo {
             // create temp collection
             _db.dropCollection( _config.tempLong );
             {
-                writelock lock( _config.tempLong.c_str() );
-                Client::Context ctx( _config.tempLong.c_str() );
+                Client::WriteContext ctx( _config.tempLong.c_str() );
                 string errmsg;
                 if ( ! userCreateNS( _config.tempLong.c_str() , BSON("temp" << true) , errmsg , true ) ) {
                     uasserted( 13630 , str::stream() << "userCreateNS failed for mr tempLong ns: " << _config.tempLong << " err: " << errmsg );
@@ -462,7 +460,7 @@ namespace mongo {
 
             if (_config.outNonAtomic)
                 return postProcessCollectionNonAtomic(op, pm);
-            writelock lock;
+            Lock::GlobalWrite lock; // TODO: this is how it was, but seems not right??
             return postProcessCollectionNonAtomic(op, pm);
         }
 
@@ -472,7 +470,7 @@ namespace mongo {
                 return _db.count( _config.finalLong );
 
             if ( _config.outType == Config::REPLACE || _db.count( _config.finalLong ) == 0 ) {
-                writelock lock;
+                Lock::GlobalWrite lock; // TODO ????
                 // replace: just rename from temp to final collection name, dropping previous collection
                 _db.dropCollection( _config.finalLong );
                 BSONObj info;
@@ -492,7 +490,7 @@ namespace mongo {
                 op->setMessage( "m/r: merge post processing" , _db.count( _config.tempLong, BSONObj() ) );
                 auto_ptr<DBClientCursor> cursor = _db.query( _config.tempLong , BSONObj() );
                 while ( cursor->more() ) {
-                    writelock lock;
+                    Lock::DBWrite lock( _config.finalLong );
                     BSONObj o = cursor->next();
                     Helpers::upsert( _config.finalLong , o );
                     getDur().commitIfNeeded();
@@ -508,7 +506,7 @@ namespace mongo {
                 op->setMessage( "m/r: reduce post processing" , _db.count( _config.tempLong, BSONObj() ) );
                 auto_ptr<DBClientCursor> cursor = _db.query( _config.tempLong , BSONObj() );
                 while ( cursor->more() ) {
-                    writelock lock;
+                    Lock::GlobalWrite lock; // TOOD
                     BSONObj temp = cursor->next();
                     BSONObj old;
 
@@ -544,8 +542,7 @@ namespace mongo {
         void State::insert( const string& ns , const BSONObj& o ) {
             verify( _onDisk );
 
-            writelock l( ns );
-            Client::Context ctx( ns );
+            Client::WriteContext ctx( ns );
 
             theDataFileMgr.insertAndLog( ns.c_str() , o , false );
         }
@@ -833,8 +830,7 @@ namespace mongo {
                     // only 1 value for this key
                     if ( _onDisk ) {
                         // this key has low cardinality, so just write to collection
-                        writelock l(_config.incLong);
-                        Client::Context ctx(_config.incLong.c_str());
+                        Client::WriteContext ctx(_config.incLong.c_str());
                         _insertToInc( *(all.begin()) );
                     }
                     else {

@@ -59,7 +59,7 @@ namespace mongo {
         checkRsConfig();
         log() << "replSet info saving a newer config version to local.system.replset" << rsLog;
         {
-            writelock lk("");
+            Lock::GlobalWrite lk; // TODO: does this really need to be a global lock?
             Client::Context cx( rsConfigNs );
             cx.db()->flushFiles(true);
 

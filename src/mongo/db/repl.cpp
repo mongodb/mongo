@@ -703,7 +703,7 @@ namespace mongo {
             }
         }
 
-        scoped_ptr<writelock> lk( alreadyLocked ? 0 : new writelock() );
+        scoped_ptr<Lock::GlobalWrite> lk( alreadyLocked ? 0 : new Lock::GlobalWrite() );
 
         if ( replAllDead ) {
             // hmmm why is this check here and not at top of this function? does it get set between top and here?
@@ -982,7 +982,7 @@ namespace mongo {
 
                 unsigned b = replApplyBatchSize;
                 bool justOne = b == 1;
-                scoped_ptr<writelock> lk( justOne ? 0 : new writelock() );
+                scoped_ptr<Lock::GlobalWrite> lk( justOne ? 0 : new Lock::GlobalWrite() );
                 while( 1 ) {
 
                     BSONElement ts = op.getField("ts");

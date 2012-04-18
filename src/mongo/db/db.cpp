@@ -344,7 +344,7 @@ namespace mongo {
     }
 
     void checkIfReplMissingFromCommandLine() {
-        writelock lk; // _openAllFiles is false at this point, so this is helpful for the query below to work as you can't open files when readlocked
+        Lock::GlobalWrite lk; // _openAllFiles is false at this point, so this is helpful for the query below to work as you can't open files when readlocked
         if( !cmdLine.usingReplSets() ) { 
             Client::GodScope gs;
             DBDirectClient c;
@@ -360,7 +360,7 @@ namespace mongo {
     }
 
     void clearTmpCollections() {
-        writelock lk; // _openAllFiles is false at this point, so this is helpful for the query below to work as you can't open files when readlocked
+        Lock::GlobalWrite lk; // _openAllFiles is false at this point, so this is helpful for the query below to work as you can't open files when readlocked
         Client::GodScope gs;
         vector< string > toDelete;
         DBDirectClient cli;
@@ -527,8 +527,7 @@ namespace mongo {
         if( !noauth ) { 
             // open admin db in case we need to use it later. TODO this is not the right way to 
             // resolve this. 
-            writelock lk;
-            Client::Context c("admin",dbpath,false);
+            Client::WriteContext c("admin",dbpath,false);
         }
 
         listen(listenPort);
