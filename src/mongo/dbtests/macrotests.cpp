@@ -16,17 +16,27 @@
 
 #undef MONGO_EXPOSE_MACROS
 
-#define malloc 42
+// pragma push_macro only works in gcc 4.3+
 
-#include "mongo/client/redef_macros.h"
-#include "mongo/client/undef_macros.h"
+#define GCC_VERSION (__GNUC__ * 10000                 \
+                     + __GNUC_MINOR__ * 100           \
+                     + __GNUC_PATCHLEVEL__)
 
-#if malloc == 42
-#else
-# error malloc macro molested
-#endif
+#if GCC_VERSION >= 40300
 
-#undef malloc
+# define malloc 42
+
+# include "mongo/client/redef_macros.h"
+# include "mongo/client/undef_macros.h"
+
+# if malloc == 42
+# else
+#  error malloc macro molested
+# endif
+
+# undef malloc
+
+#endif // gcc 4.3
 
 #include "mongo/client/dbclient.h"
 
