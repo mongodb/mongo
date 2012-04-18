@@ -604,8 +604,12 @@ namespace mongo {
                 if ( _checkConnection( nodeConn.get(), maybePrimary, retry, i ) ) {
                     scoped_lock lk( _lock );
                     if ( _checkConnMatch_inlock( nodeConn.get(), i )) {
-                        _master = i;
                         newMaster = i;
+                        if ( newMaster != _master ) {
+                            log() << "Primary for replica set " << _name
+                                  << " changed to " << _nodes[newMaster].addr << endl;
+                        }
+                        _master = i;
 
                         if ( !checkAllSecondaries )
                             return;
@@ -642,8 +646,12 @@ namespace mongo {
                             if ( _checkConnMatch_inlock( probablePrimaryConn.get(),
                                                          probablePrimaryIdx )) {
                               
-                                _master = probablePrimaryIdx;
+
                                 newMaster = probablePrimaryIdx;
+                                if ( newMaster != _master ) {
+                                    log() << "Primary for replica set " << _name << " changed to " << _nodes[newMaster].addr << endl;
+                                }
+                                _master = probablePrimaryIdx;
 
                                 if ( ! checkAllSecondaries )
                                     return;
