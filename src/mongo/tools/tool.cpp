@@ -455,12 +455,12 @@ namespace mongo {
     }
 
     long long BSONTool::processFile( const boost::filesystem::path& root ) {
-        bool fifo = boost::filesystem::status(root).type() == boost::filesystem::fifo_file;
+        bool isFifoFile = boost::filesystem::status(root).type() == boost::filesystem::fifo_file;
 
         _fileName = root.string();
 
         unsigned long long fileLength = 0;
-        if (!fifo) {
+        if (!isFifoFile) {
             unsigned long long fileLength = file_size( root );
 
             if ( fileLength == 0 ) {
@@ -475,7 +475,7 @@ namespace mongo {
             return 0;
         }
 
-        if (!fifo) {
+        if (!isFifoFile) {
 #if !defined(__sunos__) && defined(POSIX_FADV_SEQUENTIAL)
                 posix_fadvise(fileno(file), 0, fileLength, POSIX_FADV_SEQUENTIAL);
 #endif
@@ -493,7 +493,7 @@ namespace mongo {
         // no progress is available for FIFO
         // only for regular files
         boost::scoped_ptr<ProgressMeter> m(NULL);
-        if (!fifo) {
+        if (!isFifoFile) {
             m.reset(new ProgressMeter( fileLength ));
             // boost::scoped_ptr<ProgressMeter> m( fileLength );
             m->setUnits( "bytes" );
@@ -538,14 +538,14 @@ namespace mongo {
 
             num++;
 
-            if (!fifo) {
+            if (!isFifoFile) {
                 m->hit( o.objsize() );
             }
         }
 
         fclose( file );
 
-        if (!fifo) {
+        if (!isFifoFile) {
             uassert( 10265 ,  "counts don't match" , m->done() == fileLength );
         }
         (_usesstdout ? cout : cerr ) << num << " objects found" << endl;
