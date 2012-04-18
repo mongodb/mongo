@@ -1,4 +1,8 @@
+// lockstat.h
+
+
 #include "util/timer.h"
+#include "mongo/platform/atomic_uint64.h"
 
 namespace mongo { 
 
@@ -6,15 +10,6 @@ namespace mongo {
         enum { N = 4 };
     public:
         Timer W_Timer;
-        unsigned long long timeAcquiring[N];
-        unsigned long long timeLocked[N];
-
-        LockStat() { 
-            for( int i = 0; i < N; i++ ) {
-                timeAcquiring[i] = 0;
-                timeLocked[i] = 0;
-            }
-        }
 
         struct Acquiring {
             Timer tmr;
@@ -28,18 +23,23 @@ namespace mongo {
 
         BSONObj report() const;
 
-        static unsigned map(char type);
+    private:
+        // RWrw
+        AtomicUInt64 timeAcquiring[N];
+        AtomicUInt64 timeLocked[N];
+
+        static unsigned mapNo(char type);
     };
 
     inline BSONObj LockStat::report() const { 
         BSONObjBuilder x;
         BSONObjBuilder y;
-        //x.append("R", (long long) timeLocked[0]);
+        x.append("R", (long long) timeLocked[0]);
         x.append("W", (long long) timeLocked[1]);
-        /*if( timeLocked[2] || timeLocked[3] ) {
+        if( timeLocked[2] || timeLocked[3] ) {
             x.append("r", (long long) timeLocked[2]);
             x.append("w", (long long) timeLocked[3]);
-        }*/
+        }
         y.append("R", (long long) timeAcquiring[0]);
         y.append("W", (long long) timeAcquiring[1]);
         if( timeAcquiring[2] || timeAcquiring[3] ) {
@@ -52,7 +52,7 @@ namespace mongo {
         );
     }
 
-    inline unsigned LockStat::map(char type) {
+    inline unsigned LockStat::mapNo(char type) {
         switch( type ) { 
         case 'R' : return 0;
         case 'W' : return 1;
@@ -65,7 +65,7 @@ namespace mongo {
     }
 
     inline LockStat::Acquiring::Acquiring(LockStat& _ls, char t) : ls(_ls) { 
-        type = map(t);
+        type = mapNo(t);
         dassert( type < N );
     }
 
@@ -79,7 +79,7 @@ namespace mongo {
     }
 
     inline void LockStat::unlocking(char tp) { 
-        unsigned type = map(tp);
+        unsigned type = mapNo(tp);
         if( type == 1 ) 
             timeLocked[type] += W_Timer.micros();
     }
