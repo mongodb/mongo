@@ -17,12 +17,15 @@
 #undef MONGO_EXPOSE_MACROS
 
 // pragma push_macro only works in gcc 4.3+
+// However, you had to define a special macro
+// and build gcc yourself for it to work in 4.3.
+// Version 4.4+ activate the feature by default.
 
 #define GCC_VERSION (__GNUC__ * 10000                 \
                      + __GNUC_MINOR__ * 100           \
                      + __GNUC_PATCHLEVEL__)
 
-#if GCC_VERSION >= 40300
+#if GCC_VERSION >= 40400
 
 # define malloc 42
 
