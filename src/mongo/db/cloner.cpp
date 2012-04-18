@@ -136,7 +136,7 @@ namespace mongo {
         Fun() : lastLog(0) { }
         time_t lastLog;
         void operator()( DBClientCursorBatchIterator &i ) {
-            mongolock l( true );
+            Lock::GlobalWrite lk;
             if ( context ) {
                 context->relocked();
             }

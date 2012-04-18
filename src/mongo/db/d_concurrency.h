@@ -40,15 +40,16 @@ namespace mongo {
         protected: 
             friend struct TempRelease;
             ScopedLock(); 
-            virtual ~ScopedLock();
             virtual void tempRelease() = 0;
             virtual void relock() = 0;
+        public:
+            virtual ~ScopedLock();
         };
 
         // note that for these classes recursive locking is ok if the recursive locking "makes sense"
         // i.e. you could grab globalread after globalwrite.
 
-        class GlobalWrite : private ScopedLock {
+        class GlobalWrite : public ScopedLock {
             const bool stoppedGreed;
             bool noop;
         protected:
@@ -65,7 +66,7 @@ namespace mongo {
             void downgrade(); // W -> R
             bool upgrade();   // caution see notes
         };
-        class GlobalRead : private ScopedLock { // recursive is ok
+        class GlobalRead : public ScopedLock { // recursive is ok
         public:
             bool noop;
         protected:
@@ -161,21 +162,6 @@ namespace mongo {
         }
     };
 
-
-    /** parameterized choice of read or write locking */
-    class mongolock {
-        scoped_ptr<Lock::GlobalRead> r;
-        scoped_ptr<Lock::GlobalWrite> w;
-    public:
-        mongolock(bool write) {
-            if( write ) {
-                w.reset( new Lock::GlobalWrite() );
-            }
-            else {
-                r.reset( new Lock::GlobalRead() );
-            }
-        }
-    };
 
     /** a mutex, but reported in curop() - thus a "high level" (HL) one
         some overhead so we don't use this for everything.  the externalobjsort mutex
