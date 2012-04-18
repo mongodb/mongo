@@ -13,12 +13,6 @@
 # This file, SConstruct, configures the build environment, and then delegates to
 # several, subordinate SConscript files, which describe specific build rules.
 
-import os
-
-EnsureSConsVersion( 1, 1, 0 )
-mysconsroot = ".scons/%s/%s" % ( os.uname()[0] , os.getenv( "HOST" , "nohost" ) )
-SConsignFile( mysconsroot + "/sconsign" )
-
 import buildscripts
 import buildscripts.bb
 import datetime
@@ -34,6 +28,10 @@ import urllib2
 from buildscripts import utils
 
 import libdeps
+
+EnsureSConsVersion( 1, 1, 0 )
+scons_data_dir = ".scons/%s/%s" % ( os.uname()[0] , os.getenv( "HOST" , "nohost" ) )
+SConsignFile( scons_data_dir + "/sconsign" )
 
 DEFAULT_INSTALL_DIR = "/usr/local"
 
@@ -293,8 +291,8 @@ env = Environment( BUILD_DIR=variantDir,
                    PYSYSPLATFORM=os.sys.platform,
 
                    PCRE_VERSION='8.30',
-                   CONFIGUREDIR = mysconsroot + '/sconf_temp',
-                   CONFIGURELOG = mysconsroot + '/config.log'
+                   CONFIGUREDIR = scons_data_dir + '/sconf_temp',
+                   CONFIGURELOG = scons_data_dir + '/config.log'
                    )
 
 if has_option('mute'):
