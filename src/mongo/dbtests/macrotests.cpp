@@ -25,7 +25,7 @@
                      + __GNUC_MINOR__ * 100           \
                      + __GNUC_PATCHLEVEL__)
 
-#if GCC_VERSION >= 40400
+#if GCC_VERSION >= 40402
 
 # define malloc 42
 
