@@ -13,7 +13,11 @@
 # This file, SConstruct, configures the build environment, and then delegates to
 # several, subordinate SConscript files, which describe specific build rules.
 
+import os
+
 EnsureSConsVersion( 1, 1, 0 )
+mysconsroot = ".scons/%s/%s" % ( os.uname()[0] , os.getenv( "HOST" , "nohost" ) )
+SConsignFile( mysconsroot + "/sconsign" )
 
 import buildscripts
 import buildscripts.bb
@@ -289,6 +293,8 @@ env = Environment( BUILD_DIR=variantDir,
                    PYSYSPLATFORM=os.sys.platform,
 
                    PCRE_VERSION='8.30',
+                   CONFIGUREDIR = mysconsroot + '/sconf_temp',
+                   CONFIGURELOG = mysconsroot + '/config.log'
                    )
 
 if has_option('mute'):
