@@ -16,10 +16,22 @@
 
 #undef MONGO_EXPOSE_MACROS
 
+#define malloc 42
+
+#include "mongo/client/redef_macros.h"
+#include "mongo/client/undef_macros.h"
+
+#if malloc == 42
+#else
+# error malloc macro molested
+#endif
+
+#undef malloc
+
 #include "mongo/client/dbclient.h"
 
 #ifdef malloc
-# error malloc defined 0
+# error malloc macro defined
 #endif
 
 #ifdef verify
