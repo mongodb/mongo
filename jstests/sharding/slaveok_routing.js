@@ -19,7 +19,7 @@ function doesRouteToSec( coll, query ) {
 }
 
 var rsOpts = { oplogSize: 10 };
-var st = new ShardingTest({ keyFile: 'jstests/libs/key1',
+var st = new ShardingTest({ keyFile: 'jstests/libs/key1', shards: 1,
     rs: rsOpts, other: { nopreallocj: 1 }});
 
 var mongos = st.s;
@@ -53,8 +53,8 @@ var vToFind = 0;
 jsTest.log( 'First query to SEC' );
 assert( doesRouteToSec( coll, { v: vToFind++ }));
 
-var SIG_TERM  = 15;
-replTest.stopSet( SIG_TERM, true );
+var SIG_TERM = 15;
+replTest.stopSet( SIG_TERM, true, { auth: { user: 'user', pwd: 'user' }});
 
 for ( var n = 0; n < nodeCount; n++ ) {
     replTest.restart( n, rsOpts );
@@ -83,6 +83,11 @@ ReplSetTest.awaitRSClientHosts( mongos, replTest.getSecondaries(),
 // Recheck if we can still query secondaries after refreshing connections.
 jsTest.log( 'Final query to SEC' );
 assert( doesRouteToSec( coll, { v: vToFind++ }));
+
+// Cleanup auth so Windows will be able to shutdown gracefully
+priAdminDB = replTest.getPrimary().getDB( 'admin' );
+priAdminDB.auth( 'user', 'user' );
+priAdminDB.removeUser( 'user' );
 
 st.stop();
 

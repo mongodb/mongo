@@ -643,6 +643,8 @@ ReplSetTest.prototype.start = function( n , options , restart , wait ){
  * stopped first, this function will not work.  
  * 
  * Option { startClean : true } forces clearing the data directory.
+ * Option { auth : Object } object that contains the auth details for admin credentials.
+ *   Should contain the fields 'user' and 'pwd'
  * 
  * @param {int|conn|[int|conn]} n array or single server number (0, 1, 2, ...) or conn
  */
@@ -653,7 +655,7 @@ ReplSetTest.prototype.restart = function( n , options, signal, wait ){
         signal = undefined
     }
     
-    this.stop( n, signal, wait && wait.toFixed ? wait : true )
+    this.stop( n, signal, wait && wait.toFixed ? wait : true, options )
     started = this.start( n , options , true, wait );
 
     if (jsTestOptions().keyFile && !this.keyFile) {
@@ -669,14 +671,21 @@ ReplSetTest.prototype.restart = function( n , options, signal, wait ){
     return started;
 }
 
-ReplSetTest.prototype.stopMaster = function( signal , wait ) {
+ReplSetTest.prototype.stopMaster = function( signal , wait, opts ) {
     var master = this.getMaster();
     var master_id = this.getNodeId( master );
-    return this.stop( master_id , signal , wait );
+    return this.stop( master_id , signal , wait, opts );
 }
 
-// Stops a particular node or nodes, specified by conn or id
-ReplSetTest.prototype.stop = function( n , signal, wait /* wait for stop */ ){
+/**
+ * Stops a particular node or nodes, specified by conn or id
+ *
+ * @param {number} n the index of the replica set member to stop
+ * @param {number} signal the signal number to use for killing
+ * @param {boolean} wait
+ * @param {Object} opts @see MongoRunner.stopMongod
+ */
+ReplSetTest.prototype.stop = function( n , signal, wait /* wait for stop */, opts ){
         
     // Flatten array of nodes to stop
     if( n.length ){
@@ -684,7 +693,7 @@ ReplSetTest.prototype.stop = function( n , signal, wait /* wait for stop */ ){
         
         var stopped = []
         for( var i = 0; i < nodes.length; i++ ){
-            if( this.stop( nodes[i], signal, wait ) )
+            if( this.stop( nodes[i], signal, wait, opts ) )
                 stopped.push( nodes[i] )
         }
         
@@ -705,7 +714,7 @@ ReplSetTest.prototype.stop = function( n , signal, wait /* wait for stop */ ){
     
     var port = this.getPort( n );
     print('ReplSetTest stop *** Shutting down mongod in port ' + port + ' ***');
-    var ret = MongoRunner.stopMongod( port , signal );
+    var ret = MongoRunner.stopMongod( port , signal, opts );
     
     if( ! ret || wait < 0 ) return ret
     
@@ -715,10 +724,17 @@ ReplSetTest.prototype.stop = function( n , signal, wait /* wait for stop */ ){
     return true
 }
 
-
-ReplSetTest.prototype.stopSet = function( signal , forRestart ) {
+/**
+ * Kill all members of this replica set.
+ *
+ * @param {number} signal The signal number to use for killing the members
+ * @param {boolean} forRestart will not cleanup data directory or teardown
+ *   bridges if set to true.
+ * @param {Object} opts @see MongoRunner.stopMongod
+ */
+ReplSetTest.prototype.stopSet = function( signal , forRestart, opts ) {
     for(i=0; i < this.ports.length; i++) {
-        this.stop( i, signal );
+        this.stop( i, signal, false, opts );
     }
     if ( forRestart ) { return; }
     if ( this._alldbpaths ){
@@ -910,7 +926,7 @@ ReplSetTest.prototype.overflow = function( secondaries ){
  *
  * Once you have called bridging, you cannot reconfigure the replica set.
  */
-ReplSetTest.prototype.bridge = function() {
+ReplSetTest.prototype.bridge = function( opts ) {
     if (this.bridges) {
         print("ReplSetTest bridge bridges have already been created!");
         return;
@@ -933,7 +949,7 @@ ReplSetTest.prototype.bridge = function() {
     print("ReplSetTest bridge bridges: " + this.bridges);
     
     // restart everyone independently
-    this.stopSet(null, true);
+    this.stopSet(null, true, opts );
     for (var i=0; i<n; i++) {
         this.restart(i, {noReplSet : true});
     }
@@ -961,7 +977,7 @@ ReplSetTest.prototype.bridge = function() {
         this.nodes[i].getDB("local").system.replset.update({},updateMod);
     }
 
-    this.stopSet(null, true);
+    this.stopSet( null, true, opts );
     
     // start set
     for (var i=0; i<n; i++) {
