@@ -98,8 +98,6 @@
 #include <boost/thread/condition.hpp>
 #include <boost/thread/recursive_mutex.hpp>
 #include <boost/thread/xtime.hpp>
-#undef assert
-#define assert MONGO_assert
 
 namespace mongo {
 
@@ -152,6 +150,8 @@ namespace mongo {
 }
 
 
+#include "util/allocator.h"
+#include "client/redef_macros.h"
 
 // TODO: Rework the headers so we don't need this craziness
 #include "bson/inline_decls.h"
@@ -160,7 +160,7 @@ namespace mongo {
 #include "util/debug_util.h"
 #include "util/goodies.h"
 #include "util/log.h"
-#include "util/allocator.h"
+
 #include "util/assert_util.h"
 
 namespace mongo {

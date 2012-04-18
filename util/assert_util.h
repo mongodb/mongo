@@ -171,20 +171,13 @@ namespace mongo {
     /** in the mongodb source, use verify() instead of assert().  verify is always evaluated even in release builds. */
     inline void verify( int msgid , bool testOK ) { if ( ! testOK ) verifyFailed( msgid ); }
 
-#ifdef assert
-#undef assert
-#endif
-
 #define MONGO_assert(_Expression) (void)( MONGO_likely(!!(_Expression)) || (mongo::asserted(#_Expression, __FILE__, __LINE__), 0) )
-#define assert MONGO_assert
 
     /* "user assert".  if asserts, user did something wrong, not our code */
 #define MONGO_uassert(msgid, msg, expr) (void)( MONGO_likely(!!(expr)) || (mongo::uasserted(msgid, msg), 0) )
-#define uassert MONGO_uassert
 
     /* warning only - keeps going */
 #define MONGO_wassert(_Expression) (void)( MONGO_likely(!!(_Expression)) || (mongo::wasserted(#_Expression, __FILE__, __LINE__), 0) )
-#define wassert MONGO_wassert
 
     /* display a message, no context, and throw assertionexception
 
@@ -192,7 +185,6 @@ namespace mongo {
        display happening.
     */
 #define MONGO_massert(msgid, msg, expr) (void)( MONGO_likely(!!(expr)) || (mongo::msgasserted(msgid, msg), 0) )
-#define massert MONGO_massert
 
     /* dassert is 'debug assert' -- might want to turn off for production as these
        could be slow.
@@ -202,7 +194,6 @@ namespace mongo {
 #else
 # define MONGO_dassert(x)
 #endif
-#define dassert MONGO_dassert
 
     // some special ids that we want to duplicate
 
