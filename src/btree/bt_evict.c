@@ -42,8 +42,8 @@ static inline void
 __evict_clr(WT_SESSION_IMPL *session, WT_EVICT_LIST *e)
 {
 	if (e->page != NULL) {
-		WT_ASSERT(session, F_ISSET(e->page, WT_PAGE_EVICT_LRU));
-		F_CLR(e->page, WT_PAGE_EVICT_LRU);
+		WT_ASSERT(session, F_ISSET_ATOMIC(e->page, WT_PAGE_EVICT_LRU));
+		F_CLR_ATOMIC(e->page, WT_PAGE_EVICT_LRU);
 	}
 	e->page = NULL;
 	e->btree = WT_DEBUG_POINT;
@@ -85,7 +85,7 @@ __wt_evict_clr_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 	    page->ref->state == WT_REF_LOCKED);
 
 	/* Fast path: if the page isn't on the queue, don't bother searching. */
-	if (!F_ISSET(page, WT_PAGE_EVICT_LRU))
+	if (!F_ISSET_ATOMIC(page, WT_PAGE_EVICT_LRU))
 		return;
 
 	cache = S2C(session)->cache;
@@ -98,7 +98,7 @@ __wt_evict_clr_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 			break;
 		}
 
-	WT_ASSERT(session, !F_ISSET(page, WT_PAGE_EVICT_LRU));
+	WT_ASSERT(session, !F_ISSET_ATOMIC(page, WT_PAGE_EVICT_LRU));
 
 	__wt_spin_unlock(session, &cache->lru_lock);
 }
@@ -670,7 +670,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 		 * really be skipped.
 		 */
 		if (WT_PAGE_IS_ROOT(page) ||
-		    F_ISSET(page, WT_PAGE_EVICT_LRU) ||
+		    F_ISSET_ATOMIC(page, WT_PAGE_EVICT_LRU) ||
 		    (page->modify != NULL &&
 		    F_ISSET(page->modify, WT_PM_REC_SPLIT_MERGE)))
 			continue;
@@ -686,7 +686,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 		++evict;
 
 		/* Mark the page on the list */
-		F_SET(page, WT_PAGE_EVICT_LRU);
+		F_SET_ATOMIC(page, WT_PAGE_EVICT_LRU);
 	}
 
 	*slotp += (u_int)(evict - start);
