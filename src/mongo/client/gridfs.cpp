@@ -174,26 +174,27 @@ namespace mongo {
         }
     }
 
-    GridFile::GridFile(const GridFS * grid , BSONObj obj ) {
+    GridFile::GridFile(const GridFS * grid , BSONObj obj , bool slaveOk ) {
         _grid = grid;
         _obj = obj;
+        _slaveOk = slaveOk;
     }
 
-    GridFile GridFS::findFile( const string& fileName ) const {
-        return findFile( BSON( "filename" << fileName ) );
+    GridFile GridFS::findFile( const string& fileName , bool slaveOk ) const {
+        return findFile( BSON( "filename" << fileName ) , slaveOk );
     };
 
-    GridFile GridFS::findFile( BSONObj query ) const {
+    GridFile GridFS::findFile( BSONObj query , bool slaveOk ) const {
         query = BSON("query" << query << "orderby" << BSON("uploadDate" << -1));
-        return GridFile( this , _client.findOne( _filesNS.c_str() , query ) );
+        return GridFile( this , _client.findOne( _filesNS.c_str() , query , 0 , slaveOk ? QueryOption_SlaveOk : 0 ) , slaveOk );
     }
 
-    auto_ptr<DBClientCursor> GridFS::list() const {
-        return _client.query( _filesNS.c_str() , BSONObj() );
+    auto_ptr<DBClientCursor> GridFS::list( bool slaveOk ) const {
+        return _client.query( _filesNS.c_str() , BSONObj() , 0 , slaveOk ? QueryOption_SlaveOk : 0 );
     }
 
-    auto_ptr<DBClientCursor> GridFS::list( BSONObj o ) const {
-        return _client.query( _filesNS.c_str() , o );
+    auto_ptr<DBClientCursor> GridFS::list( BSONObj o , bool slaveOk ) const {
+        return _client.query( _filesNS.c_str() , o , 0 , slaveOk ? QueryOption_SlaveOk : 0 );
     }
 
     BSONObj GridFile::getMetadata() const {
@@ -211,7 +212,7 @@ namespace mongo {
         b.appendAs( _obj["_id"] , "files_id" );
         b.append( "n" , n );
 
-        BSONObj o = _grid->_client.findOne( _grid->_chunksNS.c_str() , b.obj() );
+        BSONObj o = _grid->_client.findOne( _grid->_chunksNS.c_str() , b.obj() , 0, _slaveOk ? QueryOption_SlaveOk : 0 );
         uassert( 10014 ,  "chunk is empty!" , ! o.isEmpty() );
         return GridFSChunk(o);
     }
