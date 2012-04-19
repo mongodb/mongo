@@ -115,7 +115,7 @@ ops(void *arg)
 	uint32_t op;
 	uint8_t *keybuf, *valbuf;
 	u_int np;
-	int dir, insert, notfound, ret;
+	int dir, insert, notfound, ret, sync_drop;
 	char sync_name[64];
 
 	conn = g.wts_conn;
@@ -152,6 +152,7 @@ ops(void *arg)
 		die(ret, "session.open_cursor");
 
 	/* Pick an operation where we'll do a sync and create the name. */
+	sync_drop = 0;
 	sync_op = MMRAND(1, g.c_ops);
 	snprintf(sync_name, sizeof(sync_name), "snapshot=thread-%d", tinfo->id);
 
@@ -160,10 +161,19 @@ ops(void *arg)
 			track("read/write ops", 0ULL, tinfo);
 
 		if (cnt == sync_op) {
-			if ((ret = session->sync(
-			    session, WT_TABLENAME, sync_name)) != 0)
-				die(ret, "session.sync: %s: %s",
-				    WT_TABLENAME, sync_name);
+			if (sync_drop && (int)MMRAND(1, 4) == 1) {
+				if ((ret = session->drop(
+				    session, WT_TABLENAME, sync_name)) != 0)
+					die(ret, "session.drop: %s: %s",
+					    WT_TABLENAME, sync_name);
+				sync_drop = 0;
+			} else {
+				if ((ret = session->sync(
+				    session, WT_TABLENAME, sync_name)) != 0)
+					die(ret, "session.sync: %s: %s",
+					    WT_TABLENAME, sync_name);
+				sync_drop = 1;
+			}
 
 			/* Pick the next sync operation. */
 			sync_op += wts_rand() % 1000;
