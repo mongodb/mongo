@@ -32,7 +32,7 @@ namespace mongo {
         // must be write locked as otherwise isLoaded could go false->true on you 
         // in the background and you might not expect that.
         bool _isLoaded( const string& ns , const string& path ) const {
-            d.dbMutex.assertWriteLocked();
+            Lock::assertWriteLocked(ns);
             return __isLoaded(ns,path);
         }
 
