@@ -770,11 +770,6 @@ def doConfigure(myenv):
             print( "c++ compiler not installed!" )
             Exit(1)
 
-    if nix:
-        if not conf.CheckLib( "stdc++" ):
-            print( "can't find stdc++ library which is needed" );
-            Exit(1)
-
     if use_system_version_of_library("boost"):
         if not conf.CheckCXXHeader( "boost/filesystem/operations.hpp" ):
             print( "can't find boost headers" )
