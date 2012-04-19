@@ -247,8 +247,8 @@ namespace mongo {
     }
 
     Client::WriteContext::WriteContext(const string& ns, string path , bool doauth ) 
-        : lk( ns ) {
-        c.reset( new Context( ns , path , doauth ) );
+        : _lk( ns ) ,
+          _c( ns , path , doauth ) {
     }
 
 

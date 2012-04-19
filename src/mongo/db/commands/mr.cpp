@@ -460,7 +460,7 @@ namespace mongo {
 
             if (_config.outNonAtomic)
                 return postProcessCollectionNonAtomic(op, pm);
-            Lock::GlobalWrite lock; // TODO: this is how it was, but seems not right??
+            Lock::GlobalWrite lock; // TODO(erh): this is how it was, but seems it doesn't need to be global
             return postProcessCollectionNonAtomic(op, pm);
         }
 
@@ -470,7 +470,7 @@ namespace mongo {
                 return _db.count( _config.finalLong );
 
             if ( _config.outType == Config::REPLACE || _db.count( _config.finalLong ) == 0 ) {
-                Lock::GlobalWrite lock; // TODO ????
+                Lock::GlobalWrite lock; // TODO(erh): why global???
                 // replace: just rename from temp to final collection name, dropping previous collection
                 _db.dropCollection( _config.finalLong );
                 BSONObj info;
@@ -506,7 +506,7 @@ namespace mongo {
                 op->setMessage( "m/r: reduce post processing" , _db.count( _config.tempLong, BSONObj() ) );
                 auto_ptr<DBClientCursor> cursor = _db.query( _config.tempLong , BSONObj() );
                 while ( cursor->more() ) {
-                    Lock::GlobalWrite lock; // TOOD
+                    Lock::GlobalWrite lock; // TODO(erh) why global?
                     BSONObj temp = cursor->next();
                     BSONObj old;
 

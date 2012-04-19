@@ -269,7 +269,6 @@ namespace mongo {
     bool Cloner::copyCollection( const string& ns, const BSONObj& query, string& errmsg,
                                  bool mayYield, bool mayBeInterrupted, bool copyIndexes, bool logForRepl ) {
 
-        // TODO: make this lower down
         Client::WriteContext ctx(ns);
 
         {

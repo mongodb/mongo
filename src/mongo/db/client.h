@@ -166,7 +166,7 @@ namespace mongo {
         };
 
         //static void assureDatabaseIsOpen(const string& ns, string path=dbpath);
-
+        
         /** "read lock, and set my context, all in one operation" 
          *  This handles (if not recursively locked) opening an unopened database.
          */
@@ -177,16 +177,6 @@ namespace mongo {
         private:
             scoped_ptr<Lock::DBRead> lk;
             scoped_ptr<Context> c;
-        };
-
-        class WriteContext : boost::noncopyable {
-        public:
-            WriteContext(const string& ns, string path=dbpath, bool doauth=true );
-            Context& ctx() { return *c.get(); }
-        private:
-            Lock::DBWrite lk;
-            scoped_ptr<Context> c;
-            
         };
 
         /* Set database we want to use, then, restores when we finish (are out of scope)
@@ -247,7 +237,18 @@ namespace mongo {
             Database * _db;
         }; // class Client::Context
 
+        class WriteContext : boost::noncopyable {
+        public:
+            WriteContext(const string& ns, string path=dbpath, bool doauth=true );
+            Context& ctx() { return _c; }
+        private:
+            Lock::DBWrite _lk;
+            Context _c;
+        };
+
+
     }; // class Client
+
 
     /** get the Client object for this thread. */
     inline Client& cc() {
