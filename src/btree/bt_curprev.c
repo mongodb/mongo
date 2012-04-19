@@ -344,7 +344,7 @@ __cursor_row_prev(WT_CURSOR_BTREE *cbt, int newpage)
 		 * If we haven't instantiated keys on this page, do so, else it
 		 * is a very, very slow traversal.
 		 */
-		if (!F_ISSET(cbt->page, WT_PAGE_BUILD_KEYS))
+		if (!F_ISSET_ATOMIC(cbt->page, WT_PAGE_BUILD_KEYS))
 			WT_RET(__wt_row_leaf_keys(session, cbt->page));
 
 		if (cbt->page->entries == 0)

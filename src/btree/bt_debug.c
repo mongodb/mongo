@@ -442,7 +442,7 @@ __debug_page_hdr(WT_DBG *ds, WT_PAGE *page)
 	__dmsg(ds, ": %s", __wt_page_type_string(page->type));
 
 	__dmsg(ds, " (%s", __wt_page_is_modified(page) ? "dirty" : "clean");
-	if (F_ISSET(page, WT_PAGE_BUILD_KEYS))
+	if (F_ISSET_ATOMIC(page, WT_PAGE_BUILD_KEYS))
 		__dmsg(ds, ", keys-built");
 	if (page->modify != NULL) {
 		if (F_ISSET(page->modify, WT_PM_REC_EMPTY))

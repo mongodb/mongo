@@ -127,6 +127,26 @@
 } while (0)
 
 /*
+ * Atomic versions of F_ISSET, F_SET and F_CLR.
+ * Spin until the new value can be swapped into place.
+ */
+#define	F_ISSET_ATOMIC(p, mask)	((p)->flags_atomic & (mask))
+
+#define	F_SET_ATOMIC(p, mask)	do {					\
+	uint32_t __orig;						\
+	do {								\
+		__orig = (p)->flags_atomic;				\
+	} while (!WT_ATOMIC_CAS((p)->flags_atomic, __orig, __orig | (mask)));\
+} while (0)
+
+#define	F_CLR_ATOMIC(p, mask)	do {					\
+	uint32_t __orig;						\
+	do {								\
+		__orig = (p)->flags_atomic;				\
+	} while (!WT_ATOMIC_CAS((p)->flags_atomic, __orig, __orig & ~(mask)));\
+} while (0)
+
+/*
  * Condition variables:
  *
  * WiredTiger uses standard pthread condition variables to signal between

@@ -90,9 +90,11 @@ err:		/*
 static int
 __rec_page_clean_update(WT_SESSION_IMPL *session, WT_PAGE *page, int single)
 {
+	WT_ASSERT(session, single || page->ref->state == WT_REF_LOCKED);
+
 	/* Update the relevant WT_REF structure. */
-	WT_PUBLISH(page->ref->state, WT_REF_DISK);
 	page->ref->page = NULL;
+	WT_PUBLISH(page->ref->state, WT_REF_DISK);
 
 	return (__rec_discard_page(session, page, single));
 }
@@ -107,7 +109,6 @@ __rec_root_clean_update(WT_SESSION_IMPL *session, WT_PAGE *page, int single)
 	WT_BTREE *btree;
 
 	btree = session->btree;
-
 	btree->root_page = NULL;
 
 	return (__rec_discard_page(session, page, single));
