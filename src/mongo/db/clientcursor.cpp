@@ -171,10 +171,7 @@ namespace mongo {
         }
 
         if( foundSomeToTimeout ) {
-            // todo: ideally all readlocks automatically note what we are locking for so this 
-            // can be reported in currentop command. e.g. something like:
-            //   readlock lk("", "timeout cursors");
-            readlock lk("");
+            Lock::GlobalRead lk;
             for( LockedIterator i; i.ok(); ) {
                 ClientCursor *cc = i.current();
                 if( cc->shouldTimeout(0) ) {
@@ -457,6 +454,10 @@ namespace mongo {
     }
     
     Record* ClientCursor::_recordForYield( ClientCursor::RecordNeeds need ) {
+        
+        if ( ! ok() )
+            return 0;
+
         if ( need == DontNeed ) {
             return 0;
         }

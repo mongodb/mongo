@@ -100,7 +100,7 @@ namespace mongo {
         bool ok() const { return !eoo(); }
 
         std::string toString( bool includeFieldName = true, bool full=false) const;
-        void toString(StringBuilder& s, bool includeFieldName = true, bool full=false) const;
+        void toString(StringBuilder& s, bool includeFieldName = true, bool full=false, int depth=0) const;
         std::string jsonString( JsonStringFormat format, bool includeFieldNames = true, int pretty = 0 ) const;
         operator std::string() const { return toString(); }
 

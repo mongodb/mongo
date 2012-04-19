@@ -179,7 +179,7 @@ namespace mongo {
                 // later.  of course it could be stuck then, but this check lowers the risk if weird things
                 // are up - we probably don't want a change to apply 30 minutes after the initial attempt.
                 time_t t = time(0);
-                writelock lk("");
+                Lock::GlobalWrite lk;
                 if( time(0)-t > 20 ) {
                     errmsg = "took a long time to get write lock, so not initiating.  Initiate when server less busy?";
                     return false;

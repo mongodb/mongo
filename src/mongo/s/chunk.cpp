@@ -405,6 +405,9 @@ namespace mongo {
                 BSONObj range = shouldMigrate.embeddedObject();
                 BSONObj min = range["min"].embeddedObject();
                 BSONObj max = range["max"].embeddedObject();
+                
+                // reload sharding metadata before starting migration
+                Shard::reloadShardInfo();
 
                 Shard newLocation = Shard::pick( getShard() );
                 if ( getShard() == newLocation ) {

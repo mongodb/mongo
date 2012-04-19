@@ -180,5 +180,5 @@ res = db.runCommand( { mapreduce : "mr1" , map : m , reduce : r , out : "mr1_out
 assert( res.ok , "should be ok" );
 
 t.drop();
-t1 = db.mr1.out;
+t1 = db.mr1_out;
 t1.drop();

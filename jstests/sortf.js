@@ -17,3 +17,4 @@ for( i = 0; i < 5; ++i ) {
 }
 
 assert.eq( 5, t.find( {a:1} ).sort( {b:1} ).itcount() );
+t.drop();

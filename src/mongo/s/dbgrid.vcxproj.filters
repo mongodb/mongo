@@ -638,6 +638,9 @@
     <ClCompile Include="..\util\startup_test.cpp">
       <Filter>Shared Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\util\stacktrace.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Library Include="..\..\..\..\js\js32d.lib" />
@@ -720,6 +723,9 @@
     </ClInclude>
     <ClInclude Include="..\util\concurrency\remap_lock.h">
       <Filter>Shared Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\stacktrace.h">
+      <Filter>Header Shared</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

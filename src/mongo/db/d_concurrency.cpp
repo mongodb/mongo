@@ -32,20 +32,72 @@
 #define DB_LEVEL_LOCKING_ENABLED ( ( MONGOD_CONCURRENCY_LEVEL ) >= MONGOD_CONCURRENCY_LEVEL_DB )
 
 namespace mongo { 
+    inline BSONObj LockStat::report() const { 
+        BSONObjBuilder x;
+        BSONObjBuilder y;
+        x.append("R", (long long) timeLocked[0]);
+        x.append("W", (long long) timeLocked[1]);
+        if( timeLocked[2] || timeLocked[3] ) {
+            x.append("r", (long long) timeLocked[2]);
+            x.append("w", (long long) timeLocked[3]);
+        }
+        y.append("R", (long long) timeAcquiring[0]);
+        y.append("W", (long long) timeAcquiring[1]);
+        if( timeAcquiring[2] || timeAcquiring[3] ) {
+            y.append("r", (long long) timeAcquiring[2]);
+            y.append("w", (long long) timeAcquiring[3]);
+        }
+        return BSON(
+            "timeLocked" << x.obj() << 
+            "timeAcquiring" << y.obj()
+        );
+    }
+
+    inline unsigned LockStat::mapNo(char type) {
+        switch( type ) { 
+        case 'R' : return 0;
+        case 'W' : return 1;
+        case 'r' : return 2;
+        case 'w' : return 3;
+        default: ;
+        }
+        fassert(16146,false);
+        return 0;
+    }
+
+    inline LockStat::Acquiring::Acquiring(LockStat& _ls, char t) : ls(_ls) { 
+        type = mapNo(t);
+        dassert( type < N );
+    }
+
+    // note: we have race conditions on the following += 
+    // hmmm....
+
+    inline LockStat::Acquiring::~Acquiring() { 
+        ls.timeAcquiring[type] += tmr.micros();
+        if( type == 1 ) 
+            ls.W_Timer.reset();
+    }
+
+    inline void LockStat::unlocking(char tp) { 
+        unsigned type = mapNo(tp);
+        if( type == 1 ) 
+            timeLocked[type] += W_Timer.micros();
+    }
+}
+
+namespace mongo { 
 
     class WrapperForRWLock : boost::noncopyable { 
         SimpleRWLock r;
     public:
         string name() const { return r.name; }
         LockStat stats;
-        WrapperForRWLock(const char *name) :
-          r(name)
-        { 
-        }
-        void lock()          { LockStat::Acquiring a(stats,'W'); r.lock();        }
-        void lock_shared()   { LockStat::Acquiring a(stats,'R'); r.lock_shared(); }
-        void unlock()        { stats.unlocking('W'); r.unlock();        }
-        void unlock_shared() { stats.unlocking('R'); r.unlock_shared(); }
+        WrapperForRWLock(const char *name) : r(name) { }
+        void lock()          { LockStat::Acquiring a(stats,'W'); r.lock();          }
+        void lock_shared()   { LockStat::Acquiring a(stats,'R'); r.lock_shared();   }
+        void unlock()        { stats.unlocking('W');             r.unlock();        }
+        void unlock_shared() { stats.unlocking('R');             r.unlock_shared(); }
     };
 
     class DBTryLockTimeoutException : public std::exception {
@@ -706,6 +758,7 @@ namespace mongo {
     }
 
     void Lock::DBWrite::lockDB(const string& ns) {
+        verify( ns.size() );
         Acquiring a( 'w' );
         locked_W=false;
         locked_w=false; weLocked=0; ourCounter = 0;
@@ -734,6 +787,7 @@ namespace mongo {
         }
     }
     void Lock::DBRead::lockDB(const string& ns) {
+        verify( ns.size() );
         Acquiring a( 'r' );
         locked_r=false; weLocked=0; ourCounter = 0;
         LockState& ls = lockState();
@@ -884,21 +938,8 @@ namespace mongo {
         ls.otherLock->lock_shared();
         weLocked = ls.otherLock;
     }
-}
 
-// legacy hooks and glue
-namespace mongo { 
-    writelock::writelock() { 
-        lk1.reset( new Lock::GlobalWrite() );
-    }
-    writelock::writelock(const string& ns) { 
-        if( ns.empty() ) { 
-            lk1.reset( new Lock::GlobalWrite() );
-        }
-        else {
-            lk2.reset( new Lock::DBWrite(ns) );
-        }
-    }
+
     writelocktry::writelocktry( int tryms ) : 
         _got( false ),
         _dbwlock( NULL )
@@ -929,17 +970,7 @@ namespace mongo {
     }
     readlocktry::~readlocktry() { 
     }
-    readlock::readlock() {
-        lk1.reset( new Lock::GlobalRead() );
-    }
-    readlock::readlock(const string& ns) {
-        if( ns.empty() ) { 
-            lk1.reset( new Lock::GlobalRead() );
-        }
-        else {
-            lk2.reset( new Lock::DBRead(ns) );
-        }
-    }
+
     /* backward compatible glue. it could be that the assumption was that 
        it's a global read lock, so 'r' and 'w' don't qualify.
        */ 

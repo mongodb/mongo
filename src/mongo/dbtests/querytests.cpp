@@ -993,8 +993,7 @@ namespace QueryTests {
         void run() {
             string err;
 
-            writelock lk("");
-            Client::Context ctx( "unittests" );
+            Client::WriteContext ctx( "unittests" );
 
             // note that extents are always at least 4KB now - so this will get rounded up a bit.
             ASSERT( userCreateNS( ns() , fromjson( "{ capped : true , size : 2000 }" ) , err , false ) );
@@ -1043,8 +1042,7 @@ namespace QueryTests {
         }
 
         void run() {
-            writelock lk("");
-            Client::Context ctx( "unittests" );
+            Client::WriteContext ctx( "unittests" );
 
             for ( int i=0; i<50; i++ ) {
                 insert( ns() , BSON( "_id" << i << "x" << i * 2 ) );
@@ -1092,8 +1090,7 @@ namespace QueryTests {
         }
 
         void run() {
-            writelock lk("");
-            Client::Context ctx( "unittests" );
+            Client::WriteContext ctx( "unittests" );
 
             for ( int i=0; i<1000; i++ ) {
                 insert( ns() , BSON( "_id" << i << "x" << i * 2 ) );
@@ -1116,8 +1113,7 @@ namespace QueryTests {
         }
 
         void run() {
-            writelock lk("");
-            Client::Context ctx( "unittests" );
+            Client::WriteContext ctx( "unittests" );
 
             for ( int i=0; i<1000; i++ ) {
                 insert( ns() , BSON( "_id" << i << "x" << i * 2 ) );
@@ -1327,8 +1323,7 @@ namespace QueryTests {
             long long cursorId = cursor->getCursorId();
             
             {
-                writelock lk(ns());
-                Client::Context ctx( ns() );
+                Client::WriteContext ctx( ns() );
                 ClientCursor::Pointer pinCursor( cursorId );
   
                 ASSERT_THROWS( client().killCursor( cursorId ), MsgAssertionException );

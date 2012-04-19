@@ -2123,7 +2123,7 @@ namespace mongo {
 namespace mongo {
 
     void dropAllDatabasesExceptLocal() {
-        writelock lk("");
+        Lock::GlobalWrite lk;
 
         vector<string> n;
         getDatabaseNames(n);

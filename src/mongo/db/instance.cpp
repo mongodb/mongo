@@ -461,7 +461,7 @@ namespace mongo {
                 mongo::log(1) << "note: not profiling because doing fsync+lock" << endl;
             }
             else {
-                writelock lk;
+                Lock::DBWrite lk( currentOp.getNS() );
                 if ( dbHolder()._isLoaded( nsToDatabase( currentOp.getNS() ) , dbpath ) ) {
                     Client::Context cx( currentOp.getNS(), dbpath, false );
                     profile(c , currentOp );
@@ -546,7 +546,7 @@ namespace mongo {
         
         op.debug().query = query;
         op.setQuery(query);
-        
+
         PageFaultRetryableSection s;
         while ( 1 ) {
             try {
@@ -585,19 +585,29 @@ namespace mongo {
         op.debug().query = pattern;
         op.setQuery(pattern);
 
-        writelock lk(ns);
-
-        // writelock is used to synchronize stepdowns w/ writes
-        uassert( 10056 ,  "not master", isMasterNs( ns ) );
-
-        // if this ever moves to outside of lock, need to adjust check Client::Context::_finishInit
-        if ( ! broadcast && handlePossibleShardedMessage( m , 0 ) )
-            return;
-
-        Client::Context ctx(ns);
-
-        long long n = deleteObjects(ns, pattern, justOne, true);
-        lastError.getSafe()->recordDelete( n );
+        //PageFaultRetryableSection s;
+        while ( 1 ) {
+            try {
+                Lock::DBWrite lk(ns);
+                
+                // writelock is used to synchronize stepdowns w/ writes
+                uassert( 10056 ,  "not master", isMasterNs( ns ) );
+                
+                // if this ever moves to outside of lock, need to adjust check Client::Context::_finishInit
+                if ( ! broadcast && handlePossibleShardedMessage( m , 0 ) )
+                    return;
+                
+                Client::Context ctx(ns);
+                
+                long long n = deleteObjects(ns, pattern, justOne, true);
+                lastError.getSafe()->recordDelete( n );
+                break;
+            }
+            catch ( PageFaultException& e ) {
+                LOG(2) << "recordDelete got a PageFaultException" << endl;
+                e.touch();
+            }
+        }
     }
 
     QueryResult* emptyMoreResult(long long);
@@ -769,7 +779,7 @@ namespace mongo {
             multi.push_back( d.nextJsObj() );
         }
 
-        writelock lk(ns);
+        Lock::DBWrite lk(ns);
 
         // CONCURRENCY TODO: is being read locked in big log sufficient here?
         // writelock is used to synchronize stepdowns w/ writes
@@ -822,7 +832,7 @@ namespace mongo {
                 return true;
             // we have a local database.  return true if oplog isn't empty
             {
-                readlock lk(rsoplog);
+                Lock::DBRead lk(rsoplog);
                 BSONObj o;
                 if( Helpers::getFirst(rsoplog, o) )
                     return true;

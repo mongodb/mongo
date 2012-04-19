@@ -324,6 +324,8 @@ namespace mongo {
             globalTees->push_back( t );
         }
         
+        void removeGlobalTee( Tee * tee );
+        
         void indentInc(){ indent++; }
         void indentDec(){ indent--; }
         int getIndent() const { return indent; }

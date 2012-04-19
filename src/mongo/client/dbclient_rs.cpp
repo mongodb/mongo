@@ -313,10 +313,15 @@ namespace mongo {
         }
     }
 
-    void ReplicaSetMonitor::_checkStatus(DBClientConnection *conn) {
+    void ReplicaSetMonitor::_checkStatus( const string& hostAddr ) {
         BSONObj status;
 
-        if (!conn->runCommand("admin", BSON("replSetGetStatus" << 1), status) ) {
+        /* replSetGetStatus requires admin auth so use a connection from the pool,
+         * which are authenticated with the keyFile credentials.
+         */
+        ScopedDbConnection authenticatedConn( hostAddr );
+
+        if ( !authenticatedConn->runCommand( "admin", BSON( "replSetGetStatus" << 1 ), status )) {
             LOG(1) << "dbclient_rs replSetGetStatus failed" << endl;
             return;
         }
@@ -542,7 +547,7 @@ namespace mongo {
             }
             
             _checkHosts( b.arr(), changed);
-            _checkStatus( conn );
+            _checkStatus( conn->getServerAddress() );
 
         }
         catch ( std::exception& e ) {
@@ -552,7 +557,7 @@ namespace mongo {
             errorOccured = true;
         }
 
-        if ( errorOccured ) {
+        if ( errorOccured && nodesOffset >= 0 ) {
             scoped_lock lk( _lock );
             _nodes[nodesOffset].ok = false;
         }
@@ -653,6 +658,12 @@ namespace mongo {
                 return;
 
             sleepsecs( 1 );
+        }
+
+        {
+            warning() << "No primary detected for set " << _name << endl;
+            scoped_lock lk( _lock );
+            _master = -1;
         }
     }
 

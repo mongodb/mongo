@@ -36,10 +36,7 @@
 #ifndef __LINENOISE_H
 #define __LINENOISE_H
 
-struct linenoiseCompletions {
-  int       completionCount;
-  char * *  completionStrings;
-};
+struct linenoiseCompletions;
 
 typedef void( linenoiseCompletionCallback )( const char *, linenoiseCompletions * );
 void linenoiseSetCompletionCallback( linenoiseCompletionCallback * fn );

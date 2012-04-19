@@ -1172,7 +1172,7 @@ jsTest.isMongos = function(conn) {
 jsTest.attempt = function( opts, func ) {
     var timeout = opts.timeout || 1000;
     var tries   = 0;
-    var sleepTime = 500;
+    var sleepTime = 2000;
     var result = null;
     var context = opts.context || this;
 
@@ -1267,7 +1267,7 @@ shellAutocomplete = function ( /*prefix*/ ) { // outer scope function called on 
     builtinMethods[Mongo] = "find update insert remove".split( ' ' );
     builtinMethods[BinData] = "hex base64 length subtype".split( ' ' );
 
-    var extraGlobals = "Infinity NaN undefined null true false decodeURI decodeURIComponent encodeURI encodeURIComponent escape eval isFinite isNaN parseFloat parseInt unescape Array Boolean Date Math Number RegExp String print load gc MinKey MaxKey Mongo NumberLong ObjectId DBPointer UUID BinData Map".split( ' ' );
+    var extraGlobals = "Infinity NaN undefined null true false decodeURI decodeURIComponent encodeURI encodeURIComponent escape eval isFinite isNaN parseFloat parseInt unescape Array Boolean Date Math Number RegExp String print load gc MinKey MaxKey Mongo NumberInt NumberLong ObjectId DBPointer UUID BinData Map".split( ' ' );
 
     var isPrivate = function( name ) {
         if ( shellAutocomplete.showPrivate ) return false;

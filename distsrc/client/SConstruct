@@ -44,7 +44,7 @@ env.Append(CPPDEFINES=[ "_SCONS", "MONGO_EXPOSE_MACROS" ])
 
 nix = False
 linux = False
-
+win = False
 
 if "darwin" == sys.platform:
     addExtraLibs( "/opt/local/" )
@@ -52,8 +52,10 @@ if "darwin" == sys.platform:
 elif sys.platform in ("linux2", "linux3"):
     nix = True
     linux = True
+elif sys.platform == 'win32':
+    win = True
 
-if sys.platform == 'win32':
+if win:
     env['DIST_ARCHIVE_SUFFIX'] = '.zip'
     env.Append(CCFLAGS=['/EHsc', '/O2'])
 else:
@@ -69,7 +71,8 @@ conf = Configure(env)
 for lib in boostLibs:
     if not conf.CheckLib(["boost_%s-mt" % lib, "boost_%s" % lib],
                          language="C++"):
-        Exit(1)
+        if not win:
+            Exit(1)
 conf.Finish()
 
 clientEnv = env.Clone()

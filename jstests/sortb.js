@@ -24,3 +24,4 @@ for( i = 200; i < 300; ++i ) {
 
 assert.throws( function() { t.find().sort( {a:-1} ).hint( {b:1} ).limit( 100 ).itcount(); } );
 assert.throws( function() { t.find().sort( {a:-1} ).hint( {b:1} ).showDiskLoc().limit( 100 ).itcount(); } );
+t.drop();

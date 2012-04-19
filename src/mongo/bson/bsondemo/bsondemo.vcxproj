@@ -158,7 +158,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>..\..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..;..\..\..\third_party\boost</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>BOOST_ALL_NO_LIB;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>No</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
@@ -179,7 +179,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>..\..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..;..\..\..\third_party\boost</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>BOOST_ALL_NO_LIB;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>No</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
@@ -200,7 +200,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>..\..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..;..\..\..\third_party\boost</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>BOOST_ALL_NO_LIB;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
@@ -220,7 +220,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>..\..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..;..\..\..\third_party\boost</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>BOOST_ALL_NO_LIB;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
@@ -248,7 +248,7 @@
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
-      <AdditionalIncludeDirectories>..\..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..;..\..\..\third_party\boost</AdditionalIncludeDirectories>
       <MinimalRebuild>No</MinimalRebuild>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <DisableSpecificWarnings>4355;4800;4267;4244</DisableSpecificWarnings>
@@ -272,7 +272,7 @@
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
-      <AdditionalIncludeDirectories>..\..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..;..\..\..\third_party\boost</AdditionalIncludeDirectories>
       <MinimalRebuild>No</MinimalRebuild>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <DisableSpecificWarnings>4355;4800;4267;4244</DisableSpecificWarnings>
@@ -296,7 +296,7 @@
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
-      <AdditionalIncludeDirectories>..\..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..;..\..\..\third_party\boost</AdditionalIncludeDirectories>
       <MinimalRebuild>No</MinimalRebuild>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <DisableSpecificWarnings>4355;4800;4267;4244</DisableSpecificWarnings>
@@ -319,7 +319,7 @@
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
-      <AdditionalIncludeDirectories>..\..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..;..\..\..\third_party\boost</AdditionalIncludeDirectories>
       <MinimalRebuild>No</MinimalRebuild>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <DisableSpecificWarnings>4355;4800;4267;4244</DisableSpecificWarnings>

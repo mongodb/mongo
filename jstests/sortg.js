@@ -64,3 +64,4 @@ noMemoryException( {_id:1}, {b:null} );
 // retried when the unindexed plan exhausts its memory limit.
 assert.eq( 'BtreeCursor b_1', t.find( {b:0} ).sort( {_id:1} ).explain().cursor ); // Record b:1 plan
 noMemoryException( {_id:1}, {b:null} );
+t.drop();

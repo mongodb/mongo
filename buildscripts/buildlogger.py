@@ -32,6 +32,7 @@ import sys
 import time
 import traceback
 import urllib2
+import utils
 
 try:
     import json
@@ -322,6 +323,7 @@ def loop_and_callback(command, callback):
     while proc.poll() is None:
         try:
             line = proc.stdout.readline().strip('\r\n')
+            line = utils.unicode_dammit(line)
             callback(line)
         except IOError:
             # if the signal handler is called while

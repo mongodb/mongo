@@ -13,8 +13,6 @@
 # This file, SConstruct, configures the build environment, and then delegates to
 # several, subordinate SConscript files, which describe specific build rules.
 
-EnsureSConsVersion( 1, 1, 0 )
-
 import buildscripts
 import buildscripts.bb
 import datetime
@@ -30,6 +28,13 @@ import urllib2
 from buildscripts import utils
 
 import libdeps
+
+EnsureSConsVersion( 1, 1, 0 )
+if "uname" in dir(os):
+    scons_data_dir = ".scons/%s/%s" % ( os.uname()[0] , os.getenv( "HOST" , "nohost" ) )
+else:
+    scons_data_dir = ".scons/%s/" % os.getenv( "HOST" , "nohost" )
+SConsignFile( scons_data_dir + "/sconsign" )
 
 DEFAULT_INSTALL_DIR = "/usr/local"
 
@@ -289,6 +294,8 @@ env = Environment( BUILD_DIR=variantDir,
                    PYSYSPLATFORM=os.sys.platform,
 
                    PCRE_VERSION='8.30',
+                   CONFIGUREDIR = scons_data_dir + '/sconf_temp',
+                   CONFIGURELOG = scons_data_dir + '/config.log'
                    )
 
 if has_option('mute'):
@@ -779,8 +786,11 @@ def doConfigure(myenv):
                                    l + boostCompiler + boostVersion ], language='C++' ):
                 Exit(1)
 
-    if not conf.CheckCXXHeader( "execinfo.h" ):
-        myenv.Append( CPPDEFINES=[ "NOEXECINFO" ] )
+    if (conf.CheckCXXHeader( "execinfo.h" ) and
+        conf.CheckDeclaration('backtrace', includes='#include <execinfo.h>') and
+        conf.CheckDeclaration('backtrace_symbols', includes='#include <execinfo.h>')):
+
+        myenv.Append( CPPDEFINES=[ "MONGO_HAVE_EXECINFO_BACKTRACE" ] )
 
     myenv["_HAVEPCAP"] = conf.CheckLib( ["pcap", "wpcap"], autoadd=False )
 

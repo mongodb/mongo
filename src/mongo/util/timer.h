@@ -17,111 +17,63 @@
 
 #pragma once
 
-#include "time_support.h"
-
 namespace mongo {
 
-#if !defined(_WIN32)
-
     /**
-     *  simple scoped timer
+     * Time tracking object.
+     *
+     * Should be of reasonably high performance, though the implementations are platform-specific.
+     * Each platform provides a distinct implementation of the now() method, and sets the
+     * _countsPerSecond static field to the constant number of ticks per second that now() counts
+     * in.  The maximum span measurable by the counter and convertible to microseconds is about 10
+     * trillion ticks.  As long as there are fewer than 100 ticks per nanosecond, timer durations of
+     * 2.5 years will be supported.  Since a typical tick duration will be under 10 per nanosecond,
+     * if not below 1 per nanosecond, this should not be an issue.
      */
     class Timer /*copyable*/ {
     public:
+        static const unsigned long long millisPerSecond = 1000;
+        static const unsigned long long microsPerSecond = 1000 * millisPerSecond;
+
         Timer() { reset(); }
         int seconds() const { return (int)(micros() / 1000000); }
         int millis() const { return (int)(micros() / 1000); }
         int minutes() const { return seconds() / 60; }
-        
 
-        /** gets time interval and resets at the same time.  this way we can call curTimeMicros
-              once instead of twice if one wanted millis() and then reset().
-            @return time in millis
-        */
-        int millisReset() { 
-            unsigned long long now = curTimeMicros64();
-            int m = (int)((now-old)/1000);
-            old = now;
-            return m;
-        }
-        unsigned long long microsReset() { 
-            unsigned long long now = curTimeMicros64();
-            unsigned long long m = now-old;
-            old = now;
-            return m;
+
+        /** Get the time interval and reset at the same time.
+         *  @return time in milliseconds.
+         */
+        inline int millisReset() {
+            unsigned long long nextNow = now();
+            unsigned long long deltaMicros =
+                ((nextNow - _old) * microsPerSecond) / _countsPerSecond;
+
+            _old = nextNow;
+            return static_cast<int>(deltaMicros / 1000);
         }
 
-        // note: dubious that the resolution is as anywhere near as high as ethod name implies!
-        unsigned long long micros() const {
-            unsigned long long n = curTimeMicros64();
-            return n - old;
-        }
-        unsigned long long micros(unsigned long long & n) const { // returns cur time in addition to timer result
-            n = curTimeMicros64();
-            return n - old;
+        inline unsigned long long micros() const {
+            return ((now() - _old) * microsPerSecond) / _countsPerSecond;
         }
 
-        void reset() { old = curTimeMicros64(); }
-    private:
-        unsigned long long old;
-    };
+        inline void reset() { _old = now(); }
 
-#else
-
-    class Timer /*copyable*/ {
-    public:
-        Timer() { reset(); }
-
-        int seconds() const { 
-            int s = static_cast<int>((now() - old) / countsPerSecond);
-            return s;
-        }
-
-        int millis() const { 
-            return (int)
-                    ((now() - old) * 1000.0 / countsPerSecond);
-        }
-
-        int minutes() const { return seconds() / 60; }
-        
-        /** gets time interval and resets at the same time.  this way we can call curTimeMicros
-              once instead of twice if one wanted millis() and then reset().
-            @return time in millis
-        */
-        int millisReset() { 
-            unsigned long long nw = now();
-            int m = static_cast<int>((nw - old) * 1000.0 / countsPerSecond);
-            old = nw;
-            return m;
-       } 
-       unsigned long long microsReset() { 
-            unsigned long long nw = now();
-            unsigned long long m = (nw - old) * 1000000.0 / countsPerSecond;
-            old = nw;
-            return m;
-       } 
-
-        void reset() { 
-            old = now();
-        }            
-
-        unsigned long long micros() const {
-            return (unsigned long long)
-                    ((now() - old) * 1000000.0 / countsPerSecond);
-        }
-
-        static unsigned long long countsPerSecond;
+        /**
+         * Internally, the timer counts platform-dependent ticks of some sort, and
+         * must then convert those ticks to microseconds and their ilk.  This field
+         * stores the frequency of the platform-dependent counter.
+         *
+         * This value is initialized at program startup, and never changed after.
+         * It should be treated as private.
+         */
+        static unsigned long long _countsPerSecond;
 
     private:
-        unsigned long long now() const {
-            LARGE_INTEGER i;
-            QueryPerformanceCounter(&i);
-            return i.QuadPart;
-        }
+        inline unsigned long long now() const;
 
-        unsigned long long old;
+        unsigned long long _old;
     };
-
-#endif
-
 }  // namespace mongo
+
+#include "mongo/util/timer-inl.h"
