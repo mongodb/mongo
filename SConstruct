@@ -30,7 +30,10 @@ from buildscripts import utils
 import libdeps
 
 EnsureSConsVersion( 1, 1, 0 )
-scons_data_dir = ".scons/%s/%s" % ( os.uname()[0] , os.getenv( "HOST" , "nohost" ) )
+if "uname" in dir(os):
+    scons_data_dir = ".scons/%s/%s" % ( os.uname()[0] , os.getenv( "HOST" , "nohost" ) )
+else:
+    scons_data_dir = ".scons/%s/" % os.getenv( "HOST" , "nohost" )
 SConsignFile( scons_data_dir + "/sconsign" )
 
 DEFAULT_INSTALL_DIR = "/usr/local"
