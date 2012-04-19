@@ -116,7 +116,6 @@ __bit_clear(uint8_t *bitf, uint32_t bit)
 	bitf[__bit_byte(bit)] &= ~__bit_mask(bit);
 }
 
-#ifdef __NOT_CURRENTLY_USED
 /*
  * __bit_nclr --
  *	Clear bits start-to-stop in name.
@@ -140,7 +139,6 @@ __bit_nclr(uint8_t *bitf, uint32_t start, uint32_t stop)
 		bitf[stopbyte] &= 0xff << ((stop & 0x7) + 1);
 	}
 }
-#endif
 
 /*
  * __bit_nset --
@@ -195,7 +193,6 @@ __bit_ffc(uint8_t *bitf, uint32_t nbits, uint32_t *retp)
 	return (0);
 }
 
-#ifdef __NOT_CURRENTLY_USED
 /*
  * __bit_ffs --
  *	Find first set bit in name, return 0 on success, -1 on no bit set.
@@ -224,7 +221,6 @@ __bit_ffs(uint8_t *bitf, uint32_t nbits, uint32_t *retp)
 	*retp = value;
 	return (0);
 }
-#endif
 
 /*
  * __bit_getv --

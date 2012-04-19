@@ -149,14 +149,15 @@ struct __wt_block {
 	WT_COMPRESSOR *compressor;	/* Page compressor */
 
 					/* Salvage support */
-	int	 slvg;			/* If performing salvage. */
-	off_t	 slvg_off;		/* Salvage file offset */
+	int	slvg;			/* If performing salvage. */
+	off_t	slvg_off;		/* Salvage file offset */
 
 	int	 verify;		/* Verification support */
-	uint32_t frags;			/* Total frags */
+	off_t	 verify_size;		/* Snapshot's file size */
+	WT_EXTLIST verify_alloc;	/* Verification allocation list */
+	uint32_t frags;			/* Maximum frags in the file */
 	uint8_t *fragfile;		/* Per-file frag tracking list */
 	uint8_t *fragsnap;		/* Per-snapshot frag tracking list */
-
 };
 
 /*

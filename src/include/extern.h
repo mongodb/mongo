@@ -28,6 +28,10 @@ extern int __wt_block_snapshot_to_buffer(WT_SESSION_IMPL *session,
     uint8_t **pp,
     WT_BLOCK_SNAPSHOT *si);
 extern uint32_t __wt_cksum(const void *chunk, size_t len);
+extern int __wt_block_off_remove( WT_SESSION_IMPL *session,
+    WT_EXTLIST *el,
+    off_t off,
+    off_t size);
 extern int __wt_block_alloc( WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     off_t *offp,
@@ -40,18 +44,19 @@ extern int __wt_block_free(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     const uint8_t *addr,
     uint32_t addr_size);
-extern int __wt_block_free_ext( WT_SESSION_IMPL *session,
-    off_t off,
-    off_t size,
-    WT_EXTLIST *el);
-extern int __wt_block_extlist_check(WT_SESSION_IMPL *session,
-    WT_BLOCK_SNAPSHOT *si);
+extern int __wt_block_extlist_check( WT_SESSION_IMPL *session,
+    WT_EXTLIST *al,
+    WT_EXTLIST *bl);
 extern int __wt_block_extlist_match( WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     WT_BLOCK_SNAPSHOT *si);
 extern int __wt_block_extlist_merge(WT_SESSION_IMPL *session,
     WT_EXTLIST *a,
     WT_EXTLIST *b);
+extern int __wt_block_insert_ext( WT_SESSION_IMPL *session,
+    WT_EXTLIST *el,
+    off_t off,
+    off_t size);
 extern int __wt_block_extlist_read( WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     WT_EXTLIST *el);
@@ -113,7 +118,8 @@ extern int __wt_bm_salvage_next(WT_SESSION_IMPL *session,
     uint64_t *write_genp,
     int *eofp);
 extern int __wt_bm_salvage_end(WT_SESSION_IMPL *session);
-extern int __wt_bm_verify_start(WT_SESSION_IMPL *session);
+extern int __wt_bm_verify_start(WT_SESSION_IMPL *session,
+    WT_SNAPSHOT *snapbase);
 extern int __wt_bm_verify_end(WT_SESSION_IMPL *session);
 extern int __wt_bm_verify_addr(WT_SESSION_IMPL *session,
     const uint8_t *addr,
@@ -164,7 +170,9 @@ extern int __wt_block_snapshot(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     WT_ITEM *buf,
     WT_SNAPSHOT *snapbase);
-extern int __wt_block_verify_start(WT_SESSION_IMPL *session, WT_BLOCK *block);
+extern int __wt_block_verify_start( WT_SESSION_IMPL *session,
+    WT_BLOCK *block,
+    WT_SNAPSHOT *snapbase);
 extern int __wt_block_verify_end(WT_SESSION_IMPL *session, WT_BLOCK *block);
 extern int __wt_verify_snap_load( WT_SESSION_IMPL *session,
     WT_BLOCK *block,

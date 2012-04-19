@@ -412,44 +412,30 @@ __wt_block_free(WT_SESSION_IMPL *session,
 	int ret;
 
 	WT_UNUSED(addr_size);
+	WT_BSTAT_INCR(session, free);
 
 	/* Crack the cookie. */
 	WT_RET(__wt_block_buffer_to_addr(block, addr, &off, &size, &cksum));
 
+	WT_VERBOSE(session, block,
+	    "free %" PRIdMAX "/%" PRIdMAX, (intmax_t)off, (intmax_t)size);
+
 	/* Lock the system and free the extent. */
 	__wt_spin_lock(session, &block->live_lock);
-	ret = __wt_block_free_ext(session, off, size, &block->live.discard);
+	ret = __block_merge(session, &block->live.discard, off, (off_t)size);
 	__wt_spin_unlock(session, &block->live_lock);
 
 	return (ret);
 }
 
-/*
- * __wt_block_free_ext --
- *	Free a chunk of space to the underlying file.
- */
-int
-__wt_block_free_ext(
-    WT_SESSION_IMPL *session, off_t off, off_t size, WT_EXTLIST *el)
-{
-	WT_BSTAT_INCR(session, free);
-	WT_VERBOSE(session, block,
-	    "free %" PRIdMAX "/%" PRIdMAX, (intmax_t)off, (intmax_t)size);
-
-	/*
-	 * Callers of this function are expected to be holding any locks
-	 * required to free the buffer.
-	 */
-	return (__block_merge(session, el, off, (off_t)size));
-}
-
 #ifdef HAVE_DIAGNOSTIC
 /*
- * __wt_block_extlist_check, __block_extlist_check2 --
- *	Fail if any of the extent lists overlap.
+ * __wt_block_extlist_check --
+ *	Return if the extent lists overlap.
  */
-static int
-__block_extlist_check2(WT_SESSION_IMPL *session, WT_EXTLIST *al, WT_EXTLIST *bl)
+int
+__wt_block_extlist_check(
+    WT_SESSION_IMPL *session, WT_EXTLIST *al, WT_EXTLIST *bl)
 {
 	WT_EXT *a, *b;
 
@@ -474,16 +460,6 @@ __block_extlist_check2(WT_SESSION_IMPL *session, WT_EXTLIST *al, WT_EXTLIST *bl)
 		    "snapshot merge check: %s list overlaps the %s list",
 		    al->name, bl->name);
 	}
-	return (0);
-}
-
-int
-__wt_block_extlist_check(WT_SESSION_IMPL *session, WT_BLOCK_SNAPSHOT *si)
-{
-	/* Check the extent list combinations for overlaps. */
-	WT_RET(__block_extlist_check2(session, &si->alloc, &si->avail));
-	WT_RET(__block_extlist_check2(session, &si->discard, &si->avail));
-	WT_RET(__block_extlist_check2(session, &si->alloc, &si->discard));
 	return (0);
 }
 #endif
@@ -731,9 +707,19 @@ __wt_block_extlist_merge(WT_SESSION_IMPL *session, WT_EXTLIST *a, WT_EXTLIST *b)
 }
 
 /*
- * __block_merge --
+ * __wt_block_insert_ext, __block_merge --
  *	Insert an extent into an extent list, merging if possible.
  */
+int
+__wt_block_insert_ext(
+    WT_SESSION_IMPL *session, WT_EXTLIST *el, off_t off, off_t size)
+{
+	/*
+	 * Callers of this function are expected to be holding any locks
+	 * required to manipulate the extent list.
+	 */
+	return (__block_merge(session, el, off, (off_t)size));
+}
 static int
 __block_merge(WT_SESSION_IMPL *session, WT_EXTLIST *el, off_t off, off_t size)
 {

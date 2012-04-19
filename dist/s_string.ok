@@ -259,6 +259,7 @@ fcntl
 ffc
 ffs
 fh
+filefrag
 filename
 fileops
 filesize
@@ -431,6 +432,7 @@ skiplist
 skiplists
 slvg
 snapall
+snapfrag
 snapfrom
 snapto
 snprintf

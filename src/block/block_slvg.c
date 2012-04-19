@@ -17,6 +17,9 @@ __wt_block_salvage_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	off_t len;
 	uint32_t allocsize;
 
+	/* Reset the description sector. */
+	WT_RET(__wt_desc_init(session, block->fh));
+
 	/*
 	 * Truncate the file to an initial sector plus N allocation size
 	 * units (bytes trailing the last multiple of an allocation size
@@ -29,18 +32,22 @@ __wt_block_salvage_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
 		len += WT_BLOCK_DESC_SECTOR;
 		if (len != block->fh->file_size)
 			WT_RET(__wt_ftruncate(session, block->fh, len));
-	}
+	} else
+		len = WT_BLOCK_DESC_SECTOR;
 
-	/* Reset the description sector. */
-	WT_RET(__wt_desc_init(session, block->fh));
-
-	/* The first sector of the file is the description record, skip it. */
+	/*
+	 * The first sector of the file is the description record, skip it as
+	 * we read the file.
+	 */
 	block->slvg_off = WT_BLOCK_DESC_SECTOR;
 
 	/*
-	 * We don't currently need to do anything about the snapshot extents
-	 * because we don't read them for salvage operations.
+	 * The only snapshot extent we care about is the allocation list.  Start
+	 * with the entire file on the allocation list, we'll "free" any blocks
+	 * we don't want as we process the file.
 	 */
+	WT_RET(__wt_block_insert_ext(session, &block->live.alloc,
+	    WT_BLOCK_DESC_SECTOR, len - WT_BLOCK_DESC_SECTOR));
 
 	block->slvg = 1;
 	return (0);
@@ -123,13 +130,9 @@ skip:			WT_VERBOSE(session, salvage,
 			/*
 			 * Free the block and make sure we don't return it more
 			 * than once.
-			 *
-			 * If performing salvage, snapshots no longer apply so
-			 * blocks can be immediately re-used.  Free to the live
-			 * system's avail list.
 			 */
-			WT_RET(__wt_block_free_ext(session,
-			    offset, (off_t)allocsize, &block->live.avail));
+			WT_RET(__wt_block_insert_ext(session,
+			    &block->live.discard, offset, (off_t)allocsize));
 			block->slvg_off = offset += allocsize;
 			continue;
 		}

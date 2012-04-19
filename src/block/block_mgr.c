@@ -317,14 +317,14 @@ __wt_bm_salvage_end(WT_SESSION_IMPL *session)
  *	Start a block manager salvage.
  */
 int
-__wt_bm_verify_start(WT_SESSION_IMPL *session)
+__wt_bm_verify_start(WT_SESSION_IMPL *session, WT_SNAPSHOT *snapbase)
 {
 	WT_BLOCK *block;
 
 	if ((block = session->btree->block) == NULL)
 		return (__bm_invalid(session));
 
-	return (__wt_block_verify_start(session, block));
+	return (__wt_block_verify_start(session, block, snapbase));
 }
 
 /*

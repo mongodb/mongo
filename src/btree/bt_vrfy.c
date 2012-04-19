@@ -96,11 +96,11 @@ __verify_int(WT_SESSION_IMPL *session, int dumpfile)
 	WT_ERR(__wt_scr_alloc(session, 0, &vs->tmp1));
 	WT_ERR(__wt_scr_alloc(session, 0, &vs->tmp2));
 
-	/* Inform the underlying block manager we're verifying. */
-	WT_ERR(__wt_bm_verify_start(session));
-
 	/* Get a list of the snapshots for this file. */
 	WT_ERR(__wt_session_snap_list_get(session, NULL, &snapbase));
+
+	/* Inform the underlying block manager we're verifying. */
+	WT_ERR(__wt_bm_verify_start(session, snapbase));
 
 	/* Loop through the file's snapshots, verifying each one. */
 	WT_SNAPSHOT_FOREACH(snapbase, snap) {
