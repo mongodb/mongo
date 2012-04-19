@@ -15,10 +15,141 @@
  */
 
 #include "mongo/pch.h"
-#include "mongo/db/repl/rs.h"
+#include "mongo/db/repl/bgsync.h"
 #include "mongo/db/client.h"
 
 namespace mongo {
+namespace replset {
+    BackgroundSync* BackgroundSync::s_instance = 0;
+    boost::mutex BackgroundSync::s_mutex;
+
+    BackgroundSyncInterface::~BackgroundSyncInterface() {}
+
+    BackgroundSync::BackgroundSync() : _oplogMarkerTarget(NULL),
+                                       _oplogMarker(true /* doHandshake */),
+                                       _consume(0, 0) {
+    }
+
+    BackgroundSync* BackgroundSync::get() {
+        // TODO: SERVER-5112 DCLP is not thread safe
+        if (s_instance == NULL) {
+            boost::unique_lock<boost::mutex> lock(s_mutex);
+            if (s_instance == NULL && !inShutdown()) {
+                s_instance = new BackgroundSync();
+            }
+        }
+        return s_instance;
+    }
+
+    void BackgroundSync::notifierThread() {
+        Client::initThread("rsSyncNotifier");
+        replLocalAuth();
+
+        while (!inShutdown()) {
+            bool ex = false;
+
+            if (!theReplSet) {
+                sleepsecs(5);
+                continue;
+            }
+
+            MemberState state = theReplSet->state();
+            if (state.primary() || state.fatal() || state.startup()) {
+                sleepsecs(5);
+                continue;
+            }
+
+            try {
+                markOplog();
+            }
+            catch (DBException &e) {
+                ex = true;
+                log() << "replset tracking exception: " << e.getInfo() << rsLog;
+                sleepsecs(1);
+            }
+            catch (std::exception &e2) {
+                ex = true;
+                log() << "replset tracking error" << e2.what() << rsLog;
+                sleepsecs(10);
+            }
+            catch (...) {
+                ex = true;
+                log() << "replset unknown tracking error" << rsLog;
+                sleepsecs(20);
+            }
+
+            if (ex) {
+                boost::unique_lock<boost::mutex> lock(_mutex);
+                _oplogMarkerTarget = NULL;
+            }
+        }
+
+        cc().shutdown();
+    }
+
+    void BackgroundSync::markOplog() {
+        LOG(3) << "replset markOplog: " << _consume << " " << theReplSet->lastOpTimeWritten << rsLog;
+
+        if (!getCursor()) {
+            sleepsecs(1);
+            return;
+        }
+
+        if (!_oplogMarker.moreInCurrentBatch()) {
+            _oplogMarker.more();
+        }
+
+        if (!_oplogMarker.more()) {
+            _oplogMarker.tailCheck();
+            sleepsecs(1);
+            return;
+        }
+
+        // if this member has written the op at optime T, we want to nextSafe up to and including T
+        while (_consume < theReplSet->lastOpTimeWritten && _oplogMarker.more()) {
+            BSONObj temp = _oplogMarker.nextSafe();
+            _consume = temp["ts"]._opTime();
+        }
+
+        // next time through markOplog(), call more() to signal the sync target that we've synced T
+    }
+
+    bool BackgroundSync::getCursor() {
+        // temp
+        Member *_currentSyncTarget = theReplSet->getSyncTarget();
+
+        {
+            Lock::GlobalWrite l;
+            boost::unique_lock<boost::mutex> lock(_mutex);
+
+            if (!_oplogMarkerTarget || _currentSyncTarget != _oplogMarkerTarget) {
+                if (!_currentSyncTarget) {
+                    return false;
+                }
+
+                log() << "replset setting oplog notifier to " << _currentSyncTarget->fullName() << rsLog;
+                _oplogMarkerTarget = _currentSyncTarget;
+
+                _oplogMarker.resetConnection();
+
+                if (!_oplogMarker.connect(_oplogMarkerTarget->fullName())) {
+                    LOG(1) << "replset could not connect to " << _oplogMarkerTarget->fullName() << rsLog;
+                    _oplogMarkerTarget = NULL;
+                    return false;
+                }
+            }
+        }
+
+        if (!_oplogMarker.haveCursor()) {
+            BSONObj fields = BSON("ts" << 1);
+            _oplogMarker.tailingQueryGTE(rsoplog, theReplSet->lastOpTimeWritten, &fields);
+        }
+
+        return _oplogMarker.haveCursor();
+    }
+
+} // namespace replset
+
 
     bool ReplSetImpl::_isStale(OplogReader& r, const OpTime& startTs, BSONObj& remoteOldestOp) {
         remoteOldestOp = r.findOne(rsoplog, Query());
@@ -124,5 +255,11 @@ namespace mongo {
 
         return false;
     }
+
+    Member* ReplSetImpl::getSyncTarget() {
+        lock lk(this);
+        return _currentSyncTarget;
+    }
+
 
 } // namespace mongo

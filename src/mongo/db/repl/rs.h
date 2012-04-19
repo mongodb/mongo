@@ -540,6 +540,7 @@ namespace mongo {
         // keep a list of hosts that we've tried recently that didn't work
         map<string,time_t> _veto;
     public:
+        Member* getSyncTarget();
         void syncThread();
         const OpTime lastOtherOpTime() const;
     };

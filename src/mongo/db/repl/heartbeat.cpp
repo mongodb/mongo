@@ -33,6 +33,7 @@
 #include "connections.h"
 #include "../instance.h"
 #include "../repl.h"
+#include "mongo/db/repl/bgsync.h"
 
 namespace mongo {
 
@@ -387,6 +388,9 @@ namespace mongo {
         mgr->send( boost::bind(&Manager::msgCheckNewState, theReplSet->mgr) );
 
         boost::thread t(startSyncThread);
+
+        replset::BackgroundSync* sync = replset::BackgroundSync::get();
+        boost::thread notifier(boost::bind(&replset::BackgroundSync::notifierThread, sync));
 
         task::fork(ghost);
 

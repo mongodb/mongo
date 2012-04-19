@@ -52,7 +52,7 @@ namespace mongo {
     */
     bool ReplSetImpl::initialSyncOplogApplication(const OpTime& applyGTE, const OpTime& minValid) {
         Member *source = 0;
-        OplogReader r;
+        OplogReader r(false /* doHandshake */);
 
         // keep trying to initial sync from oplog until we run out of targets
         while ((source = _getOplogReader(r, applyGTE)) != 0) {
@@ -268,7 +268,7 @@ namespace mongo {
     /* tail an oplog.  ok to return, will be re-called. */
     void ReplSetImpl::syncTail() {
         // todo : locking vis a vis the mgr...
-        OplogReader r;
+        OplogReader r(false /* doHandshake */);
         string hn;
 
         // find a target to sync from the last op time written
