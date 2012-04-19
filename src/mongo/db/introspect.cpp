@@ -30,7 +30,7 @@ namespace mongo {
     BufBuilder profileBufBuilder; // reused, instead of allocated every time - avoids a malloc/free cycle
 
     void profile( const Client& c , CurOp& currentOp ) {
-        assertInWriteLock();
+        verify( Lock::somethingWriteLocked() );
 
         Database *db = c.database();
         DEV verify( db );
