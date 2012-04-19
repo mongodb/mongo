@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include "lockstat.h"
+
 namespace mongo {
 
     class WrapperForRWLock;
@@ -190,6 +192,7 @@ namespace mongo {
         some overhead so we don't use this for everything.  the externalobjsort mutex
         uses this, as it can be held for eons. implementation still needed. */
     class HLMutex : public SimpleMutex {
+        LockStat ls;
     public:
         HLMutex(const char *name);
     };
