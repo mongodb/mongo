@@ -484,7 +484,15 @@ namespace mongo {
 
                         const char *ns = o.getStringField("ns");
                         if( ns ) {
-                            if( str::contains(ns, ".$cmd") ) { 
+                            if ( strlen(ns) == 0 ) {
+                                // this is ugly
+                                // this is often a no-op
+                                // but can't be 100% sure
+                                lk.reset();
+                                verify( !Lock::isLocked() );
+                                lk.reset( new Lock::GlobalWrite() );
+                            }
+                            else if( str::contains(ns, ".$cmd") ) { 
                                 // a command may need a global write lock. so we will conservatively go ahead and grab one here. suboptimal. :-( 
                                 lk.reset();
                                 verify( !Lock::isLocked() );
