@@ -8,8 +8,10 @@
 #include "wt_internal.h"
 
 static int __block_merge(WT_SESSION_IMPL *, WT_EXTLIST *, off_t, off_t);
+static int __block_off_remove(
+	WT_SESSION_IMPL *, WT_EXTLIST *, off_t, WT_EXT **);
 static int __block_overlap(WT_SESSION_IMPL *,
-    WT_BLOCK *, WT_EXTLIST *, WT_EXT **, WT_EXTLIST *, WT_EXT **);
+	WT_BLOCK *, WT_EXTLIST *, WT_EXT **, WT_EXTLIST *, WT_EXT **);
 
 /*
  * __block_off_srch --
@@ -177,6 +179,63 @@ __block_off_insert(WT_SESSION_IMPL *session, WT_EXTLIST *el, WT_EXT *ext)
 }
 
 /*
+ * __wt_block_off_remove --
+ *	Remove a range from an extent list, where the range may be part of a
+ * overlapping entry.
+ */
+int
+__wt_block_off_remove(
+    WT_SESSION_IMPL *session, WT_EXTLIST *el, off_t off, off_t size)
+{
+	WT_EXT *before, *after, *ext;
+	off_t toff, tsize;
+
+	/*
+	 * The chunk we're removing may be in the middle of another chunk.  We
+	 * could implement that code directly, doing one search instead of two,
+	 * but this functionality is only used by verification, so we're doing
+	 * it the slow way.
+	 *
+	 * Search for before and after entries for the offset.
+	 */
+	__block_off_pair_srch(el, off, &before, &after);
+
+	/*
+	 * If "before" overlaps, get that entry and fix it; if no overlapping
+	 * "before" entry is found, "after" had better start with the specified
+	 * offset (or the entry isn't on the list, and the list is corrupted).
+	 */
+	if (before != NULL &&
+	    before->off < off && before->off + before->size > off) {
+		/* Remove the overlapping entry. */
+		WT_RET(__block_off_remove(session, el, before->off, &ext));
+
+		/* Add an entry which is the initial overlapping part. */
+		toff = ext->off;
+		tsize = off - ext->off;
+		WT_RET(__block_merge(session, el, toff, tsize));
+
+		/* Add an entry which is the trailing overlapping part. */
+		toff = off + size;
+		tsize = ext->size - ((off - ext->off) + size);
+		if (tsize != 0)
+			WT_RET(__block_merge(session, el, toff, tsize));
+	} else {
+		/*
+		 * Remove the entry, update its size and offset, and insert it
+		 * back onto the list.
+		 */
+		WT_RET(__block_off_remove(session, el, off, &ext));
+		ext->off += size;
+		ext->size -= size;
+		if (ext->size != 0)
+			return (__block_off_insert(session, el, ext));
+	}
+	__wt_free(session, ext);
+	return (0);
+}
+
+/*
  * __block_off_remove --
  *	Remove a record from an extent list.
  */
@@ -192,7 +251,7 @@ __block_off_remove(
 	__block_off_srch(el->off, off, astack, 0);
 	ext = *astack[0];
 	if (ext == NULL || ext->off != off)
-		return (EINVAL);
+		goto corrupt;
 	for (i = 0; i < ext->depth; ++i)
 		*astack[i] = ext->next[i];
 
@@ -207,7 +266,7 @@ __block_off_remove(
 	__block_off_srch(szp->off, off, astack, 1);
 	ext = *astack[0];
 	if (ext == NULL || ext->off != off)
-		return (EINVAL);
+		goto corrupt;
 	for (i = 0; i < ext->depth; ++i)
 		*astack[i] = ext->next[i + ext->depth];
 	if (szp->off[0] == NULL) {
@@ -226,6 +285,10 @@ __block_off_remove(
 		*extp = ext;
 
 	return (0);
+
+corrupt:
+	WT_RET_MSG(session, EINVAL,
+	    "attempt to remove non-existent offset from an extent list");
 }
 
 /*
