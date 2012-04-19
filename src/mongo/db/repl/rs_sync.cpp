@@ -291,43 +291,8 @@ namespace mongo {
 
         uassert(1000, "replSet source for syncing doesn't seem to be await capable -- is it an older version of mongodb?", r.awaitCapable() );
 
-        {
-            if( !r.more() ) {
-                /* maybe we are ahead and need to roll back? */
-                try {
-                    bo theirLastOp = r.getLastOp(rsoplog);
-                    if( theirLastOp.isEmpty() ) {
-                        log() << "replSet error empty query result from " << hn << " oplog" << rsLog;
-                        sleepsecs(2);
-                        return;
-                    }
-                    OpTime theirTS = theirLastOp["ts"]._opTime();
-                    if( theirTS < lastOpTimeWritten ) {
-                        log() << "replSet we are ahead of the primary, will try to roll back" << rsLog;
-                        syncRollback(r);
-                        return;
-                    }
-                    /* we're not ahead?  maybe our new query got fresher data.  best to come back and try again */
-                    log() << "replSet syncTail condition 1" << rsLog;
-                    sleepsecs(1);
-                }
-                catch(DBException& e) {
-                    log() << "replSet error querying " << hn << ' ' << e.toString() << rsLog;
-                    veto(target->fullName());
-                    sleepsecs(2);
-                }
-                return;
-            }
-
-            BSONObj o = r.nextSafe();
-            OpTime ts = o["ts"]._opTime();
-            long long h = o["h"].numberLong();
-            if( ts != lastOpTimeWritten || h != lastH ) {
-                log() << "replSet our last op time written: " << lastOpTimeWritten.toStringPretty() << rsLog;
-                log() << "replset source's GTE: " << ts.toStringPretty() << rsLog;
-                syncRollback(r);
-                return;
-            }
+        if (haveToRollback(r)) {
+            return;
         }
 
         /* we have now checked if we need to rollback and we either don't have to or did it. */

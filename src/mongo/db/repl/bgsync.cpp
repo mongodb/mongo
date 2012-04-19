@@ -84,4 +84,45 @@ namespace mongo {
         return 0;
     }
 
+    bool ReplSetImpl::haveToRollback(OplogReader& r) {
+        string hn = r.conn()->getServerAddress();
+
+        if (!r.more()) {
+            try {
+                BSONObj theirLastOp = r.getLastOp(rsoplog);
+                if (theirLastOp.isEmpty()) {
+                    log() << "replSet error empty query result from " << hn << " oplog" << rsLog;
+                    sleepsecs(2);
+                    return true;
+                }
+                OpTime theirTS = theirLastOp["ts"]._opTime();
+                if (theirTS < lastOpTimeWritten) {
+                    log() << "replSet we are ahead of the primary, will try to roll back" << rsLog;
+                    syncRollback(r);
+                    return true;
+                }
+                /* we're not ahead?  maybe our new query got fresher data.  best to come back and try again */
+                log() << "replSet syncTail condition 1" << rsLog;
+                sleepsecs(1);
+            }
+            catch(DBException& e) {
+                log() << "replSet error querying " << hn << ' ' << e.toString() << rsLog;
+                sleepsecs(2);
+            }
+            return true;
+        }
+
+        BSONObj o = r.nextSafe();
+        OpTime ts = o["ts"]._opTime();
+        long long h = o["h"].numberLong();
+        if( ts != lastOpTimeWritten || h != lastH ) {
+            log() << "replSet our last op time written: " << lastOpTimeWritten.toStringPretty() << rsLog;
+            log() << "replset source's GTE: " << ts.toStringPretty() << rsLog;
+            syncRollback(r);
+            return true;
+        }
+
+        return false;
+    }
+
 } // namespace mongo
