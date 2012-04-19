@@ -461,7 +461,7 @@ namespace mongo {
                 mongo::log(1) << "note: not profiling because doing fsync+lock" << endl;
             }
             else {
-                writelock lk;
+                Lock::DBWrite lk( currentOp.getNS() );
                 if ( dbHolder()._isLoaded( nsToDatabase( currentOp.getNS() ) , dbpath ) ) {
                     Client::Context cx( currentOp.getNS(), dbpath, false );
                     profile(c , currentOp );
@@ -588,7 +588,7 @@ namespace mongo {
         //PageFaultRetryableSection s;
         while ( 1 ) {
             try {
-                writelock lk(ns);
+                Lock::DBWrite lk(ns);
                 
                 // writelock is used to synchronize stepdowns w/ writes
                 uassert( 10056 ,  "not master", isMasterNs( ns ) );
@@ -779,7 +779,7 @@ namespace mongo {
             multi.push_back( d.nextJsObj() );
         }
 
-        writelock lk(ns);
+        Lock::DBWrite lk(ns);
 
         // CONCURRENCY TODO: is being read locked in big log sufficient here?
         // writelock is used to synchronize stepdowns w/ writes
@@ -832,7 +832,7 @@ namespace mongo {
                 return true;
             // we have a local database.  return true if oplog isn't empty
             {
-                readlock lk(rsoplog);
+                Lock::DBRead lk(rsoplog);
                 BSONObj o;
                 if( Helpers::getFirst(rsoplog, o) )
                     return true;

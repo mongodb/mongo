@@ -591,7 +591,7 @@ namespace mongo {
             c = &cc();
         }
 
-        readlock lk("");
+        Lock::GlobalRead lk;
         for( unsigned i = a; i <= b; i++ ) {
             const BSONObj& op = v[i];
             const char *which = "o";
@@ -646,8 +646,7 @@ namespace mongo {
                 BSONObjBuilder b;
                 b.append(_id);
                 BSONObj result;
-                readlock lk(ns);
-                Client::Context ctx( ns );
+                Client::ReadContext ctx( ns );
                 if( Helpers::findById(cc(), ns, b.done(), result) )
                     _dummy_z += result.objsize(); // touch
             }

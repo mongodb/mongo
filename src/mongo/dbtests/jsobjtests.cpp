@@ -295,7 +295,7 @@ namespace JsobjTests {
                     Client::initThread("pretouchN");
                     c = &cc();
                 }
-                writelock lk(""); // for initTimestamp
+                Lock::GlobalWrite lk; // for initTimestamp
         
                 BSONObjBuilder b;
                 b.appendTimestamp( "a" );

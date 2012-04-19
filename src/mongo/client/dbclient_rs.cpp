@@ -659,6 +659,12 @@ namespace mongo {
 
             sleepsecs( 1 );
         }
+
+        {
+            warning() << "No primary detected for set " << _name << endl;
+            scoped_lock lk( _lock );
+            _master = -1;
+        }
     }
 
     void ReplicaSetMonitor::check( bool checkAllSecondaries ) {

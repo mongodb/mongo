@@ -26,14 +26,15 @@
 
 namespace mongo {
 
+    unsigned long long Timer::_countsPerSecond = Timer::microsPerSecond;
+
 #if defined(_WIN32)
-    unsigned long long Timer::countsPerSecond;
     struct AtStartup {
         AtStartup() {
             LARGE_INTEGER x;
             bool ok = QueryPerformanceFrequency(&x);
             verify(ok);
-            Timer::countsPerSecond = x.QuadPart;
+            Timer::_countsPerSecond = x.QuadPart;
         }
     } atstartuputil;
 #endif

@@ -1,6 +1,8 @@
+// lockstat.h
 #pragma once
 
 #include "util/timer.h"
+#include "mongo/platform/atomic_uint64.h"
 
 namespace mongo { 
 
@@ -10,15 +12,6 @@ namespace mongo {
         enum { N = 4 };
     public:
         Timer W_Timer;
-        unsigned long long timeAcquiring[N];
-        unsigned long long timeLocked[N];
-
-        LockStat() { 
-            for( int i = 0; i < N; i++ ) {
-                timeAcquiring[i] = 0;
-                timeLocked[i] = 0;
-            }
-        }
 
         struct Acquiring {
             Timer tmr;
@@ -32,7 +25,12 @@ namespace mongo {
 
         BSONObj report() const;
 
-        static unsigned map(char type);
+    private:
+        // RWrw
+        AtomicUInt64 timeAcquiring[N];
+        AtomicUInt64 timeLocked[N];
+
+        static unsigned mapNo(char type);
     };
 
 }

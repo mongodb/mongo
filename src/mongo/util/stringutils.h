@@ -17,27 +17,32 @@
 
 #pragma once
 
+#include <string>
+#include <vector>
+
+#include <boost/scoped_array.hpp>
+
 namespace mongo {
 
     // see also mongoutils/str.h - perhaps move these there?
     // see also text.h
 
-    void splitStringDelim( const string& str , vector<string>* res , char delim );
+    void splitStringDelim( const string& str , std::vector<std::string>* res , char delim );
 
-    void joinStringDelim( const vector<string>& strs , string* res , char delim );
+    void joinStringDelim( const std::vector<std::string>& strs , std::string* res , char delim );
 
-    inline string tolowerString( const string& input ) {
-        string::size_type sz = input.size();
+    inline std::string tolowerString( const std::string& input ) {
+        std::string::size_type sz = input.size();
 
         boost::scoped_array<char> line(new char[sz+1]);
         char * copy = line.get();
 
-        for ( string::size_type i=0; i<sz; i++ ) {
+        for ( std::string::size_type i=0; i<sz; i++ ) {
             char c = input[i];
             copy[i] = (char)tolower( (int)c );
         }
         copy[sz] = 0;
-        return string(copy);
+        return copy;
     }
 
     /** Functor for combining lexical and numeric comparisons. */
@@ -54,7 +59,7 @@ namespace mongo {
         static int cmp( const char *s1, const char *s2, bool lexOnly );
         int cmp( const char *s1, const char *s2 ) const;
         bool operator()( const char *s1, const char *s2 ) const;
-        bool operator()( const string &s1, const string &s2 ) const;
+        bool operator()( const std::string &s1, const std::string &s2 ) const;
     private:
         bool _lexOnly;
     };

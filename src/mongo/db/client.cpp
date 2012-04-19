@@ -50,14 +50,7 @@ namespace mongo {
     ThreadLocalValue<StackChecker *> checker;
 
     struct StackChecker { 
-#ifdef _WIN32
-        // Windows Server 2003 and Windows XP give a 256 KB stack for interrupt
-        // threads that they create in our process, so if we try to allocate
-        // 256 KB for stack size checking we get an instant stack overflow
         enum { SZ = 192 * 1024 };
-#else
-        enum { SZ = 256 * 1024 };
-#endif
         char buf[SZ];
         StackChecker() { 
             checker.set(this);
@@ -69,17 +62,26 @@ namespace mongo {
             static int max;
             StackChecker *sc = checker.get();
             const char *p = sc->buf;
-            int i = 0;
-            for( ; i < SZ; i++ ) { 
-                if( p[i] != 42 )
+
+            int lastStackByteModifed = 0;
+            for( ; lastStackByteModifed < SZ; lastStackByteModifed++ ) { 
+                if( p[lastStackByteModifed] != 42 )
                     break;
             }
-            int z = SZ-i;
-            if( z > max ) {
-                max = z;
-                log() << "thread " << tname << " stack usage was " << z << " bytes" << endl;
+            int numberBytesUsed = SZ-lastStackByteModifed;
+            
+            if( numberBytesUsed > max ) {
+                max = numberBytesUsed;
+                log() << "thread " << tname << " stack usage was " << numberBytesUsed << " bytes, " 
+                      << " which is the most so far" << endl;
             }
-            wassert( i > 16000 );
+            
+            if ( numberBytesUsed > ( SZ - 16000 ) ) {
+                // we are within 16000 bytes of SZ
+                log() << "used " << numberBytesUsed << " bytes, max is " << (int)SZ << " exiting" << endl;
+                fassertFailed( 16151 );
+            }
+
         }
     };
 #endif
@@ -227,7 +229,7 @@ namespace mongo {
             else if( !Lock::nested() ) { 
                 lk.reset(0);
                 {
-                    writelock w;
+                    Lock::GlobalWrite w;
                     Context c(ns, path, doauth);
                 }
                 // db could be closed at this interim point -- that is ok, we will throw, and don't mind throwing.
@@ -243,6 +245,12 @@ namespace mongo {
         //       cause of bad performance due to the write lock acquisition above?  let's fix that.
         //       it would be easy to first check that there is at least a .ns file, or something similar.
     }
+
+    Client::WriteContext::WriteContext(const string& ns, string path , bool doauth ) 
+        : _lk( ns ) ,
+          _c( ns , path , doauth ) {
+    }
+
 
     void Client::Context::checkNotStale() const { 
         switch ( _client->_curOp->getOp() ) {

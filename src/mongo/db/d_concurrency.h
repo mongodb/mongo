@@ -42,15 +42,16 @@ namespace mongo {
         protected: 
             friend struct TempRelease;
             ScopedLock(); 
-            virtual ~ScopedLock();
             virtual void tempRelease() = 0;
             virtual void relock() = 0;
+        public:
+            virtual ~ScopedLock();
         };
 
         // note that for these classes recursive locking is ok if the recursive locking "makes sense"
         // i.e. you could grab globalread after globalwrite.
 
-        class GlobalWrite : private ScopedLock {
+        class GlobalWrite : public ScopedLock {
             const bool stoppedGreed;
             bool noop;
         protected:
@@ -67,7 +68,7 @@ namespace mongo {
             void downgrade(); // W -> R
             bool upgrade();   // caution see notes
         };
-        class GlobalRead : private ScopedLock { // recursive is ok
+        class GlobalRead : public ScopedLock { // recursive is ok
         public:
             bool noop;
         protected:
@@ -79,7 +80,7 @@ namespace mongo {
             virtual ~GlobalRead();
         };
         // lock this database. do not shared_lock globally first, that is handledin herein. 
-        class DBWrite : private ScopedLock {
+        class DBWrite : public ScopedLock {
             bool isW(LockState&) const;
             void lockTop(LockState&);
             void lockNestable(Nestable db);
@@ -99,7 +100,7 @@ namespace mongo {
             virtual ~DBWrite();
         };
         // lock this database for reading. do not shared_lock globally first, that is handledin herein. 
-        class DBRead : private ScopedLock {
+        class DBRead : public ScopedLock {
             bool isRW(LockState&) const;
             void lockTop(LockState&);
             void lockNestable(Nestable db);
@@ -128,25 +129,6 @@ namespace mongo {
         };
     };
 
-    // the below are for backward compatibility.  use Lock classes above instead.
-    class readlock {
-        scoped_ptr<Lock::GlobalRead> lk1;
-        scoped_ptr<Lock::DBRead> lk2;
-    public:
-        readlock(const string& ns);
-        readlock();
-    };
-
-    // writelock is an old helper the code has used for a long time.
-    // it now DBWrite locks if ns parm is specified. otherwise global W locks
-    class writelock {
-        scoped_ptr<Lock::GlobalWrite> lk1;
-        scoped_ptr<Lock::DBWrite> lk2;
-    public:
-        writelock(const string& ns);
-        writelock();
-    };
-
     class readlocktry : boost::noncopyable {
         bool _got;
         scoped_ptr<Lock::GlobalRead> _dbrlock;
@@ -172,21 +154,6 @@ namespace mongo {
         }
     };
 
-
-    /** parameterized choice of read or write locking */
-    class mongolock {
-        scoped_ptr<readlock> r;
-        scoped_ptr<writelock> w;
-    public:
-        mongolock(bool write) {
-            if( write ) {
-                w.reset( new writelock() );
-            }
-            else {
-                r.reset( new readlock() );
-            }
-        }
-    };
 
     /** a mutex, but reported in curop() - thus a "high level" (HL) one
         some overhead so we don't use this for everything.  the externalobjsort mutex
