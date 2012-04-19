@@ -57,6 +57,9 @@ namespace mongo {
 
     void msgasserted(int msgid, const char *msg);
 
+    template <typename Allocator>
+    class StringBuilderImpl;
+
     class TrivialAllocator { 
     public:
         void* Malloc(size_t sz) { return malloc(sz); }
@@ -225,8 +228,7 @@ namespace mongo {
         int l;
         int size;
 
-        template <typename>
-        friend class _StringBuilder;
+        friend class StringBuilderImpl<Allocator>;
     };
 
     typedef _BufBuilder<TrivialAllocator> BufBuilder;
@@ -254,7 +256,7 @@ namespace mongo {
 
     /** stringstream deals with locale so this is a lot faster than std::stringstream for UTF8 */
     template <typename Allocator>
-    class _StringBuilder {
+    class StringBuilderImpl {
     public:
         static const size_t MONGO_DBL_SIZE = 3 + DBL_MANT_DIG - DBL_MIN_EXP;
         static const size_t MONGO_S32_SIZE = 12;
@@ -263,33 +265,33 @@ namespace mongo {
         static const size_t MONGO_U64_SIZE = 22;
         static const size_t MONGO_S16_SIZE = 7;
 
-        _StringBuilder() { }
+        StringBuilderImpl() { }
 
-        _StringBuilder& operator<<( double x ) {
+        StringBuilderImpl& operator<<( double x ) {
             return SBNUM( x , MONGO_DBL_SIZE , "%g" );
         }
-        _StringBuilder& operator<<( int x ) {
+        StringBuilderImpl& operator<<( int x ) {
             return SBNUM( x , MONGO_S32_SIZE , "%d" );
         }
-        _StringBuilder& operator<<( unsigned x ) {
+        StringBuilderImpl& operator<<( unsigned x ) {
             return SBNUM( x , MONGO_U32_SIZE , "%u" );
         }
-        _StringBuilder& operator<<( long x ) {
+        StringBuilderImpl& operator<<( long x ) {
             return SBNUM( x , MONGO_S64_SIZE , "%ld" );
         }
-        _StringBuilder& operator<<( unsigned long x ) {
+        StringBuilderImpl& operator<<( unsigned long x ) {
             return SBNUM( x , MONGO_U64_SIZE , "%lu" );
         }
-        _StringBuilder& operator<<( long long x ) {
+        StringBuilderImpl& operator<<( long long x ) {
             return SBNUM( x , MONGO_S64_SIZE , "%lld" );
         }
-        _StringBuilder& operator<<( unsigned long long x ) {
+        StringBuilderImpl& operator<<( unsigned long long x ) {
             return SBNUM( x , MONGO_U64_SIZE , "%llu" );
         }
-        _StringBuilder& operator<<( short x ) {
+        StringBuilderImpl& operator<<( short x ) {
             return SBNUM( x , MONGO_S16_SIZE , "%hd" );
         }
-        _StringBuilder& operator<<( char c ) {
+        StringBuilderImpl& operator<<( char c ) {
             _buf.grow( 1 )[0] = c;
             return *this;
         }
@@ -311,7 +313,7 @@ namespace mongo {
 
         void append( const StringData& str ) { memcpy( _buf.grow( str.size() ) , str.data() , str.size() ); }
 
-        _StringBuilder& operator<<( const StringData& str ) {
+        StringBuilderImpl& operator<<( const StringData& str ) {
             append( str );
             return *this;
         }
@@ -326,11 +328,11 @@ namespace mongo {
         _BufBuilder<Allocator> _buf;
 
         // non-copyable, non-assignable
-        _StringBuilder( const _StringBuilder& );
-        _StringBuilder& operator=( const _StringBuilder& );
+        StringBuilderImpl( const StringBuilderImpl& );
+        StringBuilderImpl& operator=( const StringBuilderImpl& );
 
         template <typename T>
-        _StringBuilder& SBNUM(T val,int maxSize,const char *macro)  {
+        StringBuilderImpl& SBNUM(T val,int maxSize,const char *macro)  {
             int prev = _buf.l;
             int z = mongo_snprintf( _buf.grow(maxSize) , maxSize , macro , (val) );
             verify( z >= 0 );
@@ -340,7 +342,7 @@ namespace mongo {
         }
     };
 
-    typedef _StringBuilder<TrivialAllocator> StringBuilder;
-    typedef _StringBuilder<StackAllocator> StackStringBuilder;
+    typedef StringBuilderImpl<TrivialAllocator> StringBuilder;
+    typedef StringBuilderImpl<StackAllocator> StackStringBuilder;
 
 } // namespace mongo

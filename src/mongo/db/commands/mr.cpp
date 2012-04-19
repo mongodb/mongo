@@ -1131,11 +1131,11 @@ namespace mongo {
                     if ( state.numEmits() )
                         shouldHaveData = true;
 
-                    timingBuilder.append( "mapTime" , mapTime / 1000 );
+                    timingBuilder.appendNumber( "mapTime" , mapTime / 1000 );
                     timingBuilder.append( "emitLoop" , t.millis() );
 
                     op->setMessage( "m/r: (2/3) final reduce in memory" );
-                    Timer t;
+                    Timer rt;
                     // do reduce in memory
                     // this will be the last reduce needed for inline mode
                     state.reduceInMemory();
@@ -1143,16 +1143,16 @@ namespace mongo {
                     state.dumpToInc();
                     // final reduce
                     state.finalReduce( op , pm );
-                    inReduce += t.micros();
+                    inReduce += rt.micros();
                     countsBuilder.appendNumber( "reduce" , state.numReduces() );
-                    timingBuilder.append( "reduceTime" , inReduce / 1000 );
+                    timingBuilder.appendNumber( "reduceTime" , inReduce / 1000 );
                     timingBuilder.append( "mode" , state.jsMode() ? "js" : "mixed" );
 
                     long long finalCount = state.postProcessCollection(op, pm);
                     state.appendResults( result );
 
-                    timingBuilder.append( "total" , t.millis() );
-                    result.append( "timeMillis" , t.millis() );
+                    timingBuilder.appendNumber( "total" , t.millis() );
+                    result.appendNumber( "timeMillis" , t.millis() );
                     countsBuilder.appendNumber( "output" , finalCount );
                     if ( config.verbose ) result.append( "timing" , timingBuilder.obj() );
                     result.append( "counts" , countsBuilder.obj() );

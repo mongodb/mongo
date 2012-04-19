@@ -1530,12 +1530,12 @@ namespace mongo {
             bool didAnything = false;
 
             if ( xfer["deleted"].isABSONObj() ) {
-                Client::WriteContext cx(ns);
-
                 RemoveSaver rs( "moveChunk" , ns , "removedDuring" );
 
                 BSONObjIterator i( xfer["deleted"].Obj() );
                 while ( i.more() ) {
+                    Client::WriteContext cx(ns);
+
                     BSONObj id = i.next().Obj();
 
                     // do not apply deletes if they do not belong to the chunk being migrated
@@ -1556,10 +1556,10 @@ namespace mongo {
             }
 
             if ( xfer["reload"].isABSONObj() ) {
-                Client::WriteContext cx(ns);
-
                 BSONObjIterator i( xfer["reload"].Obj() );
                 while ( i.more() ) {
+                    Client::WriteContext cx(ns);
+
                     BSONObj it = i.next().Obj();
 
                     Helpers::upsert( ns , it , true );
