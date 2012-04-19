@@ -19,6 +19,8 @@
 
 #include <cstdio> // sscanf
 #include <ctime>
+#include <string>
+#include <iostream>
 #include <boost/thread/thread.hpp>
 #include <boost/thread/tss.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
@@ -26,6 +28,8 @@
 #include "../bson/util/misc.h"  // Date_t
 
 namespace mongo {
+
+    using std::string;
 
     inline void time_t_to_Struct(time_t t, struct tm * buf , bool local = false ) {
 #if defined(_WIN32)
@@ -146,7 +150,7 @@ namespace mongo {
         t.tv_sec = s;
         t.tv_nsec = 0;
         if ( nanosleep( &t , 0 ) ) {
-            cout << "nanosleep failed" << endl;
+            std::cout << "nanosleep failed" << std::endl;
         }
     }
     inline void sleepmicros(long long s) {
@@ -157,7 +161,7 @@ namespace mongo {
         t.tv_nsec = 1000 * ( s % 1000000 );
         struct timespec out;
         if ( nanosleep( &t , &out ) ) {
-            cout << "nanosleep failed" << endl;
+            std::cout << "nanosleep failed" << std::endl;
         }
     }
     inline void sleepmillis(long long s) {
