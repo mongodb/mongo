@@ -657,7 +657,7 @@ namespace Plan {
                 client_->resetIndexCache();
                 client_->ensureIndex( ns_.c_str(), BSON( ( names + i ) << 1 ), false, names + i );
             }
-            _lk.reset( new writelock );
+            _lk.reset( new Lock::GlobalWrite );
             _ctx.reset( new Client::Context( ns_ ) );
             hint_ = BSON( "hint" << BSON( "a" << 1 ) );
         }
@@ -667,7 +667,7 @@ namespace Plan {
                                    shared_ptr<const ParsedQuery>(), hint_ );
         }
         string ns_;
-        scoped_ptr<writelock> _lk;
+        scoped_ptr<Lock::GlobalWrite> _lk;
         scoped_ptr<Client::Context> _ctx;
         BSONObj hint_;
     };
@@ -680,7 +680,7 @@ namespace Plan {
                 client_->resetIndexCache();
                 client_->ensureIndex( ns_.c_str(), BSON( ( names + i ) << 1 ), false, names + i );
             }
-            lk_.reset( new writelock );
+            lk_.reset( new Lock::GlobalWrite );
         }
         void run() {
             Client::Context ctx( ns_ );
@@ -688,7 +688,7 @@ namespace Plan {
                 MultiPlanScanner s( ns_.c_str(), BSONObj(), BSON( "a" << 1 ) );
         }
         string ns_;
-        auto_ptr< writelock > lk_;
+        auto_ptr< Lock::GlobalWrite > lk_;
     };
 
     class Query {
@@ -699,7 +699,7 @@ namespace Plan {
                 client_->resetIndexCache();
                 client_->ensureIndex( ns_.c_str(), BSON( ( names + i ) << 1 ), false, names + i );
             }
-            lk_.reset( new writelock );
+            lk_.reset( new Lock::GlobalWrite );
         }
         void run() {
             Client::Context ctx( ns_.c_str() );
@@ -707,7 +707,7 @@ namespace Plan {
                 MultiPlanScanner s( ns_.c_str(), BSON( "a" << 1 ), BSONObj() );
         }
         string ns_;
-        auto_ptr< writelock > lk_;
+        auto_ptr< Lock::GlobalWrite > lk_;
     };
 
     class All : public RunnerSuite {
