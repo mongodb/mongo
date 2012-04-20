@@ -142,8 +142,8 @@ struct __wt_item {
  * statistics, configuration data or application-specific data sources.  See
  * WT_SESSION::open_cursor for more information.
  *
- * <b>Thread safety:</b> A WT_CURSOR handle cannot be shared between threads:
- * it may only be used within the same thread as the encapsulating WT_SESSION.
+ * <b>Thread safety:</b> A WT_CURSOR handle is not usually shared between
+ * threads, see @ref threads for more information.
  */
 struct __wt_cursor {
 	WT_SESSION *session;	/*!< The session handle for this cursor. */
@@ -408,9 +408,8 @@ struct __wt_cursor {
  * All data operations are performed in the context of a WT_SESSION.  This
  * encapsulates the thread and transactional context of the operation.
  *
- * <b>Thread safety:</b> A WT_SESSION handle cannot be shared between threads:
- * it may only be used within a single thread.  Each thread accessing a
- * database should open a separate WT_SESSION handle.
+ * <b>Thread safety:</b> A WT_SESSION handle is not usually shared between
+ * threads, see @ref threads for more information.
  */
 struct __wt_session {
 	/*! The connection for this session. */
@@ -901,6 +900,9 @@ struct __wt_session {
  * the database in its own address space.  Subsequent connections (if allowed)
  * will communicate with the first process over a socket connection to perform
  * their operations.
+ *
+ * <b>Thread safety:</b> A WT_CONNECTION handle may be shared between threads,
+ * see @ref threads for more information.
  */
 struct __wt_connection {
 	/*! Load an extension.
