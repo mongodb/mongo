@@ -66,7 +66,8 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 			upd_entry = &cbt->ins->upd;
 
 		/* Allocate room for the new value from per-thread memory. */
-		WT_ERR(__wt_update_alloc(session, value, &upd, &upd_size));
+		WT_ERR(__wt_update_alloc(
+		    session, value, &upd, &upd_size, *upd_entry));
 
 		/* Insert the WT_UPDATE structure. */
 		ret = __wt_update_serial(session, page, cbt->write_gen,
@@ -121,7 +122,8 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 		 */
 		WT_ERR(__wt_row_insert_alloc(
 		    session, key, skipdepth, &ins, &ins_size));
-		WT_ERR(__wt_update_alloc(session, value, &upd, &upd_size));
+		WT_ERR(__wt_update_alloc(
+		    session, value, &upd, &upd_size, NULL));
 		ins->upd = upd;
 		ins_size += upd_size;
 		cbt->ins = ins;
@@ -255,7 +257,7 @@ err:	__wt_session_serialize_wrapup(session, page, ret);
  */
 int
 __wt_update_alloc(WT_SESSION_IMPL *session,
-    WT_ITEM *value, WT_UPDATE **updp, size_t *sizep)
+    WT_ITEM *value, WT_UPDATE **updp, size_t *sizep, WT_UPDATE *next)
 {
 	WT_UPDATE *upd;
 	size_t size;
@@ -274,11 +276,13 @@ __wt_update_alloc(WT_SESSION_IMPL *session,
 		memcpy(WT_UPDATE_DATA(upd), value->data, size);
 	}
 
-	if ((ret = __wt_txn_modify(session, &upd->txnid)) != 0) {
+	if ((ret = __wt_txn_modify(session, &upd->txnid)) != 0 ||
+	    (ret = __wt_txn_update_check(session, next)) != 0) {
 		__wt_free(session, upd);
 		return (ret);
 	}
 
+	upd->next = next;
 	*updp = upd;
 	if (sizep != NULL)
 		*sizep = sizeof(WT_UPDATE) + size;
@@ -316,7 +320,6 @@ __wt_update_serial_func(WT_SESSION_IMPL *session)
 		__wt_update_new_upd_taken(session, page);
 	}
 
-	upd->next = *upd_entry;
 	/*
 	 * Publish: there must be a barrier to ensure the new entry's next
 	 * pointer is set before we update the linked list.

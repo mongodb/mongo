@@ -104,13 +104,13 @@ __wt_confchk_index_meta =
 
 const char *
 __wt_confdfl_session_begin_transaction =
-    "isolation=read-committed,name="",priority=0,sync=full";
+    "isolation=snapshot,name="",priority=0,sync=full";
 
 const char *
 __wt_confchk_session_begin_transaction =
-    "isolation=(choices=[\"serializable\",\"snapshot\",\"read-committed\","
-    "\"read-uncommitted\"]),name=(),priority=(type=int,min=-100,max=100),"
-    "sync=(choices=[\"full\",\"flush\",\"write\",\"none\"])";
+    "isolation=(choices=[\"read-uncommitted\",\"snapshot\"]),name=(),"
+    "priority=(type=int,min=-100,max=100),sync=(choices=[\"full\",\"flush\","
+    "\"write\",\"none\"])";
 
 const char *
 __wt_confdfl_session_checkpoint =

@@ -775,9 +775,8 @@ struct __wt_session {
 	 * @param session the session handle
 	 * @configstart{session.begin_transaction, see dist/api_data.py}
 	 * @config{isolation, the isolation level for this transaction.,a
-	 * string\, chosen from the following options: \c "serializable"\, \c
-	 * "snapshot"\, \c "read-committed"\, \c "read-uncommitted"; default \c
-	 * read-committed.}
+	 * string\, chosen from the following options: \c "read-uncommitted"\,
+	 * \c "snapshot"; default \c snapshot.}
 	 * @config{name, name of the transaction for tracing and debugging.,a
 	 * string; default empty.}
 	 * @config{priority, priority of the transaction for resolving

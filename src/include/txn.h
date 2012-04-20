@@ -32,7 +32,6 @@ struct __wt_txn {
 	 */
 	wt_txnid_t snap_min;
 	wt_txnid_t *snapshot;
-	size_t snapshot_alloc;
 	u_int snapshot_count;
 
 	/* Array of txn IDs in items created or modified by this txn. */
@@ -40,7 +39,12 @@ struct __wt_txn {
 	size_t mod_alloc;
 	u_int mod_count;
 
+	enum {
+		TXN_ISO_READ_UNCOMMITTED,
+		TXN_ISO_READ_COMMITTED,
+		TXN_ISO_SNAPSHOT
+	} isolation;
+
 #define	TXN_RUNNING	0x01
-#define	TXN_SNAPSHOT	0x02
 	uint32_t flags;
 };

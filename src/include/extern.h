@@ -319,7 +319,8 @@ extern void __wt_insert_serial_func(WT_SESSION_IMPL *session);
 extern int __wt_update_alloc(WT_SESSION_IMPL *session,
     WT_ITEM *value,
     WT_UPDATE **updp,
-    size_t *sizep);
+    size_t *sizep,
+    WT_UPDATE *next);
 extern void __wt_update_serial_func(WT_SESSION_IMPL *session);
 extern WT_INSERT *__wt_search_insert(WT_SESSION_IMPL *session,
     WT_CURSOR_BTREE *cbt,
@@ -923,6 +924,7 @@ extern int __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_txn_visible(WT_SESSION_IMPL *session, wt_txnid_t id);
 extern WT_UPDATE *__wt_txn_read(WT_SESSION_IMPL *session, WT_UPDATE *upd);
+extern int __wt_txn_update_check(WT_SESSION_IMPL *session, WT_UPDATE *upd);
 extern int __wt_txn_init(WT_SESSION_IMPL *session);
 extern void __wt_txn_destroy(WT_SESSION_IMPL *session);
 extern int __wt_txn_global_init(WT_CONNECTION_IMPL *conn, const char *cfg[]);

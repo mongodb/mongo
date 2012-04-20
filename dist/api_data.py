@@ -262,10 +262,9 @@ methods = {
 'session.dumpfile' : Method([]),
 
 'session.begin_transaction' : Method([
-	Config('isolation', 'read-committed', r'''
+	Config('isolation', 'snapshot', r'''
 		the isolation level for this transaction''',
-		choices=['serializable', 'snapshot', 'read-committed',
-		    'read-uncommitted']),
+		choices=['read-uncommitted', 'snapshot']),
 	Config('name', '', r'''
 		name of the transaction for tracing and debugging'''),
 	Config('sync', 'full', r'''

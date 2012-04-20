@@ -39,23 +39,24 @@ then size to ignore any IDs in the snapshot >= our ID
 int
 __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 {
+	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
 	WT_TXN *txn;
 	WT_TXN_GLOBAL *txn_global;
-	int snapshot;
+	wt_txnid_t *myid;
 
 	conn = S2C(session);
 	txn = &session->txn;
 	txn_global = &conn->txn_global;
 
-	/* XXX assume we're not doing snapshots for now. */
-	WT_UNUSED(cfg);
-	snapshot = 0;
-
 	if (F_ISSET(txn, TXN_RUNNING)) {
 		__wt_errx(session, "Transaction already running");
 		return (EINVAL);
 	}
+
+	WT_RET(__wt_config_gets(session, cfg, "isolation", &cval));
+	txn->isolation = (strcmp(cval.str, "snapshot") == 0) ?
+	    TXN_ISO_SNAPSHOT : TXN_ISO_READ_UNCOMMITTED;
 
 	WT_ASSERT(session, txn->id == WT_TXN_INVALID);
 	WT_ASSERT(session, txn_global->ids[session->id] == WT_TXN_INVALID);
@@ -65,12 +66,25 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 		txn->id = txn_global->current;
 		WT_PUBLISH(txn_global->ids[session->id], txn->id);
 
-		if (snapshot)
+		if (txn->isolation == TXN_ISO_SNAPSHOT)
 			/* Copy the array of concurrent transactions. */
 			memcpy(txn->snapshot, txn_global->ids,
 			    sizeof(wt_txnid_t) * conn->session_size);
 	} while (!WT_ATOMIC_CAS(txn_global->current, txn->id, txn->id + 1) ||
 	    txn->id == WT_TXN_NONE || txn->id == WT_TXN_INVALID);
+
+	if (txn->isolation == TXN_ISO_SNAPSHOT) {
+		/* Sort the snapshot and size for faster searching. */
+		qsort(txn->snapshot, conn->session_size, sizeof(wt_txnid_t),
+		    __txnid_cmp);
+		myid = bsearch(&txn->id, txn->snapshot, conn->session_size,
+		    sizeof(wt_txnid_t), __txnid_cmp);
+		WT_ASSERT(session, myid != NULL);
+		while (myid > txn->snapshot && myid[-1] == myid[0])
+			--myid;
+		txn->snap_min = txn->snapshot[0];
+		txn->snapshot_count = (u_int)(myid - txn->snapshot);
+	}
 
 	F_SET(txn, TXN_RUNNING);
 
@@ -199,7 +213,7 @@ __wt_txn_visible(WT_SESSION_IMPL *session, wt_txnid_t id)
 	 * non-snapshot transactions see all other changes.
 	 */
 	txn = &session->txn;
-	if (id == WT_TXN_NONE || !F_ISSET(txn, TXN_SNAPSHOT))
+	if (id == WT_TXN_NONE || txn->isolation != TXN_ISO_SNAPSHOT)
 		return 1;
 
 	/*
@@ -229,6 +243,26 @@ __wt_txn_read(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 		upd = upd->next;
 
 	return (upd);
+}
+
+/*
+ * __wt_txn_update_check --
+ *	Check if the current transaction can update an item.
+ */
+int
+__wt_txn_update_check(WT_SESSION_IMPL *session, WT_UPDATE *upd)
+{
+	WT_TXN *txn;
+
+	txn = &session->txn;
+	if (txn->isolation == TXN_ISO_SNAPSHOT)
+		while (upd != NULL && !__wt_txn_visible(session, upd->txnid)) {
+			if (upd->txnid != WT_TXN_INVALID)
+				return (WT_DEADLOCK);
+			upd = upd->next;
+		}
+
+	return (0);
 }
 
 /*
