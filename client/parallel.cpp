@@ -503,7 +503,19 @@ namespace mongo {
                                                             0 , // nToSkip
                                                             _fields.isEmpty() ? 0 : &_fields , // fieldsToReturn
                                                             _options ,
-                                                            _batchSize == 0 ? 0 : _batchSize + _needToSkip // batchSize
+                                                            // NtoReturn is weird.
+                                                            // If zero, it means use default size, so we do that for all cursors
+                                                            // If positive, it's the batch size (we don't want this cursor limiting results), tha
+                                                            // done at a higher level
+                                                            // If negative, it's the batch size, but we don't create a cursor - so we don't want
+                                                            // to create a child cursor either.
+                                                            // Either way, if non-zero, we want to pull back the batch size + the skip amount as
+                                                            // quickly as possible.  Potentially, for a cursor on a single shard or if we keep be
+                                                            // chunks, we can actually add the skip value into the cursor and/or make some assump
+                                                            // return value size ( (batch size + skip amount) / num_servers ).
+                                                            _batchSize == 0 ? 0 :
+                                                                ( _batchSize > 0 ? _batchSize + _needToSkip :
+                                                                                   _batchSize - _needToSkip ) // batchSize
                                                             ) );
 
                 try{
