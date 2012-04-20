@@ -98,7 +98,7 @@ namespace mongo {
         Context* getContext() const { return _context; }
         Database* database() const {  return _context ? _context->db() : 0; }
         const char *ns() const { return _context->ns(); }
-        const char *desc() const { return _desc; }
+        const std::string desc() const { return _desc; }
         void setLastOp( OpTime op ) { _lastOp = op; }
         OpTime getLastOp() const { return _lastOp; }
 
@@ -135,7 +135,7 @@ namespace mongo {
         CurOp * _curOp;
         Context * _context;
         bool _shutdown; // to track if Client::shutdown() gets called
-        const char * const _desc;
+        const std::string _desc;
         bool _god;
         AuthenticationInfo _ai;
         OpTime _lastOp;
