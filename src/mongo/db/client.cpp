@@ -160,7 +160,7 @@ namespace mongo {
 #if defined(_DEBUG)
         { 
             if( sizeof(void*) == 8 ) {
-                StackChecker::check( desc() );
+                StackChecker::check( desc().c_str() );
             }
         }
 #endif
