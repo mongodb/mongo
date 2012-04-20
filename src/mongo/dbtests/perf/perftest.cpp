@@ -664,7 +664,7 @@ namespace Plan {
         void run() {
             for( int i = 0; i < 10000; ++i )
                 MultiPlanScanner s( ns_.c_str(), BSONObj(), BSONObj(),
-                                   shared_ptr<const ParsedQuery>(), hint_ );
+                                   boost::shared_ptr<const ParsedQuery>(), hint_ );
         }
         string ns_;
         scoped_ptr<Lock::GlobalWrite> _lk;
