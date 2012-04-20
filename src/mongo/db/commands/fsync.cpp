@@ -130,6 +130,8 @@ namespace mongo {
         
         fsyncCmd.locked = false;
         fsyncCmd.err = "unlocked";
+
+        fsyncCmd._unlockSync.notify_one();
     }
 
     bool lockedForWriting() { 
@@ -145,6 +147,10 @@ namespace mongo {
         fsyncCmd.pendingUnlock = true;
         fsyncCmd._unlockSync.notify_one();
         fsyncCmd._threadSync.notify_one();
+        
+        while ( fsyncCmd.locked ) {
+            fsyncCmd._unlockSync.wait( fsyncCmd.m );
+        }
         return true;
     }
 }
