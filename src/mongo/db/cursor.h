@@ -202,7 +202,7 @@ namespace mongo {
          * that generate their own keyFieldsOnly() must assert.
          */
         virtual void setKeyFieldsOnly( const shared_ptr<Projection::KeyOnly> &keyFieldsOnly ) {
-            massert( 16151, "manual keyFieldsOnly config not allowed", false );
+            massert( 16159, "manual keyFieldsOnly config not allowed", false );
         }
         
         virtual void explainDetails( BSONObjBuilder& b ) { return; }
