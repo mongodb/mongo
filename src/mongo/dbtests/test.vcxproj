@@ -815,6 +815,7 @@
     <ClCompile Include="..\client\parallel.cpp" />
     <ClCompile Include="..\db\btreebuilder.cpp" />
     <ClCompile Include="..\db\cap.cpp" />
+    <ClCompile Include="..\db\commands\fsync.cpp" />
     <ClCompile Include="..\db\commands\isself.cpp" />
     <ClCompile Include="..\db\compact.cpp" />
     <ClCompile Include="..\db\curop.cpp" />

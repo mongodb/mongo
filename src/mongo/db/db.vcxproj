@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -1246,6 +1246,8 @@
     </ClCompile>
     <ClCompile Include="commands\document_source_cursor.cpp" />
     <ClCompile Include="commands\find_and_modify.cpp" />
+    <ClCompile Include="commands\fsync.cpp">
+    </ClCompile>
     <ClCompile Include="commands\group.cpp" />
     <ClCompile Include="commands\isself.cpp" />
     <ClCompile Include="commands\mr.cpp" />
