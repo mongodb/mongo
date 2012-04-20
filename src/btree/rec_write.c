@@ -1297,6 +1297,7 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_INSERT *ins;
 	WT_INSERT_HEAD *append;
 	WT_RECONCILE *r;
+	WT_UPDATE *upd;
 	uint64_t recno;
 	uint32_t entry, nrecs;
 
@@ -1304,10 +1305,13 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 	btree = session->btree;
 
 	/* Update any changes to the original on-page data items. */
-	WT_SKIP_FOREACH(ins, WT_COL_UPDATE_SINGLE(page))
+	WT_SKIP_FOREACH(ins, WT_COL_UPDATE_SINGLE(page)) {
+		if ((upd = __wt_txn_read(session, ins->upd)) == NULL)
+			continue;
 		__bit_setv_recno(
 		    page, WT_INSERT_RECNO(ins), btree->bitcnt,
-		    ((uint8_t *)WT_UPDATE_DATA(ins->upd))[0]);
+		    ((uint8_t *)WT_UPDATE_DATA(upd))[0]);
+	}
 
 	/* Allocate the memory. */
 	WT_RET(__rec_split_init(session,
@@ -1324,7 +1328,9 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	/* Walk any append list. */
 	append = WT_COL_APPEND(page);
-	WT_SKIP_FOREACH(ins, append)
+	WT_SKIP_FOREACH(ins, append) {
+		if ((upd = __wt_txn_read(session, ins->upd)) == NULL)
+			continue;
 		for (;;) {
 			/*
 			 * The application may have inserted records which left
@@ -1338,7 +1344,7 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 			if (nrecs > 0) {
 				__bit_setv(r->first_free, entry, btree->bitcnt,
-				    ((uint8_t *)WT_UPDATE_DATA(ins->upd))[0]);
+				    ((uint8_t *)WT_UPDATE_DATA(upd))[0]);
 				--nrecs;
 				++entry;
 				++r->recno;
@@ -1359,6 +1365,7 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 			entry = 0;
 			nrecs = r->space_avail / btree->bitcnt;
 		}
+	}
 
 	/* Update the counters. */
 	__rec_incr(session, r, entry, __bitstr_size(entry * btree->bitcnt));
@@ -1580,6 +1587,8 @@ __rec_col_var(
 		 */
 		cell = WT_COL_PTR(page, cip);
 		ins = WT_SKIP_FIRST(WT_COL_UPDATE(page, cip));
+		while (ins != NULL && __wt_txn_read(session, ins->upd) == NULL)
+			ins = WT_SKIP_NEXT(ins);
 		if (cell == NULL) {
 			nrepeat = 1;
 			orig_deleted = 1;
@@ -1657,9 +1666,14 @@ __rec_col_var(
 		 */
 		for (n = 0;
 		    n < nrepeat; n += repeat_count, src_recno += repeat_count) {
-			if (ins != NULL && WT_INSERT_RECNO(ins) == src_recno) {
-				upd = ins->upd;
-				ins = WT_SKIP_NEXT(ins);
+			if (ins != NULL &&
+			    WT_INSERT_RECNO(ins) == src_recno) {
+				upd = __wt_txn_read(session, ins->upd);
+				WT_ASSERT(session, upd != NULL);
+				do {
+					ins = WT_SKIP_NEXT(ins);
+				} while (ins != NULL &&
+				    __wt_txn_read(session, ins->upd) == NULL);
 
 				deleted = WT_UPDATE_DELETED_ISSET(upd);
 				if (!deleted) {
@@ -1741,7 +1755,9 @@ __rec_col_var(
 
 	/* Walk any append list. */
 	append = WT_COL_APPEND(page);
-	WT_SKIP_FOREACH(ins, append)
+	WT_SKIP_FOREACH(ins, append) {
+		if ((upd = __wt_txn_read(session, ins->upd)) == NULL)
+			continue;
 		for (n = WT_INSERT_RECNO(ins); src_recno <= n; ++src_recno) {
 			/*
 			 * The application may have inserted records which left
@@ -1750,7 +1766,6 @@ __rec_col_var(
 			if (src_recno < n)
 				deleted = 1;
 			else {
-				upd = ins->upd;
 				deleted = WT_UPDATE_DELETED_ISSET(upd);
 				if (!deleted) {
 					data = WT_UPDATE_DATA(upd);
@@ -1790,6 +1805,7 @@ __rec_col_var(
 			rle = 1;
 			can_compare = 1;
 		}
+	}
 
 	/* If we were tracking a record, write it. */
 	if (can_compare)
@@ -2225,7 +2241,8 @@ __rec_row_leaf(
 		/* Build value cell. */
 		if ((val_cell = __wt_row_value(page, rip)) != NULL)
 			__wt_cell_unpack(val_cell, unpack);
-		if ((upd = WT_ROW_UPDATE(page, rip)) == NULL) {
+		upd = __wt_txn_read(session, WT_ROW_UPDATE(page, rip));
+		if (upd == NULL) {
 			/*
 			 * Copy the item off the page -- however, when the page
 			 * was read into memory, there may not have been a value
@@ -2410,8 +2427,9 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_INSERT *ins)
 	val = &r->v;
 
 	for (; ins != NULL; ins = WT_SKIP_NEXT(ins)) {
-		upd = ins->upd;				/* Build value cell. */
-		if (WT_UPDATE_DELETED_ISSET(upd))
+		/* Build value cell. */
+		upd = __wt_txn_read(session, ins->upd);
+		if (upd == NULL || WT_UPDATE_DELETED_ISSET(upd))
 			continue;
 		if (upd->size == 0)
 			val->len = 0;
