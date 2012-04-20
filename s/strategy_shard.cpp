@@ -91,10 +91,10 @@ namespace mongo {
             }
 
             ShardedClientCursorPtr cc (new ShardedClientCursor( q , cursor ));
-            if ( ! cc->sendNextBatch( r, q.ntoreturn ) ) {
+            if ( ! cc->sendNextBatch( r ) ) {
                 return;
             }
-            LOG(5) << "storing cursor : " << cc->getId() << endl;
+            LOG(6) << "storing cursor : " << cc->getId() << endl;
             cursorCache.store( cc );
         }
 
