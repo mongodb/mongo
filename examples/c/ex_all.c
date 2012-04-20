@@ -297,7 +297,20 @@ session_ops(WT_SESSION *session)
 	/*! [session checkpoint] */
 
 	/*! [session drop] */
+	/* Discard a table. */
 	ret = session->drop(session, "table:mytable", NULL);
+
+	/* Drop all snapshots from a table. */
+	ret = session->drop(session, "table:mytable", "snapall=true");
+
+	/* Drop all snapshots after, and including, "January". */
+	ret = session->drop(session, "table:mytable", "snapfrom=January");
+
+	/* Drop the "June" snapshot. */
+	ret = session->drop(session, "table:mytable", "snapshot=June");
+
+	/* Drop all snapshots before, and including, "November". */
+	ret = session->drop(session, "table:mytable", "snapto=November");
 	/*! [session drop] */
 
 	/*! [session dumpfile] */

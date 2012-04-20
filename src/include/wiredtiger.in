@@ -644,8 +644,8 @@ struct __wt_session {
 	 * flag; default \c false.}
 	 * @config{snapall, drop all snapshots.,a boolean flag; default \c
 	 * false.}
-	 * @config{snapfrom, drop all snapshots later than\, and including\, the
-	 * named snapshot.,a string; default empty.}
+	 * @config{snapfrom, drop all snapshots more recent than\, and
+	 * including\, the named snapshot.,a string; default empty.}
 	 * @config{snapshot, the name of a single snapshot to drop.,a string;
 	 * default empty.}
 	 * @config{snapto, drop all snapshots earlier than\, and including\, the
@@ -696,12 +696,10 @@ struct __wt_session {
 	int __F(salvage)(WT_SESSION *session,
 	    const char *name, const char *config);
 
-	/*! Sync a file or table.
+	/*! Snapshot a table or file.
 	 *
-	 * Flush dirty pages from a table to stable storage.  Note that not
-	 * all pages are necessarily flushed (pages pinned in memory, or in
-	 * use by other threads of control may not be written until all open
-	 * session handles for the table are closed).
+	 * Flush dirty pages from a table or file to stable storage, creating a
+	 * snapshot (see @ref snapshots for more information).
 	 *
 	 * @snippet ex_all.c session sync
 	 *

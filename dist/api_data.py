@@ -210,7 +210,7 @@ methods = {
 		drop all snapshots''',
 		type='boolean'),
 	Config('snapfrom', '', r'''
-		drop all snapshots later than, and including, the named
+		drop all snapshots more recent than, and including, the named
 		snapshot'''),
 	Config('snapshot', '', r'''
 		the name of a single snapshot to drop'''),
