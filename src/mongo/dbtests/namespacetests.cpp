@@ -1269,8 +1269,8 @@ namespace NamespaceTests {
 
     namespace NamespaceDetailsTransientTests {
         
-        /** setIndexMultikey() clears the query plan cache. */
-        class SetIndexMultikey : public NamespaceDetailsTests::CachedPlanBase {
+        /** clearQueryCache() clears the query plan cache. */
+        class ClearQueryCache : public NamespaceDetailsTests::CachedPlanBase {
         public:
             void run() {
                 // Register a query plan in the query plan cache.
@@ -1278,7 +1278,7 @@ namespace NamespaceTests {
                 assertCachedIndexKey( BSON( "a" << 1 ) );
                 
                 // The query plan is cleared.
-                nsdt().setIndexMultikey();
+                nsdt().clearQueryCache();
                 assertCachedIndexKey( BSONObj() );
             }
         };                                                                                         
@@ -1338,7 +1338,7 @@ namespace NamespaceTests {
             //            add< NamespaceDetailsTests::BigCollection >();
             add< NamespaceDetailsTests::Size >();
             add< NamespaceDetailsTests::SetIndexIsMultikey >();
-            add< NamespaceDetailsTransientTests::SetIndexMultikey >();
+            add< NamespaceDetailsTransientTests::ClearQueryCache >();
         }
     } myall;
 } // namespace NamespaceTests

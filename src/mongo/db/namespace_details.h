@@ -413,7 +413,6 @@ namespace mongo {
         ~NamespaceDetailsTransient();
         void addedIndex() { reset(); }
         void deletedIndex() { reset(); }
-        void setIndexMultikey();
         /* Drop cached information on all namespaces beginning with the specified prefix.
            Can be useful as index namespaces share the same start as the regular collection.
            SLOW - sequential scan of all NamespaceDetailsTransient objects */
@@ -531,7 +530,7 @@ namespace mongo {
             return get_inlock(ns);
         }
 
-        void clearQueryCache() { // public for unit tests
+        void clearQueryCache() {
             _qcCache.clear();
             _qcWriteCount = 0;
         }

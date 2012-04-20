@@ -523,7 +523,7 @@ namespace mongo {
         unsigned long long x = ((unsigned long long) 1) << i;
         if( multiKeyIndexBits & x ) return;
         *getDur().writing(&multiKeyIndexBits) |= x;
-        NamespaceDetailsTransient::get(thisns).setIndexMultikey();
+        NamespaceDetailsTransient::get(thisns).clearQueryCache();
     }
 
     /* you MUST call when adding an index.  see pdfile.cpp */
@@ -653,11 +653,6 @@ namespace mongo {
     }
 
     NamespaceDetailsTransient::~NamespaceDetailsTransient() { 
-    }
-
-    void NamespaceDetailsTransient::setIndexMultikey() {
-        Lock::assertWriteLocked(_ns);
-        clearQueryCache();
     }
 
     void NamespaceDetailsTransient::clearForPrefix(const char *prefix) {
