@@ -25,32 +25,7 @@
 // system headers and boost headers
 #include "mongo/client/undef_macros.h"
 
-#if defined(_WIN32)
-// for rand_s() usage:
-# define _CRT_RAND_S
-# ifndef NOMINMAX
-#  define NOMINMAX
-# endif
-// tell windows.h not to include a bunch of headers
-// we don't need:
-# define WIN32_LEAN_AND_MEAN
-# include "targetver.h"
-# include <winsock2.h> //this must be included before the first windows.h include
-# include <ws2tcpip.h>
-# include <wspiapi.h>
-# include <windows.h>
-#endif
-
-#if defined(__linux__)
-// glibc's optimized versions are better than g++ builtins
-# define __builtin_strcmp strcmp
-# define __builtin_strlen strlen
-# define __builtin_memchr memchr
-# define __builtin_memcmp memcmp
-# define __builtin_memcpy memcpy
-# define __builtin_memset memset
-# define __builtin_memmove memmove
-#endif
+#include "mongo/platform/basic.h"
 
 #include <ctime>
 #include <cstring>

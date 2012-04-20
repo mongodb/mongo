@@ -17,9 +17,7 @@
 
 #pragma once
 
-#ifdef _WIN32
-#include <windows.h>
-#endif
+#include "mongo/platform/basic.h"
 
 #include <cstdio> // sscanf
 #include <ctime>
