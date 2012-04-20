@@ -1089,6 +1089,12 @@ namespace mongo {
 
         virtual void setMatcher( shared_ptr< CoveredIndexMatcher > matcher ) { _matcher = matcher;  }
 
+        virtual const Projection::KeyOnly *keyFieldsOnly() const { return _keyFieldsOnly.get(); }
+        
+        virtual void setKeyFieldsOnly( const shared_ptr<Projection::KeyOnly> &keyFieldsOnly ) {
+            _keyFieldsOnly = keyFieldsOnly;
+        }
+        
         virtual long long nscanned() { return _nscanned; }
 
         /** for debugging only */
@@ -1141,6 +1147,7 @@ namespace mongo {
         const shared_ptr< FieldRangeVector > _bounds;
         auto_ptr< FieldRangeVectorIterator > _boundsIterator;
         shared_ptr< CoveredIndexMatcher > _matcher;
+        shared_ptr<Projection::KeyOnly> _keyFieldsOnly;
         bool _independentFieldRanges;
         long long _nscanned;
     };

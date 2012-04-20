@@ -21,6 +21,7 @@
 #include "jsobj.h"
 #include "diskloc.h"
 #include "matcher.h"
+#include "mongo/db/projection.h"
 
 namespace mongo {
 
@@ -187,12 +188,23 @@ namespace mongo {
         }
 
         // A convenience function for setting the value of matcher() manually
-        // so it may accessed later.  Implementations which must generate
+        // so it may be accessed later.  Implementations which must generate
         // their own matcher() should assert here.
         virtual void setMatcher( shared_ptr< CoveredIndexMatcher > matcher ) {
             massert( 13285, "manual matcher config not allowed", false );
         }
 
+        /** @return the covered index projector for the current iterate, if any. */
+        virtual const Projection::KeyOnly *keyFieldsOnly() const { return 0; }
+
+        /**
+         * Manually set the value of keyFieldsOnly() so it may be accessed later.  Implementations
+         * that generate their own keyFieldsOnly() must assert.
+         */
+        virtual void setKeyFieldsOnly( const shared_ptr<Projection::KeyOnly> &keyFieldsOnly ) {
+            massert( 16151, "manual keyFieldsOnly config not allowed", false );
+        }
+        
         virtual void explainDetails( BSONObjBuilder& b ) { return; }
     };
 
@@ -249,6 +261,10 @@ namespace mongo {
         virtual CoveredIndexMatcher *matcher() const { return _matcher.get(); }
         virtual shared_ptr< CoveredIndexMatcher > matcherPtr() const { return _matcher; }
         virtual void setMatcher( shared_ptr< CoveredIndexMatcher > matcher ) { _matcher = matcher; }
+        virtual const Projection::KeyOnly *keyFieldsOnly() const { return _keyFieldsOnly.get(); }
+        virtual void setKeyFieldsOnly( const shared_ptr<Projection::KeyOnly> &keyFieldsOnly ) {
+            _keyFieldsOnly = keyFieldsOnly;
+        }
         virtual long long nscanned() { return _nscanned; }
 
     protected:
@@ -258,6 +274,7 @@ namespace mongo {
     private:
         bool tailable_;
         shared_ptr< CoveredIndexMatcher > _matcher;
+        shared_ptr<Projection::KeyOnly> _keyFieldsOnly;
         long long _nscanned;
         void init() { tailable_ = false; }
     };

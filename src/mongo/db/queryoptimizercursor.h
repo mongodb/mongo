@@ -20,7 +20,6 @@
 
 #include "cursor.h"
 #include "diskloc.h"
-#include "projection.h"
 
 namespace mongo {
     
@@ -97,8 +96,6 @@ namespace mongo {
 
         /** @return true if the plan for the current iterate is out of order. */
         virtual bool currentPlanScanAndOrderRequired() const = 0;
-        /** @return the covered index projector for the current iterate (may be 0). */
-        virtual const Projection::KeyOnly *keyFieldsOnly() const = 0;
 
         /** @return true when there may be multiple plans running and some are in order. */
         virtual bool runningInitialInOrderPlan() const = 0;

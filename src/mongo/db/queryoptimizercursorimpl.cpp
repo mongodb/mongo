@@ -215,7 +215,9 @@ namespace mongo {
         }
         shared_ptr<ExplainPlanInfo> explainInfo() const { return _explainPlanInfo; }
         
-        const Projection::KeyOnly *keyFieldsOnly() const { return qp().keyFieldsOnly().get(); }
+        virtual const Projection::KeyOnly *keyFieldsOnly() const {
+            return qp().keyFieldsOnly().get();
+        }
         
     private:
         void mayAdvance() {
@@ -800,6 +802,9 @@ namespace mongo {
             shared_ptr<CoveredIndexMatcher> matcher
             ( new CoveredIndexMatcher( _query, single->indexKeyPattern() ) );
             single->setMatcher( matcher );
+        }
+        if ( singlePlan->keyFieldsOnly() ) {
+            single->setKeyFieldsOnly( singlePlan->keyFieldsOnly() );
         }
         if ( _simpleEqualityMatch ) {
             if ( singlePlan->exactKeyMatch() && !single->matcher()->needRecord() ) {

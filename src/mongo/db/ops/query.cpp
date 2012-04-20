@@ -113,10 +113,6 @@ namespace mongo {
             c->recoverFromYield();
             DiskLoc last;
 
-            scoped_ptr<Projection::KeyOnly> keyFieldsOnly;
-            if ( cc->modifiedKeys() == false && cc->isMultiKey() == false && cc->fields )
-                keyFieldsOnly.reset( cc->fields->checkKey( cc->indexKeyPattern() ) );
-
             // This manager may be stale, but it's the state of chunking when the cursor was created.
             ShardChunkManagerPtr manager = cc->getChunkManager();
 
@@ -158,14 +154,7 @@ namespace mongo {
                         last = c->currLoc();
                         n++;
 
-                        if ( keyFieldsOnly ) {
-                            fillQueryResultFromObj(b, 0, keyFieldsOnly->hydrate( c->currKey() ) );
-                        }
-                        else {
-                            BSONObj js = c->current();
-                            // show disk loc should be part of the main query, not in an $or clause, so this should be ok
-                            fillQueryResultFromObj(b, cc->fields.get(), js, ( cc->pq.get() && cc->pq->showDiskLoc() ? &last : 0));
-                        }
+                        cc->fillQueryResultFromObj( b );
 
                         if ( ( ntoreturn && n >= ntoreturn ) || b.len() > MaxBytesToReturnToClientAtOnce ) {
                             c->advance();
@@ -176,7 +165,8 @@ namespace mongo {
                 }
                 c->advance();
 
-                if ( ! cc->yieldSometimes( keyFieldsOnly ? ClientCursor::DontNeed : ClientCursor::WillNeed ) ) {
+                if ( ! cc->yieldSometimes( ( c->ok() && c->keyFieldsOnly() ) ?
+                                          ClientCursor::DontNeed : ClientCursor::WillNeed ) ) {
                     ClientCursor::erase(cursorid);
                     cursorid = 0;
                     cc = 0;
@@ -295,8 +285,7 @@ namespace mongo {
     _parsedQuery( parsedQuery ),
     _cursor( cursor ),
     _queryOptimizerCursor( dynamic_pointer_cast<QueryOptimizerCursor>( _cursor ) ),
-    _buf( buf ),
-    _planKeyFieldsOnly( queryPlan._keyFieldsOnly ) {
+    _buf( buf ) {
     }
 
     void ResponseBuildStrategy::resetBuf() {
@@ -311,9 +300,9 @@ namespace mongo {
             return bob.obj();
         }
         if ( allowCovered ) {
-            const Projection::KeyOnly *fields = keyFieldsOnly();
-            if ( fields ) {
-                return fields->hydrate( _cursor->currKey() );
+            const Projection::KeyOnly *keyFieldsOnly = _cursor->keyFieldsOnly();
+            if ( keyFieldsOnly ) {
+                return keyFieldsOnly->hydrate( _cursor->currKey() );
             }
         }
         BSONObj ret = _cursor->current();
@@ -321,16 +310,6 @@ namespace mongo {
         return ret;
     }
 
-    const Projection::KeyOnly *ResponseBuildStrategy::keyFieldsOnly() const {
-        if ( !_parsedQuery.getFields() ) {
-            return 0;
-        }
-        if ( _queryOptimizerCursor ) {
-            return _queryOptimizerCursor->keyFieldsOnly();
-        }
-        return _planKeyFieldsOnly.get();
-    }
-    
     OrderedBuildStrategy::OrderedBuildStrategy( const ParsedQuery &parsedQuery,
                                                const shared_ptr<Cursor> &cursor,
                                                BufBuilder &buf,

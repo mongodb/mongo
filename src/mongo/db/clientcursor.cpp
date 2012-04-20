@@ -32,6 +32,7 @@
 #include "../util/processinfo.h"
 #include "../util/timer.h"
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/db/scanandorder.h"
 
 namespace mongo {
 
@@ -418,6 +419,17 @@ namespace mongo {
         return b.obj();
     }
     
+    void ClientCursor::fillQueryResultFromObj( BufBuilder &b ) const {
+        const Projection::KeyOnly *keyFieldsOnly = c()->keyFieldsOnly();
+        if ( keyFieldsOnly ) {
+            mongo::fillQueryResultFromObj( b, 0, keyFieldsOnly->hydrate( c()->currKey() ) );
+        }
+        else {
+            DiskLoc loc = c()->currLoc();
+            mongo::fillQueryResultFromObj( b, fields.get(), c()->current(),
+                                          ( ( pq && pq->showDiskLoc() ) ? &loc : 0 ) );
+        }
+    }
 
     /* call when cursor's location changes so that we can update the
        cursorsbylocation map.  if you are locked and internally iterating, only
