@@ -22,6 +22,7 @@
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/db/dbhelpers.h"
 #include "rs_optime.h"
+#include "mongo/db/repl/rs_sync.h"
 #include "mongo/db/oplog.h"
 
 namespace mongo {
@@ -78,19 +79,17 @@ namespace mongo {
     }
 
     Member* ReplSetImpl::getMemberToSyncTo() {
+        lock lk(this);
 
         bool buildIndexes = true;
 
-        {
-            // if we have a target we've requested to sync from, use it
-            lock lk(this);
+        // if we have a target we've requested to sync from, use it
 
-            if (_forceSyncTarget) {
-                _currentSyncTarget = _forceSyncTarget;
-                _forceSyncTarget = 0;
-                sethbmsg( str::stream() << "syncing to: " << _currentSyncTarget->fullName() << " by request", 0);
-                return _currentSyncTarget;
-            }
+        if (_forceSyncTarget) {
+            Member* target = _forceSyncTarget;
+            _forceSyncTarget = 0;
+            sethbmsg( str::stream() << "syncing to: " << target->fullName() << " by request", 0);
+            return target;
         }
 
         // wait for 2N pings before choosing a sync target
@@ -107,7 +106,7 @@ namespace mongo {
 
         Member *closest = 0;
         time_t now = 0;
-        
+
         // find the member with the lowest ping time that has more data than me
 
         // Make two attempts.  The first attempt, we ignore those nodes with
@@ -119,11 +118,11 @@ namespace mongo {
                     // make sure members with buildIndexes sync from other members w/indexes
                     (!buildIndexes || (buildIndexes && m->config().buildIndexes)) &&
                     (m->state() == MemberState::RS_PRIMARY ||
-                     (m->state() == MemberState::RS_SECONDARY && 
+                     (m->state() == MemberState::RS_SECONDARY &&
                       m->hbinfo().opTime > lastOpTimeWritten)) &&
                     (!closest || m->hbinfo().ping < closest->hbinfo().ping)) {
 
-                    if ( attempts == 0 && 
+                    if ( attempts == 0 &&
                          myConfig().slaveDelay < m->config().slaveDelay ) {
                         break; // skip this one in the first attempt
                     }
@@ -146,22 +145,17 @@ namespace mongo {
                     }
 
                     // if it was recently vetoed, skip
-                    log() << "replSet not trying to sync from " << (*vetoed).first
-                          << ", it is vetoed for " << ((*vetoed).second - now) << " more seconds" << rsLog;
+                    if (time(0) % 5 == 0) {
+                        log() << "replSet not trying to sync from " << (*vetoed).first
+                              << ", it is vetoed for " << ((*vetoed).second - now) << " more seconds" << rsLog;
+                    }
                 }
             }
             if (closest) break; // no need for second attempt
         }
 
-        {
-            lock lk(this);        
-
-            if (!closest) {
-                _currentSyncTarget = NULL;
-                return NULL;
-            }
-            
-            _currentSyncTarget = closest;
+        if (!closest) {
+            return NULL;
         }
 
         sethbmsg( str::stream() << "syncing to: " << closest->fullName(), 0);
@@ -170,6 +164,7 @@ namespace mongo {
     }
 
     void ReplSetImpl::veto(const string& host, const unsigned secs) {
+        lock lk(this);
         _veto[host] = time(0)+secs;
     }
 
@@ -177,6 +172,7 @@ namespace mongo {
      * Do the initial sync for this member.
      */
     void ReplSetImpl::_syncDoInitialSync() {
+        replset::InitialSync init;
         sethbmsg("initial sync pending",0);
 
         // if this is the first node, it may have already become primary
@@ -184,7 +180,7 @@ namespace mongo {
             sethbmsg("I'm already primary, no need for initial sync",0);
             return;
         }
-        
+
         const Member *source = getMemberToSyncTo();
         if (!source) {
             sethbmsg("initial sync need a member to be primary or secondary to do our initial sync", 0);
@@ -210,6 +206,10 @@ namespace mongo {
 
         if (replSettings.fastsync) {
             log() << "fastsync: skipping database clone" << rsLog;
+
+            // prime oplog
+            init.oplogApplication(lastOp, lastOp);
+            return;
         }
         else {
             sethbmsg("initial sync drop all databases", 0);
@@ -268,14 +268,14 @@ namespace mongo {
         // apply startingTS..mvoptime portion of the oplog
         {
             // note we assume here that this call does not throw
-            if( ! initialSyncOplogApplication(startingTS, mvoptime) ) {
+            if (!init.oplogApplication(lastOp, minValid)) {
                 log() << "replSet initial sync failed during oplog application phase" << rsLog;
 
                 emptyOplog(); // otherwise we'll be up!
-                
+
                 lastOpTimeWritten = OpTime();
                 lastH = 0;
-                
+
                 log() << "replSet cleaning up [1]" << rsLog;
                 {
                     Client::WriteContext cx( "local." );

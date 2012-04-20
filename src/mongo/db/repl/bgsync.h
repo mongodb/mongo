@@ -29,6 +29,9 @@ namespace replset {
     class BackgroundSyncInterface {
     public:
         virtual ~BackgroundSyncInterface();
+        virtual BSONObj* peek() = 0;
+        virtual void consume() = 0;
+        virtual Member* getSyncTarget() = 0;
     };
 
 
@@ -46,8 +49,26 @@ namespace replset {
         // protects creation of s_instance
         static boost::mutex s_mutex;
 
+        // max size for buffer: 200 MB (plus or minus max oplog doc size)
+        const size_t _maxSize;
+
         // _mutex protects all of the class variables
         boost::mutex _mutex;
+
+
+        // Production thread
+        queue<BSONObj> _buffer;
+        size_t _bufSize;
+        // used to wait if the buffer is full
+        boost::condition_variable _bufCond;
+
+        OpTime _lastOpTimeFetched;
+        long long _lastH;
+        // if produce thread should be running
+        bool _pause;
+
+        Member* _currentSyncTarget;
+
 
         // Tracker thread
         Member* _oplogMarkerTarget;
@@ -58,15 +79,49 @@ namespace replset {
         BackgroundSync(const BackgroundSync& s);
         BackgroundSync operator=(const BackgroundSync& s);
 
+
+        // Production thread
+        void _producerThread();
+        // Adds elements to the list, up to maxSize.
+        void produce();
+        // Check if rollback is necessary
+        bool isRollbackRequired(OplogReader& r);
+        void getOplogReader(OplogReader& r);
+        // check lastOpTimeWritten against the remote's earliest op, filling in remoteOldestOp.
+        bool isStale(OplogReader& r, BSONObj& remoteOldestOp);
+        // stop syncing when this becomes a primary
+        void stop();
+        // restart syncing
+        void start();
+
+
+        // Tracker thread
         // tells the sync target where this member is synced to
         void markOplog();
         bool hasCursor();
     public:
         static BackgroundSync* get();
+        static void shutdown();
+
         virtual ~BackgroundSync() {}
 
+        // starts the producer thread
+        void producerThread();
         // starts the sync target notifying thread
         void notifierThread();
+
+
+        // Interface implementation
+
+        // Gets the head of the buffer, but does not remove it. Returns a pointer to the list
+        // element.
+        virtual BSONObj* peek();
+
+        // called by sync thread when it has applied an op
+        virtual void consume();
+
+        // return the member we're currently syncing from (or NULL)
+        virtual Member* getSyncTarget();
     };
 
 

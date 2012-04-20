@@ -993,6 +993,10 @@ namespace mongo {
 
     void exitCleanly( ExitCode code ) {
         killCurrentOp.killAll();
+        if (theReplSet) {
+            theReplSet->shutdown();
+        }
+
         {
             Lock::GlobalWrite lk;
             log() << "now exiting" << endl;

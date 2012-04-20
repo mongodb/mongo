@@ -387,9 +387,14 @@ namespace mongo {
         task::fork(mgr);
         mgr->send( boost::bind(&Manager::msgCheckNewState, theReplSet->mgr) );
 
+        if (myConfig().arbiterOnly) {
+            return;
+        }
+
         boost::thread t(startSyncThread);
 
         replset::BackgroundSync* sync = replset::BackgroundSync::get();
+        boost::thread producer(boost::bind(&replset::BackgroundSync::producerThread, sync));
         boost::thread notifier(boost::bind(&replset::BackgroundSync::notifierThread, sync));
 
         task::fork(ghost);

@@ -29,6 +29,7 @@
 #include "rs_optime.h"
 #include "rs_member.h"
 #include "rs_config.h"
+#include "mongo/db/repl/rs_sync.h"
 
 /**
  * Order of Events
@@ -80,33 +81,6 @@ namespace mongo {
         const HostAndPort _h;
         HeartbeatInfo _hbinfo;
     };
-
-    namespace replset {
-        /**
-         * "Normal" replica set syncing
-         */
-        class SyncTail : public Sync {
-        public:
-            virtual ~SyncTail() {}
-            SyncTail(const string& host) : Sync(host) {}
-            virtual bool syncApply(const BSONObj &o);
-        };
-
-        /**
-         * Initial clone and sync
-         */
-        class InitialSync : public SyncTail {
-        public:
-            InitialSync(const string& host) : SyncTail(host) {}
-            virtual ~InitialSync() {}
-            bool oplogApplication(OplogReader& r, const Member* source, const OpTime& applyGTE, const OpTime& minValid);
-            virtual void applyOp(const BSONObj& o, const OpTime& minvalid);
-        };
-
-        // TODO: move hbmsg into an error-keeping class (SERVER-4444)
-        void sethbmsg(const string& s, const int logLevel=0);
-
-    } // namespace replset
 
     class Manager : public task::Server {
         ReplSetImpl *rs;
@@ -355,6 +329,14 @@ namespace mongo {
         OpTime lastOpTimeWritten;
         long long lastH; // hash we use to make sure we are reading the right flow of ops and aren't on an out-of-date "fork"
         bool forceSyncFrom(const string& host, string& errmsg, BSONObjBuilder& result);
+
+        /**
+         * Find the closest member (using ping time) with a higher latest optime.
+         */
+        Member* getMemberToSyncTo();
+        void veto(const string& host, unsigned secs=10);
+        bool gotForceSync();
+        void goStale(const Member* m, const BSONObj& o);
     private:
         set<ReplSetHealthPollTask*> healthTasks;
         void endOldHealthTasks();
@@ -370,13 +352,7 @@ namespace mongo {
         void assumePrimary();
         void loadLastOpTimeWritten(bool quiet=false);
         void changeState(MemberState s);
-        
-        /**
-         * Find the closest member (using ping time) with a higher latest optime.
-         */
-        Member* getMemberToSyncTo();
-        void veto(const string& host, unsigned secs=10);
-        Member* _currentSyncTarget;
+
         Member* _forceSyncTarget;
 
         bool _blockSync;
@@ -518,29 +494,18 @@ namespace mongo {
         friend class Consensus;
 
     private:
-        bool initialSyncOplogApplication(const OpTime& applyGTE, const OpTime& minValid);
         void _syncDoInitialSync();
         void syncDoInitialSync();
         void _syncThread();
         bool tryToGoLiveAsASecondary(OpTime&); // readlocks
         void syncTail();
-        bool isRollbackRequired(OplogReader& r);
         unsigned _syncRollback(OplogReader& r);
-        void syncRollback(OplogReader& r);
         void syncFixUp(HowToFixUp& h, OplogReader& r);
-
-        // get an oplog reader for a server with an oplog entry timestamp greater
-        // than or equal to minTS, if set.
-        Member* _getOplogReader(OplogReader& r, const OpTime& minTS);
-
-        // check lastOpTimeWritten against the remote's earliest op, filling in
-        // remoteOldestOp.
-        bool _isStale(OplogReader& r, const OpTime& minTS, BSONObj& remoteOldestOp);
 
         // keep a list of hosts that we've tried recently that didn't work
         map<string,time_t> _veto;
     public:
-        Member* getSyncTarget();
+        void syncRollback(OplogReader& r);
         void syncThread();
         const OpTime lastOtherOpTime() const;
     };
@@ -564,6 +529,7 @@ namespace mongo {
 
         /* call after constructing to start - returns fairly quickly after la[unching its threads */
         void go() { _go(); }
+        void shutdown();
 
         void fatal() { _fatal(); }
         bool isPrimary() { return box.getState().primary(); }

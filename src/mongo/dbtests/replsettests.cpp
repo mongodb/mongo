@@ -65,7 +65,7 @@ namespace ReplSetTests {
     class MockInitialSync : public replset::InitialSync {
         int step;
     public:
-        MockInitialSync() : replset::InitialSync(""), step(0), failOnStep(SUCCEED), retry(true) {}
+        MockInitialSync() : step(0), failOnStep(SUCCEED), retry(true) {}
 
         enum FailOn {SUCCEED, FAIL_FIRST_APPLY, FAIL_BOTH_APPLY};
 
@@ -94,41 +94,40 @@ namespace ReplSetTests {
         void run() {
             Lock::GlobalWrite lk;
 
-            OpTime o1,o2;
+            OpTime o;
 
             {
                 mongo::mutex::scoped_lock lk2(OpTime::m);
-                o1 = OpTime::now(lk2);
-                o2 = OpTime::now(lk2);
+                o = OpTime::now(lk2);
             }
 
             BSONObjBuilder b;
-            b.appendTimestamp("ts", o2.asLL());
+            b.appendTimestamp("ts", o.asLL());
             BSONObj obj = b.obj();
 
             MockInitialSync mock;
 
             // all three should succeed
-            mock.applyOp(obj, o1);
+            mock.applyOp(obj);
 
             mock.failOnStep = MockInitialSync::FAIL_FIRST_APPLY;
-            mock.applyOp(obj, o1);
+            mock.applyOp(obj);
 
             mock.retry = false;
-            mock.applyOp(obj, o1);
+            mock.applyOp(obj);
 
             // force failure
             MockInitialSync mock2;
             mock2.failOnStep = MockInitialSync::FAIL_BOTH_APPLY;
 
-            ASSERT_THROWS(mock2.applyOp(obj, o2), UserException);
+            ASSERT_THROWS(mock2.applyOp(obj), UserException);
         }
     };
 
     class SyncTest2 : public replset::InitialSync {
     public:
         bool insertOnRetry;
-        SyncTest2() : replset::InitialSync(""), insertOnRetry(false) {}
+        SyncTest2() : insertOnRetry(false) {}
         virtual ~SyncTest2() {}
         virtual bool shouldRetry(const BSONObj& o) {
             if (!insertOnRetry) {
@@ -145,11 +144,10 @@ namespace ReplSetTests {
         void run() {
             Lock::GlobalWrite lk;
 
-            OpTime o1 = OpTime::_now();
-            OpTime o2 = OpTime::_now();
+            OpTime o = OpTime::_now();
 
             BSONObjBuilder b;
-            b.appendTimestamp("ts", o2.asLL());
+            b.appendTimestamp("ts", o.asLL());
             b.append("op", "u");
             b.append("o", BSON("$set" << BSON("x" << 456)));
             b.append("o2", BSON("_id" << 123));
@@ -157,11 +155,11 @@ namespace ReplSetTests {
             BSONObj obj = b.obj();
 
             SyncTest2 sync;
-            ASSERT_THROWS(sync.applyOp(obj, o1), UserException);
+            ASSERT_THROWS(sync.applyOp(obj), UserException);
 
             sync.insertOnRetry = true;
             // succeeds
-            sync.applyOp(obj, o1);
+            sync.applyOp(obj);
 
             BSONObj fin = findOne();
             verify(fin["x"].Number() == 456);
