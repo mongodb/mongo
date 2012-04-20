@@ -123,14 +123,6 @@ namespace mongo {
             virtual ~DBRead();
         };
 
-        // specialty things:
-        struct ThreadSpanningOp { 
-            static void setWLockedNongreedy();
-            static void W_to_R();
-            static void unsetW(); // reverts to greedy
-            static void unsetR(); // reverts to greedy
-            static void handoffR(); // doesn't unlock, but changes my thread state back to ''
-        };
     };
 
     class readlocktry : boost::noncopyable {

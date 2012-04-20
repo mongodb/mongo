@@ -234,13 +234,6 @@ namespace ThreadedTests {
                         Lock::DBRead r3("local");
                     }
                 }
-                else {
-                    Lock::ThreadSpanningOp::setWLockedNongreedy();
-                    Lock::ThreadSpanningOp::unsetW();
-                    Lock::ThreadSpanningOp::setWLockedNongreedy();
-                    Lock::ThreadSpanningOp::W_to_R();
-                    Lock::ThreadSpanningOp::unsetR();
-                }
                 pm.hit();
             }
             cc().shutdown();

@@ -398,34 +398,6 @@ namespace mongo {
         q.unlock_r();
     }
 
-    // these are safe for use ACROSS threads.  i.e. one thread can lock and 
-    // another unlock
-    void Lock::ThreadSpanningOp::setWLockedNongreedy() { 
-        verify( threadState() == 0 ); // as this spans threads the tls wouldn't make sense
-        lock_W_stop_greed();
-    }
-    void Lock::ThreadSpanningOp::W_to_R() { 
-        verify( threadState() == 'W' );
-        dur::assertNothingSpooled();
-        q.W_to_R();
-        threadState() = 'R';
-    }
-    void Lock::ThreadSpanningOp::unsetW() { // note there is no unlocking_W() call here
-        verify( threadState() == 'W' );
-        q.unlock_W();
-        q.start_greed();
-        threadState() = 0;
-    }
-    void Lock::ThreadSpanningOp::unsetR() {
-        verify( threadState() == 'R' || threadState() == 0 ); 
-        q.unlock_R();
-        q.start_greed();
-        threadState() = 0;
-    }
-    void Lock::ThreadSpanningOp::handoffR() {
-        threadState() = 0;
-    }
-
     int Lock::isLocked() {
         return threadState();
     }
