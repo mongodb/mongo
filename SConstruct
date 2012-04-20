@@ -507,6 +507,9 @@ elif "sunos5" == os.sys.platform:
      solaris = True
      env.Append( CPPDEFINES=[ "__sunos__" ] )
      env.Append( LIBS=["socket","resolv"] )
+     # Need v9 for atomics when sparc
+     if processor.startswith( "sun4" ):
+        env.Append( CCFLAGS=[ "-mcpu=v9" ] )
 
 elif os.sys.platform.startswith( "freebsd" ):
     nix = True
