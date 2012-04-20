@@ -4,18 +4,44 @@
 #include "mongo/db/d_concurrency.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/dur.h"
+#include "mongo/db/client.h"
+#include "mongo/util/background.h"
 
 namespace mongo {
+    
+    class FSyncLockThread : public BackgroundJob {
+    public:
+        FSyncLockThread() : BackgroundJob( true ) {}
+        virtual ~FSyncLockThread(){}
+        virtual string name() const { return "FSyncLockThread"; }
+        void doRealWork();
+        virtual void run() {
+            Client::initThread( "fsyncLockWorker" );
+            try {
+                doRealWork();
+            }
+            catch ( std::exception& e ) {
+                error() << "FSyncLockThread exception: " << e.what() << endl;
+            }
+            cc().shutdown();
+        }
+    };
 
     /* see unlockFsync() for unlocking:
        db.$cmd.sys.unlock.findOne()
     */
     class FSyncCommand : public Command {
-        static const char* url() { return "http://www.mongodb.org/display/DOCS/fsync+Command"; }
     public:
+        static const char* url() { return "http://www.mongodb.org/display/DOCS/fsync+Command"; }
         bool locked;
+        bool pendingUnlock;
         SimpleMutex m; // protects locked var above
-        FSyncCommand() : Command( "fsync" ), m("lockfsync") { locked=false; }
+        string err;
+
+        boost::condition _threadSync;
+        boost::condition _unlockSync;
+
+        FSyncCommand() : Command( "fsync" ), m("lockfsync") { locked=false; pendingUnlock=false; }
         virtual LockType locktype() const { return NONE; }
         virtual bool slaveOk() const { return true; }
         virtual bool adminOnly() const { return true; }
@@ -25,32 +51,29 @@ namespace mongo {
             bool lock = cmdObj["lock"].trueValue();
             log() << "CMD fsync: sync:" << sync << " lock:" << lock << endl;
             if( lock ) {
-                Lock::ThreadSpanningOp::setWLockedNongreedy();
-                verify( !locked ); // impossible to get here if locked is true
-                try { 
-                    //uassert(12034, "fsync: can't lock while an unlock is pending", !unlockRequested);
-                    uassert(12032, "fsync: sync option must be true when using lock", sync);
-                    getDur().syncDataAndTruncateJournal();
-                } catch(...) { 
-                    Lock::ThreadSpanningOp::unsetW();
-                    throw;
+                if ( ! sync ) {
+                    errmsg = "fsync: sync option must be true when using lock";
+                    return false;
                 }
+
                 SimpleMutex::scoped_lock lk(m);
-                Lock::ThreadSpanningOp::W_to_R();
-                try {
-                    MemoryMappedFile::flushAll(true);
+                err = "";
+                
+                (new FSyncLockThread())->go();
+                while ( ! locked && err.size() == 0 ) {
+                    _threadSync.wait( m );
                 }
-                catch(...) { 
-                    Lock::ThreadSpanningOp::unsetR();
-                    throw;
+                
+                if ( err.size() ){
+                    errmsg = err;
+                    return false;
                 }
-                verify( !locked );
-                locked = true;
+                
                 log() << "db is now locked for snapshotting, no writes allowed. db.fsyncUnlock() to unlock" << endl;
                 log() << "    For more info see " << FSyncCommand::url() << endl;
                 result.append("info", "now locked against writes, use db.fsyncUnlock() to unlock");
-                result.append("seeAlso", url());
-                Lock::ThreadSpanningOp::handoffR();
+                result.append("seeAlso", FSyncCommand::url());
+
             }
             else {
                 // the simple fsync command case
@@ -66,16 +89,62 @@ namespace mongo {
         }
     } fsyncCmd;
 
-    bool lockedForWriting() { return fsyncCmd.locked; }
+    void FSyncLockThread::doRealWork() {
+        Lock::GlobalWrite global(true/*stopGreed*/);
+        SimpleMutex::scoped_lock lk(fsyncCmd.m);
+        
+        verify( ! fsyncCmd.locked ); // impossible to get here if locked is true
+        try { 
+            getDur().syncDataAndTruncateJournal();
+        } 
+        catch( std::exception& e ) { 
+            error() << "error doing syncDataAndTruncateJournal: " << e.what() << endl;
+            fsyncCmd.err = e.what();
+            fsyncCmd._threadSync.notify_one();
+            fsyncCmd.locked = false;
+            return;
+        }
+        
+        global.downgrade();
+        
+        try {
+            MemoryMappedFile::flushAll(true);
+        }
+        catch( std::exception& e ) { 
+            error() << "error doing flushAll: " << e.what() << endl;
+            fsyncCmd.err = e.what();
+            fsyncCmd._threadSync.notify_one();
+            fsyncCmd.locked = false;
+            return;
+        }
 
+        verify( ! fsyncCmd.locked );
+        fsyncCmd.locked = true;
+        
+        fsyncCmd._threadSync.notify_one();
+
+        while ( ! fsyncCmd.pendingUnlock ) {
+            fsyncCmd._unlockSync.wait(fsyncCmd.m);
+        }
+        fsyncCmd.pendingUnlock = false;
+        
+        fsyncCmd.locked = false;
+        fsyncCmd.err = "unlocked";
+    }
+
+    bool lockedForWriting() { 
+        return fsyncCmd.locked; 
+    }
+    
     // @return true if unlocked
     bool _unlockFsync() {
-        SimpleMutex::scoped_lock lk(fsyncCmd.m);
+        SimpleMutex::scoped_lock lk( fsyncCmd.m );
         if( !fsyncCmd.locked ) { 
             return false;
         }
-        fsyncCmd.locked = false;
-        Lock::ThreadSpanningOp::unsetR();
+        fsyncCmd.pendingUnlock = true;
+        fsyncCmd._unlockSync.notify_one();
+        fsyncCmd._threadSync.notify_one();
         return true;
     }
 }
