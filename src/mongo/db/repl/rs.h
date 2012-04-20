@@ -524,7 +524,7 @@ namespace mongo {
         void _syncThread();
         bool tryToGoLiveAsASecondary(OpTime&); // readlocks
         void syncTail();
-        bool haveToRollback(OplogReader& r);
+        bool isRollbackRequired(OplogReader& r);
         unsigned _syncRollback(OplogReader& r);
         void syncRollback(OplogReader& r);
         void syncFixUp(HowToFixUp& h, OplogReader& r);

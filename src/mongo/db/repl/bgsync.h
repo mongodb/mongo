@@ -17,6 +17,9 @@
 #pragma once
 
 #include <queue>
+#include <boost/thread/mutex.hpp>
+
+#include "mongo/db/oplogreader.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/jsobj.h"
 
@@ -40,6 +43,7 @@ namespace replset {
      */
     class BackgroundSync : public BackgroundSyncInterface {
         static BackgroundSync *s_instance;
+        // protects creation of s_instance
         static boost::mutex s_mutex;
 
         // _mutex protects all of the class variables
@@ -48,7 +52,7 @@ namespace replset {
         // Tracker thread
         Member* _oplogMarkerTarget;
         OplogReader _oplogMarker; // not locked, only used by notifier thread
-        OpTime _consume; // not locked, only used by notifier thread
+        OpTime _consumedOpTime; // not locked, only used by notifier thread
 
         BackgroundSync();
         BackgroundSync(const BackgroundSync& s);
@@ -56,7 +60,7 @@ namespace replset {
 
         // tells the sync target where this member is synced to
         void markOplog();
-        bool getCursor();
+        bool hasCursor();
     public:
         static BackgroundSync* get();
         virtual ~BackgroundSync() {}

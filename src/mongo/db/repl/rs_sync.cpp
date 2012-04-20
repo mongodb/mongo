@@ -291,7 +291,7 @@ namespace mongo {
 
         uassert(1000, "replSet source for syncing doesn't seem to be await capable -- is it an older version of mongodb?", r.awaitCapable() );
 
-        if (haveToRollback(r)) {
+        if (isRollbackRequired(r)) {
             return;
         }
 

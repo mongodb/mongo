@@ -27,16 +27,13 @@ namespace replset {
 
     BackgroundSync::BackgroundSync() : _oplogMarkerTarget(NULL),
                                        _oplogMarker(true /* doHandshake */),
-                                       _consume(0, 0) {
+                                       _consumedOpTime(0, 0) {
     }
 
     BackgroundSync* BackgroundSync::get() {
-        // TODO: SERVER-5112 DCLP is not thread safe
-        if (s_instance == NULL) {
-            boost::unique_lock<boost::mutex> lock(s_mutex);
-            if (s_instance == NULL && !inShutdown()) {
-                s_instance = new BackgroundSync();
-            }
+        boost::unique_lock<boost::mutex> lock(s_mutex);
+        if (s_instance == NULL && !inShutdown()) {
+            s_instance = new BackgroundSync();
         }
         return s_instance;
     }
@@ -46,7 +43,7 @@ namespace replset {
         replLocalAuth();
 
         while (!inShutdown()) {
-            bool ex = false;
+            bool clearTarget = false;
 
             if (!theReplSet) {
                 sleepsecs(5);
@@ -63,22 +60,17 @@ namespace replset {
                 markOplog();
             }
             catch (DBException &e) {
-                ex = true;
+                clearTarget = true;
                 log() << "replset tracking exception: " << e.getInfo() << rsLog;
                 sleepsecs(1);
             }
             catch (std::exception &e2) {
-                ex = true;
+                clearTarget = true;
                 log() << "replset tracking error" << e2.what() << rsLog;
-                sleepsecs(10);
-            }
-            catch (...) {
-                ex = true;
-                log() << "replset unknown tracking error" << rsLog;
-                sleepsecs(20);
+                sleepsecs(1);
             }
 
-            if (ex) {
+            if (clearTarget) {
                 boost::unique_lock<boost::mutex> lock(_mutex);
                 _oplogMarkerTarget = NULL;
             }
@@ -88,9 +80,9 @@ namespace replset {
     }
 
     void BackgroundSync::markOplog() {
-        LOG(3) << "replset markOplog: " << _consume << " " << theReplSet->lastOpTimeWritten << rsLog;
+        LOG(3) << "replset markOplog: " << _consumedOpTime << " " << theReplSet->lastOpTimeWritten << rsLog;
 
-        if (!getCursor()) {
+        if (!hasCursor()) {
             sleepsecs(1);
             return;
         }
@@ -106,20 +98,22 @@ namespace replset {
         }
 
         // if this member has written the op at optime T, we want to nextSafe up to and including T
-        while (_consume < theReplSet->lastOpTimeWritten && _oplogMarker.more()) {
+        while (_consumedOpTime < theReplSet->lastOpTimeWritten && _oplogMarker.more()) {
             BSONObj temp = _oplogMarker.nextSafe();
-            _consume = temp["ts"]._opTime();
+            _consumedOpTime = temp["ts"]._opTime();
         }
 
         // next time through markOplog(), call more() to signal the sync target that we've synced T
     }
 
-    bool BackgroundSync::getCursor() {
+    bool BackgroundSync::hasCursor() {
         // temp
         Member *_currentSyncTarget = theReplSet->getSyncTarget();
 
         {
-            Lock::GlobalWrite l;
+            // we don't need the global write lock yet, but it's needed by OplogReader::connect
+            // so we take it preemptively to avoid deadlocking.
+            Lock::GlobalWrite gwl;
             boost::unique_lock<boost::mutex> lock(_mutex);
 
             if (!_oplogMarkerTarget || _currentSyncTarget != _oplogMarkerTarget) {
@@ -215,7 +209,7 @@ namespace replset {
         return 0;
     }
 
-    bool ReplSetImpl::haveToRollback(OplogReader& r) {
+    bool ReplSetImpl::isRollbackRequired(OplogReader& r) {
         string hn = r.conn()->getServerAddress();
 
         if (!r.more()) {
