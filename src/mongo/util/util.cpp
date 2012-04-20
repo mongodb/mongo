@@ -26,19 +26,6 @@
 
 namespace mongo {
 
-    unsigned long long Timer::_countsPerSecond = Timer::microsPerSecond;
-
-#if defined(_WIN32)
-    struct AtStartup {
-        AtStartup() {
-            LARGE_INTEGER x;
-            bool ok = QueryPerformanceFrequency(&x);
-            verify(ok);
-            Timer::_countsPerSecond = x.QuadPart;
-        }
-    } atstartuputil;
-#endif
-
     string hexdump(const char *data, unsigned len) {
         verify( len < 1000000 );
         const unsigned char *p = (const unsigned char *) data;

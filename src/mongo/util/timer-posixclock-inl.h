@@ -1,5 +1,3 @@
-// @file mongo/util/timer-generic-inl.h
-
 /*    Copyright 2010 10gen Inc.
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,22 +14,33 @@
  */
 
 /**
- * Inline function implementations for the "generic" implementation of the
- * Timer class.  This implementation often has pretty poor resolution, but is available
- * on all supported platforms.
+ * Inline function implementations for timers on systems that support the
+ * POSIX clock API and CLOCK_MONOTONIC clock.
  *
  * This file should only be included through timer-inl.h, which selects the
  * particular implementation based on target platform.
  */
 
-#pragma once
+#define MONGO_TIMER_IMPL_POSIX_MONOTONIC_CLOCK
 
-#define MONGO_TIMER_IMPL_GENERIC
+#include <ctime>
 
-#include "mongo/util/time_support.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
-    unsigned long long Timer::now() const { return curTimeMicros64(); }
+    unsigned long long Timer::now() const {
+        timespec the_time;
+        unsigned long long result;
+
+        fassert(16160, !clock_gettime(CLOCK_MONOTONIC, &the_time));
+
+        // Safe for 292 years after the clock epoch, even if we switch to a signed time value.  On
+        // Linux, the monotonic clock's epoch is the UNIX epoch.
+        result = static_cast<unsigned long long>(the_time.tv_sec);
+        result *= nanosPerSecond;
+        result += static_cast<unsigned long long>(the_time.tv_nsec);
+        return result;
+    }
 
 }  // namespace mongo

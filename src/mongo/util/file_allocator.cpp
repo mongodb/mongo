@@ -16,8 +16,11 @@
  */
 
 #include "pch.h"
+
 #include <fcntl.h>
 #include <errno.h>
+
+#include <boost/thread.hpp>
 
 #if defined(__freebsd__) || defined(__openbsd__)
 #include <sys/stat.h>
@@ -27,8 +30,9 @@
 #include <sys/vfs.h>
 #endif
 
-#include "timer.h"
-#include "mongoutils/str.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/timer.h"
+#include "mongo/util/mongoutils/str.h"
 using namespace mongoutils;
 
 #ifndef O_NOATIME

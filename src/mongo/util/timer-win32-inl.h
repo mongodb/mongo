@@ -26,11 +26,15 @@
 
 #pragma once
 
+#define MONGO_TIMER_IMPL_WIN32
+
+#include "mongo/util/assert_util.h"
+
 namespace mongo {
 
     unsigned long long Timer::now() const {
         LARGE_INTEGER i;
-        QueryPerformanceCounter(&i);
+        fassert(16161, QueryPerformanceCounter(&i));
         return i.QuadPart;
     }
 

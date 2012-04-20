@@ -25,8 +25,24 @@
 
 #pragma once
 
+#if defined(MONGO_HAVE_HEADER_UNISTD_H)
+#include <unistd.h>
+#endif
+
 #if defined(_WIN32)
+
+// On Windows, prefer the Windows-specific implementation, which employs QueryPerformanceCounter.
 #include "mongo/util/timer-win32-inl.h"
+
+#elif defined(_POSIX_TIMERS) and _POSIX_TIMERS > 0 and defined(_POSIX_MONOTONIC_CLOCK) and _POSIX_MONOTONIC_CLOCK > 0
+
+// On systems that support the POSIX clock_gettime function, and the "monotonic" clock,
+// use those.
+#include "mongo/util/timer-posixclock-inl.h"
+
 #else
+
+// If all else fails, fall back to a generic implementation.  Performance may suffer.
 #include "mongo/util/timer-generic-inl.h"
+
 #endif
