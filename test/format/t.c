@@ -67,13 +67,6 @@ main(int argc, char *argv[])
 			usage();
 		}
 
-	/* Multi-threaded runs cannot be replayed. */
-	if (g.c_threads != 1 && g.replay) {
-		fprintf(stderr,
-		    "%s: -r and -t are mutually exclusive\n", g.progname);
-		return (EXIT_FAILURE);
-	}
-
 	argc -= optind;
 	argv += optind;
 	for (; *argv != NULL; ++argv)

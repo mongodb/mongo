@@ -70,6 +70,13 @@ config_setup(void)
 			if (cp->flags & C_OPS)
 				*cp->v = 0;
 
+	/* Multi-threaded runs cannot be replayed. */
+	if (g.replay && g.c_threads != 1) {
+		fprintf(stderr,
+		    "%s: -r is incompatible with threaded runs\n", g.progname);
+		exit(EXIT_FAILURE);
+	}
+
 	/*
 	 * Periodically, set the delete percentage to 0 so salvage gets run,
 	 * as long as the delete percentage isn't nailed down.
