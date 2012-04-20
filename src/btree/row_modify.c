@@ -137,8 +137,10 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 	if (ret != 0) {
 err:		if (ins != NULL)
 			__wt_free(session, ins);
-		if (upd != NULL)
+		if (upd != NULL) {
+			__wt_txn_unmodify(session);
 			__wt_free(session, upd);
+		}
 	}
 
 	/* Free any insert, update arrays. */
@@ -257,6 +259,7 @@ __wt_update_alloc(WT_SESSION_IMPL *session,
 {
 	WT_UPDATE *upd;
 	size_t size;
+	int ret;
 
 	/*
 	 * Allocate the WT_UPDATE structure and room for the value, then copy
@@ -269,6 +272,11 @@ __wt_update_alloc(WT_SESSION_IMPL *session,
 	else {
 		upd->size = WT_STORE_SIZE(size);
 		memcpy(WT_UPDATE_DATA(upd), value->data, size);
+	}
+
+	if ((ret = __wt_txn_modify(session, &upd->txnid)) != 0) {
+		__wt_free(session, upd);
+		return (ret);
 	}
 
 	*updp = upd;

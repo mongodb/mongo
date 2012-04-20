@@ -8,6 +8,22 @@
 #include "wt_internal.h"
 
 /*
+ * __session_close_cursors --
+ *	Close all cursors open in a session.
+ */
+static int
+__session_close_cursors(WT_SESSION_IMPL *session)
+{
+	WT_CURSOR *cursor;
+	int ret;
+
+	ret = 0;
+	while ((cursor = TAILQ_FIRST(&session->cursors)) != NULL)
+		WT_TRET(cursor->close(cursor));
+	return (ret);
+}
+
+/*
  * __session_close --
  *	WT_SESSION->close method.
  */
@@ -16,7 +32,6 @@ __session_close(WT_SESSION *wt_session, const char *config)
 {
 	WT_BTREE_SESSION *btree_session;
 	WT_CONNECTION_IMPL *conn;
-	WT_CURSOR *cursor;
 	WT_SESSION_IMPL *session, **tp;
 	int ret;
 
@@ -26,8 +41,7 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	SESSION_API_CALL(session, close, config, cfg);
 	WT_UNUSED(cfg);
 
-	while ((cursor = TAILQ_FIRST(&session->cursors)) != NULL)
-		WT_TRET(cursor->close(cursor));
+	WT_TRET(__session_close_cursors(session));
 
 	while ((btree_session = TAILQ_FIRST(&session->btrees)) != NULL)
 		WT_TRET(__wt_session_remove_btree(session, btree_session, 0));
@@ -38,6 +52,9 @@ __session_close(WT_SESSION *wt_session, const char *config)
 
 	/* Discard scratch buffers. */
 	__wt_scr_discard(session);
+
+	/* Free transaction information. */
+	__wt_txn_destroy(session);
 
 	/* Confirm we're not holding any hazard references. */
 	__wt_hazard_empty(session);
@@ -355,10 +372,21 @@ err:	API_END_NOTFOUND_MAP(session, ret);
 static int
 __session_begin_transaction(WT_SESSION *wt_session, const char *config)
 {
-	WT_UNUSED(wt_session);
-	WT_UNUSED(config);
+	WT_SESSION_IMPL *session;
+	int ret;
 
-	return (ENOTSUP);
+	session = (WT_SESSION_IMPL *)wt_session;
+
+	SESSION_API_CALL(session, begin_transaction, config, cfg);
+	if (TAILQ_FIRST(&session->cursors) != NULL) {
+		__wt_errx(session, "Not permitted with open cursors");
+		ret = EINVAL;
+		goto err;
+	}
+
+	ret = __wt_txn_begin(session, cfg);
+
+err:	API_END_NOTFOUND_MAP(session, ret);
 }
 
 /*
@@ -368,10 +396,16 @@ __session_begin_transaction(WT_SESSION *wt_session, const char *config)
 static int
 __session_commit_transaction(WT_SESSION *wt_session, const char *config)
 {
-	WT_UNUSED(wt_session);
-	WT_UNUSED(config);
+	WT_SESSION_IMPL *session;
+	int ret;
 
-	return (ENOTSUP);
+	session = (WT_SESSION_IMPL *)wt_session;
+
+	SESSION_API_CALL(session, commit_transaction, config, cfg);
+	WT_TRET(__session_close_cursors(session));
+	WT_TRET(__wt_txn_commit(session, cfg));
+
+err:	API_END_NOTFOUND_MAP(session, ret);
 }
 
 /*
@@ -381,10 +415,16 @@ __session_commit_transaction(WT_SESSION *wt_session, const char *config)
 static int
 __session_rollback_transaction(WT_SESSION *wt_session, const char *config)
 {
-	WT_UNUSED(wt_session);
-	WT_UNUSED(config);
+	WT_SESSION_IMPL *session;
+	int ret;
 
-	return (ENOTSUP);
+	session = (WT_SESSION_IMPL *)wt_session;
+
+	SESSION_API_CALL(session, rollback_transaction, config, cfg);
+	WT_TRET(__session_close_cursors(session));
+	WT_TRET(__wt_txn_rollback(session, cfg));
+
+err:	API_END_NOTFOUND_MAP(session, ret);
 }
 
 /*
@@ -476,6 +516,7 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
 
 	/* Session entries are re-used, clear the old contents. */
 	WT_CLEAR(*session_ret);
+	session_ret->id = slot;
 
 	WT_ERR(__wt_cond_alloc(session, "session", 1, &session_ret->cond));
 	session_ret->iface = stds;
@@ -488,6 +529,9 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
 	TAILQ_INIT(&session_ret->btrees);
 	if (event_handler != NULL)
 		session_ret->event_handler = event_handler;
+
+	/* Initialize transaction support. */
+	WT_ERR(__wt_txn_init(session_ret));
 
 	/*
 	 * Public sessions are automatically closed during WT_CONNECTION->close.

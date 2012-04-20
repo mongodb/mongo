@@ -915,3 +915,15 @@ extern void __wt_stat_clear_btree_stats(WT_STATS *stats_arg);
 extern int __wt_stat_alloc_connection_stats(WT_SESSION_IMPL *session,
     WT_CONNECTION_STATS **statsp);
 extern void __wt_stat_clear_connection_stats(WT_STATS *stats_arg);
+extern int __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[]);
+extern int __wt_txn_release(WT_SESSION_IMPL *session);
+extern int __wt_txn_modify(WT_SESSION_IMPL *session, wt_txnid_t *id);
+extern void __wt_txn_unmodify(WT_SESSION_IMPL *session);
+extern int __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[]);
+extern int __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[]);
+extern int __wt_txn_visible(WT_SESSION_IMPL *session, wt_txnid_t id);
+extern WT_UPDATE *__wt_txn_read(WT_SESSION_IMPL *session, WT_UPDATE *upd);
+extern int __wt_txn_init(WT_SESSION_IMPL *session);
+extern void __wt_txn_destroy(WT_SESSION_IMPL *session);
+extern int __wt_txn_global_init(WT_CONNECTION_IMPL *conn, const char *cfg[]);
+extern void __wt_txn_global_destroy(WT_CONNECTION_IMPL *conn);

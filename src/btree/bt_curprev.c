@@ -121,7 +121,10 @@ static inline int
 __cursor_fix_append_prev(WT_CURSOR_BTREE *cbt, int newpage)
 {
 	WT_ITEM *val;
+	WT_SESSION_IMPL *session;
+	WT_UPDATE *upd;
 
+	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	val = &cbt->iface.value;
 
 	if (newpage) {
@@ -138,11 +141,12 @@ __cursor_fix_append_prev(WT_CURSOR_BTREE *cbt, int newpage)
 	}
 
 	cbt->iface.recno = cbt->recno;
-	if (cbt->recno > WT_INSERT_RECNO(cbt->ins)) {
+	if (cbt->recno > WT_INSERT_RECNO(cbt->ins) ||
+	    (upd = __wt_txn_read(session, cbt->ins->upd)) == NULL) {
 		cbt->v = 0;
 		val->data = &cbt->v;
 	} else
-		val->data = WT_UPDATE_DATA(cbt->ins->upd);
+		val->data = WT_UPDATE_DATA(upd);
 	val->size = 1;
 	return (0);
 }
@@ -158,6 +162,7 @@ __cursor_fix_prev(WT_CURSOR_BTREE *cbt, int newpage)
 	WT_INSERT *ins;
 	WT_ITEM *val;
 	WT_SESSION_IMPL *session;
+	WT_UPDATE *upd;
 	uint64_t *recnop;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
@@ -184,8 +189,9 @@ new_page:	*recnop = cbt->recno;
 
 		/* Check any insert list for a matching record. */
 		if ((ins = cbt->ins = __col_insert_search_match(
-		    WT_COL_UPDATE_SINGLE(cbt->page), cbt->recno)) != NULL) {
-			val->data = WT_UPDATE_DATA(ins->upd);
+		    WT_COL_UPDATE_SINGLE(cbt->page), cbt->recno)) != NULL &&
+		    (upd = __wt_txn_read(session, ins->upd)) != NULL) {
+			val->data = WT_UPDATE_DATA(upd);
 			val->size = 1;
 			return (0);
 		}
@@ -206,7 +212,10 @@ static inline int
 __cursor_var_append_prev(WT_CURSOR_BTREE *cbt, int newpage)
 {
 	WT_ITEM *val;
+	WT_SESSION_IMPL *session;
+	WT_UPDATE *upd;
 
+	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	val = &cbt->iface.value;
 
 	if (newpage) {
@@ -220,10 +229,11 @@ new_page:	if (cbt->ins == NULL)
 			return (WT_NOTFOUND);
 
 		cbt->iface.recno = WT_INSERT_RECNO(cbt->ins);
-		if (WT_UPDATE_DELETED_ISSET(cbt->ins->upd))
+		if ((upd = __wt_txn_read(session, cbt->ins->upd)) == NULL ||
+		    WT_UPDATE_DELETED_ISSET(upd))
 			continue;
-		val->data = WT_UPDATE_DATA(cbt->ins->upd);
-		val->size = cbt->ins->upd->size;
+		val->data = WT_UPDATE_DATA(upd);
+		val->size = upd->size;
 		break;
 	}
 	return (0);
@@ -242,6 +252,7 @@ __cursor_var_prev(WT_CURSOR_BTREE *cbt, int newpage)
 	WT_INSERT *ins;
 	WT_ITEM *val;
 	WT_SESSION_IMPL *session;
+	WT_UPDATE *upd;
 	uint64_t *recnop;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
@@ -270,12 +281,13 @@ new_page:	*recnop = cbt->recno;
 
 		/* Check any insert list for a matching record. */
 		if ((ins = __col_insert_search_match(
-		    WT_COL_UPDATE(cbt->page, cip), cbt->recno)) != NULL) {
-			if (WT_UPDATE_DELETED_ISSET(ins->upd))
+		    WT_COL_UPDATE(cbt->page, cip), cbt->recno)) != NULL &&
+		    (upd = __wt_txn_read(session, ins->upd)) != NULL) {
+			if (WT_UPDATE_DELETED_ISSET(upd))
 				continue;
 			cbt->ins = ins;
-			val->data = WT_UPDATE_DATA(ins->upd);
-			val->size = ins->upd->size;
+			val->data = WT_UPDATE_DATA(upd);
+			val->size = upd->size;
 			return (0);
 		}
 
@@ -367,8 +379,8 @@ __cursor_row_prev(WT_CURSOR_BTREE *cbt, int newpage)
 		if (cbt->ins != NULL)
 			__cursor_skip_prev(cbt);
 
-new_insert:	if ((ins = cbt->ins) != NULL) {
-			upd = ins->upd;
+new_insert:	if ((ins = cbt->ins) != NULL &&
+		    (upd = __wt_txn_read(session, ins->upd)) != NULL) {
 			if (WT_UPDATE_DELETED_ISSET(upd))
 				continue;
 			key->data = WT_INSERT_KEY(ins);
@@ -398,7 +410,7 @@ new_insert:	if ((ins = cbt->ins) != NULL) {
 		cbt->ins = NULL;
 
 		rip = &cbt->page->u.row.d[cbt->slot / 2 - 1];
-		upd = WT_ROW_UPDATE(cbt->page, rip);
+		upd = __wt_txn_read(session, WT_ROW_UPDATE(cbt->page, rip));
 		if (upd != NULL && WT_UPDATE_DELETED_ISSET(upd))
 			continue;
 

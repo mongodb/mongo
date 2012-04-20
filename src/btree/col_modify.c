@@ -168,8 +168,10 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 	if (ret != 0) {
 err:		if (ins != NULL)
 			__wt_free(session, ins);
-		if (upd != NULL)
+		if (upd != NULL) {
+			__wt_txn_unmodify(session);
 			__wt_free(session, upd);
+		}
 	}
 
 	__wt_free(session, new_inslist);

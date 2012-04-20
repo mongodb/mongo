@@ -58,10 +58,10 @@ typedef	enum {
 struct __wt_session_impl {
 	WT_SESSION iface;
 
-	WT_CONDVAR *cond;		/* Condition variable */
-
 	const char *name;		/* Name */
 	WT_EVENT_HANDLER *event_handler;
+
+	WT_CONDVAR *cond;		/* Condition variable */
 
 	WT_BTREE *btree;		/* Current file */
 	TAILQ_HEAD(__btrees, __wt_btree_session) btrees;
@@ -86,6 +86,8 @@ struct __wt_session_impl {
 
 	WT_HAZARD *hazard;		/* Hazard reference array */
 
+	WT_TXN	txn;			/* Transaction state */
+
 	void	*reconcile;		/* Reconciliation information */
 
 	WT_REF **excl;			/* Eviction exclusive list */
@@ -94,6 +96,8 @@ struct __wt_session_impl {
 
 	void	*schema_track;		/* Tracking schema operations */
 	u_int	 schema_track_entries;	/* Currently allocated */
+
+	uint32_t id;			/* Offset in conn->session_array */
 
 	uint32_t flags;
 };
@@ -172,6 +176,7 @@ struct __wt_connection_impl {
 	WT_SESSION_IMPL	**sessions;		/* Session reference */
 	void		 *session_array;	/* Session array */
 	uint32_t	  session_cnt;		/* Session count */
+	uint32_t	  session_size;		/* Maximum sessions. */
 
 	/*
 	 * WiredTiger allocates space for 15 hazard references in each thread of
@@ -184,10 +189,11 @@ struct __wt_connection_impl {
 	 */
 	WT_HAZARD *hazard;		/* Hazard references array */
 	uint32_t   hazard_size;
-	uint32_t   session_size;
 
 	WT_CACHE  *cache;		/* Page cache */
 	uint64_t   cache_size;
+
+	WT_TXN_GLOBAL txn_global;	/* Global transaction state. */
 
 	WT_CONNECTION_STATS *stats;	/* Connection statistics */
 
