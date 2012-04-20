@@ -469,6 +469,7 @@ __wt_session_snap_list_set(WT_SESSION_IMPL *session, WT_SNAPSHOT *snapbase)
 
 	btree = session->btree;
 	buf = NULL;
+	ret = 0;
 
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));
 	order = 0;
