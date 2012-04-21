@@ -269,10 +269,10 @@ __snapshot_process(
 		 * snapshot in the list, there's no next snapshot, the snapshot
 		 * will be merged into the live tree.
 		 */
-		if (!FLD_ISSET(snap->flags, WT_SNAP_DELETE) &&
+		if (!F_ISSET(snap, WT_SNAP_DELETE) &&
 		    (snap == snapbase ||
-		    FLD_ISSET(snap->flags, WT_SNAP_ADD) ||
-		    !FLD_ISSET((snap - 1)->flags, WT_SNAP_DELETE)))
+		    F_ISSET(snap, WT_SNAP_ADD) ||
+		    !F_ISSET(snap - 1, WT_SNAP_DELETE)))
 			continue;
 		found = 1;
 
@@ -318,7 +318,7 @@ __snapshot_process(
 	 * when writing the live extent lists.
 	 */
 	WT_SNAPSHOT_FOREACH(snapbase, snap) {
-		if (!FLD_ISSET(snap->flags, WT_SNAP_DELETE))
+		if (!F_ISSET(snap, WT_SNAP_DELETE))
 			continue;
 
 		if (WT_VERBOSE_ISSET(session, snapshot)) {
@@ -337,7 +337,7 @@ __snapshot_process(
 		 * may be the live tree.
 		 */
 		a = snap->bpriv;
-		if (FLD_ISSET((snap + 1)->flags, WT_SNAP_ADD)) {
+		if (F_ISSET(snap + 1, WT_SNAP_ADD)) {
 			live_merge = 1;
 			b = &block->live;
 		} else
@@ -383,7 +383,7 @@ __snapshot_process(
 		 * This means the extent lists may aggregate over a number of
 		 * snapshots, but that's OK, they're disjoint sets of ranges.
 		 */
-		if (FLD_ISSET((snap + 1)->flags, WT_SNAP_DELETE))
+		if (F_ISSET(snap + 1, WT_SNAP_DELETE))
 			continue;
 
 		/*
@@ -397,7 +397,7 @@ __snapshot_process(
 		/*
 		 * If we're updating the live system's information, we're done.
 		 */
-		if (FLD_ISSET((snap + 1)->flags, WT_SNAP_ADD))
+		if (F_ISSET(snap + 1, WT_SNAP_ADD))
 			continue;
 
 		/*
@@ -417,9 +417,9 @@ __snapshot_process(
 
 	/* Update snapshots marked for update. */
 	WT_SNAPSHOT_FOREACH(snapbase, snap)
-		if (FLD_ISSET(snap->flags, WT_SNAP_UPDATE)) {
+		if (F_ISSET(snap, WT_SNAP_UPDATE)) {
 			WT_ASSERT(session,
-			    !FLD_ISSET(snap->flags, WT_SNAP_ADD));
+			    !F_ISSET(snap, WT_SNAP_ADD));
 			WT_ERR(__snapshot_update(
 			    session, block, snap, snap->bpriv, 0));
 		}
@@ -438,7 +438,7 @@ live_update:
 
 	/* Update the final, added snapshot based on the live system. */
 	WT_SNAPSHOT_FOREACH(snapbase, snap)
-		if (FLD_ISSET(snap->flags, WT_SNAP_ADD))
+		if (F_ISSET(snap, WT_SNAP_ADD))
 			WT_ERR(__snapshot_update(session, block, snap, si, 1));
 
 	/*
@@ -457,7 +457,7 @@ err:	if (locked)
 	 * list.  If we've read that snapshot and/or created it, check.
 	 */
 	WT_SNAPSHOT_FOREACH(snapbase, snap)
-		if (!FLD_ISSET(snap->flags, WT_SNAP_DELETE))
+		if (!F_ISSET(snap, WT_SNAP_DELETE))
 			break;
 	if ((a = snap->bpriv) == NULL)
 		a = &block->live;
