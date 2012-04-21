@@ -216,13 +216,15 @@ nomatch:		WT_ERR_MSG(session, EINVAL,
 	default:
 		/*
 		 * Create a new, possibly named, snapshot.  Review existing
-		 * snapshots, deleting any with matching names, add the new
-		 * snapshot entry at the end of the list.
+		 * snapshots, deleting any default snapshots and snapshots
+		 * with matching names, add the new snapshot entry at the end
+		 * of the list.
 		 */
 		if (name == NULL)
 			name = WT_INTERNAL_SNAPSHOT;
 		WT_SNAPSHOT_FOREACH(snapbase, snap)
-			if (strcmp(snap->name, name) == 0)
+			if (strcmp(snap->name, name) == 0 ||
+			    strcmp(snap->name, WT_INTERNAL_SNAPSHOT) == 0)
 				F_SET(snap, WT_SNAP_DELETE);
 
 		WT_ERR(__wt_strdup(session, name, &snap->name));
