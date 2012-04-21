@@ -33,16 +33,8 @@ __wt_btree_snapshot(WT_SESSION_IMPL *session, const char *cfg[])
 	if ((ret = __wt_config_gets(
 	    session, cfg, "snapshot", &cval)) != 0 && ret != WT_NOTFOUND)
 		WT_RET(ret);
-	if (cval.len != 0) {
-		/*
-		 * If it's a named snapshot and there's nothing dirty, we won't
-		 * write any pages: mark the root page dirty to ensure a write.
-		 */
-		WT_RET(__wt_page_modify_init(session, btree->root_page));
-		__wt_page_modify_set(btree->root_page);
-
+	if (cval.len != 0)
 		WT_RET(__wt_strndup(session, cval.str, cval.len, &name));
-	}
 
 	ret = __snapshot_worker(session, name, 0, 0);
 
@@ -74,13 +66,6 @@ __wt_btree_snapshot_drop(WT_SESSION_IMPL *session, const char *cfg[])
 
 	btree = session->btree;
 	name = NULL;
-
-	/*
-	 * If there's nothing dirty, we won't write any pages: mark the root
-	 * page dirty to ensure a write.
-	 */
-	WT_RET(__wt_page_modify_init(session, btree->root_page));
-	__wt_page_modify_set(btree->root_page);
 
 	if ((ret = __wt_config_gets(
 	    session, cfg, "snapall", &cval)) != 0 && ret != WT_NOTFOUND)
@@ -140,6 +125,15 @@ __snapshot_worker(
 
 	/* Snapshots are single-threaded. */
 	__wt_writelock(session, btree->snaplock);
+
+	/*
+	 * If it's a named snapshot and there's nothing dirty, we won't write
+	 * any pages: mark the root page dirty to ensure a write.
+	 */
+	if (name != NULL) {
+		WT_RET(__wt_page_modify_init(session, btree->root_page));
+		__wt_page_modify_set(btree->root_page);
+	}
 
 	/* Get the list of snapshots for this file. */
 	WT_ERR(__wt_session_snap_list_get(session, NULL, &snapbase));
