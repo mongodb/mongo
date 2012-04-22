@@ -225,7 +225,6 @@ doneCheckOrder:
 
         if ( willScanTable() ) {
             checkTableScanAllowed();
-            warnOnCappedIdTableScan();
             return findTableScan( _frs.ns(), _order, startLoc );
         }
                 
@@ -297,27 +296,6 @@ doneCheckOrder:
         uassert( 10111 ,  (string)"table scans not allowed:" + ns() , ! cmdLine.noTableScan );
     }
 
-    void QueryPlan::warnOnCappedIdTableScan() const {
-        // if we are doing a table scan on _id
-        // and it's a capped collection
-        // we warn /*disallow*/ as it's a common user error
-        // .system. and local collections are exempt
-        if ( _d && _d->isCapped() && !_frs.range( "_id" ).universal() ) {
-            if ( cc().isSyncThread() ||
-                str::contains( _frs.ns() , ".system." ) ||
-                str::startsWith( _frs.ns() , "local." ) ) {
-                // ok
-            }
-            else {
-                warning()
-                << "_id query on capped collection without an _id index, "
-                << "performance will be poor collection: " << _frs.ns() << endl;
-                //uassert( 14820, str::stream() << "doing _id query on a capped collection "
-                //<<"without an index is not allowed: " << _frs.ns() ,
-            }
-        }
-    }
-    
     int QueryPlan::independentRangesSingleIntervalLimit() const {
         if ( _scanAndOrderRequired &&
             _parsedQuery &&
@@ -598,12 +576,14 @@ doneCheckOrder:
                     _usingCachedPlan = true;
                     _cachedPlanCharacter = bestPlanCharacter;
                     _plans.push_back( p );
+                    warnOnCappedIdTableScan();
                     return;
                 }
             }
         }
 
         addOtherPlans( false );
+        warnOnCappedIdTableScan();
     }
 
     void QueryPlanSet::addPlan( QueryPlanPtr plan, bool checkFirst ) {
@@ -763,6 +743,32 @@ doneCheckOrder:
             bab << (*i)->toString();
         }
         return bab.arr().jsonString();
+    }
+    
+    void QueryPlanSet::warnOnCappedIdTableScan() const {
+        // if we are doing a table scan on _id
+        // and it's a capped collection
+        // we warn as it's a common user error
+        // .system. and local collections are exempt
+        const char *ns = _frsp->ns();
+        NamespaceDetails *d = nsdetails( ns );
+        if ( d &&
+            d->isCapped() &&
+            nPlans() == 1 &&
+            !firstPlan()->impossible() &&
+            !firstPlan()->indexed() &&
+            !firstPlan()->multikeyFrs().range( "_id" ).universal() ) {
+            if ( cc().isSyncThread() ||
+                str::contains( ns , ".system." ) ||
+                str::startsWith( ns , "local." ) ) {
+                // ok
+            }
+            else {
+                warning()
+                << "unindexed _id query on capped collection, "
+                << "performance will be poor collection: " << ns << endl;
+            }
+        }
     }
     
     shared_ptr<QueryOp> MultiPlanScanner::iterateRunner( QueryOp &originalOp, bool retried ) {

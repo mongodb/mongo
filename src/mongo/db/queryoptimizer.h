@@ -122,7 +122,6 @@ namespace mongo {
 
     private:
         void checkTableScanAllowed() const;
-        void warnOnCappedIdTableScan() const;
         int independentRangesSingleIntervalLimit() const;
 
         NamespaceDetails * _d;
@@ -420,6 +419,7 @@ namespace mongo {
         void addPlan( QueryPlanPtr plan, bool checkFirst );
         void init();
         void addHint( IndexDetails &id );
+        void warnOnCappedIdTableScan() const;
 
         const char *_ns;
         BSONObj _originalQuery;
