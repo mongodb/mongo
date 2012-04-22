@@ -470,8 +470,8 @@ doneCheckOrder:
 
         const char *ns = _frsp->ns();
         NamespaceDetails *d = nsdetails( ns );
-        if ( !d || !_frsp->matchPossible() ) {
-            // Table scan plan, when no matches are possible
+        if ( !d ||
+            !_frsp->matchPossible() ) {
             addUnindexedPlan( d );
             return;
         }
@@ -512,6 +512,13 @@ doneCheckOrder:
                 }
             }
             uassert( 13038 , (string)"can't find special index: " + _special + " for: " + _originalQuery.toString() , 0 );
+        }
+
+        // If table scan is optimal or natural order requested.
+        if ( ( _frsp->noNonUniversalRanges() && _order.isEmpty() ) ||
+            ( !_order.isEmpty() && str::equals( _order.firstElementFieldName(), "$natural" ) ) ) {
+            addUnindexedPlan( d );
+            return;
         }
 
         if ( _recordedPlanPolicy != Ignore ) {
@@ -580,15 +587,7 @@ doneCheckOrder:
     void QueryPlanSet::addOtherPlans() {
         const char *ns = _frsp->ns();
         NamespaceDetails *d = nsdetails( ns );
-        if ( !d )
-            return;
-
-        // If table scan is optimal or natural order requested.
-        if ( !_frsp->matchPossible() || ( _frsp->noNonUniversalRanges() && _order.isEmpty() ) ||
-                ( !_order.isEmpty() && !strcmp( _order.firstElementFieldName(), "$natural" ) ) ) {
-            addUnindexedPlan( d );
-            return;
-        }
+        verify( d );
 
         PlanSet plans;
         QueryPlanPtr optimalPlan;
