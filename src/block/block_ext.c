@@ -918,9 +918,9 @@ __wt_block_extlist_write(
 	 * block write function can zero-out unused bytes and write it without
 	 * copying to something larger.
 	 *
-	 * Allocate room for the free-list entries, plus 2 additional entries:
-	 * the initial WT_BLOCK_EXTLIST_MAGIC/0 pair and the list-terminating
-	 * WT_BLOCK_INVALID_OFFSET/0 pair.
+	 * Allocate memory for the extent list's entries plus two additional
+	 * entries: the initial WT_BLOCK_EXTLIST_MAGIC/0 pair and the list-
+	 * terminating WT_BLOCK_INVALID_OFFSET/0 pair.
 	 */
 	datasize = size = (el->entries + 2) * WT_STORE_SIZE(sizeof(off_t)  * 2);
 	WT_RET(__wt_block_write_size(session, block, &size));

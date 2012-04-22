@@ -93,9 +93,9 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf,
 	 *
 	 * Diagnostics: verify the disk page: this violates layering, but it's
 	 * the place we can ensure we never write a corrupted page.  Note that
-	 * we are verifying the free-list page, too.  (We created a "page" for
-	 * the free-list, it was simpler than creating another type of object
-	 * in the file.)
+	 * we are verifying the extent list pages, too.  (We created a "page"
+	 * type for the extent lists, it was simpler than creating another type
+	 * of object in the file.)
 	 */
 #ifdef HAVE_DIAGNOSTIC
 	WT_RET(__wt_verify_dsk(session, "[write-check]", buf));
