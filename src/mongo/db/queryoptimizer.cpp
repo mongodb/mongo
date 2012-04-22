@@ -420,7 +420,7 @@ doneCheckOrder:
     }
 
 
-    void QueryPlanSet::addHint( IndexDetails &id ) {
+    void QueryPlanSet::addHintedPlan( IndexDetails &id ) {
         if ( !_min.isEmpty() || !_max.isEmpty() ) {
             string errmsg;
             BSONObj keyPattern = id.keyPattern();
@@ -428,9 +428,7 @@ doneCheckOrder:
             massert( 10365 ,  errmsg, indexDetailsForRange( _frsp->ns(), errmsg, _min, _max, keyPattern ) );
         }
         NamespaceDetails *d = nsdetails(_ns);
-        _plans.push_back( QueryPlanPtr( new QueryPlan( d, d->idxNo(id), *_frsp, _originalFrsp.get(),
-                                                      _originalQuery, _order, _parsedQuery,
-                                                      _min, _max ) ) );
+        addPlan( newQueryPlan( d, d->idxNo( id ), _min, _max ) );
     }
 
     // returns an IndexDetails * for a hint, 0 if hint is $natural.
@@ -474,9 +472,7 @@ doneCheckOrder:
         NamespaceDetails *d = nsdetails( ns );
         if ( !d || !_frsp->matchPossible() ) {
             // Table scan plan, when no matches are possible
-            _plans.push_back( QueryPlanPtr( new QueryPlan( d, -1, *_frsp, _originalFrsp.get(),
-                                                          _originalQuery, _order,
-                                                          _parsedQuery ) ) );
+            addUnindexedPlan( d );
             return;
         }
 
@@ -484,14 +480,11 @@ doneCheckOrder:
         if ( !hint.eoo() ) {
             IndexDetails *id = parseHint( hint, d );
             if ( id ) {
-                addHint( *id );
+                addHintedPlan( *id );
             }
             else {
                 uassert( 10366 ,  "natural order cannot be specified with $min/$max", _min.isEmpty() && _max.isEmpty() );
-                // Table scan plan
-                _plans.push_back( QueryPlanPtr( new QueryPlan( d, -1, *_frsp, _originalFrsp.get(),
-                                                              _originalQuery, _order,
-                                                              _parsedQuery ) ) );
+                addUnindexedPlan( d );
             }
             return;
         }
@@ -501,10 +494,7 @@ doneCheckOrder:
             BSONObj keyPattern;
             IndexDetails *idx = indexDetailsForRange( ns, errmsg, _min, _max, keyPattern );
             uassert( 10367 ,  errmsg, idx );
-            _plans.push_back( QueryPlanPtr( new QueryPlan( d, d->idxNo(*idx), *_frsp,
-                                                          _originalFrsp.get(), _originalQuery,
-                                                          _order, _parsedQuery,
-                                                          _min, _max ) ) );
+            addPlan( newQueryPlan( d, d->idxNo( *idx ), _min, _max ) );
             return;
         }
 
@@ -517,12 +507,7 @@ doneCheckOrder:
                 IndexDetails& ii = i.next();
                 const IndexSpec& spec = ii.getSpec();
                 if ( spec.getTypeName() == _special && spec.suitability( _originalQuery , _order ) ) {
-                    _plans.push_back( QueryPlanPtr( new QueryPlan( d , j , *_frsp ,
-                                                                  _originalFrsp.get() ,
-                                                                  _originalQuery, _order,
-                                                                  _parsedQuery,
-                                                                  BSONObj() , BSONObj() ,
-                                                                  _special ) ) );
+                    addPlan( newQueryPlan( d, j, BSONObj(), BSONObj(), _special ) );
                     return;
                 }
             }
@@ -537,10 +522,8 @@ doneCheckOrder:
             if ( !bestIndex.isEmpty() ) {
                 QueryPlanPtr p;
                 _oldNScanned = oldNScanned;
-                if ( !strcmp( bestIndex.firstElementFieldName(), "$natural" ) ) {
-                    // Table scan plan
-                    p.reset( new QueryPlan( d, -1, *_frsp, _originalFrsp.get(), _originalQuery,
-                                           _order, _parsedQuery ) );
+                if ( str::equals( bestIndex.firstElementFieldName(), "$natural" ) ) {
+                    p = newQueryPlan( d, -1 );
                 }
 
                 NamespaceDetails::IndexIterator i = d->ii();
@@ -548,8 +531,7 @@ doneCheckOrder:
                     int j = i.pos();
                     IndexDetails& ii = i.next();
                     if( ii.keyPattern().woCompare(bestIndex) == 0 ) {
-                        p.reset( new QueryPlan( d, j, *_frsp, _originalFrsp.get(), _originalQuery,
-                                               _order, _parsedQuery ) );
+                        p = newQueryPlan( d, j );
                     }
                 }
 
@@ -558,7 +540,7 @@ doneCheckOrder:
                     !( _recordedPlanPolicy == UseIfInOrder && p->scanAndOrderRequired() ) ) {
                     _usingCachedPlan = true;
                     _cachedPlanCharacter = bestPlanCharacter;
-                    _plans.push_back( p );
+                    addPlan( p );
                     warnOnCappedIdTableScan();
                     return;
                 }
@@ -583,6 +565,18 @@ doneCheckOrder:
         _mayRecordPlan = true;
     }
     
+    void QueryPlanSet::addUnindexedPlan( NamespaceDetails *d ) {
+        addPlan( newQueryPlan( d, -1 ) );
+    }
+    
+    QueryPlanSet::QueryPlanPtr QueryPlanSet::newQueryPlan( NamespaceDetails *d, int idxNo,
+                                                          const BSONObj &min, const BSONObj &max,
+                                                          const string &special ) {
+        QueryPlanPtr ret( new QueryPlan( d, idxNo, *_frsp, _originalFrsp.get(), _originalQuery,
+                                        _order, _parsedQuery, min, max, _special ) );
+        return ret;
+    }
+    
     void QueryPlanSet::addOtherPlans() {
         const char *ns = _frsp->ns();
         NamespaceDetails *d = nsdetails( ns );
@@ -592,11 +586,7 @@ doneCheckOrder:
         // If table scan is optimal or natural order requested.
         if ( !_frsp->matchPossible() || ( _frsp->noNonUniversalRanges() && _order.isEmpty() ) ||
                 ( !_order.isEmpty() && !strcmp( _order.firstElementFieldName(), "$natural" ) ) ) {
-            // Table scan plan
-            QueryPlanPtr plan
-            ( new QueryPlan( d, -1, *_frsp, _originalFrsp.get(), _originalQuery,
-                            _order, _parsedQuery ) );
-            addPlan( plan );
+            addUnindexedPlan( d );
             return;
         }
 
@@ -609,8 +599,7 @@ doneCheckOrder:
                 continue;
             }
 
-            QueryPlanPtr p( new QueryPlan( d, i, *_frsp, _originalFrsp.get(), _originalQuery,
-                                          _order, _parsedQuery ) );
+            QueryPlanPtr p = newQueryPlan( d, i );
             if ( p->impossible() ) {
                 addPlan( p );
                 return;
@@ -648,9 +637,7 @@ doneCheckOrder:
             return;
         }
 
-        // Table scan plan
-        addPlan( QueryPlanPtr( new QueryPlan( d, -1, *_frsp, _originalFrsp.get(), _originalQuery,
-                                             _order, _parsedQuery ) ) );
+        addUnindexedPlan( d );
 
         _mayRecordPlan = true;
     }

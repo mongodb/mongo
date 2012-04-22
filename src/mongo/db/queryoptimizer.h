@@ -398,8 +398,11 @@ namespace mongo {
         void addOtherPlans();
         void addFallbackPlans();
         void addPlan( QueryPlanPtr plan );
+        void addUnindexedPlan( NamespaceDetails *d );
+        QueryPlanPtr newQueryPlan( NamespaceDetails *d, int idxNo, const BSONObj &min = BSONObj(),
+                                  const BSONObj &max = BSONObj(), const string &special = "" );
         void init();
-        void addHint( IndexDetails &id );
+        void addHintedPlan( IndexDetails &id );
         void warnOnCappedIdTableScan() const;
 
         const char *_ns;
