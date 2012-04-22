@@ -142,7 +142,7 @@ WIREDTIGER
 WinNT
 WiredTiger
 WiredTiger's
-WiredTigerInternal
+WiredTigerInternalSnapshot
 Wuninitialized
 XP
 __wt_epoch

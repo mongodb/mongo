@@ -152,7 +152,7 @@ struct __wt_salvage_cookie {
  * WT_SNAPSHOT --
  *	Encapsulation of snapshot information, shared with the block manager.
  */
-#define	WT_INTERNAL_SNAPSHOT	"WiredTigerInternal"
+#define	WT_INTERNAL_SNAPSHOT	"WiredTigerInternalSnapshot"
 #define	WT_SNAPSHOT_FOREACH(snapbase, snap)				\
 	for ((snap) = (snapbase); (snap)->name != NULL; ++(snap))
 #define	WT_SNAPSHOT_CONTINUE(snap)					\
