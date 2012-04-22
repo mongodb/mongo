@@ -78,7 +78,7 @@ __wt_evict_clr_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_CACHE *cache;
 	WT_EVICT_LIST *evict;
-	int i, elem;
+	uint32_t i, elem;
 
 	WT_ASSERT(session, WT_PAGE_IS_ROOT(page) ||
 	    page->ref->page != page ||
