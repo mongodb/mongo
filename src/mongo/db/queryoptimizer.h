@@ -405,7 +405,6 @@ namespace mongo {
         void addHintedPlan( IndexDetails &id );
         void warnOnCappedIdTableScan() const;
 
-        const char *_ns;
         BSONObj _originalQuery;
         auto_ptr<FieldRangeSetPair> _frsp;
         auto_ptr<FieldRangeSetPair> _originalFrsp;

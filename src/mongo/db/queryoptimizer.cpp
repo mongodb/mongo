@@ -395,7 +395,6 @@ doneCheckOrder:
                                const BSONObj &hint,
                                QueryPlanSet::RecordedPlanPolicy recordedPlanPolicy,
                                const BSONObj &min, const BSONObj &max ) :
-        _ns(ns),
         _originalQuery( originalQuery ),
         _frsp( frsp ),
         _originalFrsp( originalFrsp ),
@@ -427,7 +426,7 @@ doneCheckOrder:
             // This reformats _min and _max to be used for index lookup.
             massert( 10365 ,  errmsg, indexDetailsForRange( _frsp->ns(), errmsg, _min, _max, keyPattern ) );
         }
-        NamespaceDetails *d = nsdetails(_ns);
+        NamespaceDetails *d = nsdetails( _frsp->ns() );
         addPlan( newQueryPlan( d, d->idxNo( id ), _min, _max ) );
     }
 
