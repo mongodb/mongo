@@ -513,8 +513,8 @@ __verify_dsk_chunk(WT_SESSION_IMPL *session,
 	end = (uint8_t *)dsk + dsk->size;
 
 	/*
-	 * Fixed-length column-store, overflow and freelist pages are simple
-	 * chunks of data.
+	 * Fixed-length column-store and overflow pages are simple chunks of
+	 * data.
 	 */
 	if (datalen == 0)
 		WT_RET_VRFY(session,
