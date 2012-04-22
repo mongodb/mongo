@@ -18,7 +18,6 @@
 #pragma once
 
 #include "jsobj.h"
-#include "mongo/db/queryoptimizer.h"
 
 namespace mongo {
 
@@ -56,7 +55,27 @@ namespace mongo {
         map<string,Type> _fieldTypes;
         BSONObj _sort;
     };
-    
+
+    /** Summarizes the candidate plans that may run for a query. */
+    class CandidatePlanCharacter {
+    public:
+        CandidatePlanCharacter( bool mayRunInOrderPlan, bool mayRunOutOfOrderPlan ) :
+        _mayRunInOrderPlan( mayRunInOrderPlan ),
+        _mayRunOutOfOrderPlan( mayRunOutOfOrderPlan ) {
+        }
+        CandidatePlanCharacter() :
+        _mayRunInOrderPlan(),
+        _mayRunOutOfOrderPlan() {
+        }
+        bool mayRunInOrderPlan() const { return _mayRunInOrderPlan; }
+        bool mayRunOutOfOrderPlan() const { return _mayRunOutOfOrderPlan; }
+        bool valid() const { return mayRunInOrderPlan() || mayRunOutOfOrderPlan(); }
+        bool hybridPlanSet() const { return mayRunInOrderPlan() && mayRunOutOfOrderPlan(); }
+    private:
+        bool _mayRunInOrderPlan;
+        bool _mayRunOutOfOrderPlan;
+    };
+
     /** Information about a query plan that ran successfully for a QueryPattern. */
     class CachedQueryPlan {
     public:

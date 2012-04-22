@@ -23,6 +23,7 @@
 #include "matcher.h"
 #include "explain.h"
 #include "../util/net/listen.h"
+#include "mongo/db/querypattern.h"
 
 namespace mongo {
 
@@ -30,26 +31,6 @@ namespace mongo {
     class IndexType;
     class QueryPlanSummary;
     
-    /** Summarizes the candidate plans that may run for a query. */
-    class CandidatePlanCharacter {
-    public:
-        CandidatePlanCharacter( bool mayRunInOrderPlan, bool mayRunOutOfOrderPlan ) :
-        _mayRunInOrderPlan( mayRunInOrderPlan ),
-        _mayRunOutOfOrderPlan( mayRunOutOfOrderPlan ) {
-        }
-        CandidatePlanCharacter() :
-        _mayRunInOrderPlan(),
-        _mayRunOutOfOrderPlan() {
-        }
-        bool mayRunInOrderPlan() const { return _mayRunInOrderPlan; }
-        bool mayRunOutOfOrderPlan() const { return _mayRunOutOfOrderPlan; }
-        bool valid() const { return mayRunInOrderPlan() || mayRunOutOfOrderPlan(); }
-        bool hybridPlanSet() const { return mayRunInOrderPlan() && mayRunOutOfOrderPlan(); }
-    private:
-        bool _mayRunInOrderPlan;
-        bool _mayRunOutOfOrderPlan;
-    };
-
     /** A plan for executing a query using the given index spec and FieldRangeSet. */
     class QueryPlan : boost::noncopyable {
     public:
