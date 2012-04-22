@@ -508,23 +508,6 @@ doneCheckOrder:
             return;
         }
 
-        if ( isSimpleIdQuery( _originalQuery ) ) {
-            int idx = d->findIdIndex();
-            if ( idx >= 0 ) {
-                _plans.push_back( QueryPlanPtr( new QueryPlan( d , idx , *_frsp ,
-                                                              _originalFrsp.get() , _originalQuery,
-                                                              _order, _parsedQuery ) ) );
-                return;
-            }
-        }
-
-        if ( _originalQuery.isEmpty() && _order.isEmpty() ) {
-            _plans.push_back( QueryPlanPtr( new QueryPlan( d, -1, *_frsp, _originalFrsp.get(),
-                                                          _originalQuery, _order,
-                                                          _parsedQuery ) ) );
-            return;
-        }
-
         DEBUGQO( "\t special : " << _frsp->getSpecial() );
         if ( _frsp->getSpecial().size() ) {
             _special = _frsp->getSpecial();
