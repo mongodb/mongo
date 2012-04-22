@@ -395,9 +395,9 @@ namespace mongo {
         };
 
     private:
-        void addOtherPlans( bool checkFirst );
+        void addOtherPlans();
         void addFallbackPlans();
-        void addPlan( QueryPlanPtr plan, bool checkFirst );
+        void addPlan( QueryPlanPtr plan );
         void init();
         void addHint( IndexDetails &id );
         void warnOnCappedIdTableScan() const;

@@ -565,23 +565,25 @@ doneCheckOrder:
             }
         }
 
-        addOtherPlans( false );
+        addOtherPlans();
         warnOnCappedIdTableScan();
     }
 
-    void QueryPlanSet::addPlan( QueryPlanPtr plan, bool checkFirst ) {
-        if ( checkFirst && plan->indexKey() == firstPlan()->indexKey() ) {
+    void QueryPlanSet::addPlan( QueryPlanPtr plan ) {
+        // If _plans is nonempty, the new plan may be supplementing a recorded plan at the first
+        // position of _plans.  It must not duplicate the first plan.
+        if ( nPlans() > 0 && plan->indexKey() == firstPlan()->indexKey() ) {
             return;
         }
         _plans.push_back( plan );
     }
 
     void QueryPlanSet::addFallbackPlans() {
-        addOtherPlans( true );
+        addOtherPlans();
         _mayRecordPlan = true;
     }
     
-    void QueryPlanSet::addOtherPlans( bool checkFirst ) {
+    void QueryPlanSet::addOtherPlans() {
         const char *ns = _frsp->ns();
         NamespaceDetails *d = nsdetails( ns );
         if ( !d )
@@ -594,7 +596,7 @@ doneCheckOrder:
             QueryPlanPtr plan
             ( new QueryPlan( d, -1, *_frsp, _originalFrsp.get(), _originalQuery,
                             _order, _parsedQuery ) );
-            addPlan( plan, checkFirst );
+            addPlan( plan );
             return;
         }
 
@@ -610,7 +612,7 @@ doneCheckOrder:
             QueryPlanPtr p( new QueryPlan( d, i, *_frsp, _originalFrsp.get(), _originalQuery,
                                           _order, _parsedQuery ) );
             if ( p->impossible() ) {
-                addPlan( p, checkFirst );
+                addPlan( p );
                 return;
             }
             if ( p->optimal() ) {
@@ -628,7 +630,7 @@ doneCheckOrder:
             }
         }
         if ( optimalPlan.get() ) {
-            addPlan( optimalPlan, checkFirst );
+            addPlan( optimalPlan );
             // Record an optimal plan in the query cache immediately, with a small nscanned value
             // that will be ignored.
             optimalPlan->registerSelf
@@ -637,18 +639,18 @@ doneCheckOrder:
             return;
         }
         for( PlanSet::const_iterator i = plans.begin(); i != plans.end(); ++i ) {
-            addPlan( *i, checkFirst );
+            addPlan( *i );
         }
 
         // Only add a special plan if no standard btree plans have been added. SERVER-4531
         if ( plans.empty() && specialPlan ) {
-            addPlan( specialPlan, checkFirst );
+            addPlan( specialPlan );
             return;
         }
 
         // Table scan plan
         addPlan( QueryPlanPtr( new QueryPlan( d, -1, *_frsp, _originalFrsp.get(), _originalQuery,
-                                             _order, _parsedQuery ) ), checkFirst );
+                                             _order, _parsedQuery ) ) );
 
         _mayRecordPlan = true;
     }
