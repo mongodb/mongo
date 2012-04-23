@@ -34,6 +34,7 @@
 
 #include <assert.h>
 #include <errno.h>
+#include <inttypes.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -282,7 +283,6 @@ cursor_search_near(WT_CURSOR *cursor)
 int
 session_ops(WT_SESSION *session)
 {
-	unsigned long mypid = 0;
 	int ret;
 
 	cursor_ops(session);
@@ -318,7 +318,8 @@ session_ops(WT_SESSION *session)
 	/*! [session dumpfile] */
 
 	/*! [session msg_printf] */
-	ret = session->msg_printf(session, "process pid %lu", mypid);
+	ret = session->msg_printf(
+	    session, "process ID %" PRIuMAX, (uintmax_t)getpid());
 	/*! [session msg_printf] */
 
 	/*! [session rename] */
