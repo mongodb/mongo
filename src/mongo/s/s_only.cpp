@@ -30,6 +30,8 @@ namespace mongo {
 
     TSP_DEFINE(Client,currentClient)
 
+    LockState::LockState(){} // ugh
+
     Client::Client(const char *desc , AbstractMessagingPort *p) :
         _context(0),
         _shutdown(false),
