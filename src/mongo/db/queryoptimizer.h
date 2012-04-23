@@ -374,8 +374,11 @@ namespace mongo {
         
         string toString() const;
         
+        /** Configure a single query plan if one has not already been provided. */
         void setSinglePlan( const QueryPlanPtr &plan );
+        /** Configure a query plan from the plan cache. */
         void setCachedPlan( const QueryPlanPtr &plan, const CachedQueryPlan &cachedPlan );
+        /** Add a candidate query plan, potentially one of many. */
         void addCandidatePlan( const QueryPlanPtr &plan );
         
         //for testing
@@ -432,7 +435,6 @@ namespace mongo {
         };
 
     private:
-        void addPlan( const QueryPlanPtr &plan );
         void addFallbackPlans();
         void init();
 

@@ -672,29 +672,28 @@ doneCheckOrder:
     }
 
     void QueryPlanSet::setSinglePlan( const QueryPlanPtr &plan ) {
-        addPlan( plan );
+        if ( nPlans() == 0 ) {
+            _plans.push_back( plan );
+        }
     }
     
     void QueryPlanSet::setCachedPlan( const QueryPlanPtr &plan,
                                      const CachedQueryPlan &cachedPlan ) {
+        verify( nPlans() == 0 );
         _usingCachedPlan = true;
         _oldNScanned = cachedPlan.nScanned();
         _cachedPlanCharacter = cachedPlan.planCharacter();
-        addPlan( plan );
+        _plans.push_back( plan );
     }
 
     void QueryPlanSet::addCandidatePlan( const QueryPlanPtr &plan ) {
-        addPlan( plan );
-        _mayRecordPlan = true;
-    }
-    
-    void QueryPlanSet::addPlan( const QueryPlanPtr &plan ) {
         // If _plans is nonempty, the new plan may be supplementing a recorded plan at the first
         // position of _plans.  It must not duplicate the first plan.
         if ( nPlans() > 0 && plan->indexKey() == firstPlan()->indexKey() ) {
             return;
         }
         _plans.push_back( plan );
+        _mayRecordPlan = true;
     }
     
     void QueryPlanSet::addFallbackPlans() {
