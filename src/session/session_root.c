@@ -471,9 +471,7 @@ __wt_session_snap_list_set(WT_SESSION_IMPL *session, WT_SNAPSHOT *snapbase)
 	WT_BTREE *btree;
 	WT_ITEM *buf;
 	WT_SNAPSHOT *snap;
-	time_t sec;
 	int64_t order;
-	long nsec;
 	int ret;
 	const char *sep;
 
