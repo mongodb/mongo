@@ -306,6 +306,7 @@ namespace mongo {
         bool addHintPlan( const char *ns, NamespaceDetails *d );
         bool addSpecialPlan( NamespaceDetails *d );
         void addStandardPlans( NamespaceDetails *d );
+        bool addCachedPlan( NamespaceDetails *d );
         shared_ptr<QueryPlan> newPlan( NamespaceDetails *d,
                                       int idxNo,
                                       const BSONObj &min = BSONObj(),

@@ -571,35 +571,42 @@ doneCheckOrder:
     }
     
     void QueryPlanGenerator::addStandardPlans( NamespaceDetails *d ) {
-        if ( _recordedPlanPolicy != Ignore ) {
-            CachedQueryPlan best = QueryUtilIndexed::bestIndexForPatterns( _qps.frsp(),
-                                                                          _qps.order() );
-            BSONObj bestIndex = best.indexKey();
-            if ( !bestIndex.isEmpty() ) {
-                shared_ptr<QueryPlan> p;
-                if ( str::equals( bestIndex.firstElementFieldName(), "$natural" ) ) {
-                    p = newPlan( d, -1 );
-                }
-                
-                NamespaceDetails::IndexIterator i = d->ii();
-                while( i.more() ) {
-                    int j = i.pos();
-                    IndexDetails& ii = i.next();
-                    if( ii.keyPattern().woCompare(bestIndex) == 0 ) {
-                        p = newPlan( d, j );
-                    }
-                }
-                
-                massert( 10368 ,  "Unable to locate previously recorded index", p.get() );
-                if ( !p->unhelpful() &&
-                    !( _recordedPlanPolicy == UseIfInOrder && p->scanAndOrderRequired() ) ) {
-                    _qps.setCachedPlan( p, best );
-                    return;
+        if ( !addCachedPlan( d ) ) {
+            addFallbackPlans();
+        }
+    }
+    
+    bool QueryPlanGenerator::addCachedPlan( NamespaceDetails *d ) {
+        if ( _recordedPlanPolicy == Ignore ) {
+            return false;
+        }
+
+        CachedQueryPlan best = QueryUtilIndexed::bestIndexForPatterns( _qps.frsp(), _qps.order() );
+        BSONObj bestIndex = best.indexKey();
+        if ( !bestIndex.isEmpty() ) {
+            shared_ptr<QueryPlan> p;
+            if ( str::equals( bestIndex.firstElementFieldName(), "$natural" ) ) {
+                p = newPlan( d, -1 );
+            }
+            
+            NamespaceDetails::IndexIterator i = d->ii();
+            while( i.more() ) {
+                int j = i.pos();
+                IndexDetails& ii = i.next();
+                if( ii.keyPattern().woCompare(bestIndex) == 0 ) {
+                    p = newPlan( d, j );
                 }
             }
+            
+            massert( 10368 ,  "Unable to locate previously recorded index", p.get() );
+            if ( !p->unhelpful() &&
+                !( _recordedPlanPolicy == UseIfInOrder && p->scanAndOrderRequired() ) ) {
+                _qps.setCachedPlan( p, best );
+                return true;
+            }
         }
-        
-        addFallbackPlans();
+
+        return false;
     }
 
     shared_ptr<QueryPlan> QueryPlanGenerator::newPlan( NamespaceDetails *d,
