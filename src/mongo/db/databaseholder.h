@@ -101,7 +101,7 @@ namespace mongo {
         return dbHolderUnchecked();
     }
     inline DatabaseHolder& dbHolderW() { 
-        dassert( d.dbMutex.isWriteLocked() );
+        dassert( Lock::isW() );
         return dbHolderUnchecked();
     }
 

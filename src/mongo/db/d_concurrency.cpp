@@ -998,11 +998,8 @@ namespace mongo {
         int x = Lock::isLocked();
         return x == 'R' || x == 'W';
     }
-    bool MongoMutex::isWriteLocked() { 
-        return Lock::isW();
-    }
     void MongoMutex::assertWriteLocked() const { 
-        if( !isWriteLocked() ) { 
+        if( ! Lock::isW() ) {
             lockState().dump();
             dassert(false); // dassert will terminate buildbot
             msgasserted(16101, "expected write lock");

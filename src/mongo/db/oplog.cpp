@@ -583,7 +583,7 @@ namespace mongo {
     int _dummy_z;
 
     void pretouchN(vector<BSONObj>& v, unsigned a, unsigned b) {
-        DEV verify( !d.dbMutex.isWriteLocked() );
+        DEV verify( ! Lock::isW() );
 
         Client *c = currentClient.get();
         if( c == 0 ) {
@@ -625,7 +625,7 @@ namespace mongo {
 
     void pretouchOperation(const BSONObj& op) {
 
-        if( d.dbMutex.isWriteLocked() )
+        if( Lock::somethingWriteLocked() )
             return; // no point pretouching if write locked. not sure if this will ever fire, but just in case.
 
         const char *which = "o";

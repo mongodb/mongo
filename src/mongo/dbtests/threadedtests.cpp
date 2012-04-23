@@ -121,7 +121,7 @@ namespace ThreadedTests {
                 else if( i % 7 == 4 && 
                          tnumber == 1 /*only one upgrader legal*/ ) {
                     Lock::GlobalWrite w;
-                    ASSERT( d.dbMutex.isWriteLocked() );
+                    ASSERT( Lock::isW() );
                     ASSERT( Lock::isW() );
                     if( i % 7 == 2 ) {
                         Lock::TempRelease t;
@@ -136,7 +136,7 @@ namespace ThreadedTests {
                 }
                 else if( i % 7 == 2 ) {
                     Lock::GlobalWrite w;
-                    ASSERT( d.dbMutex.isWriteLocked() );
+                    ASSERT( Lock::isW() );
                     ASSERT( Lock::isW() );
                     if( sometimes ) {
                         Lock::TempRelease t;
@@ -148,7 +148,7 @@ namespace ThreadedTests {
                         Lock::TempRelease t;
                     }
                     Lock::GlobalRead r;
-                    ASSERT( d.dbMutex.isWriteLocked() );
+                    ASSERT( Lock::isW() );
                     ASSERT( Lock::isW() );
                     if( sometimes ) {
                         Lock::TempRelease t;
@@ -339,7 +339,7 @@ namespace ThreadedTests {
 
             writelocktry lk( 0 );
             ASSERT( lk.got() );
-            ASSERT( d.dbMutex.isWriteLocked() );
+            ASSERT( Lock::isW() );
         }
     };
 
