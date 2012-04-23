@@ -6,7 +6,7 @@ import re
 import utils
 
 
-assertNames = [ "uassert" , "massert" ]
+assertNames = [ "uassert" , "massert" , "fassert" ]
 
 def assignErrorCodes():
     cur = 10000
