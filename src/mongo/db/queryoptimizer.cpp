@@ -506,29 +506,20 @@ doneCheckOrder:
     }
     
     bool QueryPlanGenerator::addShortCircuitPlan( const char *ns, NamespaceDetails *d ) {
-        if ( !d ||
-            !_qps.frsp().matchPossible() ) {
-            setSingleUnindexedPlan( d );
-            return true;
-        }
-        
-        if ( addHintPlan( ns, d ) ) {
-            return true;
-        }
-        
-        if ( addSpecialPlan( d ) ) {
-            return true;
-        }
-        
-        // If table scan is optimal or natural order requested.
-        if ( ( _qps.frsp().noNonUniversalRanges() && _qps.order().isEmpty() ) ||
-            ( !_qps.order().isEmpty() &&
-             str::equals( _qps.order().firstElementFieldName(), "$natural" ) ) ) {
-            setSingleUnindexedPlan( d );
-            return true;
-        }
-        
-        return false;
+        return
+            // The collection is missing.
+            setUnindexedPlanIf( !d, d ) ||
+            // No match is possible.
+            setUnindexedPlanIf( !_qps.frsp().matchPossible(), d ) ||
+            // The hint, min, or max parameters are specified.
+            addHintPlan( ns, d ) ||
+            // A special index operation is requested.
+            addSpecialPlan( d ) ||
+            // No indexable ranges or ordering are specified.
+            setUnindexedPlanIf( _qps.frsp().noNonUniversalRanges() && _qps.order().isEmpty(), d ) ||
+            // $natural sort is requested.
+            setUnindexedPlanIf( !_qps.order().isEmpty() &&
+                               str::equals( _qps.order().firstElementFieldName(), "$natural" ), d );
     }
     
     bool QueryPlanGenerator::addHintPlan( const char *ns, NamespaceDetails *d ) {
@@ -620,6 +611,13 @@ doneCheckOrder:
                                                  _qps.originalQuery(), _qps.order(), _parsedQuery,
                                                  min, max, special ) );
         return ret;
+    }
+
+    bool QueryPlanGenerator::setUnindexedPlanIf( bool set, NamespaceDetails *d ) {
+        if ( set ) {
+            setSingleUnindexedPlan( d );
+        }
+        return set;
     }
     
     void QueryPlanGenerator::setSingleUnindexedPlan( NamespaceDetails *d ) {

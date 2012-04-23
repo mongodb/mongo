@@ -311,6 +311,7 @@ namespace mongo {
                                       const BSONObj &min = BSONObj(),
                                       const BSONObj &max = BSONObj(),
                                       const string &special = "" ) const;
+        bool setUnindexedPlanIf( bool set, NamespaceDetails *d );
         void setSingleUnindexedPlan( NamespaceDetails *d );
         void setHintedPlan( IndexDetails &id );
         void warnOnCappedIdTableScan() const;
