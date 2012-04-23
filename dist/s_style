@@ -12,8 +12,8 @@ for f in `sed -e '/^[a-z]/! d' filelist` $extra; do
 	if grep "^[^}]*while (0);" $f > /dev/null; then
 		echo "$f: while (0) has trailing semi-colon"
 	fi
-	if grep "%dl|%ul|%xl" $f > /dev/null; then
-		echo "$f: bad printf format: %[dux]l"
+	if egrep '%l[diouxXn]|%[diouxXn]l' $f > /dev/null; then
+		echo "$f: incorrect or dangerous printf format: %l[diouxXn]"
 	fi
 	if grep "(unsigned)" $f > /dev/null; then
 		echo "$f: (unsigned) cast is wrong"
@@ -47,7 +47,6 @@ for f in `sed -e '/^[a-z]/! d' filelist` $extra; do
 	    -e 's/\([	 ,]\)u_int16_t\([	 ,]\)/\1uint16_t\2/g' \
 	    -e 's/\([	 ,]\)u_int32_t\([	 ,]\)/\1uint32_t\2/g' \
 	    -e 's/\([	 ,]\)u_int64_t\([	 ,]\)/\1uint64_t\2/g' \
-	    -e 's/%\([dux]\)l/%l\1/' \
 	    -e 's/\([|&=+-]\)  *\([^*]\)/\1 \2/' \
 	    -e 's/(void) /(void)/' \
 	    -e '/for /!s/;;$/;/' \
