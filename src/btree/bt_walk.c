@@ -62,8 +62,8 @@ __wt_tree_np(WT_SESSION_IMPL *session, WT_PAGE **pagep, int eviction, int next)
 	 * that can't be discarded.
 	 */
 	if (eviction) {
-		WT_ASSERT(session, page->ref->state == WT_REF_EVICT_WALK);
-		page->ref->state = WT_REF_MEM;
+		if (page->ref->state == WT_REF_EVICT_WALK)
+			page->ref->state = WT_REF_MEM;
 	} else {
 		if (!WT_PAGE_IS_ROOT(t))
 			ret = __wt_page_in(session, t, t->ref);
@@ -97,10 +97,25 @@ descend:	for (;;) {
 				return (0);
 			}
 
-			/* We may only care about in-memory pages. */
+			/*
+			 * The eviction server walks an in-memory tree for two
+			 * reasons:
+			 *
+			 * (1) to sync a file (write all dirty pages); and
+			 * (2) to find pages to evict.
+			 *
+			 * We want all ordinary in-memory pages, and we swap
+			 * the state to WT_REF_EVICT_WALK temporarily to avoid
+			 * the page being evicted by another thread while it is
+			 * being evaluated.
+			 *
+			 * XXX
+			 * We also return pages in the "evict-force" state.
+			 */
 			if (eviction) {
 				if (!WT_ATOMIC_CAS(ref->state,
-				    WT_REF_MEM, WT_REF_EVICT_WALK))
+				    WT_REF_MEM, WT_REF_EVICT_WALK) &&
+				    ref->state != WT_REF_EVICT_FORCE)
 					break;
 			} else {
 				/*

@@ -51,7 +51,7 @@ __wt_page_in_func(
 
 			WT_RET(__wt_cache_read(session, parent, ref));
 			continue;
-		case WT_REF_EVICTING:
+		case WT_REF_EVICT_FORCE:
 		case WT_REF_LOCKED:
 		case WT_REF_READING:
 			/*
