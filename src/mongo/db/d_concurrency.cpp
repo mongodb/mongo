@@ -242,31 +242,58 @@ namespace mongo {
             return "R";
         return "?";
     }
+
+    
+    LockState::LockState() 
+        : _recursive(0), 
+          _threadState(0),
+          _whichNestable( Lock::notnestable ),
+          _nestableCount(0), 
+          _otherCount(0), 
+          _otherLock(NULL),
+          _scopedLk(NULL)
+    {
+    }
+
+    void LockState::locked( char newState ) {
+        _threadState = newState;
+    }
+    void LockState::unlocked() {
+        _threadState = 0;
+    }
+
+    void LockState::changeLockState( char newState ) {
+        fassert( 16161 , _threadState != 0 );
+        _threadState = newState;
+    }
+
+
     /** Note: this is is called by the currentOp command, which is a different 
               thread. So be careful about thread safety here. For example reading 
               this->otherName would not be safe as-is!
     */
     void LockState::reportState(BSONObjBuilder& res) {
         BSONObjBuilder b;
-        if( threadState ) {
+        if( _threadState ) {
             char buf[2];
-            buf[0] = threadState; buf[1] = 0;
+            buf[0] = _threadState; 
+            buf[1] = 0;
             b.append(".", buf);
         }
-        if( nestableCount ) {
+        if( _nestableCount ) {
             string s = "?";
-            if( whichNestable == Lock::local ) 
+            if( _whichNestable == Lock::local ) 
                 s = ".local";
-            else if( whichNestable == Lock::admin ) 
+            else if( _whichNestable == Lock::admin ) 
                 s = ".admin";
-            b.append(s, kind(nestableCount));
+            b.append(s, kind(_nestableCount));
         }
-        if( otherCount ) { 
-            WrapperForRWLock *k = otherLock;
+        if( _otherCount ) { 
+            WrapperForRWLock *k = _otherLock;
             if( k ) {
                 string s = ".";
                 s += k->name();
-                b.append(s, kind(otherCount));
+                b.append(s, kind(_otherCount));
             }
         }
         BSONObj o = b.obj();
@@ -278,7 +305,7 @@ namespace mongo {
         lockState().dump();
     }
     void LockState::dump() {
-        char s = threadState;
+        char s = _threadState;
         stringstream ss;
         ss << "lock status: ";
         if( s == 0 ){
@@ -286,55 +313,94 @@ namespace mongo {
         }
         else {
             ss << s;
-            if( recursive ) { 
-                ss << " recursive:" << recursive;
+            if( _recursive ) { 
+                ss << " recursive:" << _recursive;
             }
-            ss << " otherCount:" << otherCount;
-            if( otherCount ) {
-                ss << " otherdb:" << otherName;
+            ss << " otherCount:" << _otherCount;
+            if( _otherCount ) {
+                ss << " otherdb:" << _otherName;
             }
-            if( nestableCount ) {
-                ss << " nestableCount:" << nestableCount << " which:";
-                if( whichNestable == Lock::local ) 
+            if( _nestableCount ) {
+                ss << " nestableCount:" << _nestableCount << " which:";
+                if( _whichNestable == Lock::local ) 
                     ss << "local";
-                else if( whichNestable == Lock::admin ) 
+                else if( _whichNestable == Lock::admin ) 
                     ss << "admin";
                 else 
-                    ss << (int) whichNestable;
+                    ss << (int)_whichNestable;
             }
         }
         log() << ss.str() << endl;
     }
-    inline char& threadState() { 
-        return lockState().threadState;
+
+    void LockState::enterScopedLock( Lock::ScopedLock* lock ) {
+        _recursive++;
+        if ( _recursive == 1 ) {
+            fassert(16115, _scopedLk == 0);
+            _scopedLk = lock;
+        }
     }
 
-    // note this doesn't tell us much actually, it tells us if we are nesting locks but 
-    // they could be the a global lock twice or a global and a specific or two specifics 
-    // (such as including local) 
-    inline unsigned& recursive() {
-        return lockState().recursive;
+    Lock::ScopedLock* LockState::leaveScopedLock() {
+        _recursive--;
+        dassert( _recursive < 10000 );
+        Lock::ScopedLock* temp = _scopedLk;
+
+        if ( _recursive > 0 ) {
+            return NULL;
+        }
+        
+        _scopedLk = NULL;
+        return temp;
+    }
+
+    void LockState::lockedNestable( Lock::Nestable what , int type) {
+        verify( type );
+        _whichNestable = what;
+        _nestableCount += type;
+    }
+
+    void LockState::unlockedNestable() {
+        _whichNestable = Lock::notnestable;
+        _nestableCount = 0;
+    }
+
+    void LockState::lockedOther( const string& other , int type , WrapperForRWLock* lock ) {
+        fassert( 16162 , _otherCount == 0 );
+        _otherName = other;
+        _otherCount = type;
+        _otherLock = lock;
+    }
+
+    void LockState::unlockedOther() {
+        _otherName = "";
+        _otherCount = 0;
+        _otherLock = 0;
+    }
+
+    char threadState() { 
+        return lockState().threadState();
     }
 
     static bool lock_R_try(int ms) { 
         verify( threadState() == 0 );
         bool got = q.lock_R_try(ms);
         if( got ) 
-            threadState() = 'R';
+            lockState().locked( 'R' );
         return got;
     }
     static bool lock_W_try(int ms) { 
         verify( threadState() == 0 );
         bool got = q.lock_W_try(ms);
         if( got ) {
-            threadState() = 'W';
+            lockState().locked( 'W' );
             locked_W();
         }
         return got;
     }
     static void lock_W_stop_greed() { 
         verify( threadState() == 0 );
-        threadState() = 'W';
+        lockState().locked( 'W' );
         {
             Acquiring a('W');
             q.lock_W_stop_greed();
@@ -343,12 +409,12 @@ namespace mongo {
     }
     static void lock_W() { 
         LockState& ls = lockState();
-        if(  ls.threadState ) {
-            log() << "can't lock_W, threadState=" << (int) ls.threadState << endl;
+        if(  ls.threadState() ) {
+            log() << "can't lock_W, threadState=" << (int) ls.threadState() << endl;
             fassert(16114,false);
         }
         getDur().commitIfNeeded(); // check before locking - will use an R lock for the commit if need to do one, which is better than W
-        threadState() = 'W';
+        ls.locked( 'W' );
         {
             Acquiring a('W');
             q.lock_W();
@@ -358,43 +424,41 @@ namespace mongo {
     static void unlock_W() { 
         wassert( threadState() == 'W' );
         unlocking_W();
-        threadState() = 0;
+        lockState().unlocked();
         q.unlock_W();
     }
     static void lock_R() { 
         LockState& ls = lockState();
-        massert(16103, str::stream() << "can't lock_R, threadState=" << (int) ls.threadState, ls.threadState == 0);
-        ls.threadState = 'R';
+        massert(16103, str::stream() << "can't lock_R, threadState=" << (int) ls.threadState(), ls.threadState() == 0);
+        ls.locked( 'R' );
         Acquiring a('R');
         q.lock_R();
     }
     static void unlock_R() { 
         wassert( threadState() == 'R' );
-        threadState() = 0;
+        lockState().unlocked();
         q.unlock_R();
     }    
     static void lock_w() { 
-        char &ts = threadState();
-        verify( ts == 0 );
+        verify( threadState() == 0 );
         getDur().commitIfNeeded();
-        ts = 'w';
+        lockState().locked( 'w' );
         q.lock_w();
     }
     static void unlock_w() { 
         unlocking_w();
         wassert( threadState() == 'w' );
-        threadState() = 0;
+        lockState().unlocked();
         q.unlock_w();
     }
     static void lock_r() {
-        char& ts = threadState();
-        verify( ts == 0 );
-        ts = 'r';
+        verify( threadState() == 0 );
+        lockState().locked( 'r' );
         q.lock_r();
     }
     static void unlock_r() { 
         wassert( threadState() == 'r' );
-        threadState() = 0;
+        lockState().unlocked();
         q.unlock_r();
     }
 
@@ -417,37 +481,40 @@ namespace mongo {
         return threadState() == 'R';
     }
     bool Lock::nested() { 
-        return recursive() > 1;
+        // note this doesn't tell us much actually, it tells us if we are nesting locks but 
+        // they could be the a global lock twice or a global and a specific or two specifics 
+        // (such as including local) 
+        return lockState().recursiveCount() > 1;
     }
     static bool weLocked(const LockState &ls, const StringData& ns) { 
         char db[MaxDatabaseNameLen];
         nsToDatabase(ns.data(), db);
         if( str::equals(db,"local") ) {
-            if( ls.whichNestable == Lock::local ) 
-                return ls.nestableCount;
+            if( ls.whichNestable() == Lock::local ) 
+                return ls.nestableCount();
             return false;
         }
         if( str::equals(db,"admin") ) {
-            if( ls.whichNestable == Lock::admin ) 
-                return ls.nestableCount;
+            if( ls.whichNestable() == Lock::admin ) 
+                return ls.nestableCount();
             return false;
         }
-        return db == ls.otherName && ls.otherCount;
+        return db == ls.otherName() && ls.otherCount();
     }
     bool Lock::isWriteLocked(const StringData& ns) { 
         LockState &ls = lockState();
-        if( ls.threadState == 'W' ) 
+        if( ls.threadState() == 'W' ) 
             return true;
-        if( ls.threadState != 'w' ) 
+        if( ls.threadState() != 'w' ) 
             return false;
         return weLocked(ls,ns);
     }
     bool Lock::atLeastReadLocked(const StringData& ns)
     { 
         LockState &ls = lockState();
-        if( ls.threadState == 'R' || ls.threadState == 'W' ) 
+        if( ls.threadState() == 'R' || ls.threadState() == 'W' ) 
             return true; // global
-        if( ls.threadState == 0 ) 
+        if( ls.threadState() == 0 ) 
             return false;
         return weLocked(ls,ns);
     }
@@ -471,48 +538,43 @@ namespace mongo {
     
     Lock::ScopedLock::ScopedLock() {
         LockState& ls = lockState();
-        ls.recursive++;
-        if( ls.recursive == 1 ) { 
-            fassert(16115, ls.scopedLk == 0);
-            ls.scopedLk = this;
-        }
+        ls.enterScopedLock( this );
     }
     Lock::ScopedLock::~ScopedLock() { 
         LockState& ls = lockState();
-        ls.recursive--;
-        dassert( ls.recursive < 10000 );
-        if( ls.recursive == 0 ) { 
-            wassert( ls.scopedLk == this );
-            ls.scopedLk = NULL;
-        }
-        else { 
-            wassert( ls.scopedLk != this );
-        }
+        int prevCount = ls.recursiveCount();
+        Lock::ScopedLock* what = ls.leaveScopedLock();
+        fassert( 16160 , prevCount != 1 || what == this );
     }
 
     Lock::TempRelease::TempRelease() : cant( Lock::nested() )
     {
         if( cant )
             return;
+
         LockState& ls = lockState();
-        fassert( 16116, ls.recursive == 1 );
-        fassert( 16117, ls.threadState );    
-        fassert( 16118, ls.scopedLk );
-        ls.recursive--;
-        ls.scopedLk->tempRelease();
-        scopedLk = ls.scopedLk;
-        ls.scopedLk = NULL;  // this must be cleared out for further ScopedLock's to work
+        
+        fassert( 16116, ls.recursiveCount() == 1 );
+        fassert( 16117, ls.threadState() != 0 );    
+        
+        scopedLk = ls.leaveScopedLock();
+        fassert( 16118, scopedLk );
+        scopedLk->tempRelease();
     }
     Lock::TempRelease::~TempRelease()
     {
         if( cant )
             return;
+
+
+        
         LockState& ls = lockState();
-        ls.recursive++;
+
         fassert( 16119, scopedLk );
-        fassert( 16120, ls.scopedLk==NULL );
-        ls.scopedLk = scopedLk;
-        ls.scopedLk->relock();
+        fassert( 16120 , ls.threadState() == 0 );
+
+        ls.enterScopedLock( scopedLk );
+        scopedLk->relock();
     }
 
     void Lock::GlobalWrite::tempRelease() { 
@@ -598,14 +660,14 @@ namespace mongo {
         verify( !noop );
         verify( threadState() == 'W' );
         q.W_to_R();
-        threadState() = 'R';
+        lockState().changeLockState( 'R' );
     }
     // you will deadlock if 2 threads doing this
     bool Lock::GlobalWrite::upgrade() { 
         verify( !noop );
         verify( threadState() == 'R' );
         if( q.R_to_W() ) {
-            threadState() = 'W';
+            lockState().changeLockState( 'W' );
             return true;
         }
         return false;
@@ -613,7 +675,7 @@ namespace mongo {
 
     Lock::GlobalRead::GlobalRead( int timeoutms ) {
         LockState& ls = lockState();
-        char ts = ls.threadState;
+        char ts = ls.threadState();
         noop = false;
         if( ts == 'R' || ts == 'W' ) { 
             noop = true;
@@ -634,7 +696,7 @@ namespace mongo {
     }
 
     bool Lock::DBWrite::isW(LockState& ls) const { 
-        switch( ls.threadState ) { 
+        switch( ls.threadState() ) { 
         case 'R' : 
             {
                 error() << "trying to get a w lock after already getting an R lock is not allowed" << endl;
@@ -658,66 +720,58 @@ namespace mongo {
     }
     void Lock::DBWrite::lockNestable(Nestable db) { 
         LockState& ls = lockState();
-        if( ls.nestableCount ) { 
-            if( db != ls.whichNestable ) { 
-                error() << "can't lock local and admin db at the same time " << (int) db << ' ' << (int) ls.whichNestable << endl;
+        if( ls.nestableCount() ) { 
+            if( db != ls.whichNestable() ) { 
+                error() << "can't lock local and admin db at the same time " << (int) db << ' ' << (int) ls.whichNestable() << endl;
                 fassert(16131,false);
             }
-            verify( ls.nestableCount > 0 );
+            verify( ls.nestableCount() > 0 );
         }
         else {
-            ls.whichNestable = db;
-            ourCounter = &ls.nestableCount;
-            ls.nestableCount++;
             fassert(16132,weLocked==0);
+            ls.lockedNestable(db, 1);
             weLocked = nestableLocks[db];
             weLocked->lock();
         }
     }
     void Lock::DBRead::lockNestable(Nestable db) { 
         LockState& ls = lockState();
-        if( ls.nestableCount ) { 
+        if( ls.nestableCount() ) { 
             // we are nested in our locking of local.  previous lock could be read OR write lock on local.
         }
         else {
-            ls.whichNestable = db;
-            ourCounter = &ls.nestableCount;
-            ls.nestableCount--;
+            ls.lockedNestable(db,-1);
             fassert(16133,weLocked==0);
             weLocked = nestableLocks[db];
             weLocked->lock_shared();
         }
     }
 
-    void Lock::DBWrite::lock(const string& db) {
+    void Lock::DBWrite::lockOther(const string& db) {
         LockState& ls = lockState();
 
         // we do checks first, as on assert destructor won't be called so don't want to be half finished with our work.
-        bool same = (db == ls.otherName);
-        if( ls.otherCount ) { 
+        if( ls.otherCount() ) { 
             // nested. if/when we do temprelease with DBWrite we will need to increment here
             // (so we can not release or assert if nested).
-            massert(16106, str::stream() << "internal error tried to lock two databases at the same time. old:" << ls.otherName << " new:" << db,same);
+            massert(16106, str::stream() << "internal error tried to lock two databases at the same time. old:" << ls.otherName() << " new:" << db , db == ls.otherName() );
             return;
         }
 
         // first lock for this db. check consistent order with local db lock so we never deadlock. local always comes last
-        massert(16098, str::stream() << "can't dblock:" << db << " when local or admin is already locked", ls.nestableCount == 0);
+        massert(16098, str::stream() << "can't dblock:" << db << " when local or admin is already locked", ls.nestableCount() == 0);
 
-        ourCounter = &ls.otherCount;
-        dassert( ls.otherCount == 0 );
-        ls.otherCount++;
-        if( !same ) {
-            ls.otherName = db;
+        {
             mapsf<string,WrapperForRWLock*>::ref r(dblocks);
             WrapperForRWLock*& lock = r[db];
             if( lock == 0 )
                 lock = new WrapperForRWLock(db.c_str());
-            ls.otherLock = lock;
+            ls.lockedOther( db , 1 , lock );
         }
+        
         fassert(16134,weLocked==0);
-        ls.otherLock->lock();
-        weLocked = ls.otherLock;
+        ls.otherLock()->lock();
+        weLocked = ls.otherLock();
     }
 
 
@@ -733,7 +787,8 @@ namespace mongo {
         verify( ns.size() );
         Acquiring a( 'w' );
         locked_W=false;
-        locked_w=false; weLocked=0; ourCounter = 0;
+        locked_w=false; 
+        weLocked=0;
         LockState& ls = lockState();
         if( isW(ls) )
             return;
@@ -748,7 +803,7 @@ namespace mongo {
                 return;
             } 
             if( !nested )
-                lock(db);
+                lockOther(db);
             lockTop(ls);
             if( nested )
                 lockNestable(nested);
@@ -761,7 +816,8 @@ namespace mongo {
     void Lock::DBRead::lockDB(const string& ns) {
         verify( ns.size() );
         Acquiring a( 'r' );
-        locked_r=false; weLocked=0; ourCounter = 0;
+        locked_r=false; 
+        weLocked=0; 
         LockState& ls = lockState();
         if( isRW(ls) )
             return;
@@ -770,7 +826,7 @@ namespace mongo {
             nsToDatabase(ns.data(), db);
             Nestable nested = n(db);
             if( !nested )
-                lock(db);
+                lockOther(db);
             lockTop(ls);
             if( nested )
                 lockNestable(nested);
@@ -797,12 +853,11 @@ namespace mongo {
     }
 
     void Lock::DBWrite::unlockDB() {
-        if( ourCounter ) {
-            (*ourCounter)--;
-            wassert( *ourCounter >= 0 );
-        }
         if( weLocked ) {
-            wassert( ourCounter && *ourCounter == 0 );
+            if ( n(what.c_str()) == Lock::notnestable )
+                lockState().unlockedOther();
+            else
+                lockState().unlockedNestable();
             weLocked->unlock();
         }
         if( locked_w ) {
@@ -815,19 +870,18 @@ namespace mongo {
         if( locked_W ) {
             unlock_W();
         }
-        ourCounter = 0;
         weLocked = 0;
         locked_W = locked_w = false;
     }
     void Lock::DBRead::unlockDB() {
-        if( ourCounter ) {
-            (*ourCounter)++;
-            wassert( *ourCounter <= 0 );
-        }
         if( weLocked ) {
-            wassert( ourCounter && *ourCounter == 0 );
+            if( n(what.c_str()) == Lock::notnestable )
+                lockState().unlockedOther();
+            else
+                lockState().unlockedNestable();
             weLocked->unlock_shared();
         }
+
         if( locked_r ) {
             if (DB_LEVEL_LOCKING_ENABLED) {
                 unlock_r();
@@ -835,13 +889,12 @@ namespace mongo {
                 unlock_R();
             }
         }
-        ourCounter = 0;
         weLocked = 0;
         locked_r = false;
     }
 
     bool Lock::DBRead::isRW(LockState& ls) const { 
-        switch( ls.threadState ) { 
+        switch( ls.threadState() ) { 
         case 'W' :
         case 'R' : 
             return true;
@@ -857,7 +910,7 @@ namespace mongo {
     }
 
     void Lock::DBWrite::lockTop(LockState& ls) { 
-        switch( ls.threadState ) { 
+        switch( ls.threadState() ) { 
         case 'w':
             break;
         default:
@@ -868,7 +921,7 @@ namespace mongo {
         }
     }
     void Lock::DBRead::lockTop(LockState& ls) { 
-        switch( ls.threadState ) { 
+        switch( ls.threadState() ) { 
         case 'r':
         case 'w':
             break;
@@ -880,35 +933,30 @@ namespace mongo {
         }
     }
 
-    void Lock::DBRead::lock(const string& db) {
+    void Lock::DBRead::lockOther(const string& db) {
         LockState& ls = lockState();
 
         // we do checks first, as on assert destructor won't be called so don't want to be half finished with our work.
-        bool same = (db == ls.otherName);
-        if( ls.otherCount ) { 
+        if( ls.otherCount() ) { 
             // nested. prev could be read or write. if/when we do temprelease with DBRead/DBWrite we will need to increment/decrement here
             // (so we can not release or assert if nested).  temprelease we should avoid if we can though, it's a bit of an anti-pattern.
-            massert(16099, str::stream() << "internal error tried to lock two databases at the same time. old:" << ls.otherName << " new:" << db,same);
+            massert(16099, str::stream() << "internal error tried to lock two databases at the same time. old:" << ls.otherName() << " new:" << db, db == ls.otherName() );
             return;
         }
 
         // first lock for this db. check consistent order with local db lock so we never deadlock. local always comes last
-        massert(16100, str::stream() << "can't dblock:" << db << " when local or admin is already locked", ls.nestableCount == 0);
+        massert(16100, str::stream() << "can't dblock:" << db << " when local or admin is already locked", ls.nestableCount() == 0);
 
-        ourCounter = &ls.otherCount;
-        dassert( ls.otherCount == 0 );
-        ls.otherCount--;
-        if( !same ) {
-            ls.otherName = db;
+        {
             mapsf<string,WrapperForRWLock*>::ref r(dblocks);
             WrapperForRWLock*& lock = r[db];
             if( lock == 0 )
                 lock = new WrapperForRWLock(db.c_str());
-            ls.otherLock = lock;
+            ls.lockedOther( db , -1 , lock );
         }
         fassert(16135,weLocked==0);
-        ls.otherLock->lock_shared();
-        weLocked = ls.otherLock;
+        ls.otherLock()->lock_shared();
+        weLocked = ls.otherLock();
     }
 
 
