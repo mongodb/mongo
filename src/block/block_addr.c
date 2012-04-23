@@ -155,6 +155,8 @@ __wt_block_buffer_to_snapshot(WT_SESSION_IMPL *session,
 	WT_RET(__wt_vunpack_uint(pp, 0, &a));
 	si->file_size = (off_t)a;
 	WT_RET(__wt_vunpack_uint(pp, 0, &a));
+	si->snapshot_size = a;
+	WT_RET(__wt_vunpack_uint(pp, 0, &a));
 	si->write_gen = a;
 
 	return (0);
@@ -185,6 +187,8 @@ __wt_block_snapshot_to_buffer(WT_SESSION_IMPL *session,
 	WT_RET(__wt_block_addr_to_buffer(block, pp,
 	    si->discard.offset, si->discard.size, si->discard.cksum));
 	a = (uint64_t)si->file_size;
+	WT_RET(__wt_vpack_uint(pp, 0, a));
+	a = (uint64_t)si->snapshot_size;
 	WT_RET(__wt_vpack_uint(pp, 0, a));
 	a = si->write_gen;
 	WT_RET(__wt_vpack_uint(pp, 0, a));

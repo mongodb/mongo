@@ -111,7 +111,7 @@ struct __wt_size {
  *
  * Version #1 snapshot cookie format:
  *	[1] [root addr] [alloc addr] [avail addr] [discard addr]
- *	    [file size] [write generation]
+ *	    [file size] [snapshot size] [write generation]
  */
 #define	WT_BM_SNAPSHOT_VERSION		1	/* Snapshot format version */
 #define	WT_BLOCK_EXTLIST_MAGIC		71002	/* Identify a list */
@@ -125,7 +125,8 @@ struct __wt_block_snapshot {
 	WT_EXTLIST  avail;			/* Extents available */
 	WT_EXTLIST  discard;			/* Extents discarded */
 
-	off_t	 file_size;			/* File size */
+	off_t	 file_size;			/* Snapshot file size */
+	uint64_t snapshot_size;			/* Snapshot contents */
 
 	uint64_t write_gen;			/* Write generation */
 };

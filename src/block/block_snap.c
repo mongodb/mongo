@@ -438,8 +438,23 @@ live_update:
 
 	/* Update the final, added snapshot based on the live system. */
 	WT_SNAPSHOT_FOREACH(snapbase, snap)
-		if (F_ISSET(snap, WT_SNAP_ADD))
+		if (F_ISSET(snap, WT_SNAP_ADD)) {
 			WT_ERR(__snapshot_update(session, block, snap, si, 1));
+
+			/*
+			 * XXX
+			 * Our caller wants two pieces of information: the time
+			 * the snapshot was taken and the final snapshot size.
+			 * This violates layering but the alternative is a call
+			 * for the btree layer to crack the snapshot cookie into
+			 * its components, and that's a fair amount of work.
+			 * (We could just read the system time in the session
+			 * layer when udpating the schema file, but that won't
+			 * work for the snapshot size, and so we do both here.
+			 */
+			snap->snapshot_size = si->snapshot_size;
+			WT_ERR(__wt_epoch(session, &snap->sec, &snap->nsec));
+		}
 
 	/*
 	 * Discard the live system's alloc and discard extent lists, leave the
@@ -529,6 +544,12 @@ __snapshot_update(WT_SESSION_IMPL *session,
 	 */
 	if (is_live)
 		WT_RET(__wt_filesize(session, block->fh, &si->file_size));
+
+	/* Set the snapshot size for the live system. */
+	if (is_live) {
+		si->snapshot_size += si->alloc.bytes;
+		si->snapshot_size -= si->discard.bytes;
+	}
 
 	/*
 	 * Copy the snapshot information into the snapshot array's address

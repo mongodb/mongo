@@ -354,7 +354,7 @@ __wt_session_snap_list_get(
 	size_t allocated, slot;
 	int ret;
 	const char *config;
-	char line[1024];
+	char line[1024], timebuf[64];
 
 	*snapbasep = NULL;
 
@@ -416,7 +416,17 @@ __wt_session_snap_list_get(
 			WT_ERR(__wt_config_subgets(session, &v, "time", &a));
 			if (a.len == 0)
 				goto format;
-			WT_ERR(__wt_strndup(session, a.str, a.len, &snap->t));
+			WT_ERR(__wt_strndup(session, a.str, a.len, &timebuf));
+			if (a.len > sizeof(timebuf) - 1)
+				goto format;
+			memcpy(timebuf, a.str, a.len);
+			timebuf[a.len] = '\0';
+			if (sscanf(timebuf,
+			    "%" SCNuMAX ".%ld", &snap->sec, &snap->nsec) != 2)
+				goto format;
+
+			WT_ERR(__wt_config_subgets(session, &v, "size", &a));
+			snap->snapshot_size = a.val;
 		}
 
 	/*
@@ -494,36 +504,21 @@ __wt_session_snap_list_set(WT_SESSION_IMPL *session, WT_SNAPSHOT *snapbase)
 		if (snap->order > order)
 			order = snap->order;
 
-		if (FLD_ISSET(snap->flags, WT_SNAP_ADD)) {
-			/* Convert the raw value to a hex string. */
+		if (FLD_ISSET(snap->flags, WT_SNAP_ADD | WT_SNAP_UPDATE)) {
+			/* Convert the raw cookie to a hex string. */
 			WT_ERR(__wt_raw_to_hex(session,
 			    snap->raw.data, snap->raw.size, &snap->addr));
 
-			WT_ERR(__wt_epoch(session, &sec, &nsec));
-			WT_ERR(__wt_buf_catfmt(session, buf,
-			    "%s%s=(addr=\"%s\",order=%" PRIu64
-			    ",time=%" PRIuMAX ".%ld)",
-			    sep, snap->name,
-			    (char *)snap->addr.data, order + 1,
-			    (uintmax_t)sec, nsec));
-		} else if (FLD_ISSET(snap->flags, WT_SNAP_UPDATE)) {
-			/*
-			 * Convert the raw value to a hex string, but update
-			 * nothing else.
-			 */
-			WT_ERR(__wt_raw_to_hex(session,
-			    snap->raw.data, snap->raw.size, &snap->addr));
-
-			WT_ERR(__wt_buf_catfmt(session, buf,
-			    "%s%s=(addr=\"%s\",order=%" PRIu64 ",time=%s)",
-			    sep, snap->name,
-			    (char *)snap->addr.data, snap->order, snap->t));
-		} else
-			WT_ERR(__wt_buf_catfmt(session, buf,
-			    "%s%s=(addr=\"%.*s\",order=%" PRIu64 ",time=%s)",
-			    sep, snap->name,
-			    (int)snap->addr.size,
-			    (char *)snap->addr.data, snap->order, snap->t));
+			if (FLD_ISSET(snap->flags, WT_SNAP_ADD))
+				snap->order = order + 1;
+		}
+		WT_ERR(__wt_buf_catfmt(session, buf,
+		    "%s%s=(addr=\"%.*s\",order=%" PRIu64
+		    ",time=%" PRIuMAX ".%ld,size=%" PRIu64 ")",
+		    sep, snap->name,
+		    (int)snap->addr.size, (char *)snap->addr.data,
+		    snap->order,
+		    (uintmax_t)snap->sec, snap->nsec, snap->snapshot_size));
 		sep = ",";
 	}
 	WT_ERR(__wt_buf_catfmt(session, buf, ")"));
@@ -555,7 +550,6 @@ __wt_session_snap_list_free(WT_SESSION_IMPL *session, WT_SNAPSHOT *snapbase)
 		return;
 	WT_SNAPSHOT_FOREACH(snapbase, snap) {
 		__wt_free(session, snap->name);
-		__wt_free(session, snap->t);
 		__wt_buf_free(session, &snap->addr);
 		__wt_buf_free(session, &snap->raw);
 		__wt_free(session, snap->bpriv);

@@ -127,7 +127,7 @@ list_print_snapshot(WT_SESSION *session, const char *config)
 	WT_SNAPSHOT *snap, *snapbase;
 	size_t len;
 	time_t t;
-	uintmax_t a;
+	uint64_t v;
 	int ret;
 	char buf[256];
 
@@ -149,16 +149,22 @@ list_print_snapshot(WT_SESSION *session, const char *config)
 	++len;
 
 	WT_SNAPSHOT_FOREACH(snapbase, snap) {
-		/*
-		 * We have the seconds since the Epoch in a string.  Convert to
-		 * a maximum-sized integral type, assign to a correctly typed
-		 * variable, display the result.
-		 */
-		if (sscanf(snap->t, "%" SCNuMAX, &a) != 1)
-			return (
-			    util_err(0, "unable to interpret snapshot time"));
-		t = (time_t)a;
-		printf("\t%*s: %s", (int)len, snap->name, ctime_r(&t, buf));
+		t = (time_t)snap->sec;
+		printf("\t%*s: %.24s", (int)len, snap->name, ctime_r(&t, buf));
+
+		v = snap->snapshot_size;
+		if (v >= WT_PETABYTE)
+			printf(" (%" PRIu64 " PB)\n", v / WT_PETABYTE);
+		else if (v >= WT_TERABYTE)
+			printf(" (%" PRIu64 " TB)\n", v / WT_TERABYTE);
+		else if (v >= WT_GIGABYTE)
+			printf(" (%" PRIu64 " GB)\n", v / WT_GIGABYTE);
+		else if (v >= WT_MEGABYTE)
+			printf(" (%" PRIu64 " MB)\n", v / WT_MEGABYTE);
+		else if (v >= WT_KILOBYTE)
+			printf(" (%" PRIu64 " KB)\n", v / WT_KILOBYTE);
+		else
+			printf(" (%" PRIu64 " B)\n", v);
 	}
 
 	__wt_snap_list_free(session, snapbase);

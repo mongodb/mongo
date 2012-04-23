@@ -159,12 +159,16 @@ struct __wt_salvage_cookie {
 	for (; (snap)->name != NULL; ++(snap))
 struct __wt_snapshot {
 	char	*name;				/* Name or NULL */
-	char	*t;				/* Time stamp */
 
 	WT_ITEM  addr;				/* Snapshot cookie string */
 	WT_ITEM  raw;				/* Snapshot cookie raw */
 
 	int64_t	 order;				/* Snapshot order */
+
+	time_t	 sec;				/* Timestamp */
+	long	 nsec;
+
+	uint64_t snapshot_size;			/* Snapshot size */
 
 	void	*bpriv;				/* Block manager's private */
 
