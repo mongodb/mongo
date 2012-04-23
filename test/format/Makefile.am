@@ -8,8 +8,8 @@ t_SOURCES =\
 t_LDADD = $(top_builddir)/libwiredtiger.la -L$(BDB)/build_unix -ldb
 t_LDFLAGS = -static
 
-s_dumpcmp: $(srcdir)/s_dumpcmp.in
-	cp $(srcdir)/s_dumpcmp.in $@
+s_dumpcmp:
+	cp $(srcdir)/s_dumpcmp s_dumpcmp
 
 backup:
 	rm -rf BACKUP && mkdir BACKUP && cp -p -r WiredTiger* __* BACKUP/
