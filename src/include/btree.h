@@ -165,8 +165,8 @@ struct __wt_snapshot {
 
 	int64_t	 order;				/* Snapshot order */
 
-	time_t	 sec;				/* Timestamp */
-	long	 nsec;
+	uint64_t sec;				/* Timestamp */
+	uint64_t nsec;
 
 	uint64_t snapshot_size;			/* Snapshot size */
 

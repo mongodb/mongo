@@ -422,7 +422,8 @@ __wt_session_snap_list_get(
 			memcpy(timebuf, a.str, a.len);
 			timebuf[a.len] = '\0';
 			if (sscanf(timebuf,
-			    "%" SCNuMAX ".%ld", &snap->sec, &snap->nsec) != 2)
+			    "%" SCNu64 ".%" SCNu64,
+			    &snap->sec, &snap->nsec) != 2)
 				goto format;
 
 			WT_ERR(__wt_config_subgets(session, &v, "size", &a));
@@ -512,7 +513,7 @@ __wt_session_snap_list_set(WT_SESSION_IMPL *session, WT_SNAPSHOT *snapbase)
 		}
 		WT_ERR(__wt_buf_catfmt(session, buf,
 		    "%s%s=(addr=\"%.*s\",order=%" PRIu64
-		    ",time=%" PRIuMAX ".%ld,size=%" PRIu64 ")",
+		    ",time=%" PRIu64 ".%" PRIu64 ",size=%" PRIu64 ")",
 		    sep, snap->name,
 		    (int)snap->addr.size, (char *)snap->addr.data,
 		    snap->order,
