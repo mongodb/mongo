@@ -22,7 +22,7 @@
 
 struct L {
 	int start, stop;			/* starting/stopping id */
-	char *name;				/* snapshot name */
+	const char *name;			/* snapshot name */
 } list[] = {
 	{ 100, 120, "snapshot-1" },
 	{ 200, 220, "snapshot-2" },

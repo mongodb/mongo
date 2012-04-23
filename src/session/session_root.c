@@ -501,8 +501,8 @@ __wt_session_snap_list_set(WT_SESSION_IMPL *session, WT_SNAPSHOT *snapbase)
 
 			WT_ERR(__wt_epoch(session, &sec, &nsec));
 			WT_ERR(__wt_buf_catfmt(session, buf,
-			    "%s%s=(addr=\"%s\",order=%lu,time=%" PRIuMAX
-			    ".%ld)",
+			    "%s%s=(addr=\"%s\",order=%" PRIu64
+			    ",time=%" PRIuMAX ".%ld)",
 			    sep, snap->name,
 			    (char *)snap->addr.data, order + 1,
 			    (uintmax_t)sec, nsec));
@@ -515,12 +515,12 @@ __wt_session_snap_list_set(WT_SESSION_IMPL *session, WT_SNAPSHOT *snapbase)
 			    snap->raw.data, snap->raw.size, &snap->addr));
 
 			WT_ERR(__wt_buf_catfmt(session, buf,
-			    "%s%s=(addr=\"%s\",order=%lu,time=%s)",
+			    "%s%s=(addr=\"%s\",order=%" PRIu64 ",time=%s)",
 			    sep, snap->name,
 			    (char *)snap->addr.data, snap->order, snap->t));
 		} else
 			WT_ERR(__wt_buf_catfmt(session, buf,
-			    "%s%s=(addr=\"%.*s\",order=%lu,time=%s)",
+			    "%s%s=(addr=\"%.*s\",order=%" PRIu64 ",time=%s)",
 			    sep, snap->name,
 			    (int)snap->addr.size,
 			    (char *)snap->addr.data, snap->order, snap->t));
