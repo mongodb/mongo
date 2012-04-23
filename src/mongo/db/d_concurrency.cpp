@@ -263,7 +263,7 @@ namespace mongo {
     }
 
     void LockState::changeLockState( char newState ) {
-        fassert( 16161 , _threadState != 0 );
+        fassert( 16169 , _threadState != 0 );
         _threadState = newState;
     }
 
@@ -366,7 +366,7 @@ namespace mongo {
     }
 
     void LockState::lockedOther( const string& other , int type , WrapperForRWLock* lock ) {
-        fassert( 16162 , _otherCount == 0 );
+        fassert( 16170 , _otherCount == 0 );
         _otherName = other;
         _otherCount = type;
         _otherLock = lock;
@@ -544,7 +544,7 @@ namespace mongo {
         LockState& ls = lockState();
         int prevCount = ls.recursiveCount();
         Lock::ScopedLock* what = ls.leaveScopedLock();
-        fassert( 16160 , prevCount != 1 || what == this );
+        fassert( 16171 , prevCount != 1 || what == this );
     }
 
     Lock::TempRelease::TempRelease() : cant( Lock::nested() )
