@@ -1,9 +1,6 @@
 #! /bin/sh
 
-# It was a pain updating all the copyrights in the Berkeley DB tree: I'm not
-# doing that again, the only files carrying copyrights in the WiredTiger tree
-# are the source files, that is, *.[ch] and *.in.  Check automatically to be
-# sure the copyright is up-to-date.
+# Check the copyrights.
 
 c1=__wt.1$$
 c2=__wt.2$$
