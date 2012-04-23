@@ -178,7 +178,7 @@ namespace mongo {
 
     void KillCurrentOp::checkForInterrupt( bool heedMutex ) {
         Client& c = cc();
-        if ( heedMutex && d.dbMutex.isWriteLocked() )
+        if ( heedMutex && Lock::somethingWriteLocked() && c.hasWrittenThisPass() )
             return;
         if( _globalKill )
             uasserted(11600,"interrupted at shutdown");
