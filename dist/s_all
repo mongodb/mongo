@@ -69,7 +69,6 @@ run "sh ./s_string" "checking string spelling"
 run "sh ./s_style" "checking style"
 run "sh ./s_symbols" "checking external symbol names"
 run "sh ./s_typedef -c" "checking for unused typedefs"
-run "sh ./s_types" "checking for old-style types"
 run "sh ./s_whitespace" "checking whitespace"
 
 run "sh ./s_docs" "generating documentation"
