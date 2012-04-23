@@ -4,9 +4,6 @@
 t=__wt.$$
 trap 'rm -f $t; exit 0' 0 1 2 3 13 15
 
-extra=`cd .. && echo dist/*.py src/include/*.[hi] src/include/*.in && \
-	find test -name '*.[ch]' -print`
-
 cd .. &&
 for f in `find examples ext src test -name '*.[chisy]' -o -name '*.in'`; do
 	if grep "^[^}]*while (0);" $f > $t; then
