@@ -176,6 +176,43 @@ namespace mongo {
         return b.obj();
     }
 
+    void KillCurrentOp::checkForInterrupt( bool heedMutex ) {
+        Client& c = cc();
+        if ( heedMutex && d.dbMutex.isWriteLocked() )
+            return;
+        if( _globalKill )
+            uasserted(11600,"interrupted at shutdown");
+        if( c.curop()->killed() ) {
+            uasserted(11601,"operation was interrupted");
+        }
+        if( c.sometimes(1024) ) {
+            AbstractMessagingPort *p = cc().port();
+            if( p ) 
+                p->assertStillConnected();
+        }
+    }
+    
+    const char * KillCurrentOp::checkForInterruptNoAssert() {
+        Client& c = cc();
+        if( _globalKill )
+            return "interrupted at shutdown";
+        if( c.curop()->killed() )
+            return "interrupted";
+        if( c.sometimes(1024) ) {
+            try { 
+                AbstractMessagingPort *p = cc().port();
+                if( p ) 
+                    p->assertStillConnected();
+            }
+            catch(...) { 
+                log() << "no longer connected to client";
+                return "no longer connected to client";
+            }
+        }
+        return "";
+    }
+
+
     AtomicUInt CurOp::_nextOpNum;
 
 }
