@@ -282,9 +282,11 @@ namespace mongo {
     };
 
     class QueryPlanSet;
-    
+
+    /** Populates a provided QueryPlanSet with candidate query plans, when requested. */
     class QueryPlanGenerator {
     public:
+
         /** Policies for utilizing recorded plans. */
         typedef enum {
             Ignore, // Ignore the recorded plan and try all candidate plans.
@@ -292,6 +294,7 @@ namespace mongo {
             Use // Always use the recorded plan.
         } RecordedPlanPolicy;
 
+        /** @param qps The QueryPlanSet to which plans will be provided. */
         QueryPlanGenerator( QueryPlanSet &qps,
                            auto_ptr<FieldRangeSetPair> originalFrsp,
                            const shared_ptr<const ParsedQuery> &parsedQuery,
@@ -299,9 +302,13 @@ namespace mongo {
                            RecordedPlanPolicy recordedPlanPolicy,
                            const BSONObj &min,
                            const BSONObj &max );
+        /** Populate the provided QueryPlanSet with an initial set of plans. */
         void addInitialPlans();
+        /** Supplement a cached plan provided earlier by adding additional query plans. */
         void addFallbackPlans();
+
     private:
+
         bool addShortCircuitPlan( NamespaceDetails *d );
         bool addHintPlan( NamespaceDetails *d );
         bool addSpecialPlan( NamespaceDetails *d );
