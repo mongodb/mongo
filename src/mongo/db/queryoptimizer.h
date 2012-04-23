@@ -109,8 +109,8 @@ namespace mongo {
         int _idxNo;
         const FieldRangeSet &_frs;
         const FieldRangeSet &_frsMulti;
-        const BSONObj &_originalQuery;
-        const BSONObj &_order;
+        const BSONObj _originalQuery;
+        const BSONObj _order;
         shared_ptr<const ParsedQuery> _parsedQuery;
         const IndexDetails * _index;
         bool _optimal;
@@ -281,6 +281,44 @@ namespace mongo {
         }
     };
 
+    class QueryPlanSet;
+    
+    class QueryPlanGenerator {
+    public:
+        /** Policies for utilizing recorded plans. */
+        typedef enum {
+            Ignore, // Ignore the recorded plan and try all candidate plans.
+            UseIfInOrder, // Use the recorded plan if it is properly ordered.
+            Use // Always use the recorded plan.
+        } RecordedPlanPolicy;
+
+        QueryPlanGenerator( QueryPlanSet &qps,
+                           auto_ptr<FieldRangeSetPair> originalFrsp,
+                           const shared_ptr<const ParsedQuery> &parsedQuery,
+                           const BSONObj &hint,
+                           RecordedPlanPolicy recordedPlanPolicy,
+                           const BSONObj &min,
+                           const BSONObj &max );
+        void addInitialPlans();
+        void addFallbackPlans();
+    private:
+        shared_ptr<QueryPlan> newPlan( NamespaceDetails *d,
+                                      int idxNo,
+                                      const BSONObj &min = BSONObj(),
+                                      const BSONObj &max = BSONObj(),
+                                      const string &special = "" ) const;
+        void setSingleUnindexedPlan( NamespaceDetails *d );
+        void setHintedPlan( IndexDetails &id );
+        void warnOnCappedIdTableScan() const;
+        QueryPlanSet &_qps;
+        auto_ptr<FieldRangeSetPair> _originalFrsp;
+        shared_ptr<const ParsedQuery> _parsedQuery;
+        BSONObj _hint;
+        RecordedPlanPolicy _recordedPlanPolicy;
+        BSONObj _min;
+        BSONObj _max;
+    };
+
     /**
      * A set of candidate query plans for a query.  This class can return a best guess plan or run a
      * QueryOp on all the plans.
@@ -290,27 +328,22 @@ namespace mongo {
         typedef boost::shared_ptr<QueryPlan> QueryPlanPtr;
         typedef vector<QueryPlanPtr> PlanSet;
 
-        /** Policies for utilizing recorded plans. */
-        typedef enum {
-            Ignore, // Ignore the recorded plan and try all candidate plans.
-            UseIfInOrder, // Use the recorded plan if it is properly ordered.
-            Use // Always use the recorded plan.
-        } RecordedPlanPolicy;
-        
         /**
-         * @param originalFrsp - original constraints for this query clause; if null, frsp will be used.
+         * @param originalFrsp - original constraints for this query clause; if null, frsp will be
+         * used.
          */
         QueryPlanSet( const char *ns,
-                      auto_ptr<FieldRangeSetPair> frsp,
-                      auto_ptr<FieldRangeSetPair> originalFrsp,
-                      const BSONObj &originalQuery,
-                      const BSONObj &order,
-                      const shared_ptr<const ParsedQuery> &parsedQuery =
-                              shared_ptr<const ParsedQuery>(),
-                      const BSONObj &hint = BSONObj(),
-                      RecordedPlanPolicy recordedPlanPolicy = Use,
-                      const BSONObj &min = BSONObj(),
-                      const BSONObj &max = BSONObj() );
+                     auto_ptr<FieldRangeSetPair> frsp,
+                     auto_ptr<FieldRangeSetPair> originalFrsp,
+                     const BSONObj &originalQuery,
+                     const BSONObj &order,
+                     const shared_ptr<const ParsedQuery> &parsedQuery =
+                            shared_ptr<const ParsedQuery>(),
+                     const BSONObj &hint = BSONObj(),
+                     QueryPlanGenerator::RecordedPlanPolicy recordedPlanPolicy =
+                            QueryPlanGenerator::Use,
+                     const BSONObj &min = BSONObj(),
+                     const BSONObj &max = BSONObj() );
 
         /** @return number of candidate plans. */
         int nPlans() const { return _plans.size(); }
@@ -325,6 +358,7 @@ namespace mongo {
         QueryPlanPtr getBestGuess() const;
 
         const FieldRangeSetPair &frsp() const { return *_frsp; }
+        BSONObj originalQuery() const { return _originalQuery; }
         BSONObj order() const { return _order; }
         
         /** @return true if an active plan is in order. */
@@ -340,8 +374,11 @@ namespace mongo {
         
         string toString() const;
         
+        void setSinglePlan( const QueryPlanPtr &plan );
+        void setCachedPlan( const QueryPlanPtr &plan, const CachedQueryPlan &cachedPlan );
+        void addCandidatePlan( const QueryPlanPtr &plan );
+        
         //for testing
-        const FieldRangeSetPair *originalFrsp() const { return _originalFrsp.get(); }
         bool modifiedKeys() const;
         bool hasMultiKey() const;
 
@@ -395,30 +432,19 @@ namespace mongo {
         };
 
     private:
-        void addOtherPlans();
+        void addPlan( const QueryPlanPtr &plan );
         void addFallbackPlans();
-        void addPlan( QueryPlanPtr plan );
-        void addUnindexedPlan( NamespaceDetails *d );
-        QueryPlanPtr newQueryPlan( NamespaceDetails *d, int idxNo, const BSONObj &min = BSONObj(),
-                                  const BSONObj &max = BSONObj(), const string &special = "" );
         void init();
-        void addHintedPlan( IndexDetails &id );
-        void warnOnCappedIdTableScan() const;
 
+        QueryPlanGenerator _generator;
         BSONObj _originalQuery;
         auto_ptr<FieldRangeSetPair> _frsp;
-        auto_ptr<FieldRangeSetPair> _originalFrsp;
         PlanSet _plans;
         bool _mayRecordPlan;
         bool _usingCachedPlan;
         CandidatePlanCharacter _cachedPlanCharacter;
-        BSONObj _hint;
         BSONObj _order;
-        shared_ptr<const ParsedQuery> _parsedQuery;
         long long _oldNScanned;
-        RecordedPlanPolicy _recordedPlanPolicy;
-        BSONObj _min;
-        BSONObj _max;
         ElapsedTracker _yieldSometimesTracker;
     };
 
@@ -431,7 +457,8 @@ namespace mongo {
                           const shared_ptr<const ParsedQuery> &parsedQuery =
                                   shared_ptr<const ParsedQuery>(),
                           const BSONObj &hint = BSONObj(),
-                          QueryPlanSet::RecordedPlanPolicy recordedPlanPolicy = QueryPlanSet::Use,
+                          QueryPlanGenerator::RecordedPlanPolicy recordedPlanPolicy =
+                                  QueryPlanGenerator::Use,
                           const BSONObj &min = BSONObj(),
                           const BSONObj &max = BSONObj() );
 
@@ -474,7 +501,7 @@ namespace mongo {
         /** Clear the runner member. */
         void clearRunner();
         
-        void setRecordedPlanPolicy( QueryPlanSet::RecordedPlanPolicy recordedPlanPolicy ) {
+        void setRecordedPlanPolicy( QueryPlanGenerator::RecordedPlanPolicy recordedPlanPolicy ) {
             _recordedPlanPolicy = recordedPlanPolicy;
         }
         
@@ -549,7 +576,7 @@ namespace mongo {
         scoped_ptr<OrRangeGenerator> _org; // May be null in certain non $or query cases.
         auto_ptr<QueryPlanSet> _currentQps;
         int _i;
-        QueryPlanSet::RecordedPlanPolicy _recordedPlanPolicy;
+        QueryPlanGenerator::RecordedPlanPolicy _recordedPlanPolicy;
         BSONObj _hint;
         bool _tableScanned;
         shared_ptr<QueryOp> _baseOp;

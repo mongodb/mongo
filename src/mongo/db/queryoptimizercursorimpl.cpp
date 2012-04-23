@@ -781,7 +781,8 @@ namespace mongo {
     
     void CursorGenerator::setMultiPlanScanner() {
         _mps.reset( new MultiPlanScanner( _ns, _query, _order, _parsedQuery, hint(),
-                                         explain() ? QueryPlanSet::Ignore : QueryPlanSet::Use,
+                                         explain() ? QueryPlanGenerator::Ignore :
+                                                QueryPlanGenerator::Use,
                                          min(), max() ) );
     }
     

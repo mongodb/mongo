@@ -956,9 +956,10 @@ namespace QueryOptimizerTests {
                 BSONObj order = BSONObj();
                 auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), query ) );
                 auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
+                auto_ptr< FieldRangeSetPair > frspOrig2( new FieldRangeSetPair( *frsp ) );
                 QueryPlanSet s( ns(), frsp, frspOrig, query, order,
                                shared_ptr<const ParsedQuery>(), hint );
-                QueryPlan qp( nsd(), 1, s.frsp(), s.originalFrsp(), query, order );
+                QueryPlan qp( nsd(), 1, s.frsp(), frspOrig2.get(), query, order );
                 boost::shared_ptr<Cursor> c = qp.newCursor();
                 double expected[] = { 2, 3, 6, 9 };
                 for( int i = 0; i < 4; ++i, c->advance() ) {
@@ -971,9 +972,10 @@ namespace QueryOptimizerTests {
                     order = BSON( "a" << -1 );
                     auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), query ) );
                     auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
+                    auto_ptr< FieldRangeSetPair > frspOrig2( new FieldRangeSetPair( *frsp ) );
                     QueryPlanSet s( ns(), frsp, frspOrig, query, order,
                                    shared_ptr<const ParsedQuery>(), hint );
-                    QueryPlan qp( nsd(), 1, s.frsp(), s.originalFrsp(), query, order );
+                    QueryPlan qp( nsd(), 1, s.frsp(), frspOrig2.get(), query, order );
                     boost::shared_ptr<Cursor> c = qp.newCursor();
                     double expected[] = { 9, 6, 3, 2 };
                     for( int i = 0; i < 4; ++i, c->advance() ) {
