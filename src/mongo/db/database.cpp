@@ -43,12 +43,12 @@ namespace mongo {
             Lock::assertWriteLocked(db->name);
         }
         else {
-            d.dbMutex.assertWriteLocked();
+            verify( Lock::isW() );
         }
     }
 
     Database::~Database() {
-        d.dbMutex.assertWriteLocked();
+        verify( Lock::isW() );
         magic = 0;
         size_t n = _files.size();
         for ( size_t i = 0; i < n; i++ )

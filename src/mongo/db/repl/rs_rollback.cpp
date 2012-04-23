@@ -374,8 +374,7 @@ namespace mongo {
         bool warn = false;
 
         verify( !h.commonPointOurDiskloc.isNull() );
-
-        mongo::d.dbMutex.assertWriteLocked();
+        verify( Lock::isW() );
 
         /* we have items we are writing that aren't from a point-in-time.  thus best not to come online
            until we get to that point in freshness. */

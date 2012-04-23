@@ -60,12 +60,8 @@ namespace mongo {
         MongoMutex();
         static bool atLeastReadLocked();
         void assertAtLeastReadLocked() const;
-        void assertWriteLocked() const;
         MutexInfo& info() { return _minfo; }
         MutexInfo _minfo;
     };
-
-    // eliminate this - we should just type "d.dbMutex.assertWriteLocked();" instead
-    inline void assertInWriteLock() { d.dbMutex.assertWriteLocked(); }
 
 }

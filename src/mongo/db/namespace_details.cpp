@@ -131,7 +131,7 @@ namespace mongo {
         }
 
         if( indexBuildInProgress ) {
-            assertInWriteLock();
+            verify( Lock::isW() ); // TODO(erh) should this be per db?
             if( indexBuildInProgress ) {
                 log() << "indexBuildInProgress was " << indexBuildInProgress << " for " << k << ", indicating an abnormal db shutdown" << endl;
                 getDur().writingInt( indexBuildInProgress ) = 0;

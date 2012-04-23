@@ -49,7 +49,7 @@ namespace mongo {
         void defer(MT mt) {
             // only one writer allowed.  however the invoke processing below can occur concurrently with
             // writes (for the most part)
-            DEV d.dbMutex.assertWriteLocked();
+            DEV verify( Lock::isW() );
 
             _queues[_which].push_back(mt);
         }

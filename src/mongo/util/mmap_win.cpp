@@ -251,7 +251,7 @@ namespace mongo {
     }
 
     void* MemoryMappedFile::remapPrivateView(void *oldPrivateAddr) {
-        d.dbMutex.assertWriteLocked(); // short window where we are unmapped so must be exclusive
+        verify( Lock::isW() );
 
         RemapLock lk;   // Interlock with PortMessageServer::acceptedMP() to stop thread creation
 
