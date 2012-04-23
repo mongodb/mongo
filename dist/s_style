@@ -5,7 +5,8 @@ t=__wt.$$
 trap 'rm -f $t; exit 0' 0 1 2 3 13 15
 
 cd .. &&
-for f in `find examples ext src test -name '*.[chisy]' -o -name '*.in'`; do
+for f in `find examples ext src test -name '*.[chisy]' -o -name '*.in' |
+    sed '/Makefile.in/d'`; do
 	if grep "^[^}]*while (0);" $f > $t; then
 		echo "$f: while (0) has trailing semi-colon"
 		cat $t
