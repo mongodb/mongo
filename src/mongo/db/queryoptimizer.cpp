@@ -439,7 +439,7 @@ doneCheckOrder:
         const char *ns = _qps.frsp().ns();
         NamespaceDetails *d = nsdetails( ns );
         
-        if ( addShortCircuitPlan( ns, d ) ) {
+        if ( addShortCircuitPlan( d ) ) {
             return;
         }
         
@@ -505,14 +505,14 @@ doneCheckOrder:
         _qps.addCandidatePlan( newPlan( d, -1 ) );
     }
     
-    bool QueryPlanGenerator::addShortCircuitPlan( const char *ns, NamespaceDetails *d ) {
+    bool QueryPlanGenerator::addShortCircuitPlan( NamespaceDetails *d ) {
         return
             // The collection is missing.
             setUnindexedPlanIf( !d, d ) ||
             // No match is possible.
             setUnindexedPlanIf( !_qps.frsp().matchPossible(), d ) ||
             // The hint, min, or max parameters are specified.
-            addHintPlan( ns, d ) ||
+            addHintPlan( d ) ||
             // A special index operation is requested.
             addSpecialPlan( d ) ||
             // No indexable ranges or ordering are specified.
@@ -522,7 +522,7 @@ doneCheckOrder:
                                str::equals( _qps.order().firstElementFieldName(), "$natural" ), d );
     }
     
-    bool QueryPlanGenerator::addHintPlan( const char *ns, NamespaceDetails *d ) {
+    bool QueryPlanGenerator::addHintPlan( NamespaceDetails *d ) {
         BSONElement hint = _hint.firstElement();
         if ( !hint.eoo() ) {
             IndexDetails *id = parseHint( hint, d );
@@ -540,7 +540,8 @@ doneCheckOrder:
         if ( !_min.isEmpty() || !_max.isEmpty() ) {
             string errmsg;
             BSONObj keyPattern;
-            IndexDetails *idx = indexDetailsForRange( ns, errmsg, _min, _max, keyPattern );
+            IndexDetails *idx = indexDetailsForRange( _qps.frsp().ns(), errmsg, _min, _max,
+                                                     keyPattern );
             uassert( 10367 ,  errmsg, idx );
             _qps.setSinglePlan( newPlan( d, d->idxNo( *idx ), _min, _max ) );
             return true;

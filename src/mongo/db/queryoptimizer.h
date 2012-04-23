@@ -302,8 +302,8 @@ namespace mongo {
         void addInitialPlans();
         void addFallbackPlans();
     private:
-        bool addShortCircuitPlan( const char *ns, NamespaceDetails *d );
-        bool addHintPlan( const char *ns, NamespaceDetails *d );
+        bool addShortCircuitPlan( NamespaceDetails *d );
+        bool addHintPlan( NamespaceDetails *d );
         bool addSpecialPlan( NamespaceDetails *d );
         void addStandardPlans( NamespaceDetails *d );
         bool addCachedPlan( NamespaceDetails *d );
