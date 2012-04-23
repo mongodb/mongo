@@ -112,7 +112,7 @@ namespace ThreadedTests {
                 }
                 else if( i % 7 == 1 ) {
                     Lock::GlobalRead r;
-                    ASSERT( d.dbMutex.atLeastReadLocked() );
+                    ASSERT( Lock::isReadLocked() );
                     ASSERT( Lock::isLocked() );
                     if( sometimes ) {
                         Lock::TempRelease t;
@@ -240,7 +240,7 @@ namespace ThreadedTests {
         }
         virtual void validate() {
             log() << "mongomutextest validate" << endl;
-            ASSERT( !d.dbMutex.atLeastReadLocked() );
+            ASSERT( ! Lock::isReadLocked() );
             ASSERT( upgradeWorked > upgradeFailed );
             ASSERT( upgradeWorked > 4 );
             {

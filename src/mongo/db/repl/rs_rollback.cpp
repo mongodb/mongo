@@ -198,7 +198,7 @@ namespace mongo {
         }
         last = time(0);
 
-        verify( d.dbMutex.atLeastReadLocked() );
+        verify( Lock::isLocked() );
         Client::Context c(rsoplog);
         NamespaceDetails *nsd = nsdetails(rsoplog);
         verify(nsd);
@@ -590,7 +590,7 @@ namespace mongo {
 
     unsigned ReplSetImpl::_syncRollback(OplogReader&r) {
         verify( !lockedByMe() );
-        verify( !d.dbMutex.atLeastReadLocked() );
+        verify( !Lock::isLocked() );
 
         sethbmsg("rollback 0");
 

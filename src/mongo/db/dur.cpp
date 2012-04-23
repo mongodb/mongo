@@ -535,7 +535,7 @@ namespace mongo {
             unspoolWriteIntents(); // in case we were doing some writing ourself (likely impossible with limitedlocks version)
             AlignedBuilder &ab = __theBuilder;
 
-            verify( !d.dbMutex.atLeastReadLocked() );
+            verify( ! Lock::isLocked() );
 
             // do we need this to be greedy, so that it can start working fairly soon?
             // probably: as this is a read lock, it wouldn't change anything if only reads anyway.

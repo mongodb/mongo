@@ -58,8 +58,6 @@ namespace mongo {
     class MongoMutex : boost::noncopyable {
     public:
         MongoMutex();
-        static bool atLeastReadLocked();
-        void assertAtLeastReadLocked() const;
         MutexInfo& info() { return _minfo; }
         MutexInfo _minfo;
     };

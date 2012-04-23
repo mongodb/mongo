@@ -991,20 +991,6 @@ namespace mongo {
     readlocktry::~readlocktry() { 
     }
 
-    /* backward compatible glue. it could be that the assumption was that 
-       it's a global read lock, so 'r' and 'w' don't qualify.
-       */ 
-    bool MongoMutex::atLeastReadLocked() { 
-        int x = Lock::isLocked();
-        return x == 'R' || x == 'W';
-    }
-    void MongoMutex::assertAtLeastReadLocked() const { 
-        if( !atLeastReadLocked() ) { 
-            lockState().dump();
-            dassert(false); // dassert will terminate buildbot
-            msgasserted(16102, "expected read lock");
-        }
-    }
     void locked_W() {
         d.dbMutex._minfo.entered(); // hopefully eliminate one day 
     }
