@@ -499,18 +499,18 @@ doneCheckOrder:
 
         DEBUGQO( "\t special : " << _frsp->getSpecial() );
         if ( _frsp->getSpecial().size() ) {
-            _special = _frsp->getSpecial();
+            string special = _frsp->getSpecial();
             NamespaceDetails::IndexIterator i = d->ii();
             while( i.more() ) {
                 int j = i.pos();
                 IndexDetails& ii = i.next();
                 const IndexSpec& spec = ii.getSpec();
-                if ( spec.getTypeName() == _special && spec.suitability( _originalQuery , _order ) ) {
-                    addPlan( newQueryPlan( d, j, BSONObj(), BSONObj(), _special ) );
+                if ( spec.getTypeName() == special && spec.suitability( _originalQuery , _order ) ) {
+                    addPlan( newQueryPlan( d, j, BSONObj(), BSONObj(), special ) );
                     return;
                 }
             }
-            uassert( 13038 , (string)"can't find special index: " + _special + " for: " + _originalQuery.toString() , 0 );
+            uassert( 13038 , (string)"can't find special index: " + special + " for: " + _originalQuery.toString() , 0 );
         }
 
         // If table scan is optimal or natural order requested.
@@ -579,7 +579,7 @@ doneCheckOrder:
                                                           const BSONObj &min, const BSONObj &max,
                                                           const string &special ) {
         QueryPlanPtr ret( new QueryPlan( d, idxNo, *_frsp, _originalFrsp.get(), _originalQuery,
-                                        _order, _parsedQuery, min, max, _special ) );
+                                        _order, _parsedQuery, min, max, special ) );
         return ret;
     }
     
@@ -871,8 +871,8 @@ doneCheckOrder:
             return holder._op;
         }
         if ( _plans.hasPossiblyExcludedPlans() &&
-            op.nscanned() > _plans._oldNScanned * 10 &&
-            _plans._special.empty() ) {
+            op.nscanned() > _plans._oldNScanned * 10 ) {
+            verify( _plans.nPlans() == 1 && _plans.firstPlan()->special().empty() );
             holder._offset = -op.nscanned();
             _plans.addFallbackPlans();
             PlanSet::iterator i = _plans._plans.begin();

@@ -419,7 +419,6 @@ namespace mongo {
         RecordedPlanPolicy _recordedPlanPolicy;
         BSONObj _min;
         BSONObj _max;
-        string _special;
         ElapsedTracker _yieldSometimesTracker;
     };
 
