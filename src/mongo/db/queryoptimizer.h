@@ -302,6 +302,10 @@ namespace mongo {
         void addInitialPlans();
         void addFallbackPlans();
     private:
+        bool addShortCircuitPlan( const char *ns, NamespaceDetails *d );
+        bool addHintPlan( const char *ns, NamespaceDetails *d );
+        bool addSpecialPlan( NamespaceDetails *d );
+        void addStandardPlans( NamespaceDetails *d );
         shared_ptr<QueryPlan> newPlan( NamespaceDetails *d,
                                       int idxNo,
                                       const BSONObj &min = BSONObj(),

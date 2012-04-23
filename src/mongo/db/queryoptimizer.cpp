@@ -438,91 +438,12 @@ doneCheckOrder:
     void QueryPlanGenerator::addInitialPlans() {
         const char *ns = _qps.frsp().ns();
         NamespaceDetails *d = nsdetails( ns );
-        if ( !d ||
-            !_qps.frsp().matchPossible() ) {
-            setSingleUnindexedPlan( d );
+        
+        if ( addShortCircuitPlan( ns, d ) ) {
             return;
         }
         
-        BSONElement hint = _hint.firstElement();
-        if ( !hint.eoo() ) {
-            IndexDetails *id = parseHint( hint, d );
-            if ( id ) {
-                setHintedPlan( *id );
-            }
-            else {
-                uassert( 10366, "natural order cannot be specified with $min/$max",
-                        _min.isEmpty() && _max.isEmpty() );
-                setSingleUnindexedPlan( d );
-            }
-            return;
-        }
-        
-        if ( !_min.isEmpty() || !_max.isEmpty() ) {
-            string errmsg;
-            BSONObj keyPattern;
-            IndexDetails *idx = indexDetailsForRange( ns, errmsg, _min, _max, keyPattern );
-            uassert( 10367 ,  errmsg, idx );
-            _qps.setSinglePlan( newPlan( d, d->idxNo( *idx ), _min, _max ) );
-            return;
-        }
-
-        DEBUGQO( "\t special : " << _qps.frsp().getSpecial() );
-        if ( _qps.frsp().getSpecial().size() ) {
-            string special = _qps.frsp().getSpecial();
-            NamespaceDetails::IndexIterator i = d->ii();
-            while( i.more() ) {
-                int j = i.pos();
-                IndexDetails& ii = i.next();
-                const IndexSpec& spec = ii.getSpec();
-                if ( spec.getTypeName() == special &&
-                    spec.suitability( _qps.originalQuery(), _qps.order() ) ) {
-                    _qps.setSinglePlan( newPlan( d, j, BSONObj(), BSONObj(), special ) );
-                    return;
-                }
-            }
-            uassert( 13038, (string)"can't find special index: " + special +
-                    " for: " + _qps.originalQuery().toString(), false );
-        }
-        
-        // If table scan is optimal or natural order requested.
-        if ( ( _qps.frsp().noNonUniversalRanges() && _qps.order().isEmpty() ) ||
-            ( !_qps.order().isEmpty() &&
-             str::equals( _qps.order().firstElementFieldName(), "$natural" ) ) ) {
-            setSingleUnindexedPlan( d );
-            return;
-        }
-        
-        if ( _recordedPlanPolicy != Ignore ) {
-            CachedQueryPlan best = QueryUtilIndexed::bestIndexForPatterns( _qps.frsp(),
-                                                                          _qps.order() );
-            BSONObj bestIndex = best.indexKey();
-            if ( !bestIndex.isEmpty() ) {
-                shared_ptr<QueryPlan> p;
-                if ( str::equals( bestIndex.firstElementFieldName(), "$natural" ) ) {
-                    p = newPlan( d, -1 );
-                }
-                
-                NamespaceDetails::IndexIterator i = d->ii();
-                while( i.more() ) {
-                    int j = i.pos();
-                    IndexDetails& ii = i.next();
-                    if( ii.keyPattern().woCompare(bestIndex) == 0 ) {
-                        p = newPlan( d, j );
-                    }
-                }
-                
-                massert( 10368 ,  "Unable to locate previously recorded index", p.get() );
-                if ( !p->unhelpful() &&
-                    !( _recordedPlanPolicy == UseIfInOrder && p->scanAndOrderRequired() ) ) {
-                    _qps.setCachedPlan( p, best );
-                    warnOnCappedIdTableScan();
-                    return;
-                }
-            }
-        }
-        
-        addFallbackPlans();
+        addStandardPlans( d );
         warnOnCappedIdTableScan();
     }
     
@@ -584,8 +505,116 @@ doneCheckOrder:
         _qps.addCandidatePlan( newPlan( d, -1 ) );
     }
     
-    shared_ptr<QueryPlan> QueryPlanGenerator::newPlan( NamespaceDetails *d, int idxNo,
-                                                      const BSONObj &min, const BSONObj &max,
+    bool QueryPlanGenerator::addShortCircuitPlan( const char *ns, NamespaceDetails *d ) {
+        if ( !d ||
+            !_qps.frsp().matchPossible() ) {
+            setSingleUnindexedPlan( d );
+            return true;
+        }
+        
+        if ( addHintPlan( ns, d ) ) {
+            return true;
+        }
+        
+        if ( addSpecialPlan( d ) ) {
+            return true;
+        }
+        
+        // If table scan is optimal or natural order requested.
+        if ( ( _qps.frsp().noNonUniversalRanges() && _qps.order().isEmpty() ) ||
+            ( !_qps.order().isEmpty() &&
+             str::equals( _qps.order().firstElementFieldName(), "$natural" ) ) ) {
+            setSingleUnindexedPlan( d );
+            return true;
+        }
+        
+        return false;
+    }
+    
+    bool QueryPlanGenerator::addHintPlan( const char *ns, NamespaceDetails *d ) {
+        BSONElement hint = _hint.firstElement();
+        if ( !hint.eoo() ) {
+            IndexDetails *id = parseHint( hint, d );
+            if ( id ) {
+                setHintedPlan( *id );
+            }
+            else {
+                uassert( 10366, "natural order cannot be specified with $min/$max",
+                        _min.isEmpty() && _max.isEmpty() );
+                setSingleUnindexedPlan( d );
+            }
+            return true;
+        }
+        
+        if ( !_min.isEmpty() || !_max.isEmpty() ) {
+            string errmsg;
+            BSONObj keyPattern;
+            IndexDetails *idx = indexDetailsForRange( ns, errmsg, _min, _max, keyPattern );
+            uassert( 10367 ,  errmsg, idx );
+            _qps.setSinglePlan( newPlan( d, d->idxNo( *idx ), _min, _max ) );
+            return true;
+        }
+        
+        return false;
+    }
+    
+    bool QueryPlanGenerator::addSpecialPlan( NamespaceDetails *d ) {
+        DEBUGQO( "\t special : " << _qps.frsp().getSpecial() );
+        if ( _qps.frsp().getSpecial().size() ) {
+            string special = _qps.frsp().getSpecial();
+            NamespaceDetails::IndexIterator i = d->ii();
+            while( i.more() ) {
+                int j = i.pos();
+                IndexDetails& ii = i.next();
+                const IndexSpec& spec = ii.getSpec();
+                if ( spec.getTypeName() == special &&
+                    spec.suitability( _qps.originalQuery(), _qps.order() ) ) {
+                    _qps.setSinglePlan( newPlan( d, j, BSONObj(), BSONObj(), special ) );
+                    return true;
+                }
+            }
+            uassert( 13038, (string)"can't find special index: " + special +
+                    " for: " + _qps.originalQuery().toString(), false );
+        }
+        return false;
+    }
+    
+    void QueryPlanGenerator::addStandardPlans( NamespaceDetails *d ) {
+        if ( _recordedPlanPolicy != Ignore ) {
+            CachedQueryPlan best = QueryUtilIndexed::bestIndexForPatterns( _qps.frsp(),
+                                                                          _qps.order() );
+            BSONObj bestIndex = best.indexKey();
+            if ( !bestIndex.isEmpty() ) {
+                shared_ptr<QueryPlan> p;
+                if ( str::equals( bestIndex.firstElementFieldName(), "$natural" ) ) {
+                    p = newPlan( d, -1 );
+                }
+                
+                NamespaceDetails::IndexIterator i = d->ii();
+                while( i.more() ) {
+                    int j = i.pos();
+                    IndexDetails& ii = i.next();
+                    if( ii.keyPattern().woCompare(bestIndex) == 0 ) {
+                        p = newPlan( d, j );
+                    }
+                }
+                
+                massert( 10368 ,  "Unable to locate previously recorded index", p.get() );
+                if ( !p->unhelpful() &&
+                    !( _recordedPlanPolicy == UseIfInOrder && p->scanAndOrderRequired() ) ) {
+                    _qps.setCachedPlan( p, best );
+                    return;
+                }
+            }
+        }
+        
+        addFallbackPlans();
+    }
+
+    shared_ptr<QueryPlan> QueryPlanGenerator::newPlan( NamespaceDetails *d,
+                                                      int idxNo,
+                                                      const BSONObj &min,
+                                                      const BSONObj &max,
                                                       const string &special ) const {
         shared_ptr<QueryPlan> ret( new QueryPlan( d, idxNo, _qps.frsp(), _originalFrsp.get(),
                                                  _qps.originalQuery(), _qps.order(), _parsedQuery,
