@@ -352,8 +352,8 @@ __rec_review(WT_SESSION_IMPL *session,
 				WT_RET(__rec_review(
 				    session, ref, ref->page, flags, 0));
 				break;
+			case WT_REF_EVICT_FORCE:	/* Forced eviction */
 			case WT_REF_EVICT_WALK:		/* Walk point */
-			case WT_REF_EVICTING:		/* Being evaluated */
 			case WT_REF_LOCKED:		/* Being evicted */
 			case WT_REF_READING:		/* Being read */
 				return (EBUSY);
@@ -479,14 +479,13 @@ __hazard_exclusive(WT_SESSION_IMPL *session, WT_REF *ref, int top)
 	 * Hazard references are acquired down the tree, which means we can't
 	 * deadlock.
 	 *
-	 * Request exclusive access to the page.  It may be either in the
-	 * evicting state (if this is the top-level page for this eviction
-	 * operation), or a child page in memory.  If another thread already
-	 * has this page, give up.
+	 * Request exclusive access to the page.  The top-level page should
+	 * already be in the locked state, lock child pages in memory.
+	 * If another thread already has this page, give up.
 	 */
-	if (!WT_ATOMIC_CAS(ref->state, WT_REF_MEM, WT_REF_LOCKED) && (!top ||
-	    !WT_ATOMIC_CAS(ref->state, WT_REF_EVICTING, WT_REF_LOCKED)))
+	if (!top && !WT_ATOMIC_CAS(ref->state, WT_REF_MEM, WT_REF_LOCKED))
 		return (EBUSY);	/* We couldn't change the state. */
+	WT_ASSERT(session, ref->state == WT_REF_LOCKED);
 
 	session->excl[session->excl_next++] = ref;
 

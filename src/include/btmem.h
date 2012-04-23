@@ -335,12 +335,12 @@ struct __wt_ref {
 	 *
 	 * WT_REF_DISK:
 	 *	The initial setting before a page is brought into memory, and
-	 * set as a result of page eviction; the page is on disk, and must be
-	 * read into into memory before use.
+	 *	set as a result of page eviction; the page is on disk, and must
+	 *	be read into into memory before use.
 	 *
-	 * WT_REF_EVICTING:
-	 *	Set by eviction when a page is about to be locked; prevents a
-	 *	page from being evicted multiple times concurrently.
+	 * WT_REF_EVICT_FORCE:
+	 *	Set by eviction when a page is awaiting forced eviction;
+	 *	prevents a page from being evicted multiple times concurrently.
 	 *
 	 * WT_REF_EVICT_WALK:
 	 *	The next page to be walked for LRU eviction.  This page is
@@ -381,7 +381,7 @@ struct __wt_ref {
 	 */
 	volatile enum {
 		WT_REF_DISK=0,		/* Page is on disk */
-		WT_REF_EVICTING,	/* Page being evaluated for eviction */
+		WT_REF_EVICT_FORCE,	/* Page is awaiting force eviction */
 		WT_REF_EVICT_WALK,	/* Next page for LRU eviction */
 		WT_REF_LOCKED,		/* Page being evicted */
 		WT_REF_MEM,		/* Page is in cache and valid */
