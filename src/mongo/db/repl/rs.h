@@ -449,7 +449,6 @@ namespace mongo {
         void loadConfig();
 
         list<HostAndPort> memberHostnames() const;
-        const ReplSetConfig::MemberCfg& myConfig() const { return _config; }
         bool iAmArbiterOnly() const { return myConfig().arbiterOnly; }
         bool iAmPotentiallyHot() const {
           return myConfig().potentiallyHot() && // not an arbiter
@@ -497,7 +496,6 @@ namespace mongo {
         void _syncDoInitialSync();
         void syncDoInitialSync();
         void _syncThread();
-        bool tryToGoLiveAsASecondary(OpTime&); // readlocks
         void syncTail();
         unsigned _syncRollback(OplogReader& r);
         void syncFixUp(HowToFixUp& h, OplogReader& r);
@@ -505,6 +503,8 @@ namespace mongo {
         // keep a list of hosts that we've tried recently that didn't work
         map<string,time_t> _veto;
     public:
+        const ReplSetConfig::MemberCfg& myConfig() const { return _config; }
+        bool tryToGoLiveAsASecondary(OpTime&); // readlocks
         void syncRollback(OplogReader& r);
         void syncThread();
         const OpTime lastOtherOpTime() const;
@@ -512,6 +512,7 @@ namespace mongo {
 
     class ReplSet : public ReplSetImpl {
     public:
+        virtual ~ReplSet() {}
         ReplSet(ReplSetCmdline& replSetCmdline) : ReplSetImpl(replSetCmdline) {  }
 
         // for the replSetStepDown command
@@ -532,11 +533,11 @@ namespace mongo {
         void shutdown();
 
         void fatal() { _fatal(); }
-        bool isPrimary() { return box.getState().primary(); }
-        bool isSecondary() {  return box.getState().secondary(); }
+        virtual bool isPrimary() { return box.getState().primary(); }
+        virtual bool isSecondary() {  return box.getState().secondary(); }
         MemberState state() const { return ReplSetImpl::state(); }
         string name() const { return ReplSetImpl::name(); }
-        const ReplSetConfig& config() { return ReplSetImpl::config(); }
+        virtual const ReplSetConfig& config() { return ReplSetImpl::config(); }
         void getOplogDiagsAsHtml(unsigned server_id, stringstream& ss) const { _getOplogDiagsAsHtml(server_id,ss); }
         void summarizeAsHtml(stringstream& ss) const { _summarizeAsHtml(ss); }
         void summarizeStatus(BSONObjBuilder& b) const  { _summarizeStatus(b); }

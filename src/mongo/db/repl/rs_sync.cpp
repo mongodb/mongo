@@ -26,11 +26,19 @@ namespace mongo {
     using namespace bson;
     extern unsigned replSetForceInitialSyncFailure;
 
-    replset::SyncTail::SyncTail(const string& hostname) : Sync(hostname) {}
+    replset::SyncTail::SyncTail(BackgroundSyncInterface *q) : Sync(""), _queue(q) {}
 
     replset::SyncTail::~SyncTail() {}
 
-    replset::InitialSync::InitialSync() : SyncTail("") {}
+    BSONObj* replset::SyncTail::peek() {
+        return _queue->peek();
+    }
+
+    void replset::SyncTail::consume() {
+        _queue->consume();
+    }
+
+    replset::InitialSync::InitialSync(BackgroundSyncInterface *q) : SyncTail(q) {}
 
     replset::InitialSync::~InitialSync() {}
 
@@ -86,7 +94,7 @@ namespace mongo {
         int fails = 0;
         while( ts < minValid ) {
             try {
-                BSONObj* o = replset::BackgroundSync::get()->peek();
+                BSONObj* o = peek();
 
                 if (!o) {
                     OCCASIONALLY log() << "replSet initial sync oplog: no more records" << endl;
@@ -103,7 +111,7 @@ namespace mongo {
 
                 ts = (*o)["ts"]._opTime();
                 applyOp(*o);
-                replset::BackgroundSync::get()->consume();
+                consume();
 
                 if ( ++n % 1000 == 0 ) {
                     time_t now = time(0);
@@ -197,7 +205,7 @@ namespace mongo {
     }
 
     /* tail an oplog.  ok to return, will be re-called. */
-    void ReplSetImpl::syncTail() {
+    void replset::SyncTail::oplogApplication() {
         while( 1 ) {
             verify( !Lock::isLocked() );
             {
@@ -207,23 +215,24 @@ namespace mongo {
                 while( 1 ) {
                     // occasionally check some things
                     if (count-- <= 0 || time(0) % 10 == 0) {
-                        if (state().primary()) {
+                        if (theReplSet->isPrimary()) {
                             return;
                         }
 
                         // can we become secondary?
                         // we have to check this before calling mgr, as we must be a secondary to
                         // become primary
-                        if (!state().secondary()) {
+                        if (!theReplSet->isSecondary()) {
                             OpTime minvalid;
-                            tryToGoLiveAsASecondary(minvalid);
+                            theReplSet->tryToGoLiveAsASecondary(minvalid);
                         }
 
                         // normally msgCheckNewState gets called periodically, but in a single node repl set
                         // there are no heartbeat threads, so we do it here to be sure.  this is relevant if the
                         // singleton member has done a stepDown() and needs to come back up.
-                        if (_members.head() == 0 && iAmPotentiallyHot()) {
-                            mgr->send( boost::bind(&Manager::msgCheckNewState, theReplSet->mgr) );
+                        if (theReplSet->config().members.size() == 1 &&
+                            theReplSet->myConfig().potentiallyHot()) {
+                            theReplSet->mgr->send(boost::bind(&Manager::msgCheckNewState, theReplSet->mgr));
                             sleepsecs(1);
                             return;
                         }
@@ -237,14 +246,14 @@ namespace mongo {
                     }
 
                     {
-                        const BSONObj *next = replset::BackgroundSync::get()->peek();
+                        const BSONObj *next = peek();
 
                         if (next == NULL) {
                             bool golive = false;
 
-                            if (!state().secondary()) {
+                            if (!theReplSet->isSecondary()) {
                                 OpTime minvalid;
-                                golive = tryToGoLiveAsASecondary(minvalid);
+                                golive = theReplSet->tryToGoLiveAsASecondary(minvalid);
                             }
 
                             if (!golive) {
@@ -258,11 +267,11 @@ namespace mongo {
 
                         const BSONObj& o = *next;
 
-                        int sd = myConfig().slaveDelay;
+                        int sd = theReplSet->myConfig().slaveDelay;
 
                         // ignore slaveDelay if the box is still initializing. once
                         // it becomes secondary we can worry about it.
-                        if( sd && box.getState().secondary() ) {
+                        if( sd && theReplSet->isSecondary() ) {
                             const OpTime ts = o["ts"]._opTime();
                             long long a = ts.getSecs();
                             long long b = time(0);
@@ -283,7 +292,7 @@ namespace mongo {
                                         if( time(0) >= waitUntil )
                                             break;
 
-                                        if( myConfig().slaveDelay != sd ) // reconf
+                                        if( theReplSet->myConfig().slaveDelay != sd ) // reconf
                                             break;
                                     }
                                 }
@@ -300,8 +309,8 @@ namespace mongo {
                                 verify( !Lock::isLocked() );
                                 lk.reset( new Lock::GlobalWrite() );
                             }
-                            else if( str::contains(ns, ".$cmd") ) { 
-                                // a command may need a global write lock. so we will conservatively go ahead and grab one here. suboptimal. :-( 
+                            else if( str::contains(ns, ".$cmd") ) {
+                                // a command may need a global write lock. so we will conservatively go ahead and grab one here. suboptimal. :-(
                                 lk.reset();
                                 verify( !Lock::isLocked() );
                                 lk.reset( new Lock::GlobalWrite() );
@@ -319,20 +328,18 @@ namespace mongo {
                             /* if we have become primary, we dont' want to apply things from elsewhere
                                anymore. assumePrimary is in the db lock so we are safe as long as
                                we check after we locked above. */
-                            if( box.getState().primary() ) {
+                            if( theReplSet->isPrimary() ) {
                                 log(0) << "replSet stopping syncTail we are now primary" << rsLog;
                                 return;
                             }
 
-                            // TODO: make this whole method a member of SyncTail (SERVER-4444)
-                            replset::SyncTail tail("");
-                            tail.syncApply(o);
+                            syncApply(o);
                             _logOpObjRS(o);   // with repl sets we write the ops to our oplog too
                             getDur().commitIfNeeded();
 
                             // we don't want the catch to reference next after it's been freed
                             next = NULL;
-                            replset::BackgroundSync::get()->consume();
+                            consume();
                         }
                         catch (DBException& e) {
                             sethbmsg(str::stream() << "syncTail: " << e.toString());
@@ -433,7 +440,8 @@ namespace mongo {
         }
 
         /* we have some data.  continue tailing. */
-        syncTail();
+        replset::SyncTail tail(replset::BackgroundSync::get());
+        tail.oplogApplication();
     }
 
     void ReplSetImpl::syncThread() {
@@ -528,10 +536,10 @@ namespace mongo {
             OCCASIONALLY warning() << "couldn't update slave " << rid << " no entry" << rsLog;
             return;
         }
-        
+
         GhostSlave& slave = *(i->second);
         if (!slave.init) {
-            OCCASIONALLY log() << "couldn't update slave " << rid << " not init" << rsLog;            
+            OCCASIONALLY log() << "couldn't update slave " << rid << " not init" << rsLog;
             return;
         }
 

@@ -18,6 +18,7 @@
 
 #include "mongo/db/oplog.h"
 #include "mongo/db/client.h"
+#include "mongo/db/repl/bgsync.h"
 
 namespace mongo {
 namespace replset {
@@ -26,10 +27,14 @@ namespace replset {
      * "Normal" replica set syncing
      */
     class SyncTail : public Sync {
+        BackgroundSyncInterface* _queue;
     public:
         virtual ~SyncTail();
-        SyncTail(const string& hostname);
+        SyncTail(BackgroundSyncInterface *q);
         virtual bool syncApply(const BSONObj &o);
+        void oplogApplication();
+        BSONObj* peek();
+        void consume();
     };
 
     /**
@@ -38,7 +43,7 @@ namespace replset {
     class InitialSync : public SyncTail {
     public:
         virtual ~InitialSync();
-        InitialSync();
+        InitialSync(BackgroundSyncInterface *q);
         bool oplogApplication(const BSONObj& applyGTEObj, const BSONObj& minValidObj);
         virtual void applyOp(const BSONObj& o);
     };

@@ -172,7 +172,7 @@ namespace mongo {
      * Do the initial sync for this member.
      */
     void ReplSetImpl::_syncDoInitialSync() {
-        replset::InitialSync init;
+        replset::InitialSync init(replset::BackgroundSync::get());
         sethbmsg("initial sync pending",0);
 
         // if this is the first node, it may have already become primary
