@@ -383,6 +383,7 @@ __evict_request_walk(WT_SESSION_IMPL *session)
 	WT_SESSION_IMPL *request_session;
 	WT_CACHE *cache;
 	WT_EVICT_REQ *er, *er_end;
+	WT_PAGE *page;
 	WT_REF *ref;
 	int ret;
 
@@ -411,6 +412,16 @@ __evict_request_walk(WT_SESSION_IMPL *session)
 		 * about to discard; clear it.
 		 */
 		__evict_clr_all(session, 0);
+
+		/* Clear the current eviction point. */
+		page = session->btree->evict_page;
+		while (page != NULL && !WT_PAGE_IS_ROOT(page)) {
+			ref = page->ref;
+			page = page->parent;
+			if (ref->state == WT_REF_EVICT_WALK)
+				ref->state = WT_REF_MEM;
+		}
+		session->btree->evict_page = NULL;
 
 		/*
 		 * Wait for LRU eviction activity to drain.  It is much easier
@@ -484,21 +495,10 @@ static int
 __evict_file(WT_SESSION_IMPL *session, WT_EVICT_REQ *er)
 {
 	WT_PAGE *next_page, *page;
-	WT_REF *ref;
 
 	WT_VERBOSE(session, evictserver,
 	    "file request: %s",
 	   (F_ISSET(er, WT_EVICT_REQ_CLOSE) ? "close" : "sync"));
-
-	/* Clear the current eviction point. */
-	page = session->btree->evict_page;
-	while (page != NULL && !WT_PAGE_IS_ROOT(page)) {
-		ref = page->ref;
-		page = page->parent;
-		if (ref->state == WT_REF_EVICT_WALK)
-			ref->state = WT_REF_MEM;
-	}
-	session->btree->evict_page = NULL;
 
 	/*
 	 * We can't evict the page just returned to us, it marks our place in
