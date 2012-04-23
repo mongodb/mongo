@@ -390,7 +390,7 @@ my_cursor_size(WT_CURSOR_TYPE *ctype, const char *obj, size_t *sizep)
 	(void)ctype;
 	(void)obj;
 
-	*sizep = sizeof (WT_CURSOR);
+	*sizep = sizeof(WT_CURSOR);
 	return (0);
 }
 /*! [WT_CURSOR_TYPE size] */
@@ -636,7 +636,7 @@ int main(void)
 	{
 	/*! [Pack fields into a buffer] */
 	char buf[100];
-	ret = wiredtiger_struct_pack(buf, sizeof (buf), "iSh", 42, "hello", -3);
+	ret = wiredtiger_struct_pack(buf, sizeof(buf), "iSh", 42, "hello", -3);
 	/*! [Pack fields into a buffer] */
  
 	{
@@ -644,7 +644,7 @@ int main(void)
 	int i;
 	char *s;
 	short h;
-	ret = wiredtiger_struct_unpack(buf, sizeof (buf), "iSh", &i, &s, &h);
+	ret = wiredtiger_struct_unpack(buf, sizeof(buf), "iSh", &i, &s, &h);
 	/*! [Unpack fields from a buffer] */
 	}
 	}

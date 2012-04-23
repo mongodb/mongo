@@ -55,7 +55,7 @@ int main(void)
 
 	/*! [packing] */
 	size = wiredtiger_struct_size("iii", 42, 1000, -9);
-	if (size > sizeof (buf)) {
+	if (size > sizeof(buf)) {
 		/* Allocate a bigger buffer. */
 	}
 	wiredtiger_struct_pack(buf, size, "iii", 42, 1000, -9);
