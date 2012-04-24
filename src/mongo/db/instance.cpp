@@ -501,7 +501,7 @@ namespace mongo {
        path - db directory
     */
     /*static*/ void Database::closeDatabase( const char *db, const string& path ) {
-        assertInWriteLock();
+        verify( Lock::isW() );
 
         Client::Context * ctx = cc().getContext();
         verify( ctx );

@@ -54,7 +54,7 @@ namespace mongo {
 
         void erase( const string& ns , const string& path ) {
             SimpleMutex::scoped_lock lk(_m);
-            d.dbMutex.assertWriteLocked();
+            verify( Lock::isW() );
             DBs& m = _paths[path];
             _size -= (int)m.erase( _todb( ns ) );
         }
@@ -101,7 +101,7 @@ namespace mongo {
         return dbHolderUnchecked();
     }
     inline DatabaseHolder& dbHolderW() { 
-        dassert( d.dbMutex.isWriteLocked() );
+        dassert( Lock::isW() );
         return dbHolderUnchecked();
     }
 

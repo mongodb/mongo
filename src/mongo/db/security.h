@@ -19,7 +19,6 @@
 #pragma once
 
 #include "mongo/db/authlevel.h"
-#include "mongo/db/concurrency.h"
 #include "mongo/db/nonce.h"
 #include "mongo/db/security_common.h"
 #include "mongo/util/concurrency/spin_lock.h"

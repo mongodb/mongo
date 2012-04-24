@@ -469,6 +469,9 @@
     <ClCompile Include="..\util\debug_util.cpp" />
     <ClCompile Include="..\util\startup_test.cpp" />
     <ClCompile Include="..\util\stacktrace.cpp" />
+    <ClCompile Include="commands\fsync.cpp">
+      <Filter>db\commands</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\client\distlock.h" />
@@ -815,6 +818,9 @@
     </Filter>
     <Filter Include="db">
       <UniqueIdentifier>{c666c392-87aa-4438-8e2a-e3b31442889f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="db\commands">
+      <UniqueIdentifier>{ecca6cd2-cb88-4e36-9bf4-21ca22bbc3e6}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

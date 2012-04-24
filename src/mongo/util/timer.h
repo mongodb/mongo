@@ -34,6 +34,7 @@ namespace mongo {
     public:
         static const unsigned long long millisPerSecond = 1000;
         static const unsigned long long microsPerSecond = 1000 * millisPerSecond;
+        static const unsigned long long nanosPerSecond = 1000 * microsPerSecond;
 
         Timer() { reset(); }
         int seconds() const { return (int)(micros() / 1000000); }

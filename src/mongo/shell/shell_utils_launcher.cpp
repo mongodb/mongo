@@ -553,7 +553,7 @@ namespace mongo {
             return undefinedReturn;
         }
 
-        inline void kill_wrapper(pid_t pid, int sig, int port) {
+      inline void kill_wrapper( pid_t pid, int sig, int port, const BSONObj& opt ) {
 #ifdef _WIN32
             if (sig == SIGKILL || port == 0) {
                 verify( registry._handles.count(pid) );
@@ -563,6 +563,20 @@ namespace mongo {
                 DBClientConnection conn;
                 try {
                     conn.connect("127.0.0.1:" + BSONObjBuilder::numStr(port));
+
+                    BSONElement authObj = opt["auth"];
+
+                    if ( !authObj.eoo() ){
+                        string errMsg;
+                        conn.auth( "admin", authObj["user"].String(),
+                                   authObj["pwd"].String(), errMsg );
+
+                        if ( !errMsg.empty() ) {
+                            cout << "Failed to authenticate before shutdown: "
+                                 << errMsg << endl;
+                        }
+                    }
+
                     BSONObj info;
                     BSONObjBuilder b;
                     b.append( "shutdown", 1 );
@@ -587,7 +601,7 @@ namespace mongo {
 #endif
         }
 
-        int killDb( int port, pid_t _pid, int signal ) {
+       int killDb( int port, pid_t _pid, int signal, const BSONObj& opt ) {
             pid_t pid;
             int exitCode = 0;
             if ( port > 0 ) {
@@ -601,7 +615,7 @@ namespace mongo {
                 pid = _pid;
             }
 
-            kill_wrapper( pid, signal, port );
+            kill_wrapper( pid, signal, port, opt );
 
             int i = 0;
             for( ; i < 130; ++i ) {
@@ -610,7 +624,7 @@ namespace mongo {
                     time_t_to_String(time(0), now);
                     now[ 20 ] = 0;
                     log() << now << " process on port " << port << ", with pid " << pid << " not terminated, sending sigkill" << endl;
-                    kill_wrapper( pid, SIGKILL, port );
+                    kill_wrapper( pid, SIGKILL, port, opt );
                 }
                 if(wait_for_pid(pid, false, &exitCode))
                     break;
@@ -639,9 +653,14 @@ namespace mongo {
             return exitCode;
         }
 
+       int killDb( int port, pid_t _pid, int signal ) {
+           BSONObj dummyOpt;
+           return killDb( port, _pid, signal, dummyOpt );
+       }
+
         int getSignal( const BSONObj &a ) {
             int ret = SIGTERM;
-            if ( a.nFields() == 2 ) {
+            if ( a.nFields() >= 2 ) {
                 BSONObjIterator i( a );
                 i.next();
                 BSONElement e = i.next();
@@ -651,12 +670,27 @@ namespace mongo {
             return ret;
         }
 
+        BSONObj getStopMongodOpts( const BSONObj &a ) {
+            if ( a.nFields() == 3 ) {
+                BSONObjIterator i( a );
+                i.next();
+                i.next();
+                BSONElement e = i.next();
+
+                if ( e.isABSONObj() ){
+                  return e.embeddedObject();
+                }
+            }
+
+            return BSONObj();
+        }
+
         /** stopMongoProgram(port[, signal]) */
         BSONObj StopMongoProgram( const BSONObj &a, void* data ) {
-            verify( a.nFields() == 1 || a.nFields() == 2 );
+            verify( a.nFields() >= 1 || a.nFields() <= 3 );
             uassert( 15853 , "stopMongo needs a number" , a.firstElement().isNumber() );
             int port = int( a.firstElement().number() );
-            int code = killDb( port, 0, getSignal( a ) );
+            int code = killDb( port, 0, getSignal( a ), getStopMongodOpts( a ));
             log() << "shell: stopped mongo program on port " << port << endl;
             return BSON( "" << (double)code );
         }

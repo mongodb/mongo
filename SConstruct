@@ -781,6 +781,12 @@ def doConfigure(myenv):
                                    l + boostCompiler + boostVersion ], language='C++' ):
                 Exit(1)
 
+    if conf.CheckHeader('unistd.h'):
+        myenv.Append(CPPDEFINES=['MONGO_HAVE_HEADER_UNISTD_H'])
+
+    if solaris or conf.CheckDeclaration('clock_gettime', includes='#include <time.h>'):
+        conf.CheckLib('rt')
+
     if (conf.CheckCXXHeader( "execinfo.h" ) and
         conf.CheckDeclaration('backtrace', includes='#include <execinfo.h>') and
         conf.CheckDeclaration('backtrace_symbols', includes='#include <execinfo.h>')):
@@ -790,7 +796,6 @@ def doConfigure(myenv):
     myenv["_HAVEPCAP"] = conf.CheckLib( ["pcap", "wpcap"], autoadd=False )
 
     if solaris:
-        conf.CheckLib( "rt" )
         conf.CheckLib( "nsl" )
 
     if usev8:

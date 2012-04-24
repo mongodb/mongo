@@ -427,7 +427,23 @@ MongoRunner.runMongos = function( opts ){
     return mongos
 }
 
-MongoRunner.stopMongod = function( port, signal ){
+/**
+ * Kills a mongod process.
+ *
+ * @param {number} port the port of the process to kill
+ * @param {number} signal The signal number to use for killing
+ * @param {Object} opts Additional options. Format:
+ *    {
+ *      auth: {
+ *        user {string}: admin user name
+ *        pwd {string}: admin password
+ *      }
+ *    }
+ *
+ * Note: The auth option is required in a authenticated mongod running in Windows since
+ *  it uses the shutdown command, which requires admin credentials.
+ */
+MongoRunner.stopMongod = function( port, signal, opts ){
     
     if( ! port ) {
         print( "Cannot stop mongo process " + port )
@@ -444,7 +460,7 @@ MongoRunner.stopMongod = function( port, signal ){
         if( opts ) port = parseInt( opts.port )
     }
     
-    var exitCode = stopMongod( parseInt( port ), parseInt( signal ) )
+    var exitCode = stopMongod( parseInt( port ), parseInt( signal ), opts )
     
     delete MongoRunner.usedPortMap[ "" + parseInt( port ) ]
 

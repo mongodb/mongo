@@ -163,7 +163,7 @@ namespace mongo {
         if ( ! args["breakOnTrap"].eoo() )
             this->breakOnTrap = args["breakOnTrap"].trueValue();
 
-        uassert(16151, "loopCommands config not supported", args["loopCommands"].eoo());
+        uassert(16164, "loopCommands config not supported", args["loopCommands"].eoo());
 
         if ( ! args["trapPattern"].eoo() ){
             const char* regex = args["trapPattern"].regex();

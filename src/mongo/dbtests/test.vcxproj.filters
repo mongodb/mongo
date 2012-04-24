@@ -65,6 +65,9 @@
     <Filter Include="Boost">
       <UniqueIdentifier>{d74d5137-4461-45f3-9851-fd5c813b0ff3}</UniqueIdentifier>
     </Filter>
+    <Filter Include="db\commands">
+      <UniqueIdentifier>{5b101eed-4c14-4a1a-864d-70fbaf17aac3}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\boostw\boost_1_34_1\boost\config\auto_link.hpp">
@@ -1069,6 +1072,9 @@
     </ClCompile>
     <ClCompile Include="..\util\stacktrace.cpp">
       <Filter>util\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\commands\fsync.cpp">
+      <Filter>db\commands</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

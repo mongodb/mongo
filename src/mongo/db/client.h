@@ -98,7 +98,7 @@ namespace mongo {
         Context* getContext() const { return _context; }
         Database* database() const {  return _context ? _context->db() : 0; }
         const char *ns() const { return _context->ns(); }
-        const char *desc() const { return _desc; }
+        const std::string desc() const { return _desc; }
         void setLastOp( OpTime op ) { _lastOp = op; }
         OpTime getLastOp() const { return _lastOp; }
 
@@ -135,7 +135,7 @@ namespace mongo {
         CurOp * _curOp;
         Context * _context;
         bool _shutdown; // to track if Client::shutdown() gets called
-        const char * const _desc;
+        const std::string _desc;
         bool _god;
         AuthenticationInfo _ai;
         OpTime _lastOp;
@@ -263,33 +263,6 @@ namespace mongo {
     }
     inline Client::GodScope::~GodScope() { cc()._god = _prev; }
 
-    /* this unreadlocks and then writelocks; i.e. it does NOT upgrade inside the
-       lock (and is thus wrong to use if you need that, which is usually).
-       that said we use it today for a specific case where the usage is correct.
-    */
-#if 0
-    inline void mongolock::releaseAndWriteLock() {
-        if( !_writelock ) {
-
-#if BOOST_VERSION >= 103500
-            int s = d.dbMutex.getState();
-            if( s != -1 ) {
-                log() << "error: releaseAndWriteLock() s == " << s << endl;
-                msgasserted( 12600, "releaseAndWriteLock: unlock_shared failed, probably recursive" );
-            }
-#endif
-
-            _writelock = true;
-            d.dbMutex.unlock_shared();
-            d.dbMutex.lock();
-
-            // todo: unlocked() method says to call it before unlocking, not after.  so fix this here,
-            // or fix the doc there.
-            if ( cc().getContext() )
-                cc().getContext()->unlocked();
-        }
-    }
-#endif
 
     inline bool haveClient() { return currentClient.get() > 0; }
 

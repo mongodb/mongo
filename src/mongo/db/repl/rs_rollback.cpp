@@ -198,7 +198,7 @@ namespace mongo {
         }
         last = time(0);
 
-        verify( d.dbMutex.atLeastReadLocked() );
+        verify( Lock::isLocked() );
         Client::Context c(rsoplog);
         NamespaceDetails *nsd = nsdetails(rsoplog);
         verify(nsd);
@@ -374,8 +374,7 @@ namespace mongo {
         bool warn = false;
 
         verify( !h.commonPointOurDiskloc.isNull() );
-
-        mongo::d.dbMutex.assertWriteLocked();
+        verify( Lock::isW() );
 
         /* we have items we are writing that aren't from a point-in-time.  thus best not to come online
            until we get to that point in freshness. */
@@ -591,7 +590,7 @@ namespace mongo {
 
     unsigned ReplSetImpl::_syncRollback(OplogReader&r) {
         verify( !lockedByMe() );
-        verify( !d.dbMutex.atLeastReadLocked() );
+        verify( !Lock::isLocked() );
 
         sethbmsg("rollback 0");
 

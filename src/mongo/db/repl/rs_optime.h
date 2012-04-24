@@ -24,35 +24,4 @@ namespace mongo {
 
     const char rsoplog[] = "local.oplog.rs";
 
-    /*
-    class RSOpTime : public OpTime {
-    public:
-        bool initiated() const { return getSecs() != 0; }
-    };*/
-
-    /*struct RSOpTime {
-        unsigned long long ord;
-
-        RSOpTime() : ord(0) { }
-
-        bool initiated() const { return ord > 0; }
-
-        void initiate() {
-            verify( !initiated() );
-            ord = 1000000;
-        }
-
-        ReplTime inc() {
-            DEV assertInWriteLock();
-            return ++ord;
-        }
-
-        string toString() const { return str::stream() << ord; }
-
-        // query the oplog and set the highest value herein.  acquires a db read lock. throws.
-        void load();
-    };
-
-    extern RSOpTime rsOpTime;*/
-
 }

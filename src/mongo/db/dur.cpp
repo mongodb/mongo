@@ -456,7 +456,7 @@ namespace mongo {
 
             LOG(4) << "journal REMAPPRIVATEVIEW" << endl;
 
-            d.dbMutex.assertWriteLocked();
+            verify( Lock::isW() );
             verify( !commitJob.hasWritten() );
 
             // we want to remap all private views about every 2 seconds.  there could be ~1000 views so
@@ -535,7 +535,7 @@ namespace mongo {
             unspoolWriteIntents(); // in case we were doing some writing ourself (likely impossible with limitedlocks version)
             AlignedBuilder &ab = __theBuilder;
 
-            verify( !d.dbMutex.atLeastReadLocked() );
+            verify( ! Lock::isLocked() );
 
             // do we need this to be greedy, so that it can start working fairly soon?
             // probably: as this is a read lock, it wouldn't change anything if only reads anyway.
@@ -852,7 +852,7 @@ namespace mongo {
         }
 
         void DurableImpl::syncDataAndTruncateJournal() {
-            d.dbMutex.assertWriteLocked();
+            verify( Lock::isW() );
 
             // a commit from the commit thread won't begin while we are in the write lock,
             // but it may already be in progress and the end of that work is done outside 

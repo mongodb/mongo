@@ -19,7 +19,7 @@
 #include "mmap.h"
 #include "text.h"
 #include "../db/mongommf.h"
-#include "../db/concurrency.h"
+#include "../db/d_concurrency.h"
 #include "../db/memconcept.h"
 #include "mongo/util/timer.h"
 #include "mongo/util/concurrency/remap_lock.h"
@@ -93,7 +93,7 @@ namespace mongo {
                     << " (file size is " << len << ")"
                     << " in MemoryMappedFile::createReadOnlyMap"
                     << endl;
-            fassertFailed( 16150 );
+            fassertFailed( 16165 );
         }
         memconcept::is( readOnlyMapAddress, memconcept::concept::other, filename() );
         views.push_back( readOnlyMapAddress );
@@ -174,7 +174,7 @@ namespace mongo {
                         << " in MemoryMappedFile::map"
                         << endl;
                 close();
-                fassertFailed( 16151 );
+                fassertFailed( 16166 );
             }
         }
         views.push_back(view);
@@ -242,7 +242,7 @@ namespace mongo {
                     << " (file size is " << len << ")"
                     << " in MemoryMappedFile::createPrivateMap"
                     << endl;
-            fassertFailed( 16152 );
+            fassertFailed( 16167 );
         }
         clearWritableBits( privateMapAddress );
         views.push_back( privateMapAddress );
@@ -251,7 +251,7 @@ namespace mongo {
     }
 
     void* MemoryMappedFile::remapPrivateView(void *oldPrivateAddr) {
-        d.dbMutex.assertWriteLocked(); // short window where we are unmapped so must be exclusive
+        verify( Lock::isW() );
 
         RemapLock lk;   // Interlock with PortMessageServer::acceptedMP() to stop thread creation
 
@@ -262,7 +262,7 @@ namespace mongo {
                     << " failed with error " << errnoWithDescription( dosError )
                     << " in MemoryMappedFile::remapPrivateView"
                     << endl;
-            fassertFailed( 16147 );
+            fassertFailed( 16168 );
         }
 
         void* newPrivateView = MapViewOfFileEx(

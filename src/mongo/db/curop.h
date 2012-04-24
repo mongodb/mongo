@@ -278,45 +278,13 @@ namespace mongo {
         /** @return true if global interrupt and should terminate the operation */
         bool globalInterruptCheck() const { return _globalKill; }
 
-        void checkForInterrupt( bool heedMutex = true ) {
-            Client& c = cc();
-            if ( heedMutex && d.dbMutex.isWriteLocked() )
-                return;
-            if( _globalKill )
-                uasserted(11600,"interrupted at shutdown");
-            if( c.curop()->killed() ) {
-                uasserted(11601,"operation was interrupted");
-            }
-            if( c.sometimes(1024) ) {
-                AbstractMessagingPort *p = cc().port();
-                if( p ) 
-                    p->assertStillConnected();
-            }
-        }
+        /**
+         * @param heedMutex if true and have a write lock, won't kill op since it might be unsafe
+         */
+        void checkForInterrupt( bool heedMutex = true );
 
         /** @return "" if not interrupted.  otherwise, you should stop. */
-        const char *checkForInterruptNoAssert( /*bool heedMutex = true*/ ) {
-            Client& c = cc();
-            // always called withi false so commented out:
-            /*if ( heedMutex && d.dbMutex.isWriteLocked() )
-                return "";*/
-            if( _globalKill )
-                return "interrupted at shutdown";
-            if( c.curop()->killed() )
-                return "interrupted";
-            if( c.sometimes(1024) ) {
-                try { 
-                    AbstractMessagingPort *p = cc().port();
-                    if( p ) 
-                        p->assertStillConnected();
-                }
-                catch(...) { 
-                    log() << "no longer connected to client";
-                    return "no longer connected to client";
-                }
-            }
-            return "";
-        }
+        const char *checkForInterruptNoAssert();
 
     private:
         void interruptJs( AtomicUInt *op );
