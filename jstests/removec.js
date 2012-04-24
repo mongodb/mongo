@@ -1,6 +1,6 @@
 // Sanity test for removing documents with adjacent index keys.  SERVER-2008
 
-t = db.jstests_remove10;
+t = db.jstests_removec;
 t.drop();
 t.ensureIndex( { a:1 } );
 
@@ -21,7 +21,7 @@ db.getLastError();
 
 // Remove and then reinsert random documents in the background.
 s = startParallelShell(
-                       't = db.jstests_remove10;' +
+                       't = db.jstests_removec;' +
                        'for( j = 0; j < 1000; ++j ) {' +
                        '    o = t.findOne( { a:Random.randInt( 1100 ) } );' +
                        '    t.remove( { _id:o._id } );' +
@@ -36,3 +36,5 @@ for( i = 0; i < 200; ++i ) {
 }
 
 s();
+
+t.drop();
