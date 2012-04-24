@@ -1153,7 +1153,7 @@ doneCheckOrder:
     }
     
     int MultiPlanScanner::currentNPlans() const {
-        return _currentQps ? _currentQps->nPlans() : 0;
+        return _currentQps->nPlans();
     }
 
     const QueryPlan *MultiPlanScanner::singlePlan() const {
@@ -1210,7 +1210,7 @@ doneCheckOrder:
     string MultiPlanScanner::toString() const {
         return BSON(
                     "or" << _or <<
-                    "currentQps" << ( _currentQps ? _currentQps->toString() : "" )
+                    "currentQps" << _currentQps->toString()
                     ).jsonString();
     }
     
