@@ -416,7 +416,6 @@ __wt_session_snap_list_get(
 			WT_ERR(__wt_config_subgets(session, &v, "time", &a));
 			if (a.len == 0)
 				goto format;
-			WT_ERR(__wt_strndup(session, a.str, a.len, &timebuf));
 			if (a.len > sizeof(timebuf) - 1)
 				goto format;
 			memcpy(timebuf, a.str, a.len);
