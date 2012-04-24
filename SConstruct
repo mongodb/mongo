@@ -625,7 +625,7 @@ elif "win32" == os.sys.platform:
     else:
         env.Append( LINKFLAGS=" /NODEFAULTLIB:MSVCPRT  /NODEFAULTLIB:MSVCRT  " )
 
-    winLibString = "ws2_32.lib kernel32.lib advapi32.lib Psapi.lib"
+    winLibString = "ws2_32.lib kernel32.lib advapi32.lib Psapi.lib DbgHelp.lib"
 
     if force64:
 

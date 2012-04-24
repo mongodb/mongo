@@ -48,6 +48,7 @@
 
 #if defined(_WIN32)
 # include "../util/ntservice.h"
+# include <DbgHelp.h>
 #else
 # include <sys/file.h>
 #endif
@@ -1253,6 +1254,48 @@ namespace mongo {
 
     LPTOP_LEVEL_EXCEPTION_FILTER filtLast = 0;
 
+    /* create a process dump.
+        To use, load up windbg.  Set your symbol and source path.
+        Open the crash dump file.  To see the crashing context, use .ecxr
+        */
+    void doMinidump(struct _EXCEPTION_POINTERS* exceptionInfo) {
+        LPCWSTR dumpFilename = L"mongo.dmp";
+        HANDLE hFile = CreateFileW(dumpFilename,
+            GENERIC_WRITE,
+            0,
+            NULL,
+            CREATE_ALWAYS,
+            FILE_ATTRIBUTE_NORMAL,
+            NULL);
+        if ( INVALID_HANDLE_VALUE == hFile ) {
+            DWORD lasterr = GetLastError();
+            log() << "failed to open minidump file " << dumpFilename << " : " 
+                  << errnoWithDescription( lasterr ) << endl;
+            return;
+        }
+
+        MINIDUMP_EXCEPTION_INFORMATION aMiniDumpInfo;
+        aMiniDumpInfo.ThreadId = GetCurrentThreadId();
+        aMiniDumpInfo.ExceptionPointers = exceptionInfo;
+        aMiniDumpInfo.ClientPointers = TRUE;
+
+        log() << "writing minidump dignostic file " << dumpFilename << endl;
+        BOOL bstatus = MiniDumpWriteDump(GetCurrentProcess(),
+            GetCurrentProcessId(),
+            hFile,
+            MiniDumpNormal,
+            &aMiniDumpInfo,
+            NULL,
+            NULL);
+        if ( FALSE == bstatus ) {
+            DWORD lasterr = GetLastError();
+            log() << "failed to create minidump : " 
+                  << errnoWithDescription( lasterr ) << endl;
+        }
+
+        CloseHandle(hFile);
+    }
+
     LONG WINAPI exceptionFilter( struct _EXCEPTION_POINTERS *excPointers ) {
         char exceptionString[128];
         sprintf_s( exceptionString, sizeof( exceptionString ),
@@ -1284,6 +1327,8 @@ namespace mongo {
                      excPointers->ExceptionRecord->ExceptionInformation[1] );
             log() << "*** access violation was a " << acTypeString << addressString << endl;
         }
+
+        doMinidump(excPointers);
 
         // In release builds, let dbexit() try to shut down cleanly
 #if !defined(_DEBUG)
