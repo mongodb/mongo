@@ -297,7 +297,7 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 		WT_ERR(__wt_session_snap_list_get(session, NULL, &snapbase));
 		WT_ERR(__wt_strdup(
 		    session, WT_INTERNAL_SNAPSHOT, &snapbase[0].name));
-		FLD_SET(snapbase[0].flags, WT_SNAP_ADD);
+		F_SET(snapbase, WT_SNAP_ADD);
 		btree->snap = snapbase;
 		ret = __wt_rec_evict(session, ss->root_page, WT_REC_SINGLE);
 		ss->root_page = NULL;

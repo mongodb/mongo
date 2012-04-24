@@ -412,7 +412,7 @@ __snapshot_process(
 		WT_RET(__snapshot_extlist_fblocks(session, block, &b->alloc));
 		WT_RET(__snapshot_extlist_fblocks(session, block, &b->discard));
 
-		FLD_SET((snap + 1)->flags, WT_SNAP_UPDATE);
+		F_SET(snap + 1, WT_SNAP_UPDATE);
 	}
 
 	/* Update snapshots marked for update. */
