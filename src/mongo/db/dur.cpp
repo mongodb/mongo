@@ -626,26 +626,26 @@ namespace mongo {
             if( !commitJob.hasWritten() ) {
                 // getlasterror request could have came after the data was already committed
                 commitJob.committingNotifyCommitted();
-                return;
             }
+            else {
+                JSectHeader h;
+                PREPLOGBUFFER(h,ab);
 
-            JSectHeader h;
-            PREPLOGBUFFER(h,ab);
+                // todo : write to the journal outside locks, as this write can be slow.
+                //        however, be careful then about remapprivateview as that cannot be done 
+                //        if new writes are then pending in the private maps.
+                WRITETOJOURNAL(h, ab);
 
-            // todo : write to the journal outside locks, as this write can be slow.
-            //        however, be careful then about remapprivateview as that cannot be done 
-            //        if new writes are then pending in the private maps.
-            WRITETOJOURNAL(h, ab);
+                // data is now in the journal, which is sufficient for acknowledging getLastError.
+                // (ok to crash after that)
+                commitJob.committingNotifyCommitted();
 
-            // data is now in the journal, which is sufficient for acknowledging getLastError.
-            // (ok to crash after that)
-            commitJob.committingNotifyCommitted();
+                WRITETODATAFILES(h, ab);
+                debugValidateAllMapsMatch();
 
-            WRITETODATAFILES(h, ab);
-            debugValidateAllMapsMatch();
-
-            commitJob.committingReset();
-            ab.reset();
+                commitJob.committingReset();
+                ab.reset();
+            }
 
             // REMAPPRIVATEVIEW
             //
@@ -790,6 +790,8 @@ namespace mongo {
                             break;
                         sleepmillis(oneThird);
                     }
+                                        
+                    //DEV log() << "privateMapBytes=" << privateMapBytes << endl;
 
                     durThreadGroupCommit();
                 }
