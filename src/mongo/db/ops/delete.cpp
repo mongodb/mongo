@@ -97,15 +97,12 @@ namespace mongo {
             BSONObj key = cc->currKey();
 
             bool match = creal->currentMatches();
-            bool dup = cc->c()->getsetdup(rloc);
 
             if ( ! cc->advance() )
                 justOne = true;
 
             if ( ! match )
                 continue;
-
-            verify( !dup ); // can't be a dup, we deleted it!
 
             if ( !justOne ) {
                 /* NOTE: this is SLOW.  this is not good, noteLocation() was designed to be called across getMore
