@@ -510,6 +510,7 @@
     <ClInclude Include="..\util\mongoutils\hash.h" />
     <ClInclude Include="..\util\sock.h" />
     <ClInclude Include="..\util\stacktrace.h" />
+    <ClInclude Include="..\util\timer.h" />
     <ClInclude Include="..\util\unittest.h" />
     <ClInclude Include="framework.h" />
   </ItemGroup>
@@ -1493,6 +1494,7 @@
     </ClCompile>
     <ClCompile Include="..\util\stringutils.cpp" />
     <ClCompile Include="..\util\text.cpp" />
+    <ClCompile Include="..\util\timer.cpp" />
     <ClCompile Include="..\util\util.cpp" />
     <ClCompile Include="..\s\d_logic.cpp" />
     <ClCompile Include="..\scripting\engine.cpp" />

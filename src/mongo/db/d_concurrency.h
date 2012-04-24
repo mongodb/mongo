@@ -13,7 +13,7 @@
 namespace mongo {
 
     class WrapperForRWLock;
-    struct LockState;
+    class LockState;
 
     class Lock : boost::noncopyable { 
     public:

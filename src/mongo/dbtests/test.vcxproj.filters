@@ -68,6 +68,9 @@
     <Filter Include="db\commands">
       <UniqueIdentifier>{5b101eed-4c14-4a1a-864d-70fbaf17aac3}</UniqueIdentifier>
     </Filter>
+    <Filter Include="util\mongoutils">
+      <UniqueIdentifier>{5bb09aa7-fce3-4573-8682-0bb42a4261a5}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\boostw\boost_1_34_1\boost\config\auto_link.hpp">
@@ -202,9 +205,6 @@
     <ClInclude Include="..\util\hashtab.h">
       <Filter>util\h</Filter>
     </ClInclude>
-    <ClInclude Include="..\db\lasterror.h">
-      <Filter>util\h</Filter>
-    </ClInclude>
     <ClInclude Include="..\util\log.h">
       <Filter>util\h</Filter>
     </ClInclude>
@@ -240,12 +240,6 @@
     </ClInclude>
     <ClInclude Include="..\db\durop.h">
       <Filter>dur</Filter>
-    </ClInclude>
-    <ClInclude Include="..\util\mongoutils\hash.h">
-      <Filter>util\h</Filter>
-    </ClInclude>
-    <ClInclude Include="..\util\checksum.h">
-      <Filter>util</Filter>
     </ClInclude>
     <ClInclude Include="..\bson\bson.h">
       <Filter>bson</Filter>
@@ -362,6 +356,18 @@
       <Filter>db\h</Filter>
     </ClInclude>
     <ClInclude Include="..\util\stacktrace.h">
+      <Filter>util\h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\checksum.h">
+      <Filter>util\h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\mongoutils\hash.h">
+      <Filter>util\mongoutils</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\lasterror.h">
+      <Filter>db\h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\timer.h">
       <Filter>util\h</Filter>
     </ClInclude>
   </ItemGroup>
@@ -734,12 +740,6 @@
     <ClCompile Include="..\db\dbcommands_generic.cpp">
       <Filter>db\cpp</Filter>
     </ClCompile>
-    <ClCompile Include="..\util\alignedbuilder.cpp">
-      <Filter>util</Filter>
-    </ClCompile>
-    <ClCompile Include="..\util\concurrency\synchronization.cpp">
-      <Filter>util</Filter>
-    </ClCompile>
     <ClCompile Include="..\db\dur_commitjob.cpp">
       <Filter>dur</Filter>
     </ClCompile>
@@ -763,9 +763,6 @@
     </ClCompile>
     <ClCompile Include="..\db\dbcommands_admin.cpp">
       <Filter>db\cpp</Filter>
-    </ClCompile>
-    <ClCompile Include="..\util\ramlog.cpp">
-      <Filter>util</Filter>
     </ClCompile>
     <ClCompile Include="..\db\key.cpp">
       <Filter>db\cpp</Filter>
@@ -1061,20 +1058,32 @@
     <ClCompile Include="..\db\namespace_details.cpp">
       <Filter>db\cpp</Filter>
     </ClCompile>
-    <ClCompile Include="..\util\debug_util.cpp">
-      <Filter>util</Filter>
-    </ClCompile>
     <ClCompile Include="..\unittest\unittest.cpp">
       <Filter>db\cpp</Filter>
-    </ClCompile>
-    <ClCompile Include="..\util\startup_test.cpp">
-      <Filter>util</Filter>
     </ClCompile>
     <ClCompile Include="..\util\stacktrace.cpp">
       <Filter>util\cpp</Filter>
     </ClCompile>
     <ClCompile Include="..\db\commands\fsync.cpp">
       <Filter>db\commands</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\timer.cpp">
+      <Filter>util\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\alignedbuilder.cpp">
+      <Filter>util\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\debug_util.cpp">
+      <Filter>util\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\ramlog.cpp">
+      <Filter>util\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\startup_test.cpp">
+      <Filter>util\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\concurrency\synchronization.cpp">
+      <Filter>util\concurrency</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

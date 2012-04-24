@@ -381,6 +381,9 @@
     <ClCompile Include="..\util\stacktrace.cpp">
       <Filter>util\Main</Filter>
     </ClCompile>
+    <ClCompile Include="..\util\timer.cpp">
+      <Filter>util\Main</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="collection.js">
@@ -893,6 +896,9 @@
       <Filter>util\Header</Filter>
     </ClInclude>
     <ClInclude Include="..\targetver.h" />
+    <ClInclude Include="..\util\timer-win32-inl.h">
+      <Filter>util\Header</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="..\db\db.rc">
