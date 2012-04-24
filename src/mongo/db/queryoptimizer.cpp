@@ -1051,8 +1051,10 @@ doneCheckOrder:
                 _or = false;
             }
         }
+
         // if _or == false, don't use or clauses for index selection
         if ( !_or ) {
+            ++_i;
             auto_ptr<FieldRangeSetPair> frsp( new FieldRangeSetPair( _ns.c_str(), _query, true ) );
             updateCurrentQps( new QueryPlanSet( _ns.c_str(), frsp, auto_ptr<FieldRangeSetPair>(),
                                                 _query, order, _parsedQuery, hint,
@@ -1061,7 +1063,9 @@ doneCheckOrder:
         }
         else {
             BSONElement e = _query.getField( "$or" );
-            massert( 13268, "invalid $or spec", e.type() == Array && e.embeddedObject().nFields() > 0 );
+            massert( 13268, "invalid $or spec",
+                    e.type() == Array && e.embeddedObject().nFields() > 0 );
+            handleBeginningOfClause();
         }
     }
 
@@ -1109,26 +1113,19 @@ doneCheckOrder:
     }
 
     shared_ptr<QueryOp> MultiPlanScanner::nextOpSimple() {
-        if ( _i == 0 ) {
-            assertMayRunMore();
-            ++_i;
-        }
         return iterateRunner( *_baseOp );
     }
 
     shared_ptr<QueryOp> MultiPlanScanner::nextOpOr() {
-        if ( _i == 0 ) {
-            return nextOpBeginningClause();
-        }
         shared_ptr<QueryOp> op = iterateRunner( *_baseOp );
         if ( !op->completeWithoutStop() ) {
             return op;   
         }
         handleEndOfClause( op->qp() );
+        _baseOp = op;
         if ( mayRunMore() ) {
             // Finished scanning the clause, but stop hasn't been requested.
             // Start scanning the next clause.
-            _baseOp = op;
             return nextOpBeginningClause();
         }
         return op;

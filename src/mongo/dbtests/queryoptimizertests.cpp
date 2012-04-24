@@ -1279,7 +1279,7 @@ namespace QueryOptimizerTests {
                 {
                     shared_ptr<MultiPlanScanner> mps =
                     makeMps( fromjson( "{$or:[{a:1,b:1}]}" ), BSONObj() );
-                    ASSERT_EQUALS( 0, mps->currentNPlans() );
+                    ASSERT_EQUALS( 3, mps->currentNPlans() );
                     ASSERT( mps->possibleInOrderPlan() );
                     ASSERT( mps->haveInOrderPlan() );
                     ASSERT( !mps->possibleOutOfOrderPlan() );
