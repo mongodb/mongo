@@ -143,14 +143,6 @@ namespace mongo {
         bool got() const { return _got; }
     };
 
-    struct readlocktryassert : public readlocktry {
-        readlocktryassert(int tryms) :
-            readlocktry(tryms) {
-            uassert(13142, "timeout getting readlock", got());
-        }
-    };
-
-
     /** a mutex, but reported in curop() - thus a "high level" (HL) one
         some overhead so we don't use this for everything.  the externalobjsort mutex
         uses this, as it can be held for eons. implementation still needed. */

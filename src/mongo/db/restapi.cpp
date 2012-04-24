@@ -237,7 +237,8 @@ namespace mongo {
 
     void openAdminDb() { 
         {
-            readlocktryassert rl(/*"admin.system.users", */10000);
+            readlocktry rl(/*"admin.system.users", */10000);
+            uassert( 16172 , "couldn't get readlock to open admin db" , rl.got() );
             if( dbHolder().get("admin.system.users",dbpath) )
                 return;
         }
@@ -249,7 +250,8 @@ namespace mongo {
 
     bool RestAdminAccess::haveAdminUsers() const {
         openAdminDb();
-        readlocktryassert rl(/*"admin.system.users", */10000);
+        readlocktry rl(/*"admin.system.users", */10000);
+        uassert( 16173 , "couldn't get read lock to get admin auth credentials" , rl.got() );
         Client::Context cx( "admin.system.users", dbpath, false );
         return ! Helpers::isEmpty("admin.system.users", false);
     }
@@ -257,7 +259,8 @@ namespace mongo {
     BSONObj RestAdminAccess::getAdminUser( const string& username ) const {
         openAdminDb();
         Client::GodScope gs;
-        readlocktryassert rl(/*"admin.system.users", */10000);
+        readlocktry rl(/*"admin.system.users", */10000);
+        uassert( 16174 , "couldn't get read lock to check admin user" , rl.got() );
         Client::Context cx( "admin.system.users" );
         BSONObj user;
         if ( Helpers::findOne( "admin.system.users" , BSON( "user" << username ) , user ) )
