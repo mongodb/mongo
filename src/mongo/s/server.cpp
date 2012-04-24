@@ -473,7 +473,7 @@ void mongo::exitCleanly( ExitCode code ) {
     mongo::dbexit( code );
 }
 
-void mongo::dbexit( ExitCode rc, const char *why, bool tryToGetLock ) {
+void mongo::dbexit( ExitCode rc, const char *why ) {
     dbexitCalled = true;
 #if defined(_WIN32)
     if ( rc == EXIT_WINDOWS_SERVICE_STOP ) {
