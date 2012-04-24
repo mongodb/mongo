@@ -285,27 +285,18 @@ __rec_discard_page(WT_SESSION_IMPL *session, WT_PAGE *page, int single)
 	/* We should never evict the file's current eviction point. */
 	WT_ASSERT(session, session->btree->evict_page != page);
 
-	if (mod != NULL) {
-		/*
-		 * If the page has been modified and was tracking objects,
-		 * discard them.
-		 */
-		__wt_rec_track_discard(session, page);
-
-		/*
-		 * If the page was split and eventually merged into the parent,
-		 * discard the split page.
-		 */
-		if (F_ISSET(mod, WT_PM_REC_MASK) == WT_PM_REC_SPLIT &&
-		    mod->u.split != NULL)
-			__wt_page_out(session, mod->u.split, 0);
-	}
-
-	/* We should never evict the file's current eviction point. */
-	WT_ASSERT(session, session->btree->evict_page != page);
-
+	/* Make sure a page is not in the eviction request list. */
 	if (!single)
 		__wt_evict_clr_page(session, page);
+
+	/*
+	 * If the page was split and eventually merged into the parent, discard
+	 * the split page.
+	 */
+	if (mod != NULL &&
+	    F_ISSET(mod, WT_PM_REC_MASK) == WT_PM_REC_SPLIT &&
+	    mod->u.split != NULL)
+		__wt_page_out(session, mod->u.split, 0);
 
 	/* Discard the page itself. */
 	__wt_page_out(session, page, 0);

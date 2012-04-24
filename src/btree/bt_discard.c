@@ -71,7 +71,13 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	if (!LF_ISSET(WT_PAGE_FREE_IGNORE_DISK))	/* Disk image */
 		__wt_free(session, page->dsk);
 
-	if (page->modify != NULL) {			/* WT_PAGE_MODIFY */
+	/*
+	 * If the page has been modified and was tracking objects, discard the
+	 * associated memory.
+	 */
+	if (page->modify != NULL) {
+		__wt_rec_track_discard(session, page);
+
 		__wt_free(session, page->modify->track);
 		__wt_free(session, page->modify);
 	}
