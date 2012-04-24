@@ -251,7 +251,7 @@ namespace mongo {
         }
 
         static int in_f;
-        void f() { 
+        void f_commitEarlyInRunExclusively() { 
             dassert( in_f == 0 );
             in_f++;
             try { 
@@ -314,7 +314,7 @@ namespace mongo {
                 }
                 else {
                     log(1) << "commitIfNeeded calling runExclusively " << force << endl;
-                    runExclusively(f);
+                    runExclusively(f_commitEarlyInRunExclusively);
                 }
             }
             else { 
