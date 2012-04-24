@@ -517,7 +517,7 @@ __wt_session_snap_list_set(WT_SESSION_IMPL *session, WT_SNAPSHOT *snapbase)
 		    sep, snap->name,
 		    (int)snap->addr.size, (char *)snap->addr.data,
 		    snap->order,
-		    (uintmax_t)snap->sec, snap->nsec, snap->snapshot_size));
+		    snap->sec, snap->nsec, snap->snapshot_size));
 		sep = ",";
 	}
 	WT_ERR(__wt_buf_catfmt(session, buf, ")"));

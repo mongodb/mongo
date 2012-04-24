@@ -49,7 +49,6 @@ WT_SESSION *session;
 int
 main(void)
 {
-	struct L *p;
 	char config[128];
 
 	(void)system("rm -f WiredTiger* __*");
