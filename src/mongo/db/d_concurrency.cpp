@@ -719,6 +719,7 @@ namespace mongo {
         return false;
     }
     void Lock::DBWrite::lockNestable(Nestable db) { 
+        _nested = true;
         LockState& ls = lockState();
         if( ls.nestableCount() ) { 
             if( db != ls.whichNestable() ) { 
@@ -735,6 +736,7 @@ namespace mongo {
         }
     }
     void Lock::DBRead::lockNestable(Nestable db) { 
+        _nested = true;
         LockState& ls = lockState();
         if( ls.nestableCount() ) { 
             // we are nested in our locking of local.  previous lock could be read OR write lock on local.
@@ -837,11 +839,11 @@ namespace mongo {
         }
     }
 
-    Lock::DBWrite::DBWrite( const StringData& ns ) : what(ns.data()) {
+    Lock::DBWrite::DBWrite( const StringData& ns ) : what(ns.data()), _nested(false) {
         lockDB( what );
     }
 
-    Lock::DBRead::DBRead( const StringData& ns )   : what(ns.data()) {
+    Lock::DBRead::DBRead( const StringData& ns )   : what(ns.data()), _nested(false) {
         lockDB( what );
     }
 
@@ -854,10 +856,11 @@ namespace mongo {
 
     void Lock::DBWrite::unlockDB() {
         if( weLocked ) {
-            if ( n(what.c_str()) == Lock::notnestable )
-                lockState().unlockedOther();
-            else
+            if ( _nested )
                 lockState().unlockedNestable();
+            else
+                lockState().unlockedOther();
+    
             weLocked->unlock();
         }
         if( locked_w ) {
@@ -875,10 +878,11 @@ namespace mongo {
     }
     void Lock::DBRead::unlockDB() {
         if( weLocked ) {
-            if( n(what.c_str()) == Lock::notnestable )
-                lockState().unlockedOther();
-            else
+            if( _nested )
                 lockState().unlockedNestable();
+            else
+                lockState().unlockedOther();
+
             weLocked->unlock_shared();
         }
 

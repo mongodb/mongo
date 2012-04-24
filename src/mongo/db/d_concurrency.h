@@ -93,6 +93,7 @@ namespace mongo {
             bool locked_W;
             WrapperForRWLock *weLocked;
             const string what;
+            bool _nested;
             void lockDB(const string& ns);
             void unlockDB();
         protected:
@@ -111,6 +112,7 @@ namespace mongo {
             bool locked_r;
             WrapperForRWLock *weLocked;
             string what;
+            bool _nested;
             void lockDB(const string& ns);
             void unlockDB();
         protected:
