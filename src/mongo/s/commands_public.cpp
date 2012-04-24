@@ -1605,7 +1605,7 @@ namespace mongo {
 
             if ( !ok && !have_errmsg) {
                 anObjBuilder.append("errmsg", errmsg);
-                uassert_nothrow(errmsg.c_str());
+                raiseError(0, errmsg.c_str());
             }
             return true;
         }

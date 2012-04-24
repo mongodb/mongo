@@ -127,10 +127,6 @@ namespace mongo {
         abort();
     }
 
-    void uassert_nothrow(const char *msg) {
-        raiseError(0,msg);
-    }
-
     void uasserted(int msgid , const string &msg) {
         uasserted(msgid, msg.c_str());
     }

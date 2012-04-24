@@ -413,7 +413,7 @@ namespace mongo {
                 }
                 else if ( ! c.getAuthenticationInfo()->isAuthorized(
                                   nsToDatabase( m.singleData()->_data + 4 ) ) ) {
-                    uassert_nothrow("unauthorized");
+                    raiseError(0, "unauthorized");
                 }
                 else if ( op == dbInsert ) {
                     receivedInsert(m, currentOp);

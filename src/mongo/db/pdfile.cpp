@@ -2059,7 +2059,7 @@ namespace mongo {
                     massert( 12583, "unexpected index insertion failure on capped collection", !d->isCapped() );
                     string s = e.toString();
                     s += " : on addIndex/capped - collection and its index will not match";
-                    uassert_nothrow(s.c_str());
+                    raiseError(0, s.c_str());
                     error() << s << endl;
                 }
                 else {

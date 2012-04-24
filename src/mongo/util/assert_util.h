@@ -157,9 +157,6 @@ namespace mongo {
     MONGO_COMPILER_NORETURN void uasserted(int msgid, const char *msg);
     MONGO_COMPILER_NORETURN void uasserted(int msgid , const std::string &msg);
 
-    /** reported via lasterror, but don't throw exception */
-    void uassert_nothrow(const char *msg);
-
     /** msgassert and massert are for errors that are internal but have a well defined error text std::string.
         a stack trace is logged.
     */
