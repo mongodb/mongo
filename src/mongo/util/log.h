@@ -225,8 +225,6 @@ namespace mongo {
     };
     extern Nullstream nullstream;
 
-    class mutex;
-
     class Logstream : public Nullstream {
         static mongo::mutex mutex;
         static int doneSetup;
