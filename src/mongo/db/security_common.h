@@ -19,7 +19,6 @@
 #pragma once
 
 #include "commands.h"
-#include "concurrency.h"
 #include "../util/concurrency/spin_lock.h"
 
 namespace mongo {

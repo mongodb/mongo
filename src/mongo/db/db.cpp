@@ -42,7 +42,7 @@
 #include "restapi.h"
 #include "dbwebserver.h"
 #include "dur.h"
-#include "concurrency.h"
+#include "d_concurrency.h"
 #include "../s/d_writeback.h"
 #include "d_globals.h"
 
