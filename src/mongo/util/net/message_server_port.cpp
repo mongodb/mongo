@@ -88,10 +88,6 @@ namespace mongo {
                 log() << "SocketException handling request, closing client connection: " << e << endl;
                 p->shutdown();
             }
-            catch ( const ClockSkewException & ) {
-                log() << "ClockSkewException - shutting down" << endl;
-                exitCleanly( EXIT_CLOCK_SKEW );
-            }
             catch ( const DBException& e ) { // must be right above std::exception to avoid catching subclasses
                 log() << "DBException handling request, closing client connection: " << e << endl;
                 p->shutdown();

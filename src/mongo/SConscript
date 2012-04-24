@@ -135,8 +135,8 @@ coreServerFiles = [ "util/version.cpp",
                     "db/security_commands.cpp",
                     ]
 
-if "win32" == os.sys.platform:
-    coreServerFiles.append( "util/ntservice.cpp" )
+
+env.StaticLibrary('ntservice', ['util/ntservice.cpp'])
 
 scripting_common_files = [ "scripting/engine.cpp",
                            "scripting/utils.cpp",
@@ -337,9 +337,10 @@ if has_option( 'use-cpu-profiler' ):
 env.StaticLibrary("coreserver", coreServerFiles, LIBDEPS=["mongocommon", "scripting"])
 
 # main db target
-mongod = env.Install( '#/', env.Program( "mongod", mongodOnlyFiles,
-                                         LIBDEPS=["coreserver", "serveronly", "coredb"],
-                                         _LIBDEPS='$_LIBDEPS_OBJS' ) )
+mongod = env.Install(
+    '#/', env.Program( "mongod", mongodOnlyFiles,
+                       LIBDEPS=["coreserver", "serveronly", "coredb", "ntservice"],
+                       _LIBDEPS='$_LIBDEPS_OBJS' ) )
 Default( mongod )
 
 # tools
@@ -361,9 +362,10 @@ env.Install( '#/', [
         ] )
 
 # mongos
-mongos = env.Program( "mongos", shardServerFiles,
-                      LIBDEPS=["coreserver", "coredb", "mongocommon", "coreshard", "dbcmdline"],
-                      _LIBDEPS='$_LIBDEPS_OBJS' )
+mongos = env.Program(
+    "mongos", shardServerFiles,
+    LIBDEPS=["coreserver", "coredb", "mongocommon", "coreshard", "dbcmdline", "ntservice"],
+    _LIBDEPS='$_LIBDEPS_OBJS')
 env.Install( '#/', mongos )
 
 env.Library("clientandshell", "client/clientAndShell.cpp", LIBDEPS=["mongocommon", "coredb", "defaultversion", "gridfs"])

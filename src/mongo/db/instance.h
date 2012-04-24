@@ -133,4 +133,6 @@ namespace mongo {
     void acquirePathLock(bool doingRepair=false); // if doingRepair=true don't consider unclean shutdown an error
     void maybeCreatePidFile();
 
+    void exitCleanly( ExitCode code );
+
 } // namespace mongo
