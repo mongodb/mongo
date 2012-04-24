@@ -360,7 +360,7 @@ void processMessage( Connection& c , Message& m ) {
                 if ( m.operation() == mongo::dbGetMore ) {
                     DbMessage d( m );
                     d.pullInt();
-                    little<long long> &cId = d.pullInt64();
+                    mongo::little<long long> &cId = d.pullInt64();
                     cId = mapCursor[ c ][ cId ];
                 }
                 Message response;

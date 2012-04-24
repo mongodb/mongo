@@ -179,8 +179,7 @@ class LogMessageVoidify {
 
 // Potentially unaligned loads and stores.
 
-#if 1
-//#if defined(__i386__) || defined(__x86_64__) || defined(__powerpc__) || defined(_WIN32)
+#if defined(__i386__) || defined(__x86_64__) || defined(__powerpc__) || defined(_WIN32)
 
 #define UNALIGNED_LOAD16(_p) (*reinterpret_cast<const uint16 *>(_p))
 #define UNALIGNED_LOAD32(_p) (*reinterpret_cast<const uint32 *>(_p))
@@ -243,8 +242,24 @@ inline void UNALIGNED_STORE64(void *p, uint64 v) {
 #define bswap_32(x) OSSwapInt32(x)
 #define bswap_64(x) OSSwapInt64(x)
 
-#else
+#elif defined(__linux__)
 #include <byteswap.h>
+#else
+inline uint16 bswap_16(uint16 x) {
+  return (x << 8) | (x >> 8);
+}
+
+inline uint32 bswap_32(uint32 x) {
+  x = ((x & 0xff00ff00UL) >> 8) | ((x & 0x00ff00ffUL) << 8);
+  return (x >> 16) | (x << 16);
+}
+
+inline uint64 bswap_64(uint64 x) {
+  x = ((x & 0xff00ff00ff00ff00ULL) >> 8) | ((x & 0x00ff00ff00ff00ffULL) << 8);
+  x = ((x & 0xffff0000ffff0000ULL) >> 16) | ((x & 0x0000ffff0000ffffULL) << 16);
+  return (x >> 32) | (x << 32);
+}
+
 #endif
 
 #endif  // WORDS_BIGENDIAN

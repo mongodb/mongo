@@ -1,9 +1,11 @@
 # -*- mode: python -*-
 
-Import("env windows")
+Import("env windows bigEndian")
 
 if not windows:
     env = env.Clone()
     env.Append(CCFLAGS=['-Wno-sign-compare', '-Wno-unused-function'])
+    if bigEndian:
+       env.Append(CPPDEFINES=[ 'WORDS_BIGENDIAN' ])
 
 env.StaticLibrary('snappy', ['snappy.cc', 'snappy-sinksource.cc'])

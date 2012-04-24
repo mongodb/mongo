@@ -247,6 +247,7 @@ windows = False
 freebsd = False
 openbsd = False
 solaris = False
+bigEndian = False # For snappy
 force32 = has_option( "force32" ) 
 force64 = has_option( "force64" )
 if not force64 and not force32 and os.getcwd().endswith( "mongo-64" ):
@@ -507,6 +508,9 @@ elif "sunos5" == os.sys.platform:
      solaris = True
      env.Append( CPPDEFINES=[ "__sunos__" ] )
      env.Append( LIBS=["socket","resolv"] )
+     # Need v9 for atomics when sparc
+     if processor.startswith( "sun4" ):
+        env.Append( CCFLAGS=[ "-mcpu=v9" ] )
 
 elif os.sys.platform.startswith( "freebsd" ):
     nix = True
@@ -814,13 +818,25 @@ def CheckAlignment( context ):
     context.Result( res )
     return res
    
+def CheckBigEndian( context ):
+    context.Message( 'Checking if system is big endian (for snappy) ...' )
+    res = context.TryCompile( """
+          #include "../src/third_party/boost/boost/detail/endian.hpp"
+          #ifdef BOOST_LITTLE_ENDIAN
+          #error "Little Endian"
+          #endif
+          
+""", ".cc" )
+    context.Result( res )
+    return not res
 
 def doConfigure(myenv):
     conf = Configure(myenv, custom_tests = {
         'CheckFetchAndAdd' : CheckFetchAndAdd,
         'CheckAlignment' : CheckAlignment,
         'CheckSwap32' : CheckSwap32,
-        'CheckSwap64' : CheckSwap64
+        'CheckSwap64' : CheckSwap64,
+        'CheckBigEndian' : CheckBigEndian,
         })
 
     if 'CheckCXX' in dir( conf ):
@@ -880,6 +896,8 @@ def doConfigure(myenv):
         env.Append( CPPDEFINES = ["HAVE_BSWAP32"] )
     if conf.CheckSwap64():
         env.Append( CPPDEFINES = ["HAVE_BSWAP64"] )
+    bigEndian = conf.CheckBigEndian()
+        
        
     # 'tcmalloc' needs to be the last library linked. Please, add new libraries before this 
     # point.
@@ -1133,6 +1151,7 @@ Export("has_option use_system_version_of_library")
 Export("installSetup")
 Export("usesm usev8")
 Export("darwin windows solaris linux nix freebsd")
+Export("bigEndian")
 
 env.SConscript( 'src/SConscript', variant_dir='$BUILD_DIR', duplicate=False )
 env.SConscript( 'src/SConscript.client', variant_dir='$BUILD_DIR/client_build', duplicate=False )
