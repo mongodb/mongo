@@ -17,7 +17,7 @@
 
 #pragma once
 
-#include "../bson/oid.h"
+#include "mongo/bson/oid.h"
 
 namespace mongo {
     class BSONObjBuilder;
@@ -147,6 +147,6 @@ namespace mongo {
         };
     } lastError;
 
-    void raiseError(int code , const char *msg);
+    void setLastError(int code , const char *msg);
 
 } // namespace mongo

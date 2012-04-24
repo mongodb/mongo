@@ -25,6 +25,7 @@ using namespace std;
 #endif
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/lasterror.h"
 #include "mongo/util/util.h"
 
 namespace mongo {
@@ -74,7 +75,6 @@ namespace mongo {
     }
 
     string getDbContext();
-    void raiseError(int code , const char *msg);
 
     /* "warning" assert -- safe to continue, so we don't throw exception. */
     NOINLINE_DECL void wasserted(const char *msg, const char *file, unsigned line) {
@@ -93,7 +93,7 @@ namespace mongo {
 
         problem() << "warning assertion failure " << msg << ' ' << file << ' ' << dec << line << endl;
         sayDbContext();
-        raiseError(0,msg && *msg ? msg : "wassertion failure");
+        setLastError(0,msg && *msg ? msg : "wassertion failure");
         assertionCount.condrollover( ++assertionCount.warning );
 #if defined(_DEBUG) || defined(_DURABLEDEFAULTON) || defined(_DURABLEDEFAULTOFF)
         // this is so we notice in buildbot
@@ -106,7 +106,7 @@ namespace mongo {
         assertionCount.condrollover( ++assertionCount.regular );
         problem() << "Assertion failure " << msg << ' ' << file << ' ' << dec << line << endl;
         sayDbContext();
-        raiseError(0,msg && *msg ? msg : "assertion failure");
+        setLastError(0,msg && *msg ? msg : "assertion failure");
         stringstream temp;
         temp << "assertion " << file << ":" << line;
         AssertionException e(temp.str(),0);
@@ -137,7 +137,7 @@ namespace mongo {
     NOINLINE_DECL void uasserted(int msgid, const char *msg) {
         assertionCount.condrollover( ++assertionCount.user );
         LOG(1) << "User Assertion: " << msgid << ":" << msg << endl;
-        raiseError(msgid,msg);
+        setLastError(msgid,msg);
         throw UserException(msgid, msg);
     }
 
@@ -148,7 +148,7 @@ namespace mongo {
     NOINLINE_DECL void msgasserted(int msgid, const char *msg) {
         assertionCount.condrollover( ++assertionCount.warning );
         tlog() << "Assertion: " << msgid << ":" << msg << endl;
-        raiseError(msgid,msg && *msg ? msg : "massert failure");
+        setLastError(msgid,msg && *msg ? msg : "massert failure");
         //breakpoint();
         printStackTrace();
         throw MsgAssertionException(msgid, msg);
@@ -157,7 +157,7 @@ namespace mongo {
     NOINLINE_DECL void msgassertedNoTrace(int msgid, const char *msg) {
         assertionCount.condrollover( ++assertionCount.warning );
         log() << "Assertion: " << msgid << ":" << msg << endl;
-        raiseError(msgid,msg && *msg ? msg : "massert failure");
+        setLastError(msgid,msg && *msg ? msg : "massert failure");
         throw MsgAssertionException(msgid, msg);
     }
 

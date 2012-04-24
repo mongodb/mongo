@@ -46,6 +46,7 @@ _ disallow system* manipulations from the database.
 #include "instance.h"
 #include "replutil.h"
 #include "memconcept.h"
+#include "mongo/db/lasterror.h"
 
 #include <boost/filesystem/operations.hpp>
 
@@ -1894,7 +1895,7 @@ namespace mongo {
             }
 
             verify( le && !saveerrmsg.empty() );
-            raiseError(savecode,saveerrmsg.c_str());
+            setLastError(savecode,saveerrmsg.c_str());
             throw;
         }
     }
@@ -2059,7 +2060,7 @@ namespace mongo {
                     massert( 12583, "unexpected index insertion failure on capped collection", !d->isCapped() );
                     string s = e.toString();
                     s += " : on addIndex/capped - collection and its index will not match";
-                    raiseError(0, s.c_str());
+                    setLastError(0, s.c_str());
                     error() << s << endl;
                 }
                 else {

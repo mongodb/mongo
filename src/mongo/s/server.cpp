@@ -42,6 +42,7 @@
 #include "../util/processinfo.h"
 #include "mongo/util/util.h"
 #include "mongo/util/concurrency/remap_lock.h"
+#include "mongo/db/lasterror.h"
 
 #if defined(_WIN32)
 # include "../util/ntservice.h"
