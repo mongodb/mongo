@@ -1048,7 +1048,7 @@ doneCheckOrder:
                 _or = false;
             }
             else if ( haveUselessOr() ) {
-                _or = false;   
+                _or = false;
             }
         }
         // if _or == false, don't use or clauses for index selection
@@ -1165,7 +1165,7 @@ doneCheckOrder:
     }
     
     int MultiPlanScanner::currentNPlans() const {
-        return _currentQps.get() ? _currentQps->nPlans() : 0;
+        return _currentQps ? _currentQps->nPlans() : 0;
     }
 
     const QueryPlan *MultiPlanScanner::singlePlan() const {
@@ -1222,7 +1222,7 @@ doneCheckOrder:
     string MultiPlanScanner::toString() const {
         return BSON(
                     "or" << _or <<
-                    "currentQps" << ( _currentQps.get() ? _currentQps->toString() : "" )
+                    "currentQps" << ( _currentQps ? _currentQps->toString() : "" )
                     ).jsonString();
     }
     

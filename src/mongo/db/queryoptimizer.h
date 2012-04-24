@@ -589,7 +589,7 @@ namespace mongo {
         BSONObj _query;
         shared_ptr<const ParsedQuery> _parsedQuery;
         scoped_ptr<OrRangeGenerator> _org; // May be null in certain non $or query cases.
-        auto_ptr<QueryPlanSet> _currentQps;
+        scoped_ptr<QueryPlanSet> _currentQps;
         int _i;
         QueryPlanGenerator::RecordedPlanPolicy _recordedPlanPolicy;
         BSONObj _hint;
