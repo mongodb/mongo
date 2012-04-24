@@ -116,7 +116,7 @@ __snapshot_worker(
 {
 	WT_SNAPSHOT *match, *snapbase, *snap;
 	WT_BTREE *btree;
-	int ret;
+	int force, ret;
 
 	btree = session->btree;
 	match = snapbase = NULL;
@@ -126,9 +126,11 @@ __snapshot_worker(
 	__wt_writelock(session, btree->snaplock);
 
 	/* Set the name to the default, if we aren't provided one. */
-	if (name == NULL)
+	if (name == NULL) {
+		force = 0;
 		name = WT_INTERNAL_SNAPSHOT;
-	else {
+	} else {
+		force = 1;
 		/*
 		 * If it's a named snapshot and there's nothing dirty, we won't
 		 * write any pages: mark the root page dirty to ensure a write.
@@ -249,7 +251,11 @@ nomatch:		WT_ERR_MSG(session,
 	WT_ASSERT(session, !discard || btree->root_page == NULL);
 
 	/* If there was a snapshot, update the schema table. */
-	if (snap->raw.data != NULL)
+	if (snap->raw.data == NULL) {
+		if (force)
+			WT_ERR_MSG(session,
+			    EINVAL, "cache flush failed to create a snapshot");
+	} else
 		WT_ERR(__wt_session_snap_list_set(session, snapbase));
 
 err:	__wt_session_snap_list_free(session, snapbase);
