@@ -147,7 +147,7 @@ namespace mongo {
         virtual void appendPrefix( std::stringstream& ss ) const;
     };
 
-    MONGO_COMPILER_NORETURN void asserted(const char *msg, const char *file, unsigned line);
+    MONGO_COMPILER_NORETURN void verifyFailed(const char *msg, const char *file, unsigned line);
     void wasserted(const char *msg, const char *file, unsigned line);
     MONGO_COMPILER_NORETURN void fassertFailed( int msgid );
     
@@ -191,7 +191,7 @@ namespace mongo {
     */
 #define MONGO_massert(msgid, msg, expr) (void)( MONGO_likely(!!(expr)) || (mongo::msgasserted(msgid, msg), 0) )
     /* same as massert except no msgid */
-#define MONGO_verify(_Expression) (void)( MONGO_likely(!!(_Expression)) || (mongo::asserted(#_Expression, __FILE__, __LINE__), 0) )
+#define MONGO_verify(_Expression) (void)( MONGO_likely(!!(_Expression)) || (mongo::verifyFailed(#_Expression, __FILE__, __LINE__), 0) )
 
     /* dassert is 'debug assert' -- might want to turn off for production as these
        could be slow.
