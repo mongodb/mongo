@@ -104,3 +104,5 @@ print("pass " + pass++);
 t.drop();
 db._dbCommand( { create:"jstests_capped8", capped: true, $nExtents: [ 10000 ] } );
 testTruncate();
+
+t.drop();
