@@ -19,7 +19,7 @@
 #include "mmap.h"
 #include "text.h"
 #include "../db/mongommf.h"
-#include "../db/concurrency.h"
+#include "../db/d_concurrency.h"
 #include "../db/memconcept.h"
 #include "mongo/util/timer.h"
 #include "mongo/util/concurrency/remap_lock.h"
