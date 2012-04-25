@@ -246,7 +246,7 @@ extern int __wt_debug_page(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     const char *ofile);
 extern void __wt_page_out(WT_SESSION_IMPL *session,
-    WT_PAGE *page,
+    WT_PAGE **pagep,
     uint32_t flags);
 extern void __wt_evict_clr_page(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern void __wt_evict_server_wake(WT_SESSION_IMPL *session);

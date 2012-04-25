@@ -324,9 +324,9 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session)
 	return (0);
 
 err:	if (leaf != NULL)
-		__wt_page_out(session, leaf, 0);
+		__wt_page_out(session, &leaf, 0);
 	if (root != NULL)
-		__wt_page_out(session, root, 0);
+		__wt_page_out(session, &root, 0);
 	return (ret);
 }
 

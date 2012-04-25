@@ -320,7 +320,7 @@ err:	WT_TRET(__wt_bm_salvage_end(session));
 
 	/* Discard any root page we created. */
 	if (ss->root_page != NULL)
-		__wt_page_out(session, ss->root_page, 0);
+		__wt_page_out(session, &ss->root_page, 0);
 
 	/* Discard any snapshot information we allocated. */
 	__wt_session_snap_list_free(session, snapbase);
@@ -586,7 +586,7 @@ __slvg_trk_leaf(WT_SESSION_IMPL *session, WT_PAGE_HEADER *dsk,
 err:		__wt_free(session, trk);
 	}
 	if (page != NULL)
-		__wt_page_out(session, page, WT_PAGE_FREE_IGNORE_DISK);
+		__wt_page_out(session, &page, WT_PAGE_FREE_IGNORE_DISK);
 	return (ret);
 }
 
@@ -1131,7 +1131,7 @@ __slvg_col_build_internal(
 	ss->root_page = page;
 
 	if (0) {
-err:		__wt_page_out(session, page, 0);
+err:		__wt_page_out(session, &page, 0);
 	}
 	return (ret);
 }
@@ -1645,7 +1645,7 @@ __slvg_row_trk_update_start(
 		    sizeof(WT_TRACK *), __slvg_trk_compare_key);
 
 	if (page != NULL)
-		__wt_page_out(session, page, WT_PAGE_FREE_IGNORE_DISK);
+		__wt_page_out(session, &page, WT_PAGE_FREE_IGNORE_DISK);
 
 err:	__wt_scr_free(&dsk);
 	__wt_scr_free(&key);
@@ -1721,7 +1721,7 @@ __slvg_row_build_internal(
 	ss->root_page = page;
 
 	if (0) {
-err:		__wt_page_out(session, page, 0);
+err:		__wt_page_out(session, &page, 0);
 	}
 	return (ret);
 }
