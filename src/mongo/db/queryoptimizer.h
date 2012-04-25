@@ -490,7 +490,7 @@ namespace mongo {
         bool doneOps() const { return _doneOps; }
 
         /**
-         * Advance to the next $or clause; mayRunMore() must be true.
+         * Advance to the next $or clause; hasMoreClauses() must be true.
          * @param currentPlan QueryPlan of the current $or clause
          * @return best guess query plan of the next $or clause, 0 if there is no such plan.
          */
@@ -529,8 +529,8 @@ namespace mongo {
          */
         const QueryPlan *singlePlan() const;
         
-        /** @return true iff more $or clauses need to be scanned. */
-        bool mayRunMore() const {
+        /** @return true if more $or clauses need to be scanned. */
+        bool hasMoreClauses() const {
             return _or ? ( !_tableScanned && !_org->orRangesExhausted() ) : _i == 0;
         }
         /**
@@ -573,8 +573,8 @@ namespace mongo {
         void assertNotOr() const {
             massert( 13266, "not implemented for $or query", !_or );
         }
-        void assertMayRunMore() const {
-            massert( 13271, "can't run more ops", mayRunMore() );
+        void assertHasMoreClauses() const {
+            massert( 13271, "no more clauses", hasMoreClauses() );
         }
         
         void handleEndOfClause( const QueryPlan &clausePlan );

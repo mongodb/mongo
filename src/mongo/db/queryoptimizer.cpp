@@ -1079,7 +1079,7 @@ doneCheckOrder:
     }
     
     void MultiPlanScanner::handleBeginningOfClause() {
-        assertMayRunMore();
+        assertHasMoreClauses();
         ++_i;
         auto_ptr<FieldRangeSetPair> frsp( _org->topFrsp() );
         auto_ptr<FieldRangeSetPair> originalFrsp( _org->topFrspOriginal() );
@@ -1089,7 +1089,7 @@ doneCheckOrder:
     }
 
     bool MultiPlanScanner::mayHandleBeginningOfClause() {
-        if ( mayRunMore() ) {
+        if ( hasMoreClauses() ) {
             handleBeginningOfClause();
             return true;
         }
@@ -1123,9 +1123,9 @@ doneCheckOrder:
     }
     
     const QueryPlan *MultiPlanScanner::nextClauseBestGuessPlan( const QueryPlan &currentPlan ) {
-        assertMayRunMore();
+        assertHasMoreClauses();
         handleEndOfClause( currentPlan );
-        if ( !mayRunMore() ) {
+        if ( !hasMoreClauses() ) {
             return 0;
         }
         handleBeginningOfClause();
@@ -1234,7 +1234,7 @@ doneCheckOrder:
     
     bool MultiCursor::advance() {
         _c->advance();
-        while( !ok() && _mps->mayRunMore() ) {
+        while( !ok() && _mps->hasMoreClauses() ) {
             nextClause();
         }
         return ok();
