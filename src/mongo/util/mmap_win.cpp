@@ -253,6 +253,8 @@ namespace mongo {
     void* MemoryMappedFile::remapPrivateView(void *oldPrivateAddr) {
         verify( Lock::isW() );
 
+        LockMongoFilesExclusive lockMongoFiles;
+
         RemapLock lk;   // Interlock with PortMessageServer::acceptedMP() to stop thread creation
 
         clearWritableBits(oldPrivateAddr);
