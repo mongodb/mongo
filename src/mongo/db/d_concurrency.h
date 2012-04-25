@@ -56,7 +56,7 @@ namespace mongo {
         // i.e. you could grab globalread after globalwrite.
 
         class GlobalWrite : public ScopedLock {
-            const bool stoppedGreed;
+            bool stoppedGreed;
             bool noop;
         protected:
             void tempRelease();
