@@ -1,7 +1,7 @@
 // Test update modifier uassert during initial sync. SERVER-4781
 
 function debug( x ) {
-    if ( 0 ) {
+    if ( debuggingEnabled = false ) {
         printjson( x );
     }
 }
