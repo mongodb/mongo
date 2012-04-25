@@ -57,6 +57,7 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	/* Update the parent and discard the page. */
 	if (page->modify == NULL || !F_ISSET(page->modify, WT_PM_REC_MASK)) {
 		WT_STAT_INCR(conn->stats, cache_evict_unmodified);
+		WT_ASSERT(session, single || page->ref->state == WT_REF_LOCKED);
 
 		if (WT_PAGE_IS_ROOT(page))
 			__rec_root_update(session);
@@ -64,7 +65,6 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 			__rec_page_clean_update(session, page);
 
 		/* Discard the page. */
-		WT_ASSERT(session, single || page->ref->state == WT_REF_LOCKED);
 		WT_RET(__rec_discard_page(session, page, single));
 	} else {
 		WT_STAT_INCR(conn->stats, cache_evict_modified);
