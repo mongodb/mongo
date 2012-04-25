@@ -255,6 +255,19 @@ namespace mongo {
     {
     }
 
+    bool LockState::isRW() const { 
+        return _threadState == 'R' || _threadState == 'W'; 
+    }
+
+    bool LockState::isW() const { 
+        return _threadState == 'W'; 
+    }
+
+    bool LockState::hasAnyReadLock() const { 
+        return _threadState == 'r' || _threadState == 'R';
+    }
+
+
     void LockState::locked( char newState ) {
         _threadState = newState;
     }
@@ -700,29 +713,6 @@ namespace mongo {
         }
     }
 
-    bool Lock::DBWrite::isW(LockState& ls) const { 
-        switch( ls.threadState() ) { 
-        case 'R' : 
-            {
-                error() << "trying to get a w lock after already getting an R lock is not allowed" << endl;
-                verify(false);
-            }
-        case 'r' : 
-            {
-                error() << "trying to get a w lock after already getting an r lock is not allowed" << endl;
-                verify(false);
-            }
-            return false;
-        case 'W' :
-            return true; // lock nothing further
-        default:
-            verify(false);
-        case 'w' :
-        case  0  : 
-            break;
-        }
-        return false;
-    }
     void Lock::DBWrite::lockNestable(Nestable db) { 
         _nested = true;
         LockState& ls = lockState();
@@ -796,9 +786,13 @@ namespace mongo {
         _locked_W=false;
         _locked_w=false; 
         _weLocked=0;
+
         LockState& ls = lockState();
-        if( isW(ls) )
+        massert( 16175 , "can't get a DBWrite while having a read lock" , ! ls.hasAnyReadLock() );
+        if( ls.isW() )
             return;
+
+
         if (DB_LEVEL_LOCKING_ENABLED) {
             char db[MaxDatabaseNameLen];
             nsToDatabase(ns.data(), db);
@@ -826,7 +820,7 @@ namespace mongo {
         _locked_r=false; 
         _weLocked=0; 
         LockState& ls = lockState();
-        if( isRW(ls) )
+        if ( ls.isRW() )
             return;
         if (DB_LEVEL_LOCKING_ENABLED) {
             char db[MaxDatabaseNameLen];
@@ -900,22 +894,6 @@ namespace mongo {
         }
         _weLocked = 0;
         _locked_r = false;
-    }
-
-    bool Lock::DBRead::isRW(LockState& ls) const { 
-        switch( ls.threadState() ) { 
-        case 'W' :
-        case 'R' : 
-            return true;
-        case 'r' :
-        case 'w' :
-            return false;
-        default:
-            verify(false);
-        case  0  : 
-            ;
-        }
-        return false;
     }
 
     void Lock::DBWrite::lockTop(LockState& ls) { 

@@ -54,7 +54,7 @@ namespace mongo {
 
         // note that for these classes recursive locking is ok if the recursive locking "makes sense"
         // i.e. you could grab globalread after globalwrite.
-
+        
         class GlobalWrite : public ScopedLock {
             bool stoppedGreed;
             bool noop;
@@ -85,7 +85,6 @@ namespace mongo {
         };
         // lock this database. do not shared_lock globally first, that is handledin herein. 
         class DBWrite : public ScopedLock {
-            bool isW(LockState&) const;
             void lockTop(LockState&);
             void lockNestable(Nestable db);
             void lockOther(const string& db);
@@ -110,7 +109,6 @@ namespace mongo {
         };
         // lock this database for reading. do not shared_lock globally first, that is handledin herein. 
         class DBRead : public ScopedLock {
-            bool isRW(LockState&) const;
             void lockTop(LockState&);
             void lockNestable(Nestable db);
             void lockOther(const string& db);
@@ -178,6 +176,13 @@ namespace mongo {
          */
         char threadState() const { return _threadState; }
         
+        bool isRW() const;
+        bool isW() const;
+        bool hasAnyReadLock() const;
+
+        // ----
+
+
         void locked( char newState ); // RWrw
         void unlocked(); // _threadState = 0
         
