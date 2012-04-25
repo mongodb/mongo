@@ -32,3 +32,5 @@ t.remove( { a:{ $gte:0 } } );
 assert( !db.getLastError(), 'The remove operation failed.' );
 
 p();
+
+t.drop();
