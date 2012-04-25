@@ -156,7 +156,7 @@ ops(void *arg)
 	sync_op = MMRAND(1, g.c_ops);
 	snprintf(sync_name, sizeof(sync_name), "snapshot=thread-%d", tinfo->id);
 
-	for (cnt = 0; cnt < g.c_ops; ++cnt) {
+	for (cnt = 0; cnt < g.c_ops / g.c_threads; ++cnt) {
 		if (SINGLETHREADED && cnt % 100 == 0)
 			track("read/write ops", 0ULL, tinfo);
 
