@@ -64,6 +64,8 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 			WT_ERR(__rec_root_clean_update(session, page, single));
 		else
 			WT_ERR(__rec_page_clean_update(session, page, single));
+		WT_ASSERT(session, single || page->ref->state == WT_REF_LOCKED);
+
 	} else {
 		WT_STAT_INCR(conn->stats, cache_evict_modified);
 
@@ -91,8 +93,6 @@ err:		/*
 static int
 __rec_page_clean_update(WT_SESSION_IMPL *session, WT_PAGE *page, int single)
 {
-	WT_ASSERT(session, single || page->ref->state == WT_REF_LOCKED);
-
 	/* Update the relevant WT_REF structure. */
 	page->ref->page = NULL;
 	WT_PUBLISH(page->ref->state, WT_REF_DISK);
