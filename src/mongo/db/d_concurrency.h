@@ -89,19 +89,24 @@ namespace mongo {
             void lockTop(LockState&);
             void lockNestable(Nestable db);
             void lockOther(const string& db);
-            bool locked_w;
-            bool locked_W;
-            WrapperForRWLock *weLocked;
-            const string what;
-            bool _nested;
             void lockDB(const string& ns);
             void unlockDB();
+
         protected:
             void tempRelease();
             void relock();
+
         public:
             DBWrite(const StringData& dbOrNs);
             virtual ~DBWrite();
+            
+        private:
+            bool _locked_w;
+            bool _locked_W;
+            WrapperForRWLock *_weLocked;
+            const string _what;
+            bool _nested;
+
         };
         // lock this database for reading. do not shared_lock globally first, that is handledin herein. 
         class DBRead : public ScopedLock {
@@ -109,18 +114,23 @@ namespace mongo {
             void lockTop(LockState&);
             void lockNestable(Nestable db);
             void lockOther(const string& db);
-            bool locked_r;
-            WrapperForRWLock *weLocked;
-            string what;
-            bool _nested;
             void lockDB(const string& ns);
             void unlockDB();
+
         protected:
             void tempRelease();
             void relock();
+
         public:
             DBRead(const StringData& dbOrNs);
             virtual ~DBRead();
+
+        private:
+            bool _locked_r;
+            WrapperForRWLock *_weLocked;
+            string _what;
+            bool _nested;
+            
         };
 
     };

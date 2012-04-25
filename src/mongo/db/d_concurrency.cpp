@@ -609,13 +609,13 @@ namespace mongo {
         unlockDB();
     }
     void Lock::DBWrite::relock() { 
-        lockDB(what);
+        lockDB(_what);
     }
     void Lock::DBRead::tempRelease() {
         unlockDB();
     }
     void Lock::DBRead::relock() { 
-        lockDB(what);
+        lockDB(_what);
     }
 
     Lock::GlobalWrite::GlobalWrite(bool sg, int timeoutms) : 
@@ -734,10 +734,10 @@ namespace mongo {
             verify( ls.nestableCount() > 0 );
         }
         else {
-            fassert(16132,weLocked==0);
+            fassert(16132,_weLocked==0);
             ls.lockedNestable(db, 1);
-            weLocked = nestableLocks[db];
-            weLocked->lock();
+            _weLocked = nestableLocks[db];
+            _weLocked->lock();
         }
     }
     void Lock::DBRead::lockNestable(Nestable db) { 
@@ -748,9 +748,9 @@ namespace mongo {
         }
         else {
             ls.lockedNestable(db,-1);
-            fassert(16133,weLocked==0);
-            weLocked = nestableLocks[db];
-            weLocked->lock_shared();
+            fassert(16133,_weLocked==0);
+            _weLocked = nestableLocks[db];
+            _weLocked->lock_shared();
         }
     }
 
@@ -776,9 +776,9 @@ namespace mongo {
             ls.lockedOther( db , 1 , lock );
         }
         
-        fassert(16134,weLocked==0);
+        fassert(16134,_weLocked==0);
         ls.otherLock()->lock();
-        weLocked = ls.otherLock();
+        _weLocked = ls.otherLock();
     }
 
 
@@ -793,9 +793,9 @@ namespace mongo {
     void Lock::DBWrite::lockDB(const string& ns) {
         verify( ns.size() );
         Acquiring a( 'w' );
-        locked_W=false;
-        locked_w=false; 
-        weLocked=0;
+        _locked_W=false;
+        _locked_w=false; 
+        _weLocked=0;
         LockState& ls = lockState();
         if( isW(ls) )
             return;
@@ -806,7 +806,7 @@ namespace mongo {
             if( nested == admin ) { 
                 // we can't nestedly lock both admin and local as implemented. so lock_W.
                 lock_W();
-                locked_W = true;
+                _locked_W = true;
                 return;
             } 
             if( !nested )
@@ -817,14 +817,14 @@ namespace mongo {
         } 
         else {
             lock_W();
-            locked_w = true;
+            _locked_w = true;
         }
     }
     void Lock::DBRead::lockDB(const string& ns) {
         verify( ns.size() );
         Acquiring a( 'r' );
-        locked_r=false; 
-        weLocked=0; 
+        _locked_r=false; 
+        _weLocked=0; 
         LockState& ls = lockState();
         if( isRW(ls) )
             return;
@@ -840,16 +840,16 @@ namespace mongo {
         } 
         else {
             lock_R();
-            locked_r = true;
+            _locked_r = true;
         }
     }
 
-    Lock::DBWrite::DBWrite( const StringData& ns ) : what(ns.data()), _nested(false) {
-        lockDB( what );
+    Lock::DBWrite::DBWrite( const StringData& ns ) : _what(ns.data()), _nested(false) {
+        lockDB( _what );
     }
 
-    Lock::DBRead::DBRead( const StringData& ns )   : what(ns.data()), _nested(false) {
-        lockDB( what );
+    Lock::DBRead::DBRead( const StringData& ns )   : _what(ns.data()), _nested(false) {
+        lockDB( _what );
     }
 
     Lock::DBWrite::~DBWrite() {
@@ -860,46 +860,46 @@ namespace mongo {
     }
 
     void Lock::DBWrite::unlockDB() {
-        if( weLocked ) {
+        if( _weLocked ) {
             if ( _nested )
                 lockState().unlockedNestable();
             else
                 lockState().unlockedOther();
     
-            weLocked->unlock();
+            _weLocked->unlock();
         }
-        if( locked_w ) {
+        if( _locked_w ) {
             if (DB_LEVEL_LOCKING_ENABLED) {
                 unlock_w();
             } else {
                 unlock_W();
             }
         }
-        if( locked_W ) {
+        if( _locked_W ) {
             unlock_W();
         }
-        weLocked = 0;
-        locked_W = locked_w = false;
+        _weLocked = 0;
+        _locked_W = _locked_w = false;
     }
     void Lock::DBRead::unlockDB() {
-        if( weLocked ) {
+        if( _weLocked ) {
             if( _nested )
                 lockState().unlockedNestable();
             else
                 lockState().unlockedOther();
 
-            weLocked->unlock_shared();
+            _weLocked->unlock_shared();
         }
 
-        if( locked_r ) {
+        if( _locked_r ) {
             if (DB_LEVEL_LOCKING_ENABLED) {
                 unlock_r();
             } else {
                 unlock_R();
             }
         }
-        weLocked = 0;
-        locked_r = false;
+        _weLocked = 0;
+        _locked_r = false;
     }
 
     bool Lock::DBRead::isRW(LockState& ls) const { 
@@ -926,7 +926,7 @@ namespace mongo {
             verify(false);
         case  0  : 
             lock_w();
-            locked_w = true;
+            _locked_w = true;
         }
     }
     void Lock::DBRead::lockTop(LockState& ls) { 
@@ -938,7 +938,7 @@ namespace mongo {
             verify(false);
         case  0  : 
             lock_r();
-            locked_r = true;
+            _locked_r = true;
         }
     }
 
@@ -963,9 +963,9 @@ namespace mongo {
                 lock = new WrapperForRWLock(db.c_str());
             ls.lockedOther( db , -1 , lock );
         }
-        fassert(16135,weLocked==0);
+        fassert(16135,_weLocked==0);
         ls.otherLock()->lock_shared();
-        weLocked = ls.otherLock();
+        _weLocked = ls.otherLock();
     }
 
 
