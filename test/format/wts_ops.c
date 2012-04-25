@@ -148,7 +148,7 @@ ops(void *arg)
 	    WT_TABLENAME, NULL, "append", &cursor_insert)) != 0)
 		die(ret, "session.open_cursor");
 
-	for (cnt = 0; cnt < g.c_ops; ++cnt) {
+	for (cnt = 0; cnt < g.c_ops / g.c_threads; ++cnt) {
 		if (SINGLETHREADED && cnt % 100 == 0)
 			track("read/write ops", 0ULL, tinfo);
 
