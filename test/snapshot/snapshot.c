@@ -42,22 +42,62 @@ void build(void);
 void check(struct L *);
 void dump_cat(struct L *, const char *);
 void dump_snap(struct L *, const char *);
+void run(void);
+int  usage(void);
 
 WT_CONNECTION *conn;
 WT_SESSION *session;
+const char *progname;
 
 int
-main(void)
+main(int argc, char *argv[])
 {
-	char config[128];
+	int ch;
 
 	(void)system("rm -f WiredTiger* __*");
 
+	if ((progname = strrchr(argv[0], '/')) == NULL)
+		progname = argv[0];
+	else
+		++progname;
+
+	while ((ch = getopt(argc, argv, "")) != EOF)
+		switch (ch) {
+		case '?':
+		default:
+			return (usage());
+		}
+	argc -= optind;
+	argv += optind;
+
+	run();
+
+	return (EXIT_SUCCESS);
+}
+
+int
+usage(void)
+{
+	(void)fprintf(stderr, "usage: %s\n", progname);
+	return (EXIT_FAILURE);
+}
+
+/*
+ * run --
+ *	Worker function.
+ */
+void
+run(void)
+{
+	char config[128];
+
 	/* Open the connection and create the file. */
-	assert(wiredtiger_open(NULL, NULL, "create", &conn) == 0);
+	assert(wiredtiger_open(
+	    NULL, NULL, "create,cache_size=100MB", &conn) == 0);
 	assert(conn->open_session(conn, NULL, NULL, &session) == 0);
 	(void)snprintf(config, sizeof(config),
-	    "key_format=S,value_format=S,leaf_page_max=512");
+	    "key_format=S,value_format=S,"
+	    "internal_page_max=512,leaf_page_max=512");
 	assert(session->create(session, URI, config) == 0);
 
 	build();				/* Build a set of snapshots */
@@ -67,8 +107,6 @@ main(void)
 #endif
 
 	assert(conn->close(conn, 0) == 0);
-
-	return (EXIT_SUCCESS);
 }
 
 /*
