@@ -236,27 +236,19 @@ Global
 		{FE959BD8-8EE2-4555-AE59-9FA14FFD410E}.Win2008PlusRelease|x64.ActiveCfg = Win2008PlusRelease|Win32
 		{79D4E297-BFB7-4FF2-9B13-08A146582E46}.Debug|Any CPU.ActiveCfg = Debug|Win32
 		{79D4E297-BFB7-4FF2-9B13-08A146582E46}.Debug|Mixed Platforms.ActiveCfg = Debug|Win32
-		{79D4E297-BFB7-4FF2-9B13-08A146582E46}.Debug|Mixed Platforms.Build.0 = Debug|Win32
 		{79D4E297-BFB7-4FF2-9B13-08A146582E46}.Debug|Win32.ActiveCfg = Debug|Win32
-		{79D4E297-BFB7-4FF2-9B13-08A146582E46}.Debug|Win32.Build.0 = Debug|Win32
 		{79D4E297-BFB7-4FF2-9B13-08A146582E46}.Debug|x64.ActiveCfg = Debug|Win32
 		{79D4E297-BFB7-4FF2-9B13-08A146582E46}.Release|Any CPU.ActiveCfg = Release|Win32
 		{79D4E297-BFB7-4FF2-9B13-08A146582E46}.Release|Mixed Platforms.ActiveCfg = Release|Win32
-		{79D4E297-BFB7-4FF2-9B13-08A146582E46}.Release|Mixed Platforms.Build.0 = Release|Win32
 		{79D4E297-BFB7-4FF2-9B13-08A146582E46}.Release|Win32.ActiveCfg = Release|Win32
-		{79D4E297-BFB7-4FF2-9B13-08A146582E46}.Release|Win32.Build.0 = Release|Win32
 		{79D4E297-BFB7-4FF2-9B13-08A146582E46}.Release|x64.ActiveCfg = Release|Win32
 		{79D4E297-BFB7-4FF2-9B13-08A146582E46}.Win2008PlusDebug|Any CPU.ActiveCfg = Win2008PlusDebug|Win32
 		{79D4E297-BFB7-4FF2-9B13-08A146582E46}.Win2008PlusDebug|Mixed Platforms.ActiveCfg = Win2008PlusDebug|Win32
-		{79D4E297-BFB7-4FF2-9B13-08A146582E46}.Win2008PlusDebug|Mixed Platforms.Build.0 = Win2008PlusDebug|Win32
 		{79D4E297-BFB7-4FF2-9B13-08A146582E46}.Win2008PlusDebug|Win32.ActiveCfg = Win2008PlusDebug|Win32
-		{79D4E297-BFB7-4FF2-9B13-08A146582E46}.Win2008PlusDebug|Win32.Build.0 = Win2008PlusDebug|Win32
 		{79D4E297-BFB7-4FF2-9B13-08A146582E46}.Win2008PlusDebug|x64.ActiveCfg = Win2008PlusDebug|Win32
 		{79D4E297-BFB7-4FF2-9B13-08A146582E46}.Win2008PlusRelease|Any CPU.ActiveCfg = Win2008PlusRelease|Win32
 		{79D4E297-BFB7-4FF2-9B13-08A146582E46}.Win2008PlusRelease|Mixed Platforms.ActiveCfg = Win2008PlusRelease|Win32
-		{79D4E297-BFB7-4FF2-9B13-08A146582E46}.Win2008PlusRelease|Mixed Platforms.Build.0 = Win2008PlusRelease|Win32
 		{79D4E297-BFB7-4FF2-9B13-08A146582E46}.Win2008PlusRelease|Win32.ActiveCfg = Win2008PlusRelease|Win32
-		{79D4E297-BFB7-4FF2-9B13-08A146582E46}.Win2008PlusRelease|Win32.Build.0 = Win2008PlusRelease|Win32
 		{79D4E297-BFB7-4FF2-9B13-08A146582E46}.Win2008PlusRelease|x64.ActiveCfg = Win2008PlusRelease|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution

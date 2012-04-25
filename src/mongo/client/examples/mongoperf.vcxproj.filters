@@ -83,6 +83,9 @@
     <ClCompile Include="..\..\util\stacktrace.cpp">
       <Filter>shared files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\util\timer.cpp">
+      <Filter>shared files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\bson\bson-inl.h">
@@ -137,6 +140,12 @@
       <Filter>shared files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\util\stacktrace.h">
+      <Filter>shared files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\util\timer.h">
+      <Filter>shared files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\util\timer-win32-inl.h">
       <Filter>shared files</Filter>
     </ClInclude>
   </ItemGroup>
