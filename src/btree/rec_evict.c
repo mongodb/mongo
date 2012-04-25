@@ -8,13 +8,13 @@
 #include "wt_internal.h"
 
 static int  __hazard_exclusive(WT_SESSION_IMPL *, WT_REF *, int);
-static int  __rec_discard(WT_SESSION_IMPL *, WT_PAGE *, int);
 static int  __rec_discard_page(WT_SESSION_IMPL *, WT_PAGE *, int);
+static int  __rec_discard_tree(WT_SESSION_IMPL *, WT_PAGE *, int);
 static void __rec_excl_clear(WT_SESSION_IMPL *);
-static int  __rec_page_clean_update(WT_SESSION_IMPL *, WT_PAGE *, int);
-static int  __rec_page_dirty_update(WT_SESSION_IMPL *, WT_PAGE *, int);
+static void __rec_page_clean_update(WT_SESSION_IMPL *, WT_PAGE *);
+static int  __rec_page_dirty_update(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_review(WT_SESSION_IMPL *, WT_REF *, WT_PAGE *, uint32_t, int);
-static int  __rec_root_update(WT_SESSION_IMPL *, WT_PAGE *, int);
+static void __rec_root_update(WT_SESSION_IMPL *);
 
 /*
  * __wt_rec_evict --
@@ -59,18 +59,24 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 		WT_STAT_INCR(conn->stats, cache_evict_unmodified);
 
 		if (WT_PAGE_IS_ROOT(page))
-			WT_ERR(__rec_root_update(session, page, single));
+			__rec_root_update(session);
 		else
-			WT_ERR(__rec_page_clean_update(session, page, single));
+			__rec_page_clean_update(session, page);
+
+		/* Discard the page. */
+		WT_ASSERT(session, single || page->ref->state == WT_REF_LOCKED);
+		WT_RET(__rec_discard_page(session, page, single));
 	} else {
 		WT_STAT_INCR(conn->stats, cache_evict_modified);
 
 		if (WT_PAGE_IS_ROOT(page))
-			WT_ERR(__rec_root_update(session, page, single));
+			__rec_root_update(session);
 		else
-			WT_ERR(__rec_page_dirty_update(session, page, single));
-	}
+			WT_ERR(__rec_page_dirty_update(session, page));
 
+		/* Discard the tree rooted in this page. */
+		WT_ERR(__rec_discard_tree(session, page, single));
+	}
 	if (0) {
 err:		/*
 		 * If unable to evict this page, release exclusive reference(s)
@@ -87,39 +93,32 @@ err:		/*
  * __rec_root_update  --
  *	Update a root page's reference on eviction (clean or dirty).
  */
-static int
-__rec_root_update(WT_SESSION_IMPL *session, WT_PAGE *page, int single)
+static void
+__rec_root_update(WT_SESSION_IMPL *session)
 {
-	WT_BTREE *btree;
-
-	btree = session->btree;
-	btree->root_page = NULL;
-
-	return (__rec_discard(session, page, single));
+	session->btree->root_page = NULL;
 }
 
 /*
  * __rec_page_clean_update  --
- *	Update a page's reference for an evicted, clean page.
+ *	Update a clean page's reference on eviction.
  */
-static int
-__rec_page_clean_update(WT_SESSION_IMPL *session, WT_PAGE *page, int single)
+static void
+__rec_page_clean_update(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	WT_ASSERT(session, single || page->ref->state == WT_REF_LOCKED);
-
 	/* Update the relevant WT_REF structure. */
 	page->ref->page = NULL;
 	WT_PUBLISH(page->ref->state, WT_REF_DISK);
 
-	return (__rec_discard(session, page, single));
+	WT_UNUSED(session);
 }
 
 /*
  * __rec_page_dirty_update --
- *	Update a page's reference for an evicted, dirty page.
+ *	Update a dirty page's reference on eviction.
  */
 static int
-__rec_page_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page, int single)
+__rec_page_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_PAGE_MODIFY *mod;
 	WT_REF *parent_ref;
@@ -168,22 +167,16 @@ __rec_page_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page, int single)
 	WT_ILLEGAL_VALUE(session);
 	}
 
-	/*
-	 * Discard pages which were merged into this page during reconciliation,
-	 * then discard the page itself.
-	 */
-	WT_RET(__rec_discard(session, page, single));
-
 	return (0);
 }
 
 /*
- * __rec_discard --
+ * __rec_discard_tree --
  *	Discard the tree rooted a page (that is, any pages merged into it),
  * then the page itself.
  */
 static int
-__rec_discard(WT_SESSION_IMPL *session, WT_PAGE *page, int single)
+__rec_discard_tree(WT_SESSION_IMPL *session, WT_PAGE *page, int single)
 {
 	WT_REF *ref;
 	uint32_t i;
@@ -197,7 +190,7 @@ __rec_discard(WT_SESSION_IMPL *session, WT_PAGE *page, int single)
 				continue;
 			WT_ASSERT(session,
 			    single || ref->state == WT_REF_LOCKED);
-			WT_RET(__rec_discard(session, ref->page, single));
+			WT_RET(__rec_discard_tree(session, ref->page, single));
 		}
 		/* FALLTHROUGH */
 	default:
