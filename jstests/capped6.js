@@ -106,4 +106,4 @@ for( var i = 0; i < 10; ++i ) {
     doTest();
 }
 
-//tzz.drop();
+tzz.drop();
