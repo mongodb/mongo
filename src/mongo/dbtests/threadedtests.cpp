@@ -820,7 +820,7 @@ namespace ThreadedTests {
         QLock m;
         virtual void validate() { }
         virtual void subthread(int x) {
-            int Z = 1;
+            int Z = 0;
             Client::initThread("qtest");
             if( x == 1 ) { 
                 log(Z) << mongo::curTimeMillis64() % 10000 << " 1 lock_r()..." << endl;
@@ -846,8 +846,8 @@ namespace ThreadedTests {
                 m.lock_r();
                 verify( gotW );
                 log(Z) << mongo::curTimeMillis64() % 10000 << " 3            got" << gotW << endl;
-                log(Z) << t.millis() << endl;
                 m.unlock_r();
+                log(Z) << t.millis() << endl;
                 ASSERT( t.millis() > 50 );
             }
             cc().shutdown();
