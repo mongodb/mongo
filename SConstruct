@@ -510,7 +510,8 @@ elif "sunos5" == os.sys.platform:
      env.Append( LIBS=["socket","resolv"] )
      # Need v9 for atomics when sparc
      if processor.startswith( "sun4" ):
-        env.Append( CCFLAGS=[ "-mcpu=v9" ] )
+        env.Append( CCFLAGS=[ "-mcpu=v9", "-m64" ] )
+        env.Append( LINKFLAGS=[ "-m64" ] )
 
 elif os.sys.platform.startswith( "freebsd" ):
     nix = True
@@ -687,8 +688,10 @@ if nix:
         env.Append( CXXFLAGS=" -fprofile-arcs -ftest-coverage " )
         env.Append( LINKFLAGS=" -fprofile-arcs -ftest-coverage " )
 
-    if debugBuild:
-        env.Append( CCFLAGS=["-O0", "-fstack-protector"] )
+    if debugBuild:        
+        env.Append( CCFLAGS=["-O0" ] )
+        if not solaris:
+            env.Append( CCFLAGS=["-fstack-protector" ] )
         env['ENV']['GLIBCXX_FORCE_NEW'] = 1; # play nice with valgrind
     else:
         env.Append( CCFLAGS=["-O3"] )
@@ -762,6 +765,26 @@ env.Append( CPPPATH=['$EXTRACPPPATH'],
 
 # --- check system ---
 
+def CheckStackProtector( context ):
+    oldCFLAGS = context.env['CFLAGS']
+    context.env['CFLAGS'] = context.env['CFLAGS'] + " -fstack-protector "
+    context.Message( 'Checking if -fstack-protector works ...' )
+    res = context.TryLink( """
+          void __attribute__((noinline)) rolf( char* x ) {
+             for ( int i = 0; i < 8; ++i ) {
+                x[i] = 0;
+             }             
+          }
+          int main( int argc, char** argv ) 
+          { 
+              rolf( argv[0] );
+          }
+""", ".cc" )
+    context.env['CFLAGS'] = oldCFLAGS
+    context.Result( res )
+    return res
+
+
 def CheckFetchAndAdd( context ):
     context.Message( 'Checking for __sync_fetch_and_add ...' )
     res = context.TryLink( """
@@ -828,7 +851,7 @@ def CheckBigEndian( context ):
           
 """, ".cc" )
     context.Result( res )
-    return not res
+    return res
 
 def doConfigure(myenv):
     conf = Configure(myenv, custom_tests = {
@@ -837,6 +860,7 @@ def doConfigure(myenv):
         'CheckSwap32' : CheckSwap32,
         'CheckSwap64' : CheckSwap64,
         'CheckBigEndian' : CheckBigEndian,
+        'CheckStackProtector' : CheckStackProtector,
         })
 
     if 'CheckCXX' in dir( conf ):
@@ -897,6 +921,11 @@ def doConfigure(myenv):
     if conf.CheckSwap64():
         env.Append( CPPDEFINES = ["HAVE_BSWAP64"] )
     bigEndian = conf.CheckBigEndian()
+    if not conf.CheckStackProtector():
+        try:
+            env['CCFLAGS'].remove( '-fstack-protector' )
+        except ValueError:
+            pass
         
        
     # 'tcmalloc' needs to be the last library linked. Please, add new libraries before this 
