@@ -1208,11 +1208,9 @@ namespace mongo {
 
         char eoo;
     };
-#pragma pack()
 
     struct JSObj1 js1;
-
-#pragma pack(1)
+    
     struct JSObj2 {
         JSObj2() {
             totsize=sizeof(JSObj2);
@@ -1229,6 +1227,7 @@ namespace mongo {
         char sval[10];
         char eoo;
     } js2;
+#pragma pack()
 
     struct JSUnitTest : public StartupTest {
         void run() {
@@ -1261,7 +1260,6 @@ namespace mongo {
         }
     } jsunittest;
 
-#pragma pack()
 
     struct RXTest : public StartupTest {
 
