@@ -247,7 +247,7 @@ windows = False
 freebsd = False
 openbsd = False
 solaris = False
-bigEndian = False # For snappy
+bigendian = False # For snappy
 force32 = has_option( "force32" ) 
 force64 = has_option( "force64" )
 if not force64 and not force32 and os.getcwd().endswith( "mongo-64" ):
@@ -920,7 +920,10 @@ def doConfigure(myenv):
         env.Append( CPPDEFINES = ["HAVE_BSWAP32"] )
     if conf.CheckSwap64():
         env.Append( CPPDEFINES = ["HAVE_BSWAP64"] )
-    bigEndian = conf.CheckBigEndian()
+    # Check endianess for snappy
+    bigendian = conf.CheckBigEndian()
+    Export( "bigendian" )
+
     if not conf.CheckStackProtector():
         try:
             env['CCFLAGS'].remove( '-fstack-protector' )
@@ -1180,7 +1183,6 @@ Export("has_option use_system_version_of_library")
 Export("installSetup")
 Export("usesm usev8")
 Export("darwin windows solaris linux nix freebsd")
-Export("bigEndian")
 
 env.SConscript( 'src/SConscript', variant_dir='$BUILD_DIR', duplicate=False )
 env.SConscript( 'src/SConscript.client', variant_dir='$BUILD_DIR/client_build', duplicate=False )
