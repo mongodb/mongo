@@ -7,5 +7,5 @@ for ( var i=0; i<50; i++ ) { // enough iterations to break 32 bit.
     assert( t.count() == 1 );
     t.drop();
 }
+t.drop();
 
-db.dropDatabase();

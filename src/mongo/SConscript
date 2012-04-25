@@ -20,6 +20,9 @@ def add_exe( v ):
 
 # ------    SOURCE FILE SETUP -----------
 
+env.StaticLibrary('log', [ 'util/assert_util.cpp',
+                           'util/log.cpp', ])
+
 commonFiles = [ "pch.cpp",
                 "buildinfo.cpp",
                 "db/jsobj.cpp",
@@ -37,9 +40,7 @@ commonFiles = [ "pch.cpp",
                 "util/timer.cpp",
                 "util/util.cpp",
                 "util/file_allocator.cpp",
-                "util/assert_util.cpp",
                 "util/trace.cpp",
-                "util/log.cpp",
                 "util/ramlog.cpp",
                 "util/progress_meter.cpp",
                 "util/md5main.cpp",
@@ -73,7 +74,8 @@ commonFiles = [ "pch.cpp",
                 "s/shardconnection.cpp"]
 
 env.StaticLibrary('mongocommon', commonFiles,
-                  LIBDEPS=['stacktrace',
+                  LIBDEPS=['log',
+                           'stacktrace',
                            '$BUILD_DIR/third_party/pcrecpp',
                            '$BUILD_DIR/third_party/murmurhash3/murmurhash3',
                            '$BUILD_DIR/third_party/mongo_boost'],)

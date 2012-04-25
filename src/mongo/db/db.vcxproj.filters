@@ -472,6 +472,7 @@
     <ClCompile Include="commands\fsync.cpp">
       <Filter>db\commands</Filter>
     </ClCompile>
+    <ClCompile Include="..\util\timer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\client\distlock.h" />
@@ -770,6 +771,8 @@
       <Filter>db</Filter>
     </ClInclude>
     <ClInclude Include="..\util\stacktrace.h" />
+    <ClInclude Include="..\util\timer.h" />
+    <ClInclude Include="..\util\timer-win32-inl.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\jstests\dur\dur1.js" />

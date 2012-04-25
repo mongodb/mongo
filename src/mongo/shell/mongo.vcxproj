@@ -1326,6 +1326,7 @@
     </ClCompile>
     <ClCompile Include="..\scripting\engine.cpp" />
     <ClCompile Include="..\util\concurrency\vars.cpp" />
+    <ClCompile Include="..\util\timer.cpp" />
     <ClCompile Include="..\util\util.cpp" />
     <ClCompile Include="..\util\version.cpp" />
     <ClCompile Include="dbshell.cpp" />
@@ -1541,6 +1542,7 @@
     <ClInclude Include="..\util\startup_test.h" />
     <ClInclude Include="..\util\stringutils.h" />
     <ClInclude Include="..\util\text.h" />
+    <ClInclude Include="..\util\timer-win32-inl.h" />
     <ClInclude Include="..\util\timer.h" />
     <ClInclude Include="..\util\time_support.h" />
     <ClInclude Include="..\util\version.h" />

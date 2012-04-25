@@ -123,14 +123,6 @@ namespace mongo {
         return "";
     }
 
-    const char *default_getcurns() { return ""; }
-    const char * (*getcurns)() = default_getcurns;
-
-    int logLevel = 0;
-    int tlogLevel = 0;
-    mongo::mutex Logstream::mutex("Logstream");
-    int Logstream::doneSetup = Logstream::magicNumber();
-
     bool isPrime(int n) {
         int z = 2;
         while ( 1 ) {

@@ -28,6 +28,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/util/background.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {
@@ -323,8 +324,13 @@ namespace mongo {
 
         if ( !authenticatedConn->runCommand( "admin", BSON( "replSetGetStatus" << 1 ), status )) {
             LOG(1) << "dbclient_rs replSetGetStatus failed" << endl;
+            authenticatedConn.done(); // connection worked properly, but we got an error from server
             return;
         }
+
+        // Make sure we return when finished
+        authenticatedConn.done();
+
         if( !status.hasField("members") ) { 
             log() << "dbclient_rs error expected members field in replSetGetStatus result" << endl;
             return;

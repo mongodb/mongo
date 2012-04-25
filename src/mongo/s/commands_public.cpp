@@ -29,6 +29,7 @@
 #include "s/interrupt_status_mongos.h"
 #include "../scripting/engine.h"
 #include "../util/timer.h"
+#include "mongo/db/lasterror.h"
 
 
 #include "config.h"
@@ -1605,7 +1606,7 @@ namespace mongo {
 
             if ( !ok && !have_errmsg) {
                 anObjBuilder.append("errmsg", errmsg);
-                uassert_nothrow(errmsg.c_str());
+                setLastError(0, errmsg.c_str());
             }
             return true;
         }

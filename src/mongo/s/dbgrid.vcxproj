@@ -805,6 +805,7 @@
     <ClCompile Include="..\util\stringutils.cpp" />
     <ClCompile Include="..\util\systeminfo_win32.cpp" />
     <ClCompile Include="..\util\text.cpp" />
+    <ClCompile Include="..\util\timer.cpp" />
     <ClCompile Include="..\util\trace.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
@@ -1349,6 +1350,8 @@
     <ClInclude Include="..\util\signal_handlers.h" />
     <ClInclude Include="..\util\stacktrace.h" />
     <ClInclude Include="..\util\systeminfo.h" />
+    <ClInclude Include="..\util\timer-win32-inl.h" />
+    <ClInclude Include="..\util\timer.h" />
     <ClInclude Include="..\util\trace.h" />
     <ClInclude Include="..\util\version.h" />
     <ClInclude Include="balance.h" />
@@ -1378,8 +1381,6 @@
     <ClInclude Include="..\db\jsobj.h" />
     <ClInclude Include="..\db\json.h" />
     <ClInclude Include="..\pch.h" />
-    <ClInclude Include="..\..\boostw\boost_1_34_1\boost\config\auto_link.hpp" />
-    <ClInclude Include="..\..\boostw\boost_1_34_1\boost\version.hpp" />
     <ClInclude Include="..\..\third_party\pcre-8.30\config.h" />
     <ClInclude Include="..\..\third_party\pcre-8.30\pcre.h" />
     <ClInclude Include="..\client\connpool.h" />

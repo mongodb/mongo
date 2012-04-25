@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -1218,6 +1218,7 @@
     <ClCompile Include="..\util\stringutils.cpp" />
     <ClCompile Include="..\util\systeminfo_win32.cpp" />
     <ClCompile Include="..\util\text.cpp" />
+    <ClCompile Include="..\util\timer.cpp" />
     <ClCompile Include="..\util\trace.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
@@ -1332,6 +1333,8 @@
     <ClInclude Include="..\util\progress_meter.h" />
     <ClInclude Include="..\util\concurrency\remap_lock.h" />
     <ClInclude Include="..\util\stacktrace.h" />
+    <ClInclude Include="..\util\timer-win32-inl.h" />
+    <ClInclude Include="..\util\timer.h" />
     <ClInclude Include="explain.h" />
     <ClInclude Include="index_insertion_continuation.h" />
     <ClInclude Include="lockstat.h" />

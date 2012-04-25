@@ -191,14 +191,14 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
             rsDefaults = { useHostname : otherParams.useHostname,
                            noJournalPrealloc : otherParams.nopreallocj, 
                            oplogSize : 40,
-                           nodes : 3,
                            pathOpts : Object.merge( pathOpts, { shard : i } )}
             
             rsDefaults = Object.merge( rsDefaults, otherParams.rs )
             rsDefaults = Object.merge( rsDefaults, otherParams.rsOptions )
             rsDefaults = Object.merge( rsDefaults, otherParams["rs" + i] )
+            rsDefaults.nodes = rsDefaults.nodes || otherParams.numReplicas
             
-            var numReplicas = rsDefaults.nodes || otherParams.numReplicas || 3
+            var numReplicas = rsDefaults.nodes || 3
             delete rsDefaults.nodes
             
             print( "Replica set test!" )

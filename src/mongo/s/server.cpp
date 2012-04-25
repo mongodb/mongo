@@ -42,6 +42,7 @@
 #include "../util/processinfo.h"
 #include "mongo/util/util.h"
 #include "mongo/util/concurrency/remap_lock.h"
+#include "mongo/db/lasterror.h"
 
 #if defined(_WIN32)
 # include "../util/ntservice.h"
@@ -148,7 +149,7 @@ namespace mongo {
     void my_new_handler() {
         rawOut( "out of memory, printing stack and exiting:" );
         printStackTrace();
-        ::exit(EXIT_ABRUPT);
+        ::_exit(EXIT_ABRUPT);
     }
 
     void setupSignals( bool inFork ) {
@@ -472,7 +473,7 @@ void mongo::exitCleanly( ExitCode code ) {
     mongo::dbexit( code );
 }
 
-void mongo::dbexit( ExitCode rc, const char *why, bool tryToGetLock ) {
+void mongo::dbexit( ExitCode rc, const char *why ) {
     dbexitCalled = true;
 #if defined(_WIN32)
     if ( rc == EXIT_WINDOWS_SERVICE_STOP ) {

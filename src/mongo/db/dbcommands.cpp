@@ -315,6 +315,8 @@ namespace mongo {
             // regardless of whether they caught up, we'll shut down
         }
 
+        writelocktry wlt( 2 * 60 * 1000 );
+        uassert( 13455 , "dbexit timed out getting lock" , wlt.got() );
         return shutdownHelper();
     }
 
@@ -1804,6 +1806,7 @@ namespace mongo {
         virtual bool slaveOk() const { return false; }
         virtual LockType locktype() const { return WRITE; }
         virtual bool requiresAuth() { return true; }
+        virtual bool logTheOp() { return true; }
         virtual bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             string coll = cmdObj[ "emptycapped" ].valuestrsafe();
             uassert( 13428, "emptycapped must specify a collection", !coll.empty() );

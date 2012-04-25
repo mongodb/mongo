@@ -38,6 +38,14 @@ using namespace std;
 
 namespace mongo {
 
+    int logLevel = 0;
+    int tlogLevel = 0;
+    mongo::mutex Logstream::mutex("Logstream");
+    int Logstream::doneSetup = Logstream::magicNumber();
+
+    const char *default_getcurns() { return ""; }
+    const char * (*getcurns)() = default_getcurns;
+
     Nullstream nullstream;
     vector<Tee*>* Logstream::globalTees = 0;
 

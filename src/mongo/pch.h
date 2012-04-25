@@ -60,7 +60,7 @@ namespace mongo {
     using namespace std;
     using boost::shared_ptr;
 
-    void dbexit( ExitCode returnCode, const char *whyMsg = "", bool tryToGetLock = false);
+    void dbexit( ExitCode returnCode, const char *whyMsg = "" );
 
     /**
        this is here so you can't just type exit() to quit the program
