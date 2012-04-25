@@ -464,7 +464,7 @@ namespace mongo {
             ( inShutdown() ? "already in shutdown" : "will terminate after current cmd ends" ) << endl;
         ServiceController::reportStatus( SERVICE_STOP_PENDING );
         if ( ! inShutdown() ) {
-            exitCleanly( EXIT_WINDOWS_SERVICE_STOP );
+            dbexit( EXIT_WINDOWS_SERVICE_STOP );
             ServiceController::reportStatus( SERVICE_STOPPED );
         }
     }
