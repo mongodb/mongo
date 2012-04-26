@@ -13,6 +13,8 @@ static int __verify_filefrag_chk(WT_SESSION_IMPL *, WT_BLOCK *);
 static int __verify_snapfrag_add(WT_SESSION_IMPL *, WT_BLOCK *, off_t, off_t);
 static int __verify_snapfrag_chk(WT_SESSION_IMPL *, WT_BLOCK *);
 static int __verify_start_avail(WT_SESSION_IMPL *, WT_BLOCK *, WT_SNAPSHOT *);
+static int __verify_start_filesize(
+	WT_SESSION_IMPL *, WT_BLOCK *, WT_SNAPSHOT *, off_t *);
 
 /* The bit list ignores the first sector: convert to/from a frag/offset. */
 #define	WT_OFF_TO_FRAG(block, off)					\
@@ -34,24 +36,20 @@ __wt_block_verify_start(
 	block->verify_alloc.name = "verify_alloc";
 	block->verify_alloc.offset = WT_BLOCK_INVALID_OFFSET;
 
-	file_size = block->fh->file_size;
-
 	/*
-	 * We're done if the file has no data pages (this is what happens if
-	 * we verify a file immediately after creation).
+	 * We're done if the file has no data pages (this happens if we verify
+	 * a file immediately after creation).
 	 */
-	if (file_size == WT_BLOCK_DESC_SECTOR)
+	if (block->fh->file_size == WT_BLOCK_DESC_SECTOR)
 		return (0);
 
 	/*
-	 * The file size should be a multiple of the allocsize, offset by the
-	 * size of the descriptor sector, the first 512B of the file.
+	 * Opening a WiredTiger file truncates it back to the snapshot we are
+	 * rolling forward, which means it's OK if there are blocks written
+	 * after that snapshot, they'll be ignored.  Find the largest file size
+	 * referenced by any snapshot.
 	 */
-	if (file_size > WT_BLOCK_DESC_SECTOR)
-		file_size -= WT_BLOCK_DESC_SECTOR;
-	if (file_size % block->allocsize != 0)
-		WT_RET_MSG(session, WT_ERROR,
-		    "the file size is not a multiple of the allocation size");
+	WT_RET(__verify_start_filesize(session, block, snapbase, &file_size));
 
 	/*
 	 * Allocate a bit array, where each bit represents a single allocation
@@ -89,6 +87,53 @@ __wt_block_verify_start(
 	WT_RET(__verify_start_avail(session, block, snapbase));
 
 	block->verify = 1;
+	return (0);
+}
+
+/*
+ * __verify_start_filesize --
+ *	Set the file size for the last snapshot.
+ */
+static int
+__verify_start_filesize(WT_SESSION_IMPL *session,
+    WT_BLOCK *block, WT_SNAPSHOT *snapbase, off_t *file_sizep)
+{
+	WT_BLOCK_SNAPSHOT *si, _si;
+	WT_SNAPSHOT *snap;
+	off_t file_size;
+
+	si = &_si;
+
+	/*
+	 * Find the largest file size referenced by any snapshot -- that should
+	 * be the last snapshot taken, but out of sheer, raving paranoia, look
+	 * through the list, future changes to snapshots might break this code
+	 * if we make that assumption.
+	 */
+	file_size = 0;
+	WT_SNAPSHOT_FOREACH(snapbase, snap) {
+		WT_RET(__wt_block_buffer_to_snapshot(
+		    session, block, snap->raw.data, si));
+		if (si->file_size > file_size)
+			file_size = si->file_size;
+	}
+
+	/* Verify doesn't make any sense if we don't have a snapshot. */
+	if (file_size <= WT_BLOCK_DESC_SECTOR)
+		WT_RET_MSG(session, WT_ERROR,
+		    "%s has no snapshots to verify", block->name);
+
+	/*
+	 * The file size should be a multiple of the allocsize, offset by the
+	 * size of the descriptor sector, the first 512B of the file.
+	 */
+	file_size -= WT_BLOCK_DESC_SECTOR;
+	if (file_size % block->allocsize != 0)
+		WT_RET_MSG(session, WT_ERROR,
+		    "the snapshot file size is not a multiple of the "
+		    "allocation size");
+
+	*file_sizep = file_size;
 	return (0);
 }
 
