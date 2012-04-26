@@ -579,8 +579,7 @@ namespace mongo {
         
         void handleEndOfClause( const QueryPlan &clausePlan );
         void handleBeginningOfClause();
-
-        shared_ptr<QueryOp> nextOpBeginningClause();
+        bool mayHandleBeginningOfClause();
 
         bool haveUselessOr() const;
 

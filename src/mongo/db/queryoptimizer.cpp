@@ -1069,21 +1069,6 @@ doneCheckOrder:
         }
     }
 
-    shared_ptr<QueryOp> MultiPlanScanner::nextOpBeginningClause() {
-        assertMayRunMore();
-        shared_ptr<QueryOp> op;
-        while( mayRunMore() ) {
-            handleBeginningOfClause();
-            op = iterateRunner( *_baseOp );
-            if ( !op->completeWithoutStop() ) {
-             	return op;
-            }
-            handleEndOfClause( op->qp() );
-            _baseOp = op;
-        }
-        return op;
-    }
-    
     void MultiPlanScanner::handleEndOfClause( const QueryPlan &clausePlan ) {
         if ( clausePlan.willScanTable() ) {
             _tableScanned = true;   
@@ -1103,6 +1088,14 @@ doneCheckOrder:
                                            BSONObj(), BSONObj() ) );
     }
 
+    bool MultiPlanScanner::mayHandleBeginningOfClause() {
+        if ( mayRunMore() ) {
+            handleBeginningOfClause();
+            return true;
+        }
+        return false;
+    }
+
     shared_ptr<QueryOp> MultiPlanScanner::nextOp() {
         verify( !doneOps() );
         shared_ptr<QueryOp> ret = _or ? nextOpOr() : nextOpSimple();
@@ -1117,17 +1110,15 @@ doneCheckOrder:
     }
 
     shared_ptr<QueryOp> MultiPlanScanner::nextOpOr() {
-        shared_ptr<QueryOp> op = iterateRunner( *_baseOp );
-        if ( !op->completeWithoutStop() ) {
-            return op;   
-        }
-        handleEndOfClause( op->qp() );
-        _baseOp = op;
-        if ( mayRunMore() ) {
-            // Finished scanning the clause, but stop hasn't been requested.
-            // Start scanning the next clause.
-            return nextOpBeginningClause();
-        }
+        shared_ptr<QueryOp> op;
+        do {
+            op = nextOpSimple();
+            if ( !op->completeWithoutStop() ) {
+                return op;
+            }
+            handleEndOfClause( op->qp() );
+            _baseOp = op;
+        } while( mayHandleBeginningOfClause() );
         return op;
     }
     
