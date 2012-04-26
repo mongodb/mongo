@@ -188,11 +188,10 @@ int
 __wt_debug_addr(
     WT_SESSION_IMPL *session, uint32_t addr, uint32_t size, const char *ofile)
 {
+	WT_DECL_RET;
 	WT_ITEM *buf;
-	int ret;
 
 	buf = NULL;
-	ret = 0;
 
 	WT_RET(__wt_scr_alloc(session, size, &buf));
 	WT_ERR(__wt_block_read_off(
@@ -212,9 +211,7 @@ __wt_debug_disk(
     WT_SESSION_IMPL *session, WT_PAGE_HEADER *dsk, const char *ofile)
 {
 	WT_DBG *ds, _ds;
-	int ret;
-
-	ret = 0;
+	WT_DECL_RET;
 
 	ds = &_ds;
 	WT_RET(__debug_config(session, ds, ofile));
@@ -329,7 +326,7 @@ int
 __wt_debug_page(WT_SESSION_IMPL *session, WT_PAGE *page, const char *ofile)
 {
 	WT_DBG *ds, _ds;
-	int ret;
+	WT_DECL_RET;
 
 	ds = &_ds;
 	WT_RET(__debug_config(session, ds, ofile));
@@ -350,7 +347,7 @@ __debug_tree(
     WT_SESSION_IMPL *session, WT_PAGE *page, const char *ofile, uint32_t flags)
 {
 	WT_DBG *ds, _ds;
-	int ret;
+	WT_DECL_RET;
 
 	ds = &_ds;
 	WT_RET(__debug_config(session, ds, ofile));
@@ -835,9 +832,9 @@ __debug_ref(WT_DBG *ds, WT_REF *ref, WT_PAGE *page)
 static int
 __debug_cell(WT_DBG *ds, WT_PAGE_HEADER *dsk, WT_CELL_UNPACK *unpack)
 {
+	WT_DECL_RET;
 	WT_ITEM *buf;
 	WT_SESSION_IMPL *session;
-	int ret;
 
 	session = ds->session;
 	buf = NULL;
@@ -887,13 +884,12 @@ __debug_cell(WT_DBG *ds, WT_PAGE_HEADER *dsk, WT_CELL_UNPACK *unpack)
 static int
 __debug_cell_data(WT_DBG *ds, const char *tag, WT_CELL_UNPACK *unpack)
 {
+	WT_DECL_RET;
 	WT_ITEM *buf;
 	WT_SESSION_IMPL *session;
-	int ret;
 
 	session = ds->session;
 	buf = NULL;
-	ret = 0;
 
 	/*
 	 * Column-store references to deleted cells return a NULL cell

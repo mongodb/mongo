@@ -15,13 +15,12 @@ int
 __wt_tree_np(WT_SESSION_IMPL *session, WT_PAGE **pagep, int eviction, int next)
 {
 	WT_BTREE *btree;
+	WT_DECL_RET;
 	WT_PAGE *page, *t;
 	WT_REF *ref;
 	uint32_t slot;
-	int ret;
 
 	btree = session->btree;
-	ret = 0;
 
 	/*
 	 * Take a copy of any returned page; we have a hazard reference on the

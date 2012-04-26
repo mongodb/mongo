@@ -14,10 +14,10 @@
 static int
 __drop_file(WT_SESSION_IMPL *session, const char *uri, int force)
 {
-	int exist, ret;
+	WT_DECL_RET;
+	int exist;
 	const char *filename;
 
-	ret = 0;
 	filename = uri;
 	if (!WT_PREFIX_SKIP(filename, "file:"))
 		return (EINVAL);
@@ -46,10 +46,8 @@ __drop_file(WT_SESSION_IMPL *session, const char *uri, int force)
 static int
 __drop_tree(WT_SESSION_IMPL *session, WT_BTREE *btree, int force)
 {
+	WT_DECL_RET;
 	WT_ITEM *buf;
-	int ret;
-
-	ret = 0;
 
 	/* Remove the schema table entry (ignore missing items). */
 	WT_TRET(__wt_schema_table_remove(session, btree->name));
@@ -79,10 +77,11 @@ __drop_colgroup(
     WT_SESSION_IMPL *session, const char *uri, int force, const char *cfg[])
 {
 	WT_BTREE *btree;
+	WT_DECL_RET;
 	WT_TABLE *table;
 	const char *cgname, *tablename;
 	size_t tlen;
-	int i, ret;
+	int i;
 
 	tablename = uri;
 	if (!WT_PREFIX_SKIP(tablename, "colgroup:"))
@@ -137,10 +136,11 @@ __drop_index(
     WT_SESSION_IMPL *session, const char *uri, int force, const char *cfg[])
 {
 	WT_BTREE *btree;
+	WT_DECL_RET;
 	WT_TABLE *table;
 	const char *idxname, *tablename;
 	size_t tlen;
-	int i, ret;
+	int i;
 
 	tablename = uri;
 	if (!WT_PREFIX_SKIP(tablename, "index:") ||
@@ -191,11 +191,10 @@ static int
 __drop_table(WT_SESSION_IMPL *session, const char *uri, int force)
 {
 	WT_BTREE *btree;
+	WT_DECL_RET;
 	WT_TABLE *table;
-	int i, ret;
+	int i;
 	const char *name;
-
-	ret = 0;
 
 	name = uri;
 	(void)WT_PREFIX_SKIP(name, "table:");
@@ -232,7 +231,8 @@ int
 __wt_schema_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 {
 	WT_CONFIG_ITEM cval;
-	int force, ret;
+	WT_DECL_RET;
+	int force;
 
 	cval.val = 0;
 	ret = __wt_config_gets(session, cfg, "force", &cval);

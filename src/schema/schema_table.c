@@ -16,11 +16,10 @@ static const char *schematab_config = "key_format=S,value_format=S";
 int
 __wt_open_schema_table(WT_SESSION_IMPL *session)
 {
+	WT_DECL_RET;
+	int tracking;
 	const char *cfg[] = API_CONF_DEFAULTS(file, meta, schematab_config);
 	const char *schemaconf;
-	int ret, tracking;
-
-	ret = 0;
 
 	if (session->schematab != NULL)
 		return (0);
@@ -69,9 +68,7 @@ __wt_schema_table_insert(
 {
 	WT_BTREE *btree;
 	WT_CURSOR *cursor;
-	int ret;
-
-	ret = 0;
+	WT_DECL_RET;
 
 	if (session->schema_track != NULL)		/* Optional tracking */
 		WT_RET(__wt_schema_table_track_insert(session, key));
@@ -99,9 +96,7 @@ __wt_schema_table_update(
 {
 	WT_BTREE *btree;
 	WT_CURSOR *cursor;
-	int ret;
-
-	ret = 0;
+	WT_DECL_RET;
 
 	if (session->schema_track != NULL)		/* Optional tracking */
 		WT_RET(__wt_schema_table_track_update(session, key));
@@ -128,9 +123,7 @@ __wt_schema_table_remove(WT_SESSION_IMPL *session, const char *key)
 {
 	WT_BTREE *btree;
 	WT_CURSOR *cursor;
-	int ret;
-
-	ret = 0;
+	WT_DECL_RET;
 
 	if (session->schema_track != NULL)		/* Optional tracking */
 		WT_RET(__wt_schema_table_track_update(session, key));
@@ -158,10 +151,8 @@ __wt_schema_table_read(
 {
 	WT_BTREE *btree;
 	WT_CURSOR *cursor;
+	WT_DECL_RET;
 	const char *value;
-	int ret;
-
-	ret = 0;
 
 	/* Save the caller's btree: the schema cursor will overwrite it. */
 	btree = session->btree;

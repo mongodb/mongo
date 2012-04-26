@@ -14,7 +14,7 @@
 int
 __wt_fsync(WT_SESSION_IMPL *session, WT_FH *fh)
 {
-	int ret;
+	WT_DECL_RET;
 
 	WT_VERBOSE(session, fileops, "%s: fsync", fh->name);
 

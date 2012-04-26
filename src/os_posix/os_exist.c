@@ -14,9 +14,9 @@
 int
 __wt_exist(WT_SESSION_IMPL *session, const char *filename, int *existp)
 {
-	const char *path;
+	WT_DECL_RET;
 	struct stat sb;
-	int ret;
+	const char *path;
 
 	WT_RET(__wt_filename(session, filename, &path));
 

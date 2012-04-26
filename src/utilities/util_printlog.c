@@ -13,8 +13,9 @@ int
 util_printlog(WT_SESSION *session, int argc, char *argv[])
 {
 	WT_CURSOR *cursor;
+	WT_DECL_RET;
 	WT_ITEM key, value;
-	int ch, printable, ret;
+	int ch, printable;
 
 	printable = 0;
 	while ((ch = util_getopt(argc, argv, "f:p")) != EOF)

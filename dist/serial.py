@@ -100,7 +100,7 @@ typedef struct {
 	f.write('''
 {
 \t__wt_''' + entry.name + '''_args _args, *args = &_args;
-\tint ret;
+\tWT_DECL_RET;
 
 ''')
 	for l in entry.args:

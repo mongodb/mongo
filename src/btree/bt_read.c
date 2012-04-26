@@ -14,19 +14,18 @@
 int
 __wt_cache_read(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *ref)
 {
+	WT_DECL_RET;
 	WT_ITEM tmp;
 	WT_PAGE *page;
+	size_t inmem_size;
 	uint32_t size;
 	const uint8_t *addr;
-	size_t inmem_size;
-	int ret;
 
 	/*
 	 * We don't pass in an allocated buffer, force allocation of new memory
 	 * of the appropriate size.
 	 */
 	WT_CLEAR(tmp);
-	ret = 0;
 
 	WT_ASSERT(session, ref->state == WT_REF_READING);
 

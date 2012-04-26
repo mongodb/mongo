@@ -49,7 +49,8 @@ static int
 text(WT_SESSION *session, const char *uri)
 {
 	WT_CURSOR *cursor;
-	int readkey, ret, tret;
+	WT_DECL_RET;
+	int readkey, tret;
 
 	/*
 	 * Open the cursor, configured to append new records (in the case of
@@ -102,8 +103,9 @@ static int
 insert(WT_CURSOR *cursor, const char *name, int readkey)
 {
 	ULINE key, value;
+	WT_DECL_RET;
 	uint64_t insert_count;
-	int eof, ret;
+	int eof;
 
 	memset(&key, 0, sizeof(key));
 	memset(&value, 0, sizeof(value));

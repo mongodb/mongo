@@ -50,11 +50,11 @@ int
 __wt_schema_get_btree(WT_SESSION_IMPL *session,
     const char *objname, size_t len, const char *cfg[], uint32_t flags)
 {
-	WT_ITEM uribuf;
 	WT_CONFIG_ITEM cval;
 	WT_CURSOR *cursor;
+	WT_DECL_RET;
+	WT_ITEM uribuf;
 	const char *fileuri, *name, *objconf;
-	int ret;
 
 	cursor = NULL;
 	WT_CLEAR(uribuf);
@@ -102,17 +102,17 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 {
 	WT_CONFIG cparser;
 	WT_CONFIG_ITEM ckey, cval;
+	WT_DECL_RET;
 	WT_ITEM plan;
 	char *cgname;
 	const char *fileconf;
-	int i, ret;
+	int i;
 
 	if (table->cg_complete)
 		return (0);
 
 	fileconf = NULL;
 	cgname = NULL;
-	ret = 0;
 
 	WT_RET(__wt_config_subinit(session, &cparser, &table->cgconf));
 
@@ -165,12 +165,12 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table,
 	WT_BTREE *btree;
 	WT_CONFIG colconf;
 	WT_CONFIG_ITEM ckey, cval, icols;
+	WT_DECL_RET;
 	WT_ITEM cols, fmt, plan, uribuf;
 	const char *fileuri;
 	u_int cursor_key_cols;
-	int i, ret;
+	int i;
 
-	ret = 0;
 	WT_CLEAR(uribuf);
 
 	/* Get the filename from the index config. */
@@ -268,8 +268,9 @@ __wt_schema_open_index(
     WT_SESSION_IMPL *session, WT_TABLE *table, const char *idxname, size_t len)
 {
 	WT_CURSOR *cursor;
+	WT_DECL_RET;
 	const char *idxconf, *name, *tablename, *uri;
-	int i, match, ret, skipped;
+	int i, match, skipped;
 
 	cursor = NULL;
 	skipped = 0;
@@ -348,11 +349,11 @@ __wt_schema_open_table(WT_SESSION_IMPL *session,
 	WT_CONFIG cparser;
 	WT_CONFIG_ITEM ckey, cval;
 	WT_CURSOR *cursor;
+	WT_DECL_RET;
 	WT_ITEM buf;
 	WT_TABLE *table;
 	const char *tconfig;
 	char *tablename;
-	int ret;
 
 	cursor = NULL;
 	table = NULL;

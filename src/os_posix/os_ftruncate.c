@@ -14,7 +14,7 @@
 int
 __wt_ftruncate(WT_SESSION_IMPL *session, WT_FH *fh, off_t len)
 {
-	int ret;
+	WT_DECL_RET;
 
 	WT_SYSCALL_RETRY(ftruncate(fh->fd, len), ret);
 	if (ret == 0) {

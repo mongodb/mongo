@@ -131,17 +131,17 @@ __verify_dsk_row(
 	WT_BTREE *btree;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
+	WT_DECL_RET;
 	WT_ITEM *current, *last, *last_pfx, *last_ovfl;
 	enum { FIRST, WAS_KEY, WAS_VALUE } last_cell_type;
 	void *huffman;
 	uint32_t cell_num, cell_type, i, prefix;
 	uint8_t *end;
-	int cmp, ret;
+	int cmp;
 
 	btree = session->btree;
 	huffman = btree->huffman_key;
 	unpack = &_unpack;
-	ret = 0;
 
 	current = last_pfx = last_ovfl = NULL;
 	WT_ERR(__wt_scr_alloc(session, 0, &current));

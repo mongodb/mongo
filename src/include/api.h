@@ -220,8 +220,7 @@ struct __wt_connection_impl {
 	const char *__oldname = (s)->name;				\
 	(s)->cursor = (cur);						\
 	(s)->btree = (bt);						\
-	(s)->name = #h "." #n;						\
-	ret = 0;
+	(s)->name = #h "." #n;
 
 #define	API_CALL_NOCONF(s, h, n, cur, bt) do {				\
 	API_SESSION_INIT(s, h, n, cur, bt);

@@ -39,8 +39,8 @@ __wt_bm_addr_stderr(
     WT_SESSION_IMPL *session, const uint8_t *addr, uint32_t addr_size)
 {
 	WT_BLOCK *block;
+	WT_DECL_RET;
 	WT_ITEM *buf;
-	int ret;
 
 	if ((block = session->btree->block) == NULL)
 		return (__bm_invalid(session));
@@ -119,7 +119,7 @@ int
 __wt_bm_close(WT_SESSION_IMPL *session)
 {
 	WT_BLOCK *block;
-	int ret;
+	WT_DECL_RET;
 
 	if ((block = session->btree->block) == NULL)
 		return (0);

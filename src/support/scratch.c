@@ -250,10 +250,10 @@ __wt_buf_catfmt(WT_SESSION_IMPL *session, WT_ITEM *buf, const char *fmt, ...)
 int
 __wt_scr_alloc(WT_SESSION_IMPL *session, uint32_t size, WT_ITEM **scratchp)
 {
+	WT_DECL_RET;
 	WT_ITEM *buf, **p, *best, **slot;
 	size_t allocated;
 	u_int i;
-	int ret;
 
 	/* Don't risk the caller not catching the error. */
 	*scratchp = NULL;

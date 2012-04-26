@@ -81,10 +81,9 @@ __wt_schema_table_track_on(WT_SESSION_IMPL *session)
 int
 __wt_schema_table_track_off(WT_SESSION_IMPL *session, int unroll)
 {
+	WT_DECL_RET;
 	WT_SCHEMA_TRACK *trk, *trk_orig;
-	int ret, tret;
-
-	ret = 0;
+	int tret;
 
 	if (session->schema_track == NULL || session->schema_track_entries == 0)
 		return (0);
@@ -186,8 +185,8 @@ __wt_schema_table_track_insert(WT_SESSION_IMPL *session, const char *key)
 int
 __wt_schema_table_track_update(WT_SESSION_IMPL *session, const char *key)
 {
+	WT_DECL_RET;
 	WT_SCHEMA_TRACK *trk;
-	int ret;
 
 	WT_RET(__schema_table_track_next(session, &trk));
 

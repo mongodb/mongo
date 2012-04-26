@@ -25,10 +25,9 @@ int
 __wt_session_snap_get(WT_SESSION_IMPL *session, const char *name, WT_ITEM *addr)
 {
 	WT_BTREE *btree;
-	int ret;
+	WT_DECL_RET;
 
 	btree = session->btree;
-	ret = 0;
 
 	/* Get the snapshot address. */
 	ret = strcmp(btree->filename, WT_SCHEMA_FILENAME) == 0 ?
@@ -65,7 +64,7 @@ __wt_session_snap_get(WT_SESSION_IMPL *session, const char *name, WT_ITEM *addr)
 int
 __wt_session_snap_clear(WT_SESSION_IMPL *session, const char *filename)
 {
-	int ret;
+	WT_DECL_RET;
 
 	ret = strcmp(filename, WT_SCHEMA_FILENAME) == 0 ?
 	    __snap_set_turtle(session, NULL) :
@@ -110,13 +109,12 @@ static int
 __snap_get_turtle_config(
     WT_SESSION_IMPL *session, char *line, size_t len)
 {
-	const char *path;
 	FILE *fp;
-	int ret;
+	WT_DECL_RET;
+	const char *path;
 	char *p;
 
 	fp = NULL;
-	ret = 0;
 	path = NULL;
 
 	/* Retrieve the turtle file's entry. */
@@ -148,14 +146,13 @@ err:	__wt_free(session, path);
 static int
 __snap_set_turtle(WT_SESSION_IMPL *session, const char *v)
 {
-	WT_ITEM *buf;
 	FILE *fp;
+	WT_DECL_RET;
+	WT_ITEM *buf;
 	size_t len;
-	int ret;
 	const char *path;
 
 	buf = NULL;
-	ret = 0;
 	path = NULL;
 
 	WT_ERR(__wt_filename(session, WT_SCHEMA_TURTLE_SET, &path));
@@ -196,14 +193,13 @@ static int
 __snap_get(WT_SESSION_IMPL *session, const char *name, WT_ITEM *addr)
 {
 	WT_BTREE *btree;
+	WT_DECL_RET;
 	WT_ITEM *key;
 	const char *config;
-	int ret;
 
 	btree = session->btree;
 	config = NULL;
 	key = NULL;
-	ret = 0;
 
 	/* Retrieve the schema-table's entry for the file. */
 	WT_ERR(__wt_scr_alloc(session, 0, &key));
@@ -231,13 +227,12 @@ err:	__wt_scr_free(&key);
 static int
 __snap_set(WT_SESSION_IMPL *session, const char *filename, const char *v)
 {
+	WT_DECL_RET;
 	WT_ITEM *key;
 	const char *config, *cfg[3], *newcfg;
-	int ret;
 
 	key = NULL;
 	config = newcfg = NULL;
-	ret = 0;
 
 	/* Retrieve the schema table information for this file. */
 	WT_ERR(__wt_scr_alloc(session, 0, &key));
@@ -349,10 +344,10 @@ __wt_session_snap_list_get(
 	WT_BTREE *btree;
 	WT_CONFIG snapconf;
 	WT_CONFIG_ITEM a, k, v;
+	WT_DECL_RET;
 	WT_ITEM *key;
 	WT_SNAPSHOT *snap, *snapbase;
 	size_t allocated, slot;
-	int ret;
 	const char *config;
 	char line[1024], timebuf[64];
 
@@ -469,15 +464,14 @@ int
 __wt_session_snap_list_set(WT_SESSION_IMPL *session, WT_SNAPSHOT *snapbase)
 {
 	WT_BTREE *btree;
+	WT_DECL_RET;
 	WT_ITEM *buf;
 	WT_SNAPSHOT *snap;
 	int64_t order;
-	int ret;
 	const char *sep;
 
 	btree = session->btree;
 	buf = NULL;
-	ret = 0;
 
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));
 	order = 0;

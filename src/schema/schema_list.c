@@ -52,7 +52,7 @@ int
 __wt_schema_get_table(WT_SESSION_IMPL *session,
     const char *name, size_t namelen, WT_TABLE **tablep)
 {
-	int ret;
+	WT_DECL_RET;
 
 	ret = __wt_schema_find_table(session, name, namelen, tablep);
 
@@ -102,10 +102,9 @@ __wt_schema_remove_table(
 int
 __wt_schema_close_tables(WT_SESSION_IMPL *session)
 {
+	WT_DECL_RET;
 	WT_TABLE *table;
-	int ret;
 
-	ret = 0;
 	while ((table = TAILQ_FIRST(&session->tables)) != NULL)
 		WT_TRET(__wt_schema_remove_table(session, table));
 

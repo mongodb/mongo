@@ -18,12 +18,12 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
    int (*func)(WT_SESSION_IMPL *, const char *[]), uint32_t open_flags)
 {
 	WT_BTREE *cg;
+	WT_DECL_RET;
 	WT_TABLE *table;
+	int i;
 	const char *tablename;
-	int i, ret;
 
 	tablename = uri;
-	ret = 0;
 
 	/* Get the btree handle(s) and call the underlying function. */
 	if (WT_PREFIX_MATCH(uri, "file:")) {

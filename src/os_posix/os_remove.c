@@ -14,10 +14,10 @@
 int
 __wt_remove(WT_SESSION_IMPL *session, const char *name)
 {
-	const char *path;
 	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
 	WT_FH *fh;
-	int ret;
+	const char *path;
 
 	conn = S2C(session);
 	fh = NULL;

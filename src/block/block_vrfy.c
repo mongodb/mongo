@@ -147,12 +147,10 @@ __verify_start_avail(
     WT_SESSION_IMPL *session, WT_BLOCK *block, WT_SNAPSHOT *snapbase)
 {
 	WT_BLOCK_SNAPSHOT *si, _si;
+	WT_DECL_RET;
 	WT_EXT *ext;
 	WT_EXTLIST *el;
 	WT_SNAPSHOT *snap;
-	int ret;
-
-	ret = 0;
 
 	/* Get the last on-disk snapshot, if one exists. */
 	WT_SNAPSHOT_FOREACH(snapbase, snap)
@@ -186,7 +184,7 @@ __verify_start_avail(
 int
 __wt_block_verify_end(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
-	int ret;
+	WT_DECL_RET;
 
 	/* Confirm we verified every file block. */
 	ret = __verify_filefrag_chk(session, block);
@@ -293,7 +291,7 @@ int
 __wt_verify_snap_unload(
     WT_SESSION_IMPL *session, WT_BLOCK *block, WT_BLOCK_SNAPSHOT *si)
 {
-	int ret;
+	WT_DECL_RET;
 
 	WT_UNUSED(si);
 
@@ -314,9 +312,9 @@ int
 __wt_block_verify(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf,
     const uint8_t *addr, uint32_t addr_size, off_t offset, uint32_t size)
 {
+	WT_DECL_RET;
 	WT_ITEM *tmp;
 	uint32_t frag, frags, i, match;
-	int ret;
 
 	/*
 	 * If we've already verify this block's physical image, we know it's
@@ -436,10 +434,8 @@ __verify_filefrag_add(WT_SESSION_IMPL *session,
 static int
 __verify_filefrag_chk(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
+	WT_DECL_RET;
 	uint32_t first, last;
-	int ret;
-
-	ret = 0;
 
 	/*
 	 * Check for file fragments we haven't verified -- every time we find
@@ -517,10 +513,8 @@ __verify_snapfrag_add(
 static int
 __verify_snapfrag_chk(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
+	WT_DECL_RET;
 	uint32_t first, last;
-	int ret;
-
-	ret = 0;
 
 	/*
 	 * Check for snapshot fragments we haven't verified -- every time we

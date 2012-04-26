@@ -41,10 +41,10 @@ __conn_load_extension(
 {
 	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
 	WT_DLH *dlh;
 	WT_SESSION_IMPL *session;
 	int (*entry)(WT_SESSION *, WT_EXTENSION_API *, const char *);
-	int ret;
 	const char *entry_name;
 
 	dlh = NULL;
@@ -92,8 +92,8 @@ __conn_add_cursor_type(WT_CONNECTION *wt_conn,
     const char *prefix, WT_CURSOR_TYPE *ctype, const char *config)
 {
 	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int ret;
 
 	WT_UNUSED(prefix);
 	WT_UNUSED(ctype);
@@ -115,9 +115,9 @@ __conn_add_collator(WT_CONNECTION *wt_conn,
     const char *name, WT_COLLATOR *collator, const char *config)
 {
 	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
 	WT_NAMED_COLLATOR *ncoll;
 	WT_SESSION_IMPL *session;
-	int ret;
 
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 	CONNECTION_API_CALL(conn, session, add_collator, config, cfg);
@@ -145,9 +145,9 @@ __conn_add_compressor(WT_CONNECTION *wt_conn,
     const char *name, WT_COMPRESSOR *compressor, const char *config)
 {
 	WT_CONNECTION_IMPL *conn;
-	WT_SESSION_IMPL *session;
+	WT_DECL_RET;
 	WT_NAMED_COMPRESSOR *ncomp;
-	int ret;
+	WT_SESSION_IMPL *session;
 
 	WT_UNUSED(name);
 	WT_UNUSED(compressor);
@@ -218,8 +218,8 @@ __conn_add_extractor(WT_CONNECTION *wt_conn,
     const char *name, WT_EXTRACTOR *extractor, const char *config)
 {
 	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int ret;
 
 	WT_UNUSED(name);
 	WT_UNUSED(extractor);
@@ -256,13 +256,12 @@ static int
 __conn_close(WT_CONNECTION *wt_conn, const char *config)
 {
 	WT_CONNECTION_IMPL *conn;
-	WT_SESSION_IMPL *s, *session, **tp;
-	WT_SESSION *wt_session;
+	WT_DECL_RET;
 	WT_NAMED_COLLATOR *ncoll;
 	WT_NAMED_COMPRESSOR *ncomp;
-	int ret;
+	WT_SESSION *wt_session;
+	WT_SESSION_IMPL *s, *session, **tp;
 
-	ret = 0;
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 
 	CONNECTION_API_CALL(conn, session, close, config, cfg);
@@ -311,12 +310,11 @@ __conn_open_session(WT_CONNECTION *wt_conn,
     WT_SESSION **wt_sessionp)
 {
 	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session, *session_ret;
-	int ret;
 
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 	session_ret = NULL;
-	ret = 0;
 
 	CONNECTION_API_CALL(conn, session, open_session, config, cfg);
 	WT_UNUSED(cfg);
@@ -374,10 +372,10 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_CONFIG subconfig;
 	WT_CONFIG_ITEM cval, skey, sval;
 	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
 	WT_ITEM *cbuf, expath, exconfig;
 	WT_SESSION *wt_session;
 	WT_SESSION_IMPL *session;
-	int ret;
 	const char *cfg[] =
 	    { __wt_confdfl_wiredtiger_open, config, NULL, NULL };
 
@@ -605,10 +603,11 @@ __conn_single(WT_CONNECTION_IMPL *conn, const char **cfg)
 {
 	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *t;
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	off_t size;
 	uint32_t len;
-	int created, ret;
+	int created;
 	char buf[256];
 
 	session = &conn->default_session;
@@ -635,7 +634,6 @@ __conn_single(WT_CONNECTION_IMPL *conn, const char **cfg)
 		    "process");
 
 	/* Check to see if another thread of control has this database open. */
-	ret = 0;
 	__wt_spin_lock(session, &__wt_process.spinlock);
 	TAILQ_FOREACH(t, &__wt_process.connqh, q)
 		if (t->home != NULL &&
@@ -691,12 +689,13 @@ err:	if (conn->lock_fh != NULL) {
 static int
 __conn_config(WT_CONNECTION_IMPL *conn, const char **cfg, WT_ITEM **cbufp)
 {
-	WT_ITEM *cbuf;
+	WT_DECL_RET;
 	WT_FH *fh;
+	WT_ITEM *cbuf;
 	WT_SESSION_IMPL *session;
 	off_t size;
 	uint32_t len;
-	int exist, quoted, ret;
+	int exist, quoted;
 	uint8_t *p, *t;
 
 	*cbufp = NULL;				/* Returned buffer */
@@ -704,7 +703,6 @@ __conn_config(WT_CONNECTION_IMPL *conn, const char **cfg, WT_ITEM **cbufp)
 	cbuf = NULL;
 	fh = NULL;
 	session = &conn->default_session;
-	ret = 0;
 
 	/* Check for an optional configuration file. */
 #define	WT_CONFIGFILE	"WiredTiger.config"

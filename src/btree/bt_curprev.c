@@ -414,8 +414,9 @@ new_insert:	if ((ins = cbt->ins) != NULL) {
 int
 __wt_btcur_prev(WT_CURSOR_BTREE *cbt)
 {
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int newpage, ret;
+	int newpage;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	WT_BSTAT_INCR(session, cursor_read_prev);

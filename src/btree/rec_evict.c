@@ -24,10 +24,10 @@ int
 __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 {
 	WT_CONNECTION_IMPL *conn;
-	int ret, single;
+	WT_DECL_RET;
+	int single;
 
 	conn = S2C(session);
-	ret = 0;
 
 	WT_VERBOSE(session, evict,
 	    "page %p (%s)", page, __wt_page_type_string(page->type));

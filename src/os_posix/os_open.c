@@ -15,16 +15,16 @@ int
 __wt_open(WT_SESSION_IMPL *session,
     const char *name, int ok_create, int exclusive, int is_tree, WT_FH **fhp)
 {
-	const char *path;
 	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
 	WT_FH *fh;
 	mode_t mode;
-	int f, fd, matched, ret;
+	int f, fd, matched;
+	const char *path;
 
 	conn = S2C(session);
 	fh = NULL;
 	fd = -1;
-	ret = 0;
 
 	WT_VERBOSE(session, fileops, "%s: open", name);
 
@@ -118,10 +118,9 @@ int
 __wt_close(WT_SESSION_IMPL *session, WT_FH *fh)
 {
 	WT_CONNECTION_IMPL *conn;
-	int ret;
+	WT_DECL_RET;
 
 	conn = S2C(session);
-	ret = 0;
 
 	if (fh == NULL || fh->refcnt == 0 || --fh->refcnt > 0)
 		return (0);

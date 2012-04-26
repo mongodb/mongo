@@ -21,7 +21,7 @@ int
 __wt_block_snap_init(WT_SESSION_IMPL *session,
     WT_BLOCK *block, WT_BLOCK_SNAPSHOT *si, int is_live)
 {
-	int ret;
+	WT_DECL_RET;
 
 	/*
 	 * If we're loading a new live snapshot, there shouldn't be one already
@@ -32,10 +32,8 @@ __wt_block_snap_init(WT_SESSION_IMPL *session,
 		__wt_spin_lock(session, &block->live_lock);
 		if (block->live_load)
 			ret = EINVAL;
-		else {
+		else
 			block->live_load = 1;
-			ret = 0;
-		}
 		__wt_spin_unlock(session, &block->live_lock);
 		if (ret)
 			WT_RET_MSG(session, EINVAL, "snapshot already loaded");
@@ -66,12 +64,11 @@ __wt_block_snapshot_load(WT_SESSION_IMPL *session,
     WT_BLOCK *block, WT_ITEM *dsk, const uint8_t *addr, uint32_t addr_size,
     int readonly)
 {
-	WT_ITEM *tmp;
 	WT_BLOCK_SNAPSHOT *si;
-	int ret;
+	WT_DECL_RET;
+	WT_ITEM *tmp;
 
 	tmp = NULL;
-	ret = 0;
 
 	/*
 	 * Sometimes we don't find a root page (we weren't given a snapshot,
@@ -154,9 +151,7 @@ int
 __wt_block_snapshot_unload(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
 	WT_BLOCK_SNAPSHOT *si;
-	int ret;
-
-	ret = 0;
+	WT_DECL_RET;
 
 	WT_VERBOSE(session, snapshot, "%s: unload snapshot", block->name);
 
@@ -246,12 +241,13 @@ __snapshot_process(
     WT_SESSION_IMPL *session, WT_BLOCK *block, WT_SNAPSHOT *snapbase)
 {
 	WT_BLOCK_SNAPSHOT *a, *b, *si;
+	WT_DECL_RET;
 	WT_ITEM *tmp;
 	WT_SNAPSHOT *snap;
-	int found, live_merge, locked, ret;
+	int found, live_merge, locked;
 
 	tmp = NULL;
-	live_merge = locked = ret = 0;
+	live_merge = locked = 0;
 
 	/*
 	 * To delete a snapshot, we'll need snapshot information for it, and we
@@ -502,12 +498,11 @@ static int
 __snapshot_update(WT_SESSION_IMPL *session,
     WT_BLOCK *block, WT_SNAPSHOT *snap, WT_BLOCK_SNAPSHOT *si, int is_live)
 {
+	WT_DECL_RET;
 	WT_ITEM *tmp;
 	uint8_t *endp;
-	int ret;
 
 	tmp = NULL;
-	ret = 0;
 
 #ifdef HAVE_DIAGNOSTIC
 	/* Check the extent list combinations for overlaps. */

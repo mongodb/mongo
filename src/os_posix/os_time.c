@@ -14,7 +14,7 @@
 int
 __wt_epoch(WT_SESSION_IMPL *session, uint64_t *secp, uint64_t *nsecp)
 {
-	int ret;
+	WT_DECL_RET;
 
 #if defined(HAVE_CLOCK_GETTIME)
 	struct timespec v;

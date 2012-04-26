@@ -14,6 +14,7 @@
 int
 __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 {
+	WT_DECL_RET;
 	WT_INSERT *ins;
 	WT_INSERT_HEAD **inshead, *new_inshead, **new_inslist;
 	WT_ITEM *key, *value;
@@ -23,7 +24,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 	size_t new_inshead_size, new_inslist_size, new_upd_size;
 	uint32_t ins_slot;
 	u_int skipdepth;
-	int i, ret;
+	int i;
 
 	key = &cbt->iface.key;
 	value = is_remove ? NULL : &cbt->iface.value;
@@ -35,7 +36,6 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 	new_inslist = NULL;
 	new_upd = NULL;
 	upd = NULL;
-	ret = 0;
 
 	/*
 	 * Modify: allocate an update array as necessary, build a WT_UPDATE
@@ -186,14 +186,12 @@ __wt_row_insert_alloc(WT_SESSION_IMPL *session,
 void
 __wt_insert_serial_func(WT_SESSION_IMPL *session)
 {
+	WT_DECL_RET;
 	WT_INSERT *new_ins, ***ins_stack;
 	WT_INSERT_HEAD **inshead, **new_inslist, *new_inshead;
 	WT_PAGE *page;
 	uint32_t write_gen;
 	u_int i, skipdepth;
-	int  ret;
-
-	ret = 0;
 
 	__wt_insert_unpack(session, &page, &write_gen, &inshead,
 	    &ins_stack, &new_inslist, &new_inshead, &new_ins, &skipdepth);
@@ -284,12 +282,10 @@ __wt_update_alloc(WT_SESSION_IMPL *session,
 void
 __wt_update_serial_func(WT_SESSION_IMPL *session)
 {
+	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_UPDATE **new_upd, *upd, **upd_entry;
 	uint32_t write_gen;
-	int ret;
-
-	ret = 0;
 
 	__wt_update_unpack(
 	    session, &page, &write_gen, &upd_entry, &new_upd, &upd);

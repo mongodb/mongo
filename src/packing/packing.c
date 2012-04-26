@@ -16,9 +16,10 @@ int
 __wt_struct_check(WT_SESSION_IMPL *session,
     const char *fmt, size_t len, int *fixedp, uint32_t *fixed_lenp)
 {
+	WT_DECL_RET;
 	WT_PACK pack;
 	WT_PACK_VALUE pv;
-	int fields, ret;
+	int fields;
 
 	WT_CLEAR(pv);		/* -Wuninitialized. */
 
@@ -92,10 +93,10 @@ int
 __wt_struct_packv(WT_SESSION_IMPL *session,
     void *buffer, size_t size, const char *fmt, va_list ap)
 {
+	WT_DECL_RET;
 	WT_PACK pack;
 	WT_PACK_VALUE pv;
 	uint8_t *p, *end;
-	int ret;
 
 	WT_CLEAR(pv);		/* -Wuninitialized */
 
@@ -125,8 +126,8 @@ int
 __wt_struct_pack(WT_SESSION_IMPL *session,
     void *buffer, size_t size, const char *fmt, ...)
 {
+	WT_DECL_RET;
 	va_list ap;
-	int ret;
 
 	va_start(ap, fmt);
 	ret = __wt_struct_packv(session, buffer, size, fmt, ap);
@@ -143,10 +144,10 @@ int
 __wt_struct_unpackv(WT_SESSION_IMPL *session,
     const void *buffer, size_t size, const char *fmt, va_list ap)
 {
+	WT_DECL_RET;
 	WT_PACK pack;
 	WT_PACK_VALUE pv;
 	const uint8_t *p, *end;
-	int ret;
 
 	WT_RET(__pack_init(session, &pack, fmt));
 
@@ -174,8 +175,8 @@ int
 __wt_struct_unpack(WT_SESSION_IMPL *session,
     const void *buffer, size_t size, const char *fmt, ...)
 {
+	WT_DECL_RET;
 	va_list ap;
-	int ret;
 
 	va_start(ap, fmt);
 	ret = __wt_struct_unpackv(session, buffer, size, fmt, ap);

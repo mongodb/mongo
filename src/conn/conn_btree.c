@@ -20,14 +20,14 @@ __wt_conn_btree_open(WT_SESSION_IMPL *session,
 	WT_BTREE *btree;
 	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
 	WT_ITEM *addr;
-	int matched, ret;
+	int matched;
 	char *p, *snapshot;
 
 	conn = S2C(session);
 	addr = NULL;
 	snapshot = NULL;
-	ret = 0;
 
 	WT_STAT_INCR(conn->stats, file_open);
 
@@ -198,11 +198,11 @@ __wt_conn_btree_close(WT_SESSION_IMPL *session, int locked)
 {
 	WT_BTREE *btree;
 	WT_CONNECTION_IMPL *conn;
-	int inuse, ret;
+	WT_DECL_RET;
+	int inuse;
 
 	btree = session->btree;
 	conn = S2C(session);
-	ret = 0;
 
 	if (F_ISSET(btree, WT_BTREE_OPEN))
 		WT_STAT_DECR(conn->stats, file_open);
@@ -236,9 +236,7 @@ __wt_conn_btree_close(WT_SESSION_IMPL *session, int locked)
 static int
 __conn_btree_remove(WT_SESSION_IMPL *session, WT_BTREE *btree)
 {
-	int ret;
-
-	ret = 0;
+	WT_DECL_RET;
 
 	if (F_ISSET(btree, WT_BTREE_OPEN)) {
 		WT_SET_BTREE_IN_SESSION(session, btree);
@@ -264,10 +262,8 @@ __wt_conn_btree_remove(WT_CONNECTION_IMPL *conn)
 {
 	WT_BTREE *btree;
 	WT_BTREE_SESSION *btree_session;
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int ret;
-
-	ret = 0;
 
 	/*
 	 * We need a session handle because we're potentially reading/writing
@@ -323,13 +319,12 @@ int
 __wt_conn_btree_reopen(
     WT_SESSION_IMPL *session, const char *cfg[], uint32_t flags)
 {
-	WT_ITEM *addr;
 	WT_BTREE *btree;
-	int ret;
+	WT_DECL_RET;
+	WT_ITEM *addr;
 
 	addr = NULL;
 	btree = session->btree;
-	ret = 0;
 
 	if (F_ISSET(btree, WT_BTREE_OPEN)) {
 		WT_RET(__wt_btree_close(session));

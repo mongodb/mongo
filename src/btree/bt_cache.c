@@ -16,11 +16,10 @@ __wt_cache_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 {
 	WT_CACHE *cache;
 	WT_CONFIG_ITEM cval;
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int ret;
 
 	session = &conn->default_session;
-	ret = 0;
 
 	WT_RET(__wt_calloc_def(session, 1, &conn->cache));
 	cache = conn->cache;

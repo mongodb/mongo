@@ -15,11 +15,11 @@ static int
 __rename_file(
     WT_SESSION_IMPL *session, const char *uri, const char *newuri)
 {
-	int exist, ret;
+	WT_DECL_RET;
+	int exist;
 	const char *filename, *newfile, *value;
 
 	value = NULL;
-	ret = 0;
 
 	filename = uri;
 	newfile = newuri;
@@ -68,12 +68,11 @@ err:	__wt_free(session, value);
 static int
 __rename_tree(WT_SESSION_IMPL *session, WT_BTREE *btree, const char *newname)
 {
+	WT_DECL_RET;
 	WT_ITEM *of, *nf, *nk, *nv;
-	int ret;
 	const char *newfile, *p, *t, *value;
 
 	nf = nk = nv = of = NULL;
-	ret = 0;
 
 	/* Read the old schema value. */
 	WT_ERR(__wt_schema_table_read(session, btree->name, &value));
@@ -141,13 +140,13 @@ __rename_table(
     WT_SESSION_IMPL *session, const char *oldname, const char *newname)
 {
 	WT_BTREE *btree;
+	WT_DECL_RET;
 	WT_ITEM *buf;
 	WT_TABLE *table;
-	int i, ret;
+	int i;
 	const char *value;
 
 	buf = NULL;
-	ret = 0;
 
 	WT_RET(
 	    __wt_schema_get_table(session, oldname, strlen(oldname), &table));
@@ -190,8 +189,8 @@ int
 __wt_schema_rename(WT_SESSION_IMPL *session,
     const char *uri, const char *newuri, const char *cfg[])
 {
+	WT_DECL_RET;
 	const char *oldname, *newname;
-	int ret;
 
 	WT_UNUSED(cfg);
 

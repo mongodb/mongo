@@ -25,6 +25,17 @@ for f in `find examples ext src test -name '*.[chisy]' -o -name '*.in' |
 		cat $t
 	}
 
+	if  expr "$f" : 'examples/.*' > /dev/null ||
+	    expr "$f" : 'test/.*' > /dev/null ||
+	    expr "$f" : 'ext/.*' > /dev/null; then
+	else
+		egrep -w ret $f | egrep 'int.*[, ]ret[,;]' > $t
+		test -s $t && {
+			echo "$f: explicit declaration of \"ret\""
+			cat $t
+		}
+	fi
+
 	# Early exits from critical loops
 	sed -n -e '/API_CALL/,/API_END/{=;p;}' \
 	       -e '/va_start/,/va_end/{=;p;}' $f | \

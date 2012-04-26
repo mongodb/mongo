@@ -140,3 +140,6 @@
 #define	WT_PREFIX_SKIP(str, pre)					\
 	((strncmp((str), (pre), strlen(pre)) == 0) ?			\
 	    ((str) += strlen(pre), 1) : 0)
+
+/* Local "ret" declaration and initialization. */
+#define	WT_DECL_RET	int ret = 0

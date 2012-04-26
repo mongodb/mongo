@@ -18,8 +18,8 @@ static int usage(void);
 static inline int
 dump_forward(WT_CURSOR *cursor, const char *name)
 {
+	WT_DECL_RET;
 	const char *key, *value;
-	int ret;
 
 	while ((ret = cursor->next(cursor)) == 0) {
 		if ((ret = cursor->get_key(cursor, &key)) != 0)
@@ -35,8 +35,8 @@ dump_forward(WT_CURSOR *cursor, const char *name)
 static inline int
 dump_reverse(WT_CURSOR *cursor, const char *name)
 {
+	WT_DECL_RET;
 	const char *key, *value;
-	int ret;
 
 	while ((ret = cursor->prev(cursor)) == 0) {
 		if ((ret = cursor->get_key(cursor, &key)) != 0)
@@ -53,8 +53,9 @@ int
 util_dump(WT_SESSION *session, int argc, char *argv[])
 {
 	WT_CURSOR *cursor;
+	WT_DECL_RET;
 	size_t len;
-	int ch, hex, ret, reverse;
+	int ch, hex, reverse;
 	char *config, *name, *snapshot;
 
 	hex = reverse = 0;
@@ -138,9 +139,8 @@ static int
 schema(WT_SESSION *session, const char *uri)
 {
 	WT_CURSOR *cursor;
-	int ret, tret;
-
-	ret = 0;
+	WT_DECL_RET;
+	int tret;
 
 	/* Open the schema file. */
 	if ((ret = session->open_cursor(
@@ -173,11 +173,10 @@ schema_table(WT_SESSION *session, WT_CURSOR *cursor, const char *uri)
 		char *key;			/* Schema key */
 		char *value;			/* Schema value */
 	} *list;
-	int i, elem, list_elem, ret;
+	WT_DECL_RET;
+	int i, elem, list_elem;
 	const char *key, *name, *value;
 	char *buf, *filename, *p, *t, *sep;
-
-	ret = 0;
 
 	/* Get the name. */
 	if ((name = strchr(uri, ':')) == NULL) {
@@ -294,10 +293,8 @@ schema_table(WT_SESSION *session, WT_CURSOR *cursor, const char *uri)
 static int
 schema_file(WT_SESSION *session, WT_CURSOR *cursor, const char *uri)
 {
+	WT_DECL_RET;
 	const char *key, *value;
-	int ret;
-
-	ret = 0;
 
 	cursor->set_key(cursor, uri);
 	if ((ret = cursor->search(cursor)) != 0)
@@ -349,8 +346,8 @@ static int
 print_config(WT_SESSION *session,
     const char *key, const char *v1, const char *v2)
 {
+	WT_DECL_RET;
 	const char *value_ret;
-	int ret;
 
 	/*
 	 * The underlying call will ignore v2 if v1 is NULL -- check here and

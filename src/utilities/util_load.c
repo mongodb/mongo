@@ -72,7 +72,8 @@ static int
 load_dump(WT_SESSION *session)
 {
 	WT_CURSOR *cursor;
-	int hex, ret, tret;
+	WT_DECL_RET;
+	int hex, tret;
 	char **entry, **list, *p, *uri, config[64];
 
 	list = NULL;            /* -Wuninitialized */
@@ -383,8 +384,9 @@ static int
 insert(WT_CURSOR *cursor, const char *name)
 {
 	ULINE key, value;
+	WT_DECL_RET;
 	uint64_t insert_count;
-	int eof, ret;
+	int eof;
 
 	memset(&key, 0, sizeof(key));
 	memset(&value, 0, sizeof(value));

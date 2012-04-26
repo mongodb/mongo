@@ -122,9 +122,9 @@ __wt_btcur_search(WT_CURSOR_BTREE *cbt)
 {
 	WT_BTREE *btree;
 	WT_CURSOR *cursor;
+	WT_DECL_RET;
 	WT_ITEM *val;
 	WT_SESSION_IMPL *session;
-	int ret;
 
 	btree = cbt->btree;
 	cursor = &cbt->iface;
@@ -167,10 +167,10 @@ int
 __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exact)
 {
 	WT_BTREE *btree;
-	WT_ITEM *val;
 	WT_CURSOR *cursor;
+	WT_DECL_RET;
+	WT_ITEM *val;
 	WT_SESSION_IMPL *session;
-	int ret;
 
 	btree = cbt->btree;
 	cursor = &cbt->iface;
@@ -236,8 +236,8 @@ __wt_btcur_insert(WT_CURSOR_BTREE *cbt)
 {
 	WT_BTREE *btree;
 	WT_CURSOR *cursor;
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int ret;
 
 	btree = cbt->btree;
 	cursor = &cbt->iface;
@@ -323,8 +323,8 @@ __wt_btcur_remove(WT_CURSOR_BTREE *cbt)
 {
 	WT_BTREE *btree;
 	WT_CURSOR *cursor;
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int ret;
 
 	btree = cbt->btree;
 	cursor = &cbt->iface;
@@ -378,8 +378,8 @@ __wt_btcur_update(WT_CURSOR_BTREE *cbt)
 {
 	WT_BTREE *btree;
 	WT_CURSOR *cursor;
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int ret;
 
 	btree = cbt->btree;
 	cursor = &cbt->iface;

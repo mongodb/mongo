@@ -100,8 +100,8 @@ __wt_page_inmem(WT_SESSION_IMPL *session,
     WT_PAGE *parent, WT_REF *parent_ref, WT_PAGE_HEADER *dsk,
     size_t *inmem_sizep, WT_PAGE **pagep)
 {
+	WT_DECL_RET;
 	WT_PAGE *page;
-	int ret;
 
 	WT_ASSERT_RET(session, dsk->u.entries > 0);
 
@@ -298,20 +298,19 @@ static int
 __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 {
 	WT_BTREE *btree;
-	WT_ITEM *current, *last, *tmp;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
+	WT_DECL_RET;
+	WT_ITEM *current, *last, *tmp;
 	WT_PAGE_HEADER *dsk;
 	WT_REF *ref;
 	uint32_t i, nindx, prefix;
-	int ret;
 	void *huffman;
 
 	btree = session->btree;
 	current = last = NULL;
 	unpack = &_unpack;
 	dsk = page->dsk;
-	ret = 0;
 	huffman = btree->huffman_key;
 
 	WT_ERR(__wt_scr_alloc(session, 0, &current));

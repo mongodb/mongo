@@ -14,7 +14,8 @@ static int usage(void);
 int
 util_list(WT_SESSION *session, int argc, char *argv[])
 {
-	int ch, ret, sflag, vflag;
+	WT_DECL_RET;
+	int ch, sflag, vflag;
 	char *name;
 
 	sflag = vflag = 0;
@@ -62,10 +63,8 @@ static int
 list_print(WT_SESSION *session, const char *name, int sflag, int vflag)
 {
 	WT_CURSOR *cursor;
-	int ret;
+	WT_DECL_RET;
 	const char *key, *value;
-
-	ret = 0;
 
 	/* Open the schema file. */
 	if ((ret = session->open_cursor(
@@ -124,11 +123,11 @@ list_print(WT_SESSION *session, const char *name, int sflag, int vflag)
 static int
 list_print_snapshot(WT_SESSION *session, const char *config)
 {
+	WT_DECL_RET;
 	WT_SNAPSHOT *snap, *snapbase;
 	size_t len;
 	time_t t;
 	uint64_t v;
-	int ret;
 	char buf[256];
 
 	/*

@@ -134,11 +134,11 @@ static int __wt_huffman_read(WT_SESSION_IMPL *,
 int
 __wt_btree_huffman_open(WT_SESSION_IMPL *session, const char *config)
 {
-	WT_BTREE *btree;
-	u_int entries, numbytes;
 	struct __wt_huffman_table *table;
+	WT_BTREE *btree;
 	WT_CONFIG_ITEM key_conf, value_conf;
-	int ret;
+	WT_DECL_RET;
+	u_int entries, numbytes;
 
 	btree = session->btree;
 
@@ -226,12 +226,11 @@ __wt_huffman_read(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *ip,
 {
 	struct __wt_huffman_table *table, *tp;
 	FILE *fp;
+	WT_DECL_RET;
 	uint64_t symbol, frequency;
 	u_int entries, lineno;
-	int ret;
 	char *file;
 
-	ret = 0;
 	file = NULL;
 	table = NULL;
 

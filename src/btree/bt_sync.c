@@ -25,8 +25,8 @@ int
 __wt_btree_snapshot(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_CONFIG_ITEM cval;
+	WT_DECL_RET;
 	char *name;
-	int ret;
 
 	name = NULL;
 
@@ -61,7 +61,7 @@ int
 __wt_btree_snapshot_drop(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_CONFIG_ITEM cval;
-	int ret;
+	WT_DECL_RET;
 	char *name;
 
 	name = NULL;
@@ -114,13 +114,13 @@ static int
 __snapshot_worker(
     WT_SESSION_IMPL *session, const char *name, int discard, snapshot_op op)
 {
-	WT_SNAPSHOT *match, *snapbase, *snap;
 	WT_BTREE *btree;
-	int force, ret;
+	WT_DECL_RET;
+	WT_SNAPSHOT *match, *snapbase, *snap;
+	int force;
 
 	btree = session->btree;
 	match = snapbase = NULL;
-	ret = 0;
 
 	/* Snapshots are single-threaded. */
 	__wt_writelock(session, btree->snaplock);
@@ -293,7 +293,7 @@ err:	__wt_session_snap_list_free(session, snapbase);
 int
 __wt_cache_flush(WT_SESSION_IMPL *session, int op)
 {
-	int ret;
+	WT_DECL_RET;
 
 	/*
 	 * Ask the eviction thread to flush any dirty pages, and optionally

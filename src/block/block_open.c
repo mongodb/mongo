@@ -16,8 +16,8 @@ static int __desc_read(WT_SESSION_IMPL *, WT_BLOCK *);
 int
 __wt_block_truncate(WT_SESSION_IMPL *session, const char *filename)
 {
+	WT_DECL_RET;
 	WT_FH *fh;
-	int ret;
 
 	/* Open the underlying file handle. */
 	WT_RET(__wt_open(session, filename, 0, 0, 1, &fh));
@@ -41,8 +41,8 @@ err:	WT_TRET(__wt_close(session, fh));
 int
 __wt_block_create(WT_SESSION_IMPL *session, const char *filename)
 {
+	WT_DECL_RET;
 	WT_FH *fh;
-	int ret;
 
 	/* Create the underlying file and open a handle. */
 	WT_RET(__wt_open(session, filename, 1, 1, 1, &fh));
@@ -71,8 +71,8 @@ __wt_block_open(WT_SESSION_IMPL *session,
 	WT_BLOCK *block;
 	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
 	WT_NAMED_COMPRESSOR *ncomp;
-	int ret;
 
 	*(void **)retp = NULL;
 	conn = S2C(session);
@@ -145,9 +145,7 @@ err:	(void)__wt_block_close(session, block);
 int
 __wt_block_close(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
-	int ret;
-
-	ret = 0;
+	WT_DECL_RET;
 
 	WT_VERBOSE(session, block, "close");
 

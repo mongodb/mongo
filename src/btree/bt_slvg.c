@@ -139,16 +139,15 @@ int
 __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_BTREE *btree;
+	WT_DECL_RET;
 	WT_SNAPSHOT *snapbase;
 	WT_STUFF *ss, stuff;
-	int ret;
 	uint32_t i, leaf_cnt;
 
 	WT_UNUSED(cfg);
 
 	btree = session->btree;
 	snapbase = NULL;
-	ret = 0;
 
 	WT_CLEAR(stuff);
 	ss = &stuff;
@@ -345,14 +344,13 @@ err:	WT_TRET(__wt_bm_salvage_end(session));
 static int
 __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 {
+	WT_DECL_RET;
 	WT_ITEM *as, *buf;
 	WT_PAGE_HEADER *dsk;
 	uint64_t gen;
 	uint32_t addrbuf_size;
 	uint8_t addrbuf[WT_BTREE_MAX_ADDR_COOKIE];
-	int eof, ret;
-
-	ret = 0;
+	int eof;
 
 	as = buf = NULL;
 	WT_ERR(__wt_scr_alloc(session, 0, &as));
@@ -450,8 +448,8 @@ __slvg_trk_init(WT_SESSION_IMPL *session,
     uint8_t *addr, uint32_t addr_size,
     uint32_t size, uint64_t gen, WT_STUFF *ss, WT_TRACK **retp)
 {
+	WT_DECL_RET;
 	WT_TRACK *trk;
-	int ret;
 
 	WT_RET(__wt_calloc_def(session, 1, &trk));
 	trk->ss = ss;
@@ -482,17 +480,16 @@ __slvg_trk_leaf(WT_SESSION_IMPL *session, WT_PAGE_HEADER *dsk,
 	WT_BTREE *btree;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
+	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_TRACK *trk;
 	uint64_t stop_recno;
 	uint32_t i;
-	int ret;
 
 	btree = session->btree;
 	unpack = &_unpack;
 	page = NULL;
 	trk = NULL;
-	ret = 0;
 
 	/* Re-allocate the array of pages, as necessary. */
 	if (ss->pages_next * sizeof(WT_TRACK *) == ss->pages_allocated)
@@ -1077,13 +1074,11 @@ __slvg_col_build_internal(
     WT_SESSION_IMPL *session, uint32_t leaf_cnt, WT_STUFF *ss)
 {
 	WT_ADDR *addr;
+	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_REF *ref;
 	WT_TRACK *trk;
 	uint32_t i;
-	int ret;
-
-	ret = 0;
 
 	/* Allocate a column-store internal page. */
 	WT_RET(__wt_calloc_def(session, 1, &page));
@@ -1145,15 +1140,14 @@ __slvg_col_build_leaf(
     WT_SESSION_IMPL *session, WT_TRACK *trk, WT_PAGE *parent, WT_REF *ref)
 {
 	WT_COL *save_col_var;
+	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_SALVAGE_COOKIE *cookie, _cookie;
 	uint64_t skip, take;
 	uint32_t save_entries;
-	int ret;
 
 	cookie = &_cookie;
 	WT_CLEAR(*cookie);
-	ret = 0;
 
 	/* Get the original page, including the full in-memory setup. */
 	WT_RET(__wt_page_in(session, parent, ref));
@@ -1555,18 +1549,19 @@ __slvg_row_trk_update_start(
     WT_SESSION_IMPL *session, WT_ITEM *stop, uint32_t slot, WT_STUFF *ss)
 {
 	WT_BTREE *btree;
+	WT_DECL_RET;
 	WT_IKEY *ikey;
 	WT_ITEM *dsk, *key, *item, _item;
 	WT_PAGE *page;
 	WT_ROW *rip;
 	WT_TRACK *trk;
 	uint32_t i;
-	int cmp, found, ret;
+	int cmp, found;
 
 	btree = session->btree;
 	key = dsk = NULL;
 	page = NULL;
-	found = ret = 0;
+	found = 0;
 
 	trk = ss->pages[slot];
 
@@ -1663,13 +1658,11 @@ __slvg_row_build_internal(
     WT_SESSION_IMPL *session, uint32_t leaf_cnt,  WT_STUFF *ss)
 {
 	WT_ADDR *addr;
+	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_REF *ref;
 	WT_TRACK *trk;
 	uint32_t i;
-	int ret;
-
-	ret = 0;
 
 	/* Allocate a row-store internal page. */
 	WT_RET(__wt_calloc_def(session, 1, &page));
@@ -1735,20 +1728,20 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
     WT_TRACK *trk, WT_PAGE *parent, WT_REF *ref, WT_STUFF *ss)
 {
 	WT_BTREE *btree;
+	WT_DECL_RET;
 	WT_IKEY *ikey;
 	WT_ITEM *item, _item, *key;
 	WT_PAGE *page;
 	WT_ROW *rip;
 	WT_SALVAGE_COOKIE *cookie, _cookie;
 	uint32_t i, skip_start, skip_stop;
-	int cmp, ret;
+	int cmp;
 
 	btree = session->btree;
 	page = NULL;
 
 	cookie = &_cookie;
 	WT_CLEAR(*cookie);
-	ret = 0;
 
 	/* Allocate temporary space in which to instantiate the keys. */
 	WT_RET(__wt_scr_alloc(session, 0, &key));
@@ -1982,9 +1975,9 @@ __slvg_row_merge_ovfl(WT_SESSION_IMPL *session,
 static int
 __slvg_trk_compare_addr(const void *a, const void *b)
 {
+	WT_DECL_RET;
 	WT_TRACK *a_trk, *b_trk;
 	uint32_t len;
-	int ret;
 
 	a_trk = *(WT_TRACK **)a;
 	b_trk = *(WT_TRACK **)b;
@@ -2009,9 +2002,9 @@ static int
 __slvg_ovfl_compare(const void *a, const void *b)
 {
 	WT_ADDR *addr;
+	WT_DECL_RET;
 	WT_TRACK *trk;
 	uint32_t len;
-	int ret;
 
 	addr = (WT_ADDR *)a;
 	trk = *(WT_TRACK **)b;

@@ -555,7 +555,8 @@ __wt_config_getraw(
     WT_CONFIG *cparser, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 {
 	WT_CONFIG_ITEM k, v;
-	int found, ret;
+	WT_DECL_RET;
+	int found;
 
 	found = 0;
 	while ((ret = __wt_config_next(cparser, &k, &v)) == 0) {
@@ -580,7 +581,8 @@ __wt_config_get(WT_SESSION_IMPL *session,
     const char **cfg, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 {
 	WT_CONFIG cparser;
-	int found, ret;
+	WT_DECL_RET;
+	int found;
 
 	for (found = 0; *cfg != NULL; cfg++) {
 		WT_RET(__wt_config_init(session, &cparser, *cfg));

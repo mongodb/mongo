@@ -32,11 +32,11 @@ static int
 __truncate_table(WT_SESSION_IMPL *session, const char *name)
 {
 	WT_BTREE *btree;
+	WT_DECL_RET;
 	WT_ITEM *buf;
 	WT_TABLE *table;
-	int i, ret;
+	int i;
 
-	ret = 0;
 	WT_RET(__wt_scr_alloc(session, 0, &buf));
 
 	WT_RET(__wt_schema_get_table(session, name, strlen(name), &table));
@@ -90,7 +90,7 @@ int
 __wt_schema_truncate(
     WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 {
-	int ret;
+	WT_DECL_RET;
 
 	WT_UNUSED(cfg);
 

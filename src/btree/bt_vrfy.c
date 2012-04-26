@@ -79,14 +79,13 @@ static int
 __verify_int(WT_SESSION_IMPL *session, int dumpfile)
 {
 	WT_BTREE *btree;
+	WT_DECL_RET;
 	WT_ITEM dsk;
 	WT_SNAPSHOT *snapbase, *snap;
 	WT_VSTUFF *vs, _vstuff;
-	int ret;
 
 	btree = session->btree;
 	snapbase = NULL;
-	ret = 0;
 
 	WT_CLEAR(_vstuff);
 	vs = &_vstuff;
@@ -189,14 +188,13 @@ __verify_tree(WT_SESSION_IMPL *session,
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_COL *cip;
+	WT_DECL_RET;
 	WT_ITEM *tmp;
 	WT_REF *ref;
 	uint64_t recno;
 	uint32_t entry, i, size;
 	const uint8_t *addr;
-	int ret;
 
-	ret = 0;
 	unpack = &_unpack;
 
 	WT_VERBOSE(session, verify, "%s %s",
@@ -476,13 +474,12 @@ __verify_overflow_cell(WT_SESSION_IMPL *session, WT_PAGE *page, WT_VSTUFF *vs)
 	WT_BTREE *btree;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
+	WT_DECL_RET;
 	WT_PAGE_HEADER *dsk;
 	uint32_t cell_num, i;
-	int ret;
 
 	btree = session->btree;
 	unpack = &_unpack;
-	ret = 0;
 
 	/*
 	 * If a tree is empty (just created), it won't have a disk image;

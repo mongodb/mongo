@@ -299,11 +299,9 @@ int
 __wt_block_alloc(
     WT_SESSION_IMPL *session, WT_BLOCK *block, off_t *offp, off_t size)
 {
+	WT_DECL_RET;
 	WT_EXT *ext;
 	WT_SIZE *szp, **sstack[WT_SKIP_MAXDEPTH];
-	int ret;
-
-	ret = 0;
 
 	WT_BSTAT_INCR(session, alloc);
 	if (size % block->allocsize != 0)
@@ -407,9 +405,9 @@ int
 __wt_block_free(WT_SESSION_IMPL *session,
     WT_BLOCK *block, const uint8_t *addr, uint32_t addr_size)
 {
+	WT_DECL_RET;
 	off_t off;
 	uint32_t cksum, size;
-	int ret;
 
 	WT_UNUSED(addr_size);
 	WT_BSTAT_INCR(session, free);
@@ -820,13 +818,12 @@ int
 __wt_block_extlist_read(
     WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el)
 {
+	WT_DECL_RET;
 	WT_ITEM *tmp;
 	off_t off, size;
 	uint8_t *p;
-	int ret;
 
 	tmp = NULL;
-	ret = 0;
 
 	/* If there isn't a list, we're done. */
 	if (el->offset == WT_BLOCK_INVALID_OFFSET)
@@ -892,15 +889,14 @@ int
 __wt_block_extlist_write(
     WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el)
 {
+	WT_DECL_RET;
 	WT_EXT *ext;
 	WT_ITEM *tmp;
 	WT_PAGE_HEADER *dsk;
 	uint32_t datasize, size;
 	uint8_t *p;
-	int ret;
 
 	tmp = NULL;
-	ret = 0;
 
 	WT_VERBOSE_CALL(session,
 	    block, __wt_block_extlist_dump(session, "write extlist", el, 0));

@@ -17,13 +17,12 @@ int
 __wt_row_leaf_keys(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BTREE *btree;
+	WT_DECL_RET;
 	WT_ITEM *tmp;
 	WT_ROW *rip;
 	uint32_t i;
-	int ret;
 
 	btree = session->btree;
-	ret = 0;
 
 	if (page->entries == 0) {			/* Just checking... */
 		F_SET_ATOMIC(page, WT_PAGE_BUILD_KEYS);
@@ -108,10 +107,11 @@ __wt_row_key(
 {
 	enum { FORWARD, BACKWARD } direction;
 	WT_CELL_UNPACK *unpack, _unpack;
+	WT_DECL_RET;
 	WT_IKEY *ikey;
 	WT_ITEM *tmp;
 	WT_ROW *rip;
-	int is_local, ret, slot_offset;
+	int is_local, slot_offset;
 	void *key;
 
 	rip = rip_arg;

@@ -843,12 +843,12 @@ __rec_split_fixup(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
 	WT_BOUNDARY *bnd;
+	WT_DECL_RET;
 	WT_ITEM *tmp;
 	WT_PAGE_HEADER *dsk;
 	WT_RECONCILE *r;
 	uint32_t i, len;
 	uint8_t *dsk_start;
-	int ret;
 
 	/*
 	 * When we overflow physical limits of the page, we walk the list of
@@ -858,7 +858,6 @@ __rec_split_fixup(WT_SESSION_IMPL *session)
 	r = session->reconcile;
 	btree = session->btree;
 	tmp = NULL;
-	ret = 0;
 
 	/*
 	 * The data isn't laid out on a page boundary or nul padded; copy it to
@@ -1651,6 +1650,7 @@ __rec_col_var(
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_COL *cip;
+	WT_DECL_RET;
 	WT_INSERT *ins;
 	WT_INSERT_HEAD *append;
 	WT_ITEM *last, orig;
@@ -1658,7 +1658,7 @@ __rec_col_var(
 	WT_UPDATE *upd;
 	uint64_t n, nrepeat, repeat_count, rle, slvg_missing, src_recno;
 	uint32_t i, size;
-	int can_compare, deleted, last_deleted, orig_deleted, ret;
+	int can_compare, deleted, last_deleted, orig_deleted;
 	const void *data;
 
 	r = session->reconcile;
@@ -1986,6 +1986,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_BTREE *btree;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
+	WT_DECL_RET;
 	WT_IKEY *ikey;
 	WT_ITEM orig;
 	WT_KV *key, *val;
@@ -1993,7 +1994,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_RECONCILE *r;
 	WT_REF *ref;
 	uint32_t i;
-	int onpage_ovfl, ovfl_key, ret, val_set;
+	int onpage_ovfl, ovfl_key, val_set;
 
 	r = session->reconcile;
 	btree = session->btree;
@@ -2360,6 +2361,7 @@ __rec_row_leaf(
 	WT_BTREE *btree;
 	WT_CELL *cell, *val_cell;
 	WT_CELL_UNPACK *unpack, _unpack;
+	WT_DECL_RET;
 	WT_IKEY *ikey;
 	WT_INSERT *ins;
 	WT_ITEM *tmpkey;
@@ -2369,14 +2371,13 @@ __rec_row_leaf(
 	WT_UPDATE *upd;
 	uint64_t slvg_skip;
 	uint32_t i;
-	int onpage_ovfl, ovfl_key, ret;
+	int onpage_ovfl, ovfl_key;
 
 	r = session->reconcile;
 	btree = session->btree;
 	tmpkey = NULL;
 	unpack = &_unpack;
 	slvg_skip = salvage == NULL ? 0 : salvage->skip;
-	ret = 0;
 
 	key = &r->k;
 	val = &r->v;
@@ -2762,16 +2763,15 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BTREE *btree;
 	WT_BOUNDARY *bnd;
+	WT_DECL_RET;
 	WT_PAGE_MODIFY *mod;
 	WT_RECONCILE *r;
 	uint32_t i, size;
-	int ret;
 	const uint8_t *addr;
 
 	r = session->reconcile;
 	btree = session->btree;
 	mod = page->modify;
-	ret = 0;
 
 	/*
 	 * This page may have previously been reconciled, and that information
@@ -2954,14 +2954,13 @@ static int
 __rec_split_row(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_PAGE **splitp)
 {
 	WT_BOUNDARY *bnd;
+	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_RECONCILE *r;
 	WT_REF *ref;
 	uint32_t i;
-	int ret;
 
 	r = session->reconcile;
-	ret = 0;
 
 	/* Allocate a row-store internal page. */
 	WT_RET(__wt_calloc_def(session, 1, &page));
@@ -3025,14 +3024,13 @@ static int
 __rec_split_col(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_PAGE **splitp)
 {
 	WT_BOUNDARY *bnd;
+	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_RECONCILE *r;
 	WT_REF *ref;
 	uint32_t i;
-	int ret;
 
 	r = session->reconcile;
-	ret = 0;
 
 	/* Allocate a column-store internal page. */
 	WT_RET(__wt_calloc_def(session, 1, &page));
@@ -3251,19 +3249,18 @@ __rec_cell_build_ovfl(
     WT_SESSION_IMPL *session, WT_KV *kv, uint8_t type, uint64_t rle)
 {
 	WT_BTREE *btree;
+	WT_DECL_RET;
 	WT_ITEM *tmp;
 	WT_PAGE *page;
 	WT_PAGE_HEADER *dsk;
 	WT_RECONCILE *r;
 	uint32_t size;
-	int ret;
 	uint8_t *addr, buf[WT_BTREE_MAX_ADDR_COOKIE];
 
 	r = session->reconcile;
 	btree = session->btree;
 	page = r->page;
 	tmp = NULL;
-	ret = 0;
 
 	/*
 	 * See if this overflow record has already been written and reuse it if

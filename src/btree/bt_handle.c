@@ -44,12 +44,11 @@ __wt_btree_open(WT_SESSION_IMPL *session,
     const char *cfg[], const uint8_t *addr, uint32_t addr_size, int readonly)
 {
 	WT_BTREE *btree;
+	WT_DECL_RET;
 	WT_ITEM dsk;
-	int ret;
 
 	btree = session->btree;
 	WT_CLEAR(dsk);
-	ret = 0;
 
 	/* Initialize and configure the WT_BTREE structure. */
 	WT_ERR(__btree_conf(session));
@@ -97,10 +96,9 @@ int
 __wt_btree_close(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
-	int ret;
+	WT_DECL_RET;
 
 	btree = session->btree;
-	ret = 0;
 
 	/*
 	 * Discard the tree and, if the tree is modified, create a new snapshot
@@ -240,13 +238,12 @@ static int
 __btree_tree_open_empty(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
+	WT_DECL_RET;
 	WT_PAGE *root, *leaf;
 	WT_REF *ref;
-	int ret;
 
 	btree = session->btree;
 	root = leaf = NULL;
-	ret = 0;
 
 	/*
 	 * Create a leaf page -- this can be reconciled while the root stays

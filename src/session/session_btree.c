@@ -37,11 +37,10 @@ __wt_session_lock_btree(
     WT_SESSION_IMPL *session, const char *cfg[], uint32_t flags)
 {
 	WT_BTREE *btree;
+	WT_DECL_RET;
 	uint32_t open_flags;
-	int ret;
 
 	btree = session->btree;
-	ret = 0;
 
 	if (LF_ISSET(WT_BTREE_EXCLUSIVE)) {
 		/*
@@ -77,10 +76,9 @@ int
 __wt_session_release_btree(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
-	int ret;
+	WT_DECL_RET;
 
 	btree = session->btree;
-	ret = 0;
 
 	/*
 	 * If we had exclusive access, reopen the tree without special flags so
@@ -136,8 +134,9 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
     const char *cfg[], uint32_t flags)
 {
 	WT_BTREE_SESSION *btree_session;
+	WT_DECL_RET;
+	int exist;
 	const char *filename, *treeconf;
-	int exist, ret;
 
 	filename = fileuri;
 	if (!WT_PREFIX_SKIP(filename, "file:"))
@@ -196,7 +195,7 @@ int
 __wt_session_close_any_open_btree(WT_SESSION_IMPL *session, const char *name)
 {
 	WT_BTREE_SESSION *btree_session;
-	int ret;
+	WT_DECL_RET;
 
 	if ((ret = __wt_session_find_btree(session, name, strlen(name),
 	    NULL, WT_BTREE_EXCLUSIVE, &btree_session)) == 0) {

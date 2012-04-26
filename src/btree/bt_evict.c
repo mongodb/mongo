@@ -265,14 +265,14 @@ __wt_evict_page_request(WT_SESSION_IMPL *session, WT_PAGE *page)
 void *
 __wt_cache_evict_server(void *arg)
 {
-	WT_CONNECTION_IMPL *conn;
-	WT_SESSION_IMPL *session;
 	WT_CACHE *cache;
-	int read_lockout, ret;
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+	int read_lockout;
 
 	conn = arg;
 	cache = conn->cache;
-	ret = 0;
 
 	/*
 	 * We need a session handle because we're reading/writing pages.
@@ -381,10 +381,10 @@ __evict_request_walk(WT_SESSION_IMPL *session)
 {
 	WT_SESSION_IMPL *request_session;
 	WT_CACHE *cache;
+	WT_DECL_RET;
 	WT_EVICT_REQ *er, *er_end;
 	WT_PAGE *page;
 	WT_REF *ref;
-	int ret;
 
 	cache = S2C(session)->cache;
 
@@ -587,15 +587,14 @@ __evict_lru(WT_SESSION_IMPL *session)
 static int
 __evict_walk(WT_SESSION_IMPL *session)
 {
-	WT_CONNECTION_IMPL *conn;
 	WT_BTREE *btree;
 	WT_CACHE *cache;
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
 	u_int elem, i;
-	int ret;
 
 	conn = S2C(session);
 	cache = S2C(session)->cache;
-	ret = 0;
 
 	/*
 	 * We hold a spinlock for the entire walk -- it's slow, but (1) how
@@ -651,9 +650,10 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 {
 	WT_BTREE *btree;
 	WT_CACHE *cache;
+	WT_DECL_RET;
 	WT_EVICT_LIST *end, *evict, *start;
 	WT_PAGE *page;
-	int restarts, ret;
+	int restarts;
 
 	btree = session->btree;
 	cache = S2C(session)->cache;
@@ -666,7 +666,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 	 * We can't evict the page just returned to us, it marks our place in
 	 * the tree.  So, always stay one page ahead of the page being returned.
 	 */
-	for (evict = start, restarts = ret = 0;
+	for (evict = start, restarts = 0;
 	    evict < end && restarts <= 1 && ret == 0;
 	    ret = __wt_tree_np(session, &btree->evict_page, 1, 1)) {
 		if ((page = btree->evict_page) == NULL) {

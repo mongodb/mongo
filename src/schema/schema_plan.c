@@ -77,9 +77,10 @@ __wt_schema_colcheck(WT_SESSION_IMPL *session,
 {
 	WT_CONFIG conf;
 	WT_CONFIG_ITEM k, v;
+	WT_DECL_RET;
 	WT_PACK pack;
 	WT_PACK_VALUE pv;
-	int kcols, ncols, ret, vcols;
+	int kcols, ncols, vcols;
 
 	WT_RET(__pack_init(session, &pack, key_format));
 	for (kcols = 0; (ret = __pack_next(&pack, &pv)) == 0; kcols++)
@@ -118,7 +119,8 @@ __wt_table_check(WT_SESSION_IMPL *session, WT_TABLE *table)
 {
 	WT_CONFIG conf;
 	WT_CONFIG_ITEM k, v;
-	int cg, col, i, ret;
+	WT_DECL_RET;
+	int cg, col, i;
 	char coltype;
 
 	if (table->is_simple)
@@ -244,8 +246,9 @@ __find_column_format(WT_SESSION_IMPL *session,
 {
 	WT_CONFIG conf;
 	WT_CONFIG_ITEM k, v;
+	WT_DECL_RET;
 	WT_PACK pack;
-	int inkey, ret;
+	int inkey;
 
 	WT_RET(__wt_config_subinit(session, &conf, &table->colconf));
 	WT_RET(__pack_init(session, &pack, table->key_format));
@@ -285,8 +288,9 @@ __wt_struct_reformat(WT_SESSION_IMPL *session, WT_TABLE *table,
 {
 	WT_CONFIG config;
 	WT_CONFIG_ITEM k, next_k, next_v;
+	WT_DECL_RET;
 	WT_PACK_VALUE pv;
-	int have_next, ret;
+	int have_next;
 
 	WT_CLEAR(pv);		/* -Wuninitialized */
 

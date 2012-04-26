@@ -12,14 +12,14 @@ __wt_create_file(WT_SESSION_IMPL *session,
     const char *name, const char *fileuri, int exclusive, const char *config)
 {
 	WT_ITEM *val;
+	WT_DECL_RET;
+	int is_schema, vmajor, vminor, vpatch;
 	const char *cfg[] = API_CONF_DEFAULTS(session, create, config);
 	const char *filecfg[4] = API_CONF_DEFAULTS(file, meta, config);
 	const char *filename, *treeconf;
-	int is_schema, vmajor, vminor, vpatch, ret;
 
 	val = NULL;
 	treeconf = NULL;
-	ret = 0;
 
 	filename = fileuri;
 	if (!WT_PREFIX_SKIP(filename, "file:"))
@@ -92,6 +92,7 @@ __create_colgroup(WT_SESSION_IMPL *session,
     const char *name, int exclusive, const char *config)
 {
 	WT_CONFIG_ITEM cval;
+	WT_DECL_RET;
 	WT_ITEM fmt, namebuf, uribuf;
 	WT_TABLE *table;
 	const char *cfg[] = { __wt_confdfl_colgroup_meta, config, NULL, NULL };
@@ -100,7 +101,6 @@ __create_colgroup(WT_SESSION_IMPL *session,
 	const char *cgconf, *cgname, *fileconf, *filename, *fileuri;
 	const char *oldconf, *tablename;
 	size_t tlen;
-	int ret;
 
 	cgconf = fileconf = oldconf = NULL;
 	WT_CLEAR(fmt);
@@ -200,6 +200,7 @@ __create_index(WT_SESSION_IMPL *session,
 {
 	WT_CONFIG pkcols;
 	WT_CONFIG_ITEM ckey, cval, icols;
+	WT_DECL_RET;
 	WT_ITEM extra_cols, fmt, namebuf, uribuf;
 	WT_TABLE *table;
 	const char *cfg[] = { __wt_confdfl_index_meta, config, NULL, NULL };
@@ -207,7 +208,7 @@ __create_index(WT_SESSION_IMPL *session,
 	const char *fileconf, *filename, *fileuri, *idxconf, *idxname;
 	const char *tablename;
 	size_t tlen;
-	int i, ret;
+	int i;
 
 	idxconf = fileconf = NULL;
 	WT_CLEAR(fmt);
@@ -307,12 +308,13 @@ __create_table(WT_SESSION_IMPL *session,
 {
 	WT_CONFIG conf;
 	WT_CONFIG_ITEM cgkey, cgval, cval;
+	WT_DECL_RET;
 	WT_TABLE *table;
 	const char *cfg[] = { __wt_confdfl_table_meta, config, NULL, NULL };
 	const char *tableconf, *tablename;
 	char *cgname;
 	size_t cgsize;
-	int ncolgroups, ret;
+	int ncolgroups;
 
 	cgname = NULL;
 	table = NULL;
@@ -368,7 +370,8 @@ __wt_schema_create(
     WT_SESSION_IMPL *session, const char *name, const char *config)
 {
 	WT_CONFIG_ITEM cval;
-	int exclusive, ret;
+	WT_DECL_RET;
+	int exclusive;
 
 	/* Disallow objects in the WiredTiger name space. */
 	WT_RET(__wt_schema_name_check(session, name));

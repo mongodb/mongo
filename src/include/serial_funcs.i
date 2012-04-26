@@ -25,7 +25,7 @@ __wt_col_append_serial(
 	skipdepth)
 {
 	__wt_col_append_args _args, *args = &_args;
-	int ret;
+	WT_DECL_RET;
 
 	args->page = page;
 
@@ -155,7 +155,7 @@ __wt_insert_serial(
 	new_ins_size, u_int skipdepth)
 {
 	__wt_insert_args _args, *args = &_args;
-	int ret;
+	WT_DECL_RET;
 
 	args->page = page;
 
@@ -274,7 +274,7 @@ __wt_row_key_serial(
 	*ikey)
 {
 	__wt_row_key_args _args, *args = &_args;
-	int ret;
+	WT_DECL_RET;
 
 	args->page = page;
 
@@ -310,7 +310,7 @@ __wt_sync_file_serial(
 	WT_SESSION_IMPL *session, int fileop)
 {
 	__wt_sync_file_args _args, *args = &_args;
-	int ret;
+	WT_DECL_RET;
 
 	args->fileop = fileop;
 
@@ -349,7 +349,7 @@ __wt_update_serial(
 	**updp, size_t upd_size)
 {
 	__wt_update_args _args, *args = &_args;
-	int ret;
+	WT_DECL_RET;
 
 	args->page = page;
 
