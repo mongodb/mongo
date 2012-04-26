@@ -135,7 +135,7 @@ __snapshot_worker(
 		 * If it's a named snapshot and there's nothing dirty, we won't
 		 * write any pages: mark the root page dirty to ensure a write.
 		 */
-		WT_RET(__wt_page_modify_init(session, btree->root_page));
+		WT_ERR(__wt_page_modify_init(session, btree->root_page));
 		__wt_page_modify_set(btree->root_page);
 	}
 
