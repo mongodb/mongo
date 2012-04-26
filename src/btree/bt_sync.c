@@ -116,11 +116,11 @@ __snapshot_worker(
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
-	WT_SNAPSHOT *match, *snapbase, *snap;
+	WT_SNAPSHOT *match, *snap, *snapbase;
 	int force;
 
 	btree = session->btree;
-	match = snapbase = NULL;
+	match = snap = snapbase = NULL;
 
 	/* Snapshots are single-threaded. */
 	__wt_writelock(session, btree->snaplock);
