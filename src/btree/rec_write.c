@@ -186,6 +186,44 @@ __rec_track_cell(
 }
 
 /*
+ * Helper macro to determine whether the given WT_REF has a page with
+ * modifications.
+ *
+ * The reconciliation code is used in the following situations:
+ *
+ * (1) by the eviction server during sync;
+ * (2) by the eviction server during forced eviction of a page; and
+ * (3) by any thread during LRU eviction.
+ *
+ * The complexity is checking the page state of child pages when looking for
+ * pages to merge.
+ *
+ * We clearly want to consider all normal, in-memory pages (WT_REF_MEM).
+ *
+ * While we are processing a sync request in case (1), pages in the file may be
+ * awaiting forced eviction (WT_REF_EVICT_FORCE).  Those pages must be included
+ * in the sync, otherwise it will be incomplete.
+ *
+ * During LRU eviction in case (3), the eviction code has already locked the
+ * subtree, so locked pages should be included in the merge (WT_REF_LOCKED).
+ *
+ * To make this tractable, the eviction server guarantees that no thread is
+ * doing LRU eviction in the tree when cases (1) and (2) occur.  That is, the
+ * only state change that can occur during a sync or forced eviction is for a
+ * reference to a page on disk to cause a page to be read (WT_REF_READING).  We
+ * can safely ignore those pages because they are unmodified by definition --
+ * they are being read from disk.
+ *
+ * If there is a valid page associated with the reference, a pointer to the
+ * page is assigned to the second parameter.  The macro evaluates true if the
+ * page has been modified.
+ */
+#define	PAGE_MODIFIED(ref, rp)						\
+	(((ref)->state != WT_REF_DISK &&				\
+	  (ref)->state != WT_REF_READING) &&				\
+	    (rp = (ref)->page)->modify != NULL)
+
+/*
  * __wt_rec_write --
  *	Reconcile an in-memory page into its on-disk format, and write it.
  */
@@ -1214,8 +1252,6 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	/* For each entry in the page... */
 	WT_REF_FOREACH(page, ref, i) {
-		rp = ref->page;
-
 		/* Update the starting record number in case we split. */
 		r->recno = ref->u.recno;
 
@@ -1224,7 +1260,7 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * Deleted/split pages are merged into the parent and discarded.
 		 */
 		val_set = 0;
-		if (ref->state != WT_REF_DISK && rp->modify != NULL) {
+		if (PAGE_MODIFIED(ref, rp)) {
 			switch (F_ISSET(rp->modify, WT_PM_REC_MASK)) {
 			case WT_PM_REC_EMPTY:
 				/*
@@ -1920,8 +1956,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * is on the split-created internal page.
 		 */
 		val_set = 0;
-		rp = ref->page;
-		if (ref->state != WT_REF_DISK && rp->modify != NULL) {
+		if (PAGE_MODIFIED(ref, rp)) {
 			switch (F_ISSET(rp->modify, WT_PM_REC_MASK)) {
 			case WT_PM_REC_EMPTY:
 				/*
@@ -2066,13 +2101,12 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	/* For each entry in the in-memory page... */
 	WT_REF_FOREACH(page, ref, i) {
-		rp = ref->page;
 		/*
 		 * The page may be deleted or internally created during a split.
 		 * Deleted/split pages are merged into the parent and discarded.
 		 */
 		val_set = 0;
-		if (ref->state != WT_REF_DISK && rp->modify != NULL) {
+		if (PAGE_MODIFIED(ref, rp)) {
 			switch (F_ISSET(rp->modify, WT_PM_REC_MASK)) {
 			case WT_PM_REC_EMPTY:
 				continue;

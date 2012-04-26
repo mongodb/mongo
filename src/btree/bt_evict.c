@@ -224,7 +224,7 @@ __wt_evict_page_request(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * it from the LRU list but not yet checked its hazard references.
 	 *
 	 * To avoid that race, we try to atomically switch the page state to
-	 * WT_REF_EVICTING.  Since only one thread can do that successfully,
+	 * WT_REF_EVICT_FORCE.  Since only one thread can do that successfully,
 	 * this prevents a page from being evicted twice.  Threads looking for
 	 * a page to evict on the ordinary LRU eviction queue will ignore this
 	 * page and it will be evicted by the main eviction thread.
@@ -234,7 +234,7 @@ __wt_evict_page_request(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * put it on the request queue because the memory may be freed by the
 	 * time the eviction thread sees it.
 	 */
-	if (!WT_ATOMIC_CAS(page->ref->state, WT_REF_MEM, WT_REF_EVICTING))
+	if (!WT_ATOMIC_CAS(page->ref->state, WT_REF_MEM, WT_REF_EVICT_FORCE))
 		return (0);
 
 	/* Find an empty slot and enter the eviction request. */
@@ -383,6 +383,7 @@ __evict_request_walk(WT_SESSION_IMPL *session)
 	WT_SESSION_IMPL *request_session;
 	WT_CACHE *cache;
 	WT_EVICT_REQ *er, *er_end;
+	WT_PAGE *page;
 	WT_REF *ref;
 	int ret;
 
@@ -412,19 +413,38 @@ __evict_request_walk(WT_SESSION_IMPL *session)
 		 */
 		__evict_clr_all(session, 0);
 
-		if (F_ISSET(er, WT_EVICT_REQ_PAGE)) {
-			ref = er->page->ref;
-			WT_ASSERT(session, ref->page == er->page);
-			WT_ASSERT(session, ref->state == WT_REF_EVICTING);
+		/* Clear the current eviction point. */
+		page = session->btree->evict_page;
+		while (page != NULL && !WT_PAGE_IS_ROOT(page)) {
+			ref = page->ref;
+			page = page->parent;
+			if (ref->state == WT_REF_EVICT_WALK)
+				ref->state = WT_REF_MEM;
+		}
+		session->btree->evict_page = NULL;
 
+		/*
+		 * Wait for LRU eviction activity to drain.  It is much easier
+		 * to reason about sync or forced eviction if we can be sure
+		 * there are no other threads evicting in the tree.
+		 */
+		while (session->btree->lru_count > 0)
+			__wt_yield();
+
+		if (F_ISSET(er, WT_EVICT_REQ_PAGE)) {
 			WT_VERBOSE(session, evictserver,
 			    "forcing eviction of page %p", er->page);
 
+			ref = er->page->ref;
+			WT_ASSERT(session, ref->page == er->page);
+			WT_ASSERT(session, ref->state == WT_REF_EVICT_FORCE);
+			ref->state = WT_REF_LOCKED;
+
 			/*
-			 * At this point, the page is marked with
-			 * WT_REF_EVICTING, which stalls new readers.  Take a
-			 * brief pause before attempting to evict it to give
-			 * existing readers a chance to drop their references.
+			 * At this point, the page is locked, which stalls new
+			 * readers.  Pause before attempting to evict it to
+			 * give existing readers a chance to drop their
+			 * references.
 			 */
 			__wt_yield();
 
@@ -475,25 +495,10 @@ static int
 __evict_file(WT_SESSION_IMPL *session, WT_EVICT_REQ *er)
 {
 	WT_PAGE *next_page, *page;
-	WT_REF *ref;
 
 	WT_VERBOSE(session, evictserver,
 	    "file request: %s",
 	   (F_ISSET(er, WT_EVICT_REQ_CLOSE) ? "close" : "sync"));
-
-	/* Clear the current eviction point. */
-	page = session->btree->evict_page;
-	while (page != NULL && !WT_PAGE_IS_ROOT(page)) {
-		ref = page->ref;
-		page = page->parent;
-		WT_ASSERT(session, ref->state == WT_REF_EVICT_WALK);
-		ref->state = WT_REF_MEM;
-	}
-	session->btree->evict_page = NULL;
-
-	/* If this is a close, wait for LRU eviction activity to drain. */
-	while (F_ISSET(er, WT_EVICT_REQ_CLOSE) && er->btree->lru_count > 0)
-		__wt_yield();
 
 	/*
 	 * We can't evict the page just returned to us, it marks our place in
@@ -670,6 +675,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 		 * really be skipped.
 		 */
 		if (WT_PAGE_IS_ROOT(page) ||
+		    page->ref->state != WT_REF_EVICT_WALK ||
 		    F_ISSET_ATOMIC(page, WT_PAGE_EVICT_LRU) ||
 		    (page->modify != NULL &&
 		    F_ISSET(page->modify, WT_PM_REC_SPLIT_MERGE)))
@@ -678,9 +684,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 		WT_VERBOSE(session, evictserver,
 		    "select: %p, size %" PRIu32, page, page->memory_footprint);
 
-		WT_ASSERT(session, page->ref->state == WT_REF_EVICT_WALK);
 		WT_ASSERT(session, evict->page == NULL);
-
 		evict->page = page;
 		evict->btree = btree;
 		++evict;
@@ -766,14 +770,14 @@ __evict_get_page(
 		++cache->evict_current;
 
 		/*
-		 * Switch the page state to evicting while holding the eviction
-		 * mutex to prevent multiple attempts to evict it.  For pages
-		 * that are already being evicted, including pages on the
-		 * request queue for forced eviction, this operation will fail
-		 * and we will move on.
+		 * Lock the page while holding the eviction mutex to prevent
+		 * multiple attempts to evict it.  For pages that are already
+		 * being evicted, including pages on the request queue for
+		 * forced eviction, this operation will fail and we will move
+		 * on.
 		 */
 		ref = evict->page->ref;
-		if (!WT_ATOMIC_CAS(ref->state, WT_REF_MEM, WT_REF_EVICTING))
+		if (!WT_ATOMIC_CAS(ref->state, WT_REF_MEM, WT_REF_LOCKED))
 			continue;
 
 		/*
@@ -812,7 +816,7 @@ __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app)
 	if (page == NULL)
 		return (WT_NOTFOUND);
 
-	WT_ASSERT(session, page->ref->state == WT_REF_EVICTING);
+	WT_ASSERT(session, page->ref->state == WT_REF_LOCKED);
 
 	/* Reference the correct WT_BTREE handle. */
 	saved_btree = session->btree;
