@@ -305,7 +305,7 @@ extern int __wt_btree_snapshot(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_btree_snapshot_close(WT_SESSION_IMPL *session);
 extern int __wt_btree_snapshot_drop(WT_SESSION_IMPL *session,
     const char *cfg[]);
-extern int __wt_btree_cache_flush(WT_SESSION_IMPL *session, int discard);
+extern int __wt_cache_flush(WT_SESSION_IMPL *session, int op);
 extern int __wt_upgrade(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_verify(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_dumpfile(WT_SESSION_IMPL *session, const char *cfg[]);

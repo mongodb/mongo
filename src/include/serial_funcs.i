@@ -302,17 +302,17 @@ __wt_row_key_unpack(
 }
 
 typedef struct {
-	int discard;
+	int fileop;
 } __wt_sync_file_args;
 
 static inline int
 __wt_sync_file_serial(
-	WT_SESSION_IMPL *session, int discard)
+	WT_SESSION_IMPL *session, int fileop)
 {
 	__wt_sync_file_args _args, *args = &_args;
 	int ret;
 
-	args->discard = discard;
+	args->fileop = fileop;
 
 	ret = __wt_session_serialize_func(session,
 	    WT_SERIAL_EVICT, __wt_sync_file_serial_func, args);
@@ -322,12 +322,12 @@ __wt_sync_file_serial(
 
 static inline void
 __wt_sync_file_unpack(
-	WT_SESSION_IMPL *session, int *discardp)
+	WT_SESSION_IMPL *session, int *fileopp)
 {
 	__wt_sync_file_args *args =
 	    (__wt_sync_file_args *)session->wq_args;
 
-	*discardp = args->discard;
+	*fileopp = args->fileop;
 }
 
 typedef struct {

@@ -139,8 +139,29 @@ __snapshot_worker(
 		__wt_page_modify_set(btree->root_page);
 	}
 
-	/* Get the list of snapshots for this file. */
-	WT_ERR(__wt_session_snap_list_get(session, NULL, &snapbase));
+	/*
+	 * Get the list of snapshots for this file.  If there's no reference,
+	 * this file is dead.  Discard it from the cache without bothering to
+	 * write any dirty pages.
+	 */
+	if ((ret =
+	    __wt_session_snap_list_get(session, NULL, &snapbase)) != 0) {
+		if (ret == WT_NOTFOUND) {
+			ret =
+			    __wt_cache_flush(session, WT_SYNC_DISCARD_NOWRITE);
+
+			/*
+			 * XXX
+			 * I'm not sure this is the right place to do this,
+			 * but it's the point in the btree engine where we
+			 * can know the root page is gone.
+			 */
+			btree->root_page = NULL;
+			__wt_rwunlock(session, btree->snaplock);
+			return (ret);
+		}
+		WT_ERR(ret);
+	}
 
 	switch (op) {
 	case SNAPSHOT:
@@ -243,7 +264,7 @@ nomatch:		WT_ERR_MSG(session,
 	}
 
 	btree->snap = snapbase;
-	ret = __wt_btree_cache_flush(session, discard);
+	ret = __wt_cache_flush(session, discard ? WT_SYNC_DISCARD : WT_SYNC);
 	btree->snap = NULL;
 	WT_ERR(ret);
 
@@ -266,11 +287,11 @@ err:	__wt_session_snap_list_free(session, snapbase);
 }
 
 /*
- * __wt_btree_cache_flush --
+ * __wt_cache_flush --
  *	Write dirty pages from the cache, optionally discarding the file.
  */
 int
-__wt_btree_cache_flush(WT_SESSION_IMPL *session, int discard)
+__wt_cache_flush(WT_SESSION_IMPL *session, int op)
 {
 	int ret;
 
@@ -298,7 +319,7 @@ __wt_btree_cache_flush(WT_SESSION_IMPL *session, int discard)
 	 */
 
 	do {
-		ret = __wt_sync_file_serial(session, discard);
+		ret = __wt_sync_file_serial(session, op);
 	} while (ret == WT_RESTART);
 
 	return (ret);

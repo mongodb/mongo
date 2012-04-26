@@ -44,7 +44,7 @@ Serial('row_key', 'WT_SERIAL_FUNC', [
 	]),
 
 Serial('sync_file', 'WT_SERIAL_EVICT', [
-		SerialArg('int', 'discard'),
+		SerialArg('int', 'fileop'),
 	]),
 
 Serial('update', 'WT_SERIAL_FUNC', [
