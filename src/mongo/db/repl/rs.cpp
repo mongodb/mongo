@@ -723,11 +723,6 @@ namespace mongo {
             }
         }
         catch(DBException& e) {
-            if( e.getCode() == 13497 /* removed from set */ ) {
-                cc().shutdown();
-                dbexit( EXIT_CLEAN , "removed from replica set" ); // never returns
-                verify(0);
-            }
             log() << "replSet error unexpected exception in haveNewConfig() : " << e.toString() << rsLog;
             _fatal();
         }
