@@ -358,7 +358,6 @@ __wt_session_snap_list_get(
 	snapbase = NULL;
 	allocated = slot = 0;
 	config = NULL;
-	ret = 0;
 
 	/*
 	 * If no configuration information was provided, retrieve the schema
