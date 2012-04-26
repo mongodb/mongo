@@ -1,3 +1,13 @@
+WiredTiger release 1.1.5, 2012-04-26
+------------------------------------
+
+Don't update a WT_REF after it has been unlocked.
+
+Add an operation to set a flag atomically, use it to avoid racing on page flags.
+
+Fix a race between sync and reading that could cause a segfault.
+
+
 WiredTiger release 1.1.4, 2012-04-16
 ------------------------------------
 

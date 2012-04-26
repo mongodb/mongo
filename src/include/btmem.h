@@ -293,15 +293,9 @@ struct __wt_page {
 #define	WT_PAGE_FREELIST	7	/* Free-list page */
 	uint8_t type;			/* Page type */
 
-	/*
-	 * The flags are divided into two sets: flags set initially, before more
-	 * than a single thread accesses the page, and the reconciliation flags.
-	 * It is important not to add other flags that can be set at run-time,
-	 * else the threads could race.
-	 */
-#define	WT_PAGE_BUILD_KEYS	0x001	/* Keys have been built in memory */
-#define	WT_PAGE_EVICT_LRU	0x002	/* Page is on the LRU queue */
-	uint8_t flags;			/* Page flags */
+#define	WT_PAGE_BUILD_KEYS	0x01	/* Keys have been built in memory */
+#define	WT_PAGE_EVICT_LRU	0x02	/* Page is on the LRU queue */
+	uint8_t flags_atomic;		/* Atomic flags, use F_*_ATOMIC */
 };
 
 /*
@@ -339,12 +333,12 @@ struct __wt_ref {
 	 *
 	 * WT_REF_DISK:
 	 *	The initial setting before a page is brought into memory, and
-	 * set as a result of page eviction; the page is on disk, and must be
-	 * read into into memory before use.
+	 *	set as a result of page eviction; the page is on disk, and must
+	 *	be read into into memory before use.
 	 *
-	 * WT_REF_EVICTING:
-	 *	Set by eviction when a page is about to be locked; prevents a
-	 *	page from being evicted multiple times concurrently.
+	 * WT_REF_EVICT_FORCE:
+	 *	Set by eviction when a page is awaiting forced eviction;
+	 *	prevents a page from being evicted multiple times concurrently.
 	 *
 	 * WT_REF_EVICT_WALK:
 	 *	The next page to be walked for LRU eviction.  This page is
@@ -385,7 +379,7 @@ struct __wt_ref {
 	 */
 	volatile enum {
 		WT_REF_DISK=0,		/* Page is on disk */
-		WT_REF_EVICTING,	/* Page being evaluated for eviction */
+		WT_REF_EVICT_FORCE,	/* Page is awaiting force eviction */
 		WT_REF_EVICT_WALK,	/* Next page for LRU eviction */
 		WT_REF_LOCKED,		/* Page being evicted */
 		WT_REF_MEM,		/* Page is in cache and valid */

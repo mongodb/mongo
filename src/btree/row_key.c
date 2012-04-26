@@ -26,7 +26,7 @@ __wt_row_leaf_keys(WT_SESSION_IMPL *session, WT_PAGE *page)
 	ret = 0;
 
 	if (page->entries == 0) {			/* Just checking... */
-		F_SET(page, WT_PAGE_BUILD_KEYS);
+		F_SET_ATOMIC(page, WT_PAGE_BUILD_KEYS);
 		return (0);
 	}
 
@@ -57,7 +57,7 @@ __wt_row_leaf_keys(WT_SESSION_IMPL *session, WT_PAGE *page)
 		if (__bit_test(tmp->mem, i))
 			WT_ERR(__wt_row_key(session, page, rip, NULL));
 
-	F_SET(page, WT_PAGE_BUILD_KEYS);
+	F_SET_ATOMIC(page, WT_PAGE_BUILD_KEYS);
 
 err:	__wt_scr_free(&tmp);
 	return (ret);
