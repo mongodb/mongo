@@ -28,7 +28,7 @@ namespace mongo {
     LastErrorHolder lastError;
 
     bool isShell = false;
-    void raiseError(int code , const char *msg) {
+    void setLastError(int code , const char *msg) {
         LastError *le = lastError.get();
         if ( le == 0 ) {
             /* might be intentional (non-user thread) */

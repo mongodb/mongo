@@ -1,8 +1,6 @@
 // Test covered index projection with $or clause, specifically in getMore
 // SERVER-4980
 
-if ( 0 ) { // SERVER-4980
-
 t = db.jstests_coveredIndex4;
 t.drop();
 
@@ -39,6 +37,4 @@ while( c.hasNext() ) {
     if ( o.b ) {
         assert.eq( 1, o.b % 2, 'unexpected result: ' + tojson( o ) );
     }
-}
-
 }

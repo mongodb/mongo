@@ -20,6 +20,9 @@ def add_exe( v ):
 
 # ------    SOURCE FILE SETUP -----------
 
+env.StaticLibrary('log', [ 'util/assert_util.cpp',
+                           'util/log.cpp', ])
+
 commonFiles = [ "pch.cpp",
                 "buildinfo.cpp",
                 "db/jsobj.cpp",
@@ -34,11 +37,10 @@ commonFiles = [ "pch.cpp",
                 "shell/mongo.cpp",
                 "util/background.cpp",
                 "util/intrusive_counter.cpp",
+                "util/timer.cpp",
                 "util/util.cpp",
                 "util/file_allocator.cpp",
-                "util/assert_util.cpp",
                 "util/trace.cpp",
-                "util/log.cpp",
                 "util/ramlog.cpp",
                 "util/progress_meter.cpp",
                 "util/md5main.cpp",
@@ -72,7 +74,8 @@ commonFiles = [ "pch.cpp",
                 "s/shardconnection.cpp"]
 
 env.StaticLibrary('mongocommon', commonFiles,
-                  LIBDEPS=['stacktrace',
+                  LIBDEPS=['log',
+                           'stacktrace',
                            '$BUILD_DIR/third_party/pcrecpp',
                            '$BUILD_DIR/third_party/murmurhash3/murmurhash3',
                            '$BUILD_DIR/third_party/mongo_boost'],)
@@ -132,8 +135,8 @@ coreServerFiles = [ "util/version.cpp",
                     "db/security_commands.cpp",
                     ]
 
-if "win32" == os.sys.platform:
-    coreServerFiles.append( "util/ntservice.cpp" )
+
+env.StaticLibrary('ntservice', ['util/ntservice.cpp'])
 
 scripting_common_files = [ "scripting/engine.cpp",
                            "scripting/utils.cpp",
@@ -252,6 +255,7 @@ serverOnlyFiles = [ "db/curop.cpp",
                     "db/dbcommands_admin.cpp",
 
                     # most commands are only for mongod
+                    "db/commands/fsync.cpp",
                     "db/commands/distinct.cpp",
                     "db/commands/find_and_modify.cpp",
                     "db/commands/group.cpp",
@@ -333,9 +337,10 @@ if has_option( 'use-cpu-profiler' ):
 env.StaticLibrary("coreserver", coreServerFiles, LIBDEPS=["mongocommon", "scripting"])
 
 # main db target
-mongod = env.Install( '#/', env.Program( "mongod", mongodOnlyFiles,
-                                         LIBDEPS=["coreserver", "serveronly", "coredb"],
-                                         _LIBDEPS='$_LIBDEPS_OBJS' ) )
+mongod = env.Install(
+    '#/', env.Program( "mongod", mongodOnlyFiles,
+                       LIBDEPS=["coreserver", "serveronly", "coredb", "ntservice"],
+                       _LIBDEPS='$_LIBDEPS_OBJS' ) )
 Default( mongod )
 
 # tools
@@ -357,9 +362,10 @@ env.Install( '#/', [
         ] )
 
 # mongos
-mongos = env.Program( "mongos", shardServerFiles,
-                      LIBDEPS=["coreserver", "coredb", "mongocommon", "coreshard", "dbcmdline"],
-                      _LIBDEPS='$_LIBDEPS_OBJS' )
+mongos = env.Program(
+    "mongos", shardServerFiles,
+    LIBDEPS=["coreserver", "coredb", "mongocommon", "coreshard", "dbcmdline", "ntservice"],
+    _LIBDEPS='$_LIBDEPS_OBJS')
 env.Install( '#/', mongos )
 
 env.Library("clientandshell", "client/clientAndShell.cpp", LIBDEPS=["mongocommon", "coredb", "defaultversion", "gridfs"])
@@ -412,7 +418,8 @@ coreShellFiles = [ "shell/dbshell.cpp",
                    "shell/shell_utils_launcher.cpp",
                    "shell/mongo-server.cpp",
                    "../third_party/linenoise/linenoise.cpp",
-                   "../third_party/linenoise/linenoise_utf8.cpp"]
+                   "../third_party/linenoise/linenoise_utf8.cpp",
+                   "../third_party/linenoise/mk_wcwidth.cpp"]
 
 if shellEnv is not None:
     mongo_shell = shellEnv.Program(
@@ -459,7 +466,7 @@ def installBinary( e, name ):
     if nix:
         e.AddPostAction( inst, 'chmod 755 $TARGET' )
 
-for t in ["mongo" + x for x in normalTools] + ["mongofiles", "bsondump", "mongoperf"]:
+for t in ["mongo" + x for x in normalTools] + ["mongofiles", "bsondump", "mongoperf", "perftest" ]:
     installBinary( env, t )
     env.Alias("tools", '#/' + add_exe(t))
 

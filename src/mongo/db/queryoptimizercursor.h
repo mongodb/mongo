@@ -20,11 +20,11 @@
 
 #include "cursor.h"
 #include "diskloc.h"
-#include "projection.h"
 
 namespace mongo {
     
     class QueryPlan;
+    class CandidatePlanCharacter;
     
     /**
      * An interface for policies overriding the query optimizer's default query plan selection
@@ -89,42 +89,21 @@ namespace mongo {
     class QueryOptimizerCursor : public Cursor {
     public:
         
-        /** Summarizes the candidate plans that may run for a query. */
-        class CandidatePlans {
-        public:
-            CandidatePlans( bool mayRunInOrderPlan, bool mayRunOutOfOrderPlan ) :
-            _mayRunInOrderPlan( mayRunInOrderPlan ),
-            _mayRunOutOfOrderPlan( mayRunOutOfOrderPlan ) {
-            }
-            CandidatePlans() :
-            _mayRunInOrderPlan(),
-            _mayRunOutOfOrderPlan() {
-            }
-            bool mayRunInOrderPlan() const { return _mayRunInOrderPlan; }
-            bool mayRunOutOfOrderPlan() const { return _mayRunOutOfOrderPlan; }
-            bool valid() const { return mayRunInOrderPlan() || mayRunOutOfOrderPlan(); }
-            bool hybridPlanSet() const { return mayRunInOrderPlan() && mayRunOutOfOrderPlan(); }
-        private:
-            bool _mayRunInOrderPlan;
-            bool _mayRunOutOfOrderPlan;
-        };
         /** Candidate plans for the query before it begins running. */
-        virtual CandidatePlans initialCandidatePlans() const = 0;
+        virtual CandidatePlanCharacter initialCandidatePlans() const = 0;
         /** FieldRangeSet for the query before it begins running. */
         virtual const FieldRangeSet *initialFieldRangeSet() const = 0;
 
         /** @return true if the plan for the current iterate is out of order. */
         virtual bool currentPlanScanAndOrderRequired() const = 0;
-        /** @return the covered index projector for the current iterate (may be 0). */
-        virtual const Projection::KeyOnly *keyFieldsOnly() const = 0;
 
         /** @return true when there may be multiple plans running and some are in order. */
         virtual bool runningInitialInOrderPlan() const = 0;
         /**
-         * @return true when a cached plan is running, but it has not been selected for the
-         * remainder of the query.
+         * @return true when some query plans may have been excluded due to plan caching, for a
+         * non-$or query.
          */
-        virtual bool runningInitialCachedPlan() const = 0;
+        virtual bool hasPossiblyExcludedPlans() const = 0;
 
         /**
          * @return true when both in order and out of order candidate plans were available, and

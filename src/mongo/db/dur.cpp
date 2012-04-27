@@ -251,7 +251,7 @@ namespace mongo {
         }
 
         static int in_f;
-        void f() { 
+        void f_commitEarlyInRunExclusively() { 
             dassert( in_f == 0 );
             in_f++;
             try { 
@@ -314,7 +314,7 @@ namespace mongo {
                 }
                 else {
                     log(1) << "commitIfNeeded calling runExclusively " << force << endl;
-                    runExclusively(f);
+                    runExclusively(f_commitEarlyInRunExclusively);
                 }
             }
             else { 
@@ -456,7 +456,7 @@ namespace mongo {
 
             LOG(4) << "journal REMAPPRIVATEVIEW" << endl;
 
-            d.dbMutex.assertWriteLocked();
+            verify( Lock::isW() );
             verify( !commitJob.hasWritten() );
 
             // we want to remap all private views about every 2 seconds.  there could be ~1000 views so
@@ -535,7 +535,7 @@ namespace mongo {
             unspoolWriteIntents(); // in case we were doing some writing ourself (likely impossible with limitedlocks version)
             AlignedBuilder &ab = __theBuilder;
 
-            verify( !d.dbMutex.atLeastReadLocked() );
+            verify( ! Lock::isLocked() );
 
             // do we need this to be greedy, so that it can start working fairly soon?
             // probably: as this is a read lock, it wouldn't change anything if only reads anyway.
@@ -626,26 +626,26 @@ namespace mongo {
             if( !commitJob.hasWritten() ) {
                 // getlasterror request could have came after the data was already committed
                 commitJob.committingNotifyCommitted();
-                return;
             }
+            else {
+                JSectHeader h;
+                PREPLOGBUFFER(h,ab);
 
-            JSectHeader h;
-            PREPLOGBUFFER(h,ab);
+                // todo : write to the journal outside locks, as this write can be slow.
+                //        however, be careful then about remapprivateview as that cannot be done 
+                //        if new writes are then pending in the private maps.
+                WRITETOJOURNAL(h, ab);
 
-            // todo : write to the journal outside locks, as this write can be slow.
-            //        however, be careful then about remapprivateview as that cannot be done 
-            //        if new writes are then pending in the private maps.
-            WRITETOJOURNAL(h, ab);
+                // data is now in the journal, which is sufficient for acknowledging getLastError.
+                // (ok to crash after that)
+                commitJob.committingNotifyCommitted();
 
-            // data is now in the journal, which is sufficient for acknowledging getLastError.
-            // (ok to crash after that)
-            commitJob.committingNotifyCommitted();
+                WRITETODATAFILES(h, ab);
+                debugValidateAllMapsMatch();
 
-            WRITETODATAFILES(h, ab);
-            debugValidateAllMapsMatch();
-
-            commitJob.committingReset();
-            ab.reset();
+                commitJob.committingReset();
+                ab.reset();
+            }
 
             // REMAPPRIVATEVIEW
             //
@@ -790,6 +790,8 @@ namespace mongo {
                             break;
                         sleepmillis(oneThird);
                     }
+                                        
+                    //DEV log() << "privateMapBytes=" << privateMapBytes << endl;
 
                     durThreadGroupCommit();
                 }
@@ -852,7 +854,7 @@ namespace mongo {
         }
 
         void DurableImpl::syncDataAndTruncateJournal() {
-            d.dbMutex.assertWriteLocked();
+            verify( Lock::isW() );
 
             // a commit from the commit thread won't begin while we are in the write lock,
             // but it may already be in progress and the end of that work is done outside 

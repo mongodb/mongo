@@ -92,7 +92,7 @@ namespace ReplSetTests {
     class TestInitApplyOp : public Base {
     public:
         void run() {
-            writelock lk("");
+            Lock::GlobalWrite lk;
 
             OpTime o1,o2;
 
@@ -143,7 +143,7 @@ namespace ReplSetTests {
     class TestInitApplyOp2 : public Base {
     public:
         void run() {
-            writelock lk("");
+            Lock::GlobalWrite lk;
 
             OpTime o1 = OpTime::_now();
             OpTime o2 = OpTime::_now();
@@ -170,7 +170,7 @@ namespace ReplSetTests {
 
     class CappedInitialSync : public Base {
         string _ns;
-        writelock _lk;
+        Lock::DBWrite _lk;
 
         string spec() const {
             return "{\"capped\":true,\"size\":512}";

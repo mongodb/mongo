@@ -106,4 +106,12 @@ namespace mongo {
         return b.obj();
     }
     
+    CachedQueryPlan::CachedQueryPlan( const BSONObj &indexKey, long long nScanned,
+                                     CandidatePlanCharacter planCharacter ) :
+    _indexKey( indexKey ),
+    _nScanned( nScanned ),
+    _planCharacter( planCharacter ) {
+    }
+
+    
 } // namespace mongo

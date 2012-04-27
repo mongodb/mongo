@@ -112,7 +112,7 @@ namespace ThreadedTests {
                 }
                 else if( i % 7 == 1 ) {
                     Lock::GlobalRead r;
-                    ASSERT( d.dbMutex.atLeastReadLocked() );
+                    ASSERT( Lock::isReadLocked() );
                     ASSERT( Lock::isLocked() );
                     if( sometimes ) {
                         Lock::TempRelease t;
@@ -121,7 +121,7 @@ namespace ThreadedTests {
                 else if( i % 7 == 4 && 
                          tnumber == 1 /*only one upgrader legal*/ ) {
                     Lock::GlobalWrite w;
-                    ASSERT( d.dbMutex.isWriteLocked() );
+                    ASSERT( Lock::isW() );
                     ASSERT( Lock::isW() );
                     if( i % 7 == 2 ) {
                         Lock::TempRelease t;
@@ -136,7 +136,7 @@ namespace ThreadedTests {
                 }
                 else if( i % 7 == 2 ) {
                     Lock::GlobalWrite w;
-                    ASSERT( d.dbMutex.isWriteLocked() );
+                    ASSERT( Lock::isW() );
                     ASSERT( Lock::isW() );
                     if( sometimes ) {
                         Lock::TempRelease t;
@@ -148,7 +148,7 @@ namespace ThreadedTests {
                         Lock::TempRelease t;
                     }
                     Lock::GlobalRead r;
-                    ASSERT( d.dbMutex.isWriteLocked() );
+                    ASSERT( Lock::isW() );
                     ASSERT( Lock::isW() );
                     if( sometimes ) {
                         Lock::TempRelease t;
@@ -234,20 +234,13 @@ namespace ThreadedTests {
                         Lock::DBRead r3("local");
                     }
                 }
-                else {
-                    Lock::ThreadSpanningOp::setWLockedNongreedy();
-                    Lock::ThreadSpanningOp::unsetW();
-                    Lock::ThreadSpanningOp::setWLockedNongreedy();
-                    Lock::ThreadSpanningOp::W_to_R();
-                    Lock::ThreadSpanningOp::unsetR();
-                }
                 pm.hit();
             }
             cc().shutdown();
         }
         virtual void validate() {
             log() << "mongomutextest validate" << endl;
-            ASSERT( !d.dbMutex.atLeastReadLocked() );
+            ASSERT( ! Lock::isReadLocked() );
             ASSERT( upgradeWorked > upgradeFailed );
             ASSERT( upgradeWorked > 4 );
             {
@@ -346,7 +339,7 @@ namespace ThreadedTests {
 
             writelocktry lk( 0 );
             ASSERT( lk.got() );
-            ASSERT( d.dbMutex.isWriteLocked() );
+            ASSERT( Lock::isW() );
         }
     };
 
@@ -827,7 +820,7 @@ namespace ThreadedTests {
         QLock m;
         virtual void validate() { }
         virtual void subthread(int x) {
-            int Z = 1;
+            int Z = 0;
             Client::initThread("qtest");
             if( x == 1 ) { 
                 log(Z) << mongo::curTimeMillis64() % 10000 << " 1 lock_r()..." << endl;
@@ -853,8 +846,8 @@ namespace ThreadedTests {
                 m.lock_r();
                 verify( gotW );
                 log(Z) << mongo::curTimeMillis64() % 10000 << " 3            got" << gotW << endl;
-                log(Z) << t.millis() << endl;
                 m.unlock_r();
+                log(Z) << t.millis() << endl;
                 ASSERT( t.millis() > 50 );
             }
             cc().shutdown();

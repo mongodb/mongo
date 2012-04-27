@@ -31,7 +31,10 @@ def shouldKill( c ):
 def killprocs( signal="" ):
 
     killed = 0
-        
+
+    if sys.platform == 'win32':
+        return killed
+
     l = utils.getprocesslist()
     print( "num procs:" + str( len( l ) ) )
     if len(l) == 0:

@@ -215,7 +215,9 @@ namespace mongo {
         }
         shared_ptr<ExplainPlanInfo> explainInfo() const { return _explainPlanInfo; }
         
-        const Projection::KeyOnly *keyFieldsOnly() const { return qp().keyFieldsOnly().get(); }
+        virtual const Projection::KeyOnly *keyFieldsOnly() const {
+            return qp().keyFieldsOnly().get();
+        }
         
     private:
         void mayAdvance() {
@@ -509,7 +511,7 @@ namespace mongo {
             return _currOp->currentMatches( details );
         }
         
-        virtual CandidatePlans initialCandidatePlans() const {
+        virtual CandidatePlanCharacter initialCandidatePlans() const {
             return _initialCandidatePlans;
         }
         
@@ -545,12 +547,12 @@ namespace mongo {
             return _mps->haveInOrderPlan();
         }
 
-        virtual bool runningInitialCachedPlan() const {
+        virtual bool hasPossiblyExcludedPlans() const {
             if ( _takeover ) {
                 return false;
             }
             assertOk();
-            return _mps->usingCachedPlan();
+            return _mps->hasPossiblyExcludedPlans();
         }
 
         virtual bool completePlanOfHybridSetScanAndOrderRequired() const {
@@ -661,7 +663,7 @@ namespace mongo {
         
         bool _requireOrder;
         auto_ptr<MultiPlanScanner> _mps;
-        CandidatePlans _initialCandidatePlans;
+        CandidatePlanCharacter _initialCandidatePlans;
         shared_ptr<QueryOptimizerCursorOp> _originalOp;
         QueryOptimizerCursorOp *_currOp;
         bool _completePlanOfHybridSetScanAndOrderRequired;
@@ -779,7 +781,8 @@ namespace mongo {
     
     void CursorGenerator::setMultiPlanScanner() {
         _mps.reset( new MultiPlanScanner( _ns, _query, _order, _parsedQuery, hint(),
-                                         explain() ? QueryPlanSet::Ignore : QueryPlanSet::Use,
+                                         explain() ? QueryPlanGenerator::Ignore :
+                                                QueryPlanGenerator::Use,
                                          min(), max() ) );
     }
     
@@ -800,6 +803,9 @@ namespace mongo {
             shared_ptr<CoveredIndexMatcher> matcher
             ( new CoveredIndexMatcher( _query, single->indexKeyPattern() ) );
             single->setMatcher( matcher );
+        }
+        if ( singlePlan->keyFieldsOnly() ) {
+            single->setKeyFieldsOnly( singlePlan->keyFieldsOnly() );
         }
         if ( _simpleEqualityMatch ) {
             if ( singlePlan->exactKeyMatch() && !single->matcher()->needRecord() ) {

@@ -372,9 +372,8 @@ public:
     }
     
     int _repair( string dbname ) {
-        writelock lk;
-        Client::Context cx( dbname );
-        Database * db = cx.db();
+        Client::WriteContext cx( dbname );
+        Database * db = cx.ctx().db();
         
         list<string> namespaces;
         db->namespaceIndex.getNamespaces( namespaces );

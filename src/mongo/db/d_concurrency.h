@@ -4,10 +4,16 @@
 
 #pragma once
 
+#include "mongo/util/concurrency/qlock.h"
+#include "mongo/util/concurrency/mutex.h"
+#include "mongo/bson/stringdata.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/lockstat.h"
+
 namespace mongo {
 
     class WrapperForRWLock;
-    struct LockState;
+    class LockState;
 
     class Lock : boost::noncopyable { 
     public:
@@ -40,16 +46,17 @@ namespace mongo {
         protected: 
             friend struct TempRelease;
             ScopedLock(); 
-            virtual ~ScopedLock();
             virtual void tempRelease() = 0;
             virtual void relock() = 0;
+        public:
+            virtual ~ScopedLock();
         };
 
         // note that for these classes recursive locking is ok if the recursive locking "makes sense"
         // i.e. you could grab globalread after globalwrite.
 
-        class GlobalWrite : private ScopedLock {
-            const bool stoppedGreed;
+        class GlobalWrite : public ScopedLock {
+            bool stoppedGreed;
             bool noop;
         protected:
             void tempRelease();
@@ -65,7 +72,7 @@ namespace mongo {
             void downgrade(); // W -> R
             bool upgrade();   // caution see notes
         };
-        class GlobalRead : private ScopedLock { // recursive is ok
+        class GlobalRead : public ScopedLock { // recursive is ok
         public:
             bool noop;
         protected:
@@ -77,16 +84,16 @@ namespace mongo {
             virtual ~GlobalRead();
         };
         // lock this database. do not shared_lock globally first, that is handledin herein. 
-        class DBWrite : private ScopedLock {
+        class DBWrite : public ScopedLock {
             bool isW(LockState&) const;
             void lockTop(LockState&);
             void lockNestable(Nestable db);
-            void lock(const string& db);
+            void lockOther(const string& db);
             bool locked_w;
             bool locked_W;
             WrapperForRWLock *weLocked;
-            int *ourCounter;
             const string what;
+            bool _nested;
             void lockDB(const string& ns);
             void unlockDB();
         protected:
@@ -97,15 +104,15 @@ namespace mongo {
             virtual ~DBWrite();
         };
         // lock this database for reading. do not shared_lock globally first, that is handledin herein. 
-        class DBRead : private ScopedLock {
+        class DBRead : public ScopedLock {
             bool isRW(LockState&) const;
             void lockTop(LockState&);
             void lockNestable(Nestable db);
-            void lock(const string& db);
+            void lockOther(const string& db);
             bool locked_r;
             WrapperForRWLock *weLocked;
-            int *ourCounter;
             string what;
+            bool _nested;
             void lockDB(const string& ns);
             void unlockDB();
         protected:
@@ -116,33 +123,6 @@ namespace mongo {
             virtual ~DBRead();
         };
 
-        // specialty things:
-        struct ThreadSpanningOp { 
-            static void setWLockedNongreedy();
-            static void W_to_R();
-            static void unsetW(); // reverts to greedy
-            static void unsetR(); // reverts to greedy
-            static void handoffR(); // doesn't unlock, but changes my thread state back to ''
-        };
-    };
-
-    // the below are for backward compatibility.  use Lock classes above instead.
-    class readlock {
-        scoped_ptr<Lock::GlobalRead> lk1;
-        scoped_ptr<Lock::DBRead> lk2;
-    public:
-        readlock(const string& ns);
-        readlock();
-    };
-
-    // writelock is an old helper the code has used for a long time.
-    // it now DBWrite locks if ns parm is specified. otherwise global W locks
-    class writelock {
-        scoped_ptr<Lock::GlobalWrite> lk1;
-        scoped_ptr<Lock::DBWrite> lk2;
-    public:
-        writelock(const string& ns);
-        writelock();
     };
 
     class readlocktry : boost::noncopyable {
@@ -163,67 +143,73 @@ namespace mongo {
         bool got() const { return _got; }
     };
 
-    struct readlocktryassert : public readlocktry {
-        readlocktryassert(int tryms) :
-            readlocktry(tryms) {
-            uassert(13142, "timeout getting readlock", got());
-        }
-    };
-
-
-    /** parameterized choice of read or write locking */
-    class mongolock {
-        scoped_ptr<readlock> r;
-        scoped_ptr<writelock> w;
-    public:
-        mongolock(bool write) {
-            if( write ) {
-                w.reset( new writelock() );
-            }
-            else {
-                r.reset( new readlock() );
-            }
-        }
-    };
-
     /** a mutex, but reported in curop() - thus a "high level" (HL) one
         some overhead so we don't use this for everything.  the externalobjsort mutex
         uses this, as it can be held for eons. implementation still needed. */
     class HLMutex : public SimpleMutex {
+        LockStat ls;
     public:
         HLMutex(const char *name);
     };
 
     // implementation stuff
-    struct LockState {
+    // per thread
+    class LockState {
+    public:
         LockState();
         void dump();
         static void Dump();
         void reportState(BSONObjBuilder& b);
+        
+        unsigned recursiveCount() const { return _recursive; }
 
-        unsigned recursive;           // we allow recursively asking for a lock; we track that here
+        /**
+         * @return 0 rwRW
+         */
+        char threadState() const { return _threadState; }
+        
+        void locked( char newState ); // RWrw
+        void unlocked(); // _threadState = 0
+        
+        /**
+         * you have to be locked already to call this
+         * this is mostly for W_to_R or R_to_W
+         */
+        void changeLockState( char newstate );
+
+        Lock::Nestable whichNestable() const { return _whichNestable; }
+        int nestableCount() const { return _nestableCount; }
+        
+        int otherCount() const { return _otherCount; }
+        string otherName() const { return _otherName; }
+        WrapperForRWLock* otherLock() const { return _otherLock; }
+        
+        void enterScopedLock( Lock::ScopedLock* lock );
+        Lock::ScopedLock* leaveScopedLock();
+
+        void lockedNestable( Lock::Nestable what , int type );
+        void unlockedNestable();
+        void lockedOther( const string& db , int type , WrapperForRWLock* lock );
+        void unlockedOther();
+    private:
+        unsigned _recursive;           // we allow recursively asking for a lock; we track that here
 
         // global lock related
-        char threadState;             // 0, 'r', 'w', 'R', 'W'
+        char _threadState;             // 0, 'r', 'w', 'R', 'W'
 
         // db level locking related
-        Lock::Nestable whichNestable;
-        int nestableCount;            // recursive lock count on local or admin db
-        int otherCount;               //   >0 means write lock, <0 read lock
-        string otherName;             // which database are we locking and working with (besides local/admin)
-        WrapperForRWLock *otherLock;  // so we don't have to check the map too often (the map has a mutex)
+        Lock::Nestable _whichNestable;
+        int _nestableCount;            // recursive lock count on local or admin db XXX - change name
+        
+        int _otherCount;               //   >0 means write lock, <0 read lock - XXX change name
+        string _otherName;             // which database are we locking and working with (besides local/admin) 
+        WrapperForRWLock* _otherLock;  // so we don't have to check the map too often (the map has a mutex)
 
         // for temprelease
-        Lock::ScopedLock *scopedLk;   // for the nonrecursive case. otherwise there would be many
+        // for the nonrecursive case. otherwise there would be many
+        // the first lock goes here, which is ok since we can't yield recursive locks
+        Lock::ScopedLock* _scopedLk;   
+        
     };
 
-    inline LockState::LockState() : recursive(0), 
-                             threadState(0), 
-                             nestableCount(0), 
-                             otherCount(0), 
-                             otherLock(NULL),
-                             scopedLk(NULL)
-    {
-        whichNestable = Lock::notnestable;
-    }
 }

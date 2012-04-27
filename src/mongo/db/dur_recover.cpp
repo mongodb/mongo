@@ -510,7 +510,7 @@ namespace mongo {
         void recover() {
             // we use a lock so that exitCleanly will wait for us
             // to finish (or at least to notice what is up and stop)
-            writelock lk;
+            Lock::GlobalWrite lk;
 
             // this is so the mutexdebugger doesn't get confused.  we are actually single threaded 
             // at this point in the program so it wouldn't have been a true problem (I think)

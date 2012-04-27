@@ -239,7 +239,8 @@ namespace mongo {
         }
     }
 
-    void getIndexChanges(vector<IndexChanges>& v, NamespaceDetails& d, BSONObj newObj, BSONObj oldObj, bool &changedId) {
+    void getIndexChanges(vector<IndexChanges>& v, const char *ns, NamespaceDetails& d,
+                         BSONObj newObj, BSONObj oldObj, bool &changedId) {
         int z = d.nIndexesBeingBuilt();
         v.resize(z);
         for( int i = 0; i < z; i++ ) {
@@ -249,7 +250,7 @@ namespace mongo {
             idx.getKeysFromObject(oldObj, ch.oldkeys);
             idx.getKeysFromObject(newObj, ch.newkeys);
             if( ch.newkeys.size() > 1 )
-                d.setIndexIsMultikey(i);
+                d.setIndexIsMultikey(ns, i);
             setDifference(ch.oldkeys, ch.newkeys, ch.removed);
             setDifference(ch.newkeys, ch.oldkeys, ch.added);
             if ( ch.removed.size() > 0 && ch.added.size() > 0 && idx.isIdIndex() ) {

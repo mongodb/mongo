@@ -32,6 +32,7 @@
 #include "../util/processinfo.h"
 #include "../util/timer.h"
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/db/scanandorder.h"
 
 namespace mongo {
 
@@ -171,10 +172,7 @@ namespace mongo {
         }
 
         if( foundSomeToTimeout ) {
-            // todo: ideally all readlocks automatically note what we are locking for so this 
-            // can be reported in currentop command. e.g. something like:
-            //   readlock lk("", "timeout cursors");
-            readlock lk("");
+            Lock::GlobalRead lk;
             for( LockedIterator i; i.ok(); ) {
                 ClientCursor *cc = i.current();
                 if( cc->shouldTimeout(0) ) {
@@ -421,6 +419,17 @@ namespace mongo {
         return b.obj();
     }
     
+    void ClientCursor::fillQueryResultFromObj( BufBuilder &b ) const {
+        const Projection::KeyOnly *keyFieldsOnly = c()->keyFieldsOnly();
+        if ( keyFieldsOnly ) {
+            mongo::fillQueryResultFromObj( b, 0, keyFieldsOnly->hydrate( c()->currKey() ) );
+        }
+        else {
+            DiskLoc loc = c()->currLoc();
+            mongo::fillQueryResultFromObj( b, fields.get(), c()->current(),
+                                          ( ( pq && pq->showDiskLoc() ) ? &loc : 0 ) );
+        }
+    }
 
     /* call when cursor's location changes so that we can update the
        cursorsbylocation map.  if you are locked and internally iterating, only
@@ -457,6 +466,10 @@ namespace mongo {
     }
     
     Record* ClientCursor::_recordForYield( ClientCursor::RecordNeeds need ) {
+        
+        if ( ! ok() )
+            return 0;
+
         if ( need == DontNeed ) {
             return 0;
         }

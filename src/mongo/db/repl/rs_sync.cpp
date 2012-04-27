@@ -114,7 +114,7 @@ namespace mongo {
         }
 
         /* we lock outside the loop to avoid the overhead of locking on every operation. */
-        writelock lk("");
+        Lock::GlobalWrite lk;
 
         // todo : use exhaust
         OpTime ts;
@@ -247,7 +247,7 @@ namespace mongo {
         }
 
         {
-            readlock lk("local.replset.minvalid");
+            Lock::DBRead lk("local.replset.minvalid");
             BSONObj mv;
             if( Helpers::getSingleton("local.replset.minvalid", mv) ) {
                 minvalid = mv["ts"]._opTime();
@@ -317,7 +317,7 @@ namespace mongo {
 
             // reset minvalid so that we can't become primary prematurely
             {
-                writelock lk("local.replset.minvalid");
+                Lock::DBWrite lk("local.replset.minvalid");
                 Helpers::putSingleton("local.replset.minvalid", oldest);
             }
 
@@ -404,7 +404,7 @@ namespace mongo {
             verify( !Lock::isLocked() );
             {
                 Timer timeInWriteLock;
-                scoped_ptr<writelock> lk;
+                scoped_ptr<Lock::ScopedLock> lk;
                 while( 1 ) {
                     if( !r.moreInCurrentBatch() ) {
                         lk.reset();
@@ -484,18 +484,26 @@ namespace mongo {
 
                         const char *ns = o.getStringField("ns");
                         if( ns ) {
-                            if( str::contains(ns, ".$cmd") ) { 
+                            if ( strlen(ns) == 0 ) {
+                                // this is ugly
+                                // this is often a no-op
+                                // but can't be 100% sure
+                                lk.reset();
+                                verify( !Lock::isLocked() );
+                                lk.reset( new Lock::GlobalWrite() );
+                            }
+                            else if( str::contains(ns, ".$cmd") ) { 
                                 // a command may need a global write lock. so we will conservatively go ahead and grab one here. suboptimal. :-( 
                                 lk.reset();
                                 verify( !Lock::isLocked() );
-                                lk.reset( new writelock() );
+                                lk.reset( new Lock::GlobalWrite() );
                             }
                             else if( !Lock::isWriteLocked(ns) || Lock::isW() ) {
                                 // we don't relock on every single op to try to be faster. however if switching collections, we have to.
                                 // note here we must reset to 0 first to assure the old object is destructed before our new operator invocation.
                                 lk.reset();
                                 verify( !Lock::isLocked() );
-                                lk.reset( new writelock(ns) );
+                                lk.reset( new Lock::DBWrite(ns) );
                             }
                         }
 

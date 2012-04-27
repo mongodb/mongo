@@ -26,18 +26,6 @@
 
 namespace mongo {
 
-#if defined(_WIN32)
-    unsigned long long Timer::countsPerSecond;
-    struct AtStartup {
-        AtStartup() {
-            LARGE_INTEGER x;
-            bool ok = QueryPerformanceFrequency(&x);
-            verify(ok);
-            Timer::countsPerSecond = x.QuadPart;
-        }
-    } atstartuputil;
-#endif
-
     string hexdump(const char *data, unsigned len) {
         verify( len < 1000000 );
         const unsigned char *p = (const unsigned char *) data;
@@ -134,14 +122,6 @@ namespace mongo {
             return *s;
         return "";
     }
-
-    const char *default_getcurns() { return ""; }
-    const char * (*getcurns)() = default_getcurns;
-
-    int logLevel = 0;
-    int tlogLevel = 0;
-    mongo::mutex Logstream::mutex("Logstream");
-    int Logstream::doneSetup = Logstream::magicNumber();
 
     bool isPrime(int n) {
         int z = 2;

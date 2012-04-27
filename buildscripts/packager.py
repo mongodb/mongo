@@ -902,8 +902,10 @@ fi
 %{_bindir}/mongo
 %{_bindir}/mongodump
 %{_bindir}/mongoexport
-%{_bindir}/mongofiles
+#@@VERSION!=2.1.0@@%{_bindir}/mongofiles
 %{_bindir}/mongoimport
+#@@VERSION>=2.1.0@@%{_bindir}/mongooplog
+#@@VERSION>=2.1.0@@%{_bindir}/mongoperf
 %{_bindir}/mongorestore
 #@@VERSION>1.9@@%{_bindir}/mongotop
 %{_bindir}/mongostat
@@ -966,9 +968,25 @@ fi
 
     lines=[]
     for line in s.split("\n"):
-        m = re.search("@@VERSION>(.*)@@(.*)", line)
-        if m and spec.version_better_than(m.group(1)):
-            lines.append(m.group(2))
+        m = re.search("@@VERSION(>|>=|!=)(\d.*)@@(.*)", line)
+        if m:
+          op = m.group(1)
+          ver = m.group(2)
+          fn = m.group(3)
+          if op == '>':
+            if spec.version_better_than(ver):
+              lines.append(fn)
+          elif op == '>=':
+            if spec.version() == ver or spec.version_better_than(ver):
+              lines.append(fn)
+          elif op == '!=':
+            if spec.version() != ver:
+              lines.append(fn)
+          else:
+            # Since we're inventing our own template system for RPM
+            # specfiles here, we oughtn't use template syntax we don't
+            # support.
+            raise Exception("BUG: probable bug in packager script: %s, %s, %s" % (m.group(1), m.group(2), m.group(3)))
         else:
             lines.append(line)
     s="\n".join(lines)

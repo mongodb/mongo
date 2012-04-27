@@ -333,8 +333,6 @@ bool isBalanced( string code ) {
     return brackets == 0 && parens == 0 && !danglingOp;
 }
 
-using mongo::asserted;
-
 struct BalancedTest : public mongo::StartupTest {
 public:
     void run() {

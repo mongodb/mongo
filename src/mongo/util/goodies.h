@@ -19,6 +19,7 @@
 #pragma once
 
 #include <boost/detail/endian.hpp>
+#include <boost/thread/condition_variable.hpp>
 
 #include "mongo/bson/util/misc.h"
 #include "mongo/util/concurrency/mutex.h"

@@ -295,7 +295,7 @@ namespace JsobjTests {
                     Client::initThread("pretouchN");
                     c = &cc();
                 }
-                writelock lk(""); // for initTimestamp
+                Lock::GlobalWrite lk; // for initTimestamp
         
                 BSONObjBuilder b;
                 b.appendTimestamp( "a" );
@@ -805,6 +805,57 @@ namespace JsobjTests {
                 ASSERT_EQUALS( 3 , o.getFieldDotted( "c.0.a" ).numberInt() );
                 ASSERT_EQUALS( 4 , o.getFieldDotted( "c.1.a" ).numberInt() );
                 keyTest(o);
+            }
+        };
+
+        class ToStringRecursionDepth {
+        public:
+            // create a nested BSON object with the specified recursion depth
+            BSONObj recursiveBSON( int depth )  {
+                BSONObjBuilder b;
+                if ( depth==0 ) {
+                    b << "name" << "Joe";
+                    return b.obj();
+                }
+                b.append( "test", recursiveBSON( depth - 1) );
+                return b.obj();
+            }
+
+            void run() {
+                BSONObj nestedBSON;
+                StringBuilder s;
+                string nestedBSONString;
+                size_t found;
+
+                // recursion depth one less than max allowed-- do not shorten the string
+                nestedBSON = recursiveBSON( BSONObj::maxToStringRecursionDepth - 1  );
+                nestedBSON.toString( s, true, false );
+                nestedBSONString = s.str();
+                found = nestedBSONString.find( "..." );
+                // did not find the "..." pattern
+                ASSERT_EQUALS( found!=string::npos, false );
+
+                // recursion depth is equal to max allowed  -- do not shorten the string
+                nestedBSON = recursiveBSON( BSONObj::maxToStringRecursionDepth );
+                nestedBSON.toString( s, true, false );
+                nestedBSONString = s.str();
+                found = nestedBSONString.find( "..." );
+                // did not find the "..." pattern
+                ASSERT_EQUALS( found!=string::npos, false );
+
+                // recursion depth - one greater than max allowed -- shorten the string
+                nestedBSON = recursiveBSON( BSONObj::maxToStringRecursionDepth + 1 );
+                nestedBSON.toString( s, false, false );
+                nestedBSONString = s.str();
+                found = nestedBSONString.find( "..." );
+                // found the "..." pattern
+                ASSERT_EQUALS( found!=string::npos, true );
+
+                /* recursion depth - one greater than max allowed but with full=true
+                 * should fail with an assertion
+                 */
+                nestedBSON = recursiveBSON( BSONObj::maxToStringRecursionDepth + 1 );
+                ASSERT_THROWS( nestedBSON.toString( s, false, true ) , UserException );
             }
         };
 
@@ -2173,6 +2224,7 @@ namespace JsobjTests {
             add< BSONObjTests::AppendAs >();
             add< BSONObjTests::ArrayAppendAs >();
             add< BSONObjTests::GetField >();
+            add< BSONObjTests::ToStringRecursionDepth >();
 
             add< BSONObjTests::Validation::BadType >();
             add< BSONObjTests::Validation::EooBeforeEnd >();

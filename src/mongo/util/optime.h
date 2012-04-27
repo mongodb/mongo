@@ -20,7 +20,6 @@
 #include <boost/thread/condition.hpp>
 
 namespace mongo {
-    void exitCleanly( ExitCode code );
 
     struct ClockSkewException : public DBException {
         ClockSkewException() : DBException( "clock skew exception" , 20001 ) {}

@@ -174,8 +174,7 @@ namespace mongo {
             int n = 0;
             list<BSONObj> src;
             {
-                readlock lk( "local.sources" );
-                Client::Context ctx( "local.sources", dbpath, authed );
+                Client::ReadContext ctx( "local.sources", dbpath, authed );
                 shared_ptr<Cursor> c = findTableScan("local.sources", BSONObj());
                 while ( c->ok() ) {
                     src.push_back(c->current());
@@ -704,7 +703,7 @@ namespace mongo {
             }
         }
 
-        scoped_ptr<writelock> lk( alreadyLocked ? 0 : new writelock() );
+        scoped_ptr<Lock::GlobalWrite> lk( alreadyLocked ? 0 : new Lock::GlobalWrite() );
 
         if ( replAllDead ) {
             // hmmm why is this check here and not at top of this function? does it get set between top and here?
@@ -983,7 +982,7 @@ namespace mongo {
 
                 unsigned b = replApplyBatchSize;
                 bool justOne = b == 1;
-                scoped_ptr<writelock> lk( justOne ? 0 : new writelock() );
+                scoped_ptr<Lock::GlobalWrite> lk( justOne ? 0 : new Lock::GlobalWrite() );
                 while( 1 ) {
 
                     BSONElement ts = op.getField("ts");

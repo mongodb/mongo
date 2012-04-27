@@ -44,7 +44,7 @@ namespace MMapTests {
             try { boost::filesystem::remove(fn); }
             catch(...) { }
 
-            writelock lk;
+            Lock::GlobalWrite lk;
 
             {
                 MongoMMF f;

@@ -223,18 +223,7 @@ namespace mongo {
            for these, we have to do some dedup work on queries.
         */
         bool isMultikey(int i) const { return (multiKeyIndexBits & (((unsigned long long) 1) << i)) != 0; }
-        void setIndexIsMultikey(int i) {
-            dassert( i < NIndexesMax );
-            unsigned long long x = ((unsigned long long) 1) << i;
-            if( multiKeyIndexBits & x ) return;
-            *getDur().writing(&multiKeyIndexBits) |= x;
-        }
-        void clearIndexIsMultikey(int i) {
-            dassert( i < NIndexesMax );
-            unsigned long long x = ((unsigned long long) 1) << i;
-            if( (multiKeyIndexBits & x) == 0 ) return;
-            *getDur().writing(&multiKeyIndexBits) &= ~x;
-        }
+        void setIndexIsMultikey(const char *thisns, int i);
 
         /* add a new index.  does not add to system.indexes etc. - just to NamespaceDetails.
            caller must populate returned object.
@@ -522,7 +511,7 @@ namespace mongo {
         /* query cache (for query optimizer) ------------------------------------- */
     private:
         int _qcWriteCount;
-        map< QueryPattern, pair< BSONObj, long long > > _qcCache;
+        map<QueryPattern,CachedQueryPlan> _qcCache;
         static NamespaceDetailsTransient& make_inlock(const char *ns);
     public:
         static SimpleMutex _qcMutex;
@@ -541,25 +530,23 @@ namespace mongo {
             return get_inlock(ns);
         }
 
-        void clearQueryCache() { // public for unit tests
+        void clearQueryCache() {
             _qcCache.clear();
             _qcWriteCount = 0;
         }
-        /* you must notify the cache if you are doing writes, as query plan optimality will change */
+        /* you must notify the cache if you are doing writes, as query plan utility will change */
         void notifyOfWriteOp() {
             if ( _qcCache.empty() )
                 return;
             if ( ++_qcWriteCount >= 100 )
                 clearQueryCache();
         }
-        BSONObj indexForPattern( const QueryPattern &pattern ) {
-            return _qcCache[ pattern ].first;
+        CachedQueryPlan cachedQueryPlanForPattern( const QueryPattern &pattern ) {
+            return _qcCache[ pattern ];
         }
-        long long nScannedForPattern( const QueryPattern &pattern ) {
-            return _qcCache[ pattern ].second;
-        }
-        void registerIndexForPattern( const QueryPattern &pattern, const BSONObj &indexKey, long long nScanned ) {
-            _qcCache[ pattern ] = make_pair( indexKey, nScanned );
+        void registerCachedQueryPlanForPattern( const QueryPattern &pattern,
+                                               const CachedQueryPlan &cachedQueryPlan ) {
+            _qcCache[ pattern ] = cachedQueryPlan;
         }
 
     }; /* NamespaceDetailsTransient */

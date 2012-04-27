@@ -46,6 +46,7 @@ _ disallow system* manipulations from the database.
 #include "instance.h"
 #include "replutil.h"
 #include "memconcept.h"
+#include "mongo/db/lasterror.h"
 
 #include <boost/filesystem/operations.hpp>
 
@@ -1104,7 +1105,7 @@ namespace mongo {
         */
         vector<IndexChanges> changes;
         bool changedId = false;
-        getIndexChanges(changes, *d, objNew, objOld, changedId);
+        getIndexChanges(changes, ns, *d, objNew, objOld, changedId);
         uassert( 13596 , str::stream() << "cannot change _id of a document old:" << objOld << " new:" << objNew , ! changedId );
         dupCheck(changes, *d, dl);
 
@@ -1233,7 +1234,8 @@ namespace mongo {
     /** add index keys for a newly inserted record 
         done in two steps/phases to allow potential deferal of write lock portion in the future
     */
-    static void indexRecordUsingTwoSteps(NamespaceDetails *d, BSONObj obj, DiskLoc loc, bool shouldBeUnlocked) {
+    static void indexRecordUsingTwoSteps(const char *ns, NamespaceDetails *d, BSONObj obj,
+                                         DiskLoc loc, bool shouldBeUnlocked) {
         vector<int> multi;
         vector<BSONObjSet> multiKeys;
 
@@ -1264,7 +1266,7 @@ namespace mongo {
             IndexDetails& idx = d->idx(i);
             IndexInterface& ii = idx.idxInterface();
             Ordering ordering = Ordering::make(idx.keyPattern());
-            d->setIndexIsMultikey(i);   
+            d->setIndexIsMultikey(ns, i);
             for( BSONObjSet::iterator k = ++keys.begin()/*skip 1*/; k != keys.end(); k++ ) {
                 try {
                     ii.bt_insert(idx.head, loc, *k, ordering, !idx.unique(), idx);
@@ -1292,7 +1294,8 @@ namespace mongo {
     }
 
     /* add keys to index idxNo for a new record */
-    static void addKeysToIndex(NamespaceDetails *d, int idxNo, BSONObj& obj, DiskLoc recordLoc, bool dupsAllowed) {
+    static void addKeysToIndex(const char *ns, NamespaceDetails *d, int idxNo, BSONObj& obj,
+                               DiskLoc recordLoc, bool dupsAllowed) {
         IndexDetails& idx = d->idx(idxNo);
         BSONObjSet keys;
         idx.getKeysFromObject(obj, keys);
@@ -1304,7 +1307,7 @@ namespace mongo {
         int n = 0;
         for ( BSONObjSet::iterator i=keys.begin(); i != keys.end(); i++ ) {
             if( ++n == 2 ) {
-                d->setIndexIsMultikey(idxNo);
+                d->setIndexIsMultikey(ns, idxNo);
             }
             verify( !recordLoc.isNull() );
             try {
@@ -1448,7 +1451,7 @@ namespace mongo {
         BSONObjExternalSorter& sorter = *(phase1->sorter);
 
         if( phase1->multi )
-            d->setIndexIsMultikey(idxNo);
+            d->setIndexIsMultikey(ns, idxNo);
 
         if ( logLevel > 1 ) printMemInfo( "before final sort" );
         phase1->sorter->sort();
@@ -1499,10 +1502,10 @@ namespace mongo {
                     {
                         if ( !dupsAllowed && dropDups ) {
                             LastError::Disabled led( lastError.get() );
-                            addKeysToIndex(d, idxNo, js, cc->currLoc(), dupsAllowed);
+                            addKeysToIndex(ns, d, idxNo, js, cc->currLoc(), dupsAllowed);
                         }
                         else {
-                            addKeysToIndex(d, idxNo, js, cc->currLoc(), dupsAllowed);
+                            addKeysToIndex(ns, d, idxNo, js, cc->currLoc(), dupsAllowed);
                         }
                     }
                     cc->advance();
@@ -1892,7 +1895,7 @@ namespace mongo {
             }
 
             verify( le && !saveerrmsg.empty() );
-            raiseError(savecode,saveerrmsg.c_str());
+            setLastError(savecode,saveerrmsg.c_str());
             throw;
         }
     }
@@ -1994,7 +1997,7 @@ namespace mongo {
                 verify( obuf );
                 BSONObj obj((const char *) obuf);
                 try {
-                    indexRecordUsingTwoSteps(d, obj, loc, true);
+                    indexRecordUsingTwoSteps(ns, d, obj, loc, true);
                 }
                 catch( AssertionException& ) {
                     // should be a dup key error on _id index
@@ -2048,7 +2051,7 @@ namespace mongo {
                 // not sure which of these is better -- either can be used.  oldIndexRecord may be faster, 
                 // but twosteps handles dup key errors more efficiently.
                 //oldIndexRecord(d, obj, loc);
-                indexRecordUsingTwoSteps(d, obj, loc, false);
+                indexRecordUsingTwoSteps(ns, d, obj, loc, false);
 
             }
             catch( AssertionException& e ) {
@@ -2057,7 +2060,7 @@ namespace mongo {
                     massert( 12583, "unexpected index insertion failure on capped collection", !d->isCapped() );
                     string s = e.toString();
                     s += " : on addIndex/capped - collection and its index will not match";
-                    uassert_nothrow(s.c_str());
+                    setLastError(0, s.c_str());
                     error() << s << endl;
                 }
                 else {
@@ -2123,7 +2126,7 @@ namespace mongo {
 namespace mongo {
 
     void dropAllDatabasesExceptLocal() {
-        writelock lk("");
+        Lock::GlobalWrite lk;
 
         vector<string> n;
         getDatabaseNames(n);
@@ -2382,7 +2385,7 @@ namespace mongo {
 
     bool DatabaseHolder::closeAll( const string& path , BSONObjBuilder& result , bool force ) {
         log() << "DatabaseHolder::closeAll path:" << path << endl;
-        d.dbMutex.assertWriteLocked();
+        verify( Lock::isW() );
         getDur().commitNow(); // bad things happen if we close a DB with outstanding writes
 
         map<string,Database*>& m = _paths[path];

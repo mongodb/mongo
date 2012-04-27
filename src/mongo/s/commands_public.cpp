@@ -29,6 +29,7 @@
 #include "s/interrupt_status_mongos.h"
 #include "../scripting/engine.h"
 #include "../util/timer.h"
+#include "mongo/db/lasterror.h"
 
 
 #include "config.h"
@@ -674,8 +675,6 @@ namespace mongo {
                 BSONObj filter = cmdObj.getObjectField("query");
                 uassert(13343,  "query for sharded findAndModify must have shardkey", cm->hasShardKey(filter));
 
-                //TODO with upsert consider tracking for splits
-
                 ChunkPtr chunk = cm->findChunk(filter);
                 ShardConnection conn( chunk->getShard() , fullns );
                 BSONObj res;
@@ -684,6 +683,15 @@ namespace mongo {
 
                 if (!ok && res.getIntField("code") == RecvStaleConfigCode) { // code for RecvStaleConfigException
                     throw RecvStaleConfigException( "FindAndModify", res ); // Command code traps this and re-runs
+                }
+
+                if (ok) {
+                    // check whether split is necessary (using update object for size heuristic)
+                    ClientInfo *client = ClientInfo::get();
+                        
+                    if (client != NULL && client->autoSplitOk()) {
+                      chunk->splitIfShould( cmdObj.getObjectField("update").objsize() ); 
+                    }
                 }
 
                 result.appendElements(res);
@@ -1598,7 +1606,7 @@ namespace mongo {
 
             if ( !ok && !have_errmsg) {
                 anObjBuilder.append("errmsg", errmsg);
-                uassert_nothrow(errmsg.c_str());
+                setLastError(0, errmsg.c_str());
             }
             return true;
         }

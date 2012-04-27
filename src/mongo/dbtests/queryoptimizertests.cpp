@@ -615,6 +615,21 @@ namespace QueryOptimizerTests {
             
         } // namespace QueryFiniteSetOrderSuffix
 
+        /** Checks related to 'special' QueryPlans. */
+        class Special : public Base {
+        public:
+            void run() {
+                int idx = INDEXNO( "a" << "2d" );
+                BSONObj query = fromjson( "{ a:{ $near:[ 50, 50 ] } }" );
+                FieldRangeSetPair frsp( ns(), query );
+                QueryPlan plan( nsd(), idx, frsp, FRSP2( query ), query, BSONObj(),
+                               shared_ptr<const ParsedQuery>(), BSONObj(), BSONObj(),
+                               frsp.getSpecial() );
+                // A 'special' plan is not optimal.
+                ASSERT( !plan.optimal() );
+            }
+        };
+
     } // namespace QueryPlanTests
 
     namespace QueryPlanSetTests {
@@ -692,11 +707,23 @@ namespace QueryOptimizerTests {
             void run() {
                 Helpers::ensureIndex( ns(), BSON( "a" << 1 ), false, "a_1" );
                 Helpers::ensureIndex( ns(), BSON( "a" << 1 ), false, "b_2" );
-                auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), BSON( "a" << 4 ) ) );
+                BSONObj query = BSON( "a" << 4 );
+                auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), query ) );
                 auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
-                QueryPlanSet s( ns(), frsp, frspOrig, BSON( "a" << 4 ),
-                               BSONObj() );
+                QueryPlanSet s( ns(), frsp, frspOrig, query, BSONObj() );
+
+                // Only one optimal plan is added to the plan set.
                 ASSERT_EQUALS( 1, s.nPlans() );
+
+                // The optimal plan is recorded in the plan cache.
+                FieldRangeSet frs( ns(), query, true );
+                CachedQueryPlan cachedPlan =
+                        NamespaceDetailsTransient::get( ns() ).cachedQueryPlanForPattern
+                            ( QueryPattern( frs, BSONObj() ) );
+                ASSERT_EQUALS( BSON( "a" << 1 ), cachedPlan.indexKey() );
+                CandidatePlanCharacter planCharacter = cachedPlan.planCharacter();
+                ASSERT( planCharacter.mayRunInOrderPlan() );
+                ASSERT( !planCharacter.mayRunOutOfOrderPlan() );
             }
         };
 
@@ -875,8 +902,12 @@ namespace QueryOptimizerTests {
                 theDataFileMgr.insertWithObjMod( ns(), one );
                 BSONObj delSpec = BSON( "a" << 1 << "_id" << NE << 0 );
                 deleteObjects( ns(), delSpec, false );
-                ASSERT( BSON( "a" << 1 ).woCompare( NamespaceDetailsTransient::get_inlock( ns() ).indexForPattern( FieldRangeSet( ns(), delSpec, true ).pattern() ) ) == 0 );
-                ASSERT_EQUALS( 1, NamespaceDetailsTransient::get_inlock( ns() ).nScannedForPattern( FieldRangeSet( ns(), delSpec, true ).pattern() ) );
+                
+                NamespaceDetailsTransient &nsdt = NamespaceDetailsTransient::get( ns() );
+                QueryPattern queryPattern = FieldRangeSet( ns(), delSpec, true ).pattern();
+                CachedQueryPlan cachedQueryPlan = nsdt.cachedQueryPlanForPattern( queryPattern ); 
+                ASSERT_EQUALS( BSON( "a" << 1 ), cachedQueryPlan.indexKey() );
+                ASSERT_EQUALS( 1, cachedQueryPlan.nScanned() );
             }
         };
 
@@ -925,9 +956,10 @@ namespace QueryOptimizerTests {
                 BSONObj order = BSONObj();
                 auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), query ) );
                 auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
+                auto_ptr< FieldRangeSetPair > frspOrig2( new FieldRangeSetPair( *frsp ) );
                 QueryPlanSet s( ns(), frsp, frspOrig, query, order,
                                shared_ptr<const ParsedQuery>(), hint );
-                QueryPlan qp( nsd(), 1, s.frsp(), s.originalFrsp(), query, order );
+                QueryPlan qp( nsd(), 1, s.frsp(), frspOrig2.get(), query, order );
                 boost::shared_ptr<Cursor> c = qp.newCursor();
                 double expected[] = { 2, 3, 6, 9 };
                 for( int i = 0; i < 4; ++i, c->advance() ) {
@@ -940,9 +972,10 @@ namespace QueryOptimizerTests {
                     order = BSON( "a" << -1 );
                     auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), query ) );
                     auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
+                    auto_ptr< FieldRangeSetPair > frspOrig2( new FieldRangeSetPair( *frsp ) );
                     QueryPlanSet s( ns(), frsp, frspOrig, query, order,
                                    shared_ptr<const ParsedQuery>(), hint );
-                    QueryPlan qp( nsd(), 1, s.frsp(), s.originalFrsp(), query, order );
+                    QueryPlan qp( nsd(), 1, s.frsp(), frspOrig2.get(), query, order );
                     boost::shared_ptr<Cursor> c = qp.newCursor();
                     double expected[] = { 9, 6, 3, 2 };
                     for( int i = 0; i < 4; ++i, c->advance() ) {
@@ -1041,6 +1074,8 @@ namespace QueryOptimizerTests {
                     ASSERT( qps->possibleInOrderPlan() );
                     ASSERT( qps->haveInOrderPlan() );
                     ASSERT( !qps->possibleOutOfOrderPlan() );
+                    ASSERT( !qps->hasPossiblyExcludedPlans() );
+                    ASSERT( !qps->usingCachedPlan() );
                 }
                 
                 {
@@ -1049,12 +1084,29 @@ namespace QueryOptimizerTests {
                     ASSERT( qps->possibleInOrderPlan() );
                     ASSERT( qps->haveInOrderPlan() );
                     ASSERT( qps->possibleOutOfOrderPlan() );
+                    ASSERT( !qps->hasPossiblyExcludedPlans() );
+                    ASSERT( !qps->usingCachedPlan() );
                 }
                 
                 NamespaceDetailsTransient &nsdt = NamespaceDetailsTransient::get( ns() );
                 
-                nsdt.registerIndexForPattern
-                ( makePattern( BSON( "a" << 1 ), BSON( "b" << 1 ) ), BSON( "a" << 1 ), 1 );
+                nsdt.registerCachedQueryPlanForPattern( makePattern( BSON( "a" << 1 ), BSONObj() ),
+                                                       CachedQueryPlan( BSON( "a" << 1 ), 1,
+                                                        CandidatePlanCharacter( true, false ) ) );
+                {
+                    shared_ptr<QueryPlanSet> qps = makeQps( BSON( "a" << 1 ), BSONObj() );
+                    ASSERT_EQUALS( 1, qps->nPlans() );
+                    ASSERT( qps->possibleInOrderPlan() );
+                    ASSERT( qps->haveInOrderPlan() );
+                    ASSERT( !qps->possibleOutOfOrderPlan() );
+                    ASSERT( !qps->hasPossiblyExcludedPlans() );
+                    ASSERT( qps->usingCachedPlan() );
+                }
+
+                nsdt.registerCachedQueryPlanForPattern
+                        ( makePattern( BSON( "a" << 1 ), BSON( "b" << 1 ) ),
+                         CachedQueryPlan( BSON( "a" << 1 ), 1,
+                                         CandidatePlanCharacter( true, true ) ) );
 
                 {
                     shared_ptr<QueryPlanSet> qps = makeQps( BSON( "a" << 1 ), BSON( "b" << 1 ) );
@@ -1062,10 +1114,14 @@ namespace QueryOptimizerTests {
                     ASSERT( qps->possibleInOrderPlan() );
                     ASSERT( !qps->haveInOrderPlan() );
                     ASSERT( qps->possibleOutOfOrderPlan() );
+                    ASSERT( qps->hasPossiblyExcludedPlans() );
+                    ASSERT( qps->usingCachedPlan() );
                 }
 
-                nsdt.registerIndexForPattern
-                ( makePattern( BSON( "a" << 1 ), BSON( "b" << 1 ) ), BSON( "b" << 1 ), 1 );
+                nsdt.registerCachedQueryPlanForPattern
+                        ( makePattern( BSON( "a" << 1 ), BSON( "b" << 1 ) ),
+                         CachedQueryPlan( BSON( "b" << 1 ), 1,
+                                         CandidatePlanCharacter( true, true ) ) );
                 
                 {
                     shared_ptr<QueryPlanSet> qps = makeQps( BSON( "a" << 1 ), BSON( "b" << 1 ) );
@@ -1073,6 +1129,8 @@ namespace QueryOptimizerTests {
                     ASSERT( qps->possibleInOrderPlan() );
                     ASSERT( qps->haveInOrderPlan() );
                     ASSERT( qps->possibleOutOfOrderPlan() );
+                    ASSERT( qps->hasPossiblyExcludedPlans() );
+                    ASSERT( qps->usingCachedPlan() );
                 }
                 
                 {
@@ -1081,10 +1139,12 @@ namespace QueryOptimizerTests {
                     ASSERT( !qps->possibleInOrderPlan() );
                     ASSERT( !qps->haveInOrderPlan() );
                     ASSERT( qps->possibleOutOfOrderPlan() );
+                    ASSERT( !qps->hasPossiblyExcludedPlans() );
+                    ASSERT( !qps->usingCachedPlan() );
                 }                
             }
         };
-
+        
     } // namespace QueryPlanSetTests
 
     class Base {
@@ -1139,6 +1199,7 @@ namespace QueryOptimizerTests {
                     ASSERT( mps->possibleInOrderPlan() );
                     ASSERT( mps->haveInOrderPlan() );
                     ASSERT( !mps->possibleOutOfOrderPlan() );
+                    ASSERT( !mps->hasPossiblyExcludedPlans() );
                 }
                 
                 {
@@ -1148,12 +1209,27 @@ namespace QueryOptimizerTests {
                     ASSERT( mps->possibleInOrderPlan() );
                     ASSERT( mps->haveInOrderPlan() );
                     ASSERT( mps->possibleOutOfOrderPlan() );
+                    ASSERT( !mps->hasPossiblyExcludedPlans() );
                 }
                 
                 NamespaceDetailsTransient &nsdt = NamespaceDetailsTransient::get( ns() );
-                
-                nsdt.registerIndexForPattern
-                ( makePattern( BSON( "a" << 1 ), BSON( "b" << 1 ) ), BSON( "a" << 1 ), 1 );
+
+                nsdt.registerCachedQueryPlanForPattern( makePattern( BSON( "a" << 1 ), BSONObj() ),
+                                                       CachedQueryPlan( BSON( "a" << 1 ), 1,
+                                                        CandidatePlanCharacter( true, false ) ) );
+                {
+                    shared_ptr<MultiPlanScanner> mps = makeMps( BSON( "a" << 1 ), BSONObj() );
+                    ASSERT_EQUALS( 1, mps->currentNPlans() );
+                    ASSERT( mps->possibleInOrderPlan() );
+                    ASSERT( mps->haveInOrderPlan() );
+                    ASSERT( !mps->possibleOutOfOrderPlan() );
+                    ASSERT( !mps->hasPossiblyExcludedPlans() );
+                }
+
+                nsdt.registerCachedQueryPlanForPattern
+                        ( makePattern( BSON( "a" << 1 ), BSON( "b" << 1 ) ),
+                         CachedQueryPlan( BSON( "a" << 1 ), 1,
+                                         CandidatePlanCharacter( true, true ) ) );
                 
                 {
                     shared_ptr<MultiPlanScanner> mps =
@@ -1162,10 +1238,13 @@ namespace QueryOptimizerTests {
                     ASSERT( mps->possibleInOrderPlan() );
                     ASSERT( !mps->haveInOrderPlan() );
                     ASSERT( mps->possibleOutOfOrderPlan() );
+                    ASSERT( mps->hasPossiblyExcludedPlans() );
                 }
                 
-                nsdt.registerIndexForPattern
-                ( makePattern( BSON( "a" << 1 ), BSON( "b" << 1 ) ), BSON( "b" << 1 ), 1 );
+                nsdt.registerCachedQueryPlanForPattern
+                        ( makePattern( BSON( "a" << 1 ), BSON( "b" << 1 ) ),
+                         CachedQueryPlan( BSON( "b" << 1 ), 1,
+                                         CandidatePlanCharacter( true, true ) ) );
                 
                 {
                     shared_ptr<MultiPlanScanner> mps =
@@ -1174,6 +1253,7 @@ namespace QueryOptimizerTests {
                     ASSERT( mps->possibleInOrderPlan() );
                     ASSERT( mps->haveInOrderPlan() );
                     ASSERT( mps->possibleOutOfOrderPlan() );
+                    ASSERT( mps->hasPossiblyExcludedPlans() );
                 }
                 
                 {
@@ -1183,6 +1263,7 @@ namespace QueryOptimizerTests {
                     ASSERT( !mps->possibleInOrderPlan() );
                     ASSERT( !mps->haveInOrderPlan() );
                     ASSERT( mps->possibleOutOfOrderPlan() );
+                    ASSERT( !mps->hasPossiblyExcludedPlans() );
                 }
                 
                 {
@@ -1192,6 +1273,7 @@ namespace QueryOptimizerTests {
                     ASSERT( !mps->possibleInOrderPlan() );
                     ASSERT( !mps->haveInOrderPlan() );
                     ASSERT( mps->possibleOutOfOrderPlan() );
+                    ASSERT( !mps->hasPossiblyExcludedPlans() );
                 }
 
                 {
@@ -1201,6 +1283,7 @@ namespace QueryOptimizerTests {
                     ASSERT( mps->possibleInOrderPlan() );
                     ASSERT( mps->haveInOrderPlan() );
                     ASSERT( !mps->possibleOutOfOrderPlan() );
+                    ASSERT( !mps->hasPossiblyExcludedPlans() );
                 }
             }
         };
@@ -1237,7 +1320,9 @@ namespace QueryOptimizerTests {
             {
                 SimpleMutex::scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
                 NamespaceDetailsTransient::get_inlock( ns() ).
-                registerIndexForPattern( frs.pattern( BSON( "b" << 1 ) ), BSON( "a" << 1 ), 0 );
+                        registerCachedQueryPlanForPattern( frs.pattern( BSON( "b" << 1 ) ),
+                                                          CachedQueryPlan( BSON( "a" << 1 ), 0,
+                                                        CandidatePlanCharacter( true, true ) ) );
             }
             
             c = NamespaceDetailsTransient::bestGuessCursor( ns(), fromjson( "{a:1,$or:[{y:1}]}" ),
@@ -1281,6 +1366,7 @@ namespace QueryOptimizerTests {
             add<QueryPlanTests::QueryFiniteSetOrderSuffix::TailingIndexField>();
             add<QueryPlanTests::QueryFiniteSetOrderSuffix::EmptySort>();
             add<QueryPlanTests::QueryFiniteSetOrderSuffix::EmptyStringField>();
+            add<QueryPlanTests::Special>();
             add<QueryPlanSetTests::ToString>();
             add<QueryPlanSetTests::NoIndexes>();
             add<QueryPlanSetTests::Optimal>();

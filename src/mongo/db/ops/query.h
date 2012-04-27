@@ -24,7 +24,6 @@
 #include "../jsobj.h"
 #include "../diskloc.h"
 #include "../explain.h"
-#include "mongo/db/projection.h"
 #include "../../s/d_chunk_manager.h"
 
 // struct QueryOptions, QueryResult, QueryResultFlags in:
@@ -163,9 +162,6 @@ namespace mongo {
         shared_ptr<Cursor> _cursor;
         shared_ptr<QueryOptimizerCursor> _queryOptimizerCursor;
         BufBuilder &_buf;
-    private:
-        const Projection::KeyOnly *keyFieldsOnly() const;
-        shared_ptr<Projection::KeyOnly> _planKeyFieldsOnly;
     };
 
     /** Build strategy for a cursor returning in order results. */

@@ -131,7 +131,7 @@ namespace mongo {
         }
 
         if( indexBuildInProgress ) {
-            assertInWriteLock();
+            verify( Lock::isW() ); // TODO(erh) should this be per db?
             if( indexBuildInProgress ) {
                 log() << "indexBuildInProgress was " << indexBuildInProgress << " for " << k << ", indicating an abnormal db shutdown" << endl;
                 getDur().writingInt( indexBuildInProgress ) = 0;
@@ -518,6 +518,14 @@ namespace mongo {
         return e;
     }
 
+    void NamespaceDetails::setIndexIsMultikey(const char *thisns, int i) {
+        dassert( i < NIndexesMax );
+        unsigned long long x = ((unsigned long long) 1) << i;
+        if( multiKeyIndexBits & x ) return;
+        *getDur().writing(&multiKeyIndexBits) |= x;
+        NamespaceDetailsTransient::get(thisns).clearQueryCache();
+    }
+
     /* you MUST call when adding an index.  see pdfile.cpp */
     IndexDetails& NamespaceDetails::addIndex(const char *thisns, bool resetTransient) {
         IndexDetails *id;
@@ -646,7 +654,7 @@ namespace mongo {
 
     NamespaceDetailsTransient::~NamespaceDetailsTransient() { 
     }
-    
+
     void NamespaceDetailsTransient::clearForPrefix(const char *prefix) {
         SimpleMutex::scoped_lock lk(_qcMutex);
         vector< string > found;

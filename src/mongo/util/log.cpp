@@ -38,6 +38,14 @@ using namespace std;
 
 namespace mongo {
 
+    int logLevel = 0;
+    int tlogLevel = 0;
+    mongo::mutex Logstream::mutex("Logstream");
+    int Logstream::doneSetup = Logstream::magicNumber();
+
+    const char *default_getcurns() { return ""; }
+    const char * (*getcurns)() = default_getcurns;
+
     Nullstream nullstream;
     vector<Tee*>* Logstream::globalTees = 0;
 
@@ -214,14 +222,14 @@ namespace mongo {
         s << "errno:" << x << ' ';
 
 #if defined(_WIN32)
-        LPTSTR errorText = NULL;
-        FormatMessage(
+        LPWSTR errorText = NULL;
+        FormatMessageW(
             FORMAT_MESSAGE_FROM_SYSTEM
             |FORMAT_MESSAGE_ALLOCATE_BUFFER
             |FORMAT_MESSAGE_IGNORE_INSERTS,
             NULL,
             x, 0,
-            (LPTSTR) &errorText,  // output
+            reinterpret_cast<LPWSTR>( &errorText ),  // output
             0, // minimum size for output buffer
             NULL);
         if( errorText ) {
@@ -351,12 +359,24 @@ namespace mongo {
                 for ( unsigned i=0; i<globalTees->size(); i++ )
                     (*globalTees)[i]->write(logLevel,out);
             }
-#ifndef _WIN32
+#if defined(_WIN32)
+            // fwrite() has a behavior problem in Windows when writing to the console
+            //  when the console is in the UTF-8 code page: fwrite() sends a single
+            //  byte and then the rest of the string.  If the first character is
+            //  non-ASCII, the console then displays two UTF-8 replacement characters
+            //  instead of the single UTF-8 character we want.  write() doesn't have
+            //  this problem.
+            int fd = fileno( logfile );
+            if ( _isatty( fd ) ) {
+                fflush( logfile );
+                _write( fd, out.data(), out.size() );
+            }
+#else
             if ( isSyslog ) {
                 syslog( logLevelToSysLogLevel(logLevel) , "%s" , out.data() );
-            } else
+            }
 #endif
-            if(fwrite(out.data(), out.size(), 1, logfile)) {
+            else if ( fwrite( out.data(), out.size(), 1, logfile ) ) {
                 fflush(logfile);
             }
             else {

@@ -315,6 +315,8 @@ namespace mongo {
             // regardless of whether they caught up, we'll shut down
         }
 
+        writelocktry wlt( 2 * 60 * 1000 );
+        uassert( 13455 , "dbexit timed out getting lock" , wlt.got() );
         return shutdownHelper();
     }
 
@@ -421,13 +423,16 @@ namespace mongo {
     } cmdProfile;
 
     void reportLockStats(BSONObjBuilder& result);
-
+    
     class CmdServerStatus : public Command {
+        unsigned long long _started;
     public:
         virtual bool slaveOk() const {
             return true;
         }
-        CmdServerStatus() : Command("serverStatus", true) {}
+        CmdServerStatus() : Command("serverStatus", true) {
+            _started = curTimeMillis64();
+        }
 
         virtual LockType locktype() const { return NONE; }
 
@@ -447,6 +452,7 @@ namespace mongo {
             result.append("process","mongod");
             result.append("pid", (int)getpid());
             result.append("uptime",(double) (time(0)-cmdLine.started));
+            result.append("uptimeMillis", (long long)(curTimeMillis64()-_started));
             result.append("uptimeEstimate",(double) (start/1000));
             result.appendDate( "localTime" , jsTime() );
 
@@ -1022,7 +1028,7 @@ namespace mongo {
             // TODO: erh 1/1/2010 I think this is broken where path != dbpath ??
             set<string> allShortNames;
             {
-                readlock lk;
+                Lock::GlobalRead lk;
                 dbHolder().getAllShortNames( false, allShortNames );
             }
             
@@ -1037,9 +1043,8 @@ namespace mongo {
                 b.append( "sizeOnDisk" , (double)1.0 );
 
                 {
-                    readlock lk( name );
-                    Client::Context ctx( name );
-                    b.appendBool( "empty", ctx.db()->isEmpty() );
+                    Client::ReadContext ctx( name );
+                    b.appendBool( "empty", ctx.ctx().db()->isEmpty() );
                 }
 
                 dbInfos.push_back( b.obj() );
@@ -1756,11 +1761,11 @@ namespace mongo {
             if ( cmdObj["secs"].isNumber() )
                 secs = cmdObj["secs"].numberInt();
             if( cmdObj.getBoolField("w") ) {
-                writelock lk("");
+                Lock::GlobalWrite lk;
                 sleepsecs(secs);
             }
             else {
-                readlock lk("");
+                Lock::GlobalRead lk;
                 sleepsecs(secs);
             }
             return true;
@@ -1801,6 +1806,7 @@ namespace mongo {
         virtual bool slaveOk() const { return false; }
         virtual LockType locktype() const { return WRITE; }
         virtual bool requiresAuth() { return true; }
+        virtual bool logTheOp() { return true; }
         virtual bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             string coll = cmdObj[ "emptycapped" ].valuestrsafe();
             uassert( 13428, "emptycapped must specify a collection", !coll.empty() );
@@ -1948,7 +1954,9 @@ namespace mongo {
                     log() << "need glboal W lock but already have w on command : " << cmdObj.toString() << endl;
                 }
             }
-            writelock lk( global ? "" : dbname );
+            scoped_ptr<Lock::ScopedLock> lk( global ? 
+                                             static_cast<Lock::ScopedLock*>( new Lock::GlobalWrite() ) :
+                                             static_cast<Lock::ScopedLock*>( new Lock::DBWrite( dbname ) ) );
             client.curop()->ensureStarted();
             Client::Context ctx( dbname , dbpath , c->requiresAuth() );
             retval = _execCommand(c, dbname , cmdObj , queryOptions, result , fromRepl );

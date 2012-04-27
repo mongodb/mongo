@@ -58,7 +58,6 @@
 #include <boost/shared_ptr.hpp>
 
 using namespace std;
-using mongo::asserted;
 using mongo::Message;
 using mongo::MsgData;
 using mongo::DbMessage;

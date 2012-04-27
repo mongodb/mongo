@@ -5,8 +5,7 @@
 // when it doesn't move
 
 
-t = db.indexb;t = db.indexb;
-db.dropDatabase();
+t = db.indexb;
 t.drop();
 t.ensureIndex({a:1},true);
 

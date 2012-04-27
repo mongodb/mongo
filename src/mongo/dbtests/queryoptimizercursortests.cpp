@@ -260,6 +260,11 @@ namespace QueryOptimizerCursorTests {
             ClientCursor::find( ns(), nsCursors );
             return nsCursors.size();
         }
+        BSONObj cachedIndexForQuery( const BSONObj &query, const BSONObj &order = BSONObj() ) {
+            QueryPattern queryPattern = FieldRangeSet( ns(), query, true ).pattern( order );
+            NamespaceDetailsTransient &nsdt = NamespaceDetailsTransient::get( ns() );
+            return nsdt.cachedQueryPlanForPattern( queryPattern ).indexKey();
+        }
     private:
         shared_ptr<Cursor> _c;
     };
@@ -287,7 +292,7 @@ namespace QueryOptimizerCursorTests {
             ASSERT_THROWS( c->currentPlanScanAndOrderRequired(), AssertionException );
             ASSERT_THROWS( c->keyFieldsOnly(), AssertionException );
             ASSERT_THROWS( c->runningInitialInOrderPlan(), AssertionException );
-            ASSERT_THROWS( c->runningInitialCachedPlan(), AssertionException );
+            ASSERT_THROWS( c->hasPossiblyExcludedPlans(), AssertionException );
 
             // ok
             c->initialCandidatePlans();
@@ -944,6 +949,55 @@ namespace QueryOptimizerCursorTests {
             }
             ASSERT_EQUALS( 300, count );
             ASSERT_EQUALS( 2U, _cli.count( ns(), BSONObj() ) );
+        }
+    };
+    
+    /**
+     * When an index becomes multikey and ceases to be optimal for a query, attempt other plans
+     * quickly.
+     */
+    class AddOtherPlansWhenOptimalBecomesNonOptimal : public Base {
+    public:
+        void run() {
+            _cli.ensureIndex( ns(), BSON( "a" << 1 << "b" << 1 ) );
+            
+            {
+                // Create a btree cursor on an optimal a:1,b:1 plan.
+                Client::ReadContext ctx( ns() );
+                shared_ptr<Cursor> cursor = getCursor();
+                ASSERT_EQUALS( "BtreeCursor a_1_b_1", cursor->toString() );
+                
+                // The optimal a:1,b:1 plan is recorded.
+                ASSERT_EQUALS( BSON( "a" << 1 << "b" << 1 ),
+                              cachedIndexForQuery( BSON( "a" << 1 ), BSON( "b" << 1 ) ) );
+            }
+            
+            // Make the a:1,b:1 index multikey.
+            _cli.insert( ns(), BSON( "a" << 1 << "b" << BSON_ARRAY( 1 << 2 ) ) );
+            
+            // Create a QueryOptimizerCursor, without an optimal plan.
+            Client::ReadContext ctx( ns() );
+            shared_ptr<Cursor> cursor = getCursor();
+            ASSERT_EQUALS( "QueryOptimizerCursor", cursor->toString() );
+            ASSERT_EQUALS( BSON( "a" << 1 << "b" << 1 ), cursor->indexKeyPattern() );
+            ASSERT( cursor->advance() );
+            // An alternative plan is quickly attempted.
+            ASSERT_EQUALS( BSONObj(), cursor->indexKeyPattern() );
+        }
+    private:
+        static shared_ptr<Cursor> getCursor() {
+            // The a:1,b:1 index will be optimal for this query and sort if single key, but if
+            // the index is multi key only one of the upper or lower constraints will be applied and
+            // the index will not be optimal.
+            BSONObj query = BSON( "a" << GTE << 1 << LTE << 1 );
+            BSONObj order = BSON( "b" << 1 );
+            shared_ptr<ParsedQuery> parsedQuery
+                    ( new ParsedQuery( ns(), 0, 0, 0,
+                                      BSON( "$query" << query << "$orderby" << order ),
+                                      BSONObj() ) );
+            return NamespaceDetailsTransient::getCursor( ns(), query, order,
+                                                        QueryPlanSelectionPolicy::any(), 0,
+                                                        parsedQuery );
         }
     };
 
@@ -2783,12 +2837,12 @@ namespace QueryOptimizerCursorTests {
     class PossiblePlans : public PlanChecking {
     protected:
         void checkCursor( bool mayRunInOrderPlan, bool mayRunOutOfOrderPlan,
-                         bool runningInitialInOrderPlan, bool runningInitialCachedPlan ) {
-            QueryOptimizerCursor::CandidatePlans plans = _cursor->initialCandidatePlans();
+                         bool runningInitialInOrderPlan, bool possiblyExcludedPlans ) {
+            CandidatePlanCharacter plans = _cursor->initialCandidatePlans();
             ASSERT_EQUALS( mayRunInOrderPlan, plans.mayRunInOrderPlan() );
             ASSERT_EQUALS( mayRunOutOfOrderPlan, plans.mayRunOutOfOrderPlan() );
             ASSERT_EQUALS( runningInitialInOrderPlan, _cursor->runningInitialInOrderPlan() );
-            ASSERT_EQUALS( runningInitialCachedPlan, _cursor->runningInitialCachedPlan() );            
+            ASSERT_EQUALS( possiblyExcludedPlans, _cursor->hasPossiblyExcludedPlans() );            
         }
         void setCursor( const BSONObj &query, const BSONObj &order ) {
             _cursor = PlanChecking::getCursor( query, order );
@@ -2815,7 +2869,7 @@ namespace QueryOptimizerCursorTests {
                           _cursor->currentPlanScanAndOrderRequired() );
             ASSERT( !_cursor->completePlanOfHybridSetScanAndOrderRequired() );
             ASSERT( !_cursor->runningInitialInOrderPlan() );
-            ASSERT( !_cursor->runningInitialCachedPlan() );
+            ASSERT( !_cursor->hasPossiblyExcludedPlans() );
         }
         virtual void checkIterate( const shared_ptr<QueryOptimizerCursor> &cursor ) const = 0;
         shared_ptr<QueryOptimizerCursor> _cursor;
@@ -3163,7 +3217,8 @@ namespace QueryOptimizerCursorTests {
             while( c->advance() );
             FieldRangeSet aPreferableFields( ns(), _aPreferableQuery, true );
             ASSERT_EQUALS( BSON( "a" << 1 ),
-                          nsdt.indexForPattern( aPreferableFields.pattern( BSON( "a" << 1 ) ) ) );            
+                          nsdt.cachedQueryPlanForPattern
+                          ( aPreferableFields.pattern( BSON( "a" << 1 ) ) ).indexKey() );
         }
         /** The first results come from the recorded index. */
         void checkInitialIteratePlans() const {
@@ -3309,7 +3364,7 @@ namespace QueryOptimizerCursorTests {
             ASSERT_EQUALS( string( "0" ), details.elemMatchKey() );
         }
     };
-    
+
     namespace GetCursor {
         
         class Base : public QueryOptimizerCursorTests::Base {
@@ -3504,29 +3559,25 @@ namespace QueryOptimizerCursorTests {
         };
 
         /**
-         * If an optimal plan is a candidate, return a cursor for it rather than a QueryOptimizerCursor.  Avoid
-         * caching optimal plans since simple cursors will not save a plan anyway (so in the most common case optimal
-         * plans won't be cached) and because this simplifies the implementation for selecting a simple cursor.
+         * If an optimal plan is cached, return a Cursor for it rather than a QueryOptimizerCursor.
          */
         class BestSavedOptimal : public QueryOptimizerCursorTests::Base {
         public:
             void run() {
                 _cli.insert( ns(), BSON( "_id" << 1 ) );
                 _cli.ensureIndex( ns(), BSON( "_id" << 1 << "q" << 1 ) );
-                // {_id:1} index not recorded for these queries since it is an optimal index.
                 ASSERT( _cli.query( ns(), QUERY( "_id" << GT << 0 ) )->more() );
-                ASSERT( _cli.query( ns(), QUERY( "$or" << BSON_ARRAY( BSON( "_id" << GT << 0 ) ) ) )->more() );
                 Lock::GlobalWrite lk;
                 Client::Context ctx( ns() );
-                // Check that no plan was recorded for this query.
-                ASSERT( BSONObj().woCompare( NamespaceDetailsTransient::get_inlock( ns() ).indexForPattern( FieldRangeSet( ns(), BSON( "_id" << GT << 0 ), true ).pattern() ) ) == 0 );
+                // Check the plan that was recorded for this query.
+                ASSERT_EQUALS( BSON( "_id" << 1 ), cachedIndexForQuery( BSON( "_id" << GT << 0 ) ) );
                 shared_ptr<Cursor> c = NamespaceDetailsTransient::getCursor( ns(), BSON( "_id" << GT << 0 ) );
                 // No need for query optimizer cursor since the plan is optimal.
                 ASSERT_EQUALS( "BtreeCursor _id_", c->toString() );
             }
         };
         
-        /** If a no optimal plan is a candidate a QueryOptimizerCursor should be returned, even if plan has been recorded. */
+        /** If a non optimal plan is a candidate a QueryOptimizerCursor should be returned, even if plan has been recorded. */
         class BestSavedNotOptimal : public QueryOptimizerCursorTests::Base {
         public:
             void run() {
@@ -3536,7 +3587,8 @@ namespace QueryOptimizerCursorTests {
                 ASSERT( _cli.query( ns(), QUERY( "q" << 1 << "_id" << 1 ) )->more() );
                 Lock::GlobalWrite lk;
                 Client::Context ctx( ns() );
-                ASSERT( BSON( "_id" << 1 ).woCompare( NamespaceDetailsTransient::get_inlock( ns() ).indexForPattern( FieldRangeSet( ns(), BSON( "q" << 1 << "_id" << 1 ), true ).pattern() ) ) == 0 );
+                ASSERT_EQUALS( BSON( "_id" << 1 ),
+                              cachedIndexForQuery( BSON( "q" << 1 << "_id" << 1 ) ) );
                 shared_ptr<Cursor> c = NamespaceDetailsTransient::getCursor( ns(), BSON( "q" << 1 << "_id" << 1 ) );
                 // Need query optimizer cursor since the cached plan is not optimal.
                 ASSERT_EQUALS( "QueryOptimizerCursor", c->toString() );
@@ -4313,8 +4365,7 @@ namespace QueryOptimizerCursorTests {
         class VirtualPickedPlan : public Base {
         public:
             void run() {
-                writelock lk(ns());
-                Client::Context ctx( ns() );
+                Client::WriteContext ctx( ns() );
                 
                 _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
                 _cli.ensureIndex( ns(), BSON( "b" << 1 ) );
@@ -4413,6 +4464,7 @@ namespace QueryOptimizerCursorTests {
             add<AddOtherPlans>();
             add<AddOtherPlansDelete>();
             add<AddOtherPlansContinuousDelete>();
+            add<AddOtherPlansWhenOptimalBecomesNonOptimal>();
             add<OrRangeElimination>();
             add<OrDedup>();
             add<EarlyDups>();

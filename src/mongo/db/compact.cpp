@@ -20,7 +20,7 @@
 
 #include "pch.h"
 #include "pdfile.h"
-#include "concurrency.h"
+#include "d_concurrency.h"
 #include "commands.h"
 #include "curop-inl.h"
 #include "background.h"

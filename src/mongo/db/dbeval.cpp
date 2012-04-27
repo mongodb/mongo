@@ -126,7 +126,10 @@ namespace mongo {
             }
 
             // write security will be enforced in DBDirectClient
-            mongolock lk( ai->isAuthorized( dbname.c_str() ) );
+            // TODO: should this be a db lock?
+            scoped_ptr<Lock::ScopedLock> lk( ai->isAuthorized( dbname.c_str() ) ? 
+                                             static_cast<Lock::ScopedLock*>( new Lock::GlobalWrite() ) : 
+                                             static_cast<Lock::ScopedLock*>( new Lock::GlobalRead() ) );
             Client::Context ctx( dbname );
 
             return dbEval(dbname, cmdObj, result, errmsg);

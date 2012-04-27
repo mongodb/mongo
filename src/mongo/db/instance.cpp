@@ -413,7 +413,7 @@ namespace mongo {
                 }
                 else if ( ! c.getAuthenticationInfo()->isAuthorized(
                                   nsToDatabase( m.singleData()->_data + 4 ) ) ) {
-                    uassert_nothrow("unauthorized");
+                    setLastError(0, "unauthorized");
                 }
                 else if ( op == dbInsert ) {
                     receivedInsert(m, currentOp);
@@ -461,7 +461,7 @@ namespace mongo {
                 mongo::log(1) << "note: not profiling because doing fsync+lock" << endl;
             }
             else {
-                writelock lk;
+                Lock::DBWrite lk( currentOp.getNS() );
                 if ( dbHolder()._isLoaded( nsToDatabase( currentOp.getNS() ) , dbpath ) ) {
                     Client::Context cx( currentOp.getNS(), dbpath, false );
                     profile(c , currentOp );
@@ -509,7 +509,7 @@ namespace mongo {
        path - db directory
     */
     /*static*/ void Database::closeDatabase( const char *db, const string& path ) {
-        assertInWriteLock();
+        verify( Lock::isW() );
 
         Client::Context * ctx = cc().getContext();
         verify( ctx );
@@ -554,7 +554,7 @@ namespace mongo {
         
         op.debug().query = query;
         op.setQuery(query);
-        
+
         PageFaultRetryableSection s;
         while ( 1 ) {
             try {
@@ -593,19 +593,29 @@ namespace mongo {
         op.debug().query = pattern;
         op.setQuery(pattern);
 
-        writelock lk(ns);
-
-        // writelock is used to synchronize stepdowns w/ writes
-        uassert( 10056 ,  "not master", isMasterNs( ns ) );
-
-        // if this ever moves to outside of lock, need to adjust check Client::Context::_finishInit
-        if ( ! broadcast && handlePossibleShardedMessage( m , 0 ) )
-            return;
-
-        Client::Context ctx(ns);
-
-        long long n = deleteObjects(ns, pattern, justOne, true);
-        lastError.getSafe()->recordDelete( n );
+        //PageFaultRetryableSection s;
+        while ( 1 ) {
+            try {
+                Lock::DBWrite lk(ns);
+                
+                // writelock is used to synchronize stepdowns w/ writes
+                uassert( 10056 ,  "not master", isMasterNs( ns ) );
+                
+                // if this ever moves to outside of lock, need to adjust check Client::Context::_finishInit
+                if ( ! broadcast && handlePossibleShardedMessage( m , 0 ) )
+                    return;
+                
+                Client::Context ctx(ns);
+                
+                long long n = deleteObjects(ns, pattern, justOne, true);
+                lastError.getSafe()->recordDelete( n );
+                break;
+            }
+            catch ( PageFaultException& e ) {
+                LOG(2) << "recordDelete got a PageFaultException" << endl;
+                e.touch();
+            }
+        }
     }
 
     QueryResult* emptyMoreResult(long long);
@@ -777,7 +787,7 @@ namespace mongo {
             multi.push_back( d.nextJsObj() );
         }
 
-        writelock lk(ns);
+        Lock::DBWrite lk(ns);
 
         // CONCURRENCY TODO: is being read locked in big log sufficient here?
         // writelock is used to synchronize stepdowns w/ writes
@@ -830,7 +840,7 @@ namespace mongo {
                 return true;
             // we have a local database.  return true if oplog isn't empty
             {
-                readlock lk(rsoplog);
+                Lock::DBRead lk(rsoplog);
                 BSONObj o;
                 if( Helpers::getFirst(rsoplog, o) )
                     return true;
@@ -997,13 +1007,7 @@ namespace mongo {
     }
 
     /* not using log() herein in case we are already locked */
-    NOINLINE_DECL void dbexit( ExitCode rc, const char *why, bool tryToGetLock ) {
-
-        auto_ptr<writelocktry> wlt;
-        if ( tryToGetLock ) {
-            wlt.reset( new writelocktry( 2 * 60 * 1000 ) );
-            uassert( 13455 , "dbexit timed out getting lock" , wlt->got() );
-        }
+    NOINLINE_DECL void dbexit( ExitCode rc, const char *why ) {
 
         Client * c = currentClient.get();
         {

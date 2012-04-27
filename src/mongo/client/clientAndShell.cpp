@@ -36,11 +36,7 @@ namespace mongo {
         mongo::mutex &mongoProgramOutputMutex(*(new mongo::mutex("mongoProgramOutputMutex")));
     }
 
-    void exitCleanly( ExitCode code ) {
-        dbexit( code );
-    }
-
-    void dbexit( ExitCode returnCode, const char *whyMsg , bool tryToGetLock ) {
+    void dbexit( ExitCode returnCode, const char *whyMsg ) {
         {
             mongo::mutex::scoped_lock lk( shell_utils::mongoProgramOutputMutex );
             dbexitCalled = true;

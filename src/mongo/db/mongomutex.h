@@ -58,15 +58,8 @@ namespace mongo {
     class MongoMutex : boost::noncopyable {
     public:
         MongoMutex();
-        static bool atLeastReadLocked();
-        void assertAtLeastReadLocked() const;
-        static bool isWriteLocked();
-        void assertWriteLocked() const;
         MutexInfo& info() { return _minfo; }
         MutexInfo _minfo;
     };
-
-    // eliminate this - we should just type "d.dbMutex.assertWriteLocked();" instead
-    inline void assertInWriteLock() { d.dbMutex.assertWriteLocked(); }
 
 }

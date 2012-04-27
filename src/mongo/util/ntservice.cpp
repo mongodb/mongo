@@ -18,6 +18,7 @@
 #include "pch.h"
 #include "ntservice.h"
 #include "../db/client.h"
+#include "../db/instance.h"
 #include "winutil.h"
 #include "text.h"
 
@@ -464,6 +465,8 @@ namespace mongo {
             ( inShutdown() ? "already in shutdown" : "will terminate after current cmd ends" ) << endl;
         ServiceController::reportStatus( SERVICE_STOP_PENDING );
         if ( ! inShutdown() ) {
+            // TODO: SERVER-5703, separate the "cleanup for shutdown" functionality from
+            // the "terminate process" functionality in exitCleanly.
             exitCleanly( EXIT_WINDOWS_SERVICE_STOP );
             ServiceController::reportStatus( SERVICE_STOPPED );
         }

@@ -5,6 +5,7 @@
 /.sconf_temp
 /perf.data
 /massif.out.*
+.scons
 
 *~
 *.swp
@@ -116,6 +117,7 @@ debian/mongodb
 
 #osx
 .DS_Store
+._.DS_Store
 
 # QtCreator
 *.config

@@ -42,12 +42,13 @@
 #include "restapi.h"
 #include "dbwebserver.h"
 #include "dur.h"
-#include "concurrency.h"
+#include "d_concurrency.h"
 #include "../s/d_writeback.h"
 #include "d_globals.h"
 
 #if defined(_WIN32)
 # include "../util/ntservice.h"
+# include <DbgHelp.h>
 #else
 # include <sys/file.h>
 #endif
@@ -182,7 +183,13 @@ namespace mongo {
                 lastError.startRequest( m , le );
 
                 DbResponse dbresponse;
-                assembleResponse( m, dbresponse, port->remote() );
+                try {
+                    assembleResponse( m, dbresponse, port->remote() );
+                }
+                catch ( const ClockSkewException & ) {
+                    log() << "ClockSkewException - shutting down" << endl;
+                    exitCleanly( EXIT_CLOCK_SKEW );
+                }
 
                 if ( dbresponse.response ) {
                     port->reply(m, *dbresponse.response, dbresponse.responseTo);
@@ -344,7 +351,7 @@ namespace mongo {
     }
 
     void checkIfReplMissingFromCommandLine() {
-        writelock lk; // _openAllFiles is false at this point, so this is helpful for the query below to work as you can't open files when readlocked
+        Lock::GlobalWrite lk; // _openAllFiles is false at this point, so this is helpful for the query below to work as you can't open files when readlocked
         if( !cmdLine.usingReplSets() ) { 
             Client::GodScope gs;
             DBDirectClient c;
@@ -360,7 +367,7 @@ namespace mongo {
     }
 
     void clearTmpCollections() {
-        writelock lk; // _openAllFiles is false at this point, so this is helpful for the query below to work as you can't open files when readlocked
+        Lock::GlobalWrite lk; // _openAllFiles is false at this point, so this is helpful for the query below to work as you can't open files when readlocked
         Client::GodScope gs;
         vector< string > toDelete;
         DBDirectClient cli;
@@ -527,8 +534,7 @@ namespace mongo {
         if( !noauth ) { 
             // open admin db in case we need to use it later. TODO this is not the right way to 
             // resolve this. 
-            writelock lk;
-            Client::Context c("admin",dbpath,false);
+            Client::WriteContext c("admin",dbpath,false);
         }
 
         listen(listenPort);
@@ -1131,7 +1137,7 @@ namespace mongo {
         rawOut( oss.str() );
 
         // Don't go through normal shutdown procedure. It may make things worse.
-        ::exit(EXIT_ABRUPT);
+        ::_exit(EXIT_ABRUPT);
 
     }
 
@@ -1172,7 +1178,7 @@ namespace mongo {
     void my_new_handler() {
         rawOut( "out of memory, printing stack and exiting:" );
         printStackTrace();
-        ::exit(EXIT_ABRUPT);
+        ::_exit(EXIT_ABRUPT);
     }
 
     void setupSignals_ignoreHelper( int signal ) {}
@@ -1254,16 +1260,81 @@ namespace mongo {
 
     LPTOP_LEVEL_EXCEPTION_FILTER filtLast = 0;
 
+    /* create a process dump.
+        To use, load up windbg.  Set your symbol and source path.
+        Open the crash dump file.  To see the crashing context, use .ecxr
+        */
+    void doMinidump(struct _EXCEPTION_POINTERS* exceptionInfo) {
+        LPCWSTR dumpFilename = L"mongo.dmp";
+        HANDLE hFile = CreateFileW(dumpFilename,
+            GENERIC_WRITE,
+            0,
+            NULL,
+            CREATE_ALWAYS,
+            FILE_ATTRIBUTE_NORMAL,
+            NULL);
+        if ( INVALID_HANDLE_VALUE == hFile ) {
+            DWORD lasterr = GetLastError();
+            log() << "failed to open minidump file " << dumpFilename << " : " 
+                  << errnoWithDescription( lasterr ) << endl;
+            return;
+        }
+
+        MINIDUMP_EXCEPTION_INFORMATION aMiniDumpInfo;
+        aMiniDumpInfo.ThreadId = GetCurrentThreadId();
+        aMiniDumpInfo.ExceptionPointers = exceptionInfo;
+        aMiniDumpInfo.ClientPointers = TRUE;
+
+        log() << "writing minidump dignostic file " << dumpFilename << endl;
+        BOOL bstatus = MiniDumpWriteDump(GetCurrentProcess(),
+            GetCurrentProcessId(),
+            hFile,
+            MiniDumpNormal,
+            &aMiniDumpInfo,
+            NULL,
+            NULL);
+        if ( FALSE == bstatus ) {
+            DWORD lasterr = GetLastError();
+            log() << "failed to create minidump : " 
+                  << errnoWithDescription( lasterr ) << endl;
+        }
+
+        CloseHandle(hFile);
+    }
+
     LONG WINAPI exceptionFilter( struct _EXCEPTION_POINTERS *excPointers ) {
         char exceptionString[128];
         sprintf_s( exceptionString, sizeof( exceptionString ),
                 ( excPointers->ExceptionRecord->ExceptionCode == EXCEPTION_ACCESS_VIOLATION ) ?
                 "(access violation)" : "0x%08X", excPointers->ExceptionRecord->ExceptionCode );
-        char addressString[128];
+        char addressString[32];
         sprintf_s( addressString, sizeof( addressString ), "0x%p",
                  excPointers->ExceptionRecord->ExceptionAddress );
         log() << "*** unhandled exception " << exceptionString <<
                 " at " << addressString << ", terminating" << endl;
+        if ( excPointers->ExceptionRecord->ExceptionCode == EXCEPTION_ACCESS_VIOLATION ) {
+            ULONG acType = excPointers->ExceptionRecord->ExceptionInformation[0];
+            const char* acTypeString;
+            switch ( acType ) {
+            case 0:
+                acTypeString = "read from";
+                break;
+            case 1:
+                acTypeString = "write to";
+                break;
+            case 8:
+                acTypeString = "DEP violation at";
+                break;
+            default:
+                acTypeString = "unknown violation at";
+                break;
+            }
+            sprintf_s( addressString, sizeof( addressString ), " 0x%p",
+                     excPointers->ExceptionRecord->ExceptionInformation[1] );
+            log() << "*** access violation was a " << acTypeString << addressString << endl;
+        }
+
+        doMinidump(excPointers);
 
         // In release builds, let dbexit() try to shut down cleanly
 #if !defined(_DEBUG)

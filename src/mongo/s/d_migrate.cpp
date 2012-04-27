@@ -168,7 +168,7 @@ namespace mongo {
         void doRemove() {
             ShardForceVersionOkModeBlock sf;
             {
-                writelock lk(ns);
+                Lock::DBWrite lk(ns);
                 RemoveSaver rs("moveChunk",ns,"post-cleanup");
                 long long numDeleted = Helpers::removeRange( ns , min , max , true , false , cmdLine.moveParanoia ? &rs : 0, true );
                 log() << "moveChunk deleted: " << numDeleted << migrateLog;
@@ -248,7 +248,7 @@ namespace mongo {
         }
 
         void done() {
-            readlock lk( _ns );
+            Lock::DBRead lk( _ns );
 
             {
                 scoped_spinlock lk( _trackerLocks );
@@ -369,8 +369,7 @@ namespace mongo {
             long long size = 0;
 
             {
-                readlock rl( _ns );
-                Client::Context cx( _ns );
+                Client::ReadContext cx( _ns );
 
                 xfer( &_deleted , b , "deleted" , size , false );
                 xfer( &_reload , b , "reload" , size , true );
@@ -389,8 +388,7 @@ namespace mongo {
          * @return false if approximate chunk size is too big to move or true otherwise
          */
         bool storeCurrentLocs( long long maxChunkSize , string& errmsg , BSONObjBuilder& result ) {
-            readlock l( _ns );
-            Client::Context ctx( _ns );
+            Client::ReadContext ctx( _ns );
             NamespaceDetails *d = nsdetails( _ns.c_str() );
             if ( ! d ) {
                 errmsg = "ns not found, should be impossible";
@@ -479,8 +477,7 @@ namespace mongo {
 
             int allocSize;
             {
-                readlock l(_ns);
-                Client::Context ctx( _ns );
+                Client::ReadContext ctx( _ns );
                 NamespaceDetails *d = nsdetails( _ns.c_str() );
                 verify( d );
                 scoped_spinlock lk( _trackerLocks );
@@ -1013,7 +1010,7 @@ namespace mongo {
                 myVersion.incMajor();
 
                 {
-                    writelock lk( ns );
+                    Lock::DBWrite lk( ns );
                     verify( myVersion > shardingState.getVersion( ns ) );
 
                     // bump the chunks manager's version up and "forget" about the chunk being moved
@@ -1046,7 +1043,7 @@ namespace mongo {
 
                     if ( ! ok ) {
                         {
-                            writelock lk( ns );
+                            Lock::DBWrite lk( ns );
 
                             // revert the chunk manager back to the state before "forgetting" about the chunk
                             shardingState.undoDonateChunk( ns , min , max , currVersion );
@@ -1337,8 +1334,7 @@ namespace mongo {
                     all.push_back( indexes->next().getOwned() );
                 }
 
-                writelock lk( ns );
-                Client::Context ct( ns );
+                Client::WriteContext ct( ns );
 
                 string system_indexes = cc().database()->name + ".system.indexes";
                 for ( unsigned i=0; i<all.size(); i++ ) {
@@ -1351,7 +1347,7 @@ namespace mongo {
 
             {
                 // 2. delete any data already in range
-                writelock lk( ns );
+                Lock::DBWrite lk( ns );
                 RemoveSaver rs( "moveChunk" , ns , "preCleanup" );
                 long long num = Helpers::removeRange( ns , min , max , true , false , cmdLine.moveParanoia ? &rs : 0, true /* flag fromMigrate in oplog */ );
                 if ( num )
@@ -1383,7 +1379,7 @@ namespace mongo {
                     while( i.more() ) {
                         BSONObj o = i.next().Obj();
                         {
-                            writelock lk( ns );
+                            Lock::DBWrite lk( ns );
                             Helpers::upsert( ns, o, true );
                         }
                         thisTime++;
@@ -1534,13 +1530,12 @@ namespace mongo {
             bool didAnything = false;
 
             if ( xfer["deleted"].isABSONObj() ) {
-                writelock lk(ns);
-                Client::Context cx(ns);
-
                 RemoveSaver rs( "moveChunk" , ns , "removedDuring" );
 
                 BSONObjIterator i( xfer["deleted"].Obj() );
                 while ( i.more() ) {
+                    Client::WriteContext cx(ns);
+
                     BSONObj id = i.next().Obj();
 
                     // do not apply deletes if they do not belong to the chunk being migrated
@@ -1555,22 +1550,21 @@ namespace mongo {
 
                     Helpers::removeRange( ns , id , id, false , true , cmdLine.moveParanoia ? &rs : 0, true );
 
-                    *lastOpApplied = cx.getClient()->getLastOp().asDate();
+                    *lastOpApplied = cx.ctx().getClient()->getLastOp().asDate();
                     didAnything = true;
                 }
             }
 
             if ( xfer["reload"].isABSONObj() ) {
-                writelock lk(ns);
-                Client::Context cx(ns);
-
                 BSONObjIterator i( xfer["reload"].Obj() );
                 while ( i.more() ) {
+                    Client::WriteContext cx(ns);
+
                     BSONObj it = i.next().Obj();
 
                     Helpers::upsert( ns , it , true );
 
-                    *lastOpApplied = cx.getClient()->getLastOp().asDate();
+                    *lastOpApplied = cx.ctx().getClient()->getLastOp().asDate();
                     didAnything = true;
                 }
             }

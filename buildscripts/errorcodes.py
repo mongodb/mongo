@@ -6,7 +6,7 @@ import re
 import utils
 
 
-assertNames = [ "uassert" , "massert" ]
+assertNames = [ "uassert" , "massert", "fassert", "fassertFailed" ]
 
 def assignErrorCodes():
     cur = 10000
@@ -36,7 +36,8 @@ def readErrorCodes( callback, replaceZero = False ):
     quick = [ "assert" , "Exception"]
 
     ps = [ re.compile( "(([umsgf]asser(t|ted))) *\(( *)(\d+)" ) ,
-           re.compile( "((User|Msg|MsgAssertion)Exceptio(n))\(( *)(\d+)" )
+           re.compile( "((User|Msg|MsgAssertion)Exceptio(n))\(( *)(\d+)" ),
+           re.compile( "((fassertFailed)()) *\(( *)(\d+)" )
            ]
 
     bad = [ re.compile( "\sassert *\(" ) ]

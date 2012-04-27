@@ -142,8 +142,8 @@ namespace mongo {
         // write lock. heartbeats can be slow (multisecond to respond), so
         // generally we don't want to be locked, at least not without
         // thinking acarefully about it first.
-        uassert(15900, "can't heartbeat: too much lock",
-                !d.dbMutex.isWriteLocked() || theReplSet == 0 || !theReplSet->lockedByMe() );
+        massert(15900, "can't heartbeat: too much lock",
+                !Lock::somethingWriteLocked() || theReplSet == 0 || !theReplSet->lockedByMe() );
 
         ScopedConn conn(memberFullName);
         return conn.runCommand("admin", cmd, result, 0);
