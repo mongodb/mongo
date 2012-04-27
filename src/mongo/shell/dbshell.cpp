@@ -854,11 +854,9 @@ int _main( int argc, char* argv[] ) {
             free(line);
             line = linePtr = NULL;
 
-            if ( code == "exit" )
-            {
-                if ( ! mongo::cmdLine.quiet )
-                    cout << "bye" << endl;
-                break;
+            if ( code == "quit" || code == "exit" ) {
+              // Replace this with the real command that the shell expects
+              code += "(0)";
             }
 
             if ( code == "cls" ) {
