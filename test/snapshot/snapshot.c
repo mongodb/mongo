@@ -198,12 +198,10 @@ dump_cat(struct L *snap, const char *f)
 
 	assert((fp = fopen(f, "w")) != NULL);
 
-	for (p = list;; ++p) {
+	for (p = list; p < snap; ++p) {
 		for (row = p->start; row < p->stop; ++row)
 			fprintf(fp,
 			    "%010d KEY------\n%010d VALUE----\n", row, row);
-		if (p == snap)
-			break;
 	}
 
 	assert(fclose(fp) == 0);
