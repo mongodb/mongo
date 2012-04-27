@@ -83,8 +83,17 @@ namespace mongo {
             GlobalRead( int timeoutms = -1 ); 
             virtual ~GlobalRead();
         };
+
         // lock this database. do not shared_lock globally first, that is handledin herein. 
         class DBWrite : public ScopedLock {
+            /**
+             * flow
+             *   1) lockDB
+             *      a) lockTop
+             *      b) lockNestable or lockOther
+             *   2) unlockDB
+             */
+
             void lockTop(LockState&);
             void lockNestable(Nestable db);
             void lockOther(const string& db);
@@ -107,6 +116,7 @@ namespace mongo {
             bool _nested;
 
         };
+
         // lock this database for reading. do not shared_lock globally first, that is handledin herein. 
         class DBRead : public ScopedLock {
             void lockTop(LockState&);
@@ -176,9 +186,11 @@ namespace mongo {
          */
         char threadState() const { return _threadState; }
         
-        bool isRW() const;
-        bool isW() const;
-        bool hasAnyReadLock() const;
+        bool isRW() const; // RW
+        bool isW() const; // W
+        bool hasAnyReadLock() const; // explicitly rR
+        
+        bool isLocked( const StringData& ns ); // rwRW
 
         // ----
 

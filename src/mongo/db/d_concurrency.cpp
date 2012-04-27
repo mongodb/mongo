@@ -267,6 +267,23 @@ namespace mongo {
         return _threadState == 'r' || _threadState == 'R';
     }
 
+    bool LockState::isLocked( const StringData& ns ) {
+        char db[MaxDatabaseNameLen];
+        nsToDatabase(ns.data(), db);
+        
+        DEV verify( _otherName.find( '.' ) == string::npos ); // XXX this shouldn't be here, but somewhere
+        if ( _otherCount && db == _otherName )
+            return true;
+
+        if ( _nestableCount ) {
+            if ( str::equals( db , "local" ) )
+                return _whichNestable == Lock::local;
+            if ( str::equals( db , "admin" ) )
+                return _whichNestable == Lock::admin;
+        }
+
+        return false;
+    }
 
     void LockState::locked( char newState ) {
         _threadState = newState;
@@ -499,28 +516,14 @@ namespace mongo {
         // (such as including local) 
         return lockState().recursiveCount() > 1;
     }
-    static bool weLocked(const LockState &ls, const StringData& ns) { 
-        char db[MaxDatabaseNameLen];
-        nsToDatabase(ns.data(), db);
-        if( str::equals(db,"local") ) {
-            if( ls.whichNestable() == Lock::local ) 
-                return ls.nestableCount();
-            return false;
-        }
-        if( str::equals(db,"admin") ) {
-            if( ls.whichNestable() == Lock::admin ) 
-                return ls.nestableCount();
-            return false;
-        }
-        return db == ls.otherName() && ls.otherCount();
-    }
+
     bool Lock::isWriteLocked(const StringData& ns) { 
         LockState &ls = lockState();
         if( ls.threadState() == 'W' ) 
             return true;
         if( ls.threadState() != 'w' ) 
             return false;
-        return weLocked(ls,ns);
+        return ls.isLocked( ns );
     }
     bool Lock::atLeastReadLocked(const StringData& ns)
     { 
@@ -529,7 +532,7 @@ namespace mongo {
             return true; // global
         if( ls.threadState() == 0 ) 
             return false;
-        return weLocked(ls,ns);
+        return ls.isLocked( ns );
     }
     void Lock::assertAtLeastReadLocked(const StringData& ns) { 
         if( !atLeastReadLocked(ns) ) { 
