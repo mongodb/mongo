@@ -53,12 +53,13 @@ int
 util_dump(WT_SESSION *session, int argc, char *argv[])
 {
 	WT_CURSOR *cursor;
+	size_t len;
 	int ch, hex, ret, reverse;
-	char *name;
+	char *config, *name, *snapshot;
 
 	hex = reverse = 0;
-	name = NULL;
-	while ((ch = util_getopt(argc, argv, "f:rx")) != EOF)
+	config = name = snapshot = NULL;
+	while ((ch = util_getopt(argc, argv, "f:rs:x")) != EOF)
 		switch (ch) {
 		case 'f':			/* output file */
 			if (freopen(util_optarg, "w", stdout) == NULL)
@@ -67,6 +68,9 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 			break;
 		case 'r':
 			reverse = 1;
+			break;
+		case 's':
+			snapshot = util_optarg;
 			break;
 		case 'x':
 			hex = 1;
@@ -90,8 +94,20 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 	    dump_suffix() != 0)
 		goto err;
 
-	if ((ret = session->open_cursor(session,
-	    name, NULL, hex ? "dump=hex" : "dump=print", &cursor)) != 0) {
+	len = snapshot == NULL ? 0 : strlen("snapshot=") + strlen(snapshot);
+	len += strlen(hex ? "dump=hex" : "dump=print");
+	if ((config = malloc(len + 10)) == NULL)
+		goto err;
+	if (snapshot == NULL)
+		config[0] = '\0';
+	else {
+		(void)strcpy(config, "snapshot=");
+		(void)strcat(config, snapshot);
+		(void)strcat(config, ",");
+	}
+	(void)strcat(config, hex ? "dump=hex" : "dump=print");
+	if ((ret = session->open_cursor(
+	    session, name, NULL, config, &cursor)) != 0) {
 		fprintf(stderr, "%s: cursor open(%s) failed: %s\n",
 		    progname, name, wiredtiger_strerror(ret));
 		goto err;
@@ -106,6 +122,8 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 err:		ret = 1;
 	}
 
+	if (config != NULL)
+		free(config);
 	if (name != NULL)
 		free(name);
 
@@ -357,7 +375,7 @@ usage(void)
 {
 	(void)fprintf(stderr,
 	    "usage: %s %s "
-	    "dump [-rx] [-f output-file] uri\n",
+	    "dump [-rx] [-f output-file] [-s snapshot] uri\n",
 	    progname, usage_prefix);
 	return (1);
 }

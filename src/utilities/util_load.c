@@ -75,8 +75,8 @@ load_dump(WT_SESSION *session)
 	int hex, ret, tret;
 	char **entry, **list, *p, *uri, config[64];
 
-        list = NULL;            /* -Wuninitialized */
-        hex = 0;                /* -Wuninitialized */
+	list = NULL;            /* -Wuninitialized */
+	hex = 0;                /* -Wuninitialized */
 
 	/* Read the schema file. */
 	if ((ret = schema_read(&list, &hex)) != 0)
@@ -127,7 +127,7 @@ load_dump(WT_SESSION *session)
 	    append ? ",append" : "", overwrite ? ",overwrite" : "");
 	if ((ret = session->open_cursor(
 	    session, uri, NULL, config, &cursor)) != 0)
-		return(util_err(ret, "%s: session.open", uri));
+		return (util_err(ret, "%s: session.open", uri));
 
 	/*
 	 * Check the append flag (it only applies to objects where the primary
@@ -233,7 +233,7 @@ schema_update(WT_SESSION *session, char **list)
 	const char *cfg[] = { NULL, NULL, NULL };
 	char **configp, **listp, *p, *t;
 
-#define MATCH(s, tag)                                           	\
+#define	MATCH(s, tag)                                           	\
 	(strncmp(s, tag, strlen(tag)) == 0)
 
 	/*

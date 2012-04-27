@@ -1,0 +1,40 @@
+/*! @page snapshots Snapshots
+
+WiredTiger supports named snapshots, a read-only, static view of an
+object.
+
+Snapshots offer basic operation durability for objects which are not
+configured for transactional logging, across application or system
+failure.  (Transactional logging offers fine-grained durability, but
+requires a recovery step when objects are first opened, and impacts
+the performance of every operation; snapshots offer durability without
+recovery or impacting operational performance, but the creation of a
+snapshot is a relatively heavy-weight operation.)
+
+Snapshots are created using the WT_SESSION::sync method, read using the
+WT_SESSION::open_cursor method, and discarded using the WT_SESSION::drop
+method.  Additionally, the \c -s option to the \c wt command line
+utility will list an object's snapshots in a human-readable format.
+
+When non-transactional WiredTiger objects are first opened for writing,
+they are opened in the state of the most recent snapshot taken on the
+file, in other words, updates after the most recent snapshot will not
+appear in the object.  If no snapshot is found when the object is
+opened, the object will appear empty.  By default, cursors are opened
+in an object's most recent snapshot.
+
+No snapshot except the most recent snapshot may be opened for writing.
+Cursors opened in the most recent snapshot support write operations,
+snapshots opened in any snapshot other than the most recent snapshot are
+read-only.
+
+Snapshots persist until they are explicitly deleted.  Snapshots share
+pages, and deleting a snapshot may or may not make pages available for
+re-use, depending on whether the deleted snapshot contained the last
+reference to a block of data.  Creating a named snapshot deletes all
+previous snapshots with the same name, although snapshots cannot be
+deleted if they are currently open in a cursor.
+
+The name of the internal WiredTiger snapshot is "WiredTigerInternal".
+
+ */

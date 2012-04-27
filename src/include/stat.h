@@ -77,8 +77,6 @@ struct __wt_btree_stats {
 	WT_STATS file_maxleafitem;
 	WT_STATS file_maxleafpage;
 	WT_STATS file_minor;
-	WT_STATS file_freelist_bytes;
-	WT_STATS file_freelist_entries;
 	WT_STATS file_overflow;
 	WT_STATS file_allocsize;
 	WT_STATS rec_page_merge;

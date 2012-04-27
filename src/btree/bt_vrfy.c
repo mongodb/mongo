@@ -25,15 +25,16 @@ typedef struct {
 	WT_ITEM *tmp2;				/* Temporary buffer */
 } WT_VSTUFF;
 
-static int __verify_int(WT_SESSION_IMPL *, int);
-static int __verify_overflow(
+static int  __verify_int(WT_SESSION_IMPL *, int);
+static int  __verify_overflow(
 	WT_SESSION_IMPL *, const uint8_t *, uint32_t, WT_VSTUFF *);
-static int __verify_overflow_cell(WT_SESSION_IMPL *, WT_PAGE *, WT_VSTUFF *);
-static int __verify_row_int_key_order(
+static int  __verify_overflow_cell(WT_SESSION_IMPL *, WT_PAGE *, WT_VSTUFF *);
+static int  __verify_row_int_key_order(
 	WT_SESSION_IMPL *, WT_PAGE *, WT_REF *, uint32_t, WT_VSTUFF *);
-static int __verify_row_leaf_key_order(
+static int  __verify_row_leaf_key_order(
 	WT_SESSION_IMPL *, WT_PAGE *, WT_VSTUFF *);
-static int __verify_tree(WT_SESSION_IMPL *, WT_PAGE *, uint64_t, WT_VSTUFF *);
+static void __verify_snapshot_reset(WT_VSTUFF *);
+static int  __verify_tree(WT_SESSION_IMPL *, WT_PAGE *, uint64_t, WT_VSTUFF *);
 
 /*
  * __wt_verify --
@@ -78,43 +79,70 @@ static int
 __verify_int(WT_SESSION_IMPL *session, int dumpfile)
 {
 	WT_BTREE *btree;
+	WT_ITEM dsk;
+	WT_SNAPSHOT *snapbase, *snap;
 	WT_VSTUFF *vs, _vstuff;
-	int empty, ret;
+	int ret;
 
 	btree = session->btree;
+	snapbase = NULL;
 	ret = 0;
-
-	WT_RET(__wt_bm_verify_start(session, &empty));
-	if (empty)
-		return (0);
 
 	WT_CLEAR(_vstuff);
 	vs = &_vstuff;
-
 	vs->dumpfile = dumpfile;
 	WT_ERR(__wt_scr_alloc(session, 0, &vs->max_key));
 	WT_ERR(__wt_scr_alloc(session, 0, &vs->max_addr));
 	WT_ERR(__wt_scr_alloc(session, 0, &vs->tmp1));
 	WT_ERR(__wt_scr_alloc(session, 0, &vs->tmp2));
 
-	/*
-	 * Verify the tree, starting at the root: if there is no root, that's
-	 * still possibly a legal file, but all of the pages must be on the
-	 * free-list.
-	 */
-	WT_ERR(__wt_btree_get_root(session, vs->tmp1));
-	if (vs->tmp1->data != NULL) {
-		WT_ERR(__wt_bm_verify_addr(
-		    session, vs->tmp1->data, vs->tmp1->size));
-		WT_ERR(__wt_btree_root_init(session, vs->tmp1));
-		WT_ERR(
-		    __verify_tree(session, btree->root_page, (uint64_t)1, vs));
+	/* Get a list of the snapshots for this file. */
+	WT_ERR(__wt_session_snap_list_get(session, NULL, &snapbase));
+
+	/* Inform the underlying block manager we're verifying. */
+	WT_ERR(__wt_bm_verify_start(session, snapbase));
+
+	/* Loop through the file's snapshots, verifying each one. */
+	WT_SNAPSHOT_FOREACH(snapbase, snap) {
+		WT_VERBOSE(session, verify,
+		    "%s: snapshot %s", btree->filename, snap->name);
+
+		/* House-keeping between snapshots. */
+		__verify_snapshot_reset(vs);
+
+		/*
+		 * Load the snapshot -- if the size of the root page is 0, the
+		 * file is empty.
+		 *
+		 * Clearing the root page reference here is not an error: any
+		 * root page we read will be discarded as part of calling the
+		 * underlying eviction thread to discard the in-cache version
+		 * of the tree.   Since our reference disappears in that call,
+		 * we can't ever use it again.
+		 */
+		WT_CLEAR(dsk);
+		WT_ERR(__wt_bm_snapshot_load(
+		    session, &dsk, snap->raw.data, snap->raw.size, 1));
+		if (dsk.size != 0) {
+			/* Verify, then discard the snapshot from the cache. */
+			if ((ret = __wt_btree_tree_open(session, &dsk)) == 0) {
+				ret = __verify_tree(
+				    session, btree->root_page, (uint64_t)1, vs);
+				WT_TRET(
+				    __wt_cache_flush(session, WT_SYNC_DISCARD));
+			}
+		}
+
+		/* Unload the snapshot. */
+		WT_TRET(__wt_bm_snapshot_unload(session));
+		WT_ERR(ret);
 	}
 
-	if (0) {
-err:		if (ret == 0)
-			ret = WT_ERROR;
-	}
+	/* Discard the list of snapshots. */
+err:	__wt_session_snap_list_free(session, snapbase);
+
+	/* Inform the underlying block manager we're done. */
+	WT_TRET(__wt_bm_verify_end(session));
 
 	if (vs != NULL) {
 		/* Wrap up reporting. */
@@ -127,9 +155,24 @@ err:		if (ret == 0)
 		__wt_scr_free(&vs->tmp2);
 	}
 
-	WT_TRET(__wt_bm_verify_end(session));
-
 	return (ret);
+}
+
+/*
+ * __verify_snapshot_reset --
+ *	Reset anything needing to be reset for each new snapshot verification.
+ */
+static void
+__verify_snapshot_reset(WT_VSTUFF *vs)
+{
+	/*
+	 * Key order is per snapshot, reset the data length that serves as a
+	 * flag value.
+	 */
+	vs->max_addr->size = 0;
+
+	/* Record total is per snapshot, reset the record count. */
+	vs->record_total = 0;
 }
 
 /*
@@ -149,15 +192,15 @@ __verify_tree(WT_SESSION_IMPL *session,
 	WT_ITEM *tmp;
 	WT_REF *ref;
 	uint64_t recno;
-	const uint8_t *addr;
 	uint32_t entry, i, size;
+	const uint8_t *addr;
 	int ret;
 
 	ret = 0;
 	unpack = &_unpack;
 
-	WT_VERBOSE(session, verify, "%p: %s %s",
-	    page, __wt_page_addr_string(session, vs->tmp1, page),
+	WT_VERBOSE(session, verify, "%s %s",
+	    __wt_page_addr_string(session, vs->tmp1, page),
 	    __wt_page_type_string(page->type));
 
 	/*
@@ -284,12 +327,12 @@ recno_chk:	if (parent_recno != recno)
 
 			/* ref references the subtree containing the record */
 			__wt_get_addr(page, ref, &addr, &size);
-			WT_RET(__wt_bm_verify_addr(session, addr, size));
 			WT_RET(__wt_page_in(session, page, ref));
 			ret =
 			    __verify_tree(session, ref->page, ref->u.recno, vs);
 			__wt_page_release(session, ref->page);
 			WT_RET(ret);
+			WT_RET(__wt_bm_verify_addr(session, addr, size));
 		}
 		break;
 	case WT_PAGE_ROW_INT:
@@ -311,12 +354,12 @@ recno_chk:	if (parent_recno != recno)
 
 			/* ref references the subtree containing the record */
 			__wt_get_addr(page, ref, &addr, &size);
-			WT_RET(__wt_bm_verify_addr(session, addr, size));
 			WT_RET(__wt_page_in(session, page, ref));
 			ret =
 			    __verify_tree(session, ref->page, (uint64_t)0, vs);
 			__wt_page_release(session, ref->page);
 			WT_RET(ret);
+			WT_RET(__wt_bm_verify_addr(session, addr, size));
 		}
 		break;
 	}
@@ -477,23 +520,24 @@ err:	WT_RET_MSG(session, ret,
  */
 static int
 __verify_overflow(WT_SESSION_IMPL *session,
-    const uint8_t *addrbuf, uint32_t addrbuf_len, WT_VSTUFF *vs)
+    const uint8_t *addr, uint32_t addr_size, WT_VSTUFF *vs)
 {
 	WT_PAGE_HEADER *dsk;
 
 	/* Read and verify the overflow item. */
-	WT_RET(__wt_bm_verify_addr(session, addrbuf, addrbuf_len));
-	WT_RET(__wt_bm_read(session, vs->tmp1, addrbuf, addrbuf_len));
+	WT_RET(__wt_bm_read(session, vs->tmp1, addr, addr_size));
 
 	/*
-	 * The page has already been verified, but we haven't confirmed that
-	 * it was an overflow page, only that it was a valid page.  Confirm
-	 * it's the type of page we expected.
+	 * The physical page has already been verified, but we haven't confirmed
+	 * it was an overflow page, only that it was a valid page.  Confirm it's
+	 * the type of page we expected.
 	 */
 	dsk = vs->tmp1->mem;
 	if (dsk->type != WT_PAGE_OVFL)
 		WT_RET_MSG(session, WT_ERROR,
 		    "overflow referenced page at %s is not an overflow page",
-		    __wt_addr_string(session, vs->tmp1, addrbuf, addrbuf_len));
+		    __wt_addr_string(session, vs->tmp1, addr, addr_size));
+
+	WT_RET(__wt_bm_verify_addr(session, addr, addr_size));
 	return (0);
 }

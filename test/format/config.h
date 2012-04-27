@@ -19,16 +19,19 @@ typedef struct {
 	uint8_t	 	type_mask;		/* File type mask */
 
 	/* Value is a boolean, yes if roll of 1-to-100 is <= CONFIG->min. */
-#define	C_BOOL		0x01
+#define	C_BOOL		0x001
 
 	/* Not a simple randomization, handle outside the main loop. */ 
-#define	C_IGNORE	0x02
+#define	C_IGNORE	0x002
+
+	/* Operation, only set if doing operations. */
+#define	C_OPS		0x004
 
 	/* Value was set from command-line or file, ignore for all runs. */
-#define	C_PERM		0x04
+#define	C_PERM		0x008
 
 	/* Value isn't random for this run, ignore just for this run. */
-#define	C_TEMP		0x08
+#define	C_TEMP		0x010
 	uint32_t 	flags;
 
 	uint32_t	 min;			/* Minimum value */
@@ -57,7 +60,7 @@ static CONFIG c[] = {
 
 	{ "delete_pct",
 	  "percent operations that are deletes",
-	  0, 0, 0, 45, &g.c_delete_pct },
+	  0, C_OPS, 0, 45, &g.c_delete_pct },
 
 	{ "file_type",
 	  "type of file to create (fix | var | row)",
@@ -73,7 +76,7 @@ static CONFIG c[] = {
 
 	{ "insert_pct",
 	  "percent operations that are inserts",
-	  0, 0, 0, 45, &g.c_insert_pct },
+	  0, C_OPS, 0, 45, &g.c_insert_pct },
 
 	{ "internal_page_max",
 	  "maximum size of Btree internal nodes",
@@ -125,7 +128,7 @@ static CONFIG c[] = {
 
 	{ "write_pct",
 	  "percent operations that are writes",
-	  0, 0, 0, 90, &g.c_write_pct },
+	  0, C_OPS, 0, 90, &g.c_write_pct },
 
 	{ NULL, NULL, 0, 0, 0, 0, NULL }
 };

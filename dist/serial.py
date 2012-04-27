@@ -26,10 +26,6 @@ Serial('col_append', 'WT_SERIAL_FUNC', [
 		SerialArg('u_int', 'skipdepth'),
 	]),
 
-Serial('evict_file', 'WT_SERIAL_EVICT', [
-		SerialArg('int', 'discard'),
-	]),
-
 Serial('insert', 'WT_SERIAL_FUNC', [
 		SerialArg('WT_PAGE *', 'page'),
 		SerialArg('uint32_t', 'write_gen'),
@@ -45,6 +41,10 @@ Serial('row_key', 'WT_SERIAL_FUNC', [
 		SerialArg('WT_PAGE *', 'page'),
 		SerialArg('WT_ROW *', 'row_arg'),
 		SerialArg('WT_IKEY *', 'ikey'),
+	]),
+
+Serial('sync_file', 'WT_SERIAL_EVICT', [
+		SerialArg('int', 'fileop'),
 	]),
 
 Serial('update', 'WT_SERIAL_FUNC', [

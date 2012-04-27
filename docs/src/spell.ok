@@ -25,11 +25,11 @@ Mewhort
 NoSQL
 RepMgr
 Rrx
-TimesTen's
 URIs
 Vv
 WiredTiger
 WiredTiger's
+WiredTigerInternal
 aR
 ack'ed
 alloc
@@ -57,6 +57,7 @@ callbk
 cd
 cdb
 cds
+checksum
 checksums
 ckp
 colgroup
@@ -255,6 +256,7 @@ structs
 subdatabases
 subpage
 superset
+sv
 tablename
 tcl
 tcmalloc

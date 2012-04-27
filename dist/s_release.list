@@ -5,7 +5,7 @@ lang/python/src
 src/server
 src/txn
 test/format
-test/insert
 test/packing
 test/salvage
+test/snapshot
 test/thread

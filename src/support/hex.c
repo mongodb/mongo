@@ -11,11 +11,11 @@ static const char hex[] = "0123456789abcdef";
 
 /*
  * __wt_raw_to_hex --
- *	Convert a chunk of data to a printable hex string.
+ *	Convert a chunk of data to a nul-terminated printable hex string.
  */
 int
-__wt_raw_to_hex(WT_SESSION_IMPL *session,
-    const uint8_t *from, uint32_t size, WT_ITEM *to)
+__wt_raw_to_hex(
+    WT_SESSION_IMPL *session, const uint8_t *from, uint32_t size, WT_ITEM *to)
 {
 	uint32_t i;
 	const uint8_t *p;
@@ -38,12 +38,12 @@ __wt_raw_to_hex(WT_SESSION_IMPL *session,
 
 /*
  * __wt_raw_to_esc_hex --
- *	Convert a chunk of data to an printable string using escaped hex as
- *	necessary.
+ *	Convert a chunk of data to a nul-terminated printable string using
+ * escaped hex, as necessary.
  */
 int
-__wt_raw_to_esc_hex(WT_SESSION_IMPL *session,
-    const uint8_t *from, size_t size, WT_ITEM *to)
+__wt_raw_to_esc_hex(
+    WT_SESSION_IMPL *session, const uint8_t *from, size_t size, WT_ITEM *to)
 {
 	size_t i;
 	const uint8_t *p;
@@ -136,22 +136,31 @@ __hex_fmterr(WT_SESSION_IMPL *session)
 
 /*
  * __wt_hex_to_raw --
- *	Convert a printable hex string to a chunk of data.
+ *	Convert a nul-terminated printable hex string to a chunk of data.
  */
 int
 __wt_hex_to_raw(WT_SESSION_IMPL *session, const char *from, WT_ITEM *to)
 {
+	return (__wt_nhex_to_raw(session, from, strlen(from), to));
+}
+
+/*
+ * __wt_nhex_to_raw --
+ *	Convert a printable hex string to a chunk of data.
+ */
+int
+__wt_nhex_to_raw(
+    WT_SESSION_IMPL *session, const char *from, size_t size, WT_ITEM *to)
+{
 	const char *p;
 	uint8_t *t;
-	size_t size;
 
-	size = strlen(from);
 	if (size % 2 != 0)
 		return (__hex_fmterr(session));
 
 	WT_RET(__wt_buf_init(session, to, size / 2));
 
-	for (p = from, t = to->mem; *p != '\0'; p += 2, ++t)
+	for (p = from, t = to->mem; size > 0; p += 2, size -= 2, ++t)
 		if (hex2byte(p, t))
 			return (__hex_fmterr(session));
 
@@ -161,8 +170,7 @@ __wt_hex_to_raw(WT_SESSION_IMPL *session, const char *from, WT_ITEM *to)
 
 /*
  * __wt_esc_hex_to_raw --
- *	Convert a printable string using escaped hex as necessary to a chunk
- *	of data.
+ *	Convert a printable string, encoded in escaped hex, to a chunk of data.
  */
 int
 __wt_esc_hex_to_raw(WT_SESSION_IMPL *session, const char *from, WT_ITEM *to)

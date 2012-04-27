@@ -211,8 +211,8 @@ int main(void)
 
 	count = 0;
 	while (ret == 0 && call.cust_id == cust.id) {
-		printf("Got call record on date %lu: type %s: %s\n",
-		    (unsigned long)call.call_date, call.call_type, call.notes);
+		printf("Got call record on date %" PRIu64 ": type %s: %s\n",
+		    call.call_date, call.call_type, call.notes);
 		if (++count == 3)
 			break;
 

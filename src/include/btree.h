@@ -32,6 +32,14 @@
 #define	WT_BTREE_MAX_OBJECT_SIZE	(UINT32_MAX - 512)
 
 /*
+ * A location in a file is a variable-length cookie, but it has a maximum size
+ * so it's easy to create temporary space in which to store them.  (Locations
+ * can't be much larger than this anyway, they must fit onto the minimum size
+ * page because a reference to an overflow page is itself a location.)
+ */
+#define	WT_BTREE_MAX_ADDR_COOKIE	255	/* Maximum address cookie */
+
+/*
  * Split page size calculation -- we don't want to repeatedly split every time
  * a new entry is added, so we split to a smaller-than-maximum page size.
  */
@@ -95,10 +103,9 @@ struct __wt_btree {
 	uint64_t last_recno;		/* Column-store last record number */
 
 	WT_PAGE *root_page;		/* Root page */
-	WT_ADDR  root_addr;		/* Replacement root address */
-	int	 root_update;		/* 0: free original root blocks
-					   1: free saved root blocks and
-					      update on close */
+
+	WT_RWLOCK   *snaplock;		/* Lock for snapshot creation */
+	WT_SNAPSHOT *snap;		/* Snapshot information */
 
 	void *block;			/* Block manager */
 	u_int block_header;		/* Block manager header length */
@@ -139,4 +146,34 @@ struct __wt_salvage_cookie {
 	uint64_t take;				/* Items to take */
 
 	int	 done;				/* Ignore the rest */
+};
+
+/*
+ * WT_SNAPSHOT --
+ *	Encapsulation of snapshot information, shared with the block manager.
+ */
+#define	WT_INTERNAL_SNAPSHOT	"WiredTigerInternalSnapshot"
+#define	WT_SNAPSHOT_FOREACH(snapbase, snap)				\
+	for ((snap) = (snapbase); (snap)->name != NULL; ++(snap))
+#define	WT_SNAPSHOT_CONTINUE(snap)					\
+	for (; (snap)->name != NULL; ++(snap))
+struct __wt_snapshot {
+	char	*name;				/* Name or NULL */
+
+	WT_ITEM  addr;				/* Snapshot cookie string */
+	WT_ITEM  raw;				/* Snapshot cookie raw */
+
+	int64_t	 order;				/* Snapshot order */
+
+	uint64_t sec;				/* Timestamp */
+	uint64_t nsec;
+
+	uint64_t snapshot_size;			/* Snapshot size */
+
+	void	*bpriv;				/* Block manager's private */
+
+#define	WT_SNAP_ADD	0x01			/* Snapshot to be added */
+#define	WT_SNAP_DELETE	0x02			/* Snapshot to be deleted */
+#define	WT_SNAP_UPDATE	0x04			/* Snapshot requires update */
+	uint32_t flags;
 };

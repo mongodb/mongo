@@ -139,7 +139,7 @@ __wt_session_create_strip(
  *	WT_SESSION->create method.
  */
 static int
-__session_create(WT_SESSION *wt_session, const char *name, const char *config)
+__session_create(WT_SESSION *wt_session, const char *uri, const char *config)
 {
 	WT_SESSION_IMPL *session;
 	int ret;
@@ -147,7 +147,7 @@ __session_create(WT_SESSION *wt_session, const char *name, const char *config)
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_API_CALL(session, create, config, cfg);
 	WT_UNUSED(cfg);
-	WT_ERR(__wt_schema_create(session, name, config));
+	WT_ERR(__wt_schema_create(session, uri, config));
 
 err:	API_END_NOTFOUND_MAP(session, ret);
 }
@@ -175,14 +175,39 @@ err:	API_END_NOTFOUND_MAP(session, ret);
  *	WT_SESSION->drop method.
  */
 static int
-__session_drop(WT_SESSION *wt_session, const char *name, const char *config)
+__session_drop(WT_SESSION *wt_session, const char *uri, const char *config)
 {
+	static const char *snapcmd[] =
+	    { "snapfrom", "snapshot", "snapto", NULL };
+	WT_CONFIG_ITEM cval;
 	WT_SESSION_IMPL *session;
 	int ret;
+	const char **p;
 
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_API_CALL(session, drop, config, cfg);
-	ret = __wt_schema_drop(session, name, cfg);
+
+	/* If dropping a snapshot, that's a different code path. */
+	if ((ret = __wt_config_gets(
+	    session, cfg, "snapall", &cval)) != 0 && ret != WT_NOTFOUND)
+		WT_ERR(ret);
+	if (cval.val != 0)
+		ret = __wt_schema_worker(
+		    session, uri, cfg, __wt_btree_snapshot_drop, 0);
+	else {
+		for (p = snapcmd; *p != NULL; ++p) {
+			ret = __wt_config_gets(session, cfg, *p, &cval);
+			if (ret != 0 && ret != WT_NOTFOUND)
+				WT_ERR(ret);
+			if (cval.len != 0) {
+				ret = __wt_schema_worker(session,
+				    uri, cfg, __wt_btree_snapshot_drop, 0);
+				break;
+			}
+		}
+		if (*p == NULL)
+			ret = __wt_schema_drop(session, uri, cfg);
+	}
 
 err:	API_END_NOTFOUND_MAP(session, ret);
 }
@@ -237,7 +262,7 @@ __session_sync(WT_SESSION *wt_session, const char *uri, const char *config)
 	session = (WT_SESSION_IMPL *)wt_session;
 
 	SESSION_API_CALL(session, sync, config, cfg);
-	ret = __wt_schema_worker(session, uri, cfg, __wt_btree_sync, 0);
+	ret = __wt_schema_worker(session, uri, cfg, __wt_btree_snapshot, 0);
 
 err:	API_END_NOTFOUND_MAP(session, ret);
 }

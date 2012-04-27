@@ -7,16 +7,16 @@
 
 #include "format.h"
 
-static void  col_del(WT_CURSOR *, WT_ITEM *, uint64_t, int *);
 static void  col_insert(WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t *);
-static void  col_put(WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t);
+static void  col_remove(WT_CURSOR *, WT_ITEM *, uint64_t, int *);
+static void  col_update(WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t);
 static void  nextprev(WT_CURSOR *, int, int *);
 static int   notfound_chk(const char *, int, int, uint64_t);
 static void *ops(void *);
-static void  read_row(WT_CURSOR *, WT_ITEM *, uint64_t);
-static void  row_del(WT_CURSOR *, WT_ITEM *, uint64_t, int *);
-static void  row_put(WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t, int);
 static void  print_item(const char *, WT_ITEM *);
+static void  read_row(WT_CURSOR *, WT_ITEM *, uint64_t);
+static void  row_remove(WT_CURSOR *, WT_ITEM *, uint64_t, int *);
+static void  row_update(WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t, int);
 
 /*
  * wts_ops --
@@ -48,6 +48,7 @@ wts_ops(void)
 
 	if (SINGLETHREADED) {
 		memset(&total, 0, sizeof(total));
+		total.id = 1;
 		(void)ops(&total);
 	} else {
 		/* Create thread structure. */
@@ -55,6 +56,7 @@ wts_ops(void)
 		    calloc((size_t)g.c_threads, sizeof(*tinfo))) == NULL)
 			die(errno, "calloc");
 		for (i = 0; i < g.c_threads; ++i) {
+			tinfo[i].id = (int)i + 1;
 			tinfo[i].state = TINFO_RUNNING;
 			if ((ret = pthread_create(
 			    &tinfo[i].tid, NULL, ops, &tinfo[i])) != 0)
@@ -109,11 +111,12 @@ ops(void *arg)
 	WT_CURSOR *cursor, *cursor_insert;
 	WT_SESSION *session;
 	WT_ITEM key, value;
-	uint64_t cnt, keyno;
+	uint64_t cnt, keyno, sync_op;
 	uint32_t op;
-	u_int np;
-	int dir, insert, notfound, ret;
 	uint8_t *keybuf, *valbuf;
+	u_int np;
+	int dir, insert, notfound, ret, sync_drop;
+	char sync_name[64];
 
 	conn = g.wts_conn;
 
@@ -148,9 +151,33 @@ ops(void *arg)
 	    WT_TABLENAME, NULL, "append", &cursor_insert)) != 0)
 		die(ret, "session.open_cursor");
 
+	/* Pick an operation where we'll do a sync and create the name. */
+	sync_drop = 0;
+	sync_op = MMRAND(1, g.c_ops);
+	snprintf(sync_name, sizeof(sync_name), "snapshot=thread-%d", tinfo->id);
+
 	for (cnt = 0; cnt < g.c_ops / g.c_threads; ++cnt) {
 		if (SINGLETHREADED && cnt % 100 == 0)
 			track("read/write ops", 0ULL, tinfo);
+
+		if (cnt == sync_op) {
+			if (sync_drop && (int)MMRAND(1, 4) == 1) {
+				if ((ret = session->drop(
+				    session, WT_TABLENAME, sync_name)) != 0)
+					die(ret, "session.drop: %s: %s",
+					    WT_TABLENAME, sync_name);
+				sync_drop = 0;
+			} else {
+				if ((ret = session->sync(
+				    session, WT_TABLENAME, sync_name)) != 0)
+					die(ret, "session.sync: %s: %s",
+					    WT_TABLENAME, sync_name);
+				sync_drop = 1;
+			}
+
+			/* Pick the next sync operation. */
+			sync_op += wts_rand() % 1000;
+		}
 
 		insert = notfound = 0;
 
@@ -174,18 +201,18 @@ ops(void *arg)
 				 * If deleting a non-existent record, the cursor
 				 * won't be positioned, and so can't do a next.
 				 */
-				row_del(cursor, &key, keyno, &notfound);
+				row_remove(cursor, &key, keyno, &notfound);
 				break;
 			case FIX:
 			case VAR:
-				col_del(cursor, &key, keyno, &notfound);
+				col_remove(cursor, &key, keyno, &notfound);
 				break;
 			}
 		} else if (op < g.c_delete_pct + g.c_insert_pct) {
 			++tinfo->insert;
 			switch (g.c_file_type) {
 			case ROW:
-				row_put(cursor, &key, &value, keyno, 1);
+				row_update(cursor, &key, &value, keyno, 1);
 				break;
 			case FIX:
 			case VAR:
@@ -204,11 +231,11 @@ ops(void *arg)
 			++tinfo->update;
 			switch (g.c_file_type) {
 			case ROW:
-				row_put(cursor, &key, &value, keyno, 0);
+				row_update(cursor, &key, &value, keyno, 0);
 				break;
 			case FIX:
 			case VAR:
-				col_put(cursor, &key, &value, keyno);
+				col_update(cursor, &key, &value, keyno);
 				break;
 			}
 		} else {
@@ -221,7 +248,7 @@ ops(void *arg)
 		 * If we did any operation, we've set the cursor, do a small
 		 * number of next/prev cursor operations in a random direction.
 		 */
-		dir = MMRAND(0, 1);
+		dir = (int)MMRAND(0, 1);
 		for (np = 0; np < MMRAND(1, 8); ++np) {
 			if (notfound)
 				break;
@@ -480,11 +507,11 @@ nextprev(WT_CURSOR *cursor, int next, int *notfoundp)
 }
 
 /*
- * row_put --
- *	Update an element in a row-store file.
+ * row_update --
+ *	Update a row in a row-store file.
  */
 static void
-row_put(
+row_update(
     WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t keyno, int insert)
 {
 	WT_SESSION *session;
@@ -508,22 +535,22 @@ row_put(
 	ret = cursor->insert(cursor);
 	if (ret != 0 && ret != WT_NOTFOUND)
 		die(ret,
-		    "row_put: %s row %" PRIu64 " by key",
+		    "row_update: %s row %" PRIu64 " by key",
 		    insert ? "insert" : "update", keyno);
 
 	if (!SINGLETHREADED)
 		return;
 
-	bdb_put(key->data, key->size, value->data, value->size, &notfound);
-	NTF_CHK(notfound_chk("row_put", ret, notfound, keyno));
+	bdb_update(key->data, key->size, value->data, value->size, &notfound);
+	NTF_CHK(notfound_chk("row_update", ret, notfound, keyno));
 }
 
 /*
- * col_put --
- *	Update an element in a column-store file.
+ * col_update --
+ *	Update a row in a column-store file.
  */
 static void
-col_put(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t keyno)
+col_update(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t keyno)
 {
 	WT_SESSION *session;
 	int notfound, ret;
@@ -553,14 +580,14 @@ col_put(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t keyno)
 		cursor->set_value(cursor, value);
 	ret = cursor->insert(cursor);
 	if (ret != 0 && ret != WT_NOTFOUND)
-		die(ret, "col_put: %" PRIu64, keyno);
+		die(ret, "col_update: %" PRIu64, keyno);
 
 	if (!SINGLETHREADED)
 		return;
 
 	key_gen((uint8_t *)key->data, &key->size, keyno, 0);
-	bdb_put(key->data, key->size, value->data, value->size, &notfound);
-	NTF_CHK(notfound_chk("col_put", ret, notfound, keyno));
+	bdb_update(key->data, key->size, value->data, value->size, &notfound);
+	NTF_CHK(notfound_chk("col_update", ret, notfound, keyno));
 }
 
 /*
@@ -613,15 +640,15 @@ col_insert(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t *keynop)
 		return;
 
 	key_gen((uint8_t *)key->data, &key->size, keyno, 0);
-	bdb_put(key->data, key->size, value->data, value->size, &notfound);
+	bdb_update(key->data, key->size, value->data, value->size, &notfound);
 }
 
 /*
- * row_del --
- *	Delete an element from a row-store file.
+ * row_remove --
+ *	Remove an row from a row-store file.
  */
 static void
-row_del(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int *notfoundp)
+row_remove(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int *notfoundp)
 {
 	WT_SESSION *session;
 	int notfound, ret;
@@ -638,22 +665,22 @@ row_del(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int *notfoundp)
 	cursor->set_key(cursor, key);
 	ret = cursor->remove(cursor);
 	if (ret != 0 && ret != WT_NOTFOUND)
-		die(ret, "row_del: remove %" PRIu64 " by key", keyno);
+		die(ret, "row_remove: remove %" PRIu64 " by key", keyno);
 	*notfoundp = ret == WT_NOTFOUND;
 
 	if (!SINGLETHREADED)
 		return;
 
-	bdb_del(keyno, &notfound);
-	NTF_CHK(notfound_chk("row_del", ret, notfound, keyno));
+	bdb_remove(keyno, &notfound);
+	NTF_CHK(notfound_chk("row_remove", ret, notfound, keyno));
 }
 
 /*
- * col_del --
- *	Delete an element from a column-store file.
+ * col_remove --
+ *	Remove a row from a column-store file.
  */
 static void
-col_del(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int *notfoundp)
+col_remove(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int *notfoundp)
 {
 	WT_SESSION *session;
 	int notfound, ret;
@@ -668,7 +695,7 @@ col_del(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int *notfoundp)
 	cursor->set_key(cursor, keyno);
 	ret = cursor->remove(cursor);
 	if (ret != 0 && ret != WT_NOTFOUND)
-		die(ret, "col_del: remove %" PRIu64 " by key", keyno);
+		die(ret, "col_remove: remove %" PRIu64 " by key", keyno);
 	*notfoundp = ret == WT_NOTFOUND;
 
 	if (!SINGLETHREADED)
@@ -680,11 +707,11 @@ col_del(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int *notfoundp)
 	 */
 	if (g.c_file_type == FIX) {
 		key_gen((uint8_t *)key->data, &key->size, keyno, 0);
-		bdb_put(key->data, key->size, "\0", 1, &notfound);
+		bdb_update(key->data, key->size, "\0", 1, &notfound);
 	} else
-		bdb_del(keyno, &notfound);
+		bdb_remove(keyno, &notfound);
 
-	NTF_CHK(notfound_chk("col_del", ret, notfound, keyno));
+	NTF_CHK(notfound_chk("col_remove", ret, notfound, keyno));
 }
 
 /*

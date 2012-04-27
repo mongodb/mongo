@@ -34,8 +34,10 @@
 
 #include <assert.h>
 #include <errno.h>
+#include <inttypes.h>
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 
 #include <wiredtiger.h>
 
@@ -282,7 +284,6 @@ cursor_search_near(WT_CURSOR *cursor)
 int
 session_ops(WT_SESSION *session)
 {
-	unsigned long mypid = 0;
 	int ret;
 
 	cursor_ops(session);
@@ -297,7 +298,20 @@ session_ops(WT_SESSION *session)
 	/*! [session checkpoint] */
 
 	/*! [session drop] */
+	/* Discard a table. */
 	ret = session->drop(session, "table:mytable", NULL);
+
+	/* Drop all snapshots from a table. */
+	ret = session->drop(session, "table:mytable", "snapall=true");
+
+	/* Drop all snapshots after, and including, "January". */
+	ret = session->drop(session, "table:mytable", "snapfrom=January");
+
+	/* Drop the "June" snapshot. */
+	ret = session->drop(session, "table:mytable", "snapshot=June");
+
+	/* Drop all snapshots before, and including, "November". */
+	ret = session->drop(session, "table:mytable", "snapto=November");
 	/*! [session drop] */
 
 	/*! [session dumpfile] */
@@ -305,7 +319,8 @@ session_ops(WT_SESSION *session)
 	/*! [session dumpfile] */
 
 	/*! [session msg_printf] */
-	ret = session->msg_printf(session, "process pid %lu", mypid);
+	ret = session->msg_printf(
+	    session, "process ID %" PRIuMAX, (uintmax_t)getpid());
 	/*! [session msg_printf] */
 
 	/*! [session rename] */
@@ -376,7 +391,7 @@ my_cursor_size(WT_CURSOR_TYPE *ctype, const char *obj, size_t *sizep)
 	(void)ctype;
 	(void)obj;
 
-	*sizep = sizeof (WT_CURSOR);
+	*sizep = sizeof(WT_CURSOR);
 	return (0);
 }
 /*! [WT_CURSOR_TYPE size] */
@@ -622,7 +637,7 @@ int main(void)
 	{
 	/*! [Pack fields into a buffer] */
 	char buf[100];
-	ret = wiredtiger_struct_pack(buf, sizeof (buf), "iSh", 42, "hello", -3);
+	ret = wiredtiger_struct_pack(buf, sizeof(buf), "iSh", 42, "hello", -3);
 	/*! [Pack fields into a buffer] */
  
 	{
@@ -630,7 +645,7 @@ int main(void)
 	int i;
 	char *s;
 	short h;
-	ret = wiredtiger_struct_unpack(buf, sizeof (buf), "iSh", &i, &s, &h);
+	ret = wiredtiger_struct_unpack(buf, sizeof(buf), "iSh", &i, &s, &h);
 	/*! [Unpack fields from a buffer] */
 	}
 	}

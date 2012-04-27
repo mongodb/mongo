@@ -136,7 +136,7 @@ bdb_read(uint64_t keyno, void *valuep, uint32_t *valuesizep, int *notfoundp)
 }
 
 void
-bdb_put(const void *arg_key, uint32_t arg_key_size,
+bdb_update(const void *arg_key, uint32_t arg_key_size,
     const void *arg_value, uint32_t arg_value_size, int *notfoundp)
 {
 	DBC *dbc = g.dbc;
@@ -159,7 +159,7 @@ bdb_put(const void *arg_key, uint32_t arg_key_size,
 }
 
 void
-bdb_del(uint64_t keyno, int *notfoundp)
+bdb_remove(uint64_t keyno, int *notfoundp)
 {
 	DBC *dbc = g.dbc;
 	int ret;

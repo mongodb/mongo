@@ -129,6 +129,8 @@ Subtrees
 TAILQ
 TODO
 TOOSMALL
+TRK
+Timestamp
 UINT
 URI
 URIs
@@ -141,6 +143,7 @@ WIREDTIGER
 WinNT
 WiredTiger
 WiredTiger's
+WiredTigerInternalSnapshot
 Wuninitialized
 XP
 __wt_epoch
@@ -253,10 +256,13 @@ evictserver
 exactp
 extern
 extlist
+extlists
+fblocks
 fcntl
 ffc
 ffs
 fh
+filefrag
 filename
 fileops
 filesize
@@ -317,6 +323,7 @@ keycmp
 keyname
 keyv
 kv
+ld
 len
 lenp
 lex
@@ -359,12 +366,15 @@ nbits
 nclr
 negint
 newname
+nhex
 nl
 nlpo
 nocase
 nop
+notset
 notsup
 notyet
+nowrite
 np
 nset
 nul
@@ -425,6 +435,10 @@ sizev
 skiplist
 skiplists
 slvg
+snapall
+snapfrag
+snapfrom
+snapto
 snprintf
 sp
 spinlock

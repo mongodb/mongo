@@ -157,8 +157,8 @@ file_config = format_meta + [
 
 # File metadata, including both configurable and non-configurable (internal)
 file_meta = file_config + [
-	Config('root', '', r'''
-		the root page address'''),
+	Config('snapshot', '', r'''
+		the file snapshot entries'''),
 	Config('version', '(major=0,minor=0)', r'''
 		the file version'''),
 ]
@@ -206,8 +206,20 @@ methods = {
 	Config('force', 'false', r'''
 		return success if the object does not exist''',
 		type='boolean'),
+	Config('snapall', 'false', r'''
+		drop all snapshots''',
+		type='boolean'),
+	Config('snapfrom', '', r'''
+		drop all snapshots more recent than, and including, the named
+		snapshot'''),
+	Config('snapshot', '', r'''
+		the name of a single snapshot to drop'''),
+	Config('snapto', '', r'''
+		drop all snapshots earlier than, and including, the named
+		snapshot'''),
 	]),
 
+'session.dumpfile' : Method([]),
 'session.log_printf' : Method([]),
 
 'session.open_cursor' : Method([
@@ -243,6 +255,8 @@ methods = {
 		ignore the encodings for the key and value, manage data as if
 		the formats were \c "u".  See @ref cursor_raw for details''',
 		type='boolean'),
+	Config('snapshot', '', r'''
+		the name of a snapshot to open'''),
 	Config('statistics', 'false', r'''
 		configure the cursor for statistics''',
 		type='boolean'),
@@ -255,11 +269,13 @@ methods = {
 		files''',
 		type='boolean'),
 ]),
-'session.sync' : Method([]),
+'session.sync' : Method([
+	Config('snapshot', '', r'''
+		name of the snapshot'''),
+]),
 'session.truncate' : Method([]),
 'session.upgrade' : Method([]),
 'session.verify' : Method([]),
-'session.dumpfile' : Method([]),
 
 'session.begin_transaction' : Method([
 	Config('isolation', 'read-committed', r'''
@@ -395,6 +411,7 @@ methods = {
 		    'readserver',
 		    'reconcile',
 		    'salvage',
+		    'snapshot',
 		    'verify',
 		    'write']),
 ]),
@@ -418,6 +435,7 @@ flags = {
 		'VERB_readserver',
 		'VERB_reconcile',
 		'VERB_salvage',
+		'VERB_snapshot',
 		'VERB_verify',
 		'VERB_write'
 	],

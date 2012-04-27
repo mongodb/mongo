@@ -363,6 +363,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		{ "reconcile",	WT_VERB_reconcile },
 		{ "salvage",	WT_VERB_salvage },
 		{ "verify",	WT_VERB_verify },
+		{ "snapshot",	WT_VERB_snapshot },
 		{ "write",	WT_VERB_write },
 		{ NULL, 0 }
 	}, directio_types[] = {

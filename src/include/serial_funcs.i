@@ -130,35 +130,6 @@ __wt_col_append_new_ins_taken(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 typedef struct {
-	int discard;
-} __wt_evict_file_args;
-
-static inline int
-__wt_evict_file_serial(
-	WT_SESSION_IMPL *session, int discard)
-{
-	__wt_evict_file_args _args, *args = &_args;
-	int ret;
-
-	args->discard = discard;
-
-	ret = __wt_session_serialize_func(session,
-	    WT_SERIAL_EVICT, __wt_evict_file_serial_func, args);
-
-	return (ret);
-}
-
-static inline void
-__wt_evict_file_unpack(
-	WT_SESSION_IMPL *session, int *discardp)
-{
-	__wt_evict_file_args *args =
-	    (__wt_evict_file_args *)session->wq_args;
-
-	*discardp = args->discard;
-}
-
-typedef struct {
 	WT_PAGE *page;
 	uint32_t write_gen;
 	WT_INSERT_HEAD **inshead;
@@ -328,6 +299,35 @@ __wt_row_key_unpack(
 	*pagep = args->page;
 	*row_argp = args->row_arg;
 	*ikeyp = args->ikey;
+}
+
+typedef struct {
+	int fileop;
+} __wt_sync_file_args;
+
+static inline int
+__wt_sync_file_serial(
+	WT_SESSION_IMPL *session, int fileop)
+{
+	__wt_sync_file_args _args, *args = &_args;
+	int ret;
+
+	args->fileop = fileop;
+
+	ret = __wt_session_serialize_func(session,
+	    WT_SERIAL_EVICT, __wt_sync_file_serial_func, args);
+
+	return (ret);
+}
+
+static inline void
+__wt_sync_file_unpack(
+	WT_SESSION_IMPL *session, int *fileopp)
+{
+	__wt_sync_file_args *args =
+	    (__wt_sync_file_args *)session->wq_args;
+
+	*fileopp = args->fileop;
 }
 
 typedef struct {

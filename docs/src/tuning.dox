@@ -101,6 +101,14 @@ better threaded performance (for example, Google's
 or <a href="http://www.canonware.com/jemalloc">jemalloc</a>),
 can dramatically improve throughput.
 
+@section checksums Checksums
+
+WiredTiger configures checksums on file reads and writes, by default.
+In read-only applications, or when file compression provides any
+necessary checksum functionality, or when using backing storage systems
+where blocks require no validation, performance can be increased by
+turning off checksum support when calling the WT_SESSION::create method.
+
 @section statistics Performance monitoring with statistics
 
 WiredTiger maintains a variety of statistics that can be read with a

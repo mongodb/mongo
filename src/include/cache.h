@@ -20,12 +20,14 @@ struct __wt_evict_list {
  */
 struct __wt_evict_req {
 	WT_SESSION_IMPL *session;		/* Requesting thread */
-	WT_BTREE *btree;			/* Btree */
+	WT_BTREE *btree;			/* Enclosing btree */
+
 	WT_PAGE *page;                          /* Single page to flush */
 
-#define	WT_EVICT_REQ_CLOSE      0x1		/* Discard pages */
-#define	WT_EVICT_REQ_PAGE       0x2		/* Force out a page */
-	uint32_t flags;
+#define	WT_SYNC			1		/* Sync a file */
+#define	WT_SYNC_DISCARD		2		/* Sync a file, discard pages */
+#define	WT_SYNC_DISCARD_NOWRITE	3		/* Discard a file */
+	int fileop;				/* File operation */
 };
 
 /*

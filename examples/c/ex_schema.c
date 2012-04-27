@@ -105,7 +105,7 @@ int main(void)
 	ret = session->open_cursor(session, "table:population",
 	    NULL, "append", &cursor);
 
-	endp = pop_data + (sizeof (pop_data) / sizeof (pop_data[0]));
+	endp = pop_data + (sizeof (pop_data) / sizeof(pop_data[0]));
 	for (p = pop_data; p < endp; p++) {
 		cursor->set_value(cursor, p->country, p->year, p->population);
 		ret = cursor->insert(cursor);

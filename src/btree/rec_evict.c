@@ -8,15 +8,13 @@
 #include "wt_internal.h"
 
 static int  __hazard_exclusive(WT_SESSION_IMPL *, WT_REF *, int);
-static int  __rec_discard(WT_SESSION_IMPL *, WT_PAGE *, int);
 static int  __rec_discard_page(WT_SESSION_IMPL *, WT_PAGE *, int);
+static int  __rec_discard_tree(WT_SESSION_IMPL *, WT_PAGE *, int);
 static void __rec_excl_clear(WT_SESSION_IMPL *);
-static int  __rec_page_clean_update(WT_SESSION_IMPL *, WT_PAGE *, int);
-static int  __rec_page_dirty_update(WT_SESSION_IMPL *, WT_PAGE *, int);
+static void __rec_page_clean_update(WT_SESSION_IMPL *, WT_PAGE *);
+static int  __rec_page_dirty_update(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_review(WT_SESSION_IMPL *, WT_REF *, WT_PAGE *, uint32_t, int);
-static int  __rec_root_addr_update(WT_SESSION_IMPL *, uint8_t *, uint32_t);
-static int  __rec_root_clean_update(WT_SESSION_IMPL *, WT_PAGE *, int);
-static int  __rec_root_dirty_update(WT_SESSION_IMPL *, WT_PAGE *, int);
+static void __rec_root_update(WT_SESSION_IMPL *);
 
 /*
  * __wt_rec_evict --
@@ -59,20 +57,26 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	/* Update the parent and discard the page. */
 	if (page->modify == NULL || !F_ISSET(page->modify, WT_PM_REC_MASK)) {
 		WT_STAT_INCR(conn->stats, cache_evict_unmodified);
+		WT_ASSERT(session, single || page->ref->state == WT_REF_LOCKED);
 
 		if (WT_PAGE_IS_ROOT(page))
-			WT_ERR(__rec_root_clean_update(session, page, single));
+			__rec_root_update(session);
 		else
-			WT_ERR(__rec_page_clean_update(session, page, single));
+			__rec_page_clean_update(session, page);
+
+		/* Discard the page. */
+		WT_RET(__rec_discard_page(session, page, single));
 	} else {
 		WT_STAT_INCR(conn->stats, cache_evict_modified);
 
 		if (WT_PAGE_IS_ROOT(page))
-			WT_ERR(__rec_root_dirty_update(session, page, single));
+			__rec_root_update(session);
 		else
-			WT_ERR(__rec_page_dirty_update(session, page, single));
-	}
+			WT_ERR(__rec_page_dirty_update(session, page));
 
+		/* Discard the tree rooted in this page. */
+		WT_ERR(__rec_discard_tree(session, page, single));
+	}
 	if (0) {
 err:		/*
 		 * If unable to evict this page, release exclusive reference(s)
@@ -81,46 +85,40 @@ err:		/*
 		__rec_excl_clear(session);
 	}
 	session->excl_next = 0;
+
 	return (ret);
 }
 
 /*
- * __rec_page_clean_update  --
- *	Update a page's reference for an evicted, clean page.
+ * __rec_root_update  --
+ *	Update a root page's reference on eviction (clean or dirty).
  */
-static int
-__rec_page_clean_update(WT_SESSION_IMPL *session, WT_PAGE *page, int single)
+static void
+__rec_root_update(WT_SESSION_IMPL *session)
 {
-	WT_ASSERT(session, single || page->ref->state == WT_REF_LOCKED);
+	session->btree->root_page = NULL;
+}
 
+/*
+ * __rec_page_clean_update  --
+ *	Update a clean page's reference on eviction.
+ */
+static void
+__rec_page_clean_update(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
 	/* Update the relevant WT_REF structure. */
 	page->ref->page = NULL;
 	WT_PUBLISH(page->ref->state, WT_REF_DISK);
 
-	return (__rec_discard_page(session, page, single));
-}
-
-/*
- * __rec_root_clean_update  --
- *	Update a page's reference for an evicted, clean page.
- */
-static int
-__rec_root_clean_update(WT_SESSION_IMPL *session, WT_PAGE *page, int single)
-{
-	WT_BTREE *btree;
-
-	btree = session->btree;
-	btree->root_page = NULL;
-
-	return (__rec_discard_page(session, page, single));
+	WT_UNUSED(session);
 }
 
 /*
  * __rec_page_dirty_update --
- *	Update a page's reference for an evicted, dirty page.
+ *	Update a dirty page's reference on eviction.
  */
 static int
-__rec_page_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page, int single)
+__rec_page_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_PAGE_MODIFY *mod;
 	WT_REF *parent_ref;
@@ -161,6 +159,7 @@ __rec_page_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page, int single)
 
 		/* Clear the reference else discarding the page will free it. */
 		mod->u.split = NULL;
+		F_CLR(mod, WT_PM_REC_SPLIT);
 		break;
 	case WT_PM_REC_EMPTY:				/* Page is empty */
 		/* We checked if the page was empty when we reviewed it. */
@@ -168,123 +167,16 @@ __rec_page_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page, int single)
 	WT_ILLEGAL_VALUE(session);
 	}
 
-	/*
-	 * Discard pages which were merged into this page during reconciliation,
-	 * then discard the page itself.
-	 */
-	WT_RET(__rec_discard(session, page, single));
-
 	return (0);
 }
 
 /*
- * __rec_root_addr_update --
- *	Update the root page's address.
+ * __rec_discard_tree --
+ *	Discard the tree rooted a page (that is, any pages merged into it),
+ * then the page itself.
  */
 static int
-__rec_root_addr_update(WT_SESSION_IMPL *session, uint8_t *addr, uint32_t size)
-{
-	WT_ADDR *root_addr;
-	WT_BTREE *btree;
-
-	btree = session->btree;
-	root_addr = &btree->root_addr;
-
-	/* Free any previously created root addresses. */
-	if (root_addr->addr != NULL) {
-		WT_RET(__wt_bm_free(session, root_addr->addr, root_addr->size));
-		__wt_free(session, root_addr->addr);
-	}
-	btree->root_update = 1;
-
-	root_addr->addr = addr;
-	root_addr->size = size;
-
-	return (0);
-}
-
-/*
- * __rec_root_dirty_update --
- *	Update the reference for an evicted, dirty root page.
- */
-static int
-__rec_root_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page, int single)
-{
-	WT_BTREE *btree;
-	WT_PAGE *next;
-	WT_PAGE_MODIFY *mod;
-
-	btree = session->btree;
-	mod = page->modify;
-
-	next = NULL;
-	switch (F_ISSET(mod, WT_PM_REC_MASK)) {
-	case WT_PM_REC_EMPTY:				/* Page is empty */
-		WT_VERBOSE(session, evict, "root page empty");
-
-		/* If the root page is empty, clear the root address. */
-		WT_RET(__rec_root_addr_update(session, NULL, 0));
-		btree->root_page = NULL;
-		break;
-	case WT_PM_REC_REPLACE: 			/* 1-for-1 page swap */
-		WT_VERBOSE(session, evict, "root page replaced");
-
-		/* Update the root to its replacement. */
-		WT_RET(__rec_root_addr_update(
-		    session, mod->u.replace.addr, mod->u.replace.size));
-		btree->root_page = NULL;
-		break;
-	case WT_PM_REC_SPLIT:				/* Page split */
-		WT_VERBOSE(session, evict,
-		    "root page split %p -> %p", page, mod->u.split);
-
-		/* Update the root to the split page. */
-		next = mod->u.split;
-
-		/* Clear the reference else discarding the page will free it. */
-		mod->u.split = NULL;
-		break;
-	}
-
-	/*
-	 * Discard pages which were merged into this page during reconciliation,
-	 * then discard the page itself.
-	 */
-	WT_RET(__rec_discard(session, page, single));
-
-	if (next == NULL)
-		return (0);
-
-	/*
-	 * Newly created internal pages are normally merged into their parent
-	 * when the parent is evicted.  Newly split root pages can't be merged,
-	 * they have no parent and the new root page must be written.  We also
-	 * have to write the root page immediately, as the sync or close that
-	 * triggered the split won't see our new root page during its traversal.
-	 *
-	 * Make the new root page look like a normal page that's been modified,
-	 * write it out and discard it.  Keep doing that and eventually we'll
-	 * perform a simple replacement (as opposed to another level of split),
-	 * allowing us to can update the tree's root information and quit.  The
-	 * only time we see multiple splits in here is when we've bulk-loaded
-	 * something huge, and now we're evicting the index page referencing all
-	 * of those leaf pages.
-	 */
-	WT_RET(__wt_page_modify_init(session, next));
-	__wt_page_modify_set(next);
-	F_CLR(next->modify, WT_PM_REC_MASK);
-
-	WT_RET(__wt_rec_write(session, next, NULL));
-
-	return (__rec_root_dirty_update(session, next, single));
-}
-
-/*
- * __rec_discard --
- *	Discard any pages merged into an evicted page, then the page itself.
- */
-static int
-__rec_discard(WT_SESSION_IMPL *session, WT_PAGE *page, int single)
+__rec_discard_tree(WT_SESSION_IMPL *session, WT_PAGE *page, int single)
 {
 	WT_REF *ref;
 	uint32_t i;
@@ -298,7 +190,7 @@ __rec_discard(WT_SESSION_IMPL *session, WT_PAGE *page, int single)
 				continue;
 			WT_ASSERT(session,
 			    single || ref->state == WT_REF_LOCKED);
-			WT_RET(__rec_discard(session, ref->page, single));
+			WT_RET(__rec_discard_tree(session, ref->page, single));
 		}
 		/* FALLTHROUGH */
 	default:
@@ -310,44 +202,20 @@ __rec_discard(WT_SESSION_IMPL *session, WT_PAGE *page, int single)
 
 /*
  * __rec_discard_page --
- *	Process the page's list of tracked objects, and discard it.
+ *	Discard the page.
  */
 static int
 __rec_discard_page(WT_SESSION_IMPL *session, WT_PAGE *page, int single)
 {
-	WT_PAGE_MODIFY *mod;
-
-	mod = page->modify;
-
-	/*
-	 * or if the page was split and later merged, discard it.
-	 */
-	if (mod != NULL) {
-		/*
-		 * If the page has been modified and was tracking objects,
-		 * resolve them.
-		 */
-		WT_RET(__wt_rec_track_wrapup(session, page, 1));
-
-		/*
-		 * If the page was split and eventually merged into the parent,
-		 * discard the split page; if the split page was promoted into
-		 * a split-merge page, then the reference must be cleared before
-		 * the page is discarded.
-		 */
-		if (F_ISSET(mod, WT_PM_REC_MASK) == WT_PM_REC_SPLIT &&
-		    mod->u.split != NULL)
-			__wt_page_out(session, mod->u.split, 0);
-	}
-
 	/* We should never evict the file's current eviction point. */
 	WT_ASSERT(session, session->btree->evict_page != page);
 
+	/* Make sure a page is not in the eviction request list. */
 	if (!single)
 		__wt_evict_clr_page(session, page);
 
-	/* Discard the page itself. */
-	__wt_page_out(session, page, 0);
+	/* Discard the page. */
+	__wt_page_out(session, &page, 0);
 
 	return (0);
 }

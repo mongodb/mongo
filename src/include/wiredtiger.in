@@ -142,8 +142,8 @@ struct __wt_item {
  * statistics, configuration data or application-specific data sources.  See
  * WT_SESSION::open_cursor for more information.
  *
- * <b>Thread safety:</b> A WT_CURSOR handle cannot be shared between threads:
- * it may only be used within the same thread as the encapsulating WT_SESSION.
+ * <b>Thread safety:</b> A WT_CURSOR handle is not usually shared between
+ * threads, see @ref threads for more information.
  */
 struct __wt_cursor {
 	WT_SESSION *session;	/*!< The session handle for this cursor. */
@@ -408,9 +408,8 @@ struct __wt_cursor {
  * All data operations are performed in the context of a WT_SESSION.  This
  * encapsulates the thread and transactional context of the operation.
  *
- * <b>Thread safety:</b> A WT_SESSION handle cannot be shared between threads:
- * it may only be used within a single thread.  Each thread accessing a
- * database should open a separate WT_SESSION handle.
+ * <b>Thread safety:</b> A WT_SESSION handle is not usually shared between
+ * threads, see @ref threads for more information.
  */
 struct __wt_session {
 	/*! The connection for this session. */
@@ -514,6 +513,8 @@ struct __wt_session {
 	 * @config{raw, ignore the encodings for the key and value\, manage data
 	 * as if the formats were \c "u".  See @ref cursor_raw for details.,a
 	 * boolean flag; default \c false.}
+	 * @config{snapshot, the name of a snapshot to open.,a string; default
+	 * empty.}
 	 * @config{statistics, configure the cursor for statistics.,a boolean
 	 * flag; default \c false.}
 	 * @configend
@@ -641,6 +642,14 @@ struct __wt_session {
 	 * @configstart{session.drop, see dist/api_data.py}
 	 * @config{force, return success if the object does not exist.,a boolean
 	 * flag; default \c false.}
+	 * @config{snapall, drop all snapshots.,a boolean flag; default \c
+	 * false.}
+	 * @config{snapfrom, drop all snapshots more recent than\, and
+	 * including\, the named snapshot.,a string; default empty.}
+	 * @config{snapshot, the name of a single snapshot to drop.,a string;
+	 * default empty.}
+	 * @config{snapto, drop all snapshots earlier than\, and including\, the
+	 * named snapshot.,a string; default empty.}
 	 * @configend
 	 * @errors
 	 */
@@ -687,18 +696,18 @@ struct __wt_session {
 	int __F(salvage)(WT_SESSION *session,
 	    const char *name, const char *config);
 
-	/*! Sync a file or table.
+	/*! Snapshot a table or file.
 	 *
-	 * Flush dirty pages from a table to stable storage.  Note that not
-	 * all pages are necessarily flushed (pages pinned in memory, or in
-	 * use by other threads of control may not be written until all open
-	 * session handles for the table are closed).
+	 * Flush dirty pages from a table or file to stable storage, creating a
+	 * snapshot (see @ref snapshots for more information).
 	 *
 	 * @snippet ex_all.c session sync
 	 *
 	 * @param session the session handle
 	 * @param name the URI of the file or table to sync
-	 * @configempty{session.sync, see dist/api_data.py}
+	 * @configstart{session.sync, see dist/api_data.py}
+	 * @config{snapshot, name of the snapshot.,a string; default empty.}
+	 * @configend
 	 * @errors
 	 */
 	int __F(sync)(WT_SESSION *session,
@@ -889,6 +898,9 @@ struct __wt_session {
  * the database in its own address space.  Subsequent connections (if allowed)
  * will communicate with the first process over a socket connection to perform
  * their operations.
+ *
+ * <b>Thread safety:</b> A WT_CONNECTION handle may be shared between threads,
+ * see @ref threads for more information.
  */
 struct __wt_connection {
 	/*! Load an extension.
@@ -1081,8 +1093,8 @@ struct __wt_connection {
  * list\, such as <code>"verbose=[evictserver\,read]"</code>.,a list\, with
  * values chosen from the following options: \c "block"\, \c "evict"\, \c
  * "evictserver"\, \c "fileops"\, \c "hazard"\, \c "mutex"\, \c "read"\, \c
- * "readserver"\, \c "reconcile"\, \c "salvage"\, \c "verify"\, \c "write";
- * default empty.}
+ * "readserver"\, \c "reconcile"\, \c "salvage"\, \c "snapshot"\, \c "verify"\,
+ * \c "write"; default empty.}
  * @configend
  * Additionally, if a file named \c WiredTiger.config appears in the WiredTiger
  * home directory, it is read for configuration values (see @ref config_file
@@ -1607,36 +1619,32 @@ extern int wiredtiger_extension_init(WT_SESSION *session,
 #define	WT_STAT_file_maxleafpage			26
 /*! minor version number */
 #define	WT_STAT_file_minor				27
-/*! number of bytes in the freelist */
-#define	WT_STAT_file_freelist_bytes			28
-/*! number of entries in the freelist */
-#define	WT_STAT_file_freelist_entries			29
 /*! overflow pages */
-#define	WT_STAT_file_overflow				30
+#define	WT_STAT_file_overflow				28
 /*! page size allocation unit */
-#define	WT_STAT_file_allocsize				31
+#define	WT_STAT_file_allocsize				29
 /*! reconcile: deleted or temporary pages merged */
-#define	WT_STAT_rec_page_merge				32
+#define	WT_STAT_rec_page_merge				30
 /*! reconcile: internal pages split */
-#define	WT_STAT_rec_split_intl				33
+#define	WT_STAT_rec_split_intl				31
 /*! reconcile: leaf pages split */
-#define	WT_STAT_rec_split_leaf				34
+#define	WT_STAT_rec_split_leaf				32
 /*! reconcile: overflow key */
-#define	WT_STAT_rec_ovfl_key				35
+#define	WT_STAT_rec_ovfl_key				33
 /*! reconcile: overflow value */
-#define	WT_STAT_rec_ovfl_value				36
+#define	WT_STAT_rec_ovfl_value				34
 /*! reconcile: pages deleted */
-#define	WT_STAT_rec_page_delete				37
+#define	WT_STAT_rec_page_delete				35
 /*! reconcile: pages written */
-#define	WT_STAT_rec_written				38
+#define	WT_STAT_rec_written				36
 /*! reconcile: unable to acquire hazard reference */
-#define	WT_STAT_rec_hazard				39
+#define	WT_STAT_rec_hazard				37
 /*! row-store internal pages */
-#define	WT_STAT_file_row_int_pages			40
+#define	WT_STAT_file_row_int_pages			38
 /*! row-store leaf pages */
-#define	WT_STAT_file_row_leaf_pages			41
+#define	WT_STAT_file_row_leaf_pages			39
 /*! total entries */
-#define	WT_STAT_file_entries				42
+#define	WT_STAT_file_entries				40
 /*! @} */
 /*
  * Statistics section: END

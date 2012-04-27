@@ -8,7 +8,6 @@
 /*
  * WiredTiger's block manager interface.
  */
-#define	WT_BM_MAX_ADDR_COOKIE		255	/* Maximum address cookie */
 
 /*
  * The file's description is written into the first 512B of the file, which
@@ -18,21 +17,27 @@
 #define	WT_BLOCK_INVALID_OFFSET		0
 
 /*
- * The block allocator maintains two primary skiplists: first, the by-offset
- * list linking WT_EXT elements and sorted by file offset (low-to-high):
- * this list has an entry for every free chunk in the file.  The second primary
- * skiplist is the by-size list linking WT_SIZE elements and sorted by chunk
- * size (low-to-high).  This list has an entry for every free chunk size seen
- * since the list was created.
- *	Additionally, each WT_SIZE element has a skiplist of its own, linking
- * WT_EXT elements and sorted by file offset (low-to-high).  This list has an
- * entry for every free chunk in the file of a particular size.
+ * The block manager maintains three per-snapshot extent lists:
+ *	alloc:	 the extents allocated in this snapshot
+ *	avail:	 the extents available for allocation
+ *	discard: the extents freed in this snapshot
+ * Each of the extent lists is based on two skiplists: first, a by-offset list
+ * linking WT_EXT elements and sorted by file offset (low-to-high), second, a
+ * by-size list linking WT_SIZE elements and sorted by chunk size (low-to-high).
+ *	Additionally, each WT_SIZE element on the by-size has a skiplist of its
+ * own, linking WT_EXT elements and sorted by file offset (low-to-high).  This
+ * list has an entry for extents of a particular size.
  *	The trickiness is that each individual WT_EXT element appears on two
  * skiplists.  In order to minimize allocation calls, we allocate a single
  * array of WT_EXT pointers at the end of the WT_EXT structure, for both
  * skiplists, and store the depth of the skiplist in the WT_EXT structure.
  * The skiplist entries for the offset skiplist start at WT_EXT.next[0] and
  * the entries for the size skiplist start at WT_EXT.next[WT_EXT.depth].
+ *
+ * XXX
+ * We maintain the per-size skiplists for the alloc and discard extent lists,
+ * but there's no reason for that, the avail list is the only list we search
+ * by size.
  */
 
 /*
@@ -45,8 +50,11 @@ struct __wt_extlist {
 	uint64_t bytes;				/* Byte count */
 	uint32_t entries;			/* Entry count */
 
+	off_t	 offset;			/* Written extent offset */
+	uint32_t cksum, size;			/* Written extent cksum, size */
+
 	WT_EXT	*off[WT_SKIP_MAXDEPTH];		/* Size/offset skiplists */
-	WT_SIZE *size[WT_SKIP_MAXDEPTH];
+	WT_SIZE *sz[WT_SKIP_MAXDEPTH];
 };
 
 /*
@@ -98,6 +106,32 @@ struct __wt_size {
 	    (skip) != NULL; (skip) = (skip)->next[(skip)->depth])
 
 /*
+ * Snapshot cookie: carries a version number as I don't want to rev the schema
+ * file version should the default block manager snapshot format change.
+ *
+ * Version #1 snapshot cookie format:
+ *	[1] [root addr] [alloc addr] [avail addr] [discard addr]
+ *	    [file size] [snapshot size] [write generation]
+ */
+#define	WT_BM_SNAPSHOT_VERSION		1	/* Snapshot format version */
+#define	WT_BLOCK_EXTLIST_MAGIC		71002	/* Identify a list */
+struct __wt_block_snapshot {
+	uint8_t	 version;			/* Version */
+
+	off_t	 root_offset;			/* The root */
+	uint32_t root_cksum, root_size;
+
+	WT_EXTLIST  alloc;			/* Extents allocated */
+	WT_EXTLIST  avail;			/* Extents available */
+	WT_EXTLIST  discard;			/* Extents discarded */
+
+	off_t	 file_size;			/* Snapshot file size */
+	uint64_t snapshot_size;			/* Snapshot contents */
+
+	uint64_t write_gen;			/* Write generation */
+};
+
+/*
  * WT_BLOCK --
  *	Encapsulation of the standard WiredTiger block manager.
  */
@@ -106,31 +140,25 @@ struct __wt_block {
 
 	WT_FH	*fh;			/* Backing file handle */
 
-	uint64_t write_gen;		/* Write generation */
-
 	uint32_t allocsize;		/* Allocation size */
 	int	 checksum;		/* If checksums configured */
 
+	WT_SPINLOCK	  live_lock;	/* Lock to protect the live snapshot. */
+	WT_BLOCK_SNAPSHOT live;		/* Live snapshot */
+	int		  live_load;	/* Live snapshot loaded */
+
 	WT_COMPRESSOR *compressor;	/* Page compressor */
 
-					/* Freelist support */
-	WT_SPINLOCK freelist_lock;	/* Lock to protect the freelist. */
-
-	WT_EXTLIST free;		/* Freelist offset/size skiplists */
-
-	off_t	 free_offset;		/* Freelist file location */
-	uint32_t free_size;
-	uint32_t free_cksum;
-
 					/* Salvage support */
-	off_t	 slvg_off;		/* Salvage file offset */
+	int	slvg;			/* If performing salvage. */
+	off_t	slvg_off;		/* Salvage file offset */
 
-					/* Verification support */
-	uint32_t frags;			/* Total frags */
-	uint8_t *fragbits;		/* Frag tracking bit list */
-
-#define	WT_BLOCK_OK	0x01		/* File successfully opened */
-	uint32_t flags;
+	int	 verify;		/* Verification support */
+	off_t	 verify_size;		/* Snapshot's file size */
+	WT_EXTLIST verify_alloc;	/* Verification allocation list */
+	uint32_t frags;			/* Maximum frags in the file */
+	uint8_t *fragfile;		/* Per-file frag tracking list */
+	uint8_t *fragsnap;		/* Per-snapshot frag tracking list */
 };
 
 /*
@@ -148,19 +176,6 @@ struct __wt_block_desc {
 	uint32_t cksum;			/* 08-11: Description block checksum */
 
 	uint32_t unused;		/* 12-15: Padding */
-#define	WT_BLOCK_EXTLIST_MAGIC	071002
-	uint64_t free_offset;		/* 16-23: Free list page offset */
-	uint32_t free_size;		/* 24-27: Free list page length */
-	uint32_t free_cksum;		/* 28-31: Free list page checksum */
-
-	/*
-	 * We maintain page write-generations in the non-transactional case
-	 * (where, instead of a transactional LSN, the value is a counter),
-	 * as that's how salvage can determine the most recent page between
-	 * pages overlapping the same key range.  The value has to persist,
-	 * so it's included in the file's metadata.
-	 */
-	uint64_t write_gen;		/* 32-39: Write generation */
 };
 /*
  * WT_BLOCK_DESC_SIZE is the expected structure size -- we verify the build to
@@ -168,7 +183,7 @@ struct __wt_block_desc {
  * since we reserve the first sector of the file for this information, but it
  * would be worth investigation, regardless).
  */
-#define	WT_BLOCK_DESC_SIZE		40
+#define	WT_BLOCK_DESC_SIZE		16
 
 /*
  * WT_BLOCK_HEADER --

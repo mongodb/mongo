@@ -11,6 +11,7 @@ src/block/block_mgr.c
 src/block/block_open.c
 src/block/block_read.c
 src/block/block_slvg.c
+src/block/block_snap.c
 src/block/block_vrfy.c
 src/block/block_write.c
 src/btree/bt_bulk.c

@@ -78,7 +78,7 @@ __wt_evict_clr_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_CACHE *cache;
 	WT_EVICT_LIST *evict;
-	int i, elem;
+	uint32_t i, elem;
 
 	WT_ASSERT(session, WT_PAGE_IS_ROOT(page) ||
 	    page->ref->page != page ||
@@ -109,7 +109,7 @@ __wt_evict_clr_page(WT_SESSION_IMPL *session, WT_PAGE *page)
  */
 static inline void
 __evict_req_set(
-    WT_SESSION_IMPL *session, WT_EVICT_REQ *r, WT_PAGE *page, uint32_t flags)
+    WT_SESSION_IMPL *session, WT_EVICT_REQ *r, WT_PAGE *page, int fileop)
 {
 					/* Should be empty */
 	WT_ASSERT(session, r->session == NULL);
@@ -117,7 +117,7 @@ __evict_req_set(
 	WT_CLEAR(*r);
 	r->btree = session->btree;
 	r->page = page;
-	r->flags = flags;
+	r->fileop = fileop;
 
 	/*
 	 * Publish: there must be a barrier to ensure the structure fields are
@@ -169,26 +169,25 @@ __wt_evict_server_wake(WT_SESSION_IMPL *session)
 }
 
 /*
- * __evict_file_serial_func --
+ * __sync_file_serial_func --
  *	Eviction serialization function called when a tree is being flushed
  *	or closed.
  */
 void
-__wt_evict_file_serial_func(WT_SESSION_IMPL *session)
+__wt_sync_file_serial_func(WT_SESSION_IMPL *session)
 {
 	WT_CACHE *cache;
 	WT_EVICT_REQ *er, *er_end;
-	int discard;
+	int fileop;
 
-	__wt_evict_file_unpack(session, &discard);
+	__wt_sync_file_unpack(session, &fileop);
 
 	cache = S2C(session)->cache;
 
 	/* Find an empty slot and enter the eviction request. */
 	WT_EVICT_REQ_FOREACH(er, er_end, cache)
 		if (er->session == NULL) {
-			__evict_req_set(session,
-			    er, NULL, discard ? WT_EVICT_REQ_CLOSE : 0);
+			__evict_req_set(session, er, NULL, fileop);
 			return;
 		}
 
@@ -245,7 +244,7 @@ __wt_evict_page_request(WT_SESSION_IMPL *session, WT_PAGE *page)
 				first = 0;
 				continue;
 			}
-			__evict_req_set(session, er, page, WT_EVICT_REQ_PAGE);
+			__evict_req_set(session, er, page, 0);
 			__wt_evict_server_wake(session);
 			return (0);
 		}
@@ -431,7 +430,21 @@ __evict_request_walk(WT_SESSION_IMPL *session)
 		while (session->btree->lru_count > 0)
 			__wt_yield();
 
-		if (F_ISSET(er, WT_EVICT_REQ_PAGE)) {
+		if (er->page == NULL) {
+			WT_VERBOSE(session, evictserver,
+			    "file request: %s",
+			    (er->fileop == WT_SYNC ? "sync" :
+			    (er->fileop == WT_SYNC_DISCARD ?
+			    "sync-discard" : "sync-discard-nowrite")));
+
+			/*
+			 * If we're about to do a walk of the file tree (and
+			 * possibly close the file), any page we're referencing
+			 * won't be useful; Discard any page we're holding and
+			 * we can restart our walk as needed.
+			 */
+			ret = __evict_file(session, er);
+		} else {
 			WT_VERBOSE(session, evictserver,
 			    "forcing eviction of page %p", er->page);
 
@@ -456,14 +469,6 @@ __evict_request_walk(WT_SESSION_IMPL *session)
 			 * indefinitely leads to deadlock.
 			 */
 			ret = __wt_rec_evict(session, er->page, 0);
-		} else {
-			/*
-			 * If we're about to do a walk of the file tree (and
-			 * possibly close the file), any page we're referencing
-			 * won't be useful; Discard any page we're holding and
-			 * we can restart our walk as needed.
-			 */
-			ret = __evict_file(session, er);
 		}
 
 		__wt_spin_unlock(session, &cache->lru_lock);
@@ -478,7 +483,7 @@ __evict_request_walk(WT_SESSION_IMPL *session)
 		 * Page eviction is special: the requesting thread is already
 		 * inside wrapup.
 		 */
-		if (!F_ISSET(er, WT_EVICT_REQ_PAGE))
+		if (er->page == NULL)
 			__wt_session_serialize_wrapup(
 			    request_session, NULL, ret);
 
@@ -496,10 +501,6 @@ __evict_file(WT_SESSION_IMPL *session, WT_EVICT_REQ *er)
 {
 	WT_PAGE *next_page, *page;
 
-	WT_VERBOSE(session, evictserver,
-	    "file request: %s",
-	   (F_ISSET(er, WT_EVICT_REQ_CLOSE) ? "close" : "sync"));
-
 	/*
 	 * We can't evict the page just returned to us, it marks our place in
 	 * the tree.  So, always stay one page ahead of the page being returned.
@@ -511,32 +512,41 @@ __evict_file(WT_SESSION_IMPL *session, WT_EVICT_REQ *er)
 			break;
 		WT_RET(__wt_tree_np(session, &next_page, 1, 1));
 
-		/*
-		 * Close: discarding all of the file's pages from the cache.
-		 *  Sync: only dirty pages need to be written.
-		 *
-		 * First, write the dirty pages: if we're closing the file, we
-		 * will be evicting all of the pages, and all child pages have
-		 * to be in their final, clean state, to evict the parent.
-		 *
-		 * The specific problem this solves is an empty page, which is
-		 * dirty because new material was added: reconciling it clears
-		 * the empty flag, and then we evict it.
-		 */
-		if (__wt_page_is_modified(page))
-			WT_RET(__wt_rec_write(session, page, NULL));
-		if (!F_ISSET(er, WT_EVICT_REQ_CLOSE))
-			continue;
+		/* Write dirty pages for sync, and sync with discard. */
+		switch (er->fileop) {
+		case WT_SYNC:
+		case WT_SYNC_DISCARD:
+			if (__wt_page_is_modified(page))
+				WT_RET(__wt_rec_write(session, page, NULL));
+			break;
+		case WT_SYNC_DISCARD_NOWRITE:
+			break;
+		}
 
 		/*
-		 * We do not attempt to evict pages expected to be merged into
-		 * their parents, with the single exception that the root page
-		 * can't be merged into anything, it must be written.
+		 * Evict the page for sync with discard, simply discard the page
+		 * for discard alone.
 		 */
-		if (WT_PAGE_IS_ROOT(page) ||
-		    page->modify == NULL || !F_ISSET(page->modify,
-		    WT_PM_REC_EMPTY | WT_PM_REC_SPLIT | WT_PM_REC_SPLIT_MERGE))
-			WT_RET(__wt_rec_evict(session, page, WT_REC_SINGLE));
+		switch (er->fileop) {
+		case WT_SYNC:
+			break;
+		case WT_SYNC_DISCARD:
+			/*
+			 * Do not attempt to evict pages expected to be merged
+			 * into their parents, with the single exception that
+			 * the root page can't be merged into anything, it must
+			 * be written.
+			 */
+			if (WT_PAGE_IS_ROOT(page) || page->modify == NULL ||
+			    !F_ISSET(page->modify, WT_PM_REC_EMPTY |
+			    WT_PM_REC_SPLIT | WT_PM_REC_SPLIT_MERGE))
+				WT_RET(__wt_rec_evict(
+				    session, page, WT_REC_SINGLE));
+			break;
+		case WT_SYNC_DISCARD_NOWRITE:
+			__wt_page_out(session, &page, 0);
+			break;
+		}
 	}
 
 	return (0);
@@ -671,8 +681,8 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 		 *
 		 * Don't skip pages marked WT_PM_REC_EMPTY or SPLIT: updates
 		 * after their last reconciliation may have changed their state
-		 * and only the eviction code can check whether they should
-		 * really be skipped.
+		 * and only the reconciliation/eviction code can confirm if they
+		 * should really be skipped.
 		 */
 		if (WT_PAGE_IS_ROOT(page) ||
 		    page->ref->state != WT_REF_EVICT_WALK ||

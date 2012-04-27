@@ -11,14 +11,12 @@
  * __wt_block_header --
  *	Return the size of the block-specific header.
  */
-int
-__wt_block_header(WT_SESSION_IMPL *session, WT_BLOCK *block, uint32_t *headerp)
+u_int
+__wt_block_header(WT_SESSION_IMPL *session)
 {
 	WT_UNUSED(session);
-	WT_UNUSED(block);
 
-	*headerp = WT_BLOCK_HEADER_SIZE;
-	return (0);
+	return ((u_int)WT_BLOCK_HEADER_SIZE);
 }
 
 /*
@@ -36,11 +34,11 @@ __wt_block_write_size(
 }
 
 /*
- * __wt_block_write_buf --
+ * __wt_block_write --
  *	Write a buffer into a block, returning the block's address cookie.
  */
 int
-__wt_block_write_buf(WT_SESSION_IMPL *session,
+__wt_block_write(WT_SESSION_IMPL *session,
     WT_BLOCK *block, WT_ITEM *buf, uint8_t *addr, uint32_t *addr_size)
 {
 	off_t offset;
@@ -49,7 +47,8 @@ __wt_block_write_buf(WT_SESSION_IMPL *session,
 
 	WT_UNUSED(addr_size);
 
-	WT_RET(__wt_block_write(session, block, buf, &offset, &size, &cksum));
+	WT_RET(__wt_block_write_off(
+	    session, block, buf, &offset, &size, &cksum, 0));
 
 	endp = addr;
 	WT_RET(__wt_block_addr_to_buffer(block, &endp, offset, size, cksum));
@@ -59,13 +58,13 @@ __wt_block_write_buf(WT_SESSION_IMPL *session,
 }
 
 /*
- * __wt_block_write --
+ * __wt_block_write_off --
  *	Write a buffer into a block, returning the block's addr/size and
  * checksum.
  */
 int
-__wt_block_write(WT_SESSION_IMPL *session, WT_BLOCK *block,
-    WT_ITEM *buf, off_t *offsetp, uint32_t *sizep, uint32_t *cksump)
+__wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf,
+    off_t *offsetp, uint32_t *sizep, uint32_t *cksump, int force_extend)
 {
 	WT_BLOCK_HEADER *blk;
 	WT_PAGE_HEADER *dsk;
@@ -94,12 +93,12 @@ __wt_block_write(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	 *
 	 * Diagnostics: verify the disk page: this violates layering, but it's
 	 * the place we can ensure we never write a corrupted page.  Note that
-	 * we are verifying the free-list page, too.  (We created a "page" for
-	 * the free-list, it was simpler than creating another type of object
-	 * in the file.)
+	 * we are verifying the extent list pages, too.  (We created a "page"
+	 * type for the extent lists, it was simpler than creating another type
+	 * of object in the file.)
 	 */
 #ifdef HAVE_DIAGNOSTIC
-	WT_RET(__wt_verify_dsk(session, "[write-check]", buf->mem, buf->size));
+	WT_RET(__wt_verify_dsk(session, "[write-check]", buf));
 #endif
 
 	/*
@@ -208,7 +207,7 @@ not_compressed:	/*
 	 * internal page may not have been written to disk after the leaf page
 	 * was updated.  So, write generations it is.)
 	 */
-	blk->write_gen = ++block->write_gen;
+	blk->write_gen = ++block->live.write_gen;
 
 	blk->disk_size = align_size;
 
@@ -226,8 +225,19 @@ not_compressed:	/*
 	} else
 		blk->cksum = WT_BLOCK_CHECKSUM_NOT_SET;
 
-	/* Allocate space from the underlying file and write the block. */
-	WT_ERR(__wt_block_alloc(session, block, &offset, (off_t)align_size));
+	/*
+	 * Allocate space from the underlying file and write the block.  Always
+	 * extend the file when writing snapshot extents, that's easier than
+	 * distinguishing between extents allocated from the live avail list,
+	 * and those which can't be allocated from the live avail list such as
+	 * blocks for writing the live avail list itself.
+	 */
+	if (force_extend)
+		WT_ERR(__wt_block_extend(
+		    session, block, &offset, (off_t)align_size));
+	else
+		WT_ERR(__wt_block_alloc(
+		    session, block, &offset, (off_t)align_size));
 	WT_ERR(__wt_write(session, block->fh, offset, align_size, dsk));
 
 	WT_BSTAT_INCR(session, page_write);

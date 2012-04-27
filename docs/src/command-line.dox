@@ -68,7 +68,7 @@ which can be re-loaded into a new table using the \c load command.
 See @subpage dump_formats for details of the dump file formats.
 
 @subsection utility_dump_synopsis Synopsis
-<code>wt [-Vv] [-C config] [-h directory] dump [-rx] [-f output] uri</code>
+<code>wt [-Vv] [-C config] [-h directory] dump [-rx] [-f output] [-s snapshot] uri</code>
 
 @subsection utility_dump_options Options
 The following are command-specific options for the \c dump command:
@@ -79,6 +79,10 @@ the \c -f option re-directs the output to the specified file.
 
 @par <code>-r</code>
 Dump in reverse order, from largest to smallest.
+
+@par <code>-s</code>
+By default, the \c dump command opens the most recent snapshot of the object;
+the \c -s option changes the \c dump command to open the named snapshot.
 
 @par <code>-x</code>
 Dump all characters in a hexadecimal encoding (the default is to leave
@@ -109,14 +113,23 @@ file.
 @section utility_read wt list
 List the tables and files in the database.
 
-The \c list command prints out the URIs for tables and files stored in
-the database.
+By default, the \c list command prints out the tables and files stored
+in the database.  If an object name is specified as an argument, only
+information about that object is printed.
 
 @subsection utility_list_synopsis Synopsis
-<code>wt [-Vv] [-C config] [-h directory] list</code>
+<code>wt [-Vv] [-C config] [-h directory] list [-sv] [uri]</code>
 
 @subsection utility_list_options Options
-The \c list command has no command-specific options.
+The following are command-specific options for the \c list command:
+
+@par <code>-s</code>
+If the \c -s option is specified, the object's snapshots are printed
+in a human-readable format.
+
+@par <code>-v</code>
+If the \c -v option is specified, the object's complete schema table
+value is printed.
 
 
 <hr>
@@ -130,7 +143,6 @@ The \c rename command renames the specified table or file.
 
 @subsection utility_rename_options Options
 The \c rename command has no command-specific options.
-
 
 
 <hr>

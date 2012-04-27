@@ -22,17 +22,40 @@ static void __free_update_list(WT_SESSION_IMPL *, WT_UPDATE *);
  *	Discard an in-memory page, freeing all memory associated with it.
  */
 void
-__wt_page_out(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
+__wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep, uint32_t flags)
 {
+	WT_PAGE *page;
+	WT_PAGE_MODIFY *mod;
+
 	/*
 	 * When a page is discarded, it's been disconnected from its parent and
-	 * parent's WT_REF structure may now point to a different page.   Make
-	 * sure we don't use any of that information by accident.
+	 * its parent's WT_REF structure may now point to a different page.
+	 * Make sure we don't accidentally use the page itself or any other
+	 * information.
 	 */
+	page = *pagep;
+	*pagep = NULL;
 	page->parent = NULL;
 	page->ref = NULL;
 
 	WT_ASSERT(session, !F_ISSET_ATOMIC(page, WT_PAGE_EVICT_LRU));
+
+	/*
+	 * If the page split, there may one or more pages linked from the page;
+	 * walk the list, discarding pages.
+	 */
+	if ((mod = page->modify) != NULL) {
+		if (F_ISSET(mod, WT_PM_REC_MASK) == WT_PM_REC_SPLIT)
+			__wt_page_out(session, &mod->u.split, 0);
+
+		/*
+		 * Discard any objects the page was tracking plus associated
+		 * memory.
+		 */
+		__wt_rec_track_discard(session, page);
+		__wt_free(session, mod->track);
+		__wt_free(session, page->modify);
+	}
 
 	/* If not a split merged into its parent, the page must be clean. */
 	WT_ASSERT(session,
@@ -70,11 +93,6 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 
 	if (!LF_ISSET(WT_PAGE_FREE_IGNORE_DISK))	/* Disk image */
 		__wt_free(session, page->dsk);
-
-	if (page->modify != NULL) {			/* WT_PAGE_MODIFY */
-		__wt_free(session, page->modify->track);
-		__wt_free(session, page->modify);
-	}
 
 #ifdef HAVE_DIAGNOSTIC
 	memset(page, WT_DEBUG_BYTE, sizeof(WT_PAGE));

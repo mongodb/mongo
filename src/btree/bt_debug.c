@@ -195,7 +195,7 @@ __wt_debug_addr(
 	ret = 0;
 
 	WT_RET(__wt_scr_alloc(session, size, &buf));
-	WT_ERR(__wt_block_read(
+	WT_ERR(__wt_block_read_off(
 	    session, session->btree->block, buf, addr, size, 0));
 	ret = __wt_debug_disk(session, buf->mem, ofile);
 err:	__wt_scr_free(&buf);
@@ -511,20 +511,26 @@ __debug_page_modify(WT_DBG *ds, WT_PAGE *page)
 	if (mod->track_entries != 0)
 		__dmsg(ds, "\t" "tracking list:\n");
 	for (track = mod->track, i = 0; i < mod->track_entries; ++track, ++i) {
-		switch (track->type) {
-		case WT_PT_BLOCK:
-			__dmsg(ds, "\t\t" "block");
+		if (WT_TRK_TYPE(track) == WT_TRK_EMPTY)
+			continue;
+
+		__dmsg(ds, "\t\t");
+		if (F_ISSET(track, WT_TRK_PERM))
+			__dmsg(ds, "permanent ");
+		switch (WT_TRK_TYPE(track)) {
+		case WT_TRK_DISCARD:
+			__dmsg(ds, "discard");
 			break;
-		case WT_PT_BLOCK_EVICT:
-			__dmsg(ds, "\t\t" "block-evict");
+		case WT_TRK_DISCARD_COMPLETE:
+			__dmsg(ds, "discard-complete");
 			break;
-		case WT_PT_OVFL:
-			__dmsg(ds, "\t\t" "overflow (on)");
+		case WT_TRK_OVFL:
+			__dmsg(ds, "overflow");
 			break;
-		case WT_PT_OVFL_DISCARD:
-			__dmsg(ds, "\t\t" "overflow (off)");
+		case WT_TRK_OVFL_ACTIVE:
+			__dmsg(ds, "overflow-active");
 			break;
-		case WT_PT_EMPTY:
+		case WT_TRK_EMPTY:
 			continue;
 		WT_ILLEGAL_VALUE(session);
 		}

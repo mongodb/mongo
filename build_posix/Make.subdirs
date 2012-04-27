@@ -14,4 +14,5 @@ ext/compressors/nop_compress
 lang/python PYTHON
 test/format HAVE_BDB
 test/salvage
+test/snapshot
 test/thread

@@ -64,6 +64,19 @@ config_setup(void)
 			*cp->v = CONF_RAND(cp);
 	}
 
+	/* Clear operations values if the whole run is read-only. */
+	if (g.c_ops == 0)
+		for (cp = c; cp->name != NULL; ++cp)
+			if (cp->flags & C_OPS)
+				*cp->v = 0;
+
+	/* Multi-threaded runs cannot be replayed. */
+	if (g.replay && g.c_threads != 1) {
+		fprintf(stderr,
+		    "%s: -r is incompatible with threaded runs\n", g.progname);
+		exit(EXIT_FAILURE);
+	}
+
 	/*
 	 * Periodically, set the delete percentage to 0 so salvage gets run,
 	 * as long as the delete percentage isn't nailed down.

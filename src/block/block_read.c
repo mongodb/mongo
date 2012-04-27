@@ -8,46 +8,36 @@
 #include "wt_internal.h"
 
 /*
- * __wt_block_read_buf --
+ * __wt_block_read --
  *	Read filesystem cookie referenced block into a buffer.
  */
 int
-__wt_block_read_buf(WT_SESSION_IMPL *session, WT_BLOCK *block,
+__wt_block_read(WT_SESSION_IMPL *session, WT_BLOCK *block,
     WT_ITEM *buf, const uint8_t *addr, uint32_t addr_size)
 {
-	WT_ITEM *tmp;
 	off_t offset;
 	uint32_t size, cksum;
-	int ret;
-
-	ret = 0;
 
 	/* Crack the cookie. */
 	WT_RET(__wt_block_buffer_to_addr(block, addr, &offset, &size, &cksum));
 
 	/* Read the block. */
-	WT_RET(__wt_block_read(session, block, buf, offset, size, cksum));
+	WT_RET(__wt_block_read_off(session, block, buf, offset, size, cksum));
 
 	/* Optionally verify the page. */
-	if (block->fragbits == NULL)
-		return (0);
+	if (block->verify)
+		WT_RET(__wt_block_verify(
+		    session, block, buf, addr, addr_size, offset, size));
 
-	WT_RET(__wt_scr_alloc(session, 0, &tmp));
-	WT_ERR(__wt_block_addr_string(session, block, tmp, addr, addr_size));
-	WT_ERR(__wt_verify_dsk(
-	    session, (char *)tmp->data, buf->mem, buf->size));
-
-err:	__wt_scr_free(&tmp);
-
-	return (ret);
+	return (0);
 }
 
 /*
- * __wt_block_read --
+ * __wt_block_read_off --
  *	Read an addr/size pair referenced block into a buffer.
  */
 int
-__wt_block_read(WT_SESSION_IMPL *session, WT_BLOCK *block,
+__wt_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
     WT_ITEM *buf, off_t offset, uint32_t size, uint32_t cksum)
 {
 	WT_BLOCK_HEADER *blk;

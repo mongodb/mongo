@@ -7,11 +7,10 @@
 
 #include "wt_internal.h"
 
-static int __btree_conf(WT_SESSION_IMPL *, uint32_t);
+static int __btree_conf(WT_SESSION_IMPL *);
 static int __btree_get_last_recno(WT_SESSION_IMPL *);
 static int __btree_page_sizes(WT_SESSION_IMPL *, const char *);
-static int __btree_root_init_empty(WT_SESSION_IMPL *);
-static int __btree_tree_init(WT_SESSION_IMPL *);
+static int __btree_tree_open_empty(WT_SESSION_IMPL *);
 
 static int pse1(WT_SESSION_IMPL *, const char *, uint32_t, uint32_t);
 static int pse2(WT_SESSION_IMPL *, const char *, uint32_t, uint32_t, uint32_t);
@@ -41,26 +40,51 @@ __wt_btree_truncate(WT_SESSION_IMPL *session, const char *filename)
  *	Open a Btree.
  */
 int
-__wt_btree_open(WT_SESSION_IMPL *session, const char *cfg[], uint32_t flags)
+__wt_btree_open(WT_SESSION_IMPL *session,
+    const char *cfg[], const uint8_t *addr, uint32_t addr_size, int readonly)
 {
 	WT_BTREE *btree;
+	WT_ITEM dsk;
 	int ret;
 
 	btree = session->btree;
+	WT_CLEAR(dsk);
 	ret = 0;
 
 	/* Initialize and configure the WT_BTREE structure. */
-	WT_RET(__btree_conf(session, flags));
+	WT_ERR(__btree_conf(session));
 
-	/* Open the underlying block object. */
-	WT_RET(__wt_bm_open(session, btree->filename,
-	    btree->config, cfg, F_ISSET(btree, WT_BTREE_SALVAGE) ? 1 : 0));
-	WT_RET(__wt_bm_block_header(session, &btree->block_header));
+	/* Connect to the underlying block manager. */
+	WT_ERR(__wt_bm_open(session, btree->filename, btree->config, cfg));
 
-	/* Initialize the tree if not a special command. */
-	if (!F_ISSET(btree,
+	/*
+	 * Open the specified snapshot unless it's a special command (special
+	 * commands are responsible for loading their own snapshots, if any).
+	 */
+	if (F_ISSET(btree,
 	    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY))
-		WT_RET(__btree_tree_init(session));
+		return (0);
+
+	/*
+	 * There are two reasons to load an empty tree rather than a snapshot:
+	 * either there is no snapshot (the file is being created), or the load
+	 * call returns no root page (the snapshot is empty).
+	 */
+	WT_ERR(__wt_bm_snapshot_load(session, &dsk, addr, addr_size, readonly));
+	if (addr == NULL || addr_size == 0 || dsk.size == 0)
+		WT_ERR(__btree_tree_open_empty(session));
+	else {
+		WT_ERR(__wt_btree_tree_open(session, &dsk));
+
+		/* Get the last record number in a column-store file. */
+		if (btree->type != BTREE_ROW)
+			WT_ERR(__btree_get_last_recno(session));
+	}
+
+	if (0) {
+err:		__wt_buf_free(session, &dsk);
+		(void)__wt_btree_close(session);
+	}
 
 	return (ret);
 }
@@ -78,24 +102,15 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 	btree = session->btree;
 	ret = 0;
 
-	/* Clear any cache. */
-	if (btree->root_page != NULL)
-		WT_TRET(__wt_evict_file_serial(session, 1));
-	WT_ASSERT(session, btree->root_page == NULL);
-
-	/* After all pages are evicted, update the root's address. */
-	if (btree->root_update) {
-		/*
-		 * Release the original blocks held by the root, that is,
-		 * the blocks listed in the schema file.
-		 */
-		WT_RET(__wt_btree_free_root(session));
-
-		WT_RET(__wt_btree_set_root(session, btree->filename,
-		    btree->root_addr.addr, btree->root_addr.size));
-		if (btree->root_addr.addr != NULL)
-			__wt_free(session, btree->root_addr.addr);
-		btree->root_update = 0;
+	/*
+	 * Discard the tree and, if the tree is modified, create a new snapshot
+	 * for the underlying object, unless it's a special command.
+	 */
+	if (F_ISSET(btree, WT_BTREE_OPEN) &&
+	    !F_ISSET(btree,
+	    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY)) {
+		ret = __wt_btree_snapshot_close(session);
+		WT_TRET(__wt_bm_snapshot_unload(session));
 	}
 
 	/* Close the underlying block manager reference. */
@@ -103,6 +118,10 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 
 	/* Close the Huffman tree. */
 	__wt_btree_huffman_close(session);
+
+	/* Snapshot lock. */
+	if (btree->snaplock != NULL)
+		(void)__wt_rwlock_destroy(session, btree->snaplock);
 
 	/* Free allocated memory. */
 	__wt_free(session, btree->key_format);
@@ -120,7 +139,7 @@ __wt_btree_close(WT_SESSION_IMPL *session)
  *	Configure a WT_BTREE structure.
  */
 static int
-__btree_conf(WT_SESSION_IMPL *session, uint32_t flags)
+__btree_conf(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
 	WT_CONFIG_ITEM cval;
@@ -180,6 +199,9 @@ __btree_conf(WT_SESSION_IMPL *session, uint32_t flags)
 		}
 	}
 
+	/* Snapshot lock. */
+	WT_RET(__wt_rwlock_alloc(session, "btree snapshot", &btree->snaplock));
+
 	/* Page sizes */
 	WT_RET(__btree_page_sizes(session, config));
 
@@ -188,84 +210,34 @@ __btree_conf(WT_SESSION_IMPL *session, uint32_t flags)
 
 	WT_RET(__wt_stat_alloc_btree_stats(session, &btree->stats));
 
-	/* Take the config string: it will be freed with the btree handle. */
-	btree->config = config;
-
-	/* Set the flags. */
-	btree->flags = flags;
-
 	return (0);
 }
 
 /*
- * __btree_tree_init --
- *	Open the file in the block manager and read the root/last pages.
- */
-static int
-__btree_tree_init(WT_SESSION_IMPL *session)
-{
-	WT_BTREE *btree;
-	WT_ITEM *addr;
-	int ret;
-
-	btree = session->btree;
-	ret = 0;
-
-	WT_RET(__wt_scr_alloc(session, 0, &addr));
-	WT_ERR(__wt_btree_get_root(session, addr));
-
-	/*
-	 * If there's a root page in the file, read it in and pin it.
-	 * If there's no root page, create an empty in-memory page.
-	 */
-	if (addr->data == NULL)
-		WT_ERR(__btree_root_init_empty(session));
-	else
-		WT_ERR(__wt_btree_root_init(session, addr));
-
-	/* Get the last record number in a column-store file. */
-	if (btree->type != BTREE_ROW)
-		WT_ERR(__btree_get_last_recno(session));
-
-err:	__wt_scr_free(&addr);
-
-	return (ret);
-}
-
-/*
- * __wt_btree_root_init --
+ * __wt_btree_tree_open --
  *      Read in a tree from disk.
  */
 int
-__wt_btree_root_init(WT_SESSION_IMPL *session, WT_ITEM *addr)
+__wt_btree_tree_open(WT_SESSION_IMPL *session, WT_ITEM *dsk)
 {
 	WT_BTREE *btree;
-	WT_ITEM tmp;
 	WT_PAGE *page;
-	int ret;
 
 	btree = session->btree;
 
-	/* Read the root into memory. */
-	WT_CLEAR(tmp);
-	WT_RET(__wt_bm_read(session, &tmp, addr->data, addr->size));
-
 	/* Build the in-memory version of the page. */
-	WT_ERR(__wt_page_inmem(session, NULL, NULL, tmp.mem, NULL, &page));
-
+	WT_RET(__wt_page_inmem(session, NULL, NULL, dsk->mem, NULL, &page));
 	btree->root_page = page;
-	return (0);
 
-err:	__wt_buf_free(session, &tmp);
-	return (ret);
+	return (0);
 }
 
 /*
- * __btree_root_init_empty --
+ * __btree_tree_open_empty --
  *      Create an empty in-memory tree.
  */
 static int
-__btree_root_init_empty(WT_SESSION_IMPL *session)
+__btree_tree_open_empty(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
 	WT_PAGE *root, *leaf;
@@ -352,9 +324,9 @@ __btree_root_init_empty(WT_SESSION_IMPL *session)
 	return (0);
 
 err:	if (leaf != NULL)
-		__wt_page_out(session, leaf, 0);
+		__wt_page_out(session, &leaf, 0);
 	if (root != NULL)
-		__wt_page_out(session, root, 0);
+		__wt_page_out(session, &root, 0);
 	return (ret);
 }
 

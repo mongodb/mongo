@@ -26,6 +26,8 @@ struct __wt_stuff {
 	uint32_t   ovfl_next;			/* Next empty slot */
 	size_t     ovfl_allocated;		/* Bytes allocated */
 
+	WT_PAGE	  *root_page;			/* Created root page */
+
 	uint8_t    page_type;			/* Page type */
 
 	/* If need to free blocks backing merged page ranges. */
@@ -137,14 +139,16 @@ int
 __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_BTREE *btree;
+	WT_SNAPSHOT *snapbase;
 	WT_STUFF *ss, stuff;
+	int ret;
 	uint32_t i, leaf_cnt;
-	int ret, started;
 
 	WT_UNUSED(cfg);
 
 	btree = session->btree;
-	ret = started = 0;
+	snapbase = NULL;
+	ret = 0;
 
 	WT_CLEAR(stuff);
 	ss = &stuff;
@@ -160,23 +164,28 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 	 * Step 1:
 	 * Clear the salvaged file's root address, we're done with this file
 	 * until it's salvaged.  We do this first because salvage writes a
-	 * root page when it wraps up, and the eviction of that page updates
-	 * the root's address: if the root address were still set, eviction
-	 * would also free the previous root page, which would collide with
-	 * salvage freeing the previous root page when it reads those blocks
-	 * from the file.
+	 * root page when it wraps up, and the eviction of that page creates
+	 * a snapshot and updates the root's address: if the root address were
+	 * still set, eviction attempt to free the previous root page, which
+	 * would collide with salvage freeing the previous root page when it
+	 * reads those blocks from the file.
 	 */
-	WT_ERR(__wt_btree_set_root(session, btree->filename, NULL, 0));
+	WT_ERR(__wt_session_snap_clear(session, btree->filename));
 
 	/*
 	 * Step 2:
-	 * Inform the underlying block manager that we're salvaging the file.
+	 * Load an empty snapshot, for modification.
 	 */
-	WT_ERR(__wt_bm_salvage_start(session));
-	started = 1;
+	WT_ERR(__wt_bm_snapshot_load(session, NULL, NULL, 0, 0));
 
 	/*
 	 * Step 3:
+	 * Inform the underlying block manager that we're salvaging the file.
+	 */
+	WT_ERR(__wt_bm_salvage_start(session));
+
+	/*
+	 * Step 4:
 	 * Read the file and build in-memory structures that reference any leaf
 	 * or overflow page.  Any pages other than leaf or overflow pages are
 	 * added to the free list.
@@ -190,10 +199,10 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_ERR(ret);
 
 	/*
-	 * Step 4:
+	 * Step 5:
 	 * Review the relationships between the pages and the overflow items.
 	 *
-	 * Step 5:
+	 * Step 6:
 	 * Add unreferenced overflow page blocks to the free list.
 	 */
 	if (ss->ovfl_next != 0) {
@@ -202,7 +211,7 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 	}
 
 	/*
-	 * Step 6:
+	 * Step 7:
 	 * Walk the list of pages looking for overlapping ranges to resolve.
 	 * If we find a range that needs to be resolved, set a global flag
 	 * and a per WT_TRACK flag on the pages requiring modification.
@@ -228,7 +237,7 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 		WT_ERR(__slvg_col_range(session, ss));
 
 	/*
-	 * Step 7:
+	 * Step 8:
 	 * We may have lost key ranges in column-store databases, that is, some
 	 * part of the record number space is gone.   Look for missing ranges.
 	 */
@@ -242,7 +251,7 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 	}
 
 	/*
-	 * Step 8:
+	 * Step 9:
 	 * Build an internal page that references all of the leaf pages,
 	 * and write it, as well as any merged pages, to the file.
 	 *
@@ -266,7 +275,7 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 		}
 
 	/*
-	 * Step 9:
+	 * Step 10:
 	 * If we had to merge key ranges, we have to do a final pass through
 	 * the leaf page array and discard file pages used during key merges.
 	 * We can't do it earlier: if we free'd the leaf pages we're merging as
@@ -281,10 +290,40 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/*
 	 * Step 11:
+	 * Evict the newly created root page, creating a snapshot, and update
+	 * the schema table with the new snapshot's location.
+	 */
+	if (ss->root_page != NULL) {
+		WT_ERR(__wt_session_snap_list_get(session, NULL, &snapbase));
+		WT_ERR(__wt_strdup(
+		    session, WT_INTERNAL_SNAPSHOT, &snapbase[0].name));
+		F_SET(snapbase, WT_SNAP_ADD);
+		btree->snap = snapbase;
+		ret = __wt_rec_evict(session, ss->root_page, WT_REC_SINGLE);
+		ss->root_page = NULL;
+		btree->snap = NULL;
+		if (snapbase[0].raw.data != NULL)
+			WT_ERR(__wt_session_snap_list_set(session, snapbase));
+	}
+
+	/*
+	 * Step 12:
 	 * Inform the underlying block manager that we're done.
 	 */
-err:	if (started)
-		WT_TRET(__wt_bm_salvage_end(session, ret == 0 ? 1 : 0));
+err:	WT_TRET(__wt_bm_salvage_end(session));
+
+	/*
+	 * Step 13:
+	 * Discard the live snapshot.
+	 */
+	WT_TRET(__wt_bm_snapshot_unload(session));
+
+	/* Discard any root page we created. */
+	if (ss->root_page != NULL)
+		__wt_page_out(session, &ss->root_page, 0);
+
+	/* Discard any snapshot information we allocated. */
+	__wt_session_snap_list_free(session, snapbase);
 
 	/* Discard the leaf and overflow page memory. */
 	WT_TRET(__slvg_cleanup(session, ss));
@@ -310,7 +349,7 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 	WT_PAGE_HEADER *dsk;
 	uint64_t gen;
 	uint32_t addrbuf_size;
-	uint8_t addrbuf[WT_BM_MAX_ADDR_COOKIE];
+	uint8_t addrbuf[WT_BTREE_MAX_ADDR_COOKIE];
 	int eof, ret;
 
 	ret = 0;
@@ -343,8 +382,8 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 		 * calls don't need them either.
 		 */
 		switch (dsk->type) {
+		case WT_PAGE_BLOCK_MANAGER:
 		case WT_PAGE_COL_INT:
-		case WT_PAGE_FREELIST:
 		case WT_PAGE_ROW_INT:
 			WT_VERBOSE(session, salvage,
 			    "%s page ignored %s",
@@ -361,8 +400,7 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 		 * see in a corrupted file, like overflow references past the
 		 * end of the file, might as well discard these pages now.
 		 */
-		if (__wt_verify_dsk(session,
-		    (char *)as->data, buf->mem, buf->size) != 0) {
+		if (__wt_verify_dsk(session, (char *)as->data, buf) != 0) {
 			WT_VERBOSE(session, salvage,
 			    "%s page failed verify %s",
 			    __wt_page_type_string(dsk->type), (char *)as->data);
@@ -548,7 +586,7 @@ __slvg_trk_leaf(WT_SESSION_IMPL *session, WT_PAGE_HEADER *dsk,
 err:		__wt_free(session, trk);
 	}
 	if (page != NULL)
-		__wt_page_out(session, page, WT_PAGE_FREE_IGNORE_DISK);
+		__wt_page_out(session, &page, WT_PAGE_FREE_IGNORE_DISK);
 	return (ret);
 }
 
@@ -809,23 +847,21 @@ __slvg_col_range_overlap(
 	 * and:
 	 *
 	 *		BBBBBBBBBBBBBBBBBB
-	 * #7			AAAAAAAAAAAAAAAA	same as #2
-	 * #8	AAAAAAAAAAAAA				same as #3
+	 * #7	AAAAAAAAAAAAA				same as #3
+	 * #8			AAAAAAAAAAAAAAAA	same as #2
 	 * #9		AAAAA				A is a prefix of B
 	 * #10			AAAAAA			A is middle of B
 	 * #11			AAAAAAAAAA		A is a suffix of B
 	 *
 	 * Because the leaf page array was sorted by record number and a_trk
-	 * appears earlier in that array than b_trk, cases #2/7, #10 and #11
+	 * appears earlier in that array than b_trk, cases #2/8, #10 and #11
 	 * are impossible.
 	 *
 	 * Finally, there's one additional complicating factor -- final ranges
 	 * are assigned based on the page's LSN.
 	 */
-	if (a_trk->col_start == b_trk->col_start) {
+	if (a_trk->col_start == b_trk->col_start) {	/* Case #1, #4 and #9 */
 		/*
-		 * Case #1, #4 and #9.
-		 *
 		 * The secondary sort of the leaf page array was the page's LSN,
 		 * in high-to-low order, which means a_trk has a higher LSN, and
 		 * is more desirable, than b_trk.  In cases #1 and #4 and #9,
@@ -851,8 +887,7 @@ __slvg_col_range_overlap(
 		goto merge;
 	}
 
-	if (a_trk->col_stop == b_trk->col_stop) {
-		/* Case #6. */
+	if (a_trk->col_stop == b_trk->col_stop) {	/* Case #6 */
 		if (a_trk->gen > b_trk->gen)
 			/*
 			 * Case #6: a_trk is a superset of b_trk and a_trk is
@@ -869,8 +904,7 @@ __slvg_col_range_overlap(
 		goto merge;
 	}
 
-	if  (a_trk->col_stop < b_trk->col_stop) {
-		/* Case #3/8. */
+	if  (a_trk->col_stop < b_trk->col_stop) {	/* Case #3/7 */
 		if (a_trk->gen > b_trk->gen) {
 			/*
 			 * Case #3/8: a_trk is more desirable, delete a_trk's
@@ -1049,6 +1083,8 @@ __slvg_col_build_internal(
 	uint32_t i;
 	int ret;
 
+	ret = 0;
+
 	/* Allocate a column-store internal page. */
 	WT_RET(__wt_calloc_def(session, 1, &page));
 	WT_ERR(__wt_calloc_def(session, (size_t)leaf_cnt, &page->u.intl.t));
@@ -1092,10 +1128,11 @@ __slvg_col_build_internal(
 		++ref;
 	}
 
-	/* Write the internal page to disk. */
-	return (__wt_rec_evict(session, page, WT_REC_SINGLE));
+	ss->root_page = page;
 
-err:	__wt_page_out(session, page, 0);
+	if (0) {
+err:		__wt_page_out(session, &page, 0);
+	}
 	return (ret);
 }
 
@@ -1348,14 +1385,14 @@ __slvg_row_range_overlap(
 	 * and:
 	 *
 	 *		BBBBBBBBBBBBBBBBBB
-	 * #7			AAAAAAAAAAAAAAAA	same as #2
-	 * #8	AAAAAAAAAAAAA				same as #3
+	 * #7	AAAAAAAAAAAAA				same as #3
+	 * #8			AAAAAAAAAAAAAAAA	same as #2
 	 * #9		AAAAA				A is a prefix of B
 	 * #10			AAAAAA			A is middle of B
 	 * #11			AAAAAAAAAA		A is a suffix of B
 	 *
 	 * Because the leaf page array was sorted by record number and a_trk
-	 * appears earlier in that array than b_trk, cases #2/7, #10 and #11
+	 * appears earlier in that array than b_trk, cases #2/8, #10 and #11
 	 * are impossible.
 	 *
 	 * Finally, there's one additional complicating factor -- final ranges
@@ -1370,10 +1407,8 @@ __slvg_row_range_overlap(
 	__wt_buf_set(session, dst, (src)->data, (src)->size)
 
 	WT_RET(WT_BTREE_CMP(session, btree, A_TRK_START, B_TRK_START, cmp));
-	if (cmp == 0) {
+	if (cmp == 0) {					/* Case #1, #4, #9 */
 		/*
-		 * Case #1, #4 and #9.
-		 *
 		 * The secondary sort of the leaf page array was the page's LSN,
 		 * in high-to-low order, which means a_trk has a higher LSN, and
 		 * is more desirable, than b_trk.  In cases #1 and #4 and #9,
@@ -1402,8 +1437,7 @@ __slvg_row_range_overlap(
 	}
 
 	WT_RET(WT_BTREE_CMP(session, btree, A_TRK_STOP, B_TRK_STOP, cmp));
-	if (cmp == 0) {
-		/* Case #6. */
+	if (cmp == 0) {					/* Case #6 */
 		if (a_trk->gen > b_trk->gen)
 			/*
 			 * Case #6: a_trk is a superset of b_trk and a_trk is
@@ -1421,8 +1455,7 @@ __slvg_row_range_overlap(
 	}
 
 	WT_RET(WT_BTREE_CMP(session, btree, A_TRK_STOP, B_TRK_STOP, cmp));
-	if (cmp < 0) {
-		/* Case #3/8. */
+	if (cmp < 0) {					/* Case #3/7 */
 		if (a_trk->gen > b_trk->gen) {
 			/*
 			 * Case #3/8: a_trk is more desirable, delete a_trk's
@@ -1612,7 +1645,7 @@ __slvg_row_trk_update_start(
 		    sizeof(WT_TRACK *), __slvg_trk_compare_key);
 
 	if (page != NULL)
-		__wt_page_out(session, page, WT_PAGE_FREE_IGNORE_DISK);
+		__wt_page_out(session, &page, WT_PAGE_FREE_IGNORE_DISK);
 
 err:	__wt_scr_free(&dsk);
 	__wt_scr_free(&key);
@@ -1635,6 +1668,8 @@ __slvg_row_build_internal(
 	WT_TRACK *trk;
 	uint32_t i;
 	int ret;
+
+	ret = 0;
 
 	/* Allocate a row-store internal page. */
 	WT_RET(__wt_calloc_def(session, 1, &page));
@@ -1683,10 +1718,11 @@ __slvg_row_build_internal(
 		++ref;
 	}
 
-	/* Write the internal page to disk. */
-	return (__wt_rec_evict(session, page, WT_REC_SINGLE));
+	ss->root_page = page;
 
-err:	__wt_page_out(session, page, 0);
+	if (0) {
+err:		__wt_page_out(session, &page, 0);
+	}
 	return (ret);
 }
 

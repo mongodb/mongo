@@ -7,16 +7,26 @@
 
 #include "util.h"
 
-static int list_print(WT_SESSION *);
+static int list_print(WT_SESSION *, const char *, int, int);
+static int list_print_snapshot(WT_SESSION *, const char *);
 static int usage(void);
 
 int
 util_list(WT_SESSION *session, int argc, char *argv[])
 {
-	int ch;
+	int ch, ret, sflag, vflag;
+	char *name;
 
-	while ((ch = util_getopt(argc, argv, "")) != EOF)
+	sflag = vflag = 0;
+	name = NULL;
+	while ((ch = util_getopt(argc, argv, "sv")) != EOF)
 		switch (ch) {
+		case 's':
+			sflag = 1;
+			break;
+		case 'v':
+			vflag = 1;
+			break;
 		case '?':
 		default:
 			return (usage());
@@ -24,10 +34,24 @@ util_list(WT_SESSION *session, int argc, char *argv[])
 	argc -= util_optind;
 	argv += util_optind;
 
-	if (argc != 0)
+	switch (argc) {
+	case 0:
+		break;
+	case 1:
+		if ((name = util_name(
+		    *argv, "table", UTIL_FILE_OK | UTIL_TABLE_OK)) == NULL)
+			return (1);
+		break;
+	default:
 		return (usage());
+	}
 
-	return (list_print(session));
+	ret = list_print(session, name, sflag, vflag);
+
+	if (name != NULL)
+		free(name);
+
+	return (ret);
 }
 
 /*
@@ -35,11 +59,11 @@ util_list(WT_SESSION *session, int argc, char *argv[])
  *	List the high-level objects in the database.
  */
 static int
-list_print(WT_SESSION *session)
+list_print(WT_SESSION *session, const char *name, int sflag, int vflag)
 {
 	WT_CURSOR *cursor;
 	int ret;
-	const char *key;
+	const char *key, *value;
 
 	ret = 0;
 
@@ -66,13 +90,84 @@ list_print(WT_SESSION *session)
 		if ((ret = cursor->get_key(cursor, &key)) != 0)
 			return (util_cerr("schema", "get_key", ret));
 			
-		/* All we care about are top-level objects (files or tables). */
-		if (MATCH(key, "table:") || MATCH(key, "file:"))
-			printf("%s\n", key);
+		/*
+		 * If no object specified, show top-level objects (files and
+		 * tables).
+		 */
+		if (name == NULL) {
+			if (!MATCH(key, "table:") && !MATCH(key, "file:"))
+				continue;
+		} else
+			if (!MATCH(key, name))
+				continue;
+		printf("%s\n", key);
+		if (!sflag && !vflag)
+			continue;
+		if ((ret = cursor->get_value(cursor, &value)) != 0)
+			return (util_cerr("schema", "get_value", ret));
+		if (sflag && (ret = list_print_snapshot(session, value)) != 0)
+			return (ret);
+		if (vflag)
+			printf("%s\n", value);
+
 	}
 	if (ret != WT_NOTFOUND)
 		return (util_cerr("schema", "next", ret));
 
+	return (0);
+}
+
+/*
+ * list_print_snapshot --
+ *	List the snapshot information.
+ */
+static int
+list_print_snapshot(WT_SESSION *session, const char *config)
+{
+	WT_SNAPSHOT *snap, *snapbase;
+	size_t len;
+	time_t t;
+	uint64_t v;
+	int ret;
+	char buf[256];
+
+	/*
+	 * We may not find any snapshots for this file, in which case we don't
+	 * report an error, and continue our caller's loop.  Otherwise, report
+	 * each snapshot's name and time.
+	 */
+	if ((ret =
+	    __wt_snap_list_get(session, config, &snapbase)) == WT_NOTFOUND)
+		return (0);
+	WT_RET(ret);
+
+	/* Find the longest name, so we can pretty-print. */
+	len = 0;
+	WT_SNAPSHOT_FOREACH(snapbase, snap)
+		if (strlen(snap->name) > len)
+			len = strlen(snap->name);
+	++len;
+
+	WT_SNAPSHOT_FOREACH(snapbase, snap) {
+		t = (time_t)snap->sec;
+		printf("\t%*s: %.24s", (int)len, snap->name, ctime_r(&t, buf));
+
+		v = snap->snapshot_size;
+		if (v >= WT_PETABYTE)
+			printf(" (%" PRIu64 " PB)\n", v / WT_PETABYTE);
+		else if (v >= WT_TERABYTE)
+			printf(" (%" PRIu64 " TB)\n", v / WT_TERABYTE);
+		else if (v >= WT_GIGABYTE)
+			printf(" (%" PRIu64 " GB)\n", v / WT_GIGABYTE);
+		else if (v >= WT_MEGABYTE)
+			printf(" (%" PRIu64 " MB)\n", v / WT_MEGABYTE);
+		else if (v >= WT_KILOBYTE)
+			printf(" (%" PRIu64 " KB)\n", v / WT_KILOBYTE);
+		else
+			printf(" (%" PRIu64 " B)\n", v);
+	}
+
+	__wt_snap_list_free(session, snapbase);
 	return (0);
 }
 
@@ -81,7 +176,7 @@ usage(void)
 {
 	(void)fprintf(stderr,
 	    "usage: %s %s "
-	    "list\n",
+	    "list [-sv] [uri]\n",
 	    progname, usage_prefix);
 	return (1);
 }

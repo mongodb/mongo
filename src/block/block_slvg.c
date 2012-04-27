@@ -17,6 +17,9 @@ __wt_block_salvage_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	off_t len;
 	uint32_t allocsize;
 
+	/* Reset the description sector. */
+	WT_RET(__wt_desc_init(session, block->fh));
+
 	/*
 	 * Truncate the file to an initial sector plus N allocation size
 	 * units (bytes trailing the last multiple of an allocation size
@@ -29,19 +32,24 @@ __wt_block_salvage_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
 		len += WT_BLOCK_DESC_SECTOR;
 		if (len != block->fh->file_size)
 			WT_RET(__wt_ftruncate(session, block->fh, len));
-	}
+	} else
+		len = WT_BLOCK_DESC_SECTOR;
 
-	/* Reset the description sector. */
-	WT_RET(__wt_desc_init(session, block->fh));
-
-	/* The first sector of the file is the description record, skip it. */
+	/*
+	 * The first sector of the file is the description record, skip it as
+	 * we read the file.
+	 */
 	block->slvg_off = WT_BLOCK_DESC_SECTOR;
 
 	/*
-	 * We don't currently need to do anything about the freelist because
-	 * we don't read it for salvage operations.
+	 * The only snapshot extent we care about is the allocation list.  Start
+	 * with the entire file on the allocation list, we'll "free" any blocks
+	 * we don't want as we process the file.
 	 */
+	WT_RET(__wt_block_insert_ext(session, &block->live.alloc,
+	    WT_BLOCK_DESC_SECTOR, len - WT_BLOCK_DESC_SECTOR));
 
+	block->slvg = 1;
 	return (0);
 }
 
@@ -50,16 +58,12 @@ __wt_block_salvage_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
  *	End a file salvage.
  */
 int
-__wt_block_salvage_end(WT_SESSION_IMPL *session, WT_BLOCK *block, int success)
+__wt_block_salvage_end(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
-	/*
-	 * If not successful, discard the free-list, it's not useful, and
-	 * don't write back an updated description block.
-	 */
-	if (!success) {
-		F_CLR(block, WT_BLOCK_OK);
-		__wt_block_discard(session, block);
-	}
+	WT_UNUSED(session);
+
+	block->slvg = 0;
+
 	return (0);
 }
 
@@ -117,7 +121,8 @@ __wt_block_salvage_next(
 		 * needed.  If reading the page fails, it's probably corruption,
 		 * we ignore this block.
 		 */
-		if (__wt_block_read(session, block, buf, offset, size, cksum)) {
+		if (__wt_block_read_off(
+		    session, block, buf, offset, size, cksum)) {
 skip:			WT_VERBOSE(session, salvage,
 			    "skipping %" PRIu32 "B at file offset %" PRIuMAX,
 			    allocsize, (uintmax_t)offset);
@@ -126,8 +131,8 @@ skip:			WT_VERBOSE(session, salvage,
 			 * Free the block and make sure we don't return it more
 			 * than once.
 			 */
-			WT_RET(__wt_block_free(
-			    session, block, offset, (off_t)allocsize));
+			WT_RET(__wt_block_insert_ext(session,
+			    &block->live.discard, offset, (off_t)allocsize));
 			block->slvg_off = offset += allocsize;
 			continue;
 		}
@@ -147,8 +152,8 @@ skip:			WT_VERBOSE(session, salvage,
 	 * writes, done after salvage completes, are preferred to these blocks.
 	 */
 	*write_genp = blk->write_gen;
-	if (block->write_gen < blk->write_gen)
-		block->write_gen = blk->write_gen;
+	if (block->live.write_gen < blk->write_gen)
+		block->live.write_gen = blk->write_gen;
 
 	/* Re-create the address cookie that should reference this block. */
 	endp = addr;

@@ -414,13 +414,21 @@ __wt_cursor_init(WT_CURSOR *cursor,
 	} else
 		cdump = NULL;
 
+	WT_RET(__wt_config_gets(session, cfg, "overwrite", &cval));
+	if (cval.val != 0)
+		F_SET(cursor, WT_CURSTD_OVERWRITE);
+
 	WT_RET(__wt_config_gets(session, cfg, "raw", &cval));
 	if (cval.val != 0)
 		F_SET(cursor, WT_CURSTD_RAW);
 
-	WT_RET(__wt_config_gets(session, cfg, "overwrite", &cval));
-	if (cval.val != 0)
-		F_SET(cursor, WT_CURSTD_OVERWRITE);
+	/* Snapshot cursors are read-only. */
+	WT_RET(__wt_config_gets(session, cfg, "snapshot", &cval));
+	if (cval.len != 0) {
+		cursor->insert = (int (*)(WT_CURSOR *))__wt_cursor_notsup;
+		cursor->update = (int (*)(WT_CURSOR *))__wt_cursor_notsup;
+		cursor->remove = (int (*)(WT_CURSOR *))__wt_cursor_notsup;
+	}
 
 	/*
 	 * Cursors that are internal to some other cursor (such as file cursors
