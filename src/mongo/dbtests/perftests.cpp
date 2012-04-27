@@ -1,3 +1,4 @@
+
 /** @file perftests.cpp.cpp : unit tests relating to performance
 
           The idea herein is tests that run fast and can be part of the normal CI suite.  So no tests herein that take
@@ -901,7 +902,7 @@ namespace PerfTests {
         void prep() {
             {
                 // the checksum code assumes 'standard' rollover on addition overflows. let's check that:
-                unsigned long long x = 0xffffffffffffffffULL;
+                little<unsigned long long> x = 0xffffffffffffffffULL;
                 ASSERT( x+2 == 1 );
             }
 

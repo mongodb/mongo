@@ -151,7 +151,7 @@ namespace mongo {
         /** declares "the next entry(s) are for this database / file path prefix" */
         struct JDbContext {
             JDbContext() : sentinel(JEntry::OpCode_DbContext) { }
-            const unsigned sentinel;   // compare to JEntry::len -- zero is our sentinel
+            const little<unsigned> sentinel;   // compare to JEntry::len -- zero is our sentinel
             //char dbname[];
         };
 

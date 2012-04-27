@@ -290,7 +290,7 @@ namespace mongo {
                 }
             case Date:
                 b.appendUChar(cdate|bits);
-                b.appendStruct(e.date());
+                b.appendNum( ( unsigned long long) e.date());
                 break;
             case String:
                 {
