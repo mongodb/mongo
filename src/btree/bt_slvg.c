@@ -169,7 +169,7 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 	 * would collide with salvage freeing the previous root page when it
 	 * reads those blocks from the file.
 	 */
-	WT_ERR(__wt_session_snap_clear(session, btree->filename));
+	WT_ERR(__wt_snapshot_clear(session, btree->filename));
 
 	/*
 	 * Step 2:
@@ -293,7 +293,7 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 	 * the schema table with the new snapshot's location.
 	 */
 	if (ss->root_page != NULL) {
-		WT_ERR(__wt_session_snap_list_get(session, NULL, &snapbase));
+		WT_ERR(__wt_snapshot_list_get(session, NULL, &snapbase));
 		WT_ERR(__wt_strdup(
 		    session, WT_INTERNAL_SNAPSHOT, &snapbase[0].name));
 		F_SET(snapbase, WT_SNAP_ADD);
@@ -302,7 +302,7 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 		ss->root_page = NULL;
 		btree->snap = NULL;
 		if (snapbase[0].raw.data != NULL)
-			WT_ERR(__wt_session_snap_list_set(session, snapbase));
+			WT_ERR(__wt_snapshot_list_set(session, snapbase));
 	}
 
 	/*
@@ -322,7 +322,7 @@ err:	WT_TRET(__wt_bm_salvage_end(session));
 		__wt_page_out(session, &ss->root_page, 0);
 
 	/* Discard any snapshot information we allocated. */
-	__wt_session_snap_list_free(session, snapbase);
+	__wt_snapshot_list_free(session, snapbase);
 
 	/* Discard the leaf and overflow page memory. */
 	WT_TRET(__slvg_cleanup(session, ss));

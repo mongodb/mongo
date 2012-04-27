@@ -18,11 +18,11 @@ static int __snap_set_turtle(WT_SESSION_IMPL *, const char *);
 static int __snap_version_chk(WT_SESSION_IMPL *, const char *);
 
 /*
- * __wt_session_snap_get --
+ * __wt_snapshot_get --
  *	Get the file's most recent snapshot address.
  */
 int
-__wt_session_snap_get(WT_SESSION_IMPL *session, const char *name, WT_ITEM *addr)
+__wt_snapshot_get(WT_SESSION_IMPL *session, const char *name, WT_ITEM *addr)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
@@ -58,11 +58,11 @@ __wt_session_snap_get(WT_SESSION_IMPL *session, const char *name, WT_ITEM *addr)
 }
 
 /*
- * __wt_session_snap_clear --
+ * __wt_snapshot_clear --
  *	Clear a file's snapshot information.
  */
 int
-__wt_session_snap_clear(WT_SESSION_IMPL *session, const char *filename)
+__wt_snapshot_clear(WT_SESSION_IMPL *session, const char *filename)
 {
 	WT_DECL_RET;
 
@@ -326,19 +326,11 @@ __snap_compare_order(const void *a, const void *b)
 }
 
 /*
- * __wt_snap_list_get, __wt_session_snap_list_get --
+ * __wt_snapshot_list_get --
  *	Load all available snapshot information from a schema-table entry.
  */
 int
-__wt_snap_list_get(
-    WT_SESSION *session, const char *config, WT_SNAPSHOT **snapbasep)
-{
-	WT_SESSION_IMPL *session_impl = (WT_SESSION_IMPL *)session;
-
-	return (__wt_session_snap_list_get(session_impl, config, snapbasep));
-}
-int
-__wt_session_snap_list_get(
+__wt_snapshot_list_get(
     WT_SESSION_IMPL *session, const char *config_arg, WT_SNAPSHOT **snapbasep)
 {
 	WT_BTREE *btree;
@@ -447,7 +439,7 @@ __wt_session_snap_list_get(
 	if (0) {
 format:		WT_ERR_MSG(session, WT_ERROR,
 		    "%s: corrupted snapshot list", btree->filename);
-err:		__wt_session_snap_list_free(session, snapbase);
+err:		__wt_snapshot_list_free(session, snapbase);
 	}
 	if (config != config_arg && config != line)
 		__wt_free(session, config);
@@ -457,11 +449,11 @@ err:		__wt_session_snap_list_free(session, snapbase);
 }
 
 /*
- * __wt_session_snap_list_set --
+ * __wt_snapshot_list_set --
  *	Set a schema-table entry snapshot from the WT_SNAPSHOT list.
  */
 int
-__wt_session_snap_list_set(WT_SESSION_IMPL *session, WT_SNAPSHOT *snapbase)
+__wt_snapshot_list_set(WT_SESSION_IMPL *session, WT_SNAPSHOT *snapbase)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
@@ -524,18 +516,11 @@ err:	__wt_scr_free(&buf);
 }
 
 /*
- * __wt_snap_list_free, __wt_session_snap_list_free --
+ * __wt_snapshot_list_free --
  *	Discard the snapshot array.
  */
 void
-__wt_snap_list_free(WT_SESSION *session, WT_SNAPSHOT *snapbase)
-{
-	WT_SESSION_IMPL *session_impl = (WT_SESSION_IMPL *)session;
-
-	return (__wt_session_snap_list_free(session_impl, snapbase));
-}
-void
-__wt_session_snap_list_free(WT_SESSION_IMPL *session, WT_SNAPSHOT *snapbase)
+__wt_snapshot_list_free(WT_SESSION_IMPL *session, WT_SNAPSHOT *snapbase)
 {
 	WT_SNAPSHOT *snap;
 	if (snapbase == NULL)

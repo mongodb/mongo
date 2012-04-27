@@ -576,6 +576,44 @@ extern int __wt_log_printf(WT_SESSION_IMPL *session,
     2,
     3)));
 extern WT_LOGREC_DESC __wt_logdesc_debug;
+extern int __wt_snaplist_get( WT_SESSION *session,
+    const char *config,
+    WT_SNAPSHOT **snapbasep);
+extern void __wt_snaplist_free(WT_SESSION *session, WT_SNAPSHOT *snapbase);
+extern int __wt_snapshot_get(WT_SESSION_IMPL *session,
+    const char *name,
+    WT_ITEM *addr);
+extern int __wt_snapshot_clear(WT_SESSION_IMPL *session, const char *filename);
+extern int __wt_snapshot_list_get( WT_SESSION_IMPL *session,
+    const char *config_arg,
+    WT_SNAPSHOT **snapbasep);
+extern int __wt_snapshot_list_set(WT_SESSION_IMPL *session,
+    WT_SNAPSHOT *snapbase);
+extern void __wt_snapshot_list_free(WT_SESSION_IMPL *session,
+    WT_SNAPSHOT *snapbase);
+extern int __wt_open_schema_table(WT_SESSION_IMPL *session);
+extern int __wt_schema_table_cursor( WT_SESSION_IMPL *session,
+    const char *config,
+    WT_CURSOR **cursorp);
+extern int __wt_schema_table_insert( WT_SESSION_IMPL *session,
+    const char *key,
+    const char *value);
+extern int __wt_schema_table_update( WT_SESSION_IMPL *session,
+    const char *key,
+    const char *value);
+extern int __wt_schema_table_remove(WT_SESSION_IMPL *session, const char *key);
+extern int __wt_schema_table_read( WT_SESSION_IMPL *session,
+    const char *key,
+    const char **valuep);
+extern int __wt_schema_table_track_on(WT_SESSION_IMPL *session);
+extern int __wt_schema_table_track_off(WT_SESSION_IMPL *session, int unroll);
+extern int __wt_schema_table_track_insert(WT_SESSION_IMPL *session,
+    const char *key);
+extern int __wt_schema_table_track_update(WT_SESSION_IMPL *session,
+    const char *key);
+extern int __wt_schema_table_track_fileop( WT_SESSION_IMPL *session,
+    const char *oldname,
+    const char *newname);
 extern void __wt_abort(WT_SESSION_IMPL *session);
 extern int __wt_calloc(WT_SESSION_IMPL *session,
     size_t number,
@@ -778,29 +816,6 @@ extern int __wt_schema_rename(WT_SESSION_IMPL *session,
     const char *uri,
     const char *newuri,
     const char *cfg[]);
-extern int __wt_open_schema_table(WT_SESSION_IMPL *session);
-extern int __wt_schema_table_cursor( WT_SESSION_IMPL *session,
-    const char *config,
-    WT_CURSOR **cursorp);
-extern int __wt_schema_table_insert( WT_SESSION_IMPL *session,
-    const char *key,
-    const char *value);
-extern int __wt_schema_table_update( WT_SESSION_IMPL *session,
-    const char *key,
-    const char *value);
-extern int __wt_schema_table_remove(WT_SESSION_IMPL *session, const char *key);
-extern int __wt_schema_table_read( WT_SESSION_IMPL *session,
-    const char *key,
-    const char **valuep);
-extern int __wt_schema_table_track_on(WT_SESSION_IMPL *session);
-extern int __wt_schema_table_track_off(WT_SESSION_IMPL *session, int unroll);
-extern int __wt_schema_table_track_insert(WT_SESSION_IMPL *session,
-    const char *key);
-extern int __wt_schema_table_track_update(WT_SESSION_IMPL *session,
-    const char *key);
-extern int __wt_schema_table_track_fileop( WT_SESSION_IMPL *session,
-    const char *oldname,
-    const char *newname);
 extern int __wt_schema_truncate( WT_SESSION_IMPL *session,
     const char *uri,
     const char *cfg[]);
@@ -843,22 +858,6 @@ extern int __wt_session_remove_btree( WT_SESSION_IMPL *session,
     int locked);
 extern int __wt_session_close_any_open_btree(WT_SESSION_IMPL *session,
     const char *name);
-extern int __wt_session_snap_get(WT_SESSION_IMPL *session,
-    const char *name,
-    WT_ITEM *addr);
-extern int __wt_session_snap_clear(WT_SESSION_IMPL *session,
-    const char *filename);
-extern int __wt_snap_list_get( WT_SESSION *session,
-    const char *config,
-    WT_SNAPSHOT **snapbasep);
-extern int __wt_session_snap_list_get( WT_SESSION_IMPL *session,
-    const char *config_arg,
-    WT_SNAPSHOT **snapbasep);
-extern int __wt_session_snap_list_set(WT_SESSION_IMPL *session,
-    WT_SNAPSHOT *snapbase);
-extern void __wt_snap_list_free(WT_SESSION *session, WT_SNAPSHOT *snapbase);
-extern void __wt_session_snap_list_free(WT_SESSION_IMPL *session,
-    WT_SNAPSHOT *snapbase);
 extern void __wt_eventv(WT_SESSION_IMPL *session,
     int msg_event,
     int error,

@@ -438,6 +438,7 @@ slvg
 snapall
 snapfrag
 snapfrom
+snaplist
 snapto
 snprintf
 sp

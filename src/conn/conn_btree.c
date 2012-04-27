@@ -172,7 +172,7 @@ conf:	session->btree = btree;
 	btree->flags = flags;
 
 	WT_ERR(__wt_scr_alloc(session, WT_BTREE_MAX_ADDR_COOKIE, &addr));
-	WT_ERR(__wt_session_snap_get(session, snapshot, addr));
+	WT_ERR(__wt_snapshot_get(session, snapshot, addr));
 	WT_ERR(__wt_btree_open(
 	    session, cfg, addr->data, addr->size, snapshot == NULL ? 0 : 1));
 	F_SET(btree, WT_BTREE_OPEN);
@@ -332,7 +332,7 @@ __wt_conn_btree_reopen(
 	}
 
 	WT_RET(__wt_scr_alloc(session, WT_BTREE_MAX_ADDR_COOKIE, &addr));
-	WT_ERR(__wt_session_snap_get(session, NULL, addr));
+	WT_ERR(__wt_snapshot_get(session, NULL, addr));
 	btree->flags = flags;
 	WT_ERR(__wt_btree_open(session, cfg, addr->data, addr->size, 0));
 	F_SET(btree, WT_BTREE_OPEN);

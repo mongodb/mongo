@@ -136,7 +136,7 @@ list_print_snapshot(WT_SESSION *session, const char *config)
 	 * each snapshot's name and time.
 	 */
 	if ((ret =
-	    __wt_snap_list_get(session, config, &snapbase)) == WT_NOTFOUND)
+	    __wt_snaplist_get(session, config, &snapbase)) == WT_NOTFOUND)
 		return (0);
 	WT_RET(ret);
 
@@ -166,7 +166,7 @@ list_print_snapshot(WT_SESSION *session, const char *config)
 			printf(" (%" PRIu64 " B)\n", v);
 	}
 
-	__wt_snap_list_free(session, snapbase);
+	__wt_snaplist_free(session, snapbase);
 	return (0);
 }
 
