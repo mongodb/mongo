@@ -31,4 +31,3 @@ __wt_snaplist_free(WT_SESSION *session, WT_SNAPSHOT *snapbase)
 
 	return (__wt_snapshot_list_free(session_impl, snapbase));
 }
-
