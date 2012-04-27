@@ -34,6 +34,7 @@
 #include "../util/net/message_port.h"
 #include "../util/concurrency/rwlock.h"
 #include "d_concurrency.h"
+#include "mongo/db/lockstate.h"
 #include "mongo/util/paths.h"
 
 namespace mongo {
@@ -56,8 +57,6 @@ namespace mongo {
     class Client : public ClientBasic {
         static Client *syncThread;
     public:
-        LockState _ls;
-
         // always be in clientsMutex when manipulating this. killop stuff uses these.
         static set<Client*>& clients;
         static mongo::mutex& clientsMutex;
@@ -127,6 +126,8 @@ namespace mongo {
         
         bool allowedToThrowPageFaultException() const;
 
+        LockState& lockState() { return _ls; }
+
     private:
         Client(const char *desc, AbstractMessagingPort *p = 0);
         friend class CurOp;
@@ -146,6 +147,8 @@ namespace mongo {
 
         bool _hasWrittenThisPass;
         PageFaultRetryableSection *_pageFaultRetryableSection;
+
+        LockState _ls;
         
         friend class PageFaultRetryableSection; // TEMP
     public:
