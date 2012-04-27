@@ -90,7 +90,9 @@ namespace mongo {
     }
 
     void ShardingConnectionHook::onHandedOut( DBClientBase * conn ) {
-        ClientInfo::get()->addShard( conn->getServerAddress() );
+        if( _shardedConnections ){
+            ClientInfo::get()->addShard( conn->getServerAddress() );
+        }
     }
 
     class ShardedMessageHandler : public MessageHandler {
