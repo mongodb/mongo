@@ -36,7 +36,7 @@ namespace mongo {
             CpuProfilerCommand( char const *name ) : Command( name ) {}
             virtual bool slaveOk() const { return true; }
             virtual bool adminOnly() const { return true; }
-            virtual bool localHostOnlyIfNoAuth() const { return true; }
+            virtual bool localHostOnlyIfNoAuth( const BSONObj& cmdObj ) { return true; }
 
             // This is an abuse of the global dbmutex.  We only really need to
             // ensure that only one cpuprofiler command runs at once; it would
