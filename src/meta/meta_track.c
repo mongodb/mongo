@@ -107,8 +107,9 @@ __wt_meta_track_off(WT_SESSION_IMPL *session, int unroll)
 				 * For removes, b is NULL.
 				 */
 				if (trk->a != NULL && trk->b != NULL &&
-				    (tret = __wt_rename(
-				    session, trk->b, trk->a)) != 0) {
+				    (tret = __wt_rename(session,
+				    trk->b + strlen("file:"),
+				    trk->a + strlen("file:"))) != 0) {
 					__wt_err(session, tret,
 					    "metadata unroll rename "
 					    "%s to %s",
@@ -116,8 +117,9 @@ __wt_meta_track_off(WT_SESSION_IMPL *session, int unroll)
 					WT_TRET(tret);
 				} else if (trk->a == NULL &&
 				    ((tret = __wt_session_close_any_open_btree(
-				    session, trk->b)) != 0 || (tret =
-				    __wt_remove(session, trk->b)) != 0)) {
+				    session, trk->b)) != 0 ||
+				    (tret = __wt_remove(session,
+				    trk->b + strlen("file:"))) != 0)) {
 					__wt_err(session, tret,
 					    "metadata unroll create %s",
 					    trk->b);
@@ -210,16 +212,16 @@ __wt_meta_track_update(WT_SESSION_IMPL *session, const char *key)
  */
 int
 __wt_meta_track_fileop(
-    WT_SESSION_IMPL *session, const char *oldname, const char *newname)
+    WT_SESSION_IMPL *session, const char *olduri, const char *newuri)
 {
 	WT_META_TRACK *trk;
 
 	WT_RET(__meta_track_next(session, &trk));
 
 	trk->op = WT_ST_FILEOP;
-	if (oldname != NULL)
-		WT_RET(__wt_strdup(session, oldname, &trk->a));
-	if (newname != NULL)
-		WT_RET(__wt_strdup(session, newname, &trk->b));
+	if (olduri != NULL)
+		WT_RET(__wt_strdup(session, olduri, &trk->a));
+	if (newuri != NULL)
+		WT_RET(__wt_strdup(session, newuri, &trk->b));
 	return (0);
 }

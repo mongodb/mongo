@@ -104,7 +104,7 @@ __verify_int(WT_SESSION_IMPL *session, int dumpfile)
 	/* Loop through the file's snapshots, verifying each one. */
 	WT_SNAPSHOT_FOREACH(snapbase, snap) {
 		WT_VERBOSE(session, verify,
-		    "%s: snapshot %s", btree->filename, snap->name);
+		    "%s: snapshot %s", btree->name, snap->name);
 
 		/* House-keeping between snapshots. */
 		__verify_snapshot_reset(vs);

@@ -19,12 +19,12 @@ __wt_open_metadata(WT_SESSION_IMPL *session)
 	WT_DECL_RET;
 	int tracking;
 	const char *cfg[] = API_CONF_DEFAULTS(file, meta, metafile_config);
-	const char *metadata;
+	const char *metaconf;
 
 	if (session->metafile != NULL)
 		return (0);
 
-	WT_RET(__wt_config_collapse(session, cfg, &metadata));
+	WT_RET(__wt_config_collapse(session, cfg, &metaconf));
 
 	/*
 	 * Turn off tracking when creating the metadata file: this is always
@@ -33,10 +33,9 @@ __wt_open_metadata(WT_SESSION_IMPL *session)
 	tracking = (session->meta_track != NULL);
 	if (tracking)
 		__wt_meta_track_off(session, 0);
-	WT_ERR(__wt_create_file(session,
-	    WT_METADATA_URI, WT_METADATA_URI, 0, metadata));
+	WT_ERR(__wt_create_file(session, WT_METADATA_URI, 0, metaconf));
 	session->metafile = session->btree;
-err:	__wt_free(session, metadata);
+err:	__wt_free(session, metaconf);
 	if (tracking)
 		WT_TRET(__wt_meta_track_on(session));
 	return (ret);

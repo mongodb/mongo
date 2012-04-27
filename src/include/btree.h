@@ -70,8 +70,7 @@ struct __wt_btree {
 
 	volatile uint32_t lru_count;	/* Count of threads in LRU eviction. */
 
-	const char *name;		/* Logical name */
-	const char *filename;		/* File name */
+	const char *name;		/* Object name as a URI */
 	const char *config;		/* Configuration string */
 
 	enum {	BTREE_COL_FIX=1,	/* Fixed-length column store */

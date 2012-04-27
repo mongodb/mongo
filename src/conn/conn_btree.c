@@ -14,7 +14,7 @@
  */
 int
 __wt_conn_btree_open(WT_SESSION_IMPL *session,
-    const char *name, const char *filename, const char *config,
+    const char *name, const char *config,
     const char *cfg[], uint32_t flags)
 {
 	WT_BTREE *btree;
@@ -128,7 +128,7 @@ __wt_conn_btree_open(WT_SESSION_IMPL *session,
 	 * connection layer owns:
 	 *	the WT_BTREE structure itself
 	 *	the structure lock
-	 *	the structure names
+	 *	the structure name
 	 *	the structure configuration string
 	 *	the WT_BTREE_OPEN flag
 	 */
@@ -136,8 +136,7 @@ __wt_conn_btree_open(WT_SESSION_IMPL *session,
 	if ((ret = __wt_calloc_def(session, 1, &btree)) == 0 &&
 	    (ret = __wt_rwlock_alloc(
 		session, "btree handle", &btree->rwlock)) == 0 &&
-	    (ret = __wt_strdup(session, name, &btree->name)) == 0 &&
-	    (ret = __wt_strdup(session, filename, &btree->filename)) == 0) {
+	    (ret = __wt_strdup(session, name, &btree->name)) == 0) {
 		/* Lock the handle before it is inserted in the list. */
 		__wt_writelock(session, btree->rwlock);
 
@@ -153,7 +152,6 @@ __wt_conn_btree_open(WT_SESSION_IMPL *session,
 			if (btree->rwlock != NULL)
 				(void)__wt_rwlock_destroy(
 				    session, btree->rwlock);
-			__wt_free(session, btree->filename);
 			__wt_free(session, btree->name);
 			__wt_free(session, btree);
 			__wt_free(session, config);
@@ -245,7 +243,6 @@ __conn_btree_remove(WT_SESSION_IMPL *session, WT_BTREE *btree)
 		WT_CLEAR_BTREE_IN_SESSION(session);
 	}
 	WT_TRET(__wt_rwlock_destroy(session, btree->rwlock));
-	__wt_free(session, btree->filename);
 	__wt_free(session, btree->name);
 	__wt_free(session, btree->config);
 	__wt_free(session, btree);
@@ -280,7 +277,7 @@ __wt_conn_btree_remove(WT_CONNECTION_IMPL *conn)
 	 */
 restart:
 	TAILQ_FOREACH(btree, &conn->btqh, q) {
-		if (strcmp(btree->filename, WT_METADATA_FILENAME) == 0)
+		if (strcmp(btree->name, WT_METADATA_URI) == 0)
 			continue;
 
 		TAILQ_REMOVE(&conn->btqh, btree, q);

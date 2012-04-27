@@ -9,7 +9,7 @@
 
 int
 __wt_create_file(WT_SESSION_IMPL *session,
-    const char *name, const char *fileuri, int exclusive, const char *config)
+    const char *name, int exclusive, const char *config)
 {
 	WT_ITEM *val;
 	WT_DECL_RET;
@@ -21,19 +21,19 @@ __wt_create_file(WT_SESSION_IMPL *session,
 	val = NULL;
 	treeconf = NULL;
 
-	filename = fileuri;
+	filename = name;
 	if (!WT_PREFIX_SKIP(filename, "file:"))
 		WT_RET_MSG(
-		    session, EINVAL, "Expecting a 'file:' URI: %s", fileuri);
+		    session, EINVAL, "Expecting a 'file:' URI: %s", name);
 
 	/*
 	 * Opening the metadata file is a special case, use the config
 	 * string we were passed to open the file.
 	 */
-	is_metadata = (strcmp(filename, WT_METADATA_FILENAME) == 0);
+	is_metadata = (strcmp(name, WT_METADATA_URI) == 0);
 
 	/* If the file exists, don't try to recreate it. */
-	if ((ret = __wt_session_get_btree(session, name, fileuri,
+	if ((ret = __wt_session_get_btree(session, name,
 	    is_metadata ? config : NULL,
 	    NULL, WT_BTREE_NO_LOCK)) != WT_NOTFOUND) {
 		if (ret == 0 && exclusive)
@@ -42,7 +42,7 @@ __wt_create_file(WT_SESSION_IMPL *session,
 	}
 
 	WT_RET(__wt_btree_create(session, filename));
-	WT_ERR(__wt_meta_track_fileop(session, NULL, filename));
+	WT_ERR(__wt_meta_track_fileop(session, NULL, name));
 
 	/* Insert WiredTiger version numbers into the metadata file. */
 	WT_ERR(__wt_scr_alloc(session, 0, &val));
@@ -69,14 +69,14 @@ __wt_create_file(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_strdup(session, config, &treeconf));
 	else
 		WT_ERR(__wt_config_collapse(session, filecfg, &treeconf));
-	WT_ERR(__wt_metadata_insert(session, fileuri, treeconf));
+	WT_ERR(__wt_metadata_insert(session, name, treeconf));
 
 	/*
 	 * Call the underlying connection function to allocate a WT_BTREE handle
 	 * and open the underlying file (note we no longer own the configuration
 	 * string after that call).
 	 */
-	ret = __wt_conn_btree_open(session, name, filename, treeconf, cfg, 0);
+	ret = __wt_conn_btree_open(session, name, treeconf, cfg, 0);
 	treeconf = NULL;
 	WT_ERR(ret);
 	WT_ERR(__wt_session_add_btree(session, NULL));
@@ -181,7 +181,7 @@ __create_colgroup(WT_SESSION_IMPL *session,
 			ret = exclusive ? EEXIST : 0;
 		goto err;
 	}
-	WT_ERR(__wt_create_file(session, name, fileuri, exclusive, fileconf));
+	WT_ERR(__wt_create_file(session, fileuri, exclusive, fileconf));
 
 	WT_ERR(__wt_schema_open_colgroups(session, table));
 
@@ -291,7 +291,7 @@ __create_index(WT_SESSION_IMPL *session,
 			ret = exclusive ? EEXIST : 0;
 		goto err;
 	}
-	WT_ERR(__wt_create_file(session, name, fileuri, exclusive, fileconf));
+	WT_ERR(__wt_create_file(session, fileuri, exclusive, fileconf));
 
 err:	__wt_free(session, fileconf);
 	__wt_free(session, idxconf);
@@ -390,7 +390,7 @@ __wt_schema_create(
 	if (WT_PREFIX_MATCH(name, "colgroup:"))
 		ret = __create_colgroup(session, name, exclusive, config);
 	else if (WT_PREFIX_MATCH(name, "file:"))
-		ret = __wt_create_file(session, name, name, exclusive, config);
+		ret = __wt_create_file(session, name, exclusive, config);
 	else if (WT_PREFIX_MATCH(name, "index:"))
 		ret = __create_index(session, name, exclusive, config);
 	else if (WT_PREFIX_MATCH(name, "table:"))

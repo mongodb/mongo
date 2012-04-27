@@ -29,6 +29,9 @@ struct __wt_table {
 	WT_BTREE **index;
 	size_t index_alloc;
 
+	const char **cg_name, **idx_name;
+	size_t idx_name_alloc;
+
 	TAILQ_ENTRY(__wt_table) q;
 
 	int cg_complete, idx_complete, is_simple;

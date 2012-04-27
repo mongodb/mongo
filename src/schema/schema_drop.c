@@ -23,7 +23,7 @@ __drop_file(WT_SESSION_IMPL *session, const char *uri, int force)
 		return (EINVAL);
 
 	/* If open, close the btree handle. */
-	WT_RET(__wt_session_close_any_open_btree(session, filename));
+	WT_RET(__wt_session_close_any_open_btree(session, uri));
 
 	/* Remove the metadata entry (ignore missing items). */
 	WT_TRET(__wt_metadata_remove(session, uri));
@@ -44,23 +44,27 @@ __drop_file(WT_SESSION_IMPL *session, const char *uri, int force)
  *	Drop an index or colgroup reference.
  */
 static int
-__drop_tree(WT_SESSION_IMPL *session, WT_BTREE *btree, int force)
+__drop_tree(
+    WT_SESSION_IMPL *session, WT_BTREE *btree, const char *uri, int force)
 {
 	WT_DECL_RET;
 	WT_ITEM *buf;
 
+	buf = NULL;
+
 	/* Remove the metadata entry (ignore missing items). */
-	WT_TRET(__wt_metadata_remove(session, btree->name));
+	WT_TRET(__wt_metadata_remove(session, uri));
 	if (force && ret == WT_NOTFOUND)
 		ret = 0;
 
 	/*
 	 * Drop the file.
 	 * __drop_file closes the WT_BTREE handle, so we copy the
-	 * WT_BTREE->filename field to make a URI.
+	 * WT_BTREE->name field to save the URI.
 	 */
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));
-	WT_ERR(__wt_buf_fmt(session, buf, "file:%s", btree->filename));
+	WT_ERR(__wt_buf_set(
+	    session, buf, btree->name, strlen(btree->name) + 1));
 	WT_ERR(__drop_file(session, buf->data, force));
 
 err:	__wt_scr_free(&buf);
@@ -122,7 +126,7 @@ __drop_colgroup(
 	} else if (ret != WT_NOTFOUND)
 		WT_TRET(ret);
 
-	WT_TRET(__drop_tree(session, btree, force));
+	WT_TRET(__drop_tree(session, btree, uri, force));
 
 	return (ret);
 }
@@ -178,7 +182,7 @@ __drop_index(
 	} else if (ret != WT_NOTFOUND)
 		WT_TRET(ret);
 
-	WT_TRET(__drop_tree(session, btree, force));
+	WT_TRET(__drop_tree(session, btree, uri, force));
 
 	return (ret);
 }
@@ -206,7 +210,7 @@ __drop_table(WT_SESSION_IMPL *session, const char *uri, int force)
 		if ((btree = table->colgroup[i]) == NULL)
 			continue;
 		table->colgroup[i] = NULL;
-		WT_TRET(__drop_tree(session, btree, force));
+		WT_TRET(__drop_tree(session, btree, table->cg_name[i], force));
 	}
 
 	/* Drop the indices. */
@@ -214,7 +218,7 @@ __drop_table(WT_SESSION_IMPL *session, const char *uri, int force)
 	for (i = 0; i < table->nindices; i++) {
 		btree = table->index[i];
 		table->index[i] = NULL;
-		WT_TRET(__drop_tree(session, btree, force));
+		WT_TRET(__drop_tree(session, btree, table->idx_name[i], force));
 	}
 
 	WT_TRET(__wt_schema_remove_table(session, table));

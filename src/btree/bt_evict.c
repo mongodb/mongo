@@ -778,7 +778,7 @@ __evict_get_page(
 
 		/* Move to the next item. */
 		++cache->evict_current;
- 
+
 		/*
 		 * In case something goes wrong, don't pick the same set of
 		 * pages every time.

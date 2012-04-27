@@ -104,7 +104,7 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
  */
 int
 __wt_session_find_btree(WT_SESSION_IMPL *session,
-    const char *filename, size_t namelen, const char *cfg[], uint32_t flags,
+    const char *uri, size_t urilen, const char *cfg[], uint32_t flags,
     WT_BTREE_SESSION **btree_sessionp)
 {
 	WT_BTREE *btree;
@@ -112,8 +112,8 @@ __wt_session_find_btree(WT_SESSION_IMPL *session,
 
 	TAILQ_FOREACH(btree_session, &session->btrees, q) {
 		btree = btree_session->btree;
-		if (strncmp(filename, btree->filename, namelen) == 0 &&
-		    btree->filename[namelen] == '\0') {
+		if (strncmp(uri, btree->name, urilen) == 0 &&
+		    btree->name[urilen] == '\0') {
 			if (btree_sessionp != NULL)
 				*btree_sessionp = btree_session;
 			session->btree = btree;
@@ -130,21 +130,20 @@ __wt_session_find_btree(WT_SESSION_IMPL *session,
  */
 int
 __wt_session_get_btree(WT_SESSION_IMPL *session,
-    const char *name, const char *fileuri, const char *tconfig,
-    const char *cfg[], uint32_t flags)
+    const char *uri, const char *tconfig, const char *cfg[], uint32_t flags)
 {
 	WT_BTREE_SESSION *btree_session;
 	WT_DECL_RET;
 	int exist;
 	const char *filename, *treeconf;
 
-	filename = fileuri;
+	filename = uri;
 	if (!WT_PREFIX_SKIP(filename, "file:"))
 		WT_RET_MSG(
-		    session, EINVAL, "Expected a 'file:' URI: %s", fileuri);
+		    session, EINVAL, "Expected a 'file:' URI: %s", uri);
 
 	if ((ret = __wt_session_find_btree(session,
-	    filename, strlen(filename), cfg, flags, &btree_session)) == 0) {
+	    uri, strlen(uri), cfg, flags, &btree_session)) == 0) {
 		WT_ASSERT(session, btree_session->btree != NULL);
 		session->btree = btree_session->btree;
 		return (0);
@@ -163,9 +162,8 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 	if (tconfig != NULL)
 		WT_RET(__wt_strdup(session, tconfig, &treeconf));
 	else
-		WT_RET(__wt_metadata_read(session, fileuri, &treeconf));
-	WT_RET(__wt_conn_btree_open(
-	    session, name, filename, treeconf, cfg, flags));
+		WT_RET(__wt_metadata_read(session, uri, &treeconf));
+	WT_RET(__wt_conn_btree_open(session, uri, treeconf, cfg, flags));
 	WT_RET(__wt_session_lock_btree(session, cfg, flags));
 	WT_RET(__wt_session_add_btree(session, NULL));
 
