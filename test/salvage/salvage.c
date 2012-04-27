@@ -551,7 +551,7 @@ copy(u_int gen, u_int recno)
 	if (gen != 0) {
 		assert(fseek(ifp, (long)512, SEEK_SET) == 0);
 		assert(fread(buf, 1, PSIZE, ifp) == PSIZE);
-		dsk = (WT_PAGE_HEADER *)buf;
+		dsk = (void *)buf;
 		if (page_type != WT_PAGE_ROW_LEAF)
 			dsk->recno = recno;
 		blk = WT_BLOCK_HEADER_REF(buf);

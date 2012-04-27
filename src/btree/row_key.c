@@ -393,7 +393,7 @@ __wt_row_value(WT_PAGE *page, WT_ROW *rip)
  */
 int
 __wt_row_ikey_alloc(WT_SESSION_IMPL *session,
-    uint32_t cell_offset, const void *key, uint32_t size, WT_IKEY **ikeyp)
+    uint32_t cell_offset, const void *key, uint32_t size, void *ikeyp)
 {
 	WT_IKEY *ikey;
 
@@ -406,7 +406,7 @@ __wt_row_ikey_alloc(WT_SESSION_IMPL *session,
 	ikey->cell_offset = cell_offset;
 	memcpy(WT_IKEY_DATA(ikey), key, size);
 
-	*ikeyp = ikey;
+	*(WT_IKEY **)ikeyp = ikey;
 	return (0);
 }
 

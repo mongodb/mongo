@@ -297,8 +297,7 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session)
 		ref->page = leaf;
 		ref->addr = NULL;
 		ref->state = WT_REF_MEM;
-		WT_ERR(__wt_row_ikey_alloc(
-		    session, 0, "", 1, (WT_IKEY **)&(ref->u.key)));
+		WT_ERR(__wt_row_ikey_alloc(session, 0, "", 1, &ref->u.key));
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}

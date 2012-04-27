@@ -398,7 +398,7 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 		 */
 		WT_ERR(__wt_row_ikey_alloc(session,
 		    WT_PAGE_DISK_OFFSET(page, cell),
-		    current->data, current->size, (WT_IKEY **)&ref->u.key));
+		    current->data, current->size, &ref->u.key));
 		if (inmem_sizep != NULL)
 			*inmem_sizep += sizeof(WT_IKEY) + current->size;
 

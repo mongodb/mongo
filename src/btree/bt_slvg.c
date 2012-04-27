@@ -1707,7 +1707,7 @@ __slvg_row_build_internal(
 			WT_ERR(__wt_row_ikey_alloc(session, 0,
 			    trk->row_start.data,
 			    trk->row_start.size,
-			    (WT_IKEY **)&ref->u.key));
+			    &ref->u.key));
 		++ref;
 	}
 
@@ -1846,11 +1846,11 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 	if (__wt_off_page(page, rip->key)) {
 		ikey = rip->key;
 		WT_ERR(__wt_row_ikey_alloc(session, 0,
-		    WT_IKEY_DATA(ikey), ikey->size, (WT_IKEY **)&ref->u.key));
+		    WT_IKEY_DATA(ikey), ikey->size, &ref->u.key));
 	} else {
 		WT_ERR(__wt_row_key(session, page, rip, key));
 		WT_ERR(__wt_row_ikey_alloc(session, 0,
-		    key->data, key->size, (WT_IKEY **)&ref->u.key));
+		    key->data, key->size, &ref->u.key));
 	}
 
 	/*
