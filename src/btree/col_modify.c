@@ -118,7 +118,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 		/* There may be no WT_INSERT list, allocate as necessary. */
 		if (*inshead == NULL) {
 			new_inshead_size = sizeof(WT_INSERT_HEAD);
-			WT_RET(__wt_calloc_def(session, 1, &new_inshead));
+			WT_ERR(__wt_calloc_def(session, 1, &new_inshead));
 			for (i = 0; i < WT_SKIP_MAXDEPTH; i++)
 				cbt->ins_stack[i] = &new_inshead->head[i];
 			cbt->ins_head = new_inshead;
