@@ -169,7 +169,7 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 	 * would collide with salvage freeing the previous root page when it
 	 * reads those blocks from the file.
 	 */
-	WT_ERR(__wt_session_snap_clear(session, btree->filename));
+	WT_ERR(__wt_snapshot_clear(session, btree->name));
 
 	/*
 	 * Step 2:
@@ -290,10 +290,10 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 	/*
 	 * Step 11:
 	 * Evict the newly created root page, creating a snapshot, and update
-	 * the schema table with the new snapshot's location.
+	 * the metadata with the new snapshot's location.
 	 */
 	if (ss->root_page != NULL) {
-		WT_ERR(__wt_session_snap_list_get(session, NULL, &snapbase));
+		WT_ERR(__wt_snapshot_list_get(session, NULL, &snapbase));
 		WT_ERR(__wt_strdup(
 		    session, WT_INTERNAL_SNAPSHOT, &snapbase[0].name));
 		F_SET(snapbase, WT_SNAP_ADD);
@@ -302,7 +302,7 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 		ss->root_page = NULL;
 		btree->snap = NULL;
 		if (snapbase[0].raw.data != NULL)
-			WT_ERR(__wt_session_snap_list_set(session, snapbase));
+			WT_ERR(__wt_snapshot_list_set(session, snapbase));
 	}
 
 	/*
@@ -322,7 +322,7 @@ err:	WT_TRET(__wt_bm_salvage_end(session));
 		__wt_page_out(session, &ss->root_page, 0);
 
 	/* Discard any snapshot information we allocated. */
-	__wt_session_snap_list_free(session, snapbase);
+	__wt_snapshot_list_free(session, snapbase);
 
 	/* Discard the leaf and overflow page memory. */
 	WT_TRET(__slvg_cleanup(session, ss));
@@ -1707,7 +1707,7 @@ __slvg_row_build_internal(
 			WT_ERR(__wt_row_ikey_alloc(session, 0,
 			    trk->row_start.data,
 			    trk->row_start.size,
-			    (WT_IKEY **)&ref->u.key));
+			    &ref->u.key));
 		++ref;
 	}
 
@@ -1846,11 +1846,11 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 	if (__wt_off_page(page, rip->key)) {
 		ikey = rip->key;
 		WT_ERR(__wt_row_ikey_alloc(session, 0,
-		    WT_IKEY_DATA(ikey), ikey->size, (WT_IKEY **)&ref->u.key));
+		    WT_IKEY_DATA(ikey), ikey->size, &ref->u.key));
 	} else {
 		WT_ERR(__wt_row_key(session, page, rip, key));
 		WT_ERR(__wt_row_ikey_alloc(session, 0,
-		    key->data, key->size, (WT_IKEY **)&ref->u.key));
+		    key->data, key->size, &ref->u.key));
 	}
 
 	/*

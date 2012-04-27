@@ -351,6 +351,7 @@ memcpy
 memfree
 memsize
 metadata
+metafile
 mfence
 minorp
 minprefix
@@ -438,6 +439,7 @@ slvg
 snapall
 snapfrag
 snapfrom
+snaplist
 snapto
 snprintf
 sp

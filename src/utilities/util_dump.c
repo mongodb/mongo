@@ -7,12 +7,12 @@
 
 #include "util.h"
 
+static int dump_config(WT_SESSION *, const char *);
+static int dump_file_config(WT_SESSION *, WT_CURSOR *, const char *);
 static int dump_prefix(int);
 static int dump_suffix(void);
+static int dump_table_config(WT_SESSION *, WT_CURSOR *, const char *);
 static int print_config(WT_SESSION *, const char *, const char *, const char *);
-static int schema(WT_SESSION *, const char *);
-static int schema_file(WT_SESSION *, WT_CURSOR *, const char *);
-static int schema_table(WT_SESSION *, WT_CURSOR *, const char *);
 static int usage(void);
 
 static inline int
@@ -91,7 +91,7 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 		goto err;
 
 	if (dump_prefix(hex) != 0 ||
-	    schema(session, name) != 0 ||
+	    dump_config(session, name) != 0 ||
 	    dump_suffix() != 0)
 		goto err;
 
@@ -132,29 +132,29 @@ err:		ret = 1;
 }
 
 /*
- * schema --
- *	Dump the schema for the uri.
+ * config --
+ *	Dump the config for the uri.
  */
 static int
-schema(WT_SESSION *session, const char *uri)
+dump_config(WT_SESSION *session, const char *uri)
 {
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	int tret;
 
-	/* Open the schema file. */
+	/* Open a metadata cursor. */
 	if ((ret = session->open_cursor(
-	    session, WT_SCHEMA_URI, NULL, NULL, &cursor)) != 0) {
+	    session, WT_METADATA_URI, NULL, NULL, &cursor)) != 0) {
 		fprintf(stderr, "%s: %s: session.open_cursor: %s\n",
-		    progname, WT_SCHEMA_URI, wiredtiger_strerror(ret));
+		    progname, WT_METADATA_URI, wiredtiger_strerror(ret));
 		return (1);
 	}
 
-	/* Dump the schema. */
+	/* Dump the config. */
 	if (strncmp(uri, "table:", strlen("table:")) == 0)
-		ret = schema_table(session, cursor, uri);
+		ret = dump_table_config(session, cursor, uri);
 	else
-		ret = schema_file(session, cursor, uri);
+		ret = dump_file_config(session, cursor, uri);
 
 	if ((tret = cursor->close(cursor)) != 0 && ret == 0)
 		ret = tret;
@@ -163,15 +163,15 @@ schema(WT_SESSION *session, const char *uri)
 }
 
 /*
- * schema_table --
- *	Dump the schema for a table.
+ * dump_table_config --
+ *	Dump the config for a table.
  */
 static int
-schema_table(WT_SESSION *session, WT_CURSOR *cursor, const char *uri)
+dump_table_config(WT_SESSION *session, WT_CURSOR *cursor, const char *uri)
 {
 	struct {
-		char *key;			/* Schema key */
-		char *value;			/* Schema value */
+		char *key;			/* Metadata key */
+		char *value;			/* Metadata value */
 	} *list;
 	WT_DECL_RET;
 	int i, elem, list_elem;
@@ -223,7 +223,7 @@ schema_table(WT_SESSION *session, WT_CURSOR *cursor, const char *uri)
 	ret = 0;
 
 	/*
-	 * Dump out the schema information: first, dump the uri entry itself
+	 * Dump out the config information: first, dump the uri entry itself
 	 * (requires a lookup).
 	 */
 	cursor->set_key(cursor, uri);
@@ -265,7 +265,7 @@ schema_table(WT_SESSION *session, WT_CURSOR *cursor, const char *uri)
 		cursor->set_key(cursor, p);
 		if ((ret = cursor->search(cursor)) != 0) {
 			fprintf(stderr,
-			    "%s: %s: unable to find schema reference for the "
+			    "%s: %s: unable to find metadata for the "
 			    "underlying file %s\n",
 			    progname, list[i].key, p);
 			return (1);
@@ -287,11 +287,11 @@ schema_table(WT_SESSION *session, WT_CURSOR *cursor, const char *uri)
 }
 
 /*
- * schema_file --
- *	Dump the schema for a file.
+ * dump_file_config --
+ *	Dump the config for a file.
  */
 static int
-schema_file(WT_SESSION *session, WT_CURSOR *cursor, const char *uri)
+dump_file_config(WT_SESSION *session, WT_CURSOR *cursor, const char *uri)
 {
 	WT_DECL_RET;
 	const char *key, *value;

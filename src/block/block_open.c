@@ -66,23 +66,28 @@ __wt_block_create(WT_SESSION_IMPL *session, const char *filename)
  */
 int
 __wt_block_open(WT_SESSION_IMPL *session,
-    const char *filename, const char *config, const char *cfg[], void *retp)
+    const char *uri, const char *config, const char *cfg[], void *retp)
 {
 	WT_BLOCK *block;
 	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_NAMED_COMPRESSOR *ncomp;
+	const char *filename;
 
 	*(void **)retp = NULL;
 	conn = S2C(session);
+
+	filename = uri;
+	if (!WT_PREFIX_SKIP(filename, "file:"))
+		return (EINVAL);
 
 	/*
 	 * Allocate the structure, connect (so error close works), copy the
 	 * name.
 	 */
 	WT_RET(__wt_calloc_def(session, 1, &block));
-	WT_ERR(__wt_strdup(session, filename, &block->name));
+	WT_ERR(__wt_strdup(session, uri, &block->name));
 
 	/* Get the allocation size. */
 	WT_ERR(__wt_config_getones(session, config, "allocation_size", &cval));
@@ -178,7 +183,7 @@ __wt_desc_init(WT_SESSION_IMPL *session, WT_FH *fh)
 	uint8_t buf[WT_BLOCK_DESC_SECTOR];
 
 	memset(buf, 0, sizeof(buf));
-	desc = (WT_BLOCK_DESC *)buf;
+	desc = (void *)buf;
 	desc->magic = WT_BLOCK_MAGIC;
 	desc->majorv = WT_BLOCK_MAJOR_VERSION;
 	desc->minorv = WT_BLOCK_MINOR_VERSION;
@@ -206,7 +211,7 @@ __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	WT_RET(__wt_read(
 	    session, block->fh, (off_t)0, WT_BLOCK_DESC_SECTOR, buf));
 
-	desc = (WT_BLOCK_DESC *)buf;
+	desc = (void *)buf;
 	WT_VERBOSE(session, block,
 	    "open: magic %" PRIu32
 	    ", major/minor: %" PRIu32 "/%" PRIu32

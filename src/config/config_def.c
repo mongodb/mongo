@@ -27,11 +27,11 @@ __wt_confchk_connection_add_compressor =
     "";
 
 const char *
-__wt_confdfl_connection_add_cursor_type =
+__wt_confdfl_connection_add_data_source =
     "";
 
 const char *
-__wt_confchk_connection_add_cursor_type =
+__wt_confchk_connection_add_data_source =
     "";
 
 const char *

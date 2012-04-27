@@ -145,7 +145,7 @@ __snapshot_worker(
 	 * write any dirty pages.
 	 */
 	if ((ret =
-	    __wt_session_snap_list_get(session, NULL, &snapbase)) != 0) {
+	    __wt_snapshot_list_get(session, NULL, &snapbase)) != 0) {
 		if (ret == WT_NOTFOUND) {
 			ret =
 			    __wt_cache_flush(session, WT_SYNC_DISCARD_NOWRITE);
@@ -271,15 +271,15 @@ nomatch:		WT_ERR_MSG(session,
 	/* If we're discarding the tree, the root page should be gone. */
 	WT_ASSERT(session, !discard || btree->root_page == NULL);
 
-	/* If there was a snapshot, update the schema table. */
+	/* If there was a snapshot, update the metadata. */
 	if (snap->raw.data == NULL) {
 		if (force)
 			WT_ERR_MSG(session,
 			    EINVAL, "cache flush failed to create a snapshot");
 	} else
-		WT_ERR(__wt_session_snap_list_set(session, snapbase));
+		WT_ERR(__wt_snapshot_list_set(session, snapbase));
 
-err:	__wt_session_snap_list_free(session, snapbase);
+err:	__wt_snapshot_list_free(session, snapbase);
 
 	__wt_rwunlock(session, btree->snaplock);
 

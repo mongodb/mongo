@@ -14,7 +14,7 @@
  */
 int
 __wt_conn_btree_open(WT_SESSION_IMPL *session,
-    const char *name, const char *filename, const char *config,
+    const char *name, const char *config,
     const char *cfg[], uint32_t flags)
 {
 	WT_BTREE *btree;
@@ -128,7 +128,7 @@ __wt_conn_btree_open(WT_SESSION_IMPL *session,
 	 * connection layer owns:
 	 *	the WT_BTREE structure itself
 	 *	the structure lock
-	 *	the structure names
+	 *	the structure name
 	 *	the structure configuration string
 	 *	the WT_BTREE_OPEN flag
 	 */
@@ -136,8 +136,7 @@ __wt_conn_btree_open(WT_SESSION_IMPL *session,
 	if ((ret = __wt_calloc_def(session, 1, &btree)) == 0 &&
 	    (ret = __wt_rwlock_alloc(
 		session, "btree handle", &btree->rwlock)) == 0 &&
-	    (ret = __wt_strdup(session, name, &btree->name)) == 0 &&
-	    (ret = __wt_strdup(session, filename, &btree->filename)) == 0) {
+	    (ret = __wt_strdup(session, name, &btree->name)) == 0) {
 		/* Lock the handle before it is inserted in the list. */
 		__wt_writelock(session, btree->rwlock);
 
@@ -153,7 +152,6 @@ __wt_conn_btree_open(WT_SESSION_IMPL *session,
 			if (btree->rwlock != NULL)
 				(void)__wt_rwlock_destroy(
 				    session, btree->rwlock);
-			__wt_free(session, btree->filename);
 			__wt_free(session, btree->name);
 			__wt_free(session, btree);
 			__wt_free(session, config);
@@ -172,7 +170,7 @@ conf:	session->btree = btree;
 	btree->flags = flags;
 
 	WT_ERR(__wt_scr_alloc(session, WT_BTREE_MAX_ADDR_COOKIE, &addr));
-	WT_ERR(__wt_session_snap_get(session, snapshot, addr));
+	WT_ERR(__wt_snapshot_get(session, snapshot, addr));
 	WT_ERR(__wt_btree_open(
 	    session, cfg, addr->data, addr->size, snapshot == NULL ? 0 : 1));
 	F_SET(btree, WT_BTREE_OPEN);
@@ -245,7 +243,6 @@ __conn_btree_remove(WT_SESSION_IMPL *session, WT_BTREE *btree)
 		WT_CLEAR_BTREE_IN_SESSION(session);
 	}
 	WT_TRET(__wt_rwlock_destroy(session, btree->rwlock));
-	__wt_free(session, btree->filename);
 	__wt_free(session, btree->name);
 	__wt_free(session, btree->config);
 	__wt_free(session, btree);
@@ -272,15 +269,15 @@ __wt_conn_btree_remove(WT_CONNECTION_IMPL *conn)
 	WT_RET(__wt_open_session(conn, 1, NULL, NULL, &session));
 
 	/*
-	 * Close open btree handles: first, everything but the schema file (as
-	 * closing a normal file may open and write the schema file), then the
-	 * schema file.  This function isn't called often, and I don't want to
-	 * "know" anything about the schema file's position on the list, so we
-	 * do it the hard way.
+	 * Close open btree handles: first, everything but the metadata file
+	 * (as closing a normal file may open and write the metadata file),
+	 * then the metadata file.  This function isn't called often, and I
+	 * don't want to "know" anything about the metadata file's position on
+	 * the list, so we do it the hard way.
 	 */
 restart:
 	TAILQ_FOREACH(btree, &conn->btqh, q) {
-		if (strcmp(btree->filename, WT_SCHEMA_FILENAME) == 0)
+		if (strcmp(btree->name, WT_METADATA_URI) == 0)
 			continue;
 
 		TAILQ_REMOVE(&conn->btqh, btree, q);
@@ -291,14 +288,14 @@ restart:
 
 	/*
 	 * Closing the files may have resulted in entries on our session's list
-	 * of open btree handles, specifically, we added the schema file if any
-	 * of the files were dirty.  Clean up that list before we shut down the
-	 * schema file entry, for good.
+	 * of open btree handles, specifically, we added the metadata file if
+	 * any of the files were dirty.  Clean up that list before we shut down
+	 * the metadata entry, for good.
 	 */
 	while ((btree_session = TAILQ_FIRST(&session->btrees)) != NULL)
 		WT_TRET(__wt_session_remove_btree(session, btree_session, 0));
 
-	/* Close the schema file handle. */
+	/* Close the metadata file handle. */
 	while ((btree = TAILQ_FIRST(&conn->btqh)) != NULL) {
 		TAILQ_REMOVE(&conn->btqh, btree, q);
 		--conn->btqcnt;
@@ -332,7 +329,7 @@ __wt_conn_btree_reopen(
 	}
 
 	WT_RET(__wt_scr_alloc(session, WT_BTREE_MAX_ADDR_COOKIE, &addr));
-	WT_ERR(__wt_session_snap_get(session, NULL, addr));
+	WT_ERR(__wt_snapshot_get(session, NULL, addr));
 	btree->flags = flags;
 	WT_ERR(__wt_btree_open(session, cfg, addr->data, addr->size, 0));
 	F_SET(btree, WT_BTREE_OPEN);

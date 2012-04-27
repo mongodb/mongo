@@ -10,9 +10,9 @@
 static int format(void);
 static int insert(WT_CURSOR *, const char *);
 static int load_dump(WT_SESSION *);
-static int schema_read(char ***, int *);
-static int schema_rename(char **, const char *);
-static int schema_update(WT_SESSION *, char **);
+static int config_read(char ***, int *);
+static int config_rename(char **, const char *);
+static int config_update(WT_SESSION *, char **);
 static int usage(void);
 
 static int	append;		/* -a append (ignore record number keys) */
@@ -79,8 +79,8 @@ load_dump(WT_SESSION *session)
 	list = NULL;            /* -Wuninitialized */
 	hex = 0;                /* -Wuninitialized */
 
-	/* Read the schema file. */
-	if ((ret = schema_read(&list, &hex)) != 0)
+	/* Read the metadata file. */
+	if ((ret = config_read(&list, &hex)) != 0)
 		return (ret);
 
 	/*
@@ -112,8 +112,8 @@ load_dump(WT_SESSION *session)
 		p = list[1]; list[1] = entry[1]; entry[1] = p;
 	}
 
-	/* Update the schema based on any command-line configuration. */
-	if ((ret = schema_update(session, list)) != 0)
+	/* Update the config based on any command-line configuration. */
+	if ((ret = config_update(session, list)) != 0)
 		return (ret);
 
 	uri = list[0];
@@ -160,11 +160,11 @@ load_dump(WT_SESSION *session)
 }
 
 /*
- * schema_read --
- *	Read the schema lines and do some basic validation.
+ * config_read --
+ *	Read the config lines and do some basic validation.
  */
 static int
-schema_read(char ***listp, int *hexp)
+config_read(char ***listp, int *hexp)
 {
 	ULINE l;
 	int entry, eof, max_entry;
@@ -223,12 +223,12 @@ schema_read(char ***listp, int *hexp)
 }
 
 /*
- * schema_update --
+ * config_update --
  *	Reconcile and update the command line configuration against the
- * schema we found.
+ * config we found.
  */
 static int
-schema_update(WT_SESSION *session, char **list)
+config_update(WT_SESSION *session, char **list)
 {
 	int found;
 	const char *cfg[] = { NULL, NULL, NULL };
@@ -247,7 +247,7 @@ schema_update(WT_SESSION *session, char **list)
 			    MATCH(*listp, "file:") ||
 			    MATCH(*listp, "index:") ||
 			    MATCH(*listp, "table:"))
-				if (schema_rename(listp, cmdname))
+				if (config_rename(listp, cmdname))
 					return (1);
 
 		/*
@@ -257,7 +257,7 @@ schema_update(WT_SESSION *session, char **list)
 		 */
 		for (configp = cmdconfig;
 		    cmdconfig != NULL && *configp != NULL; configp += 2)
-			if (schema_rename(configp, cmdname))
+			if (config_rename(configp, cmdname))
 				return (1);
 	}
 
@@ -338,11 +338,11 @@ schema_update(WT_SESSION *session, char **list)
 }
 
 /*
- * schema_rename --
+ * config_rename --
  *	Update the URI name.
  */
 static int
-schema_rename(char **urip, const char *name)
+config_rename(char **urip, const char *name)
 {
 	size_t len;
 	char *buf, *p;

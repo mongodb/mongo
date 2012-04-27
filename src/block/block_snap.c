@@ -445,7 +445,7 @@ live_update:
 			 * for the btree layer to crack the snapshot cookie into
 			 * its components, and that's a fair amount of work.
 			 * (We could just read the system time in the session
-			 * layer when updating the schema file, but that won't
+			 * layer when updating the metadata file, but that won't
 			 * work for the snapshot size, and so we do both here.
 			 */
 			snap->snapshot_size = si->snapshot_size;

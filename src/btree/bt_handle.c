@@ -54,7 +54,7 @@ __wt_btree_open(WT_SESSION_IMPL *session,
 	WT_ERR(__btree_conf(session));
 
 	/* Connect to the underlying block manager. */
-	WT_ERR(__wt_bm_open(session, btree->filename, btree->config, cfg));
+	WT_ERR(__wt_bm_open(session, btree->name, btree->config, cfg));
 
 	/*
 	 * Open the specified snapshot unless it's a special command (special
@@ -297,8 +297,7 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session)
 		ref->page = leaf;
 		ref->addr = NULL;
 		ref->state = WT_REF_MEM;
-		WT_ERR(__wt_row_ikey_alloc(
-		    session, 0, "", 1, (WT_IKEY **)&(ref->u.key)));
+		WT_ERR(__wt_row_ikey_alloc(session, 0, "", 1, &ref->u.key));
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}

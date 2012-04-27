@@ -72,7 +72,7 @@ struct __wt_collator;	    typedef struct __wt_collator WT_COLLATOR;
 struct __wt_compressor;	    typedef struct __wt_compressor WT_COMPRESSOR;
 struct __wt_connection;	    typedef struct __wt_connection WT_CONNECTION;
 struct __wt_cursor;	    typedef struct __wt_cursor WT_CURSOR;
-struct __wt_cursor_type;    typedef struct __wt_cursor_type WT_CURSOR_TYPE;
+struct __wt_data_source;    typedef struct __wt_data_source WT_DATA_SOURCE;
 struct __wt_event_handler;  typedef struct __wt_event_handler WT_EVENT_HANDLER;
 struct __wt_extension_api;  typedef struct __wt_extension_api WT_EXTENSION_API;
 struct __wt_extractor;	    typedef struct __wt_extractor WT_EXTRACTOR;
@@ -461,7 +461,7 @@ struct __wt_session {
 	 *  opened on any data source, regardless of whether it is ultimately
 	 *  stored in a table.  Some cursor types may have limited
 	 *  functionality (for example, be read-only or not support
-	 *  transactional updates).  See @ref cursor_types for more
+	 *  transactional updates).  See @ref data_sources for more
 	 *  information.
 	 *  <br>
 	 *  The following are the builtin cursor types:
@@ -483,7 +483,7 @@ struct __wt_session {
 	 *	database or file statistics cursor,
 	 *	key=<code>int id</code>\, value=(<code>string description\,
 	 *	string value\, uint64_t value</code>)\,
-	 *	see @ref cursor_statistics for details}
+	 *	see @ref data_statistics for details}
 	 *  </table>
 	 * @param to_dup a cursor to duplicate
 	 * @param session the session handle
@@ -921,23 +921,22 @@ struct __wt_connection {
 	int __F(load_extension)(WT_CONNECTION *connection,
 	    const char *path, const char *config);
 
-	/*! Add a new type of cursor. @notyet{custom cursors}
+	/*! Add a custom data source. @notyet{custom data sources}
 	 *
-	 * The application must first implement the WT_CURSOR_TYPE interface
+	 * The application must first implement the WT_DATA_SOURCE interface
 	 * and then register the implementation with WiredTiger:
 	 *
-	 * @snippet ex_all.c WT_CURSOR_TYPE register
+	 * @snippet ex_all.c WT_DATA_SOURCE register
 	 *
 	 * @param connection the connection handle
-	 * @param prefix the prefix for location strings passed to
-	 * WT_SESSION::open_cursor
-	 * @param ctype the application-supplied code to manage cursors of
-	 * this type
-	 * @configempty{connection.add_cursor_type, see dist/api_data.py}
+	 * @param prefix the URI prefix for this data source, e.g., "file:"
+	 * @param data_source the application-supplied implementation of
+	 *	WT_DATA_SOURCE to manage this data source.
+	 * @configempty{connection.add_data_source, see dist/api_data.py}
 	 * @errors
 	 */
-	int __F(add_cursor_type)(WT_CONNECTION *connection,
-	    const char *prefix, WT_CURSOR_TYPE *ctype, const char *config);
+	int __F(add_data_source)(WT_CONNECTION *connection, const char *prefix,
+	    WT_DATA_SOURCE *data_source, const char *config);
 
 	/*! Add a custom collation function. @notyet{custom collation}
 	 *
@@ -1433,37 +1432,62 @@ struct __wt_compressor {
 
 /*!
  * Applications can extend WiredTiger by providing new implementations of the
- * WT_CURSOR class.
+ * WT_DATA_SOURCE class.  Each data source supports a different URI scheme for
+ * data sources to WT_SESSION::create, WT_SESSION::open_cursor and related
+ * methods.
  *
- * <b>Thread safety:</b> WiredTiger may invoke methods on the WT_CURSOR_TYPE
+ * <b>Thread safety:</b> WiredTiger may invoke methods on the WT_DATA_SOURCE
  * interface from multiple threads concurrently.  It is the responsibility of
  * the implementation to protect any shared data.
  *
  * Applications register their implementation with WiredTiger by calling
- * WT_CONNECTION::add_cursor_type.
+ * WT_CONNECTION::add_data_source.
  *
- * @snippet ex_all.c WT_CURSOR_TYPE register
+ * @snippet ex_all.c WT_DATA_SOURCE register
  */
-struct __wt_cursor_type {
-	/*! Callback to determine how much space to allocate for a cursor.
+struct __wt_data_source {
+	/*! Callback to create a new object.
 	 *
-	 * If the callback is NULL, no additional space is allocated in the
-	 * WT_CURSOR implementation.
-	 *
-	 * @errors
-	 *
-	 * @snippet ex_all.c WT_CURSOR_TYPE size
+	 * @snippet ex_all.c WT_DATA_SOURCE create
 	 */
-	int (*cursor_size)(WT_CURSOR_TYPE *ctype,
-	    const char *obj, size_t *sizep);
+	int (*create)(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
+	    const char *name, const char *config);
+
+	/*! Callback to drop an object.
+	 *
+	 * @snippet ex_all.c WT_DATA_SOURCE drop
+	 */
+	int (*drop)(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
+	    const char *name, const char *config);
 
 	/*! Callback to initialize a cursor.
 	 *
-	 * @snippet ex_all.c WT_CURSOR_TYPE init
+	 * @snippet ex_all.c WT_DATA_SOURCE open_cursor
 	 */
-	int (*init_cursor)(WT_CURSOR_TYPE *ctype,
-	    WT_SESSION *session, const char *obj, WT_CURSOR *old_cursor,
-	    const char *config, WT_CURSOR *new_cursor);
+	int (*open_cursor)(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
+	    const char *obj, WT_CURSOR *old_cursor,
+	    const char *config, WT_CURSOR **new_cursor);
+
+	/*! Callback to rename an object.
+	 *
+	 * @snippet ex_all.c WT_DATA_SOURCE sync
+	 */
+	int (*rename)(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
+	    const char *oldname, const char *newname, const char *config);
+
+	/*! Callback to sync an object.
+	 *
+	 * @snippet ex_all.c WT_DATA_SOURCE sync
+	 */
+	int (*sync)(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
+	    const char *name, const char *config);
+
+	/*! Callback to truncate an object.
+	 *
+	 * @snippet ex_all.c WT_DATA_SOURCE truncate
+	 */
+	int (*truncate)(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
+	    const char *name, const char *config);
 };
 
 /*!

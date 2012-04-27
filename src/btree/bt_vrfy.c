@@ -96,7 +96,7 @@ __verify_int(WT_SESSION_IMPL *session, int dumpfile)
 	WT_ERR(__wt_scr_alloc(session, 0, &vs->tmp2));
 
 	/* Get a list of the snapshots for this file. */
-	WT_ERR(__wt_session_snap_list_get(session, NULL, &snapbase));
+	WT_ERR(__wt_snapshot_list_get(session, NULL, &snapbase));
 
 	/* Inform the underlying block manager we're verifying. */
 	WT_ERR(__wt_bm_verify_start(session, snapbase));
@@ -104,7 +104,7 @@ __verify_int(WT_SESSION_IMPL *session, int dumpfile)
 	/* Loop through the file's snapshots, verifying each one. */
 	WT_SNAPSHOT_FOREACH(snapbase, snap) {
 		WT_VERBOSE(session, verify,
-		    "%s: snapshot %s", btree->filename, snap->name);
+		    "%s: snapshot %s", btree->name, snap->name);
 
 		/* House-keeping between snapshots. */
 		__verify_snapshot_reset(vs);
@@ -138,7 +138,7 @@ __verify_int(WT_SESSION_IMPL *session, int dumpfile)
 	}
 
 	/* Discard the list of snapshots. */
-err:	__wt_session_snap_list_free(session, snapbase);
+err:	__wt_snapshot_list_free(session, snapbase);
 
 	/* Inform the underlying block manager we're done. */
 	WT_TRET(__wt_bm_verify_end(session));

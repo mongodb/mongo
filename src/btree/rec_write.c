@@ -2999,7 +2999,7 @@ __rec_split_row(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_PAGE **splitp)
 	for (ref = page->u.intl.t,
 	    bnd = r->bnd, i = 0; i < r->bnd_next; ++ref, ++bnd, ++i) {
 		WT_ERR(__wt_row_ikey_alloc(session, 0,
-		    bnd->key.data, bnd->key.size, (WT_IKEY **)&ref->u.key));
+		    bnd->key.data, bnd->key.size, &ref->u.key));
 		WT_ERR(__wt_calloc(session, 1, sizeof(WT_ADDR), &ref->addr));
 		((WT_ADDR *)ref->addr)->addr = bnd->addr.addr;
 		((WT_ADDR *)ref->addr)->size = bnd->addr.size;

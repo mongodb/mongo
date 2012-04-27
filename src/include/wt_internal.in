@@ -120,6 +120,8 @@ struct __wt_named_collator;
     typedef struct __wt_named_collator WT_NAMED_COLLATOR;
 struct __wt_named_compressor;
     typedef struct __wt_named_compressor WT_NAMED_COMPRESSOR;
+struct __wt_named_data_source;
+    typedef struct __wt_named_data_source WT_NAMED_DATA_SOURCE;
 struct __wt_page;
     typedef struct __wt_page WT_PAGE;
 struct __wt_page_header;
@@ -175,6 +177,7 @@ struct __wt_update;
 
 #include "api.h"
 #include "cursor.h"
+#include "meta.h"
 #include "schema.h"
 
 #include "extern.h"

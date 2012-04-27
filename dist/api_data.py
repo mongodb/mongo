@@ -321,9 +321,9 @@ methods = {
 		min='0'),
 ]),
 
-'connection.add_cursor_type' : Method([]),
 'connection.add_collator' : Method([]),
 'connection.add_compressor' : Method([]),
+'connection.add_data_source' : Method([]),
 'connection.add_extractor' : Method([]),
 'connection.close' : Method([]),
 
