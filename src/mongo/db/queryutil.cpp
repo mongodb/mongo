@@ -1688,7 +1688,11 @@ namespace mongo {
 
         if ( l.isNumber() ) {
             long long limit = l.numberLong();
-            if ( limit < num ) {
+            if( limit < 0 ){
+                limit = -limit;
+            }
+
+            if ( limit < num && limit != 0 ) { // 0 limit means no limit
                 num = limit;
             }
         }
