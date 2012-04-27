@@ -114,12 +114,12 @@ static int
 __snapshot_worker(
     WT_SESSION_IMPL *session, const char *name, int discard, snapshot_op op)
 {
-	WT_SNAPSHOT *match, *snapbase, *snap;
+	WT_SNAPSHOT *match, *snap, *snapbase;
 	WT_BTREE *btree;
 	int force, ret;
 
 	btree = session->btree;
-	match = snapbase = NULL;
+	match = snap = snapbase = NULL;
 	ret = 0;
 
 	/* Snapshots are single-threaded. */
