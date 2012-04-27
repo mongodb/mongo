@@ -7,7 +7,7 @@
 
 #include "wt_internal.h"
 
-static void __free_page_col_fix(WT_SESSION_IMPL *, WT_PAGE *);
+static void __free_page_modify(WT_SESSION_IMPL *, WT_PAGE *);
 static void __free_page_col_int(WT_SESSION_IMPL *, WT_PAGE *);
 static void __free_page_col_var(WT_SESSION_IMPL *, WT_PAGE *);
 static void __free_page_row_int(WT_SESSION_IMPL *, WT_PAGE *);
@@ -40,23 +40,6 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep, uint32_t flags)
 
 	WT_ASSERT(session, !F_ISSET_ATOMIC(page, WT_PAGE_EVICT_LRU));
 
-	/*
-	 * If the page split, there may one or more pages linked from the page;
-	 * walk the list, discarding pages.
-	 */
-	if ((mod = page->modify) != NULL) {
-		if (F_ISSET(mod, WT_PM_REC_MASK) == WT_PM_REC_SPLIT)
-			__wt_page_out(session, &mod->u.split, 0);
-
-		/*
-		 * Discard any objects the page was tracking plus associated
-		 * memory.
-		 */
-		__wt_rec_track_discard(session, page);
-		__wt_free(session, mod->track);
-		__wt_free(session, page->modify);
-	}
-
 	/* If not a split merged into its parent, the page must be clean. */
 	WT_ASSERT(session,
 	    !__wt_page_is_modified(page) ||
@@ -65,7 +48,6 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep, uint32_t flags)
 #ifdef HAVE_DIAGNOSTIC
 	__wt_hazard_validate(session, page);
 #endif
-
 	/*
 	 * If this page has a memory footprint associated with it, update
 	 * the cache information.
@@ -73,9 +55,20 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep, uint32_t flags)
 	if (page->memory_footprint != 0)
 		__wt_cache_page_evict(session, page);
 
+	/* Clean up page modifications. */
+	if ((mod = page->modify) != NULL) {
+		/*
+		 * If the page split, there may one or more pages linked from
+		 * the page; walk the list, discarding pages.
+		 */
+		if (F_ISSET(mod, WT_PM_REC_MASK) == WT_PM_REC_SPLIT)
+			__wt_page_out(session, &mod->u.split, 0);
+
+		__free_page_modify(session, page);
+	}
+
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
-		__free_page_col_fix(session, page);
 		break;
 	case WT_PAGE_COL_INT:
 		__free_page_col_int(session, page);
@@ -101,24 +94,33 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep, uint32_t flags)
 }
 
 /*
- * __free_page_col_fix --
- *	Discard a WT_PAGE_COL_FIX page.
+ * __free_page_modify --
+ *	Discard the page's associated modification structures.
  */
 static void
-__free_page_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
+__free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_INSERT_HEAD *append;
+	WT_PAGE_MODIFY *mod;
+
+	mod = page->modify;
 
 	/* Free the append array. */
 	if ((append = WT_COL_APPEND(page)) != NULL) {
 		__free_skip_list(session, WT_SKIP_FIRST(append));
 		__wt_free(session, append);
-		__wt_free(session, page->modify->append);
+		__wt_free(session, mod->append);
 	}
 
-	/* Free the update array. */
-	if (page->modify != NULL && page->modify->update != NULL)
-		__free_skip_array(session, page->modify->update, 1);
+	/* Free the insert/update array. */
+	if (mod->update != NULL)
+		__free_skip_array(session, mod->update,
+		    page->type == WT_PAGE_COL_FIX ? 1 : page->entries);
+
+	/* Discard any objects the page was tracking plus associated memory. */
+	__wt_rec_track_discard(session, page);
+	__wt_free(session, mod->track);
+	__wt_free(session, page->modify);
 }
 
 /*
@@ -153,24 +155,11 @@ __free_page_col_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 static void
 __free_page_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	WT_INSERT_HEAD *append;
-
 	/* Free the in-memory index array. */
 	__wt_free(session, page->u.col_var.d);
 
 	/* Free the RLE lookup array. */
 	__wt_free(session, page->u.col_var.repeats);
-
-	/* Free the append array. */
-	if ((append = WT_COL_APPEND(page)) != NULL) {
-		__free_skip_list(session, WT_SKIP_FIRST(append));
-		__wt_free(session, append);
-		__wt_free(session, page->modify->append);
-	}
-
-	/* Free the insert array. */
-	if (page->modify != NULL && page->modify->update != NULL)
-		__free_skip_array(session, page->modify->update, page->entries);
 }
 
 /*
@@ -262,7 +251,7 @@ __free_skip_array(
 			__wt_free(session, *head);
 		}
 
-	/* Free the page's array of inserts. */
+	/* Free the header array. */
 	__wt_free(session, head_arg);
 }
 
@@ -302,7 +291,7 @@ __free_update(
 		if (*updp != NULL)
 			__free_update_list(session, *updp);
 
-	/* Free the page's array of updates. */
+	/* Free the update array. */
 	__wt_free(session, update_head);
 }
 
