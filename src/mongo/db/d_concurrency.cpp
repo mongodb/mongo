@@ -34,6 +34,14 @@
 
 namespace mongo { 
 
+    inline LockState& lockState() { 
+        return cc().lockState();
+    }
+
+    char threadState() { 
+        return lockState().threadState();
+    }
+
     class DBTryLockTimeoutException : public std::exception {
     public:
     	DBTryLockTimeoutException() {}
@@ -95,22 +103,108 @@ namespace mongo {
     public:
         LockStat stats;
 
-        void start_greed()          { q.start_greed(); }
+        void start_greed() { q.start_greed(); }
 
-        void lock_r()               { LockStat::Acquiring a(stats,'r'); q.lock_r(); }
-        void lock_w()               { LockStat::Acquiring a(stats,'w'); q.lock_w(); }
-        void lock_R()               { LockStat::Acquiring a(stats,'R'); q.lock_R(); }
-        void lock_W()               { LockStat::Acquiring a(stats,'W'); q.lock_W(); }
-        void lock_W_stop_greed()    { LockStat::Acquiring a(stats,'W'); q.lock_W_stop_greed(); }
+        void lock_r() { 
+            verify( threadState() == 0 );
+            lockState().locked( 'r' );
+            LockStat::Acquiring a(stats,'r'); 
+            q.lock_r(); 
+        }
+        
+        void lock_w() { 
+            verify( threadState() == 0 );
+            getDur().commitIfNeeded();
+            lockState().locked( 'w' );
+            LockStat::Acquiring a(stats,'w'); 
+            q.lock_w(); 
+        }
+        
+        void lock_R() {
+            LockState& ls = lockState();
+            massert(16103, str::stream() << "can't lock_R, threadState=" << (int) ls.threadState(), ls.threadState() == 0);
+            ls.locked( 'R' );
+            Acquiring a1('R');
+            LockStat::Acquiring a2(stats,'R'); 
+            q.lock_R(); 
+        }
+
+        void lock_W() {
+            
+            LockState& ls = lockState();
+            if(  ls.threadState() ) {
+                log() << "can't lock_W, threadState=" << (int) ls.threadState() << endl;
+                fassert(16114,false);
+            }
+            getDur().commitIfNeeded(); // check before locking - will use an R lock for the commit if need to do one, which is better than W
+            ls.locked( 'W' );
+            {
+                LockStat::Acquiring a1(stats,'W'); 
+                Acquiring a2('W');
+                q.lock_W();
+            }
+            locked_W();
+        }
+
+
+        void lock_W_stop_greed() {
+            verify( threadState() == 0 );
+            lockState().locked( 'W' );
+            {
+                Acquiring a1('W');
+                LockStat::Acquiring a2(stats,'W'); 
+                q.lock_W_stop_greed(); 
+            }
+            locked_W();
+        }
 
         // how to count try's that fail is an interesting question. we should get rid of try().
-        bool lock_R_try(int millis) { LockStat::Acquiring a(stats,'R'); return q.lock_R_try(millis); }
-        bool lock_W_try(int millis) { LockStat::Acquiring a(stats,'W'); return q.lock_W_try(millis); }
+        bool lock_R_try(int millis) { 
+            verify( threadState() == 0 );
+            LockStat::Acquiring a(stats,'R'); 
+            bool got = q.lock_R_try(millis); 
+            if( got ) 
+                lockState().locked( 'R' );
+            return got;
+        }
+        
+        bool lock_W_try(int millis) { 
+            verify( threadState() == 0 );
+            LockStat::Acquiring a(stats,'W'); 
+            bool got = q.lock_W_try(millis); 
+            if( got ) {
+                lockState().locked( 'W' );
+                locked_W();
+            }
+            return got;
+        }
 
-        void unlock_r()             { stats.unlocking('r'); q.unlock_r(); }
-        void unlock_w()             { stats.unlocking('w'); q.unlock_w(); }
-        void unlock_R()             { stats.unlocking('R'); q.unlock_R(); }
-        void unlock_W()             { stats.unlocking('W'); q.unlock_W(); }
+        void unlock_r() {
+            wassert( threadState() == 'r' );
+            lockState().unlocked();
+            stats.unlocking('r'); 
+            q.unlock_r(); 
+        }
+        void unlock_w() {
+            unlocking_w();
+            wassert( threadState() == 'w' );
+            lockState().unlocked();
+            stats.unlocking('w'); 
+            q.unlock_w(); 
+        }
+        void unlock_R() {
+            wassert( threadState() == 'R' );
+            lockState().unlocked();
+            stats.unlocking('R'); 
+            q.unlock_R(); 
+        }
+        void unlock_W() {
+            wassert( threadState() == 'W' );
+            unlocking_W();
+            lockState().unlocked();
+            stats.unlocking('W'); 
+            q.unlock_W(); 
+        }
 
         // todo timing stats? : 
         void runExclusively(void (*f)(void)) { q.runExclusively(f); }
@@ -163,94 +257,6 @@ namespace mongo {
         }
         greed--;
         dlog(1) << "run exclusively end" << endl;
-    }
-
-    inline LockState& lockState() { 
-        return cc().lockState();
-    }
-
-    char threadState() { 
-        return lockState().threadState();
-    }
-
-    static bool lock_R_try(int ms) { 
-        verify( threadState() == 0 );
-        bool got = q.lock_R_try(ms);
-        if( got ) 
-            lockState().locked( 'R' );
-        return got;
-    }
-    static bool lock_W_try(int ms) { 
-        verify( threadState() == 0 );
-        bool got = q.lock_W_try(ms);
-        if( got ) {
-            lockState().locked( 'W' );
-            locked_W();
-        }
-        return got;
-    }
-    static void lock_W_stop_greed() { 
-        verify( threadState() == 0 );
-        lockState().locked( 'W' );
-        {
-            Acquiring a('W');
-            q.lock_W_stop_greed();
-        }
-        locked_W();
-    }
-    static void lock_W() { 
-        LockState& ls = lockState();
-        if(  ls.threadState() ) {
-            log() << "can't lock_W, threadState=" << (int) ls.threadState() << endl;
-            fassert(16114,false);
-        }
-        getDur().commitIfNeeded(); // check before locking - will use an R lock for the commit if need to do one, which is better than W
-        ls.locked( 'W' );
-        {
-            Acquiring a('W');
-            q.lock_W();
-        }
-        locked_W();
-    }
-    static void unlock_W() { 
-        wassert( threadState() == 'W' );
-        unlocking_W();
-        lockState().unlocked();
-        q.unlock_W();
-    }
-    static void lock_R() { 
-        LockState& ls = lockState();
-        massert(16103, str::stream() << "can't lock_R, threadState=" << (int) ls.threadState(), ls.threadState() == 0);
-        ls.locked( 'R' );
-        Acquiring a('R');
-        q.lock_R();
-    }
-    static void unlock_R() { 
-        wassert( threadState() == 'R' );
-        lockState().unlocked();
-        q.unlock_R();
-    }    
-    static void lock_w() { 
-        verify( threadState() == 0 );
-        getDur().commitIfNeeded();
-        lockState().locked( 'w' );
-        q.lock_w();
-    }
-    static void unlock_w() { 
-        unlocking_w();
-        wassert( threadState() == 'w' );
-        lockState().unlocked();
-        q.unlock_w();
-    }
-    static void lock_r() {
-        verify( threadState() == 0 );
-        lockState().locked( 'r' );
-        q.lock_r();
-    }
-    static void unlock_r() { 
-        wassert( threadState() == 'r' );
-        lockState().unlocked();
-        q.unlock_r();
     }
 
     int Lock::isLocked() {
@@ -360,26 +366,26 @@ namespace mongo {
         fassert(16122, ts != 'R'); // indicates downgraded; not allowed with temprelease
         fassert(16123, ts == 'W');
         fassert(16124, !stoppedGreed); // not allowed with temprelease
-        unlock_W();
+        q.unlock_W();
     }
     void Lock::GlobalWrite::relock() { 
         fassert(16125, !noop);
         char ts = threadState();
         fassert(16126, ts == 0);
-        lock_W();
+        q.lock_W();
     }
 
     void Lock::GlobalRead::tempRelease() { 
         fassert(16127, !noop);
         char ts = threadState();
         fassert(16128, ts == 'R');
-        unlock_R();
+        q.unlock_R();
     }
     void Lock::GlobalRead::relock() { 
         fassert(16129, !noop);
         char ts = threadState();
         fassert(16130, ts == 0);
-        lock_R();
+        q.lock_R();
     }
 
     void Lock::DBWrite::tempRelease() { 
@@ -409,14 +415,14 @@ namespace mongo {
         }
         dassert( ts == 0 );
         if( sg ) {
-            lock_W_stop_greed();
+            q.lock_W_stop_greed();
         } 
         else if ( timeoutms != -1 ) {
-            bool success = lock_W_try( timeoutms );
+            bool success = q.lock_W_try( timeoutms );
             if ( !success ) throw DBTryLockTimeoutException(); 
         }
         else {
-            lock_W();
+            q.lock_W();
         }
     }
     Lock::GlobalWrite::~GlobalWrite() {
@@ -424,10 +430,10 @@ namespace mongo {
             return;
         }
         if( threadState() == 'R' ) { // we downgraded
-            unlock_R();
+            q.unlock_R();
         }
         else {
-            unlock_W();
+            q.unlock_W();
         }
         if( stoppedGreed ) {
             q.start_greed();
@@ -464,16 +470,16 @@ namespace mongo {
             return;
         }
         if ( timeoutms != -1 ) {
-            bool success = lock_R_try( timeoutms );
+            bool success = q.lock_R_try( timeoutms );
             if ( !success ) throw DBTryLockTimeoutException(); 
         }
         else {
-            lock_R(); // we are unlocked in the qlock/top sense.  lock_R will assert if we are in an in compatible state
+            q.lock_R(); // we are unlocked in the qlock/top sense.  lock_R will assert if we are in an in compatible state
         }
     }
     Lock::GlobalRead::~GlobalRead() {
         if( !noop ) {
-            unlock_R();
+            q.unlock_R();
         }
     }
 
@@ -563,7 +569,7 @@ namespace mongo {
             Nestable nested = n(db);
             if( nested == admin ) { 
                 // we can't nestedly lock both admin and local as implemented. so lock_W.
-                lock_W();
+                q.lock_W();
                 _locked_W = true;
                 return;
             } 
@@ -574,10 +580,11 @@ namespace mongo {
                 lockNestable(nested);
         } 
         else {
-            lock_W();
+            q.lock_W();
             _locked_w = true;
         }
     }
+
     void Lock::DBRead::lockDB(const string& ns) {
         verify( ns.size() );
         Acquiring a( 'r' );
@@ -597,7 +604,7 @@ namespace mongo {
                 lockNestable(nested);
         } 
         else {
-            lock_R();
+            q.lock_R();
             _locked_r = true;
         }
     }
@@ -628,13 +635,13 @@ namespace mongo {
         }
         if( _locked_w ) {
             if (DB_LEVEL_LOCKING_ENABLED) {
-                unlock_w();
+                q.unlock_w();
             } else {
-                unlock_W();
+                q.unlock_W();
             }
         }
         if( _locked_W ) {
-            unlock_W();
+            q.unlock_W();
         }
         _weLocked = 0;
         _locked_W = _locked_w = false;
@@ -651,9 +658,9 @@ namespace mongo {
 
         if( _locked_r ) {
             if (DB_LEVEL_LOCKING_ENABLED) {
-                unlock_r();
+                q.unlock_r();
             } else {
-                unlock_R();
+                q.unlock_R();
             }
         }
         _weLocked = 0;
@@ -667,7 +674,7 @@ namespace mongo {
         default:
             verify(false);
         case  0  : 
-            lock_w();
+            q.lock_w();
             _locked_w = true;
         }
     }
@@ -679,7 +686,7 @@ namespace mongo {
         default:
             verify(false);
         case  0  : 
-            lock_r();
+            q.lock_r();
             _locked_r = true;
         }
     }
