@@ -16,6 +16,7 @@
  */
 
 #include "pch.h"
+#include <pcrecpp.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -112,8 +113,11 @@ void shellHistoryAdd( const char * line ) {
         return;
     lastLine = line;
 
-    if ( strstr( line, ".auth") == NULL &&
-         strstr( line, ".addUser") == NULL )
+    // We don't want any .auth() or .addUser() commands added, but we want to
+    // be able to add things like `.author`, so be smart about how this is
+    // detected by using regular expresions.
+    static pcrecpp::RE hiddenCommands("\\.(auth|addUser)\\s*\\(");
+    if (!hiddenCommands.PartialMatch(line))
     {
         linenoiseHistoryAdd( line );
     }
