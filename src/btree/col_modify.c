@@ -180,8 +180,7 @@ err:		if (ins != NULL)
 
 /*
  * __col_insert_alloc --
- *	Column-store insert: allocate a WT_INSERT structure from the session's
- *	buffer and fill it in.
+ *	Column-store insert: allocate a WT_INSERT structure and fill it in.
  */
 static int
 __col_insert_alloc(WT_SESSION_IMPL *session,
