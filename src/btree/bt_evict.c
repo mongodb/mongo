@@ -41,7 +41,7 @@ static int  __evict_worker(WT_SESSION_IMPL *);
  *	Clear an entry in the LRU eviction list.
  */
 static inline void
-__evict_list_clr(WT_SESSION_IMPL *session, WT_EVICT_LIST *e)
+__evict_list_clr(WT_SESSION_IMPL *session, WT_EVICT_ENTRY *e)
 {
 	if (e->page != NULL) {
 		WT_ASSERT(session, F_ISSET_ATOMIC(e->page, WT_PAGE_EVICT_LRU));
@@ -59,7 +59,7 @@ static inline void
 __evict_list_clr_all(WT_SESSION_IMPL *session, u_int start)
 {
 	WT_CACHE *cache;
-	WT_EVICT_LIST *evict;
+	WT_EVICT_ENTRY *evict;
 	uint32_t i, elem;
 
 	cache = S2C(session)->cache;
@@ -79,7 +79,7 @@ void
 __wt_evict_list_clr_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_CACHE *cache;
-	WT_EVICT_LIST *evict;
+	WT_EVICT_ENTRY *evict;
 	uint32_t i, elem;
 
 	WT_ASSERT(session, WT_PAGE_IS_ROOT(page) ||
@@ -110,7 +110,7 @@ __wt_evict_list_clr_page(WT_SESSION_IMPL *session, WT_PAGE *page)
  *	Set an entry in the forced page eviction request list.
  */
 static inline void
-__evict_req_set(WT_EVICT_REQ *r, WT_BTREE *btree, WT_PAGE *page)
+__evict_req_set(WT_EVICT_ENTRY *r, WT_BTREE *btree, WT_PAGE *page)
 {
 	r->btree = btree;
 	/*
@@ -125,7 +125,7 @@ __evict_req_set(WT_EVICT_REQ *r, WT_BTREE *btree, WT_PAGE *page)
  *	Clear an entry in the forced page eviction request list.
  */
 static inline void
-__evict_req_clr(WT_EVICT_REQ *r)
+__evict_req_clr(WT_EVICT_ENTRY *r)
 {
 	r->btree = NULL;
 	r->page = NULL;
@@ -176,6 +176,7 @@ __wt_sync_file_serial_func(WT_SESSION_IMPL *session)
 	 */
 	WT_PUBLISH(session->syncop, syncop);
 
+	/* We're serialized at this point, no lock needed. */
 	cache = S2C(session)->cache;
 	++cache->sync_request;
 }
@@ -192,7 +193,7 @@ int
 __wt_evict_page_request(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_CACHE *cache;
-	WT_EVICT_REQ *er, *er_end;
+	WT_EVICT_ENTRY *er, *er_end;
 
 	cache = S2C(session)->cache;
 
@@ -536,7 +537,7 @@ static int
 __evict_page_request_walk(WT_SESSION_IMPL *session)
 {
 	WT_CACHE *cache;
-	WT_EVICT_REQ *er, *er_end;
+	WT_EVICT_ENTRY *er, *er_end;
 	WT_PAGE *page;
 	WT_REF *ref;
 
@@ -675,7 +676,7 @@ __evict_walk(WT_SESSION_IMPL *session)
 		__wt_spin_lock(session, &cache->lru_lock);
 		i = (u_int)(cache->evict_current - cache->evict);
 		WT_ERR(__wt_realloc(session, &cache->evict_allocated,
-		    elem * sizeof(WT_EVICT_LIST), &cache->evict));
+		    elem * sizeof(WT_EVICT_ENTRY), &cache->evict));
 		cache->evict_entries = elem;
 		if (cache->evict_current != NULL)
 			cache->evict_current = cache->evict + i;
@@ -712,7 +713,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 	WT_BTREE *btree;
 	WT_CACHE *cache;
 	WT_DECL_RET;
-	WT_EVICT_LIST *end, *evict, *start;
+	WT_EVICT_ENTRY *end, *evict, *start;
 	WT_PAGE *page;
 	int restarts;
 
@@ -793,7 +794,7 @@ __evict_lru_sort(WT_SESSION_IMPL *session)
 	 */
 	cache = S2C(session)->cache;
 	qsort(cache->evict,
-	    cache->evict_entries, sizeof(WT_EVICT_LIST), __evict_lru_cmp);
+	    cache->evict_entries, sizeof(WT_EVICT_ENTRY), __evict_lru_cmp);
 }
 
 /*
@@ -805,7 +806,7 @@ __evict_get_page(
     WT_SESSION_IMPL *session, int is_app, WT_BTREE **btreep, WT_PAGE **pagep)
 {
 	WT_CACHE *cache;
-	WT_EVICT_LIST *evict;
+	WT_EVICT_ENTRY *evict;
 	WT_REF *ref;
 	int candidates;
 
@@ -932,7 +933,7 @@ __evict_pages(WT_SESSION_IMPL *session)
 
 /*
  * __evict_lru_cmp --
- *	Qsort function: sort WT_EVICT_LIST array based on the page's read
+ *	Qsort function: sort LRU eviction array based on the page's read
  *	generation.
  */
 static int
@@ -945,8 +946,8 @@ __evict_lru_cmp(const void *a, const void *b)
 	 * There may be NULL references in the array; sort them as greater than
 	 * anything else so they migrate to the end of the array.
 	 */
-	a_page = ((WT_EVICT_LIST *)a)->page;
-	b_page = ((WT_EVICT_LIST *)b)->page;
+	a_page = ((WT_EVICT_ENTRY *)a)->page;
+	b_page = ((WT_EVICT_ENTRY *)b)->page;
 	if (a_page == NULL)
 		return (b_page == NULL ? 0 : 1);
 	if (b_page == NULL)

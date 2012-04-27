@@ -43,8 +43,8 @@ __wt_cache_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	__wt_spin_init(session, &cache->lru_lock);
 
 	/*
-	 * Allocate the eviction request array.  We size it to allow one
-	 * eviction request request per session.
+	 * Allocate the forced page eviction request array.  We size it to
+	 * allow one eviction page request per session.
 	 */
 	cache->max_evict_request = conn->session_size;
 	WT_ERR(__wt_calloc_def(
