@@ -44,7 +44,7 @@ __wt_schema_get_btree(WT_SESSION_IMPL *session,
 	const char *fileuri, *name, *objconf;
 
 	cursor = NULL;
-	WT_ERR(__wt_scr_alloc(session, 0, &uribuf));
+	uribuf = NULL;
 
 	name = objname;
 	if (len != strlen(objname))
@@ -56,9 +56,10 @@ __wt_schema_get_btree(WT_SESSION_IMPL *session,
 	WT_ERR(cursor->get_value(cursor, &objconf));
 
 	/* Get the filename from the metadata. */
+	WT_ERR(__wt_scr_alloc(session, 0, &uribuf));
 	WT_ERR(__wt_config_getones(session, objconf, "filename", &cval));
-	WT_ERR(__wt_buf_fmt(session, uribuf, "file:%.*s",
-	    (int)cval.len, cval.str));
+	WT_ERR(__wt_buf_fmt(
+	    session, uribuf, "file:%.*s", (int)cval.len, cval.str));
 	fileuri = uribuf->data;
 
 	/* !!! Close the schema cursor first, this overwrites session->btree. */
