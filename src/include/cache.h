@@ -10,7 +10,7 @@
  *	Encapsulation of an eviction candidate.
  */
 struct __wt_evict_list {
-	WT_BTREE *btree;			/* File object */
+	WT_BTREE *btree;			/* Enclosing btree object */
 	WT_PAGE	 *page;				/* Page */
 };
 
@@ -19,15 +19,8 @@ struct __wt_evict_list {
  *	Encapsulation of a eviction request.
  */
 struct __wt_evict_req {
-	WT_SESSION_IMPL *session;		/* Requesting thread */
 	WT_BTREE *btree;			/* Enclosing btree */
-
-	WT_PAGE *page;                          /* Single page to flush */
-
-#define	WT_SYNC			1		/* Sync a file */
-#define	WT_SYNC_DISCARD		2		/* Sync a file, discard pages */
-#define	WT_SYNC_DISCARD_NOWRITE	3		/* Discard a file */
-	int fileop;				/* File operation */
+	WT_PAGE *page;                          /* Page to flush */
 };
 
 /*
@@ -70,4 +63,7 @@ struct __wt_cache {
 	WT_EVICT_REQ *evict_request;	/* Eviction requests:
 					   slot available if session is NULL */
 	uint32_t max_evict_request;	/* Size of the evict request array */
+
+	volatile uint64_t sync_request;		/* File sync requests */
+	volatile uint64_t sync_complete;	/* File sync completed */
 };
