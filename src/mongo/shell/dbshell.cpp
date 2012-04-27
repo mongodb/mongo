@@ -825,98 +825,90 @@ int _main( int argc, char* argv[] ) {
             }
 
             char * line = shellReadline( prompt.c_str() );
-
             char * linePtr = line;  // can't clobber 'line', we need to free() it later
-            if ( linePtr ) {
+
+            if ( line ) {
+                // Strips out leading whitespace.
                 while ( linePtr[0] == ' ' )
                     ++linePtr;
                 int lineLen = strlen( linePtr );
-                while ( lineLen > 0 && linePtr[lineLen - 1] == ' ' )
-                    linePtr[--lineLen] = 0;
-            }
 
-            if ( ! linePtr || ( strlen( linePtr ) == 4 && strstr( linePtr , "exit" ) ) ) {
-                if ( ! mongo::cmdLine.quiet )
-                    cout << "bye" << endl;
-                if ( line )
-                    free( line );
+                // Strip out trailing whitespace and semicolons; semicolons
+                // have no bearing on commands in the shell.  This also allows
+                // for "bad" commands like `exit ;`.  This will help habitual
+                // C++ programmers. :)
+                while ( lineLen > 0 && ( linePtr[lineLen - 1] == ' ' 
+                                      || linePtr[lineLen - 1] == ';' ) )
+                    --lineLen;
+                linePtr[lineLen] = 0;
+            } else {
+                // User must have hit ^C; treat this like an exit.
+                if( !mongo::cmdLine.quiet )
+                    cout << "User interrupt detected; exiting..." << endl;
                 break;
             }
 
             string code = linePtr;
-            if ( code == "exit" || code == "exit;" ) {
-                free( line );
+
+            // Free line before we forget.
+            free(line);
+            line = linePtr = NULL;
+
+            if ( code == "exit" )
+            {
+                if ( ! mongo::cmdLine.quiet )
+                    cout << "bye" << endl;
                 break;
             }
+
             if ( code == "cls" ) {
-                free( line );
                 linenoiseClearScreen();
-                continue;
-            }
-
-            if ( code.size() == 0 ) {
-                free( line );
-                continue;
-            }
-
-            if ( startsWith( linePtr, "edit " ) ) {
-                shellHistoryAdd( linePtr );
-
-                const char* s = linePtr + 5; // skip "edit "
+            } else if( startsWith( code, "edit " ) ) {
+                const char* s = code.c_str() + 5; // skip "edit "
                 while( *s && isspace( *s ) )
                     s++;
 
                 edit( s );
-                free( line );
-                continue;
-            }
+            } else if ( !code.empty() ) {
+                // Whatever we have now will be in the form:
+                //   CMD ARGS
+                bool wasCmd = false;
+                string cmd;
+                size_t strPos = code.find(" ");
+                if ( strPos > 0 )
+                    cmd = code.substr( 0, strPos );
 
-            gotInterrupted = false;
-            code = finishCode( code );
-            if ( gotInterrupted ) {
-                cout << endl;
-                free( line );
-                continue;
-            }
-
-            if ( code.size() == 0 ) {
-                free( line );
-                break;
-            }
-
-            bool wascmd = false;
-            {
-                string cmd = linePtr;
-                if ( cmd.find( " " ) > 0 )
-                    cmd = cmd.substr( 0 , cmd.find( " " ) );
-
-                if ( cmd.find( "\"" ) == string::npos ) {
+                if ( cmd.find("\"") == string::npos ) {
                     try {
-                        scope->exec( (string)"__iscmd__ = shellHelper[\"" + cmd + "\"];" , "(shellhelp1)" , false , true , true );
+                        scope->exec(
+                                (string) "__iscmd__ = shellHelper[\"" + cmd + "\"];",
+                                "(shellhelp1)" , false , true , true );
                         if ( scope->getBoolean( "__iscmd__" )  ) {
-                            scope->exec( (string)"shellHelper( \"" + cmd + "\" , \"" + code.substr( cmd.size() ) + "\");" , "(shellhelp2)" , false , true , false );
-                            wascmd = true;
+                            scope->exec(
+                                    (string) "shellHelper( \"" + cmd + "\" , \"" + code.substr( cmd.size() ) + "\");",
+                                    "(shellhelp2)" , false , true , false );
+                            wasCmd = true;
                         }
+                    } catch ( std::exception& exc) {
+                        cout << "error2:" << exc.what() << endl;
+                        wasCmd = true;
                     }
-                    catch ( std::exception& e ) {
-                        cout << "error2:" << e.what() << endl;
-                        wascmd = true;
+                }
+
+                if ( !wasCmd ) {
+                    try {
+                        if ( scope->exec( code.c_str() , "(shell)" , false , true , false ) )
+                            scope->exec( "shellPrintHelper( __lastres__ );" , "(shell2)" , true , true , false );
+                    }
+                    catch ( std::exception& exc ) {
+                        cout << "error:" << exc.what() << endl;
                     }
                 }
             }
 
-            if ( ! wascmd ) {
-                try {
-                    if ( scope->exec( code.c_str() , "(shell)" , false , true , false ) )
-                        scope->exec( "shellPrintHelper( __lastres__ );" , "(shell2)" , true , true , false );
-                }
-                catch ( std::exception& e ) {
-                    cout << "error:" << e.what() << endl;
-                }
-            }
-
-            shellHistoryAdd( code.c_str() );
-            free( line );
+            // If the code contained anything, add it to the history.
+            if(!code.empty())
+                shellHistoryAdd( code.c_str() );
         }
 
         shellHistoryDone();
