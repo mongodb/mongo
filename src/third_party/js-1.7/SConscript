@@ -12,18 +12,21 @@ env = env.Clone()
 
 env.Append(CPPDEFINES=["JSFILE", "EXPORT_JS_API", "JS_C_STRINGS_ARE_UTF8"])
 
-for to_remove in ['-Werror', '/TP', '/O2', '/Gy']:
+for to_remove in ['-Werror', '-Wcast-align', '/TP', '/O2', '/Gy']:
     removeIfPresent(env['CCFLAGS'], to_remove)
 
 if windows:
     env.Append(CCFLAGS=['/wd4748'])
+else:
+    # Force language to be c. Does not work when setting --cxx=g++ otherwise
+    env.Append(CCFLAGS=['-xc'])
 
 removeIfPresent(env['CPPDEFINES'], 'NDEBUG')
 
 if linux or darwin or freebsd:
     env.Append(CPPDEFINES=['HAVE_VA_COPY', 'VA_COPY=va_copy'])
 elif solaris:
-    env.Append(CPPDEFINES=['SOLARIS', 'HAVE_VA_LIST_AS_ARRAY', 'SVR4', 'SYSV', 'HAVE_LOCALTIME_R'])
+    env.Append(CPPDEFINES=['SOLARIS', 'HAVE_VA_COPY', 'VA_COPY=va_copy', 'SVR4', 'SYSV', 'HAVE_LOCALTIME_R'])
 
 env.Program('jskwgen', 'jskwgen.c')
 env.Program('jscpucfg', 'jscpucfg.c')

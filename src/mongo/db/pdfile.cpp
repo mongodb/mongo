@@ -1716,10 +1716,10 @@ namespace mongo {
             verify( sizeof(IDToInsert_) == 17 );
         }
     } idToInsert_;
+#pragma pack()
     struct IDToInsert : public BSONElement {
         IDToInsert() : BSONElement( ( char * )( &idToInsert_ ) ) {}
     } idToInsert;
-#pragma pack()
 
     void DataFileMgr::insertAndLog( const char *ns, const BSONObj &o, bool god, bool fromMigrate ) {
         BSONObj tmp = o;
