@@ -40,6 +40,43 @@ namespace mongo {
     }
     */
 
+    BSONObj AuthenticationInfo::toBSON() const {
+        scoped_spinlock lk(_lock);
+        BSONObjBuilder b;
+        for ( MA::const_iterator i = _dbs.begin(); i != _dbs.end(); ++i ) {
+            BSONObjBuilder temp( b.subobjStart( i->first ) );
+            temp.append( i->second.user, i->second.level );
+            temp.done();
+        }
+        return b.obj();
+    }
+
+    void AuthenticationInfo::setTemporaryAuthorization( BSONObj& obj ) {
+        fassert( 16232, !_usingTempAuth );
+        scoped_spinlock lk( _lock );
+        BSONObjIterator it( obj );
+        while ( it.more() ) {
+            BSONElement dbInfo = it.next();
+            BSONElement subObj = dbInfo.Obj().firstElement();
+            _addTempAuth_inlock( dbInfo.fieldName(), subObj.fieldName(),
+                                 static_cast<Auth::Level>(subObj.Int()) );
+        }
+        _usingTempAuth = true;
+    }
+
+    void AuthenticationInfo::clearTemporaryAuthorization() {
+        scoped_spinlock lk( _lock );
+        _usingTempAuth = false;
+        _tempAuthDbs.clear();
+    }
+
+    void AuthenticationInfo::_addTempAuth_inlock( const std::string& dbname, const std::string& user, Auth::Level level) {
+        fassert( 16233, !_tempAuthDbs.count( dbname ) );
+        _tempAuthDbs[dbname].level = level;
+        _tempAuthDbs[dbname].user = user;
+    }
+
+
     string AuthenticationInfo::getUser( const string& dbname ) const {
         scoped_spinlock lk(_lock);
 
