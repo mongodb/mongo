@@ -9,7 +9,7 @@ t_LDADD = $(top_builddir)/libwiredtiger.la -L$(BDB)/build_unix -ldb
 t_LDFLAGS = -static
 
 s_dumpcmp: $(srcdir)/s_dumpcmp.sh
-	cp $< $@
+	cp $(srcdir)/s_dumpcmp.sh $@
 	chmod +x $@
 
 backup:
