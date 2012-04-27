@@ -272,15 +272,15 @@ __wt_conn_btree_remove(WT_CONNECTION_IMPL *conn)
 	WT_RET(__wt_open_session(conn, 1, NULL, NULL, &session));
 
 	/*
-	 * Close open btree handles: first, everything but the schema file (as
-	 * closing a normal file may open and write the schema file), then the
-	 * schema file.  This function isn't called often, and I don't want to
-	 * "know" anything about the schema file's position on the list, so we
-	 * do it the hard way.
+	 * Close open btree handles: first, everything but the metadata file
+	 * (as closing a normal file may open and write the metadata file),
+	 * then the metadata file.  This function isn't called often, and I
+	 * don't want to "know" anything about the metadata file's position on
+	 * the list, so we do it the hard way.
 	 */
 restart:
 	TAILQ_FOREACH(btree, &conn->btqh, q) {
-		if (strcmp(btree->filename, WT_SCHEMA_FILENAME) == 0)
+		if (strcmp(btree->filename, WT_METADATA_FILENAME) == 0)
 			continue;
 
 		TAILQ_REMOVE(&conn->btqh, btree, q);
@@ -291,14 +291,14 @@ restart:
 
 	/*
 	 * Closing the files may have resulted in entries on our session's list
-	 * of open btree handles, specifically, we added the schema file if any
-	 * of the files were dirty.  Clean up that list before we shut down the
-	 * schema file entry, for good.
+	 * of open btree handles, specifically, we added the metadata file if
+	 * any of the files were dirty.  Clean up that list before we shut down
+	 * the metadata entry, for good.
 	 */
 	while ((btree_session = TAILQ_FIRST(&session->btrees)) != NULL)
 		WT_TRET(__wt_session_remove_btree(session, btree_session, 0));
 
-	/* Close the schema file handle. */
+	/* Close the metadata file handle. */
 	while ((btree = TAILQ_FIRST(&conn->btqh)) != NULL) {
 		TAILQ_REMOVE(&conn->btqh, btree, q);
 		--conn->btqcnt;

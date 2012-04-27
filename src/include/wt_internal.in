@@ -175,6 +175,7 @@ struct __wt_update;
 
 #include "api.h"
 #include "cursor.h"
+#include "meta.h"
 #include "schema.h"
 
 #include "extern.h"

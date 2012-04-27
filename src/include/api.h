@@ -70,7 +70,10 @@ struct __wt_session_impl {
 					/* Cursors closed with the session */
 	TAILQ_HEAD(__cursors, __wt_cursor) cursors;
 
-	WT_BTREE *schematab;		/* Schema tables */
+	WT_BTREE *metafile;		/* Metadata file */
+	void	*meta_track;		/* Metadata operation tracking */
+	u_int	 meta_track_entries;	/* Currently allocated */
+
 	TAILQ_HEAD(__tables, __wt_table) tables;
 
 	WT_ITEM	logrec_buf;		/* Buffer for log records */
@@ -91,9 +94,6 @@ struct __wt_session_impl {
 	WT_REF **excl;			/* Eviction exclusive list */
 	u_int	 excl_next;		/* Next empty slot */
 	size_t	 excl_allocated;	/* Bytes allocated */
-
-	void	*schema_track;		/* Tracking schema operations */
-	u_int	 schema_track_entries;	/* Currently allocated */
 
 	uint32_t flags;
 };

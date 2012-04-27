@@ -8,38 +8,38 @@
 #include "wt_internal.h"
 
 /*
- * WT_SCHEMA_TRACK --
- *	A tracked schema operation: a non-transactional log, maintained to make
- * it easy to unroll simple schema table and filesystem operations.
+ * WT_META_TRACK -- A tracked metadata operation: a non-transactional log,
+ * maintained to make it easy to unroll simple metadata and filesystem
+ * operations.
  */
-typedef struct __wt_schema_track {
+typedef struct __wt_meta_track {
 	enum {
 		WT_ST_EMPTY=0,		/* Unused slot */
 		WT_ST_FILEOP=1,		/* File operation */
-		WT_ST_REMOVE=2,		/* Remove a schema table entry */
-		WT_ST_SET=3		/* Reset a schema table entry */
+		WT_ST_REMOVE=2,		/* Remove a metadata entry */
+		WT_ST_SET=3		/* Reset a metadata entry */
 	} op;
 	const char *a, *b;		/* Strings */
-} WT_SCHEMA_TRACK;
+} WT_META_TRACK;
 
 /*
- * __schema_table_track_next --
+ * __meta_track_next --
  *	Return the next slot, and extend the list of operations we're tracking,
  * as necessary.
  */
 static int
-__schema_table_track_next(WT_SESSION_IMPL *session, WT_SCHEMA_TRACK **trkp)
+__meta_track_next(WT_SESSION_IMPL *session, WT_META_TRACK **trkp)
 {
-	WT_SCHEMA_TRACK *trk;
+	WT_META_TRACK *trk;
 	size_t bytes_allocated;
 	u_int i;
 
 	/*
-	 * Slow, but we don't care -- it's a schema table op, searching an array
-	 * of maybe 20 items.
+	 * Slow, but we don't care -- it's a metadata operation, searching an
+	 * array of maybe 20 items.
 	 */
-	for (trk = session->schema_track,
-	    i = 0; i <  session->schema_track_entries; ++trk, ++i)
+	for (trk = session->meta_track,
+	    i = 0; i <  session->meta_track_entries; ++trk, ++i)
 		if (trk->op == WT_ST_EMPTY) {
 			if (trkp != NULL)
 				*trkp = trk;
@@ -53,47 +53,47 @@ __schema_table_track_next(WT_SESSION_IMPL *session, WT_SCHEMA_TRACK **trkp)
 	 * it's a security thing).
 	 */
 	bytes_allocated =
-	    session->schema_track_entries * sizeof(WT_SCHEMA_TRACK);
+	    session->meta_track_entries * sizeof(WT_META_TRACK);
 	WT_RET(__wt_realloc(session, &bytes_allocated,
-	    (session->schema_track_entries + 20) * sizeof(WT_SCHEMA_TRACK),
-	    &session->schema_track));
+	    (session->meta_track_entries + 20) * sizeof(WT_META_TRACK),
+	    &session->meta_track));
 	if (trkp != NULL)
-		*trkp = &((WT_SCHEMA_TRACK *)
-		    session->schema_track)[session->schema_track_entries];
-	session->schema_track_entries += 20;
+		*trkp = &((WT_META_TRACK *)
+		    session->meta_track)[session->meta_track_entries];
+	session->meta_track_entries += 20;
 	return (0);
 }
 
 /*
- * __wt_schema_table_track_on --
- *	Turn on schema table tracking.
+ * __wt_meta_track_on --
+ *	Turn on metadata operation tracking.
  */
 int
-__wt_schema_table_track_on(WT_SESSION_IMPL *session)
+__wt_meta_track_on(WT_SESSION_IMPL *session)
 {
-	return (__schema_table_track_next(session, NULL));
+	return (__meta_track_next(session, NULL));
 }
 
 /*
- * __wt_schema_table_track_off --
- *	Turn off schema table tracking, unrolling on error.
+ * __wt_meta_track_off --
+ *	Turn off metadata operation tracking, unrolling on error.
  */
 int
-__wt_schema_table_track_off(WT_SESSION_IMPL *session, int unroll)
+__wt_meta_track_off(WT_SESSION_IMPL *session, int unroll)
 {
 	WT_DECL_RET;
-	WT_SCHEMA_TRACK *trk, *trk_orig;
+	WT_META_TRACK *trk, *trk_orig;
 	int tret;
 
-	if (session->schema_track == NULL || session->schema_track_entries == 0)
+	if (session->meta_track == NULL || session->meta_track_entries == 0)
 		return (0);
 
-	trk_orig = session->schema_track;
-	trk = &trk_orig[session->schema_track_entries - 1];
+	trk_orig = session->meta_track;
+	trk = &trk_orig[session->meta_track_entries - 1];
 
 	/* Turn off tracking for unroll. */
-	session->schema_track = NULL;
-	session->schema_track_entries = 0;
+	session->meta_track = NULL;
+	session->meta_track_entries = 0;
 
 	for (;; --trk) {
 		if (unroll)
@@ -110,7 +110,7 @@ __wt_schema_table_track_off(WT_SESSION_IMPL *session, int unroll)
 				    (tret = __wt_rename(
 				    session, trk->b, trk->a)) != 0) {
 					__wt_err(session, tret,
-					    "schema table unroll rename "
+					    "metadata unroll rename "
 					    "%s to %s",
 					    trk->b, trk->a);
 					WT_TRET(tret);
@@ -119,7 +119,7 @@ __wt_schema_table_track_off(WT_SESSION_IMPL *session, int unroll)
 				    session, trk->b)) != 0 || (tret =
 				    __wt_remove(session, trk->b)) != 0)) {
 					__wt_err(session, tret,
-					    "schema table unroll create %s",
+					    "metadata unroll create %s",
 					    trk->b);
 					WT_TRET(tret);
 				}
@@ -130,19 +130,19 @@ __wt_schema_table_track_off(WT_SESSION_IMPL *session, int unroll)
 				 */
 				break;
 			case WT_ST_REMOVE:	/* Remove trk.a */
-				if ((tret = __wt_schema_table_remove(
+				if ((tret = __wt_metadata_remove(
 				    session, trk->a)) != 0) {
 					__wt_err(session, ret,
-					    "schema table unroll remove: %s",
+					    "metadata unroll remove: %s",
 					    trk->a);
 					WT_TRET(tret);
 				}
 				break;
 			case WT_ST_SET:		/* Set trk.a to trk.b */
-				if ((tret = __wt_schema_table_update(
+				if ((tret = __wt_metadata_update(
 				    session, trk->a, trk->b)) != 0) {
 					__wt_err(session, ret,
-					    "schema table unroll update "
+					    "metadata unroll update "
 					    "%s to %s",
 					    trk->a, trk->b);
 					WT_TRET(tret);
@@ -162,15 +162,15 @@ __wt_schema_table_track_off(WT_SESSION_IMPL *session, int unroll)
 }
 
 /*
- * __wt_schema_table_track_insert --
+ * __wt_meta_track_insert --
  *	Track an insert operation.
  */
 int
-__wt_schema_table_track_insert(WT_SESSION_IMPL *session, const char *key)
+__wt_meta_track_insert(WT_SESSION_IMPL *session, const char *key)
 {
-	WT_SCHEMA_TRACK *trk;
+	WT_META_TRACK *trk;
 
-	WT_RET(__schema_table_track_next(session, &trk));
+	WT_RET(__meta_track_next(session, &trk));
 
 	trk->op = WT_ST_REMOVE;
 	WT_RET(__wt_strdup(session, key, &trk->a));
@@ -179,16 +179,16 @@ __wt_schema_table_track_insert(WT_SESSION_IMPL *session, const char *key)
 }
 
 /*
- * __wt_schema_table_track_update --
- *	Track a schema table update operation.
+ * __wt_meta_track_update --
+ *	Track a metadata update operation.
  */
 int
-__wt_schema_table_track_update(WT_SESSION_IMPL *session, const char *key)
+__wt_meta_track_update(WT_SESSION_IMPL *session, const char *key)
 {
 	WT_DECL_RET;
-	WT_SCHEMA_TRACK *trk;
+	WT_META_TRACK *trk;
 
-	WT_RET(__schema_table_track_next(session, &trk));
+	WT_RET(__meta_track_next(session, &trk));
 
 	trk->op = WT_ST_SET;
 	WT_RET(__wt_strdup(session, key, &trk->a));
@@ -197,8 +197,7 @@ __wt_schema_table_track_update(WT_SESSION_IMPL *session, const char *key)
 	 * If there was a previous value, keep it around -- if not, then this
 	 * "update" is really an insert.
 	 */
-	if ((ret =
-	    __wt_schema_table_read(session, key, &trk->b)) == WT_NOTFOUND) {
+	if ((ret = __wt_metadata_read(session, key, &trk->b)) == WT_NOTFOUND) {
 		trk->op = WT_ST_REMOVE;
 		ret = 0;
 	}
@@ -206,16 +205,16 @@ __wt_schema_table_track_update(WT_SESSION_IMPL *session, const char *key)
 }
 
 /*
- * __wt_schema_table_track_fs_rename --
+ * __wt_meta_track_fs_rename --
  *	Track a filesystem rename operation.
  */
 int
-__wt_schema_table_track_fileop(
+__wt_meta_track_fileop(
     WT_SESSION_IMPL *session, const char *oldname, const char *newname)
 {
-	WT_SCHEMA_TRACK *trk;
+	WT_META_TRACK *trk;
 
-	WT_RET(__schema_table_track_next(session, &trk));
+	WT_RET(__meta_track_next(session, &trk));
 
 	trk->op = WT_ST_FILEOP;
 	if (oldname != NULL)

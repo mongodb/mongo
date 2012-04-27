@@ -157,13 +157,13 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 		return (WT_NOTFOUND);
 
 	/*
-	 * A fixed configuration is passed in for special files, such
-	 * as the schema table itself.
+	 * A fixed configuration is passed in for special files, such as the
+	 * metadata file itself.
 	 */
 	if (tconfig != NULL)
 		WT_RET(__wt_strdup(session, tconfig, &treeconf));
 	else
-		WT_RET(__wt_schema_table_read(session, fileuri, &treeconf));
+		WT_RET(__wt_metadata_read(session, fileuri, &treeconf));
 	WT_RET(__wt_conn_btree_open(
 	    session, name, filename, treeconf, cfg, flags));
 	WT_RET(__wt_session_lock_btree(session, cfg, flags));

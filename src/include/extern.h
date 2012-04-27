@@ -591,27 +591,25 @@ extern int __wt_snapshot_list_set(WT_SESSION_IMPL *session,
     WT_SNAPSHOT *snapbase);
 extern void __wt_snapshot_list_free(WT_SESSION_IMPL *session,
     WT_SNAPSHOT *snapbase);
-extern int __wt_open_schema_table(WT_SESSION_IMPL *session);
-extern int __wt_schema_table_cursor( WT_SESSION_IMPL *session,
+extern int __wt_open_metadata(WT_SESSION_IMPL *session);
+extern int __wt_metadata_cursor( WT_SESSION_IMPL *session,
     const char *config,
     WT_CURSOR **cursorp);
-extern int __wt_schema_table_insert( WT_SESSION_IMPL *session,
+extern int __wt_metadata_insert( WT_SESSION_IMPL *session,
     const char *key,
     const char *value);
-extern int __wt_schema_table_update( WT_SESSION_IMPL *session,
+extern int __wt_metadata_update( WT_SESSION_IMPL *session,
     const char *key,
     const char *value);
-extern int __wt_schema_table_remove(WT_SESSION_IMPL *session, const char *key);
-extern int __wt_schema_table_read( WT_SESSION_IMPL *session,
+extern int __wt_metadata_remove(WT_SESSION_IMPL *session, const char *key);
+extern int __wt_metadata_read( WT_SESSION_IMPL *session,
     const char *key,
     const char **valuep);
-extern int __wt_schema_table_track_on(WT_SESSION_IMPL *session);
-extern int __wt_schema_table_track_off(WT_SESSION_IMPL *session, int unroll);
-extern int __wt_schema_table_track_insert(WT_SESSION_IMPL *session,
-    const char *key);
-extern int __wt_schema_table_track_update(WT_SESSION_IMPL *session,
-    const char *key);
-extern int __wt_schema_table_track_fileop( WT_SESSION_IMPL *session,
+extern int __wt_meta_track_on(WT_SESSION_IMPL *session);
+extern int __wt_meta_track_off(WT_SESSION_IMPL *session, int unroll);
+extern int __wt_meta_track_insert(WT_SESSION_IMPL *session, const char *key);
+extern int __wt_meta_track_update(WT_SESSION_IMPL *session, const char *key);
+extern int __wt_meta_track_fileop( WT_SESSION_IMPL *session,
     const char *oldname,
     const char *newname);
 extern void __wt_abort(WT_SESSION_IMPL *session);

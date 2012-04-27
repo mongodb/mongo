@@ -30,7 +30,7 @@ __wt_snapshot_get(WT_SESSION_IMPL *session, const char *name, WT_ITEM *addr)
 	btree = session->btree;
 
 	/* Get the snapshot address. */
-	ret = strcmp(btree->filename, WT_SCHEMA_FILENAME) == 0 ?
+	ret = strcmp(btree->filename, WT_METADATA_FILENAME) == 0 ?
 	    __snap_get_turtle(session, addr) : __snap_get(session, name, addr);
 
 	/*
@@ -66,14 +66,14 @@ __wt_snapshot_clear(WT_SESSION_IMPL *session, const char *filename)
 {
 	WT_DECL_RET;
 
-	ret = strcmp(filename, WT_SCHEMA_FILENAME) == 0 ?
+	ret = strcmp(filename, WT_METADATA_FILENAME) == 0 ?
 	    __snap_set_turtle(session, NULL) :
 	    __snap_set(session, filename, NULL);
 
 	/*
 	 * If we are unrolling a failed create, we may have already removed the
-	 * schema table entry.  If no entry is found to update and we're trying
-	 * to clear the snapshot, just ignore it.
+	 * metadata entry.  If no entry is found to update and we're trying to
+	 * clear the snapshot, just ignore it.
 	 */
 	if (ret == WT_NOTFOUND)
 		ret = 0;
@@ -82,7 +82,7 @@ __wt_snapshot_clear(WT_SESSION_IMPL *session, const char *filename)
 
 /*
  * __snap_get_turtle --
- *	Get the schema file's snapshot address.
+ *	Get the metadata file's snapshot address.
  */
 static int
 __snap_get_turtle(
@@ -103,7 +103,7 @@ __snap_get_turtle(
 
 /*
  * __snap_get_turtle_config --
- *	Return the configuration value for the schema-table.
+ *	Return the configuration value for the metadata file.
  */
 static int
 __snap_get_turtle_config(
@@ -118,13 +118,13 @@ __snap_get_turtle_config(
 	path = NULL;
 
 	/* Retrieve the turtle file's entry. */
-	WT_RET(__wt_filename(session, WT_SCHEMA_TURTLE, &path));
+	WT_RET(__wt_filename(session, WT_METADATA_TURTLE, &path));
 	WT_ERR_TEST((fp = fopen(path, "r")) == NULL, WT_NOTFOUND);
 	while (fgets(line, (int)len, fp) != NULL) {
 		if ((p = strchr(line, '\n')) == NULL)
 			break;
 		*p = '\0';
-		if (strcmp(line, WT_SCHEMA_TURTLE_MSG) == 0)
+		if (strcmp(line, WT_METADATA_TURTLE_MSG) == 0)
 			continue;
 	}
 	if (ferror(fp))
@@ -141,7 +141,7 @@ err:	__wt_free(session, path);
 
 /*
  * __snap_set_turtle --
- *	Set the schema file's snapshot address.
+ *	Set the metadata file's snapshot address.
  */
 static int
 __snap_set_turtle(WT_SESSION_IMPL *session, const char *v)
@@ -155,7 +155,7 @@ __snap_set_turtle(WT_SESSION_IMPL *session, const char *v)
 	buf = NULL;
 	path = NULL;
 
-	WT_ERR(__wt_filename(session, WT_SCHEMA_TURTLE_SET, &path));
+	WT_ERR(__wt_filename(session, WT_METADATA_TURTLE_SET, &path));
 	WT_ERR_TEST((fp = fopen(path, "w")) == NULL, __wt_errno());
 
 	WT_RET(__wt_scr_alloc(session, 0, &buf));
@@ -163,7 +163,7 @@ __snap_set_turtle(WT_SESSION_IMPL *session, const char *v)
 	    "%s\n"
 	    "version=(major=%d,minor=%d),"
 	    "%s\n",
-	    WT_SCHEMA_TURTLE_MSG,
+	    WT_METADATA_TURTLE_MSG,
 	    WT_BTREE_MAJOR_VERSION, WT_BTREE_MINOR_VERSION,
 	    v == NULL ? "snapshot=()" : v));
 	len = (size_t)fprintf(fp, "%s", (char *)buf->data);
@@ -175,9 +175,9 @@ __snap_set_turtle(WT_SESSION_IMPL *session, const char *v)
 
 	if (ret == 0)
 		ret = __wt_rename(
-		    session, WT_SCHEMA_TURTLE_SET, WT_SCHEMA_TURTLE);
+		    session, WT_METADATA_TURTLE_SET, WT_METADATA_TURTLE);
 	else
-		(void)__wt_remove(session, WT_SCHEMA_TURTLE_SET);
+		(void)__wt_remove(session, WT_METADATA_TURTLE_SET);
 
 err:	if (path != NULL)
 		__wt_free(session, path);
@@ -187,7 +187,7 @@ err:	if (path != NULL)
 
 /*
  * __snap_get --
- *	Return the version and snapshot information for a schema-table entry.
+ *	Return the version and snapshot information for a metadata entry.
  */
 static int
 __snap_get(WT_SESSION_IMPL *session, const char *name, WT_ITEM *addr)
@@ -201,10 +201,10 @@ __snap_get(WT_SESSION_IMPL *session, const char *name, WT_ITEM *addr)
 	config = NULL;
 	key = NULL;
 
-	/* Retrieve the schema-table's entry for the file. */
+	/* Retrieve the metadata entry for the file. */
 	WT_ERR(__wt_scr_alloc(session, 0, &key));
 	WT_ERR(__wt_buf_fmt(session, key, "file:%s", btree->filename));
-	WT_ERR(__wt_schema_table_read(session, key->data, &config));
+	WT_ERR(__wt_metadata_read(session, key->data, &config));
 
 	/* Check the major/minor version numbers. */
 	WT_ERR(__snap_version_chk(session, config));
@@ -222,7 +222,7 @@ err:	__wt_scr_free(&key);
 
 /*
  * __snap_set --
- *	Set a non-schema file's snapshot address.
+ *	Set an ordinary file's snapshot address.
  */
 static int
 __snap_set(WT_SESSION_IMPL *session, const char *filename, const char *v)
@@ -234,17 +234,17 @@ __snap_set(WT_SESSION_IMPL *session, const char *filename, const char *v)
 	key = NULL;
 	config = newcfg = NULL;
 
-	/* Retrieve the schema table information for this file. */
+	/* Retrieve the metadata for this file. */
 	WT_ERR(__wt_scr_alloc(session, 0, &key));
 	WT_ERR(__wt_buf_fmt(session, key, "file:%s", filename));
-	WT_ERR(__wt_schema_table_read(session, key->data, &config));
+	WT_ERR(__wt_metadata_read(session, key->data, &config));
 
 	/* Replace the snapshot entry. */
 	cfg[0] = config;
 	cfg[1] = v == NULL ? "snapshot=()" : v;
 	cfg[2] = NULL;
 	WT_ERR(__wt_config_collapse(session, cfg, &newcfg));
-	WT_ERR(__wt_schema_table_update(session, key->data, newcfg));
+	WT_ERR(__wt_metadata_update(session, key->data, newcfg));
 
 err:	__wt_scr_free(&key);
 	__wt_free(session, config);
@@ -254,8 +254,7 @@ err:	__wt_scr_free(&key);
 
 /*
  * __snap_get_name --
- *	Return the cookie associated with a single snapshot in a schema-table
- * entry.
+ *	Return the cookie associated with a single snapshot in the metadata.
  */
 static int
 __snap_get_name(WT_SESSION_IMPL *session,
@@ -277,8 +276,7 @@ __snap_get_name(WT_SESSION_IMPL *session,
 
 /*
  * __snap_get_last --
- *	Return the cookie associated with the last snapshot in a schema-table
- * entry.
+ *	Return the cookie associated with the last snapshot in the metadata.
  */
 static int
 __snap_get_last(
@@ -327,7 +325,7 @@ __snap_compare_order(const void *a, const void *b)
 
 /*
  * __wt_snapshot_list_get --
- *	Load all available snapshot information from a schema-table entry.
+ *	Load all available snapshot information from a metadata entry.
  */
 int
 __wt_snapshot_list_get(
@@ -352,13 +350,13 @@ __wt_snapshot_list_get(
 	config = NULL;
 
 	/*
-	 * If no configuration information was provided, retrieve the schema
-	 * table information for the current file or the configuration line
-	 * for the schema table itself.
+	 * If no configuration information was provided, retrieve the metadata
+	 * information for the current file or the configuration line for the
+	 * metadata file itself.
 	 */
 	if (config_arg != NULL)
 		config = config_arg;
-	else if (strcmp(btree->filename, WT_SCHEMA_FILENAME) == 0) {
+	else if (strcmp(btree->filename, WT_METADATA_FILENAME) == 0) {
 		line[0] = '\0';
 		ret = __snap_get_turtle_config(session, line, sizeof(line));
 		if (ret != 0 && ret != WT_NOTFOUND)
@@ -367,7 +365,7 @@ __wt_snapshot_list_get(
 	} else {
 		WT_ERR(__wt_scr_alloc(session, 0, &key));
 		WT_ERR(__wt_buf_fmt(session, key, "file:%s", btree->filename));
-		WT_ERR(__wt_schema_table_read(session, key->data, &config));
+		WT_ERR(__wt_metadata_read(session, key->data, &config));
 	}
 
 	/* Load any existing snapshots into the array. */
@@ -450,7 +448,7 @@ err:		__wt_snapshot_list_free(session, snapbase);
 
 /*
  * __wt_snapshot_list_set --
- *	Set a schema-table entry snapshot from the WT_SNAPSHOT list.
+ *	Set a metadata snapshot value from the WT_SNAPSHOT list.
  */
 int
 __wt_snapshot_list_set(WT_SESSION_IMPL *session, WT_SNAPSHOT *snapbase)
@@ -506,7 +504,7 @@ __wt_snapshot_list_set(WT_SESSION_IMPL *session, WT_SNAPSHOT *snapbase)
 		sep = ",";
 	}
 	WT_ERR(__wt_buf_catfmt(session, buf, ")"));
-	WT_ERR(strcmp(btree->filename, WT_SCHEMA_FILENAME) == 0 ?
+	WT_ERR(strcmp(btree->filename, WT_METADATA_FILENAME) == 0 ?
 	    __snap_set_turtle(session, (char *)buf->data) :
 	    __snap_set(session, btree->filename, (char *)buf->data));
 

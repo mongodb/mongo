@@ -101,6 +101,6 @@ __wt_schema_truncate(
 	else
 		return (__wt_unknown_object_type(session, uri));
 
-	/* If we didn't find a schema file entry, map that error to ENOENT. */
+	/* If we didn't find a metadata entry, map that error to ENOENT. */
 	return (ret == WT_NOTFOUND ? ENOENT : ret);
 }

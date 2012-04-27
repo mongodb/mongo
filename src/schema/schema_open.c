@@ -9,7 +9,7 @@
 
 /*
  * __wt_schema_colgroup_name --
- *	Get the URI for a column group.  This is used for schema table lookups.
+ *	Get the URI for a column group.  This is used for metadata lookups.
  *	The only complexity here is that simple tables (with a single column
  *	group) use a simpler naming scheme.
  */
@@ -63,12 +63,12 @@ __wt_schema_get_btree(WT_SESSION_IMPL *session,
 	if (len != strlen(objname))
 		WT_ERR(__wt_strndup(session, objname, len, &name));
 
-	WT_ERR(__wt_schema_table_cursor(session, NULL, &cursor));
+	WT_ERR(__wt_metadata_cursor(session, NULL, &cursor));
 	cursor->set_key(cursor, name);
 	WT_ERR(cursor->search(cursor));
 	WT_ERR(cursor->get_value(cursor, &objconf));
 
-	/* Get the filename from the schema table. */
+	/* Get the filename from the metadata. */
 	WT_ERR(__wt_config_getones(session, objconf, "filename", &cval));
 	WT_ERR(__wt_buf_fmt(
 	    session, &uribuf, "file:%.*s", (int)cval.len, cval.str));
@@ -282,10 +282,11 @@ __wt_schema_open_index(
 		return (0);
 
 	/*
-	 * XXX Do a full scan through the schema table to find all matching
-	 * indices.  This scan be optimized when we have cursor search + next.
+	 * XXX
+	 * Do a full scan through the metadata to find all matching indices.
+	 * This scan be optimized with search + next.
 	 */
-	WT_RET(__wt_schema_table_cursor(session, NULL, &cursor));
+	WT_RET(__wt_metadata_cursor(session, NULL, &cursor));
 
 	/* Open each index. */
 	for (i = 0; (ret = cursor->next(cursor)) == 0;) {
@@ -362,7 +363,7 @@ __wt_schema_open_table(WT_SESSION_IMPL *session,
 	WT_RET(__wt_buf_fmt(session, &buf, "table:%.*s", (int)namelen, name));
 	tablename = __wt_buf_steal(session, &buf, NULL);
 
-	WT_ERR(__wt_schema_table_cursor(session, NULL, &cursor));
+	WT_ERR(__wt_metadata_cursor(session, NULL, &cursor));
 	cursor->set_key(cursor, tablename);
 	WT_ERR(cursor->search(cursor));
 	WT_ERR(cursor->get_value(cursor, &tconfig));

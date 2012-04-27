@@ -18,7 +18,7 @@ __wt_schema_name_check(WT_SESSION_IMPL *session, const char *uri)
 
 	/*
 	 * Check if name is somewhere in the WiredTiger name space: it would be
-	 * "bad" if the application truncated the schema file.  We get passed
+	 * "bad" if the application truncated the metadata file.  We get passed
 	 * both objects and simple strings, skip any leading URI prefix.
 	 */
 	name = uri;

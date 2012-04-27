@@ -25,8 +25,8 @@ __drop_file(WT_SESSION_IMPL *session, const char *uri, int force)
 	/* If open, close the btree handle. */
 	WT_RET(__wt_session_close_any_open_btree(session, filename));
 
-	/* Remove the schema table entry (ignore missing items). */
-	WT_TRET(__wt_schema_table_remove(session, uri));
+	/* Remove the metadata entry (ignore missing items). */
+	WT_TRET(__wt_metadata_remove(session, uri));
 	if (force && ret == WT_NOTFOUND)
 		ret = 0;
 
@@ -49,8 +49,8 @@ __drop_tree(WT_SESSION_IMPL *session, WT_BTREE *btree, int force)
 	WT_DECL_RET;
 	WT_ITEM *buf;
 
-	/* Remove the schema table entry (ignore missing items). */
-	WT_TRET(__wt_schema_table_remove(session, btree->name));
+	/* Remove the metadata entry (ignore missing items). */
+	WT_TRET(__wt_metadata_remove(session, btree->name));
 	if (force && ret == WT_NOTFOUND)
 		ret = 0;
 
@@ -100,11 +100,11 @@ __drop_colgroup(
 	 * __wt_session_close_any_open_btree.  If two threads race dropping
 	 * the same object, it will be caught there.
 	 *
-	 * If we can't get a tree, try to remove it from the schema table.
+	 * If we can't get a tree, try to remove it from the metadata.
 	 */
 	if ((ret = __wt_schema_get_btree(
 	    session, uri, strlen(uri), cfg, WT_BTREE_NO_LOCK)) != 0) {
-		(void)__wt_schema_table_remove(session, uri);
+		(void)__wt_metadata_remove(session, uri);
 		return (ret);
 	}
 	btree = session->btree;
@@ -156,11 +156,11 @@ __drop_index(
 	 * __wt_session_close_any_open_btree.  If two threads race dropping
 	 * the same object, it will be caught there.
 	 *
-	 * If we can't get a tree, try to remove it from the schema table.
+	 * If we can't get a tree, try to remove it from the metadata.
 	 */
 	if ((ret = __wt_schema_get_btree(
 	    session, uri, strlen(uri), cfg, WT_BTREE_NO_LOCK)) != 0) {
-		(void)__wt_schema_table_remove(session, uri);
+		(void)__wt_metadata_remove(session, uri);
 		return (ret);
 	}
 	btree = session->btree;
@@ -219,8 +219,8 @@ __drop_table(WT_SESSION_IMPL *session, const char *uri, int force)
 
 	WT_TRET(__wt_schema_remove_table(session, table));
 
-	/* Remove the schema table entry (ignore missing items). */
-	WT_TRET(__wt_schema_table_remove(session, uri));
+	/* Remove the metadata entry (ignore missing items). */
+	WT_TRET(__wt_metadata_remove(session, uri));
 
 err:	if (force && ret == WT_NOTFOUND)
 		ret = 0;
@@ -256,7 +256,7 @@ __wt_schema_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 
 	/*
 	 * Map WT_NOTFOUND to ENOENT (or to 0 if "force" is set), based on the
-	 * assumption WT_NOTFOUND means there was no schema file entry.  The
+	 * assumption WT_NOTFOUND means there was no metadata entry.  The
 	 * underlying drop functions should handle this case (we passed them
 	 * the "force" value), but better safe than sorry.
 	 */

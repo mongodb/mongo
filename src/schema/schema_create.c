@@ -13,7 +13,7 @@ __wt_create_file(WT_SESSION_IMPL *session,
 {
 	WT_ITEM *val;
 	WT_DECL_RET;
-	int is_schema, vmajor, vminor, vpatch;
+	int is_metadata, vmajor, vminor, vpatch;
 	const char *cfg[] = API_CONF_DEFAULTS(session, create, config);
 	const char *filecfg[4] = API_CONF_DEFAULTS(file, meta, config);
 	const char *filename, *treeconf;
@@ -27,14 +27,14 @@ __wt_create_file(WT_SESSION_IMPL *session,
 		    session, EINVAL, "Expecting a 'file:' URI: %s", fileuri);
 
 	/*
-	 * Opening the schema table is a special case, use the config
+	 * Opening the metadata file is a special case, use the config
 	 * string we were passed to open the file.
 	 */
-	is_schema = (strcmp(filename, WT_SCHEMA_FILENAME) == 0);
+	is_metadata = (strcmp(filename, WT_METADATA_FILENAME) == 0);
 
 	/* If the file exists, don't try to recreate it. */
 	if ((ret = __wt_session_get_btree(session, name, fileuri,
-	    is_schema ? config : NULL,
+	    is_metadata ? config : NULL,
 	    NULL, WT_BTREE_NO_LOCK)) != WT_NOTFOUND) {
 		if (ret == 0 && exclusive)
 			ret = EEXIST;
@@ -42,34 +42,34 @@ __wt_create_file(WT_SESSION_IMPL *session,
 	}
 
 	WT_RET(__wt_btree_create(session, filename));
-	WT_ERR(__wt_schema_table_track_fileop(session, NULL, filename));
+	WT_ERR(__wt_meta_track_fileop(session, NULL, filename));
 
-	/* Insert WiredTiger version numbers into the schema file. */
+	/* Insert WiredTiger version numbers into the metadata file. */
 	WT_ERR(__wt_scr_alloc(session, 0, &val));
-	if (is_schema) {
-		WT_ERR(__wt_schema_table_insert(
-		    session, WT_SCHEMA_VERSION_STR,
+	if (is_metadata) {
+		WT_ERR(__wt_metadata_insert(
+		    session, WT_METADATA_VERSION_STR,
 		    wiredtiger_version(&vmajor, &vminor, &vpatch)));
 		WT_ERR(__wt_buf_fmt(session, val,
 		    "major=%d,minor=%d,patch=%d", vmajor, vminor, vpatch));
-		WT_ERR(__wt_schema_table_insert(
-		    session, WT_SCHEMA_VERSION, val->data));
+		WT_ERR(__wt_metadata_insert(
+		    session, WT_METADATA_VERSION, val->data));
 	}
 
 	/*
-	 * Insert Btree version numbers into the schema file (including for
-	 * the schema file itself, although the schema file version numbers
+	 * Insert Btree version numbers into the metadata file (including for
+	 * the metadata file itself, although the metadata file version numbers
 	 * can never be trusted, we have to get them from the turtle file).
 	 */
 	WT_ERR(__wt_buf_fmt(session, val, "version=(major=%d,minor=%d)",
 	    WT_BTREE_MAJOR_VERSION, WT_BTREE_MINOR_VERSION));
 	filecfg[2] = val->data;
 
-	if (is_schema)
+	if (is_metadata)
 		WT_ERR(__wt_strdup(session, config, &treeconf));
 	else
 		WT_ERR(__wt_config_collapse(session, filecfg, &treeconf));
-	WT_ERR(__wt_schema_table_insert(session, fileuri, treeconf));
+	WT_ERR(__wt_metadata_insert(session, fileuri, treeconf));
 
 	/*
 	 * Call the underlying connection function to allocate a WT_BTREE handle
@@ -172,9 +172,9 @@ __create_colgroup(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_buf_fmt(session, &uribuf, "file:%s", filename));
 	fileuri = uribuf.data;
 
-	if ((ret = __wt_schema_table_insert(session, name, cgconf)) != 0) {
+	if ((ret = __wt_metadata_insert(session, name, cgconf)) != 0) {
 		/*
-		 * If the entry already exists in the schema table, we're done.
+		 * If the entry already exists in the metadata, we're done.
 		 * This is an error for exclusive creates but okay otherwise.
 		 */
 		if (ret == WT_DUPLICATE_KEY)
@@ -282,9 +282,9 @@ __create_index(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_buf_fmt(session, &uribuf, "file:%s", filename));
 	fileuri = uribuf.data;
 
-	if ((ret = __wt_schema_table_insert(session, name, idxconf)) != 0) {
+	if ((ret = __wt_metadata_insert(session, name, idxconf)) != 0) {
 		/*
-		 * If the entry already exists in the schema table, we're done.
+		 * If the entry already exists in the metadata, we're done.
 		 * This is an error for exclusive creates but okay otherwise.
 		 */
 		if (ret == WT_DUPLICATE_KEY)
@@ -343,7 +343,7 @@ __create_table(WT_SESSION_IMPL *session,
 		return (ret);
 
 	WT_RET(__wt_config_collapse(session, cfg, &tableconf));
-	WT_ERR(__wt_schema_table_insert(session, name, tableconf));
+	WT_ERR(__wt_metadata_insert(session, name, tableconf));
 
 	/* Attempt to open the table now to catch any errors. */
 	WT_ERR(__wt_schema_get_table(
@@ -384,7 +384,7 @@ __wt_schema_create(
 	 * We track rename operations, if we fail in the middle, we want to
 	 * back it all out.
 	 */
-	WT_RET(__wt_schema_table_track_on(session));
+	WT_RET(__wt_meta_track_on(session));
 
 	if (WT_PREFIX_MATCH(name, "colgroup:"))
 		ret = __create_colgroup(session, name, exclusive, config);
@@ -397,7 +397,7 @@ __wt_schema_create(
 	else
 		ret = __wt_unknown_object_type(session, name);
 
-	WT_TRET(__wt_schema_table_track_off(session, ret != 0));
+	WT_TRET(__wt_meta_track_off(session, ret != 0));
 
 	return (ret);
 }

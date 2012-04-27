@@ -32,9 +32,9 @@ __rename_file(
 
 	/*
 	 * Check to see if the proposed name is already in use, in either
-	 * the schema table or the filesystem.
+	 * the metadata or the filesystem.
 	 */
-	switch (ret = __wt_schema_table_read(session, newuri, &value)) {
+	switch (ret = __wt_metadata_read(session, newuri, &value)) {
 	case 0:
 		WT_ERR_MSG(session, EEXIST, "%s", newuri);
 	case WT_NOTFOUND:
@@ -48,12 +48,12 @@ __rename_file(
 		WT_ERR_MSG(session, EEXIST, "%s", newfile);
 
 	/* Replace the old file entries with new file entries. */
-	WT_ERR(__wt_schema_table_read(session, uri, &value));
-	WT_ERR(__wt_schema_table_remove(session, uri));
-	WT_ERR(__wt_schema_table_insert(session, newuri, value));
+	WT_ERR(__wt_metadata_read(session, uri, &value));
+	WT_ERR(__wt_metadata_remove(session, uri));
+	WT_ERR(__wt_metadata_insert(session, newuri, value));
 
 	/* Rename the underlying file. */
-	WT_ERR(__wt_schema_table_track_fileop(session, filename, newfile));
+	WT_ERR(__wt_meta_track_fileop(session, filename, newfile));
 	WT_ERR(__wt_rename(session, filename, newfile));
 
 err:	__wt_free(session, value);
@@ -75,7 +75,7 @@ __rename_tree(WT_SESSION_IMPL *session, WT_BTREE *btree, const char *newname)
 	nf = nk = nv = of = NULL;
 
 	/* Read the old schema value. */
-	WT_ERR(__wt_schema_table_read(session, btree->name, &value));
+	WT_ERR(__wt_metadata_read(session, btree->name, &value));
 
 	/*
 	 * Create the new file name, new schema key, new schema value.
@@ -108,11 +108,11 @@ __rename_tree(WT_SESSION_IMPL *session, WT_BTREE *btree, const char *newname)
 	    newfile, t == NULL ? "" : t));
 
 	/*
-	 * Remove the old schema table entry
-	 * Insert the new schema table entry
+	 * Remove the old metadata entry.
+	 * Insert the new metadata entry.
 	 */
-	WT_ERR(__wt_schema_table_remove(session, btree->name));
-	WT_ERR(__wt_schema_table_insert(session, nk->data, nv->data));
+	WT_ERR(__wt_metadata_remove(session, btree->name));
+	WT_ERR(__wt_metadata_insert(session, nk->data, nv->data));
 
 	/*
 	 * Rename the file.
@@ -172,10 +172,10 @@ __rename_table(
 	/* Rename the table. */
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));
 	WT_ERR(__wt_buf_fmt(session, buf, "table:%s", oldname));
-	WT_ERR(__wt_schema_table_read(session, buf->data, &value));
-	WT_ERR(__wt_schema_table_remove(session, buf->data));
+	WT_ERR(__wt_metadata_read(session, buf->data, &value));
+	WT_ERR(__wt_metadata_remove(session, buf->data));
 	WT_ERR(__wt_buf_fmt(session, buf, "table:%s", newname));
-	WT_ERR(__wt_schema_table_insert(session, buf->data, value));
+	WT_ERR(__wt_metadata_insert(session, buf->data, value));
 
 err:	__wt_scr_free(&buf);
 	return (ret);
@@ -202,7 +202,7 @@ __wt_schema_rename(WT_SESSION_IMPL *session,
 	 * We track rename operations, if we fail in the middle, we want to
 	 * back it all out.
 	 */
-	WT_RET(__wt_schema_table_track_on(session));
+	WT_RET(__wt_meta_track_on(session));
 
 	oldname = uri;
 	newname = newuri;
@@ -221,8 +221,8 @@ __wt_schema_rename(WT_SESSION_IMPL *session,
 	} else
 		return (__wt_unknown_object_type(session, uri));
 
-	WT_TRET(__wt_schema_table_track_off(session, ret != 0));
+	WT_TRET(__wt_meta_track_off(session, ret != 0));
 
-	/* If we didn't find a schema file entry, map that error to ENOENT. */
+	/* If we didn't find a metadata entry, map that error to ENOENT. */
 	return (ret == WT_NOTFOUND ? ENOENT : ret);
 }

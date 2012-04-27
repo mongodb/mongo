@@ -66,9 +66,9 @@ list_print(WT_SESSION *session, const char *name, int sflag, int vflag)
 	WT_DECL_RET;
 	const char *key, *value;
 
-	/* Open the schema file. */
+	/* Open the metadata file. */
 	if ((ret = session->open_cursor(
-	    session, WT_SCHEMA_URI, NULL, NULL, &cursor)) != 0) {
+	    session, WT_METADATA_URI, NULL, NULL, &cursor)) != 0) {
 		/*
 		 * If there is no schema (yet), this will return ENOENT.
 		 * Treat that the same as an empty schema.
@@ -77,7 +77,7 @@ list_print(WT_SESSION *session, const char *name, int sflag, int vflag)
 			return (0);
 
 		fprintf(stderr, "%s: %s: session.open_cursor: %s\n",
-		    progname, WT_SCHEMA_URI, wiredtiger_strerror(ret));
+		    progname, WT_METADATA_URI, wiredtiger_strerror(ret));
 		return (1);
 	}
 

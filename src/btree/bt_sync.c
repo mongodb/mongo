@@ -271,7 +271,7 @@ nomatch:		WT_ERR_MSG(session,
 	/* If we're discarding the tree, the root page should be gone. */
 	WT_ASSERT(session, !discard || btree->root_page == NULL);
 
-	/* If there was a snapshot, update the schema table. */
+	/* If there was a snapshot, update the metadata. */
 	if (snap->raw.data == NULL) {
 		if (force)
 			WT_ERR_MSG(session,

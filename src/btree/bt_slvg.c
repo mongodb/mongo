@@ -290,7 +290,7 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 	/*
 	 * Step 11:
 	 * Evict the newly created root page, creating a snapshot, and update
-	 * the schema table with the new snapshot's location.
+	 * the metadata with the new snapshot's location.
 	 */
 	if (ss->root_page != NULL) {
 		WT_ERR(__wt_snapshot_list_get(session, NULL, &snapbase));

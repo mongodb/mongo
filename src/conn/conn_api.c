@@ -514,14 +514,14 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	}
 
 	/*
-	 * If this is a new database, create the schema file.  This avoids
+	 * If this is a new database, create the metadata file.  This avoids
 	 * application threads racing to create it later.  We need a real
 	 * session handle for this: open one.
 	 */
 	if (conn->is_new) {
 		WT_ERR(conn->iface.open_session(&conn->iface,
 		    NULL, NULL, &wt_session));
-		WT_TRET(__wt_open_schema_table((WT_SESSION_IMPL *)wt_session));
+		WT_TRET(__wt_open_metadata((WT_SESSION_IMPL *)wt_session));
 		WT_TRET(wt_session->close(wt_session, NULL));
 		WT_ERR(ret);
 	}
