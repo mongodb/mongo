@@ -677,7 +677,7 @@ namespace mongo {
 namespace boost {
 
     void assertion_failed(char const * expr, char const * function, char const * file, long line) {
-        mongo::log() << "boost assertion failure " << expr << ' ' << function << ' ' << file << ' ' << line << endl;
+        mongo::log() << "boost assertion failure " << expr << ' ' << function << ' ' << file << ' ' << line << std::endl;
     }
 
 }

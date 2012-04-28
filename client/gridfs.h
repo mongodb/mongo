@@ -32,13 +32,13 @@ namespace mongo {
         GridFSChunk( BSONObj data );
         GridFSChunk( BSONObj fileId , int chunkNumber , const char * data , int len );
 
-        int len() {
+        int len() const {
             int len;
             _data["data"].binDataClean( len );
             return len;
         }
 
-        const char * data( int & len ) {
+        const char * data( int & len ) const {
             return _data["data"].binDataClean( len );
         }
 
@@ -100,22 +100,22 @@ namespace mongo {
         /**
          * returns a file object matching the query
          */
-        GridFile findFile( BSONObj query );
+        GridFile findFile( BSONObj query ) const;
 
         /**
          * equiv to findFile( { filename : filename } )
          */
-        GridFile findFile( const string& fileName );
+        GridFile findFile( const string& fileName ) const;
 
         /**
          * convenience method to get all the files
          */
-        auto_ptr<DBClientCursor> list();
+        auto_ptr<DBClientCursor> list() const;
 
         /**
          * convenience method to get all the files with a filter
          */
-        auto_ptr<DBClientCursor> list( BSONObj query );
+        auto_ptr<DBClientCursor> list( BSONObj query ) const;
 
     private:
         DBClientBase& _client;
@@ -140,63 +140,63 @@ namespace mongo {
          * @return whether or not this file exists
          * findFile will always return a GriFile, so need to check this
          */
-        bool exists() {
+        bool exists() const {
             return ! _obj.isEmpty();
         }
 
-        string getFilename() {
+        string getFilename() const {
             return _obj["filename"].str();
         }
 
-        int getChunkSize() {
+        int getChunkSize() const {
             return (int)(_obj["chunkSize"].number());
         }
 
-        gridfs_offset getContentLength() {
+        gridfs_offset getContentLength() const {
             return (gridfs_offset)(_obj["length"].number());
         }
 
-        string getContentType() {
+        string getContentType() const {
             return _obj["contentType"].valuestr();
         }
 
-        Date_t getUploadDate() {
+        Date_t getUploadDate() const {
             return _obj["uploadDate"].date();
         }
 
-        string getMD5() {
+        string getMD5() const {
             return _obj["md5"].str();
         }
 
-        BSONElement getFileField( const string& name ) {
+        BSONElement getFileField( const string& name ) const {
             return _obj[name];
         }
 
-        BSONObj getMetadata();
+        BSONObj getMetadata() const;
 
-        int getNumChunks() {
+        int getNumChunks() const {
             return (int) ceil( (double)getContentLength() / (double)getChunkSize() );
         }
 
-        GridFSChunk getChunk( int n );
+        GridFSChunk getChunk( int n ) const;
 
         /**
            write the file to the output stream
          */
-        gridfs_offset write( ostream & out );
+        gridfs_offset write( ostream & out ) const;
 
         /**
            write the file to this filename
          */
-        gridfs_offset write( const string& where );
+        gridfs_offset write( const string& where ) const;
 
     private:
-        GridFile( GridFS * grid , BSONObj obj );
+        GridFile(const GridFS * grid , BSONObj obj );
 
-        void _exists();
+        void _exists() const;
 
-        GridFS * _grid;
-        BSONObj _obj;
+        const GridFS * _grid;
+        BSONObj        _obj;
 
         friend class GridFS;
     };

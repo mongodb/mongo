@@ -60,8 +60,8 @@ namespace mongo {
 
         // accessors
 
-        const char* const data() const { return _data; }
-        const unsigned size() const { return _size; }
+        const char* data() const { return _data; }
+        unsigned size() const { return _size; }
 
     private:
         // There are two assumptions we use bellow.

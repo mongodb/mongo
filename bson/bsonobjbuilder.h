@@ -24,9 +24,9 @@
 
 #include <limits>
 #include <cmath>
-using namespace std;
 
 namespace mongo {
+using namespace std;
 
 #if defined(_WIN32)
 // warning: 'this' : used in base member initializer list
