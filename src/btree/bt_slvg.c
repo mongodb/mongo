@@ -284,7 +284,7 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 	 * final key range.  In other words, if the salvage run fails, we don't
 	 * want to overwrite data the next salvage run might need.
 	 */
-	 if (ss->merge_free)
+	if (ss->merge_free)
 		WT_ERR(__slvg_merge_block_free(session, ss));
 
 	/*
