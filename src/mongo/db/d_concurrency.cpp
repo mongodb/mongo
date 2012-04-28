@@ -98,7 +98,7 @@ namespace mongo {
     static void unlocking_w();
     static void unlocking_W();
 
-    class WrapperForTiming { 
+    class WrapperForQLock { 
         QLock q;
     public:
         LockStat stats;
@@ -212,7 +212,7 @@ namespace mongo {
         bool R_to_W()                        { return q.R_to_W(); }
     };
 
-    static WrapperForTiming& q = *new WrapperForTiming();
+    static WrapperForQLock& q = *new WrapperForQLock();
 
     void reportLockStats(BSONObjBuilder& result) {
         BSONObjBuilder b;
