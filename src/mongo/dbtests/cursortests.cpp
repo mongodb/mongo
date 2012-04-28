@@ -26,7 +26,9 @@
 
 namespace CursorTests {
 
-    namespace BtreeCursorTests {
+    namespace BtreeCursor {
+
+        using mongo::BtreeCursor;
 
         // The ranges expressed in these tests are impossible given our query
         // syntax, so going to do them a hacky way.
@@ -284,22 +286,22 @@ namespace CursorTests {
             }
         };
 
-    } // namespace BtreeCursorTests
+    } // namespace BtreeCursor
 
     class All : public Suite {
     public:
         All() : Suite( "cursor" ) {}
 
         void setupTests() {
-            add< BtreeCursorTests::MultiRange >();
-            add< BtreeCursorTests::MultiRangeGap >();
-            add< BtreeCursorTests::MultiRangeReverse >();
-            add< BtreeCursorTests::EqEq >();
-            add< BtreeCursorTests::EqRange >();
-            add< BtreeCursorTests::EqIn >();
-            add< BtreeCursorTests::RangeEq >();
-            add< BtreeCursorTests::RangeIn >();
-            add< BtreeCursorTests::AbortImplicitScan >();
+            add<BtreeCursor::MultiRange>();
+            add<BtreeCursor::MultiRangeGap>();
+            add<BtreeCursor::MultiRangeReverse>();
+            add<BtreeCursor::EqEq>();
+            add<BtreeCursor::EqRange>();
+            add<BtreeCursor::EqIn>();
+            add<BtreeCursor::RangeEq>();
+            add<BtreeCursor::RangeIn>();
+            add<BtreeCursor::AbortImplicitScan>();
         }
     } myall;
 } // namespace CursorTests
