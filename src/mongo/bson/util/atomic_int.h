@@ -22,6 +22,10 @@
 #  include <windows.h>
 #endif
 
+#if defined(__APPLE__)
+#  include <libkern/OSAtomic.h>
+#endif
+
 #include "mongo/platform/compiler.h"
 
 namespace mongo {
@@ -124,6 +128,35 @@ namespace mongo {
     void AtomicUInt::signedAdd(int by) {
         atomic_int_helper(&x, by);
     }
+#elif defined(__APPLE__)
+#define PTR_CAST reinterpret_cast<volatile int32_t*>( &x )
+
+    AtomicUInt AtomicUInt::operator++() {
+        // OSAtomicIncrement32Barrier  returns the new value
+        // TODO: Is the barrier version needed?
+        return OSAtomicIncrement32Barrier( PTR_CAST );
+    }
+    AtomicUInt AtomicUInt::operator++(int) {
+        return OSAtomicIncrement32Barrier( PTR_CAST ) - 1;
+    }
+    AtomicUInt AtomicUInt::operator--() {
+        return OSAtomicDecrement32Barrier( PTR_CAST );
+    }
+    AtomicUInt AtomicUInt::operator--(int) {
+        return OSAtomicDecrement32Barrier( PTR_CAST ) + 1;
+    }
+
+    void AtomicUInt::signedAdd( int by ) {
+        OSAtomicAdd32Barrier( by, PTR_CAST );
+    }
+
+    void AtomicUInt::set( unsigned newX ) {
+        x = newX;
+        OSMemoryBarrier();
+    }
+
+#undef PTR_CAST
+
 #else
 #  error "unsupported compiler or platform"
 #endif
