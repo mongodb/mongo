@@ -1843,6 +1843,100 @@ namespace QueryOptimizerCursorTests {
                 }                    
             }
         };
+
+        class TakeoverUpdateBase : public Base {
+        public:
+            TakeoverUpdateBase() :
+                _lastId( -1 ) {
+                populateWithKey( "a" );
+                populateWithKey( "b" );
+                _cli.ensureIndex( ns(), BSON( "c" << 1 ) );
+            }
+            virtual ~TakeoverUpdateBase() {}
+            void run() {
+                advanceToEndOfARangeAndUpdate();
+                advanceThroughBRange();
+            }
+        protected:
+            virtual BSONObj query() const = 0;
+            void advanceToEndOfARangeAndUpdate() {
+                {
+                    Lock::GlobalWrite lk;
+
+                    Client::Context ctx( ns() );
+                    setQueryOptimizerCursor( query() );
+                    for( int i = 0; i < 149; ++i ) {
+                        advance();
+                    }
+                    ASSERT( ok() );
+                    // The current iterate corresponds to the last 'a' document.
+                    ASSERT_EQUALS( BSON( "_id" << 149 << "a" << 1 ), current() );
+                    ASSERT_EQUALS( BSON( "a" << 1 ), c()->indexKeyPattern() );
+                    prepareToYield();
+                }
+
+                _cli.update( ns(), BSON( "_id" << 149 ), BSON( "$set" << BSON( "a" << -1 ) ) );
+            }
+            void advanceThroughBRange() {
+                Lock::GlobalWrite lk;
+
+                Client::Context ctx( ns() );
+                recoverFromYield();
+                ASSERT( ok() );
+                // The current iterate corresponds to the first 'b' document.
+                ASSERT_EQUALS( BSON( "_id" << 150 << "b" << 1 ), current() );
+                ASSERT_EQUALS( BSON( "b" << 1 ), c()->indexKeyPattern() );
+                // Eventually the last 'b' document is reached.
+                while( current() != BSON( "_id" << 299 << "b" << 1 ) ) {
+                    ASSERT( advance() );
+                }
+                ASSERT( !advance() );
+            }
+        private:
+            void populateWithKey( const string &key ) {
+                for( int i = 0; i < 150; ++i ) {
+                    _cli.insert( ns(), BSON( "_id" << nextId() << key << 1 ) );
+                }
+                _cli.ensureIndex( ns(), BSON( key << 1 ) );
+            }
+            int nextId() {
+                return ++_lastId;
+            }
+            int _lastId;
+        };
+
+        /** An update causing an index key change advances the cursor past the last iterate. */
+        class TakeoverUpdateKeyAtEndOfIteration : public TakeoverUpdateBase {
+        public:
+            virtual BSONObj query() const { return BSON( "a" << 1 ); }
+            void run() {
+                advanceToEndOfARangeAndUpdate();
+
+                {
+                    Lock::GlobalWrite lk;
+
+                    Client::Context ctx( ns() );
+                    recoverFromYield();
+                    ASSERT( !ok() );
+                }
+            }
+        };
+
+        /**
+         * An update causing an index key change advances the cursor past the last iterate of a $or
+         * clause.
+         */
+        class TakeoverUpdateKeyAtEndOfClause : public TakeoverUpdateBase {
+            virtual BSONObj query() const { return fromjson( "{$or:[{a:1},{b:1}]}" ); }
+        };
+
+        /**
+         * An update causing an index key change advances the cursor past the last iterate of a $or
+         * clause, and also past an empty clause.
+         */
+        class TakeoverUpdateKeyPrecedingEmptyClause : public TakeoverUpdateBase {
+            virtual BSONObj query() const { return fromjson( "{$or:[{a:1},{c:1},{b:1}]}" ); }
+        };
             
     } // namespace Yield
     
@@ -4491,6 +4585,9 @@ namespace QueryOptimizerCursorTests {
             add<Yield::Takeover>();
             add<Yield::TakeoverBasic>();
             add<Yield::InactiveCursorAdvance>();
+            add<Yield::TakeoverUpdateKeyAtEndOfIteration>();
+            add<Yield::TakeoverUpdateKeyAtEndOfClause>();
+            add<Yield::TakeoverUpdateKeyPrecedingEmptyClause>();
             add<OrderId>();
             add<OrderMultiIndex>();
             add<OrderReject>();

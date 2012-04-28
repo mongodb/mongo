@@ -1243,6 +1243,9 @@ doneCheckOrder:
     void MultiCursor::recoverFromYield() {
         noteYield();
         Cursor::recoverFromYield();
+        while( !ok() && _mps->mayRunMore() ) {
+            nextClause();
+        }
     }
     
     void MultiCursor::nextClause() {
