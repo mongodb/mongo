@@ -850,8 +850,9 @@ def CheckAlignment( context ):
    
 def CheckBigEndian( context ):
     context.Message( 'Checking if system is big endian (for snappy) ...' )
+    # Include path is a bit brittle, find the correct variable to use
     res = context.TryCompile( """
-          #include "../src/third_party/boost/boost/detail/endian.hpp"
+          #include "../../../src/third_party/boost/boost/detail/endian.hpp"
           #ifdef BOOST_LITTLE_ENDIAN
           #error "Little Endian"
           #endif
