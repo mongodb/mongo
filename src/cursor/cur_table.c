@@ -557,9 +557,9 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 	if (columns == NULL)
 		size = strlen(tablename);
 	else
-		size = columns - tablename;
-	if ((ret = __wt_schema_get_table(session,
-	    tablename, size, &table)) != 0) {
+		size = WT_PTRDIFF(columns, tablename);
+	if ((ret =
+	    __wt_schema_get_table(session, tablename, size, &table)) != 0) {
 		if (ret == WT_NOTFOUND)
 			WT_RET_MSG(session, EINVAL,
 			    "Cannot open cursor '%s' on unknown table", uri);
