@@ -53,7 +53,7 @@ namespace mongo {
         shared_ptr<Cursor> cursor =
         NamespaceDetailsTransient::getCursor( ns, query, BSONObj(), QueryPlanSelectionPolicy::any(),
                                              &simpleEqualityMatch );
-        ClientCursor::CleanupPointer ccPointer;
+        ClientCursor::Holder ccPointer;
         ElapsedTracker timeToStartYielding( 256, 20 );
         try {
             while( cursor->ok() ) {

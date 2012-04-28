@@ -2298,7 +2298,7 @@ namespace QueryOptimizerCursorTests {
             setQueryOptimizerCursor( BSON( "x" << GT << 0 ) );
             ASSERT_EQUALS( 1, current().getIntField( "x" ) );
             
-            ClientCursor::CleanupPointer p;
+            ClientCursor::Holder p;
             p.reset( new ClientCursor( QueryOption_NoCursorTimeout, c(), ns() ) );
             ClientCursor::YieldData yieldData;
             p->prepareToYield( yieldData );
@@ -2323,7 +2323,7 @@ namespace QueryOptimizerCursorTests {
                 _cli.insert( ns(), BSON( "_id" << i << "x" << i ) );                
             }
 
-            ClientCursor::CleanupPointer p;
+            ClientCursor::Holder p;
             ClientCursor::YieldData yieldData;
             {
                 Lock::GlobalWrite lk;
@@ -2364,7 +2364,7 @@ namespace QueryOptimizerCursorTests {
                 Lock::GlobalWrite lk;
 
                 Client::Context ctx( ns() );
-                ClientCursor::CleanupPointer p;
+                ClientCursor::Holder p;
                 p.reset
                 ( new ClientCursor
                  ( QueryOption_NoCursorTimeout,
@@ -2385,7 +2385,7 @@ namespace QueryOptimizerCursorTests {
             _cli.insert( ns(), BSON( "a" << 1 << "b" << 1 ) );
             Lock::GlobalWrite lk;
             Client::Context ctx( ns() );
-            ClientCursor::CleanupPointer p;
+            ClientCursor::Holder p;
             p.reset
             ( new ClientCursor
              ( 0,
@@ -2413,7 +2413,7 @@ namespace QueryOptimizerCursorTests {
                 Lock::GlobalWrite lk;
 
                 Client::Context ctx( ns() );
-                ClientCursor::CleanupPointer p;
+                ClientCursor::Holder p;
                 p.reset
                 ( new ClientCursor
                  ( 0,
@@ -2450,7 +2450,7 @@ namespace QueryOptimizerCursorTests {
                 Lock::GlobalWrite lk;
 
                 Client::Context ctx( ns() );
-                ClientCursor::CleanupPointer p;
+                ClientCursor::Holder p;
                 p.reset
                 ( new ClientCursor
                  ( QueryOption_NoCursorTimeout,
@@ -2512,7 +2512,7 @@ namespace QueryOptimizerCursorTests {
                 Lock::GlobalWrite lk;
 
                 Client::Context ctx( ns() );
-                ClientCursor::CleanupPointer p;
+                ClientCursor::Holder p;
                 p.reset
                 ( new ClientCursor
                  ( QueryOption_NoCursorTimeout,
@@ -2561,7 +2561,7 @@ namespace QueryOptimizerCursorTests {
                 {
                     Lock::DBWrite lk(ns());
                     Client::Context ctx( ns() );
-                    ClientCursor::CleanupPointer p;
+                    ClientCursor::Holder p;
                     p.reset
                     ( new ClientCursor
                      ( QueryOption_NoCursorTimeout,

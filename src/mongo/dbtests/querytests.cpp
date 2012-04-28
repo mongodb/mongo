@@ -210,7 +210,7 @@ namespace QueryTests {
                 // Check internal server handoff to getmore.
                 Lock::DBWrite lk(ns);
                 Client::Context ctx( ns );
-                ClientCursor::Pointer clientCursor( cursorId );
+                ClientCursor::Pin clientCursor( cursorId );
                 ASSERT( clientCursor.c()->pq );
                 ASSERT_EQUALS( 2, clientCursor.c()->pq->getNumToReturn() );
                 ASSERT_EQUALS( 2, clientCursor.c()->pos() );
@@ -458,7 +458,7 @@ namespace QueryTests {
             ASSERT_EQUALS( two, c->next()["ts"].Date() );
             long long cursorId = c->getCursorId();
             
-            ClientCursor::Pointer clientCursor( cursorId );
+            ClientCursor::Pin clientCursor( cursorId );
             ASSERT_EQUALS( three.millis, clientCursor.c()->getSlaveReadTill().asDate() );
         }
     };
@@ -1287,7 +1287,7 @@ namespace QueryTests {
             
             ClientCursor *clientCursor = 0;
             {
-                ClientCursor::Pointer clientCursorPointer( cursorId );
+                ClientCursor::Pin clientCursorPointer( cursorId );
                 clientCursor = clientCursorPointer.c();
                 // clientCursorPointer destructor unpins the cursor.
             }
@@ -1324,7 +1324,7 @@ namespace QueryTests {
             
             {
                 Client::WriteContext ctx( ns() );
-                ClientCursor::Pointer pinCursor( cursorId );
+                ClientCursor::Pin pinCursor( cursorId );
   
                 ASSERT_THROWS( client().killCursor( cursorId ), MsgAssertionException );
                 string expectedAssertion =

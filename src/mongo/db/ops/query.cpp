@@ -81,7 +81,7 @@ namespace mongo {
 
     QueryResult* processGetMore(const char *ns, int ntoreturn, long long cursorid , CurOp& curop, int pass, bool& exhaust ) {
         exhaust = false;
-        ClientCursor::Pointer p(cursorid);
+        ClientCursor::Pin p(cursorid);
         ClientCursor *cc = p.c();
 
         int bufSize = 512 + sizeof( QueryResult ) + MaxBytesToReturnToClientAtOnce;
@@ -616,7 +616,7 @@ namespace mongo {
         bool saveClientCursor = false;
         const char *exhaust = 0;
         OpTime slaveReadTill;
-        ClientCursor::CleanupPointer ccPointer;
+        ClientCursor::Holder ccPointer;
         ccPointer.reset( new ClientCursor( QueryOption_NoCursorTimeout, cursor, ns ) );
         
         for( ; cursor->ok(); cursor->advance() ) {

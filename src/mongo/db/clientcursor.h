@@ -85,7 +85,7 @@ namespace mongo {
            at the same time - which might be bad.  That should never happen, but if a client driver
            had a bug, it could (or perhaps some sort of attack situation).
         */
-        class Pointer : boost::noncopyable {
+        class Pin : boost::noncopyable {
             ClientCursor *_c;
         public:
             ClientCursor * c() { return _c; }
@@ -103,8 +103,8 @@ namespace mongo {
             void deleted() {
                 _c = 0;
             }
-            ~Pointer() { release(); }
-            Pointer(long long cursorid) {
+            ~Pin() { release(); }
+            Pin(long long cursorid) {
                 recursive_scoped_lock lock(ccmutex);
                 _c = ClientCursor::find_inlock(cursorid, true);
                 if( _c ) {
@@ -118,9 +118,9 @@ namespace mongo {
         };
 
         // This object assures safe and reliable cleanup of a ClientCursor.
-        class CleanupPointer : boost::noncopyable {
+        class Holder : boost::noncopyable {
         public:
-            CleanupPointer() : _c( 0 ), _id( -1 ) {}
+            Holder() : _c( 0 ), _id( -1 ) {}
             void reset( ClientCursor *c = 0 ) {
                 if ( c == _c )
                     return;
@@ -137,7 +137,7 @@ namespace mongo {
                     _id = -1;
                 }
             }
-            ~CleanupPointer() {
+            ~Holder() {
                 DESTRUCTOR_GUARD ( reset(); );
             }
             operator bool() { return _c; }
@@ -445,8 +445,8 @@ namespace mongo {
 // release()ed after a yield if stillOk() returns false and these pointer types
 // do not support releasing. This will prevent them from being used accidentally
 // Instead of auto_ptr<>, which still requires some degree of manual management
-// of this, consider using ClientCursor::CleanupPointer which handles
-// ClientCursor's unusual self-deletion mechanics
+// of this, consider using ClientCursor::Holder which handles ClientCursor's
+// unusual self-deletion mechanics.
 namespace boost{
     template<> class scoped_ptr<mongo::ClientCursor> {};
     template<> class shared_ptr<mongo::ClientCursor> {};

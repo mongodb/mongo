@@ -372,7 +372,7 @@ namespace mongo {
         /*
           In order to yield, we need a ClientCursor.
          */
-        ClientCursor::CleanupPointer pClientCursor;
+        ClientCursor::Holder pClientCursor;
 
         /*
           Advance the cursor, and yield sometimes.
