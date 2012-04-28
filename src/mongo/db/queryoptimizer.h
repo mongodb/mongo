@@ -659,7 +659,8 @@ namespace mongo {
             return _queryPlan->keyFieldsOnly().get();
         }
     private:
-        void nextClause();
+        void advanceClause();
+        void advanceExhaustedClauses();
         auto_ptr<MultiPlanScanner> _mps;
         shared_ptr<Cursor> _c;
         shared_ptr<CoveredIndexMatcher> _matcher;

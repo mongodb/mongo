@@ -1234,21 +1234,17 @@ doneCheckOrder:
     
     bool MultiCursor::advance() {
         _c->advance();
-        while( !ok() && _mps->hasMoreClauses() ) {
-            nextClause();
-        }
+        advanceExhaustedClauses();
         return ok();
     }
 
     void MultiCursor::recoverFromYield() {
         noteYield();
         Cursor::recoverFromYield();
-        while( !ok() && _mps->mayRunMore() ) {
-            nextClause();
-        }
+        advanceExhaustedClauses();
     }
     
-    void MultiCursor::nextClause() {
+    void MultiCursor::advanceClause() {
         _nscanned += _c->nscanned();
         if ( _explainPlanInfo ) _explainPlanInfo->noteDone( *_c );
         _matcher->advanceOrClause( _queryPlan->originalFrv() );
@@ -1268,6 +1264,12 @@ doneCheckOrder:
                 clauseInfo->addPlanInfo( _explainPlanInfo );
                 _mps->addClauseInfo( clauseInfo );
             }
+        }
+    }
+
+    void MultiCursor::advanceExhaustedClauses() {
+        while( !ok() && _mps->hasMoreClauses() ) {
+            advanceClause();
         }
     }
 
