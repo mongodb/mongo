@@ -127,7 +127,7 @@ extern int __wt_bm_verify_addr(WT_SESSION_IMPL *session,
 extern int __wt_block_truncate(WT_SESSION_IMPL *session, const char *filename);
 extern int __wt_block_create(WT_SESSION_IMPL *session, const char *filename);
 extern int __wt_block_open(WT_SESSION_IMPL *session,
-    const char *uri,
+    const char *filename,
     const char *config,
     const char *cfg[],
     void *retp);

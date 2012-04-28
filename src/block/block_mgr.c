@@ -90,10 +90,15 @@ __wt_bm_open(WT_SESSION_IMPL *session,
     const char *uri, const char *config, const char *cfg[])
 {
 	WT_BTREE *btree;
+	const char *filename;
 
 	btree = session->btree;
 
-	WT_RET(__wt_block_open(session, uri, config, cfg, &btree->block));
+	filename = uri;
+	if (!WT_PREFIX_SKIP(filename, "file:"))
+		return (EINVAL);
+
+	WT_RET(__wt_block_open(session, filename, config, cfg, &btree->block));
 
 	/*
 	 * !!!

@@ -66,28 +66,20 @@ __wt_block_create(WT_SESSION_IMPL *session, const char *filename)
  */
 int
 __wt_block_open(WT_SESSION_IMPL *session,
-    const char *uri, const char *config, const char *cfg[], void *retp)
+    const char *filename, const char *config, const char *cfg[], void *retp)
 {
 	WT_BLOCK *block;
 	WT_CONFIG_ITEM cval;
-	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	WT_NAMED_COMPRESSOR *ncomp;
-	const char *filename;
 
 	*(void **)retp = NULL;
-	conn = S2C(session);
-
-	filename = uri;
-	if (!WT_PREFIX_SKIP(filename, "file:"))
-		return (EINVAL);
 
 	/*
 	 * Allocate the structure, connect (so error close works), copy the
 	 * name.
 	 */
 	WT_RET(__wt_calloc_def(session, 1, &block));
-	WT_ERR(__wt_strdup(session, uri, &block->name));
+	WT_ERR(__wt_strdup(session, filename, &block->name));
 
 	/* Get the allocation size. */
 	WT_ERR(__wt_config_getones(session, config, "allocation_size", &cval));
@@ -100,6 +92,10 @@ __wt_block_open(WT_SESSION_IMPL *session,
 	/* Page compressor */
 	WT_RET(__wt_config_getones(session, config, "block_compressor", &cval));
 	if (cval.len > 0) {
+		WT_CONNECTION_IMPL *conn;
+		WT_NAMED_COMPRESSOR *ncomp;
+
+		conn = S2C(session);
 		TAILQ_FOREACH(ncomp, &conn->compqh, q) {
 			if (strncmp(ncomp->name, cval.str, cval.len) == 0) {
 				block->compressor = ncomp->compressor;
