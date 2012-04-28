@@ -136,7 +136,7 @@ namespace mongo {
         getDatabaseNames( others , path );
         
         set<string> allShortNames;
-        dbHolder().getAllShortNames( inholderlock, allShortNames );
+        dbHolder().getAllShortNames( allShortNames );
         
         others.insert( others.end(), allShortNames.begin(), allShortNames.end() );
         

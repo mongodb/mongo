@@ -68,7 +68,7 @@ namespace mongo {
         /**
          * gets all unique db names, ignoring paths
          */
-        void getAllShortNames( bool locked, set<string>& all ) const {
+        void getAllShortNames( set<string>& all ) const {
             SimpleMutex::scoped_lock lk(_m);
             for ( Paths::const_iterator i=_paths.begin(); i!=_paths.end(); i++ ) {
                 DBs m = i->second;

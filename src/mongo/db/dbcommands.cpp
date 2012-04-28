@@ -1029,7 +1029,7 @@ namespace mongo {
             set<string> allShortNames;
             {
                 Lock::GlobalRead lk;
-                dbHolder().getAllShortNames( false, allShortNames );
+                dbHolder().getAllShortNames( allShortNames );
             }
             
             for ( set<string>::iterator i = allShortNames.begin(); i != allShortNames.end(); i++ ) {
