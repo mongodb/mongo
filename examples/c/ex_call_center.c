@@ -82,8 +82,6 @@ int main(void)
 	CUSTOMER cust;
 	CALL call;
 
-	system("rm -rf WT_TEST; mkdir WT_TEST");
-
 	ret = wiredtiger_open(home, NULL, "create", &conn);
 	if (ret != 0) {
 		fprintf(stderr, "Error connecting to %s: %s\n",
