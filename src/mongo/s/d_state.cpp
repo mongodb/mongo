@@ -210,9 +210,11 @@ namespace mongo {
         //     one triggered the 'slow path' (below)
         //     when the second's request gets here, the version is already current
         ConfigVersion storedVersion;
+        ShardChunkManagerPtr currManager;
         {
             scoped_lock lk( _mutex );
             ChunkManagersMap::const_iterator it = _chunks.find( ns );
+            if ( it != _chunks.end() ) currManager = it->second;
             if ( it != _chunks.end() && ( storedVersion = it->second->getVersion() ) == version )
                 return true;
         }
@@ -232,7 +234,7 @@ namespace mongo {
 
         // Can't lock default mutex while creating ShardChunkManager, b/c may have to create a new connection to myself
         const string c = (_configServer == _shardHost) ? "" /* local */ : _configServer;
-        ShardChunkManagerPtr p( new ShardChunkManager( c , ns , _shardName ) );
+        ShardChunkManagerPtr p( new ShardChunkManager( c , ns , _shardName, currManager ) );
 
         {
             scoped_lock lk( _mutex );
