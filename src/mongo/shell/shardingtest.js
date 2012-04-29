@@ -11,9 +11,9 @@
  *     keyFile {string}: the location of the keyFile
  *     chunksize {number}:
  *     nopreallocj {boolean|number}:
- *
+ * 
  *     mongos {number|Object|Array.<Object>}: number of mongos or mongos
- *       configuration object(s). @see MongoRunner.runMongos
+ *       configuration object(s)(*). @see MongoRunner.runMongos
  * 
  *     rs {Object|Array.<Object>}: replica set configuration object. Can
  *       contain:
@@ -23,15 +23,25 @@
  *       }
  * 
  *     shards {number|Object|Array.<Object>}: number of shards or shard
- *       configuration object(s). @see MongoRunner.runMongod
+ *       configuration object(s)(*). @see MongoRunner.runMongod
  *     
  *     config {number|Object|Array.<Object>}: number of config server or
- *       config server configuration object(s). the presence of this field implies
- *       other.separateConfig = true, and if has 3 or more members, implies
- *       other.sync = true. @see MongoRunner.runMongod
+ *       config server configuration object(s)(*). The presence of this field
+ *       implies other.separateConfig = true, and if has 3 or more members,
+ *       implies other.sync = true. @see MongoRunner.runMongod
  * 
- *     WARNING: use Array format for shards/config/rs/mongos when used
- *       together as they can overwrite each other's settings.
+ *     (*) There are two ways For multiple configuration objects.
+ *       (1) Using the object format. Example:
+ * 
+ *           { d0: { verbose: 5 }, d1: { auth: '' }, rs2: { oplogsize: 10 }}
+ * 
+ *           In this format, d = mongod, s = mongos & c = config servers
+ * 
+ *       (2) Using the array format. Example:
+ * 
+ *           [{ verbose: 5 }, { auth: '' }]
+ * 
+ *       Note: you can only have single server shards for array format.
  * 
  *     other: {
  *       nopreallocj: same as above
@@ -94,60 +104,70 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
         otherParams.nopreallocj = params.nopreallocj || otherParams.nopreallocj
         otherParams.rs = params.rs || ( params.other ? params.other.rs : undefined )
         otherParams.chunksize = params.chunksize || ( params.other ? params.other.chunksize : undefined )
+
+        var tempCount = 0;
         
         // Allow specifying options like :
         // { mongos : [ { noprealloc : "" } ], config : [ { smallfiles : "" } ], shards : { rs : true, d : true } } 
-        if( isObject( numShards ) ){
-            var len = 0
-            for( var i in numShards ){
-                otherParams[ "" + i ] = numShards[i]
-                len++
+        if( Array.isArray( numShards ) ){
+            for( var i = 0; i < numShards.length; i++ ){
+                otherParams[ "d" + i ] = numShards[i];
             }
-            numShards = len
+
+            numShards = numShards.length;
+        }
+        else if( isObject( numShards ) ){
+            tempCount = 0;
+            for( var i in numShards ) {
+                otherParams[ i ] = numShards[i];
+                tempCount++;
+            }
+            
+            numShards = tempCount;
         }
         
-        if( isObject( numMongos ) ){
-            var len = 0
-            for( var i in numMongos ){
-                otherParams[ "" + i ] = numMongos[i]
-                len++
+        if( Array.isArray( numMongos ) ){
+            for( var i = 0; i < numMongos.length; i++ ) {
+                otherParams[ "s" + i ] = numMongos[i];
             }
-            numMongos = len
+                
+            numMongos = numMongos.length;
         }
-        else if( Array.isArray( numMongos ) ){
-            for( var i = 0; i < numMongos.length; i++ )
-                otherParams[ "s" + i ] = numMongos[i]
-            numMongos = numMongos.length
+        else if( isObject( numMongos ) ){
+            tempCount = 0;
+            for( var i in numMongos ) {
+                otherParams[ i ] = numMongos[i];
+                tempCount++;
+            }
+            
+            numMongos = tempCount;
         }
         
-        if( isObject( params.config ) ){
-            var len = 0
-            for( var i in params.config ){
-                otherParams[ "" + i ] = params.config[i]
-                len++
+        if( Array.isArray( params.config ) ){
+            for( var i = 0; i < params.config.length; i++ ){
+                otherParams[ "c" + i ] = params.config[i];
+            }
+                
+            // If we're specifying explicit config options, we need separate config servers
+            otherParams.separateConfig = true;
+            if( params.config.length == 3 ) otherParams.sync = true;
+            else otherParams.sync = false;
+        }
+        else if( isObject( params.config ) ){
+            tempCount = 0;
+            for( var i in params.config ) {
+                otherParams[ i ] = params.config[i];
+                tempCount++;
             }
             
             // If we're specifying explicit config options, we need separate config servers
-            otherParams.separateConfig = true
-            if( len == 3 ) otherParams.sync = true
-            else otherParams.sync = false
+            otherParams.separateConfig = true;
+            if( params.config.length == 3 ) otherParams.sync = true;
+            else otherParams.sync = false;
         }
-        else if( Array.isArray( params.config ) ){
-            for( var i = 0; i < params.config.length; i++ )
-                otherParams[ "c" + i ] = params.config[i]
-            
-            // If we're specifying explicit config options, we need separate config servers
-            otherParams.separateConfig = true
-            if( params.config.length == 3 ) otherParams.sync = true
-            else otherParams.sync = false
-        }
-        else if( params.config ) {
-            
-            if( params.config == 3 ){
-                otherParams.separateConfig = otherParams.separateConfig || true
-                otherParams.sync = true
-            }
-            
+        else if( params.config && params.config == 3 ) {
+            otherParams.separateConfig = otherParams.separateConfig || true;
+            otherParams.sync = true;
         }
     }
     else {
