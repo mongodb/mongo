@@ -345,7 +345,7 @@ namespace mongo {
             clientCursorsById.erase(_cursorid);
 
             // defensive:
-            (CursorId&)_cursorid = -1;
+            _cursorid = INVALID_CURSOR_ID;
             _pos = -2;
         }
     }

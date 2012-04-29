@@ -43,6 +43,7 @@ namespace mongo {
 
     typedef boost::recursive_mutex::scoped_lock recursive_scoped_lock;
     typedef long long CursorId; /* passed to the client so it can send back on getMore */
+    static const CursorId INVALID_CURSOR_ID = -1;
     class Cursor; /* internal server cursor base class */
     class ClientCursor;
     class ParsedQuery;
@@ -120,7 +121,7 @@ namespace mongo {
         // This object assures safe and reliable cleanup of a ClientCursor.
         class Holder : boost::noncopyable {
         public:
-            Holder() : _c( 0 ), _id( -1 ) {}
+            Holder() : _c( 0 ), _id( INVALID_CURSOR_ID ) {}
             void reset( ClientCursor *c = 0 ) {
                 if ( c == _c )
                     return;
@@ -134,7 +135,7 @@ namespace mongo {
                 }
                 else {
                     _c = 0;
-                    _id = -1;
+                    _id = INVALID_CURSOR_ID;
                 }
             }
             ~Holder() {
@@ -145,7 +146,7 @@ namespace mongo {
             /** Release ownership of the ClientCursor. */
             void release() {
                 _c = 0;
-                _id = -1;
+                _id = INVALID_CURSOR_ID;
             }
         private:
             ClientCursor *_c;
