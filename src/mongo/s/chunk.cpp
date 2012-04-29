@@ -25,6 +25,7 @@
 #include "mongo/client/dbclientcursor.h"
 
 #include "chunk.h"
+#include "chunk_diff.h"
 #include "config.h"
 #include "cursors.h"
 #include "grid.h"
@@ -74,9 +75,8 @@ namespace mongo {
         uassert( 10173 ,  "Chunk needs a max" , ! _max.isEmpty() );
     }
 
-
-    Chunk::Chunk(const ChunkManager * info , const BSONObj& min, const BSONObj& max, const Shard& shard)
-        : _manager(info), _min(min), _max(max), _shard(shard), _lastmod(0), _jumbo(false), _dataWritten(mkDataWritten())
+    Chunk::Chunk(const ChunkManager * info , const BSONObj& min, const BSONObj& max, const Shard& shard, ShardChunkVersion lastmod)
+        : _manager(info), _min(min), _max(max), _shard(shard), _lastmod(lastmod), _jumbo(false), _dataWritten(mkDataWritten())
     {}
 
     long Chunk::mkDataWritten() {
@@ -560,7 +560,7 @@ namespace mongo {
 
     AtomicUInt ChunkManager::NextSequenceNumber = 1;
 
-    ChunkManager::ChunkManager( string ns , ShardKeyPattern pattern , bool unique ) :
+    ChunkManager::ChunkManager( string ns , ShardKeyPattern pattern , bool unique, ChunkManagerPtr oldManager ) :
         _ns( ns ) , _key( pattern ) , _unique( unique ) , _chunkRanges(), _mutex("ChunkManager"),
         _nsLock( ConnectionString( configServer.modelServer() , ConnectionString::SYNC ) , ns ),
 
@@ -578,12 +578,13 @@ namespace mongo {
             set<Shard> shards;
             ShardVersionMap shardVersions;
             Timer t;
-            _load(chunkMap, shards, shardVersions);
+            _load(chunkMap, shards, shardVersions, oldManager);
             {
                 int ms = t.millis();
                 log() << "ChunkManager: time to load chunks for " << ns << ": " << ms << "ms" 
                       << " sequenceNumber: " << _sequenceNumber 
-                      << " version: " << _version.toString() 
+                      << " version: " << _version.toString()
+                      << " based on: " << ( oldManager.get() ? oldManager->getVersion().toString() : "(empty)" )
                       << endl;
             }
 
@@ -615,35 +616,101 @@ namespace mongo {
         return grid.getDBConfig(getns())->getChunkManager(getns(), force);
     }
 
-    void ChunkManager::_load(ChunkMap& chunkMap, set<Shard>& shards, ShardVersionMap& shardVersions) {
-        ScopedDbConnection conn( configServer.modelServer() );
+    /**
+     * This is an adapter so we can use config diffs - mongos and mongod do them slightly differently
+     *
+     * The mongos adapter here tracks all shards, and stores ranges by (max, Chunk) in the map.
+     */
+    class CMConfigDiffTracker : public ConfigDiffTracker<BSONObj,ChunkPtr,BSONObjCmp,Shard> {
+    public:
+        CMConfigDiffTracker( ChunkManager* manager ) : _manager( manager ) {}
 
-        // TODO really need the sort?
-        auto_ptr<DBClientCursor> cursor = conn->query( Chunk::chunkMetadataNS, QUERY("ns" << _ns).sort("lastmod",-1), 0, 0, 0, 0,
-                                          (DEBUG_BUILD ? 2 : 1000000)); // batch size. Try to induce potential race conditions in debug builds
-        verify( cursor.get() );
-        while ( cursor->more() ) {
-            BSONObj d = cursor->next();
-            if ( d["isMaxMarker"].trueValue() ) {
-                continue;
+        virtual bool isTracked( const BSONObj& chunkDoc ) const {
+            // Mongos tracks all shards
+            return true;
+        }
+
+        virtual BSONObj keyFor( const BSONObj& min ) const {
+            return min;
+        }
+
+        virtual BSONObj minFrom( const ChunkPtr& val ) const {
+            return val.get()->getMin();
+        }
+
+        virtual bool isMinKeyIndexed() const { return false; }
+
+        virtual pair<BSONObj,ChunkPtr> rangeFor( const BSONObj& chunkDoc, const BSONObj& min, const BSONObj& max ) const {
+            ChunkPtr c( new Chunk( _manager, chunkDoc ) );
+            return make_pair( max, c );
+        }
+
+        virtual Shard shardFor( const string& name ) const {
+            return Shard::make( name );
+        }
+
+        virtual string nameFrom( const Shard& shard ) const {
+            return shard.getName();
+        }
+
+        ChunkManager* _manager;
+
+    };
+
+    void ChunkManager::_load(ChunkMap& chunkMap, set<Shard>& shards, ShardVersionMap& shardVersions, ChunkManagerPtr oldManager) {
+
+        _version = 0;
+
+        // If we have a previous version of the ChunkManager to work from, use that info to reduce our config query
+        if( oldManager && oldManager->getVersion() > 0 ){
+
+            // Get the old max version
+            _version = oldManager->getVersion();
+            // Load a copy of the old versions
+            shardVersions = oldManager->_shardVersions;
+
+            // Load a copy of the chunk map, replacing the chunk manager with our own
+            const ChunkMap& oldChunkMap = oldManager->getChunkMap();
+
+            // Could be v.expensive
+            // TODO: If chunks were immutable and didn't reference the manager, we could do more interesting things here
+            for( ChunkMap::const_iterator it = oldChunkMap.begin(); it != oldChunkMap.end(); it++ ){
+
+                ChunkPtr oldC = it->second;
+                ChunkPtr c( new Chunk( this, oldC->getMin(), oldC->getMax(), oldC->getShard(), oldC->getLastmod() ) );
+                chunkMap.insert( make_pair( oldC->getMax(), c ) );
             }
 
-            ChunkPtr c( new Chunk( this, d ) );
-
-            chunkMap[c->getMax()] = c;
-            shards.insert(c->getShard());
-            
-
-            // set global max
-            if ( c->getLastmod() > _version )
-                _version = c->getLastmod();
-            
-            // set shard max
-            ShardChunkVersion& shardMax = shardVersions[c->getShard()];
-            if ( c->getLastmod() > shardMax )
-                shardMax = c->getLastmod();
+            LOG(2) << "loading chunk manager for collection " << _ns << " using old chunk manager w/ version " << _version.toString() << " and " << oldChunkMap.size() << " chunks" << endl;
         }
-        conn.done();
+
+        // Attach a diff tracker for the versioned chunk data
+        CMConfigDiffTracker differ( this );
+        differ.attach( _ns, chunkMap, _version, shardVersions );
+
+        // Diff tracker should *always* find at least one chunk if collection exists
+        int diffsApplied = differ.calculateConfigDiff( configServer.modelServer() );
+        if( diffsApplied > 0 ){
+
+            LOG(2) << "loaded " << diffsApplied << " chunks into new chunk manager for " << _ns
+                   << " with version " << _version << endl;
+
+            // Add all the shards we find to the shards set
+            for( ShardVersionMap::iterator it = shardVersions.begin(); it != shardVersions.end(); it++ ){
+                shards.insert( it->first );
+            }
+        }
+        else{
+
+            // No chunks were found for the ns
+            warning() << "no chunks found when reloading " << _ns << ", previous version was " << _version << endl;
+
+            // Set all our data to empty
+            chunkMap.clear();
+            shardVersions.clear();
+            _version = 0;
+        }
+
     }
 
     bool ChunkManager::_isValid(const ChunkMap& chunkMap) {

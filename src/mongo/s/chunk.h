@@ -54,7 +54,11 @@ namespace mongo {
     class Chunk : boost::noncopyable {
     public:
         Chunk( const ChunkManager * info , BSONObj from);
-        Chunk( const ChunkManager * info , const BSONObj& min, const BSONObj& max, const Shard& shard);
+        Chunk( const ChunkManager * info ,
+               const BSONObj& min,
+               const BSONObj& max,
+               const Shard& shard,
+               ShardChunkVersion lastmod = ShardChunkVersion() );
 
         //
         // serialization support
@@ -298,7 +302,7 @@ namespace mongo {
     public:
         typedef map<Shard,ShardChunkVersion> ShardVersionMap;
 
-        ChunkManager( string ns , ShardKeyPattern pattern , bool unique );
+        ChunkManager( string ns , ShardKeyPattern pattern , bool unique, ChunkManagerPtr oldManager = ChunkManagerPtr() );
 
         string getns() const { return _ns; }
 
@@ -358,7 +362,7 @@ namespace mongo {
         ChunkManagerPtr reload(bool force=true) const; // doesn't modify self!
 
         // helpers for constructor
-        void _load(ChunkMap& chunks, set<Shard>& shards, ShardVersionMap& shardVersions);
+        void _load(ChunkMap& chunks, set<Shard>& shards, ShardVersionMap& shardVersions, ChunkManagerPtr oldManager);
         static bool _isValid(const ChunkMap& chunks);
 
         // All members should be const for thread-safety

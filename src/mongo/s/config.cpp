@@ -270,6 +270,7 @@ namespace mongo {
         BSONObj key;
         bool unique;
         ShardChunkVersion oldVersion;
+        ChunkManagerPtr oldManager;
 
         {
             scoped_lock lk( _lock );
@@ -289,8 +290,10 @@ namespace mongo {
 
             key = ci.key().copy();
             unique = ci.unique();
-            if ( ci.getCM() )
+            if ( ci.getCM() ){
+                oldManager = ci.getCM();
                 oldVersion = ci.getCM()->getVersion();
+            }
         }
         
         verify( ! key.isEmpty() );
@@ -340,7 +343,7 @@ namespace mongo {
                 
             }
             
-            temp.reset( new ChunkManager( ns , key , unique ) );
+            temp.reset( new ChunkManager( ns , key , unique, oldManager ) );
             if ( temp->numChunks() == 0 ) {
                 // maybe we're not sharded any more
                 reload(); // this is a full reload
