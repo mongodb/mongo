@@ -131,7 +131,7 @@ skip:			WT_VERBOSE(session, salvage,
 			 * Free the block and make sure we don't return it more
 			 * than once.
 			 */
-			WT_RET(__wt_block_free_ext(
+			WT_RET(__wt_block_off_free(
 			    session, block, offset, (off_t)allocsize));
 			block->slvg_off = offset += allocsize;
 			continue;

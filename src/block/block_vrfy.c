@@ -250,7 +250,7 @@ __wt_verify_snap_load(
 	if (el->offset != WT_BLOCK_INVALID_OFFSET) {
 		WT_RET(__wt_block_extlist_read(session, block, el));
 		WT_EXT_FOREACH(ext, el->off)
-			WT_RET(__wt_block_off_overlap_remove(session,
+			WT_RET(__wt_block_off_remove_overlap(session,
 			    &block->verify_alloc, ext->off, ext->size));
 		__wt_block_extlist_free(session, el);
 	}
@@ -262,7 +262,7 @@ __wt_verify_snap_load(
 	 * pages, so it doesn't add a new requirement for subsequent snapshots.
 	 */
 	if (si->root_offset != WT_BLOCK_INVALID_OFFSET)
-		WT_RET(__wt_block_off_overlap_remove(session,
+		WT_RET(__wt_block_off_remove_overlap(session,
 		    &block->verify_alloc, si->root_offset, si->root_size));
 
 	/*

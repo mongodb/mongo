@@ -387,7 +387,7 @@ __snapshot_process(
 		 * appears on both lists, move it to the live system's available
 		 * list, it can be re-used.
 		 */
-		WT_ERR(__wt_block_extlist_match(session, block, b));
+		WT_ERR(__wt_block_extlist_overlap(session, block, b));
 
 		/*
 		 * If we're updating the live system's information, we're done.

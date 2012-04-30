@@ -28,7 +28,7 @@ extern int __wt_block_snapshot_to_buffer(WT_SESSION_IMPL *session,
     uint8_t **pp,
     WT_BLOCK_SNAPSHOT *si);
 extern uint32_t __wt_cksum(const void *chunk, size_t len);
-extern int __wt_block_off_overlap_remove( WT_SESSION_IMPL *session,
+extern int __wt_block_off_remove_overlap( WT_SESSION_IMPL *session,
     WT_EXTLIST *el,
     off_t off,
     off_t size);
@@ -44,14 +44,14 @@ extern int __wt_block_free(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     const uint8_t *addr,
     uint32_t addr_size);
-extern int __wt_block_free_ext( WT_SESSION_IMPL *session,
+extern int __wt_block_off_free( WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     off_t off,
     off_t size);
 extern int __wt_block_extlist_check( WT_SESSION_IMPL *session,
     WT_EXTLIST *al,
     WT_EXTLIST *bl);
-extern int __wt_block_extlist_match( WT_SESSION_IMPL *session,
+extern int __wt_block_extlist_overlap( WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     WT_BLOCK_SNAPSHOT *si);
 extern int __wt_block_extlist_merge(WT_SESSION_IMPL *session,
