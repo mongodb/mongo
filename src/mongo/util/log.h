@@ -423,8 +423,8 @@ namespace mongo {
        log to a file rather than stdout
        defined in assert_util.cpp
      */
-    void initLogging( const string& logpath , bool append );
-    void rotateLogs( int signal = 0 );
+    bool initLogging( const string& logpath , bool append );
+    bool rotateLogs();
 
     std::string toUtf8String(const std::wstring& wide);
 

@@ -333,7 +333,7 @@ namespace mongo {
         virtual bool slaveOk() const { return true; }
         virtual bool adminOnly() const { return true; }
         virtual bool run(const string& ns, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            rotateLogs();
+            fassert(16175, rotateLogs());
             return 1;
         }
 

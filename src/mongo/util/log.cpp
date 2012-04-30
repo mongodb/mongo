@@ -65,7 +65,7 @@ namespace mongo {
             : _enabled(0) , _file(0) {
         }
 
-        void start( const string& lp , bool append ) {
+        bool start( const string& lp , bool append ) {
             uassert( 10268 ,  "LoggingManager already started" , ! _enabled );
             _append = append;
 
@@ -76,9 +76,7 @@ namespace mongo {
             if ( exists ) {
                 if ( isdir ) {
                     cout << "logpath [" << lp << "] should be a filename, not a directory" << endl;
-                    
-                    dbexit( EXIT_BADOPTIONS );
-                    verify( 0 );
+                    return false;
                 }
 
                 if ( ! append ) {
@@ -93,8 +91,7 @@ namespace mongo {
                         } else {
                             cout << "log file [" << lp << "] exists and couldn't make backup; run with --logappend or manually remove file (" << strerror(errno) << ")" << endl;
                             
-                            dbexit( EXIT_BADOPTIONS );
-                            verify( 0 );
+                            return false;
                         }
                     }
                 }
@@ -103,8 +100,7 @@ namespace mongo {
             FILE * test = fopen( lp.c_str() , _append ? "a" : "w" );
             if ( ! test ) {
                 cout << "can't open [" << lp << "] for log file: " << errnoWithDescription() << endl;
-                dbexit( EXIT_BADOPTIONS );
-                verify( 0 );
+                return false;
             }
 
             if (append && exists){
@@ -118,13 +114,13 @@ namespace mongo {
 
             _path = lp;
             _enabled = 1;
-            rotate();
+            return rotate();
         }
 
-        void rotate() {
+        bool rotate() {
             if ( ! _enabled ) {
                 cout << "LoggingManager not enabled" << endl;
-                return;
+                return true;
             }
 
             if ( _file ) {
@@ -137,7 +133,10 @@ namespace mongo {
                 stringstream ss;
                 ss << _path << "." << terseCurrentTime( false );
                 string s = ss.str();
-                rename( _path.c_str() , s.c_str() );
+                if (0 != rename(_path.c_str(), s.c_str())) {
+                    error() << "Failed to rename " << _path << " to " << s;
+                    return false;
+                }
             }
 
             FILE* tmp = 0;  // The new file using the original logpath name
@@ -165,8 +164,7 @@ namespace mongo {
 #endif
             if ( !tmp ) {
                 cerr << "can't open: " << _path.c_str() << " for log file" << endl;
-                dbexit( EXIT_BADOPTIONS );
-                verify( 0 );
+                return false;
             }
 
             // redirect stdout and stderr to log file
@@ -187,6 +185,7 @@ namespace mongo {
 #endif
 
             _file = tmp;    // Save new file for next rotation
+            return true;
         }
 
     private:
@@ -197,13 +196,13 @@ namespace mongo {
 
     } loggingManager;
 
-    void initLogging( const string& lp , bool append ) {
+    bool initLogging( const string& lp , bool append ) {
         cout << "all output going to: " << lp << endl;
-        loggingManager.start( lp , append );
+        return loggingManager.start( lp , append );
     }
 
-    void rotateLogs( int signal ) {
-        loggingManager.rotate();
+    bool rotateLogs() {
+        return loggingManager.rotate();
     }
 
     // done *before* static initialization

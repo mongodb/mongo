@@ -919,8 +919,7 @@ namespace mongo {
         // uh - oh, not sure there is anything else we can do...
     }
 
-    /** also called by ntservice.cpp */
-    void shutdownServer() {
+    static void shutdownServer() {
 
         log() << "shutdown: going to close listening sockets..." << endl;
         ListeningSockets::get()->closeAll();
