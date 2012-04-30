@@ -347,6 +347,7 @@ namespace mongo {
             // defensive:
             _cursorid = INVALID_CURSOR_ID;
             _pos = -2;
+            _pinValue = 0;
         }
     }
 

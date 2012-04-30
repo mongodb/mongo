@@ -287,6 +287,86 @@ namespace CursorTests {
         };
 
     } // namespace BtreeCursor
+    
+    namespace ClientCursor {
+
+        using mongo::ClientCursor;
+        
+        static const char * const ns() { return "unittests.cursortests.clientcursor"; }
+
+        namespace Pin {
+
+            class Base {
+            public:
+                Base() :
+                    _ctx( ns() ),
+                    _cursor( theDataFileMgr.findAll( ns() ) ) {
+                        ASSERT( _cursor );
+                        _clientCursor.reset( new ClientCursor( 0, _cursor, ns() ) );
+                }
+            protected:
+                CursorId cursorid() const { return _clientCursor->cursorid(); }
+            private:
+                Lock::GlobalWrite _lk;
+                Client::Context _ctx;
+                shared_ptr<Cursor> _cursor;
+                ClientCursor::Holder _clientCursor;
+            };
+            
+            /** Pin pins a ClientCursor over its lifetime. */
+            class PinCursor : public Base {
+            public:
+                void run() {
+                    assertNotPinned();
+                    {
+                        ClientCursor::Pin pin( cursorid() );
+                        assertPinned();
+                        ASSERT_THROWS( erase(), AssertionException );
+                    }
+                    assertNotPinned();
+                    ASSERT( erase() );
+                }
+            private:
+                void assertPinned() const {
+                    ASSERT( ClientCursor::find( cursorid() ) );
+                }
+                void assertNotPinned() const {
+                    ASSERT_THROWS( ClientCursor::find( cursorid() ), AssertionException );
+                }
+                bool erase() const {
+                    return ClientCursor::erase( cursorid() );
+                }
+            };
+            
+            /** A ClientCursor cannot be pinned twice. */
+            class PinTwice : public Base {
+            public:
+                void run() {
+                    ClientCursor::Pin pin( cursorid() );
+                    ASSERT_THROWS( pinCursor(), AssertionException );
+                }
+            private:
+                void pinCursor() const {
+                    ClientCursor::Pin pin( cursorid() );
+                }
+            };
+            
+            /** Pin behaves properly if its ClientCursor is destroyed early. */
+            class CursorDeleted : public Base {
+            public:
+                void run() {
+                    ClientCursor::Pin pin( cursorid() );
+                    ASSERT( pin.c() );
+                    // Delete the pinned cursor.
+                    ClientCursor::invalidate( ns() );
+                    ASSERT( !pin.c() );
+                    // pin is destroyed safely, even though its ClientCursor was already destroyed.
+                }
+            };
+            
+        } // namespace Pin
+        
+    } // namespace ClientCursor
 
     class All : public Suite {
     public:
@@ -302,6 +382,9 @@ namespace CursorTests {
             add<BtreeCursor::RangeEq>();
             add<BtreeCursor::RangeIn>();
             add<BtreeCursor::AbortImplicitScan>();
+            add<ClientCursor::Pin::PinCursor>();
+            add<ClientCursor::Pin::PinTwice>();
+            add<ClientCursor::Pin::CursorDeleted>();
         }
     } myall;
 } // namespace CursorTests

@@ -87,38 +87,32 @@ namespace mongo {
            had a bug, it could (or perhaps some sort of attack situation).
         */
         class Pin : boost::noncopyable {
-            ClientCursor *_c;
+            CursorId _cursorid;
         public:
-            ClientCursor * c() { return _c; }
+            ClientCursor *c() const { return ClientCursor::find( _cursorid ); }
             void release() {
-                if( _c ) {
-                    verify( _c->_pinValue >= 100 );
-                    _c->_pinValue -= 100;
-                    _c = 0;
+                ClientCursor *cursor = c();
+                _cursorid = INVALID_CURSOR_ID;
+                if ( cursor ) {
+                    verify( cursor->_pinValue >= 100 );
+                    cursor->_pinValue -= 100;
                 }
             }
-            /**
-             * call this if during a yield, the cursor got deleted
-             * if so, we don't want to use the point address
-             */
-            void deleted() {
-                _c = 0;
-            }
-            ~Pin() { release(); }
-            Pin(long long cursorid) {
-                recursive_scoped_lock lock(ccmutex);
-                _c = ClientCursor::find_inlock(cursorid, true);
-                if( _c ) {
-                    if( _c->_pinValue >= 100 ) {
-                        _c = 0;
-                        uasserted(12051, "clientcursor already in use? driver problem?");
-                    }
-                    _c->_pinValue += 100;
+            ~Pin() { DESTRUCTOR_GUARD( release(); ) }
+            Pin( long long cursorid ) :
+                _cursorid( INVALID_CURSOR_ID ) {
+                recursive_scoped_lock lock( ccmutex );
+                ClientCursor *cursor = ClientCursor::find_inlock( cursorid, true );
+                if ( cursor ) {
+                    uassert( 12051, "clientcursor already in use? driver problem?",
+                            cursor->_pinValue < 100 );
+                    cursor->_pinValue += 100;
+                    _cursorid = cursorid;
                 }
             }
         };
 
-        // This object assures safe and reliable cleanup of a ClientCursor.
+        /** Assures safe and reliable cleanup of a ClientCursor. */
         class Holder : boost::noncopyable {
         public:
             Holder() : _c( 0 ), _id( INVALID_CURSOR_ID ) {}
@@ -143,6 +137,7 @@ namespace mongo {
             }
             operator bool() { return _c; }
             ClientCursor * operator-> () { return _c; }
+            const ClientCursor * operator-> () const { return _c; }
             /** Release ownership of the ClientCursor. */
             void release() {
                 _c = 0;

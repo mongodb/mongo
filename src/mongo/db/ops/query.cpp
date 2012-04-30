@@ -170,7 +170,6 @@ namespace mongo {
                     ClientCursor::erase(cursorid);
                     cursorid = 0;
                     cc = 0;
-                    p.deleted();
                     break;
                 }
             }
