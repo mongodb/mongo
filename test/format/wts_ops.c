@@ -111,7 +111,7 @@ ops(void *arg)
 	WT_CURSOR *cursor, *cursor_insert;
 	WT_SESSION *session;
 	WT_ITEM key, value;
-	uint64_t cnt, keyno, sync_op;
+	uint64_t cnt, keyno, sync_op, thread_ops;
 	uint32_t op;
 	uint8_t *keybuf, *valbuf;
 	u_int np;
@@ -151,12 +151,15 @@ ops(void *arg)
 	    WT_TABLENAME, NULL, "append", &cursor_insert)) != 0)
 		die(ret, "session.open_cursor");
 
+	/* Each thread does its share of the total operations. */
+	thread_ops = g.c_ops / g.c_threads;
+
 	/* Pick an operation where we'll do a sync and create the name. */
 	sync_drop = 0;
-	sync_op = MMRAND(1, g.c_ops);
+	sync_op = MMRAND(1, thread_ops);
 	snprintf(sync_name, sizeof(sync_name), "snapshot=thread-%d", tinfo->id);
 
-	for (cnt = 0; cnt < g.c_ops / g.c_threads; ++cnt) {
+	for (cnt = 0; cnt < thread_ops; ++cnt) {
 		if (SINGLETHREADED && cnt % 100 == 0)
 			track("read/write ops", 0ULL, tinfo);
 
@@ -175,8 +178,11 @@ ops(void *arg)
 				sync_drop = 1;
 			}
 
-			/* Pick the next sync operation. */
-			sync_op += wts_rand() % 1000;
+			/*
+			 * Pick the next sync operation, try for roughly five
+			 * snapshot operations per thread run.
+			 */
+			sync_op += MMRAND(1, thread_ops) / 5;
 		}
 
 		insert = notfound = 0;
