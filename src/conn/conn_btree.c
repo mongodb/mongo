@@ -19,13 +19,11 @@ __conn_btree_get(WT_SESSION_IMPL *session, const char *name)
 	WT_BTREE *btree;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	WT_ITEM *addr;
 	const char *filename, *snapshot;
 	size_t filename_len;
 	int matched;
 
 	conn = S2C(session);
-	addr = NULL;
 	snapshot = NULL;
 
 	filename = name;
