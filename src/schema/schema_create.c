@@ -23,8 +23,7 @@ __wt_create_file(WT_SESSION_IMPL *session,
 
 	filename = name;
 	if (!WT_PREFIX_SKIP(filename, "file:"))
-		WT_RET_MSG(
-		    session, EINVAL, "Expecting a 'file:' URI: %s", name);
+		WT_RET_MSG(session, EINVAL, "Expected a 'file:' URI: %s", name);
 
 	/*
 	 * Opening the metadata file is a special case, use the config

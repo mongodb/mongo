@@ -72,6 +72,8 @@ struct __wt_btree {
 
 	const char *name;		/* Object name as a URI */
 	const char *config;		/* Configuration string */
+	const char *filename;		/* File name */
+	const char *snapshot;		/* Snapshot name (or NULL) */
 
 	enum {	BTREE_COL_FIX=1,	/* Fixed-length column store */
 		BTREE_COL_VAR=2,	/* Variable-length column store */
@@ -116,10 +118,11 @@ struct __wt_btree {
 #define	WT_BTREE_BULK		0x01	/* Bulk-load handle */
 #define	WT_BTREE_EXCLUSIVE	0x02	/* Need exclusive access to handle */
 #define	WT_BTREE_NO_LOCK	0x04	/* Do not lock the handle */
-#define	WT_BTREE_OPEN		0x08	/* Handle is open */
-#define	WT_BTREE_SALVAGE	0x10	/* Handle is for salvage */
-#define	WT_BTREE_UPGRADE	0x20	/* Handle is for upgrade */
-#define	WT_BTREE_VERIFY		0x40	/* Handle is for verify */
+#define	WT_BTREE_NO_SNAPSHOT	0x08	/* Don't use the snapshot name */
+#define	WT_BTREE_OPEN		0x10	/* Handle is open */
+#define	WT_BTREE_SALVAGE	0x20	/* Handle is for salvage */
+#define	WT_BTREE_UPGRADE	0x40	/* Handle is for upgrade */
+#define	WT_BTREE_VERIFY		0x80	/* Handle is for verify */
 	uint32_t flags;
 };
 

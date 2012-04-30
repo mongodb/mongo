@@ -178,7 +178,7 @@ static int
 __session_drop(WT_SESSION *wt_session, const char *uri, const char *config)
 {
 	static const char *snapcmd[] =
-	    { "snapfrom", "snapshot", "snapto", NULL };
+	    { "snapall", "snapfrom", "snapshot", "snapto", NULL };
 	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
@@ -188,26 +188,17 @@ __session_drop(WT_SESSION *wt_session, const char *uri, const char *config)
 	SESSION_API_CALL(session, drop, config, cfg);
 
 	/* If dropping a snapshot, that's a different code path. */
-	if ((ret = __wt_config_gets(
-	    session, cfg, "snapall", &cval)) != 0 && ret != WT_NOTFOUND)
-		WT_ERR(ret);
-	if (cval.val != 0)
-		ret = __wt_schema_worker(
-		    session, uri, cfg, __wt_btree_snapshot_drop, 0);
-	else {
-		for (p = snapcmd; *p != NULL; ++p) {
-			ret = __wt_config_gets(session, cfg, *p, &cval);
-			if (ret != 0 && ret != WT_NOTFOUND)
-				WT_ERR(ret);
-			if (cval.len != 0) {
-				ret = __wt_schema_worker(session,
-				    uri, cfg, __wt_btree_snapshot_drop, 0);
-				break;
-			}
+	for (p = snapcmd; *p != NULL; ++p) {
+		WT_ERR(__wt_config_gets(session, cfg, *p, &cval));
+		if ((strcmp(*p, "snapall") == 0) ?
+		    cval.val != 0 : cval.len != 0) {
+			ret = __wt_schema_worker(session, uri, cfg,
+			    __wt_btree_snapshot_drop, WT_BTREE_NO_SNAPSHOT);
+			break;
 		}
-		if (*p == NULL)
-			ret = __wt_schema_drop(session, uri, cfg);
 	}
+	if (*p == NULL)
+		ret = __wt_schema_drop(session, uri, cfg);
 
 err:	API_END_NOTFOUND_MAP(session, ret);
 }
@@ -262,7 +253,8 @@ __session_sync(WT_SESSION *wt_session, const char *uri, const char *config)
 	session = (WT_SESSION_IMPL *)wt_session;
 
 	SESSION_API_CALL(session, sync, config, cfg);
-	ret = __wt_schema_worker(session, uri, cfg, __wt_btree_snapshot, 0);
+	ret = __wt_schema_worker(session, uri, cfg,
+	    __wt_btree_snapshot, WT_BTREE_NO_SNAPSHOT);
 
 err:	API_END_NOTFOUND_MAP(session, ret);
 }

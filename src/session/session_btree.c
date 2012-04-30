@@ -99,11 +99,11 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_session_find_btree --
+ * __session_find_btree --
  *	Find an open btree handle for the named table.
  */
-int
-__wt_session_find_btree(WT_SESSION_IMPL *session,
+static int
+__session_find_btree(WT_SESSION_IMPL *session,
     const char *uri, size_t urilen, const char *cfg[], uint32_t flags,
     WT_BTREE_SESSION **btree_sessionp)
 {
@@ -133,41 +133,67 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
     const char *uri, const char *tconfig, const char *cfg[], uint32_t flags)
 {
 	WT_BTREE_SESSION *btree_session;
+	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
+	WT_ITEM *buf;
+	const char *filename, *name, *treeconf;
+	size_t namelen;
 	int exist;
-	const char *filename, *treeconf;
+
+	buf = NULL;
+	treeconf = NULL;
 
 	filename = uri;
 	if (!WT_PREFIX_SKIP(filename, "file:"))
 		WT_RET_MSG(
 		    session, EINVAL, "Expected a 'file:' URI: %s", uri);
 
-	if ((ret = __wt_session_find_btree(session,
-	    uri, strlen(uri), cfg, flags, &btree_session)) == 0) {
+	/* Is this a snapshot handle? */
+	if (!LF_ISSET(WT_BTREE_NO_SNAPSHOT) && cfg != NULL &&
+	    __wt_config_gets(session, cfg, "snapshot", &cval) == 0 &&
+	    cval.len != 0) {
+		WT_RET(__wt_scr_alloc(session, 0, &buf));
+		WT_RET(__wt_buf_fmt(session, buf, "%s:%.*s",
+		    uri, (int)cval.len, cval.str));
+		name = buf->data;
+		namelen = buf->size;
+	} else {
+		name = uri;
+		namelen = strlen(uri);
+	}
+
+	if ((ret = __session_find_btree(session,
+	    name, namelen, cfg, flags, &btree_session)) == 0) {
 		WT_ASSERT(session, btree_session->btree != NULL);
 		session->btree = btree_session->btree;
 		return (0);
 	}
 	if (ret != WT_NOTFOUND)
-		return (ret);
+		goto err;
 
-	WT_RET(__wt_exist(session, filename, &exist));
-	if (!exist)
-		return (WT_NOTFOUND);
+	WT_ERR(__wt_exist(session, filename, &exist));
+	if (!exist) {
+		ret = WT_NOTFOUND;
+		goto err;
+	}
 
 	/*
 	 * A fixed configuration is passed in for special files, such as the
 	 * metadata file itself.
 	 */
 	if (tconfig != NULL)
-		WT_RET(__wt_strdup(session, tconfig, &treeconf));
+		WT_ERR(__wt_strdup(session, tconfig, &treeconf));
 	else
-		WT_RET(__wt_metadata_read(session, uri, &treeconf));
-	WT_RET(__wt_conn_btree_open(session, uri, treeconf, cfg, flags));
-	WT_RET(__wt_session_lock_btree(session, cfg, flags));
-	WT_RET(__wt_session_add_btree(session, NULL));
+		WT_ERR(__wt_metadata_read(session, uri, &treeconf));
+	WT_ERR(__wt_conn_btree_open(session, name, treeconf, cfg, flags));
+	WT_ERR(__wt_session_lock_btree(session, cfg, flags));
+	WT_ERR(__wt_session_add_btree(session, NULL));
 
-	return (0);
+	if (0) {
+err:		__wt_free(session, treeconf);
+	}
+	__wt_scr_free(&buf);
+	return (ret);
 }
 
 /*
@@ -195,7 +221,7 @@ __wt_session_close_any_open_btree(WT_SESSION_IMPL *session, const char *name)
 	WT_BTREE_SESSION *btree_session;
 	WT_DECL_RET;
 
-	if ((ret = __wt_session_find_btree(session, name, strlen(name),
+	if ((ret = __session_find_btree(session, name, strlen(name),
 	    NULL, WT_BTREE_EXCLUSIVE, &btree_session)) == 0) {
 		/*
 		 * XXX

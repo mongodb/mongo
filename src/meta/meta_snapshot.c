@@ -31,7 +31,8 @@ __wt_snapshot_get(WT_SESSION_IMPL *session, const char *name, WT_ITEM *addr)
 
 	/* Get the snapshot address. */
 	ret = strcmp(btree->name, WT_METADATA_URI) == 0 ?
-	    __snap_get_turtle(session, addr) : __snap_get(session, name, addr);
+	    __snap_get_turtle(session, addr) :
+	    __snap_get(session, name, addr);
 
 	/*
 	 * If we find a snapshot, check the version and return the address.

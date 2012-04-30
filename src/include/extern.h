@@ -87,7 +87,7 @@ extern int __wt_bm_addr_string(WT_SESSION_IMPL *session,
     uint32_t addr_size);
 extern int __wt_bm_create(WT_SESSION_IMPL *session, const char *filename);
 extern int __wt_bm_open(WT_SESSION_IMPL *session,
-    const char *uri,
+    const char *filename,
     const char *config,
     const char *cfg[]);
 extern int __wt_bm_close(WT_SESSION_IMPL *session);
@@ -252,7 +252,7 @@ extern int __wt_debug_page(WT_SESSION_IMPL *session,
 extern void __wt_page_out(WT_SESSION_IMPL *session,
     WT_PAGE **pagep,
     uint32_t flags);
-extern void __wt_evict_clr_page(WT_SESSION_IMPL *session, WT_PAGE *page);
+extern void __wt_evict_list_clr_page(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern void __wt_evict_server_wake(WT_SESSION_IMPL *session);
 extern void __wt_sync_file_serial_func(WT_SESSION_IMPL *session);
 extern int __wt_evict_page_request(WT_SESSION_IMPL *session, WT_PAGE *page);
@@ -844,12 +844,6 @@ extern int __wt_session_lock_btree( WT_SESSION_IMPL *session,
     const char *cfg[],
     uint32_t flags);
 extern int __wt_session_release_btree(WT_SESSION_IMPL *session);
-extern int __wt_session_find_btree(WT_SESSION_IMPL *session,
-    const char *uri,
-    size_t urilen,
-    const char *cfg[],
-    uint32_t flags,
-    WT_BTREE_SESSION **btree_sessionp);
 extern int __wt_session_get_btree(WT_SESSION_IMPL *session,
     const char *uri,
     const char *tconfig,
