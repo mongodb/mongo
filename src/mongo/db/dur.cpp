@@ -469,7 +469,16 @@ namespace mongo {
                 fraction = 1;
             lastRemap = now;
 
+#if defined(_WIN32)
+            // Note that this negatively affects performance.
+            // We must grab the exclusive lock here because remapThePrivateView() on Windows needs
+            // to grab it as well, due to the lack of a non-atomic way to remap a memory mapped file.
+            // See SERVER-5723 for performance improvement.
+            // See SERVER-5680 to see why this code is necessary.
+            LockMongoFilesExclusive lk;
+#else
             LockMongoFilesShared lk;
+#endif
             set<MongoFile*>& files = MongoFile::getAllFiles();
             unsigned sz = files.size();
             if( sz == 0 )
