@@ -247,6 +247,7 @@ namespace mongo {
                 callback->goingToDelete( cc->current() );
 
             cc->advance();
+            // SERVER-5198 Additional advancement is unnecessary for a single btree cursor.
             c->prepareToTouchEarlierIterate();
 
             logOp( "d" , ns.c_str() , rloc.obj()["_id"].wrap() , 0 , 0 , fromMigrate );

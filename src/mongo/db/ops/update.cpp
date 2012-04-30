@@ -321,8 +321,13 @@ namespace mongo {
 
                     if ( multi ) {
                         c->advance(); // go to next record in case this one moves
-                        if ( autoDedup && seenObjects.count( loc ) )
+                        if ( autoDedup && seenObjects.count( loc ) ) {
                             continue;
+                        }
+                        // SERVER-5198 Advance past the document to be modified.
+                        while( c->ok() && loc == c->currLoc() ) {
+                            c->advance();
+                        }
                     }
 
                     const BSONObj& onDisk = loc.obj();

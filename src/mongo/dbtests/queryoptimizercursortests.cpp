@@ -2332,7 +2332,11 @@ namespace QueryOptimizerCursorTests {
                     ASSERT( c()->currentMatches() );
                     ASSERT( !c()->getsetdup( currLoc() ) );
                     deleted.insert( currLoc() );
-                    c()->advance();
+                    // Advance past the document before deleting it.
+                    DiskLoc loc = currLoc();
+                    while( ok() && loc == currLoc() ) {
+                        c()->advance();
+                    }
                     prepareToTouchEarlierIterate();
                     
                     _cli.remove( ns(), BSON( "_id" << id ), true );

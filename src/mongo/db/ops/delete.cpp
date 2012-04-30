@@ -98,11 +98,19 @@ namespace mongo {
 
             bool match = creal->currentMatches();
 
-            if ( ! cc->advance() )
-                justOne = true;
-
+            cc->advance();
+            
             if ( ! match )
                 continue;
+
+            // SERVER-5198 Advance past the document to be modified.
+            while( cc->ok() && rloc == cc->currLoc() ) {
+                cc->advance();
+            }
+            
+            if ( !cc->ok() ) {
+                justOne = true;
+            }
 
             if ( !justOne ) {
                 /* NOTE: this is SLOW.  this is not good, noteLocation() was designed to be called across getMore

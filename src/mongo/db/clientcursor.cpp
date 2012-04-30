@@ -281,6 +281,7 @@ namespace mongo {
                  * The loop is to handle MultiKey indexes where the deleted record is pointed to by multiple adjacent keys.
                  * In that case we need to advance until we get to the next distinct record or EOF.
                  * SERVER-4154
+                 * SERVER-5198
                  */
                 c->advance();
             }
