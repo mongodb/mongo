@@ -201,7 +201,7 @@ namespace mongo {
         }
 
         virtual void help( stringstream& help ) const {
-            help << "internal - should not be called directly" << migrateLog;
+            help << "internal - should not be called directly";
         }
         virtual bool slaveOk() const { return false; }
         virtual bool adminOnly() const { return true; }
@@ -714,7 +714,7 @@ namespace mongo {
     public:
         MoveChunkCommand() : Command( "moveChunk" ) {}
         virtual void help( stringstream& help ) const {
-            help << "should not be calling this directly" << migrateLog;
+            help << "should not be calling this directly";
         }
 
         virtual bool slaveOk() const { return false; }
