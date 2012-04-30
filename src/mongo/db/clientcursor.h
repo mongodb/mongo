@@ -87,18 +87,7 @@ namespace mongo {
            had a bug, it could (or perhaps some sort of attack situation).
         */
         class Pin : boost::noncopyable {
-            CursorId _cursorid;
         public:
-            ClientCursor *c() const { return ClientCursor::find( _cursorid ); }
-            void release() {
-                ClientCursor *cursor = c();
-                _cursorid = INVALID_CURSOR_ID;
-                if ( cursor ) {
-                    verify( cursor->_pinValue >= 100 );
-                    cursor->_pinValue -= 100;
-                }
-            }
-            ~Pin() { DESTRUCTOR_GUARD( release(); ) }
             Pin( long long cursorid ) :
                 _cursorid( INVALID_CURSOR_ID ) {
                 recursive_scoped_lock lock( ccmutex );
@@ -110,6 +99,18 @@ namespace mongo {
                     _cursorid = cursorid;
                 }
             }
+            void release() {
+                ClientCursor *cursor = c();
+                _cursorid = INVALID_CURSOR_ID;
+                if ( cursor ) {
+                    verify( cursor->_pinValue >= 100 );
+                    cursor->_pinValue -= 100;
+                }
+            }
+            ~Pin() { DESTRUCTOR_GUARD( release(); ) }
+            ClientCursor *c() const { return ClientCursor::find( _cursorid ); }
+        private:
+            CursorId _cursorid;
         };
 
         /** Assures safe and reliable cleanup of a ClientCursor. */
