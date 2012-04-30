@@ -149,7 +149,7 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 		    session, EINVAL, "Expected a 'file:' URI: %s", uri);
 
 	/* Is this a snapshot handle? */
-	if (cfg != NULL &&
+	if (!LF_ISSET(WT_BTREE_NO_SNAPSHOT) && cfg != NULL &&
 	    __wt_config_gets(session, cfg, "snapshot", &cval) == 0 &&
 	    cval.len != 0) {
 		WT_RET(__wt_scr_alloc(session, 0, &buf));
