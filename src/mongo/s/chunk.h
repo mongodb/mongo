@@ -360,6 +360,8 @@ namespace mongo {
 
     private:
         ChunkManagerPtr reload(bool force=true) const; // doesn't modify self!
+        void markMinorForReload( ShardChunkVersion majorVersion ) const;
+        void getMarkedMinorVersions( set<ShardChunkVersion> minorVersions ) const;
 
         // helpers for constructor
         void _load(ChunkMap& chunks, set<Shard>& shards, ShardVersionMap& shardVersions, ChunkManagerPtr oldManager);
@@ -384,8 +386,33 @@ namespace mongo {
 
         const unsigned long long _sequenceNumber;
 
+        //
+        // Split Heuristic info
+        //
+
         mutable TicketHolder _splitTickets; // number of concurrent splitVector we can do from a splitIfShould per collection
         
+
+        mutable mutex _staleMinorSetMutex;
+        mutable int _staleMinorCount;
+        mutable set<ShardChunkVersion> _staleMinorSet;
+
+        // Test whether we should split once data * splitTestFactor > chunkSize (approximately)
+        static const int splitTestFactor = 5;
+        // Maximum number of parallel threads requesting a split
+        static const int maxParallelSplits = 5;
+
+        // The idea here is that we're over-aggressive on split testing by a factor of splitTestFactor, so we can
+        // safely wait until we get to splitTestFactor invalid splits before changing.  Unfortunately, we also
+        // potentially over-request the splits by a factor of maxParallelSplits, but since the factors are identical
+        // it works out (for now) for parallel or sequential oversplitting.
+        // TODO: Make splitting a separate thread with notifications?
+        static const int staleMinorReloadThreshold = maxParallelSplits;
+
+        //
+        // End split heuristics
+        //
+
         friend class Chunk;
         friend class ChunkRangeManager; // only needed for CRM::assertValid()
         static AtomicUInt NextSequenceNumber;

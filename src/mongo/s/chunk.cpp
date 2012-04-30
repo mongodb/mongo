@@ -80,7 +80,7 @@ namespace mongo {
     {}
 
     long Chunk::mkDataWritten() {
-        return rand() % ( MaxChunkSize / 5 );
+        return rand() % ( MaxChunkSize / ChunkManager::splitTestFactor );
     }
 
     string Chunk::getns() const {
@@ -295,9 +295,8 @@ namespace mongo {
             warning() << "splitChunk failed - cmd: " << cmdObj << " result: " << res << endl;
             conn.done();
 
-            // reloading won't strictly solve all problems, e.g. the collection's metadata lock can be taken
-            // but we issue here so that mongos may refresh without needing to be written/read against
-            _manager->reload();
+            // Mark the minor versions of this major version for reload (eventually)
+            _manager->markMinorForReload( this->_lastmod );
 
             return false;
         }
@@ -357,7 +356,7 @@ namespace mongo {
                 splitThreshold = (int) ((double)splitThreshold * .9);
             }
 
-            if ( _dataWritten < splitThreshold / 5 )
+            if ( _dataWritten < splitThreshold / ChunkManager::splitTestFactor )
                 return false;
             
             if ( ! getManager()->_splitTickets.tryAcquire() ) {
@@ -569,8 +568,8 @@ namespace mongo {
         // the most up to date value.
         _sequenceNumber(++NextSequenceNumber),
 
-        _splitTickets( 5 )
-
+        _splitTickets( maxParallelSplits ),
+        _staleMinorSetMutex( "ChunkManager::_staleMinorSet" )
     {
         int tries = 3;
         while (tries--) {
@@ -616,6 +615,51 @@ namespace mongo {
         return grid.getDBConfig(getns())->getChunkManager(getns(), force);
     }
 
+    void ChunkManager::markMinorForReload( ShardChunkVersion majorVersion ) const {
+
+        // When we get a stale minor version, it means that some *other* mongos has just split a chunk into a
+        // number of smaller parts, so we shouldn't need reload the data needed to split it ourselves
+        // for awhile.  Don't be very aggressive reloading just because of this, since reloads are expensive
+        // and disrupt operations.
+
+        // *** Multiple threads could indicate a stale minor version at the same time ***
+        // TODO:  Ideally, this could be a single-threaded background service doing splits
+        // TODO:  Ideally, we wouldn't need to care that this is stale at all
+        bool forceReload = false;
+        {
+            scoped_lock lk( _staleMinorSetMutex );
+
+            // The major version of the chunks which need to be reloaded
+            _staleMinorSet.insert( majorVersion );
+
+            // Increment the number of requests for minor version data
+            _staleMinorCount++;
+
+            if( _staleMinorCount >= staleMinorReloadThreshold ){
+
+                _staleMinorCount = 0;
+
+                // There's maxParallelSplits coming down this codepath at once - block as little as possible.
+                forceReload = true;
+            }
+
+            // There is no guarantee that a minor version change will be processed here, in the case where
+            // the request comes in "late" and the version's already getting reloaded - it's a heuristic anyway
+            // though, and we'll see requests multiple times.
+        }
+
+        if( forceReload )
+            grid.getDBConfig( getns() )->getChunkManagerIfExists( getns(), true, true );
+    }
+
+    void ChunkManager::getMarkedMinorVersions( set<ShardChunkVersion> minorVersions ) const {
+        scoped_lock lk( _staleMinorSetMutex );
+        for( set<ShardChunkVersion>::iterator it = _staleMinorSet.begin(); it != _staleMinorSet.end(); it++ ){
+            minorVersions.insert( *it );
+        }
+    }
+
+
     /**
      * This is an adapter so we can use config diffs - mongos and mongod do them slightly differently
      *
@@ -660,6 +704,7 @@ namespace mongo {
     void ChunkManager::_load(ChunkMap& chunkMap, set<Shard>& shards, ShardVersionMap& shardVersions, ChunkManagerPtr oldManager) {
 
         _version = 0;
+        set<ShardChunkVersion> minorVersions;
 
         // If we have a previous version of the ChunkManager to work from, use that info to reduce our config query
         if( oldManager && oldManager->getVersion() > 0 ){
@@ -681,6 +726,9 @@ namespace mongo {
                 chunkMap.insert( make_pair( oldC->getMax(), c ) );
             }
 
+            // Also get any minor versions stored for reload
+            oldManager->getMarkedMinorVersions( minorVersions );
+
             LOG(2) << "loading chunk manager for collection " << _ns << " using old chunk manager w/ version " << _version.toString() << " and " << oldChunkMap.size() << " chunks" << endl;
         }
 
@@ -689,7 +737,7 @@ namespace mongo {
         differ.attach( _ns, chunkMap, _version, shardVersions );
 
         // Diff tracker should *always* find at least one chunk if collection exists
-        int diffsApplied = differ.calculateConfigDiff( configServer.modelServer() );
+        int diffsApplied = differ.calculateConfigDiff( configServer.modelServer(), minorVersions );
         if( diffsApplied > 0 ){
 
             LOG(2) << "loaded " << diffsApplied << " chunks into new chunk manager for " << _ns
@@ -1165,8 +1213,9 @@ namespace mongo {
     _mutex( "ChunkManager" ),
     _nsLock( ConnectionString(), "" ),
     _sequenceNumber(),
-    _splitTickets( 0 ){
-    }
+    _splitTickets( 0 ),
+    _staleMinorSetMutex( "ChunkManager::_staleMinorSet" )
+    {}
 
     class ChunkObjUnitTest : public StartupTest {
     public:
