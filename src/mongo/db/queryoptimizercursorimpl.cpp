@@ -312,9 +312,6 @@ namespace mongo {
      * all delegate Cursors, so the calls are forwarded as prepareToYield()/recoverFromYield() to a
      * ClientCursor for each delegate Cursor.
      *
-     * If the advance() call preceeding prepareToTouchEarlierIterate() may cause _takeover to be
-     * set, the implemenation will internally call _takeover->advance() if necessary.
-     *
      * After _takeover is set, consistency after writes is ensured by delegation to the _takeover
      * MultiCursor.
      */
