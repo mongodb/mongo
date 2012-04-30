@@ -1275,7 +1275,7 @@ namespace mongo {
             NULL);
         if ( INVALID_HANDLE_VALUE == hFile ) {
             DWORD lasterr = GetLastError();
-            log() << "failed to open minidump file " << dumpFilename << " : " 
+            log() << "failed to open minidump file " << toUtf8String(dumpFilename) << " : " 
                   << errnoWithDescription( lasterr ) << endl;
             return;
         }
@@ -1285,7 +1285,7 @@ namespace mongo {
         aMiniDumpInfo.ExceptionPointers = exceptionInfo;
         aMiniDumpInfo.ClientPointers = TRUE;
 
-        log() << "writing minidump dignostic file " << dumpFilename << endl;
+        log() << "writing minidump dignostic file " << toUtf8String(dumpFilename) << endl;
         BOOL bstatus = MiniDumpWriteDump(GetCurrentProcess(),
             GetCurrentProcessId(),
             hFile,
