@@ -282,6 +282,7 @@ namespace mongo {
                  * In that case we need to advance until we get to the next distinct record or EOF.
                  * SERVER-4154
                  * SERVER-5198
+                 * But see SERVER-5725.
                  */
                 c->advance();
             }

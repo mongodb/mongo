@@ -77,6 +77,8 @@ namespace mongo {
      *     runOtherOps();
      *     cursor->checkLocation();
      *
+     * But see SERVER-5725.
+     *
      * A Cursor may rely on additional callbacks not listed above to relocate its position after a
      * write.
      */

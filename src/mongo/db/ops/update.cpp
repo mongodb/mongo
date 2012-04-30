@@ -324,7 +324,8 @@ namespace mongo {
                         if ( autoDedup && seenObjects.count( loc ) ) {
                             continue;
                         }
-                        // SERVER-5198 Advance past the document to be modified.
+                        // SERVER-5198 Advance past the document to be modified, but see
+                        // SERVER-5725.
                         while( c->ok() && loc == c->currLoc() ) {
                             c->advance();
                         }
