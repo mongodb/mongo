@@ -43,7 +43,7 @@ namespace mongo {
 
     typedef boost::recursive_mutex::scoped_lock recursive_scoped_lock;
     typedef long long CursorId; /* passed to the client so it can send back on getMore */
-    static const CursorId INVALID_CURSOR_ID = -1;
+    static const CursorId INVALID_CURSOR_ID = -1; // But see SERVER-5726.
     class Cursor; /* internal server cursor base class */
     class ClientCursor;
     class ParsedQuery;

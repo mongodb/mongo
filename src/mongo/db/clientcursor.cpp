@@ -616,6 +616,7 @@ namespace mongo {
         return ClientCursor::recoverFromYield( data );
     }
 
+    // See SERVER-5726.
     long long ctmLast = 0; // so we don't have to do find() which is a little slow very often.
     long long ClientCursor::allocCursorId_inlock() {
         long long ctm = curTimeMillis64();
