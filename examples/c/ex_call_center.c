@@ -57,9 +57,9 @@ const char *home = "WT_TEST";
 /* Customer records. */
 typedef struct {
 	uint64_t id;
-	char *name;
-	char *address;
-	char *phone;
+	const char *name;
+	const char *address;
+	const char *phone;
 } CUSTOMER;
 
 /* Call records. */
@@ -68,8 +68,8 @@ typedef struct {
 	uint64_t call_date;
 	uint64_t cust_id;
 	uint64_t emp_id;
-	char *call_type;
-	char *notes;
+	const char *call_type;
+	const char *notes;
 } CALL;
 /*! [call-center decl] */
 
@@ -79,8 +79,18 @@ int main(void)
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
 	WT_CURSOR *cursor;
-	CUSTOMER cust;
-	CALL call;
+	CUSTOMER cust, *custp, cust_sample[] = {
+		{ 0, "Professor Oak", "LeafGreen Avenue", "123-456-7890" },
+		{ 0, "Lorelei", "Sevii Islands", "098-765-4321" },
+		{ 0, NULL, NULL, NULL }
+	};
+	CALL call, *callp, call_sample[] = {
+		{ 0, 32, 1, 2, "billing", "unavailable" },
+		{ 0, 33, 1, 2, "billing", "available" },
+		{ 0, 34, 1, 2, "reminder", "unavailable" },
+		{ 0, 35, 1, 2, "reminder", "available" },
+		{ 0, 0, 0, 0, NULL, NULL }
+	};
 
 	ret = wiredtiger_open(home, NULL, "create", &conn);
 	if (ret != 0) {
@@ -119,11 +129,11 @@ int main(void)
 	/* Populate the customers table with some data. */
 	ret = session->open_cursor(
 	    session, "table:customers", NULL, "append", &cursor);
-	cursor->set_value(cursor,
-	    "Professor Oak", "LeafGreen Avenue", "123-456-7890");
-	ret = cursor->insert(cursor);
-	cursor->set_value(cursor, "Lorelei", "Sevii Islands", "098-765-4321");
-	ret = cursor->insert(cursor);
+	for (custp = cust_sample; custp->name != NULL; custp++) {
+		cursor->set_value(cursor,
+		    custp->name, custp->address, custp->phone);
+		ret = cursor->insert(cursor);
+	}
 	ret = cursor->close(cursor);
 
 	/*
@@ -145,18 +155,11 @@ int main(void)
 	/* Populate the calls table with some data. */
 	ret = session->open_cursor(
 	    session, "table:calls", NULL, "append", &cursor);
-	cursor->set_value(cursor, (long long)32,
-	    (uint64_t)1, (uint64_t)2, "billing", "unavailable");
-	ret = cursor->insert(cursor);
-	cursor->set_value(cursor, (long long)33,
-	    (uint64_t)1, (uint64_t)2, "billing", "available");
-	ret = cursor->insert(cursor);
-	cursor->set_value(cursor, (long long)34,
-	    (uint64_t)1, (uint64_t)2, "reminder", "unavailable");
-	ret = cursor->insert(cursor);
-	cursor->set_value(cursor, (long long)35,
-	    (uint64_t)1, (uint64_t)2, "reminder", "available");
-	ret = cursor->insert(cursor);
+	for (callp = call_sample; callp->call_type != NULL; callp++) {
+		cursor->set_value(cursor, callp->call_date, callp->cust_id,
+		    callp->emp_id, callp->call_type, callp->notes);
+		ret = cursor->insert(cursor);
+	}
 	ret = cursor->close(cursor);
 
 	/*
