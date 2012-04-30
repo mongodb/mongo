@@ -131,8 +131,8 @@ skip:			WT_VERBOSE(session, salvage,
 			 * Free the block and make sure we don't return it more
 			 * than once.
 			 */
-			WT_RET(__wt_block_insert_ext(session,
-			    &block->live.discard, offset, (off_t)allocsize));
+			WT_RET(__wt_block_free_ext(
+			    session, block, offset, (off_t)allocsize));
 			block->slvg_off = offset += allocsize;
 			continue;
 		}

@@ -244,10 +244,10 @@ __snapshot_process(
 	WT_DECL_RET;
 	WT_ITEM *tmp;
 	WT_SNAPSHOT *snap;
-	int found, live_merge, locked;
+	int found, locked;
 
 	tmp = NULL;
-	live_merge = locked = 0;
+	locked = 0;
 
 	/*
 	 * To delete a snapshot, we'll need snapshot information for it, and we
@@ -333,10 +333,9 @@ __snapshot_process(
 		 * may be the live tree.
 		 */
 		a = snap->bpriv;
-		if (F_ISSET(snap + 1, WT_SNAP_ADD)) {
-			live_merge = 1;
+		if (F_ISSET(snap + 1, WT_SNAP_ADD))
 			b = &block->live;
-		} else
+		else
 			b = (snap + 1)->bpriv;
 
 		/*
@@ -421,13 +420,7 @@ __snapshot_process(
 		}
 
 live_update:
-	/*
-	 * If we didn't review the live snapshot's allocation and discard lists
-	 * as part of delete processing, do it now.
-	 */
 	si = &block->live;
-	if (!live_merge)
-		WT_ERR(__wt_block_extlist_match(session, block, si));
 
 	/* Truncate the file if that's possible. */
 	WT_RET(__wt_block_extlist_truncate(session, block, &si->avail));

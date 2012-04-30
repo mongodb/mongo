@@ -179,63 +179,6 @@ __block_off_insert(WT_SESSION_IMPL *session, WT_EXTLIST *el, WT_EXT *ext)
 }
 
 /*
- * __wt_block_off_remove --
- *	Remove a range from an extent list, where the range may be part of a
- * overlapping entry.
- */
-int
-__wt_block_off_remove(
-    WT_SESSION_IMPL *session, WT_EXTLIST *el, off_t off, off_t size)
-{
-	WT_EXT *before, *after, *ext;
-	off_t toff, tsize;
-
-	/*
-	 * The chunk we're removing may be in the middle of another chunk.  We
-	 * could implement that code directly, doing one search instead of two,
-	 * but this functionality is only used by verification, so we're doing
-	 * it the slow way.
-	 *
-	 * Search for before and after entries for the offset.
-	 */
-	__block_off_pair_srch(el, off, &before, &after);
-
-	/*
-	 * If "before" overlaps, get that entry and fix it; if no overlapping
-	 * "before" entry is found, "after" had better start with the specified
-	 * offset (or the entry isn't on the list, and the list is corrupted).
-	 */
-	if (before != NULL &&
-	    before->off < off && before->off + before->size > off) {
-		/* Remove the overlapping entry. */
-		WT_RET(__block_off_remove(session, el, before->off, &ext));
-
-		/* Add an entry which is the initial overlapping part. */
-		toff = ext->off;
-		tsize = off - ext->off;
-		WT_RET(__block_merge(session, el, toff, tsize));
-
-		/* Add an entry which is the trailing overlapping part. */
-		toff = off + size;
-		tsize = ext->size - ((off - ext->off) + size);
-		if (tsize != 0)
-			WT_RET(__block_merge(session, el, toff, tsize));
-	} else {
-		/*
-		 * Remove the entry, update its size and offset, and insert it
-		 * back onto the list.
-		 */
-		WT_RET(__block_off_remove(session, el, off, &ext));
-		ext->off += size;
-		ext->size -= size;
-		if (ext->size != 0)
-			return (__block_off_insert(session, el, ext));
-	}
-	__wt_free(session, ext);
-	return (0);
-}
-
-/*
  * __block_off_remove --
  *	Remove a record from an extent list.
  */
@@ -289,6 +232,69 @@ __block_off_remove(
 corrupt:
 	WT_RET_MSG(session, EINVAL,
 	    "attempt to remove non-existent offset from an extent list");
+}
+
+/*
+ * __wt_block_off_overlap_remove --
+ *	Remove a range from an extent list, where the range may be part of a
+ * overlapping entry.
+ */
+int
+__wt_block_off_overlap_remove(
+    WT_SESSION_IMPL *session, WT_EXTLIST *el, off_t off, off_t size)
+{
+	WT_EXT *before, *after, *ext;
+	off_t a_off, a_size, b_off, b_size;
+
+	/* Search for before and after entries for the offset. */
+	__block_off_pair_srch(el, off, &before, &after);
+
+	/* If "before" or "after" overlaps, retrieve the overlapping entry. */
+	if (before != NULL && before->off + before->size > off) {
+		WT_RET(__block_off_remove(session, el, before->off, &ext));
+
+		/* Calculate overlapping extents. */
+		a_off = ext->off;
+		a_size = off - ext->off;
+		b_off = off + size;
+		b_size = ext->size - (a_size + size);
+	} else if (after != NULL && off + size > after->off) {
+		WT_RET(__block_off_remove(session, el, after->off, &ext));
+
+		/*
+		 * Calculate overlapping extents.  There's no initial overlap
+		 * since the after extent presumably cannot begin before "off".
+		 */
+		a_off = WT_BLOCK_INVALID_OFFSET;
+		a_size = 0;
+		b_off = off + size;
+		b_size = ext->size - (b_off - ext->off);
+	} else
+		return (WT_NOTFOUND);
+
+	/*
+	 * If there are overlaps, insert the item; re-use the extent structure
+	 * and save the allocation (we know there's no need to merge).
+	 */
+	if (a_size != 0) {
+		ext->off = a_off;
+		ext->size = a_size;
+		WT_RET(__block_off_insert(session, el, ext));
+		ext = NULL;
+	}
+	if (b_size != 0) {
+		if (ext == NULL)
+			WT_RET(__block_merge(session, el, b_off, b_size));
+		else {
+			ext->off = b_off;
+			ext->size = b_size;
+			WT_RET(__block_off_insert(session, el, ext));
+			ext = NULL;
+		}
+	}
+	if (ext != NULL)
+		__wt_free(session, ext);
+	return (0);
 }
 
 /*
@@ -418,12 +424,39 @@ __wt_block_free(WT_SESSION_IMPL *session,
 	WT_VERBOSE(session, block,
 	    "free %" PRIdMAX "/%" PRIdMAX, (intmax_t)off, (intmax_t)size);
 
-	/* Lock the system and free the extent. */
 	__wt_spin_lock(session, &block->live_lock);
-	ret = __block_merge(session, &block->live.discard, off, (off_t)size);
+	ret = __wt_block_free_ext(session, block, off, (off_t)size);
 	__wt_spin_unlock(session, &block->live_lock);
 
 	return (ret);
+}
+
+/*
+ * __wt_block_free_ext --
+ *	Free an extent to the underlying file.
+ */
+int
+__wt_block_free_ext(
+    WT_SESSION_IMPL *session, WT_BLOCK *block, off_t off, off_t size)
+{
+	WT_EXTLIST *el;
+
+	/*
+	 * Callers of this function are expected to be holding any locks
+	 * required to manipulate the extent lists.
+	 *
+	 * We can reuse this extent immediately if it was allocated during this
+	 * snapshot,  merge it into the avail list (which slows file growth in
+	 * workloads including repeated overflow record modification).  If this
+	 * extent is referenced in a previous snapshot, merge into the discard
+	 * list.
+	 */
+	el = __wt_block_off_overlap_remove(
+	    session, &block->live.alloc, off, size) == 0 ?
+	    &block->live.avail : &block->live.discard;
+	WT_RET(__block_merge(session, el, off, (off_t)size));
+
+	return (0);
 }
 
 #ifdef HAVE_DIAGNOSTIC
@@ -713,10 +746,17 @@ __wt_block_insert_ext(
     WT_SESSION_IMPL *session, WT_EXTLIST *el, off_t off, off_t size)
 {
 	/*
+	 * There are currently two copies of this function (this code is a
+	 * one-liner that calls the internal version of the function, which
+	 * means the compiler should compress out the function call).  It's
+	 * that way because the interface is still fluid, I'm not convinced
+	 * there won't be a need for a functional split between the internal
+	 * and external versions in the future.
+	 *
 	 * Callers of this function are expected to be holding any locks
 	 * required to manipulate the extent list.
 	 */
-	return (__block_merge(session, el, off, (off_t)size));
+	return (__block_merge(session, el, off, size));
 }
 static int
 __block_merge(WT_SESSION_IMPL *session, WT_EXTLIST *el, off_t off, off_t size)
