@@ -87,16 +87,11 @@ __wt_bm_create(WT_SESSION_IMPL *session, const char *filename)
  */
 int
 __wt_bm_open(WT_SESSION_IMPL *session,
-    const char *uri, const char *config, const char *cfg[])
+    const char *filename, const char *config, const char *cfg[])
 {
 	WT_BTREE *btree;
-	const char *filename;
 
 	btree = session->btree;
-
-	filename = uri;
-	if (!WT_PREFIX_SKIP(filename, "file:"))
-		return (EINVAL);
 
 	WT_RET(__wt_block_open(session, filename, config, cfg, &btree->block));
 

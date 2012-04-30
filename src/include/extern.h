@@ -83,7 +83,7 @@ extern int __wt_bm_addr_string(WT_SESSION_IMPL *session,
     uint32_t addr_size);
 extern int __wt_bm_create(WT_SESSION_IMPL *session, const char *filename);
 extern int __wt_bm_open(WT_SESSION_IMPL *session,
-    const char *uri,
+    const char *filename,
     const char *config,
     const char *cfg[]);
 extern int __wt_bm_close(WT_SESSION_IMPL *session);
@@ -840,12 +840,6 @@ extern int __wt_session_lock_btree( WT_SESSION_IMPL *session,
     const char *cfg[],
     uint32_t flags);
 extern int __wt_session_release_btree(WT_SESSION_IMPL *session);
-extern int __wt_session_find_btree(WT_SESSION_IMPL *session,
-    const char *uri,
-    size_t urilen,
-    const char *cfg[],
-    uint32_t flags,
-    WT_BTREE_SESSION **btree_sessionp);
 extern int __wt_session_get_btree(WT_SESSION_IMPL *session,
     const char *uri,
     const char *tconfig,

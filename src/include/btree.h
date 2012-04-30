@@ -72,6 +72,8 @@ struct __wt_btree {
 
 	const char *name;		/* Object name as a URI */
 	const char *config;		/* Configuration string */
+	const char *filename;		/* File name */
+	const char *snapshot;		/* Snapshot name (or NULL) */
 
 	enum {	BTREE_COL_FIX=1,	/* Fixed-length column store */
 		BTREE_COL_VAR=2,	/* Variable-length column store */

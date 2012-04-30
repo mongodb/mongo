@@ -54,7 +54,7 @@ __wt_btree_open(WT_SESSION_IMPL *session,
 	WT_ERR(__btree_conf(session));
 
 	/* Connect to the underlying block manager. */
-	WT_ERR(__wt_bm_open(session, btree->name, btree->config, cfg));
+	WT_ERR(__wt_bm_open(session, btree->filename, btree->config, cfg));
 
 	/*
 	 * Open the specified snapshot unless it's a special command (special
