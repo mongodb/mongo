@@ -212,7 +212,7 @@ __rec_discard_page(WT_SESSION_IMPL *session, WT_PAGE *page, int single)
 
 	/* Make sure a page is not in the eviction request list. */
 	if (!single)
-		__wt_evict_clr_page(session, page);
+		__wt_evict_list_clr_page(session, page);
 
 	/* Discard the page. */
 	__wt_page_out(session, &page, 0);

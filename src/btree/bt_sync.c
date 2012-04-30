@@ -296,8 +296,6 @@ err:	__wt_snapshot_list_free(session, snapbase);
 int
 __wt_cache_flush(WT_SESSION_IMPL *session, int op)
 {
-	WT_DECL_RET;
-
 	/*
 	 * Ask the eviction thread to flush any dirty pages, and optionally
 	 * discard the file from the cache.
@@ -320,10 +318,7 @@ __wt_cache_flush(WT_SESSION_IMPL *session, int op)
 	 * already works that way.   None of these problems can't be fixed, but
 	 * I don't see a reason to change at this time, either.
 	 */
+	WT_RET(__wt_sync_file_serial(session, op));
 
-	do {
-		ret = __wt_sync_file_serial(session, op);
-	} while (ret == WT_RESTART);
-
-	return (ret);
+	return (0);
 }
