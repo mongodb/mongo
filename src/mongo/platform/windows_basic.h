@@ -16,4 +16,6 @@
 # include <ws2tcpip.h>
 # include <wspiapi.h>
 # include <windows.h>
+// *Nix has isatty, Windows has it too but spells it _isatty. Let's simplify
+#define isatty _isatty
 #endif
