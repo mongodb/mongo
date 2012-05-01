@@ -18,6 +18,11 @@
 #include "pch.h"
 #include <stdio.h>
 #include <string.h>
+#ifndef _WIN32
+#include <unistd.h> // isatty
+#endif
+
+#include <fstream>
 
 #include <boost/filesystem/operations.hpp>
 
@@ -780,9 +785,9 @@ int _main( int argc, char* argv[] ) {
     if ( runShell ) {
 
         mongo::shell_utils::MongoProgramScope s;
-
+        bool hasMongoRC = norc; // If they specify norc, assume it's not their first time
+        string rcLocation;
         if ( !norc ) {
-            string rcLocation;
 #ifndef _WIN32
             if ( getenv( "HOME" ) != NULL )
                 rcLocation = str::stream() << getenv( "HOME" ) << "/.mongorc.js" ;
@@ -791,11 +796,23 @@ int _main( int argc, char* argv[] ) {
                 rcLocation = str::stream() << getenv( "HOMEDRIVE" ) << getenv( "HOMEPATH" ) << "\\.mongorc.js";
 #endif
             if ( !rcLocation.empty() && fileExists(rcLocation) ) {
+                hasMongoRC = true;
                 if ( ! scope->execFile( rcLocation , false , true , false , 0 ) ) {
                     cout << "The \".mongorc.js\" file located in your home folder could not be executed" << endl;
                     return -5;
                 }
             }
+        }
+        
+        if ( !hasMongoRC && isatty(0) ) {
+           cout << "Welcome to the Mongo shell.\n" 
+                   "It looks like this is your first time using the mongo shell.\n" 
+                   "For interactive help, you can try `help`.\n" 
+                   "For more comprehensive documentation see\n\thttp://www.mongodb.org/display/DOCS/Home\n"
+                   "There is also a Google group\n\thttp://groups.google.com/group/mongodb-user" << endl; 
+           fstream f;
+           f.open(rcLocation.c_str(), ios_base::out );
+           f.close();
         }
 
         shellHistoryInit();
