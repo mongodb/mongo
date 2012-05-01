@@ -10,8 +10,8 @@
 static int __snapshot_process(WT_SESSION_IMPL *, WT_BLOCK *, WT_SNAPSHOT *);
 static int __snapshot_string(
 	WT_SESSION_IMPL *, WT_BLOCK *, const uint8_t *, WT_ITEM *);
-static int __snapshot_update(
-	WT_SESSION_IMPL *, WT_BLOCK *, WT_SNAPSHOT *, WT_BLOCK_SNAPSHOT *, int);
+static int __snapshot_update(WT_SESSION_IMPL *,
+	WT_BLOCK *, WT_SNAPSHOT *, WT_BLOCK_SNAPSHOT *, uint64_t, int);
 
 /*
  * __wt_block_snap_init --
@@ -244,16 +244,28 @@ __snapshot_process(
 	WT_DECL_RET;
 	WT_ITEM *tmp;
 	WT_SNAPSHOT *snap;
-	int found, locked;
+	uint64_t snapshot_size;
+	int deleting, locked;
 
 	tmp = NULL;
 	locked = 0;
 
 	/*
+	 * We've allocated our last page, update the snapshot size.  We need to
+	 * calculate the live system's snapshot size before reading and merging
+	 * snapshot allocation and discard information from the snapshots we're
+	 * deleting, those operations will change the underlying byte counts.
+	 */
+	si = &block->live;
+	snapshot_size = si->snapshot_size;
+	snapshot_size += si->alloc.bytes;
+	snapshot_size -= si->discard.bytes;
+
+	/*
 	 * To delete a snapshot, we'll need snapshot information for it, and we
 	 * have to read that from the disk.
 	 */
-	found = 0;
+	deleting = 0;
 	WT_SNAPSHOT_FOREACH(snapbase, snap) {
 		/*
 		 * To delete a snapshot, we'll need snapshot information for it
@@ -270,7 +282,7 @@ __snapshot_process(
 		    F_ISSET(snap, WT_SNAP_ADD) ||
 		    !F_ISSET(snap - 1, WT_SNAP_DELETE)))
 			continue;
-		found = 1;
+		deleting = 1;
 
 		/*
 		 * Allocate a snapshot structure, crack the cookie and read the
@@ -305,7 +317,9 @@ __snapshot_process(
 	 */
 	__wt_spin_lock(session, &block->live_lock);
 	locked = 1;
-	if (!found)
+
+	/* Skip the additional processing if we aren't deleting snapshots. */
+	if (!deleting)
 		goto live_update;
 
 	/*
@@ -416,7 +430,7 @@ __snapshot_process(
 			WT_ASSERT(session,
 			    !F_ISSET(snap, WT_SNAP_ADD));
 			WT_ERR(__snapshot_update(
-			    session, block, snap, snap->bpriv, 0));
+			    session, block, snap, snap->bpriv, 0, 0));
 		}
 
 live_update:
@@ -428,7 +442,8 @@ live_update:
 	/* Update the final, added snapshot based on the live system. */
 	WT_SNAPSHOT_FOREACH(snapbase, snap)
 		if (F_ISSET(snap, WT_SNAP_ADD)) {
-			WT_ERR(__snapshot_update(session, block, snap, si, 1));
+			WT_ERR(__snapshot_update(
+			    session, block, snap, si, snapshot_size, 1));
 
 			/*
 			 * XXX
@@ -488,8 +503,9 @@ err:	if (locked)
  *	Update a snapshot.
  */
 static int
-__snapshot_update(WT_SESSION_IMPL *session,
-    WT_BLOCK *block, WT_SNAPSHOT *snap, WT_BLOCK_SNAPSHOT *si, int is_live)
+__snapshot_update(
+    WT_SESSION_IMPL *session, WT_BLOCK *block, WT_SNAPSHOT *snap,
+    WT_BLOCK_SNAPSHOT *si, uint64_t snapshot_size, int is_live)
 {
 	WT_DECL_RET;
 	WT_ITEM *tmp;
@@ -534,10 +550,8 @@ __snapshot_update(WT_SESSION_IMPL *session,
 		WT_RET(__wt_filesize(session, block->fh, &si->file_size));
 
 	/* Set the snapshot size for the live system. */
-	if (is_live) {
-		si->snapshot_size += si->alloc.bytes;
-		si->snapshot_size -= si->discard.bytes;
-	}
+	if (is_live)
+		si->snapshot_size = snapshot_size;
 
 	/*
 	 * Copy the snapshot information into the snapshot array's address
