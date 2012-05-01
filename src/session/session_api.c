@@ -193,7 +193,7 @@ __session_drop(WT_SESSION *wt_session, const char *uri, const char *config)
 		if ((strcmp(*p, "snapall") == 0) ?
 		    cval.val != 0 : cval.len != 0) {
 			ret = __wt_schema_worker(session, uri, cfg,
-			    __wt_btree_snapshot_drop, WT_BTREE_NO_SNAPSHOT);
+			    __wt_btree_snapshot_drop, WT_BTREE_SNAPSHOT_OP);
 			break;
 		}
 	}
@@ -254,7 +254,7 @@ __session_sync(WT_SESSION *wt_session, const char *uri, const char *config)
 
 	SESSION_API_CALL(session, sync, config, cfg);
 	ret = __wt_schema_worker(session, uri, cfg,
-	    __wt_btree_snapshot, WT_BTREE_NO_SNAPSHOT);
+	    __wt_btree_snapshot, WT_BTREE_SNAPSHOT_OP);
 
 err:	API_END_NOTFOUND_MAP(session, ret);
 }
