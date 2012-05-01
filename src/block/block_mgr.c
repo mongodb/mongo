@@ -86,14 +86,15 @@ __wt_bm_create(WT_SESSION_IMPL *session, const char *filename)
  *	Open a file.
  */
 int
-__wt_bm_open(WT_SESSION_IMPL *session,
-    const char *filename, const char *config, const char *cfg[])
+__wt_bm_open(WT_SESSION_IMPL *session, const char *filename,
+    const char *config, const char *cfg[], int forced_salvage)
 {
 	WT_BTREE *btree;
 
 	btree = session->btree;
 
-	WT_RET(__wt_block_open(session, filename, config, cfg, &btree->block));
+	WT_RET(__wt_block_open(
+	    session, filename, config, cfg, forced_salvage, &btree->block));
 
 	/*
 	 * !!!

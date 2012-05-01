@@ -44,8 +44,10 @@ __wt_btree_open(WT_SESSION_IMPL *session,
     const char *cfg[], const uint8_t *addr, uint32_t addr_size, int readonly)
 {
 	WT_BTREE *btree;
+	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
 	WT_ITEM dsk;
+	int forced_salvage;
 
 	btree = session->btree;
 	WT_CLEAR(dsk);
@@ -53,8 +55,17 @@ __wt_btree_open(WT_SESSION_IMPL *session,
 	/* Initialize and configure the WT_BTREE structure. */
 	WT_ERR(__btree_conf(session));
 
+	forced_salvage = 0;
+	if (F_ISSET(btree, WT_BTREE_SALVAGE)) {
+		ret = __wt_config_gets(session, cfg, "force", &cval);
+		if (ret != 0 && ret != WT_NOTFOUND)
+			WT_ERR(ret);
+		if (cval.val != 0)
+			forced_salvage = 1;
+	}
 	/* Connect to the underlying block manager. */
-	WT_ERR(__wt_bm_open(session, btree->filename, btree->config, cfg));
+	WT_ERR(__wt_bm_open(
+	    session, btree->filename, btree->config, cfg, forced_salvage));
 
 	/*
 	 * Open the specified snapshot unless it's a special command (special

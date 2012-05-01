@@ -65,14 +65,15 @@ __wt_block_create(WT_SESSION_IMPL *session, const char *filename)
  *	Open a file.
  */
 int
-__wt_block_open(WT_SESSION_IMPL *session,
-    const char *filename, const char *config, const char *cfg[], void *retp)
+__wt_block_open(WT_SESSION_IMPL *session, const char *filename,
+    const char *config, const char *cfg[], int forced_salvage, void *blockp)
 {
 	WT_BLOCK *block;
 	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
 
-	*(void **)retp = NULL;
+	WT_UNUSED(cfg);
+	*(void **)blockp = NULL;
 
 	/*
 	 * Allocate the structure, connect (so error close works), copy the
@@ -119,20 +120,11 @@ __wt_block_open(WT_SESSION_IMPL *session,
 	 *
 	 * Salvage is a special case -- if we're forcing the salvage, we don't
 	 * even look at the description sector.
-	 *
-	 * XXX
-	 * We shouldn't be looking at the WT_BTREE->flags field here.
 	 */
-	cval.val = 0;
-	if (F_ISSET(session->btree, WT_BTREE_SALVAGE)) {
-		ret = __wt_config_gets(session, cfg, "force", &cval);
-		if (ret != 0 && ret != WT_NOTFOUND)
-			WT_ERR(ret);
-	}
-	if (cval.val == 0)
+	if (!forced_salvage)
 		WT_ERR(__desc_read(session, block));
 
-	*(void **)retp = block;
+	*(void **)blockp = block;
 	return (0);
 
 err:	(void)__wt_block_close(session, block);
