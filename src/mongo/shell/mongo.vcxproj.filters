@@ -512,6 +512,9 @@
     <ClCompile Include="..\..\third_party\linenoise\mk_wcwidth.cpp">
       <Filter>third_party\linenoise\Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\util\signal_handlers.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="collection.js">
@@ -1165,6 +1168,9 @@
     </ClInclude>
     <ClInclude Include="..\..\third_party\linenoise\linenoise_utf8.h">
       <Filter>third_party\linenoise\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\signal_handlers.h">
+      <Filter>util\Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
