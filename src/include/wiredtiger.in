@@ -642,14 +642,13 @@ struct __wt_session {
 	 * @configstart{session.drop, see dist/api_data.py}
 	 * @config{force, return success if the object does not exist.,a boolean
 	 * flag; default \c false.}
-	 * @config{snapall, drop all snapshots.,a boolean flag; default \c
-	 * false.}
-	 * @config{snapfrom, drop all snapshots more recent than\, and
-	 * including\, the named snapshot.,a string; default empty.}
-	 * @config{snapshot, the name of a single snapshot to drop.,a string;
-	 * default empty.}
-	 * @config{snapto, drop all snapshots earlier than\, and including\, the
-	 * named snapshot.,a string; default empty.}
+	 * @config{snapshot, specify one or more snapshots to drop.  The value
+	 * must be either the name of a single snapshot to drop (a string)\, or
+	 * a list containing one of the following keys: \c "all" to drop all
+	 * snapshots\, \c "from=<snapshot>" to drop all snapshots after and
+	 * including the named snapshots\, or \c "to=<snapshot>" to drop all
+	 * snapshots before and including the named snapshot.,a string; default
+	 * empty.}
 	 * @configend
 	 * @errors
 	 */

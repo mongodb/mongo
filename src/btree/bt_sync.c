@@ -60,49 +60,33 @@ __wt_btree_snapshot_close(WT_SESSION_IMPL *session)
 int
 __wt_btree_snapshot_drop(WT_SESSION_IMPL *session, const char *cfg[])
 {
-	WT_CONFIG_ITEM cval;
+	WT_CONFIG_ITEM cval, sval;
 	WT_DECL_RET;
 	char *name;
 
 	name = NULL;
 
-	if ((ret = __wt_config_gets(
-	    session, cfg, "snapall", &cval)) != 0 && ret != WT_NOTFOUND)
-		WT_RET(ret);
-	if (cval.val != 0) {
-		ret = __snapshot_worker(session, name, 0, SNAPSHOT_DROP_ALL);
-		goto done;
-	}
-
-	if ((ret = __wt_config_gets(
-	    session, cfg, "snapfrom", &cval)) != 0 && ret != WT_NOTFOUND)
-		WT_RET(ret);
-	if (cval.len != 0) {
-		WT_RET(__wt_strndup(session, cval.str, cval.len, &name));
-		ret =
-		    __snapshot_worker(session, name, 0, SNAPSHOT_DROP_FROM);
-		goto done;
-	}
-
-	if ((ret = __wt_config_gets(
-	    session, cfg, "snapto", &cval)) != 0 && ret != WT_NOTFOUND)
-		WT_RET(ret);
-	if (cval.len != 0) {
-		WT_RET(__wt_strndup(session, cval.str, cval.len, &name));
-		ret = __snapshot_worker(session, name, 0, SNAPSHOT_DROP_TO);
-		goto done;
-	}
-
-	if ((ret = __wt_config_gets(
-	    session, cfg, "snapshot", &cval)) != 0 && ret != WT_NOTFOUND)
-		WT_RET(ret);
-	if (cval.len != 0) {
+	WT_RET(__wt_config_gets(session, cfg, "snapshot", &cval));
+	if (cval.type != ITEM_STRUCT) {
 		WT_RET(__wt_strndup(session, cval.str, cval.len, &name));
 		ret = __snapshot_worker(session, name, 0, SNAPSHOT_DROP);
-		goto done;
-	}
+	} else if (__wt_config_subgets(session, &cval, "all", &sval) == 0 &&
+	    sval.val != 0)
+		ret = __snapshot_worker(session, name, 0, SNAPSHOT_DROP_ALL);
+	else if (__wt_config_subgets(session, &cval, "from", &sval) == 0 &&
+	    sval.len != 0) {
+		WT_RET(__wt_strndup(session, sval.str, sval.len, &name));
+		ret = __snapshot_worker(session, name, 0, SNAPSHOT_DROP_FROM);
+	} else if (__wt_config_subgets(session, &cval, "to", &sval) == 0 &&
+	    sval.len != 0) {
+		WT_RET(__wt_strndup(session, sval.str, sval.len, &name));
+		ret = __snapshot_worker(session, name, 0, SNAPSHOT_DROP_TO);
+	} else
+		WT_RET_MSG(session, EINVAL,
+		    "Unexpected value for 'snapshot' key: %.*s",
+		    (int)cval.len, cval.str);
 
-done:	__wt_free(session, name);
+	__wt_free(session, name);
 	return (ret);
 }
 
