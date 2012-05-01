@@ -615,6 +615,7 @@ extern int __wt_meta_track_update(WT_SESSION_IMPL *session, const char *key);
 extern int __wt_meta_track_fileop( WT_SESSION_IMPL *session,
     const char *olduri,
     const char *newuri);
+extern int __wt_meta_track_handle_lock(WT_SESSION_IMPL *session);
 extern void __wt_abort(WT_SESSION_IMPL *session);
 extern int __wt_calloc(WT_SESSION_IMPL *session,
     size_t number,
