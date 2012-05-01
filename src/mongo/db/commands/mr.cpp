@@ -1069,9 +1069,6 @@ namespace mongo {
                         auto_ptr<ClientCursor> cursor( new ClientCursor( QueryOption_NoCursorTimeout , temp , config.ns.c_str() ) );
                         uassert( 16053, str::stream() << "could not create client cursor over " << config.ns << " for query : " << config.filter << " sort : " << config.sort, cursor.get() );
 
-                        // Cleanup our previous cursor
-                        holdCursor.reset();
-
                         Timer mt;
                         // go through each doc
                         while ( cursor->ok() ) {
