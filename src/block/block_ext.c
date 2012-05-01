@@ -1075,8 +1075,8 @@ __wt_block_extlist_dump(
 	WT_EXT *ext;
 	WT_SIZE *szp;
 
-	__wt_verbose(session, "%s: %s: by offset:%s",
-	    tag, el->name, el->entries == 0 ? " [Empty]" : "");
+	__wt_verbose(session, "%s: %s: %" PRIu64 " bytes, by offset:%s",
+	    tag, el->name, el->bytes, el->entries == 0 ? " [Empty]" : "");
 	if (el->entries == 0)
 		return;
 
