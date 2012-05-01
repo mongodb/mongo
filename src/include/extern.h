@@ -850,6 +850,9 @@ extern int __wt_session_get_btree(WT_SESSION_IMPL *session,
     const char *tconfig,
     const char *cfg[],
     uint32_t flags);
+extern int __wt_session_lock_snapshot( WT_SESSION_IMPL *session,
+    const char *snapshot,
+    uint32_t flags);
 extern int __wt_session_remove_btree( WT_SESSION_IMPL *session,
     WT_BTREE_SESSION *btree_session,
     int locked);
