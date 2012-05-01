@@ -252,33 +252,32 @@ namespace mongo {
             BSONObjBuilder bb( b.subarrayStart( shortFieldName ) );
 
             int n = 0;
-
-            BSONObjIterator i( in.embeddedObject() );
-            if ( elt.isNumber() && elt.number() < 0 ) {
-                // pop from front
-                if ( i.more() ) {
-                    i.next();
-                    n++;
-                }
-
-                while( i.more() ) {
-                    bb.appendAs( i.next() , bb.numStr( n - 1 ) );
-                    n++;
-                }
+            int nFields = in.embeddedObject().nFields();
+            int popPosition = 1;
+            
+            if ( elt.isNumber() ) {
+                popPosition = elt.number();
             }
-            else {
+            
+            if ( popPosition < 0 ) {
+                // pop from front
+                popPosition = -1 * popPosition - 1;
+            } else {
                 // pop from back
-                while( i.more() ) {
-                    n++;
-                    BSONElement arrI = i.next();
-                    if ( i.more() ) {
-                        bb.append( arrI );
-                    }
+                popPosition = nFields - popPosition;
+            }
+            int cur = 0;
+            BSONObjIterator i( in.embeddedObject() );
+            while ( i.more() ) {
+                BSONElement arrI = i.next();
+                if ( n != popPosition ) {
+                    bb.appendAs( arrI, bb.numStr( cur++ ) );
                 }
+                n++;
             }
 
             ms.pushStartSize = n;
-            verify( ms.pushStartSize == in.embeddedObject().nFields() );
+            assert( ms.pushStartSize == nFields );
             bb.done();
             break;
         }
