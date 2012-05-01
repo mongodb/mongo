@@ -399,8 +399,8 @@ __verify_filefrag_add(WT_SESSION_IMPL *session,
 	uint32_t f, frag, frags, i;
 
 	WT_VERBOSE(session, verify,
-	    "adding file block at %" PRIuMAX "-%" PRIuMAX,
-	    (uintmax_t)offset, (uintmax_t)(offset + size));
+	    "adding file block at %" PRIuMAX "-%" PRIuMAX " (%" PRIuMAX ")",
+	    (uintmax_t)offset, (uintmax_t)(offset + size), (uintmax_t)size);
 
 	/* Check each chunk against the total file size. */
 	if (offset + size > block->fh->file_size)
@@ -474,8 +474,8 @@ __verify_snapfrag_add(
 	uint32_t f, frag, frags, i;
 
 	WT_VERBOSE(session, verify,
-	    "adding snapshot block at %" PRIuMAX "-%" PRIuMAX,
-	    (uintmax_t)offset, (uintmax_t)(offset + size));
+	    "adding snapshot block at %" PRIuMAX "-%" PRIuMAX " (%" PRIuMAX ")",
+	    (uintmax_t)offset, (uintmax_t)(offset + size), (uintmax_t)size);
 
 	/*
 	 * Check each chunk against the snapshot's size, a snapshot should never
