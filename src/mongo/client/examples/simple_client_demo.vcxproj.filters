@@ -73,6 +73,9 @@
     <ClCompile Include="..\..\util\timer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\util\signal_handlers.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\util\stringutils.h">
@@ -88,6 +91,9 @@
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\util\timer-win32-inl.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\util\signal_handlers.h">
       <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>
