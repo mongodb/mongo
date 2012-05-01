@@ -14,54 +14,58 @@
  */
 typedef struct __wt_meta_track {
 	enum {
-		WT_ST_EMPTY=0,		/* Unused slot */
-		WT_ST_FILEOP=1,		/* File operation */
-		WT_ST_REMOVE=2,		/* Remove a metadata entry */
-		WT_ST_SET=3		/* Reset a metadata entry */
+		WT_ST_EMPTY,		/* Unused slot */
+		WT_ST_FILEOP,		/* File operation */
+		WT_ST_REMOVE,		/* Remove a metadata entry */
+		WT_ST_SET		/* Reset a metadata entry */
 	} op;
 	const char *a, *b;		/* Strings */
 } WT_META_TRACK;
 
 /*
  * __meta_track_next --
- *	Return the next slot, and extend the list of operations we're tracking,
- * as necessary.
+ *	Extend the list of operations we're tracking, as necessary, and
+ *	optionally return the next slot.
  */
 static int
 __meta_track_next(WT_SESSION_IMPL *session, WT_META_TRACK **trkp)
 {
-	WT_META_TRACK *trk;
-	size_t bytes_allocated;
-	u_int i;
+	size_t offset;
 
-	/*
-	 * Slow, but we don't care -- it's a metadata operation, searching an
-	 * array of maybe 20 items.
-	 */
-	for (trk = session->meta_track,
-	    i = 0; i <  session->meta_track_entries; ++trk, ++i)
-		if (trk->op == WT_ST_EMPTY) {
-			if (trkp != NULL)
-				*trkp = trk;
-			return (0);
-		}
+	if (!WT_META_TRACKING(session))
+		session->meta_track_next = session->meta_track;
 
-	/*
-	 * The __wt_realloc() function uses the "bytes allocated" value
-	 * to figure out how much of the memory it needs to clear (see
-	 * the function for an explanation of why the memory is cleared,
-	 * it's a security thing).
-	 */
-	bytes_allocated =
-	    session->meta_track_entries * sizeof(WT_META_TRACK);
-	WT_RET(__wt_realloc(session, &bytes_allocated,
-	    (session->meta_track_entries + 20) * sizeof(WT_META_TRACK),
-	    &session->meta_track));
-	if (trkp != NULL)
-		*trkp = &((WT_META_TRACK *)
-		    session->meta_track)[session->meta_track_entries];
-	session->meta_track_entries += 20;
+	offset = WT_PTRDIFF(session->meta_track_next, session->meta_track);
+	if (offset == session->meta_track_alloc) {
+		WT_RET(__wt_realloc(session, &session->meta_track_alloc,
+		    WT_MAX(2 * session->meta_track_alloc,
+		    20 * sizeof(WT_META_TRACK)), &session->meta_track));
+
+		/* Maintain the position in the new chunk of memory. */
+		session->meta_track_next =
+		    (uint8_t *)session->meta_track + offset;
+	}
+
+	WT_ASSERT(session, session->meta_track_next != NULL);
+
+	if (trkp != NULL) {
+		*trkp = session->meta_track_next;
+		session->meta_track_next = *trkp + 1;
+	}
+
 	return (0);
+}
+
+/*
+ * __wt_meta_track_discard --
+ *	Cleanup metadata tracking when closing a session.
+ */
+void
+__wt_meta_track_discard(WT_SESSION_IMPL *session)
+{
+	__wt_free(session, session->meta_track);
+	session->meta_track_next = NULL;
+	session->meta_track_alloc = 0;
 }
 
 /*
@@ -85,17 +89,16 @@ __wt_meta_track_off(WT_SESSION_IMPL *session, int unroll)
 	WT_META_TRACK *trk, *trk_orig;
 	int tret;
 
-	if (session->meta_track == NULL || session->meta_track_entries == 0)
+	if (session->meta_track_next == NULL)
 		return (0);
 
 	trk_orig = session->meta_track;
-	trk = &trk_orig[session->meta_track_entries - 1];
+	trk = session->meta_track_next;
 
 	/* Turn off tracking for unroll. */
-	session->meta_track = NULL;
-	session->meta_track_entries = 0;
+	session->meta_track_next = NULL;
 
-	for (;; --trk) {
+	for (; trk >= trk_orig; --trk) {
 		if (unroll)
 			switch (trk->op) {
 			case WT_ST_EMPTY:	/* Unused slot */
@@ -155,11 +158,7 @@ __wt_meta_track_off(WT_SESSION_IMPL *session, int unroll)
 
 		__wt_free(session, trk->a);
 		__wt_free(session, trk->b);
-
-		if (trk == trk_orig)
-			break;
 	}
-	__wt_free(session, trk_orig);
 	return (ret);
 }
 

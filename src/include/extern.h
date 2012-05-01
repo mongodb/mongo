@@ -607,6 +607,7 @@ extern int __wt_metadata_remove(WT_SESSION_IMPL *session, const char *key);
 extern int __wt_metadata_read( WT_SESSION_IMPL *session,
     const char *key,
     const char **valuep);
+extern void __wt_meta_track_discard(WT_SESSION_IMPL *session);
 extern int __wt_meta_track_on(WT_SESSION_IMPL *session);
 extern int __wt_meta_track_off(WT_SESSION_IMPL *session, int unroll);
 extern int __wt_meta_track_insert(WT_SESSION_IMPL *session, const char *key);

@@ -36,6 +36,9 @@ __session_close(WT_SESSION *wt_session, const char *config)
 
 	__wt_spin_lock(session, &conn->spinlock);
 
+	/* Discard metadata tracking. */
+	__wt_meta_track_discard(session);
+
 	/* Discard scratch buffers. */
 	__wt_scr_discard(session);
 
