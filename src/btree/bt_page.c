@@ -7,7 +7,7 @@
 
 #include "wt_internal.h"
 
-static int  __inmem_col_fix(WT_SESSION_IMPL *, WT_PAGE *, size_t *);
+static int  __inmem_col_fix(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __inmem_col_int(WT_SESSION_IMPL *, WT_PAGE *, size_t *);
 static int  __inmem_col_var(WT_SESSION_IMPL *, WT_PAGE *, size_t *);
 static int  __inmem_row_int(WT_SESSION_IMPL *, WT_PAGE *, size_t *);
@@ -97,54 +97,54 @@ __wt_page_in_func(
  */
 int
 __wt_page_inmem(WT_SESSION_IMPL *session,
-    WT_PAGE *parent, WT_REF *parent_ref, WT_PAGE_HEADER *dsk,
-    size_t *inmem_sizep, WT_PAGE **pagep)
+    WT_PAGE *parent, WT_REF *parent_ref, WT_PAGE_HEADER *dsk, WT_PAGE **pagep)
 {
 	WT_DECL_RET;
 	WT_PAGE *page;
+	size_t inmem_size;
 
 	WT_ASSERT_RET(session, dsk->u.entries > 0);
 
-	*pagep = NULL;
+	*pagep = page = NULL;
 
 	/*
 	 * Allocate and initialize the WT_PAGE.
 	 * Set the LRU so the page is not immediately selected for eviction.
+	 * Set the read generation (which can't match a search where the write
+	 * generation wasn't set, that is, remained 0).
 	 */
 	WT_RET(__wt_calloc_def(session, 1, &page));
-	if (inmem_sizep != NULL)
-		*inmem_sizep = sizeof(*page) + dsk->size;
-	page->type = dsk->type;
 	page->parent = parent;
 	page->ref = parent_ref;
 	page->dsk = dsk;
-	/*
-	 * Set the write generation to 1 (which can't match a search where the
-	 * write generation wasn't set, that is, remained 0).
-	 */
 	page->read_gen = __wt_cache_read_gen(session);
+	page->type = dsk->type;
 
+	inmem_size = 0;
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
 		page->u.col_fix.recno = dsk->recno;
-		WT_ERR(__inmem_col_fix(session, page, inmem_sizep));
+		WT_ERR(__inmem_col_fix(session, page));
 		break;
 	case WT_PAGE_COL_INT:
 		page->u.intl.recno = dsk->recno;
-		WT_ERR(__inmem_col_int(session, page, inmem_sizep));
+		WT_ERR(__inmem_col_int(session, page, &inmem_size));
 		break;
 	case WT_PAGE_COL_VAR:
 		page->u.col_var.recno = dsk->recno;
-		WT_ERR(__inmem_col_var(session, page, inmem_sizep));
+		WT_ERR(__inmem_col_var(session, page, &inmem_size));
 		break;
 	case WT_PAGE_ROW_INT:
-		WT_ERR(__inmem_row_int(session, page, inmem_sizep));
+		WT_ERR(__inmem_row_int(session, page, &inmem_size));
 		break;
 	case WT_PAGE_ROW_LEAF:
-		WT_ERR(__inmem_row_leaf(session, page, inmem_sizep));
+		WT_ERR(__inmem_row_leaf(session, page, &inmem_size));
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}
+
+	__wt_cache_page_read(
+	    session, page, sizeof(WT_PAGE) + dsk->size + inmem_size);
 
 	*pagep = page;
 	return (0);
@@ -158,12 +158,10 @@ err:	__wt_free(session, page);
  *	Build in-memory index for fixed-length column-store leaf pages.
  */
 static int
-__inmem_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
+__inmem_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BTREE *btree;
 	WT_PAGE_HEADER *dsk;
-
-	WT_UNUSED(inmem_sizep);
 
 	btree = session->btree;
 	dsk = page->dsk;

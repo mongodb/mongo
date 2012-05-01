@@ -224,7 +224,7 @@ __wt_btree_tree_open(WT_SESSION_IMPL *session, WT_ITEM *dsk)
 	btree = session->btree;
 
 	/* Build the in-memory version of the page. */
-	WT_RET(__wt_page_inmem(session, NULL, NULL, dsk->mem, NULL, &page));
+	WT_RET(__wt_page_inmem(session, NULL, NULL, dsk->mem, &page));
 	btree->root_page = page;
 
 	return (0);

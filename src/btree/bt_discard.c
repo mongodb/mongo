@@ -44,8 +44,9 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep, uint32_t flags)
 	__wt_hazard_validate(session, page);
 #endif
 	/*
-	 * If this page has a memory footprint associated with it, update
-	 * the cache information.
+	 * Pages without a memory footprint aren't associated with the cache
+	 * and were never counted as "pages read".  If the page has a memory
+	 * footprint, update the cache information based on the discard.
 	 */
 	if (page->memory_footprint != 0)
 		__wt_cache_page_evict(session, page);
