@@ -408,7 +408,7 @@ def run_tests(tests):
                 master.wait_for_repl()
 
             tests_run = 0
-            for tests_run, test in enumerate(tests, 1):
+            for tests_run, test in enumerate(tests):
                 try:
                     fails.append(test)
                     runTest(test)
@@ -418,7 +418,7 @@ def run_tests(tests):
                     if small_oplog:
                         master.wait_for_repl()
                     elif test[1]: # reach inside test and see if startmongod is true
-                        if tests_run % 20 == 0:
+                        if (tests_run+1) % 20 == 0:
                             # restart mongo every 20 times, for our 32-bit machines
                             master.__exit__(None, None, None)
                             master = mongod(small_oplog=small_oplog,no_journal=no_journal,no_preallocj=no_preallocj,auth=auth).__enter__()
