@@ -457,7 +457,7 @@ live_update:
 			 * work for the snapshot size, and so we do both here.
 			 */
 			snap->snapshot_size = si->snapshot_size;
-			WT_ERR(__wt_epoch(session, &snap->sec, &snap->nsec));
+			WT_ERR(__wt_epoch(session, &snap->sec, NULL));
 		}
 
 	/*
