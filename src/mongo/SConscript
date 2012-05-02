@@ -290,7 +290,7 @@ shardServerFiles = [
     "s/commands_admin.cpp",
     "s/commands_public.cpp",
     "s/request.cpp",
-    "s/client.cpp",
+    "s/client_info.cpp",
     "s/cursors.cpp",
     "s/server.cpp",
     "s/config_migrate.cpp",
