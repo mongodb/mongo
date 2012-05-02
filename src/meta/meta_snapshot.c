@@ -7,7 +7,8 @@
 
 #include "wt_internal.h"
 
-static int __snap_get(WT_SESSION_IMPL *, const char *, WT_ITEM *);
+static int __snap_get(
+	WT_SESSION_IMPL *, const char *, const char *,  WT_ITEM *);
 static int __snap_get_last(WT_SESSION_IMPL *, const char *, WT_ITEM *);
 static int __snap_get_name(
 	WT_SESSION_IMPL *, const char *, const char *, WT_ITEM *);
@@ -15,24 +16,22 @@ static int __snap_get_turtle(WT_SESSION_IMPL *, WT_ITEM *);
 static int __snap_get_turtle_config(WT_SESSION_IMPL *, char *, size_t);
 static int __snap_set(WT_SESSION_IMPL *, const char *, const char *);
 static int __snap_set_turtle(WT_SESSION_IMPL *, const char *);
-static int __snap_version_chk(WT_SESSION_IMPL *, const char *);
+static int __snap_version_chk(WT_SESSION_IMPL *, const char *, const char *);
 
 /*
  * __wt_snapshot_get --
  *	Get the file's most recent snapshot address.
  */
 int
-__wt_snapshot_get(WT_SESSION_IMPL *session, const char *name, WT_ITEM *addr)
+__wt_snapshot_get(WT_SESSION_IMPL *session,
+    const char *filename, const char *snapshot, WT_ITEM *addr)
 {
-	WT_BTREE *btree;
 	WT_DECL_RET;
 
-	btree = session->btree;
-
 	/* Get the snapshot address. */
-	ret = strcmp(btree->name, WT_METADATA_URI) == 0 ?
+	ret = strcmp(filename, WT_METADATA_FILENAME) == 0 ?
 	    __snap_get_turtle(session, addr) :
-	    __snap_get(session, name, addr);
+	    __snap_get(session, filename, snapshot, addr);
 
 	/*
 	 * If we find a snapshot, check the version and return the address.
@@ -46,10 +45,10 @@ __wt_snapshot_get(WT_SESSION_IMPL *session, const char *name, WT_ITEM *addr)
 		 * assume it's a creation and there isn't a snapshot to find.
 		 * Let the caller deal with the failure.
 		 */
-		if (name != NULL)
+		if (snapshot != NULL)
 			WT_RET_MSG(session, WT_NOTFOUND,
-			    "unable to find a \"%s\" snapshot entry for %s",
-			    name, btree->name);
+			    "no \"%s\" snapshot found in %s",
+			    snapshot, filename);
 
 		addr->data = NULL;
 		addr->size = 0;
@@ -62,13 +61,13 @@ __wt_snapshot_get(WT_SESSION_IMPL *session, const char *name, WT_ITEM *addr)
  *	Clear a file's snapshot information.
  */
 int
-__wt_snapshot_clear(WT_SESSION_IMPL *session, const char *uri)
+__wt_snapshot_clear(WT_SESSION_IMPL *session, const char *filename)
 {
 	WT_DECL_RET;
 
-	ret = strcmp(uri, WT_METADATA_URI) == 0 ?
+	ret = strcmp(filename, WT_METADATA_FILENAME) == 0 ?
 	    __snap_set_turtle(session, NULL) :
-	    __snap_set(session, uri, NULL);
+	    __snap_set(session, filename, NULL);
 
 	/*
 	 * If we are unrolling a failed create, we may have already removed the
@@ -85,15 +84,14 @@ __wt_snapshot_clear(WT_SESSION_IMPL *session, const char *uri)
  *	Get the metadata file's snapshot address.
  */
 static int
-__snap_get_turtle(
-    WT_SESSION_IMPL *session, WT_ITEM *addr)
+__snap_get_turtle(WT_SESSION_IMPL *session, WT_ITEM *addr)
 {
 	char line[1024];
 
 	WT_RET(__snap_get_turtle_config(session, line, sizeof(line)));
 
 	/* Check the major/minor version numbers. */
-	WT_RET(__snap_version_chk(session, line));
+	WT_RET(__snap_version_chk(session, WT_METADATA_FILENAME, line));
 
 	/* Retrieve the last snapshot (there should only be one). */
 	WT_RET(__snap_get_last(session, line, addr));
@@ -106,8 +104,7 @@ __snap_get_turtle(
  *	Return the configuration value for the metadata file.
  */
 static int
-__snap_get_turtle_config(
-    WT_SESSION_IMPL *session, char *line, size_t len)
+__snap_get_turtle_config(WT_SESSION_IMPL *session, char *line, size_t len)
 {
 	FILE *fp;
 	WT_DECL_RET;
@@ -190,28 +187,33 @@ err:	if (path != NULL)
  *	Return the version and snapshot information for a metadata entry.
  */
 static int
-__snap_get(WT_SESSION_IMPL *session, const char *name, WT_ITEM *addr)
+__snap_get(WT_SESSION_IMPL *session,
+    const char *filename, const char *snapshot, WT_ITEM *addr)
 {
-	WT_BTREE *btree;
+	WT_ITEM *buf;
 	WT_DECL_RET;
 	const char *config;
 
-	btree = session->btree;
+	buf = NULL;
 	config = NULL;
 
+	WT_RET(__wt_scr_alloc(session, 0, &buf));
+	WT_ERR(__wt_buf_fmt(session, buf, "file:%s", filename));
+
 	/* Retrieve the metadata entry for the file. */
-	WT_ERR(__wt_metadata_read(session, btree->name, &config));
+	WT_ERR(__wt_metadata_read(session, buf->mem, &config));
 
 	/* Check the major/minor version numbers. */
-	WT_ERR(__snap_version_chk(session, config));
+	WT_ERR(__snap_version_chk(session, filename, config));
 
 	/* Retrieve the named snapshot or the last snapshot. */
-	if (name == NULL)
+	if (snapshot == NULL)
 		WT_ERR(__snap_get_last(session, config, addr));
 	else
-		WT_ERR(__snap_get_name(session, name, config, addr));
+		WT_ERR(__snap_get_name(session, snapshot, config, addr));
 
 err:	__wt_free(session, config);
+	__wt_scr_free(&buf);
 	return (ret);
 }
 
@@ -220,25 +222,31 @@ err:	__wt_free(session, config);
  *	Set an ordinary file's snapshot address.
  */
 static int
-__snap_set(WT_SESSION_IMPL *session, const char *uri, const char *v)
+__snap_set(WT_SESSION_IMPL *session, const char *filename, const char *v)
 {
 	WT_DECL_RET;
+	WT_ITEM *buf;
 	const char *config, *cfg[3], *newcfg;
 
+	buf = NULL;
 	config = newcfg = NULL;
 
+	WT_RET(__wt_scr_alloc(session, 0, &buf));
+	WT_ERR(__wt_buf_fmt(session, buf, "file:%s", filename));
+
 	/* Retrieve the metadata for this file. */
-	WT_ERR(__wt_metadata_read(session, uri, &config));
+	WT_ERR(__wt_metadata_read(session, buf->mem, &config));
 
 	/* Replace the snapshot entry. */
 	cfg[0] = config;
 	cfg[1] = v == NULL ? "snapshot=()" : v;
 	cfg[2] = NULL;
 	WT_ERR(__wt_config_collapse(session, cfg, &newcfg));
-	WT_ERR(__wt_metadata_update(session, uri, newcfg));
+	WT_ERR(__wt_metadata_update(session, buf->mem, newcfg));
 
 err:	__wt_free(session, config);
 	__wt_free(session, newcfg);
+	__wt_scr_free(&buf);
 	return (ret);
 }
 
@@ -319,39 +327,42 @@ __snap_compare_order(const void *a, const void *b)
  */
 int
 __wt_snapshot_list_get(
-    WT_SESSION_IMPL *session, const char *config_arg, WT_SNAPSHOT **snapbasep)
+    WT_SESSION_IMPL *session, const char *filename, WT_SNAPSHOT **snapbasep)
 {
-	WT_BTREE *btree;
 	WT_CONFIG snapconf;
 	WT_CONFIG_ITEM a, k, v;
 	WT_DECL_RET;
+	WT_ITEM *buf;
 	WT_SNAPSHOT *snap, *snapbase;
 	size_t allocated, slot;
 	const char *config;
-	char line[1024], timebuf[64];
+	char timebuf[64];
 
 	*snapbasep = NULL;
 
-	btree = session->btree;
+	buf = NULL;
 	snapbase = NULL;
 	allocated = slot = 0;
 	config = NULL;
 
+#define	WT_MAX_CONFIG_LINE	1024
+	WT_RET(__wt_scr_alloc(session, WT_MAX_CONFIG_LINE, &buf));
+
 	/*
-	 * If no configuration information was provided, retrieve the metadata
-	 * information for the current file or the configuration line for the
-	 * metadata file itself.
+	 * Retrieve the metadata information for the current file or the
+	 * configuration line for the metadata file itself.
 	 */
-	if (config_arg != NULL)
-		config = config_arg;
-	else if (strcmp(btree->name, WT_METADATA_URI) == 0) {
-		line[0] = '\0';
-		ret = __snap_get_turtle_config(session, line, sizeof(line));
+	if (strcmp(filename, WT_METADATA_FILENAME) == 0) {
+		((char *)buf->mem)[0] = '\0';
+		ret = __snap_get_turtle_config(
+		    session, buf->mem, WT_MAX_CONFIG_LINE);
 		if (ret != 0 && ret != WT_NOTFOUND)
 			return (ret);
-		config = line;
-	} else
-		WT_ERR(__wt_metadata_read(session, btree->name, &config));
+		config = buf->mem;
+	} else {
+		WT_ERR(__wt_buf_fmt(session, buf, "file:%s", filename));
+		WT_ERR(__wt_metadata_read(session, buf->mem, &config));
+	}
 
 	/* Load any existing snapshots into the array. */
 	if (__wt_config_getones(session, config, "snapshot", &v) == 0 &&
@@ -419,11 +430,12 @@ __wt_snapshot_list_get(
 
 	if (0) {
 format:		WT_ERR_MSG(session, WT_ERROR,
-		    "%s: corrupted snapshot list", btree->name);
+		    "%s: corrupted snapshot list", filename);
 err:		__wt_snapshot_list_free(session, snapbase);
 	}
-	if (config != config_arg && config != line)
+	if (config != buf->mem)
 		__wt_free(session, config);
+	__wt_scr_free(&buf);
 
 	return (ret);
 }
@@ -433,16 +445,15 @@ err:		__wt_snapshot_list_free(session, snapbase);
  *	Set a metadata snapshot value from the WT_SNAPSHOT list.
  */
 int
-__wt_snapshot_list_set(WT_SESSION_IMPL *session, WT_SNAPSHOT *snapbase)
+__wt_snapshot_list_set(
+    WT_SESSION_IMPL *session, const char *filename, WT_SNAPSHOT *snapbase)
 {
-	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_ITEM *buf;
 	WT_SNAPSHOT *snap;
 	int64_t order;
 	const char *sep;
 
-	btree = session->btree;
 	buf = NULL;
 
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));
@@ -485,9 +496,9 @@ __wt_snapshot_list_set(WT_SESSION_IMPL *session, WT_SNAPSHOT *snapbase)
 		sep = ",";
 	}
 	WT_ERR(__wt_buf_catfmt(session, buf, ")"));
-	WT_ERR(strcmp(btree->name, WT_METADATA_URI) == 0 ?
-	    __snap_set_turtle(session, (char *)buf->data) :
-	    __snap_set(session, btree->name, (char *)buf->data));
+	WT_ERR(strcmp(filename, WT_METADATA_FILENAME) == 0 ?
+	    __snap_set_turtle(session, buf->mem) :
+	    __snap_set(session, filename, buf->mem));
 
 err:	__wt_scr_free(&buf);
 
@@ -518,13 +529,11 @@ __wt_snapshot_list_free(WT_SESSION_IMPL *session, WT_SNAPSHOT *snapbase)
  *	Check the version major/minor numbers.
  */
 static int
-__snap_version_chk(WT_SESSION_IMPL *session, const char *config)
+__snap_version_chk(
+    WT_SESSION_IMPL *session, const char *filename, const char *config)
 {
-	WT_BTREE *btree;
 	WT_CONFIG_ITEM a, v;
 	int majorv, minorv;
-
-	btree = session->btree;
 
 	WT_RET(__wt_config_getones(session, config, "version", &v));
 	WT_RET(__wt_config_subgets(session, &v, "major", &a));
@@ -537,6 +546,6 @@ __snap_version_chk(WT_SESSION_IMPL *session, const char *config)
 	    minorv > WT_BTREE_MINOR_VERSION))
 		WT_RET_MSG(session, EACCES,
 		    "%s is an unsupported version of a WiredTiger file",
-		    btree->name);
+		    filename);
 	return (0);
 }

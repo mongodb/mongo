@@ -13,11 +13,11 @@
  */
 int
 __wt_snaplist_get(
-    WT_SESSION *session, const char *config, WT_SNAPSHOT **snapbasep)
+    WT_SESSION *session, const char *filename, WT_SNAPSHOT **snapbasep)
 {
 	WT_SESSION_IMPL *session_impl = (WT_SESSION_IMPL *)session;
 
-	return (__wt_snapshot_list_get(session_impl, config, snapbasep));
+	return (__wt_snapshot_list_get(session_impl, filename, snapbasep));
 }
 
 /*

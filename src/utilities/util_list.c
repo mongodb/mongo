@@ -64,14 +64,15 @@ list_print(WT_SESSION *session, const char *name, int sflag, int vflag)
 {
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
+	int found;
 	const char *key, *value;
 
 	/* Open the metadata file. */
 	if ((ret = session->open_cursor(
 	    session, WT_METADATA_URI, NULL, NULL, &cursor)) != 0) {
 		/*
-		 * If there is no schema (yet), this will return ENOENT.
-		 * Treat that the same as an empty schema.
+		 * If there is no metadata (yet), this will return ENOENT.
+		 * Treat that the same as an empty metadata.
 		 */
 		if (ret == ENOENT)
 			return (0);
@@ -84,34 +85,44 @@ list_print(WT_SESSION *session, const char *name, int sflag, int vflag)
 #define	MATCH(s, tag)							\
 	(strncmp(s, tag, strlen(tag)) == 0)
 
+	found = name == NULL;
 	while ((ret = cursor->next(cursor)) == 0) {
 		/* Get the key. */
 		if ((ret = cursor->get_key(cursor, &key)) != 0)
-			return (util_cerr("schema", "get_key", ret));
+			return (util_cerr("metadata", "get_key", ret));
 			
 		/*
 		 * If no object specified, show top-level objects (files and
 		 * tables).
 		 */
 		if (name == NULL) {
-			if (!MATCH(key, "table:") && !MATCH(key, "file:"))
+			if (!MATCH(key, "file:") && !MATCH(key, "table:"))
 				continue;
-		} else
+		} else {
 			if (!MATCH(key, name))
 				continue;
+			found = 1;
+		}
 		printf("%s\n", key);
 		if (!sflag && !vflag)
 			continue;
-		if ((ret = cursor->get_value(cursor, &value)) != 0)
-			return (util_cerr("schema", "get_value", ret));
-		if (sflag && (ret = list_print_snapshot(session, value)) != 0)
+
+		if (sflag && (ret = list_print_snapshot(session, key)) != 0)
 			return (ret);
-		if (vflag)
+		if (vflag) {
+			if ((ret = cursor->get_value(cursor, &value)) != 0)
+				return (
+				    util_cerr("metadata", "get_value", ret));
 			printf("%s\n", value);
+		}
 
 	}
 	if (ret != WT_NOTFOUND)
-		return (util_cerr("schema", "next", ret));
+		return (util_cerr("metadata", "next", ret));
+	if (!found) {
+		fprintf(stderr, "%s: %s: not found\n", progname, name);
+		return (1);
+	}
 
 	return (0);
 }
@@ -121,7 +132,7 @@ list_print(WT_SESSION *session, const char *name, int sflag, int vflag)
  *	List the snapshot information.
  */
 static int
-list_print_snapshot(WT_SESSION *session, const char *config)
+list_print_snapshot(WT_SESSION *session, const char *key)
 {
 	WT_DECL_RET;
 	WT_SNAPSHOT *snap, *snapbase;
@@ -130,13 +141,17 @@ list_print_snapshot(WT_SESSION *session, const char *config)
 	uint64_t v;
 	char buf[256];
 
+	/* Snapshots only make sense for files, at least at the moment. */
+	if (!MATCH(key, "file:"))
+		return (0);
+	key += strlen("file:");
+
 	/*
 	 * We may not find any snapshots for this file, in which case we don't
 	 * report an error, and continue our caller's loop.  Otherwise, report
 	 * each snapshot's name and time.
 	 */
-	if ((ret =
-	    __wt_snaplist_get(session, config, &snapbase)) == WT_NOTFOUND)
+	if ((ret = __wt_snaplist_get(session, key, &snapbase)) == WT_NOTFOUND)
 		return (0);
 	WT_RET(ret);
 
