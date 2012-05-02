@@ -293,7 +293,8 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 	 * the metadata with the new snapshot's location.
 	 */
 	if (ss->root_page != NULL) {
-		WT_ERR(__wt_snapshot_list_get(session, NULL, &snapbase));
+		WT_ERR(__wt_snapshot_list_get(
+		    session, btree->filename, &snapbase));
 		WT_ERR(__wt_strdup(
 		    session, WT_INTERNAL_SNAPSHOT, &snapbase[0].name));
 		F_SET(snapbase, WT_SNAP_ADD);
@@ -302,7 +303,8 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 		ss->root_page = NULL;
 		btree->snap = NULL;
 		if (snapbase[0].raw.data != NULL)
-			WT_ERR(__wt_snapshot_list_set(session, snapbase));
+			WT_ERR(__wt_snapshot_list_set(
+			    session, btree->filename, snapbase));
 	}
 
 	/*

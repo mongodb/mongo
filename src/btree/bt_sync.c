@@ -129,7 +129,8 @@ __snapshot_worker(
 	 * this file is dead.  Discard it from the cache without bothering to
 	 * write any dirty pages.
 	 */
-	if ((ret = __wt_snapshot_list_get(session, NULL, &snapbase)) != 0) {
+	if ((ret =
+	    __wt_snapshot_list_get(session, btree->filename, &snapbase)) != 0) {
 		if (ret == WT_NOTFOUND) {
 			ret =
 			    __wt_cache_flush(session, WT_SYNC_DISCARD_NOWRITE);
@@ -265,7 +266,8 @@ nomatch:		WT_ERR_MSG(session,
 			WT_ERR_MSG(session,
 			    EINVAL, "cache flush failed to create a snapshot");
 	} else
-		WT_ERR(__wt_snapshot_list_set(session, snapbase));
+		WT_ERR(
+		    __wt_snapshot_list_set(session, btree->filename, snapbase));
 
 err:	__wt_snapshot_list_free(session, snapbase);
 	__wt_rwunlock(session, btree->snaplock);

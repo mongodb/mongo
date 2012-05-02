@@ -5,6 +5,7 @@
  * See the file LICENSE for redistribution information.
  */
 
+#define	WT_METADATA_FILENAME	"WiredTiger.wt"
 #define	WT_METADATA_URI		"file:WiredTiger.wt"
 
 #define	WT_METADATA_TURTLE	"WiredTiger.turtle"	/* Metadata metadata */

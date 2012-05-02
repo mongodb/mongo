@@ -581,17 +581,19 @@ extern int __wt_log_printf(WT_SESSION_IMPL *session,
     3)));
 extern WT_LOGREC_DESC __wt_logdesc_debug;
 extern int __wt_snaplist_get( WT_SESSION *session,
-    const char *config,
+    const char *filename,
     WT_SNAPSHOT **snapbasep);
 extern void __wt_snaplist_free(WT_SESSION *session, WT_SNAPSHOT *snapbase);
 extern int __wt_snapshot_get(WT_SESSION_IMPL *session,
-    const char *name,
+    const char *filename,
+    const char *snapshot,
     WT_ITEM *addr);
-extern int __wt_snapshot_clear(WT_SESSION_IMPL *session, const char *uri);
+extern int __wt_snapshot_clear(WT_SESSION_IMPL *session, const char *filename);
 extern int __wt_snapshot_list_get( WT_SESSION_IMPL *session,
-    const char *config_arg,
+    const char *filename,
     WT_SNAPSHOT **snapbasep);
-extern int __wt_snapshot_list_set(WT_SESSION_IMPL *session,
+extern int __wt_snapshot_list_set( WT_SESSION_IMPL *session,
+    const char *filename,
     WT_SNAPSHOT *snapbase);
 extern void __wt_snapshot_list_free(WT_SESSION_IMPL *session,
     WT_SNAPSHOT *snapbase);
