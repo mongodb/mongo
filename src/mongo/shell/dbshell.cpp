@@ -20,6 +20,8 @@
 #include <string.h>
 
 #include <boost/filesystem/operations.hpp>
+#include <boost/algorithm/string/predicate.hpp>
+#include <boost/algorithm/string/trim.hpp>
 
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/cmdline.h"
@@ -833,18 +835,8 @@ int _main( int argc, char* argv[] ) {
                 break;
             }
 
-            // Strips out leading whitespace.
-            while ( lineCStr[0] == ' ' )
-                ++lineCStr;
-            int lineLen = strlen( lineCStr );
-
-            // Strip out trailing whitespace
-            while ( lineLen > 0 && ( lineCStr[lineLen - 1] == ' ' 
-                                  || lineCStr[lineLen - 1] == ';' ) )
-                --lineLen;
-            lineCStr[lineLen] = 0;
-
             string code = lineCStr;
+            boost::algorithm::trim(code);
 
             // Free line before we forget.
             free(lineCStr);
@@ -857,11 +849,9 @@ int _main( int argc, char* argv[] ) {
 
             if ( code == "cls" ) {
                 linenoiseClearScreen();
-            } else if( startsWith( code, "edit " ) ) {
-                const char* s = code.c_str() + 5; // skip "edit "
-                while( *s && isspace( *s ) )
-                    s++;
-
+            } else if( boost::algorithm::starts_with( code, "edit " ) ) {
+                string s = code.c_str() + 5; // skip "edit "
+                boost::algorithm::trim_left(s);
                 edit( s );
             } else if ( !code.empty() ) {
                 // Whatever we have now will be in the form:
