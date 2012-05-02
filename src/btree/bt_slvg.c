@@ -169,7 +169,7 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 	 * would collide with salvage freeing the previous root page when it
 	 * reads those blocks from the file.
 	 */
-	WT_ERR(__wt_snapshot_clear(session, btree->name));
+	WT_ERR(__wt_snapshot_clear(session, btree->filename));
 
 	/*
 	 * Step 2:
