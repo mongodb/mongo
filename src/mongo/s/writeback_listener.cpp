@@ -159,8 +159,8 @@ namespace mongo {
                     }
 
                     int len; // not used, but needed for next call
-                    Message m( (void*)data["msg"].binData( len ) , false );
-                    massert( 10427 ,  "invalid writeback message" , m.header()->valid() );
+                    Message msg( (void*)data["msg"].binData( len ) , false );
+                    massert( 10427 ,  "invalid writeback message" , msg.header()->valid() );
 
                     DBConfigPtr db = grid.getDBConfig( ns );
                     ShardChunkVersion needVersion( data["version"] );
@@ -187,7 +187,7 @@ namespace mongo {
                            << " mine : " << ( manager ? manager->getVersion().toString() : "(unknown)" )
                            << endl;
 
-                    LOG(1) << m.toString() << endl;
+                    LOG(1) << msg.toString() << endl;
 
                     if ( needVersion.isSet() && manager && needVersion <= manager->getVersion() ) {
                         // this means when the write went originally, the version was old
@@ -211,7 +211,7 @@ namespace mongo {
 
                         try {
                             
-                            Request r( m , 0 );
+                            Request r( msg , 0 );
                             r.init();
                             
                             r.d().reservedField() |= DbMessage::Reserved_FromWriteback;
