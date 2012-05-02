@@ -457,12 +457,11 @@ static void edit( const string& whatToEdit ) {
         }
     }
 
+    // Convert "whatToEdit" to JavaScript (JSON) text; if it can't be done,
+    // simply use the provided string
     string js;
-    if ( editingVariable ) {
-        // Convert "whatToEdit" to JavaScript (JSON) text
-        if ( !shellMainScope->exec( "__jsout__ = tojson(" + whatToEdit + ")", "tojs", false, false, false ) )
-            return; // Error already printed
-
+    if ( editingVariable && shellMainScope->exec(
+           "__jsout__ = tojson(" + whatToEdit + ")", "tojs", false, false, false ) ) {
         js = shellMainScope->getString( "__jsout__" );
 
         if ( strstr( js.c_str(), "[native code]" ) ) {
@@ -470,7 +469,12 @@ static void edit( const string& whatToEdit ) {
             return;
         }
     }
-    else {
+
+    // If there was no variable available, or js was set to undefined
+    // (indicating the JS parser could not figure out whatToEdit), we can use
+    // the text entered as is.
+    if ( js.empty() || js == "undefined" ) {
+        editingVariable = false;
         js = whatToEdit;
     }
 
@@ -853,8 +857,9 @@ int _main( int argc, char* argv[] ) {
 
             if ( line == "cls" ) {
                 linenoiseClearScreen();
-            } else if( boost::algorithm::starts_with( line, "edit " ) ) {
-                string s = line.c_str() + 5; // skip "edit "
+            } else if( boost::algorithm::starts_with( line, "edit " ) || line == "edit" ) {
+                size_t strPos = line.find(' ');
+                string s = ( strPos != string::npos ? line.substr(strPos) : "" );
                 boost::algorithm::trim_left(s);
                 edit( s );
             } else if ( !line.empty() ) {
