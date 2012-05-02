@@ -408,7 +408,7 @@ def run_tests(tests):
                 master.wait_for_repl()
 
             tests_run = 0
-            for tests_run, test in enumerate(tests):
+            for tests_run, test in enumerate(tests, 1):
                 try:
                     fails.append(test)
                     runTest(test)
