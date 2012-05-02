@@ -824,35 +824,31 @@ int _main( int argc, char* argv[] ) {
                 prompt = "> ";
             }
 
-            char * line = shellReadline( prompt.c_str() );
-            char * linePtr = line;  // can't clobber 'line', we need to free() it later
+            char * lineCStr = shellReadline( prompt.c_str() );
 
-            if ( line ) {
-                // Strips out leading whitespace.
-                while ( linePtr[0] == ' ' )
-                    ++linePtr;
-                int lineLen = strlen( linePtr );
-
-                // Strip out trailing whitespace and semicolons; semicolons
-                // have no bearing on commands in the shell.  This also allows
-                // for "bad" commands like `exit ;`.  This will help habitual
-                // C++ programmers. :)
-                while ( lineLen > 0 && ( linePtr[lineLen - 1] == ' ' 
-                                      || linePtr[lineLen - 1] == ';' ) )
-                    --lineLen;
-                linePtr[lineLen] = 0;
-            } else {
+            if ( !lineCStr ) {
                 // User must have hit ^C; treat this like an exit.
                 if( !mongo::cmdLine.quiet )
                     cout << "User interrupt detected; exiting..." << endl;
                 break;
             }
 
-            string code = linePtr;
+            // Strips out leading whitespace.
+            while ( lineCStr[0] == ' ' )
+                ++lineCStr;
+            int lineLen = strlen( lineCStr );
+
+            // Strip out trailing whitespace
+            while ( lineLen > 0 && ( lineCStr[lineLen - 1] == ' ' 
+                                  || lineCStr[lineLen - 1] == ';' ) )
+                --lineLen;
+            lineCStr[lineLen] = 0;
+
+            string code = lineCStr;
 
             // Free line before we forget.
-            free(line);
-            line = linePtr = NULL;
+            free(lineCStr);
+            lineCStr = NULL;
 
             if ( code == "quit" || code == "exit" ) {
               // Replace this with the real command that the shell expects
