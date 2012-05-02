@@ -155,9 +155,6 @@
     <ClCompile Include="..\client\dbclient_rs.cpp">
       <Filter>client</Filter>
     </ClCompile>
-    <ClCompile Include="client.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="security.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -723,6 +720,9 @@
     <ClCompile Include="..\..\third_party\js-1.7\prmjtime.c">
       <Filter>third_party\SpiderMonkey\Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="client_info.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\pch.h" />
@@ -751,9 +751,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="chunk.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="client.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="config.h">
@@ -1019,6 +1016,9 @@
     </ClInclude>
     <ClInclude Include="..\..\third_party\js-1.7\resource.h">
       <Filter>third_party\SpiderMonkey\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="client_info.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
