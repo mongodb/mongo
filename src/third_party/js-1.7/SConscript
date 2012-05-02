@@ -12,7 +12,7 @@ env = env.Clone()
 
 env.Append(CPPDEFINES=["JSFILE", "EXPORT_JS_API", "JS_C_STRINGS_ARE_UTF8"])
 
-for to_remove in ['-Werror', '-Wcast-align', '/TP', '/O2', '/Gy']:
+for to_remove in ['-Werror', '/TP', '/O2', '/Gy']:
     removeIfPresent(env['CCFLAGS'], to_remove)
 
 if windows:
