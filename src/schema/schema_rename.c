@@ -54,7 +54,8 @@ __rename_file(
 
 	/* Rename the underlying file. */
 	WT_ERR(__wt_rename(session, filename, newfile));
-	WT_ERR(__wt_meta_track_fileop(session, uri, newuri));
+	if (WT_META_TRACKING(session))
+		WT_ERR(__wt_meta_track_fileop(session, uri, newuri));
 
 err:	__wt_free(session, value);
 

@@ -165,12 +165,11 @@ __wt_confchk_session_create =
 
 const char *
 __wt_confdfl_session_drop =
-    "force=false,snapall=false,snapfrom="",snapshot="",snapto=""";
+    "force=false,snapshot=""";
 
 const char *
 __wt_confchk_session_drop =
-    "force=(type=boolean),snapall=(type=boolean),snapfrom=(),snapshot=(),"
-    "snapto=()";
+    "force=(type=boolean),snapshot=()";
 
 const char *
 __wt_confdfl_session_dumpfile =

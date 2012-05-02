@@ -36,6 +36,9 @@ __session_close(WT_SESSION *wt_session, const char *config)
 
 	__wt_spin_lock(session, &conn->spinlock);
 
+	/* Discard metadata tracking. */
+	__wt_meta_track_discard(session);
+
 	/* Discard scratch buffers. */
 	__wt_scr_discard(session);
 
@@ -177,30 +180,24 @@ err:	API_END_NOTFOUND_MAP(session, ret);
 static int
 __session_drop(WT_SESSION *wt_session, const char *uri, const char *config)
 {
-	static const char *snapcmd[] =
-	    { "snapall", "snapfrom", "snapshot", "snapto", NULL };
 	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	const char **p;
 
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_API_CALL(session, drop, config, cfg);
 
-	/* If dropping a snapshot, that's a different code path. */
-	for (p = snapcmd; *p != NULL; ++p) {
-		WT_ERR(__wt_config_gets(session, cfg, *p, &cval));
-		if ((strcmp(*p, "snapall") == 0) ?
-		    cval.val != 0 : cval.len != 0) {
-			ret = __wt_schema_worker(session, uri, cfg,
-			    __wt_btree_snapshot_drop, WT_BTREE_NO_SNAPSHOT);
-			break;
-		}
-	}
-	if (*p == NULL)
-		ret = __wt_schema_drop(session, uri, cfg);
+	WT_ERR(__wt_meta_track_on(session));
 
-err:	API_END_NOTFOUND_MAP(session, ret);
+	/* If dropping snapshots, that's a different code path. */
+	WT_ERR(__wt_config_gets(session, cfg, "snapshot", &cval));
+	ret = (cval.len != 0) ?
+	    __wt_schema_worker(session, uri, cfg,
+		__wt_btree_snapshot_drop, WT_BTREE_SNAPSHOT_OP) :
+	    __wt_schema_drop(session, uri, cfg);
+
+err:    WT_TRET(__wt_meta_track_off(session, ret != 0));
+	API_END_NOTFOUND_MAP(session, ret);
 }
 
 /*
@@ -253,10 +250,13 @@ __session_sync(WT_SESSION *wt_session, const char *uri, const char *config)
 	session = (WT_SESSION_IMPL *)wt_session;
 
 	SESSION_API_CALL(session, sync, config, cfg);
-	ret = __wt_schema_worker(session, uri, cfg,
-	    __wt_btree_snapshot, WT_BTREE_NO_SNAPSHOT);
+	WT_ERR(__wt_meta_track_on(session));
 
-err:	API_END_NOTFOUND_MAP(session, ret);
+	ret = __wt_schema_worker(session, uri, cfg,
+	    __wt_btree_snapshot, WT_BTREE_SNAPSHOT_OP);
+
+err:    WT_TRET(__wt_meta_track_off(session, ret != 0));
+	API_END_NOTFOUND_MAP(session, ret);
 }
 
 /*

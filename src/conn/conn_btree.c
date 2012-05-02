@@ -165,7 +165,7 @@ __wt_conn_btree_open(WT_SESSION_IMPL *session,
 	}
 
 	btree = session->btree;
-	if (F_ISSET(btree, WT_BTREE_OPEN)) {
+	if (F_ISSET(btree, WT_BTREE_OPEN) || LF_ISSET(WT_BTREE_LOCK_ONLY)) {
 		__wt_rwunlock(session, btree->rwlock);
 		__wt_free(session, config);
 		return (0);
@@ -187,7 +187,6 @@ err:		(void)__wt_conn_btree_close(session, 1);
 	}
 
 	__wt_rwunlock(session, btree->rwlock);
-
 	__wt_scr_free(&addr);
 	return (ret);
 }

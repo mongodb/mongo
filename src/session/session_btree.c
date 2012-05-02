@@ -65,6 +65,10 @@ __wt_session_lock_btree(
 	} else if (!LF_ISSET(WT_BTREE_NO_LOCK))
 		__wt_readlock(session, btree->rwlock);
 
+	if (LF_ISSET(WT_BTREE_LOCK_ONLY) &&
+	    WT_META_TRACKING(session))
+		WT_TRET(__wt_meta_track_handle_lock(session));
+
 	return (ret);
 }
 
@@ -148,12 +152,12 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 		WT_RET_MSG(
 		    session, EINVAL, "Expected a 'file:' URI: %s", uri);
 
-	/* Is this a snapshot handle? */
-	if (!LF_ISSET(WT_BTREE_NO_SNAPSHOT) && cfg != NULL &&
+	/* Is this a snapshot operation? */
+	if (!LF_ISSET(WT_BTREE_SNAPSHOT_OP) && cfg != NULL &&
 	    __wt_config_gets(session, cfg, "snapshot", &cval) == 0 &&
 	    cval.len != 0) {
 		WT_RET(__wt_scr_alloc(session, 0, &buf));
-		WT_RET(__wt_buf_fmt(session, buf, "%s:%.*s",
+		WT_ERR(__wt_buf_fmt(session, buf, "%s:%.*s",
 		    uri, (int)cval.len, cval.str));
 		name = buf->data;
 		namelen = buf->size;
@@ -166,7 +170,7 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 	    name, namelen, cfg, flags, &btree_session)) == 0) {
 		WT_ASSERT(session, btree_session->btree != NULL);
 		session->btree = btree_session->btree;
-		return (0);
+		goto err;
 	}
 	if (ret != WT_NOTFOUND)
 		goto err;
@@ -193,6 +197,36 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 err:		__wt_free(session, treeconf);
 	}
 	__wt_scr_free(&buf);
+	return (ret);
+}
+
+/*
+ * __wt_session_lock_snapshot --
+ *	Lock the btree handle for the given snapshot name.
+ */
+int
+__wt_session_lock_snapshot(
+    WT_SESSION_IMPL *session, const char *snapshot, uint32_t flags)
+{
+	WT_BTREE *btree;
+	WT_DECL_RET;
+	WT_ITEM *buf;
+	const char *cfg[] = { NULL, NULL };
+
+	buf = NULL;
+	btree = session->btree;
+
+	WT_ERR(__wt_scr_alloc(session, 0, &buf));
+	WT_ERR(__wt_buf_fmt(session, buf, "snapshot=\"%s\"", snapshot));
+	cfg[0] = buf->data;
+
+	LF_SET(WT_BTREE_LOCK_ONLY);
+	WT_ERR(__wt_session_get_btree(session, btree->name, NULL, cfg, flags));
+
+	/* Restore the original btree in the session. */
+err:	session->btree = btree;
+	__wt_scr_free(&buf);
+
 	return (ret);
 }
 

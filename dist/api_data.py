@@ -206,17 +206,16 @@ methods = {
 	Config('force', 'false', r'''
 		return success if the object does not exist''',
 		type='boolean'),
-	Config('snapall', 'false', r'''
-		drop all snapshots''',
-		type='boolean'),
-	Config('snapfrom', '', r'''
-		drop all snapshots more recent than, and including, the named
-		snapshot'''),
 	Config('snapshot', '', r'''
-		the name of a single snapshot to drop'''),
-	Config('snapto', '', r'''
-		drop all snapshots earlier than, and including, the named
-		snapshot'''),
+		specify one or more snapshots to drop.
+
+		The value must be either the name of a single snapshot to drop
+		(a string), or a list containing one of the following keys:
+		\c "all" to drop all snapshots,
+		\c "from=<snapshot>" to drop all snapshots after and including
+		the named snapshots, or
+		\c "to=<snapshot>" to drop all snapshots before and including
+		the named snapshot'''),
 	]),
 
 'session.dumpfile' : Method([]),

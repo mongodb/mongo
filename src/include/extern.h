@@ -609,6 +609,7 @@ extern int __wt_metadata_remove(WT_SESSION_IMPL *session, const char *key);
 extern int __wt_metadata_read( WT_SESSION_IMPL *session,
     const char *key,
     const char **valuep);
+extern void __wt_meta_track_discard(WT_SESSION_IMPL *session);
 extern int __wt_meta_track_on(WT_SESSION_IMPL *session);
 extern int __wt_meta_track_off(WT_SESSION_IMPL *session, int unroll);
 extern int __wt_meta_track_insert(WT_SESSION_IMPL *session, const char *key);
@@ -616,6 +617,7 @@ extern int __wt_meta_track_update(WT_SESSION_IMPL *session, const char *key);
 extern int __wt_meta_track_fileop( WT_SESSION_IMPL *session,
     const char *olduri,
     const char *newuri);
+extern int __wt_meta_track_handle_lock(WT_SESSION_IMPL *session);
 extern void __wt_abort(WT_SESSION_IMPL *session);
 extern int __wt_calloc(WT_SESSION_IMPL *session,
     size_t number,
@@ -849,6 +851,9 @@ extern int __wt_session_get_btree(WT_SESSION_IMPL *session,
     const char *uri,
     const char *tconfig,
     const char *cfg[],
+    uint32_t flags);
+extern int __wt_session_lock_snapshot( WT_SESSION_IMPL *session,
+    const char *snapshot,
     uint32_t flags);
 extern int __wt_session_remove_btree( WT_SESSION_IMPL *session,
     WT_BTREE_SESSION *btree_session,

@@ -115,14 +115,15 @@ struct __wt_btree {
 
 	WT_BTREE_STATS *stats;		/* Btree statistics */
 
-#define	WT_BTREE_BULK		0x01	/* Bulk-load handle */
-#define	WT_BTREE_EXCLUSIVE	0x02	/* Need exclusive access to handle */
-#define	WT_BTREE_NO_LOCK	0x04	/* Do not lock the handle */
-#define	WT_BTREE_NO_SNAPSHOT	0x08	/* Don't use the snapshot name */
-#define	WT_BTREE_OPEN		0x10	/* Handle is open */
-#define	WT_BTREE_SALVAGE	0x20	/* Handle is for salvage */
-#define	WT_BTREE_UPGRADE	0x40	/* Handle is for upgrade */
-#define	WT_BTREE_VERIFY		0x80	/* Handle is for verify */
+#define	WT_BTREE_BULK		0x001	/* Bulk-load handle */
+#define	WT_BTREE_EXCLUSIVE	0x002	/* Need exclusive access to handle */
+#define	WT_BTREE_NO_LOCK	0x004	/* Do not lock the handle */
+#define	WT_BTREE_LOCK_ONLY	0x008	/* Handle is only needed for locking */
+#define	WT_BTREE_OPEN		0x010	/* Handle is open */
+#define	WT_BTREE_SALVAGE	0x020	/* Handle is for salvage */
+#define	WT_BTREE_SNAPSHOT_OP	0x040	/* Handle is for a snapshot operation */
+#define	WT_BTREE_UPGRADE	0x080	/* Handle is for upgrade */
+#define	WT_BTREE_VERIFY		0x100	/* Handle is for verify */
 	uint32_t flags;
 };
 
@@ -157,8 +158,7 @@ struct __wt_salvage_cookie {
 #define	WT_INTERNAL_SNAPSHOT	"WiredTigerInternalSnapshot"
 #define	WT_SNAPSHOT_FOREACH(snapbase, snap)				\
 	for ((snap) = (snapbase); (snap)->name != NULL; ++(snap))
-#define	WT_SNAPSHOT_CONTINUE(snap)					\
-	for (; (snap)->name != NULL; ++(snap))
+
 struct __wt_snapshot {
 	char	*name;				/* Name or NULL */
 

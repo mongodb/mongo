@@ -301,17 +301,17 @@ session_ops(WT_SESSION *session)
 	/* Discard a table. */
 	ret = session->drop(session, "table:mytable", NULL);
 
+	/* Drop the "midnight" snapshot. */
+	ret = session->drop(session, "table:mytable", "snapshot=midnight");
+
 	/* Drop all snapshots from a table. */
-	ret = session->drop(session, "table:mytable", "snapall=true");
+	ret = session->drop(session, "table:mytable", "snapshot=(all)");
 
-	/* Drop all snapshots after, and including, "January". */
-	ret = session->drop(session, "table:mytable", "snapfrom=January");
+	/* Drop all snapshots after and including "noon". */
+	ret = session->drop(session, "table:mytable", "snapshot=(from=noon)");
 
-	/* Drop the "June" snapshot. */
-	ret = session->drop(session, "table:mytable", "snapshot=June");
-
-	/* Drop all snapshots before, and including, "November". */
-	ret = session->drop(session, "table:mytable", "snapto=November");
+	/* Drop all snapshots before and including "midnight". */
+	ret = session->drop(session, "table:mytable", "snapshot=(to=midnight)");
 	/*! [session drop] */
 
 	/*! [session dumpfile] */

@@ -60,49 +60,33 @@ __wt_btree_snapshot_close(WT_SESSION_IMPL *session)
 int
 __wt_btree_snapshot_drop(WT_SESSION_IMPL *session, const char *cfg[])
 {
-	WT_CONFIG_ITEM cval;
+	WT_CONFIG_ITEM cval, sval;
 	WT_DECL_RET;
 	char *name;
 
 	name = NULL;
 
-	if ((ret = __wt_config_gets(
-	    session, cfg, "snapall", &cval)) != 0 && ret != WT_NOTFOUND)
-		WT_RET(ret);
-	if (cval.val != 0) {
-		ret = __snapshot_worker(session, name, 0, SNAPSHOT_DROP_ALL);
-		goto done;
-	}
-
-	if ((ret = __wt_config_gets(
-	    session, cfg, "snapfrom", &cval)) != 0 && ret != WT_NOTFOUND)
-		WT_RET(ret);
-	if (cval.len != 0) {
-		WT_RET(__wt_strndup(session, cval.str, cval.len, &name));
-		ret =
-		    __snapshot_worker(session, name, 0, SNAPSHOT_DROP_FROM);
-		goto done;
-	}
-
-	if ((ret = __wt_config_gets(
-	    session, cfg, "snapto", &cval)) != 0 && ret != WT_NOTFOUND)
-		WT_RET(ret);
-	if (cval.len != 0) {
-		WT_RET(__wt_strndup(session, cval.str, cval.len, &name));
-		ret = __snapshot_worker(session, name, 0, SNAPSHOT_DROP_TO);
-		goto done;
-	}
-
-	if ((ret = __wt_config_gets(
-	    session, cfg, "snapshot", &cval)) != 0 && ret != WT_NOTFOUND)
-		WT_RET(ret);
-	if (cval.len != 0) {
+	WT_RET(__wt_config_gets(session, cfg, "snapshot", &cval));
+	if (cval.type != ITEM_STRUCT) {
 		WT_RET(__wt_strndup(session, cval.str, cval.len, &name));
 		ret = __snapshot_worker(session, name, 0, SNAPSHOT_DROP);
-		goto done;
-	}
+	} else if (__wt_config_subgets(session, &cval, "all", &sval) == 0 &&
+	    sval.val != 0)
+		ret = __snapshot_worker(session, name, 0, SNAPSHOT_DROP_ALL);
+	else if (__wt_config_subgets(session, &cval, "from", &sval) == 0 &&
+	    sval.len != 0) {
+		WT_RET(__wt_strndup(session, sval.str, sval.len, &name));
+		ret = __snapshot_worker(session, name, 0, SNAPSHOT_DROP_FROM);
+	} else if (__wt_config_subgets(session, &cval, "to", &sval) == 0 &&
+	    sval.len != 0) {
+		WT_RET(__wt_strndup(session, sval.str, sval.len, &name));
+		ret = __snapshot_worker(session, name, 0, SNAPSHOT_DROP_TO);
+	} else
+		WT_RET_MSG(session, EINVAL,
+		    "Unexpected value for 'snapshot' key: %.*s",
+		    (int)cval.len, cval.str);
 
-done:	__wt_free(session, name);
+	__wt_free(session, name);
 	return (ret);
 }
 
@@ -116,24 +100,25 @@ __snapshot_worker(
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
-	WT_SNAPSHOT *match, *snap, *snapbase;
-	int force;
+	WT_SNAPSHOT *deleted, *snap, *snapbase;
+	int force, matched;
 
 	btree = session->btree;
-	match = snap = snapbase = NULL;
+	matched = 0;
+	snap = snapbase = NULL;
 
 	/* Snapshots are single-threaded. */
 	__wt_writelock(session, btree->snaplock);
 
 	/* Set the name to the default, if we aren't provided one. */
-	if (name == NULL) {
+	if (op == SNAPSHOT && name == NULL) {
 		force = 0;
 		name = WT_INTERNAL_SNAPSHOT;
 	} else {
 		force = 1;
 		/*
-		 * If it's a named snapshot and there's nothing dirty, we won't
-		 * write any pages: mark the root page dirty to ensure a write.
+		 * If we need a new snapshot, mark the root page dirty to
+		 * ensure a write.
 		 */
 		WT_ERR(__wt_page_modify_init(session, btree->root_page));
 		__wt_page_modify_set(btree->root_page);
@@ -144,8 +129,7 @@ __snapshot_worker(
 	 * this file is dead.  Discard it from the cache without bothering to
 	 * write any dirty pages.
 	 */
-	if ((ret =
-	    __wt_snapshot_list_get(session, NULL, &snapbase)) != 0) {
+	if ((ret = __wt_snapshot_list_get(session, NULL, &snapbase)) != 0) {
 		if (ret == WT_NOTFOUND) {
 			ret =
 			    __wt_cache_flush(session, WT_SYNC_DISCARD_NOWRITE);
@@ -157,10 +141,8 @@ __snapshot_worker(
 			 * can know the root page is gone.
 			 */
 			btree->root_page = NULL;
-			__wt_rwunlock(session, btree->snaplock);
-			return (ret);
 		}
-		WT_ERR(ret);
+		goto err;
 	}
 
 	switch (op) {
@@ -191,12 +173,12 @@ __snapshot_worker(
 			 * name, but it doesn't hurt to check the rest.
 			 */
 			if (strcmp(snap->name, name) == 0)
-				match = snap;
-			if (strcmp(snap->name, name) == 0 ||
-			    strcmp(snap->name, WT_INTERNAL_SNAPSHOT) == 0)
-				F_SET(snap, WT_SNAP_DELETE);
+				matched = 1;
+			else if (strcmp(snap->name, WT_INTERNAL_SNAPSHOT) != 0)
+				continue;
+			F_SET(snap, WT_SNAP_DELETE);
 		}
-		if (match == NULL)
+		if (!matched)
 			goto nomatch;
 
 		WT_ERR(__wt_strdup(session, WT_INTERNAL_SNAPSHOT, &snap->name));
@@ -220,18 +202,14 @@ __snapshot_worker(
 		 * Add a new snapshot with the default name.
 		 */
 		WT_SNAPSHOT_FOREACH(snapbase, snap) {
-			if (strcmp(snap->name, name) == 0) {
-				match = snap;
-				break;
-			}
-			if (strcmp(snap->name, WT_INTERNAL_SNAPSHOT) == 0)
+			if (strcmp(snap->name, name) == 0)
+				matched = 1;
+			if (matched ||
+			    strcmp(snap->name, WT_INTERNAL_SNAPSHOT) == 0)
 				F_SET(snap, WT_SNAP_DELETE);
 		}
-		if (match == NULL)
+		if (!matched)
 			goto nomatch;
-
-		WT_SNAPSHOT_CONTINUE(snap)
-			F_SET(snap, WT_SNAP_DELETE);
 
 		WT_ERR(__wt_strdup(session, WT_INTERNAL_SNAPSHOT, &snap->name));
 		F_SET(snap, WT_SNAP_ADD);
@@ -243,25 +221,35 @@ __snapshot_worker(
 		 * Add a new snapshot with the default name.
 		 */
 		WT_SNAPSHOT_FOREACH(snapbase, snap) {
-			if (strcmp(snap->name, name) == 0)
-				match = snap;
-			if (strcmp(snap->name, WT_INTERNAL_SNAPSHOT) == 0)
+			if (!matched ||
+			    strcmp(snap->name, WT_INTERNAL_SNAPSHOT) == 0)
 				F_SET(snap, WT_SNAP_DELETE);
+			if (strcmp(snap->name, name) == 0)
+				matched = 1;
 		}
-		if (match == NULL)
+		if (!matched)
 nomatch:		WT_ERR_MSG(session,
 			    EINVAL, "no snapshot named %s was found", name);
-
-		WT_SNAPSHOT_FOREACH(snapbase, snap) {
-			F_SET(snap, WT_SNAP_DELETE);
-			if (match == snap)
-				break;
-		}
 
 		WT_ERR(__wt_strdup(session, WT_INTERNAL_SNAPSHOT, &snap->name));
 		F_SET(snap, WT_SNAP_ADD);
 		break;
 	}
+
+	/*
+	 * Lock the snapshots that will be deleted.
+	 *
+	 * Snapshots are only locked when tracking is enabled, which covers
+	 * sync and drop operations, but not close.  The reasoning is that
+	 * there should be no access to a snapshot during close, because any
+	 * thread accessing a snapshot will also have the current file handle
+	 * open.
+	 */
+	if (WT_META_TRACKING(session))
+		WT_SNAPSHOT_FOREACH(snapbase, deleted)
+			if (F_ISSET(deleted, WT_SNAP_DELETE))
+				WT_ERR(__wt_session_lock_snapshot(session,
+				    deleted->name, WT_BTREE_EXCLUSIVE));
 
 	btree->snap = snapbase;
 	ret = __wt_cache_flush(session, discard ? WT_SYNC_DISCARD : WT_SYNC);
@@ -280,7 +268,6 @@ nomatch:		WT_ERR_MSG(session,
 		WT_ERR(__wt_snapshot_list_set(session, snapbase));
 
 err:	__wt_snapshot_list_free(session, snapbase);
-
 	__wt_rwunlock(session, btree->snaplock);
 
 	return (ret);

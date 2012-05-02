@@ -30,7 +30,7 @@ __wt_open_metadata(WT_SESSION_IMPL *session)
 	 * Turn off tracking when creating the metadata file: this is always
 	 * done before any other metadata operations and there is no going back.
 	 */
-	tracking = (session->meta_track != NULL);
+	tracking = WT_META_TRACKING(session);
 	if (tracking)
 		__wt_meta_track_off(session, 0);
 	WT_ERR(__wt_create_file(session, WT_METADATA_URI, 0, metaconf));
@@ -68,7 +68,7 @@ __wt_metadata_insert(
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 
-	if (session->meta_track != NULL)		/* Optional tracking */
+	if (WT_META_TRACKING(session))
 		WT_RET(__wt_meta_track_insert(session, key));
 
 	/* Save the caller's btree: the metadata cursor will overwrite it. */
@@ -96,7 +96,7 @@ __wt_metadata_update(
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 
-	if (session->meta_track != NULL)		/* Optional tracking */
+	if (WT_META_TRACKING(session))
 		WT_RET(__wt_meta_track_update(session, key));
 
 	/* Save the caller's btree: the metadata cursor will overwrite it. */
@@ -123,7 +123,7 @@ __wt_metadata_remove(WT_SESSION_IMPL *session, const char *key)
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 
-	if (session->meta_track != NULL)		/* Optional tracking */
+	if (WT_META_TRACKING(session))
 		WT_RET(__wt_meta_track_update(session, key));
 
 	/* Save the caller's btree: the metadata cursor will overwrite it. */

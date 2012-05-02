@@ -41,7 +41,8 @@ __wt_create_file(WT_SESSION_IMPL *session,
 	}
 
 	WT_RET(__wt_btree_create(session, filename));
-	WT_ERR(__wt_meta_track_fileop(session, NULL, name));
+	if (WT_META_TRACKING(session))
+		WT_ERR(__wt_meta_track_fileop(session, NULL, name));
 
 	/* Insert WiredTiger version numbers into the metadata file. */
 	WT_ERR(__wt_scr_alloc(session, 0, &val));
