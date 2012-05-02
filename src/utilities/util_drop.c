@@ -12,11 +12,18 @@ static int usage(void);
 int
 util_drop(WT_SESSION *session, int argc, char *argv[])
 {
-	int ch;
-	const char *name;
+	size_t len;
+	int ch, ret;
+	const char *snapshot;
+	char *name, *config;
 
-	while ((ch = util_getopt(argc, argv, "")) != EOF)
+	config = NULL;
+	snapshot = NULL;
+	while ((ch = util_getopt(argc, argv, "s:")) != EOF)
 		switch (ch) {
+		case 's':
+			snapshot = util_optarg;
+			break;
 		case '?':
 		default:
 			return (usage());
@@ -31,7 +38,25 @@ util_drop(WT_SESSION *session, int argc, char *argv[])
 	if ((name = util_name(*argv, "table", UTIL_ALL_OK)) == NULL)
 		return (1);
 
-	return (session->drop(session, name, "force"));
+	if (snapshot == NULL)
+		ret = session->drop(session, name, "force");
+	else {
+		len = strlen(snapshot) +
+		    strlen("snapshot=") + strlen("force") + 10;
+		if ((config = malloc(len)) == NULL)
+			goto err;
+		(void)snprintf(config, len, "snapshot=%s,force", snapshot);
+		ret = session->drop(session, name, config);
+	}
+
+	if (0) {
+err:		ret = 1;
+	}
+	if (config != NULL)
+		free(config);
+	if (name != NULL)
+		free(name);
+	return (ret);
 }
 
 static int
@@ -39,7 +64,7 @@ usage(void)
 {
 	(void)fprintf(stderr,
 	    "usage: %s %s "
-	    "drop uri\n",
+	    "drop [-s snapshot] uri\n",
 	    progname, usage_prefix);
 	return (1);
 }
