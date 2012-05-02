@@ -858,8 +858,8 @@ int _main( int argc, char* argv[] ) {
                 //   CMD ARGS
                 bool wasCmd = false;
                 string cmd;
-                size_t strPos = code.find(" ");
-                if ( strPos > 0 )
+                size_t strPos = code.find(' ');
+                if ( strPos != string::npos )
                     cmd = code.substr( 0, strPos );
 
                 if ( cmd.find("\"") == string::npos ) {
