@@ -129,7 +129,7 @@ running() {
 
 start_server() {
 # Start the process using the wrapper
-            start-stop-daemon --background --start --quiet \
+            start-stop-daemon --background --start --quiet --pidfile $PIDFILE \
                         --chuid $DAEMONUSER \
                         --exec $NUMACTL $DAEMON $DAEMON_OPTS
             errcode=$?
