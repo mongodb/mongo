@@ -835,32 +835,32 @@ int _main( int argc, char* argv[] ) {
                 break;
             }
 
-            string code = lineCStr;
-            boost::algorithm::trim(code);
+            string line = lineCStr;
+            boost::algorithm::trim(line);
 
             // Free line before we forget.
             free(lineCStr);
             lineCStr = NULL;
 
-            if ( code == "quit" || code == "exit" ) {
+            if ( line == "quit" || line == "exit" ) {
               // Replace this with the real command that the shell expects
-              code += "(0)";
+              line += "(0)";
             }
 
-            if ( code == "cls" ) {
+            if ( line == "cls" ) {
                 linenoiseClearScreen();
-            } else if( boost::algorithm::starts_with( code, "edit " ) ) {
-                string s = code.c_str() + 5; // skip "edit "
+            } else if( boost::algorithm::starts_with( line, "edit " ) ) {
+                string s = line.c_str() + 5; // skip "edit "
                 boost::algorithm::trim_left(s);
                 edit( s );
-            } else if ( !code.empty() ) {
+            } else if ( !line.empty() ) {
                 // Whatever we have now will be in the form:
                 //   CMD ARGS
                 bool wasCmd = false;
                 string cmd;
-                size_t strPos = code.find(' ');
+                size_t strPos = line.find(' ');
                 if ( strPos != string::npos )
-                    cmd = code.substr( 0, strPos );
+                    cmd = line.substr( 0, strPos );
 
                 if ( cmd.find("\"") == string::npos ) {
                     try {
@@ -869,7 +869,7 @@ int _main( int argc, char* argv[] ) {
                                 "(shellhelp1)" , false , true , true );
                         if ( scope->getBoolean( "__iscmd__" )  ) {
                             scope->exec(
-                                    (string) "shellHelper( \"" + cmd + "\" , \"" + code.substr( cmd.size() ) + "\");",
+                                    (string) "shellHelper( \"" + cmd + "\" , \"" + line.substr( cmd.size() ) + "\");",
                                     "(shellhelp2)" , false , true , false );
                             wasCmd = true;
                         }
@@ -881,7 +881,7 @@ int _main( int argc, char* argv[] ) {
 
                 if ( !wasCmd ) {
                     try {
-                        if ( scope->exec( code.c_str() , "(shell)" , false , true , false ) )
+                        if ( scope->exec( line.c_str() , "(shell)" , false , true , false ) )
                             scope->exec( "shellPrintHelper( __lastres__ );" , "(shell2)" , true , true , false );
                     }
                     catch ( std::exception& exc ) {
@@ -890,9 +890,9 @@ int _main( int argc, char* argv[] ) {
                 }
             }
 
-            // If the code contained anything, add it to the history.
-            if(!code.empty())
-                shellHistoryAdd( code.c_str() );
+            // If the line contained anything, add it to the history.
+            if(!line.empty())
+                shellHistoryAdd( line.c_str() );
         }
 
         shellHistoryDone();
