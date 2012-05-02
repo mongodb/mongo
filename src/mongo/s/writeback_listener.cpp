@@ -26,7 +26,7 @@
 #include "server.h"
 #include "shard.h"
 #include "util.h"
-#include "client.h"
+#include "client_info.h"
 
 #include "writeback_listener.h"
 
@@ -46,7 +46,7 @@ namespace mongo {
 
     /* static */
     void WriteBackListener::init( DBClientBase& conn ) {
-        
+
         if ( conn.type() == ConnectionString::SYNC ) {
             // don't want write back listeners for config servers
             return;
@@ -56,7 +56,6 @@ namespace mongo {
             init( conn.getServerAddress() );
             return;
         }
-        
 
         {
             scoped_lock lk( _cacheLock );
@@ -70,12 +69,12 @@ namespace mongo {
         uassert( 13641 , str::stream() << "can't parse host [" << conn.getServerAddress() << "]" , cs.isValid() );
 
         vector<HostAndPort> hosts = cs.getServers();
-        
+
         for ( unsigned i=0; i<hosts.size(); i++ )
             init( hosts[i].toString() );
 
     }
-    
+
     /* static */
     void WriteBackListener::init( const string& host ) {
         scoped_lock lk( _cacheLock );
@@ -104,7 +103,7 @@ namespace mongo {
                 else if ( oid == s.id ) {
                     return s.gle;
                 }
-                
+
             }
             sleepmillis( 10 );
         }
@@ -115,7 +114,7 @@ namespace mongo {
     void WriteBackListener::run() {
         int secsToSleep = 0;
         while ( ! inShutdown() ) {
-            
+
             if ( ! Shard::isAShardNode( _addr ) ) {
                 LOG(1) << _addr << " is not a shard node" << endl;
                 sleepsecs( 60 );
@@ -167,7 +166,7 @@ namespace mongo {
 
                     // TODO: The logic here could be refactored, but keeping to the original codepath for safety for now
                     ChunkManagerPtr manager = db->getChunkManagerIfExists( ns );
-                    
+
                     if ( ! manager ) {
                         // I don't trust the above code
                         // for this to be valid, we would have to have gotten a writeback because
@@ -180,7 +179,7 @@ namespace mongo {
                         if ( manager ) {
                             warning() << "after reload, getChunkManagerIfExists works, this is inefficient, but should be" << endl;
                         }
-                        
+
                     }
 
                     LOG(1) << "connectionId: " << cid << " writebackId: " << wid << " needVersion : " << needVersion.toString()
@@ -210,28 +209,28 @@ namespace mongo {
                         attempts++;
 
                         try {
-                            
+
                             Request r( msg , 0 );
                             r.init();
-                            
+
                             r.d().reservedField() |= DbMessage::Reserved_FromWriteback;
-                            
+
                             ClientInfo * ci = r.getClientInfo();
                             if (!noauth) {
                                 ci->getAuthenticationInfo()->authorize("admin", internalSecurity.user);
                             }
                             ci->noAutoSplit();
-                            
+
                             r.process();
-                            
+
                             ci->newRequest(); // this so we flip prev and cur shards
-                            
+
                             BSONObjBuilder b;
                             if ( ! ci->getLastError( BSON( "getLastError" << 1 ) , b , true ) ) {
                                 b.appendBool( "commandFailed" , true );
                             }
                             gle = b.obj();
-                            
+
                             if ( gle["code"].numberInt() == 9517 ) {
                                 log() << "writeback failed because of stale config, retrying attempts: " << attempts << endl;
                                 if( ! db->getChunkManagerIfExists( ns , true, attempts > 2 ) ){
@@ -250,7 +249,7 @@ namespace mongo {
                             e.getInfo().append( b );
                             gle = b.obj();
                         }
-                        
+
                         break;
                     }
 

@@ -32,7 +32,7 @@
 
 #include "server.h"
 #include "request.h"
-#include "client.h"
+#include "client_info.h"
 #include "config.h"
 #include "chunk.h"
 #include "balance.h"
@@ -103,7 +103,7 @@ namespace mongo {
             verify( p );
             Request r( m , p );
 
-            verify( le );            
+            verify( le );
             lastError.startRequest( m , le );
 
             try {
@@ -344,7 +344,7 @@ int _main(int argc, char* argv[]) {
 
     if ( params.count( "chunkSize" ) ) {
         int csize = params["chunkSize"].as<int>();
-    
+
         // validate chunksize before proceeding
         if ( csize == 0 ) {
             out() << "error: need a non-zero chunksize" << endl;
@@ -448,19 +448,19 @@ int main(int argc, char* argv[]) {
     try {
         return _main(argc, argv);
     }
-    catch(SocketException& e) { 
+    catch(SocketException& e) {
         cout << "uncaught SocketException in mongos main:" << endl;
         cout << e.toString() << endl;
     }
-    catch(DBException& e) { 
+    catch(DBException& e) {
         cout << "uncaught DBException in mongos main:" << endl;
         cout << e.toString() << endl;
     }
-    catch(std::exception& e) { 
+    catch(std::exception& e) {
         cout << "uncaught std::exception in mongos main:" << endl;
         cout << e.what() << endl;
     }
-    catch(...) { 
+    catch(...) {
         cout << "uncaught unknown exception in mongos main" << endl;
     }
     return 20;

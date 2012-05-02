@@ -36,7 +36,7 @@
 #include "chunk.h"
 #include "strategy.h"
 #include "grid.h"
-#include "client.h"
+#include "client_info.h"
 
 namespace mongo {
 

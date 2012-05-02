@@ -23,7 +23,7 @@
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/index.h"
-#include "mongo/s/client.h"
+#include "mongo/s/client_info.h"
 #include "mongo/s/cursors.h"
 #include "mongo/s/request.h"
 #include "mongo/s/stats.h"
@@ -383,7 +383,7 @@ namespace mongo {
                 }
 
             }
-            
+
             const int LEFT_START = 5;
             int left = LEFT_START;
             while ( true ) {
@@ -441,7 +441,7 @@ namespace mongo {
             uassert( 10203 ,  "bad delete message" , d.moreJSObjs() );
             BSONObj pattern = d.nextJsObj();
             uassert( 13505 ,  "$atomic not supported sharded" , pattern["$atomic"].eoo() );
-            
+
             const int LEFT_START = 5;
             int left = LEFT_START;
             while ( true ) {
@@ -476,7 +476,7 @@ namespace mongo {
                 }
             }
         }
-        
+
         virtual void writeOp( int op , Request& r ) {
 
             ChunkManagerPtr info;

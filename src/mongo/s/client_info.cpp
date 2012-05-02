@@ -1,4 +1,4 @@
-// s/client.cpp
+// @file s/client_info.cpp
 
 /**
  *    Copyright (C) 2008 10gen Inc.
@@ -25,7 +25,7 @@
 
 #include "../client/connpool.h"
 
-#include "client.h"
+#include "client_info.h"
 #include "request.h"
 #include "config.h"
 #include "chunk.h"
@@ -35,8 +35,6 @@
 #include "s/writeback_listener.h"
 
 namespace mongo {
-
-    /* todo: rename this file clientinfo.cpp would be more intuitive? */
 
     ClientInfo::ClientInfo() {
         _cur = &_a;

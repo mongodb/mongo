@@ -17,7 +17,7 @@
 
 #include "pch.h"
 #include "request.h"
-#include "client.h"
+#include "client_info.h"
 #include "../db/dbhelpers.h"
 #include "../db/matcher.h"
 #include "../db/commands.h"
@@ -44,7 +44,7 @@ namespace mongo {
     bool Client::shutdown() { return true; }
 
     static unsigned long long nThreads = 0;
-    void assertStartingUp() { 
+    void assertStartingUp() {
         dassert( nThreads <= 1 );
     }
     Client& Client::initThread(const char *desc, AbstractMessagingPort *mp) {

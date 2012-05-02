@@ -21,7 +21,7 @@
 #include "../db/security_common.h"
 #include "../db/security.h"
 #include "config.h"
-#include "client.h"
+#include "client_info.h"
 #include "grid.h"
 
 // this is the _mongos only_ implementation of security.h
