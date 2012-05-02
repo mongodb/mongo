@@ -13,7 +13,8 @@ int
 util_drop(WT_SESSION *session, int argc, char *argv[])
 {
 	size_t len;
-	int ch, ret;
+	WT_DECL_RET;
+	int ch;
 	const char *snapshot;
 	char *name, *config;
 
