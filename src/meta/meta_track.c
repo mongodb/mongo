@@ -92,7 +92,7 @@ __wt_meta_track_off(WT_SESSION_IMPL *session, int unroll)
 	WT_META_TRACK *trk, *trk_orig;
 	int tret;
 
-	if (session->meta_track_next == NULL)
+	if (!WT_META_TRACKING(session))
 		return (0);
 
 	trk_orig = session->meta_track;

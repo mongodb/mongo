@@ -153,13 +153,10 @@ __snapshot_worker(
 		 * matching names, add the new snapshot entry at the end of
 		 * the list.
 		 */
-		WT_SNAPSHOT_FOREACH(snapbase, snap) {
-			if (strcmp(snap->name, name) == 0)
-				matched = 1;
-			else if (strcmp(snap->name, WT_INTERNAL_SNAPSHOT) != 0)
-				continue;
-			F_SET(snap, WT_SNAP_DELETE);
-		}
+		WT_SNAPSHOT_FOREACH(snapbase, snap)
+			if (strcmp(snap->name, name) == 0 ||
+			    strcmp(snap->name, WT_INTERNAL_SNAPSHOT) == 0)
+				F_SET(snap, WT_SNAP_DELETE);
 
 		WT_ERR(__wt_strdup(session, name, &snap->name));
 		F_SET(snap, WT_SNAP_ADD);
@@ -192,11 +189,8 @@ __snapshot_worker(
 		 * Drop all snapshots.
 		 * Add a new snapshot with the default name.
 		 */
-		WT_SNAPSHOT_FOREACH(snapbase, snap) {
-			if (strcmp(WT_INTERNAL_SNAPSHOT, name) == 0)
-				matched = 1;
+		WT_SNAPSHOT_FOREACH(snapbase, snap)
 			F_SET(snap, WT_SNAP_DELETE);
-		}
 
 		WT_ERR(__wt_strdup(session, WT_INTERNAL_SNAPSHOT, &snap->name));
 		F_SET(snap, WT_SNAP_ADD);
