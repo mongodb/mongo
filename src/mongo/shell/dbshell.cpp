@@ -842,6 +842,10 @@ int _main( int argc, char* argv[] ) {
             free(lineCStr);
             lineCStr = NULL;
 
+            // If the line contains anything, add it to the history.
+            if(!line.empty())
+                shellHistoryAdd( line.c_str() );
+
             if ( line == "quit" || line == "exit" ) {
               // Replace this with the real command that the shell expects
               line += "(0)";
@@ -889,10 +893,6 @@ int _main( int argc, char* argv[] ) {
                     }
                 }
             }
-
-            // If the line contained anything, add it to the history.
-            if(!line.empty())
-                shellHistoryAdd( line.c_str() );
         }
 
         shellHistoryDone();
