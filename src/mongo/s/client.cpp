@@ -119,12 +119,12 @@ namespace mongo {
 
         if ( all.size() == 0 )
             return res;
-        
+
         if ( fromWriteBackListener ) {
             LOG(1) << "not doing recursive writeback" << endl;
             return res;
         }
-        
+
         for ( unsigned i=0; i<all.size(); i++ ) {
             res.push_back( WriteBackListener::waitFor( all[i].ident , all[i].id ) );
         }
@@ -147,9 +147,9 @@ namespace mongo {
         // handle single server
         if ( shards->size() == 1 ) {
             string theShard = *(shards->begin() );
-            
-            
-            
+
+
+
             BSONObj res;
             bool ok = false;
             {
@@ -158,17 +158,17 @@ namespace mongo {
                     ok = conn->runCommand( "admin" , options , res );
                 }
                 catch( std::exception &e ) {
-                
+
                     warning() << "could not get last error from shard " << theShard << causedBy( e ) << endl;
-                    
+
                     // Catch everything that happens here, since we need to ensure we return our connection when we're
                     // finished.
                     conn.done();
-                    
+
                     return false;
                 }
-            
-            
+
+
                 res = res.getOwned();
                 conn.done();
             }
@@ -185,15 +185,15 @@ namespace mongo {
                     ShardConnection conn( temp , "" );
                     ON_BLOCK_EXIT_OBJ( conn, &ShardConnection::done );
                     _addWriteBack( writebacks , conn->getLastErrorDetailed() );
-                    
+
                 }
                 catch( std::exception &e ){
                     warning() << "could not clear last error from shard " << temp << causedBy( e ) << endl;
                 }
-                
+
             }
             clearSinceLastGetError();
-            
+
             if ( writebacks.size() ){
                 vector<BSONObj> v = _handleWriteBacks( writebacks , fromWriteBackListener );
                 if ( v.size() == 0 && fromWriteBackListener ) {
@@ -217,7 +217,7 @@ namespace mongo {
                 result.append( "singleShard" , theShard );
                 result.appendElements( res );
             }
-            
+
             return ok;
         }
 
@@ -225,7 +225,7 @@ namespace mongo {
         BSONObjBuilder shardRawGLE;
 
         long long n = 0;
-        
+
         int updatedExistingStat = 0; // 0 is none, -1 has but false, 1 has true
 
         // hit each shard
@@ -244,17 +244,17 @@ namespace mongo {
             }
             catch( std::exception &e ){
 
-        	    // Safe to return here, since we haven't started any extra processing yet, just collecting
-        	    // responses.
-                
-        	    warning() << "could not get last error from a shard " << theShard << causedBy( e ) << endl;
+              // Safe to return here, since we haven't started any extra processing yet, just collecting
+              // responses.
+
+              warning() << "could not get last error from a shard " << theShard << causedBy( e ) << endl;
                 conn->done();
-                
+
                 return false;
             }
-            
+
             _addWriteBack( writebacks, res );
-            
+
             string temp = DBClientWithCommands::getLastErrorString( res );
             if ( (*conn)->type() != ConnectionString::SYNC && ( ok == false || temp.size() ) ) {
                 errors.push_back( temp );
