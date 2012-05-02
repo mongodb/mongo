@@ -34,14 +34,16 @@
 
 #include <assert.h>
 #include <errno.h>
+#include <inttypes.h>
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 
 #include <wiredtiger.h>
 
 int add_collator(WT_CONNECTION *conn);
 int add_compressor(WT_CONNECTION *conn);
-int add_cursor_type(WT_CONNECTION *conn);
+int add_data_source(WT_CONNECTION *conn);
 int add_extractor(WT_CONNECTION *conn);
 int connection_ops(WT_CONNECTION *conn);
 int cursor_ops(WT_SESSION *session);
@@ -282,7 +284,6 @@ cursor_search_near(WT_CURSOR *cursor)
 int
 session_ops(WT_SESSION *session)
 {
-	unsigned long mypid = 0;
 	int ret;
 
 	cursor_ops(session);
@@ -297,7 +298,20 @@ session_ops(WT_SESSION *session)
 	/*! [session checkpoint] */
 
 	/*! [session drop] */
+	/* Discard a table. */
 	ret = session->drop(session, "table:mytable", NULL);
+
+	/* Drop the "midnight" snapshot. */
+	ret = session->drop(session, "table:mytable", "snapshot=midnight");
+
+	/* Drop all snapshots from a table. */
+	ret = session->drop(session, "table:mytable", "snapshot=(all)");
+
+	/* Drop all snapshots after and including "noon". */
+	ret = session->drop(session, "table:mytable", "snapshot=(from=noon)");
+
+	/* Drop all snapshots before and including "midnight". */
+	ret = session->drop(session, "table:mytable", "snapshot=(to=midnight)");
 	/*! [session drop] */
 
 	/*! [session dumpfile] */
@@ -305,7 +319,8 @@ session_ops(WT_SESSION *session)
 	/*! [session dumpfile] */
 
 	/*! [session msg_printf] */
-	ret = session->msg_printf(session, "process pid %lu", mypid);
+	ret = session->msg_printf(
+	    session, "process ID %" PRIuMAX, (uintmax_t)getpid());
 	/*! [session msg_printf] */
 
 	/*! [session rename] */
@@ -369,26 +384,45 @@ session_ops(WT_SESSION *session)
 	return (ret);
 }
 
-/*! [WT_CURSOR_TYPE size] */
+/*! [WT_DATA_SOURCE create] */
 static int
-my_cursor_size(WT_CURSOR_TYPE *ctype, const char *obj, size_t *sizep)
-{
-	(void)ctype;
-	(void)obj;
-
-	*sizep = sizeof (WT_CURSOR);
-	return (0);
-}
-/*! [WT_CURSOR_TYPE size] */
-
-/*! [WT_CURSOR_TYPE init] */
-static int
-my_init_cursor(WT_CURSOR_TYPE *ctype, WT_SESSION *session,
-    const char *obj, WT_CURSOR *old_cursor, const char *config,
-    WT_CURSOR *new_cursor)
+my_create(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
+    const char *name, const char *config)
 {
 	/* Unused parameters */
-	(void)ctype;
+	(void)dsrc;
+	(void)session;
+	(void)name;
+	(void)config;
+
+	return (0);
+}
+/*! [WT_DATA_SOURCE create] */
+
+/*! [WT_DATA_SOURCE drop] */
+static int
+my_drop(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
+    const char *name, const char *config)
+{
+	/* Unused parameters */
+	(void)dsrc;
+	(void)session;
+	(void)name;
+	(void)config;
+
+	return (0);
+}
+/*! [WT_DATA_SOURCE drop] */
+
+/*! [WT_DATA_SOURCE open_cursor] */
+static int
+my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
+    const char *obj, WT_CURSOR *old_cursor, const char *config,
+    WT_CURSOR **new_cursor)
+{
+	/* Unused parameters */
+	(void)dsrc;
+
 	(void)session;
 	(void)obj;
 	(void)old_cursor;
@@ -397,17 +431,70 @@ my_init_cursor(WT_CURSOR_TYPE *ctype, WT_SESSION *session,
 
 	return (0);
 }
-/*! [WT_CURSOR_TYPE init] */
+/*! [WT_DATA_SOURCE open_cursor] */
+
+/*! [WT_DATA_SOURCE rename] */
+static int
+my_rename(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
+    const char *oldname, const char *newname, const char *config)
+{
+	/* Unused parameters */
+	(void)dsrc;
+	(void)session;
+	(void)oldname;
+	(void)newname;
+	(void)config;
+
+	return (0);
+}
+/*! [WT_DATA_SOURCE rename] */
+
+/*! [WT_DATA_SOURCE sync] */
+static int
+my_sync(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
+    const char *name, const char *config)
+{
+	/* Unused parameters */
+	(void)dsrc;
+	(void)session;
+	(void)name;
+	(void)config;
+
+	return (0);
+}
+/*! [WT_DATA_SOURCE sync] */
+
+/*! [WT_DATA_SOURCE truncate] */
+static int
+my_truncate(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
+    const char *name, const char *config)
+{
+	/* Unused parameters */
+	(void)dsrc;
+	(void)session;
+	(void)name;
+	(void)config;
+
+	return (0);
+}
+/*! [WT_DATA_SOURCE truncate] */
 
 int
-add_cursor_type(WT_CONNECTION *conn)
+add_data_source(WT_CONNECTION *conn)
 {
 	int ret;
 
-	/*! [WT_CURSOR_TYPE register] */
-	static WT_CURSOR_TYPE my_ctype = { my_cursor_size, my_init_cursor };
-	ret = conn->add_cursor_type(conn, NULL, &my_ctype, NULL);
-	/*! [WT_CURSOR_TYPE register] */
+	/*! [WT_DATA_SOURCE register] */
+	static WT_DATA_SOURCE my_dsrc = {
+		my_create,
+		my_drop,
+		my_open_cursor,
+		my_rename,
+		my_sync,
+		my_truncate
+	};
+	ret = conn->add_data_source(conn, "dsrc:", &my_dsrc, NULL);
+	/*! [WT_DATA_SOURCE register] */
 
 	return (ret);
 }
@@ -569,8 +656,8 @@ connection_ops(WT_CONNECTION *conn)
 	ret = conn->load_extension(conn, "my_extension.dll", NULL);
 	/*! [conn load extension] */
 
-	add_cursor_type(conn);
 	add_collator(conn);
+	add_data_source(conn);
 	add_extractor(conn);
 
 	/*! [conn close] */
@@ -622,7 +709,7 @@ int main(void)
 	{
 	/*! [Pack fields into a buffer] */
 	char buf[100];
-	ret = wiredtiger_struct_pack(buf, sizeof (buf), "iSh", 42, "hello", -3);
+	ret = wiredtiger_struct_pack(buf, sizeof(buf), "iSh", 42, "hello", -3);
 	/*! [Pack fields into a buffer] */
  
 	{
@@ -630,7 +717,7 @@ int main(void)
 	int i;
 	char *s;
 	short h;
-	ret = wiredtiger_struct_unpack(buf, sizeof (buf), "iSh", &i, &s, &h);
+	ret = wiredtiger_struct_unpack(buf, sizeof(buf), "iSh", &i, &s, &h);
 	/*! [Unpack fields from a buffer] */
 	}
 	}

@@ -14,19 +14,19 @@
 static int
 __drop_file(WT_SESSION_IMPL *session, const char *uri, int force)
 {
-	int exist, ret;
+	WT_DECL_RET;
+	int exist;
 	const char *filename;
 
-	ret = 0;
 	filename = uri;
 	if (!WT_PREFIX_SKIP(filename, "file:"))
 		return (EINVAL);
 
 	/* If open, close the btree handle. */
-	WT_RET(__wt_session_close_any_open_btree(session, filename));
+	WT_RET(__wt_session_close_any_open_btree(session, uri));
 
-	/* Remove the schema table entry (ignore missing items). */
-	WT_TRET(__wt_schema_table_remove(session, uri));
+	/* Remove the metadata entry (ignore missing items). */
+	WT_TRET(__wt_metadata_remove(session, uri));
 	if (force && ret == WT_NOTFOUND)
 		ret = 0;
 
@@ -44,25 +44,27 @@ __drop_file(WT_SESSION_IMPL *session, const char *uri, int force)
  *	Drop an index or colgroup reference.
  */
 static int
-__drop_tree(WT_SESSION_IMPL *session, WT_BTREE *btree, int force)
+__drop_tree(
+    WT_SESSION_IMPL *session, WT_BTREE *btree, const char *uri, int force)
 {
+	WT_DECL_RET;
 	WT_ITEM *buf;
-	int ret;
 
-	ret = 0;
+	buf = NULL;
 
-	/* Remove the schema table entry (ignore missing items). */
-	WT_TRET(__wt_schema_table_remove(session, btree->name));
+	/* Remove the metadata entry (ignore missing items). */
+	WT_TRET(__wt_metadata_remove(session, uri));
 	if (force && ret == WT_NOTFOUND)
 		ret = 0;
 
 	/*
 	 * Drop the file.
 	 * __drop_file closes the WT_BTREE handle, so we copy the
-	 * WT_BTREE->filename field to make a URI.
+	 * WT_BTREE->name field to save the URI.
 	 */
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));
-	WT_ERR(__wt_buf_fmt(session, buf, "file:%s", btree->filename));
+	WT_ERR(__wt_buf_set(
+	    session, buf, btree->name, strlen(btree->name) + 1));
 	WT_ERR(__drop_file(session, buf->data, force));
 
 err:	__wt_scr_free(&buf);
@@ -79,10 +81,11 @@ __drop_colgroup(
     WT_SESSION_IMPL *session, const char *uri, int force, const char *cfg[])
 {
 	WT_BTREE *btree;
+	WT_DECL_RET;
 	WT_TABLE *table;
 	const char *cgname, *tablename;
 	size_t tlen;
-	int i, ret;
+	int i;
 
 	tablename = uri;
 	if (!WT_PREFIX_SKIP(tablename, "colgroup:"))
@@ -101,11 +104,11 @@ __drop_colgroup(
 	 * __wt_session_close_any_open_btree.  If two threads race dropping
 	 * the same object, it will be caught there.
 	 *
-	 * If we can't get a tree, try to remove it from the schema table.
+	 * If we can't get a tree, try to remove it from the metadata.
 	 */
 	if ((ret = __wt_schema_get_btree(
 	    session, uri, strlen(uri), cfg, WT_BTREE_NO_LOCK)) != 0) {
-		(void)__wt_schema_table_remove(session, uri);
+		(void)__wt_metadata_remove(session, uri);
 		return (ret);
 	}
 	btree = session->btree;
@@ -123,7 +126,7 @@ __drop_colgroup(
 	} else if (ret != WT_NOTFOUND)
 		WT_TRET(ret);
 
-	WT_TRET(__drop_tree(session, btree, force));
+	WT_TRET(__drop_tree(session, btree, uri, force));
 
 	return (ret);
 }
@@ -137,10 +140,11 @@ __drop_index(
     WT_SESSION_IMPL *session, const char *uri, int force, const char *cfg[])
 {
 	WT_BTREE *btree;
+	WT_DECL_RET;
 	WT_TABLE *table;
 	const char *idxname, *tablename;
 	size_t tlen;
-	int i, ret;
+	int i;
 
 	tablename = uri;
 	if (!WT_PREFIX_SKIP(tablename, "index:") ||
@@ -156,11 +160,11 @@ __drop_index(
 	 * __wt_session_close_any_open_btree.  If two threads race dropping
 	 * the same object, it will be caught there.
 	 *
-	 * If we can't get a tree, try to remove it from the schema table.
+	 * If we can't get a tree, try to remove it from the metadata.
 	 */
 	if ((ret = __wt_schema_get_btree(
 	    session, uri, strlen(uri), cfg, WT_BTREE_NO_LOCK)) != 0) {
-		(void)__wt_schema_table_remove(session, uri);
+		(void)__wt_metadata_remove(session, uri);
 		return (ret);
 	}
 	btree = session->btree;
@@ -178,7 +182,7 @@ __drop_index(
 	} else if (ret != WT_NOTFOUND)
 		WT_TRET(ret);
 
-	WT_TRET(__drop_tree(session, btree, force));
+	WT_TRET(__drop_tree(session, btree, uri, force));
 
 	return (ret);
 }
@@ -191,11 +195,10 @@ static int
 __drop_table(WT_SESSION_IMPL *session, const char *uri, int force)
 {
 	WT_BTREE *btree;
+	WT_DECL_RET;
 	WT_TABLE *table;
-	int i, ret;
+	int i;
 	const char *name;
-
-	ret = 0;
 
 	name = uri;
 	(void)WT_PREFIX_SKIP(name, "table:");
@@ -207,7 +210,7 @@ __drop_table(WT_SESSION_IMPL *session, const char *uri, int force)
 		if ((btree = table->colgroup[i]) == NULL)
 			continue;
 		table->colgroup[i] = NULL;
-		WT_TRET(__drop_tree(session, btree, force));
+		WT_TRET(__drop_tree(session, btree, table->cg_name[i], force));
 	}
 
 	/* Drop the indices. */
@@ -215,13 +218,13 @@ __drop_table(WT_SESSION_IMPL *session, const char *uri, int force)
 	for (i = 0; i < table->nindices; i++) {
 		btree = table->index[i];
 		table->index[i] = NULL;
-		WT_TRET(__drop_tree(session, btree, force));
+		WT_TRET(__drop_tree(session, btree, table->idx_name[i], force));
 	}
 
 	WT_TRET(__wt_schema_remove_table(session, table));
 
-	/* Remove the schema table entry (ignore missing items). */
-	WT_TRET(__wt_schema_table_remove(session, uri));
+	/* Remove the metadata entry (ignore missing items). */
+	WT_TRET(__wt_metadata_remove(session, uri));
 
 err:	if (force && ret == WT_NOTFOUND)
 		ret = 0;
@@ -232,7 +235,9 @@ int
 __wt_schema_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 {
 	WT_CONFIG_ITEM cval;
-	int force, ret;
+	WT_DATA_SOURCE *dsrc;
+	WT_DECL_RET;
+	int force;
 
 	cval.val = 0;
 	ret = __wt_config_gets(session, cfg, "force", &cval);
@@ -251,12 +256,12 @@ __wt_schema_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 		ret = __drop_index(session, uri, force, cfg);
 	else if (WT_PREFIX_MATCH(uri, "table:"))
 		ret = __drop_table(session, uri, force);
-	else
-		return (__wt_unknown_object_type(session, uri));
+	else if ((ret = __wt_schema_get_source(session, uri, &dsrc)) == 0)
+		ret = dsrc->drop(dsrc, &session->iface, uri, cfg[1]);
 
 	/*
 	 * Map WT_NOTFOUND to ENOENT (or to 0 if "force" is set), based on the
-	 * assumption WT_NOTFOUND means there was no schema file entry.  The
+	 * assumption WT_NOTFOUND means there was no metadata entry.  The
 	 * underlying drop functions should handle this case (we passed them
 	 * the "force" value), but better safe than sorry.
 	 */

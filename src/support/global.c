@@ -32,7 +32,7 @@ __wt_library_init(void)
 {
 	static pthread_once_t once_control = PTHREAD_ONCE_INIT;
 	static int first = 1;
-	int ret;
+	WT_DECL_RET;
 
 	/*
 	 * Do per-process initialization once, before anything else, but only

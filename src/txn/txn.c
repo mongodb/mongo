@@ -153,8 +153,8 @@ __wt_txn_unmodify(WT_SESSION_IMPL *session)
 int
 __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 {
+	WT_DECL_RET;
 	WT_TXN *txn;
-	int ret;
 
 	WT_UNUSED(cfg);
 
@@ -179,10 +179,10 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 int
 __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
 {
+	WT_DECL_RET;
 	WT_TXN *txn;
 	wt_txnid_t **m;
 	u_int i;
-	int ret;
 
 	WT_UNUSED(cfg);
 

@@ -1,0 +1,87 @@
+/*! @page data_sources Data Sources
+
+WiredTiger provides access to data from a variety of sources.  At the
+lowest level, data may be stored in a file using a tree structure.  A
+relational schema supporting tables, indices and column groups is
+layered on top of file.  Additional sources include LSM trees and
+statistics, and applications can further extend the supported types by
+implementing the ::WT_DATA_SOURCE interface.
+
+Common operations on all data sources are performed using WT_CURSOR
+handles.  See @subpage cursor_ops for a description of how to use
+cursors.
+
+@section data_builtin Builtin data sources
+
+The following are the builtin cursor types:
+
+<table>
+  @hrow{URI, Type}
+   @row{<tt>colgroup:\<tablename\>.\<columnset\></tt>,
+column group cursor}
+   @row{<tt>config:[\<uri\>]</tt>,
+object configuration cursor (key=config string\,
+value=config value}
+  @row{<tt>table:\<tablename\></tt>,
+table cursor (key=table key\, value=table value)}
+  @row{<tt>file:\<filename\></tt>,
+file cursor (key=file key\, value=file value)}
+  @row{<tt>index:\<tablename\>.\<indexname\></tt>,
+index cursor (key=index key\, value=table value)}
+  @row{<tt>join:\<cursor1\>\&\<cursor2\>[&\<cursor3\>...]</tt>,
+join cursor @notyet{join cursors}}
+  @row{<tt>statistics:[file</tt><tt>:\<filename\>]</tt>,
+  database or file statistics (key=(int)\,
+  value=(string)description\, (string)value\, (uint64_t)value)}
+</table>
+
+@subsection data_files Raw Files
+
+WiredTiger's schema layer can be bypassed by opening cursors with a \c
+"file:" URI, using the name of the underlying file.  This can be useful for
+seeing the contents of a column group or index without reading all of the
+columns from the table.
+
+For example, if an index becomes inconsistent with its primary, a file
+cursor can read from the index without errors (even though some of the keys
+that are returned may not exist in the primary).
+
+@subsection data_indices Table Index data
+
+When an index is created for a table, records are inserted into the index
+whenever the table is updated.  These records use a different key to the
+primary table, as specified when the index is created with the
+WT_SESSION::create method.
+
+A cursor opened on an index has the specified index columns as its key,
+accessed by WT_CURSOR::set_key and WT_CURSOR::get_key.  The value columns
+default to returning the value columns from the table, but this can be
+overridden by configuring a projection cursor (see @ref cursor_projections),
+which can access the table key columns or a subset of the value columns.
+
+@subsection data_statistics Statistics Data
+
+Cursors can return run-time statistics about the WiredTiger engine as
+well as statistics for the underlying row- and column-store files.  Each
+cursor iteration sets three separate values: a printable description of
+the entry, a printable version of the entry's value, and the entry's
+unsigned 64-bit integral value.
+
+The statistic key is an integer from the list of keys in @ref statistics_keys
+"Statistics Keys".
+
+The following is an example of printing run-time statistics about the
+WiredTiger engine:
+
+@snippet ex_stat.c statistics database function
+
+The following is an example of printing statistics about an underlying
+file:
+
+@snippet ex_stat.c statistics file function
+
+Both examples can use a common display routine that iterates through the
+statistics until the cursor returns the end of the list.
+
+@snippet ex_stat.c statistics display function
+*/

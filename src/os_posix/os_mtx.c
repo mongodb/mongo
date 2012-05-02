@@ -48,7 +48,7 @@ err:	__wt_free(session, cond);
 void
 __wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond)
 {
-	int ret;
+	WT_DECL_RET;
 
 	/*
 	 * !!!
@@ -95,7 +95,7 @@ err:	__wt_err(session, ret, "mutex lock failed");
 void
 __wt_cond_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond)
 {
-	int ret;
+	WT_DECL_RET;
 
 	/*
 	 * !!!
@@ -105,7 +105,6 @@ __wt_cond_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond)
 		WT_VERBOSE(
 		    session, mutex, "signal %s cond (%p)", cond->name, cond);
 
-	ret = 0;
 	WT_ERR(pthread_mutex_lock(&cond->mtx));
 	if (cond->locked) {
 		cond->locked = 0;
@@ -125,7 +124,7 @@ err:	__wt_err(session, ret, "mutex unlock failed");
 int
 __wt_cond_destroy(WT_SESSION_IMPL *session, WT_CONDVAR *cond)
 {
-	int ret;
+	WT_DECL_RET;
 
 	ret = pthread_cond_destroy(&cond->cond);
 	WT_TRET(pthread_mutex_destroy(&cond->mtx));
@@ -144,11 +143,10 @@ int
 __wt_rwlock_alloc(
     WT_SESSION_IMPL *session, const char *name, WT_RWLOCK **rwlockp)
 {
+	WT_DECL_RET;
 	WT_RWLOCK *rwlock;
-	int ret;
 
 	WT_RET(__wt_calloc(session, 1, sizeof(WT_RWLOCK), &rwlock));
-	ret = 0;
 	WT_ERR_TEST(pthread_rwlock_init(&rwlock->rwlock, NULL), WT_ERROR);
 
 	rwlock->name = name;
@@ -166,7 +164,7 @@ err:		__wt_free(session, rwlock);
 void
 __wt_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
-	int ret;
+	WT_DECL_RET;
 
 	WT_VERBOSE(session, mutex,
 	    "readlock %s rwlock (%p)", rwlock->name, rwlock);
@@ -187,7 +185,7 @@ err:		__wt_err(session, ret, "rwlock readlock failed");
 int
 __wt_try_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
-	int ret;
+	WT_DECL_RET;
 
 	WT_VERBOSE(session, mutex,
 	    "try_writelock %s rwlock (%p)", rwlock->name, rwlock);
@@ -209,7 +207,7 @@ __wt_try_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 void
 __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
-	int ret;
+	WT_DECL_RET;
 
 	WT_VERBOSE(session, mutex,
 	    "writelock %s rwlock (%p)", rwlock->name, rwlock);
@@ -230,7 +228,7 @@ err:		__wt_err(session, ret, "rwlock writelock failed");
 void
 __wt_rwunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
-	int ret;
+	WT_DECL_RET;
 
 	WT_VERBOSE(session, mutex,
 	    "unlock %s rwlock (%p)", rwlock->name, rwlock);
@@ -250,7 +248,7 @@ err:		__wt_err(session, ret, "rwlock unlock failed");
 int
 __wt_rwlock_destroy(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
-	int ret;
+	WT_DECL_RET;
 
 	ret = pthread_rwlock_destroy(&rwlock->rwlock);
 	if (ret == EBUSY)

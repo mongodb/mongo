@@ -15,7 +15,7 @@ int
 __wt_filesize(WT_SESSION_IMPL *session, WT_FH *fh, off_t *sizep)
 {
 	struct stat sb;
-	int ret;
+	WT_DECL_RET;
 
 	WT_VERBOSE(session, fileops, "%s: fstat", fh->name);
 

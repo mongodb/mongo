@@ -15,7 +15,7 @@ int
 __wt_bytelock(WT_FH *fhp, off_t byte, int lock)
 {
 	struct flock fl;
-	int ret;
+	WT_DECL_RET;
 
 	/*
 	 * WiredTiger requires this function be able to acquire locks past

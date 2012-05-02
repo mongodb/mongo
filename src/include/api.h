@@ -70,7 +70,12 @@ struct __wt_session_impl {
 					/* Cursors closed with the session */
 	TAILQ_HEAD(__cursors, __wt_cursor) cursors;
 
-	WT_BTREE *schematab;		/* Schema tables */
+	WT_BTREE *metafile;		/* Metadata file */
+	void	*meta_track;		/* Metadata operation tracking */
+	void	*meta_track_next;	/* Current position */
+	size_t	 meta_track_alloc;	/* Currently allocated */
+#define	WT_META_TRACKING(session)	(session->meta_track_next != NULL)
+
 	TAILQ_HEAD(__tables, __wt_table) tables;
 
 	WT_ITEM	logrec_buf;		/* Buffer for log records */
@@ -94,8 +99,10 @@ struct __wt_session_impl {
 	u_int	 excl_next;		/* Next empty slot */
 	size_t	 excl_allocated;	/* Bytes allocated */
 
-	void	*schema_track;		/* Tracking schema operations */
-	u_int	 schema_track_entries;	/* Currently allocated */
+#define	WT_SYNC			1	/* Sync the file */
+#define	WT_SYNC_DISCARD		2	/* Sync the file, discard pages */
+#define	WT_SYNC_DISCARD_NOWRITE	3	/* Discard the file */
+	int syncop;			/* File operation */
 
 	uint32_t id;			/* Offset in conn->session_array */
 
@@ -126,6 +133,16 @@ struct __wt_named_compressor {
 };
 
 /*
+ * WT_NAMED_DATA_SOURCE --
+ *	A data source list entry
+ */
+struct __wt_named_data_source {
+	const char *prefix;		/* Name of compressor */
+	WT_DATA_SOURCE *dsrc;		/* User supplied callbacks */
+	TAILQ_ENTRY(__wt_named_data_source) q;	/* Linked list of compressors */
+};
+
+/*
  * WT_CONNECTION_IMPL --
  *	Implementation of WT_CONNECTION
  */
@@ -152,7 +169,6 @@ struct __wt_connection_impl {
 
 					/* Locked: btree list */
 	TAILQ_HEAD(__wt_btree_qh, __wt_btree) btqh;
-
 					/* Locked: file list */
 	TAILQ_HEAD(__wt_fh_qh, __wt_fh) fhqh;
 
@@ -205,6 +221,9 @@ struct __wt_connection_impl {
 					/* Locked: compressor list */
 	TAILQ_HEAD(__wt_comp_qh, __wt_named_compressor) compqh;
 
+					/* Locked: data source list */
+	TAILQ_HEAD(__wt_dsrc_qh, __wt_named_data_source) dsrcqh;
+
 	FILE *msgfile;
 	void (*msgcall)(const WT_CONNECTION_IMPL *, const char *);
 
@@ -226,8 +245,7 @@ struct __wt_connection_impl {
 	const char *__oldname = (s)->name;				\
 	(s)->cursor = (cur);						\
 	(s)->btree = (bt);						\
-	(s)->name = #h "." #n;						\
-	ret = 0;
+	(s)->name = #h "." #n;
 
 #define	API_CALL_NOCONF(s, h, n, cur, bt) do {				\
 	API_SESSION_INIT(s, h, n, cur, bt);
@@ -283,16 +301,17 @@ extern WT_PROCESS __wt_process;
 #define	WT_SERVER_RUN					0x00000001
 #define	WT_SESSION_INTERNAL				0x00000002
 #define	WT_SESSION_SALVAGE_QUIET_ERR			0x00000001
-#define	WT_VERB_block					0x00000800
-#define	WT_VERB_evict					0x00000400
-#define	WT_VERB_evictserver				0x00000200
-#define	WT_VERB_fileops					0x00000100
-#define	WT_VERB_hazard					0x00000080
-#define	WT_VERB_mutex					0x00000040
-#define	WT_VERB_read					0x00000020
-#define	WT_VERB_readserver				0x00000010
-#define	WT_VERB_reconcile				0x00000008
-#define	WT_VERB_salvage					0x00000004
+#define	WT_VERB_block					0x00001000
+#define	WT_VERB_evict					0x00000800
+#define	WT_VERB_evictserver				0x00000400
+#define	WT_VERB_fileops					0x00000200
+#define	WT_VERB_hazard					0x00000100
+#define	WT_VERB_mutex					0x00000080
+#define	WT_VERB_read					0x00000040
+#define	WT_VERB_readserver				0x00000020
+#define	WT_VERB_reconcile				0x00000010
+#define	WT_VERB_salvage					0x00000008
+#define	WT_VERB_snapshot				0x00000004
 #define	WT_VERB_verify					0x00000002
 #define	WT_VERB_write					0x00000001
 /*

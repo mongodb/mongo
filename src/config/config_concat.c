@@ -23,12 +23,11 @@ __wt_config_concat(
 {
 	WT_CONFIG cparser;
 	WT_CONFIG_ITEM k, v;
+	WT_DECL_RET;
 	WT_ITEM buf;
-	int ret;
 	const char **cp;
 
 	WT_CLEAR(buf);
-	ret = 0;
 
 	for (cp = cfg; *cp != NULL; ++cp) {
 		WT_ERR(__wt_config_init(session, &cparser, *cp));

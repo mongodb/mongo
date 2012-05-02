@@ -250,10 +250,10 @@ __wt_buf_catfmt(WT_SESSION_IMPL *session, WT_ITEM *buf, const char *fmt, ...)
 int
 __wt_scr_alloc(WT_SESSION_IMPL *session, uint32_t size, WT_ITEM **scratchp)
 {
+	WT_DECL_RET;
 	WT_ITEM *buf, **p, *best, **slot;
 	size_t allocated;
 	u_int i;
-	int ret;
 
 	/* Don't risk the caller not catching the error. */
 	*scratchp = NULL;
@@ -356,11 +356,9 @@ __wt_scr_discard(WT_SESSION_IMPL *session)
 	    bufp = session->scratch; i < session->scratch_alloc; ++i, ++bufp) {
 		if (*bufp == NULL)
 			continue;
-#if 0
 		if (F_ISSET(*bufp, WT_ITEM_INUSE))
 			__wt_errx(session,
 			    "scratch buffer allocated and never discarded");
-#endif
 		__wt_buf_free(session, *bufp);
 		__wt_free(session, *bufp);
 	}

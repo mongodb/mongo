@@ -310,8 +310,8 @@ SELFHELPER(struct __wt_cursor)
 %ignore __wt_connection::add_collator;
 %ignore __wt_compressor;
 %ignore __wt_connection::add_compressor;
-%ignore __wt_cursor_type;
-%ignore __wt_connection::add_cursor_type;
+%ignore __wt_data_source;
+%ignore __wt_connection::add_data_source;
 %ignore __wt_event_handler;
 %ignore __wt_extractor;
 %ignore __wt_connection::add_extractor;

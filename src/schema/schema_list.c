@@ -52,7 +52,7 @@ int
 __wt_schema_get_table(WT_SESSION_IMPL *session,
     const char *name, size_t namelen, WT_TABLE **tablep)
 {
-	int ret;
+	WT_DECL_RET;
 
 	ret = __wt_schema_find_table(session, name, namelen, tablep);
 
@@ -71,6 +71,8 @@ __wt_schema_get_table(WT_SESSION_IMPL *session,
 void
 __wt_schema_destroy_table(WT_SESSION_IMPL *session, WT_TABLE *table)
 {
+	int i;
+
 	__wt_free(session, table->name);
 	__wt_free(session, table->config);
 	__wt_free(session, table->plan);
@@ -78,6 +80,16 @@ __wt_schema_destroy_table(WT_SESSION_IMPL *session, WT_TABLE *table)
 	__wt_free(session, table->value_format);
 	__wt_free(session, table->colgroup);
 	__wt_free(session, table->index);
+	if (table->cg_name != NULL) {
+		for (i = 0; i < WT_COLGROUPS(table); i++)
+			__wt_free(session, table->cg_name[i]);
+		__wt_free(session, table->cg_name);
+	}
+	if (table->idx_name != NULL) {
+		for (i = 0; i < table->nindices; i++)
+			__wt_free(session, table->idx_name[i]);
+		__wt_free(session, table->idx_name);
+	}
 	__wt_free(session, table);
 }
 
@@ -102,10 +114,9 @@ __wt_schema_remove_table(
 int
 __wt_schema_close_tables(WT_SESSION_IMPL *session)
 {
+	WT_DECL_RET;
 	WT_TABLE *table;
-	int ret;
 
-	ret = 0;
 	while ((table = TAILQ_FIRST(&session->tables)) != NULL)
 		WT_TRET(__wt_schema_remove_table(session, table));
 

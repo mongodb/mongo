@@ -28,9 +28,6 @@ __wt_stat_alloc_btree_stats(WT_SESSION_IMPL *session, WT_BTREE_STATS **statsp)
 	    "column-store variable-size leaf pages";
 	stats->file_entries.desc = "total entries";
 	stats->file_fixed_len.desc = "fixed-record size";
-	stats->file_freelist_bytes.desc = "number of bytes in the freelist";
-	stats->file_freelist_entries.desc =
-	    "number of entries in the freelist";
 	stats->file_magic.desc = "magic number";
 	stats->file_major.desc = "major version number";
 	stats->file_maxintlitem.desc = "maximum internal page item size";
@@ -85,8 +82,6 @@ __wt_stat_clear_btree_stats(WT_STATS *stats_arg)
 	stats->file_col_var_pages.v = 0;
 	stats->file_entries.v = 0;
 	stats->file_fixed_len.v = 0;
-	stats->file_freelist_bytes.v = 0;
-	stats->file_freelist_entries.v = 0;
 	stats->file_magic.v = 0;
 	stats->file_major.v = 0;
 	stats->file_maxintlitem.v = 0;

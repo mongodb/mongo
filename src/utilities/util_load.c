@@ -10,9 +10,9 @@
 static int format(void);
 static int insert(WT_CURSOR *, const char *);
 static int load_dump(WT_SESSION *);
-static int schema_read(char ***, int *);
-static int schema_rename(char **, const char *);
-static int schema_update(WT_SESSION *, char **);
+static int config_read(char ***, int *);
+static int config_rename(char **, const char *);
+static int config_update(WT_SESSION *, char **);
 static int usage(void);
 
 static int	append;		/* -a append (ignore record number keys) */
@@ -72,14 +72,15 @@ static int
 load_dump(WT_SESSION *session)
 {
 	WT_CURSOR *cursor;
-	int hex, ret, tret;
+	WT_DECL_RET;
+	int hex, tret;
 	char **entry, **list, *p, *uri, config[64];
 
-        list = NULL;            /* -Wuninitialized */
-        hex = 0;                /* -Wuninitialized */
+	list = NULL;            /* -Wuninitialized */
+	hex = 0;                /* -Wuninitialized */
 
-	/* Read the schema file. */
-	if ((ret = schema_read(&list, &hex)) != 0)
+	/* Read the metadata file. */
+	if ((ret = config_read(&list, &hex)) != 0)
 		return (ret);
 
 	/*
@@ -111,8 +112,8 @@ load_dump(WT_SESSION *session)
 		p = list[1]; list[1] = entry[1]; entry[1] = p;
 	}
 
-	/* Update the schema based on any command-line configuration. */
-	if ((ret = schema_update(session, list)) != 0)
+	/* Update the config based on any command-line configuration. */
+	if ((ret = config_update(session, list)) != 0)
 		return (ret);
 
 	uri = list[0];
@@ -127,7 +128,7 @@ load_dump(WT_SESSION *session)
 	    append ? ",append" : "", overwrite ? ",overwrite" : "");
 	if ((ret = session->open_cursor(
 	    session, uri, NULL, config, &cursor)) != 0)
-		return(util_err(ret, "%s: session.open", uri));
+		return (util_err(ret, "%s: session.open", uri));
 
 	/*
 	 * Check the append flag (it only applies to objects where the primary
@@ -159,11 +160,11 @@ load_dump(WT_SESSION *session)
 }
 
 /*
- * schema_read --
- *	Read the schema lines and do some basic validation.
+ * config_read --
+ *	Read the config lines and do some basic validation.
  */
 static int
-schema_read(char ***listp, int *hexp)
+config_read(char ***listp, int *hexp)
 {
 	ULINE l;
 	int entry, eof, max_entry;
@@ -222,18 +223,18 @@ schema_read(char ***listp, int *hexp)
 }
 
 /*
- * schema_update --
+ * config_update --
  *	Reconcile and update the command line configuration against the
- * schema we found.
+ * config we found.
  */
 static int
-schema_update(WT_SESSION *session, char **list)
+config_update(WT_SESSION *session, char **list)
 {
 	int found;
 	const char *cfg[] = { NULL, NULL, NULL };
 	char **configp, **listp, *p, *t;
 
-#define MATCH(s, tag)                                           	\
+#define	MATCH(s, tag)                                           	\
 	(strncmp(s, tag, strlen(tag)) == 0)
 
 	/*
@@ -246,7 +247,7 @@ schema_update(WT_SESSION *session, char **list)
 			    MATCH(*listp, "file:") ||
 			    MATCH(*listp, "index:") ||
 			    MATCH(*listp, "table:"))
-				if (schema_rename(listp, cmdname))
+				if (config_rename(listp, cmdname))
 					return (1);
 
 		/*
@@ -256,7 +257,7 @@ schema_update(WT_SESSION *session, char **list)
 		 */
 		for (configp = cmdconfig;
 		    cmdconfig != NULL && *configp != NULL; configp += 2)
-			if (schema_rename(configp, cmdname))
+			if (config_rename(configp, cmdname))
 				return (1);
 	}
 
@@ -337,11 +338,11 @@ schema_update(WT_SESSION *session, char **list)
 }
 
 /*
- * schema_rename --
+ * config_rename --
  *	Update the URI name.
  */
 static int
-schema_rename(char **urip, const char *name)
+config_rename(char **urip, const char *name)
 {
 	size_t len;
 	char *buf, *p;
@@ -383,8 +384,9 @@ static int
 insert(WT_CURSOR *cursor, const char *name)
 {
 	ULINE key, value;
+	WT_DECL_RET;
 	uint64_t insert_count;
-	int eof, ret;
+	int eof;
 
 	memset(&key, 0, sizeof(key));
 	memset(&value, 0, sizeof(value));

@@ -14,14 +14,13 @@
 int
 __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[])
 {
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int ret;
 
 	/* Default session. */
 	conn->default_session.iface.connection = &conn->iface;
 
 	session = &conn->default_session;
-	ret = 0;
 
 	/* WT_SESSION_IMPL and hazard arrays. */
 	WT_ERR(__wt_calloc(session,
@@ -64,12 +63,11 @@ int
 __wt_connection_close(WT_CONNECTION_IMPL *conn)
 {
 	WT_SESSION_IMPL *session;
+	WT_DECL_RET;
 	WT_DLH *dlh;
 	WT_FH *fh;
-	int ret;
 
 	session = &conn->default_session;
-	ret = 0;
 
 	/*
 	 * Complain if files weren't closed (ignoring the lock and logging

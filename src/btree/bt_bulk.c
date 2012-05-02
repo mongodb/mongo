@@ -16,8 +16,8 @@ static int __bulk_row_keycmp_err(WT_CURSOR_BULK *);
 int
 __wt_bulk_init(WT_CURSOR_BULK *cbulk)
 {
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int ret;
 
 	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
 

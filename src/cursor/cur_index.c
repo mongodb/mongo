@@ -15,10 +15,10 @@ static int
 __curindex_get_value(WT_CURSOR *cursor, ...)
 {
 	WT_CURSOR_INDEX *cindex;
+	WT_DECL_RET;
 	WT_ITEM *item;
 	WT_SESSION_IMPL *session;
 	va_list ap;
-	int ret;
 
 	cindex = (WT_CURSOR_INDEX *)cursor;
 	CURSOR_API_CALL(cursor, session, get_value, NULL);
@@ -50,8 +50,8 @@ err:	API_END(session);
 static void
 __curindex_set_value(WT_CURSOR *cursor, ...)
 {
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int ret;
 
 	CURSOR_API_CALL(cursor, session, set_value, NULL);
 	WT_UNUSED(ret);
@@ -111,8 +111,8 @@ static int
 __curindex_next(WT_CURSOR *cursor)
 {
 	WT_CURSOR_INDEX *cindex;
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int ret;
 
 	cindex = (WT_CURSOR_INDEX *)cursor;
 	CURSOR_API_CALL(cursor, session, next, cindex->cbt.btree);
@@ -131,8 +131,8 @@ static int
 __curindex_prev(WT_CURSOR *cursor)
 {
 	WT_CURSOR_INDEX *cindex;
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int ret;
 
 	cindex = (WT_CURSOR_INDEX *)cursor;
 	CURSOR_API_CALL(cursor, session, prev, cindex->cbt.btree);
@@ -152,8 +152,9 @@ __curindex_reset(WT_CURSOR *cursor)
 {
 	WT_CURSOR **cp;
 	WT_CURSOR_INDEX *cindex;
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int i, ret;
+	int i;
 
 	cindex = (WT_CURSOR_INDEX *)cursor;
 	CURSOR_API_CALL(cursor, session, reset, cindex->cbt.btree);
@@ -179,9 +180,10 @@ static int
 __curindex_search(WT_CURSOR *cursor)
 {
 	WT_CURSOR_INDEX *cindex;
+	WT_DECL_RET;
 	WT_ITEM *oldkeyp;
 	WT_SESSION_IMPL *session;
-	int exact, ret;
+	int exact;
 
 	cindex = (WT_CURSOR_INDEX *)cursor;
 	CURSOR_API_CALL(cursor, session, search, cindex->cbt.btree);
@@ -244,8 +246,8 @@ static int
 __curindex_search_near(WT_CURSOR *cursor, int *exact)
 {
 	WT_CURSOR_INDEX *cindex;
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int ret;
 
 	cindex = (WT_CURSOR_INDEX *)cursor;
 	CURSOR_API_CALL(cursor, session, search_near, cindex->cbt.btree);
@@ -266,8 +268,9 @@ __curindex_close(WT_CURSOR *cursor)
 	WT_BTREE *btree;
 	WT_CURSOR_INDEX *cindex;
 	WT_CURSOR **cp;
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int i, ret;
+	int i;
 
 	cindex = (WT_CURSOR_INDEX *)cursor;
 	btree = cindex->cbt.btree;
@@ -365,12 +368,10 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 	WT_CURSOR_INDEX *cindex;
 	WT_CURSOR_BTREE *cbt;
 	WT_CURSOR *cursor;
+	WT_DECL_RET;
 	WT_TABLE *table;
 	const char *columns, *idxname, *tablename;
 	size_t namesize;
-	int ret;
-
-	ret = 0;
 
 	tablename = uri;
 	if (!WT_PREFIX_SKIP(tablename, "index:") ||

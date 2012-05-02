@@ -7,10 +7,6 @@
 
 #include "wt_internal.h"
 
-static int __conn_config(WT_CONNECTION_IMPL *, const char **, WT_ITEM **);
-static int __conn_home(WT_CONNECTION_IMPL *, const char *, const char **);
-static int __conn_single(WT_CONNECTION_IMPL *, const char **);
-
 /*
  * api_err_printf --
  *	Extension API call to print to the error stream.
@@ -41,10 +37,10 @@ __conn_load_extension(
 {
 	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
 	WT_DLH *dlh;
 	WT_SESSION_IMPL *session;
 	int (*entry)(WT_SESSION *, WT_EXTENSION_API *, const char *);
-	int ret;
 	const char *entry_name;
 
 	dlh = NULL;
@@ -84,29 +80,6 @@ err:		if (dlh != NULL)
 }
 
 /*
- * __conn_add_cursor_type --
- *	WT_CONNECTION->add_cursor_type method.
- */
-static int
-__conn_add_cursor_type(WT_CONNECTION *wt_conn,
-    const char *prefix, WT_CURSOR_TYPE *ctype, const char *config)
-{
-	WT_CONNECTION_IMPL *conn;
-	WT_SESSION_IMPL *session;
-	int ret;
-
-	WT_UNUSED(prefix);
-	WT_UNUSED(ctype);
-	ret = ENOTSUP;
-
-	conn = (WT_CONNECTION_IMPL *)wt_conn;
-	CONNECTION_API_CALL(conn, session, add_cursor_type, config, cfg);
-	WT_UNUSED(cfg);
-
-err:	API_END_NOTFOUND_MAP(session, ret);
-}
-
-/*
  * __conn_add_collator --
  *	WT_CONNECTION->add_collator method.
  */
@@ -115,9 +88,9 @@ __conn_add_collator(WT_CONNECTION *wt_conn,
     const char *name, WT_COLLATOR *collator, const char *config)
 {
 	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
 	WT_NAMED_COLLATOR *ncoll;
 	WT_SESSION_IMPL *session;
-	int ret;
 
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 	CONNECTION_API_CALL(conn, session, add_collator, config, cfg);
@@ -132,39 +105,6 @@ __conn_add_collator(WT_CONNECTION *wt_conn,
 	__wt_spin_unlock(session, &conn->spinlock);
 	ncoll = NULL;
 err:	__wt_free(session, ncoll);
-
-	API_END_NOTFOUND_MAP(session, ret);
-}
-
-/*
- * __conn_add_compressor --
- *	WT_CONNECTION->add_compressor method.
- */
-static int
-__conn_add_compressor(WT_CONNECTION *wt_conn,
-    const char *name, WT_COMPRESSOR *compressor, const char *config)
-{
-	WT_CONNECTION_IMPL *conn;
-	WT_SESSION_IMPL *session;
-	WT_NAMED_COMPRESSOR *ncomp;
-	int ret;
-
-	WT_UNUSED(name);
-	WT_UNUSED(compressor);
-
-	conn = (WT_CONNECTION_IMPL *)wt_conn;
-	CONNECTION_API_CALL(conn, session, add_compressor, config, cfg);
-	WT_UNUSED(cfg);
-
-	WT_ERR(__wt_calloc_def(session, 1, &ncomp));
-	WT_ERR(__wt_strdup(session, name, &ncomp->name));
-	ncomp->compressor = compressor;
-
-	__wt_spin_lock(session, &conn->spinlock);
-	TAILQ_INSERT_TAIL(&conn->compqh, ncomp, q);
-	__wt_spin_unlock(session, &conn->spinlock);
-	ncomp = NULL;
-err:	__wt_free(session, ncomp);
 
 	API_END_NOTFOUND_MAP(session, ret);
 }
@@ -190,6 +130,39 @@ __conn_remove_collator(WT_CONNECTION_IMPL *conn, WT_NAMED_COLLATOR *ncoll)
 }
 
 /*
+ * __conn_add_compressor --
+ *	WT_CONNECTION->add_compressor method.
+ */
+static int
+__conn_add_compressor(WT_CONNECTION *wt_conn,
+    const char *name, WT_COMPRESSOR *compressor, const char *config)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+	WT_NAMED_COMPRESSOR *ncomp;
+	WT_SESSION_IMPL *session;
+
+	WT_UNUSED(name);
+	WT_UNUSED(compressor);
+
+	conn = (WT_CONNECTION_IMPL *)wt_conn;
+	CONNECTION_API_CALL(conn, session, add_compressor, config, cfg);
+	WT_UNUSED(cfg);
+
+	WT_ERR(__wt_calloc_def(session, 1, &ncomp));
+	WT_ERR(__wt_strdup(session, name, &ncomp->name));
+	ncomp->compressor = compressor;
+
+	__wt_spin_lock(session, &conn->spinlock);
+	TAILQ_INSERT_TAIL(&conn->compqh, ncomp, q);
+	__wt_spin_unlock(session, &conn->spinlock);
+	ncomp = NULL;
+err:	__wt_free(session, ncomp);
+
+	API_END_NOTFOUND_MAP(session, ret);
+}
+
+/*
  * __conn_remove_compressor --
  *	remove compressor added by WT_CONNECTION->add_compressor,
  *	only used internally.
@@ -210,6 +183,62 @@ __conn_remove_compressor(WT_CONNECTION_IMPL *conn, WT_NAMED_COMPRESSOR *ncomp)
 }
 
 /*
+ * __conn_add_data_source --
+ *	WT_CONNECTION->add_data_source method.
+ */
+static int
+__conn_add_data_source(WT_CONNECTION *wt_conn,
+    const char *prefix, WT_DATA_SOURCE *dsrc, const char *config)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+	WT_NAMED_DATA_SOURCE *ndsrc;
+
+	ndsrc = NULL;
+
+	conn = (WT_CONNECTION_IMPL *)wt_conn;
+	CONNECTION_API_CALL(conn, session, add_data_source, config, cfg);
+	WT_UNUSED(cfg);
+
+	WT_ERR(__wt_calloc_def(session, 1, &ndsrc));
+	WT_ERR(__wt_strdup(session, prefix, &ndsrc->prefix));
+	ndsrc->dsrc = dsrc;
+
+	/* Link onto the environment's list of data sources. */
+	__wt_spin_lock(session, &conn->spinlock);
+	TAILQ_INSERT_TAIL(&conn->dsrcqh, ndsrc, q);
+	__wt_spin_unlock(session, &conn->spinlock);
+
+	if (0) {
+err:		if (ndsrc != NULL)
+			__wt_free(session, ndsrc->prefix);
+		__wt_free(session, ndsrc);
+	}
+
+	API_END_NOTFOUND_MAP(session, ret);
+}
+
+/*
+ * __conn_remove_compressor --
+ *	remove compressor added by WT_CONNECTION->add_compressor,
+ *	only used internally.
+ */
+static void
+__conn_remove_data_source(
+    WT_CONNECTION_IMPL *conn, WT_NAMED_DATA_SOURCE *ndsrc)
+{
+	WT_SESSION_IMPL *session;
+
+	session = &conn->default_session;
+
+	/* Remove from the connection's list. */
+	TAILQ_REMOVE(&conn->dsrcqh, ndsrc, q);
+	__wt_free(session, ndsrc->prefix);
+	__wt_free(session, ndsrc);
+}
+
+/*
  * __conn_add_extractor --
  *	WT_CONNECTION->add_extractor method.
  */
@@ -218,8 +247,8 @@ __conn_add_extractor(WT_CONNECTION *wt_conn,
     const char *name, WT_EXTRACTOR *extractor, const char *config)
 {
 	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int ret;
 
 	WT_UNUSED(name);
 	WT_UNUSED(extractor);
@@ -256,13 +285,13 @@ static int
 __conn_close(WT_CONNECTION *wt_conn, const char *config)
 {
 	WT_CONNECTION_IMPL *conn;
-	WT_SESSION_IMPL *s, *session, **tp;
-	WT_SESSION *wt_session;
+	WT_DECL_RET;
 	WT_NAMED_COLLATOR *ncoll;
 	WT_NAMED_COMPRESSOR *ncomp;
-	int ret;
+	WT_NAMED_DATA_SOURCE *ndsrc;
+	WT_SESSION *wt_session;
+	WT_SESSION_IMPL *s, *session, **tp;
 
-	ret = 0;
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 
 	CONNECTION_API_CALL(conn, session, close, config, cfg);
@@ -294,6 +323,10 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 	while ((ncomp = TAILQ_FIRST(&conn->compqh)) != NULL)
 		__conn_remove_compressor(conn, ncomp);
 
+	/* Free memory for data sources */
+	while ((ndsrc = TAILQ_FIRST(&conn->dsrcqh)) != NULL)
+		__conn_remove_data_source(conn, ndsrc);
+
 	WT_TRET(__wt_connection_close(conn));
 	/* We no longer have a session, don't try to update it. */
 	session = NULL;
@@ -311,12 +344,11 @@ __conn_open_session(WT_CONNECTION *wt_conn,
     WT_SESSION **wt_sessionp)
 {
 	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session, *session_ret;
-	int ret;
 
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 	session_ret = NULL;
-	ret = 0;
 
 	CONNECTION_API_CALL(conn, session, open_session, config, cfg);
 	WT_UNUSED(cfg);
@@ -326,6 +358,296 @@ __conn_open_session(WT_CONNECTION *wt_conn,
 	*wt_sessionp = &session_ret->iface;
 
 err:	API_END_NOTFOUND_MAP(session, ret);
+}
+
+/*
+ * __conn_config --
+ *	Read in any WiredTiger_config file in the home directory.
+ */
+static int
+__conn_config(WT_CONNECTION_IMPL *conn, const char **cfg, WT_ITEM **cbufp)
+{
+	WT_DECL_RET;
+	WT_FH *fh;
+	WT_ITEM *cbuf;
+	WT_SESSION_IMPL *session;
+	off_t size;
+	uint32_t len;
+	int exist, quoted;
+	uint8_t *p, *t;
+
+	*cbufp = NULL;				/* Returned buffer */
+
+	cbuf = NULL;
+	fh = NULL;
+	session = &conn->default_session;
+
+	/* Check for an optional configuration file. */
+#define	WT_CONFIGFILE	"WiredTiger.config"
+	WT_RET(__wt_exist(session, WT_CONFIGFILE, &exist));
+	if (!exist)
+		return (0);
+
+	/* Open the configuration file. */
+	WT_RET(__wt_open(session, WT_CONFIGFILE, 0, 0, 0, &fh));
+	WT_ERR(__wt_filesize(session, fh, &size));
+	if (size == 0)
+		goto err;
+
+	/*
+	 * Sanity test: a 100KB configuration file would be insane.  (There's
+	 * no practical reason to limit the file size, but I can either limit
+	 * the file size to something rational, or I can add code to test if
+	 * the off_t size is larger than a uint32_t, which is more complicated
+	 * and a waste of time.)
+	 */
+	if (size > 100 * 1024)
+		WT_ERR_MSG(session, EFBIG, WT_CONFIGFILE);
+	len = (uint32_t)size;
+
+	/*
+	 * Copy the configuration file into memory, with a little slop, I'm not
+	 * interested in debugging off-by-ones.
+	 *
+	 * The beginning of a file is the same as if we run into an unquoted
+	 * newline character, simplify the parsing loop by pretending that's
+	 * what we're doing.
+	 */
+	WT_ERR(__wt_scr_alloc(session, len + 10,  &cbuf));
+	WT_ERR(
+	    __wt_read(session, fh, (off_t)0, len, ((uint8_t *)cbuf->mem) + 1));
+	((uint8_t *)cbuf->mem)[0] = '\n';
+	cbuf->size = len + 1;
+
+	/*
+	 * Collapse the file's lines into a single string: newline characters
+	 * are replaced with commas unless the newline is quoted or backslash
+	 * escaped.  Comment lines (an unescaped newline where the next non-
+	 * white-space character is a hash), are discarded.
+	 */
+	for (quoted = 0, p = t = cbuf->mem; len > 0;) {
+		/*
+		 * Backslash pairs pass through untouched, unless immediately
+		 * preceding a newline, in which case both the backslash and
+		 * the newline are discarded.  Backslash characters escape
+		 * quoted characters, too, that is, a backslash followed by a
+		 * quote doesn't start or end a quoted string.
+		 */
+		if (*p == '\\' && len > 1) {
+			if (p[1] != '\n') {
+				*t++ = p[0];
+				*t++ = p[1];
+			}
+			p += 2;
+			len -= 2;
+			continue;
+		}
+
+		/*
+		 * If we're in a quoted string, or starting a quoted string,
+		 * take all characters, including white-space and newlines.
+		 */
+		if (quoted || *p == '"') {
+			if (*p == '"')
+				quoted = !quoted;
+			*t++ = *p++;
+			--len;
+			continue;
+		}
+
+		/* Everything else gets taken, except for newline characters. */
+		if (*p != '\n') {
+			*t++ = *p++;
+			--len;
+			continue;
+		}
+
+		/*
+		 * Replace any newline characters with commas (and strings of
+		 * commas are safe).
+		 *
+		 * After any newline, skip to a non-white-space character; if
+		 * the next character is a hash mark, skip to the next newline.
+		 */
+		for (;;) {
+			for (*t++ = ','; --len > 0 && isspace(*++p);)
+				;
+			if (len == 0)
+				break;
+			if (*p != '#')
+				break;
+			while (--len > 0 && *++p != '\n')
+				;
+			if (len == 0)
+				break;
+		}
+	}
+	*t = '\0';
+
+#if 0
+	fprintf(stderr, "file config: {%s}\n", (char *)cbuf->data);
+	exit(0);
+#endif
+
+	/* Check the configuration string. */
+	WT_ERR(__wt_config_check(
+	    session, __wt_confchk_wiredtiger_open, cbuf->data));
+
+	/*
+	 * The configuration file falls between the default configuration and
+	 * the wiredtiger_open() configuration, overriding the defaults but not
+	 * overriding the wiredtiger_open() configuration.
+	 */
+	cfg[2] = cfg[1];
+	cfg[1] = cbuf->data;
+
+	*cbufp = cbuf;
+
+	if (0) {
+err:		if (cbuf != NULL)
+			__wt_buf_free(session, cbuf);
+	}
+	if (fh != NULL)
+		WT_TRET(__wt_close(session, fh));
+	return (ret);
+}
+
+/*
+ * __conn_home --
+ *	Set the database home directory.
+ */
+static int
+__conn_home(WT_CONNECTION_IMPL *conn, const char *home, const char **cfg)
+{
+	WT_CONFIG_ITEM cval;
+	WT_SESSION_IMPL *session;
+
+	session = &conn->default_session;
+
+	/* If the application specifies a home directory, use it. */
+	if (home != NULL)
+		goto copy;
+
+	/* If there's no WIREDTIGER_HOME environment variable, use ".". */
+	if ((home = getenv("WIREDTIGER_HOME")) == NULL) {
+		home = ".";
+		goto copy;
+	}
+
+	/*
+	 * Security stuff:
+	 *
+	 * If the "home_environment" configuration string is set, use the
+	 * environment variable for all processes.
+	 */
+	WT_RET(__wt_config_gets(session, cfg, "home_environment", &cval));
+	if (cval.val != 0)
+		goto copy;
+
+	/*
+	 * If the "home_environment_priv" configuration string is set, use the
+	 * environment variable if the process has appropriate privileges.
+	 */
+	WT_RET(__wt_config_gets(session, cfg, "home_environment_priv", &cval));
+	if (cval.val == 0)
+		WT_RET_MSG(session, WT_ERROR, "%s",
+		    "WIREDTIGER_HOME environment variable set but WiredTiger "
+		    "not configured to use that environment variable");
+
+	if (!__wt_has_priv())
+		WT_RET_MSG(session, WT_ERROR, "%s",
+		    "WIREDTIGER_HOME environment variable set but process "
+		    "lacks privileges to use that environment variable");
+
+copy:	return (__wt_strdup(session, home, &conn->home));
+}
+
+/*
+ * __conn_single --
+ *	Confirm that no other thread of control is using this database.
+ */
+static int
+__conn_single(WT_CONNECTION_IMPL *conn, const char **cfg)
+{
+	WT_CONFIG_ITEM cval;
+	WT_CONNECTION_IMPL *t;
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+	off_t size;
+	uint32_t len;
+	int created;
+	char buf[256];
+
+	session = &conn->default_session;
+
+#define	WT_FLAGFILE	"WiredTiger"
+	/*
+	 * Optionally create the wiredtiger flag file if it doesn't already
+	 * exist.  We don't actually care if we create it or not, the "am I the
+	 * only locker" tests are all that matter.
+	 */
+	WT_RET(__wt_config_gets(session, cfg, "create", &cval));
+	WT_RET(__wt_open(session,
+	    WT_FLAGFILE, cval.val == 0 ? 0 : 1, 0, 0, &conn->lock_fh));
+
+	/*
+	 * Lock a byte of the file: if we don't get the lock, some other process
+	 * is holding it, we're done.  Note the file may be zero-length length,
+	 * and that's OK, the underlying call supports acquisition of locks past
+	 * the end-of-file.
+	 */
+	if (__wt_bytelock(conn->lock_fh, (off_t)0, 1) != 0)
+		WT_ERR_MSG(session, EBUSY, "%s",
+		    "WiredTiger database is already being managed by another "
+		    "process");
+
+	/* Check to see if another thread of control has this database open. */
+	__wt_spin_lock(session, &__wt_process.spinlock);
+	TAILQ_FOREACH(t, &__wt_process.connqh, q)
+		if (t->home != NULL &&
+		    t != conn && strcmp(t->home, conn->home) == 0) {
+			ret = EBUSY;
+			break;
+		}
+	__wt_spin_unlock(session, &__wt_process.spinlock);
+	if (ret != 0)
+		WT_ERR_MSG(session, EBUSY, "%s",
+		    "WiredTiger database is already being managed by another "
+		    "thread in this process");
+
+	/*
+	 * If the size of the file is 0, we created it (or we're racing with
+	 * the thread that created it, it doesn't matter), write some bytes
+	 * into the file.  Strictly speaking, this isn't even necessary, but
+	 * zero-length files always make me nervous.
+	 */
+	WT_ERR(__wt_filesize(session, conn->lock_fh, &size));
+	if (size == 0) {
+		len = (uint32_t)snprintf(buf, sizeof(buf), "%s\n%s\n",
+		    WT_FLAGFILE, wiredtiger_version(NULL, NULL, NULL));
+		WT_ERR(__wt_write(
+		    session, conn->lock_fh, (off_t)0, (uint32_t)len, buf));
+		created = 1;
+	} else
+		created = 0;
+
+	/*
+	 * If we found a zero-length WiredTiger lock file, and eventually ended
+	 * as the database owner, return that we created the database.  (There
+	 * is a theoretical chance that another process created the WiredTiger
+	 * lock file but we won the race to add the WT_CONNECTION_IMPL structure
+	 * to the process' list.  It doesn't much matter, only one thread will
+	 * be told it created the database.)
+	 */
+	conn->is_new = created;
+
+	return (0);
+
+err:	if (conn->lock_fh != NULL) {
+		(void)__wt_close(session, conn->lock_fh);
+		conn->lock_fh = NULL;
+	}
+	return (ret);
 }
 
 /*
@@ -339,7 +661,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 {
 	static WT_CONNECTION stdc = {
 		__conn_load_extension,
-		__conn_add_cursor_type,
+		__conn_add_data_source,
 		__conn_add_collator,
 		__conn_add_compressor,
 		__conn_add_extractor,
@@ -363,6 +685,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		{ "reconcile",	WT_VERB_reconcile },
 		{ "salvage",	WT_VERB_salvage },
 		{ "verify",	WT_VERB_verify },
+		{ "snapshot",	WT_VERB_snapshot },
 		{ "write",	WT_VERB_write },
 		{ NULL, 0 }
 	}, directio_types[] = {
@@ -373,10 +696,10 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_CONFIG subconfig;
 	WT_CONFIG_ITEM cval, skey, sval;
 	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
 	WT_ITEM *cbuf, expath, exconfig;
 	WT_SESSION *wt_session;
 	WT_SESSION_IMPL *session;
-	int ret;
 	const char *cfg[] =
 	    { __wt_confdfl_wiredtiger_open, config, NULL, NULL };
 
@@ -515,14 +838,14 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	}
 
 	/*
-	 * If this is a new database, create the schema file.  This avoids
+	 * If this is a new database, create the metadata file.  This avoids
 	 * application threads racing to create it later.  We need a real
 	 * session handle for this: open one.
 	 */
 	if (conn->is_new) {
 		WT_ERR(conn->iface.open_session(&conn->iface,
 		    NULL, NULL, &wt_session));
-		WT_TRET(__wt_open_schema_table((WT_SESSION_IMPL *)wt_session));
+		WT_TRET(__wt_open_metadata((WT_SESSION_IMPL *)wt_session));
 		WT_TRET(wt_session->close(wt_session, NULL));
 		WT_ERR(ret);
 	}
@@ -542,295 +865,5 @@ err:	if (cbuf != NULL)
 	if (ret != 0 && conn != NULL)
 		__wt_connection_destroy(conn);
 
-	return (ret);
-}
-
-/*
- * __conn_home --
- *	Set the database home directory.
- */
-static int
-__conn_home(WT_CONNECTION_IMPL *conn, const char *home, const char **cfg)
-{
-	WT_CONFIG_ITEM cval;
-	WT_SESSION_IMPL *session;
-
-	session = &conn->default_session;
-
-	/* If the application specifies a home directory, use it. */
-	if (home != NULL)
-		goto copy;
-
-	/* If there's no WIREDTIGER_HOME environment variable, use ".". */
-	if ((home = getenv("WIREDTIGER_HOME")) == NULL) {
-		home = ".";
-		goto copy;
-	}
-
-	/*
-	 * Security stuff:
-	 *
-	 * If the "home_environment" configuration string is set, use the
-	 * environment variable for all processes.
-	 */
-	WT_RET(__wt_config_gets(session, cfg, "home_environment", &cval));
-	if (cval.val != 0)
-		goto copy;
-
-	/*
-	 * If the "home_environment_priv" configuration string is set, use the
-	 * environment variable if the process has appropriate privileges.
-	 */
-	WT_RET(__wt_config_gets(session, cfg, "home_environment_priv", &cval));
-	if (cval.val == 0)
-		WT_RET_MSG(session, WT_ERROR, "%s",
-		    "WIREDTIGER_HOME environment variable set but WiredTiger "
-		    "not configured to use that environment variable");
-
-	if (!__wt_has_priv())
-		WT_RET_MSG(session, WT_ERROR, "%s",
-		    "WIREDTIGER_HOME environment variable set but process "
-		    "lacks privileges to use that environment variable");
-
-copy:	return (__wt_strdup(session, home, &conn->home));
-}
-
-/*
- * __conn_single --
- *	Confirm that no other thread of control is using this database.
- */
-static int
-__conn_single(WT_CONNECTION_IMPL *conn, const char **cfg)
-{
-	WT_CONFIG_ITEM cval;
-	WT_CONNECTION_IMPL *t;
-	WT_SESSION_IMPL *session;
-	off_t size;
-	uint32_t len;
-	int created, ret;
-	char buf[256];
-
-	session = &conn->default_session;
-
-#define	WT_FLAGFILE	"WiredTiger"
-	/*
-	 * Optionally create the wiredtiger flag file if it doesn't already
-	 * exist.  We don't actually care if we create it or not, the "am I the
-	 * only locker" tests are all that matter.
-	 */
-	WT_RET(__wt_config_gets(session, cfg, "create", &cval));
-	WT_RET(__wt_open(session,
-	    WT_FLAGFILE, cval.val == 0 ? 0 : 1, 0, 0, &conn->lock_fh));
-
-	/*
-	 * Lock a byte of the file: if we don't get the lock, some other process
-	 * is holding it, we're done.  Note the file may be zero-length length,
-	 * and that's OK, the underlying call supports acquisition of locks past
-	 * the end-of-file.
-	 */
-	if (__wt_bytelock(conn->lock_fh, (off_t)0, 1) != 0)
-		WT_ERR_MSG(session, EBUSY, "%s",
-		    "WiredTiger database is already being managed by another "
-		    "process");
-
-	/* Check to see if another thread of control has this database open. */
-	ret = 0;
-	__wt_spin_lock(session, &__wt_process.spinlock);
-	TAILQ_FOREACH(t, &__wt_process.connqh, q)
-		if (t->home != NULL &&
-		    t != conn && strcmp(t->home, conn->home) == 0) {
-			ret = EBUSY;
-			break;
-		}
-	__wt_spin_unlock(session, &__wt_process.spinlock);
-	if (ret != 0)
-		WT_ERR_MSG(session, EBUSY, "%s",
-		    "WiredTiger database is already being managed by another "
-		    "thread in this process");
-
-	/*
-	 * If the size of the file is 0, we created it (or we're racing with
-	 * the thread that created it, it doesn't matter), write some bytes
-	 * into the file.  Strictly speaking, this isn't even necessary, but
-	 * zero-length files always make me nervous.
-	 */
-	WT_ERR(__wt_filesize(session, conn->lock_fh, &size));
-	if (size == 0) {
-		len = (uint32_t)snprintf(buf, sizeof(buf), "%s\n%s\n",
-		    WT_FLAGFILE, wiredtiger_version(NULL, NULL, NULL));
-		WT_ERR(__wt_write(
-		    session, conn->lock_fh, (off_t)0, (uint32_t)len, buf));
-		created = 1;
-	} else
-		created = 0;
-
-	/*
-	 * If we found a zero-length WiredTiger lock file, and eventually ended
-	 * as the database owner, return that we created the database.  (There
-	 * is a theoretical chance that another process created the WiredTiger
-	 * lock file but we won the race to add the WT_CONNECTION_IMPL structure
-	 * to the process' list.  It doesn't much matter, only one thread will
-	 * be told it created the database.)
-	 */
-	conn->is_new = created;
-
-	return (0);
-
-err:	if (conn->lock_fh != NULL) {
-		(void)__wt_close(session, conn->lock_fh);
-		conn->lock_fh = NULL;
-	}
-	return (ret);
-}
-
-/*
- * __conn_config --
- *	Read in any WiredTiger_config file in the home directory.
- */
-static int
-__conn_config(WT_CONNECTION_IMPL *conn, const char **cfg, WT_ITEM **cbufp)
-{
-	WT_ITEM *cbuf;
-	WT_FH *fh;
-	WT_SESSION_IMPL *session;
-	off_t size;
-	uint32_t len;
-	int exist, quoted, ret;
-	uint8_t *p, *t;
-
-	*cbufp = NULL;				/* Returned buffer */
-
-	cbuf = NULL;
-	fh = NULL;
-	session = &conn->default_session;
-	ret = 0;
-
-	/* Check for an optional configuration file. */
-#define	WT_CONFIGFILE	"WiredTiger.config"
-	WT_RET(__wt_exist(session, WT_CONFIGFILE, &exist));
-	if (!exist)
-		return (0);
-
-	/* Open the configuration file. */
-	WT_RET(__wt_open(session, WT_CONFIGFILE, 0, 0, 0, &fh));
-	WT_ERR(__wt_filesize(session, fh, &size));
-	if (size == 0)
-		goto err;
-
-	/*
-	 * Sanity test: a 100KB configuration file would be insane.  (There's
-	 * no practical reason to limit the file size, but I can either limit
-	 * the file size to something rational, or I can add code to test if
-	 * the off_t size is larger than a uint32_t, which is more complicated
-	 * and a waste of time.)
-	 */
-	if (size > 100 * 1024)
-		WT_ERR_MSG(session, EFBIG, WT_CONFIGFILE);
-	len = (uint32_t)size;
-
-	/*
-	 * Copy the configuration file into memory, with a little slop, I'm not
-	 * interested in debugging off-by-ones.
-	 *
-	 * The beginning of a file is the same as if we run into an unquoted
-	 * newline character, simplify the parsing loop by pretending that's
-	 * what we're doing.
-	 */
-	WT_ERR(__wt_scr_alloc(session, len + 10,  &cbuf));
-	WT_ERR(
-	    __wt_read(session, fh, (off_t)0, len, ((uint8_t *)cbuf->mem) + 1));
-	((uint8_t *)cbuf->mem)[0] = '\n';
-	cbuf->size = len + 1;
-
-	/*
-	 * Collapse the file's lines into a single string: newline characters
-	 * are replaced with commas unless the newline is quoted or backslash
-	 * escaped.  Comment lines (an unescaped newline where the next non-
-	 * white-space character is a hash), are discarded.
-	 */
-	for (quoted = 0, p = t = cbuf->mem; len > 0;) {
-		/*
-		 * Backslash pairs pass through untouched, unless immediately
-		 * preceding a newline, in which case both the backslash and
-		 * the newline are discarded.  Backslash characters escape
-		 * quoted characters, too, that is, a backslash followed by a
-		 * quote doesn't start or end a quoted string.
-		 */
-		if (*p == '\\' && len > 1) {
-			if (p[1] != '\n') {
-				*t++ = p[0];
-				*t++ = p[1];
-			}
-			p += 2;
-			len -= 2;
-			continue;
-		}
-
-		/*
-		 * If we're in a quoted string, or starting a quoted string,
-		 * take all characters, including white-space and newlines.
-		 */
-		if (quoted || *p == '"') {
-			if (*p == '"')
-				quoted = !quoted;
-			*t++ = *p++;
-			--len;
-			continue;
-		}
-
-		/* Everything else gets taken, except for newline characters. */
-		if (*p != '\n') {
-			*t++ = *p++;
-			--len;
-			continue;
-		}
-
-		/*
-		 * Replace any newline characters with commas (and strings of
-		 * commas are safe).
-		 *
-		 * After any newline, skip to a non-white-space character; if
-		 * the next character is a hash mark, skip to the next newline.
-		 */
-		for (;;) {
-			for (*t++ = ','; --len > 0 && isspace(*++p);)
-				;
-			if (len == 0)
-				break;
-			if (*p != '#')
-				break;
-			while (--len > 0 && *++p != '\n')
-				;
-			if (len == 0)
-				break;
-		}
-	}
-	*t = '\0';
-
-#if 0
-	fprintf(stderr, "file config: {%s}\n", (char *)cbuf->data);
-	exit(0);
-#endif
-
-	/* Check the configuration string. */
-	WT_ERR(__wt_config_check(
-	    session, __wt_confchk_wiredtiger_open, cbuf->data));
-
-	/*
-	 * The configuration file falls between the default configuration and
-	 * the wiredtiger_open() configuration, overriding the defaults but not
-	 * overriding the wiredtiger_open() configuration.
-	 */
-	cfg[2] = cfg[1];
-	cfg[1] = cbuf->data;
-
-	*cbufp = cbuf;
-
-	if (0) {
-err:		if (cbuf != NULL)
-			__wt_buf_free(session, cbuf);
-	}
-	if (fh != NULL)
-		WT_TRET(__wt_close(session, fh));
 	return (ret);
 }

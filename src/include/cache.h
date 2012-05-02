@@ -6,26 +6,12 @@
  */
 
 /*
- * WT_EVICT_LIST --
+ * WT_EVICT_ENTRY --
  *	Encapsulation of an eviction candidate.
  */
-struct __wt_evict_list {
-	WT_BTREE *btree;			/* File object */
-	WT_PAGE	 *page;				/* Page */
-};
-
-/*
- * WT_EVICT_REQ --
- *	Encapsulation of a eviction request.
- */
-struct __wt_evict_req {
-	WT_SESSION_IMPL *session;		/* Requesting thread */
-	WT_BTREE *btree;			/* Btree */
-	WT_PAGE *page;                          /* Single page to flush */
-
-#define	WT_EVICT_REQ_CLOSE      0x1		/* Discard pages */
-#define	WT_EVICT_REQ_PAGE       0x2		/* Force out a page */
-	uint32_t flags;
+struct __wt_evict_entry {
+	WT_BTREE *btree;			/* Enclosing btree object */
+	WT_PAGE	 *page;				/* Page to flush/evict */
 };
 
 /*
@@ -55,17 +41,27 @@ struct __wt_cache {
 	 */
 	WT_CONDVAR *evict_cond;		/* Cache eviction server mutex */
 
-	WT_SPINLOCK lru_lock;		/* Manage the eviction list. */
-
-	WT_EVICT_LIST *evict;		/* Pages being tracked for eviction */
-	WT_EVICT_LIST *evict_current;	/* Current page to be evicted */
-	size_t   evict_allocated;	/* Bytes allocated */
-	uint32_t evict_entries;		/* Total evict slots */
-
 	u_int eviction_trigger;		/* Percent to trigger eviction. */
-	u_int eviction_target;		/* Percent to end eviction. */
+	u_int eviction_target;		/* Percent to end eviction */
 
-	WT_EVICT_REQ *evict_request;	/* Eviction requests:
-					   slot available if session is NULL */
-	uint32_t max_evict_request;	/* Size of the evict request array */
+	/*
+	 * LRU eviction list information.
+	 */
+	WT_SPINLOCK	lru_lock;	/* LRU serialization */
+	WT_EVICT_ENTRY *evict;		/* LRU pages being tracked */
+	WT_EVICT_ENTRY *evict_current;	/* LRU current page to be evicted */
+	size_t   evict_allocated;	/* LRU list bytes allocated */
+	uint32_t evict_entries;		/* LRU list eviction slots */
+
+	/*
+	 * Forced-page eviction request information.
+	 */
+	WT_EVICT_ENTRY *evict_request;	/* Forced page eviction request list */
+	uint32_t max_evict_request;	/* Size of the eviction request array */
+
+	/*
+	 * Sync/flush request information.
+	 */
+	volatile uint64_t sync_request;	/* File sync requests */
+	volatile uint64_t sync_complete;/* File sync requests completed */
 };

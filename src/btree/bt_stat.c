@@ -19,8 +19,8 @@ int
 __wt_btree_stat_init(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
+	WT_DECL_RET;
 	WT_PAGE *page;
-	int ret;
 
 	btree = session->btree;
 

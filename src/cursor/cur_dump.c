@@ -51,9 +51,9 @@ __curdump_get_key(WT_CURSOR *cursor, ...)
 {
 	WT_CURSOR *child;
 	WT_CURSOR_DUMP *cdump;
+	WT_DECL_RET;
 	WT_ITEM item, *itemp;
 	WT_SESSION_IMPL *session;
-	int ret;
 	uint64_t recno;
 	va_list ap;
 
@@ -123,11 +123,11 @@ __curdump_set_key(WT_CURSOR *cursor, ...)
 {
 	WT_CURSOR_DUMP *cdump;
 	WT_CURSOR *child;
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	uint64_t recno;
 	va_list ap;
 	const char *p;
-	int ret;
 
 	cdump = (WT_CURSOR_DUMP *)cursor;
 	child = cdump->child;
@@ -168,10 +168,10 @@ __curdump_get_value(WT_CURSOR *cursor, ...)
 {
 	WT_CURSOR_DUMP *cdump;
 	WT_CURSOR *child;
+	WT_DECL_RET;
 	WT_ITEM item, *itemp;
 	WT_SESSION_IMPL *session;
 	va_list ap;
-	int ret;
 
 	cdump = (WT_CURSOR_DUMP *)cursor;
 	child = cdump->child;
@@ -204,9 +204,9 @@ __curdump_set_value(WT_CURSOR *cursor, ...)
 {
 	WT_CURSOR_DUMP *cdump;
 	WT_CURSOR *child;
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	va_list ap;
-	int ret;
 	const char *p;
 
 	cdump = (WT_CURSOR_DUMP *)cursor;
@@ -267,12 +267,11 @@ __curdump_close(WT_CURSOR *cursor)
 {
 	WT_CURSOR_DUMP *cdump;
 	WT_CURSOR *child;
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int ret;
 
 	cdump = (WT_CURSOR_DUMP *)cursor;
 	child = cdump->child;
-	ret = 0;
 
 	CURSOR_API_CALL(cursor, session, get_key, NULL);
 	if (child != NULL)

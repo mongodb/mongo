@@ -18,6 +18,7 @@ int
 __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 {
 	WT_BTREE *btree;
+	WT_DECL_RET;
 	WT_INSERT *ins, *ins_copy;
 	WT_INSERT_HEAD **inshead, *new_inshead, **new_inslist;
 	WT_ITEM *value, _value;
@@ -26,7 +27,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 	size_t ins_size, new_inshead_size, new_inslist_size, upd_size;
 	uint64_t recno;
 	u_int skipdepth;
-	int i, ret;
+	int i;
 
 	btree = cbt->btree;
 	page = cbt->page;
@@ -65,7 +66,6 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 	new_inshead = NULL;
 	new_inslist = NULL;
 	upd = NULL;
-	ret = 0;
 
 	/*
 	 * Delete, insert or update a column-store entry.
@@ -119,7 +119,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 		/* There may be no WT_INSERT list, allocate as necessary. */
 		if (*inshead == NULL) {
 			new_inshead_size = sizeof(WT_INSERT_HEAD);
-			WT_RET(__wt_calloc_def(session, 1, &new_inshead));
+			WT_ERR(__wt_calloc_def(session, 1, &new_inshead));
 			for (i = 0; i < WT_SKIP_MAXDEPTH; i++)
 				cbt->ins_stack[i] = &new_inshead->head[i];
 			cbt->ins_head = new_inshead;
@@ -184,8 +184,7 @@ err:		if (ins != NULL)
 
 /*
  * __col_insert_alloc --
- *	Column-store insert: allocate a WT_INSERT structure from the session's
- *	buffer and fill it in.
+ *	Column-store insert: allocate a WT_INSERT structure and fill it in.
  */
 static int
 __col_insert_alloc(WT_SESSION_IMPL *session,
@@ -216,15 +215,14 @@ void
 __wt_col_append_serial_func(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
-	WT_PAGE *page;
+	WT_DECL_RET;
 	WT_INSERT *ins, *new_ins, ***ins_stack;
 	WT_INSERT_HEAD **inshead, **new_inslist, *new_inshead;
+	WT_PAGE *page;
 	uint64_t recno;
 	u_int i, skipdepth;
-	int ret;
 
 	btree = session->btree;
-	ret = 0;
 
 	__wt_col_append_unpack(session, &page, &inshead, &ins_stack,
 	    &new_inslist, &new_inshead, &new_ins, &skipdepth);

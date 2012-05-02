@@ -16,8 +16,8 @@ __curbulk_insert(WT_CURSOR *cursor)
 {
 	WT_BTREE *btree;
 	WT_CURSOR_BULK *cbulk;
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int ret;
 
 	cbulk = (WT_CURSOR_BULK *)cursor;
 	btree = cbulk->cbt.btree;
@@ -40,8 +40,8 @@ __curbulk_close(WT_CURSOR *cursor)
 {
 	WT_BTREE *btree;
 	WT_CURSOR_BULK *cbulk;
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int ret;
 
 	cbulk = (WT_CURSOR_BULK *)cursor;
 	btree = cbulk->cbt.btree;

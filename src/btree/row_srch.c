@@ -88,13 +88,14 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 {
 	WT_BTREE *btree;
 	WT_CELL_UNPACK *unpack, _unpack;
+	WT_DECL_RET;
 	WT_IKEY *ikey;
 	WT_ITEM *item, _item, *srch_key;
 	WT_PAGE *page;
 	WT_REF *ref;
 	WT_ROW *rip;
 	uint32_t base, indx, limit;
-	int cmp, ret;
+	int cmp;
 	void *key;
 
 	__cursor_search_clear(cbt);

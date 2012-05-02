@@ -374,8 +374,9 @@ __wt_btcur_iterate_setup(WT_CURSOR_BTREE *cbt, int next)
 int
 __wt_btcur_next(WT_CURSOR_BTREE *cbt)
 {
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int newpage, ret;
+	int newpage;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	WT_BSTAT_INCR(session, cursor_read_next);

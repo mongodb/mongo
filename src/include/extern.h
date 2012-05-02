@@ -1,15 +1,15 @@
 /* DO NOT EDIT: automatically built by dist/s_prototypes. */
 
+extern int __wt_block_addr_to_buffer(WT_BLOCK *block,
+    uint8_t **pp,
+    off_t offset,
+    uint32_t size,
+    uint32_t cksum);
 extern int __wt_block_buffer_to_addr(WT_BLOCK *block,
     const uint8_t *p,
     off_t *offsetp,
     uint32_t *sizep,
     uint32_t *cksump);
-extern int __wt_block_addr_to_buffer(WT_BLOCK *block,
-    uint8_t **p,
-    off_t offset,
-    uint32_t size,
-    uint32_t cksum);
 extern int __wt_block_addr_valid(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     const uint8_t *addr,
@@ -19,36 +19,62 @@ extern int __wt_block_addr_string(WT_SESSION_IMPL *session,
     WT_ITEM *buf,
     const uint8_t *addr,
     uint32_t addr_size);
+extern int __wt_block_buffer_to_snapshot(WT_SESSION_IMPL *session,
+    WT_BLOCK *block,
+    const uint8_t *p,
+    WT_BLOCK_SNAPSHOT *si);
+extern int __wt_block_snapshot_to_buffer(WT_SESSION_IMPL *session,
+    WT_BLOCK *block,
+    uint8_t **pp,
+    WT_BLOCK_SNAPSHOT *si);
 extern uint32_t __wt_cksum(const void *chunk, size_t len);
+extern int __wt_block_off_remove_overlap( WT_SESSION_IMPL *session,
+    WT_EXTLIST *el,
+    off_t off,
+    off_t size);
 extern int __wt_block_alloc( WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     off_t *offp,
     off_t size);
-extern int __wt_block_free_buf(WT_SESSION_IMPL *session,
+extern int __wt_block_extend( WT_SESSION_IMPL *session,
+    WT_BLOCK *block,
+    off_t *offp,
+    off_t size);
+extern int __wt_block_free(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     const uint8_t *addr,
     uint32_t addr_size);
-extern int __wt_block_free( WT_SESSION_IMPL *session,
+extern int __wt_block_off_free( WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     off_t off,
     off_t size);
-extern int __wt_block_extlist_read(WT_SESSION_IMPL *session,
+extern int __wt_block_extlist_check( WT_SESSION_IMPL *session,
+    WT_EXTLIST *al,
+    WT_EXTLIST *bl);
+extern int __wt_block_extlist_overlap( WT_SESSION_IMPL *session,
     WT_BLOCK *block,
+    WT_BLOCK_SNAPSHOT *si);
+extern int __wt_block_extlist_merge(WT_SESSION_IMPL *session,
+    WT_EXTLIST *a,
+    WT_EXTLIST *b);
+extern int __wt_block_insert_ext( WT_SESSION_IMPL *session,
     WT_EXTLIST *el,
     off_t off,
-    uint32_t size,
-    uint32_t cksum);
-extern void __wt_block_freelist_open(WT_SESSION_IMPL *session, WT_BLOCK *block);
-extern void __wt_block_freelist_close(WT_SESSION_IMPL *session,
-    WT_BLOCK *block);
-extern int __wt_block_extlist_write(WT_SESSION_IMPL *session,
+    off_t size);
+extern int __wt_block_extlist_read( WT_SESSION_IMPL *session,
     WT_BLOCK *block,
+    WT_EXTLIST *el);
+extern int __wt_block_extlist_write( WT_SESSION_IMPL *session,
+    WT_BLOCK *block,
+    WT_EXTLIST *el);
+extern int __wt_block_extlist_truncate( WT_SESSION_IMPL *session,
+    WT_BLOCK *block,
+    WT_EXTLIST *el);
+extern void __wt_block_extlist_free(WT_SESSION_IMPL *session, WT_EXTLIST *el);
+extern void __wt_block_extlist_dump( WT_SESSION_IMPL *session,
+    const char *tag,
     WT_EXTLIST *el,
-    off_t *offp,
-    uint32_t *sizep,
-    uint32_t *cksump);
-extern void __wt_block_discard(WT_SESSION_IMPL *session, WT_BLOCK *block);
-extern void __wt_block_stat(WT_SESSION_IMPL *session, WT_BLOCK *block);
+    int show_size);
 extern int __wt_bm_addr_valid( WT_SESSION_IMPL *session,
     const uint8_t *addr,
     uint32_t addr_size);
@@ -64,8 +90,17 @@ extern int __wt_bm_open(WT_SESSION_IMPL *session,
     const char *filename,
     const char *config,
     const char *cfg[],
-    int salvage);
+    int forced_salvage);
 extern int __wt_bm_close(WT_SESSION_IMPL *session);
+extern int __wt_bm_snapshot(WT_SESSION_IMPL *session,
+    WT_ITEM *buf,
+    WT_SNAPSHOT *snap);
+extern int __wt_bm_snapshot_load(WT_SESSION_IMPL *session,
+    WT_ITEM *buf,
+    const uint8_t *addr,
+    uint32_t addr_size,
+    int readonly);
+extern int __wt_bm_snapshot_unload(WT_SESSION_IMPL *session);
 extern int __wt_bm_truncate(WT_SESSION_IMPL *session, const char *filename);
 extern int __wt_bm_free(WT_SESSION_IMPL *session,
     const uint8_t *addr,
@@ -74,7 +109,6 @@ extern int __wt_bm_read(WT_SESSION_IMPL *session,
     WT_ITEM *buf,
     const uint8_t *addr,
     uint32_t addr_size);
-extern int __wt_bm_block_header(WT_SESSION_IMPL *session, uint32_t *headerp);
 extern int __wt_bm_write_size(WT_SESSION_IMPL *session, uint32_t *sizep);
 extern int __wt_bm_write( WT_SESSION_IMPL *session,
     WT_ITEM *buf,
@@ -88,8 +122,9 @@ extern int __wt_bm_salvage_next(WT_SESSION_IMPL *session,
     uint32_t *addr_sizep,
     uint64_t *write_genp,
     int *eofp);
-extern int __wt_bm_salvage_end(WT_SESSION_IMPL *session, int success);
-extern int __wt_bm_verify_start(WT_SESSION_IMPL *session, int *emptyp);
+extern int __wt_bm_salvage_end(WT_SESSION_IMPL *session);
+extern int __wt_bm_verify_start(WT_SESSION_IMPL *session,
+    WT_SNAPSHOT *snapbase);
 extern int __wt_bm_verify_end(WT_SESSION_IMPL *session);
 extern int __wt_bm_verify_addr(WT_SESSION_IMPL *session,
     const uint8_t *addr,
@@ -100,25 +135,24 @@ extern int __wt_block_open(WT_SESSION_IMPL *session,
     const char *filename,
     const char *config,
     const char *cfg[],
-    int salvage,
-    void *retp);
+    int forced_salvage,
+    void *blockp);
 extern int __wt_block_close(WT_SESSION_IMPL *session, WT_BLOCK *block);
 extern int __wt_desc_init(WT_SESSION_IMPL *session, WT_FH *fh);
-extern int __wt_block_read_buf(WT_SESSION_IMPL *session,
+extern void __wt_block_stat(WT_SESSION_IMPL *session, WT_BLOCK *block);
+extern int __wt_block_read(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     WT_ITEM *buf,
     const uint8_t *addr,
     uint32_t addr_size);
-extern int __wt_block_read(WT_SESSION_IMPL *session,
+extern int __wt_block_read_off(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     WT_ITEM *buf,
     off_t offset,
     uint32_t size,
     uint32_t cksum);
 extern int __wt_block_salvage_start(WT_SESSION_IMPL *session, WT_BLOCK *block);
-extern int __wt_block_salvage_end(WT_SESSION_IMPL *session,
-    WT_BLOCK *block,
-    int success);
+extern int __wt_block_salvage_end(WT_SESSION_IMPL *session, WT_BLOCK *block);
 extern int __wt_block_salvage_next( WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     WT_ITEM *buf,
@@ -126,31 +160,59 @@ extern int __wt_block_salvage_next( WT_SESSION_IMPL *session,
     uint32_t *addr_sizep,
     uint64_t *write_genp,
     int *eofp);
-extern int __wt_block_verify_start(WT_SESSION_IMPL *session,
+extern int __wt_block_snap_init(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
-    int *emptyp);
+    WT_BLOCK_SNAPSHOT *si,
+    int is_live);
+extern int __wt_block_snapshot_load(WT_SESSION_IMPL *session,
+    WT_BLOCK *block,
+    WT_ITEM *dsk,
+    const uint8_t *addr,
+    uint32_t addr_size,
+    int readonly);
+extern int __wt_block_snapshot_unload(WT_SESSION_IMPL *session,
+    WT_BLOCK *block);
+extern int __wt_block_snapshot(WT_SESSION_IMPL *session,
+    WT_BLOCK *block,
+    WT_ITEM *buf,
+    WT_SNAPSHOT *snapbase);
+extern int __wt_block_verify_start( WT_SESSION_IMPL *session,
+    WT_BLOCK *block,
+    WT_SNAPSHOT *snapbase);
 extern int __wt_block_verify_end(WT_SESSION_IMPL *session, WT_BLOCK *block);
+extern int __wt_verify_snap_load( WT_SESSION_IMPL *session,
+    WT_BLOCK *block,
+    WT_BLOCK_SNAPSHOT *si);
+extern int __wt_verify_snap_unload( WT_SESSION_IMPL *session,
+    WT_BLOCK *block,
+    WT_BLOCK_SNAPSHOT *si);
+extern int __wt_block_verify(WT_SESSION_IMPL *session,
+    WT_BLOCK *block,
+    WT_ITEM *buf,
+    const uint8_t *addr,
+    uint32_t addr_size,
+    off_t offset,
+    uint32_t size);
 extern int __wt_block_verify_addr(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     const uint8_t *addr,
     uint32_t addr_size);
-extern int __wt_block_header(WT_SESSION_IMPL *session,
-    WT_BLOCK *block,
-    uint32_t *headerp);
+extern u_int __wt_block_header(WT_SESSION_IMPL *session);
 extern int __wt_block_write_size( WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     uint32_t *sizep);
-extern int __wt_block_write_buf(WT_SESSION_IMPL *session,
+extern int __wt_block_write(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     WT_ITEM *buf,
     uint8_t *addr,
     uint32_t *addr_size);
-extern int __wt_block_write(WT_SESSION_IMPL *session,
+extern int __wt_block_write_off(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     WT_ITEM *buf,
     off_t *offsetp,
     uint32_t *sizep,
-    uint32_t *cksump);
+    uint32_t *cksump,
+    int force_extend);
 extern int __wt_bulk_init(WT_CURSOR_BULK *cbulk);
 extern int __wt_bulk_insert(WT_CURSOR_BULK *cbulk);
 extern int __wt_bulk_end(WT_CURSOR_BULK *cbulk);
@@ -190,11 +252,11 @@ extern int __wt_debug_page(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     const char *ofile);
 extern void __wt_page_out(WT_SESSION_IMPL *session,
-    WT_PAGE *page,
+    WT_PAGE **pagep,
     uint32_t flags);
-extern void __wt_evict_clr_page(WT_SESSION_IMPL *session, WT_PAGE *page);
+extern void __wt_evict_list_clr_page(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern void __wt_evict_server_wake(WT_SESSION_IMPL *session);
-extern void __wt_evict_file_serial_func(WT_SESSION_IMPL *session);
+extern void __wt_sync_file_serial_func(WT_SESSION_IMPL *session);
 extern int __wt_evict_page_request(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern void *__wt_cache_evict_server(void *arg);
 extern int __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app);
@@ -202,9 +264,11 @@ extern int __wt_btree_create(WT_SESSION_IMPL *session, const char *filename);
 extern int __wt_btree_truncate(WT_SESSION_IMPL *session, const char *filename);
 extern int __wt_btree_open(WT_SESSION_IMPL *session,
     const char *cfg[],
-    uint32_t flags);
+    const uint8_t *addr,
+    uint32_t addr_size,
+    int readonly);
 extern int __wt_btree_close(WT_SESSION_IMPL *session);
-extern int __wt_btree_root_init(WT_SESSION_IMPL *session, WT_ITEM *addr);
+extern int __wt_btree_tree_open(WT_SESSION_IMPL *session, WT_ITEM *dsk);
 extern int __wt_btree_root_empty(WT_SESSION_IMPL *session, WT_PAGE **leafp);
 extern int __wt_btree_huffman_open(WT_SESSION_IMPL *session,
     const char *config);
@@ -233,7 +297,6 @@ extern int __wt_page_inmem(WT_SESSION_IMPL *session,
     WT_PAGE *parent,
     WT_REF *parent_ref,
     WT_PAGE_HEADER *dsk,
-    size_t *inmem_sizep,
     WT_PAGE **pagep);
 extern int __wt_cache_read(WT_SESSION_IMPL *session,
     WT_PAGE *parent,
@@ -243,14 +306,17 @@ extern int __wt_kv_return(WT_SESSION_IMPL *session,
     int key_ret);
 extern int __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_btree_stat_init(WT_SESSION_IMPL *session);
-extern int __wt_btree_sync(WT_SESSION_IMPL *session, const char *cfg[]);
+extern int __wt_btree_snapshot(WT_SESSION_IMPL *session, const char *cfg[]);
+extern int __wt_btree_snapshot_close(WT_SESSION_IMPL *session);
+extern int __wt_btree_snapshot_drop(WT_SESSION_IMPL *session,
+    const char *cfg[]);
+extern int __wt_cache_flush(WT_SESSION_IMPL *session, int op);
 extern int __wt_upgrade(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_verify(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_dumpfile(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_verify_dsk(WT_SESSION_IMPL *session,
     const char *addr,
-    WT_PAGE_HEADER *dsk,
-    uint32_t size);
+    WT_ITEM *buf);
 extern int __wt_tree_np(WT_SESSION_IMPL *session,
     WT_PAGE **pagep,
     int eviction,
@@ -266,26 +332,30 @@ extern int __wt_rec_evict(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     uint32_t flags);
 extern int __wt_rec_track_block(WT_SESSION_IMPL *session,
-    __wt_pt_type_t type,
     WT_PAGE *page,
     const uint8_t *addr,
-    uint32_t size);
+    uint32_t size,
+    int permanent);
 extern int __wt_rec_track_ovfl(WT_SESSION_IMPL *session,
     WT_PAGE *page,
-    uint8_t *addr,
+    const uint8_t *addr,
     uint32_t addr_size,
     const void *data,
-    uint32_t data_size);
+    uint32_t data_size,
+    uint32_t flags);
 extern int __wt_rec_track_ovfl_reuse(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     const void *data,
     uint32_t size,
     uint8_t **addrp,
     uint32_t *sizep);
-extern int __wt_rec_track_init(WT_SESSION_IMPL *session, WT_PAGE *page);
-extern int __wt_rec_track_wrapup(WT_SESSION_IMPL *session,
+extern int __wt_rec_track_ovfl_srch(WT_SESSION_IMPL *session,
     WT_PAGE *page,
-    int final);
+    const uint8_t *addr,
+    uint32_t size,
+    WT_ITEM *copy);
+extern int __wt_rec_track_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page);
+extern void __wt_rec_track_discard(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_rec_write( WT_SESSION_IMPL *session,
     WT_PAGE *page,
     WT_SALVAGE_COOKIE *salvage);
@@ -305,7 +375,7 @@ extern int __wt_row_ikey_alloc(WT_SESSION_IMPL *session,
     uint32_t cell_offset,
     const void *key,
     uint32_t size,
-    WT_IKEY **ikeyp);
+    void *ikeyp);
 extern void __wt_row_key_serial_func(WT_SESSION_IMPL *session);
 extern int __wt_row_modify(WT_SESSION_IMPL *session,
     WT_CURSOR_BTREE *cbt,
@@ -384,8 +454,8 @@ extern const char *__wt_confdfl_connection_add_collator;
 extern const char *__wt_confchk_connection_add_collator;
 extern const char *__wt_confdfl_connection_add_compressor;
 extern const char *__wt_confchk_connection_add_compressor;
-extern const char *__wt_confdfl_connection_add_cursor_type;
-extern const char *__wt_confchk_connection_add_cursor_type;
+extern const char *__wt_confdfl_connection_add_data_source;
+extern const char *__wt_confchk_connection_add_data_source;
 extern const char *__wt_confdfl_connection_add_extractor;
 extern const char *__wt_confchk_connection_add_extractor;
 extern const char *__wt_confdfl_connection_close;
@@ -438,7 +508,6 @@ extern const char *__wt_confdfl_wiredtiger_open;
 extern const char *__wt_confchk_wiredtiger_open;
 extern int __wt_conn_btree_open(WT_SESSION_IMPL *session,
     const char *name,
-    const char *filename,
     const char *config,
     const char *cfg[],
     uint32_t flags);
@@ -512,6 +581,44 @@ extern int __wt_log_printf(WT_SESSION_IMPL *session,
     2,
     3)));
 extern WT_LOGREC_DESC __wt_logdesc_debug;
+extern int __wt_snaplist_get( WT_SESSION *session,
+    const char *config,
+    WT_SNAPSHOT **snapbasep);
+extern void __wt_snaplist_free(WT_SESSION *session, WT_SNAPSHOT *snapbase);
+extern int __wt_snapshot_get(WT_SESSION_IMPL *session,
+    const char *name,
+    WT_ITEM *addr);
+extern int __wt_snapshot_clear(WT_SESSION_IMPL *session, const char *uri);
+extern int __wt_snapshot_list_get( WT_SESSION_IMPL *session,
+    const char *config_arg,
+    WT_SNAPSHOT **snapbasep);
+extern int __wt_snapshot_list_set(WT_SESSION_IMPL *session,
+    WT_SNAPSHOT *snapbase);
+extern void __wt_snapshot_list_free(WT_SESSION_IMPL *session,
+    WT_SNAPSHOT *snapbase);
+extern int __wt_open_metadata(WT_SESSION_IMPL *session);
+extern int __wt_metadata_cursor( WT_SESSION_IMPL *session,
+    const char *config,
+    WT_CURSOR **cursorp);
+extern int __wt_metadata_insert( WT_SESSION_IMPL *session,
+    const char *key,
+    const char *value);
+extern int __wt_metadata_update( WT_SESSION_IMPL *session,
+    const char *key,
+    const char *value);
+extern int __wt_metadata_remove(WT_SESSION_IMPL *session, const char *key);
+extern int __wt_metadata_read( WT_SESSION_IMPL *session,
+    const char *key,
+    const char **valuep);
+extern void __wt_meta_track_discard(WT_SESSION_IMPL *session);
+extern int __wt_meta_track_on(WT_SESSION_IMPL *session);
+extern int __wt_meta_track_off(WT_SESSION_IMPL *session, int unroll);
+extern int __wt_meta_track_insert(WT_SESSION_IMPL *session, const char *key);
+extern int __wt_meta_track_update(WT_SESSION_IMPL *session, const char *key);
+extern int __wt_meta_track_fileop( WT_SESSION_IMPL *session,
+    const char *olduri,
+    const char *newuri);
+extern int __wt_meta_track_handle_lock(WT_SESSION_IMPL *session);
 extern void __wt_abort(WT_SESSION_IMPL *session);
 extern int __wt_calloc(WT_SESSION_IMPL *session,
     size_t number,
@@ -589,7 +696,9 @@ extern int __wt_thread_create(pthread_t *tidret,
     void *(*func)(void *),
     void *arg);
 extern int __wt_thread_join(pthread_t tid);
-extern int __wt_epoch(WT_SESSION_IMPL *session, time_t *secp, long *nsecp);
+extern int __wt_epoch(WT_SESSION_IMPL *session,
+    uint64_t *secp,
+    uint64_t *nsecp);
 extern void __wt_yield(void);
 extern int __wt_struct_check(WT_SESSION_IMPL *session,
     const char *fmt,
@@ -622,7 +731,6 @@ extern int __wt_struct_unpack(WT_SESSION_IMPL *session,
     ...);
 extern int __wt_create_file(WT_SESSION_IMPL *session,
     const char *name,
-    const char *fileuri,
     int exclusive,
     const char *config);
 extern int __wt_schema_create( WT_SESSION_IMPL *session,
@@ -649,7 +757,7 @@ extern int __wt_schema_colgroup_name(WT_SESSION_IMPL *session,
     WT_TABLE *table,
     const char *cgname,
     size_t len,
-    char **namebufp);
+    WT_ITEM *namebuf);
 extern int __wt_schema_get_btree(WT_SESSION_IMPL *session,
     const char *objname,
     size_t len,
@@ -712,32 +820,12 @@ extern int __wt_schema_rename(WT_SESSION_IMPL *session,
     const char *uri,
     const char *newuri,
     const char *cfg[]);
-extern int __wt_open_schema_table(WT_SESSION_IMPL *session);
-extern int __wt_schema_table_cursor( WT_SESSION_IMPL *session,
-    const char *config,
-    WT_CURSOR **cursorp);
-extern int __wt_schema_table_insert( WT_SESSION_IMPL *session,
-    const char *key,
-    const char *value);
-extern int __wt_schema_table_update( WT_SESSION_IMPL *session,
-    const char *key,
-    const char *value);
-extern int __wt_schema_table_remove(WT_SESSION_IMPL *session, const char *key);
-extern int __wt_schema_table_read( WT_SESSION_IMPL *session,
-    const char *key,
-    const char **valuep);
-extern int __wt_schema_table_track_on(WT_SESSION_IMPL *session);
-extern int __wt_schema_table_track_off(WT_SESSION_IMPL *session, int unroll);
-extern int __wt_schema_table_track_insert(WT_SESSION_IMPL *session,
-    const char *key);
-extern int __wt_schema_table_track_update(WT_SESSION_IMPL *session,
-    const char *key);
-extern int __wt_schema_table_track_fileop( WT_SESSION_IMPL *session,
-    const char *oldname,
-    const char *newname);
 extern int __wt_schema_truncate( WT_SESSION_IMPL *session,
     const char *uri,
     const char *cfg[]);
+extern int __wt_schema_get_source( WT_SESSION_IMPL *session,
+    const char *name,
+    WT_DATA_SOURCE **dsrcp);
 extern int __wt_schema_name_check(WT_SESSION_IMPL *session, const char *uri);
 extern int __wt_schema_worker(WT_SESSION_IMPL *session,
     const char *uri,
@@ -760,29 +848,19 @@ extern int __wt_session_lock_btree( WT_SESSION_IMPL *session,
     const char *cfg[],
     uint32_t flags);
 extern int __wt_session_release_btree(WT_SESSION_IMPL *session);
-extern int __wt_session_find_btree(WT_SESSION_IMPL *session,
-    const char *filename,
-    size_t namelen,
-    const char *cfg[],
-    uint32_t flags,
-    WT_BTREE_SESSION **btree_sessionp);
 extern int __wt_session_get_btree(WT_SESSION_IMPL *session,
-    const char *name,
-    const char *fileuri,
+    const char *uri,
     const char *tconfig,
     const char *cfg[],
+    uint32_t flags);
+extern int __wt_session_lock_snapshot( WT_SESSION_IMPL *session,
+    const char *snapshot,
     uint32_t flags);
 extern int __wt_session_remove_btree( WT_SESSION_IMPL *session,
     WT_BTREE_SESSION *btree_session,
     int locked);
 extern int __wt_session_close_any_open_btree(WT_SESSION_IMPL *session,
     const char *name);
-extern int __wt_btree_get_root(WT_SESSION_IMPL *session, WT_ITEM *addr);
-extern int __wt_btree_free_root(WT_SESSION_IMPL *session);
-extern int __wt_btree_set_root(WT_SESSION_IMPL *session,
-    const char *filename,
-    const uint8_t *addr,
-    uint32_t size);
 extern void __wt_eventv(WT_SESSION_IMPL *session,
     int msg_event,
     int error,
@@ -837,16 +915,20 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref
 extern void __wt_hazard_clear(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern void __wt_hazard_empty(WT_SESSION_IMPL *session);
 extern void __wt_hazard_validate(WT_SESSION_IMPL *session, WT_PAGE *page);
-extern int __wt_raw_to_hex(WT_SESSION_IMPL *session,
+extern int __wt_raw_to_hex( WT_SESSION_IMPL *session,
     const uint8_t *from,
     uint32_t size,
     WT_ITEM *to);
-extern int __wt_raw_to_esc_hex(WT_SESSION_IMPL *session,
+extern int __wt_raw_to_esc_hex( WT_SESSION_IMPL *session,
     const uint8_t *from,
     size_t size,
     WT_ITEM *to);
 extern int __wt_hex_to_raw(WT_SESSION_IMPL *session,
     const char *from,
+    WT_ITEM *to);
+extern int __wt_nhex_to_raw( WT_SESSION_IMPL *session,
+    const char *from,
+    size_t size,
     WT_ITEM *to);
 extern int __wt_esc_hex_to_raw(WT_SESSION_IMPL *session,
     const char *from,

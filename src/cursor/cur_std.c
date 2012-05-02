@@ -26,8 +26,8 @@ __wt_cursor_notsup(WT_CURSOR *cursor)
 int
 __wt_cursor_get_key(WT_CURSOR *cursor, ...)
 {
+	WT_DECL_RET;
 	va_list ap;
-	int ret;
 
 	va_start(ap, cursor);
 	ret = __wt_cursor_get_keyv(cursor, cursor->flags, ap);
@@ -42,10 +42,10 @@ __wt_cursor_get_key(WT_CURSOR *cursor, ...)
 int
 __wt_cursor_get_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 {
+	WT_DECL_RET;
 	WT_ITEM *key;
 	WT_SESSION_IMPL *session;
 	const char *fmt;
-	int ret;
 
 	CURSOR_API_CALL(cursor, session, get_key, NULL);
 	WT_CURSOR_NEEDKEY(cursor);
@@ -80,10 +80,10 @@ err:	API_END(session);
 int
 __wt_cursor_get_value(WT_CURSOR *cursor, ...)
 {
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	const char *fmt;
 	va_list ap;
-	int ret;
 
 	CURSOR_API_CALL(cursor, session, get_value, NULL);
 	WT_CURSOR_NEEDVALUE(cursor);
@@ -121,12 +121,12 @@ __wt_cursor_set_key(WT_CURSOR *cursor, ...)
 void
 __wt_cursor_set_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 {
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	WT_ITEM *buf, *item;
 	va_list ap_copy;
 	const char *fmt, *str;
 	size_t sz;
-	int ret;
 
 	CURSOR_API_CALL(cursor, session, set_key, NULL);
 
@@ -192,12 +192,12 @@ err:		cursor->saved_err = ret;
 void
 __wt_cursor_set_value(WT_CURSOR *cursor, ...)
 {
-	WT_SESSION_IMPL *session;
+	WT_DECL_RET;
 	WT_ITEM *buf, *item;
+	WT_SESSION_IMPL *session;
 	const char *fmt, *str;
 	size_t sz;
 	va_list ap;
-	int ret;
 
 	CURSOR_API_CALL(cursor, session, set_value, NULL);
 
@@ -255,8 +255,8 @@ __cursor_search(WT_CURSOR *cursor)
 static int
 __cursor_equals(WT_CURSOR *cursor, WT_CURSOR *other)
 {
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int ret;
 
 	CURSOR_API_CALL(cursor, session, equals, NULL);
 
@@ -285,8 +285,8 @@ done:	API_END(session);
 int
 __wt_cursor_close(WT_CURSOR *cursor)
 {
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int ret;
 
 	CURSOR_API_CALL(cursor, session, close, NULL);
 
@@ -312,10 +312,10 @@ __wt_cursor_dup(WT_SESSION_IMPL *session,
     WT_CURSOR *to_dup, const char *config, WT_CURSOR **cursorp)
 {
 	WT_CURSOR *cursor;
-	WT_SESSION *wt_session;
+	WT_DECL_RET;
 	WT_ITEM key;
+	WT_SESSION *wt_session;
 	uint32_t saved_flags;
-	int ret;
 
 	wt_session = &session->iface;
 
@@ -414,13 +414,21 @@ __wt_cursor_init(WT_CURSOR *cursor,
 	} else
 		cdump = NULL;
 
+	WT_RET(__wt_config_gets(session, cfg, "overwrite", &cval));
+	if (cval.val != 0)
+		F_SET(cursor, WT_CURSTD_OVERWRITE);
+
 	WT_RET(__wt_config_gets(session, cfg, "raw", &cval));
 	if (cval.val != 0)
 		F_SET(cursor, WT_CURSTD_RAW);
 
-	WT_RET(__wt_config_gets(session, cfg, "overwrite", &cval));
-	if (cval.val != 0)
-		F_SET(cursor, WT_CURSTD_OVERWRITE);
+	/* Snapshot cursors are read-only. */
+	WT_RET(__wt_config_gets(session, cfg, "snapshot", &cval));
+	if (cval.len != 0) {
+		cursor->insert = (int (*)(WT_CURSOR *))__wt_cursor_notsup;
+		cursor->update = (int (*)(WT_CURSOR *))__wt_cursor_notsup;
+		cursor->remove = (int (*)(WT_CURSOR *))__wt_cursor_notsup;
+	}
 
 	/*
 	 * Cursors that are internal to some other cursor (such as file cursors

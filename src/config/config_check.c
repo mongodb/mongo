@@ -21,7 +21,8 @@ __wt_config_check(WT_SESSION_IMPL *session,
 {
 	WT_CONFIG parser, cparser, sparser;
 	WT_CONFIG_ITEM k, v, chk, ck, cv, dummy;
-	int found, ret;
+	WT_DECL_RET;
+	int found;
 
 	/* It is always okay to pass NULL. */
 	if (config == NULL)

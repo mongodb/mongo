@@ -32,6 +32,14 @@
 #define	WT_BTREE_MAX_OBJECT_SIZE	(UINT32_MAX - 512)
 
 /*
+ * A location in a file is a variable-length cookie, but it has a maximum size
+ * so it's easy to create temporary space in which to store them.  (Locations
+ * can't be much larger than this anyway, they must fit onto the minimum size
+ * page because a reference to an overflow page is itself a location.)
+ */
+#define	WT_BTREE_MAX_ADDR_COOKIE	255	/* Maximum address cookie */
+
+/*
  * Split page size calculation -- we don't want to repeatedly split every time
  * a new entry is added, so we split to a smaller-than-maximum page size.
  */
@@ -62,9 +70,10 @@ struct __wt_btree {
 
 	volatile uint32_t lru_count;	/* Count of threads in LRU eviction. */
 
-	const char *name;		/* Logical name */
-	const char *filename;		/* File name */
+	const char *name;		/* Object name as a URI */
 	const char *config;		/* Configuration string */
+	const char *filename;		/* File name */
+	const char *snapshot;		/* Snapshot name (or NULL) */
 
 	enum {	BTREE_COL_FIX=1,	/* Fixed-length column store */
 		BTREE_COL_VAR=2,	/* Variable-length column store */
@@ -95,10 +104,9 @@ struct __wt_btree {
 	uint64_t last_recno;		/* Column-store last record number */
 
 	WT_PAGE *root_page;		/* Root page */
-	WT_ADDR  root_addr;		/* Replacement root address */
-	int	 root_update;		/* 0: free original root blocks
-					   1: free saved root blocks and
-					      update on close */
+
+	WT_RWLOCK   *snaplock;		/* Lock for snapshot creation */
+	WT_SNAPSHOT *snap;		/* Snapshot information */
 
 	void *block;			/* Block manager */
 	u_int block_header;		/* Block manager header length */
@@ -107,13 +115,15 @@ struct __wt_btree {
 
 	WT_BTREE_STATS *stats;		/* Btree statistics */
 
-#define	WT_BTREE_BULK		0x01	/* Bulk-load handle */
-#define	WT_BTREE_EXCLUSIVE	0x02	/* Need exclusive access to handle */
-#define	WT_BTREE_NO_LOCK	0x04	/* Do not lock the handle */
-#define	WT_BTREE_OPEN		0x08	/* Handle is open */
-#define	WT_BTREE_SALVAGE	0x10	/* Handle is for salvage */
-#define	WT_BTREE_UPGRADE	0x20	/* Handle is for upgrade */
-#define	WT_BTREE_VERIFY		0x40	/* Handle is for verify */
+#define	WT_BTREE_BULK		0x001	/* Bulk-load handle */
+#define	WT_BTREE_EXCLUSIVE	0x002	/* Need exclusive access to handle */
+#define	WT_BTREE_NO_LOCK	0x004	/* Do not lock the handle */
+#define	WT_BTREE_LOCK_ONLY	0x008	/* Handle is only needed for locking */
+#define	WT_BTREE_OPEN		0x010	/* Handle is open */
+#define	WT_BTREE_SALVAGE	0x020	/* Handle is for salvage */
+#define	WT_BTREE_SNAPSHOT_OP	0x040	/* Handle is for a snapshot operation */
+#define	WT_BTREE_UPGRADE	0x080	/* Handle is for upgrade */
+#define	WT_BTREE_VERIFY		0x100	/* Handle is for verify */
 	uint32_t flags;
 };
 
@@ -139,4 +149,33 @@ struct __wt_salvage_cookie {
 	uint64_t take;				/* Items to take */
 
 	int	 done;				/* Ignore the rest */
+};
+
+/*
+ * WT_SNAPSHOT --
+ *	Encapsulation of snapshot information, shared with the block manager.
+ */
+#define	WT_INTERNAL_SNAPSHOT	"WiredTigerInternalSnapshot"
+#define	WT_SNAPSHOT_FOREACH(snapbase, snap)				\
+	for ((snap) = (snapbase); (snap)->name != NULL; ++(snap))
+
+struct __wt_snapshot {
+	char	*name;				/* Name or NULL */
+
+	WT_ITEM  addr;				/* Snapshot cookie string */
+	WT_ITEM  raw;				/* Snapshot cookie raw */
+
+	int64_t	 order;				/* Snapshot order */
+
+	uint64_t sec;				/* Timestamp */
+	uint64_t nsec;
+
+	uint64_t snapshot_size;			/* Snapshot size */
+
+	void	*bpriv;				/* Block manager's private */
+
+#define	WT_SNAP_ADD	0x01			/* Snapshot to be added */
+#define	WT_SNAP_DELETE	0x02			/* Snapshot to be deleted */
+#define	WT_SNAP_UPDATE	0x04			/* Snapshot requires update */
+	uint32_t flags;
 };

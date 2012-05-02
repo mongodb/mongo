@@ -16,13 +16,13 @@ __wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 {
 	WT_BTREE *btree;
 	WT_COL *cip;
+	WT_DECL_RET;
 	WT_INSERT *ins;
 	WT_INSERT_HEAD *ins_head;
 	WT_PAGE *page;
 	WT_REF *ref;
 	uint64_t recno;
 	uint32_t base, indx, limit;
-	int ret;
 
 	__cursor_search_clear(cbt);
 

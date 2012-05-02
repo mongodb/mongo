@@ -296,17 +296,16 @@ __wt_huffman_open(WT_SESSION_IMPL *session,
 {
 	INDEXED_SYMBOL *indexed_freqs, *sym;
 	NODE_QUEUE *combined_nodes, *leaves;
+	WT_DECL_RET;
 	WT_FREQTREE_NODE *node, *node2, **refnode, *tempnode;
 	WT_HUFFMAN_OBJ *huffman;
 	uint64_t w1, w2;
 	uint16_t i;
-	int ret;
 
 	indexed_freqs = symbol_frequency_array;
 
 	combined_nodes = leaves = NULL;
 	node = node2 = tempnode = NULL;
-	ret = 0;
 
 	WT_RET(__wt_calloc_def(session, 1, &huffman));
 
@@ -590,6 +589,7 @@ int
 __wt_huffman_encode(WT_SESSION_IMPL *session, void *huffman_arg,
     const uint8_t *from_arg, uint32_t from_len, WT_ITEM *to_buf)
 {
+	WT_DECL_RET;
 	WT_HUFFMAN_CODE code;
 	WT_HUFFMAN_OBJ *huffman;
 	WT_ITEM *tmp;
@@ -597,7 +597,6 @@ __wt_huffman_encode(WT_SESSION_IMPL *session, void *huffman_arg,
 	uint32_t max_len, outlen, bytes;
 	const uint8_t *from;
 	uint8_t len, *out, padding_info, symbol;
-	int ret;
 
 	/*
 	 * Shift register to accumulate bits from input.
@@ -612,7 +611,6 @@ __wt_huffman_encode(WT_SESSION_IMPL *session, void *huffman_arg,
 	huffman = huffman_arg;
 	from = from_arg;
 	tmp = NULL;
-	ret = 0;
 
 	/*
 	 * We don't want to find all of our callers and ensure they don't pass
@@ -729,6 +727,7 @@ int
 __wt_huffman_decode(WT_SESSION_IMPL *session, void *huffman_arg,
     const uint8_t *from_arg, uint32_t from_len, WT_ITEM *to_buf)
 {
+	WT_DECL_RET;
 	WT_ITEM *tmp;
 	WT_HUFFMAN_OBJ *huffman;
 	uint64_t from_len_bits;
@@ -736,12 +735,10 @@ __wt_huffman_decode(WT_SESSION_IMPL *session, void *huffman_arg,
 	uint16_t pattern;
 	const uint8_t *from;
 	uint8_t padding_info, symbol, *to, valid;
-	int ret;
 
 	huffman = huffman_arg;
 	from = from_arg;
 	tmp = NULL;
-	ret = 0;
 
 	/*
 	 * We don't want to find all of our callers and ensure they don't pass

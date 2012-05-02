@@ -37,6 +37,7 @@ To build the WiredTiger software on a POSIX-like system, change directory to
 the top-level directory, then configure and build the software:
 
 @code
+cd wiredtiger
 ./configure && make
 @endcode
 

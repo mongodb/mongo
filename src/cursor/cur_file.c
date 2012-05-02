@@ -15,8 +15,8 @@ static int
 __curfile_next(WT_CURSOR *cursor)
 {
 	WT_CURSOR_BTREE *cbt;
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int ret;
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL(cursor, session, next, cbt->btree);
@@ -34,8 +34,8 @@ static int
 __curfile_prev(WT_CURSOR *cursor)
 {
 	WT_CURSOR_BTREE *cbt;
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int ret;
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL(cursor, session, prev, cbt->btree);
@@ -53,8 +53,8 @@ static int
 __curfile_reset(WT_CURSOR *cursor)
 {
 	WT_CURSOR_BTREE *cbt;
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int ret;
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL(cursor, session, reset, cbt->btree);
@@ -72,8 +72,8 @@ static int
 __curfile_search(WT_CURSOR *cursor)
 {
 	WT_CURSOR_BTREE *cbt;
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int ret;
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL(cursor, session, search, cbt->btree);
@@ -92,8 +92,8 @@ static int
 __curfile_search_near(WT_CURSOR *cursor, int *exact)
 {
 	WT_CURSOR_BTREE *cbt;
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int ret;
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL(cursor, session, search_near, cbt->btree);
@@ -112,8 +112,8 @@ static int
 __curfile_insert(WT_CURSOR *cursor)
 {
 	WT_CURSOR_BTREE *cbt;
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int ret;
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL(cursor, session, insert, cbt->btree);
@@ -134,8 +134,8 @@ static int
 __curfile_update(WT_CURSOR *cursor)
 {
 	WT_CURSOR_BTREE *cbt;
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int ret;
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL(cursor, session, update, cbt->btree);
@@ -155,8 +155,8 @@ static int
 __curfile_remove(WT_CURSOR *cursor)
 {
 	WT_CURSOR_BTREE *cbt;
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int ret;
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL(cursor, session, remove, cbt->btree);
@@ -175,8 +175,8 @@ static int
 __curfile_close(WT_CURSOR *cursor)
 {
 	WT_CURSOR_BTREE *cbt;
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int ret;
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL(cursor, session, close, cbt->btree);
@@ -230,11 +230,11 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 	WT_CONFIG_ITEM cval;
 	WT_CURSOR *cursor;
 	WT_CURSOR_BTREE *cbt;
+	WT_DECL_RET;
 	size_t csize;
-	int bulk, ret;
+	int bulk;
 
 	cbt = NULL;
-	ret = 0;
 
 	btree = session->btree;
 	WT_ASSERT(session, btree != NULL);
@@ -285,7 +285,7 @@ __wt_curfile_open(WT_SESSION_IMPL *session,
 		    uri, strlen(uri), NULL, WT_BTREE_NO_LOCK));
 	else if (WT_PREFIX_MATCH(uri, "file:"))
 		WT_RET(__wt_session_get_btree(session,
-		     uri, uri, NULL, NULL, WT_BTREE_NO_LOCK));
+		     uri, NULL, cfg, WT_BTREE_NO_LOCK));
 	else
 		return (EINVAL);
 

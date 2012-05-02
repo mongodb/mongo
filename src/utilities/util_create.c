@@ -12,7 +12,8 @@ static int usage(void);
 int
 util_create(WT_SESSION *session, int argc, char *argv[])
 {
-	int ch, ret;
+	WT_DECL_RET;
+	int ch;
 	const char *config, *uri;
 
 	config = NULL;

@@ -172,48 +172,6 @@ class test_util05(wttest.WiredTigerTestCase, suite_subprocess):
         self.runWt(["verify", "table:" + self.tablename], errfilename="verifyerr.out")
         self.check_non_empty_file("verifyerr.out")
 
-    def test_verify_process_appended_null(self):
-        """
-        Test verify in a 'wt' process on a table that is purposely damaged,
-        with some null bytes at the end of the file.
-        """
-        params = 'key_format=S,value_format=S'
-        self.session.create('table:' + self.tablename, params)
-        self.populate(self.tablename)
-        with self.open_and_position(self.tablename, 100) as f:
-            for i in range(0, 6):
-                f.write(struct.pack('B', 0))
-        self.runWt(["verify", "table:" + self.tablename], errfilename="verifyerr.out")
-        self.check_non_empty_file("verifyerr.out")
-
-    def test_verify_process_appended_null_block(self):
-        """
-        Test verify in a 'wt' process on a table that is purposely damaged,
-        with some null bytes at the end of the file.
-        """
-        params = 'key_format=S,value_format=S'
-        self.session.create('table:' + self.tablename, params)
-        self.populate(self.tablename)
-        with self.open_and_position(self.tablename, 100) as f:
-            for i in range(0, 4096):
-                f.write(struct.pack('B', 0))
-        self.runWt(["verify", "table:" + self.tablename], errfilename="verifyerr.out")
-        self.check_non_empty_file("verifyerr.out")
-
-    def test_verify_process_appended_junk(self):
-        """
-        Test verify in a 'wt' process on a table that is purposely damaged,
-        with some junk bytes at the end of the file.
-        """
-        params = 'key_format=S,value_format=S'
-        self.session.create('table:' + self.tablename, params)
-        self.populate(self.tablename)
-        with self.open_and_position(self.tablename, 100) as f:
-            for i in range(0, 1024):
-                f.write('\x01\0x02\x03\x04')
-        self.runWt(["verify", "table:" + self.tablename], errfilename="verifyerr.out")
-        self.check_non_empty_file("verifyerr.out")
-
     def test_verify_process_truncated(self):
         """
         Test verify in a 'wt' process on a table that is purposely damaged,
@@ -229,7 +187,7 @@ class test_util05(wttest.WiredTigerTestCase, suite_subprocess):
 
     def test_verify_process_zero_length(self):
         """
-        Test verify in a 'wt' process on a table that has junk added
+        Test verify in a 'wt' process on a zero-length table.
         """
         params = 'key_format=S,value_format=S'
         self.session.create('table:' + self.tablename, params)

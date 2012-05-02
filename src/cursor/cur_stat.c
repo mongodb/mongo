@@ -37,13 +37,12 @@ static int
 __curstat_get_key(WT_CURSOR *cursor, ...)
 {
 	WT_CURSOR_STAT *cst;
+	WT_DECL_RET;
 	WT_ITEM *item;
 	WT_SESSION_IMPL *session;
 	size_t size;
 	va_list ap;
-	int ret;
 
-	ret = 0;
 	cst = (WT_CURSOR_STAT *)cursor;
 	CURSOR_API_CALL(cursor, session, get_key, cst->btree);
 	va_start(ap, cursor);
@@ -75,13 +74,12 @@ static int
 __curstat_get_value(WT_CURSOR *cursor, ...)
 {
 	WT_CURSOR_STAT *cst;
+	WT_DECL_RET;
 	WT_ITEM *item;
 	WT_SESSION_IMPL *session;
 	va_list ap;
 	size_t size;
-	int ret;
 
-	ret = 0;
 	cst = (WT_CURSOR_STAT *)cursor;
 	CURSOR_API_CALL(cursor, session, get_value, cst->btree);
 	va_start(ap, cursor);
@@ -118,12 +116,11 @@ static void
 __curstat_set_key(WT_CURSOR *cursor, ...)
 {
 	WT_CURSOR_STAT *cst;
+	WT_DECL_RET;
 	WT_ITEM *item;
 	WT_SESSION_IMPL *session;
 	va_list ap;
-	int ret;
 
-	ret = 0;
 	cst = (WT_CURSOR_STAT *)cursor;
 	CURSOR_API_CALL(cursor, session, set_key, cst->btree);
 
@@ -163,10 +160,9 @@ static int
 __curstat_next(WT_CURSOR *cursor)
 {
 	WT_CURSOR_STAT *cst;
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int ret;
 
-	ret = 0;
 	cst = (WT_CURSOR_STAT *)cursor;
 	CURSOR_API_CALL(cursor, session, next, cst->btree);
 
@@ -196,10 +192,9 @@ static int
 __curstat_prev(WT_CURSOR *cursor)
 {
 	WT_CURSOR_STAT *cst;
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int ret;
 
-	ret = 0;
 	cst = (WT_CURSOR_STAT *)cursor;
 	CURSOR_API_CALL(cursor, session, prev, cst->btree);
 
@@ -244,10 +239,9 @@ static int
 __curstat_search(WT_CURSOR *cursor)
 {
 	WT_CURSOR_STAT *cst;
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int ret;
 
-	ret = 0;
 	cst = (WT_CURSOR_STAT *)cursor;
 	CURSOR_API_CALL(cursor, session, search, cst->btree);
 
@@ -273,10 +267,9 @@ static int
 __curstat_close(WT_CURSOR *cursor)
 {
 	WT_CURSOR_STAT *cst;
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int ret;
 
-	ret = 0;
 	cst = (WT_CURSOR_STAT *)cursor;
 	CURSOR_API_CALL(cursor, session, close, cst->btree);
 
@@ -333,17 +326,17 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 		0			/* uint32_t flags */
 	};
 	WT_BTREE *btree;
-	WT_CURSOR_STAT *cst;
 	WT_CONFIG_ITEM cval;
 	WT_CURSOR *cursor;
+	WT_CURSOR_STAT *cst;
+	WT_DECL_RET;
 	WT_STATS *stats_first;
 	void (*clear_func)(WT_STATS *);
-	int clear_on_close, ret, stats_count;
+	int clear_on_close, stats_count;
 
 	btree = NULL;
 	clear_func = NULL;
 	cst = NULL;
-	ret = 0;
 
 	WT_RET(__wt_config_gets(session, cfg, "clear_on_close", &cval));
 	clear_on_close = (cval.val != 0);
@@ -351,8 +344,7 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 	if (!WT_PREFIX_SKIP(uri, "statistics:"))
 		return (EINVAL);
 	if (WT_PREFIX_MATCH(uri, "file:")) {
-		WT_ERR(
-		    __wt_session_get_btree(session, uri, uri, NULL, NULL, 0));
+		WT_ERR(__wt_session_get_btree(session, uri, NULL, NULL, 0));
 		btree = session->btree;
 		WT_ERR(__wt_btree_stat_init(session));
 		stats_first = (WT_STATS *)session->btree->stats;

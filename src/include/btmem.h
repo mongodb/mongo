@@ -61,7 +61,6 @@ struct __wt_page_header {
  * WT_ADDR --
  *	A block location.
  */
-#define	WT_NOADDR	""		/* No address */
 struct __wt_addr {
 	uint8_t *addr;			/* Cookie */
 	uint32_t size;			/* Cookie length */
@@ -72,14 +71,6 @@ struct __wt_addr {
  *	When a page is modified, there's additional information maintained as it
  * is written to disk.
  */
-typedef enum {
-	WT_PT_EMPTY=0,			/* Unused slot */
-	WT_PT_BLOCK,			/* Block: inactive */
-	WT_PT_BLOCK_EVICT,		/* Block: inactive on eviction */
-	WT_PT_OVFL,			/* Overflow: active */
-	WT_PT_OVFL_DISCARD		/* Overflow: inactive */
-} __wt_pt_type_t;
-
 struct __wt_page_modify {
 	/*
 	 * The write generation is incremented after a page is modified.  That
@@ -169,7 +160,13 @@ struct __wt_page_modify {
 		uint8_t *data;		/* Overflow data reference */
 		uint32_t size;		/* Overflow data length */
 
-		__wt_pt_type_t type;	/* Type */
+#define	WT_TRK_EMPTY		0x00	/* Unused slot */
+#define	WT_TRK_DISCARD		0x01	/* Block/overflow to discard */
+#define	WT_TRK_DISCARD_COMPLETE	0x02	/* Block/overflow freed */
+#define	WT_TRK_OVFL		0x04	/* Overflow record not yet in use */
+#define	WT_TRK_OVFL_ACTIVE	0x08	/* Overflow record in use */
+#define	WT_TRK_PERM		0x80	/* Overflow record that must remain */
+		uint8_t  flags;
 	} *track;			/* Array of tracked objects */
 	uint32_t track_entries;		/* Total track slots */
 
@@ -179,6 +176,11 @@ struct __wt_page_modify {
 #define	WT_PM_REC_SPLIT_MERGE	0x08	/* Reconciliation: page split merge */
 	uint8_t flags;			/* Page flags */
 };
+
+#define	WT_TRK_TYPE(track)						\
+	((track)->flags &						\
+	    (WT_TRK_DISCARD |						\
+	    WT_TRK_DISCARD_COMPLETE | WT_TRK_OVFL | WT_TRK_OVFL_ACTIVE))
 
 #define	WT_PM_REC_MASK							\
 	(WT_PM_REC_EMPTY |						\
@@ -284,13 +286,13 @@ struct __wt_page {
 	uint32_t memory_footprint;
 
 #define	WT_PAGE_INVALID		0	/* Invalid page */
-#define	WT_PAGE_COL_FIX		1	/* Col-store fixed-len leaf */
-#define	WT_PAGE_COL_INT		2	/* Col-store internal page */
-#define	WT_PAGE_COL_VAR		3	/* Col-store var-length leaf page */
-#define	WT_PAGE_OVFL		4	/* Overflow page */
-#define	WT_PAGE_ROW_INT		5	/* Row-store internal page */
-#define	WT_PAGE_ROW_LEAF	6	/* Row-store leaf page */
-#define	WT_PAGE_FREELIST	7	/* Free-list page */
+#define	WT_PAGE_BLOCK_MANAGER	1	/* Block-manager page */
+#define	WT_PAGE_COL_FIX		2	/* Col-store fixed-len leaf */
+#define	WT_PAGE_COL_INT		3	/* Col-store internal page */
+#define	WT_PAGE_COL_VAR		4	/* Col-store var-length leaf page */
+#define	WT_PAGE_OVFL		5	/* Overflow page */
+#define	WT_PAGE_ROW_INT		6	/* Row-store internal page */
+#define	WT_PAGE_ROW_LEAF	7	/* Row-store leaf page */
 	uint8_t type;			/* Page type */
 
 #define	WT_PAGE_BUILD_KEYS	0x01	/* Keys have been built in memory */

@@ -8,6 +8,7 @@ example programs:
 - @subpage schema
 - @subpage cursors
 - @subpage threads
+- @subpage snapshots
 - @subpage transactions
 
 Additional Notes:

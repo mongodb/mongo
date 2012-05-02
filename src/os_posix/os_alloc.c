@@ -104,7 +104,7 @@ __wt_realloc_aligned(WT_SESSION_IMPL *session,
     size_t *bytes_allocated_ret, size_t bytes_to_allocate, void *retp)
 {
 #if defined(HAVE_POSIX_MEMALIGN)
-	int ret;
+	WT_DECL_RET;
 
 	/*
 	 * !!!

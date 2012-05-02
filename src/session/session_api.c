@@ -15,7 +15,7 @@ static int
 __session_close_cursors(WT_SESSION_IMPL *session)
 {
 	WT_CURSOR *cursor;
-	int ret;
+	WT_DECL_RET;
 
 	ret = 0;
 	while ((cursor = TAILQ_FIRST(&session->cursors)) != NULL)
@@ -32,8 +32,8 @@ __session_close(WT_SESSION *wt_session, const char *config)
 {
 	WT_BTREE_SESSION *btree_session;
 	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session, **tp;
-	int ret;
 
 	conn = (WT_CONNECTION_IMPL *)wt_session->connection;
 	session = (WT_SESSION_IMPL *)wt_session;
@@ -49,6 +49,9 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	WT_TRET(__wt_schema_close_tables(session));
 
 	__wt_spin_lock(session, &conn->spinlock);
+
+	/* Discard metadata tracking. */
+	__wt_meta_track_discard(session);
 
 	/* Discard scratch buffers. */
 	__wt_scr_discard(session);
@@ -103,8 +106,8 @@ static int
 __session_open_cursor(WT_SESSION *wt_session,
     const char *uri, WT_CURSOR *to_dup, const char *config, WT_CURSOR **cursorp)
 {
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int ret;
 
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_API_CALL(session, open_cursor, config, cfg);
@@ -156,15 +159,15 @@ __wt_session_create_strip(
  *	WT_SESSION->create method.
  */
 static int
-__session_create(WT_SESSION *wt_session, const char *name, const char *config)
+__session_create(WT_SESSION *wt_session, const char *uri, const char *config)
 {
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int ret;
 
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_API_CALL(session, create, config, cfg);
 	WT_UNUSED(cfg);
-	WT_ERR(__wt_schema_create(session, name, config));
+	WT_ERR(__wt_schema_create(session, uri, config));
 
 err:	API_END_NOTFOUND_MAP(session, ret);
 }
@@ -177,8 +180,8 @@ static int
 __session_rename(WT_SESSION *wt_session,
     const char *uri, const char *newname, const char *config)
 {
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int ret;
 
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_API_CALL(session, rename, config, cfg);
@@ -192,16 +195,26 @@ err:	API_END_NOTFOUND_MAP(session, ret);
  *	WT_SESSION->drop method.
  */
 static int
-__session_drop(WT_SESSION *wt_session, const char *name, const char *config)
+__session_drop(WT_SESSION *wt_session, const char *uri, const char *config)
 {
+	WT_CONFIG_ITEM cval;
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int ret;
 
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_API_CALL(session, drop, config, cfg);
-	ret = __wt_schema_drop(session, name, cfg);
 
-err:	API_END_NOTFOUND_MAP(session, ret);
+	WT_ERR(__wt_meta_track_on(session));
+
+	/* If dropping snapshots, that's a different code path. */
+	WT_ERR(__wt_config_gets(session, cfg, "snapshot", &cval));
+	ret = (cval.len != 0) ?
+	    __wt_schema_worker(session, uri, cfg,
+		__wt_btree_snapshot_drop, WT_BTREE_SNAPSHOT_OP) :
+	    __wt_schema_drop(session, uri, cfg);
+
+err:    WT_TRET(__wt_meta_track_off(session, ret != 0));
+	API_END_NOTFOUND_MAP(session, ret);
 }
 
 /*
@@ -211,8 +224,8 @@ err:	API_END_NOTFOUND_MAP(session, ret);
 static int
 __session_dumpfile(WT_SESSION *wt_session, const char *uri, const char *config)
 {
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int ret;
 
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_API_CALL(session, dumpfile, config, cfg);
@@ -229,8 +242,8 @@ err:	API_END_NOTFOUND_MAP(session, ret);
 static int
 __session_salvage(WT_SESSION *wt_session, const char *uri, const char *config)
 {
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int ret;
 
 	session = (WT_SESSION_IMPL *)wt_session;
 
@@ -248,15 +261,19 @@ err:	API_END_NOTFOUND_MAP(session, ret);
 static int
 __session_sync(WT_SESSION *wt_session, const char *uri, const char *config)
 {
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int ret;
 
 	session = (WT_SESSION_IMPL *)wt_session;
 
 	SESSION_API_CALL(session, sync, config, cfg);
-	ret = __wt_schema_worker(session, uri, cfg, __wt_btree_sync, 0);
+	WT_ERR(__wt_meta_track_on(session));
 
-err:	API_END_NOTFOUND_MAP(session, ret);
+	ret = __wt_schema_worker(session, uri, cfg,
+	    __wt_btree_snapshot, WT_BTREE_SNAPSHOT_OP);
+
+err:    WT_TRET(__wt_meta_track_off(session, ret != 0));
+	API_END_NOTFOUND_MAP(session, ret);
 }
 
 /*
@@ -267,8 +284,8 @@ static int
 __session_truncate(WT_SESSION *wt_session,
     const char *uri, WT_CURSOR *start, WT_CURSOR *stop, const char *config)
 {
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int ret;
 
 	session = (WT_SESSION_IMPL *)wt_session;
 
@@ -334,8 +351,8 @@ err:	API_END_NOTFOUND_MAP(session, ret);
 static int
 __session_upgrade(WT_SESSION *wt_session, const char *uri, const char *config)
 {
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int ret;
 
 	session = (WT_SESSION_IMPL *)wt_session;
 
@@ -353,8 +370,8 @@ err:	API_END_NOTFOUND_MAP(session, ret);
 static int
 __session_verify(WT_SESSION *wt_session, const char *uri, const char *config)
 {
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int ret;
 
 	session = (WT_SESSION_IMPL *)wt_session;
 
@@ -372,8 +389,8 @@ err:	API_END_NOTFOUND_MAP(session, ret);
 static int
 __session_begin_transaction(WT_SESSION *wt_session, const char *config)
 {
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int ret;
 
 	session = (WT_SESSION_IMPL *)wt_session;
 
@@ -396,8 +413,8 @@ err:	API_END_NOTFOUND_MAP(session, ret);
 static int
 __session_commit_transaction(WT_SESSION *wt_session, const char *config)
 {
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int ret;
 
 	session = (WT_SESSION_IMPL *)wt_session;
 
@@ -415,8 +432,8 @@ err:	API_END_NOTFOUND_MAP(session, ret);
 static int
 __session_rollback_transaction(WT_SESSION *wt_session, const char *config)
 {
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int ret;
 
 	session = (WT_SESSION_IMPL *)wt_session;
 
@@ -488,12 +505,12 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
 		__session_dumpfile,
 		__session_msg_printf
 	};
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session, *session_ret;
 	uint32_t slot;
-	int ret;
 
 	WT_UNUSED(config);
-	ret = 0;
+
 	session = &conn->default_session;
 	session_ret = NULL;
 

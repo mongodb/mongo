@@ -15,11 +15,11 @@ static int
 __rename_file(
     WT_SESSION_IMPL *session, const char *uri, const char *newuri)
 {
-	int exist, ret;
+	WT_DECL_RET;
+	int exist;
 	const char *filename, *newfile, *value;
 
 	value = NULL;
-	ret = 0;
 
 	filename = uri;
 	newfile = newuri;
@@ -28,13 +28,13 @@ __rename_file(
 		return (EINVAL);
 
 	/* If open, close the btree handle. */
-	WT_RET(__wt_session_close_any_open_btree(session, filename));
+	WT_RET(__wt_session_close_any_open_btree(session, uri));
 
 	/*
 	 * Check to see if the proposed name is already in use, in either
-	 * the schema table or the filesystem.
+	 * the metadata or the filesystem.
 	 */
-	switch (ret = __wt_schema_table_read(session, newuri, &value)) {
+	switch (ret = __wt_metadata_read(session, newuri, &value)) {
 	case 0:
 		WT_ERR_MSG(session, EEXIST, "%s", newuri);
 	case WT_NOTFOUND:
@@ -48,13 +48,14 @@ __rename_file(
 		WT_ERR_MSG(session, EEXIST, "%s", newfile);
 
 	/* Replace the old file entries with new file entries. */
-	WT_ERR(__wt_schema_table_read(session, uri, &value));
-	WT_ERR(__wt_schema_table_remove(session, uri));
-	WT_ERR(__wt_schema_table_insert(session, newuri, value));
+	WT_ERR(__wt_metadata_read(session, uri, &value));
+	WT_ERR(__wt_metadata_remove(session, uri));
+	WT_ERR(__wt_metadata_insert(session, newuri, value));
 
 	/* Rename the underlying file. */
-	WT_ERR(__wt_schema_table_track_fileop(session, filename, newfile));
 	WT_ERR(__wt_rename(session, filename, newfile));
+	if (WT_META_TRACKING(session))
+		WT_ERR(__wt_meta_track_fileop(session, uri, newuri));
 
 err:	__wt_free(session, value);
 
@@ -66,17 +67,16 @@ err:	__wt_free(session, value);
  *	Rename an index or colgroup reference.
  */
 static int
-__rename_tree(WT_SESSION_IMPL *session, WT_BTREE *btree, const char *newname)
+__rename_tree(WT_SESSION_IMPL *session, const char *name, const char *newname)
 {
+	WT_DECL_RET;
 	WT_ITEM *of, *nf, *nk, *nv;
-	int ret;
 	const char *newfile, *p, *t, *value;
 
 	nf = nk = nv = of = NULL;
-	ret = 0;
 
 	/* Read the old schema value. */
-	WT_ERR(__wt_schema_table_read(session, btree->name, &value));
+	WT_ERR(__wt_metadata_read(session, name, &value));
 
 	/*
 	 * Create the new file name, new schema key, new schema value.
@@ -84,9 +84,9 @@ __rename_tree(WT_SESSION_IMPL *session, WT_BTREE *btree, const char *newname)
 	 * Names are of the form "prefix.oldname:suffix", where suffix is
 	 * optional; we need prefix and suffix.
 	 */
-	if ((p = strchr(btree->name, ':')) == NULL)
+	if ((p = strchr(name, ':')) == NULL)
 		WT_ERR_MSG(session, EINVAL,
-		    "invalid index or column-group name: %s", btree->name);
+		    "invalid index or column-group name: %s", name);
 	t = strchr(p + 1, ':');
 
 	WT_ERR(__wt_scr_alloc(session, 0, &nf));
@@ -96,32 +96,34 @@ __rename_tree(WT_SESSION_IMPL *session, WT_BTREE *btree, const char *newname)
 
 	WT_ERR(__wt_scr_alloc(session, 0, &nk));
 	WT_ERR(__wt_buf_fmt(session, nk, "%.*s:%s%s%s",
-	    (int)WT_PTRDIFF(p, btree->name), btree->name,
-	    newname, t == NULL ? "" : ":", t == NULL ? "" : t + 1));
+	    (int)WT_PTRDIFF(p, name), name, newname,
+	    t == NULL ? "" : ":", t == NULL ? "" : t + 1));
 
-	WT_ERR(__wt_scr_alloc(session, 0, &nv));
 	if ((p = strstr(value, "filename=")) == NULL)
 		WT_ERR_MSG(session, EINVAL,
 		    "index or column-group value has no file name: %s", value);
+	p += strlen("filename=");
 	t = strchr(p, ',');
-	WT_ERR(__wt_buf_fmt(session, nv, "%.*s" "filename=%s%s",
+
+	/* Take a copy of the old filename. */
+	WT_ERR(__wt_scr_alloc(session, 0, &of));
+	WT_ERR(__wt_buf_fmt(session, of, "file:%.*s",
+	    (int)((t == NULL) ? strlen(p) : WT_PTRDIFF(t, p)), p));
+
+	/* Overwrite it with the new filename. */
+	WT_ERR(__wt_scr_alloc(session, 0, &nv));
+	WT_ERR(__wt_buf_fmt(session, nv, "%.*s%s%s",
 	    (int)WT_PTRDIFF(p, value), value,
 	    newfile, t == NULL ? "" : t));
 
 	/*
-	 * Remove the old schema table entry
-	 * Insert the new schema table entry
+	 * Remove the old metadata entry.
+	 * Insert the new metadata entry.
 	 */
-	WT_ERR(__wt_schema_table_remove(session, btree->name));
-	WT_ERR(__wt_schema_table_insert(session, nk->data, nv->data));
+	WT_ERR(__wt_metadata_remove(session, name));
+	WT_ERR(__wt_metadata_insert(session, nk->data, nv->data));
 
-	/*
-	 * Rename the file.
-	 * __rename_file closes the WT_BTREE handle, so we have to have a local
-	 * copy of the WT_BTREE->filename field.
-	 */
-	WT_ERR(__wt_scr_alloc(session, 0, &of));
-	WT_ERR(__wt_buf_fmt(session, of, "file:%s", btree->filename));
+	/* Rename the file. */
 	WT_ERR(__rename_file(session, of->data, nf->data));
 
 err:	__wt_scr_free(&nf);
@@ -140,32 +142,31 @@ static int
 __rename_table(
     WT_SESSION_IMPL *session, const char *oldname, const char *newname)
 {
-	WT_BTREE *btree;
+	WT_DECL_RET;
 	WT_ITEM *buf;
 	WT_TABLE *table;
-	int i, ret;
+	int i;
 	const char *value;
 
 	buf = NULL;
-	ret = 0;
 
 	WT_RET(
 	    __wt_schema_get_table(session, oldname, strlen(oldname), &table));
 
 	/* Rename the column groups. */
 	for (i = 0; i < WT_COLGROUPS(table); i++) {
-		if ((btree = table->colgroup[i]) == NULL)
+		if (table->colgroup[i] == NULL)
 			continue;
 		table->colgroup[i] = NULL;
-		WT_RET(__rename_tree(session, btree, newname));
+		WT_RET(__rename_tree(session, table->cg_name[i], newname));
 	}
 
 	/* Rename the indices. */
 	WT_RET(__wt_schema_open_index(session, table, NULL, 0));
 	for (i = 0; i < table->nindices; i++) {
-		btree = table->index[i];
 		table->index[i] = NULL;
-		WT_RET(__rename_tree(session, btree, newname));
+		WT_RET(
+		    __rename_tree(session, table->idx_name[i], newname));
 	}
 
 	WT_RET(__wt_schema_remove_table(session, table));
@@ -173,10 +174,10 @@ __rename_table(
 	/* Rename the table. */
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));
 	WT_ERR(__wt_buf_fmt(session, buf, "table:%s", oldname));
-	WT_ERR(__wt_schema_table_read(session, buf->data, &value));
-	WT_ERR(__wt_schema_table_remove(session, buf->data));
+	WT_ERR(__wt_metadata_read(session, buf->data, &value));
+	WT_ERR(__wt_metadata_remove(session, buf->data));
 	WT_ERR(__wt_buf_fmt(session, buf, "table:%s", newname));
-	WT_ERR(__wt_schema_table_insert(session, buf->data, value));
+	WT_ERR(__wt_metadata_insert(session, buf->data, value));
 
 err:	__wt_scr_free(&buf);
 	return (ret);
@@ -190,8 +191,9 @@ int
 __wt_schema_rename(WT_SESSION_IMPL *session,
     const char *uri, const char *newuri, const char *cfg[])
 {
+	WT_DATA_SOURCE *dsrc;
+	WT_DECL_RET;
 	const char *oldname, *newname;
-	int ret;
 
 	WT_UNUSED(cfg);
 
@@ -203,7 +205,7 @@ __wt_schema_rename(WT_SESSION_IMPL *session,
 	 * We track rename operations, if we fail in the middle, we want to
 	 * back it all out.
 	 */
-	WT_RET(__wt_schema_table_track_on(session));
+	WT_RET(__wt_meta_track_on(session));
 
 	oldname = uri;
 	newname = newuri;
@@ -219,11 +221,12 @@ __wt_schema_rename(WT_SESSION_IMPL *session,
 			    "rename target type must match URI: %s to %s",
 			    uri, newuri);
 		ret = __rename_table(session, oldname, newname);
-	} else
-		return (__wt_unknown_object_type(session, uri));
+	} else if ((ret = __wt_schema_get_source(session, oldname, &dsrc)) == 0)
+		ret = dsrc->rename(dsrc,
+		    &session->iface, oldname, newname, cfg[1]);
 
-	WT_TRET(__wt_schema_table_track_off(session, ret != 0));
+	WT_TRET(__wt_meta_track_off(session, ret != 0));
 
-	/* If we didn't find a schema file entry, map that error to ENOENT. */
+	/* If we didn't find a metadata entry, map that error to ENOENT. */
 	return (ret == WT_NOTFOUND ? ENOENT : ret);
 }
