@@ -9,17 +9,17 @@
 
 namespace mongo { 
 
-    PageFaultException::PageFaultException(Record *_r)
+    PageFaultException::PageFaultException(const Record *_r)
     {
-        assert( cc().allowedToThrowPageFaultException() );
+        verify( cc().allowedToThrowPageFaultException() );
         cc().getPageFaultRetryableSection()->didLap();
         r = _r;
         era = LockMongoFilesShared::getEra();
-        log(2) << "PageFaultException thrown" << endl;
+        LOG(2) << "PageFaultException thrown" << endl;
     }
 
     void PageFaultException::touch() { 
-        assert( !d.dbMutex.atLeastReadLocked() );
+        verify( ! Lock::isLocked() );
         LockMongoFilesShared lk;
         if( LockMongoFilesShared::getEra() != era ) {
             // files opened and closed.  we don't try to handle but just bail out; this is much simpler
@@ -35,8 +35,8 @@ namespace mongo {
     }
     PageFaultRetryableSection::PageFaultRetryableSection() {
         _laps = 0;
-        assert( cc()._pageFaultRetryableSection == 0 );
-        if( d.dbMutex.atLeastReadLocked() ) { 
+        verify( cc()._pageFaultRetryableSection == 0 );
+        if( Lock::isLocked() ) {
             cc()._pageFaultRetryableSection = 0;
             if( debug || logLevel > 2 ) { 
                 LOGSOME << "info PageFaultRetryableSection will not yield, already locked upon reaching" << endl;

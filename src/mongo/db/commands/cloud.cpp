@@ -19,15 +19,15 @@ namespace mongo {
     }
 
     void dynHostResolve(string& name, int& port) {
-        assert( !name.empty() );
-        assert( !str::contains(name, ':') );
-        assert( str::startsWith(name, '#') );
+        verify( !name.empty() );
+        verify( !str::contains(name, ':') );
+        verify( str::startsWith(name, '#') );
         string s = dynHostNames.get(name);
         if( s.empty() ) { 
             name.clear();
             return;
         }
-        assert( !str::startsWith(s, '#') );
+        verify( !str::startsWith(s, '#') );
         HostAndPort hp(s);
         if( hp.hasPort() ) {
             port = hp.port();
@@ -56,17 +56,17 @@ namespace mongo {
         }
         CmdCloud() : Command("cloud") {}
         bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            assert(!fromRepl);
+            verify(!fromRepl);
             BSONObj nodes = cmdObj["nodes"].Obj();
             map<string,string> ipmap;
             for( BSONObj::iterator i(nodes); i.more(); ) { 
                 BSONElement e = i.next();
-                assert( *e.fieldName() == '#' );
+                verify( *e.fieldName() == '#' );
                 ipmap[e.fieldName()] = e.String();
             }
 
             string me = cmdObj["me"].String();
-            assert( !me.empty() && me[0] == '#' );
+            verify( !me.empty() && me[0] == '#' );
             
             log(/*1*/) << "CmdCloud" << endl;
 

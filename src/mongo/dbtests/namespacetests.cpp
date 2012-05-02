@@ -23,6 +23,7 @@
 
 #include "../db/db.h"
 #include "../db/json.h"
+#include "mongo/db/queryutil.h"
 
 #include "dbtests.h"
 
@@ -32,7 +33,7 @@ namespace NamespaceTests {
 
     namespace IndexDetailsTests {
         class Base {
-            dblock lk;
+            Lock::GlobalWrite lk;
             Client::Context _context;
         public:
             Base() : _context(ns()) {
@@ -107,7 +108,7 @@ namespace NamespaceTests {
                 return b.obj();
             }
         private:
-            dblock lk_;
+            Lock::GlobalWrite lk_;
             IndexDetails id_;
         };
 
@@ -920,11 +921,42 @@ namespace NamespaceTests {
         
     } // namespace IndexDetailsTests
 
+    namespace IndexSpecTests {
+        
+        class Suitability {
+        public:
+            void run() {
+                IndexSpec spec( BSON( "a" << 1 ), BSONObj() );
+                ASSERT_EQUALS( HELPFUL,
+                              spec.suitability( BSON( "a" << 2 << "b" << 3 ), BSONObj() ) );
+                ASSERT_EQUALS( USELESS,
+                              spec.suitability( BSON( "b" << 3 ), BSONObj() ) );
+                ASSERT_EQUALS( HELPFUL,
+                              spec.suitability( BSON( "b" << 3 ), BSON( "a" << 1 ) ) );
+            }
+        };
+        
+        /** Lexical rather than numeric comparison should be used to determine index suitability. */
+        class NumericFieldSuitability {
+        public:
+            void run() {
+                IndexSpec spec( BSON( "1" << 1 ), BSONObj() );
+                ASSERT_EQUALS( HELPFUL,
+                              spec.suitability( BSON( "1" << 2 ), BSONObj() ) );
+                ASSERT_EQUALS( USELESS,
+                              spec.suitability( BSON( "01" << 3 ), BSON( "01" << 1 ) ) );
+                ASSERT_EQUALS( HELPFUL,
+                              spec.suitability( BSONObj(), BSON( "1" << 1 ) ) );                
+            }
+        };
+        
+    } // namespace IndexSpecTests
+    
     namespace NamespaceDetailsTests {
 
         class Base {
             const char *ns_;
-            dblock lk;
+            Lock::GlobalWrite lk;
             Client::Context _context;
         public:
             Base( const char *ns = "unittests.NamespaceDetailsTests" ) : ns_( ns ) , _context( ns ) {}
@@ -938,7 +970,7 @@ namespace NamespaceTests {
             }
         protected:
             void create() {
-                dblock lk;
+                Lock::GlobalWrite lk;
                 string err;
                 ASSERT( userCreateNS( ns(), fromjson( spec() ), err, false ) );
             }
@@ -952,7 +984,7 @@ namespace NamespaceTests {
                     if ( fileNo == -1 )
                         continue;
                     for ( int j = i.ext()->firstRecord.getOfs(); j != DiskLoc::NullOfs;
-                            j = DiskLoc( fileNo, j ).rec()->nextOfs ) {
+                          j = DiskLoc( fileNo, j ).rec()->nextOfs() ) {
                         ++count;
                     }
                 }
@@ -973,6 +1005,9 @@ namespace NamespaceTests {
             }
             NamespaceDetails *nsd() const {
                 return nsdetails( ns() )->writingWithExtra();
+            }
+            NamespaceDetailsTransient &nsdt() const {
+                return NamespaceDetailsTransient::get( ns() );
             }
             static BSONObj bigObj(bool bGenID=false) {
                 BSONObjBuilder b;
@@ -1134,8 +1169,8 @@ namespace NamespaceTests {
         public:
             void run() {
                 create();
-                nsd()->deletedList[ 2 ] = nsd()->cappedListOfAllDeletedRecords().drec()->nextDeleted.drec()->nextDeleted;
-                nsd()->cappedListOfAllDeletedRecords().drec()->nextDeleted.drec()->nextDeleted.writing() = DiskLoc();
+                nsd()->deletedList[ 2 ] = nsd()->cappedListOfAllDeletedRecords().drec()->nextDeleted().drec()->nextDeleted();
+                nsd()->cappedListOfAllDeletedRecords().drec()->nextDeleted().drec()->nextDeleted().writing() = DiskLoc();
                 nsd()->cappedLastDelRecLastExtent().Null();
                 NamespaceDetails *d = nsd();
                 zero( &d->capExtent );
@@ -1147,7 +1182,7 @@ namespace NamespaceTests {
                 ASSERT( nsd()->capExtent.getOfs() != 0 );
                 ASSERT( !nsd()->capFirstNewRecord.isValid() );
                 int nDeleted = 0;
-                for ( DiskLoc i = nsd()->cappedListOfAllDeletedRecords(); !i.isNull(); i = i.drec()->nextDeleted, ++nDeleted );
+                for ( DiskLoc i = nsd()->cappedListOfAllDeletedRecords(); !i.isNull(); i = i.drec()->nextDeleted(), ++nDeleted );
                 ASSERT_EQUALS( 10, nDeleted );
                 ASSERT( nsd()->cappedLastDelRecLastExtent().isNull() );
             }
@@ -1185,9 +1220,71 @@ namespace NamespaceTests {
                 ASSERT_EQUALS( 496U, sizeof( NamespaceDetails ) );
             }
         };
-
+        
+        class CachedPlanBase : public Base {
+        public:
+            CachedPlanBase() :
+                _fieldRangeSet( ns(), BSON( "a" << 1 ), true ),
+                _pattern( _fieldRangeSet, BSONObj() ) {
+                create();
+            }
+        protected:
+            void assertCachedIndexKey( const BSONObj &indexKey ) const {
+                ASSERT_EQUALS( indexKey,
+                              nsdt().cachedQueryPlanForPattern( _pattern ).indexKey() );
+            }
+            void registerIndexKey( const BSONObj &indexKey ) {
+                nsdt().registerCachedQueryPlanForPattern
+                        ( _pattern,
+                         CachedQueryPlan( indexKey, 1, CandidatePlanCharacter( true, false ) ) );                
+            }
+            FieldRangeSet _fieldRangeSet;
+            QueryPattern _pattern;
+        };
+        
+        /**
+         * setIndexIsMultikey() sets the multikey flag for an index and clears the query plan
+         * cache.
+         */
+        class SetIndexIsMultikey : public CachedPlanBase {
+        public:
+            void run() {
+                DBDirectClient client;
+                client.ensureIndex( ns(), BSON( "a" << 1 ) );
+                registerIndexKey( BSON( "a" << 1 ) );
+                
+                ASSERT( !nsd()->isMultikey( 1 ) );
+                
+                nsd()->setIndexIsMultikey( ns(), 1 );
+                ASSERT( nsd()->isMultikey( 1 ) );
+                assertCachedIndexKey( BSONObj() );
+                
+                registerIndexKey( BSON( "a" << 1 ) );
+                nsd()->setIndexIsMultikey( ns(), 1 );
+                assertCachedIndexKey( BSON( "a" << 1 ) );
+            }
+        };
+        
     } // namespace NamespaceDetailsTests
 
+    namespace NamespaceDetailsTransientTests {
+        
+        /** clearQueryCache() clears the query plan cache. */
+        class ClearQueryCache : public NamespaceDetailsTests::CachedPlanBase {
+        public:
+            void run() {
+                // Register a query plan in the query plan cache.
+                registerIndexKey( BSON( "a" << 1 ) );
+                assertCachedIndexKey( BSON( "a" << 1 ) );
+                
+                // The query plan is cleared.
+                nsdt().clearQueryCache();
+                assertCachedIndexKey( BSONObj() );
+            }
+        };                                                                                         
+        
+    } // namespace NamespaceDetailsTransientTests
+                                                                                 
     class All : public Suite {
     public:
         All() : Suite( "namespace" ) {
@@ -1230,6 +1327,8 @@ namespace NamespaceTests {
             add< IndexDetailsTests::MissingField >();
             add< IndexDetailsTests::SubobjectMissing >();
             add< IndexDetailsTests::CompoundMissing >();
+            add< IndexSpecTests::Suitability >();
+            add< IndexSpecTests::NumericFieldSuitability >();
             add< NamespaceDetailsTests::Create >();
             add< NamespaceDetailsTests::SingleAlloc >();
             add< NamespaceDetailsTests::Realloc >();
@@ -1238,6 +1337,8 @@ namespace NamespaceTests {
             add< NamespaceDetailsTests::Migrate >();
             //            add< NamespaceDetailsTests::BigCollection >();
             add< NamespaceDetailsTests::Size >();
+            add< NamespaceDetailsTests::SetIndexIsMultikey >();
+            add< NamespaceDetailsTransientTests::ClearQueryCache >();
         }
     } myall;
 } // namespace NamespaceTests

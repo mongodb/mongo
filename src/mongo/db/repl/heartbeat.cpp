@@ -18,7 +18,7 @@
 #include "rs.h"
 #include "health.h"
 #include "../../util/background.h"
-#include "../../client/dbclient.h"
+
 #include "../commands.h"
 #include "../../util/concurrency/value.h"
 #include "../../util/concurrency/task.h"
@@ -28,7 +28,6 @@
 #include "../../util/ramlog.h"
 #include "../helpers/dblogger.h"
 #include "connections.h"
-#include "../../util/unittest.h"
 #include "../instance.h"
 #include "../repl.h"
 
@@ -97,7 +96,7 @@ namespace mongo {
             if( cmdObj["checkEmpty"].trueValue() ) {
                 result.append("hasData", replHasDatabases());
             }
-            if( theReplSet == 0 ) {
+            if( (theReplSet == 0) || (theReplSet->startupStatus == ReplSetImpl::LOADINGCONFIG) ) {
                 string from( cmdObj.getStringField("from") );
                 if( !from.empty() ) {
                     scoped_lock lck( replSettings.discoveredSeeds_mx );
@@ -143,8 +142,8 @@ namespace mongo {
         // write lock. heartbeats can be slow (multisecond to respond), so
         // generally we don't want to be locked, at least not without
         // thinking acarefully about it first.
-        uassert(15900, "can't heartbeat: too much lock",
-                !d.dbMutex.isWriteLocked() || theReplSet == 0 || !theReplSet->lockedByMe() );
+        massert(15900, "can't heartbeat: too much lock",
+                !Lock::somethingWriteLocked() || theReplSet == 0 || !theReplSet->lockedByMe() );
 
         ScopedConn conn(memberFullName);
         return conn.runCommand("admin", cmd, result, 0);
@@ -168,15 +167,28 @@ namespace mongo {
      */
     class ReplSetHealthPollTask : public task::Task {
     private:
+        /**
+         * Each healthpoll task reconnects periodically.  By starting each task at a different
+         * number for "tries", the tasks will reconnect at different times, minimizing the impact
+         * of network blips.
+         */
+        static int s_try_offset;
+
         HostAndPort h;
         HeartbeatInfo m;
         int tries;
         const int threshold;
     public:
         ReplSetHealthPollTask(const HostAndPort& hh, const HeartbeatInfo& mm)
-            : h(hh), m(mm), tries(0), threshold(15) { }
+            : h(hh), m(mm), tries(s_try_offset), threshold(15) {
+            // doesn't need protection, all health tasks are created in a single thread
+            s_try_offset += 7;
+        }
 
         string name() const { return "rsHealthPoll"; }
+
+        void setUp() { Client::initThread( name().c_str() ); }
+
         void doWork() {
             if ( !theReplSet ) {
                 LOG(2) << "replSet not initialized yet, skipping health poll this round" << rsLog;
@@ -343,6 +355,8 @@ namespace mongo {
         }
     };
 
+    int ReplSetHealthPollTask::s_try_offset = 0;
+
     void ReplSetImpl::endOldHealthTasks() {
         unsigned sz = healthTasks.size();
         for( set<ReplSetHealthPollTask*>::iterator i = healthTasks.begin(); i != healthTasks.end(); i++ )
@@ -353,6 +367,7 @@ namespace mongo {
     }
 
     void ReplSetImpl::startHealthTaskFor(Member *m) {
+        DEV log() << "starting rsHealthPoll for " << m->fullName() << endl;
         ReplSetHealthPollTask *task = new ReplSetHealthPollTask(m->h(), m->hbinfo());
         healthTasks.insert(task);
         task::repeat(task, 2000);

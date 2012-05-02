@@ -15,7 +15,11 @@
  *    limitations under the License.
  */
 
-#include "../pch.h"
+#include "pch.h"
+
+#include <list>
+
+#include <boost/thread/condition.hpp>
 
 namespace mongo {
 
@@ -75,7 +79,7 @@ namespace mongo {
         mutable mongo::mutex _pendingMutex;
         mutable boost::condition _pendingUpdated;
 
-        list< string > _pending;
+        std::list< string > _pending;
         mutable map< string, long > _pendingSize;
 
         bool _failed;

@@ -1,3 +1,4 @@
+if ( !_isWindows() ) { // SERVER-5024
 var path = "jstests/libs/";
 
 var rs = new ReplSetTest({"nodes" : {node0 : {}, node1 : {}, arbiter : {}}, keyFile : path+"key1"});
@@ -7,6 +8,7 @@ rs.initiate();
 master = rs.getMaster();
 print("adding user");
 master.getDB("admin").addUser("foo", "bar");
+master.getDB("admin").runCommand({getLastError:1, w:2});
 
 var checkValidState = function(i) {
     assert.soon(function() {
@@ -26,12 +28,19 @@ var safeInsert = function() {
 }
 
 print("authing");
-for (var i=0; i<2; i++) {
-    checkValidState(i);
+assert.soon(function() {
+    for (var i=0; i<2; i++) {
+        checkValidState(i);
 
-    // if this is run before initial sync finishes, we won't be logged in
-    rs.nodes[i].getDB("admin").auth("foo", "bar");
-}
+        // if this is run before initial sync finishes, we won't be logged in
+        var res = rs.nodes[i].getDB("admin").auth("foo", "bar");
+        if (res != 1) {
+            print("couldn't log into "+rs.nodes[i].host);
+            return false;
+        }
+    }
+    return true;
+});
 
 print("make common point");
 
@@ -66,3 +75,4 @@ m = rs.nodes[0];
 
 checkValidState(0);
 checkValidState(1);
+} // !_isWindows()

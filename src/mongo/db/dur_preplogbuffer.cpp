@@ -82,7 +82,7 @@ namespace mongo {
 
             JEntry e;
             e.len = min(i->length(), (unsigned)(mmf->length() - ofs)); //dont write past end of file
-            assert( ofs <= 0x80000000 );
+            verify( ofs <= 0x80000000 );
             e.ofs = (unsigned) ofs;
             e.setFileNo( mmf->fileSuffixNo() );
             if( mmf->relativePath() == local ) {
@@ -113,6 +113,8 @@ namespace mongo {
             }
         }
 
+        void assertNothingSpooled();
+
         /** basic write ops / write intents.  note there is no particular order to these : if we have
             two writes to the same location during the group commit interval, it is likely
             (although not assured) that it is journaled here once.
@@ -121,11 +123,27 @@ namespace mongo {
             scoped_lock lk(privateViews._mutex());
 
             // each time events switch to a different database we journal a JDbContext
+            // switches will be rare as we sort by memory location first and we batch commit.
             RelativePath lastDbPath;
 
-            for( set<WriteIntent>::iterator i = commitJob.writes().begin(); i != commitJob.writes().end(); i++ ) {
-                prepBasicWrite_inlock(bb, &(*i), lastDbPath);
+            assertNothingSpooled();
+            const vector<WriteIntent>& _intents = commitJob.getIntentsSorted();
+            verify( !_intents.empty() );
+
+            WriteIntent last;
+            for( vector<WriteIntent>::const_iterator i = _intents.begin(); i != _intents.end(); i++ ) { 
+                if( i->start() < last.end() ) { 
+                    // overlaps
+                    last.absorb(*i);
+                }
+                else { 
+                    // discontinuous
+                    if( i != _intents.begin() )
+                        prepBasicWrite_inlock(bb, &last, lastDbPath);
+                    last = *i;
+                }
             }
+            prepBasicWrite_inlock(bb, &last, lastDbPath);
         }
 
         static void resetLogBuffer(/*out*/JSectHeader& h, AlignedBuilder& bb) {
@@ -141,18 +159,10 @@ namespace mongo {
             caller handles locking
             @return partially populated sectheader and _ab set
         */
-        static void _PREPLOGBUFFER(JSectHeader& h) {
-            assert( cmdLine.dur );
+        static void _PREPLOGBUFFER(JSectHeader& h, AlignedBuilder& bb) {
+            verify( cmdLine.dur );
+            assertLockedForCommitting();
 
-            {
-                // now that we are locked, fully drain deferred notes of write intents
-                DEV d.dbMutex.assertAtLeastReadLocked();
-                Writes& writes = commitJob.wi();
-                writes._deferred.invoke();
-                writes._drained = true;
-            }
-
-            AlignedBuilder& bb = commitJob._ab;
             resetLogBuffer(h, bb); // adds JSectHeader
 
             // ops other than basic writes (DurOp's)
@@ -166,10 +176,11 @@ namespace mongo {
 
             return;
         }
-        void PREPLOGBUFFER(/*out*/ JSectHeader& h) {
+        void PREPLOGBUFFER(/*out*/ JSectHeader& h, AlignedBuilder& ab) {
+            assertLockedForCommitting();
             Timer t;
             j.assureLogFileOpen(); // so fileId is set
-            _PREPLOGBUFFER(h);
+            _PREPLOGBUFFER(h, ab);
             stats.curr->_prepLogBufferMicros += t.micros();
         }
 

@@ -16,8 +16,11 @@
  */
 
 #include "pch.h"
+
 #include <fcntl.h>
 #include <errno.h>
+
+#include <boost/thread.hpp>
 
 #if defined(__freebsd__) || defined(__openbsd__)
 #include <sys/stat.h>
@@ -27,8 +30,9 @@
 #include <sys/vfs.h>
 #endif
 
-#include "timer.h"
-#include "mongoutils/str.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/timer.h"
+#include "mongo/util/mongoutils/str.h"
 using namespace mongoutils;
 
 #ifndef O_NOATIME
@@ -52,7 +56,7 @@ namespace mongo {
             flushMyDirectory(parent); // flushes grandparent to ensure parent exists after crash
         }
         
-        assert(boost::filesystem::is_directory(parent));
+        verify(boost::filesystem::is_directory(parent));
         return parent;
     }
 
@@ -325,8 +329,8 @@ namespace mongo {
                     log() << "    will try again in 10 seconds" << endl; // not going to warning logs
                     try {
                         if ( tmp.size() )
-                            BOOST_CHECK_EXCEPTION( boost::filesystem::remove( tmp ) );
-                        BOOST_CHECK_EXCEPTION( boost::filesystem::remove( name ) );
+                            MONGO_ASSERT_ON_EXCEPTION( boost::filesystem::remove( tmp ) );
+                        MONGO_ASSERT_ON_EXCEPTION( boost::filesystem::remove( name ) );
                     }
                     catch ( ... ) {
                     }

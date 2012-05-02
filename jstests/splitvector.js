@@ -185,11 +185,22 @@ f.save( { x: 2 } );
 f.save( { x: 3 } );
 db.getLastError();
 
-res = db.runCommand( { splitVector: "test.jstests_splitvector" , keyPattern: {x:1} , force : true } );
+assert.eq( 3 , f.count() );
+print( f.getFullName() )
+
+res = db.runCommand( { splitVector: f.getFullName() , keyPattern: {x:1} , force : true } );
 
 assert.eq( true , res.ok , "9a" );
 assert.eq( 1 , res.splitKeys.length , "9b" );
 assert.eq( 2 , res.splitKeys[0].x , "9c" );
+
+if ( db.runCommand( "isMaster" ).msg != "isdbgrid" ) {
+    res = db.adminCommand( { splitVector: "test.jstests_splitvector" , keyPattern: {x:1} , force : true } );
+    
+    assert.eq( true , res.ok , "9a: " + tojson(res) );
+    assert.eq( 1 , res.splitKeys.length , "9b: " + tojson(res) );
+    assert.eq( 2 , res.splitKeys[0].x , "9c: " + tojson(res) );
+}
 
 
 print("PASSED");

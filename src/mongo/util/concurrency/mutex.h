@@ -17,10 +17,20 @@
 
 #pragma once
 
-#include "../heapcheck.h"
-#include "threadlocal.h"
+#ifdef _WIN32
+# include <concrt.h>
+#endif
+
+#include <boost/noncopyable.hpp>
+#include <boost/thread/mutex.hpp>
+#include <boost/thread/xtime.hpp>
+
+#include "mongo/util/assert_util.h"
+#include "mongo/util/heapcheck.h"
+#include "mongo/util/concurrency/threadlocal.h"
+
 #if defined(_DEBUG)
-#include "mutexdebugger.h"
+#include "mongo/util/concurrency/mutexdebugger.h"
 #endif
 
 namespace mongo {
@@ -70,11 +80,7 @@ namespace mongo {
         public:
             try_lock( mongo::mutex &m , int millis = 0 )
                 : _l( m.boost() , incxtimemillis( millis ) ) ,
-#if BOOST_VERSION >= 103500
                   ok( _l.owns_lock() )
-#else
-                  ok( _l.locked() )
-#endif
             { }
         private:
             boost::timed_mutex::scoped_timed_lock _l;
@@ -113,8 +119,7 @@ namespace mongo {
         boost::timed_mutex *_m;
     };
 
-    typedef mutex::scoped_lock scoped_lock;
-    typedef boost::recursive_mutex::scoped_lock recursive_scoped_lock;
+    typedef mongo::mutex::scoped_lock scoped_lock;
 
     /** The concept with SimpleMutex is that it is a basic lock/unlock with no 
           special functionality (such as try and try timeout).  Thus it can be 
@@ -122,60 +127,36 @@ namespace mongo {
         On Windows, the implementation below is faster than boost mutex.
     */
 #if defined(_WIN32)
-    class SimpleMutex : boost::noncopyable {
-        CRITICAL_SECTION _cs;
+    class SimpleMutex  {
     public:
-        SimpleMutex(const char *name) { InitializeCriticalSection(&_cs); }
-        ~SimpleMutex() { DeleteCriticalSection(&_cs); }
-
-#if defined(_DEBUG)
-        ThreadLocalValue<int> _nlocksByMe;
-        void lock() { 
-            assert( _nlocksByMe.get() == 0 ); // indicates you rae trying to lock recursively
-            _nlocksByMe.set(1);
-            EnterCriticalSection(&_cs); 
-        }
-        void dassertLocked() const { 
-            assert( _nlocksByMe.get() == 1 );
-        }
-        void unlock() { 
-            dassertLocked();
-            _nlocksByMe.set(0);
-            LeaveCriticalSection(&_cs); 
-        }
-#else
+        SimpleMutex( const char * ) {}
         void dassertLocked() const { }
-        void lock() { 
-            EnterCriticalSection(&_cs); 
-        }
-        void unlock() { 
-            LeaveCriticalSection(&_cs); 
-        }
-#endif
-
-        class scoped_lock : boost::noncopyable {
+        void lock() { _cs.lock(); }
+        void unlock() { _cs.unlock(); }
+        class scoped_lock {
             SimpleMutex& _m;
         public:
             scoped_lock( SimpleMutex &m ) : _m(m) { _m.lock(); }
             ~scoped_lock() { _m.unlock(); }
-# if defined(_DEBUG)
             const SimpleMutex& m() const { return _m; }
-# endif
         };
+
+    private:
+        Concurrency::critical_section _cs;
     };
 #else
     class SimpleMutex : boost::noncopyable {
     public:
         void dassertLocked() const { }
-        SimpleMutex(const char* name) { assert( pthread_mutex_init(&_lock,0) == 0 ); }
+        SimpleMutex(const char* name) { verify( pthread_mutex_init(&_lock,0) == 0 ); }
         ~SimpleMutex(){ 
             if ( ! StaticObserver::_destroyingStatics ) { 
-                assert( pthread_mutex_destroy(&_lock) == 0 ); 
+                verify( pthread_mutex_destroy(&_lock) == 0 ); 
             }
         }
 
-        void lock() { assert( pthread_mutex_lock(&_lock) == 0 ); }
-        void unlock() { assert( pthread_mutex_unlock(&_lock) == 0 ); }
+        void lock() { verify( pthread_mutex_lock(&_lock) == 0 ); }
+        void unlock() { verify( pthread_mutex_unlock(&_lock) == 0 ); }
     public:
         class scoped_lock : boost::noncopyable {
             SimpleMutex& _m;
@@ -207,7 +188,7 @@ namespace mongo {
                     rm.m.lock(); 
             }
             ~scoped_lock() { 
-                assert( nLocksByMe > 0 );
+                verify( nLocksByMe > 0 );
                 if( --nLocksByMe == 0 ) {
                     rm.m.unlock(); 
                 }

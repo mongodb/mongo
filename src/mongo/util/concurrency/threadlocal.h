@@ -16,7 +16,10 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "mongo/client/undef_macros.h"
 #include <boost/thread/tss.hpp>
+#include "mongo/client/redef_macros.h"
+
 
 namespace mongo { 
 
@@ -78,6 +81,12 @@ namespace mongo {
     public:
         T* get() const;
         void reset(T* v);
+        T* getMake() { 
+            T *t = get();
+            if( t == 0 )
+                reset( t = new T() );
+            return t;
+        }
     };
 
 # if defined(_WIN32)
@@ -115,6 +124,12 @@ namespace mongo {
     public:
         T* get() const { return tsp.get(); }
         void reset(T* v) { tsp.reset(v); }
+        T* getMake() { 
+            T *t = get();
+            if( t == 0 )
+                reset( t = new T() );
+            return t;
+        }
     };
 
 #  define TSP_DECLARE(T,p) extern TSP<T> p;

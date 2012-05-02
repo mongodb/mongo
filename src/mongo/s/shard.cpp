@@ -20,14 +20,15 @@
 #include "shard.h"
 #include "config.h"
 #include "request.h"
-#include "client.h"
+#include "client_info.h"
 #include "../db/commands.h"
+#include "mongo/client/dbclientcursor.h"
 #include <set>
 
 namespace mongo {
 
     typedef shared_ptr<Shard> ShardPtr;
-    
+
     class StaticShardInfo {
     public:
         StaticShardInfo() : _mutex("StaticShardInfo"), _rsMutex("RSNameMap") { }
@@ -85,7 +86,7 @@ namespace mongo {
             }
 
         }
-        
+
         ShardPtr find( const string& ident ) {
             string mykey = ident;
 
@@ -102,17 +103,6 @@ namespace mongo {
 
             scoped_lock lk( _mutex );
             ShardMap::iterator i = _lookup.find( mykey );
-            
-            if ( i == _lookup.end() ) {
-                size_t x = ident.find( '/' );
-                if ( x != string::npos ) {
-                    string y = ident.substr( 0 , x );
-                    ShardMap::iterator j = _rsLookup.find( y );
-                    if ( j != _rsLookup.end() )
-                        return j->second;
-                }
-            }
-
             massert( 13129 , (string)"can't find shard for: " + mykey , i != _lookup.end() );
             return i->second;
         }
@@ -146,7 +136,7 @@ namespace mongo {
 
         void _installHost( const string& host , const ShardPtr& s ) {
             _lookup[host] = s;
-            
+
             const ConnectionString& cs = s->getAddress();
             if ( cs.type() == ConnectionString::SET ) {
                 if ( cs.getSetName().size() ) {
@@ -159,7 +149,7 @@ namespace mongo {
                 }
             }
         }
-        
+
         void remove( const string& name ) {
             scoped_lock lk( _mutex );
             for ( ShardMap::iterator i = _lookup.begin(); i!=_lookup.end(); ) {
@@ -181,7 +171,7 @@ namespace mongo {
                 }
             }
         }
-        
+
         void getAllShards( vector<ShardPtr>& all ) const {
             scoped_lock lk( _mutex );
             std::set<string> seen;
@@ -210,15 +200,15 @@ namespace mongo {
             }
         }
 
-        
+
         bool isAShardNode( const string& addr ) const {
-            scoped_lock lk( _mutex );      
-            
+            scoped_lock lk( _mutex );
+
             // check direct nods or set names
             ShardMap::const_iterator i = _lookup.find( addr );
             if ( i != _lookup.end() )
                 return true;
-            
+
             // check for set nodes
             for ( ShardMap::const_iterator i = _lookup.begin(); i!=_lookup.end(); ++i ) {
                 if ( i->first == "config" )
@@ -230,7 +220,7 @@ namespace mongo {
 
             return false;
         }
-        
+
         bool getShardMap( BSONObjBuilder& result , string& errmsg ) const {
             scoped_lock lk( _mutex );
 
@@ -239,9 +229,9 @@ namespace mongo {
             for ( ShardMap::const_iterator i = _lookup.begin(); i!=_lookup.end(); ++i ) {
                 b.append( i->first , i->second->getConnString() );
             }
-            
+
             result.append( "map" , b.obj() );
-            
+
             return true;
         }
 
@@ -253,7 +243,7 @@ namespace mongo {
         mutable mongo::mutex _rsMutex;
     } staticShardInfo;
 
-    
+
     class CmdGetShardMap : public Command {
     public:
         CmdGetShardMap() : Command( "getShardMap" ){}
@@ -266,7 +256,7 @@ namespace mongo {
             return staticShardInfo.getShardMap( result , errmsg );
         }
     } cmdGetShardMap;
-    
+
 
     void Shard::_setAddr( const string& addr ) {
         _addr = addr;
@@ -285,7 +275,7 @@ namespace mongo {
     }
 
     void Shard::setAddress( const ConnectionString& cs) {
-        assert( _name.size() );
+        verify( _name.size() );
         _addr = cs.toString();
         _cs = cs;
         _rsInit();
@@ -301,7 +291,7 @@ namespace mongo {
     bool Shard::containsNode( const string& node ) const {
         if ( _addr == node )
             return true;
-        
+
         if ( _rs && _rs->contains( node ) )
             return true;
 

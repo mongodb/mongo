@@ -24,11 +24,12 @@
 #include "../util/net/listen.h"
 
 namespace mongo {
+    const int ShardedClientCursor::INIT_REPLY_BUFFER_SIZE = 32768;
 
     // --------  ShardedCursor -----------
 
     ShardedClientCursor::ShardedClientCursor( QueryMessage& q , ClusteredCursor * cursor ) {
-        assert( cursor );
+        verify( cursor );
         _cursor = cursor;
 
         _skip = q.ntoskip;
@@ -47,7 +48,7 @@ namespace mongo {
     }
 
     ShardedClientCursor::~ShardedClientCursor() {
-        assert( _cursor );
+        verify( _cursor );
         delete _cursor;
         _cursor = 0;
     }
@@ -55,9 +56,13 @@ namespace mongo {
     long long ShardedClientCursor::getId() {
         if ( _id <= 0 ) {
             _id = cursorCache.genId();
-            assert( _id >= 0 );
+            verify( _id >= 0 );
         }
         return _id;
+    }
+
+    int ShardedClientCursor::getTotalSent() const {
+        return _totalSent;
     }
 
     void ShardedClientCursor::accessed() {
@@ -71,48 +76,64 @@ namespace mongo {
         return now - _lastAccessMillis;
     }
 
-    bool ShardedClientCursor::sendNextBatch( Request& r , int ntoreturn ) {
+    bool ShardedClientCursor::sendNextBatchAndReply( Request& r ){
+        BufBuilder buffer( INIT_REPLY_BUFFER_SIZE );
+        int docCount = 0;
+        bool hasMore = sendNextBatch( r, _ntoreturn, buffer, docCount );
+        replyToQuery( 0, r.p(), r.m(), buffer.buf(), buffer.len(), docCount,
+                _totalSent, hasMore ? getId() : 0 );
+
+        return hasMore;
+    }
+
+    bool ShardedClientCursor::sendNextBatch( Request& r , int ntoreturn ,
+            BufBuilder& buffer, int& docCount ) {
         uassert( 10191 ,  "cursor already done" , ! _done );
 
         int maxSize = 1024 * 1024;
         if ( _totalSent > 0 )
             maxSize *= 3;
 
-        BufBuilder b(32768);
+        docCount = 0;
 
-        int num = 0;
-
-        // Send more if ntoreturn is 0, or any value > 1 (one is assumed to be a single doc return, with no cursor)
+        // Send more if ntoreturn is 0, or any value > 1
+        // (one is assumed to be a single doc return, with no cursor)
         bool sendMore = ntoreturn == 0 || ntoreturn > 1;
         ntoreturn = abs( ntoreturn );
 
         while ( _cursor->more() ) {
             BSONObj o = _cursor->next();
 
-            b.appendBuf( (void*)o.objdata() , o.objsize() );
-            num++;
+            buffer.appendBuf( (void*)o.objdata() , o.objsize() );
+            docCount++;
 
-            if ( b.len() > maxSize ) {
+            if ( buffer.len() > maxSize ) {
                 break;
             }
 
-            if ( num == ntoreturn ) {
+            if ( docCount == ntoreturn ) {
                 // soft limit aka batch size
                 break;
             }
 
-            if ( ntoreturn == 0 && _totalSent == 0 && num >= 100 ) {
+            if ( ntoreturn == 0 && _totalSent == 0 && docCount >= 100 ) {
                 // first batch should be max 100 unless batch size specified
                 break;
             }
         }
 
         bool hasMore = sendMore && _cursor->more();
-        LOG(5) << "\t hasMore: " << hasMore << " sendMore: " << sendMore << " cursorMore: " << _cursor->more() << " ntoreturn: " << ntoreturn
-               << " num: " << num << " wouldSendMoreIfHad: " << sendMore << " id:" << getId() << " totalSent: " << _totalSent << endl;
 
-        replyToQuery( 0 , r.p() , r.m() , b.buf() , b.len() , num , _totalSent , hasMore ? getId() : 0 );
-        _totalSent += num;
+        LOG(5) << "\t hasMore: " << hasMore
+               << " sendMore: " << sendMore
+               << " cursorMore: " << _cursor->more()
+               << " ntoreturn: " << ntoreturn
+               << " num: " << docCount
+               << " wouldSendMoreIfHad: " << sendMore
+               << " id:" << getId()
+               << " totalSent: " << _totalSent << endl;
+
+        _totalSent += docCount;
         _done = ! hasMore;
 
         return hasMore;
@@ -153,26 +174,26 @@ namespace mongo {
 
     void CursorCache::store( ShardedClientCursorPtr cursor ) {
         LOG(_myLogLevel) << "CursorCache::store cursor " << " id: " << cursor->getId() << endl;
-        assert( cursor->getId() );
+        verify( cursor->getId() );
         scoped_lock lk( _mutex );
         _cursors[cursor->getId()] = cursor;
         _shardedTotal++;
     }
     void CursorCache::remove( long long id ) {
-        assert( id );
+        verify( id );
         scoped_lock lk( _mutex );
         _cursors.erase( id );
     }
     
     void CursorCache::storeRef( const string& server , long long id ) {
         LOG(_myLogLevel) << "CursorCache::storeRef server: " << server << " id: " << id << endl;
-        assert( id );
+        verify( id );
         scoped_lock lk( _mutex );
         _refs[id] = server;
     }
 
     string CursorCache::getRef( long long id ) const {
-        assert( id );
+        verify( id );
         scoped_lock lk( _mutex );
         MapNormal::const_iterator i = _refs.find( id );
 
@@ -249,7 +270,7 @@ namespace mongo {
 
             LOG(_myLogLevel) << "CursorCache::found gotKillCursors id: " << id << " server: " << server << endl;
 
-            assert( server.size() );
+            verify( server.size() );
             ScopedDbConnection conn( server );
             conn->killCursor( id );
             conn.done();
@@ -290,10 +311,10 @@ namespace mongo {
         virtual void doWork() {
             cursorCache.doTimeouts();
         }
-    } cursorTimeoutTask;
+    };
 
     void CursorCache::startTimeoutThread() {
-        task::repeat( &cursorTimeoutTask , 400 );
+        task::repeat( new CursorTimeoutTask , 400 );
     }
 
     class CmdCursorInfo : public Command {

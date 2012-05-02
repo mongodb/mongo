@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include "cmdline.h"
-#include "namespace.h"
+#include "mongo/db/cmdline.h"
+#include "mongo/db/namespace_details.h"
 
 namespace mongo {
 

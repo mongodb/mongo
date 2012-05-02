@@ -13,23 +13,30 @@
 # This file, SConstruct, configures the build environment, and then delegates to
 # several, subordinate SConscript files, which describe specific build rules.
 
-EnsureSConsVersion( 1, 1, 0 )
-
-import os
-import sys
-import imp
-import types
-import re
-import shutil
-import urllib
-import urllib2
 import buildscripts
 import buildscripts.bb
+import datetime
+import imp
+import os
+import re
+import shutil
 import stat
+import sys
+import types
+import urllib
+import urllib2
 from buildscripts import utils
 
 import libdeps
 
+EnsureSConsVersion( 1, 1, 0 )
+if "uname" in dir(os):
+    scons_data_dir = ".scons/%s/%s" % ( os.uname()[0] , os.getenv( "HOST" , "nohost" ) )
+else:
+    scons_data_dir = ".scons/%s/" % os.getenv( "HOST" , "nohost" )
+SConsignFile( scons_data_dir + "/sconsign" )
+
+DEFAULT_INSTALL_DIR = "/usr/local"
 
 def _rpartition(string, sep):
     """A replacement for str.rpartition which is missing in Python < 2.5
@@ -48,15 +55,6 @@ def findSettingsSetup():
     sys.path.append( ".." )
     sys.path.append( "../../" )
 
-def getThirdPartyShortNames():
-    lst = []
-    for x in os.listdir( "src/third_party" ):
-        if not x.endswith( ".py" ) or x.find( "#" ) >= 0:
-            continue
-
-        lst.append( _rpartition( x, "." )[0] )
-    return lst
-
 
 # --- options ----
 
@@ -64,21 +62,24 @@ options = {}
 
 options_topass = {}
 
-def add_option( name, help , nargs , contibutesToVariantDir , dest=None ):
+def add_option( name, help, nargs, contributesToVariantDir,
+                dest=None, default = None, type="string", choices=None ):
 
     if dest is None:
         dest = name
 
     AddOption( "--" + name , 
                dest=dest,
-               type="string",
+               type=type,
                nargs=nargs,
                action="store",
+               choices=choices,
+               default=default,
                help=help )
 
     options[name] = { "help" : help ,
                       "nargs" : nargs , 
-                      "contibutesToVariantDir" : contibutesToVariantDir ,
+                      "contributesToVariantDir" : contributesToVariantDir ,
                       "dest" : dest } 
 
 def get_option( name ):
@@ -106,6 +107,8 @@ def has_option( name ):
 
     return x
 
+def use_system_version_of_library(name):
+    return has_option('use-system-all') or has_option('use-system-' + name)
 
 def get_variant_dir():
     
@@ -115,7 +118,7 @@ def get_variant_dir():
         o = options[name]
         if not has_option( o["dest"] ):
             continue
-        if not o["contibutesToVariantDir"]:
+        if not o["contributesToVariantDir"]:
             continue
         
         if o["nargs"] == 0:
@@ -134,8 +137,11 @@ def get_variant_dir():
         s += "normal/"
     return s
         
+# build output
+add_option( "mute" , "do not display commandlines for compiling and linking, to reduce screen noise", 0, False )
+
 # installation/packaging
-add_option( "prefix" , "installation prefix" , 1 , False )
+add_option( "prefix" , "installation prefix" , 1 , False, default=DEFAULT_INSTALL_DIR )
 add_option( "distname" , "dist name (0.8.0)" , 1 , False )
 add_option( "distmod", "additional piece for full dist name" , 1 , False )
 add_option( "nostrip", "do not strip installed binaries" , 0 , False )
@@ -160,8 +166,6 @@ add_option( "libpath", "Library path if you have libraries in a nonstandard dire
 add_option( "extrapath", "comma separated list of add'l paths  (--extrapath /opt/foo/,/foo) static linking" , 1 , True )
 add_option( "extrapathdyn", "comma separated list of add'l paths  (--extrapath /opt/foo/,/foo) dynamic linking" , 1 , True )
 add_option( "extralib", "comma separated list of libraries  (--extralib js_static,readline" , 1 , True )
-add_option( "staticlib", "comma separated list of libs to link statically (--staticlib js_static,boost_program_options-mt,..." , 1 , True )
-add_option( "staticlibpath", "comma separated list of dirs to search for staticlib arguments" , 1 , True )
 
 add_option( "boost-compiler", "compiler used for boost (gcc41)" , 1 , True , "boostCompiler" )
 add_option( "boost-version", "boost version for linking(1_38)" , 1 , True , "boostVersion" )
@@ -197,19 +201,30 @@ add_option( "clang" , "use clang++ rather than g++ (experimental)" , 0 , True )
 add_option( "tcmalloc" , "link against tcmalloc" , 0 , False )
 add_option( "gdbserver" , "build in gdb server support" , 0 , True )
 add_option( "heapcheck", "link to heap-checking malloc-lib and look for memory leaks during tests" , 0 , False )
+add_option( "gcov" , "compile with flags for gcov" , 0 , True )
 
 add_option("smokedbprefix", "prefix to dbpath et al. for smoke tests", 1 , False )
-
-for shortName in getThirdPartyShortNames():
-    add_option( "use-system-" + shortName , "use system version of library " + shortName , 0 , True )
+add_option("smokeauth", "run smoke tests with --auth", 0 , False )
 
 add_option( "use-system-pcre", "use system version of pcre library", 0, True )
+
+add_option( "use-system-boost", "use system version of boost libraries", 0, True )
+
+add_option( "use-system-snappy", "use system version of snappy library", 0, True )
+
+add_option( "use-system-sm", "use system version of spidermonkey library", 0, True )
 
 add_option( "use-system-all" , "use all system libraries", 0 , True )
 
 add_option( "use-cpu-profiler",
             "Link against the google-perftools profiler library",
             0, True )
+
+add_option("mongod-concurrency-level", "Concurrency level, \"global\" or \"db\"", 1, True,
+           type="choice", choices=["global", "db"])
+
+add_option('client-dist-basename', "Name of the client source archive.", 1, False,
+           default='mongo-cxx-driver')
 
 # don't run configure if user calls --help
 if GetOption('help'):
@@ -219,10 +234,6 @@ if GetOption('help'):
 
 variantDir = get_variant_dir()
 
-def removeIfInList( lst , thing ):
-    if thing in lst:
-        lst.remove( thing )
-
 def printLocalInfo():
     import sys, SCons
     print( "scons version: " + SCons.__version__ )
@@ -230,7 +241,7 @@ def printLocalInfo():
 
 printLocalInfo()
 
-boostLibs = [ "thread" , "filesystem" , "program_options" ]
+boostLibs = [ "thread" , "filesystem" , "program_options", "system" ]
 
 onlyServer = len( COMMAND_LINE_TARGETS ) == 0 or ( len( COMMAND_LINE_TARGETS ) == 1 and str( COMMAND_LINE_TARGETS[0] ) in [ "mongod" , "mongos" , "test" ] )
 nix = False
@@ -241,15 +252,17 @@ windows = False
 freebsd = False
 openbsd = False
 solaris = False
+force32 = has_option( "force32" ) 
 force64 = has_option( "force64" )
-if not force64 and os.getcwd().endswith( "mongo-64" ):
+if not force64 and not force32 and os.getcwd().endswith( "mongo-64" ):
     force64 = True
     print( "*** assuming you want a 64-bit build b/c of directory *** " )
 msarch = None
-if force64:
+if force32:
+    msarch = "x86"
+elif force64:
     msarch = "amd64"
 
-force32 = has_option( "force32" ) 
 release = has_option( "release" )
 static = has_option( "static" )
 
@@ -267,13 +280,32 @@ usePCH = has_option( "usePCH" )
 justClientLib = (COMMAND_LINE_TARGETS == ['mongoclient'])
 
 env = Environment( BUILD_DIR=variantDir,
+                   CLIENT_ARCHIVE='${CLIENT_DIST_BASENAME}${DIST_ARCHIVE_SUFFIX}',
+                   CLIENT_DIST_BASENAME=get_option('client-dist-basename'),
+                   CLIENT_LICENSE='#distsrc/client/LICENSE.txt',
+                   CLIENT_SCONSTRUCT='#distsrc/client/SConstruct',
+                   DIST_ARCHIVE_SUFFIX='.tgz',
+                   EXTRAPATH=get_option("extrapath"),
                    MSVS_ARCH=msarch ,
-                   tools=["default", "gch", "jsheader", "mergelib" ],
+                   PYTHON=utils.find_python(),
+                   SERVER_ARCHIVE='${SERVER_DIST_BASENAME}${DIST_ARCHIVE_SUFFIX}',
+                   TARGET_ARCH=msarch ,
+                   tools=["default", "gch", "jsheader", "mergelib"],
                    PYSYSPLATFORM=os.sys.platform,
 
-                   PCRE_VERSION='7.4',
+                   PCRE_VERSION='8.30',
+                   CONFIGUREDIR = scons_data_dir + '/sconf_temp',
+                   CONFIGURELOG = scons_data_dir + '/config.log'
                    )
 
+if has_option('mute'):
+    env.Append( CCCOMSTR = "Compiling $TARGET" )
+    env.Append( CXXCOMSTR = env["CCCOMSTR"] )
+    env.Append( LINKCOMSTR = "Linking $TARGET" )
+    env.Append( ARCOMSTR = "Generating library $TARGET" )
+
+if has_option('mongod-concurrency-level'):
+    env.Append(CPPDEFINES=['MONGOD_CONCURRENCY_LEVEL=MONGOD_CONCURRENCY_LEVEL_%s' % get_option('mongod-concurrency-level').upper()])
 
 libdeps.setup_environment( env )
 
@@ -325,8 +357,12 @@ if has_option( "libpath" ):
 if has_option( "cpppath" ):
     env["CPPPATH"] = [get_option( "cpppath" )]
 
-env.Append( CPPDEFINES=[ "_SCONS" , "MONGO_EXPOSE_MACROS" ],
-            CPPPATH=[ '$BUILD_DIR', "$BUILD_DIR/mongo" ] )
+env.Prepend( CPPDEFINES=[ "_SCONS" , 
+                          "MONGO_EXPOSE_MACROS" ,
+                          "SUPPORT_UTF8" ],  # for pcre
+
+
+             CPPPATH=[ '$BUILD_DIR', "$BUILD_DIR/mongo" ] )
 
 if has_option( "safeshell" ):
     env.Append( CPPDEFINES=[ "MONGO_SAFE_SHELL" ] )
@@ -353,8 +389,6 @@ if ( not ( usesm or usev8 or justClientLib) ):
     usesm = True
     options_topass["usesm"] = True
 
-distBuild = len( COMMAND_LINE_TARGETS ) == 1 and ( str( COMMAND_LINE_TARGETS[0] ) == "s3dist" or str( COMMAND_LINE_TARGETS[0] ) == "dist" )
-
 extraLibPlaces = []
 
 env['EXTRACPPPATH'] = []
@@ -380,38 +414,18 @@ if has_option( "extralib" ):
 
 class InstallSetup:
     binaries = False
-    clientSrc = False
+    libraries = False
     headers = False
-    bannerFiles = tuple()
-    headerRoot = "include"
 
     def __init__(self):
         self.default()
-    
+
     def default(self):
         self.binaries = True
         self.libraries = False
-        self.clientSrc = False
         self.headers = False
-        self.bannerFiles = tuple()
-        self.headerRoot = "include"
-        self.clientTestsDir = None
-
-    def justClient(self):
-        self.binaries = False
-        self.libraries = False
-        self.clientSrc = True
-        self.headers = True
-        self.bannerFiles = [ "#distsrc/client/LICENSE.txt",
-                             "#distsrc/client/SConstruct" ]
-        self.headerRoot = "mongo/"
-        self.clientTestsDir = "#src/mongo/client/examples/"
 
 installSetup = InstallSetup()
-if distBuild:
-    installSetup.bannerFiles = [ "#distsrc/GNU-AGPL-3.0",
-                                 "#distsrc/README",
-                                 "#distsrc/THIRD-PARTY-NOTICES", ]
 
 if has_option( "full" ):
     installSetup.headers = True
@@ -432,24 +446,14 @@ if force64:
 
 env['PROCESSOR_ARCHITECTURE'] = processor
 
-DEFAULT_INSTALL_DIR = "/usr/local"
 installDir = DEFAULT_INSTALL_DIR
 nixLibPrefix = "lib"
 
-distName = GetOption( "distname" )
 dontReplacePackage = False
-
-if distBuild:
-    release = True
-
-def isDriverBuild():
-    return GetOption( "prefix" ) and GetOption( "prefix" ).find( "mongo-cxx-driver" ) >= 0
+isBuildingLatest = False
 
 if has_option( "prefix" ):
     installDir = GetOption( "prefix" )
-    if isDriverBuild():
-        installDir = '#' + installDir
-        installSetup.justClient()
 
 def findVersion( root , choices ):
     if not isinstance(root, list):
@@ -459,12 +463,6 @@ def findVersion( root , choices ):
             if ( os.path.exists( r + c ) ):
                 return r + c
     raise RuntimeError("can't find a version of [" + repr(root) + "] choices: " + repr(choices))
-
-def choosePathExist( choices , default=None):
-    for c in choices:
-        if c != None and os.path.exists( c ):
-            return c
-    return default
 
 def filterExists(paths):
     return filter(os.path.exists, paths)
@@ -481,13 +479,13 @@ if "darwin" == os.sys.platform:
     nix = True
 
     if force64:
-        env.Append( EXTRACPPPATH=["/usr/64/include"] )
-        env.Append( EXTRALIBPATH=["/usr/64/lib"] )
-        if installDir == DEFAULT_INSTALL_DIR and not distBuild:
-            installDir = "/usr/64/"
+       env.Append( EXTRACPPPATH=["/usr/64/include"] )
+       env.Append( EXTRALIBPATH=["/usr/64/lib"] )
+       if installDir == DEFAULT_INSTALL_DIR:
+           installDir = "/usr/64/"
     else:
-        env.Append( EXTRACPPPATH=filterExists(["/sw/include" , "/opt/local/include"]) )
-        env.Append( EXTRALIBPATH=filterExists(["/sw/lib/", "/opt/local/lib"]) )
+       env.Append( EXTRACPPPATH=filterExists(["/sw/include" , "/opt/local/include"]) )
+       env.Append( EXTRALIBPATH=filterExists(["/sw/lib/", "/opt/local/lib"]) )
 
 elif os.sys.platform.startswith("linux"):
     linux = True
@@ -533,8 +531,8 @@ elif os.sys.platform.startswith( "openbsd" ):
 
 elif "win32" == os.sys.platform:
     windows = True
-    #if force64:
-    #    release = True
+
+    env['DIST_ARCHIVE_SUFFIX'] = '.zip'
 
     if has_option( "win2008plus" ):
         env.Append( CPPDEFINES=[ "MONGO_USE_SRW_ON_WINDOWS" ] )
@@ -547,31 +545,6 @@ elif "win32" == os.sys.platform:
 	#use current environment
 	env['ENV'] = dict(os.environ)
 
-    def find_boost():
-        for x in ('', ' (x86)'):	
-            boostDir = "C:/Program Files" + x + "/boost/latest"
-            if os.path.exists( boostDir ):
-                return boostDir
-            for bv in reversed( range(33,50) ):
-	            for extra in ('', '_0', '_1'):
-		            boostDir = "C:/Program Files" + x + "/Boost/boost_1_" + str(bv) + extra
-		            if os.path.exists( boostDir ):
-		                return boostDir
-        if os.path.exists( "C:/boost" ):
-	        return "C:/boost"
-        if os.path.exists( "/boost" ):
-	        return "/boost"
-        return None
-
-    boostDir = find_boost()
-    if boostDir is None:
-        print( "can't find boost" )
-        Exit(1)
-    else:
-        print( "boost found at '" + boostDir + "'" )
-
-    boostLibs = []
-
     env.Append( CPPDEFINES=[ "_UNICODE" ] )
     env.Append( CPPDEFINES=[ "UNICODE" ] )
 
@@ -579,14 +552,12 @@ elif "win32" == os.sys.platform:
                               [ "v7.1", "v7.0A", "v7.0", "v6.1", "v6.0a", "v6.0" ] )
     print( "Windows SDK Root '" + winSDKHome + "'" )
 
-    env.Append( EXTRACPPPATH=[ boostDir , winSDKHome + "/Include" ] )
-
-    # consider adding /MP build with multiple processes option.
+    env.Append( EXTRACPPPATH=[ winSDKHome + "/Include" ] )
 
     # /EHsc exception handling style for visual studio
     # /W3 warning level
     # /WX abort build on compiler warnings
-    env.Append( CPPFLAGS=" /EHsc /W3 " ) #  /WX " )
+    env.Append(CCFLAGS=["/EHsc","/W3"])
 
     # some warnings we don't like:
     # c4355
@@ -601,50 +572,48 @@ elif "win32" == os.sys.platform:
     # c4244
     # 'conversion' conversion from 'type1' to 'type2', possible loss of data
     #  An integer type is converted to a smaller integer type.
-    env.Append( CPPFLAGS=" /wd4355 /wd4800 /wd4267 /wd4244 " )
+    env.Append( CCFLAGS=["/wd4355", "/wd4800", "/wd4267", "/wd4244"] )
     
     # PSAPI_VERSION relates to process api dll Psapi.dll.
     env.Append( CPPDEFINES=["_CONSOLE","_CRT_SECURE_NO_WARNINGS","PSAPI_VERSION=1" ] )
 
     # this would be for pre-compiled headers, could play with it later  
-    #env.Append( CPPFLAGS=' /Yu"pch.h" ' ) 
+    #env.Append( CCFLAGS=['/Yu"pch.h"'] )
 
     # docs say don't use /FD from command line (minimal rebuild)
-    # /Gy function level linking
-    # /Gm is minimal rebuild, but may not work in parallel mode.
+    # /Gy function level linking (implicit when using /Z7)
+    # /Z7 debug info goes into each individual .obj file -- no .pdb created 
+    env.Append( CCFLAGS= ["/Z7", "/errorReport:none"] )
     if release:
-        env.Append( CPPDEFINES=[ "NDEBUG" ] )
-        env.Append( CPPFLAGS= " /O2 /Gy " )
-        env.Append( CPPFLAGS= " /MT /Zi /TP /errorReport:none " )
+        # /MT: Causes your application to use the multithread, static version of the run-time library (LIBCMT.lib)
+        # /O2: optimize for speed (as opposed to size)
+        env.Append( CCFLAGS= ["/O2", "/MT"] )
+
         # TODO: this has caused some linking problems :
         # /GL whole program optimization
         # /LTCG link time code generation
-        env.Append( CPPFLAGS= " /GL " ) 
+        env.Append( CCFLAGS= ["/GL"] )
         env.Append( LINKFLAGS=" /LTCG " )
+        env.Append( ARFLAGS=" /LTCG " ) # for the Library Manager
         # /DEBUG will tell the linker to create a .pdb file
         # which WinDbg and Visual Studio will use to resolve
-        # symbols if you want to debug a release-mode image
+        # symbols if you want to debug a release-mode image.
+        # Note that this means we can't do parallel links in the build.
         env.Append( LINKFLAGS=" /DEBUG " )
     else:
-        # /Od disable optimization
-        # /Z7 debug info goes into each individual .obj file -- no .pdb created 
-        # /TP it's a c++ file
         # /RTC1: - Enable Stack Frame Run-Time Error Checking; Reports when a variable is used without having been initialized
-        env.Append( CPPFLAGS=" /RTC1 /MDd /Z7 /TP /errorReport:none " )
-
+        #        (implies /Od: no optimizations)
+        # /MTd: Defines _DEBUG, _MT, and causes your application to use the
+        #       debug multithread version of the run-time library (LIBCMTD.lib)
+        env.Append( CCFLAGS=["/RTC1", "/Od", "/MTd"] )
         if debugBuild:
+            # If you build without --d, no debug PDB will be generated, and 
+            # linking will be faster. However, you won't be able to debug your code with the debugger.
             env.Append( LINKFLAGS=" /debug " )
-            env.Append( CPPFLAGS=" /Od " )
-            
-        if debugLogging:
-            env.Append( CPPDEFINES=[ "_DEBUG" ] )
-
-    if force64 and os.path.exists( boostDir + "/lib/vs2010_64" ):
-        env.Append( EXTRALIBPATH=[ boostDir + "/lib/vs2010_64" ] )
-    elif not force64 and os.path.exists( boostDir + "/lib/vs2010_32" ):
-        env.Append( EXTRALIBPATH=[ boostDir + "/lib/vs2010_32" ] )
-    else:
-        env.Append( EXTRALIBPATH=[ boostDir + "/Lib" ] )
+        #if debugLogging:
+            # This is already implicit from /MDd...
+            #env.Append( CPPDEFINES=[ "_DEBUG" ] )
+            # This means --dd is always on unless you say --release
 
     if force64:
         env.Append( EXTRALIBPATH=[ winSDKHome + "/Lib/x64" ] )
@@ -652,17 +621,15 @@ elif "win32" == os.sys.platform:
         env.Append( EXTRALIBPATH=[ winSDKHome + "/Lib" ] )
 
     if release:
-        #env.Append( LINKFLAGS=" /NODEFAULTLIB:MSVCPRT  /NODEFAULTLIB:MSVCRTD " )
         env.Append( LINKFLAGS=" /NODEFAULTLIB:MSVCPRT  " )
     else:
         env.Append( LINKFLAGS=" /NODEFAULTLIB:MSVCPRT  /NODEFAULTLIB:MSVCRT  " )
 
-    winLibString = "ws2_32.lib kernel32.lib advapi32.lib Psapi.lib"
+    winLibString = "ws2_32.lib kernel32.lib advapi32.lib Psapi.lib DbgHelp.lib"
 
     if force64:
 
         winLibString += ""
-        #winLibString += " LIBCMT LIBCPMT "
 
     else:
         winLibString += " user32.lib gdi32.lib winspool.lib comdlg32.lib  shell32.lib ole32.lib oleaut32.lib "
@@ -673,12 +640,6 @@ elif "win32" == os.sys.platform:
         winLibString += " winmm.lib "
 
     env.Append( LIBS=Split(winLibString) )
-
-    # dm these should automatically be defined by the compiler. commenting out to see if works. jun2010
-    #if force64:
-    #    env.Append( CPPDEFINES=["_AMD64_=1"] )
-    #else:
-    #    env.Append( CPPDEFINES=["_X86_=1"] )
 
     env.Append( EXTRACPPPATH=["#/../winpcap/Include"] )
     env.Append( EXTRALIBPATH=["#/../winpcap/Lib"] )
@@ -692,17 +653,24 @@ if nix:
     if has_option( "distcc" ):
         env["CXX"] = "distcc " + env["CXX"]
 
-    # -Winvalid-pch Warn if a precompiled header (see Precompiled Headers) is found in the search path but can't be used. 
-    env.Append( CPPFLAGS="-fPIC -fno-strict-aliasing -ggdb -pthread -Wall -Wsign-compare -Wno-unknown-pragmas -Winvalid-pch" )
+    # -Winvalid-pch Warn if a precompiled header (see Precompiled Headers) is found in the search path but can't be used.
+    env.Append( CCFLAGS=["-fPIC",
+                         "-fno-strict-aliasing",
+                         "-ggdb",
+                         "-pthread",
+                         "-Wall",
+                         "-Wsign-compare",
+                         "-Wno-unknown-pragmas",
+                         "-Winvalid-pch"] )
     # env.Append( " -Wconversion" ) TODO: this doesn't really work yet
     if linux:
-        env.Append( CPPFLAGS=" -Werror -pipe " )
+        env.Append( CCFLAGS=["-Werror", "-pipe"] )
         if not has_option('clang'):
-            env.Append( CPPFLAGS=" -fno-builtin-memcmp " ) # glibc's memcmp is faster than gcc's
+            env.Append( CCFLAGS=["-fno-builtin-memcmp"] ) # glibc's memcmp is faster than gcc's
 
-    env.Append( CPPDEFINES="_FILE_OFFSET_BITS=64" )
-    env.Append( CXXFLAGS=" -Wnon-virtual-dtor -Woverloaded-virtual" )
-    env.Append( LINKFLAGS=" -fPIC -pthread -rdynamic" )
+    env.Append( CPPDEFINES=["_FILE_OFFSET_BITS=64"] )
+    env.Append( CXXFLAGS=["-Wnon-virtual-dtor", "-Woverloaded-virtual"] )
+    env.Append( LINKFLAGS=["-fPIC", "-pthread",  "-rdynamic"] )
     env.Append( LIBS=[] )
 
     #make scons colorgcc friendly
@@ -715,28 +683,25 @@ if nix:
     if linux and has_option( "sharedclient" ):
         env.Append( LINKFLAGS=" -Wl,--as-needed -Wl,-zdefs " )
 
+    if linux and has_option( "gcov" ):
+        env.Append( CXXFLAGS=" -fprofile-arcs -ftest-coverage " )
+        env.Append( LINKFLAGS=" -fprofile-arcs -ftest-coverage " )
+
     if debugBuild:
-        env.Append( CPPFLAGS=" -O0 -fstack-protector " );
+        env.Append( CCFLAGS=["-O0", "-fstack-protector"] )
         env['ENV']['GLIBCXX_FORCE_NEW'] = 1; # play nice with valgrind
     else:
-        env.Append( CPPFLAGS=" -O3 " )
-        #env.Append( CPPFLAGS=" -fprofile-generate" )
-        #env.Append( LINKFLAGS=" -fprofile-generate" )
-        # then:
-        #env.Append( CPPFLAGS=" -fprofile-use" )
-        #env.Append( LINKFLAGS=" -fprofile-use" )
+        env.Append( CCFLAGS=["-O3"] )
 
     if debugLogging:
-        env.Append( CPPFLAGS=" -D_DEBUG" );
+        env.Append( CPPDEFINES=["_DEBUG"] );
 
     if force64:
-        env.Append( CFLAGS="-m64" )
-        env.Append( CXXFLAGS="-m64" )
+        env.Append( CCFLAGS="-m64" )
         env.Append( LINKFLAGS="-m64" )
 
     if force32:
-        env.Append( CFLAGS="-m32" )
-        env.Append( CXXFLAGS="-m32" )
+        env.Append( CCFLAGS="-m32" )
         env.Append( LINKFLAGS="-m32" )
 
     if has_option( "gdbserver" ):
@@ -761,6 +726,9 @@ if usev8:
     env.Prepend( EXTRACPPPATH=["#/../v8/include/"] )
     env.Prepend( EXTRALIBPATH=["#/../v8/"] )
 
+if usesm:
+    env.Append( CPPDEFINES=["JS_C_STRINGS_ARE_UTF8"] )
+
 if "uname" in dir(os):
     hacks = buildscripts.findHacks( os.uname() )
     if hacks is not None:
@@ -782,168 +750,74 @@ if not windows:
         keyfile = "jstests/libs/key%s" % keysuffix
         os.chmod( keyfile , stat.S_IWUSR|stat.S_IRUSR )
 
-moduleFiles = {}
-commonFiles = []
-serverOnlyFiles = []
-scriptingFiles = []
-for shortName in getThirdPartyShortNames():
-    path = "src/third_party/%s.py" % shortName
-    myModule = imp.load_module( "src/third_party_%s" % shortName , open( path , "r" ) , path , ( ".py" , "r" , imp.PY_SOURCE ) )
-    fileLists = { "commonFiles" : commonFiles , "serverOnlyFiles" : serverOnlyFiles , "scriptingFiles" : scriptingFiles, "moduleFiles" : moduleFiles }
+if not use_system_version_of_library("pcre"):
+    env.Prepend(CPPPATH=[ '$BUILD_DIR/third_party/pcre-${PCRE_VERSION}' ])
 
-    options_topass["windows"] = windows
-    options_topass["nix"] = nix
-
-    if has_option( "use-system-" + shortName ) or has_option( "use-system-all" ):
-        print( "using system version of: " + shortName )
-        myModule.configureSystem( env , fileLists , options_topass )
-    else:
-        myModule.configure( env , fileLists , options_topass )
-
-if not has_option("use-system-all") and not has_option("use-system-pcre"):
-    env.Append(CPPPATH=[ '$BUILD_DIR/third_party/pcre-${PCRE_VERSION}' ])
+if not use_system_version_of_library("boost"):
+    env.Prepend(CPPPATH=['$BUILD_DIR/third_party/boost'],
+                CPPDEFINES=['BOOST_ALL_NO_LIB'])
 
 env.Append( CPPPATH=['$EXTRACPPPATH'],
             LIBPATH=['$EXTRALIBPATH'] )
 
-env['MONGO_COMMON_FILES'] = commonFiles
-env['MONGO_SERVER_ONLY_FILES' ] = serverOnlyFiles
-env['MONGO_SCRIPTING_FILES'] = scriptingFiles
-env['MONGO_MODULE_FILES'] = moduleFiles
-
 # --- check system ---
 
-def getSysInfo():
-    if windows:
-        return "windows " + str( sys.getwindowsversion() )
-    else:
-        return " ".join( os.uname() )
-
-def doConfigure( myenv , shell=False ):
+def doConfigure(myenv):
     conf = Configure(myenv)
-    myenv["LINKFLAGS_CLEAN"] = list( myenv["LINKFLAGS"] )
-    myenv["LIBS_CLEAN"] = list( myenv["LIBS"] )
 
     if 'CheckCXX' in dir( conf ):
         if  not conf.CheckCXX():
             print( "c++ compiler not installed!" )
             Exit(1)
 
-    if nix and not shell:
-        if not conf.CheckLib( "stdc++" ):
-            print( "can't find stdc++ library which is needed" );
+    if use_system_version_of_library("boost"):
+        if not conf.CheckCXXHeader( "boost/filesystem/operations.hpp" ):
+            print( "can't find boost headers" )
             Exit(1)
 
-    def myCheckLib( poss , failIfNotFound=False , staticOnly=False):
+        for b in boostLibs:
+            l = "boost_" + b
+            if not conf.CheckLib([ l + boostCompiler + "-mt" + boostVersion,
+                                   l + boostCompiler + boostVersion ], language='C++' ):
+                Exit(1)
 
-        if type( poss ) != types.ListType :
-            poss = [poss]
+    if conf.CheckHeader('unistd.h'):
+        myenv.Append(CPPDEFINES=['MONGO_HAVE_HEADER_UNISTD_H'])
 
-        allPlaces = [];
-        allPlaces += extraLibPlaces
-        if nix and release:
-            allPlaces += myenv.subst( myenv["LIBPATH"] )
-            if not force64:
-                allPlaces += [ "/usr/lib" , "/usr/local/lib" ]
+    if solaris or conf.CheckDeclaration('clock_gettime', includes='#include <time.h>'):
+        conf.CheckLib('rt')
 
-            for p in poss:
-                for loc in allPlaces:
-                    fullPath = loc + "/lib" + p + ".a"
-                    if os.path.exists( fullPath ):
-                        myenv.Append( _LIBFLAGS='${SLIBS}',
-                                      SLIBS=" " + fullPath + " " )
-                        return True
+    if (conf.CheckCXXHeader( "execinfo.h" ) and
+        conf.CheckDeclaration('backtrace', includes='#include <execinfo.h>') and
+        conf.CheckDeclaration('backtrace_symbols', includes='#include <execinfo.h>')):
 
-        if release and not windows and failIfNotFound:
-            print( "ERROR: can't find static version of: " + str( poss ) + " in: " + str( allPlaces ) )
-            Exit(1)
+        myenv.Append( CPPDEFINES=[ "MONGO_HAVE_EXECINFO_BACKTRACE" ] )
 
-        res = not staticOnly and conf.CheckLib( poss )
-        if res:
-            return True
-
-        if failIfNotFound:
-            print( "can't find or link against library " + str( poss ) + " in " + str( myenv["LIBPATH"] ) )
-            print( "see config.log for more information" )
-            if windows:
-                print( "use scons --64 when cl.exe is 64 bit compiler" )
-            Exit(1)
-
-        return False
-
-    if not conf.CheckCXXHeader( "boost/filesystem/operations.hpp" ):
-        print( "can't find boost headers" )
-        if shell:
-            print( "\tshell might not compile" )
-        else:
-            Exit(1)
-
-    if asio:
-        if conf.CheckCXXHeader( "boost/asio.hpp" ):
-            myenv.Append( CPPDEFINES=[ "USE_ASIO" ] )
-        else:
-            print( "WARNING: old version of boost - you should consider upgrading" )
-
-    # this will add it if it exists and works
-    myCheckLib( [ "boost_system" + boostCompiler + "-mt" + boostVersion ,
-                  "boost_system" + boostCompiler + boostVersion ] )
-
-    for b in boostLibs:
-        l = "boost_" + b
-        myCheckLib( [ l + boostCompiler + "-mt" + boostVersion ,
-                      l + boostCompiler + boostVersion ] ,
-                    release or not shell)
-
-    if not conf.CheckCXXHeader( "execinfo.h" ):
-        myenv.Append( CPPDEFINES=[ "NOEXECINFO" ] )
-
-    myenv["_HAVEPCAP"] = myCheckLib( ["pcap", "wpcap"] )
-    removeIfInList( myenv["LIBS"] , "pcap" )
-    removeIfInList( myenv["LIBS"] , "wpcap" )
+    myenv["_HAVEPCAP"] = conf.CheckLib( ["pcap", "wpcap"], autoadd=False )
 
     if solaris:
         conf.CheckLib( "nsl" )
 
     if usev8:
         if debugBuild:
-            myCheckLib( [ "v8_g" , "v8" ] , True )
+            v8_lib_choices = ["v8_g", "v8"]
         else:
-            myCheckLib( "v8" , True )
+            v8_lib_choices = ["v8"]
+        if not conf.CheckLib( v8_lib_choices ):
+            Exit(1)
 
     # requires ports devel/libexecinfo to be installed
     if freebsd or openbsd:
-        myCheckLib( "execinfo", True )
-        env.Append( LIBS=[ "execinfo" ] )
-
-    # Handle staticlib,staticlibpath options.
-    staticlibfiles = []
-    if has_option( "staticlib" ):
-        # FIXME: probably this loop ought to do something clever
-        # depending on whether we want to use 32bit or 64bit
-        # libraries.  For now, we sort of rely on the user supplying a
-        # sensible staticlibpath option. (myCheckLib implements an
-        # analogous search, but it also does other things I don't
-        # understand, so I'm not using it.)
-        if has_option ( "staticlibpath" ):
-            dirs = GetOption ( "staticlibpath" ).split( "," )
-        else:
-            dirs = [ "/usr/lib64", "/usr/lib" ]
-
-        for l in GetOption( "staticlib" ).split( "," ):
-            removeIfInList(myenv["LIBS"], l)
-            found = False
-            for d in dirs:
-                f=  "%s/lib%s.a" % ( d, l )
-                if os.path.exists( f ):
-                    staticlibfiles.append(f)
-                    found = True
-                    break
-            if not found:
-                raise RuntimeError("can't find a static %s" % l)
+        if not conf.CheckLib("execinfo"):
+            Exit(1)
 
     # 'tcmalloc' needs to be the last library linked. Please, add new libraries before this 
     # point.
-    if has_option( "heapcheck" ) and not shell:
+    if has_option("tcmalloc") or has_option("heapcheck"):
+        if not conf.CheckLib("tcmalloc"):
+            Exit(1)
+
+    if has_option("heapcheck"):
         if ( not debugBuild ) and ( not debugLogging ):
             print( "--heapcheck needs --d or --dd" )
             Exit( 1 )
@@ -952,23 +826,8 @@ def doConfigure( myenv , shell=False ):
             print( "--heapcheck neads header 'google/heap-checker.h'" )
             Exit( 1 )
 
-        myCheckLib( "tcmalloc" , True );  # if successful, appedded 'tcmalloc' to myenv[ LIBS ]
         myenv.Append( CPPDEFINES=[ "HEAP_CHECKING" ] )
-        myenv.Append( CPPFLAGS="-fno-omit-frame-pointer" )
-
-    # FIXME doConfigure() is being called twice, in the case of the shell. So if it is called 
-    # with shell==True, it'd be on its second call and it would need to rearrange the libraries'
-    # order. The following removes tcmalloc from the LIB's list and reinserts it at the end.
-    if has_option( "heapcheck" ) and shell:
-        removeIfInList( myenv["LIBS"] , "tcmalloc" )
-        myenv.Append( LIBS="tcmalloc" )
-
-    myenv.Append(LINKCOM=" $STATICFILES")
-    myenv.Append(STATICFILES=staticlibfiles)
-
-    if has_option( "tcmalloc" ):
-        myCheckLib( "tcmalloc" , True );  # if successful, appedded 'tcmalloc' to myenv[ LIBS ]
-
+        myenv.Append( CCFLAGS=["-fno-omit-frame-pointer"] )
 
     return conf.Finish()
 
@@ -984,14 +843,10 @@ elif not onlyServer:
     shellEnv = env.Clone();
 
     if release and ( ( darwin and force64 ) or linux64 ):
-        shellEnv["LINKFLAGS"] = env["LINKFLAGS_CLEAN"]
-        shellEnv["LIBS"] = env["LIBS_CLEAN"]
-        shellEnv["SLIBS"] = ""
+        shellEnv["SLIBS"] = []
 
     if windows:
         shellEnv.Append( LIBS=["winmm.lib"] )
-
-    shellEnv = doConfigure( shellEnv , shell=True )
 
 def checkErrorCodes():
     import buildscripts.errorcodes as x
@@ -1067,37 +922,23 @@ def getCodeVersion():
         return None
     return allMatches[0]
 
-if getCodeVersion() == None:
+mongoCodeVersion = getCodeVersion()
+if mongoCodeVersion == None:
     Exit(-1)
 
-def getDistName( sofar ):
-    global distName
-    global dontReplacePackage
-
-    if distName is not None:
-        return distName
-
-    if str( COMMAND_LINE_TARGETS[0] ) == "s3dist":
-        version = getCodeVersion()
-        if not version.endswith( "+" ) and not version.endswith("-"):
-            print( "got real code version, doing release build for: " + version )
-            dontReplacePackage = True
-            distName = version
-            return version
+if has_option('distname'):
+    distName = GetOption( "distname" )
+elif mongoCodeVersion[-1] not in ("+", "-"):
+    dontReplacePackage = True
+    distName = mongoCodeVersion
+else:
+    isBuildingLatest = True
+    distName = utils.getGitBranchString("" , "-") + datetime.date.today().strftime("%Y-%m-%d")
 
 
-    return utils.getGitBranchString( "" , "-" ) + today.strftime( "%Y-%m-%d" )
+env['SERVER_DIST_BASENAME'] = 'mongodb-%s-%s' % (getSystemInstallName(), distName)
 
-
-if distBuild:
-    if isDriverBuild():
-        installDir = GetOption( "prefix" )
-    else:
-        from datetime import date
-        today = date.today()
-        installDir = "#mongodb-" + getSystemInstallName() + "-"
-        installDir += getDistName( installDir )
-        print "going to make dist: " + installDir[1:]
+distFile = "${SERVER_ARCHIVE}"
 
 env['NIX_LIB_DIR'] = nixLibPrefix
 env['INSTALL_DIR'] = installDir
@@ -1133,11 +974,10 @@ env.AlwaysBuild( "push" )
 # ---- deploying ---
 
 def s3push( localName , remoteName=None , remotePrefix=None , fixName=True , platformDir=True ):
-
     localName = str( localName )
 
     if remotePrefix is None:
-        if distName is None:
+        if isBuildingLatest:
             remotePrefix = utils.getGitBranchString( "-" ) + "-latest"
         else:
             remotePrefix = "-" + distName
@@ -1161,10 +1001,8 @@ def s3push( localName , remoteName=None , remotePrefix=None , fixName=True , pla
         name = name.lower()
     else:
         name = remoteName
-        
-    if isDriverBuild():
-        name = "cxx-driver/" + name
-    elif platformDir:
+
+    if platformDir:
         name = platform + "/" + name
 
     print( "uploading " + localName + " to http://s3.amazonaws.com/" + s.name + "/" + name )
@@ -1182,19 +1020,15 @@ env.Alias( "s3shell" , [ "mongo" ] , [ s3shellpush ] )
 env.AlwaysBuild( "s3shell" )
 
 def s3dist( env , target , source ):
-    s3push( distFile , "mongodb" )
+    s3push( str(source[0]) , "mongodb" )
 
-env.Append( TARFLAGS=" -z " )
+def s3distclient(env, target, source):
+    s3push(str(source[0]), "cxx-driver/mongodb", platformDir=False)
 
-if installDir[-1] != "/":
-    if windows:
-        distFile = env.Zip( installDir + ".zip", installDir )[0]
-    else:
-        distFile = env.Tar( installDir + '.tgz', installDir )[0]
-
-    env.Alias( "dist" , distFile )
-    env.Alias( "s3dist" , [ distFile ] , [ s3dist ] )
-    env.AlwaysBuild( "s3dist" )
+env.Alias( "dist" , '$SERVER_ARCHIVE' )
+env.Alias( "distclient", "$CLIENT_ARCHIVE")
+env.AlwaysBuild(env.Alias( "s3dist" , [ '$SERVER_ARCHIVE' ] , [ s3dist ] ))
+env.AlwaysBuild(env.Alias( "s3distclient" , [ '$CLIENT_ARCHIVE' ] , [ s3distclient ] ))
 
 # --- an uninstall target ---
 if len(COMMAND_LINE_TARGETS) > 0 and 'uninstall' in COMMAND_LINE_TARGETS:
@@ -1203,6 +1037,15 @@ if len(COMMAND_LINE_TARGETS) > 0 and 'uninstall' in COMMAND_LINE_TARGETS:
     # what we want, but changing BUILD_TARGETS does.
     BUILD_TARGETS.remove("uninstall")
     BUILD_TARGETS.append("install")
+
+clientEnv = env.Clone()
+clientEnv['CPPDEFINES'].remove('MONGO_EXPOSE_MACROS')
+
+if not use_system_version_of_library("boost"):
+    clientEnv.Append(LIBS=['boost_thread', 'boost_filesystem', 'boost_system'])
+    clientEnv.Prepend(LIBPATH=['$BUILD_DIR/third_party/boost/'])
+
+clientEnv.Prepend(LIBS=['mongoclient'], LIBPATH=['.'])
 
 # The following symbols are exported for use in subordinate SConscript files.
 # Ideally, the SConscript files would be purely declarative.  They would only
@@ -1213,15 +1056,17 @@ if len(COMMAND_LINE_TARGETS) > 0 and 'uninstall' in COMMAND_LINE_TARGETS:
 # conditional decision making that hasn't been moved up to this SConstruct file,
 # and they are exported here, as well.
 Export("env")
+Export("clientEnv")
 Export("shellEnv")
 Export("testEnv")
-Export("has_option")
-Export("installSetup getSysInfo")
+Export("has_option use_system_version_of_library")
+Export("installSetup")
 Export("usesm usev8")
 Export("darwin windows solaris linux nix")
 
-env.SConscript( 'src/SConscript', variant_dir=variantDir, duplicate=False )
-env.SConscript( 'SConscript.smoke' )
+env.SConscript( 'src/SConscript', variant_dir='$BUILD_DIR', duplicate=False )
+env.SConscript( 'src/SConscript.client', variant_dir='$BUILD_DIR/client_build', duplicate=False )
+env.SConscript( ['SConscript.buildinfo', 'SConscript.smoke'] )
 
 def clean_old_dist_builds(env, target, source):
     prefix = "mongodb-%s-%s" % (platform, processor)
@@ -1237,3 +1082,5 @@ def clean_old_dist_builds(env, target, source):
 
 env.Alias("dist_clean", [], [clean_old_dist_builds])
 env.AlwaysBuild("dist_clean")
+
+env.Alias('all', ['core', 'tools', 'clientTests', 'test'])

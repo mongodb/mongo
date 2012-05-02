@@ -34,13 +34,13 @@ namespace mongo {
         FieldRangeVector _keyCutter;
     public:
         KeyType(const BSONObj &pattern, const FieldRangeSet &frs):
-        _spec((assert(!pattern.isEmpty()),pattern)),
+        _spec((verify(!pattern.isEmpty()),pattern)),
         _keyCutter(frs, _spec, 1) {
         }
 
         /**
          * @return first key of the object that would be encountered while
-         * scanning index with keySpec 'pattern' using constraints 'frs', or
+         * scanning an index with keySpec 'pattern' using constraints 'frs', or
          * BSONObj() if no such key.
          */
         BSONObj getKeyFromObject(const BSONObj &o) const {

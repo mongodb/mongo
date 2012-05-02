@@ -20,10 +20,9 @@
 #pragma once
 
 #include <ctime>
+#include <limits>
 
 namespace mongo {
-
-    using namespace std;
 
     inline void time_t_to_String(time_t t, char *buf) {
 #if defined(_WIN32)
@@ -34,7 +33,7 @@ namespace mongo {
         buf[24] = 0; // don't want the \n
     }
 
-    inline string time_t_to_String(time_t t = time(0) ) {
+    inline std::string time_t_to_String(time_t t = time(0) ) {
         char buf[64];
 #if defined(_WIN32)
         ctime_s(buf, sizeof(buf), &t);
@@ -45,7 +44,7 @@ namespace mongo {
         return buf;
     }
 
-    inline string time_t_to_String_no_year(time_t t) {
+    inline std::string time_t_to_String_no_year(time_t t) {
         char buf[64];
 #if defined(_WIN32)
         ctime_s(buf, sizeof(buf), &t);
@@ -56,7 +55,7 @@ namespace mongo {
         return buf;
     }
 
-    inline string time_t_to_String_short(time_t t) {
+    inline std::string time_t_to_String_short(time_t t) {
         char buf[64];
 #if defined(_WIN32)
         ctime_s(buf, sizeof(buf), &t);
@@ -77,17 +76,23 @@ namespace mongo {
         operator unsigned long long&() { return millis; }
         operator const unsigned long long&() const { return millis; }
         void toTm (tm *buf) {
-            time_t dtime = (time_t)(millis/1000);
+            time_t dtime = toTimeT();
 #if defined(_WIN32)
             gmtime_s(buf, &dtime);
 #else
             gmtime_r(&dtime, buf);
 #endif
         }
-        string toString() const {
+        std::string toString() const {
             char buf[64];
-            time_t_to_String(millis/1000, buf);
+            time_t_to_String(toTimeT(), buf);
             return buf;
+        }
+        time_t toTimeT() const {
+            // cant use uassert from bson/util
+            verify((long long)millis >= 0); // TODO when millis is signed, delete 
+            verify(((long long)millis/1000) < (std::numeric_limits<time_t>::max)());
+            return millis / 1000;
         }
     };
 

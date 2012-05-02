@@ -285,6 +285,7 @@ namespace mongo {
 
             long long numEmits() const { if (_jsMode) return _scope->getNumberLongLong("_emitCt"); return _numEmits; }
             long long numReduces() const { if (_jsMode) return _scope->getNumberLongLong("_redCt"); return _config.reducer->numReduces; }
+            long long numInMemKeys() const { if (_jsMode) return _scope->getNumberLongLong("_keyCt"); return _temp->size(); }
 
             bool jsMode() {return _jsMode;}
             void switchMode(bool jsMode);

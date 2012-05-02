@@ -94,7 +94,7 @@ namespace mongo {
          * you do not have to have Context set
          * o has to have an _id field or will assert
          */
-        static void upsert( const string& ns , const BSONObj& o );
+        static void upsert( const string& ns , const BSONObj& o, bool fromMigrate = false );
 
         /** You do not need to set the database before calling.
             @return true if collection is empty.
@@ -109,34 +109,27 @@ namespace mongo {
             virtual ~RemoveCallback() {}
             virtual void goingToDelete( const BSONObj& o ) = 0;
         };
-        /* removeRange: operation is oplog'd */
-        static long long removeRange( const string& ns , const BSONObj& min , const BSONObj& max , bool yield = false , bool maxInclusive = false , RemoveCallback * callback = 0 );
 
-        /* Remove all objects from a collection.
-        You do not need to set the database before calling.
-        */
+        /**
+         * Remove all documents in the range.
+         * Does oplog the individual document deletions.
+         */
+        static long long removeRange( const string& ns , 
+                                      const BSONObj& min , 
+                                      const BSONObj& max , 
+                                      bool yield = false , 
+                                      bool maxInclusive = false , 
+                                      RemoveCallback * callback = 0, 
+                                      bool fromMigrate = false );
+
+        /**
+         * Remove all documents from a collection.
+         * You do not need to set the database before calling.
+         * Does not oplog the operation.
+         */
         static void emptyCollection(const char *ns);
 
     };
-
-    class Database;
-
-    // manage a set using collection backed storage
-    class DbSet {
-    public:
-        DbSet( const string &name = "", const BSONObj &key = BSONObj() ) :
-            name_( name ),
-            key_( key.getOwned() ) {
-        }
-        ~DbSet();
-        void reset( const string &name = "", const BSONObj &key = BSONObj() );
-        bool get( const BSONObj &obj ) const;
-        void set( const BSONObj &obj, bool val );
-    private:
-        string name_;
-        BSONObj key_;
-    };
-
 
     /**
      * user for saving deleted bson objects to a flat file

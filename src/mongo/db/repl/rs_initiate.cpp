@@ -116,7 +116,7 @@ namespace mongo {
                     if( !initial && failures <= allowableFailures ) {
                         const Member* m = theReplSet->findById( i->_id );
                         if( m ) {
-                            assert( m->h().toString() == i->h.toString() );
+                            verify( m->h().toString() == i->h.toString() );
                         }
                         // it's okay if the down member isn't part of the config,
                         // we might be adding a new member that isn't up yet
@@ -168,7 +168,7 @@ namespace mongo {
                 // later.  of course it could be stuck then, but this check lowers the risk if weird things
                 // are up.
                 time_t t = time(0);
-                writelock lk("");
+                Lock::GlobalWrite lk;
                 if( time(0)-t > 10 ) {
                     errmsg = "took a long time to get write lock, so not initiating.  Initiate when server less busy?";
                     return false;
@@ -240,7 +240,7 @@ namespace mongo {
 
                 createOplog();
 
-                writelock lk("");
+                Lock::GlobalWrite lk;
                 bo comment = BSON( "msg" << "initiating set");
                 newConfig.saveConfigLocally(comment);
                 log() << "replSet replSetInitiate config now saved locally.  Should come online in about a minute." << rsLog;

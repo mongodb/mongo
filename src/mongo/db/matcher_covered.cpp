@@ -21,7 +21,6 @@
 #include "pch.h"
 #include "matcher.h"
 #include "../util/goodies.h"
-#include "../util/unittest.h"
 #include "diskloc.h"
 #include "../scripting/engine.h"
 #include "db.h"
@@ -31,22 +30,20 @@
 
 namespace mongo {
 
-    CoveredIndexMatcher::CoveredIndexMatcher( const BSONObj &jsobj, const BSONObj &indexKeyPattern, bool alwaysUseRecord) :
+    CoveredIndexMatcher::CoveredIndexMatcher( const BSONObj &jsobj, const BSONObj &indexKeyPattern ) :
         _docMatcher( new Matcher( jsobj ) ),
         _keyMatcher( *_docMatcher, indexKeyPattern ) {
-        init( alwaysUseRecord );
+        init();
     }
 
-    CoveredIndexMatcher::CoveredIndexMatcher( const shared_ptr< Matcher > &docMatcher, const BSONObj &indexKeyPattern , bool alwaysUseRecord ) :
+    CoveredIndexMatcher::CoveredIndexMatcher( const shared_ptr< Matcher > &docMatcher, const BSONObj &indexKeyPattern ) :
         _docMatcher( docMatcher ),
         _keyMatcher( *_docMatcher, indexKeyPattern ) {
-        init( alwaysUseRecord );
+        init();
     }
 
-    void CoveredIndexMatcher::init( bool alwaysUseRecord ) {
-        _needRecord =
-            alwaysUseRecord ||
-	        !_keyMatcher.keyMatch( *_docMatcher );
+    void CoveredIndexMatcher::init() {
+        _needRecord = !_keyMatcher.keyMatch( *_docMatcher );
     }
 
     bool CoveredIndexMatcher::matchesCurrent( Cursor * cursor , MatchDetails * details ) {
@@ -64,19 +61,20 @@ namespace mongo {
         dassert( key.isValid() );
 
         if ( details )
-            details->reset();
+            details->resetOutput();
 
         if ( keyUsable ) {
             if ( !_keyMatcher.matches(key, details ) ) {
                 return false;
             }
-            if ( ! _needRecord ) {
+            bool needRecordForDetails = details && details->needRecord();
+            if ( !_needRecord && !needRecordForDetails ) {
                 return true;
             }
         }
 
         if ( details )
-            details->_loadedObject = true;
+            details->setLoadedRecord( true );
 
         bool res = _docMatcher->matches(recLoc.obj() , details );
         LOG(5) << "CoveredIndexMatcher _docMatcher->matches() returns " << res << endl;

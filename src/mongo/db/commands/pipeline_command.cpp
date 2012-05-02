@@ -19,13 +19,13 @@
 #include "db/commands/pipeline.h"
 #include "db/commands/pipeline_d.h"
 #include "db/cursor.h"
+#include "db/interrupt_status_mongod.h"
 #include "db/pdfile.h"
 #include "db/pipeline/accumulator.h"
 #include "db/pipeline/document.h"
 #include "db/pipeline/document_source.h"
 #include "db/pipeline/expression.h"
 #include "db/pipeline/expression_context.h"
-#include "db/queryoptimizer.h"
 
 namespace mongo {
 
@@ -72,7 +72,8 @@ namespace mongo {
                               int options, string &errmsg,
                               BSONObjBuilder &result, bool fromRepl) {
 
-        intrusive_ptr<ExpressionContext> pCtx(ExpressionContext::create());
+        intrusive_ptr<ExpressionContext> pCtx(
+            ExpressionContext::create(&InterruptStatusMongod::status));
 
         /* try to parse the command; if this fails, then we didn't run */
         intrusive_ptr<Pipeline> pPipeline(
@@ -81,7 +82,7 @@ namespace mongo {
             return false;
 
         intrusive_ptr<DocumentSource> pSource(
-            PipelineD::prepareCursorSource(pPipeline, db));
+            PipelineD::prepareCursorSource(pPipeline, db, pCtx));
 
         /* this is the normal non-debug path */
         if (!pPipeline->getSplitMongodPipeline())
@@ -123,7 +124,8 @@ namespace mongo {
         }
 
         /* on the shard servers, create the local pipeline */
-        intrusive_ptr<ExpressionContext> pShardCtx(ExpressionContext::create());
+        intrusive_ptr<ExpressionContext> pShardCtx(
+            ExpressionContext::create(&InterruptStatusMongod::status));
         intrusive_ptr<Pipeline> pShardPipeline(
             Pipeline::parseCommand(errmsg, shardBson, pShardCtx));
         if (!pShardPipeline.get()) {
@@ -144,7 +146,8 @@ namespace mongo {
             const char *pFieldName = shardElement.fieldName();
 
             if (strcmp(pFieldName, "result") == 0) {
-                pShardSource = DocumentSourceBsonArray::create(&shardElement);
+                pShardSource = DocumentSourceBsonArray::create(
+                    &shardElement, pCtx);
 
                 /*
                   Connect the output of the shard pipeline with the mongos
@@ -155,7 +158,7 @@ namespace mongo {
         }
 
         /* NOTREACHED */
-        assert(false);
+        verify(false);
         return false;
     }
 

@@ -25,7 +25,7 @@ namespace mongo {
         void *_p;
         unsigned _len;
     public:
-        enum Advice { Sequential=1 };
+        enum Advice { Sequential=1 , Random=2 };
         MAdvise(void *p, unsigned len, Advice a); 
         ~MAdvise(); // destructor resets the range to MADV_NORMAL
     };
@@ -92,14 +92,6 @@ namespace mongo {
         static long long totalMappedLength();
         static void closeAllFiles( stringstream &message );
 
-#if defined(_DEBUG)
-        static void markAllWritable();
-        static void unmarkAllWritable();
-#else
-        static void markAllWritable() { }
-        static void unmarkAllWritable() { }
-#endif
-
         virtual bool isMongoMMF() { return false; }
 
         string filename() const { return _filename; }
@@ -128,10 +120,6 @@ namespace mongo {
 
         virtual unsigned long long length() const = 0;
 
-        // only supporting on posix mmap
-        virtual void _lock() {}
-        virtual void _unlock() {}
-
         static set<MongoFile*> mmfiles;
     public:
         static map<string,MongoFile*> pathToFile;
@@ -159,21 +147,12 @@ namespace mongo {
         LockMongoFilesShared _lk;
     };
 
-    struct MongoFileAllowWrites {
-        MongoFileAllowWrites() {
-            MongoFile::markAllWritable();
-        }
-        ~MongoFileAllowWrites() {
-            MongoFile::unmarkAllWritable();
-        }
-    };
-
     class MemoryMappedFile : public MongoFile {
     protected:
         virtual void* viewForFlushing() { 
             if( views.size() == 0 )
                 return 0;
-            assert( views.size() == 1 );
+            verify( views.size() == 1 );
             return views[0];
         }
     public:
@@ -243,9 +222,6 @@ namespace mongo {
 #endif
 
     protected:
-        // only posix mmap implementations will support this
-        virtual void _lock();
-        virtual void _unlock();
 
         /** close the current private view and open a new replacement */
         void* remapPrivateView(void *oldPrivateAddr);
@@ -270,18 +246,18 @@ namespace mongo {
         }
         bool get(unsigned i) const { 
             unsigned x = i / 32;
-            assert( x < MemoryMappedFile::NChunks );
+            verify( x < MemoryMappedFile::NChunks );
             return (bits[x] & (1 << (i%32))) != 0;
         }
         void set(unsigned i) { 
             unsigned x = i / 32;
             wassert( x < (MemoryMappedFile::NChunks*2/3) ); // warn if getting close to limit
-            assert( x < MemoryMappedFile::NChunks );
+            verify( x < MemoryMappedFile::NChunks );
             bits[x] |= (1 << (i%32));
         }
         void clear(unsigned i) { 
             unsigned x = i / 32;
-            assert( x < MemoryMappedFile::NChunks );
+            verify( x < MemoryMappedFile::NChunks );
             bits[x] &= ~(1 << (i%32));
         }
     };

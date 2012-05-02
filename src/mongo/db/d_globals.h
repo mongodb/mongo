@@ -8,7 +8,7 @@
 
 namespace mongo { 
 
-    class RWLock;
+    class RWLockRecursive;
     class MongoMutex;
     class ClientCursorMonitor;
 
@@ -16,7 +16,6 @@ namespace mongo {
         DGlobals();
 
         // these are intentionally never deleted:
-        RWLock& writeExcluder;
         MongoMutex &dbMutex;
         ClientCursorMonitor& clientCursorMonitor;
 

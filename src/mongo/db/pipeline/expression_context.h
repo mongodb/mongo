@@ -22,6 +22,8 @@
 
 namespace mongo {
 
+    class InterruptStatus;
+
     class ExpressionContext :
         public IntrusiveCounterUnsigned {
     public:
@@ -33,13 +35,22 @@ namespace mongo {
         bool getInShard() const;
         bool getInRouter() const;
 
-        static ExpressionContext *create();
+        /**
+           Used by a pipeline to check for interrupts so that killOp() works.
+
+           @throws if the operation has been interrupted
+         */
+        void checkForInterrupt();
+
+        static ExpressionContext *create(InterruptStatus *pStatus);
 
     private:
-        ExpressionContext();
+        ExpressionContext(InterruptStatus *pStatus);
         
         bool inShard;
         bool inRouter;
+        unsigned intCheckCounter; // interrupt check counter
+        InterruptStatus *const pStatus;
     };
 }
 

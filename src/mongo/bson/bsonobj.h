@@ -28,8 +28,8 @@
 
 namespace mongo {
 
-    typedef set< BSONElement, BSONElementCmpWithoutField > BSONElementSet;
-    typedef multiset< BSONElement, BSONElementCmpWithoutField > BSONElementMSet;
+    typedef std::set< BSONElement, BSONElementCmpWithoutField > BSONElementSet;
+    typedef std::multiset< BSONElement, BSONElementCmpWithoutField > BSONElementMSet;
 
     /**
        C++ representation of a "BSON" object -- that is, an extended JSON-style
@@ -138,16 +138,18 @@ namespace mongo {
         /** Readable representation of a BSON object in an extended JSON-style notation.
             This is an abbreviated representation which might be used for logging.
         */
-        string toString( bool isArray = false, bool full=false ) const;
-        void toString(StringBuilder& s, bool isArray = false, bool full=false ) const;
+        enum { maxToStringRecursionDepth = 100 };
+
+        std::string toString( bool isArray = false, bool full=false ) const;
+        void toString( StringBuilder& s, bool isArray = false, bool full=false, int depth=0 ) const;
 
         /** Properly formatted JSON string.
             @param pretty if true we try to add some lf's and indentation
         */
-        string jsonString( JsonStringFormat format = Strict, int pretty = 0 ) const;
+        std::string jsonString( JsonStringFormat format = Strict, int pretty = 0 ) const;
 
         /** note: addFields always adds _id even if not specified */
-        int addFields(BSONObj& from, set<string>& fields); /* returns n added */
+        int addFields(BSONObj& from, std::set<std::string>& fields); /* returns n added */
 
         /** remove specified field and return a new object with the remaining fields.
             slowish as builds a full new object
@@ -160,7 +162,7 @@ namespace mongo {
         int nFields() const;
 
         /** adds the field names to the fields set.  does NOT clear it (appends). */
-        int getFieldNames(set<string>& fields) const;
+        int getFieldNames(std::set<std::string>& fields) const;
 
         /** @return the specified element.  element.eoo() will be true if not found.
             @param name field to find. supports dot (".") notation to reach into embedded objects.
@@ -171,7 +173,7 @@ namespace mongo {
             @param name field to find. supports dot (".") notation to reach into embedded objects.
              for example "x.y" means "in the nested object in field x, retrieve field y"
         */
-        BSONElement getFieldDotted(const string& name) const {
+        BSONElement getFieldDotted(const std::string& name) const {
             return getFieldDotted( name.c_str() );
         }
 
@@ -207,14 +209,14 @@ namespace mongo {
             return getField(field);
         }
 
-        BSONElement operator[] (const string& field) const {
+        BSONElement operator[] (const std::string& field) const {
             return getField(field);
         }
 
         BSONElement operator[] (int field) const {
             StringBuilder ss;
             ss << field;
-            string s = ss.str();
+            std::string s = ss.str();
             return getField(s.c_str());
         }
 
@@ -281,7 +283,7 @@ namespace mongo {
         void dump() const;
 
         /** Alternative output format */
-        string hexDump() const;
+        std::string hexDump() const;
 
         /**wo='well ordered'.  fields must be in same order in each object.
            Ordering is with respect to the signs of the elements
@@ -368,7 +370,7 @@ namespace mongo {
         bool valid() const;
 
         /** @return an md5 value for this object. */
-        string md5() const;
+        std::string md5() const;
 
         bool operator==( const BSONObj& other ) const { return equal( other ); }
         bool operator!=(const BSONObj& other) const { return !operator==( other); }
@@ -398,30 +400,30 @@ namespace mongo {
         };
 
         /** add all elements of the object to the specified vector */
-        void elems(vector<BSONElement> &) const;
+        void elems(std::vector<BSONElement> &) const;
         /** add all elements of the object to the specified list */
-        void elems(list<BSONElement> &) const;
+        void elems(std::list<BSONElement> &) const;
 
         /** add all values of the object to the specified vector.  If type mismatches, exception.
             this is most useful when the BSONObj is an array, but can be used with non-arrays too in theory.
 
             example:
               bo sub = y["subobj"].Obj();
-              vector<int> myints;
+              std::vector<int> myints;
               sub.Vals(myints);
         */
         template <class T>
-        void Vals(vector<T> &) const;
+        void Vals(std::vector<T> &) const;
         /** add all values of the object to the specified list.  If type mismatches, exception. */
         template <class T>
-        void Vals(list<T> &) const;
+        void Vals(std::list<T> &) const;
 
         /** add all values of the object to the specified vector.  If type mismatches, skip. */
         template <class T>
-        void vals(vector<T> &) const;
+        void vals(std::vector<T> &) const;
         /** add all values of the object to the specified list.  If type mismatches, skip. */
         template <class T>
-        void vals(list<T> &) const;
+        void vals(std::list<T> &) const;
 
         friend class BSONObjIterator;
         typedef BSONObjIterator iterator;
@@ -435,7 +437,7 @@ namespace mongo {
         BSONObjIterator begin() const;
 
         void appendSelfToBufBuilder(BufBuilder& b) const {
-            assert( objsize() );
+            verify( objsize() );
             b.appendBuf(reinterpret_cast<const void *>( objdata() ), objsize());
         }
 
@@ -453,12 +455,12 @@ namespace mongo {
             friend void intrusive_ptr_add_ref(Holder* h) { h->refCount++; }
             friend void intrusive_ptr_release(Holder* h) {
 #if defined(_DEBUG) // cant use dassert or DEV here
-                assert((int)h->refCount > 0); // make sure we haven't already freed the buffer
+                verify((int)h->refCount > 0); // make sure we haven't already freed the buffer
 #endif
                 if(--(h->refCount) == 0){
 #if defined(_DEBUG)
                     unsigned sz = (unsigned&) *h->data;
-                    assert(sz < BSONObjMaxInternalSize * 3);
+                    verify(sz < BSONObjMaxInternalSize * 3);
                     memset(h->data, 0xdd, sz);
 #endif
                     free(h);
@@ -466,6 +468,18 @@ namespace mongo {
             }
         };
 #pragma pack()
+
+    BSONObj(const BSONObj &rO):
+        _objdata(rO._objdata), _holder(rO._holder) {
+        }
+
+    BSONObj &operator=(const BSONObj &rRHS) {
+        if (this != &rRHS) {
+            _objdata = rRHS._objdata;
+            _holder = rRHS._holder;
+        }
+        return *this;
+    }
 
     private:
         const char *_objdata;
@@ -484,8 +498,8 @@ namespace mongo {
         }
     };
 
-    ostream& operator<<( ostream &s, const BSONObj &o );
-    ostream& operator<<( ostream &s, const BSONElement &e );
+    std::ostream& operator<<( std::ostream &s, const BSONObj &o );
+    std::ostream& operator<<( std::ostream &s, const BSONElement &e );
 
     StringBuilder& operator<<( StringBuilder &s, const BSONObj &o );
     StringBuilder& operator<<( StringBuilder &s, const BSONElement &e );

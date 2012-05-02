@@ -99,7 +99,7 @@ namespace mongo {
                 b.append( myId );
             }
 
-            assert( ! myId.eoo() );
+            verify( ! myId.eoo() );
 
             BSONObjBuilder qb;
             qb.append( myId );

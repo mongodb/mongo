@@ -58,13 +58,13 @@ namespace mongo {
 
         /** @return the next element in the object. For the final element, element.eoo() will be true. */
         BSONElement next( bool checkEnd ) {
-            assert( _pos <= _theend );
+            verify( _pos <= _theend );
             BSONElement e( _pos, checkEnd ? (int)(_theend + 1 - _pos) : -1 );
             _pos += e.size( checkEnd ? (int)(_theend + 1 - _pos) : -1 );
             return e;
         }
         BSONElement next() {
-            assert( _pos <= _theend );
+            verify( _pos <= _theend );
             BSONElement e(_pos);
             _pos += e.size();
             return e;
@@ -73,7 +73,7 @@ namespace mongo {
         void operator++(int) { next(); }
 
         BSONElement operator*() {
-            assert( _pos <= _theend );
+            verify( _pos <= _theend );
             return BSONElement(_pos);
         }
 
@@ -82,12 +82,11 @@ namespace mongo {
         const char* _theend;
     };
 
-    class BSONObjIteratorSorted {
+    /** Base class implementing ordered iteration through BSONElements. */
+    class BSONIteratorSorted {
     public:
-        BSONObjIteratorSorted( const BSONObj& o );
-
-        ~BSONObjIteratorSorted() {
-            assert( _fields );
+        ~BSONIteratorSorted() {
+            verify( _fields );
             delete[] _fields;
             _fields = 0;
         }
@@ -97,32 +96,52 @@ namespace mongo {
         }
 
         BSONElement next() {
-            assert( _fields );
+            verify( _fields );
             if ( _cur < _nfields )
                 return BSONElement( _fields[_cur++] );
             return BSONElement();
         }
 
+    protected:
+        class ElementFieldCmp;
+        BSONIteratorSorted( const BSONObj &o, const ElementFieldCmp &cmp );
+        
     private:
         const char ** _fields;
         int _nfields;
         int _cur;
     };
 
+    /** Provides iteration of a BSONObj's BSONElements in lexical field order. */
+    class BSONObjIteratorSorted : public BSONIteratorSorted {
+    public:
+        BSONObjIteratorSorted( const BSONObj &object );
+    };
+
+    /**
+     * Provides iteration of a BSONArray's BSONElements in numeric field order.
+     * The elements of a bson array should always be numerically ordered by field name, but this
+     * implementation re-sorts them anyway.
+     */
+    class BSONArrayIteratorSorted : public BSONIteratorSorted {
+    public:
+        BSONArrayIteratorSorted( const BSONArray &array );
+    };
+
     /** transform a BSON array into a vector of BSONElements.
         we match array # positions with their vector position, and ignore
         any fields with non-numeric field names.
         */
-    inline vector<BSONElement> BSONElement::Array() const {
+    inline std::vector<BSONElement> BSONElement::Array() const {
         chk(mongo::Array);
-        vector<BSONElement> v;
+        std::vector<BSONElement> v;
         BSONObjIterator i(Obj());
         while( i.more() ) {
             BSONElement e = i.next();
             const char *f = e.fieldName();
             try {
                 unsigned u = stringToNum(f);
-                assert( u < 1000000 );
+                verify( u < 1000000 );
                 if( u >= v.size() )
                     v.resize(u+1);
                 v[u] = e;

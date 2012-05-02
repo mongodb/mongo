@@ -1,0 +1,137 @@
+# -*- mode: python -*-
+
+# This SConscript describes build and install rules for the Mongo C++ driver and associated exmaple
+# programs.
+
+Import('env clientEnv')
+
+clientSource = [
+    'mongo/bson/oid.cpp',
+    'mongo/buildinfo.cpp',
+    'mongo/client/clientAndShell.cpp',
+    'mongo/client/clientOnly.cpp',
+    'mongo/client/connpool.cpp',
+    'mongo/client/dbclient.cpp',
+    'mongo/client/dbclient_rs.cpp',
+    'mongo/client/dbclientcursor.cpp',
+    'mongo/client/distlock.cpp',
+    'mongo/client/gridfs.cpp',
+    'mongo/client/model.cpp',
+    'mongo/client/syncclusterconnection.cpp',
+    'mongo/db/jsobj.cpp',
+    'mongo/db/json.cpp',
+    'mongo/db/lasterror.cpp',
+    'mongo/db/namespace.cpp',
+    'mongo/db/nonce.cpp',
+    'mongo/pch.cpp',
+    'mongo/util/assert_util.cpp',
+    'mongo/util/background.cpp',
+    'mongo/util/base64.cpp',
+    'mongo/util/concurrency/rwlockimpl.cpp',
+    'mongo/util/concurrency/spin_lock.cpp',
+    'mongo/util/concurrency/synchronization.cpp',
+    'mongo/util/concurrency/task.cpp',
+    'mongo/util/concurrency/thread_pool.cpp',
+    'mongo/util/concurrency/vars.cpp',
+    'mongo/util/debug_util.cpp',
+    'mongo/util/stacktrace.cpp',
+    'mongo/util/file_allocator.cpp',
+    'mongo/util/histogram.cpp',
+    'mongo/util/intrusive_counter.cpp',
+    'mongo/util/log.cpp',
+    'mongo/util/md5.cpp',
+    'mongo/util/md5main.cpp',
+    'mongo/util/net/httpclient.cpp',
+    'mongo/util/net/listen.cpp',
+    'mongo/util/net/message.cpp',
+    'mongo/util/net/message_port.cpp',
+    'mongo/util/net/sock.cpp',
+    'mongo/util/password.cpp',
+    'mongo/util/ramlog.cpp',
+    'mongo/util/signal_handlers.cpp',
+    'mongo/util/stringutils.cpp',
+    'mongo/util/text.cpp',
+    'mongo/util/timer.cpp',
+    'mongo/util/trace.cpp',
+    'mongo/util/util.cpp',
+    ]
+
+exampleSourceMap = [
+        ('authTest', 'mongo/client/examples/authTest.cpp'),
+        ('clientTest', 'mongo/client/examples/clientTest.cpp'),
+        ('firstExample', 'mongo/client/examples/first.cpp'),
+        ('httpClientTest', 'mongo/client/examples/httpClientTest.cpp'),
+        ('rsExample', 'mongo/client/examples/rs.cpp'),
+        ('secondExample', 'mongo/client/examples/second.cpp'),
+        ('tutorial', 'mongo/client/examples/tutorial.cpp'),
+        ('whereExample', 'mongo/client/examples/whereExample.cpp'),
+        ('bsondemo', 'mongo/bson/bsondemo/bsondemo.cpp'),
+        ]
+
+clientHeaders = []
+for id in ["",
+           "util/",
+           "util/net/",
+           "util/mongoutils/",
+           "util/concurrency/",
+           "db/",
+           "db/stats/",
+           "db/repl/",
+           "db/ops/",
+           "client/",
+           "bson/",
+           "bson/util/",
+           "s/",
+           "scripting/",
+           "platform/"]:
+    clientHeaders.extend(Glob('mongo/%s/*.h' % id))
+    clientHeaders.extend(Glob('mongo/%s/*.hpp' % id))
+
+env.Install('#/', [
+        env.Library('mongoclient', clientSource),
+        #env.SharedLibrary('mongoclient', clientSource),
+        ])
+
+clientTests = clientEnv.Install('#/', [
+        clientEnv.Program(target, [source]) for (target, source) in exampleSourceMap])
+
+clientEnv.Alias('clientTests', clientTests, [])
+
+env.Install(
+    '#/',
+    env.Command('$CLIENT_ARCHIVE',
+                ['#buildscripts/make_archive.py',
+                 '$CLIENT_SCONSTRUCT',
+                 '$CLIENT_LICENSE',
+                 'SConscript.client',
+                 '#buildscripts/make_archive.py',
+                 clientSource,
+                 clientHeaders,
+                 [source for (target, source) in exampleSourceMap]],
+                '${PYTHON} ${SOURCES[0]} -o $TARGET '
+                '--transform ${str(Dir(BUILD_DIR))}/client_build=$CLIENT_DIST_BASENAME/src '
+                '--transform ${str(Dir(BUILD_DIR))}=$CLIENT_DIST_BASENAME/src '
+                '--transform distsrc/client=$CLIENT_DIST_BASENAME '
+                '--transform =$CLIENT_DIST_BASENAME/ '
+                '${TEMPFILE(SOURCES[1:])}'))
+
+# install
+prefix = GetOption("prefix")
+
+env.Install(prefix + "/lib", '${LIBPREFIX}mongoclient${LIBSUFFIX}')
+
+for x in ["",
+          "bson/",
+          "bson/util/",
+          "client/",
+          "s/",
+          "shell/",
+          "db/",
+          "scripting/",
+          "util/",
+          "util/concurrency/",
+          "util/mongoutils/",
+          "util/net/" ]:
+    env.Install(prefix + "/include/mongo/" + x,
+                [Glob('mongo/%s*.h' % x), Glob('mongo/%s*.hpp' % x)])
+

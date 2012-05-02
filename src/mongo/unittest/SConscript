@@ -1,0 +1,5 @@
+# -*- mode: python; -*-
+
+Import("env")
+
+env.StaticLibrary("unittest", ['unittest.cpp'])

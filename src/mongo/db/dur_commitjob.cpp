@@ -21,17 +21,80 @@
 #include "dur_stats.h"
 #include "taskqueue.h"
 #include "client.h"
+#include "../util/concurrency/threadlocal.h"
 
 namespace mongo {
 
+#if defined(_DEBUG) && (defined(_WIN64) || !defined(_WIN32))
+#define CHECK_SPOOLING 1
+#endif
+
     namespace dur {
+       void ThreadLocalIntents::push(const WriteIntent& x) { 
+            if( !commitJob._hasWritten )
+                commitJob._hasWritten = true;
+            if( n == 21 )
+                unspool();
+            i[n++] = x;
+#if( CHECK_SPOOLING )
+            nSpooled++;
+#endif
+        }
+        void ThreadLocalIntents::_unspool() {
+            if( n ) { 
+                for( int j = 0; j < n; j++ )
+                    commitJob.note(i[j].start(), i[j].length());
+#if( CHECK_SPOOLING )
+                nSpooled.signedAdd(-n);
+#endif
+                n = 0;
+                dassert( cmdLine.dur );
+            }
+        }
+        void ThreadLocalIntents::unspool() {
+            if( n ) { 
+                SimpleMutex::scoped_lock lk(commitJob.groupCommitMutex);
+                _unspool();
+            }
+        }
+        AtomicUInt ThreadLocalIntents::nSpooled;
+    }
+
+    TSP_DECLARE(dur::ThreadLocalIntents,tlIntents)
+    TSP_DEFINE(dur::ThreadLocalIntents,tlIntents)
+
+    namespace dur {
+
+        void assertNothingSpooled() { 
+#if( CHECK_SPOOLING )
+            if( ThreadLocalIntents::nSpooled != 0 ) {
+                log() << ThreadLocalIntents::nSpooled.get() << endl;
+                if( tlIntents.get() )
+                    log() << "me:" << tlIntents.get()->n_informational() << endl;
+                else 
+                    log() << "no tlIntent for my thread" << endl;
+                verify(false);
+            }
+#endif
+        }
+        // when we release our w or W lock this is invoked
+        void unspoolWriteIntents() { 
+            ThreadLocalIntents *t = tlIntents.get();
+            if( t ) 
+                t->unspool();
+        }
+
+        /** base declare write intent function that all the helpers call. */
+        /** we batch up our write intents so that we do not have to synchronize too often */
+        void DurableImpl::declareWriteIntent(void *p, unsigned len) {
+            cc().writeHappened();
+            MemoryMappedFile::makeWritable(p, len);
+            ThreadLocalIntents *t = tlIntents.getMake();
+            t->push(WriteIntent(p,len));
+        }
 
         BOOST_STATIC_ASSERT( UncommittedBytesLimit > BSONObjMaxInternalSize * 3 );
         BOOST_STATIC_ASSERT( sizeof(void*)==4 || UncommittedBytesLimit > BSONObjMaxInternalSize * 6 );
-
-        void Writes::D::go(const Writes::D& d) {
-            commitJob.wi()._insertWriteIntent(d.p, d.len);
-        }
 
         void WriteIntent::absorb(const WriteIntent& other) {
             dassert(overlaps(other));
@@ -43,13 +106,12 @@ namespace mongo {
             dassert(contains(other));
         }
 
-        void Writes::clear() {
-            d.dbMutex.assertAtLeastReadLocked();
-
+        void IntentsAndDurOps::clear() {
+            assertLockedForCommitting();
+            commitJob.groupCommitMutex.dassertLocked();
             _alreadyNoted.clear();
-            _writes.clear();
-            _ops.clear();
-            _drained = false;
+            _intents.clear();
+            _durOps.clear();
 #if defined(DEBUG_WRITE_INTENT)
             cout << "_debug clear\n";
             _debug.clear();
@@ -66,107 +128,51 @@ namespace mongo {
         }
 #endif
 
-        void Writes::_insertWriteIntent(void* p, int len) {
-            WriteIntent wi(p, len);
-
-            if (_writes.empty()) {
-                _writes.insert(wi);
-                return;
-            }
-
-            typedef set<WriteIntent>::const_iterator iterator; // shorter
-
-            iterator closest = _writes.lower_bound(wi);
-            // closest.end() >= wi.end()
-
-            if ((closest != _writes.end() && closest->overlaps(wi)) || // high end
-                    (closest != _writes.begin() && (--closest)->overlaps(wi))) { // low end
-                if (closest->contains(wi))
-                    return; // nothing to do
-
-                // find overlapping range and merge into wi
-                iterator   end(closest);
-                iterator begin(closest);
-                while (  end->overlaps(wi)) { wi.absorb(*end); ++end; if (end == _writes.end()) break; }  // look forwards
-                while (begin->overlaps(wi)) { wi.absorb(*begin); if (begin == _writes.begin()) break; --begin; } // look backwards
-                if (!begin->overlaps(wi)) ++begin; // make inclusive
-
-                DEV { // ensure we're not deleting anything we shouldn't
-                    for (iterator it(begin); it != end; ++it) {
-                        assert(wi.contains(*it));
-                    }
-                }
-
-                _writes.erase(begin, end);
-                _writes.insert(wi);
-
-                DEV { // ensure there are no overlaps
-                    // this can be very slow - n^2 - so make it RARELY
-                    RARELY {
-                        for (iterator it(_writes.begin()), end(boost::prior(_writes.end())); it != end; ++it) {
-                            assert(!it->overlaps(*boost::next(it)));
-                        }
-                    }
-                }
-            }
-            else { // no entries overlapping wi
-                _writes.insert(closest, wi);
-            }
-        }
-
         /** note an operation other than a "basic write" */
         void CommitJob::noteOp(shared_ptr<DurOp> p) {
-            d.dbMutex.assertWriteLocked();
             dassert( cmdLine.dur );
+            // DurOp's are rare so it is ok to have the lock cost here
+            SimpleMutex::scoped_lock lk(groupCommitMutex);
             cc().writeHappened();
-            if( !_hasWritten ) {
-                assert( !d.dbMutex._remapPrivateViewRequested );
-                _hasWritten = true;
-            }
-            _wi._ops.push_back(p);
+            _hasWritten = true;
+            _intentsAndDurOps._durOps.push_back(p);
         }
 
         size_t privateMapBytes = 0; // used by _REMAPPRIVATEVIEW to track how much / how fast to remap
 
-        void CommitJob::beginCommit() { 
-            DEV d.dbMutex.assertAtLeastReadLocked();
+        void CommitJob::commitingBegin() { 
+            assertLockedForCommitting();
             _commitNumber = _notify.now();
             stats.curr->_commits++;
         }
 
-        void CommitJob::reset() {
+        void CommitJob::_committingReset() {
             _hasWritten = false;
-            _wi.clear();
+            _intentsAndDurOps.clear();
             privateMapBytes += _bytes;
             _bytes = 0;
             _nSinceCommitIfNeededCall = 0;
         }
 
-        CommitJob::CommitJob() : _ab(4 * 1024 * 1024) , _hasWritten(false), 
-            _bytes(0), _nSinceCommitIfNeededCall(0) { 
+        CommitJob::CommitJob() : 
+            groupCommitMutex("groupCommit"),
+            _hasWritten(false)
+        { 
             _commitNumber = 0;
+            _bytes = 0;
+            _nSinceCommitIfNeededCall = 0;
         }
 
-        extern unsigned notesThisLock;
-
         void CommitJob::note(void* p, int len) {
+            groupCommitMutex.dassertLocked();
+
+            dassert( _hasWritten );
+
             // from the point of view of the dur module, it would be fine (i think) to only
             // be read locked here.  but must be at least read locked to avoid race with
             // remapprivateview
-            DEV notesThisLock++;
-            DEV d.dbMutex.assertWriteLocked();
-            dassert( cmdLine.dur );
-            cc().writeHappened();
-            if( !_wi._alreadyNoted.checkAndSet(p, len) ) {
-                MemoryMappedFile::makeWritable(p, len);
 
-                if( !_hasWritten ) {
-                    // you can't be writing if one of these is pending, so this is a verification.
-                    assert( !d.dbMutex._remapPrivateViewRequested ); // safe to assert here since it must be the first write in a write lock
-
-                    // we don't bother doing a group commit when nothing is written, so we have a var to track that
-                    _hasWritten = true;
-                }
+            if( !_intentsAndDurOps._alreadyNoted.checkAndSet(p, len) ) {
 
                 /** tips for debugging:
                         if you have an incorrect diff between data files in different folders
@@ -194,9 +200,7 @@ namespace mongo {
 #endif
 
                 // remember intent. we will journal it in a bit
-                _wi.insertWriteIntent(p, len);
-                wassert( _wi._writes.size() <  2000000 );
-                //assert(  _wi._writes.size() < 20000000 );
+                _intentsAndDurOps.insertWriteIntent(p, len);
 
                 {
                     // a bit over conservative in counting pagebytes used
@@ -211,7 +215,7 @@ namespace mongo {
                         if( _nSinceCommitIfNeededCall >= 80 ) {
                             if( _nSinceCommitIfNeededCall % 40 == 0 ) {
                                 log() << "debug nsincecommitifneeded:" << _nSinceCommitIfNeededCall << " bytes:" << _bytes << endl;
-                                if( _nSinceCommitIfNeededCall == 120 || _nSinceCommitIfNeededCall == 1200 ) {
+                                if( _nSinceCommitIfNeededCall == 240 || _nSinceCommitIfNeededCall == 1200 ) {
                                     log() << "_DEBUG printing stack given high nsinccommitifneeded number" << endl;
                                     printStackTrace();
                                 }

@@ -24,8 +24,10 @@
 #include <boost/shared_ptr.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <boost/thread/tss.hpp>
-#include "../bson/util/builder.h"
-#include "debug_util.h"
+
+#include "mongo/bson/util/builder.h"
+#include "mongo/util/debug_util.h"
+#include "mongo/util/exit_code.h"
 
 #ifndef _WIN32
 #include <syslog.h>
@@ -199,7 +201,7 @@ namespace mongo {
             return operator<<( static_cast<const void*>( t ) );
         }
         template< class T >
-        Nullstream& operator<<(const shared_ptr<T> p ) {
+        Nullstream& operator<<(const boost::shared_ptr<T> &p ) {
             T * t = p.get();
             if ( ! t )
                 *this << "null";
@@ -212,10 +214,10 @@ namespace mongo {
             return operator<<( static_cast<const LazyString&>( LazyStringImpl< T >( t ) ) );
         }
 
-        virtual Nullstream& operator<< (ostream& ( *endl )(ostream&)) {
+        virtual Nullstream& operator<< (std::ostream& ( *endl )(std::ostream&)) {
             return *this;
         }
-        virtual Nullstream& operator<< (ios_base& (*hex)(ios_base&)) {
+        virtual Nullstream& operator<< (std::ios_base& (*hex)(std::ios_base&)) {
             return *this;
         }
 
@@ -223,17 +225,15 @@ namespace mongo {
     };
     extern Nullstream nullstream;
 
-    class mutex;
-
     class Logstream : public Nullstream {
         static mongo::mutex mutex;
         static int doneSetup;
-        stringstream ss;
+        std::stringstream ss;
         int indent;
         LogLevel logLevel;
         static FILE* logfile;
-        static boost::scoped_ptr<ostream> stream;
-        static vector<Tee*> * globalTees;
+        static boost::scoped_ptr<std::ostream> stream;
+        static std::vector<Tee*> * globalTees;
         static bool isSyslog;
     public:
         static void logLockless( const StringData& s );
@@ -241,7 +241,7 @@ namespace mongo {
         static void setLogFile(FILE* f);
 #ifndef _WIN32
         static void useSyslog(const char * name) {
-            cout << "using syslog ident: " << name << endl;
+            std::cout << "using syslog ident: " << name << std::endl;
             
             // openlog requires heap allocated non changing pointer
             // this should only be called once per pragram execution
@@ -302,12 +302,12 @@ namespace mongo {
             flush(tee);
             return *this;
         }
-        Logstream& operator<< (ostream& ( *_endl )(ostream&)) {
+        Logstream& operator<< (std::ostream& ( *_endl )(std::ostream&)) {
             ss << '\n';
             flush(0);
             return *this;
         }
-        Logstream& operator<< (ios_base& (*_hex)(ios_base&)) {
+        Logstream& operator<< (std::ios_base& (*_hex)(std::ios_base&)) {
             ss << _hex;
             return *this;
         }
@@ -318,9 +318,11 @@ namespace mongo {
 
         void addGlobalTee( Tee * t ) {
             if ( ! globalTees )
-                globalTees = new vector<Tee*>();
+                globalTees = new std::vector<Tee*>();
             globalTees->push_back( t );
         }
+        
+        void removeGlobalTee( Tee * tee );
         
         void indentInc(){ indent++; }
         void indentDec(){ indent--; }
@@ -365,11 +367,7 @@ namespace mongo {
 
     /** logging which we may not want during unit tests (dbtests) runs.
         set tlogLevel to -1 to suppress tlog() output in a test program. */
-    inline Nullstream& tlog( int level = 0 ) {
-        if ( level > tlogLevel || level > logLevel )
-            return nullstream;
-        return Logstream::get().prolog();
-    }
+    Nullstream& tlog( int level = 0 );
 
     // log if debug build or if at a certain level
     inline Nullstream& dlog( int level ) {
@@ -425,8 +423,8 @@ namespace mongo {
        log to a file rather than stdout
        defined in assert_util.cpp
      */
-    void initLogging( const string& logpath , bool append );
-    void rotateLogs( int signal = 0 );
+    bool initLogging( const string& logpath , bool append );
+    bool rotateLogs();
 
     std::string toUtf8String(const std::wstring& wide);
 
@@ -447,5 +445,6 @@ namespace mongo {
     extern Tee* const warnings; // Things put here go in serverStatus
 
     string errnoWithDescription(int errorcode = -1);
+    void rawOut( const string &s );
 
 } // namespace mongo

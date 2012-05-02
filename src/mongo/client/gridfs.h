@@ -17,8 +17,9 @@
 
 #pragma once
 
-#include "dbclient.h"
-#include "redef_macros.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/client/dbclientinterface.h"
 
 namespace mongo {
 
@@ -201,5 +202,3 @@ namespace mongo {
         friend class GridFS;
     };
 }
-
-#include "undef_macros.h"

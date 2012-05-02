@@ -17,8 +17,11 @@
 
 
 #include "pch.h"
-#include "syncclusterconnection.h"
-#include "../db/dbmessage.h"
+
+#include "mongo/client/syncclusterconnection.h"
+
+#include "mongo/client/dbclientcursor.h"
+#include "mongo/db/dbmessage.h"
 
 // error codes 8000-8009
 
@@ -59,7 +62,7 @@ namespace mongo {
     }
 
     SyncClusterConnection::SyncClusterConnection( SyncClusterConnection& prev, double socketTimeout) : _mutex("SyncClusterConnection"), _socketTimeout( socketTimeout ) {
-        assert(0);
+        verify(0);
     }
 
     SyncClusterConnection::~SyncClusterConnection() {
@@ -89,6 +92,7 @@ namespace mongo {
                 errmsg += e.what();
             }
             catch ( ... ) {
+                warning() << "unknown exception in SyncClusterConnection::fsync" << endl;
             }
             ok = false;
             errmsg += " " + _conns[i]->toString() + ":" + res.toString();
@@ -117,7 +121,7 @@ namespace mongo {
             errors.push_back( err );
         }
 
-        assert( _lastErrors.size() == errors.size() && _lastErrors.size() == _conns.size() );
+        verify( _lastErrors.size() == errors.size() && _lastErrors.size() == _conns.size() );
 
         stringstream err;
         bool ok = true;
@@ -310,7 +314,7 @@ namespace mongo {
 
         if ( _writeConcern ) {
             _checkLast();
-            assert( _lastErrors.size() > 1 );
+            verify( _lastErrors.size() > 1 );
 
             int a = _lastErrors[0]["n"].numberInt();
             for ( unsigned i=1; i<_lastErrors.size(); i++ ) {
@@ -376,7 +380,7 @@ namespace mongo {
     }
 
     void SyncClusterConnection::sayPiggyBack( Message &toSend ) {
-        assert(0);
+        verify(0);
     }
 
     int SyncClusterConnection::_lockType( const string& name ) {
@@ -399,7 +403,7 @@ namespace mongo {
 
     void SyncClusterConnection::killCursor( long long cursorID ) {
         // should never need to do this
-        assert(0);
+        verify(0);
     }
 
     void SyncClusterConnection::setAllSoTimeouts( double socketTimeout ){

@@ -23,7 +23,6 @@
 #include "rs_config.h"
 #include "../dbwebserver.h"
 #include "../../util/mongoutils/html.h"
-#include "../../client/dbclient.h"
 #include "../repl_block.h"
 
 using namespace bson;
@@ -180,7 +179,7 @@ namespace mongo {
                 // later.  of course it could be stuck then, but this check lowers the risk if weird things
                 // are up - we probably don't want a change to apply 30 minutes after the initial attempt.
                 time_t t = time(0);
-                writelock lk("");
+                Lock::GlobalWrite lk;
                 if( time(0)-t > 20 ) {
                     errmsg = "took a long time to get write lock, so not initiating.  Initiate when server less busy?";
                     return false;
@@ -313,6 +312,25 @@ namespace mongo {
             return true;
         }
     } cmdReplSetMaintenance;
+
+    class CmdReplSetSyncFrom: public ReplSetCommand {
+    public:
+        virtual void help( stringstream &help ) const {
+            help << "{ replSetSyncFrom : \"host:port\" }\n";
+            help << "Change who this member is syncing from.";
+        }
+
+        CmdReplSetSyncFrom() : ReplSetCommand("replSetSyncFrom") { }
+        virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            if (!checkAuth(errmsg, result) || !check(errmsg, result)) {
+                return false;
+            }
+
+            string newTarget = cmdObj["replSetSyncFrom"].valuestrsafe();
+            result.append("syncFromRequested", newTarget);
+            return theReplSet->forceSyncFrom(newTarget, errmsg, result);
+        }
+    } cmdReplSetSyncFrom;
 
     using namespace bson;
     using namespace mongoutils::html;

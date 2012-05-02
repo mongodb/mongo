@@ -16,7 +16,6 @@
  */
 
 #include "pch.h"
-#include "../client/dbclient.h"
 #include "../db/cmdline.h"
 #include "../db/client_common.h"
 #include "../s/shard.h"
@@ -33,17 +32,13 @@ namespace mongo {
     // This mutex helps the shell serialize output on exit,
     // to avoid deadlocks at shutdown.  So it also protects
     // the global dbexitCalled.
-    namespace shellUtils {
+    namespace shell_utils {
         mongo::mutex &mongoProgramOutputMutex(*(new mongo::mutex("mongoProgramOutputMutex")));
     }
 
-    void exitCleanly( ExitCode code ) {
-        dbexit( code );
-    }
-
-    void dbexit( ExitCode returnCode, const char *whyMsg , bool tryToGetLock ) {
+    void dbexit( ExitCode returnCode, const char *whyMsg ) {
         {
-            mongo::mutex::scoped_lock lk( shellUtils::mongoProgramOutputMutex );
+            mongo::mutex::scoped_lock lk( shell_utils::mongoProgramOutputMutex );
             dbexitCalled = true;
         }
         out() << "dbexit called" << endl;
@@ -75,16 +70,16 @@ namespace mongo {
     }
 
     void Shard::getAllShards( vector<Shard>& all ) {
-        assert(0);
+        verify(0);
     }
 
     bool Shard::isAShardNode( const string& ident ) {
-        assert(0);
+        verify(0);
         return false;
     }
 
     string prettyHostName() {
-        assert(0);
+        verify(0);
         return "";
     }
 

@@ -17,14 +17,27 @@
 #include "pch.h"
 
 #include "db/pipeline/document_source.h"
+#include "db/pipeline/expression_context.h"
 
 namespace mongo {
+
+    DocumentSource::DocumentSource(
+        const intrusive_ptr<ExpressionContext> &pCtx):
+        pSource(NULL),
+        step(-1),
+        pExpCtx(pCtx) {
+    }
+
     DocumentSource::~DocumentSource() {
     }
 
-    void DocumentSource::setSource(
-        const intrusive_ptr<DocumentSource> &pTheSource) {
-        assert(!pSource.get());
+    const char *DocumentSource::getSourceName() const {
+        static const char unknown[] = "[UNKNOWN]";
+        return unknown;
+    }
+
+    void DocumentSource::setSource(DocumentSource *pTheSource) {
+        verify(!pSource);
         pSource = pTheSource;
     }
 
@@ -38,6 +51,14 @@ namespace mongo {
 
     void DocumentSource::manageDependencies(
         const intrusive_ptr<DependencyTracker> &pTracker) {
+#ifdef MONGO_LATER_SERVER_4644
+        verify(false); // identify any sources that need this but don't have it
+#endif /* MONGO_LATER_SERVER_4644 */
+    }
+
+    bool DocumentSource::advance() {
+        pExpCtx->checkForInterrupt(); // might not return
+        return false;
     }
 
     void DocumentSource::addToBsonArray(BSONArrayBuilder *pBuilder) const {

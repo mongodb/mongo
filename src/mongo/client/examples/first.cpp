@@ -21,7 +21,7 @@
 
 #include <iostream>
 
-#include "client/dbclient.h"
+#include "mongo/client/dbclient.h"
 
 using namespace std;
 
@@ -36,8 +36,10 @@ int main( int argc, const char **argv ) {
 
     const char *port = "27017";
     if ( argc != 1 ) {
-        if ( argc != 3 )
-            throw -12;
+        if ( argc != 3 ) {
+            cout << "need to pass port as second param" << endl;
+            return EXIT_FAILURE;
+        }
         port = argv[ 2 ];
     }
 
@@ -45,7 +47,7 @@ int main( int argc, const char **argv ) {
     string errmsg;
     if ( ! conn.connect( string( "127.0.0.1:" ) + port , errmsg ) ) {
         cout << "couldn't connect : " << errmsg << endl;
-        throw -11;
+        return EXIT_FAILURE;
     }
 
     {
@@ -81,6 +83,5 @@ int main( int argc, const char **argv ) {
         mongo::BSONObj res = conn.findOne( "test.people" , query.obj() );
         cout << res.isEmpty() << "\t" << res.jsonString() << endl;
     }
-
 
 }

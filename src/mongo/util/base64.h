@@ -37,9 +37,9 @@ namespace mongo {
                 test();
             }
             void test() {
-                assert( strlen( (char*)encode ) == 64 );
+                verify( strlen( (char*)encode ) == 64 );
                 for ( int i=0; i<26; i++ )
-                    assert( encode[i] == toupper( encode[i+26] ) );
+                    verify( encode[i] == toupper( encode[i+26] ) );
             }
 
             char e( int x ) {

@@ -15,10 +15,9 @@
 */
 
 #include "pch.h"
-#include "../client.h"
-#include "../../client/dbclient.h"
+#include "mongo/db/client.h"
 #include "rs.h"
-#include "../repl.h"
+#include "mongo/db/repl.h"
 #include "connections.h"
 
 namespace mongo {
@@ -115,7 +114,7 @@ namespace mongo {
         }
 
         /* we lock outside the loop to avoid the overhead of locking on every operation. */
-        writelock lk("");
+        Lock::GlobalWrite lk;
 
         // todo : use exhaust
         OpTime ts;
@@ -248,7 +247,7 @@ namespace mongo {
         }
 
         {
-            readlock lk("local.replset.minvalid");
+            Lock::DBRead lk("local.replset.minvalid");
             BSONObj mv;
             if( Helpers::getSingleton("local.replset.minvalid", mv) ) {
                 minvalid = mv["ts"]._opTime();
@@ -286,7 +285,7 @@ namespace mongo {
         Member *target = 0, *stale = 0;
         BSONObj oldest;
 
-        assert(r.conn() == 0);
+        verify(r.conn() == 0);
 
         while ((target = getMemberToSyncTo()) != 0) {
             string current = target->fullName();
@@ -318,7 +317,7 @@ namespace mongo {
 
             // reset minvalid so that we can't become primary prematurely
             {
-                writelock lk("local.replset.minvalid");
+                Lock::DBWrite lk("local.replset.minvalid");
                 Helpers::putSingleton("local.replset.minvalid", oldest);
             }
 
@@ -402,12 +401,22 @@ namespace mongo {
         }
 
         while( 1 ) {
+            verify( !Lock::isLocked() );
             {
                 Timer timeInWriteLock;
-                writelock lk("");
+                scoped_ptr<Lock::ScopedLock> lk;
                 while( 1 ) {
                     if( !r.moreInCurrentBatch() ) {
-                        dbtemprelease tempRelease;
+                        lk.reset();
+                        timeInWriteLock.reset();
+
+                        {
+                            lock lk(this);
+                            if (_forceSyncTarget) {
+                                return;
+                            }
+                        }
+
                         {
                             // we need to occasionally check some things. between
                             // batches is probably a good time.                            
@@ -430,7 +439,7 @@ namespace mongo {
                         r.more(); // to make the requestmore outside the db lock, which obviously is quite important
                     }
                     if( timeInWriteLock.micros() > 1000 ) {
-                        dbtemprelease tempRelease;
+                        lk.reset();
                         timeInWriteLock.reset();
                     }
                     if( !r.more() )
@@ -448,7 +457,7 @@ namespace mongo {
                             long long lag = b - a;
                             long long sleeptime = sd - lag;
                             if( sleeptime > 0 ) {
-                                dbtemprelease tempRelease;
+                                lk.reset();
                                 uassert(12000, "rs slaveDelay differential too big check clocks and systems", sleeptime < 0x40000000);
                                 if( sleeptime < 60 ) {
                                     sleepsecs((int) sleeptime);
@@ -473,7 +482,31 @@ namespace mongo {
                             }
                         } // endif slaveDelay
 
-                        d.dbMutex.assertWriteLocked();
+                        const char *ns = o.getStringField("ns");
+                        if( ns ) {
+                            if ( strlen(ns) == 0 ) {
+                                // this is ugly
+                                // this is often a no-op
+                                // but can't be 100% sure
+                                lk.reset();
+                                verify( !Lock::isLocked() );
+                                lk.reset( new Lock::GlobalWrite() );
+                            }
+                            else if( str::contains(ns, ".$cmd") ) { 
+                                // a command may need a global write lock. so we will conservatively go ahead and grab one here. suboptimal. :-( 
+                                lk.reset();
+                                verify( !Lock::isLocked() );
+                                lk.reset( new Lock::GlobalWrite() );
+                            }
+                            else if( !Lock::isWriteLocked(ns) || Lock::isW() ) {
+                                // we don't relock on every single op to try to be faster. however if switching collections, we have to.
+                                // note here we must reset to 0 first to assure the old object is destructed before our new operator invocation.
+                                lk.reset();
+                                verify( !Lock::isLocked() );
+                                lk.reset( new Lock::DBWrite(ns) );
+                            }
+                        }
+
                         try {
                             /* if we have become primary, we dont' want to apply things from elsewhere
                                anymore. assumePrimary is in the db lock so we are safe as long as
@@ -487,10 +520,12 @@ namespace mongo {
                             replset::SyncTail tail("");
                             tail.syncApply(o);
                             _logOpObjRS(o);   // with repl sets we write the ops to our oplog too
+                            getDur().commitIfNeeded();
                         }
                         catch (DBException& e) {
                             sethbmsg(str::stream() << "syncTail: " << e.toString() << ", syncing: " << o);
                             veto(target->fullName(), 300);
+                            lk.reset();
                             sleepsecs(30);
                             return;
                         }
@@ -510,6 +545,67 @@ namespace mongo {
             }
             // looping back is ok because this is a tailable cursor
         }
+    }
+
+    bool ReplSetImpl::forceSyncFrom(const string& host, string& errmsg, BSONObjBuilder& result) {
+        lock lk(this);
+
+        // initial sanity check
+        if (iAmArbiterOnly()) {
+            errmsg = "arbiters don't sync";
+            return false;
+        }
+
+        // find the member we want to sync from
+        Member *newTarget = 0;
+        for (Member *m = _members.head(); m; m = m->next()) {
+            if (m->fullName() == host) {
+                newTarget = m;
+                break;
+            }
+        }
+
+        // do some more sanity checks
+        if (!newTarget) {
+            // this will also catch if someone tries to sync a member from itself, as _self is not
+            // included in the _members list.
+            errmsg = "could not find member in replica set";
+            return false;
+        }
+        if (newTarget->config().arbiterOnly) {
+            errmsg = "I cannot sync from an arbiter";
+            return false;
+        }
+        if (!newTarget->config().buildIndexes && myConfig().buildIndexes) {
+            errmsg = "I cannot sync from a member who does not build indexes";
+            return false;
+        }
+        if (newTarget->hbinfo().authIssue) {
+            errmsg = "I cannot authenticate against the requested member";
+            return false;
+        }
+        if (newTarget->hbinfo().health == 0) {
+            errmsg = "I cannot reach the requested member";
+            return false;
+        }
+        if (newTarget->hbinfo().opTime.getSecs()+10 < lastOpTimeWritten.getSecs()) {
+            log() << "attempting to sync from " << newTarget->fullName()
+                  << ", but its latest opTime is " << newTarget->hbinfo().opTime.getSecs()
+                  << " and ours is " << lastOpTimeWritten.getSecs() << " so this may not work"
+                  << rsLog;
+            result.append("warning", "requested member is more than 10 seconds behind us");
+            // not returning false, just warning
+        }
+
+        // record the previous member we were syncing from
+        Member *prev = _currentSyncTarget;
+        if (prev) {
+            result.append("prevSyncTarget", prev->fullName());
+        }
+
+        // finally, set the new target
+        _forceSyncTarget = newTarget;
+        return true;
     }
 
     void ReplSetImpl::_syncThread() {
@@ -539,12 +635,15 @@ namespace mongo {
             // check that we are in the set (and not an arbiter) before
             // trying to sync with other replicas.
             if( ! _self ) {
-            	log() << "replSet warning did not detect own host and port, not syncing, config: " << theReplSet->config() << rsLog;
-                return;
+                log() << "replSet warning did not receive a valid config yet, sleeping 20 seconds " << rsLog;
+                sleepsecs(20);
+                continue;
             }
             if( myConfig().arbiterOnly ) {
                 return;
             }
+
+            fassert(16113, !Lock::isLocked());
 
             try {
                 _syncThread();
@@ -574,7 +673,7 @@ namespace mongo {
         static int n;
         if( n != 0 ) {
             log() << "replSet ERROR : more than one sync thread?" << rsLog;
-            assert( n == 0 );
+            verify( n == 0 );
         }
         n++;
 
@@ -659,7 +758,7 @@ namespace mongo {
             }
         }
 
-        assert(slave->slave);
+        verify(slave->slave);
 
         const Member *target = rs->_currentSyncTarget;
         if (!target || rs->box.getState().primary()

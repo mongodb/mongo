@@ -19,6 +19,10 @@ var config = replTest.getReplSetConfig();
 config.members[1].arbiterOnly = true;
 for (i=2; i<config.members.length; i++) {
     config.members[i].priority = 0;
+    if (i == 4) {
+        config.members[i].buildIndexes = false;
+        config.members[i].hidden = true;
+    }
 }
 replTest.initiate(config);
 
@@ -118,3 +122,70 @@ wait(function() {
             friendlyEqual(status.members[3].optime, status.members[4].optime) &&
             friendlyEqual(status.members[2].optime, status.members[4].optime);
   });
+
+
+print("force sync from various members");
+master = replTest.getMaster();
+
+print("sync from self: error");
+var result = replTest.nodes[3].getDB("admin").runCommand({replSetSyncFrom: replTest.host+":"+replTest.ports[3]});
+printjson(result);
+assert.eq(result.ok, 0);
+
+print("sync from arbiter: error");
+result = replTest.nodes[3].getDB("admin").runCommand({replSetSyncFrom: replTest.host+":"+replTest.ports[1]});
+printjson(result);
+assert.eq(result.ok, 0);
+
+print("sync arbiter from someone: error");
+result = replTest.nodes[1].getDB("admin").runCommand({replSetSyncFrom: replTest.host+":"+replTest.ports[3]});
+printjson(result);
+assert.eq(result.ok, 0);
+
+print("sync from non-index-building member: error");
+result = replTest.nodes[3].getDB("admin").runCommand({replSetSyncFrom: replTest.host+":"+replTest.ports[4]});
+printjson(result)
+assert.eq(result.ok, 0);
+
+var checkSyncingFrom = function(node, target) {
+    var status = node.getDB("admin").runCommand({replSetGetStatus:1});
+    occasionally(function() {
+        printjson(status);
+    });
+    return status.syncingTo == target;
+}
+
+print("sync from primary");
+result = replTest.nodes[3].getDB("admin").runCommand({replSetSyncFrom: replTest.host+":"+replTest.ports[0]});
+printjson(result)
+assert.eq(result.ok, 1);
+assert.soon(function() {
+    return checkSyncingFrom(nodes[3], replTest.host+":"+replTest.ports[0])
+});
+
+print("sync from another passive");
+result = replTest.nodes[3].getDB("admin").runCommand({replSetSyncFrom: replTest.host+":"+replTest.ports[2]});
+printjson(result)
+assert.eq(result.ok, 1);
+assert.soon(function() {
+    return checkSyncingFrom(nodes[3], replTest.host+":"+replTest.ports[2])
+});
+
+print("sync primary on stepdown");
+result = replTest.nodes[0].getDB("admin").runCommand({replSetSyncFrom: replTest.host+":"+replTest.ports[3]});
+printjson(result)
+assert.eq(result.ok, 1);
+
+try {
+    replTest.nodes[0].getDB("admin").runCommand({replSetStepDown:60});
+}
+catch (e) {
+    print(e);
+}
+
+// hammer this, because it's probably not going to stick to it for long
+assert.soon(function() {
+    return checkSyncingFrom(nodes[0], replTest.host+":"+replTest.ports[3])
+}, "stepdown", 30000, 0);
+
+replTest.stopSet();

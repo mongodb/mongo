@@ -6,7 +6,7 @@ import re
 import utils
 
 
-assertNames = [ "uassert" , "massert" ]
+assertNames = [ "uassert" , "massert", "fassert", "fassertFailed" ]
 
 def assignErrorCodes():
     cur = 10000
@@ -33,12 +33,14 @@ codes = []
 
 def readErrorCodes( callback, replaceZero = False ):
     
-    quick = [ "assert" , "Exception" , "verify" ]
+    quick = [ "assert" , "Exception"]
 
-    ps = [ re.compile( "(([umsg]asser(t|ted))) *\(( *)(\d+)" ) ,
-           re.compile( "((User|Msg|MsgAssertion)Exceptio(n))\(( *)(\d+)" ) ,
-           re.compile( "(((verify))) *\(( *)(\d+)" )
+    ps = [ re.compile( "(([umsgf]asser(t|ted))) *\(( *)(\d+)" ) ,
+           re.compile( "((User|Msg|MsgAssertion)Exceptio(n))\(( *)(\d+)" ),
+           re.compile( "((fassertFailed)()) *\(( *)(\d+)" )
            ]
+
+    bad = [ re.compile( "\sassert *\(" ) ]
     
     for x in utils.getAllSourceFiles():
         
@@ -56,6 +58,14 @@ def readErrorCodes( callback, replaceZero = False ):
                     break
 
             if found:
+                
+                if x.find( "src/mongo/" ) >= 0:
+                    for b in bad:
+                        if len(b.findall( line )) > 0:
+                            print( x )
+                            print( line )
+                            raise Exception( "you can't use a bare assert" )
+
                 for p in ps:               
 
                     def repl( m ):

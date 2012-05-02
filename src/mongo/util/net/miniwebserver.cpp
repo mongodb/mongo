@@ -156,7 +156,7 @@ namespace mongo {
         }
         else {
             for ( vector<string>::iterator i = headers.begin(); i != headers.end(); i++ ) {
-                assert( strncmp("Content-Length", i->c_str(), 14) );
+                verify( strncmp("Content-Length", i->c_str(), 14) );
                 ss << *i << "\r\n";
             }
         }

@@ -17,17 +17,21 @@
 
 #pragma once
 
+#include "mongo/platform/basic.h"
+
 #include <cstdio> // sscanf
 #include <ctime>
+#include <string>
+#include <iostream>
 #include <boost/thread/thread.hpp>
 #include <boost/thread/tss.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/thread/xtime.hpp>
-#undef assert
-#define assert MONGO_assert
 #include "../bson/util/misc.h"  // Date_t
 
 namespace mongo {
+
+    using std::string;
 
     inline void time_t_to_Struct(time_t t, struct tm * buf , bool local = false ) {
 #if defined(_WIN32)
@@ -51,7 +55,7 @@ namespace mongo {
 
         const char* fmt = (colonsOk ? "%Y-%m-%dT%H:%M:%S" : "%Y-%m-%dT%H-%M-%S");
         char buf[32];
-        assert(strftime(buf, sizeof(buf), fmt, &t) == 19);
+        verify(strftime(buf, sizeof(buf), fmt, &t) == 19);
         return buf;
     }
 
@@ -61,7 +65,7 @@ namespace mongo {
 
         const char* fmt = "%Y-%m-%dT%H:%M:%SZ";
         char buf[32];
-        assert(strftime(buf, sizeof(buf), fmt, &t) == 20);
+        verify(strftime(buf, sizeof(buf), fmt, &t) == 20);
         return buf;
     }
 
@@ -88,15 +92,6 @@ namespace mongo {
         return true;
     }
 
-#define MONGO_asctime _asctime_not_threadsafe_
-#define asctime MONGO_asctime
-#define MONGO_gmtime _gmtime_not_threadsafe_
-#define gmtime MONGO_gmtime
-#define MONGO_localtime _localtime_not_threadsafe_
-#define localtime MONGO_localtime
-#define MONGO_ctime _ctime_is_not_threadsafe_
-#define ctime MONGO_ctime
-
 #if defined(_WIN32)
     inline void sleepsecs(int s) {
         // todo : add an assert here that we are not locked in d.dbMutex.  there may be debugging things where we 
@@ -104,7 +99,7 @@ namespace mongo {
         Sleep(s*1000);
     }
     inline void sleepmillis(long long s) {
-        assert( s <= 0xffffffff );
+        verify( s <= 0xffffffff );
         Sleep((DWORD) s);
     }
     inline void sleepmicros(long long s) {
@@ -157,7 +152,7 @@ namespace mongo {
         t.tv_sec = s;
         t.tv_nsec = 0;
         if ( nanosleep( &t , 0 ) ) {
-            cout << "nanosleep failed" << endl;
+            std::cout << "nanosleep failed" << std::endl;
         }
     }
     inline void sleepmicros(long long s) {
@@ -168,7 +163,7 @@ namespace mongo {
         t.tv_nsec = 1000 * ( s % 1000000 );
         struct timespec out;
         if ( nanosleep( &t , &out ) ) {
-            cout << "nanosleep failed" << endl;
+            std::cout << "nanosleep failed" << std::endl;
         }
     }
     inline void sleepmillis(long long s) {
@@ -254,5 +249,12 @@ namespace mongo {
         return secs*1000*1000 + tv.tv_usec;
     }
 #endif
+
+
+    // these are so that if you use one of them compilation will fail
+    char *asctime(const struct tm *tm);
+    char *ctime(const time_t *timep);
+    struct tm *gmtime(const time_t *timep);
+    struct tm *localtime(const time_t *timep);
 
 }  // namespace mongo

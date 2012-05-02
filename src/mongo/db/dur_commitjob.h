@@ -1,5 +1,4 @@
-/* @file dur_commitjob.h used by dur.cpp
-*/
+/* @file dur_commitjob.h used by dur.cpp */
 
 /**
 *    Copyright (C) 2009 10gen Inc.
@@ -26,49 +25,31 @@
 #include "durop.h"
 #include "dur.h"
 #include "taskqueue.h"
-
-//#define DEBUG_WRITE_INTENT 1
+#include "d_concurrency.h"
 
 namespace mongo {
     namespace dur {
 
-        /** declaration of an intent to write to a region of a memory mapped view
-         *
-         * We store the end rather than the start pointer to make operator< faster
-         * since that is heavily used in set lookup.
+        void assertLockedForCommitting();
+
+        /** Declaration of an intent to write to a region of a memory mapped view
+         *  We store the end rather than the start pointer to make operator< faster
+         *    since that is heavily used in set lookup.
          */
         struct WriteIntent { /* copyable */
-            WriteIntent() : /*w_ptr(0), */ p(0) { }
-            WriteIntent(void *a, unsigned b) : /*w_ptr(0), */ p((char*)a+b), len(b) { }
-
-            void* start() const { return (char*)p - len; }
-            void* end() const { return p; }
-            unsigned length() const { return len; }
-
+            WriteIntent() : p(0) { }
+            WriteIntent(void *a, unsigned b) : p((char*)a+b), len(b) { }
+            void* start() const                            { return (char*)p - len; }
+            void* end() const                              { return p; }
+            unsigned length() const                        { return len; }
             bool operator < (const WriteIntent& rhs) const { return end() < rhs.end(); }
-
-            // can they be merged?
-            bool overlaps(const WriteIntent& rhs) const {
-                return (start() <= rhs.end() && end() >= rhs.start());
-            }
-
-            // is merging necessary?
-            bool contains(const WriteIntent& rhs) const {
-                return (start() <= rhs.start() && end() >= rhs.end());
-            }
-
-            // merge into me
+            bool overlaps(const WriteIntent& rhs) const    { return (start() <= rhs.end() && end() >= rhs.start()); }
+            bool contains(const WriteIntent& rhs) const    { return (start() <= rhs.start() && end() >= rhs.end()); }
+            // merge into me:
             void absorb(const WriteIntent& other);
-
             friend ostream& operator << (ostream& out, const WriteIntent& wi) {
                 return (out << "p: " << wi.p << " end: " << wi.end() << " len: " << wi.len);
             }
-
-            //mutable void *w_ptr;  // writable mapping of p.
-            // mutable because set::iterator is const but this isn't used in op<
-#if defined(_EXPERIMENTAL)
-            mutable unsigned ofsInJournalBuffer;
-#endif
         private:
             void *p;      // intent to write up to p
             unsigned len; // up to this len
@@ -82,7 +63,6 @@ namespace mongo {
         public:
             Already() { clear(); }
             void clear() { memset(this, 0, sizeof(*this)); }
-
             /* see if we have Already recorded/indicated our write intent for this region of memory.
                automatically upgrades the length if the length was shorter previously.
                @return true if already indicated.
@@ -101,56 +81,43 @@ namespace mongo {
                 nd.second = len;
                 return false; // a new set
             }
-
         private:
             enum { N = Prime }; // this should be small the idea is that it fits in the cpu cache easily
             pair<void*,int> nodes[N];
         };
 
         /** our record of pending/uncommitted write intents */
-        class Writes : boost::noncopyable {
-            struct D {
-                void *p;
-                unsigned len;
-                static void go(const D& d);
-            };
+        class IntentsAndDurOps : boost::noncopyable {
         public:
-            TaskQueue<D> _deferred;
+            vector<WriteIntent> _intents;
             Already<127> _alreadyNoted;
-            set<WriteIntent> _writes;
-            vector< shared_ptr<DurOp> > _ops; // all the ops other than basic writes
-            bool _drained; // _deferred is drained?  for asserting/testing
+            vector< shared_ptr<DurOp> > _durOps; // all the ops other than basic writes
 
-            /** reset the Writes structure (empties all the above) */
+            /** reset the IntentsAndDurOps structure (empties all the above) */
             void clear();
 
-            /** merges into set (ie non-deferred version) */
-            void _insertWriteIntent(void* p, int len);
-
             void insertWriteIntent(void* p, int len) {
-#if defined(DEBUG_WRITE_INTENT)
-                if( _debug[p] < len )
-                    _debug[p] = len;
-#endif
-                D d;
-                d.p = p;
-                d.len = len;
-                _deferred.defer(d);
+                _intents.push_back(WriteIntent(p,len));
+                wassert( _intents.size() < 2000000 );
             }
-
-#ifdef _DEBUG
-            WriteIntent _last;
-#endif
-#if defined(DEBUG_WRITE_INTENT)
+            #if defined(DEBUG_WRITE_INTENT)
             map<void*,int> _debug;
-#endif
+            #endif
         };
 
-#if defined(DEBUG_WRITE_INTENT)
-        void assertAlreadyDeclared(void *, int len);
-#else
-        inline void assertAlreadyDeclared(void *, int len) { }
-#endif
+        /** so we don't have to lock the groupCommitMutex too often */
+        class ThreadLocalIntents {
+            enum { N = 21 };
+            dur::WriteIntent i[N];
+            int n;
+        public:
+            ThreadLocalIntents() : n(0) { }
+            void _unspool();
+            void unspool();
+            void push(const WriteIntent& i);
+            int n_informational() const { return n; }
+            static AtomicUInt nSpooled;
+        };
 
         /** A commit job object for a group commit.  Currently there is one instance of this object.
 
@@ -159,62 +126,77 @@ namespace mongo {
                          other uses are in a read lock from a single thread (durThread)
         */
         class CommitJob : boost::noncopyable {
-        public:
-            AlignedBuilder _ab; // for direct i/o writes to journal
-
-            CommitJob();
-
-            ~CommitJob(){ assert(!"shouldn't destroy CommitJob!"); }
+            void _committingReset();
+            ~CommitJob(){ verify(!"shouldn't destroy CommitJob!"); }
 
             /** record/note an intent to write */
             void note(void* p, int len);
+            // only called by : 
+            friend class ThreadLocalIntents;
 
-            /** note an operation other than a "basic write" */
+        public:
+            SimpleMutex groupCommitMutex;
+            CommitJob();
+
+            /** note an operation other than a "basic write". threadsafe (locks in the impl) */
             void noteOp(shared_ptr<DurOp> p);
 
-            set<WriteIntent>& writes() {
-                if( !_wi._drained ) {
-                    // generally, you don't want to use the set until it is prepared (after deferred ops are applied)
-                    // thus this assert here.
-                    assert(false);
-                }
-                return _wi._writes;
+            vector< shared_ptr<DurOp> >& ops() { 
+                dassert( Lock::isLocked() );          // a rather weak check, we require more than that
+                groupCommitMutex.dassertLocked(); // this is what really makes the below safe
+                return _intentsAndDurOps._durOps;                
             }
-
-            vector< shared_ptr<DurOp> >& ops() { return _wi._ops; }
 
             /** this method is safe to call outside of locks. when haswritten is false we don't do any group commit and avoid even
                 trying to acquire a lock, which might be helpful at times.
             */
             bool hasWritten() const { return _hasWritten; }
 
-            /** we use the commitjob object over and over, calling reset() rather than reconstructing */
-            void reset();
-
-            void beginCommit();
-
+        public:
+            /** these called by the groupCommit code as it goes along */
+            void commitingBegin();
             /** the commit code calls this when data reaches the journal (on disk) */
-            void notifyCommitted() { _notify.notifyAll(_commitNumber); }
+            void committingNotifyCommitted() { 
+                groupCommitMutex.dassertLocked();
+                _notify.notifyAll(_commitNumber); 
+            }
+            /** we use the commitjob object over and over, calling reset() rather than reconstructing */
+            void committingReset() {
+                groupCommitMutex.dassertLocked();
+                _committingReset();
+            }
 
+        public:
             /** we check how much written and if it is getting to be a lot, we commit sooner. */
             size_t bytes() const { return _bytes; }
 
-#if defined(_DEBUG)
-            const WriteIntent& lastWrite() const { return _wi._last; }
-#endif
+            /** used in prepbasicwrites. sorted so that overlapping and duplicate items 
+             * can be merged.  we sort here so the caller receives something they must 
+             * keep const from their pov. */
+            const vector<WriteIntent>& getIntentsSorted() {
+                groupCommitMutex.dassertLocked();
+                sort(_intentsAndDurOps._intents.begin(), _intentsAndDurOps._intents.end());
+                return _intentsAndDurOps._intents;
+            }
 
-            Writes& wi() { return _wi; }
+            bool _hasWritten;
+
         private:
             NotifyAll::When _commitNumber;
-            bool _hasWritten;
-            Writes _wi; // todo: fix name
+            IntentsAndDurOps _intentsAndDurOps;
             size_t _bytes;
         public:
-            NotifyAll _notify; // for getlasterror fsync:true acknowledgements
-            unsigned _nSinceCommitIfNeededCall;
+            NotifyAll _notify;                  // for getlasterror fsync:true acknowledgements
+            unsigned _nSinceCommitIfNeededCall; // for asserts and debugging
         };
 
         extern CommitJob& commitJob;
+
+#if defined(DEBUG_WRITE_INTENT)
+        void assertAlreadyDeclared(void *, int len);
+#else
+        inline void assertAlreadyDeclared(void *, int len) { }
+#endif
 
     }
 }

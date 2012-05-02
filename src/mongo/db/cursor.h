@@ -21,6 +21,7 @@
 #include "jsobj.h"
 #include "diskloc.h"
 #include "matcher.h"
+#include "mongo/db/projection.h"
 
 namespace mongo {
 
@@ -28,12 +29,53 @@ namespace mongo {
     class Record;
     class CoveredIndexMatcher;
 
-    /* Query cursors, base class.  This is for our internal cursors.  "ClientCursor" is a separate
-       concept and is for the user's cursor.
-
-       WARNING concurrency: the vfunctions below are called back from within a
-       ClientCursor::ccmutex.  Don't cause a deadlock, you've been warned.
-    */
+    /**
+     * Query cursors, base class.  This is for our internal cursors.  "ClientCursor" is a separate
+     * concept and is for the user's cursor.
+     *
+     * WARNING concurrency: the vfunctions below are called back from within a
+     * ClientCursor::ccmutex.  Don't cause a deadlock, you've been warned.
+     *
+     * Two general techniques may be used to ensure a Cursor is in a consistent state after a write.
+     *     - The Cursor may be advanced before the document at its current position is deleted.
+     *     - The Cursor may record its position and then relocate this position.
+     * A particular Cursor may potentially utilize only one of the above techniques, but a client
+     * that is Cursor subclass agnostic must implement a pattern handling both techniques.
+     *
+     * When the document at a Cursor's current position is deleted (or moved to a new location) the
+     * following pattern is used:
+     *     DiskLoc toDelete = cursor->currLoc();
+     *     cursor->advance();
+     *     cursor->prepareToTouchEarlierIterate();
+     *     delete( toDelete );
+     *     cursor->recoverFromTouchingEarlierIterate();
+     * 
+     * When a cursor yields, the following pattern is used:
+     *     cursor->prepareToYield();
+     *     while( Op theOp = nextOp() ) {
+     *         if ( theOp.type() == INSERT || theOp.type() == UPDATE_IN_PLACE ) {
+     *             theOp.run();
+     *         }
+     *         else if ( theOp.type() == DELETE ) {
+     *             if ( cursor->refLoc() == theOp.toDelete() ) {
+     *                 cursor->recoverFromYield();
+     *                 cursor->advance();
+     *                 cursor->prepareToYield();
+     *             }
+     *             theOp.run();
+     *         }
+     *     }
+     *     cursor->recoverFromYield();
+     *     
+     * The break before a getMore request is typically treated as a yield, but if a Cursor supports
+     * getMore but not yield the following pattern is currently used:
+     *     cursor->noteLocation();
+     *     runOtherOps();
+     *     cursor->checkLocation();
+     *
+     * A Cursor may rely on additional callbacks not listed above to relocate its position after a
+     * write.
+     */
     class Cursor : boost::noncopyable {
     public:
         virtual ~Cursor() {}
@@ -92,7 +134,7 @@ namespace mongo {
         virtual bool supportYields() = 0;
 
         /** Called before a ClientCursor yield. */
-        virtual bool prepareToYield() { noteLocation(); return supportYields(); }
+        virtual void prepareToYield() { noteLocation(); }
         
         /** Called after a ClientCursor yield.  Recovers from a previous call to prepareToYield(). */
         virtual void recoverFromYield() { checkLocation(); }
@@ -146,12 +188,23 @@ namespace mongo {
         }
 
         // A convenience function for setting the value of matcher() manually
-        // so it may accessed later.  Implementations which must generate
+        // so it may be accessed later.  Implementations which must generate
         // their own matcher() should assert here.
         virtual void setMatcher( shared_ptr< CoveredIndexMatcher > matcher ) {
             massert( 13285, "manual matcher config not allowed", false );
         }
 
+        /** @return the covered index projector for the current iterate, if any. */
+        virtual const Projection::KeyOnly *keyFieldsOnly() const { return 0; }
+
+        /**
+         * Manually set the value of keyFieldsOnly() so it may be accessed later.  Implementations
+         * that generate their own keyFieldsOnly() must assert.
+         */
+        virtual void setKeyFieldsOnly( const shared_ptr<Projection::KeyOnly> &keyFieldsOnly ) {
+            massert( 16159, "manual keyFieldsOnly config not allowed", false );
+        }
+        
         virtual void explainDetails( BSONObjBuilder& b ) { return; }
     };
 
@@ -165,7 +218,13 @@ namespace mongo {
     const AdvanceStrategy *forward();
     const AdvanceStrategy *reverse();
 
-    /* table-scan style cursor */
+    /**
+     * table-scan style cursor
+     *
+     * A BasicCursor relies on advance() to ensure it is in a consistent state after a write.  If
+     * the document at a BasicCursor's current position will be deleted or relocated, the cursor
+     * must first be advanced.  The same is true of BasicCursor subclasses.
+     */
     class BasicCursor : public Cursor {
     public:
         BasicCursor(DiskLoc dl, const AdvanceStrategy *_s = forward()) : curr(dl), s( _s ), _nscanned() {
@@ -177,7 +236,7 @@ namespace mongo {
         }
         bool ok() { return !curr.isNull(); }
         Record* _current() {
-            assert( ok() );
+            verify( ok() );
             return curr.rec();
         }
         BSONObj current() {
@@ -202,6 +261,10 @@ namespace mongo {
         virtual CoveredIndexMatcher *matcher() const { return _matcher.get(); }
         virtual shared_ptr< CoveredIndexMatcher > matcherPtr() const { return _matcher; }
         virtual void setMatcher( shared_ptr< CoveredIndexMatcher > matcher ) { _matcher = matcher; }
+        virtual const Projection::KeyOnly *keyFieldsOnly() const { return _keyFieldsOnly.get(); }
+        virtual void setKeyFieldsOnly( const shared_ptr<Projection::KeyOnly> &keyFieldsOnly ) {
+            _keyFieldsOnly = keyFieldsOnly;
+        }
         virtual long long nscanned() { return _nscanned; }
 
     protected:
@@ -211,6 +274,7 @@ namespace mongo {
     private:
         bool tailable_;
         shared_ptr< CoveredIndexMatcher > _matcher;
+        shared_ptr<Projection::KeyOnly> _keyFieldsOnly;
         long long _nscanned;
         void init() { tailable_ = false; }
     };

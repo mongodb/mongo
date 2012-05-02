@@ -18,10 +18,9 @@
 
 #pragma once
 
-#include "../pch.h"
-#include "../client/dbclient.h"
-#include "../db/jsobj.h"
-
+#include "mongo/pch.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/util/mongoutils/str.h"
 /**
    some generic sharding utils that can be used in mongod or mongos
  */
@@ -55,7 +54,7 @@ namespace mongo {
             else {
                 _combined = 0;
                 log() << "ShardChunkVersion can't handle type (" << (int)(e.type()) << ") " << e << endl;
-                assert(0);
+                verify(0);
             }
         }
 
@@ -105,7 +104,7 @@ namespace mongo {
                 _combined = 0;
                 break;
             default:
-                massert( 13657 , str::stream() << "unknown type for ShardChunkVersion: " << elem , 0 );
+                massert( 13657 , mongoutils::str::stream() << "unknown type for ShardChunkVersion: " << elem , 0 );
             }
             return *this;
         }
@@ -121,11 +120,34 @@ namespace mongo {
      */
     class StaleConfigException : public AssertionException {
     public:
-        StaleConfigException( const string& ns , const string& raw , int code, bool justConnection = false )
-            : AssertionException( (string)"ns: " + ns + " " + raw , code ) ,
+        StaleConfigException( const string& ns , const string& raw , int code, ShardChunkVersion received, ShardChunkVersion wanted, bool justConnection = false )
+            : AssertionException(
+                    mongoutils::str::stream() << raw << " ( ns : " << ns <<
+                                             ", received : " << received.toString() <<
+                                             ", wanted : " << wanted.toString() <<
+                                             ", " << ( code == SendStaleConfigCode ? "send" : "recv" ) << " )",
+                    code ),
               _justConnection(justConnection) ,
-              _ns(ns) {
-        }
+              _ns(ns),
+              _received( received ),
+              _wanted( wanted )
+        {}
+
+        // Preferred if we're rebuilding this from a thrown exception
+        StaleConfigException( const string& raw , int code, const BSONObj& error, bool justConnection = false )
+            : AssertionException(
+                    mongoutils::str::stream() << raw << " ( ns : " << error["ns"].String() << // Note, this will fail if we don't have a ns
+                                             ", received : " << ShardChunkVersion( error["vReceived"] ).toString() <<
+                                             ", wanted : " << ShardChunkVersion( error["vWanted"] ).toString() <<
+                                             ", " << ( code == SendStaleConfigCode ? "send" : "recv" ) << " )",
+                    code ),
+              _justConnection(justConnection) ,
+              _ns( error["ns"].String() ),
+              _received( ShardChunkVersion( error["vReceived"] ) ),
+              _wanted( ShardChunkVersion( error["vWanted"] ) )
+        {}
+
+        StaleConfigException() : AssertionException( "", 0 ) {}
 
         virtual ~StaleConfigException() throw() {}
 
@@ -147,24 +169,47 @@ namespace mongo {
             raw = big.substr( end + 1 );
             return true;
         }
+
+        ShardChunkVersion getVersionReceived() const { return _received; }
+        ShardChunkVersion getVersionWanted() const { return _wanted; }
+
+        StaleConfigException& operator=( const StaleConfigException& elem ) {
+
+            this->_ei.msg = elem._ei.msg;
+            this->_ei.code = elem._ei.code;
+            this->_justConnection = elem._justConnection;
+            this->_ns = elem._ns;
+            this->_received = elem._received;
+            this->_wanted = elem._wanted;
+
+            return *this;
+        }
+
     private:
         bool _justConnection;
         string _ns;
+        ShardChunkVersion _received;
+        ShardChunkVersion _wanted;
     };
 
     class SendStaleConfigException : public StaleConfigException {
     public:
-        SendStaleConfigException( const string& ns , const string& raw , bool justConnection = false )
-            : StaleConfigException( ns, raw + "(send)", SendStaleConfigCode, justConnection ) {}
+        SendStaleConfigException( const string& ns , const string& raw , ShardChunkVersion received, ShardChunkVersion wanted, bool justConnection = false )
+            : StaleConfigException( ns, raw, SendStaleConfigCode, received, wanted, justConnection ) {}
+        SendStaleConfigException( const string& raw , const BSONObj& error, bool justConnection = false )
+            : StaleConfigException( raw, SendStaleConfigCode, error, justConnection ) {}
     };
 
     class RecvStaleConfigException : public StaleConfigException {
     public:
-        RecvStaleConfigException( const string& ns , const string& raw , bool justConnection = false )
-            : StaleConfigException( ns, raw + "(recv)", RecvStaleConfigCode, justConnection ) {}
+        RecvStaleConfigException( const string& ns , const string& raw , ShardChunkVersion received, ShardChunkVersion wanted, bool justConnection = false )
+            : StaleConfigException( ns, raw, RecvStaleConfigCode, received, wanted, justConnection ) {}
+        RecvStaleConfigException( const string& raw , const BSONObj& error, bool justConnection = false )
+            : StaleConfigException( raw, RecvStaleConfigCode, error, justConnection ) {}
     };
 
     class ShardConnection;
+    class DBClientBase;
     class VersionManager {
     public:
         VersionManager(){};

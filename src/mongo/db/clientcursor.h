@@ -24,7 +24,10 @@
 
 #pragma once
 
-#include "../pch.h"
+#include "pch.h"
+
+#include <boost/thread/recursive_mutex.hpp>
+
 #include "cursor.h"
 #include "jsobj.h"
 #include "../util/net/message.h"
@@ -33,12 +36,12 @@
 #include "diskloc.h"
 #include "dbhelpers.h"
 #include "matcher.h"
-#include "../client/dbclient.h"
 #include "projection.h"
 #include "s/d_chunk_manager.h"
 
 namespace mongo {
 
+    typedef boost::recursive_mutex::scoped_lock recursive_scoped_lock;
     typedef long long CursorId; /* passed to the client so it can send back on getMore */
     class Cursor; /* internal server cursor base class */
     class ClientCursor;
@@ -71,7 +74,7 @@ namespace mongo {
 
     extern BSONObj id_obj;
 
-    class ClientCursor {
+    class ClientCursor : private boost::noncopyable {
         friend class CmdCursorInfo;
     public:
         static void assertNoCursors();
@@ -88,7 +91,7 @@ namespace mongo {
             ClientCursor * c() { return _c; }
             void release() {
                 if( _c ) {
-                    assert( _c->_pinValue >= 100 );
+                    verify( _c->_pinValue >= 100 );
                     _c->_pinValue -= 100;
                     _c = 0;
                 }
@@ -139,6 +142,11 @@ namespace mongo {
             }
             operator bool() { return _c; }
             ClientCursor * operator-> () { return _c; }
+            /** Release ownership of the ClientCursor. */
+            void release() {
+                _c = 0;
+                _id = -1;
+            }
         private:
             ClientCursor *_c;
             CursorId _id;
@@ -215,30 +223,21 @@ namespace mongo {
         struct YieldData { CursorId _id; bool _doingDeletes; };
         bool prepareToYield( YieldData &data );
         static bool recoverFromYield( const YieldData &data );
-
+        
         struct YieldLock : boost::noncopyable {
-            explicit YieldLock( ptr<ClientCursor> cc )
-                : _canYield(cc->_c->supportYields()) {
-                if ( _canYield ) {
-                    cc->prepareToYield( _data );
-                    _unlock.reset(new dbtempreleasecond());
-                }
-            }
-            ~YieldLock() {
-                if ( _unlock ) {
-                    log( LL_WARNING ) << "ClientCursor::YieldLock not closed properly" << endl;
-                    relock();
-                }
-            }
-            bool stillOk() {
-                if ( ! _canYield )
-                    return true;
-                relock();
-                return ClientCursor::recoverFromYield( _data );
-            }
-            void relock() {
-                _unlock.reset();
-            }
+            
+            explicit YieldLock( ptr<ClientCursor> cc );
+            
+            ~YieldLock();
+            
+            /**
+             * @return if the cursor is still ok
+             *         if it is, we also relock
+             */
+            bool stillOk();
+
+            void relock();
+
         private:
             const bool _canYield;
             YieldData _data;
@@ -287,6 +286,8 @@ namespace mongo {
         */
         BSONObj extractFields(const BSONObj &pattern , bool fillWithNull = false) ;
         
+        void fillQueryResultFromObj( BufBuilder &b ) const;
+        
         bool currentIsDup() { return _c->getsetdup( _c->currLoc() ); }
 
         bool currentMatches() {
@@ -310,6 +311,13 @@ namespace mongo {
             }
             return it->second;
         }
+        
+        /* call when cursor's location changes so that we can update the
+         cursorsbylocation map.  if you are locked and internally iterating, only
+         need to call when you are ready to "unlock".
+         */
+        void updateLocation();
+
     public:
         static ClientCursor* find(CursorId id, bool warn = true) {
             recursive_scoped_lock lock(ccmutex);
@@ -324,27 +332,12 @@ namespace mongo {
          * Deletes the cursor with the provided @param 'id' if one exists.
          * @throw if the cursor with the provided id is pinned.
          */
-        static bool erase(CursorId id) {
-            recursive_scoped_lock lock(ccmutex);
-            ClientCursor *cc = find_inlock(id);
-            if ( cc ) {
-                assert( cc->_pinValue < 100 ); // you can't still have an active ClientCursor::Pointer
-                delete cc;
-                return true;
-            }
-            return false;
-        }
+        static bool erase(CursorId id);
 
         /**
          * @return number of cursors found
          */
         static int erase( int n , long long * ids );
-
-        /* call when cursor's location changes so that we can update the
-           cursorsbylocation map.  if you are locked and internally iterating, only
-           need to call when you are ready to "unlock".
-           */
-        void updateLocation();
 
         void mayUpgradeStorage() {
             /* if ( !ids_.get() )
@@ -367,6 +360,9 @@ namespace mongo {
         void setDoingDeletes( bool doingDeletes ) {_doingDeletes = doingDeletes; }
 
         void slaveReadTill( const OpTime& t ) { _slaveReadTill = t; }
+        
+        /** Just for testing. */
+        OpTime getSlaveReadTill() const { return _slaveReadTill; }
 
     public: // static methods
 
@@ -448,6 +444,9 @@ namespace mongo {
 // ClientCursor should only be used with auto_ptr because it needs to be
 // release()ed after a yield if stillOk() returns false and these pointer types
 // do not support releasing. This will prevent them from being used accidentally
+// Instead of auto_ptr<>, which still requires some degree of manual management
+// of this, consider using ClientCursor::CleanupPointer which handles
+// ClientCursor's unusual self-deletion mechanics
 namespace boost{
     template<> class scoped_ptr<mongo::ClientCursor> {};
     template<> class shared_ptr<mongo::ClientCursor> {};

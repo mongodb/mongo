@@ -30,7 +30,7 @@ namespace mongo {
     public:
         BSONElementManipulator( const BSONElement &element ) :
             _element( element ) {
-            assert( !_element.eoo() );
+            verify( !_element.eoo() );
         }
         /** Replace a Timestamp type with a Date type initialized to
             OpTime::now().asDate()
@@ -43,16 +43,16 @@ namespace mongo {
         void setNumber(double d) {
             if ( _element.type() == NumberDouble ) *reinterpret_cast< double * >( value() )  = d;
             else if ( _element.type() == NumberInt ) *reinterpret_cast< int * >( value() ) = (int) d;
-            else assert(0);
+            else verify(0);
         }
         void SetNumber(double d);
         void setLong(long long n) {
-            assert( _element.type() == NumberLong );
+            verify( _element.type() == NumberLong );
             *reinterpret_cast< long long * >( value() ) = n;
         }
         void SetLong(long long n);
         void setInt(int n) {
-            assert( _element.type() == NumberInt );
+            verify( _element.type() == NumberInt );
             *reinterpret_cast< int * >( value() ) = n;
         }
         void SetInt(int n);
@@ -78,6 +78,7 @@ namespace mongo {
                 if ( e.eoo() )
                     break;
                 if ( e.type() == Timestamp ) {
+                    // performance note, this locks a mutex:
                     BSONElementManipulator( e ).initTimestamp();
                     break;
                 }

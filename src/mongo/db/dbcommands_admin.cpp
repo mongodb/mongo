@@ -184,9 +184,9 @@ namespace mongo {
 
             bool valid = true;
             BSONArrayBuilder errors; // explanation(s) for why valid = false
-            if ( d->capped ){
-                result.append("capped", d->capped);
-                result.append("max", d->max);
+            if ( d->isCapped() ){
+                result.append("capped", d->isCapped());
+                result.appendNumber("max", d->maxCappedDocs());
             }
 
             result.append("firstExtent", str::stream() << d->firstExtent.toString() << " ns:" << d->firstExtent.ext()->nsDiagnostic.toString());
@@ -224,7 +224,7 @@ namespace mongo {
             result.appendNumber("datasize", d->stats.datasize);
             result.appendNumber("nrecords", d->stats.nrecords);
             result.appendNumber("lastExtentSize", d->lastExtentSize);
-            result.appendNumber("padding", d->paddingFactor);
+            result.appendNumber("padding", d->paddingFactor());
             
 
             try {
@@ -255,14 +255,14 @@ namespace mongo {
                         DiskLoc cl = c->currLoc();
                         if ( n < 1000000 )
                             recs.insert(cl);
-                        if ( d->capped ) {
+                        if ( d->isCapped() ) {
                             if ( cl < cl_last )
                                 outOfOrder++;
                             cl_last = cl;
                         }
 
                         Record *r = c->_current();
-                        len += r->lengthWithHeaders;
+                        len += r->lengthWithHeaders();
                         nlen += r->netLength();
 
                         if (full){
@@ -290,7 +290,7 @@ namespace mongo {
 
                         c->advance();
                     }
-                    if ( d->capped && !d->capLooped() ) {
+                    if ( d->isCapped() && !d->capLooped() ) {
                         result.append("cappedOutOfOrder", outOfOrder);
                         if ( outOfOrder > 1 ) {
                             valid = false;
@@ -325,7 +325,7 @@ namespace mongo {
                             ndel++;
 
                             if ( loc.questionable() ) {
-                                if( d->capped && !loc.isValid() && i == 1 ) {
+                                if( d->isCapped() && !loc.isValid() && i == 1 ) {
                                     /* the constructor for NamespaceDetails intentionally sets deletedList[1] to invalid
                                        see comments in namespace.h
                                     */
@@ -342,8 +342,8 @@ namespace mongo {
                             }
 
                             DeletedRecord *d = loc.drec();
-                            delSize += d->lengthWithHeaders;
-                            loc = d->nextDeleted;
+                            delSize += d->lengthWithHeaders();
+                            loc = d->nextDeleted();
                             k++;
                             killCurrentOp.checkForInterrupt();
                         }
@@ -398,156 +398,4 @@ namespace mongo {
         }
     } validateCmd;
 
-    bool lockedForWriting = false; // read from db/instance.cpp
-    static bool unlockRequested = false;
-    static mongo::mutex fsyncLockMutex("fsyncLock");
-    static boost::condition fsyncLockCondition;
-    static OID fsyncLockID; // identifies the current lock job
-
-    /*
-        class UnlockCommand : public Command {
-        public:
-            UnlockCommand() : Command( "unlock" ) { }
-            virtual bool readOnly() { return true; }
-            virtual bool slaveOk() const { return true; }
-            virtual bool adminOnly() const { return true; }
-            virtual bool run(const char *ns, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-                if( lockedForWriting ) {
-                    log() << "command: unlock requested" << endl;
-                    errmsg = "unlock requested";
-                    unlockRequested = true;
-                }
-                else {
-                    errmsg = "not locked, so cannot unlock";
-                    return 0;
-                }
-                return 1;
-            }
-
-        } unlockCommand;
-    */
-    /* see unlockFsync() for unlocking:
-       db.$cmd.sys.unlock.findOne()
-    */
-    class FSyncCommand : public Command {
-        static const char* url() { return  "http://www.mongodb.org/display/DOCS/fsync+Command"; }
-        class LockDBJob : public BackgroundJob {
-        protected:
-            virtual string name() const { return "lockdbjob"; }
-            void run() {
-                Client::initThread("fsyncjob");
-                Client& c = cc();
-                {
-                    scoped_lock lk(fsyncLockMutex);
-                    while (lockedForWriting){ // there is a small window for two LockDBJob's to be active. This prevents it.
-                        fsyncLockCondition.wait(lk.boost());
-                    }
-                    lockedForWriting = true;
-                    fsyncLockID.init();
-                }
-                readlock lk("");
-                MemoryMappedFile::flushAll(true);
-                log() << "db is now locked for snapshotting, no writes allowed. db.fsyncUnlock() to unlock" << endl;
-                log() << "    For more info see " << FSyncCommand::url() << endl;
-                _ready = true;
-                {
-                    scoped_lock lk(fsyncLockMutex);
-                    while( !unlockRequested ) {
-                        fsyncLockCondition.wait(lk.boost());
-                    }
-                    unlockRequested = false;
-                    lockedForWriting = false;
-                    fsyncLockCondition.notify_all();
-                }
-                c.shutdown();
-            }
-        public:
-            bool& _ready;
-            LockDBJob(bool& ready) : BackgroundJob( true /* delete self */ ), _ready(ready) {
-                _ready = false;
-            }
-        };
-    public:
-        FSyncCommand() : Command( "fsync" ) {}
-        virtual LockType locktype() const { return WRITE; }
-        virtual bool slaveOk() const { return true; }
-        virtual bool adminOnly() const { return true; }
-        /*virtual bool localHostOnlyIfNoAuth(const BSONObj& cmdObj) {
-            string x = cmdObj["exec"].valuestrsafe();
-            return !x.empty();
-        }*/
-        virtual void help(stringstream& h) const { h << url(); }
-        virtual bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            bool sync = !cmdObj["async"].trueValue(); // async means do an fsync, but return immediately
-            bool lock = cmdObj["lock"].trueValue();
-            log() << "CMD fsync:  sync:" << sync << " lock:" << lock << endl;
-
-            if( lock ) {
-                // fsync and lock variation 
-
-                uassert(12034, "fsync: can't lock while an unlock is pending", !unlockRequested);
-                uassert(12032, "fsync: sync option must be true when using lock", sync);
-                /* With releaseEarly(), we must be extremely careful we don't do anything
-                   where we would have assumed we were locked.  profiling is one of those things.
-                   Perhaps at profile time we could check if we released early -- however,
-                   we need to be careful to keep that code very fast it's a very common code path when on.
-                */
-                uassert(12033, "fsync: profiling must be off to enter locked mode", cc().database()->profile == 0);
-
-                // todo future: Perhaps we could do this in the background thread.  As is now, writes may interleave between 
-                //              the releaseEarly below and the acquisition of the readlock in the background thread. 
-                //              However the real problem is that it seems complex to unlock here and then have a window for 
-                //              writes before the bg job -- can be done correctly but harder to reason about correctness.
-                //              If this command ran within a read lock in the first place, would it work, and then that 
-                //              would be quite easy?
-                //              Or, could we downgrade the write lock to a read lock, wait for ready, then release?
-                getDur().syncDataAndTruncateJournal();
-
-                bool ready = false;
-                LockDBJob *l = new LockDBJob(ready);
-
-                d.dbMutex.releaseEarly();
-                
-                // There is a narrow window for another lock request to come in
-                // here before the LockDBJob grabs the readlock. LockDBJob will
-                // ensure that the requests are serialized and never running
-                // concurrently
-
-                l->go();
-                // don't return until background thread has acquired the read lock
-                while( !ready ) {
-                    sleepmillis(10);
-                }
-                result.append("info", "now locked against writes, use db.fsyncUnlock() to unlock");
-                result.append("seeAlso", url());
-            }
-            else {
-                // the simple fsync command case
-
-                if (sync)
-                    getDur().commitNow();
-                result.append( "numFiles" , MemoryMappedFile::flushAll( sync ) );
-            }
-            return 1;
-        }
-
-    } fsyncCmd;
-
-    // Note that this will only unlock the current lock.  If another thread
-    // relocks before we return we still consider the unlocking successful.
-    // This is imporant because if two scripts are trying to fsync-lock, each
-    // one must be assured that between the fsync return and the call to unlock
-    // that the database is fully locked
-    void unlockFsyncAndWait(){
-        scoped_lock lk(fsyncLockMutex);
-        if (lockedForWriting) { // could have handled another unlock before we grabbed the lock
-            OID curOp = fsyncLockID;
-            unlockRequested = true;
-            fsyncLockCondition.notify_all();
-            while (lockedForWriting && fsyncLockID == curOp){
-                fsyncLockCondition.wait( lk.boost() );
-            }
-        }
-    }
 }
-

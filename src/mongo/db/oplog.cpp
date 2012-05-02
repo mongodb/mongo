@@ -24,14 +24,15 @@
 #include "repl/rs.h"
 #include "stats/counters.h"
 #include "../util/file.h"
-#include "../util/unittest.h"
+#include "../util/startup_test.h"
 #include "queryoptimizer.h"
 #include "ops/update.h"
 #include "ops/delete.h"
-#include "ops/query.h"
+#include "mongo/db/instance.h"
 
 namespace mongo {
 
+    // from d_migrate.cpp
     void logOpForSharding( const char * opstr , const char * ns , const BSONObj& obj , BSONObj * patt );
 
     int __findingStartInitialTimeout = 5; // configurable for testing
@@ -41,13 +42,14 @@ namespace mongo {
     static Database *localDB = 0;
     static NamespaceDetails *rsOplogDetails = 0;
     void oplogCheckCloseDatabase( Database * db ) {
+        verify( Lock::isW() );
         localDB = 0;
         localOplogMainDetails = 0;
         rsOplogDetails = 0;
         resetSlaveCache();
     }
 
-    static void _logOpUninitialized(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb ) {
+    static void _logOpUninitialized(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb, bool fromMigrate ) {
         uassert(13288, "replSet error write op to db before replSet initialized", str::startsWith(ns, "local.") || *opstr == 'n');
     }
 
@@ -55,7 +57,7 @@ namespace mongo {
         todo : make _logOpRS() call this so we don't repeat ourself?
         */
     void _logOpObjRS(const BSONObj& op) {
-        DEV assertInWriteLock();
+        Lock::DBWrite lk("local");
 
         const OpTime ts = op["ts"]._opTime();
         long long h = op["h"].numberLong();
@@ -65,7 +67,7 @@ namespace mongo {
             if ( rsOplogDetails == 0 ) {
                 Client::Context ctx( logns , dbpath, false);
                 localDB = ctx.db();
-                assert( localDB );
+                verify( localDB );
                 rsOplogDetails = nsdetails(logns);
                 massert(13389, "local.oplog.rs missing. did you drop it? if so restart server", rsOplogDetails);
             }
@@ -73,7 +75,7 @@ namespace mongo {
             {
                 int len = op.objsize();
                 Record *r = theDataFileMgr.fast_oplog_insert(rsOplogDetails, logns, len);
-                memcpy(getDur().writingPtr(r->data, len), op.objdata(), len);
+                memcpy(getDur().writingPtr(r->data(), len), op.objdata(), len);
             }
             /* todo: now() has code to handle clock skew.  but if the skew server to server is large it will get unhappy.
                      this code (or code in now() maybe) should be improved.
@@ -123,8 +125,8 @@ namespace mongo {
     // the compiler would use if inside the function.  the reason this is static is to avoid a malloc/free for this
     // on every logop call.
     static BufBuilder logopbufbuilder(8*1024);
-    static void _logOpRS(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb ) {
-        DEV assertInWriteLock();
+    static void _logOpRS(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb, bool fromMigrate ) {
+        Lock::DBWrite lk1("local");
 
         if ( strncmp(ns, "local.", 6) == 0 ) {
             if ( strncmp(ns, "local.slaves", 12) == 0 )
@@ -132,7 +134,9 @@ namespace mongo {
             return;
         }
 
-        const OpTime ts = OpTime::now();
+        mutex::scoped_lock lk2(OpTime::m);
+
+        const OpTime ts = OpTime::now(lk2);
         long long hashNew;
         if( theReplSet ) {
             massert(13312, "replSet error : logOp() but not primary?", theReplSet->box.getState().primary());
@@ -140,7 +144,7 @@ namespace mongo {
         }
         else {
             // must be initiation
-            assert( *ns == 0 );
+            verify( *ns == 0 );
             hashNew = 0;
         }
 
@@ -154,6 +158,8 @@ namespace mongo {
         b.append("h", hashNew);
         b.append("op", opstr);
         b.append("ns", ns);
+        if (fromMigrate) 
+            b.appendBool("fromMigrate", true);
         if ( bb )
             b.appendBool("b", *bb);
         if ( o2 )
@@ -163,13 +169,13 @@ namespace mongo {
         int len = posz + obj.objsize() + 1 + 2 /*o:*/;
 
         Record *r;
-        DEV assert( logNS == 0 );
+        DEV verify( logNS == 0 );
         {
             const char *logns = rsoplog;
             if ( rsOplogDetails == 0 ) {
                 Client::Context ctx( logns , dbpath, false);
                 localDB = ctx.db();
-                assert( localDB );
+                verify( localDB );
                 rsOplogDetails = nsdetails(logns);
                 massert(13347, "local.oplog.rs missing. did you drop it? if so restart server", rsOplogDetails);
             }
@@ -189,7 +195,7 @@ namespace mongo {
             }
         }
 
-        append_O_Obj(r->data, partial, obj);
+        append_O_Obj(r->data(), partial, obj);
 
         if ( logLevel >= 6 ) {
             BSONObj temp(r);
@@ -197,7 +203,7 @@ namespace mongo {
         }
     }
 
-    /* we write to local.opload.$main:
+    /* we write to local.oplog.$main:
          { ts : ..., op: ..., ns: ..., o: ... }
        ts: an OpTime timestamp
        op:
@@ -207,7 +213,7 @@ namespace mongo {
         "c" db cmd
         "db" declares presence of a database (ns is set to the db name + '.')
         "n" no op
-       logNS - where to log it.  0/null means "local.oplog.$main".
+       logNS: where to log it.  0/null means "local.oplog.$main".
        bb:
          if not null, specifies a boolean to pass along to the other side as b: param.
          used for "justOne" or "upsert" flags on 'd', 'u'
@@ -217,9 +223,9 @@ namespace mongo {
 
        note this is used for single collection logging even when --replSet is enabled.
     */
-    static void _logOpOld(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb ) {
-        DEV assertInWriteLock();
-        static BufBuilder bufbuilder(8*1024);
+    static void _logOpOld(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb, bool fromMigrate ) {
+        Lock::DBWrite lk("local");
+        static BufBuilder bufbuilder(8*1024); // todo there is likely a mutex on this constructor
 
         if ( strncmp(ns, "local.", 6) == 0 ) {
             if ( strncmp(ns, "local.slaves", 12) == 0 ) {
@@ -228,7 +234,9 @@ namespace mongo {
             return;
         }
 
-        const OpTime ts = OpTime::now();
+        mutex::scoped_lock lk2(OpTime::m);
+
+        const OpTime ts = OpTime::now(lk2);
         Client::Context context("",0,false);
 
         /* we jump through a bunch of hoops here to avoid copying the obj buffer twice --
@@ -240,6 +248,8 @@ namespace mongo {
         b.appendTimestamp("ts", ts.asDate());
         b.append("op", opstr);
         b.append("ns", ns);
+        if (fromMigrate) 
+            b.appendBool("fromMigrate", true);
         if ( bb )
             b.appendBool("b", *bb);
         if ( o2 )
@@ -255,21 +265,21 @@ namespace mongo {
             if ( localOplogMainDetails == 0 ) {
                 Client::Context ctx( logNS , dbpath, false);
                 localDB = ctx.db();
-                assert( localDB );
+                verify( localDB );
                 localOplogMainDetails = nsdetails(logNS);
-                assert( localOplogMainDetails );
+                verify( localOplogMainDetails );
             }
             Client::Context ctx( logNS , localDB, false );
             r = theDataFileMgr.fast_oplog_insert(localOplogMainDetails, logNS, len);
         }
         else {
             Client::Context ctx( logNS, dbpath, false );
-            assert( nsdetails( logNS ) );
+            verify( nsdetails( logNS ) );
             // first we allocate the space, then we fill it below.
             r = theDataFileMgr.fast_oplog_insert( nsdetails( logNS ), logNS, len);
         }
 
-        append_O_Obj(r->data, partial, obj);
+        append_O_Obj(r->data(), partial, obj);
 
         context.getClient()->setLastOp( ts );
 
@@ -277,10 +287,9 @@ namespace mongo {
             BSONObj temp(r);
             log( 6 ) << "logging op:" << temp << endl;
         }
-
     }
 
-    static void (*_logOp)(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb ) = _logOpOld;
+    static void (*_logOp)(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb, bool fromMigrate ) = _logOpOld;
     void newReplUp() {
         replSettings.master = true;
         _logOp = _logOpRS;
@@ -292,13 +301,13 @@ namespace mongo {
     void oldRepl() { _logOp = _logOpOld; }
 
     void logKeepalive() {
-        _logOp("n", "", 0, BSONObj(), 0, 0);
+        _logOp("n", "", 0, BSONObj(), 0, 0, false);
     }
     void logOpComment(const BSONObj& obj) {
-        _logOp("n", "", 0, obj, 0, 0);
+        _logOp("n", "", 0, obj, 0, 0, false);
     }
     void logOpInitiate(const BSONObj& obj) {
-        _logOpRS("n", "", 0, obj, 0, 0);
+        _logOpRS("n", "", 0, obj, 0, 0, false);
     }
 
     /*@ @param opstr:
@@ -308,16 +317,16 @@ namespace mongo {
           d delete / remove
           u update
     */
-    void logOp(const char *opstr, const char *ns, const BSONObj& obj, BSONObj *patt, bool *b) {
+    void logOp(const char *opstr, const char *ns, const BSONObj& obj, BSONObj *patt, bool *b, bool fromMigrate) {
         if ( replSettings.master ) {
-            _logOp(opstr, ns, 0, obj, patt, b);
+            _logOp(opstr, ns, 0, obj, patt, b, fromMigrate);
         }
 
         logOpForSharding( opstr , ns , obj , patt );
     }
 
     void createOplog() {
-        dblock lk;
+        Lock::GlobalWrite lk;
 
         const char * ns = "local.oplog.$main";
 
@@ -531,26 +540,50 @@ namespace mongo {
         _findingStartMode = Initial;
     }
     
+    shared_ptr<Cursor> FindingStartCursor::getCursor( const char *ns, const BSONObj &query, const BSONObj &order ) {
+        NamespaceDetails *d = nsdetails(ns);
+        if ( !d ) {
+            return shared_ptr<Cursor>( new BasicCursor( DiskLoc() ) );
+        }
+        FieldRangeSetPair frsp( ns, query );
+        QueryPlan oplogPlan( d, -1, frsp, 0, query, order );
+        FindingStartCursor finder( oplogPlan );
+        ElapsedTracker yieldCondition( 256, 20 );
+        while( !finder.done() ) {
+            if ( yieldCondition.intervalHasElapsed() ) {
+                if ( finder.prepareToYield() ) {
+                    ClientCursor::staticYield( -1, ns, 0 );
+                    finder.recoverFromYield();
+                }
+            }
+            finder.next();
+        }
+        shared_ptr<Cursor> ret = finder.cursor();
+        shared_ptr<CoveredIndexMatcher> matcher( new CoveredIndexMatcher( query, BSONObj() ) );
+        ret->setMatcher( matcher );
+        return ret;
+    }
+    
     // -------------------------------------
 
-    struct TestOpTime : public UnitTest {
+    struct TestOpTime : public StartupTest {
         void run() {
             OpTime t;
             for ( int i = 0; i < 10; i++ ) {
-                OpTime s = OpTime::now_inlock();
-                assert( s != t );
+                OpTime s = OpTime::_now();
+                verify( s != t );
                 t = s;
             }
             OpTime q = t;
-            assert( q == t );
-            assert( !(q != t) );
+            verify( q == t );
+            verify( !(q != t) );
         }
     } testoptime;
 
     int _dummy_z;
 
     void pretouchN(vector<BSONObj>& v, unsigned a, unsigned b) {
-        DEV assert( !d.dbMutex.isWriteLocked() );
+        DEV verify( ! Lock::isW() );
 
         Client *c = currentClient.get();
         if( c == 0 ) {
@@ -558,7 +591,7 @@ namespace mongo {
             c = &cc();
         }
 
-        readlock lk("");
+        Lock::GlobalRead lk;
         for( unsigned i = a; i <= b; i++ ) {
             const BSONObj& op = v[i];
             const char *which = "o";
@@ -592,7 +625,7 @@ namespace mongo {
 
     void pretouchOperation(const BSONObj& op) {
 
-        if( d.dbMutex.isWriteLocked() )
+        if( Lock::somethingWriteLocked() )
             return; // no point pretouching if write locked. not sure if this will ever fire, but just in case.
 
         const char *which = "o";
@@ -613,8 +646,7 @@ namespace mongo {
                 BSONObjBuilder b;
                 b.append(_id);
                 BSONObj result;
-                readlock lk(ns);
-                Client::Context ctx( ns );
+                Client::ReadContext ctx( ns );
                 if( Helpers::findById(cc(), ns, b.done(), result) )
                     _dummy_z += result.objsize(); // touch
             }
@@ -630,7 +662,7 @@ namespace mongo {
 
         // capped collections
         NamespaceDetails *nsd = nsdetails(ns);
-        if (nsd && nsd->capped) {
+        if ( nsd && nsd->isCapped() ) {
             log() << "replication missing doc, but this is okay for a capped collection (" << ns << ")" << endl;
             return BSONObj();
         }
@@ -679,7 +711,6 @@ namespace mongo {
         @return true if was and update should have happened and the document DNE.  see replset initial sync code.
      */
     bool applyOperation_inlock(const BSONObj& op , bool fromRepl ) {
-        assertInWriteLock();
         LOG(6) << "applying op: " << op << endl;
         bool failedUpdate = false;
 
@@ -694,6 +725,9 @@ namespace mongo {
             o = fields[0].embeddedObject();
             
         const char *ns = fields[1].valuestrsafe();
+
+        Lock::assertWriteLocked(ns);
+
         NamespaceDetails *nsd = nsdetails(ns);
 
         // operation type -- see logOp() comments for types
@@ -715,21 +749,23 @@ namespace mongo {
                 if( !o.getObjectID(_id) ) {
                     /* No _id.  This will be very slow. */
                     Timer t;
-                    updateObjects(ns, o, o, true, false, false, debug );
+                    updateObjects(ns, o, o, true, false, false, debug, false,
+                                  QueryPlanSelectionPolicy::idElseNatural() );
                     if( t.millis() >= 2 ) {
                         RARELY OCCASIONALLY log() << "warning, repl doing slow updates (no _id field) for " << ns << endl;
                     }
                 }
                 else {
                     /* erh 10/16/2009 - this is probably not relevant any more since its auto-created, but not worth removing */
-                    RARELY if (nsd && !nsd->capped) { ensureHaveIdIndex(ns); } // otherwise updates will be slow
+                    RARELY if (nsd && !nsd->isCapped()) { ensureHaveIdIndex(ns); } // otherwise updates will be slow
 
                     /* todo : it may be better to do an insert here, and then catch the dup key exception and do update
                               then.  very few upserts will not be inserts...
                               */
                     BSONObjBuilder b;
                     b.append(_id);
-                    updateObjects(ns, o, b.done(), true, false, false , debug );
+                    updateObjects(ns, o, b.done(), true, false, false , debug, false,
+                                  QueryPlanSelectionPolicy::idElseNatural() );
                 }
             }
         }
@@ -741,11 +777,13 @@ namespace mongo {
             //    - if on primary was by another key and there are other indexes, this could be very bad w/out an index
             //  - if do create, odd to have on secondary but not primary.  also can cause secondary to block for
             //    quite a while on creation.
-            RARELY if (nsd && !nsd->capped) { ensureHaveIdIndex(ns); } // otherwise updates will be super slow
+            RARELY if (nsd && !nsd->isCapped()) { ensureHaveIdIndex(ns); } // otherwise updates will be super slow
             OpDebug debug;
             BSONObj updateCriteria = op.getObjectField("o2");
             bool upsert = fields[3].booleanSafe();
-            UpdateResult ur = updateObjects(ns, o, updateCriteria, upsert, /*multi*/ false, /*logop*/ false , debug );
+            UpdateResult ur = updateObjects(ns, o, updateCriteria, upsert, /*multi*/ false,
+                                            /*logop*/ false , debug, /*fromMigrate*/ false,
+                                            QueryPlanSelectionPolicy::idElseNatural() );
             if( ur.num == 0 ) { 
                 if( ur.mod ) {
                     if( updateCriteria.nFields() == 1 ) {
@@ -785,7 +823,7 @@ namespace mongo {
             if ( opType[1] == 0 )
                 deleteObjects(ns, o, /*justOne*/ fields[3].booleanSafe());
             else
-                assert( opType[1] == 'b' ); // "db" advertisement
+                verify( opType[1] == 'b' ); // "db" advertisement
         }
         else if ( *opType == 'c' ) {
             opCounters->gotCommand();
@@ -806,6 +844,7 @@ namespace mongo {
     public:
         virtual bool slaveOk() const { return false; }
         virtual LockType locktype() const { return WRITE; }
+        virtual bool lockGlobally() const { return true; } // SERVER-4328 todo : is global ok or does this take a long time? i believe multiple ns used so locking individually requires more analysis
         ApplyOpsCmd() : Command( "applyOps" ) {}
         virtual void help( stringstream &help ) const {
             help << "internal (sharding)\n{ applyOps : [ ] , preCondition : [ { ns : ... , q : ... , res : ... } ] }";
@@ -851,15 +890,26 @@ namespace mongo {
 
             // apply
             int num = 0;
+            int errors = 0;
+            
             BSONObjIterator i( ops );
+            BSONArrayBuilder ab;
+            
             while ( i.more() ) {
                 BSONElement e = i.next();
-                // todo SERVER-4259 ?
-                applyOperation_inlock( e.Obj() , false );
+                const BSONObj& temp = e.Obj();
+                
+                Client::Context ctx( temp["ns"].String() ); // this handles security
+                bool failed = applyOperation_inlock( temp , false );
+                ab.append(!failed);
+                if ( failed )
+                    errors++;
+
                 num++;
             }
 
             result.append( "applied" , num );
+            result.append( "results" , ab.arr() );
 
             if ( ! fromRepl ) {
                 // We want this applied atomically on slaves
@@ -870,7 +920,7 @@ namespace mongo {
                 logOp( "c" , tempNS.c_str() , cmdObj.firstElement().wrap() );
             }
 
-            return true;
+            return errors == 0;
         }
 
         DBDirectClient db;

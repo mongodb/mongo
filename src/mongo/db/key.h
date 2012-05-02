@@ -42,6 +42,7 @@ namespace mongo {
         bool isCompactFormat() const { return false; }
         bool woEqual(const KeyBson& r) const;
         void assign(const KeyBson& rhs) { *this = rhs; }
+        bool isValid() const { return true; }
     private:
         BSONObj _o;
     };
@@ -84,6 +85,8 @@ namespace mongo {
         /** only used by geo, which always has bson keys */
         BSONElement _firstElement() const { return bson().firstElement(); }
         bool isCompactFormat() const { return *_keyData != IsBSON; }
+
+        bool isValid() const { return _keyData > (const unsigned char*)1; }
     protected:
         enum { IsBSON = 0xff };
         const unsigned char *_keyData;

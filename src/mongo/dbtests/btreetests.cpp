@@ -21,13 +21,14 @@
 
 #include "../db/db.h"
 #include "../db/btree.h"
+#include "mongo/db/json.h"
 
 #include "dbtests.h"
 
 #define BtreeBucket BtreeBucket<V0>
 #define btree btree<V0>
 #define btreemod btreemod<V0>
-#define Continuation Continuation<V0>
+#define Continuation IndexInsertionContinuationImpl<V0>
 #define testName "btree"
 #define BTVERSION 0
 namespace BtreeTests0 {
@@ -41,7 +42,7 @@ namespace BtreeTests0 {
 #define BtreeBucket BtreeBucket<V1>
 #define btree btree<V1>
 #define btreemod btreemod<V1>
-#define Continuation Continuation<V1>
+#define Continuation IndexInsertionContinuationImpl<V1>
 #undef testName
 #define testName "btree1"
 #undef BTVERSION

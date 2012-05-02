@@ -31,14 +31,14 @@
 #include "stats.h"
 #include "cursors.h"
 #include "grid.h"
-#include "client.h"
+#include "client_info.h"
 
 namespace mongo {
 
     Request::Request( Message& m, AbstractMessagingPort* p ) :
         _m(m) , _d( m ) , _p(p) , _didInit(false) {
 
-        assert( _d.getns() );
+        verify( _d.getns() );
         _id = _m.header()->id;
 
         _clientInfo = ClientInfo::get();
@@ -53,8 +53,8 @@ namespace mongo {
             use = need;
         else
             nsToDatabase(getns(), cl);
-        
-        uassert( 15845 , 
+
+        uassert( 15845 ,
                  str::stream() << "unauthorized for db:" << use << " level: " << levelNeeded ,
                  _clientInfo->getAuthenticationInfo()->isAuthorizedForLevel(use,levelNeeded) );
     }
@@ -93,7 +93,7 @@ namespace mongo {
 
     // Deprecated, will move to the strategy itself
     Shard Request::primaryShard() const {
-        assert( _didInit );
+        verify( _didInit );
 
         if ( _chunkManager ) {
             if ( _chunkManager->numChunks() > 1 )
@@ -108,7 +108,7 @@ namespace mongo {
     void Request::process( int attempt ) {
         init();
         int op = _m.operation();
-        assert( op > dbMsg );
+        verify( op > dbMsg );
 
         if ( op == dbKillCursors ) {
             cursorCache.gotKillCursors( _m );
@@ -152,7 +152,7 @@ namespace mongo {
     }
 
     void Request::reply( Message & response , const string& fromServer ) {
-        assert( _didInit );
+        verify( _didInit );
         long long cursor =response.header()->getCursor();
         if ( cursor ) {
             if ( fromServer.size() ) {
@@ -161,7 +161,7 @@ namespace mongo {
             else {
                 // probably a getMore
                 // make sure we have a ref for this
-                assert( cursorCache.getRef( cursor ).size() );
+                verify( cursorCache.getRef( cursor ).size() );
             }
         }
         _p->reply( _m , response , _id );

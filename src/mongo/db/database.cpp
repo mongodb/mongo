@@ -29,18 +29,26 @@ namespace mongo {
 
     bool Database::_openAllFiles = true;
 
-    void assertDbAtLeastReadLocked(const Database *) { 
-        // temp impl
-        d.dbMutex.assertAtLeastReadLocked(); 
+    void assertDbAtLeastReadLocked(const Database *db) { 
+        if( db ) { 
+            Lock::assertAtLeastReadLocked(db->name);
+        }
+        else {
+            verify( Lock::isLocked() );
+        }
     }
 
-    void assertDbWriteLocked(const Database *) { 
-        // temp impl
-        d.dbMutex.assertWriteLocked();
+    void assertDbWriteLocked(const Database *db) { 
+        if( db ) { 
+            Lock::assertWriteLocked(db->name);
+        }
+        else {
+            verify( Lock::isW() );
+        }
     }
 
     Database::~Database() {
-        d.dbMutex.assertWriteLocked();
+        verify( Lock::isW() );
         magic = 0;
         size_t n = _files.size();
         for ( size_t i = 0; i < n; i++ )
@@ -96,7 +104,7 @@ namespace mongo {
 
     /*static*/
     string Database::duplicateUncasedName( bool inholderlock, const string &name, const string &path, set< string > *duplicates ) {
-        d.dbMutex.assertAtLeastReadLocked();
+        Lock::assertAtLeastReadLocked(name);
 
         if ( duplicates ) {
             duplicates->clear();   
@@ -142,13 +150,13 @@ namespace mongo {
     }
 
     bool Database::openExistingFile( int n ) { 
-        assert(this);
-        d.dbMutex.assertWriteLocked();
+        verify(this);
+        Lock::assertWriteLocked(name);
         {
             // must not yet be visible to others as we aren't in the db's write lock and 
             // we will write to _files vector - thus this assert.
             bool loaded = dbHolder().__isLoaded(name, path);
-            assert( !loaded );
+            verify( !loaded );
         }
         // additionally must be in the dbholder mutex (no assert for that yet)
 
@@ -194,7 +202,7 @@ namespace mongo {
     //        repair purposes yet we do not.
     void Database::openAllFiles() {
         //log() << "TEMP openallfiles " << path << ' ' << name << endl;
-        assert(this);
+        verify(this);
         int n = 0;
         while( openExistingFile(n) ) {
             n++;
@@ -216,7 +224,7 @@ namespace mongo {
 
     // todo: this is called a lot. streamline the common case
     MongoDataFile* Database::getFile( int n, int sizeNeeded , bool preallocateOnly) {
-        assert(this);
+        verify(this);
         DEV assertDbAtLeastReadLocked(this);
 
         namespaceIndex.init();
@@ -232,12 +240,13 @@ namespace mongo {
         MongoDataFile* p = 0;
         if ( !preallocateOnly ) {
             while ( n >= (int) _files.size() ) {
-                DEV if( !d.dbMutex.isWriteLocked() ) { 
+                verify(this);
+                if( !Lock::isWriteLocked(this->name) ) {
                     log() << "error: getFile() called in a read lock, yet file to return is not yet open" << endl;
                     log() << "       getFile(" << n << ") _files.size:" <<_files.size() << ' ' << fileName(n).string() << endl;
                     log() << "       context ns: " << cc().ns() << " openallfiles:" << _openAllFiles << endl;
+                    verify(false);
                 }
-                assertDbWriteLocked(this);
                 _files.push_back(0);
             }
             p = _files[n];
@@ -300,8 +309,14 @@ namespace mongo {
             }
         }
 
-        if ( fileIndexExceedsQuota( ns, numFiles(), enforceQuota ) )
-            uasserted(12501, "quota exceeded");
+        if ( fileIndexExceedsQuota( ns, numFiles(), enforceQuota ) ) {
+            if ( cc().hasWrittenThisPass() ) {
+                warning() << "quota exceeded, but can't assert, probably going over quota for: " << ns << endl;
+            }
+            else {
+                uasserted(12501, "quota exceeded");
+            }
+        }
 
         // allocate files until we either get one big enough or hit maxSize
         for ( int i = 0; i < 8; i++ ) {
@@ -353,7 +368,7 @@ namespace mongo {
             return true;
         }
 
-        assert( cc().database() == this );
+        verify( cc().database() == this );
 
         if ( ! namespaceIndex.details( profileName.c_str() ) ) {
             log() << "creating profile collection: " << profileName << endl;
@@ -393,32 +408,40 @@ namespace mongo {
     }
 
     Database* DatabaseHolder::getOrCreate( const string& ns , const string& path , bool& justCreated ) {
-        d.dbMutex.assertAtLeastReadLocked();
-
-        DBs& m = _paths[path];
-
         string dbname = _todb( ns );
+        {
+            SimpleMutex::scoped_lock lk(_m);
+            Lock::assertAtLeastReadLocked(ns);
+            DBs& m = _paths[path];
+            {
+                DBs::iterator i = m.find(dbname); 
+                if( i != m.end() ) {
+                    justCreated = false;
+                    return i->second;
+                }
+            }
+
+            // todo: protect against getting sprayed with requests for different db names that DNE - 
+            //       that would make the DBs map very large.  not clear what to do to handle though, 
+            //       perhaps just log it, which is what we do here with the "> 40" : 
+            bool cant = !Lock::isWriteLocked(ns);
+            if( logLevel >= 1 || m.size() > 40 || cant || DEBUG_BUILD ) {
+                log() << "opening db: " << (path==dbpath?"":path) << ' ' << dbname << endl;
+            }
+            massert(15927, "can't open database in a read lock. if db was just closed, consider retrying the query. might otherwise indicate an internal error", !cant);
+        }
+
+        // this locks _m for defensive checks, so we don't want to be locked right here : 
+        Database *db = new Database( dbname.c_str() , justCreated , path );
 
         {
-            DBs::iterator i = m.find(dbname); 
-            if( i != m.end() ) {
-                justCreated = false;
-                return i->second;
-            }
+            SimpleMutex::scoped_lock lk(_m);
+            DBs& m = _paths[path];
+            verify( m[dbname] == 0 );
+            m[dbname] = db;
+            _size++;
         }
 
-        // todo: protect against getting sprayed with requests for different db names that DNE - 
-        //       that would make the DBs map very large.  not clear what to do to handle though, 
-        //       perhaps just log it, which is what we do here with the "> 40" : 
-        bool cant = !d.dbMutex.isWriteLocked();
-        if( logLevel >= 1 || m.size() > 40 || cant || DEBUG_BUILD ) {
-            log() << "opening db: " << (path==dbpath?"":path) << ' ' << dbname << endl;
-        }
-        massert(15927, "can't open database in a read lock. if db was just closed, consider retrying the query. might otherwise indicate an internal error", !cant);
-        
-        Database *db = new Database( dbname.c_str() , justCreated , path );
-        m[dbname] = db;
-        _size++;
         return db;
     }
 

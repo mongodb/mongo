@@ -17,9 +17,7 @@
 
 #include "pch.h"
 
-#include "../util/unittest.h"
-#include "../util/net/message.h"
-
+#include "mongo/util/net/message.h"
 
 #include "lasterror.h"
 #include "jsobj.h"
@@ -30,7 +28,7 @@ namespace mongo {
     LastErrorHolder lastError;
 
     bool isShell = false;
-    void raiseError(int code , const char *msg) {
+    void setLastError(int code , const char *msg) {
         LastError *le = lastError.get();
         if ( le == 0 ) {
             /* might be intentional (non-user thread) */
@@ -130,7 +128,7 @@ namespace mongo {
 
     void prepareErrForNewRequest( Message &m, LastError * err ) {
         // a killCursors message shouldn't affect last error
-        assert( err );
+        verify( err );
         if ( m.operation() == dbKillCursors ) {
             err->disabled = true;
         }
@@ -141,7 +139,7 @@ namespace mongo {
     }
 
     LastError * LastErrorHolder::startRequest( Message& m , LastError * le ) {
-        assert( le );
+        verify( le );
         prepareErrForNewRequest( m, le );
         return le;
     }

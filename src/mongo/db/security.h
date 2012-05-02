@@ -18,37 +18,28 @@
 
 #pragma once
 
-#include "nonce.h"
-#include "concurrency.h"
-#include "security_common.h"
-#include "../util/concurrency/spin_lock.h"
+#include "mongo/db/authlevel.h"
+#include "mongo/db/nonce.h"
+#include "mongo/db/security_common.h"
+#include "mongo/util/concurrency/spin_lock.h"
 
 // this is used by both mongos and mongod
 
 namespace mongo {
 
-    /* 
-     * for a particular db
-     * levels
-     *     0 : none
-     *     1 : read
-     *     2 : write
-     */
-    struct Auth {
-        
-        enum Level { NONE = 0 , READ = 1 , WRITE = 2 };
-
-        Auth() { level = NONE; }
-        Level level;
-        string user;
-    };
-
+    /** An AuthenticationInfo object is present within every mongo::Client object */
     class AuthenticationInfo : boost::noncopyable {
+        bool _isLocalHost;
+        bool _isLocalHostAndLocalHostIsAuthorizedForAll;
     public:
-        bool isLocalHost;
-        
-        AuthenticationInfo(){ isLocalHost = false; }
+        void startRequest(); // need to call at the beginning of each request
+        void setIsALocalHostConnectionWithSpecialAuthPowers(); // called, if localhost, when conneciton established.
+        AuthenticationInfo() {
+            _isLocalHost = false; 
+            _isLocalHostAndLocalHostIsAuthorizedForAll = false;
+        }
         ~AuthenticationInfo() {}
+        bool isLocalHost() const { return _isLocalHost; } // why are you calling this? makes no sense to be externalized
 
         // -- modifiers ----
         
@@ -92,7 +83,9 @@ namespace mongo {
 
         void print() const;
 
-    protected:
+    private:
+        void _checkLocalHostSpecialAdmin();
+
         /** takes a lock */
         bool _isAuthorized(const string& dbname, Auth::Level level) const;
 
@@ -102,8 +95,11 @@ namespace mongo {
         bool _isAuthorizedSpecialChecks( const string& dbname ) const ;
 
     private:
+        // while most access to _dbs is from our thread (the TLS thread), currentOp() inspects
+        // it too thus we need this
         mutable SpinLock _lock;
 
+        // todo: caching should not last forever
         typedef map<string,Auth> MA;
         MA _dbs; // dbname -> auth
 

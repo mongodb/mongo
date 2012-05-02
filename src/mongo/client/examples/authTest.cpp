@@ -16,8 +16,9 @@
  */
 
 #include <iostream>
-
-#include "client/dbclient.h"
+#include <cstdlib>
+#include <string>
+#include "mongo/client/dbclient.h"
 
 using namespace mongo;
 
@@ -25,22 +26,22 @@ int main( int argc, const char **argv ) {
 
     const char *port = "27017";
     if ( argc != 1 ) {
-        if ( argc != 3 )
-            throw -12;
+        if ( argc != 3 ) {
+            std::cout << "need to pass port as second param" << endl;
+            return EXIT_FAILURE;
+        }
         port = argv[ 2 ];
     }
 
     DBClientConnection conn;
-    string errmsg;
+    std::string errmsg;
     if ( ! conn.connect( string( "127.0.0.1:" ) + port , errmsg ) ) {
-        cout << "couldn't connect : " << errmsg << endl;
-        throw -11;
+        cout << "couldn't connect: " << errmsg << endl;
+        return EXIT_FAILURE;
     }
 
-    {
-        // clean up old data from any previous tests
-        conn.remove( "test.system.users" , BSONObj() );
-    }
+    // clean up old data from any previous tests
+    conn.remove( "test.system.users" , BSONObj() );
 
     conn.insert( "test.system.users" , BSON( "user" << "eliot" << "pwd" << conn.createPasswordDigest( "eliot" , "bar" ) ) );
 
@@ -48,7 +49,8 @@ int main( int argc, const char **argv ) {
     bool ok = conn.auth( "test" , "eliot" , "bar" , errmsg );
     if ( ! ok )
         cout << errmsg << endl;
-    MONGO_assert( ok );
+    MONGO_verify( ok );
 
-    MONGO_assert( ! conn.auth( "test" , "eliot" , "bars" , errmsg ) );
+    MONGO_verify( ! conn.auth( "test" , "eliot" , "bars" , errmsg ) );
+    return EXIT_SUCCESS;
 }

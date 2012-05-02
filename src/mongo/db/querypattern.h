@@ -18,10 +18,11 @@
 #pragma once
 
 #include "jsobj.h"
-#include "queryutil.h"
 
 namespace mongo {
 
+    class FieldRangeSet;
+    
     /**
      * Implements query pattern matching, used to determine if a query is
      * similar to an earlier query and should use the same plan.
@@ -53,6 +54,43 @@ namespace mongo {
         static BSONObj normalizeSort( const BSONObj &spec );
         map<string,Type> _fieldTypes;
         BSONObj _sort;
+    };
+
+    /** Summarizes the candidate plans that may run for a query. */
+    class CandidatePlanCharacter {
+    public:
+        CandidatePlanCharacter( bool mayRunInOrderPlan, bool mayRunOutOfOrderPlan ) :
+        _mayRunInOrderPlan( mayRunInOrderPlan ),
+        _mayRunOutOfOrderPlan( mayRunOutOfOrderPlan ) {
+        }
+        CandidatePlanCharacter() :
+        _mayRunInOrderPlan(),
+        _mayRunOutOfOrderPlan() {
+        }
+        bool mayRunInOrderPlan() const { return _mayRunInOrderPlan; }
+        bool mayRunOutOfOrderPlan() const { return _mayRunOutOfOrderPlan; }
+        bool valid() const { return mayRunInOrderPlan() || mayRunOutOfOrderPlan(); }
+        bool hybridPlanSet() const { return mayRunInOrderPlan() && mayRunOutOfOrderPlan(); }
+    private:
+        bool _mayRunInOrderPlan;
+        bool _mayRunOutOfOrderPlan;
+    };
+
+    /** Information about a query plan that ran successfully for a QueryPattern. */
+    class CachedQueryPlan {
+    public:
+        CachedQueryPlan() :
+        _nScanned() {
+        }
+        CachedQueryPlan( const BSONObj &indexKey, long long nScanned,
+                        CandidatePlanCharacter planCharacter );
+        BSONObj indexKey() const { return _indexKey; }
+        long long nScanned() const { return _nScanned; }
+        CandidatePlanCharacter planCharacter() const { return _planCharacter; }
+    private:
+        BSONObj _indexKey;
+        long long _nScanned;
+        CandidatePlanCharacter _planCharacter;
     };
 
     inline bool QueryPattern::operator<( const QueryPattern &other ) const {

@@ -19,6 +19,7 @@
 #include "../../pch.h"
 #include "../jsobj.h"
 #include "../../util/embedded_builder.h"
+#include "../../util/stringutils.h"
 #include "../matcher.h"
 
 namespace mongo {
@@ -47,11 +48,28 @@ namespace mongo {
        multi - update multiple objects - mostly useful with things like $set
        god - allow access to system namespaces
     */
-    UpdateResult updateObjects(const char *ns, const BSONObj& updateobj, BSONObj pattern, bool upsert, bool multi , bool logop , OpDebug& debug );
-    UpdateResult _updateObjects(bool god, const char *ns, const BSONObj& updateobj, BSONObj pattern,
-                                bool upsert, bool multi , bool logop , OpDebug& debug , RemoveSaver * rs = 0 );
-
-
+    UpdateResult updateObjects(const char *ns, 
+                               const BSONObj& updateobj, 
+                               BSONObj pattern, 
+                               bool upsert, 
+                               bool multi , 
+                               bool logop , 
+                               OpDebug& debug, 
+                               bool fromMigrate = false,
+                               const QueryPlanSelectionPolicy &planPolicy =
+                               QueryPlanSelectionPolicy::any());
+    UpdateResult _updateObjects(bool god, 
+                                const char *ns, 
+                                const BSONObj& updateobj, 
+                                BSONObj pattern,
+                                bool upsert, 
+                                bool multi , 
+                                bool logop , 
+                                OpDebug& debug , 
+                                RemoveSaver * rs = 0, 
+                                bool fromMigrate = false,
+                                const QueryPlanSelectionPolicy &planPolicy =
+                                QueryPlanSelectionPolicy::any());
 
     // ---------- private -------------
 
@@ -118,7 +136,7 @@ namespace mongo {
                 manip.setInt( elt.numberInt() + in.numberInt() );
                 break;
             default:
-                assert(0);
+                verify(0);
             }
         }
         void IncrementMe( BSONElement& in ) const {
@@ -134,7 +152,7 @@ namespace mongo {
                 manip.SetInt( elt.numberInt() + in.numberInt() );
                 break;
             default:
-                assert(0);
+                verify(0);
             }
         }
 
@@ -280,7 +298,7 @@ namespace mongo {
         bool _hasDynamicArray;
 
         static Mod::Op opFromStr( const char *fn ) {
-            assert( fn[0] == '$' );
+            verify( fn[0] == '$' );
             switch( fn[1] ) {
             case 'i': {
                 if ( fn[2] == 'n' && fn[3] == 'c' && fn[4] == 0 )
@@ -365,7 +383,7 @@ namespace mongo {
               );
 
         // TODO: this is inefficient - should probably just handle when iterating
-        ModSet * fixDynamicArray( const char * elemMatchKey ) const;
+        ModSet * fixDynamicArray( const string &elemMatchKey ) const;
 
         bool hasDynamicArray() const { return _hasDynamicArray; }
 
@@ -401,7 +419,8 @@ namespace mongo {
 
             ModHolder::const_iterator start = _mods.lower_bound(fieldName.substr(0,idx));
             for ( ; start != _mods.end(); start++ ) {
-                FieldCompareResult r = compareDottedFieldNames( fieldName , start->first );
+                FieldCompareResult r = compareDottedFieldNames( fieldName , start->first ,
+                                                               LexNumCmp( true ) );
                 switch ( r ) {
                 case LEFT_SUBFIELD: return true;
                 case LEFT_BEFORE: return false;
@@ -420,7 +439,7 @@ namespace mongo {
     /**
      * stores any information about a single Mod operating on a single Object
      */
-    class ModState {
+    class ModState : boost::noncopyable {
     public:
         const Mod * m;
         BSONElement old;
@@ -494,7 +513,7 @@ namespace mongo {
             case NumberInt:
                 b.append( n , incint ); break;
             default:
-                assert(0);
+                verify(0);
             }
         }
 
@@ -509,17 +528,15 @@ namespace mongo {
      * the goal is to make ModSet const so its re-usable
      */
     class ModSetState : boost::noncopyable {
-        struct FieldCmp {
-            bool operator()( const string &l, const string &r ) const;
-        };
-        typedef map<string,ModState,FieldCmp> ModStateHolder;
+        typedef map<string,shared_ptr<ModState>,LexNumCmp> ModStateHolder;
+        typedef pair<const ModStateHolder::iterator,const ModStateHolder::iterator> ModStateRange;
         const BSONObj& _obj;
         ModStateHolder _mods;
         bool _inPlacePossible;
         BSONObj _newFromMods; // keep this data alive, as oplog generation may depend on it
 
         ModSetState( const BSONObj& obj )
-            : _obj( obj ) , _inPlacePossible(true) {
+            : _obj( obj ) , _mods( LexNumCmp( true ) ) , _inPlacePossible(true) {
         }
 
         /**
@@ -531,8 +548,15 @@ namespace mongo {
             return _inPlacePossible;
         }
 
+        ModStateRange modsForRoot( const string &root );
+        
+        void createNewObjFromMods( const string &root, BSONObjBuilder &b, const BSONObj &obj );
+        void createNewArrayFromMods( const string &root, BSONArrayBuilder &b,
+                                    const BSONArray &arr );
+
         template< class Builder >
-        void createNewFromMods( const string& root , Builder& b , const BSONObj &obj );
+        void createNewFromMods( const string& root , Builder& b , BSONIteratorSorted& es ,
+                               const ModStateRange& modRange , const LexNumCmp& lexNumCmp );
 
         template< class Builder >
         void _appendNewFromMods( const string& root , ModState& m , Builder& b , set<string>& onedownseen );
@@ -634,7 +658,7 @@ namespace mongo {
 
         bool needOpLogRewrite() const {
             for ( ModStateHolder::const_iterator i = _mods.begin(); i != _mods.end(); i++ )
-                if ( i->second.needOpLogRewrite() )
+                if ( i->second->needOpLogRewrite() )
                     return true;
             return false;
         }
@@ -642,20 +666,20 @@ namespace mongo {
         BSONObj getOpLogRewrite() const {
             BSONObjBuilder b;
             for ( ModStateHolder::const_iterator i = _mods.begin(); i != _mods.end(); i++ )
-                i->second.appendForOpLog( b );
+                i->second->appendForOpLog( b );
             return b.obj();
         }
 
         bool haveArrayDepMod() const {
             for ( ModStateHolder::const_iterator i = _mods.begin(); i != _mods.end(); i++ )
-                if ( i->second.m->arrayDep() )
+                if ( i->second->m->arrayDep() )
                     return true;
             return false;
         }
 
         void appendSizeSpecForArrayDepMods( BSONObjBuilder &b ) const {
             for ( ModStateHolder::const_iterator i = _mods.begin(); i != _mods.end(); i++ ) {
-                const ModState& m = i->second;
+                const ModState& m = *i->second;
                 if ( m.m->arrayDep() ) {
                     if ( m.pushStartSize == -1 )
                         b.appendNull( m.fieldName() );

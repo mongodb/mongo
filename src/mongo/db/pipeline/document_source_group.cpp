@@ -31,6 +31,10 @@ namespace mongo {
     DocumentSourceGroup::~DocumentSourceGroup() {
     }
 
+    const char *DocumentSourceGroup::getSourceName() const {
+        return groupName;
+    }
+
     bool DocumentSourceGroup::eof() {
         if (!populated)
             populate();
@@ -39,10 +43,12 @@ namespace mongo {
     }
 
     bool DocumentSourceGroup::advance() {
+        DocumentSource::advance(); // check for interrupts
+
         if (!populated)
             populate();
 
-        assert(groupsIterator != groups.end());
+        verify(groupsIterator != groups.end());
 
         ++groupsIterator;
         if (groupsIterator == groups.end()) {
@@ -65,35 +71,35 @@ namespace mongo {
         BSONObjBuilder insides;
 
         /* add the _id */
-        pIdExpression->addToBsonObj(&insides, Document::idName.c_str(), 0);
+        pIdExpression->addToBsonObj(&insides, Document::idName.c_str(), false);
 
         /* add the remaining fields */
         const size_t n = vFieldName.size();
         for(size_t i = 0; i < n; ++i) {
-            intrusive_ptr<Accumulator> pA((*vpAccumulatorFactory[i])(pCtx));
+            intrusive_ptr<Accumulator> pA((*vpAccumulatorFactory[i])(pExpCtx));
             pA->addOperand(vpExpression[i]);
-            pA->addToBsonObj(&insides, vFieldName[i], 0);
+            pA->addToBsonObj(&insides, vFieldName[i], false);
         }
 
         pBuilder->append(groupName, insides.done());
     }
 
     intrusive_ptr<DocumentSourceGroup> DocumentSourceGroup::create(
-        const intrusive_ptr<ExpressionContext> &pCtx) {
+        const intrusive_ptr<ExpressionContext> &pExpCtx) {
         intrusive_ptr<DocumentSourceGroup> pSource(
-            new DocumentSourceGroup(pCtx));
+            new DocumentSourceGroup(pExpCtx));
         return pSource;
     }
 
     DocumentSourceGroup::DocumentSourceGroup(
-        const intrusive_ptr<ExpressionContext> &pTheCtx):
+        const intrusive_ptr<ExpressionContext> &pExpCtx):
+        DocumentSource(pExpCtx),
         populated(false),
         pIdExpression(),
         groups(),
         vFieldName(),
         vpAccumulatorFactory(),
-        vpExpression(),
-        pCtx(pTheCtx) {
+        vpExpression() {
     }
 
     void DocumentSourceGroup::addAccumulator(
@@ -137,12 +143,12 @@ namespace mongo {
 
     intrusive_ptr<DocumentSource> DocumentSourceGroup::createFromBson(
         BSONElement *pBsonElement,
-        const intrusive_ptr<ExpressionContext> &pCtx) {
+        const intrusive_ptr<ExpressionContext> &pExpCtx) {
         uassert(15947, "a group's fields must be specified in an object",
                 pBsonElement->type() == Object);
 
         intrusive_ptr<DocumentSourceGroup> pGroup(
-            DocumentSourceGroup::create(pCtx));
+            DocumentSourceGroup::create(pExpCtx));
         bool idSet = false;
 
         BSONObj groupObj(pBsonElement->Obj());
@@ -222,13 +228,13 @@ namespace mongo {
                   add aggregation operators.
                 */
                 uassert(15950, str::stream() <<
-                        "the group aggregate field name " <<
-                        *pFieldName << " cannot be an operator name",
+                        "the group aggregate field name \"" <<
+                        pFieldName << "\" cannot be an operator name",
                         *pFieldName != '$');
 
-                uassert(15951, str::stream() << 
-                        "the group aggregate field " << *pFieldName <<
-                        "must be defined as an expression inside an object",
+                uassert(15951, str::stream() <<
+                        "the group aggregate field \"" << pFieldName <<
+                        "\" must be defined as an expression inside an object",
                         groupField.type() == Object);
 
                 BSONObj subField(groupField.Obj());
@@ -291,8 +297,10 @@ namespace mongo {
 
             /* get the _id document */
             intrusive_ptr<const Value> pId(pIdExpression->evaluate(pDocument));
-            uassert(15956, "the _id field for a group must not be undefined",
-                    pId->getType() != Undefined);
+
+            /* treat Undefined the same as NULL SERVER-4674 */
+            if (pId->getType() == Undefined)
+                pId = Value::getNull();
 
             /*
               Look for the _id value in the map; if it's not there, add a
@@ -320,7 +328,7 @@ namespace mongo {
                 pGroup->reserve(n);
                 for(size_t i = 0; i < n; ++i) {
                     intrusive_ptr<Accumulator> pAccumulator(
-                        (*vpAccumulatorFactory[i])(pCtx));
+                        (*vpAccumulatorFactory[i])(pExpCtx));
                     pAccumulator->addOperand(vpExpression[i]);
                     pGroup->push_back(pAccumulator);
                 }
@@ -363,7 +371,7 @@ namespace mongo {
 
     intrusive_ptr<DocumentSource> DocumentSourceGroup::createMerger() {
         intrusive_ptr<DocumentSourceGroup> pMerger(
-            DocumentSourceGroup::create(pCtx));
+            DocumentSourceGroup::create(pExpCtx));
 
         /* the merger will use the same grouping key */
         pMerger->setIdExpression(ExpressionFieldPath::create(
@@ -387,5 +395,3 @@ namespace mongo {
         return pMerger;
     }
 }
-
-

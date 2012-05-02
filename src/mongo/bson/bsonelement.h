@@ -60,16 +60,16 @@ namespace mongo {
         /** These functions, which start with a capital letter, throw a UserException if the
             element is not of the required type. Example:
 
-            string foo = obj["foo"].String(); // exception if not a string type or DNE
+            std::string foo = obj["foo"].String(); // std::exception if not a std::string type or DNE
         */
-        string String()             const { return chk(mongo::String).valuestr(); }
+        std::string String()        const { return chk(mongo::String).valuestr(); }
         Date_t Date()               const { return chk(mongo::Date).date(); }
         double Number()             const { return chk(isNumber()).number(); }
         double Double()             const { return chk(NumberDouble)._numberDouble(); }
         long long Long()            const { return chk(NumberLong)._numberLong(); }
         int Int()                   const { return chk(NumberInt)._numberInt(); }
         bool Bool()                 const { return chk(mongo::Bool).boolean(); }
-        vector<BSONElement> Array() const; // see implementation for detailed comments
+        std::vector<BSONElement> Array() const; // see implementation for detailed comments
         mongo::OID OID()            const { return chk(jstOID).__oid(); }
         void Null()                 const { chk(isNull()); } // throw UserException if not null
         void OK()                   const { chk(ok()); }     // throw UserException if element DNE
@@ -92,25 +92,25 @@ namespace mongo {
         void Val(mongo::OID& v)     const { v = OID(); }
         void Val(int& v)            const { v = Int(); }
         void Val(double& v)         const { v = Double(); }
-        void Val(string& v)         const { v = String(); }
+        void Val(std::string& v)    const { v = String(); }
 
         /** Use ok() to check if a value is assigned:
             if( myObj["foo"].ok() ) ...
         */
         bool ok() const { return !eoo(); }
 
-        string toString( bool includeFieldName = true, bool full=false) const;
-        void toString(StringBuilder& s, bool includeFieldName = true, bool full=false) const;
-        string jsonString( JsonStringFormat format, bool includeFieldNames = true, int pretty = 0 ) const;
-        operator string() const { return toString(); }
+        std::string toString( bool includeFieldName = true, bool full=false) const;
+        void toString(StringBuilder& s, bool includeFieldName = true, bool full=false, int depth=0) const;
+        std::string jsonString( JsonStringFormat format, bool includeFieldNames = true, int pretty = 0 ) const;
+        operator std::string() const { return toString(); }
 
         /** Returns the type of the element */
-        BSONType type() const { return (BSONType) *data; }
+        BSONType type() const { return (BSONType) *reinterpret_cast< const signed char * >(data); }
 
         /** retrieve a field within this element
             throws exception if *this is not an embedded object
         */
-        BSONElement operator[] (const string& field) const;
+        BSONElement operator[] (const std::string& field) const;
 
         /** returns the tyoe of the element fixed for the main type
             the main purpose is numbers.  any numeric type will return NumberDouble
@@ -184,7 +184,7 @@ namespace mongo {
         bool isNumber() const;
 
         /** Return double value for this field. MUST be NumberDouble type. */
-        double _numberDouble() const {return *reinterpret_cast< const double* >( value() ); }
+        double _numberDouble() const {return (reinterpret_cast< const PackedDouble* >( value() ))->d; }
         /** Return int value for this field. MUST be NumberInt type. */
         int _numberInt() const {return *reinterpret_cast< const int* >( value() ); }
         /** Return long long value for this field. MUST be NumberLong type. */
@@ -237,8 +237,8 @@ namespace mongo {
             return type() == mongo::String ? valuestr() : "";
         }
         /** Get the string value of the element.  If not a string returns "". */
-        string str() const {
-            return type() == mongo::String ? string(valuestr(), valuestrsize()-1) : string();
+        std::string str() const {
+            return type() == mongo::String ? std::string(valuestr(), valuestrsize()-1) : std::string();
         }
 
         /** Get javascript code of a CodeWScope data element. */
@@ -262,7 +262,7 @@ namespace mongo {
         /** Get raw binary data.  Element must be of type BinData. Doesn't handle type 2 specially */
         const char *binData(int& len) const {
             // BinData: <int len> <byte subtype> <byte[len] data>
-            assert( type() == BinData );
+            verify( type() == BinData );
             len = valuestrsize();
             return value() + 5;
         }
@@ -281,14 +281,14 @@ namespace mongo {
 
         BinDataType binDataType() const {
             // BinData: <int len> <byte subtype> <byte[len] data>
-            assert( type() == BinData );
+            verify( type() == BinData );
             unsigned char c = (value() + 4)[0];
             return (BinDataType)c;
         }
 
         /** Retrieve the regex string for a Regex element */
         const char *regex() const {
-            assert(type() == RegEx);
+            verify(type() == RegEx);
             return value();
         }
 
@@ -407,7 +407,7 @@ namespace mongo {
             }
         }
 
-        string _asCode() const;
+        std::string _asCode() const;
         OpTime _opTime() const;
 
     private:
@@ -480,7 +480,7 @@ namespace mongo {
         case CodeWScope:
             return 65;
         default:
-            assert(0);
+            verify(0);
             return -1;
         }
     }
@@ -490,7 +490,7 @@ namespace mongo {
         case NumberLong:
             return *reinterpret_cast< const long long* >( value() ) != 0;
         case NumberDouble:
-            return *reinterpret_cast< const double* >( value() ) != 0;
+            return (reinterpret_cast < const PackedDouble* >(value ()))->d != 0;
         case NumberInt:
             return *reinterpret_cast< const int* >( value() ) != 0;
         case mongo::Bool:

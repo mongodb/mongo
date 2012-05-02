@@ -15,14 +15,18 @@
  *    limitations under the License.
  */
 
-#include "../util/net/hostandport.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/startup_test.h"
 
 namespace mongo {
 
     string dynHostMyName() { return ""; }
 
     void dynHostResolve(string& name, int& port) {
-        assert(false);
+        verify(false);
     }
+
+    StartupTest::StartupTest() {}
+    StartupTest::~StartupTest() {}
 
 }

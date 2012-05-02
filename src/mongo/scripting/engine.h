@@ -183,9 +183,6 @@ namespace mongo {
         /** call this method to release some JS resources when a thread is done */
         void threadDone();
 
-        struct Unlocker { virtual ~Unlocker() {} };
-        virtual auto_ptr<Unlocker> newThreadUnlocker() { return auto_ptr< Unlocker >( new Unlocker ); }
-
         void setScopeInitCallback( void ( *func )( Scope & ) ) { _scopeInitCallback = func; }
         static void setConnectCallback( void ( *func )( DBClientWithCommands& ) ) { _connectCallback = func; }
         static void runConnectCallback( DBClientWithCommands &c ) {

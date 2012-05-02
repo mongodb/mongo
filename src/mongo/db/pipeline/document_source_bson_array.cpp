@@ -17,8 +17,8 @@
 #include "pch.h"
 
 #include "db/pipeline/document_source.h"
-
 #include "db/pipeline/document.h"
+
 
 namespace mongo {
 
@@ -30,6 +30,8 @@ namespace mongo {
     }
 
     bool DocumentSourceBsonArray::advance() {
+        DocumentSource::advance(); // check for interrupts
+
         if (eof())
             return false;
 
@@ -43,21 +45,22 @@ namespace mongo {
     }
 
     intrusive_ptr<Document> DocumentSourceBsonArray::getCurrent() {
-        assert(haveCurrent);
+        verify(haveCurrent);
         BSONObj documentObj(currentElement.Obj());
         intrusive_ptr<Document> pDocument(
             Document::createFromBsonObj(&documentObj));
         return pDocument;
     }
 
-    void DocumentSourceBsonArray::setSource(
-        const intrusive_ptr<DocumentSource> &pSource) {
+    void DocumentSourceBsonArray::setSource(DocumentSource *pSource) {
         /* this doesn't take a source */
-        assert(false);
+        verify(false);
     }
 
     DocumentSourceBsonArray::DocumentSourceBsonArray(
-        BSONElement *pBsonElement):
+        BSONElement *pBsonElement,
+        const intrusive_ptr<ExpressionContext> &pExpCtx):
+        DocumentSource(pExpCtx),
         embeddedObject(pBsonElement->embeddedObject()),
         arrayIterator(embeddedObject),
         haveCurrent(false) {
@@ -68,16 +71,17 @@ namespace mongo {
     }
 
     intrusive_ptr<DocumentSourceBsonArray> DocumentSourceBsonArray::create(
-        BSONElement *pBsonElement) {
+        BSONElement *pBsonElement,
+        const intrusive_ptr<ExpressionContext> &pExpCtx) {
 
-        assert(pBsonElement->type() == Array);
+        verify(pBsonElement->type() == Array);
         intrusive_ptr<DocumentSourceBsonArray> pSource(
-            new DocumentSourceBsonArray(pBsonElement));
+            new DocumentSourceBsonArray(pBsonElement, pExpCtx));
 
         return pSource;
     }
 
     void DocumentSourceBsonArray::sourceToBson(BSONObjBuilder *pBuilder) const {
-        assert(false); // this has no analog in the BSON world
+        verify(false); // this has no analog in the BSON world
     }
 }

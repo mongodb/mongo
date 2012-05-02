@@ -111,7 +111,7 @@ namespace mongo {
 
             if ( sizeof(Node) != 628 ) {
                 out() << "HashTable() " << _name << " sizeof(node):" << sizeof(Node) << " n:" << n << " sizeof(Key): " << sizeof(Key) << " sizeof(Type):" << sizeof(Type) << endl;
-                assert( sizeof(Node) == 628 );
+                verify( sizeof(Node) == 628 );
             }
 
         }
@@ -147,7 +147,7 @@ namespace mongo {
                 n->hash = k.hash();
             }
             else {
-                assert( n->hash == k.hash() );
+                verify( n->hash == k.hash() );
             }
             n->value = value;
             return true;

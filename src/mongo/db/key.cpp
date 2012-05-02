@@ -18,7 +18,8 @@
 
 #include "pch.h"
 #include "key.h"
-#include "../util/unittest.h"
+#include "mongo/util/startup_test.h"
+#include "mongo/bson/util/builder.h"
 
 namespace mongo {
 
@@ -124,7 +125,7 @@ namespace mongo {
         }
         default:
             out() << "oldCompareElementValues: bad type " << (int) l.type() << endl;
-            assert(false);
+            verify(false);
         }
         return -1;
     }
@@ -314,7 +315,7 @@ namespace mongo {
                     long long m = 2LL << 52;
                     DEV {
                         long long d = m-1;
-                        assert( ((long long) ((double) -d)) == -d );
+                        verify( ((long long) ((double) -d)) == -d );
                     }
                     if( n >= m || n <= -m ) {
                         // can't represent exactly as a double
@@ -351,7 +352,7 @@ namespace mongo {
     }
 
     BSONObj KeyV1::toBson() const { 
-        assert( _keyData != 0 );
+        verify( _keyData != 0 );
         if( !isCompactFormat() )
             return bson();
 
@@ -405,15 +406,15 @@ namespace mongo {
                     p += sizeof(double);
                     break;
                 case cint:
-                    b.append("", (int) ((double&) *p));
+                    b.append("", static_cast< int >((reinterpret_cast< const PackedDouble& >(*p)).d));
                     p += sizeof(double);
                     break;
                 case clong:
-                    b.append("", (long long) ((double&) *p));
+                    b.append("", static_cast< long long>((reinterpret_cast< const PackedDouble& >(*p)).d));
                     p += sizeof(double);
                     break;
                 default:
-                    assert(false);
+                    verify(false);
             }
 
             if( (bits & cHASMORE) == 0 )
@@ -435,8 +436,8 @@ namespace mongo {
         switch( lt ) { 
         case cdouble:
             {
-                double L = *((double *) l);
-                double R = *((double *) r);
+                double L = (reinterpret_cast< const PackedDouble* >(l))->d;
+                double R = (reinterpret_cast< const PackedDouble* >(r))->d;
                 if( L < R )
                     return -1;
                 if( L != R )
@@ -577,7 +578,7 @@ namespace mongo {
                 sz = ((unsigned) p[1]) + 2;
             }
             else {
-                assert( type == cbindata );
+                verify( type == cbindata );
                 sz = binDataCodeToLength(p[1]) + 2;
             }
         }
@@ -624,7 +625,7 @@ namespace mongo {
                 l += 8; r += 8;
                 break;
             case cdouble:
-                if( *((double *) l) != *((double *) r) )
+                if( (reinterpret_cast< const PackedDouble* > (l))->d != (reinterpret_cast< const PackedDouble* >(r))->d )
                     return false;
                 l += 8; r += 8;
                 break;
@@ -655,7 +656,7 @@ namespace mongo {
             case cmaxkey:
                 break;
             default:
-                assert(false);
+                verify(false);
             }
             if( (lval&cHASMORE) == 0 )
                 break;
@@ -663,7 +664,7 @@ namespace mongo {
         return true;
     }
 
-    struct CmpUnitTest : public UnitTest {
+    struct CmpUnitTest : public StartupTest {
         void run() {
             char a[2];
             char b[2];
@@ -671,7 +672,7 @@ namespace mongo {
             a[1] = 0;
             b[0] = 3;
             b[1] = 0;
-            assert( strcmp(a,b)>0 && memcmp(a,b,2)>0 );
+            verify( strcmp(a,b)>0 && memcmp(a,b,2)>0 );
         }
     } cunittest;
 

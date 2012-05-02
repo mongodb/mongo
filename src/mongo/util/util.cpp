@@ -17,7 +17,7 @@
 
 #include "pch.h"
 #include "goodies.h"
-#include "unittest.h"
+#include "mongo/util/startup_test.h"
 #include "file_allocator.h"
 #include "optime.h"
 #include "time_support.h"
@@ -26,20 +26,8 @@
 
 namespace mongo {
 
-#if defined(_WIN32)
-    unsigned long long Timer::countsPerSecond;
-    struct AtStartup {
-        AtStartup() {
-            LARGE_INTEGER x;
-            bool ok = QueryPerformanceFrequency(&x);
-            assert(ok);
-            Timer::countsPerSecond = x.QuadPart;
-        }
-    } atstartuputil;
-#endif
-
     string hexdump(const char *data, unsigned len) {
-        assert( len < 1000000 );
+        verify( len < 1000000 );
         const unsigned char *p = (const unsigned char *) data;
         stringstream ss;
         for( unsigned i = 0; i < 4 && i < len; i++ ) {
@@ -54,20 +42,24 @@ namespace mongo {
 
     boost::thread_specific_ptr<string> _threadName;
 
-    unsigned _setThreadName( const char * name ) {
+    long long _setThreadName( const char * name ) {
         if ( ! name ) name = "NONE";
 
-        static unsigned N = 0;
+        static long long N = 0;
 
         if ( strcmp( name , "conn" ) == 0 ) {
             string* x = _threadName.get();
             if ( x && mongoutils::str::startsWith( *x , "conn" ) ) {
-                int n = atoi( x->c_str() + 4 );
+#if defined(_WIN32)
+                long long n = _atoi64( x->c_str() + 4 );
+#else
+                long long n = atoll( x->c_str() + 4 );
+#endif
                 if ( n > 0 )
                     return n;
                 warning() << "unexpected thread name [" << *x << "] parsed to " << n << endl;
             }
-            unsigned n = ++N;
+            long long n = ++N;
             stringstream ss;
             ss << name << n;
             _threadName.reset( new string( ss.str() ) );
@@ -105,8 +97,8 @@ namespace mongo {
         }
     }
 
-    unsigned setThreadName(const char *name) {
-        unsigned n = _setThreadName( name );
+    long long setThreadName(const char *name) {
+        long long n = _setThreadName( name );
 #if !defined(_DEBUG)
         // naming might be expensive so don't do "conn*" over and over
         if( string("conn") == name )
@@ -118,7 +110,7 @@ namespace mongo {
 
 #else
 
-    unsigned setThreadName(const char * name ) {
+    long long setThreadName(const char * name ) {
         return _setThreadName( name );
     }
 
@@ -130,17 +122,6 @@ namespace mongo {
             return *s;
         return "";
     }
-
-    vector<UnitTest*> *UnitTest::tests = 0;
-    bool UnitTest::running = false;
-
-    const char *default_getcurns() { return ""; }
-    const char * (*getcurns)() = default_getcurns;
-
-    int logLevel = 0;
-    int tlogLevel = 0;
-    mongo::mutex Logstream::mutex("Logstream");
-    int Logstream::doneSetup = Logstream::magicNumber();
 
     bool isPrime(int n) {
         int z = 2;
@@ -161,21 +142,21 @@ namespace mongo {
         return n;
     }
 
-    struct UtilTest : public UnitTest {
+    struct UtilTest : public StartupTest {
         void run() {
-            assert( isPrime(3) );
-            assert( isPrime(2) );
-            assert( isPrime(13) );
-            assert( isPrime(17) );
-            assert( !isPrime(9) );
-            assert( !isPrime(6) );
-            assert( nextPrime(4) == 5 );
-            assert( nextPrime(8) == 11 );
+            verify( isPrime(3) );
+            verify( isPrime(2) );
+            verify( isPrime(13) );
+            verify( isPrime(17) );
+            verify( !isPrime(9) );
+            verify( !isPrime(6) );
+            verify( nextPrime(4) == 5 );
+            verify( nextPrime(8) == 11 );
 
-            assert( endsWith("abcde", "de") );
-            assert( !endsWith("abcde", "dasdfasdfashkfde") );
+            verify( endsWith("abcde", "de") );
+            verify( !endsWith("abcde", "dasdfasdfashkfde") );
 
-            assert( swapEndian(0x01020304) == 0x04030201 );
+            verify( swapEndian(0x01020304) == 0x04030201 );
 
         }
     } utilTest;
@@ -190,24 +171,6 @@ namespace mongo {
             problem() << errmsg << endl;
         }
         printStackTrace();
-    }
-
-    /* note: can't use malloc herein - may be in signal handler.
-             logLockless() likely does not comply and should still be fixed todo
-             likewise class string?
-    */
-    void rawOut( const string &s ) {
-        if( s.empty() ) return;
-
-        char buf[64];
-        time_t_to_String( time(0) , buf );
-        /* truncate / don't show the year: */
-        buf[19] = ' ';
-        buf[20] = 0;
-
-        Logstream::logLockless(buf);
-        Logstream::logLockless(s);
-        Logstream::logLockless("\n");
     }
 
     ostream& operator<<( ostream &s, const ThreadSafeString &o ) {

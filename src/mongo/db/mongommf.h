@@ -76,7 +76,7 @@ namespace mongo {
             if the suffix is "ns", fileSuffixNo -1
         */
         const RelativePath& relativePath() const {
-            DEV assert( !_p._p.empty() );
+            DEV verify( !_p._p.empty() );
             return _p;
         }
 

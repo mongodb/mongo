@@ -34,11 +34,11 @@ checkCursor( {a:1,b:1}, 'a_1' );
 checkCursor( {a:100,b:100}, 'b_1' );
 
 // Check smallest filler for which {b:1} will take over.
-reset( 2, 11 );
+reset( 2, 12 );
 checkCursor( {a:1,b:1}, 'a_1' );
 checkCursor( {a:100,b:100}, 'b_1' );
 
 // Check largest filler for which {b:1} will not take over - demonstrating that new plans run alongside the old plan.
-reset( 2, 10 );
+reset( 2, 11 );
 checkCursor( {a:1,b:1}, 'a_1' );
 checkCursor( {a:100,b:100}, 'a_1' );

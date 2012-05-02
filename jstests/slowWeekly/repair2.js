@@ -2,7 +2,10 @@
 
 baseName = "jstests_repair2";
 
-t = db.getSisterDB( baseName )[ baseName ];
+load( "jstests/libs/slow_weekly_util.js" )
+testServer = new SlowWeeklyMongod( baseName )
+
+t = testServer.getDB( baseName )[ baseName ];
 t.drop();
 
 function protect( f ) {
@@ -27,3 +30,6 @@ for( i = 0; i < 30; ++i ) {
     
 	assert.eq( 0, t.count() );
 }
+
+
+testServer.stop();

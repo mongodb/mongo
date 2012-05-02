@@ -59,7 +59,7 @@ namespace mongo {
     }
 
     DiskLoc nextLoop( NamespaceDetails *nsd, const DiskLoc &prev ) {
-        assert( nsd->capLooped() );
+        verify( nsd->capLooped() );
         DiskLoc next = forward()->next( prev );
         if ( !next.isNull() )
             return next;
@@ -67,7 +67,7 @@ namespace mongo {
     }
 
     DiskLoc prevLoop( NamespaceDetails *nsd, const DiskLoc &curr ) {
-        assert( nsd->capLooped() );
+        verify( nsd->capLooped() );
         DiskLoc prev = reverse()->next( curr );
         if ( !prev.isNull() )
             return prev;
@@ -96,7 +96,7 @@ namespace mongo {
     }
 
     DiskLoc ForwardCappedCursor::next( const DiskLoc &prev ) const {
-        assert( nsd );
+        verify( nsd );
         if ( !nsd->capLooped() )
             return forward()->next( prev );
 
@@ -134,7 +134,7 @@ namespace mongo {
     }
 
     DiskLoc ReverseCappedCursor::next( const DiskLoc &prev ) const {
-        assert( nsd );
+        verify( nsd );
         if ( !nsd->capLooped() )
             return reverse()->next( prev );
 

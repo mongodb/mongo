@@ -40,7 +40,8 @@ namespace mongo {
 
 #if defined(__linux__) || defined(__sunos__) || defined(__APPLE__)
         _devrandom = new ifstream("/dev/urandom", ios::binary|ios::in);
-        massert( 10353 ,  "can't open dev/urandom", _devrandom->is_open() );
+        if ( !_devrandom->is_open() )
+            massert( 10353 , std::string("can't open dev/urandom: ") + strerror(errno), 0 );
 #elif defined(_WIN32)
         srand(curTimeMicros()); // perhaps not relevant for rand_s but we might want elsewhere anyway
 #else
@@ -61,8 +62,8 @@ namespace mongo {
         massert(10355 , "devrandom failed", !_devrandom->fail());
 #elif defined(_WIN32)
         unsigned a=0, b=0;
-        assert( rand_s(&a) == 0 );
-        assert( rand_s(&b) == 0 );
+        verify( rand_s(&a) == 0 );
+        verify( rand_s(&b) == 0 );
         n = (((unsigned long long)a)<<32) | b;
 #else
         n = (((unsigned long long)random())<<32) | random();
@@ -72,7 +73,6 @@ namespace mongo {
 
     SimpleMutex nonceMutex("nonce");
     nonce64 Security::_getNonce() {
-        // not good this is a static as gcc will mutex protect it which costs time
         SimpleMutex::scoped_lock lk(nonceMutex);
         if( !_initialized )
             init();

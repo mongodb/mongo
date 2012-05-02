@@ -2,6 +2,9 @@
 
 var st = new ShardingTest({ shards : 2, mongos : 2 })
 
+// Don't balance since we're manually moving chunks
+st.stopBalancer()
+
 var coll = st.s.getCollection( jsTestName() + ".coll" )
 
 for( var i = -10; i < 10; i++ )

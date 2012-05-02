@@ -16,6 +16,7 @@
 
 #include "pch.h"
 
+#include "db/interrupt_status.h"
 #include "db/pipeline/expression_context.h"
 
 namespace mongo {
@@ -23,13 +24,25 @@ namespace mongo {
     ExpressionContext::~ExpressionContext() {
     }
 
-    inline ExpressionContext::ExpressionContext():
+    inline ExpressionContext::ExpressionContext(InterruptStatus *pS):
         inShard(false),
-        inRouter(false) {
+        inRouter(false),
+        intCheckCounter(1),
+        pStatus(pS) {
     }
 
-    ExpressionContext *ExpressionContext::create() {
-        return new ExpressionContext();
+    void ExpressionContext::checkForInterrupt() {
+        /*
+          Only really check periodically; the check gets a mutex, and could
+          be expensive, at least in relative terms.
+        */
+        if ((++intCheckCounter % 128) == 0) {
+            pStatus->checkForInterrupt();
+        }
+    }
+
+    ExpressionContext *ExpressionContext::create(InterruptStatus *pStatus) {
+        return new ExpressionContext(pStatus);
     }
 
 }

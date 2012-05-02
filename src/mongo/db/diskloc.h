@@ -69,7 +69,7 @@ namespace mongo {
             _a = -1;
             ofs = 0; /* note NullOfs is different. todo clean up.  see refs to NullOfs in code - use is valid but outside DiskLoc context so confusing as-is. */
         }
-        void assertOk() { assert(!isNull()); }
+        void assertOk() { verify(!isNull()); }
         void setInvalid() {
             _a = -2;
             ofs = 0;
@@ -96,7 +96,7 @@ namespace mongo {
         }
 
         void inc(int amt) {
-            assert( !isNull() );
+            verify( !isNull() );
             ofs += amt;
         }
 
@@ -113,7 +113,7 @@ namespace mongo {
         const DiskLoc& operator=(const DiskLoc& b) {
             _a=b._a;
             ofs = b.ofs;
-            //assert(ofs!=0);
+            //verify(ofs!=0);
             return *this;
         }
         int compare(const DiskLoc& b) const {

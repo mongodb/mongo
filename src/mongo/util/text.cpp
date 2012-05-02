@@ -16,11 +16,10 @@
  */
 
 #include "pch.h"
-#include "text.h"
-#include "unittest.h"
-#if defined(_WIN32)
-#include <boost/system/system_error.hpp>
-#endif
+
+#include "mongo/util/text.h"
+#include "mongo/util/startup_test.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
@@ -88,13 +87,14 @@ namespace mongo {
                       CP_UTF8, 0, wide.c_str(), static_cast<int>(wide.size()),
                       &buffer[0], static_cast<int>(buffer.size()), NULL, NULL);
             if (len > 0) {
-                assert(len == static_cast<int>(buffer.size()));
+                verify(len == static_cast<int>(buffer.size()));
                 return std::string(&buffer[0], buffer.size());
             }
         }
 
-        throw boost::system::system_error(
-            ::GetLastError(), boost::system::system_category);
+        msgasserted( 16091 ,
+                     mongoutils::str::stream() << "can't wstring to utf8: " << ::GetLastError() );
+        return "";
     }
 
 #if defined(_UNICODE)
@@ -105,12 +105,35 @@ namespace mongo {
     }
 #endif
 
-#endif
+    WindowsCommandLine::WindowsCommandLine( int argc, wchar_t* argvW[] ) {
+        vector < string >   utf8args;
+        vector < size_t >   utf8argLength;
+        size_t blockSize = argc * sizeof( char * );
+        size_t blockPtr = blockSize;
+        for ( int i = 0; i < argc; ++i ) {
+            utf8args.push_back( toUtf8String( argvW[ i ] ) );
+            size_t argLength = utf8args[ i ].length() + 1;
+            utf8argLength.push_back( argLength );
+            blockSize += argLength;
+        }
+        _argv = reinterpret_cast< char** >( malloc( blockSize ) );
+        for ( int i = 0; i < argc; ++i ) {
+            _argv[ i ] = reinterpret_cast< char * >( _argv ) + blockPtr;
+            strcpy_s( _argv[ i ], utf8argLength[ i ], utf8args[ i ].c_str() );
+            blockPtr += utf8argLength[ i ];
+        }
+    }
 
-    struct TextUnitTest : public UnitTest {
+    WindowsCommandLine::~WindowsCommandLine() {
+        free( _argv );
+    }
+
+#endif // #if defined(_WIN32)
+
+    struct TextUnitTest : public StartupTest {
         void run() {
-            assert( parseLL("123") == 123 );
-            assert( parseLL("-123000000000") == -123000000000LL );
+            verify( parseLL("123") == 123 );
+            verify( parseLL("-123000000000") == -123000000000LL );
         }
     } textUnitTest;
 

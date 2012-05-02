@@ -21,7 +21,7 @@
 #include "../db/security_common.h"
 #include "../db/security.h"
 #include "config.h"
-#include "client.h"
+#include "client_info.h"
 #include "grid.h"
 
 // this is the _mongos only_ implementation of security.h
@@ -42,13 +42,13 @@ namespace mongo {
 
             static BSONObj userPattern = BSON("user" << 1);
 
-            ShardConnection conn( s, systemUsers );
+            ScopedDbConnection conn( s, 30.0 );
             OCCASIONALLY conn->ensureIndex(systemUsers, userPattern, false, "user_1");
             {
                 BSONObjBuilder b;
                 b << "user" << user;
                 BSONObj query = b.done();
-                userObj = conn->findOne(systemUsers, query);
+                userObj = conn->findOne(systemUsers, query, 0, QueryOption_SlaveOk);
                 if( userObj.isEmpty() ) {
                     log() << "auth: couldn't find user " << user << ", " << systemUsers << endl;
                     conn.done(); // return to pool
@@ -63,8 +63,13 @@ namespace mongo {
         return true;
     }
 
+    void AuthenticationInfo::setIsALocalHostConnectionWithSpecialAuthPowers() {
+        verify(!_isLocalHost);
+        _isLocalHost = true;
+    }
+
     bool AuthenticationInfo::_isAuthorizedSpecialChecks( const string& dbname ) const {
-        if ( !isLocalHost ) {
+        if ( !_isLocalHost ) {
             return false;
         }
 

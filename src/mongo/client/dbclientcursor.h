@@ -17,11 +17,14 @@
 
 #pragma once
 
-#include "../pch.h"
-#include "../util/net/message.h"
-#include "../db/jsobj.h"
-#include "../db/json.h"
+#include "pch.h"
+
 #include <stack>
+
+#include "mongo/client/dbclientinterface.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/json.h"
+#include "mongo/util/net/message.h"
 
 namespace mongo {
 
@@ -246,4 +249,3 @@ namespace mongo {
 
 } // namespace mongo
 
-#include "undef_macros.h"

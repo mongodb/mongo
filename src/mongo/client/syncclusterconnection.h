@@ -18,9 +18,10 @@
 
 #pragma once
 
-#include "../pch.h"
-#include "dbclient.h"
-#include "redef_macros.h"
+
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/client/dbclientinterface.h"
 
 namespace mongo {
 
@@ -40,6 +41,9 @@ namespace mongo {
      */
     class SyncClusterConnection : public DBClientBase {
     public:
+
+        using DBClientBase::query;
+
         /**
          * @param commaSeparated should be 3 hosts comma separated
          */
@@ -122,7 +126,7 @@ namespace mongo {
     public:
         UpdateNotTheSame( int code , const string& msg , const vector<string>& addrs , const vector<BSONObj>& lastErrors )
             : UserException( code , msg ) , _addrs( addrs ) , _lastErrors( lastErrors ) {
-            assert( _addrs.size() == _lastErrors.size() );
+            verify( _addrs.size() == _lastErrors.size() );
         }
 
         virtual ~UpdateNotTheSame() throw() {
@@ -143,5 +147,3 @@ namespace mongo {
     };
 
 };
-
-#include "undef_macros.h"

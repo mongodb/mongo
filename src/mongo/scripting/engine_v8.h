@@ -85,6 +85,9 @@ namespace mongo {
 
         BSONObj _obj;
         bool _modified;
+        list<string> _extra;
+        set<string> _removed;
+
     };
 
     class V8Scope : public Scope {
@@ -236,12 +239,6 @@ namespace mongo {
         virtual void runTest() {}
 
         bool utf8Ok() const { return true; }
-
-        class V8UnlockForClient : public Unlocker {
-//            V8Unlock u_;
-        };
-
-        virtual auto_ptr<Unlocker> newThreadUnlocker() { return auto_ptr< Unlocker >( new V8UnlockForClient ); }
 
         virtual void interrupt( unsigned opSpec );
         virtual void interruptAll();

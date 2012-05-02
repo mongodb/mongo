@@ -26,7 +26,7 @@
 #include "listen.h"
 
 #include "../goodies.h"
-#include "../../client/dbclient.h"
+
 
 namespace mongo {
 
@@ -47,7 +47,7 @@ namespace mongo {
     /*struct MsgStart {
         MsgStart() {
             NextMsgId = (((unsigned) time(0)) << 16) ^ curTimeMillis();
-            assert(MsgDataHeaderSize == 16);
+            verify(MsgDataHeaderSize == 16);
         }
     } msgstart;*/
 

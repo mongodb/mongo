@@ -22,18 +22,23 @@
  */
 
 #include "pch.h"
+
+#include <sys/stat.h>
+
 #include "security.h"
 #include "security_common.h"
-#include "../client/dbclient.h"
 #include "commands.h"
 #include "nonce.h"
 #include "../util/md5.hpp"
 #include "client_common.h"
-#include <sys/stat.h>
+#include "mongo/client/dbclientinterface.h"
+
 
 namespace mongo {
 
+    // this is a config setting, set at startup and not changing after initialization.
     bool noauth = true;
+
     AuthInfo internalSecurity;
 
     bool setUpSecurityKey(const string& filename) {
@@ -109,7 +114,7 @@ namespace mongo {
 
     void CmdAuthenticate::authenticate(const string& dbname, const string& user, const bool readOnly) {
         ClientBasic* c = ClientBasic::getCurrent();
-        assert(c);
+        verify(c);
         AuthenticationInfo *ai = c->getAuthenticationInfo();
 
         if ( readOnly ) {
@@ -122,13 +127,13 @@ namespace mongo {
 
 
     bool AuthenticationInfo::_isAuthorized(const string& dbname, Auth::Level level) const {
+        if ( noauth ) {
+            return true;
+        }
         {
             scoped_spinlock lk(_lock);
 
             if ( _isAuthorizedSingle_inlock( dbname , level ) )
-                return true;
-
-            if ( noauth )
                 return true;
 
             if ( _isAuthorizedSingle_inlock( "admin" , level ) )

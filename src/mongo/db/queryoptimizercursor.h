@@ -1,4 +1,4 @@
-// @file queryoptimizercursor.h
+// @file queryoptimizercursor.h - Interface for a cursor interleaving multiple candidate cursors.
 
 /**
  *    Copyright (C) 2011 10gen Inc.
@@ -16,135 +16,110 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#pragma once
+
+#include "cursor.h"
+#include "diskloc.h"
+
 namespace mongo {
     
-    /** Helper class for caching and counting matches during execution of a QueryPlan. */
-    class CachedMatchCounter {
+    class QueryPlan;
+    class CandidatePlanCharacter;
+    
+    /**
+     * An interface for policies overriding the query optimizer's default query plan selection
+     * behavior.
+     */
+    class QueryPlanSelectionPolicy {
     public:
-        /**
-         * @param aggregateNscanned - shared count of nscanned for this and othe plans.
-         * @param cumulativeCount - starting point for accumulated count over a series of plans.
-         */
-        CachedMatchCounter( long long &aggregateNscanned, int cumulativeCount ) : _aggregateNscanned( aggregateNscanned ), _nscanned(), _cumulativeCount( cumulativeCount ), _count(), _checkDups(), _match( Unknown ), _counted() {}
+        virtual ~QueryPlanSelectionPolicy() {}
+        virtual string name() const = 0;
+        virtual bool permitOptimalNaturalPlan() const { return true; }
+        virtual bool permitOptimalIdPlan() const { return true; }
+        virtual bool permitPlan( const QueryPlan &plan ) const { return true; }
+        virtual BSONObj planHint( const char *ns ) const { return BSONObj(); }
         
-        /** Set whether dup checking is enabled when counting. */
-        void setCheckDups( bool checkDups ) { _checkDups = checkDups; }
-        
-        /**
-         * Usual sequence of events:
-         * 1) resetMatch() - reset stored match value to Unkonwn.
-         * 2) setMatch() - set match value to a definite true/false value.
-         * 3) knowMatch() - check if setMatch() has been called.
-         * 4) countMatch() - increment count if match is true.
-         */
-        
-        void resetMatch() {
-            _match = Unknown;
-            _counted = false;
-        }
-        void setMatch( bool match ) { _match = match ? True : False; }
-        bool knowMatch() const { return _match != Unknown; }
-        void countMatch( const DiskLoc &loc ) {
-            if ( !_counted && _match == True && !getsetdup( loc ) ) {
-                ++_cumulativeCount;
-                ++_count;
-                _counted = true;
-            }
-        }
+        /** Allow any query plan selection, permitting the query optimizer's default behavior. */
+        static const QueryPlanSelectionPolicy &any();
 
-        bool enoughCumulativeMatchesToChooseAPlan() const {
-            // This is equivalent to the default condition for switching from
-            // a query to a getMore, which was the historical default match count for
-            // choosing a plan.
-            return _cumulativeCount >= 101;
-        }
-        bool enoughMatchesToRecordPlan() const {
-            // Recording after 50 matches is a historical default (101 default limit / 2).
-            return _count > 50;
-        }
+        /** Prevent unindexed collection scans. */
+        static const QueryPlanSelectionPolicy &indexOnly();
 
-        int cumulativeCount() const { return _cumulativeCount; }
-        int count() const { return _count; }
+        /**
+         * Generally hints to use the _id plan, falling back to the $natural plan.  However, the
+         * $natural plan will always be used if optimal for the query.
+         */
+        static const QueryPlanSelectionPolicy &idElseNatural();
         
-        /** Update local and aggregate nscanned counts. */
-        void updateNscanned( long long nscanned ) {
-            _aggregateNscanned += ( nscanned - _nscanned );
-            _nscanned = nscanned;
-        }
-        long long nscanned() const { return _nscanned; }
-        long long &aggregateNscanned() const { return _aggregateNscanned; }
     private:
-        bool getsetdup( const DiskLoc &loc ) {
-            if ( !_checkDups ) {
-                return false;
-            }
-            pair<set<DiskLoc>::iterator, bool> p = _dups.insert( loc );
-            return !p.second;
-        }
-        long long &_aggregateNscanned;
-        long long _nscanned;
-        int _cumulativeCount;
-        int _count;
-        bool _checkDups;
-        enum MatchState { Unknown, False, True };
-        MatchState _match;
-        bool _counted;
-        set<DiskLoc> _dups;
+        class Any;
+        static Any __any;
+        class IndexOnly;
+        static IndexOnly __indexOnly;
+        class IdElseNatural;
+        static IdElseNatural __idElseNatural;
+    };
+
+    class QueryPlanSelectionPolicy::Any : public QueryPlanSelectionPolicy {
+    public:
+        virtual string name() const { return "any"; }
     };
     
-    /** Dup tracking class, optimizing one common case with small set and few initial reads. */
-    class SmallDupSet {
+    class QueryPlanSelectionPolicy::IndexOnly : public QueryPlanSelectionPolicy {
     public:
-        SmallDupSet() : _accesses() {
-            _vec.reserve( 250 );
-        }
-        /** @return true if @param 'loc' already added to the set, false if adding to the set in this call. */
-        bool getsetdup( const DiskLoc &loc ) {
-            access();
-            return vec() ? getsetdupVec( loc ) : getsetdupSet( loc );
-        }
-        /** @return true when @param loc in the set. */
-        bool getdup( const DiskLoc &loc ) {
-            access();
-            return vec() ? getdupVec( loc ) : getdupSet( loc );
-        }            
-    private:
-        void access() {
-            ++_accesses;
-            mayUpgrade();
-        }
-        void mayUpgrade() {
-            if ( vec() && _accesses > 500 ) {
-                _set.insert( _vec.begin(), _vec.end() );
-            }
-        }
-        bool vec() const {
-            return _set.size() == 0;
-        }
-        bool getsetdupVec( const DiskLoc &loc ) {
-            if ( getdupVec( loc ) ) {
-                return true;
-            }
-            _vec.push_back( loc );
-            return false;
-        }
-        bool getdupVec( const DiskLoc &loc ) const {
-            for( vector<DiskLoc>::const_iterator i = _vec.begin(); i != _vec.end(); ++i ) {
-                if ( *i == loc ) {
-                    return true;
-                }
-            }
-            return false;
-        }
-        bool getsetdupSet( const DiskLoc &loc ) {
-            pair<set<DiskLoc>::iterator, bool> p = _set.insert(loc);
-            return !p.second;
-        }
-        bool getdupSet( const DiskLoc &loc ) {
-            return _set.count( loc ) > 0;
-        }
-        vector<DiskLoc> _vec;
-        set<DiskLoc> _set;
-        long long _accesses;
+        virtual string name() const { return "indexOnly"; }
+        virtual bool permitOptimalNaturalPlan() const { return false; }
+        virtual bool permitPlan( const QueryPlan &plan ) const;
     };
+
+    class QueryPlanSelectionPolicy::IdElseNatural : public QueryPlanSelectionPolicy {
+    public:
+        virtual string name() const { return "idElseNatural"; }
+        virtual bool permitPlan( const QueryPlan &plan ) const;
+        virtual BSONObj planHint( const char *ns ) const;
+    };
+    
+    class FieldRangeSet;
+    class ExplainQueryInfo;
+    
+    /**
+     * Adds functionality to Cursor for running multiple plans, running out of order plans,
+     * utilizing covered indexes, and generating explain output.
+     */
+    class QueryOptimizerCursor : public Cursor {
+    public:
+        
+        /** Candidate plans for the query before it begins running. */
+        virtual CandidatePlanCharacter initialCandidatePlans() const = 0;
+        /** FieldRangeSet for the query before it begins running. */
+        virtual const FieldRangeSet *initialFieldRangeSet() const = 0;
+
+        /** @return true if the plan for the current iterate is out of order. */
+        virtual bool currentPlanScanAndOrderRequired() const = 0;
+
+        /** @return true when there may be multiple plans running and some are in order. */
+        virtual bool runningInitialInOrderPlan() const = 0;
+        /**
+         * @return true when some query plans may have been excluded due to plan caching, for a
+         * non-$or query.
+         */
+        virtual bool hasPossiblyExcludedPlans() const = 0;
+
+        /**
+         * @return true when both in order and out of order candidate plans were available, and
+         * an out of order candidate plan completed iteration.
+         */
+        virtual bool completePlanOfHybridSetScanAndOrderRequired() const = 0;
+
+        /** Clear recorded indexes for the current clause's query patterns. */
+        virtual void clearIndexesForPatterns() = 0;
+        /** Stop returning results from out of order plans and do not allow them to complete. */
+        virtual void abortOutOfOrderPlans() = 0;
+
+        /** Note match information for the current iterate, to generate explain output. */
+        virtual void noteIterate( bool match, bool loadedDocument, bool chunkSkip ) = 0;
+        /** @return explain output for the query run by this cursor. */
+        virtual shared_ptr<ExplainQueryInfo> explainQueryInfo() const = 0;
+    };
+    
 } // namespace mongo

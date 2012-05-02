@@ -18,15 +18,15 @@
  */
 
 #include "pch.h"
-
-#include "../../client/dbclient.h"
-#include "../../db/instance.h"
-#include "../../db/ops/query.h"
-#include "../../db/queryoptimizer.h"
-#include "../../util/file_allocator.h"
-
-#include "../framework.h"
 #include <boost/date_time/posix_time/posix_time.hpp>
+
+#include "mongo/client/dbclientcursor.h"
+#include "mongo/db/instance.h"
+#include "mongo/db/json.h"
+#include "mongo/db/queryoptimizer.h"
+#include "mongo/dbtests/framework.h"
+#include "mongo/util/file_allocator.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
     extern string dbpath;
@@ -34,7 +34,7 @@ namespace mongo {
 
 
 using namespace mongo;
-using namespace mongo::regression;
+using namespace mongo::unittest;
 
 DBClientBase *client_;
 
@@ -657,19 +657,19 @@ namespace Plan {
                 client_->resetIndexCache();
                 client_->ensureIndex( ns_.c_str(), BSON( ( names + i ) << 1 ), false, names + i );
             }
-            lk_.reset( new dblock );
-            Client::Context ctx( ns_ );
+            _lk.reset( new Lock::GlobalWrite );
+            _ctx.reset( new Client::Context( ns_ ) );
             hint_ = BSON( "hint" << BSON( "a" << 1 ) );
-            hintElt_ = hint_.firstElement();
         }
         void run() {
             for( int i = 0; i < 10000; ++i )
-                MultiPlanScanner s( ns_.c_str(), BSONObj(), BSONObj(), &hintElt_ );
+                MultiPlanScanner s( ns_.c_str(), BSONObj(), BSONObj(),
+                                   boost::shared_ptr<const ParsedQuery>(), hint_ );
         }
         string ns_;
-        auto_ptr< dblock > lk_;
+        scoped_ptr<Lock::GlobalWrite> _lk;
+        scoped_ptr<Client::Context> _ctx;
         BSONObj hint_;
-        BSONElement hintElt_;
     };
 
     class Sort {
@@ -680,7 +680,7 @@ namespace Plan {
                 client_->resetIndexCache();
                 client_->ensureIndex( ns_.c_str(), BSON( ( names + i ) << 1 ), false, names + i );
             }
-            lk_.reset( new dblock );
+            lk_.reset( new Lock::GlobalWrite );
         }
         void run() {
             Client::Context ctx( ns_ );
@@ -688,7 +688,7 @@ namespace Plan {
                 MultiPlanScanner s( ns_.c_str(), BSONObj(), BSON( "a" << 1 ) );
         }
         string ns_;
-        auto_ptr< dblock > lk_;
+        auto_ptr< Lock::GlobalWrite > lk_;
     };
 
     class Query {
@@ -699,7 +699,7 @@ namespace Plan {
                 client_->resetIndexCache();
                 client_->ensureIndex( ns_.c_str(), BSON( ( names + i ) << 1 ), false, names + i );
             }
-            lk_.reset( new dblock );
+            lk_.reset( new Lock::GlobalWrite );
         }
         void run() {
             Client::Context ctx( ns_.c_str() );
@@ -707,7 +707,7 @@ namespace Plan {
                 MultiPlanScanner s( ns_.c_str(), BSON( "a" << 1 ), BSONObj() );
         }
         string ns_;
-        auto_ptr< dblock > lk_;
+        auto_ptr< Lock::GlobalWrite > lk_;
     };
 
     class All : public RunnerSuite {
@@ -756,6 +756,6 @@ int main( int argc, char **argv ) {
     logLevel = -1;
     client_ = new DBDirectClient();
 
-    return Suite::run(argc, argv, "/data/db/perftest");
+    return mongo::dbtests::runDbTests(argc, argv, "/data/db/perftest");
 }
 

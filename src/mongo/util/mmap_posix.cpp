@@ -18,7 +18,7 @@
 #include "pch.h"
 #include "mmap.h"
 #include "file_allocator.h"
-#include "../db/concurrency.h"
+#include "../db/d_concurrency.h"
 #include <errno.h>
 #include <sys/mman.h>
 #include <sys/types.h>
@@ -62,9 +62,27 @@ namespace mongo {
     MAdvise::MAdvise(void *,unsigned, Advice) { }
     MAdvise::~MAdvise() { }
 #else
-    MAdvise::MAdvise(void *p, unsigned len, Advice a) : _p(p), _len(len) {
-        assert( a == Sequential ); // more later
-        madvise(_p,_len,MADV_SEQUENTIAL);
+    MAdvise::MAdvise(void *p, unsigned len, Advice a) {
+        
+        static long pageSize = 0;
+        if ( pageSize == 0 ) {
+            pageSize = sysconf( _SC_PAGESIZE );
+        }
+        _p = (void*)((long)p & ~(pageSize-1));
+        
+        _len = len +((unsigned long long)p-(unsigned long long)_p);
+        
+        int advice = 0;
+        switch ( a ) {
+        case Sequential: advice = MADV_SEQUENTIAL; break;
+        case Random: advice = MADV_RANDOM; break;
+        default: verify(0);
+        }
+        
+        if ( madvise(_p,_len,advice ) ) {
+            error() << "madvise failed: " << errnoWithDescription() << endl;
+        }
+        
     }
     MAdvise::~MAdvise() { 
         madvise(_p,_len,MADV_NORMAL);
@@ -115,10 +133,6 @@ namespace mongo {
 
         views.push_back( view );
 
-        DEV if (! d.dbMutex.info().isLocked()) {
-            _unlock();
-        }
-
         return view;
     }
 
@@ -167,7 +181,7 @@ namespace mongo {
             printMemInfo();
             abort();
         }
-        assert( x == oldPrivateAddr );
+        verify( x == oldPrivateAddr );
         return x;
     }
 
@@ -200,15 +214,6 @@ namespace mongo {
         return new PosixFlushable( viewForFlushing() , fd , len );
     }
 
-    void MemoryMappedFile::_lock() {
-        if (! views.empty() && isMongoMMF() ) 
-            assert(mprotect(views[0], len, PROT_READ | PROT_WRITE) == 0);
-    }
-
-    void MemoryMappedFile::_unlock() {
-        if (! views.empty() && isMongoMMF() ) 
-            assert(mprotect(views[0], len, PROT_READ) == 0);
-    }
 
 } // namespace mongo
 

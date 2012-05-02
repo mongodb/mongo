@@ -30,10 +30,10 @@ namespace mongo {
     BufBuilder profileBufBuilder; // reused, instead of allocated every time - avoids a malloc/free cycle
 
     void profile( const Client& c , CurOp& currentOp ) {
-        assertInWriteLock();
+        verify( Lock::somethingWriteLocked() );
 
         Database *db = c.database();
-        DEV assert( db );
+        DEV verify( db );
         const char *ns = db->profileName.c_str();
         
         // build object
@@ -74,7 +74,7 @@ namespace mongo {
         if( d ) {
             int len = p.objsize();
             Record *r = theDataFileMgr.fast_oplog_insert(d, ns, len);
-            memcpy(getDur().writingPtr(r->data, len), p.objdata(), len);
+            memcpy(getDur().writingPtr(r->data(), len), p.objdata(), len);
         }
         else { 
             static time_t last;

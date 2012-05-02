@@ -21,6 +21,8 @@
 #include "../db/commands.h"
 #include "../util/queue.h"
 #include "../util/net/listen.h"
+#include "../db/curop.h"
+#include "../db/client.h"
 
 #include "d_writeback.h"
 
@@ -45,7 +47,7 @@ namespace mongo {
 
         scoped_lock lk( xxx );
         const BSONElement& e = o["id"];
-        
+
         if ( lastOID.isSet() ) {
             if ( e.OID() < lastOID ) {
                 log() << "this could fail" << endl;
@@ -84,7 +86,7 @@ namespace mongo {
             scoped_lock lk( _writebackQueueLock );
             for ( WriteBackQueuesMap::const_iterator it = _writebackQueues.begin(); it != _writebackQueues.end(); ++it ) {
                 const shared_ptr<QueueInfo> queue = it->second;
-                
+
                 BSONObjBuilder t( sub.subobjStart( it->first ) );
                 t.appendNumber( "n" , queue->queue.size() );
                 t.appendNumber( "minutesSinceLastCall" , ( now - queue->lastCall ) / ( 1000 * 60 ) );
@@ -93,7 +95,7 @@ namespace mongo {
                 totalQueued += queue->queue.size();
             }
         }
-        
+
         b.appendBool( "hasOpsQueued" , totalQueued > 0 );
         b.appendNumber( "totalOpsQueued" , totalQueued );
         b.append( "queues" , sub.obj() );
@@ -107,13 +109,13 @@ namespace mongo {
             const shared_ptr<QueueInfo> queue = it->second;
             long long sinceMinutes = ( now - queue->lastCall ) / ( 1000 * 60 );
 
-            if ( sinceMinutes < 60 ) // minutes of inactivity.  
+            if ( sinceMinutes < 60 ) // minutes of inactivity.
                 continue;
-            
-            log() << "deleting queue from: " << it->first 
-                  << " of size: " << queue->queue.size() 
-                  << " after " << sinceMinutes << " inactivity" 
-                  << " (normal if any mongos has restarted)" 
+
+            log() << "deleting queue from: " << it->first
+                  << " of size: " << queue->queue.size()
+                  << " after " << sinceMinutes << " inactivity"
+                  << " (normal if any mongos has restarted)"
                   << endl;
 
             _writebackQueues.erase( it );
@@ -122,7 +124,7 @@ namespace mongo {
         return false;
     }
 
-    void WriteBackManager::Cleaner::taskDoWork() { 
+    void WriteBackManager::Cleaner::taskDoWork() {
         for ( int i=0; i<1000; i++ ) {
             if ( ! writeBackManager.cleanupOldQueues() )
                 break;
@@ -143,6 +145,9 @@ namespace mongo {
         void help(stringstream& h) const { h<<"internal"; }
 
         bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+
+            cc().curop()->suppressFromCurop();
+            cc().curop()->setExpectedLatencyMs( 30000 );
 
             BSONElement e = cmdObj.firstElement();
             if ( e.type() != jstOID ) {
@@ -197,6 +202,5 @@ namespace mongo {
         }
 
     } writeBacksQueuedCommand;
-    
 
 }  // namespace mongo

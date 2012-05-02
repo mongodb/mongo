@@ -1,0 +1,122 @@
+#!/bin/sh
+
+prefix=/usr/local
+exec_prefix=${prefix}
+exec_prefix_set=no
+
+cflags="[--cflags]"
+
+if test yes = yes ; then
+  libs="[--libs-cpp]"
+else
+  libs=
+fi
+
+if test no = yes ; then
+  libs="[--libs16] $libs"
+fi
+
+if test yes = yes ; then
+  libs="[--libs] [--libs-posix] $libs"
+  cflags="$cflags [--cflags-posix]"
+fi
+
+usage="Usage: pcre-config [--prefix] [--exec-prefix] [--version] $libs $cflags"
+
+if test $# -eq 0; then
+      echo "${usage}" 1>&2
+      exit 1
+fi
+
+libR=
+case `uname -s` in
+  *SunOS*)
+  libR=" -R${exec_prefix}/lib"
+  ;;
+  *BSD*)
+  libR=" -Wl,-R${exec_prefix}/lib"
+  ;;
+esac
+
+libS=
+if test ${exec_prefix}/lib != /usr/lib ; then
+  libS=-L${exec_prefix}/lib
+fi
+
+while test $# -gt 0; do
+  case "$1" in
+  -*=*) optarg=`echo "$1" | sed 's/[-_a-zA-Z0-9]*=//'` ;;
+  *) optarg= ;;
+  esac
+
+  case $1 in
+    --prefix=*)
+      prefix=$optarg
+      if test $exec_prefix_set = no ; then
+        exec_prefix=$optarg
+      fi
+      ;;
+    --prefix)
+      echo $prefix
+      ;;
+    --exec-prefix=*)
+      exec_prefix=$optarg
+      exec_prefix_set=yes
+      ;;
+    --exec-prefix)
+      echo $exec_prefix
+      ;;
+    --version)
+      echo 8.30
+      ;;
+    --cflags)
+      if test ${prefix}/include != /usr/include ; then
+        includes=-I${prefix}/include
+      fi
+      echo $includes 
+      ;;
+    --cflags-posix)
+      if test yes = yes ; then
+        if test ${prefix}/include != /usr/include ; then
+          includes=-I${prefix}/include
+        fi
+        echo $includes 
+      else
+        echo "${usage}" 1>&2
+      fi
+      ;;
+    --libs-posix)
+      if test yes = yes ; then
+        echo $libS$libR -lpcreposix -lpcre
+      else
+        echo "${usage}" 1>&2
+      fi
+      ;;
+    --libs)
+      if test yes = yes ; then
+        echo $libS$libR -lpcre
+      else
+        echo "${usage}" 1>&2
+      fi
+      ;;
+    --libs16)
+      if test no = yes ; then
+        echo $libS$libR -lpcre16
+      else
+        echo "${usage}" 1>&2
+      fi
+      ;;
+    --libs-cpp)
+      if test yes = yes ; then
+        echo $libS$libR -lpcrecpp -lpcre
+      else
+        echo "${usage}" 1>&2
+      fi
+      ;;
+    *)
+      echo "${usage}" 1>&2
+      exit 1
+      ;;
+  esac
+  shift
+done

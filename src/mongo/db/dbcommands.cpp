@@ -22,7 +22,6 @@
 
 #include "pch.h"
 #include "ops/count.h"
-#include "ops/query.h"
 #include "pdfile.h"
 #include "jsobj.h"
 #include "../bson/util/builder.h"
@@ -89,7 +88,7 @@ namespace mongo {
         CmdResetError() : Command("resetError", false, "reseterror") {}
         bool run(const string& db, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             LastError *le = lastError.get();
-            assert( le );
+            verify( le );
             le->reset();
             return true;
         }
@@ -223,7 +222,7 @@ namespace mongo {
                         return true;
                     }
 
-                    assert( sprintf( buf , "w block pass: %lld" , ++passes ) < 30 );
+                    verify( sprintf( buf , "w block pass: %lld" , ++passes ) < 30 );
                     c.curop()->setMessage( buf );
                     sleepmillis(1);
                     killCurrentOp.checkForInterrupt();
@@ -316,6 +315,8 @@ namespace mongo {
             // regardless of whether they caught up, we'll shut down
         }
 
+        writelocktry wlt( 2 * 60 * 1000 );
+        uassert( 13455 , "dbexit timed out getting lock" , wlt.got() );
         return shutdownHelper();
     }
 
@@ -330,6 +331,11 @@ namespace mongo {
         virtual bool slaveOk() const {
             return false;
         }
+
+        // this is suboptimal but syncDataAndTruncateJournal is called from dropDatabase, and that 
+        // may need a global lock.
+        virtual bool lockGlobally() const { return true; }
+
         virtual LockType locktype() const { return WRITE; }
         CmdDropDatabase() : Command("dropDatabase") {}
         bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
@@ -357,6 +363,8 @@ namespace mongo {
             help << "repair database.  also compacts. note: slow.";
         }
         virtual LockType locktype() const { return WRITE; }
+        // SERVER-4328 todo don't lock globally. currently syncDataAndTruncateJournal is being called within, and that requires a global lock i believe.
+        virtual bool lockGlobally() const { return true; }
         CmdRepairDatabase() : Command("repairDatabase") {}
         bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             BSONElement e = cmdObj.firstElement();
@@ -414,12 +422,17 @@ namespace mongo {
         }
     } cmdProfile;
 
+    void reportLockStats(BSONObjBuilder& result);
+    
     class CmdServerStatus : public Command {
+        unsigned long long _started;
     public:
         virtual bool slaveOk() const {
             return true;
         }
-        CmdServerStatus() : Command("serverStatus", true) {}
+        CmdServerStatus() : Command("serverStatus", true) {
+            _started = curTimeMillis64();
+        }
 
         virtual LockType locktype() const { return NONE; }
 
@@ -434,12 +447,16 @@ namespace mongo {
 
             bool authed = cc().getAuthenticationInfo()->isAuthorizedReads("admin");
 
-            result.append( "host" , prettyHostName() );
+            result.append("host", prettyHostName() );
             result.append("version", versionString);
             result.append("process","mongod");
+            result.append("pid", (int)getpid());
             result.append("uptime",(double) (time(0)-cmdLine.started));
+            result.append("uptimeMillis", (long long)(curTimeMillis64()-_started));
             result.append("uptimeEstimate",(double) (start/1000));
             result.appendDate( "localTime" , jsTime() );
+
+            reportLockStats(result);
 
             {
                 BSONObjBuilder t;
@@ -480,7 +497,6 @@ namespace mongo {
             timeBuilder.appendNumber( "after basic" , Listener::getElapsedTimeMillis() - start );
 
             {
-
                 BSONObjBuilder t( result.subobjStart( "mem" ) );
 
                 t.append("bits",  ( sizeof(int*) == 4 ? 32 : 64 ) );
@@ -602,7 +618,7 @@ namespace mongo {
 
             {
                 RamLog* rl = RamLog::get( "warnings" );
-                verify(15880, rl);
+                massert(15880, "no ram log for warnings?" , rl);
                 
                 if (rl->lastWrite() >= time(0)-(10*60)){ // only show warnings from last 10 minutes
                     vector<const char*> lines;
@@ -638,8 +654,8 @@ namespace mongo {
         virtual LockType locktype() const { return NONE; }
         CmdGetOpTime() : Command("getoptime") { }
         bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            writelock l( "" );
-            result.appendDate("optime", OpTime::now().asDate());
+            mutex::scoped_lock lk(OpTime::m);
+            result.appendDate("optime", OpTime::now(lk).asDate());
             return true;
         }
     } cmdgetoptime;
@@ -690,12 +706,12 @@ namespace mongo {
 
     struct DBCommandsUnitTest {
         DBCommandsUnitTest() {
-            assert( removeBit(1, 0) == 0 );
-            assert( removeBit(2, 0) == 1 );
-            assert( removeBit(2, 1) == 0 );
-            assert( removeBit(255, 1) == 127 );
-            assert( removeBit(21, 2) == 9 );
-            assert( removeBit(0x4000000000000001ULL, 62) == 1 );
+            verify( removeBit(1, 0) == 0 );
+            verify( removeBit(2, 0) == 1 );
+            verify( removeBit(2, 1) == 0 );
+            verify( removeBit(255, 1) == 127 );
+            verify( removeBit(21, 2) == 9 );
+            verify( removeBit(0x4000000000000001ULL, 62) == 1 );
         }
     } dbc_unittest;
 
@@ -1012,7 +1028,7 @@ namespace mongo {
             // TODO: erh 1/1/2010 I think this is broken where path != dbpath ??
             set<string> allShortNames;
             {
-                readlock lk;
+                Lock::GlobalRead lk;
                 dbHolder().getAllShortNames( false, allShortNames );
             }
             
@@ -1027,9 +1043,8 @@ namespace mongo {
                 b.append( "sizeOnDisk" , (double)1.0 );
 
                 {
-                    readlock lk( name );
-                    Client::Context ctx( name );
-                    b.appendBool( "empty", ctx.db()->isEmpty() );
+                    Client::ReadContext ctx( name );
+                    b.appendBool( "empty", ctx.ctx().db()->isEmpty() );
                 }
 
                 dbInfos.push_back( b.obj() );
@@ -1050,6 +1065,7 @@ namespace mongo {
         virtual bool adminOnly() const { return true; }
         virtual bool slaveOk() const { return false; }
         virtual LockType locktype() const { return WRITE; }
+        virtual bool lockGlobally() const { return true; }
 
         CmdCloseAllDatabases() : Command( "closeAllDatabases" ) {}
         bool run(const string& dbname , BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
@@ -1118,7 +1134,7 @@ namespace mongo {
                 cursor->advance();
 
                 BSONElement ne = obj["n"];
-                assert(ne.isNumber());
+                verify(ne.isNumber());
                 int myn = ne.numberInt();
                 if ( n != myn ) {
                     log() << "should have chunk: " << n << " have:" << myn << endl;
@@ -1270,7 +1286,7 @@ namespace mongo {
 
     namespace {
         long long getIndexSizeForCollection(string db, string ns, BSONObjBuilder* details=NULL, int scale = 1 ) {
-            d.dbMutex.assertAtLeastReadLocked();
+            Lock::assertAtLeastReadLocked(ns);
 
             NamespaceDetails * nsd = nsdetails( ns.c_str() );
             if ( ! nsd )
@@ -1344,16 +1360,17 @@ namespace mongo {
             result.append( "numExtents" , numExtents );
             result.append( "nindexes" , nsd->nIndexes );
             result.append( "lastExtentSize" , nsd->lastExtentSize / scale );
-            result.append( "paddingFactor" , nsd->paddingFactor );
-            result.append( "flags" , nsd->flags );
+            result.append( "paddingFactor" , nsd->paddingFactor() );
+            result.append( "systemFlags" , nsd->systemFlags() );
+            result.append( "userFlags" , nsd->userFlags() );
 
             BSONObjBuilder indexSizes;
             result.appendNumber( "totalIndexSize" , getIndexSizeForCollection(dbname, ns, &indexSizes, scale) / scale );
             result.append("indexSizes", indexSizes.obj());
 
-            if ( nsd->capped ) {
-                result.append( "capped" , nsd->capped );
-                result.append( "max" , nsd->max );
+            if ( nsd->isCapped() ) {
+                result.append( "capped" , nsd->isCapped() );
+                result.appendNumber( "max" , nsd->maxCappedDocs() );
             }
 
             if ( verbose )
@@ -1362,6 +1379,36 @@ namespace mongo {
             return true;
         }
     } cmdCollectionStats;
+
+    class CollectionModCommand : public Command {
+    public:
+        CollectionModCommand() : Command( "collMod" ){}
+        virtual bool slaveOk() const { return true; }
+        virtual LockType locktype() const { return WRITE; }
+        virtual bool logTheOp() { return true; }
+        
+        bool run(const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+            string ns = dbname + "." + jsobj.firstElement().valuestr();
+            Client::Context ctx( ns );
+            NamespaceDetails* nsd = nsdetails( ns.c_str() );
+            if ( ! nsd ) {
+                errmsg = "ns does not exist";
+                return false;
+            }
+
+            if ( jsobj["usePowerOf2Sizes"].type() ) {
+                result.appendBool( "usePowerOf2Sizes_old" , nsd->isUserFlagSet( NamespaceDetails::Flag_UsePowerOf2Sizes ) );
+                if ( jsobj["usePowerOf2Sizes"].trueValue() ) {
+                    nsd->setUserFlag( NamespaceDetails::Flag_UsePowerOf2Sizes );
+                }
+                else {
+                    nsd->clearUserFlag( NamespaceDetails::Flag_UsePowerOf2Sizes );
+                }
+            }
+
+            return true;
+        }
+    } collectionModCommand;
 
     class DBStats : public Command {
     public:
@@ -1509,6 +1556,8 @@ namespace mongo {
         CmdConvertToCapped() : Command( "convertToCapped" ) {}
         virtual bool slaveOk() const { return false; }
         virtual LockType locktype() const { return WRITE; }
+        // calls renamecollection which does a global lock, so we must too:
+        virtual bool lockGlobally() const { return true; }
         virtual void help( stringstream &help ) const {
             help << "{ convertToCapped:<fromCollectionName>, size:<sizeInBytes> }";
         }
@@ -1589,7 +1638,7 @@ namespace mongo {
         virtual bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
 
             AuthenticationInfo *ai = cc().getAuthenticationInfo();
-            if ( ! ai->isLocalHost ) {
+            if ( ! ai->isLocalHost() ) {
                 errmsg = "godinsert only works locally";
                 return false;
             }
@@ -1600,7 +1649,7 @@ namespace mongo {
             string ns = dbname + "." + coll;
             BSONObj obj = cmdObj[ "obj" ].embeddedObjectUserCheck();
             {
-                dblock lk;
+                Lock::DBWrite lk(ns);
                 Client::Context ctx( ns );
                 theDataFileMgr.insertWithObjMod( ns.c_str(), obj, true );
             }
@@ -1629,7 +1678,7 @@ namespace mongo {
             BSONObjBuilder bb( result.subobjStart( "collections" ) );
             for ( list<string>::iterator i=colls.begin(); i != colls.end(); i++ ) {
                 string c = *i;
-                if ( c.find( ".system.profil" ) != string::npos )
+                if ( c.find( ".system.profile" ) != string::npos )
                     continue;
 
                 shared_ptr<Cursor> cursor;
@@ -1655,7 +1704,7 @@ namespace mongo {
                 else if ( c.find( ".system." ) != string::npos ) {
                     continue;
                 }
-                else if ( nsd->capped ) {
+                else if ( nsd->isCapped() ) {
                     cursor = findTableScan( c.c_str() , BSONObj() );
                 }
                 else {
@@ -1712,11 +1761,11 @@ namespace mongo {
             if ( cmdObj["secs"].isNumber() )
                 secs = cmdObj["secs"].numberInt();
             if( cmdObj.getBoolField("w") ) {
-                writelock lk("");
+                Lock::GlobalWrite lk;
                 sleepsecs(secs);
             }
             else {
-                readlock lk("");
+                Lock::GlobalRead lk;
                 sleepsecs(secs);
             }
             return true;
@@ -1757,6 +1806,7 @@ namespace mongo {
         virtual bool slaveOk() const { return false; }
         virtual LockType locktype() const { return WRITE; }
         virtual bool requiresAuth() { return true; }
+        virtual bool logTheOp() { return true; }
         virtual bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             string coll = cmdObj[ "emptycapped" ].valuestrsafe();
             uassert( 13428, "emptycapped must specify a collection", !coll.empty() );
@@ -1813,7 +1863,7 @@ namespace mongo {
 
         AuthenticationInfo *ai = client.getAuthenticationInfo();
 
-        if( c->adminOnly() && c->localHostOnlyIfNoAuth( cmdObj ) && noauth && !ai->isLocalHost ) {
+        if( c->adminOnly() && c->localHostOnlyIfNoAuth( cmdObj ) && noauth && !ai->isLocalHost() ) {
             result.append( "errmsg" ,
                            "unauthorized: this command must run from localhost when running db without auth" );
             log() << "command denied: " << cmdObj.toString() << endl;
@@ -1863,6 +1913,8 @@ namespace mongo {
 
         bool retval = false;
         if ( c->locktype() == Command::NONE ) {
+            verify( !c->lockGlobally() );
+
             // we also trust that this won't crash
             retval = true;
 
@@ -1881,15 +1933,30 @@ namespace mongo {
         }
         else if( c->locktype() != Command::WRITE ) { 
             // read lock
-            assert( ! c->logTheOp() );
+            verify( ! c->logTheOp() );
             string ns = c->parseNs(dbname, cmdObj);
+            scoped_ptr<Lock::GlobalRead> lk;
+            if( c->lockGlobally() )
+                lk.reset( new Lock::GlobalRead() );
             Client::ReadContext ctx( ns , dbpath, c->requiresAuth() ); // read locks
             client.curop()->ensureStarted();
             retval = _execCommand(c, dbname , cmdObj , queryOptions, result , fromRepl );
         }
         else {
             dassert( c->locktype() == Command::WRITE );
-            writelock lk;
+            bool global = c->lockGlobally();
+            DEV {
+                if( !global && Lock::isW() ) { 
+                    log() << "\ndebug have W lock but w would suffice for command " << c->name << endl;
+                }
+                if( global && Lock::isLocked() == 'w' ) { 
+                    // can't go w->W
+                    log() << "need glboal W lock but already have w on command : " << cmdObj.toString() << endl;
+                }
+            }
+            scoped_ptr<Lock::ScopedLock> lk( global ? 
+                                             static_cast<Lock::ScopedLock*>( new Lock::GlobalWrite() ) :
+                                             static_cast<Lock::ScopedLock*>( new Lock::DBWrite( dbname ) ) );
             client.curop()->ensureStarted();
             Client::Context ctx( dbname , dbpath , c->requiresAuth() );
             retval = _execCommand(c, dbname , cmdObj , queryOptions, result , fromRepl );

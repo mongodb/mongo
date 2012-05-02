@@ -29,8 +29,9 @@ namespace mongo {
         */
         class Task : private BackgroundJob {
         protected:
+            virtual void setUp();  // Override to perform any do-once work for the task.
             virtual void doWork() = 0;                  // implement the task here.
-            virtual string name() const = 0;            // name the threada
+            virtual string name() const = 0;            // name the thread
         public:
             Task();
 

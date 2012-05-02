@@ -50,6 +50,7 @@ namespace mongo {
         NamespaceString _ns;
         static map<string, unsigned> dbsInProg;
         static set<string> nsInProg;
+        static SimpleMutex m;
     };
 
 } // namespace mongo

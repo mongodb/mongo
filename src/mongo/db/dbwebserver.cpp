@@ -35,8 +35,6 @@
 #include "../util/admin_access.h"
 #include "dbwebserver.h"
 #include <boost/date_time/posix_time/posix_time.hpp>
-#undef assert
-#define assert MONGO_assert
 
 namespace mongo {
 
@@ -407,8 +405,8 @@ namespace mongo {
                 string cmd = commands[i];
 
                 Command * c = Command::findCommand( cmd );
-                assert( c );
-                assert( c->locktype() == 0 );
+                verify( c );
+                verify( c->locktype() == 0 );
 
                 BSONObj co;
                 {
@@ -498,9 +496,9 @@ namespace mongo {
                              vector<string>& headers,  const SockAddr &from ) {
             string cmd;
             bool text = false;
-            assert( _cmd( url , cmd , text, params ) );
+            verify( _cmd( url , cmd , text, params ) );
             Command * c = _cmd( cmd );
-            assert( c );
+            verify( c );
 
             BSONObj cmdObj = BSON( cmd << 1 );
             Client& client = cc();

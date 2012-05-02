@@ -51,7 +51,7 @@ namespace ReplSetTests {
         DBDirectClient *client() const { return &client_; }
 
         static void insert( const BSONObj &o, bool god = false ) {
-            dblock lk;
+            Lock::DBWrite lk(ns());
             Client::Context ctx( ns() );
             theDataFileMgr.insert( ns(), o.objdata(), o.objsize(), god );
         }
@@ -92,10 +92,15 @@ namespace ReplSetTests {
     class TestInitApplyOp : public Base {
     public:
         void run() {
-            writelock lk("");
+            Lock::GlobalWrite lk;
 
-            OpTime o1 = OpTime::now();
-            OpTime o2 = OpTime::now();
+            OpTime o1,o2;
+
+            {
+                mongo::mutex::scoped_lock lk2(OpTime::m);
+                o1 = OpTime::now(lk2);
+                o2 = OpTime::now(lk2);
+            }
 
             BSONObjBuilder b;
             b.appendTimestamp("ts", o2.asLL());
@@ -138,10 +143,10 @@ namespace ReplSetTests {
     class TestInitApplyOp2 : public Base {
     public:
         void run() {
-            writelock lk("");
+            Lock::GlobalWrite lk;
 
-            OpTime o1 = OpTime::now();
-            OpTime o2 = OpTime::now();
+            OpTime o1 = OpTime::_now();
+            OpTime o2 = OpTime::_now();
 
             BSONObjBuilder b;
             b.appendTimestamp("ts", o2.asLL());
@@ -159,13 +164,13 @@ namespace ReplSetTests {
             sync.applyOp(obj, o1);
 
             BSONObj fin = findOne();
-            assert(fin["x"].Number() == 456);
+            verify(fin["x"].Number() == 456);
         }
     };
 
     class CappedInitialSync : public Base {
         string _ns;
-        writelock _lk;
+        Lock::DBWrite _lk;
 
         string spec() const {
             return "{\"capped\":true,\"size\":512}";
@@ -188,14 +193,17 @@ namespace ReplSetTests {
 
         BSONObj updateFail() {
             BSONObjBuilder b;
-            b.appendTimestamp("ts", OpTime::now().asLL());
+            {
+                mongo::mutex::scoped_lock lk2(OpTime::m);
+                b.appendTimestamp("ts", OpTime::now(lk2).asLL());
+            }
             b.append("op", "u");
             b.append("o", BSON("$set" << BSON("x" << 456)));
             b.append("o2", BSON("_id" << 123 << "x" << 123));
             b.append("ns", _ns);
             BSONObj o = b.obj();
 
-            assert(!apply(o));
+            verify(!apply(o));
             return o;
         }
     public:
@@ -219,12 +227,12 @@ namespace ReplSetTests {
         }
 
         void run() {
-            writelock lk("");
+            Lock::DBWrite lk(_ns);
 
             BSONObj op = updateFail();
 
             Sync s("");
-            assert(!s.shouldRetry(op));
+            verify(!s.shouldRetry(op));
         }
     };
 
@@ -233,20 +241,23 @@ namespace ReplSetTests {
     class CappedUpdate : public CappedInitialSync {
         void updateSucceed() {
             BSONObjBuilder b;
-            b.appendTimestamp("ts", OpTime::now().asLL());
+            {
+                mongo::mutex::scoped_lock lk2(OpTime::m);
+                b.appendTimestamp("ts", OpTime::now(lk2).asLL());
+            }
             b.append("op", "u");
             b.append("o", BSON("$set" << BSON("x" << 789)));
             b.append("o2", BSON("x" << 456));
             b.append("ns", cappedNs());
 
-            assert(apply(b.obj()));
+            verify(apply(b.obj()));
         }
 
         void insert() {
             Client::Context ctx( cappedNs() );
             BSONObj o = BSON("x" << 456);
             DiskLoc loc = theDataFileMgr.insert( cappedNs().c_str(), o.objdata(), o.objsize(), false );
-            assert(!loc.isNull());
+            verify(!loc.isNull());
         }
     public:
         virtual ~CappedUpdate() {}
@@ -258,24 +269,27 @@ namespace ReplSetTests {
             }
 
             DBDirectClient client;
-            int count = client.count(cappedNs(), BSONObj());
-            assert(count > 1);
+            int count = (int) client.count(cappedNs(), BSONObj());
+            verify(count > 1);
 
             // Just to be sure, no _id index, right?
             Client::Context ctx(cappedNs());
             NamespaceDetails *nsd = nsdetails(cappedNs().c_str());
-            assert(nsd->findIdIndex() == -1);
+            verify(nsd->findIdIndex() == -1);
         }
     };
 
     class CappedInsert : public CappedInitialSync {
         void insertSucceed() {
             BSONObjBuilder b;
-            b.appendTimestamp("ts", OpTime::now().asLL());
+            {
+                mongo::mutex::scoped_lock lk2(OpTime::m);
+                b.appendTimestamp("ts", OpTime::now(lk2).asLL());
+            }
             b.append("op", "i");
             b.append("o", BSON("_id" << 123 << "x" << 456));
             b.append("ns", cappedNs());
-            assert(apply(b.obj()));
+            verify(apply(b.obj()));
         }
     public:
         virtual ~CappedInsert() {}
@@ -288,7 +302,7 @@ namespace ReplSetTests {
             // Just to be sure, no _id index, right?
             Client::Context ctx(cappedNs());
             NamespaceDetails *nsd = nsdetails(cappedNs().c_str());
-            assert(nsd->findIdIndex() == -1);
+            verify(nsd->findIdIndex() == -1);
         }
     };
 

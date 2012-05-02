@@ -35,7 +35,7 @@ namespace mongo {
         Member *m = rs->head();
         Member *p = 0;
         while( m ) {
-            DEV assert( m != rs->_self );
+            DEV verify( m != rs->_self );
             if( m->state().primary() && m->hbinfo().up() ) {
                 if( p ) {
                     two = true;
@@ -98,8 +98,14 @@ namespace mongo {
         const Member *primary = rs->box.getPrimary();
         
         if (primary && highestPriority &&
-            highestPriority->config().priority > primary->config().priority) {
-            log() << "stepping down " << primary->fullName() << endl;
+            highestPriority->config().priority > primary->config().priority &&
+            // if we're stepping down to allow another member to become primary, we
+            // better have another member (otherOp), and it should be up-to-date
+            otherOp != 0 && highestPriority->hbinfo().opTime.getSecs() >= otherOp - 10) {
+            log() << "stepping down " << primary->fullName() << " (priority " <<
+                primary->config().priority << "), " << highestPriority->fullName() <<
+                " is priority " << highestPriority->config().priority << " and " <<
+                (otherOp - highestPriority->hbinfo().opTime.getSecs()) << " seconds behind" << endl;
 
             if (primary->h().isSelf()) {
                 // replSetStepDown tries to acquire the same lock

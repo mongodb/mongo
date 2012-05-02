@@ -88,25 +88,38 @@ namespace mongo {
     class Where; // used for $where javascript eval
     class DiskLoc;
 
-    struct MatchDetails {
-        MatchDetails() {
-            reset();
+    /** Reports information about a match request. */
+    class MatchDetails {
+    public:
+        MatchDetails();
+        void resetOutput();
+        string toString() const;
+
+        /** Request that an elemMatchKey be recorded. */
+        void requestElemMatchKey() { _elemMatchKeyRequested = true; }
+        
+        bool needRecord() const { return _elemMatchKeyRequested; }
+        
+        bool hasLoadedRecord() const { return _loadedRecord; }
+        bool hasElemMatchKey() const { return _elemMatchKeyFound; }
+        string elemMatchKey() const {
+            verify( hasElemMatchKey() );
+            return _elemMatchKey;
         }
 
-        void reset() {
-            _loadedObject = false;
-            _elemMatchKey = 0;
+        void setLoadedRecord( bool loadedRecord ) { _loadedRecord = loadedRecord; }
+        void setElemMatchKey( const string &elemMatchKey ) {
+            if ( _elemMatchKeyRequested ) {
+                _elemMatchKeyFound = true;
+                _elemMatchKey = elemMatchKey;
+            }
         }
-
-        string toString() const {
-            stringstream ss;
-            ss << "loadedObject: " << _loadedObject << " ";
-            ss << "elemMatchKey: " << ( _elemMatchKey ? _elemMatchKey : "NULL" ) << " ";
-            return ss.str();
-        }
-
-        bool _loadedObject;
-        const char * _elemMatchKey; // warning, this may go out of scope if matched object does
+        
+    private:
+        bool _loadedRecord;
+        bool _elemMatchKeyRequested;
+        bool _elemMatchKeyFound;
+        string _elemMatchKey;
     };
 
     /* Match BSON objects against a query pattern.
@@ -149,6 +162,27 @@ namespace mongo {
 
         bool matches(const BSONObj& j, MatchDetails * details = 0 ) const;
 
+#ifdef MONGO_LATER_SERVER_4644
+        class FieldSink {
+        public:
+            virtual ~FieldSink() {};
+            virtual void referenceField(const string &fieldPath) = 0;
+        };
+
+        /**
+           Visit all of the fields that are referenced by this Matcher
+           (and any descendants).
+
+           This can be used to gather a list of all the references made by
+           this matcher.  The implementation of this parallels that of
+           matches() above.
+
+           @param pSink a FieldSink that the caller will use to gather or
+             process the references
+         */
+        void visitReferences(FieldSink *pSink) const;
+#endif /* MONGO_LATER_SERVER_4644 */
+
         bool atomic() const { return _atomic; }
 
         string toString() const {
@@ -177,7 +211,7 @@ namespace mongo {
 //            return ( ( basics.size() + nRegex ) < 2 ) && !where && !_orMatchers.size() && !_norMatchers.size();
         }
 
-	const BSONObj *getQuery() const { return &_jsobj; };
+        const BSONObj *getQuery() const { return &_jsobj; };
 
     private:
         /**
@@ -235,8 +269,7 @@ namespace mongo {
     // If match succeeds on index key, then attempt to match full document.
     class CoveredIndexMatcher : boost::noncopyable {
     public:
-        CoveredIndexMatcher(const BSONObj &pattern, const BSONObj &indexKeyPattern , bool alwaysUseRecord=false );
-        bool matches(const BSONObj &o) { return _docMatcher->matches( o ); }
+        CoveredIndexMatcher(const BSONObj &pattern, const BSONObj &indexKeyPattern);
         bool matchesWithSingleKeyIndex(const BSONObj &key, const DiskLoc &recLoc , MatchDetails * details = 0 ) {
             return matches( key, recLoc, details, true );   
         }
@@ -258,16 +291,16 @@ namespace mongo {
             _docMatcher->popOrClause();
         }
 
-        CoveredIndexMatcher *nextClauseMatcher( const BSONObj &indexKeyPattern, bool alwaysUseRecord=false ) {
-            return new CoveredIndexMatcher( _docMatcher, indexKeyPattern, alwaysUseRecord );
+        CoveredIndexMatcher *nextClauseMatcher( const BSONObj &indexKeyPattern ) {
+            return new CoveredIndexMatcher( _docMatcher, indexKeyPattern );
         }
 
         string toString() const;
 
     private:
         bool matches(const BSONObj &key, const DiskLoc &recLoc , MatchDetails * details = 0 , bool keyUsable = true );
-        CoveredIndexMatcher(const shared_ptr< Matcher > &docMatcher, const BSONObj &indexKeyPattern , bool alwaysUseRecord=false );
-        void init( bool alwaysUseRecord );
+        CoveredIndexMatcher(const shared_ptr< Matcher > &docMatcher, const BSONObj &indexKeyPattern);
+        void init();
         shared_ptr< Matcher > _docMatcher;
         Matcher _keyMatcher;
 

@@ -40,7 +40,7 @@ namespace mongo {
             conn = direct.get();
         }
         else {
-            scoped.reset( new ScopedDbConnection( configServer ) );
+            scoped.reset( new ScopedDbConnection( configServer, 30.0 ) );
             conn = scoped->get();
         }
 
@@ -85,7 +85,7 @@ namespace mongo {
     }
 
     void ShardChunkManager::_fillChunks( DBClientCursorInterface* cursor ) {
-        assert( cursor );
+        verify( cursor );
 
         ShardChunkVersion version;
         while ( cursor->more() ) {
@@ -129,7 +129,7 @@ namespace mongo {
             min = currMin;
             max = currMax;
         }
-        assert( ! min.isEmpty() );
+        verify( ! min.isEmpty() );
 
         _rangesMap.insert( make_pair( min , max ) );
     }
@@ -139,7 +139,7 @@ namespace mongo {
     }
     
     bool ShardChunkManager::belongsToMe( ClientCursor* cc ) const {
-        verify( 15851 , cc );
+        verify( cc );
         if ( _rangesMap.size() == 0 )
             return false;
         
@@ -173,8 +173,8 @@ namespace mongo {
     }
 
     bool ShardChunkManager::getNextChunk( const BSONObj& lookupKey, BSONObj* foundMin , BSONObj* foundMax ) const {
-        assert( foundMin );
-        assert( foundMax );
+        verify( foundMin );
+        verify( foundMax );
         *foundMin = BSONObj();
         *foundMax = BSONObj();
 

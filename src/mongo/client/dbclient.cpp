@@ -16,17 +16,23 @@
  */
 
 #include "pch.h"
-#include "dbclient.h"
-#include "../bson/util/builder.h"
-#include "../db/jsobj.h"
-#include "../db/json.h"
-#include "../db/instance.h"
-#include "../util/md5.hpp"
-#include "../db/dbmessage.h"
-#include "../db/cmdline.h"
-#include "connpool.h"
-#include "../s/util.h"
-#include "syncclusterconnection.h"
+
+#include "mongo/bson/util/builder.h"
+#include "mongo/client/constants.h"
+#include "mongo/client/dbclient_rs.h"
+#include "mongo/client/dbclientcursor.h"
+#include "mongo/client/syncclusterconnection.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/json.h"
+#include "mongo/db/namespace-inl.h"
+#include "mongo/db/namespacestring.h"
+#include "mongo/s/util.h"
+#include "mongo/util/md5.hpp"
+
+#ifdef MONGO_SSL
+// TODO: Remove references to cmdline from the client.
+#include "mongo/db/cmdline.h"
+#endif  // defined MONGO_SSL
 
 namespace mongo {
 
@@ -103,7 +109,7 @@ namespace mongo {
             break;
         }
 
-        assert( 0 );
+        verify( 0 );
         return 0;
     }
 
@@ -143,14 +149,20 @@ namespace mongo {
         case SYNC:
             return "sync";
         }
-        assert(0);
+        verify(0);
         return "";
     }
 
 
+    Query::Query( const string &json ) : obj( fromjson( json ) ) {}
+
+    Query::Query( const char *json ) : obj( fromjson( json ) ) {}
+
+    Query& Query::hint(const string &jsonKeyPatt) { return hint( fromjson( jsonKeyPatt ) ); }
+
     Query& Query::where(const string &jscode, BSONObj scope) {
         /* use where() before sort() and hint() and explain(), else this will assert. */
-        assert( ! isComplex() );
+        verify( ! isComplex() );
         BSONObjBuilder b;
         b.appendElements(obj);
         b.appendWhere(jscode, scope);
@@ -253,13 +265,18 @@ namespace mongo {
 
     enum QueryOptions DBClientWithCommands::availableOptions() {
         if ( !_haveCachedAvailableOptions ) {
-            BSONObj ret;
-            if ( runCommand( "admin", BSON( "availablequeryoptions" << 1 ), ret ) ) {
-                _cachedAvailableOptions = ( enum QueryOptions )( ret.getIntField( "options" ) );
-            }
+            _cachedAvailableOptions = _lookupAvailableOptions();
             _haveCachedAvailableOptions = true;
         }
         return _cachedAvailableOptions;
+    }
+
+    enum QueryOptions DBClientWithCommands::_lookupAvailableOptions() {
+        BSONObj ret;
+        if ( runCommand( "admin", BSON( "availablequeryoptions" << 1 ), ret ) ) {
+            return QueryOptions( ret.getIntField( "options" ) );
+        }
+        return QueryOptions(0);
     }
 
     inline bool DBClientWithCommands::runCommand(const string &dbname, const BSONObj& cmd, BSONObj &info, int options) {
@@ -376,7 +393,7 @@ namespace mongo {
         }
         {
             BSONElement e = info.getField("nonce");
-            assert( e.type() == String );
+            verify( e.type() == String );
             nonce = e.valuestr();
         }
 
@@ -424,7 +441,7 @@ namespace mongo {
     }
 
     bool DBClientWithCommands::createCollection(const string &ns, long long size, bool capped, int max, BSONObj *info) {
-        assert(!capped||size);
+        verify(!capped||size);
         BSONObj o;
         if ( info == 0 )    info = &o;
         BSONObjBuilder b;
@@ -574,8 +591,11 @@ namespace mongo {
 
         uassert( 10276 ,  str::stream() << "DBClientBase::findN: transport error: " << getServerAddress() << " ns: " << ns << " query: " << query.toString(), c.get() );
 
-        if ( c->hasResultFlag( ResultFlag_ShardConfigStale ) )
-            throw RecvStaleConfigException( ns , "findN stale config" );
+        if ( c->hasResultFlag( ResultFlag_ShardConfigStale ) ){
+            BSONObj error;
+            c->peekError( &error );
+            throw RecvStaleConfigException( "findN stale config", error );
+        }
 
         for( int i = 0; i < nToReturn; i++ ) {
             if ( !c->more() )
@@ -700,33 +720,55 @@ namespace mongo {
         boost::function<void(const BSONObj &)> _f;
     };
 
-    unsigned long long DBClientConnection::query( boost::function<void(const BSONObj&)> f, const string& ns, Query query, const BSONObj *fieldsToReturn, int queryOptions ) {
+    unsigned long long DBClientBase::query( boost::function<void(const BSONObj&)> f, const string& ns, Query query, const BSONObj *fieldsToReturn, int queryOptions ) {
         DBClientFunConvertor fun;
         fun._f = f;
         boost::function<void(DBClientCursorBatchIterator &)> ptr( fun );
-        return DBClientConnection::query( ptr, ns, query, fieldsToReturn, queryOptions );
+        return this->query( ptr, ns, query, fieldsToReturn, queryOptions );
     }
 
-    unsigned long long DBClientConnection::query( boost::function<void(DBClientCursorBatchIterator &)> f, const string& ns, Query query, const BSONObj *fieldsToReturn, int queryOptions ) {
+    unsigned long long DBClientBase::query(
+            boost::function<void(DBClientCursorBatchIterator &)> f,
+            const string& ns,
+            Query query,
+            const BSONObj *fieldsToReturn,
+            int queryOptions ) {
+
         // mask options
         queryOptions &= (int)( QueryOption_NoCursorTimeout | QueryOption_SlaveOk );
+
+        auto_ptr<DBClientCursor> c( this->query(ns, query, 0, 0, fieldsToReturn, queryOptions) );
+        uassert( 16090, "socket error for mapping query", c.get() );
+
         unsigned long long n = 0;
 
-        bool doExhaust = ( availableOptions() & QueryOption_Exhaust );
-        if ( doExhaust ) {
-            queryOptions |= (int)QueryOption_Exhaust;
+        while ( c->more() ) {
+            DBClientCursorBatchIterator i( *c );
+            f( i );
+            n += i.n();
         }
+        return n;
+    }
+
+    unsigned long long DBClientConnection::query(
+            boost::function<void(DBClientCursorBatchIterator &)> f,
+            const string& ns,
+            Query query,
+            const BSONObj *fieldsToReturn,
+            int queryOptions ) {
+
+        if ( ! ( availableOptions() & QueryOption_Exhaust ) ) {
+            return DBClientBase::query( f, ns, query, fieldsToReturn, queryOptions );
+        }
+
+        // mask options
+        queryOptions &= (int)( QueryOption_NoCursorTimeout | QueryOption_SlaveOk );
+        queryOptions |= (int)QueryOption_Exhaust;
+
         auto_ptr<DBClientCursor> c( this->query(ns, query, 0, 0, fieldsToReturn, queryOptions) );
         uassert( 13386, "socket error for mapping query", c.get() );
 
-        if ( !doExhaust ) {
-            while( c->more() ) {
-                DBClientCursorBatchIterator i( *c );
-                f( i );
-                n += i.n();
-            }
-            return n;
-        }
+        unsigned long long n = 0;
 
         try {
             while( 1 ) {
@@ -977,6 +1019,7 @@ namespace mongo {
                  an exception.  we should make it return void and just throw an exception anytime
                  it fails
         */
+        checkConnection();
         try {
             if ( !port().call(toSend, response) ) {
                 _failed = true;
@@ -1024,7 +1067,7 @@ namespace mongo {
         *host = _serverString;
 
         if ( clientSet && nReturned ) {
-            assert(data);
+            verify(data);
             BSONObj o(data);
             if ( isNotMasterErrorString( getErrField(o) ) ) {
                 clientSet->isntMaster();

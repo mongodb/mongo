@@ -6,7 +6,7 @@
 # description: Mongo is a scalable, document-oriented database.
 # processname: mongod
 # config: /etc/mongod.conf
-# pidfile: /var/run/mongo/mongo.pid
+# pidfile: /var/run/mongo/mongod.pid
 
 . /etc/rc.d/init.d/functions
 
@@ -23,17 +23,30 @@ SYSCONFIG="/etc/sysconfig/mongod"
 # shuts down the correct running pid, but that's unavailable in 1.8
 # for now.  This can go away when this script stops supporting 1.8.
 DBPATH=`awk -F= '/^dbpath=/{print $2}' "$CONFIGFILE"`
+PIDFILE=`awk -F= '/^dbpath\s=\s/{print $2}' "$CONFIGFILE"`
 mongod=${MONGOD-/usr/bin/mongod}
 
 MONGO_USER=mongod
 MONGO_GROUP=mongod
 
-. "$SYSCONFIG" || true
+if [ -f "$SYSCONFIG" ]; then
+    . "$SYSCONFIG"
+fi
+
+# Handle NUMA access to CPUs (SERVER-3574)
+# This verifies the existence of numactl as well as testing that the command works
+NUMACTL_ARGS="--interleave=all"
+if which numactl >/dev/null 2>/dev/null && numactl $NUMACTL_ARGS ls / >/dev/null 2>/dev/null
+then
+    NUMACTL="numactl $NUMACTL_ARGS"
+else
+    NUMACTL=""
+fi
 
 start()
 {
   echo -n $"Starting mongod: "
-  daemon --user "$MONGO_USER" $mongod $OPTIONS
+  daemon --user "$MONGO_USER" $NUMACTL $mongod $OPTIONS
   RETVAL=$?
   echo
   [ $RETVAL -eq 0 ] && touch /var/lock/subsys/mongod
@@ -42,7 +55,7 @@ start()
 stop()
 {
   echo -n $"Stopping mongod: "
-  killproc -p "$DBPATH"/mongod.lock -d 300 /usr/bin/mongod
+  killproc -p "$PIDFILE" -d 300 /usr/bin/mongod
   RETVAL=$?
   echo
   [ $RETVAL -eq 0 ] && rm -f /var/lock/subsys/mongod

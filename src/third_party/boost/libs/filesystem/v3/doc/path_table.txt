@@ -1,0 +1,50 @@
+# Paths for the reference.html Path Decomposition Table
+#
+# This is the input file for path_table, which generates the actual html
+#
+# Copyright Beman Dawes 2010
+#
+# Distributed under the Boost Software License, Version 1.0.
+# See www.boost.org/LICENSE_1_0.txt
+#
+# Note that an empty line is treated as input rather than as a comment
+
+.
+..
+foo
+/
+/foo
+foo/
+/foo/
+foo/bar
+/foo/bar
+//net
+//net/foo
+///foo///
+///foo///bar
+/.
+./
+/..
+../
+foo/.
+foo/..
+foo/./
+foo/./bar
+foo/..
+foo/../
+foo/../bar
+c:
+c:/
+c:foo
+c:/foo
+c:foo/
+c:/foo/
+c:/foo/bar
+prn:
+c:\
+c:foo
+c:\foo
+c:foo\
+c:\foo\
+c:\foo/
+c:/foo\bar

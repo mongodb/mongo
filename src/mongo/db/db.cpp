@@ -20,7 +20,7 @@
 #include "db.h"
 #include "introspect.h"
 #include "repl.h"
-#include "../util/unittest.h"
+#include "../util/startup_test.h"
 #include "../util/file_allocator.h"
 #include "../util/background.h"
 #include "../util/text.h"
@@ -42,12 +42,13 @@
 #include "restapi.h"
 #include "dbwebserver.h"
 #include "dur.h"
-#include "concurrency.h"
+#include "d_concurrency.h"
 #include "../s/d_writeback.h"
 #include "d_globals.h"
 
 #if defined(_WIN32)
 # include "../util/ntservice.h"
+# include <DbgHelp.h>
 #else
 # include <sys/file.h>
 #endif
@@ -74,6 +75,14 @@ namespace mongo {
     void startReplication();
     void exitCleanly( ExitCode code );
 
+#ifdef _WIN32
+    ntServiceDefaultStrings defaultServiceStrings = {
+        L"MongoDB",
+        L"Mongo DB",
+        L"Mongo DB Server"
+    };
+#endif
+
     CmdLine cmdLine;
     static bool scriptingEnabled = true;
     bool noHttpInterface = false;
@@ -91,7 +100,7 @@ namespace mongo {
 
     struct MyStartupTests {
         MyStartupTests() {
-            assert( sizeof(OID) == 12 );
+            verify( sizeof(OID) == 12 );
         }
     } mystartupdbcpp;
 
@@ -106,12 +115,12 @@ namespace mongo {
         sleepsecs(1);
         unsigned n = 0;
         auto f = [&n](const BSONObj& o) {
-            assert( o.valid() );
+            verify( o.valid() );
             //cout << o << endl;
             n++;
             bool testClosingSocketOnError = false;
             if( testClosingSocketOnError )
-                assert(false);
+                verify(false);
         };
         DBClientConnection db(false);
         db.connect("localhost");
@@ -160,7 +169,8 @@ namespace mongo {
     public:
         virtual void connected( AbstractMessagingPort* p ) {
             Client& c = Client::initThread("conn", p);
-            c.getAuthenticationInfo()->isLocalHost = p->remote().isLocalHost();
+            if( p->remote().isLocalHost() )
+                c.getAuthenticationInfo()->setIsALocalHostConnectionWithSpecialAuthPowers();
         }
 
         virtual void process( Message& m , AbstractMessagingPort* port , LastError * le) {
@@ -173,7 +183,13 @@ namespace mongo {
                 lastError.startRequest( m , le );
 
                 DbResponse dbresponse;
-                assembleResponse( m, dbresponse, port->remote() );
+                try {
+                    assembleResponse( m, dbresponse, port->remote() );
+                }
+                catch ( const ClockSkewException & ) {
+                    log() << "ClockSkewException - shutting down" << endl;
+                    exitCleanly( EXIT_CLOCK_SKEW );
+                }
 
                 if ( dbresponse.response ) {
                     port->reply(m, *dbresponse.response, dbresponse.responseTo);
@@ -182,7 +198,7 @@ namespace mongo {
                         QueryResult *qr = (QueryResult *) header;
                         long long cursorid = qr->cursorId;
                         if( cursorid ) {
-                            assert( dbresponse.exhaust && *dbresponse.exhaust != 0 );
+                            verify( dbresponse.exhaust && *dbresponse.exhaust != 0 );
                             string ns = dbresponse.exhaust; // before reset() free's it...
                             m.reset();
                             BufBuilder b(512);
@@ -238,8 +254,8 @@ namespace mongo {
         static DBDirectClient db;
 
         if ( h->version == 4 && h->versionMinor == 4 ) {
-            assert( PDFILE_VERSION == 4 );
-            assert( PDFILE_VERSION_MINOR == 5 );
+            verify( PDFILE_VERSION == 4 );
+            verify( PDFILE_VERSION_MINOR == 5 );
 
             list<string> colls = db.getCollectionNames( dbName );
             for ( list<string>::iterator i=colls.begin(); i!=colls.end(); i++) {
@@ -268,10 +284,10 @@ namespace mongo {
         Client::GodScope gs;
         log(1) << "enter repairDatabases (to check pdfile version #)" << endl;
 
-        //assert(checkNsFilesOnLoad);
+        //verify(checkNsFilesOnLoad);
         checkNsFilesOnLoad = false; // we are mainly just checking the header - don't scan the whole .ns file for every db here.
 
-        dblock lk;
+        Lock::GlobalWrite lk;
         vector< string > dbNames;
         getDatabaseNames( dbNames );
         for ( vector< string >::iterator i = dbNames.begin(); i != dbNames.end(); ++i ) {
@@ -296,7 +312,7 @@ namespace mongo {
                     // QUESTION: Repair even if file format is higher version than code?
                     log() << "\t starting upgrade" << endl;
                     string errmsg;
-                    assert( doDBUpgrade( dbName , errmsg , h ) );
+                    verify( doDBUpgrade( dbName , errmsg , h ) );
                 }
                 else {
                     log() << "\t Not upgrading, exiting" << endl;
@@ -335,7 +351,7 @@ namespace mongo {
     }
 
     void checkIfReplMissingFromCommandLine() {
-        writelock lk; // _openAllFiles is false at this point, so this is helpful for the query below to work as you can't open files when readlocked
+        Lock::GlobalWrite lk; // _openAllFiles is false at this point, so this is helpful for the query below to work as you can't open files when readlocked
         if( !cmdLine.usingReplSets() ) { 
             Client::GodScope gs;
             DBDirectClient c;
@@ -351,7 +367,7 @@ namespace mongo {
     }
 
     void clearTmpCollections() {
-        writelock lk; // _openAllFiles is false at this point, so this is helpful for the query below to work as you can't open files when readlocked
+        Lock::GlobalWrite lk; // _openAllFiles is false at this point, so this is helpful for the query below to work as you can't open files when readlocked
         Client::GodScope gs;
         vector< string > toDelete;
         DBDirectClient cli;
@@ -378,6 +394,7 @@ namespace mongo {
     public:
         string name() const { return "DataFileSync"; }
         void run() {
+            Client::initThread( name().c_str() );
             if( cmdLine.syncdelay == 0 )
                 log() << "warning: --syncdelay 0 is not recommended and can have strange performance" << endl;
             else if( cmdLine.syncdelay == 1 )
@@ -473,7 +490,7 @@ namespace mongo {
 
         FileAllocator::get()->start();
 
-        MONGO_BOOST_CHECK_EXCEPTION_WITH_MSG( clearTmpFiles(), "clear tmp files" );
+        MONGO_ASSERT_ON_EXCEPTION_WITH_MSG( clearTmpFiles(), "clear tmp files" );
 
         dur::startup();
 
@@ -513,6 +530,13 @@ namespace mongo {
 #ifndef _WIN32
         CmdLine::launchOk();
 #endif
+
+        if( !noauth ) { 
+            // open admin db in case we need to use it later. TODO this is not the right way to 
+            // resolve this. 
+            Client::WriteContext c("admin",dbpath,false);
+        }
+
         listen(listenPort);
 
         // listen() will return when exit code closes its socket.
@@ -546,6 +570,7 @@ namespace mongo {
 #if defined(_WIN32)
     bool initService() {
         ServiceController::reportStatus( SERVICE_RUNNING );
+        log() << "Service running" << endl;
         initAndListen( cmdLine.port );
         return true;
     }
@@ -556,8 +581,6 @@ namespace mongo {
 using namespace mongo;
 
 #include <boost/program_options.hpp>
-#undef assert
-#define assert MONGO_assert
 
 namespace po = boost::program_options;
 
@@ -573,7 +596,6 @@ string arg_error_check(int argc, char* argv[]) {
 
 int main(int argc, char* argv[]) {
     static StaticObserver staticObserver;
-    doPreServerStartupInits();
     getcurns = ourgetns;
 
     po::options_description general_options("General options");
@@ -669,7 +691,6 @@ int main(int argc, char* argv[]) {
     ("opIdMem", "DEPRECATED")
     ;
 
-
     positional_options.add("command", 3);
     visible_options.add(general_options);
 #if defined(_WIN32)
@@ -736,9 +757,6 @@ int main(int argc, char* argv[]) {
                 // so '/' is safe 
                 dbpath = cmdLine.cwd + "/" + dbpath;
             }
-        }
-        else {
-            dbpath = "/data/db/";
         }
 #ifdef _WIN32
         if (dbpath.size() > 1 && dbpath[dbpath.size()-1] == '/') {
@@ -825,7 +843,7 @@ int main(int argc, char* argv[]) {
         }
         if (params.count("smallfiles")) {
             cmdLine.smallfiles = true;
-            assert( dur::DataLimitPerJournalFile >= 128 * 1024 * 1024 );
+            verify( dur::DataLimitPerJournalFile >= 128 * 1024 * 1024 );
             dur::DataLimitPerJournalFile = 128 * 1024 * 1024;
         }
         if (params.count("diaglog")) {
@@ -901,7 +919,7 @@ int main(int argc, char* argv[]) {
                 dbexit( EXIT_BADOPTIONS );
             }
             lenForNewNsFiles = x * 1024 * 1024;
-            assert(lenForNewNsFiles > 0);
+            verify(lenForNewNsFiles > 0);
         }
         if (params.count("oplogSize")) {
             long long x = params["oplogSize"].as<int>();
@@ -915,7 +933,7 @@ int main(int argc, char* argv[]) {
                 dbexit( EXIT_BADOPTIONS );
             }
             cmdLine.oplogSize = x * 1024 * 1024;
-            assert(cmdLine.oplogSize > 0);
+            verify(cmdLine.oplogSize > 0);
         }
         if (params.count("cacheSize")) {
             long x = params["cacheSize"].as<long>();
@@ -1024,22 +1042,6 @@ int main(int argc, char* argv[]) {
                     procPath = (str::stream() << "/proc/" << pid);
                     if (!boost::filesystem::exists(procPath))
                         failed = true;
-
-                    string exePath = procPath + "/exe";
-                    if (boost::filesystem::exists(exePath)){
-                        char buf[256];
-                        int ret = readlink(exePath.c_str(), buf, sizeof(buf)-1);
-                        buf[ret] = '\0'; // readlink doesn't terminate string
-                        if (ret == -1) {
-                            int e = errno;
-                            cerr << "Error resolving " << exePath << ": " << errnoWithDescription(e);
-                            failed = true;
-                        }
-                        else if (!endsWith(buf, "mongod")){
-                            cerr << "Process " << pid << " is running " << buf << " not mongod" << endl;
-                            ::exit(-1);
-                        }
-                    }
                 }
                 catch (const std::exception& e){
                     cerr << "Error reading pid from lock file [" << name << "]: " << e.what() << endl;
@@ -1069,11 +1071,15 @@ int main(int argc, char* argv[]) {
 #endif
 
 #if defined(_WIN32)
-        if (serviceParamsCheck( params, dbpath, argc, argv )) {
-            return 0;
+        vector<string> disallowedOptions;
+        if (serviceParamsCheck( params, dbpath, defaultServiceStrings, disallowedOptions, argc, argv )) {
+            return 0;   // this means that we are running as a service, and we won't
+                        // reach this statement until initService() has run and returned,
+                        // but it usually exits directly so we never actually get here
         }
+        // if we reach here, then we are not running as a service.  service installation
+        // exits directly and so never reaches here either.
 #endif
-
 
         if (sizeof(void*) == 4 && !journalExplicit){
             // trying to make this stand out more like startup warnings
@@ -1084,7 +1090,7 @@ int main(int argc, char* argv[]) {
 
     }
 
-    UnitTest::runTests();
+    StartupTest::runTests();
     initAndListen(cmdLine.port);
     dbexit(EXIT_CLEAN);
     return 0;
@@ -1131,7 +1137,7 @@ namespace mongo {
         rawOut( oss.str() );
 
         // Don't go through normal shutdown procedure. It may make things worse.
-        ::exit(EXIT_ABRUPT);
+        ::_exit(EXIT_ABRUPT);
 
     }
 
@@ -1141,28 +1147,29 @@ namespace mongo {
         if ( signal == SIGSEGV || signal == SIGBUS ) {
             oss << " access";
         } else {
-            oss << " operation";   
+            oss << " operation";
         }
         oss << " at address: " << siginfo->si_addr << " from thread: " << getThreadName() << endl;
         rawOut( oss.str() );
-        abruptQuit( signal );   
+        abruptQuit( signal );
     }
-        
+
     sigset_t asyncSignals;
     // The above signals will be processed by this thread only, in order to
     // ensure the db and log mutexes aren't held.
     void interruptThread() {
-        int x;
-        sigwait( &asyncSignals, &x );
-        log() << "got kill or ctrl c or hup signal " << x << " (" << strsignal( x ) << "), will terminate after current cmd ends" << endl;
+        int actualSignal;
+        sigwait( &asyncSignals, &actualSignal );
+        log() << "got signal " << actualSignal << " (" << strsignal( actualSignal )
+              << "), will terminate after current cmd ends" << endl;
         Client::initThread( "interruptThread" );
-        exitCleanly( EXIT_KILL );
+        exitCleanly( EXIT_CLEAN );
     }
 
     // this will be called in certain c++ error cases, for example if there are two active
     // exceptions
     void myterminate() {
-        rawOut( "terminate() called, printing stack:" );
+        rawOut( "terminate() called, printing stack (if implemented for platform):" );
         printStackTrace();
         ::abort();
     }
@@ -1171,7 +1178,7 @@ namespace mongo {
     void my_new_handler() {
         rawOut( "out of memory, printing stack and exiting:" );
         printStackTrace();
-        ::exit(EXIT_ABRUPT);
+        ::_exit(EXIT_ABRUPT);
     }
 
     void setupSignals_ignoreHelper( int signal ) {}
@@ -1183,27 +1190,27 @@ namespace mongo {
         sigemptyset( &addrSignals.sa_mask );
         addrSignals.sa_flags = SA_SIGINFO;
        
-        assert( sigaction(SIGSEGV, &addrSignals, 0) == 0 );
-        assert( sigaction(SIGBUS, &addrSignals, 0) == 0 );
-        assert( sigaction(SIGILL, &addrSignals, 0) == 0 );
-        assert( sigaction(SIGFPE, &addrSignals, 0) == 0 );
+        verify( sigaction(SIGSEGV, &addrSignals, 0) == 0 );
+        verify( sigaction(SIGBUS, &addrSignals, 0) == 0 );
+        verify( sigaction(SIGILL, &addrSignals, 0) == 0 );
+        verify( sigaction(SIGFPE, &addrSignals, 0) == 0 );
         
-        assert( signal(SIGABRT, abruptQuit) != SIG_ERR );
-        assert( signal(SIGQUIT, abruptQuit) != SIG_ERR );
-        assert( signal(SIGPIPE, pipeSigHandler) != SIG_ERR );
+        verify( signal(SIGABRT, abruptQuit) != SIG_ERR );
+        verify( signal(SIGQUIT, abruptQuit) != SIG_ERR );
+        verify( signal(SIGPIPE, pipeSigHandler) != SIG_ERR );
 
         setupSIGTRAPforGDB();
 
         sigemptyset( &asyncSignals );
 
         if ( inFork )
-            assert( signal( SIGHUP , setupSignals_ignoreHelper ) != SIG_ERR );
+            verify( signal( SIGHUP , setupSignals_ignoreHelper ) != SIG_ERR );
         else
             sigaddset( &asyncSignals, SIGHUP );
 
         sigaddset( &asyncSignals, SIGINT );
         sigaddset( &asyncSignals, SIGTERM );
-        assert( pthread_sigmask( SIG_SETMASK, &asyncSignals, 0 ) == 0 );
+        verify( pthread_sigmask( SIG_SETMASK, &asyncSignals, 0 ) == 0 );
         boost::thread it( interruptThread );
 
         set_terminate( myterminate );
@@ -1252,29 +1259,91 @@ namespace mongo {
     }
 
     LPTOP_LEVEL_EXCEPTION_FILTER filtLast = 0;
-    ::HANDLE standardOut = GetStdHandle(STD_OUTPUT_HANDLE);
-    LONG WINAPI exceptionFilter(struct _EXCEPTION_POINTERS *ExceptionInfo) { 
-        {
-            // given the severity of the event we write to console in addition to the --logFile
-            // (rawOut writes to the logfile, if a special one were specified)
-            DWORD written;
-            WriteFile(standardOut, "unhandled windows exception\n", 20, &written, 0);
-            FlushFileBuffers(standardOut);
+
+    /* create a process dump.
+        To use, load up windbg.  Set your symbol and source path.
+        Open the crash dump file.  To see the crashing context, use .ecxr
+        */
+    void doMinidump(struct _EXCEPTION_POINTERS* exceptionInfo) {
+        LPCWSTR dumpFilename = L"mongo.dmp";
+        HANDLE hFile = CreateFileW(dumpFilename,
+            GENERIC_WRITE,
+            0,
+            NULL,
+            CREATE_ALWAYS,
+            FILE_ATTRIBUTE_NORMAL,
+            NULL);
+        if ( INVALID_HANDLE_VALUE == hFile ) {
+            DWORD lasterr = GetLastError();
+            log() << "failed to open minidump file " << toUtf8String(dumpFilename) << " : " 
+                  << errnoWithDescription( lasterr ) << endl;
+            return;
         }
 
-        DWORD ec = ExceptionInfo->ExceptionRecord->ExceptionCode;
-        if( ec == EXCEPTION_ACCESS_VIOLATION ) {
-            rawOut("access violation");
-        } 
-        else {
-            rawOut("unhandled windows exception");
-            char buf[64];
-            strcpy(buf, "ec=0x");
-            _ui64toa(ec, buf+5, 16);
-            rawOut(buf);
+        MINIDUMP_EXCEPTION_INFORMATION aMiniDumpInfo;
+        aMiniDumpInfo.ThreadId = GetCurrentThreadId();
+        aMiniDumpInfo.ExceptionPointers = exceptionInfo;
+        aMiniDumpInfo.ClientPointers = TRUE;
+
+        log() << "writing minidump dignostic file " << toUtf8String(dumpFilename) << endl;
+        BOOL bstatus = MiniDumpWriteDump(GetCurrentProcess(),
+            GetCurrentProcessId(),
+            hFile,
+            MiniDumpNormal,
+            &aMiniDumpInfo,
+            NULL,
+            NULL);
+        if ( FALSE == bstatus ) {
+            DWORD lasterr = GetLastError();
+            log() << "failed to create minidump : " 
+                  << errnoWithDescription( lasterr ) << endl;
         }
+
+        CloseHandle(hFile);
+    }
+
+    LONG WINAPI exceptionFilter( struct _EXCEPTION_POINTERS *excPointers ) {
+        char exceptionString[128];
+        sprintf_s( exceptionString, sizeof( exceptionString ),
+                ( excPointers->ExceptionRecord->ExceptionCode == EXCEPTION_ACCESS_VIOLATION ) ?
+                "(access violation)" : "0x%08X", excPointers->ExceptionRecord->ExceptionCode );
+        char addressString[32];
+        sprintf_s( addressString, sizeof( addressString ), "0x%p",
+                 excPointers->ExceptionRecord->ExceptionAddress );
+        log() << "*** unhandled exception " << exceptionString <<
+                " at " << addressString << ", terminating" << endl;
+        if ( excPointers->ExceptionRecord->ExceptionCode == EXCEPTION_ACCESS_VIOLATION ) {
+            ULONG acType = excPointers->ExceptionRecord->ExceptionInformation[0];
+            const char* acTypeString;
+            switch ( acType ) {
+            case 0:
+                acTypeString = "read from";
+                break;
+            case 1:
+                acTypeString = "write to";
+                break;
+            case 8:
+                acTypeString = "DEP violation at";
+                break;
+            default:
+                acTypeString = "unknown violation at";
+                break;
+            }
+            sprintf_s( addressString, sizeof( addressString ), " 0x%p",
+                     excPointers->ExceptionRecord->ExceptionInformation[1] );
+            log() << "*** access violation was a " << acTypeString << addressString << endl;
+        }
+
+        doMinidump(excPointers);
+
+        // In release builds, let dbexit() try to shut down cleanly
+#if !defined(_DEBUG)
+        dbexit( EXIT_UNCAUGHT, "unhandled exception" );
+#endif
+
+        // In debug builds, give debugger a chance to run
         if( filtLast ) 
-            return filtLast(ExceptionInfo);
+            return filtLast( excPointers );
         return EXCEPTION_EXECUTE_HANDLER;
     }
 

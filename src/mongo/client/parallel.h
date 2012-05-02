@@ -21,12 +21,11 @@
 
 #pragma once
 
-#include "../pch.h"
-#include "dbclient.h"
-#include "redef_macros.h"
-#include "../db/dbmessage.h"
-#include "../db/matcher.h"
-#include "../util/concurrency/mvar.h"
+#include "mongo/db/dbmessage.h"
+#include "mongo/db/matcher.h"
+#include "mongo/db/namespacestring.h"
+#include "mongo/s/util.h"
+#include "mongo/util/concurrency/mvar.h"
 
 namespace mongo {
 
@@ -375,7 +374,7 @@ namespace mongo {
 
         virtual void _explain( map< string,list<BSONObj> >& out );
 
-        void _markStaleNS( const NamespaceString& staleNS, bool& forceReload, bool& fullReload );
+        void _markStaleNS( const NamespaceString& staleNS, const StaleConfigException& e, bool& forceReload, bool& fullReload );
         void _handleStaleNS( const NamespaceString& staleNS, bool forceReload, bool fullReload );
 
         set<Shard> _qShards;
@@ -412,12 +411,12 @@ namespace mongo {
             bool isDone() const { return _done; }
 
             bool ok() const {
-                assert( _done );
+                verify( _done );
                 return _ok;
             }
 
             BSONObj result() const {
-                assert( _done );
+                verify( _done );
                 return _res;
             }
 
@@ -461,4 +460,3 @@ namespace mongo {
 
 }
 
-#include "undef_macros.h"

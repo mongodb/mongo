@@ -21,6 +21,7 @@
 #include "../util/base64.h"
 #include "../util/text.h"
 #include "../util/hex.h"
+#include "../db/namespacestring.h"
 
 #if( BOOST_VERSION >= 104200 )
 //#include <boost/uuid/uuid.hpp>
@@ -65,7 +66,7 @@ namespace mongo {
         CursorHolder( auto_ptr< DBClientCursor > &cursor, const shared_ptr< DBClientWithCommands > &connection ) :
             connection_( connection ),
             cursor_( cursor ) {
-            assert( cursor_.get() );
+            verify( cursor_.get() );
         }
         DBClientCursor *get() const { return cursor_.get(); }
     private:
@@ -81,7 +82,7 @@ namespace mongo {
 
     JSBool internal_cursor_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ) {
         uassert( 10236 ,  "no args to internal_cursor_constructor" , argc == 0 );
-        assert( JS_SetPrivate( cx , obj , 0 ) ); // just for safety
+        verify( JS_SetPrivate( cx , obj , 0 ) ); // just for safety
         return JS_TRUE;
     }
 
@@ -89,7 +90,7 @@ namespace mongo {
         CursorHolder * holder = (CursorHolder*)JS_GetPrivate( cx , obj );
         if ( holder ) {
             delete holder;
-            assert( JS_SetPrivate( cx , obj , 0 ) );
+            verify( JS_SetPrivate( cx , obj , 0 ) );
         }
     }
 
@@ -161,10 +162,10 @@ namespace mongo {
         Convertor c( cx );
 
         shared_ptr< DBClientWithCommands > client( createDirectClient() );
-        assert( JS_SetPrivate( cx , obj , (void*)( new shared_ptr< DBClientWithCommands >( client ) ) ) );
+        verify( JS_SetPrivate( cx , obj , (void*)( new shared_ptr< DBClientWithCommands >( client ) ) ) );
 
         jsval host = c.toval( "EMBEDDED" );
-        assert( JS_SetProperty( cx , obj , "host" , &host ) );
+        verify( JS_SetProperty( cx , obj , "host" , &host ) );
 
         return JS_TRUE;
     }
@@ -202,9 +203,9 @@ namespace mongo {
         	return JS_FALSE;
         }
 
-        assert( JS_SetPrivate( cx , obj , (void*)( new shared_ptr< DBClientWithCommands >( conn ) ) ) );
+        verify( JS_SetPrivate( cx , obj , (void*)( new shared_ptr< DBClientWithCommands >( conn ) ) ) );
         jsval host_val = c.toval( host.c_str() );
-        assert( JS_SetProperty( cx , obj , "host" , &host_val ) );
+        verify( JS_SetProperty( cx , obj , "host" , &host_val ) );
         return JS_TRUE;
 
     }
@@ -219,7 +220,7 @@ namespace mongo {
         shared_ptr< DBClientWithCommands > * connHolder = (shared_ptr< DBClientWithCommands >*)JS_GetPrivate( cx , obj );
         if ( connHolder ) {
             delete connHolder;
-            assert( JS_SetPrivate( cx , obj , 0 ) );
+            verify( JS_SetPrivate( cx , obj , 0 ) );
         }
     }
 
@@ -283,7 +284,7 @@ namespace mongo {
             }
             JSObject * mycursor = JS_NewObject( cx , &internal_cursor_class , 0 , 0 );
             CHECKNEWOBJECT( mycursor, cx, "internal_cursor_class" );
-            assert( JS_SetPrivate( cx , mycursor , new CursorHolder( cursor, *connHolder ) ) );
+            verify( JS_SetPrivate( cx , mycursor , new CursorHolder( cursor, *connHolder ) ) );
             *rval = OBJECT_TO_JSVAL( mycursor );
             return JS_TRUE;
         }
@@ -429,10 +430,10 @@ namespace mongo {
 
     JSBool db_collection_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ) {
         smuassert( cx ,  "db_collection_constructor wrong args" , argc == 4 );
-        assert( JS_SetProperty( cx , obj , "_mongo" , &(argv[0]) ) );
-        assert( JS_SetProperty( cx , obj , "_db" , &(argv[1]) ) );
-        assert( JS_SetProperty( cx , obj , "_shortName" , &(argv[2]) ) );
-        assert( JS_SetProperty( cx , obj , "_fullName" , &(argv[3]) ) );
+        verify( JS_SetProperty( cx , obj , "_mongo" , &(argv[0]) ) );
+        verify( JS_SetProperty( cx , obj , "_db" , &(argv[1]) ) );
+        verify( JS_SetProperty( cx , obj , "_shortName" , &(argv[2]) ) );
+        verify( JS_SetProperty( cx , obj , "_fullName" , &(argv[3]) ) );
 
         Convertor c(cx);
         if ( haveLocalShardingInfo( c.toString( argv[3] ) ) ) {
@@ -487,8 +488,8 @@ namespace mongo {
     JSObject * doCreateCollection( JSContext * cx , JSObject * db , const string& shortName ) {
         Convertor c(cx);
 
-        assert( c.hasProperty( db , "_mongo" ) );
-        assert( c.hasProperty( db , "_name" ) );
+        verify( c.hasProperty( db , "_mongo" ) );
+        verify( c.hasProperty( db , "_name" ) );
 
         JSObject * coll = JS_NewObject( cx , &db_collection_class , 0 , 0 );
         CHECKNEWOBJECT( coll, cx, "doCreateCollection" );
@@ -513,8 +514,15 @@ namespace mongo {
 
     JSBool db_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ) {
         smuassert( cx,  "wrong number of arguments to DB" , argc == 2 );
-        assert( JS_SetProperty( cx , obj , "_mongo" , &(argv[0]) ) );
-        assert( JS_SetProperty( cx , obj , "_name" , &(argv[1]) ) );
+
+        Convertor convertor( cx );
+        string dbName = convertor.toString( argv[1] );
+        string msg = str::stream() << "[" << dbName << "] is not a "
+                                   << "valid database name";
+        smuassert( cx, msg.c_str(), NamespaceString::validDBName( dbName ) );
+
+        verify( JS_SetProperty( cx , obj , "_mongo" , &(argv[0]) ) );
+        verify( JS_SetProperty( cx , obj , "_name" , &(argv[1]) ) );
 
         return JS_TRUE;
     }
@@ -585,7 +593,7 @@ namespace mongo {
         }
 
         jsval v = c.toval( oid.str().c_str() );
-        assert( JS_SetProperty( cx , obj , "str" , &v  ) );
+        verify( JS_SetProperty( cx , obj , "str" , &v  ) );
 
         return JS_TRUE;
     }
@@ -614,8 +622,8 @@ namespace mongo {
                 return JS_FALSE;
             }
 
-            assert( JS_SetProperty( cx , obj , "ns" , &(argv[0]) ) );
-            assert( JS_SetProperty( cx , obj , "id" , &(argv[1]) ) );
+            verify( JS_SetProperty( cx , obj , "ns" , &(argv[0]) ) );
+            verify( JS_SetProperty( cx , obj , "id" , &(argv[1]) ) );
             return JS_TRUE;
         }
         else {
@@ -647,15 +655,15 @@ namespace mongo {
         if ( argc == 2 ) {
             JSObject * o = JS_NewObject( cx , NULL , NULL, NULL );
             CHECKNEWOBJECT( o, cx, "dbref_constructor" );
-            assert( JS_SetProperty( cx, o , "$ref" , &argv[ 0 ] ) );
-            assert( JS_SetProperty( cx, o , "$id" , &argv[ 1 ] ) );
+            verify( JS_SetProperty( cx, o , "$ref" , &argv[ 0 ] ) );
+            verify( JS_SetProperty( cx, o , "$id" , &argv[ 1 ] ) );
             BSONObj bo = c.toObject( o );
-            assert( JS_SetPrivate( cx , obj , (void*)(new BSONHolder( bo.getOwned() ) ) ) );
+            verify( JS_SetPrivate( cx , obj , (void*)(new BSONHolder( bo.getOwned() ) ) ) );
             return JS_TRUE;
         }
         else {
             JS_ReportError( cx , "DBRef needs 2 arguments" );
-            assert( JS_SetPrivate( cx , obj , (void*)(new BSONHolder( BSONObj().getOwned() ) ) ) );
+            verify( JS_SetPrivate( cx , obj , (void*)(new BSONHolder( BSONObj().getOwned() ) ) ) );
             return JS_FALSE;
         }
     }
@@ -691,7 +699,7 @@ namespace mongo {
 
 zzz
 
-            assert( JS_SetPrivate( cx, obj, new BinDataHolder( buf, 16 ) ) );
+            verify( JS_SetPrivate( cx, obj, new BinDataHolder( buf, 16 ) ) );
             c.setProperty( obj, "len", c.toval( (double)16 ) );
             c.setProperty( obj, "type", c.toval( (double)3 ) );
 
@@ -706,7 +714,7 @@ zzz
     JSBool uuid_tostring(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {
         Convertor c(cx);
         void *holder = JS_GetPrivate( cx, obj );
-        assert( holder );
+        verify( holder );
         const char *data = ( ( BinDataHolder* )( holder ) )->c_;
         stringstream ss;
         ss << "UUID(\"" << toHex(data, 16);
@@ -720,7 +728,7 @@ zzz
         void *holder = JS_GetPrivate( cx, obj );
         if ( holder ) {
             delete ( BinDataHolder* )holder;
-            assert( JS_SetPrivate( cx , obj , 0 ) );
+            verify( JS_SetPrivate( cx , obj , 0 ) );
         }
     }
 
@@ -765,7 +773,7 @@ zzz
                 return JS_FALSE;
             }
 
-            assert( JS_SetPrivate( cx, obj, new BinDataHolder( decoded.data(), decoded.length() ) ) );
+            verify( JS_SetPrivate( cx, obj, new BinDataHolder( decoded.data(), decoded.length() ) ) );
             c.setProperty( obj, "len", c.toval( (double)decoded.length() ) );
             c.setProperty( obj, "type", c.toval( (double)type ) );
 
@@ -782,7 +790,7 @@ zzz
         int type = (int)c.getNumber( obj , "type" );
         int len = (int)c.getNumber( obj, "len" );
         void *holder = JS_GetPrivate( cx, obj );
-        assert( holder );
+        verify( holder );
         const char *data = ( ( BinDataHolder* )( holder ) )->c_;
         stringstream ss;
         ss << "BinData(" << type << ",\"";
@@ -796,7 +804,7 @@ zzz
         Convertor c(cx);
         int len = (int)c.getNumber( obj, "len" );
         void *holder = JS_GetPrivate( cx, obj );
-        assert( holder );
+        verify( holder );
         const char *data = ( ( BinDataHolder* )( holder ) )->c_;
         stringstream ss;
         base64::encode( ss, (const char *)data, len );
@@ -808,7 +816,7 @@ zzz
         Convertor c(cx);
         int len = (int)c.getNumber( obj, "len" );
         void *holder = JS_GetPrivate( cx, obj );
-        assert( holder );
+        verify( holder );
         const char *data = ( ( BinDataHolder* )( holder ) )->c_;
         stringstream ss;
         ss.setf (ios_base::hex , ios_base::basefield);
@@ -827,7 +835,7 @@ zzz
         void *holder = JS_GetPrivate( cx, obj );
         if ( holder ) {
             delete ( BinDataHolder* )holder;
-            assert( JS_SetPrivate( cx , obj , 0 ) );
+            verify( JS_SetPrivate( cx , obj , 0 ) );
         }
     }
 
@@ -1130,7 +1138,7 @@ zzz
             return JS_TRUE;
 
         jsval val = JSVAL_VOID;
-        assert( JS_CallFunctionName( cx , obj , "arrayAccess" , 1 , &id , &val ) );
+        verify( JS_CallFunctionName( cx , obj , "arrayAccess" , 1 , &id , &val ) );
         Convertor c(cx);
         c.setProperty( obj , c.toString( id ).c_str() , val );
         *objp = obj;
@@ -1148,31 +1156,31 @@ zzz
 
     void initMongoJS( SMScope * scope , JSContext * cx , JSObject * global , bool local ) {
 
-        assert( JS_InitClass( cx , global , 0 , &mongo_class , local ? mongo_local_constructor : mongo_external_constructor , 0 , 0 , mongo_functions , 0 , 0 ) );
+        verify( JS_InitClass( cx , global , 0 , &mongo_class , local ? mongo_local_constructor : mongo_external_constructor , 0 , 0 , mongo_functions , 0 , 0 ) );
 
-        assert( JS_InitClass( cx , global , 0 , &object_id_class , object_id_constructor , 0 , 0 , 0 , 0 , 0 ) );
-        assert( JS_InitClass( cx , global , 0 , &db_class , db_constructor , 2 , 0 , 0 , 0 , 0 ) );
-        assert( JS_InitClass( cx , global , 0 , &db_collection_class , db_collection_constructor , 4 , 0 , 0 , 0 , 0 ) );
-        assert( JS_InitClass( cx , global , 0 , &internal_cursor_class , internal_cursor_constructor , 0 , 0 , internal_cursor_functions , 0 , 0 ) );
-        assert( JS_InitClass( cx , global , 0 , &dbquery_class , dbquery_constructor , 0 , 0 , 0 , 0 , 0 ) );
-        assert( JS_InitClass( cx , global , 0 , &dbpointer_class , dbpointer_constructor , 0 , 0 , dbpointer_functions , 0 , 0 ) );
-        assert( JS_InitClass( cx , global , 0 , &bindata_class , bindata_constructor , 0 , 0 , bindata_functions , 0 , 0 ) );
-//        assert( JS_InitClass( cx , global , 0 , &uuid_class , uuid_constructor , 0 , 0 , uuid_functions , 0 , 0 ) );
+        verify( JS_InitClass( cx , global , 0 , &object_id_class , object_id_constructor , 0 , 0 , 0 , 0 , 0 ) );
+        verify( JS_InitClass( cx , global , 0 , &db_class , db_constructor , 2 , 0 , 0 , 0 , 0 ) );
+        verify( JS_InitClass( cx , global , 0 , &db_collection_class , db_collection_constructor , 4 , 0 , 0 , 0 , 0 ) );
+        verify( JS_InitClass( cx , global , 0 , &internal_cursor_class , internal_cursor_constructor , 0 , 0 , internal_cursor_functions , 0 , 0 ) );
+        verify( JS_InitClass( cx , global , 0 , &dbquery_class , dbquery_constructor , 0 , 0 , 0 , 0 , 0 ) );
+        verify( JS_InitClass( cx , global , 0 , &dbpointer_class , dbpointer_constructor , 0 , 0 , dbpointer_functions , 0 , 0 ) );
+        verify( JS_InitClass( cx , global , 0 , &bindata_class , bindata_constructor , 0 , 0 , bindata_functions , 0 , 0 ) );
+//        verify( JS_InitClass( cx , global , 0 , &uuid_class , uuid_constructor , 0 , 0 , uuid_functions , 0 , 0 ) );
 
-        assert( JS_InitClass( cx , global , 0 , &timestamp_class , timestamp_constructor , 0 , 0 , 0 , 0 , 0 ) );
-        assert( JS_InitClass( cx , global , 0 , &numberlong_class , numberlong_constructor , 0 , 0 , numberlong_functions , 0 , 0 ) );
-        assert( JS_InitClass( cx , global , 0 , &numberint_class , numberint_constructor , 0 , 0 , numberint_functions , 0 , 0 ) );
-        assert( JS_InitClass( cx , global , 0 , &minkey_class , 0 , 0 , 0 , 0 , 0 , 0 ) );
-        assert( JS_InitClass( cx , global , 0 , &maxkey_class , 0 , 0 , 0 , 0 , 0 , 0 ) );
+        verify( JS_InitClass( cx , global , 0 , &timestamp_class , timestamp_constructor , 0 , 0 , 0 , 0 , 0 ) );
+        verify( JS_InitClass( cx , global , 0 , &numberlong_class , numberlong_constructor , 0 , 0 , numberlong_functions , 0 , 0 ) );
+        verify( JS_InitClass( cx , global , 0 , &numberint_class , numberint_constructor , 0 , 0 , numberint_functions , 0 , 0 ) );
+        verify( JS_InitClass( cx , global , 0 , &minkey_class , 0 , 0 , 0 , 0 , 0 , 0 ) );
+        verify( JS_InitClass( cx , global , 0 , &maxkey_class , 0 , 0 , 0 , 0 , 0 , 0 ) );
 
-        assert( JS_InitClass( cx , global , 0 , &map_class , map_constructor , 0 , 0 , map_functions , 0 , 0 ) );
+        verify( JS_InitClass( cx , global , 0 , &map_class , map_constructor , 0 , 0 , map_functions , 0 , 0 ) );
 
-        assert( JS_InitClass( cx , global , 0 , &bson_ro_class , bson_cons , 0 , 0 , bson_functions , 0 , 0 ) );
-        assert( JS_InitClass( cx , global , 0 , &bson_class , bson_cons , 0 , 0 , bson_functions , 0 , 0 ) );
+        verify( JS_InitClass( cx , global , 0 , &bson_ro_class , bson_cons , 0 , 0 , bson_functions , 0 , 0 ) );
+        verify( JS_InitClass( cx , global , 0 , &bson_class , bson_cons , 0 , 0 , bson_functions , 0 , 0 ) );
 
         static const char *dbrefName = "DBRef";
         dbref_class.name = dbrefName;
-        assert( JS_InitClass( cx , global , 0 , &dbref_class , dbref_constructor , 2 , 0 , bson_functions , 0 , 0 ) );
+        verify( JS_InitClass( cx , global , 0 , &dbref_class , dbref_constructor , 2 , 0 , bson_functions , 0 , 0 ) );
 
         scope->execCoreFiles();
     }

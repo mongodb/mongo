@@ -54,22 +54,44 @@ namespace mongo {
     bool AuthenticationInfo::_isAuthorizedSpecialChecks( const string& dbname ) const {
         if ( cc().isGod() ) 
             return true;
+        return _isLocalHostAndLocalHostIsAuthorizedForAll;
+    }
 
-        if ( isLocalHost ) {
+    void AuthenticationInfo::setIsALocalHostConnectionWithSpecialAuthPowers() {
+        verify(!_isLocalHost);
+        _isLocalHost = true;
+        _isLocalHostAndLocalHostIsAuthorizedForAll = true;
+        _checkLocalHostSpecialAdmin();
+    }
+
+    void AuthenticationInfo::_checkLocalHostSpecialAdmin() {
+        if ( ! _isLocalHost )
+            return;
+        
+        if ( ! _isLocalHostAndLocalHostIsAuthorizedForAll )
+            return;
+        
+        if ( ! noauth ) {
             Client::GodScope gs;
             Client::ReadContext ctx("admin.system.users");
             BSONObj result;
-            if( ! Helpers::getSingleton("admin.system.users", result) ) {
-                if( ! _warned ) {
-                    // you could get a few of these in a race, but that's ok
-                    _warned = true;
-                    log() << "note: no users configured in admin.system.users, allowing localhost access" << endl;
-                }
-                return true;
+            if( Helpers::getSingleton("admin.system.users", result) ) {
+                _isLocalHostAndLocalHostIsAuthorizedForAll = false;
+            }
+            else if ( ! _warned ) {
+                // you could get a few of these in a race, but that's ok
+                _warned = true;
+                log() << "note: no users configured in admin.system.users, allowing localhost access" << endl;
             }
         }
+        
+        
+    }
 
-        return false;
+    void AuthenticationInfo::startRequest() {
+        if ( ! Lock::isLocked() ) {
+            _checkLocalHostSpecialAdmin();
+        }
     }
 
     bool CmdAuthenticate::getUserObj(const string& dbname, const string& user, BSONObj& userObj, string& pwd) {

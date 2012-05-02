@@ -14,6 +14,8 @@ namespace mongo {
 
     namespace dur {
 
+        void releasedWriteLock();
+
         // a smaller limit is likely better on 32 bit
 #if defined(__i386__) || defined(_M_IX86)
         const unsigned UncommittedBytesLimit = 50 * 1024 * 1024;
@@ -88,6 +90,8 @@ namespace mongo {
                 You must be at least read locked when you call this.  Ideally, you are not write locked
                 and then read operations can occur concurrently.
 
+                Do not use this. Use commitIfNeeded() instead.
+
                 @return true if --dur is on.
                 @return false if --dur is off. (in which case there is action)
             */
@@ -101,7 +105,7 @@ namespace mongo {
                 from growing too large.
                 @return true if commited
             */
-            virtual bool commitIfNeeded() = 0;
+            virtual bool commitIfNeeded(bool force=false) = 0;
 
             /** @return true if time to commit but does NOT do a commit */
             virtual bool aCommitIsNeeded() const = 0;
@@ -110,7 +114,7 @@ namespace mongo {
             inline DiskLoc& writingDiskLoc(DiskLoc& d) { return *((DiskLoc*) writingPtr(&d, sizeof(d))); }
 
             /** Declare write intent for an int */
-            inline int& writingInt(const int& d) { return *((int*) writingPtr((int*) &d, sizeof(d))); }
+            inline int& writingInt(int& d) { return *static_cast<int*>(writingPtr( &d, sizeof(d))); }
 
             /** "assume i've already indicated write intent, let me write"
                 redeclaration is fine too, but this is faster.
@@ -131,14 +135,6 @@ namespace mongo {
             T* writing(T *x) {
                 return (T*) writingPtr(x, sizeof(T));
             }
-
-            /** write something that doesn't have to be journaled, as this write is "unimportant".
-                a good example is paddingFactor.
-                can be thought of as memcpy(dst,src,len)
-                the dur implementation acquires a mutex in this method, so do not assume it is faster
-                without measuring!
-            */
-            virtual void setNoJournal(void *dst, void *src, unsigned len) = 0;
 
             /** Commits pending changes, flushes all changes to main data
                 files, then removes the journal.
@@ -179,9 +175,8 @@ namespace mongo {
             void createdFile(string filename, unsigned long long len) { }
             bool awaitCommit() { return false; }
             bool commitNow() { return false; }
-            bool commitIfNeeded() { return false; }
+            bool commitIfNeeded(bool) { return false; }
             bool aCommitIsNeeded() const { return false; }
-            void setNoJournal(void *dst, void *src, unsigned len);
             void syncDataAndTruncateJournal() {}
         };
 
@@ -194,8 +189,7 @@ namespace mongo {
             bool awaitCommit();
             bool commitNow();
             bool aCommitIsNeeded() const;
-            bool commitIfNeeded();
-            void setNoJournal(void *dst, void *src, unsigned len);
+            bool commitIfNeeded(bool);
             void syncDataAndTruncateJournal();
         };
 

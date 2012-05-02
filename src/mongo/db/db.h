@@ -26,64 +26,56 @@
 
 namespace mongo {
 
+    // todo: relocked is being called when there was no unlock below. 
+    //       that is weird.
+
     struct dbtemprelease {
         Client::Context * _context;
-        int _locktype;
-
+        scoped_ptr<Lock::TempRelease> tr;
         dbtemprelease() {
             const Client& c = cc();
             _context = c.getContext();
-            _locktype = d.dbMutex.getState();
-            assert( _locktype );
-
-            if ( _locktype > 0 ) {
-                massert( 10298 , "can't temprelease nested write lock", _locktype == 1);
-                if ( _context ) _context->unlocked();
-                d.dbMutex.unlock();
+            verify( Lock::isLocked() );
+            if( Lock::nested() ) {
+                Lock::nested();
+                massert(10298 , "can't temprelease nested lock", false);
             }
-            else {
-                massert( 10299 , "can't temprelease nested read lock", _locktype == -1);
-                if ( _context ) _context->unlocked();
-                d.dbMutex.unlock_shared();
+            if ( _context ) {
+                _context->unlocked();
             }
-            
-            verify( 14814 , c.curop() );
+            tr.reset(new Lock::TempRelease);
+            verify( c.curop() );
             c.curop()->yielded();
-            
         }
         ~dbtemprelease() {
-            if ( _locktype > 0 )
-                d.dbMutex.lock();
-            else
-                d.dbMutex.lock_shared();
-
-            if ( _context ) _context->relocked();
+            tr.reset();
+            if ( _context ) 
+                _context->relocked();
         }
     };
 
     /** must be write locked
-        no assert (and no release) if nested write lock 
-        a lot like dbtempreleasecond but no malloc so should be a tiny bit faster
+        no verify(and no release) if nested write lock 
+        a lot like dbtempreleasecond, eliminate?
     */
     struct dbtempreleasewritelock {
         Client::Context * _context;
         int _locktype;
+        scoped_ptr<Lock::TempRelease> tr;
         dbtempreleasewritelock() {
             const Client& c = cc();
             _context = c.getContext();
-            _locktype = d.dbMutex.getState();
-            assert( _locktype >= 1 );
-            if( _locktype > 1 ) 
-                return; // nested
+            verify( Lock::isW() );
+            if( Lock::nested() )
+                return;
             if ( _context ) 
                 _context->unlocked();
-            d.dbMutex.unlock();
-            verify( 14845 , c.curop() );
+            tr.reset(new Lock::TempRelease);
+            verify( c.curop() );
             c.curop()->yielded();            
         }
         ~dbtempreleasewritelock() {
-            if ( _locktype == 1 )
-                d.dbMutex.lock();
+            tr.reset();
             if ( _context ) 
                 _context->relocked();
         }
@@ -92,27 +84,25 @@ namespace mongo {
     /**
        only does a temp release if we're not nested and have a lock
      */
-    struct dbtempreleasecond {
+    class dbtempreleasecond : boost::noncopyable {
         dbtemprelease * real;
-        int locktype;
-
+    public:
         dbtempreleasecond() {
             real = 0;
-            locktype = d.dbMutex.getState();
-            if ( locktype == 1 || locktype == -1 )
-                real = new dbtemprelease();
+            if( Lock::isLocked() ) {
+                // if nested don't temprelease, and we don't complain either for this class
+                if( !Lock::nested() ) {
+                    real = new dbtemprelease();
+                }
+            }
         }
-
         ~dbtempreleasecond() {
             if ( real ) {
                 delete real;
                 real = 0;
             }
         }
-
-        bool unlocked() {
-            return real != 0;
-        }
+        bool unlocked() const { return real != 0; }
     };
 
 } // namespace mongo

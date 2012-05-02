@@ -25,6 +25,7 @@
 #include "../db/repl.h"
 #include "../db/extsort.h"
 #include "dbtests.h"
+#include "../util/stringutils.h"
 #include "../util/mongoutils/checksum.h"
 #include "../db/key.h"
 #include "../db/btree.h"
@@ -294,7 +295,7 @@ namespace JsobjTests {
                     Client::initThread("pretouchN");
                     c = &cc();
                 }
-                writelock lk(""); // for initTimestamp
+                Lock::GlobalWrite lk; // for initTimestamp
         
                 BSONObjBuilder b;
                 b.appendTimestamp( "a" );
@@ -314,9 +315,9 @@ namespace JsobjTests {
                 e = i.next();
                 ASSERT( e.eoo() );
 
-                OpTime before = OpTime::now();
+                OpTime before = OpTime::_now();
                 BSONElementManipulator( o.firstElement() ).initTimestamp();
-                OpTime after = OpTime::now();
+                OpTime after = OpTime::_now();
 
                 OpTime test = OpTime( o.firstElement().date() );
                 ASSERT( before < test && test < after );
@@ -443,23 +444,23 @@ namespace JsobjTests {
                     BSONObj b = BSON( "x" << d );
 
                     long long back = (long long) d;
-//3717
+//3719
 //////                    int res = a.woCompare(b);
 
                     ASSERT( n > back );
-                    //ASSERT( res > 0 );  // SERVER-3717
+                    //ASSERT( res > 0 );  // SERVER-3719
 
                     keyTest(a, false);
 
                     KeyV1Owned A(a);
                     KeyV1Owned B(b);
-//3717
+//3719
 //////                    int res2 =  A.woCompare(B, Ordering::make(BSONObj()));
-                    // ASSERT( res2 > 0 ); // SERVER-3717
+                    // ASSERT( res2 > 0 ); // SERVER-3719
 
                     // fixing requires an index v# change.
 
-                    cout << "todo fix SERVER-3717 and uncomment test in AppendIntOrLL" << endl;
+                    cout << "todo fix SERVER-3719 and uncomment test in AppendIntOrLL" << endl;
 
                     n++;
                 }
@@ -807,6 +808,57 @@ namespace JsobjTests {
             }
         };
 
+        class ToStringRecursionDepth {
+        public:
+            // create a nested BSON object with the specified recursion depth
+            BSONObj recursiveBSON( int depth )  {
+                BSONObjBuilder b;
+                if ( depth==0 ) {
+                    b << "name" << "Joe";
+                    return b.obj();
+                }
+                b.append( "test", recursiveBSON( depth - 1) );
+                return b.obj();
+            }
+
+            void run() {
+                BSONObj nestedBSON;
+                StringBuilder s;
+                string nestedBSONString;
+                size_t found;
+
+                // recursion depth one less than max allowed-- do not shorten the string
+                nestedBSON = recursiveBSON( BSONObj::maxToStringRecursionDepth - 1  );
+                nestedBSON.toString( s, true, false );
+                nestedBSONString = s.str();
+                found = nestedBSONString.find( "..." );
+                // did not find the "..." pattern
+                ASSERT_EQUALS( found!=string::npos, false );
+
+                // recursion depth is equal to max allowed  -- do not shorten the string
+                nestedBSON = recursiveBSON( BSONObj::maxToStringRecursionDepth );
+                nestedBSON.toString( s, true, false );
+                nestedBSONString = s.str();
+                found = nestedBSONString.find( "..." );
+                // did not find the "..." pattern
+                ASSERT_EQUALS( found!=string::npos, false );
+
+                // recursion depth - one greater than max allowed -- shorten the string
+                nestedBSON = recursiveBSON( BSONObj::maxToStringRecursionDepth + 1 );
+                nestedBSON.toString( s, false, false );
+                nestedBSONString = s.str();
+                found = nestedBSONString.find( "..." );
+                // found the "..." pattern
+                ASSERT_EQUALS( found!=string::npos, true );
+
+                /* recursion depth - one greater than max allowed but with full=true
+                 * should fail with an assertion
+                 */
+                nestedBSON = recursiveBSON( BSONObj::maxToStringRecursionDepth + 1 );
+                ASSERT_THROWS( nestedBSON.toString( s, false, true ) , UserException );
+            }
+        };
+
         namespace Validation {
 
             class Base {
@@ -1047,6 +1099,7 @@ namespace JsobjTests {
             };
 
             // Randomized BSON parsing test.  See if we seg fault.
+            // NOTE This test is disabled (below), see SERVER-4948.
             class Fuzz {
             public:
                 Fuzz( double frequency ) : frequency_( frequency ) {}
@@ -1249,7 +1302,7 @@ namespace JsobjTests {
                 return BSON( "a" << BSON( "$size" << 4 ) );
             }
             BSONObj actual() {
-                return BSON( "a" << mongo::SIZE << 4 );
+                return BSON( "a" << mongo::BSIZE << 4 );
             }
         };
 
@@ -1412,11 +1465,11 @@ namespace JsobjTests {
     public:
         void run() {
             BSONObj x = BSON( "a" << 10 << "b" << 11 );
-            assert( BSON( "a" << 10 ).woCompare( x.extractFields( BSON( "a" << 1 ) ) ) == 0 );
-            assert( BSON( "b" << 11 ).woCompare( x.extractFields( BSON( "b" << 1 ) ) ) == 0 );
-            assert( x.woCompare( x.extractFields( BSON( "a" << 1 << "b" << 1 ) ) ) == 0 );
+            verify( BSON( "a" << 10 ).woCompare( x.extractFields( BSON( "a" << 1 ) ) ) == 0 );
+            verify( BSON( "b" << 11 ).woCompare( x.extractFields( BSON( "b" << 1 ) ) ) == 0 );
+            verify( x.woCompare( x.extractFields( BSON( "a" << 1 << "b" << 1 ) ) ) == 0 );
 
-            assert( (string)"a" == x.extractFields( BSON( "a" << 1 << "c" << 1 ) ).firstElementFieldName() );
+            verify( (string)"a" == x.extractFields( BSON( "a" << 1 << "c" << 1 ) ).firstElementFieldName() );
         }
     };
 
@@ -1486,12 +1539,12 @@ namespace JsobjTests {
                 while ( i->more() ) {
                     pair<BSONObj,DiskLoc> p = i->next();
                     if ( num == 0 )
-                        assert( p.first["x"].number() == 2 );
+                        verify( p.first["x"].number() == 2 );
                     else if ( num <= 2 ) {
-                        assert( p.first["x"].number() == 5 );
+                        verify( p.first["x"].number() == 5 );
                     }
                     else if ( num == 3 )
-                        assert( p.first["x"].number() == 10 );
+                        verify( p.first["x"].number() == 10 );
                     else
                         ASSERT( 0 );
                     num++;
@@ -1518,13 +1571,13 @@ namespace JsobjTests {
                 while ( i->more() ) {
                     pair<BSONObj,DiskLoc> p = i->next();
                     if ( num == 0 ) {
-                        assert( p.first["x"].number() == 2 );
+                        verify( p.first["x"].number() == 2 );
                         ASSERT_EQUALS( p.second.toString() , "3:1" );
                     }
                     else if ( num <= 2 )
-                        assert( p.first["x"].number() == 5 );
+                        verify( p.first["x"].number() == 5 );
                     else if ( num == 3 ) {
-                        assert( p.first["x"].number() == 10 );
+                        verify( p.first["x"].number() == 10 );
                         ASSERT_EQUALS( p.second.toString() , "5:b" );
                     }
                     else
@@ -1542,7 +1595,7 @@ namespace JsobjTests {
                 sorter.sort();
 
                 auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
-                assert( ! i->more() );
+                verify( ! i->more() );
 
             }
         };
@@ -1565,12 +1618,12 @@ namespace JsobjTests {
                 while ( i->more() ) {
                     pair<BSONObj,DiskLoc> p = i->next();
                     if ( num == 0 )
-                        assert( p.first["x"].number() == 2 );
+                        verify( p.first["x"].number() == 2 );
                     else if ( num <= 3 ) {
-                        assert( p.first["x"].number() == 5 );
+                        verify( p.first["x"].number() == 5 );
                     }
                     else if ( num == 4 )
-                        assert( p.first["x"].number() == 10 );
+                        verify( p.first["x"].number() == 10 );
                     else
                         ASSERT( 0 );
                     ASSERT_EQUALS( num , p.second.getOfs() );
@@ -1599,10 +1652,10 @@ namespace JsobjTests {
                     pair<BSONObj,DiskLoc> p = i->next();
                     num++;
                     double cur = p.first["x"].number();
-                    assert( cur >= prev );
+                    verify( cur >= prev );
                     prev = cur;
                 }
-                assert( num == 10000 );
+                verify( num == 10000 );
             }
         };
 
@@ -1624,10 +1677,10 @@ namespace JsobjTests {
                     pair<BSONObj,DiskLoc> p = i->next();
                     num++;
                     double cur = p.first["x"].number();
-                    assert( cur >= prev );
+                    verify( cur >= prev );
                     prev = cur;
                 }
-                assert( num == total );
+                verify( num == total );
                 ASSERT( sorter.numFiles() > 2 );
             }
         };
@@ -1685,20 +1738,47 @@ namespace JsobjTests {
     class CompareDottedFieldNamesTest {
     public:
         void t( FieldCompareResult res , const string& l , const string& r ) {
-            ASSERT_EQUALS( res , compareDottedFieldNames( l , r ) );
-            ASSERT_EQUALS( -1 * res , compareDottedFieldNames( r , l ) );
+            LexNumCmp cmp( true );
+            ASSERT_EQUALS( res , compareDottedFieldNames( l , r , cmp ) );
+            ASSERT_EQUALS( -1 * res , compareDottedFieldNames( r , l , cmp ) );
         }
 
         void run() {
             t( SAME , "x" , "x" );
             t( SAME , "x.a" , "x.a" );
+            t( SAME , "x.4" , "x.4" );
             t( LEFT_BEFORE , "a" , "b" );
             t( RIGHT_BEFORE , "b" , "a" );
+            t( LEFT_BEFORE , "x.04" , "x.4" );
 
             t( LEFT_SUBFIELD , "a.x" , "a" );
+            t( LEFT_SUBFIELD , "a.4" , "a" );
         }
     };
 
+    class CompareDottedArrayFieldNamesTest {
+    public:
+        void t( FieldCompareResult res , const string& l , const string& r ) {
+            LexNumCmp cmp( false ); // Specify numeric comparison for array field names.
+            ASSERT_EQUALS( res , compareDottedFieldNames( l , r , cmp ) );
+            ASSERT_EQUALS( -1 * res , compareDottedFieldNames( r , l , cmp ) );
+        }
+        
+        void run() {
+            t( SAME , "0" , "0" );
+            t( SAME , "1" , "1" );
+            t( SAME , "0.1" , "0.1" );
+            t( SAME , "0.a" , "0.a" );
+            t( LEFT_BEFORE , "0" , "1" );
+            t( LEFT_BEFORE , "2" , "10" );
+            t( RIGHT_BEFORE , "1" , "0" );
+            t( RIGHT_BEFORE , "10" , "2" );
+            
+            t( LEFT_SUBFIELD , "5.4" , "5" );
+            t( LEFT_SUBFIELD , "5.x" , "5" );
+        }
+    };
+    
     struct NestedDottedConversions {
         void t(const BSONObj& nest, const BSONObj& dot) {
             ASSERT_EQUALS( nested2dotted(nest), dot);
@@ -1819,8 +1899,33 @@ namespace JsobjTests {
                 //unsigned long long tm = t.micros();
                 //cout << "time: " << tm << endl;
             }
+            
+            BSONObj o2 = BSON( "2" << "a" << "11" << "b" );
+            BSONObjIteratorSorted i2( o2 );
+            // First field in sorted order should be "11" due use of a lexical comparison.
+            ASSERT_EQUALS( "11", string( i2.next().fieldName() ) );
         }
 
+    };
+    
+    class BSONArrayIteratorSorted {
+    public:
+        void run() {
+            BSONArrayBuilder bab;
+            for( int i = 0; i < 11; ++i ) {
+                bab << "a";
+            }
+            BSONArray arr = bab.arr();
+            // The sorted iterator should perform numeric comparisons and return results in the same
+            // order as the unsorted iterator.
+            BSONObjIterator unsorted( arr );
+            mongo::BSONArrayIteratorSorted sorted( arr );
+            while( unsorted.more() ) {
+                ASSERT( sorted.more() );
+                ASSERT_EQUALS( string( unsorted.next().fieldName() ), sorted.next().fieldName() );
+            }
+            ASSERT( !sorted.more() );
+        }
     };
 
     class checkForStorageTests {
@@ -2119,6 +2224,7 @@ namespace JsobjTests {
             add< BSONObjTests::AppendAs >();
             add< BSONObjTests::ArrayAppendAs >();
             add< BSONObjTests::GetField >();
+            add< BSONObjTests::ToStringRecursionDepth >();
 
             add< BSONObjTests::Validation::BadType >();
             add< BSONObjTests::Validation::EooBeforeEnd >();
@@ -2147,11 +2253,13 @@ namespace JsobjTests {
             add< BSONObjTests::Validation::NoSize >( Object );
             add< BSONObjTests::Validation::NoSize >( Array );
             add< BSONObjTests::Validation::NoSize >( BinData );
+            if ( 0 ) { // SERVER-4948
             add< BSONObjTests::Validation::Fuzz >( .5 );
             add< BSONObjTests::Validation::Fuzz >( .1 );
             add< BSONObjTests::Validation::Fuzz >( .05 );
             add< BSONObjTests::Validation::Fuzz >( .01 );
             add< BSONObjTests::Validation::Fuzz >( .001 );
+            }
             add< OIDTests::init1 >();
             add< OIDTests::initParse1 >();
             add< OIDTests::append >();
@@ -2165,8 +2273,6 @@ namespace JsobjTests {
             add< ValueStreamTests::LabelSize >();
             add< ValueStreamTests::LabelMulti >();
             add< ValueStreamTests::LabelishOr >();
-            add< ValueStreamTests::Unallowed >();
-            add< ValueStreamTests::ElementAppend >();
             add< ValueStreamTests::Unallowed >();
             add< ValueStreamTests::ElementAppend >();
             add< SubObjectBuilder >();
@@ -2186,11 +2292,13 @@ namespace JsobjTests {
             add< external_sort::D1 >();
             add< CompatBSON >();
             add< CompareDottedFieldNamesTest >();
+            add< CompareDottedArrayFieldNamesTest >();
             add< NestedDottedConversions >();
             add< BSONArrayBuilderTest >();
             add< ArrayMacroTest >();
             add< NumberParsing >();
             add< bson2settest >();
+            add< BSONArrayIteratorSorted >();
             add< checkForStorageTests >();
             add< InvalidIDFind >();
             add< ElementSetTest >();

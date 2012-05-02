@@ -34,6 +34,7 @@
 #include "../util/net/message_port.h"
 #include "../util/concurrency/rwlock.h"
 #include "d_concurrency.h"
+#include "mongo/util/paths.h"
 
 namespace mongo {
 
@@ -47,12 +48,6 @@ namespace mongo {
     class LockCollectionForReading;
     class PageFaultRetryableSection;
 
-#if defined(CLC)
-    typedef LockCollectionForReading _LockCollectionForReading;
-#else
-    typedef readlock _LockCollectionForReading;
-#endif
-
     TSP_DECLARE(Client, currentClient)
 
     typedef long long ConnectionId;
@@ -61,9 +56,11 @@ namespace mongo {
     class Client : public ClientBasic {
         static Client *syncThread;
     public:
+        LockState _ls;
+
         // always be in clientsMutex when manipulating this. killop stuff uses these.
-        static set<Client*> clients;      
-        static mongo::mutex clientsMutex; 
+        static set<Client*>& clients;
+        static mongo::mutex& clientsMutex;
         static int getActiveClientCount( int& writers , int& readers );
         class Context;
         ~Client();
@@ -101,7 +98,7 @@ namespace mongo {
         Context* getContext() const { return _context; }
         Database* database() const {  return _context ? _context->db() : 0; }
         const char *ns() const { return _context->ns(); }
-        const char *desc() const { return _desc; }
+        const std::string desc() const { return _desc; }
         void setLastOp( OpTime op ) { _lastOp = op; }
         OpTime getLastOp() const { return _lastOp; }
 
@@ -115,7 +112,7 @@ namespace mongo {
         string toString() const;
         void gotHandshake( const BSONObj& o );
         bool hasRemote() const { return _mp; }
-        HostAndPort getRemote() const { assert( _mp ); return _mp->remote(); }
+        HostAndPort getRemote() const { verify( _mp ); return _mp->remote(); }
         BSONObj getRemoteID() const { return _remoteId; }
         BSONObj getHandshake() const { return _handshake; }
         AbstractMessagingPort * port() const { return _mp; }
@@ -126,6 +123,7 @@ namespace mongo {
         
         bool hasWrittenThisPass() const { return _hasWrittenThisPass; }
         void writeHappened() { _hasWrittenThisPass = true; }
+        void newTopLevelRequest() { _hasWrittenThisPass = false; }
         
         bool allowedToThrowPageFaultException() const;
 
@@ -137,7 +135,7 @@ namespace mongo {
         CurOp * _curOp;
         Context * _context;
         bool _shutdown; // to track if Client::shutdown() gets called
-        const char * const _desc;
+        const std::string _desc;
         bool _god;
         AuthenticationInfo _ai;
         OpTime _lastOp;
@@ -168,7 +166,7 @@ namespace mongo {
         };
 
         //static void assureDatabaseIsOpen(const string& ns, string path=dbpath);
-
+        
         /** "read lock, and set my context, all in one operation" 
          *  This handles (if not recursively locked) opening an unopened database.
          */
@@ -177,7 +175,7 @@ namespace mongo {
             ReadContext(const string& ns, string path=dbpath, bool doauth=true );
             Context& ctx() { return *c.get(); }
         private:
-            scoped_ptr<_LockCollectionForReading> lk;
+            scoped_ptr<Lock::DBRead> lk;
             scoped_ptr<Context> c;
         };
 
@@ -211,7 +209,7 @@ namespace mongo {
             bool inDB( const string& db , const string& path=dbpath ) const;
 
             void _clear() { // this is sort of an "early destruct" indication, _ns can never be uncleared
-                const_cast<string&>(_ns).empty();
+                const_cast<string&>(_ns).clear();
                 _db = 0;
             }
 
@@ -228,7 +226,8 @@ namespace mongo {
             void _finishInit( bool doauth=true);
             void _auth( int lockState );
             void checkNotStale() const;
-            void checkNsAccess( bool doauth, int lockState = d.dbMutex.getState() );
+            void checkNsAccess( bool doauth );
+            void checkNsAccess( bool doauth, int lockState );
             Client * const _client;
             Context * const _oldContext;
             const string _path;
@@ -238,25 +237,23 @@ namespace mongo {
             Database * _db;
         }; // class Client::Context
 
-        struct LockStatus {
-            LockStatus();
-            string whichCollection;
-            unsigned excluder, global, collection;
-            string toString() const;
-        } lockStatus;
+        class WriteContext : boost::noncopyable {
+        public:
+            WriteContext(const string& ns, string path=dbpath, bool doauth=true );
+            Context& ctx() { return _c; }
+        private:
+            Lock::DBWrite _lk;
+            Context _c;
+        };
 
-#if defined(CLC)
-        void checkLocks() const;
-#else
-        void checkLocks() const { }
-#endif
 
     }; // class Client
+
 
     /** get the Client object for this thread. */
     inline Client& cc() {
         Client * c = currentClient.get();
-        assert( c );
+        verify( c );
         return *c;
     }
 
@@ -266,33 +263,6 @@ namespace mongo {
     }
     inline Client::GodScope::~GodScope() { cc()._god = _prev; }
 
-    /* this unreadlocks and then writelocks; i.e. it does NOT upgrade inside the
-       lock (and is thus wrong to use if you need that, which is usually).
-       that said we use it today for a specific case where the usage is correct.
-    */
-#if 0
-    inline void mongolock::releaseAndWriteLock() {
-        if( !_writelock ) {
-
-#if BOOST_VERSION >= 103500
-            int s = d.dbMutex.getState();
-            if( s != -1 ) {
-                log() << "error: releaseAndWriteLock() s == " << s << endl;
-                msgasserted( 12600, "releaseAndWriteLock: unlock_shared failed, probably recursive" );
-            }
-#endif
-
-            _writelock = true;
-            d.dbMutex.unlock_shared();
-            d.dbMutex.lock();
-
-            // todo: unlocked() method says to call it before unlocking, not after.  so fix this here,
-            // or fix the doc there.
-            if ( cc().getContext() )
-                cc().getContext()->unlocked();
-        }
-    }
-#endif
 
     inline bool haveClient() { return currentClient.get() > 0; }
 

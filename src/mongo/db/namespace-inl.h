@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "namespace.h"
+#include "mongo/db/namespace.h"
 
 namespace mongo {
 
@@ -63,70 +63,11 @@ namespace mongo {
 
     /* future : this doesn't need to be an inline. */
     inline string Namespace::getSisterNS( const char * local ) const {
-        assert( local && local[0] != '.' );
+        verify( local && local[0] != '.' );
         string old(buf);
         if ( old.find( "." ) != string::npos )
             old = old.substr( 0 , old.find( "." ) );
         return old + "." + local;
     }
 
-    inline IndexDetails& NamespaceDetails::idx(int idxNo, bool missingExpected ) {
-        if( idxNo < NIndexesBase ) {
-            IndexDetails& id = _indexes[idxNo];
-            return id;
-        }
-        Extra *e = extra();
-        if ( ! e ) {
-            if ( missingExpected )
-                throw MsgAssertionException( 13283 , "Missing Extra" );
-            massert(14045, "missing Extra", e);
-        }
-        int i = idxNo - NIndexesBase;
-        if( i >= NIndexesExtra ) {
-            e = e->next(this);
-            if ( ! e ) {
-                if ( missingExpected )
-                    throw MsgAssertionException( 14823 , "missing extra" );
-                massert(14824, "missing Extra", e);
-            }
-            i -= NIndexesExtra;
-        }
-        return e->details[i];
-    }
-
-    inline int NamespaceDetails::idxNo(IndexDetails& idx) {
-        IndexIterator i = ii();
-        while( i.more() ) {
-            if( &i.next() == &idx )
-                return i.pos()-1;
-        }
-        massert( 10349 , "E12000 idxNo fails", false);
-        return -1;
-    }
-
-    inline int NamespaceDetails::findIndexByKeyPattern(const BSONObj& keyPattern) {
-        IndexIterator i = ii();
-        while( i.more() ) {
-            if( i.next().keyPattern() == keyPattern )
-                return i.pos()-1;
-        }
-        return -1;
-    }
-
-    // @return offset in indexes[]
-    inline int NamespaceDetails::findIndexByName(const char *name) {
-        IndexIterator i = ii();
-        while( i.more() ) {
-            if ( strcmp(i.next().info.obj().getStringField("name"),name) == 0 )
-                return i.pos()-1;
-        }
-        return -1;
-    }
-
-    inline NamespaceDetails::IndexIterator::IndexIterator(NamespaceDetails *_d) {
-        d = _d;
-        i = 0;
-        n = d->nIndexes;
-    }
-
-}
+}  // namespace mongo

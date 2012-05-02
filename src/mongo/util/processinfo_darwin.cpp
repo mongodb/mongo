@@ -32,6 +32,7 @@
 
 #include <sys/types.h>
 #include <sys/mman.h>
+#include <sys/sysctl.h>
 
 using namespace std;
 
@@ -105,6 +106,65 @@ namespace mongo {
         }
 
         info.append("page_faults", taskInfo.pageins);
+    }
+
+    /**
+     * Get a sysctl string value by name.  Use string specialization by default.
+     */
+    typedef long long NumberVal;
+    template <typename Variant>
+    Variant getSysctlByName( const char * sysctlName ) {
+        char value[256];
+        size_t len = sizeof(value);
+        if ( sysctlbyname(sysctlName, &value, &len, NULL, 0) < 0 ) {
+            log() << "Unable to resolve sysctl " << sysctlName << " (string) " << endl;
+        }
+        return string(value, len - 1);        
+    }
+
+    /**
+     * Get a sysctl integer value by name (specialization)
+     */
+    template <>
+    long long getSysctlByName< NumberVal > ( const char * sysctlName ) {
+        long long value = 0;
+        size_t len = sizeof(value);
+        if ( sysctlbyname(sysctlName, &value, &len, NULL, 0) < 0 ) {
+            log() << "Unable to resolve sysctl " << sysctlName << " (number) " << endl;
+        }
+        if (len > 8) {
+            log() << "Unable to resolve sysctl " << sysctlName << " as integer.  System returned " << len << " bytes." << endl;
+        }
+        return value;
+    }
+
+    void ProcessInfo::SystemInfo::collectSystemInfo() {
+        osType = "Darwin";
+        osName = "Mac OS X";
+        osVersion = getSysctlByName< string >( "kern.osrelease");
+        addrSize = (getSysctlByName< NumberVal >( "hw.cpu64bit_capable" ) ? 64 : 32);
+        memSize = getSysctlByName< NumberVal >( "hw.memsize" );
+        numCores = getSysctlByName< NumberVal >( "hw.ncpu" ); // includes hyperthreading cores
+        cpuArch = getSysctlByName< string >( "hw.machine" );
+        hasNuma = checkNumaEnabled();
+        
+        BSONObjBuilder bExtra;
+        bExtra.append( "versionString", getSysctlByName< string >( "kern.version" ) );
+        bExtra.append( "alwaysFullSync", static_cast< int >( getSysctlByName< NumberVal >( "vfs.generic.always_do_fullfsync" ) ) );
+        bExtra.append( "nfsAsync", static_cast< int >( getSysctlByName< NumberVal >( "vfs.generic.nfs.client.allow_async" ) ) );
+        bExtra.append( "model", getSysctlByName< string >( "hw.model" ) );
+        bExtra.append( "physicalCores", static_cast< int >( getSysctlByName< NumberVal >( "machdep.cpu.core_count" ) ) );
+        bExtra.append( "cpuFrequencyMHz", static_cast< int >( (getSysctlByName< NumberVal >( "hw.cpufrequency" ) / (1000 * 1000)) ) );
+        bExtra.append( "cpuString", getSysctlByName< string >( "machdep.cpu.brand_string" ) );
+        bExtra.append( "cpuFeatures", getSysctlByName< string >( "machdep.cpu.features" ) + string(" ") + 
+                                      getSysctlByName< string >( "machdep.cpu.extfeatures" ) );
+        bExtra.append( "pageSize", static_cast< int >( getSysctlByName< NumberVal >( "hw.pagesize" ) ) );
+        bExtra.append( "scheduler", getSysctlByName< string >( "kern.sched" ) );
+        _extraStats = bExtra.obj();
+    }
+
+    bool ProcessInfo::checkNumaEnabled() { 
+        return false;
     }
 
     bool ProcessInfo::blockCheckSupported() {

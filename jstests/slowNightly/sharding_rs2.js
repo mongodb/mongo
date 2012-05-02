@@ -60,6 +60,9 @@ for ( i=0; i<5; i++ ){
     catch ( e ){}
 }
 
+debug( "Awaiting replication of all nodes, so spurious sync'ing queries don't upset our counts..." )
+rs.test.awaitReplication()
+
 // -------------------------------------------------------------------------------------------
 debug( "test routing to slaves" )
 // -------------------------------------------------------------------------------------------

@@ -33,6 +33,7 @@
 #   off all mongods on a box, which means you can't run two smoke.py
 #   jobs on the same host at once.  So something's gotta change.
 
+from datetime import datetime
 import glob
 from optparse import OptionParser
 import os
@@ -86,6 +87,19 @@ class Nothing(object):
         return self
     def __exit__(self, type, value, traceback):
         return not isinstance(value, Exception)
+
+def buildlogger(cmd, is_global=False):
+    # if the environment variable MONGO_USE_BUILDLOGGER
+    # is set to 'true', then wrap the command with a call
+    # to buildlogger.py, which sends output to the buidlogger
+    # machine; otherwise, return as usual.
+    if os.environ.get('MONGO_USE_BUILDLOGGER', '').lower().strip() == 'true':
+        if is_global:
+            return [utils.find_python(), 'buildscripts/buildlogger.py', '-g'] + cmd
+        else:
+            return [utils.find_python(), 'buildscripts/buildlogger.py'] + cmd
+    return cmd
+
 
 class mongod(object):
     def __init__(self, **kwargs):
@@ -155,9 +169,9 @@ class mongod(object):
             self.slave = True
         if os.path.exists(dir_name):
             if 'slave' in self.kwargs:
-                argv = ["python", "buildscripts/cleanbb.py", '--nokill', dir_name]
+                argv = [utils.find_python(), "buildscripts/cleanbb.py", '--nokill', dir_name]
             else:
-                argv = ["python", "buildscripts/cleanbb.py", dir_name]
+                argv = [utils.find_python(), "buildscripts/cleanbb.py", dir_name]
             call(argv)
         utils.ensureDir(dir_name)
         argv = [mongod_executable, "--port", str(self.port), "--dbpath", dir_name]
@@ -173,7 +187,7 @@ class mongod(object):
             argv += ['--auth']
             self.auth = True
         print "running " + " ".join(argv)
-        self.proc = Popen(argv)
+        self.proc = Popen(buildlogger(argv, is_global=True))
         if not self.did_mongod_start(self.port):
             raise Exception("Failed to start mongod")
 
@@ -317,10 +331,13 @@ def runTest(test):
     else:
         keyFileData = None
 
-    sys.stderr.write( "starting test : %s \n" % os.path.basename(path) )
-    sys.stderr.flush()
-    print " *******************************************"
-    print "         Test : " + os.path.basename(path) + " ..."
+
+    # sys.stdout.write() is more atomic than print, so using it prevents
+    # lines being interrupted by, e.g., child processes
+    sys.stdout.write(" *******************************************\n")
+    sys.stdout.write("         Test : %s ...\n" % os.path.basename(path))
+    sys.stdout.flush()
+
     # FIXME: we don't handle the case where the subprocess
     # hangs... that's bad.
     if ( argv[0].endswith( 'mongo' ) or argv[0].endswith( 'mongo.exe' ) ) and not '--eval' in argv :
@@ -333,21 +350,34 @@ def runTest(test):
                      'TestData.auth = ' + ternary( auth ) + ";" + \
                      'TestData.keyFile = ' + ternary( keyFile , '"' + str(keyFile) + '"' , 'null' ) + ";" + \
                      'TestData.keyFileData = ' + ternary( keyFile , '"' + str(keyFileData) + '"' , 'null' ) + ";"
-        if auth and usedb:
-            evalString += 'db.getSiblingDB("admin").addUser("admin","password");'
-            evalString += 'jsTest.authenticate(db.getMongo());'
-        argv = argv + [ '--eval', evalString]
+        if os.sys.platform == "win32":
+            # double quotes in the evalString on windows; this
+            # prevents the backslashes from being removed when
+            # the shell (i.e. bash) evaluates this string. yuck.
+            evalString = evalString.replace('\\', '\\\\')
 
+        if auth and usedb:
+            evalString += 'jsTest.authenticate(db.getMongo());'
+
+        argv = argv + [ '--eval', evalString]
     
     if argv[0].endswith( 'test' ) and no_preallocj :
         argv = argv + [ '--nopreallocj' ]
     
     
-    print argv
+    sys.stdout.write("      Command : %s\n" % ' '.join(argv))
+    sys.stdout.write("         Date : %s\n" % datetime.now().ctime())
+    sys.stdout.flush()
+
+    os.environ['MONGO_TEST_FILENAME'] = os.path.basename(path)
     t1 = time.time()
-    r = call(argv, cwd=test_path)
+    r = call(buildlogger(argv), cwd=test_path)
     t2 = time.time()
-    print "                " + str((t2 - t1) * 1000) + "ms"
+    del os.environ['MONGO_TEST_FILENAME']
+
+    sys.stdout.write("                %fms\n" % ((t2 - t1) * 1000))
+    sys.stdout.flush()
+
     if r != 0:
         raise TestExitFailure(path, r)
     
@@ -377,7 +407,8 @@ def run_tests(tests):
             if small_oplog:
                 master.wait_for_repl()
 
-            for test in tests:
+            tests_run = 0
+            for tests_run, test in enumerate(tests, 1):
                 try:
                     fails.append(test)
                     runTest(test)
@@ -386,6 +417,12 @@ def run_tests(tests):
 
                     if small_oplog:
                         master.wait_for_repl()
+                    elif test[1]: # reach inside test and see if startmongod is true
+                        if tests_run % 20 == 0:
+                            # restart mongo every 20 times, for our 32-bit machines
+                            master.__exit__(None, None, None)
+                            master = mongod(small_oplog=small_oplog,no_journal=no_journal,no_preallocj=no_preallocj,auth=auth).__enter__()
+
                 except TestFailure, f:
                     try:
                         print f
@@ -474,7 +511,7 @@ def expand_suites(suites):
                                   "jsPerf": ("perf/*.js", True),
                                   "disk": ("disk/*.js", True),
                                   "jsSlowNightly": ("slowNightly/*.js", True),
-                                  "jsSlowWeekly": ("slowWeekly/*.js", True),
+                                  "jsSlowWeekly": ("slowWeekly/*.js", False),
                                   "parallel": ("parallel/*.js", True),
                                   "clone": ("clone/*.js", False),
                                   "repl": ("repl/*.js", False),
@@ -494,6 +531,7 @@ def expand_suites(suites):
             else:
                 loc = ''
             globstr = os.path.join(mongo_repo, (os.path.join(loc, globstr)))
+            globstr = os.path.normpath(globstr)
             paths = glob.glob(globstr)
             paths.sort()
             tests += [(path, usedb) for path in paths]
@@ -538,7 +576,12 @@ def run_old_fails():
     try:
         f = open(failfile, 'r')
         testsAndOptions = pickle.load(f)
+        f.close()
     except Exception:
+        try:
+            f.close()
+        except:
+            pass
         clear_failfile()
         return # This counts as passing so we will run all tests
 
@@ -546,11 +589,17 @@ def run_old_fails():
     passed = []
     try:
         for (i, (test, options)) in enumerate(testsAndOptions):
-            set_globals(options)
-            oldWinners = len(winners)
-            run_tests([test])
-            if len(winners) != oldWinners: # can't use return value due to continue_on_failure
-                passed.append(i)
+            # SERVER-5102: until we can figure out a better way to manage
+            # dependencies of the --only-old-fails build phase, just skip
+            # tests which we can't safely run at this point
+            path, usedb = test
+            filename = os.path.basename(path)
+            if filename in ('test', 'test.exe') or filename.endswith('.js'):
+                set_globals(options)
+                oldWinners = len(winners)
+                run_tests([test])
+                if len(winners) != oldWinners: # can't use return value due to continue_on_failure
+                    passed.append(i)
     finally:
         for offset, i in enumerate(passed):
             testsAndOptions.pop(i - offset)
@@ -628,8 +677,6 @@ def main():
 
     global tests
     (options, tests) = parser.parse_args()
-
-    print tests
 
     set_globals(options)
 

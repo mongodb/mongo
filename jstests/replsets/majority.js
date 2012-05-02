@@ -1,3 +1,5 @@
+if (!_isWindows()) {
+
 var testInsert = function() {
     master.getDB("foo").bar.insert({x:1});
     var result = master.getDB("foo").runCommand({getLastError:1, w:"majority", wtimeout:timeout});
@@ -8,7 +10,7 @@ var testInsert = function() {
 var num = 7;
 var host = getHostName();
 var name = "tags";
-var timeout = 10000;
+var timeout = 60000;
 
 var replTest = new ReplSetTest( {name: name, nodes: num, startPort:31000} );
 var nodes = replTest.startSet();
@@ -94,3 +96,5 @@ master = replTest.getMaster();
 print("make sure majority works");
 assert.eq(testInsert().err, null);
 
+replTest.stopSet();
+}

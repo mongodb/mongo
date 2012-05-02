@@ -18,12 +18,10 @@
  */
 
 #include "pch.h"
-#include "../db/ops/query.h"
 #include "../db/db.h"
 #include "../db/instance.h"
 #include "../db/json.h"
 #include "../db/lasterror.h"
-#include "../db/ops/update.h"
 #include "../util/timer.h"
 #include "dbtests.h"
 
@@ -61,10 +59,10 @@ namespace DirectClientTests {
                     //cout << cmd.toString() << endl;
                     bool ok = client().runCommand("a", cmd, info);
                     //cout << info.toString() << endl;
-                    assert(ok);
+                    verify(ok);
                 }
 
-                assert( client().dropCollection(ns) );
+                verify( client().dropCollection(ns) );
             }
         }
     };

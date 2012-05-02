@@ -18,7 +18,6 @@
 
 #include "pch.h"
 #include "rs.h"
-#include "../../client/dbclient.h"
 #include "../../client/syncclusterconnection.h"
 #include "../../util/net/hostandport.h"
 #include "../dbhelpers.h"
@@ -31,6 +30,8 @@
 using namespace bson;
 
 namespace mongo {
+
+    mongo::mutex ReplSetConfig::groupMx("RS tag group");
 
     void logOpInitiate(const bo&);
 
@@ -58,7 +59,7 @@ namespace mongo {
         checkRsConfig();
         log() << "replSet info saving a newer config version to local.system.replset" << rsLog;
         {
-            writelock lk("");
+            Lock::GlobalWrite lk; // TODO: does this really need to be a global lock?
             Client::Context cx( rsConfigNs );
             cx.db()->flushFiles(true);
 
@@ -97,6 +98,7 @@ namespace mongo {
         for (vector<MemberCfg>::const_iterator source = members.begin(); source < members.end(); source++) {
             for( Member *d = dest.head(); d; d = d->next() ) {
                 if (d->fullName() == (*source).h.toString()) {
+                    scoped_lock lk(groupMx);
                     d->configw().groupsw() = (*source).groups();
                 }
             }
@@ -231,7 +233,7 @@ namespace mongo {
         */
     /*static*/
     bool ReplSetConfig::legalChange(const ReplSetConfig& o, const ReplSetConfig& n, string& errmsg) {
-        assert( theReplSet );
+        verify( theReplSet );
 
         if( o._id != n._id ) {
             errmsg = "set name may not change";
@@ -420,6 +422,7 @@ namespace mongo {
                         }
                     }
 
+                    scoped_lock lk(groupMx);
                     for (set<MemberCfg *>::iterator cfg = (*sgs).second->m.begin();
                          !foundMe && cfg != (*sgs).second->m.end(); cfg++) {
                         (*cfg)->groupsw().insert((*sgs).second);

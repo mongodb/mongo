@@ -26,6 +26,7 @@ namespace mongo {
         _client(client), 
         _wrapped(wrapped) 
     {
+        _lockType = 0;
         if ( _wrapped )
             _client->_curOp = this;
         _start = _checkpoint = 0;
@@ -39,6 +40,7 @@ namespace mongo {
     }
 
     void CurOp::_reset() {
+        _suppressFromCurop = false;
         _command = false;
         _lockType = 0;
         _dbprofile = 0;
@@ -48,6 +50,7 @@ namespace mongo {
         _progressMeter.finished();
         _killed = false;
         _numYields = 0;
+        _expectedLatencyMs = 0;
     }
 
     void CurOp::reset() {
@@ -73,7 +76,7 @@ namespace mongo {
         if ( progressMeterTotal ) {
             if ( _progressMeter.isActive() ) {
                 cout << "about to assert, old _message: " << _message << " new message:" << msg << endl;
-                assert( ! _progressMeter.isActive() );
+                verify( ! _progressMeter.isActive() );
             }
             _progressMeter.reset( progressMeterTotal , secondsBetween );
         }
@@ -119,8 +122,12 @@ namespace mongo {
         b.append("opid", _opNum);
         bool a = _active && _start;
         b.append("active", a);
-        if ( _lockType )
-            b.append("lockType" , _lockType > 0 ? "write" : "read"  );
+        if ( _lockType ) {
+            char str[2];
+            str[0] = _lockType;
+            str[1] = 0;
+            b.append("lockType" , str);
+        }
         b.append("waitingForLock" , _waitingForLock );
 
         if( a ) {
@@ -143,6 +150,7 @@ namespace mongo {
                 b.append( "threadId" , _client->_threadId );
             if ( _client->_connectionId )
                 b.appendNumber( "connectionId" , _client->_connectionId );
+            _client->_ls.reportState(b);
         }
         
         if ( ! _message.empty() ) {
@@ -167,6 +175,43 @@ namespace mongo {
 
         return b.obj();
     }
+
+    void KillCurrentOp::checkForInterrupt( bool heedMutex ) {
+        Client& c = cc();
+        if ( heedMutex && Lock::somethingWriteLocked() && c.hasWrittenThisPass() )
+            return;
+        if( _globalKill )
+            uasserted(11600,"interrupted at shutdown");
+        if( c.curop()->killed() ) {
+            uasserted(11601,"operation was interrupted");
+        }
+        if( c.sometimes(1024) ) {
+            AbstractMessagingPort *p = cc().port();
+            if( p ) 
+                p->assertStillConnected();
+        }
+    }
+    
+    const char * KillCurrentOp::checkForInterruptNoAssert() {
+        Client& c = cc();
+        if( _globalKill )
+            return "interrupted at shutdown";
+        if( c.curop()->killed() )
+            return "interrupted";
+        if( c.sometimes(1024) ) {
+            try { 
+                AbstractMessagingPort *p = cc().port();
+                if( p ) 
+                    p->assertStillConnected();
+            }
+            catch(...) { 
+                log() << "no longer connected to client";
+                return "no longer connected to client";
+            }
+        }
+        return "";
+    }
+
 
     AtomicUInt CurOp::_nextOpNum;
 

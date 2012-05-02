@@ -18,11 +18,16 @@
 
 #pragma once
 
-#include "../pch.h"
-#include "diskloc.h"
-#include "jsobj.h"
-#include "indexkey.h"
-#include "key.h"
+#include "pch.h"
+
+#include <vector>
+
+#include "mongo/db/diskloc.h"
+#include "mongo/db/index_insertion_continuation.h"
+#include "mongo/db/indexkey.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/key.h"
+#include "mongo/db/namespace.h"
 
 namespace mongo {
 
@@ -30,12 +35,22 @@ namespace mongo {
     protected:
         virtual ~IndexInterface() { }
     public:
-        static void phasedBegin();
-        virtual void phasedQueueItemToInsert(
+        class IndexInserter : private boost::noncopyable {
+        public:
+            IndexInserter();
+            ~IndexInserter();
+
+            void addInsertionContinuation(IndexInsertionContinuation *c);
+            void finishAllInsertions();
+
+        private:
+            std::vector<IndexInsertionContinuation *> _continuations;
+        };
+
+        virtual IndexInsertionContinuation *beginInsertIntoIndex(
             int idxNo,
-            DiskLoc thisLoc, DiskLoc _recordLoc, const BSONObj &_key,
-            const Ordering& _order, IndexDetails& _idx, bool dupsAllowed) = 0;
-        static void phasedFinish();
+            IndexDetails &_idx, DiskLoc _recordLoc, const BSONObj &_key,
+            const Ordering& _order, bool dupsAllowed) = 0;
 
         virtual int keyCompare(const BSONObj& l,const BSONObj& r, const Ordering &ordering) = 0;
         virtual long long fullValidate(const DiskLoc& thisLoc, const BSONObj &order) = 0;
@@ -126,7 +141,7 @@ namespace mongo {
             string s;
             s.reserve(Namespace::MaxNsLen);
             s = io.getStringField("ns");
-            assert( !s.empty() );
+            verify( !s.empty() );
             s += ".$";
             s += io.getStringField("name");
             return s;
@@ -232,6 +247,7 @@ namespace mongo {
 
     class NamespaceDetails;
     // changedId should be initialized to false
-    void getIndexChanges(vector<IndexChanges>& v, NamespaceDetails& d, BSONObj newObj, BSONObj oldObj, bool &cangedId);
+    void getIndexChanges(vector<IndexChanges>& v, const char *ns, NamespaceDetails& d,
+                         BSONObj newObj, BSONObj oldObj, bool &cangedId);
     void dupCheck(vector<IndexChanges>& v, NamespaceDetails& d, DiskLoc curObjLoc);
 } // namespace mongo

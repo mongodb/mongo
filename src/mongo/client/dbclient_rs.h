@@ -17,8 +17,15 @@
 
 #pragma once
 
-#include "../pch.h"
-#include "dbclient.h"
+#include "pch.h"
+
+#include <boost/function.hpp>
+#include <boost/shared_ptr.hpp>
+#include <set>
+#include <utility>
+
+#include "mongo/client/dbclientinterface.h"
+#include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 
@@ -56,7 +63,12 @@ namespace mongo {
         static void checkAll( bool checkAllSecondaries );
 
         /**
-         * this is called whenever the config of any repclia set changes
+         * deletes the ReplicaSetMonitor for the given set name.
+         */
+        static void remove( const string& name );
+
+        /**
+         * this is called whenever the config of any replica set changes
          * currently only 1 globally
          * asserts if one already exists
          * ownership passes to ReplicaSetMonitor and the hook will actually never be deleted
@@ -107,13 +119,20 @@ namespace mongo {
          */
         ReplicaSetMonitor( const string& name , const vector<HostAndPort>& servers );
 
+        /**
+         * Checks all connections from the host list and sets the current
+         * master.
+         * 
+         * @param checkAllSecondaries if set to false, stop immediately when
+         *    the master is found or when _master is not -1.
+         */
         void _check( bool checkAllSecondaries );
 
         /**
          * Use replSetGetStatus command to make sure hosts in host list are up
          * and readable.  Sets Node::ok appropriately.
          */
-        void _checkStatus(DBClientConnection *conn);
+        void _checkStatus( const string& hostAddr );
 
         /**
          * Add array of hosts to host list. Doesn't do anything if hosts are
@@ -125,25 +144,50 @@ namespace mongo {
 
         /**
          * Updates host list.
-         * @param c the connection to check
+         * Invariant: if nodesOffset is >= 0, _nodes[nodesOffset].conn should be
+         *  equal to conn.
+         *
+         * @param conn the connection to check
          * @param maybePrimary OUT
          * @param verbose
          * @param nodesOffset - offset into _nodes array, -1 for not in it
-         * @return if the connection is good
+         *
+         * @return true if the connection is good or false if invariant
+         *   is broken
          */
-        bool _checkConnection( DBClientConnection * c , string& maybePrimary , bool verbose , int nodesOffset );
+        bool _checkConnection( DBClientConnection* conn, string& maybePrimary,
+                bool verbose, int nodesOffset );
 
         string _getServerAddress_inlock() const;
 
         NodeDiff _getHostDiff_inlock( const BSONObj& hostList );
         bool _shouldChangeHosts( const BSONObj& hostList, bool inlock );
 
-
+        /**
+         * @return the index to _nodes corresponding to the server address.
+         */
         int _find( const string& server ) const ;
         int _find_inlock( const string& server ) const ;
-        int _find( const HostAndPort& server ) const ;
 
-        mutable mongo::mutex _lock; // protects _nodes
+        /**
+         * Checks whether the given connection matches the connection stored in _nodes.
+         * Mainly used for sanity checking to confirm that nodeOffset still
+         * refers to the right connection after releasing and reacquiring
+         * a mutex.
+         */
+        bool _checkConnMatch_inlock( DBClientConnection* conn, size_t nodeOffset ) const;
+
+        // protects _nodes and indices pointing to it (_master & _nextSlave)
+        mutable mongo::mutex _lock;
+
+        /**
+         * "Synchronizes" the _checkConnection method. Should ideally be one mutex per
+         * connection object being used. The purpose of this lock is to make sure that
+         * the reply from the connection the lock holder got is the actual response
+         * to what it sent.
+         *
+         * Deadlock WARNING: never acquire this while holding _lock
+         */
         mutable mongo::mutex  _checkConnectionLock;
 
         string _name;
@@ -214,8 +258,9 @@ namespace mongo {
        an exception) before the failover is complete.  Operations are not retried.
     */
     class DBClientReplicaSet : public DBClientBase {
-
     public:
+        using DBClientBase::query;
+
         /** Call connect() after constructing. autoReconnect is always on for DBClientReplicaSet connections. */
         DBClientReplicaSet( const string& name , const vector<HostAndPort>& servers, double so_timeout=0 );
         virtual ~DBClientReplicaSet();

@@ -281,14 +281,14 @@ namespace mongo {
     }
 
     BSONObj Projection::KeyOnly::hydrate( const BSONObj& key ) const {
-        assert( _include.size() == _names.size() );
+        verify( _include.size() == _names.size() );
 
         BSONObjBuilder b( key.objsize() + _stringSize + 16 );
 
         BSONObjIterator i(key);
         unsigned n=0;
         while ( i.more() ) {
-            assert( n < _include.size() );
+            verify( n < _include.size() );
             BSONElement e = i.next();
             if ( _include[n] ) {
                 b.appendAs( e , _names[n] );

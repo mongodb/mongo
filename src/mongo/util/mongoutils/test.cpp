@@ -30,16 +30,16 @@ int main() {
     {
         string s = "abcde";
         str::stripTrailing(s, "ef");
-        assert( s == "abcd" );
+        verify( s == "abcd" );
         str::stripTrailing(s, "abcd");
-        assert( s.empty() );
+        verify( s.empty() );
         s = "abcddd";
         str::stripTrailing(s, "d");
-        assert( s == "abc" );
+        verify( s == "abc" );
     }
 
     string x = str::after("abcde", 'c');
-    assert( x == "de" );
-    assert( str::after("abcde", 'x') == "" );
+    verify( x == "de" );
+    verify( str::after("abcde", 'x') == "" );
     return 0;
 }

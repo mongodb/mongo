@@ -3,7 +3,7 @@
 #---------------------------------------------------------------------------
 DOXYFILE_ENCODING      = UTF-8
 PROJECT_NAME           = MongoDB
-PROJECT_NUMBER         = 2.1.1-pre-
+PROJECT_NUMBER         = 2.1.2-pre-
 OUTPUT_DIRECTORY       = docs/doxygen
 CREATE_SUBDIRS         = NO
 OUTPUT_LANGUAGE        = English
@@ -101,7 +101,7 @@ WARN_LOGFILE           =
 #---------------------------------------------------------------------------
 # configuration options related to the input files
 #---------------------------------------------------------------------------
-INPUT                  = client db/jsobj.h db/json.h bson util
+INPUT                  = src/mongo/client src/mongo/db/jsobj.h src/mongo/db/json.h src/mongo/bson src/mongo/util
 INPUT_ENCODING         = UTF-8
 FILE_PATTERNS          = *.c \
                          *.cc \

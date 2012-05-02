@@ -72,18 +72,22 @@ using namespace mongoutils;
 
 namespace mongo {
 
-    extern bool lockedForWriting;
+    bool lockedForWriting();
+    void runExclusively(void (*f)(void));
 
     namespace dur {
 
-        void PREPLOGBUFFER(JSectHeader& outParm);
+        void assertNothingSpooled();
+        void unspoolWriteIntents();
+
+        void PREPLOGBUFFER(JSectHeader& outParm, AlignedBuilder&);
         void WRITETOJOURNAL(JSectHeader h, AlignedBuilder& uncompressed);
         void WRITETODATAFILES(const JSectHeader& h, AlignedBuilder& uncompressed);
 
         /** declared later in this file
             only used in this file -- use DurableInterface::commitNow() outside
         */
-        static void groupCommit();
+        static void groupCommit(Lock::GlobalWrite *lgw = 0);
 
         CommitJob& commitJob = *(new CommitJob()); // don't destroy
 
@@ -173,67 +177,30 @@ namespace mongo {
             return x; 
         }
 
-        void NonDurableImpl::setNoJournal(void *dst, void *src, unsigned len) {
-            memcpy(dst, src, len);
-        }
-
         void NonDurableImpl::declareWriteIntent(void *, unsigned) { 
             cc().writeHappened(); 
         }
 
-        void DurableImpl::setNoJournal(void *dst, void *src, unsigned len) {
-            // we are at least read locked, so we need not worry about REMAPPRIVATEVIEW herein.
-            DEV d.dbMutex.assertAtLeastReadLocked();
-
-            MemoryMappedFile::makeWritable(dst, len);
-
-            // we enter the RecoveryJob mutex here, so that if WRITETODATAFILES is happening we do not 
-            // conflict with it
-            scoped_lock lk1( RecoveryJob::get()._mx );
-
-            // we stay in this mutex for everything to work with DurParanoid/validateSingleMapMatches
-            //
-            // either of these mutexes also makes setNoJournal threadsafe, which is good as we call it from a read 
-            // (not a write) lock in class SlaveTracking
-            //
-            scoped_lock lk( privateViews._mutex() );
-
-            size_t ofs;
-            MongoMMF *f = privateViews.find_inlock(dst, ofs);
-            assert(f);
-            void *w = (((char *)f->view_write())+ofs);
-            // first write it to the writable (file) view
-            memcpy(w, src, len);
-            if( memcmp(w, dst, len) ) {
-                // if we get here, a copy-on-write had previously occurred. so write it to the private view too
-                // to keep them in sync.  we do this as we do not want to cause a copy on write unnecessarily.
-                memcpy(dst, src, len);
-            }
-        }
-
-        /** base declare write intent function that all the helpers call. */
-        void DurableImpl::declareWriteIntent(void *p, unsigned len) {
-            commitJob.note(p, len);
-        }
+        void assertLockedForCommitting();
 
         static DurableImpl* durableImpl = new DurableImpl();
         static NonDurableImpl* nonDurableImpl = new NonDurableImpl();
         DurableInterface* DurableInterface::_impl = nonDurableImpl;
 
         void DurableInterface::enableDurability() {
-            assert(_impl == nonDurableImpl);
+            verify(_impl == nonDurableImpl);
             _impl = durableImpl;
         }
 
         void DurableInterface::disableDurability() {
-            assert(_impl == durableImpl);
+            verify(_impl == durableImpl);
             massert(13616, "can't disable durability with pending writes", !commitJob.hasWritten());
             _impl = nonDurableImpl;
         }
 
         bool DurableImpl::commitNow() {
             stats.curr->_earlyCommits++;
-            groupCommit();
+            groupCommit(0);
             return true;
         }
 
@@ -283,17 +250,78 @@ namespace mongo {
             return commitJob.bytes() > UncommittedBytesLimit;
         }
 
-        bool DurableImpl::commitIfNeeded() {
-            if ( !d.dbMutex.isWriteLocked() )
-                return false;
-
-            DEV commitJob._nSinceCommitIfNeededCall = 0;
-            if (commitJob.bytes() > UncommittedBytesLimit) { // should this also fire if CmdLine::DurAlwaysCommit?
-                stats.curr->_earlyCommits++;
-                groupCommit();
-                return true;
+        static int in_f;
+        void f_commitEarlyInRunExclusively() { 
+            dassert( in_f == 0 );
+            in_f++;
+            try { 
+                assertNothingSpooled();
+                getDur().commitNow();
+                assertNothingSpooled(); // a light sanity check that we truly were exclusive
             }
-            return false;
+            catch(...) { 
+                in_f--;
+                throw;
+            }
+            in_f--;
+        }
+
+        void assertLockedForCommitting() { 
+            char t = Lock::isLocked();
+            if(  t == 'R' || t == 'W' )
+                return;
+            // 'w' case we use runExclusively
+            fassert( 16110, t == 'w' );
+            fassert( 16111, in_f == 1 );
+        }
+
+        /** we may need to commit earlier than normal if data are being written at 
+            very high rates. 
+        
+            note you can call this unlocked, and that is a good idea as if you are in 
+            say, a 'w' lock state, we can't do the commit
+
+	        @param force force a commit now even if seemingly not needed - ie the caller may 
+ 	           know something we don't such as that files will be closed
+        */
+        bool DurableImpl::commitIfNeeded(bool force) {
+            unspoolWriteIntents();
+            DEV commitJob._nSinceCommitIfNeededCall = 0;
+            if( commitJob.bytes() < UncommittedBytesLimit && !force ) {
+                return false;
+            }
+            if( !Lock::isLocked() ) {
+                DEV log() << "commitIfNeeded but we are unlocked that is ok but why do we get here" << endl;
+                Lock::GlobalRead r;
+                if( commitJob.bytes() < UncommittedBytesLimit ) {
+                    // someone else beat us to it
+                    return false;
+                }
+                commitNow();
+            }
+            else if( Lock::isLocked() == 'w' ) {
+                if( Lock::atLeastReadLocked("local") ) { 
+                    error() << "can't commitNow from commitIfNeeded, as we are in local db lock" << endl;
+                    printStackTrace();
+                    dassert(false); // this will make _DEBUG builds terminate. so we will notice in buildbot.
+                    return false;
+                }
+                else if( Lock::atLeastReadLocked("admin") ) { 
+                    error() << "can't commitNow from commitIfNeeded, as we are in admin db lock" << endl;
+                    printStackTrace();
+                    dassert(false);
+                    return false;
+                }
+                else {
+                    log(1) << "commitIfNeeded calling runExclusively " << force << endl;
+                    runExclusively(f_commitEarlyInRunExclusively);
+                }
+            }
+            else { 
+                // 'W'
+                commitNow();
+            }
+            return true;
         }
 
         /** Used in _DEBUG builds to check that we didn't overwrite the last intent
@@ -309,7 +337,7 @@ namespace mongo {
             static int n;
             ++n;
 
-            assert(debug && cmdLine.dur);
+            verify(debug && cmdLine.dur);
             if (commitJob.writes().empty())
                 return;
             const WriteIntent &i = commitJob.lastWrite();
@@ -358,12 +386,10 @@ namespace mongo {
 
                     _bytes += mmf->length();
 
-                    assert( mmf->length() == (unsigned) mmf->length() );
-                    {
-                        scoped_lock lk( privateViews._mutex() ); // see setNoJournal
-                        if (memcmp(p, w, (unsigned) mmf->length()) == 0)
-                            return; // next file
-                    }
+                    verify( mmf->length() == (unsigned) mmf->length() );
+
+                    if (memcmp(p, w, (unsigned) mmf->length()) == 0)
+                        return; // next file
 
                     unsigned low = 0xffffffff;
                     unsigned high = 0;
@@ -395,8 +421,8 @@ namespace mongo {
                         ss << "journal error warning views mismatch " << mmf->filename() << ' ' << (hex) << low << ".." << high << " len:" << high-low+1;
                         log() << ss.str() << endl;
                         log() << "priv loc: " << (void*)(p+low) << ' ' << endl;
-                        set<WriteIntent>& b = commitJob.writes();
-                        (void)b; // mark as unused. Useful for inspection in debugger
+                        //vector<WriteIntent>& _intents = commitJob.wi()._intents;
+                        //(void) _intents; // mark as unused. Useful for inspection in debugger
 
                         // should we abort() here so this isn't unnoticed in some circumstances?
                         massert(13599, "Written data does not match in-memory view. Missing WriteIntent?", false);
@@ -430,9 +456,8 @@ namespace mongo {
 
             LOG(4) << "journal REMAPPRIVATEVIEW" << endl;
 
-            d.dbMutex.assertWriteLocked();
-            d.dbMutex._remapPrivateViewRequested = false;
-            assert( !commitJob.hasWritten() );
+            verify( Lock::isW() );
+            verify( !commitJob.hasWritten() );
 
             // we want to remap all private views about every 2 seconds.  there could be ~1000 views so
             // we do a little each pass; beyond the remap time, more significantly, there will be copy on write
@@ -444,7 +469,16 @@ namespace mongo {
                 fraction = 1;
             lastRemap = now;
 
+#if defined(_WIN32)
+            // Note that this negatively affects performance.
+            // We must grab the exclusive lock here because remapThePrivateView() on Windows needs
+            // to grab it as well, due to the lack of a non-atomic way to remap a memory mapped file.
+            // See SERVER-5723 for performance improvement.
+            // See SERVER-5680 to see why this code is necessary.
+            LockMongoFilesExclusive lk;
+#else
             LockMongoFilesShared lk;
+#endif
             set<MongoFile*>& files = MongoFile::getAllFiles();
             unsigned sz = files.size();
             if( sz == 0 )
@@ -480,7 +514,7 @@ namespace mongo {
                 dassert( i != e );
                 if( (*i)->isMongoMMF() ) {
                     MongoMMF *mmf = (MongoMMF*) *i;
-                    assert(mmf);
+                    verify(mmf);
                     if( mmf->willNeedRemap() ) {
                         mmf->willNeedRemap() = false;
                         mmf->remapThePrivateView();
@@ -501,72 +535,60 @@ namespace mongo {
             stats.curr->_remapPrivateViewMicros += t.micros();
         }
 
-        // lock order: dbMutex first, then this
-        mutex groupCommitMutex("groupCommit");
+        // this is a pseudo-local variable in the groupcommit functions 
+        // below.  however we don't truly do that so that we don't have to 
+        // reallocate, and more importantly regrow it, on every single commit.
+        static AlignedBuilder __theBuilder(4 * 1024 * 1024);
 
-        bool _groupCommitWithLimitedLocks() {
+        static bool _groupCommitWithLimitedLocks() {
+            unspoolWriteIntents(); // in case we were doing some writing ourself (likely impossible with limitedlocks version)
+            AlignedBuilder &ab = __theBuilder;
 
-            int p = 0;
-            LOG(4) << "groupcommitll " << p++ << endl;
+            verify( ! Lock::isLocked() );
 
-            scoped_ptr<ExcludeAllWrites> lk1( new ExcludeAllWrites() );
+            // do we need this to be greedy, so that it can start working fairly soon?
+            // probably: as this is a read lock, it wouldn't change anything if only reads anyway.
+            // also needs to stop greed. our time to work before clearing lk1 is not too bad, so 
+            // not super critical, but likely 'correct'.  todo.
+            scoped_ptr<Lock::GlobalRead> lk1( new Lock::GlobalRead() );
 
-            LOG(4) << "groupcommitll " << p++ << endl;
+            SimpleMutex::scoped_lock lk2(commitJob.groupCommitMutex);
 
-            scoped_lock lk2(groupCommitMutex);
-
-            LOG(4) << "groupcommitll " << p++ << endl;
-
-            commitJob.beginCommit();
+            commitJob.commitingBegin(); // increments the commit epoch for getlasterror j:true
 
             if( !commitJob.hasWritten() ) {
                 // getlasterror request could have came after the data was already committed
-                commitJob.notifyCommitted();
+                commitJob.committingNotifyCommitted();
                 return true;
             }
 
-            LOG(4) << "groupcommitll " << p++ << endl;
-
             JSectHeader h;
-            PREPLOGBUFFER(h); // need to be in readlock (writes excluded) for this
-
-            LOG(4) << "groupcommitll " << p++ << endl;
+            PREPLOGBUFFER(h,ab); // need to be in readlock (writes excluded) for this
 
             LockMongoFilesShared lk3;
 
-            LOG(4) << "groupcommitll " << p++ << endl;
-
-            unsigned abLen = commitJob._ab.len();
-            commitJob.reset(); // must be reset before allowing anyone to write
-            DEV assert( !commitJob.hasWritten() );
-
-            LOG(4) << "groupcommitll " << p++ << endl;
+            unsigned abLen = ab.len();
+            commitJob.committingReset(); // must be reset before allowing anyone to write
+            DEV verify( !commitJob.hasWritten() );
 
             // release the readlock -- allowing others to now write while we are writing to the journal (etc.)
             lk1.reset();
 
-            LOG(4) << "groupcommitll " << p++ << endl;
-
             // ****** now other threads can do writes ******
 
-            WRITETOJOURNAL(h, commitJob._ab);
-            assert( abLen == commitJob._ab.len() ); // a check that no one touched the builder while we were doing work. if so, our locking is wrong.
-
-            LOG(4) << "groupcommitll " << p++ << endl;
+            WRITETOJOURNAL(h, ab);
+            verify( abLen == ab.len() ); // a check that no one touched the builder while we were doing work. if so, our locking is wrong.
 
             // data is now in the journal, which is sufficient for acknowledging getLastError.
             // (ok to crash after that)
-            commitJob.notifyCommitted();
+            commitJob.committingNotifyCommitted();
 
-            LOG(4) << "groupcommitll " << p++ << " WRITETODATAFILES()" << endl;
-
-            WRITETODATAFILES(h, commitJob._ab);
-            assert( abLen == commitJob._ab.len() ); // check again wasn't modded
-            commitJob._ab.reset();
-
-            LOG(4) << "groupcommitll " << p++ << endl;
+            WRITETODATAFILES(h, ab);
+            verify( abLen == ab.len() ); // check again wasn't modded
+            ab.reset();
 
             // can't : d.dbMutex._remapPrivateViewRequested = true;
+            // (writes have happened we released)
 
             return true;
         }
@@ -595,58 +617,71 @@ namespace mongo {
             return false;
         }
 
-        static void _groupCommit() {
-
+        static void _groupCommit(Lock::GlobalWrite *lgw) {
             LOG(4) << "_groupCommit " << endl;
 
-            // we need to be at least read locked on the dbMutex so that we know the write intent data 
-            // structures are not changing while we work
-            d.dbMutex.assertAtLeastReadLocked();
+            // runExclusively is in 'w', else we are 'R' or 'W'
+            assertLockedForCommitting();
 
-            commitJob.beginCommit();
-
-            if( !commitJob.hasWritten() ) {
-                // getlasterror request could have came after the data was already committed
-                commitJob.notifyCommitted();
-                return;
-            }
+            unspoolWriteIntents(); // in case we were doing some writing ourself
+            AlignedBuilder &ab = __theBuilder;
 
             // we need to make sure two group commits aren't running at the same time
             // (and we are only read locked in the dbMutex, so it could happen)
-            scoped_lock lk(groupCommitMutex);
+            SimpleMutex::scoped_lock lk(commitJob.groupCommitMutex);
 
-            JSectHeader h;
-            PREPLOGBUFFER(h);
+            commitJob.commitingBegin();
 
-            // todo : write to the journal outside locks, as this write can be slow.
-            //        however, be careful then about remapprivateview as that cannot be done 
-            //        if new writes are then pending in the private maps.
-            WRITETOJOURNAL(h, commitJob._ab);
+            if( !commitJob.hasWritten() ) {
+                // getlasterror request could have came after the data was already committed
+                commitJob.committingNotifyCommitted();
+            }
+            else {
+                JSectHeader h;
+                PREPLOGBUFFER(h,ab);
 
-            // data is now in the journal, which is sufficient for acknowledging getLastError.
-            // (ok to crash after that)
-            commitJob.notifyCommitted();
+                // todo : write to the journal outside locks, as this write can be slow.
+                //        however, be careful then about remapprivateview as that cannot be done 
+                //        if new writes are then pending in the private maps.
+                WRITETOJOURNAL(h, ab);
 
-            WRITETODATAFILES(h, commitJob._ab);
-            debugValidateAllMapsMatch();
+                // data is now in the journal, which is sufficient for acknowledging getLastError.
+                // (ok to crash after that)
+                commitJob.committingNotifyCommitted();
 
-            commitJob.reset();
-            commitJob._ab.reset();
+                WRITETODATAFILES(h, ab);
+                debugValidateAllMapsMatch();
+
+                commitJob.committingReset();
+                ab.reset();
+            }
 
             // REMAPPRIVATEVIEW
             //
             // remapping private views must occur after WRITETODATAFILES otherwise
             // we wouldn't see newly written data on reads.
             //
-            DEV assert( !commitJob.hasWritten() );
-            if( !d.dbMutex.isWriteLocked() ) {
-                // this needs done in a write lock (as there is a short window during remapping when each view 
-                // might not exist) thus we do it on the next acquisition of that instead of here (there is no 
-                // rush if you aren't writing anyway -- but it must happen, if it is done, before any uncommitted 
-                // writes occur).  If desired, perhaps this can be eliminated on posix as it may be that the remap 
-                // is race-free there.
+            DEV verify( !commitJob.hasWritten() );
+            if( !Lock::isW() ) {
+                // REMAPPRIVATEVIEW needs done in a write lock (as there is a short window during remapping when each view 
+                // might not exist) thus we do it later.
+                // 
+                // if commitIfNeeded() operations are not in a W lock, you could get too big of a private map 
+                // on a giant operation.  for now they will all be W.
+                // 
+                // If desired, perhaps this can be eliminated on posix as it may be that the remap is race-free there.
                 //
-                d.dbMutex._remapPrivateViewRequested = true;
+                // For durthread, lgw is set, and we can upgrade to a W lock for the remap. we do this way as we don't want 
+                // to be in W the entire time we were committing about (in particular for WRITETOJOURNAL() which takes time).
+                if( lgw ) { 
+                    LOG(4) << "_groupCommit upgrade" << endl;
+                    if( lgw->upgrade() ) {
+                        REMAPPRIVATEVIEW();
+                    }
+                    else {
+                        log() << "info timeout on lock upgrade for REMAPPRIVATEVIEW" << endl;
+                    }
+                }
             }
             else {
                 stats.curr->_commitsInWriteLock++;
@@ -660,11 +695,14 @@ namespace mongo {
 
         /** locking: in read lock when called
                      or, for early commits (commitIfNeeded), in write lock
+            @param lwg set if the durcommitthread *only* -- then we will upgrade the lock 
+                   to W so we can remapprivateview. only durcommitthread as more than one 
+                   thread upgrading would potentially deadlock
             @see MongoMMF::close()
         */
-        static void groupCommit() {
+        static void groupCommit(Lock::GlobalWrite *lgw) {
             try {
-                _groupCommit();
+                _groupCommit(lgw);
             }
             catch(DBException& e ) { 
                 log() << "dbexception in groupCommit causing immediate shutdown: " << e.toString() << endl;
@@ -685,7 +723,7 @@ namespace mongo {
             LOG(4) << "groupCommit end" << endl;
         }
 
-        static void go() {
+        static void durThreadGroupCommit() {
             const int N = 10;
             static int n;
             if( privateMapBytes < UncommittedBytesLimit && ++n % N && (cmdLine.durOptions&CmdLine::DurAlwaysRemap)==0 ) {
@@ -695,25 +733,14 @@ namespace mongo {
                 if( groupCommitWithLimitedLocks() )
                     return;
             }
-            else {
-                readlocktry lk("", 1000);
-                if( lk.got() ) {
-                    groupCommit();
-                    return;
-                }
-            }
 
-            if ( lockedForWriting ) {
-                warning() << "group commit delayed beacuse of fsync + lock" << endl;
-                return;
-            }
-
-            // starvation on read locks could occur.  so if read lock acquisition is slow, try to get a
-            // write lock instead.  otherwise journaling could be delayed too long (too much data will 
-            // not accumulate though, as commitIfNeeded logic will have executed in the meantime if there 
-            // has been writes)
-            writelock lk;
-            groupCommit();
+            // we get a write lock, downgrade, do work, upgrade, finish work.
+            // getting a write lock is helpful also as we need to be greedy and not be starved here
+            // note our "stopgreed" parm -- to stop greed by others while we are working. you can't write 
+            // anytime soon anyway if we are journaling for a while, that was the idea.
+            Lock::GlobalWrite w(/*stopgreed:*/true);
+            w.downgrade();
+            groupCommit(&w);
         }
 
         /** called when a MongoMMF is closing -- we need to go ahead and group commit in that case before its
@@ -723,11 +750,11 @@ namespace mongo {
             if (!cmdLine.dur)
                 return;
 
-            if( d.dbMutex.atLeastReadLocked() ) {
-                groupCommit();
+	    if( Lock::isLocked() ) {
+                getDur().commitIfNeeded(true);
             }
             else {
-                assert( inShutdown() );
+                verify( inShutdown() );
                 if( commitJob.hasWritten() ) {
                     log() << "journal warning files are closing outside locks with writes pending" << endl;
                 }
@@ -770,11 +797,12 @@ namespace mongo {
                     for( unsigned i = 1; i <= 2; i++ ) {
                         if( commitJob._notify.nWaiting() )
                             break;
-                        commitJob.wi()._deferred.invoke();
                         sleepmillis(oneThird);
                     }
+                                        
+                    //DEV log() << "privateMapBytes=" << privateMapBytes << endl;
 
-                    go();
+                    durThreadGroupCommit();
                 }
                 catch(std::exception& e) {
                     log() << "exception in durThread causing immediate shutdown: " << e.what() << endl;
@@ -786,16 +814,8 @@ namespace mongo {
 
         void recover();
 
-        unsigned notesThisLock = 0;
-
         void releasingWriteLock() {
-            DEV notesThisLock = 0;
-            // implicit commitIfNeeded check on each write unlock
-            DEV commitJob._nSinceCommitIfNeededCall = 0; // implicit commit if needed
-            if( commitJob.bytes() > UncommittedBytesLimit || cmdLine.durOptions & CmdLine::DurAlwaysCommit ) {
-                stats.curr->_earlyCommits++;
-                groupCommit();
-            }
+            unspoolWriteIntents();
         }
 
         void preallocateFiles();
@@ -824,6 +844,14 @@ namespace mongo {
             try {
                 recover();
             }
+            catch(DBException& e) {
+                log() << "dbexception during recovery: " << e.toString() << endl;
+                throw;
+            }
+            catch(std::exception& e) {
+                log() << "std::exception during recovery: " << e.what() << endl;
+                throw;
+            }
             catch(...) {
                 log() << "exception during recovery" << endl;
                 throw;
@@ -835,20 +863,20 @@ namespace mongo {
         }
 
         void DurableImpl::syncDataAndTruncateJournal() {
-            d.dbMutex.assertWriteLocked();
+            verify( Lock::isW() );
 
             // a commit from the commit thread won't begin while we are in the write lock,
             // but it may already be in progress and the end of that work is done outside 
             // (dbMutex) locks. This line waits for that to complete if already underway.
             {
-                scoped_lock lk(groupCommitMutex);
+                SimpleMutex::scoped_lock lk(commitJob.groupCommitMutex);
             }
 
-            groupCommit();
+            commitNow();
             MongoFile::flushAll(true);
             journalCleanup();
 
-            assert(!haveJournalFiles()); // Double check post-conditions
+            verify(!haveJournalFiles()); // Double check post-conditions
         }
 
     } // namespace dur

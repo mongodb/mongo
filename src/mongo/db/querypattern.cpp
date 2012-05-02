@@ -16,6 +16,7 @@
  */
 
 #include "querypattern.h"
+#include "mongo/db/queryutil.h"
 
 namespace mongo {
 
@@ -51,7 +52,7 @@ namespace mongo {
     bool QueryPattern::operator==( const QueryPattern &other ) const {
         bool less = operator<( other );
         bool more = other.operator<( *this );
-        assert( !( less && more ) );
+        verify( !( less && more ) );
         return !( less || more );
     }
     
@@ -104,5 +105,13 @@ namespace mongo {
         }
         return b.obj();
     }
+    
+    CachedQueryPlan::CachedQueryPlan( const BSONObj &indexKey, long long nScanned,
+                                     CandidatePlanCharacter planCharacter ) :
+    _indexKey( indexKey ),
+    _nScanned( nScanned ),
+    _planCharacter( planCharacter ) {
+    }
+
     
 } // namespace mongo

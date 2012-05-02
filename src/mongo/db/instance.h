@@ -20,11 +20,11 @@
 #pragma once
 
 
-#include "../client/dbclient.h"
 #include "curop-inl.h"
 #include "security.h"
 #include "cmdline.h"
 #include "client.h"
+#include "mongo/client/dbclientinterface.h"
 
 namespace mongo {
 
@@ -85,6 +85,8 @@ namespace mongo {
      */
     class DBDirectClient : public DBClientBase {
     public:
+        using DBClientBase::query;
+
         virtual auto_ptr<DBClientCursor> query(const string &ns, Query query, int nToReturn = 0, int nToSkip = 0,
                                                const BSONObj *fieldsToReturn = 0, int queryOptions = 0, int batchSize = 0);
 
@@ -117,6 +119,9 @@ namespace mongo {
         double getSoTimeout() const { return 0; }
 
         virtual bool lazySupported() const { return true; }
+
+        virtual QueryOptions _lookupAvailableOptions();
+
     private:
         static HostAndPort _clientHost;
     };
@@ -127,5 +132,7 @@ namespace mongo {
 #endif
     void acquirePathLock(bool doingRepair=false); // if doingRepair=true don't consider unclean shutdown an error
     void maybeCreatePidFile();
+
+    void exitCleanly( ExitCode code );
 
 } // namespace mongo

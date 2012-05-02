@@ -18,7 +18,6 @@
 */
 
 #include "pch.h"
-#include "ops/query.h"
 #include "pdfile.h"
 #include "jsobj.h"
 #include "../bson/util/builder.h"
@@ -51,9 +50,9 @@ namespace mongo {
             code = e.codeWScopeCode();
             break;
         default:
-            assert(0);
+            verify(0);
         }
-        assert( code );
+        verify( code );
 
         if ( ! globalScriptEngine ) {
             errmsg = "db side execution is disabled";
@@ -106,6 +105,7 @@ namespace mongo {
         return true;
     }
 
+    // SERVER-4328 todo review for concurrency
     class CmdEval : public Command {
     public:
         virtual bool slaveOk() const {
@@ -126,7 +126,10 @@ namespace mongo {
             }
 
             // write security will be enforced in DBDirectClient
-            mongolock lk( ai->isAuthorized( dbname.c_str() ) );
+            // TODO: should this be a db lock?
+            scoped_ptr<Lock::ScopedLock> lk( ai->isAuthorized( dbname.c_str() ) ? 
+                                             static_cast<Lock::ScopedLock*>( new Lock::GlobalWrite() ) : 
+                                             static_cast<Lock::ScopedLock*>( new Lock::GlobalRead() ) );
             Client::Context ctx( dbname );
 
             return dbEval(dbname, cmdObj, result, errmsg);

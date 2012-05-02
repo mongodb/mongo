@@ -24,6 +24,7 @@
 
 #include "d_chunk_manager.h"
 #include "util.h"
+#include "mongo/util/concurrency/ticketholder.h"
 
 namespace mongo {
 
@@ -149,6 +150,9 @@ namespace mongo {
 
         // protects state below
         mutable mongo::mutex _mutex;
+        // protects accessing the config server
+        // Using a ticket holder so we can have multiple redundant tries at any given time
+        mutable TicketHolder _configServerTickets;
 
         // map from a namespace into the ensemble of chunk ranges that are stored in this mongod
         // a ShardChunkManager carries all state we need for a collection at this shard, including its version information
@@ -223,8 +227,9 @@ namespace mongo {
 
     /**
      * @return true if the current threads shard version is ok, or not in sharded version
+     * Also returns an error message and the Config/ShardChunkVersions causing conflicts
      */
-    bool shardVersionOk( const string& ns , string& errmsg );
+    bool shardVersionOk( const string& ns , string& errmsg, ConfigVersion& received, ConfigVersion& wanted );
 
     /**
      * @return true if we took care of the message and nothing else should be done

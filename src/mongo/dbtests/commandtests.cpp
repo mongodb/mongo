@@ -15,9 +15,8 @@
  */
 
 #include "pch.h"
-#include "../client/dbclient.h"
 #include "dbtests.h"
-#include "../db/concurrency.h"
+#include "../db/d_concurrency.h"
 
 using namespace mongo;
 

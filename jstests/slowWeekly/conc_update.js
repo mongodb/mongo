@@ -1,4 +1,6 @@
-db = db.getSisterDB("concurrency")
+load( "jstests/libs/slow_weekly_util.js" )
+test = new SlowWeeklyMongod( "conc_update" )
+db = test.getDB("concurrency")
 db.dropDatabase();
 
 NRECORDS=5*1024*1024 // this needs to be relatively big so that
@@ -52,3 +54,5 @@ print(querycount + " queries, " + decrements + " decrements, " + misses + " miss
 assert.eq( NRECORDS , db.conc.count() , "AT END 1" )
 
 updater() // wait()
+
+test.stop();

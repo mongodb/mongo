@@ -45,3 +45,4 @@ res.drop();
 
 assert.eq(x, x2, "object from inline and collection are not equal")
 
+t.drop();

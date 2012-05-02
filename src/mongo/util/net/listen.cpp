@@ -307,6 +307,13 @@ namespace mongo {
                 }
                 if (from.getType() != AF_UNIX)
                     disableNagle(s);
+
+#ifdef SO_NOSIGPIPE
+                // ignore SIGPIPE signals on osx, to avoid process exit
+                const int one = 1;
+                setsockopt( s , SOL_SOCKET, SO_NOSIGPIPE, &one, sizeof(int));
+#endif
+
                 if ( _logConnect && ! cmdLine.quiet ){
                     int conns = connTicketHolder.used()+1;
                     const char* word = (conns == 1 ? " connection" : " connections");
@@ -334,7 +341,7 @@ namespace mongo {
     }
     
     void Listener::acceptedMP(MessagingPort *mp) {
-        assert(!"You must overwrite one of the accepted methods");
+        verify(!"You must overwrite one of the accepted methods");
     }
 
     // ----- ListeningSockets -------
@@ -355,7 +362,7 @@ namespace mongo {
         return DEFAULT_MAX_CONN;
 #else
         struct rlimit limit;
-        assert( getrlimit(RLIMIT_NOFILE,&limit) == 0 );
+        verify( getrlimit(RLIMIT_NOFILE,&limit) == 0 );
 
         int max = (int)(limit.rlim_cur * .8);
 

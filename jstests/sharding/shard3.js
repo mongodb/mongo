@@ -61,13 +61,19 @@ function doCounts( name , total , onlyItCounts ){
 }
 
 var total = doCounts( "before wrong save" )
-secondary.save( { num : -3 } );
+secondary.save( { _id : 111 , num : -3 } );
 printjson( secondary.getDB().getLastError() )
 doCounts( "after wrong save" , total , true )
 e = a.find().explain();
 assert.eq( 3 , e.n , "ex1" )
 assert.eq( 4 , e.nscanned , "ex2" )
-assert.eq( 1 , e.nChunkSkips , "ex3" )
+assert.eq( 4 , e.nscannedObjects , "ex3" )
+assert.eq( 1 , e.nChunkSkips , "ex4" )
+
+// SERVER-4612 
+// make sure idhack obeys chunks
+x = a.findOne( { _id : 111 } )
+assert( ! x , "idhack didn't obey chunk boundaries " + tojson(x) );
 
 // --- move all to 1 ---
 print( "MOVE ALL TO 1" );

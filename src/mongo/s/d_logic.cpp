@@ -29,7 +29,6 @@
 #include "../db/commands.h"
 #include "../db/jsobj.h"
 #include "../db/dbmessage.h"
-#include "../db/ops/query.h"
 
 #include "../client/connpool.h"
 
@@ -44,7 +43,7 @@ using namespace std;
 namespace mongo {
 
     bool _handlePossibleShardedMessage( Message &m, DbResponse* dbresponse ) {
-        DEV assert( shardingState.enabled() );
+        DEV verify( shardingState.enabled() );
 
         int op = m.operation();
         if ( op < 2000
@@ -56,14 +55,16 @@ namespace mongo {
         DbMessage d(m);
         const char *ns = d.getns();
         string errmsg;
-        if ( shardVersionOk( ns , errmsg ) ) {
+        // We don't care about the version here, since we're returning it later in the writeback
+        ConfigVersion received, wanted;
+        if ( shardVersionOk( ns , errmsg, received, wanted ) ) {
             return false;
         }
 
         LOG(1) << "connection meta data too old - will retry ns:(" << ns << ") op:(" << opToString(op) << ") " << errmsg << endl;
 
         if ( doesOpGetAResponse( op ) ) {
-            assert( dbresponse );
+            verify( dbresponse );
             BufBuilder b( 32768 );
             b.skip( sizeof( QueryResult ) );
             {

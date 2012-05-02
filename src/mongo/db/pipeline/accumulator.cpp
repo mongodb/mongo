@@ -38,33 +38,24 @@ namespace mongo {
 
     void Accumulator::opToBson(
         BSONObjBuilder *pBuilder, string opName,
-        string fieldName, unsigned depth) const {
-        assert(vpOperand.size() == 1);
+        string fieldName) const {
+        verify(vpOperand.size() == 1);
         BSONObjBuilder builder;
-        vpOperand[0]->addToBsonObj(&builder, opName, depth);
+        vpOperand[0]->addToBsonObj(&builder, opName, false);
         pBuilder->append(fieldName, builder.done());
     }
 
     void Accumulator::addToBsonObj(
-        BSONObjBuilder *pBuilder, string fieldName, unsigned depth) const {
-        opToBson(pBuilder, getOpName(), fieldName, depth);
+        BSONObjBuilder *pBuilder, string fieldName,
+        bool requireExpression) const {
+        opToBson(pBuilder, getOpName(), fieldName);
     }
 
-    void Accumulator::addToBsonArray(
-        BSONArrayBuilder *pBuilder, unsigned depth) const {
-        assert(false); // these can't appear in arrays
+    void Accumulator::addToBsonArray(BSONArrayBuilder *pBuilder) const {
+        verify(false); // these can't appear in arrays
     }
 
     void agg_framework_reservedErrors() {
-        uassert(15984, "reserved error", false);
-
-        uassert(16023, "reserved error", false);
-        uassert(16024, "reserved error", false);
-        uassert(16025, "reserved error", false);
-        uassert(16026, "reserved error", false);
-        uassert(16027, "reserved error", false);
-        uassert(16028, "reserved error", false);
-        uassert(16029, "reserved error", false);
         uassert(16030, "reserved error", false);
         uassert(16031, "reserved error", false);
         uassert(16032, "reserved error", false);

@@ -23,6 +23,7 @@
 
 #include "../db/dbhelpers.h"
 #include "../db/clientcursor.h"
+#include "mongo/client/dbclientcursor.h"
 
 #include "../db/instance.h"
 #include "../db/json.h"
@@ -34,12 +35,14 @@
 
 namespace mongo {
     extern int __findingStartInitialTimeout;
+    void assembleRequest( const string &ns, BSONObj query, int nToReturn, int nToSkip,
+                         const BSONObj *fieldsToReturn, int queryOptions, Message &toSend );
 }
 
 namespace QueryTests {
 
     class Base {
-        dblock lk;
+        Lock::GlobalWrite lk;
         Client::Context _context;
     public:
         Base() : _context( ns() ) {
@@ -127,12 +130,14 @@ namespace QueryTests {
     class FindOneEmptyObj : public Base {
     public:
         void run() {
+            // todo: this is BAD.
+            cc().getAuthenticationInfo()->setIsALocalHostConnectionWithSpecialAuthPowers();
+
             // We don't normally allow empty objects in the database, but test that we can find
             // an empty object (one might be allowed inside a reserved namespace at some point).
-            dblock lk;
+            Lock::GlobalWrite lk;
             Client::Context ctx( "unittests.querytests" );
             // Set up security so godinsert command can run.
-            cc().getAuthenticationInfo()->isLocalHost = true;
             DBDirectClient cl;
             BSONObj info;
             ASSERT( cl.runCommand( "unittests", BSON( "godinsert" << "querytests" << "obj" << BSONObj() ), info ) );
@@ -200,6 +205,17 @@ namespace QueryTests {
             long long cursorId = cursor->getCursorId();
             cursor->decouple();
             cursor.reset();
+
+            {
+                // Check internal server handoff to getmore.
+                Lock::DBWrite lk(ns);
+                Client::Context ctx( ns );
+                ClientCursor::Pointer clientCursor( cursorId );
+                ASSERT( clientCursor.c()->pq );
+                ASSERT_EQUALS( 2, clientCursor.c()->pq->getNumToReturn() );
+                ASSERT_EQUALS( 2, clientCursor.c()->pos() );
+            }
+            
             cursor = client().getMore( ns, cursorId );
             ASSERT( cursor->more() );
             ASSERT_EQUALS( 3, cursor->next().getIntField( "a" ) );
@@ -414,6 +430,39 @@ namespace QueryTests {
         }
     };
 
+    class OplogReplaySlaveReadTill : public ClientBase {
+    public:
+        ~OplogReplaySlaveReadTill() {
+            client().dropCollection( "unittests.querytests.OplogReplaySlaveReadTill" );
+        }
+        void run() {
+            const char *ns = "unittests.querytests.OplogReplaySlaveReadTill";
+            Lock::DBWrite lk(ns);
+            Client::Context ctx( ns );
+            
+            BSONObj info;
+            client().runCommand( "unittests",
+                                BSON( "create" << "querytests.OplogReplaySlaveReadTill" <<
+                                     "capped" << true << "size" << 8192 ),
+                                info );
+            Date_t one = OpTime::_now().asDate();
+            Date_t two = OpTime::_now().asDate();
+            Date_t three = OpTime::_now().asDate();
+            insert( ns, BSON( "ts" << one ) );
+            insert( ns, BSON( "ts" << two ) );
+            insert( ns, BSON( "ts" << three ) );
+            auto_ptr<DBClientCursor> c =
+            client().query( ns, QUERY( "ts" << GTE << two ).hint( BSON( "$natural" << 1 ) ),
+                           0, 0, 0, QueryOption_OplogReplay | QueryOption_CursorTailable );
+            ASSERT( c->more() );
+            ASSERT_EQUALS( two, c->next()["ts"].Date() );
+            long long cursorId = c->getCursorId();
+            
+            ClientCursor::Pointer clientCursor( cursorId );
+            ASSERT_EQUALS( three.millis, clientCursor.c()->getSlaveReadTill().asDate() );
+        }
+    };
+
     class BasicCount : public ClientBase {
     public:
         ~BasicCount() {
@@ -608,7 +657,7 @@ namespace QueryTests {
             const char *ns = "unittests.querytests.Size";
             client().insert( ns, fromjson( "{a:[1,2,3]}" ) );
             client().ensureIndex( ns, BSON( "a" << 1 ) );
-            ASSERT( client().query( ns, QUERY( "a" << mongo::SIZE << 3 ).hint( BSON( "a" << 1 ) ) )->more() );
+            ASSERT( client().query( ns, QUERY( "a" << mongo::BSIZE << 3 ).hint( BSON( "a" << 1 ) ) )->more() );
         }
     };
 
@@ -825,7 +874,7 @@ namespace QueryTests {
     class DirectLocking : public ClientBase {
     public:
         void run() {
-            dblock lk;
+            Lock::GlobalWrite lk;
             Client::Context ctx( "unittests.DirectLocking" );
             client().remove( "a.b", BSONObj() );
             ASSERT_EQUALS( "unittests", cc().database()->name );
@@ -871,7 +920,7 @@ namespace QueryTests {
             auto_ptr< DBClientCursor > cursor = client().query( ns, Query().sort( "7" ) );
             while ( cursor->more() ) {
                 BSONObj o = cursor->next();
-                assert( o.valid() );
+                verify( o.valid() );
                 //cout << " foo " << o << endl;
             }
 
@@ -944,8 +993,7 @@ namespace QueryTests {
         void run() {
             string err;
 
-            writelock lk("");
-            Client::Context ctx( "unittests" );
+            Client::WriteContext ctx( "unittests" );
 
             // note that extents are always at least 4KB now - so this will get rounded up a bit.
             ASSERT( userCreateNS( ns() , fromjson( "{ capped : true , size : 2000 }" ) , err , false ) );
@@ -994,8 +1042,7 @@ namespace QueryTests {
         }
 
         void run() {
-            writelock lk("");
-            Client::Context ctx( "unittests" );
+            Client::WriteContext ctx( "unittests" );
 
             for ( int i=0; i<50; i++ ) {
                 insert( ns() , BSON( "_id" << i << "x" << i * 2 ) );
@@ -1043,8 +1090,7 @@ namespace QueryTests {
         }
 
         void run() {
-            writelock lk("");
-            Client::Context ctx( "unittests" );
+            Client::WriteContext ctx( "unittests" );
 
             for ( int i=0; i<1000; i++ ) {
                 insert( ns() , BSON( "_id" << i << "x" << i * 2 ) );
@@ -1067,8 +1113,7 @@ namespace QueryTests {
         }
 
         void run() {
-            writelock lk("");
-            Client::Context ctx( "unittests" );
+            Client::WriteContext ctx( "unittests" );
 
             for ( int i=0; i<1000; i++ ) {
                 insert( ns() , BSON( "_id" << i << "x" << i * 2 ) );
@@ -1161,7 +1206,11 @@ namespace QueryTests {
 
         void run() {
             unsigned startNumCursors = ClientCursor::numCursors();
-            
+
+            // Check OplogReplay mode with missing collection.
+            auto_ptr< DBClientCursor > c0 = client().query( ns(), QUERY( "ts" << GTE << 50 ), 0, 0, 0, QueryOption_OplogReplay );
+            ASSERT( !c0->more() );
+
             BSONObj info;
             ASSERT( client().runCommand( "unittests", BSON( "create" << "querytests.findingstart" << "capped" << true << "$nExtents" << 5 << "autoIndexId" << false ), info ) );
             
@@ -1187,6 +1236,104 @@ namespace QueryTests {
             BSONObj result;
             client().runCommand( "admin", BSON( "whatsmyuri" << 1 ), result );
             ASSERT_EQUALS( unknownAddress.toString(), result[ "you" ].str() );
+        }
+    };
+    
+    class CollectionInternalBase : public CollectionBase {
+    public:
+        CollectionInternalBase( const char *nsLeaf ) :
+          CollectionBase( nsLeaf ),
+          _lk( ns() ),
+          _ctx( ns() ) {
+        }
+    private:
+        Lock::DBWrite _lk;
+        Client::Context _ctx;
+    };
+    
+    class Exhaust : public CollectionInternalBase {
+    public:
+        Exhaust() : CollectionInternalBase( "exhaust" ) {}
+        void run() {
+            BSONObj info;
+            ASSERT( client().runCommand( "unittests",
+                                        BSON( "create" << "querytests.exhaust" <<
+                                             "capped" << true << "size" << 8192 ), info ) );
+            client().insert( ns(), BSON( "ts" << 0 ) );
+            Message message;
+            assembleRequest( ns(), BSON( "ts" << GTE << 0 ), 0, 0, 0,
+                            QueryOption_OplogReplay | QueryOption_CursorTailable |
+                            QueryOption_Exhaust,
+                            message );
+            DbMessage dbMessage( message );
+            QueryMessage queryMessage( dbMessage );
+            Message result;
+            const char *exhaust = runQuery( message, queryMessage, *cc().curop(), result );
+            ASSERT( exhaust );
+            ASSERT_EQUALS( string( ns() ), exhaust );
+        }
+    };
+
+    class QueryCursorTimeout : public CollectionInternalBase {
+    public:
+        QueryCursorTimeout() : CollectionInternalBase( "querycursortimeout" ) {}
+        void run() {
+            for( int i = 0; i < 150; ++i ) {
+                insert( ns(), BSONObj() );
+            }
+            auto_ptr<DBClientCursor> c = client().query( ns(), Query() );
+            ASSERT( c->more() );
+            long long cursorId = c->getCursorId();
+            
+            ClientCursor *clientCursor = 0;
+            {
+                ClientCursor::Pointer clientCursorPointer( cursorId );
+                clientCursor = clientCursorPointer.c();
+                // clientCursorPointer destructor unpins the cursor.
+            }
+            ASSERT( clientCursor->shouldTimeout( 600001 ) );
+        }
+    };
+
+    class QueryReadsAll : public CollectionBase {
+    public:
+        QueryReadsAll() : CollectionBase( "queryreadsall" ) {}
+        void run() {
+            for( int i = 0; i < 5; ++i ) {
+                insert( ns(), BSONObj() );
+            }
+            auto_ptr<DBClientCursor> c = client().query( ns(), Query(), 5 );
+            ASSERT( c->more() );
+            // With five results and a batch size of 5, no cursor is created.
+            ASSERT_EQUALS( 0, c->getCursorId() );
+        }
+    };
+    
+    /**
+     * Check that an attempt to kill a pinned cursor fails and produces an appropriate assertion.
+     */
+    class KillPinnedCursor : public CollectionBase {
+    public:
+        KillPinnedCursor() : CollectionBase( "killpinnedcursor" ) {
+        }
+        void run() {
+            client().insert( ns(), vector<BSONObj>( 3, BSONObj() ) );
+            auto_ptr<DBClientCursor> cursor = client().query( ns(), BSONObj(), 0, 0, 0, 0, 2 );
+            ASSERT_EQUALS( 2, cursor->objsLeftInBatch() );
+            long long cursorId = cursor->getCursorId();
+            
+            {
+                Client::WriteContext ctx( ns() );
+                ClientCursor::Pointer pinCursor( cursorId );
+  
+                ASSERT_THROWS( client().killCursor( cursorId ), MsgAssertionException );
+                string expectedAssertion =
+                        str::stream() << "Cannot kill active cursor " << cursorId;
+                ASSERT_EQUALS( expectedAssertion, client().getLastError() );
+            }
+            
+            // Verify that the remaining document is read from the cursor.
+            ASSERT_EQUALS( 3, cursor->itcount() );
         }
     };
 
@@ -1431,6 +1578,7 @@ namespace QueryTests {
             add< TailCappedOnly >();
             add< TailableQueryOnId >();
             add< OplogReplayMode >();
+            add< OplogReplaySlaveReadTill >();
             add< ArrayId >();
             add< UnderscoreNs >();
             add< EmptyFieldSpec >();
@@ -1460,6 +1608,10 @@ namespace QueryTests {
             add< FindingStartPartiallyFull >();
             add< FindingStartStale >();
             add< WhatsMyUri >();
+            add< Exhaust >();
+            add< QueryCursorTimeout >();
+            add< QueryReadsAll >();
+            add< KillPinnedCursor >();
 
             add< parsedtests::basic1 >();
 

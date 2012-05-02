@@ -15,15 +15,14 @@
 */
 
 #include "pch.h"
-#include "../repl.h"
-#include "../client.h"
-#include "../../client/dbclient.h"
+#include "mongo/db/repl.h"
+#include "mongo/db/client.h"
 #include "rs.h"
-#include "../oplogreader.h"
-#include "../../util/mongoutils/str.h"
-#include "../dbhelpers.h"
+#include "mongo/db/oplogreader.h"
+#include "mongo/util/mongoutils/str.h"
+#include "mongo/db/dbhelpers.h"
 #include "rs_optime.h"
-#include "../oplog.h"
+#include "mongo/db/oplog.h"
 
 namespace mongo {
 
@@ -67,8 +66,7 @@ namespace mongo {
     void _logOpObjRS(const BSONObj& op);
 
     static void emptyOplog() {
-        writelock lk(rsoplog);
-        Client::Context ctx(rsoplog);
+        Client::WriteContext ctx(rsoplog);
         NamespaceDetails *d = nsdetails(rsoplog);
 
         // temp
@@ -80,9 +78,20 @@ namespace mongo {
     }
 
     Member* ReplSetImpl::getMemberToSyncTo() {
-        Member *closest = 0;
-        time_t now = 0;
+
         bool buildIndexes = true;
+
+        {
+            // if we have a target we've requested to sync from, use it
+            lock lk(this);
+
+            if (_forceSyncTarget) {
+                _currentSyncTarget = _forceSyncTarget;
+                _forceSyncTarget = 0;
+                sethbmsg( str::stream() << "syncing to: " << _currentSyncTarget->fullName() << " by request", 0);
+                return _currentSyncTarget;
+            }
+        }
 
         // wait for 2N pings before choosing a sync target
         if (_cfg) {
@@ -96,6 +105,8 @@ namespace mongo {
             buildIndexes = myConfig().buildIndexes;
         }
 
+        Member *closest = 0;
+        time_t now = 0;
         // find the member with the lowest ping time that has more data than me
         for (Member *m = _members.head(); m; m = m->next()) {
             if (m->hbinfo().up() &&
@@ -103,7 +114,8 @@ namespace mongo {
                 (!buildIndexes || (buildIndexes && m->config().buildIndexes)) &&
                 (m->state() == MemberState::RS_PRIMARY ||
                  (m->state() == MemberState::RS_SECONDARY && m->hbinfo().opTime > lastOpTimeWritten)) &&
-                (!closest || m->hbinfo().ping < closest->hbinfo().ping)) {
+                (!closest || m->hbinfo().ping < closest->hbinfo().ping) &&
+                ( myConfig().slaveDelay >= m->config().slaveDelay )) {
 
                 map<string,time_t>::iterator vetoed = _veto.find(m->fullName());
                 if (vetoed == _veto.end()) {
@@ -199,8 +211,7 @@ namespace mongo {
                     sethbmsg( str::stream() << "initial sync cloning db: " << db , 0);
                     bool ok;
                     {
-                        writelock lk(db);
-                        Client::Context ctx(db);
+                        Client::WriteContext ctx(db);
                         ok = clone(sourceHostname.c_str(), db);
                     }
                     if( !ok ) {
@@ -217,11 +228,29 @@ namespace mongo {
 
         /* our cloned copy will be strange until we apply oplog events that occurred
            through the process.  we note that time point here. */
-        BSONObj minValid = r.getLastOp(rsoplog);
+        BSONObj minValid;
+        try {
+            // It may have been a long time since we last used this connection to
+            // query the oplog, depending on the size of the databases we needed to clone.
+            // A common problem is that TCP keepalives are set too infrequent, and thus
+            // our connection here is terminated by a firewall due to inactivity.
+            // Solution is to increase the TCP keepalive frequency.
+            minValid = r.getLastOp(rsoplog);
+        } catch ( SocketException & ) {
+            log() << "connection lost to " << source->h().toString() << "; is your tcp keepalive interval set appropriately?";
+            if( !r.connect(sourceHostname) ) {
+                sethbmsg( str::stream() << "initial sync couldn't connect to " << source->h().toString() , 0);
+                throw;
+            }
+            // retry
+            minValid = r.getLastOp(rsoplog);
+        }
+
+
         isyncassert( "getLastOp is empty ", !minValid.isEmpty() );
         OpTime mvoptime = minValid["ts"]._opTime();
-        assert( !mvoptime.isNull() );
-        assert( mvoptime >= startingTS );
+        verify( !mvoptime.isNull() );
+        verify( mvoptime >= startingTS );
 
         // apply startingTS..mvoptime portion of the oplog
         {
@@ -236,9 +265,8 @@ namespace mongo {
                 
                 log() << "replSet cleaning up [1]" << rsLog;
                 {
-                    writelock lk("local.");
-                    Client::Context cx( "local." );
-                    cx.db()->flushFiles(true);
+                    Client::WriteContext cx( "local." );
+                    cx.ctx().db()->flushFiles(true);
                 }
                 log() << "replSet cleaning up [2]" << rsLog;
 
@@ -251,18 +279,17 @@ namespace mongo {
 
         sethbmsg("initial sync finishing up",0);
 
-        assert( !box.getState().primary() ); // wouldn't make sense if we were.
+        verify( !box.getState().primary() ); // wouldn't make sense if we were.
 
         {
-            writelock lk("local.");
-            Client::Context cx( "local." );
-            cx.db()->flushFiles(true);
+            Client::WriteContext cx( "local." );
+            cx.ctx().db()->flushFiles(true);
             try {
                 log() << "replSet set minValid=" << minValid["ts"]._opTime().toString() << rsLog;
             }
             catch(...) { }
             Helpers::putSingleton("local.replset.minvalid", minValid);
-            cx.db()->flushFiles(true);
+            cx.ctx().db()->flushFiles(true);
         }
 
         sethbmsg("initial sync done",0);

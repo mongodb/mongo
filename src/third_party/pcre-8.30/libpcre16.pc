@@ -1,0 +1,12 @@
+# Package Information for pkg-config
+
+prefix=/usr/local
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: libpcre16
+Description: PCRE - Perl compatible regular expressions C library with 16 bit character support
+Version: 8.30
+Libs: -L${libdir} -lpcre16
+Cflags: -I${includedir} 

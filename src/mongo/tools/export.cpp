@@ -17,8 +17,8 @@
 */
 
 #include "pch.h"
-#include "client/dbclient.h"
 #include "db/json.h"
+#include "mongo/client/dbclientcursor.h"
 
 #include "tool.h"
 
@@ -43,6 +43,7 @@ public:
         ("out,o", po::value<string>(), "output file; if not specified, stdout is used")
         ("jsonArray", "output to a json array rather than one object per line")
         ("slaveOk,k", po::value<bool>()->default_value(true) , "use secondaries for export if available, default true")
+        ("forceTableScan", "force a table scan (do not use $snapshot)" )
         ;
         _usesstdout = false;
     }
@@ -123,7 +124,7 @@ public:
             return "";
         }
         // Can never get here
-        assert(false);
+        verify(false);
         return "";
     }
 
@@ -190,7 +191,7 @@ public:
         }
 
         Query q( getParam( "query" , "" ) );
-        if ( q.getFilter().isEmpty() && !hasParam("dbpath"))
+        if ( q.getFilter().isEmpty() && !hasParam("dbpath") && !hasParam("forceTableScan") )
             q.snapshot();
 
         bool slaveOk = _params["slaveOk"].as<bool>();

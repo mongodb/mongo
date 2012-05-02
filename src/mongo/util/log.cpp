@@ -38,10 +38,26 @@ using namespace std;
 
 namespace mongo {
 
+    int logLevel = 0;
+    int tlogLevel = 0;
+    mongo::mutex Logstream::mutex("Logstream");
+    int Logstream::doneSetup = Logstream::magicNumber();
+
+    const char *default_getcurns() { return ""; }
+    const char * (*getcurns)() = default_getcurns;
+
     Nullstream nullstream;
     vector<Tee*>* Logstream::globalTees = 0;
 
     thread_specific_ptr<Logstream> Logstream::tsp;
+
+    Nullstream& tlog( int level ) {
+        if ( !debug && level > tlogLevel )
+            return nullstream;
+        if ( level > logLevel )
+            return nullstream;
+        return Logstream::get().prolog();
+    }
 
     class LoggingManager {
     public:
@@ -49,7 +65,7 @@ namespace mongo {
             : _enabled(0) , _file(0) {
         }
 
-        void start( const string& lp , bool append ) {
+        bool start( const string& lp , bool append ) {
             uassert( 10268 ,  "LoggingManager already started" , ! _enabled );
             _append = append;
 
@@ -60,9 +76,7 @@ namespace mongo {
             if ( exists ) {
                 if ( isdir ) {
                     cout << "logpath [" << lp << "] should be a filename, not a directory" << endl;
-                    
-                    dbexit( EXIT_BADOPTIONS );
-                    assert( 0 );
+                    return false;
                 }
 
                 if ( ! append ) {
@@ -77,8 +91,7 @@ namespace mongo {
                         } else {
                             cout << "log file [" << lp << "] exists and couldn't make backup; run with --logappend or manually remove file (" << strerror(errno) << ")" << endl;
                             
-                            dbexit( EXIT_BADOPTIONS );
-                            assert( 0 );
+                            return false;
                         }
                     }
                 }
@@ -87,8 +100,7 @@ namespace mongo {
             FILE * test = fopen( lp.c_str() , _append ? "a" : "w" );
             if ( ! test ) {
                 cout << "can't open [" << lp << "] for log file: " << errnoWithDescription() << endl;
-                dbexit( EXIT_BADOPTIONS );
-                assert( 0 );
+                return false;
             }
 
             if (append && exists){
@@ -102,13 +114,13 @@ namespace mongo {
 
             _path = lp;
             _enabled = 1;
-            rotate();
+            return rotate();
         }
 
-        void rotate() {
+        bool rotate() {
             if ( ! _enabled ) {
                 cout << "LoggingManager not enabled" << endl;
-                return;
+                return true;
             }
 
             if ( _file ) {
@@ -121,7 +133,10 @@ namespace mongo {
                 stringstream ss;
                 ss << _path << "." << terseCurrentTime( false );
                 string s = ss.str();
-                rename( _path.c_str() , s.c_str() );
+                if (0 != rename(_path.c_str(), s.c_str())) {
+                    error() << "Failed to rename " << _path << " to " << s;
+                    return false;
+                }
             }
 
             FILE* tmp = 0;  // The new file using the original logpath name
@@ -149,8 +164,7 @@ namespace mongo {
 #endif
             if ( !tmp ) {
                 cerr << "can't open: " << _path.c_str() << " for log file" << endl;
-                dbexit( EXIT_BADOPTIONS );
-                assert( 0 );
+                return false;
             }
 
             // redirect stdout and stderr to log file
@@ -171,6 +185,7 @@ namespace mongo {
 #endif
 
             _file = tmp;    // Save new file for next rotation
+            return true;
         }
 
     private:
@@ -181,13 +196,13 @@ namespace mongo {
 
     } loggingManager;
 
-    void initLogging( const string& lp , bool append ) {
+    bool initLogging( const string& lp , bool append ) {
         cout << "all output going to: " << lp << endl;
-        loggingManager.start( lp , append );
+        return loggingManager.start( lp , append );
     }
 
-    void rotateLogs( int signal ) {
-        loggingManager.rotate();
+    bool rotateLogs() {
+        return loggingManager.rotate();
     }
 
     // done *before* static initialization
@@ -206,14 +221,14 @@ namespace mongo {
         s << "errno:" << x << ' ';
 
 #if defined(_WIN32)
-        LPTSTR errorText = NULL;
-        FormatMessage(
+        LPWSTR errorText = NULL;
+        FormatMessageW(
             FORMAT_MESSAGE_FROM_SYSTEM
             |FORMAT_MESSAGE_ALLOCATE_BUFFER
             |FORMAT_MESSAGE_IGNORE_INSERTS,
             NULL,
             x, 0,
-            (LPTSTR) &errorText,  // output
+            reinterpret_cast<LPWSTR>( &errorText ),  // output
             0, // minimum size for output buffer
             NULL);
         if( errorText ) {
@@ -243,15 +258,32 @@ namespace mongo {
     }
 
     void Logstream::logLockless( const StringData& s ) {
+
         if ( s.size() == 0 )
             return;
 
         if ( doneSetup == 1717 ) {
-#ifndef _WIN32
+
+#if defined(_WIN32)
+            // fwrite() has a behavior problem in Windows when writing to the console
+            //  when the console is in the UTF-8 code page: fwrite() sends a single
+            //  byte and then the rest of the string.  If the first character is
+            //  non-ASCII, the console then displays two UTF-8 replacement characters
+            //  instead of the single UTF-8 character we want.  write() doesn't have
+            //  this problem.
+            int fd = fileno( logfile );
+            if ( _isatty( fd ) ) {
+                fflush( logfile );
+                _write( fd, s.data(), s.size() );
+                return;
+            }
+#else
             if ( isSyslog ) {
                 syslog( LOG_INFO , "%s" , s.data() );
-            } else
+                return;
+            }
 #endif
+
             if (fwrite(s.data(), s.size(), 1, logfile)) {
                 fflush(logfile);
             }
@@ -267,13 +299,20 @@ namespace mongo {
     }
 
     void Logstream::flush(Tee *t) {
+        const size_t MAX_LOG_LINE = 1024 * 10;
+
         // this ensures things are sane
         if ( doneSetup == 1717 ) {
             string msg = ss.str();
+            
             string threadName = getThreadName();
             const char * type = logLevelToString(logLevel);
 
-            int spaceNeeded = (int)(msg.size() + 64 + threadName.size());
+            size_t msgLen = msg.size();
+            if ( msgLen > MAX_LOG_LINE )
+                msgLen = MAX_LOG_LINE;
+
+            const int spaceNeeded = (int)( msgLen + 64 /* for extra info */ + threadName.size());
             int bufSize = 128;
             while ( bufSize < spaceNeeded )
                 bufSize += 128;
@@ -295,9 +334,22 @@ namespace mongo {
                 b.appendStr( ": " , false );
             }
 
-            b.appendStr( msg );
+            if ( msg.size() > MAX_LOG_LINE ) {
+                stringstream sss;
+                sss << "warning: log line attempted (" << msg.size() / 1024 << "k) over max size(" << MAX_LOG_LINE / 1024 << "k)";
+                sss << ", printing beginning and end ... ";
+                b.appendStr( sss.str() );
+                const char * xx = msg.c_str();
+                b.appendBuf( xx , MAX_LOG_LINE / 3 );
+                b.appendStr( " .......... " );
+                b.appendStr( xx + msg.size() - ( MAX_LOG_LINE / 3 ) );
+            }
+            else {
+                b.appendStr( msg );
+            }
 
             string out( b.buf() , b.len() - 1);
+            verify( b.len() < spaceNeeded );
 
             scoped_lock lk(mutex);
 
@@ -306,12 +358,24 @@ namespace mongo {
                 for ( unsigned i=0; i<globalTees->size(); i++ )
                     (*globalTees)[i]->write(logLevel,out);
             }
-#ifndef _WIN32
+#if defined(_WIN32)
+            // fwrite() has a behavior problem in Windows when writing to the console
+            //  when the console is in the UTF-8 code page: fwrite() sends a single
+            //  byte and then the rest of the string.  If the first character is
+            //  non-ASCII, the console then displays two UTF-8 replacement characters
+            //  instead of the single UTF-8 character we want.  write() doesn't have
+            //  this problem.
+            int fd = fileno( logfile );
+            if ( _isatty( fd ) ) {
+                fflush( logfile );
+                _write( fd, out.data(), out.size() );
+            }
+#else
             if ( isSyslog ) {
                 syslog( logLevelToSysLogLevel(logLevel) , "%s" , out.data() );
-            } else
+            }
 #endif
-            if(fwrite(out.data(), out.size(), 1, logfile)) {
+            else if ( fwrite( out.data(), out.size(), 1, logfile ) ) {
                 fflush(logfile);
             }
             else {
@@ -324,6 +388,18 @@ namespace mongo {
 #endif
         }
         _init();
+    }
+    
+    void Logstream::removeGlobalTee( Tee * tee ) {
+        if ( !globalTees ) {
+            return;
+        }
+        for( std::vector<Tee*>::iterator i = globalTees->begin(); i != globalTees->end(); ++i ) {
+            if ( *i == tee ) {
+                globalTees->erase( i );
+                return;
+            }
+        }
     }
 
     void Logstream::setLogFile(FILE* f) {
@@ -339,6 +415,24 @@ namespace mongo {
         if( p == 0 )
             tsp.reset( p = new Logstream() );
         return *p;
+    }
+
+    /* note: can't use malloc herein - may be in signal handler.
+             logLockless() likely does not comply and should still be fixed todo
+             likewise class string?
+    */
+    void rawOut( const string &s ) {
+        if( s.empty() ) return;
+
+        char buf[64];
+        time_t_to_String( time(0) , buf );
+        /* truncate / don't show the year: */
+        buf[19] = ' ';
+        buf[20] = 0;
+
+        Logstream::logLockless(buf);
+        Logstream::logLockless(s);
+        Logstream::logLockless("\n");
     }
 
 }

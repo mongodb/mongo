@@ -4,7 +4,9 @@ t = db.jstests_indexp;
 t.drop();
 
 function expectRecordedPlan( query, idx ) {
- 	assert.eq( "BtreeCursor " + idx, t.find( query ).explain( true ).oldPlan.cursor );
+    explain = t.find( query ).explain( true );
+    assert( explain.oldPlan );
+ 	assert.eq( "BtreeCursor " + idx, explain.oldPlan.cursor );
 }
 
 function expectNoRecordedPlan( query ) {
@@ -24,7 +26,7 @@ t.ensureIndex( {a:1} );
 t.save( {a:1} );
 t.find( {a:1,x:1} ).itcount();
 t.save( {a:[1,2]} );
-expectRecordedPlan( {a:1,x:1}, "a_1" );
+expectNoRecordedPlan( {a:1,x:1} );
 
 // Multi key QueryPattern reuses index
 t.drop();
@@ -37,13 +39,13 @@ for( i = 0; i < 5; ++i ) {
 t.find( {a:{$gt:0},x:{$gt:0}} ).itcount();
 expectRecordedPlan( {a:{$gt:0,$lt:5},x:{$gt:0}}, "a_1" );
 
-// Single key QueryPattern can still be used to find best plan - at least for now.
+// Single key QueryPattern is dropped.
 t.drop();
 t.ensureIndex( {a:1} );
 t.save( {a:1} );
 t.find( {a:{$gt:0,$lt:5},x:1} ).itcount();
 t.save( {a:[1,2]} );
-expectRecordedPlan( {a:{$gt:0,$lt:5},x:1}, "a_1" );
+expectNoRecordedPlan( {a:{$gt:0,$lt:5},x:1} );
 
 // Invalid query with only valid fields used 
 // SERVER-2864
@@ -52,6 +54,15 @@ t.ensureIndex( {a:1} );
 t.save( {a:1}  );
 t.find( {a:1,b:{$gt:5,$lt:0},x:1} ).itcount();
 expectRecordedPlan( {a:1,b:{$gt:5,$lt:0},x:1}, "a_1" );
+
+// SERVER-2864
+t.drop();
+t.ensureIndex( {a:1} );
+t.ensureIndex( {c:1} );
+t.save( {a:1,c:1} );
+t.save( {c:1} );
+t.find( {a:1,b:{$gt:5,$lt:0},c:1} ).itcount();
+expectRecordedPlan( {a:1,b:{$gt:5,$lt:0},c:1}, "a_1" );
 
 // SERVER-2864
 t.drop();

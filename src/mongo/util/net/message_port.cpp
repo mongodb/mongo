@@ -28,7 +28,6 @@
 #include "../background.h"
 #include "../time_support.h"
 #include "../../db/cmdline.h"
-#include "../../client/dbclient.h"
 #include "../scopeguard.h"
 
 
@@ -64,7 +63,7 @@ namespace mongo {
         }
 
         void append( Message& m ) {
-            assert( m.header()->len <= 1300 );
+            verify( m.header()->len <= 1300 );
 
             if ( len() + m.header()->len > 1300 )
                 flush();
@@ -180,10 +179,10 @@ again:
             }
 
             int z = (len+1023)&0xfffffc00;
-            assert(z>=len);
+            verify(z>=len);
             MsgData *md = (MsgData *) malloc(z);
             ScopeGuard guard = MakeGuard(free, md);
-            assert(md);
+            verify(md);
             md->len = len;
 
             char *p = (char *) &md->id;
@@ -234,7 +233,7 @@ again:
                     << "  response len:  " << (unsigned)response.header()->len << '\n'
                     << "  response op:  " << response.operation() << '\n'
                     << "  remote: " << psock->remoteString() << endl;
-            assert(false);
+            verify(false);
             response.reset();
         }
         mmm( log() << "*call() end" << endl; )
@@ -246,7 +245,7 @@ again:
     }
 
     void MessagingPort::say(Message& toSend, int responseTo) {
-        assert( !toSend.empty() );
+        verify( !toSend.empty() );
         mmm( log() << "*  say()  thr:" << GetCurrentThreadId() << endl; )
         toSend.header()->id = nextMessageId();
         toSend.header()->responseTo = responseTo;

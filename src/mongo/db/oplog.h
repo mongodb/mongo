@@ -27,7 +27,6 @@
 #include "db.h"
 #include "dbhelpers.h"
 #include "clientcursor.h"
-#include "../client/dbclient.h"
 #include "../util/optime.h"
 #include "../util/timer.h"
 
@@ -49,7 +48,7 @@ namespace mongo {
 
        See _logOp() in oplog.cpp for more details.
     */
-    void logOp(const char *opstr, const char *ns, const BSONObj& obj, BSONObj *patt = 0, bool *b = 0);
+    void logOp( const char *opstr, const char *ns, const BSONObj& obj, BSONObj *patt = 0, bool *b = 0, bool fromMigrate = false );
 
     void logKeepalive();
 
@@ -79,7 +78,7 @@ namespace mongo {
         bool done() const { return !_findingStart; }
 
         /** @return cursor pointing to the first matching op, if done(). */
-        shared_ptr<Cursor> cursor() { verify( 14835, done() ); return _c; }
+        shared_ptr<Cursor> cursor() { verify( done() ); return _c; }
 
         /** Iterate the cursor, to continue trying to find matching op. */
         void next();
@@ -101,6 +100,15 @@ namespace mongo {
                 }
             }
         }
+        
+        /**
+         * @return a BasicCursor constructed using a FindingStartCursor with the provided query and
+         * order parameters.
+         * @yields the db lock.
+         * @asserts on yield recovery failure.
+         */
+        static shared_ptr<Cursor> getCursor( const char *ns, const BSONObj &query, const BSONObj &order );
+
     private:
         enum FindingStartMode { Initial, FindExtent, InExtent };
         const QueryPlan &_qp;

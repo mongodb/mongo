@@ -19,8 +19,10 @@
 #include "mmap.h"
 #include "text.h"
 #include "../db/mongommf.h"
-#include "../db/concurrency.h"
+#include "../db/d_concurrency.h"
 #include "../db/memconcept.h"
+#include "mongo/util/timer.h"
+#include "mongo/util/concurrency/remap_lock.h"
 
 namespace mongo {
 
@@ -30,11 +32,22 @@ namespace mongo {
     MAdvise::MAdvise(void *,unsigned, Advice) { }
     MAdvise::~MAdvise() { }
 
+    // SERVER-2942 -- We do it this way because RemapLock is used in both mongod and mongos but
+    // we need different effects.  When called in mongod it needs to be a mutex and in mongos it
+    // needs to be a no-op.  This is the mongod version, the no-op mongos version is in server.cpp.
+    SimpleMutex _remapLock( "remapLock" );
+    RemapLock::RemapLock() {
+        _remapLock.lock();
+    }
+    RemapLock::~RemapLock() {
+        _remapLock.unlock();
+    }
+
     /** notification on unmapping so we can clear writable bits */
     void MemoryMappedFile::clearWritableBits(void *p) {
         for( unsigned i = ((size_t)p)/ChunkSize; i <= (((size_t)p)+len)/ChunkSize; i++ ) {
             writable.clear(i);
-            assert( !writable.get(i) );
+            verify( !writable.get(i) );
         }
     }
 
@@ -66,22 +79,29 @@ namespace mongo {
     unsigned long long mapped = 0;
 
     void* MemoryMappedFile::createReadOnlyMap() {
-        assert( maphandle );
+        verify( maphandle );
         scoped_lock lk(mapViewMutex);
-        void *p = MapViewOfFile(maphandle, FILE_MAP_READ, /*f ofs hi*/0, /*f ofs lo*/ 0, /*dwNumberOfBytesToMap 0 means to eof*/0);
-        if ( p == 0 ) {
-            DWORD e = GetLastError();
-            log() << "FILE_MAP_READ MapViewOfFile failed " << filename() << " " << errnoWithDescription(e) << endl;
+        void* readOnlyMapAddress = MapViewOfFile(
+                maphandle,          // file mapping handle
+                FILE_MAP_READ,      // access
+                0, 0,               // file offset, high and low
+                0 );                // bytes to map, 0 == all
+        if ( 0 == readOnlyMapAddress ) {
+            DWORD dosError = GetLastError();
+            log() << "MapViewOfFile for " << filename()
+                    << " failed with error " << errnoWithDescription( dosError )
+                    << " (file size is " << len << ")"
+                    << " in MemoryMappedFile::createReadOnlyMap"
+                    << endl;
+            fassertFailed( 16165 );
         }
-        else {
-            memconcept::is(p, memconcept::other, filename());
-            views.push_back(p);
-        }
-        return p;
+        memconcept::is( readOnlyMapAddress, memconcept::concept::other, filename() );
+        views.push_back( readOnlyMapAddress );
+        return readOnlyMapAddress;
     }
 
     void* MemoryMappedFile::map(const char *filenameIn, unsigned long long &length, int options) {
-        assert( fd == 0 && len == 0 ); // can't open more than once
+        verify( fd == 0 && len == 0 ); // can't open more than once
         setFilename(filenameIn);
         /* big hack here: Babble uses db names with colons.  doesn't seem to work on windows.  temporary perhaps. */
         char filename[256];
@@ -140,22 +160,129 @@ namespace mongo {
         void *view = 0;
         {
             scoped_lock lk(mapViewMutex);
-            DWORD access = (options&READONLY)? FILE_MAP_READ : FILE_MAP_ALL_ACCESS;
-            view = MapViewOfFile(maphandle, access, /*f ofs hi*/0, /*f ofs lo*/ 0, /*dwNumberOfBytesToMap 0 means to eof*/0);
+            DWORD access = ( options & READONLY ) ? FILE_MAP_READ : FILE_MAP_ALL_ACCESS;
+            view = MapViewOfFile(
+                    maphandle,  // file mapping handle
+                    access,     // access
+                    0, 0,       // file offset, high and low
+                    0 );        // bytes to map, 0 == all
+            if ( view == 0 ) {
+                DWORD dosError = GetLastError();
+                log() << "MapViewOfFile for " << filename
+                        << " failed with error " << errnoWithDescription( dosError )
+                        << " (file size is " << len << ")"
+                        << " in MemoryMappedFile::map"
+                        << endl;
+                close();
+                fassertFailed( 16166 );
+            }
         }
-        if ( view == 0 ) {
-            DWORD e = GetLastError();
-            log() << "MapViewOfFile failed " << filename << " " << errnoWithDescription(e) << 
-                ((sizeof(void*)==4)?" (32 bit build)":"") << endl;
-            close();
-        }
-        else {
-            views.push_back(view);
-            memconcept::is(view, memconcept::memorymappedfile, this->filename());
-        }
+        views.push_back(view);
+        memconcept::is(view, memconcept::concept::memorymappedfile, this->filename(), (unsigned) length);
         len = length;
-
         return view;
+    }
+
+    extern mutex mapViewMutex;
+
+    __declspec(noinline) void makeChunkWritable(size_t chunkno) { 
+        scoped_lock lk(mapViewMutex);
+
+        if( writable.get(chunkno) ) // double check lock
+            return;
+
+        // remap all maps in this chunk.  common case is a single map, but could have more than one with smallfiles or .ns files
+        size_t chunkStart = chunkno * MemoryMappedFile::ChunkSize;
+        size_t chunkNext = chunkStart + MemoryMappedFile::ChunkSize;
+
+        scoped_lock lk2(privateViews._mutex());
+        map<void*,MongoMMF*>::iterator i = privateViews.finditer_inlock((void*) (chunkNext-1));
+        while( 1 ) {
+            const pair<void*,MongoMMF*> x = *(--i);
+            MongoMMF *mmf = x.second;
+            if( mmf == 0 )
+                break;
+
+            size_t viewStart = (size_t) x.first;
+            size_t viewEnd = (size_t) (viewStart + mmf->length());
+            if( viewEnd <= chunkStart )
+                break;
+
+            size_t protectStart = max(viewStart, chunkStart);
+            dassert(protectStart<chunkNext);
+
+            size_t protectEnd = min(viewEnd, chunkNext);
+            size_t protectSize = protectEnd - protectStart;
+            dassert(protectSize>0&&protectSize<=MemoryMappedFile::ChunkSize);
+
+            DWORD old;
+            bool ok = VirtualProtect((void*)protectStart, protectSize, PAGE_WRITECOPY, &old);
+            if( !ok ) {
+                DWORD e = GetLastError();
+                log() << "VirtualProtect failed (mcw) " << mmf->filename() << ' ' << chunkno << hex << protectStart << ' ' << protectSize << ' ' << errnoWithDescription(e) << endl;
+                verify(false);
+            }
+        }
+
+        writable.set(chunkno);
+    }
+
+    void* MemoryMappedFile::createPrivateMap() {
+        verify( maphandle );
+        scoped_lock lk(mapViewMutex);
+        void* privateMapAddress = MapViewOfFile(
+                maphandle,          // file mapping handle
+                FILE_MAP_READ,      // access
+                0, 0,               // file offset, high and low
+                0 );                // bytes to map, 0 == all
+        if ( privateMapAddress == 0 ) {
+            DWORD dosError = GetLastError();
+            log() << "MapViewOfFile for " << filename()
+                    << " failed with error " << errnoWithDescription( dosError )
+                    << " (file size is " << len << ")"
+                    << " in MemoryMappedFile::createPrivateMap"
+                    << endl;
+            fassertFailed( 16167 );
+        }
+        clearWritableBits( privateMapAddress );
+        views.push_back( privateMapAddress );
+        memconcept::is( privateMapAddress, memconcept::concept::memorymappedfile, filename() );
+        return privateMapAddress;
+    }
+
+    void* MemoryMappedFile::remapPrivateView(void *oldPrivateAddr) {
+        verify( Lock::isW() );
+
+        LockMongoFilesExclusive lockMongoFiles;
+
+        RemapLock lk;   // Interlock with PortMessageServer::acceptedMP() to stop thread creation
+
+        clearWritableBits(oldPrivateAddr);
+        if( !UnmapViewOfFile(oldPrivateAddr) ) {
+            DWORD dosError = GetLastError();
+            log() << "UnMapViewOfFile for " << filename()
+                    << " failed with error " << errnoWithDescription( dosError )
+                    << " in MemoryMappedFile::remapPrivateView"
+                    << endl;
+            fassertFailed( 16168 );
+        }
+
+        void* newPrivateView = MapViewOfFileEx(
+                maphandle,          // file mapping handle
+                FILE_MAP_READ,      // access
+                0, 0,               // file offset, high and low
+                0,                  // bytes to map, 0 == all
+                oldPrivateAddr );   // we want the same address we had before
+        if ( 0 == newPrivateView ) {
+            DWORD dosError = GetLastError();
+            log() << "MapViewOfFileEx for " << filename()
+                    << " failed with error " << errnoWithDescription( dosError )
+                    << " (file size is " << len << ")"
+                    << " in MemoryMappedFile::remapPrivateView"
+                    << endl;
+        }
+        fassert( 16148, newPrivateView == oldPrivateAddr );
+        return newPrivateView;
     }
 
     class WindowsFlushable : public MemoryMappedFile::Flushable {
@@ -170,13 +297,39 @@ namespace mongo {
 
             scoped_lock lk(*_flushMutex);
 
-            BOOL success = FlushViewOfFile(_view, 0); // 0 means whole mapping
-            if (!success) {
-                int err = GetLastError();
-                out() << "FlushViewOfFile failed " << err << " file: " << _filename << endl;
+            int loopCount = 0;
+            bool success = false;
+            bool timeout = false;
+            int dosError = ERROR_SUCCESS;
+            const int maximumLoopCount = 1000 * 1000;
+            const int maximumTimeInSeconds = 60;
+            Timer t;
+            while ( !success && !timeout && loopCount < maximumLoopCount ) {
+                ++loopCount;
+                success = FALSE != FlushViewOfFile( _view, 0 );
+                if ( !success ) {
+                    dosError = GetLastError();
+                    if ( dosError != ERROR_LOCK_VIOLATION ) {
+                        break;
+                    }
+                    timeout = t.seconds() > maximumTimeInSeconds;
+                }
+            }
+            if ( success && loopCount > 1 ) {
+                log() << "FlushViewOfFile for " << _filename
+                        << " succeeded after " << loopCount
+                        << " attempts taking " << t.millis()
+                        << " ms" << endl;
+            }
+            else if ( !success ) {
+                log() << "FlushViewOfFile for " << _filename
+                        << " failed with error " << dosError
+                        << " after " << loopCount
+                        << " attempts taking " << t.millis()
+                        << " ms" << endl;
             }
 
-            success = FlushFileBuffers(_fd);
+            success = FALSE != FlushFileBuffers(_fd);
             if (!success) {
                 int err = GetLastError();
                 out() << "FlushFileBuffers failed " << err << " file: " << _filename << endl;
@@ -200,7 +353,5 @@ namespace mongo {
     MemoryMappedFile::Flushable * MemoryMappedFile::prepareFlush() {
         return new WindowsFlushable( viewForFlushing() , fd , filename() , _flushMutex );
     }
-    void MemoryMappedFile::_lock() {}
-    void MemoryMappedFile::_unlock() {}
 
 }

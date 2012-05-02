@@ -66,6 +66,10 @@ assert = function( b , msg ){
     doassert( msg == undefined ? "assert failed" : "assert failed : " + msg );
 }
 
+// the mongo code uses verify
+// so this is to be nice to mongo devs
+verify = assert;
+
 assert.automsg = function( b ) {
     assert( eval( b ), b );
 }
@@ -341,7 +345,7 @@ String.prototype.startsWith = function (str){
 }
 
 String.prototype.endsWith = function (str){
-    return new RegExp( str + "$" ).test( this )
+    return new RegExp( RegExp.escape(str) + "$" ).test( this )
 }
 
 Number.prototype.zeroPad = function(width) {
@@ -425,6 +429,10 @@ ISODate = function(isoDateStr){
     }
 
     return new Date(time);
+}
+
+RegExp.escape = function( text ){
+    return text.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&");
 }
 
 RegExp.prototype.tojson = RegExp.prototype.toString;
@@ -819,7 +827,8 @@ if ( typeof _threadInject != "undefined" ){
                                    "jstests/dropdb_race.js",
                                    "jstests/fsync2.js", // May be placed in serialTestsArr once SERVER-4243 is fixed.
                                    "jstests/bench_test1.js",
-                                   "jstests/padding.js"] );
+                                   "jstests/padding.js",
+                                   "jstests/queryoptimizera.js"] );
         
         // some tests can't be run in parallel with each other
         var serialTestsArr = [ "jstests/fsync.js"
@@ -1164,7 +1173,7 @@ jsTest.isMongos = function(conn) {
 jsTest.attempt = function( opts, func ) {
     var timeout = opts.timeout || 1000;
     var tries   = 0;
-    var sleepTime = 500;
+    var sleepTime = 2000;
     var result = null;
     var context = opts.context || this;
 
@@ -1179,6 +1188,30 @@ jsTest.attempt = function( opts, func ) {
     return result;
 }
 
+replSetMemberStatePrompt = function() {
+    var state = '';
+    var stateInfo = db.getSiblingDB( 'admin' ).runCommand( { replSetGetStatus:1, forShell:1 } );
+    if ( stateInfo.ok ) {
+        // Report the self member's stateStr if it's present.
+        stateInfo.members.forEach( function( member ) {
+                                      if ( member.self ) {
+                                          state = member.stateStr;
+                                      }
+                                  } );
+        // Otherwise fall back to reporting the numeric myState field (mongodb 1.6).
+        if ( !state ) {
+            state = stateInfo.myState;
+        }
+        state = '' + stateInfo.set + ':' + state;
+    }
+    else {
+        var info = stateInfo.info;
+        if ( info && info.length < 20 ) {
+            state = info; // "mongos", "configsvr"
+        }
+    }
+    return state + '> ';
+}
 
 shellPrintHelper = function (x) {
     if (typeof (x) == "undefined") {
@@ -1235,7 +1268,7 @@ shellAutocomplete = function ( /*prefix*/ ) { // outer scope function called on 
     builtinMethods[Mongo] = "find update insert remove".split( ' ' );
     builtinMethods[BinData] = "hex base64 length subtype".split( ' ' );
 
-    var extraGlobals = "Infinity NaN undefined null true false decodeURI decodeURIComponent encodeURI encodeURIComponent escape eval isFinite isNaN parseFloat parseInt unescape Array Boolean Date Math Number RegExp String print load gc MinKey MaxKey Mongo NumberLong ObjectId DBPointer UUID BinData Map".split( ' ' );
+    var extraGlobals = "Infinity NaN undefined null true false decodeURI decodeURIComponent encodeURI encodeURIComponent escape eval isFinite isNaN parseFloat parseInt unescape Array Boolean Date Math Number RegExp String print load gc MinKey MaxKey Mongo NumberInt NumberLong ObjectId DBPointer UUID BinData Map".split( ' ' );
 
     var isPrivate = function( name ) {
         if ( shellAutocomplete.showPrivate ) return false;

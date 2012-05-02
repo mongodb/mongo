@@ -19,16 +19,29 @@
 
 #include "pch.h"
 #include "../util/timer.h"
-
 #include "../db/matcher.h"
 #include "../db/json.h"
-
 #include "dbtests.h"
-
-
+#include "../db/namespace_details.h"
 
 namespace MatcherTests {
 
+    class CollectionBase {
+    public:
+        CollectionBase() :
+        _ns( "unittests.matchertests" ) {
+        }
+        virtual ~CollectionBase() {
+            client().dropCollection( ns() );
+        }
+    protected:
+        const char * const ns() const { return _ns; }
+        DBDirectClient &client() { return _client; }
+    private:
+        const char * const _ns;
+        DBDirectClient _client;
+    };
+    
     class Basic {
     public:
         void run() {
@@ -119,7 +132,101 @@ namespace MatcherTests {
         }
     };
 
+    /** Test that MatchDetails::elemMatchKey() is set correctly after a match. */
+    class ElemMatchKey {
+    public:
+        void run() {
+            Matcher matcher( BSON( "a.b" << 1 ) );
+            MatchDetails details;
+            details.requestElemMatchKey();
+            ASSERT( !details.hasElemMatchKey() );
+            ASSERT( matcher.matches( fromjson( "{ a:[ { b:1 } ] }" ), &details ) );
+            // The '0' entry of the 'a' array is matched.
+            ASSERT( details.hasElemMatchKey() );
+            ASSERT_EQUALS( string( "0" ), details.elemMatchKey() );
+        }
+    };
 
+    namespace Covered { // Tests for CoveredIndexMatcher.
+    
+        /**
+         * Test that MatchDetails::elemMatchKey() is set correctly after an unindexed cursor match.
+         */
+        class ElemMatchKeyUnindexed : public CollectionBase {
+        public:
+            void run() {
+                client().insert( ns(), fromjson( "{ a:[ {}, { b:1 } ] }" ) );
+                
+                Client::ReadContext context( ns() );
+
+                CoveredIndexMatcher matcher( BSON( "a.b" << 1 ), BSON( "$natural" << 1 ) );
+                MatchDetails details;
+                details.requestElemMatchKey();
+                boost::shared_ptr<Cursor> cursor = NamespaceDetailsTransient::getCursor( ns(), BSONObj() );
+                // Verify that the cursor is unindexed.
+                ASSERT_EQUALS( "BasicCursor", cursor->toString() );
+                ASSERT( matcher.matchesCurrent( cursor.get(), &details ) );
+                // The '1' entry of the 'a' array is matched.
+                ASSERT( details.hasElemMatchKey() );
+                ASSERT_EQUALS( string( "1" ), details.elemMatchKey() );
+            }
+        };
+        
+        /**
+         * Test that MatchDetails::elemMatchKey() is set correctly after an indexed cursor match.
+         */
+        class ElemMatchKeyIndexed : public CollectionBase {
+        public:
+            void run() {
+                client().ensureIndex( ns(), BSON( "a.b" << 1 ) );
+                client().insert( ns(), fromjson( "{ a:[ {}, { b:9 }, { b:1 } ] }" ) );
+                
+                Client::ReadContext context( ns() );
+                
+                BSONObj query = BSON( "a.b" << 1 );
+                CoveredIndexMatcher matcher( query, BSON( "a.b" << 1 ) );
+                MatchDetails details;
+                details.requestElemMatchKey();
+                boost::shared_ptr<Cursor> cursor = NamespaceDetailsTransient::getCursor( ns(), query );
+                // Verify that the cursor is indexed.
+                ASSERT_EQUALS( "BtreeCursor a.b_1", cursor->toString() );
+                ASSERT( matcher.matchesCurrent( cursor.get(), &details ) );
+                // The '2' entry of the 'a' array is matched.
+                ASSERT( details.hasElemMatchKey() );
+                ASSERT_EQUALS( string( "2" ), details.elemMatchKey() );
+            }
+        };
+        
+        /**
+         * Test that MatchDetails::elemMatchKey() is set correctly after an indexed cursor match
+         * on a non multikey index.
+         */
+        class ElemMatchKeyIndexedSingleKey : public CollectionBase {
+        public:
+            void run() {
+                client().ensureIndex( ns(), BSON( "a.b" << 1 ) );
+                client().insert( ns(), fromjson( "{ a:[ { b:1 } ] }" ) );
+                
+                Client::ReadContext context( ns() );
+                
+                BSONObj query = BSON( "a.b" << 1 );
+                CoveredIndexMatcher matcher( query, BSON( "a.b" << 1 ) );
+                MatchDetails details;
+                details.requestElemMatchKey();
+                boost::shared_ptr<Cursor> cursor = NamespaceDetailsTransient::getCursor( ns(), query );
+                // Verify that the cursor is indexed.
+                ASSERT_EQUALS( "BtreeCursor a.b_1", cursor->toString() );
+                // Verify that the cursor is not multikey.
+                ASSERT( !cursor->isMultiKey() );
+                ASSERT( matcher.matchesCurrent( cursor.get(), &details ) );
+                // The '0' entry of the 'a' array is matched.
+                ASSERT( details.hasElemMatchKey() );
+                ASSERT_EQUALS( string( "0" ), details.elemMatchKey() );
+            }
+        };
+        
+    } // namespace Covered
+    
     class TimingBase {
     public:
         long time( const BSONObj& patt , const BSONObj& obj ) {
@@ -141,21 +248,25 @@ namespace MatcherTests {
             cout << "normal: " << normal << " all: " << all << endl;
         }
     };
-
+    
     class All : public Suite {
     public:
         All() : Suite( "matcher" ) {
         }
 
         void setupTests() {
-            add< Basic >();
-            add< DoubleEqual >();
-            add< MixedNumericEqual >();
-            add< MixedNumericGt >();
-            add< MixedNumericIN >();
-            add< Size >();
-            add< MixedNumericEmbedded >();
-            add< AllTiming >();
+            add<Basic>();
+            add<DoubleEqual>();
+            add<MixedNumericEqual>();
+            add<MixedNumericGt>();
+            add<MixedNumericIN>();
+            add<Size>();
+            add<MixedNumericEmbedded>();
+            add<ElemMatchKey>();
+            add<Covered::ElemMatchKeyUnindexed>();
+            add<Covered::ElemMatchKeyIndexed>();
+            add<Covered::ElemMatchKeyIndexedSingleKey>();
+            add<AllTiming>();
         }
     } dball;
 

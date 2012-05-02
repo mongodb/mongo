@@ -17,8 +17,7 @@
 
 #include "pch.h"
 #include "request.h"
-#include "client.h"
-#include "../client/dbclient.h"
+#include "client_info.h"
 #include "../db/dbhelpers.h"
 #include "../db/matcher.h"
 #include "../db/commands.h"
@@ -31,12 +30,7 @@ namespace mongo {
 
     TSP_DEFINE(Client,currentClient)
 
-    Client::LockStatus::LockStatus() { 
-        // why is mongo::Client used in mongos?  that is very weird.  
-        // commenting this out until that is cleaned up or until someone puts a comment here
-        // explaining why it does make sense. 
-        ////dassert(false);
-    } 
+    LockState::LockState(){} // ugh
 
     Client::Client(const char *desc , AbstractMessagingPort *p) :
         _context(0),
@@ -50,13 +44,13 @@ namespace mongo {
     bool Client::shutdown() { return true; }
 
     static unsigned long long nThreads = 0;
-    void assertStartingUp() { 
+    void assertStartingUp() {
         dassert( nThreads <= 1 );
     }
     Client& Client::initThread(const char *desc, AbstractMessagingPort *mp) {
         DEV nThreads++; // never decremented.  this is for casi class asserts
         setThreadName(desc);
-        assert( currentClient.get() == 0 );
+        verify( currentClient.get() == 0 );
         Client *c = new Client(desc, mp);
         currentClient.reset(c);
         mongo::lastError.initThread();
@@ -75,7 +69,7 @@ namespace mongo {
                       const char *ns, BSONObj& cmdObj ,
                       BSONObjBuilder& result,
                       bool fromRepl ) {
-        assert(c);
+        verify(c);
 
         string dbname = nsToDatabase( ns );
 

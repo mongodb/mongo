@@ -1,0 +1,835 @@
+<html>
+
+<head>
+<meta http-equiv="Content-Language" content="en-us">
+<meta name="GENERATOR" content="Microsoft FrontPage 5.0">
+<meta name="ProgId" content="FrontPage.Editor.Document">
+<meta http-equiv="Content-Type" content="text/html; charset=windows-1252">
+<title>Filesystem Home</title>
+<link rel="stylesheet" type="text/css" href="../../../../doc/src/minimal.css">
+</head>
+
+<body>
+
+<table border="0" cellpadding="5" cellspacing="0" style="border-collapse: collapse" bordercolor="#111111" width="710">
+  <tr>
+    <td width="277">
+<a href="../../../../index.htm">
+<img src="../../../../boost.png" alt="boost.png (6897 bytes)" align="middle" width="277" height="86" border="0"></a></td>
+    <td width="410" align="middle">
+    <font size="7">Filesystem Library<br>
+    Version 2</font>
+    </td>
+  </tr>
+</table>
+
+<table border="0" cellpadding="5" cellspacing="0" style="border-collapse: collapse" bordercolor="#111111" bgcolor="#D7EEFF" width="100%">
+  <tr>
+    <td><a href="../../../../index.htm">Boost Home</a>&nbsp;&nbsp;&nbsp;
+    <a href="index.htm">Library Home</a>&nbsp; &nbsp; <a href="#tutorial">Tutorial</a>&nbsp; &nbsp; <a href="reference.html">
+    Reference</a>&nbsp;&nbsp; <a href="faq.htm">FAQ</a></td>
+  </tr>
+</table>
+
+<table border="1" cellpadding="5" cellspacing="0" style="border-collapse: collapse" bordercolor="#111111" align="right">
+  <tr>
+    <td width="100%" bgcolor="#D7EEFF" align="center">
+      <i><b>Contents</b></i></td>
+  </tr>
+  <tr>
+    <td width="100%" bgcolor="#E8F5FF">
+    <a href="#Introduction">Introduction</a><br>
+    <a href="#Using">Using the library</a><br>
+    <a href="#tutorial">Two-minute tutorial</a><br>
+    <a href="#Cautions">Cautions</a><br>
+    <a href="#Examples">Example programs</a><br>
+    <a href="#Implementation">Implementation</a><br>
+    <a href="#Macros">Macros</a><br>
+    <a href="#Deprecated-names">Deprecated names and features</a><br>
+    <a href="#narrow-only">Using only narrow character paths</a><br>
+    <a href="#Building">Building the object-library</a><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<a href="#Cgywin">Notes for Cygwin users</a><br>
+    <a href="#Acknowledgements">Acknowledgements</a><br>
+    <a href="#Change-history">Change history</a></td>
+  </tr>
+  <tr>
+    <td width="100%" bgcolor="#D7EEFF" align="center">
+      <i><b>Other Documents</b></i></td>
+  </tr>
+  <tr>
+    <td width="100%" bgcolor="#E8F5FF">
+    <a href="reference.html">Reference</a><br>
+    <a href="design.htm">Library Design</a><br>
+    <a href="faq.htm">FAQ</a><br>
+    <a href="portability_guide.htm">Portability Guide</a><br>
+    <a href="do-list.htm">Do-list</a>
+    </td>
+  </tr>
+</table>
+
+<div align="center">
+  <center>
+  <table border="1" cellpadding="10" cellspacing="1" style="border-collapse: collapse" bordercolor="#111111">
+    <tr>
+      <td>
+      <p align="center"><b>This is the home page for Version 2 of the Filesystem library.</b></p>
+      <p align="left"><a href="../../v3/doc/index.htm">Version 3</a>, a major revision with many new and improved 
+      features, is also available. Version 3 may break some user code written 
+      for Version 2.</p>
+      <p align="left">To ease the transition, Boost releases 1.44 through 1.47 
+      will supply both V2 and V3. Version 2 is the default version for Boost release 1.44 
+      and 1.45. Version 3 will be the default starting with release 1.46.</p>
+      <p align="left"><b>Define macro BOOST_FILESYSTEM_VERSION as 3 to use 
+      Version 3. This will be the default for release 1.46 and later.</b></p>
+      <p align="left"><b>Define macro BOOST_FILESYSTEM_VERSION as 2 to use 
+      Version 2. This is the default for release 1.44 and 1.45.</b></p>
+      <p align="left"><b>You may define the BOOST_FILESYSTEM_VERSION macro:</b></p>
+      <ul>
+        <li>
+      <p align="left"><b>On the build command line; the exact format depends on 
+      your compiler or IDE</b></p>
+        </li>
+        <li>
+      <p align="left"><b>In your code, before including any filesystem header, 
+      #define BOOST_FILESYSTEM_VERSION <i>n</i></b></p>
+        </li>
+        <li>
+      <p align="left"><b>#define BOOST_FILESYSTEM_VERSION <i>n </i>in boost/config/user.hpp. 
+      Note that this approach applies to all uses of Boost.Filesystem.</b></p>
+        </li>
+      </ul>
+      <p align="left">Existing code should be moved to version 3 as soon as 
+      convenient. New code should be written for version 3.</p>
+      <p align="left">Version 2 is deprecated, and will not be included in Boost 
+      releases 1.48 and later.</p>
+      <p align="left"><b>Building the library</b></p>
+      <p align="left">By default, the Boost build system creates libraries that 
+      support both version 2 and version 3. To support only a single version, 
+      include <code>--disable-filesystem2</code> or <code>--disable-filesystem3</code> 
+      on the <code>bjam</code> command line.</p>
+      </td>
+    </tr>
+  </table>
+  </center>
+</div>
+
+<h2><a name="Introduction">Introduction</a></h2>
+<p>The Boost.Filesystem library provides portable facilities to query and 
+manipulate paths, files, and directories.</p>
+
+<p>The motivation for the library is the need to perform portable script-like operations from within C++ programs. The intent is not to 
+compete with Python, Perl, or shell languages, but rather to provide portable filesystem 
+operations when C++ is already the language of choice. The <a href="design.htm">
+design</a> encourages, but does not require, safe and portable  usage.</p>
+
+<p>Programs using the library are <b><i>portable</i></b>, both in the sense that 
+the syntax of program code is portable, and the sense that the semantics or 
+behavior of code is portable. The <a href="reference.html">generic path 
+grammar</a> is another important aid to portability.</p>
+
+<p>Usage is <i><b>safe</b></i> in the sense that errors cannot be ignored since most functions throw C++ 
+exceptions when errors are detected. This is also convenient for users because 
+it alleviates the&nbsp;need to explicitly check error 
+return codes.</p>
+
+<p>A proposal,
+<a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2006/n1975.html">
+N1975</a>, to include Boost.Filesystem in Technical Report 2 has been accepted 
+by the C++ Standards Committee. The Boost.Filesystem library will stay in 
+alignment with the TR2 Filesystem proposal as it works its way through the TR2 
+process. Note, however, that namespaces and header granularity differs between 
+Boost.Filesystem and the TR2 proposal.</p>
+
+<p>The Boost.Filesystem library provides several&nbsp; headers:</p>
+
+<ul>
+  <li>Header &lt;<a href="../../../../boost/filesystem.hpp">boost/filesystem.hpp</a>&gt; provides class <i>
+  basic_path, </i>a portable mechanism for representing
+      <a href="#path">paths</a> in C++ programs. Typedefs <i>path</i> and <i>
+  wpath</i> ease the most common usages of <i>basic_path</i>. Operational 
+  functions provide useful query and maintenance operations on files and directories. 
+  Class <i>basic_directory_iterator</i> with typdefs <i>
+  directory_iterator</i> and <i>wdirectory_iterator</i> provide iteration over 
+  the contents of directories. Convenience functions and classes combine lower-level functionality 
+  in useful ways.<br>
+&nbsp;</li>
+  <li>Header &lt;<a href="../../../../boost/filesystem/fstream.hpp">boost/filesystem<i>/</i>fstream.hpp</a>&gt; provides the same components as the C++ Standard 
+  Library's <i>fstream</i> header, except 
+      that files are identified by <i>basic_path</i> objects rather that <i>char *</i>'s.</li>
+</ul>
+<h2><a name="Using">Using</a> the library</h2>
+<p>Boost.Filesystem is implemented as a separately compiled library, so before 
+using it you must install it in a location that can be found by your linker. See
+<a href="#Building">Building the object-library</a>. </p>
+<p>The library's <a href="../example">example directory</a> contains very simple 
+scripts for building the <a href="#Examples">example programs</a> on various 
+platforms. You can use these scripts to see what's needed to compile and link 
+your own programs.</p>
+<h2>Two-minute <a name="tutorial">tutorial</a></h2>
+<p>(A
+<a href="http://beans.seartipy.com/2006/05/10/boost-filesystem-library-writing-portable-c-programs-to-acess-the-filesystem/">
+more elaborate tutorial</a> is also available from Tabrez Iqbal.)</p>
+<p>First some preliminaries:</p>
+<blockquote>
+  <pre>#include &quot;boost/filesystem.hpp&quot;   // includes all needed Boost.Filesystem declarations
+#include &lt;iostream&gt;               // for std::cout
+using boost::filesystem;          // for ease of tutorial presentation;
+                                  //  a namespace alias is preferred practice in real code</pre>
+</blockquote>
+<p>A <a href="reference.html#Class-template-basic_path">class <i>path</i></a> object can be created:</p>
+<blockquote>
+  <pre>path my_path( &quot;some_dir/file.txt&quot; );</pre>
+</blockquote>
+<p>The string passed to the <i>path</i> constructor may be in a
+<a href="reference.html#Pathname-formats">portable generic path format</a> or an 
+implementation-defined native operating system format. Access functions 
+make <i>my_path</i> contents available to the underlying operating system API in an operating system dependent format, 
+such as <code>&quot;some_dir:file.txt&quot;</code>, <code>&quot;[some_dir]file.txt&quot;</code>,
+<code>&quot;some_dir/file.txt&quot;</code>, or whatever is appropriate for the  
+operating system. If class <i>wpath</i> is used instead of class <i>path</i>, 
+translation between wide and narrow character paths is performed automatically 
+if necessary for the operating system.</p>
+<p>Class <i>path</i> has conversion constructors from <i>const char*</i> and <i>
+const std:: string&amp;</i>, so that even though the Filesystem Library 
+functions used in the following code snippet have <i>const path&amp;</i> formal 
+parameters, the user can just 
+code C-style strings as actual arguments:</p>
+<blockquote>
+  <pre>remove_all( &quot;foobar&quot; );
+create_directory( &quot;foobar&quot; );
+ofstream file( &quot;foobar/cheeze&quot; );
+file &lt;&lt; &quot;tastes good!\n&quot;;
+file.close();
+if ( !exists( &quot;foobar/cheeze&quot; ) )
+  std::cout &lt;&lt; &quot;Something is rotten in foobar\n&quot;;</pre>
+</blockquote>
+<p>To make class <i>path</i> objects easy to use in expressions, <i>operator/</i> 
+appends paths:</p>
+<blockquote>
+  <pre>ifstream file1( arg_path / &quot;foo/bar&quot; );
+ifstream file2( arg_path / &quot;foo&quot; / &quot;bar&quot; );</pre>
+</blockquote>
+<p>The expressions <i>arg_path / &quot;foo/bar&quot;</i> and <i>arg_path / &quot;foo&quot; 
+/ &quot;bar&quot;</i> yield identical results.</p>
+<p>Paths can include references to the current directory, using &quot;<code>.</code>&quot; 
+notation, and the parent directory, using &quot;<code>..</code>&quot; 
+notation.</p>
+<p><a href="reference.html#Class-template-basic_directory_iterator">Class <i>basic_directory_iterator</i></a> 
+is an important component of the library. It provides an input iterator over the 
+contents of a directory, with the value type being class <i>basic_path</i>. 
+Typedefs <i>directory_iterator</i> and <i>wdirectory_iterator</i> are provided 
+to cover the most common use cases.</p>
+<p>The following function, given a directory path and a file name, recursively 
+searches the directory and its sub-directories for the file name, returning a 
+bool, and if successful, the path to the file that was found.&nbsp; The code 
+below is extracted from a real program, slightly modified for clarity:</p>
+<blockquote>
+  <pre>bool find_file( const path &amp; dir_path,         // in this directory,
+                const std::string &amp; file_name, // search for this name,
+                path &amp; path_found )            // placing path here if found
+{
+  if ( !exists( dir_path ) ) return false;
+  directory_iterator end_itr; // default construction yields past-the-end
+  for ( directory_iterator itr( dir_path );
+        itr != end_itr;
+        ++itr )
+  {
+    if ( is_directory(itr-&gt;status()) )
+    {
+      if ( find_file( itr-&gt;path(), file_name, path_found ) ) return true;
+    }
+    else if ( itr-&gt;path().filename() == file_name ) // see below
+    {
+      path_found = itr-&gt;path();
+      return true;
+    }
+  }
+  return false;
+}</pre>
+</blockquote>
+<p>The expression <i>itr-&gt;path().filename() == file_name</i>, in the line commented <i>// 
+see below</i>, calls the <i>filename()</i> function on the <i>path</i> returned by 
+calling the <i>path()</i> function of the <i>directory_entry </i>object pointed 
+to by the iterator. <i>filename()</i> returns a string which is a copy of the 
+last (closest to the leaf, farthest from the root) file or directory name in the
+<i>path</i> object.</p>
+<p>Notice that <i>find_file()</i> does not do explicit error checking, such as 
+verifying that the <i>dir_path</i> argument really represents a directory.  
+Boost.Filesystem  functions throw 
+exceptions if they do not complete successfully, so there is enough implicit 
+error checking that this application doesn't need to supply additional error 
+checking code unless desired. Several Boost.Filesystem functions have non-throwing 
+versions, to ease use cases where exceptions would not be appropriate.</p>
+<blockquote>
+<p><i>Note: </i>Recursive 
+directory iteration was added  as a convenience function after the above tutorial code 
+was written, so nowadays you 
+don't have to actually code the recursion yourself.</p>
+</blockquote>
+<h2><a name="Cautions">Cautions</a></h2>
+<p>After reading the tutorial you can dive right into  simple, 
+script-like programs using the Filesystem Library! Before doing any serious 
+work, however, there a few cautions to be aware of:</p>
+<h4><b>Effects and Postconditions not guaranteed in the presence of race-conditions</b></h4>
+<p>Filesystem function specifications follow the C++ Standard Library form, specifying behavior in terms of 
+effects and postconditions. If 
+a <a href="reference.html#Race-condition">race-condition</a> exists, a function's 
+postconditions may no longer be true by the time the function returns to the 
+caller.</p>
+<blockquote>
+<p><b><i>Explanation: </i></b>The state of files and directories is often
+globally shared, and thus may be changed unexpectedly by other threads, 
+processes, or even other computers having network access to the filesystem. As an 
+example of the difficulties this can cause, note that the following asserts 
+may fail:</p>
+<blockquote>
+<p><code>assert( exists( &quot;foo&quot; ) == exists( &quot;foo&quot; ) );&nbsp; // 
+(1)<br>
+<br>
+remove_all( &quot;foo&quot; );<br>
+assert( !exists( &quot;foo&quot; ) );&nbsp; // (2)<br>
+<br>
+assert( is_directory( &quot;foo&quot; ) == is_directory( &quot;foo&quot; ) ); // 
+(3)</code></p>
+</blockquote>
+<p>(1) will fail if a non-existent &quot;foo&quot; comes into existence, or an 
+existent &quot;foo&quot; is removed, between the first and second call to <i>exists()</i>. 
+This could happen if, during the execution of the example code, another thread, 
+process, or computer is also performing operations in the same directory.</p>
+<p>(2) will fail if between the call to <i>remove_all()</i> and the call to
+<i>exists()</i> a new file or directory named &quot;foo&quot; is created by another 
+thread, process, or computer.</p>
+<p>(3) will fail if another thread, process, or computer removes an 
+existing file &quot;foo&quot; and then creates a directory named &quot;foo&quot;, between the 
+example code's two calls to <i>is_directory()</i>.</p>
+</blockquote>
+<h4><b>May throw exceptions</b></h4>
+<p>Unless otherwise specified, Boost.Filesystem functions throw <i>
+<a href="reference.html#basic_filesystem_error-constructors">basic_filesystem_error</a></i> 
+exceptions if they cannot successfully complete their operational 
+specifications. Also, implementations may use C++ Standard Library functions, 
+which may throw <i>std::bad_alloc</i>. These exceptions may be thrown even 
+though the error condition leading to the exception is not explicitly specified 
+in the function's &quot;Throws&quot; paragraph.</p>
+<p>All exceptions thrown by the Filesystem 
+Library are implemented by calling <a href="../../../utility/throw_exception.html">
+boost::throw_exception()</a>. Thus exact behavior may differ depending on 
+BOOST_NO_EXCEPTIONS at the time the filesystem source files are compiled.</p>
+<p>Non-throwing versions are provided of several functions that are often used 
+in contexts where error codes may be the preferred way to report an error.</p>
+<h2><a name="Examples">Example programs</a></h2>
+<h3><a href="../example/simple_ls.cpp">simple_ls.cpp</a></h3>
+<p>The example program <a href="../example/simple_ls.cpp">simple_ls.cpp</a> is 
+given a path as a command line argument. Since the command line argument may be 
+a relative path, the complete path is determined so that messages displayed 
+can be more precise.</p>
+<p>The program checks to see if the path exists; if not a message is printed.</p>
+<p>If the path identifies a directory, the directory is iterated through, 
+printing the name of the entries found, and an indication if they are 
+directories. A count of directories and files is updated, and then printed after 
+the iteration is complete.</p>
+<p>If the path is for a file, a message indicating that is printed.</p>
+<p>Try compiling and executing <a href="../example/simple_ls.cpp">simple_ls.cpp</a> 
+to see how it works on your system. Try various path arguments to see what 
+happens.</p>
+<h3><a href="../example/file_size.cpp">file_size.cpp</a></h3>
+<p>This example program prints the file's size if it is a regular file.</p>
+<h3>Other examples</h3>
+<p>The programs used to generate the Boost regression test status tables use the 
+Filesystem Library extensively.&nbsp; See:</p>
+<ul>
+  <li><a href="../../../../tools/regression/src/process_jam_log.cpp">process_jam_log.cpp</a></li>
+  <li><a href="../../../../tools/regression/src/compiler_status.cpp">compiler_status.cpp</a></li>
+</ul>
+<p>Test programs are sometimes useful in understanding a library, as they 
+illustrate what the developer expected to work and not work. See:</p>
+<ul>
+  <li><a href="../test/wide_test.cpp">wide_test.cpp</a></li>
+  <li><a href="../test/path_test.cpp">path_test.cpp</a></li>
+  <li><a href="../test/operations_test.cpp">operations_test.cpp</a></li>
+  <li><a href="../test/fstream_test.cpp">fstream_test.cpp</a></li>
+</ul>
+<h2><a name="Implementation">Implementation</a></h2>
+<p>The current implementation supports operating systems which provide 
+either the POSIX or Windows API.</p>
+<p>The library is in regular use on Apple  OS X, HP-UX, IBM AIX, Linux, 
+Microsoft Windows, SGI IRIX, and Sun Solaris operating systems using a variety 
+of compilers.</p>
+<h2><a name="Macros">Macros</a></h2>
+<p>Users may defined the following macros if desired. Sensible defaults are 
+provided, so users can ignore these macros unless they have special needs.</p>
+<table border="1" cellpadding="5" cellspacing="0" style="border-collapse: collapse" bordercolor="#111111">
+  <tr>
+    <td><b><i>Macro Name</i></b></td>
+    <td><b><i>Default</i></b></td>
+    <td><b><i>Effect if defined</i></b></td>
+  </tr>
+  <tr>
+    <td valign="top"><code>BOOST_FILESYSTEM_DYN_LINK</code></td>
+    <td valign="top">Defined if <code>BOOST_ALL_DYN_LINK</code> is defined, 
+    otherwise not defined.</td>
+    <td valign="top">Boost.System library is dynamically linked. If not defined, 
+    static linking is assumed.</td>
+  </tr>
+  <tr>
+    <td valign="top"><code>BOOST_FILESYSTEM_NO_LIB</code></td>
+    <td valign="top">Defined if <code>BOOST_ALL_NO_LIB</code> is defined, 
+    otherwise not defined.</td>
+    <td valign="top">Boost.System library does not use the Boost auto-link 
+    facility.</td>
+  </tr>
+  <tr>
+    <td valign="top"><code>BOOST_FILESYSTEM_NARROW_ONLY</code></td>
+    <td valign="top">Not defined.</td>
+    <td valign="top">Removes features that require wchar_t support.</td>
+  </tr>
+  <tr>
+    <td valign="top"><code>BOOST_FILESYSTEM_NO_DEPRECATED</code></td>
+    <td valign="top">Not defined.</td>
+    <td valign="top">Deprecated features are excluded.</td>
+  </tr>
+</table>
+<h2><a name="Deprecated-names">Deprecated names</a> and features</h2>
+<p style="font-size: 10pt">User-defined BOOST_POSIX_API and BOOST_WINDOWS_API 
+macros are no longer supported.</p>
+<p style="font-size: 10pt">As the library evolves over time, names sometimes 
+change or features are removed. To ease transition, Boost.Filesystem deprecates 
+the old names and features, but continues to provide them unless macro <code>
+BOOST_FILESYSTEM_NO_DEPRECATED</code> is defined.</p>
+<table border="1" cellpadding="5" cellspacing="1" style="border-collapse: collapse" bordercolor="#111111">
+  <tr>
+    <td style="font-size: 10pt">
+    <b><i>Component</i></b></td>
+    <td style="font-size: 10pt">
+    <p style="font-size: 10pt"><b><i>Old name, now deprecated</i></b></td>
+    <td style="font-size: 10pt">
+    <p style="font-size: 10pt"><b><i>New name</i></b></td>
+  </tr>
+  <tr>
+    <td style="font-size: 10pt" valign="top"><code>basic_path</code></td>
+    <td style="font-size: 10pt"><code>leaf()</code></td>
+    <td style="font-size: 10pt"><code>filename()</code></td>
+  </tr>
+  <tr>
+    <td style="font-size: 10pt" valign="top"><code>basic_path</code></td>
+    <td style="font-size: 10pt"><code>branch_path()</code></td>
+    <td style="font-size: 10pt"><code>parent_path()</code></td>
+  </tr>
+  <tr>
+    <td style="font-size: 10pt" valign="top"><code>basic_path</code></td>
+    <td style="font-size: 10pt"><code>has_leaf()</code></td>
+    <td style="font-size: 10pt"><code>has_filename()</code></td>
+  </tr>
+  <tr>
+    <td style="font-size: 10pt" valign="top"><code>basic_path</code></td>
+    <td style="font-size: 10pt"><code>has_branch_path()</code></td>
+    <td style="font-size: 10pt"><code>has_parent_path()</code></td>
+  </tr>
+  <tr>
+    <td style="font-size: 10pt" valign="top">
+    <code>basic_path</code></td>
+    <td style="font-size: 10pt">
+    <p style="font-size: 10pt"><code>remove_leaf()</code></td>
+    <td style="font-size: 10pt">
+    <p style="font-size: 10pt"><code>remove_filename()</code></td>
+  </tr>
+  <tr>
+    <td style="font-size: 10pt" valign="top">
+    <code>basic_path</code></td>
+    <td style="font-size: 10pt">
+    <code>basic_path( const string_type &amp; str,<br>
+&nbsp; name_check )</code></td>
+    <td style="font-size: 10pt">
+    <i><code>feature removed</code></i></td>
+  </tr>
+  <tr>
+    <td style="font-size: 10pt" valign="top">
+    <code>basic_path</code></td>
+    <td style="font-size: 10pt">
+    <code>basic_path( const string_type::value_type * s,<br>
+&nbsp; name_check )</code></td>
+    <td style="font-size: 10pt">
+    <i><code>feature removed</code></i></td>
+  </tr>
+  <tr>
+    <td style="font-size: 10pt" valign="top">
+    <code>basic_path</code></td>
+    <td style="font-size: 10pt">
+    <code>native_file_string()</code></td>
+    <td style="font-size: 10pt">
+    <code>file_string()</code></td>
+  </tr>
+  <tr>
+    <td style="font-size: 10pt" valign="top">
+    <code>basic_path</code></td>
+    <td style="font-size: 10pt">
+    <code>native_directory_string()</code></td>
+    <td style="font-size: 10pt">
+    <code>directory_string()</code></td>
+  </tr>
+  <tr>
+    <td style="font-size: 10pt" valign="top">
+    <code>basic_path</code></td>
+    <td style="font-size: 10pt">
+    <code>default_name_check_writable()</code></td>
+    <td style="font-size: 10pt">
+    <i><code>feature removed</code></i></td>
+  </tr>
+  <tr>
+    <td style="font-size: 10pt" valign="top">
+    <code>basic_path</code></td>
+    <td style="font-size: 10pt">
+    <code>default_name_check( name_check )</code></td>
+    <td style="font-size: 10pt">
+    <i><code>feature removed</code></i></td>
+  </tr>
+  <tr>
+    <td style="font-size: 10pt" valign="top">
+    <code>basic_path</code></td>
+    <td style="font-size: 10pt">
+    <code>default_name_check()</code></td>
+    <td style="font-size: 10pt">
+    <i><code>feature removed</code></i></td>
+  </tr>
+  <tr>
+    <td style="font-size: 10pt" valign="top">
+    <code>basic_path</code></td>
+    <td style="font-size: 10pt">
+    <code>canonize()</code></td>
+    <td style="font-size: 10pt">
+    <i><code>feature removed</code></i></td>
+  </tr>
+  <tr>
+    <td style="font-size: 10pt" valign="top">
+    <code>basic_path</code></td>
+    <td style="font-size: 10pt">
+    <code>normalize()</code></td>
+    <td style="font-size: 10pt">
+    <i><code>feature removed</code></i></td>
+  </tr>
+  <tr>
+    <td style="font-size: 10pt" valign="top">
+    <code>operations.hpp</code></td>
+    <td style="font-size: 10pt">
+    <code>is_regular( file_status f )</code></td>
+    <td style="font-size: 10pt">
+    <code>is_regular_file( file_status f )</code></td>
+  </tr>
+  <tr>
+    <td style="font-size: 10pt" valign="top">
+    <code>operations.hpp</code></td>
+    <td style="font-size: 10pt">
+    <code>symbolic_link_exists( const path &amp; ph )</code></td>
+    <td style="font-size: 10pt">
+    <i><code>feature removed</code></i></td>
+  </tr>
+  <tr>
+    <td style="font-size: 10pt" valign="top">
+    <code>basic_directory_status</code></td>
+    <td style="font-size: 10pt">
+    <code>filename()</code></td>
+    <td style="font-size: 10pt">
+    <i><code>feature removed, use path().filename() instead</code></i></td>
+  </tr>
+  <tr>
+    <td style="font-size: 10pt" valign="top">
+    <code>basic_directory_status</code></td>
+    <td style="font-size: 10pt">
+    <code>leaf()</code></td>
+    <td style="font-size: 10pt">
+    <i><code>feature removed, use path().filename() instead</code></i></td>
+  </tr>
+  <tr>
+    <td style="font-size: 10pt" valign="top">
+    <code>basic_directory_status</code></td>
+    <td style="font-size: 10pt">
+    <code>string()</code></td>
+    <td style="font-size: 10pt">
+    <i><code>feature removed, use path().string() instead</code></i></td>
+  </tr>
+</table>
+<h2><a name="narrow-only">Restricting library to narrow character paths</a></h2>
+<p>Compilers or standard libraries which do not support wide characters (wchar_t) 
+or wide character strings (std::wstring) are detected automatically, and cause 
+the library to compile code that is restricted to narrow character paths 
+(boost::filesystem::path). Users can force this restriction by defining the 
+macro BOOST_FILESYSTEM_NARROW_ONLY. That may be useful for dealing with legacy 
+compilers or operating systems.</p>
+<h2><a name="Building">Building</a> the object-library</h2>
+<p>The object-library will  be built automatically if you are using the Boost 
+build system. See
+<a href="../../../../more/getting_started.html">Getting Started</a>. It can also be 
+built manually using a <a href="../build/Jamfile.v2">Jamfile</a> 
+supplied in directory libs/filesystem/build, or the user can construct an IDE 
+project or make file which includes the object-library source files.</p>
+<p>The object-library source files are 
+supplied in directory <a href="../src">libs/filesystem/src</a>. These source files implement the 
+library for POSIX or Windows compatible operating systems; no implementation is 
+supplied for other operating systems. Note that many operating systems not 
+normally thought of as POSIX  systems, such as mainframe legacy 
+operating systems or embedded operating systems, support POSIX compatible file 
+systems which will work with the Filesystem Library.</p>
+<p>The object-library can be built for static or dynamic (shared/dll) linking. 
+This is controlled by the BOOST_ALL_DYN_LINK or BOOST_FILESYSTEM_DYN_LINK 
+macros. See the <a href="http://www.boost.org/development/separate_compilation.html">Separate 
+Compilation</a> page for a description of the techniques used.</p>
+<h3>Note for <a name="Cgywin">Cygwin</a> users</h3>
+<p>The library's implementation code treats <a href="http://www.cygwin.com/">Cygwin</a> 
+as a Windows platform, and thus uses the Windows API.</p>
+<h2><a name="Acknowledgements">Acknowledgements</a></h2>
+<p>The Filesystem Library was designed and implemented by Beman Dawes. The 
+original <i>directory_iterator</i> and <i>filesystem_error</i> classes were 
+based on prior work from Dietmar Kuehl, as modified by Jan Langer. Thomas Witt 
+was a particular help in later stages of initial development. Peter Dimov and 
+Rob Stewart made many useful suggestions and comments over a long period of 
+time. Howard Hinnant helped with internationalization issues.</p>
+
+<p>Key <a href="design.htm#Requirements">design requirements</a> and
+<a href="design.htm#Realities">design realities</a> were developed during 
+extensive discussions on the Boost mailing list, followed by comments on the 
+initial implementation. Numerous helpful comments were then received during the 
+Formal Review.<p>Participants included 
+Aaron Brashears,
+Alan Bellingham,
+Aleksey Gurtovoy,
+Alex Rosenberg,
+Alisdair Meredith,
+Andy Glew,
+Anthony Williams,
+Baptiste Lepilleur, 
+Beman Dawes,
+Bill Kempf,
+Bill Seymour, 
+Carl Daniel,
+Chris Little,
+Chuck Allison,
+Craig Henderson, 
+Dan Nuffer,
+Dan'l Miller,
+Daniel Frey, 
+Darin Adler, 
+David Abrahams,
+David Held, 
+Davlet Panech,
+Dietmar Kuehl,
+Douglas Gregor, 
+Dylan Nicholson,
+Ed Brey, 
+Eric Jensen,
+Eric Woodruff,
+Fedder Skovgaard,
+Gary Powell,
+Gennaro Prota,
+Geoff Leyland, 
+George Heintzelman, 
+Giovanni Bajo,
+Glen Knowles,
+Hillel Sims,
+Howard Hinnant,
+Jaap Suter,
+James Dennett, 
+Jan Langer, 
+Jani Kajala, 
+Jason Stewart, 
+Jeff Garland,
+Jens Maurer,
+Jesse Jones,
+Jim Hyslop,
+Joel de Guzman,
+Joel Young,
+John Levon, 
+John Maddock,
+John Williston,
+Jonathan Caves,
+Jonathan Biggar,
+Jurko,
+Justus Schwartz,
+Keith Burton, 
+Ken Hagen,
+Kostya Altukhov, 
+Mark Rodgers,
+Martin Schuerch, 
+Matt Austern,
+Matthias Troyer, 
+Mattias Flodin, 
+Michiel Salters,
+Mickael Pointier,
+Misha Bergal,
+Neal Becker,
+Noel Yap,
+Parksie,
+Patrick Hartling, Pavel Vozenilek,
+Pete Becker, 
+Peter Dimov,
+Rainer Deyke,
+Rene Rivera,
+Rob Lievaart,
+Rob Stewart,
+Ron Garcia,
+Ross Smith,
+Sashan,
+Steve Robbins, 
+Thomas Witt, 
+Tom Harris, 
+Toon Knapen,
+Victor Wagner,
+Vincent Finn,
+Vladimir Prus, and
+Yitzhak Sapir
+ 
+<p>A lengthy discussion on the C++ committee's library reflector illuminated the &quot;illusion 
+of portability&quot; problem, particularly in postings by PJ Plauger and Pete Becker.</p>
+
+<p>Walter Landry provided much help illuminating symbolic link use cases for 
+version 1.31.0.</p>
+
+<h3>Version 1.34 (<a href="i18n.html">i18n</a>) acknowledgements</h3>
+
+<p>So many people have contributed comments and bug reports that it isn't any 
+longer possible to acknowledge them individually. That said, Peter Dimov and Rob 
+Stewart need to be specially thanked for their many constructive criticisms and 
+suggestions. Terence 
+Wilson and Chris Frey contributed timing programs which helped illuminate 
+performance issues.</p>
+
+<h2><a name="Change-history">Change history</a></h2>
+
+<h3>Version 1.37.0</h3>
+
+<ul>
+  <li>Doc fixes: Update release history, add tables of macros and deprecated 
+  names.</li>
+  <li>Bug fix: convenience.hpp didn't fully apply BOOST_FILESYSTEM_NO_DEPRECATED 
+  to name changes.</li>
+  <li>Bug fix: Ticket #1972 'remove' fixes.</li>
+  <li>Bug fix: Restore deprecated basic_directory_entry names inadvertently 
+  removed.</li>
+  <li>Bug fix: Provide deprecated functions has_branch_path and has_leaf, 
+  inadvertently omitted from 1.36.0</li>
+  <li>Add workarounds for Codegear/Borland C++ Builder 2009.</li>
+</ul>
+
+<h3>Version 1.36.0 - August 14th, 2008</h3>
+
+<ul>
+  <li>Added stem(), extension(), and replace_extension() member functions to 
+  basic_path, based on the basename(), extension(), and change_extension() 
+  functions from convenience.hpp.</li>
+  <li>Changed path.hpp function names:<ul>
+    <li>leaf() -&gt; filename().</li>
+    <li>has_leaf() -&gt; has_filename().</li>
+    <li>branch_path() -&gt; parent_path().</li>
+    <li>has_branch_path() -&gt; has_parent_path().</li>
+    <li>remove_leaf() -&gt; remove_filename().</li>
+  </ul>
+  </li>
+  <li>Changed operations.hpp function names:<ul>
+    <li>is_regular() -&gt; is_regular_file().</li>
+  </ul>
+  </li>
+  <li>Bug fix: Add path.cpp #include &lt;cwchar&gt;</li>
+  <li>Cleared path.hpp gcc shadow warnings.</li>
+</ul>
+
+<h3>Version 1.35.0 - March 29th, 2008</h3>
+
+<ul>
+  <li>Diagnostics moved to the separate <a href="../../../system/doc/index.html">
+  Boost.System</a> library.</li>
+  <li>current_path() function added to set the current directory path.</li>
+  <li>Test coverage extended.</li>
+  <li>A few minor implementation fixes.</li>
+</ul>
+
+<h3>Version 1.34.1 - July 24th, 2007</h3>
+
+<h3><a href="i18n.html">Version 1.34.0</a> - May 12th, 2007</h3>
+
+<ul>
+  <li><a href="i18n.html#Internationalization">Internationalization</a>, provided by 
+  class templates <i>basic_path</i>, <i>basic_filesystem_error</i>, and <i>
+  basic_directory_iterator</i>.</li>
+  <li><a href="i18n.html#Simplification">Simplification</a> of the path interface, 
+  including elimination of distinction between native and generic formats, 
+  and separation of name checking functionality from general path functionality.</li>
+  <li><a href="i18n.html#Rationalization">Rationalization</a> of predicate 
+  function design, including the addition of several new functions.</li>
+  <li><a href="i18n.html#Preservation">Preservation</a> of existing user code whenever 
+  possible. Deprecated features (<i>symbolic_link_exists()</i>, etc.) remain 
+  available for legacy code.</li>
+  <li>Clearer specification, by reference to [<a href="design.htm#POSIX-01">POSIX-01</a>], 
+  the ISO/IEEE Single Unix Standard, with provisions for Windows and other 
+  operating systems.</li>
+  <li>New functions <a href="reference.html#Status-functions">status</a>,
+  <a href="reference.html#Status-functions">symlink_status</a>,
+  <a href="reference.html#Predicate-functions">is_file</a>,
+  <a href="reference.html#Predicate-functions">is_symlink</a>,
+  <a href="reference.html#Operations-functions">create_hard_link</a>, 
+  <a href="reference.html#Operations-functions">create_symlink</a>, path member and non-member swap, path inserter, path 
+  extractor, additional path relational and &quot;/&quot; operator overloads, additional 
+  path member template functions taking iterator arguments.</li>
+  <li><a href="i18n.html#More_efficient">More efficient operations</a> when iterating over directories.</li>
+  <li>Separation within the implementation of the distinction between the native 
+  operating system path syntax and API. This is important for CYGWIN users 
+  because it allows them to build for either the Windows or POSIX API's.</li>
+  <li>Numerous small implementation fixes.</li>
+</ul>
+
+<h3>Version 1.33.0 - August 11th, 2005</h3>
+
+<ul>
+  <li>Some small implementation fixes.</li>
+</ul>
+
+<h3>Version 1.32.0 - November 19th, 2004</h3>
+
+<ul>
+  <li><a href="reference.html#Attribute-functions">file_size()</a> function added.</li>
+  <li>Class path <a href="reference.html#basic_path-non-member-functions">relational operators</a> added.</li>
+  <li><a href="reference.html#Predicate-functions">equivalent()</a> function added.</li>
+  <li><a href="reference.html#Operations-functions">create_directory()</a> no longer 
+  throws if the directory already exists. A bool is returned, indicating that 
+  the directory did not preexist. Similar changes made to
+  <a href="reference.html#Convenience-functions">create_directories()</a>.</li>
+  <li><a href="#Cgywin">Docs added</a> for users wishing Cygwin/POSIX behavior 
+  on Windows.</li>
+  <li>For POSIX, Large File Support (LSF) is enabled if available, such as on 
+  Linux.</li>
+  <li><a href="reference.html#initial_path">current_path()</a> and
+  <a href="reference.html#initial_path">initial_path()</a> on POSIX now handle 
+  very long paths correctly.</li>
+</ul>
+
+<h3>Version 1.31.0 - January 26th, 2004</h3>
+
+<ul>
+  <li>The object library can now be <a href="#Building">built</a> for either 
+  static or dynamic (shared/dll) linking. </li>
+  <li>Several added functions, including improved checking for directory and 
+  file name portability. See <a href="portability_guide.htm#name_check_functions">
+  Name check functions</a>.</li>
+  <li>Separation of canonical form and normalized form and a new path member 
+  function normalize(). This changes behavior, 
+  in that canonical form is now different, but eliminates a subtle
+  <a href="design.htm#symbolic-link-use-case">bug</a> when symbolic links to 
+  directories are present.</li>
+</ul>
+
+<h3>&nbsp;<br>
+Version 1.30.0 - March 19th, 2003</h3>
+<ul>
+  <li>Initial official Boost version.</li>
+</ul>
+
+<hr>
+<p>Revised
+<!--webbot bot="Timestamp" S-Type="EDITED" S-Format="%d %B, %Y" startspan -->06 December, 2010<!--webbot bot="Timestamp" endspan i-checksum="38640" --></p>
+
+<p>&copy; Copyright Beman Dawes, 2002-2005</p>
+<p> Use, modification, and distribution are subject to the Boost Software 
+License, Version 1.0. See <a href="http://www.boost.org/LICENSE_1_0.txt">
+www.boost.org/LICENSE_1_0.txt</a></p>
+
+</body>
+
+</html>

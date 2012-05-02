@@ -51,6 +51,16 @@ import SCons.Errors
 import SCons.Scanner
 import SCons.Util
 
+def sorted_by_str(iterable):
+    """Shorthand for sorting an iterable according to its string representation.
+
+    We use this instead of sorted(), below, because SCons.Node objects are
+    compared on object identity, rather than value, so sorts aren't stable
+    across invocations of SCons.  Since dependency order changes force rebuilds,
+    we use this sort to create stable dependency orders.
+    """
+    return sorted(iterable, cmp=lambda lhs, rhs: cmp(str(lhs), str(rhs)))
+
 class DependencyCycleError(SCons.Errors.UserError):
     """Exception representing a cycle discovered in library dependencies."""
 
@@ -110,13 +120,13 @@ def update_scanner(builder):
             result = set(old_scanner.function(node, env, path))
             result.update(__get_libdeps(node, 'LIBDEPS'))
             result.update(__get_libdeps(node, 'SYSLIBDEPS'))
-            return sorted(result)
+            return sorted_by_str(result)
     else:
         path_function = None
         def new_scanner(node, env, path=()):
             result = set(__get_libdeps(node, 'LIBDEPS'))
             result.update(__get_libdeps(node, 'SYSLIBDEPS'))
-            return sorted(result)
+            return sorted_by_str(result)
 
     builder.target_scanner = SCons.Scanner.Scanner(function=new_scanner,
                                                     path_function=path_function)
@@ -133,12 +143,18 @@ def get_libdeps(source, target, env, for_signature):
     return list(__get_libdeps(target[0], 'LIBDEPS'))
 
 def get_libdeps_objs(source, target, env, for_signature):
+    if for_signature:
+        return []
+
     objs = set()
     for lib in get_libdeps(source, target, env, for_signature):
         objs.update(lib.sources_set)
     return list(objs)
 
 def get_libdeps_special_sun(source, target, env, for_signature):
+    if for_signature:
+        return []
+
     x = get_libdeps(source, target, env, for_signature )
     return x + x + x
 

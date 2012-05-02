@@ -1,8 +1,13 @@
 
+import codecs
 import re
 import socket
 import time
 import os
+import os.path
+import itertools
+import subprocess
+import sys
 # various utilities that are handy
 
 def getAllSourceFiles( arr=None , prefix="." ):
@@ -133,4 +138,75 @@ def didMongodStart( port=27017 , timeout=20 ):
             print( e )
             timeout = timeout - 1
     return False
+
+def which(executable):
+    if sys.platform == 'win32':
+        paths = os.environ.get('Path', '').split(';')
+    else:
+        paths = os.environ.get('PATH', '').split(':')
+
+    for path in paths:
+        path = os.path.expandvars(path)
+        path = os.path.expanduser(path)
+        path = os.path.abspath(path)
+        executable_path = os.path.join(path, executable)
+        if os.path.exists(executable_path):
+            return executable_path
+
+    return executable
+
+def find_python(min_version=(2, 5)):
+    try:
+        if sys.version_info >= min_version:
+            return sys.executable
+    except AttributeError:
+        # In case the version of Python is somehow missing sys.version_info or sys.executable.
+        pass
+
+    version = re.compile(r'[Pp]ython ([\d\.]+)', re.MULTILINE)
+    binaries = ('python27', 'python2.7', 'python26', 'python2.6', 'python25', 'python2.5', 'python')
+    for binary in binaries:
+        try:
+            out, err = subprocess.Popen([binary, '-V'], stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()
+            for stream in (out, err):
+                match = version.search(stream)
+                if match:
+                    versiontuple = tuple(map(int, match.group(1).split('.')))
+                    if versiontuple >= min_version:
+                        return which(binary)
+        except:
+            pass
+
+    raise Exception('could not find suitable Python (version >= %s)' % '.'.join(str(v) for v in min_version))
+
+def smoke_command(*args):
+    # return a list of arguments that comprises a complete
+    # invocation of smoke.py
+    here = os.path.dirname(__file__)
+    smoke_py = os.path.abspath(os.path.join(here, 'smoke.py'))
+    return [find_python(), smoke_py] + list(args)
+
+def run_smoke_command(*args):
+    # to run a command line script from a scons Alias (or any
+    # Action), the command sequence must be enclosed in a list,
+    # otherwise SCons treats it as a list of dependencies.
+    return [smoke_command(*args)]
+
+# unicode is a pain. some strings cannot be unicode()'d
+# but we want to just preserve the bytes in a human-readable
+# fashion. this codec error handler will substitute the
+# repr() of the offending bytes into the decoded string
+# at the position they occurred
+def replace_with_repr(unicode_error):
+    offender = unicode_error.object[unicode_error.start:unicode_error.end]
+    return (unicode(repr(offender).strip("'").strip('"')), unicode_error.end)
+
+codecs.register_error('repr', replace_with_repr)
+
+def unicode_dammit(string, encoding='utf8'):
+    # convert a string to a unicode, using the Python
+    # representation of non-ascii bytes when necessary
+    #
+    # name inpsired by BeautifulSoup's "UnicodeDammit"
+    return string.decode(encoding, 'repr')
 

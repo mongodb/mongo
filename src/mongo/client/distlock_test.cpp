@@ -1,4 +1,4 @@
-// distlock_test.h
+// distlock_test.cpp
 
 /*    Copyright 2009 10gen Inc.
  *
@@ -16,8 +16,7 @@
  */
 
 #include <iostream>
-#include "../pch.h"
-#include "dbclient.h"
+#include "pch.h"
 #include "distlock.h"
 #include "../db/commands.h"
 #include "../util/bson_util.h"
@@ -264,7 +263,7 @@ namespace mongo {
                         }
                         else {
                             log() << "**** Not unlocking for thread " << threadId << endl;
-                            assert( DistributedLock::killPinger( *myLock ) );
+                            verify( DistributedLock::killPinger( *myLock ) );
                             // We're simulating a crashed process...
                             break;
                         }

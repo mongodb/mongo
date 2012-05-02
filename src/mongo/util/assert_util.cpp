@@ -24,17 +24,9 @@ using namespace std;
 #include <sys/file.h>
 #endif
 
-#include "../bson/bsonobjbuilder.h"
-
-namespace boost {
-    void assertion_failed(char const * expr, char const * function, char const * file, long line) {
-        mongo::log() << "boost assertion failure " << expr << ' ' << function << ' ' << file << ' ' << line << endl;
-#if defined(_DEBUG)
-        // for _DEBUG, abort so we notice for sure
-        ::abort();
-#endif
-    }
-}
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/lasterror.h"
+#include "mongo/util/util.h"
 
 namespace mongo {
 
@@ -83,7 +75,6 @@ namespace mongo {
     }
 
     string getDbContext();
-    void raiseError(int code , const char *msg);
 
     /* "warning" assert -- safe to continue, so we don't throw exception. */
     NOINLINE_DECL void wasserted(const char *msg, const char *file, unsigned line) {
@@ -102,7 +93,7 @@ namespace mongo {
 
         problem() << "warning assertion failure " << msg << ' ' << file << ' ' << dec << line << endl;
         sayDbContext();
-        raiseError(0,msg && *msg ? msg : "wassertion failure");
+        setLastError(0,msg && *msg ? msg : "wassertion failure");
         assertionCount.condrollover( ++assertionCount.warning );
 #if defined(_DEBUG) || defined(_DURABLEDEFAULTON) || defined(_DURABLEDEFAULTOFF)
         // this is so we notice in buildbot
@@ -111,18 +102,18 @@ namespace mongo {
 #endif
     }
 
-    NOINLINE_DECL void asserted(const char *msg, const char *file, unsigned line) {
+    NOINLINE_DECL void verifyFailed(const char *msg, const char *file, unsigned line) {
         assertionCount.condrollover( ++assertionCount.regular );
         problem() << "Assertion failure " << msg << ' ' << file << ' ' << dec << line << endl;
         sayDbContext();
-        raiseError(0,msg && *msg ? msg : "assertion failure");
+        setLastError(0,msg && *msg ? msg : "assertion failure");
         stringstream temp;
         temp << "assertion " << file << ":" << line;
         AssertionException e(temp.str(),0);
         breakpoint();
 #if defined(_DEBUG) || defined(_DURABLEDEFAULTON) || defined(_DURABLEDEFAULTOFF)
         // this is so we notice in buildbot
-        log() << "\n\n***aborting after assert() failure as this is a debug/test build\n\n" << endl;
+        log() << "\n\n***aborting after verify() failure as this is a debug/test build\n\n" << endl;
         abort();
 #endif
         throw e;
@@ -136,27 +127,6 @@ namespace mongo {
         abort();
     }
 
-    NOINLINE_DECL void verifyFailed( int msgid ) {
-        assertionCount.condrollover( ++assertionCount.regular );
-        problem() << "Assertion failure " << msgid << endl;
-        sayDbContext();
-        raiseError(0,"assertion failure");
-        stringstream temp;
-        temp << msgid;
-        AssertionException e(temp.str(),0);
-        breakpoint();
-#if defined(_DEBUG) || defined(_DURABLEDEFAULTON) || defined(_DURABLEDEFAULTOFF)
-        // this is so we notice in buildbot
-        log() << "\n\n***aborting after verify() failure in a debug/test build\n\n" << endl;
-        abort();
-#endif
-        throw e;
-    }
-
-    void uassert_nothrow(const char *msg) {
-        raiseError(0,msg);
-    }
-
     void uasserted(int msgid , const string &msg) {
         uasserted(msgid, msg.c_str());
     }
@@ -167,7 +137,7 @@ namespace mongo {
     NOINLINE_DECL void uasserted(int msgid, const char *msg) {
         assertionCount.condrollover( ++assertionCount.user );
         LOG(1) << "User Assertion: " << msgid << ":" << msg << endl;
-        raiseError(msgid,msg);
+        setLastError(msgid,msg);
         throw UserException(msgid, msg);
     }
 
@@ -178,8 +148,8 @@ namespace mongo {
     NOINLINE_DECL void msgasserted(int msgid, const char *msg) {
         assertionCount.condrollover( ++assertionCount.warning );
         tlog() << "Assertion: " << msgid << ":" << msg << endl;
-        raiseError(msgid,msg && *msg ? msg : "massert failure");
-        breakpoint();
+        setLastError(msgid,msg && *msg ? msg : "massert failure");
+        //breakpoint();
         printStackTrace();
         throw MsgAssertionException(msgid, msg);
     }
@@ -187,7 +157,7 @@ namespace mongo {
     NOINLINE_DECL void msgassertedNoTrace(int msgid, const char *msg) {
         assertionCount.condrollover( ++assertionCount.warning );
         log() << "Assertion: " << msgid << ":" << msg << endl;
-        raiseError(msgid,msg && *msg ? msg : "massert failure");
+        setLastError(msgid,msg && *msg ? msg : "massert failure");
         throw MsgAssertionException(msgid, msg);
     }
 
@@ -229,7 +199,7 @@ namespace mongo {
 
     NOINLINE_DECL ErrorMsg::ErrorMsg(const char *msg, char ch) {
         int l = strlen(msg);
-        assert( l < 128);
+        verify( l < 128);
         memcpy(buf, msg, l);
         char *p = buf + l;
         p[0] = ch;
@@ -238,11 +208,10 @@ namespace mongo {
 
     NOINLINE_DECL ErrorMsg::ErrorMsg(const char *msg, unsigned val) {
         int l = strlen(msg);
-        assert( l < 128);
+        verify( l < 128);
         memcpy(buf, msg, l);
         char *p = buf + l;
         sprintf(p, "%u", val);
     }
 
 }
-

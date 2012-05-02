@@ -18,7 +18,6 @@
 #include "rs.h"
 #include "health.h"
 #include "../../util/background.h"
-#include "../../client/dbclient.h"
 #include "../../client/connpool.h"
 #include "../commands.h"
 #include "../../util/concurrency/value.h"
@@ -28,7 +27,7 @@
 #include "../../util/ramlog.h"
 #include "../helpers/dblogger.h"
 #include "connections.h"
-#include "../../util/unittest.h"
+#include "../../util/startup_test.h"
 #include "../dbhelpers.h"
 
 namespace mongo {
@@ -259,6 +258,14 @@ namespace mongo {
         s << table(0, false);
         s << tr("Set name:", _name);
         s << tr("Majority up:", elect.aMajoritySeemsToBeUp()?"yes":"no" );
+
+        // lag
+        const Member *primary = box.getPrimary();
+        if (primary != 0 && primary != _self && !iAmArbiterOnly() && !lastOpTimeWritten.isNull()) {
+            int lag = primary->hbinfo().opTime.getSecs() - lastOpTimeWritten.getSecs();
+            s << tr("Lag: ", str::stream() << lag << " secs");
+        }
+
         s << _table();
 
         const char *h[] = {"Member",
@@ -268,7 +275,7 @@ namespace mongo {
                            "<a title=\"when this server last received a heartbeat response - includes error code responses\">Last heartbeat</a>",
                            "Votes", "Priority", "State", "Messages",
                            "<a title=\"how up to date this server is.  this value polled every few seconds so actually lag is typically much lower than value shown here.\">optime</a>",
-                           "<a title=\"Clock skew in seconds relative to this server. Informational; server clock variances will make the diagnostics hard to read, but otherwise are benign..\">skew</a>",
+                           "<a title=\"Not replication lag. Clock skew in seconds relative to this server. Informational; server clock variances will make the diagnostics hard to read, but otherwise are benign.\">clock skew</a>",
                            0
                           };
         s << table(h);
@@ -279,7 +286,7 @@ namespace mongo {
 
         string myMinValid;
         try {
-            readlocktry lk("local.replset.minvalid", 300);
+            readlocktry lk(/*"local.replset.minvalid", */300);
             if( lk.got() ) {
                 BSONObj mv;
                 if( Helpers::getSingleton("local.replset.minvalid", mv) ) {
@@ -293,7 +300,7 @@ namespace mongo {
         }
 
         const Member *_self = this->_self;
-        assert(_self);
+        verify(_self);
         {
             stringstream s;
             /* self row */
@@ -360,7 +367,7 @@ namespace mongo {
         vector<BSONObj> v;
 
         const Member *_self = this->_self;
-        assert( _self );
+        verify( _self );
 
         MemberState myState = box.getState();
 
@@ -430,7 +437,9 @@ namespace mongo {
         b.appendTimeT("date", time(0));
         b.append("myState", myState.s);
         const Member *syncTarget = _currentSyncTarget;
-        if (syncTarget && myState != MemberState::RS_PRIMARY) {
+        if ( syncTarget && 
+            (myState != MemberState::RS_PRIMARY) && 
+            (myState != MemberState::RS_SHUNNED) ) {
             b.append("syncingTo", syncTarget->fullName());
         }
         b.append("members", v);
@@ -438,11 +447,11 @@ namespace mongo {
             b.append("blind",true); // to avoid confusion if set...normally never set except for testing.
     }
 
-    static struct Test : public UnitTest {
+    static struct Test : public StartupTest {
         void run() {
             HealthOptions a,b;
-            assert( a == b );
-            assert( a.isDefault() );
+            verify( a == b );
+            verify( a.isDefault() );
         }
     } test;
 

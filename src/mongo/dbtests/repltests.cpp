@@ -41,7 +41,7 @@ namespace ReplTests {
     }
 
     class Base {
-        dblock lk;
+        Lock::GlobalWrite lk;
         Client::Context _context;
     public:
         Base() : _context( ns() ) {
@@ -75,7 +75,7 @@ namespace ReplTests {
         }
         void checkAll( const BSONObj &o ) const {
             auto_ptr< DBClientCursor > c = client()->query( ns(), o );
-            assert( c->more() );
+            verify( c->more() );
             while( c->more() ) {
                 check( o, c->next() );
             }
@@ -92,7 +92,7 @@ namespace ReplTests {
         }
         int count() const {
             int count = 0;
-            dblock lk;
+            Lock::GlobalWrite lk;
             Client::Context ctx( ns() );
             boost::shared_ptr<Cursor> c = theDataFileMgr.findAll( ns() );
             for(; c->ok(); c->advance(), ++count ) {
@@ -101,7 +101,7 @@ namespace ReplTests {
             return count;
         }
         static int opCount() {
-            dblock lk;
+            Lock::GlobalWrite lk;
             Client::Context ctx( cllNS() );
             int count = 0;
             for( boost::shared_ptr<Cursor> c = theDataFileMgr.findAll( cllNS() ); c->ok(); c->advance() )
@@ -109,7 +109,7 @@ namespace ReplTests {
             return count;
         }
         static void applyAllOperations() {
-            dblock lk;
+            Lock::GlobalWrite lk;
             vector< BSONObj > ops;
             {
                 Client::Context ctx( cllNS() );
@@ -123,12 +123,15 @@ namespace ReplTests {
                 b.appendTimestamp("syncedTo", 0);
                 ReplSource a(b.obj());
                 for( vector< BSONObj >::iterator i = ops.begin(); i != ops.end(); ++i ) {
+                    if ( 0 ) {
+                        log() << "op: " << *i << endl;
+                    }
                     a.applyOperation( *i );
                 }
             }
         }
         static void printAll( const char *ns ) {
-            dblock lk;
+            Lock::GlobalWrite lk;
             Client::Context ctx( ns );
             boost::shared_ptr<Cursor> c = theDataFileMgr.findAll( ns );
             vector< DiskLoc > toDelete;
@@ -139,7 +142,7 @@ namespace ReplTests {
         }
         // These deletes don't get logged.
         static void deleteAll( const char *ns ) {
-            dblock lk;
+            Lock::GlobalWrite lk;
             Client::Context ctx( ns );
             boost::shared_ptr<Cursor> c = theDataFileMgr.findAll( ns );
             vector< DiskLoc > toDelete;
@@ -151,7 +154,7 @@ namespace ReplTests {
             }
         }
         static void insert( const BSONObj &o, bool god = false ) {
-            dblock lk;
+            Lock::GlobalWrite lk;
             Client::Context ctx( ns() );
             theDataFileMgr.insert( ns(), o.objdata(), o.objsize(), god );
         }
@@ -784,6 +787,18 @@ namespace ReplTests {
             }
         };
 
+        class EmptyPushSparseIndex : public EmptyPush {
+        public:
+            EmptyPushSparseIndex() {
+                client()->insert( "unittests.system.indexes",
+                                 BSON( "ns" << ns() << "key" << BSON( "a" << 1 ) <<
+                                      "name" << "foo" << "sparse" << true ) );
+            }
+            ~EmptyPushSparseIndex() {
+                client()->dropIndexes( ns() );
+            }
+        };
+
         class PushAll : public Base {
         public:
             void doIt() const {
@@ -1062,7 +1077,7 @@ namespace ReplTests {
             for( int i = 0; i < 10; ++i ) {
                 client()->insert( ns(), BSON( "_id" << i ) );
             }
-            dblock lk;
+            Lock::GlobalWrite lk;
             Client::Context ctx( cllNS() );
             NamespaceDetails *nsd = nsdetails( cllNS() );
             BSONObjBuilder b;
@@ -1108,17 +1123,17 @@ namespace ReplTests {
     public:
         void run() {
             ReplSetConfig::MemberCfg m1, m2;
-            assert(m1 == m2);
+            verify(m1 == m2);
             m1.tags["x"] = "foo";
-            assert(m1 != m2);
+            verify(m1 != m2);
             m2.tags["y"] = "bar";
-            assert(m1 != m2);
+            verify(m1 != m2);
             m1.tags["y"] = "bar";
-            assert(m1 != m2);
+            verify(m1 != m2);
             m2.tags["x"] = "foo";
-            assert(m1 == m2);
+            verify(m1 == m2);
             m1.tags.clear();
-            assert(m1 != m2);
+            verify(m1 != m2);
         }
     };
 
@@ -1150,16 +1165,16 @@ namespace ReplTests {
             catch (DBException&) {
                 threw = true;
             }
-            assert(threw);
+            verify(threw);
 
             // now this should succeed
             SyncTest t;
-            assert(t.shouldRetry(o));
-            assert(!client()->findOne(ns(), BSON("_id" << "on remote")).isEmpty());
+            verify(t.shouldRetry(o));
+            verify(!client()->findOne(ns(), BSON("_id" << "on remote")).isEmpty());
 
             // force it not to find an obj
             t.returnEmpty = true;
-            assert(!t.shouldRetry(o));
+            verify(!t.shouldRetry(o));
         }
     };
 
@@ -1201,6 +1216,7 @@ namespace ReplTests {
             add< Idempotence::PushUpsert >();
             add< Idempotence::MultiPush >();
             add< Idempotence::EmptyPush >();
+            add< Idempotence::EmptyPushSparseIndex >();
             add< Idempotence::PushAll >();
             add< Idempotence::PushAllUpsert >();
             add< Idempotence::EmptyPushAll >();

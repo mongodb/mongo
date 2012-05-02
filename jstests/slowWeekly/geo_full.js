@@ -17,6 +17,9 @@
 // test fails, and hard-wiring that as the test number.
 //
 
+load( "jstests/libs/slow_weekly_util.js" )
+testServer = new SlowWeeklyMongod( "geo_full" )
+db = testServer.getDB( "test" );
 
 var randEnvironment = function(){
 	
@@ -510,3 +513,4 @@ for ( var test = 0; test < numTests; test++ ) {
 }
 
 
+testServer.stop();

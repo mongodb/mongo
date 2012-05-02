@@ -1,14 +1,44 @@
 # -*- mode: python -*-
 
-Import( "env has_option" )
+Import( "env use_system_version_of_library windows" )
 
 env.SConscript( [
-        "pcre-${PCRE_VERSION}/SConscript",
+        "murmurhash3/SConscript",
         ] )
 
-if has_option( "use-system-pcre" ) or has_option( "use-system-all" ):
+if use_system_version_of_library("pcre"):
     env.StaticLibrary( "pcrecpp", ['mongo_pcrecpp.cc'],
-                       SYSLIBDEPS=[ 'pcrecpp' ] )
+                       SYSLIBDEPS=[ 'pcre' , 'pcrecpp' ] )
 else:
+    env.SConscript('pcre-${PCRE_VERSION}/SConscript')
     env.StaticLibrary( "pcrecpp", ['mongo_pcrecpp.cc'],
                        LIBDEPS=[ 'pcre-${PCRE_VERSION}/pcrecpp' ] )
+
+if use_system_version_of_library("boost"):
+    env.StaticLibrary("mongo_boost", ['mongo_boost.cpp'])
+else:
+    env.SConscript('boost/SConscript')
+    env.StaticLibrary( "mongo_boost", ['mongo_boost.cpp'],
+                       LIBDEPS=[ 'boost/boost_program_options',
+                                 'boost/boost_filesystem',
+                                 'boost/boost_thread',
+                                 'boost/boost_system',
+                                 ] )
+if use_system_version_of_library("snappy"):
+    env.StaticLibrary("mongo_snappy", ['mongo_snappy.cpp'],
+                      SYSLIBDEPS=['snappy'])
+else:
+    env.Append(CPPPATH='$BUILD_DIR/third_party/snappy')
+    env.SConscript('snappy/SConscript')
+    env.StaticLibrary('mongo_snappy', ['mongo_snappy.cpp'], LIBDEPS=['snappy/snappy'])
+
+if use_system_version_of_library("sm"):
+    env.StaticLibrary("mongo_spidermonkey", ['mongo_spidermonkey.cpp'], SYSLIBDEPS=['js'])
+else:
+    if windows:
+        env.Append(CPPDEFINES=['XP_WIN'])
+    else:
+        env.Append(CPPDEFINES=['XP_UNIX'])
+    env.Append(CPPPATH='$BUILD_DIR/third_party/js-1.7')
+    env.SConscript('js-1.7/SConscript')
+    env.StaticLibrary('mongo_spidermonkey', ['mongo_spidermonkey.cpp'], LIBDEPS=['js-1.7/js'])

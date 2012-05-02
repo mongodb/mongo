@@ -17,6 +17,8 @@
 
 #include "pch.h"
 
+#include <boost/thread/condition.hpp>
+
 #include "concurrency/mutex.h"
 #include "concurrency/spin_lock.h"
 
@@ -83,7 +85,7 @@ namespace mongo {
     }
 
     bool BackgroundJob::wait( unsigned msTimeOut ) {
-        assert( !_status->deleteSelf ); // you cannot call wait on a self-deleting job
+        verify( !_status->deleteSelf ); // you cannot call wait on a self-deleting job
         scoped_lock l( _status->m );
         while ( _status->state != Done ) {
             if ( msTimeOut ) {
@@ -180,7 +182,7 @@ namespace mongo {
                 }
                 
                 int ms = timer.millis();
-                LOG( ms <= 3 ? 1 : 0 ) << "task: " << t->taskName() << " took: " << ms << "ms" << endl;
+                LOG( ms <= 3 ? 3 : 0 ) << "task: " << t->taskName() << " took: " << ms << "ms" << endl;
             }
         }
     }

@@ -18,9 +18,10 @@
 
 #include "pch.h"
 #include "client/gridfs.h"
-#include "client/dbclient.h"
+#include "mongo/client/dbclientcursor.h"
 
 #include "tool.h"
+#include "pcrecpp.h"
 
 #include <fstream>
 #include <iostream>
@@ -87,8 +88,11 @@ public:
 
         if ( cmd == "list" ) {
             BSONObjBuilder b;
-            if ( filename.size() )
-                b.appendRegex( "filename" , ( (string)"^" + filename ) );
+            if ( filename.size() ) {
+                b.appendRegex( "filename" , (string)"^" +
+                               pcrecpp::RE::QuoteMeta( filename ) );
+            }
+            
             display( &g , b.obj() );
             return 0;
         }

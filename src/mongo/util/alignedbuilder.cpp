@@ -59,15 +59,15 @@ namespace mongo {
     }
 
     void AlignedBuilder::mallocSelfAligned(unsigned sz) {
-        assert( sz == _p._size );
+        verify( sz == _p._size );
         void *p = malloc(sz + Alignment - 1);
         _p._allocationAddress = p;
         size_t s = (size_t) p;
         size_t sold = s;
         s += Alignment - 1;
         s = (s/Alignment)*Alignment;
-        assert( s >= sold ); // begining
-        assert( (s + sz) <= (sold + sz + Alignment - 1) ); //end
+        verify( s >= sold ); // begining
+        verify( (s + sz) <= (sold + sz + Alignment - 1) ); //end
         _p._data = (char *) s;
     }
 
@@ -75,7 +75,7 @@ namespace mongo {
     void NOINLINE_DECL AlignedBuilder::growReallocate(unsigned oldLen) {
         dassert( _len > _p._size );
         unsigned a = _p._size;
-        assert( a );
+        verify( a );
         while( 1 ) {
             if( a < 128 * 1024 * 1024 )
                 a *= 2;
@@ -88,7 +88,7 @@ namespace mongo {
                 abort();
             }
             wassert( a <= 256*1024*1024 );
-            assert( a <= 512*1024*1024 );
+            verify( a <= 512*1024*1024 );
             if( _len < a )
                 break;
         }
@@ -111,7 +111,7 @@ namespace mongo {
         _p._data = (char *) p;
 #else
         mallocSelfAligned(sz);
-        assert( ((size_t) _p._data) % Alignment == 0 );
+        verify( ((size_t) _p._data) % Alignment == 0 );
 #endif
     }
 
@@ -119,7 +119,7 @@ namespace mongo {
         // posix_memalign alignment is not maintained on reallocs, so we can't use realloc().
         AllocationInfo old = _p;
         _malloc(newSize);
-        assert( oldLen <= _len );
+        verify( oldLen <= _len );
         memcpy(_p._data, old._data, oldLen);
         _free(old._allocationAddress);
     }

@@ -1,9 +1,4 @@
-// repl.cpp
-
-/* TODO
-   PAIRING
-    _ on a syncexception, don't allow going back to master state?
-*/
+// @file repl.cpp
 
 /**
 *    Copyright (C) 2008 10gen Inc.
@@ -37,10 +32,8 @@
 #include "repl.h"
 #include "../util/net/message.h"
 #include "../util/background.h"
-#include "../client/dbclient.h"
 #include "../client/connpool.h"
 #include "pdfile.h"
-#include "ops/query.h"
 #include "db.h"
 #include "commands.h"
 #include "security.h"
@@ -50,6 +43,8 @@
 #include "replutil.h"
 #include "repl/connections.h"
 #include "ops/update.h"
+#include "pcrecpp.h"
+#include "mongo/db/instance.h"
 
 namespace mongo {
 
@@ -92,6 +87,7 @@ namespace mongo {
             return true;
         }
         virtual bool logTheOp() { return false; }
+        virtual bool lockGlobally() const { return true; }
         virtual LockType locktype() const { return WRITE; }
         void help(stringstream&h) const { h << "resync (from scratch) an out of date replica slave.\nhttp://www.mongodb.org/display/DOCS/Master+Slave"; }
         CmdResync() : Command("resync") { }
@@ -126,7 +122,7 @@ namespace mongo {
                 if ( syncing == 0 || t.millis() > 30000 )
                     break;
                 {
-                    dbtemprelease t;
+                    Lock::TempRelease t;
                     relinquishSyncingSome = 1;
                     sleepmillis(1);
                 }
@@ -175,19 +171,24 @@ namespace mongo {
         else if ( level ) {
             BSONObjBuilder sources( result.subarrayStart( "sources" ) );
 
-            readlock lk( "local.sources" );
-            Client::Context ctx( "local.sources", dbpath, authed );
-            shared_ptr<Cursor> c = findTableScan("local.sources", BSONObj());
             int n = 0;
-            while ( c->ok() ) {
-                BSONObj s = c->current();
+            list<BSONObj> src;
+            {
+                Client::ReadContext ctx( "local.sources", dbpath, authed );
+                shared_ptr<Cursor> c = findTableScan("local.sources", BSONObj());
+                while ( c->ok() ) {
+                    src.push_back(c->current());
+                    c->advance();
+                }
+            }
 
+            for( list<BSONObj>::const_iterator i = src.begin(); i != src.end(); i++ ) {
+                BSONObj s = *i;
                 BSONObjBuilder bb;
                 bb.append( s["host"] );
                 string sourcename = s["source"].valuestr();
                 if ( sourcename != "main" )
                     bb.append( s["source"] );
-
                 {
                     BSONElement e = s["syncedTo"];
                     BSONObjBuilder t( bb.subobjStart( "syncedTo" ) );
@@ -197,7 +198,7 @@ namespace mongo {
                 }
 
                 if ( level > 1 ) {
-                    dbtemprelease unlock;
+                    wassert( !Lock::isLocked() );
                     // note: there is no so-style timeout on this connection; perhaps we should have one.
                     ScopedDbConnection conn( s["host"].valuestr() );
                     DBClientConnection *cliConn = dynamic_cast< DBClientConnection* >( &conn.conn() );
@@ -213,7 +214,6 @@ namespace mongo {
                 }
 
                 sources.append( BSONObjBuilder::numStr( n++ ) , bb.obj() );
-                c->advance();
             }
 
             sources.done();
@@ -242,6 +242,7 @@ namespace mongo {
             appendReplicationInfo( result , authed );
 
             result.appendNumber("maxBsonObjectSize", BSONObjMaxUserSize);
+            result.appendDate("localTime", jsTime());
             return true;
         }
     } cmdismaster;
@@ -319,7 +320,7 @@ namespace mongo {
 
     void ReplSource::save() {
         BSONObjBuilder b;
-        assert( !hostName.empty() );
+        verify( !hostName.empty() );
         b.append("host", hostName);
         // todo: finish allowing multiple source configs.
         // this line doesn't work right when source is null, if that is allowed as it is now:
@@ -333,8 +334,8 @@ namespace mongo {
             OpDebug debug;
             Client::Context ctx("local.sources");
             UpdateResult res = updateObjects("local.sources", o, pattern, true/*upsert for pair feature*/, false,false,debug);
-            assert( ! res.mod );
-            assert( res.num == 1 );
+            verify( ! res.mod );
+            verify( res.num == 1 );
         }
     }
 
@@ -669,7 +670,7 @@ namespace mongo {
             if( cmdLine.pretouch > 1 ) {
                 /* note: this is bad - should be put in ReplSource.  but this is first test... */
                 static int countdown;
-                assert( countdown >= 0 );
+                verify( countdown >= 0 );
                 if( countdown > 0 ) {
                     countdown--; // was pretouched on a prev pass
                 }
@@ -702,7 +703,7 @@ namespace mongo {
             }
         }
 
-        scoped_ptr<writelock> lk( alreadyLocked ? 0 : new writelock() );
+        scoped_ptr<Lock::GlobalWrite> lk( alreadyLocked ? 0 : new Lock::GlobalWrite() );
 
         if ( replAllDead ) {
             // hmmm why is this check here and not at top of this function? does it get set between top and here?
@@ -764,7 +765,7 @@ namespace mongo {
         string _ns = ns();
         BSONObjBuilder b;
         if ( !only.empty() ) {
-            b.appendRegex("ns", string("^") + only);
+            b.appendRegex("ns", string("^") + pcrecpp::RE::QuoteMeta( only ));
         }
         BSONObj last = oplogReader.findOne( _ns.c_str(), Query( b.done() ).sort( BSON( "$natural" << -1 ) ) );
         if ( !last.isEmpty() ) {
@@ -814,7 +815,9 @@ namespace mongo {
                         }
                     }
                 }
-                dblock lk;
+                // obviously global isn't ideal, but non-repl set is old so 
+                // keeping it simple
+                Lock::GlobalWrite lk;
                 save();
             }
 
@@ -824,7 +827,8 @@ namespace mongo {
             query.append("ts", q.done());
             if ( !only.empty() ) {
                 // note we may here skip a LOT of data table scanning, a lot of work for the master.
-                query.appendRegex("ns", string("^") + only); // maybe append "\\." here?
+                // maybe append "\\." here?
+                query.appendRegex("ns", string("^") + pcrecpp::RE::QuoteMeta( only ));
             }
             BSONObj queryObj = query.done();
             // e.g. queryObj = { ts: { $gte: syncedTo } }
@@ -865,7 +869,7 @@ namespace mongo {
                 log() << "repl:   " << ns << " oplog is empty\n";
             }
             {
-                dblock lk;
+                Lock::GlobalWrite lk;
                 save();
             }
             return okResultCode;
@@ -904,7 +908,7 @@ namespace mongo {
                     log() << "repl ASSERTION failed : syncedTo < nextOpTime" << endl;
                     log() << "repl syncTo:     " << syncedTo.toStringLong() << endl;
                     log() << "repl nextOpTime: " << nextOpTime.toStringLong() << endl;
-                    assert(false);
+                    verify(false);
                 }
                 oplogReader.putBack( op ); // op will be processed in the loop below
                 nextOpTime = OpTime(); // will reread the op below
@@ -922,7 +926,7 @@ namespace mongo {
                 log() << "repl:   tailing: " << tailing << '\n';
                 log() << "repl:   data too stale, halting replication" << endl;
                 replInfo = replAllDead = "data too stale halted replication";
-                assert( syncedTo < nextOpTime );
+                verify( syncedTo < nextOpTime );
                 throw SyncException();
             }
             else {
@@ -939,7 +943,7 @@ namespace mongo {
                 bool moreInitialSyncsPending = !addDbNextPass.empty() && n; // we need "&& n" to assure we actually process at least one op to get a sync point recorded in the first place.
 
                 if ( moreInitialSyncsPending || !oplogReader.more() ) {
-                    dblock lk;
+                    Lock::GlobalWrite lk;
 
                     // NOTE aaron 2011-03-29 This block may be unnecessary, but I'm leaving it in place to avoid changing timing behavior.
                     {
@@ -964,7 +968,7 @@ namespace mongo {
 
                 OCCASIONALLY if( n > 0 && ( n > 100000 || time(0) - saveLast > 60 ) ) {
                     // periodically note our progress, in case we are doing a lot of work and crash
-                    dblock lk;
+                    Lock::GlobalWrite lk;
                     syncedTo = nextOpTime;
                     // can't update local log ts since there are pending operations from our peer
                     save();
@@ -978,7 +982,7 @@ namespace mongo {
 
                 unsigned b = replApplyBatchSize;
                 bool justOne = b == 1;
-                scoped_ptr<writelock> lk( justOne ? 0 : new writelock() );
+                scoped_ptr<Lock::GlobalWrite> lk( justOne ? 0 : new Lock::GlobalWrite() );
                 while( 1 ) {
 
                     BSONElement ts = op.getField("ts");
@@ -1000,10 +1004,10 @@ namespace mongo {
                         uassert( 10123 , "replication error last applied optime at slave >= nextOpTime from master", false);
                     }
                     if ( replSettings.slavedelay && ( unsigned( time( 0 ) ) < nextOpTime.getSecs() + replSettings.slavedelay ) ) {
-                        assert( justOne );
+                        verify( justOne );
                         oplogReader.putBack( op );
                         _sleepAdviceTime = nextOpTime.getSecs() + replSettings.slavedelay + 1;
-                        dblock lk;
+                        Lock::GlobalWrite lk;
                         if ( n > 0 ) {
                             syncedTo = last;
                             save();
@@ -1054,7 +1058,7 @@ namespace mongo {
         else {
             BSONObj user;
             {
-                dblock lk;
+                Lock::GlobalWrite lk;
                 Client::Context ctxt("local.");
                 if( !Helpers::findOne("local.system.users", userReplQuery, user) ||
                         // try the first user in local
@@ -1078,13 +1082,12 @@ namespace mongo {
     }
 
     bool replHandshake(DBClientConnection *conn) {
-
         string myname = getHostName();
 
         BSONObj me;
         {
             
-            dblock l;
+            Lock::GlobalWrite l;
             // local.me is an identifier for a server for getLastError w:2+
             if ( ! Helpers::getSingleton( "local.me" , me ) ||
                  ! me.hasField("host") ||
@@ -1115,9 +1118,19 @@ namespace mongo {
         return true;
     }
 
+    OplogReader::OplogReader( bool doHandshake ) : 
+        _doHandshake( doHandshake ) { 
+        
+        _tailingQueryOptions = QueryOption_SlaveOk;
+        _tailingQueryOptions |= QueryOption_CursorTailable | QueryOption_OplogReplay;
+        
+        /* TODO: slaveOk maybe shouldn't use? */
+        _tailingQueryOptions |= QueryOption_AwaitData;
+    }
+
     bool OplogReader::commonConnect(const string& hostName) {
         if( conn() == 0 ) {
-            _conn = shared_ptr<DBClientConnection>(new DBClientConnection( false, 0, 0 /* tcp timeout */));
+            _conn = shared_ptr<DBClientConnection>(new DBClientConnection( false, 0, 60 /* tcp timeout */));
             string errmsg;
             ReplInfo r("trying to connect to sync source");
             if ( !_conn->connect(hostName.c_str(), errmsg) ||
@@ -1135,10 +1148,16 @@ namespace mongo {
             return true;
         }
 
-        if (commonConnect(hostName)) {
-            return replHandshake(_conn.get());
+        if ( ! commonConnect(hostName) ) {
+            return false;
         }
-        return false;
+        
+        
+        if ( _doHandshake && ! replHandshake(_conn.get() ) ) {
+            return false;
+        }
+
+        return true;
     }
 
     bool OplogReader::connect(const BSONObj& rid, const int from, const string& to) {
@@ -1160,6 +1179,21 @@ namespace mongo {
         BSONObj res;
         return conn()->runCommand( "admin" , cmd.obj() , res );
     }
+
+    void OplogReader::tailingQuery(const char *ns, const BSONObj& query, const BSONObj* fields ) {
+        verify( !haveCursor() );
+        LOG(2) << "repl: " << ns << ".find(" << query.toString() << ')' << endl;
+        cursor.reset( _conn->query( ns, query, 0, 0, fields, _tailingQueryOptions ).release() );
+    }
+    
+    void OplogReader::tailingQueryGTE(const char *ns, OpTime t, const BSONObj* fields ) {
+        BSONObjBuilder q;
+        q.appendDate("$gte", t.asDate());
+        BSONObjBuilder query;
+        query.append("ts", q.done());
+        tailingQuery(ns, query.done(), fields);
+    }
+
 
     /* note: not yet in mutex at this point.
        returns >= 0 if ok.  return -1 if you want to reconnect.
@@ -1221,7 +1255,7 @@ namespace mongo {
     int _replMain(ReplSource::SourceVector& sources, int& nApplied) {
         {
             ReplInfo r("replMain load sources");
-            dblock lk;
+            Lock::GlobalWrite lk;
             ReplSource::loadAll(sources);
             replSettings.fastsync = false; // only need this param for initial reset
         }
@@ -1290,7 +1324,7 @@ namespace mongo {
         while ( 1 ) {
             int s = 0;
             {
-                dblock lk;
+                Lock::GlobalWrite lk;
                 if ( replAllDead ) {
                     // throttledForceResyncDead can throw
                     if ( !replSettings.autoresync || !ReplSource::throttledForceResyncDead( "auto" ) ) {
@@ -1298,7 +1332,7 @@ namespace mongo {
                         break;
                     }
                 }
-                assert( syncing == 0 ); // i.e., there is only one sync thread running. we will want to change/fix this.
+                verify( syncing == 0 ); // i.e., there is only one sync thread running. we will want to change/fix this.
                 syncing++;
             }
             try {
@@ -1318,8 +1352,8 @@ namespace mongo {
                 s = 4;
             }
             {
-                dblock lk;
-                assert( syncing == 1 );
+                Lock::GlobalWrite lk;
+                verify( syncing == 1 );
                 syncing--;
             }
 
@@ -1352,7 +1386,7 @@ namespace mongo {
                even when things are idle.
             */
             {
-                writelocktry lk("",1);
+                writelocktry lk(1);
                 if ( lk.got() ) {
                     toSleep = 10;
 
@@ -1379,7 +1413,7 @@ namespace mongo {
         cc().iAmSyncThread();
 
         {
-            dblock lk;
+            Lock::GlobalWrite lk;
             replLocalAuth();
         }
 
@@ -1443,12 +1477,12 @@ namespace mongo {
             return;
 
         {
-            dblock lk;
+            Lock::GlobalWrite lk;
             replLocalAuth();
         }
 
         if ( replSettings.slave ) {
-            assert( replSettings.slave == SimpleSlave );
+            verify( replSettings.slave == SimpleSlave );
             log(1) << "slave=true" << endl;
             boost::thread repl_thread(replSlaveThread);
         }

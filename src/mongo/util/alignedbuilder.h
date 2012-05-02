@@ -87,7 +87,7 @@ namespace mongo {
 
         void appendStr(const StringData &str , bool includeEOO = true ) {
             const unsigned len = str.size() + ( includeEOO ? 1 : 0 );
-            assert( len < (unsigned) BSONObjMaxUserSize );
+            verify( len < (unsigned) BSONObjMaxUserSize );
             memcpy(grow(len), str.data(), len);
         }
 

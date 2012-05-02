@@ -182,8 +182,6 @@ pargs.start(true);
 
 p = new Mongo("localhost:"+ports[3]);
 
-printjson(p.getDB("admin").runCommand({replSetGetStatus:1}));
-
 // initFromConfig will keep closing sockets, so we'll a couple of times
 assert.soon(function() {
     try {

@@ -24,7 +24,6 @@
 #pragma once
 
 #include "../db/namespace.h"
-#include "../client/dbclient.h"
 #include "../client/model.h"
 
 #include "chunk.h"
@@ -83,8 +82,8 @@ namespace mongo {
             }
 
             void resetCM( ChunkManager * cm ) {
-                assert(cm);
-                assert(_cm); // this has to be already sharded
+                verify(cm);
+                verify(_cm); // this has to be already sharded
                 _cm.reset( cm );
             }
 
@@ -118,7 +117,7 @@ namespace mongo {
               _shardingEnabled(false),
               _lock("DBConfig") ,
               _hitConfigServerLock( "DBConfig::_hitConfigServerLock" ) {
-            assert( name.size() );
+            verify( name.size() );
         }
         virtual ~DBConfig() {}
 
@@ -143,6 +142,10 @@ namespace mongo {
          * @return whether or not the 'ns' collection is partitioned
          */
         bool isSharded( const string& ns );
+
+        // Atomically returns *either* the chunk manager *or* the primary shard for the collection,
+        // neither if the collection doesn't exist.
+        void getChunkManagerOrPrimary( const string& ns, ChunkManagerPtr& manager, ShardPtr& primary );
 
         ChunkManagerPtr getChunkManager( const string& ns , bool reload = false, bool forceReload = false );
         ChunkManagerPtr getChunkManagerIfExists( const string& ns , bool reload = false, bool forceReload = false );
@@ -174,6 +177,8 @@ namespace mongo {
         void unserialize(const BSONObj& from);
 
         void getAllShards(set<Shard>& shards) const;
+
+        void getAllShardedCollections(set<string>& namespaces) const;
 
     protected:
 

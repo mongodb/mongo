@@ -25,6 +25,7 @@
 #include "../s/chunk.h"
 #include "../s/config.h"
 #include "../s/grid.h"
+#include "mongo/client/dbclientcursor.h"
 
 namespace mongo {
 
@@ -83,10 +84,12 @@ namespace mongo {
     }
 
     void ClusteredCursor::_checkCursor( DBClientCursor * cursor ) {
-        assert( cursor );
+        verify( cursor );
         
         if ( cursor->hasResultFlag( ResultFlag_ShardConfigStale ) ) {
-            throw RecvStaleConfigException( _ns , "ClusteredCursor::_checkCursor" );
+            BSONObj error;
+            cursor->peekError( &error );
+            throw RecvStaleConfigException( "ClusteredCursor::_checkCursor", error );
         }
         
         if ( cursor->hasResultFlag( ResultFlag_ErrSet ) ) {
@@ -97,7 +100,7 @@ namespace mongo {
 
     auto_ptr<DBClientCursor> ClusteredCursor::query( const string& server , int num , BSONObj extra , int skipLeft , bool lazy ) {
         uassert( 10017 ,  "cursor already done" , ! _done );
-        assert( _didInit );
+        verify( _didInit );
 
         BSONObj q = _query;
         if ( ! extra.isEmpty() ) {
@@ -109,7 +112,8 @@ namespace mongo {
             
             if ( conn.setVersion() ) {
                 conn.done();
-                throw RecvStaleConfigException( _ns , "ClusteredCursor::query" , true );
+                // Deprecated, so we don't care about versions here
+                throw RecvStaleConfigException( _ns , "ClusteredCursor::query" , true, ShardChunkVersion( 0 ), ShardChunkVersion( 0 ) );
             }
             
             LOG(5) << "ClusteredCursor::query (" << type() << ") server:" << server
@@ -128,7 +132,7 @@ namespace mongo {
             massert( 13633 , str::stream() << "error querying server: " << server  , cursor.get() );
             
             cursor->attach( &conn ); // this calls done on conn
-            assert( ! conn.ok() );
+            verify( ! conn.ok() );
             _checkCursor( cursor.get() );
             return cursor;
         }
@@ -202,9 +206,9 @@ namespace mongo {
         if( ( isVersioned() && ! isSharded() ) || _qShards.size() == 1 ){
             map<string,list<BSONObj> > out;
             _explain( out );
-            assert( out.size() == 1 );
+            verify( out.size() == 1 );
             list<BSONObj>& l = out.begin()->second;
-            assert( l.size() == 1 );
+            verify( l.size() == 1 );
             b.appendElements( *(l.begin()) );
             return;
         }
@@ -335,8 +339,8 @@ namespace mongo {
     }
 
     BSONObj FilteringClientCursor::next() {
-        assert( ! _next.isEmpty() );
-        assert( ! _done );
+        verify( ! _next.isEmpty() );
+        verify( ! _done );
 
         BSONObj ret = _next;
         _next = BSONObj();
@@ -351,7 +355,7 @@ namespace mongo {
     }
 
     void FilteringClientCursor::_advance() {
-        assert( _next.isEmpty() );
+        verify( _next.isEmpty() );
         if ( ! _cursor.get() || _done )
             return;
 
@@ -466,7 +470,7 @@ namespace mongo {
             _sortKey = _qSpec.sort();
             _fields = _qSpec.fields();
 
-            if( ! isVersioned() ) assert( _cInfo.isEmpty() );
+            if( ! isVersioned() ) verify( _cInfo.isEmpty() );
         }
 
         if ( ! _sortKey.isEmpty() && ! _fields.isEmpty() ) {
@@ -529,8 +533,8 @@ namespace mongo {
             }
             else if( initialized ){
 
-                assert( pcState->cursor );
-                assert( pcState->conn );
+                verify( pcState->cursor );
+                verify( pcState->conn );
 
                 if( ! finished && pcState->conn->ok() ){
                     try{
@@ -554,7 +558,7 @@ namespace mongo {
 
             pcState.reset();
         }
-        else assert( finished || ! initialized );
+        else verify( finished || ! initialized );
 
         initialized = false;
         finished = false;
@@ -638,7 +642,7 @@ namespace mongo {
         finishInit();
     }
 
-    void ParallelSortClusteredCursor::_markStaleNS( const NamespaceString& staleNS, bool& forceReload, bool& fullReload ){
+    void ParallelSortClusteredCursor::_markStaleNS( const NamespaceString& staleNS, const StaleConfigException& e, bool& forceReload, bool& fullReload ){
         if( _staleNSMap.find( staleNS ) == _staleNSMap.end() ){
             forceReload = false;
             fullReload = false;
@@ -647,7 +651,8 @@ namespace mongo {
         else{
             int tries = ++_staleNSMap[ staleNS ];
 
-            if( tries >= 5 ) throw SendStaleConfigException( staleNS, str::stream() << "too many retries of stale version info" );
+            if( tries >= 5 ) throw SendStaleConfigException( staleNS, str::stream() << "too many retries of stale version info",
+                                                             e.getVersionReceived(), e.getVersionWanted() );
 
             forceReload = tries > 1;
             fullReload = tries > 2;
@@ -700,18 +705,7 @@ namespace mongo {
             uassert( 15989, "database not found for parallel cursor request", config );
 
             // Try to get either the chunk manager or the primary shard
-            int cmRetries = 0;
-            // We need to test config->isSharded() to avoid throwing a stupid exception in most cases
-            // b/c that's how getChunkManager works
-            // This loop basically retries getting either the chunk manager or primary, one or the other *should* exist
-            // eventually?  TODO: Verify that we need / don't need the loop b/c we are / are not protected by const fields or mutexes
-            while( ! ( config->isSharded( ns ) && ( manager = config->getChunkManagerIfExists( ns ) ).get() ) &&
-                   ! ( primary = config->getShardIfExists( ns ) ) &&
-                   cmRetries++ < 5 ) sleepmillis( 100 ); // TODO: Do we need to loop here?
-
-            uassert( 15919, "too many retries for chunk manager or primary", cmRetries < 5 );
-            assert( manager || primary );
-            assert( ! manager || ! primary );
+            config->getChunkManagerOrPrimary( ns, manager, primary );
 
             if( manager ) vinfo = ( str::stream() << "[" << manager->getns() << " @ " << manager->getVersion().toString() << "]" );
             else vinfo = (str::stream() << "[unsharded @ " << primary->toString() << "]" );
@@ -736,7 +730,7 @@ namespace mongo {
 
         }
 
-        assert( todo.size() );
+        verify( todo.size() );
 
         log( pc ) << "initializing over " << todo.size() << " shards required by " << vinfo << endl;
 
@@ -756,7 +750,7 @@ namespace mongo {
 
                 if( mdata.initialized ){
 
-                    assert( mdata.pcState );
+                    verify( mdata.pcState );
 
                     PCStatePtr state = mdata.pcState;
 
@@ -801,7 +795,7 @@ namespace mongo {
                 if( manager ) state->manager = manager;
                 else if( primary ) state->primary = primary;
 
-                assert( ! primary || shard == *primary || ! isVersioned() );
+                verify( ! primary || shard == *primary || ! isVersioned() );
 
                 // Setup conn
                 if( ! state->conn ) state->conn.reset( new ShardConnection( shard, ns, manager ) );
@@ -880,10 +874,10 @@ namespace mongo {
 
                 // Probably need to retry fully
                 bool forceReload, fullReload;
-                _markStaleNS( staleNS, forceReload, fullReload );
+                _markStaleNS( staleNS, e, forceReload, fullReload );
 
                 int logLevel = fullReload ? 0 : 1;
-                log( pc + logLevel ) << "stale config of ns " << staleNS << " during initialization, will retry with forced : " << forceReload << ", full : " << fullReload << endl;
+                log( pc + logLevel ) << "stale config of ns " << staleNS << " during initialization, will retry with forced : " << forceReload << ", full : " << fullReload << causedBy( e ) << endl;
 
                 // This is somewhat strange
                 if( staleNS != ns )
@@ -934,21 +928,20 @@ namespace mongo {
             if( ! mdata.pcState ) continue;
 
             // Make sure all state is in shards
-            assert( todo.find( shard ) != todo.end() );
-            assert( mdata.initialized = true );
-            if( ! mdata.completed ) assert( mdata.pcState->conn->ok() );
-            assert( mdata.pcState->cursor );
-            if( isVersioned() ) assert( mdata.pcState->primary || mdata.pcState->manager );
-            else assert( ! mdata.pcState->primary || ! mdata.pcState->manager );
-            assert( ! mdata.retryNext );
+            verify( todo.find( shard ) != todo.end() );
+            verify( mdata.initialized = true );
+            if( ! mdata.completed ) verify( mdata.pcState->conn->ok() );
+            verify( mdata.pcState->cursor );
+            if( isVersioned() ) verify( mdata.pcState->primary || mdata.pcState->manager );
+            else verify( ! mdata.pcState->primary || ! mdata.pcState->manager );
+            verify( ! mdata.retryNext );
 
-            if( mdata.completed ) assert( mdata.finished );
-            if( mdata.finished ) assert( mdata.initialized );
-            if( ! returnPartial ) assert( mdata.initialized );
+            if( mdata.completed ) verify( mdata.finished );
+            if( mdata.finished ) verify( mdata.initialized );
+            if( ! returnPartial ) verify( mdata.initialized );
         }
 
     }
-
 
     void ParallelSortClusteredCursor::finishInit(){
 
@@ -957,7 +950,7 @@ namespace mongo {
         string ns = specialVersion ? _cInfo.versionedNS : _qSpec.ns();
 
         bool retry = false;
-        set< string > staleNSes;
+        map< string, StaleConfigException > staleNSExceptions;
 
         log( pc ) << "finishing over " << _cursorMap.size() << " shards" << endl;
 
@@ -976,13 +969,13 @@ namespace mongo {
             try {
 
                 // Sanity checks
-                if( ! mdata.completed ) assert( state->conn && state->conn->ok() );
-                assert( state->cursor );
+                if( ! mdata.completed ) verify( state->conn && state->conn->ok() );
+                verify( state->cursor );
                 if( isVersioned() ){
-                    assert( state->manager || state->primary );
-                    assert( ! state->manager || ! state->primary );
+                    verify( state->manager || state->primary );
+                    verify( ! state->manager || ! state->primary );
                 }
-                else assert( ! state->manager && ! state->primary );
+                else verify( ! state->manager && ! state->primary );
 
 
                 // If we weren't init'ing lazily, ignore this
@@ -1024,20 +1017,11 @@ namespace mongo {
                 retry = true;
 
                 // Will retry all at once
-                staleNSes.insert( e.getns() );
+                staleNSExceptions[ e.getns() ] = e;
 
                 // Fully clear this cursor, as it needs to be re-established
                 mdata.cleanup();
                 continue;
-            }
-            catch ( MsgAssertionException& e ){
-                warning() << "socket (msg) exception when finishing on " << shard << ", current connection state is " << mdata.toBSON() << causedBy( e ) << endl;
-                mdata.errored = true;
-                if( returnPartial ){
-                    mdata.cleanup();
-                    continue;
-                }
-                throw;
             }
             catch( SocketException& e ){
                 warning() << "socket exception when finishing on " << shard << ", current connection state is " << mdata.toBSON() << causedBy( e ) << endl;
@@ -1070,16 +1054,17 @@ namespace mongo {
         if( retry ){
 
             // Refresh stale namespaces
-            if( staleNSes.size() ){
-                for( set<string>::iterator i = staleNSes.begin(), end = staleNSes.end(); i != end; ++i ){
+            if( staleNSExceptions.size() ){
+                for( map<string,StaleConfigException>::iterator i = staleNSExceptions.begin(), end = staleNSExceptions.end(); i != end; ++i ){
 
-                    const string& staleNS = *i;
+                    const string& staleNS = i->first;
+                    const StaleConfigException& exception = i->second;
 
                     bool forceReload, fullReload;
-                    _markStaleNS( staleNS, forceReload, fullReload );
+                    _markStaleNS( staleNS, exception, forceReload, fullReload );
 
                     int logLevel = fullReload ? 0 : 1;
-                    log( pc + logLevel ) << "stale config of ns " << staleNS << " on finishing query, will retry with forced : " << forceReload << ", full : " << fullReload << endl;
+                    log( pc + logLevel ) << "stale config of ns " << staleNS << " on finishing query, will retry with forced : " << forceReload << ", full : " << fullReload << causedBy( exception ) << endl;
 
                     // This is somewhat strange
                     if( staleNS != ns )
@@ -1111,13 +1096,13 @@ namespace mongo {
             else ++i;
 
             // Make sure all state is in shards
-            assert( mdata.initialized = true );
-            assert( mdata.finished = true );
-            assert( mdata.completed = true );
-            assert( ! mdata.pcState->conn->ok() );
-            assert( mdata.pcState->cursor );
-            if( isVersioned() ) assert( mdata.pcState->primary || mdata.pcState->manager );
-            else assert( ! mdata.pcState->primary && ! mdata.pcState->manager );
+            verify( mdata.initialized = true );
+            verify( mdata.finished = true );
+            verify( mdata.completed = true );
+            verify( ! mdata.pcState->conn->ok() );
+            verify( mdata.pcState->cursor );
+            if( isVersioned() ) verify( mdata.pcState->primary || mdata.pcState->manager );
+            else verify( ! mdata.pcState->primary && ! mdata.pcState->manager );
         }
 
         // TODO : More cleanup of metadata?
@@ -1195,7 +1180,7 @@ namespace mongo {
         // log() << "Starting parallel search..." << endl;
 
         // make sure we're not already initialized
-        assert( ! _cursors );
+        verify( ! _cursors );
         _cursors = new FilteringClientCursor[_numServers];
 
         bool returnPartial = ( _options & QueryOption_PartialResults );
@@ -1269,7 +1254,8 @@ namespace mongo {
 
                 if ( conns[i]->setVersion() ) {
                     conns[i]->done();
-                    staleConfigExs.push_back( (string)"stale config detected for " + RecvStaleConfigException( _ns , "ParallelCursor::_init" , true ).what() + errLoc );
+                    // Version is zero b/c this is deprecated codepath
+                    staleConfigExs.push_back( (string)"stale config detected for " + RecvStaleConfigException( _ns , "ParallelCursor::_init" , ShardChunkVersion( 0 ), ShardChunkVersion( 0 ), true ).what() + errLoc );
                     break;
                 }
 
@@ -1317,7 +1303,7 @@ namespace mongo {
                     continue;
                 }
 
-                assert( conns[i] );
+                verify( conns[i] );
                 retryQueries.erase( i );
 
                 bool retry = false;
@@ -1346,12 +1332,6 @@ namespace mongo {
                     allConfigStale = true;
 
                     staleConfigExs.push_back( (string)"stale config detected when receiving response for " + e.what() + errLoc );
-                    _cursors[i].reset( NULL );
-                    conns[i]->done();
-                    continue;
-                }
-                catch ( MsgAssertionException& e ){
-                    socketExs.push_back( e.what() + errLoc );
                     _cursors[i].reset( NULL );
                     conns[i]->done();
                     continue;
@@ -1395,7 +1375,7 @@ namespace mongo {
             }
 
             // Don't exceed our max retries, should not happen
-            assert( retries < 5 );
+            verify( retries < 5 );
         }
         while( retryQueries.size() > 0 /* something to retry */ &&
                ( socketExs.size() == 0 || returnPartial ) /* no conn issues */ &&
@@ -1404,7 +1384,7 @@ namespace mongo {
 
         // Assert that our conns are all closed!
         for( vector< shared_ptr<ShardConnection> >::iterator i = conns.begin(); i < conns.end(); ++i ){
-            assert( ! (*i) || ! (*i)->ok() );
+            verify( ! (*i) || ! (*i)->ok() );
         }
 
         // Handle errors we got during initialization.
@@ -1427,8 +1407,10 @@ namespace mongo {
                 errMsg << *i;
             }
 
-            if( throwException && staleConfigExs.size() > 0 )
-                throw RecvStaleConfigException( _ns , errMsg.str() , ! allConfigStale );
+            if( throwException && staleConfigExs.size() > 0 ){
+                // Version is zero b/c this is deprecated codepath
+                throw RecvStaleConfigException( _ns , errMsg.str() , ! allConfigStale, ShardChunkVersion( 0 ), ShardChunkVersion( 0 ) );
+            }
             else if( throwException )
                 throw DBException( errMsg.str(), 14827 );
             else
@@ -1579,7 +1561,7 @@ namespace mongo {
             }
             catch ( RecvStaleConfigException& e ){
 
-                assert( versionManager.isVersionableCB( _conn ) );
+                verify( versionManager.isVersionableCB( _conn ) );
 
                 if( i >= maxRetries ){
                     error() << "Future::spawnComand (part 2) stale config exception" << causedBy( e ) << endl;
@@ -1597,7 +1579,7 @@ namespace mongo {
 
                 LOG( i > 1 ? 0 : 1 ) << "retrying lazy command" << causedBy( e ) << endl;
 
-                assert( _conn->lazySupported() );
+                verify( _conn->lazySupported() );
                 _done = false;
                 init();
                 continue;

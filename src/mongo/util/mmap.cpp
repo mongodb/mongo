@@ -16,13 +16,17 @@
  */
 
 #include "pch.h"
-#include "mmap.h"
-#include "processinfo.h"
-#include "concurrency/rwlock.h"
-#include "../db/namespace.h"
-#include "../db/cmdline.h"
+
+#include "mongo/util/mmap.h"
 
 #include <boost/filesystem/operations.hpp>
+
+#include "mongo/db/cmdline.h"
+#include "mongo/db/namespace.h"
+#include "mongo/util/concurrency/rwlock.h"
+#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/processinfo.h"
+#include "mongo/util/progress_meter.h"
 
 namespace mongo {
 
@@ -37,7 +41,7 @@ namespace mongo {
         void *p = map(filename.c_str(), len);
         if( p && zero ) {
             size_t sz = (size_t) len;
-            assert( len == sz );
+            verify( len == sz );
             memset(p, 0, sz);
         }
         return p;
@@ -57,7 +61,7 @@ namespace mongo {
             l = boost::filesystem::file_size( filename );
         } 
         catch(boost::filesystem::filesystem_error& e) { 
-            uasserted(15922, str::stream() << "couldn't get file length when opening mapping " << filename << ' ' << e.what() );
+            uasserted(15922, mongoutils::str::stream() << "couldn't get file length when opening mapping " << filename << ' ' << e.what() );
         }
         return map( filename , l );
     }
@@ -67,7 +71,7 @@ namespace mongo {
             l = boost::filesystem::file_size( filename );
         } 
         catch(boost::filesystem::filesystem_error& e) { 
-            uasserted(15923, str::stream() << "couldn't get file length when opening mapping " << filename << ' ' << e.what() );
+            uasserted(15923, mongoutils::str::stream() << "couldn't get file length when opening mapping " << filename << ' ' << e.what() );
         }
         return map( filename , l, options );
     }
@@ -182,32 +186,12 @@ namespace mongo {
 
     void MongoFile::setFilename(string fn) {
         LockMongoFilesExclusive lk;
-        assert( _filename.empty() );
+        verify( _filename.empty() );
         _filename = fn;
         MongoFile *&ptf = pathToFile[fn];
         massert(13617, "MongoFile : multiple opens of same filename", ptf == 0);
         ptf = this;
     }
 
-#if defined(_DEBUG)
-    void MongoFile::markAllWritable() {
-      if( cmdLine.dur )
-          return;
-        LockMongoFilesShared lk;
-        for ( set<MongoFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ ) {
-            MongoFile * mmf = *i;
-            if (mmf) mmf->_lock();
-        }
-    }
 
-    void MongoFile::unmarkAllWritable() {
-        if( cmdLine.dur )
-            return;
-        LockMongoFilesShared lk;
-        for ( set<MongoFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ ) {
-            MongoFile * mmf = *i;
-            if (mmf) mmf->_unlock();
-        }
-    }
-#endif
 } // namespace mongo

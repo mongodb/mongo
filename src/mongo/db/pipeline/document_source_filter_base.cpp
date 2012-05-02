@@ -55,6 +55,8 @@ namespace mongo {
     }
 
     bool DocumentSourceFilterBase::advance() {
+        DocumentSource::advance(); // check for interrupts
+
         if (unstarted)
             findNext();
 
@@ -73,11 +75,13 @@ namespace mongo {
         if (unstarted)
             findNext();
 
-        assert(pCurrent.get() != NULL);
+        verify(pCurrent.get() != NULL);
         return pCurrent;
     }
 
-    DocumentSourceFilterBase::DocumentSourceFilterBase():
+    DocumentSourceFilterBase::DocumentSourceFilterBase(
+        const intrusive_ptr<ExpressionContext> &pExpCtx):
+        DocumentSource(pExpCtx),
         unstarted(true),
         hasNext(false),
         pCurrent() {

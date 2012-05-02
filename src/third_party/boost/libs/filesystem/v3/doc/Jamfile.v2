@@ -1,0 +1,19 @@
+# Boost Filesystem Library Example Jamfile
+ 
+# Copyright Beman Dawes 2010
+
+# Distributed under the Boost Software License, Version 1.0.
+# See www.boost.org/LICENSE_1_0.txt
+
+# Library home page: http://www.boost.org/libs/filesystem
+
+project
+    : requirements
+      <library>/boost/filesystem//boost_filesystem
+      <library>/boost/system//boost_system
+      <toolset>msvc:<asynch-exceptions>on
+      <link>static
+    ;
+    
+exe path_table : path_table.cpp ;    
+install path_table-copy : path_table : <location>. ;

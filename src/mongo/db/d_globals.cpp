@@ -9,8 +9,7 @@
 namespace mongo { 
 
     DGlobals::DGlobals() :
-        writeExcluder( *(new RWLock("writeexcluder")) ),
-        dbMutex( *(new MongoMutex("dbMutex")) ),
+        dbMutex( *(new MongoMutex()) ),
         clientCursorMonitor( *(new ClientCursorMonitor()) )
     {
     }

@@ -18,8 +18,12 @@
 
 #pragma once
 
-#include "../bson/util/misc.h"
-#include "concurrency/mutex.h"
+#include <boost/detail/endian.hpp>
+#include <boost/thread/condition_variable.hpp>
+
+#include "mongo/bson/util/misc.h"
+#include "mongo/util/concurrency/mutex.h"
+#include "mongo/util/stacktrace.h"
 
 namespace mongo {
 
@@ -30,7 +34,7 @@ namespace mongo {
      * @return if this name has an increasing counter associated, return the value
      *         otherwise 0
      */
-    unsigned setThreadName(const char * name);
+    long long setThreadName(const char * name);
     string getThreadName();
 
     template<class T>
@@ -39,40 +43,6 @@ namespace mongo {
         s << t;
         return s.str();
     }
-
-#if !defined(_WIN32) && !defined(NOEXECINFO) && !defined(__freebsd__) && !defined(__openbsd__) && !defined(__sun__)
-
-} // namespace mongo
-
-#include <pthread.h>
-#include <execinfo.h>
-
-namespace mongo {
-
-    inline pthread_t GetCurrentThreadId() {
-        return pthread_self();
-    }
-
-    /* use "addr2line -CFe <exe>" to parse. */
-    inline void printStackTrace(ostream &o = cout) {
-        void *b[20];
-
-        int size = backtrace(b, 20);
-        for (int i = 0; i < size; i++)
-            o << hex << b[i] << dec << ' ';
-        o << endl;
-
-        char **strings;
-
-        strings = backtrace_symbols(b, size);
-        for (int i = 0; i < size; i++)
-            o << ' ' << strings[i] << '\n';
-        o.flush();
-        free (strings);
-    }
-#else
-    inline void printStackTrace(ostream &o = cout) { }
-#endif
 
     bool isPrime(int n);
     int nextPrime(int n);
@@ -112,9 +82,6 @@ namespace mongo {
 #define MONGO_FLOG log() << __FILE__ ":" << __LINE__ << endl
 #define FLOG MONGO_FLOG
 
-#undef assert
-#define assert MONGO_assert
-
     inline bool startsWith(const char *str, const char *prefix) {
         size_t l = strlen(prefix);
         if ( strlen(str) < l ) return false;
@@ -141,231 +108,23 @@ namespace mongo {
     inline unsigned long fixEndian(unsigned long x) {
         return x;
     }
-#else
+#elif defined(BOOST_BIG_ENDIAN)
     inline unsigned long fixEndian(unsigned long x) {
         return swapEndian(x);
     }
+#else
+#error no boost endian header defined
 #endif
 
 #if !defined(_WIN32)
     typedef int HANDLE;
     inline void strcpy_s(char *dst, unsigned len, const char *src) {
-        assert( strlen(src) < len );
+        verify( strlen(src) < len );
         strcpy(dst, src);
     }
 #else
     typedef void *HANDLE;
 #endif
-
-    class ProgressMeter : boost::noncopyable {
-    public:
-        ProgressMeter( unsigned long long total , int secondsBetween = 3 , int checkInterval = 100 , string units = "" ) : _units(units) {
-            reset( total , secondsBetween , checkInterval );
-        }
-
-        ProgressMeter() {
-            _active = 0;
-            _units = "";
-        }
-
-        // typically you do ProgressMeterHolder
-        void reset( unsigned long long total , int secondsBetween = 3 , int checkInterval = 100 ) {
-            _total = total;
-            _secondsBetween = secondsBetween;
-            _checkInterval = checkInterval;
-
-            _done = 0;
-            _hits = 0;
-            _lastTime = (int)time(0);
-
-            _active = 1;
-        }
-
-        void finished() {
-            _active = 0;
-        }
-
-        bool isActive() {
-            return _active;
-        }
-
-        /**
-         * @param n how far along we are relative to the total # we set in CurOp::setMessage
-         * @return if row was printed
-         */
-        bool hit( int n = 1 ) {
-            if ( ! _active ) {
-                cout << "warning: hit an inactive ProgressMeter" << endl;
-                return false;
-            }
-
-            _done += n;
-            _hits++;
-            if ( _hits % _checkInterval )
-                return false;
-
-            int t = (int) time(0);
-            if ( t - _lastTime < _secondsBetween )
-                return false;
-
-            if ( _total > 0 ) {
-                int per = (int)( ( (double)_done * 100.0 ) / (double)_total );
-                cout << "\t\t" << _done << "/" << _total << "\t" << per << "%";
-
-                if ( ! _units.empty() ) {
-                    cout << "\t(" << _units << ")" << endl;
-                }
-                else {
-                    cout << endl;
-                }
-            }
-            _lastTime = t;
-            return true;
-        }
-
-        void setUnits( string units ) {
-            _units = units;
-        }
-
-        void setTotalWhileRunning( unsigned long long total ) {
-            _total = total;
-        }
-
-        unsigned long long done() const { return _done; }
-
-        unsigned long long hits() const { return _hits; }
-
-        unsigned long long total() const { return _total; } 
-
-        string toString() const {
-            if ( ! _active )
-                return "";
-            stringstream buf;
-            buf << _done << "/" << _total << " " << (_done*100)/_total << "%";
-
-            if ( ! _units.empty() ) {
-                buf << "\t(" << _units << ")" << endl;
-            }
-
-            return buf.str();
-        }
-
-        bool operator==( const ProgressMeter& other ) const {
-            return this == &other;
-        }
-    private:
-
-        bool _active;
-
-        unsigned long long _total;
-        int _secondsBetween;
-        int _checkInterval;
-
-        unsigned long long _done;
-        unsigned long long _hits;
-        int _lastTime;
-
-        string _units;
-    };
-
-    // e.g.: 
-    // CurOp * op = cc().curop();
-    // ProgressMeterHolder pm( op->setMessage( "index: (1/3) external sort" , d->stats.nrecords , 10 ) );
-    // loop { pm.hit(); }
-    class ProgressMeterHolder : boost::noncopyable {
-    public:
-        ProgressMeterHolder( ProgressMeter& pm )
-            : _pm( pm ) {
-        }
-
-        ~ProgressMeterHolder() {
-            _pm.finished();
-        }
-
-        ProgressMeter* operator->() {
-            return &_pm;
-        }
-
-        bool hit( int n = 1 ) {
-            return _pm.hit( n );
-        }
-
-        void finished() {
-            _pm.finished();
-        }
-
-        bool operator==( const ProgressMeter& other ) {
-            return _pm == other;
-        }
-
-    private:
-        ProgressMeter& _pm;
-    };
-
-    class TicketHolder {
-    public:
-        TicketHolder( int num ) : _mutex("TicketHolder") {
-            _outof = num;
-            _num = num;
-        }
-
-        bool tryAcquire() {
-            scoped_lock lk( _mutex );
-            if ( _num <= 0 ) {
-                if ( _num < 0 ) {
-                    cerr << "DISASTER! in TicketHolder" << endl;
-                }
-                return false;
-            }
-            _num--;
-            return true;
-        }
-
-        void release() {
-            scoped_lock lk( _mutex );
-            _num++;
-        }
-
-        void resize( int newSize ) {
-            scoped_lock lk( _mutex );
-            int used = _outof - _num;
-            if ( used > newSize ) {
-                cout << "ERROR: can't resize since we're using (" << used << ") more than newSize(" << newSize << ")" << endl;
-                return;
-            }
-
-            _outof = newSize;
-            _num = _outof - used;
-        }
-
-        int available() const {
-            return _num;
-        }
-
-        int used() const {
-            return _outof - _num;
-        }
-
-        int outof() const { return _outof; }
-
-    private:
-        int _outof;
-        int _num;
-        mongo::mutex _mutex;
-    };
-
-    class TicketHolderReleaser {
-    public:
-        TicketHolderReleaser( TicketHolder * holder ) {
-            _holder = holder;
-        }
-
-        ~TicketHolderReleaser() {
-            _holder->release();
-        }
-    private:
-        TicketHolder * _holder;
-    };
 
 
     /**
@@ -470,6 +229,5 @@ namespace mongo {
     using boost::scoped_ptr;
     using boost::scoped_array;
     using boost::intrusive_ptr;
-    using boost::bad_lexical_cast;
     using boost::dynamic_pointer_cast;
 } // namespace mongo

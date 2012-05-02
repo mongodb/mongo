@@ -17,10 +17,8 @@
 
 #include "pch.h"
 #include "../client.h"
-#include "../../client/dbclient.h"
 #include "rs.h"
 #include "../repl.h"
-#include "../ops/query.h"
 #include "../cloner.h"
 #include "../ops/update.h"
 #include "../ops/delete.h"
@@ -200,10 +198,10 @@ namespace mongo {
         }
         last = time(0);
 
-        assert( d.dbMutex.atLeastReadLocked() );
+        verify( Lock::isLocked() );
         Client::Context c(rsoplog);
         NamespaceDetails *nsd = nsdetails(rsoplog);
-        assert(nsd);
+        verify(nsd);
         ReverseCappedCursor u(nsd);
         if( !u.ok() )
             throw "our oplog empty or unreadable";
@@ -336,7 +334,7 @@ namespace mongo {
             for( set<DocID>::iterator i = h.toRefetch.begin(); i != h.toRefetch.end(); i++ ) {
                 d = *i;
 
-                assert( !d._id.eoo() );
+                verify( !d._id.eoo() );
 
                 {
                     /* TODO : slow.  lots of round trips. */
@@ -375,9 +373,8 @@ namespace mongo {
 
         bool warn = false;
 
-        assert( !h.commonPointOurDiskloc.isNull() );
-
-        mongo::d.dbMutex.assertWriteLocked();
+        verify( !h.commonPointOurDiskloc.isNull() );
+        verify( Lock::isW() );
 
         /* we have items we are writing that aren't from a point-in-time.  thus best not to come online
            until we get to that point in freshness. */
@@ -463,7 +460,7 @@ namespace mongo {
             const DocID& d = i->first;
             bo pattern = d._id.wrap(); // { _id : ... }
             try {
-                assert( d.ns && *d.ns );
+                verify( d.ns && *d.ns );
                 if( h.collectionsToResync.count(d.ns) ) {
                     /* we just synced this entire collection */
                     continue;
@@ -485,7 +482,7 @@ namespace mongo {
 
                     NamespaceDetails *nsd = nsdetails(d.ns);
                     if( nsd ) {
-                        if( nsd->capped ) {
+                        if( nsd->isCapped() ) {
                             /* can't delete from a capped collection - so we truncate instead. if this item must go,
                             so must all successors!!! */
                             try {
@@ -592,12 +589,12 @@ namespace mongo {
     }
 
     unsigned ReplSetImpl::_syncRollback(OplogReader&r) {
-        assert( !lockedByMe() );
-        assert( !d.dbMutex.atLeastReadLocked() );
+        verify( !lockedByMe() );
+        verify( !Lock::isLocked() );
 
         sethbmsg("rollback 0");
 
-        writelocktry lk(rsoplog, 20000);
+        writelocktry lk(20000);
         if( !lk.got() ) {
             sethbmsg("rollback couldn't get write lock in a reasonable time");
             return 2;

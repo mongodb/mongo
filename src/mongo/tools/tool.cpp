@@ -16,16 +16,19 @@
 
 // Tool.cpp
 
-#include "tool.h"
+#include "mongo/tools/tool.h"
 
 #include <fstream>
 #include <iostream>
 
 #include "pcrecpp.h"
 
-#include "util/file_allocator.h"
-#include "util/password.h"
-#include "util/version.h"
+#include "mongo/db/namespace_details.h"
+#include "mongo/util/file_allocator.h"
+#include "mongo/util/password.h"
+#include "mongo/util/version.h"
+#include "mongo/client/dbclient_rs.h"
+#include "mongo/db/json.h"
 
 #include <boost/filesystem/operations.hpp>
 
@@ -220,7 +223,7 @@ namespace mongo {
             if ( _params.count( "directoryperdb" ) ) {
                 directoryperdb = true;
             }
-            assert( lastError.get( true ) );
+            verify( lastError.get( true ) );
 
             if (_params.count("journal")){
                 cmdLine.dur = true;
@@ -487,13 +490,13 @@ namespace mongo {
 
         while ( read < fileLength ) {
             size_t amt = fread(buf, 1, 4, file);
-            assert( amt == 4 );
+            verify( amt == 4 );
 
             int size = ((int*)buf)[0];
             uassert( 10264 , str::stream() << "invalid object size: " << size , size < BUF_SIZE );
 
             amt = fread(buf+4, 1, size-4, file);
-            assert( amt == (size_t)( size - 4 ) );
+            verify( amt == (size_t)( size - 4 ) );
 
             BSONObj o( buf );
             if ( _objcheck && ! o.valid() ) {

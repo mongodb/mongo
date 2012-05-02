@@ -25,7 +25,7 @@ for( i = 0; i < 90; ++i ) {
 }
 // At this point, our initial query has ended and there is a client cursor waiting
 // to read additional documents from index {b:1}.  Deduping is performed against
-// the index key {a:1}
+// the index key {a:1}.
 
 t.dropIndex( {a:1} );
 db.getLastError();

@@ -18,8 +18,10 @@
 
 #pragma once
 
-#include "../pch.h"
-#include "../client/connpool.h"
+#include "pch.h"
+
+#include "mongo/client/connpool.h"
+#include "mongo/client/dbclient_rs.h"
 
 namespace mongo {
 
@@ -71,12 +73,12 @@ namespace mongo {
         ConnectionString getAddress() const { return _cs; }
 
         string getName() const {
-            assert( _name.size() );
+            verify( _name.size() );
             return _name;
         }
 
         string getConnString() const {
-            assert( _addr.size() );
+            verify( _addr.size() );
             return _addr;
         }
 
@@ -100,7 +102,7 @@ namespace mongo {
             bool n = _name == s._name;
             bool a = _addr == s._addr;
 
-            assert( n == a ); // names and address are 1 to 1
+            verify( n == a ); // names and address are 1 to 1
             return n;
         }
 
@@ -225,19 +227,19 @@ namespace mongo {
 
         DBClientBase& conn() {
             _finishInit();
-            assert( _conn );
+            verify( _conn );
             return *_conn;
         }
 
         DBClientBase* operator->() {
             _finishInit();
-            assert( _conn );
+            verify( _conn );
             return _conn;
         }
 
         DBClientBase* get() {
             _finishInit();
-            assert( _conn );
+            verify( _conn );
             return _conn;
         }
 

@@ -26,6 +26,7 @@
 #include "../db/instance.h"
 #include "../db/queryoptimizer.h"
 #include "../db/clientcursor.h"
+#include "mongo/client/dbclientcursor.h"
 
 #include "../client/connpool.h"
 #include "../client/distlock.h"
@@ -132,7 +133,7 @@ namespace mongo {
     public:
         CheckShardingIndex() : Command( "checkShardingIndex" , false ) {}
         virtual bool slaveOk() const { return false; }
-        virtual LockType locktype() const { return READ; }
+        virtual LockType locktype() const { return NONE; }
         virtual void help( stringstream &help ) const {
             help << "Internal command.\n";
         }
@@ -165,7 +166,7 @@ namespace mongo {
                 return false;
             }
 
-            Client::Context ctx( ns );
+            Client::ReadContext ctx( ns );
             NamespaceDetails *d = nsdetails( ns );
             if ( ! d ) {
                 errmsg = "ns not found";
@@ -240,7 +241,7 @@ namespace mongo {
     public:
         SplitVector() : Command( "splitVector" , false ) {}
         virtual bool slaveOk() const { return false; }
-        virtual LockType locktype() const { return READ; }
+        virtual LockType locktype() const { return NONE; }
         virtual void help( stringstream &help ) const {
             help <<
                  "Internal command.\n"
@@ -298,7 +299,7 @@ namespace mongo {
 
             {
                 // Get the size estimate for this namespace
-                Client::Context ctx( ns );
+                Client::ReadContext ctx( ns );
                 NamespaceDetails *d = nsdetails( ns );
                 if ( ! d ) {
                     errmsg = "ns not found";
@@ -397,7 +398,7 @@ namespace mongo {
                         currCount++;
                         BSONObj currKey = c->currKey();
                         
-                        DEV assert( currKey.woCompare( max ) <= 0 );
+                        DEV verify( currKey.woCompare( max ) <= 0 );
                         
                         if ( currCount > keyCount ) {
                             // Do not use this split key if it is the same used in the previous split point.
@@ -462,7 +463,7 @@ namespace mongo {
                 
                 // Remove the sentinel at the beginning before returning and add fieldnames.
                 splitKeys.erase( splitKeys.begin() );
-                assert( c.get() );
+                verify( c.get() );
                 for ( vector<BSONObj>::iterator it = splitKeys.begin(); it != splitKeys.end() ; ++it ) {
                     *it = bc->prettyKey( *it );
                 }
@@ -633,9 +634,9 @@ namespace mongo {
                 maxVersion = x["lastmod"];
 
                 BSONObj currChunk = conn->findOne( ShardNS::chunk , shardId.wrap( "_id" ) ).getOwned();
-                assert( currChunk["shard"].type() );
-                assert( currChunk["min"].type() );
-                assert( currChunk["max"].type() );
+                verify( currChunk["shard"].type() );
+                verify( currChunk["min"].type() );
+                verify( currChunk["max"].type() );
                 shard = currChunk["shard"].String();
                 conn.done();
 
@@ -774,7 +775,7 @@ namespace mongo {
                 stringstream ss;
                 ss << "saving chunks failed.  cmd: " << cmd << " result: " << cmdResult;
                 error() << ss.str() << endl;
-                msgasserted( 13593 , ss.str() ); // assert(13593)
+                msgasserted( 13593 , ss.str() );
             }
 
             // install a chunk manager with knowledge about newly split chunks in this shard's state

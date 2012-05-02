@@ -17,7 +17,7 @@
  */
 
 #include "stat_util.h"
-#include "../util/mongoutils/str.h"
+#include "mongo/util/mongoutils/str.h"
 
 using namespace mongoutils;
 
@@ -115,7 +115,7 @@ namespace mongo {
         if ( b["extra_info"].type() == Object ) {
             BSONObj ax = a["extra_info"].embeddedObject();
             BSONObj bx = b["extra_info"].embeddedObject();
-            if ( ax["page_faults"].type() || ax["page_faults"].type() )
+            if ( ax["page_faults"].type() )
                 _append( result , "faults" , 6 , (int)diff( "page_faults" , ax , bx ) );
         }
 

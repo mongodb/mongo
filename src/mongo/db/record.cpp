@@ -56,7 +56,7 @@ namespace mongo {
             }
 
             State get( int regionHash , size_t region  , short offset ) {
-                DEV assert( hash( region ) == regionHash );
+                DEV verify( hash( region ) == regionHash );
                 
                 Entry * e = _get( regionHash , region , false );
                 if ( ! e )
@@ -69,7 +69,7 @@ namespace mongo {
              * @return true if added, false if full
              */
             bool in( int regionHash , size_t region , short offset ) {
-                DEV assert( hash( region ) == regionHash );
+                DEV verify( hash( region ) == regionHash );
                 
                 Entry * e = _get( regionHash , region , true );
                 if ( ! e )
@@ -184,10 +184,10 @@ namespace mongo {
     bool Record::MemoryTrackingEnabled = true;
     
     volatile int __record_touch_dummy = 1; // this is used to make sure the compiler doesn't get too smart on us
-    void Record::touch( bool entireRecrd ) {
-        if ( lengthWithHeaders > HeaderSize ) { // this also makes sure lengthWithHeaders is in memory
-            char * addr = data;
-            char * end = data + netLength();
+    void Record::touch( bool entireRecrd ) const {
+        if ( _lengthWithHeaders > HeaderSize ) { // this also makes sure lengthWithHeaders is in memory
+            const char * addr = _data;
+            const char * end = _data + _netLength();
             for ( ; addr <= end ; addr += 2048 ) {
                 __record_touch_dummy += addr[0];
 
@@ -206,19 +206,19 @@ namespace mongo {
 
     const bool blockSupported = ProcessInfo::blockCheckSupported();
 
-    bool Record::likelyInPhysicalMemory() {
+    bool Record::likelyInPhysicalMemory() const {
         DEV if ( rand() % 100 == 0 ) return false;
 
         if ( ! MemoryTrackingEnabled )
             return true;
 
-        const size_t page = (size_t)data >> 12;
+        const size_t page = (size_t)_data >> 12;
         const size_t region = page >> 6;
         const size_t offset = page & 0x3f;
         
         if ( ps::rolling.access( region , offset , false ) ) {
 #ifdef _DEBUG
-            if ( blockSupported && ! ProcessInfo::blockInMemory( data ) ) {
+            if ( blockSupported && ! ProcessInfo::blockInMemory( const_cast<char*>(_data) ) ) {
                 warning() << "we think data is in ram but system says no"  << endl;
             }
 #endif
@@ -232,12 +232,12 @@ namespace mongo {
             return false;
         }
 
-        return ProcessInfo::blockInMemory( data );
+        return ProcessInfo::blockInMemory( const_cast<char*>(_data) );
     }
 
 
     Record* Record::accessed() {
-        const size_t page = (size_t)data >> 12;
+        const size_t page = (size_t)_data >> 12;
         const size_t region = page >> 6;
         const size_t offset = page & 0x3f;        
         ps::rolling.access( region , offset , true );
@@ -246,27 +246,18 @@ namespace mongo {
     
     Record* DiskLoc::rec() const {
         Record *r = DataFileMgr::getRecord(*this);
-        memconcept::is(r, memconcept::record);
-#if defined(_PAGEFAULTEXCEPTION)
-        DEV ONCE { 
-            log() << "_DEBUG info _PAGEFAULTEXCEPTION is ON -- experimental at this time" << endl;
-        }
-        bool fault = !r->likelyInPhysicalMemory();
-        if( cc().allowedToThrowPageFaultException() && 
-            ! r->likelyInPhysicalMemory() ) {
-            if( cc().getPageFaultRetryableSection()->laps() > 100 ) { 
-                log() << "info pagefaultexception _laps > 100" << endl;
-            }
-            else {
-                throw PageFaultException(r);
-            }
-        }
-#else 
-        DEV ONCE { 
-            log() << "_DEBUG info _PAGEFAULTEXCEPTION is off" << endl;
-        }
-#endif
+        memconcept::is(r, memconcept::concept::record);
         return r;
+    }
+
+    void Record::_accessing() const {
+        if ( cc().allowedToThrowPageFaultException() && ! likelyInPhysicalMemory() ) {
+            throw PageFaultException(this);
+        }
+    }
+
+    void DeletedRecord::_accessing() const {
+
     }
 
 }

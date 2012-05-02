@@ -86,18 +86,17 @@ namespace mongo {
 
     }
 
-
 #if defined(_WIN32)
     void CmdLine::addWindowsOptions( boost::program_options::options_description& windows ,
                                      boost::program_options::options_description& hidden ) {
         windows.add_options()
-        ("install", "install mongodb service")
-        ("remove", "remove mongodb service")
-        ("reinstall", "reinstall mongodb service (equivilant of mongod --remove followed by mongod --install)")
-        ("serviceName", po::value<string>(), "windows service name")
-        ("serviceDisplayName", po::value<string>(), "windows service display name")
-        ("serviceDescription", po::value<string>(), "windows service description")
-        ("serviceUser", po::value<string>(), "user name service executes as")
+        ("install", "install Windows service")
+        ("remove", "remove Windows service")
+        ("reinstall", "reinstall Windows service (equivalent to --remove followed by --install)")
+        ("serviceName", po::value<string>(), "Windows service name")
+        ("serviceDisplayName", po::value<string>(), "Windows service display name")
+        ("serviceDescription", po::value<string>(), "Windows service description")
+        ("serviceUser", po::value<string>(), "account for service execution")
         ("servicePassword", po::value<string>(), "password used to authenticate serviceUser")
         ;
         hidden.add_options()("service", "start mongodb service");
@@ -143,14 +142,14 @@ namespace mongo {
     }
 
     void setupLaunchSignals() {
-        assert( signal(SIGUSR2 , launchSignal ) != SIG_ERR );
+        verify( signal(SIGUSR2 , launchSignal ) != SIG_ERR );
     }
 
 
     void CmdLine::launchOk() {
         if ( cmdLine.doFork ) {
             // killing leader will propagate to parent
-            assert( kill( cmdLine.leaderProc, SIGUSR2 ) == 0 );
+            verify( kill( cmdLine.leaderProc, SIGUSR2 ) == 0 );
         }
     }
 #endif
@@ -172,9 +171,9 @@ namespace mongo {
             // setup cwd
             char buffer[1024];
 #ifdef _WIN32
-            assert( _getcwd( buffer , 1000 ) );
+            verify( _getcwd( buffer , 1000 ) );
 #else
-            assert( getcwd( buffer , 1000 ) );
+            verify( getcwd( buffer , 1000 ) );
 #endif
             cmdLine.cwd = buffer;
         }
@@ -243,11 +242,11 @@ namespace mongo {
             int newSize = params["maxConns"].as<int>();
             if ( newSize < 5 ) {
                 out() << "maxConns has to be at least 5" << endl;
-                dbexit( EXIT_BADOPTIONS );
+                ::exit( EXIT_BADOPTIONS );
             }
             else if ( newSize >= 10000000 ) {
                 out() << "maxConns can't be greater than 10000000" << endl;
-                dbexit( EXIT_BADOPTIONS );
+                ::exit( EXIT_BADOPTIONS );
             }
             connTicketHolder.resize( newSize );
         }
@@ -279,26 +278,31 @@ namespace mongo {
             cmdLine.noUnixSocket = true;
         }
 
-        if (params.count("fork")) {
+        if (params.count("fork") && !params.count("shutdown")) {
             cmdLine.doFork = true;
             if ( ! params.count( "logpath" ) && ! params.count( "syslog" ) ) {
                 cout << "--fork has to be used with --logpath or --syslog" << endl;
-                ::exit(-1);
+                ::exit(EXIT_BADOPTIONS);
             }
 
             if ( params.count( "logpath" ) ) {
                 // test logpath
                 logpath = params["logpath"].as<string>();
-                assert( logpath.size() );
+                verify( logpath.size() );
                 if ( logpath[0] != '/' ) {
                     logpath = cmdLine.cwd + "/" + logpath;
                 }
+                bool exists = boost::filesystem::exists( logpath );
                 FILE * test = fopen( logpath.c_str() , "a" );
                 if ( ! test ) {
                     cout << "can't open [" << logpath << "] for log file: " << errnoWithDescription() << endl;
                     ::exit(-1);
                 }
                 fclose( test );
+                // if we created a file, unlink it (to avoid confusing log rotation code)
+                if ( ! exists ) {
+                    unlink( logpath.c_str() );
+                }
             }
 
             cout.flush();
@@ -375,10 +379,10 @@ namespace mongo {
             Logstream::useSyslog( sb.str().c_str() );
         }
 #endif
-        if (params.count("logpath")) {
+        if (params.count("logpath") && !params.count("shutdown")) {
             if ( params.count("syslog") ) {
                 cout << "Cant use both a logpath and syslog " << endl;
-                ::exit(-1);
+                ::exit(EXIT_BADOPTIONS);
             }
             
             if ( logpath.size() == 0 )
@@ -396,7 +400,7 @@ namespace mongo {
 
             if (!setUpSecurityKey(f)) {
                 // error message printed in setUpPrivateKey
-                dbexit(EXIT_BADOPTIONS);
+                ::exit(EXIT_BADOPTIONS);
             }
 
             cmdLine.keyFile = true;
@@ -412,12 +416,12 @@ namespace mongo {
 
             if ( cmdLine.sslPEMKeyPassword.size() == 0 ) {
                 log() << "need sslPEMKeyPassword" << endl;
-                dbexit(EXIT_BADOPTIONS);
+                ::exit(EXIT_BADOPTIONS);
             }
             
             if ( cmdLine.sslPEMKeyFile.size() == 0 ) {
                 log() << "need sslPEMKeyFile" << endl;
-                dbexit(EXIT_BADOPTIONS);
+                ::exit(EXIT_BADOPTIONS);
             }
             
             cmdLine.sslServerManager = new SSLManager( false );
@@ -425,7 +429,7 @@ namespace mongo {
         }
         else if ( cmdLine.sslPEMKeyFile.size() || cmdLine.sslPEMKeyPassword.size() ) {
             log() << "need to enable sslOnNormalPorts" << endl;
-            dbexit(EXIT_BADOPTIONS);
+            ::exit(EXIT_BADOPTIONS);
         }
 #endif
         
@@ -440,8 +444,14 @@ namespace mongo {
                     if (type == typeid(string)){
                         if (value.as<string>().empty())
                             b.appendBool(key, true); // boost po uses empty string for flags like --quiet
-                        else
-                            b.append(key, value.as<string>());
+                        else {
+                            if ( key == "servicePassword" ) {
+                                b.append( key, "<password>" );
+                            }
+                            else {
+                                b.append( key, value.as<string>() );
+                            }
+                        }
                     }
                     else if (type == typeid(int))
                         b.append(key, value.as<int>());
@@ -480,10 +490,14 @@ namespace mongo {
 
     void ignoreSignal( int sig ) {}
 
+    static void rotateLogsOrDie(int sig) {
+        fassert(16176, rotateLogs());
+    }
+
     void setupCoreSignals() {
 #if !defined(_WIN32)
-        assert( signal(SIGUSR1 , rotateLogs ) != SIG_ERR );
-        assert( signal(SIGHUP , ignoreSignal ) != SIG_ERR );
+        verify( signal(SIGUSR1 , rotateLogsOrDie ) != SIG_ERR );
+        verify( signal(SIGHUP , ignoreSignal ) != SIG_ERR );
 #endif
     }
 

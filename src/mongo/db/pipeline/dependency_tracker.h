@@ -24,17 +24,26 @@
 
 namespace mongo {
 
+    class DocumentSource;
+
     class DependencyTracker :
         public IntrusiveCounterUnsigned {
     public:
-        void include(const string &fieldName);
-        void exclude(const string &fieldName);
+        void addDependency(const string &fieldPath,
+                           const DocumentSource *pSource);
 
-        bool isRequired(const string &fieldName) const;
+        void removeDependency(const string &fieldPath);
+
+        bool getDependency(intrusive_ptr<const DocumentSource> *ppSource,
+                           const string &fieldPath) const;
 
     private:
         struct Tracker {
-            string fieldName;
+            Tracker(const string &fieldPath,
+                    const DocumentSource *pSource);
+
+            string fieldPath;
+            intrusive_ptr<const DocumentSource> pSource;
 
             struct Hash :
                 unary_function<string, size_t> {
@@ -42,12 +51,13 @@ namespace mongo {
             };
         };
 
-        boost::unordered_map<string, Tracker, Tracker::Hash> map;
+        typedef boost::unordered_map<string, Tracker, Tracker::Hash> MapType;
+        MapType map;
     };
 
 }
 
-/* ======================= INLINED IMPLEMENTATIONS ========================== */
+/* ======================= PRIVATE IMPLEMENTATIONS ========================== */
 
 namespace mongo {
 

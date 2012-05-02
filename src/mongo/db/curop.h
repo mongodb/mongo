@@ -25,6 +25,7 @@
 #include "../util/concurrency/spin_lock.h"
 #include "../util/time_support.h"
 #include "../util/net/hostandport.h"
+#include "../util/progress_meter.h"
 
 namespace mongo {
 
@@ -164,13 +165,9 @@ namespace mongo {
         void reset();
         void reset( const HostAndPort& remote, int op );
         void markCommand() { _command = true; }
-
-        void waitingForLock( int type ) {
+        void waitingForLock( char type ) {
             _waitingForLock = true;
-            if ( type > 0 )
-                _lockType = 1;
-            else
-                _lockType = -1;
+            _lockType = type;
         }
         void gotLock()             { _waitingForLock = false; }
         OpDebug& debug()           { return _debug; }
@@ -189,7 +186,8 @@ namespace mongo {
         /** if this op is running */
         bool active() const { return _active; }
 
-        int getLockType() const { return _lockType; }
+        char lockType() const { return _lockType; }
+        bool displayInCurop() const { return _active && ! _suppressFromCurop; }
         bool isWaitingForLock() const { return _waitingForLock; }
         int getOp() const { return _op; }
         unsigned long long startTime() { // micros
@@ -226,6 +224,11 @@ namespace mongo {
             strncpy(_ns, ns, Namespace::MaxNsLen);
             _ns[Namespace::MaxNsLen] = 0;
         }
+        
+        void suppressFromCurop() { _suppressFromCurop = true; }
+        
+        long long getExpectedLatencyMs() const { return _expectedLatencyMs; }
+        void setExpectedLatencyMs( long long latency ) { _expectedLatencyMs = latency; }
 
     private:
         friend class Client;
@@ -238,9 +241,10 @@ namespace mongo {
         unsigned long long _checkpoint;
         unsigned long long _end;
         bool _active;
+        bool _suppressFromCurop; // unless $all is set
         int _op;
         bool _command;
-        int _lockType;                   // see concurrency.h for values
+        char _lockType;                   // r w R W
         bool _waitingForLock;
         int _dbprofile;                  // 0=off, 1=slow, 2=all
         AtomicUInt _opNum;               // todo: simple being "unsigned" may make more sense here
@@ -252,6 +256,13 @@ namespace mongo {
         ProgressMeter _progressMeter;
         volatile bool _killed;
         int _numYields;
+
+        // this is how much "extra" time a query might take
+        // a writebacklisten for example will block for 30s 
+        // so this should be 30000 in that case
+        long long _expectedLatencyMs; 
+                                     
+
     };
 
     /* _globalKill: we are shutting down
@@ -267,44 +278,13 @@ namespace mongo {
         /** @return true if global interrupt and should terminate the operation */
         bool globalInterruptCheck() const { return _globalKill; }
 
-        void checkForInterrupt( bool heedMutex = true ) {
-            Client& c = cc();
-            if ( heedMutex && d.dbMutex.isWriteLocked() )
-                return;
-            if( _globalKill )
-                uasserted(11600,"interrupted at shutdown");
-            if( c.curop()->killed() )
-                uasserted(11601,"interrupted");
-            if( c.sometimes(1024) ) {
-                AbstractMessagingPort *p = cc().port();
-                if( p ) 
-                    p->assertStillConnected();
-            }
-        }
+        /**
+         * @param heedMutex if true and have a write lock, won't kill op since it might be unsafe
+         */
+        void checkForInterrupt( bool heedMutex = true );
 
         /** @return "" if not interrupted.  otherwise, you should stop. */
-        const char *checkForInterruptNoAssert( /*bool heedMutex = true*/ ) {
-            Client& c = cc();
-            // always called withi false so commented out:
-            /*if ( heedMutex && d.dbMutex.isWriteLocked() )
-                return "";*/
-            if( _globalKill )
-                return "interrupted at shutdown";
-            if( c.curop()->killed() )
-                return "interrupted";
-            if( c.sometimes(1024) ) {
-                try { 
-                    AbstractMessagingPort *p = cc().port();
-                    if( p ) 
-                        p->assertStillConnected();
-                }
-                catch(...) { 
-                    log() << "no longer connected to client";
-                    return "no longer connected to client";
-                }
-            }
-            return "";
-        }
+        const char *checkForInterruptNoAssert();
 
     private:
         void interruptJs( AtomicUInt *op );

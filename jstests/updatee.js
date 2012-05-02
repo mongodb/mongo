@@ -29,7 +29,7 @@ t.update({"profile-id" : "test"}, {$set: {"actual.02": "v4"}});
 
 q = t.findOne();
 assert.eq(q.actual["02"], "v4", "A4");
-assert(!q.actual["002"], "A5");
+assert.eq(q.actual["002"], "val4", "A5");
 
 t.update({"_id" : 1}, {$set : {"actual.2139043290148390248219423941.b" : 4}});
 q = t.findOne();
@@ -51,12 +51,12 @@ assert.eq(q.actual["000"], "val000", "A8 zeros");
 t.update({"_id" : 1}, {$set : {"actual.00" : "val00"}});
 q = t.findOne();
 assert.eq(q.actual["00"], "val00", "A8 00");
-assert(!q.actual["000"], "A9");
+assert.eq(q.actual["000"], "val000", "A9");
 
 t.update({"_id" : 1}, {$set : {"actual.000" : "val000"}});
 q = t.findOne();
 assert.eq(q.actual["000"], "val000", "A9");
-assert(!q.actual["00"], "A10");
+assert.eq(q.actual["00"], "val00", "A10");
 
 t.update({"_id" : 1}, {$set : {"actual.01" : "val01"}});
 q = t.findOne();

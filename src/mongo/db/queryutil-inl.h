@@ -74,12 +74,36 @@ namespace mongo {
         return true;
     }
 
-    inline long long FieldRangeVector::size() {
-        long long ret = 1;
+    inline unsigned FieldRangeVector::size() {
+        unsigned ret = 1;
         for( vector<FieldRange>::const_iterator i = _ranges.begin(); i != _ranges.end(); ++i ) {
-            ret *= i->intervals().size();
+            unsigned long long product =
+                    (unsigned long long)ret * (unsigned long long)i->intervals().size();
+            // Check for overflow SERVER-5415.
+            verify( ( product >> 32 ) == 0 );
+            ret = static_cast<unsigned>( product );
         }
         return ret;
+    }
+    
+    inline void FieldRangeVectorIterator::CompoundRangeCounter::set( int i, int newVal ) {
+        resetIntervalCount();
+        _i[ i ] = newVal;
+    }
+    
+    inline void FieldRangeVectorIterator::CompoundRangeCounter::inc( int i ) {
+        resetIntervalCount();
+        ++_i[ i ];
+    }
+    
+    inline void FieldRangeVectorIterator::CompoundRangeCounter::setZeroes( int i ) {
+        resetIntervalCount();
+        for( int j = i; j < (int)_i.size(); ++j ) _i[ j ] = 0;
+    }
+    
+    inline void FieldRangeVectorIterator::CompoundRangeCounter::setUnknowns( int i ) {
+        resetIntervalCount();
+        for( int j = i; j < (int)_i.size(); ++j ) _i[ j ] = -1;
     }
 
     inline FieldRangeSetPair *OrRangeGenerator::topFrsp() const {

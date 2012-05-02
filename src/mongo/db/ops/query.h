@@ -23,226 +23,259 @@
 #include "../dbmessage.h"
 #include "../jsobj.h"
 #include "../diskloc.h"
-#include "../projection.h"
+#include "../explain.h"
+#include "../../s/d_chunk_manager.h"
 
 // struct QueryOptions, QueryResult, QueryResultFlags in:
-#include "../../client/dbclient.h"
 
 namespace mongo {
 
-    extern const int MaxBytesToReturnToClientAtOnce;
-
+    class ParsedQuery;
+    class QueryOptimizerCursor;
+    class QueryPlanSummary;
+    
     QueryResult* processGetMore(const char *ns, int ntoreturn, long long cursorid , CurOp& op, int pass, bool& exhaust);
 
     const char * runQuery(Message& m, QueryMessage& q, CurOp& curop, Message &result);
 
-    /* This is for languages whose "objects" are not well ordered (JSON is well ordered).
-       [ { a : ... } , { b : ... } ] -> { a : ..., b : ... }
-    */
-    inline BSONObj transformOrderFromArrayFormat(BSONObj order) {
-        /* note: this is slow, but that is ok as order will have very few pieces */
-        BSONObjBuilder b;
-        char p[2] = "0";
-
-        while ( 1 ) {
-            BSONObj j = order.getObjectField(p);
-            if ( j.isEmpty() )
-                break;
-            BSONElement e = j.firstElement();
-            uassert( 10102 , "bad order array", !e.eoo());
-            uassert( 10103 , "bad order array [2]", e.isNumber());
-            b.append(e);
-            (*p)++;
-            uassert( 10104 , "too many ordering elements", *p <= '9');
-        }
-
-        return b.obj();
-    }
-
-    /**
-     * this represents a total user query
-     * includes fields from the query message, both possible query levels
-     * parses everything up front
-     */
-    class ParsedQuery : boost::noncopyable {
+    /** Exception indicating that a query should be retried from the beginning. */
+    class QueryRetryException : public DBException {
     public:
-        ParsedQuery( QueryMessage& qm )
-            : _ns( qm.ns ) , _ntoskip( qm.ntoskip ) , _ntoreturn( qm.ntoreturn ) , _options( qm.queryOptions ) {
-            init( qm.query );
-            initFields( qm.fields );
+        QueryRetryException() : DBException( "query retry exception" , 16083 ) {
+            return;
+            massert( 16083, "reserve 16083", true ); // Reserve 16083.
         }
-        ParsedQuery( const char* ns , int ntoskip , int ntoreturn , int queryoptions , const BSONObj& query , const BSONObj& fields )
-            : _ns( ns ) , _ntoskip( ntoskip ) , _ntoreturn( ntoreturn ) , _options( queryoptions ) {
-            init( query );
-            initFields( fields );
-        }
-
-        const char * ns() const { return _ns; }
-        bool isLocalDB() const { return strncmp(_ns, "local.", 6) == 0; }
-
-        const BSONObj& getFilter() const { return _filter; }
-        Projection* getFields() const { return _fields.get(); }
-        shared_ptr<Projection> getFieldPtr() const { return _fields; }
-
-        int getSkip() const { return _ntoskip; }
-        int getNumToReturn() const { return _ntoreturn; }
-        bool wantMore() const { return _wantMore; }
-        int getOptions() const { return _options; }
-        bool hasOption( int x ) const { return x & _options; }
-
-        bool isExplain() const { return _explain; }
-        bool isSnapshot() const { return _snapshot; }
-        bool returnKey() const { return _returnKey; }
-        bool showDiskLoc() const { return _showDiskLoc; }
-
-        const BSONObj& getMin() const { return _min; }
-        const BSONObj& getMax() const { return _max; }
-        const BSONObj& getOrder() const { return _order; }
-        const BSONElement& getHint() const { return _hint; }
-        int getMaxScan() const { return _maxScan; }
-
-        bool couldBeCommand() const {
-            /* we assume you are using findOne() for running a cmd... */
-            return _ntoreturn == 1 && strstr( _ns , ".$cmd" );
-        }
-
-        bool hasIndexSpecifier() const {
-            return ! _hint.eoo() || ! _min.isEmpty() || ! _max.isEmpty();
-        }
-
-        /* if ntoreturn is zero, we return up to 101 objects.  on the subsequent getmore, there
-           is only a size limit.  The idea is that on a find() where one doesn't use much results,
-           we don't return much, but once getmore kicks in, we start pushing significant quantities.
-
-           The n limit (vs. size) is important when someone fetches only one small field from big
-           objects, which causes massive scanning server-side.
-        */
-        bool enoughForFirstBatch( int n , int len ) const {
-            if ( _ntoreturn == 0 )
-                return ( len > 1024 * 1024 ) || n >= 101;
-            return n >= _ntoreturn || len > MaxBytesToReturnToClientAtOnce;
-        }
-
-        bool enough( int n ) const {
-            if ( _ntoreturn == 0 )
-                return false;
-            return n >= _ntoreturn;
-        }
-
-    private:
-        void init( const BSONObj& q ) {
-            _reset();
-            uassert( 10105 , "bad skip value in query", _ntoskip >= 0);
-
-            if ( _ntoreturn < 0 ) {
-                /* _ntoreturn greater than zero is simply a hint on how many objects to send back per
-                   "cursor batch".
-                   A negative number indicates a hard limit.
-                */
-                _wantMore = false;
-                _ntoreturn = -_ntoreturn;
-            }
-
-
-            BSONElement e = q["query"];
-            if ( ! e.isABSONObj() )
-                e = q["$query"];
-
-            if ( e.isABSONObj() ) {
-                _filter = e.embeddedObject();
-                _initTop( q );
-            }
-            else {
-                _filter = q;
-            }
-        }
-
-        void _reset() {
-            _wantMore = true;
-            _explain = false;
-            _snapshot = false;
-            _returnKey = false;
-            _showDiskLoc = false;
-            _maxScan = 0;
-        }
-
-        void _initTop( const BSONObj& top ) {
-            BSONObjIterator i( top );
-            while ( i.more() ) {
-                BSONElement e = i.next();
-                const char * name = e.fieldName();
-
-                if ( strcmp( "$orderby" , name ) == 0 ||
-                        strcmp( "orderby" , name ) == 0 ) {
-                    if ( e.type() == Object ) {
-                        _order = e.embeddedObject();
-                    }
-                    else if ( e.type() == Array ) {
-                        _order = transformOrderFromArrayFormat( _order );
-                    }
-                    else {
-                        uasserted(13513, "sort must be an object or array");
-                    }
-                    continue;
-                }
-
-                if( *name == '$' ) {
-                    name++;
-                    if ( strcmp( "explain" , name ) == 0 )
-                        _explain = e.trueValue();
-                    else if ( strcmp( "snapshot" , name ) == 0 )
-                        _snapshot = e.trueValue();
-                    else if ( strcmp( "min" , name ) == 0 )
-                        _min = e.embeddedObject();
-                    else if ( strcmp( "max" , name ) == 0 )
-                        _max = e.embeddedObject();
-                    else if ( strcmp( "hint" , name ) == 0 )
-                        _hint = e;
-                    else if ( strcmp( "returnKey" , name ) == 0 )
-                        _returnKey = e.trueValue();
-                    else if ( strcmp( "maxScan" , name ) == 0 )
-                        _maxScan = e.numberInt();
-                    else if ( strcmp( "showDiskLoc" , name ) == 0 )
-                        _showDiskLoc = e.trueValue();
-                    else if ( strcmp( "comment" , name ) == 0 ) {
-                        ; // no-op
-                    }
-                }
-            }
-
-            if ( _snapshot ) {
-                uassert( 12001 , "E12001 can't sort with $snapshot", _order.isEmpty() );
-                uassert( 12002 , "E12002 can't use hint with $snapshot", _hint.eoo() );
-            }
-
-        }
-
-        void initFields( const BSONObj& fields ) {
-            if ( fields.isEmpty() )
-                return;
-            _fields.reset( new Projection() );
-            _fields->init( fields );
-        }
-
-        const char * const _ns;
-        const int _ntoskip;
-        int _ntoreturn;
-        BSONObj _filter;
-        BSONObj _order;
-        const int _options;
-        shared_ptr< Projection > _fields;
-        bool _wantMore;
-        bool _explain;
-        bool _snapshot;
-        bool _returnKey;
-        bool _showDiskLoc;
-        BSONObj _min;
-        BSONObj _max;
-        BSONElement _hint;
-        int _maxScan;
     };
 
+    /** Interface for recording events that contribute to explain results. */
+    class ExplainRecordingStrategy {
+    public:
+        ExplainRecordingStrategy( const ExplainQueryInfo::AncillaryInfo &ancillaryInfo );
+        virtual ~ExplainRecordingStrategy() {}
+        /** Note information about a single query plan. */
+        virtual void notePlan( bool scanAndOrder, bool indexOnly ) {}
+        /** Note an iteration of the query. */
+        virtual void noteIterate( bool match, bool orderedMatch, bool loadedRecord,
+                                 bool chunkSkip ) {}
+        /** Note that the query yielded. */
+        virtual void noteYield() {}
+        /** @return number of ordered matches noted. */
+        virtual long long orderedMatches() const { return 0; }
+        /** @return ExplainQueryInfo for a complete query. */
+        shared_ptr<ExplainQueryInfo> doneQueryInfo();
+    protected:
+        /** @return ExplainQueryInfo for a complete query, to be implemented by subclass. */
+        virtual shared_ptr<ExplainQueryInfo> _doneQueryInfo() = 0;
+    private:
+        ExplainQueryInfo::AncillaryInfo _ancillaryInfo;
+    };
+    
+    /** No explain events are recorded. */
+    class NoExplainStrategy : public ExplainRecordingStrategy {
+    public:
+        NoExplainStrategy();
+    private:
+        /** @asserts always. */
+        virtual shared_ptr<ExplainQueryInfo> _doneQueryInfo();
+    };
+    
+    class MatchCountingExplainStrategy : public ExplainRecordingStrategy {
+    public:
+        MatchCountingExplainStrategy( const ExplainQueryInfo::AncillaryInfo &ancillaryInfo );
+    protected:
+        virtual void _noteIterate( bool match, bool orderedMatch, bool loadedRecord,
+                                  bool chunkSkip ) = 0;
+    private:
+        virtual void noteIterate( bool match, bool orderedMatch, bool loadedRecord,
+                                 bool chunkSkip );
+        virtual long long orderedMatches() const { return _orderedMatches; }
+        long long _orderedMatches;
+    };
+    
+    /** Record explain events for a simple cursor representing a single clause and plan. */
+    class SimpleCursorExplainStrategy : public MatchCountingExplainStrategy {
+    public:
+        SimpleCursorExplainStrategy( const ExplainQueryInfo::AncillaryInfo &ancillaryInfo,
+                                    const shared_ptr<Cursor> &cursor );
+    private:
+        virtual void notePlan( bool scanAndOrder, bool indexOnly );
+        virtual void _noteIterate( bool match, bool orderedMatch, bool loadedRecord,
+                                  bool chunkSkip );
+        virtual void noteYield();
+        virtual shared_ptr<ExplainQueryInfo> _doneQueryInfo();
+        shared_ptr<Cursor> _cursor;
+        shared_ptr<ExplainSinglePlanQueryInfo> _explainInfo;
+    };
+    
+    /**
+     * Record explain events for a QueryOptimizerCursor, which may record some explain information
+     * for multiple clauses and plans through an internal implementation.
+     */
+    class QueryOptimizerCursorExplainStrategy : public MatchCountingExplainStrategy {
+    public:
+        QueryOptimizerCursorExplainStrategy( const ExplainQueryInfo::AncillaryInfo &ancillaryInfo,
+                                            const shared_ptr<QueryOptimizerCursor> &cursor );
+    private:
+        virtual void _noteIterate( bool match, bool orderedMatch, bool loadedRecord,
+                                  bool chunkSkip );
+        virtual shared_ptr<ExplainQueryInfo> _doneQueryInfo();
+        shared_ptr<QueryOptimizerCursor> _cursor;
+    };
+
+    /** Interface for building a query response in a supplied BufBuilder. */
+    class ResponseBuildStrategy {
+    public:
+        /**
+         * @param queryPlan must be supplied if @param cursor is not a QueryOptimizerCursor and
+         * results must be sorted or read with a covered index.
+         */
+        ResponseBuildStrategy( const ParsedQuery &parsedQuery, const shared_ptr<Cursor> &cursor,
+                              BufBuilder &buf, const QueryPlanSummary &queryPlan );
+        virtual ~ResponseBuildStrategy() {}
+        /**
+         * Handle the current iterate of the supplied cursor as a (possibly duplicate) match.
+         * @return true if a match is found.
+         * @param orderedMatch set if it is an ordered match.
+         */
+        virtual bool handleMatch( bool &orderedMatch ) = 0;
+        /**
+         * Write all matches into the buffer, overwriting existing data.
+         * @return number of matches written, or -1 if no op.
+         */
+        virtual int rewriteMatches() { return -1; }
+        /** @return the number of matches that have been written to the buffer. */
+        virtual int bufferedMatches() const = 0;
+        /**
+         * Callback when enough results have been read for the first batch, with potential handoff
+         * to getMore.
+         */
+        virtual void finishedFirstBatch() {}
+        /** Reset the buffer. */
+        void resetBuf();
+    protected:
+        /**
+         * Return the document for the current iterate.  Implements the $returnKey option.
+         * @param allowCovered - enable covered index support.
+         */
+        BSONObj current( bool allowCovered ) const;
+        const ParsedQuery &_parsedQuery;
+        shared_ptr<Cursor> _cursor;
+        shared_ptr<QueryOptimizerCursor> _queryOptimizerCursor;
+        BufBuilder &_buf;
+    };
+
+    /** Build strategy for a cursor returning in order results. */
+    class OrderedBuildStrategy : public ResponseBuildStrategy {
+    public:
+        OrderedBuildStrategy( const ParsedQuery &parsedQuery, const shared_ptr<Cursor> &cursor,
+                             BufBuilder &buf, const QueryPlanSummary &queryPlan );
+        virtual bool handleMatch( bool &orderedMatch );
+        virtual int bufferedMatches() const { return _bufferedMatches; }
+    private:
+        int _skip;
+        int _bufferedMatches;
+    };
+    
+    class ScanAndOrder;
+    
+    /** Build strategy for a cursor returning out of order results. */
+    class ReorderBuildStrategy : public ResponseBuildStrategy {
+    public:
+        ReorderBuildStrategy( const ParsedQuery &parsedQuery,
+                             const shared_ptr<Cursor> &cursor,
+                             BufBuilder &buf,
+                             const QueryPlanSummary &queryPlan );
+        virtual bool handleMatch( bool &orderedMatch );
+        /** Handle a match without performing deduping. */
+        void _handleMatchNoDedup();
+        virtual int rewriteMatches();
+        virtual int bufferedMatches() const { return _bufferedMatches; }
+    private:
+        ScanAndOrder *newScanAndOrder( const QueryPlanSummary &queryPlan ) const;
+        shared_ptr<ScanAndOrder> _scanAndOrder;
+        int _bufferedMatches;
+    };
+
+    /** Helper class for deduping DiskLocs */
+    class DiskLocDupSet {
+    public:
+        /** @return true if dup, otherwise return false and insert. */
+        bool getsetdup( const DiskLoc &loc ) {
+            pair<set<DiskLoc>::iterator, bool> p = _dups.insert(loc);
+            return !p.second;
+        }
+    private:
+        set<DiskLoc> _dups;
+    };
+
+    /**
+     * Build strategy for a QueryOptimizerCursor containing some in order and some out of order
+     * candidate plans.
+     */
+    class HybridBuildStrategy : public ResponseBuildStrategy {
+    public:
+        HybridBuildStrategy( const ParsedQuery &parsedQuery,
+                            const shared_ptr<QueryOptimizerCursor> &cursor,
+                            BufBuilder &buf );
+    private:
+        virtual bool handleMatch( bool &orderedMatch );
+        virtual int rewriteMatches();
+        virtual int bufferedMatches() const;
+        virtual void finishedFirstBatch();
+        bool handleReorderMatch();
+        DiskLocDupSet _scanAndOrderDups;
+        OrderedBuildStrategy _orderedBuild;
+        ReorderBuildStrategy _reorderBuild;
+        bool _reorderedMatches;
+    };
+
+    /**
+     * Builds a query response with the help of an ExplainRecordingStrategy and a
+     * ResponseBuildStrategy.
+     */
+    class QueryResponseBuilder {
+    public:
+        /**
+         * @param queryPlan must be supplied if @param cursor is not a QueryOptimizerCursor and
+         * results must be sorted or read with a covered index.
+         */
+        QueryResponseBuilder( const ParsedQuery &parsedQuery, const shared_ptr<Cursor> &cursor,
+                             const QueryPlanSummary &queryPlan, const BSONObj &oldPlan );
+        /** @return true if the current iterate matches and is added. */
+        bool addMatch();
+        /** Note that a yield occurred. */
+        void noteYield();
+        /** @return true if there are enough results to return the first batch. */
+        bool enoughForFirstBatch() const;
+        /** @return true if there are enough results to return the full result set. */
+        bool enoughTotalResults() const;
+        /**
+         * Callback when enough results have been read for the first batch, with potential handoff
+         * to getMore.
+         */
+        void finishedFirstBatch();
+        /**
+         * Set the data portion of the supplied Message to a buffer containing the query results.
+         * @return the number of results in the buffer.
+         */
+        int handoff( Message &result );
+        /** A chunk manager found at the beginning of the query. */
+        ShardChunkManagerPtr chunkManager() const { return _chunkManager; }
+    private:
+        ShardChunkManagerPtr newChunkManager() const;
+        shared_ptr<ExplainRecordingStrategy> newExplainRecordingStrategy
+        ( const QueryPlanSummary &queryPlan, const BSONObj &oldPlan ) const;
+        shared_ptr<ResponseBuildStrategy> newResponseBuildStrategy
+        ( const QueryPlanSummary &queryPlan );
+        bool currentMatches();
+        bool chunkMatches();
+        const ParsedQuery &_parsedQuery;
+        shared_ptr<Cursor> _cursor;
+        shared_ptr<QueryOptimizerCursor> _queryOptimizerCursor;
+        BufBuilder _buf;
+        ShardChunkManagerPtr _chunkManager;
+        shared_ptr<ExplainRecordingStrategy> _explain;
+        shared_ptr<ResponseBuildStrategy> _builder;
+    };
 
 } // namespace mongo
-
-

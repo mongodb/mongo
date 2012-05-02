@@ -20,7 +20,6 @@
 #include "../namespace-inl.h"
 #include "../jsobj.h"
 #include "../index.h"
-#include "../../util/unittest.h"
 #include "../commands.h"
 #include "../pdfile.h"
 #include "../btree.h"
@@ -149,7 +148,7 @@ namespace mongo {
             }
 
 
-            assert( _other.size() == 1 );
+            verify( _other.size() == 1 );
 
             BSONElementSet all;
             obj.getFieldsDotted( _other[0] , all );
@@ -167,7 +166,7 @@ namespace mongo {
 
         shared_ptr<Cursor> newCursor( const BSONObj& query , const BSONObj& order , int numWanted ) const {
             shared_ptr<Cursor> c;
-            assert(0);
+            verify(0);
             return c;
         }
 
@@ -290,7 +289,7 @@ namespace mongo {
 
             IndexDetails& id = d->idx( idxNum );
             GeoHaystackSearchIndex * si = (GeoHaystackSearchIndex*)id.getSpec().getType();
-            assert( &id == si->getDetails() );
+            verify( &id == si->getDetails() );
 
             BSONElement n = cmdObj["near"];
             BSONElement maxDistance = cmdObj["maxDistance"];

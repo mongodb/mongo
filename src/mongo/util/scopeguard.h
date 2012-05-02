@@ -15,6 +15,8 @@
 #ifndef LOKI_SCOPEGUARD_H_
 #define LOKI_SCOPEGUARD_H_
 
+#include "mongo/platform/compiler.h"
+
 namespace mongo
 {
 
@@ -421,12 +423,9 @@ namespace mongo
 #define LOKI_CONCATENATE(s1, s2)         LOKI_CONCATENATE_DIRECT(s1, s2)
 #define LOKI_ANONYMOUS_VARIABLE(str)     LOKI_CONCATENATE(str, __LINE__)
 
-#ifdef __GNUC__
-#define ON_BLOCK_EXIT ScopeGuard LOKI_ANONYMOUS_VARIABLE(scopeGuard) __attribute__ ((unused)) = MakeGuard
-#define ON_BLOCK_EXIT_OBJ ScopeGuard LOKI_ANONYMOUS_VARIABLE(scopeGuard) __attribute__ ((unused)) = MakeObjGuard
-#else
-#define ON_BLOCK_EXIT ScopeGuard LOKI_ANONYMOUS_VARIABLE(scopeGuard) = MakeGuard
-#define ON_BLOCK_EXIT_OBJ ScopeGuard LOKI_ANONYMOUS_VARIABLE(scopeGuard) = MakeObjGuard
-#endif 
+#define ON_BLOCK_EXIT                                                   \
+    MONGO_COMPILER_VARIABLE_UNUSED ScopeGuard LOKI_ANONYMOUS_VARIABLE(scopeGuard) = MakeGuard
+#define ON_BLOCK_EXIT_OBJ \
+    MONGO_COMPILER_VARIABLE_UNUSED ScopeGuard LOKI_ANONYMOUS_VARIABLE(scopeGuard) = MakeObjGuard
 
 #endif //LOKI_SCOPEGUARD_H_

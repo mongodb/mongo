@@ -46,7 +46,7 @@ namespace mongo {
             for ( HostMap::iterator i=_hosts.begin(); i!=_hosts.end(); ++i ) {
                 string addr = i->first;
                 Status* ss = i->second;
-                assert( ss );
+                verify( ss );
                 if ( ss->avail ) {
                     /* if we're shutting down, don't want to initiate release mechanism as it is slow,
                        and isn't needed since all connections will be closed anyway */
@@ -89,7 +89,7 @@ namespace mongo {
 
         void done( const string& addr , DBClientBase* conn ) {
             Status* s = _hosts[addr];
-            assert( s );
+            verify( s );
             if ( s->avail ) {
                 release( addr , conn );
                 return;
@@ -176,7 +176,7 @@ namespace mongo {
     }
 
     void ShardConnection::_init() {
-        assert( _addr.size() );
+        verify( _addr.size() );
         _conn = ClientConnections::threadInstance()->get( _addr , _ns );
         _finishedInit = false;
     }
@@ -188,12 +188,12 @@ namespace mongo {
 
         if ( _ns.size() && versionManager.isVersionableCB( _conn ) ) {
             // Make sure we specified a manager for the correct namespace
-            if( _manager ) assert( _manager->getns() == _ns );
+            if( _manager ) verify( _manager->getns() == _ns );
             _setVersion = versionManager.checkShardVersionCB( this , false , 1 );
         }
         else {
             // Make sure we didn't specify a manager for an empty namespace
-            assert( ! _manager );
+            verify( ! _manager );
             _setVersion = false;
         }
 
@@ -221,12 +221,12 @@ namespace mongo {
     }
 
     bool ShardConnection::runCommand( const string& db , const BSONObj& cmd , BSONObj& res ) {
-        assert( _conn );
+        verify( _conn );
         bool ok = _conn->runCommand( db , cmd , res );
         if ( ! ok ) {
             if ( res["code"].numberInt() == SendStaleConfigCode ) {
                 done();
-                throw RecvStaleConfigException( res["ns"].String() , res["errmsg"].String() );
+                throw RecvStaleConfigException( res["errmsg"].String(), res );
             }
         }
         return ok;
@@ -240,7 +240,7 @@ namespace mongo {
         if ( _conn ) {
             if ( ! _conn->isFailed() ) {
                 /* see done() comments above for why we log this line */
-                log() << "~ScopedDBConnection: _conn != null" << endl;
+                log() << "sharded connection to " << _conn->getServerAddress() << " not being returned to the pool" << endl;
             }
             kill();
         }

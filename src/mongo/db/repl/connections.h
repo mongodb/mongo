@@ -19,7 +19,6 @@
 #pragma once
 
 #include <map>
-#include "../../client/dbclient.h"
 #include "../security_common.h"
 
 namespace mongo {
@@ -48,7 +47,8 @@ namespace mongo {
             // conLock releases...
         }
         void reconnect() {
-            conn().reset(new DBClientConnection(true, 0, 10));
+            x->cc.reset(new DBClientConnection(true, 0, 10));
+            x->cc->_logLevel = 2;
             x->connected = false;
             connect();
         }

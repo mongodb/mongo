@@ -20,6 +20,9 @@
 
 #include "mongomutex.h"
 
+// if you turn this back on be sure to enable TaskQueueTest again
+#if 0
+
 namespace mongo {
 
     /** defer work items by queueing them for invocation by another thread.  presumption is that
@@ -46,7 +49,7 @@ namespace mongo {
         void defer(MT mt) {
             // only one writer allowed.  however the invoke processing below can occur concurrently with
             // writes (for the most part)
-            DEV d.dbMutex.assertWriteLocked();
+            DEV verify( Lock::isW() );
 
             _queues[_which].push_back(mt);
         }
@@ -72,7 +75,7 @@ namespace mongo {
             int toDrain = 0;
             {
                 // flip queueing to the other queue (we are double buffered)
-                readlocktry lk("", 5);
+                readlocktry lk(5);
                 if( !lk.got() )
                     return;
                 toDrain = _which;
@@ -81,7 +84,7 @@ namespace mongo {
             }
 
             _drain( _queues[toDrain] );
-            assert( _queues[toDrain].empty() );
+            verify( _queues[toDrain].empty() );
         }
 
     private:
@@ -99,8 +102,10 @@ namespace mongo {
                 MT::go(v);
             }
             queue.clear();
-            DEV assert( queue.capacity() == oldCap ); // just checking that clear() doesn't deallocate, we don't want that
+            DEV verify( queue.capacity() == oldCap ); // just checking that clear() doesn't deallocate, we don't want that
         }
     };
 
 }
+
+#endif

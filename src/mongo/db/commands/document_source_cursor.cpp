@@ -18,6 +18,7 @@
 
 #include "db/pipeline/document_source.h"
 
+#include "db/clientcursor.h"
 #include "db/cursor.h"
 #include "db/pipeline/document.h"
 
@@ -35,6 +36,8 @@ namespace mongo {
     }
 
     bool DocumentSourceCursor::advance() {
+        DocumentSource::advance(); // check for interrupts
+
         /* if we haven't gotten the first one yet, do so now */
         if (!pCurrent.get())
             findNext();
@@ -51,6 +54,22 @@ namespace mongo {
         return pCurrent;
     }
 
+    void DocumentSourceCursor::advanceAndYield() {
+        pCursor->advance();
+        /*
+          TODO ask for index key pattern in order to determine which index
+          was used for this particular document; that will allow us to
+          sometimes use ClientCursor::MaybeCovered.
+          See https://jira.mongodb.org/browse/SERVER-5224 .
+        */
+        bool cursorOk = pClientCursor->yieldSometimes(ClientCursor::WillNeed);
+        if (!cursorOk) {
+            uassert(16028,
+                    "collection or database disappeared when cursor yielded",
+                    false);
+        }
+    }
+
     void DocumentSourceCursor::findNext() {
         /* standard cursor usage pattern */
         while(pCursor->ok()) {
@@ -61,41 +80,50 @@ namespace mongo {
 
                 /* grab the matching document */
                 BSONObj documentObj(pCursor->current());
-                pCurrent = Document::createFromBsonObj(&documentObj);
-                pCursor->advance();
+                pCurrent = Document::createFromBsonObj(
+                    &documentObj, NULL /* LATER pDependencies.get()*/);
+                advanceAndYield();
                 return;
             }
 
-            pCursor->advance();
+            advanceAndYield();
         }
 
         /* if we got here, there aren't any more documents */
         pCurrent.reset();
     }
 
-    void DocumentSourceCursor::setSource(
-        const intrusive_ptr<DocumentSource> &pSource) {
+    void DocumentSourceCursor::setSource(DocumentSource *pSource) {
         /* this doesn't take a source */
-        assert(false);
+        verify(false);
     }
 
     void DocumentSourceCursor::sourceToBson(BSONObjBuilder *pBuilder) const {
         /* this has no analog in the BSON world */
-        assert(false);
+        verify(false);
     }
 
     DocumentSourceCursor::DocumentSourceCursor(
-        const shared_ptr<Cursor> &pTheCursor):
+        const shared_ptr<Cursor> &pTheCursor,
+        const string &ns,
+        const intrusive_ptr<ExpressionContext> &pCtx):
+        DocumentSource(pCtx),
         pCurrent(),
         bsonDependencies(),
-        pCursor(pTheCursor) {
+        pCursor(pTheCursor),
+        pClientCursor(),
+        pDependencies() {
+        pClientCursor.reset(
+            new ClientCursor(QueryOption_NoCursorTimeout, pTheCursor, ns));
     }
 
     intrusive_ptr<DocumentSourceCursor> DocumentSourceCursor::create(
-        const shared_ptr<Cursor> &pCursor) {
-        assert(pCursor.get());
+        const shared_ptr<Cursor> &pCursor,
+        const string &ns,
+        const intrusive_ptr<ExpressionContext> &pExpCtx) {
+        verify(pCursor.get());
         intrusive_ptr<DocumentSourceCursor> pSource(
-            new DocumentSourceCursor(pCursor));
+            new DocumentSourceCursor(pCursor, ns, pExpCtx));
             return pSource;
     }
 
@@ -103,4 +131,11 @@ namespace mongo {
         const shared_ptr<BSONObj> &pBsonObj) {
         bsonDependencies.push_back(pBsonObj);
     }
+
+    void DocumentSourceCursor::manageDependencies(
+        const intrusive_ptr<DependencyTracker> &pTracker) {
+        /* hang on to the tracker */
+        pDependencies = pTracker;
+    }
+
 }

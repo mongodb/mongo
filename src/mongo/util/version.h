@@ -3,21 +3,21 @@
 
 #include <string>
 
+#include "mongo/bson/stringdata.h"
+
 namespace mongo {
     struct BSONArray;
-
-    using std::string;
 
     // mongo version
     extern const char versionString[];
     extern const BSONArray versionArray;
-    string mongodVersion();
+    std::string mongodVersion();
     int versionCmp(StringData rhs, StringData lhs); // like strcmp
 
     const char * gitVersion();
     void printGitVersion();
 
-    string sysInfo();
+    std::string sysInfo();
     void printSysInfo();
 
     void show_warnings();

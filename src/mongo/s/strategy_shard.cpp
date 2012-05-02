@@ -17,14 +17,17 @@
 // strategy_sharded.cpp
 
 #include "pch.h"
-#include "request.h"
-#include "chunk.h"
-#include "cursors.h"
-#include "stats.h"
-#include "client.h"
 
-#include "../client/connpool.h"
-#include "../db/commands.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/client/connpool.h"
+#include "mongo/client/dbclientcursor.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/index.h"
+#include "mongo/s/client_info.h"
+#include "mongo/s/cursors.h"
+#include "mongo/s/request.h"
+#include "mongo/s/stats.h"
+#include "mongo/s/chunk.h"
 
 // error codes 8010-8040
 
@@ -52,7 +55,7 @@ namespace mongo {
             QuerySpec qSpec( (string)q.ns, q.query, q.fields, q.ntoskip, q.ntoreturn, q.queryOptions );
 
             ParallelSortClusteredCursor * cursor = new ParallelSortClusteredCursor( qSpec, CommandInfo() );
-            assert( cursor );
+            verify( cursor );
 
             // TODO:  Move out to Request itself, not strategy based
             try {
@@ -84,12 +87,17 @@ namespace mongo {
             if( cursor->isSharded() ){
                 ShardedClientCursorPtr cc (new ShardedClientCursor( q , cursor ));
 
-                if ( ! cc->sendNextBatch( r, q.ntoreturn ) ) {
-                    return;
+                BufBuilder buffer( ShardedClientCursor::INIT_REPLY_BUFFER_SIZE );
+                int docCount = 0;
+                bool hasMore = cc->sendNextBatch( r, q.ntoreturn, buffer, docCount );
+
+                if ( hasMore ) {
+                    LOG(5) << "storing cursor : " << cc->getId() << endl;
+                    cursorCache.store( cc );
                 }
 
-                LOG(5) << "storing cursor : " << cc->getId() << endl;
-                cursorCache.store( cc );
+                replyToQuery( 0, r.p(), r.m(), buffer.buf(), buffer.len(), docCount,
+                        cc->getTotalSent(), hasMore ? cc->getId() : 0 );
             }
             else{
                 // TODO:  Better merge this logic.  We potentially can now use the same cursor logic for everything.
@@ -142,15 +150,23 @@ namespace mongo {
                     replyToQuery( ResultFlag_CursorNotFound , r.p() , r.m() , 0 , 0 , 0 );
                     return;
                 }
+
                 // TODO: Try to match logic of mongod, where on subsequent getMore() we pull lots more data?
-                if ( cursor->sendNextBatch( r , ntoreturn ) ) {
+                BufBuilder buffer( ShardedClientCursor::INIT_REPLY_BUFFER_SIZE );
+                int docCount = 0;
+                bool hasMore = cursor->sendNextBatch( r, ntoreturn, buffer, docCount );
+
+                if ( hasMore ) {
                     // still more data
                     cursor->accessed();
-                    return;
+                }
+                else {
+                    // we've exhausted the cursor
+                    cursorCache.remove( id );
                 }
 
-                // we've exhausted the cursor
-                cursorCache.remove( id );
+                replyToQuery( 0, r.p(), r.m(), buffer.buf(), buffer.len(), docCount,
+                        cursor->getTotalSent(), hasMore ? cursor->getId() : 0 );
             }
         }
 
@@ -368,7 +384,8 @@ namespace mongo {
 
             }
 
-            int left = 5;
+            const int LEFT_START = 5;
+            int left = LEFT_START;
             while ( true ) {
                 try {
                     Shard shard;
@@ -390,12 +407,12 @@ namespace mongo {
                         }
                     }
                     else {
-                        verify(16066, sk.hasShardKey(key));
+                        uassert(16066, "", sk.hasShardKey(key));
                         c = manager->findChunk( key );
                         shard = c->getShard();
                     }
 
-                    verify(16067, shard != Shard());
+                    verify(shard != Shard());
                     doWrite( dbUpdate , r , shard );
 
                     if ( c &&r.getClientInfo()->autoSplitOk() )
@@ -406,9 +423,9 @@ namespace mongo {
                 catch ( StaleConfigException& e ) {
                     if ( left <= 0 )
                         throw e;
+                    log( left == LEFT_START ) << "update will be retried b/c sharding config info is stale, "
+                                              << " left:" << left - 1 << " ns: " << r.getns() << " query: " << query << endl;
                     left--;
-                    log() << "update will be retried b/c sharding config info is stale, "
-                          << " left:" << left << " ns: " << r.getns() << " query: " << query << endl;
                     r.reset();
                     manager = r.getChunkManager();
                     uassert(14806, "collection no longer sharded", manager);
@@ -425,7 +442,8 @@ namespace mongo {
             BSONObj pattern = d.nextJsObj();
             uassert( 13505 ,  "$atomic not supported sharded" , pattern["$atomic"].eoo() );
 
-            int left = 5;
+            const int LEFT_START = 5;
+            int left = LEFT_START;
             while ( true ) {
                 try {
                     set<Shard> shards;
@@ -449,9 +467,9 @@ namespace mongo {
                 catch ( StaleConfigException& e ) {
                     if ( left <= 0 )
                         throw e;
+                    log( left == LEFT_START ) << "delete will be retried b/c of StaleConfigException, "
+                                              << " left:" << left - 1 << " ns: " << r.getns() << " patt: " << pattern << endl;
                     left--;
-                    log() << "delete will be retried b/c of StaleConfigException, "
-                          << " left:" << left << " ns: " << r.getns() << " patt: " << pattern << endl;
                     r.reset();
                     manager = r.getChunkManager();
                     uassert(14805, "collection no longer sharded", manager);
@@ -461,12 +479,28 @@ namespace mongo {
 
         virtual void writeOp( int op , Request& r ) {
 
-            // TODO:  Handle stale config exceptions here from coll being dropped or sharded during op
-            // for now has same semantics as legacy request
-            ChunkManagerPtr info = r.getChunkManager();
+            ChunkManagerPtr info;
+            ShardPtr primary;
 
-            if( ! info ){
-                SINGLE->writeOp( op, r );
+            r.getConfig()->getChunkManagerOrPrimary( r.getns(), info, primary );
+
+            if( primary ){
+
+                const char *ns = r.getns();
+
+                if ( r.isShardingEnabled() &&
+                        strstr( ns , ".system.indexes" ) == strchr( ns , '.' ) &&
+                        strchr( ns , '.' ) )
+                {
+                    LOG(1) << " .system.indexes write for: " << ns << endl;
+                    handleIndexWrite( op , r );
+                    return;
+                }
+
+                LOG(3) << "single write: " << ns << endl;
+                SINGLE->doWrite( op , r , *primary );
+                r.gotInsert(); // Won't handle mulit-insert correctly. Not worth parsing the request.
+
                 return;
             }
             else{
@@ -490,6 +524,51 @@ namespace mongo {
                 }
                 return;
             }
+        }
+
+        void handleIndexWrite( int op , Request& r ) {
+
+            DbMessage& d = r.d();
+
+            if ( op == dbInsert ) {
+                while( d.moreJSObjs() ) {
+                    BSONObj o = d.nextJsObj();
+                    const char * ns = o["ns"].valuestr();
+                    if ( r.getConfig()->isSharded( ns ) ) {
+                        BSONObj newIndexKey = o["key"].embeddedObjectUserCheck();
+
+                        uassert( 10205 ,  (string)"can't use unique indexes with sharding  ns:" + ns +
+                                 " key: " + o["key"].embeddedObjectUserCheck().toString() ,
+                                 IndexDetails::isIdIndexPattern( newIndexKey ) ||
+                                 ! o["unique"].trueValue() ||
+                                 r.getConfig()->getChunkManager( ns )->getShardKey().isPrefixOf( newIndexKey ) );
+
+                        ChunkManagerPtr cm = r.getConfig()->getChunkManager( ns );
+                        verify( cm );
+
+                        set<Shard> shards;
+                        cm->getAllShards(shards);
+                        for (set<Shard>::const_iterator it=shards.begin(), end=shards.end(); it != end; ++it)
+                            SINGLE->doWrite( op , r , *it );
+                    }
+                    else {
+                        SINGLE->doWrite( op , r , r.primaryShard() );
+                    }
+                    r.gotInsert();
+                }
+            }
+            else if ( op == dbUpdate ) {
+                throw UserException( 8050 , "can't update system.indexes" );
+            }
+            else if ( op == dbDelete ) {
+                // TODO
+                throw UserException( 8051 , "can't delete indexes on sharded collection yet" );
+            }
+            else {
+                log() << "handleIndexWrite invalid write op: " << op << endl;
+                throw UserException( 8052 , "handleIndexWrite invalid write op" );
+            }
+
         }
 
     };

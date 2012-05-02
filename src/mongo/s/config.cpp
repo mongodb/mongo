@@ -19,16 +19,18 @@
 #include "pch.h"
 #include "../util/net/message.h"
 #include "../util/stringutils.h"
-#include "../util/unittest.h"
 #include "../client/connpool.h"
 #include "../client/model.h"
+#include "mongo/client/dbclientcursor.h"
 #include "../db/pdfile.h"
 #include "../db/cmdline.h"
+
 
 #include "chunk.h"
 #include "config.h"
 #include "grid.h"
 #include "server.h"
+#include "pcrecpp.h"
 
 namespace mongo {
 
@@ -134,7 +136,7 @@ namespace mongo {
         if ( _shardingEnabled )
             return;
         
-        assert( _name != "config" );
+        verify( _name != "config" );
 
         scoped_lock lk( _lock );
         _shardingEnabled = true;
@@ -212,6 +214,48 @@ namespace mongo {
         return true;
     }
 
+    // Handles weird logic related to getting *either* a chunk manager *or* the collection primary shard
+    void DBConfig::getChunkManagerOrPrimary( const string& ns, ChunkManagerPtr& manager, ShardPtr& primary ){
+
+        // The logic here is basically that at any time, our collection can become sharded or unsharded
+        // via a command.  If we're not sharded, we want to send data to the primary, if sharded, we want
+        // to send data to the correct chunks, and we can't check both w/o the lock.
+
+        manager.reset();
+        primary.reset();
+
+        {
+            scoped_lock lk( _lock );
+
+            Collections::iterator i = _collections.find( ns );
+
+            // No namespace
+            if( i == _collections.end() ){
+                // If we don't know about this namespace, it's unsharded by default
+                primary.reset( new Shard( _primary ) );
+            }
+            else {
+                CollectionInfo& cInfo = i->second;
+
+                // TODO: we need to be careful about handling shardingEnabled, b/c in some places we seem to use and
+                // some we don't.  If we use this function in combination with just getChunkManager() on a slightly
+                // borked config db, we'll get lots of staleconfig retries
+                if( _shardingEnabled && cInfo.isSharded() ){
+                    manager = cInfo.getCM();
+                }
+                else{
+                    // Make a copy, we don't want to be tied to this config object
+                    primary.reset( new Shard( _primary ) );
+                }
+            }
+        }
+
+        verify( manager || primary );
+        verify( ! manager || ! primary );
+
+    }
+
+
     ChunkManagerPtr DBConfig::getChunkManagerIfExists( const string& ns, bool shouldReload, bool forceReload ){
         try{
             return getChunkManager( ns, shouldReload, forceReload );
@@ -230,16 +274,15 @@ namespace mongo {
         {
             scoped_lock lk( _lock );
             
-            CollectionInfo& ci = _collections[ns];
-            
-            bool earlyReload = ! ci.isSharded() && ( shouldReload || forceReload );
+            bool earlyReload = ! _collections[ns].isSharded() && ( shouldReload || forceReload );
             if ( earlyReload ) {
                 // this is to catch cases where there this is a new sharded collection
                 _reload();
-                ci = _collections[ns];
             }
-            massert( 10181 ,  (string)"not sharded:" + ns , ci.isSharded() );
-            assert( ! ci.key().isEmpty() );
+
+            CollectionInfo& ci = _collections[ns];
+            uassert( 10181 ,  (string)"not sharded:" + ns , ci.isSharded() );
+            verify( ! ci.key().isEmpty() );
             
             if ( ! ( shouldReload || forceReload ) || earlyReload )
                 return ci.getCM();
@@ -250,7 +293,7 @@ namespace mongo {
                 oldVersion = ci.getCM()->getVersion();
         }
         
-        assert( ! key.isEmpty() );
+        verify( ! key.isEmpty() );
         
         BSONObj newest;
         if ( oldVersion > 0 && ! forceReload ) {
@@ -264,7 +307,7 @@ namespace mongo {
                 if ( v == oldVersion ) {
                     scoped_lock lk( _lock );
                     CollectionInfo& ci = _collections[ns];
-                    massert( 15885 , str::stream() << "not sharded after reloading from chunks : " << ns , ci.isSharded() );
+                    uassert( 15885 , str::stream() << "not sharded after reloading from chunks : " << ns , ci.isSharded() );
                     return ci.getCM();
                 }
             }
@@ -308,7 +351,7 @@ namespace mongo {
         scoped_lock lk( _lock );
         
         CollectionInfo& ci = _collections[ns];
-        massert( 14822 ,  (string)"state changed in the middle: " + ns , ci.isSharded() );
+        uassert( 14822 ,  (string)"state changed in the middle: " + ns , ci.isSharded() );
         
         bool forced = false;
         if ( temp->getVersion() > ci.getCM()->getVersion() ||
@@ -323,7 +366,7 @@ namespace mongo {
             ci.resetCM( temp.release() );
         }
         
-        massert( 15883 , str::stream() << "not sharded after chunk manager reset : " << ns , ci.isSharded() );
+        uassert( 15883 , str::stream() << "not sharded after chunk manager reset : " << ns , ci.isSharded() );
         return ci.getCM();
     }
 
@@ -341,7 +384,7 @@ namespace mongo {
 
     void DBConfig::unserialize(const BSONObj& from) {
         LOG(1) << "DBConfig unserialize: " << _name << " " << from << endl;
-        assert( _name == from["_id"].String() );
+        verify( _name == from["_id"].String() );
 
         _shardingEnabled = from.getBoolField("partitioned");
         _primary.reset( from.getStringField("primary") );
@@ -372,10 +415,10 @@ namespace mongo {
         unserialize( o );
 
         BSONObjBuilder b;
-        b.appendRegex( "_id" , (string)"^" + _name + "\\." );
+        b.appendRegex( "_id" , (string)"^" + pcrecpp::RE::QuoteMeta( _name ) + "\\." );
 
-        auto_ptr<DBClientCursor> cursor = conn->query( ShardNS::collection ,b.obj() );
-        assert( cursor.get() );
+        auto_ptr<DBClientCursor> cursor = conn->query( ShardNS::collection, b.obj() );
+        verify( cursor.get() );
         while ( cursor->more() ) {
             BSONObj o = cursor->next();
             if( o["dropped"].trueValue() ) _collections.erase( o["_id"].String() );
@@ -549,6 +592,17 @@ namespace mongo {
                 it->second.getCM()->getAllShards(shards);
             } // TODO: handle collections on non-primary shard
         }
+    }
+
+    void DBConfig::getAllShardedCollections( set<string>& namespaces ) const {
+
+        scoped_lock lk( _lock );
+
+        for( Collections::const_iterator i = _collections.begin(); i != _collections.end(); i++ ) {
+            log() << "Coll : " << i->first << " sharded? " << i->second.isSharded() << endl;
+            if( i->second.isSharded() ) namespaces.insert( i->first );
+        }
+
     }
 
     /* --- ConfigServer ---- */
@@ -749,51 +803,53 @@ namespace mongo {
         set<string> got;
 
         ScopedDbConnection conn( _primary, 30.0 );
-        auto_ptr<DBClientCursor> c = conn->query( ShardNS::settings , BSONObj() );
-        assert( c.get() );
-        while ( c->more() ) {
-            BSONObj o = c->next();
-            string name = o["_id"].valuestrsafe();
-            got.insert( name );
-            if ( name == "chunksize" ) {
-                int csize = o["value"].numberInt();
+        
+        try {
+            
+            auto_ptr<DBClientCursor> c = conn->query( ShardNS::settings , BSONObj() );
+            verify( c.get() );
+            while ( c->more() ) {
+                
+                BSONObj o = c->next();
+                string name = o["_id"].valuestrsafe();
+                got.insert( name );
+                if ( name == "chunksize" ) {
+                    int csize = o["value"].numberInt();
 
-                // validate chunksize before proceeding
-                if ( csize == 0 ) {
-                    // setting was not modified; mark as such
-                    got.erase(name);
-                    log() << "warning: invalid chunksize (" << csize << ") ignored" << endl;
-                } else {
-                    LOG(1) << "MaxChunkSize: " << csize << endl;
-                    Chunk::MaxChunkSize = csize * 1024 * 1024;
+                    // validate chunksize before proceeding
+                    if ( csize == 0 ) {
+                        // setting was not modified; mark as such
+                        got.erase(name);
+                        log() << "warning: invalid chunksize (" << csize << ") ignored" << endl;
+                    } else {
+                        LOG(1) << "MaxChunkSize: " << csize << endl;
+                        Chunk::MaxChunkSize = csize * 1024 * 1024;
+                    }
+                }
+                else if ( name == "balancer" ) {
+                    // ones we ignore here
+                }
+                else {
+                    log() << "warning: unknown setting [" << name << "]" << endl;
                 }
             }
-            else if ( name == "balancer" ) {
-                // ones we ignore here
+
+            if ( ! got.count( "chunksize" ) ) {
+                conn->insert( ShardNS::settings , BSON( "_id" << "chunksize"  <<
+                                                        "value" << (Chunk::MaxChunkSize / ( 1024 * 1024 ) ) ) );
             }
-            else {
-                log() << "warning: unknown setting [" << name << "]" << endl;
-            }
-        }
 
-        if ( ! got.count( "chunksize" ) ) {
-            conn->insert( ShardNS::settings , BSON( "_id" << "chunksize"  <<
-                                                    "value" << (Chunk::MaxChunkSize / ( 1024 * 1024 ) ) ) );
-        }
-
-
-        // indexes
-        try {
+            // indexes
             conn->ensureIndex( ShardNS::chunk , BSON( "ns" << 1 << "min" << 1 ) , true );
             conn->ensureIndex( ShardNS::chunk , BSON( "ns" << 1 << "shard" << 1 << "min" << 1 ) , true );
             conn->ensureIndex( ShardNS::chunk , BSON( "ns" << 1 << "lastmod" << 1 ) , true );
             conn->ensureIndex( ShardNS::shard , BSON( "host" << 1 ) , true );
+                
+            conn.done();
         }
-        catch ( std::exception& e ) {
-            log( LL_WARNING ) << "couldn't create indexes on config db: " << e.what() << endl;
+        catch ( DBException& e ) {
+            warning() << "couldn't load settings or create indexes on config db: " << e.what() << endl;
         }
-
-        conn.done();
     }
 
     string ConfigServer::getHost( string name , bool withPort ) {
@@ -829,7 +885,7 @@ namespace mongo {
                                 << "time" << DATENOW << "what" << what << "ns" << ns << "details" << detail );
             log() << "about to log metadata event: " << msg << endl;
 
-            assert( _primary.ok() );
+            verify( _primary.ok() );
 
             ScopedDbConnection conn( _primary, 30.0 );
 

@@ -1,4 +1,6 @@
-
+load( "jstests/libs/slow_weekly_util.js" );
+test = new SlowWeeklyMongod( "conc_update" );
+db = test.getDB( "test" );
 t = db.disk_reuse1;
 t.drop();
 
@@ -39,3 +41,6 @@ for ( j=0; j<100; j++ ){
 
     assert.eq( orig.storageSize , t.stats().storageSize , "B" + j  )
 }
+
+
+test.stop();

@@ -20,12 +20,12 @@
 #include "logfile.h"
 #include "text.h"
 #include "mongoutils/str.h"
-#include "unittest.h"
+#include "mongo/util/startup_test.h"
 
 using namespace mongoutils;
 
 namespace mongo {
-    struct LogfileTest : public UnitTest {
+    struct LogfileTest : public StartupTest {
         LogfileTest() { }
         void run() {
             if( 0 && debug ) {
@@ -78,7 +78,7 @@ namespace mongo {
     }
 
     void LogFile::truncate() {
-        verify(15870, _fd != INVALID_HANDLE_VALUE);
+        verify(_fd != INVALID_HANDLE_VALUE);
 
         if (!SetEndOfFile(_fd)){
             msgasserted(15871, "Couldn't truncate file: " + errnoWithDescription());
@@ -91,7 +91,7 @@ namespace mongo {
         memset(&o,0,sizeof(o));
         (unsigned long long&) o.Offset = offset; 
         BOOL ok= WriteFile(_fd, _buf, _len, 0, &o);
-        assert(ok);
+        verify(ok);
     }
 
     void LogFile::readAt(unsigned long long offset, void *_buf, size_t _len) { 
@@ -105,14 +105,14 @@ namespace mongo {
             string e = errnoWithDescription();
             //DWORD e = GetLastError();
             log() << "LogFile readAt(" << offset << ") len:" << _len << "errno:" << e << endl;
-            assert(false);
+            verify(false);
         }
     }
 
     void LogFile::synchronousAppend(const void *_buf, size_t _len) {
         const size_t BlockSize = 8 * 1024 * 1024;
-        assert(_fd);
-        assert(_len % 4096 == 0);
+        verify(_fd);
+        verify(_len % 4096 == 0);
         const char *buf = (const char *) _buf;
         size_t left = _len;
         while( left ) {
@@ -184,7 +184,7 @@ namespace mongo {
     }
 
     void LogFile::truncate() {
-        verify(15872, _fd >= 0);
+        verify(_fd >= 0);
 
         BOOST_STATIC_ASSERT(sizeof(off_t) == 8); // we don't want overflow here
         const off_t pos = lseek(_fd, 0, SEEK_CUR); // doesn't actually seek
@@ -196,7 +196,7 @@ namespace mongo {
     }
 
     void LogFile::writeAt(unsigned long long offset, const void *buf, size_t len) { 
-        assert(((size_t)buf)%4096==0); // aligned
+        verify(((size_t)buf)%4096==0); // aligned
         ssize_t written = pwrite(_fd, buf, len, offset);
         if( written != (ssize_t) len ) {
             log() << "writeAt fails " << errnoWithDescription() << endl;
@@ -209,27 +209,34 @@ namespace mongo {
     }
 
     void LogFile::readAt(unsigned long long offset, void *_buf, size_t _len) { 
-        assert(((size_t)_buf)%4096==0); // aligned
+        verify(((size_t)_buf)%4096==0); // aligned
         ssize_t rd = pread(_fd, _buf, _len, offset);
-        assert( rd != -1 );
+        verify( rd != -1 );
     }
 
     void LogFile::synchronousAppend(const void *b, size_t len) {
+
+        const char *buf = static_cast<const char *>( b );
+        ssize_t charsToWrite = static_cast<ssize_t>( len );
+
+        fassert( 16144, charsToWrite >= 0 );
+        fassert( 16142, _fd >= 0 );
+        fassert( 16143, reinterpret_cast<ssize_t>( buf ) % 4096 == 0 );  // aligned
+
 #ifdef POSIX_FADV_DONTNEED
         const off_t pos = lseek(_fd, 0, SEEK_CUR); // doesn't actually seek, just get current position
 #endif
 
-        const char *buf = (char *) b;
-        assert(_fd);
-        assert(((size_t)buf)%4096==0); // aligned
-        if( len % 4096 != 0 ) {
-            log() << len << ' ' << len % 4096 << endl;
-            assert(false);
-        }
-        ssize_t written = write(_fd, buf, len);
-        if( written != (ssize_t) len ) {
-            log() << "write fails written:" << written << " len:" << len << " buf:" << buf << ' ' << errnoWithDescription() << endl;
-            uasserted(13515, str::stream() << "error appending to file " << _fd  << ' ' << errnoWithDescription());
+        while ( charsToWrite > 0 ) {
+            const ssize_t written = write( _fd, buf, static_cast<size_t>( charsToWrite ) );
+            if ( -1 == written ) {
+                log() << "LogFile::synchronousAppend failed with " << charsToWrite
+                      << " bytes unwritten out of " << len << " bytes;  b=" << b << ' '
+                      << errnoWithDescription() << std::endl;
+                fassertFailed( 13515 );
+            }
+            buf += written;
+            charsToWrite -= written;
         }
 
         if( 
@@ -239,7 +246,8 @@ namespace mongo {
            fsync(_fd)
 #endif
             ) {
-            uasserted(13514, str::stream() << "error appending to file on fsync " << ' ' << errnoWithDescription());
+            log() << "error appending to file on fsync " << ' ' << errnoWithDescription();
+            fassertFailed( 13514 );
         }
 
 #ifdef POSIX_FADV_DONTNEED

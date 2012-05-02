@@ -22,6 +22,7 @@
 #include "../clientcursor.h"
 #include "../namespace.h"
 #include "../queryutil.h"
+#include "mongo/client/dbclientinterface.h"
 
 namespace mongo {
     
@@ -43,8 +44,15 @@ namespace mongo {
         long long count = 0;
         long long skip = cmd["skip"].numberLong();
         long long limit = cmd["limit"].numberLong();
-        bool simpleEqualityMatch;
-        shared_ptr<Cursor> cursor = NamespaceDetailsTransient::getCursor( ns, query, BSONObj(), false, &simpleEqualityMatch );
+
+        if( limit < 0 ){
+            limit  = -limit;
+        }
+
+        bool simpleEqualityMatch = false;
+        shared_ptr<Cursor> cursor =
+        NamespaceDetailsTransient::getCursor( ns, query, BSONObj(), QueryPlanSelectionPolicy::any(),
+                                             &simpleEqualityMatch );
         ClientCursor::CleanupPointer ccPointer;
         ElapsedTracker timeToStartYielding( 256, 20 );
         try {

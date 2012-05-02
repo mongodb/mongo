@@ -28,17 +28,17 @@ t.save( { a:1,b:2 } );
 t.save( { a:2,b:1 } );
 t.save( { a:2,b:2 } );
 
-assert.eq( 2, t.find( { a:{$in:[1,2]}, b:{$gt:1,$lt:2} } ).explain().nscanned );
-assert.eq( 2, t.find( { a:{$in:[1,2]}, b:{$gt:1,$lt:2} } ).sort( {a:-1,b:-1} ).explain().nscanned );
+assert.eq( 2, t.find( { a:{$in:[1,2]}, b:{$gt:1,$lt:2} } ).hint( {a:1,b:1} ).explain().nscanned );
+assert.eq( 2, t.find( { a:{$in:[1,2]}, b:{$gt:1,$lt:2} } ).hint( {a:1,b:1} ).sort( {a:-1,b:-1} ).explain().nscanned );
 
 t.save( {a:1,b:1} );
 t.save( {a:1,b:1} );
-assert.eq( 2, t.find( { a:{$in:[1,2]}, b:{$gt:1,$lt:2} } ).explain().nscanned );
-assert.eq( 2, t.find( { a:{$in:[1,2]}, b:{$gt:1,$lt:2} } ).explain().nscanned );
-assert.eq( 2, t.find( { a:{$in:[1,2]}, b:{$gt:1,$lt:2} } ).sort( {a:-1,b:-1} ).explain().nscanned );
+assert.eq( 2, t.find( { a:{$in:[1,2]}, b:{$gt:1,$lt:2} } ).hint( {a:1,b:1} ).explain().nscanned );
+assert.eq( 2, t.find( { a:{$in:[1,2]}, b:{$gt:1,$lt:2} } ).hint( {a:1,b:1} ).explain().nscanned );
+assert.eq( 2, t.find( { a:{$in:[1,2]}, b:{$gt:1,$lt:2} } ).hint( {a:1,b:1} ).sort( {a:-1,b:-1} ).explain().nscanned );
 
-assert.eq( 1, t.find( { a:{$in:[1,1.9]}, b:{$gt:1,$lt:2} } ).explain().nscanned );
-assert.eq( 1, t.find( { a:{$in:[1.1,2]}, b:{$gt:1,$lt:2} } ).sort( {a:-1,b:-1} ).explain().nscanned );
+assert.eq( 1, t.find( { a:{$in:[1,1.9]}, b:{$gt:1,$lt:2} } ).hint( {a:1,b:1} ).explain().nscanned );
+assert.eq( 1, t.find( { a:{$in:[1.1,2]}, b:{$gt:1,$lt:2} } ).hint( {a:1,b:1} ).sort( {a:-1,b:-1} ).explain().nscanned );
 
 t.save( { a:1,b:1.5} );
-assert.eq( 3, t.find( { a:{$in:[1,2]}, b:{$gt:1,$lt:2} } ).explain().nscanned, "F" );
+assert.eq( 3, t.find( { a:{$in:[1,2]}, b:{$gt:1,$lt:2} } ).hint( {a:1,b:1} ).explain().nscanned, "F" );

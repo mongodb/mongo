@@ -18,10 +18,9 @@
 #pragma once
 
 #include <stack>
-#include "dbclient.h"
-#include "redef_macros.h"
 
-#include "../util/background.h"
+#include "mongo/util/background.h"
+#include "mongo/client/dbclientinterface.h"
 
 namespace mongo {
 
@@ -38,9 +37,9 @@ namespace mongo {
             : _created(0) {}
 
         PoolForHost( const PoolForHost& other ) {
-            assert(other._pool.size() == 0);
+            verify(other._pool.size() == 0);
             _created = other._created;
-            assert( _created == 0 );
+            verify( _created == 0 );
         }
 
         ~PoolForHost();
@@ -50,7 +49,7 @@ namespace mongo {
         void createdOne( DBClientBase * base );
         long long numCreated() const { return _created; }
 
-        ConnectionString::ConnectionType type() const { assert(_created); return _type; }
+        ConnectionString::ConnectionType type() const { verify(_created); return _type; }
 
         /**
          * gets a connection or return NULL
@@ -287,5 +286,3 @@ namespace mongo {
     };
 
 } // namespace mongo
-
-#include "undef_macros.h"

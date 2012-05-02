@@ -16,12 +16,14 @@
  */
 
 #include "pch.h"
-#include <fcntl.h>
-#include <utility>
-#include <fstream>
 
-#include "gridfs.h"
 #include <boost/smart_ptr.hpp>
+#include <fcntl.h>
+#include <fstream>
+#include <utility>
+
+#include "mongo/client/gridfs.h"
+#include "mongo/client/dbclientcursor.h"
 
 #if defined(_WIN32)
 #include <io.h>
@@ -115,7 +117,7 @@ namespace mongo {
                 chunkLen += readLen;
                 bufPos += readLen;
 
-                assert(chunkLen <= _chunkSize);
+                verify(chunkLen <= _chunkSize);
             }
 
             GridFSChunk c(idObj, chunkNumber, buf, chunkLen);

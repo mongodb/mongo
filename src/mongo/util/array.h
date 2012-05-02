@@ -41,7 +41,7 @@ namespace mongo {
         }
 
         T& operator[]( int x ) {
-            assert( x >= 0 && x < _capacity );
+            verify( x >= 0 && x < _capacity );
             return _data[x];
         }
 
@@ -50,7 +50,7 @@ namespace mongo {
         }
 
         void push_back( const T& t ) {
-            assert( _size < _capacity );
+            verify( _size < _capacity );
             _data[_size++] = t;
         }
 

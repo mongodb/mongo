@@ -25,16 +25,22 @@
 
 #pragma once
 
-#include "../pch.h"
-#include "../util/mmap.h"
-#include "diskloc.h"
-#include "jsobjmanipulator.h"
-#include "namespace-inl.h"
-#include "client.h"
-#include "mongommf.h"
-#include "memconcept.h"
+#include "mongo/db/client.h"
+#include "mongo/db/diskloc.h"
+#include "mongo/db/jsobjmanipulator.h"
+#include "mongo/db/memconcept.h"
+#include "mongo/db/mongommf.h"
+#include "mongo/db/namespace-inl.h"
+#include "mongo/db/namespace_details-inl.h"
+#include "mongo/db/namespacestring.h"
+#include "mongo/util/mmap.h"
+#include "mongo/util/util.h"
 
 namespace mongo {
+
+    // pdfile versions
+    const int PDFILE_VERSION = 4;
+    const int PDFILE_VERSION_MINOR = 5;
 
     class DataFileHeader;
     class Extent;
@@ -124,7 +130,7 @@ namespace mongo {
             const char *buf, int len, OpDebug& debug, bool god=false);
 
         // The object o may be updated if modified on insert.
-        void insertAndLog( const char *ns, const BSONObj &o, bool god = false );
+        void insertAndLog( const char *ns, const BSONObj &o, bool god = false, bool fromMigrate = false );
 
         /** insert will add an _id to the object if not present.  if you would like to see the final object
             after such an addition, use this method.
@@ -163,15 +169,31 @@ namespace mongo {
 
     class DeletedRecord {
     public:
-        int lengthWithHeaders;
-        int extentOfs;
-        DiskLoc nextDeleted;
+
+        int lengthWithHeaders() const { _accessing(); return _lengthWithHeaders; }
+        int& lengthWithHeaders() { _accessing(); return _lengthWithHeaders; }
+        
+        int extentOfs() const { _accessing(); return _extentOfs; }
+        int& extentOfs() { _accessing(); return _extentOfs; }
+
+        // TODO: we need to not const_cast here but problem is DiskLoc::writing
+        DiskLoc& nextDeleted() const { _accessing(); return const_cast<DiskLoc&>(_nextDeleted); }
+
         DiskLoc myExtentLoc(const DiskLoc& myLoc) const {
-            return DiskLoc(myLoc.a(), extentOfs);
+            _accessing();
+            return DiskLoc(myLoc.a(), _extentOfs);
         }
         Extent* myExtent(const DiskLoc& myLoc) {
-            return DataFileMgr::getExtent(DiskLoc(myLoc.a(), extentOfs));
+            _accessing();
+            return DataFileMgr::getExtent(DiskLoc(myLoc.a(), _extentOfs));
         }
+    private:
+
+        void _accessing() const;
+
+        int _lengthWithHeaders;
+        int _extentOfs;
+        DiskLoc _nextDeleted;
     };
 
     /* Record is a record in a datafile.  DeletedRecord is similar but for deleted space.
@@ -188,40 +210,46 @@ namespace mongo {
     class Record {
     public:
         enum HeaderSizeValue { HeaderSize = 16 };
-        int lengthWithHeaders;
-        int extentOfs;
-        int nextOfs;
-        int prevOfs;
 
-        /** be careful when referencing this that your write intent was correct */
-        char data[4];
+        int lengthWithHeaders() const {  _accessing(); return _lengthWithHeaders; }
+        int& lengthWithHeaders() {  _accessing(); return _lengthWithHeaders; }
 
-        int netLength() {
-            return lengthWithHeaders - HeaderSize;
-        }
-        //void setNewLength(int netlen) { lengthWithHeaders = netlen + HeaderSize; }
+        int extentOfs() const { _accessing(); return _extentOfs; }
+        int& extentOfs() { _accessing(); return _extentOfs; }
+        
+        int nextOfs() const { _accessing(); return _nextOfs; }
+        int& nextOfs() { _accessing(); return _nextOfs; }
+
+        int prevOfs() const {  _accessing(); return _prevOfs; }
+        int& prevOfs() {  _accessing(); return _prevOfs; }
+
+        const char * data() const { _accessing(); return _data; }
+        char * data() { _accessing(); return _data; }
+
+        int netLength() const { _accessing(); return _netLength(); }
 
         /* use this when a record is deleted. basically a union with next/prev fields */
         DeletedRecord& asDeleted() { return *((DeletedRecord*) this); }
 
-        Extent* myExtent(const DiskLoc& myLoc) { return DataFileMgr::getExtent(DiskLoc(myLoc.a(), extentOfs)); }
+        Extent* myExtent(const DiskLoc& myLoc) { return DataFileMgr::getExtent(DiskLoc(myLoc.a(), extentOfs() ) ); }
 
         /* get the next record in the namespace, traversing extents as necessary */
         DiskLoc getNext(const DiskLoc& myLoc);
         DiskLoc getPrev(const DiskLoc& myLoc);
 
         DiskLoc nextInExtent(const DiskLoc& myLoc) { 
-            if ( nextOfs == DiskLoc::NullOfs )
+            _accessing();
+            if ( _nextOfs == DiskLoc::NullOfs )
                 return DiskLoc();
-            assert( nextOfs );
-            return DiskLoc(myLoc.a(), nextOfs);
+            verify( _nextOfs );
+            return DiskLoc(myLoc.a(), _nextOfs);
         }
 
         struct NP {
             int nextOfs;
             int prevOfs;
         };
-        NP* np() { return (NP*) &nextOfs; }
+        NP* np() { return (NP*) &_nextOfs; }
 
         // ---------------------
         // memory cache
@@ -232,19 +260,38 @@ namespace mongo {
          * @param entireRecrd if false, only the header and first byte is touched
          *                    if true, the entire record is touched
          * */
-        void touch( bool entireRecrd = false );
+        void touch( bool entireRecrd = false ) const;
 
         /**
          * @return if this record is likely in physical memory
          *         its not guaranteed because its possible it gets swapped out in a very unlucky windows
          */
-        bool likelyInPhysicalMemory();
+        bool likelyInPhysicalMemory() const ;
 
         /**
          * tell the cache this Record was accessed
          * @return this, for simple chaining
          */
         Record* accessed();
+
+    private:
+        
+        int _netLength() const { return _lengthWithHeaders - HeaderSize; }
+
+        /**
+         * call this when accessing a field which could hit disk
+         */
+        void _accessing() const;
+
+        int _lengthWithHeaders;
+        int _extentOfs;
+        int _nextOfs;
+        int _prevOfs;
+
+        /** be careful when referencing this that your write intent was correct */
+        char _data[4];
+
+    public:
 
         static bool MemoryTrackingEnabled;
     };
@@ -300,15 +347,15 @@ namespace mongo {
         DiskLoc reuse(const char *nsname, bool newUseIsAsCapped);
 
         bool isOk() const { return magic == 0x41424344; }
-        void assertOk() const { assert(isOk()); }
+        void assertOk() const { verify(isOk()); }
 
         Record* newRecord(int len);
 
         Record* getRecord(DiskLoc dl) {
-            assert( !dl.isNull() );
-            assert( dl.sameFile(myLoc) );
+            verify( !dl.isNull() );
+            verify( dl.sameFile(myLoc) );
             int x = dl.getOfs() - myLoc.getOfs();
-            assert( x > 0 );
+            verify( x > 0 );
             return (Record *) (((char *) this) + x);
         }
 
@@ -316,7 +363,7 @@ namespace mongo {
         Extent* getPrevExtent() { return xprev.isNull() ? 0 : DataFileMgr::getExtent(xprev); }
 
         static int maxSize();
-        static int minSize() { return 0x100; }
+        static int minSize() { return 0x1000; }
         /**
          * @param len lengt of record we need
          * @param lastRecord size of last extent which is a factor in next extent size
@@ -381,7 +428,9 @@ namespace mongo {
                 }
 
                 { 
-                    if( !d.dbMutex.isWriteLocked() ) { 
+                    // "something" is too vague, but we checked for the right db to be locked higher up the call stack
+                    if( !Lock::somethingWriteLocked() ) { 
+                        LockState::Dump();
                         log() << "*** TEMP NOT INITIALIZING FILE " << filename << ", not in a write lock." << endl;
                         log() << "temp bypass until more elaborate change - case that is manifesting is benign anyway" << endl;
                         return;
@@ -394,13 +443,13 @@ namespace mongo {
                 }
 
                 getDur().createdFile(filename, filelength);
-                assert( HeaderSize == 8192 );
+                verify( HeaderSize == 8192 );
                 DataFileHeader *h = getDur().writing(this);
                 h->fileLength = filelength;
                 h->version = PDFILE_VERSION;
                 h->versionMinor = PDFILE_VERSION_MINOR;
                 h->unused.set( fileno, HeaderSize );
-                assert( (data-(char*)this) == HeaderSize );
+                verify( (data-(char*)this) == HeaderSize );
                 h->unusedLength = fileLength - HeaderSize - 16;
             }
         }
@@ -421,7 +470,7 @@ namespace mongo {
     inline Extent* MongoDataFile::getExtent(DiskLoc loc) const {
         Extent *e = _getExtent(loc);
         e->assertOk();
-        memconcept::is(e, memconcept::extent);
+        memconcept::is(e, memconcept::concept::extent);
         return e;
     }
 
@@ -444,14 +493,15 @@ namespace mongo {
     }
 
     inline DiskLoc Record::getNext(const DiskLoc& myLoc) {
-        if ( nextOfs != DiskLoc::NullOfs ) {
+        _accessing();
+        if ( _nextOfs != DiskLoc::NullOfs ) {
             /* defensive */
-            if ( nextOfs >= 0 && nextOfs < 10 ) {
+            if ( _nextOfs >= 0 && _nextOfs < 10 ) {
                 sayDbContext("Assertion failure - Record::getNext() referencing a deleted record?");
                 return DiskLoc();
             }
 
-            return DiskLoc(myLoc.a(), nextOfs);
+            return DiskLoc(myLoc.a(), _nextOfs);
         }
         Extent *e = myExtent(myLoc);
         while ( 1 ) {
@@ -465,8 +515,9 @@ namespace mongo {
         return e->firstRecord;
     }
     inline DiskLoc Record::getPrev(const DiskLoc& myLoc) {
-        if ( prevOfs != DiskLoc::NullOfs )
-            return DiskLoc(myLoc.a(), prevOfs);
+        _accessing();
+        if ( _prevOfs != DiskLoc::NullOfs )
+            return DiskLoc(myLoc.a(), _prevOfs);
         Extent *e = myExtent(myLoc);
         if ( e->xprev.isNull() )
             return DiskLoc();
@@ -477,9 +528,9 @@ namespace mongo {
         return BSONObj(rec()->accessed());
     }
     inline DeletedRecord* DiskLoc::drec() const {
-        assert( _a != -1 );
+        verify( _a != -1 );
         DeletedRecord* dr = (DeletedRecord*) rec();
-        memconcept::is(dr, memconcept::deletedrecord);
+        memconcept::is(dr, memconcept::concept::deletedrecord);
         return dr;
     }
     inline Extent* DiskLoc::ext() const {
@@ -489,8 +540,10 @@ namespace mongo {
     template< class V >
     inline 
     const BtreeBucket<V> * DiskLoc::btree() const {
-        assert( _a != -1 );
-        return (const BtreeBucket<V> *) rec()->data;
+        verify( _a != -1 );
+        Record *r = rec();
+        memconcept::is(r, memconcept::concept::btreebucket, "", 8192);
+        return (const BtreeBucket<V> *) r->data();
     }
 
 } // namespace mongo
@@ -504,8 +557,8 @@ namespace mongo {
 
     inline NamespaceIndex* nsindex(const char *ns) {
         Database *database = cc().database();
-        assert( database );
-        memconcept::is(database, memconcept::database, ns, sizeof(Database));
+        verify( database );
+        memconcept::is(database, memconcept::concept::database, ns, sizeof(Database));
         DEV {
             char buf[256];
             nsToDatabase(ns, buf);
@@ -513,7 +566,7 @@ namespace mongo {
                 out() << "ERROR: attempt to write to wrong database\n";
                 out() << " ns:" << ns << '\n';
                 out() << " database->name:" << database->name << endl;
-                assert( database->name == buf );
+                verify( database->name == buf );
             }
         }
         return &database->namespaceIndex;
@@ -523,18 +576,18 @@ namespace mongo {
         // if this faults, did you set the current db first?  (Client::Context + dblock)
         NamespaceDetails *d = nsindex(ns)->details(ns);
         if( d ) {
-            memconcept::is(d, memconcept::nsdetails, ns, sizeof(NamespaceDetails));
+            memconcept::is(d, memconcept::concept::nsdetails, ns, sizeof(NamespaceDetails));
         }
         return d;
     }
 
     inline Extent* DataFileMgr::getExtent(const DiskLoc& dl) {
-        assert( dl.a() != -1 );
+        verify( dl.a() != -1 );
         return cc().database()->getFile(dl.a())->getExtent(dl);
     }
 
     inline Record* DataFileMgr::getRecord(const DiskLoc& dl) {
-        assert( dl.a() != -1 );
+        verify( dl.a() != -1 );
         Record* r = cc().database()->getFile(dl.a())->recordAt(dl);
         return r;
     }
@@ -542,7 +595,7 @@ namespace mongo {
     BOOST_STATIC_ASSERT( 16 == sizeof(DeletedRecord) );
 
     inline DeletedRecord* DataFileMgr::makeDeletedRecord(const DiskLoc& dl, int len) {
-        assert( dl.a() != -1 );
+        verify( dl.a() != -1 );
         return (DeletedRecord*) cc().database()->getFile(dl.a())->makeRecord(dl, sizeof(DeletedRecord));
     }
 
@@ -551,7 +604,7 @@ namespace mongo {
     bool dropIndexes( NamespaceDetails *d, const char *ns, const char *name, string &errmsg, BSONObjBuilder &anObjBuilder, bool maydeleteIdIndex );
 
     inline BSONObj::BSONObj(const Record *r) {
-        init(r->data);
+        init(r->data());
     }
 
 } // namespace mongo

@@ -21,11 +21,13 @@
 #include <iomanip>
 #include "../client/connpool.h"
 #include "../util/stringutils.h"
-#include "../util/unittest.h"
+#include "../util/startup_test.h"
 #include "../db/namespacestring.h"
+#include "mongo/db/json.h"
 
 #include "grid.h"
 #include "shard.h"
+#include "pcrecpp.h"
 
 namespace mongo {
 
@@ -55,7 +57,8 @@ namespace mongo {
                         // lets check case
                         ScopedDbConnection conn( configServer.modelServer() );
                         BSONObjBuilder b;
-                        b.appendRegex( "_id" , (string)"^" + database + "$" , "i" );
+                        b.appendRegex( "_id" , (string)"^" +
+                                       pcrecpp::RE::QuoteMeta( database ) + "$" , "i" );
                         BSONObj d = conn->findOne( ShardNS::database , b.obj() );
                         conn.done();
 
@@ -275,6 +278,9 @@ namespace mongo {
             newShardConn.done();
         }
         catch ( DBException& e ) {
+            if ( servers.type() == ConnectionString::SET ) {
+                ReplicaSetMonitor::remove( servers.getSetName() );
+            }
             ostringstream ss;
             ss << "couldn't connect to new shard ";
             ss << e.what();
@@ -347,19 +353,19 @@ namespace mongo {
     }
 
     bool Grid::knowAboutShard( const string& name ) const {
-        ShardConnection conn( configServer.getPrimary() , "" );
+        ScopedDbConnection conn( configServer.getPrimary()  );
         BSONObj shard = conn->findOne( ShardNS::shard , BSON( "host" << name ) );
         conn.done();
         return ! shard.isEmpty();
     }
 
     bool Grid::_getNewShardName( string* name ) const {
-        DEV assert( name );
+        DEV verify( name );
 
         bool ok = false;
         int count = 0;
 
-        ShardConnection conn( configServer.getPrimary() , "" );
+        ScopedDbConnection conn( configServer.getPrimary() );
         BSONObj o = conn->findOne( ShardNS::shard , Query( fromjson ( "{_id: /^shard/}" ) ).sort(  BSON( "_id" << -1 ) ) );
         if ( ! o.isEmpty() ) {
             string last = o["_id"].String();
@@ -378,18 +384,35 @@ namespace mongo {
         return ok;
     }
 
-    bool Grid::shouldBalance() const {
-        ShardConnection conn( configServer.getPrimary() , "" );
+    /*
+     * Returns whether balancing is enabled, with optional namespace "ns" parameter for balancing on a particular
+     * collection.
+     */
+    bool Grid::shouldBalance( const string& ns ) const {
 
-        // look for the stop balancer marker
-        BSONObj balancerDoc = conn->findOne( ShardNS::settings, BSON( "_id" << "balancer" ) );
-        conn.done();
+        ScopedDbConnection conn( configServer.getPrimary() );
+        BSONObj balancerDoc;
+        BSONObj collDoc;
+
+        try {
+            // look for the stop balancer marker
+            balancerDoc = conn->findOne( ShardNS::settings, BSON( "_id" << "balancer" ) );
+            if( ns.size() > 0 ) collDoc = conn->findOne( ShardNS::collection, BSON( "_id" << ns ) );
+            conn.done();
+        }
+        catch( DBException& e ){
+            conn.kill();
+            warning() << "could not determine whether balancer should be running, error getting config data from " << conn.getHost() << causedBy( e ) << endl;
+            // if anything goes wrong, we shouldn't try balancing
+            return false;
+        }
 
         boost::posix_time::ptime now = boost::posix_time::second_clock::local_time();
         if ( _balancerStopped( balancerDoc ) || ! _inBalancingWindow( balancerDoc , now ) ) {
             return false;
         }
 
+        if( collDoc["noBalance"].trueValue() ) return false;
         return true;
     }
 
@@ -485,7 +508,7 @@ namespace mongo {
 
     // unit tests
 
-    class BalancingWindowUnitTest : public UnitTest {
+    class BalancingWindowUnitTest : public StartupTest {
     public:
         void run() {
             
@@ -505,10 +528,10 @@ namespace mongo {
             BSONObj w3 = BSON( "activeWindow" << BSON( "start" << T1 << "stop" << T2 ) ); // open now
             BSONObj w4 = BSON( "activeWindow" << BSON( "start" << T3 << "stop" << T2 ) ); // open since last day
 
-            assert( ! Grid::_inBalancingWindow( w1 , now ) );
-            assert( ! Grid::_inBalancingWindow( w2 , now ) );
-            assert( Grid::_inBalancingWindow( w3 , now ) );
-            assert( Grid::_inBalancingWindow( w4 , now ) );
+            verify( ! Grid::_inBalancingWindow( w1 , now ) );
+            verify( ! Grid::_inBalancingWindow( w2 , now ) );
+            verify( Grid::_inBalancingWindow( w3 , now ) );
+            verify( Grid::_inBalancingWindow( w4 , now ) );
 
             // bad input should not stop the balancer
 
@@ -518,11 +541,11 @@ namespace mongo {
             BSONObj w8 = BSON( "wrongMarker" << 1 << "start" << 1 << "stop" << 1 ); // active window marker missing
             BSONObj w9 = BSON( "activeWindow" << BSON( "start" << T3 << "stop" << E ) ); // garbage in window
 
-            assert( Grid::_inBalancingWindow( w5 , now ) );
-            assert( Grid::_inBalancingWindow( w6 , now ) );
-            assert( Grid::_inBalancingWindow( w7 , now ) );
-            assert( Grid::_inBalancingWindow( w8 , now ) );
-            assert( Grid::_inBalancingWindow( w9 , now ) );
+            verify( Grid::_inBalancingWindow( w5 , now ) );
+            verify( Grid::_inBalancingWindow( w6 , now ) );
+            verify( Grid::_inBalancingWindow( w7 , now ) );
+            verify( Grid::_inBalancingWindow( w8 , now ) );
+            verify( Grid::_inBalancingWindow( w9 , now ) );
 
             LOG(1) << "BalancingWidowObjTest passed" << endl;
         }

@@ -5,6 +5,7 @@
 /.sconf_temp
 /perf.data
 /massif.out.*
+.scons
 
 *~
 *.swp
@@ -46,6 +47,8 @@
 /src/mongo/db/.gdb*
 /src/mongo/db/makefile.local
 /src/mongo/db/_ReSharper.db
+/src/third_party/*/*.tlog
+/src/third_party/*/*.lastbuildstate
 config.log
 settings.py
 tags
@@ -98,6 +101,7 @@ scratch
 /whereExample
 /bsondemo
 /rsExample
+/tutorial
 
 #tests
 /test
@@ -115,6 +119,7 @@ debian/mongodb
 
 #osx
 .DS_Store
+._.DS_Store
 
 # QtCreator
 *.config
@@ -135,3 +140,4 @@ src/mongo/shell/mongo.cpp
 src/third_party/js-1.7/jsautocfg.h
 src/third_party/js-1.7/jsautokw.h
 buildinfo.cpp
+/.settings/

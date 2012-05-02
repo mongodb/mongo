@@ -16,32 +16,51 @@
 
 #undef MONGO_EXPOSE_MACROS
 
-#include "../client/dbclient.h"
+// pragma push_macro only works in gcc 4.3+
+// However, you had to define a special macro
+// and build gcc yourself for it to work in 4.3.
+// Version 4.4+ activate the feature by default.
+
+#define GCC_VERSION (__GNUC__ * 10000                 \
+                     + __GNUC_MINOR__ * 100           \
+                     + __GNUC_PATCHLEVEL__)
+
+#if GCC_VERSION >= 40402
+
+# define malloc 42
+
+# include "mongo/client/redef_macros.h"
+# include "mongo/client/undef_macros.h"
+
+# if malloc == 42
+# else
+#  error malloc macro molested
+# endif
+
+# undef malloc
+
+#endif // gcc 4.3
+
+#include "mongo/client/dbclient.h"
 
 #ifdef malloc
-# error malloc defined 0
+# error malloc macro defined
 #endif
 
-#ifdef assert
-# error assert defined 1
+#ifdef verify
+# error verify defined 1
 #endif
 
-#include "../client/parallel.h" //uses assert
+#include "mongo/client/redef_macros.h"
 
-#ifdef assert
-# error assert defined 2
+#ifndef verify
+# error verify not defined 3
 #endif
 
-#include "../client/redef_macros.h"
+#include "mongo/client/undef_macros.h"
 
-#ifndef assert
-# error assert not defined 3
-#endif
-
-#include "../client/undef_macros.h"
-
-#ifdef assert
-# error assert defined 3
+#ifdef verify
+# error verify defined 3
 #endif
 
 

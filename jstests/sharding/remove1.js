@@ -4,6 +4,7 @@ assert.eq( 2, s.config.shards.count() , "initial server count wrong" );
 
 s.config.databases.insert({_id: 'local', partitioned: false, primary: 'shard0000'});
 s.config.databases.insert({_id: 'needToMove', partitioned: false, primary: 'shard0000'});
+s.config.getLastError();
 
 // first remove puts in draining mode, the second tells me a db needs to move, the third actually removes
 assert( s.admin.runCommand( { removeshard: "shard0000" } ).ok , "failed to start draining shard" );

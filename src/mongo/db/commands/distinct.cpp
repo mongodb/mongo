@@ -91,21 +91,21 @@ namespace mongo {
             }
 
             
-            assert( cursor );
+            verify( cursor );
             string cursorName = cursor->toString();
             
             auto_ptr<ClientCursor> cc (new ClientCursor(QueryOption_NoCursorTimeout, cursor, ns));
 
             while ( cursor->ok() ) {
                 nscanned++;
-                bool loadedObject = false;
+                bool loadedRecord = false;
 
                 if ( cursor->currentMatches( &md ) && !cursor->getsetdup( cursor->currLoc() ) ) {
                     n++;
 
                     BSONObj holder;
                     BSONElementSet temp;
-                    loadedObject = ! cc->getFieldsDotted( key , temp, holder );
+                    loadedRecord = ! cc->getFieldsDotted( key , temp, holder );
 
                     for ( BSONElementSet::iterator i=temp.begin(); i!=temp.end(); ++i ) {
                         BSONElement e = *i;
@@ -123,7 +123,7 @@ namespace mongo {
                     }
                 }
 
-                if ( loadedObject || md._loadedObject )
+                if ( loadedRecord || md.hasLoadedRecord() )
                     nscannedObjects++;
 
                 cursor->advance();
@@ -136,7 +136,7 @@ namespace mongo {
                 RARELY killCurrentOp.checkForInterrupt();
             }
 
-            assert( start == bb.buf() );
+            verify( start == bb.buf() );
 
             result.appendArray( "values" , arr.done() );
 

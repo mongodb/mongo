@@ -20,7 +20,6 @@
 #include "../instance.h"
 #include "../commands.h"
 #include "../../scripting/engine.h"
-#include "../../client/dbclient.h"
 #include "../../client/connpool.h"
 #include "../../client/parallel.h"
 #include "../matcher.h"
@@ -48,7 +47,7 @@ namespace mongo {
 
         void JSFunction::init( State * state ) {
             _scope = state->scope();
-            assert( _scope );
+            verify( _scope );
             _scope->init( &_wantedScope );
 
             _func = _scope->createFunction( _code.c_str() );
@@ -68,7 +67,7 @@ namespace mongo {
          */
         void JSMapper::map( const BSONObj& o ) {
             Scope * s = _func.scope();
-            assert( s );
+            verify( s );
             if ( s->invoke( _func.func() , &_params, &o , 0 , true, false, true ) )
                 throw UserException( 9014, str::stream() << "map invoke failed: " + s->getError() );
         }
@@ -176,14 +175,14 @@ namespace mongo {
                 uassert( 13070 , "value too large to reduce" , ee.size() < ( BSONObjMaxUserSize / 2 ) );
 
                 if ( sizeSoFar + ee.size() > BSONObjMaxUserSize ) {
-                    assert( n > 1 ); // if not, inf. loop
+                    verify( n > 1 ); // if not, inf. loop
                     break;
                 }
 
                 valueBuilder->append( ee );
                 sizeSoFar += ee.size();
             }
-            assert(valueBuilder);
+            verify(valueBuilder);
             valueBuilder->done();
             BSONObj args = reduceArgs.obj();
 
@@ -215,7 +214,9 @@ namespace mongo {
             _reduce( x , key , endSizeEstimate );
         }
 
-        Config::Config( const string& _dbname , const BSONObj& cmdObj ) {
+        Config::Config( const string& _dbname , const BSONObj& cmdObj ) :
+            outNonAtomic(false)
+        {
 
             dbname = _dbname;
             ns = dbname + "." + cmdObj.firstElement().valuestr();
@@ -339,8 +340,7 @@ namespace mongo {
                 // create the inc collection and make sure we have index on "0" key
                 _db.dropCollection( _config.incLong );
                 {
-                    writelock l( _config.incLong );
-                    Client::Context ctx( _config.incLong );
+                    Client::WriteContext ctx( _config.incLong );
                     string err;
                     if ( ! userCreateNS( _config.incLong.c_str() , BSON( "autoIndexId" << 0 << "temp" << true ) , err , false ) ) {
                         uasserted( 13631 , str::stream() << "userCreateNS failed for mr incLong ns: " << _config.incLong << " err: " << err );
@@ -354,8 +354,7 @@ namespace mongo {
             // create temp collection
             _db.dropCollection( _config.tempLong );
             {
-                writelock lock( _config.tempLong.c_str() );
-                Client::Context ctx( _config.tempLong.c_str() );
+                Client::WriteContext ctx( _config.tempLong.c_str() );
                 string errmsg;
                 if ( ! userCreateNS( _config.tempLong.c_str() , BSON("temp" << true) , errmsg , true ) ) {
                     uasserted( 13630 , str::stream() << "userCreateNS failed for mr tempLong ns: " << _config.tempLong << " err: " << errmsg );
@@ -436,7 +435,7 @@ namespace mongo {
                 BSONObj key = i->first;
                 BSONList& all = i->second;
 
-                assert( all.size() == 1 );
+                verify( all.size() == 1 );
 
                 BSONObjIterator vi( all[0] );
                 vi.next();
@@ -457,11 +456,11 @@ namespace mongo {
          */
         long long State::postProcessCollection(CurOp* op, ProgressMeterHolder& pm) {
             if ( _onDisk == false || _config.outType == Config::INMEMORY )
-                return _temp->size();
+                return numInMemKeys();
 
             if (_config.outNonAtomic)
                 return postProcessCollectionNonAtomic(op, pm);
-            writelock lock;
+            Lock::GlobalWrite lock; // TODO(erh): this is how it was, but seems it doesn't need to be global
             return postProcessCollectionNonAtomic(op, pm);
         }
 
@@ -471,7 +470,7 @@ namespace mongo {
                 return _db.count( _config.finalLong );
 
             if ( _config.outType == Config::REPLACE || _db.count( _config.finalLong ) == 0 ) {
-                writelock lock;
+                Lock::GlobalWrite lock; // TODO(erh): why global???
                 // replace: just rename from temp to final collection name, dropping previous collection
                 _db.dropCollection( _config.finalLong );
                 BSONObj info;
@@ -491,7 +490,7 @@ namespace mongo {
                 op->setMessage( "m/r: merge post processing" , _db.count( _config.tempLong, BSONObj() ) );
                 auto_ptr<DBClientCursor> cursor = _db.query( _config.tempLong , BSONObj() );
                 while ( cursor->more() ) {
-                    writelock lock;
+                    Lock::DBWrite lock( _config.finalLong );
                     BSONObj o = cursor->next();
                     Helpers::upsert( _config.finalLong , o );
                     getDur().commitIfNeeded();
@@ -507,7 +506,7 @@ namespace mongo {
                 op->setMessage( "m/r: reduce post processing" , _db.count( _config.tempLong, BSONObj() ) );
                 auto_ptr<DBClientCursor> cursor = _db.query( _config.tempLong , BSONObj() );
                 while ( cursor->more() ) {
-                    writelock lock;
+                    Lock::GlobalWrite lock; // TODO(erh) why global?
                     BSONObj temp = cursor->next();
                     BSONObj old;
 
@@ -541,28 +540,18 @@ namespace mongo {
          * Insert doc in collection
          */
         void State::insert( const string& ns , const BSONObj& o ) {
-            assert( _onDisk );
+            verify( _onDisk );
 
-            writelock l( ns );
-            Client::Context ctx( ns );
+            Client::WriteContext ctx( ns );
 
             theDataFileMgr.insertAndLog( ns.c_str() , o , false );
-        }
-
-        /**
-         * Insert doc into the inc collection, taking proper lock
-         */
-        void State::insertToInc( BSONObj& o ) {
-            writelock l(_config.incLong);
-            Client::Context ctx(_config.incLong);
-            _insertToInc(o);
         }
 
         /**
          * Insert doc into the inc collection
          */
         void State::_insertToInc( BSONObj& o ) {
-            assert( _onDisk );
+            verify( _onDisk );
             theDataFileMgr.insertWithObjMod( _config.incLong.c_str() , o , true );
             getDur().commitIfNeeded();
         }
@@ -613,7 +602,7 @@ namespace mongo {
             _config.reducer->init( this );
             if ( _config.finalizer )
                 _config.finalizer->init( this );
-            _scope->setBoolean("_doFinal", _config.finalizer);
+            _scope->setBoolean("_doFinal", _config.finalizer.get() != 0);
 
             // by default start in JS mode, will be faster for small jobs
             _jsMode = _config.jsMode;
@@ -715,7 +704,7 @@ namespace mongo {
                         BSONObj key = i->first;
                         BSONList& all = i->second;
 
-                        assert( all.size() == 1 );
+                        verify( all.size() == 1 );
 
                         BSONObj res = _config.finalizer->finalize( all[0] );
 
@@ -729,7 +718,7 @@ namespace mongo {
             }
 
             // use index on "0" to pull sorted data
-            assert( _temp->size() == 0 );
+            verify( _temp->size() == 0 );
             BSONObj sortKey = BSON( "0" << 1 );
             {
                 bool foundIndex = false;
@@ -743,16 +732,15 @@ namespace mongo {
                     }
                 }
 
-                assert( foundIndex );
+                verify( foundIndex );
             }
 
-            readlock rl( _config.incLong.c_str() );
-            Client::Context ctx( _config.incLong );
+            Client::ReadContext ctx( _config.incLong );
 
             BSONObj prev;
             BSONList all;
 
-            assert( pm == op->setMessage( "m/r: (3/3) final reduce to collection" , _db.count( _config.incLong, BSONObj(), QueryOption_SlaveOk ) ) );
+            verify( pm == op->setMessage( "m/r: (3/3) final reduce to collection" , _db.count( _config.incLong, BSONObj(), QueryOption_SlaveOk ) ) );
 
             shared_ptr<Cursor> temp =
             NamespaceDetailsTransient::bestGuessCursor( _config.incLong.c_str() , BSONObj() ,
@@ -842,8 +830,7 @@ namespace mongo {
                     // only 1 value for this key
                     if ( _onDisk ) {
                         // this key has low cardinality, so just write to collection
-                        writelock l(_config.incLong);
-                        Client::Context ctx(_config.incLong.c_str());
+                        Client::WriteContext ctx(_config.incLong.c_str());
                         _insertToInc( *(all.begin()) );
                     }
                     else {
@@ -870,7 +857,7 @@ namespace mongo {
             if ( ! _onDisk )
                 return;
 
-            writelock l(_config.incLong);
+            Lock::DBWrite kl(_config.incLong);
             Client::Context ctx(_config.incLong);
 
             for ( InMemory::iterator i=_temp->begin(); i!=_temp->end(); i++ ) {
@@ -1010,6 +997,8 @@ namespace mongo {
 
                 log(1) << "mr ns: " << config.ns << endl;
 
+                uassert( 16149 , "cannot run map reduce without the js engine", globalScriptEngine );
+
                 auto_ptr<ClientCursor> holdCursor;
                 ShardChunkManagerPtr chunkManager;
 
@@ -1021,8 +1010,7 @@ namespace mongo {
                     }
 
                     // Check our version immediately, to avoid migrations happening in the meantime while we do prep
-                    readlock lock( config.ns );
-                    Client::Context ctx( config.ns );
+                    Client::ReadContext ctx( config.ns );
 
                     // Get a very basic cursor, prevents deletion of migrated data while we m/r
                     shared_ptr<Cursor> temp = NamespaceDetailsTransient::getCursor( config.ns.c_str(), BSONObj(), BSONObj() );
@@ -1070,7 +1058,7 @@ namespace mongo {
                         // We've got a cursor preventing migrations off, now re-establish our useful cursor
 
                         // Need lock and context to use it
-                        readlock lock( config.ns );
+                        Lock::DBRead lock( config.ns );
                         // This context does no version check, safe b/c we checked earlier and have an
                         // open cursor
                         Client::Context ctx( config.ns, dbpath, true, false );
@@ -1080,9 +1068,6 @@ namespace mongo {
                         uassert( 16052, str::stream() << "could not create cursor over " << config.ns << " for query : " << config.filter << " sort : " << config.sort, temp.get() );
                         auto_ptr<ClientCursor> cursor( new ClientCursor( QueryOption_NoCursorTimeout , temp , config.ns.c_str() ) );
                         uassert( 16053, str::stream() << "could not create client cursor over " << config.ns << " for query : " << config.filter << " sort : " << config.sort, cursor.get() );
-
-                        // Cleanup our previous cursor
-                        holdCursor.reset();
 
                         Timer mt;
                         // go through each doc
@@ -1143,11 +1128,11 @@ namespace mongo {
                     if ( state.numEmits() )
                         shouldHaveData = true;
 
-                    timingBuilder.append( "mapTime" , mapTime / 1000 );
+                    timingBuilder.appendNumber( "mapTime" , mapTime / 1000 );
                     timingBuilder.append( "emitLoop" , t.millis() );
 
                     op->setMessage( "m/r: (2/3) final reduce in memory" );
-                    Timer t;
+                    Timer rt;
                     // do reduce in memory
                     // this will be the last reduce needed for inline mode
                     state.reduceInMemory();
@@ -1155,16 +1140,16 @@ namespace mongo {
                     state.dumpToInc();
                     // final reduce
                     state.finalReduce( op , pm );
-                    inReduce += t.micros();
+                    inReduce += rt.micros();
                     countsBuilder.appendNumber( "reduce" , state.numReduces() );
-                    timingBuilder.append( "reduceTime" , inReduce / 1000 );
+                    timingBuilder.appendNumber( "reduceTime" , inReduce / 1000 );
                     timingBuilder.append( "mode" , state.jsMode() ? "js" : "mixed" );
 
                     long long finalCount = state.postProcessCollection(op, pm);
                     state.appendResults( result );
 
-                    timingBuilder.append( "total" , t.millis() );
-                    result.append( "timeMillis" , t.millis() );
+                    timingBuilder.appendNumber( "total" , t.millis() );
+                    result.appendNumber( "timeMillis" , t.millis() );
                     countsBuilder.appendNumber( "output" , finalCount );
                     if ( config.verbose ) result.append( "timing" , timingBuilder.obj() );
                     result.append( "counts" , countsBuilder.obj() );
@@ -1316,7 +1301,7 @@ namespace mongo {
                         BSONObj res = config.reducer->finalReduce( values , config.finalizer.get());
                         chunkSize += res.objsize();
                         if (state.isOnDisk())
-                            state.insertToInc(res);
+                            state.insert( config.tempLong , res );
                         else
                             state.emit(res);
                         values.clear();

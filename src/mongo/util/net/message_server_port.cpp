@@ -27,6 +27,8 @@
 #include "../../db/cmdline.h"
 #include "../../db/lasterror.h"
 #include "../../db/stats/counters.h"
+#include "mongo/util/concurrency/remap_lock.h"
+#include "mongo/util/concurrency/ticketholder.h"
 
 #ifdef __linux__  // TODO: consider making this ifndef _WIN32
 # include <sys/resource.h>
@@ -43,7 +45,7 @@ namespace mongo {
 
             setThreadName( "conn" );
             
-            assert( inPort );
+            verify( inPort );
             inPort->psock->setLogLevel(1);
             scoped_ptr<MessagingPort> p( inPort );
 
@@ -85,10 +87,6 @@ namespace mongo {
             catch ( SocketException& e ) {
                 log() << "SocketException handling request, closing client connection: " << e << endl;
                 p->shutdown();
-            }
-            catch ( const ClockSkewException & ) {
-                log() << "ClockSkewException - shutting down" << endl;
-                exitCleanly( EXIT_CLOCK_SKEW );
             }
             catch ( const DBException& e ) { // must be right above std::exception to avoid catching subclasses
                 log() << "DBException handling request, closing client connection: " << e << endl;
@@ -132,7 +130,16 @@ namespace mongo {
 
             try {
 #ifndef __linux__  // TODO: consider making this ifdef _WIN32
-                boost::thread thr( boost::bind( &pms::threadRun , p ) );
+                {
+#ifdef _WIN32
+                    // This Windows-only lock is to protect MemoryMappedFile::remapPrivateView ...
+                    //  it unmaps and remaps the private map and needs to get the previous address,
+                    //  and if we let a new thread get created between those calls, its thread
+                    //  stack could be created within that block, leading to an fassert ...
+                    RemapLock lk;
+#endif
+                    boost::thread thr( boost::bind( &pms::threadRun , p ) );
+                }
 #else
                 pthread_attr_t attrs;
                 pthread_attr_init(&attrs);
@@ -141,7 +148,7 @@ namespace mongo {
                 static const size_t STACK_SIZE = 1024*1024; // if we change this we need to update the warning
 
                 struct rlimit limits;
-                verify(15887, getrlimit(RLIMIT_STACK, &limits) == 0);
+                verify(getrlimit(RLIMIT_STACK, &limits) == 0);
                 if (limits.rlim_cur > STACK_SIZE) {
                     pthread_attr_setstacksize(&attrs, (DEBUG_BUILD
                                                         ? (STACK_SIZE / 2)

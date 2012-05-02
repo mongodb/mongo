@@ -19,12 +19,226 @@
 
 #include "jsobj.h"
 #include "indexkey.h"
+#include "projection.h"
 
 namespace mongo {
+    
+    extern const int MaxBytesToReturnToClientAtOnce;
+    
+    /* This is for languages whose "objects" are not well ordered (JSON is well ordered).
+     [ { a : ... } , { b : ... } ] -> { a : ..., b : ... }
+     */
+    inline BSONObj transformOrderFromArrayFormat(BSONObj order) {
+        /* note: this is slow, but that is ok as order will have very few pieces */
+        BSONObjBuilder b;
+        char p[2] = "0";
+        
+        while ( 1 ) {
+            BSONObj j = order.getObjectField(p);
+            if ( j.isEmpty() )
+                break;
+            BSONElement e = j.firstElement();
+            uassert( 10102 , "bad order array", !e.eoo());
+            uassert( 10103 , "bad order array [2]", e.isNumber());
+            b.append(e);
+            (*p)++;
+            uassert( 10104 , "too many ordering elements", *p <= '9');
+        }
+        
+        return b.obj();
+    }
 
+    class QueryMessage;
+    
     /**
-     * One side of an interval of valid BSONElements, specified by a value and a
-     * boolean indicating whether the interval includes the value.
+     * this represents a total user query
+     * includes fields from the query message, both possible query levels
+     * parses everything up front
+     */
+    class ParsedQuery : boost::noncopyable {
+    public:
+        ParsedQuery( QueryMessage& qm );
+        ParsedQuery( const char* ns , int ntoskip , int ntoreturn , int queryoptions , const BSONObj& query , const BSONObj& fields )
+        : _ns( ns ) , _ntoskip( ntoskip ) , _ntoreturn( ntoreturn ) , _options( queryoptions ) {
+            init( query );
+            initFields( fields );
+        }
+        
+        const char * ns() const { return _ns; }
+        bool isLocalDB() const { return strncmp(_ns, "local.", 6) == 0; }
+        
+        const BSONObj& getFilter() const { return _filter; }
+        Projection* getFields() const { return _fields.get(); }
+        shared_ptr<Projection> getFieldPtr() const { return _fields; }
+        
+        int getSkip() const { return _ntoskip; }
+        int getNumToReturn() const { return _ntoreturn; }
+        bool wantMore() const { return _wantMore; }
+        int getOptions() const { return _options; }
+        bool hasOption( int x ) const { return ( x & _options ) != 0; }
+        
+        bool isExplain() const { return _explain; }
+        bool isSnapshot() const { return _snapshot; }
+        bool returnKey() const { return _returnKey; }
+        bool showDiskLoc() const { return _showDiskLoc; }
+        
+        const BSONObj& getMin() const { return _min; }
+        const BSONObj& getMax() const { return _max; }
+        const BSONObj& getOrder() const { return _order; }
+        const BSONObj& getHint() const { return _hint; }
+        int getMaxScan() const { return _maxScan; }
+        
+        bool couldBeCommand() const {
+            /* we assume you are using findOne() for running a cmd... */
+            return _ntoreturn == 1 && strstr( _ns , ".$cmd" );
+        }
+        
+        bool hasIndexSpecifier() const {
+            return ! _hint.isEmpty() || ! _min.isEmpty() || ! _max.isEmpty();
+        }
+        
+        /* if ntoreturn is zero, we return up to 101 objects.  on the subsequent getmore, there
+         is only a size limit.  The idea is that on a find() where one doesn't use much results,
+         we don't return much, but once getmore kicks in, we start pushing significant quantities.
+         
+         The n limit (vs. size) is important when someone fetches only one small field from big
+         objects, which causes massive scanning server-side.
+         */
+        bool enoughForFirstBatch( int n , int len ) const {
+            if ( _ntoreturn == 0 )
+                return ( len > 1024 * 1024 ) || n >= 101;
+            return n >= _ntoreturn || len > MaxBytesToReturnToClientAtOnce;
+        }
+        
+        bool enough( int n ) const {
+            if ( _ntoreturn == 0 )
+                return false;
+            return n >= _ntoreturn;
+        }
+        
+        bool enoughForExplain( long long n ) const {
+            if ( _wantMore || _ntoreturn == 0 ) {
+                return false;
+            }
+            return n >= _ntoreturn;            
+        }
+        
+    private:
+        void init( const BSONObj& q ) {
+            _reset();
+            uassert( 10105 , "bad skip value in query", _ntoskip >= 0);
+            
+            if ( _ntoreturn < 0 ) {
+                /* _ntoreturn greater than zero is simply a hint on how many objects to send back per
+                 "cursor batch".
+                 A negative number indicates a hard limit.
+                 */
+                _wantMore = false;
+                _ntoreturn = -_ntoreturn;
+            }
+            
+            
+            BSONElement e = q["query"];
+            if ( ! e.isABSONObj() )
+                e = q["$query"];
+            
+            if ( e.isABSONObj() ) {
+                _filter = e.embeddedObject();
+                _initTop( q );
+            }
+            else {
+                _filter = q;
+            }
+        }
+        
+        void _reset() {
+            _wantMore = true;
+            _explain = false;
+            _snapshot = false;
+            _returnKey = false;
+            _showDiskLoc = false;
+            _maxScan = 0;
+        }
+        
+        void _initTop( const BSONObj& top ) {
+            BSONObjIterator i( top );
+            while ( i.more() ) {
+                BSONElement e = i.next();
+                const char * name = e.fieldName();
+                
+                if ( strcmp( "$orderby" , name ) == 0 ||
+                    strcmp( "orderby" , name ) == 0 ) {
+                    if ( e.type() == Object ) {
+                        _order = e.embeddedObject();
+                    }
+                    else if ( e.type() == Array ) {
+                        _order = transformOrderFromArrayFormat( _order );
+                    }
+                    else {
+                        uasserted(13513, "sort must be an object or array");
+                    }
+                    continue;
+                }
+                
+                if( *name == '$' ) {
+                    name++;
+                    if ( strcmp( "explain" , name ) == 0 )
+                        _explain = e.trueValue();
+                    else if ( strcmp( "snapshot" , name ) == 0 )
+                        _snapshot = e.trueValue();
+                    else if ( strcmp( "min" , name ) == 0 )
+                        _min = e.embeddedObject();
+                    else if ( strcmp( "max" , name ) == 0 )
+                        _max = e.embeddedObject();
+                    else if ( strcmp( "hint" , name ) == 0 )
+                        _hint = e.wrap();
+                    else if ( strcmp( "returnKey" , name ) == 0 )
+                        _returnKey = e.trueValue();
+                    else if ( strcmp( "maxScan" , name ) == 0 )
+                        _maxScan = e.numberInt();
+                    else if ( strcmp( "showDiskLoc" , name ) == 0 )
+                        _showDiskLoc = e.trueValue();
+                    else if ( strcmp( "comment" , name ) == 0 ) {
+                        ; // no-op
+                    }
+                }
+            }
+            
+            if ( _snapshot ) {
+                uassert( 12001 , "E12001 can't sort with $snapshot", _order.isEmpty() );
+                uassert( 12002 , "E12002 can't use hint with $snapshot", _hint.isEmpty() );
+            }
+            
+        }
+        
+        void initFields( const BSONObj& fields ) {
+            if ( fields.isEmpty() )
+                return;
+            _fields.reset( new Projection() );
+            _fields->init( fields );
+        }
+        
+        const char * const _ns;
+        const int _ntoskip;
+        int _ntoreturn;
+        BSONObj _filter;
+        BSONObj _order;
+        const int _options;
+        shared_ptr< Projection > _fields;
+        bool _wantMore;
+        bool _explain;
+        bool _snapshot;
+        bool _returnKey;
+        bool _showDiskLoc;
+        BSONObj _min;
+        BSONObj _max;
+        BSONObj _hint;
+        int _maxScan;
+    };
+    
+    /**
+     * One side of an interval of BSONElements, defined by a value and a boolean indicating if the
+     * interval includes the value.
      */
     struct FieldBound {
         BSONElement _bound;
@@ -36,7 +250,7 @@ namespace mongo {
         void flipInclusive() { _inclusive = !_inclusive; }
     };
 
-    /** A closed interval composed of a lower and an upper FieldBound. */
+    /** An interval defined between a lower and an upper FieldBound. */
     struct FieldInterval {
         FieldInterval() : _cachedEquality( -1 ) {}
         FieldInterval( const BSONElement& e ) : _cachedEquality( -1 ) {
@@ -79,10 +293,10 @@ namespace mongo {
          * be extracted.
          */
         
-        BSONElement min() const { assert( !empty() ); return _intervals[ 0 ]._lower._bound; }
-        BSONElement max() const { assert( !empty() ); return _intervals[ _intervals.size() - 1 ]._upper._bound; }
-        bool minInclusive() const { assert( !empty() ); return _intervals[ 0 ]._lower._inclusive; }
-        bool maxInclusive() const { assert( !empty() ); return _intervals[ _intervals.size() - 1 ]._upper._inclusive; }
+        BSONElement min() const { verify( !empty() ); return _intervals[ 0 ]._lower._bound; }
+        BSONElement max() const { verify( !empty() ); return _intervals[ _intervals.size() - 1 ]._upper._bound; }
+        bool minInclusive() const { verify( !empty() ); return _intervals[ 0 ]._lower._inclusive; }
+        bool maxInclusive() const { verify( !empty() ); return _intervals[ _intervals.size() - 1 ]._upper._inclusive; }
 
         /** @return true iff this range expresses a single equality interval. */
         bool equality() const;
@@ -93,6 +307,14 @@ namespace mongo {
         bool universal() const;
         /** @return true iff this range includes no BSONElements. */
         bool empty() const { return _intervals.empty(); }
+        /**
+         * @return true in many cases when this FieldRange describes a finite set of BSONElements,
+         * all of which will be matched by the query BSONElement that generated this FieldRange.
+         * This attribute is used to implement higher level optimizations and is computed with a
+         * simple implementation that identifies common (but not all) cases satisfying the stated
+         * properties.
+         */
+        bool simpleFiniteSet() const { return _simpleFiniteSet; }
         
         /** Empty the range so it includes no BSONElements. */
         void makeEmpty() { _intervals.clear(); }
@@ -110,14 +332,16 @@ namespace mongo {
         string toString() const;
     private:
         BSONObj addObj( const BSONObj &o );
-        void finishOperation( const vector<FieldInterval> &newIntervals, const FieldRange &other );
+        void finishOperation( const vector<FieldInterval> &newIntervals, const FieldRange &other,
+                             bool simpleFiniteSet );
         vector<FieldInterval> _intervals;
         // Owns memory for our BSONElements.
         vector<BSONObj> _objData;
         string _special;
         bool _singleKey;
+        bool _simpleFiniteSet;
     };
-
+    
     /**
      * A BoundList contains intervals specified by inclusive start
      * and end bounds.  The intervals should be nonoverlapping and occur in
@@ -159,8 +383,16 @@ namespace mongo {
          * @param keyPattern May be {} or {$natural:1} for a non index scan.
          */
         bool matchPossibleForIndex( const BSONObj &keyPattern ) const;
+        /**
+         * @return true in many cases when this FieldRangeSet describes a finite set of BSONObjs,
+         * all of which will be matched by the query BSONObj that generated this FieldRangeSet.
+         * This attribute is used to implement higher level optimizations and is computed with a
+         * simple implementation that identifies common (but not all) cases satisfying the stated
+         * properties.
+         */
+        bool simpleFiniteSet() const { return _simpleFiniteSet; }
         
-        const char *ns() const { return _ns; }
+        const char *ns() const { return _ns.c_str(); }
         
         /**
          * @return a simplified query from the extreme values of the non universal
@@ -205,19 +437,26 @@ namespace mongo {
         bool singleKey() const { return _singleKey; }
         
         BSONObj originalQuery() const { return _queries[ 0 ]; }
+        
+        string toString() const;
     private:
         void appendQueries( const FieldRangeSet &other );
         void makeEmpty();
         void processQueryField( const BSONElement &e, bool optimize );
         void processOpElement( const char *fieldName, const BSONElement &f, bool isNot, bool optimize );
+        /** Must be called when a match element is skipped or modified to generate a FieldRange. */
+        void adjustMatchField();
+        void intersectMatchField( const char *fieldName, const BSONElement &matchElement,
+                                 bool isNot, bool optimize );
         static FieldRange *__singleKeyUniversalRange;
         static FieldRange *__multiKeyUniversalRange;
         const FieldRange &universalRange() const;
         map<string,FieldRange> _ranges;
-        const char *_ns;
+        string _ns;
         // Owns memory for FieldRange BSONElements.
         vector<BSONObj> _queries;
         bool _singleKey;
+        bool _simpleFiniteSet;
     };
 
     class NamespaceDetails;
@@ -277,6 +516,7 @@ namespace mongo {
         
         BSONObj originalQuery() const { return _singleKey.originalQuery(); }
 
+        string toString() const;
     private:
         FieldRangeSetPair( const FieldRangeSet &singleKey, const FieldRangeSet &multiKey )
         :_singleKey( singleKey ), _multiKey( multiKey ) {}
@@ -307,7 +547,7 @@ namespace mongo {
         FieldRangeVector( const FieldRangeSet &frs, const IndexSpec &indexSpec, int direction );
 
         /** @return the number of index ranges represented by 'this' */
-        long long size();
+        unsigned size();
         /** @return starting point for an index traversal. */
         BSONObj startKey() const;
         /** @return end point for an index traversal. */
@@ -331,6 +571,8 @@ namespace mongo {
          */
         BSONObj firstMatch( const BSONObj &obj ) const;
         
+        string toString() const;
+        
     private:
         int matchingLowElement( const BSONElement &e, int i, bool direction, bool &lowEquality ) const;
         bool matchesElement( const BSONElement &e, int i, bool direction ) const;
@@ -348,40 +590,125 @@ namespace mongo {
      */
     class FieldRangeVectorIterator {
     public:
-        FieldRangeVectorIterator( const FieldRangeVector &v ) : _v( v ), _i( _v._ranges.size(), -1 ), _cmp( _v._ranges.size(), 0 ), _inc( _v._ranges.size(), false ), _after() {
-        }
-        static BSONObj minObject() {
-            BSONObjBuilder b; b.appendMinKey( "" );
-            return b.obj();
-        }
-        static BSONObj maxObject() {
-            BSONObjBuilder b; b.appendMaxKey( "" );
-            return b.obj();
-        }
         /**
-         * @return Suggested advance method, based on current key.
-         *   -2 Iteration is complete, no need to advance.
-         *   -1 Advance to the next key, without skipping.
-         *  >=0 Skip parameter.  If @return is r, skip to the key comprised
-         *      of the first r elements of curr followed by the (r+1)th and
-         *      remaining elements of cmp() (with inclusivity specified by
-         *      the (r+1)th and remaining elements of inc()).  If after() is
-         *      true, skip past this key not to it.
+         * @param v - a FieldRangeVector representing matching keys.
+         * @param singleIntervalLimit - The maximum number of keys to match a single (compound)
+         *     interval before advancing to the next interval.  Limit checking is disabled if 0 and
+         *     must be disabled if v contains FieldIntervals that are not equality().
+         */
+        FieldRangeVectorIterator( const FieldRangeVector &v, int singleIntervalLimit );
+
+        /**
+         * @return Suggested advance method through an ordered list of keys with lookup support
+         *      (generally a btree).
+         *   -2 Iteration is complete, no need to advance further.
+         *   -1 Advance to the next ordered key, without skipping.
+         *  >=0 Skip parameter, let's call it 'r'.  If after() is true, skip past the key prefix
+         *      comprised of the first r elements of curr.  For example, if curr is {a:1,b:1}, the
+         *      index is {a:1,b:1}, the direction is 1, and r == 1, skip past {a:1,b:MaxKey}.  If
+         *      after() is false, skip to the key comprised of the first r elements of curr followed
+         *      by the (r+1)th and greater elements of cmp() (with inclusivity specified by the
+         *      (r+1)th and greater elements of inc()).  For example, if curr is {a:1,b:1}, the
+         *      index is {a:1,b:1}, the direction is 1, r == 1, cmp()[1] == b:4, and inc()[1] ==
+         *      true, then skip to {a:1,b:4}.  Note that the element field names in curr and cmp()
+         *      should generally be ignored when performing index key comparisons.
+         * @param curr The key at the current position in the list of keys.  Values of curr must be
+         *      supplied in order.
          */
         int advance( const BSONObj &curr );
         const vector<const BSONElement *> &cmp() const { return _cmp; }
         const vector<bool> &inc() const { return _inc; }
         bool after() const { return _after; }
         void prepDive();
-        void setZero( int i ) { for( int j = i; j < (int)_i.size(); ++j ) _i[ j ] = 0; }
-        void setMinus( int i ) { for( int j = i; j < (int)_i.size(); ++j ) _i[ j ] = -1; }
-        bool ok() { return _i[ 0 ] < (int)_v._ranges[ 0 ].intervals().size(); }
-        BSONObj startKey();
-        // temp
-        BSONObj endKey();
+
+        /**
+         * Helper class representing a position within a vector of ranges.  Public for testing.
+         */
+        class CompoundRangeCounter {
+        public:
+            CompoundRangeCounter( int size, int singleIntervalLimit );
+            int size() const { return (int)_i.size(); }
+            int get( int i ) const { return _i[ i ]; }
+            void set( int i, int newVal );
+            void inc( int i );
+            void setZeroes( int i );
+            void setUnknowns( int i );
+            void incSingleIntervalCount() {
+                if ( isTrackingIntervalCounts() ) ++_singleIntervalCount;
+            }
+            bool hasSingleIntervalCountReachedLimit() const {
+                return isTrackingIntervalCounts() && _singleIntervalCount >= _singleIntervalLimit;
+            }
+            void resetIntervalCount() { _singleIntervalCount = 0; }
+        private:
+            bool isTrackingIntervalCounts() const { return _singleIntervalLimit > 0; }
+            vector<int> _i;
+            int _singleIntervalCount;
+            int _singleIntervalLimit;
+        };
+
+        /**
+         * Helper class for matching a BSONElement with the bounds of a FieldInterval.  Some
+         * internal comparison results are cached. Public for testing.
+         */
+        class FieldIntervalMatcher {
+        public:
+            FieldIntervalMatcher( const FieldInterval &interval, const BSONElement &element,
+                                 bool reverse );
+            bool isEqInclusiveUpperBound() const {
+                return upperCmp() == 0 && _interval._upper._inclusive;
+            }
+            bool isGteUpperBound() const { return upperCmp() >= 0; }
+            bool isEqExclusiveLowerBound() const {
+                return lowerCmp() == 0 && !_interval._lower._inclusive;
+            }
+            bool isLtLowerBound() const { return lowerCmp() < 0; }
+        private:
+            struct BoundCmp {
+                BoundCmp() : _cmp(), _valid() {}
+                void set( int cmp ) { _cmp = cmp; _valid = true; }
+                int _cmp;
+                bool _valid;
+            };
+            int mayReverse( int val ) const { return _reverse ? -val : val; }
+            int cmp( const BSONElement &bound ) const {
+                return mayReverse( _element.woCompare( bound, false ) );
+            }
+            void setCmp( BoundCmp &boundCmp, const BSONElement &bound ) const {
+                boundCmp.set( cmp( bound ) );
+            }
+            int lowerCmp() const;
+            int upperCmp() const;
+            const FieldInterval &_interval;
+            const BSONElement &_element;
+            bool _reverse;
+            mutable BoundCmp _lowerCmp;
+            mutable BoundCmp _upperCmp;
+        };
+
     private:
+        /**
+         * @return values similar to advance()
+         *   -2 Iteration is complete for the current interval.
+         *   -1 Iteration is not complete for the current interval.
+         *  >=0 Return value to be forwarded by advance().
+         */
+        int validateCurrentInterval( int intervalIdx, const BSONElement &currElt,
+                                    bool reverse, bool first, bool &eqInclusiveUpperBound );
+        
+        /** Skip to curr / i / nextbounds. */
+        int advanceToLowerBound( int i );
+        /** Skip to curr / i / superlative. */
+        int advancePast( int i );
+        /** Skip to curr / i / superlative and reset following interval positions. */
+        int advancePastZeroed( int i );
+
+        bool hasReachedLimitForLastInterval( int intervalIdx ) const {
+            return _i.hasSingleIntervalCountReachedLimit() && ( intervalIdx + 1 == _i.size() );
+        }
+
         const FieldRangeVector &_v;
-        vector<int> _i;
+        CompoundRangeCounter _i;
         vector<const BSONElement*> _cmp;
         vector<bool> _inc;
         bool _after;

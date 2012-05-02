@@ -17,8 +17,8 @@
 */
 
 #include "../pch.h"
-#include "../client/dbclient.h"
 #include "../db/db.h"
+#include "mongo/client/dbclientcursor.h"
 #include "tool.h"
 
 #include <fcntl.h>
@@ -292,7 +292,7 @@ public:
             BSONObj obj;
             try {
                 obj = loc.obj();
-                assert( obj.valid() );
+                verify( obj.valid() );
                 LOG(1) << obj << endl;
                 w( obj );
             }
@@ -372,9 +372,8 @@ public:
     }
     
     int _repair( string dbname ) {
-        dblock lk;
-        Client::Context cx( dbname );
-        Database * db = cx.db();
+        Client::WriteContext cx( dbname );
+        Database * db = cx.ctx().db();
         
         list<string> namespaces;
         db->namespaceIndex.getNamespaces( namespaces );
@@ -454,7 +453,7 @@ public:
                 return -1;
             }
 
-            assert(op["ts"].type() == Timestamp);
+            verify(op["ts"].type() == Timestamp);
             opLogStart = op["ts"]._numberLong();
         }
 

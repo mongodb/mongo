@@ -40,7 +40,7 @@ namespace mongo {
 
         /** @param p port number. -1 is ok to use default. */
         HostAndPort(string h, int p /*= -1*/) : _host(h), _port(p) { 
-            assert( !str::startsWith(h, '#') );
+            verify( !str::startsWith(h, '#') );
         }
 
         HostAndPort(const SockAddr& sock ) : _host( sock.getAddr() ) , _port( sock.getPort() ) { }
@@ -158,8 +158,8 @@ namespace mongo {
         }
 
         string h = getHostName();
-        assert( !h.empty() );
-        assert( h != "localhost" );
+        verify( !h.empty() );
+        verify( h != "localhost" );
         return HostAndPort(h, cmdLine.port);
     }
 
@@ -207,9 +207,9 @@ namespace mongo {
     }
 
     inline void HostAndPort::init(const char *p) {
-        uassert(13110, "HostAndPort: bad host:port config string", *p);
-        assert( *p != '#' );
-        assert( _dynName.empty() );
+        massert(13110, "HostAndPort: host is empty", *p);
+        verify( *p != '#' );
+        verify( _dynName.empty() );
         const char *colon = strrchr(p, ':');
         if( colon ) {
             int port = atoi(colon+1);

@@ -1,7 +1,7 @@
 #pragma once
 #include "db/mongomutex.h"
 namespace mongo {
-    namespace shellUtils {
+    namespace shell_utils {
         extern mongo::mutex &mongoProgramOutputMutex;
     }
 }

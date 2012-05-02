@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include "diskloc.h"
 #include "jsobj.h"
 #include "namespace-inl.h"
 #include "../util/net/message.h"
@@ -218,7 +217,7 @@ namespace mongo {
         }
 
         void markReset() {
-            assert( mark );
+            verify( mark );
             nextjsobj = mark;
         }
 
