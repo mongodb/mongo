@@ -21,6 +21,8 @@
 #include <string.h>
 
 #include <boost/filesystem/operations.hpp>
+#include <boost/algorithm/string/predicate.hpp>
+#include <boost/algorithm/string/trim.hpp>
 
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/cmdline.h"
@@ -459,12 +461,11 @@ static void edit( const string& whatToEdit ) {
         }
     }
 
+    // Convert "whatToEdit" to JavaScript (JSON) text; if it can't be done,
+    // simply use the provided string
     string js;
-    if ( editingVariable ) {
-        // Convert "whatToEdit" to JavaScript (JSON) text
-        if ( !shellMainScope->exec( "__jsout__ = tojson(" + whatToEdit + ")", "tojs", false, false, false ) )
-            return; // Error already printed
-
+    if ( editingVariable && shellMainScope->exec(
+           "__jsout__ = tojson(" + whatToEdit + ")", "tojs", false, false, false ) ) {
         js = shellMainScope->getString( "__jsout__" );
 
         if ( strstr( js.c_str(), "[native code]" ) ) {
@@ -472,7 +473,12 @@ static void edit( const string& whatToEdit ) {
             return;
         }
     }
-    else {
+
+    // If there was no variable available, or js was set to undefined
+    // (indicating the JS parser could not figure out whatToEdit), we can use
+    // the text entered as is.
+    if ( js.empty() || js == "undefined" ) {
+        editingVariable = false;
         js = whatToEdit;
     }
 
@@ -828,99 +834,74 @@ int _main( int argc, char* argv[] ) {
                 prompt = "> ";
             }
 
-            char * line = shellReadline( prompt.c_str() );
+            char * lineCStr = shellReadline( prompt.c_str() );
 
-            char * linePtr = line;  // can't clobber 'line', we need to free() it later
-            if ( linePtr ) {
-                while ( linePtr[0] == ' ' )
-                    ++linePtr;
-                int lineLen = strlen( linePtr );
-                while ( lineLen > 0 && linePtr[lineLen - 1] == ' ' )
-                    linePtr[--lineLen] = 0;
-            }
-
-            if ( ! linePtr || ( strlen( linePtr ) == 4 && strstr( linePtr , "exit" ) ) ) {
-                if ( ! mongo::cmdLine.quiet )
-                    cout << "bye" << endl;
-                if ( line )
-                    free( line );
+            if ( !lineCStr ) {
+                // User must have hit ^C; treat this like an exit.
+                if( !mongo::cmdLine.quiet )
+                    cout << "User interrupt detected; exiting..." << endl;
                 break;
             }
 
-            string code = linePtr;
-            if ( code == "exit" || code == "exit;" ) {
-                free( line );
-                break;
+            string line = lineCStr;
+            boost::algorithm::trim(line);
+
+            // Free line before we forget.
+            free(lineCStr);
+            lineCStr = NULL;
+
+            // If the line contains anything, add it to the history.
+            if(!line.empty())
+                shellHistoryAdd( line.c_str() );
+
+            if ( line == "quit" || line == "exit" ) {
+              // Replace this with the real command that the shell expects
+              line += "(0)";
             }
-            if ( code == "cls" ) {
-                free( line );
+
+            if ( line == "cls" ) {
                 linenoiseClearScreen();
-                continue;
-            }
-
-            if ( code.size() == 0 ) {
-                free( line );
-                continue;
-            }
-
-            if ( startsWith( linePtr, "edit " ) ) {
-                shellHistoryAdd( linePtr );
-
-                const char* s = linePtr + 5; // skip "edit "
-                while( *s && isspace( *s ) )
-                    s++;
-
+            } else if( boost::algorithm::starts_with( line, "edit " ) || line == "edit" ) {
+                size_t strPos = line.find(' ');
+                string s = ( strPos != string::npos ? line.substr(strPos) : "" );
+                boost::algorithm::trim_left(s);
                 edit( s );
-                free( line );
-                continue;
-            }
+            } else if ( !line.empty() ) {
+                // Whatever we have now will be in the form:
+                //   CMD ARGS
+                bool wasCmd = false;
+                string cmd;
+                size_t strPos = line.find(' ');
+                if ( strPos != string::npos )
+                    cmd = line.substr( 0, strPos );
 
-            gotInterrupted = false;
-            code = finishCode( code );
-            if ( gotInterrupted ) {
-                cout << endl;
-                free( line );
-                continue;
-            }
-
-            if ( code.size() == 0 ) {
-                free( line );
-                break;
-            }
-
-            bool wascmd = false;
-            {
-                string cmd = linePtr;
-                if ( cmd.find( " " ) > 0 )
-                    cmd = cmd.substr( 0 , cmd.find( " " ) );
-
-                if ( cmd.find( "\"" ) == string::npos ) {
+                if ( cmd.find("\"") == string::npos ) {
                     try {
-                        scope->exec( (string)"__iscmd__ = shellHelper[\"" + cmd + "\"];" , "(shellhelp1)" , false , true , true );
+                        scope->exec(
+                                (string) "__iscmd__ = shellHelper[\"" + cmd + "\"];",
+                                "(shellhelp1)" , false , true , true );
                         if ( scope->getBoolean( "__iscmd__" )  ) {
-                            scope->exec( (string)"shellHelper( \"" + cmd + "\" , \"" + code.substr( cmd.size() ) + "\");" , "(shellhelp2)" , false , true , false );
-                            wascmd = true;
+                            scope->exec(
+                                    (string) "shellHelper( \"" + cmd + "\" , \"" + line.substr( cmd.size() ) + "\");",
+                                    "(shellhelp2)" , false , true , false );
+                            wasCmd = true;
                         }
+                    } catch ( std::exception& exc) {
+                        cout << "error2:" << exc.what() << endl;
+                        wasCmd = true;
                     }
-                    catch ( std::exception& e ) {
-                        cout << "error2:" << e.what() << endl;
-                        wascmd = true;
+                }
+
+                if ( !wasCmd ) {
+                    try {
+                        if ( scope->exec( line.c_str() , "(shell)" , false , true , false ) )
+                            scope->exec( "shellPrintHelper( __lastres__ );" , "(shell2)" , true , true , false );
+                    }
+                    catch ( std::exception& exc ) {
+                        cout << "error:" << exc.what() << endl;
                     }
                 }
             }
-
-            if ( ! wascmd ) {
-                try {
-                    if ( scope->exec( code.c_str() , "(shell)" , false , true , false ) )
-                        scope->exec( "shellPrintHelper( __lastres__ );" , "(shell2)" , true , true , false );
-                }
-                catch ( std::exception& e ) {
-                    cout << "error:" << e.what() << endl;
-                }
-            }
-
-            shellHistoryAdd( code.c_str() );
-            free( line );
         }
 
         shellHistoryDone();
