@@ -698,8 +698,8 @@ extern int __wt_thread_create(pthread_t *tidret,
     void *arg);
 extern int __wt_thread_join(pthread_t tid);
 extern int __wt_epoch(WT_SESSION_IMPL *session,
-    uint64_t *secp,
-    uint64_t *nsecp);
+    uintmax_t *secp,
+    uintmax_t *nsecp);
 extern void __wt_yield(void);
 extern int __wt_struct_check(WT_SESSION_IMPL *session,
     const char *fmt,
