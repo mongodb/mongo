@@ -1,4 +1,7 @@
 
+/* load the test documents */
+load('jstests/aggregation/articles.js');
+
 // load utils
 load('jstests/aggregation/utils.js');
 

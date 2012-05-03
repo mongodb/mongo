@@ -31,7 +31,7 @@
 #include "stats.h"
 #include "cursors.h"
 #include "grid.h"
-#include "client.h"
+#include "client_info.h"
 
 namespace mongo {
 
@@ -53,8 +53,8 @@ namespace mongo {
             use = need;
         else
             nsToDatabase(getns(), cl);
-        
-        uassert( 15845 , 
+
+        uassert( 15845 ,
                  str::stream() << "unauthorized for db:" << use << " level: " << levelNeeded ,
                  _clientInfo->getAuthenticationInfo()->isAuthorizedForLevel(use,levelNeeded) );
     }

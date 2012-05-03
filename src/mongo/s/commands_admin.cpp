@@ -46,7 +46,7 @@
 #include "strategy.h"
 #include "stats.h"
 #include "writeback_listener.h"
-#include "client.h"
+#include "client_info.h"
 #include "../util/ramlog.h"
 
 namespace mongo {

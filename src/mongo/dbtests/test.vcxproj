@@ -568,6 +568,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\util\miniwebserver.h" />
     <ClInclude Include="..\util\mmap.h" />
     <ClInclude Include="..\util\mongoutils\hash.h" />
+    <ClInclude Include="..\util\signal_handlers.h" />
     <ClInclude Include="..\util\sock.h" />
     <ClInclude Include="..\util\stacktrace.h" />
     <ClInclude Include="..\util\timer.h" />
@@ -2322,6 +2323,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     </ClCompile>
     <ClCompile Include="..\util\ramlog.cpp" />
     <ClCompile Include="..\util\net\sock.cpp" />
+    <ClCompile Include="..\util\signal_handlers.cpp" />
     <ClCompile Include="..\util\stacktrace.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>

@@ -179,6 +179,7 @@
       <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">BOOST_THREAD_BUILD_LIB;BOOST_ALL_NO_LIB; _CRT_SECURE_NO_WARNINGS;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <ClCompile Include="..\..\util\debug_util.cpp" />
+    <ClCompile Include="..\..\util\signal_handlers.cpp" />
     <ClCompile Include="..\..\util\stacktrace.cpp" />
     <ClCompile Include="..\..\util\stringutils.cpp" />
     <ClCompile Include="..\..\util\timer.cpp" />
@@ -187,6 +188,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\util\debug_util.h" />
+    <ClInclude Include="..\..\util\signal_handlers.h" />
     <ClInclude Include="..\..\util\stacktrace.h" />
     <ClInclude Include="..\..\util\stringutils.h" />
     <ClInclude Include="..\..\util\timer-win32-inl.h" />

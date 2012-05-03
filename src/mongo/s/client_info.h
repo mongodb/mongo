@@ -1,4 +1,4 @@
-// @file s/client.h
+// @file s/client_info.h
 
 /*
  *    Copyright (C) 2010 10gen Inc.
@@ -57,7 +57,7 @@ namespace mongo {
          * gets shards used on the previous request
          */
         set<string> * getPrev() const { return _prev; };
-        
+
         /**
          * gets all shards we've accessed since the last time we called clearSinceLastGetError
          */
@@ -83,7 +83,7 @@ namespace mongo {
 
         /** @return if its ok to auto split from this client */
         bool autoSplitOk() const { return _autoSplitOk; }
-        
+
         void noAutoSplit() { _autoSplitOk = false; }
 
         static ClientInfo * get();
@@ -119,7 +119,7 @@ namespace mongo {
         set<string> _sinceLastGetError; // all shards accessed since last getLastError
 
         int _lastAccess;
-        bool _autoSplitOk; 
+        bool _autoSplitOk;
 
         static boost::thread_specific_ptr<ClientInfo> _tlInfo;
     };

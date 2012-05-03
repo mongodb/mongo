@@ -36,17 +36,17 @@ namespace mongo {
      */
     class WriteBackListener : public BackgroundJob {
     public:
-        
+
         class ConnectionIdent {
         public:
-            ConnectionIdent( const string& ii , ConnectionId id ) 
+            ConnectionIdent( const string& ii , ConnectionId id )
                 : instanceIdent( ii ) , connectionId( id ) {
             }
-            
+
             bool operator<(const ConnectionIdent& other) const {
                 if ( instanceIdent == other.instanceIdent )
                     return connectionId < other.connectionId;
-                
+
                 return instanceIdent < other.instanceIdent;
             }
 
@@ -70,7 +70,7 @@ namespace mongo {
     private:
         string _addr;
         string _name;
-        
+
         static mongo::mutex _cacheLock; // protects _cache
         static map<string,WriteBackListener*> _cache; // server to listener
         static set<string> _seenSets; // cache of set urls we've seen - note this is ever expanding for order, case, changes

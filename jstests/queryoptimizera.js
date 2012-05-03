@@ -16,9 +16,9 @@ collectionNameIndex = 0;
 
 // Generate a collection name not already present in the log.
 do {
-    testCollectionName = 'jstests_queryoptimizer9__' + collectionNameIndex++;
+    testCollectionName = 'jstests_queryoptimizera__' + collectionNameIndex++;
     warningMatchString = 'unindexed _id query on capped collection.*collection: test.' +
-    testCollectionName;
+        testCollectionName;
     warningMatchRegexp = new RegExp( warningMatchString );    
     
 } while( numWarnings() > 0 );
@@ -83,3 +83,5 @@ assertNoNewWarnings();
 
 t.find( { _id:0, a:0 } ).itcount();
 assertNoNewWarnings();
+
+t.drop(); // cleanup

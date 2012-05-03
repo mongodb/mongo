@@ -854,6 +854,9 @@
     <ClCompile Include="btreebuilder.cpp">
       <Filter>db\Source Files\a to d</Filter>
     </ClCompile>
+    <ClCompile Include="..\util\signal_handlers.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\targetver.h" />
@@ -1550,6 +1553,9 @@
     </ClInclude>
     <ClInclude Include="..\..\third_party\js-1.7\resource.h">
       <Filter>third_party\SpiderMonkey\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\signal_handlers.h">
+      <Filter>util\Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -555,6 +555,9 @@
     <ClInclude Include="..\..\third_party\js-1.7\resource.h">
       <Filter>third_party\SpiderMonkey\Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\util\signal_handlers.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\client\connpool.cpp">
@@ -1362,6 +1365,9 @@
     </ClCompile>
     <ClCompile Include="..\..\third_party\js-1.7\prmjtime.c">
       <Filter>third_party\SpiderMonkey\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\signal_handlers.cpp">
+      <Filter>util\Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

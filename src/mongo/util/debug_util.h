@@ -20,22 +20,6 @@
 
 namespace mongo {
 
-// for debugging
-    typedef struct _Ints {
-        int i[100];
-    } *Ints;
-    typedef struct _Chars {
-        char c[200];
-    } *Chars;
-
-    typedef char CHARS[400];
-
-    typedef struct _OWS {
-        int size;
-        char type;
-        char string[400];
-    } *OWS;
-
 #if defined(_DEBUG)
     enum {DEBUG_BUILD = 1};
     const bool debug=true;
