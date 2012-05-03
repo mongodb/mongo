@@ -841,17 +841,15 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	}
 
 	/*
-	 * If this is a new database, create the metadata file.  This avoids
-	 * application threads racing to create it later.  We need a real
-	 * session handle for this: open one.
+	 * Check on the turtle and metadata files, creating them if necessary
+	 * (which avoids application threads racing to create the metadata file
+	 * later).  We need a session handle for this, open one.
 	 */
-	if (conn->is_new) {
-		WT_ERR(conn->iface.open_session(&conn->iface,
-		    NULL, NULL, &wt_session));
-		WT_TRET(__wt_open_metadata((WT_SESSION_IMPL *)wt_session));
-		WT_TRET(wt_session->close(wt_session, NULL));
-		WT_ERR(ret);
-	}
+	WT_ERR(conn->iface.open_session(&conn->iface, NULL, NULL, &wt_session));
+	if ((ret = __wt_turtle_init((WT_SESSION_IMPL *)wt_session)) == 0)
+		ret = __wt_metadata_open((WT_SESSION_IMPL *)wt_session);
+	WT_TRET(wt_session->close(wt_session, NULL));
+	WT_ERR(ret);
 
 	STATIC_ASSERT(offsetof(WT_CONNECTION_IMPL, iface) == 0);
 	*wt_connp = &conn->iface;

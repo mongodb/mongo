@@ -166,13 +166,15 @@ __wt_assert(WT_SESSION_IMPL *session,
  *	Print a standard error message when we detect an illegal value.
  */
 int
-__wt_illegal_value(WT_SESSION_IMPL *session)
+__wt_illegal_value(WT_SESSION_IMPL *session, const char *name)
 {
 	WT_RET_MSG(session, WT_ERROR,
+	    "%s%s"
 	    "encountered an illegal file format or internal value; restart "
 	    "the system and verify the underlying files, if corruption is "
 	    "detected use the WT_SESSION salvage method or the wt utility's "
-	    "salvage command to repair the file");
+	    "salvage command to repair the file",
+	    name == NULL ? "" : name, name == NULL ? "" : " ");
 }
 
 /*

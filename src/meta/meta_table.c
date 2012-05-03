@@ -7,24 +7,40 @@
 
 #include "wt_internal.h"
 
-static const char *metafile_config = "key_format=S,value_format=S";
+/*
+ * __metadata_turtle --
+ *	Return if a key's value should be taken from the turtle file.
+ */
+static int
+__metadata_turtle(const char *key)
+{
+	switch (key[0]) {
+	case 'f':
+		if (strcmp(key, WT_METADATA_URI) == 0)
+			return (1);
+		break;
+	case 'W':
+		if (strcmp(key, "WiredTiger version") == 0)
+			return (1);
+		if (strcmp(key, "WiredTiger version string") == 0)
+			return (1);
+		break;
+	}
+	return (0);
+}
 
 /*
- * __wt_open_metadata --
+ * __wt_metadata_open --
  *	Opens the metadata file, sets session->metafile.
  */
 int
-__wt_open_metadata(WT_SESSION_IMPL *session)
+__wt_metadata_open(WT_SESSION_IMPL *session)
 {
 	WT_DECL_RET;
 	int tracking;
-	const char *cfg[] = API_CONF_DEFAULTS(file, meta, metafile_config);
-	const char *metaconf;
 
 	if (session->metafile != NULL)
 		return (0);
-
-	WT_RET(__wt_config_collapse(session, cfg, &metaconf));
 
 	/*
 	 * Turn off tracking when creating the metadata file: this is always
@@ -32,11 +48,12 @@ __wt_open_metadata(WT_SESSION_IMPL *session)
 	 */
 	tracking = WT_META_TRACKING(session);
 	if (tracking)
-		__wt_meta_track_off(session, 0);
-	WT_ERR(__wt_create_file(session, WT_METADATA_URI, 0, metaconf));
+		(void)__wt_meta_track_off(session, 0);
+
+	WT_ERR(__wt_create_file(session, WT_METADATA_URI, 0, NULL));
 	session->metafile = session->btree;
-err:	__wt_free(session, metaconf);
-	if (tracking)
+
+err:	if (tracking)
 		WT_TRET(__wt_meta_track_on(session));
 	return (ret);
 }
@@ -51,7 +68,7 @@ __wt_metadata_cursor(
 {
 	const char *cfg[] = API_CONF_DEFAULTS(session, open_cursor, config);
 
-	WT_RET(__wt_open_metadata(session));
+	WT_RET(__wt_metadata_open(session));
 	session->btree = session->metafile;
 	return (__wt_curfile_create(session, NULL, cfg, cursorp));
 }
@@ -67,6 +84,10 @@ __wt_metadata_insert(
 	WT_BTREE *btree;
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
+
+	if (__metadata_turtle(key))
+		WT_RET_MSG(session, EINVAL,
+		    "%s: insert not supported on the turtle file", key);
 
 	if (WT_META_TRACKING(session))
 		WT_RET(__wt_meta_track_insert(session, key));
@@ -96,6 +117,9 @@ __wt_metadata_update(
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 
+	if (__metadata_turtle(key))
+		return (__wt_turtle_update(session, key, value));
+
 	if (WT_META_TRACKING(session))
 		WT_RET(__wt_meta_track_update(session, key));
 
@@ -122,6 +146,10 @@ __wt_metadata_remove(WT_SESSION_IMPL *session, const char *key)
 	WT_BTREE *btree;
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
+
+	if (__metadata_turtle(key))
+		WT_RET_MSG(session, EINVAL,
+		    "%s: remove not supported on the turtle file", key);
 
 	if (WT_META_TRACKING(session))
 		WT_RET(__wt_meta_track_update(session, key));
@@ -151,6 +179,9 @@ __wt_metadata_read(
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	const char *value;
+
+	if (__metadata_turtle(key))
+		return (__wt_turtle_read(session, key, valuep));
 
 	/* Save the caller's btree: the metadata cursor will overwrite it. */
 	btree = session->btree;

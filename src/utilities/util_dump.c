@@ -8,7 +8,7 @@
 #include "util.h"
 
 static int dump_config(WT_SESSION *, const char *);
-static int dump_file_config(WT_SESSION *, WT_CURSOR *, const char *);
+static int dump_file_config(WT_SESSION *, const char *);
 static int dump_prefix(int);
 static int dump_suffix(void);
 static int dump_table_config(WT_SESSION *, WT_CURSOR *, const char *);
@@ -142,22 +142,23 @@ dump_config(WT_SESSION *session, const char *uri)
 	WT_DECL_RET;
 	int tret;
 
-	/* Open a metadata cursor. */
-	if ((ret = session->open_cursor(
-	    session, WT_METADATA_URI, NULL, NULL, &cursor)) != 0) {
-		fprintf(stderr, "%s: %s: session.open_cursor: %s\n",
-		    progname, WT_METADATA_URI, wiredtiger_strerror(ret));
-		return (1);
-	}
-
 	/* Dump the config. */
-	if (strncmp(uri, "table:", strlen("table:")) == 0)
-		ret = dump_table_config(session, cursor, uri);
-	else
-		ret = dump_file_config(session, cursor, uri);
+	if (strncmp(uri, "table:", strlen("table:")) == 0) {
+		/* Open a metadata cursor. */
+		if ((ret = session->open_cursor(
+		    session, WT_METADATA_URI, NULL, NULL, &cursor)) != 0) {
+			fprintf(stderr, "%s: %s: session.open_cursor: %s\n",
+			    progname,
+			    WT_METADATA_URI, wiredtiger_strerror(ret));
+			return (1);
+		}
 
-	if ((tret = cursor->close(cursor)) != 0 && ret == 0)
-		ret = tret;
+		ret = dump_table_config(session, cursor, uri);
+
+		if ((tret = cursor->close(cursor)) != 0 && ret == 0)
+			ret = tret;
+	} else
+		ret = dump_file_config(session, uri);
 
 	return (ret);
 }
@@ -291,19 +292,22 @@ dump_table_config(WT_SESSION *session, WT_CURSOR *cursor, const char *uri)
  *	Dump the config for a file.
  */
 static int
-dump_file_config(WT_SESSION *session, WT_CURSOR *cursor, const char *uri)
+dump_file_config(WT_SESSION *session, const char *uri)
 {
 	WT_DECL_RET;
-	const char *key, *value;
+	const char *value;
 
-	cursor->set_key(cursor, uri);
-	if ((ret = cursor->search(cursor)) != 0)
-		return (util_cerr(uri, "search", ret));
-	if ((ret = cursor->get_key(cursor, &key)) != 0)
-		return (util_cerr(uri, "get_key", ret));
-	if ((ret = cursor->get_value(cursor, &value)) != 0)
-		return (util_cerr(uri, "get_value", ret));
-	return (print_config(session, key, value, NULL));
+	/*
+	 * We want to be able to dump the metadata file itself, but the
+	 * configuration for that file lives in the turtle file.  Reach
+	 * down into the library and ask for the file's configuration,
+	 * that will work in all cases.
+	 */
+	if ((ret = __wt_file_metadata(session, uri, &value)) != 0)
+		return (util_err(ret, "metadata read: %s", uri));
+
+	/* Leak the memory, I don't care. */
+	return (print_config(session, uri, value, NULL));
 }
 
 /*
