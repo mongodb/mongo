@@ -18,6 +18,7 @@
 #pragma once
 
 #include <vector>
+#include <cmath>
 #include <string.h>
 #include "util/builder.h"
 #include "bsontypes.h"
@@ -144,6 +145,13 @@ namespace mongo {
             return data + 1;
         }
 
+
+        int fieldNameSize() const {
+            if ( fieldNameSize_ == -1 )
+                fieldNameSize_ = (int)strlen( fieldName() ) + 1;
+            return fieldNameSize_;
+        }
+
         /** raw data of the element's value (so be careful). */
         const char * value() const {
             return (data + fieldNameSize() + 1);
@@ -192,8 +200,18 @@ namespace mongo {
 
         /** Retrieve int value for the element safely.  Zero returned if not a number. */
         int numberInt() const;
-        /** Retrieve long value for the element safely.  Zero returned if not a number. */
+        /** Retrieve long value for the element safely.  Zero returned if not a number.
+         *  Behavior is not defined for double values that are NaNs, or too large/small
+         *  to be represented by long longs */
         long long numberLong() const;
+
+        /** Like numberLong() but with well-defined behavior for doubles that
+         *  are NaNs, or too large/small to be represented as long longs.
+         *  NaNs -> 0
+         *  very large doubles -> LLONG_MAX
+         *  very small doubles -> LLONG_MIN  */
+        long long safeNumberLong() const;
+
         /** Retrieve the numeric value of the element.  If not of a numeric type, returns 0.
             Note: casts to double, data loss may occur with large (>52 bit) NumberLong values.
         */
@@ -243,11 +261,20 @@ namespace mongo {
 
         /** Get javascript code of a CodeWScope data element. */
         const char * codeWScopeCode() const {
-            return value() + 8;
+            massert( 16177 , "not codeWScope" , type() == CodeWScope );
+            return value() + 4 + 4; //two ints precede code (see BSON spec)
         }
+
+        /** Get length of the code part of the CodeWScope object
+         *  This INCLUDES the null char at the end */
+        int codeWScopeCodeLen() const {
+            massert( 16178 , "not codeWScope" , type() == CodeWScope );
+            return *(int *)( value() + 4 );
+        }
+
         /** Get the scope SavedContext of a CodeWScope data element. */
         const char * codeWScopeScopeData() const {
-            // TODO fix
+            //This can error if there are null chars in the codeWScopeCode
             return codeWScopeCode() + strlen( codeWScopeCode() ) + 1;
         }
 
@@ -413,11 +440,7 @@ namespace mongo {
     private:
         const char *data;
         mutable int fieldNameSize_; // cached value
-        int fieldNameSize() const {
-            if ( fieldNameSize_ == -1 )
-                fieldNameSize_ = (int)strlen( fieldName() ) + 1;
-            return fieldNameSize_;
-        }
+
         mutable int totalSize; /* caches the computed size */
 
         friend class BSONObjIterator;
@@ -571,6 +594,30 @@ namespace mongo {
             return _numberLong();
         default:
             return 0;
+        }
+    }
+
+    /** Like numberLong() but with well-defined behavior for doubles that
+     *  are NaNs, or too large/small to be represented as long longs.
+     *  NaNs -> 0
+     *  very large doubles -> LLONG_MAX
+     *  very small doubles -> LLONG_MIN  */
+    inline long long BSONElement::safeNumberLong() const {
+        double d;
+        switch( type() ) {
+        case NumberDouble:
+            d = numberDouble();
+            if ( std::isnan( d ) ){
+                return 0;
+            }
+            if ( d > (double) std::numeric_limits<long long>::max() ){
+                return std::numeric_limits<long long>::max();
+            }
+            if ( d < std::numeric_limits<long long>::min() ){
+                return std::numeric_limits<long long>::min();
+            }
+        default:
+            return numberLong();
         }
     }
 
