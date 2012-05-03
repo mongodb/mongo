@@ -61,6 +61,9 @@ check()
 	if `sed -e 3,4p -e 5q -e d ../$1 | diff - $c4 > /dev/null` ; then
 		return;
 	fi
+	if `sed -e 1,2p -e 3q -e d ../$1 | diff - $c4 > /dev/null` ; then
+		return;
+	fi
 
 	echo "$1: copyright information is incorrect"
 }
