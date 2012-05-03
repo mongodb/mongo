@@ -15,6 +15,7 @@ int session_per_op;				/* New session per operation */
 static char *progname;				/* Program name */
 static FILE *logfp;				/* Log file */
 
+static void handle_error(WT_EVENT_HANDLER *, int, const char *);
 static int  handle_message(WT_EVENT_HANDLER *, const char *);
 static void onint(int);
 static void shutdown(void);
@@ -26,7 +27,7 @@ int
 main(int argc, char *argv[])
 {
 	u_int readers, writers;
-	int ch, cnt, runs;
+	int ch, cnt, fileops, runs;
 	char *config_open;
 
 	if ((progname = strrchr(argv[0], '/')) == NULL)
@@ -35,6 +36,7 @@ main(int argc, char *argv[])
 		++progname;
 
 	config_open = NULL;
+	fileops = 0;
 	ftype = ROW;
 	nkeys = 1000;
 	nops = 10000;
@@ -43,13 +45,17 @@ main(int argc, char *argv[])
 	session_per_op = 0;
 	writers = 10;
 
-	while ((ch = getopt(argc, argv, "1C:k:l:n:R:r:St:W:")) != EOF)
+	while ((ch = getopt(argc, argv, "1C:fk:l:n:R:r:St:W:")) != EOF)
 		switch (ch) {
 		case '1':			/* One run */
 			runs = 1;
 			break;
 		case 'C':			/* wiredtiger_open config */
 			config_open = optarg;
+			break;
+		case 'f':			/* file operations */
+			fileops = 1;
+			nops = 1000;
 			break;
 		case 'k':			/* rows */
 			nkeys = (u_int)atoi(optarg);
@@ -112,12 +118,17 @@ main(int argc, char *argv[])
 
 		wt_connect(config_open);	/* WiredTiger connection */
 
-		load();				/* Load initial records */
+		if (fileops) {
+			if (fop_start(readers + writers))
+				return (EXIT_FAILURE);
+		} else {
+			load();			/* Load initial records */
 						/* Loop operations */
-		if (run(readers, writers))
-			return (EXIT_FAILURE);
+			if (rw_start(readers, writers))
+				return (EXIT_FAILURE);
 
-		stats();			/* Statistics */
+			stats();		/* Statistics */
+		}
 
 		wt_shutdown();			/* WiredTiger shut down */
 	}
@@ -132,7 +143,7 @@ static void
 wt_connect(char *config_open)
 {
 	static WT_EVENT_HANDLER event_handler = {
-		NULL,
+		handle_error,
 		handle_message,
 		NULL
 	};
@@ -180,6 +191,17 @@ static void
 shutdown(void)
 {
 	(void)system("rm -f WildTiger WiredTiger.* __wt*");
+}
+
+static void
+handle_error(WT_EVENT_HANDLER *handler, int error, const char *errmsg)
+{
+	UNUSED(handler);
+
+	/* Ignore complaints about truncation of missing files. */
+	if (strcmp(errmsg,
+	    "session.truncate: __wt: No such file or directory") != 0)
+		fprintf(stderr, "%s\n", errmsg);
 }
 
 static int
@@ -235,6 +257,7 @@ usage(void)
 	fprintf(stderr, "%s",
 	    "\t-1 run once\n"
 	    "\t-C specify wiredtiger_open configuration arguments\n"
+	    "\t-f file operations instead of read/write operations\n"
 	    "\t-k set number of keys to load\n"
 	    "\t-l specify a log file\n"
 	    "\t-n set number of operations each thread does\n"

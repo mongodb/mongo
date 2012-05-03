@@ -38,6 +38,35 @@ void die(const char *, int) __attribute__((noreturn));
 #else
 void die(const char *, int);
 #endif
+int  fops(u_int);
+void file_create(void);
+void file_drop(void);
+void file_truncate(void);
 void load(void);
-int  run(u_int, u_int);
+int  rw(u_int, u_int);
 void stats(void);
+
+/*
+ * r --
+ *	Return a 32-bit pseudo-random number.
+ *
+ * This is an implementation of George Marsaglia's multiply-with-carry pseudo-
+ * random number generator.  Computationally fast, with reasonable randomness
+ * properties.
+ */
+static inline uint32_t
+r(void)
+{
+	static uint32_t m_w = 0, m_z = 0;
+
+	if (m_w == 0) {
+		struct timeval t;
+		(void)gettimeofday(&t, NULL);
+		m_w = (uint32_t)t.tv_sec;
+		m_z = (uint32_t)t.tv_usec;
+	}
+
+	m_z = 36969 * (m_z & 65535) + (m_z >> 16);
+	m_w = 18000 * (m_w & 65535) + (m_w >> 16);
+	return (m_z << 16) + (m_w & 65535);
+}
