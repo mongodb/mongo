@@ -68,24 +68,29 @@ exampleSourceMap = [
         ('bsondemo', 'mongo/bson/bsondemo/bsondemo.cpp'),
         ]
 
+clientHeaderDirectories = [
+    "bson/",
+    "bson/util/",
+    "client/",
+    "db/",
+    "db/stats/",
+    "db/repl/",
+    "db/ops/",
+    "platform/",
+    "s/",
+    "scripting/",
+    "shell/",
+    "util/",
+    "util/concurrency/",
+    "util/mongoutils/",
+    "util/net/", 
+    "" 
+    ]
+
 clientHeaders = []
-for id in ["",
-           "util/",
-           "util/net/",
-           "util/mongoutils/",
-           "util/concurrency/",
-           "db/",
-           "db/stats/",
-           "db/repl/",
-           "db/ops/",
-           "client/",
-           "bson/",
-           "bson/util/",
-           "s/",
-           "scripting/",
-           "platform/"]:
-    clientHeaders.extend(Glob('mongo/%s/*.h' % id))
-    clientHeaders.extend(Glob('mongo/%s/*.hpp' % id))
+for path in clientHeaderDirectories:
+    clientHeaders.extend(Glob('mongo/%s/*.h' % path))
+    clientHeaders.extend(Glob('mongo/%s/*.hpp' % path))
 
 env.Install('#/', [
         env.Library('mongoclient', clientSource),
@@ -120,18 +125,6 @@ prefix = GetOption("prefix")
 
 env.Install(prefix + "/lib", '${LIBPREFIX}mongoclient${LIBSUFFIX}')
 
-for x in ["",
-          "bson/",
-          "bson/util/",
-          "client/",
-          "s/",
-          "shell/",
-          "db/",
-          "scripting/",
-          "util/",
-          "util/concurrency/",
-          "util/mongoutils/",
-          "util/net/" ]:
+for x in clientHeaderDirectories:
     env.Install(prefix + "/include/mongo/" + x,
                 [Glob('mongo/%s*.h' % x), Glob('mongo/%s*.hpp' % x)])
-
