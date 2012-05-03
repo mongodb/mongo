@@ -12,19 +12,19 @@
  *	WT_SESSION::truncate for a file.
  */
 static int
-__truncate_file(WT_SESSION_IMPL *session, const char *fileuri)
+__truncate_file(WT_SESSION_IMPL *session, const char *name)
 {
 	const char *filename;
 
-	filename = fileuri;
+	filename = name;
 	if (!WT_PREFIX_SKIP(filename, "file:"))
 		return (EINVAL);
 
 	/* If open, close the btree handle. */
-	WT_RET(__wt_session_close_any_open_btree(session, fileuri));
+	WT_RET(__wt_session_close_any_open_btree(session, name));
 
 	/* Delete the root address and truncate the file. */
-	WT_RET(__wt_snapshot_clear(session, filename));
+	WT_RET(__wt_snapshot_clear(session, name));
 	WT_RET(__wt_btree_truncate(session, filename));
 
 	return (0);
