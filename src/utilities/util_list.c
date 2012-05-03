@@ -141,11 +141,6 @@ list_print_snapshot(WT_SESSION *session, const char *key)
 	uint64_t v;
 	char buf[256];
 
-	/* Snapshots only make sense for files, at least at the moment. */
-	if (!MATCH(key, "file:"))
-		return (0);
-	key += strlen("file:");
-
 	/*
 	 * We may not find any snapshots for this file, in which case we don't
 	 * report an error, and continue our caller's loop.  Otherwise, report
