@@ -169,7 +169,7 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 	 * would collide with salvage freeing the previous root page when it
 	 * reads those blocks from the file.
 	 */
-	WT_ERR(__wt_snapshot_clear(session, btree->filename));
+	WT_ERR(__wt_snapshot_clear(session, btree->name));
 
 	/*
 	 * Step 2:
@@ -294,7 +294,7 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 	 */
 	if (ss->root_page != NULL) {
 		WT_ERR(__wt_snapshot_list_get(
-		    session, btree->filename, &snapbase));
+		    session, btree->name, &snapbase));
 		WT_ERR(__wt_strdup(
 		    session, WT_INTERNAL_SNAPSHOT, &snapbase[0].name));
 		F_SET(snapbase, WT_SNAP_ADD);
@@ -304,7 +304,7 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 		btree->snap = NULL;
 		if (snapbase[0].raw.data != NULL)
 			WT_ERR(__wt_snapshot_list_set(
-			    session, btree->filename, snapbase));
+			    session, btree->name, snapbase));
 	}
 
 	/*

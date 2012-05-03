@@ -47,6 +47,7 @@ __wt_btree_open(WT_SESSION_IMPL *session,
 	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
 	WT_ITEM dsk;
+	const char *filename;
 	int forced_salvage;
 
 	btree = session->btree;
@@ -63,9 +64,14 @@ __wt_btree_open(WT_SESSION_IMPL *session,
 		if (cval.val != 0)
 			forced_salvage = 1;
 	}
+
 	/* Connect to the underlying block manager. */
+	filename = btree->name;
+	if (!WT_PREFIX_SKIP(filename, "file:"))
+		WT_ERR_MSG(session, EINVAL, "expected a 'file:' URI");
+
 	WT_ERR(__wt_bm_open(
-	    session, btree->filename, btree->config, cfg, forced_salvage));
+	    session, filename, btree->config, cfg, forced_salvage));
 
 	/*
 	 * Open the specified snapshot unless it's a special command (special

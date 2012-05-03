@@ -108,7 +108,8 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
  */
 static int
 __session_find_btree(WT_SESSION_IMPL *session,
-    const char *uri, size_t urilen, const char *cfg[], uint32_t flags,
+    const char *uri, size_t urilen, const char *snapshot, size_t snaplen,
+    const char *cfg[], uint32_t flags,
     WT_BTREE_SESSION **btree_sessionp)
 {
 	WT_BTREE *btree;
@@ -116,13 +117,18 @@ __session_find_btree(WT_SESSION_IMPL *session,
 
 	TAILQ_FOREACH(btree_session, &session->btrees, q) {
 		btree = btree_session->btree;
-		if (strncmp(uri, btree->name, urilen) == 0 &&
-		    btree->name[urilen] == '\0') {
-			if (btree_sessionp != NULL)
-				*btree_sessionp = btree_session;
-			session->btree = btree;
-			return (__wt_session_lock_btree(session, cfg, flags));
-		}
+		if (strncmp(uri, btree->name, urilen) != 0 ||
+		    btree->name[urilen] != '\0')
+			continue;
+		if (snapshot != btree->snapshot &&
+		    (snapshot == NULL || btree->snapshot == NULL ||
+		    strncmp(snapshot, btree->snapshot, snaplen) != 0 ||
+		    btree->snapshot[snaplen] != '\0'))
+			continue;
+		if (btree_sessionp != NULL)
+			*btree_sessionp = btree_session;
+		session->btree = btree;
+		return (__wt_session_lock_btree(session, cfg, flags));
 	}
 
 	return (WT_NOTFOUND);
@@ -139,12 +145,10 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 	WT_BTREE_SESSION *btree_session;
 	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
-	WT_ITEM *buf;
-	const char *filename, *name, *treeconf;
-	size_t namelen;
+	const char *filename, *name, *snapshot, *treeconf;
+	size_t namelen, snaplen;
 	int exist;
 
-	buf = NULL;
 	treeconf = NULL;
 
 	filename = uri;
@@ -152,22 +156,23 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 		WT_RET_MSG(
 		    session, EINVAL, "Expected a 'file:' URI: %s", uri);
 
+	name = uri;
+	namelen = strlen(uri);
+
 	/* Is this a snapshot operation? */
 	if (!LF_ISSET(WT_BTREE_SNAPSHOT_OP) && cfg != NULL &&
 	    __wt_config_gets(session, cfg, "snapshot", &cval) == 0 &&
 	    cval.len != 0) {
-		WT_RET(__wt_scr_alloc(session, 0, &buf));
-		WT_ERR(__wt_buf_fmt(session, buf, "%s:%.*s",
-		    uri, (int)cval.len, cval.str));
-		name = buf->data;
-		namelen = buf->size;
+		snapshot = cval.str;
+		snaplen = cval.len;
 	} else {
-		name = uri;
-		namelen = strlen(uri);
+		snapshot = NULL;
+		snaplen = 0;
 	}
 
 	if ((ret = __session_find_btree(session,
-	    name, namelen, cfg, flags, &btree_session)) == 0) {
+	    name, namelen, snapshot, snaplen,
+	    cfg, flags, &btree_session)) == 0) {
 		WT_ASSERT(session, btree_session->btree != NULL);
 		session->btree = btree_session->btree;
 		goto err;
@@ -189,14 +194,14 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_strdup(session, tconfig, &treeconf));
 	else
 		WT_ERR(__wt_metadata_read(session, uri, &treeconf));
-	WT_ERR(__wt_conn_btree_open(session, name, treeconf, cfg, flags));
+	WT_ERR(__wt_conn_btree_open(
+	    session, name, snapshot, treeconf, cfg, flags));
 	WT_ERR(__wt_session_lock_btree(session, cfg, flags));
 	WT_ERR(__wt_session_add_btree(session, NULL));
 
 	if (0) {
 err:		__wt_free(session, treeconf);
 	}
-	__wt_scr_free(&buf);
 	return (ret);
 }
 
@@ -255,7 +260,14 @@ __wt_session_close_any_open_btree(WT_SESSION_IMPL *session, const char *name)
 	WT_BTREE_SESSION *btree_session;
 	WT_DECL_RET;
 
-	if ((ret = __session_find_btree(session, name, strlen(name),
+	/*
+	 * XXX
+	 * We need a different loop in here that closes all snapshot handles as
+	 * well.  And this belongs in conn_btree.c: it should apply to all
+	 * sessions.
+	 */
+	if ((ret = __session_find_btree(session,
+	    name, strlen(name), NULL, 0,
 	    NULL, WT_BTREE_EXCLUSIVE, &btree_session)) == 0) {
 		/*
 		 * XXX

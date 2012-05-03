@@ -507,6 +507,7 @@ extern const char *__wt_confdfl_wiredtiger_open;
 extern const char *__wt_confchk_wiredtiger_open;
 extern int __wt_conn_btree_open(WT_SESSION_IMPL *session,
     const char *name,
+    const char *snapshot,
     const char *config,
     const char *cfg[],
     uint32_t flags);
@@ -585,15 +586,15 @@ extern int __wt_snaplist_get( WT_SESSION *session,
     WT_SNAPSHOT **snapbasep);
 extern void __wt_snaplist_free(WT_SESSION *session, WT_SNAPSHOT *snapbase);
 extern int __wt_snapshot_get(WT_SESSION_IMPL *session,
-    const char *filename,
+    const char *name,
     const char *snapshot,
     WT_ITEM *addr);
-extern int __wt_snapshot_clear(WT_SESSION_IMPL *session, const char *filename);
+extern int __wt_snapshot_clear(WT_SESSION_IMPL *session, const char *name);
 extern int __wt_snapshot_list_get( WT_SESSION_IMPL *session,
-    const char *filename,
+    const char *name,
     WT_SNAPSHOT **snapbasep);
 extern int __wt_snapshot_list_set( WT_SESSION_IMPL *session,
-    const char *filename,
+    const char *name,
     WT_SNAPSHOT *snapbase);
 extern void __wt_snapshot_list_free(WT_SESSION_IMPL *session,
     WT_SNAPSHOT *snapbase);

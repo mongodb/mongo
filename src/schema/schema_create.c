@@ -76,7 +76,7 @@ __wt_create_file(WT_SESSION_IMPL *session,
 	 * and open the underlying file (note we no longer own the configuration
 	 * string after that call).
 	 */
-	ret = __wt_conn_btree_open(session, name, treeconf, cfg, 0);
+	ret = __wt_conn_btree_open(session, name, NULL, treeconf, cfg, 0);
 	treeconf = NULL;
 	WT_ERR(ret);
 	WT_ERR(__wt_session_add_btree(session, NULL));
