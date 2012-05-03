@@ -1085,6 +1085,8 @@ struct __wt_connection {
  * \c false.}
  * @config{session_max, maximum expected number of sessions (including server
  * threads).,an integer greater than or equal to 1; default \c 50.}
+ * @config{sync, sync files when closing or writing snapshots.,a boolean flag;
+ * default \c true.}
  * @config{transactional, support transactional semantics.,a boolean flag;
  * default \c false.}
  * @config{verbose, enable messages for various events.  Options are given as a

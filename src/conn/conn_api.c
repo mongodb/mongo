@@ -770,6 +770,9 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	conn->hazard_size = (uint32_t)cval.val;
 	WT_ERR(__wt_config_gets(session, cfg, "session_max", &cval));
 	conn->session_size = (uint32_t)cval.val;
+	WT_ERR(__wt_config_gets(session, cfg, "sync", &cval));
+	if (!cval.val)
+		F_SET(conn, WT_CONN_NOSYNC);
 
 	/* Configure verbose flags. */
 	conn->verbose = 0;

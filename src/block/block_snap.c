@@ -212,7 +212,8 @@ __wt_block_snapshot(WT_SESSION_IMPL *session,
 	 * lazy snapshots, but we don't support them yet).  Regardless, we're
 	 * not holding any locks, other writers can proceed while we wait.
 	 */
-	WT_RET(__wt_fsync(session, block->fh));
+	if (!F_ISSET(S2C(session), WT_CONN_NOSYNC))
+		WT_RET(__wt_fsync(session, block->fh));
 
 	return (0);
 }

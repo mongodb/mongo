@@ -64,7 +64,7 @@ wts_open(void)
 	 * end so they can override "standard" configuration.
 	 */
 	snprintf(config, sizeof(config),
-	    "create,error_prefix=\"%s\",cache_size=%" PRIu32 "MB,"
+	    "create,error_prefix=\"%s\",cache_size=%" PRIu32 "MB,sync=false,"
 	    "extensions=[\"%s\",\"%s\"],%s",
 	    g.progname, g.c_cache, ext1, ext2,
 	    g.config_open == NULL ? "" : g.config_open);
