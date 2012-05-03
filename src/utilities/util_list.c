@@ -151,9 +151,8 @@ list_print_snapshot(WT_SESSION *session, const char *key)
 	 * report an error, and continue our caller's loop.  Otherwise, report
 	 * each snapshot's name and time.
 	 */
-	if ((ret = __wt_snaplist_get(session, key, &snapbase)) == WT_NOTFOUND)
-		return (0);
-	WT_RET(ret);
+	if ((ret = __wt_snaplist_get(session, key, &snapbase)) != 0)
+		return (ret == WT_NOTFOUND ? 0 : ret);
 
 	/* Find the longest name, so we can pretty-print. */
 	len = 0;
