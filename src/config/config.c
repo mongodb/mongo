@@ -403,7 +403,7 @@ __process_value(WT_CONFIG *conf, WT_CONFIG_ITEM *value)
 		if (value->type == ITEM_NUM && errno == ERANGE)
 			return (
 			    __config_err(conf, "Number out of range", ERANGE));
-}
+	}
 
 	return (0);
 }
