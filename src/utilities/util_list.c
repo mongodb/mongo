@@ -65,7 +65,27 @@ list_print(WT_SESSION *session, const char *name, int sflag, int vflag)
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	int found;
-	const char *key, *value;
+	const char *key, *value, *uri;
+
+	/*
+	 * XXX
+	 * Normally, we don't say anything about the WiredTiger metadata file,
+	 * it's not an "object" in the database.  I'm making an exception for
+	 * -s and -v, the snapshot and verbose options.
+	 */
+	if (sflag || vflag) {
+		uri = WT_METADATA_URI;
+		printf("%s\n", uri);
+		if (sflag && (ret = list_print_snapshot(session, uri)) != 0)
+			return (ret);
+		if (vflag) {
+			if ((ret =
+			    __wt_file_metadata(session, uri, &value)) != 0)
+				return (
+				    util_err(ret, "metadata read: %s", uri));
+			printf("%s\n", value);
+		}
+	}
 
 	/* Open the metadata file. */
 	if ((ret = session->open_cursor(
@@ -115,7 +135,6 @@ list_print(WT_SESSION *session, const char *name, int sflag, int vflag)
 				    util_cerr("metadata", "get_value", ret));
 			printf("%s\n", value);
 		}
-
 	}
 	if (ret != WT_NOTFOUND)
 		return (util_cerr("metadata", "next", ret));

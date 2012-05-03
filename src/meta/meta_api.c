@@ -9,7 +9,7 @@
 
 /*
  * __wt_file_metadata --
- *	Public entry point to __wt_metadata_read (for "wt dump").
+ *	Public entry point to __wt_metadata_read (for wt dump and list).
  */
 int
 __wt_file_metadata(
@@ -20,7 +20,7 @@ __wt_file_metadata(
 
 /*
  * __wt_snaplist_get --
- *	Public entry point to __wt_snapshot_list_get (for "wt list").
+ *	Public entry point to __wt_snapshot_list_get (for wt list).
  */
 int
 __wt_snaplist_get(
@@ -32,7 +32,7 @@ __wt_snaplist_get(
 
 /*
  * __wt_snaplist_free --
- *	Public entry point to __wt_snapshot_list_free (for "wt list").
+ *	Public entry point to __wt_snapshot_list_free (for wt list).
  */
 void
 __wt_snaplist_free(WT_SESSION *session, WT_SNAPSHOT *snapbase)
