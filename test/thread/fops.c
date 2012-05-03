@@ -69,11 +69,9 @@ static void *
 fop(void *arg)
 {
 	STATS *s;
-	WT_CURSOR *cursor;
-	WT_SESSION *session;
 	pthread_t tid;
 	u_int i;
-	int id, ret;
+	int id;
 
 	id = (int)(uintptr_t)arg;
 	tid = pthread_self();

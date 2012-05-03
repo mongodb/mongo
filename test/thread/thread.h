@@ -38,6 +38,7 @@ void die(const char *, int) __attribute__((noreturn));
 #else
 void die(const char *, int);
 #endif
+int  fop_start(u_int);
 int  fops(u_int);
 void file_create(void);
 void file_drop(void);
@@ -45,7 +46,7 @@ void file_sync(void);
 void file_truncate(void);
 void file_verify(void);
 void load(void);
-int  rw(u_int, u_int);
+int  rw_start(u_int, u_int);
 void stats(void);
 
 /*

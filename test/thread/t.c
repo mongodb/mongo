@@ -197,6 +197,7 @@ static void
 handle_error(WT_EVENT_HANDLER *handler, int error, const char *errmsg)
 {
 	UNUSED(handler);
+	UNUSED(error);
 
 	/* Ignore complaints about truncation of missing files. */
 	if (strcmp(errmsg,
