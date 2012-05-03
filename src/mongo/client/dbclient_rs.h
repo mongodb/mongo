@@ -195,9 +195,8 @@ namespace mongo {
         // note these get copied around in the nodes vector so be sure to maintain copyable semantics here
         struct Node {
             Node( const HostAndPort& a , DBClientConnection* c ) 
-                : addr( a ) , conn(c) , ok(true) , 
+                : addr( a ) , conn(c) , ok( c != NULL ),
                   ismaster(false), secondary( false ) , hidden( false ) , pingTimeMillis(0) {
-                ok = conn.get() == NULL;
             }
 
             bool okForSecondaryQueries() const {
