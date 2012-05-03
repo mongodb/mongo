@@ -788,18 +788,7 @@ namespace mongo {
             uassert(15891, "can't backfill array to larger than 1,500,000 elements", upTo <= maxElems);
 
             while( _i < upTo )
-                append( nullElt() );
-        }
-
-        static BSONElement nullElt() {
-            static BSONObj n = nullObj();
-            return n.firstElement();
-        }
-
-        static BSONObj nullObj() {
-            BSONObjBuilder _b;
-            _b.appendNull( "" );
-            return _b.obj();
+                appendNull();
         }
 
         std::string num() { return _b.numStr(_i++); }
