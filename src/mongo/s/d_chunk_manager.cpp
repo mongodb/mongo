@@ -123,7 +123,7 @@ namespace mongo {
         Query query = differ.configDiffQuery();
         auto_ptr<DBClientCursor> cursor = conn->query( "config.chunks" , query );
 
-        uassert( 16175, str::stream() << "could not initialize cursor to config server chunks collection for ns " << ns, cursor.get() );
+        uassert( 16181, str::stream() << "could not initialize cursor to config server chunks collection for ns " << ns, cursor.get() );
 
         // Diff tracker should *always* find at least one chunk if collection exists
         int diffsApplied = differ.calculateConfigDiff( *cursor );
