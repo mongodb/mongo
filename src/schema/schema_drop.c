@@ -22,8 +22,8 @@ __drop_file(WT_SESSION_IMPL *session, const char *uri, int force)
 	if (!WT_PREFIX_SKIP(filename, "file:"))
 		return (EINVAL);
 
-	/* If open, close the btree handle. */
-	WT_RET(__wt_session_close_any_open_btree(session, uri));
+	/* Close all btree handles associated with this file. */
+	WT_RET(__wt_conn_btree_close_all(session, uri));
 
 	/* Remove the metadata entry (ignore missing items). */
 	WT_TRET(__wt_metadata_remove(session, uri));
@@ -100,8 +100,8 @@ __drop_colgroup(
 	/*
 	 * Try to get the btree handle.  Ideally, we would use an exclusive
 	 * lock here to prevent access to the table while we are dropping it,
-	 * but conflicts with the exclusive lock taken by
-	 * __wt_session_close_any_open_btree.  If two threads race dropping
+	 * but that conflicts with the exclusive lock taken by
+	 * __wt_conn_btree_close_all.  If two threads race dropping
 	 * the same object, it will be caught there.
 	 *
 	 * If we can't get a tree, try to remove it from the metadata.
@@ -156,8 +156,8 @@ __drop_index(
 	/*
 	 * Try to get the btree handle.  Ideally, we would use an exclusive
 	 * lock here to prevent access to the table while we are dropping it,
-	 * but conflicts with the exclusive lock taken by
-	 * __wt_session_close_any_open_btree.  If two threads race dropping
+	 * but that conflicts with the exclusive lock taken by
+	 * __wt_conn_btree_close_all.  If two threads race dropping
 	 * the same object, it will be caught there.
 	 *
 	 * If we can't get a tree, try to remove it from the metadata.

@@ -27,8 +27,8 @@ __rename_file(
 	    !WT_PREFIX_SKIP(newfile, "file:"))
 		return (EINVAL);
 
-	/* If open, close the btree handle. */
-	WT_RET(__wt_session_close_any_open_btree(session, uri));
+	/* Close any btree handles in the file. */
+	WT_RET(__wt_conn_btree_close_all(session, uri));
 
 	/*
 	 * Check to see if the proposed name is already in use, in either

@@ -41,7 +41,7 @@ __wt_btree_truncate(WT_SESSION_IMPL *session, const char *filename)
  */
 int
 __wt_btree_open(WT_SESSION_IMPL *session,
-    const char *cfg[], const uint8_t *addr, uint32_t addr_size, int readonly)
+    const uint8_t *addr, uint32_t addr_size, const char *cfg[], int readonly)
 {
 	WT_BTREE *btree;
 	WT_CONFIG_ITEM cval;

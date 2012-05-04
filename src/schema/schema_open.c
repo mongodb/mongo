@@ -109,7 +109,8 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 			WT_ERR(__wt_config_next(&cparser, &ckey, &cval));
 		else
 			WT_CLEAR(ckey);
-		if (table->colgroup[i] != NULL)
+		if (table->colgroup[i] != NULL &&
+		    F_ISSET(table->colgroup[i], WT_BTREE_OPEN))
 			continue;
 
 		if ((cgname = table->cg_name[i]) == NULL) {
@@ -119,7 +120,7 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 			    __wt_buf_steal(session, &namebuf, NULL);
 		}
 		ret = __wt_schema_get_btree(session,
-		    cgname, strlen(cgname), NULL, WT_BTREE_NO_LOCK);
+		    cgname, strlen(cgname), NULL, 0);
 		if (ret != 0) {
 			/* It is okay if the table is not yet complete. */
 			if (ret == WT_NOTFOUND)
@@ -127,6 +128,7 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 			goto err;
 		}
 		table->colgroup[i] = session->btree;
+		WT_ERR(__wt_session_release_btree(session));
 	}
 
 	if (!table->is_simple) {
@@ -170,7 +172,8 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table,
 	    session, &uribuf, "file:%.*s", (int)cval.len, cval.str));
 	fileuri = uribuf.data;
 
-	ret = __wt_session_get_btree(session, fileuri, NULL, WT_BTREE_NO_LOCK);
+	ret = __wt_session_get_btree(
+	    session, fileuri, NULL, WT_BTREE_EXCLUSIVE);
 	if (ret == ENOENT)
 		__wt_errx(session,
 		    "Index '%s' created but '%s' is missing", uri, fileuri);
@@ -245,6 +248,8 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table,
 
 err:	__wt_buf_free(session, &cols);
 	__wt_buf_free(session, &uribuf);
+	if (session->btree != NULL)
+		__wt_session_release_btree(session);
 
 	return (ret);
 }
@@ -305,7 +310,8 @@ __wt_schema_open_index(
 		if (table->idx_name[i] == NULL)
 			WT_ERR(__wt_strdup(session, uri, &table->idx_name[i]));
 
-		if (table->index[i] == NULL) {
+		if (table->index[i] == NULL ||
+		    !F_ISSET(table->index[i], WT_BTREE_OPEN)) {
 			if (len == 0 || match) {
 				WT_ERR(cursor->get_value(cursor, &idxconf));
 				WT_ERR(__open_index(session,

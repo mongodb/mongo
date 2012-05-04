@@ -40,7 +40,8 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 		    tablename, strlen(tablename), &table));
 
 		for (i = 0; i < WT_COLGROUPS(table); i++) {
-			if (table->colgroup[i] == NULL)
+			if (table->colgroup[i] == NULL ||
+			    !F_ISSET(table->colgroup[i], WT_BTREE_OPEN))
 				continue;
 			cgname = table->cg_name[i];
 

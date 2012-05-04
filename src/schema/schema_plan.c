@@ -20,7 +20,8 @@ __find_next_col(WT_SESSION_IMPL *session, WT_TABLE *table,
 
 	getnext = 1;
 	for (cg = 0; cg < WT_COLGROUPS(table); cg++) {
-		if ((cgtree = table->colgroup[cg]) == NULL)
+		if ((cgtree = table->colgroup[cg]) == NULL ||
+		    !F_ISSET(cgtree, WT_BTREE_OPEN))
 			continue;
 		/*
 		 * If there is only one column group, we just scan through all

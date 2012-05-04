@@ -103,7 +103,6 @@ __conn_btree_get(WT_SESSION_IMPL *session,
 	}
 	if (matched) {
 		__wt_spin_unlock(session, &conn->spinlock);
-		session->btree = btree;
 		return (__conn_btree_open_lock(session, flags));
 	}
 
@@ -169,11 +168,12 @@ __conn_btree_open(WT_SESSION_IMPL *session, const char *cfg[], uint32_t flags)
 		/* Set any special flags on the handle. */
 		F_SET(btree, LF_ISSET(WT_BTREE_SPECIAL_FLAGS));
 
-		WT_ERR(__wt_scr_alloc(session, WT_BTREE_MAX_ADDR_COOKIE, &addr));
+		WT_ERR(__wt_scr_alloc(
+		    session, WT_BTREE_MAX_ADDR_COOKIE, &addr));
 		WT_ERR(__wt_snapshot_get(
 		    session, btree->name, btree->snapshot, addr));
-		WT_ERR(__wt_btree_open(session,
-		    cfg, addr->data, addr->size, btree->snapshot == NULL ? 0 : 1));
+		WT_ERR(__wt_btree_open(session, addr->data, addr->size, cfg,
+		    btree->snapshot == NULL ? 0 : 1));
 		F_SET(btree, WT_BTREE_OPEN);
 
 		/* Drop back to a readlock if that is all that was needed. */
@@ -267,6 +267,58 @@ __wt_conn_btree_close(WT_SESSION_IMPL *session, int locked)
 			__wt_rwunlock(session, btree->rwlock);
 	}
 
+	return (ret);
+}
+
+/*
+ * __wt_conn_btree_close_all --
+ *	Close all btree handles handles with matching name (including all
+ *	snapshot handles).
+ */
+int
+__wt_conn_btree_close_all(WT_SESSION_IMPL *session, const char *name)
+{
+	WT_BTREE *btree;
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+
+	conn = S2C(session);
+
+	__wt_spin_lock(session, &conn->spinlock);
+	TAILQ_FOREACH(btree, &conn->btqh, q)
+		if (strcmp(btree->name, name) == 0) {
+			WT_ERR(__wt_try_writelock(session, btree->rwlock));
+			F_SET(btree, WT_BTREE_EXCLUSIVE);
+
+			/*
+			 * We have an exclusive lock, which means there are no
+			 * cursors open at this point.  Close the handle, if
+			 * necessary.
+			 */
+			session->btree = btree;
+			if (F_ISSET(btree, WT_BTREE_OPEN)) {
+				__wt_spin_unlock(session, &conn->spinlock);
+
+				WT_RET(__wt_meta_track_sub_on(session));
+				ret = __wt_btree_close(session);
+				F_CLR(btree,
+				    WT_BTREE_OPEN | WT_BTREE_SPECIAL_FLAGS);
+				if (ret == 0)
+					ret = __wt_meta_track_sub_off(session);
+
+				__wt_spin_lock(session, &conn->spinlock);
+			}
+
+			if (WT_META_TRACKING(session))
+				WT_TRET(__wt_meta_track_handle_lock(session));
+			else
+				WT_TRET(__wt_session_release_btree(session));
+			session->btree = NULL;
+
+			WT_ERR(ret);
+		}
+
+err:	__wt_spin_unlock(session, &conn->spinlock);
 	return (ret);
 }
 

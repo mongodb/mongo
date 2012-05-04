@@ -20,8 +20,8 @@ __truncate_file(WT_SESSION_IMPL *session, const char *name)
 	if (!WT_PREFIX_SKIP(filename, "file:"))
 		return (EINVAL);
 
-	/* If open, close the btree handle. */
-	WT_RET(__wt_session_close_any_open_btree(session, name));
+	/* Close any btree handles in the file. */
+	WT_RET(__wt_conn_btree_close_all(session, name));
 
 	/* Delete the root address and truncate the file. */
 	WT_RET(__wt_snapshot_clear(session, name));

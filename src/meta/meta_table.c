@@ -151,14 +151,16 @@ __wt_metadata_remove(WT_SESSION_IMPL *session, const char *key)
 		WT_RET_MSG(session, EINVAL,
 		    "%s: remove not supported on the turtle file", key);
 
-	if (WT_META_TRACKING(session))
-		WT_RET(__wt_meta_track_update(session, key));
-
 	/* Save the caller's btree: the metadata cursor will overwrite it. */
 	btree = session->btree;
 	WT_RET(__wt_metadata_cursor(session, NULL, &cursor));
 	cursor->set_key(cursor, key);
-	WT_TRET(cursor->remove(cursor));
+	WT_TRET(cursor->search(cursor));
+	if (ret == 0) {
+		if (WT_META_TRACKING(session))
+			WT_TRET(__wt_meta_track_update(session, key));
+		WT_TRET(cursor->remove(cursor));
+	}
 	WT_TRET(cursor->close(cursor));
 
 	/* Restore the caller's btree. */

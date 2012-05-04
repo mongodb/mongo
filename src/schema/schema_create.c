@@ -22,9 +22,14 @@ __wt_create_file(WT_SESSION_IMPL *session,
 	treeconf = NULL;
 
 	/* First check if the file already exists. */
-	if ((ret = __wt_session_get_btree(
-	    session, uri, NULL, WT_BTREE_NO_LOCK)) != WT_NOTFOUND)
-		return (ret == 0 && exclusive ? EEXIST : ret);
+	if ((ret = __wt_session_get_btree(session, uri, NULL, 0)) != ENOENT) {
+		if (ret == 0) {
+			if (exclusive)
+				ret = EEXIST;
+			WT_TRET(__wt_session_release_btree(session));
+		}
+		return (ret);
+	}
 
 	/* Create the file. */
 	filename = uri;
@@ -62,11 +67,7 @@ __wt_create_file(WT_SESSION_IMPL *session,
 	 * and open the underlying file (note we no longer own the configuration
 	 * string after that call).
 	 */
-	ret = __wt_conn_btree_open(
-	    session, uri, NULL, treeconf, cfg, WT_BTREE_NO_LOCK);
-	treeconf = NULL;
-	WT_ERR(ret);
-	WT_ERR(__wt_session_add_btree(session, NULL));
+	WT_ERR(__wt_session_get_btree(session, uri, cfg, WT_BTREE_NO_LOCK));
 
 err:	__wt_scr_free(&val);
 	__wt_free(session, treeconf);
