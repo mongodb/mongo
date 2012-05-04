@@ -825,7 +825,7 @@ namespace mongo {
             indexDetails.info = newIndexSpecLoc;
             string newIndexNs = indexDetails.indexNamespace();
 
-            renameIndexNamespace( oldIndexNs.c_str(), newIndexNs.c_str() );
+            renameNamespace( oldIndexNs.c_str(), newIndexNs.c_str(), false );
             deleteObjects( s.c_str(), oldIndexSpec.getOwned(), true, false, true );
         }
     }

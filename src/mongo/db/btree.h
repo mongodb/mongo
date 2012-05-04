@@ -1152,9 +1152,6 @@ namespace mongo {
         long long _nscanned;
     };
 
-    /** Renames the index namespace for this btree's index. */
-    void renameIndexNamespace(const char *oldNs, const char *newNs);
-
     /**
      * give us a writable version of the btree bucket (declares write intent).
      * note it is likely more efficient to declare write intent on something smaller when you can.

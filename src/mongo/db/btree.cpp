@@ -1442,10 +1442,6 @@ namespace mongo {
         return loc;
     }
 
-    void renameIndexNamespace(const char *oldNs, const char *newNs) {
-        renameNamespace( oldNs, newNs, false );
-    }
-
     template< class V >
     const DiskLoc BtreeBucket<V>::getHead(const DiskLoc& thisLoc) const {
         DiskLoc p = thisLoc;
