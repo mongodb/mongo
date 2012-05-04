@@ -177,7 +177,7 @@ void runTest() {
         mongo::sleepmillis( 1000 * globalLoadGenOption.durationSeconds );
         runner.stop();
         mongo::BenchRunStats stats;
-        runner.populateStats( &stats, &runner );
+        runner.populateStats( &stats );
 
         long long numEvents =
                 static_cast<long long>( stats.findOneCounter.getNumEvents() );
@@ -194,7 +194,7 @@ void runTest() {
         buf.append( "totalTimeMicros", totalTimeMicros );
         buf.append( "insertLatencyMicros", latencyMicros );
 
-        for (map<string, double>::iterator it = stats.opcounters.begin(); it != stats.opcounters.end(); ++it) {
+        for (map<string, long long>::iterator it = stats.opcounters.begin(); it != stats.opcounters.end(); ++it) {
             buf.append( (*it).first + "ThroughputPerSec",
                         (*it).second/globalLoadGenOption.durationSeconds );
         }
