@@ -87,7 +87,7 @@ namespace mongo {
             GlobalWrite(bool stopGreed = false, int timeoutms = -1 ); 
             virtual ~GlobalWrite();
             void downgrade(); // W -> R
-            bool upgrade();   // caution see notes
+            void upgrade();   // caution see notes
         };
         class GlobalRead : public ScopedLock { // recursive is ok
         public:
@@ -124,14 +124,23 @@ namespace mongo {
         public:
             DBWrite(const StringData& dbOrNs);
             virtual ~DBWrite();
-            
+
+            class UpgradeToExclusive : private boost::noncopyable {
+            public:
+                UpgradeToExclusive();
+                ~UpgradeToExclusive();
+
+                bool gotUpgrade() const { return _gotUpgrade; }
+            private:
+                bool _gotUpgrade;
+            };
+
         private:
             bool _locked_w;
             bool _locked_W;
             WrapperForRWLock *_weLocked;
             const string _what;
             bool _nested;
-
         };
 
         // lock this database for reading. do not shared_lock globally first, that is handledin herein. 

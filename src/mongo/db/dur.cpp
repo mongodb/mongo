@@ -74,7 +74,6 @@ using namespace mongoutils;
 namespace mongo {
 
     bool lockedForWriting();
-    void runExclusively(void (*f)(void));
 
     namespace dur {
 
@@ -251,29 +250,12 @@ namespace mongo {
             return commitJob.bytes() > UncommittedBytesLimit;
         }
 
-        static int in_f;
-        void f_commitEarlyInRunExclusively() { 
-            dassert( in_f == 0 );
-            in_f++;
-            try { 
-                assertNothingSpooled();
-                getDur().commitNow();
-                assertNothingSpooled(); // a light sanity check that we truly were exclusive
-            }
-            catch(...) { 
-                in_f--;
-                throw;
-            }
-            in_f--;
-        }
-
         void assertLockedForCommitting() { 
             char t = Lock::isLocked();
             if(  t == 'R' || t == 'W' )
                 return;
-            // 'w' case we use runExclusively
-            fassert( 16110, t == 'w' );
-            fassert( 16111, in_f == 1 );
+            // 'w' case we upgrade to exclusive (X).
+            fassertFailed( 16110 );
         }
 
         bool NOINLINE_DECL DurableImpl::_aCommitIsNeeded() {
@@ -300,8 +282,12 @@ namespace mongo {
                     return false;
                 }
                 else {
-                    log(1) << "commitIfNeeded calling runExclusively" << endl;
-                    runExclusively(f_commitEarlyInRunExclusively);
+                    log(1) << "commitIfNeeded upgrading from shared write to exclusive write state"
+                           << endl;
+                    Lock::DBWrite::UpgradeToExclusive ex;
+                    if (ex.gotUpgrade()) {
+                        commitNow();
+                    }
                 }
             }
             else { 
@@ -627,7 +613,7 @@ namespace mongo {
         static void _groupCommit(Lock::GlobalWrite *lgw) {
             LOG(4) << "_groupCommit " << endl;
 
-            // runExclusively is in 'w', else we are 'R' or 'W'
+            // We are 'R' or 'W'
             assertLockedForCommitting();
 
             unspoolWriteIntents(); // in case we were doing some writing ourself
@@ -682,12 +668,8 @@ namespace mongo {
                 // to be in W the entire time we were committing about (in particular for WRITETOJOURNAL() which takes time).
                 if( lgw ) { 
                     LOG(4) << "_groupCommit upgrade" << endl;
-                    if( lgw->upgrade() ) {
-                        REMAPPRIVATEVIEW();
-                    }
-                    else {
-                        log() << "info timeout on lock upgrade for REMAPPRIVATEVIEW" << endl;
-                    }
+                    lgw->upgrade();
+                    REMAPPRIVATEVIEW();
                 }
             }
             else {
