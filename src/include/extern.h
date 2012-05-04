@@ -519,7 +519,7 @@ extern int __wt_conn_btree_get(WT_SESSION_IMPL *session,
 extern int __wt_conn_btree_close(WT_SESSION_IMPL *session, int locked);
 extern int __wt_conn_btree_close_all(WT_SESSION_IMPL *session,
     const char *name);
-extern int __wt_conn_btree_remove(WT_CONNECTION_IMPL *conn);
+extern int __wt_conn_btree_discard(WT_CONNECTION_IMPL *conn);
 extern int __wt_connection_init(WT_CONNECTION_IMPL *conn);
 extern void __wt_connection_destroy(WT_CONNECTION_IMPL *conn);
 extern int __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[]);
@@ -871,7 +871,7 @@ extern int __wt_session_get_btree(WT_SESSION_IMPL *session,
 extern int __wt_session_lock_snapshot( WT_SESSION_IMPL *session,
     const char *snapshot,
     uint32_t flags);
-extern int __wt_session_remove_btree( WT_SESSION_IMPL *session,
+extern int __wt_session_discard_btree( WT_SESSION_IMPL *session,
     WT_BTREE_SESSION *btree_session,
     int locked);
 extern void __wt_eventv(WT_SESSION_IMPL *session,

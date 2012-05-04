@@ -240,11 +240,11 @@ err:	session->btree = btree;
 }
 
 /*
- * __wt_session_remove_btree --
+ * __wt_session_discard_btree --
  *	Discard our reference to the btree.
  */
 int
-__wt_session_remove_btree(
+__wt_session_discard_btree(
     WT_SESSION_IMPL *session, WT_BTREE_SESSION *btree_session, int locked)
 {
 	TAILQ_REMOVE(&session->btrees, btree_session, q);

@@ -340,11 +340,11 @@ err:	__wt_spin_unlock(session, &conn->spinlock);
 }
 
 /*
- * __conn_btree_remove --
+ * __conn_btree_discard --
  *	Discard a single btree file handle structure.
  */
 static int
-__conn_btree_remove(WT_SESSION_IMPL *session, WT_BTREE *btree)
+__conn_btree_discard(WT_SESSION_IMPL *session, WT_BTREE *btree)
 {
 	WT_DECL_RET;
 
@@ -364,11 +364,11 @@ __conn_btree_remove(WT_SESSION_IMPL *session, WT_BTREE *btree)
 }
 
 /*
- * __wt_conn_btree_remove --
+ * __wt_conn_btree_discard --
  *	Discard the btree file handle structures.
  */
 int
-__wt_conn_btree_remove(WT_CONNECTION_IMPL *conn)
+__wt_conn_btree_discard(WT_CONNECTION_IMPL *conn)
 {
 	WT_BTREE *btree;
 	WT_BTREE_SESSION *btree_session;
@@ -395,7 +395,7 @@ restart:
 
 		TAILQ_REMOVE(&conn->btqh, btree, q);
 		--conn->btqcnt;
-		WT_TRET(__conn_btree_remove(session, btree));
+		WT_TRET(__conn_btree_discard(session, btree));
 		goto restart;
 	}
 
@@ -406,13 +406,13 @@ restart:
 	 * the metadata entry, for good.
 	 */
 	while ((btree_session = TAILQ_FIRST(&session->btrees)) != NULL)
-		WT_TRET(__wt_session_remove_btree(session, btree_session, 0));
+		WT_TRET(__wt_session_discard_btree(session, btree_session, 0));
 
 	/* Close the metadata file handle. */
 	while ((btree = TAILQ_FIRST(&conn->btqh)) != NULL) {
 		TAILQ_REMOVE(&conn->btqh, btree, q);
 		--conn->btqcnt;
-		WT_TRET(__conn_btree_remove(session, btree));
+		WT_TRET(__conn_btree_discard(session, btree));
 	}
 
 	/* Discard our session. */
