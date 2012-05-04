@@ -35,9 +35,6 @@
     <Filter Include="third_party">
       <UniqueIdentifier>{b68efe41-5e2c-4bef-b538-5265a839fc7a}</UniqueIdentifier>
     </Filter>
-    <Filter Include="third_party\linenoise">
-      <UniqueIdentifier>{2faba381-6961-4e3d-ad8b-086a141bd35b}</UniqueIdentifier>
-    </Filter>
     <Filter Include="third_party\pcre">
       <UniqueIdentifier>{291e0d72-13ca-42d7-b0fd-2e7b5f89639f}</UniqueIdentifier>
     </Filter>
@@ -91,12 +88,6 @@
     </Filter>
     <Filter Include="util\Source Files">
       <UniqueIdentifier>{6603da1a-0530-4d55-aff7-61c46a010198}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="third_party\linenoise\Source Files">
-      <UniqueIdentifier>{8ef72b9e-4e59-4b7f-a795-e4cd882e64aa}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="third_party\linenoise\Header Files">
-      <UniqueIdentifier>{26507f26-0762-4559-9e59-c053daab9e33}</UniqueIdentifier>
     </Filter>
     <Filter Include="db\Header Files">
       <UniqueIdentifier>{5d0b1ae0-ec8a-4c09-9cac-6f7b0de60de9}</UniqueIdentifier>
@@ -503,17 +494,17 @@
     <ClCompile Include="shell_utils_launcher.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\third_party\linenoise\linenoise.cpp">
-      <Filter>third_party\linenoise\Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\third_party\linenoise\linenoise_utf8.cpp">
-      <Filter>third_party\linenoise\Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\third_party\linenoise\mk_wcwidth.cpp">
-      <Filter>third_party\linenoise\Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\util\signal_handlers.cpp">
       <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="linenoise.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="linenoise_utf8.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="mk_wcwidth.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1160,17 +1151,17 @@
     <ClInclude Include="shell_utils_extended.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\third_party\linenoise\linenoise.h">
-      <Filter>third_party\linenoise\Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\third_party\linenoise\mk_wcwidth.h">
-      <Filter>third_party\linenoise\Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\third_party\linenoise\linenoise_utf8.h">
-      <Filter>third_party\linenoise\Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\util\signal_handlers.h">
       <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="linenoise.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="linenoise_utf8.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="mk_wcwidth.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

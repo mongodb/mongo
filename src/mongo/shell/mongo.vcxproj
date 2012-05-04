@@ -1148,7 +1148,7 @@ cscript //Nologo createCPPfromJavaScriptFiles.js "$(ProjectDir).."</Command>
       <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4334</DisableSpecificWarnings>
       <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4334</DisableSpecificWarnings>
     </ClCompile>
-    <ClCompile Include="..\..\third_party\linenoise\linenoise_utf8.cpp">
+    <ClCompile Include="linenoise_utf8.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
@@ -1158,7 +1158,7 @@ cscript //Nologo createCPPfromJavaScriptFiles.js "$(ProjectDir).."</Command>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="..\..\third_party\linenoise\mk_wcwidth.cpp">
+    <ClCompile Include="mk_wcwidth.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
@@ -2063,7 +2063,7 @@ cscript //Nologo createCPPfromJavaScriptFiles.js "$(ProjectDir).."</Command>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="..\scripting\utils.cpp" />
-    <ClCompile Include="..\..\third_party\linenoise\linenoise.cpp">
+    <ClCompile Include="linenoise.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">NotUsing</PrecompiledHeader>
@@ -2222,8 +2222,8 @@ cscript //Nologo createCPPfromJavaScriptFiles.js "$(ProjectDir).."</Command>
     <ClInclude Include="..\..\third_party\js-1.7\jsxml.h" />
     <ClInclude Include="..\..\third_party\js-1.7\prmjtime.h" />
     <ClInclude Include="..\..\third_party\js-1.7\resource.h" />
-    <ClInclude Include="..\..\third_party\linenoise\linenoise_utf8.h" />
-    <ClInclude Include="..\..\third_party\linenoise\mk_wcwidth.h" />
+    <ClInclude Include="linenoise_utf8.h" />
+    <ClInclude Include="mk_wcwidth.h" />
     <ClInclude Include="..\..\third_party\pcre-8.30\config.h" />
     <ClInclude Include="..\..\third_party\pcre-8.30\pcre.h" />
     <ClInclude Include="..\..\third_party\pcre-8.30\pcrecpp.h" />
@@ -2284,7 +2284,7 @@ cscript //Nologo createCPPfromJavaScriptFiles.js "$(ProjectDir).."</Command>
     <ClInclude Include="..\db\json.h" />
     <ClInclude Include="..\db\key.h" />
     <ClInclude Include="..\db\lasterror.h" />
-    <ClInclude Include="..\..\third_party\linenoise\linenoise.h" />
+    <ClInclude Include="linenoise.h" />
     <ClInclude Include="..\db\matcher.h" />
     <ClInclude Include="..\db\mongommf.h" />
     <ClInclude Include="..\db\mongomutex.h" />
