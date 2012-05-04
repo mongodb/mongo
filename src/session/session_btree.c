@@ -38,9 +38,16 @@ __wt_session_lock_btree(
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
-	uint32_t open_flags;
+	uint32_t special_flags;
 
 	btree = session->btree;
+
+	/*
+	 * Reopen the handle for this operation to set any special flags.
+	 * For example, set WT_BTREE_BULK so the handle is closed correctly.
+	 */
+	special_flags = LF_ISSET(WT_BTREE_SPECIAL_FLAGS);
+	WT_ASSERT(session, special_flags == 0 || LF_ISSET(WT_BTREE_EXCLUSIVE));
 
 	if (LF_ISSET(WT_BTREE_EXCLUSIVE)) {
 		/*
@@ -49,25 +56,27 @@ __wt_session_lock_btree(
 		 * trees to be mixed with ordinary cursor access, but if there
 		 * is a use case in the future, we could make blocking here
 		 * configurable.
+		 *
+		 * Special operations will trigger a reopen, which will get
+		 * the necessary lock, so don't bother here.
 		 */
-		WT_RET(__wt_try_writelock(session, btree->rwlock));
-
-		/*
-		 * Reopen the handle for this operation to set any special
-		 * flags.  For example, set WT_BTREE_BULK so the handle is
-		 * closed correctly.
-		 */
-		open_flags = LF_ISSET(WT_BTREE_BULK |
-		    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY);
-		if (open_flags != 0)
-			ret = __wt_conn_btree_reopen(session, cfg, open_flags);
-		F_SET(btree, WT_BTREE_EXCLUSIVE);
+		if (LF_ISSET(WT_BTREE_LOCK_ONLY) || special_flags == 0) {
+			WT_RET(__wt_try_writelock(session, btree->rwlock));
+			F_SET(btree, WT_BTREE_EXCLUSIVE);
+		}
 	} else if (!LF_ISSET(WT_BTREE_NO_LOCK))
 		__wt_readlock(session, btree->rwlock);
 
-	if (LF_ISSET(WT_BTREE_LOCK_ONLY) &&
-	    WT_META_TRACKING(session))
-		WT_TRET(__wt_meta_track_handle_lock(session));
+	/*
+	 * At this point, we have the requested lock.  Now check that the
+	 * handle is open with the requested flags.
+	 */
+	if (!LF_ISSET(WT_BTREE_LOCK_ONLY | WT_BTREE_NO_LOCK) &&
+	    (special_flags != 0 || !F_ISSET(btree, WT_BTREE_OPEN))) {
+		if (!LF_ISSET(WT_BTREE_EXCLUSIVE))
+			__wt_rwunlock(session, btree->rwlock);
+		ret = __wt_conn_btree_reopen(session, cfg, flags);
+	}
 
 	return (ret);
 }
@@ -85,13 +94,13 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 	btree = session->btree;
 
 	/*
-	 * If we had exclusive access, reopen the tree without special flags so
-	 * that other threads can use it (note the reopen call sets the flags).
+	 * If we had special flags set, close the handle so that future access
+	 * can get a handle without special flags.
 	 */
-	if (F_ISSET(btree, WT_BTREE_BULK |
-	    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY)) {
+	if (F_ISSET(btree, WT_BTREE_SPECIAL_FLAGS)) {
 		WT_ASSERT(session, F_ISSET(btree, WT_BTREE_EXCLUSIVE));
-		ret = __wt_conn_btree_reopen(session, NULL, 0);
+		ret = __wt_btree_close(session);
+		F_CLR(btree, WT_BTREE_OPEN | WT_BTREE_SPECIAL_FLAGS);
 	}
 
 	if (F_ISSET(btree, WT_BTREE_EXCLUSIVE))
@@ -189,8 +198,10 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_metadata_read(session, uri, &treeconf));
 	WT_ERR(__wt_conn_btree_open(
 	    session, name, snapshot, treeconf, cfg, flags));
-	WT_ERR(__wt_session_lock_btree(session, cfg, flags));
 	WT_ERR(__wt_session_add_btree(session, NULL));
+
+	if (LF_ISSET(WT_BTREE_LOCK_ONLY) && WT_META_TRACKING(session))
+		WT_ERR(__wt_meta_track_handle_lock(session));
 
 	if (0) {
 err:		__wt_free(session, treeconf);
