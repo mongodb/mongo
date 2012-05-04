@@ -120,8 +120,6 @@ namespace mongo {
     public:
         LockStat stats;
 
-        void start_greed() { q.start_greed(); }
-
         void lock_r() { 
             verify( threadState() == 0 );
             lockState().locked( 'r' );
@@ -452,9 +450,6 @@ namespace mongo {
         else {
             q.unlock_W();
         }
-        if( stoppedGreed ) {
-            q.start_greed();
-        }
     }
     void Lock::GlobalWrite::downgrade() { 
         verify( !noop );
@@ -466,11 +461,6 @@ namespace mongo {
     bool Lock::GlobalWrite::upgrade() { 
         verify( !noop );
         verify( threadState() == 'R' );
-        if( stoppedGreed ) { 
-            // we undo stopgreed here if it were set earlier, as we now want a W lock
-            stoppedGreed = false;
-            q.start_greed();
-        }
         if( q.R_to_W() ) {
             lockState().changeLockState( 'W' );
             return true;

@@ -47,8 +47,8 @@ namespace mongo {
         Z r,w,R,W,U,X;       // X is used by QLock::runExclusively 
         int greed;           // >0 if someone wants to acquire a write lock
         int greedyWrites;    // 0=no, 1=true
-        int greedSuspended;
-        void _stop_greed();  // we are already inlock for these underscore methods
+        void _start_greed();  // we are already inlock for these underscore methods
+        void _stop_greed();
         void _lock_W();
         bool W_legal() const { return r.n + w.n + R.n + W.n == 0; }
         bool R_legal() const { return       w.n +     + W.n == 0; }
@@ -57,7 +57,7 @@ namespace mongo {
         void notifyWeUnlocked(char me);
         static bool i_block(char me, char them);
     public:
-        QLock() : greed(0), greedyWrites(1), greedSuspended(0) { }
+        QLock() : greed(0), greedyWrites(1) { }
         void lock_r();
         void lock_w();
         void lock_R();
@@ -69,8 +69,6 @@ namespace mongo {
         void unlock_w();
         void unlock_R();
         void unlock_W();
-        void start_greed();
-        void stop_greed();
         void W_to_R();
         bool R_to_W(); // caution see notes below
         void runExclusively(void (*f)(void));
@@ -113,18 +111,11 @@ namespace mongo {
     }
 
     inline void QLock::_stop_greed() {
-        if( ++greedSuspended == 1 ) // recursion on stop_greed/start_greed is ok
-            greedyWrites = 0;
-    }
-    inline void QLock::stop_greed() {
-        boost::mutex::scoped_lock lk(m);
-        _stop_greed();
+        greedyWrites = 0;
     }
 
-    inline void QLock::start_greed() { 
-        boost::mutex::scoped_lock lk(m);
-        if( --greedSuspended == 0 ) 
-            greedyWrites = 1;
+    inline void QLock::_start_greed() {
+        greedyWrites = 1;
     }
 
     // "i will be reading. i promise to coordinate my activities with w's as i go with more 
@@ -212,11 +203,16 @@ namespace mongo {
     }
 
     // upgrade from R to W state.
-    // there is no "upgradable" state so this is NOT a classic upgrade - 
+    //
+    // This transition takes precedence over all pending requests by threads to enter
+    // any state other than '\0'.
+    //
+    // there is no "upgradable" state so this is NOT a classic upgrade -
     // if two threads try to do this you will deadlock.
     inline bool QLock::R_to_W() { 
         boost::mutex::scoped_lock lk(m);
         verify( R.n > 0 && W.n == 0 );
+        greed++;
         U.n++;
         fassert( 16136, U.n == 1 ); // for now we only allow one upgrade attempter
         int pass = 0;
@@ -227,6 +223,7 @@ namespace mongo {
             }
             U.c.timed_wait(m, boost::posix_time::milliseconds(300));
         }
+        greed--;
         R.n--;
         W.n++;
         U.n--;
@@ -272,11 +269,13 @@ namespace mongo {
         fassert(16139, R.n > 0);
         if( --R.n == 0 )
             notifyWeUnlocked('R');
-    }    
+    }
+
     inline void QLock::unlock_W() {
         boost::mutex::scoped_lock lk(m);
         fassert(16140, W.n == 1);
         W.n--;
+        _start_greed();
         notifyWeUnlocked('W');
     }
 

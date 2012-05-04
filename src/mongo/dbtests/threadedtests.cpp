@@ -803,19 +803,12 @@ namespace ThreadedTests {
         }
     };
 
-    static int pass;
     class QLockTest : public ThreadedTest<3> {
     public:
         bool gotW;
         QLockTest() : gotW(false), m() { }
-        void setup() { 
-            if( pass == 1) { 
-                m.stop_greed();
-            }
-        }
-        ~QLockTest() {
-            m.start_greed();
-        }
+        void setup() {}
+        ~QLockTest() {}
     private:
         QLock m;
         virtual void validate() { }
