@@ -25,8 +25,6 @@
 #endif
 
 #include <boost/filesystem/operations.hpp>
-#include <boost/algorithm/string/predicate.hpp>
-#include <boost/algorithm/string/trim.hpp>
 
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/cmdline.h"
@@ -845,73 +843,99 @@ int _main( int argc, char* argv[] ) {
                 prompt = "> ";
             }
 
-            char * lineCStr = shellReadline( prompt.c_str() );
+            char * line = shellReadline( prompt.c_str() );
 
-            if ( !lineCStr ) {
-                // User must have hit ^C; treat this like an exit.
-                if( !mongo::cmdLine.quiet )
-                    cout << "User interrupt detected; exiting..." << endl;
+            char * linePtr = line;  // can't clobber 'line', we need to free() it later
+            if ( linePtr ) {
+                while ( linePtr[0] == ' ' )
+                    ++linePtr;
+                int lineLen = strlen( linePtr );
+                while ( lineLen > 0 && linePtr[lineLen - 1] == ' ' )
+                    linePtr[--lineLen] = 0;
+            }
+
+            if ( ! linePtr || ( strlen( linePtr ) == 4 && strstr( linePtr , "exit" ) ) ) {
+                if ( ! mongo::cmdLine.quiet )
+                    cout << "bye" << endl;
+                if ( line )
+                    free( line );
                 break;
             }
 
-            string line = lineCStr;
-            boost::algorithm::trim(line);
-
-            // Free line before we forget.
-            free(lineCStr);
-            lineCStr = NULL;
-
-            if ( line == "quit" || line == "exit" ) {
-              // Replace this with the real command that the shell expects
-              line += "(0)";
+            string code = linePtr;
+            if ( code == "exit" || code == "exit;" ) {
+                free( line );
+                break;
             }
-
-            if ( line == "cls" ) {
+            if ( code == "cls" ) {
+                free( line );
                 linenoiseClearScreen();
-            } else if( boost::algorithm::starts_with( line, "edit " ) ) {
-                string s = line.c_str() + 5; // skip "edit "
-                boost::algorithm::trim_left(s);
+                continue;
+            }
+
+            if ( code.size() == 0 ) {
+                free( line );
+                continue;
+            }
+
+            if ( startsWith( linePtr, "edit " ) ) {
+                shellHistoryAdd( linePtr );
+
+                const char* s = linePtr + 5; // skip "edit "
+                while( *s && isspace( *s ) )
+                    s++;
+
                 edit( s );
-            } else if ( !line.empty() ) {
-                // Whatever we have now will be in the form:
-                //   CMD ARGS
-                bool wasCmd = false;
-                string cmd;
-                size_t strPos = line.find(' ');
-                if ( strPos != string::npos )
-                    cmd = line.substr( 0, strPos );
+                free( line );
+                continue;
+            }
 
-                if ( cmd.find("\"") == string::npos ) {
+            gotInterrupted = false;
+            code = finishCode( code );
+            if ( gotInterrupted ) {
+                cout << endl;
+                free( line );
+                continue;
+            }
+
+            if ( code.size() == 0 ) {
+                free( line );
+                break;
+            }
+
+            bool wascmd = false;
+            {
+                string cmd = linePtr;
+                if ( cmd.find( " " ) > 0 )
+                    cmd = cmd.substr( 0 , cmd.find( " " ) );
+
+                if ( cmd.find( "\"" ) == string::npos ) {
                     try {
-                        scope->exec(
-                                (string) "__iscmd__ = shellHelper[\"" + cmd + "\"];",
-                                "(shellhelp1)" , false , true , true );
+                        scope->exec( (string)"__iscmd__ = shellHelper[\"" + cmd + "\"];" , "(shellhelp1)" , false , true , true );
                         if ( scope->getBoolean( "__iscmd__" )  ) {
-                            scope->exec(
-                                    (string) "shellHelper( \"" + cmd + "\" , \"" + line.substr( cmd.size() ) + "\");",
-                                    "(shellhelp2)" , false , true , false );
-                            wasCmd = true;
+                            scope->exec( (string)"shellHelper( \"" + cmd + "\" , \"" + code.substr( cmd.size() ) + "\");" , "(shellhelp2)" , false , true , false );
+                            wascmd = true;
                         }
-                    } catch ( std::exception& exc) {
-                        cout << "error2:" << exc.what() << endl;
-                        wasCmd = true;
                     }
-                }
-
-                if ( !wasCmd ) {
-                    try {
-                        if ( scope->exec( line.c_str() , "(shell)" , false , true , false ) )
-                            scope->exec( "shellPrintHelper( __lastres__ );" , "(shell2)" , true , true , false );
-                    }
-                    catch ( std::exception& exc ) {
-                        cout << "error:" << exc.what() << endl;
+                    catch ( std::exception& e ) {
+                        cout << "error2:" << e.what() << endl;
+                        wascmd = true;
                     }
                 }
             }
 
-            // If the line contained anything, add it to the history.
-            if(!line.empty())
-                shellHistoryAdd( line.c_str() );
+            if ( ! wascmd ) {
+                try {
+                    if ( scope->exec( code.c_str() , "(shell)" , false , true , false ) )
+                        scope->exec( "shellPrintHelper( __lastres__ );" , "(shell2)" , true , true , false );
+                }
+                catch ( std::exception& e ) {
+                    cout << "error:" << e.what() << endl;
+                }
+            }
+
+            shellHistoryAdd( code.c_str() );
+            free( line );
         }
 
         shellHistoryDone();
