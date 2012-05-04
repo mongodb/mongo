@@ -842,12 +842,22 @@ int _main( int argc, char* argv[] ) {
             free(lineCStr);
             lineCStr = NULL;
 
+            // First, check to see if this code needs to be finished.  If it
+            // does, we'll need to do some parsing before we look at commands.
+            gotInterrupted = false;
+            line = finishCode( line );
+
             if ( line == "quit" || line == "exit" ) {
               // Replace this with the real command that the shell expects
               line += "(0)";
             }
 
-            if ( line == "cls" ) {
+            if ( gotInterrupted ) {
+                // If we got interrupted in multiline editing, just print a new
+                // line so that the next command will be entered (correctly) on
+                // the next line.
+                cout << endl;
+            } else if ( line == "cls" ) {
                 linenoiseClearScreen();
             } else if( boost::algorithm::starts_with( line, "edit " ) ) {
                 string s = line.c_str() + 5; // skip "edit "
