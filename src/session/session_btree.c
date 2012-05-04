@@ -140,7 +140,7 @@ __session_find_btree(WT_SESSION_IMPL *session,
  */
 int
 __wt_session_get_btree(WT_SESSION_IMPL *session,
-    const char *uri, const char *tconfig, const char *cfg[], uint32_t flags)
+    const char *uri, const char *cfg[], uint32_t flags)
 {
 	WT_BTREE_SESSION *btree_session;
 	WT_CONFIG_ITEM cval;
@@ -186,14 +186,7 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 		goto err;
 	}
 
-	/*
-	 * A fixed configuration is passed in for special files, such as the
-	 * metadata file itself.
-	 */
-	if (tconfig != NULL)
-		WT_ERR(__wt_strdup(session, tconfig, &treeconf));
-	else
-		WT_ERR(__wt_metadata_read(session, uri, &treeconf));
+	WT_ERR(__wt_metadata_read(session, uri, &treeconf));
 	WT_ERR(__wt_conn_btree_open(
 	    session, name, snapshot, treeconf, cfg, flags));
 	WT_ERR(__wt_session_lock_btree(session, cfg, flags));
@@ -226,7 +219,7 @@ __wt_session_lock_snapshot(
 	cfg[0] = buf->data;
 
 	LF_SET(WT_BTREE_LOCK_ONLY);
-	WT_ERR(__wt_session_get_btree(session, btree->name, NULL, cfg, flags));
+	WT_ERR(__wt_session_get_btree(session, btree->name, cfg, flags));
 
 	/* Restore the original btree in the session. */
 err:	session->btree = btree;

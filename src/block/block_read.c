@@ -103,7 +103,7 @@ __wt_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	 */
 	if (blk->disk_size < dsk->size) {
 		if (block->compressor == NULL)
-			WT_ERR(__wt_illegal_value(session));
+			WT_ERR(__wt_illegal_value(session, block->name));
 
 		WT_RET(__wt_buf_init(session, buf, dsk->size));
 		buf->size = dsk->size;
@@ -127,7 +127,7 @@ __wt_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 		    dsk->size - WT_BLOCK_COMPRESS_SKIP,
 		    &result_len));
 		if (result_len != dsk->size - WT_BLOCK_COMPRESS_SKIP)
-			WT_ERR(__wt_illegal_value(session));
+			WT_ERR(__wt_illegal_value(session, block->name));
 	} else
 		if (block->compressor == NULL)
 			buf->size = dsk->size;

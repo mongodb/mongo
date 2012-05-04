@@ -69,6 +69,7 @@ src/meta/meta_api.c
 src/meta/meta_snapshot.c
 src/meta/meta_table.c
 src/meta/meta_track.c
+src/meta/meta_turtle.c
 src/os_posix/os_abort.c
 src/os_posix/os_alloc.c
 src/os_posix/os_dlopen.c

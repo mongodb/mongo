@@ -68,7 +68,7 @@ __wt_schema_get_btree(WT_SESSION_IMPL *session,
 	if (ret != 0)
 		goto err;
 
-	ret = __wt_session_get_btree(session, fileuri, NULL, cfg, flags);
+	ret = __wt_session_get_btree(session, fileuri, cfg, flags);
 	if (ret == ENOENT)
 		__wt_errx(session,
 		    "%s created but '%s' is missing", objname, fileuri);
@@ -170,8 +170,7 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table,
 	    session, &uribuf, "file:%.*s", (int)cval.len, cval.str));
 	fileuri = uribuf.data;
 
-	ret = __wt_session_get_btree(
-	    session, fileuri, NULL, NULL, WT_BTREE_NO_LOCK);
+	ret = __wt_session_get_btree(session, fileuri, NULL, WT_BTREE_NO_LOCK);
 	if (ret == ENOENT)
 		__wt_errx(session,
 		    "Index '%s' created but '%s' is missing", uri, fileuri);

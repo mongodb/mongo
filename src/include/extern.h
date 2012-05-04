@@ -581,6 +581,9 @@ extern int __wt_log_printf(WT_SESSION_IMPL *session,
     2,
     3)));
 extern WT_LOGREC_DESC __wt_logdesc_debug;
+extern int __wt_file_metadata( WT_SESSION *session,
+    const char *uri,
+    const char **valuep);
 extern int __wt_snaplist_get( WT_SESSION *session,
     const char *name,
     WT_SNAPSHOT **snapbasep);
@@ -598,7 +601,7 @@ extern int __wt_snapshot_list_set( WT_SESSION_IMPL *session,
     WT_SNAPSHOT *snapbase);
 extern void __wt_snapshot_list_free(WT_SESSION_IMPL *session,
     WT_SNAPSHOT *snapbase);
-extern int __wt_open_metadata(WT_SESSION_IMPL *session);
+extern int __wt_metadata_open(WT_SESSION_IMPL *session);
 extern int __wt_metadata_cursor( WT_SESSION_IMPL *session,
     const char *config,
     WT_CURSOR **cursorp);
@@ -621,6 +624,13 @@ extern int __wt_meta_track_fileop( WT_SESSION_IMPL *session,
     const char *olduri,
     const char *newuri);
 extern int __wt_meta_track_handle_lock(WT_SESSION_IMPL *session);
+extern int __wt_turtle_init(WT_SESSION_IMPL *session);
+extern int __wt_turtle_read(WT_SESSION_IMPL *session,
+    const char *key,
+    const char **valuep);
+extern int __wt_turtle_update( WT_SESSION_IMPL *session,
+    const char *key,
+    const char *value);
 extern void __wt_abort(WT_SESSION_IMPL *session);
 extern int __wt_calloc(WT_SESSION_IMPL *session,
     size_t number,
@@ -732,7 +742,7 @@ extern int __wt_struct_unpack(WT_SESSION_IMPL *session,
     const char *fmt,
     ...);
 extern int __wt_create_file(WT_SESSION_IMPL *session,
-    const char *name,
+    const char *uri,
     int exclusive,
     const char *config);
 extern int __wt_schema_create( WT_SESSION_IMPL *session,
@@ -852,7 +862,6 @@ extern int __wt_session_lock_btree( WT_SESSION_IMPL *session,
 extern int __wt_session_release_btree(WT_SESSION_IMPL *session);
 extern int __wt_session_get_btree(WT_SESSION_IMPL *session,
     const char *uri,
-    const char *tconfig,
     const char *cfg[],
     uint32_t flags);
 extern int __wt_session_lock_snapshot( WT_SESSION_IMPL *session,
@@ -900,7 +909,7 @@ extern int __wt_assert(WT_SESSION_IMPL *session,
     ...) WT_GCC_ATTRIBUTE((format (printf,
     5,
     6)));
-extern int __wt_illegal_value(WT_SESSION_IMPL *session);
+extern int __wt_illegal_value(WT_SESSION_IMPL *session, const char *name);
 extern int __wt_unknown_object_type(WT_SESSION_IMPL *session, const char *uri);
 extern int __wt_filename(WT_SESSION_IMPL *session,
     const char *name,

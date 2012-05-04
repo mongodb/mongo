@@ -65,7 +65,27 @@ list_print(WT_SESSION *session, const char *name, int sflag, int vflag)
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	int found;
-	const char *key, *value;
+	const char *key, *value, *uri;
+
+	/*
+	 * XXX
+	 * Normally, we don't say anything about the WiredTiger metadata file,
+	 * it's not an "object" in the database.  I'm making an exception for
+	 * -s and -v, the snapshot and verbose options.
+	 */
+	if (sflag || vflag) {
+		uri = WT_METADATA_URI;
+		printf("%s\n", uri);
+		if (sflag && (ret = list_print_snapshot(session, uri)) != 0)
+			return (ret);
+		if (vflag) {
+			if ((ret =
+			    __wt_file_metadata(session, uri, &value)) != 0)
+				return (
+				    util_err(ret, "metadata read: %s", uri));
+			printf("%s\n", value);
+		}
+	}
 
 	/* Open the metadata file. */
 	if ((ret = session->open_cursor(
@@ -115,7 +135,6 @@ list_print(WT_SESSION *session, const char *name, int sflag, int vflag)
 				    util_cerr("metadata", "get_value", ret));
 			printf("%s\n", value);
 		}
-
 	}
 	if (ret != WT_NOTFOUND)
 		return (util_cerr("metadata", "next", ret));
@@ -141,19 +160,13 @@ list_print_snapshot(WT_SESSION *session, const char *key)
 	uint64_t v;
 	char buf[256];
 
-	/* Snapshots only make sense for files, at least at the moment. */
-	if (!MATCH(key, "file:"))
-		return (0);
-	key += strlen("file:");
-
 	/*
 	 * We may not find any snapshots for this file, in which case we don't
 	 * report an error, and continue our caller's loop.  Otherwise, report
 	 * each snapshot's name and time.
 	 */
-	if ((ret = __wt_snaplist_get(session, key, &snapbase)) == WT_NOTFOUND)
-		return (0);
-	WT_RET(ret);
+	if ((ret = __wt_snaplist_get(session, key, &snapbase)) != 0)
+		return (ret == WT_NOTFOUND ? 0 : ret);
 
 	/* Find the longest name, so we can pretty-print. */
 	len = 0;

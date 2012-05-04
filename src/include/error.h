@@ -11,10 +11,10 @@
 /* Return and branch-to-err-label cases for switch statements. */
 #define	WT_ILLEGAL_VALUE(session)					\
 	default:							\
-		return (__wt_illegal_value(session))
+		return (__wt_illegal_value(session, NULL))
 #define	WT_ILLEGAL_VALUE_ERR(session)					\
 	default:							\
-		ret = __wt_illegal_value(session);			\
+		ret = __wt_illegal_value(session, NULL);		\
 		goto err
 
 /* Set "ret" and branch-to-err-label tests. */

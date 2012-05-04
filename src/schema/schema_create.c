@@ -9,11 +9,11 @@
 
 int
 __wt_create_file(WT_SESSION_IMPL *session,
-    const char *name, int exclusive, const char *config)
+    const char *uri, int exclusive, const char *config)
 {
 	WT_ITEM *val;
 	WT_DECL_RET;
-	int is_metadata, vmajor, vminor, vpatch;
+	int is_metadata;
 	const char *cfg[] = API_CONF_DEFAULTS(session, create, config);
 	const char *filecfg[4] = API_CONF_DEFAULTS(file, meta, config);
 	const char *filename, *treeconf;
@@ -21,69 +21,55 @@ __wt_create_file(WT_SESSION_IMPL *session,
 	val = NULL;
 	treeconf = NULL;
 
-	filename = name;
+	/* First check if the file already exists. */
+	if ((ret = __wt_session_get_btree(
+	    session, uri, NULL, WT_BTREE_NO_LOCK)) != WT_NOTFOUND)
+		return (ret == 0 && exclusive ? EEXIST : ret);
+
+	/* Create the file. */
+	filename = uri;
 	if (!WT_PREFIX_SKIP(filename, "file:"))
-		WT_RET_MSG(session, EINVAL, "Expected a 'file:' URI: %s", name);
-
-	/*
-	 * Opening the metadata file is a special case, use the config
-	 * string we were passed to open the file.
-	 */
-	is_metadata = (strcmp(name, WT_METADATA_URI) == 0);
-
-	/* If the file exists, don't try to recreate it. */
-	if ((ret = __wt_session_get_btree(session, name,
-	    is_metadata ? config : NULL,
-	    NULL, WT_BTREE_NO_LOCK)) != WT_NOTFOUND) {
-		if (ret == 0 && exclusive)
-			ret = EEXIST;
-		return (ret);
-	}
-
+		WT_RET_MSG(session, EINVAL, "Expected a 'file:' URI: %s", uri);
 	WT_RET(__wt_btree_create(session, filename));
 	if (WT_META_TRACKING(session))
-		WT_ERR(__wt_meta_track_fileop(session, NULL, name));
-
-	/* Insert WiredTiger version numbers into the metadata file. */
-	WT_ERR(__wt_scr_alloc(session, 0, &val));
-	if (is_metadata) {
-		WT_ERR(__wt_metadata_insert(
-		    session, WT_METADATA_VERSION_STR,
-		    wiredtiger_version(&vmajor, &vminor, &vpatch)));
-		WT_ERR(__wt_buf_fmt(session, val,
-		    "major=%d,minor=%d,patch=%d", vmajor, vminor, vpatch));
-		WT_ERR(__wt_metadata_insert(
-		    session, WT_METADATA_VERSION, val->data));
-	}
+		WT_ERR(__wt_meta_track_fileop(session, NULL, uri));
 
 	/*
-	 * Insert Btree version numbers into the metadata file (including for
-	 * the metadata file itself, although the metadata file version numbers
-	 * can never be trusted, we have to get them from the turtle file).
+	 * If creating the metadata file, read the configuration information
+	 * from the turtle file (we made sure it was available when we first
+	 * opened the database).  It looks wrong that we're calling a metadata
+	 * function to read the turtle file, but it's OK, the functions that
+	 * read the metadata file do the right thing for a few special keys.
+	 *
+	 * If not creating the metadata file, append the current version numbers
+	 * to the passed-in configuration and insert the resulting configuration
+	 * into the metadata file.
 	 */
-	WT_ERR(__wt_buf_fmt(session, val, "version=(major=%d,minor=%d)",
-	    WT_BTREE_MAJOR_VERSION, WT_BTREE_MINOR_VERSION));
-	filecfg[2] = val->data;
-
+	is_metadata = strcmp(uri, WT_METADATA_URI) == 0;
 	if (is_metadata)
-		WT_ERR(__wt_strdup(session, config, &treeconf));
-	else
+		WT_ERR(__wt_metadata_read(session, uri, &treeconf));
+	else {
+		WT_ERR(__wt_scr_alloc(session, 0, &val));
+		WT_ERR(__wt_buf_fmt(session, val, "version=(major=%d,minor=%d)",
+		    WT_BTREE_MAJOR_VERSION, WT_BTREE_MINOR_VERSION));
+		filecfg[2] = val->data;
 		WT_ERR(__wt_config_collapse(session, filecfg, &treeconf));
-	WT_ERR(__wt_metadata_insert(session, name, treeconf));
+		WT_ERR(__wt_metadata_insert(session, uri, treeconf));
+	}
 
 	/*
 	 * Call the underlying connection function to allocate a WT_BTREE handle
 	 * and open the underlying file (note we no longer own the configuration
 	 * string after that call).
 	 */
-	ret = __wt_conn_btree_open(session, name, NULL, treeconf, cfg, 0);
+	ret = __wt_conn_btree_open(session, uri, NULL, treeconf, cfg, 0);
 	treeconf = NULL;
 	WT_ERR(ret);
 	WT_ERR(__wt_session_add_btree(session, NULL));
 
-	/* If something goes wrong, throw away anything we created. */
 err:	__wt_scr_free(&val);
 	__wt_free(session, treeconf);
+
 	return (ret);
 }
 
