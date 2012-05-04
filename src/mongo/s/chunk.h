@@ -390,7 +390,8 @@ namespace mongo {
         // Split Heuristic info
         //
 
-        mutable TicketHolder _splitTickets; // number of concurrent splitVector we can do from a splitIfShould per collection
+        // number of concurrent splitVector we can do from a splitIfShould per collection
+        mutable TicketHolder _splitTickets;
         
 
         mutable mutex _staleMinorSetMutex;
@@ -402,10 +403,11 @@ namespace mongo {
         // Maximum number of parallel threads requesting a split
         static const int maxParallelSplits = 5;
 
-        // The idea here is that we're over-aggressive on split testing by a factor of splitTestFactor, so we can
-        // safely wait until we get to splitTestFactor invalid splits before changing.  Unfortunately, we also
-        // potentially over-request the splits by a factor of maxParallelSplits, but since the factors are identical
-        // it works out (for now) for parallel or sequential oversplitting.
+        // The idea here is that we're over-aggressive on split testing by a factor of
+        // splitTestFactor, so we can safely wait until we get to splitTestFactor invalid splits
+        // before changing.  Unfortunately, we also potentially over-request the splits by a
+        // factor of maxParallelSplits, but since the factors are identical it works out (for now)
+        // for parallel or sequential oversplitting.
         // TODO: Make splitting a separate thread with notifications?
         static const int staleMinorReloadThreshold = maxParallelSplits;
 

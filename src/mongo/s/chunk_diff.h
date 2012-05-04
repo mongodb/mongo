@@ -29,13 +29,15 @@
 namespace mongo {
 
     /**
-     * This class manages and applies diffs from partial config server data reloads.  Because the config data can be
-     * large, we want to update it in small parts, not all-at-once.  Once a ConfigDiffTracker is created, the current
-     * config data is *attached* to it, and it is then able to modify the data.
+     * This class manages and applies diffs from partial config server data reloads.  Because the
+     * config data can be large, we want to update it in small parts, not all-at-once.  Once a
+     * ConfigDiffTracker is created, the current config data is *attached* to it, and it is then
+     * able to modify the data.
      *
-     * The current form is templated b/c the overall algorithm is identical between mongos and mongod, but
-     * the actual chunk maps used differ in implementation.  We don't want to copy the implementation, because the logic
-     * is identical, or the chunk data, because that would be slow for big clusters, so this is the alternative for now.
+     * The current form is templated b/c the overall algorithm is identical between mongos and
+     * mongod, but the actual chunk maps used differ in implementation.  We don't want to copy the
+     * implementation, because the logic is identical, or the chunk data, because that would be
+     * slow for big clusters, so this is the alternative for now.
      * TODO: Standardize between mongos and mongod and convert template parameters to types.
      */
     template < class KeyType, class ValType, class CmpType, class ShardType >
@@ -56,9 +58,10 @@ namespace mongo {
         virtual ~ConfigDiffTracker() {}
 
         /**
-         * The tracker attaches to a set of ranges with versions, and uses a config server connection to update these.
-         * Because the set of ranges and versions may be large, they aren't owned by the tracker, they're just
-         * passed in and updated.  Therefore they must all stay in scope while the tracker is working.
+         * The tracker attaches to a set of ranges with versions, and uses a config server
+         * connection to update these. Because the set of ranges and versions may be large, they
+         * aren't owned by the tracker, they're just passed in and updated.  Therefore they must all
+         * stay in scope while the tracker is working.
          *
          * TODO: Make a standard VersionedRange to encapsulate this info in both mongod and mongos?
          */
@@ -126,7 +129,8 @@ namespace mongo {
         RangeOverlap overlappingRange( const BSONObj& min, const BSONObj& max );
 
         // Finds and applies the changes to a collection from the config server specified
-        // Also includes minor version changes for particular major-version chunks if explicitly specified
+        // Also includes minor version changes for particular major-version chunks if explicitly
+        // specified
         int calculateConfigDiff( string config,
                                  const set<ShardChunkVersion>& extraMinorVersions = set<ShardChunkVersion>() );
 

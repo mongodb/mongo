@@ -113,10 +113,10 @@ namespace mongo {
 
         //
         // Overall idea here is to work in two steps :
-        // 1. For all the new chunks we find, increment the maximum version per-shard and per-collection, and remove
-        //    any conflicting chunks from the ranges
-        // 2. For all the new chunks we're interested in (all of them for mongos, just chunks on the shard for mongod)
-        //    add them to the ranges
+        // 1. For all the new chunks we find, increment the maximum version per-shard and
+        //    per-collection, and remove any conflicting chunks from the ranges
+        // 2. For all the new chunks we're interested in (all of them for mongos, just chunks on the
+        //    shard for mongod) add them to the ranges
         //
 
         vector<BSONObj> newTracked;
@@ -180,8 +180,9 @@ namespace mongo {
         verifyAttached();
 
         //
-        // Basic idea behind the query is to find all the chunks $gt the current max version, and then also update
-        // chunks that we need minor versions for - i.e. max chunks on shards and extra versions we pass in (for splits)
+        // Basic idea behind the query is to find all the chunks $gt the current max version, and
+        // then also update chunks that we need minor versions for - i.e. max chunks on shards and
+        // extra versions we pass in (for splits)
         //
 
         BSONObjBuilder queryB;
@@ -195,8 +196,9 @@ namespace mongo {
                 queryNewB.append( "ns", _ns );
                 {
                     BSONObjBuilder ts( queryNewB.subobjStart( "lastmod" ) );
-                    // We should *always* pull at least a single chunk back, this lets us quickly detect if our
-                    // collection was unsharded (and most of the time if it was resharded) in the meantime
+                    // We should *always* pull at least a single chunk back, this lets us quickly
+                    // detect if our collection was unsharded (and most of the time if it was
+                    // resharded) in the meantime
                     ts.appendTimestamp( "$gte", *_maxVersion );
                     ts.done();
                 }

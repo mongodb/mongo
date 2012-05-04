@@ -295,7 +295,7 @@ namespace mongo {
             warning() << "splitChunk failed - cmd: " << cmdObj << " result: " << res << endl;
             conn.done();
 
-            // Mark the minor versions of this major version for reload (eventually)
+            // Mark the minor version for *eventual* reload
             _manager->markMinorForReload( this->_lastmod );
 
             return false;
@@ -617,12 +617,12 @@ namespace mongo {
 
     void ChunkManager::markMinorForReload( ShardChunkVersion majorVersion ) const {
 
-        // When we get a stale minor version, it means that some *other* mongos has just split a chunk into a
-        // number of smaller parts, so we shouldn't need reload the data needed to split it ourselves
-        // for awhile.  Don't be very aggressive reloading just because of this, since reloads are expensive
-        // and disrupt operations.
+        // When we get a stale minor version, it means that some *other* mongos has just split a
+        // chunk into a number of smaller parts, so we shouldn't need reload the data needed to
+        // split it ourselves for awhile.  Don't be very aggressive reloading just because of this,
+        // since reloads are expensive and disrupt operations.
 
-        // *** Multiple threads could indicate a stale minor version at the same time ***
+        // *** Multiple threads could indicate a stale minor version simultaneously ***
         // TODO:  Ideally, this could be a single-threaded background service doing splits
         // TODO:  Ideally, we wouldn't need to care that this is stale at all
         bool forceReload = false;
@@ -639,13 +639,14 @@ namespace mongo {
 
                 _staleMinorCount = 0;
 
-                // There's maxParallelSplits coming down this codepath at once - block as little as possible.
+                // There's maxParallelSplits coming down this codepath at once -
+                // block as little as possible.
                 forceReload = true;
             }
 
-            // There is no guarantee that a minor version change will be processed here, in the case where
-            // the request comes in "late" and the version's already getting reloaded - it's a heuristic anyway
-            // though, and we'll see requests multiple times.
+            // There is no guarantee that a minor version change will be processed here, in the
+            // case where the request comes in "late" and the version's already getting reloaded -
+            // it's a heuristic anyway though, and we'll see requests multiple times.
         }
 
         if( forceReload )
@@ -661,7 +662,8 @@ namespace mongo {
 
 
     /**
-     * This is an adapter so we can use config diffs - mongos and mongod do them slightly differently
+     * This is an adapter so we can use config diffs - mongos and mongod do them slightly
+     * differently
      *
      * The mongos adapter here tracks all shards, and stores ranges by (max, Chunk) in the map.
      */
@@ -706,7 +708,8 @@ namespace mongo {
         _version = 0;
         set<ShardChunkVersion> minorVersions;
 
-        // If we have a previous version of the ChunkManager to work from, use that info to reduce our config query
+        // If we have a previous version of the ChunkManager to work from, use that info to reduce
+        // our config query
         if( oldManager && oldManager->getVersion() > 0 ){
 
             // Get the old max version
@@ -718,18 +721,25 @@ namespace mongo {
             const ChunkMap& oldChunkMap = oldManager->getChunkMap();
 
             // Could be v.expensive
-            // TODO: If chunks were immutable and didn't reference the manager, we could do more interesting things here
+            // TODO: If chunks were immutable and didn't reference the manager, we could do more
+            // interesting things here
             for( ChunkMap::const_iterator it = oldChunkMap.begin(); it != oldChunkMap.end(); it++ ){
 
                 ChunkPtr oldC = it->second;
-                ChunkPtr c( new Chunk( this, oldC->getMin(), oldC->getMax(), oldC->getShard(), oldC->getLastmod() ) );
+                ChunkPtr c( new Chunk( this, oldC->getMin(),
+                                             oldC->getMax(),
+                                             oldC->getShard(),
+                                             oldC->getLastmod() ) );
+
                 chunkMap.insert( make_pair( oldC->getMax(), c ) );
             }
 
             // Also get any minor versions stored for reload
             oldManager->getMarkedMinorVersions( minorVersions );
 
-            LOG(2) << "loading chunk manager for collection " << _ns << " using old chunk manager w/ version " << _version.toString() << " and " << oldChunkMap.size() << " chunks" << endl;
+            LOG(2) << "loading chunk manager for collection " << _ns
+                   << " using old chunk manager w/ version " << _version.toString()
+                   << " and " << oldChunkMap.size() << " chunks" << endl;
         }
 
         // Attach a diff tracker for the versioned chunk data

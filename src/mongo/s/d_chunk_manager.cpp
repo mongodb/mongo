@@ -29,7 +29,9 @@
 namespace mongo {
 
     /**
-     * This is an adapter so we can use config diffs - mongos and mongod do them slightly differently
+     * This is an adapter so we can use config diffs - mongos and mongod do them slightly
+     * differently
+     *
      * The mongod adapter here tracks only a single shard, and stores ranges by (min, max)
      */
     class SCMConfigDiffTracker : public ConfigDiffTracker<BSONObj,BSONObj,BSONObjCmp,string> {
@@ -105,8 +107,8 @@ namespace mongo {
 
             versionMap[ shardName ] = oldManager->_version;
             _collVersion = oldManager->_collVersion;
-            // TODO: This could be made more efficient if copying not required, but not as frequently reloaded as in
-            // mongos.
+            // TODO: This could be made more efficient if copying not required, but not as
+            // frequently reloaded as in mongos.
             _chunksMap = oldManager->_chunksMap;
 
             LOG(2) << "loading new chunks for collection " << ns << " using old chunk manager w/ version " << _collVersion
