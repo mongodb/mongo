@@ -7,7 +7,6 @@
 # If a condition is included, the subdir is made conditional via AM_CONDITIONAL
 bench/tcbench
 examples/c
-examples/python PYTHON
 ext/collators/reverse
 ext/compressors/bzip2_compress BZIP2
 ext/compressors/snappy_compress SNAPPY
