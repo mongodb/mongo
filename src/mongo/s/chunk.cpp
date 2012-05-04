@@ -80,7 +80,7 @@ namespace mongo {
     {}
 
     long Chunk::mkDataWritten() {
-        return rand() % ( MaxChunkSize / ChunkManager::splitTestFactor );
+        return rand() % ( MaxChunkSize / ChunkManager::SplitHeuristics::splitTestFactor );
     }
 
     string Chunk::getns() const {
@@ -356,14 +356,14 @@ namespace mongo {
                 splitThreshold = (int) ((double)splitThreshold * .9);
             }
 
-            if ( _dataWritten < splitThreshold / ChunkManager::splitTestFactor )
+            if ( _dataWritten < splitThreshold / ChunkManager::SplitHeuristics::splitTestFactor )
                 return false;
             
-            if ( ! getManager()->_splitTickets.tryAcquire() ) {
+            if ( ! getManager()->_splitHeuristics._splitTickets.tryAcquire() ) {
                 LOG(1) << "won't auto split becaue not enough tickets: " << getManager()->getns() << endl;
                 return false;
             }
-            TicketHolderReleaser releaser( &getManager()->_splitTickets );
+            TicketHolderReleaser releaser( &(getManager()->_splitHeuristics._splitTickets) );
 
             // this is a bit ugly
             // we need it so that mongos blocks for the writes to actually be committed
@@ -566,10 +566,7 @@ namespace mongo {
         // The shard versioning mechanism hinges on keeping track of the number of times we reloaded ChunkManager's.
         // Increasing this number here will prompt checkShardVersion() to refresh the connection-level versions to
         // the most up to date value.
-        _sequenceNumber(++NextSequenceNumber),
-
-        _splitTickets( maxParallelSplits ),
-        _staleMinorSetMutex( "ChunkManager::_staleMinorSet" )
+        _sequenceNumber(++NextSequenceNumber)
     {
         int tries = 3;
         while (tries--) {
@@ -616,6 +613,14 @@ namespace mongo {
     }
 
     void ChunkManager::markMinorForReload( ShardChunkVersion majorVersion ) const {
+        _splitHeuristics.markMinorForReload( getns(), majorVersion );
+    }
+
+    void ChunkManager::getMarkedMinorVersions( set<ShardChunkVersion> minorVersions ) const {
+        _splitHeuristics.getMarkedMinorVersions( minorVersions );
+    }
+
+    void ChunkManager::SplitHeuristics::markMinorForReload( const string& ns, ShardChunkVersion majorVersion ) {
 
         // When we get a stale minor version, it means that some *other* mongos has just split a
         // chunk into a number of smaller parts, so we shouldn't need reload the data needed to
@@ -650,10 +655,10 @@ namespace mongo {
         }
 
         if( forceReload )
-            grid.getDBConfig( getns() )->getChunkManagerIfExists( getns(), true, true );
+            grid.getDBConfig( ns )->getChunkManagerIfExists( ns, true, true );
     }
 
-    void ChunkManager::getMarkedMinorVersions( set<ShardChunkVersion> minorVersions ) const {
+    void ChunkManager::SplitHeuristics::getMarkedMinorVersions( set<ShardChunkVersion> minorVersions ) {
         scoped_lock lk( _staleMinorSetMutex );
         for( set<ShardChunkVersion>::iterator it = _staleMinorSet.begin(); it != _staleMinorSet.end(); it++ ){
             minorVersions.insert( *it );
@@ -1222,9 +1227,7 @@ namespace mongo {
     _chunkRanges(),
     _mutex( "ChunkManager" ),
     _nsLock( ConnectionString(), "" ),
-    _sequenceNumber(),
-    _splitTickets( 0 ),
-    _staleMinorSetMutex( "ChunkManager::_staleMinorSet" )
+    _sequenceNumber()
     {}
 
     class ChunkObjUnitTest : public StartupTest {

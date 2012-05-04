@@ -390,26 +390,42 @@ namespace mongo {
         // Split Heuristic info
         //
 
-        // number of concurrent splitVector we can do from a splitIfShould per collection
-        mutable TicketHolder _splitTickets;
-        
 
-        mutable mutex _staleMinorSetMutex;
-        mutable int _staleMinorCount;
-        mutable set<ShardChunkVersion> _staleMinorSet;
+        class SplitHeuristics {
+        public:
 
-        // Test whether we should split once data * splitTestFactor > chunkSize (approximately)
-        static const int splitTestFactor = 5;
-        // Maximum number of parallel threads requesting a split
-        static const int maxParallelSplits = 5;
+            SplitHeuristics() :
+                _splitTickets( maxParallelSplits ),
+                _staleMinorSetMutex( "SplitHeuristics::staleMinorSet" ),
+                _staleMinorCount( 0 ) {}
 
-        // The idea here is that we're over-aggressive on split testing by a factor of
-        // splitTestFactor, so we can safely wait until we get to splitTestFactor invalid splits
-        // before changing.  Unfortunately, we also potentially over-request the splits by a
-        // factor of maxParallelSplits, but since the factors are identical it works out (for now)
-        // for parallel or sequential oversplitting.
-        // TODO: Make splitting a separate thread with notifications?
-        static const int staleMinorReloadThreshold = maxParallelSplits;
+            void markMinorForReload( const string& ns, ShardChunkVersion majorVersion );
+            void getMarkedMinorVersions( set<ShardChunkVersion> minorVersions );
+
+            TicketHolder _splitTickets;
+
+            mutex _staleMinorSetMutex;
+
+            // mutex protects below
+            int _staleMinorCount;
+            set<ShardChunkVersion> _staleMinorSet;
+
+            // Test whether we should split once data * splitTestFactor > chunkSize (approximately)
+            static const int splitTestFactor = 5;
+            // Maximum number of parallel threads requesting a split
+            static const int maxParallelSplits = 5;
+
+            // The idea here is that we're over-aggressive on split testing by a factor of
+            // splitTestFactor, so we can safely wait until we get to splitTestFactor invalid splits
+            // before changing.  Unfortunately, we also potentially over-request the splits by a
+            // factor of maxParallelSplits, but since the factors are identical it works out
+            // (for now) for parallel or sequential oversplitting.
+            // TODO: Make splitting a separate thread with notifications?
+            static const int staleMinorReloadThreshold = maxParallelSplits;
+
+        };
+
+        mutable SplitHeuristics _splitHeuristics;
 
         //
         // End split heuristics
