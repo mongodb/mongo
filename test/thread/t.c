@@ -15,7 +15,7 @@ int session_per_op;				/* New session per operation */
 static char *progname;				/* Program name */
 static FILE *logfp;				/* Log file */
 
-static void handle_error(WT_EVENT_HANDLER *, int, const char *);
+static int  handle_error(WT_EVENT_HANDLER *, int, const char *);
 static int  handle_message(WT_EVENT_HANDLER *, const char *);
 static void onint(int);
 static void shutdown(void);
@@ -193,7 +193,7 @@ shutdown(void)
 	(void)system("rm -f WildTiger WiredTiger.* __wt*");
 }
 
-static void
+static int
 handle_error(WT_EVENT_HANDLER *handler, int error, const char *errmsg)
 {
 	UNUSED(handler);
@@ -201,8 +201,9 @@ handle_error(WT_EVENT_HANDLER *handler, int error, const char *errmsg)
 
 	/* Ignore complaints about truncation of missing files. */
 	if (strcmp(errmsg,
-	    "session.truncate: __wt: No such file or directory") != 0)
-		fprintf(stderr, "%s\n", errmsg);
+	    "session.truncate: __wt: No such file or directory") == 0)
+		return (0);
+	return (fprintf(stderr, "%s\n", errmsg) < 0 ? -1 : 0);
 }
 
 static int
@@ -210,11 +211,10 @@ handle_message(WT_EVENT_HANDLER *handler, const char *message)
 {
 	UNUSED(handler);
 
-	if (logfp == NULL)
-		printf("%s\n", message);
-	else
-		fprintf(logfp, "%s\n", message);
-	return (0);
+	if (logfp != NULL)
+		return (fprintf(logfp, "%s\n", message) < 0 ? -1 : 0);
+
+	return (printf("%s\n", message) < 0 ? -1 : 0);
 }
 
 /*

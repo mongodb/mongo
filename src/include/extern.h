@@ -891,12 +891,13 @@ extern void __wt_errx(WT_SESSION_IMPL *session,
     2,
     3)));
 extern void __wt_msgv(WT_SESSION_IMPL *session, const char *fmt, va_list ap);
-extern void __wt_verbose(WT_SESSION_IMPL *session,
+extern void __wt_msg(WT_SESSION_IMPL *session,
     const char *fmt,
     ...) WT_GCC_ATTRIBUTE((format (printf,
     2,
     3)));
-extern void __wt_msg(WT_SESSION_IMPL *session,
+extern void __wt_progress(WT_SESSION_IMPL *session, const char *s, uint64_t v);
+extern void __wt_verbose(WT_SESSION_IMPL *session,
     const char *fmt,
     ...) WT_GCC_ATTRIBUTE((format (printf,
     2,

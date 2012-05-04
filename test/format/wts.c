@@ -15,24 +15,22 @@ handle_message(WT_EVENT_HANDLER *handler, const char *message)
 	UNUSED(handler);
 
 	if (g.logfp != NULL)
-		fprintf(g.logfp, "%s\n", message);
-	else
-		printf("%s\n", message);
-	return (0);
+		return (fprintf(g.logfp, "%s\n", message) < 0 ? -1 : 0);
+
+	return (printf("%s\n", message) < 0 ? -1 : 0);
 }
 
 /*
  * __handle_progress_default --
  *	Default WT_EVENT_HANDLER->handle_progress implementation: ignore.
  */
-static int
+static void
 handle_progress(
     WT_EVENT_HANDLER *handler, const char *operation, uint64_t progress)
 {
 	UNUSED(handler);
 
 	track(operation, progress, NULL);
-	return (0);
 }
 
 static WT_EVENT_HANDLER event_handler = {

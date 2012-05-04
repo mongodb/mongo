@@ -8,6 +8,39 @@
 #include "wt_internal.h"
 
 /*
+ * __handle_error_default --
+ *	Default WT_EVENT_HANDLER->handle_error implementation: send to stderr.
+ */
+static void
+__handle_error_default(int error, const char *errmsg)
+{
+	size_t len_err, len_errmsg;
+	const char *err;
+
+	if (error != 0) {
+		err = wiredtiger_strerror(error);
+		len_err = strlen(err);
+		len_errmsg = strlen(errmsg);
+		if (len_err >= len_errmsg &&
+		    strcmp(errmsg + (len_errmsg - len_err), err) != 0) {
+			(void)fprintf(stderr,
+			    "%s: %s\n", errmsg, wiredtiger_strerror(error));
+		}
+	}
+	(void)fprintf(stderr, "%s\n", errmsg);
+}
+
+/*
+ * __handle_message_default --
+ *	Default WT_EVENT_HANDLER->handle_message implementation: send to stdout.
+ */
+static void
+__handle_message_default(const char *message)
+{
+	(void)printf("%s\n", message);
+}
+
+/*
  * __wt_eventv --
  * 	Report a message to an event handler.
  */
@@ -49,11 +82,15 @@ __wt_eventv(WT_SESSION_IMPL *session, int msg_event,
 		p += snprintf(p,
 		    (size_t)(end - p), ": %s", wiredtiger_strerror(error));
 
-	handler = session->event_handler;
-	if (msg_event)
-		(void)handler->handle_message(handler, s);
-	else
-		handler->handle_error(handler, error, s);
+	handler = &session->event_handler;
+	if (msg_event) {
+		if (handler->handle_message == NULL ||
+		    handler->handle_message(handler, s))
+			__handle_message_default(s);
+	} else
+		if (handler->handle_error == NULL ||
+		    handler->handle_error(handler, error, s))
+			__handle_error_default(error, s);
 }
 
 /*
@@ -87,8 +124,8 @@ __wt_errx(WT_SESSION_IMPL *session, const char *fmt, ...)
 }
 
 /*
- * __wt_msg_call --
- *	Pass a message to an event handler.
+ * __wt_msgv --
+ * 	Informational message.
  */
 void
 __wt_msgv(WT_SESSION_IMPL *session, const char *fmt, va_list ap)
@@ -104,8 +141,40 @@ __wt_msgv(WT_SESSION_IMPL *session, const char *fmt, va_list ap)
 
 	(void)vsnprintf(s, sizeof(s), fmt, ap);
 
-	handler = session->event_handler;
-	(void)handler->handle_message(handler, s);
+	handler = &session->event_handler;
+	if (handler->handle_message == NULL ||
+	    handler->handle_message(handler, s))
+		__handle_message_default(s);
+}
+
+/*
+ * __wt_msg --
+ * 	Informational message.
+ */
+void
+__wt_msg(WT_SESSION_IMPL *session, const char *fmt, ...)
+    WT_GCC_FUNC_ATTRIBUTE((format (printf, 2, 3)))
+{
+	va_list ap;
+
+	va_start(ap, fmt);
+	__wt_msgv(session, fmt, ap);
+	va_end(ap);
+}
+
+/*
+ * __wt_progress --
+ *	Progress message.
+ */
+void
+__wt_progress(WT_SESSION_IMPL *session, const char *s, uint64_t v)
+{
+	WT_EVENT_HANDLER *handler;
+
+	handler = &session->event_handler;
+	if (handler->handle_progress != NULL)
+		handler->handle_progress(
+		    handler, s == NULL ? session->name : s, v);
 }
 
 /*
@@ -120,21 +189,6 @@ __wt_verbose(WT_SESSION_IMPL *session, const char *fmt, ...)
 
 	va_start(ap, fmt);
 	__wt_eventv(session, 1, 0, NULL, 0, fmt, ap);
-	va_end(ap);
-}
-
-/*
- * __wt_msg --
- * 	Report a message.
- */
-void
-__wt_msg(WT_SESSION_IMPL *session, const char *fmt, ...)
-    WT_GCC_FUNC_ATTRIBUTE((format (printf, 2, 3)))
-{
-	va_list ap;
-
-	va_start(ap, fmt);
-	__wt_msgv(session, fmt, ap);
 	va_end(ap);
 }
 
