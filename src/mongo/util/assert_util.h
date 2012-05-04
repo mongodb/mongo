@@ -194,7 +194,7 @@ namespace mongo {
        could be slow.
     */
 #if defined(_DEBUG)
-# define MONGO_dassert verify
+# define MONGO_dassert(x) fassert(0, (x))
 #else
 # define MONGO_dassert(x)
 #endif
