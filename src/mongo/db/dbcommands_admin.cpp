@@ -169,12 +169,12 @@ namespace mongo {
 
             if ( ! d ) {
                 errmsg = "ns not found";
-                return 0;
+                return false;
             }
 
             result.append( "ns", ns );
             validateNS( ns.c_str() , d, cmdObj, result);
-            return 1;
+            return true;
         }
 
     private:
