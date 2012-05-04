@@ -321,9 +321,8 @@ __curindex_open_colgroups(
 		if ((*proj != WT_PROJ_KEY && *proj != WT_PROJ_VALUE) ||
 		    cp[arg] != NULL)
 			continue;
-		session->btree = table->colgroup[arg];
-		WT_RET(__wt_curfile_create(
-		    session, &cindex->cbt.iface, cfg, &cp[arg]));
+		WT_RET(__wt_curfile_open(session,
+		    table->cg_name[arg], &cindex->cbt.iface, cfg, &cp[arg]));
 	}
 
 	return (0);
@@ -395,7 +394,9 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 		namesize = (size_t)(columns - idxname);
 
 	WT_RET(__wt_schema_open_index(session, table, idxname, namesize));
-	WT_RET(__wt_session_lock_btree(session, NULL, 0));
+	WT_RET(__wt_schema_get_btree(session,
+	    uri, (columns == NULL) ? strlen(uri) : WT_PTRDIFF(columns, uri),
+	    NULL, 0));
 	WT_RET(__wt_calloc_def(session, 1, &cindex));
 
 	cbt = &cindex->cbt;

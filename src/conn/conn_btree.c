@@ -12,8 +12,8 @@
  *	Spin on the current btree handle until either (a) it is open, read
  *	locked; or (b) it is closed, write locked.
  */
-static int
-__conn_btree_open_lock(WT_SESSION_IMPL *session, uint32_t flags)
+int
+__wt_conn_btree_open_lock(WT_SESSION_IMPL *session, uint32_t flags)
 {
 	WT_BTREE *btree;
 
@@ -103,7 +103,7 @@ __conn_btree_get(WT_SESSION_IMPL *session,
 	}
 	if (matched) {
 		__wt_spin_unlock(session, &conn->spinlock);
-		return (__conn_btree_open_lock(session, flags));
+		return (__wt_conn_btree_open_lock(session, flags));
 	}
 
 	/*
@@ -151,22 +151,40 @@ __conn_btree_get(WT_SESSION_IMPL *session,
 }
 
 /*
- * __conn_btree_open --
+ * __wt_conn_btree_open --
  *	Open the current btree handle.
  */
-static int
-__conn_btree_open(WT_SESSION_IMPL *session, const char *cfg[], uint32_t flags)
+int
+__wt_conn_btree_open(WT_SESSION_IMPL *session,
+    const char *config, const char *cfg[], uint32_t flags)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_ITEM *addr;
+	uint32_t special_flags;
 
 	addr = NULL;
 	btree = session->btree;
 
+	/* Open the underlying file, free any old config. */
+	__wt_free(session, btree->config);
+	btree->config = config;
+
+	/* Check if the state is correct. */
+	btree = session->btree;
+	special_flags = LF_ISSET(WT_BTREE_SPECIAL_FLAGS);
+	if (F_ISSET(btree, WT_BTREE_OPEN) &&
+	    F_ISSET(btree, WT_BTREE_SPECIAL_FLAGS) != special_flags) {
+		WT_ASSERT(session, F_ISSET(btree, WT_BTREE_EXCLUSIVE));
+		ret = __wt_btree_close(session);
+		F_CLR(btree, WT_BTREE_OPEN | WT_BTREE_SPECIAL_FLAGS);
+	}
+
+	WT_ASSERT(session, !F_ISSET(btree, WT_BTREE_OPEN));
+
 	do {
 		/* Set any special flags on the handle. */
-		F_SET(btree, LF_ISSET(WT_BTREE_SPECIAL_FLAGS));
+		F_SET(btree, special_flags);
 
 		WT_ERR(__wt_scr_alloc(
 		    session, WT_BTREE_MAX_ADDR_COOKIE, &addr));
@@ -180,7 +198,7 @@ __conn_btree_open(WT_SESSION_IMPL *session, const char *cfg[], uint32_t flags)
 		if (!LF_ISSET(WT_BTREE_EXCLUSIVE)) {
 			F_CLR(btree, WT_BTREE_EXCLUSIVE);
 			__wt_rwunlock(session, btree->rwlock);
-			WT_RET(__conn_btree_open_lock(session, flags));
+			WT_RET(__wt_conn_btree_open_lock(session, flags));
 		}
 	} while (!F_ISSET(btree, WT_BTREE_OPEN));
 
@@ -197,7 +215,7 @@ err:		(void)__wt_conn_btree_close(session, 1);
  *	Get an open btree file handle, otherwise open a new one.
  */
 int
-__wt_conn_btree_open(WT_SESSION_IMPL *session,
+__wt_conn_btree_get(WT_SESSION_IMPL *session,
     const char *name, const char *snapshot, const char *config,
     const char *cfg[], uint32_t flags)
 {
@@ -213,19 +231,18 @@ __wt_conn_btree_open(WT_SESSION_IMPL *session,
 		__wt_free(session, config);
 		return (ret);
 	}
-
 	btree = session->btree;
+
 	if (F_ISSET(btree, WT_BTREE_OPEN) || LF_ISSET(WT_BTREE_LOCK_ONLY))
 		__wt_free(session, config);
-	else {
-		/* Open the underlying file, free any old config. */
-		__wt_free(session, btree->config);
-		btree->config = config;
-		ret = __conn_btree_open(session, cfg, flags);
-	}
+	else
+		ret = __wt_conn_btree_open(session, config, cfg, flags);
 
 	if (ret != 0 || LF_ISSET(WT_BTREE_NO_LOCK))
 		__wt_rwunlock(session, btree->rwlock);
+
+	WT_ASSERT(session, ret != 0 ||
+	    LF_ISSET(WT_BTREE_EXCLUSIVE) == F_ISSET(btree, WT_BTREE_EXCLUSIVE));
 
 	return (ret);
 }
@@ -402,28 +419,4 @@ restart:
 	WT_TRET(session->iface.close(&session->iface, NULL));
 
 	return (ret);
-}
-
-/*
- * __wt_conn_btree_reopen --
- *	Reset an open btree handle back to its initial state.
- */
-int
-__wt_conn_btree_reopen(
-    WT_SESSION_IMPL *session, const char *cfg[], uint32_t flags)
-{
-	WT_BTREE *btree;
-
-	btree = session->btree;
-
-	if (F_ISSET(btree, WT_BTREE_OPEN)) {
-		WT_RET(__wt_btree_close(session));
-		F_CLR(btree, WT_BTREE_OPEN | WT_BTREE_SPECIAL_FLAGS);
-	}
-
-	WT_RET(__conn_btree_open_lock(session, flags));
-	WT_RET(__conn_btree_open(session, cfg, flags));
-
-	F_SET(btree, WT_BTREE_OPEN);
-	return (0);
 }

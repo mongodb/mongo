@@ -33,12 +33,9 @@ __wt_session_add_btree(
  *	Lock a btree handle.
  */
 int
-__wt_session_lock_btree(
-    WT_SESSION_IMPL *session, const char *cfg[], uint32_t flags)
+__wt_session_lock_btree(WT_SESSION_IMPL *session, uint32_t flags)
 {
 	WT_BTREE *btree;
-	const char *filename;
-	int exist;
 	uint32_t special_flags;
 
 	btree = session->btree;
@@ -76,12 +73,9 @@ __wt_session_lock_btree(
 	    (!F_ISSET(btree, WT_BTREE_OPEN) || special_flags != 0)) {
 		if (!LF_ISSET(WT_BTREE_EXCLUSIVE))
 			__wt_rwunlock(session, btree->rwlock);
-		filename = btree->name + strlen("file:");
-		WT_RET(__wt_exist(session, filename, &exist));
-		if (exist)
-			WT_RET(__wt_conn_btree_reopen(session, cfg, flags));
-		else
-			return (ENOENT);
+
+		/* Treat an unopened handle just like a non-existent handle. */
+		return (WT_NOTFOUND);
 	}
 
 	return (0);
@@ -118,14 +112,13 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_session_find_btree --
+ * __session_find_btree --
  *	Find an open btree handle for the named table.
  */
-int
-__wt_session_find_btree(WT_SESSION_IMPL *session,
+static int
+__session_find_btree(WT_SESSION_IMPL *session,
     const char *uri, size_t urilen, const char *snapshot, size_t snaplen,
-    const char *cfg[], uint32_t flags,
-    WT_BTREE_SESSION **btree_sessionp)
+    uint32_t flags, WT_BTREE_SESSION **btree_sessionp)
 {
 	WT_BTREE *btree;
 	WT_BTREE_SESSION *btree_session;
@@ -143,7 +136,7 @@ __wt_session_find_btree(WT_SESSION_IMPL *session,
 		if (btree_sessionp != NULL)
 			*btree_sessionp = btree_session;
 		session->btree = btree;
-		return (__wt_session_lock_btree(session, cfg, flags));
+		return (__wt_session_lock_btree(session, flags));
 	}
 
 	*btree_sessionp = NULL;
@@ -186,32 +179,31 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 		snaplen = 0;
 	}
 
-	if ((ret = __wt_session_find_btree(session, name, namelen,
-	    snapshot, snaplen, cfg, flags, &btree_session)) != WT_NOTFOUND) {
+	if ((ret = __session_find_btree(session, name, namelen,
+	    snapshot, snaplen, flags, &btree_session)) != WT_NOTFOUND) {
 		if (ret == 0 && LF_ISSET(WT_BTREE_NO_LOCK))
 			ret = __wt_session_release_btree(session);
 		return (ret);
 	}
 
-	WT_ERR(__wt_exist(session, filename, &exist));
-	if (!exist) {
-		ret = ENOENT;
-		goto err;
+	WT_RET(__wt_exist(session, filename, &exist));
+	if (!exist)
+		return (ENOENT);
+
+	if (LF_ISSET(WT_BTREE_LOCK_ONLY) && btree_session != NULL)
+		return (0);
+
+	WT_RET(__wt_metadata_read(session, uri, &treeconf));
+	if (btree_session == NULL) {
+		WT_RET(__wt_conn_btree_get(
+		    session, name, snapshot, treeconf, cfg, flags));
+		WT_RET(__wt_session_add_btree(session, NULL));
+	} else {
+		WT_RET(__wt_conn_btree_open_lock(session, flags));
+		WT_RET(__wt_conn_btree_open(session, treeconf, cfg, flags));
 	}
 
-	WT_ERR(__wt_metadata_read(session, uri, &treeconf));
-	ret = (__wt_conn_btree_open(
-	    session, name, snapshot, treeconf, cfg, flags));
-	treeconf = NULL;
-	WT_ERR(ret);
-	if (btree_session == NULL)
-		WT_ERR(__wt_session_add_btree(session, NULL));
-
-	if (0) {
-err:		__wt_free(session, treeconf);
-	}
-
-	return (ret);
+	return (0);
 }
 
 /*

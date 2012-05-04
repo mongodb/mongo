@@ -271,8 +271,8 @@ err:		__wt_free(session, cbt);
  *	WT_SESSION->open_cursor method for the btree cursor type.
  */
 int
-__wt_curfile_open(WT_SESSION_IMPL *session,
-    const char *uri, const char *cfg[], WT_CURSOR **cursorp)
+__wt_curfile_open(WT_SESSION_IMPL *session, const char *uri,
+    WT_CURSOR *owner, const char *cfg[], WT_CURSOR **cursorp)
 {
 	WT_CONFIG_ITEM cval;
 	int bulk;
@@ -283,7 +283,7 @@ __wt_curfile_open(WT_SESSION_IMPL *session,
 	/* TODO: handle projections. */
 
 	/* Get the handle and lock it while the cursor is using it. */
-	if (WT_PREFIX_MATCH(uri, "colgroup:"))
+	if (WT_PREFIX_MATCH(uri, "colgroup:") || WT_PREFIX_MATCH(uri, "index:"))
 		WT_RET(__wt_schema_get_btree(session,
 		    uri, strlen(uri), cfg, bulk ? WT_BTREE_EXCLUSIVE : 0));
 	else if (WT_PREFIX_MATCH(uri, "file:"))
@@ -292,5 +292,5 @@ __wt_curfile_open(WT_SESSION_IMPL *session,
 	else
 		return (EINVAL);
 
-	return (__wt_curfile_create(session, NULL, cfg, cursorp));
+	return (__wt_curfile_create(session, owner, cfg, cursorp));
 }

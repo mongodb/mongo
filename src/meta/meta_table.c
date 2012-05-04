@@ -70,6 +70,7 @@ __wt_metadata_cursor(
 
 	WT_RET(__wt_metadata_open(session));
 	session->btree = session->metafile;
+	WT_RET(__wt_session_lock_btree(session, 0));
 	return (__wt_curfile_create(session, NULL, cfg, cursorp));
 }
 

@@ -154,20 +154,13 @@ __rename_table(
 	    __wt_schema_get_table(session, oldname, strlen(oldname), &table));
 
 	/* Rename the column groups. */
-	for (i = 0; i < WT_COLGROUPS(table); i++) {
-		if (table->colgroup[i] == NULL)
-			continue;
-		table->colgroup[i] = NULL;
+	for (i = 0; i < WT_COLGROUPS(table); i++)
 		WT_RET(__rename_tree(session, table->cg_name[i], newname));
-	}
 
 	/* Rename the indices. */
 	WT_RET(__wt_schema_open_index(session, table, NULL, 0));
-	for (i = 0; i < table->nindices; i++) {
-		table->index[i] = NULL;
-		WT_RET(
-		    __rename_tree(session, table->idx_name[i], newname));
-	}
+	for (i = 0; i < table->nindices; i++)
+		WT_RET(__rename_tree(session, table->idx_name[i], newname));
 
 	WT_RET(__wt_schema_remove_table(session, table));
 
