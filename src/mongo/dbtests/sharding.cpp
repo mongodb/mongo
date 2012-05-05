@@ -99,7 +99,7 @@ namespace ShardingTests {
 #if !defined(_WIN32)
             int r = rand_r( &seed ) ;
 #else
-            int r = rand(); // seed not used in this case
+            int r = ::rand(); // seed not used in this case
 #endif
 
             // Modding is bad, but don't really care in this case
@@ -229,7 +229,7 @@ namespace ShardingTests {
             VersionMap maxShardVersions;
 
             // Create a differ which will track our progress
-            shared_ptr< DefaultDiffAdapter > differ( _inverse ? new InverseDiffAdapter() : new DefaultDiffAdapter() );
+            boost::shared_ptr< DefaultDiffAdapter > differ( _inverse ? new InverseDiffAdapter() : new DefaultDiffAdapter() );
             differ->attach( "test", ranges, maxVersion, maxShardVersions );
 
             // Validate initial load

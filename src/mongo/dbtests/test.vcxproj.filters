@@ -1369,6 +1369,9 @@
     <ClCompile Include="..\util\signal_handlers.cpp">
       <Filter>util\Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="sharding.cpp">
+      <Filter>dbtests</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="btreetests.inl">

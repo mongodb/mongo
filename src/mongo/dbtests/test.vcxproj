@@ -2411,6 +2411,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     </ClCompile>
     <ClCompile Include="replsettests.cpp" />
     <ClCompile Include="repltests.cpp" />
+    <ClCompile Include="sharding.cpp" />
     <ClCompile Include="socktests.cpp" />
     <ClCompile Include="spin_lock_test.cpp" />
     <ClCompile Include="threadedtests.cpp">
