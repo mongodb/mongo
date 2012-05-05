@@ -22,7 +22,6 @@
 
 #pragma once
 
-#include "mongo/util/concurrency/qlock.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/bson/stringdata.h"
 #include "mongo/db/jsobj.h"
