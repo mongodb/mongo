@@ -309,7 +309,7 @@ namespace CursorTests {
             private:
                 Lock::GlobalWrite _lk;
                 Client::Context _ctx;
-                shared_ptr<Cursor> _cursor;
+                boost::shared_ptr<Cursor> _cursor;
                 ClientCursor::Holder _clientCursor;
             };
             
