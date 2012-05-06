@@ -20,6 +20,7 @@
 #include "mongo/util/text.h"
 #include "mongo/util/startup_test.h"
 #include "mongo/util/mongoutils/str.h"
+#include <boost/smart_ptr/scoped_array.hpp>
 
 namespace mongo {
 
@@ -97,13 +98,30 @@ namespace mongo {
         return "";
     }
 
-#if defined(_UNICODE)
-    std::wstring toWideString(const char *s) {
-        std::basic_ostringstream<TCHAR> buf;
-        buf << s;
-        return buf.str();
+    std::wstring toWideString(const char *utf8String) {
+        int bufferSize = MultiByteToWideChar(
+                CP_UTF8,            // Code page
+                0,                  // Flags
+                utf8String,         // Input string
+                -1,                 // Count, -1 for NUL-terminated
+                NULL,               // No output buffer
+                0                   // Zero means "compute required size"
+        );
+        if ( bufferSize == 0 ) {
+            return std::wstring();
+        }
+        boost::scoped_array< wchar_t > tempBuffer( new wchar_t[ bufferSize ] );
+        tempBuffer[0] = 0;
+        MultiByteToWideChar(
+                CP_UTF8,            // Code page
+                0,                  // Flags
+                utf8String,         // Input string
+                -1,                 // Count, -1 for NUL-terminated
+                tempBuffer.get(),   // UTF-16 output buffer
+                bufferSize          // Buffer size in wide characters
+        );
+        return std::wstring( tempBuffer.get() );
     }
-#endif
 
     WindowsCommandLine::WindowsCommandLine( int argc, wchar_t* argvW[] ) {
         vector < string >   utf8args;
