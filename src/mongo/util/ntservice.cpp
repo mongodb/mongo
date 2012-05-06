@@ -189,18 +189,23 @@ namespace mongo {
         GetModuleFileNameA( NULL, exePath, sizeof exePath );
         commandLine << '"' << exePath << "\" ";
 
+        // because we use allow_long_disguise in our style for boost::program_options
+        // parsing (to make -vvvvv work) we will accept "-install" and "--install" and
+        // likewise for all options.  this means that when parsing option-by-option as
+        // we do here, we need to handle both "-" and "--" prefixes.
+
         for ( int i = 1; i < argc; i++ ) {
             std::string arg( argv[ i ] );
             // replace install command to indicate process is being started as a service
-            if ( arg == "--install" || arg == "--reinstall" ) {
+            if ( arg == "-install" || arg == "--install" || arg == "-reinstall" || arg == "--reinstall" ) {
                 arg = "--service";
             }
-            else if ( arg == "--dbpath" && i + 1 < argc ) {
+            else if ( (arg == "-dbpath" || arg == "--dbpath") && i + 1 < argc ) {
                 commandLine << arg << " \"" << dbpath << "\" ";
                 i++;
                 continue;
             }
-            else if ( arg == "--logpath" && i + 1 < argc ) {
+            else if ( (arg == "-logpath" || arg == "--logpath") && i + 1 < argc ) {
                 commandLine << arg << " \"" << argv[i+1] << "\" ";
                 i++;
                 continue;
@@ -210,23 +215,28 @@ namespace mongo {
                 i++;
                 continue;
             }
-            else if ( arg == "--config" && i + 1 < argc ) {
+            else if ( (arg == "-config" || arg == "--config") && i + 1 < argc ) {
                 commandLine << arg << " \"" << argv[i+1] << "\" ";
                 i++;
                 continue;
             }
-            else if ( arg == "--pidfilepath" && i + 1 < argc ) {
+            else if ( (arg == "-pidfilepath" || arg == "--pidfilepath") && i + 1 < argc ) {
                 commandLine << arg << " \"" << argv[i+1] << "\" ";
                 i++;
                 continue;
             }
-            else if ( arg == "--repairpath" && i + 1 < argc ) {
+            else if ( (arg == "-repairpath" || arg == "--repairpath") && i + 1 < argc ) {
                 commandLine << arg << " \"" << argv[i+1] << "\" ";
                 i++;
                 continue;
             }
-            else if ( arg == "--keyfile" && i + 1 < argc ) {
+            else if ( (arg == "-keyfile" || arg == "--keyfile") && i + 1 < argc ) {
                 commandLine << arg << " \"" << argv[i+1] << "\" ";
+                i++;
+                continue;
+            }
+            else if ( arg.length() > 8 && arg.substr(0, 8) == "-service" ) {
+                // Strip off --service(Name|User|Password) arguments
                 i++;
                 continue;
             }
