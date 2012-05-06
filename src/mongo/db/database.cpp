@@ -71,6 +71,20 @@ namespace mongo {
                 uassert( 10029 ,  "bad db name [1]", *nm != '.' );
                 uassert( 10030 ,  "bad db name [2]", nm[L-1] != '.' );
                 uassert( 10031 ,  "bad char(s) in db name", strchr(nm, ' ') == 0 );
+#ifdef _WIN32
+                static const char* windowsReservedNames[] = {
+                    "con", "prn", "aux", "nul",
+                    "com1", "com2", "com3", "com4", "com5", "com6", "com7", "com8", "com9",
+                    "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9"
+                };
+                for ( size_t i = 0; i < (sizeof(windowsReservedNames) / sizeof(char*)); ++i ) {
+                    if ( strcasecmp( nm, windowsReservedNames[i] ) == 0 ) {
+                        stringstream errorString;
+                        errorString << "db name \"" << nm << "\" is a reserved name";
+                        uassert( 16185 , errorString.str(), false );
+                    }
+                }
+#endif
             }
             newDb = namespaceIndex.exists();
             profile = cmdLine.defaultProfile;
@@ -84,11 +98,19 @@ namespace mongo {
             }
             magic = 781231;
         } catch(std::exception& e) {
-            log() << "warning database " << path << ' ' << nm << " could not be opened" << endl;
-            log() << e.what() << endl;
+            log() << "warning database " << path << " " << nm << " could not be opened" << endl;
+            DBException* dbe = dynamic_cast<DBException*>(&e);
+            if ( dbe != 0 ) {
+                log() << "DBException " << dbe->getCode() << ": " << e.what() << endl;
+            }
+            else {
+                log() << e.what() << endl;
+            }
             // since destructor won't be called:
-            for ( size_t i = 0; i < _files.size(); i++ )
+            for ( size_t i = 0; i < _files.size(); i++ ) {
                 delete _files[i];
+            }
+            _files.clear();
             throw;
         }
     }
