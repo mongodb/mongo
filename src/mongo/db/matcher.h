@@ -192,10 +192,6 @@ namespace mongo {
             _orDedupConstraints.push_back( frv );
         }
 
-        void popOrClause() {
-            _orMatchers.pop_front();
-        }
-
         /**
          * @return true if this key matcher will return the same true/false
          * value as the provided doc matcher.
@@ -284,10 +280,6 @@ namespace mongo {
         // once this is called, shouldn't use this matcher for matching any more
         void advanceOrClause( const shared_ptr< FieldRangeVector > &frv ) {
             _docMatcher->addOrDedupConstraint( frv );
-            // TODO this is not yet optimal.  Since we could skip an entire
-            // or clause (if a match is impossible) between calls to advanceOrClause()
-            // we may not pop all the clauses we can.
-            _docMatcher->popOrClause();
         }
 
         CoveredIndexMatcher *nextClauseMatcher( const BSONObj &indexKeyPattern ) {
