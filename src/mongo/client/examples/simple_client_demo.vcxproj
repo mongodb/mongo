@@ -75,8 +75,6 @@
     <LinkIncremental>false</LinkIncremental>
   </PropertyGroup>
   <ItemDefinitionGroup>
-    <PrecompiledHeader>
-    </PrecompiledHeader>
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <AdditionalIncludeDirectories>..\..\..;..\..\..\third_party\boost</AdditionalIncludeDirectories>

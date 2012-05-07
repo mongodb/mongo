@@ -869,6 +869,12 @@
     <ClCompile Include="stats\service_stats.cpp">
       <Filter>db\stats</Filter>
     </ClCompile>
+    <ClCompile Include="lockstat.cpp">
+      <Filter>db\Source Files\e to n</Filter>
+    </ClCompile>
+    <ClCompile Include="lockstate.cpp">
+      <Filter>db\Source Files\e to n</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\targetver.h" />
@@ -1574,6 +1580,9 @@
     </ClInclude>
     <ClInclude Include="stats\service_stats.h">
       <Filter>db\stats</Filter>
+    </ClInclude>
+    <ClInclude Include="lockstate.h">
+      <Filter>db\Header Files\e to n</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

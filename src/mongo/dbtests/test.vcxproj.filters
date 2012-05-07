@@ -558,6 +558,12 @@
     <ClInclude Include="..\util\signal_handlers.h">
       <Filter>util\Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\db\lockstat.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\lockstate.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\client\connpool.cpp">
@@ -1371,6 +1377,12 @@
     </ClCompile>
     <ClCompile Include="sharding.cpp">
       <Filter>dbtests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\lockstat.cpp">
+      <Filter>db\Source Files\e to n</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\lockstate.cpp">
+      <Filter>db\Source Files\e to n</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
