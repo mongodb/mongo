@@ -11,14 +11,16 @@
  * api_err_printf --
  *	Extension API call to print to the error stream.
  */
-static void
+static int
 __api_err_printf(WT_SESSION *wt_session, const char *fmt, ...)
 {
+	WT_DECL_RET;
 	va_list ap;
 
 	va_start(ap, fmt);
-	__wt_eventv((WT_SESSION_IMPL *)wt_session, 0, 0, NULL, 0, fmt, ap);
+	ret = __wt_verrx((WT_SESSION_IMPL *)wt_session, fmt, ap);
 	va_end(ap);
+	return (ret);
 }
 
 static WT_EXTENSION_API __api = {
@@ -732,7 +734,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	 * possible so errors are handled correctly.
 	 */
 	if (event_handler != NULL)
-		session->event_handler = *event_handler;
+		session->event_handler = event_handler;
 
 	/* Remaining basic initialization of the connection structure. */
 	WT_ERR(__wt_connection_init(conn));

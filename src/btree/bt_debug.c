@@ -112,7 +112,7 @@ __dmsg_wrapup(WT_DBG *ds)
 	 */
 	if (msg != NULL) {
 		if (msg->size != 0)
-			__wt_msg(session, "%s", (char *)msg->mem);
+			(void)__wt_msg(session, "%s", (char *)msg->mem);
 		__wt_scr_free(&ds->msg);
 	}
 
@@ -170,7 +170,7 @@ __dmsg(WT_DBG *ds, const char *fmt, ...)
 		}
 		if (((uint8_t *)msg->mem)[msg->size - 1] == '\n') {
 			((uint8_t *)msg->mem)[msg->size - 1] = '\0';
-			__wt_msg(session, "%s", (char *)msg->mem);
+			(void)__wt_msg(session, "%s", (char *)msg->mem);
 			msg->size = 0;
 		}
 	} else {

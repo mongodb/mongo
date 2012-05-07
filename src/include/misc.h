@@ -92,7 +92,7 @@
  *
  * They come in 3 flavors: F_XXX (handles a field named "flags" in the structure
  * referenced by its argument), LF_XXX (handles a local variable named "flags"),
- * and FLD_XXX (handles any variable, anywhere.
+ * and FLD_XXX (handles any variable, anywhere).
  *
  * Flags are unsigned 32-bit values -- we cast to keep the compiler quiet (the
  * hex constant might be a negative integer), and to ensure the hex constant is
@@ -114,18 +114,28 @@
 #ifdef HAVE_VERBOSE
 #define	WT_VERBOSE_ISSET(session, f)					\
 	(FLD_ISSET(S2C(session)->verbose, WT_VERB_##f))
-#define	WT_VERBOSE(session, f, ...) do {				\
+#define	WT_VERBOSE_ERR(session, f, ...) do {				\
 	if (WT_VERBOSE_ISSET(session, f))				\
-		__wt_verbose(session, #f ": " __VA_ARGS__);		\
+		WT_ERR(__wt_verbose(session, #f ": " __VA_ARGS__));	\
 } while (0)
-#define	WT_VERBOSE_CALL(session, f, func) do {				\
+#define	WT_VERBOSE_RET(session, f, ...) do {				\
 	if (WT_VERBOSE_ISSET(session, f))				\
-		func;							\
+		WT_RET(__wt_verbose(session, #f ": " __VA_ARGS__));	\
+} while (0)
+#define	WT_VERBOSE_RETVAL(session, f, ret, ...) do {			\
+	if (WT_VERBOSE_ISSET(session, f))				\
+		(ret) = __wt_verbose(session, #f ": " __VA_ARGS__);	\
+} while (0)
+#define	WT_VERBOSE_VOID(session, f, ...) do {				\
+	if (WT_VERBOSE_ISSET(session, f))				\
+		(void)__wt_verbose(session, #f ": " __VA_ARGS__);	\
 } while (0)
 #else
 #define	WT_VERBOSE_ISSET(session, f)	0
-#define	WT_VERBOSE(session, f, ...)
-#define	WT_VERBOSE_CALL(session, f, func)
+#define	WT_VERBOSE_ERR(session, f, ...)
+#define	WT_VERBOSE_RET(session, f, ...)
+#define	WT_VERBOSE_RETVAL(session, f, ret, ...)
+#define	WT_VERBOSE_VOID(session, f, ...)
 #endif
 
 /* Clear a structure. */

@@ -24,13 +24,14 @@ handle_message(WT_EVENT_HANDLER *handler, const char *message)
  * __handle_progress_default --
  *	Default WT_EVENT_HANDLER->handle_progress implementation: ignore.
  */
-static void
+static int
 handle_progress(
     WT_EVENT_HANDLER *handler, const char *operation, uint64_t progress)
 {
 	UNUSED(handler);
 
 	track(operation, progress, NULL);
+	return (0);
 }
 
 static WT_EVENT_HANDLER event_handler = {

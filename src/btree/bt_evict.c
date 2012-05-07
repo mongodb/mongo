@@ -147,7 +147,7 @@ __wt_evict_server_wake(WT_SESSION_IMPL *session)
 	bytes_inuse = __wt_cache_bytes_inuse(cache);
 	bytes_max = conn->cache_size;
 
-	WT_VERBOSE(session, evictserver,
+	WT_VERBOSE_VOID(session, evictserver,
 	    "waking, bytes inuse %s max (%" PRIu64 "MB %s %" PRIu64 "MB), ",
 	    bytes_inuse <= bytes_max ? "<=" : ">",
 	    bytes_inuse / WT_MEGABYTE,
@@ -232,7 +232,7 @@ __wt_evict_page_request(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * The request table is full, that's okay for page requests: another
 	 * thread will see this later.
 	 */
-	WT_VERBOSE(session, evictserver,
+	WT_VERBOSE_VOID(session, evictserver,
 	    "eviction server forced page eviction request table is full");
 	page->ref->state = WT_REF_MEM;
 	return (WT_RESTART);
@@ -269,17 +269,19 @@ __wt_cache_evict_server(void *arg)
 		__wt_eviction_check(session, &read_lockout, 0);
 
 		if (!read_lockout) {
-			WT_VERBOSE(session, evictserver, "sleeping");
+			WT_VERBOSE_ERR(session, evictserver, "sleeping");
 			__wt_cond_wait(session, cache->evict_cond);
 		}
 
 		if (!F_ISSET(conn, WT_SERVER_RUN))
 			break;
-		WT_VERBOSE(session, evictserver, "waking");
+		WT_VERBOSE_ERR(session, evictserver, "waking");
 
 		/* Evict pages from the cache as needed. */
 		WT_ERR(__evict_worker(session));
 	}
+
+	WT_VERBOSE_ERR(session, evictserver, "exiting");
 
 	if (ret == 0) {
 		if (__wt_cache_bytes_inuse(cache) != 0) {
@@ -291,8 +293,6 @@ __wt_cache_evict_server(void *arg)
 		}
 	} else
 err:		__wt_err(session, ret, "eviction server error");
-
-	WT_VERBOSE(session, evictserver, "exiting");
 
 	__wt_free(session, cache->evict);
 
@@ -346,7 +346,7 @@ __evict_worker(WT_SESSION_IMPL *session)
 		if (bytes_start == bytes_inuse) {
 			if (loop == 10) {
 				WT_STAT_INCR(conn->stats, cache_evict_slow);
-				WT_VERBOSE(session, evictserver,
+				WT_VERBOSE_RET(session, evictserver,
 				    "unable to reach eviction goal");
 				break;
 			}
@@ -428,7 +428,7 @@ __evict_file_request_walk(WT_SESSION_IMPL *session)
 		syncop = request_session->syncop;
 		request_session->syncop = 0;
 
-		WT_VERBOSE(session, evictserver,
+		WT_VERBOSE_RET(session, evictserver,
 		    "file request: %s",
 		    (request_session->syncop == WT_SYNC ? "sync" :
 		    (request_session->syncop == WT_SYNC_DISCARD ?
@@ -554,6 +554,9 @@ __evict_page_request_walk(WT_SESSION_IMPL *session)
 		/* Reference the correct WT_BTREE handle. */
 		WT_SET_BTREE_IN_SESSION(session, er->btree);
 
+		WT_VERBOSE_RET(session, evictserver,
+		    "forcing eviction of page %p", page);
+
 		/*
 		 * Block out concurrent eviction while we are handling this
 		 * request.
@@ -579,9 +582,6 @@ __evict_page_request_walk(WT_SESSION_IMPL *session)
 		 */
 		while (session->btree->lru_count > 0)
 			__wt_yield();
-
-		WT_VERBOSE(session, evictserver,
-		    "forcing eviction of page %p", page);
 
 		ref = page->ref;
 		WT_ASSERT(session, ref->page == page);
@@ -753,9 +753,6 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 		    F_ISSET(page->modify, WT_PM_REC_SPLIT_MERGE)))
 			continue;
 
-		WT_VERBOSE(session, evictserver,
-		    "select: %p, size %" PRIu32, page, page->memory_footprint);
-
 		WT_ASSERT(session, evict->page == NULL);
 		evict->page = page;
 		evict->btree = btree;
@@ -763,6 +760,9 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 
 		/* Mark the page on the list */
 		F_SET_ATOMIC(page, WT_PAGE_EVICT_LRU);
+
+		WT_VERBOSE_RET(session, evictserver,
+		    "select: %p, size %" PRIu32, page, page->memory_footprint);
 	}
 
 	*slotp += (u_int)(evict - start);

@@ -17,7 +17,7 @@ __handle_error_verbose(WT_EVENT_HANDLER *handler, int error, const char *errmsg)
 	WT_UNUSED(handler);
 	WT_UNUSED(error);
 
-	return (fprintf(stderr, "%s\n", errmsg) < 0 ? -1 : 0);
+	return (fprintf(stderr, "%s\n", errmsg) < 0 ? EIO : 0);
 }
 
 /*
@@ -29,20 +29,21 @@ __handle_message_verbose(WT_EVENT_HANDLER *handler, const char *message)
 {
 	WT_UNUSED(handler);
 
-	return (printf("%s\n", message) < 0 ? -1 : 0);
+	return (printf("%s\n", message) < 0 ? EIO : 0);
 }
 
 /*
  * __handle_progress_verbose --
  *	Default WT_EVENT_HANDLER->handle_progress implementation: ignore.
  */
-static void
+static int
 __handle_progress_verbose(WT_EVENT_HANDLER *handler,
      const char *operation, uint64_t progress)
 {
 	WT_UNUSED(handler);
 
-	(void)printf("\r\t%s %-20" PRIu64, operation, progress);
+	return (
+	    printf("\r\t%s %-20" PRIu64, operation, progress) < 0 ? EIO : 0);
 }
 
 static WT_EVENT_HANDLER __event_handler_verbose = {
