@@ -236,7 +236,7 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session)
 	 */
 	if ((recno = WT_INSERT_RECNO(new_ins)) == 0)
 		recno = WT_INSERT_RECNO(new_ins) = ++btree->last_recno;
-	
+
 	ins = __col_insert_search(inshead, ins_stack, recno);
 
 	/* If we find the record number, there's been a race. */
@@ -266,7 +266,7 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session)
 	/*
 	 * If the insert head does not yet have an insert list, our caller
 	 * passed us one.
-         *
+	 *
 	 * NOTE: it is important to do this after the item has been added to
 	 * the list.  Code can assume that if the list is set, it is non-empty.
 	 */
@@ -278,7 +278,7 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session)
 	/*
 	 * If the page does not yet have an insert array, our caller passed
 	 * us one.
-         *
+	 *
 	 * NOTE: it is important to do this after publishing the list entry.
 	 * Code can assume that if the array is set, it is non-empty.
 	 */
