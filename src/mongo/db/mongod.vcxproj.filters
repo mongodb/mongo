@@ -857,6 +857,18 @@
     <ClCompile Include="..\util\signal_handlers.cpp">
       <Filter>util\Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\client\distlock_test.cpp">
+      <Filter>client\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="driverHelpers.cpp">
+      <Filter>db\Source Files\a to d</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\histogram.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="stats\service_stats.cpp">
+      <Filter>db\stats</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\targetver.h" />
@@ -1556,6 +1568,12 @@
     </ClInclude>
     <ClInclude Include="..\util\signal_handlers.h">
       <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\histogram.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="stats\service_stats.h">
+      <Filter>db\stats</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
