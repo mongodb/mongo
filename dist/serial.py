@@ -18,6 +18,7 @@ class Serial:
 msgtypes = [
 Serial('col_append', 'WT_SERIAL_FUNC', [
 		SerialArg('WT_PAGE *', 'page'),
+		SerialArg('uint32_t', 'write_gen'),
 		SerialArg('WT_INSERT_HEAD **', 'insheadp'),
 		SerialArg('WT_INSERT ***', 'ins_stack'),
 		SerialArg('WT_INSERT_HEAD **', 'new_inslist', 1),

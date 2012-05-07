@@ -149,7 +149,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 			ins_copy = ins;
 
 			WT_ERR(__wt_col_append_serial(session,
-			    page, inshead, cbt->ins_stack,
+			    page, cbt->write_gen, inshead, cbt->ins_stack,
 			    &new_inslist, new_inslist_size,
 			    &new_inshead, new_inshead_size,
 			    &ins, ins_size, skipdepth));
@@ -216,12 +216,16 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session)
 	WT_INSERT_HEAD *inshead, **insheadp, **new_inslist, *new_inshead;
 	WT_PAGE *page;
 	uint64_t recno;
+	uint32_t write_gen;
 	u_int i, skipdepth;
 
 	btree = session->btree;
 
-	__wt_col_append_unpack(session, &page, &insheadp, &ins_stack,
-	    &new_inslist, &new_inshead, &new_ins, &skipdepth);
+	__wt_col_append_unpack(session, &page, &write_gen, &insheadp,
+	    &ins_stack, &new_inslist, &new_inshead, &new_ins, &skipdepth);
+
+	/* Check the page's write-generation. */
+	WT_ERR(__wt_page_write_gen_check(page, write_gen));
 
 	if ((inshead = *insheadp) == NULL)
 		inshead = new_inshead;
@@ -240,10 +244,8 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session)
 	ins = __col_insert_search(inshead, ins_stack, recno);
 
 	/* If we find the record number, there's been a race. */
-	if (ins != NULL && WT_INSERT_RECNO(ins) == recno) {
-		ret = WT_RESTART;
-		goto done;
-	}
+	if (ins != NULL && WT_INSERT_RECNO(ins) == recno)
+		WT_ERR(WT_RESTART);
 
 	/*
 	 * Publish: First, point the new WT_INSERT item's skiplist references
@@ -294,5 +296,5 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session)
 	if (recno > btree->last_recno)
 		btree->last_recno = recno;
 
-done:	__wt_session_serialize_wrapup(session, page, ret);
+err:	__wt_session_serialize_wrapup(session, page, ret);
 }
