@@ -107,37 +107,50 @@ namespace mongo {
 
         Member *closest = 0;
         time_t now = 0;
+        
         // find the member with the lowest ping time that has more data than me
-        for (Member *m = _members.head(); m; m = m->next()) {
-            if (m->hbinfo().up() &&
-                // make sure members with buildIndexes sync from other members w/indexes
-                (!buildIndexes || (buildIndexes && m->config().buildIndexes)) &&
-                (m->state() == MemberState::RS_PRIMARY ||
-                 (m->state() == MemberState::RS_SECONDARY && m->hbinfo().opTime > lastOpTimeWritten)) &&
-                (!closest || m->hbinfo().ping < closest->hbinfo().ping) &&
-                ( myConfig().slaveDelay >= m->config().slaveDelay )) {
 
-                map<string,time_t>::iterator vetoed = _veto.find(m->fullName());
-                if (vetoed == _veto.end()) {
-                    closest = m;
-                    break;
+        // Make two attempts.  The first attempt, we ignore those nodes with
+        // slave delay higher than our own.  The second attempt includes such
+        // nodes, in case those are the only ones we can reach.
+        for (int attempts = 0; attempts < 2; ++attempts) {
+            for (Member *m = _members.head(); m; m = m->next()) {
+                if (m->hbinfo().up() &&
+                    // make sure members with buildIndexes sync from other members w/indexes
+                    (!buildIndexes || (buildIndexes && m->config().buildIndexes)) &&
+                    (m->state() == MemberState::RS_PRIMARY ||
+                     (m->state() == MemberState::RS_SECONDARY && 
+                      m->hbinfo().opTime > lastOpTimeWritten)) &&
+                    (!closest || m->hbinfo().ping < closest->hbinfo().ping)) {
+
+                    if ( attempts == 0 && 
+                         myConfig().slaveDelay < m->config().slaveDelay ) {
+                        break; // skip this one in the first attempt
+                    }
+
+                    map<string,time_t>::iterator vetoed = _veto.find(m->fullName());
+                    if (vetoed == _veto.end()) {
+                        closest = m;
+                        break;
+                    }
+
+                    if (now == 0) {
+                        now = time(0);
+                    }
+
+                    // if this was on the veto list, check if it was vetoed in the last "while"
+                    if ((*vetoed).second < now) {
+                        _veto.erase(vetoed);
+                        closest = m;
+                        break;
+                    }
+
+                    // if it was recently vetoed, skip
+                    log() << "replSet not trying to sync from " << (*vetoed).first
+                          << ", it is vetoed for " << ((*vetoed).second - now) << " more seconds" << rsLog;
                 }
-
-                if (now == 0) {
-                    now = time(0);
-                }
-
-                // if this was on the veto list, check if it was vetoed in the last "while"
-                if ((*vetoed).second < now) {
-                    _veto.erase(vetoed);
-                    closest = m;
-                    break;
-                }
-
-                // if it was recently vetoed, skip
-                log() << "replSet not trying to sync from " << (*vetoed).first
-                      << ", it is vetoed for " << ((*vetoed).second - now) << " more seconds" << rsLog;
             }
+            if (closest) break; // no need for second attempt
         }
 
         {
