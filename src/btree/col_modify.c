@@ -236,14 +236,13 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session)
 	 */
 	if ((recno = WT_INSERT_RECNO(new_ins)) == 0)
 		recno = WT_INSERT_RECNO(new_ins) = ++btree->last_recno;
-	else {
-		ins = __col_insert_search(inshead, ins_stack, recno);
+	
+	ins = __col_insert_search(inshead, ins_stack, recno);
 
-		/* If we find the record number, there's been a race. */
-		if (ins != NULL && WT_INSERT_RECNO(ins) == recno) {
-			ret = WT_RESTART;
-			goto done;
-		}
+	/* If we find the record number, there's been a race. */
+	if (ins != NULL && WT_INSERT_RECNO(ins) == recno) {
+		ret = WT_RESTART;
+		goto done;
 	}
 
 	/*
