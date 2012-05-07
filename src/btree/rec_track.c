@@ -351,7 +351,10 @@ __wt_rec_track_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		case WT_TRK_DISCARD:
 		case WT_TRK_OVFL:
 			WT_VERBOSE_CALL(session, reconcile, __track_msg(
-			    session, page, "discard block", &track->addr));
+			    session, page,
+			    WT_TRK_TYPE(track) == WT_TRK_DISCARD ?
+			    "discard block" : "inactive overflow",
+			    &track->addr));
 
 			/* We no longer need the underlying blocks. */
 			WT_RET(__wt_bm_free(
