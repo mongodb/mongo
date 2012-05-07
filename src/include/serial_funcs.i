@@ -2,7 +2,7 @@
 
 typedef struct {
 	WT_PAGE *page;
-	WT_INSERT_HEAD **inshead;
+	WT_INSERT_HEAD **insheadp;
 	WT_INSERT ***ins_stack;
 	WT_INSERT_HEAD **new_inslist;
 	size_t new_inslist_size;
@@ -18,7 +18,7 @@ typedef struct {
 
 static inline int
 __wt_col_append_serial(
-	WT_SESSION_IMPL *session, WT_PAGE *page, WT_INSERT_HEAD **inshead,
+	WT_SESSION_IMPL *session, WT_PAGE *page, WT_INSERT_HEAD **insheadp,
 	WT_INSERT ***ins_stack, WT_INSERT_HEAD ***new_inslistp, size_t
 	new_inslist_size, WT_INSERT_HEAD **new_insheadp, size_t
 	new_inshead_size, WT_INSERT **new_insp, size_t new_ins_size, u_int
@@ -29,7 +29,7 @@ __wt_col_append_serial(
 
 	args->page = page;
 
-	args->inshead = inshead;
+	args->insheadp = insheadp;
 
 	args->ins_stack = ins_stack;
 
@@ -76,16 +76,16 @@ __wt_col_append_serial(
 
 static inline void
 __wt_col_append_unpack(
-	WT_SESSION_IMPL *session, WT_PAGE **pagep, WT_INSERT_HEAD ***insheadp,
-	WT_INSERT ****ins_stackp, WT_INSERT_HEAD ***new_inslistp,
-	WT_INSERT_HEAD **new_insheadp, WT_INSERT **new_insp, u_int
-	*skipdepthp)
+	WT_SESSION_IMPL *session, WT_PAGE **pagep, WT_INSERT_HEAD
+	***insheadpp, WT_INSERT ****ins_stackp, WT_INSERT_HEAD
+	***new_inslistp, WT_INSERT_HEAD **new_insheadp, WT_INSERT **new_insp,
+	u_int *skipdepthp)
 {
 	__wt_col_append_args *args =
 	    (__wt_col_append_args *)session->wq_args;
 
 	*pagep = args->page;
-	*insheadp = args->inshead;
+	*insheadpp = args->insheadp;
 	*ins_stackp = args->ins_stack;
 	*new_inslistp = args->new_inslist;
 	*new_insheadp = args->new_inshead;
