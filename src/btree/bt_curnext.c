@@ -95,11 +95,14 @@ static inline int
 __cursor_var_append_next(WT_CURSOR_BTREE *cbt, int newpage)
 {
 	WT_ITEM *val;
+	WT_SESSION_IMPL *session;
 
+	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	val = &cbt->iface.value;
 
 	if (newpage) {
 		cbt->ins = WT_SKIP_FIRST(cbt->ins_head);
+		WT_ASSERT(session, cbt->ins != NULL);
 		goto new_page;
 	}
 
