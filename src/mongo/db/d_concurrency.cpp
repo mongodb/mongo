@@ -575,7 +575,7 @@ namespace mongo {
         _weLocked=0;
 
         LockState& ls = lockState();
-        massert( 16175 , "can't get a DBWrite while having a read lock" , ! ls.hasAnyReadLock() );
+        massert( 16186 , "can't get a DBWrite while having a read lock" , ! ls.hasAnyReadLock() );
         if( ls.isW() )
             return;
 
