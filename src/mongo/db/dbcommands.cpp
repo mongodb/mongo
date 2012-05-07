@@ -1143,8 +1143,10 @@ namespace mongo {
                     uassert( 10040 ,  "chunks out of order" , n == myn );
                 }
 
+                // make a copy of obj since we access data in it while yielding
+                BSONObj owned = obj.getOwned();
                 int len;
-                const char * data = obj["data"].binDataClean( len );
+                const char * data = owned["data"].binDataClean( len );
 
                 ClientCursor::YieldLock yield (cc.get());
                 try {
