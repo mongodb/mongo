@@ -80,7 +80,7 @@ namespace mongo {
     }
 
     const Member* ReplSetImpl::getMemberToSyncTo() {
-        Member *closest = 0;
+
         bool buildIndexes = true;
 
         // wait for 2N pings before choosing a sync target
@@ -95,16 +95,31 @@ namespace mongo {
             buildIndexes = myConfig().buildIndexes;
         }
 
+        Member *closest = 0;
+
         // find the member with the lowest ping time that has more data than me
-        for (Member *m = _members.head(); m; m = m->next()) {
-            if (m->hbinfo().up() &&
-                // make sure members with buildIndexes sync from other members w/indexes
-                (!buildIndexes || (buildIndexes && m->config().buildIndexes)) &&
-                (m->state() == MemberState::RS_PRIMARY ||
-                 (m->state() == MemberState::RS_SECONDARY && m->hbinfo().opTime > lastOpTimeWritten)) &&
-                (!closest || m->hbinfo().ping < closest->hbinfo().ping)) {
-                closest = m;
+
+        // Make two attempts.  The first attempt, we ignore those nodes with
+        // slave delay higher than our own.  The second attempt includes such
+        // nodes, in case those are the only ones we can reach.
+        for (int attempts = 0; attempts < 2; ++attempts) {
+            for (Member *m = _members.head(); m; m = m->next()) {
+                if (m->hbinfo().up() &&
+                    // make sure members with buildIndexes sync from other members w/indexes
+                    (!buildIndexes || (buildIndexes && m->config().buildIndexes)) &&
+                    (m->state() == MemberState::RS_PRIMARY ||
+                     (m->state() == MemberState::RS_SECONDARY && 
+                      m->hbinfo().opTime > lastOpTimeWritten)) &&
+                    (!closest || m->hbinfo().ping < closest->hbinfo().ping)) {
+
+                    if ( attempts == 0 && 
+                         myConfig().slaveDelay < m->config().slaveDelay ) {
+                        break; // skip this one in the first attempt
+                    }
+                    closest = m;
+                }
             }
+            if (closest) break; // no need for second attempt
         }
 
         {
