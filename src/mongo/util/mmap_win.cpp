@@ -126,8 +126,8 @@ namespace mongo {
             if ( options & SEQUENTIAL )
                 createOptions |= FILE_FLAG_SEQUENTIAL_SCAN;
             DWORD rw = GENERIC_READ | GENERIC_WRITE;
-            fd = CreateFile(
-                     toNativeString(filename).c_str(),
+            fd = CreateFileW(
+                     toWideString(filename).c_str(),
                      rw, // desired access
                      FILE_SHARE_WRITE | FILE_SHARE_READ, // share mode
                      NULL, // security
@@ -135,8 +135,12 @@ namespace mongo {
                      createOptions , // flags
                      NULL); // hTempl
             if ( fd == INVALID_HANDLE_VALUE ) {
-                DWORD e = GetLastError();
-                log() << "Create/OpenFile failed " << filename << " errno:" << e << endl;
+                DWORD dosError = GetLastError();
+                log() << "CreateFileW for " << filename
+                        << " failed with " << errnoWithDescription( dosError )
+                        << " (file size is " << length << ")"
+                        << " in MemoryMappedFile::map"
+                        << endl;
                 return 0;
             }
         }
@@ -145,15 +149,19 @@ namespace mongo {
 
         {
             DWORD flProtect = PAGE_READWRITE; //(options & READONLY)?PAGE_READONLY:PAGE_READWRITE;
-            maphandle = CreateFileMapping(fd, NULL, flProtect,
+            maphandle = CreateFileMappingW(fd, NULL, flProtect,
                                           length >> 32 /*maxsizehigh*/,
                                           (unsigned) length /*maxsizelow*/,
                                           NULL/*lpName*/);
             if ( maphandle == NULL ) {
-                DWORD e = GetLastError(); // log() call was killing lasterror before we get to that point in the stream
-                log() << "CreateFileMapping failed " << filename << ' ' << errnoWithDescription(e) << endl;
+                DWORD dosError = GetLastError();
+                log() << "CreateFileMappingW for " << filename
+                        << " failed with " << errnoWithDescription( dosError )
+                        << " (file size is " << length << ")"
+                        << " in MemoryMappedFile::map"
+                        << endl;
                 close();
-                return 0;
+                fassertFailed( 16225 );
             }
         }
 
@@ -169,8 +177,8 @@ namespace mongo {
             if ( view == 0 ) {
                 DWORD dosError = GetLastError();
                 log() << "MapViewOfFile for " << filename
-                        << " failed with error " << errnoWithDescription( dosError )
-                        << " (file size is " << len << ")"
+                        << " failed with " << errnoWithDescription( dosError )
+                        << " (file size is " << length << ")"
                         << " in MemoryMappedFile::map"
                         << endl;
                 close();
