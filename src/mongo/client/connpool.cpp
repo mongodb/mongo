@@ -385,13 +385,6 @@ namespace mongo {
 
     // ------ ScopedDbConnection ------
 
-    ScopedDbConnection * ScopedDbConnection::steal() {
-        verify( _conn );
-        ScopedDbConnection * n = new ScopedDbConnection( _host , _conn, _socketTimeout );
-        _conn = 0;
-        return n;
-    }
-
     void ScopedDbConnection::_setSocketTimeout(){
         if( ! _conn ) return;
         if( _conn->type() == ConnectionString::MASTER )
