@@ -1307,6 +1307,10 @@ namespace QueryOptimizerTests {
             c = NamespaceDetailsTransient::bestGuessCursor( ns(), BSON( "a" << 1 ),
                                                            BSON( "b" << 1 ) );
             ASSERT_EQUALS( string( "b" ), c->indexKeyPattern().firstElementFieldName() );
+            ASSERT( c->matcher() );
+            ASSERT( c->currentMatches() ); // { b:1 } document
+            c->advance();
+            ASSERT( !c->currentMatches() ); // { a:1 } document
             
             c = NamespaceDetailsTransient::bestGuessCursor( ns(), fromjson( "{b:1,$or:[{z:1}]}" ),
                                                          BSON( "a" << 1 ) );

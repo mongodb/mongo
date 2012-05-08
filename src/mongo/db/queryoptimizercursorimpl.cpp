@@ -785,9 +785,7 @@ namespace mongo {
         }
         shared_ptr<Cursor> single = singlePlan->newCursor();
         if ( !_query.isEmpty() && !single->matcher() ) {
-            shared_ptr<CoveredIndexMatcher> matcher
-            ( new CoveredIndexMatcher( _query, single->indexKeyPattern() ) );
-            single->setMatcher( matcher );
+            single->setMatcher( singlePlan->matcher() );
         }
         if ( singlePlan->keyFieldsOnly() ) {
             single->setKeyFieldsOnly( singlePlan->keyFieldsOnly() );

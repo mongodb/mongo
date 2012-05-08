@@ -397,6 +397,13 @@ doneCheckOrder:
                     ).jsonString();
     }
     
+    shared_ptr<CoveredIndexMatcher> QueryPlan::matcher() const {
+        if ( !_matcher ) {
+            _matcher.reset( new CoveredIndexMatcher( originalQuery(), indexKey() ) );
+        }
+        return _matcher;
+    }
+    
     bool QueryPlan::isMultiKey() const {
         if ( _idxNo < 0 )
             return false;
@@ -404,7 +411,6 @@ doneCheckOrder:
     }
     
     void QueryOp::init() {
-        _matcher.reset( new CoveredIndexMatcher( qp().originalQuery(), qp().indexKey() ) );
         _init();
     }
     
@@ -1435,8 +1441,7 @@ doneCheckOrder:
 
         // If we don't already have a matcher, supply one.
         if ( !query.isEmpty() && ! ret->matcher() ) {
-            shared_ptr<CoveredIndexMatcher> matcher( new CoveredIndexMatcher( query, ret->indexKeyPattern() ) );
-            ret->setMatcher( matcher );
+            ret->setMatcher( qpp->matcher() );
         }
         return ret;
     }

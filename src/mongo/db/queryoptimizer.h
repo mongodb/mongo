@@ -91,6 +91,9 @@ namespace mongo {
         const FieldRangeSet &multikeyFrs() const { return _frsMulti; }
         
         shared_ptr<Projection::KeyOnly> keyFieldsOnly() const { return _keyFieldsOnly; }
+
+        /** @return a shared, lazily initialized matcher for the query plan. */
+        shared_ptr<CoveredIndexMatcher> matcher() const;
         
         QueryPlanSummary summary() const;
 
@@ -128,6 +131,7 @@ namespace mongo {
         IndexType * _type;
         bool _startOrEndSpec;
         shared_ptr<Projection::KeyOnly> _keyFieldsOnly;
+        mutable shared_ptr<CoveredIndexMatcher> _matcher; // Lazy initialization.
     };
 
     /**
@@ -214,8 +218,10 @@ namespace mongo {
            return matcher( c.get() );
         }
         shared_ptr<CoveredIndexMatcher> matcher( Cursor* c ) const {
-            if( ! c ) return _matcher;
-            return c->matcher() ? c->matcherPtr() : _matcher;
+            if ( c && c->matcher() ) {
+                return c->matcherPtr();
+            }
+            return qp().matcher();
         }
 
         /** @return an ExplainPlanInfo object that will be updated as the query runs. */
@@ -241,7 +247,6 @@ namespace mongo {
         ExceptionInfo _exception;
         const QueryPlan *_qp;
         bool _error;
-        shared_ptr<CoveredIndexMatcher> _matcher;
     };
 
     // temp.  this class works if T::operator< is variant unlike a regular stl priority queue.
