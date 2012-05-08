@@ -750,7 +750,7 @@ namespace mongo {
             if (!cmdLine.dur)
                 return;
 
-	    if( Lock::isLocked() ) {
+            if( Lock::isLocked() ) {
                 getDur().commitIfNeeded(true);
             }
             else {
