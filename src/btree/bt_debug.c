@@ -182,11 +182,33 @@ __dmsg(WT_DBG *ds, const char *fmt, ...)
 
 /*
  * __wt_debug_addr --
- *	Read and dump a disk page in debugging mode.
+ *	Read and dump a disk page in debugging mode, using an addr/size pair.
  */
 int
-__wt_debug_addr(
-    WT_SESSION_IMPL *session, uint32_t addr, uint32_t size, const char *ofile)
+__wt_debug_addr(WT_SESSION_IMPL *session,
+    const uint8_t *addr, uint32_t addr_size, const char *ofile)
+{
+	WT_DECL_RET;
+	WT_ITEM *buf;
+
+	buf = NULL;
+
+	WT_RET(__wt_scr_alloc(session, 1024, &buf));
+	WT_ERR(__wt_block_read(
+	    session, session->btree->block, buf, addr, addr_size));
+	ret = __wt_debug_disk(session, buf->mem, ofile);
+err:	__wt_scr_free(&buf);
+
+	return (ret);
+}
+
+/*
+ * __wt_debug_off --
+ *	Read and dump a disk page in debugging mode, using an offset/size pair.
+ */
+int
+__wt_debug_off(
+    WT_SESSION_IMPL *session, uint32_t offset, uint32_t size, const char *ofile)
 {
 	WT_DECL_RET;
 	WT_ITEM *buf;
@@ -195,7 +217,7 @@ __wt_debug_addr(
 
 	WT_RET(__wt_scr_alloc(session, size, &buf));
 	WT_ERR(__wt_block_read_off(
-	    session, session->btree->block, buf, addr, size, 0));
+	    session, session->btree->block, buf, offset, size, 0));
 	ret = __wt_debug_disk(session, buf->mem, ofile);
 err:	__wt_scr_free(&buf);
 
