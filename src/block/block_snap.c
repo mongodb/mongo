@@ -333,7 +333,8 @@ __snapshot_process(
 			continue;
 
 		if (WT_VERBOSE_ISSET(session, snapshot)) {
-			WT_ERR(__wt_scr_alloc(session, 0, &tmp));
+			if (tmp == NULL)
+				WT_ERR(__wt_scr_alloc(session, 0, &tmp));
 			WT_ERR(__snapshot_string(
 			    session, block, snap->raw.data, tmp));
 			WT_VERBOSE_ERR(session, snapshot,
@@ -370,9 +371,9 @@ __snapshot_process(
 		 * never on any alloc list.   Include the "from" snapshot's
 		 * avail list, it's going away.
 		 */
-		WT_RET(__snapshot_extlist_fblocks(session, block, &a->alloc));
-		WT_RET(__snapshot_extlist_fblocks(session, block, &a->avail));
-		WT_RET(__snapshot_extlist_fblocks(session, block, &a->discard));
+		WT_ERR(__snapshot_extlist_fblocks(session, block, &a->alloc));
+		WT_ERR(__snapshot_extlist_fblocks(session, block, &a->avail));
+		WT_ERR(__snapshot_extlist_fblocks(session, block, &a->discard));
 
 		/*
 		 * Roll the "from" alloc and discard extent lists into the "to"
@@ -417,8 +418,8 @@ __snapshot_process(
 		 * any alloc list.  Do not include the "to" snapshot's avail
 		 * list, it's not changing.
 		 */
-		WT_RET(__snapshot_extlist_fblocks(session, block, &b->alloc));
-		WT_RET(__snapshot_extlist_fblocks(session, block, &b->discard));
+		WT_ERR(__snapshot_extlist_fblocks(session, block, &b->alloc));
+		WT_ERR(__snapshot_extlist_fblocks(session, block, &b->discard));
 
 		F_SET(snap + 1, WT_SNAP_UPDATE);
 	}
@@ -436,7 +437,7 @@ live_update:
 	si = &block->live;
 
 	/* Truncate the file if that's possible. */
-	WT_RET(__wt_block_extlist_truncate(session, block, &si->avail));
+	WT_ERR(__wt_block_extlist_truncate(session, block, &si->avail));
 
 	/* Update the final, added snapshot based on the live system. */
 	WT_SNAPSHOT_FOREACH(snapbase, snap)
