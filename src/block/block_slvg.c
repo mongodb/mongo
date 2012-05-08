@@ -130,7 +130,7 @@ __wt_block_salvage_next(
 		 */
 		if (__wt_block_read_off(
 		    session, block, buf, offset, size, cksum)) {
-skip:			WT_VERBOSE(session, salvage,
+skip:			WT_VERBOSE_RET(session, salvage,
 			    "skipping %" PRIu32 "B at file offset %" PRIuMAX,
 			    allocsize, (uintmax_t)offset);
 

@@ -357,6 +357,7 @@ mfence
 minorp
 minprefix
 msg
+msgv
 mtx
 multiprocess
 multithread
@@ -519,7 +520,9 @@ utf
 va
 vanishingly
 vcell
+verrx
 versa
+vmsg
 vpack
 vsize
 vslot

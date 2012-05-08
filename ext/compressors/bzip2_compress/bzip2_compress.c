@@ -120,7 +120,7 @@ bzip2_error(WT_SESSION *session, const char *call, int bzret)
 		break;
 	}
 
-	wiredtiger_err_printf(
+	(void)wiredtiger_err_printf(
 	    session, "bzip2 error: %s: %s: %d", call, msg, bzret);
 	return (WT_ERROR);
 }

@@ -19,7 +19,6 @@ wiredtiger_struct_size(const char *fmt, ...)
 	size_t size;
 
 	WT_CLEAR(session);
-	session.event_handler = __wt_event_handler_default;
 
 	va_start(ap, fmt);
 	size = __wt_struct_sizev(&session, fmt, ap);
@@ -40,7 +39,6 @@ wiredtiger_struct_pack(void *buffer, size_t size, const char *fmt, ...)
 	va_list ap;
 
 	WT_CLEAR(session);
-	session.event_handler = __wt_event_handler_default;
 
 	va_start(ap, fmt);
 	ret = __wt_struct_packv(&session, buffer, size, fmt, ap);
@@ -61,7 +59,6 @@ wiredtiger_struct_unpack(const void *buffer, size_t size, const char *fmt, ...)
 	va_list ap;
 
 	WT_CLEAR(session);
-	session.event_handler = __wt_event_handler_default;
 
 	va_start(ap, fmt);
 	ret = __wt_struct_unpackv(&session, buffer, size, fmt, ap);

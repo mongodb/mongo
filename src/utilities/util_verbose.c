@@ -11,13 +11,13 @@
  * __handle_error_verbose --
  *	Verbose WT_EVENT_HANDLER->handle_error implementation: send to stderr.
  */
-static void
+static int
 __handle_error_verbose(WT_EVENT_HANDLER *handler, int error, const char *errmsg)
 {
 	WT_UNUSED(handler);
 	WT_UNUSED(error);
 
-	fprintf(stderr, "%s\n", errmsg);
+	return (fprintf(stderr, "%s\n", errmsg) < 0 ? EIO : 0);
 }
 
 /*
@@ -29,8 +29,7 @@ __handle_message_verbose(WT_EVENT_HANDLER *handler, const char *message)
 {
 	WT_UNUSED(handler);
 
-	(void)printf("%s\n", message);
-	return (0);
+	return (printf("%s\n", message) < 0 ? EIO : 0);
 }
 
 /*
@@ -43,8 +42,8 @@ __handle_progress_verbose(WT_EVENT_HANDLER *handler,
 {
 	WT_UNUSED(handler);
 
-	(void)printf("\r\t%s %-20" PRIu64, operation, progress);
-	return (0);
+	return (
+	    printf("\r\t%s %-20" PRIu64, operation, progress) < 0 ? EIO : 0);
 }
 
 static WT_EVENT_HANDLER __event_handler_verbose = {

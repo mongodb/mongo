@@ -22,7 +22,7 @@ __wt_remove(WT_SESSION_IMPL *session, const char *name)
 	conn = S2C(session);
 	fh = NULL;
 
-	WT_VERBOSE(session, fileops, "%s: remove", name);
+	WT_VERBOSE_RET(session, fileops, "%s: remove", name);
 
 	/* If the file is open, close/free it. */
 	__wt_spin_lock(session, &conn->fh_lock);

@@ -1119,27 +1119,39 @@ int wiredtiger_open(const char *home,
 const char *wiredtiger_strerror(int err);
 
 /*!
- * The interface implemented by applications in order to handle error messages,
- * information messages and progress.  Entries set to NULL are ignored and will
- * continue to use the default handlers.
+ * The interface implemented by applications to handle error, informational and
+ * progress messages.  Entries set to NULL are ignored and the default handlers
+ * will continue to be used.
  */
 struct __wt_event_handler {
 	/*!
 	 * Callback to handle error messages; by default, error messages are
-	 * written to the stderr stream.
+	 * written to the stderr stream.  If the handler returns non-zero,
+	 * the application's current operation will return an error.
+	 *
+	 * @param error a WiredTiger, C99 or POSIX error code, which can
+	 * be converted to a string using ::wiredtiger_strerror
+	 * @param message an error string
 	 */
-	void (*handle_error)(WT_EVENT_HANDLER *handler,
-	    int error, const char *errmsg);
+	int (*handle_error)(WT_EVENT_HANDLER *handler,
+	    int error, const char *message);
 
 	/*!
 	 * Callback to handle informational messages; by default, informational
-	 * messages are written to the stdout stream.
+	 * messages are written to the stdout stream.  If the handler returns
+	 * non-zero, the application's current operation will return an error.
+	 *
+	 * @param message an informational string
 	 */
 	int (*handle_message)(WT_EVENT_HANDLER *handler, const char *message);
 
 	/*!
-	 * Callback to handle progress messages; by default, progress messages
-	 * are ignored.
+	 * Callback to handle progress messages; by default, no progress
+	 * messages are written.  If the handler returns non-zero, the
+	 * application's current operation will return an error.
+	 *
+	 * @param operation a string representation of the operation
+	 * @param progress a counter
 	 */
 	int (*handle_progress)(WT_EVENT_HANDLER *handler,
 	    const char *operation, uint64_t progress);
@@ -1219,9 +1231,9 @@ const char *wiredtiger_version(int *majorp, int *minorp, int *patchp);
  * whether the operation succeeded or failed.  A return of zero indicates
  * success, all non-zero return values indicate some kind of failure.
  *
- * WiredTiger reserves all values from -31,800 to -31,999 to itself as possible
- * error values.  In addition, C99/POSIX error codes such as \c ENOMEM,
- * \c EINVAL and \c ENOTSUP may also be returned, with the usual meanings.
+ * WiredTiger reserves all values from -31,800 to -31,999 as possible error
+ * return values.  WiredTiger may also return C99/POSIX error codes such as
+ * \c ENOMEM, \c EINVAL and \c ENOTSUP, with the usual meanings.
  *
  * The following are all of the WiredTiger-specific error returns:
  * @{

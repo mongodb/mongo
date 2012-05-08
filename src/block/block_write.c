@@ -243,7 +243,7 @@ not_compressed:	/*
 	WT_BSTAT_INCR(session, page_write);
 	WT_CSTAT_INCR(session, block_write);
 
-	WT_VERBOSE(session, write,
+	WT_VERBOSE_ERR(session, write,
 	    "off %" PRIuMAX ", size %" PRIu32 ", cksum %" PRIu32,
 	    (uintmax_t)offset, align_size, blk->cksum);
 

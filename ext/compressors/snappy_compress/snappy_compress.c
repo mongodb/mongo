@@ -86,7 +86,7 @@ wt_snappy_error(WT_SESSION *session, const char *call, snappy_status snret)
 		break;
 	}
 
-	wiredtiger_err_printf(
+	(void)wiredtiger_err_printf(
 	    session, "snappy error: %s: %s: %d", call, msg, snret);
 	return (WT_ERROR);
 }
@@ -147,7 +147,7 @@ wt_snappy_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	/* retrieve the saved length */
 	snaplen = *(size_t *)src;
 	if (snaplen + sizeof(size_t) > src_len) {
-		wiredtiger_err_printf(
+		(void)wiredtiger_err_printf(
 		    session,
 		    "wt_snappy_decompress: stored size exceeds buffer size");
 		return (WT_ERROR);

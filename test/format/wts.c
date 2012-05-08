@@ -15,10 +15,9 @@ handle_message(WT_EVENT_HANDLER *handler, const char *message)
 	UNUSED(handler);
 
 	if (g.logfp != NULL)
-		fprintf(g.logfp, "%s\n", message);
-	else
-		printf("%s\n", message);
-	return (0);
+		return (fprintf(g.logfp, "%s\n", message) < 0 ? -1 : 0);
+
+	return (printf("%s\n", message) < 0 ? -1 : 0);
 }
 
 /*

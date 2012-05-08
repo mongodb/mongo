@@ -71,7 +71,7 @@ extern int __wt_block_extlist_truncate( WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     WT_EXTLIST *el);
 extern void __wt_block_extlist_free(WT_SESSION_IMPL *session, WT_EXTLIST *el);
-extern void __wt_block_extlist_dump( WT_SESSION_IMPL *session,
+extern int __wt_block_extlist_dump( WT_SESSION_IMPL *session,
     const char *tag,
     WT_EXTLIST *el,
     int show_size);
@@ -343,12 +343,13 @@ extern int __wt_rec_track_ovfl(WT_SESSION_IMPL *session,
     const void *data,
     uint32_t data_size,
     uint32_t flags);
-extern int __wt_rec_track_ovfl_reuse(WT_SESSION_IMPL *session,
+extern int __wt_rec_track_ovfl_reuse( WT_SESSION_IMPL *session,
     WT_PAGE *page,
     const void *data,
     uint32_t size,
     uint8_t **addrp,
-    uint32_t *sizep);
+    uint32_t *sizep,
+    int *foundp);
 extern int __wt_rec_track_ovfl_srch(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     const uint8_t *addr,
@@ -872,13 +873,6 @@ extern int __wt_session_remove_btree( WT_SESSION_IMPL *session,
     int locked);
 extern int __wt_session_close_any_open_btree(WT_SESSION_IMPL *session,
     const char *name);
-extern void __wt_eventv(WT_SESSION_IMPL *session,
-    int msg_event,
-    int error,
-    const char *file_name,
-    int line_number,
-    const char *fmt,
-    va_list ap);
 extern void __wt_err(WT_SESSION_IMPL *session,
     int error,
     const char *fmt,
@@ -890,13 +884,15 @@ extern void __wt_errx(WT_SESSION_IMPL *session,
     ...) WT_GCC_ATTRIBUTE((format (printf,
     2,
     3)));
-extern void __wt_msgv(WT_SESSION_IMPL *session, const char *fmt, va_list ap);
-extern void __wt_verbose(WT_SESSION_IMPL *session,
+extern int __wt_verrx(WT_SESSION_IMPL *session, const char *fmt, va_list ap);
+extern int __wt_msg(WT_SESSION_IMPL *session,
     const char *fmt,
     ...) WT_GCC_ATTRIBUTE((format (printf,
     2,
     3)));
-extern void __wt_msg(WT_SESSION_IMPL *session,
+extern int __wt_vmsg(WT_SESSION_IMPL *session, const char *fmt, va_list ap);
+extern int __wt_progress(WT_SESSION_IMPL *session, const char *s, uint64_t v);
+extern int __wt_verbose(WT_SESSION_IMPL *session,
     const char *fmt,
     ...) WT_GCC_ATTRIBUTE((format (printf,
     2,
@@ -918,7 +914,7 @@ extern int __wt_library_init(void);
 extern int __wt_breakpoint(void);
 extern void __wt_attach(WT_SESSION_IMPL *session);
 extern int
-__wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref
+__wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, int *busyp
 #ifdef HAVE_DIAGNOSTIC
  , const char *file, int line
 #endif

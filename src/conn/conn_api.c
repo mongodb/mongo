@@ -11,14 +11,16 @@
  * api_err_printf --
  *	Extension API call to print to the error stream.
  */
-static void
+static int
 __api_err_printf(WT_SESSION *wt_session, const char *fmt, ...)
 {
+	WT_DECL_RET;
 	va_list ap;
 
 	va_start(ap, fmt);
-	__wt_eventv((WT_SESSION_IMPL *)wt_session, 0, 0, NULL, 0, fmt, ap);
+	ret = __wt_verrx((WT_SESSION_IMPL *)wt_session, fmt, ap);
 	va_end(ap);
+	return (ret);
 }
 
 static WT_EXTENSION_API __api = {
@@ -728,25 +730,11 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	session->name = "wiredtiger_open";
 
 	/*
-	 * Configure event handling as soon as possible so errors are handled
-	 * correctly.  If the application didn't configure an event handler,
-	 * use the default one, and use default entries for any entries not
-	 * set by the application.
+	 * Configure any event handlers provided by the application as soon as
+	 * possible so errors are handled correctly.
 	 */
-	if (event_handler == NULL)
-		event_handler = __wt_event_handler_default;
-	else {
-		if (event_handler->handle_error == NULL)
-			event_handler->handle_error =
-			    __wt_event_handler_default->handle_error;
-		if (event_handler->handle_message == NULL)
-			event_handler->handle_message =
-			    __wt_event_handler_default->handle_message;
-		if (event_handler->handle_progress == NULL)
-			event_handler->handle_progress =
-			    __wt_event_handler_default->handle_progress;
-	}
-	session->event_handler = event_handler;
+	if (event_handler != NULL)
+		session->event_handler = event_handler;
 
 	/* Remaining basic initialization of the connection structure. */
 	WT_ERR(__wt_connection_init(conn));

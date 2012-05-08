@@ -38,15 +38,15 @@ __wt_session_dump(WT_SESSION_IMPL *session)
 
 	conn = S2C(session);
 
-	__wt_msg(session, "session: %s%s%p",
+	(void)__wt_msg(session, "session: %s%s%p",
 	    session->name == NULL ? "" : session->name,
 	    session->name == NULL ? "" : " ", session);
 
 	first = 0;
 	TAILQ_FOREACH(cursor, &session->cursors, q) {
 		if (++first == 1)
-			__wt_msg(session, "\tcursors:");
-		__wt_msg(session, "\t\t%p", cursor);
+			(void)__wt_msg(session, "\tcursors:");
+		(void)__wt_msg(session, "\t\t%p", cursor);
 	}
 
 	first = 0;
@@ -55,12 +55,12 @@ __wt_session_dump(WT_SESSION_IMPL *session)
 		if (hp->page == NULL)
 			continue;
 		if (++first == 1)
-			__wt_msg(session, "\thazard references:");
+			(void)__wt_msg(session, "\thazard references:");
 #ifdef HAVE_DIAGNOSTIC
-		__wt_msg(session,
+		(void)__wt_msg(session,
 		    "\t\t%p (%s, line %d)", hp->page, hp->file, hp->line);
 #else
-		__wt_msg(session, "\t\t%p", hp->page);
+		(void)__wt_msg(session, "\t\t%p", hp->page);
 #endif
 	}
 }

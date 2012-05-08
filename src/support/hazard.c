@@ -16,7 +16,7 @@ static void __hazard_dump(WT_SESSION_IMPL *);
  *	Set a hazard reference.
  */
 int
-__wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref
+__wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, int *busyp
 #ifdef HAVE_DIAGNOSTIC
     , const char *file, int line
 #endif
@@ -26,6 +26,7 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref
 	WT_HAZARD *hp;
 
 	conn = S2C(session);
+	*busyp = 0;
 
 	/*
 	 * Do the dance:
@@ -60,7 +61,7 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref
 		 */
 		if (ref->state == WT_REF_MEM ||
 		    ref->state == WT_REF_EVICT_WALK) {
-			WT_VERBOSE(session, hazard,
+			WT_VERBOSE_RET(session, hazard,
 			    "session %p hazard %p: set", session, ref->page);
 			return (0);
 		}
@@ -78,7 +79,8 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref
 		 * again until it loops around through the tree.
 		 */
 		hp->page = NULL;
-		return (EBUSY);
+		*busyp = 1;
+		return (0);
 	}
 
 	__wt_errx(session,
@@ -109,9 +111,6 @@ __wt_hazard_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 */
 	WT_ASSERT(session, page != NULL);
 
-	WT_VERBOSE(session, hazard,
-	    "session %p hazard %p: clr", session, page);
-
 	/* Clear the caller's hazard pointer. */
 	for (hp = session->hazard;
 	    hp < session->hazard + conn->hazard_size; ++hp)
@@ -126,7 +125,9 @@ __wt_hazard_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
 			 */
 			return;
 		}
-	__wt_errx(session, "hazard reference not found");
+	__wt_errx(session,
+	    "clear hazard reference: session: %p reference %p: not found",
+	    session, page);
 }
 
 /*

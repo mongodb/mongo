@@ -424,16 +424,14 @@ __session_checkpoint(WT_SESSION *wt_session, const char *config)
 static int
 __session_msg_printf(WT_SESSION *wt_session, const char *fmt, ...)
 {
-	WT_SESSION_IMPL *session;
+	WT_DECL_RET;
 	va_list ap;
 
-	session = (WT_SESSION_IMPL *)wt_session;
-
 	va_start(ap, fmt);
-	__wt_msgv(session, fmt, ap);
+	ret = __wt_vmsg((WT_SESSION_IMPL *)wt_session, fmt, ap);
 	va_end(ap);
 
-	return (0);
+	return (ret);
 }
 
 /*
@@ -497,14 +495,12 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
 	WT_ERR(__wt_cond_alloc(session, "session", 1, &session_ret->cond));
 	session_ret->iface = stds;
 	session_ret->iface.connection = &conn->iface;
-	WT_ASSERT(session, session->event_handler != NULL);
-	session_ret->event_handler = session->event_handler;
+	session_ret->event_handler =
+	    event_handler == NULL ? session->event_handler : event_handler;
 	session_ret->hazard = conn->hazard + slot * conn->hazard_size;
 
 	TAILQ_INIT(&session_ret->cursors);
 	TAILQ_INIT(&session_ret->btrees);
-	if (event_handler != NULL)
-		session_ret->event_handler = event_handler;
 
 	/*
 	 * Public sessions are automatically closed during WT_CONNECTION->close.

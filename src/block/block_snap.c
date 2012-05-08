@@ -81,18 +81,22 @@ __wt_block_snapshot_load(WT_SESSION_IMPL *session,
 	 */
 	dsk->size = 0;
 
+	si = &block->live;
+	WT_RET(__wt_block_snap_init(session, block, si, 1));
+
 	if (WT_VERBOSE_ISSET(session, snapshot)) {
 		if (addr != NULL) {
 			WT_ERR(__wt_scr_alloc(session, 0, &tmp));
 			WT_ERR(__snapshot_string(session, block, addr, tmp));
 		}
-		WT_VERBOSE(session, snapshot,
+		WT_VERBOSE_ERR(session, snapshot,
 		    "%s: load-snapshot: %s", block->name,
 		    addr == NULL ? "[Empty]" : (char *)tmp->data);
 	}
 
-	si = &block->live;
-	WT_RET(__wt_block_snap_init(session, block, si, 1));
+	/* If not loading a snapshot from disk, we're done. */
+	if (addr == NULL || addr_size == 0)
+		return (0);
 
 	/* Crack the snapshot cookie. */
 	if (addr != NULL)
@@ -129,13 +133,13 @@ __wt_block_snapshot_load(WT_SESSION_IMPL *session,
 	 * the snapshot is no longer interesting.  Truncate the file.
 	 */
 	if (!readonly) {
-		WT_VERBOSE(session, snapshot,
+		WT_VERBOSE_ERR(session, snapshot,
 		    "truncate file to %" PRIuMAX, (uintmax_t)si->file_size);
 		WT_ERR(__wt_ftruncate(session, block->fh, si->file_size));
 	}
 
 	if (0) {
-err:		block->live_load = 0;
+err:		(void)__wt_block_snapshot_unload(session, block);
 	}
 
 	__wt_scr_free(&tmp);
@@ -152,17 +156,14 @@ __wt_block_snapshot_unload(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	WT_BLOCK_SNAPSHOT *si;
 	WT_DECL_RET;
 
-	WT_VERBOSE(session, snapshot, "%s: unload snapshot", block->name);
-
-	/* Work on the "live" snapshot. */
-	if (!block->live_load)
-		WT_RET_MSG(session, EINVAL, "no snapshot to unload");
+	WT_VERBOSE_RETVAL(
+	    session, snapshot, ret, "%s: unload snapshot", block->name);
 
 	si = &block->live;
 
 	/* Verify cleanup. */
 	if (block->verify)
-		ret = __wt_verify_snap_unload(session, block, si);
+		WT_TRET(__wt_verify_snap_unload(session, block, si));
 
 	/* Discard the extent lists. */
 	__wt_block_extlist_free(session, &si->alloc);
@@ -333,13 +334,11 @@ __snapshot_process(
 
 		if (WT_VERBOSE_ISSET(session, snapshot)) {
 			WT_ERR(__wt_scr_alloc(session, 0, &tmp));
-			if ((ret = __snapshot_string(
-			    session, block, snap->raw.data, tmp)) == 0)
-				WT_VERBOSE(session, snapshot,
-				    "%s: delete-snapshot: %s: %s",
-				    block->name, snap->name, (char *)tmp->data);
-			__wt_scr_free(&tmp);
-			WT_ERR(ret);
+			WT_ERR(__snapshot_string(
+			    session, block, snap->raw.data, tmp));
+			WT_VERBOSE_ERR(session, snapshot,
+			    "%s: delete-snapshot: %s: %s",
+			    block->name, snap->name, (char *)tmp->data);
 		}
 
 		/*
@@ -467,9 +466,6 @@ live_update:
 	__wt_block_extlist_free(session, &si->alloc);
 	__wt_block_extlist_free(session, &si->discard);
 
-err:	if (locked)
-		__wt_spin_unlock(session, &block->live_lock);
-
 #ifdef HAVE_DIAGNOSTIC
 	/*
 	 * The first snapshot in the system should always have an empty discard
@@ -483,9 +479,12 @@ err:	if (locked)
 	if (a->discard.entries != 0) {
 		__wt_errx(session,
 		    "snapshot incorrectly has blocks on the discard list");
-		ret = WT_ERROR;
+		WT_ERR(WT_ERROR);
 	}
 #endif
+
+err:	if (locked)
+		__wt_spin_unlock(session, &block->live_lock);
 
 	/* Discard any snapshot information we loaded, we no longer need it. */
 	WT_SNAPSHOT_FOREACH(snapbase, snap)
@@ -495,6 +494,7 @@ err:	if (locked)
 			__wt_block_extlist_free(session, &si->discard);
 		}
 
+	__wt_scr_free(&tmp);
 	return (ret);
 }
 
@@ -564,16 +564,14 @@ __snapshot_update(
 
 	if (WT_VERBOSE_ISSET(session, snapshot)) {
 		WT_RET(__wt_scr_alloc(session, 0, &tmp));
-		if ((ret = __snapshot_string(
-		    session, block, snap->raw.data, tmp)) == 0)
-			WT_VERBOSE(session, snapshot,
-			    "%s: create-snapshot: %s: %s",
-			    block->name, snap->name, (char *)tmp->data);
-		__wt_scr_free(&tmp);
-		WT_RET(ret);
+		WT_ERR(__snapshot_string(session, block, snap->raw.data, tmp));
+		WT_VERBOSE_ERR(session, snapshot,
+		    "%s: create-snapshot: %s: %s",
+		    block->name, snap->name, (char *)tmp->data);
 	}
 
-	return (0);
+err:	__wt_scr_free(&tmp);
+	return (ret);
 }
 
 /*

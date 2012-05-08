@@ -87,9 +87,9 @@
  */
 
 #ifdef HAVE_VERBOSE
-static void __track_dump(WT_SESSION_IMPL *, WT_PAGE *, const char *);
-static void __track_msg(WT_SESSION_IMPL *, WT_PAGE *, const char *, WT_ADDR *);
-static void __track_print(WT_SESSION_IMPL *, WT_PAGE *, WT_PAGE_TRACK *);
+static int __track_dump(WT_SESSION_IMPL *, WT_PAGE *, const char *);
+static int __track_msg(WT_SESSION_IMPL *, WT_PAGE *, const char *, WT_ADDR *);
+static int __track_print(WT_SESSION_IMPL *, WT_PAGE *, WT_PAGE_TRACK *);
 #endif
 
 /*
@@ -178,8 +178,8 @@ __wt_rec_track_block(WT_SESSION_IMPL *session,
 	WT_RET(__wt_strndup(session, (char *)addr, size, &track->addr.addr));
 	track->addr.size = size;
 
-	WT_VERBOSE_CALL(
-	    session, reconcile, __track_print(session, page, track));
+	if (WT_VERBOSE_ISSET(session, reconcile))
+		WT_RET(__track_print(session, page, track));
 	return (0);
 }
 
@@ -231,8 +231,8 @@ __wt_rec_track_ovfl(WT_SESSION_IMPL *session, WT_PAGE *page,
 	track->size = data_size;
 	memcpy(track->data, data, data_size);
 
-	WT_VERBOSE_CALL(
-	    session, reconcile, __track_print(session, page, track));
+	if (WT_VERBOSE_ISSET(session, reconcile))
+		WT_RET(__track_print(session, page, track));
 	return (0);
 }
 
@@ -241,13 +241,15 @@ __wt_rec_track_ovfl(WT_SESSION_IMPL *session, WT_PAGE *page,
  *	Search for an overflow record and reactivate it.
  */
 int
-__wt_rec_track_ovfl_reuse(WT_SESSION_IMPL *session, WT_PAGE *page,
-    const void *data, uint32_t size, uint8_t **addrp, uint32_t *sizep)
+__wt_rec_track_ovfl_reuse(
+    WT_SESSION_IMPL *session, WT_PAGE *page, const void *data,
+    uint32_t size, uint8_t **addrp, uint32_t *sizep, int *foundp)
 {
 	WT_PAGE_TRACK *track;
 	uint32_t i;
 
 	WT_PAGE_MODIFY *mod;
+	*foundp = 0;
 
 	mod = page->modify;
 	for (track = mod->track, i = 0; i < mod->track_entries; ++track, ++i) {
@@ -264,9 +266,11 @@ __wt_rec_track_ovfl_reuse(WT_SESSION_IMPL *session, WT_PAGE *page,
 		*addrp = track->addr.addr;
 		*sizep = track->addr.size;
 
-		WT_VERBOSE_CALL(session, reconcile, __track_msg(
-		    session, page, "reactivate overflow", &track->addr));
-		return (1);
+		if (WT_VERBOSE_ISSET(session, reconcile))
+			WT_RET(__track_msg(session,
+			    page, "reactivate overflow", &track->addr));
+		*foundp = 1;
+		break;
 	}
 	return (0);
 }
@@ -335,8 +339,8 @@ __wt_rec_track_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_PAGE_TRACK *track;
 	uint32_t i;
 
-	WT_VERBOSE_CALL(session, reconcile,
-	    __track_dump(session, page, "reconcile wrapup"));
+	if (WT_VERBOSE_ISSET(session, reconcile))
+		WT_RET(__track_dump(session, page, "reconcile wrapup"));
 
 	/*
 	 * After a sync of a page, some of the objects we're tracking are no
@@ -350,11 +354,11 @@ __wt_rec_track_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 			continue;
 		case WT_TRK_DISCARD:
 		case WT_TRK_OVFL:
-			WT_VERBOSE_CALL(session, reconcile, __track_msg(
-			    session, page,
-			    WT_TRK_TYPE(track) == WT_TRK_DISCARD ?
-			    "discard block" : "inactive overflow",
-			    &track->addr));
+			if (WT_VERBOSE_ISSET(session, reconcile))
+				WT_RET(__track_msg(session,
+				    page, WT_TRK_TYPE(track) == WT_TRK_DISCARD ?
+				    "discard block" : "inactive overflow",
+				    &track->addr));
 
 			/* We no longer need the underlying blocks. */
 			WT_RET(__wt_bm_free(
@@ -406,7 +410,7 @@ __wt_rec_track_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
  * __track_dump --
  *	Dump the list of tracked objects.
  */
-static void
+static int
 __track_dump(WT_SESSION_IMPL *session, WT_PAGE *page, const char *tag)
 {
 	WT_PAGE_MODIFY *mod;
@@ -416,54 +420,63 @@ __track_dump(WT_SESSION_IMPL *session, WT_PAGE *page, const char *tag)
 	mod = page->modify;
 
 	if (mod->track_entries == 0)
-		return;
+		return (0);
 
-	WT_VERBOSE(session,
+	WT_VERBOSE_RET(session,
 	    reconcile, "page %p tracking list at %s:", page, tag);
 	for (track = mod->track, i = 0; i < mod->track_entries; ++track, ++i)
-		__track_print(session, page, track);
+		WT_RET(__track_print(session, page, track));
+	return (0);
 }
 
 /*
  * __track_print --
  *	Display a tracked entry.
  */
-static void
+static int
 __track_print(WT_SESSION_IMPL *session, WT_PAGE *page, WT_PAGE_TRACK *track)
 {
+	WT_DECL_RET;
+
 	switch (WT_TRK_TYPE(track)) {
 	case WT_TRK_DISCARD:
-		__track_msg(session, page, "discard", &track->addr);
+		ret = __track_msg(session, page, "discard", &track->addr);
 		break;
 	case WT_TRK_DISCARD_COMPLETE:
-		__track_msg(session, page, "discard-complete", &track->addr);
+		ret = __track_msg(
+		    session, page, "discard-complete", &track->addr);
 		break;
 	case WT_TRK_OVFL:
-		__track_msg(session, page, "overflow", &track->addr);
+		ret = __track_msg(session, page, "overflow", &track->addr);
 		break;
 	case WT_TRK_OVFL_ACTIVE:
-		__track_msg(session, page, "overflow-active", &track->addr);
+		ret = __track_msg(
+		    session, page, "overflow-active", &track->addr);
 		break;
 	case WT_TRK_EMPTY:
-	default:				/* Not possible. */
+		ret = __track_msg(session, page, "empty", &track->addr);
 		break;
 	}
+	return (ret);
 }
 
 /*
  * __track_msg --
  *	Output a verbose message and associated page and address pair.
  */
-static void
+static int
 __track_msg(
     WT_SESSION_IMPL *session, WT_PAGE *page, const char *msg, WT_ADDR *addr)
 {
+	WT_DECL_RET;
 	WT_ITEM *buf;
 
-	if (__wt_scr_alloc(session, 64, &buf))
-		return;
-	WT_VERBOSE(session, reconcile, "page %p %s %s", page, msg,
+	WT_RET(__wt_scr_alloc(session, 64, &buf));
+
+	WT_VERBOSE_ERR(session, reconcile, "page %p %s %s", page, msg,
 	    __wt_addr_string(session, buf, addr->addr, addr->size));
-	__wt_scr_free(&buf);
+
+err:	__wt_scr_free(&buf);
+	return (ret);
 }
 #endif

@@ -103,7 +103,7 @@ __verify_int(WT_SESSION_IMPL *session, int dumpfile)
 
 	/* Loop through the file's snapshots, verifying each one. */
 	WT_SNAPSHOT_FOREACH(snapbase, snap) {
-		WT_VERBOSE(session, verify,
+		WT_VERBOSE_ERR(session, verify,
 		    "%s: snapshot %s", btree->name, snap->name);
 
 		/* House-keeping between snapshots. */
@@ -145,7 +145,7 @@ err:	__wt_snapshot_list_free(session, snapbase);
 
 	if (vs != NULL) {
 		/* Wrap up reporting. */
-		__wt_progress(session, NULL, vs->fcnt);
+		WT_TRET(__wt_progress(session, NULL, vs->fcnt));
 
 		/* Free allocated memory. */
 		__wt_scr_free(&vs->max_key);
@@ -197,7 +197,7 @@ __verify_tree(WT_SESSION_IMPL *session,
 
 	unpack = &_unpack;
 
-	WT_VERBOSE(session, verify, "%s %s",
+	WT_VERBOSE_RET(session, verify, "%s %s",
 	    __wt_page_addr_string(session, vs->tmp1, page),
 	    __wt_page_type_string(page->type));
 
@@ -225,7 +225,7 @@ __verify_tree(WT_SESSION_IMPL *session,
 	 * Report progress every 10 pages.
 	 */
 	if (++vs->fcnt % 10 == 0)
-		__wt_progress(session, NULL, vs->fcnt);
+		WT_RET(__wt_progress(session, NULL, vs->fcnt));
 
 #ifdef HAVE_DIAGNOSTIC
 	/* Optionally dump the page in debugging mode. */
