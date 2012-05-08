@@ -50,7 +50,7 @@ namespace mongo {
             !_orDedupConstraints.empty();
     }
 
-    bool CoveredIndexMatcher::matchesCurrent( Cursor * cursor , MatchDetails * details ) {
+    bool CoveredIndexMatcher::matchesCurrent( Cursor * cursor , MatchDetails * details ) const {
         // bool keyUsable = ! cursor->isMultiKey() && check for $orish like conditions in matcher SERVER-1264
         return matches( cursor->currKey() , cursor->currLoc() , details ,
                        !cursor->indexKeyPattern().isEmpty() // unindexed cursor
@@ -58,7 +58,8 @@ namespace mongo {
                        );
     }
 
-    bool CoveredIndexMatcher::matches(const BSONObj &key, const DiskLoc &recLoc , MatchDetails * details , bool keyUsable ) {
+    bool CoveredIndexMatcher::matches( const BSONObj &key, const DiskLoc &recLoc,
+                                      MatchDetails * details, bool keyUsable ) const {
 
         LOG(5) << "CoveredIndexMatcher::matches() " << key.toString() << ' ' << recLoc.toString() << ' ' << keyUsable << endl;
 

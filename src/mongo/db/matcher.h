@@ -260,17 +260,18 @@ namespace mongo {
     class CoveredIndexMatcher : boost::noncopyable {
     public:
         CoveredIndexMatcher(const BSONObj &pattern, const BSONObj &indexKeyPattern);
-        bool matchesWithSingleKeyIndex(const BSONObj &key, const DiskLoc &recLoc , MatchDetails * details = 0 ) {
+        bool matchesWithSingleKeyIndex( const BSONObj &key, const DiskLoc &recLoc,
+                                       MatchDetails * details = 0 ) const {
             return matches( key, recLoc, details, true );   
         }
         /**
          * This is the preferred method for matching against a cursor, as it
          * can handle both multi and single key cursors.
          */
-        bool matchesCurrent( Cursor * cursor , MatchDetails * details = 0 );
-        bool needRecord() { return _needRecord; }
+        bool matchesCurrent( Cursor * cursor , MatchDetails * details = 0 ) const;
+        bool needRecord() const { return _needRecord; }
 
-        Matcher& docMatcher() { return *_docMatcher; }
+        const Matcher &docMatcher() const { return *_docMatcher; }
 
         /**
          * @return a matcher for a following $or clause.
@@ -286,7 +287,7 @@ namespace mongo {
 
     private:
         bool matches( const BSONObj &key, const DiskLoc &recLoc, MatchDetails *details = 0,
-                     bool keyUsable = true );
+                     bool keyUsable = true ) const;
         bool isOrClauseDup( const BSONObj &obj ) const;
         CoveredIndexMatcher( const CoveredIndexMatcher &prevClauseMatcher,
                             const shared_ptr<FieldRangeVector> &prevClauseFrv,
