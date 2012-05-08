@@ -21,6 +21,12 @@ __wt_block_salvage_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	WT_RET(__wt_desc_init(session, block->fh));
 
 	/*
+	 * Salvage creates a new snapshot when it's finished, set up for
+	 * rolling an empty file forward.
+	 */
+	WT_RET(__wt_block_snap_init(session, block, &block->live, 1));
+
+	/*
 	 * Truncate the file to an initial sector plus N allocation size
 	 * units (bytes trailing the last multiple of an allocation size
 	 * unit must be garbage, by definition).
@@ -64,7 +70,8 @@ __wt_block_salvage_end(WT_SESSION_IMPL *session, WT_BLOCK *block)
 
 	block->slvg = 0;
 
-	return (0);
+	/* Discard the snapshot. */
+	return (__wt_block_snapshot_unload(session, block));
 }
 
 /*

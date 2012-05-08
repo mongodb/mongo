@@ -52,6 +52,8 @@ __wt_block_snap_init(WT_SESSION_IMPL *session,
 	si->discard.name = "discard";
 	si->discard.offset = WT_BLOCK_INVALID_OFFSET;
 
+	si->file_size = WT_BLOCK_DESC_SECTOR;
+
 	return (0);
 }
 
@@ -68,15 +70,16 @@ __wt_block_snapshot_load(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_ITEM *tmp;
 
+	WT_UNUSED(addr_size);
+
 	tmp = NULL;
 
 	/*
 	 * Sometimes we don't find a root page (we weren't given a snapshot,
 	 * or the referenced snapshot was empty).  In that case we return a
-	 * size of 0.  Set that up now.
+	 * root page size of 0.  Set that up now.
 	 */
-	if (dsk != NULL)
-		dsk->size = 0;
+	dsk->size = 0;
 
 	si = &block->live;
 	WT_RET(__wt_block_snap_init(session, block, si, 1));
@@ -96,7 +99,8 @@ __wt_block_snapshot_load(WT_SESSION_IMPL *session,
 		return (0);
 
 	/* Crack the snapshot cookie. */
-	WT_ERR(__wt_block_buffer_to_snapshot(session, block, addr, si));
+	if (addr != NULL)
+		WT_ERR(__wt_block_buffer_to_snapshot(session, block, addr, si));
 
 	/* Verify sets up next. */
 	if (block->verify)
@@ -130,8 +134,7 @@ __wt_block_snapshot_load(WT_SESSION_IMPL *session,
 	 */
 	if (!readonly) {
 		WT_VERBOSE_ERR(session, snapshot,
-		    "snapshot truncates file to %" PRIuMAX,
-		    (uintmax_t)si->file_size);
+		    "truncate file to %" PRIuMAX, (uintmax_t)si->file_size);
 		WT_ERR(__wt_ftruncate(session, block->fh, si->file_size));
 	}
 

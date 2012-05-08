@@ -140,14 +140,14 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
-	WT_SNAPSHOT *snapbase;
+	WT_SNAPSHOT snapbase[2];
 	WT_STUFF *ss, stuff;
 	uint32_t i, leaf_cnt;
 
 	WT_UNUSED(cfg);
 
 	btree = session->btree;
-	snapbase = NULL;
+	memset(snapbase, 0, sizeof(snapbase));
 
 	WT_CLEAR(stuff);
 	ss = &stuff;
@@ -161,30 +161,12 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/*
 	 * Step 1:
-	 * Clear the salvaged file's root address, we're done with this file
-	 * until it's salvaged.  We do this first because salvage writes a
-	 * root page when it wraps up, and the eviction of that page creates
-	 * a snapshot and updates the root's address: if the root address were
-	 * still set, eviction attempt to free the previous root page, which
-	 * would collide with salvage freeing the previous root page when it
-	 * reads those blocks from the file.
-	 */
-	WT_ERR(__wt_snapshot_clear(session, btree->name));
-
-	/*
-	 * Step 2:
-	 * Load an empty snapshot, for modification.
-	 */
-	WT_ERR(__wt_bm_snapshot_load(session, NULL, NULL, 0, 0));
-
-	/*
-	 * Step 3:
 	 * Inform the underlying block manager that we're salvaging the file.
 	 */
 	WT_ERR(__wt_bm_salvage_start(session));
 
 	/*
-	 * Step 4:
+	 * Step 2:
 	 * Read the file and build in-memory structures that reference any leaf
 	 * or overflow page.  Any pages other than leaf or overflow pages are
 	 * added to the free list.
@@ -198,10 +180,10 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_ERR(ret);
 
 	/*
-	 * Step 5:
+	 * Step 3:
 	 * Review the relationships between the pages and the overflow items.
 	 *
-	 * Step 6:
+	 * Step 4:
 	 * Add unreferenced overflow page blocks to the free list.
 	 */
 	if (ss->ovfl_next != 0) {
@@ -210,7 +192,7 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 	}
 
 	/*
-	 * Step 7:
+	 * Step 5:
 	 * Walk the list of pages looking for overlapping ranges to resolve.
 	 * If we find a range that needs to be resolved, set a global flag
 	 * and a per WT_TRACK flag on the pages requiring modification.
@@ -236,7 +218,7 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 		WT_ERR(__slvg_col_range(session, ss));
 
 	/*
-	 * Step 8:
+	 * Step 6:
 	 * We may have lost key ranges in column-store databases, that is, some
 	 * part of the record number space is gone.   Look for missing ranges.
 	 */
@@ -250,7 +232,7 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 	}
 
 	/*
-	 * Step 9:
+	 * Step 7:
 	 * Build an internal page that references all of the leaf pages,
 	 * and write it, as well as any merged pages, to the file.
 	 *
@@ -274,7 +256,7 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 		}
 
 	/*
-	 * Step 10:
+	 * Step 8:
 	 * If we had to merge key ranges, we have to do a final pass through
 	 * the leaf page array and discard file pages used during key merges.
 	 * We can't do it earlier: if we free'd the leaf pages we're merging as
@@ -288,43 +270,55 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 		WT_ERR(__slvg_merge_block_free(session, ss));
 
 	/*
-	 * Step 11:
+	 * Step 9:
 	 * Evict the newly created root page, creating a snapshot, and update
 	 * the metadata with the new snapshot's location.
 	 */
 	if (ss->root_page != NULL) {
-		WT_ERR(__wt_snapshot_list_get(
-		    session, btree->name, &snapbase));
+		/*
+		 * XXX
+		 * The salvage process has processed previous snapshot blocks,
+		 * which means the underlying block manager has to ignore any
+		 * previous snapshot entries when creating the new snapshot, in
+		 * other words, we can't use the metadata snapshot list, it has
+		 * all of those snapshots listed.  Build a clean snapshot array
+		 * and use it instead.
+		 *	Don't clear the metadata snapshot list and then call the
+		 * snapshot get routines: a crash after clearing the metadata
+		 * snapshot list, but before creating a new snapshot list, would
+		 * look like a create or open of a file without a snapshot from
+		 * which to roll-forward, and the contents of the file would be
+		 * discarded.
+		 */
 		WT_ERR(__wt_strdup(
 		    session, WT_INTERNAL_SNAPSHOT, &snapbase[0].name));
-		F_SET(snapbase, WT_SNAP_ADD);
+		F_SET(&snapbase[0], WT_SNAP_ADD);
+
 		btree->snap = snapbase;
 		ret = __wt_rec_evict(session, ss->root_page, WT_REC_SINGLE);
-		ss->root_page = NULL;
 		btree->snap = NULL;
-		if (snapbase[0].raw.data != NULL)
+		ss->root_page = NULL;
+
+		if (snapbase[0].raw.data == NULL)
+			WT_ERR_MSG(session, EINVAL,
+			    "root page eviction failed to create a snapshot");
+		else
 			WT_ERR(__wt_snapshot_list_set(
 			    session, btree->name, snapbase));
 	}
 
 	/*
-	 * Step 12:
+	 * Step 10:
 	 * Inform the underlying block manager that we're done.
 	 */
 err:	WT_TRET(__wt_bm_salvage_end(session));
-
-	/*
-	 * Step 13:
-	 * Discard the live snapshot.
-	 */
-	WT_TRET(__wt_bm_snapshot_unload(session));
 
 	/* Discard any root page we created. */
 	if (ss->root_page != NULL)
 		__wt_page_out(session, &ss->root_page, 0);
 
 	/* Discard any snapshot information we allocated. */
-	__wt_snapshot_list_free(session, snapbase);
+	__wt_free(session, snapbase[0].name);
 
 	/* Discard the leaf and overflow page memory. */
 	WT_TRET(__slvg_cleanup(session, ss));

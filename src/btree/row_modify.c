@@ -188,20 +188,55 @@ __wt_insert_serial_func(WT_SESSION_IMPL *session)
 {
 	WT_DECL_RET;
 	WT_INSERT *new_ins, ***ins_stack;
-	WT_INSERT_HEAD **inshead, **new_inslist, *new_inshead;
+	WT_INSERT_HEAD *inshead, **insheadp, **new_inslist, *new_inshead;
 	WT_PAGE *page;
 	uint32_t write_gen;
 	u_int i, skipdepth;
 
-	__wt_insert_unpack(session, &page, &write_gen, &inshead,
+	__wt_insert_unpack(session, &page, &write_gen, &insheadp,
 	    &ins_stack, &new_inslist, &new_inshead, &new_ins, &skipdepth);
 
 	/* Check the page's write-generation. */
 	WT_ERR(__wt_page_write_gen_check(page, write_gen));
 
 	/*
+	 * Publish: First, point the new WT_INSERT item's skiplist references
+	 * to the next elements in the insert list, then flush memory.  Second,
+	 * update the skiplist elements that reference the new WT_INSERT item,
+	 * this ensures the list is never inconsistent.
+	 */
+	if ((inshead = *insheadp) == NULL)
+		inshead = new_inshead;
+	for (i = 0; i < skipdepth; i++)
+		new_ins->next[i] = *ins_stack[i];
+	WT_WRITE_BARRIER();
+	for (i = 0; i < skipdepth; i++) {
+		if (inshead->tail[i] == NULL ||
+		    ins_stack[i] == &inshead->tail[i]->next[i])
+			inshead->tail[i] = new_ins;
+		*ins_stack[i] = new_ins;
+	}
+
+	__wt_insert_new_ins_taken(session, page);
+
+	/*
+	 * If the insert head does not yet have an insert list, our caller
+	 * passed us one.
+	 *
+	 * NOTE: it is important to do this after the item has been added to
+	 * the list.  Code can assume that if the list is set, it is non-empty.
+	 */
+	if (*insheadp == NULL) {
+		WT_PUBLISH(*insheadp, new_inshead);
+		__wt_insert_new_inshead_taken(session, page);
+	}
+
+	/*
 	 * If the page does not yet have an insert array, our caller passed
 	 * us one.
+	 *
+	 * NOTE: it is important to do this after publishing the list entry.
+	 * Code can assume that if the array is set, it is non-empty.
 	 */
 	if (page->type == WT_PAGE_ROW_LEAF) {
 		if (page->u.row.ins == NULL) {
@@ -213,33 +248,6 @@ __wt_insert_serial_func(WT_SESSION_IMPL *session)
 			page->modify->update = new_inslist;
 			__wt_insert_new_inslist_taken(session, page);
 		}
-
-	/*
-	 * If the insert head does not yet have an insert list, our caller
-	 * passed us one.
-	 */
-	if (*inshead == NULL) {
-		*inshead = new_inshead;
-		__wt_insert_new_inshead_taken(session, page);
-	}
-
-	/*
-	 * Publish: First, point the new WT_INSERT item's skiplist references
-	 * to the next elements in the insert list, then flush memory.  Second,
-	 * update the skiplist elements that reference the new WT_INSERT item,
-	 * this ensures the list is never inconsistent.
-	 */
-	for (i = 0; i < skipdepth; i++)
-		new_ins->next[i] = *ins_stack[i];
-	WT_WRITE_BARRIER();
-	for (i = 0; i < skipdepth; i++) {
-		if ((*inshead)->tail[i] == NULL ||
-		    ins_stack[i] == &(*inshead)->tail[i]->next[i])
-			(*inshead)->tail[i] = new_ins;
-		*ins_stack[i] = new_ins;
-	}
-
-	__wt_insert_new_ins_taken(session, page);
 
 err:	__wt_session_serialize_wrapup(session, page, ret);
 }
@@ -293,25 +301,27 @@ __wt_update_serial_func(WT_SESSION_IMPL *session)
 	/* Check the page's write-generation. */
 	WT_ERR(__wt_page_write_gen_check(page, write_gen));
 
-	/*
-	 * If the page needs an update array (column-store pages and inserts on
-	 * row-store pages do not use the update array), our caller passed us
-	 * one of the correct size.   Check the page still needs one (the write
-	 * generation test should have caught that, though).
-	 */
-	if (new_upd != NULL && page->u.row.upd == NULL) {
-		page->u.row.upd = new_upd;
-		__wt_update_new_upd_taken(session, page);
-	}
-
 	upd->next = *upd_entry;
 	/*
 	 * Publish: there must be a barrier to ensure the new entry's next
 	 * pointer is set before we update the linked list.
 	 */
 	WT_PUBLISH(*upd_entry, upd);
-
 	__wt_update_upd_taken(session, page);
+
+	/*
+	 * If the page needs an update array (column-store pages and inserts on
+	 * row-store pages do not use the update array), our caller passed us
+	 * one of the correct size.   Check the page still needs one (the write
+	 * generation test should have caught that, though).
+	 *
+	 * NOTE: it is important to do this after publishing that the update is
+	 * set.  Code can assume that if the array is set, it is non-empty.
+	 */
+	if (new_upd != NULL && page->u.row.upd == NULL) {
+		page->u.row.upd = new_upd;
+		__wt_update_new_upd_taken(session, page);
+	}
 
 err:	__wt_session_serialize_wrapup(session, page, ret);
 }
