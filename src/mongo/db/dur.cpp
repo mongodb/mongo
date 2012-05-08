@@ -796,13 +796,12 @@ namespace mongo {
                 try {
                     stats.rotate();
 
-                    // we do this in a couple blocks (the invoke()), which makes it a tiny bit faster (only a little) on throughput,
-                    // but is likely also less spiky on our cpu usage, which is good.
-
                     // commit sooner if one or more getLastError j:true is pending
                     sleepmillis(oneThird);
                     for( unsigned i = 1; i <= 2; i++ ) {
                         if( commitJob._notify.nWaiting() )
+                            break;
+                        if( commitJob.bytes() > UncommittedBytesLimit / 2  )
                             break;
                         sleepmillis(oneThird);
                     }
