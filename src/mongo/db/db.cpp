@@ -1285,7 +1285,7 @@ namespace mongo {
         aMiniDumpInfo.ExceptionPointers = exceptionInfo;
         aMiniDumpInfo.ClientPointers = TRUE;
 
-        log() << "writing minidump dignostic file " << toUtf8String(dumpFilename) << endl;
+        log() << "writing minidump diagnostic file " << toUtf8String(dumpFilename) << endl;
         BOOL bstatus = MiniDumpWriteDump(GetCurrentProcess(),
             GetCurrentProcessId(),
             hFile,
