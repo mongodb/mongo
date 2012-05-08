@@ -107,8 +107,8 @@ restart:
 	}
 
 	/* If we found a previous node, the next one must be current. */
-	WT_ASSERT(session,
-	    cbt->ins_stack[0] == NULL || *cbt->ins_stack[0] == current);
+	if (cbt->ins_stack[0] != NULL && *cbt->ins_stack[0] != current)
+		goto restart;
 
 	cbt->ins = PREV_INS(cbt, 0);
 }
