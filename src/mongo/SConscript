@@ -365,11 +365,13 @@ for x in normalTools:
     env.Install( '#/', env.Program( "mongo" + x, [ "tools/" + x + ".cpp" ],
                                     LIBDEPS=["alltools"]) )
 
+env.StaticLibrary("docgenerator", "tools/docgenerator.cpp")
+
 #some special tools
 env.Install( '#/', [
         env.Program( "mongofiles", "tools/files.cpp", LIBDEPS=["alltools", "gridfs"] ),
-        env.Program( "docgen", "tools/docgenerator.cpp", LIBDEPS=["alltools"] ),
-        env.Program( "loadgen", "tools/loadgenerator.cpp", LIBDEPS=["alltools"] ),
+        env.Program( "docgen", "tools/docgeneratormain.cpp", LIBDEPS=["alltools", "docgenerator"] ),
+        env.Program( "loadgen", "tools/loadgenerator.cpp", LIBDEPS=["alltools", "docgenerator"] ),
         env.Program( "bsondump", "tools/bsondump.cpp", LIBDEPS=["alltools"]),
         env.Program( "mongobridge", "tools/bridge.cpp", LIBDEPS=["alltools"]),
         env.Program( "mongoperf", "client/examples/mongoperf.cpp", LIBDEPS=["alltools"] ),
