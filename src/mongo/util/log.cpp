@@ -39,7 +39,7 @@ using namespace std;
 namespace mongo {
 
     int logLevel = 0;
-    int tlogLevel = 0;
+    int tlogLevel = 0; // test log level. so we avoid overchattiness (somewhat) in the c++ unit tests
     mongo::mutex Logstream::mutex("Logstream");
     int Logstream::doneSetup = Logstream::magicNumber();
 
