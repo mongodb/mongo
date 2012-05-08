@@ -181,6 +181,7 @@ namespace mongo {
         };
 
         class DurableImpl : public DurableInterface {
+            bool _aCommitIsNeeded();
             void* writingPtr(void *x, unsigned len);
             void* writingAtOffset(void *buf, unsigned ofs, unsigned len);
             void* writingRangesAtOffsets(void *buf, const vector< pair< long long, unsigned > > &ranges);

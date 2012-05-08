@@ -67,6 +67,7 @@
 #include "../util/mongoutils/hash.h"
 #include "../util/mongoutils/str.h"
 #include "../util/timer.h"
+#include "../server.h"
 
 using namespace mongoutils;
 
@@ -275,21 +276,7 @@ namespace mongo {
             fassert( 16111, in_f == 1 );
         }
 
-        /** we may need to commit earlier than normal if data are being written at 
-            very high rates. 
-        
-            note you can call this unlocked, and that is a good idea as if you are in 
-            say, a 'w' lock state, we can't do the commit
-
-	        @param force force a commit now even if seemingly not needed - ie the caller may 
- 	           know something we don't such as that files will be closed
-        */
-        bool DurableImpl::commitIfNeeded(bool force) {
-            unspoolWriteIntents();
-            DEV commitJob._nSinceCommitIfNeededCall = 0;
-            if( commitJob.bytes() < UncommittedBytesLimit && !force ) {
-                return false;
-            }
+        bool NOINLINE_DECL DurableImpl::_aCommitIsNeeded() {
             if( !Lock::isLocked() ) {
                 DEV log() << "commitIfNeeded but we are unlocked that is ok but why do we get here" << endl;
                 Lock::GlobalRead r;
@@ -313,7 +300,7 @@ namespace mongo {
                     return false;
                 }
                 else {
-                    log(1) << "commitIfNeeded calling runExclusively " << force << endl;
+                    log(1) << "commitIfNeeded calling runExclusively" << endl;
                     runExclusively(f_commitEarlyInRunExclusively);
                 }
             }
@@ -322,6 +309,26 @@ namespace mongo {
                 commitNow();
             }
             return true;
+        }
+
+        /** we may need to commit earlier than normal if data are being written at 
+            very high rates. 
+        
+            note you can call this unlocked, and that is a good idea as if you are in 
+            say, a 'w' lock state, we can't do the commit
+
+	        @param force force a commit now even if seemingly not needed - ie the caller may 
+ 	           know something we don't such as that files will be closed
+
+            perf note: this function is called a lot, on every lock_w() ... and usually returns right away
+        */
+        bool DurableImpl::commitIfNeeded(bool force) {
+            unspoolWriteIntents();
+            DEV commitJob._nSinceCommitIfNeededCall = 0;
+            if( likely( commitJob.bytes() < UncommittedBytesLimit && !force ) ) {
+                return false;
+            }
+            return _aCommitIsNeeded();
         }
 
         /** Used in _DEBUG builds to check that we didn't overwrite the last intent
