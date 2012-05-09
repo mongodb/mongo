@@ -33,14 +33,20 @@ __wt_session_add_btree(
  *	Lock a btree handle.
  */
 int
-__wt_session_lock_btree(
-    WT_SESSION_IMPL *session, const char *cfg[], uint32_t flags)
+__wt_session_lock_btree(WT_SESSION_IMPL *session, uint32_t flags)
 {
 	WT_BTREE *btree;
-	WT_DECL_RET;
-	uint32_t open_flags;
+	uint32_t special_flags;
 
 	btree = session->btree;
+
+	/*
+	 * Special operation flags will cause the handle to be reopened.
+	 * For example, a handle opened with WT_BTREE_BULK cannot use the same
+	 * internal data structures as a handle opened for ordinary access.
+	 */
+	special_flags = LF_ISSET(WT_BTREE_SPECIAL_FLAGS);
+	WT_ASSERT(session, special_flags == 0 || LF_ISSET(WT_BTREE_EXCLUSIVE));
 
 	if (LF_ISSET(WT_BTREE_EXCLUSIVE)) {
 		/*
@@ -49,27 +55,35 @@ __wt_session_lock_btree(
 		 * trees to be mixed with ordinary cursor access, but if there
 		 * is a use case in the future, we could make blocking here
 		 * configurable.
+		 *
+		 * Special flags will cause the handle to be reopened, which
+		 * will get the necessary lock, so don't bother here.
 		 */
-		WT_RET(__wt_try_writelock(session, btree->rwlock));
-
-		/*
-		 * Reopen the handle for this operation to set any special
-		 * flags.  For example, set WT_BTREE_BULK so the handle is
-		 * closed correctly.
-		 */
-		open_flags = LF_ISSET(WT_BTREE_BULK |
-		    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY);
-		if (open_flags != 0)
-			ret = __wt_conn_btree_reopen(session, cfg, open_flags);
-		F_SET(btree, WT_BTREE_EXCLUSIVE);
-	} else if (!LF_ISSET(WT_BTREE_NO_LOCK))
+		if (LF_ISSET(WT_BTREE_LOCK_ONLY) || special_flags == 0) {
+			WT_RET(__wt_try_writelock(session, btree->rwlock));
+			F_SET(btree, WT_BTREE_EXCLUSIVE);
+		}
+	} else
 		__wt_readlock(session, btree->rwlock);
 
-	if (LF_ISSET(WT_BTREE_LOCK_ONLY) &&
-	    WT_META_TRACKING(session))
-		WT_TRET(__wt_meta_track_handle_lock(session));
+	/*
+	 * At this point, we have the requested lock -- if that is all that was
+	 * required, we're done.  Otherwise, check that the handle is open and
+	 * that no special flags are required.
+	 */
+	if (LF_ISSET(WT_BTREE_LOCK_ONLY) ||
+	    (F_ISSET(btree, WT_BTREE_OPEN) && special_flags == 0))
+		return (0);
 
-	return (ret);
+	/*
+	 * The handle needs to be opened.  If we locked the handle above,
+	 * unlock it before returning.
+	 */
+	if (!LF_ISSET(WT_BTREE_EXCLUSIVE) || special_flags == 0)
+		__wt_rwunlock(session, btree->rwlock);
+
+	/* Treat an unopened handle just like a non-existent handle. */
+	return (WT_NOTFOUND);
 }
 
 /*
@@ -85,13 +99,13 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 	btree = session->btree;
 
 	/*
-	 * If we had exclusive access, reopen the tree without special flags so
-	 * that other threads can use it (note the reopen call sets the flags).
+	 * If we had special flags set, close the handle so that future access
+	 * can get a handle without special flags.
 	 */
-	if (F_ISSET(btree, WT_BTREE_BULK |
-	    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY)) {
+	if (F_ISSET(btree, WT_BTREE_SPECIAL_FLAGS)) {
 		WT_ASSERT(session, F_ISSET(btree, WT_BTREE_EXCLUSIVE));
-		ret = __wt_conn_btree_reopen(session, NULL, 0);
+		ret = __wt_btree_close(session);
+		F_CLR(btree, WT_BTREE_OPEN | WT_BTREE_SPECIAL_FLAGS);
 	}
 
 	if (F_ISSET(btree, WT_BTREE_EXCLUSIVE))
@@ -103,38 +117,6 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 }
 
 /*
- * __session_find_btree --
- *	Find an open btree handle for the named table.
- */
-static int
-__session_find_btree(WT_SESSION_IMPL *session,
-    const char *uri, size_t urilen, const char *snapshot, size_t snaplen,
-    const char *cfg[], uint32_t flags,
-    WT_BTREE_SESSION **btree_sessionp)
-{
-	WT_BTREE *btree;
-	WT_BTREE_SESSION *btree_session;
-
-	TAILQ_FOREACH(btree_session, &session->btrees, q) {
-		btree = btree_session->btree;
-		if (strncmp(uri, btree->name, urilen) != 0 ||
-		    btree->name[urilen] != '\0')
-			continue;
-		if (snapshot != btree->snapshot &&
-		    (snapshot == NULL || btree->snapshot == NULL ||
-		    strncmp(snapshot, btree->snapshot, snaplen) != 0 ||
-		    btree->snapshot[snaplen] != '\0'))
-			continue;
-		if (btree_sessionp != NULL)
-			*btree_sessionp = btree_session;
-		session->btree = btree;
-		return (__wt_session_lock_btree(session, cfg, flags));
-	}
-
-	return (WT_NOTFOUND);
-}
-
-/*
  * __wt_session_get_btree --
  *	Get a btree handle for the given name, set session->btree.
  */
@@ -142,22 +124,15 @@ int
 __wt_session_get_btree(WT_SESSION_IMPL *session,
     const char *uri, const char *cfg[], uint32_t flags)
 {
+	WT_BTREE *btree;
 	WT_BTREE_SESSION *btree_session;
 	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
-	const char *filename, *name, *snapshot, *treeconf;
-	size_t namelen, snaplen;
-	int exist;
+	const char *snapshot, *treeconf;
+	size_t snaplen;
 
+	btree = NULL;
 	treeconf = NULL;
-
-	filename = uri;
-	if (!WT_PREFIX_SKIP(filename, "file:"))
-		WT_RET_MSG(
-		    session, EINVAL, "Expected a 'file:' URI: %s", uri);
-
-	name = uri;
-	namelen = strlen(uri);
 
 	/* Is this a snapshot operation? */
 	if (!LF_ISSET(WT_BTREE_SNAPSHOT_OP) && cfg != NULL &&
@@ -170,32 +145,51 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 		snaplen = 0;
 	}
 
-	if ((ret = __session_find_btree(session,
-	    name, namelen, snapshot, snaplen,
-	    cfg, flags, &btree_session)) == 0) {
-		WT_ASSERT(session, btree_session->btree != NULL);
-		session->btree = btree_session->btree;
-		goto err;
-	}
-	if (ret != WT_NOTFOUND)
-		goto err;
-
-	WT_ERR(__wt_exist(session, filename, &exist));
-	if (!exist) {
-		ret = WT_NOTFOUND;
-		goto err;
+	TAILQ_FOREACH(btree_session, &session->btrees, q) {
+		btree = btree_session->btree;
+		if (strcmp(uri, btree->name) != 0)
+			continue;
+		if ((snapshot == NULL && btree->snapshot == NULL) ||
+		    (snapshot != NULL && btree->snapshot != NULL &&
+		    (strncmp(snapshot, btree->snapshot, snaplen) == 0 &&
+		    btree->snapshot[snaplen] == '\0')))
+			break;
 	}
 
-	WT_ERR(__wt_metadata_read(session, uri, &treeconf));
-	WT_ERR(__wt_conn_btree_open(
-	    session, name, snapshot, treeconf, cfg, flags));
-	WT_ERR(__wt_session_lock_btree(session, cfg, flags));
-	WT_ERR(__wt_session_add_btree(session, NULL));
-
-	if (0) {
-err:		__wt_free(session, treeconf);
+	if (btree_session != NULL) {
+		session->btree = btree;
+		if ((ret =
+		    __wt_session_lock_btree(session, flags)) != WT_NOTFOUND) {
+			if (ret == 0 && LF_ISSET(WT_BTREE_NO_LOCK))
+				ret = __wt_session_release_btree(session);
+			return (ret);
+		}
 	}
-	return (ret);
+	
+	/*
+	 * Reading the metadata doubles as an existence check.  If it fails, we
+	 * can't open the file anyway, so it might as well not exist.
+	 */
+	if ((ret = __wt_metadata_read(session, uri, &treeconf)) == WT_NOTFOUND)
+		ret = ENOENT;
+	WT_RET(ret);
+
+	if (LF_ISSET(WT_BTREE_LOCK_ONLY) && btree_session != NULL)
+		return (0);
+
+	if (btree_session == NULL) {
+		WT_RET(__wt_conn_btree_get(
+		    session, uri, snapshot, treeconf, cfg, flags));
+		WT_RET(__wt_session_add_btree(session, NULL));
+	} else {
+		WT_RET(__wt_conn_btree_open_lock(session, flags));
+		ret = __wt_conn_btree_open(session, treeconf, cfg, flags);
+		if (ret != 0 || LF_ISSET(WT_BTREE_NO_LOCK))
+			__wt_rwunlock(session, btree->rwlock);
+		WT_RET(ret);
+	}
+
+	return (0);
 }
 
 /*
@@ -221,6 +215,9 @@ __wt_session_lock_snapshot(
 	LF_SET(WT_BTREE_LOCK_ONLY);
 	WT_ERR(__wt_session_get_btree(session, btree->name, cfg, flags));
 
+	WT_ASSERT(session, WT_META_TRACKING(session));
+	WT_ERR(__wt_meta_track_handle_lock(session));
+
 	/* Restore the original btree in the session. */
 err:	session->btree = btree;
 	__wt_scr_free(&buf);
@@ -229,52 +226,16 @@ err:	session->btree = btree;
 }
 
 /*
- * __wt_session_remove_btree --
+ * __wt_session_discard_btree --
  *	Discard our reference to the btree.
  */
 int
-__wt_session_remove_btree(
-    WT_SESSION_IMPL *session, WT_BTREE_SESSION *btree_session, int locked)
+__wt_session_discard_btree(
+    WT_SESSION_IMPL *session, WT_BTREE_SESSION *btree_session)
 {
 	TAILQ_REMOVE(&session->btrees, btree_session, q);
 	session->btree = btree_session->btree;
 	__wt_free(session, btree_session);
 
-	return (__wt_conn_btree_close(session, locked));
-}
-
-/*
- * __wt_session_close_any_open_btree --
- *	If open, close the btree handle.
- */
-int
-__wt_session_close_any_open_btree(WT_SESSION_IMPL *session, const char *name)
-{
-	WT_BTREE_SESSION *btree_session;
-	WT_DECL_RET;
-
-	/*
-	 * XXX
-	 * We need a different loop in here that closes all snapshot handles as
-	 * well.  And this belongs in conn_btree.c: it should apply to all
-	 * sessions.
-	 */
-	if ((ret = __session_find_btree(session,
-	    name, strlen(name), NULL, 0,
-	    NULL, WT_BTREE_EXCLUSIVE, &btree_session)) == 0) {
-		/*
-		 * XXX
-		 * We have an exclusive lock, which means there are no cursors
-		 * open but some other thread may have the handle cached.
-		 * Fixing this will mean adding additional synchronization to
-		 * the cursor open path.
-		 */
-		WT_ASSERT(session, btree_session->btree->refcnt == 1);
-		__wt_schema_detach_tree(session, btree_session->btree);
-		ret = __wt_session_remove_btree(session, btree_session, 1);
-		__wt_rwunlock(session, session->btree->rwlock);
-	} else if (ret == WT_NOTFOUND)
-		ret = 0;
-
-	return (ret);
+	return (__wt_conn_btree_close(session, 0));
 }

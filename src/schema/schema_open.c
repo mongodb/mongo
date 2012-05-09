@@ -109,8 +109,6 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 			WT_ERR(__wt_config_next(&cparser, &ckey, &cval));
 		else
 			WT_CLEAR(ckey);
-		if (table->colgroup[i] != NULL)
-			continue;
 
 		if ((cgname = table->cg_name[i]) == NULL) {
 			WT_ERR(__wt_schema_colgroup_name(session, table,
@@ -119,14 +117,14 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 			    __wt_buf_steal(session, &namebuf, NULL);
 		}
 		ret = __wt_schema_get_btree(session,
-		    cgname, strlen(cgname), NULL, WT_BTREE_NO_LOCK);
+		    cgname, strlen(cgname), NULL, 0);
 		if (ret != 0) {
 			/* It is okay if the table is not yet complete. */
 			if (ret == WT_NOTFOUND)
 				ret = 0;
 			goto err;
 		}
-		table->colgroup[i] = session->btree;
+		WT_ERR(__wt_session_release_btree(session));
 	}
 
 	if (!table->is_simple) {
@@ -151,7 +149,7 @@ err:	__wt_buf_free(session, &namebuf);
  */
 static int
 __open_index(WT_SESSION_IMPL *session, WT_TABLE *table,
-    const char *uri, const char *idxconf, WT_BTREE **btreep)
+    const char *uri, const char *idxconf)
 {
 	WT_BTREE *btree;
 	WT_CONFIG colconf;
@@ -170,7 +168,8 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table,
 	    session, &uribuf, "file:%.*s", (int)cval.len, cval.str));
 	fileuri = uribuf.data;
 
-	ret = __wt_session_get_btree(session, fileuri, NULL, WT_BTREE_NO_LOCK);
+	ret = __wt_session_get_btree(
+	    session, fileuri, NULL, WT_BTREE_EXCLUSIVE);
 	if (ret == ENOENT)
 		__wt_errx(session,
 		    "Index '%s' created but '%s' is missing", uri, fileuri);
@@ -241,10 +240,10 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table,
 	    table, table->colconf.str, table->colconf.len, 1, &plan));
 	btree->value_plan = __wt_buf_steal(session, &plan, NULL);
 
-	*btreep = btree;
-
 err:	__wt_buf_free(session, &cols);
 	__wt_buf_free(session, &uribuf);
+	if (session->btree != NULL)
+		__wt_session_release_btree(session);
 
 	return (ret);
 }
@@ -291,33 +290,24 @@ __wt_schema_open_index(
 		match = (len > 0 &&
 		   strncmp(name, idxname, len) == 0 && name[len] == '\0');
 
-		if (i * sizeof(WT_BTREE *) >= table->index_alloc) {
-			WT_ERR(__wt_realloc(session, &table->index_alloc,
-			    WT_MAX(10 * sizeof(WT_BTREE *),
-			    2 * table->index_alloc),
-			    &table->index));
+		if (i * sizeof(const char *) >= table->idx_name_alloc)
 			WT_ERR(__wt_realloc(session, &table->idx_name_alloc,
-			    (table->index_alloc / sizeof(WT_BTREE *)) *
-			    sizeof(const char *),
+			    WT_MAX(10 * sizeof(const char *),
+			    2 * table->idx_name_alloc),
 			    &table->idx_name));
-		}
 
 		if (table->idx_name[i] == NULL)
 			WT_ERR(__wt_strdup(session, uri, &table->idx_name[i]));
 
-		if (table->index[i] == NULL) {
-			if (len == 0 || match) {
-				WT_ERR(cursor->get_value(cursor, &idxconf));
-				WT_ERR(__open_index(session,
-				    table, uri, idxconf, &table->index[i]));
-			} else
-				skipped = 1;
-		}
+		if (len == 0 || match) {
+			WT_ERR(cursor->get_value(cursor, &idxconf));
+			WT_ERR(__open_index(session, table, uri, idxconf));
+		} else
+			skipped = 1;
 
 		if (match) {
 			ret = cursor->close(cursor);
 			cursor = NULL;
-			session->btree = table->index[i];
 			break;
 		}
 		i++;
@@ -410,7 +400,6 @@ __wt_schema_open_table(WT_SESSION_IMPL *session,
 	if (ret != WT_NOTFOUND)
 		goto err;
 
-	WT_ERR(__wt_calloc_def(session, WT_COLGROUPS(table), &table->colgroup));
 	WT_ERR(__wt_calloc_def(session, WT_COLGROUPS(table), &table->cg_name));
 	WT_ERR(__wt_schema_open_colgroups(session, table));
 

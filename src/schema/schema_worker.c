@@ -29,8 +29,8 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 		WT_RET(__wt_session_get_btree(session, uri, cfg, open_flags));
 		ret = func(session, cfg);
 		WT_TRET(__wt_session_release_btree(session));
-	} else if (WT_PREFIX_SKIP(uri, "colgroup:") ||
-	    WT_PREFIX_SKIP(uri, "index:")) {
+	} else if (WT_PREFIX_MATCH(uri, "colgroup:") ||
+	    WT_PREFIX_MATCH(uri, "index:")) {
 		WT_RET(__wt_schema_get_btree(
 		    session, uri, strlen(uri), cfg, open_flags));
 		ret = func(session, cfg);
@@ -40,10 +40,7 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 		    tablename, strlen(tablename), &table));
 
 		for (i = 0; i < WT_COLGROUPS(table); i++) {
-			if (table->colgroup[i] == NULL)
-				continue;
 			cgname = table->cg_name[i];
-
 			WT_TRET(__wt_schema_get_btree(session,
 			    cgname, strlen(cgname), cfg, open_flags));
 			ret = func(session, cfg);

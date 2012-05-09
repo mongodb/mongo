@@ -30,7 +30,7 @@ __session_close(WT_SESSION *wt_session, const char *config)
 		WT_TRET(cursor->close(cursor));
 
 	while ((btree_session = TAILQ_FIRST(&session->btrees)) != NULL)
-		WT_TRET(__wt_session_remove_btree(session, btree_session, 0));
+		WT_TRET(__wt_session_discard_btree(session, btree_session));
 
 	WT_TRET(__wt_schema_close_tables(session));
 
@@ -102,11 +102,11 @@ __session_open_cursor(WT_SESSION *wt_session,
 	if (to_dup != NULL)
 		ret = __wt_cursor_dup(session, to_dup, config, cursorp);
 	else if (WT_PREFIX_MATCH(uri, "colgroup:"))
-		ret = __wt_curfile_open(session, uri, cfg, cursorp);
+		ret = __wt_curfile_open(session, uri, NULL, cfg, cursorp);
 	else if (WT_PREFIX_MATCH(uri, "config:"))
 		ret = __wt_curconfig_open(session, uri, cfg, cursorp);
 	else if (WT_PREFIX_MATCH(uri, "file:"))
-		ret = __wt_curfile_open(session, uri, cfg, cursorp);
+		ret = __wt_curfile_open(session, uri, NULL, cfg, cursorp);
 	else if (WT_PREFIX_MATCH(uri, "index:"))
 		ret = __wt_curindex_open(session, uri, cfg, cursorp);
 	else if (WT_PREFIX_MATCH(uri, "statistics:"))
@@ -150,6 +150,10 @@ __session_create(WT_SESSION *wt_session, const char *uri, const char *config)
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_API_CALL(session, create, config, cfg);
 	WT_UNUSED(cfg);
+
+	/* Disallow objects in the WiredTiger name space. */
+	WT_RET(__wt_schema_name_check(session, uri));
+
 	WT_ERR(__wt_schema_create(session, uri, config));
 
 err:	API_END_NOTFOUND_MAP(session, ret);

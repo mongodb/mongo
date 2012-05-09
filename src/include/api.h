@@ -74,6 +74,7 @@ struct __wt_session_impl {
 	WT_BTREE *metafile;		/* Metadata file */
 	void	*meta_track;		/* Metadata operation tracking */
 	void	*meta_track_next;	/* Current position */
+	void	*meta_track_sub;	/* Child transaction / save point */
 	size_t	 meta_track_alloc;	/* Currently allocated */
 #define	WT_META_TRACKING(session)	(session->meta_track_next != NULL)
 

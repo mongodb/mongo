@@ -315,7 +315,7 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 	}
 
 	/* Close open btree handles. */
-	WT_TRET(__wt_conn_btree_remove(conn));
+	WT_TRET(__wt_conn_btree_discard(conn));
 
 	/* Free memory for collators */
 	while ((ncoll = TAILQ_FIRST(&conn->collqh)) != NULL)
@@ -700,7 +700,6 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_ITEM *cbuf, expath, exconfig;
-	WT_SESSION *wt_session;
 	WT_SESSION_IMPL *session;
 	const char *cfg[] =
 	    { __wt_confdfl_wiredtiger_open, config, NULL, NULL };
@@ -833,10 +832,11 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	 * (which avoids application threads racing to create the metadata file
 	 * later).  We need a session handle for this, open one.
 	 */
-	WT_ERR(conn->iface.open_session(&conn->iface, NULL, NULL, &wt_session));
-	if ((ret = __wt_turtle_init((WT_SESSION_IMPL *)wt_session)) == 0)
-		ret = __wt_metadata_open((WT_SESSION_IMPL *)wt_session);
-	WT_TRET(wt_session->close(wt_session, NULL));
+	WT_ERR(__wt_open_session(conn, 0, NULL, NULL, &session));
+	if ((ret = __wt_turtle_init(session)) == 0 && conn->is_new)
+		ret = __wt_schema_create(session, WT_METADATA_URI, NULL);
+	WT_TRET(session->iface.close(&session->iface, NULL));
+	session = &conn->default_session;
 	WT_ERR(ret);
 
 	STATIC_ASSERT(offsetof(WT_CONNECTION_IMPL, iface) == 0);

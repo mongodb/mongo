@@ -7,8 +7,8 @@
 
 #include "wt_internal.h"
 
-int
-__wt_create_file(WT_SESSION_IMPL *session,
+static int
+__create_file(WT_SESSION_IMPL *session,
     const char *uri, int exclusive, const char *config)
 {
 	WT_ITEM *val;
@@ -21,34 +21,31 @@ __wt_create_file(WT_SESSION_IMPL *session,
 	val = NULL;
 	treeconf = NULL;
 
-	/* First check if the file already exists. */
-	if ((ret = __wt_session_get_btree(
-	    session, uri, NULL, WT_BTREE_NO_LOCK)) != WT_NOTFOUND)
-		return (ret == 0 && exclusive ? EEXIST : ret);
+	is_metadata = strcmp(uri, WT_METADATA_URI) == 0;
 
-	/* Create the file. */
 	filename = uri;
 	if (!WT_PREFIX_SKIP(filename, "file:"))
 		WT_RET_MSG(session, EINVAL, "Expected a 'file:' URI: %s", uri);
+
+	/* Check if the file already exists. */
+	if (!is_metadata && (ret =
+	    __wt_metadata_read(session, uri, &treeconf)) != WT_NOTFOUND) {
+		if (exclusive)
+			WT_TRET(EEXIST);
+		return (ret);
+	}
+
+	/* Create the file. */
 	WT_RET(__wt_btree_create(session, filename));
 	if (WT_META_TRACKING(session))
 		WT_ERR(__wt_meta_track_fileop(session, NULL, uri));
 
 	/*
-	 * If creating the metadata file, read the configuration information
-	 * from the turtle file (we made sure it was available when we first
-	 * opened the database).  It looks wrong that we're calling a metadata
-	 * function to read the turtle file, but it's OK, the functions that
-	 * read the metadata file do the right thing for a few special keys.
-	 *
-	 * If not creating the metadata file, append the current version numbers
-	 * to the passed-in configuration and insert the resulting configuration
-	 * into the metadata file.
+	 * If creating an ordinary file, append the current version numbers to
+	 * the passed-in configuration and insert the resulting configuration
+	 * into the metadata.
 	 */
-	is_metadata = strcmp(uri, WT_METADATA_URI) == 0;
-	if (is_metadata)
-		WT_ERR(__wt_metadata_read(session, uri, &treeconf));
-	else {
+	if (!is_metadata) {
 		WT_ERR(__wt_scr_alloc(session, 0, &val));
 		WT_ERR(__wt_buf_fmt(session, val, "version=(major=%d,minor=%d)",
 		    WT_BTREE_MAJOR_VERSION, WT_BTREE_MINOR_VERSION));
@@ -57,15 +54,8 @@ __wt_create_file(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_metadata_insert(session, uri, treeconf));
 	}
 
-	/*
-	 * Call the underlying connection function to allocate a WT_BTREE handle
-	 * and open the underlying file (note we no longer own the configuration
-	 * string after that call).
-	 */
-	ret = __wt_conn_btree_open(session, uri, NULL, treeconf, cfg, 0);
-	treeconf = NULL;
-	WT_ERR(ret);
-	WT_ERR(__wt_session_add_btree(session, NULL));
+	/* Open the file to check that that everything was setup correctly. */
+	WT_ERR(__wt_session_get_btree(session, uri, cfg, WT_BTREE_NO_LOCK));
 
 err:	__wt_scr_free(&val);
 	__wt_free(session, treeconf);
@@ -167,7 +157,7 @@ __create_colgroup(WT_SESSION_IMPL *session,
 			ret = exclusive ? EEXIST : 0;
 		goto err;
 	}
-	WT_ERR(__wt_create_file(session, fileuri, exclusive, fileconf));
+	WT_ERR(__create_file(session, fileuri, exclusive, fileconf));
 
 	WT_ERR(__wt_schema_open_colgroups(session, table));
 
@@ -277,7 +267,7 @@ __create_index(WT_SESSION_IMPL *session,
 			ret = exclusive ? EEXIST : 0;
 		goto err;
 	}
-	WT_ERR(__wt_create_file(session, fileuri, exclusive, fileconf));
+	WT_ERR(__create_file(session, fileuri, exclusive, fileconf));
 
 err:	__wt_free(session, fileconf);
 	__wt_free(session, idxconf);
@@ -360,9 +350,6 @@ __wt_schema_create(
 	WT_DECL_RET;
 	int exclusive;
 
-	/* Disallow objects in the WiredTiger name space. */
-	WT_RET(__wt_schema_name_check(session, name));
-
 	exclusive = (
 	    __wt_config_getones(session, config, "exclusive", &cval) == 0 &&
 	    cval.val != 0);
@@ -376,7 +363,7 @@ __wt_schema_create(
 	if (WT_PREFIX_MATCH(name, "colgroup:"))
 		ret = __create_colgroup(session, name, exclusive, config);
 	else if (WT_PREFIX_MATCH(name, "file:"))
-		ret = __wt_create_file(session, name, exclusive, config);
+		ret = __create_file(session, name, exclusive, config);
 	else if (WT_PREFIX_MATCH(name, "index:"))
 		ret = __create_index(session, name, exclusive, config);
 	else if (WT_PREFIX_MATCH(name, "table:"))
