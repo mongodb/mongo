@@ -18,8 +18,7 @@
 #pragma once
 
 #include <vector>
-#include <float.h>
-#include <math.h>
+#include <cmath>
 #include <string.h>
 #include "util/builder.h"
 #include "bsontypes.h"
@@ -262,14 +261,14 @@ namespace mongo {
 
         /** Get javascript code of a CodeWScope data element. */
         const char * codeWScopeCode() const {
-            massert( 16225 , "not codeWScope" , type() == CodeWScope );
+            massert( 16177 , "not codeWScope" , type() == CodeWScope );
             return value() + 4 + 4; //two ints precede code (see BSON spec)
         }
 
         /** Get length of the code part of the CodeWScope object
          *  This INCLUDES the null char at the end */
         int codeWScopeCodeLen() const {
-            massert( 16226 , "not codeWScope" , type() == CodeWScope );
+            massert( 16178 , "not codeWScope" , type() == CodeWScope );
             return *(int *)( value() + 4 );
         }
 
@@ -608,7 +607,7 @@ namespace mongo {
         switch( type() ) {
         case NumberDouble:
             d = numberDouble();
-            if ( mongo_isnan( d ) ){
+            if ( std::isnan( d ) ){
                 return 0;
             }
             if ( d > (double) std::numeric_limits<long long>::max() ){

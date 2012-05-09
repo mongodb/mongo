@@ -16,6 +16,4 @@
 # include <ws2tcpip.h>
 # include <wspiapi.h>
 # include <windows.h>
-
-#define mongo_isnan(x) _isnan(x)
 #endif
