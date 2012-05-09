@@ -140,12 +140,9 @@ __wt_block_close(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
 	WT_DECL_RET;
 
-	WT_VERBOSE(session, block, "close");
+	WT_VERBOSE_RETVAL(session, block, ret, "close");
 
-	if (block->live_load) {
-		__wt_errx(session, "snapshot never unloaded");
-		ret = EINVAL;
-	}
+	ret = __wt_block_snapshot_unload(session, block);
 
 	if (block->name != NULL)
 		__wt_free(session, block->name);
@@ -200,7 +197,7 @@ __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	    session, block->fh, (off_t)0, WT_BLOCK_DESC_SECTOR, buf));
 
 	desc = (void *)buf;
-	WT_VERBOSE(session, block,
+	WT_VERBOSE_RET(session, block,
 	    "open: magic %" PRIu32
 	    ", major/minor: %" PRIu32 "/%" PRIu32
 	    ", checksum %#" PRIx32,

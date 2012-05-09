@@ -323,7 +323,7 @@ __wt_snapshot_list_set(
 	WT_ERR(__wt_buf_fmt(session, buf, "snapshot=("));
 	WT_SNAPSHOT_FOREACH(snapbase, snap) {
 		/* Skip deleted snapshots. */
-		if (FLD_ISSET(snap->flags, WT_SNAP_DELETE))
+		if (F_ISSET(snap, WT_SNAP_DELETE))
 			continue;
 
 		/*
@@ -340,12 +340,12 @@ __wt_snapshot_list_set(
 		if (snap->order > order)
 			order = snap->order;
 
-		if (FLD_ISSET(snap->flags, WT_SNAP_ADD | WT_SNAP_UPDATE)) {
+		if (F_ISSET(snap, WT_SNAP_ADD | WT_SNAP_UPDATE)) {
 			/* Convert the raw cookie to a hex string. */
 			WT_ERR(__wt_raw_to_hex(session,
 			    snap->raw.data, snap->raw.size, &snap->addr));
 
-			if (FLD_ISSET(snap->flags, WT_SNAP_ADD))
+			if (F_ISSET(snap, WT_SNAP_ADD))
 				snap->order = order + 1;
 		}
 		WT_ERR(__wt_buf_catfmt(session, buf,

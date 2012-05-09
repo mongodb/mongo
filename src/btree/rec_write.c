@@ -220,7 +220,7 @@ int
 __wt_rec_write(
     WT_SESSION_IMPL *session, WT_PAGE *page, WT_SALVAGE_COOKIE *salvage)
 {
-	WT_VERBOSE(session, reconcile,
+	WT_VERBOSE_RET(session, reconcile,
 	    "page %p %s", page, __wt_page_type_string(page->type));
 
 	WT_BSTAT_INCR(session, rec_written);
@@ -324,7 +324,7 @@ __wt_rec_write(
 	 * to do), but the code is simpler this way, and this operation should
 	 * not be common.
 	 */
-	WT_VERBOSE(session, reconcile,
+	WT_VERBOSE_RET(session, reconcile,
 	    "root page split %p -> %p", page, page->modify->u.split);
 	page = page->modify->u.split;
 	__wt_page_modify_set(page);
@@ -928,7 +928,7 @@ __rec_split_write(
 	uint8_t addr[WT_BTREE_MAX_ADDR_COOKIE];
 
 	dsk = buf->mem;
-	WT_VERBOSE(session, write, "%s", __wt_page_type_string(dsk->type));
+	WT_VERBOSE_RET(session, write, "%s", __wt_page_type_string(dsk->type));
 
 	/*
 	 * We always write an additional byte on row-store leaf pages after the
@@ -2839,7 +2839,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	switch (r->bnd_next) {
 	case 0:						/* Page delete */
-		WT_VERBOSE(session, reconcile, "page %p empty", page);
+		WT_VERBOSE_RET(session, reconcile, "page %p empty", page);
 		WT_BSTAT_INCR(session, rec_page_delete);
 
 		/* If this is the root page, we need to create a sync point. */
@@ -2876,7 +2876,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		F_SET(mod, WT_PM_REC_REPLACE);
 		break;
 	default:					/* Page split */
-		WT_VERBOSE(session, reconcile,
+		WT_VERBOSE_RET(session, reconcile,
 		    "page %p split into %" PRIu32 " pages",
 		    page, r->bnd_next);
 
@@ -2906,7 +2906,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 					WT_ERR(__wt_buf_set_printable(
 					    session, tkey,
 					    bnd->key.data, bnd->key.size));
-					WT_VERBOSE(session, reconcile,
+					WT_VERBOSE_RET(session, reconcile,
 					    "split: starting key "
 					    "%.*s",
 					    (int)tkey->size,
@@ -2915,7 +2915,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 				case WT_PAGE_COL_FIX:
 				case WT_PAGE_COL_INT:
 				case WT_PAGE_COL_VAR:
-					WT_VERBOSE(session, reconcile,
+					WT_VERBOSE_RET(session, reconcile,
 					    "split: starting recno %" PRIu64,
 					    bnd->recno);
 					break;
@@ -3255,6 +3255,7 @@ __rec_cell_build_ovfl(
 	WT_PAGE_HEADER *dsk;
 	WT_RECONCILE *r;
 	uint32_t size;
+	int found;
 	uint8_t *addr, buf[WT_BTREE_MAX_ADDR_COOKIE];
 
 	r = session->reconcile;
@@ -3266,8 +3267,9 @@ __rec_cell_build_ovfl(
 	 * See if this overflow record has already been written and reuse it if
 	 * possible.  Else, write a new overflow record.
 	 */
-	if (!__wt_rec_track_ovfl_reuse(
-	    session, page, kv->buf.data, kv->buf.size, &addr, &size)) {
+	WT_RET(__wt_rec_track_ovfl_reuse(
+	    session, page, kv->buf.data, kv->buf.size, &addr, &size, &found));
+	if (!found) {
 		/* Allocate a buffer big enough to write the overflow record. */
 		size = kv->buf.size;
 		WT_RET(__wt_bm_write_size(session, &size));

@@ -49,7 +49,7 @@ __wt_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 
 	tmp = NULL;
 
-	WT_VERBOSE(session, read,
+	WT_VERBOSE_RET(session, read,
 	    "off %" PRIuMAX ", size %" PRIu32 ", cksum %" PRIu32,
 	    (uintmax_t)offset, size, cksum);
 

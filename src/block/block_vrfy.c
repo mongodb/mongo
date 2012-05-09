@@ -316,6 +316,8 @@ __wt_block_verify(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf,
 	WT_ITEM *tmp;
 	uint32_t frag, frags, i, match;
 
+	tmp = NULL;
+
 	/*
 	 * If we've already verify this block's physical image, we know it's
 	 * good, we don't have to verify it again.
@@ -326,7 +328,7 @@ __wt_block_verify(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf,
 		if (__bit_test(block->fragfile, frag++))
 			++match;
 	if (match == frags) {
-		WT_VERBOSE(session, verify,
+		WT_VERBOSE_RET(session, verify,
 		    "skipping block at %" PRIuMAX "-%" PRIuMAX ", already "
 		    "verified",
 		    (uintmax_t)offset, (uintmax_t)(offset + size));
@@ -398,7 +400,7 @@ __verify_filefrag_add(WT_SESSION_IMPL *session,
 {
 	uint32_t f, frag, frags, i;
 
-	WT_VERBOSE(session, verify,
+	WT_VERBOSE_RET(session, verify,
 	    "adding file block at %" PRIuMAX "-%" PRIuMAX " (%" PRIuMAX ")",
 	    (uintmax_t)offset, (uintmax_t)(offset + size), (uintmax_t)size);
 
@@ -473,7 +475,7 @@ __verify_snapfrag_add(
 {
 	uint32_t f, frag, frags, i;
 
-	WT_VERBOSE(session, verify,
+	WT_VERBOSE_RET(session, verify,
 	    "adding snapshot block at %" PRIuMAX "-%" PRIuMAX " (%" PRIuMAX ")",
 	    (uintmax_t)offset, (uintmax_t)(offset + size), (uintmax_t)size);
 

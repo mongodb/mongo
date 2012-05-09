@@ -26,7 +26,7 @@ __wt_page_in_func(
 #endif
     )
 {
-	int wake, read_lockout;
+	int busy, read_lockout, wake;
 
 	/*
 	 * Only wake the eviction server the first time through here (if the
@@ -67,11 +67,13 @@ __wt_page_in_func(
 			 * can't get a hazard reference is because the page is
 			 * being evicted; yield and try again.
 			 */
-			if (__wt_hazard_set(session, ref
 #ifdef HAVE_DIAGNOSTIC
-			    , file, line
+			WT_RET(
+			    __wt_hazard_set(session, ref, &busy, file, line));
+#else
+			WT_RET(__wt_hazard_set(session, ref, &busy));
 #endif
-			    ) == 0) {
+			if (!busy) {
 				WT_ASSERT(session, !WT_PAGE_IS_ROOT(ref->page));
 				ref->page->read_gen =
 				    __wt_cache_read_gen(session);

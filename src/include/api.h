@@ -61,7 +61,8 @@ struct __wt_session_impl {
 	WT_CONDVAR *cond;		/* Condition variable */
 
 	const char *name;		/* Name */
-	WT_EVENT_HANDLER *event_handler;
+
+	WT_EVENT_HANDLER *event_handler;/* Application's event handlers */
 
 	WT_BTREE *btree;		/* Current file */
 	TAILQ_HEAD(__btrees, __wt_btree_session) btrees;

@@ -29,7 +29,7 @@ index cursor (key=index key\, value=table value)}
   value=(string)description\, (string)value\, (uint64_t)value)}
 </table>
 
-See @ref data_sources for the full list.
+See @subpage data_sources for the full list.
 
 @section cursor_projections Projections
 

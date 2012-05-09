@@ -168,8 +168,10 @@ track(const char *tag, uint64_t cnt, TINFO *tinfo)
 	}
 	lastlen = len;
 
-	(void)printf("%s\r", msg);
-	(void)fflush(stdout);
+	if (printf("%s\r", msg) < 0)
+		die(EIO, "printf");
+	if (fflush(stdout) == EOF)
+		die(errno, "fflush");
 }
 
 /*
