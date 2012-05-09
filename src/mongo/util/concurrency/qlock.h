@@ -60,6 +60,7 @@ namespace mongo {
         void _start_greed();  // we are already inlock for these underscore methods
         void _stop_greed();
         void _lock_W();
+        void _unlock_R();
         bool _areQueueJumpingGlobalWritesPending() const {
             return areGlobalWritesGreedy && numPendingGlobalWrites > 0;
         }
@@ -104,6 +105,7 @@ namespace mongo {
         void unlock_r();
         void unlock_w();
         void unlock_R();
+        void unlock_R_start_greed();
         void unlock_W();
         void W_to_R();
         void R_to_W(); // caution see notes below
@@ -353,6 +355,16 @@ namespace mongo {
 
     inline void QLock::unlock_R() {
         boost::mutex::scoped_lock lk(m);
+        _unlock_R();
+    }
+
+    inline void QLock::unlock_R_start_greed() {
+        boost::mutex::scoped_lock lk(m);
+        _unlock_R();
+        _start_greed();
+    }
+
+    inline void QLock::_unlock_R() {
         fassert(16139, R.n > 0);
         --R.n;
         notifyWeUnlocked('R');

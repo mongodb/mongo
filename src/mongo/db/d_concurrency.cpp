@@ -207,12 +207,10 @@ namespace mongo {
             stats.unlocking('w'); 
             q.unlock_w(); 
         }
-        void unlock_R() {
-            wassert( threadState() == 'R' );
-            lockState().unlocked();
-            stats.unlocking('R'); 
-            q.unlock_R(); 
-        }
+
+        void unlock_R() { _unlock_R(false); }
+        void unlock_R_start_greed() { _unlock_R(true); }
+
         void unlock_W() {
             wassert( threadState() == 'W' );
             unlocking_W();
@@ -226,6 +224,18 @@ namespace mongo {
         void R_to_W()                        { q.R_to_W(); }
         bool w_to_X() { return q.w_to_X(); }
         void X_to_w() { q.X_to_w(); }
+
+    private:
+        void _unlock_R(bool startGreed) {
+            wassert( threadState() == 'R' );
+            lockState().unlocked();
+            stats.unlocking('R'); 
+            if (startGreed)
+                q.unlock_R_start_greed();
+            else
+                q.unlock_R(); 
+        }
+
     };
 
     static WrapperForQLock& q = *new WrapperForQLock();
@@ -415,7 +425,10 @@ namespace mongo {
             return;
         }
         if( threadState() == 'R' ) { // we downgraded
-            q.unlock_R();
+            if (stoppedGreed)
+                q.unlock_R_start_greed();
+            else
+                q.unlock_R();
         }
         else {
             q.unlock_W();
