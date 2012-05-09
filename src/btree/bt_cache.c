@@ -19,7 +19,7 @@ __wt_cache_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
-	session = &conn->default_session;
+	session = conn->default_session;
 
 	WT_RET(__wt_calloc_def(session, 1, &conn->cache));
 	cache = conn->cache;
@@ -90,7 +90,7 @@ __wt_cache_destroy(WT_CONNECTION_IMPL *conn)
 	WT_SESSION_IMPL *session;
 	WT_CACHE *cache;
 
-	session = &conn->default_session;
+	session = conn->default_session;
 	cache = conn->cache;
 
 	if (cache == NULL)

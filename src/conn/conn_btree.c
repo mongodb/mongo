@@ -367,11 +367,7 @@ __wt_conn_btree_discard(WT_CONNECTION_IMPL *conn)
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
-	/*
-	 * We need a session handle because we're potentially reading/writing
-	 * pages.
-	 */
-	WT_RET(__wt_open_session(conn, 1, NULL, NULL, &session));
+	session = conn->default_session;
 
 	/*
 	 * Close open btree handles: first, everything but the metadata file
@@ -406,9 +402,6 @@ restart:
 		--conn->btqcnt;
 		WT_TRET(__conn_btree_discard(session, btree));
 	}
-
-	/* Discard our session. */
-	WT_TRET(session->iface.close(&session->iface, NULL));
 
 	return (ret);
 }

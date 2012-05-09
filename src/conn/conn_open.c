@@ -18,9 +18,8 @@ __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	WT_SESSION_IMPL *session;
 
 	/* Default session. */
-	conn->default_session.iface.connection = &conn->iface;
-
-	session = &conn->default_session;
+	session = conn->default_session;
+	session->iface.connection = &conn->iface;
 
 	/* WT_SESSION_IMPL and hazard arrays. */
 	WT_ERR(__wt_calloc(session,
@@ -64,7 +63,7 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	WT_DLH *dlh;
 	WT_FH *fh;
 
-	session = &conn->default_session;
+	session = conn->default_session;
 
 	/*
 	 * Complain if files weren't closed (ignoring the lock and logging
@@ -94,6 +93,16 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	while ((dlh = TAILQ_FIRST(&conn->dlhqh)) != NULL) {
 		TAILQ_REMOVE(&conn->dlhqh, dlh, q);
 		WT_TRET(__wt_dlclose(session, dlh));
+	}
+
+	/*
+	 * Close the default session and switch back to the dummy session in
+	 * case of any error messages from the remaining operations while
+	 * destroying the connection handle.
+	 */
+	if (session != &conn->dummy_session) {
+		WT_TRET(session->iface.close(&session->iface, NULL));
+		conn->default_session = &conn->dummy_session;
 	}
 
 	/* Destroy the handle. */

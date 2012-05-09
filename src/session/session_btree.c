@@ -165,7 +165,7 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 			return (ret);
 		}
 	}
-	
+
 	/*
 	 * Reading the metadata doubles as an existence check.  If it fails, we
 	 * can't open the file anyway, so it might as well not exist.

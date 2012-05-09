@@ -75,7 +75,7 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	 */
 	WT_PUBLISH(session->iface.connection, NULL);
 
-	session = &conn->default_session;
+	session = conn->default_session;
 	__wt_spin_unlock(session, &conn->spinlock);
 
 err:	API_END_NOTFOUND_MAP(session, ret);
@@ -152,7 +152,7 @@ __session_create(WT_SESSION *wt_session, const char *uri, const char *config)
 	WT_UNUSED(cfg);
 
 	/* Disallow objects in the WiredTiger name space. */
-	WT_RET(__wt_schema_name_check(session, uri));
+	WT_ERR(__wt_schema_name_check(session, uri));
 
 	WT_ERR(__wt_schema_create(session, uri, config));
 
@@ -473,7 +473,7 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
 
 	WT_UNUSED(config);
 
-	session = &conn->default_session;
+	session = conn->default_session;
 	session_ret = NULL;
 
 	__wt_spin_lock(session, &conn->spinlock);
