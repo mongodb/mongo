@@ -130,11 +130,15 @@ namespace mongo {
 
         // Finds and applies the changes to a collection from the config server specified
         // Also includes minor version changes for particular major-version chunks if explicitly
-        // specified
+        // specified.
+        // Returns the number of diffs processed, or -1 if the diffs were inconsistent
+        // Throws a DBException on connection errors
         int calculateConfigDiff( string config,
                                  const set<ShardChunkVersion>& extraMinorVersions = set<ShardChunkVersion>() );
 
         // Applies changes to the config data from a cursor passed in
+        // Returns the number of diffs processed, or -1 if the diffs were inconsistent
+        // Throws a DBException on connection errors
         int calculateConfigDiff( DBClientCursorInterface& diffCursor );
 
         // Returns the query needed to find new changes to a collection from the config server
@@ -150,7 +154,6 @@ namespace mongo {
         map<ShardType, ShardChunkVersion>* _maxShardVersions;
 
     };
-
 
 } // namespace mongo
 
