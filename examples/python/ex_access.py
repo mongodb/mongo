@@ -1,5 +1,3 @@
-#!/usr/bin/env PYTHONPATH=../../lang/python:../../lang/python/src python
-#
 # Copyright (c) 2008-2012 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
@@ -24,41 +22,26 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-#
-# ex_access.py
-# 	demonstrates how to create and access a simple table.
-#
 
-import wiredtiger
-import sys
+from wiredtiger import wiredtiger_open
 
-home = 'WT_TEST'
+# Connect to the database and open a session
+conn = wiredtiger_open('WT_TEST', 'create')
+session = conn.open_session()
 
-try:
-    conn = wiredtiger.wiredtiger_open(home, None, 'create')
-    print('connected: ' + `conn`);
-    session = conn.open_session(None, None)
-except BaseException as e:
-    print('Error connecting to', (home + ':'), e);
-    sys.exit(1)
+# Create a simple table
+session.create('table:T', 'key_format=S,value_format=S')
 
-# Note: further error checking omitted for clarity.
+# Open a cursor and insert a record
+cursor = session.open_cursor('table:T', None)
 
-session.create_table('access', 'key_format=S,value_format=S')
-cursor = session.open_cursor('table:access', None, None)
-
-# Insert a record.
 cursor.set_key('key1')
 cursor.set_value('value1')
+cursor.insert()
 
-# TODO: remove try block when cursor.insert works
-try:
-    cursor.insert()
-except BaseException as tuple:
-    print('Error cursor insert: ', tuple);
-  
+# Iterate through the records
+cursor.reset()
 for key, value in cursor:
     print('Got record: ' + key + ' : ' + value)
 
-conn.close(None)
-sys.exit(0)
+conn.close()

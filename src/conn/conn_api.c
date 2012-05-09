@@ -11,14 +11,16 @@
  * api_err_printf --
  *	Extension API call to print to the error stream.
  */
-static void
+static int
 __api_err_printf(WT_SESSION *wt_session, const char *fmt, ...)
 {
+	WT_DECL_RET;
 	va_list ap;
 
 	va_start(ap, fmt);
-	__wt_eventv((WT_SESSION_IMPL *)wt_session, 0, 0, NULL, 0, fmt, ap);
+	ret = __wt_verrx((WT_SESSION_IMPL *)wt_session, fmt, ap);
 	va_end(ap);
+	return (ret);
 }
 
 static WT_EXTENSION_API __api = {
@@ -728,25 +730,11 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	session->name = "wiredtiger_open";
 
 	/*
-	 * Configure event handling as soon as possible so errors are handled
-	 * correctly.  If the application didn't configure an event handler,
-	 * use the default one, and use default entries for any entries not
-	 * set by the application.
+	 * Configure any event handlers provided by the application as soon as
+	 * possible so errors are handled correctly.
 	 */
-	if (event_handler == NULL)
-		event_handler = __wt_event_handler_default;
-	else {
-		if (event_handler->handle_error == NULL)
-			event_handler->handle_error =
-			    __wt_event_handler_default->handle_error;
-		if (event_handler->handle_message == NULL)
-			event_handler->handle_message =
-			    __wt_event_handler_default->handle_message;
-		if (event_handler->handle_progress == NULL)
-			event_handler->handle_progress =
-			    __wt_event_handler_default->handle_progress;
-	}
-	session->event_handler = event_handler;
+	if (event_handler != NULL)
+		session->event_handler = event_handler;
 
 	/* Remaining basic initialization of the connection structure. */
 	WT_ERR(__wt_connection_init(conn));
@@ -770,6 +758,9 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	conn->hazard_size = (uint32_t)cval.val;
 	WT_ERR(__wt_config_gets(session, cfg, "session_max", &cval));
 	conn->session_size = (uint32_t)cval.val;
+	WT_ERR(__wt_config_gets(session, cfg, "sync", &cval));
+	if (!cval.val)
+		F_SET(conn, WT_CONN_NOSYNC);
 
 	/* Configure verbose flags. */
 	conn->verbose = 0;
@@ -838,17 +829,15 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	}
 
 	/*
-	 * If this is a new database, create the metadata file.  This avoids
-	 * application threads racing to create it later.  We need a real
-	 * session handle for this: open one.
+	 * Check on the turtle and metadata files, creating them if necessary
+	 * (which avoids application threads racing to create the metadata file
+	 * later).  We need a session handle for this, open one.
 	 */
-	if (conn->is_new) {
-		WT_ERR(conn->iface.open_session(&conn->iface,
-		    NULL, NULL, &wt_session));
-		WT_TRET(__wt_open_metadata((WT_SESSION_IMPL *)wt_session));
-		WT_TRET(wt_session->close(wt_session, NULL));
-		WT_ERR(ret);
-	}
+	WT_ERR(conn->iface.open_session(&conn->iface, NULL, NULL, &wt_session));
+	if ((ret = __wt_turtle_init((WT_SESSION_IMPL *)wt_session)) == 0)
+		ret = __wt_metadata_open((WT_SESSION_IMPL *)wt_session);
+	WT_TRET(wt_session->close(wt_session, NULL));
+	WT_ERR(ret);
 
 	STATIC_ASSERT(offsetof(WT_CONNECTION_IMPL, iface) == 0);
 	*wt_connp = &conn->iface;

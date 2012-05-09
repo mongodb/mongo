@@ -52,10 +52,18 @@ The \c drop command drops the specified \c uri.  It is equivalent to a
 call to WT_SESSION::drop with the "force" configuration argument.
 
 @subsection utility_drop_synopsis Synopsis
-<code>wt [-Vv] [-C config] [-h directory] drop uri</code>
+<code>wt [-Vv] [-C config] [-h directory] drop [-s snapshot] uri</code>
 
 @subsection utility_drop_options Options
-There are no command-specific options for the \c drop command.
+The following are command-specific options for the \c drop command:
+
+@par <code>-s</code>
+Specify one more more snapshots to drop; the argument must be either the
+name of a single snapshot to drop (a string), or a list containing one
+of the following keys: "all" to drop all snapshots, "from=<snapshot>"
+to drop all snapshots after and including the named snapshots, or
+"to=<snapshot>" to drop all snapshots before and including the named
+snapshot.
 
 
 <hr>

@@ -40,6 +40,8 @@ struct L {
 void add(int, int);
 void build(void);
 void check(struct L *);
+void cursor_lock(void);
+void drop(void);
 void dump_cat(struct L *, const char *);
 void dump_snap(struct L *, const char *);
 void run(void);
@@ -89,6 +91,7 @@ usage(void)
 void
 run(void)
 {
+	struct L *p;
 	char config[128];
 
 	/* Open the connection and create the file. */
@@ -100,11 +103,18 @@ run(void)
 	    "internal_page_max=512,leaf_page_max=512");
 	assert(session->create(session, URI, config) == 0);
 
+	printf("building...\n");
 	build();				/* Build a set of snapshots */
-#if 0
+
+	printf("checking build...\n");
 	for (p = list; p->start != 0; ++p)
 		check(p);			/* Check the contents */
-#endif
+
+	printf("checking cursor_lock...\n");
+	cursor_lock();
+
+	printf("checking delete...\n");
+	drop();
 
 	assert(conn->close(conn, 0) == 0);
 }
@@ -124,7 +134,6 @@ build(void)
 
 		snprintf(buf, sizeof(buf), "snapshot=%s", p->name);
 		assert(session->sync(session, URI, buf) == 0);
-
 		assert(session->verify(session, URI, NULL) == 0);
 	}
 }
@@ -198,7 +207,7 @@ dump_cat(struct L *snap, const char *f)
 
 	assert((fp = fopen(f, "w")) != NULL);
 
-	for (p = list; p < snap; ++p) {
+	for (p = list; p <= snap; ++p) {
 		for (row = p->start; row < p->stop; ++row)
 			fprintf(fp,
 			    "%010d KEY------\n%010d VALUE----\n", row, row);
@@ -234,4 +243,48 @@ dump_snap(struct L *snap, const char *f)
 
 	assert(cursor->close(cursor) == 0);
 	assert(fclose(fp) == 0);
+}
+
+/*
+ * cursor_lock --
+ *	Check locking cases.
+ */
+void
+cursor_lock(void)
+{
+	WT_CURSOR *cursor, *c1, *c2, *c3;
+	char buf[64];
+
+	/* Check that you can't drop a snapshot if it's in use. */
+	snprintf(buf, sizeof(buf), "snapshot=%s", list[0].name);
+	assert(session->open_cursor(session, URI, NULL, buf, &cursor) == 0);
+	assert(session->drop(session, URI, buf) != 0);
+	assert(cursor->close(cursor) == 0);
+
+	/* Check you can open two snapshots at the same time. */
+	snprintf(buf, sizeof(buf), "snapshot=%s", list[0].name);
+	assert(session->open_cursor(session, URI, NULL, buf, &c1) == 0);
+	snprintf(buf, sizeof(buf), "snapshot=%s", list[1].name);
+	assert(session->open_cursor(session, URI, NULL, buf, &c2) == 0);
+	assert(session->open_cursor(session, URI, NULL, NULL, &c3) == 0);
+	assert(cursor->close(c2) == 0);
+	assert(cursor->close(c1) == 0);
+	assert(cursor->close(c3) == 0);
+}
+
+/*
+ * drop --
+ *	Delete a snapshot and verify the file.
+ */
+void
+drop(void)
+{
+	struct L *p;
+	char buf[64];
+
+	for (p = list; p->start != 0; ++p) {
+		snprintf(buf, sizeof(buf), "snapshot=%s", p->name);
+		assert(session->drop(session, URI, buf) == 0);
+		assert(session->verify(session, URI, NULL) == 0);
+	}
 }

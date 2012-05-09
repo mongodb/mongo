@@ -26,8 +26,7 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 
 	/* Get the btree handle(s) and call the underlying function. */
 	if (WT_PREFIX_MATCH(uri, "file:")) {
-		WT_RET(__wt_session_get_btree(
-		    session, uri, NULL, cfg, open_flags));
+		WT_RET(__wt_session_get_btree(session, uri, cfg, open_flags));
 		ret = func(session, cfg);
 		WT_TRET(__wt_session_release_btree(session));
 	} else if (WT_PREFIX_SKIP(uri, "colgroup:") ||

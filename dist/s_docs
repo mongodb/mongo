@@ -33,6 +33,15 @@ spellchk()
 	}
 }
 
+valid_build()
+{
+	# Complain if there are pages we don't reference directly.
+	egrep 'Related Pages' ../docs/navtree.js > /dev/null && {
+		echo 'Unreferenced page: see "Related Pages" for the list.'
+		e=1
+	}
+}
+
 build()
 {
 	# Build from scratch on demand.
@@ -91,5 +100,8 @@ spellchk
 
 # Build the documentation.
 build $clean
+
+# Any post-build validity checks we want to make.
+valid_build
 
 exit $e

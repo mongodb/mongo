@@ -14,34 +14,24 @@
  *	(a) an open handle, read locked; or (b) a closed handle, write locked.
  */
 static int
-__conn_btree_get(WT_SESSION_IMPL *session, const char *name)
+__conn_btree_get(
+    WT_SESSION_IMPL *session, const char *name, const char *snapshot)
 {
 	WT_BTREE *btree;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	const char *filename, *snapshot;
-	size_t filename_len;
 	int matched;
 
 	conn = S2C(session);
-	snapshot = NULL;
-
-	filename = name;
-	if (!WT_PREFIX_SKIP(filename, "file:"))
-		WT_RET_MSG(session, EINVAL, "Expected a 'file:' URI: %s", name);
-
-	/* Snapshot handles have the snapshot name after a colon. */
-	if ((snapshot = strchr(filename, ':')) != NULL) {
-		filename_len = (size_t)(snapshot - filename);
-		++snapshot;
-	} else
-		filename_len = strlen(filename);
 
 	/* Increment the reference count if we already have the btree open. */
 	matched = 0;
 	__wt_spin_lock(session, &conn->spinlock);
 	TAILQ_FOREACH(btree, &conn->btqh, q) {
-		if (strcmp(name, btree->name) == 0) {
+		if (strcmp(name, btree->name) == 0 &&
+		    (snapshot == btree->snapshot ||
+		    (snapshot != NULL && btree->snapshot != NULL &&
+		    strcmp(snapshot, btree->snapshot) == 0))) {
 			++btree->refcnt;
 			session->btree = btree;
 			matched = 1;
@@ -111,16 +101,14 @@ __conn_btree_get(WT_SESSION_IMPL *session, const char *name)
 	if ((ret = __wt_calloc_def(session, 1, &btree)) == 0 &&
 	    (ret = __wt_rwlock_alloc(
 		session, "btree handle", &btree->rwlock)) == 0 &&
-	    (ret = __wt_strndup(session,
-		filename, filename_len, &btree->filename)) == 0 &&
-	    (ret = __wt_strdup(session, name, &btree->name)) == 0) {
+	    (ret = __wt_strdup(session, name, &btree->name)) == 0 &&
+	    (snapshot == NULL ||
+	    (ret = __wt_strdup(session, snapshot, &btree->snapshot)) == 0)) {
 		/* Lock the handle before it is inserted in the list. */
 		__wt_writelock(session, btree->rwlock);
 
 		/* Add to the connection list. */
 		btree->refcnt = 1;
-		btree->snapshot = (snapshot == NULL) ?
-		    NULL : btree->name + (snapshot - name);
 		TAILQ_INSERT_TAIL(&conn->btqh, btree, q);
 		++conn->btqcnt;
 	}
@@ -132,8 +120,8 @@ __conn_btree_get(WT_SESSION_IMPL *session, const char *name)
 		if (btree->rwlock != NULL)
 			(void)__wt_rwlock_destroy(
 			    session, btree->rwlock);
-		__wt_free(session, btree->filename);
 		__wt_free(session, btree->name);
+		__wt_free(session, btree->snapshot);
 		__wt_free(session, btree);
 	}
 
@@ -146,7 +134,7 @@ __conn_btree_get(WT_SESSION_IMPL *session, const char *name)
  */
 int
 __wt_conn_btree_open(WT_SESSION_IMPL *session,
-    const char *name, const char *config,
+    const char *name, const char *snapshot, const char *config,
     const char *cfg[], uint32_t flags)
 {
 	WT_BTREE *btree;
@@ -159,7 +147,7 @@ __wt_conn_btree_open(WT_SESSION_IMPL *session,
 
 	WT_STAT_INCR(conn->stats, file_open);
 
-	if ((ret = __conn_btree_get(session, name)) != 0) {
+	if ((ret = __conn_btree_get(session, name, snapshot)) != 0) {
 		__wt_free(session, config);
 		return (ret);
 	}
@@ -177,7 +165,8 @@ __wt_conn_btree_open(WT_SESSION_IMPL *session,
 	btree->flags = flags;
 
 	WT_ERR(__wt_scr_alloc(session, WT_BTREE_MAX_ADDR_COOKIE, &addr));
-	WT_ERR(__wt_snapshot_get(session, btree->snapshot, addr));
+	WT_ERR(__wt_snapshot_get(
+	    session, btree->name, btree->snapshot, addr));
 	WT_ERR(__wt_btree_open(session,
 	    cfg, addr->data, addr->size, btree->snapshot == NULL ? 0 : 1));
 	F_SET(btree, WT_BTREE_OPEN);
@@ -248,8 +237,8 @@ __conn_btree_remove(WT_SESSION_IMPL *session, WT_BTREE *btree)
 	}
 	WT_TRET(__wt_rwlock_destroy(session, btree->rwlock));
 	__wt_free(session, btree->config);
-	__wt_free(session, btree->filename);
 	__wt_free(session, btree->name);
+	__wt_free(session, btree->snapshot);
 	__wt_free(session, btree);
 
 	return (ret);
@@ -334,7 +323,7 @@ __wt_conn_btree_reopen(
 	}
 
 	WT_RET(__wt_scr_alloc(session, WT_BTREE_MAX_ADDR_COOKIE, &addr));
-	WT_ERR(__wt_snapshot_get(session, NULL, addr));
+	WT_ERR(__wt_snapshot_get(session, btree->name, NULL, addr));
 	btree->flags = flags;
 	WT_ERR(__wt_btree_open(session, cfg, addr->data, addr->size, 0));
 	F_SET(btree, WT_BTREE_OPEN);

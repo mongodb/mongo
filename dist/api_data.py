@@ -392,6 +392,9 @@ methods = {
 		maximum expected number of sessions (including server
 		threads)''',
 		min='1'),
+	Config('sync', 'true', r'''
+		sync files when closing or writing snapshots''',
+		type='boolean'),
 	Config('transactional', 'false', r'''
 		support transactional semantics''',
 		type='boolean'),
@@ -441,6 +444,6 @@ flags = {
 ###################################################
 # Structure flag declarations
 ###################################################
-	'conn' : [ 'SERVER_RUN' ],
+	'conn' : [ 'CONN_NOSYNC', 'SERVER_RUN' ],
 	'session' : [ 'SESSION_INTERNAL', 'SESSION_SALVAGE_QUIET_ERR' ],
 }

@@ -9,9 +9,14 @@ begin with the string "WT_".
 
 WiredTiger's private function names begin with the string "__wt__".
 
-@section file File system name space
+@section filename File system name space
 
 WiredTiger's files begin with the string "WiredTiger"; applications
 should not create files in the WiredTiger file system name space.
+
+@section error Error return name space
+
+WiredTiger reserves all values from -31,800 to -31,999 as possible error
+return values.
 
 */

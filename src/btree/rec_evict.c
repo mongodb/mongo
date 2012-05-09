@@ -29,7 +29,7 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 
 	conn = S2C(session);
 
-	WT_VERBOSE(session, evict,
+	WT_VERBOSE_RET(session, evict,
 	    "page %p (%s)", page, __wt_page_type_string(page->type));
 
 	WT_ASSERT(session, session->excl_next == 0);
@@ -404,7 +404,7 @@ __hazard_exclusive(WT_SESSION_IMPL *session, WT_REF *ref, int top)
 			WT_BSTAT_INCR(session, rec_hazard);
 			WT_CSTAT_INCR(session, cache_evict_hazard);
 
-			WT_VERBOSE(session,
+			WT_VERBOSE_RET(session,
 			    evict, "page %p hazard request failed", ref->page);
 			return (EBUSY);
 		}

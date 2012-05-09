@@ -37,7 +37,7 @@ __wt_cache_read(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *ref)
 	/* Build the in-memory version of the page. */
 	WT_ERR(__wt_page_inmem(session, parent, ref, tmp.mem, &page));
 
-	WT_VERBOSE(session, read,
+	WT_VERBOSE_ERR(session, read,
 	    "page %p: %s", page, __wt_page_type_string(page->type));
 
 	ref->page = page;

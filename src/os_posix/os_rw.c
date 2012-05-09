@@ -17,7 +17,7 @@ __wt_read(WT_SESSION_IMPL *session,
 {
 	WT_CSTAT_INCR(session, total_read_io);
 
-	WT_VERBOSE(session, fileops,
+	WT_VERBOSE_RET(session, fileops,
 	    "%s: read %" PRIu32 " bytes at offset %" PRIuMAX,
 	    fh->name, bytes, (uintmax_t)offset);
 
@@ -40,7 +40,7 @@ __wt_write(WT_SESSION_IMPL *session,
 {
 	WT_CSTAT_INCR(session, total_write_io);
 
-	WT_VERBOSE(session, fileops,
+	WT_VERBOSE_RET(session, fileops,
 	    "%s: write %" PRIu32 " bytes at offset %" PRIuMAX,
 	    fh->name, bytes, (uintmax_t)offset);
 

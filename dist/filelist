@@ -1,7 +1,6 @@
 # filelist --
 #	List of source files for WiredTiger library.
 
-src/api/api_event.c
 src/api/api_strerror.c
 src/api/api_version.c
 src/block/block_addr.c
@@ -69,6 +68,7 @@ src/meta/meta_api.c
 src/meta/meta_snapshot.c
 src/meta/meta_table.c
 src/meta/meta_track.c
+src/meta/meta_turtle.c
 src/os_posix/os_abort.c
 src/os_posix/os_alloc.c
 src/os_posix/os_dlopen.c

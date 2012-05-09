@@ -64,14 +64,35 @@ list_print(WT_SESSION *session, const char *name, int sflag, int vflag)
 {
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
-	const char *key, *value;
+	int found;
+	const char *key, *value, *uri;
+
+	/*
+	 * XXX
+	 * Normally, we don't say anything about the WiredTiger metadata file,
+	 * it's not an "object" in the database.  I'm making an exception for
+	 * -s and -v, the snapshot and verbose options.
+	 */
+	if (sflag || vflag) {
+		uri = WT_METADATA_URI;
+		printf("%s\n", uri);
+		if (sflag && (ret = list_print_snapshot(session, uri)) != 0)
+			return (ret);
+		if (vflag) {
+			if ((ret =
+			    __wt_file_metadata(session, uri, &value)) != 0)
+				return (
+				    util_err(ret, "metadata read: %s", uri));
+			printf("%s\n", value);
+		}
+	}
 
 	/* Open the metadata file. */
 	if ((ret = session->open_cursor(
 	    session, WT_METADATA_URI, NULL, NULL, &cursor)) != 0) {
 		/*
-		 * If there is no schema (yet), this will return ENOENT.
-		 * Treat that the same as an empty schema.
+		 * If there is no metadata (yet), this will return ENOENT.
+		 * Treat that the same as an empty metadata.
 		 */
 		if (ret == ENOENT)
 			return (0);
@@ -84,34 +105,43 @@ list_print(WT_SESSION *session, const char *name, int sflag, int vflag)
 #define	MATCH(s, tag)							\
 	(strncmp(s, tag, strlen(tag)) == 0)
 
+	found = name == NULL;
 	while ((ret = cursor->next(cursor)) == 0) {
 		/* Get the key. */
 		if ((ret = cursor->get_key(cursor, &key)) != 0)
-			return (util_cerr("schema", "get_key", ret));
+			return (util_cerr("metadata", "get_key", ret));
 			
 		/*
 		 * If no object specified, show top-level objects (files and
 		 * tables).
 		 */
 		if (name == NULL) {
-			if (!MATCH(key, "table:") && !MATCH(key, "file:"))
+			if (!MATCH(key, "file:") && !MATCH(key, "table:"))
 				continue;
-		} else
+		} else {
 			if (!MATCH(key, name))
 				continue;
+			found = 1;
+		}
 		printf("%s\n", key);
 		if (!sflag && !vflag)
 			continue;
-		if ((ret = cursor->get_value(cursor, &value)) != 0)
-			return (util_cerr("schema", "get_value", ret));
-		if (sflag && (ret = list_print_snapshot(session, value)) != 0)
-			return (ret);
-		if (vflag)
-			printf("%s\n", value);
 
+		if (sflag && (ret = list_print_snapshot(session, key)) != 0)
+			return (ret);
+		if (vflag) {
+			if ((ret = cursor->get_value(cursor, &value)) != 0)
+				return (
+				    util_cerr("metadata", "get_value", ret));
+			printf("%s\n", value);
+		}
 	}
 	if (ret != WT_NOTFOUND)
-		return (util_cerr("schema", "next", ret));
+		return (util_cerr("metadata", "next", ret));
+	if (!found) {
+		fprintf(stderr, "%s: %s: not found\n", progname, name);
+		return (1);
+	}
 
 	return (0);
 }
@@ -121,7 +151,7 @@ list_print(WT_SESSION *session, const char *name, int sflag, int vflag)
  *	List the snapshot information.
  */
 static int
-list_print_snapshot(WT_SESSION *session, const char *config)
+list_print_snapshot(WT_SESSION *session, const char *key)
 {
 	WT_DECL_RET;
 	WT_SNAPSHOT *snap, *snapbase;
@@ -135,10 +165,8 @@ list_print_snapshot(WT_SESSION *session, const char *config)
 	 * report an error, and continue our caller's loop.  Otherwise, report
 	 * each snapshot's name and time.
 	 */
-	if ((ret =
-	    __wt_snaplist_get(session, config, &snapbase)) == WT_NOTFOUND)
-		return (0);
-	WT_RET(ret);
+	if ((ret = __wt_snaplist_get(session, key, &snapbase)) != 0)
+		return (ret == WT_NOTFOUND ? 0 : ret);
 
 	/* Find the longest name, so we can pretty-print. */
 	len = 0;

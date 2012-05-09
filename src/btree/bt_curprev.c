@@ -107,8 +107,8 @@ restart:
 	}
 
 	/* If we found a previous node, the next one must be current. */
-	WT_ASSERT(session,
-	    cbt->ins_stack[0] == NULL || *cbt->ins_stack[0] == current);
+	if (cbt->ins_stack[0] != NULL && *cbt->ins_stack[0] != current)
+		goto restart;
 
 	cbt->ins = PREV_INS(cbt, 0);
 }
@@ -293,8 +293,10 @@ new_page:	*recnop = cbt->recno;
 
 		/*
 		 * If we're at the same slot as the last reference and there's
-		 * no matching insert list item, re-use the return information.
-		 * Otherwise, unpack the cell and build the return information.
+		 * no matching insert list item, re-use the return information
+		 * (so encoded items with large repeat counts aren't repeatedly
+		 * decoded).  Otherwise, unpack the cell and build the return
+		 * information.
 		 */
 		if (cbt->cip_saved != cip) {
 			if ((cell = WT_COL_PTR(cbt->page, cip)) == NULL)
