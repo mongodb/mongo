@@ -1076,16 +1076,27 @@ var slenresult = [
 
 assert(arrayEq(slen.result, slenresult), 'strlen1 failed');
 
-// $strlen on nonexistent field should return a "not a string"
-// error
+// $strlen on nonexistent field should return a 0
 var slen2 = db.runCommand({aggregate : "article", pipeline : [
     { $project : {
-        "authorlen": {$strlen: "$cake"},
+        "authorlen": {$strlen: "$notafield"},
         _id : 0
     }}
 ]});
 
-assert((slen2.ok == 0), 'strlen2 failed');
+var slen2result = [
+    {
+        "authorlen" : 0
+    },
+    {
+        "authorlen" : 0
+    },
+    {
+        "authorlen" : 0
+    }
+];
+
+assert(arrayEq(slen2.result, slen2result), 'strlen2 failed');
 
 
 // $strlen on non-string field should return an error
