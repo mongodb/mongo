@@ -40,7 +40,7 @@ namespace mongo {
      * slow for big clusters, so this is the alternative for now.
      * TODO: Standardize between mongos and mongod and convert template parameters to types.
      */
-    template < class KeyType, class ValType, class CmpType, class ShardType >
+    template < class ValType, class ShardType >
     class ConfigDiffTracker {
     public:
 
@@ -49,7 +49,7 @@ namespace mongo {
         //
 
         // RangeMap stores ranges indexed by max or  min key
-        typedef typename std::map<KeyType, ValType, CmpType> RangeMap;
+        typedef typename std::map<BSONObj, ValType, BSONObjCmp> RangeMap;
 
         // RangeOverlap is a pair of iterators defining a subset of ranges
         typedef typename std::pair< typename RangeMap::iterator, typename RangeMap::iterator> RangeOverlap;
@@ -102,14 +102,12 @@ namespace mongo {
         /// TODO: Remove these when able
         ///
 
-        virtual KeyType keyFor( const BSONObj& key ) const = 0;
-
         // If we're indexing on the min of the chunk bound, implement maxFrom (default)
         virtual BSONObj maxFrom( const ValType& max ) const { verify( false ); return BSONObj(); }
         // If we're indexing on the max of the chunk bound, implement minFrom
         virtual BSONObj minFrom( const ValType& max ) const { verify( false ); return BSONObj(); }
 
-        virtual std::pair<KeyType,ValType> rangeFor( const BSONObj& chunkDoc, const BSONObj& min, const BSONObj& max ) const = 0;
+        virtual std::pair<BSONObj,ValType> rangeFor( const BSONObj& chunkDoc, const BSONObj& min, const BSONObj& max ) const = 0;
         virtual ShardType shardFor( const string& name ) const = 0;
         virtual string nameFrom( const ShardType& shard ) const = 0;
 

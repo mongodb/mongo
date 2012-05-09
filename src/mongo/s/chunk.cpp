@@ -679,17 +679,13 @@ namespace mongo {
      *
      * The mongos adapter here tracks all shards, and stores ranges by (max, Chunk) in the map.
      */
-    class CMConfigDiffTracker : public ConfigDiffTracker<BSONObj,ChunkPtr,BSONObjCmp,Shard> {
+    class CMConfigDiffTracker : public ConfigDiffTracker<ChunkPtr,Shard> {
     public:
         CMConfigDiffTracker( ChunkManager* manager ) : _manager( manager ) {}
 
         virtual bool isTracked( const BSONObj& chunkDoc ) const {
             // Mongos tracks all shards
             return true;
-        }
-
-        virtual BSONObj keyFor( const BSONObj& min ) const {
-            return min;
         }
 
         virtual BSONObj minFrom( const ChunkPtr& val ) const {

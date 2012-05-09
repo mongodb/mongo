@@ -22,8 +22,8 @@
 
 namespace mongo {
 
-    template < class KeyType, class ValType, class CmpType, class ShardType >
-    bool ConfigDiffTracker<KeyType,ValType,CmpType,ShardType>::
+    template < class ValType, class ShardType >
+    bool ConfigDiffTracker<ValType,ShardType>::
         isOverlapping( const BSONObj& min, const BSONObj& max )
     {
         RangeOverlap overlap = overlappingRange( min, max );
@@ -31,8 +31,8 @@ namespace mongo {
         return overlap.first != overlap.second;
     }
 
-    template < class KeyType, class ValType, class CmpType, class ShardType >
-    void ConfigDiffTracker<KeyType,ValType,CmpType,ShardType>::
+    template < class ValType, class ShardType >
+    void ConfigDiffTracker<ValType,ShardType>::
         removeOverlapping( const BSONObj& min, const BSONObj& max )
     {
         verifyAttached();
@@ -42,8 +42,8 @@ namespace mongo {
         _currMap->erase( overlap.first, overlap.second );
     }
 
-    template < class KeyType, class ValType, class CmpType, class ShardType >
-    typename ConfigDiffTracker<KeyType,ValType,CmpType,ShardType>::RangeOverlap ConfigDiffTracker<KeyType,ValType,CmpType,ShardType>::
+    template < class ValType, class ShardType >
+    typename ConfigDiffTracker<ValType,ShardType>::RangeOverlap ConfigDiffTracker<ValType,ShardType>::
         overlappingRange( const BSONObj& min, const BSONObj& max )
     {
         verifyAttached();
@@ -54,25 +54,25 @@ namespace mongo {
         if( isMinKeyIndexed() ){
             // Returns the first chunk with a min key that is >= min - implies the
             // previous chunk cannot overlap min
-            low = _currMap->lower_bound( keyFor( min ) );
+            low = _currMap->lower_bound( min );
             // Returns the first chunk with a min key that is >= max - implies the
             // chunk does not overlap max
-            high = _currMap->lower_bound( keyFor( max ) );
+            high = _currMap->lower_bound( max );
         }
         else{
             // Returns the first chunk with a max key that is > min - implies that
             // the chunk overlaps min
-            low = _currMap->upper_bound( keyFor( min ) );
+            low = _currMap->upper_bound( min );
             // Returns the first chunk with a max key that is > max - implies that
             // the next chunk cannot not overlap max
-            high = _currMap->upper_bound( keyFor( max ) );
+            high = _currMap->upper_bound( max );
         }
 
         return RangeOverlap( low, high );
     }
 
-    template < class KeyType, class ValType, class CmpType, class ShardType >
-    int ConfigDiffTracker<KeyType,ValType,CmpType,ShardType>::
+    template < class ValType, class ShardType >
+    int ConfigDiffTracker<ValType,ShardType>::
         calculateConfigDiff( string config,
                              const set<ShardChunkVersion>& extraMinorVersions )
     {
@@ -103,8 +103,8 @@ namespace mongo {
         }
     }
 
-    template < class KeyType, class ValType, class CmpType, class ShardType >
-    int ConfigDiffTracker<KeyType,ValType,CmpType,ShardType>::
+    template < class ValType, class ShardType >
+    int ConfigDiffTracker<ValType,ShardType>::
         calculateConfigDiff( DBClientCursorInterface& diffCursor )
     {
         verifyAttached();
@@ -177,8 +177,8 @@ namespace mongo {
         return chunksFound;
     }
 
-    template < class KeyType, class ValType, class CmpType, class ShardType >
-    Query ConfigDiffTracker<KeyType,ValType,CmpType,ShardType>::
+    template < class ValType, class ShardType >
+    Query ConfigDiffTracker<ValType,ShardType>::
         configDiffQuery( const set<ShardChunkVersion>& extraMinorVersions ) const
     {
         verifyAttached();

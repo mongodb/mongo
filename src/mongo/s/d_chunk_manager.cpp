@@ -34,16 +34,12 @@ namespace mongo {
      *
      * The mongod adapter here tracks only a single shard, and stores ranges by (min, max)
      */
-    class SCMConfigDiffTracker : public ConfigDiffTracker<BSONObj,BSONObj,BSONObjCmp,string> {
+    class SCMConfigDiffTracker : public ConfigDiffTracker<BSONObj,string> {
     public:
         SCMConfigDiffTracker( const string& currShard ) : _currShard( currShard ) {}
 
         virtual bool isTracked( const BSONObj& chunkDoc ) const {
             return chunkDoc["shard"].type() == String && chunkDoc["shard"].String() == _currShard;
-        }
-
-        virtual BSONObj keyFor( const BSONObj& min ) const {
-            return min;
         }
 
         virtual BSONObj maxFrom( const BSONObj& val ) const {

@@ -57,14 +57,13 @@ namespace ShardingTests {
         ChunkDiffUnitTest( bool inverse ) : _inverse( inverse ) {}
 
         // The default pass-through adapter for using config diffs
-        class DefaultDiffAdapter : public ConfigDiffTracker<BSONObj,BSONObj,BSONObjCmp,string> {
+        class DefaultDiffAdapter : public ConfigDiffTracker<BSONObj,string> {
         public:
 
             DefaultDiffAdapter() {}
             virtual ~DefaultDiffAdapter() {}
 
             virtual bool isTracked( const BSONObj& chunkDoc ) const { return true; }
-            virtual BSONObj keyFor( const BSONObj& key ) const { return key; }
             virtual BSONObj maxFrom( const BSONObj& max ) const { return max; }
 
             virtual pair<BSONObj,BSONObj> rangeFor( const BSONObj& chunkDoc, const BSONObj& min, const BSONObj& max ) const {
