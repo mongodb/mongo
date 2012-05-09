@@ -29,13 +29,21 @@ namespace mongo {
 
         Non-recursive.
 
-          r w R W  <== lock that was around
-        r - - - X
-        w - - X X             - allowed
-        R - X - X             X not allowed (blocks)
-        W X X X X
+          r w R W X  <== lock that was around
+        r * * * - -
+        w * * - - -            * allowed
+        R * - * - -            - not allowed (blocks)
+        W - - - - -            ! See NOTE(!).
+        X - ! - - -
         ^
         lock we are requesting
+
+        NOTE(!): The "X" state can only be reached from the "w" state.  A thread successfully
+        transitions from "w" to "X" when w_to_X() returns true, and fails to transition to that
+        state (remaining in "w") when that function returns false.  For one thread to successfully
+        transition, all threads in the "w" state must be blocked in w_to_X().  When all threads in
+        the "w" state are blocked in w_to_X(), one thread will be released in the X state.  The
+        other threads remain blocked in w_to_X() until the thread in the X state calls X_to_w().
     */
     class QLock : boost::noncopyable {
         struct Z { 
@@ -44,20 +52,48 @@ namespace mongo {
             int n;
         };
         boost::mutex m;
-        Z r,w,R,W,U,X;       // X is used by QLock::runExclusively 
-        int greed;           // >0 if someone wants to acquire a write lock
-        int greedyWrites;    // 0=no, 1=true
-        int greedSuspended;
-        void _stop_greed();  // we are already inlock for these underscore methods
+        Z r,w,R,W,U,X;
+        int numPendingGlobalWrites;  // >0 if someone wants to acquire a write lock
+        bool areGlobalWritesGreedy;
+        long long generationX;
+        long long generationXExit;
+        void _start_greed();  // we are already inlock for these underscore methods
+        void _stop_greed();
         void _lock_W();
-        bool W_legal() const { return r.n + w.n + R.n + W.n == 0; }
-        bool R_legal() const { return       w.n +     + W.n == 0; }
-        bool w_legal() const { return             R.n + W.n == 0; }
-        bool r_legal() const { return                   W.n == 0; }
+        bool _areQueueJumpingGlobalWritesPending() const {
+            return areGlobalWritesGreedy && numPendingGlobalWrites > 0;
+        }
+
+        bool W_legal() const { return r.n + w.n + R.n + W.n + X.n == 0; }
+        bool R_legal_ignore_greed() const { return w.n + W.n + X.n == 0; }
+        bool r_legal_ignore_greed() const { return W.n + X.n == 0; }
+        bool w_legal_ignore_greed() const { return R.n + W.n + X.n == 0; }
+
+        bool R_legal() const {
+            return !_areQueueJumpingGlobalWritesPending() && R_legal_ignore_greed();
+        }
+
+        bool w_legal() const {
+            return !_areQueueJumpingGlobalWritesPending() && w_legal_ignore_greed();
+        }
+
+
+        bool r_legal() const {
+            return !_areQueueJumpingGlobalWritesPending() && r_legal_ignore_greed();
+        }
+
+        bool X_legal() const { return w.n + r.n + R.n + W.n == 0; }
+
         void notifyWeUnlocked(char me);
         static bool i_block(char me, char them);
     public:
-        QLock() : greed(0), greedyWrites(1), greedSuspended(0) { }
+        QLock() :
+            numPendingGlobalWrites(0),
+            areGlobalWritesGreedy(true),
+            generationX(0),
+            generationXExit(0) {
+        }
+
         void lock_r();
         void lock_w();
         void lock_R();
@@ -69,69 +105,68 @@ namespace mongo {
         void unlock_w();
         void unlock_R();
         void unlock_W();
-        void start_greed();
-        void stop_greed();
         void W_to_R();
-        bool R_to_W(); // caution see notes below
-        void runExclusively(void (*f)(void));
+        void R_to_W(); // caution see notes below
+        bool w_to_X();
+        void X_to_w();
     };
 
     inline bool QLock::i_block(char me, char them) {
         switch( me ) {
         case 'W' : return true;
-        case 'R' : return them == 'W' || them == 'w';
-        case 'w' : return them == 'W' || them == 'R';
-        case 'r' : return them == 'W';
-        default  : verify(false);
+        case 'R' : return them == 'W' || them == 'w' || them == 'X';
+        case 'w' : return them == 'W' || them == 'R' || them == 'X';
+        case 'r' : return them == 'W' || them == 'X';
+        case 'X' : return true;
+        default  : fassertFailed(16200);
         }
         return false;
     }
 
     inline void QLock::notifyWeUnlocked(char me) {
-        verify( W.n == 0 );
+        fassert(16201, W.n == 0);
+        if ( me == 'X' ) {
+            X.c.notify_all();
+        }
         if( U.n ) {
             // U is highest priority
-  	    if( r.n + w.n + W.n == 0 ) 
+            if( (r.n + w.n + W.n + X.n == 0) && (R.n == 1) ) {
                 U.c.notify_one();
-            return;
+                return;
+            }
         }
-        if( W_legal() /*&& i_block(me,'W')*/ ) {
-            int g = greed;
+        if ( X_legal() && i_block(me, 'X') ) {
+            X.c.notify_one();
+        }
+        if ( W_legal() && i_block(me, 'W') ) {
             W.c.notify_one();
-            if( g ) // g>0 indicates someone was definitely waiting for W, so we can stop here
+            if( _areQueueJumpingGlobalWritesPending() )
                 return;
         }
-        if( R_legal() && i_block(me,'R') ) {
+        if ( R_legal_ignore_greed() && i_block(me, 'R') ) {
             R.c.notify_all();
         }
-        if( w_legal() && i_block(me,'w') ) { 
+        if ( w_legal_ignore_greed() && i_block(me, 'w') ) {
             w.c.notify_all();
         }
-        if( r_legal() && i_block(me,'r') ) { 
+        if ( r_legal_ignore_greed() && i_block(me, 'r') ) {
             r.c.notify_all();
         }
     }
 
     inline void QLock::_stop_greed() {
-        if( ++greedSuspended == 1 ) // recursion on stop_greed/start_greed is ok
-            greedyWrites = 0;
-    }
-    inline void QLock::stop_greed() {
-        boost::mutex::scoped_lock lk(m);
-        _stop_greed();
+        areGlobalWritesGreedy = false;
     }
 
-    inline void QLock::start_greed() { 
-        boost::mutex::scoped_lock lk(m);
-        if( --greedSuspended == 0 ) 
-            greedyWrites = 1;
+    inline void QLock::_start_greed() {
+        areGlobalWritesGreedy = true;
     }
 
     // "i will be reading. i promise to coordinate my activities with w's as i go with more 
     //  granular locks."
     inline void QLock::lock_r() {
         boost::mutex::scoped_lock lk(m);
-        while( greed + W.n ) {
+        while( !r_legal() ) {
             r.c.wait(m);
         }
         r.n++;
@@ -141,7 +176,7 @@ namespace mongo {
     //  granular locks."
     inline void QLock::lock_w() { 
         boost::mutex::scoped_lock lk(m);
-        while( greed + W.n + R.n ) {
+        while( !w_legal() ) {
             w.c.wait(m);
         }
         w.n++;
@@ -151,7 +186,7 @@ namespace mongo {
     // are writing."
     inline void QLock::lock_R() {
         boost::mutex::scoped_lock lk(m);
-        while( greed + W.n + w.n ) { 
+        while( ! R_legal() ) {
             R.c.wait(m);
         }
         R.n++;
@@ -160,89 +195,138 @@ namespace mongo {
     inline bool QLock::lock_R_try(int millis) {
         unsigned long long end = curTimeMillis64() + millis;
         boost::mutex::scoped_lock lk(m);
-        while( 1 ) {
-            if( greed + W.n + w.n == 0 )
-                break;
+        while( !R_legal() && curTimeMillis64() < end ) {
             R.c.timed_wait(m, boost::posix_time::milliseconds(millis));
-            if( greed + W.n + w.n == 0 )
-                break;
-            if( curTimeMillis64() >= end )
-                return false;
         }
-        R.n++;
-        return true;
+        if ( R_legal() ) {
+            R.n++;
+            return true;
+        }
+        return false;
     }
 
-    inline bool QLock::lock_W_try(int millis) { 
+    inline bool QLock::lock_W_try(int millis) {
         unsigned long long end = curTimeMillis64() + millis;
         boost::mutex::scoped_lock lk(m);
-        int g = greedyWrites;
-        greed += g;
-        while( 1 ) {
-            if( W.n + R.n + w.n + r.n == 0 )
-                break;
+
+        ++numPendingGlobalWrites;
+        while (!W_legal() && curTimeMillis64() < end) {
             W.c.timed_wait(m, boost::posix_time::milliseconds(millis));
-            if( W.n + R.n + w.n + r.n == 0 )
-                break;
-            if( curTimeMillis64() >= end ) {
-                greed -= g;
-                dassert( greed >= 0 );
-                // should we do notify_one on W.c so we should be careful not to leave someone 
-                // else waiting when we give up here perhaps. it is very possible this code
-                // is unnecessary:
-                //   W.c.notify_one();
-                return false;
-            }
         }
-        W.n += 1;
-        dassert( W.n == 1 );
-        greed -= g;
-        return true;
+        --numPendingGlobalWrites;
+
+        if (W_legal()) {
+            W.n++;
+            fassert( 16202, W.n == 1 );
+            return true;
+        }
+
+        return false;
     }
+
 
     // downgrade from W state to R state
     inline void QLock::W_to_R() { 
         boost::mutex::scoped_lock lk(m);
-        verify( W.n == 1 );
-        verify( R.n == 0 );
-        verify( U.n == 0 );
+        fassert(16203, W.n == 1);
+        fassert(16204, R.n == 0);
+        fassert(16205, U.n == 0);
         W.n = 0;
         R.n = 1;
         notifyWeUnlocked('W');
     }
 
     // upgrade from R to W state.
-    // there is no "upgradable" state so this is NOT a classic upgrade - 
+    //
+    // This transition takes precedence over all pending requests by threads to enter
+    // any state other than '\0'.
+    //
+    // there is no "upgradable" state so this is NOT a classic upgrade -
     // if two threads try to do this you will deadlock.
-    inline bool QLock::R_to_W() { 
+    //
+    // NOTE: ONLY CALL THIS FUNCTION ON A THREAD THAT GOT TO R BY CALLING W_to_R(), OR
+    // YOU MAY DEADLOCK WITH THREADS LEAVING THE X STATE.
+    inline void QLock::R_to_W() { 
         boost::mutex::scoped_lock lk(m);
-        verify( R.n > 0 && W.n == 0 );
-        U.n++;
-        fassert( 16136, U.n == 1 ); // for now we only allow one upgrade attempter
-        int pass = 0;
+        fassert(16206, R.n > 0);
+        fassert(16207, W.n == 0);
+        fassert(16208, U.n == 0);
+
+        U.n = 1;
+
+        bool wereGlobalWritesGreedy = areGlobalWritesGreedy;
+        _start_greed();
+        ++numPendingGlobalWrites;
+
         while( W.n + R.n + w.n + r.n > 1 ) {
-            if( ++pass >= 3 ) {
-                U.n--;
-                return false;
-            }
-            U.c.timed_wait(m, boost::posix_time::milliseconds(300));
+            U.c.wait(m);
         }
-        R.n--;
-        W.n++;
-        U.n--;
-        verify( R.n == 0 && W.n == 1 && U.n == 0 );
-        return true;
+        --numPendingGlobalWrites;
+        if (!wereGlobalWritesGreedy)
+            _stop_greed();
+
+        fassert(16209, R.n == 1);
+        fassert(16210, W.n == 0);
+        fassert(16211, U.n == 1);
+
+        R.n = 0;
+        W.n = 1;
+        U.n = 0;
+    }
+
+    inline bool QLock::w_to_X() {
+        boost::mutex::scoped_lock lk(m);
+
+        fassert( 16212, w.n > 0 );
+        fassert( 16213, areGlobalWritesGreedy );
+
+        ++X.n;
+        --w.n;
+
+        long long myGeneration = generationX;
+
+        while ( !X_legal() && (myGeneration == generationX) )
+            X.c.wait(m);
+
+        if ( myGeneration == generationX ) {
+            fassert( 16214, X_legal() );
+            fassert( 16215, w.n == 0 );
+            ++generationX;
+            notifyWeUnlocked('w');
+            return true;
+        }
+
+        while ( myGeneration == generationXExit )
+            X.c.wait(m);
+
+        fassert( 16216, R.n == 0 );
+        fassert( 16217, w.n > 0 );
+        fassert( 16218, areGlobalWritesGreedy );
+        return false;
+    }
+
+    inline void QLock::X_to_w() {
+        boost::mutex::scoped_lock lk(m);
+
+        fassert( 16219, W.n == 0 );
+        fassert( 16220, R.n == 0 );
+        fassert( 16221, w.n == 0 );
+        fassert( 16222, X.n > 0 );
+
+        w.n = X.n;
+        X.n = 0;
+        ++generationXExit;
+        notifyWeUnlocked('X');
     }
 
     // "i will be writing. i will coordinate with no one. you better stop them all"
     inline void QLock::_lock_W() {
-        int g = greedyWrites;
-        greed += g;
-        while( W.n + R.n + w.n + r.n ) {
+        ++numPendingGlobalWrites;
+        while( !W_legal() ) {
             W.c.wait(m);
         }
+        --numPendingGlobalWrites;
         W.n++;
-        greed -= g;
     }
     inline void QLock::lock_W() {
         boost::mutex::scoped_lock lk(m);
@@ -257,26 +341,28 @@ namespace mongo {
     inline void QLock::unlock_r() {
         boost::mutex::scoped_lock lk(m);
         fassert(16137, r.n > 0);
-        if( --r.n == 0 )
-            notifyWeUnlocked('r');
+        --r.n;
+        notifyWeUnlocked('r');
     }
     inline void QLock::unlock_w() {
         boost::mutex::scoped_lock lk(m);
         fassert(16138, w.n > 0);
-        if( --w.n == 0 )
-            notifyWeUnlocked('w');
-        X.c.notify_one();
+        --w.n;
+        notifyWeUnlocked('w');
     }
+
     inline void QLock::unlock_R() {
         boost::mutex::scoped_lock lk(m);
         fassert(16139, R.n > 0);
-        if( --R.n == 0 )
-            notifyWeUnlocked('R');
-    }    
+        --R.n;
+        notifyWeUnlocked('R');
+    }
+
     inline void QLock::unlock_W() {
         boost::mutex::scoped_lock lk(m);
         fassert(16140, W.n == 1);
-        W.n--;
+        --W.n;
+        _start_greed();
         notifyWeUnlocked('W');
     }
 

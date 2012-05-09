@@ -39,9 +39,12 @@ priAdminDB.addUser( 'user', 'user' );
 coll.drop();
 coll.setSlaveOk( true );
 
-// Secondaries should be up here, since we awaitReplication in the ShardingTest, but we *don't* wait
-// for the mongos to explicitly detect them.
-ReplSetTest.awaitRSClientHosts( mongos, replTest.getSecondaries(), { ok : true, secondary : true });
+/* Secondaries should be up here, but they can still be in RECOVERY
+ * state, which will make the ReplicaSetMonitor mark them as
+ * ok = false and not eligible for slaveOk queries.
+ */
+ReplSetTest.awaitRSClientHosts( mongos, replTest.getSecondaries(),
+   { ok : true, secondary : true });
 
 for ( var x = 0; x < 20; x++ ) {
     coll.insert({ v: x, k: 10 });

@@ -31,27 +31,6 @@
 
 namespace mongo {
 
-    inline bool isNaN(double d) { 
-        return d != d;
-    }
-
-    inline bool isInf(double d, int* sign = 0) {
-        volatile double tmp = d;
-
-        if ((tmp == d) && ((tmp - d) != 0.0)) {
-            if ( sign ) {
-                *sign = (d < 0.0 ? -1 : 1);
-            }
-            return true;
-        }
-        
-        if ( sign ) {
-            *sign = 0;
-        }
-
-        return false;
-    }
-
     /* must be same type when called, unless both sides are #s 
        this large function is in header to facilitate inline-only use of bson
     */

@@ -66,6 +66,243 @@ namespace ThreadedTests {
         }
     };
 
+    class LockStepWriteUpgradeTest {
+    public:
+        struct Options {
+            Options(int myNumRounds, int myNumUpgraders, int myNumNoiseMakers)
+                : numRounds(myNumRounds),
+                  numUpgraders(myNumUpgraders),
+                  numNoiseMakers(myNumNoiseMakers) {
+
+                fassert(16190, numUpgraders > 0);
+            }
+
+            int numRounds;
+            int numUpgraders;
+            int numNoiseMakers;
+        };
+
+        explicit LockStepWriteUpgradeTest(const Options &opts);
+        ~LockStepWriteUpgradeTest();
+
+        void run();
+
+    private:
+        void noiseMakerThread(int threadNumber);
+        void writeUpgraderThread(int threadNumber);
+
+        void makeNoise(int currentIteration);
+        void writeAndUpgrade(int threadNumber, int currentIteration);
+
+        bool allDone() {
+            fassert(16191, _numNoiseMakersFinished <= _numNoiseMakersDesired);
+            fassert(16192, _numUpgradersFinished <= _numUpgradersDesired);
+            if (_numNoiseMakersFinished < _numNoiseMakersDesired)
+                return false;
+            if (_numUpgradersFinished < _numUpgradersDesired)
+                return false;
+            return true;
+        }
+
+        void maybeSignalAllDone() {
+            if (allDone()) {
+                _allWorkersTerminated.notify_all();
+            }
+        }
+
+        bool shouldUpgrade(int threadNumber, int currentIteration) {
+            if (_numUpgradersDesired < 4)
+                return true;
+            return ((threadNumber + currentIteration) % _numUpgradersDesired) <
+                (_numUpgradersDesired / 4);
+        }
+
+        void barrier();
+        void barrier_inlock(boost::mutex::scoped_lock &lk);
+
+        void finishRound(bool skippedUpgrade, bool gotUpgrade);
+
+        /*
+         * Locking Guide:
+         * (I) Immutable during parallel operation.
+         * (A) Accessed only via atomic operations.
+         * (L) Guarded by _m.
+         */
+
+        boost::mutex _m;
+
+        AtomicUInt _shouldTerminate;             // (A)
+        boost::condition _allWorkersTerminated;  // (L)
+
+        const int _numRounds;                    // (I)
+        const int _numUpgradersDesired;          // (I)
+        const int _numNoiseMakersDesired;        // (I)
+        int _numUpgradersFinished;               // (L)
+        int _numNoiseMakersFinished;             // (L)
+        int _numWinnersThisRound;                // (L)
+        int _numLosersThisRound;                 // (L)
+        int _numBypassersThisRound;              // (L)
+
+        boost::condition _barrierRelease;        // (L)
+        int _numThreadsAtBarrier;                // (L)
+        long long _barrierGeneration;            // (L)
+
+        ProgressMeter _pmeter;                   // (L)
+    };
+
+    LockStepWriteUpgradeTest::LockStepWriteUpgradeTest(const Options &opts)
+        : _shouldTerminate(0),
+          _numRounds(opts.numRounds),
+          _numUpgradersDesired(opts.numUpgraders),
+          _numNoiseMakersDesired(opts.numNoiseMakers),
+          _numUpgradersFinished(0),
+          _numNoiseMakersFinished(0),
+          _numWinnersThisRound(0),
+          _numLosersThisRound(0),
+          _numBypassersThisRound(0),
+          _numThreadsAtBarrier(0),
+          _barrierGeneration(0),
+          _pmeter(opts.numRounds) {
+    }
+
+    LockStepWriteUpgradeTest::~LockStepWriteUpgradeTest() {
+        fassert(16193, _numThreadsAtBarrier == 0);
+        fassert(16194, _numUpgradersFinished == _numUpgradersDesired);
+        fassert(16195, _numNoiseMakersFinished == _numNoiseMakersDesired);
+    }
+
+    void LockStepWriteUpgradeTest::run() {
+        ASSERT_EQUALS(0, _numNoiseMakersDesired);
+        ASSERT(_numUpgradersDesired > 0);
+        ASSERT(_numRounds > 0);
+
+        for (int i = 0; i < _numUpgradersDesired; ++i) {
+            boost::thread thr(boost::bind(&LockStepWriteUpgradeTest::writeUpgraderThread, this, i));
+        }
+
+        {
+            boost::mutex::scoped_lock lk(_m);
+            while (!allDone()) {
+                _allWorkersTerminated.wait(lk);
+            }
+        }
+    }
+
+    void LockStepWriteUpgradeTest::noiseMakerThread(int threadNumber) {
+        Client::initThread(static_cast<std::string>(
+                                   str::stream() << "noiseMakerThread" << threadNumber).c_str());
+
+        for (int currentIteration = threadNumber; !_shouldTerminate; ++currentIteration) {
+            makeNoise(currentIteration);
+        }
+
+        {
+            boost::mutex::scoped_lock lk(_m);
+            fassert(16196, _numNoiseMakersFinished < _numNoiseMakersDesired);
+            ++_numNoiseMakersFinished;
+            maybeSignalAllDone();
+        }
+
+        cc().shutdown();
+    }
+
+    void LockStepWriteUpgradeTest::makeNoise(int currentIteration) {
+        ::abort();
+    }
+
+    void LockStepWriteUpgradeTest::writeUpgraderThread(int threadNumber) {
+        Client::initThread(static_cast<std::string>(
+                                   str::stream() << "writeUpgraderThread" << threadNumber).c_str());
+
+        for (int currentIteration = 0; currentIteration < _numRounds; ++currentIteration) {
+            writeAndUpgrade(threadNumber, currentIteration);
+        }
+
+        _shouldTerminate.set(1);
+
+        {
+            boost::mutex::scoped_lock lk(_m);
+            fassert(16197, _numUpgradersFinished < _numUpgradersDesired);
+            ++_numUpgradersFinished;
+            maybeSignalAllDone();
+        }
+
+        cc().shutdown();
+    }
+
+    void LockStepWriteUpgradeTest::writeAndUpgrade(int threadNumber, int currentIteration) {
+        // Are these sleep times too short to be meaningful?
+        const long long microsToSleepIfIWinUpgrade = (currentIteration % 11) * 100;
+
+        bool gotUpgrade = false;
+        bool skippedUpgrade = false;
+        barrier();
+        {
+            Lock::DBWrite lk(static_cast<std::string>(str::stream() << "fakeDb" << threadNumber));
+            barrier();
+            if ( shouldUpgrade(threadNumber, currentIteration) ) {
+                Lock::DBWrite::UpgradeToExclusive ex;
+                if (ex.gotUpgrade()) {
+                    gotUpgrade = true;
+                    sleepmicros(microsToSleepIfIWinUpgrade);
+                }
+            }
+            else {
+                skippedUpgrade = true;
+            }
+        }
+
+        finishRound(skippedUpgrade, gotUpgrade);
+    }
+
+    void LockStepWriteUpgradeTest::barrier() {
+        boost::mutex::scoped_lock lk(_m);
+        barrier_inlock(lk);
+    }
+
+    void LockStepWriteUpgradeTest::barrier_inlock(boost::mutex::scoped_lock &lk) {
+        const long long myGeneration = _barrierGeneration;
+        ++_numThreadsAtBarrier;
+        if (_numThreadsAtBarrier == _numUpgradersDesired) {
+            _numThreadsAtBarrier = 0;
+            ++_barrierGeneration;
+            _barrierRelease.notify_all();
+        }
+        while (_barrierGeneration == myGeneration) {
+            _barrierRelease.wait(lk);
+        }
+    }
+
+    void LockStepWriteUpgradeTest::finishRound(bool skippedUpgrade, bool gotUpgrade) {
+        boost::mutex::scoped_lock lk(_m);
+        fassert( 16198, !(skippedUpgrade && gotUpgrade) );
+        if (skippedUpgrade) {
+            ++_numBypassersThisRound;
+        }
+        else if (gotUpgrade) {
+            ++_numWinnersThisRound;
+        }
+        else {
+            ++_numLosersThisRound;
+        }
+        if (_numThreadsAtBarrier + 1 == _numUpgradersDesired) {
+            ASSERT_EQUALS( _numWinnersThisRound, 1 );
+            ASSERT_EQUALS( _numUpgradersDesired - 1, _numLosersThisRound + _numBypassersThisRound );
+            if (_numUpgradersDesired > 1) {
+                ASSERT_NOT_EQUALS( _numLosersThisRound, 0 );
+            }
+            if (_numUpgradersDesired >= 4) {
+                ASSERT_NOT_EQUALS( _numBypassersThisRound, 0 );
+            }
+
+            _numWinnersThisRound = 0;
+            _numLosersThisRound = 0;
+            _numBypassersThisRound = 0;
+            _pmeter.hit();
+        }
+        barrier_inlock(lk);
+    }
+
     const int nthr=135;
     //const int nthr=7;
     class MongoMutexTest : public ThreadedTest<nthr> {
@@ -75,10 +312,11 @@ namespace ThreadedTests {
         enum { N = 4000/*0*/ };
 #endif
         ProgressMeter pm;
+        int wToXSuccessfulUpgradeCount, wToXFailedUpgradeCount;
     public:
-        int upgradeWorked, upgradeFailed;
         MongoMutexTest() : pm(N * nthreads) {
-            upgradeWorked = upgradeFailed = 0;
+            wToXSuccessfulUpgradeCount = 0;
+            wToXFailedUpgradeCount = 0;
         }
         void run() {
             DEV {
@@ -128,10 +366,7 @@ namespace ThreadedTests {
                     }
                     if( sometimes ) { 
                         w.downgrade();
-                        sleepmillis(0);
-                        bool worked = w.upgrade();
-                        if( worked) upgradeWorked++;
-                        else upgradeFailed++;
+                        w.upgrade();
                     }
                 }
                 else if( i % 7 == 2 ) {
@@ -216,6 +451,21 @@ namespace ThreadedTests {
                             Lock::DBRead y("admin");
                             { Lock::TempRelease t; }
                         }
+                        else if ( q > 4 && q < 8 ) {
+                            static const char * const dbnames[] = {
+                                "bar0", "bar1", "bar2", "bar3", "bar4", "bar5",
+                                "bar6", "bar7", "bar8", "bar9", "bar10" };
+                            Lock::DBWrite w(dbnames[q]);
+                            {
+                                Lock::DBWrite::UpgradeToExclusive wToX;
+                                if (wToX.gotUpgrade()) {
+                                    ++wToXSuccessfulUpgradeCount;
+                                }
+                                else {
+                                    ++wToXFailedUpgradeCount;
+                                }
+                            }
+                        }
                         else { 
                             Lock::DBWrite w("foo");
                             {
@@ -241,8 +491,7 @@ namespace ThreadedTests {
         virtual void validate() {
             log() << "mongomutextest validate" << endl;
             ASSERT( ! Lock::isReadLocked() );
-            ASSERT( upgradeWorked > upgradeFailed );
-            ASSERT( upgradeWorked > 4 );
+            ASSERT( wToXSuccessfulUpgradeCount >= 39 * N / 2000 );
             {
                     Lock::GlobalWrite w;
             }
@@ -803,19 +1052,12 @@ namespace ThreadedTests {
         }
     };
 
-    static int pass;
     class QLockTest : public ThreadedTest<3> {
     public:
         bool gotW;
         QLockTest() : gotW(false), m() { }
-        void setup() { 
-            if( pass == 1) { 
-                m.stop_greed();
-            }
-        }
-        ~QLockTest() {
-            m.start_greed();
-        }
+        void setup() {}
+        ~QLockTest() {}
     private:
         QLock m;
         virtual void validate() { }
@@ -962,6 +1204,9 @@ namespace ThreadedTests {
 
             add< MongoMutexTest >();
             add< TicketHolderWaits >();
+
+            add< LockStepWriteUpgradeTest >(LockStepWriteUpgradeTest::Options(100, 1, 0));
+            add< LockStepWriteUpgradeTest >(LockStepWriteUpgradeTest::Options(5000, 100, 0));
         }
     } myall;
 }

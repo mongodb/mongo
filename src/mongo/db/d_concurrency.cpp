@@ -120,8 +120,6 @@ namespace mongo {
     public:
         LockStat stats;
 
-        void start_greed() { q.start_greed(); }
-
         void lock_r() { 
             verify( threadState() == 0 );
             lockState().locked( 'r' );
@@ -224,9 +222,10 @@ namespace mongo {
         }
 
         // todo timing stats? : 
-        void runExclusively(void (*f)(void)) { q.runExclusively(f); }
         void W_to_R()                        { q.W_to_R(); }
-        bool R_to_W()                        { return q.R_to_W(); }
+        void R_to_W()                        { q.R_to_W(); }
+        bool w_to_X() { return q.w_to_X(); }
+        void X_to_w() { q.X_to_w(); }
     };
 
     static WrapperForQLock& q = *new WrapperForQLock();
@@ -243,37 +242,6 @@ namespace mongo {
             }
         }
         result.append("locks", b.obj());
-    }
-
-    void runExclusively(void (*f)(void)) { 
-        q.runExclusively(f);
-    }
-
-    /** commitIfNeeded(), we have to do work when no one else is writing, and do it at a 
-        point where there is data consistency.  yet we have multiple writers so what to do.
-        this is the solution chosen.  we wait until all writers either finish (quick ones) 
-        or also call commitIfNeeded (long ones) -- a little like a synchronization barrier.
-        a more elegant solution likely is best long term.
-    */
-    void QLock::runExclusively(void (*f)(void)) { 
-        dlog(1) << "QLock::runExclusively" << endl;
-        boost::mutex::scoped_lock lk( m );
-        verify( w.n > 0 );
-        greed++; // stop new acquisitions
-        X.n++;
-        while( X.n ) { 
-            if( X.n == w.n ) {
-                // we're all here
-                f();
-                X.n = 0; // sentinel, tell everyone we're done
-                X.c.notify_all();
-            }
-            else { 
-                X.c.wait(lk);
-            }
-        }
-        greed--;
-        dlog(1) << "run exclusively end" << endl;
     }
 
     int Lock::isLocked() {
@@ -452,9 +420,6 @@ namespace mongo {
         else {
             q.unlock_W();
         }
-        if( stoppedGreed ) {
-            q.start_greed();
-        }
     }
     void Lock::GlobalWrite::downgrade() { 
         verify( !noop );
@@ -462,20 +427,13 @@ namespace mongo {
         q.W_to_R();
         lockState().changeLockState( 'R' );
     }
+
     // you will deadlock if 2 threads doing this
-    bool Lock::GlobalWrite::upgrade() { 
+    void Lock::GlobalWrite::upgrade() { 
         verify( !noop );
         verify( threadState() == 'R' );
-        if( stoppedGreed ) { 
-            // we undo stopgreed here if it were set earlier, as we now want a W lock
-            stoppedGreed = false;
-            q.start_greed();
-        }
-        if( q.R_to_W() ) {
-            lockState().changeLockState( 'W' );
-            return true;
-        }
-        return false;
+        q.R_to_W();
+        lockState().changeLockState( 'W' );
     }
 
     Lock::GlobalRead::GlobalRead( int timeoutms ) {
@@ -734,6 +692,23 @@ namespace mongo {
         _weLocked = ls.otherLock();
     }
 
+    Lock::DBWrite::UpgradeToExclusive::UpgradeToExclusive() {
+        fassert( 16187, lockState().threadState() == 'w' );
+        _gotUpgrade = q.w_to_X();
+        if ( _gotUpgrade )
+            lockState().locked('W');
+    }
+
+    Lock::DBWrite::UpgradeToExclusive::~UpgradeToExclusive() {
+        if ( _gotUpgrade ) {
+            fassert( 16188, lockState().threadState() == 'W' );
+            q.X_to_w();
+            lockState().locked('w');
+        }
+        else {
+            fassert( 16189, lockState().threadState() == 'w' );
+        }
+    }
 
     writelocktry::writelocktry( int tryms ) : 
         _got( false ),
