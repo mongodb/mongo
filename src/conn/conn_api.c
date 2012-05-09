@@ -121,7 +121,7 @@ __conn_remove_collator(WT_CONNECTION_IMPL *conn, WT_NAMED_COLLATOR *ncoll)
 {
 	WT_SESSION_IMPL *session;
 
-	session = &conn->default_session;
+	session = conn->default_session;
 
 	/* Remove from the connection's list. */
 	TAILQ_REMOVE(&conn->collqh, ncoll, q);
@@ -174,7 +174,7 @@ __conn_remove_compressor(WT_CONNECTION_IMPL *conn, WT_NAMED_COMPRESSOR *ncomp)
 {
 	WT_SESSION_IMPL *session;
 
-	session = &conn->default_session;
+	session = conn->default_session;
 
 	/* Remove from the connection's list. */
 	TAILQ_REMOVE(&conn->compqh, ncomp, q);
@@ -232,7 +232,7 @@ __conn_remove_data_source(
 {
 	WT_SESSION_IMPL *session;
 
-	session = &conn->default_session;
+	session = conn->default_session;
 
 	/* Remove from the connection's list. */
 	TAILQ_REMOVE(&conn->dsrcqh, ndsrc, q);
@@ -315,7 +315,7 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 	}
 
 	/* Close open btree handles. */
-	WT_TRET(__wt_conn_btree_remove(conn));
+	WT_TRET(__wt_conn_btree_discard(conn));
 
 	/* Free memory for collators */
 	while ((ncoll = TAILQ_FIRST(&conn->collqh)) != NULL)
@@ -382,7 +382,7 @@ __conn_config(WT_CONNECTION_IMPL *conn, const char **cfg, WT_ITEM **cbufp)
 
 	cbuf = NULL;
 	fh = NULL;
-	session = &conn->default_session;
+	session = conn->default_session;
 
 	/* Check for an optional configuration file. */
 #define	WT_CONFIGFILE	"WiredTiger.config"
@@ -524,7 +524,7 @@ __conn_home(WT_CONNECTION_IMPL *conn, const char *home, const char **cfg)
 	WT_CONFIG_ITEM cval;
 	WT_SESSION_IMPL *session;
 
-	session = &conn->default_session;
+	session = conn->default_session;
 
 	/* If the application specifies a home directory, use it. */
 	if (home != NULL)
@@ -580,7 +580,7 @@ __conn_single(WT_CONNECTION_IMPL *conn, const char **cfg)
 	int created;
 	char buf[256];
 
-	session = &conn->default_session;
+	session = conn->default_session;
 
 #define	WT_FLAGFILE	"WiredTiger"
 	/*
@@ -700,10 +700,10 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_ITEM *cbuf, expath, exconfig;
-	WT_SESSION *wt_session;
 	WT_SESSION_IMPL *session;
 	const char *cfg[] =
 	    { __wt_confdfl_wiredtiger_open, config, NULL, NULL };
+	int exist;
 
 	*wt_connp = NULL;
 	session = NULL;
@@ -725,16 +725,11 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	TAILQ_INSERT_TAIL(&__wt_process.connqh, conn, q);
 	__wt_spin_unlock(NULL, &__wt_process.spinlock);
 
-	session = &conn->default_session;
+	conn->default_session = session = &conn->dummy_session;
 	session->iface.connection = &conn->iface;
 	session->name = "wiredtiger_open";
-
-	/*
-	 * Configure any event handlers provided by the application as soon as
-	 * possible so errors are handled correctly.
-	 */
-	if (event_handler != NULL)
-		session->event_handler = event_handler;
+	session->event_handler = (event_handler != NULL) ?
+	    event_handler : __wt_event_handler_default;
 
 	/* Remaining basic initialization of the connection structure. */
 	WT_ERR(__wt_connection_init(conn));
@@ -757,7 +752,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_ERR(__wt_config_gets(session, cfg, "hazard_max", &cval));
 	conn->hazard_size = (uint32_t)cval.val;
 	WT_ERR(__wt_config_gets(session, cfg, "session_max", &cval));
-	conn->session_size = (uint32_t)cval.val;
+	conn->session_size = (uint32_t)cval.val + WT_NUM_INTERNAL_SESSIONS;
 	WT_ERR(__wt_config_gets(session, cfg, "sync", &cval));
 	if (!cval.val)
 		F_SET(conn, WT_CONN_NOSYNC);
@@ -828,15 +823,16 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		WT_ERR(ret);
 	}
 
+	WT_ERR(__wt_open_session(conn, 1, NULL, NULL, &conn->default_session));
+	session = conn->default_session;
+
 	/*
 	 * Check on the turtle and metadata files, creating them if necessary
 	 * (which avoids application threads racing to create the metadata file
 	 * later).  We need a session handle for this, open one.
 	 */
-	WT_ERR(conn->iface.open_session(&conn->iface, NULL, NULL, &wt_session));
-	if ((ret = __wt_turtle_init((WT_SESSION_IMPL *)wt_session)) == 0)
-		ret = __wt_metadata_open((WT_SESSION_IMPL *)wt_session);
-	WT_TRET(wt_session->close(wt_session, NULL));
+	if ((ret = __wt_meta_turtle_init(session, &exist)) == 0 && !exist)
+		ret = __wt_schema_create(session, WT_METADATA_URI, NULL);
 	WT_ERR(ret);
 
 	STATIC_ASSERT(offsetof(WT_CONNECTION_IMPL, iface) == 0);

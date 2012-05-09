@@ -466,11 +466,9 @@ __curtable_open_colgroups(WT_CURSOR_TABLE *ctable, const char *cfg[])
 
 	for (i = 0, cp = ctable->cg_cursors;
 	    i < WT_COLGROUPS(table);
-	    i++, cp++) {
-		session->btree = table->colgroup[i];
-		WT_RET(__wt_curfile_create(
-		    session, &ctable->iface, cfg_no_overwrite, cp));
-	}
+	    i++, cp++)
+		WT_RET(__wt_curfile_open(session, table->cg_name[i],
+		    &ctable->iface, cfg_no_overwrite, cp));
 	return (0);
 }
 
@@ -496,10 +494,10 @@ __curtable_open_indices(WT_CURSOR_TABLE *ctable)
 		WT_RET_MSG(session, ENOTSUP,
 		    "Bulk load is not supported for tables with indices");
 	WT_RET(__wt_calloc_def(session, table->nindices, &ctable->idx_cursors));
-	for (i = 0, cp = ctable->idx_cursors; i < table->nindices; i++, cp++) {
-		session->btree = table->index[i];
-		WT_RET(__wt_curfile_create(session, &ctable->iface, cfg, cp));
-	}
+
+	for (i = 0, cp = ctable->idx_cursors; i < table->nindices; i++, cp++)
+		WT_RET(__wt_curfile_open(session, table->idx_name[i],
+		    &ctable->iface, cfg, cp));
 	return (0);
 }
 
@@ -569,14 +567,13 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 	if (!table->cg_complete)
 		WT_RET_MSG(session, EINVAL,
 		    "Cannot open cursor '%s' on incomplete table", uri);
-	if (table->is_simple) {
+	if (table->is_simple)
 		/*
 		 * The returned cursor should be public: it is not part of a
 		 * table cursor.
 		 */
-		session->btree = table->colgroup[0];
-		return (__wt_curfile_create(session, NULL, cfg, cursorp));
-	}
+		return (__wt_curfile_open(
+		    session, table->cg_name[0], NULL, cfg, cursorp));
 
 	WT_RET(__wt_calloc_def(session, 1, &ctable));
 

@@ -74,6 +74,7 @@ struct __wt_session_impl {
 	WT_BTREE *metafile;		/* Metadata file */
 	void	*meta_track;		/* Metadata operation tracking */
 	void	*meta_track_next;	/* Current position */
+	void	*meta_track_sub;	/* Child transaction / save point */
 	size_t	 meta_track_alloc;	/* Currently allocated */
 #define	WT_META_TRACKING(session)	(session->meta_track_next != NULL)
 
@@ -144,14 +145,21 @@ struct __wt_named_data_source {
 };
 
 /*
+ * Allocate some additional slots for internal sessions.  There is a default
+ * session for each connection, plus a session for the eviction thread.
+ */
+#define	WT_NUM_INTERNAL_SESSIONS	2
+
+/*
  * WT_CONNECTION_IMPL --
  *	Implementation of WT_CONNECTION
  */
 struct __wt_connection_impl {
 	WT_CONNECTION iface;
 
-	WT_SESSION_IMPL default_session;/* For operations without an
-					   application-supplied session */
+	/* For operations without an application-supplied session */
+	WT_SESSION_IMPL *default_session;
+	WT_SESSION_IMPL  dummy_session;
 
 	WT_SPINLOCK fh_lock;		/* File handle queue spinlock */
 	WT_SPINLOCK serial_lock;	/* Serial function call spinlock */
@@ -277,7 +285,7 @@ struct __wt_connection_impl {
 	API_CALL(s, session, n, NULL, NULL, cfg, cfgvar);
 
 #define	CONNECTION_API_CALL(conn, s, n, cfg, cfgvar)			\
-	s = &conn->default_session;					\
+	s = conn->default_session;					\
 	API_CALL(s, connection, n, NULL, NULL, cfg, cfgvar);		\
 
 #define	CURSOR_API_CALL(cur, s, n, bt)					\

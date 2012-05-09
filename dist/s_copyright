@@ -80,7 +80,7 @@ done
 
 # The documentation copyright appears in two files.
 s="Copyright (c) 2008-$year WiredTiger, Inc."
-f="docs/build-javadoc.sh docs/style/footer.html"
+f="src/docs/build-javadoc.sh src/docs/style/footer.html"
 for i in $f; do
 	if `grep "$s" ../$i > /dev/null`; then
 		continue;

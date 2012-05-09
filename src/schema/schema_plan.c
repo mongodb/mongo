@@ -14,14 +14,18 @@ __find_next_col(WT_SESSION_IMPL *session, WT_TABLE *table,
 	WT_BTREE *cgtree;
 	WT_CONFIG conf;
 	WT_CONFIG_ITEM cval, k, v;
+	WT_DECL_RET;
 	int cg, col, foundcg, foundcol, getnext;
 
 	foundcg = foundcol = -1;
 
 	getnext = 1;
 	for (cg = 0; cg < WT_COLGROUPS(table); cg++) {
-		if ((cgtree = table->colgroup[cg]) == NULL)
-			continue;
+		WT_RET(__wt_schema_get_btree(session,
+		    table->cg_name[cg], strlen(table->cg_name[cg]),
+		    NULL, 0));
+		cgtree = session->btree;
+
 		/*
 		 * If there is only one column group, we just scan through all
 		 * of the columns.  For tables with multiple column groups, we
@@ -32,11 +36,11 @@ __find_next_col(WT_SESSION_IMPL *session, WT_TABLE *table,
 			cval = table->colconf;
 			col = 0;
 		} else {
-cgcols:			WT_RET(__wt_config_getones(session,
+cgcols:			WT_ERR(__wt_config_getones(session,
 			    cgtree->config, "columns", &cval));
 			col = table->nkey_columns;
 		}
-		WT_RET(__wt_config_subinit(session, &conf, &cval));
+		WT_ERR(__wt_config_subinit(session, &conf, &cval));
 		for (; __wt_config_next(&conf, &k, &v) == 0; col++) {
 			if (cg == *cgnump && col == *colnump)
 				getnext = 1;
@@ -50,7 +54,14 @@ cgcols:			WT_RET(__wt_config_getones(session,
 			    col == table->nkey_columns - 1)
 				goto cgcols;
 		}
+
+		WT_RET(__wt_session_release_btree(session));
+		cgtree = NULL;
 	}
+
+err:	if (cgtree != NULL)
+		WT_TRET(__wt_session_release_btree(session));
+	WT_RET(ret);
 
 	if (foundcg == -1)
 		return (WT_NOTFOUND);
@@ -163,20 +174,23 @@ int
 __wt_struct_plan(WT_SESSION_IMPL *session, WT_TABLE *table,
     const char *columns, size_t len, int value_only, WT_ITEM *plan)
 {
+	WT_BTREE *saved_btree;
 	WT_CONFIG conf;
 	WT_CONFIG_ITEM k, v;
+	WT_DECL_RET;
 	int cg, col, current_cg, current_col, start_cg, start_col;
 	int i, have_it;
 	char coltype, current_coltype;
 
+	saved_btree = session->btree;
 	start_cg = start_col = -1;      /* -Wuninitialized */
 
 	/* Work through the value columns by skipping over the key columns. */
-	WT_RET(__wt_config_initn(session, &conf, columns, len));
+	WT_ERR(__wt_config_initn(session, &conf, columns, len));
 
 	if (value_only)
 		for (i = 0; i < table->nkey_columns; i++)
-			WT_RET(__wt_config_next(&conf, &k, &v));
+			WT_ERR(__wt_config_next(&conf, &k, &v));
 
 	current_cg = cg = 0;
 	current_col = col = INT_MAX;
@@ -198,7 +212,7 @@ __wt_struct_plan(WT_SESSION_IMPL *session, WT_TABLE *table,
 			    current_coltype != coltype) {
 				WT_ASSERT(session, !value_only ||
 				    coltype == WT_PROJ_VALUE);
-				WT_RET(__wt_buf_catfmt(
+				WT_ERR(__wt_buf_catfmt(
 				    session, plan, "%d%c", cg, coltype));
 
 				/*
@@ -212,9 +226,9 @@ __wt_struct_plan(WT_SESSION_IMPL *session, WT_TABLE *table,
 			/* Now move to the column we want. */
 			if (current_col < col) {
 				if (col - current_col > 1)
-					WT_RET(__wt_buf_catfmt(session,
+					WT_ERR(__wt_buf_catfmt(session,
 					    plan, "%d", col - current_col));
-				WT_RET(__wt_buf_catfmt(session,
+				WT_ERR(__wt_buf_catfmt(session,
 				    plan, "%c", WT_PROJ_SKIP));
 			}
 			/*
@@ -224,20 +238,21 @@ __wt_struct_plan(WT_SESSION_IMPL *session, WT_TABLE *table,
 			 * a "reuse" operation to avoid making another copy.
 			 */
 			if (!have_it) {
-				WT_RET(__wt_buf_catfmt(session,
+				WT_ERR(__wt_buf_catfmt(session,
 				    plan, "%c", WT_PROJ_NEXT));
 
 				start_cg = cg;
 				start_col = col;
 				have_it = 1;
 			} else
-				WT_RET(__wt_buf_catfmt(session,
+				WT_ERR(__wt_buf_catfmt(session,
 				    plan, "%c", WT_PROJ_REUSE));
 			current_col = col + 1;
 		}
 	}
 
-	return (0);
+err:	session->btree = saved_btree;
+	return (ret);
 }
 
 static int

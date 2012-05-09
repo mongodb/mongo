@@ -130,7 +130,7 @@ __snapshot_worker(
 	 * write any dirty pages.
 	 */
 	if ((ret =
-	    __wt_snapshot_list_get(session, btree->name, &snapbase)) != 0) {
+	    __wt_meta_snaplist_get(session, btree->name, &snapbase)) != 0) {
 		if (ret == WT_NOTFOUND) {
 			ret =
 			    __wt_cache_flush(session, WT_SYNC_DISCARD_NOWRITE);
@@ -266,10 +266,9 @@ nomatch:		WT_ERR_MSG(session,
 			WT_ERR_MSG(session,
 			    EINVAL, "cache flush failed to create a snapshot");
 	} else
-		WT_ERR(
-		    __wt_snapshot_list_set(session, btree->name, snapbase));
+		WT_ERR(__wt_meta_snaplist_set(session, btree->name, snapbase));
 
-err:	__wt_snapshot_list_free(session, snapbase);
+err:	__wt_meta_snaplist_free(session, snapbase);
 	__wt_rwunlock(session, btree->snaplock);
 
 	return (ret);

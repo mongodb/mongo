@@ -16,7 +16,7 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 {
 	WT_SESSION_IMPL *session;
 
-	session = &conn->default_session;
+	session = conn->default_session;
 
 	TAILQ_INIT(&conn->btqh);		/* WT_BTREE list */
 	TAILQ_INIT(&conn->dlhqh);		/* Library list */
@@ -49,7 +49,7 @@ __wt_connection_destroy(WT_CONNECTION_IMPL *conn)
 {
 	WT_SESSION_IMPL *session;
 
-	session = &conn->default_session;
+	session = conn->default_session;
 
 	/* Check there's something to destroy. */
 	if (conn == NULL)

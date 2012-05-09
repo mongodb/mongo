@@ -80,6 +80,84 @@ __wt_meta_track_on(WT_SESSION_IMPL *session)
 	return (__meta_track_next(session, NULL));
 }
 
+static int
+__meta_track_apply(WT_SESSION_IMPL *session, WT_META_TRACK *trk, int unroll)
+{
+	WT_BTREE *saved_btree;
+	WT_DECL_RET;
+	int tret;
+
+	/* Unlock handles regardless of whether we are unrolling. */
+	if (!unroll && trk->op != WT_ST_LOCK)
+		goto free;
+
+	switch (trk->op) {
+	case WT_ST_EMPTY:	/* Unused slot */
+		break;
+	case WT_ST_LOCK:	/* Handle lock, see above */
+		saved_btree = session->btree;
+		session->btree = trk->btree;
+		WT_TRET(__wt_session_release_btree(session));
+		session->btree = saved_btree;
+		break;
+	case WT_ST_FILEOP:	/* File operation */
+		/*
+		 * For renames, both a and b are set.
+		 * For creates, a is NULL.
+		 * For removes, b is NULL.
+		 */
+		if (trk->a != NULL && trk->b != NULL &&
+		    (tret = __wt_rename(session,
+		    trk->b + strlen("file:"),
+		    trk->a + strlen("file:"))) != 0) {
+			__wt_err(session, tret,
+			    "metadata unroll rename %s to %s",
+			    trk->b, trk->a);
+			WT_TRET(tret);
+		} else if (trk->a == NULL && ((tret =
+		    __wt_conn_btree_close_all(session, trk->b)) != 0 ||
+		    (tret = __wt_remove(session,
+		    trk->b + strlen("file:"))) != 0)) {
+			__wt_err(session, tret,
+			    "metadata unroll create %s",
+			    trk->b);
+			WT_TRET(tret);
+		}
+		/*
+		 * We can't undo removes yet: that would imply
+		 * some kind of temporary rename and remove in
+		 * roll forward.
+		 */
+		break;
+	case WT_ST_REMOVE:	/* Remove trk.a */
+		if ((tret = __wt_metadata_remove(
+		    session, trk->a)) != 0) {
+			__wt_err(session, ret,
+			    "metadata unroll remove: %s",
+			    trk->a);
+			WT_TRET(tret);
+		}
+		break;
+	case WT_ST_SET:		/* Set trk.a to trk.b */
+		if ((tret = __wt_metadata_update(
+		    session, trk->a, trk->b)) != 0) {
+			__wt_err(session, ret,
+			    "metadata unroll update %s to %s",
+			    trk->a, trk->b);
+			WT_TRET(tret);
+		}
+		break;
+	WT_ILLEGAL_VALUE(session);
+	}
+
+free:	trk->op = WT_ST_EMPTY;
+	__wt_free(session, trk->a);
+	__wt_free(session, trk->b);
+	trk->btree = NULL;
+
+	return (ret);
+}
+
 /*
  * __wt_meta_track_off --
  *	Turn off metadata operation tracking, unrolling on error.
@@ -87,10 +165,8 @@ __wt_meta_track_on(WT_SESSION_IMPL *session)
 int
 __wt_meta_track_off(WT_SESSION_IMPL *session, int unroll)
 {
-	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_META_TRACK *trk, *trk_orig;
-	int tret;
 
 	if (!WT_META_TRACKING(session))
 		return (0);
@@ -99,78 +175,50 @@ __wt_meta_track_off(WT_SESSION_IMPL *session, int unroll)
 	trk = session->meta_track_next;
 
 	/* Turn off tracking for unroll. */
-	session->meta_track_next = NULL;
+	session->meta_track_next = session->meta_track_sub = NULL;
 
-	while (--trk >= trk_orig) {
-		/* Unlock handles regardless of whether we are unrolling. */
-		if (!unroll && trk->op != WT_ST_LOCK)
-			goto free;
+	while (--trk >= trk_orig)
+		WT_TRET(__meta_track_apply(session, trk, unroll));
 
-		switch (trk->op) {
-		case WT_ST_EMPTY:	/* Unused slot */
-			break;
-		case WT_ST_LOCK:	/* Handle lock, see above */
-			btree = session->btree;
-			session->btree = trk->btree;
-			WT_TRET(__wt_session_release_btree(session));
-			session->btree = btree;
-			break;
-		case WT_ST_FILEOP:	/* File operation */
-			/*
-			 * For renames, both a and b are set.
-			 * For creates, a is NULL.
-			 * For removes, b is NULL.
-			 */
-			if (trk->a != NULL && trk->b != NULL &&
-			    (tret = __wt_rename(session,
-			    trk->b + strlen("file:"),
-			    trk->a + strlen("file:"))) != 0) {
-				__wt_err(session, tret,
-				    "metadata unroll rename %s to %s",
-				    trk->b, trk->a);
-				WT_TRET(tret);
-			} else if (trk->a == NULL &&
-			    ((tret = __wt_session_close_any_open_btree(
-			    session, trk->b)) != 0 ||
-			    (tret = __wt_remove(session,
-			    trk->b + strlen("file:"))) != 0)) {
-				__wt_err(session, tret,
-				    "metadata unroll create %s",
-				    trk->b);
-				WT_TRET(tret);
-			}
-			/*
-			 * We can't undo removes yet: that would imply
-			 * some kind of temporary rename and remove in
-			 * roll forward.
-			 */
-			break;
-		case WT_ST_REMOVE:	/* Remove trk.a */
-			if ((tret = __wt_metadata_remove(
-			    session, trk->a)) != 0) {
-				__wt_err(session, ret,
-				    "metadata unroll remove: %s",
-				    trk->a);
-				WT_TRET(tret);
-			}
-			break;
-		case WT_ST_SET:		/* Set trk.a to trk.b */
-			if ((tret = __wt_metadata_update(
-			    session, trk->a, trk->b)) != 0) {
-				__wt_err(session, ret,
-				    "metadata unroll update %s to %s",
-				    trk->a, trk->b);
-				WT_TRET(tret);
-			}
-			break;
-		WT_ILLEGAL_VALUE(session);
-		}
+	return (ret);
+}
 
-free:		trk->op = WT_ST_EMPTY;
-		__wt_free(session, trk->a);
-		__wt_free(session, trk->b);
-		trk->btree = NULL;
-	}
+/*
+ * __wt_meta_track_sub_on --
+ *	Start a group of operations that can be committed independent of the
+ *	main transaction.
+ */
+int
+__wt_meta_track_sub_on(WT_SESSION_IMPL *session)
+{
+	WT_ASSERT(session, session->meta_track_sub == NULL);
+	session->meta_track_sub = session->meta_track_next;
+	return (0);
+}
+
+/*
+ * __wt_meta_track_sub_off --
+ *	Commit a group of operations independent of the main transaction.
+ */
+int
+__wt_meta_track_sub_off(WT_SESSION_IMPL *session)
+{
+	WT_DECL_RET;
+	WT_META_TRACK *trk, *trk_orig;
+
+	if (!WT_META_TRACKING(session) || session->meta_track_sub == NULL)
+		return (0);
+
+	trk_orig = session->meta_track_sub;
+	trk = session->meta_track_next;
+
+	/* Turn off tracking for unroll. */
+	session->meta_track_next = session->meta_track_sub = NULL;
+
+	while (--trk >= trk_orig)
+		WT_TRET(__meta_track_apply(session, trk, 0));
+
+	session->meta_track_next = trk_orig;
 	return (ret);
 }
 
@@ -245,6 +293,8 @@ int
 __wt_meta_track_handle_lock(WT_SESSION_IMPL *session)
 {
 	WT_META_TRACK *trk;
+
+	WT_ASSERT(session, session->btree != NULL);
 
 	WT_RET(__meta_track_next(session, &trk));
 

@@ -126,6 +126,10 @@ struct __wt_btree {
 	uint32_t flags;
 };
 
+/* Flags that make a btree handle special (not for normal use). */
+#define	WT_BTREE_SPECIAL_FLAGS	 					\
+	(WT_BTREE_BULK | WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY)
+
 /*
  * In diagnostic mode we track the locations from which hazard references
  * were acquired.
