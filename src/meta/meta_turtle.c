@@ -12,7 +12,7 @@
  *	Check on the turtle file.
  */
 int
-__wt_turtle_init(WT_SESSION_IMPL *session)
+__wt_turtle_init(WT_SESSION_IMPL *session, int *existp)
 {
 	WT_DECL_RET;
 	WT_ITEM *buf;
@@ -22,6 +22,7 @@ __wt_turtle_init(WT_SESSION_IMPL *session)
 
 	buf = NULL;
 	metaconf = path = NULL;
+	*existp = 0;
 
 	/* Discard any turtle setup file left-over from previous runs. */
 	WT_RET(__wt_exist(session, WT_METADATA_TURTLE_SET, &exist));
@@ -30,8 +31,10 @@ __wt_turtle_init(WT_SESSION_IMPL *session)
 
 	/* If there's already a turtle file, we're done. */
 	WT_RET(__wt_exist(session, WT_METADATA_TURTLE, &exist));
-	if (exist)
+	if (exist) {
+		*existp = 1;
 		return (0);
+	}
 
 	/* Create a turtle file with default values. */
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));

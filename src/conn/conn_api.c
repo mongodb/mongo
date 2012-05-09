@@ -703,6 +703,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_SESSION_IMPL *session;
 	const char *cfg[] =
 	    { __wt_confdfl_wiredtiger_open, config, NULL, NULL };
+	int exist;
 
 	*wt_connp = NULL;
 	session = NULL;
@@ -833,7 +834,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	 * later).  We need a session handle for this, open one.
 	 */
 	WT_ERR(__wt_open_session(conn, 0, NULL, NULL, &session));
-	if ((ret = __wt_turtle_init(session)) == 0 && conn->is_new)
+	if ((ret = __wt_turtle_init(session, &exist)) == 0 && !exist)
 		ret = __wt_schema_create(session, WT_METADATA_URI, NULL);
 	WT_TRET(session->iface.close(&session->iface, NULL));
 	session = &conn->default_session;
