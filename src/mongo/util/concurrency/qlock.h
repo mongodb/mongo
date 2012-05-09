@@ -118,13 +118,13 @@ namespace mongo {
         case 'w' : return them == 'W' || them == 'R' || them == 'X';
         case 'r' : return them == 'W' || them == 'X';
         case 'X' : return true;
-        default  : fassertFailed(0);
+        default  : fassertFailed(16200);
         }
         return false;
     }
 
     inline void QLock::notifyWeUnlocked(char me) {
-        fassert(0, W.n == 0);
+        fassert(16201, W.n == 0);
         if ( me == 'X' ) {
             X.c.notify_all();
         }
@@ -217,7 +217,7 @@ namespace mongo {
 
         if (W_legal()) {
             W.n++;
-            fassert( 0, W.n == 1 );
+            fassert( 16202, W.n == 1 );
             return true;
         }
 
@@ -228,9 +228,9 @@ namespace mongo {
     // downgrade from W state to R state
     inline void QLock::W_to_R() { 
         boost::mutex::scoped_lock lk(m);
-        fassert(0, W.n == 1);
-        fassert(0, R.n == 0);
-        fassert(0, U.n == 0);
+        fassert(16203, W.n == 1);
+        fassert(16204, R.n == 0);
+        fassert(16205, U.n == 0);
         W.n = 0;
         R.n = 1;
         notifyWeUnlocked('W');
@@ -248,9 +248,9 @@ namespace mongo {
     // YOU MAY DEADLOCK WITH THREADS LEAVING THE X STATE.
     inline void QLock::R_to_W() { 
         boost::mutex::scoped_lock lk(m);
-        fassert(0, R.n > 0);
-        fassert(0, W.n == 0);
-        fassert(0, U.n == 0);
+        fassert(16206, R.n > 0);
+        fassert(16207, W.n == 0);
+        fassert(16208, U.n == 0);
 
         U.n = 1;
 
@@ -265,9 +265,9 @@ namespace mongo {
         if (!wereGlobalWritesGreedy)
             _stop_greed();
 
-        fassert(0, R.n == 1);
-        fassert(0, W.n == 0);
-        fassert(0, U.n == 1);
+        fassert(16209, R.n == 1);
+        fassert(16210, W.n == 0);
+        fassert(16211, U.n == 1);
 
         R.n = 0;
         W.n = 1;
@@ -277,8 +277,8 @@ namespace mongo {
     inline bool QLock::w_to_X() {
         boost::mutex::scoped_lock lk(m);
 
-        fassert( 0, w.n > 0 );
-        fassert( 0, areGlobalWritesGreedy );
+        fassert( 16212, w.n > 0 );
+        fassert( 16213, areGlobalWritesGreedy );
 
         ++X.n;
         --w.n;
@@ -289,8 +289,8 @@ namespace mongo {
             X.c.wait(m);
 
         if ( myGeneration == generationX ) {
-            fassert( 0, X_legal() );
-            fassert( 0, w.n == 0 );
+            fassert( 16214, X_legal() );
+            fassert( 16215, w.n == 0 );
             ++generationX;
             notifyWeUnlocked('w');
             return true;
@@ -299,19 +299,19 @@ namespace mongo {
         while ( myGeneration == generationXExit )
             X.c.wait(m);
 
-        fassert( 0, R.n == 0 );
-        fassert( 0, w.n > 0 );
-        fassert( 0, areGlobalWritesGreedy );
+        fassert( 16216, R.n == 0 );
+        fassert( 16217, w.n > 0 );
+        fassert( 16218, areGlobalWritesGreedy );
         return false;
     }
 
     inline void QLock::X_to_w() {
         boost::mutex::scoped_lock lk(m);
 
-        fassert( 0, W.n == 0 );
-        fassert( 0, R.n == 0 );
-        fassert( 0, w.n == 0 );
-        fassert( 0, X.n > 0 );
+        fassert( 16219, W.n == 0 );
+        fassert( 16220, R.n == 0 );
+        fassert( 16221, w.n == 0 );
+        fassert( 16222, X.n > 0 );
 
         w.n = X.n;
         X.n = 0;

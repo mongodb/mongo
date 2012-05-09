@@ -693,7 +693,7 @@ namespace mongo {
     }
 
     Lock::DBWrite::UpgradeToExclusive::UpgradeToExclusive() {
-        fassert( 0, lockState().threadState() == 'w' );
+        fassert( 16187, lockState().threadState() == 'w' );
         _gotUpgrade = q.w_to_X();
         if ( _gotUpgrade )
             lockState().locked('W');
@@ -701,12 +701,12 @@ namespace mongo {
 
     Lock::DBWrite::UpgradeToExclusive::~UpgradeToExclusive() {
         if ( _gotUpgrade ) {
-            fassert( 0, lockState().threadState() == 'W' );
+            fassert( 16188, lockState().threadState() == 'W' );
             q.X_to_w();
             lockState().locked('w');
         }
         else {
-            fassert( 0, lockState().threadState() == 'w' );
+            fassert( 16189, lockState().threadState() == 'w' );
         }
     }
 

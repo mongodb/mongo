@@ -74,7 +74,7 @@ namespace ThreadedTests {
                   numUpgraders(myNumUpgraders),
                   numNoiseMakers(myNumNoiseMakers) {
 
-                fassert(0, numUpgraders > 0);
+                fassert(16190, numUpgraders > 0);
             }
 
             int numRounds;
@@ -95,8 +95,8 @@ namespace ThreadedTests {
         void writeAndUpgrade(int threadNumber, int currentIteration);
 
         bool allDone() {
-            fassert(0, _numNoiseMakersFinished <= _numNoiseMakersDesired);
-            fassert(0, _numUpgradersFinished <= _numUpgradersDesired);
+            fassert(16191, _numNoiseMakersFinished <= _numNoiseMakersDesired);
+            fassert(16192, _numUpgradersFinished <= _numUpgradersDesired);
             if (_numNoiseMakersFinished < _numNoiseMakersDesired)
                 return false;
             if (_numUpgradersFinished < _numUpgradersDesired)
@@ -166,9 +166,9 @@ namespace ThreadedTests {
     }
 
     LockStepWriteUpgradeTest::~LockStepWriteUpgradeTest() {
-        fassert(0, _numThreadsAtBarrier == 0);
-        fassert(0, _numUpgradersFinished == _numUpgradersDesired);
-        fassert(0, _numNoiseMakersFinished == _numNoiseMakersDesired);
+        fassert(16193, _numThreadsAtBarrier == 0);
+        fassert(16194, _numUpgradersFinished == _numUpgradersDesired);
+        fassert(16195, _numNoiseMakersFinished == _numNoiseMakersDesired);
     }
 
     void LockStepWriteUpgradeTest::run() {
@@ -198,7 +198,7 @@ namespace ThreadedTests {
 
         {
             boost::mutex::scoped_lock lk(_m);
-            fassert(0, _numNoiseMakersFinished < _numNoiseMakersDesired);
+            fassert(16196, _numNoiseMakersFinished < _numNoiseMakersDesired);
             ++_numNoiseMakersFinished;
             maybeSignalAllDone();
         }
@@ -222,7 +222,7 @@ namespace ThreadedTests {
 
         {
             boost::mutex::scoped_lock lk(_m);
-            fassert(0, _numUpgradersFinished < _numUpgradersDesired);
+            fassert(16197, _numUpgradersFinished < _numUpgradersDesired);
             ++_numUpgradersFinished;
             maybeSignalAllDone();
         }
@@ -275,7 +275,7 @@ namespace ThreadedTests {
 
     void LockStepWriteUpgradeTest::finishRound(bool skippedUpgrade, bool gotUpgrade) {
         boost::mutex::scoped_lock lk(_m);
-        fassert( 0, !(skippedUpgrade && gotUpgrade) );
+        fassert( 16198, !(skippedUpgrade && gotUpgrade) );
         if (skippedUpgrade) {
             ++_numBypassersThisRound;
         }
