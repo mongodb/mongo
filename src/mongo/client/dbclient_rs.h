@@ -88,9 +88,12 @@ namespace mongo {
         /** @return prev if its still ok, and if not returns a random slave that is ok for reads */
         HostAndPort getSlave( const HostAndPort& prev );
 
-        /** @return a random slave that is ok for reads */
-        HostAndPort getSlave();
-
+        /**
+         * @param  preferLocal  Prefer a local secondary, otherwise pick any
+         *                      secondary, or fall back to primary
+         * @return a random slave that is ok for reads
+         */
+        HostAndPort getSlave( bool preferLocal = true );
 
         /**
          * notify the monitor that server has faild
@@ -109,6 +112,12 @@ namespace mongo {
         bool contains( const string& server ) const;
         
         void appendInfo( BSONObjBuilder& b ) const;
+
+        /**
+         * Set the threshold value (in ms) for a node to be considered local.
+         * NOTE:  This function acquires the _lock mutex.
+         **/
+        void setLocalThresholdMillis( const int millis );
 
     private:
         /**
@@ -177,7 +186,7 @@ namespace mongo {
          */
         bool _checkConnMatch_inlock( DBClientConnection* conn, size_t nodeOffset ) const;
 
-        // protects _nodes and indices pointing to it (_master & _nextSlave)
+        // protects _localThresholdMillis, _nodes and refs to _nodes (eg. _master & _nextSlave)
         mutable mongo::mutex _lock;
 
         /**
@@ -201,6 +210,14 @@ namespace mongo {
 
             bool okForSecondaryQueries() const {
                 return ok && secondary && ! hidden;
+            }
+
+            /**
+             * @param  threshold  max ping time (in ms) to be considered local
+             * @return true if node is a local secondary, and can handle queries
+            **/
+            bool isLocalSecondary_inlock( const int threshold ) const {
+                return pingTimeMillis < threshold;
             }
 
             BSONObj toBSON() const {
@@ -229,7 +246,7 @@ namespace mongo {
             bool ismaster;
             bool secondary; 
             bool hidden;
-            
+
             int pingTimeMillis;
 
         };
@@ -244,8 +261,8 @@ namespace mongo {
 
         static mongo::mutex _setsLock; // protects _sets
         static map<string,ReplicaSetMonitorPtr> _sets; // set name to Monitor
-
         static ConfigChangeHook _hook;
+        int _localThresholdMillis; // local ping latency threshold (protected by _lock)
     };
 
     /** Use this class to connect to a replica set of servers.  The class will manage
