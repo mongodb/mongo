@@ -361,7 +361,7 @@ namespace mongo {
     private:
         ChunkManagerPtr reload(bool force=true) const; // doesn't modify self!
         void markMinorForReload( ShardChunkVersion majorVersion ) const;
-        void getMarkedMinorVersions( set<ShardChunkVersion> minorVersions ) const;
+        void getMarkedMinorVersions( set<ShardChunkVersion>& minorVersions ) const;
 
         // helpers for constructor
         void _load(ChunkMap& chunks, set<Shard>& shards, ShardVersionMap& shardVersions, ChunkManagerPtr oldManager);
@@ -400,7 +400,7 @@ namespace mongo {
                 _staleMinorCount( 0 ) {}
 
             void markMinorForReload( const string& ns, ShardChunkVersion majorVersion );
-            void getMarkedMinorVersions( set<ShardChunkVersion> minorVersions );
+            void getMarkedMinorVersions( set<ShardChunkVersion>& minorVersions );
 
             TicketHolder _splitTickets;
 

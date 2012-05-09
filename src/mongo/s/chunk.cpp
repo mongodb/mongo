@@ -616,7 +616,7 @@ namespace mongo {
         _splitHeuristics.markMinorForReload( getns(), majorVersion );
     }
 
-    void ChunkManager::getMarkedMinorVersions( set<ShardChunkVersion> minorVersions ) const {
+    void ChunkManager::getMarkedMinorVersions( set<ShardChunkVersion>& minorVersions ) const {
         _splitHeuristics.getMarkedMinorVersions( minorVersions );
     }
 
@@ -658,7 +658,7 @@ namespace mongo {
             grid.getDBConfig( ns )->getChunkManagerIfExists( ns, true, true );
     }
 
-    void ChunkManager::SplitHeuristics::getMarkedMinorVersions( set<ShardChunkVersion> minorVersions ) {
+    void ChunkManager::SplitHeuristics::getMarkedMinorVersions( set<ShardChunkVersion>& minorVersions ) {
         scoped_lock lk( _staleMinorSetMutex );
         for( set<ShardChunkVersion>::iterator it = _staleMinorSet.begin(); it != _staleMinorSet.end(); it++ ){
             minorVersions.insert( *it );
