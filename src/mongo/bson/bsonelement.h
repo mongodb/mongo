@@ -18,6 +18,7 @@
 #pragma once
 
 #include <vector>
+#include <float.h>
 #include <math.h>
 #include <string.h>
 #include "util/builder.h"
@@ -607,7 +608,7 @@ namespace mongo {
         switch( type() ) {
         case NumberDouble:
             d = numberDouble();
-            if ( isnan( d ) ){
+            if ( mongo_isnan( d ) ){
                 return 0;
             }
             if ( d > (double) std::numeric_limits<long long>::max() ){

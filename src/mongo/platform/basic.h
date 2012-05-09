@@ -15,5 +15,7 @@
 # define __builtin_memcpy memcpy
 # define __builtin_memset memset
 # define __builtin_memmove memmove
+
+#define mongo_isnan(x) isnan(x)
 #endif
 
