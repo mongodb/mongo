@@ -92,8 +92,6 @@ val_gen_setup(uint8_t **valp)
 void
 value_gen(uint8_t *val, uint32_t *sizep, uint64_t keyno)
 {
-	static const char *dup_data = "duplicate data item";
-
 	/*
 	 * Fixed-length records: take the low N bits from the last digit of
 	 * the record number.
