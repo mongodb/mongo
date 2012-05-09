@@ -132,11 +132,11 @@ value_gen(uint8_t *val, uint32_t *sizep, uint64_t keyno)
 	if (g.c_file_type == VAR &&
 	    g.c_repeat_data_pct != 0 &&
 	    MMRAND(1, 100) > g.c_repeat_data_pct) {
-		strcpy(val, "DUPLICATEV");
+		(void)strcpy(val, (char *)"DUPLICATEV");
 		val[10] = '/';
 		*sizep = val_dup_data_len;
 	} else {
-		sprintf((char *)val, "%010" PRIu64, keyno);
+		(void)sprintf((char *)val, "%010" PRIu64, keyno);
 		val[10] = '/';
 		*sizep = MMRAND(g.c_value_min, g.c_value_max);
 	}
