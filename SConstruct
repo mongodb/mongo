@@ -674,11 +674,11 @@ if nix:
     env.Append( LIBS=[] )
 
     #make scons colorgcc friendly
-    env['ENV']['HOME'] = os.environ['HOME']
-    try:
-        env['ENV']['TERM'] = os.environ['TERM']
-    except KeyError:
-        pass
+    for key in ('HOME', 'TERM'):
+        try:
+            env['ENV'][key] = os.environ[key]
+        except KeyError:
+            pass
 
     if linux and has_option( "sharedclient" ):
         env.Append( LINKFLAGS=" -Wl,--as-needed -Wl,-zdefs " )
