@@ -93,10 +93,10 @@ class DocumentGenerator {
 
 
 void DocumentGenerator::init( BSONObj& args ) {
-    uassert( 16177, "blob is not a string", (args["blob"].type() == String) );
+    uassert( 16223, "blob is not a string", (args["blob"].type() == String) );
     config.blob = args["blob"].String();
 
-    uassert( 16178, "md5 seed is not a string", (args["md5seed"].type() == String) );
+    uassert( 16224, "md5 seed is not a string", (args["md5seed"].type() == String) );
     config.md5seed = args["md5seed"].String();
 
     uassert( 16179, "counterUp is not a number", args["counterUp"].isNumber() );
