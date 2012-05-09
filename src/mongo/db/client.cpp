@@ -48,9 +48,8 @@ namespace mongo {
 #if defined(_DEBUG)
     struct StackChecker;
     ThreadLocalValue<StackChecker *> checker;
-
     struct StackChecker { 
-        enum { SZ = 192 * 1024 };
+        enum { SZ = 256 * 1024 };
         char buf[SZ];
         StackChecker() { 
             checker.set(this);
@@ -75,15 +74,18 @@ namespace mongo {
                 log() << "thread " << tname << " stack usage was " << numberBytesUsed << " bytes, " 
                       << " which is the most so far" << endl;
             }
-            
+
             if ( numberBytesUsed > ( SZ - 16000 ) ) {
                 // we are within 16000 bytes of SZ
-                log() << "used " << numberBytesUsed << " bytes, max is " << (int)SZ << " exiting" << endl;
+                log() << "stack used " << numberBytesUsed << " bytes, StackChecker max is " << (int)SZ << " exiting" << endl;
                 fassertFailed( 16151 );
             }
 
         }
     };
+    void stackCheck(const char *name) { StackChecker::check(name); }
+#else
+    void stackCheck(const char *) {}
 #endif
 
     /* each thread which does db operations has a Client object in TLS.

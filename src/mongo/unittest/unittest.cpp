@@ -28,6 +28,8 @@
 
 namespace mongo {
 
+    void stackCheck(const char *);
+
     namespace unittest {
 
         namespace {
@@ -181,6 +183,8 @@ namespace mongo {
 
                 log() << "going to run suite: " << name << std::endl;
                 results.push_back( s->run( filter ) );
+
+                stackCheck("dbtests");
             }
 
             Logstream::get().flush();
