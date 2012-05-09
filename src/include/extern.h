@@ -235,8 +235,12 @@ extern int __wt_btcur_insert(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_remove(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_update(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_close(WT_CURSOR_BTREE *cbt);
-extern int __wt_debug_addr( WT_SESSION_IMPL *session,
-    uint32_t addr,
+extern int __wt_debug_addr(WT_SESSION_IMPL *session,
+    const uint8_t *addr,
+    uint32_t addr_size,
+    const char *ofile);
+extern int __wt_debug_off( WT_SESSION_IMPL *session,
+    uint32_t offset,
     uint32_t size,
     const char *ofile);
 extern int __wt_debug_disk( WT_SESSION_IMPL *session,
