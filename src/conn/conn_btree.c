@@ -55,10 +55,7 @@ __wt_conn_btree_open_lock(WT_SESSION_IMPL *session, uint32_t flags)
 				continue;
 			}
 
-			/*
-			 * We've got the exclusive handle lock and it's
-			 * our job to open the file.
-			 */
+			/* We have an exclusive lock, we're done. */
 			F_SET(btree, WT_BTREE_EXCLUSIVE);
 			break;
 		}
@@ -74,7 +71,9 @@ __wt_conn_btree_open_lock(WT_SESSION_IMPL *session, uint32_t flags)
  * __wt_conn_btree_get --
  *	Find an open btree file handle, otherwise create a new one and link it
  *	into the connection's list.  If successful, it returns with either
- *	(a) an open handle, read locked; or (b) a closed handle, write locked.
+ *	(a) an open handle, read locked (if WT_BTREE_EXCLUSIVE is set); or
+ *	(b) an open handle, write locked (if WT_BTREE_EXCLUSIVE is set), or
+ *	(c) a closed handle, write locked.
  */
 static int
 __conn_btree_get(WT_SESSION_IMPL *session,
@@ -92,7 +91,7 @@ __conn_btree_get(WT_SESSION_IMPL *session,
 	__wt_spin_lock(session, &conn->spinlock);
 	TAILQ_FOREACH(btree, &conn->btqh, q) {
 		if (strcmp(name, btree->name) == 0 &&
-		    (snapshot == btree->snapshot ||
+		    ((snapshot == NULL && btree->snapshot == NULL) ||
 		    (snapshot != NULL && btree->snapshot != NULL &&
 		    strcmp(snapshot, btree->snapshot) == 0))) {
 			++btree->refcnt;
@@ -109,14 +108,6 @@ __conn_btree_get(WT_SESSION_IMPL *session,
 	/*
 	 * Allocate the WT_BTREE structure, its lock, and set the name so we
 	 * can put the handle into the list.
-	 *
-	 * Because this loop checks for existing btree file handles, the
-	 * connection layer owns:
-	 *	the WT_BTREE structure itself
-	 *	the structure lock
-	 *	the structure name
-	 *	the structure configuration string
-	 *	the WT_BTREE_OPEN flag
 	 */
 	btree = NULL;
 	if ((ret = __wt_calloc_def(session, 1, &btree)) == 0 &&
@@ -161,31 +152,32 @@ __wt_conn_btree_open(WT_SESSION_IMPL *session,
 	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_ITEM *addr;
-	uint32_t special_flags;
 
 	addr = NULL;
 	btree = session->btree;
+
+	WT_ASSERT(session, F_ISSET(btree, WT_BTREE_EXCLUSIVE));
 
 	/* Open the underlying file, free any old config. */
 	__wt_free(session, btree->config);
 	btree->config = config;
 
-	/* Check if the state is correct. */
-	btree = session->btree;
-	special_flags = LF_ISSET(WT_BTREE_SPECIAL_FLAGS);
-	if (F_ISSET(btree, WT_BTREE_OPEN) &&
-	    F_ISSET(btree, WT_BTREE_SPECIAL_FLAGS) != special_flags) {
-		WT_ASSERT(session, F_ISSET(btree, WT_BTREE_EXCLUSIVE));
+	/*
+	 * If the handle is already open, it has to be closed so it can be
+	 * reopened with a new configuration.  We don't need to check again:
+	 * this function isn't called if the handle is already open in the
+	 * required mode.
+	 */
+	if (F_ISSET(btree, WT_BTREE_OPEN)) {
 		ret = __wt_btree_close(session);
 		F_CLR(btree, WT_BTREE_OPEN | WT_BTREE_SPECIAL_FLAGS);
+		WT_RET(ret);
 	}
 
-	WT_ASSERT(session, !F_ISSET(btree, WT_BTREE_OPEN));
+	/* Set any special flags on the handle. */
+	F_SET(btree, LF_ISSET(WT_BTREE_SPECIAL_FLAGS));
 
 	do {
-		/* Set any special flags on the handle. */
-		F_SET(btree, special_flags);
-
 		WT_ERR(__wt_scr_alloc(
 		    session, WT_BTREE_MAX_ADDR_COOKIE, &addr));
 		WT_ERR(__wt_snapshot_get(
@@ -211,7 +203,7 @@ err:		(void)__wt_conn_btree_close(session, 1);
 }
 
 /*
- * __wt_conn_btree_open --
+ * __wt_conn_btree_get --
  *	Get an open btree file handle, otherwise open a new one.
  */
 int
@@ -406,7 +398,7 @@ restart:
 	 * the metadata entry, for good.
 	 */
 	while ((btree_session = TAILQ_FIRST(&session->btrees)) != NULL)
-		WT_TRET(__wt_session_discard_btree(session, btree_session, 0));
+		WT_TRET(__wt_session_discard_btree(session, btree_session));
 
 	/* Close the metadata file handle. */
 	while ((btree = TAILQ_FIRST(&conn->btqh)) != NULL) {

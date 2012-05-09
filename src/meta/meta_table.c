@@ -36,26 +36,13 @@ __metadata_turtle(const char *key)
 int
 __wt_metadata_open(WT_SESSION_IMPL *session)
 {
-	WT_DECL_RET;
-	int tracking;
-
 	if (session->metafile != NULL)
 		return (0);
 
-	/*
-	 * Turn off tracking when creating the metadata file: this is always
-	 * done before any other metadata operations and there is no going back.
-	 */
-	tracking = WT_META_TRACKING(session);
-	if (tracking)
-		(void)__wt_meta_track_off(session, 0);
-
-	WT_ERR(__wt_create_file(session, WT_METADATA_URI, 0, NULL));
+	WT_RET(__wt_session_get_btree(
+	    session, WT_METADATA_URI, NULL, WT_BTREE_NO_LOCK));
 	session->metafile = session->btree;
-
-err:	if (tracking)
-		WT_TRET(__wt_meta_track_on(session));
-	return (ret);
+	return (0);
 }
 
 /*
@@ -95,14 +82,14 @@ __wt_metadata_insert(
 
 	/* Save the caller's btree: the metadata cursor will overwrite it. */
 	btree = session->btree;
-	WT_RET(__wt_metadata_cursor(session, NULL, &cursor));
+	WT_ERR(__wt_metadata_cursor(session, NULL, &cursor));
 	cursor->set_key(cursor, key);
 	cursor->set_value(cursor, value);
 	WT_TRET(cursor->insert(cursor));
 	WT_TRET(cursor->close(cursor));
 
 	/* Restore the caller's btree. */
-	session->btree = btree;
+err:	session->btree = btree;
 	return (ret);
 }
 

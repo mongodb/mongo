@@ -749,10 +749,6 @@ extern int __wt_struct_unpack(WT_SESSION_IMPL *session,
     size_t size,
     const char *fmt,
     ...);
-extern int __wt_create_file(WT_SESSION_IMPL *session,
-    const char *uri,
-    int exclusive,
-    const char *config);
 extern int __wt_schema_create( WT_SESSION_IMPL *session,
     const char *name,
     const char *config);
@@ -873,8 +869,7 @@ extern int __wt_session_lock_snapshot( WT_SESSION_IMPL *session,
     const char *snapshot,
     uint32_t flags);
 extern int __wt_session_discard_btree( WT_SESSION_IMPL *session,
-    WT_BTREE_SESSION *btree_session,
-    int locked);
+    WT_BTREE_SESSION *btree_session);
 extern void __wt_err(WT_SESSION_IMPL *session,
     int error,
     const char *fmt,
