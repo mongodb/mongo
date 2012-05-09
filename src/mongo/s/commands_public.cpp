@@ -794,17 +794,91 @@ namespace mongo {
 
                 ChunkManagerPtr cm = conf->getChunkManager( fullns );
                 massert( 13091 , "how could chunk manager be null!" , cm );
-                uassert( 13092 , "GridFS chunks collection can only be sharded on files_id", cm->getShardKey().key() == BSON("files_id" << 1));
+                if(cm->getShardKey().key() == BSON("files_id" << 1)) {
+                    BSONObj finder = BSON("files_id" << cmdObj.firstElement());
 
-                ChunkPtr chunk = cm->findChunk( BSON("files_id" << cmdObj.firstElement()) );
+                    map<Shard, BSONObj> resMap;
+                    SHARDED->commandOp(dbName, cmdObj, 0, fullns, finder, resMap);
+                    verify(resMap.size() == 1); // querying on shard key so should only talk to one shard
+                    BSONObj res = resMap.begin()->second;
 
-                ShardConnection conn( chunk->getShard() , fullns );
-                BSONObj res;
-                bool ok = conn->runCommand( conf->getName() , cmdObj , res );
-                conn.done();
+                    result.appendElements(res);
+                    return res["ok"].trueValue();
+                }
+                else if (cm->getShardKey().key() == BSON("files_id" << 1 << "n" << 1)) {
+                    int n = 0;
+                    BSONObj lastResult;
 
-                result.appendElements(res);
-                return ok;
+                    while (true) {
+                        // Theory of operation: Starting with n=0, send filemd5 command to shard
+                        // with that chunk (gridfs chunk not sharding chunk). That shard will then
+                        // compute a partial md5 state (passed in the "md5state" field) for all
+                        // contiguous chunks that it has. When it runs out or hits a discontinuity
+                        // (eg [1,2,7]) it returns what it has done so far. This is repeated as
+                        // long as we keep getting more chunks. The end condition is when we go to
+                        // look for chunk n and it doesn't exist. This means that the file's last
+                        // chunk is n-1, so we return the computed md5 results.
+                        BSONObjBuilder bb;
+                        bb.appendElements(cmdObj);
+                        bb.appendBool("partialOk", true);
+                        bb.append("startAt", n);
+                        if (!lastResult.isEmpty()){
+                            bb.append(lastResult["md5state"]);
+                        }
+                        BSONObj shardCmd = bb.obj();
+
+                        BSONObj finder = BSON("files_id" << cmdObj.firstElement() << "n" << n);
+
+                        map<Shard, BSONObj> resMap;
+                        try {
+                            SHARDED->commandOp(dbName, shardCmd, 0, fullns, finder, resMap);
+                        }
+                        catch( DBException& e ){
+                            //This is handled below and logged
+                            resMap[Shard()] = BSON("errmsg" << e.what() << "ok" << 0);
+                        }
+
+                        verify(resMap.size() == 1); // querying on shard key so should only talk to one shard
+                        BSONObj res = resMap.begin()->second;
+                        bool ok = res["ok"].trueValue();
+
+                        if (!ok) {
+                            // Add extra info to make debugging easier
+                            result.append("failedAt", n);
+                            result.append("sentCommand", shardCmd);
+                            BSONForEach(e, res){
+                                if (!str::equals(e.fieldName(), "errmsg"))
+                                    result.append(e);
+                            }
+
+                            log() << "Sharded filemd5 failed: " << result.asTempObj() << endl;
+
+                            errmsg = string("sharded filemd5 failed because: ") + res["errmsg"].valuestrsafe();
+                            return false;
+                        }
+
+                        uassert(16246, "Shard " + conf->getName() + " is too old to support GridFS sharded by {files_id:1, n:1}",
+                                res.hasField("md5state"));
+
+                        lastResult = res;
+                        int nNext = res["numChunks"].numberInt();
+
+                        if (n == nNext){
+                            // no new data means we've reached the end of the file
+                            result.appendElements(res);
+                            return true;
+                        }
+                            
+                        verify(nNext > n);
+                        n = nNext;
+                    }
+
+                    verify(0);
+                }
+
+                // We could support arbitrary shard keys by sending commands to all shards but I don't think we should
+                errmsg = "GridFS fs.chunks collection must be sharded on either {files_id:1} or {files_id:1, n:1}";
+                return false;
             }
         } fileMD5Cmd;
 
