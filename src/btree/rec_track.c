@@ -245,10 +245,10 @@ __wt_rec_track_ovfl_reuse(
     WT_SESSION_IMPL *session, WT_PAGE *page, const void *data,
     uint32_t size, uint8_t **addrp, uint32_t *sizep, int *foundp)
 {
+	WT_PAGE_MODIFY *mod;
 	WT_PAGE_TRACK *track;
 	uint32_t i;
 
-	WT_PAGE_MODIFY *mod;
 	*foundp = 0;
 
 	mod = page->modify;
@@ -454,7 +454,6 @@ __track_print(WT_SESSION_IMPL *session, WT_PAGE *page, WT_PAGE_TRACK *track)
 		    session, page, "overflow-active", &track->addr);
 		break;
 	case WT_TRK_EMPTY:
-		ret = __track_msg(session, page, "empty", &track->addr);
 		break;
 	}
 	return (ret);
