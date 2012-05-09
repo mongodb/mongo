@@ -17,12 +17,13 @@
 
 #pragma once
 
+#include <string.h> // strlen
 #include <vector>
-#include <cmath>
-#include <string.h>
-#include "util/builder.h"
-#include "bsontypes.h"
-#include "oid.h"
+
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/platform/float_utils.h"
 
 namespace mongo {
     class OpTime;
@@ -607,7 +608,7 @@ namespace mongo {
         switch( type() ) {
         case NumberDouble:
             d = numberDouble();
-            if ( std::isnan( d ) ){
+            if ( isNaN( d ) ){
                 return 0;
             }
             if ( d > (double) std::numeric_limits<long long>::max() ){

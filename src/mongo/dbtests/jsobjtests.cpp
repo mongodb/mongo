@@ -29,6 +29,7 @@
 #include "../util/mongoutils/checksum.h"
 #include "../db/key.h"
 #include "../db/btree.h"
+#include "mongo/platform/float_utils.h"
 
 namespace JsobjTests {
 

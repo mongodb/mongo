@@ -31,6 +31,7 @@
 #include "mongo/db/jsobjmanipulator.h"
 #include "mongo/db/json.h"
 #include "mongo/db/nonce.h"
+#include "mongo/platform/float_utils.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/embedded_builder.h"
 #include "mongo/util/md5.hpp"

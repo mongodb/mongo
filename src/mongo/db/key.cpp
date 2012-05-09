@@ -16,10 +16,14 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
-#include "key.h"
-#include "mongo/util/startup_test.h"
+#include "mongo/pch.h"
+
+#include "mongo/db/key.h"
+
 #include "mongo/bson/util/builder.h"
+#include "mongo/platform/float_utils.h"
+#include "mongo/util/startup_test.h"
+
 
 namespace mongo {
 
