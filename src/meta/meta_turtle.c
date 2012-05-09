@@ -8,11 +8,11 @@
 #include "wt_internal.h"
 
 /*
- * __wt_turtle_init --
- *	Check on the turtle file.
+ * __wt_meta_turtle_init --
+ *	Check the turtle file and create if necessary.
  */
 int
-__wt_turtle_init(WT_SESSION_IMPL *session, int *existp)
+__wt_meta_turtle_init(WT_SESSION_IMPL *session, int *existp)
 {
 	WT_DECL_RET;
 	WT_ITEM *buf;
@@ -43,7 +43,7 @@ __wt_turtle_init(WT_SESSION_IMPL *session, int *existp)
 	    WT_BTREE_MAJOR_VERSION, WT_BTREE_MINOR_VERSION));
 	cfg[1] = buf->data;
 	WT_RET(__wt_config_collapse(session, cfg, &metaconf));
-	WT_ERR(__wt_turtle_update(session, WT_METADATA_URI, metaconf));
+	WT_ERR(__wt_meta_turtle_update(session, WT_METADATA_URI, metaconf));
 
 err:	__wt_free(session, metaconf);
 	__wt_free(session, path);
@@ -53,11 +53,12 @@ err:	__wt_free(session, metaconf);
 }
 
 /*
- * __wt_turtle_read --
+ * __wt_meta_turtle_read --
  *	Read the turtle file.
  */
 int
-__wt_turtle_read(WT_SESSION_IMPL *session, const char *key, const char **valuep)
+__wt_meta_turtle_read(
+    WT_SESSION_IMPL *session, const char *key, const char **valuep)
 {
 	FILE *fp;
 	WT_DECL_RET;
@@ -109,11 +110,11 @@ err:	if (fp != NULL)
 }
 
 /*
- * __wt_turtle_update --
+ * __wt_meta_turtle_update --
  *	Update the turtle file.
  */
 int
-__wt_turtle_update(
+__wt_meta_turtle_update(
     WT_SESSION_IMPL *session, const char *key,  const char *value)
 {
 	FILE *fp;

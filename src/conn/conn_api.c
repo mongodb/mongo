@@ -831,7 +831,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	 * (which avoids application threads racing to create the metadata file
 	 * later).  We need a session handle for this, open one.
 	 */
-	if ((ret = __wt_turtle_init(session, &exist)) == 0 && !exist)
+	if ((ret = __wt_meta_turtle_init(session, &exist)) == 0 && !exist)
 		ret = __wt_schema_create(session, WT_METADATA_URI, NULL);
 	WT_ERR(ret);
 

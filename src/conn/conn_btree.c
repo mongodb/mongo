@@ -180,7 +180,7 @@ __wt_conn_btree_open(WT_SESSION_IMPL *session,
 	do {
 		WT_ERR(__wt_scr_alloc(
 		    session, WT_BTREE_MAX_ADDR_COOKIE, &addr));
-		WT_ERR(__wt_snapshot_get(
+		WT_ERR(__wt_meta_snapshot_get(
 		    session, btree->name, btree->snapshot, addr));
 		WT_ERR(__wt_btree_open(session, addr->data, addr->size, cfg,
 		    btree->snapshot == NULL ? 0 : 1));

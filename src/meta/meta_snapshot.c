@@ -16,11 +16,11 @@ static int __snap_set(WT_SESSION_IMPL *, const char *, const char *);
 static int __snap_version_chk(WT_SESSION_IMPL *, const char *, const char *);
 
 /*
- * __wt_snapshot_get --
+ * __wt_meta_snapshot_get --
  *	Get the file's most recent snapshot address.
  */
 int
-__wt_snapshot_get(WT_SESSION_IMPL *session,
+__wt_meta_snapshot_get(WT_SESSION_IMPL *session,
     const char *name, const char *snapshot, WT_ITEM *addr)
 {
 	WT_DECL_RET;
@@ -52,11 +52,11 @@ __wt_snapshot_get(WT_SESSION_IMPL *session,
 }
 
 /*
- * __wt_snapshot_clear --
+ * __wt_meta_snapshot_clear --
  *	Clear a file's snapshot.
  */
 int
-__wt_snapshot_clear(WT_SESSION_IMPL *session, const char *name)
+__wt_meta_snapshot_clear(WT_SESSION_IMPL *session, const char *name)
 {
 	WT_DECL_RET;
 
@@ -200,11 +200,11 @@ __snap_compare_order(const void *a, const void *b)
 }
 
 /*
- * __wt_snapshot_list_get --
+ * __wt_meta_snaplist_get --
  *	Load all available snapshot information for a file.
  */
 int
-__wt_snapshot_list_get(
+__wt_meta_snaplist_get(
     WT_SESSION_IMPL *session, const char *name, WT_SNAPSHOT **snapbasep)
 {
 	WT_CONFIG snapconf;
@@ -293,7 +293,7 @@ __wt_snapshot_list_get(
 
 	if (0) {
 format:		WT_ERR_MSG(session, WT_ERROR, "corrupted snapshot list");
-err:		__wt_snapshot_list_free(session, snapbase);
+err:		__wt_meta_snaplist_free(session, snapbase);
 	}
 	__wt_free(session, config);
 	__wt_scr_free(&buf);
@@ -302,11 +302,11 @@ err:		__wt_snapshot_list_free(session, snapbase);
 }
 
 /*
- * __wt_snapshot_list_set --
+ * __wt_meta_snaplist_set --
  *	Set a file's snapshot value from the WT_SNAPSHOT list.
  */
 int
-__wt_snapshot_list_set(
+__wt_meta_snaplist_set(
     WT_SESSION_IMPL *session, const char *name, WT_SNAPSHOT *snapbase)
 {
 	WT_DECL_RET;
@@ -365,11 +365,11 @@ err:	__wt_scr_free(&buf);
 }
 
 /*
- * __wt_snapshot_list_free --
+ * __wt_meta_snaplist_free --
  *	Discard the snapshot array.
  */
 void
-__wt_snapshot_list_free(WT_SESSION_IMPL *session, WT_SNAPSHOT *snapbase)
+__wt_meta_snaplist_free(WT_SESSION_IMPL *session, WT_SNAPSHOT *snapbase)
 {
 	WT_SNAPSHOT *snap;
 	if (snapbase == NULL)

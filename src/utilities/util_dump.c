@@ -303,7 +303,7 @@ dump_file_config(WT_SESSION *session, const char *uri)
 	 * down into the library and ask for the file's configuration,
 	 * that will work in all cases.
 	 */
-	if ((ret = __wt_file_metadata(session, uri, &value)) != 0)
+	if ((ret = __wt_metadata_get(session, uri, &value)) != 0)
 		return (util_err(ret, "metadata read: %s", uri));
 
 	/* Leak the memory, I don't care. */

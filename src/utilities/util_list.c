@@ -80,7 +80,7 @@ list_print(WT_SESSION *session, const char *name, int sflag, int vflag)
 			return (ret);
 		if (vflag) {
 			if ((ret =
-			    __wt_file_metadata(session, uri, &value)) != 0)
+			    __wt_metadata_get(session, uri, &value)) != 0)
 				return (
 				    util_err(ret, "metadata read: %s", uri));
 			printf("%s\n", value);
@@ -165,7 +165,7 @@ list_print_snapshot(WT_SESSION *session, const char *key)
 	 * report an error, and continue our caller's loop.  Otherwise, report
 	 * each snapshot's name and time.
 	 */
-	if ((ret = __wt_snaplist_get(session, key, &snapbase)) != 0)
+	if ((ret = __wt_metadata_get_snaplist(session, key, &snapbase)) != 0)
 		return (ret == WT_NOTFOUND ? 0 : ret);
 
 	/* Find the longest name, so we can pretty-print. */
@@ -194,7 +194,7 @@ list_print_snapshot(WT_SESSION *session, const char *key)
 			printf(" (%" PRIu64 " B)\n", v);
 	}
 
-	__wt_snaplist_free(session, snapbase);
+	__wt_metadata_free_snaplist(session, snapbase);
 	return (0);
 }
 

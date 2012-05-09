@@ -587,25 +587,26 @@ extern int __wt_log_printf(WT_SESSION_IMPL *session,
     2,
     3)));
 extern WT_LOGREC_DESC __wt_logdesc_debug;
-extern int __wt_file_metadata( WT_SESSION *session,
+extern int __wt_metadata_get(WT_SESSION *session,
     const char *uri,
     const char **valuep);
-extern int __wt_snaplist_get( WT_SESSION *session,
+extern int __wt_metadata_get_snaplist( WT_SESSION *session,
     const char *name,
     WT_SNAPSHOT **snapbasep);
-extern void __wt_snaplist_free(WT_SESSION *session, WT_SNAPSHOT *snapbase);
-extern int __wt_snapshot_get(WT_SESSION_IMPL *session,
+extern void __wt_metadata_free_snaplist(WT_SESSION *session,
+    WT_SNAPSHOT *snapbase);
+extern int __wt_meta_snapshot_get(WT_SESSION_IMPL *session,
     const char *name,
     const char *snapshot,
     WT_ITEM *addr);
-extern int __wt_snapshot_clear(WT_SESSION_IMPL *session, const char *name);
-extern int __wt_snapshot_list_get( WT_SESSION_IMPL *session,
+extern int __wt_meta_snapshot_clear(WT_SESSION_IMPL *session, const char *name);
+extern int __wt_meta_snaplist_get( WT_SESSION_IMPL *session,
     const char *name,
     WT_SNAPSHOT **snapbasep);
-extern int __wt_snapshot_list_set( WT_SESSION_IMPL *session,
+extern int __wt_meta_snaplist_set( WT_SESSION_IMPL *session,
     const char *name,
     WT_SNAPSHOT *snapbase);
-extern void __wt_snapshot_list_free(WT_SESSION_IMPL *session,
+extern void __wt_meta_snaplist_free(WT_SESSION_IMPL *session,
     WT_SNAPSHOT *snapbase);
 extern int __wt_metadata_open(WT_SESSION_IMPL *session);
 extern int __wt_metadata_cursor( WT_SESSION_IMPL *session,
@@ -632,11 +633,11 @@ extern int __wt_meta_track_fileop( WT_SESSION_IMPL *session,
     const char *olduri,
     const char *newuri);
 extern int __wt_meta_track_handle_lock(WT_SESSION_IMPL *session);
-extern int __wt_turtle_init(WT_SESSION_IMPL *session, int *existp);
-extern int __wt_turtle_read(WT_SESSION_IMPL *session,
+extern int __wt_meta_turtle_init(WT_SESSION_IMPL *session, int *existp);
+extern int __wt_meta_turtle_read( WT_SESSION_IMPL *session,
     const char *key,
     const char **valuep);
-extern int __wt_turtle_update( WT_SESSION_IMPL *session,
+extern int __wt_meta_turtle_update( WT_SESSION_IMPL *session,
     const char *key,
     const char *value);
 extern void __wt_abort(WT_SESSION_IMPL *session);

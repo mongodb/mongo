@@ -303,7 +303,7 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 			WT_ERR_MSG(session, EINVAL,
 			    "root page eviction failed to create a snapshot");
 		else
-			WT_ERR(__wt_snapshot_list_set(
+			WT_ERR(__wt_meta_snaplist_set(
 			    session, btree->name, snapbase));
 	}
 

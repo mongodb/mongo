@@ -106,7 +106,7 @@ __wt_metadata_update(
 	WT_DECL_RET;
 
 	if (__metadata_turtle(key))
-		return (__wt_turtle_update(session, key, value));
+		return (__wt_meta_turtle_update(session, key, value));
 
 	if (WT_META_TRACKING(session))
 		WT_RET(__wt_meta_track_update(session, key));
@@ -171,7 +171,7 @@ __wt_metadata_read(
 	const char *value;
 
 	if (__metadata_turtle(key))
-		return (__wt_turtle_read(session, key, valuep));
+		return (__wt_meta_turtle_read(session, key, valuep));
 
 	/* Save the caller's btree: the metadata cursor will overwrite it. */
 	btree = session->btree;
