@@ -22,6 +22,8 @@
 #include <ctime>
 #include <limits>
 
+#include "mongo/util/assert_util.h"
+
 namespace mongo {
 
     inline void time_t_to_String(time_t t, char *buf) {

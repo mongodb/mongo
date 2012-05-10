@@ -22,6 +22,8 @@
 
 #include "mongo/scripting/bench.h"
 
+#include <boost/thread/thread.hpp>
+
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/md5.h"

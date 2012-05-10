@@ -27,6 +27,8 @@
 #include <string>
 #include <algorithm>
 
+#include <boost/thread/thread.hpp>
+
 #include "../db/commands.h"
 #include "../db/jsobj.h"
 #include "../db/cmdline.h"

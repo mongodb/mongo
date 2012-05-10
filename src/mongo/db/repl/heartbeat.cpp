@@ -15,6 +15,9 @@
 */
 
 #include "pch.h"
+
+#include <boost/thread/thread.hpp>
+
 #include "rs.h"
 #include "health.h"
 #include "../../util/background.h"

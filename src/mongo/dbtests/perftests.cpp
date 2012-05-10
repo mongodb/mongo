@@ -23,6 +23,9 @@
  */
 
 #include "pch.h"
+
+#include <boost/thread/thread.hpp>
+
 #include <fstream>
 #include "../db/db.h"
 #include "../db/instance.h"

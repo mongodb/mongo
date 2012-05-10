@@ -27,6 +27,9 @@
 */
 
 #include "pch.h"
+
+#include <boost/thread/thread.hpp>
+
 #include "jsobj.h"
 #include "../util/goodies.h"
 #include "repl.h"

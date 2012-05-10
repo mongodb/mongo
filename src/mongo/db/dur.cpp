@@ -56,6 +56,9 @@
 */
 
 #include "pch.h"
+
+#include <boost/thread/thread.hpp>
+
 #include "cmdline.h"
 #include "client.h"
 #include "dur.h"

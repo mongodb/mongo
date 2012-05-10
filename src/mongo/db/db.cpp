@@ -17,7 +17,11 @@
 */
 
 #include "pch.h"
+
+#include <boost/thread/thread.hpp>
+
 #include "db.h"
+
 #include "introspect.h"
 #include "repl.h"
 #include "../util/startup_test.h"

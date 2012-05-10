@@ -17,6 +17,8 @@
 
 #include "pch.h"
 
+#include <boost/thread/thread.hpp>
+
 #ifndef USE_ASIO
 
 #include "message.h"

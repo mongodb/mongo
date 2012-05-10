@@ -17,6 +17,7 @@
 
 #include "pch.h"
 
+#include <boost/thread/thread.hpp>
 #include <iostream>
 #include <map>
 #include <vector>

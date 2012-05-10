@@ -15,6 +15,7 @@
 #include <iostream>
 
 #include <boost/filesystem/operations.hpp>
+#include <boost/thread/thread.hpp>
 
 #include "mongo/bson/util/atomic_int.h"
 #include "mongo/db/jsobj.h"

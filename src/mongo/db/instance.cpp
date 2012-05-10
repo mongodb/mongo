@@ -17,6 +17,9 @@
 */
 
 #include "pch.h"
+
+#include <boost/thread/thread.hpp>
+
 #include "../util/time_support.h"
 #include "db.h"
 #include "../bson/util/atomic_int.h"
