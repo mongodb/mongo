@@ -56,11 +56,11 @@ for ( i=0; i<5; i++ ){
     catch ( e ){}
 }
 
-debug( "Awaiting replication of all nodes, so spurious sync'ing queries don't upset our counts..." )
+jsTest.log( "Awaiting replication of all nodes, so spurious sync'ing queries don't upset our counts..." )
 rs.test.awaitReplication()
 // Make sure we wait for secondaries here - otherwise a secondary could come online later and be used for the
 // count command before being fully replicated
-debug( "Awaiting secondary status of all nodes" )
+jsTest.log( "Awaiting secondary status of all nodes" )
 rs.test.waitForState( rs.test.getSecondaries(), rs.test.SECONDARY, 180 * 1000 )
 
 // -------------------------------------------------------------------------------------------
