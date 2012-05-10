@@ -7,6 +7,8 @@
 #include "mongo/db/client.h"
 #include "mongo/util/background.h"
 
+#include "../curop.h"
+
 namespace mongo {
     
     class FSyncLockThread : public BackgroundJob {
@@ -56,9 +58,15 @@ namespace mongo {
                     return false;
                 }
 
+                // from db.eval()
+                if ( cc().getContext() ) {
+                    errmsg = "fsync: it is not possible to call from db.eval()";
+                    return false;
+                }
+
                 SimpleMutex::scoped_lock lk(m);
                 err = "";
-                
+
                 (new FSyncLockThread())->go();
                 while ( ! locked && err.size() == 0 ) {
                     _threadSync.wait( m );
