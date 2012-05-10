@@ -56,7 +56,7 @@ __truncate_table(WT_SESSION_IMPL *session, const char *name)
 		if ((tret = __wt_schema_get_btree(session,
 		    table->cg_name[i], strlen(table->cg_name[i]),
 		    NULL, WT_BTREE_NO_LOCK)) != 0) {
-			WT_TRET(ret);
+			WT_TRET(tret);
 			continue;
 		}
 		btree = session->btree;
@@ -71,7 +71,7 @@ __truncate_table(WT_SESSION_IMPL *session, const char *name)
 		if ((tret = __wt_schema_get_btree(session,
 		    table->idx_name[i], strlen(table->idx_name[i]),
 		    NULL, WT_BTREE_NO_LOCK)) != 0) {
-			WT_TRET(ret);
+			WT_TRET(tret);
 			continue;
 		}
 		btree = session->btree;
