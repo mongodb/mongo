@@ -49,6 +49,7 @@
 #include "d_concurrency.h"
 #include "../s/d_writeback.h"
 #include "d_globals.h"
+#include "ttl.h"
 
 #if defined(_WIN32)
 # include "../util/ntservice.h"
@@ -530,7 +531,8 @@ namespace mongo {
         snapshotThread.go();
         d.clientCursorMonitor.go();
         PeriodicTask::theRunner->go();
-        
+        startTTLBackgroundJob();
+
 #ifndef _WIN32
         CmdLine::launchOk();
 #endif
