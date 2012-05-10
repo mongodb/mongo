@@ -58,6 +58,10 @@ for ( i=0; i<5; i++ ){
 
 debug( "Awaiting replication of all nodes, so spurious sync'ing queries don't upset our counts..." )
 rs.test.awaitReplication()
+// Make sure we wait for secondaries here - otherwise a secondary could come online later and be used for the
+// count command before being fully replicated
+debug( "Awaiting secondary status of all nodes" )
+rs.test.waitForState( rs.test.getSecondaries(), rs.test.SECONDARY, 180 * 1000 )
 
 // -------------------------------------------------------------------------------------------
 // ---------- test routing to slaves ----------------
@@ -93,6 +97,10 @@ for ( i=0; i<100; i++ ){
     db.foo.insert( { x : i } )
 }
 db.getLastError( 3 , 10000 );
+
+// Counts pass the options of the connection - which is slaveOk'd, so we need to wait for 
+// replication for this and future tests to pass
+rs.test.awaitReplication()
 
 assert.eq( 100 , ts.count() , "B4" )
 assert.eq( 100 , ts.find().itcount() , "B5" )
