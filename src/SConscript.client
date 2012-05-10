@@ -51,6 +51,7 @@ clientSource = [
     'mongo/util/signal_handlers.cpp',
     'mongo/util/stringutils.cpp',
     'mongo/util/text.cpp',
+    'mongo/util/time_support.cpp',
     'mongo/util/timer.cpp',
     'mongo/util/trace.cpp',
     'mongo/util/util.cpp',
