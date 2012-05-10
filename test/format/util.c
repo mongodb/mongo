@@ -132,7 +132,7 @@ value_gen(uint8_t *val, uint32_t *sizep, uint64_t keyno)
 	if (g.c_file_type == VAR &&
 	    g.c_repeat_data_pct != 0 &&
 	    MMRAND(1, 100) > g.c_repeat_data_pct) {
-		(void)strcpy(val, (char *)"DUPLICATEV");
+		(void)strcpy((char *)val, "DUPLICATEV");
 		val[10] = '/';
 		*sizep = val_dup_data_len;
 	} else {
