@@ -162,9 +162,14 @@ __wt_page_is_modified(WT_PAGE *page)
  *	Confirm the page's write generation number is correct.
  */
 static inline int
-__wt_page_write_gen_check(WT_PAGE *page, uint32_t write_gen)
+__wt_page_write_gen_check(
+    WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t write_gen)
 {
-	return (page->modify->write_gen == write_gen ? 0 : WT_RESTART);
+	if (page->modify->write_gen == write_gen)
+		return (0);
+
+	WT_BSTAT_INCR(session, file_write_conflicts);
+	return (WT_RESTART);
 }
 
 /*

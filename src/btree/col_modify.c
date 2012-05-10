@@ -225,7 +225,7 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session)
 	    &ins_stack, &new_inslist, &new_inshead, &new_ins, &skipdepth);
 
 	/* Check the page's write-generation. */
-	WT_ERR(__wt_page_write_gen_check(page, write_gen));
+	WT_ERR(__wt_page_write_gen_check(session, page, write_gen));
 
 	if ((inshead = *insheadp) == NULL)
 		inshead = new_inshead;

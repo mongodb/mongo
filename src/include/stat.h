@@ -90,6 +90,7 @@ struct __wt_btree_stats {
 	WT_STATS file_row_int_pages;
 	WT_STATS file_row_leaf_pages;
 	WT_STATS file_entries;
+	WT_STATS file_write_conflicts;
 };
 
 /*

@@ -39,6 +39,7 @@ __wt_stat_alloc_btree_stats(WT_SESSION_IMPL *session, WT_BTREE_STATS **statsp)
 	stats->file_row_int_pages.desc = "row-store internal pages";
 	stats->file_row_leaf_pages.desc = "row-store leaf pages";
 	stats->file_size.desc = "file: size";
+	stats->file_write_conflicts.desc = "write generation conflicts";
 	stats->free.desc = "file: block frees";
 	stats->overflow_read.desc = "file: overflow pages read from the file";
 	stats->page_read.desc = "file: pages read from the file";
@@ -93,6 +94,7 @@ __wt_stat_clear_btree_stats(WT_STATS *stats_arg)
 	stats->file_row_int_pages.v = 0;
 	stats->file_row_leaf_pages.v = 0;
 	stats->file_size.v = 0;
+	stats->file_write_conflicts.v = 0;
 	stats->free.v = 0;
 	stats->overflow_read.v = 0;
 	stats->page_read.v = 0;
