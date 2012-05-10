@@ -42,7 +42,6 @@
 using namespace bson;
 
 namespace mongo {
-    void stackCheck(const char *);
     namespace dbtests {
         extern unsigned perfHist;
     }
@@ -196,9 +195,7 @@ namespace PerfTests {
         // return name of it
         virtual string timed2(DBClientBase&) { return ""; }
 
-        virtual void post() {
-            stackCheck("dbtests perftests");
-        }
+        virtual void post() { }
 
         virtual string name() = 0;
 
