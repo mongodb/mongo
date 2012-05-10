@@ -7,6 +7,9 @@
 #endif
 
 #if defined(__linux__)
+
+#include <cstring>
+
 // glibc's optimized versions are better than g++ builtins
 # define __builtin_strcmp strcmp
 # define __builtin_strlen strlen
