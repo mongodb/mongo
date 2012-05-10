@@ -1666,7 +1666,7 @@ __rec_col_var(
 	WT_UPDATE *upd;
 	uint64_t n, nrepeat, repeat_count, rle, slvg_missing, src_recno;
 	uint32_t i, size;
-	int deleted, last_deleted, orig_deleted;
+	int deleted, last_deleted, orig_deleted, update_no_copy;
 	const void *data;
 
 	r = session->reconcile;
@@ -1786,6 +1786,8 @@ record_loop:	/*
 				upd = ins->upd;
 				ins = WT_SKIP_NEXT(ins);
 
+				update_no_copy = 1;	/* No data copy */
+
 				repeat_count = 1;
 
 				deleted = WT_UPDATE_DELETED_ISSET(upd);
@@ -1794,6 +1796,8 @@ record_loop:	/*
 					size = upd->size;
 				}
 			} else {
+				update_no_copy = 0;	/* Maybe data copy */
+
 				/*
 				 * The repeat count is the number of records up
 				 * to the next WT_INSERT record, or up to the
@@ -1887,26 +1891,30 @@ compare:		/*
 			}
 
 			/*
-			 * Swap the current/last state.  We can't always assign
-			 * the data values to the buffer because they may come
-			 * from a copy built from an encoded or overflow cell.
-			 * Check, because encoded/overflow cells aren't common
-			 * and we'd like to avoid the copy.
+			 * Swap the current/last state.
 			 *
 			 * Reset RLE counter and turn on comparisons.
 			 */
 			if (!deleted) {
 				/*
-				 * WRONG WRONG WRONG
-				 * THIS IS GOING TO COPY EVERY TIME.
+				 * We can't simply assign the data values into
+				 * the last buffer because they may have come
+				 * from a copy built from an encoded/overflow
+				 * cell and creating the next record is going
+				 * to overwrite that memory.  Check, because
+				 * encoded/overflow cells aren't that common
+				 * and we'd like to avoid the copy.  If data
+				 * was taken from the current unpack structure
+				 * (which points into the page), or was taken
+				 * from an update structure, we can just use
+				 * the pointers, they're not moving.
 				 */
-				if (data == orig->data)
-					WT_ERR(__wt_buf_set(
-					    session, last, data, size));
-				else {
+				if (data == unpack->data || update_no_copy) {
 					last->data = data;
 					last->size = size;
-				}
+				} else
+					WT_ERR(__wt_buf_set(
+					    session, last, data, size));
 			}
 			last_deleted = deleted;
 			rle = repeat_count;
