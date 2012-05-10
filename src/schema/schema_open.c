@@ -290,11 +290,10 @@ __wt_schema_open_index(
 		match = (len > 0 &&
 		   strncmp(name, idxname, len) == 0 && name[len] == '\0');
 
-		if (i * sizeof(const char *) >= table->idx_name_alloc)
+		if ((size_t)i * sizeof(const char *) >= table->idx_name_alloc)
 			WT_ERR(__wt_realloc(session, &table->idx_name_alloc,
 			    WT_MAX(10 * sizeof(const char *),
-			    2 * table->idx_name_alloc),
-			    &table->idx_name));
+			    2 * table->idx_name_alloc), &table->idx_name));
 
 		if (table->idx_name[i] == NULL)
 			WT_ERR(__wt_strdup(session, uri, &table->idx_name[i]));
