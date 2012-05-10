@@ -8,6 +8,8 @@ import os.path
 import itertools
 import subprocess
 import sys
+import hashlib
+
 # various utilities that are handy
 
 def getAllSourceFiles( arr=None , prefix="." ):
@@ -154,6 +156,13 @@ def which(executable):
             return executable_path
 
     return executable
+
+def md5sum( file ):
+    #TODO error handling, etc..
+    return execsys( "md5sum " + file )[0].partition(" ")[0]
+
+def md5string( a_string ):
+    return hashlib.md5(a_string).hexdigest()
 
 def find_python(min_version=(2, 5)):
     try:
