@@ -243,7 +243,7 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table,
 err:	__wt_buf_free(session, &cols);
 	__wt_buf_free(session, &uribuf);
 	if (session->btree != NULL)
-		__wt_session_release_btree(session);
+		WT_TRET(__wt_session_release_btree(session));
 
 	return (ret);
 }
