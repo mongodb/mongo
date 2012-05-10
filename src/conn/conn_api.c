@@ -728,8 +728,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	conn->default_session = session = &conn->dummy_session;
 	session->iface.connection = &conn->iface;
 	session->name = "wiredtiger_open";
-	session->event_handler = (event_handler != NULL) ?
-	    event_handler : __wt_event_handler_default;
+	__wt_event_handler_set(session, event_handler);
 
 	/* Remaining basic initialization of the connection structure. */
 	WT_ERR(__wt_connection_init(conn));

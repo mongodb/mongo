@@ -72,8 +72,6 @@ static WT_EVENT_HANDLER __event_handler_default = {
 	__handle_progress_default
 };
 
-WT_EVENT_HANDLER *__wt_event_handler_default = &__event_handler_default;
-
 /*
  * __handler_failure --
  *	Report the failure of an application-configured event handler.
@@ -107,6 +105,27 @@ __handler_failure(WT_SESSION_IMPL *session,
 		return;
 
 	(void)__handle_error_default(NULL, error, s);
+}
+
+/*
+ * __wt_event_handler_set --
+ *	Set an event handler, fill in any NULL methods with the defaults.
+ */
+void
+__wt_event_handler_set(WT_SESSION_IMPL *session, WT_EVENT_HANDLER *handler)
+{
+	if (handler == NULL)
+		handler = &__event_handler_default;
+	else {
+		if (handler->handle_error == NULL)
+			handler->handle_error = __handle_error_default;
+		if (handler->handle_message == NULL)
+			handler->handle_message = __handle_message_default;
+		if (handler->handle_progress == NULL)
+			handler->handle_progress = __handle_progress_default;
+	}
+
+	session->event_handler = handler;
 }
 
 /*
