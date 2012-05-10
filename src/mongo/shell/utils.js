@@ -1867,6 +1867,7 @@ help = shellHelper.help = function (x) {
         print("\tb = HexData(subtype,hexstr)         create a BSON BinData value from a hex string");
         print("\tb = UUID(hexstr)                    create a BSON BinData value of UUID subtype");
         print("\tb = MD5(hexstr)                     create a BSON BinData value of MD5 subtype");
+        print("\t\"hexstr\"                            string, sequence of hex characters (no 0x prefix)");
         print();
         print("\to = new ObjectId()                  create a new ObjectId");
         print("\to.getTimestamp()                    return timestamp derived from first 32 bits of the OID");
