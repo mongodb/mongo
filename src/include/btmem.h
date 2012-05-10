@@ -160,16 +160,10 @@ struct __wt_page_modify {
 		uint8_t *data;		/* Overflow data reference */
 		uint32_t size;		/* Overflow data length */
 
-#define	WT_TRK_EMPTY		0x00	/* Unused slot */
-#define	WT_TRK_DISCARD		0x01	/* Block/overflow to discard */
-#define	WT_TRK_DISCARD_COMPLETE	0x02	/* Block/overflow freed */
-#define	WT_TRK_OVFL		0x04	/* Overflow record not yet in use */
-#define	WT_TRK_OVFL_ACTIVE	0x08	/* Overflow record in use */
-#define	WT_TRK_PERM		0x80	/* Overflow record that must remain */
-#define	WT_TRK_TYPE(track)						\
-	((track)->flags &						\
-	    (WT_TRK_DISCARD |						\
-	    WT_TRK_DISCARD_COMPLETE | WT_TRK_OVFL | WT_TRK_OVFL_ACTIVE))
+#define	WT_TRK_DISCARD		0x01	/* Object was discarded */
+#define	WT_TRK_INUSE		0x02	/* Object is currently in-use */
+#define	WT_TRK_OBJECT		0x04	/* Slot set (not empty) */
+#define	WT_TRK_ONPAGE		0x08	/* Object was referenced from a page */
 		uint8_t  flags;
 	} *track;			/* Array of tracked objects */
 	uint32_t track_entries;		/* Total track slots */

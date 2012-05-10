@@ -335,32 +335,34 @@ extern int __wt_col_search(WT_SESSION_IMPL *session,
 extern int __wt_rec_evict(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     uint32_t flags);
-extern int __wt_rec_track_block(WT_SESSION_IMPL *session,
-    WT_PAGE *page,
-    const uint8_t *addr,
-    uint32_t size,
-    int permanent);
-extern int __wt_rec_track_ovfl(WT_SESSION_IMPL *session,
+extern int __wt_rec_track(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     const uint8_t *addr,
     uint32_t addr_size,
     const void *data,
     uint32_t data_size,
     uint32_t flags);
+extern int __wt_rec_track_onpage_srch(WT_SESSION_IMPL *session,
+    WT_PAGE *page,
+    const uint8_t *addr,
+    uint32_t addr_size,
+    int *foundp,
+    WT_ITEM *copy);
+extern int __wt_rec_track_onpage_add(WT_SESSION_IMPL *session,
+    WT_PAGE *page,
+    const uint8_t *addr,
+    uint32_t addr_size);
 extern int __wt_rec_track_ovfl_reuse( WT_SESSION_IMPL *session,
     WT_PAGE *page,
     const void *data,
-    uint32_t size,
+    uint32_t data_size,
     uint8_t **addrp,
-    uint32_t *sizep,
+    uint32_t *addr_sizep,
     int *foundp);
-extern int __wt_rec_track_ovfl_srch(WT_SESSION_IMPL *session,
-    WT_PAGE *page,
-    const uint8_t *addr,
-    uint32_t size,
-    WT_ITEM *copy);
+extern int __wt_rec_track_init(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_rec_track_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern void __wt_rec_track_discard(WT_SESSION_IMPL *session, WT_PAGE *page);
+extern char *__wt_track_string(WT_PAGE_TRACK *track, char *buf, size_t len);
 extern int __wt_rec_write( WT_SESSION_IMPL *session,
     WT_PAGE *page,
     WT_SALVAGE_COOKIE *salvage);

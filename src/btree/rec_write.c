@@ -237,6 +237,7 @@ __wt_rec_write(
 
 	/* Initialize the reconciliation structures for each new run. */
 	WT_RET(__rec_write_init(session, page));
+	WT_RET(__wt_rec_track_init(session, page));
 
 	/* Reconcile the page. */
 	switch (page->type) {
@@ -1537,7 +1538,7 @@ __rec_col_fix_slvg(
 static int
 __rec_col_var_helper(
     WT_SESSION_IMPL *session, WT_SALVAGE_COOKIE *salvage,
-    WT_ITEM *value, int deleted, int raw, uint64_t rle)
+    WT_ITEM *value, int deleted, int ovfl, uint64_t rle)
 {
 	WT_RECONCILE *r;
 	WT_KV *val;
@@ -1578,13 +1579,15 @@ __rec_col_var_helper(
 
 	if (deleted) {
 		val->cell_len = __wt_cell_pack_del(&val->cell, rle);
+		val->buf.data = NULL;
 		val->buf.size = 0;
 		val->len = val->cell_len;
-	} else if (raw) {
+	} else if (ovfl) {
+		val->cell_len = __wt_cell_pack_ovfl(
+		    &val->cell, WT_CELL_VALUE_OVFL, rle, value->size);
 		val->buf.data = value->data;
 		val->buf.size = value->size;
-		val->cell_len = 0;
-		val->len = val->buf.size;
+		val->len = val->cell_len + value->size;
 	} else
 		WT_RET(__rec_cell_build_val(
 		    session, value->data, value->size, rle));
@@ -1603,38 +1606,42 @@ __rec_col_var_helper(
 }
 
 /*
- * __rec_track_cell_ovfl --
- *	Get/set overflow cells we need to track over the life of the page.
+ * __rec_onpage_ovfl --
+ *	Get/set overflow records we need to track over the life of the page.
  */
 static int
-__rec_track_cell_ovfl(WT_SESSION_IMPL *session,
+__rec_onpage_ovfl(WT_SESSION_IMPL *session,
     WT_PAGE *page, WT_CELL_UNPACK *unpack, WT_ITEM *buf)
 {
+	int found;
+
 	/*
 	 * We're dealing with an overflow cell we may encounter repeatedly and
-	 * which we can re-use (unless it's deleted).  If it's deleted, we
-	 * still, at least in the case of page keys, need to know the original
-	 * value so we can re-create it.  As we can't get the original value of
-	 * the overflow cell's blocks from disk if the blocks were discarded,
-	 * we have to be able to get a copy from the tracking system.
+	 * which we can re-use (unless it's discarded).  If it's discarded, we
+	 * may still (in the case of row-store page keys), need to know the
+	 * original value so we can re-create it.  As we can't get the original
+	 * value of the overflow cell's blocks from disk after the blocks are
+	 * discarded, we have to be able to get a copy from the tracking system.
 	 *
-	 * Try and get a copy from the tracking system.
+	 * First, check in with the tracking system, and if we find it, we have
+	 * a copy and we're done.
 	 */
-	buf->size = 0;
-	WT_RET(__wt_rec_track_ovfl_srch(
-	    session, page, unpack->data, unpack->size, buf));
-	if (buf->size != 0)
+	WT_RET(__wt_rec_track_onpage_srch(
+	    session, page, unpack->data, unpack->size, &found, buf));
+	if (found)
 		return (0);
 
 	/*
 	 * Read the original value from disk, and enter it into the tracking
-	 * system.  Mark it permanent, we may need it repeatedly over the life
-	 * of the page, even after the underlying blocks are discarded.
+	 * system.
+	 *
+	 * There are serious implications to this call: this overflow item will
+	 * be discarded when reconciliation completes, if not later marked for
+	 * re-use.
 	 */
 	WT_RET(__wt_cell_unpack_copy(session, unpack, buf));
-	WT_RET(__wt_rec_track_ovfl(session, page,
-	    unpack->data, unpack->size,
-	    buf->data, buf->size, WT_TRK_OVFL | WT_TRK_PERM));
+	WT_RET(__wt_rec_track(session, page,
+	    unpack->data, unpack->size, buf->data, buf->size, WT_TRK_ONPAGE));
 	return (0);
 }
 
@@ -1646,6 +1653,7 @@ static int
 __rec_col_var(
     WT_SESSION_IMPL *session, WT_PAGE *page, WT_SALVAGE_COOKIE *salvage)
 {
+	enum { OVFL_IGNORE, OVFL_UNUSED, OVFL_USED } ovfl_state;
 	WT_BTREE *btree;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
@@ -1653,12 +1661,12 @@ __rec_col_var(
 	WT_DECL_RET;
 	WT_INSERT *ins;
 	WT_INSERT_HEAD *append;
-	WT_ITEM *last, orig;
+	WT_ITEM *last, *orig;
 	WT_RECONCILE *r;
 	WT_UPDATE *upd;
 	uint64_t n, nrepeat, repeat_count, rle, slvg_missing, src_recno;
 	uint32_t i, size;
-	int can_compare, deleted, last_deleted, orig_deleted;
+	int deleted, last_deleted, orig_deleted;
 	const void *data;
 
 	r = session->reconcile;
@@ -1666,7 +1674,7 @@ __rec_col_var(
 	last = r->last;
 	unpack = &_unpack;
 
-	WT_CLEAR(orig);
+	WT_RET(__wt_scr_alloc(session, 0, &orig));
 	data = NULL;
 	size = 0;
 
@@ -1703,19 +1711,56 @@ __rec_col_var(
 
 	/* For each entry in the in-memory page... */
 	rle = 0;
-	can_compare = deleted = last_deleted = 0;
+	deleted = last_deleted = 0;
 	WT_COL_FOREACH(page, cip, i) {
-		/*
-		 * Review the original cell, and get its repeat count and
-		 * insert list.
-		 */
-		cell = WT_COL_PTR(page, cip);
-		ins = WT_SKIP_FIRST(WT_COL_UPDATE(page, cip));
-		if (cell == NULL) {
+		ovfl_state = OVFL_IGNORE;
+		if ((cell = WT_COL_PTR(page, cip)) == NULL) {
+			ins = NULL;
 			nrepeat = 1;
 			orig_deleted = 1;
 		} else {
 			__wt_cell_unpack(cell, unpack);
+
+			ins = WT_SKIP_FIRST(WT_COL_UPDATE(page, cip));
+			nrepeat = __wt_cell_rle(unpack);
+
+			/*
+			 * If the original value is "deleted", there's no value
+			 * to compare, we're done.
+			 */
+			orig_deleted = unpack->type == WT_CELL_DEL ? 1 : 0;
+			if (orig_deleted)
+				goto record_loop;
+
+			/*
+			 * Overflow items are tricky: we don't know until we're
+			 * finished processing the set of values if we need the
+			 * overflow value or not.  If we don't use the overflow
+			 * item at all, we'll have to discard it (that's safe
+			 * because once the original value is unused during any
+			 * page reconciliation, it will never be needed again).
+			 *
+			 * Regardless, we avoid copying in overflow records: if
+			 * there's a WT_INSERT entry that modifies a reference
+			 * counted overflow record, we may have to write copies
+			 * of the overflow record, and in that case we'll do the
+			 * comparisons, but we don't read overflow items just to
+			 * see if they match records on either side.
+			 */
+			if (unpack->ovfl) {
+				ovfl_state = OVFL_UNUSED;
+				goto record_loop;
+			}
+
+			/*
+			 * Check for the common case where the underlying value
+			 * is simple and avoid a copy.
+			 */
+			if (btree->huffman_value == NULL) {
+				orig->data = unpack->data;
+				orig->size = unpack->size;
+				goto record_loop;
+			}
 
 			/*
 			 * The data may be Huffman encoded, which means we have
@@ -1725,105 +1770,12 @@ __rec_col_var(
 			 * objects we can RLE encode, including the application
 			 * inserting an update to an existing record where it
 			 * happened (?) to match a Huffman-encoded value in the
-			 * previous or next record.   However, we try to avoid
-			 * copying in overflow records: if there's a WT_INSERT
-			 * entry inserting a new record into a reference counted
-			 * overflow record, then we have to write copies of the
-			 * overflow record, and we do the comparisons.  But, we
-			 * don't copy in the overflow record just to see if it
-			 * matches records on either side.
+			 * previous or next record.
 			 */
-			if (unpack->ovfl && ins == NULL) {
-				/*
-				 * Write out any record we're tracking and turn
-				 * off comparisons for the next item.
-				 */
-				if (can_compare) {
-					WT_ERR(__rec_col_var_helper(
-					    session, salvage,
-					    last, last_deleted, 0, rle));
-					can_compare = 0;
-				}
-
-				/* Write out the overflow cell as a raw cell. */
-				last->data = cell;
-				last->size = unpack->len;
-				WT_ERR(__rec_col_var_helper(
-				    session, salvage,
-				    last, 0, 1, __wt_cell_rle(unpack)));
-				src_recno += __wt_cell_rle(unpack);
-				continue;
-			}
-
-			nrepeat = __wt_cell_rle(unpack);
-
-			/*
-			 * If the original value is "deleted", there's no value
-			 * to compare, we're done.
-			 */
-			orig_deleted = unpack->type == WT_CELL_DEL ? 1 : 0;
-			if (orig_deleted)
-				goto value_loop;
-
-			/*
-			 * If we're updating a single cell, we never look at the
-			 * original value.
-			 */
-			if (nrepeat == 1 && ins != NULL) {
-				WT_ASSERT(
-				    session, WT_INSERT_RECNO(ins) == src_recno);
-
-				/*
-				 * If the original cell was an overflow value,
-				 * discard it; we will discard it again on each
-				 * page reconciliation, so mark it permanent so
-				 * subsequent discards are ignored.
-				 */
-				if (unpack->ovfl)
-					WT_ERR(
-					    __wt_rec_track_block(session, page,
-					    unpack->data, unpack->size, 1));
-				goto value_loop;
-			}
-
-			/*
-			 * We need a copy of the original value.  Check for the
-			 * common case where the underlying value is simple and
-			 * avoid a copy.
-			 */
-			if (!unpack->ovfl && btree->huffman_value == NULL) {
-				orig.data = unpack->data;
-				orig.size = unpack->size;
-				goto value_loop;
-			}
-
-			/*
-			 * We either have an encoded value, an overflow value,
-			 * or both.  If the underlying cell is not an overflow
-			 * value, decode it and we're good to go.
-			 */
-			if (!unpack->ovfl) {
-				WT_ERR(__wt_cell_unpack_copy(
-				    session, unpack, &orig));
-				goto value_loop;
-			}
-
-			/*
-			 * Special handling when re-writing an overflow cell's
-			 * value.  The problem is the original overflow pages:
-			 * we'd like to reuse them for some set of the column
-			 * values.  For example, if columns #10-17 reference
-			 * overflow A, and cell 12 is updated with a new value,
-			 * we could use the original overflow pages for cells
-			 * #10-11 or cells #13-17.  Insert the overflow cell's
-			 * value into the tracking system as an overflow page
-			 * so we can find it and re-use it.
-			 */
-			WT_ERR(__rec_track_cell_ovfl(
-			    session, page, unpack, &orig));
+			WT_ERR(__wt_cell_unpack_copy(session, unpack, orig));
 		}
 
-value_loop:	/*
+record_loop:	/*
 		 * Generate on-page entries: loop repeat records, looking for
 		 * WT_INSERT entries matching the record number.  The WT_INSERT
 		 * lists are in sorted order, so only need check the next one.
@@ -1834,21 +1786,14 @@ value_loop:	/*
 				upd = ins->upd;
 				ins = WT_SKIP_NEXT(ins);
 
+				repeat_count = 1;
+
 				deleted = WT_UPDATE_DELETED_ISSET(upd);
 				if (!deleted) {
 					data = WT_UPDATE_DATA(upd);
 					size = upd->size;
 				}
-
-				repeat_count = 1;
 			} else {
-				upd = NULL;
-				deleted = orig_deleted;
-				if (!deleted) {
-					data = orig.data;
-					size = orig.size;
-				}
-
 				/*
 				 * The repeat count is the number of records up
 				 * to the next WT_INSERT record, or up to the
@@ -1860,14 +1805,68 @@ value_loop:	/*
 				else
 					repeat_count =
 					    WT_INSERT_RECNO(ins) - src_recno;
+
+				deleted = orig_deleted;
+				if (deleted)
+					goto compare;
+
+				/*
+				 * If we are handling overflow items, use the
+				 * overflow item itself exactly once, after
+				 * which we have to copy it into a buffer and
+				 * from then on use a complete copy because we
+				 * are re-creating a new overflow record each
+				 * time.
+				 */
+				switch (ovfl_state) {
+				case OVFL_UNUSED:
+					/*
+					 * Original is an overflow item, as yet
+					 * unused -- use it now.
+					 *
+					 * Write out any record we're tracking.
+					 */
+					if (rle != 0) {
+						WT_ERR(__rec_col_var_helper(
+						    session, salvage, last,
+						    last_deleted, 0, rle));
+						rle = 0;
+					}
+
+					/* Write the overflow item. */
+					last->data = unpack->data;
+					last->size = unpack->size;
+					WT_ERR(__rec_col_var_helper(
+					    session, salvage,
+					    last, 0, 1, repeat_count));
+
+					ovfl_state = OVFL_USED;
+					continue;
+				case OVFL_USED:
+					/*
+					 * Original is an overflow item; we used
+					 * it for a key and now we need another
+					 * copy; read it into memory.
+					 */
+					WT_ERR(__wt_cell_unpack_copy(
+					    session, unpack, orig));
+
+					ovfl_state = OVFL_IGNORE;
+					/* FALLTHROUGH */
+				case OVFL_IGNORE:
+					/*
+					 * Original is an overflow item and we
+					 * were forced to copy it into memory,
+					 * or the original wasn't an overflow
+					 * item; use the data copied into orig.
+					 */
+					data = orig->data;
+					size = orig->size;
+					break;
+				}
 			}
 
-			/*
-			 * Handle RLE accounting and comparisons.
-			 *
-			 * If we don't have a record against which to compare,
-			 * save this record for the purpose and continue.
-			 *
+compare:		/*
 			 * If we have a record against which to compare, and
 			 * the records compare equal, increment the rle counter
 			 * and continue.  If the records don't compare equal,
@@ -1875,7 +1874,7 @@ value_loop:	/*
 			 * buffers: do NOT update the starting record number,
 			 * we've been doing that all along.
 			 */
-			if (can_compare) {
+			if (rle != 0) {
 				if ((deleted && last_deleted) ||
 				    (!last_deleted && !deleted &&
 				    last->size == size &&
@@ -1883,7 +1882,6 @@ value_loop:	/*
 					rle += repeat_count;
 					continue;
 				}
-
 				WT_ERR(__rec_col_var_helper(session,
 				    salvage, last, last_deleted, 0, rle));
 			}
@@ -1891,12 +1889,18 @@ value_loop:	/*
 			/*
 			 * Swap the current/last state.  We can't always assign
 			 * the data values to the buffer because they may come
-			 * from a copy built based on an encoded cell.  Check,
-			 * because encoded cells aren't common and we'd like to
-			 * avoid the copy.
+			 * from a copy built from an encoded or overflow cell.
+			 * Check, because encoded/overflow cells aren't common
+			 * and we'd like to avoid the copy.
+			 *
+			 * Reset RLE counter and turn on comparisons.
 			 */
 			if (!deleted) {
-				if (data == orig.data)
+				/*
+				 * WRONG WRONG WRONG
+				 * THIS IS GOING TO COPY EVERY TIME.
+				 */
+				if (data == orig->data)
 					WT_ERR(__wt_buf_set(
 					    session, last, data, size));
 				else {
@@ -1905,11 +1909,16 @@ value_loop:	/*
 				}
 			}
 			last_deleted = deleted;
-
-			/* Reset RLE counter and turn on comparisons. */
 			rle = repeat_count;
-			can_compare = 1;
 		}
+
+		/*
+		 * If we had a reference to an overflow record we never used,
+		 * discard the underlying blocks, they're no longer useful.
+		 */
+		if (ovfl_state == OVFL_UNUSED)
+			 WT_ERR(__wt_rec_track_onpage_add(
+			     session, page, unpack->data, unpack->size));
 	}
 
 	/* Walk any append list. */
@@ -1935,7 +1944,7 @@ value_loop:	/*
 			 * Handle RLE accounting and comparisons -- see comment
 			 * above, this code fragment does the same thing.
 			 */
-			if (can_compare) {
+			if (rle != 0) {
 				if ((deleted && last_deleted) ||
 				    (!last_deleted && !deleted &&
 				    last->size == size &&
@@ -1943,7 +1952,6 @@ value_loop:	/*
 					++rle;
 					continue;
 				}
-
 				WT_ERR(__rec_col_var_helper(session,
 				    salvage, last, last_deleted, 0, rle));
 			}
@@ -1952,27 +1960,26 @@ value_loop:	/*
 			 * Swap the current/last state.  We always assign the
 			 * data values to the buffer because they can only be
 			 * the data from a WT_UPDATE structure.
+			 *
+			 * Reset RLE counter and turn on comparisons.
 			 */
 			if (!deleted) {
 				last->data = data;
 				last->size = size;
 			}
 			last_deleted = deleted;
-
-			/* Reset RLE counter and turn on comparisons. */
 			rle = 1;
-			can_compare = 1;
 		}
 
 	/* If we were tracking a record, write it. */
-	if (can_compare)
+	if (rle != 0)
 		WT_ERR(__rec_col_var_helper(
 		    session, salvage, last, last_deleted, 0, rle));
 
 	/* Write the remnant page. */
 	ret = __rec_split_finish(session);
 
-err:	__wt_buf_free(session, &orig);
+err:	__wt_scr_free(&orig);
 	return (ret);
 }
 
@@ -1994,7 +2001,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_RECONCILE *r;
 	WT_REF *ref;
 	uint32_t i;
-	int onpage_ovfl, ovfl_key, val_set;
+	int found, onpage_ovfl, ovfl_key, val_set;
 
 	r = session->reconcile;
 	btree = session->btree;
@@ -2087,12 +2094,13 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 			case WT_PM_REC_EMPTY:
 				/*
 				 * Overflow keys referencing discarded pages are
-				 * no longer useful.  They may be necessary for
-				 * a subsequent reconciliation, enter them into
-				 * the tracking system.
+				 * no longer useful.  We can't just discard them
+				 * though: if the page is re-filled, they may be
+				 * necessary for a subsequent reconciliation,
+				 * enter them into the tracking system.
 				 */
 				if (onpage_ovfl)
-					WT_ERR(__rec_track_cell_ovfl(
+					WT_ERR(__rec_onpage_ovfl(
 					    session, page, unpack, &orig));
 				continue;
 			case WT_PM_REC_REPLACE:
@@ -2106,12 +2114,14 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 				/*
 				 * Overflow keys referencing split pages are no
 				 * no longer useful (the interesting key is the
-				 * key for the split page).  They may be
-				 * necessary for a subsequent reconciliation,
-				 * enter them into the tracking system.
+				 * key for the split page).  We can't just
+				 * discard them, though: if the page shrinks,
+				 * they may be necessary for a subsequent
+				 * reconciliation, enter them into the tracking
+				 * system.
 				 */
 				if (onpage_ovfl)
-					WT_ERR(__rec_track_cell_ovfl(
+					WT_ERR(__rec_onpage_ovfl(
 					    session, page, unpack, &orig));
 
 				r->merge_ref = ref;
@@ -2144,10 +2154,9 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * Truncate any 0th key, internal pages don't need 0th keys.
 		 */
 		if (onpage_ovfl) {
-			orig.size = 0;
-			WT_ERR(__wt_rec_track_ovfl_srch(
-			    session, page, unpack->data, unpack->size, &orig));
-			if (orig.size == 0) {
+			WT_ERR(__wt_rec_track_onpage_srch(session,
+			    page, unpack->data, unpack->size, &found, &orig));
+			if (!found) {
 				key->buf.data = cell;
 				key->buf.size = unpack->len;
 				key->cell_len = 0;
@@ -2371,7 +2380,7 @@ __rec_row_leaf(
 	WT_UPDATE *upd;
 	uint64_t slvg_skip;
 	uint32_t i;
-	int onpage_ovfl, ovfl_key;
+	int found, onpage_ovfl, ovfl_key;
 
 	r = session->reconcile;
 	btree = session->btree;
@@ -2446,26 +2455,29 @@ __rec_row_leaf(
 			val->len = val->buf.size;
 		} else {
 			/*
-			 * If the original cell was an overflow value, discard
-			 * it; we will discard it again during subsequent page
-			 * reconciliations, so mark it permanent.
+			 * If the original value was an overflow and we've not
+			 * already done so, discard it.   We don't save a copy
+			 * of the overflow value in case it is re-used -- we'd
+			 * have to read it to get a copy, and that implies disk
+			 * I/O for little reason.
 			 */
 			if (val_cell != NULL && unpack->ovfl)
-				WT_ERR(__wt_rec_track_block(session,
-				    page, unpack->data, unpack->size, 1));
+				WT_ERR(__wt_rec_track_onpage_add(
+				    session, page, unpack->data, unpack->size));
 
 			/* If this key/value pair was deleted, we're done. */
 			if (WT_UPDATE_DELETED_ISSET(upd)) {
 				/*
 				 * Overflow keys referencing discarded values
-				 * are no longer useful.  They may be necessary
-				 * for a subsequent reconciliation though, the
-				 * value might be replaced, so enter them into
-				 * the tracking system.
+				 * are no longer useful.  We can't just discard
+				 * overflow keys as we did overflow values: if
+				 * the value gets replaced, we'll need the key
+				 * again for a subsequent reconciliation.  Add
+				 * the key to the tracking system.
 				 */
 				__wt_cell_unpack(cell, unpack);
 				if (unpack->ovfl)
-					WT_ERR(__rec_track_cell_ovfl(
+					WT_ERR(__rec_onpage_ovfl(
 					    session, page, unpack, tmpkey));
 
 				/*
@@ -2506,10 +2518,9 @@ __rec_row_leaf(
 		__wt_cell_unpack(cell, unpack);
 		onpage_ovfl = unpack->ovfl;
 		if (onpage_ovfl) {
-			tmpkey->size = 0;
-			WT_ERR(__wt_rec_track_ovfl_srch(
-			    session, page, unpack->data, unpack->size, tmpkey));
-			if (tmpkey->size == 0) {
+			WT_ERR(__wt_rec_track_onpage_srch(session,
+			    page, unpack->data, unpack->size, &found, tmpkey));
+			if (!found) {
 				key->buf.data = cell;
 				key->buf.size = unpack->len;
 				key->cell_len = 0;
@@ -2718,11 +2729,13 @@ __rec_split_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * root splits.  In the case of root splits, we potentially have to
 	 * cope with the underlying blocks of multiple pages, but also there
 	 * may be overflow items that we have to resolve.
+	 *
+	 * These pages are discarded -- add them to the object tracking list.
 	 */
 	WT_REF_FOREACH(page, ref, i)
-		WT_RET(__wt_rec_track_block(session, page,
+		WT_RET(__wt_rec_track(session, page,
 		    ((WT_ADDR *)ref->addr)->addr,
-		    ((WT_ADDR *)ref->addr)->size, 0));
+		    ((WT_ADDR *)ref->addr)->size, NULL, 0, 0));
 	WT_RET(__wt_rec_track_wrapup(session, page));
 
 	if ((mod = page->modify) != NULL)
@@ -2789,8 +2802,8 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 */
 		if (!WT_PAGE_IS_ROOT(page) && page->ref->addr != NULL) {
 			__wt_get_addr(page->parent, page->ref, &addr, &size);
-			WT_RET(
-			    __wt_rec_track_block(session, page, addr, size, 1));
+			WT_RET(__wt_rec_track_onpage_add(
+			    session, page, addr, size));
 		}
 		break;
 	case WT_PM_REC_EMPTY:				/* Page deleted */
@@ -2803,8 +2816,9 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * are snapshots, and must be explicitly dropped.
 		 */
 		if (!WT_PAGE_IS_ROOT(page))
-			WT_RET(__wt_rec_track_block(session,
-			    page, mod->u.replace.addr, mod->u.replace.size, 0));
+			WT_RET(__wt_rec_track(session, page,
+			    mod->u.replace.addr, mod->u.replace.size,
+			    NULL, 0, 0));
 
 		/* Discard the replacement page's address. */
 		__wt_free(session, mod->u.replace.addr);
@@ -3289,8 +3303,8 @@ __rec_cell_build_ovfl(
 		WT_ERR(__wt_bm_write(session, tmp, addr, &size));
 
 		/* Track the overflow record. */
-		WT_ERR(__wt_rec_track_ovfl(session, page, addr,
-		    size, kv->buf.data, kv->buf.size, WT_TRK_OVFL_ACTIVE));
+		WT_ERR(__wt_rec_track(session, page,
+		    addr, size, kv->buf.data, kv->buf.size, WT_TRK_INUSE));
 	}
 
 	/* Set the callers K/V to reference the overflow record's address. */
