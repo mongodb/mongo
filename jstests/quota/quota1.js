@@ -1,6 +1,7 @@
 t = db.quota1;
 
 print( "starting quota1.a" );
+/*
 assert.throws( 
     function(z){
         db.eval(
@@ -14,6 +15,7 @@ assert.throws(
         )
     }
 );
+*/
 print( "done quota1.a" );
 
 //print( "starting quota1.b" );
