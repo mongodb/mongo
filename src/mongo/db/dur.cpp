@@ -620,36 +620,39 @@ namespace mongo {
             assertLockedForCommitting();
 
             unspoolWriteIntents(); // in case we were doing some writing ourself
-            AlignedBuilder &ab = __theBuilder;
 
-            // we need to make sure two group commits aren't running at the same time
-            // (and we are only read locked in the dbMutex, so it could happen)
-            SimpleMutex::scoped_lock lk(commitJob.groupCommitMutex);
+            {
+                AlignedBuilder &ab = __theBuilder;
 
-            commitJob.commitingBegin();
+                // we need to make sure two group commits aren't running at the same time
+                // (and we are only read locked in the dbMutex, so it could happen)
+                SimpleMutex::scoped_lock lk(commitJob.groupCommitMutex);
 
-            if( !commitJob.hasWritten() ) {
-                // getlasterror request could have came after the data was already committed
-                commitJob.committingNotifyCommitted();
-            }
-            else {
-                JSectHeader h;
-                PREPLOGBUFFER(h,ab);
+                commitJob.commitingBegin();
 
-                // todo : write to the journal outside locks, as this write can be slow.
-                //        however, be careful then about remapprivateview as that cannot be done 
-                //        if new writes are then pending in the private maps.
-                WRITETOJOURNAL(h, ab);
+                if( !commitJob.hasWritten() ) {
+                    // getlasterror request could have came after the data was already committed
+                    commitJob.committingNotifyCommitted();
+                }
+                else {
+                    JSectHeader h;
+                    PREPLOGBUFFER(h,ab);
 
-                // data is now in the journal, which is sufficient for acknowledging getLastError.
-                // (ok to crash after that)
-                commitJob.committingNotifyCommitted();
+                    // todo : write to the journal outside locks, as this write can be slow.
+                    //        however, be careful then about remapprivateview as that cannot be done 
+                    //        if new writes are then pending in the private maps.
+                    WRITETOJOURNAL(h, ab);
 
-                WRITETODATAFILES(h, ab);
-                debugValidateAllMapsMatch();
+                    // data is now in the journal, which is sufficient for acknowledging getLastError.
+                    // (ok to crash after that)
+                    commitJob.committingNotifyCommitted();
 
-                commitJob.committingReset();
-                ab.reset();
+                    WRITETODATAFILES(h, ab);
+                    debugValidateAllMapsMatch();
+
+                    commitJob.committingReset();
+                    ab.reset();
+                }
             }
 
             // REMAPPRIVATEVIEW
