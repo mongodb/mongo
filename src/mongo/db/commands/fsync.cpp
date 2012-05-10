@@ -7,8 +7,6 @@
 #include "mongo/db/client.h"
 #include "mongo/util/background.h"
 
-#include "../curop.h"
-
 namespace mongo {
     
     class FSyncLockThread : public BackgroundJob {
@@ -66,7 +64,7 @@ namespace mongo {
 
                 SimpleMutex::scoped_lock lk(m);
                 err = "";
-
+                
                 (new FSyncLockThread())->go();
                 while ( ! locked && err.size() == 0 ) {
                     _threadSync.wait( m );
