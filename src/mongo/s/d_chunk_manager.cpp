@@ -137,7 +137,7 @@ namespace mongo {
             _fillRanges();
 
         }
-        else {
+        else if( diffsApplied == 0 ){
 
             // No chunks were found for the ns
             warning() << "no chunks found when reloading " << ns << ", previous version was " << _collVersion << endl;
@@ -145,6 +145,20 @@ namespace mongo {
             _version = 0;
             _collVersion = 0;
             _chunksMap.clear();
+        }
+        else{
+
+            // TODO: make this impossible by making sure we don't migrate / split on this shard during the
+            // reload
+            // No chunks were found for the ns
+            warning() << "invalid chunks found when reloading " << ns << ", previous version was " << _collVersion
+                      << ", this should be rare" << endl;
+
+            // Handle the same way as a connectivity error, for now
+            // TODO: handle inline
+            uassert( 16226,
+                     str::stream() << "could not initialize cursor to config server chunks collection for ns "
+                                   << ns, cursor.get() );
         }
 
         if ( scoped.get() )
