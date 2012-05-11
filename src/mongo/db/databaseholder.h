@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "mongo/db/database.h"
 #include "mongo/db/namespacestring.h"
 
 namespace mongo { 
