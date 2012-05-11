@@ -51,7 +51,7 @@ namespace mongo {
     */
     UpdateResult updateObjects(const char* ns,
                                const BSONObj& updateobj,
-                               BSONObj pattern,
+                               const BSONObj& pattern,
                                bool upsert,
                                bool multi,
                                bool logop,
@@ -62,7 +62,7 @@ namespace mongo {
     UpdateResult _updateObjects(bool su,
                                 const char* ns,
                                 const BSONObj& updateobj,
-                                BSONObj pattern,
+                                const BSONObj& pattern,
                                 bool upsert,
                                 bool multi,
                                 bool logop,
