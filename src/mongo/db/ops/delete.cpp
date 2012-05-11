@@ -110,9 +110,8 @@ namespace mongo {
             bool foundAllResults = ( justOne || !cc->ok() );
 
             if ( !foundAllResults ) {
-                /* NOTE: this is SLOW.  this is not good, noteLocation() was designed to be called across getMore
-                    blocks.  here we might call millions of times which would be bad.
-                    */
+                // NOTE: Saving and restoring a btree cursor's position was historically described
+                // as slow here.
                 cc->c()->prepareToTouchEarlierIterate();
             }
 
