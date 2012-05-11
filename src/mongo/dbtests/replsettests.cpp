@@ -27,7 +27,8 @@
 #include "dbtests.h"
 #include "../db/oplog.h"
 
-#include "../db/repl/rs.h"
+#include "mongo/db/repl/rs.h"
+#include "mongo/db/repl/bgsync.h"
 
 namespace mongo {
     void createOplog();
@@ -61,9 +62,7 @@ namespace ReplSetTests {
         }
 
         void drop() {
-            Lock::DBWrite lk(ns());
-
-            Client::Context c(ns());
+            Client::WriteContext c(ns());
             string errmsg;
             BSONObjBuilder result;
 
@@ -182,7 +181,7 @@ namespace ReplSetTests {
     };
 
     class CappedInitialSync : public Base {
-        string _ns;
+        string _cappedNs;
         Lock::DBWrite _lk;
 
         string spec() const {
@@ -190,17 +189,17 @@ namespace ReplSetTests {
         }
 
         void create() {
-            Client::Context c(_ns);
+            Client::Context c(_cappedNs);
             string err;
-            ASSERT(userCreateNS( _ns.c_str(), fromjson( spec() ), err, false ));
+            ASSERT(userCreateNS( _cappedNs.c_str(), fromjson( spec() ), err, false ));
         }
 
-        virtual void drop() {
-            Client::Context c(_ns);
-            if (nsdetails(_ns.c_str()) != NULL) {
+        void dropCapped() {
+            Client::Context c(_cappedNs);
+            if (nsdetails(_cappedNs.c_str()) != NULL) {
                 string errmsg;
                 BSONObjBuilder result;
-                dropCollection( string(_ns), errmsg, result );
+                dropCollection( string(_cappedNs), errmsg, result );
             }
         }
 
@@ -213,34 +212,34 @@ namespace ReplSetTests {
             b.append("op", "u");
             b.append("o", BSON("$set" << BSON("x" << 456)));
             b.append("o2", BSON("_id" << 123 << "x" << 123));
-            b.append("ns", _ns);
+            b.append("ns", _cappedNs);
             BSONObj o = b.obj();
 
             verify(!apply(o));
             return o;
         }
     public:
-        CappedInitialSync() : _ns("unittests.foo.bar"), _lk(_ns) {
-            drop();
+        CappedInitialSync() : _cappedNs("unittests.foo.bar"), _lk(_cappedNs) {
+            dropCapped();
             create();
         }
         virtual ~CappedInitialSync() {
-            drop();
+            dropCapped();
         }
 
         string& cappedNs() {
-            return _ns;
+            return _cappedNs;
         }
 
         // returns true on success, false on failure
         bool apply(const BSONObj& op) {
-            Client::Context ctx( _ns );
+            Client::Context ctx( _cappedNs );
             // in an annoying twist of api, returns true on failure
             return !applyOperation_inlock(op, true);
         }
 
         void run() {
-            Lock::DBWrite lk(_ns);
+            Lock::DBWrite lk(_cappedNs);
 
             BSONObj op = updateFail();
 
@@ -350,7 +349,7 @@ namespace ReplSetTests {
             delete _myConfig;
             delete _config;
         }
-        ReplSetTest(ReplSetCmdline& cmdline) : ReplSet(cmdline) {
+        ReplSetTest() : _syncTail(0) {
             BSONArrayBuilder members;
             members.append(BSON("_id" << 0 << "host" << "host1"));
             members.append(BSON("_id" << 1 << "host" << "host2"));
@@ -373,13 +372,15 @@ namespace ReplSetTests {
         virtual const ReplSetConfig::MemberCfg& myConfig() {
             return *_myConfig;
         }
+        virtual bool buildIndexes() const {
+            return true;
+        }
         void setSyncTail(replset::BackgroundSyncInterface *syncTail) {
             _syncTail = syncTail;
         }
     };
 
     class TestRSSync : public Base {
-        int _expected;
         BackgroundSyncTest *_bgsync;
         replset::SyncTail *_tailer;
 
@@ -391,8 +392,7 @@ namespace ReplSetTests {
             _tailer = new replset::SyncTail(_bgsync);
 
             // setup theReplSet
-            ReplSetCmdline cmdline("foo");
-            ReplSetTest *rst = new ReplSetTest(cmdline);
+            ReplSetTest *rst = new ReplSetTest();
             rst->setSyncTail(_bgsync);
             theReplSet = rst;
         }
@@ -469,7 +469,7 @@ namespace ReplSetTests {
             addInserts(100);
             applyOplog();
 
-            ASSERT_EQUALS(expected, (int)client()->count(ns()));
+            ASSERT_EQUALS(expected, static_cast<int>(client()->count(ns())));
 
             drop();
             addUpdates();
@@ -486,7 +486,7 @@ namespace ReplSetTests {
             addUniqueIndex();
             applyOplog();
 
-            ASSERT_EQUALS(1, (int)client()->count(ns()));
+            ASSERT_EQUALS(1, static_cast<int>(client()->count(ns())));
             ASSERT(_bgsync->peek() != NULL);
         }
     };

@@ -427,6 +427,8 @@ namespace mongo {
 
         /* throws exception if a problem initializing. */
         ReplSetImpl(ReplSetCmdline&);
+        // used for testing
+        ReplSetImpl();
 
         /* call afer constructing to start - returns fairly quickly after launching its threads */
         void _go();
@@ -512,8 +514,9 @@ namespace mongo {
 
     class ReplSet : public ReplSetImpl {
     public:
+        ReplSet();
+        ReplSet(ReplSetCmdline& replSetCmdline);
         virtual ~ReplSet() {}
-        ReplSet(ReplSetCmdline& replSetCmdline) : ReplSetImpl(replSetCmdline) {  }
 
         // for the replSetStepDown command
         bool stepDown(int secs) { return _stepDown(secs); }
@@ -526,7 +529,7 @@ namespace mongo {
             return _self->fullName();
         }
 
-        bool buildIndexes() const { return _buildIndexes; }
+        virtual bool buildIndexes() const { return _buildIndexes; }
 
         /* call after constructing to start - returns fairly quickly after la[unching its threads */
         void go() { _go(); }

@@ -387,6 +387,20 @@ namespace mongo {
         }
     }
 
+    ReplSetImpl::ReplSetImpl() :
+        elect(this),
+        _forceSyncTarget(0),
+        _blockSync(false),
+        _hbmsgTime(0),
+        _self(0),
+        _maintenanceMode(0),
+        mgr(0),
+        ghost(0) {
+    }
+
+    ReplSet::ReplSet(ReplSetCmdline& replSetCmdline) : ReplSetImpl(replSetCmdline) {}
+    ReplSet::ReplSet() : ReplSetImpl() {}
+
     void newReplUp();
 
     void ReplSetImpl::loadLastOpTimeWritten(bool quiet) {

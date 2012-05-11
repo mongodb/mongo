@@ -18,10 +18,11 @@
 
 #include "mongo/db/oplog.h"
 #include "mongo/db/client.h"
-#include "mongo/db/repl/bgsync.h"
 
 namespace mongo {
 namespace replset {
+
+    class BackgroundSyncInterface;
 
     /**
      * "Normal" replica set syncing

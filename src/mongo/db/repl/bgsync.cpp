@@ -484,7 +484,7 @@ namespace replset {
     void BackgroundSync::start() {
         boost::unique_lock<boost::mutex> lock(_mutex);
         _pause = false;
-        massert(16160, "going to start syncing, but buffer is not empty", _buffer.empty() && _bufSize == 0);
+        massert(16231, "going to start syncing, but buffer is not empty", _buffer.empty() && _bufSize == 0);
 
         // reset _last fields with current data
         _lastOpTimeFetched = theReplSet->lastOpTimeWritten;

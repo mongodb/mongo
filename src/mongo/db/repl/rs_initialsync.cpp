@@ -23,6 +23,7 @@
 #include "mongo/db/dbhelpers.h"
 #include "rs_optime.h"
 #include "mongo/db/repl/rs_sync.h"
+#include "mongo/db/repl/bgsync.h"
 #include "mongo/db/oplog.h"
 
 namespace mongo {
