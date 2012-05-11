@@ -29,7 +29,7 @@ namespace mongo {
        justOne: stop after 1 match
        god:     allow access to system namespaces, and don't yield
     */
-    long long deleteObjects(const char *ns, BSONObj pattern, bool justOneOrig, bool logop, bool god, RemoveSaver * rs ) {
+    long long deleteObjects(const char *ns, BSONObj pattern, bool justOne, bool logop, bool god, RemoveSaver * rs ) {
         if( !god ) {
             if ( strstr(ns, ".system.") ) {
                 /* note a delete from system.indexes would corrupt the db
@@ -64,7 +64,6 @@ namespace mongo {
 
         CursorId id = cc->cursorid();
 
-        bool justOne = justOneOrig;
         bool canYield = !god && !(creal->matcher() && creal->matcher()->docMatcher().atomic());
 
         do {
@@ -108,11 +107,9 @@ namespace mongo {
                 cc->advance();
             }
             
-            if ( !cc->ok() ) {
-                justOne = true;
-            }
+            bool foundAllResults = ( justOne || !cc->ok() );
 
-            if ( !justOne ) {
+            if ( !foundAllResults ) {
                 /* NOTE: this is SLOW.  this is not good, noteLocation() was designed to be called across getMore
                     blocks.  here we might call millions of times which would be bad.
                     */
@@ -137,7 +134,7 @@ namespace mongo {
 
             theDataFileMgr.deleteRecord(ns, rloc.rec(), rloc);
             nDeleted++;
-            if ( justOne ) {
+            if ( foundAllResults ) {
                 break;
             }
             cc->c()->recoverFromTouchingEarlierIterate();
