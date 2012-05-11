@@ -52,7 +52,7 @@ namespace mongo {
                 
 
                 BSONObj key = idx["key"].Obj();
-                uassert( 16187 , "key for ttl index can only have 1 field" , key.nFields() == 1 );
+                uassert( 16230 , "key for ttl index can only have 1 field" , key.nFields() == 1 );
 
                 BSONObj query;
                 {
