@@ -257,6 +257,7 @@ serverOnlyFiles = [ "db/curop.cpp",
                     "db/ops/delete.cpp",
                     "db/ops/query.cpp",
                     "db/ops/update.cpp",
+                    "db/ops/update_internal.cpp",
                     "db/dbcommands.cpp",
                     "db/dbcommands_admin.cpp",
 
