@@ -293,6 +293,99 @@ namespace CursorTests {
         using mongo::ClientCursor;
         
         static const char * const ns() { return "unittests.cursortests.clientcursor"; }
+        DBDirectClient client;
+
+        class Base {
+        public:
+            virtual ~Base() {
+                client.dropCollection( ns() );
+            }
+        };        
+        
+        /**
+         * ClientCursor::aboutToDelete() advances a ClientCursor with a refLoc() matching the
+         * document to be deleted.
+         */
+        class AboutToDelete : public Base {
+        public:
+            void run() {
+                populateData();
+                Lock::GlobalWrite lk;
+                Client::Context ctx( ns() );
+                
+                // Generate a cursor from the supplied query and advance it to the iterate to be
+                // deleted.
+                shared_ptr<Cursor> cursor = NamespaceDetailsTransient::getCursor( ns(), query() );
+                while( !isExpectedIterate( cursor->current() ) ) {
+                    ASSERT( cursor->advance() );
+                }
+                ClientCursor::Holder clientCursor;
+                clientCursor.reset( new ClientCursor( QueryOption_NoCursorTimeout, cursor, ns() ) );
+                DiskLoc loc = clientCursor->currLoc();
+                ASSERT( !loc.isNull() );
+                
+                // Yield the cursor.
+                ClientCursor::YieldData data;
+                clientCursor->prepareToYield( data );
+                // The cursor will be advanced in aboutToDelete().
+                ClientCursor::aboutToDelete( loc );
+                clientCursor->recoverFromYield( data );
+                ASSERT( clientCursor->ok() );
+                
+                // Validate the expected cursor advancement.
+                validateIterateAfterYield( clientCursor->current() );
+            }
+        protected:
+            virtual void populateData() const {
+                client.insert( ns(), BSON( "a" << 1 ) );
+                client.insert( ns(), BSON( "a" << 2 ) );
+            }
+            virtual BSONObj query() const { return BSONObj(); }
+            virtual bool isExpectedIterate( const BSONObj &current ) const {
+                return 1 == current[ "a" ].number();
+            }
+            virtual void validateIterateAfterYield( const BSONObj &current ) const {
+                ASSERT_EQUALS( 2, current[ "a" ].number() );
+            }
+        };
+        
+        /** aboutToDelete() advances past a document referenced by adjacent cursor iterates. */
+        class AboutToDeleteDuplicate : public AboutToDelete {
+            virtual void populateData() const {
+                client.insert( ns(), BSON( "a" << BSON_ARRAY( 1 << 2 ) ) );
+                client.insert( ns(), BSON( "a" << 3 ) );
+                client.ensureIndex( ns(), BSON( "a" << 1 ) );
+            }
+            virtual BSONObj query() const { return BSON( "a" << GT << 0 ); }
+            virtual bool isExpectedIterate( const BSONObj &current ) const {
+                return BSON_ARRAY( 1 << 2 ) == current[ "a" ].embeddedObject();
+            }
+            virtual void validateIterateAfterYield( const BSONObj &current ) const {
+                ASSERT_EQUALS( 3, current[ "a" ].number() );                
+            }
+        };
+        
+        /** aboutToDelete() advances past a document referenced by adjacent cursor clauses. */
+        class AboutToDeleteDuplicateNextClause : public AboutToDelete {
+            virtual void populateData() const {
+                for( int i = 119; i >= 0; --i ) {
+                    client.insert( ns(), BSON( "a" << i ) );
+                }
+                client.ensureIndex( ns(), BSON( "a" << 1 ) );
+                client.ensureIndex( ns(), BSON( "a" << 1 << "b" << 1 ) );
+            }
+            virtual BSONObj query() const { return fromjson( "{$or:[{a:{$gte:0}},{b:1}]}" ); }
+            virtual bool isExpectedIterate( const BSONObj &current ) const {
+                // In the absence of the aboutToDelete() call, the next iterate will be a:119 from
+                // an unindexed cursor over the second clause.
+                return 119 == current[ "a" ].number();
+            }
+            virtual void validateIterateAfterYield( const BSONObj &current ) const {
+                // After the aboutToDelete() call, the a:119 iterate of the unindexed cursor is
+                // skipped, advancing to the a:118 iterate.
+                ASSERT_EQUALS( 118, current[ "a" ].number() );                
+            }
+        };
 
         namespace Pin {
 
@@ -365,9 +458,9 @@ namespace CursorTests {
             };
             
         } // namespace Pin
-        
-    } // namespace ClientCursor
 
+    } // namespace ClientCursor
+    
     class All : public Suite {
     public:
         All() : Suite( "cursor" ) {}
@@ -382,6 +475,9 @@ namespace CursorTests {
             add<BtreeCursor::RangeEq>();
             add<BtreeCursor::RangeIn>();
             add<BtreeCursor::AbortImplicitScan>();
+            add<ClientCursor::AboutToDelete>();
+            add<ClientCursor::AboutToDeleteDuplicate>();
+            add<ClientCursor::AboutToDeleteDuplicateNextClause>();
             add<ClientCursor::Pin::PinCursor>();
             add<ClientCursor::Pin::PinTwice>();
             add<ClientCursor::Pin::CursorDeleted>();
