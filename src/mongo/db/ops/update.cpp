@@ -84,11 +84,11 @@ namespace mongo {
     }
 
     template< class Builder >
-    void appendUnset( Builder &b ) {
+    void appendUnset( Builder& b ) {
     }
 
     template<>
-    void appendUnset( BSONArrayBuilder &b ) {
+    void appendUnset( BSONArrayBuilder& b ) {
         b.appendNull();
     }
 
@@ -340,8 +340,8 @@ namespace mongo {
     // -1 inside a non-object (non-object could be array)
     // 0 missing
     // 1 found
-    int validRenamePath( BSONObj obj, const char *path ) {
-        while( const char *p = strchr( path, '.' ) ) {
+    int validRenamePath( BSONObj obj, const char* path ) {
+        while( const char* p = strchr( path, '.' ) ) {
             string left( path, p - path );
             BSONElement e = obj.getField( left );
             if ( e.eoo() ) {
@@ -356,7 +356,7 @@ namespace mongo {
         return !obj.getField( path ).eoo();
     }
 
-    auto_ptr<ModSetState> ModSet::prepare(const BSONObj &obj) const {
+    auto_ptr<ModSetState> ModSet::prepare(const BSONObj& obj) const {
         DEBUGUPDATE( "\t start prepare" );
         auto_ptr<ModSetState> mss( new ModSetState( obj ) );
 
@@ -523,7 +523,7 @@ namespace mongo {
             return;
         }
 
-        const char * name = fixedOpName ? fixedOpName : Mod::modNames[op()];
+        const char* name = fixedOpName ? fixedOpName : Mod::modNames[op()];
 
         DEBUGUPDATE( "\t\t\t\t\t appendForOpLog name:" << name << " fixed: " << fixed << " fn: " << m->fieldName );
 
@@ -547,7 +547,7 @@ namespace mongo {
     }
 
     template< class Builder >
-    void ModState::handleRename( Builder &newObjBuilder, const char *shortFieldName ) {
+    void ModState::handleRename( Builder& newObjBuilder, const char* shortFieldName ) {
         newObjBuilder.appendAs( newVal , shortFieldName );
         BSONObjBuilder b;
         b.appendAs( newVal, shortFieldName );
@@ -606,9 +606,9 @@ namespace mongo {
     template< class Builder >
     void ModSetState::_appendNewFromMods( const string& root , ModState& m , Builder& b ,
                                          set<string>& onedownseen ) {
-        const char * temp = m.fieldName();
+        const char*  temp = m.fieldName();
         temp += root.size();
-        const char * dot = strchr( temp , '.' );
+        const char* dot = strchr( temp , '.' );
         if ( dot ) {
             string nr( m.fieldName() , 0 , 1 + ( dot - m.fieldName() ) );
             string nf( temp , 0 , dot - temp );
@@ -625,7 +625,7 @@ namespace mongo {
         }
     }
 
-    bool ModSetState::duplicateFieldName( const BSONElement &a, const BSONElement &b ) {
+    bool ModSetState::duplicateFieldName( const BSONElement& a, const BSONElement& b ) {
         return
         !a.eoo() &&
         !b.eoo() &&
@@ -633,7 +633,7 @@ namespace mongo {
         str::equals( a.fieldName(), b.fieldName() );
     }
 
-    ModSetState::ModStateRange ModSetState::modsForRoot( const string &root ) {
+    ModSetState::ModStateRange ModSetState::modsForRoot( const string& root ) {
         ModStateHolder::iterator mstart = _mods.lower_bound( root );
         StringBuilder buf;
         buf << root << (char)255;
@@ -641,14 +641,14 @@ namespace mongo {
         return make_pair( mstart, mend );
     }
 
-    void ModSetState::createNewObjFromMods( const string &root , BSONObjBuilder &b ,
-                                           const BSONObj &obj ) {
+    void ModSetState::createNewObjFromMods( const string& root , BSONObjBuilder& b ,
+                                           const BSONObj& obj ) {
         BSONObjIteratorSorted es( obj );
         createNewFromMods( root, b, es, modsForRoot( root ), LexNumCmp( true ) );
     }
 
-    void ModSetState::createNewArrayFromMods( const string &root , BSONArrayBuilder &b ,
-                                             const BSONArray &arr ) {
+    void ModSetState::createNewArrayFromMods( const string& root , BSONArrayBuilder& b ,
+                                             const BSONArray& arr ) {
         BSONArrayIteratorSorted es( arr );
         ModStateRange objectOrderedRange = modsForRoot( root );
         ModStateHolder arrayOrderedMods( LexNumCmp( false ) );
@@ -810,16 +810,16 @@ namespace mongo {
        NOTE: MODIFIES source from object!
     */
     ModSet::ModSet(
-        const BSONObj &from ,
+        const BSONObj& from ,
         const set<string>& idxKeys,
-        const set<string> *backgroundKeys)
+        const set<string>* backgroundKeys)
         : _isIndexed(0) , _hasDynamicArray( false ) {
 
         BSONObjIterator it(from);
 
         while ( it.more() ) {
             BSONElement e = it.next();
-            const char *fn = e.fieldName();
+            const char* fn = e.fieldName();
 
             uassert( 10147 ,  "Invalid modifier specified: " + string( fn ), e.type() == Object );
             BSONObj j = e.embeddedObject();
@@ -831,7 +831,7 @@ namespace mongo {
             while ( jt.more() ) {
                 BSONElement f = jt.next(); // x:44
 
-                const char * fieldName = f.fieldName();
+                const char* fieldName = f.fieldName();
 
                 uassert( 15896 ,  "Modified field name may not start with $", fieldName[0] != '$' || op == Mod::UNSET );  // allow remove of invalid field name in case it was inserted before this check was added (~ version 2.1)
                 uassert( 10148 ,  "Mod on _id not allowed", strcmp( fieldName, "_id" ) != 0 );
@@ -843,7 +843,7 @@ namespace mongo {
 
                 if ( op == Mod::RENAME_TO ) {
                     uassert( 13494, "$rename target must be a string", f.type() == String );
-                    const char *target = f.valuestr();
+                    const char* target = f.valuestr();
                     uassert( 13495, "$rename source must differ from target", strcmp( fieldName, target ) != 0 );
                     uassert( 13496, "invalid mod field name, source may not be empty", fieldName[0] );
                     uassert( 13479, "invalid mod field name, target may not be empty", target[0] );
@@ -887,8 +887,8 @@ namespace mongo {
 
     }
 
-    ModSet * ModSet::fixDynamicArray( const string &elemMatchKey ) const {
-        ModSet * n = new ModSet();
+    ModSet* ModSet::fixDynamicArray( const string& elemMatchKey ) const {
+        ModSet* n = new ModSet();
         n->_isIndexed = _isIndexed;
         n->_hasDynamicArray = _hasDynamicArray;
         for ( ModHolder::const_iterator i=_mods.begin(); i!=_mods.end(); i++ ) {
@@ -931,12 +931,12 @@ namespace mongo {
     */
     static UpdateResult _updateById(bool isOperatorUpdate,
                                     int idIdxNo,
-                                    ModSet *mods,
+                                    ModSet* mods,
                                     int profile,
-                                    NamespaceDetails *d,
+                                    NamespaceDetails* d,
                                     NamespaceDetailsTransient *nsdt,
                                     bool su,
-                                    const char *ns,
+                                    const char* ns,
                                     const BSONObj& updateobj,
                                     BSONObj patternOrig,
                                     bool logop,
@@ -953,7 +953,7 @@ namespace mongo {
                 return UpdateResult(0, 0, 0);
             }
         }
-        Record *r = loc.rec();
+        Record* r = loc.rec();
 
         if ( cc().allowedToThrowPageFaultException() && ! r->likelyInPhysicalMemory() ) {
             throw PageFaultException( r );
@@ -1011,7 +1011,7 @@ namespace mongo {
     }
 
     UpdateResult _updateObjects( bool su,
-                                 const char *ns,
+                                 const char* ns,
                                  const BSONObj& updateobj,
                                  BSONObj patternOrig,
                                  bool upsert,
@@ -1020,7 +1020,7 @@ namespace mongo {
                                  OpDebug& debug,
                                  RemoveSaver* rs,
                                  bool fromMigrate,
-                                 const QueryPlanSelectionPolicy &planPolicy ) {
+                                 const QueryPlanSelectionPolicy& planPolicy ) {
         DEBUGUPDATE( "update: " << ns << " update: " << updateobj << " query: " << patternOrig << " upsert: " << upsert << " multi: " << multi );
         Client& client = cc();
         int profile = client.database()->profile;
@@ -1029,8 +1029,8 @@ namespace mongo {
 
         // idea with these here it to make them loop invariant for multi updates, and thus be a bit faster for that case
         // The pointers may be left invalid on a failed or terminal yield recovery.
-        NamespaceDetails *d = nsdetails(ns); // can be null if an upsert...
-        NamespaceDetailsTransient *nsdt = &NamespaceDetailsTransient::get(ns);
+        NamespaceDetails* d = nsdetails(ns); // can be null if an upsert...
+        NamespaceDetailsTransient* nsdt = &NamespaceDetailsTransient::get(ns);
 
         auto_ptr<ModSet> mods;
         bool isOperatorUpdate = updateobj.firstElementFieldName()[0] == '$';
@@ -1145,7 +1145,7 @@ namespace mongo {
                     continue;
                 }
 
-                Record *r = c->_current();
+                Record* r = c->_current();
                 DiskLoc loc = c->currLoc();
 
                 if ( c->getsetdup( loc ) && autoDedup ) {
@@ -1185,7 +1185,7 @@ namespace mongo {
 
                     const BSONObj& onDisk = loc.obj();
 
-                    ModSet * useMods = mods.get();
+                    ModSet* useMods = mods.get();
                     bool forceRewrite = false;
 
                     auto_ptr<ModSet> mymodset;
@@ -1321,7 +1321,7 @@ namespace mongo {
         return UpdateResult( 0 , isOperatorUpdate , 0 );
     }
 
-    UpdateResult updateObjects( const char *ns,
+    UpdateResult updateObjects( const char* ns,
                                 const BSONObj& updateobj,
                                 BSONObj patternOrig,
                                 bool upsert,
@@ -1329,7 +1329,7 @@ namespace mongo {
                                 bool logop ,
                                 OpDebug& debug,
                                 bool fromMigrate,
-                                const QueryPlanSelectionPolicy &planPolicy ) {
+                                const QueryPlanSelectionPolicy& planPolicy ) {
         uassert( 10155 , "cannot update reserved $ collection", strchr(ns, '$') == 0 );
         if ( strstr(ns, ".system.") ) {
             /* dm: it's very important that system.indexes is never updated as IndexDetails has pointers into it */

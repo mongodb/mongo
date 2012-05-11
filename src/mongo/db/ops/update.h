@@ -48,29 +48,27 @@ namespace mongo {
        multi - update multiple objects - mostly useful with things like $set
        su - allow access to system namespaces (super user)
     */
-    UpdateResult updateObjects(const char *ns,
+    UpdateResult updateObjects(const char* ns,
                                const BSONObj& updateobj,
                                BSONObj pattern,
                                bool upsert,
-                               bool multi ,
-                               bool logop ,
+                               bool multi,
+                               bool logop,
                                OpDebug& debug,
                                bool fromMigrate = false,
-                               const QueryPlanSelectionPolicy &planPolicy =
-                               QueryPlanSelectionPolicy::any());
+                               const QueryPlanSelectionPolicy& planPolicy = QueryPlanSelectionPolicy::any());
 
     UpdateResult _updateObjects(bool su,
-                                const char *ns,
+                                const char* ns,
                                 const BSONObj& updateobj,
                                 BSONObj pattern,
                                 bool upsert,
-                                bool multi ,
-                                bool logop ,
-                                OpDebug& debug ,
-                                RemoveSaver * rs = 0,
+                                bool multi,
+                                bool logop,
+                                OpDebug& debug,
+                                RemoveSaver* rs = 0,
                                 bool fromMigrate = false,
-                                const QueryPlanSelectionPolicy &planPolicy =
-                                QueryPlanSelectionPolicy::any());
+                                const QueryPlanSelectionPolicy& planPolicy = QueryPlanSelectionPolicy::any());
 
     // ---------- private -------------
 
@@ -89,8 +87,8 @@ namespace mongo {
         static const char* modNames[];
         static unsigned modNamesNum;
 
-        const char *fieldName;
-        const char *shortFieldName;
+        const char* fieldName;
+        const char* shortFieldName;
 
         BSONElement elt; // x:5 note: this is the actual element from the updateobj
         boost::shared_ptr<Matcher> matcher;
@@ -112,7 +110,7 @@ namespace mongo {
             }
         }
 
-        void setFieldName( const char * s ) {
+        void setFieldName( const char* s ) {
             fieldName = s;
             shortFieldName = strrchr( fieldName , '.' );
             if ( shortFieldName )
@@ -160,7 +158,7 @@ namespace mongo {
         template< class Builder >
         void appendIncremented( Builder& bb , const BSONElement& in, ModState& ms ) const;
 
-        bool operator<( const Mod &other ) const {
+        bool operator<( const Mod& other ) const {
             return strcmp( fieldName, other.fieldName ) < 0;
         }
 
@@ -178,7 +176,7 @@ namespace mongo {
         static bool isIndexed( const string& fullName , const set<string>& idxKeys ) {
             const char * fieldName = fullName.c_str();
             // check if there is an index key that is a parent of mod
-            for( const char *dot = strchr( fieldName, '.' ); dot; dot = strchr( dot + 1, '.' ) )
+            for( const char* dot = strchr( fieldName, '.' ); dot; dot = strchr( dot + 1, '.' ) )
                 if ( idxKeys.count( string( fieldName, dot - fieldName ) ) )
                     return true;
 
@@ -282,7 +280,7 @@ namespace mongo {
             }
         }
 
-        const char *renameFrom() const {
+        const char* renameFrom() const {
             massert( 13492, "mod must be RENAME_TO type", op == Mod::RENAME_TO );
             return elt.fieldName();
         }
@@ -298,7 +296,7 @@ namespace mongo {
         int _isIndexed;
         bool _hasDynamicArray;
 
-        static Mod::Op opFromStr( const char *fn ) {
+        static Mod::Op opFromStr( const char* fn ) {
             verify( fn[0] == '$' );
             switch( fn[1] ) {
             case 'i': {
@@ -369,7 +367,7 @@ namespace mongo {
 
         ModSet() {}
 
-        void updateIsIndexed( const Mod &m, const set<string> &idxKeys, const set<string> *backgroundKeys ) {
+        void updateIsIndexed( const Mod& m, const set<string>& idxKeys, const set<string>* backgroundKeys ) {
             if ( m.isIndexed( idxKeys ) ||
                     (backgroundKeys && m.isIndexed(*backgroundKeys)) ) {
                 _isIndexed++;
@@ -378,13 +376,13 @@ namespace mongo {
 
     public:
 
-        ModSet( const BSONObj &from ,
+        ModSet( const BSONObj& from ,
                 const set<string>& idxKeys = set<string>(),
                 const set<string>* backgroundKeys = 0
               );
 
         // TODO: this is inefficient - should probably just handle when iterating
-        ModSet * fixDynamicArray( const string &elemMatchKey ) const;
+        ModSet * fixDynamicArray( const string& elemMatchKey ) const;
 
         bool hasDynamicArray() const { return _hasDynamicArray; }
 
@@ -409,7 +407,7 @@ namespace mongo {
 
         unsigned size() const { return _mods.size(); }
 
-        bool haveModForField( const char *fieldName ) const {
+        bool haveModForField( const char* fieldName ) const {
             return _mods.find( fieldName ) != _mods.end();
         }
 
@@ -442,13 +440,13 @@ namespace mongo {
      */
     class ModState : boost::noncopyable {
     public:
-        const Mod * m;
+        const Mod* m;
         BSONElement old;
         BSONElement newVal;
         BSONObj _objData;
 
-        const char * fixedOpName;
-        BSONElement * fixed;
+        const char* fixedOpName;
+        BSONElement* fixed;
         int pushStartSize;
 
         BSONType incType;
@@ -470,7 +468,7 @@ namespace mongo {
             return m->op;
         }
 
-        const char * fieldName() const {
+        const char* fieldName() const {
             return m->fieldName;
         }
 
@@ -504,7 +502,7 @@ namespace mongo {
 
         template< class Builder >
         void appendIncValue( Builder& b , bool useFullName ) const {
-            const char * n = useFullName ? m->fieldName : m->shortFieldName;
+            const char* n = useFullName ? m->fieldName : m->shortFieldName;
 
             switch ( incType ) {
             case NumberDouble:
@@ -521,7 +519,7 @@ namespace mongo {
         string toString() const;
 
         template< class Builder >
-        void handleRename( Builder &newObjBuilder, const char *shortFieldName );
+        void handleRename( Builder& newObjBuilder, const char* shortFieldName );
     };
 
     /**
@@ -549,11 +547,11 @@ namespace mongo {
             return _inPlacePossible;
         }
 
-        ModStateRange modsForRoot( const string &root );
+        ModStateRange modsForRoot( const string& root );
 
-        void createNewObjFromMods( const string &root, BSONObjBuilder &b, const BSONObj &obj );
-        void createNewArrayFromMods( const string &root, BSONArrayBuilder &b,
-                                    const BSONArray &arr );
+        void createNewObjFromMods( const string& root, BSONObjBuilder& b, const BSONObj& obj );
+        void createNewArrayFromMods( const string& root, BSONArrayBuilder& b,
+                                    const BSONArray& arr );
 
         template< class Builder >
         void createNewFromMods( const string& root , Builder& b , BSONIteratorSorted& es ,
@@ -639,7 +637,7 @@ namespace mongo {
         }
 
         /** @return true iff the elements aren't eoo(), are distinct, and share a field name. */
-        static bool duplicateFieldName( const BSONElement &a, const BSONElement &b );
+        static bool duplicateFieldName( const BSONElement& a, const BSONElement& b );
 
     public:
 
@@ -678,7 +676,7 @@ namespace mongo {
             return false;
         }
 
-        void appendSizeSpecForArrayDepMods( BSONObjBuilder &b ) const {
+        void appendSizeSpecForArrayDepMods( BSONObjBuilder& b ) const {
             for ( ModStateHolder::const_iterator i = _mods.begin(); i != _mods.end(); i++ ) {
                 const ModState& m = *i->second;
                 if ( m.m->arrayDep() ) {
