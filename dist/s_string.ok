@@ -460,6 +460,7 @@ stdarg
 stderr
 stdout
 str
+strcmp
 strdup
 strerror
 stringin
