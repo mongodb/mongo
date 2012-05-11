@@ -656,7 +656,7 @@ namespace mongo {
         ModStateRange arrayOrderedRange( arrayOrderedMods.begin(), arrayOrderedMods.end() );
         createNewFromMods( root, b, es, arrayOrderedRange, LexNumCmp( false ) );
     }
-    
+
     template< class Builder >
     void ModSetState::createNewFromMods( const string& root , Builder& b ,
                                         BSONIteratorSorted& es ,
@@ -929,24 +929,24 @@ namespace mongo {
              - not mods is indexed
              - not upsert
     */
-    static UpdateResult _updateById(bool isOperatorUpdate, 
-                                    int idIdxNo, 
-                                    ModSet *mods, 
-                                    int profile, 
+    static UpdateResult _updateById(bool isOperatorUpdate,
+                                    int idIdxNo,
+                                    ModSet *mods,
+                                    int profile,
                                     NamespaceDetails *d,
                                     NamespaceDetailsTransient *nsdt,
-                                    bool god, 
+                                    bool su,
                                     const char *ns,
-                                    const BSONObj& updateobj, 
-                                    BSONObj patternOrig, 
-                                    bool logop, 
-                                    OpDebug& debug, 
+                                    const BSONObj& updateobj,
+                                    BSONObj patternOrig,
+                                    bool logop,
+                                    OpDebug& debug,
                                     bool fromMigrate = false) {
 
         DiskLoc loc;
         {
             IndexDetails& i = d->idx(idIdxNo);
-            BSONObj key = i.getKeyFromQuery( patternOrig );            
+            BSONObj key = i.getKeyFromQuery( patternOrig );
             loc = i.idxInterface().findSingle(i, i.head, key);
             if( loc.isNull() ) {
                 // no upsert support in _updateById yet, so we are done.
@@ -989,7 +989,7 @@ namespace mongo {
 
                 if( mss->needOpLogRewrite() ) {
                     DEBUGUPDATE( "\t rewrite update: " << mss->getOpLogRewrite() );
-                    logOp("u", ns, mss->getOpLogRewrite() , 
+                    logOp("u", ns, mss->getOpLogRewrite() ,
                           &pattern, 0, fromMigrate );
                 }
                 else {
@@ -1010,21 +1010,21 @@ namespace mongo {
         return UpdateResult( 1 , 0 , 1 );
     }
 
-    UpdateResult _updateObjects( bool god, 
-                                 const char *ns, 
-                                 const BSONObj& updateobj, 
-                                 BSONObj patternOrig, 
-                                 bool upsert, 
-                                 bool multi, 
-                                 bool logop , 
-                                 OpDebug& debug, 
+    UpdateResult _updateObjects( bool su,
+                                 const char *ns,
+                                 const BSONObj& updateobj,
+                                 BSONObj patternOrig,
+                                 bool upsert,
+                                 bool multi,
+                                 bool logop ,
+                                 OpDebug& debug,
                                  RemoveSaver* rs,
                                  bool fromMigrate,
                                  const QueryPlanSelectionPolicy &planPolicy ) {
         DEBUGUPDATE( "update: " << ns << " update: " << updateobj << " query: " << patternOrig << " upsert: " << upsert << " multi: " << multi );
         Client& client = cc();
         int profile = client.database()->profile;
-        
+
         debug.updateobj = updateobj;
 
         // idea with these here it to make them loop invariant for multi updates, and thus be a bit faster for that case
@@ -1052,7 +1052,7 @@ namespace mongo {
             int idxNo = d->findIdIndex();
             if( idxNo >= 0 ) {
                 debug.idhack = true;
-                UpdateResult result = _updateById(isOperatorUpdate, idxNo, mods.get(), profile, d, nsdt, god, ns, updateobj, patternOrig, logop, debug, fromMigrate);
+                UpdateResult result = _updateById(isOperatorUpdate, idxNo, mods.get(), profile, d, nsdt, su, ns, updateobj, patternOrig, logop, debug, fromMigrate);
                 if ( result.existing || ! upsert ) {
                     return result;
                 }
@@ -1061,7 +1061,7 @@ namespace mongo {
                     checkNoMods( updateobj );
                     debug.upsert = true;
                     BSONObj no = updateobj;
-                    theDataFileMgr.insertWithObjMod(ns, no, god);
+                    theDataFileMgr.insertWithObjMod(ns, no, su);
                     return UpdateResult( 0 , 0 , 1 , no );
                 }
             }
@@ -1080,16 +1080,16 @@ namespace mongo {
             MatchDetails details;
             auto_ptr<ClientCursor> cc;
             do {
-                
-                if ( cc.get() == 0 && 
-                     client.allowedToThrowPageFaultException() && 
-                     ! c->currLoc().isNull() && 
+
+                if ( cc.get() == 0 &&
+                     client.allowedToThrowPageFaultException() &&
+                     ! c->currLoc().isNull() &&
                      ! c->currLoc().rec()->likelyInPhysicalMemory() ) {
                     throw PageFaultException( c->currLoc().rec() );
                 }
 
                 bool atomic = c->matcher() && c->matcher()->docMatcher().atomic();
-                
+
                 if ( ! atomic && debug.nscanned > 0 ) {
                     // we need to use a ClientCursor to yield
                     if ( cc.get() == 0 ) {
@@ -1105,7 +1105,7 @@ namespace mongo {
                     if ( !c->ok() ) {
                         break;
                     }
-                    
+
                     if ( didYield ) {
                         d = nsdetails(ns);
                         nsdt = &NamespaceDetailsTransient::get(ns);
@@ -1122,7 +1122,7 @@ namespace mongo {
                     //verify( c->matcher() );
                     details.requestElemMatchKey();
                 }
-                
+
                 if ( !c->currentMatches( &details ) ) {
                     c->advance();
 
@@ -1210,7 +1210,7 @@ namespace mongo {
                         mss->applyModsInPlace( true );// const_cast<BSONObj&>(onDisk) );
 
                         DEBUGUPDATE( "\t\t\t doing in place update" );
-                        if ( profile && !multi ) 
+                        if ( profile && !multi )
                             debug.fastmod = true;
 
                         if ( modsIsIndexed ) {
@@ -1246,7 +1246,7 @@ namespace mongo {
 
                         if ( forceRewrite || mss->needOpLogRewrite() ) {
                             DEBUGUPDATE( "\t rewrite update: " << mss->getOpLogRewrite() );
-                            logOp("u", ns, mss->getOpLogRewrite() , 
+                            logOp("u", ns, mss->getOpLogRewrite() ,
                                   &pattern, 0, fromMigrate );
                         }
                         else {
@@ -1284,9 +1284,9 @@ namespace mongo {
 
                 BSONElementManipulator::lookForTimestamps( updateobj );
                 checkNoMods( updateobj );
-                theDataFileMgr.updateRecord(ns, d, nsdt, r, loc , updateobj.objdata(), updateobj.objsize(), debug, god);
+                theDataFileMgr.updateRecord(ns, d, nsdt, r, loc , updateobj.objdata(), updateobj.objsize(), debug, su);
                 if ( logop ) {
-                    DEV wassert( !god ); // god doesn't get logged, this would be bad.
+                    DEV wassert( !su ); // super used doesn't get logged, this would be bad.
                     logOp("u", ns, updateobj, &pattern, 0, fromMigrate );
                 }
                 return UpdateResult( 1 , 0 , 1 );
@@ -1298,11 +1298,11 @@ namespace mongo {
 
         if ( upsert ) {
             if ( updateobj.firstElementFieldName()[0] == '$' ) {
-                // upsert of an $operation. build a default object 
+                // upsert of an $operation. build a default object
                 BSONObj newObj = mods->createNewFromQuery( patternOrig );
                 checkNoMods( newObj );
                 debug.fastmodinsert = true;
-                theDataFileMgr.insertWithObjMod(ns, newObj, god);
+                theDataFileMgr.insertWithObjMod(ns, newObj, su);
                 if ( logop )
                     logOp( "i", ns, newObj, 0, 0, fromMigrate );
 
@@ -1312,7 +1312,7 @@ namespace mongo {
             checkNoMods( updateobj );
             debug.upsert = true;
             BSONObj no = updateobj;
-            theDataFileMgr.insertWithObjMod(ns, no, god);
+            theDataFileMgr.insertWithObjMod(ns, no, su);
             if ( logop )
                 logOp( "i", ns, no, 0, 0, fromMigrate );
             return UpdateResult( 0 , 0 , 1 , no );
@@ -1321,13 +1321,13 @@ namespace mongo {
         return UpdateResult( 0 , isOperatorUpdate , 0 );
     }
 
-    UpdateResult updateObjects( const char *ns, 
-                                const BSONObj& updateobj, 
-                                BSONObj patternOrig, 
-                                bool upsert, 
-                                bool multi, 
-                                bool logop , 
-                                OpDebug& debug, 
+    UpdateResult updateObjects( const char *ns,
+                                const BSONObj& updateobj,
+                                BSONObj patternOrig,
+                                bool upsert,
+                                bool multi,
+                                bool logop ,
+                                OpDebug& debug,
                                 bool fromMigrate,
                                 const QueryPlanSelectionPolicy &planPolicy ) {
         uassert( 10155 , "cannot update reserved $ collection", strchr(ns, '$') == 0 );
@@ -1335,7 +1335,7 @@ namespace mongo {
             /* dm: it's very important that system.indexes is never updated as IndexDetails has pointers into it */
             uassert( 10156 , str::stream() << "cannot update system collection: " << ns << " q: " << patternOrig << " u: " << updateobj , legalClientSystemNS( ns , true ) );
         }
-        UpdateResult ur = _updateObjects(false, ns, updateobj, patternOrig, 
+        UpdateResult ur = _updateObjects(false, ns, updateobj, patternOrig,
                                          upsert, multi, logop,
                                          debug, 0, fromMigrate, planPolicy );
         debug.nupdated = ur.num;

@@ -46,27 +46,28 @@ namespace mongo {
 
     /* returns true if an existing object was updated, false if no existing object was found.
        multi - update multiple objects - mostly useful with things like $set
-       god - allow access to system namespaces
+       su - allow access to system namespaces (super user)
     */
-    UpdateResult updateObjects(const char *ns, 
-                               const BSONObj& updateobj, 
-                               BSONObj pattern, 
-                               bool upsert, 
-                               bool multi , 
-                               bool logop , 
-                               OpDebug& debug, 
+    UpdateResult updateObjects(const char *ns,
+                               const BSONObj& updateobj,
+                               BSONObj pattern,
+                               bool upsert,
+                               bool multi ,
+                               bool logop ,
+                               OpDebug& debug,
                                bool fromMigrate = false,
                                const QueryPlanSelectionPolicy &planPolicy =
                                QueryPlanSelectionPolicy::any());
-    UpdateResult _updateObjects(bool god, 
-                                const char *ns, 
-                                const BSONObj& updateobj, 
+
+    UpdateResult _updateObjects(bool su,
+                                const char *ns,
+                                const BSONObj& updateobj,
                                 BSONObj pattern,
-                                bool upsert, 
-                                bool multi , 
-                                bool logop , 
-                                OpDebug& debug , 
-                                RemoveSaver * rs = 0, 
+                                bool upsert,
+                                bool multi ,
+                                bool logop ,
+                                OpDebug& debug ,
+                                RemoveSaver * rs = 0,
                                 bool fromMigrate = false,
                                 const QueryPlanSelectionPolicy &planPolicy =
                                 QueryPlanSelectionPolicy::any());
@@ -549,7 +550,7 @@ namespace mongo {
         }
 
         ModStateRange modsForRoot( const string &root );
-        
+
         void createNewObjFromMods( const string &root, BSONObjBuilder &b, const BSONObj &obj );
         void createNewArrayFromMods( const string &root, BSONArrayBuilder &b,
                                     const BSONArray &arr );
@@ -694,5 +695,4 @@ namespace mongo {
         friend class ModSet;
     };
 
-}
-
+}  // namespace mongo
