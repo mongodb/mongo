@@ -1632,14 +1632,13 @@ __rec_onpage_ovfl(WT_SESSION_IMPL *session,
 		return (0);
 
 	/*
-	 * Read the original value from disk, and enter it into the tracking
-	 * system.
+	 * Read the original (possibly Huffman encoded) value from disk, and
+	 * enter it into the tracking system.
 	 *
-	 * There are serious implications to this call: this overflow item will
-	 * be discarded when reconciliation completes, if not later marked for
-	 * re-use.
+	 * There are implications to this call: the overflow item is discarded
+	 * when reconciliation completes, if not subsequently marked for re-use.
 	 */
-	WT_RET(__wt_cell_unpack_copy(session, unpack, buf));
+	WT_RET(__wt_ovfl_in(session, buf, unpack->data, unpack->size));
 	WT_RET(__wt_rec_track(session, page,
 	    unpack->data, unpack->size, buf->data, buf->size, WT_TRK_ONPAGE));
 	return (0);
@@ -1763,14 +1762,14 @@ __rec_col_var(
 			}
 
 			/*
-			 * The data may be Huffman encoded, which means we have
-			 * to decode it in order to compare it with the last
-			 * item we saw, which may have been an update string.
-			 * This code guarantees we find every single pair of
-			 * objects we can RLE encode, including the application
-			 * inserting an update to an existing record where it
-			 * happened (?) to match a Huffman-encoded value in the
-			 * previous or next record.
+			 * The data is Huffman encoded, which means we have to
+			 * decode it in order to compare it with the last item
+			 * we saw, which may have been an update string.  This
+			 * guarantees we find every single pair of objects we
+			 * can RLE encode, including applications updating an
+			 * existing record where the new value happens (?) to
+			 * match a Huffman-encoded value in a previous or next
+			 * record.
 			 */
 			WT_ERR(__wt_cell_unpack_copy(session, unpack, orig));
 		}
@@ -2003,7 +2002,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_DECL_RET;
 	WT_IKEY *ikey;
-	WT_ITEM orig;
+	WT_ITEM *tmpkey;
 	WT_KV *key, *val;
 	WT_PAGE *rp;
 	WT_RECONCILE *r;
@@ -2015,7 +2014,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	btree = session->btree;
 	unpack = &_unpack;
 
-	WT_CLEAR(orig);
+	WT_RET(__wt_scr_alloc(session, 0, &tmpkey));
 	key = &r->k;
 	val = &r->v;
 
@@ -2109,7 +2108,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 				 */
 				if (onpage_ovfl)
 					WT_ERR(__rec_onpage_ovfl(
-					    session, page, unpack, &orig));
+					    session, page, unpack, tmpkey));
 				continue;
 			case WT_PM_REC_REPLACE:
 				__rec_cell_build_addr(session,
@@ -2130,7 +2129,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 				 */
 				if (onpage_ovfl)
 					WT_ERR(__rec_onpage_ovfl(
-					    session, page, unpack, &orig));
+					    session, page, unpack, tmpkey));
 
 				r->merge_ref = ref;
 				WT_ERR(__rec_row_merge(session,
@@ -2163,16 +2162,27 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 */
 		if (onpage_ovfl) {
 			WT_ERR(__wt_rec_track_onpage_srch(session,
-			    page, unpack->data, unpack->size, &found, &orig));
-			if (!found) {
-				key->buf.data = cell;
-				key->buf.size = unpack->len;
-				key->cell_len = 0;
-				key->len = key->buf.size;
-				ovfl_key = 1;
-			} else {
+			    page, unpack->data, unpack->size, &found, tmpkey));
+			if (found) {
+				/*
+				 * If the key is Huffman encoded, decode it and
+				 * build a new key cell, which re-encodes the
+				 * key, wasting some work: this isn't a likely
+				 * path, a deleted key we then re-instantiate,
+				 * it's not worth handling Huffman encoded
+				 * keys separately to avoid the additional work,
+				 * we still have to write the key which is more
+				 * time than anything else.
+				 */
+				if (btree->huffman_key != NULL)
+					WT_ERR(__wt_huffman_decode(session,
+					    btree->huffman_key,
+					    tmpkey->data, tmpkey->size,
+					    tmpkey));
+
 				WT_ERR(__rec_cell_build_key(session,
-				    orig.data, r->cell_zero ? 1 : orig.size,
+				    tmpkey->data,
+				    r->cell_zero ? 1 : tmpkey->size,
 				    1, &ovfl_key));
 
 				/*
@@ -2181,6 +2191,12 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 				 * page.
 				 */
 				onpage_ovfl = 0;
+			} else {
+				key->buf.data = cell;
+				key->buf.size = unpack->len;
+				key->cell_len = 0;
+				key->len = key->buf.size;
+				ovfl_key = 1;
 			}
 		} else
 			WT_ERR(__rec_cell_build_key(session,
@@ -2244,7 +2260,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	/* Write the remnant page. */
 	ret = __rec_split_finish(session);
 
-err:	__wt_buf_free(session, &orig);
+err:	__wt_scr_free(&tmpkey);
 	return (ret);
 }
 
@@ -2528,7 +2544,33 @@ __rec_row_leaf(
 		if (onpage_ovfl) {
 			WT_ERR(__wt_rec_track_onpage_srch(session,
 			    page, unpack->data, unpack->size, &found, tmpkey));
-			if (!found) {
+			if (found) {
+				/*
+				 * If the key is Huffman encoded, decode it and
+				 * build a new key cell, which re-encodes the
+				 * key, wasting some work: this isn't a likely
+				 * path, a deleted key we then re-instantiate,
+				 * it's not worth handling Huffman encoded
+				 * keys separately to avoid the additional work,
+				 * we still have to write the key which is more
+				 * time than anything else.
+				 */
+				if (btree->huffman_key != NULL)
+					WT_ERR(__wt_huffman_decode(session,
+					    btree->huffman_key,
+					    tmpkey->data, tmpkey->size,
+					    tmpkey));
+
+				WT_ERR(__rec_cell_build_key(session,
+				    tmpkey->data, tmpkey->size, 0, &ovfl_key));
+
+				/*
+				 * Clear the on-page overflow key flag: we've
+				 * built a real key, we're not copying from a
+				 * page.
+				 */
+				onpage_ovfl = 0;
+			} else {
 				key->buf.data = cell;
 				key->buf.size = unpack->len;
 				key->cell_len = 0;
@@ -2545,16 +2587,6 @@ __rec_row_leaf(
 				 * a place to hang this comment.
 				 */
 				tmpkey->size = 0;
-			} else {
-				WT_ERR(__rec_cell_build_key(session,
-				    tmpkey->data, tmpkey->size, 0, &ovfl_key));
-
-				/*
-				 * Clear the on-page overflow key flag: we've
-				 * built a real key, we're not copying from a
-				 * page.
-				 */
-				onpage_ovfl = 0;
 			}
 		} else {
 			/*
