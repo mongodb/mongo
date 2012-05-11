@@ -1009,7 +1009,7 @@ namespace mongo {
             loc = i.idxInterface().findSingle(i, i.head, key);
             if( loc.isNull() ) {
                 // no upsert support in _updateById yet, so we are done.
-                return UpdateResult(0, 0, 0);
+                return UpdateResult( 0 , 0 , 0 , BSONObj() );
             }
         }
         Record* r = loc.rec();
@@ -1055,7 +1055,7 @@ namespace mongo {
                     logOp("u", ns, updateobj, &pattern, 0, fromMigrate );
                 }
             }
-            return UpdateResult( 1 , 1 , 1);
+            return UpdateResult( 1 , 1 , 1 , BSONObj() );
         } // end $operator update
 
         // regular update
@@ -1066,7 +1066,7 @@ namespace mongo {
         if ( logop ) {
             logOp("u", ns, updateobj, &patternOrig, 0, fromMigrate );
         }
-        return UpdateResult( 1 , 0 , 1 );
+        return UpdateResult( 1 , 0 , 1 , BSONObj() );
     }
 
     UpdateResult _updateObjects( bool su,
@@ -1342,7 +1342,7 @@ namespace mongo {
                     }
                     numModded++;
                     if ( ! multi )
-                        return UpdateResult( 1 , 1 , numModded );
+                        return UpdateResult( 1 , 1 , numModded , BSONObj() );
                     if ( willAdvanceCursor )
                         c->recoverFromTouchingEarlierIterate();
 
@@ -1376,12 +1376,12 @@ namespace mongo {
                     DEV wassert( !su ); // super used doesn't get logged, this would be bad.
                     logOp("u", ns, updateobj, &pattern, 0, fromMigrate );
                 }
-                return UpdateResult( 1 , 0 , 1 );
+                return UpdateResult( 1 , 0 , 1 , BSONObj() );
             } while ( c->ok() );
         } // endif
 
         if ( numModded )
-            return UpdateResult( 1 , 1 , numModded );
+            return UpdateResult( 1 , 1 , numModded , BSONObj() );
 
         if ( upsert ) {
             if ( updateobj.firstElementFieldName()[0] == '$' ) {
@@ -1405,7 +1405,7 @@ namespace mongo {
             return UpdateResult( 0 , 0 , 1 , no );
         }
 
-        return UpdateResult( 0 , isOperatorUpdate , 0 );
+        return UpdateResult( 0 , isOperatorUpdate , 0 , BSONObj() );
     }
 
     UpdateResult updateObjects( const char* ns,

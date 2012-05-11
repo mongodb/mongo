@@ -33,7 +33,7 @@ namespace mongo {
         const long long num; // how many objects touched
         OID upserted;  // if something was upserted, the new _id of the object
 
-        UpdateResult( bool e, bool m, unsigned long long n , const BSONObj& upsertedObject = BSONObj() )
+        UpdateResult( bool e, bool m, unsigned long long n , const BSONObj& upsertedObject )
             : existing(e) , mod(m), num(n) {
             upserted.clear();
             BSONElement id = upsertedObject["_id"];
