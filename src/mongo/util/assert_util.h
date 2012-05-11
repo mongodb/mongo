@@ -161,7 +161,9 @@ namespace mongo {
         a stack trace is logged.
     */
     MONGO_COMPILER_NORETURN void msgassertedNoTrace(int msgid, const char *msg);
-    inline void msgassertedNoTrace(int msgid, const std::string& msg) { msgassertedNoTrace( msgid , msg.c_str() ); }
+    MONGO_COMPILER_NORETURN inline void msgassertedNoTrace(int msgid, const std::string& msg) {
+        msgassertedNoTrace( msgid , msg.c_str() );
+    }
     MONGO_COMPILER_NORETURN void msgasserted(int msgid, const char *msg);
     MONGO_COMPILER_NORETURN void msgasserted(int msgid, const std::string &msg);
 

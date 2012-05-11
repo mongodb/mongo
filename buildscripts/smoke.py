@@ -471,13 +471,29 @@ at the end of testing:"""
     if losers or lost_in_slave or lost_in_master or screwy_in_slave:
         raise Exception("Test failures")
 
+suiteGlobalConfig = {"js": ("[!_]*.js", True),
+                     "quota": ("quota/*.js", True),
+                     "jsPerf": ("perf/*.js", True),
+                     "disk": ("disk/*.js", True),
+                     "jsSlowNightly": ("slowNightly/*.js", True),
+                     "jsSlowWeekly": ("slowWeekly/*.js", False),
+                     "parallel": ("parallel/*.js", True),
+                     "clone": ("clone/*.js", False),
+                     "repl": ("repl/*.js", False),
+                     "replSets": ("replsets/*.js", False),
+                     "dur": ("dur/*.js", False),
+                     "auth": ("auth/*.js", False),
+                     "sharding": ("sharding/*.js", False),
+                     "tool": ("tool/*.js", False),
+                     "aggregation": ("aggregation/test[ab]*.js", True),
+                     }
 
-def expand_suites(suites):
+def expand_suites(suites,expandUseDB=True):
     globstr = None
     tests = []
     for suite in suites:
         if suite == 'all':
-            return expand_suites(['test', 'perf', 'client', 'js', 'jsPerf', 'jsSlowNightly', 'jsSlowWeekly', 'clone', 'parallel', 'repl', 'auth', 'sharding', 'tool'])
+            return expand_suites(['test', 'perf', 'client', 'js', 'jsPerf', 'jsSlowNightly', 'jsSlowWeekly', 'clone', 'parallel', 'repl', 'auth', 'sharding', 'tool'],expandUseDB=expandUseDB)
         if suite == 'test':
             if os.sys.platform == "win32":
                 program = 'test.exe'
@@ -503,38 +519,31 @@ def expand_suites(suites):
                 program = 'mongos'
             tests += [(os.path.join(mongo_repo, program), False)]
         elif os.path.exists( suite ):
-            tests += [ ( os.path.join( mongo_repo , suite ) , True ) ]
+            usedb = True
+            for name in suiteGlobalConfig:
+                if suite in glob.glob( "jstests/" + suiteGlobalConfig[name][0] ):
+                    usedb = suiteGlobalConfig[name][1]
+                    break
+            tests += [ ( os.path.join( mongo_repo , suite ) , usedb ) ]
         else:
             try:
-                globstr, usedb = {"js": ("[!_]*.js", True),
-                                  "quota": ("quota/*.js", True),
-                                  "jsPerf": ("perf/*.js", True),
-                                  "disk": ("disk/*.js", True),
-                                  "jsSlowNightly": ("slowNightly/*.js", True),
-                                  "jsSlowWeekly": ("slowWeekly/*.js", False),
-                                  "parallel": ("parallel/*.js", True),
-                                  "clone": ("clone/*.js", False),
-                                  "repl": ("repl/*.js", False),
-                                  "replSets": ("replsets/*.js", False),
-                                  "dur": ("dur/*.js", False),
-                                  "auth": ("auth/*.js", False),
-                                  "sharding": ("sharding/*.js", False),
-                                  "tool": ("tool/*.js", False),
-                                  "aggregation": ("aggregation/test[ab]*.js", True),
-                                 }[suite]
+                globstr, usedb = suiteGlobalConfig[suite]
             except KeyError:
                 raise Exception('unknown test suite %s' % suite)
 
         if globstr:
-            if globstr.endswith('.js'):
-                loc = 'jstests/'
-            else:
-                loc = ''
-            globstr = os.path.join(mongo_repo, (os.path.join(loc, globstr)))
-            globstr = os.path.normpath(globstr)
-            paths = glob.glob(globstr)
-            paths.sort()
-            tests += [(path, usedb) for path in paths]
+            if usedb and not expandUseDB:
+                tests += [ (suite,False) ]
+            else:                
+                if globstr.endswith('.js'):
+                    loc = 'jstests/'
+                else:
+                    loc = ''
+                globstr = os.path.join(mongo_repo, (os.path.join(loc, globstr)))
+                globstr = os.path.normpath(globstr)
+                paths = glob.glob(globstr)
+                paths.sort()
+                tests += [(path, usedb) for path in paths]
 
     return tests
 

@@ -574,32 +574,39 @@ namespace mongo {
             set<Shard> shards;
             ShardVersionMap shardVersions;
             Timer t;
-            _load(chunkMap, shards, shardVersions, oldManager);
-            {
-                int ms = t.millis();
-                log() << "ChunkManager: time to load chunks for " << ns << ": " << ms << "ms" 
-                      << " sequenceNumber: " << _sequenceNumber 
-                      << " version: " << _version.toString()
-                      << " based on: " << ( oldManager.get() ? oldManager->getVersion().toString() : "(empty)" )
-                      << endl;
+
+            bool success = _load(chunkMap, shards, shardVersions, oldManager);
+
+            if( success ){
+                {
+                    int ms = t.millis();
+                    log() << "ChunkManager: time to load chunks for " << ns << ": " << ms << "ms"
+                          << " sequenceNumber: " << _sequenceNumber
+                          << " version: " << _version.toString()
+                          << " based on: " <<
+                              ( oldManager.get() ? oldManager->getVersion().toString() : "(empty)" )
+                          << endl;
+                }
+
+                // TODO: Merge into diff code above, so we validate in one place
+                if (_isValid(chunkMap)) {
+                    // These variables are const for thread-safety. Since the
+                    // constructor can only be called from one thread, we don't have
+                    // to worry about that here.
+                    const_cast<ChunkMap&>(_chunkMap).swap(chunkMap);
+                    const_cast<set<Shard>&>(_shards).swap(shards);
+                    const_cast<ShardVersionMap&>(_shardVersions).swap(shardVersions);
+                    const_cast<ChunkRangeManager&>(_chunkRanges).reloadAll(_chunkMap);
+                    return;
+                }
             }
 
-            if (_isValid(chunkMap)) {
-                // These variables are const for thread-safety. Since the
-                // constructor can only be called from one thread, we don't have
-                // to worry about that here.
-                const_cast<ChunkMap&>(_chunkMap).swap(chunkMap);
-                const_cast<set<Shard>&>(_shards).swap(shards);
-                const_cast<ShardVersionMap&>(_shardVersions).swap(shardVersions);
-                const_cast<ChunkRangeManager&>(_chunkRanges).reloadAll(_chunkMap);
-                return;
-            }
-            
             if (_chunkMap.size() < 10) {
                 _printChunks();
             }
             
-            warning() << "ChunkManager loaded an invalid config, trying again" << endl;
+            warning() << "ChunkManager loaded an invalid config for " << ns
+                      << ", trying again" << endl;
 
             sleepmillis(10 * (3-tries));
         }
@@ -708,7 +715,7 @@ namespace mongo {
 
     };
 
-    void ChunkManager::_load(ChunkMap& chunkMap, set<Shard>& shards, ShardVersionMap& shardVersions, ChunkManagerPtr oldManager) {
+    bool ChunkManager::_load(ChunkMap& chunkMap, set<Shard>& shards, ShardVersionMap& shardVersions, ChunkManagerPtr oldManager) {
 
         _version = 0;
         set<ShardChunkVersion> minorVersions;
@@ -762,16 +769,35 @@ namespace mongo {
             for( ShardVersionMap::iterator it = shardVersions.begin(); it != shardVersions.end(); it++ ){
                 shards.insert( it->first );
             }
+
+            return true;
         }
-        else{
+        else if( diffsApplied == 0 ){
 
             // No chunks were found for the ns
-            warning() << "no chunks found when reloading " << _ns << ", previous version was " << _version << endl;
+            warning() << "no chunks found when reloading " << _ns
+                      << ", previous version was " << _version << endl;
 
             // Set all our data to empty
             chunkMap.clear();
             shardVersions.clear();
             _version = 0;
+
+            return true;
+        }
+        else { // diffsApplied < 0
+
+            // Inconsistent load (due to yielding cursor during load)
+            warning() << "inconsistent chunks found when reloading "
+                      << _ns << ", previous version was " << _version
+                      << ", this should be rare" << endl;
+
+            // Set all our data to empty to be extra safe
+            chunkMap.clear();
+            shardVersions.clear();
+            _version = 0;
+
+            return false;
         }
 
     }

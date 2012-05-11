@@ -44,7 +44,8 @@
 #include <memory>
 #include <iostream>
 #include <sstream>
-//#include <boost/utility.hpp>
+
+#include "mongo/platform/compiler.h"
 
 namespace bson {
 
@@ -79,7 +80,7 @@ namespace mongo {
     }
 #endif
 #if !defined(uassert)
-    inline void uasserted(unsigned msgid, std::string s) {
+    MONGO_COMPILER_NORETURN inline void uasserted(int msgid, const std::string &s) {
         throw bson::assertion( msgid , s );
     }
 
@@ -87,11 +88,13 @@ namespace mongo {
         if( !expr )
             uasserted( msgid , msg );
     }
-    inline void msgasserted(int msgid, const char *msg) {
+    MONGO_COMPILER_NORETURN inline void msgasserted(int msgid, const char *msg) {
         throw bson::assertion( msgid , msg );
     }
-    inline void msgasserted(int msgid, const std::string &msg) { msgasserted(msgid, msg.c_str()); }
-    inline void massert(unsigned msgid, std::string msg, bool expr) {
+    MONGO_COMPILER_NORETURN inline void msgasserted(int msgid, const std::string &msg) {
+        msgasserted(msgid, msg.c_str());
+    }
+    inline void massert(int msgid, std::string msg, bool expr) {
         if(!expr) {
             std::cout << "assertion failure in bson library: " << msgid << ' ' << msg << std::endl;
             throw bson::assertion( msgid , msg );

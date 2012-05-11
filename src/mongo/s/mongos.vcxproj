@@ -1036,6 +1036,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="..\util\systeminfo_win32.cpp" />
     <ClCompile Include="..\util\text.cpp" />
     <ClCompile Include="..\util\timer.cpp" />
+    <ClCompile Include="..\util\time_support.cpp" />
     <ClCompile Include="..\util\trace.cpp" />
     <ClCompile Include="..\util\version.cpp" />
     <ClCompile Include="balance.cpp" />
@@ -1198,6 +1199,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\util\systeminfo.h" />
     <ClInclude Include="..\util\timer-win32-inl.h" />
     <ClInclude Include="..\util\timer.h" />
+    <ClInclude Include="..\util\time_support.h" />
     <ClInclude Include="..\util\trace.h" />
     <ClInclude Include="..\util\version.h" />
     <ClInclude Include="balance.h" />

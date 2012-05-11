@@ -20,6 +20,9 @@ def shouldKill( c ):
         # don't kill smoke.py
         return False
 
+    if "emr.py" in c:
+        return False
+
     if c.find( cwd ) >= 0:
         return True
 

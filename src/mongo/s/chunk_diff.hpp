@@ -165,7 +165,11 @@ namespace mongo {
             BSONObj max = chunkDoc[ "max" ].Obj().getOwned();
 
             // Invariant enforced by sharding
-            verify( ! isOverlapping( min, max ) );
+            // It's possible to read inconsistent state b/c of getMore() and yielding, so we want
+            // to detect as early as possible.
+            // TODO: This checks for overlap, we also should check for holes here iff we're tracking
+            // all chunks
+            if( isOverlapping( min, max ) ) return -1;
 
             _currMap->insert( rangeFor( chunkDoc, min, max ) );
         }

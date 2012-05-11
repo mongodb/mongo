@@ -181,6 +181,7 @@
     <ClCompile Include="..\..\util\stacktrace.cpp" />
     <ClCompile Include="..\..\util\stringutils.cpp" />
     <ClCompile Include="..\..\util\timer.cpp" />
+    <ClCompile Include="..\..\util\time_support.cpp" />
     <ClCompile Include="..\mongo_client_lib.cpp" />
     <ClCompile Include="..\simple_client_demo.cpp" />
   </ItemGroup>
@@ -191,6 +192,7 @@
     <ClInclude Include="..\..\util\stringutils.h" />
     <ClInclude Include="..\..\util\timer-win32-inl.h" />
     <ClInclude Include="..\..\util\timer.h" />
+    <ClInclude Include="..\..\util\time_support.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

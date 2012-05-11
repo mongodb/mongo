@@ -1,4 +1,4 @@
-// update.cpp
+//@file update.cpp
 
 /**
  *    Copyright (C) 2008 10gen Inc.
@@ -17,13 +17,15 @@
  */
 
 #include "pch.h"
-#include "../pdfile.h"
-#include "../jsobjmanipulator.h"
-#include "../queryutil.h"
+
 #include "mongo/db/oplog.h"
-#include "update.h"
-#include "../pagefault.h"
+#include "mongo/db/jsobjmanipulator.h"
+#include "mongo/db/pagefault.h"
+#include "mongo/db/pdfile.h"
+#include "mongo/db/queryutil.h"
 #include "mongo/client/dbclientinterface.h"
+
+#include "update.h"
 
 //#define DEBUGUPDATE(x) cout << x << endl;
 #define DEBUGUPDATE(x)
@@ -84,11 +86,11 @@ namespace mongo {
     }
 
     template< class Builder >
-    void appendUnset( Builder &b ) {
+    void appendUnset( Builder& b ) {
     }
 
     template<>
-    void appendUnset( BSONArrayBuilder &b ) {
+    void appendUnset( BSONArrayBuilder& b ) {
         b.appendNull();
     }
 
@@ -340,8 +342,8 @@ namespace mongo {
     // -1 inside a non-object (non-object could be array)
     // 0 missing
     // 1 found
-    int validRenamePath( BSONObj obj, const char *path ) {
-        while( const char *p = strchr( path, '.' ) ) {
+    int validRenamePath( BSONObj obj, const char* path ) {
+        while( const char* p = strchr( path, '.' ) ) {
             string left( path, p - path );
             BSONElement e = obj.getField( left );
             if ( e.eoo() ) {
@@ -356,7 +358,7 @@ namespace mongo {
         return !obj.getField( path ).eoo();
     }
 
-    auto_ptr<ModSetState> ModSet::prepare(const BSONObj &obj) const {
+    auto_ptr<ModSetState> ModSet::prepare(const BSONObj& obj) const {
         DEBUGUPDATE( "\t start prepare" );
         auto_ptr<ModSetState> mss( new ModSetState( obj ) );
 
@@ -425,13 +427,17 @@ namespace mongo {
 
             case Mod::PUSH:
             case Mod::PUSH_ALL:
-                uassert( 10141 ,  "Cannot apply $push/$pushAll modifier to non-array", e.type() == Array || e.eoo() );
+                uassert( 10141,
+                         "Cannot apply $push/$pushAll modifier to non-array",
+                         e.type() == Array || e.eoo() );
                 mss->amIInPlacePossible( false );
                 break;
 
             case Mod::PULL:
             case Mod::PULL_ALL: {
-                uassert( 10142 ,  "Cannot apply $pull/$pullAll modifier to non-array", e.type() == Array || e.eoo() );
+                uassert( 10142,
+                         "Cannot apply $pull/$pullAll modifier to non-array",
+                         e.type() == Array || e.eoo() );
                 BSONObjIterator i( e.embeddedObject() );
                 while( mss->_inPlacePossible && i.more() ) {
                     BSONElement arrI = i.next();
@@ -452,13 +458,17 @@ namespace mongo {
             }
 
             case Mod::POP: {
-                uassert( 10143 ,  "Cannot apply $pop modifier to non-array", e.type() == Array || e.eoo() );
+                uassert( 10143,
+                         "Cannot apply $pop modifier to non-array",
+                         e.type() == Array || e.eoo() );
                 mss->amIInPlacePossible( e.embeddedObject().isEmpty() );
                 break;
             }
 
             case Mod::ADDTOSET: {
-                uassert( 12591 ,  "Cannot apply $addToSet modifier to non-array", e.type() == Array || e.eoo() );
+                uassert( 12591,
+                         "Cannot apply $addToSet modifier to non-array",
+                         e.type() == Array || e.eoo() );
 
                 BSONObjIterator i( e.embeddedObject() );
                 if ( m.isEach() ) {
@@ -501,7 +511,8 @@ namespace mongo {
         }
 
         if ( incType ) {
-            DEBUGUPDATE( "\t\t\t\t\t appendForOpLog inc fieldname: " << m->fieldName << " short:" << m->shortFieldName );
+            DEBUGUPDATE( "\t\t\t\t\t appendForOpLog inc fieldname: " << m->fieldName
+                         << " short:" << m->shortFieldName );
             BSONObjBuilder bb( b.subobjStart( "$set" ) );
             appendIncValue( bb , true );
             bb.done();
@@ -523,9 +534,10 @@ namespace mongo {
             return;
         }
 
-        const char * name = fixedOpName ? fixedOpName : Mod::modNames[op()];
+        const char* name = fixedOpName ? fixedOpName : Mod::modNames[op()];
 
-        DEBUGUPDATE( "\t\t\t\t\t appendForOpLog name:" << name << " fixed: " << fixed << " fn: " << m->fieldName );
+        DEBUGUPDATE( "\t\t\t\t\t appendForOpLog name:" << name << " fixed: " << fixed
+                     << " fn: " << m->fieldName );
 
         BSONObjBuilder bb( b.subobjStart( name ) );
         if ( fixed ) {
@@ -547,7 +559,7 @@ namespace mongo {
     }
 
     template< class Builder >
-    void ModState::handleRename( Builder &newObjBuilder, const char *shortFieldName ) {
+    void ModState::handleRename( Builder& newObjBuilder, const char* shortFieldName ) {
         newObjBuilder.appendAs( newVal , shortFieldName );
         BSONObjBuilder b;
         b.appendAs( newVal, shortFieldName );
@@ -606,9 +618,9 @@ namespace mongo {
     template< class Builder >
     void ModSetState::_appendNewFromMods( const string& root , ModState& m , Builder& b ,
                                          set<string>& onedownseen ) {
-        const char * temp = m.fieldName();
+        const char*  temp = m.fieldName();
         temp += root.size();
-        const char * dot = strchr( temp , '.' );
+        const char* dot = strchr( temp , '.' );
         if ( dot ) {
             string nr( m.fieldName() , 0 , 1 + ( dot - m.fieldName() ) );
             string nf( temp , 0 , dot - temp );
@@ -625,7 +637,7 @@ namespace mongo {
         }
     }
 
-    bool ModSetState::duplicateFieldName( const BSONElement &a, const BSONElement &b ) {
+    bool ModSetState::duplicateFieldName( const BSONElement& a, const BSONElement& b ) {
         return
         !a.eoo() &&
         !b.eoo() &&
@@ -633,7 +645,7 @@ namespace mongo {
         str::equals( a.fieldName(), b.fieldName() );
     }
 
-    ModSetState::ModStateRange ModSetState::modsForRoot( const string &root ) {
+    ModSetState::ModStateRange ModSetState::modsForRoot( const string& root ) {
         ModStateHolder::iterator mstart = _mods.lower_bound( root );
         StringBuilder buf;
         buf << root << (char)255;
@@ -641,14 +653,14 @@ namespace mongo {
         return make_pair( mstart, mend );
     }
 
-    void ModSetState::createNewObjFromMods( const string &root , BSONObjBuilder &b ,
-                                           const BSONObj &obj ) {
+    void ModSetState::createNewObjFromMods( const string& root , BSONObjBuilder& b ,
+                                           const BSONObj& obj ) {
         BSONObjIteratorSorted es( obj );
         createNewFromMods( root, b, es, modsForRoot( root ), LexNumCmp( true ) );
     }
 
-    void ModSetState::createNewArrayFromMods( const string &root , BSONArrayBuilder &b ,
-                                             const BSONArray &arr ) {
+    void ModSetState::createNewArrayFromMods( const string& root , BSONArrayBuilder& b ,
+                                             const BSONArray& arr ) {
         BSONArrayIteratorSorted es( arr );
         ModStateRange objectOrderedRange = modsForRoot( root );
         ModStateHolder arrayOrderedMods( LexNumCmp( false ) );
@@ -656,7 +668,7 @@ namespace mongo {
         ModStateRange arrayOrderedRange( arrayOrderedMods.begin(), arrayOrderedMods.end() );
         createNewFromMods( root, b, es, arrayOrderedRange, LexNumCmp( false ) );
     }
-    
+
     template< class Builder >
     void ModSetState::createNewFromMods( const string& root , Builder& b ,
                                         BSONIteratorSorted& es ,
@@ -685,12 +697,16 @@ namespace mongo {
             FieldCompareResult cmp = compareDottedFieldNames( m->second->m->fieldName , field ,
                                                              lexNumCmp );
 
-            DEBUGUPDATE( "\t\t\t field:" << field << "\t mod:" << m->second->m->fieldName << "\t cmp:" << cmp << "\t short: " << e.fieldName() );
+            DEBUGUPDATE( "\t\t\t field:" << field << "\t mod:"
+                         << m->second->m->fieldName << "\t cmp:" << cmp
+                         << "\t short: " << e.fieldName() );
 
             switch ( cmp ) {
 
             case LEFT_SUBFIELD: { // Mod is embedded under this element
-                uassert( 10145 ,  str::stream() << "LEFT_SUBFIELD only supports Object: " << field << " not: " << e.type() , e.type() == Object || e.type() == Array );
+                uassert( 10145,
+                         str::stream() << "LEFT_SUBFIELD only supports Object: " << field
+                         << " not: " << e.type() , e.type() == Object || e.type() == Array );
                 if ( onedownseen.count( e.fieldName() ) == 0 ) {
                     onedownseen.insert( e.fieldName() );
                     if ( e.type() == Object ) {
@@ -810,16 +826,16 @@ namespace mongo {
        NOTE: MODIFIES source from object!
     */
     ModSet::ModSet(
-        const BSONObj &from ,
+        const BSONObj& from ,
         const set<string>& idxKeys,
-        const set<string> *backgroundKeys)
+        const set<string>* backgroundKeys)
         : _isIndexed(0) , _hasDynamicArray( false ) {
 
         BSONObjIterator it(from);
 
         while ( it.more() ) {
             BSONElement e = it.next();
-            const char *fn = e.fieldName();
+            const char* fn = e.fieldName();
 
             uassert( 10147 ,  "Invalid modifier specified: " + string( fn ), e.type() == Object );
             BSONObj j = e.embeddedObject();
@@ -831,31 +847,74 @@ namespace mongo {
             while ( jt.more() ) {
                 BSONElement f = jt.next(); // x:44
 
-                const char * fieldName = f.fieldName();
+                const char* fieldName = f.fieldName();
 
-                uassert( 15896 ,  "Modified field name may not start with $", fieldName[0] != '$' || op == Mod::UNSET );  // allow remove of invalid field name in case it was inserted before this check was added (~ version 2.1)
-                uassert( 10148 ,  "Mod on _id not allowed", strcmp( fieldName, "_id" ) != 0 );
-                uassert( 10149 ,  "Invalid mod field name, may not end in a period", fieldName[ strlen( fieldName ) - 1 ] != '.' );
-                uassert( 10150 ,  "Field name duplication not allowed with modifiers", ! haveModForField( fieldName ) );
-                uassert( 10151 ,  "have conflicting mods in update" , ! haveConflictingMod( fieldName ) );
-                uassert( 10152 ,  "Modifier $inc allowed for numbers only", f.isNumber() || op != Mod::INC );
-                uassert( 10153 ,  "Modifier $pushAll/pullAll allowed for arrays only", f.type() == Array || ( op != Mod::PUSH_ALL && op != Mod::PULL_ALL ) );
+                // Allow remove of invalid field name in case it was inserted before this check
+                // was added (~ version 2.1).
+                uassert( 15896,
+                         "Modified field name may not start with $",
+                         fieldName[0] != '$' || op == Mod::UNSET );
+                uassert( 10148,
+                         "Mod on _id not allowed",
+                         strcmp( fieldName, "_id" ) != 0 );
+                uassert( 10149,
+                         "Invalid mod field name, may not end in a period",
+                         fieldName[ strlen( fieldName ) - 1 ] != '.' );
+                uassert( 10150,
+                         "Field name duplication not allowed with modifiers",
+                         ! haveModForField( fieldName ) );
+                uassert( 10151,
+                         "have conflicting mods in update",
+                         ! haveConflictingMod( fieldName ) );
+                uassert( 10152,
+                         "Modifier $inc allowed for numbers only",
+                         f.isNumber() || op != Mod::INC );
+                uassert( 10153,
+                         "Modifier $pushAll/pullAll allowed for arrays only",
+                         f.type() == Array || ( op != Mod::PUSH_ALL && op != Mod::PULL_ALL ) );
 
                 if ( op == Mod::RENAME_TO ) {
                     uassert( 13494, "$rename target must be a string", f.type() == String );
-                    const char *target = f.valuestr();
-                    uassert( 13495, "$rename source must differ from target", strcmp( fieldName, target ) != 0 );
-                    uassert( 13496, "invalid mod field name, source may not be empty", fieldName[0] );
-                    uassert( 13479, "invalid mod field name, target may not be empty", target[0] );
-                    uassert( 13480, "invalid mod field name, source may not begin or end in period", fieldName[0] != '.' && fieldName[ strlen( fieldName ) - 1 ] != '.' );
-                    uassert( 13481, "invalid mod field name, target may not begin or end in period", target[0] != '.' && target[ strlen( target ) - 1 ] != '.' );
-                    uassert( 13482, "$rename affecting _id not allowed", !( fieldName[0] == '_' && fieldName[1] == 'i' && fieldName[2] == 'd' && ( !fieldName[3] || fieldName[3] == '.' ) ) );
-                    uassert( 13483, "$rename affecting _id not allowed", !( target[0] == '_' && target[1] == 'i' && target[2] == 'd' && ( !target[3] || target[3] == '.' ) ) );
-                    uassert( 13484, "field name duplication not allowed with $rename target", !haveModForField( target ) );
-                    uassert( 13485, "conflicting mods not allowed with $rename target", !haveConflictingMod( target ) );
-                    uassert( 13486, "$rename target may not be a parent of source", !( strncmp( fieldName, target, strlen( target ) ) == 0 && fieldName[ strlen( target ) ] == '.' ) );
-                    uassert( 13487, "$rename source may not be dynamic array", strstr( fieldName , ".$" ) == 0 );
-                    uassert( 13488, "$rename target may not be dynamic array", strstr( target , ".$" ) == 0 );
+                    const char* target = f.valuestr();
+                    uassert( 13495,
+                             "$rename source must differ from target",
+                             strcmp( fieldName, target ) != 0 );
+                    uassert( 13496,
+                             "invalid mod field name, source may not be empty",
+                             fieldName[0] );
+                    uassert( 13479,
+                             "invalid mod field name, target may not be empty",
+                             target[0] );
+                    uassert( 13480,
+                             "invalid mod field name, source may not begin or end in period",
+                             fieldName[0] != '.' && fieldName[ strlen( fieldName ) - 1 ] != '.' );
+                    uassert( 13481,
+                             "invalid mod field name, target may not begin or end in period",
+                             target[0] != '.' && target[ strlen( target ) - 1 ] != '.' );
+                    uassert( 13482,
+                             "$rename affecting _id not allowed",
+                             !( fieldName[0] == '_' && fieldName[1] == 'i' && fieldName[2] == 'd'
+                                && ( !fieldName[3] || fieldName[3] == '.' ) ) );
+                    uassert( 13483,
+                             "$rename affecting _id not allowed",
+                             !( target[0] == '_' && target[1] == 'i' && target[2] == 'd'
+                                && ( !target[3] || target[3] == '.' ) ) );
+                    uassert( 13484,
+                             "field name duplication not allowed with $rename target",
+                             !haveModForField( target ) );
+                    uassert( 13485,
+                             "conflicting mods not allowed with $rename target",
+                             !haveConflictingMod( target ) );
+                    uassert( 13486,
+                             "$rename target may not be a parent of source",
+                             !( strncmp( fieldName, target, strlen( target ) ) == 0
+                                && fieldName[ strlen( target ) ] == '.' ) );
+                    uassert( 13487,
+                             "$rename source may not be dynamic array",
+                             strstr( fieldName , ".$" ) == 0 );
+                    uassert( 13488,
+                             "$rename target may not be dynamic array",
+                             strstr( target , ".$" ) == 0 );
 
                     Mod from;
                     from.init( Mod::RENAME_FROM, f );
@@ -887,8 +946,8 @@ namespace mongo {
 
     }
 
-    ModSet * ModSet::fixDynamicArray( const string &elemMatchKey ) const {
-        ModSet * n = new ModSet();
+    ModSet* ModSet::fixDynamicArray( const string& elemMatchKey ) const {
+        ModSet* n = new ModSet();
         n->_isIndexed = _isIndexed;
         n->_hasDynamicArray = _hasDynamicArray;
         for ( ModHolder::const_iterator i=_mods.begin(); i!=_mods.end(); i++ ) {
@@ -929,31 +988,31 @@ namespace mongo {
              - not mods is indexed
              - not upsert
     */
-    static UpdateResult _updateById(bool isOperatorUpdate, 
-                                    int idIdxNo, 
-                                    ModSet *mods, 
-                                    int profile, 
-                                    NamespaceDetails *d,
+    static UpdateResult _updateById(bool isOperatorUpdate,
+                                    int idIdxNo,
+                                    ModSet* mods,
+                                    int profile,
+                                    NamespaceDetails* d,
                                     NamespaceDetailsTransient *nsdt,
-                                    bool god, 
-                                    const char *ns,
-                                    const BSONObj& updateobj, 
-                                    BSONObj patternOrig, 
-                                    bool logop, 
-                                    OpDebug& debug, 
+                                    bool su,
+                                    const char* ns,
+                                    const BSONObj& updateobj,
+                                    BSONObj patternOrig,
+                                    bool logop,
+                                    OpDebug& debug,
                                     bool fromMigrate = false) {
 
         DiskLoc loc;
         {
             IndexDetails& i = d->idx(idIdxNo);
-            BSONObj key = i.getKeyFromQuery( patternOrig );            
+            BSONObj key = i.getKeyFromQuery( patternOrig );
             loc = i.idxInterface().findSingle(i, i.head, key);
             if( loc.isNull() ) {
                 // no upsert support in _updateById yet, so we are done.
                 return UpdateResult(0, 0, 0);
             }
         }
-        Record *r = loc.rec();
+        Record* r = loc.rec();
 
         if ( cc().allowedToThrowPageFaultException() && ! r->likelyInPhysicalMemory() ) {
             throw PageFaultException( r );
@@ -989,7 +1048,7 @@ namespace mongo {
 
                 if( mss->needOpLogRewrite() ) {
                     DEBUGUPDATE( "\t rewrite update: " << mss->getOpLogRewrite() );
-                    logOp("u", ns, mss->getOpLogRewrite() , 
+                    logOp("u", ns, mss->getOpLogRewrite() ,
                           &pattern, 0, fromMigrate );
                 }
                 else {
@@ -1010,27 +1069,34 @@ namespace mongo {
         return UpdateResult( 1 , 0 , 1 );
     }
 
-    UpdateResult _updateObjects( bool god, 
-                                 const char *ns, 
-                                 const BSONObj& updateobj, 
-                                 BSONObj patternOrig, 
-                                 bool upsert, 
-                                 bool multi, 
-                                 bool logop , 
-                                 OpDebug& debug, 
+    UpdateResult _updateObjects( bool su,
+                                 const char* ns,
+                                 const BSONObj& updateobj,
+                                 BSONObj patternOrig,
+                                 bool upsert,
+                                 bool multi,
+                                 bool logop ,
+                                 OpDebug& debug,
                                  RemoveSaver* rs,
                                  bool fromMigrate,
-                                 const QueryPlanSelectionPolicy &planPolicy ) {
-        DEBUGUPDATE( "update: " << ns << " update: " << updateobj << " query: " << patternOrig << " upsert: " << upsert << " multi: " << multi );
+                                 const QueryPlanSelectionPolicy& planPolicy ) {
+
+        DEBUGUPDATE( "update: " << ns
+                     << " update: " << updateobj
+                     << " query: " << patternOrig
+                     << " upsert: " << upsert << " multi: " << multi );
+
         Client& client = cc();
         int profile = client.database()->profile;
-        
+
         debug.updateobj = updateobj;
 
-        // idea with these here it to make them loop invariant for multi updates, and thus be a bit faster for that case
-        // The pointers may be left invalid on a failed or terminal yield recovery.
-        NamespaceDetails *d = nsdetails(ns); // can be null if an upsert...
-        NamespaceDetailsTransient *nsdt = &NamespaceDetailsTransient::get(ns);
+        // The idea with these here it to make them loop invariant for
+        // multi updates, and thus be a bit faster for that case.  The
+        // pointers may be left invalid on a failed or terminal yield
+        // recovery.
+        NamespaceDetails* d = nsdetails(ns); // can be null if an upsert...
+        NamespaceDetailsTransient* nsdt = &NamespaceDetailsTransient::get(ns);
 
         auto_ptr<ModSet> mods;
         bool isOperatorUpdate = updateobj.firstElementFieldName()[0] == '$';
@@ -1052,7 +1118,20 @@ namespace mongo {
             int idxNo = d->findIdIndex();
             if( idxNo >= 0 ) {
                 debug.idhack = true;
-                UpdateResult result = _updateById(isOperatorUpdate, idxNo, mods.get(), profile, d, nsdt, god, ns, updateobj, patternOrig, logop, debug, fromMigrate);
+
+                UpdateResult result = _updateById( isOperatorUpdate,
+                                                   idxNo,
+                                                   mods.get(),
+                                                   profile,
+                                                   d,
+                                                   nsdt,
+                                                   su,
+                                                   ns,
+                                                   updateobj,
+                                                   patternOrig,
+                                                   logop,
+                                                   debug,
+                                                   fromMigrate);
                 if ( result.existing || ! upsert ) {
                     return result;
                 }
@@ -1061,7 +1140,7 @@ namespace mongo {
                     checkNoMods( updateobj );
                     debug.upsert = true;
                     BSONObj no = updateobj;
-                    theDataFileMgr.insertWithObjMod(ns, no, god);
+                    theDataFileMgr.insertWithObjMod(ns, no, su);
                     return UpdateResult( 0 , 0 , 1 , no );
                 }
             }
@@ -1080,16 +1159,16 @@ namespace mongo {
             MatchDetails details;
             auto_ptr<ClientCursor> cc;
             do {
-                
-                if ( cc.get() == 0 && 
-                     client.allowedToThrowPageFaultException() && 
-                     ! c->currLoc().isNull() && 
+
+                if ( cc.get() == 0 &&
+                     client.allowedToThrowPageFaultException() &&
+                     ! c->currLoc().isNull() &&
                      ! c->currLoc().rec()->likelyInPhysicalMemory() ) {
                     throw PageFaultException( c->currLoc().rec() );
                 }
 
                 bool atomic = c->matcher() && c->matcher()->docMatcher().atomic();
-                
+
                 if ( ! atomic && debug.nscanned > 0 ) {
                     // we need to use a ClientCursor to yield
                     if ( cc.get() == 0 ) {
@@ -1105,7 +1184,7 @@ namespace mongo {
                     if ( !c->ok() ) {
                         break;
                     }
-                    
+
                     if ( didYield ) {
                         d = nsdetails(ns);
                         nsdt = &NamespaceDetailsTransient::get(ns);
@@ -1122,7 +1201,7 @@ namespace mongo {
                     //verify( c->matcher() );
                     details.requestElemMatchKey();
                 }
-                
+
                 if ( !c->currentMatches( &details ) ) {
                     c->advance();
 
@@ -1145,7 +1224,7 @@ namespace mongo {
                     continue;
                 }
 
-                Record *r = c->_current();
+                Record* r = c->_current();
                 DiskLoc loc = c->currLoc();
 
                 if ( c->getsetdup( loc ) && autoDedup ) {
@@ -1185,7 +1264,7 @@ namespace mongo {
 
                     const BSONObj& onDisk = loc.obj();
 
-                    ModSet * useMods = mods.get();
+                    ModSet* useMods = mods.get();
                     bool forceRewrite = false;
 
                     auto_ptr<ModSet> mymodset;
@@ -1210,7 +1289,7 @@ namespace mongo {
                         mss->applyModsInPlace( true );// const_cast<BSONObj&>(onDisk) );
 
                         DEBUGUPDATE( "\t\t\t doing in place update" );
-                        if ( profile && !multi ) 
+                        if ( profile && !multi )
                             debug.fastmod = true;
 
                         if ( modsIsIndexed ) {
@@ -1225,7 +1304,15 @@ namespace mongo {
 
                         BSONObj newObj = mss->createNewFromMods();
                         checkTooLarge(newObj);
-                        DiskLoc newLoc = theDataFileMgr.updateRecord(ns, d, nsdt, r, loc , newObj.objdata(), newObj.objsize(), debug);
+                        DiskLoc newLoc = theDataFileMgr.updateRecord(ns,
+                                                                     d,
+                                                                     nsdt,
+                                                                     r,
+                                                                     loc,
+                                                                     newObj.objdata(),
+                                                                     newObj.objsize(),
+                                                                     debug);
+
                         if ( newLoc != loc || modsIsIndexed ){
                             // log() << "Moved obj " << newLoc.obj()["_id"] << " from " << loc << " to " << newLoc << endl;
                             // object moved, need to make sure we don' get again
@@ -1246,7 +1333,7 @@ namespace mongo {
 
                         if ( forceRewrite || mss->needOpLogRewrite() ) {
                             DEBUGUPDATE( "\t rewrite update: " << mss->getOpLogRewrite() );
-                            logOp("u", ns, mss->getOpLogRewrite() , 
+                            logOp("u", ns, mss->getOpLogRewrite() ,
                                   &pattern, 0, fromMigrate );
                         }
                         else {
@@ -1284,9 +1371,9 @@ namespace mongo {
 
                 BSONElementManipulator::lookForTimestamps( updateobj );
                 checkNoMods( updateobj );
-                theDataFileMgr.updateRecord(ns, d, nsdt, r, loc , updateobj.objdata(), updateobj.objsize(), debug, god);
+                theDataFileMgr.updateRecord(ns, d, nsdt, r, loc , updateobj.objdata(), updateobj.objsize(), debug, su);
                 if ( logop ) {
-                    DEV wassert( !god ); // god doesn't get logged, this would be bad.
+                    DEV wassert( !su ); // super used doesn't get logged, this would be bad.
                     logOp("u", ns, updateobj, &pattern, 0, fromMigrate );
                 }
                 return UpdateResult( 1 , 0 , 1 );
@@ -1298,11 +1385,11 @@ namespace mongo {
 
         if ( upsert ) {
             if ( updateobj.firstElementFieldName()[0] == '$' ) {
-                // upsert of an $operation. build a default object 
+                // upsert of an $operation. build a default object
                 BSONObj newObj = mods->createNewFromQuery( patternOrig );
                 checkNoMods( newObj );
                 debug.fastmodinsert = true;
-                theDataFileMgr.insertWithObjMod(ns, newObj, god);
+                theDataFileMgr.insertWithObjMod(ns, newObj, su);
                 if ( logop )
                     logOp( "i", ns, newObj, 0, 0, fromMigrate );
 
@@ -1312,7 +1399,7 @@ namespace mongo {
             checkNoMods( updateobj );
             debug.upsert = true;
             BSONObj no = updateobj;
-            theDataFileMgr.insertWithObjMod(ns, no, god);
+            theDataFileMgr.insertWithObjMod(ns, no, su);
             if ( logop )
                 logOp( "i", ns, no, 0, 0, fromMigrate );
             return UpdateResult( 0 , 0 , 1 , no );
@@ -1321,21 +1408,25 @@ namespace mongo {
         return UpdateResult( 0 , isOperatorUpdate , 0 );
     }
 
-    UpdateResult updateObjects( const char *ns, 
-                                const BSONObj& updateobj, 
-                                BSONObj patternOrig, 
-                                bool upsert, 
-                                bool multi, 
-                                bool logop , 
-                                OpDebug& debug, 
+    UpdateResult updateObjects( const char* ns,
+                                const BSONObj& updateobj,
+                                BSONObj patternOrig,
+                                bool upsert,
+                                bool multi,
+                                bool logop ,
+                                OpDebug& debug,
                                 bool fromMigrate,
-                                const QueryPlanSelectionPolicy &planPolicy ) {
+                                const QueryPlanSelectionPolicy& planPolicy ) {
+
         uassert( 10155 , "cannot update reserved $ collection", strchr(ns, '$') == 0 );
         if ( strstr(ns, ".system.") ) {
             /* dm: it's very important that system.indexes is never updated as IndexDetails has pointers into it */
-            uassert( 10156 , str::stream() << "cannot update system collection: " << ns << " q: " << patternOrig << " u: " << updateobj , legalClientSystemNS( ns , true ) );
+            uassert( 10156,
+                     str::stream() << "cannot update system collection: " << ns << " q: " << patternOrig << " u: " << updateobj,
+                     legalClientSystemNS( ns , true ) );
         }
-        UpdateResult ur = _updateObjects(false, ns, updateobj, patternOrig, 
+
+        UpdateResult ur = _updateObjects(false, ns, updateobj, patternOrig,
                                          upsert, multi, logop,
                                          debug, 0, fromMigrate, planPolicy );
         debug.nupdated = ur.num;

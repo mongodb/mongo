@@ -17,6 +17,9 @@
  */
 
 #include "pch.h"
+
+#include <boost/thread.hpp>
+
 #include "mongo/db/dbmessage.h"
 #include "mongo/util/net/listen.h"
 #include "mongo/util/net/message.h"

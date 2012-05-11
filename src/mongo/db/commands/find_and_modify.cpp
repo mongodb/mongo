@@ -19,6 +19,10 @@
 #include "../commands.h"
 #include "../instance.h"
 #include "../clientcursor.h"
+#include "../pagefault.h"
+#include "../dbhelpers.h"
+#include "../ops/delete.h"
+#include "../ops/update.h"
 
 namespace mongo {
 
@@ -37,8 +41,117 @@ namespace mongo {
         virtual bool logTheOp() { return false; } // the modifications will be logged directly
         virtual bool slaveOk() const { return false; }
         virtual LockType locktype() const { return WRITE; }
-        virtual bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+        
+        /* this will eventually replace run,  once sort is handled */
+        bool runNoDirectClient( const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+            verify( cmdObj["sort"].eoo() );
+
+            string ns = dbname + '.' + cmdObj.firstElement().valuestr();
+
+            BSONObj query = cmdObj.getObjectField("query");
+            BSONObj fields = cmdObj.getObjectField("fields");
+            BSONObj update = cmdObj.getObjectField("update");
+            
+            bool upsert = cmdObj["upsert"].trueValue();
+            bool returnNew = cmdObj["new"].trueValue();
+            bool remove = cmdObj["remove"].trueValue();
+
+            if ( remove ) {
+                if ( upsert ) {
+                    errmsg = "remove and upsert can't co-exist";
+                    return false;
+                }
+                if ( returnNew ) {
+                    errmsg = "remove and returnNew can't co-exist";
+                    return false;
+                }
+            }
+            else if ( update.isEmpty() ) {
+                errmsg = "need remove or update";
+                return false;
+            }
+            
+            PageFaultRetryableSection s;
+            while ( 1 ) {
+                try {
+                    return runNoDirectClient( ns , 
+                                              query , fields , update , 
+                                              upsert , returnNew , remove , 
+                                              result );
+                }
+                catch ( PageFaultException& e ) {
+                    e.touch();
+                }
+            }
+
+                    
+        }
+
+        void _appendHelper( BSONObjBuilder& result , const BSONObj& doc , bool found , const BSONObj& fields ) {
+            if ( ! found ) {
+                result.appendNull( "value" );
+                return;
+            }
+
+            if ( fields.isEmpty() ) {
+                result.append( "value" , doc );
+                return;
+            }
+
+            Projection p;
+            p.init( fields );
+            result.append( "value" , p.transform( doc ) );
+                
+        }
+
+        bool runNoDirectClient( const string& ns , 
+                                const BSONObj& query , const BSONObj& fields , const BSONObj& update , 
+                                bool upsert , bool returnNew , bool remove ,
+                                BSONObjBuilder& result ) {
+            
+            
+            Lock::DBWrite lk( ns );
+            
+            BSONObj doc;
+            
+            bool found = Helpers::findOne( ns.c_str() , query , doc );
+            if ( remove ) {
+                _appendHelper( result , doc , found , fields );
+                if ( found ) {
+                    deleteObjects( ns.c_str() , query , true , true );
+                }
+            }
+            else {
+                // update
+                if ( ! found && ! upsert ) {
+                    // didn't have it, and am not upserting
+                    _appendHelper( result , doc , found , fields );
+                }
+                else {
+                    // we found it or we're updating
+                    
+                    if ( ! returnNew ) {
+                        _appendHelper( result , doc , found , fields );
+                    }
+                    
+                    updateObjects( ns.c_str() , update , query , upsert , false , true , cc().curop()->debug() );
+                    
+                    if ( returnNew ) {
+                        verify( Helpers::findOne( ns.c_str() , query , doc ) );
+                        _appendHelper( result , doc , true , fields );
+                    }
+                    
+                }
+            }
+            
+            return true;
+        }
+        
+        virtual bool run(const string& dbname, BSONObj& cmdObj, int x, string& errmsg, BSONObjBuilder& result, bool y) {
             static DBDirectClient db;
+
+            if ( cmdObj["sort"].eoo() )
+                return runNoDirectClient( dbname , cmdObj , x, errmsg , result, y );
 
             string ns = dbname + '.' + cmdObj.firstElement().valuestr();
 

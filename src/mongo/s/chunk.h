@@ -364,8 +364,12 @@ namespace mongo {
         void getMarkedMinorVersions( set<ShardChunkVersion>& minorVersions ) const;
 
         // helpers for constructor
-        void _load(ChunkMap& chunks, set<Shard>& shards, ShardVersionMap& shardVersions, ChunkManagerPtr oldManager);
+
+        // returns true if load was consistent
+        bool _load(ChunkMap& chunks, set<Shard>& shards, ShardVersionMap& shardVersions, ChunkManagerPtr oldManager);
         static bool _isValid(const ChunkMap& chunks);
+
+        // end helpers
 
         // All members should be const for thread-safety
         const string _ns;

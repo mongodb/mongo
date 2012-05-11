@@ -1145,6 +1145,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="pipeline\field_path.cpp" />
     <ClCompile Include="pipeline\value.cpp" />
     <ClCompile Include="projection.cpp" />
+    <ClCompile Include="ttl.cpp" />
     <ClInclude Include="..\..\third_party\js-1.7\jsarena.h" />
     <ClInclude Include="..\..\third_party\js-1.7\jsarray.h" />
     <ClInclude Include="..\..\third_party\js-1.7\jsatom.h" />
@@ -1299,6 +1300,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="repl\rs.cpp" />
     <ClCompile Include="repl\replset_commands.cpp" />
     <ClCompile Include="repl\rs_config.cpp" />
+    <ClInclude Include="ttl.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\third_party\js-1.7\jskeyword.tbl" />
