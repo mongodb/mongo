@@ -189,10 +189,11 @@ SELFHELPER(struct __wt_cursor)
         void _set_recno(uint64_t recno) {
                 WT_ITEM k;
                 uint8_t recno_buf[20];
-                if (wiredtiger_struct_pack(recno_buf, sizeof (recno_buf),
-                    "r", recno) == 0) {
+                if (wiredtiger_struct_pack($self->session,
+		    recno_buf, sizeof (recno_buf), "r", recno) == 0) {
                         k.data = recno_buf;
-                        k.size = (uint32_t)wiredtiger_struct_size("q", recno);
+                        k.size = (uint32_t)
+			    wiredtiger_struct_size($self->session, "q", recno);
                         $self->set_key($self, &k);
                 }
         }
@@ -220,7 +221,8 @@ SELFHELPER(struct __wt_cursor)
                 uint64_t r;
                 int ret = $self->get_key($self, &k);
                 if (ret == 0)
-                        ret = wiredtiger_struct_unpack(k.data, k.size, "q", &r);
+                        ret = wiredtiger_struct_unpack(
+			    $self->session, k.data, k.size, "q", &r);
                 if (ret != 0) {
                         SWIG_Python_SetErrorMsg(wtError,
                             wiredtiger_strerror(ret));

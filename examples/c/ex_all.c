@@ -48,6 +48,7 @@ int add_extractor(WT_CONNECTION *conn);
 int connection_ops(WT_CONNECTION *conn);
 int cursor_ops(WT_SESSION *session);
 int cursor_search_near(WT_CURSOR *cursor);
+int pack_ops(WT_SESSION *session);
 int session_ops(WT_SESSION *session);
 
 int
@@ -686,6 +687,40 @@ connection_ops(WT_CONNECTION *conn)
 	return (ret);
 }
 
+int
+pack_ops(WT_SESSION *session)
+{
+	int ret;
+
+	{
+	/*! [Get the packed size] */
+	size_t size;
+	size = wiredtiger_struct_size(session, "iSh", 42, "hello", -3);
+	assert(size < 100);
+	/*! [Get the packed size] */
+	}
+
+	{
+	/*! [Pack fields into a buffer] */
+	char buf[100];
+	ret = wiredtiger_struct_pack(
+	    session, buf, sizeof(buf), "iSh", 42, "hello", -3);
+	/*! [Pack fields into a buffer] */
+ 
+	{
+	/*! [Unpack fields from a buffer] */
+	int i;
+	char *s;
+	short h;
+	ret = wiredtiger_struct_unpack(
+	    session, buf, sizeof(buf), "iSh", &i, &s, &h);
+	/*! [Unpack fields from a buffer] */
+	}
+	}
+
+	return (ret);
+}
+
 int main(void)
 {
 	int ret;
@@ -696,30 +731,6 @@ int main(void)
 	const char *home = "WT_TEST";
 	ret = wiredtiger_open(home, NULL, "create,transactional", &conn);
 	/*! [Open a connection] */
-	}
-
-	{
-	/*! [Get the packed size] */
-	size_t size;
-	size = wiredtiger_struct_size("iSh", 42, "hello", -3);
-	assert(size < 100);
-	/*! [Get the packed size] */
-	}
-
-	{
-	/*! [Pack fields into a buffer] */
-	char buf[100];
-	ret = wiredtiger_struct_pack(buf, sizeof(buf), "iSh", 42, "hello", -3);
-	/*! [Pack fields into a buffer] */
- 
-	{
-	/*! [Unpack fields from a buffer] */
-	int i;
-	char *s;
-	short h;
-	ret = wiredtiger_struct_unpack(buf, sizeof(buf), "iSh", &i, &s, &h);
-	/*! [Unpack fields from a buffer] */
-	}
 	}
 
 	/*! [Get the WiredTiger library version #1] */

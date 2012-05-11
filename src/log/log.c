@@ -11,9 +11,7 @@ static int
 __log_record_size(WT_SESSION_IMPL *session,
     WT_LOGREC_DESC *recdesc, va_list ap, size_t *sizep)
 {
-	WT_UNUSED(session);
-
-	*sizep = wiredtiger_struct_size(recdesc->fmt, ap);
+	*sizep = __wt_struct_sizev(session, recdesc->fmt, ap);
 	return (0);
 }
 

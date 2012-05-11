@@ -1174,12 +1174,14 @@ struct __wt_event_handler {
  *
  * @snippet ex_all.c Unpack fields from a buffer
  *
+ * @param session the session handle
  * @param buffer a pointer to a packed byte array
  * @param size the number of valid bytes in the buffer
- * @param format the data format, see ::wiredtiger_struct_pack
+ * @param format the data format, see @ref packing
  * @errors
  */
-int wiredtiger_struct_pack(void *buffer, size_t size, const char *format, ...);
+int wiredtiger_struct_pack(
+    WT_SESSION *session, void *buffer, size_t size, const char *format, ...);
 
 /*! Calculate the size required to pack a structure.
  *
@@ -1189,11 +1191,12 @@ int wiredtiger_struct_pack(void *buffer, size_t size, const char *format, ...);
  *
  * @snippet ex_all.c Get the packed size
  *
- * @param format the data format, see ::wiredtiger_struct_pack
+ * @param session the session handle
+ * @param format the data format, see @ref packing
  * @returns the number of bytes needed for the matching call to
  * ::wiredtiger_struct_pack
  */
-size_t wiredtiger_struct_size(const char *format, ...);
+size_t wiredtiger_struct_size(WT_SESSION *session, const char *format, ...);
 
 /*! Unpack a structure from a buffer.
  *
@@ -1201,13 +1204,14 @@ size_t wiredtiger_struct_size(const char *format, ...);
  *
  * @snippet ex_all.c Unpack fields from a buffer
  *
+ * @param session the session handle
  * @param buffer a pointer to a packed byte array
  * @param size the number of valid bytes in the buffer
- * @param format the data format, see ::wiredtiger_struct_pack
+ * @param format the data format, see @ref packing
  * @errors
  */
-int wiredtiger_struct_unpack(const void *buffer, size_t size,
-    const char *format, ...);
+int wiredtiger_struct_unpack(WT_SESSION *session,
+    const void *buffer, size_t size, const char *format, ...);
 
 /*! Get version information.
  *

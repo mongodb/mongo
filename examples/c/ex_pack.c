@@ -54,12 +54,12 @@ int main(void)
 		    home, wiredtiger_strerror(ret));
 
 	/*! [packing] */
-	size = wiredtiger_struct_size("iii", 42, 1000, -9);
+	size = wiredtiger_struct_size(session, "iii", 42, 1000, -9);
 	if (size > sizeof(buf)) {
 		/* Allocate a bigger buffer. */
 	}
-	wiredtiger_struct_pack(buf, size, "iii", 42, 1000, -9);
-	wiredtiger_struct_unpack(buf, size, "iii", &i, &j, &k);
+	wiredtiger_struct_pack(session, buf, size, "iii", 42, 1000, -9);
+	wiredtiger_struct_unpack(session, buf, size, "iii", &i, &j, &k);
 	/*! [packing] */
 
 	/* Note: closing the connection implicitly closes open session(s). */

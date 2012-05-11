@@ -12,16 +12,13 @@
  *	Calculate the size of a packed byte string.
  */
 size_t
-wiredtiger_struct_size(const char *fmt, ...)
+wiredtiger_struct_size(WT_SESSION *wt_session, const char *fmt, ...)
 {
-	WT_SESSION_IMPL session;
 	va_list ap;
 	size_t size;
 
-	WT_CLEAR(session);
-
 	va_start(ap, fmt);
-	size = __wt_struct_sizev(&session, fmt, ap);
+	size = __wt_struct_sizev((WT_SESSION_IMPL *)wt_session, fmt, ap);
 	va_end(ap);
 
 	return (size);
@@ -32,16 +29,15 @@ wiredtiger_struct_size(const char *fmt, ...)
  *	Pack a byte string.
  */
 int
-wiredtiger_struct_pack(void *buffer, size_t size, const char *fmt, ...)
+wiredtiger_struct_pack(
+    WT_SESSION *wt_session, void *buffer, size_t size, const char *fmt, ...)
 {
 	WT_DECL_RET;
-	WT_SESSION_IMPL session;
 	va_list ap;
 
-	WT_CLEAR(session);
-
 	va_start(ap, fmt);
-	ret = __wt_struct_packv(&session, buffer, size, fmt, ap);
+	ret = __wt_struct_packv(
+	    (WT_SESSION_IMPL *)wt_session, buffer, size, fmt, ap);
 	va_end(ap);
 
 	return (ret);
@@ -52,16 +48,15 @@ wiredtiger_struct_pack(void *buffer, size_t size, const char *fmt, ...)
  *	Unpack a byte string.
  */
 int
-wiredtiger_struct_unpack(const void *buffer, size_t size, const char *fmt, ...)
+wiredtiger_struct_unpack(WT_SESSION *wt_session,
+    const void *buffer, size_t size, const char *fmt, ...)
 {
 	WT_DECL_RET;
-	WT_SESSION_IMPL session;
 	va_list ap;
 
-	WT_CLEAR(session);
-
 	va_start(ap, fmt);
-	ret = __wt_struct_unpackv(&session, buffer, size, fmt, ap);
+	ret = __wt_struct_unpackv(
+	    (WT_SESSION_IMPL *)wt_session, buffer, size, fmt, ap);
 	va_end(ap);
 
 	return (ret);
