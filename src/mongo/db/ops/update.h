@@ -377,10 +377,9 @@ namespace mongo {
 
     public:
 
-        ModSet( const BSONObj& from ,
+        ModSet( const BSONObj& from,
                 const set<string>& idxKeys = set<string>(),
-                const set<string>* backgroundKeys = 0
-              );
+                const set<string>* backgroundKeys = 0 );
 
         // TODO: this is inefficient - should probably just handle when iterating
         ModSet * fixDynamicArray( const string& elemMatchKey ) const;
@@ -399,12 +398,7 @@ namespace mongo {
          */
         BSONObj createNewFromQuery( const BSONObj& query );
 
-        /**
-         *
-         */
-        int isIndexed() const {
-            return _isIndexed;
-        }
+        int isIndexed() const { return _isIndexed; }
 
         unsigned size() const { return _mods.size(); }
 
@@ -430,8 +424,6 @@ namespace mongo {
                 }
             }
             return false;
-
-
         }
 
     };
