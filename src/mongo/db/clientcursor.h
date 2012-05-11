@@ -116,7 +116,11 @@ namespace mongo {
         /** Assures safe and reliable cleanup of a ClientCursor. */
         class Holder : boost::noncopyable {
         public:
-            Holder() : _c( 0 ), _id( INVALID_CURSOR_ID ) {}
+            Holder( ClientCursor *c = 0 ) :
+                _c( 0 ),
+                _id( INVALID_CURSOR_ID ) {
+                reset( c );
+            }
             void reset( ClientCursor *c = 0 ) {
                 if ( c == _c )
                     return;

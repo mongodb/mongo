@@ -2396,8 +2396,7 @@ namespace QueryOptimizerCursorTests {
             setQueryOptimizerCursor( BSON( "x" << GT << 0 ) );
             ASSERT_EQUALS( 1, current().getIntField( "x" ) );
             
-            ClientCursor::Holder p;
-            p.reset( new ClientCursor( QueryOption_NoCursorTimeout, c(), ns() ) );
+            ClientCursor::Holder p( new ClientCursor( QueryOption_NoCursorTimeout, c(), ns() ) );
             ClientCursor::YieldData yieldData;
             p->prepareToYield( yieldData );
             
@@ -2462,13 +2461,12 @@ namespace QueryOptimizerCursorTests {
                 Lock::GlobalWrite lk;
 
                 Client::Context ctx( ns() );
-                ClientCursor::Holder p;
-                p.reset
-                ( new ClientCursor
-                 ( QueryOption_NoCursorTimeout,
-                  NamespaceDetailsTransient::getCursor
-                  ( ns(), BSON( "a" << GTE << 0 << "b" << GTE << 0 ) ),
-                  ns() ) );
+                ClientCursor::Holder p
+                        ( new ClientCursor
+                         ( QueryOption_NoCursorTimeout,
+                          NamespaceDetailsTransient::getCursor
+                          ( ns(), BSON( "a" << GTE << 0 << "b" << GTE << 0 ) ),
+                          ns() ) );
             ClientCursor::invalidate( ns() );
             ASSERT_EQUALS( 0U, nNsCursors() );
         }
@@ -2483,13 +2481,12 @@ namespace QueryOptimizerCursorTests {
             _cli.insert( ns(), BSON( "a" << 1 << "b" << 1 ) );
             Lock::GlobalWrite lk;
             Client::Context ctx( ns() );
-            ClientCursor::Holder p;
-            p.reset
-            ( new ClientCursor
-             ( 0,
-              NamespaceDetailsTransient::getCursor
-              ( ns(), BSON( "a" << GTE << 0 << "b" << GTE << 0 ) ),
-              ns() ) );
+            ClientCursor::Holder p
+                    ( new ClientCursor
+                     ( 0,
+                      NamespaceDetailsTransient::getCursor
+                      ( ns(), BSON( "a" << GTE << 0 << "b" << GTE << 0 ) ),
+                      ns() ) );
             
             // Construct component client cursors.
             ClientCursor::YieldData yieldData;
@@ -2511,13 +2508,12 @@ namespace QueryOptimizerCursorTests {
                 Lock::GlobalWrite lk;
 
                 Client::Context ctx( ns() );
-                ClientCursor::Holder p;
-                p.reset
-                ( new ClientCursor
-                 ( 0,
-                  NamespaceDetailsTransient::getCursor
-                  ( ns(), BSON( "a" << GTE << 0 << "b" << GTE << 0 ) ),
-                  ns() ) );
+                ClientCursor::Holder p
+                        ( new ClientCursor
+                         ( 0,
+                          NamespaceDetailsTransient::getCursor
+                          ( ns(), BSON( "a" << GTE << 0 << "b" << GTE << 0 ) ),
+                          ns() ) );
                 
                 // Construct component client cursors.
                 ClientCursor::YieldData yieldData;
@@ -2548,13 +2544,12 @@ namespace QueryOptimizerCursorTests {
                 Lock::GlobalWrite lk;
 
                 Client::Context ctx( ns() );
-                ClientCursor::Holder p;
-                p.reset
-                ( new ClientCursor
-                 ( QueryOption_NoCursorTimeout,
-                  NamespaceDetailsTransient::getCursor
-                  ( ns(), BSON( "a" << GTE << 0 << "b" << 0 ) ),
-                  ns() ) );
+                ClientCursor::Holder p
+                        ( new ClientCursor
+                         ( QueryOption_NoCursorTimeout,
+                          NamespaceDetailsTransient::getCursor
+                          ( ns(), BSON( "a" << GTE << 0 << "b" << 0 ) ),
+                          ns() ) );
                 
                 // Iterate until after MultiCursor takes over.
                 int readTo = 110;
@@ -2610,13 +2605,12 @@ namespace QueryOptimizerCursorTests {
                 Lock::GlobalWrite lk;
 
                 Client::Context ctx( ns() );
-                ClientCursor::Holder p;
-                p.reset
-                ( new ClientCursor
-                 ( QueryOption_NoCursorTimeout,
-                  NamespaceDetailsTransient::getCursor
-                  ( ns(), OR( BSON( "a" << GTE << 0 ), BSON( "b" << 1 ) ) ),
-                  ns() ) );
+                ClientCursor::Holder p
+                        ( new ClientCursor
+                         ( QueryOption_NoCursorTimeout,
+                          NamespaceDetailsTransient::getCursor
+                          ( ns(), OR( BSON( "a" << GTE << 0 ), BSON( "b" << 1 ) ) ),
+                          ns() ) );
                 
                 // Iterate until after MultiCursor takes over.
                 int readTo = 109;
@@ -2659,13 +2653,12 @@ namespace QueryOptimizerCursorTests {
                 {
                     Lock::DBWrite lk(ns());
                     Client::Context ctx( ns() );
-                    ClientCursor::Holder p;
-                    p.reset
-                    ( new ClientCursor
-                     ( QueryOption_NoCursorTimeout,
-                      NamespaceDetailsTransient::getCursor
-                      ( ns(), BSON( "_id" << GT << 0 << "z" << 0 ) ),
-                      ns() ) );
+                    ClientCursor::Holder p
+                        ( new ClientCursor
+                         ( QueryOption_NoCursorTimeout,
+                          NamespaceDetailsTransient::getCursor
+                          ( ns(), BSON( "_id" << GT << 0 << "z" << 0 ) ),
+                          ns() ) );
 
                     ASSERT_EQUALS( "QueryOptimizerCursor", p->c()->toString() );
                     ASSERT_EQUALS( 1, p->c()->current().getIntField( "_id" ) );

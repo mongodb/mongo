@@ -88,8 +88,8 @@ namespace mongo {
             list<BSONObj> blah;
 
             shared_ptr<Cursor> cursor = NamespaceDetailsTransient::getCursor(ns.c_str() , query);
-            ClientCursor::Holder ccPointer;
-            ccPointer.reset( new ClientCursor( QueryOption_NoCursorTimeout, cursor, ns ) );
+            ClientCursor::Holder ccPointer( new ClientCursor( QueryOption_NoCursorTimeout, cursor,
+                                                             ns ) );
 
             while ( cursor->ok() ) {
                 

@@ -615,8 +615,8 @@ namespace mongo {
         bool saveClientCursor = false;
         const char *exhaust = 0;
         OpTime slaveReadTill;
-        ClientCursor::Holder ccPointer;
-        ccPointer.reset( new ClientCursor( QueryOption_NoCursorTimeout, cursor, ns ) );
+        ClientCursor::Holder ccPointer( new ClientCursor( QueryOption_NoCursorTimeout, cursor,
+                                                         ns ) );
         
         for( ; cursor->ok(); cursor->advance() ) {
 

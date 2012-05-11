@@ -313,8 +313,8 @@ namespace CursorTests {
                 while( !isExpectedIterate( cursor->current() ) ) {
                     ASSERT( cursor->advance() );
                 }
-                ClientCursor::Holder clientCursor;
-                clientCursor.reset( new ClientCursor( QueryOption_NoCursorTimeout, cursor, ns() ) );
+                ClientCursor::Holder clientCursor( new ClientCursor( QueryOption_NoCursorTimeout,
+                                                                    cursor, ns() ) );
                 DiskLoc loc = clientCursor->currLoc();
                 ASSERT( !loc.isNull() );
                 
