@@ -83,9 +83,15 @@ def build_jar():
         shutil.copyfile( src + "/" + x , root + "/" + x )
     shutil.copyfile( src + "/MANIFEST.MF" , root + "/MANIFEST.FM" )
     
+    classpath = os.listdir( src + "/lib" )
+    for x in classpath:
+        shutil.copyfile( src + "/lib/" + x , root + "/" + x )
+    classpath.append( "." )
+    classpath = ":".join(classpath)
+
     for x in os.listdir( root ):
         if x.endswith( ".java" ):
-            if subprocess.call( [ "javac" , x ] , cwd=root) != 0:
+            if subprocess.call( [ "javac" , "-cp" , classpath , x ] , cwd=root) != 0:
                 raise Exception( "compiled failed" )
 
     args = [ "jar" , "-cfm" , "emr.jar" , "MANIFEST.FM" ]
