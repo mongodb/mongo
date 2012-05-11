@@ -695,9 +695,9 @@ pack_ops(WT_SESSION *session)
 	{
 	/*! [Get the packed size] */
 	size_t size;
-	size = wiredtiger_struct_size(session, "iSh", 42, "hello", -3);
-	assert(size < 100);
+	ret = wiredtiger_struct_size(session, &size, "iSh", 42, "hello", -3);
 	/*! [Get the packed size] */
+	assert(size < 100);
 	}
 
 	{

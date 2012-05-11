@@ -11,17 +11,18 @@
  * wiredtiger_struct_size --
  *	Calculate the size of a packed byte string.
  */
-size_t
-wiredtiger_struct_size(WT_SESSION *wt_session, const char *fmt, ...)
+int
+wiredtiger_struct_size(
+    WT_SESSION *wt_session, size_t *sizep, const char *fmt, ...)
 {
+	WT_DECL_RET;
 	va_list ap;
-	size_t size;
 
 	va_start(ap, fmt);
-	size = __wt_struct_sizev((WT_SESSION_IMPL *)wt_session, fmt, ap);
+	ret = __wt_struct_sizev((WT_SESSION_IMPL *)wt_session, sizep, fmt, ap);
 	va_end(ap);
 
-	return (size);
+	return (ret);
 }
 
 /*

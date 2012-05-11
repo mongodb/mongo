@@ -437,6 +437,7 @@ sessionp
 setv
 sfence
 sizeof
+sizep
 sizev
 skiplist
 skiplists

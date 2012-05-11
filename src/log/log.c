@@ -9,10 +9,9 @@
 
 static int
 __log_record_size(WT_SESSION_IMPL *session,
-    WT_LOGREC_DESC *recdesc, va_list ap, size_t *sizep)
+    size_t *sizep, WT_LOGREC_DESC *recdesc, va_list ap)
 {
-	*sizep = __wt_struct_sizev(session, recdesc->fmt, ap);
-	return (0);
+	return (__wt_struct_sizev(session, sizep, recdesc->fmt, ap));
 }
 
 int
@@ -26,7 +25,7 @@ __wt_log_put(WT_SESSION_IMPL *session, WT_LOGREC_DESC *recdesc, ...)
 	buf = &session->logrec_buf;
 
 	va_start(ap, recdesc);
-	WT_ERR(__log_record_size(session, recdesc, ap, &size));
+	WT_ERR(__log_record_size(session, &size, recdesc, ap));
 	va_end(ap);
 
 	WT_RET(__wt_buf_initsize(session, buf, size));

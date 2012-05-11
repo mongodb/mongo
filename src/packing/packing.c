@@ -49,8 +49,9 @@ __wt_struct_check(WT_SESSION_IMPL *session,
  * __wt_struct_sizev --
  *	Calculate the size of a packed byte string (va_list version).
  */
-size_t
-__wt_struct_sizev(WT_SESSION_IMPL *session, const char *fmt, va_list ap)
+int
+__wt_struct_sizev(
+    WT_SESSION_IMPL *session, size_t *sizep, const char *fmt, va_list ap)
 {
 	WT_PACK pack;
 	WT_PACK_VALUE pv;
@@ -58,31 +59,31 @@ __wt_struct_sizev(WT_SESSION_IMPL *session, const char *fmt, va_list ap)
 
 	WT_CLEAR(pv);		/* -Wuninitialized */
 
-	if (__pack_init(session, &pack, fmt) != 0)
-		return ((size_t)-1);
+	WT_RET(__pack_init(session, &pack, fmt));
 
 	for (total = 0; __pack_next(&pack, &pv) == 0;) {
 		WT_PACK_GET(session, pv, ap);
 		total += __pack_size(session, &pv);
 	}
-	return (total);
+	*sizep = total;
+	return (0);
 }
 
 /*
  * __wt_struct_size --
  *	Calculate the size of a packed byte string.
  */
-size_t
-__wt_struct_size(WT_SESSION_IMPL *session, const char *fmt, ...)
+int
+__wt_struct_size(WT_SESSION_IMPL *session, size_t *sizep, const char *fmt, ...)
 {
+	WT_DECL_RET;
 	va_list ap;
-	size_t size;
 
 	va_start(ap, fmt);
-	size = __wt_struct_sizev(session, fmt, ap);
+	ret = __wt_struct_sizev(session, sizep, fmt, ap);
 	va_end(ap);
 
-	return (size);
+	return (ret);
 }
 
 /*

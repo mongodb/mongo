@@ -1192,11 +1192,13 @@ int wiredtiger_struct_pack(
  * @snippet ex_all.c Get the packed size
  *
  * @param session the session handle
+ * @param sizep a location where the the number of bytes needed for the
+ * matching call to ::wiredtiger_struct_pack is returned
  * @param format the data format, see @ref packing
- * @returns the number of bytes needed for the matching call to
- * ::wiredtiger_struct_pack
+ * @errors
  */
-size_t wiredtiger_struct_size(WT_SESSION *session, const char *format, ...);
+int wiredtiger_struct_size(
+    WT_SESSION *session, size_t *sizep, const char *format, ...);
 
 /*! Unpack a structure from a buffer.
  *
