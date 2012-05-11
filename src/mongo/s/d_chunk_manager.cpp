@@ -156,7 +156,7 @@ namespace mongo {
 
             // Handle the same way as a connectivity error, for now
             // TODO: handle inline
-            uassert( 16226,
+            uassert( 16229,
                      str::stream() << "could not initialize cursor to config server chunks collection for ns "
                                    << ns, cursor.get() );
         }
