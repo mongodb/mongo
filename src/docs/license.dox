@@ -1,12 +1,14 @@
 /*! @page license WiredTiger license
 
-The WiredTiger software is Open Source software: you can redistribute
-it and/or modify it under the superset of the terms of version 3 of the
+The WiredTiger software is Open Source software: you may redistribute
+it and modify it under the terms of version 3 of the
 <a href="http://www.gnu.org/licenses/gpl-3.0-standalone.html">
 <b>GNU General Public License</b></a>
-as published by the Free Software Foundation, and the
+as published by the Free Software Foundation.  The WiredTiger library
+binary also includes software copyrighted under the terms of the
 <a href="http://www.opensource.org/licenses/BSD-3-Clause">
 <b>University of California, Berkeley (BSD) 3-Clause License</b></a>.
+Any redistribution should comply with both copyrights.
 
 This program is distributed in the hope that it will be useful, but
 WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -19,13 +21,13 @@ those described above, or for technical support for this software, please
 contact WiredTiger, Inc. at
 <a mailto="info@wiredtiger.com">info@wiredtiger.com</a>.
 
-@section library 3rd party software included in the WiredTiger library
+@section library 3rd party software included in the WiredTiger library binary
 
-The WiredTiger binary library build includes the following 3rd party
-software, distributed under the following licenses:
+The WiredTiger library binary includes the following 3rd party software,
+distributed under the following licenses:
 
 <table>
-@hrow{File, License}
+@hrow{Distribution File, License}
 @row{src/include/bitstring.i, University of California\, Berkeley (BSD) 3-Clause License}
 @row{src/include/queue.h, University of California\, Berkeley (BSD) 3-Clause License}
 @row{src/utilities/util_getopt.c, University of California\, Berkeley (BSD) 3-Clause License}
