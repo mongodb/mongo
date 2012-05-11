@@ -97,6 +97,7 @@ scratch
 
 
 /emr.jar
+*.class
 
 # examples
 /firstExample
