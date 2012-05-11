@@ -875,6 +875,12 @@
     <ClCompile Include="lockstate.cpp">
       <Filter>db\Source Files\e to n</Filter>
     </ClCompile>
+    <ClCompile Include="..\util\time_support.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ttl.cpp">
+      <Filter>db\Source Files\o to z</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\targetver.h" />
@@ -1583,6 +1589,9 @@
     </ClInclude>
     <ClInclude Include="lockstate.h">
       <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="ttl.h">
+      <Filter>db\Header Files\o to z</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

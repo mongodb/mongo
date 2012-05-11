@@ -860,6 +860,7 @@ cscript //Nologo createCPPfromJavaScriptFiles.js "$(ProjectDir).."</Command>
       <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4334</DisableSpecificWarnings>
       <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4334</DisableSpecificWarnings>
     </ClCompile>
+    <ClCompile Include="..\util\time_support.cpp" />
     <ClCompile Include="linenoise_utf8.cpp" />
     <ClCompile Include="mk_wcwidth.cpp" />
     <ClCompile Include="..\..\third_party\boost\libs\filesystem\v2\src\v2_operations.cpp" />

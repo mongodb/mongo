@@ -565,7 +565,9 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\util\signal_handlers.h" />
     <ClInclude Include="..\util\sock.h" />
     <ClInclude Include="..\util\stacktrace.h" />
+    <ClInclude Include="..\util\timer-win32-inl.h" />
     <ClInclude Include="..\util\timer.h" />
+    <ClInclude Include="..\util\time_support.h" />
     <ClInclude Include="..\util\unittest.h" />
     <ClInclude Include="framework.h" />
   </ItemGroup>
@@ -1319,6 +1321,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="..\util\stringutils.cpp" />
     <ClCompile Include="..\util\text.cpp" />
     <ClCompile Include="..\util\timer.cpp" />
+    <ClCompile Include="..\util\time_support.cpp" />
     <ClCompile Include="..\util\util.cpp" />
     <ClCompile Include="..\s\d_logic.cpp" />
     <ClCompile Include="..\scripting\engine.cpp" />

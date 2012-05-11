@@ -723,6 +723,9 @@
     <ClCompile Include="client_info.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\util\time_support.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\pch.h" />
@@ -1019,6 +1022,9 @@
     </ClInclude>
     <ClInclude Include="client_info.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\time_support.h">
+      <Filter>util\Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
