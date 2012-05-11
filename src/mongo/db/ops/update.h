@@ -16,11 +16,12 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "../../pch.h"
-#include "../jsobj.h"
-#include "../../util/embedded_builder.h"
-#include "../../util/stringutils.h"
-#include "../matcher.h"
+#include "pch.h"
+
+#include "mongo/db/jsobj.h"
+#include "mongo/db/matcher.h"
+#include "mongo/util/embedded_builder.h"
+#include "mongo/util/stringutils.h"
 
 namespace mongo {
 
