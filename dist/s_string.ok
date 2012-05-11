@@ -67,6 +67,7 @@ INDX
 INIT
 INITIALIZER
 INSERT's
+INUSE
 ISSET
 JPEG
 JSON
@@ -97,6 +98,7 @@ NRECS
 NUL
 NULLs
 NoAddr
+ONPAGE
 OVFL
 PADDR
 PAGE's
@@ -385,6 +387,7 @@ numSymbols
 numbare
 offpage
 oldname
+onpage
 os
 ovfl
 packv

@@ -20,7 +20,7 @@ __find_next_col(WT_SESSION_IMPL *session, WT_TABLE *table,
 	foundcg = foundcol = -1;
 
 	getnext = 1;
-	for (cg = 0; cg < WT_COLGROUPS(table); cg++) {
+	for (cgtree = NULL, cg = 0; cg < WT_COLGROUPS(table); cg++) {
 		WT_RET(__wt_schema_get_btree(session,
 		    table->cg_name[cg], strlen(table->cg_name[cg]),
 		    NULL, 0));

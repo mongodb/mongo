@@ -182,11 +182,33 @@ __dmsg(WT_DBG *ds, const char *fmt, ...)
 
 /*
  * __wt_debug_addr --
- *	Read and dump a disk page in debugging mode.
+ *	Read and dump a disk page in debugging mode, using an addr/size pair.
  */
 int
-__wt_debug_addr(
-    WT_SESSION_IMPL *session, uint32_t addr, uint32_t size, const char *ofile)
+__wt_debug_addr(WT_SESSION_IMPL *session,
+    const uint8_t *addr, uint32_t addr_size, const char *ofile)
+{
+	WT_DECL_RET;
+	WT_ITEM *buf;
+
+	buf = NULL;
+
+	WT_RET(__wt_scr_alloc(session, 1024, &buf));
+	WT_ERR(__wt_block_read(
+	    session, session->btree->block, buf, addr, addr_size));
+	ret = __wt_debug_disk(session, buf->mem, ofile);
+err:	__wt_scr_free(&buf);
+
+	return (ret);
+}
+
+/*
+ * __wt_debug_off --
+ *	Read and dump a disk page in debugging mode, using an offset/size pair.
+ */
+int
+__wt_debug_off(
+    WT_SESSION_IMPL *session, uint32_t offset, uint32_t size, const char *ofile)
 {
 	WT_DECL_RET;
 	WT_ITEM *buf;
@@ -195,7 +217,7 @@ __wt_debug_addr(
 
 	WT_RET(__wt_scr_alloc(session, size, &buf));
 	WT_ERR(__wt_block_read_off(
-	    session, session->btree->block, buf, addr, size, 0));
+	    session, session->btree->block, buf, offset, size, 0));
 	ret = __wt_debug_disk(session, buf->mem, ofile);
 err:	__wt_scr_free(&buf);
 
@@ -474,6 +496,7 @@ __debug_page_modify(WT_DBG *ds, WT_PAGE *page)
 	WT_PAGE_TRACK *track;
 	WT_SESSION_IMPL *session;
 	uint32_t i;
+	char buf[64];
 
 	session = ds->session;
 
@@ -507,33 +530,13 @@ __debug_page_modify(WT_DBG *ds, WT_PAGE *page)
 
 	if (mod->track_entries != 0)
 		__dmsg(ds, "\t" "tracking list:\n");
-	for (track = mod->track, i = 0; i < mod->track_entries; ++track, ++i) {
-		if (WT_TRK_TYPE(track) == WT_TRK_EMPTY)
-			continue;
-
-		__dmsg(ds, "\t\t");
-		if (F_ISSET(track, WT_TRK_PERM))
-			__dmsg(ds, "permanent ");
-		switch (WT_TRK_TYPE(track)) {
-		case WT_TRK_DISCARD:
-			__dmsg(ds, "discard");
-			break;
-		case WT_TRK_DISCARD_COMPLETE:
-			__dmsg(ds, "discard-complete");
-			break;
-		case WT_TRK_OVFL:
-			__dmsg(ds, "overflow");
-			break;
-		case WT_TRK_OVFL_ACTIVE:
-			__dmsg(ds, "overflow-active");
-			break;
-		case WT_TRK_EMPTY:
-			continue;
-		WT_ILLEGAL_VALUE(session);
+	for (track = mod->track, i = 0; i < mod->track_entries; ++track, ++i)
+		if (F_ISSET(track, WT_TRK_OBJECT)) {
+			__dmsg(ds, "\t\t%s %s\n",
+			    __wt_track_string(track, buf, sizeof(buf)),
+			    __wt_addr_string(session,
+			    ds->tmp, track->addr.addr, track->addr.size));
 		}
-		__dmsg(ds, " %s\n", __wt_addr_string(
-		    session, ds->tmp, track->addr.addr, track->addr.size));
-	}
 
 	return (0);
 }
@@ -842,22 +845,34 @@ __debug_cell(WT_DBG *ds, WT_PAGE_HEADER *dsk, WT_CELL_UNPACK *unpack)
 	__dmsg(ds, "\t%s: len %" PRIu32,
 	    __wt_cell_type_string(unpack->raw), unpack->size);
 
+	switch (dsk->type) {
+	case WT_PAGE_COL_INT:
+		switch (unpack->type) {
+		case WT_CELL_VALUE:
+			__dmsg(ds, ", recno: %" PRIu64, unpack->v);
+			break;
+		}
+		break;
+	case WT_PAGE_COL_VAR:
+		switch (unpack->type) {
+		case WT_CELL_DEL:
+		case WT_CELL_VALUE:
+		case WT_CELL_VALUE_OVFL:
+			__dmsg(ds, ", rle: %" PRIu64, __wt_cell_rle(unpack));
+			break;
+		}
+		break;
+	case WT_PAGE_ROW_INT:
+	case WT_PAGE_ROW_LEAF:
+		switch (unpack->type) {
+		case WT_CELL_KEY:
+			__dmsg(ds, ", pfx: %" PRIu8, unpack->prefix);
+			break;
+		}
+		break;
+	}
+
 	switch (unpack->type) {
-	case WT_CELL_DEL:
-	case WT_CELL_VALUE:
-		/*
-		 * Column-store internal page value cells include a record
-		 * number, column-store leaf page value cells include a RLE;
-		 * row-store leaf page value cells have no associated value.
-		 */
-		if (unpack->v != 0)
-			__dmsg(ds, ", %s: %" PRIu64,
-			    dsk->type == WT_PAGE_COL_INT ? "recno" : "rle",
-			    unpack->v);
-		break;
-	case WT_CELL_KEY:
-		__dmsg(ds, ", pfx: %" PRIu8, unpack->prefix);
-		break;
 	case WT_CELL_ADDR:
 	case WT_CELL_KEY_OVFL:
 	case WT_CELL_VALUE_OVFL:
@@ -870,7 +885,6 @@ __debug_cell(WT_DBG *ds, WT_PAGE_HEADER *dsk, WT_CELL_UNPACK *unpack)
 		__wt_scr_free(&buf);
 		WT_RET(ret);
 		break;
-	WT_ILLEGAL_VALUE(session);
 	}
 	__dmsg(ds, "\n");
 

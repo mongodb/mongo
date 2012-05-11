@@ -400,13 +400,14 @@ __evict_file_request_walk(WT_SESSION_IMPL *session)
 	++cache->sync_complete;
 
 	/* The session array requires no lock, it's fixed in size. */
+	request_session = NULL;
 	for (i = 0; i < conn->session_cnt; ++i)
 		if ((request_session = conn->sessions[i]) != NULL &&
 		    request_session->syncop != 0)
 			break;
 
 	/* If we don't find an entry, something broke, complain. */
-	if (i == conn->session_cnt) {
+	if (request_session == NULL) {
 		__wt_errx(session,
 		    "failed to find handle's sync operation request");
 		return (0);

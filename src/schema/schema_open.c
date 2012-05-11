@@ -243,7 +243,7 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table,
 err:	__wt_buf_free(session, &cols);
 	__wt_buf_free(session, &uribuf);
 	if (session->btree != NULL)
-		__wt_session_release_btree(session);
+		WT_TRET(__wt_session_release_btree(session));
 
 	return (ret);
 }
@@ -290,11 +290,10 @@ __wt_schema_open_index(
 		match = (len > 0 &&
 		   strncmp(name, idxname, len) == 0 && name[len] == '\0');
 
-		if (i * sizeof(const char *) >= table->idx_name_alloc)
+		if ((size_t)i * sizeof(const char *) >= table->idx_name_alloc)
 			WT_ERR(__wt_realloc(session, &table->idx_name_alloc,
 			    WT_MAX(10 * sizeof(const char *),
-			    2 * table->idx_name_alloc),
-			    &table->idx_name));
+			    2 * table->idx_name_alloc), &table->idx_name));
 
 		if (table->idx_name[i] == NULL)
 			WT_ERR(__wt_strdup(session, uri, &table->idx_name[i]));

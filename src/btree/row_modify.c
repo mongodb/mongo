@@ -201,7 +201,7 @@ __wt_insert_serial_func(WT_SESSION_IMPL *session)
 	    &ins_stack, &new_inslist, &new_inshead, &new_ins, &skipdepth);
 
 	/* Check the page's write-generation. */
-	WT_ERR(__wt_page_write_gen_check(page, write_gen));
+	WT_ERR(__wt_page_write_gen_check(session, page, write_gen));
 
 	/*
 	 * Publish: First, point the new WT_INSERT item's skiplist references
@@ -311,7 +311,7 @@ __wt_update_serial_func(WT_SESSION_IMPL *session)
 	    session, &page, &write_gen, &upd_entry, &new_upd, &upd);
 
 	/* Check the page's write-generation. */
-	WT_ERR(__wt_page_write_gen_check(page, write_gen));
+	WT_ERR(__wt_page_write_gen_check(session, page, write_gen));
 
 	upd->next = *upd_entry;
 	/*

@@ -1681,6 +1681,8 @@ extern int wiredtiger_extension_init(WT_SESSION *session,
 #define	WT_STAT_file_row_leaf_pages			39
 /*! total entries */
 #define	WT_STAT_file_entries				40
+/*! write generation conflicts */
+#define	WT_STAT_file_write_conflicts			41
 /*! @} */
 /*
  * Statistics section: END
