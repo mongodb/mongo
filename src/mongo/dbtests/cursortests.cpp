@@ -60,7 +60,6 @@ namespace CursorTests {
         class MultiRange : public Base {
         public:
             void run() {
-                Lock::GlobalWrite lk;
                 const char *ns = "unittests.cursortests.BtreeCursorTests.MultiRange";
                 {
                     DBDirectClient c;
@@ -70,7 +69,7 @@ namespace CursorTests {
                 }
                 int v[] = { 1, 2, 4, 6 };
                 boost::shared_ptr< FieldRangeVector > frv( vec( v, 4 ) );
-                Client::Context ctx( ns );
+                Client::WriteContext ctx( ns );
                 scoped_ptr<BtreeCursor> _c( BtreeCursor::make( nsdetails( ns ), nsdetails( ns )->idx(1), frv, 1 ) );
                 BtreeCursor &c = *_c.get();
                 ASSERT_EQUALS( "BtreeCursor a_1 multi", c.toString() );
@@ -87,7 +86,6 @@ namespace CursorTests {
         class MultiRangeGap : public Base {
         public:
             void run() {
-                Lock::GlobalWrite lk;
                 const char *ns = "unittests.cursortests.BtreeCursorTests.MultiRangeGap";
                 {
                     DBDirectClient c;
@@ -99,7 +97,7 @@ namespace CursorTests {
                 }
                 int v[] = { -50, 2, 40, 60, 109, 200 };
                 boost::shared_ptr< FieldRangeVector > frv( vec( v, 6 ) );
-                Client::Context ctx( ns );
+                Client::WriteContext ctx( ns );
                 scoped_ptr<BtreeCursor> _c( BtreeCursor::make(nsdetails( ns ), nsdetails( ns )->idx(1), frv, 1 ) );
                 BtreeCursor &c = *_c.get();
                 ASSERT_EQUALS( "BtreeCursor a_1 multi", c.toString() );
@@ -116,7 +114,6 @@ namespace CursorTests {
         class MultiRangeReverse : public Base {
         public:
             void run() {
-                Lock::GlobalWrite lk;
                 const char *ns = "unittests.cursortests.BtreeCursorTests.MultiRangeReverse";
                 {
                     DBDirectClient c;
@@ -126,7 +123,7 @@ namespace CursorTests {
                 }
                 int v[] = { 1, 2, 4, 6 };
                 boost::shared_ptr< FieldRangeVector > frv( vec( v, 4, -1 ) );
-                Client::Context ctx( ns );
+                Client::WriteContext ctx( ns );
                 scoped_ptr<BtreeCursor> _c( BtreeCursor::make( nsdetails( ns ), nsdetails( ns )->idx(1), frv, -1 ) );
                 BtreeCursor& c = *_c.get();
                 ASSERT_EQUALS( "BtreeCursor a_1 reverse multi", c.toString() );
@@ -159,7 +156,7 @@ namespace CursorTests {
                     _c.ensureIndex( ns(), idx() );
                 }
 
-                Client::Context ctx( ns() );
+                Client::WriteContext ctx( ns() );
                 FieldRangeSet frs( ns(), spec, true );
                 // orphan spec for this test.
                 IndexSpec *idxSpec = new IndexSpec( idx() );
@@ -181,7 +178,6 @@ namespace CursorTests {
                 ASSERT_EQUALS( expectedCount, count );
             }
         private:
-            Lock::GlobalWrite _lk;
             vector< BSONObj > _objs;
         };
 
@@ -266,7 +262,6 @@ namespace CursorTests {
         class AbortImplicitScan : public Base {
         public:
             void run() {
-                Lock::GlobalWrite lk;
                 IndexSpec idx( BSON( "a" << 1 << "b" << 1 ) );
                 _c.ensureIndex( ns(), idx.keyPattern );
                 for( int i = 0; i < 300; ++i ) {
@@ -274,7 +269,7 @@ namespace CursorTests {
                 }
                 FieldRangeSet frs( ns(), BSON( "b" << 3 ), true );
                 boost::shared_ptr<FieldRangeVector> frv( new FieldRangeVector( frs, idx, 1 ) );
-                Client::Context ctx( ns() );
+                Client::WriteContext ctx( ns() );
                 scoped_ptr<BtreeCursor> c( BtreeCursor::make( nsdetails( ns() ), nsdetails( ns() )->idx(1), frv, 1 ) );
                 long long initialNscanned = c->nscanned();
                 ASSERT( initialNscanned < 200 );
@@ -310,9 +305,8 @@ namespace CursorTests {
         public:
             void run() {
                 populateData();
-                Lock::GlobalWrite lk;
-                Client::Context ctx( ns() );
-                
+                Client::WriteContext ctx( ns() );
+
                 // Generate a cursor from the supplied query and advance it to the iterate to be
                 // deleted.
                 shared_ptr<Cursor> cursor = NamespaceDetailsTransient::getCursor( ns(), query() );
@@ -400,8 +394,7 @@ namespace CursorTests {
             protected:
                 CursorId cursorid() const { return _clientCursor->cursorid(); }
             private:
-                Lock::GlobalWrite _lk;
-                Client::Context _ctx;
+                Client::WriteContext _ctx;
                 boost::shared_ptr<Cursor> _cursor;
                 ClientCursor::Holder _clientCursor;
             };
