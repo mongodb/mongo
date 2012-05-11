@@ -308,7 +308,7 @@ __wt_txn_global_init(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	u_int i;
 
 	WT_UNUSED(cfg);
-	session = &conn->default_session;
+	session = conn->default_session;
 	txn_global = &conn->txn_global;
 
 	WT_RET(__wt_calloc_def(session, conn->session_size, &txn_global->ids));
@@ -328,7 +328,7 @@ __wt_txn_global_destroy(WT_CONNECTION_IMPL *conn)
 	WT_SESSION_IMPL *session;
 	WT_TXN_GLOBAL *txn_global;
 
-	session = &conn->default_session;
+	session = conn->default_session;
 	txn_global = &conn->txn_global;
 
 	__wt_free(session, txn_global->ids);
