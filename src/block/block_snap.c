@@ -67,12 +67,10 @@ __wt_block_snapshot_load(WT_SESSION_IMPL *session,
     int readonly)
 {
 	WT_BLOCK_SNAPSHOT *si;
+	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
-	WT_ITEM *tmp;
 
 	WT_UNUSED(addr_size);
-
-	tmp = NULL;
 
 	/*
 	 * Sometimes we don't find a root page (we weren't given a snapshot,
@@ -242,13 +240,12 @@ __snapshot_process(
     WT_SESSION_IMPL *session, WT_BLOCK *block, WT_SNAPSHOT *snapbase)
 {
 	WT_BLOCK_SNAPSHOT *a, *b, *si;
+	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
-	WT_ITEM *tmp;
 	WT_SNAPSHOT *snap;
 	uint64_t snapshot_size;
 	int deleting, locked;
 
-	tmp = NULL;
 	locked = 0;
 
 	/*
@@ -508,11 +505,9 @@ __snapshot_update(
     WT_SESSION_IMPL *session, WT_BLOCK *block, WT_SNAPSHOT *snap,
     WT_BLOCK_SNAPSHOT *si, uint64_t snapshot_size, int is_live)
 {
+	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
-	WT_ITEM *tmp;
 	uint8_t *endp;
-
-	tmp = NULL;
 
 #ifdef HAVE_DIAGNOSTIC
 	/* Check the extent list combinations for overlaps. */

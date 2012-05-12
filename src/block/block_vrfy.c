@@ -312,11 +312,9 @@ int
 __wt_block_verify(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf,
     const uint8_t *addr, uint32_t addr_size, off_t offset, uint32_t size)
 {
+	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
-	WT_ITEM *tmp;
 	uint32_t frag, frags, i, match;
-
-	tmp = NULL;
 
 	/*
 	 * If we've already verify this block's physical image, we know it's

@@ -67,16 +67,14 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf,
     off_t *offsetp, uint32_t *sizep, uint32_t *cksump, int force_extend)
 {
 	WT_BLOCK_HEADER *blk;
+	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
 	WT_PAGE_HEADER *dsk;
-	WT_ITEM *tmp;
 	off_t offset;
 	uint32_t align_size, size;
 	int compression_failed;
 	uint8_t *src, *dst;
 	size_t len, src_len, dst_len, result_len;
-
-	tmp = NULL;
 
 	/*
 	 * Set the block's in-memory size.

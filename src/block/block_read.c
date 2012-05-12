@@ -41,13 +41,11 @@ __wt_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
     WT_ITEM *buf, off_t offset, uint32_t size, uint32_t cksum)
 {
 	WT_BLOCK_HEADER *blk;
+	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
-	WT_ITEM *tmp;
 	WT_PAGE_HEADER *dsk;
 	size_t result_len;
 	uint32_t page_cksum;
-
-	tmp = NULL;
 
 	WT_VERBOSE_RET(session, read,
 	    "off %" PRIuMAX ", size %" PRIu32 ", cksum %" PRIu32,
