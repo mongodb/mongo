@@ -112,7 +112,8 @@ file_config = format_meta + [
 		"utf16<file>".  See @ref huffman for more information'''),
 	Config('internal_key_truncate', 'true', r'''
 		configure internal key truncation, discarding unnecessary
-		trailing bytes on internal keys''',
+		trailing bytes on internal keys (ignored for custom
+		collators)''',
 		type='boolean'),
 	Config('internal_page_max', '2KB', r'''
 		the maximum page size for internal nodes, in bytes; the size

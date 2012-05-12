@@ -369,9 +369,24 @@ __rec_write_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 		    btree->config, "split_pct", &cval));
 		r->btree_split_pct = (uint32_t)cval.val;
 
-		WT_RET(__wt_config_getones(session,
-		    btree->config, "internal_key_truncate", &cval));
-		r->key_sfx_compress_conf = (cval.val != 0);
+		/*
+		 * Suffix compression is a hack to shorten internal page keys
+		 * by discarding trailing bytes that aren't necessary for tree
+		 * navigation.  We don't do suffix compression if there is a
+		 * custom collator because we don't know what bytes a custom
+		 * collator might use.  Some custom collators (for example, a
+		 * collator implementing reverse ordering of strings), won't
+		 * have any problem with suffix compression: if there's ever a
+		 * reason to implement suffix compression for custom collators,
+		 * we can add a setting to the collator, configured when the
+		 * collator is added, that turns on suffix compression.
+		 */
+		r->key_sfx_compress_conf = 0;
+		if (btree->collator == NULL) {
+			WT_RET(__wt_config_getones(session,
+			    btree->config, "internal_key_truncate", &cval));
+			r->key_sfx_compress_conf = (cval.val != 0);
+		}
 
 		WT_RET(__wt_config_getones(session,
 		    btree->config, "prefix_compression", &cval));
@@ -1034,11 +1049,14 @@ __rec_split_row_promote(WT_SESSION_IMPL *session, uint8_t type)
 	 * internal pages, you cannot repeat suffix truncation as you split up
 	 * the tree, it loses too much information.
 	 *
+	 * One note: if the last key on the previous page was an overflow key,
+	 * we don't have the in-memory key against which to compare, and don't
+	 * try to do suffix compression.  The code for that case turns suffix
+	 * compression off for the next key.
+	 *
 	 * The r->last key sorts before the r->cur key, so we'll either find a
-	 * larger byte value in r->cur, or r->cur will be the longer key. One
-	 * caveat: if the largest key on the previous page was an overflow key,
-	 * we don't have a key against which to compare, and we can't do suffix
-	 * compression.
+	 * larger byte value in r->cur, or r->cur will be the longer key, and
+	 * the interesting byte is one past the length of the shorter key.
 	 */
 	if (type == WT_PAGE_ROW_LEAF && r->key_sfx_compress) {
 		pa = r->last->data;

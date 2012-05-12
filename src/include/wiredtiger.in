@@ -585,8 +585,8 @@ struct __wt_session {
 	 * least 8 keys per internal page.,an integer greater than or equal to
 	 * 0; default \c 0.}
 	 * @config{internal_key_truncate, configure internal key truncation\,
-	 * discarding unnecessary trailing bytes on internal keys.,a boolean
-	 * flag; default \c true.}
+	 * discarding unnecessary trailing bytes on internal keys (ignored for
+	 * custom collators).,a boolean flag; default \c true.}
 	 * @config{internal_page_max, the maximum page size for internal nodes\,
 	 * in bytes; the size must be a multiple of the allocation size and is
 	 * significant for applications wanting to avoid excessive L2 cache
