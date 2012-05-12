@@ -142,12 +142,12 @@ __bulk_row_keycmp_err(WT_CURSOR_BULK *cbulk)
 	WT_ERR(__wt_scr_alloc(session, 512, &a));
 	WT_ERR(__wt_scr_alloc(session, 512, &b));
 
-	WT_RET(__wt_buf_set_printable(
+	WT_ERR(__wt_buf_set_printable(
 	    session, a, cursor->key.data, cursor->key.size));
-	WT_RET(__wt_buf_set_printable(
+	WT_ERR(__wt_buf_set_printable(
 	    session, b, cbulk->cmp.data, cbulk->cmp.size));
 
-	WT_RET_MSG(session, EINVAL,
+	WT_ERR_MSG(session, EINVAL,
 	    "bulk-load presented with out-of-order keys: %.*s compares smaller "
 	    "than previously inserted key %.*s",
 	    (int)a->size, (char *)a->data, (int)b->size, (char *)b->data);
