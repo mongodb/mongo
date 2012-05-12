@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="..\util\compress.cpp">
@@ -876,9 +876,13 @@
       <Filter>db\Source Files\e to n</Filter>
     </ClCompile>
     <ClCompile Include="..\util\time_support.cpp">
-      <Filter>util</Filter>
+      <Filter>util\Source Files</Filter>
     </ClCompile>
     <ClCompile Include="ttl.cpp">
+      <Filter>db\Source Files\o to z</Filter>
+    </ClCompile>
+    <ClCompile Include="ops\update_internal.cpp">
+      <Filter>db\ops</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1591,6 +1595,12 @@
     </ClInclude>
     <ClInclude Include="ttl.h">
       <Filter>db\Header Files\o to z</Filter>
+    </ClInclude>
+    <ClInclude Include="ops\query.h">
+      <Filter>db\ops</Filter>
+    </ClInclude>
+    <ClInclude Include="ops\update_internal.h">
+      <Filter>db\ops</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -499,6 +499,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\db\ops\delete.h" />
     <ClInclude Include="..\db\ops\query.h" />
     <ClInclude Include="..\db\ops\update.h" />
+    <ClInclude Include="..\db\ops\update_internal.h" />
     <ClInclude Include="..\db\pagefault.h" />
     <ClInclude Include="..\..\third_party\pcre-8.30\pcrecpp.h" />
     <ClInclude Include="..\server.h" />
@@ -1180,6 +1181,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="..\db\ops\delete.cpp" />
     <ClCompile Include="..\db\ops\query.cpp" />
     <ClCompile Include="..\db\ops\update.cpp" />
+    <ClCompile Include="..\db\ops\update_internal.cpp" />
     <ClCompile Include="..\db\pagefault.cpp" />
     <ClCompile Include="..\db\projection.cpp" />
     <ClCompile Include="..\db\queryoptimizercursorimpl.cpp" />

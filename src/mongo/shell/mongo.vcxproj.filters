@@ -53,9 +53,6 @@
     <Filter Include="JavaScript source files">
       <UniqueIdentifier>{473e7192-9f2a-47c5-ad95-e5b75d4f48f9}</UniqueIdentifier>
     </Filter>
-    <Filter Include="db\ops">
-      <UniqueIdentifier>{213d2677-2ddd-44c7-a5b5-fbec457eb0cf}</UniqueIdentifier>
-    </Filter>
     <Filter Include="db\commands">
       <UniqueIdentifier>{afb47ac9-02b9-4073-b154-b89918d3bb33}</UniqueIdentifier>
     </Filter>
@@ -828,9 +825,6 @@
     </ClInclude>
     <ClInclude Include="..\db\projection.h">
       <Filter>db\Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\db\ops\query.h">
-      <Filter>db\ops</Filter>
     </ClInclude>
     <ClInclude Include="..\db\querypattern.h">
       <Filter>db\Header Files</Filter>

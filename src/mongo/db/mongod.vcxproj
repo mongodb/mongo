@@ -1113,6 +1113,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="ops\delete.cpp" />
     <ClCompile Include="ops\query.cpp" />
     <ClCompile Include="ops\update.cpp" />
+    <ClCompile Include="ops\update_internal.cpp" />
     <ClCompile Include="pagefault.cpp" />
     <ClCompile Include="pipeline\accumulator.cpp" />
     <ClCompile Include="pipeline\accumulator_add_to_set.cpp" />
@@ -1206,6 +1207,8 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="lockstate.h" />
     <ClInclude Include="namespace_details-inl.h" />
     <ClInclude Include="namespace_details.h" />
+    <ClInclude Include="ops\query.h" />
+    <ClInclude Include="ops\update_internal.h" />
     <ClInclude Include="queryoptimizercursorimpl.h" />
     <ClCompile Include="queryoptimizercursorimpl.cpp" />
     <ClCompile Include="querypattern.cpp" />
