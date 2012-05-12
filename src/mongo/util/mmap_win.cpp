@@ -263,7 +263,7 @@ namespace mongo {
 
         LockMongoFilesExclusive lockMongoFiles;
 
-        RemapLock lk;   // Interlock with PortMessageServer::acceptedMP() to stop thread creation
+        RemapLock remapLock;
 
         clearWritableBits(oldPrivateAddr);
         if( !UnmapViewOfFile(oldPrivateAddr) ) {

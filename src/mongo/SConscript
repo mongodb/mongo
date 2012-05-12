@@ -137,7 +137,6 @@ coreServerFiles = [ "util/version.cpp",
                     "db/security_commands.cpp",
                     ]
 
-
 env.StaticLibrary('ntservice', ['util/ntservice.cpp'])
 
 scripting_common_files = [ "scripting/engine.cpp",
@@ -271,6 +270,9 @@ serverOnlyFiles = [ "db/curop.cpp",
                     "db/commands/pipeline_d.cpp",
                     "db/commands/document_source_cursor.cpp",
                     "db/driverHelpers.cpp" ]
+
+if os.sys.platform == 'win32':
+    serverOnlyFiles += [ "util/hook_win32.cpp", "util/hook_windows_memory.cpp" ]
 
 env.Library( "dbcmdline", "db/cmdline.cpp" )
 

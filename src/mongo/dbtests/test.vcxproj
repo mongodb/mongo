@@ -556,6 +556,8 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\util\goodies.h" />
     <ClInclude Include="..\util\hashtab.h" />
     <ClInclude Include="..\db\lasterror.h" />
+    <ClInclude Include="..\util\hook_win32.h" />
+    <ClInclude Include="..\util\hook_windows_memory.h" />
     <ClInclude Include="..\util\log.h" />
     <ClInclude Include="..\util\logfile.h" />
     <ClInclude Include="..\util\lruishmap.h" />
@@ -1279,6 +1281,8 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="..\util\concurrency\vars.cpp" />
     <ClCompile Include="..\util\debug_util.cpp" />
     <ClCompile Include="..\util\file_allocator.cpp" />
+    <ClCompile Include="..\util\hook_win32.cpp" />
+    <ClCompile Include="..\util\hook_windows_memory.cpp" />
     <ClCompile Include="..\util\log.cpp" />
     <ClCompile Include="..\util\logfile.cpp" />
     <ClCompile Include="..\util\mmap_win.cpp" />
