@@ -241,7 +241,7 @@ __wt_huffman_read(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *ip,
 	if (strncasecmp(ip->str, "utf8", 4) == 0) {
 		entries = UINT8_MAX;
 		*numbytesp = 1;
-		WT_RET(__wt_calloc_def(session, entries, &table));
+		WT_ERR(__wt_calloc_def(session, entries, &table));
 
 		if (ip->len == 4)
 			WT_ERR_MSG(session, EINVAL,
@@ -251,7 +251,7 @@ __wt_huffman_read(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *ip,
 	} else if (strncasecmp(ip->str, "utf16", 5) == 0) {
 		entries = UINT16_MAX;
 		*numbytesp = 2;
-		WT_RET(__wt_calloc_def(session, entries, &table));
+		WT_ERR(__wt_calloc_def(session, entries, &table));
 
 		if (ip->len == 5)
 			WT_ERR_MSG(session, EINVAL,

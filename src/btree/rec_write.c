@@ -2978,7 +2978,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 					WT_ERR(__wt_buf_set_printable(
 					    session, tkey,
 					    bnd->key.data, bnd->key.size));
-					WT_VERBOSE_RET(session, reconcile,
+					WT_VERBOSE_ERR(session, reconcile,
 					    "split: starting key "
 					    "%.*s",
 					    (int)tkey->size,
@@ -2987,11 +2987,11 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 				case WT_PAGE_COL_FIX:
 				case WT_PAGE_COL_INT:
 				case WT_PAGE_COL_VAR:
-					WT_VERBOSE_RET(session, reconcile,
+					WT_VERBOSE_ERR(session, reconcile,
 					    "split: starting recno %" PRIu64,
 					    bnd->recno);
 					break;
-				WT_ILLEGAL_VALUE(session);
+				WT_ILLEGAL_VALUE_ERR(session);
 				}
 err:			__wt_scr_free(&tkey);
 		}

@@ -17,11 +17,11 @@ __wt_meta_turtle_init(WT_SESSION_IMPL *session, int *existp)
 	WT_DECL_RET;
 	WT_ITEM *buf;
 	int exist;
-	const char *metaconf, *path;
+	const char *metaconf;
 	const char *cfg[] = API_CONF_DEFAULTS(file, meta, NULL);
 
 	buf = NULL;
-	metaconf = path = NULL;
+	metaconf = NULL;
 	*existp = 0;
 
 	/* Discard any turtle setup file left-over from previous runs. */
@@ -42,11 +42,10 @@ __wt_meta_turtle_init(WT_SESSION_IMPL *session, int *existp)
 	    "key_format=S,value_format=S,version=(major=%d,minor=%d)",
 	    WT_BTREE_MAJOR_VERSION, WT_BTREE_MINOR_VERSION));
 	cfg[1] = buf->data;
-	WT_RET(__wt_config_collapse(session, cfg, &metaconf));
+	WT_ERR(__wt_config_collapse(session, cfg, &metaconf));
 	WT_ERR(__wt_meta_turtle_update(session, WT_METADATA_URI, metaconf));
 
 err:	__wt_free(session, metaconf);
-	__wt_free(session, path);
 	__wt_scr_free(&buf);
 
 	return (ret);

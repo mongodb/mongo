@@ -142,7 +142,7 @@ __wt_page_inmem(WT_SESSION_IMPL *session,
 	case WT_PAGE_ROW_LEAF:
 		WT_ERR(__inmem_row_leaf(session, page, &inmem_size));
 		break;
-	WT_ILLEGAL_VALUE(session);
+	WT_ILLEGAL_VALUE_ERR(session);
 	}
 
 	__wt_cache_page_read(
@@ -323,7 +323,7 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 	 * and location cookie).
 	 */
 	nindx = dsk->u.entries / 2;
-	WT_RET((__wt_calloc_def(session, (size_t)nindx, &page->u.intl.t)));
+	WT_ERR((__wt_calloc_def(session, (size_t)nindx, &page->u.intl.t)));
 	if (inmem_sizep != NULL)
 		*inmem_sizep += nindx * sizeof(*page->u.intl.t);
 
@@ -361,7 +361,7 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 		 */
 		prefix = unpack->prefix;
 		if (huffman != NULL || unpack->ovfl) {
-			WT_RET(__wt_cell_unpack_copy(session, unpack, current));
+			WT_ERR(__wt_cell_unpack_copy(session, unpack, current));
 
 			/*
 			 * If there's a prefix, make sure there's enough buffer

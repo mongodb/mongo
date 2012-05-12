@@ -306,7 +306,7 @@ retry:	__cursor_func_init(cbt, 1);
 		if ((ret = __wt_row_modify(session, cbt, 0)) == WT_RESTART)
 			goto retry;
 		break;
-	WT_ILLEGAL_VALUE(session);
+	WT_ILLEGAL_VALUE_ERR(session);
 	}
 
 err:	__cursor_func_resolve(cbt, ret);
@@ -361,7 +361,7 @@ retry:	__cursor_func_init(cbt, 1);
 		else if ((ret = __wt_row_modify(session, cbt, 1)) == WT_RESTART)
 			goto retry;
 		break;
-	WT_ILLEGAL_VALUE(session);
+	WT_ILLEGAL_VALUE_ERR(session);
 	}
 
 err:	__cursor_func_resolve(cbt, ret);
@@ -423,7 +423,7 @@ retry:	__cursor_func_init(cbt, 1);
 		else if ((ret = __wt_row_modify(session, cbt, 0)) == WT_RESTART)
 			goto retry;
 		break;
-	WT_ILLEGAL_VALUE(session);
+	WT_ILLEGAL_VALUE_ERR(session);
 	}
 
 err:	__cursor_func_resolve(cbt, ret);

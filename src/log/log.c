@@ -25,15 +25,15 @@ __wt_log_put(WT_SESSION_IMPL *session, WT_LOGREC_DESC *recdesc, ...)
 	buf = &session->logrec_buf;
 
 	va_start(ap, recdesc);
-	WT_ERR(__log_record_size(session, &size, recdesc, ap));
+	ret = __log_record_size(session, &size, recdesc, ap);
 	va_end(ap);
+	WT_RET(ret);
 
 	WT_RET(__wt_buf_initsize(session, buf, size));
 
 	va_start(ap, recdesc);
-	WT_ERR(__wt_struct_packv(session, buf->mem, size, recdesc->fmt, ap));
-err:	va_end(ap);
-
+	ret = __wt_struct_packv(session, buf->mem, size, recdesc->fmt, ap);
+	va_end(ap);
 	return (ret);
 }
 
