@@ -857,10 +857,10 @@ __rec_split_finish(WT_SESSION_IMPL *session)
 static int
 __rec_split_fixup(WT_SESSION_IMPL *session)
 {
-	WT_BTREE *btree;
 	WT_BOUNDARY *bnd;
+	WT_BTREE *btree;
+	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
-	WT_ITEM *tmp;
 	WT_PAGE_HEADER *dsk;
 	WT_RECONCILE *r;
 	uint32_t i, len;
@@ -873,7 +873,6 @@ __rec_split_fixup(WT_SESSION_IMPL *session)
 	 */
 	r = session->reconcile;
 	btree = session->btree;
-	tmp = NULL;
 
 	/*
 	 * The data isn't laid out on a page boundary or nul padded; copy it to
@@ -1675,10 +1674,11 @@ __rec_col_var(
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_COL *cip;
+	WT_DECL_ITEM(orig);
 	WT_DECL_RET;
 	WT_INSERT *ins;
 	WT_INSERT_HEAD *append;
-	WT_ITEM *last, *orig;
+	WT_ITEM *last;
 	WT_RECONCILE *r;
 	WT_UPDATE *upd;
 	uint64_t n, nrepeat, repeat_count, rle, slvg_missing, src_recno;
@@ -2020,7 +2020,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_DECL_RET;
 	WT_IKEY *ikey;
-	WT_ITEM *tmpkey;
+	WT_DECL_ITEM(tmpkey);
 	WT_KV *key, *val;
 	WT_PAGE *rp;
 	WT_RECONCILE *r;
@@ -2412,10 +2412,10 @@ __rec_row_leaf(
 	WT_BTREE *btree;
 	WT_CELL *cell, *val_cell;
 	WT_CELL_UNPACK *unpack, _unpack;
+	WT_DECL_ITEM(tmpkey);
 	WT_DECL_RET;
 	WT_IKEY *ikey;
 	WT_INSERT *ins;
-	WT_ITEM *tmpkey;
 	WT_KV *key, *val;
 	WT_RECONCILE *r;
 	WT_ROW *rip;
@@ -2967,7 +2967,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 #ifdef HAVE_VERBOSE
 		if (WT_VERBOSE_ISSET(session, reconcile)) {
-			WT_ITEM *tkey;
+			WT_DECL_ITEM(tkey);
 			if (page->type == WT_PAGE_ROW_INT ||
 			    page->type == WT_PAGE_ROW_LEAF)
 				WT_RET(__wt_scr_alloc(session, 0, &tkey));
@@ -2993,9 +2993,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 					break;
 				WT_ILLEGAL_VALUE(session);
 				}
-err:			if (page->type == WT_PAGE_ROW_INT ||
-			    page->type == WT_PAGE_ROW_LEAF)
-				__wt_scr_free(&tkey);
+err:			__wt_scr_free(&tkey);
 		}
 #endif
 		switch (page->type) {
@@ -3321,8 +3319,8 @@ __rec_cell_build_ovfl(
     WT_SESSION_IMPL *session, WT_KV *kv, uint8_t type, uint64_t rle)
 {
 	WT_BTREE *btree;
+	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
-	WT_ITEM *tmp;
 	WT_PAGE *page;
 	WT_PAGE_HEADER *dsk;
 	WT_RECONCILE *r;
@@ -3333,7 +3331,6 @@ __rec_cell_build_ovfl(
 	r = session->reconcile;
 	btree = session->btree;
 	page = r->page;
-	tmp = NULL;
 
 	/*
 	 * See if this overflow record has already been written and reuse it if

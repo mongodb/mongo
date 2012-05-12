@@ -340,15 +340,15 @@ err:	WT_TRET(__wt_bm_salvage_end(session));
 static int
 __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 {
+	WT_DECL_ITEM(as);
+	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
-	WT_ITEM *as, *buf;
 	WT_PAGE_HEADER *dsk;
 	uint64_t gen;
 	uint32_t addrbuf_size;
 	uint8_t addrbuf[WT_BTREE_MAX_ADDR_COOKIE];
 	int eof;
 
-	as = buf = NULL;
 	WT_ERR(__wt_scr_alloc(session, 0, &as));
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));
 
@@ -1546,9 +1546,11 @@ __slvg_row_trk_update_start(
     WT_SESSION_IMPL *session, WT_ITEM *stop, uint32_t slot, WT_STUFF *ss)
 {
 	WT_BTREE *btree;
+	WT_DECL_ITEM(dsk);
+	WT_DECL_ITEM(key);
 	WT_DECL_RET;
 	WT_IKEY *ikey;
-	WT_ITEM *dsk, *key, *item, _item;
+	WT_ITEM *item, _item;
 	WT_PAGE *page;
 	WT_ROW *rip;
 	WT_TRACK *trk;
@@ -1556,7 +1558,6 @@ __slvg_row_trk_update_start(
 	int cmp, found;
 
 	btree = session->btree;
-	key = dsk = NULL;
 	page = NULL;
 	found = 0;
 
@@ -1590,7 +1591,7 @@ __slvg_row_trk_update_start(
 	 * Walk the page, looking for a key sorting greater than the specified
 	 * stop key -- that's our new start key.
 	 */
-	WT_RET(__wt_scr_alloc(session, 0, &key));
+	WT_ERR(__wt_scr_alloc(session, 0, &key));
 	WT_ROW_FOREACH(page, rip, i) {
 		if (__wt_off_page(page, rip->key)) {
 			ikey = rip->key;
@@ -1614,8 +1615,8 @@ __slvg_row_trk_update_start(
 	 * would have discarded it, we wouldn't be here.  Therefore, this test
 	 * is safe.  (But, it never hurts to check.)
 	 */
-	WT_RET_TEST(!found, WT_ERROR);
-	WT_RET(__slvg_key_copy(session, &trk->row_start, item));
+	WT_ERR_TEST(!found, WT_ERROR);
+	WT_ERR(__slvg_key_copy(session, &trk->row_start, item));
 
 	/*
 	 * We may need to re-sort some number of elements in the list.  Walk
@@ -1725,9 +1726,10 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
     WT_TRACK *trk, WT_PAGE *parent, WT_REF *ref, WT_STUFF *ss)
 {
 	WT_BTREE *btree;
+	WT_DECL_ITEM(key);
 	WT_DECL_RET;
 	WT_IKEY *ikey;
-	WT_ITEM *item, _item, *key;
+	WT_ITEM *item, _item;
 	WT_PAGE *page;
 	WT_ROW *rip;
 	WT_SALVAGE_COOKIE *cookie, _cookie;

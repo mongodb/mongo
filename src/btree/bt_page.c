@@ -300,15 +300,16 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 	WT_BTREE *btree;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
+	WT_DECL_ITEM(current);
+	WT_DECL_ITEM(last);
 	WT_DECL_RET;
-	WT_ITEM *current, *last, *tmp;
+	WT_ITEM *tmp;
 	WT_PAGE_HEADER *dsk;
 	WT_REF *ref;
 	uint32_t i, nindx, prefix;
 	void *huffman;
 
 	btree = session->btree;
-	current = last = NULL;
 	unpack = &_unpack;
 	dsk = page->dsk;
 	huffman = btree->huffman_key;

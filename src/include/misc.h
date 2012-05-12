@@ -151,5 +151,6 @@
 	((strncmp((str), (pre), strlen(pre)) == 0) ?			\
 	    ((str) += strlen(pre), 1) : 0)
 
-/* Local "ret" declaration and initialization. */
+/* Function return value and scratch buffer declaration and initialization. */
+#define	WT_DECL_ITEM(i)	WT_ITEM *i = NULL
 #define	WT_DECL_RET	int ret = 0

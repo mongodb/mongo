@@ -189,7 +189,6 @@ __verify_tree(WT_SESSION_IMPL *session,
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_COL *cip;
 	WT_DECL_RET;
-	WT_ITEM *tmp;
 	WT_REF *ref;
 	uint64_t recno;
 	uint32_t entry, i, size;
@@ -309,6 +308,7 @@ recno_chk:	if (parent_recno != recno)
 			 * reviewed to this point.
 			 */
 			if (ref->u.recno != vs->record_total + 1) {
+				WT_DECL_ITEM(tmp);
 				WT_RET(__wt_scr_alloc(session, 0, &tmp));
 				__wt_cell_unpack(ref->addr, unpack);
 				ret = __wt_bm_addr_string(

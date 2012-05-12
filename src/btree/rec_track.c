@@ -420,7 +420,7 @@ __track_msg(WT_SESSION_IMPL *session,
     WT_PAGE *page, const char *msg, WT_PAGE_TRACK *track)
 {
 	WT_DECL_RET;
-	WT_ITEM *buf;
+	WT_DECL_ITEM(buf);
 	char f[64];
 
 	WT_RET(__wt_scr_alloc(session, 64, &buf));

@@ -188,10 +188,8 @@ int
 __wt_debug_addr(WT_SESSION_IMPL *session,
     const uint8_t *addr, uint32_t addr_size, const char *ofile)
 {
+	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
-	WT_ITEM *buf;
-
-	buf = NULL;
 
 	WT_RET(__wt_scr_alloc(session, 1024, &buf));
 	WT_ERR(__wt_block_read(
@@ -210,10 +208,8 @@ int
 __wt_debug_off(
     WT_SESSION_IMPL *session, uint32_t offset, uint32_t size, const char *ofile)
 {
+	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
-	WT_ITEM *buf;
-
-	buf = NULL;
 
 	WT_RET(__wt_scr_alloc(session, size, &buf));
 	WT_ERR(__wt_block_read_off(
@@ -835,12 +831,11 @@ __debug_ref(WT_DBG *ds, WT_REF *ref, WT_PAGE *page)
 static int
 __debug_cell(WT_DBG *ds, WT_PAGE_HEADER *dsk, WT_CELL_UNPACK *unpack)
 {
+	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
-	WT_ITEM *buf;
 	WT_SESSION_IMPL *session;
 
 	session = ds->session;
-	buf = NULL;
 
 	__dmsg(ds, "\t%s: len %" PRIu32,
 	    __wt_cell_type_string(unpack->raw), unpack->size);
@@ -898,12 +893,11 @@ __debug_cell(WT_DBG *ds, WT_PAGE_HEADER *dsk, WT_CELL_UNPACK *unpack)
 static int
 __debug_cell_data(WT_DBG *ds, const char *tag, WT_CELL_UNPACK *unpack)
 {
+	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
-	WT_ITEM *buf;
 	WT_SESSION_IMPL *session;
 
 	session = ds->session;
-	buf = NULL;
 
 	/*
 	 * Column-store references to deleted cells return a NULL cell
