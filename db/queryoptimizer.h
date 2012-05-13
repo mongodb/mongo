@@ -314,6 +314,7 @@ namespace mongo {
         }
         void init();
         void addHint( IndexDetails &id );
+        void warnOnCappedIdTableScan() const;
         class Runner {
         public:
             Runner( QueryPlanSet &plans, QueryOp &op );
