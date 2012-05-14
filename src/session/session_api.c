@@ -196,8 +196,8 @@ __session_drop(WT_SESSION *wt_session, const char *uri, const char *config)
 	/* If dropping snapshots, that's a different code path. */
 	WT_ERR(__wt_config_gets(session, cfg, "snapshot", &cval));
 	ret = (cval.len != 0) ?
-	    __wt_schema_worker(session, uri, cfg,
-		__wt_btree_snapshot_drop, WT_BTREE_SNAPSHOT_OP) :
+	    __wt_schema_worker(
+		session, uri, cfg, __wt_snapshot_drop, WT_BTREE_SNAPSHOT_OP) :
 	    __wt_schema_drop(session, uri, cfg);
 
 err:    WT_TRET(__wt_meta_track_off(session, ret != 0));
@@ -256,8 +256,8 @@ __session_sync(WT_SESSION *wt_session, const char *uri, const char *config)
 	SESSION_API_CALL(session, sync, config, cfg);
 	WT_ERR(__wt_meta_track_on(session));
 
-	ret = __wt_schema_worker(session, uri, cfg,
-	    __wt_btree_snapshot, WT_BTREE_SNAPSHOT_OP);
+	ret = __wt_schema_worker(
+	    session, uri, cfg, __wt_snapshot, WT_BTREE_SNAPSHOT_OP);
 
 err:    WT_TRET(__wt_meta_track_off(session, ret != 0));
 	API_END_NOTFOUND_MAP(session, ret);

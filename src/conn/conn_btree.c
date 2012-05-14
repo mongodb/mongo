@@ -142,6 +142,32 @@ __conn_btree_get(WT_SESSION_IMPL *session,
 }
 
 /*
+ * __wt_conn_btree_sync_and_close --
+ *	Sync and close the underlying btree handle.
+ */
+int
+__wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session)
+{
+	WT_DECL_RET;
+	WT_BTREE *btree;
+
+	btree = session->btree;
+
+	if (!F_ISSET(btree, WT_BTREE_OPEN))
+		return (0);
+
+	if (!F_ISSET(btree,
+	    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY))
+		ret = __wt_snapshot_close(session);
+
+	WT_TRET(__wt_btree_close(session));
+
+	F_CLR(btree, WT_BTREE_OPEN | WT_BTREE_SPECIAL_FLAGS);
+
+	return (ret);
+}
+
+/*
  * __wt_conn_btree_open --
  *	Open the current btree handle.
  */
@@ -168,11 +194,8 @@ __wt_conn_btree_open(WT_SESSION_IMPL *session,
 	 * this function isn't called if the handle is already open in the
 	 * required mode.
 	 */
-	if (F_ISSET(btree, WT_BTREE_OPEN)) {
-		ret = __wt_btree_close(session);
-		F_CLR(btree, WT_BTREE_OPEN | WT_BTREE_SPECIAL_FLAGS);
-		WT_RET(ret);
-	}
+	if (F_ISSET(btree, WT_BTREE_OPEN))
+		WT_RET(__wt_conn_btree_sync_and_close(session));
 
 	/* Set any special flags on the handle. */
 	F_SET(btree, LF_ISSET(WT_BTREE_SPECIAL_FLAGS));
@@ -268,10 +291,8 @@ __wt_conn_btree_close(WT_SESSION_IMPL *session, int locked)
 	__wt_spin_unlock(session, &conn->spinlock);
 
 	if (!inuse) {
-		if (F_ISSET(btree, WT_BTREE_OPEN)) {
-			ret = __wt_btree_close(session);
-			F_CLR(btree, WT_BTREE_OPEN | WT_BTREE_SPECIAL_FLAGS);
-		}
+		if (F_ISSET(btree, WT_BTREE_OPEN))
+			WT_TRET(__wt_conn_btree_sync_and_close(session));
 		if (!locked)
 			__wt_rwunlock(session, btree->rwlock);
 	}
@@ -309,11 +330,9 @@ __wt_conn_btree_close_all(WT_SESSION_IMPL *session, const char *name)
 				__wt_spin_unlock(session, &conn->spinlock);
 
 				ret = __wt_meta_track_sub_on(session);
-				if (ret == 0) {
-					ret = __wt_btree_close(session);
-					F_CLR(btree, WT_BTREE_OPEN |
-					    WT_BTREE_SPECIAL_FLAGS);
-				}
+				if (ret == 0)
+					ret = __wt_conn_btree_sync_and_close(
+					session);
 
 				/*
 				 * If the close succeeded, drop any locks it
@@ -351,8 +370,7 @@ __conn_btree_discard(WT_SESSION_IMPL *session, WT_BTREE *btree)
 
 	if (F_ISSET(btree, WT_BTREE_OPEN)) {
 		WT_SET_BTREE_IN_SESSION(session, btree);
-		WT_TRET(__wt_btree_close(session));
-		F_CLR(btree, WT_BTREE_OPEN | WT_BTREE_SPECIAL_FLAGS);
+		WT_TRET(__wt_conn_btree_sync_and_close(session));
 		WT_CLEAR_BTREE_IN_SESSION(session);
 	}
 	WT_TRET(__wt_rwlock_destroy(session, btree->rwlock));

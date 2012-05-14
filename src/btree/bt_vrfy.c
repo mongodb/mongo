@@ -127,8 +127,8 @@ __verify_int(WT_SESSION_IMPL *session, int dumpfile)
 			if ((ret = __wt_btree_tree_open(session, &dsk)) == 0) {
 				ret = __verify_tree(
 				    session, btree->root_page, (uint64_t)1, vs);
-				WT_TRET(
-				    __wt_cache_flush(session, WT_SYNC_DISCARD));
+				WT_TRET(__wt_bt_cache_flush(
+				    session, NULL, WT_SYNC_DISCARD, 0));
 			}
 		}
 
