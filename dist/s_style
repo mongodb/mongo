@@ -9,8 +9,6 @@ cd ..
 # Returns in functions after a jump to error lable.
 for f in `find examples ext src test -name '*.[ci]'`; do
 	sed -n \
-	    -e '/^__wt_conn_btree_close_all(/,/^}/d' \
-	    -e '/^__find_next_col(/,/^}/d' \
 	    -e '/^{$/,/^}$/{=;p;}' $f |
 	sed 'N;s/\n/:/' |
 	sed -e '/./{H;/^[0-9][0-9]*:}$/!d;}' \
