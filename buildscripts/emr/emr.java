@@ -99,21 +99,29 @@ public class emr {
 
         public void map( Text key, MongoSuite value, OutputCollector<Text,IntWritable> output, Reporter reporter ) 
             throws IOException {
-
-            System.out.println( "key: " + key );
-            System.out.println( "value: " + value );
-
-            long start = System.currentTimeMillis();
-            boolean passed = value.runTest();
-            long end = System.currentTimeMillis();
             
-            output.collect( new Text( passed ? "passed" : "failed" ) , new IntWritable( 1 ) );
-            output.collect( new Text( key.toString() + "-time-seconds" ) , new IntWritable( (int)((end-start)/(1000)) ) );
-            output.collect( new Text( key.toString() + "-passed" ) , new IntWritable( passed ? 1 : 0 ) );
+            FileLock lock = new FileLock( "mapper" );
+            try {
+                lock.lock();
 
-            String ip = IOUtil.readStringFully( new URL( "http://myip.10gen.com/" ).openConnection().getInputStream() );
-            ip = ip.substring( ip.indexOf( ":" ) + 1 ).trim();
-            output.collect( new Text( ip ) , new IntWritable(1) );
+                System.out.println( "key: " + key );
+                System.out.println( "value: " + value );
+                
+                long start = System.currentTimeMillis();
+                boolean passed = value.runTest();
+                long end = System.currentTimeMillis();
+                
+                output.collect( new Text( passed ? "passed" : "failed" ) , new IntWritable( 1 ) );
+                output.collect( new Text( key.toString() + "-time-seconds" ) , new IntWritable( (int)((end-start)/(1000)) ) );
+                output.collect( new Text( key.toString() + "-passed" ) , new IntWritable( passed ? 1 : 0 ) );
+                
+                String ip = IOUtil.readStringFully( new URL( "http://myip.10gen.com/" ).openConnection().getInputStream() );
+                ip = ip.substring( ip.indexOf( ":" ) + 1 ).trim();
+                output.collect( new Text( ip ) , new IntWritable(1) );
+            }
+            finally {
+                lock.unlock();
+            }
             
         }
 
@@ -290,7 +298,7 @@ public class emr {
         conf.set( "suites" , suites );
 
         conf.set( "mapred.map.tasks" , "1" );
-        conf.setLong( "mapred.task.timeout" , 3600 * 1000 /* 1 hour */);
+        conf.setLong( "mapred.task.timeout" , 4 * 3600 * 1000 /* 4  hours */);
 
         conf.setOutputKeyClass(Text.class);
         conf.setOutputValueClass(IntWritable.class);
