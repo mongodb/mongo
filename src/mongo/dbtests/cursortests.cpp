@@ -309,7 +309,7 @@ namespace CursorTests {
 
                 // Generate a cursor from the supplied query and advance it to the iterate to be
                 // deleted.
-                shared_ptr<Cursor> cursor = NamespaceDetailsTransient::getCursor( ns(), query() );
+                boost::shared_ptr<Cursor> cursor = NamespaceDetailsTransient::getCursor( ns(), query() );
                 while( !isExpectedIterate( cursor->current() ) ) {
                     ASSERT( cursor->advance() );
                 }
