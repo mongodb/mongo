@@ -17,6 +17,8 @@
 
 #pragma once
 
+#include <map>
+
 namespace mongo {
 
 /*
