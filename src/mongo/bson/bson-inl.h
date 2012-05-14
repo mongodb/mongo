@@ -136,7 +136,7 @@ dodouble:
             f = strcmp( l.codeWScopeCode() , r.codeWScopeCode() );
             if ( f )
                 return f;
-            f = strcmp( l.codeWScopeScopeData() , r.codeWScopeScopeData() );
+            f = strcmp( l.codeWScopeScopeDataUnsafe() , r.codeWScopeScopeDataUnsafe() );
             if ( f )
                 return f;
             return 0;

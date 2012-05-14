@@ -396,7 +396,7 @@ namespace mongo {
 
                         if ( e.type() == CodeWScope ) {
                             scopeFunc = scope->createFunction( e["check"].codeWScopeCode() );
-                            scopeObj = BSONObj( e.codeWScopeScopeData() );
+                            scopeObj = BSONObj( e.codeWScopeScopeDataUnsafe() );
                         }
                         else {
                             scopeFunc = scope->createFunction( e["check"].valuestr() );

@@ -212,7 +212,7 @@ namespace mongo {
                 finalize = p["finalize"]._asCode();
 
             return group( dbname , ns , q ,
-                          key , keyf , reduce._asCode() , reduce.type() != CodeWScope ? 0 : reduce.codeWScopeScopeData() ,
+                          key , keyf , reduce._asCode() , reduce.type() != CodeWScope ? 0 : reduce.codeWScopeScopeDataUnsafe() ,
                           initial.embeddedObject() , finalize ,
                           errmsg , result );
         }
