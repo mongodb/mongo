@@ -308,13 +308,14 @@ extern int __wt_cache_read(WT_SESSION_IMPL *session,
 extern int __wt_kv_return(WT_SESSION_IMPL *session,
     WT_CURSOR_BTREE *cbt,
     int key_ret);
-extern int __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[]);
-extern int __wt_btree_stat_init(WT_SESSION_IMPL *session);
-extern int __wt_btree_snapshot(WT_SESSION_IMPL *session, const char *cfg[]);
-extern int __wt_btree_snapshot_close(WT_SESSION_IMPL *session);
-extern int __wt_btree_snapshot_drop(WT_SESSION_IMPL *session,
+extern int __wt_bt_salvage( WT_SESSION_IMPL *session,
+    WT_SNAPSHOT *snapbase,
     const char *cfg[]);
-extern int __wt_cache_flush(WT_SESSION_IMPL *session, int op);
+extern int __wt_btree_stat_init(WT_SESSION_IMPL *session);
+extern int __wt_bt_cache_flush( WT_SESSION_IMPL *session,
+    WT_SNAPSHOT *snapbase,
+    int op,
+    int force);
 extern int __wt_upgrade(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_verify(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_dumpfile(WT_SESSION_IMPL *session, const char *cfg[]);
@@ -513,6 +514,7 @@ extern const char *__wt_confchk_table_meta;
 extern const char *__wt_confdfl_wiredtiger_open;
 extern const char *__wt_confchk_wiredtiger_open;
 extern int __wt_conn_btree_open_lock(WT_SESSION_IMPL *session, uint32_t flags);
+extern int __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session);
 extern int __wt_conn_btree_open(WT_SESSION_IMPL *session,
     const char *config,
     const char *cfg[],
@@ -881,6 +883,10 @@ extern int __wt_session_lock_snapshot( WT_SESSION_IMPL *session,
     uint32_t flags);
 extern int __wt_session_discard_btree( WT_SESSION_IMPL *session,
     WT_BTREE_SESSION *btree_session);
+extern int __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[]);
+extern int __wt_snapshot(WT_SESSION_IMPL *session, const char *cfg[]);
+extern int __wt_snapshot_close(WT_SESSION_IMPL *session);
+extern int __wt_snapshot_drop(WT_SESSION_IMPL *session, const char *cfg[]);
 extern void __wt_event_handler_set(WT_SESSION_IMPL *session,
     WT_EVENT_HANDLER *handler);
 extern void __wt_err(WT_SESSION_IMPL *session,

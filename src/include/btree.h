@@ -74,6 +74,9 @@ struct __wt_btree {
 	const char *config;		/* Configuration string */
 	const char *snapshot;		/* Snapshot name (or NULL) */
 
+	/* XXX Should move into the session-level handle information. */
+	WT_RWLOCK   *snaplock;		/* Lock for snapshot creation */
+
 	enum {	BTREE_COL_FIX=1,	/* Fixed-length column store */
 		BTREE_COL_VAR=2,	/* Variable-length column store */
 		BTREE_ROW=3		/* Row-store */
@@ -104,7 +107,6 @@ struct __wt_btree {
 
 	WT_PAGE *root_page;		/* Root page */
 
-	WT_RWLOCK   *snaplock;		/* Lock for snapshot creation */
 	WT_SNAPSHOT *snap;		/* Snapshot information */
 
 	void *block;			/* Block manager */

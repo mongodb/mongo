@@ -132,22 +132,21 @@ static int  __slvg_trk_ovfl(WT_SESSION_IMPL *,
 		WT_PAGE_HEADER *, uint8_t *, uint32_t, uint64_t, WT_STUFF *);
 
 /*
- * __wt_salvage --
+ * __wt_bt_salvage --
  *	Salvage a Btree.
  */
 int
-__wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
+__wt_bt_salvage(
+    WT_SESSION_IMPL *session, WT_SNAPSHOT *snapbase, const char *cfg[])
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
-	WT_SNAPSHOT snapbase[2];
 	WT_STUFF *ss, stuff;
 	uint32_t i, leaf_cnt;
 
 	WT_UNUSED(cfg);
 
 	btree = session->btree;
-	memset(snapbase, 0, sizeof(snapbase));
 
 	WT_CLEAR(stuff);
 	ss = &stuff;
@@ -271,40 +270,13 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/*
 	 * Step 9:
-	 * Evict the newly created root page, creating a snapshot, and update
-	 * the metadata with the new snapshot's location.
+	 * Evict the newly created root page, creating a snapshot.
 	 */
 	if (ss->root_page != NULL) {
-		/*
-		 * XXX
-		 * The salvage process has processed previous snapshot blocks,
-		 * which means the underlying block manager has to ignore any
-		 * previous snapshot entries when creating the new snapshot, in
-		 * other words, we can't use the metadata snapshot list, it has
-		 * all of those snapshots listed.  Build a clean snapshot array
-		 * and use it instead.
-		 *	Don't clear the metadata snapshot list and then call the
-		 * snapshot get routines: a crash after clearing the metadata
-		 * snapshot list, but before creating a new snapshot list, would
-		 * look like a create or open of a file without a snapshot from
-		 * which to roll-forward, and the contents of the file would be
-		 * discarded.
-		 */
-		WT_ERR(__wt_strdup(
-		    session, WT_INTERNAL_SNAPSHOT, &snapbase[0].name));
-		F_SET(&snapbase[0], WT_SNAP_ADD);
-
 		btree->snap = snapbase;
 		ret = __wt_rec_evict(session, ss->root_page, WT_REC_SINGLE);
 		btree->snap = NULL;
 		ss->root_page = NULL;
-
-		if (snapbase[0].raw.data == NULL)
-			WT_ERR_MSG(session, EINVAL,
-			    "root page eviction failed to create a snapshot");
-		else
-			WT_ERR(__wt_meta_snaplist_set(
-			    session, btree->name, snapbase));
 	}
 
 	/*
@@ -316,9 +288,6 @@ err:	WT_TRET(__wt_bm_salvage_end(session));
 	/* Discard any root page we created. */
 	if (ss->root_page != NULL)
 		__wt_page_out(session, &ss->root_page, 0);
-
-	/* Discard any snapshot information we allocated. */
-	__wt_free(session, snapbase[0].name);
 
 	/* Discard the leaf and overflow page memory. */
 	WT_TRET(__slvg_cleanup(session, ss));

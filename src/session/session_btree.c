@@ -104,8 +104,8 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 	 */
 	if (F_ISSET(btree, WT_BTREE_SPECIAL_FLAGS)) {
 		WT_ASSERT(session, F_ISSET(btree, WT_BTREE_EXCLUSIVE));
-		ret = __wt_btree_close(session);
-		F_CLR(btree, WT_BTREE_OPEN | WT_BTREE_SPECIAL_FLAGS);
+
+		ret = __wt_conn_btree_sync_and_close(session);
 	}
 
 	if (F_ISSET(btree, WT_BTREE_EXCLUSIVE))
