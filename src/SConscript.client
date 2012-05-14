@@ -117,7 +117,9 @@ env.Install(
                  '#buildscripts/make_archive.py',
                  clientSource,
                  clientHeaders,
-                 [source for (target, source) in exampleSourceMap]],
+                 [source for (target, source) in exampleSourceMap],
+                 'mongo/bson/bsondemo/bsondemo.cpp',
+                 ],
                 '${PYTHON} ${SOURCES[0]} -o $TARGET '
                 '--transform ${str(Dir(BUILD_DIR))}/client_build=$CLIENT_DIST_BASENAME/src '
                 '--transform ${str(Dir(BUILD_DIR))}=$CLIENT_DIST_BASENAME/src '
