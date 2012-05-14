@@ -22,6 +22,7 @@
 #include "mongo/client/connpool.h"
 #include "mongo/db/cmdline.h"
 #include "mongo/db/dbmessage.h"
+#include "mongo/db/namespacestring.h"
 #include "mongo/s/shard.h"
 #include "mongo/s/util.h"
 
@@ -103,6 +104,16 @@ namespace mongo {
 
         dataReceived( retry, _lazyHost );
         return ! retry;
+    }
+
+    bool DBClientCursor::initCommand(){
+        BSONObj res;
+
+        bool ok = _client->runCommand( nsGetDB( ns ), query, res, opts );
+        replyToQuery( 0, *batch.m, res );
+        dataReceived();
+
+        return ok;
     }
 
     void DBClientCursor::requestMore() {

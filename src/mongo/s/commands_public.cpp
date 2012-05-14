@@ -397,136 +397,53 @@ namespace mongo {
 
         class CountCmd : public PublicGridCommand {
         public:
-            CountCmd() : PublicGridCommand("count") { }
+            CountCmd() : PublicGridCommand( "count" ) { }
             virtual bool passOptions() const { return true; }
-            bool run(const string& dbName, BSONObj& cmdObj, int options, string& errmsg, BSONObjBuilder& result, bool) {
-                string collection = cmdObj.firstElement().valuestrsafe();
-                string fullns = dbName + "." + collection;
+            bool run( const string& dbName,
+                    BSONObj& cmdObj,
+                    int options,
+                    string& errmsg,
+                    BSONObjBuilder& result,
+                    bool ){
+
+                const string collection = cmdObj.firstElement().valuestrsafe();
+                const string fullns = dbName + "." + collection;
 
                 BSONObj filter;
-                if ( cmdObj["query"].isABSONObj() )
+                if( cmdObj["query"].isABSONObj() ){
                     filter = cmdObj["query"].Obj();
-
-                DBConfigPtr conf = grid.getDBConfig( dbName , false );
-                if ( ! conf || ! conf->isShardingEnabled() || ! conf->isSharded( fullns ) ) {
-                    ShardConnection conn( conf->getPrimary() , fullns );
-
-                    BSONObj temp;
-                    bool ok = false;
-                    try{
-                        ok = conn->runCommand( dbName , cmdObj , temp, options );
-                    }
-                    catch( RecvStaleConfigException& e ){
-                        conn.done();
-                        throw e;
-                    }
-                    conn.done();
-
-                    if ( ok ) {
-                        result.append( temp["n"] );
-                        return true;
-                    }
-
-                    if ( temp["code"].numberInt() != SendStaleConfigCode ) {
-                        errmsg = temp["errmsg"].String();
-                        result.appendElements( temp );
-                        return false;
-                    }
-
-                    // this collection got sharded
-                    ChunkManagerPtr cm = conf->getChunkManagerIfExists( fullns , true );
-                    if ( ! cm ) {
-                        errmsg = "should be sharded now";
-                        result.append( "root" , temp );
-                        return false;
-                    }
                 }
+
+                map<Shard, BSONObj> countResult;
+
+                SHARDED->commandOp( dbName, BSON( "count" << collection << "query" << filter ),
+                            options, fullns, filter, countResult );
 
                 long long total = 0;
-                map<string,long long> shardCounts;
-                int numTries = 0;
-                bool hadToBreak = false;
+                BSONObjBuilder shardSubTotal( result.subobjStart( "shards" ));
 
-                ChunkManagerPtr cm = conf->getChunkManagerIfExists( fullns );
-                while ( numTries < 5 ) {
-                    numTries++;
+                for( map<Shard, BSONObj>::const_iterator iter = countResult.begin();
+                        iter != countResult.end(); ++iter ){
+                    const string& shardName = iter->first.getName();
 
-                    // This all should eventually be replaced by new pcursor framework, but for now match query
-                    // retry behavior manually
-                    if( numTries >= 2 ) sleepsecs( numTries - 1 );
+                    if( iter->second["ok"].trueValue() ){
+                        long long shardCount = iter->second["n"].numberLong();
 
-                    if ( ! cm ) {
-                        // probably unsharded now
-                        return run( dbName , cmdObj , options , errmsg , result, false );
+                        shardSubTotal.appendNumber( shardName, shardCount );
+                        total += shardCount;
                     }
-
-                    set<Shard> shards;
-                    cm->getShardsForQuery( shards , filter );
-                    verify( shards.size() );
-
-                    hadToBreak = false;
-
-                    for (set<Shard>::iterator it=shards.begin(), end=shards.end(); it != end; ++it) {
-                        ShardConnection conn(*it, fullns);
-                        if ( conn.setVersion() ){
-                            ChunkManagerPtr newCM = conf->getChunkManagerIfExists( fullns );
-                            if( ! newCM->getVersion().isEquivalentTo( cm->getVersion() ) ){
-                                cm = newCM;
-                                total = 0;
-                                shardCounts.clear();
-                                conn.done();
-                                hadToBreak = true;
-                                break;
-                            }
-                        }
-
-                        BSONObj temp;
-                        bool ok = false;
-                        try{
-                            ok = conn->runCommand( dbName , BSON( "count" << collection << "query" << filter ) , temp, options );
-                        }
-                        catch( RecvStaleConfigException& e ){
-                            conn.done();
-                            throw e;
-                        }
-                        conn.done();
-
-                        if ( ok ) {
-                            long long mine = temp["n"].numberLong();
-                            total += mine;
-                            shardCounts[it->getName()] = mine;
-                            continue;
-
-                        }
-
-                        if ( SendStaleConfigCode == temp["code"].numberInt() ) {
-                            // my version is old
-                            total = 0;
-                            shardCounts.clear();
-                            cm = conf->getChunkManagerIfExists( fullns , true, numTries > 2 ); // Force reload on third attempt
-                            hadToBreak = true;
-                            break;
-                        }
-
-                        // command failed :(
-                        errmsg = "failed on : " + it->getName();
-                        result.append( "cause" , temp );
+                    else {
+                        shardSubTotal.doneFast();
+                        errmsg = "failed on : " + shardName;
+                        result.append( "cause", iter->second );
                         return false;
                     }
-                    if ( ! hadToBreak )
-                        break;
-                }
-                if (hadToBreak) {
-                    errmsg = "Tried 5 times without success to get count for " + fullns + " from all shards";
-                    return false;
                 }
 
+                shardSubTotal.doneFast();
                 total = applySkipLimit( total , cmdObj );
                 result.appendNumber( "n" , total );
-                BSONObjBuilder temp( result.subobjStart( "shards" ) );
-                for ( map<string,long long>::iterator i=shardCounts.begin(); i!=shardCounts.end(); ++i )
-                    temp.appendNumber( i->first , i->second );
-                temp.done();
+
                 return true;
             }
         } countCmd;
