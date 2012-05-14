@@ -135,7 +135,7 @@ namespace mongo {
             }
 
             // Get max changed version and chunk version
-            ShardChunkVersion chunkVersion = diffChunkDoc[ "lastmod" ];
+            ShardChunkVersion chunkVersion = ShardChunkVersion::fromBSON( diffChunkDoc[ "lastmod" ] );
             if( chunkVersion > *_maxVersion ) *_maxVersion = chunkVersion;
 
             // Chunk version changes
@@ -203,7 +203,7 @@ namespace mongo {
                     // We should *always* pull at least a single chunk back, this lets us quickly
                     // detect if our collection was unsharded (and most of the time if it was
                     // resharded) in the meantime
-                    ts.appendTimestamp( "$gte", *_maxVersion );
+                    ts.appendTimestamp( "$gte", _maxVersion->toLong() );
                     ts.done();
                 }
 
@@ -234,8 +234,9 @@ namespace mongo {
                 queryShardB.append( "ns", _ns );
                 {
                     BSONObjBuilder ts( queryShardB.subobjStart( "lastmod" ) );
-                    ts.appendTimestamp( "$gt", *it );
-                    ts.appendTimestamp( "$lt", ShardChunkVersion( it->majorVersion() + 1, 0 ) );
+                    ts.appendTimestamp( "$gt", it->toLong() );
+                    ts.appendTimestamp( "$lt",
+                                        ShardChunkVersion( it->majorVersion() + 1, 0, OID() ).toLong() );
                     ts.done();
                 }
                 queryShardB.done();

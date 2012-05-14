@@ -470,7 +470,7 @@ namespace mongo {
                         ShardConnection conn(*it, fullns);
                         if ( conn.setVersion() ){
                             ChunkManagerPtr newCM = conf->getChunkManagerIfExists( fullns );
-                            if( newCM->getVersion() != cm->getVersion() ){
+                            if( ! newCM->getVersion().isEquivalentTo( cm->getVersion() ) ){
                                 cm = newCM;
                                 total = 0;
                                 shardCounts.clear();

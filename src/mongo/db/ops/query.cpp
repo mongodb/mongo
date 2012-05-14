@@ -685,7 +685,7 @@ namespace mongo {
             }
         }
         
-        if ( shardingState.getVersion( ns ) != shardingVersionAtStart ) {
+        if ( ! shardingState.getVersion( ns ).isEquivalentTo( shardingVersionAtStart ) ) {
             // if the version changed during the query
             // we might be missing some data
             // and its safe to send this as mongos can resend

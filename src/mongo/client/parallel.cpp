@@ -113,7 +113,7 @@ namespace mongo {
             if ( conn.setVersion() ) {
                 conn.done();
                 // Deprecated, so we don't care about versions here
-                throw RecvStaleConfigException( _ns , "ClusteredCursor::query" , true, ShardChunkVersion( 0 ), ShardChunkVersion( 0 ) );
+                throw RecvStaleConfigException( _ns , "ClusteredCursor::query" , ShardChunkVersion( 0, OID() ), ShardChunkVersion( 0, OID() ), true );
             }
             
             LOG(5) << "ClusteredCursor::query (" << type() << ") server:" << server
@@ -1255,7 +1255,7 @@ namespace mongo {
                 if ( conns[i]->setVersion() ) {
                     conns[i]->done();
                     // Version is zero b/c this is deprecated codepath
-                    staleConfigExs.push_back( (string)"stale config detected for " + RecvStaleConfigException( _ns , "ParallelCursor::_init" , ShardChunkVersion( 0 ), ShardChunkVersion( 0 ), true ).what() + errLoc );
+                    staleConfigExs.push_back( (string)"stale config detected for " + RecvStaleConfigException( _ns , "ParallelCursor::_init" , ShardChunkVersion( 0, OID() ), ShardChunkVersion( 0, OID() ), true ).what() + errLoc );
                     break;
                 }
 
@@ -1409,7 +1409,7 @@ namespace mongo {
 
             if( throwException && staleConfigExs.size() > 0 ){
                 // Version is zero b/c this is deprecated codepath
-                throw RecvStaleConfigException( _ns , errMsg.str() , ! allConfigStale, ShardChunkVersion( 0 ), ShardChunkVersion( 0 ) );
+                throw RecvStaleConfigException( _ns , errMsg.str() , ShardChunkVersion( 0, OID() ), ShardChunkVersion( 0, OID() ), ! allConfigStale );
             }
             else if( throwException )
                 throw DBException( errMsg.str(), 14827 );

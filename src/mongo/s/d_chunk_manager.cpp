@@ -96,10 +96,10 @@ namespace mongo {
 
         map<string,ShardChunkVersion> versionMap;
         versionMap[ shardName ] = _version;
-        _collVersion = 0;
+        _collVersion = ShardChunkVersion( 0, OID() );
 
         // Check to see if we have an old ShardChunkManager to use
-        if( oldManager && oldManager->_collVersion > 0 ){
+        if( oldManager && oldManager->_collVersion.isSet() ){
 
             versionMap[ shardName ] = oldManager->_version;
             _collVersion = oldManager->_collVersion;
@@ -138,8 +138,8 @@ namespace mongo {
             // No chunks were found for the ns
             warning() << "no chunks found when reloading " << ns << ", previous version was " << _collVersion << endl;
 
-            _version = 0;
-            _collVersion = 0;
+            _version = ShardChunkVersion( 0, OID() );
+            _collVersion = ShardChunkVersion( 0, OID() );
             _chunksMap.clear();
         }
         else{
@@ -192,7 +192,7 @@ namespace mongo {
             BSONObj d = cursor->next();
             _chunksMap.insert( make_pair( d["min"].Obj().getOwned() , d["max"].Obj().getOwned() ) );
 
-            ShardChunkVersion currVersion( d["lastmod"] );
+            ShardChunkVersion currVersion = ShardChunkVersion::fromBSON( d["lastmod"] );
             if ( currVersion > version ) {
                 version = currVersion;
             }
@@ -325,9 +325,9 @@ namespace mongo {
 
         if ( _chunksMap.size() == 1 ) {
             // if left with no chunks, just reset version
-            uassert( 13590 , str::stream() << "setting version to " << version << " on removing last chunk", version == 0 );
+            uassert( 13590 , str::stream() << "setting version to " << version.toString() << " on removing last chunk", ! version.isSet() );
 
-            p->_version = 0;
+            p->_version = ShardChunkVersion( 0, OID() );
             p->_collVersion = _collVersion;
 
         }
@@ -357,7 +357,7 @@ namespace mongo {
 
         // it is acceptable to move version backwards (e.g., undoing a migration that went bad during commit)
         // but only cloning away the last chunk may reset the version to 0
-        uassert( 13591 , "version can't be set to zero" , version > 0 );
+        uassert( 13591 , "version can't be set to zero" , version.isSet() );
 
         if ( ! _chunksMap.empty() ) {
 
@@ -434,7 +434,7 @@ namespace mongo {
 
     string ShardChunkManager::toString() const {
         StringBuilder ss;
-        ss << " ShardChunkManager version: " << _version << " key: " << _key;
+        ss << " ShardChunkManager version: " << _version.toString() << " key: " << _key;
         bool first = true;
         for ( RangeMap::const_iterator i=_rangesMap.begin(); i!=_rangesMap.end(); ++i ) {
             if ( first ) first = false;

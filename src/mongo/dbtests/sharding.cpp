@@ -141,7 +141,7 @@ namespace ShardingTests {
                     ASSERT( chunkRange->second.woCompare( _inverse ? chunkDoc["min"].Obj() : chunkDoc["max"].Obj() ) == 0 );
                 }
 
-                ShardChunkVersion version( chunkDoc["lastmod"] );
+                ShardChunkVersion version = ShardChunkVersion::fromBSON( chunkDoc["lastmod"] );
                 if( version > foundMaxVersion ) foundMaxVersion = version;
 
                 ShardChunkVersion shardMaxVersion = foundMaxShardVersions[ chunkDoc["shard"].String() ];
@@ -153,7 +153,7 @@ namespace ShardingTests {
             // log() << "Validating that all shard versions are up to date..." << endl;
 
             // Validate that all the versions are the same
-            ASSERT( foundMaxVersion == maxVersion );
+            ASSERT( foundMaxVersion.isEquivalentTo( maxVersion ) );
 
             for( VersionMap::iterator it = foundMaxShardVersions.begin(); it != foundMaxShardVersions.end(); it++ ){
 
@@ -161,7 +161,7 @@ namespace ShardingTests {
                 VersionMap::const_iterator maxIt = maxShardVersions.find( it->first );
 
                 ASSERT( maxIt != maxShardVersions.end() );
-                ASSERT( foundVersion == maxIt->second );
+                ASSERT( foundVersion.isEquivalentTo( maxIt->second ) );
             }
             // Make sure all shards are accounted for
             ASSERT( foundMaxShardVersions.size() == maxShardVersions.size() );
@@ -177,7 +177,7 @@ namespace ShardingTests {
             BSONArrayBuilder chunksB;
 
             BSONObj lastSplitPt;
-            ShardChunkVersion version( 1, 0 );
+            ShardChunkVersion version( 1, 0, OID() );
 
             //
             // Generate numChunks with a given key size over numShards
@@ -208,7 +208,7 @@ namespace ShardingTests {
                     chunkB.append( "shard", "shard" + string( 1, (char)('A' + shardNum) ) );
 
                     rand( 2 ) ? version.incMajor() : version.incMinor();
-                    chunkB.appendTimestamp( "lastmod", version );
+                    version.addToBSON( chunkB, "lastmod" );
 
                     chunksB.append( chunkB.obj() );
                 }
@@ -224,7 +224,7 @@ namespace ShardingTests {
 
             // Setup the empty ranges and versions first
             RangeMap ranges;
-            ShardChunkVersion maxVersion = 0;
+            ShardChunkVersion maxVersion = ShardChunkVersion( 0, 0, OID() );
             VersionMap maxShardVersions;
 
             // Create a differ which will track our progress
@@ -296,9 +296,9 @@ namespace ShardingTests {
 
                         version.incMajor();
                         version._minor = 0;
-                        leftB.appendTimestamp( "lastmod", version );
+                        version.addToBSON( leftB, "lastmod" );
                         version.incMinor();
-                        rightB.appendTimestamp( "lastmod", version );
+                        version.addToBSON( rightB, "lastmod" );
 
                         BSONObj left = leftB.obj();
                         BSONObj right = rightB.obj();
@@ -346,9 +346,9 @@ namespace ShardingTests {
 
                             version.incMajor();
                             version._minor = 0;
-                            newShardB.appendTimestamp( "lastmod", version );
+                            version.addToBSON( newShardB, "lastmod" );
                             version.incMinor();
-                            prevShardB.appendTimestamp( "lastmod", version );
+                            version.addToBSON( prevShardB, "lastmod" );
 
                             BSONObj newShard = newShardB.obj();
                             BSONObj prevShard = prevShardB.obj();
@@ -384,7 +384,7 @@ namespace ShardingTests {
                 if( rand( 10 ) < 1 ){
                     diffs = chunks;
                     ranges.clear();
-                    maxVersion = 0;
+                    maxVersion = ShardChunkVersion( 0, 0, OID() );
                     maxShardVersions.clear();
                 }
 

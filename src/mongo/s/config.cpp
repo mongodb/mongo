@@ -299,15 +299,15 @@ namespace mongo {
         verify( ! key.isEmpty() );
         
         BSONObj newest;
-        if ( oldVersion > 0 && ! forceReload ) {
+        if ( oldVersion.isSet() && ! forceReload ) {
             ScopedDbConnection conn( configServer.modelServer() , 30.0 );
             newest = conn->findOne( ShardNS::chunk , 
                                     Query( BSON( "ns" << ns ) ).sort( "lastmod" , -1 ) );
             conn.done();
             
             if ( ! newest.isEmpty() ) {
-                ShardChunkVersion v = newest["lastmod"];
-                if ( v == oldVersion ) {
+                ShardChunkVersion v = ShardChunkVersion::fromBSON( newest["lastmod"] );
+                if ( v.isEquivalentTo( oldVersion ) ) {
                     scoped_lock lk( _lock );
                     CollectionInfo& ci = _collections[ns];
                     uassert( 15885 , str::stream() << "not sharded after reloading from chunks : " << ns , ci.isSharded() );
@@ -316,7 +316,7 @@ namespace mongo {
             }
 
         }
-        else if( oldVersion == 0 ){
+        else if( ! oldVersion.isSet() ){
             warning() << "version 0 found when " << ( forceReload ? "reloading" : "checking" ) << " chunk manager"
                       << ", collection '" << ns << "' initially detected as sharded" << endl;
         }
@@ -335,8 +335,8 @@ namespace mongo {
                 scoped_lock lk( _lock );
                 CollectionInfo& ci = _collections[ns];
                 if ( ci.isSharded() && ci.getCM() ) {
-                    ShardChunkVersion currentVersion = newest["lastmod"];
-                    if ( currentVersion == ci.getCM()->getVersion() ) {
+                    ShardChunkVersion currentVersion = ShardChunkVersion::fromBSON( newest["lastmod"] );
+                    if ( currentVersion.isEquivalentTo( ci.getCM()->getVersion() ) ) {
                         return ci.getCM();
                     }
                 }
@@ -358,7 +358,7 @@ namespace mongo {
         
         bool forced = false;
         if ( temp->getVersion() > ci.getCM()->getVersion() ||
-            (forced = (temp->getVersion() == ci.getCM()->getVersion() && forceReload ) ) ) {
+            (forced = (temp->getVersion().isEquivalentTo( ci.getCM()->getVersion() ) && forceReload ) ) ) {
 
             if( forced ){
                 warning() << "chunk manager reload forced for collection '" << ns << "', config version is " << temp->getVersion() << endl;

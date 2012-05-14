@@ -53,13 +53,13 @@ namespace mongo {
     
 
     Chunk::Chunk(const ChunkManager * manager, BSONObj from)
-        : _manager(manager), _lastmod(0), _dataWritten(mkDataWritten())
+        : _manager(manager), _lastmod(0, OID()), _dataWritten(mkDataWritten())
     {
         string ns = from.getStringField( "ns" );
         _shard.reset( from.getStringField( "shard" ) );
 
-        _lastmod = from["lastmod"];
-        verify( _lastmod > 0 );
+        _lastmod = ShardChunkVersion::fromBSON( from["lastmod"] );
+        verify( _lastmod.isSet() );
 
         _min = from.getObjectField( "min" ).getOwned();
         _max = from.getObjectField( "max" ).getOwned();
@@ -480,11 +480,11 @@ namespace mongo {
         to.append( "_id" , genID( _manager->getns() , _min ) );
 
         if ( myLastMod.isSet() ) {
-            to.appendTimestamp( "lastmod" , myLastMod );
+            myLastMod.addToBSON( to, "lastmod" );
         }
         else if ( _lastmod.isSet() ) {
-            verify( _lastmod > 0 && _lastmod < 1000 );
-            to.appendTimestamp( "lastmod" , _lastmod );
+            verify( _lastmod.isSet() && _lastmod.toLong() < 1000 );
+            _lastmod.addToBSON( to, "lastmod" );
         }
         else {
             verify(0);
@@ -713,12 +713,12 @@ namespace mongo {
 
     bool ChunkManager::_load(ChunkMap& chunkMap, set<Shard>& shards, ShardVersionMap& shardVersions, ChunkManagerPtr oldManager) {
 
-        _version = 0;
+        _version = ShardChunkVersion( 0, OID() );
         set<ShardChunkVersion> minorVersions;
 
         // If we have a previous version of the ChunkManager to work from, use that info to reduce
         // our config query
-        if( oldManager && oldManager->getVersion() > 0 ){
+        if( oldManager && oldManager->getVersion().isSet() ){
 
             // Get the old max version
             _version = oldManager->getVersion();
@@ -777,7 +777,7 @@ namespace mongo {
             // Set all our data to empty
             chunkMap.clear();
             shardVersions.clear();
-            _version = 0;
+            _version = ShardChunkVersion( 0, OID() );
 
             return true;
         }
@@ -791,7 +791,7 @@ namespace mongo {
             // Set all our data to empty to be extra safe
             chunkMap.clear();
             shardVersions.clear();
-            _version = 0;
+            _version = ShardChunkVersion( 0, OID() );
 
             return false;
         }
@@ -1052,7 +1052,8 @@ namespace mongo {
 
     bool ChunkManager::compatibleWith( const ChunkManager& other, const Shard& shard ) const {
         // Return true if the shard version is the same in the two chunk managers
-        return other.getVersion( shard ).toLong() == getVersion( shard ).toLong();
+        // TODO: This doesn't need to be so strong, just major vs
+        return other.getVersion( shard ).isEquivalentTo( getVersion( shard ) );
 
     }
 
@@ -1117,7 +1118,7 @@ namespace mongo {
             // we need a special command for dropping on the d side
             // this hack works for the moment
 
-            if ( ! setShardVersion( conn.conn() , _ns , 0 , true , res ) )
+            if ( ! setShardVersion( conn.conn() , _ns , ShardChunkVersion( 0, OID() ) , true , res ) )
                 throw UserException( 8071 , str::stream() << "cleaning up after drop failed: " << res );
             conn->simpleCommand( "admin", 0, "unsetSharding" );
             conn.done();
@@ -1130,7 +1131,7 @@ namespace mongo {
     ShardChunkVersion ChunkManager::getVersion( const Shard& shard ) const {
         ShardVersionMap::const_iterator i = _shardVersions.find( shard );
         if ( i == _shardVersions.end() )
-            return 0;
+            return ShardChunkVersion( 0, OID() );
         return i->second;
     }
 
@@ -1256,10 +1257,10 @@ namespace mongo {
     public:
         void runShardChunkVersion() {
             vector<ShardChunkVersion> all;
-            all.push_back( ShardChunkVersion(1,1) );
-            all.push_back( ShardChunkVersion(1,2) );
-            all.push_back( ShardChunkVersion(2,1) );
-            all.push_back( ShardChunkVersion(2,2) );
+            all.push_back( ShardChunkVersion(1,1, OID()) );
+            all.push_back( ShardChunkVersion(1,2, OID()) );
+            all.push_back( ShardChunkVersion(2,1, OID()) );
+            all.push_back( ShardChunkVersion(2,2, OID()) );
 
             for ( unsigned i=0; i<all.size(); i++ ) {
                 for ( unsigned j=i+1; j<all.size(); j++ ) {
@@ -1286,7 +1287,7 @@ namespace mongo {
         BSONObjBuilder cmdBuilder;
         cmdBuilder.append( "setShardVersion" , ns.c_str() );
         cmdBuilder.append( "configdb" , configServer.modelServer() );
-        cmdBuilder.appendTimestamp( "version" , version.toLong() );
+        version.addToBSON( cmdBuilder );
         cmdBuilder.appendOID( "serverID" , &serverID );
         if ( authoritative )
             cmdBuilder.appendBool( "authoritative" , 1 );

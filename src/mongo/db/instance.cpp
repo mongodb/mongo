@@ -271,8 +271,8 @@ namespace mongo {
             ex->getInfo().append( err );
             if( scex ){
                 err.append( "ns", scex->getns() );
-                err.appendTimestamp( "vReceived", scex->getVersionReceived() );
-                err.appendTimestamp( "vWanted", scex->getVersionWanted() );
+                scex->getVersionReceived().addToBSON( err, "vReceived" );
+                scex->getVersionWanted().addToBSON( err, "vWanted" );
             }
             BSONObj errObj = err.done();
 
