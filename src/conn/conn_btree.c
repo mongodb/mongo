@@ -308,10 +308,19 @@ __wt_conn_btree_close_all(WT_SESSION_IMPL *session, const char *name)
 			if (F_ISSET(btree, WT_BTREE_OPEN)) {
 				__wt_spin_unlock(session, &conn->spinlock);
 
-				WT_RET(__wt_meta_track_sub_on(session));
-				ret = __wt_btree_close(session);
-				F_CLR(btree,
-				    WT_BTREE_OPEN | WT_BTREE_SPECIAL_FLAGS);
+				ret = __wt_meta_track_sub_on(session);
+				if (ret == 0) {
+					ret = __wt_btree_close(session);
+					F_CLR(btree, WT_BTREE_OPEN |
+					    WT_BTREE_SPECIAL_FLAGS);
+				}
+
+				/*
+				 * If the close succeeded, drop any locks it
+				 * acquired.  If there was a failure, this
+				 * function will fail and the whole transaction
+				 * will be rolled back.
+				 */
 				if (ret == 0)
 					ret = __wt_meta_track_sub_off(session);
 
