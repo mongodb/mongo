@@ -67,9 +67,9 @@ namespace mongo{
 		producer.connect("inproc://worker");
 
 		BSONObjBuilder b;
-		b.append("op",(int)operation);
 		b.append("ns",ns);
-		b.appendElements(id);
+		b.appendElements(id);		
+		b.append("op",(int)operation);
 		b.append("change",update);
 		std::string msg = b.obj().jsonString(TenGen,0);
 		zmq::message_t message(msg.size());
