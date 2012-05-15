@@ -918,7 +918,8 @@ extern int __wt_assert(WT_SESSION_IMPL *session,
     const char *file_name,
     int line_number,
     const char *fmt,
-    ...) WT_GCC_ATTRIBUTE((format (printf,
+    ...) WT_GCC_ATTRIBUTE((noreturn,
+    format (printf,
     5,
     6)));
 extern int __wt_illegal_value(WT_SESSION_IMPL *session, const char *name);

@@ -323,7 +323,7 @@ __wt_verbose(WT_SESSION_IMPL *session, const char *fmt, ...)
 int
 __wt_assert(WT_SESSION_IMPL *session,
     int error, const char *file_name, int line_number, const char *fmt, ...)
-    WT_GCC_FUNC_ATTRIBUTE((format (printf, 5, 6)))
+    WT_GCC_FUNC_ATTRIBUTE((noreturn, format (printf, 5, 6)))
 {
 	va_list ap;
 
