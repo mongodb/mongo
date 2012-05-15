@@ -185,6 +185,11 @@ namespace mongo {
         _nestableCount = 0;
     }
 
+    void LockState::lockedOther( int type ) {
+        fassert( 16231 , _otherCount == 0 );
+        _otherCount = type;
+    }
+
     void LockState::lockedOther( const string& other , int type , WrapperForRWLock* lock ) {
         fassert( 16170 , _otherCount == 0 );
         _otherName = other;

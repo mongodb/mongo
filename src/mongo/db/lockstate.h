@@ -69,6 +69,7 @@ namespace mongo {
         void lockedNestable( Lock::Nestable what , int type );
         void unlockedNestable();
         void lockedOther( const string& db , int type , WrapperForRWLock* lock );
+        void lockedOther( int type );  // "same lock as last time" case 
         void unlockedOther();
     private:
         unsigned _recursive;           // we allow recursively asking for a lock; we track that here

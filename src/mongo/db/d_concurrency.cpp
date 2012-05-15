@@ -511,12 +511,17 @@ namespace mongo {
         // first lock for this db. check consistent order with local db lock so we never deadlock. local always comes last
         massert(16098, str::stream() << "can't dblock:" << db << " when local or admin is already locked", ls.nestableCount() == 0);
 
+        if( db != ls.otherName() )
         {
             mapsf<string,WrapperForRWLock*>::ref r(dblocks);
             WrapperForRWLock*& lock = r[db];
             if( lock == 0 )
                 lock = new WrapperForRWLock(db.c_str());
             ls.lockedOther( db , 1 , lock );
+        }
+        else { 
+            DEV OCCASIONALLY { dassert( dblocks.get(db) == ls.otherLock() ); }
+            ls.lockedOther(1);
         }
         
         fassert(16134,_weLocked==0);
@@ -543,7 +548,6 @@ namespace mongo {
         massert( 16186 , "can't get a DBWrite while having a read lock" , ! ls.hasAnyReadLock() );
         if( ls.isW() )
             return;
-
 
         if (DB_LEVEL_LOCKING_ENABLED) {
             char db[MaxDatabaseNameLen];
@@ -687,12 +691,17 @@ namespace mongo {
         // first lock for this db. check consistent order with local db lock so we never deadlock. local always comes last
         massert(16100, str::stream() << "can't dblock:" << db << " when local or admin is already locked", ls.nestableCount() == 0);
 
+        if( db != ls.otherName() )
         {
             mapsf<string,WrapperForRWLock*>::ref r(dblocks);
             WrapperForRWLock*& lock = r[db];
             if( lock == 0 )
                 lock = new WrapperForRWLock(db.c_str());
             ls.lockedOther( db , -1 , lock );
+        }
+        else { 
+            DEV OCCASIONALLY { dassert( dblocks.get(db) == ls.otherLock() ); }
+            ls.lockedOther(-1);
         }
         fassert(16135,_weLocked==0);
         ls.otherLock()->lock_shared();
