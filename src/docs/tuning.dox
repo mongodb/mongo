@@ -128,7 +128,7 @@ file:
 @snippet ex_stat.c statistics file function
 
 Both examples can use a common display routine that iterates through the
-statistics until the cursor returns the end of the list. 
+statistics until the cursor returns the end of the list.
 
 @snippet ex_stat.c statistics display function
 

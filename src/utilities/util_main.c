@@ -186,7 +186,7 @@ static int
 usage(void)
 {
 	fprintf(stderr,
-	    "WiredTiger Data Engine (version %d.%d)\n", 
+	    "WiredTiger Data Engine (version %d.%d)\n",
 	    WIREDTIGER_VERSION_MAJOR, WIREDTIGER_VERSION_MINOR);
 	fprintf(stderr,
 	    "global options:\n"

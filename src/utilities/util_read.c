@@ -86,7 +86,7 @@ util_read(WT_SESSION *session, int argc, char *argv[])
 			return (util_cerr(uri, "search", ret));
 		}
 	}
-		
+
 	return (rval);
 }
 

@@ -43,7 +43,6 @@ The following are command-specific options for the \c create command:
 @par <code>-c</code>
 Include a configuration string to be passed to WT_SESSION::create.
 
-
 <hr>
 @section utility_drop wt drop
 Drop a table or file.
@@ -64,7 +63,6 @@ of the following keys: "all" to drop all snapshots, "from=<snapshot>"
 to drop all snapshots after and including the named snapshots, or
 "to=<snapshot>" to drop all snapshots before and including the named
 snapshot.
-
 
 <hr>
 @section utility_dump wt dump
@@ -96,7 +94,6 @@ the \c -s option changes the \c dump command to open the named snapshot.
 Dump all characters in a hexadecimal encoding (the default is to leave
 printable characters unencoded).
 
-
 <hr>
 @section utility_dumpfile wt dumpfile
 Dump a file in a debugging format.
@@ -115,7 +112,6 @@ The following are command-specific options for the \c dumpfile command:
 By default, the \c dumpfile command output is written to the standard
 output; the \c -f option re-directs the output to the specified
 file.
-
 
 <hr>
 @section utility_read wt list
@@ -139,7 +135,6 @@ in a human-readable format.
 If the \c -v option is specified, the object's complete schema table
 value is printed.
 
-
 <hr>
 @section utility_rename wt rename
 Rename a table or file.
@@ -151,7 +146,6 @@ The \c rename command renames the specified table or file.
 
 @subsection utility_rename_options Options
 The \c rename command has no command-specific options.
-
 
 <hr>
 @section utility_load wt load
@@ -198,7 +192,6 @@ configuration of an object in the table or file.  For each of the pairs,
 the configuration string will be appended to the WT_SESSION::create call
 for the object matching the uri.
 
-
 <hr>
 @section utility_loadtext wt loadtext
 Load text into a table or file.
@@ -227,7 +220,6 @@ The following are command-specific options for the \c loadtext command:
 By default, the \c loadtext command reads from the standard input; the
 \c -f option reads the input from the specified file.
 
-
 <hr>
 @section utility_printlog wt printlog
 Display the database log.
@@ -247,7 +239,6 @@ output; the \c -f option re-directs the output to the specified file.
 @par <code>-p</code>
 Display the log in a printable format.
 
-
 <hr>
 @section utility_read wt read
 Read records from a table or file.
@@ -265,7 +256,6 @@ The \c read command exits non-zero if a specified record is not found.
 
 @subsection utility_read_options Options
 The \c read command has no command-specific options.
-
 
 <hr>
 @section utility_salvage wt salvage
@@ -286,7 +276,6 @@ By default, salvage will refuse to salvage files that fail basic tests
 (for example, files that don't appear to be in a WiredTiger format).
 The \c -F option forces the salvage of the file, regardless.
 
-
 <hr>
 @section utility_stat wt stat
 Display database or object statistics.
@@ -299,7 +288,6 @@ engine, or, if specified, for the command-line object.
 
 @subsection utility_stat_options Options
 The \c stat command has no command-specific options.
-
 
 <hr>
 @section utility_upgrade wt upgrade
@@ -315,7 +303,6 @@ upgraded.
 @subsection utility_upgrade_options Options
 The \c upgrade command has no command-specific options.
 
-
 <hr>
 @section utility_verify wt verify
 Check the structural integrity of a table or file.
@@ -328,7 +315,6 @@ success if the object is correct, and failure if the object is corrupted.
 
 @subsection utility_verify_options Options
 The \c verify command has no command-specific options.
-
 
 <hr>
 @section utility_write wt write

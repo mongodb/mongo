@@ -93,7 +93,7 @@ util_write(WT_SESSION *session, int argc, char *argv[])
 		if ((ret = cursor->insert(cursor)) != 0)
 			return (util_cerr(uri, "search", ret));
 	}
-		
+
 	return (0);
 }
 

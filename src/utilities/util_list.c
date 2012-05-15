@@ -110,7 +110,7 @@ list_print(WT_SESSION *session, const char *name, int sflag, int vflag)
 		/* Get the key. */
 		if ((ret = cursor->get_key(cursor, &key)) != 0)
 			return (util_cerr("metadata", "get_key", ret));
-			
+
 		/*
 		 * If no object specified, show top-level objects (files and
 		 * tables).

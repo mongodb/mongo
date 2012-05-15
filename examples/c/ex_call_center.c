@@ -221,7 +221,7 @@ int main(void)
 	if (ret == 0 && exact >= 0)
 		ret = cursor->prev(cursor);
 	for (count = 0; ret == 0 && count < 3; ++count) {
-		ret = cursor->get_value(cursor, 
+		ret = cursor->get_value(cursor,
 		    &call.cust_id, &call.call_type, &call.notes);
 		if (call.cust_id != cust.id)
 			break;

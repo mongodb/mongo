@@ -194,7 +194,7 @@ dump_table_config(WT_SESSION *session, WT_CURSOR *cursor, const char *uri)
 			return (util_cerr(uri, "get_key", ret));
 		if ((buf = strdup(key)) == NULL)
 			return (util_err(errno, NULL));
-			
+
 		/* Check for the dump table's column groups or indices. */
 		if ((p = strchr(buf, ':')) == NULL)
 			continue;

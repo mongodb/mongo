@@ -9,4 +9,4 @@ t_LDFLAGS = -static
 TESTS = $(noinst_PROGRAMS)
 
 clean-local:
-	rm -rf WiredTiger* *.core __* 
+	rm -rf WiredTiger* *.core __*

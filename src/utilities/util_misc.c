@@ -57,7 +57,7 @@ util_read_line(ULINE *l, int eof_expected, int *eofp)
 					*eofp = 1;
 					return (0);
 				}
-				return (util_err(0, 
+				return (util_err(0,
 				    "line %llu: unexpected end-of-file", line));
 			}
 			return (util_err(0,

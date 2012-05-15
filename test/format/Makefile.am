@@ -16,4 +16,4 @@ backup:
 	rm -rf BACKUP && mkdir BACKUP && cp -p -r WiredTiger* __* BACKUP/
 
 clean-local:
-	rm -rf WiredTiger* *.core __* 
+	rm -rf WiredTiger* *.core __*
