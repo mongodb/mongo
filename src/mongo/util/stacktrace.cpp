@@ -5,8 +5,11 @@
 #include <cstdlib>
 #include <iostream>
 #include <string>
+#include <map>
 
-using std::string;
+#include "mongo/util/concurrency/mutex.h"
+
+using namespace std;
 
 #ifdef MONGO_HAVE_EXECINFO_BACKTRACE
 
@@ -62,6 +65,31 @@ namespace mongo {
         return method == clazz;
     }
 
+    class ConsCache {
+    public:
+        
+        ConsCache() : _mutex( "ConsCache" ){}
+
+        bool inCache( const string& name , bool& val ) const {
+            SimpleMutex::scoped_lock lk( _mutex );
+            map<string,bool>::const_iterator it = _map.find( name );
+            if ( it == _map.end() )
+                return false;
+            return it->second;
+        }
+
+        void set( const string& name , bool val ) {
+            SimpleMutex::scoped_lock lk( _mutex );
+            _map[name] = val;
+        }
+
+    private:
+        map<string,bool> _map;
+        mutable SimpleMutex _mutex;
+    };
+
+    ConsCache &consCache = *(new ConsCache());
+
     bool inConstructorChain( bool printOffending ){
         void* b[maxBackTraceFrames];
         int size = ::backtrace( b, maxBackTraceFrames );
@@ -69,6 +97,13 @@ namespace mongo {
         
         for ( int i = 0; i < size; i++ ) {
             string x = strings[i];
+            
+            {
+                bool temp;
+                if ( consCache.inCache( x , temp ) )
+                    return temp;
+            }
+
             size_t l = x.find( '(' );
             size_t r = x.find( '+' );
             if ( l == string::npos || r == string::npos )
