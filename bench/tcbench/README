@@ -2,34 +2,65 @@
  Comparison of key/value stores
 ================================================================
 
-In this directory is a simple test of WiredTiger that inserts, then
-reads, some simple records in a single file.
+In the wiredtiger/bench/tcbench directory is a simple test of WiredTiger
+that inserts, then reads, some records in a single file.  It's designed
+to match the functionality of the Tokyo Cabinet "bros" tests, so results
+can be compared across various key/value stores.
 
-This code is designed to match the functionality of the Tokyo Cabinet
-"bros" tests, so that the results can be compared across various
-key/value stores.
+To run the test, first build WiredTiger in the top-level "build_posix"
+directory.  Building WiredTiger also builds the application "wttest" in
+the wiredtiger/build_posix/bench/tcbench directory.
 
-To run the test standalone, first build WiredTiger in the top-level
-"build_posix" directory, then do the following in this directory:
+To run wttest as a standalone read test:
 
-	$ make
-	$ ./wttest write file:casket.wt 1000000
+	$ cd wiredtiger/build_posix/bench/tcbench
 	$ ./wttest read file:casket.wt 1000000
 
+To run wttest as a standalone write test:
+
+	$ cd wiredtiger/build_posix/bench/tcbench
+	$ ./wttest write file:casket.wt 1000000
+
+================================================================
 To compare the results from WiredTiger with various other stores:
 
-	1. Configure and build Tokyo Cabinet
+1. Download, configure and build Tokyo Cabinet, using GNU make:
 
-	2. Apply the tokyocabinet-test.patch in the bros subdirectory;
-	this patch updates the Makefile to build wttest and to build a
-	local version of Berkeley DB, updates the "reporter" script to
-	run wttest, as well as fixing bugs in the reporter script.
+	$ cd tokyocabinet
+	$ ./configure
+	$ gmake
 
-	3. Build the test programs, using a command something like:
-		$ env \
-		WT_HOME=path-to-WiredTiger \
-		BDB_HOME=path-to-BerkeleyDB \
-		make bdbtest tctest wttest
+2. Apply the tokyocabinet-test.patch in the bros subdirectory of the
+   TokyoCabinet distribution; this patch updates the bros Makefile to
+   build wttest and to build a local version of Berkeley DB, updates the
+   "reporter" script to run wttest, as well as fixing bugs in the
+   reporter script.
 
-	4. Run "reporter":
-		$ ./reporter
+   NOTE: This patch was created for the TokyoCabinet 1.4.47 release
+   distribution, if you are building with a different distribution, the
+   patch may not work.
+
+	$ cd tokyocabinet/bros
+	$ patch < path-to-WiredTiger/bench/tcbench/tokyocabinet-test.patch
+
+3. Set the environment variable WT_HOME to the path of the top-level
+   WiredTiger directory and the BDB_HOME environment variable to path
+   of the top-level Berkeley DB directory, and then build the test
+   programs:
+
+	$ env \
+	WT_HOME=path-to-WiredTiger \
+	BDB_HOME=path-to-BerkeleyDB \
+	gmake bdbtest tctest wttest
+
+4. Run "reporter":
+
+	$ ./reporter
+
+5. The output concludes with CSV output for the various runs: the columns
+    are as follows:
+
+    column 1: key/value store identifier,
+    column 2: elapsed time for writing 1M records,
+    column 3: elapsed time for reading 1M records,
+    column 4: file size.
