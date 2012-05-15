@@ -55,19 +55,22 @@ namespace mongo {
     DBConfig::CollectionInfo::CollectionInfo( const BSONObj& in ) {
         _dirty = false;
         _dropped = in["dropped"].trueValue();
+
         if ( in["key"].isABSONObj() ) {
-            _key = in["key"].Obj().getOwned();
-            _unqiue = in["unique"].trueValue();
-            shard( in["_id"].String() , _key , _unqiue );
+            shard( new ChunkManager( in ) );
         }
+
         _dirty = false;
     }
     
+    void DBConfig::CollectionInfo::shard( ChunkManager* manager ){
 
-    void DBConfig::CollectionInfo::shard( const string& ns , const ShardKeyPattern& key , bool unique ) {
-        _cm.reset( new ChunkManager( ns , key , unique ) );
-        _key = key.key().getOwned();
-        _unqiue = unique;
+        // Do this *first* so we're invisible to everyone else
+        manager->loadExistingRanges( configServer.getPrimary().getConnString() );
+
+        _cm = ChunkManagerPtr( manager );
+        _key = manager->getShardKey().key().getOwned();
+        _unqiue = manager->isUnique();
         _dirty = true;
         _dropped = false;
     }
@@ -159,11 +162,11 @@ namespace mongo {
 
             log() << "enable sharding on: " << ns << " with shard key: " << fieldsAndOrder << endl;
 
-            ci.shard( ns , fieldsAndOrder , unique );
-            ChunkManagerPtr cm = ci.getCM();
-            uassert( 13449 , "collections already sharded" , (cm->numChunks() == 0) );
+            ChunkManager* cm = new ChunkManager( ns, fieldsAndOrder, unique );
+            cm->createFirstChunks( configServer.getPrimary().getConnString(),
+                                   getPrimary(), initPoints, initShards );
+            ci.shard( cm );
 
-            cm->createFirstChunks( getPrimary() , initPoints, initShards );
             _save();
         }
 
@@ -268,7 +271,6 @@ namespace mongo {
 
     ChunkManagerPtr DBConfig::getChunkManager( const string& ns , bool shouldReload, bool forceReload ) {
         BSONObj key;
-        bool unique;
         ShardChunkVersion oldVersion;
         ChunkManagerPtr oldManager;
 
@@ -289,7 +291,6 @@ namespace mongo {
                 return ci.getCM();
 
             key = ci.key().copy();
-            unique = ci.unique();
             if ( ci.getCM() ){
                 oldManager = ci.getCM();
                 oldVersion = ci.getCM()->getVersion();
@@ -343,7 +344,9 @@ namespace mongo {
                 
             }
             
-            temp.reset( new ChunkManager( ns , key , unique, oldManager ) );
+            temp.reset( new ChunkManager( oldManager ) );
+            temp->loadExistingRanges( configServer.getPrimary().getConnString() );
+
             if ( temp->numChunks() == 0 ) {
                 // maybe we're not sharded any more
                 reload(); // this is a full reload

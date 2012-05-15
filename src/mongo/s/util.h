@@ -228,6 +228,10 @@ namespace mongo {
             b.appendElements( toBSON( prefix ) );
         }
 
+        void addEpochToBSON( BSONObjBuilder& b, const string& prefix="" ) const {
+            b.append( prefix + "Epoch", _epoch );
+        }
+
     };
 
     inline ostream& operator<<( ostream &s , const ShardChunkVersion& v) {
