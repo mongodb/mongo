@@ -40,6 +40,12 @@ namespace StackTests {
     class InCons {
     public:
         void run() {
+            for ( int i=0; i<3; i++ ) {
+                _run();
+            }
+        }
+
+        void _run() {
             
             foo::Bar b;
             ASSERT( b.a );

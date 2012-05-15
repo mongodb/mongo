@@ -75,7 +75,8 @@ namespace mongo {
             map<string,bool>::const_iterator it = _map.find( name );
             if ( it == _map.end() )
                 return false;
-            return it->second;
+            val = it->second;
+            return true;
         }
 
         void set( const string& name , bool val ) {
@@ -96,12 +97,15 @@ namespace mongo {
         char** strings = ::backtrace_symbols( b, size );
         
         for ( int i = 0; i < size; i++ ) {
-            string x = strings[i];
+            const string x = strings[i];
             
             {
                 bool temp;
-                if ( consCache.inCache( x , temp ) )
-                    return temp;
+                if ( consCache.inCache( x , temp ) ) {
+                    if ( temp )
+                        return true;
+                    continue;
+                }
             }
 
             size_t l = x.find( '(' );
@@ -121,13 +125,16 @@ namespace mongo {
             
             if ( isNameAConstructor( nice ) ) {
                 if ( printOffending ) 
-                    std::cout << "found a constructor in the call tree: " << nice << std::endl;
+                    std::cout << "found a constructor in the call tree: " << nice << "\n" << x << std::endl;
                 ::free( strings );
                 ::free( nice );
+                consCache.set( x , true );
                 return true;
             }
 
             ::free( nice );
+
+            consCache.set( x , false );
 
         }
         ::free( strings );
