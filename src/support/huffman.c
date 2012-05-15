@@ -62,7 +62,6 @@ typedef struct __wt_huffman_obj {
 	 * memory: code2symbol[1 << max_code_length]
 	 */
 	uint8_t *code2symbol;
-
 } WT_HUFFMAN_OBJ;
 
 /*
@@ -336,12 +335,12 @@ __wt_huffman_open(WT_SESSION_IMPL *session,
 		if (i > 0 &&
 		    indexed_freqs[i].symbol == indexed_freqs[i - 1].symbol)
 			WT_ERR_MSG(session, EINVAL,
-			    "duplicate symbol %" PRIx16
+			    "duplicate symbol %" PRIx32
 			    " specified in a huffman table",
 			    indexed_freqs[i].symbol);
 		if (indexed_freqs[i].symbol > huffman->numSymbols)
 			WT_ERR_MSG(session, EINVAL,
-			    "illegal symbol %" PRIx16
+			    "illegal symbol %" PRIx32
 			    " specified in a huffman table",
 			    indexed_freqs[i].symbol);
 	}

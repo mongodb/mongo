@@ -648,7 +648,7 @@ extern int __wt_meta_turtle_read( WT_SESSION_IMPL *session,
 extern int __wt_meta_turtle_update( WT_SESSION_IMPL *session,
     const char *key,
     const char *value);
-extern void __wt_abort(WT_SESSION_IMPL *session);
+extern void __wt_abort(WT_SESSION_IMPL *session) WT_GCC_ATTRIBUTE((noreturn));
 extern int __wt_calloc(WT_SESSION_IMPL *session,
     size_t number,
     size_t size,
