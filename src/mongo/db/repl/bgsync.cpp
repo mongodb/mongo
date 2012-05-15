@@ -186,11 +186,11 @@ namespace replset {
                 _producerThread();
             }
             catch (DBException& e) {
-                sethbmsg(str::stream() << "syncThread: " << e.toString());
+                sethbmsg(str::stream() << "db exception in producer: " << e.toString());
                 sleepsecs(10);
             }
-            catch (...) {
-                sethbmsg("unexpected exception in syncThread()");
+            catch (std::exception& e2) {
+                sethbmsg(str::stream() << "exception in producer: " << e2.what());
                 sleepsecs(60);
             }
 
