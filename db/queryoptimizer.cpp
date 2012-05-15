@@ -1258,8 +1258,12 @@ doneCheckOrder:
     void QueryUtilIndexed::clearIndexesForPatterns( const FieldRangeSetPair &frsp, const BSONObj &order ) {
         SimpleMutex::scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
         NamespaceDetailsTransient& nsd = NamespaceDetailsTransient::get_inlock( frsp.ns() );
-        nsd.registerIndexForPattern( frsp._singleKey.pattern( order ), BSONObj(), 0 );
-        nsd.registerIndexForPattern( frsp._multiKey.pattern( order ), BSONObj(), 0 );
+        if ( frsp._singleKey.matchPossible() ) {
+            nsd.registerIndexForPattern( frsp._singleKey.pattern( order ), BSONObj(), 0 );
+        }
+        if ( frsp._multiKey.matchPossible() ) {
+            nsd.registerIndexForPattern( frsp._multiKey.pattern( order ), BSONObj(), 0 );
+        }
     }
     
     pair< BSONObj, long long > QueryUtilIndexed::bestIndexForPatterns( const FieldRangeSetPair &frsp, const BSONObj &order ) {
