@@ -16,7 +16,6 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-
 #include "pch.h"
 #include "d_concurrency.h"
 #include "../util/concurrency/qlock.h"
@@ -46,10 +45,9 @@
 #define MONGOD_CONCURRENCY_LEVEL MONGOD_CONCURRENCY_LEVEL_DB
 #endif
 
-#define DB_LEVEL_LOCKING_ENABLED ( ( MONGOD_CONCURRENCY_LEVEL ) >= MONGOD_CONCURRENCY_LEVEL_DB )
-
-
 namespace mongo { 
+
+    static const bool DB_LEVEL_LOCKING_ENABLED = ( ( MONGOD_CONCURRENCY_LEVEL ) >= MONGOD_CONCURRENCY_LEVEL_DB );
 
     inline LockState& lockState() { 
         return cc().lockState();
@@ -144,8 +142,7 @@ namespace mongo {
             q.lock_R(); 
         }
 
-        void lock_W() {
-            
+        void lock_W() {            
             LockState& ls = lockState();
             if(  ls.threadState() ) {
                 log() << "can't lock_W, threadState=" << (int) ls.threadState() << endl;
@@ -160,7 +157,6 @@ namespace mongo {
             }
             locked_W();
         }
-
 
         void lock_W_stop_greed() {
             verify( threadState() == 0 );
@@ -200,6 +196,7 @@ namespace mongo {
             stats.unlocking('r'); 
             q.unlock_r(); 
         }
+
         void unlock_w() {
             unlocking_w();
             wassert( threadState() == 'w' );
@@ -209,6 +206,7 @@ namespace mongo {
         }
 
         void unlock_R() { _unlock_R(false); }
+
         void unlock_R_start_greed() { _unlock_R(true); }
 
         void unlock_W() {
@@ -235,14 +233,13 @@ namespace mongo {
             else
                 q.unlock_R(); 
         }
-
     };
 
-    static WrapperForQLock& q = *new WrapperForQLock();
+    static WrapperForQLock& qlk = *new WrapperForQLock();
 
     void reportLockStats(BSONObjBuilder& result) {
         BSONObjBuilder b;
-        b.append(".", q.stats.report());
+        b.append(".", qlk.stats.report());
         b.append("admin", nestableLocks[Lock::local]->stats.report());
         b.append("local", nestableLocks[Lock::local]->stats.report());
         {
@@ -343,8 +340,6 @@ namespace mongo {
     {
         if( cant )
             return;
-
-
         
         LockState& ls = lockState();
 
@@ -361,26 +356,26 @@ namespace mongo {
         fassert(16122, ts != 'R'); // indicates downgraded; not allowed with temprelease
         fassert(16123, ts == 'W');
         fassert(16124, !stoppedGreed); // not allowed with temprelease
-        q.unlock_W();
+        qlk.unlock_W();
     }
     void Lock::GlobalWrite::relock() { 
         fassert(16125, !noop);
         char ts = threadState();
         fassert(16126, ts == 0);
-        q.lock_W();
+        qlk.lock_W();
     }
 
     void Lock::GlobalRead::tempRelease() { 
         fassert(16127, !noop);
         char ts = threadState();
         fassert(16128, ts == 'R');
-        q.unlock_R();
+        qlk.unlock_R();
     }
     void Lock::GlobalRead::relock() { 
         fassert(16129, !noop);
         char ts = threadState();
         fassert(16130, ts == 0);
-        q.lock_R();
+        qlk.lock_R();
     }
 
     void Lock::DBWrite::tempRelease() { 
@@ -410,14 +405,14 @@ namespace mongo {
         }
         dassert( ts == 0 );
         if( sg ) {
-            q.lock_W_stop_greed();
+            qlk.lock_W_stop_greed();
         } 
         else if ( timeoutms != -1 ) {
-            bool success = q.lock_W_try( timeoutms );
+            bool success = qlk.lock_W_try( timeoutms );
             if ( !success ) throw DBTryLockTimeoutException(); 
         }
         else {
-            q.lock_W();
+            qlk.lock_W();
         }
     }
     Lock::GlobalWrite::~GlobalWrite() {
@@ -426,18 +421,18 @@ namespace mongo {
         }
         if( threadState() == 'R' ) { // we downgraded
             if (stoppedGreed)
-                q.unlock_R_start_greed();
+                qlk.unlock_R_start_greed();
             else
-                q.unlock_R();
+                qlk.unlock_R();
         }
         else {
-            q.unlock_W();
+            qlk.unlock_W();
         }
     }
     void Lock::GlobalWrite::downgrade() { 
         verify( !noop );
         verify( threadState() == 'W' );
-        q.W_to_R();
+        qlk.W_to_R();
         lockState().changeLockState( 'R' );
     }
 
@@ -445,7 +440,7 @@ namespace mongo {
     void Lock::GlobalWrite::upgrade() { 
         verify( !noop );
         verify( threadState() == 'R' );
-        q.R_to_W();
+        qlk.R_to_W();
         lockState().changeLockState( 'W' );
     }
 
@@ -458,16 +453,16 @@ namespace mongo {
             return;
         }
         if ( timeoutms != -1 ) {
-            bool success = q.lock_R_try( timeoutms );
+            bool success = qlk.lock_R_try( timeoutms );
             if ( !success ) throw DBTryLockTimeoutException(); 
         }
         else {
-            q.lock_R(); // we are unlocked in the qlock/top sense.  lock_R will assert if we are in an in compatible state
+            qlk.lock_R(); // we are unlocked in the qlock/top sense.  lock_R will assert if we are in an in compatible state
         }
     }
     Lock::GlobalRead::~GlobalRead() {
         if( !noop ) {
-            q.unlock_R();
+            qlk.unlock_R();
         }
     }
 
@@ -529,7 +524,6 @@ namespace mongo {
         _weLocked = ls.otherLock();
     }
 
-
     static Lock::Nestable n(const char *db) { 
         if( str::equals(db, "local") )
             return Lock::local;
@@ -557,7 +551,7 @@ namespace mongo {
             Nestable nested = n(db);
             if( nested == admin ) { 
                 // we can't nestedly lock both admin and local as implemented. so lock_W.
-                q.lock_W();
+                qlk.lock_W();
                 _locked_W = true;
                 return;
             } 
@@ -568,7 +562,7 @@ namespace mongo {
                 lockNestable(nested);
         } 
         else {
-            q.lock_W();
+            qlk.lock_W();
             _locked_w = true;
         }
     }
@@ -592,7 +586,7 @@ namespace mongo {
                 lockNestable(nested);
         } 
         else {
-            q.lock_R();
+            qlk.lock_R();
             _locked_r = true;
         }
     }
@@ -623,13 +617,13 @@ namespace mongo {
         }
         if( _locked_w ) {
             if (DB_LEVEL_LOCKING_ENABLED) {
-                q.unlock_w();
+                qlk.unlock_w();
             } else {
-                q.unlock_W();
+                qlk.unlock_W();
             }
         }
         if( _locked_W ) {
-            q.unlock_W();
+            qlk.unlock_W();
         }
         _weLocked = 0;
         _locked_W = _locked_w = false;
@@ -646,9 +640,9 @@ namespace mongo {
 
         if( _locked_r ) {
             if (DB_LEVEL_LOCKING_ENABLED) {
-                q.unlock_r();
+                qlk.unlock_r();
             } else {
-                q.unlock_R();
+                qlk.unlock_R();
             }
         }
         _weLocked = 0;
@@ -662,7 +656,7 @@ namespace mongo {
         default:
             verify(false);
         case  0  : 
-            q.lock_w();
+            qlk.lock_w();
             _locked_w = true;
         }
     }
@@ -674,7 +668,7 @@ namespace mongo {
         default:
             verify(false);
         case  0  : 
-            q.lock_r();
+            qlk.lock_r();
             _locked_r = true;
         }
     }
@@ -707,7 +701,7 @@ namespace mongo {
 
     Lock::DBWrite::UpgradeToExclusive::UpgradeToExclusive() {
         fassert( 16187, lockState().threadState() == 'w' );
-        _gotUpgrade = q.w_to_X();
+        _gotUpgrade = qlk.w_to_X();
         if ( _gotUpgrade )
             lockState().locked('W');
     }
@@ -715,7 +709,7 @@ namespace mongo {
     Lock::DBWrite::UpgradeToExclusive::~UpgradeToExclusive() {
         if ( _gotUpgrade ) {
             fassert( 16188, lockState().threadState() == 'W' );
-            q.X_to_w();
+            qlk.X_to_w();
             lockState().locked('w');
         }
         else {
