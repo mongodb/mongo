@@ -54,5 +54,5 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 		WT_ERR(__wt_meta_snaplist_set(session, btree->name, snapbase));
 
 err:	__wt_free(session, snapbase[0].name);
-	return (0);
+	return (ret);
 }
