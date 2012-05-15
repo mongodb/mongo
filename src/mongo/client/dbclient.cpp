@@ -68,8 +68,28 @@ namespace mongo {
         _string = ss.str();
     }
 
+    mutex ConnectionString::_connectHookMutex( "ConnectionString::_connectHook" );
+    ConnectionString::ConnectionHook* ConnectionString::_connectHook = NULL;
 
     DBClientBase* ConnectionString::connect( string& errmsg, double socketTimeout ) const {
+
+        // Allow the replacement of connections with other connections - useful for testing.
+        // TODO: Potentially make a new connection type?  Difficult in the case of direct connections b/c these
+        // aren't always available in all configurations, and this is a shared library.
+        if( _connectHook ){
+            scoped_lock lk( _connectHookMutex );
+
+            // Double-checked lock, since this will never be active during normal operation
+            if( _connectHook ){
+                DBClientBase* replacementConn = _connectHook->connect( *this, errmsg, socketTimeout );
+                if( replacementConn ){
+                    log() << "replacing connection to " << toString() << " with "
+                          << replacementConn->getServerAddress() << endl;
+                    return replacementConn;
+                }
+            }
+        }
+
         switch ( _type ) {
         case MASTER: {
             DBClientConnection * c = new DBClientConnection(true);

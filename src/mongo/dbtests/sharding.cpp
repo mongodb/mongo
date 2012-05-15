@@ -45,6 +45,75 @@ namespace ShardingTests {
         };
     }
 
+    class ChunkManagerTest : public ConnectionString::ConnectionHook {
+    public:
+
+        static DBDirectClient _client;
+
+        ChunkManagerTest() {
+            // Make all connections redirect to the direct client
+            ConnectionString::setConnectionHook( this );
+
+            // Create the default config database before querying, necessary for direct connections
+            client().dropDatabase( "config" );
+            client().insert( "config.test", BSON( "hello" << "world" ) );
+            client().dropCollection( "config.test" );
+
+            client().dropDatabase( nsGetDB( collName() ) );
+            client().insert( collName(), BSON( "hello" << "world" ) );
+            client().dropCollection( collName() );
+        }
+
+        string collName(){ return "foo.bar"; }
+
+        virtual ~ChunkManagerTest() {
+            // Reset the redirection
+            ConnectionString::setConnectionHook( NULL );
+        }
+
+        DBDirectClient& client(){
+            return _client;
+        }
+
+        virtual DBClientBase* connect( const ConnectionString& connStr,
+                                         string& errmsg,
+                                         double socketTimeout )
+        {
+            // Note - must be new, since it gets owned elsewhere
+            return new DBDirectClient();
+        }
+    };
+
+    DBDirectClient ChunkManagerTest::_client;
+
+    class ChunkManagerCreateBasicTest : public ChunkManagerTest {
+    public:
+
+        void run(){
+
+            BSONObj key = BSON( "_id" << 1 );
+            bool unique = false;
+
+            // Since we've redirected the conns, the host doesn't matter here
+            Shard shard( "shard0000", "hostFooBar:27017" );
+
+            ChunkManager manager( collName(), ShardKeyPattern( key ), unique );
+            manager.createFirstChunks( shard.getConnString(), shard, NULL, NULL );
+
+            BSONObj firstChunk = client().findOne( ShardNS::chunk, BSONObj() );
+
+            ASSERT( firstChunk[ "min" ].Obj()[ "_id" ].type() == MinKey );
+            ASSERT( firstChunk[ "max" ].Obj()[ "_id" ].type() == MaxKey );
+
+            ShardChunkVersion version = ShardChunkVersion::fromBSON( firstChunk, "lastmod" );
+
+            ASSERT( version.majorVersion() == 1 );
+            ASSERT( version.minorVersion() == 0 );
+            ASSERT( version.isEpochSet() );
+
+        }
+
+    };
 
     class ChunkDiffUnitTest {
     public:
@@ -418,6 +487,7 @@ namespace ShardingTests {
 
         void setupTests() {
             add< serverandquerytests::test1 >();
+            add< ChunkManagerCreateBasicTest >();
             add< ChunkDiffUnitTestNormal >();
             add< ChunkDiffUnitTestInverse >();
         }

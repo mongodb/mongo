@@ -199,6 +199,27 @@ namespace mongo {
 
         static string typeToString( ConnectionType type );
 
+        //
+        // Allow overriding the default connection behavior
+        // This is needed for some tests, which otherwise would fail because they are unable to contact
+        // the correct servers.
+        //
+
+        class ConnectionHook {
+        public:
+            virtual ~ConnectionHook(){}
+
+            // Returns an alternative connection object for a string
+            virtual DBClientBase* connect( const ConnectionString& c,
+                                             string& errmsg,
+                                             double socketTimeout ) = 0;
+        };
+
+        static void setConnectionHook( ConnectionHook* hook ){
+            scoped_lock lk( _connectHookMutex );
+            _connectHook = hook;
+        }
+
     private:
 
         void _fillServers( string s );
@@ -208,6 +229,9 @@ namespace mongo {
         vector<HostAndPort> _servers;
         string _string;
         string _setName;
+
+        static mutex _connectHookMutex;
+        static ConnectionHook* _connectHook;
     };
 
     /**
