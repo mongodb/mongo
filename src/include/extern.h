@@ -913,7 +913,7 @@ extern int __wt_verbose(WT_SESSION_IMPL *session,
     ...) WT_GCC_ATTRIBUTE((format (printf,
     2,
     3)));
-extern int __wt_assert(WT_SESSION_IMPL *session,
+extern void __wt_assert(WT_SESSION_IMPL *session,
     int error,
     const char *file_name,
     int line_number,
