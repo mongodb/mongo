@@ -658,7 +658,7 @@ int main(int argc, char* argv[]) {
 #endif
 
     replication_options.add_options()
-    ("oplogSize", po::value<int>(), "size limit (in MB) for op log")
+    ("oplogSize", po::value<int>(), "size to use (in MB) for replication op log. default is 5% of disk space (i.e. large is good)")
     ;
 
     ms_options.add_options()
