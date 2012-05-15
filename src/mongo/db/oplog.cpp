@@ -703,6 +703,7 @@ namespace mongo {
             DiskLoc d = theDataFileMgr.insert(ns, (void*) missingObj.objdata(), missingObj.objsize());
             uassert(15917, "Got bad disk location when attempting to insert", !d.isNull());
 
+            LOG(1) << "replication inserted missing doc: " << missingObj.toString() << endl;
             return true;
         }
     }
@@ -788,7 +789,8 @@ namespace mongo {
                 if( ur.mod ) {
                     if( updateCriteria.nFields() == 1 ) {
                         // was a simple { _id : ... } update criteria
-                        failedUpdate = true; 
+                        failedUpdate = true;
+                        LOG(1) << "replication failed to apply update: " << op.toString() << endl;
                         // todo: probably should assert in these failedUpdate cases if not in initialSync
                     }
                     // need to check to see if it isn't present so we can set failedUpdate correctly.
@@ -802,6 +804,7 @@ namespace mongo {
                             // capped collections won't have an _id index
                             (nsd->findIdIndex() < 0 && Helpers::findOne(ns, updateCriteria, false).isNull())) {
                             failedUpdate = true;
+                            LOG(1) << "replication couldn't find doc: " << op.toString() << endl;
                         }
 
                         // Otherwise, it's present; zero objects were updated because of additional specifiers
@@ -814,6 +817,7 @@ namespace mongo {
                     // if an regular non-mod update fails the item is (presumably) missing.
                     if( !upsert ) {
                         failedUpdate = true;
+                        LOG(1) << "replication update of non-mod failed: " << op.toString() << endl;
                     }
                 }
             }
