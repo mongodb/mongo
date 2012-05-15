@@ -4,7 +4,27 @@
 t=__wt.$$
 trap 'rm -f $t; exit 0' 0 1 2 3 13 15
 
-cd .. &&
+cd ..
+
+# Returns in functions after a jump to error lable.
+for f in `find examples ext src test -name '*.[ci]'`; do
+	sed -n \
+	    -e '/^{$/,/^}$/{=;p;}' $f |
+	sed 'N;s/\n/:/' |
+	sed -e '/./{H;/^[0-9][0-9]*:}$/!d;}' \
+	    -e x \
+	    -e 's/\n/ /g' \
+	    -e 's/\/\*.*\*\///g' \
+	    -e p \
+	    -e '{s/.*//;x;}' |
+	egrep 'WT_ERR\(.*WT_RET.*err:|WT_ERR_MSG\(.*WT_RET.*err:|WT_ERR_TEST\(.*WT_RET.*err:|WT_ERR\(.*WT_ILLEGAL_VALUE\(.*err:|WT_ERR_MSG\(.*WT_ILLEGAL_VALUE\(.*err:|WT_ERR_TEST\(.*WT_ILLEGAL_VALUE\(.*err:' |
+	    sed 's/:.*//' > $t
+	test -s $t && {
+		echo "$f: function with return after a jump to an error label"
+		sed 's/^/function @ line:/' < $t
+	}
+done
+
 for f in `find examples ext src test -name '*.[chisy]' -o -name '*.in' |
     sed '/Makefile.in/d'`; do
 	if grep "^[^}]*while (0);" $f > $t; then

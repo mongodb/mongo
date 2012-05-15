@@ -869,12 +869,10 @@ int
 __wt_block_extlist_read(
     WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el)
 {
+	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
-	WT_ITEM *tmp;
 	off_t off, size;
 	uint8_t *p;
-
-	tmp = NULL;
 
 	/* If there isn't a list, we're done. */
 	if (el->offset == WT_BLOCK_INVALID_OFFSET)
@@ -942,14 +940,12 @@ int
 __wt_block_extlist_write(
     WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el)
 {
+	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
 	WT_EXT *ext;
-	WT_ITEM *tmp;
 	WT_PAGE_HEADER *dsk;
 	uint32_t datasize, size;
 	uint8_t *p;
-
-	tmp = NULL;
 
 	if (WT_VERBOSE_ISSET(session, block))
 		WT_RET(

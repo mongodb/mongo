@@ -585,8 +585,8 @@ struct __wt_session {
 	 * least 8 keys per internal page.,an integer greater than or equal to
 	 * 0; default \c 0.}
 	 * @config{internal_key_truncate, configure internal key truncation\,
-	 * discarding unnecessary trailing bytes on internal keys.,a boolean
-	 * flag; default \c true.}
+	 * discarding unnecessary trailing bytes on internal keys (ignored for
+	 * custom collators).,a boolean flag; default \c true.}
 	 * @config{internal_page_max, the maximum page size for internal nodes\,
 	 * in bytes; the size must be a multiple of the allocation size and is
 	 * significant for applications wanting to avoid excessive L2 cache
@@ -1173,12 +1173,14 @@ struct __wt_event_handler {
  *
  * @snippet ex_all.c Unpack fields from a buffer
  *
+ * @param session the session handle
  * @param buffer a pointer to a packed byte array
  * @param size the number of valid bytes in the buffer
- * @param format the data format, see ::wiredtiger_struct_pack
+ * @param format the data format, see @ref packing
  * @errors
  */
-int wiredtiger_struct_pack(void *buffer, size_t size, const char *format, ...);
+int wiredtiger_struct_pack(
+    WT_SESSION *session, void *buffer, size_t size, const char *format, ...);
 
 /*! Calculate the size required to pack a structure.
  *
@@ -1188,11 +1190,14 @@ int wiredtiger_struct_pack(void *buffer, size_t size, const char *format, ...);
  *
  * @snippet ex_all.c Get the packed size
  *
- * @param format the data format, see ::wiredtiger_struct_pack
- * @returns the number of bytes needed for the matching call to
- * ::wiredtiger_struct_pack
+ * @param session the session handle
+ * @param sizep a location where the the number of bytes needed for the
+ * matching call to ::wiredtiger_struct_pack is returned
+ * @param format the data format, see @ref packing
+ * @errors
  */
-size_t wiredtiger_struct_size(const char *format, ...);
+int wiredtiger_struct_size(
+    WT_SESSION *session, size_t *sizep, const char *format, ...);
 
 /*! Unpack a structure from a buffer.
  *
@@ -1200,13 +1205,14 @@ size_t wiredtiger_struct_size(const char *format, ...);
  *
  * @snippet ex_all.c Unpack fields from a buffer
  *
+ * @param session the session handle
  * @param buffer a pointer to a packed byte array
  * @param size the number of valid bytes in the buffer
- * @param format the data format, see ::wiredtiger_struct_pack
+ * @param format the data format, see @ref packing
  * @errors
  */
-int wiredtiger_struct_unpack(const void *buffer, size_t size,
-    const char *format, ...);
+int wiredtiger_struct_unpack(WT_SESSION *session,
+    const void *buffer, size_t size, const char *format, ...);
 
 /*! Get version information.
  *

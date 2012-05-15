@@ -45,6 +45,7 @@ __wt_cursor_get_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 	WT_DECL_RET;
 	WT_ITEM *key;
 	WT_SESSION_IMPL *session;
+	size_t size;
 	const char *fmt;
 
 	CURSOR_API_CALL(cursor, session, get_key, NULL);
@@ -54,8 +55,9 @@ __wt_cursor_get_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 		if (LF_ISSET(WT_CURSTD_RAW)) {
 			key = va_arg(ap, WT_ITEM *);
 			key->data = cursor->raw_recno_buf;
-			key->size = (uint32_t)
-			    __wt_struct_size(session, "q", cursor->recno);
+			WT_ERR(__wt_struct_size(
+			    session, &size, "q", cursor->recno));
+			key->size = (uint32_t)size;
 			ret = __wt_struct_pack(session, cursor->raw_recno_buf,
 			    sizeof(cursor->raw_recno_buf), "q", cursor->recno);
 		} else
@@ -124,9 +126,9 @@ __wt_cursor_set_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	WT_ITEM *buf, *item;
+	size_t sz;
 	va_list ap_copy;
 	const char *fmt, *str;
-	size_t sz;
 
 	CURSOR_API_CALL(cursor, session, set_key, NULL);
 
@@ -160,9 +162,10 @@ __wt_cursor_set_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 			buf = &cursor->key;
 
 			va_copy(ap_copy, ap);
-			sz = __wt_struct_sizev(
-			    session, cursor->key_format, ap_copy);
+			ret = __wt_struct_sizev(
+			    session, &sz, cursor->key_format, ap_copy);
 			va_end(ap_copy);
+			WT_ERR(ret);
 
 			WT_ERR(__wt_buf_initsize(session, buf, sz));
 			WT_ERR(__wt_struct_packv(
@@ -216,8 +219,9 @@ __wt_cursor_set_value(WT_CURSOR *cursor, ...)
 		cursor->value.data = item->data;
 	} else {
 		buf = &cursor->value;
-		sz = __wt_struct_sizev(session, cursor->value_format, ap);
+		ret = __wt_struct_sizev(session, &sz, cursor->value_format, ap);
 		va_end(ap);
+		WT_ERR(ret);
 		va_start(ap, cursor);
 		if ((ret = __wt_buf_initsize(session, buf, sz)) != 0 ||
 		    (ret = __wt_struct_packv(session, buf->mem, sz,

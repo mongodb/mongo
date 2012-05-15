@@ -55,8 +55,8 @@ cgcols:			WT_ERR(__wt_config_getones(session,
 				goto cgcols;
 		}
 
-		WT_RET(__wt_session_release_btree(session));
 		cgtree = NULL;
+		WT_ERR(__wt_session_release_btree(session));
 	}
 
 err:	if (cgtree != NULL)

@@ -132,22 +132,21 @@ static int  __slvg_trk_ovfl(WT_SESSION_IMPL *,
 		WT_PAGE_HEADER *, uint8_t *, uint32_t, uint64_t, WT_STUFF *);
 
 /*
- * __wt_salvage --
+ * __wt_bt_salvage --
  *	Salvage a Btree.
  */
 int
-__wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
+__wt_bt_salvage(
+    WT_SESSION_IMPL *session, WT_SNAPSHOT *snapbase, const char *cfg[])
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
-	WT_SNAPSHOT snapbase[2];
 	WT_STUFF *ss, stuff;
 	uint32_t i, leaf_cnt;
 
 	WT_UNUSED(cfg);
 
 	btree = session->btree;
-	memset(snapbase, 0, sizeof(snapbase));
 
 	WT_CLEAR(stuff);
 	ss = &stuff;
@@ -271,40 +270,13 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/*
 	 * Step 9:
-	 * Evict the newly created root page, creating a snapshot, and update
-	 * the metadata with the new snapshot's location.
+	 * Evict the newly created root page, creating a snapshot.
 	 */
 	if (ss->root_page != NULL) {
-		/*
-		 * XXX
-		 * The salvage process has processed previous snapshot blocks,
-		 * which means the underlying block manager has to ignore any
-		 * previous snapshot entries when creating the new snapshot, in
-		 * other words, we can't use the metadata snapshot list, it has
-		 * all of those snapshots listed.  Build a clean snapshot array
-		 * and use it instead.
-		 *	Don't clear the metadata snapshot list and then call the
-		 * snapshot get routines: a crash after clearing the metadata
-		 * snapshot list, but before creating a new snapshot list, would
-		 * look like a create or open of a file without a snapshot from
-		 * which to roll-forward, and the contents of the file would be
-		 * discarded.
-		 */
-		WT_ERR(__wt_strdup(
-		    session, WT_INTERNAL_SNAPSHOT, &snapbase[0].name));
-		F_SET(&snapbase[0], WT_SNAP_ADD);
-
 		btree->snap = snapbase;
 		ret = __wt_rec_evict(session, ss->root_page, WT_REC_SINGLE);
 		btree->snap = NULL;
 		ss->root_page = NULL;
-
-		if (snapbase[0].raw.data == NULL)
-			WT_ERR_MSG(session, EINVAL,
-			    "root page eviction failed to create a snapshot");
-		else
-			WT_ERR(__wt_meta_snaplist_set(
-			    session, btree->name, snapbase));
 	}
 
 	/*
@@ -316,9 +288,6 @@ err:	WT_TRET(__wt_bm_salvage_end(session));
 	/* Discard any root page we created. */
 	if (ss->root_page != NULL)
 		__wt_page_out(session, &ss->root_page, 0);
-
-	/* Discard any snapshot information we allocated. */
-	__wt_free(session, snapbase[0].name);
 
 	/* Discard the leaf and overflow page memory. */
 	WT_TRET(__slvg_cleanup(session, ss));
@@ -340,15 +309,15 @@ err:	WT_TRET(__wt_bm_salvage_end(session));
 static int
 __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 {
+	WT_DECL_ITEM(as);
+	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
-	WT_ITEM *as, *buf;
 	WT_PAGE_HEADER *dsk;
 	uint64_t gen;
 	uint32_t addrbuf_size;
 	uint8_t addrbuf[WT_BTREE_MAX_ADDR_COOKIE];
 	int eof;
 
-	as = buf = NULL;
 	WT_ERR(__wt_scr_alloc(session, 0, &as));
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));
 
@@ -413,7 +382,7 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 			if (ss->page_type == WT_PAGE_INVALID)
 				ss->page_type = dsk->type;
 			if (ss->page_type != dsk->type)
-				WT_RET_MSG(session, WT_ERROR,
+				WT_ERR_MSG(session, WT_ERROR,
 				    "file contains multiple file formats (both "
 				    "%s and %s), and cannot be salvaged",
 				    __wt_page_type_string(ss->page_type),
@@ -1546,9 +1515,11 @@ __slvg_row_trk_update_start(
     WT_SESSION_IMPL *session, WT_ITEM *stop, uint32_t slot, WT_STUFF *ss)
 {
 	WT_BTREE *btree;
+	WT_DECL_ITEM(dsk);
+	WT_DECL_ITEM(key);
 	WT_DECL_RET;
 	WT_IKEY *ikey;
-	WT_ITEM *dsk, *key, *item, _item;
+	WT_ITEM *item, _item;
 	WT_PAGE *page;
 	WT_ROW *rip;
 	WT_TRACK *trk;
@@ -1556,7 +1527,6 @@ __slvg_row_trk_update_start(
 	int cmp, found;
 
 	btree = session->btree;
-	key = dsk = NULL;
 	page = NULL;
 	found = 0;
 
@@ -1590,7 +1560,7 @@ __slvg_row_trk_update_start(
 	 * Walk the page, looking for a key sorting greater than the specified
 	 * stop key -- that's our new start key.
 	 */
-	WT_RET(__wt_scr_alloc(session, 0, &key));
+	WT_ERR(__wt_scr_alloc(session, 0, &key));
 	WT_ROW_FOREACH(page, rip, i) {
 		if (__wt_off_page(page, rip->key)) {
 			ikey = rip->key;
@@ -1614,8 +1584,8 @@ __slvg_row_trk_update_start(
 	 * would have discarded it, we wouldn't be here.  Therefore, this test
 	 * is safe.  (But, it never hurts to check.)
 	 */
-	WT_RET_TEST(!found, WT_ERROR);
-	WT_RET(__slvg_key_copy(session, &trk->row_start, item));
+	WT_ERR_TEST(!found, WT_ERROR);
+	WT_ERR(__slvg_key_copy(session, &trk->row_start, item));
 
 	/*
 	 * We may need to re-sort some number of elements in the list.  Walk
@@ -1725,9 +1695,10 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
     WT_TRACK *trk, WT_PAGE *parent, WT_REF *ref, WT_STUFF *ss)
 {
 	WT_BTREE *btree;
+	WT_DECL_ITEM(key);
 	WT_DECL_RET;
 	WT_IKEY *ikey;
-	WT_ITEM *item, _item, *key;
+	WT_ITEM *item, _item;
 	WT_PAGE *page;
 	WT_ROW *rip;
 	WT_SALVAGE_COOKIE *cookie, _cookie;

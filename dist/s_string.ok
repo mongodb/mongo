@@ -94,6 +94,7 @@ Mutexes
 NONINFRINGEMENT
 NOTFOUND
 NOTREACHED
+NOWRITE
 NRECS
 NUL
 NULLs
@@ -437,6 +438,7 @@ sessionp
 setv
 sfence
 sizeof
+sizep
 sizev
 skiplist
 skiplists
@@ -459,6 +461,7 @@ stdarg
 stderr
 stdout
 str
+strcmp
 strdup
 strerror
 stringin

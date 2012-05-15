@@ -45,7 +45,7 @@ valid_build()
 build()
 {
 	# Build from scratch on demand.
-	[ "$1" -eq 0 ] || (cd ../src/docs && make clean)
+	[ "$1" -eq 0 ] || (cd .. && rm -rf docs && mkdir docs)
 
 	# Run doxygen to generate warnings for the base HTML documentation.
 	#

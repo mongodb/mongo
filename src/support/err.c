@@ -14,25 +14,10 @@
 static int
 __handle_error_default(WT_EVENT_HANDLER *handler, int error, const char *errmsg)
 {
-	size_t len_err, len_errmsg;
-	const char *err;
-	int cprint;
-
 	WT_UNUSED(handler);
+	WT_UNUSED(error);
 
-	if (error != 0) {
-		err = wiredtiger_strerror(error);
-		len_err = strlen(err);
-		len_errmsg = strlen(errmsg);
-		if (len_err >= len_errmsg &&
-		    strcmp(errmsg + (len_errmsg - len_err), err) != 0) {
-			cprint = fprintf(stderr,
-			    "%s: %s\n", errmsg, wiredtiger_strerror(error));
-		}
-	}
-	cprint = fprintf(stderr, "%s\n", errmsg);
-
-	return (cprint >= 0 ? 0 : EIO);
+	return (fprintf(stderr, "%s\n", errmsg) >= 0 ? 0 : EIO);
 }
 
 /*
@@ -42,13 +27,9 @@ __handle_error_default(WT_EVENT_HANDLER *handler, int error, const char *errmsg)
 static int
 __handle_message_default(WT_EVENT_HANDLER *handler, const char *message)
 {
-	int cprint;
-
 	WT_UNUSED(handler);
 
-	cprint = printf("%s\n", message);
-
-	return (cprint >= 0 ? 0 : EIO);
+	return (printf("%s\n", message) >= 0 ? 0 : EIO);
 }
 
 /*
@@ -138,7 +119,8 @@ __eventv(WT_SESSION_IMPL *session, int msg_event, int error,
 {
 	WT_EVENT_HANDLER *handler;
 	WT_DECL_RET;
-	const char *prefix1, *prefix2;
+	size_t len;
+	const char *err, *prefix1, *prefix2;
 	char *end, *p;
 
 	/*
@@ -166,9 +148,22 @@ __eventv(WT_SESSION_IMPL *session, int msg_event, int error,
 		    "%s, %d: ", file_name, line_number);
 	if (p < end)
 		p += vsnprintf(p, (size_t)(end - p), fmt, ap);
-	if (error != 0 && p < end)
-		p += snprintf(p,
-		    (size_t)(end - p), ": %s", wiredtiger_strerror(error));
+	if (error != 0 && p < end) {
+		/*
+		 * When the engine calls __wt_err on error, it often outputs an
+		 * error message including the string associated with the error
+		 * it's returning.  We could change the calls to call __wt_errx,
+		 * but it's simpler to not append an error string if all we are
+		 * doing is duplicating an existing error string.
+		 *
+		 * Use strcmp to compare: both strings are nul-terminated, and
+		 * we don't want to run past the end of the buffer.
+		 */
+		err = wiredtiger_strerror(error);
+		len = strlen(err);
+		if ((size_t)(p - s) < len || strcmp(p - len, err) != 0)
+			p += snprintf(p, (size_t)(end - p), ": %s", err);
+	}
 
 	/*
 	 * If a handler fails, return the error status: if we're in the process

@@ -50,7 +50,8 @@ __curstat_get_key(WT_CURSOR *cursor, ...)
 	WT_CURSOR_NEEDKEY(cursor);
 
 	if (F_ISSET(cursor, WT_CURSTD_RAW)) {
-		size = __wt_struct_size(session, cursor->key_format, cst->key);
+		WT_ERR(__wt_struct_size(
+		    session, &size, cursor->key_format, cst->key));
 		WT_ERR(__wt_buf_initsize(session, &cursor->key, size));
 		WT_ERR(__wt_struct_pack(session, cursor->key.mem, size,
 		    cursor->key_format, cst->key));
@@ -87,8 +88,8 @@ __curstat_get_value(WT_CURSOR *cursor, ...)
 	WT_CURSOR_NEEDVALUE(cursor);
 
 	if (F_ISSET(cursor, WT_CURSTD_RAW)) {
-		size = __wt_struct_size(session, cursor->value_format,
-		    cst->stats_first[cst->key].desc, cst->pv.data, cst->v);
+		WT_ERR(__wt_struct_size(session, &size, cursor->value_format,
+		    cst->stats_first[cst->key].desc, cst->pv.data, cst->v));
 		WT_ERR(__wt_buf_initsize(session, &cursor->value, size));
 		WT_ERR(__wt_struct_pack(session, cursor->value.mem, size,
 		    cursor->value_format,
