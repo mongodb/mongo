@@ -59,13 +59,16 @@ namespace mongo {
         if ( method[0] == '~' )
             method = method.substr(1);
 
-        if ( method == "BSONObj" || 
-             method == "MultiPlanScanner" || 
+        if ( method == "MultiPlanScanner" || 
              method == "QueryPlan" ||
              method == "QueryPlanSet" || 
+             method == "QueryOptimizerCursorImpl" || 
              method == "QueryPlanGenerator" )
             return false;
         
+        if ( name.find( "Geo" ) != string::npos ) 
+            return false;
+
         if ( name.find( "Tests" ) != string::npos )
             return false;
         
@@ -77,22 +80,22 @@ namespace mongo {
         
         ConsCache() : _mutex( "ConsCache" ){}
 
-        bool inCache( const string& name , bool& val ) const {
+        bool inCache( void* name , bool& val ) const {
             SimpleMutex::scoped_lock lk( _mutex );
-            map<string,bool>::const_iterator it = _map.find( name );
+            map<void*,bool>::const_iterator it = _map.find( name );
             if ( it == _map.end() )
                 return false;
             val = it->second;
             return true;
         }
 
-        void set( const string& name , bool val ) {
+        void set( void* name , bool val ) {
             SimpleMutex::scoped_lock lk( _mutex );
             _map[name] = val;
         }
 
     private:
-        map<string,bool> _map;
+        map<void*,bool> _map;
         mutable SimpleMutex _mutex;
     };
 
@@ -101,30 +104,35 @@ namespace mongo {
     bool inConstructorChain( bool printOffending ){
         void* b[maxBackTraceFrames];
         int size = ::backtrace( b, maxBackTraceFrames );
-        char** strings = ::backtrace_symbols( b, size );
+
+        char** strings = 0;
         
         for ( int i = 0; i < size; i++ ) {
-            const string x = strings[i];
             
             {
                 bool temp;
-                if ( consCache.inCache( x , temp ) ) {
+                if ( consCache.inCache( b[i] , temp ) ) {
                     if ( temp )
                         return true;
                     continue;
                 }
             }
 
-            size_t l = x.find( '(' );
-            size_t r = x.find( '+' );
+            if ( ! strings ) 
+                strings = ::backtrace_symbols( b, size );
+
+            string symbol = strings[i];
+
+            size_t l = symbol.find( '(' );
+            size_t r = symbol.find( '+' );
             if ( l == string::npos || r == string::npos )
                 continue;
-            string sym = x.substr( l + 1 , r-l-1);
-            if ( sym.size() == 0 )
+            symbol = symbol.substr( l + 1 , r-l-1);
+            if ( symbol.size() == 0 )
                 continue;
 
             int status = -1;
-            char * nice = abi::__cxa_demangle( sym.c_str() , 0 , 0 , &status );
+            char * nice = abi::__cxa_demangle( symbol.c_str() , 0 , 0 , &status );
             if ( status ) 
                 continue;
             
@@ -132,16 +140,16 @@ namespace mongo {
             
             if ( isNameAConstructor( nice ) ) {
                 if ( printOffending ) 
-                    std::cout << "found a constructor in the call tree: " << nice << "\n" << x << std::endl;
+                    std::cout << "found a constructor in the call tree: " << nice << "\n" << symbol << std::endl;
                 ::free( strings );
                 ::free( nice );
-                consCache.set( x , true );
+                consCache.set( b[i] , true );
                 return true;
             }
 
             ::free( nice );
 
-            consCache.set( x , false );
+            consCache.set( b[i] , false );
 
         }
         ::free( strings );
