@@ -94,7 +94,15 @@ def post(endpoint, data, headers=None):
     headers.update({'Content-Type': 'application/json; charset=utf-8'})
 
     req = urllib2.Request(url=url(endpoint), data=data, headers=headers)
-    response = url_opener.open(req)
+    try:
+        response = url_opener.open(req)
+    except urllib2.URLError:
+        import traceback
+        traceback.print_exc(file=sys.stderr)
+        sys.stderr.flush()
+        # indicate that the request did not succeed
+        return None
+
     response_headers = dict(response.info())
 
     # eg "Content-Type: application/json; charset=utf-8"
@@ -137,6 +145,8 @@ def get_or_create_build(builder, buildnum, extra={}):
     data = {'builder': builder, 'buildnum': buildnum}
     data.update(extra)
     response = post('build', data)
+    if response is None:
+        return None
     return response['id']
 
 @traceback_to_stderr
@@ -146,11 +156,15 @@ def create_test(build_id, test_filename, test_command, test_phase):
         'command': test_command,
         'phase': test_phase,
     })
+    if response is None:
+        return None
     return response['id']
 
 @traceback_to_stderr
 def append_test_logs(build_id, test_id, log_lines):
-    post('build/%s/test/%s' % (build_id, test_id), data=log_lines)
+    response = post('build/%s/test/%s' % (build_id, test_id), data=log_lines)
+    if response is None:
+        return False
     return True
 
 @traceback_to_stderr
@@ -161,15 +175,19 @@ def append_global_logs(build_id, log_lines):
     may be output in here that is important but spans individual
     tests, the buildlogs webapp handles these logs specially.
     """
-    post('build/%s' % build_id, data=log_lines)
+    response = post('build/%s' % build_id, data=log_lines)
+    if response is None:
+        return False
     return True
 
 @traceback_to_stderr
 def finish_test(build_id, test_id, failed=False):
-    post('build/%s/test/%s' % (build_id, test_id), data=[], headers={
+    response = post('build/%s/test/%s' % (build_id, test_id), data=[], headers={
         'X-Sendlogs-Test-Done': 'true',
         'X-Sendlogs-Test-Failed': failed and 'true' or 'false',
     })
+    if response is None:
+        return False
     return True
 
 def run_and_echo(command):
@@ -181,6 +199,46 @@ def run_and_echo(command):
     webapp is unavailable, etc
     """
     return subprocess.call(command)
+
+class LogAppender(object):
+    def __init__(self, callback, args, send_after_lines=200, send_after_seconds=2):
+        self.callback = callback
+        self.callback_args = args
+
+        self.send_after_lines = send_after_lines
+        self.send_after_seconds = send_after_seconds
+
+        self.buf = []
+        self.retrybuf = []
+        self.last_sent = time.time()
+
+    def __call__(self, line):
+        self.buf.append((time.time(), line))
+
+        delay = time.time() - self.last_sent
+        if len(self.buf) >= self.send_after_lines or delay >= self.send_after_seconds:
+            self.submit()
+
+        # no return value is expected
+
+    def submit(self):
+        if len(self.buf) + len(self.retrybuf) == 0:
+            return True
+
+        args = list(self.callback_args)
+        args.append(list(self.buf) + self.retrybuf)
+
+        self.last_sent = time.time()
+
+        if self.callback(*args):
+            self.buf = []
+            self.retrybuf = []
+            return True
+        else:
+            self.retrybuf += self.buf
+            self.buf = []
+            return False
+
 
 def wrap_test(command):
     """
@@ -221,35 +279,31 @@ def wrap_test(command):
     if not test_id:
         return run_and_echo(command)
 
-    start_time = time.time()
-    buf = [(start_time, '*** beginning test %r ***' % test_filename)]
-    def callback(line):
-        if line is None:
-            # callback is called with None when the
-            # command is finished
-            end_time = time.time()
-            buf.append((end_time, '*** finished test %r in %f seconds ***' % (test_filename, end_time - start_time)))
-            append_test_logs(build_id, test_id, buf)
-        else:
-            buf.append((time.time(), line))
-            if len(buf) > 100 or (buf and time.time() - buf[0][0] > 10):
-                append_test_logs(build_id, test_id, buf)
-
-                # this is like "buf = []", but doesn't change
-                # the "buf" reference -- necessary to  make
-                # the closure work
-                buf[:] = []
-
     # the peculiar formatting here matches what is printed by
     # smoke.py when starting tests
     output_url = '%s/build/%s/test/%s/' % (URL_ROOT.rstrip('/'), build_id, test_id)
     sys.stdout.write('                (output suppressed; see %s)\n' % output_url)
     sys.stdout.flush()
 
+    callback = LogAppender(callback=append_test_logs, args=(build_id, test_id))
     returncode = loop_and_callback(command, callback)
-
     failed = bool(returncode != 0)
-    finish_test(build_id, test_id, failed)
+
+    # this will append any remaining unsubmitted logs, or
+    # return True if there are none left to submit
+    tries = 5
+    while not callback.submit() and tries > 0:
+        sys.stderr.write('failed to finish sending test logs, retrying in 1s\n')
+        sys.stderr.flush()
+        time.sleep(1)
+        tries -= 1
+
+    tries = 5
+    while not finish_test(build_id, test_id, failed) and tries > 5:
+        sys.stderr.write('failed to mark test finished, retrying in 1s\n')
+        sys.stderr.flush()
+        time.sleep(1)
+        tries -= 1
 
     return returncode
 
@@ -284,23 +338,19 @@ def wrap_global(command):
     if not build_id:
         return run_and_echo(command)
 
-    buf = []
-    def callback(line):
-        if line is None and buf:
-            # callback is called with None when the
-            # command is finished
-            append_global_logs(build_id, buf)
-        else:
-            buf.append((time.time(), line))
-            if len(buf) > 100 or (buf and time.time() - buf[0][0] > 10):
-                append_global_logs(build_id, buf)
+    callback = LogAppender(callback=append_global_logs, args=(build_id, ))
+    returncode = loop_and_callback(command, callback)
 
-                # this is like "buf = []", but doesn't change
-                # the "buf" reference -- necessary to  make
-                # the closure work
-                buf[:] = []
+    # this will append any remaining unsubmitted logs, or
+    # return True if there are none left to submit
+    tries = 5
+    while not callback.submit() and tries > 0:
+        sys.stderr.write('failed to finish sending global logs, retrying in 1s\n')
+        sys.stderr.flush()
+        time.sleep(1)
+        tries -= 1
 
-    return loop_and_callback(command, callback)
+    return returncode
 
 def loop_and_callback(command, callback):
     """
@@ -335,8 +385,6 @@ def loop_and_callback(command, callback):
 
     # restore the original signal handler, if any
     signal.signal(signal.SIGTERM, orig_handler)
-
-    callback(None)
     return proc.returncode
 
 
