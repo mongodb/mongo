@@ -25,14 +25,18 @@
 #include <limits>
 #include <cmath>
 #include <boost/static_assert.hpp>
-#if defined(MONGO_EXPOSE_MACROS)
-#define verify MONGO_verify
-#endif
-#include "bsonelement.h"
-#include "bsonobj.h"
-#include "bsonmisc.h"
+
+//#if defined(MONGO_EXPOSE_MACROS)
+//#define verify MONGO_verify
+//#endif
+
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/builder_base.h"
+
 #if defined(_DEBUG) && defined(MONGO_EXPOSE_MACROS)
-#include "../util/log.h"
+#include "mongo/util/log.h"
 #endif
 
 namespace mongo {
@@ -87,7 +91,7 @@ namespace mongo {
     /** Utility for creating a BSONObj.
         See also the BSON() and BSON_ARRAY() macros.
     */
-    class BSONObjBuilder : boost::noncopyable {
+    class BSONObjBuilder : public BSONBuilderBase, private boost::noncopyable {
     public:
         /** @param initsize this is just a hint as to the final size of the object */
         BSONObjBuilder(int initsize=512) : _b(_buf), _buf(initsize + sizeof(unsigned)), _offset( sizeof(unsigned) ), _s( this ) , _tracker(0) , _doneCalled(false) {
@@ -411,6 +415,11 @@ namespace mongo {
             return *this;
         }
 
+        /** Implements builder interface but no-op in ObjBuilder */
+        void appendNull() {
+            msgasserted(16234, "Invalid call to appendNull in BSONObj Builder.");
+        }
+
         /** Append a Null element to the object */
         BSONObjBuilder& appendNull( const StringData& fieldName ) {
             _b.appendNum( (char) jstNULL );
@@ -641,6 +650,10 @@ namespace mongo {
             return *this;
         }
 
+        bool isArray() const {
+            return false;
+        }
+
         /** @return true if we are using our own bufbuilder, and not an alternate that was given to us in our constructor */
         bool owned() const { return &_b == &_buf; }
 
@@ -679,7 +692,7 @@ namespace mongo {
         static bool numStrsReady; // for static init safety. see comments in db/jsobj.cpp
     };
 
-    class BSONArrayBuilder : boost::noncopyable {
+    class BSONArrayBuilder : public BSONBuilderBase, private boost::noncopyable {
     public:
         BSONArrayBuilder() : _i(0), _b() {}
         BSONArrayBuilder( BufBuilder &_b ) : _i(0), _b(_b) {}
@@ -696,6 +709,10 @@ namespace mongo {
             return *this;
         }
 
+        BSONArrayBuilder& operator<<(const BSONElement& e) {
+            return append(e);
+        }
+
         template <typename T>
         BSONArrayBuilder& operator<<(const T& x) {
             return append(x);
@@ -710,10 +727,29 @@ namespace mongo {
          * @return owned BSONArray
          */
         BSONArray arr() { return BSONArray(_b.obj()); }
+        BSONObj obj() { return _b.obj(); }
 
         BSONObj done() { return _b.done(); }
 
         void doneFast() { _b.doneFast(); }
+
+        BSONArrayBuilder& append(const StringData& name, int n) {
+            fill( name );
+            append( n );
+            return *this;
+        }
+
+        BSONArrayBuilder& append(const StringData& name, long long n) {
+            fill( name );
+            append( n );
+            return *this;
+        }
+
+        BSONArrayBuilder& append(const StringData& name, double n) {
+            fill( name );
+            append( n );
+            return *this;
+        }
 
         template <typename T>
         BSONArrayBuilder& append(const StringData& name, const T& x) {
@@ -749,19 +785,25 @@ namespace mongo {
             return _b.subobjStart( num() );
         }
 
-        BufBuilder &subarrayStart( const char *name ) {
+        BufBuilder &subarrayStart( const StringData& name ) {
             fill( name );
             return _b.subarrayStart( num() );
         }
 
-        void appendArray( const StringData& name, BSONObj subObj ) {
+        BSONArrayBuilder& appendArray( const StringData& name, const BSONObj& subObj ) {
             fill( name );
             _b.appendArray( num(), subObj );
+            return *this;
         }
 
-        void appendAs( const BSONElement &e, const char *name) {
+        BSONArrayBuilder& appendAs( const BSONElement &e, const StringData& name) {
             fill( name );
             append( e );
+            return *this;
+        }
+
+        bool isArray() const {
+            return true;
         }
 
         int len() const { return _b.len(); }
