@@ -369,10 +369,6 @@ __rec_excl_clear(WT_SESSION_IMPL *session)
 static int
 __hazard_exclusive(WT_SESSION_IMPL *session, WT_REF *ref, int top)
 {
-	WT_CONNECTION_IMPL *conn;
-	WT_HAZARD *hp;
-	uint32_t elem, i, session_max;
-
 	/*
 	 * Make sure there is space to track exclusive access so we can unlock
 	 * to clean up.
@@ -396,31 +392,14 @@ __hazard_exclusive(WT_SESSION_IMPL *session, WT_REF *ref, int top)
 
 	session->excl[session->excl_next++] = ref;
 
-	/* Walk the list of hazard references to search for a match. */
-	conn = S2C(session);
+	/* Check for a matching hazard reference. */
+	if (__wt_page_hazard_check(session, ref->page) == NULL)
+		return (0);
 
-	/*
-	 * The list of sessions can grow and shrink underfoot, but walking a
-	 * big list is expensive, we don't want to look at more entries than
-	 * necessary.  There's a maximum number of sessions, and that's the
-	 * most hazard references we'll ever need to review.
-	 */
-	session_max = conn->session_max;
-	WT_READ_BARRIER();
+	WT_BSTAT_INCR(session, rec_hazard);
+	WT_CSTAT_INCR(session, cache_evict_hazard);
 
-retry:	elem = session_max * conn->hazard_size;
-	for (i = 0, hp = conn->hazard; i < elem; ++i, ++hp)
-		if (hp->page == ref->page) {
-			WT_BSTAT_INCR(session, rec_hazard);
-			WT_CSTAT_INCR(session, cache_evict_hazard);
-
-			WT_VERBOSE_RET(session,
-			    evict, "page %p hazard request failed", ref->page);
-			return (EBUSY);
-		}
-	WT_READ_BARRIER();
-	if (session_max != conn->session_max)
-		goto retry;
-
-	return (0);
+	WT_VERBOSE_RET(
+	    session, evict, "page %p hazard request failed", ref->page);
+	return (EBUSY);
 }

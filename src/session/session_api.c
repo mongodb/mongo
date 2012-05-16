@@ -469,7 +469,6 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
 	};
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session, *session_ret;
-	uint32_t slot;
 
 	WT_UNUSED(config);
 
@@ -488,9 +487,9 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
 	 * The session reference list is compact, the session array is not.
 	 * Find the first empty session slot.
 	 */
-	for (slot = 0, session_ret = conn->session_array;
+	for (session_ret = conn->session_array;
 	    session_ret->iface.connection != NULL;
-	    ++session_ret, ++slot)
+	    ++session_ret)
 		;
 
 	/* Session entries are re-used, clear the old contents. */
@@ -501,7 +500,9 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
 	session_ret->iface.connection = &conn->iface;
 	__wt_event_handler_set(session_ret, (event_handler != NULL) ?
 	    event_handler : session_ret->event_handler);
-	session_ret->hazard = conn->hazard + slot * conn->hazard_size;
+
+	WT_ERR(__wt_calloc(session,
+	    conn->hazard_size, sizeof(WT_HAZARD), &session_ret->hazard));
 
 	TAILQ_INIT(&session_ret->cursors);
 	TAILQ_INIT(&session_ret->btrees);
@@ -514,13 +515,6 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
 	 */
 	if (internal)
 		F_SET(session_ret, WT_SESSION_INTERNAL);
-
-	/*
-	 * If the maximum number of sessions has grown, then we need to review
-	 * a larger chunk of the hazard reference space.
-	 */
-	if (conn->session_cnt + 1 > conn->session_max)
-		conn->session_max = conn->session_cnt + 1;
 
 	/*
 	 * Publish: make the entry visible to server threads.  There must be a

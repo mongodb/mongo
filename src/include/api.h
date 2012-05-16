@@ -194,23 +194,18 @@ struct __wt_connection_impl {
 	 * the server thread code to avoid walking the entire array when only a
 	 * few threads are running.
 	 */
-	WT_SESSION_IMPL	**sessions;		/* Session reference */
-	void		 *session_array;	/* Session array */
-	uint32_t	  session_cnt;		/* Session count */
-	uint32_t	  session_max;		/* Session count maximum */
+	WT_SESSION_IMPL	**sessions;	/* Session reference */
+	void		 *session_array;/* Session array */
+	uint32_t	  session_size;	/* Session array size */
+	uint32_t	  session_cnt;	/* Session count */
 
 	/*
 	 * WiredTiger allocates space for 15 hazard references in each thread of
 	 * control, by default.  There's no code path that requires more than 15
 	 * pages at a time (and if we find one, the right change is to increase
 	 * the default).
-	 *
-	 * The hazard array is separate from the WT_SESSION_IMPL array because
-	 * we need to easily copy and search it when evicting pages from memory.
 	 */
-	WT_HAZARD *hazard;		/* Hazard references array */
-	uint32_t   hazard_size;
-	uint32_t   session_size;
+	uint32_t   hazard_size;		/* Hazard array size */
 
 	WT_CACHE  *cache;		/* Page cache */
 	uint64_t   cache_size;

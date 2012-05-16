@@ -27,9 +27,6 @@ __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	WT_ERR(__wt_calloc(session,
 	    conn->session_size, sizeof(WT_SESSION_IMPL),
 	    &conn->session_array));
-	WT_ERR(__wt_calloc(session,
-	   conn->session_size * conn->hazard_size, sizeof(WT_HAZARD),
-	   &conn->hazard));
 
 	/* Create the cache. */
 	WT_ERR(__wt_cache_create(conn, cfg));
