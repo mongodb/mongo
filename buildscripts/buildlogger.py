@@ -27,6 +27,7 @@ import os
 import os.path
 import re
 import signal
+import socket
 import subprocess
 import sys
 import time
@@ -70,6 +71,7 @@ for path in possible_paths:
 
 URL_ROOT = 'http://buildlogs.mongodb.org/'
 TIMEOUT_SECONDS = 10
+socket.setdefaulttimeout(TIMEOUT_SECONDS)
 
 digest_handler = urllib2.HTTPDigestAuthHandler()
 digest_handler.add_password(
@@ -92,7 +94,7 @@ def post(endpoint, data, headers=None):
     headers.update({'Content-Type': 'application/json; charset=utf-8'})
 
     req = urllib2.Request(url=url(endpoint), data=data, headers=headers)
-    response = url_opener.open(req, timeout=TIMEOUT_SECONDS)
+    response = url_opener.open(req)
     response_headers = dict(response.info())
 
     # eg "Content-Type: application/json; charset=utf-8"
