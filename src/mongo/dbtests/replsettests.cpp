@@ -18,6 +18,9 @@
  */
 
 #include "pch.h"
+
+#include <queue>
+
 #include "../db/repl.h"
 
 #include "../db/db.h"
