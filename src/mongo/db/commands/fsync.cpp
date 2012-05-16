@@ -56,6 +56,12 @@ namespace mongo {
                     return false;
                 }
 
+                // from db.eval()
+                if ( cc().getContext() ) {
+                    errmsg = "fsync: it is not possible to call from db.eval()";
+                    return false;
+                }
+
                 SimpleMutex::scoped_lock lk(m);
                 err = "";
                 
