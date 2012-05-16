@@ -19,6 +19,7 @@
 
 #include <iostream>
 #include <typeinfo>
+#include <string>
 
 #include "mongo/bson/inline_decls.h"
 #include "mongo/platform/compiler.h"
