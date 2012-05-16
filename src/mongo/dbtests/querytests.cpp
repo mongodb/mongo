@@ -85,7 +85,7 @@ namespace QueryTests {
         }
     };
 
-    class FindOne : public Base {
+    class FindOneOr : public Base {
     public:
         void run() {
             addIndex( BSON( "b" << 1 ) );
@@ -1564,7 +1564,7 @@ namespace QueryTests {
 
         void setupTests() {
             add< FindingStart >();
-            add< FindOne >();
+            add< FindOneOr >();
             add< FindOneRequireIndex >();
             add< FindOneEmptyObj >();
             add< BoundedKey >();

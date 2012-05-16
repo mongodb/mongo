@@ -57,7 +57,7 @@ namespace CursorTests {
             vector< BSONObj > _objs;
         };
 
-        class MultiRange : public Base {
+        class MultiRangeForward : public Base {
         public:
             void run() {
                 const char *ns = "unittests.cursortests.BtreeCursorTests.MultiRange";
@@ -459,7 +459,7 @@ namespace CursorTests {
         All() : Suite( "cursor" ) {}
 
         void setupTests() {
-            add<BtreeCursor::MultiRange>();
+            add<BtreeCursor::MultiRangeForward>();
             add<BtreeCursor::MultiRangeGap>();
             add<BtreeCursor::MultiRangeReverse>();
             add<BtreeCursor::EqEq>();
