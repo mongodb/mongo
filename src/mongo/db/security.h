@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include <string>
+
 #include "mongo/db/authlevel.h"
 #include "mongo/db/nonce.h"
 #include "mongo/db/security_common.h"
@@ -43,16 +45,16 @@ namespace mongo {
 
         // -- modifiers ----
         
-        void logout(const string& dbname ) {
+        void logout(const std::string& dbname ) {
             scoped_spinlock lk(_lock);
             _dbs.erase(dbname);
         }
-        void authorize(const string& dbname , const string& user ) {
+        void authorize(const std::string& dbname , const std::string& user ) {
             scoped_spinlock lk(_lock);
             _dbs[dbname].level = Auth::WRITE;
             _dbs[dbname].user = user;
         }
-        void authorizeReadOnly(const string& dbname , const string& user ) {
+        void authorizeReadOnly(const std::string& dbname , const std::string& user ) {
             scoped_spinlock lk(_lock);
             _dbs[dbname].level = Auth::READ;
             _dbs[dbname].user = user;
@@ -60,26 +62,26 @@ namespace mongo {
         
         // -- accessors ---
 
-        bool isAuthorized(const string& dbname) const { 
+        bool isAuthorized(const std::string& dbname) const { 
             return _isAuthorized( dbname, Auth::WRITE ); 
         }
         
-        bool isAuthorizedReads(const string& dbname) const { 
+        bool isAuthorizedReads(const std::string& dbname) const { 
             return _isAuthorized( dbname, Auth::READ ); 
         }
         
         /**
          * @param lockType - this is from dbmutex 1 is write, 0 is read
          */
-        bool isAuthorizedForLock(const string& dbname, int lockType ) const { 
+        bool isAuthorizedForLock(const std::string& dbname, int lockType ) const { 
             return _isAuthorized( dbname , lockType > 0 ? Auth::WRITE : Auth::READ ); 
         }
 
-        bool isAuthorizedForLevel( const string& dbname , Auth::Level level ) const {
+        bool isAuthorizedForLevel( const std::string& dbname , Auth::Level level ) const {
             return _isAuthorized( dbname , level );
         }
 
-        string getUser( const string& dbname ) const;
+        std::string getUser( const std::string& dbname ) const;
 
         void print() const;
 
@@ -87,12 +89,12 @@ namespace mongo {
         void _checkLocalHostSpecialAdmin();
 
         /** takes a lock */
-        bool _isAuthorized(const string& dbname, Auth::Level level) const;
+        bool _isAuthorized(const std::string& dbname, Auth::Level level) const;
 
-        bool _isAuthorizedSingle_inlock(const string& dbname, Auth::Level level) const;
+        bool _isAuthorizedSingle_inlock(const std::string& dbname, Auth::Level level) const;
         
         /** cannot call this locked */
-        bool _isAuthorizedSpecialChecks( const string& dbname ) const ;
+        bool _isAuthorizedSpecialChecks( const std::string& dbname ) const ;
 
     private:
         // while most access to _dbs is from our thread (the TLS thread), currentOp() inspects
@@ -100,7 +102,7 @@ namespace mongo {
         mutable SpinLock _lock;
 
         // todo: caching should not last forever
-        typedef map<string,Auth> MA;
+        typedef map<std::string,Auth> MA;
         MA _dbs; // dbname -> auth
 
         static bool _warned;

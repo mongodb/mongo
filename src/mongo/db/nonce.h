@@ -17,6 +17,8 @@
 
 #pragma once
 
+#include <iostream>
+
 namespace mongo {
 
     typedef unsigned long long nonce64;
@@ -28,7 +30,7 @@ namespace mongo {
     private:
         nonce64 _getNonce();
         nonce64 __getNonce();
-        ifstream *_devrandom;
+        std::ifstream *_devrandom;
         bool _initialized;
         void init(); // can call more than once
     };

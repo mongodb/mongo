@@ -38,6 +38,6 @@ namespace mongo {
         Auth() : level( NONE ) {}
 
         Level level;
-        string user;
+        std::string user;
     };
 }  // namespace mongo
