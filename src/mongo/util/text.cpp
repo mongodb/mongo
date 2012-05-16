@@ -22,7 +22,59 @@
 #include "mongo/util/mongoutils/str.h"
 #include <boost/smart_ptr/scoped_array.hpp>
 
+using namespace std;
+
 namespace mongo {
+
+    // --- StringSplitter ----
+
+    /** get next split string fragment */
+    string StringSplitter::next() {
+        const char * foo = strstr( _big , _splitter );
+        if ( foo ) {
+            string s( _big , foo - _big );
+            _big = foo + 1;
+            while ( *_big && strstr( _big , _splitter ) == _big )
+                _big++;
+            return s;
+        }
+        
+        string s = _big;
+        _big += strlen( _big );
+        return s;
+    }
+
+
+    void StringSplitter::split( vector<string>& l ) {
+        while ( more() ) {
+            l.push_back( next() );
+        }
+    }
+
+    vector<string> StringSplitter::split() {
+        vector<string> l;
+        split( l );
+        return l;
+    }
+
+    string StringSplitter::join( vector<string>& l , const string& split ) {
+        stringstream ss;
+        for ( unsigned i=0; i<l.size(); i++ ) {
+            if ( i > 0 )
+                ss << split;
+            ss << l[i];
+        }
+        return ss.str();
+    }
+
+    vector<string> StringSplitter::split( const string& big , const string& splitter ) {
+        StringSplitter ss( big.c_str() , splitter.c_str() );
+        return ss.split();
+    }
+    
+
+
+    // --- utf8 utils ------
 
     inline int leadingOnes(unsigned char c) {
         if (c < 0x80) return 0;
@@ -42,6 +94,10 @@ namespace mongo {
         };
         return _leadingOnes[c & 0x7f];
 
+    }
+
+    bool isValidUTF8(string s) { 
+        return isValidUTF8(s.c_str()); 
     }
 
     bool isValidUTF8(const char *s) {
@@ -66,6 +122,32 @@ namespace mongo {
         if (left!=0) return false; // string ended mid-codepoint
         return true;
     }
+
+    long long parseLL( const char *n ) {
+        long long ret;
+        uassert( 13307, "cannot convert empty string to long long", *n != 0 );
+#if !defined(_WIN32)
+        char *endPtr = 0;
+        errno = 0;
+        ret = strtoll( n, &endPtr, 10 );
+        uassert( 13305, "could not convert string to long long", *endPtr == 0 && errno == 0 );
+#elif _MSC_VER>=1600    // 1600 is VS2k10 1500 is VS2k8
+        size_t endLen = 0;
+        try {
+            ret = stoll( n, &endLen, 10 );
+        }
+        catch ( ... ) {
+            endLen = 0;
+        }
+        uassert( 13306, "could not convert string to long long", endLen != 0 && n[ endLen ] == 0 );
+#else // stoll() wasn't introduced until VS 2010.
+        char* endPtr = 0;
+        ret = _strtoi64( n, &endPtr, 10 );
+        uassert( 13310, "could not convert string to long long", (*endPtr == 0) && (ret != _I64_MAX) && (ret != _I64_MIN) );
+#endif // !defined(_WIN32)
+        return ret;
+    }
+
 
 #if defined(_WIN32)
 
