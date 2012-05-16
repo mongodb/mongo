@@ -247,8 +247,7 @@ namespace mongo {
         }
         BSONObj current() {
             Record *r = _current();
-            BSONObj j(r);
-            return j;
+            return BSONObj::make(r);
         }
         virtual DiskLoc currLoc() { return curr; }
         virtual DiskLoc refLoc()  { return curr.isNull() ? last : curr; }

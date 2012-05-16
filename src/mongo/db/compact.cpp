@@ -87,7 +87,7 @@ namespace mongo {
                 while( 1 ) {
                     Record *recOld = L.rec();
                     L = recOld->nextInExtent(L);
-                    BSONObj objOld(recOld);
+                    BSONObj objOld = BSONObj::make(recOld);
 
                     if( !validate || objOld.valid() ) {
                         nrecords++;

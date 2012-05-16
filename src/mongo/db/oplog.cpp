@@ -201,8 +201,7 @@ namespace mongo {
         append_O_Obj(r->data(), partial, obj);
 
         if ( logLevel >= 6 ) {
-            BSONObj temp(r);
-            log( 6 ) << "logOp:" << temp << endl;
+            log( 6 ) << "logOp:" << BSONObj::make(r) << endl;
         }
     }
 
@@ -286,11 +285,8 @@ namespace mongo {
 
         context.getClient()->setLastOp( ts );
 
-        if ( logLevel >= 6 ) {
-            BSONObj temp(r);
-            log( 6 ) << "logging op:" << temp << endl;
-        }
-    }
+        LOG( 6 ) << "logging op:" << BSONObj::make(r) << endl;
+    } 
 
     static void (*_logOp)(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb, bool fromMigrate ) = _logOpOld;
     void newReplUp() {

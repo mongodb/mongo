@@ -71,7 +71,7 @@ namespace mongo {
      */
     class BSONObj {
     public:
-
+        
         /** Construct a BSONObj from data in the proper format.
          *  Use this constructor when something else owns msgdata's buffer
         */
@@ -88,10 +88,10 @@ namespace mongo {
             init(holder);
         }
 
-        explicit BSONObj(const Record *r);
-
         /** Construct an empty BSONObj -- that is, {}. */
         BSONObj();
+
+        static BSONObj make( const Record* r );
 
         ~BSONObj() { 
             _objdata = 0; // defensive

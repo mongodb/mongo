@@ -266,7 +266,7 @@ namespace mongo {
                         nlen += r->netLength();
 
                         if (full){
-                            BSONObj obj(r);
+                            BSONObj obj = BSONObj::make(r);
                             if (!obj.isValid() || !obj.valid()){ // both fast and deep checks
                                 valid = false;
                                 if (nInvalid == 0) // only log once;

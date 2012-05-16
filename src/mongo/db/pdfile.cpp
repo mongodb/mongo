@@ -973,7 +973,7 @@ namespace mongo {
 //zzz
     /* unindex all keys in all indexes for this record. */
     static void unindexRecord(NamespaceDetails *d, Record *todelete, const DiskLoc& dl, bool noWarn = false) {
-        BSONObj obj(todelete);
+        BSONObj obj = BSONObj::make(todelete);
         int n = d->nIndexes;
         for ( int i = 0; i < n; i++ )
             _unindexRecord(d->idx(i), obj, dl, !noWarn);
@@ -1082,7 +1082,7 @@ namespace mongo {
 
         dassert( toupdate == dl.rec() );
 
-        BSONObj objOld(toupdate);
+        BSONObj objOld = BSONObj::make(toupdate);
         BSONObj objNew(_buf);
         DEV verify( objNew.objsize() == _len );
         DEV verify( objNew.objdata() == _buf );
@@ -1733,7 +1733,7 @@ namespace mongo {
         bool addedID = false;
         DiskLoc loc = insert( ns, o.objdata(), o.objsize(), god, true, &addedID );
         if( addedID && !loc.isNull() )
-            o = BSONObj( loc.rec() );
+            o = BSONObj::make( loc.rec() );
         return loc;
     }
 

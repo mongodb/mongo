@@ -117,7 +117,7 @@ namespace mongo {
 
             if ( logop ) {
                 BSONElement e;
-                if( BSONObj( rloc.rec() ).getObjectID( e ) ) {
+                if( BSONObj::make( rloc.rec() ).getObjectID( e ) ) {
                     BSONObjBuilder b;
                     b.append( e );
                     bool replJustOne = true;

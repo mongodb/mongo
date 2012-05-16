@@ -525,7 +525,7 @@ namespace mongo {
     }
 
     inline BSONObj DiskLoc::obj() const {
-        return BSONObj(rec()->accessed());
+        return BSONObj::make(rec()->accessed());
     }
     inline DeletedRecord* DiskLoc::drec() const {
         verify( _a != -1 );
@@ -603,8 +603,8 @@ namespace mongo {
 
     bool dropIndexes( NamespaceDetails *d, const char *ns, const char *name, string &errmsg, BSONObjBuilder &anObjBuilder, bool maydeleteIdIndex );
 
-    inline BSONObj::BSONObj(const Record *r) {
-        init(r->data());
+    inline BSONObj BSONObj::make(const Record* r ) {
+        return BSONObj( r->data() );
     }
-
+    
 } // namespace mongo

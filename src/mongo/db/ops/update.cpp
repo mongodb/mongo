@@ -295,7 +295,7 @@ namespace mongo {
                     continue;
                 }
 
-                BSONObj js(r);
+                BSONObj js = BSONObj::make(r);
 
                 BSONObj pattern = patternOrig;
 
