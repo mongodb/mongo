@@ -38,7 +38,7 @@ namespace mongo {
      */
     template<typename T>
     class BlockingQueue : boost::noncopyable {
-        typedef size_t (*getSize_t)(const T& t);
+        typedef size_t (*getSizeFunc)(const T& t);
     public:
         BlockingQueue() :
             _lock("BlockingQueue"),
@@ -48,7 +48,7 @@ namespace mongo {
             _lock("BlockingQueue(bounded)"),
             _maxSize(size),
             _getSize(&_getSizeDefault) {}
-        BlockingQueue(size_t size, getSize_t f) :
+        BlockingQueue(size_t size, getSizeFunc f) :
             _lock("BlockingQueue(custom size)"),
             _maxSize(size),
             _getSize(f) {}
@@ -76,9 +76,7 @@ namespace mongo {
 
         void clear() {
             scoped_lock l(_lock);
-            while (!_queue.empty()) {
-                _queue.pop();
-            }
+            _queue = std::queue<T>();
             _currentSize = 0;
         }
 
@@ -158,7 +156,7 @@ namespace mongo {
         std::queue<T> _queue;
         const size_t _maxSize;
         size_t _currentSize;
-        getSize_t _getSize;
+        getSizeFunc _getSize;
 
         boost::condition _cvNoLongerFull;
         boost::condition _cvNoLongerEmpty;

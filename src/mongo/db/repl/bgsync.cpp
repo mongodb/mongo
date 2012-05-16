@@ -232,6 +232,8 @@ namespace replset {
     }
 
     void BackgroundSync::produce() {
+        // this oplog reader does not do a handshake because we don't want the server it's syncing
+        // from to track how far it has synced
         OplogReader r(false /* doHandshake */);
 
         // find a target to sync from the last op time written
@@ -327,13 +329,14 @@ namespace replset {
         }
 
         if (!_buffer.blockingPeek(_currentOp, 1)) {
-            return 0;
+            return NULL;
         }
 
         return &_currentOp;
     }
 
     void BackgroundSync::consume() {
+        // this is just to get the op off the queue, it's been peeked at and applied already
         _buffer.blockingPop();
     }
 
