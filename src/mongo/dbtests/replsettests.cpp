@@ -322,7 +322,7 @@ namespace ReplSetTests {
     };
 
     class BackgroundSyncTest : public replset::BackgroundSyncInterface {
-        queue<BSONObj> _queue;
+        std::queue<BSONObj> _queue;
     public:
         BackgroundSyncTest() {}
         virtual ~BackgroundSyncTest() {}
