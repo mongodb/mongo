@@ -47,6 +47,12 @@ namespace mongo {
         virtual bool adminOnly() const { return true; }
         virtual void help(stringstream& h) const { h << url(); }
         virtual bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+
+            if (Lock::isLocked()) {
+                errmsg = "fsync: Cannot execute fsync command from contexts that hold a data lock";
+                return false;
+            }
+
             bool sync = !cmdObj["async"].trueValue(); // async means do an fsync, but return immediately
             bool lock = cmdObj["lock"].trueValue();
             log() << "CMD fsync: sync:" << sync << " lock:" << lock << endl;

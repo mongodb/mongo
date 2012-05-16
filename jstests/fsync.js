@@ -19,3 +19,4 @@ db.getLastError();
 
 assert( db.currentOp().fsyncLock == null, "A" );
 
+assert( !db.eval('db.fsyncLock()').ok, "eval('db.fsyncLock()') should fail." )
