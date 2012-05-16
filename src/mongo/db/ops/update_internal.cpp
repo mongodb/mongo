@@ -53,8 +53,7 @@ namespace mongo {
         return matcher->matches( toMatch.embeddedObject() );
     }
 
-    template< class Builder >
-    void Mod::appendIncremented( Builder& bb , const BSONElement& in, ModState& ms ) const {
+    void Mod::appendIncremented( BSONBuilderBase& builder , const BSONElement& in, ModState& ms ) const {
         BSONType a = in.type();
         BSONType b = elt.type();
 
@@ -79,47 +78,43 @@ namespace mongo {
             }
         }
 
-        ms.appendIncValue( bb , false );
+        ms.appendIncValue( builder , false );
     }
 
-    template< class Builder >
-    void appendUnset( Builder& b ) {
+    void appendUnset( BSONBuilderBase& builder ) {
+        if ( builder.isArray() ) {
+            builder.appendNull();
+        }
     }
 
-    template<>
-    void appendUnset( BSONArrayBuilder& b ) {
-        b.appendNull();
-    }
-
-    template< class Builder >
-    void Mod::apply( Builder& b , BSONElement in , ModState& ms ) const {
+    void Mod::apply( BSONBuilderBase& builder , BSONElement in , ModState& ms ) const {
         if ( ms.dontApply ) {
             // Pass the original element through unchanged.
-            b << in;
+            builder << in;
             return;
         }
 
         switch ( op ) {
 
         case INC: {
-            appendIncremented( b , in , ms );
+            appendIncremented( builder , in , ms );
             break;
         }
 
         case SET: {
             _checkForAppending( elt );
-            b.appendAs( elt , shortFieldName );
+            builder.appendAs( elt , shortFieldName );
             break;
         }
 
         case UNSET: {
-            appendUnset( b );
+            appendUnset( builder );
             break;
         }
 
         case PUSH: {
             uassert( 10131 ,  "$push can only be applied to an array" , in.type() == Array );
-            BSONObjBuilder bb( b.subarrayStart( shortFieldName ) );
+            BSONObjBuilder bb( builder.subarrayStart( shortFieldName ) );
             BSONObjIterator i( in.embeddedObject() );
             int n=0;
             while ( i.more() ) {
@@ -136,7 +131,7 @@ namespace mongo {
 
         case ADDTOSET: {
             uassert( 12592 ,  "$addToSet can only be applied to an array" , in.type() == Array );
-            BSONObjBuilder bb( b.subarrayStart( shortFieldName ) );
+            BSONObjBuilder bb( builder.subarrayStart( shortFieldName ) );
 
             BSONObjIterator i( in.embeddedObject() );
             int n=0;
@@ -192,7 +187,7 @@ namespace mongo {
             uassert( 10132 ,  "$pushAll can only be applied to an array" , in.type() == Array );
             uassert( 10133 ,  "$pushAll has to be passed an array" , elt.type() );
 
-            BSONObjBuilder bb( b.subarrayStart( shortFieldName ) );
+            BSONObjBuilder bb( builder.subarrayStart( shortFieldName ) );
 
             BSONObjIterator i( in.embeddedObject() );
             int n=0;
@@ -215,7 +210,7 @@ namespace mongo {
         case PULL:
         case PULL_ALL: {
             uassert( 10134 ,  "$pull/$pullAll can only be applied to an array" , in.type() == Array );
-            BSONObjBuilder bb( b.subarrayStart( shortFieldName ) );
+            BSONObjBuilder bb( builder.subarrayStart( shortFieldName ) );
 
             int n = 0;
 
@@ -248,7 +243,7 @@ namespace mongo {
 
         case POP: {
             uassert( 10135 ,  "$pop can only be applied to an array" , in.type() == Array );
-            BSONObjBuilder bb( b.subarrayStart( shortFieldName ) );
+            BSONObjBuilder bb( builder.subarrayStart( shortFieldName ) );
 
             int n = 0;
 
@@ -314,8 +309,8 @@ namespace mongo {
             }
 
             switch( in.type() ) {
-            case NumberInt: b.append( shortFieldName , x ); break;
-            case NumberLong: b.append( shortFieldName , y ); break;
+            case NumberInt: builder.append( shortFieldName , x ); break;
+            case NumberLong: builder.append( shortFieldName , y ); break;
             default: verify( 0 );
             }
 
@@ -327,7 +322,7 @@ namespace mongo {
         }
 
         case RENAME_TO: {
-            ms.handleRename( b, shortFieldName );
+            ms.handleRename( builder, shortFieldName );
             break;
         }
 
@@ -555,8 +550,7 @@ namespace mongo {
         return ss.str();
     }
 
-    template< class Builder >
-    void ModState::handleRename( Builder& newObjBuilder, const char* shortFieldName ) {
+    void ModState::handleRename( BSONBuilderBase& newObjBuilder, const char* shortFieldName ) {
         newObjBuilder.appendAs( newVal , shortFieldName );
         BSONObjBuilder b;
         b.appendAs( newVal, shortFieldName );
@@ -612,25 +606,26 @@ namespace mongo {
         }
     }
 
-    template< class Builder >
-    void ModSetState::_appendNewFromMods( const string& root , ModState& m , Builder& b ,
-                                         set<string>& onedownseen ) {
-        const char*  temp = m.fieldName();
+    void ModSetState::_appendNewFromMods( const string& root,
+                                          ModState& modState,
+                                          BSONBuilderBase& builder,
+                                          set<string>& onedownseen ) {
+        const char*  temp = modState.fieldName();
         temp += root.size();
         const char* dot = strchr( temp , '.' );
         if ( dot ) {
-            string nr( m.fieldName() , 0 , 1 + ( dot - m.fieldName() ) );
+            string nr( modState.fieldName() , 0 , 1 + ( dot - modState.fieldName() ) );
             string nf( temp , 0 , dot - temp );
             if ( onedownseen.count( nf ) )
                 return;
             onedownseen.insert( nf );
-            BSONObjBuilder bb ( b.subobjStart( nf ) );
+            BSONObjBuilder bb ( builder.subobjStart( nf ) );
             // Always insert an object, even if the field name is numeric.
             createNewObjFromMods( nr , bb , BSONObj() );
             bb.done();
         }
         else {
-            appendNewFromMod( m , b );
+            appendNewFromMod( modState , builder );
         }
     }
 
@@ -650,27 +645,29 @@ namespace mongo {
         return make_pair( mstart, mend );
     }
 
-    void ModSetState::createNewObjFromMods( const string& root , BSONObjBuilder& b ,
-                                           const BSONObj& obj ) {
+    void ModSetState::createNewObjFromMods( const string& root,
+                                            BSONObjBuilder& builder,
+                                            const BSONObj& obj ) {
         BSONObjIteratorSorted es( obj );
-        createNewFromMods( root, b, es, modsForRoot( root ), LexNumCmp( true ) );
+        createNewFromMods( root, builder, es, modsForRoot( root ), LexNumCmp( true ) );
     }
 
-    void ModSetState::createNewArrayFromMods( const string& root , BSONArrayBuilder& b ,
-                                             const BSONArray& arr ) {
+    void ModSetState::createNewArrayFromMods( const string& root,
+                                              BSONArrayBuilder& builder,
+                                              const BSONArray& arr ) {
         BSONArrayIteratorSorted es( arr );
         ModStateRange objectOrderedRange = modsForRoot( root );
         ModStateHolder arrayOrderedMods( LexNumCmp( false ) );
         arrayOrderedMods.insert( objectOrderedRange.first, objectOrderedRange.second );
         ModStateRange arrayOrderedRange( arrayOrderedMods.begin(), arrayOrderedMods.end() );
-        createNewFromMods( root, b, es, arrayOrderedRange, LexNumCmp( false ) );
+        createNewFromMods( root, builder, es, arrayOrderedRange, LexNumCmp( false ) );
     }
 
-    template< class Builder >
-    void ModSetState::createNewFromMods( const string& root , Builder& b ,
-                                        BSONIteratorSorted& es ,
-                                        const ModStateRange& modRange ,
-                                        const LexNumCmp& lexNumCmp ) {
+    void ModSetState::createNewFromMods( const string& root,
+                                         BSONBuilderBase& builder,
+                                         BSONIteratorSorted& es,
+                                         const ModStateRange& modRange,
+                                         const LexNumCmp& lexNumCmp ) {
 
         DEBUGUPDATE( "\t\t createNewFromMods root: " << root );
         ModStateHolder::iterator m = modRange.first;
@@ -683,7 +680,7 @@ namespace mongo {
 
             if ( duplicateFieldName( prevE, e ) ) {
                 // Just copy through an element with a duplicate field name.
-                b.append( e );
+                builder.append( e );
                 prevE = e;
                 e = es.next();
                 continue;
@@ -707,13 +704,13 @@ namespace mongo {
                 if ( onedownseen.count( e.fieldName() ) == 0 ) {
                     onedownseen.insert( e.fieldName() );
                     if ( e.type() == Object ) {
-                        BSONObjBuilder bb( b.subobjStart( e.fieldName() ) );
+                        BSONObjBuilder bb( builder.subobjStart( e.fieldName() ) );
                         stringstream nr; nr << root << e.fieldName() << ".";
                         createNewObjFromMods( nr.str() , bb , e.Obj() );
                         bb.done();
                     }
                     else {
-                        BSONArrayBuilder ba( b.subarrayStart( e.fieldName() ) );
+                        BSONArrayBuilder ba( builder.subarrayStart( e.fieldName() ) );
                         stringstream nr; nr << root << e.fieldName() << ".";
                         createNewArrayFromMods( nr.str() , ba , BSONArray( e.embeddedObject() ) );
                         ba.done();
@@ -730,18 +727,18 @@ namespace mongo {
             }
             case LEFT_BEFORE: // Mod on a field that doesn't exist
                 DEBUGUPDATE( "\t\t\t\t creating new field for: " << m->second->m->fieldName );
-                _appendNewFromMods( root , *m->second , b , onedownseen );
+                _appendNewFromMods( root , *m->second , builder , onedownseen );
                 m++;
                 continue;
             case SAME:
                 DEBUGUPDATE( "\t\t\t\t applying mod on: " << m->second->m->fieldName );
-                m->second->apply( b , e );
+                m->second->apply( builder , e );
                 e = es.next();
                 m++;
                 continue;
             case RIGHT_BEFORE: // field that doesn't have a MOD
                 DEBUGUPDATE( "\t\t\t\t just copying" );
-                b.append( e ); // if array, ignore field name
+                builder.append( e ); // if array, ignore field name
                 e = es.next();
                 continue;
             case RIGHT_SUBFIELD:
@@ -755,14 +752,14 @@ namespace mongo {
         // finished looping the mods, just adding the rest of the elements
         while ( !e.eoo() ) {
             DEBUGUPDATE( "\t\t\t copying: " << e.fieldName() );
-            b.append( e );  // if array, ignore field name
+            builder.append( e );  // if array, ignore field name
             e = es.next();
         }
 
         // do mods that don't have fields already
         for ( ; m != mend; m++ ) {
             DEBUGUPDATE( "\t\t\t\t appending from mod at end: " << m->second->m->fieldName );
-            _appendNewFromMods( root , *m->second , b , onedownseen );
+            _appendNewFromMods( root , *m->second , builder , onedownseen );
         }
     }
 

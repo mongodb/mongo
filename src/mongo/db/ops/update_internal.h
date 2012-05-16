@@ -18,6 +18,7 @@
 
 #include "pch.h"
 
+#include "mongo/bson/bson_builder_base.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher.h"
 #include "mongo/util/embedded_builder.h"
@@ -108,8 +109,7 @@ namespace mongo {
             }
         }
 
-        template< class Builder >
-        void appendIncremented( Builder& bb , const BSONElement& in, ModState& ms ) const;
+        void appendIncremented( BSONBuilderBase& bb , const BSONElement& in, ModState& ms ) const;
 
         bool operator<( const Mod& other ) const {
             return strcmp( fieldName, other.fieldName ) < 0;
@@ -195,8 +195,7 @@ namespace mongo {
             return false;
         }
 
-        template< class Builder >
-        void apply( Builder& b , BSONElement in , ModState& ms ) const;
+        void apply( BSONBuilderBase& b , BSONElement in , ModState& ms ) const;
 
         /**
          * @return true iff toMatch should be removed from the array
@@ -440,13 +439,11 @@ namespace mongo {
 
         void appendForOpLog( BSONObjBuilder& b ) const;
 
-        template< class Builder >
-        void apply( Builder& b , BSONElement in ) {
+        void apply( BSONBuilderBase& b , BSONElement in ) {
             m->apply( b , in , *this );
         }
 
-        template< class Builder >
-        void appendIncValue( Builder& b , bool useFullName ) const {
+        void appendIncValue( BSONBuilderBase& b , bool useFullName ) const {
             const char* n = useFullName ? m->fieldName : m->shortFieldName;
 
             switch ( incType ) {
@@ -463,8 +460,7 @@ namespace mongo {
 
         string toString() const;
 
-        template< class Builder >
-        void handleRename( Builder& newObjBuilder, const char* shortFieldName );
+        void handleRename( BSONBuilderBase& newObjBuilder, const char* shortFieldName );
     };
 
     /**
@@ -498,15 +494,12 @@ namespace mongo {
         void createNewArrayFromMods( const string& root, BSONArrayBuilder& b,
                                     const BSONArray& arr );
 
-        template< class Builder >
-        void createNewFromMods( const string& root , Builder& b , BSONIteratorSorted& es ,
+        void createNewFromMods( const string& root , BSONBuilderBase& b , BSONIteratorSorted& es ,
                                const ModStateRange& modRange , const LexNumCmp& lexNumCmp );
 
-        template< class Builder >
-        void _appendNewFromMods( const string& root , ModState& m , Builder& b , set<string>& onedownseen );
+        void _appendNewFromMods( const string& root , ModState& m , BSONBuilderBase& b , set<string>& onedownseen );
 
-        template< class Builder >
-        void appendNewFromMod( ModState& ms , Builder& b ) {
+        void appendNewFromMod( ModState& ms , BSONBuilderBase& b ) {
             if ( ms.dontApply ) {
                 return;
             }
