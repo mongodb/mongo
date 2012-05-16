@@ -6,8 +6,10 @@
 #include <iostream>
 #include <string>
 #include <map>
+#include <vector>
 
 #include "mongo/util/concurrency/mutex.h"
+#include "mongo/util/text.h"
 
 using namespace std;
 
@@ -37,16 +39,6 @@ namespace mongo {
         ::free( strings );
     }
 
-   string lastPiece( string& name ) {
-        size_t x = name.rfind( "::" );
-        if ( x == string::npos )
-            return "";
-        
-        string last = name.substr( x + 2 );
-        name = name.substr( 0 , x );
-        return last;
-    }
-
     bool isNameAConstructor( string name ) {
         size_t x = name.rfind( '(' );
         if ( name[name.size()-1] != ')' || x == string::npos )
@@ -54,14 +46,23 @@ namespace mongo {
         
         name = name.substr( 0 , x );
         
-        string method = lastPiece( name );
-        if ( method.size() == 0 )
+        vector<string> pieces = StringSplitter::split( name , "::" );
+
+        if ( pieces.size() < 2 )
+            return false;
+        
+        string method = pieces[pieces.size()-1];
+        string clazz = pieces[pieces.size()-2];
+
+        if ( method == "BSONObj" || 
+             method == "BtreeCursor" || 
+             method == "MultiPlanScanner" || 
+             method == "ClientCursor" || 
+             method == "QueryPlan" ||
+             method == "QueryPlanSet" || 
+             method == "QueryPlanGenerator" )
             return false;
 
-        string clazz = lastPiece( name );
-        if ( clazz.size() == 0 )
-            clazz = name;
-        
         return method == clazz;
     }
 
