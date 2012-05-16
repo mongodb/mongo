@@ -63,8 +63,12 @@ namespace replset {
 
         Member* _currentSyncTarget;
 
+        // Notifier thread
 
-        // Tracker thread
+        // used to wait until another op has been replicated
+        boost::condition_variable _lastOpCond;
+        boost::mutex _lastOpMutex;
+
         Member* _oplogMarkerTarget;
         OplogReader _oplogMarker; // not locked, only used by notifier thread
         OpTime _consumedOpTime; // not locked, only used by notifier thread
@@ -96,6 +100,7 @@ namespace replset {
     public:
         static BackgroundSync* get();
         static void shutdown();
+        static void notify();
 
         virtual ~BackgroundSync() {}
 

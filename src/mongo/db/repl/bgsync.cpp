@@ -49,12 +49,17 @@ namespace replset {
     }
 
     void BackgroundSync::shutdown() {
+        notify();
+    }
+
+    void BackgroundSync::notify() {
         boost::unique_lock<boost::mutex> lock(s_mutex);
         if (s_instance == NULL) {
             return;
         }
 
-        s_instance->_bufCond.notify_all();
+        boost::unique_lock<boost::mutex> opLock(s_instance->_lastOpMutex);
+        s_instance->_lastOpCond.notify_all();
     }
 
     void BackgroundSync::notifierThread() {
@@ -76,6 +81,13 @@ namespace replset {
             }
 
             try {
+                {
+                    boost::unique_lock<boost::mutex> lock(_lastOpMutex);
+                    if (_consumedOpTime == theReplSet->lastOpTimeWritten) {
+                        _lastOpCond.wait(lock);
+                    }
+                }
+
                 markOplog();
             }
             catch (DBException &e) {
@@ -122,7 +134,8 @@ namespace replset {
             _consumedOpTime = temp["ts"]._opTime();
         }
 
-        // next time through markOplog(), call more() to signal the sync target that we've synced T
+        // call more() to signal the sync target that we've synced T
+        _oplogMarker.more();
     }
 
     bool BackgroundSync::hasCursor() {
