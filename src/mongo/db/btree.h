@@ -1015,10 +1015,21 @@ namespace mongo {
      */
     class BtreeCursor : public Cursor {
     protected:
+        BtreeCursor( NamespaceDetails* nsd , int theIndexNo, const IndexDetails& idxDetails );
+        /*
         BtreeCursor( NamespaceDetails *_d, int _idxNo, const IndexDetails&, const BSONObj &startKey, const BSONObj &endKey, bool endKeyInclusive, int direction );
         BtreeCursor( NamespaceDetails *_d, int _idxNo, const IndexDetails& _id,
                     const shared_ptr< FieldRangeVector > &_bounds, int singleIntervalLimit,
                     int _direction );
+        */
+
+        virtual void init( const BSONObj &startKey, const BSONObj &endKey, bool endKeyInclusive, int direction );
+        virtual void init( const shared_ptr< FieldRangeVector > &_bounds, int singleIntervalLimit, int _direction );
+
+    private:
+        void _finishConstructorInit();
+        static BtreeCursor* make( NamespaceDetails * nsd , int idxNo , const IndexDetails& indexDetails );
+
     public:
         virtual ~BtreeCursor();
         /** makes an appropriate subclass depending on the index version */
@@ -1065,7 +1076,7 @@ namespace mongo {
         virtual BSONObj keyAt(int ofs) const = 0;
 
         virtual BSONObj currKey() const = 0;
-        virtual BSONObj indexKeyPattern() { return indexDetails.keyPattern(); }
+        virtual BSONObj indexKeyPattern() { return _order; }
 
         virtual void aboutToDeleteBucket(const DiskLoc& b) {
             if ( bucket == b )
@@ -1129,22 +1140,25 @@ namespace mongo {
         /** if afterKey is true, we want the first key with values of the keyBegin fields greater than keyBegin */
         void advanceTo( const BSONObj &keyBegin, int keyBeginLen, bool afterKey, const vector< const BSONElement * > &keyEnd, const vector< bool > &keyEndInclusive );
 
-        set<DiskLoc> _dups;
+        // these are set in the construtor
         NamespaceDetails * const d;
         const int idxNo;
+        const IndexDetails& indexDetails;
+
+        // these are all set in init()
+        set<DiskLoc> _dups;
         BSONObj startKey;
         BSONObj endKey;
         bool _endKeyInclusive;
         bool _multikey; // this must be updated every getmore batch in case someone added a multikey
-        const IndexDetails& indexDetails;
-        const BSONObj _order;
-        const Ordering _ordering;
+        BSONObj _order; // this is the same as indexDetails.keyPattern()
+        Ordering _ordering;
         DiskLoc bucket;
         int keyOfs;
-        const int _direction; // 1=fwd,-1=reverse
+        int _direction; // 1=fwd,-1=reverse
         BSONObj keyAtKeyOfs; // so we can tell if things moved around on us between the query and the getMore call
         DiskLoc locAtKeyOfs;
-        const shared_ptr< FieldRangeVector > _bounds;
+        shared_ptr< FieldRangeVector > _bounds;
         auto_ptr< FieldRangeVectorIterator > _boundsIterator;
         shared_ptr< CoveredIndexMatcher > _matcher;
         shared_ptr<Projection::KeyOnly> _keyFieldsOnly;
