@@ -26,8 +26,11 @@ namespace replset {
 
     BackgroundSyncInterface::~BackgroundSyncInterface() {}
 
-    BackgroundSync::BackgroundSync() : _maxSize(200*1024*1024),
-                                       _bufSize(0),
+    size_t getSize(const BSONObj& o) {
+        return o.objsize();
+    }
+
+    BackgroundSync::BackgroundSync() : _buffer(256*1024*1024, &getSize),
                                        _lastOpTimeFetched(0, 0),
                                        _lastH(0),
                                        _pause(true),
@@ -216,8 +219,7 @@ namespace replset {
     }
 
     void BackgroundSync::produce() {
-        bool doHandshake = false;
-        OplogReader r(doHandshake);
+        OplogReader r(false /* doHandshake */);
 
         // find a target to sync from the last op time written
         getOplogReader(r);
@@ -250,16 +252,6 @@ namespace replset {
 
         while (!inShutdown()) {
             while (!inShutdown()) {
-                // if the buffer is full, wait for items to be removed
-                if (_bufSize >= _maxSize) {
-                    boost::unique_lock<boost::mutex> lock(_mutex);
-                    _bufCond.wait(lock);
-
-                    // if we produce [peanut, ..., peanut, whale] we'll have to consume more than
-                    // one peanut before we're below _maxSize, so keep waiting until we are
-                    break;
-                }
-
                 if (!r.moreInCurrentBatch()) {
                     if (theReplSet->gotForceSync()) {
                         return;
@@ -284,10 +276,11 @@ namespace replset {
 
                 BSONObj o = r.nextSafe();
 
+                // the blocking queue will wait (forever) until there's room for us to push
+                _buffer.push(o.getOwned());
+
                 {
                     boost::unique_lock<boost::mutex> lock(_mutex);
-                    _buffer.push(o.getOwned());
-                    _bufSize += o.objsize();
                     _lastH = o["h"].numberLong();
                     _lastOpTimeFetched = o["ts"]._opTime();
                 }
@@ -311,32 +304,24 @@ namespace replset {
     }
 
     BSONObj* BackgroundSync::peek() {
-        boost::unique_lock<boost::mutex> lock(_mutex);
+        {
+            boost::unique_lock<boost::mutex> lock(_mutex);
 
-        if (_currentSyncTarget != _oplogMarkerTarget &&
-            _currentSyncTarget != NULL) {
-            _oplogMarkerTarget = NULL;
+            if (_currentSyncTarget != _oplogMarkerTarget &&
+                _currentSyncTarget != NULL) {
+                _oplogMarkerTarget = NULL;
+            }
         }
 
-        if (_buffer.empty()) {
-            // it should already be 0, but just in case
-            _bufSize = 0;
-            return NULL;
+        if (!_buffer.blockingPeek(_currentOp, 1)) {
+            return 0;
         }
 
-        return &_buffer.front();
+        return &_currentOp;
     }
 
     void BackgroundSync::consume() {
-        boost::unique_lock<boost::mutex> lock(_mutex);
-        BSONObj& front = _buffer.front();
-
-        // remove from the queue first, in case catchup goes wrong
-        _bufSize -= front.objsize();
-        _buffer.pop();
-
-        // wake up producer, if it's waiting for docs to be consumed
-        _bufCond.notify_one();
+        _buffer.blockingPop();
     }
 
     bool BackgroundSync::isStale(OplogReader& r, BSONObj& remoteOldestOp) {
@@ -459,32 +444,29 @@ namespace replset {
     }
 
     void BackgroundSync::stop() {
-        boost::unique_lock<boost::mutex> lock(_mutex);
+        {
+            boost::unique_lock<boost::mutex> lock(_mutex);
 
-        int popped = 0;
-
-        _pause = true;
-        _currentSyncTarget = NULL;
-        _lastOpTimeFetched = OpTime(0,0);
-        _lastH = 0;
-
-        // get rid of pending ops
-        while (!_buffer.empty()) {
-            _buffer.pop();
-            popped++;
+            _pause = true;
+            _currentSyncTarget = NULL;
+            _lastOpTimeFetched = OpTime(0,0);
+            _lastH = 0;
         }
-        _bufSize = 0;
 
-        if (popped > 0) {
-            log() << "replset " << popped << " ops were not applied from buffer, this should "
+        if (!_buffer.empty()) {
+            log() << "replset " << _buffer.size() << " ops were not applied from buffer, this should "
                   << "cause a rollback on the former primary" << rsLog;
         }
+
+        // get rid of pending ops
+        _buffer.clear();
     }
 
     void BackgroundSync::start() {
+        massert(16231, "going to start syncing, but buffer is not empty", _buffer.empty());
+
         boost::unique_lock<boost::mutex> lock(_mutex);
         _pause = false;
-        massert(16231, "going to start syncing, but buffer is not empty", _buffer.empty() && _bufSize == 0);
 
         // reset _last fields with current data
         _lastOpTimeFetched = theReplSet->lastOpTimeWritten;

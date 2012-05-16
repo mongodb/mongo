@@ -16,9 +16,9 @@
 
 #pragma once
 
-#include <queue>
 #include <boost/thread/mutex.hpp>
 
+#include "mongo/util/queue.h"
 #include "mongo/db/oplogreader.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/jsobj.h"
@@ -49,19 +49,13 @@ namespace replset {
         // protects creation of s_instance
         static boost::mutex s_mutex;
 
-        // max size for buffer: 200 MB (plus or minus max oplog doc size)
-        const size_t _maxSize;
-
         // _mutex protects all of the class variables
         boost::mutex _mutex;
 
-
         // Production thread
-        queue<BSONObj> _buffer;
-        size_t _bufSize;
-        // used to wait if the buffer is full
-        boost::condition_variable _bufCond;
+        BlockingQueue<BSONObj> _buffer;
 
+        BSONObj _currentOp;
         OpTime _lastOpTimeFetched;
         long long _lastH;
         // if produce thread should be running
