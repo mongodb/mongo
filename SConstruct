@@ -311,6 +311,8 @@ libdeps.setup_environment( env )
 
 if env['PYSYSPLATFORM'] == 'linux3':
     env['PYSYSPLATFORM'] = 'linux2'
+if env['PYSYSPLATFORM'] in ('freebsd9', ):
+    env['PYSYSPLATFORM'] = 'freebsd'
 
 if os.sys.platform == 'win32':
     env['OS_FAMILY'] = 'win'
@@ -327,7 +329,7 @@ elif has_option("clang"):
 if has_option( "cc" ):
     env["CC"] = get_option( "cc" )
 
-if env['PYSYSPLATFORM'] == 'linux2':
+if env['PYSYSPLATFORM'] in ('linux2', 'freebsd'):
     env['LINK_LIBGROUP_START'] = '-Wl,--start-group'
     env['LINK_LIBGROUP_END'] = '-Wl,--end-group'
     env['RELOBJ_LIBDEPS_START'] = '--whole-archive'
