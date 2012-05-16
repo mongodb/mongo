@@ -3,6 +3,8 @@
 
 #include "dbtests.h"
 
+#include "mongo/util/stack_introspect.h"
+
 class MyClass {
 public:
     MyClass() {

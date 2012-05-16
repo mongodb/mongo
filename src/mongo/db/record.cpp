@@ -5,6 +5,7 @@
 #include "../util/processinfo.h"
 #include "../util/net/listen.h"
 #include "pagefault.h"
+#include "mongo/util/stack_introspect.h"
 
 namespace mongo {
 
