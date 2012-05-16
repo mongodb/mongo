@@ -479,7 +479,7 @@ namespace replset {
     }
 
     void BackgroundSync::start() {
-        massert(16231, "going to start syncing, but buffer is not empty", _buffer.empty());
+        massert(16235, "going to start syncing, but buffer is not empty", _buffer.empty());
 
         boost::unique_lock<boost::mutex> lock(_mutex);
         _pause = false;
