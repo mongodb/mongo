@@ -35,6 +35,8 @@
 
 namespace mongo {
 
+    const BSONObj reverseNaturalObj = BSON( "$natural" << -1 );
+
     void Helpers::ensureIndex(const char *ns, BSONObj keyPattern, bool unique, const char *name) {
         NamespaceDetails *d = nsdetails(ns);
         if( d == 0 )
