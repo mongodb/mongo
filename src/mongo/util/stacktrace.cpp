@@ -40,6 +40,8 @@ namespace mongo {
     }
 
     bool isNameAConstructor( string name ) {
+        //cout << "XX : " << name << endl;
+
         size_t x = name.rfind( '(' );
         if ( name[name.size()-1] != ')' || x == string::npos )
             return false;
@@ -54,15 +56,19 @@ namespace mongo {
         string method = pieces[pieces.size()-1];
         string clazz = pieces[pieces.size()-2];
 
+        if ( method[0] == '~' )
+            method = method.substr(1);
+
         if ( method == "BSONObj" || 
-             method == "BtreeCursor" || 
              method == "MultiPlanScanner" || 
-             method == "ClientCursor" || 
              method == "QueryPlan" ||
              method == "QueryPlanSet" || 
              method == "QueryPlanGenerator" )
             return false;
-
+        
+        if ( name.find( "Tests" ) != string::npos )
+            return false;
+        
         return method == clazz;
     }
 

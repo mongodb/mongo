@@ -15,6 +15,9 @@ public:
         b = thing();
     }
 
+    ~MyClass() {
+        z = mongo::inConstructorChain();
+    }
 
     bool thing() {
         return mongo::inConstructorChain();
@@ -22,7 +25,11 @@ public:
 
     bool a;
     bool b;
+
+    static bool z;
 };
+
+bool MyClass::z;
 
 namespace foo {
     class Bar {
@@ -50,6 +57,8 @@ namespace StackTests {
             foo::Bar b;
             ASSERT( b.a );
             
+            MyClass::z = false;
+
             {
                 MyClass x;
                 ASSERT( x.a );
@@ -57,6 +66,8 @@ namespace StackTests {
                 ASSERT( ! x.thing() );
             }
             
+            ASSERT( MyClass::z );
+
             {
                 MyClass x(5);
                 ASSERT( x.a );
