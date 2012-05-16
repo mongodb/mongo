@@ -33,7 +33,7 @@ namespace mongo {
         const char * foo = strstr( _big , _splitter );
         if ( foo ) {
             string s( _big , foo - _big );
-            _big = foo + 1;
+            _big = foo + strlen( _splitter );
             while ( *_big && strstr( _big , _splitter ) == _big )
                 _big++;
             return s;

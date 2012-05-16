@@ -543,6 +543,19 @@ namespace BasicTests {
             test( "a" );
             test( "a,b" );
             test( "a,b,c" );
+
+            vector<string> x = StringSplitter::split( "axbxc" , "x" );
+            ASSERT_EQUALS( 3 , (int)x.size() );
+            ASSERT_EQUALS( "a" , x[0] );
+            ASSERT_EQUALS( "b" , x[1] );
+            ASSERT_EQUALS( "c" , x[2] );
+
+            x = StringSplitter::split( "axxbxxc" , "xx" );
+            ASSERT_EQUALS( 3 , (int)x.size() );
+            ASSERT_EQUALS( "a" , x[0] );
+            ASSERT_EQUALS( "b" , x[1] );
+            ASSERT_EQUALS( "c" , x[2] );
+
         }
     };
 
