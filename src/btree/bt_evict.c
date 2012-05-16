@@ -399,7 +399,10 @@ __evict_file_request_walk(WT_SESSION_IMPL *session)
 	/* Make progress, regardless of success or failure. */
 	++cache->sync_complete;
 
-	/* The session array requires no lock, it's fixed in size. */
+	/*
+	 * The session array requires no lock, it's fixed in size, but it
+	 * may contain NULL entries.
+	 */
 	request_session = NULL;
 	for (i = 0; i < conn->session_cnt; ++i)
 		if ((request_session = conn->sessions[i]) != NULL &&

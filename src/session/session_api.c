@@ -56,11 +56,11 @@ __session_close(WT_SESSION *wt_session, const char *config)
 		(void)__wt_cond_destroy(session, session->cond);
 
 	/*
-	 * Replace the session reference we're closing with the last entry in
-	 * the table, then clear the last entry.  As far as the walk of the
-	 * server threads is concerned, it's OK if the session appears twice,
-	 * or if it doesn't appear at all, so these lines can race all they
-	 * want.
+	 * Replace the session reference being closed with the last active entry
+	 * in the array, then clear the last entry, packing the active sessions
+	 * at the start of the array.  There are no memory barriers here, which
+	 * means a reader may see both NULL entries or sessions referenced more
+	 * than once.
 	 */
 	for (tp = conn->sessions; *tp != session; ++tp)
 		;
@@ -516,9 +516,18 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
 		F_SET(session_ret, WT_SESSION_INTERNAL);
 
 	/*
+	 * If the maximum number of sessions has grown, then we need to review
+	 * a larger chunk of the hazard reference space.
+	 */
+	if (conn->session_cnt + 1 > conn->session_max)
+		conn->session_max = conn->session_cnt + 1;
+
+	/*
 	 * Publish: make the entry visible to server threads.  There must be a
-	 * barrier to ensure the structure fields are set before any other
-	 * thread can see the session.
+	 * barrier for two reasons, to ensure structure fields are set before
+	 * any other thread can see the session and to push the maximum session
+	 * count to ensure the eviction thread can't possibly review too few
+	 * slots.
 	 */
 	WT_PUBLISH(conn->sessions[conn->session_cnt++], session_ret);
 

@@ -197,6 +197,7 @@ struct __wt_connection_impl {
 	WT_SESSION_IMPL	**sessions;		/* Session reference */
 	void		 *session_array;	/* Session array */
 	uint32_t	  session_cnt;		/* Session count */
+	uint32_t	  session_max;		/* Session count maximum */
 
 	/*
 	 * WiredTiger allocates space for 15 hazard references in each thread of
