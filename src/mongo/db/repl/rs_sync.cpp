@@ -148,7 +148,6 @@ namespace mongo {
     }
 
     void replset::InitialSync::applyOp(const BSONObj& o) {
-        OpTime ts = o["ts"]._opTime();
 
         // optimes before we started copying need not be applied.
         if (!syncApply(o)) {
