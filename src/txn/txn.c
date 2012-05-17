@@ -8,11 +8,11 @@
 #include "wt_internal.h"
 
 /*
- * __txnid_cmp --
+ * __wt_txnid_cmp --
  *	Compare transaction IDs for sorting / searching.
  */
-static int
-__txnid_cmp(const void *v1, const void *v2)
+int
+__wt_txnid_cmp(const void *v1, const void *v2)
 {
 	wt_txnid_t id1, id2;
 
@@ -49,9 +49,9 @@ __wt_txn_get_snapshot(WT_SESSION_IMPL *session)
 
 	/* Sort the snapshot and size for faster searching. */
 	qsort(txn->snapshot, conn->session_size, sizeof(wt_txnid_t),
-	    __txnid_cmp);
+	    __wt_txnid_cmp);
 	lastid = bsearch(&id, txn->snapshot, conn->session_size,
-	    sizeof(wt_txnid_t), __txnid_cmp);
+	    sizeof(wt_txnid_t), __wt_txnid_cmp);
 	WT_ASSERT(session, lastid != NULL);
 	while (lastid > txn->snapshot && lastid[-1] == lastid[0])
 		--lastid;
@@ -105,9 +105,9 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 	if (txn->isolation == TXN_ISO_SNAPSHOT) {
 		/* Sort the snapshot and size for faster searching. */
 		qsort(txn->snapshot, conn->session_size, sizeof(wt_txnid_t),
-		    __txnid_cmp);
+		    __wt_txnid_cmp);
 		lastid = bsearch(&txn->id, txn->snapshot, conn->session_size,
-		    sizeof(wt_txnid_t), __txnid_cmp);
+		    sizeof(wt_txnid_t), __wt_txnid_cmp);
 		WT_ASSERT(session, lastid != NULL);
 		while (lastid > txn->snapshot && lastid[-1] == lastid[0])
 			--lastid;
@@ -147,43 +147,10 @@ __txn_release(WT_SESSION_IMPL *session)
 	return (0);
 }
 
-int
-__wt_txn_modify(WT_SESSION_IMPL *session, wt_txnid_t *id)
-{
-	WT_TXN *txn;
-
-	txn = &session->txn;
-	if (F_ISSET(txn, TXN_RUNNING)) {
-		*id = txn->id;
-		if (txn->mod_count * sizeof(wt_txnid_t *) == txn->mod_alloc)
-			WT_RET(__wt_realloc(session, &txn->mod_alloc,
-			    WT_MAX(10, 2 * txn->mod_count) *
-			    sizeof(wt_txnid_t *), &txn->mod));
-		txn->mod[txn->mod_count++] = id;
-	} else
-		*id = WT_TXN_NONE;
-
-	return (0);
-}
-
 /*
- * __wt_txn_unmodify --
- *	If threads race making updates, they may discard the last referenced
- *	WT_UPDATE item while the transaction is still active.  This function
- *	removes the last update item from the "log".
+ * __wt_txn_commit --
+ *	Commit the current transaction.
  */
-void
-__wt_txn_unmodify(WT_SESSION_IMPL *session)
-{
-	WT_TXN *txn;
-
-	txn = &session->txn;
-	if (F_ISSET(txn, TXN_RUNNING)) {
-		WT_ASSERT(session, txn->mod_count > 0);
-		txn->mod_count--;
-	}
-}
-
 int
 __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 {
@@ -210,6 +177,10 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	return (ret);
 }
 
+/*
+ * __wt_txn_rollback --
+ *	Roll back the current transaction.
+ */
 int
 __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
 {
@@ -230,89 +201,9 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
 }
 
 /*
- * __wt_txn_visible --
- *	Can the current transaction see the given ID?
+ * __wt_txn_checkpoint --
+ *	Write a checkpoint.
  */
-int
-__wt_txn_visible(WT_SESSION_IMPL *session, wt_txnid_t id)
-{
-	WT_TXN *txn;
-
-	/* Nobody sees the results of aborted transactions. */
-	if (id == WT_TXN_INVALID)
-		return 0;
-
-	/*
-	 * Changes with no associated transaction are always visible, and
-	 * non-snapshot transactions see all other changes.
-	 */
-	txn = &session->txn;
-	if (id == WT_TXN_NONE || txn->isolation != TXN_ISO_SNAPSHOT)
-		return 1;
-
-	/*
-	 * The snapshot test.
-	 */
-	if (TXNID_LT(id, txn->snap_min))
-		return 1;
-	if (TXNID_LT(txn->id, id))
-		return 0;
-
-	/*
-	 * Otherwise, the ID is visible if it is not the result of a concurrent
-	 * transaction.  That is, if it is not in the snapshot list.
-	 */
-	return (bsearch(&id, txn->snapshot, txn->snapshot_count,
-	    sizeof(wt_txnid_t), __txnid_cmp) == NULL);
-}
-
-/*
- * __wt_txn_read_int --
- *	Get the first visible update in a list (or NULL if none are visible),
- *	and report whether uncommitted changes were skipped.
- */
-WT_UPDATE *
-__wt_txn_read_int(WT_SESSION_IMPL *session, WT_UPDATE *upd, int *skipp)
-{
-	while (upd != NULL && !__wt_txn_visible(session, upd->txnid)) {
-		if (skipp != NULL && upd->txnid != WT_TXN_NONE)
-			*skipp = 1;
-		upd = upd->next;
-	}
-
-	return (upd);
-}
-
-/*
- * __wt_txn_read --
- *	Get the first visible update in a list (or NULL if none are visible).
- */
-WT_UPDATE *
-__wt_txn_read(WT_SESSION_IMPL *session, WT_UPDATE *upd)
-{
-	return (__wt_txn_read_int(session, upd, NULL));
-}
-
-/*
- * __wt_txn_update_check --
- *	Check if the current transaction can update an item.
- */
-int
-__wt_txn_update_check(WT_SESSION_IMPL *session, WT_UPDATE *upd)
-{
-	WT_TXN *txn;
-
-	txn = &session->txn;
-	if (txn->isolation == TXN_ISO_SNAPSHOT)
-		while (upd != NULL && !__wt_txn_visible(session, upd->txnid)) {
-			if (upd->txnid != WT_TXN_INVALID)
-				return (WT_DEADLOCK);
-			upd = upd->next;
-		}
-
-	return (0);
-}
-
 int
 __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 {
