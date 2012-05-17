@@ -991,10 +991,19 @@ namespace mongo {
              - not mods is indexed
              - not upsert
     */
-    static UpdateResult _updateById(bool isOperatorUpdate, int idIdxNo, ModSet *mods, int profile, NamespaceDetails *d,
+    static UpdateResult _updateById(bool isOperatorUpdate, 
+                                    int idIdxNo, 
+                                    ModSet *mods, 
+                                    int profile, 
+                                    NamespaceDetails *d,
                                     NamespaceDetailsTransient *nsdt,
-                                    bool god, const char *ns,
-                                    const BSONObj& updateobj, BSONObj patternOrig, bool logop, OpDebug& debug) {
+                                    bool god, 
+                                    const char *ns,
+                                    const BSONObj& updateobj, 
+                                    BSONObj patternOrig, 
+                                    bool logop, 
+                                    OpDebug& debug, 
+                                    bool fromMigrate = false) {
 
         DiskLoc loc;
         {
@@ -1066,10 +1075,11 @@ namespace mongo {
 
                 if( mss->needOpLogRewrite() ) {
                     DEBUGUPDATE( "\t rewrite update: " << mss->getOpLogRewrite() );
-                    logOp("u", ns, mss->getOpLogRewrite() , &pattern );
+                    logOp("u", ns, mss->getOpLogRewrite() , 
+                          &pattern, 0, fromMigrate );
                 }
                 else {
-                    logOp("u", ns, updateobj, &pattern );
+                    logOp("u", ns, updateobj, &pattern, 0, fromMigrate );
                 }
             }
             return UpdateResult( 1 , 1 , 1);
@@ -1081,12 +1091,21 @@ namespace mongo {
         assert(nsdt);
         theDataFileMgr.updateRecord(ns, d, nsdt, r, loc , updateobj.objdata(), updateobj.objsize(), debug );
         if ( logop ) {
-            logOp("u", ns, updateobj, &patternOrig );
+            logOp("u", ns, updateobj, &patternOrig, 0, fromMigrate );
         }
         return UpdateResult( 1 , 0 , 1 );
     }
 
-    UpdateResult _updateObjects(bool god, const char *ns, const BSONObj& updateobj, BSONObj patternOrig, bool upsert, bool multi, bool logop , OpDebug& debug, RemoveSaver* rs ) {
+    UpdateResult _updateObjects( bool god, 
+                                 const char *ns, 
+                                 const BSONObj& updateobj, 
+                                 BSONObj patternOrig, 
+                                 bool upsert, 
+                                 bool multi, 
+                                 bool logop , 
+                                 OpDebug& debug, 
+                                 RemoveSaver* rs,
+                                 bool fromMigrate ) {
         DEBUGUPDATE( "update: " << ns << " update: " << updateobj << " query: " << patternOrig << " upsert: " << upsert << " multi: " << multi );
         Client& client = cc();
         int profile = client.database()->profile;
@@ -1117,7 +1136,7 @@ namespace mongo {
             int idxNo = d->findIdIndex();
             if( idxNo >= 0 ) {
                 debug.idhack = true;
-                UpdateResult result = _updateById(isOperatorUpdate, idxNo, mods.get(), profile, d, nsdt, god, ns, updateobj, patternOrig, logop, debug);
+                UpdateResult result = _updateById(isOperatorUpdate, idxNo, mods.get(), profile, d, nsdt, god, ns, updateobj, patternOrig, logop, debug, fromMigrate);
                 if ( result.existing || ! upsert ) {
                     return result;
                 }
@@ -1297,10 +1316,11 @@ namespace mongo {
 
                         if ( forceRewrite || mss->needOpLogRewrite() ) {
                             DEBUGUPDATE( "\t rewrite update: " << mss->getOpLogRewrite() );
-                            logOp("u", ns, mss->getOpLogRewrite() , &pattern );
+                            logOp("u", ns, mss->getOpLogRewrite() , 
+                                  &pattern, 0, fromMigrate );
                         }
                         else {
-                            logOp("u", ns, updateobj, &pattern );
+                            logOp("u", ns, updateobj, &pattern, 0, fromMigrate );
                         }
                     }
                     numModded++;
@@ -1337,7 +1357,7 @@ namespace mongo {
                 theDataFileMgr.updateRecord(ns, d, nsdt, r, loc , updateobj.objdata(), updateobj.objsize(), debug, god);
                 if ( logop ) {
                     DEV wassert( !god ); // god doesn't get logged, this would be bad.
-                    logOp("u", ns, updateobj, &pattern );
+                    logOp("u", ns, updateobj, &pattern, 0, fromMigrate );
                 }
                 return UpdateResult( 1 , 0 , 1 );
             } while ( c->ok() );
@@ -1357,7 +1377,7 @@ namespace mongo {
                 debug.fastmodinsert = true;
                 theDataFileMgr.insertWithObjMod(ns, newObj, god);
                 if ( logop )
-                    logOp( "i", ns, newObj );
+                    logOp( "i", ns, newObj, 0, 0, fromMigrate );
 
                 return UpdateResult( 0 , 1 , 1 , newObj );
             }
@@ -1367,20 +1387,27 @@ namespace mongo {
             BSONObj no = updateobj;
             theDataFileMgr.insertWithObjMod(ns, no, god);
             if ( logop )
-                logOp( "i", ns, no );
+                logOp( "i", ns, no, 0, 0, fromMigrate );
             return UpdateResult( 0 , 0 , 1 , no );
         }
 
         return UpdateResult( 0 , isOperatorUpdate , 0 );
     }
 
-    UpdateResult updateObjects(const char *ns, const BSONObj& updateobj, BSONObj patternOrig, bool upsert, bool multi, bool logop , OpDebug& debug ) {
+    UpdateResult updateObjects( const char *ns, 
+                                const BSONObj& updateobj, 
+                                BSONObj patternOrig, 
+                                bool upsert, 
+                                bool multi, 
+                                bool logop , 
+                                OpDebug& debug, 
+                                bool fromMigrate ) {
         uassert( 10155 , "cannot update reserved $ collection", strchr(ns, '$') == 0 );
         if ( strstr(ns, ".system.") ) {
             /* dm: it's very important that system.indexes is never updated as IndexDetails has pointers into it */
             uassert( 10156 , str::stream() << "cannot update system collection: " << ns << " q: " << patternOrig << " u: " << updateobj , legalClientSystemNS( ns , true ) );
         }
-        return _updateObjects(false, ns, updateobj, patternOrig, upsert, multi, logop, debug);
+        return _updateObjects(false, ns, updateobj, patternOrig, upsert, multi, logop, debug, 0, fromMigrate);
     }
 
 }

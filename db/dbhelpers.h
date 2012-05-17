@@ -94,7 +94,7 @@ namespace mongo {
          * you do not have to have Context set
          * o has to have an _id field or will assert
          */
-        static void upsert( const string& ns , const BSONObj& o );
+        static void upsert( const string& ns , const BSONObj& o, bool fromMigrate = false );
 
         /** You do not need to set the database before calling.
             @return true if collection is empty.
@@ -110,7 +110,13 @@ namespace mongo {
             virtual void goingToDelete( const BSONObj& o ) = 0;
         };
         /* removeRange: operation is oplog'd */
-        static long long removeRange( const string& ns , const BSONObj& min , const BSONObj& max , bool yield = false , bool maxInclusive = false , RemoveCallback * callback = 0 );
+        static long long removeRange( const string& ns , 
+                                      const BSONObj& min , 
+                                      const BSONObj& max , 
+                                      bool yield = false , 
+                                      bool maxInclusive = false , 
+                                      RemoveCallback * callback = 0, 
+                                      bool fromMigrate = false );
 
         /* Remove all objects from a collection.
         You do not need to set the database before calling.

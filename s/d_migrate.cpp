@@ -162,7 +162,7 @@ namespace mongo {
             {
                 writelock lk(ns);
                 RemoveSaver rs("moveChunk",ns,"post-cleanup");
-                long long numDeleted = Helpers::removeRange( ns , min , max , true , false , cmdLine.moveParanoia ? &rs : 0 );
+                long long numDeleted = Helpers::removeRange( ns , min , max , true , false , cmdLine.moveParanoia ? &rs : 0, true );
                 log() << "moveChunk deleted: " << numDeleted << migrateLog;
             }
             
@@ -1275,7 +1275,7 @@ namespace mongo {
                 string system_indexes = cc().database()->name + ".system.indexes";
                 for ( unsigned i=0; i<all.size(); i++ ) {
                     BSONObj idx = all[i];
-                    theDataFileMgr.insertAndLog( system_indexes.c_str() , idx );
+                    theDataFileMgr.insertAndLog( system_indexes.c_str() , idx, true /* flag fromMigrate in oplog */ );
                 }
 
                 timing.done(1);
@@ -1285,7 +1285,7 @@ namespace mongo {
                 // 2. delete any data already in range
                 writelock lk( ns );
                 RemoveSaver rs( "moveChunk" , ns , "preCleanup" );
-                long long num = Helpers::removeRange( ns , min , max , true , false , cmdLine.moveParanoia ? &rs : 0 );
+                long long num = Helpers::removeRange( ns , min , max , true , false , cmdLine.moveParanoia ? &rs : 0, true /* flag fromMigrate in oplog */ );
                 if ( num )
                     warning() << "moveChunkCmd deleted data already in chunk # objects: " << num << migrateLog;
 
@@ -1299,7 +1299,7 @@ namespace mongo {
 
                 while ( true ) {
                     BSONObj res;
-                    if ( ! conn->runCommand( "admin" , BSON( "_migrateClone" << 1 ) , res ) ) {
+                    if ( ! conn->runCommand( "admin" , BSON( "_migrateClone" << 1 ) , res ) ) {  // gets array of objects to copy, in disk order
                         state = FAIL;
                         errmsg = "_migrateClone failed: ";
                         errmsg += res.toString();
@@ -1316,7 +1316,7 @@ namespace mongo {
                         BSONObj o = i.next().Obj();
                         {
                             writelock lk( ns );
-                            Helpers::upsert( ns , o );
+                            Helpers::upsert( ns, o, true );
                         }
                         thisTime++;
                         numCloned++;
@@ -1423,7 +1423,7 @@ namespace mongo {
                 }
 
                 if ( state == FAIL ) {
-                    errmsg = "imted out waiting for commit";
+                    errmsg = "timed out waiting for commit";
                     return;
                 }
 
@@ -1485,7 +1485,7 @@ namespace mongo {
                         }
                     }
 
-                    Helpers::removeRange( ns , id , id, false , true , cmdLine.moveParanoia ? &rs : 0 );
+                    Helpers::removeRange( ns , id , id, false , true , cmdLine.moveParanoia ? &rs : 0, true );
 
                     *lastOpApplied = cx.getClient()->getLastOp();
                     didAnything = true;
@@ -1500,7 +1500,7 @@ namespace mongo {
                 while ( i.more() ) {
                     BSONObj it = i.next().Obj();
 
-                    Helpers::upsert( ns , it );
+                    Helpers::upsert( ns , it , true );
 
                     *lastOpApplied = cx.getClient()->getLastOp();
                     didAnything = true;
