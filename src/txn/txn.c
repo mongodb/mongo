@@ -23,19 +23,48 @@ __txnid_cmp(const void *v1, const void *v2)
 }
 
 /*
-Non-blocking approach to getting a snapshot:
+ * __wt_txn_get_snapshot --
+ *	Set up a snapshot in the current transaction.
+ */
+int
+__wt_txn_get_snapshot(WT_SESSION_IMPL *session)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_TXN *txn;
+	WT_TXN_GLOBAL *txn_global;
+	wt_txnid_t id, *lastid;
 
-for (;;) {
-  read conn->txnid into our slot, barrier
-  copy the array of active transactions
-  attempt to atomically swap conn->txnid to our txnid + 1
-  if successful:
-    break
+	conn = S2C(session);
+	txn = &session->txn;
+	txn_global = &conn->txn_global;
+
+	do {
+		/* Take a copy of the current session ID. */
+		id = txn_global->current;
+
+		/* Copy the array of concurrent transactions. */
+		memcpy(txn->snapshot, txn_global->ids,
+		    sizeof(wt_txnid_t) * conn->session_size);
+	} while (txn_global->current != id);
+
+	/* Sort the snapshot and size for faster searching. */
+	qsort(txn->snapshot, conn->session_size, sizeof(wt_txnid_t),
+	    __txnid_cmp);
+	lastid = bsearch(&id, txn->snapshot, conn->session_size,
+	    sizeof(wt_txnid_t), __txnid_cmp);
+	WT_ASSERT(session, lastid != NULL);
+	while (lastid > txn->snapshot && lastid[-1] == lastid[0])
+		--lastid;
+	txn->snap_min = txn->snapshot[0];
+	txn->snapshot_count = (u_int)(lastid - txn->snapshot);
+
+	return (0);
 }
 
-sort our snapshot so we can efficiently bsearch for concurrent txns
-then size to ignore any IDs in the snapshot >= our ID
-*/
+/*
+ * __wt_txn_begin --
+ *	Begin a transaction.
+ */
 int
 __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 {
@@ -43,7 +72,7 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_CONNECTION_IMPL *conn;
 	WT_TXN *txn;
 	WT_TXN_GLOBAL *txn_global;
-	wt_txnid_t *myid;
+	wt_txnid_t *lastid;
 
 	conn = S2C(session);
 	txn = &session->txn;
@@ -77,13 +106,13 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 		/* Sort the snapshot and size for faster searching. */
 		qsort(txn->snapshot, conn->session_size, sizeof(wt_txnid_t),
 		    __txnid_cmp);
-		myid = bsearch(&txn->id, txn->snapshot, conn->session_size,
+		lastid = bsearch(&txn->id, txn->snapshot, conn->session_size,
 		    sizeof(wt_txnid_t), __txnid_cmp);
-		WT_ASSERT(session, myid != NULL);
-		while (myid > txn->snapshot && myid[-1] == myid[0])
-			--myid;
+		WT_ASSERT(session, lastid != NULL);
+		while (lastid > txn->snapshot && lastid[-1] == lastid[0])
+			--lastid;
 		txn->snap_min = txn->snapshot[0];
-		txn->snapshot_count = (u_int)(myid - txn->snapshot);
+		txn->snapshot_count = (u_int)(lastid - txn->snapshot);
 	}
 
 	F_SET(txn, TXN_RUNNING);
@@ -91,8 +120,12 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 	return (0);
 }
 
-int
-__wt_txn_release(WT_SESSION_IMPL *session)
+/*
+ * __txn_release --
+ *	Release the resources associated with the current transaction.
+ */
+static int
+__txn_release(WT_SESSION_IMPL *session)
 {
 	WT_TXN *txn;
 	WT_TXN_GLOBAL *txn_global;
@@ -106,8 +139,9 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 	}
 
 	txn_global = &S2C(session)->txn_global;
-	WT_ASSERT(session, txn_global->ids[session->id] != WT_TXN_INVALID);
-	WT_PUBLISH(txn_global->ids[session->id], WT_TXN_INVALID);
+	WT_ASSERT(session, txn_global->ids[session->id] != WT_TXN_INVALID &&
+	    txn->id != WT_TXN_INVALID);
+	WT_PUBLISH(txn_global->ids[session->id], txn->id = WT_TXN_INVALID);
 	F_CLR(txn, TXN_RUNNING);
 
 	return (0);
@@ -172,7 +206,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	for (i = 0, m = txn->mod; i < txn->mod_count; i++, m++)
 		**m = WT_TXN_NONE;
 #endif
-	WT_TRET(__wt_txn_release(session));
+	WT_TRET(__txn_release(session));
 	return (ret);
 }
 
@@ -191,7 +225,7 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
 
 	for (i = 0, m = txn->mod; i < txn->mod_count; i++, m++)
 		**m = WT_TXN_INVALID;
-	WT_TRET(__wt_txn_release(session));
+	WT_TRET(__txn_release(session));
 	return (ret);
 }
 
@@ -263,6 +297,56 @@ __wt_txn_update_check(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 		}
 
 	return (0);
+}
+
+int
+__wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
+{
+	WT_CONFIG_ITEM cval;
+	WT_CURSOR *cursor;
+	WT_DECL_RET;
+	WT_TXN_GLOBAL *txn_global;
+	const char *snapshot;
+	const char *txn_cfg[] = { "isolation=snapshot", NULL };
+
+	cursor = NULL;
+	txn_global = &S2C(session)->txn_global;
+
+	if ((ret = __wt_config_gets(
+	    session, cfg, "snapshot", &cval)) != 0 && ret != WT_NOTFOUND)
+		WT_RET(ret);
+	if (cval.len != 0)
+		WT_RET(__wt_strndup(session, cval.str, cval.len, &snapshot));
+	else
+		snapshot = NULL;
+
+	/* Only one checkpoint can be active at a time. */
+	__wt_writelock(session, S2C(session)->ckpt_rwlock);
+
+	WT_ERR(__wt_txn_begin(session, txn_cfg));
+
+	/* TODO: prevent eviction from evicting anything newer than this... */
+	txn_global->checkpoint_txn = &session->txn;
+
+	/*
+	 * If we're doing an ordinary unnamed checkpoint, we only need to flush
+	 * open files.  If we're creating a named snapshot, we need to walk the
+	 * entire list of files in the metadata.
+	 */
+	WT_TRET((snapshot == NULL) ?
+	    __wt_conn_btree_apply(session, __wt_snapshot, cfg) :
+	    __wt_meta_btree_apply(session, __wt_snapshot, cfg, 0));
+
+	if (cursor != NULL)
+		WT_TRET(cursor->close(cursor));
+
+	txn_global->checkpoint_txn = NULL;
+
+	WT_TRET(__txn_release(session));
+
+err:	__wt_rwunlock(session, S2C(session)->ckpt_rwlock);
+	__wt_free(session, snapshot);
+	return (ret);
 }
 
 /*

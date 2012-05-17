@@ -65,6 +65,7 @@ src/cursor/cur_table.c
 src/log/log.c
 src/log/log_desc.c
 src/meta/meta_api.c
+src/meta/meta_apply.c
 src/meta/meta_snapshot.c
 src/meta/meta_table.c
 src/meta/meta_track.c

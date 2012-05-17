@@ -263,6 +263,33 @@ __wt_conn_btree_get(WT_SESSION_IMPL *session,
 }
 
 /*
+ * __wt_conn_btree_apply --
+ *	Apply a function to all open, non-snapshot btree handles.
+ */
+int
+__wt_conn_btree_apply(WT_SESSION_IMPL *session,
+    int (*func)(WT_SESSION_IMPL *, const char *[]), const char *cfg[])
+{
+	WT_BTREE *btree, *saved_btree;
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+
+	conn = S2C(session);
+	saved_btree = session->btree;
+
+	__wt_spin_lock(session, &conn->spinlock);
+	TAILQ_FOREACH(btree, &conn->btqh, q)
+		if (btree->snapshot == NULL) {
+			session->btree = btree;
+			WT_TRET(func(session, cfg));
+		}
+
+	__wt_spin_unlock(session, &conn->spinlock);
+	session->btree = saved_btree;
+	return (ret);
+}
+
+/*
  * __wt_conn_btree_close --
  *	Discard a reference to an open btree file handle.
  */

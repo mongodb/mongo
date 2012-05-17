@@ -16,9 +16,11 @@ typedef uint32_t wt_txnid_t;
 	 (t2) - (t1) < (UINT32_MAX / 2))
 
 struct __wt_txn_global {
-	wt_txnid_t current;
+	volatile wt_txnid_t current;
 
 	wt_txnid_t *ids;
+
+	WT_TXN *checkpoint_txn;
 };
 
 struct __wt_txn {

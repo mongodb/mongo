@@ -165,6 +165,8 @@ struct __wt_connection_impl {
 	WT_SPINLOCK serial_lock;	/* Serial function call spinlock */
 	WT_SPINLOCK spinlock;		/* General purpose spinlock */
 
+	WT_RWLOCK *ckpt_rwlock;		/* Checkpoint lock */
+
 					/* Connection queue */
 	TAILQ_ENTRY(__wt_connection_impl) q;
 

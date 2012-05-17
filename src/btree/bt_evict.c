@@ -13,7 +13,6 @@ static int  __evict_file_request_walk(WT_SESSION_IMPL *);
 static int  __evict_lru(WT_SESSION_IMPL *);
 static int  __evict_lru_cmp(const void *, const void *);
 static void __evict_lru_sort(WT_SESSION_IMPL *);
-static void __evict_pages(WT_SESSION_IMPL *);
 static int  __evict_page_request_walk(WT_SESSION_IMPL *);
 static int  __evict_walk(WT_SESSION_IMPL *);
 static int  __evict_walk_file(WT_SESSION_IMPL *, u_int *);
@@ -597,7 +596,7 @@ __evict_page_request_walk(WT_SESSION_IMPL *session)
 		 * while trying to get another (e.g., if they have two cursors
 		 * open), so blocking indefinitely leads to deadlock.
 		 */
-		(void)__wt_rec_evict(session, page, 0);
+		(void)__wt_evict_page(session, page);
 
 		__wt_spin_unlock(session, &cache->lru_lock);
 
@@ -633,7 +632,8 @@ __evict_lru(WT_SESSION_IMPL *session)
 	__wt_spin_unlock(session, &cache->lru_lock);
 
 	/* Reconcile and discard some pages. */
-	__evict_pages(session);
+	while (__wt_evict_lru_page(session, 0) == 0)
+		;
 
 	return (0);
 }
@@ -882,6 +882,50 @@ __evict_get_page(
 }
 
 /*
+ * __wt_evict_page --
+ *	Evict a given page.
+ *
+ *	Use the current checkpoint context, if available, otherwise use a local
+ *	transaction to get read-committed semantics.
+ */
+int
+__wt_evict_page(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	WT_DECL_RET;
+	WT_TXN_GLOBAL *txn_global;
+	WT_TXN saved_txn, *txn, *txn_ckpt;
+	const char *txn_cfg[] = { "isolation=snapshot", NULL };
+	int was_running;
+
+	txn = &session->txn;
+	saved_txn = *txn;
+	was_running = (F_ISSET(txn, TXN_RUNNING) != 0);
+
+	txn_global = &S2C(session)->txn_global;
+	if ((txn_ckpt = txn_global->checkpoint_txn) == NULL) {
+		if (was_running) {
+			WT_RET(__wt_txn_init(session));
+			WT_ERR(__wt_txn_get_snapshot(session));
+		} else
+			WT_ERR(__wt_txn_begin(session, txn_cfg));
+	} else
+		session->txn = *txn_ckpt;
+
+	ret = __wt_rec_evict(session, page, 0);
+
+err:	if (txn_ckpt == NULL) {
+		if (was_running)
+			__wt_txn_destroy(session);
+		else
+			WT_TRET(__wt_txn_commit(session, NULL));
+	}
+
+	session->txn = saved_txn;
+
+	return (ret);
+}
+
+/*
  * __wt_evict_lru_page --
  *	Called by both eviction and application threads to evict a page.
  */
@@ -902,11 +946,14 @@ __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app)
 	WT_SET_BTREE_IN_SESSION(session, btree);
 
 	/*
-	 * We don't care why eviction failed (maybe the page was dirty and we're
-	 * out of disk space, or the page had an in-memory subtree already being
-	 * evicted).
+	 * We don't care why eviction failed (maybe the page was dirty and
+	 * we're out of disk space, or the page had an in-memory subtree
+	 * already being evicted).
+	 *
+	 * Also, if a checkpoint is in progress, avoid writing dirty pages:
+	 * only evict if they are clean.
 	 */
-	(void)__wt_rec_evict(session, page, 0);
+	(void)__wt_evict_page(session, page);
 
 	WT_ATOMIC_ADD(btree->lru_count, -1);
 
@@ -914,17 +961,6 @@ __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app)
 	session->btree = saved_btree;
 
 	return (0);
-}
-
-/*
- * __evict_page --
- *	Reconcile and discard cache pages.
- */
-static void
-__evict_pages(WT_SESSION_IMPL *session)
-{
-	while (__wt_evict_lru_page(session, 0) == 0)
-		;
 }
 
 /*

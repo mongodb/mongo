@@ -1,0 +1,52 @@
+/*-
+ * Copyright (c) 2008-2012 WiredTiger, Inc.
+ *	All rights reserved.
+ *
+ * See the file LICENSE for redistribution information.
+ */
+
+#include "wt_internal.h"
+
+/*
+ * wt_metadata_get --
+ *	Public entry point to __wt_metadata_read (for wt dump and list).
+ */
+int
+__wt_meta_btree_apply(WT_SESSION_IMPL *session,
+    int (*func)(WT_SESSION_IMPL *, const char *[]),
+    const char *cfg[], uint32_t flags)
+{
+	WT_BTREE *saved_btree;
+	WT_CURSOR *cursor;
+	WT_DECL_RET;
+	const char *uri;
+	int cmp, tret;
+
+	saved_btree = session->btree;
+	WT_RET(__wt_metadata_cursor(session, NULL, &cursor));
+	cursor->set_key(cursor, "file:");
+	tret = cursor->search_near(cursor, &cmp);
+	if (tret == 0 && cmp < 0)
+		tret = cursor->next(cursor);
+	for (; tret == 0; tret = cursor->next(cursor)) {
+		cursor->get_key(cursor, &uri);
+		if (!WT_PREFIX_MATCH(uri, "file:"))
+			break;
+		else if (strcmp(uri, WT_METADATA_URI) == 0)
+			continue;
+		if ((ret =
+		    __wt_session_get_btree(session, uri, NULL, flags)) != 0) {
+			WT_TRET(ret);
+			continue;
+		}
+		WT_TRET(func(session, cfg));
+		if (!LF_ISSET(WT_BTREE_NO_LOCK))
+			WT_TRET(__wt_session_release_btree(session));
+	}
+
+	if (tret != WT_NOTFOUND)
+		WT_TRET(tret);
+	WT_TRET(cursor->close(cursor));
+	session->btree = saved_btree;
+	return (ret);
+}

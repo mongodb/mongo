@@ -440,7 +440,6 @@ __session_rollback_transaction(WT_SESSION *wt_session, const char *config)
 	WT_SESSION_IMPL *session;
 
 	session = (WT_SESSION_IMPL *)wt_session;
-
 	SESSION_API_CALL(session, rollback_transaction, config, cfg);
 	WT_TRET(__session_close_cursors(session));
 	WT_TRET(__wt_txn_rollback(session, cfg));
@@ -455,10 +454,14 @@ err:	API_END_NOTFOUND_MAP(session, ret);
 static int
 __session_checkpoint(WT_SESSION *wt_session, const char *config)
 {
-	WT_UNUSED(wt_session);
-	WT_UNUSED(config);
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
 
-	return (ENOTSUP);
+	session = (WT_SESSION_IMPL *)wt_session;
+	SESSION_API_CALL(session, checkpoint, config, cfg);
+	WT_TRET(__wt_txn_checkpoint(session, cfg));
+
+err:	API_END_NOTFOUND_MAP(session, ret);
 }
 
 /*

@@ -271,7 +271,7 @@ methods = {
 ]),
 'session.sync' : Method([
 	Config('snapshot', '', r'''
-		name of the snapshot'''),
+		if non-empty, create a named snapshot'''),
 ]),
 'session.truncate' : Method([]),
 'session.upgrade' : Method([]),
@@ -300,24 +300,8 @@ methods = {
 		remove log files no longer required for transactional
 		durability''',
 		type='boolean'),
-	Config('flush_cache', 'true', r'''
-		flush the cache''',
-		type='boolean'),
-	Config('flush_log', 'true', r'''
-		flush the log to disk''',
-		type='boolean'),
-	Config('log_size', '0', r'''
-		only proceed if more than the specified number of bytes of log
-		records have been written since the last checkpoint''',
-		min='0'),
-	Config('force', 'false', r'''
-		write a new checkpoint even if nothing has changed since the
-		last one''',
-		type='boolean'),
-	Config('timeout', '0', r'''
-		only proceed if more than the specified number of milliseconds
-		have elapsed since the last checkpoint''',
-		min='0'),
+	Config('snapshot', '', r'''
+		if non-empty, create a named snapshot'''),
 ]),
 
 'connection.add_collator' : Method([]),

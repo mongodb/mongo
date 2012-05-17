@@ -705,7 +705,8 @@ struct __wt_session {
 	 * @param session the session handle
 	 * @param name the URI of the file or table to sync
 	 * @configstart{session.sync, see dist/api_data.py}
-	 * @config{snapshot, name of the snapshot.,a string; default empty.}
+	 * @config{snapshot, if non-empty\, create a named snapshot.,a string;
+	 * default empty.}
 	 * @configend
 	 * @errors
 	 */
@@ -837,18 +838,8 @@ struct __wt_session {
 	 * @configstart{session.checkpoint, see dist/api_data.py}
 	 * @config{archive, remove log files no longer required for
 	 * transactional durability.,a boolean flag; default \c false.}
-	 * @config{flush_cache, flush the cache.,a boolean flag; default \c
-	 * true.}
-	 * @config{flush_log, flush the log to disk.,a boolean flag; default \c
-	 * true.}
-	 * @config{force, write a new checkpoint even if nothing has changed
-	 * since the last one.,a boolean flag; default \c false.}
-	 * @config{log_size, only proceed if more than the specified number of
-	 * bytes of log records have been written since the last checkpoint.,an
-	 * integer greater than or equal to 0; default \c 0.}
-	 * @config{timeout, only proceed if more than the specified number of
-	 * milliseconds have elapsed since the last checkpoint.,an integer
-	 * greater than or equal to 0; default \c 0.}
+	 * @config{snapshot, if non-empty\, create a named snapshot.,a string;
+	 * default empty.}
 	 * @configend
 	 * @errors
 	 */

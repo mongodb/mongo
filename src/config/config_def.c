@@ -114,14 +114,11 @@ __wt_confchk_session_begin_transaction =
 
 const char *
 __wt_confdfl_session_checkpoint =
-    "archive=false,flush_cache=true,flush_log=true,force=false,log_size=0,"
-    "timeout=0";
+    "archive=false,snapshot=""";
 
 const char *
 __wt_confchk_session_checkpoint =
-    "archive=(type=boolean),flush_cache=(type=boolean),"
-    "flush_log=(type=boolean),force=(type=boolean),log_size=(type=int,min=0),"
-    "timeout=(type=int,min=0)";
+    "archive=(type=boolean),snapshot=()";
 
 const char *
 __wt_confdfl_session_close =
