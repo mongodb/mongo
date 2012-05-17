@@ -275,6 +275,8 @@ namespace mongo {
         Record* accessed();
 
         static bool likelyInPhysicalMemory( const char* data );
+        
+        static bool blockCheckSupported();
 
     private:
         

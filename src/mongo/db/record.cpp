@@ -207,6 +207,10 @@ namespace mongo {
 
     const bool blockSupported = ProcessInfo::blockCheckSupported();
 
+    bool Record::blockCheckSupported() { 
+        return ProcessInfo::blockCheckSupported();
+    }
+
     bool Record::likelyInPhysicalMemory() const {
         return likelyInPhysicalMemory( _data );
     }
