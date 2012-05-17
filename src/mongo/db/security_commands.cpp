@@ -69,7 +69,7 @@ namespace mongo {
     CmdLogout cmdLogout;
 
     bool CmdAuthenticate::run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-        log() << " authenticate: " << cmdObj << endl;
+        log() << " authenticate db: " << dbname << " " << cmdObj << endl;
 
         string user = cmdObj.getStringField("user");
         string key = cmdObj.getStringField("key");
