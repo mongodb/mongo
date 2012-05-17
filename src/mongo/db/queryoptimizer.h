@@ -155,6 +155,9 @@ namespace mongo {
     };
 
     /**
+     * NOTE This interface is deprecated and will be replaced by a special purpose delegation class
+     * for the query optimizer cursor (QueryOptimizerCursorOp).
+     *
      * Inherit from this interface to implement a new query operation.
      * The query optimizer will clone the QueryOp that is provided, giving
      * each clone its own query plan.
