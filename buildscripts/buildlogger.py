@@ -383,7 +383,10 @@ def loop_and_callback(command, callback):
     )
 
     def handle_sigterm(signum, frame):
-        proc.send_signal(signum)
+        try:
+            proc.send_signal(signum)
+        except AttributeError:
+            os.kill(proc.pid, signum)
 
     # register a handler to delegate SIGTERM
     # to the child process
