@@ -62,14 +62,14 @@ namespace AuthTests {
         }
     };
 
-    /** Simple test for AuthenticationInfo::toBSON. */
+    /** Simple test for AuthenticationTable::toBSON. */
     class ToBSON {
     public:
         void run() {
-            AuthenticationInfo ai;
-            ai.authorize("admin", "adminUser");
-            ai.authorize("test", "testUser");
-            ai.authorizeReadOnly("local", "localUser");
+            AuthenticationTable at;
+            at.addAuth("admin", "adminUser", Auth::WRITE);
+            at.addAuth("test", "testUser", Auth::WRITE);
+            at.addAuth("local", "localUser", Auth::READ);
 
             BSONObj expected = BSON(
                                  "admin" << BSON( "adminUser" << 2 ) <<
@@ -77,7 +77,7 @@ namespace AuthTests {
                                  "local" << BSON( "localUser" << 1 )
                                  );
 
-            ASSERT( bson2set(expected) == bson2set(ai.toBSON()) );
+            ASSERT( bson2set(expected) == bson2set(at.toBSON()) );
         }
     };
 

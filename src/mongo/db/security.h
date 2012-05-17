@@ -20,11 +20,11 @@
 
 #include <string>
 
-#include "mongo/db/authlevel.h"
 #include "mongo/db/nonce.h"
 #include "mongo/db/security_common.h"
+#include "mongo/client/authentication_table.h"
+#include "mongo/client/authlevel.h"
 #include "mongo/util/concurrency/spin_lock.h"
-#include <string>
 
 // this is used by both mongos and mongod
 
@@ -49,17 +49,15 @@ namespace mongo {
         
         void logout(const std::string& dbname ) {
             scoped_spinlock lk(_lock);
-            _dbs.erase(dbname);
+            _authTable.removeAuth( dbname );
         }
         void authorize(const std::string& dbname , const std::string& user ) {
             scoped_spinlock lk(_lock);
-            _dbs[dbname].level = Auth::WRITE;
-            _dbs[dbname].user = user;
+            _authTable.addAuth( dbname, user, Auth::WRITE );
         }
         void authorizeReadOnly(const std::string& dbname , const std::string& user ) {
             scoped_spinlock lk(_lock);
-            _dbs[dbname].level = Auth::READ;
-            _dbs[dbname].user = user;
+            _authTable.addAuth( dbname, user, Auth::READ );
         }
         
         // -- accessors ---
@@ -109,15 +107,15 @@ namespace mongo {
                                   Auth::Level level);
 
     private:
-        // while most access to _dbs is from our thread (the TLS thread), currentOp() inspects
-        // it too thus we need this.
-        // This protects _dbs, _tempAuthDbs, and _usingTempAuth.
+        // while most access to _authTable is from our thread (the TLS thread), currentOp()
+        // inspects it too thus we need this.
+        // This protects _authTable, _tempAuthTable, and _usingTempAuth.
         mutable SpinLock _lock;
 
         // todo: caching should not last forever
-        typedef map<std::string,Auth> MA;
-        MA _dbs; // dbname -> auth
-        MA _tempAuthDbs; // when _usingTempAuth is true, this map is used for all auth checks instead of _dbs
+        AuthenticationTable _authTable;
+        // when _usingTempAuth is true, this is used for all auth checks instead of _authTable
+        AuthenticationTable _tempAuthTable;
 
         bool _usingTempAuth;
         static bool _warned;

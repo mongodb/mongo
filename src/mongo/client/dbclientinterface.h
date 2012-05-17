@@ -22,8 +22,8 @@
 
 #include "pch.h"
 
-#include "mongo/db/authlevel.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/client/authlevel.h"
 #include "mongo/util/net/message.h"
 #include "mongo/util/net/message_port.h"
 
