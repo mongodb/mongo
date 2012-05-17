@@ -78,7 +78,7 @@ namespace mongo {
     }
 
     IndexCounters::IndexCounters() {
-        _memSupported = Record::blockCheckSupported();
+        _memSupported = ProcessInfo().blockCheckSupported();
 
         _btreeMemHits = 0;
         _btreeMemMisses = 0;
