@@ -151,7 +151,7 @@ namespace mongo {
 #else
 
 namespace mongo {   
-    bool inConstructorChain(){ return false; }
+    bool inConstructorChain( bool ){ return false; }
     bool inConstructorChainSupported() { return false; }
 }
 
