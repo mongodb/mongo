@@ -30,7 +30,7 @@
 
 namespace mongo {
     struct touch_location {
-        int fd;
+        HANDLE fd;
         int offset;
         size_t length;
         Extent *ext;
