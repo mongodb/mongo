@@ -400,6 +400,10 @@ def loop_and_callback(command, callback):
             # don't show a traceback
             break
 
+    # There may be additional buffered output
+    for line in proc.stdout.readlines():
+        callback(line.strip('\r\n'))
+
     # restore the original signal handler, if any
     signal.signal(signal.SIGTERM, orig_handler)
     return proc.returncode
