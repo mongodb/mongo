@@ -96,7 +96,7 @@ namespace mongo {
         for ( int i = 0; i < size; i++ ) {
             
             {
-                bool temp;
+                bool temp = false;
                 if ( cache.inCache( b[i] , temp ) ) {
                     if ( temp )
                         return true;
