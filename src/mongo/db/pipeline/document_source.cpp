@@ -25,7 +25,8 @@ namespace mongo {
         const intrusive_ptr<ExpressionContext> &pCtx):
         pSource(NULL),
         step(-1),
-        pExpCtx(pCtx) {
+        pExpCtx(pCtx),
+        nOut(0) {
     }
 
     DocumentSource::~DocumentSource() {
@@ -61,9 +62,17 @@ namespace mongo {
         return false;
     }
 
-    void DocumentSource::addToBsonArray(BSONArrayBuilder *pBuilder) const {
+    void DocumentSource::addToBsonArray(
+        BSONArrayBuilder *pBuilder, bool explain) const {
         BSONObjBuilder insides;
-        sourceToBson(&insides);
+        sourceToBson(&insides, explain);
+
+/* No statistics at this time
+        if (explain) {
+            insides.append("nOut", nOut);
+        }
+*/
+
         pBuilder->append(insides.done());
     }
 

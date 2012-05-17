@@ -93,7 +93,8 @@ namespace mongo {
         return pCurrent;
     }
 
-    void DocumentSourceSkip::sourceToBson(BSONObjBuilder *pBuilder) const {
+    void DocumentSourceSkip::sourceToBson(
+        BSONObjBuilder *pBuilder, bool explain) const {
         pBuilder->append("$skip", skip);
     }
 

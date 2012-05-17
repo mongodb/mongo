@@ -485,7 +485,7 @@ suiteGlobalConfig = {"js": ("[!_]*.js", True),
                      "auth": ("auth/*.js", False),
                      "sharding": ("sharding/*.js", False),
                      "tool": ("tool/*.js", False),
-                     "aggregation": ("aggregation/test[ab]*.js", True),
+                     "aggregation": ("aggregation/test[abe]*.js", True),
                      }
 
 def expand_suites(suites,expandUseDB=True):

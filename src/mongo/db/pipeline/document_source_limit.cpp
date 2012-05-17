@@ -76,7 +76,8 @@ namespace mongo {
         return pSource->getCurrent();
     }
 
-    void DocumentSourceLimit::sourceToBson(BSONObjBuilder *pBuilder) const {
+    void DocumentSourceLimit::sourceToBson(
+        BSONObjBuilder *pBuilder, bool explain) const {
         pBuilder->append("$limit", limit);
     }
 

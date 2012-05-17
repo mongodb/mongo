@@ -136,11 +136,18 @@ namespace mongo {
         intrusive_ptr<DocumentSourceCursor> pSource(
             DocumentSourceCursor::create(pCursor, dbName, pExpCtx));
 
-        /* record any dependencies we created */
-        if (initQuery)
-            pSource->addBsonDependency(pQueryObj);
+        pSource->setNamespace(fullName);
+
+        /*
+          Note the query and sort
+
+          This records them for explain, and keeps them alive; they are
+          referenced (by reference) by the cursor, which doesn't make its
+          own copies of them.
+        */
+        pSource->setQuery(pQueryObj);
         if (initSort)
-            pSource->addBsonDependency(pSortObj);
+            pSource->setSort(pSortObj);
 
         return pSource;
     }
