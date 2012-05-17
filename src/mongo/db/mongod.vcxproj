@@ -1071,6 +1071,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="..\util\text.cpp" />
     <ClCompile Include="..\util\timer.cpp" />
     <ClCompile Include="..\util\time_support.cpp" />
+    <ClCompile Include="..\util\touch_pages.cpp" />
     <ClCompile Include="..\util\trace.cpp" />
     <ClCompile Include="..\util\version.cpp" />
     <ClCompile Include="btreebuilder.cpp" />
@@ -1086,6 +1087,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="commands\pipeline_command.cpp" />
     <ClCompile Include="commands\pipeline.cpp" />
     <ClCompile Include="commands\pipeline_d.cpp" />
+    <ClCompile Include="commands\touch.cpp" />
     <ClCompile Include="compact.cpp" />
     <ClCompile Include="curop.cpp" />
     <ClCompile Include="dbcommands_generic.cpp" />
@@ -1204,6 +1206,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\util\stack_introspect.h" />
     <ClInclude Include="..\util\timer-win32-inl.h" />
     <ClInclude Include="..\util\timer.h" />
+    <ClInclude Include="..\util\touch_pages.h" />
     <ClInclude Include="explain.h" />
     <ClInclude Include="index_insertion_continuation.h" />
     <ClInclude Include="lockstat.h" />

@@ -890,6 +890,12 @@
     <ClCompile Include="..\util\stack_introspect.cpp">
       <Filter>util\Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="commands\touch.cpp">
+      <Filter>db\commands</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\touch_pages.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\targetver.h" />
@@ -1609,6 +1615,9 @@
       <Filter>db\ops</Filter>
     </ClInclude>
     <ClInclude Include="..\util\stack_introspect.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\touch_pages.h">
       <Filter>util\Header Files</Filter>
     </ClInclude>
   </ItemGroup>
