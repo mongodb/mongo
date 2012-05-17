@@ -330,7 +330,7 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session)
 	 * up sane.
 	 */
 	WT_ERR(__wt_page_modify_init(session, leaf));
-	__wt_page_modify_set(leaf);
+	F_SET(leaf->modify, WT_PM_REC_EMPTY);
 
 	return (0);
 
