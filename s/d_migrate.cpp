@@ -138,6 +138,7 @@ namespace mongo {
         BSONObj min;
         BSONObj max;
         set<CursorId> initial;
+        long long numDocuments;
 
         OldDataCleanup(){
             _numThreads++;
@@ -147,6 +148,7 @@ namespace mongo {
             min = other.min.getOwned();
             max = other.max.getOwned();
             initial = other.initial;
+            numDocuments = other.numDocuments;
             _numThreads++;
         }
         ~OldDataCleanup(){
@@ -158,10 +160,11 @@ namespace mongo {
         }
         
         void doRemove() {
+            log() << "going to start removing data from chunk migrate, expected number: " << numDocuments << endl;
             ShardForceVersionOkModeBlock sf;
             {
                 RemoveSaver rs("moveChunk",ns,"post-cleanup");
-                long long numDeleted = Helpers::removeRangeUnlocked( ns , min , max , true , false , cmdLine.moveParanoia ? &rs : 0, true );
+                long long numDeleted = Helpers::removeRangeUnlocked( ns , min , max , true , false , cmdLine.moveParanoia ? &rs : 0, true , numDocuments );
                 log() << "moveChunk deleted: " << numDeleted << migrateLog;
             }
             
@@ -377,15 +380,15 @@ namespace mongo {
          *
          * @param maxChunkSize number of bytes beyond which a chunk's base data (no indices) is considered too large to move
          * @param errmsg filled with textual description of error if this call return false
-         * @return false if approximate chunk size is too big to move or true otherwise
+         * @return -1 if approximate chunk size is too big to move or # of docs othrwise
          */
-        bool storeCurrentLocs( long long maxChunkSize , string& errmsg , BSONObjBuilder& result ) {
+        long long storeCurrentLocs( long long maxChunkSize , string& errmsg , BSONObjBuilder& result ) {
             readlock l( _ns );
             Client::Context ctx( _ns );
             NamespaceDetails *d = nsdetails( _ns.c_str() );
             if ( ! d ) {
                 errmsg = "ns not found, should be impossible";
-                return false;
+                return -1;
             }
 
             BSONObj keyPattern;
@@ -395,7 +398,7 @@ namespace mongo {
             IndexDetails *idx = indexDetailsForRange( _ns.c_str() , errmsg , min , max , keyPattern );
             if ( idx == NULL ) {
                 errmsg = "can't find index in storeCurrentLocs";
-                return false;
+                return -1;
             }
 
             auto_ptr<ClientCursor> cc( new ClientCursor( QueryOption_NoCursorTimeout ,
@@ -450,14 +453,13 @@ namespace mongo {
                 result.appendBool( "chunkTooBig" , true );
                 result.appendNumber( "estimatedChunkSize" , (long long)(recCount * avgRecSize) );
                 errmsg = "chunk too big to move";
-                return false;
+                return -1;
             }
 
-            {
-                scoped_spinlock lk( _trackerLocks );
-                log() << "moveChunk number of documents: " << _cloneLocs.size() << migrateLog;
-            }
-            return true;
+
+            scoped_spinlock lk( _trackerLocks );
+            log() << "moveChunk number of documents: " << _cloneLocs.size() << migrateLog;
+            return _cloneLocs.size();
         }
 
         bool clone( string& errmsg , BSONObjBuilder& result ) {
@@ -875,11 +877,14 @@ namespace mongo {
 
             timing.done(2);
 
+            long long numberOfDocuments = 0;
+
             // 3.
             MigrateStatusHolder statusHolder( ns , min , max );
             {
                 // this gets a read lock, so we know we have a checkpoint for mods
-                if ( ! migrateFromStatus.storeCurrentLocs( maxChunkSize , errmsg , result ) )
+                numberOfDocuments = migrateFromStatus.storeCurrentLocs( maxChunkSize , errmsg , result );
+                if ( numberOfDocuments < 0 )
                     return false;
 
                 ScopedDbConnection connTo( to );
@@ -1172,6 +1177,7 @@ namespace mongo {
                 c.ns = ns;
                 c.min = min.getOwned();
                 c.max = max.getOwned();
+                c.numDocuments = numberOfDocuments;
                 ClientCursor::find( ns , c.initial );
                 if ( c.initial.size() ) {
                     log() << "forking for cleaning up chunk data" << migrateLog;

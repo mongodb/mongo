@@ -292,7 +292,9 @@ namespace mongo {
         return num;
     }
 
-    long long Helpers::removeRangeUnlocked( const string& ns , const BSONObj& min , const BSONObj& max , bool yield , bool maxInclusive , RemoveCallback * callback , bool fromMigrate ) {
+    long long Helpers::removeRangeUnlocked( const string& ns , const BSONObj& min , const BSONObj& max , 
+                                            bool yield , bool maxInclusive , RemoveCallback * callback , bool fromMigrate ,
+                                            long long numDocuments ) {
         BSONObj keya , keyb;
         BSONObj minClean = toKeyFormat( min , keya );
         BSONObj maxClean = toKeyFormat( max , keyb );
@@ -303,6 +305,8 @@ namespace mongo {
         auto_ptr<RWLockRecursive::Shared> fileLock;
         Record* recordToTouch = NULL;
         
+        ProgressMeter m(numDocuments);
+
         while ( true ) {
             
             if ( recordToTouch ) {
@@ -335,6 +339,7 @@ namespace mongo {
 
                 Record* r = rloc.rec();
                 if ( yield && ! r->likelyInPhysicalMemory() ) {
+                    log() << "removeRange yielding for: " << rloc << endl;
                     fileLock.reset( new RWLockRecursive::Shared( MongoFile::mmmutex) );
                     recordToTouch = r;
                     continue;
@@ -351,7 +356,7 @@ namespace mongo {
             num++;
 
             getDur().commitIfNeeded();
-
+            m.hit();
         }
 
         return num;
