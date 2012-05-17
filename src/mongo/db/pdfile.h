@@ -274,6 +274,8 @@ namespace mongo {
          */
         Record* accessed();
 
+        static bool likelyInPhysicalMemory( const char* data );
+
     private:
         
         int _netLength() const { return _lengthWithHeaders - HeaderSize; }

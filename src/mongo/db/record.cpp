@@ -208,18 +208,22 @@ namespace mongo {
     const bool blockSupported = ProcessInfo::blockCheckSupported();
 
     bool Record::likelyInPhysicalMemory() const {
+        return likelyInPhysicalMemory( _data );
+    }
+
+    bool Record::likelyInPhysicalMemory( const char* data ) {
         DEV if ( rand() % 100 == 0 ) return false;
 
         if ( ! MemoryTrackingEnabled )
             return true;
 
-        const size_t page = (size_t)_data >> 12;
+        const size_t page = (size_t)data >> 12;
         const size_t region = page >> 6;
         const size_t offset = page & 0x3f;
         
         if ( ps::rolling.access( region , offset , false ) ) {
 #ifdef _DEBUG
-            if ( blockSupported && ! ProcessInfo::blockInMemory( const_cast<char*>(_data) ) ) {
+            if ( blockSupported && ! ProcessInfo::blockInMemory( const_cast<char*>(data) ) ) {
                 warning() << "we think data is in ram but system says no"  << endl;
             }
 #endif
@@ -233,7 +237,7 @@ namespace mongo {
             return false;
         }
 
-        return ProcessInfo::blockInMemory( const_cast<char*>(_data) );
+        return ProcessInfo::blockInMemory( const_cast<char*>(data) );
     }
 
 
