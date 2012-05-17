@@ -155,7 +155,7 @@ load_dump(WT_SESSION *session)
 	}
 	if (ret == 0 && (ret = session->sync(session, uri, NULL)) != 0)
 		ret = util_err(ret, "%s: session.sync", uri);
-		
+
 	return (ret == 0 ? 0 : 1);
 }
 
@@ -390,7 +390,7 @@ insert(WT_CURSOR *cursor, const char *name)
 
 	memset(&key, 0, sizeof(key));
 	memset(&value, 0, sizeof(value));
-	
+
 	/* Read key/value pairs and insert them into the file. */
 	for (insert_count = 0;;) {
 		/*

@@ -608,7 +608,7 @@ int
 add_compressor(WT_CONNECTION *conn)
 {
 	int ret;
-	
+
 	/*! [WT_COMPRESSOR register] */
 	static WT_COMPRESSOR my_compressor = {
 	    my_compress, my_decompress, my_pre_size };
@@ -706,7 +706,7 @@ pack_ops(WT_SESSION *session)
 	ret = wiredtiger_struct_pack(
 	    session, buf, sizeof(buf), "iSh", 42, "hello", -3);
 	/*! [Pack fields into a buffer] */
- 
+
 	{
 	/*! [Unpack fields from a buffer] */
 	int i;

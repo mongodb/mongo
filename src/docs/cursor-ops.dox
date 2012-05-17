@@ -28,7 +28,7 @@ See @ref cursors for more information on available cursor types.
 
 Cursors may be positioned at the beginning of the data source, the end of
 the data source, at an exact key within the data source, and near a key
-within the data source.  
+within the data source.
 
 To invalidate the position of a cursor so that subsequent iterations start
 from the beginning or end of the data source, use the WT_CURSOR::reset method:

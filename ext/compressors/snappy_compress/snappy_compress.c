@@ -43,7 +43,7 @@ wt_snappy_decompress(WT_COMPRESSOR *, WT_SESSION *,
     uint8_t *, size_t, uint8_t *, size_t, size_t *);
 static int
 wt_snappy_pre_size(WT_COMPRESSOR *, WT_SESSION *, uint8_t *, size_t, size_t *);
-	
+
 static WT_COMPRESSOR wt_snappy_compressor = {
     wt_snappy_compress, wt_snappy_decompress, wt_snappy_pre_size };
 

@@ -64,11 +64,12 @@
  */
 #define	WT_ASSERT(session, exp) do {					\
 	if (!(exp))							\
-		(void)__wt_assert(					\
-		    session, 0, __FILE__, __LINE__, "%s", #exp);	\
+		__wt_assert(session, 0, __FILE__, __LINE__, "%s", #exp);\
 } while (0)
 #define	WT_ASSERT_RET(session, exp) do {				\
-	if (!(exp))							\
-		return (__wt_assert(					\
-		    session, WT_ERROR, __FILE__, __LINE__, "%s", #exp));\
+	if (!(exp)) {							\
+		__wt_assert(						\
+		    session, WT_ERROR, __FILE__, __LINE__, "%s", #exp);	\
+		return (WT_ERROR);					\
+	}								\
 } while (0)
