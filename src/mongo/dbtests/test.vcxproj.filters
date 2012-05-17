@@ -579,6 +579,9 @@
     <ClInclude Include="..\db\repl\bgsync.h">
       <Filter>db\repl</Filter>
     </ClInclude>
+    <ClInclude Include="..\util\touch_pages.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\client\connpool.cpp">
@@ -1410,6 +1413,9 @@
     </ClCompile>
     <ClCompile Include="..\db\repl\bgsync.cpp">
       <Filter>db\repl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\touch_pages.cpp">
+      <Filter>util\Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
