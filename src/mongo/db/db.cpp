@@ -974,7 +974,7 @@ int main(int argc, char* argv[]) {
             dur::DataLimitPerJournalFile = 128 * 1024 * 1024;
             if (cmdLine.usingReplSets() || replSettings.master || replSettings.slave) {
                 log() << "replication should not be enabled on a config server" << endl;
-                ::exit(-1);
+                ::_exit(-1);
             }
             if ( params.count( "nodur" ) == 0 && params.count( "nojournal" ) == 0 )
                 cmdLine.dur = true;
@@ -1067,7 +1067,7 @@ int main(int argc, char* argv[]) {
 
             if (failed) {
                 cerr << "There doesn't seem to be a server running with dbpath: " << dbpath << endl;
-                ::exit(-1);
+                ::_exit(-1);
             }
 
             cout << "killing process with pid: " << pid << endl;
@@ -1075,14 +1075,14 @@ int main(int argc, char* argv[]) {
             if (ret) {
                 int e = errno;
                 cerr << "failed to kill process: " << errnoWithDescription(e) << endl;
-                ::exit(-1);
+                ::_exit(-1);
             }
 
             while (boost::filesystem::exists(procPath)) {
                 sleepsecs(1);
             }
 
-            ::exit(0);
+            ::_exit(0);
         }
 #endif
 

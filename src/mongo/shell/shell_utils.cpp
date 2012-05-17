@@ -71,7 +71,7 @@ namespace mongo {
             // converts to the integer value 0.
             goingAwaySoon();
             int exit_code = int( args.firstElement().number() );
-            ::exit(exit_code);
+            ::_exit(exit_code);
             return undefinedReturn;
         }
 

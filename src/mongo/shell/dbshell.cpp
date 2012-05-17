@@ -163,7 +163,7 @@ void quitNicely( int sig ) {
 
     killOps();
     shellHistoryDone();
-    exit(0);
+    ::_exit(0);
 }
 
 // the returned string is allocated with strdup() or malloc() and must be freed by calling free()
@@ -218,7 +218,7 @@ void quitAbruptly( int sig ) {
     mongo::rawOut( ossBt.str() );
 
     mongo::shell_utils::KillMongoProgramInstances();
-    exit( 14 );
+    ::_exit( 14 );
 }
 
 // this will be called in certain c++ error cases, for example if there are two active
@@ -226,7 +226,7 @@ void quitAbruptly( int sig ) {
 void myterminate() {
     mongo::rawOut( "terminate() called in shell, printing stack:" );
     mongo::printStackTrace();
-    exit( 14 );
+    ::_exit( 14 );
 }
 
 void setupSignals() {
@@ -262,7 +262,7 @@ string fixHost( string url , string host , string port ) {
 
     if ( url.find( "/" ) != string::npos ) {
         cerr << "url can't have host or port if you specify them individually" << endl;
-        exit(-1);
+        ::_exit(-1);
     }
 
     if ( host.size() == 0 )

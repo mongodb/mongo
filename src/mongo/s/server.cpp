@@ -506,5 +506,5 @@ void mongo::dbexit( ExitCode rc, const char *why ) {
           << " rc:" << rc
           << " " << ( why ? why : "" )
           << endl;
-    ::exit(rc);
+    ::_exit(rc);
 }

@@ -242,11 +242,11 @@ namespace mongo {
             int newSize = params["maxConns"].as<int>();
             if ( newSize < 5 ) {
                 out() << "maxConns has to be at least 5" << endl;
-                ::exit( EXIT_BADOPTIONS );
+                ::_exit( EXIT_BADOPTIONS );
             }
             else if ( newSize >= 10000000 ) {
                 out() << "maxConns can't be greater than 10000000" << endl;
-                ::exit( EXIT_BADOPTIONS );
+                ::_exit( EXIT_BADOPTIONS );
             }
             connTicketHolder.resize( newSize );
         }
@@ -270,7 +270,7 @@ namespace mongo {
             cmdLine.socket = params["unixSocketPrefix"].as<string>();
             if (!fs::is_directory(cmdLine.socket)) {
                 cout << cmdLine.socket << " must be a directory" << endl;
-                ::exit(-1);
+                ::_exit(-1);
             }
         }
 
@@ -282,7 +282,7 @@ namespace mongo {
             cmdLine.doFork = true;
             if ( ! params.count( "logpath" ) && ! params.count( "syslog" ) ) {
                 cout << "--fork has to be used with --logpath or --syslog" << endl;
-                ::exit(EXIT_BADOPTIONS);
+                ::_exit(EXIT_BADOPTIONS);
             }
 
             if ( params.count( "logpath" ) ) {
@@ -296,7 +296,7 @@ namespace mongo {
                 FILE * test = fopen( logpath.c_str() , "a" );
                 if ( ! test ) {
                     cout << "can't open [" << logpath << "] for log file: " << errnoWithDescription() << endl;
-                    ::exit(-1);
+                    ::_exit(-1);
                 }
                 fclose( test );
                 // if we created a file, unlink it (to avoid confusing log rotation code)
@@ -331,7 +331,7 @@ namespace mongo {
 
             if ( chdir("/") < 0 ) {
                 cout << "Cant chdir() while forking server process: " << strerror(errno) << endl;
-                ::exit(-1);
+                ::_exit(-1);
             }
             setsid();
             
@@ -360,13 +360,13 @@ namespace mongo {
             FILE* f = freopen("/dev/null", "w", stderr);
             if ( f == NULL ) {
                 cout << "Cant reassign stderr while forking server process: " << strerror(errno) << endl;
-                ::exit(-1);
+                ::_exit(-1);
             }
 
             f = freopen("/dev/null", "r", stdin);
             if ( f == NULL ) {
                 cout << "Cant reassign stdin while forking server process: " << strerror(errno) << endl;
-                ::exit(-1);
+                ::_exit(-1);
             }
 
             setupCoreSignals();
@@ -382,7 +382,7 @@ namespace mongo {
         if (params.count("logpath") && !params.count("shutdown")) {
             if ( params.count("syslog") ) {
                 cout << "Cant use both a logpath and syslog " << endl;
-                ::exit(EXIT_BADOPTIONS);
+                ::_exit(EXIT_BADOPTIONS);
             }
             
             if ( logpath.size() == 0 )
@@ -400,7 +400,7 @@ namespace mongo {
 
             if (!setUpSecurityKey(f)) {
                 // error message printed in setUpPrivateKey
-                ::exit(EXIT_BADOPTIONS);
+                ::_exit(EXIT_BADOPTIONS);
             }
 
             cmdLine.keyFile = true;
@@ -416,12 +416,12 @@ namespace mongo {
 
             if ( cmdLine.sslPEMKeyPassword.size() == 0 ) {
                 log() << "need sslPEMKeyPassword" << endl;
-                ::exit(EXIT_BADOPTIONS);
+                ::_exit(EXIT_BADOPTIONS);
             }
             
             if ( cmdLine.sslPEMKeyFile.size() == 0 ) {
                 log() << "need sslPEMKeyFile" << endl;
-                ::exit(EXIT_BADOPTIONS);
+                ::_exit(EXIT_BADOPTIONS);
             }
             
             cmdLine.sslServerManager = new SSLManager( false );
@@ -429,7 +429,7 @@ namespace mongo {
         }
         else if ( cmdLine.sslPEMKeyFile.size() || cmdLine.sslPEMKeyPassword.size() ) {
             log() << "need to enable sslOnNormalPorts" << endl;
-            ::exit(EXIT_BADOPTIONS);
+            ::_exit(EXIT_BADOPTIONS);
         }
 #endif
         

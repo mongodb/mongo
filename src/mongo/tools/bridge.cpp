@@ -112,7 +112,7 @@ void cleanup( int sig ) {
     ListeningSockets::get()->closeAll();
     for ( set<MessagingPort*>::iterator i = ports.begin(); i != ports.end(); i++ )
         (*i)->shutdown();
-    ::exit( 0 );
+    ::_exit( 0 );
 }
 #if !defined(_WIN32)
 void myterminate() {
@@ -139,7 +139,7 @@ void helpExit() {
     cout << "usage mongobridge --port <port> --dest <destUri>" << endl;
     cout << "    port: port to listen for mongo messages" << endl;
     cout << "    destUri: uri of remote mongod instance" << endl;
-    ::exit( -1 );
+    ::_exit( -1 );
 }
 
 void check( bool b ) {
