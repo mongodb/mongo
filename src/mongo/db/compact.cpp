@@ -72,7 +72,7 @@ namespace mongo {
             Timer t;
             MongoDataFile* mdf = cc().database()->getFile( diskloc.a() );
             int fd = mdf->getFd();
-            off64_t offset = diskloc.getOfs();
+            int offset = diskloc.getOfs();
             Extent* ext = diskloc.ext();
             size_t length = ext->length;
                 

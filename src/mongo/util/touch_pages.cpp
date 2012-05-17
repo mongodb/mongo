@@ -31,7 +31,7 @@
 namespace mongo {
     struct touch_location {
         int fd;
-        off64_t offset;
+        int offset;
         size_t length;
         Extent *ext;
     };
@@ -70,7 +70,7 @@ namespace mongo {
     }
 
 #if defined(__linux__)    
-    void touch_pages( int fd, off64_t offset, size_t length, Extent* ext ) {
+    void touch_pages( int fd, int offset, size_t length, const Extent* ext ) {
         if ( -1 == readahead(fd, offset, length) ) {
             massert( 16237, str::stream() << "readahead failed on fd " << fd 
                      << " offset " << offset << " len " << length 
@@ -79,10 +79,10 @@ namespace mongo {
     }
 #else // if defined __linux__
     char _touch_pages_char_reader; // goes in .bss
-    void touch_pages( int fd, off64_t offset, size_t length, Extent* ext ) {
+    void touch_pages( int fd, int offset, size_t length, const Extent* ext ) {
         // read first byte of every page, in order
-        const char *p = static_cast<const char *> (ext);
-        for( int i = 0; i < length; i += 4096 /*pagesize*/ ) { 
+        const char *p = static_cast<const char *>(static_cast<const void *> (ext));
+        for( size_t i = 0; i < length; i += 4096 /*pagesize*/ ) { 
             _touch_pages_char_reader += p[i];
         }
   
