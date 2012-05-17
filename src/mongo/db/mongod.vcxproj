@@ -1201,6 +1201,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\util\concurrency\remap_lock.h" />
     <ClInclude Include="..\util\signal_handlers.h" />
     <ClInclude Include="..\util\stacktrace.h" />
+    <ClInclude Include="..\util\stack_introspect.h" />
     <ClInclude Include="..\util\timer-win32-inl.h" />
     <ClInclude Include="..\util\timer.h" />
     <ClInclude Include="explain.h" />

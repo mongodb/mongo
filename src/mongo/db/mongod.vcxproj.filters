@@ -885,10 +885,10 @@
       <Filter>db\ops</Filter>
     </ClCompile>
     <ClCompile Include="repl\bgsync.cpp">
-      <Filter>db</Filter>
+      <Filter>db\repl</Filter>
     </ClCompile>
     <ClCompile Include="..\util\stack_introspect.cpp">
-      <Filter>util</Filter>
+      <Filter>util\Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1607,6 +1607,9 @@
     </ClInclude>
     <ClInclude Include="ops\update_internal.h">
       <Filter>db\ops</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\stack_introspect.h">
+      <Filter>util\Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

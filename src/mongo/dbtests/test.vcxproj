@@ -502,6 +502,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\db\ops\update_internal.h" />
     <ClInclude Include="..\db\pagefault.h" />
     <ClInclude Include="..\..\third_party\pcre-8.30\pcrecpp.h" />
+    <ClInclude Include="..\db\repl\bgsync.h" />
     <ClInclude Include="..\server.h" />
     <ClInclude Include="..\targetver.h" />
     <ClInclude Include="..\..\third_party\pcre-8.30\config.h" />
@@ -566,6 +567,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\util\signal_handlers.h" />
     <ClInclude Include="..\util\sock.h" />
     <ClInclude Include="..\util\stacktrace.h" />
+    <ClInclude Include="..\util\stack_introspect.h" />
     <ClInclude Include="..\util\timer-win32-inl.h" />
     <ClInclude Include="..\util\timer.h" />
     <ClInclude Include="..\util\time_support.h" />
@@ -1188,6 +1190,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\db\queryoptimizercursorimpl.h" />
     <ClCompile Include="..\db\querypattern.cpp" />
     <ClCompile Include="..\db\record.cpp" />
+    <ClCompile Include="..\db\repl\bgsync.cpp" />
     <ClCompile Include="..\db\repl\consensus.cpp" />
     <ClCompile Include="..\db\repl\heartbeat.cpp" />
     <ClCompile Include="..\db\repl\manager.cpp" />
@@ -1319,6 +1322,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="..\util\net\sock.cpp" />
     <ClCompile Include="..\util\signal_handlers.cpp" />
     <ClCompile Include="..\util\stacktrace.cpp" />
+    <ClCompile Include="..\util\stack_introspect.cpp" />
     <ClCompile Include="..\util\startup_test.cpp" />
     <ClCompile Include="..\util\stringutils.cpp" />
     <ClCompile Include="..\util\text.cpp" />

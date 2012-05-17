@@ -573,6 +573,12 @@
     <ClInclude Include="..\db\ops\update_internal.h">
       <Filter>db\ops</Filter>
     </ClInclude>
+    <ClInclude Include="..\util\stack_introspect.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\repl\bgsync.h">
+      <Filter>db\repl</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\client\connpool.cpp">
@@ -1398,6 +1404,12 @@
     </ClCompile>
     <ClCompile Include="..\db\ops\update_internal.cpp">
       <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\stack_introspect.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\repl\bgsync.cpp">
+      <Filter>db\repl</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
