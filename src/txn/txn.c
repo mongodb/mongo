@@ -267,16 +267,30 @@ __wt_txn_visible(WT_SESSION_IMPL *session, wt_txnid_t id)
 }
 
 /*
+ * __wt_txn_read_int --
+ *	Get the first visible update in a list (or NULL if none are visible),
+ *	and report whether uncommitted changes were skipped.
+ */
+WT_UPDATE *
+__wt_txn_read_int(WT_SESSION_IMPL *session, WT_UPDATE *upd, int *skipp)
+{
+	while (upd != NULL && !__wt_txn_visible(session, upd->txnid)) {
+		if (skipp != NULL && upd->txnid != WT_TXN_NONE)
+			*skipp = 1;
+		upd = upd->next;
+	}
+
+	return (upd);
+}
+
+/*
  * __wt_txn_read --
  *	Get the first visible update in a list (or NULL if none are visible).
  */
 WT_UPDATE *
 __wt_txn_read(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 {
-	while (upd != NULL && !__wt_txn_visible(session, upd->txnid))
-		upd = upd->next;
-
-	return (upd);
+	return (__wt_txn_read_int(session, upd, NULL));
 }
 
 /*
