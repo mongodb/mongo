@@ -68,7 +68,7 @@ namespace mongo{
 
 		BSONObjBuilder b;
 		b.append("ns",ns);
-		b.appendElements(id);		
+		b.appendElements(id["_id"]);		
 		b.append("op",(int)operation);
 		b.append("change",update);
 		std::string msg = b.obj().jsonString(Strict,0);
