@@ -601,7 +601,14 @@ string arg_error_check(int argc, char* argv[]) {
     return "";
 }
 
+static int mongoDbMain(int argc, char* argv[]);
+
 int main(int argc, char* argv[]) {
+    int exitCode = mongoDbMain(argc, argv);
+    ::_exit(exitCode);
+}
+
+static int mongoDbMain(int argc, char* argv[]) {
     static StaticObserver staticObserver;
     getcurns = ourgetns;
 

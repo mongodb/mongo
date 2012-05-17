@@ -966,17 +966,19 @@ int wmain( int argc, wchar_t* argvW[] ) {
     }
     SetConsoleCP( initialConsoleInputCodePage );
     SetConsoleOutputCP( initialConsoleOutputCodePage );
-    return returnValue;
+    ::_exit(returnValue);
 }
 #else // #ifdef _WIN32
 int main( int argc, char* argv[] ) {
     static mongo::StaticObserver staticObserver;
+    int returnCode;
     try {
-        return _main( argc , argv );
+        returnCode = _main( argc , argv );
     }
     catch ( mongo::DBException& e ) {
         cerr << "exception: " << e.what() << endl;
-        return -1;
+        returnCode = 1;
     }
+    _exit(returnCode);
 }
 #endif // #ifdef _WIN32
