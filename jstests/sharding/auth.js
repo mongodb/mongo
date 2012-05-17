@@ -111,7 +111,9 @@ s.getDB("admin").runCommand({enableSharding : "test"});
 s.getDB("admin").runCommand({shardCollection : "test.foo", key : {x : 1}});
 
 s.getDB(testUser.db).addUser(testUser.username, testUser.password , false );
+s.getDB(testUser.db).getLastError();
 s.getDB(testUserReadOnly.db).addUser(testUserReadOnly.username, testUserReadOnly.password, true);
+s.getDB(testUser.db).getLastError();
 
 logout(adminUser);
 
