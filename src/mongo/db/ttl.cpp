@@ -23,6 +23,7 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/util/background.h"
+#include "mongo/db/replutil.h"
 
 namespace mongo {
 
@@ -36,6 +37,10 @@ namespace mongo {
         static string secondsExpireField;
         
         void doTTLForDB( const string& dbName ) {
+            
+            if ( ! isMasterNs( dbName.c_str() ) )
+                return;
+
             vector<BSONObj> indexes;
             {
                 auto_ptr<DBClientCursor> cursor = db.query( dbName + ".system.indexes" , 
