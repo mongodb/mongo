@@ -1076,6 +1076,27 @@ namespace JSTests {
     };
 
 
+    class InvalidStoredJS {
+    public:
+        void run() {
+            BSONObjBuilder query;
+            query.append( "_id" , "invalidstoredjs1" );
+            
+            BSONObjBuilder update;
+            update.append( "_id" , "invalidstoredjs1" );
+            update.appendCode( "value" , "function () { db.test.find().forEach(function(obj) { continue; }); }" );
+            client.update( "test.system.js" , query.obj() , update.obj() , true /* upsert */ );
+
+            scoped_ptr<Scope> s( globalScriptEngine->newScope() );
+            client.eval( "test" , "invalidstoredjs1()" );
+            
+            BSONObj info;
+            BSONElement ret;
+            ASSERT( client.eval( "test" , "return 5 + 12" , info , ret ) );
+            ASSERT_EQUALS( 17 , ret.number() );
+        }
+    };
+
     class All : public Suite {
     public:
         All() : Suite( "js" ) {
@@ -1117,6 +1138,7 @@ namespace JSTests {
             add< LongUtf8String >();
 
             add< ScopeOut >();
+            add< InvalidStoredJS >();
         }
     } myall;
 
