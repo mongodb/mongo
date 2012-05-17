@@ -71,7 +71,7 @@ namespace mongo{
 		b.appendElements(id);		
 		b.append("op",(int)operation);
 		b.append("change",update);
-		std::string msg = b.obj().jsonString(TenGen,0);
+		std::string msg = b.obj().jsonString(Strict,0);
 		zmq::message_t message(msg.size());
 		memcpy(message.data(),msg.data(),msg.size());
 		producer.send(message);
