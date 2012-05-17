@@ -884,6 +884,12 @@
     <ClCompile Include="ops\update_internal.cpp">
       <Filter>db\ops</Filter>
     </ClCompile>
+    <ClCompile Include="repl\bgsync.cpp">
+      <Filter>db</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\stack_introspect.cpp">
+      <Filter>util</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\targetver.h" />

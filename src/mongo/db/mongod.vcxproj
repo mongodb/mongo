@@ -1064,6 +1064,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="..\util\ramlog.cpp" />
     <ClCompile Include="..\util\signal_handlers.cpp" />
     <ClCompile Include="..\util\stacktrace.cpp" />
+    <ClCompile Include="..\util\stack_introspect.cpp" />
     <ClCompile Include="..\util\startup_test.cpp" />
     <ClCompile Include="..\util\stringutils.cpp" />
     <ClCompile Include="..\util\systeminfo_win32.cpp" />
@@ -1146,6 +1147,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="pipeline\field_path.cpp" />
     <ClCompile Include="pipeline\value.cpp" />
     <ClCompile Include="projection.cpp" />
+    <ClCompile Include="repl\bgsync.cpp" />
     <ClCompile Include="ttl.cpp" />
     <ClInclude Include="..\..\third_party\js-1.7\jsarena.h" />
     <ClInclude Include="..\..\third_party\js-1.7\jsarray.h" />
