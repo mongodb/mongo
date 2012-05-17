@@ -71,7 +71,7 @@ namespace mongo {
             log() << "compact paging in len=" << e->length/1000000.0 << "MB" << endl;
             Timer t;
             MongoDataFile* mdf = cc().database()->getFile( diskloc.a() );
-            int fd = mdf->getFd();
+            HANDLE fd = mdf->getFd();
             int offset = diskloc.getOfs();
             Extent* ext = diskloc.ext();
             size_t length = ext->length;

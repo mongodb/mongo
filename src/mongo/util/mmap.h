@@ -188,7 +188,7 @@ namespace mongo {
 
         long shortLength() const          { return (long) len; }
         unsigned long long length() const { return len; }
-        int getFd() const              { return -1; } // unimplemented; a HANDLE is a void*
+        HANDLE getFd() const              { return fd; }
         /** create a new view with the specified properties.
             automatically cleaned up upon close/destruction of the MemoryMappedFile object.
             */
