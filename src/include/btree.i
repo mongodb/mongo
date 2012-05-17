@@ -257,8 +257,7 @@ __wt_page_hazard_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * we'll check the slots for all of the sessions that could have been
 	 * active when we started our check.
 	 */
-	WT_READ_BARRIER();
-	session_cnt = conn->session_cnt;
+	WT_ORDERED_READ(session_cnt, conn->session_cnt);
 	for (i = 0; i < session_cnt; ++i) {
 		if ((t = conn->sessions[i]) == NULL)
 			continue;
