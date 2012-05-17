@@ -91,7 +91,7 @@ namespace mongo {
 
     CmdLine cmdLine;
     static bool scriptingEnabled = true;
-    bool noHttpInterface = false;
+    static bool noHttpInterface = false;
     bool shouldRepairDatabases = 0;
     static bool forceRepair = 0;
     Timer startupSrandTimer;

@@ -66,6 +66,7 @@ namespace mongo {
     string mongosCommand;
     bool dbexitCalled = false;
     static bool scriptingEnabled = true;
+    static bool noHttpInterface = false;
     static vector<string> configdbs;
 
     // SERVER-2942 -- We do it this way because RemapLock is used in both mongod and mongos but
@@ -275,7 +276,8 @@ static bool runMongosServer( bool doUpgrade ) {
     CmdLine::launchOk();
 #endif
 
-    boost::thread web( boost::bind(&webServerThread, new NoAdminAccess() /* takes ownership */) );
+    if ( !noHttpInterface )
+        boost::thread web( boost::bind(&webServerThread, new NoAdminAccess() /* takes ownership */) );
 
     MessageServer::Options opts;
     opts.port = cmdLine.port;
@@ -305,6 +307,9 @@ int _main(int argc, char* argv[]) {
     po::positional_options_description positional_options;
 
     CmdLine::addGlobalOptions( general_options, hidden_options );
+
+    general_options.add_options()
+    ("nohttpinterface", "disable http interface");
 
 #if defined(_WIN32)
     CmdLine::addWindowsOptions( windows_scm_options, hidden_options );
@@ -380,6 +385,10 @@ int _main(int argc, char* argv[]) {
 
     if (params.count("noscripting")) {
         scriptingEnabled = false;
+    }
+
+    if (params.count("nohttpinterface")) {
+        noHttpInterface = true;
     }
 
     if ( ! params.count( "configdb" ) ) {
