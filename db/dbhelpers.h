@@ -118,6 +118,10 @@ namespace mongo {
                                       RemoveCallback * callback = 0, 
                                       bool fromMigrate = false );
 
+        static long long removeRangeUnlocked( const string& ns , const BSONObj& min , const BSONObj& max , 
+                                              bool yield = false , bool maxInclusive = false , RemoveCallback * callback = 0 ,
+                                              bool fromMigrate = false );
+
         /* Remove all objects from a collection.
         You do not need to set the database before calling.
         */

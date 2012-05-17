@@ -292,6 +292,72 @@ namespace mongo {
         return num;
     }
 
+    long long Helpers::removeRangeUnlocked( const string& ns , const BSONObj& min , const BSONObj& max , bool yield , bool maxInclusive , RemoveCallback * callback , bool fromMigrate ) {
+        BSONObj keya , keyb;
+        BSONObj minClean = toKeyFormat( min , keya );
+        BSONObj maxClean = toKeyFormat( max , keyb );
+        assert( keya == keyb );
+
+        long long num = 0;
+        
+        auto_ptr<RWLockRecursive::Shared> fileLock;
+        Record* recordToTouch = NULL;
+        
+        while ( true ) {
+            
+            if ( recordToTouch ) {
+                assert( fileLock.get() );
+                recordToTouch->touch();
+                recordToTouch = NULL;
+                fileLock.reset(0);
+            }
+
+            writelock lk( ns );
+            Client::Context ctx(ns);
+            NamespaceDetails* nsd = nsdetails( ns.c_str() );
+            if ( ! nsd )
+                break;
+
+            int ii = nsd->findIndexByKeyPattern( keya );
+            assert( ii >= 0 );
+        
+            IndexDetails& i = nsd->idx( ii );
+            
+            DiskLoc rloc;
+            BSONObj current;
+            {
+                scoped_ptr<Cursor> c( BtreeCursor::make( nsd , ii , i , minClean , maxClean , maxInclusive, 1 ) );
+                
+                if ( ! c->ok() )
+                    break;
+                
+                rloc = c->currLoc();
+
+                Record* r = rloc.rec();
+                if ( yield && ! r->likelyInPhysicalMemory() ) {
+                    fileLock.reset( new RWLockRecursive::Shared( MongoFile::mmmutex) );
+                    recordToTouch = r;
+                    continue;
+                }
+                
+                current = c->current();
+            }
+
+            if ( callback )
+                callback->goingToDelete( current );
+
+            logOp( "d" , ns.c_str() , rloc.obj()["_id"].wrap() , 0 , 0 , fromMigrate );
+            theDataFileMgr.deleteRecord(ns.c_str() , rloc.rec(), rloc);
+            num++;
+
+            getDur().commitIfNeeded();
+
+        }
+
+        return num;
+    }
+
+
     void Helpers::emptyCollection(const char *ns) {
         Client::Context context(ns);
         deleteObjects(ns, BSONObj(), false);

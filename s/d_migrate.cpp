@@ -160,9 +160,8 @@ namespace mongo {
         void doRemove() {
             ShardForceVersionOkModeBlock sf;
             {
-                writelock lk(ns);
                 RemoveSaver rs("moveChunk",ns,"post-cleanup");
-                long long numDeleted = Helpers::removeRange( ns , min , max , true , false , cmdLine.moveParanoia ? &rs : 0, true );
+                long long numDeleted = Helpers::removeRangeUnlocked( ns , min , max , true , false , cmdLine.moveParanoia ? &rs : 0, true );
                 log() << "moveChunk deleted: " << numDeleted << migrateLog;
             }
             
