@@ -78,7 +78,7 @@ namespace mongo {
     }
 
     IndexCounters::IndexCounters() {
-        _memSupported = _pi.blockCheckSupported();
+        _memSupported = Record::blockCheckSupported();
 
         _btreeMemHits = 0;
         _btreeMemMisses = 0;
@@ -87,9 +87,6 @@ namespace mongo {
 
         _maxAllowed = ( numeric_limits< long long >::max() ) / 2;
         _resets = 0;
-
-        _sampling = 0;
-        _samplingrate = 100;
     }
 
     void IndexCounters::append( BSONObjBuilder& b ) {
