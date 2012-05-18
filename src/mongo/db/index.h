@@ -155,7 +155,12 @@ namespace mongo {
         static bool isIdIndexPattern( const BSONObj &pattern ) {
             BSONObjIterator i(pattern);
             BSONElement e = i.next();
-            if( strcmp(e.fieldName(), "_id") != 0 ) return false;
+            //_id index must have form exactly {_id : 1} or {_id : -1}.
+            //Allows an index of form {_id : "hashed"} to exist but
+            //do not consider it to be the primary _id index
+            if(! ( strcmp(e.fieldName(), "_id") == 0
+                    && (e.numberInt() == 1 || e.numberInt() == -1)))
+                return false;
             return i.next().eoo();
         }
 

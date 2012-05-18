@@ -927,6 +927,8 @@ namespace mongo {
             ss << f.fieldName() << "_";
             if( f.isNumber() )
                 ss << f.numberInt();
+            else
+                ss << f.str(); //this should match up with shell command
         }
         return ss.str();
     }

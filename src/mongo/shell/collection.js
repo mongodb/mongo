@@ -248,8 +248,7 @@ DBCollection.prototype._genIndexName = function( keys ){
             name += "_";
         name += k + "_";
 
-        if ( typeof v == "number" )
-            name += v;
+        name += v;
     }
     return name;
 }
