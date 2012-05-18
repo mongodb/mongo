@@ -215,7 +215,19 @@ def run_and_echo(command):
     dependencies cannot be configured, or when the logging
     webapp is unavailable, etc
     """
-    return subprocess.call(command)
+    proc = subprocess.Popen(command)
+
+    def handle_sigterm(signum, frame):
+        try:
+            proc.send_signal(signum)
+        except AttributeError:
+            os.kill(proc.pid, signum)
+    orig_handler = signal.signal(signal.SIGTERM, handle_sigterm)
+
+    proc.wait()
+
+    signal.signal(signal.SIGTERM, orig_handler)
+    return proc.returncode
 
 class LogAppender(object):
     def __init__(self, callback, args, send_after_lines=200, send_after_seconds=2):
