@@ -20,8 +20,6 @@
 
 #include "mongo/util/hook_windows_memory.h"
 
-#include <vector>
-
 #include "mongo/platform/windows_basic.h"
 #include "mongo/util/concurrency/remap_lock.h"
 #include "mongo/util/hook_win32.h"
@@ -117,20 +115,20 @@ namespace mongo {
 
     void hookWindowsMemory( void ) {
 
-        // kernel32.dll calls directly prior to Windows 7
+        // prior to Windows 7, these calls are through kernel32.dll
         char* hookModuleAddress = reinterpret_cast<char*>( GetModuleHandleA( "kernel32.dll" ) );
         originalRtlCreateHeap_kernel32 = reinterpret_cast<RtlCreateHeap_t>(
-                        hookWin32( hookModuleAddress,
-                                   "ntdll.dll",
-                                   "RtlCreateHeap",
-                                   myRtlCreateHeap_kernel32 ) );
+                hookWin32( hookModuleAddress,
+                           "ntdll.dll",
+                           "RtlCreateHeap",
+                           myRtlCreateHeap_kernel32 ) );
         originalNtAllocateVirtualMemory_kernel32 = reinterpret_cast<NtAllocateVirtualMemory_t>(
-                        hookWin32( hookModuleAddress,
-                                   "ntdll.dll",
-                                   "NtAllocateVirtualMemory",
-                                    myNtAllocateVirtualMemory_kernel32 ) );
+                hookWin32( hookModuleAddress,
+                           "ntdll.dll",
+                           "NtAllocateVirtualMemory",
+                           myNtAllocateVirtualMemory_kernel32 ) );
 
-        // in Windows 7 and Server 2008 R2, calls are through kernelbase.dll
+        // in Windows 7 and Server 2008 R2, these calls are through kernelbase.dll
         hookModuleAddress = reinterpret_cast<char*>( GetModuleHandleA( "kernelbase.dll" ) );
         originalRtlCreateHeap_kernelbase = reinterpret_cast<RtlCreateHeap_t>(
                 hookWin32( hookModuleAddress,
