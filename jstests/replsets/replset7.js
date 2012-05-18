@@ -1,6 +1,6 @@
 
 // test for SERVER-5040 - if documents move forward during an initial sync.
-if ( 0 ) { // SERVER-5040
+
 var rt = new ReplSetTest( { name : "replset7tests" , nodes: 1 } );
 
 var nodes = rt.startSet();
@@ -44,4 +44,3 @@ rt.awaitSecondaryNodes();
 // Do we have an index?
 assert.eq (1, slave.getDB( 'd' )['system.indexes']
            .find({"v" : 1,"key" : {"x" : 1},"unique" : true,"ns" : "d.c","name" : "x_1"}).count());
-}

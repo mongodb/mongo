@@ -44,18 +44,24 @@ namespace mongo {
     }
 
     void ReplSetImpl::syncDoInitialSync() {
+        const static int maxFailedAttempts = 3;
         createOplog();
-
-        while( 1 ) {
+        int failedAttempts = 0;
+        while ( failedAttempts < maxFailedAttempts ) {
             try {
                 _syncDoInitialSync();
                 break;
             }
             catch(DBException& e) {
-                sethbmsg("initial sync exception " + e.toString(), 0);
+                failedAttempts++;
+                str::stream msg;
+                msg << "initial sync exception: ";
+                msg << e.toString() << " " << (maxFailedAttempts - failedAttempts) << " attempts remaining" ;
+                sethbmsg(msg, 0);
                 sleepsecs(30);
             }
         }
+        fassert( 16233, failedAttempts < maxFailedAttempts);
     }
 
     /* todo : progress metering to sethbmsg. */
