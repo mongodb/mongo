@@ -21,12 +21,9 @@ __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	session = conn->default_session;
 	session->iface.connection = &conn->iface;
 
-	/* WT_SESSION_IMPL and hazard arrays. */
+	/* WT_SESSION_IMPL array. */
 	WT_ERR(__wt_calloc(session,
-	    conn->session_size, sizeof(WT_SESSION_IMPL *), &conn->sessions));
-	WT_ERR(__wt_calloc(session,
-	    conn->session_size, sizeof(WT_SESSION_IMPL),
-	    &conn->session_array));
+	    conn->session_size, sizeof(WT_SESSION_IMPL), &conn->sessions));
 
 	/* Create the cache. */
 	WT_ERR(__wt_cache_create(conn, cfg));

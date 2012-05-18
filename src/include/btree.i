@@ -244,24 +244,24 @@ __wt_page_hazard_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_HAZARD *hp;
-	WT_SESSION_IMPL *t;
+	WT_SESSION_IMPL *s;
 	uint32_t i, session_cnt;
 
 	conn = S2C(session);
 
 	/*
-	 * No lock is required because the session array is fixed in size, but
-	 * it may contain NULL entries.  We must review any active session that
-	 * might contain a hazard reference so insert a barrier before reading
-	 * the session count.  That way, no matter what sessions come or go,
-	 * we'll check the slots for all of the sessions that could have been
-	 * active when we started our check.
+	 * No lock is required because the session array is fixed size, but it
+	 * it may contain inactive entries.  We must review any active session
+	 * that might contain a hazard reference, so insert a barrier before
+	 * reading the active session count.  That way, no matter what sessions
+	 * come or go, we'll check the slots for all of the sessions that could
+	 * have been active when we started our check.
 	 */
 	WT_ORDERED_READ(session_cnt, conn->session_cnt);
-	for (i = 0; i < session_cnt; ++i) {
-		if ((t = conn->sessions[i]) == NULL)
+	for (s = conn->sessions, i = 0; i < conn->session_cnt; ++s, ++i) {
+		if (!s->active)
 			continue;
-		for (hp = t->hazard; hp < t->hazard + conn->hazard_size; ++hp)
+		for (hp = s->hazard; hp < s->hazard + conn->hazard_size; ++hp)
 			if (hp->page == page)
 				return (hp);
 	}

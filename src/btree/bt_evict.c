@@ -400,17 +400,17 @@ __evict_file_request_walk(WT_SESSION_IMPL *session)
 	++cache->sync_complete;
 
 	/*
-	 * The session array requires no lock, it's fixed in size, but it
-	 * may contain NULL entries.
+	 * No lock is required because the session array is fixed size, but it
+	 * it may contain inactive entries.
+	 *
+	 * If we don't find a request, something went wrong; complain, but don't
+	 * return an error code, the eviction thread doesn't need to exit.
 	 */
-	request_session = NULL;
-	for (i = 0; i < conn->session_cnt; ++i)
-		if ((request_session = conn->sessions[i]) != NULL &&
-		    request_session->syncop != 0)
+	for (request_session = conn->sessions,
+	    i = 0; i < conn->session_cnt; ++request_session, ++i)
+		if (request_session->active && request_session->syncop != 0)
 			break;
-
-	/* If we don't find an entry, something broke, complain. */
-	if (request_session == NULL) {
+	if (i == conn->session_cnt) {
 		__wt_errx(session,
 		    "failed to find handle's sync operation request");
 		return (0);
@@ -424,8 +424,6 @@ __evict_file_request_walk(WT_SESSION_IMPL *session)
 	 */
 	syncop = request_session->syncop;
 	request_session->syncop = 0;
-
-	WT_ASSERT(session, syncop != 0);
 
 	WT_VERBOSE_RET(session, evictserver,
 	    "file request: %s",

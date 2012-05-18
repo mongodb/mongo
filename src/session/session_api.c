@@ -18,7 +18,7 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	WT_CONNECTION_IMPL *conn;
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
-	WT_SESSION_IMPL *session, **tp;
+	WT_SESSION_IMPL *session;
 
 	conn = (WT_CONNECTION_IMPL *)wt_session->connection;
 	session = (WT_SESSION_IMPL *)wt_session;
@@ -35,6 +35,12 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	WT_TRET(__wt_schema_close_tables(session));
 
 	__wt_spin_lock(session, &conn->spinlock);
+
+	/*
+	 * Exclude the session from hazard reference checking; use a barrier to
+	 * ensure the session is ignored before we start freeing resources.
+	 */
+	WT_PUBLISH(session->active, 0);
 
 	/* Discard metadata tracking. */
 	__wt_meta_track_discard(session);
@@ -56,26 +62,21 @@ __session_close(WT_SESSION *wt_session, const char *config)
 		(void)__wt_cond_destroy(session, session->cond);
 
 	/*
-	 * Replace the session reference being closed with the last active entry
-	 * in the array, then clear the last entry, packing the active sessions
-	 * at the start of the array.  There are no memory barriers here, which
-	 * means a reader may see both NULL entries or sessions referenced more
-	 * than once.
+	 * Sessions are re-used, clear the structure (which resets the active
+	 * field to 0, so that's OK).
 	 */
-	for (tp = conn->sessions; *tp != session; ++tp)
-		;
-	--conn->session_cnt;
-	*tp = conn->sessions[conn->session_cnt];
-	conn->sessions[conn->session_cnt] = NULL;
+	memset(session, 0, sizeof(*session));
+	session = conn->default_session;
 
 	/*
-	 * Publish, making the session array entry available for re-use.  There
-	 * must be a barrier here to ensure the cleanup above completes before
-	 * the entry is re-used.
+	 * Decrement the count of active sessions if that's possible: a session
+	 * being closed may or may not be at the end of the array, step toward
+	 * the beginning of the array until we reach an active session.
 	 */
-	WT_PUBLISH(session->iface.connection, NULL);
+	while (conn->sessions[conn->session_cnt - 1].active == 0)
+		if (--conn->session_cnt == 0)
+			break;
 
-	session = conn->default_session;
 	__wt_spin_unlock(session, &conn->spinlock);
 
 err:	API_END_NOTFOUND_MAP(session, ret);
@@ -469,6 +470,7 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
 	};
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session, *session_ret;
+	uint32_t i;
 
 	WT_UNUSED(config);
 
@@ -477,35 +479,37 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
 
 	__wt_spin_lock(session, &conn->spinlock);
 
-	/* Check to see if there's an available session slot. */
-	if (conn->session_cnt == conn->session_size - 1)
+	/* Find the first inactive session slot. */
+	for (session_ret = conn->sessions,
+	    i = 0; i < conn->session_size; ++session_ret, ++i)
+		if (!session_ret->active)
+			break;
+	if (i == conn->session_size)
 		WT_ERR_MSG(session, WT_ERROR,
-		    "WiredTiger only configured to support %d thread contexts",
+		    "only configured to support %d thread contexts",
 		    conn->session_size);
 
 	/*
-	 * The session reference list is compact, the session array is not.
-	 * Find the first empty session slot.
+	 * If the active session count is increasing, update it.  We don't worry
+	 * about correcting the session count on error, as long as we don't mark
+	 * this session as active, we'll clean it up on close.
 	 */
-	for (session_ret = conn->session_array;
-	    session_ret->iface.connection != NULL;
-	    ++session_ret)
-		;
+	if (i >= conn->session_cnt)	/* Defend against off-by-one errors. */
+		conn->session_cnt = i + 1;
 
-	/* Session entries are re-used, clear the old contents. */
-	WT_CLEAR(*session_ret);
-
-	WT_ERR(__wt_cond_alloc(session, "session", 1, &session_ret->cond));
 	session_ret->iface = stds;
 	session_ret->iface.connection = &conn->iface;
+
+	WT_ERR(__wt_cond_alloc(session, "session", 1, &session_ret->cond));
+
 	__wt_event_handler_set(session_ret, (event_handler != NULL) ?
 	    event_handler : session_ret->event_handler);
 
-	WT_ERR(__wt_calloc(session,
-	    conn->hazard_size, sizeof(WT_HAZARD), &session_ret->hazard));
-
 	TAILQ_INIT(&session_ret->cursors);
 	TAILQ_INIT(&session_ret->btrees);
+
+	WT_ERR(__wt_calloc(session,
+	    conn->hazard_size, sizeof(WT_HAZARD), &session_ret->hazard));
 
 	/*
 	 * Public sessions are automatically closed during WT_CONNECTION->close.
@@ -519,11 +523,10 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
 	/*
 	 * Publish: make the entry visible to server threads.  There must be a
 	 * barrier for two reasons, to ensure structure fields are set before
-	 * any other thread can see the session and to push the maximum session
-	 * count to ensure the eviction thread can't possibly review too few
-	 * slots.
+	 * any other thread will consider the session, and to push the session
+	 * count to ensure the eviction thread can't review too few slots.
 	 */
-	WT_PUBLISH(conn->sessions[conn->session_cnt++], session_ret);
+	WT_PUBLISH(session_ret->active, 1);
 
 	STATIC_ASSERT(offsetof(WT_CONNECTION_IMPL, iface) == 0);
 	*sessionp = session_ret;

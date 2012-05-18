@@ -58,6 +58,8 @@ typedef	enum {
 struct __wt_session_impl {
 	WT_SESSION iface;
 
+	u_int active;			/* Non-zero if the session is in-use */
+
 	WT_CONDVAR *cond;		/* Condition variable */
 
 	const char *name;		/* Name */
@@ -194,10 +196,9 @@ struct __wt_connection_impl {
 	 * the server thread code to avoid walking the entire array when only a
 	 * few threads are running.
 	 */
-	WT_SESSION_IMPL	**sessions;	/* Session reference */
-	void		 *session_array;/* Session array */
-	uint32_t	  session_size;	/* Session array size */
-	uint32_t	  session_cnt;	/* Session count */
+	WT_SESSION_IMPL	*sessions;	/* Session reference */
+	uint32_t	 session_size;	/* Session array size */
+	uint32_t	 session_cnt;	/* Session count */
 
 	/*
 	 * WiredTiger allocates space for 15 hazard references in each thread of
