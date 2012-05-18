@@ -436,7 +436,10 @@ namespace mongo {
                 
                 result.append( "configdb" , BSON( "stored" << shardingState.getConfigServer() << 
                                                   "given" << configdb ) );
-                errmsg = "specified a different configdb!";
+                                                  
+                errmsg = str::stream() << "mongos specified a different config database string : "
+                                       << "stored : " << shardingState.getConfigServer()
+                                       << " vs given : " << configdb;
                 return false;
             }
             
