@@ -42,7 +42,7 @@ libtool: $(LIBTOOL_DEPS)
 	$(SHELL) ./config.status libtool
 
 $(top_srcdir)/src/include/extern.h: auto-includes.chk
-$(top_srcdir)/src/include/wt_internal.in: auto-includes.chk
+$(top_srcdir)/src/include/wt_internal.h: auto-includes.chk
 
 auto-includes.chk: $(libwiredtiger_la_SOURCES)
 	@(cd $(srcdir)/dist && sh s_prototypes && sh s_typedef -b) && touch $@
