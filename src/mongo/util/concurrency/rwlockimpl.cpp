@@ -22,7 +22,7 @@ using namespace std;
 
 namespace mongo {
 
-#if defined(_WIN32)
+#if defined(_WIN32) && defined(MONGO_USE_SRW_ON_WINDOWS)
     SimpleRWLock::SimpleRWLock(const char *p) : name(p?p:"") { 
         InitializeSRWLock(&_lock);
     }
