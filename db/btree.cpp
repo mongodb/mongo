@@ -1170,6 +1170,7 @@ namespace mongo {
 
     template< class V >
     bool BtreeBucket<V>::mayBalanceWithNeighbors( const DiskLoc thisLoc, IndexDetails &id, const Ordering &order ) const {
+        return false;
         if ( this->parent.isNull() ) { // we are root, there are no neighbors
             return false;
         }
