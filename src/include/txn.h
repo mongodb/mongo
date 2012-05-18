@@ -11,7 +11,8 @@ typedef uint32_t wt_txnid_t;
 
 /* Transaction ID comparison dealing with edge cases and wrapping. */
 #define	TXNID_LT(t1, t2)						\
-	(((t1) == (t2)) ? 0 :						\
+	(((t1) == (t2) ||						\
+	 (t1) == WT_TXN_INVALID || (t2) == WT_TXN_NONE) ? 0 :		\
 	 ((t2) == WT_TXN_INVALID || (t1) == WT_TXN_NONE) ? 1 :		\
 	 (t2) - (t1) < (UINT32_MAX / 2))
 
