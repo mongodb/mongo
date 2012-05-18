@@ -309,7 +309,7 @@ namespace mongo {
 
         while ( true ) {
             
-            sleepmicros( Client::recommendedYieldMicros() );
+            sleepmicros( 10 * Client::recommendedYieldMicros() );
             
             if ( recordToTouch ) {
                 assert( fileLock.get() );
