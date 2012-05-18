@@ -18,7 +18,7 @@
 #pragma once
 
 #ifdef _WIN32
-# include <concrt.h>
+#include "mongo/platform/windows_basic.h"
 #endif
 
 #include <boost/noncopyable.hpp>
@@ -127,12 +127,12 @@ namespace mongo {
         On Windows, the implementation below is faster than boost mutex.
     */
 #if defined(_WIN32)
-    class SimpleMutex  {
+    class SimpleMutex : boost::noncopyable {
     public:
-        SimpleMutex( const char * ) {}
+        SimpleMutex( const char * ) { InitializeCriticalSection( &_cs ); }
         void dassertLocked() const { }
-        void lock() { _cs.lock(); }
-        void unlock() { _cs.unlock(); }
+        void lock() { EnterCriticalSection( &_cs ); }
+        void unlock() { LeaveCriticalSection( &_cs ); }
         class scoped_lock {
             SimpleMutex& _m;
         public:
@@ -142,7 +142,7 @@ namespace mongo {
         };
 
     private:
-        Concurrency::critical_section _cs;
+        CRITICAL_SECTION _cs;
     };
 #else
     class SimpleMutex : boost::noncopyable {
@@ -169,7 +169,6 @@ namespace mongo {
     private:
         pthread_mutex_t _lock;
     };
-    
 #endif
 
     /** This can be used instead of boost recursive mutex. The advantage is the _DEBUG checks
