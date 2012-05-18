@@ -169,7 +169,8 @@ namespace mongo {
                     getDur().commitIfNeeded();
                 }
                 catch( UserException& e ) {
-                    log() << "warning: exception cloning object in " << from_collection << ' ' << e.what() << " obj:" << js.toString() << '\n';
+                    error() << "error: exception cloning object in " << from_collection << ' ' << e.what() << " obj:" << js.toString() << '\n';
+                    throw;
                 }
 
                 RARELY if ( time( 0 ) - saveLast > 60 ) {
@@ -238,7 +239,8 @@ namespace mongo {
                     getDur().commitIfNeeded();
                 }
                 catch( UserException& e ) {
-                    log() << "warning: exception cloning object in " << from_collection << ' ' << e.what() << " obj:" << js.toString() << '\n';
+                    error() << "error: exception cloning object in " << from_collection << ' ' << e.what() << " obj:" << js.toString() << '\n';
+                    throw;
                 }
             }
         }
