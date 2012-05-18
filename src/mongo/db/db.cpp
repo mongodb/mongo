@@ -50,6 +50,7 @@
 #include "../s/d_writeback.h"
 #include "d_globals.h"
 #include "ttl.h"
+#include "mongo/util/stacktrace.h"
 
 #if defined(_WIN32)
 # include "mongo/util/ntservice.h"

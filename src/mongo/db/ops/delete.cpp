@@ -21,6 +21,7 @@
 #include "../queryutil.h"
 #include "../oplog.h"
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/util/stacktrace.h"
 
 namespace mongo {
     

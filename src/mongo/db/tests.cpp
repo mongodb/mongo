@@ -19,8 +19,10 @@
    unit test & such
 */
 
-#include "pch.h"
-#include "../util/mmap.h"
+#include "mongo/pch.h"
+
+#include "mongo/util/mmap.h"
+#include "mongo/util/stacktrace.h"
 
 namespace mongo {
 

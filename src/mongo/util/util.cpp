@@ -17,6 +17,7 @@
 
 #include "pch.h"
 #include "goodies.h"
+#include "mongo/util/stacktrace.h"
 #include "mongo/util/startup_test.h"
 #include "file_allocator.h"
 #include "optime.h"

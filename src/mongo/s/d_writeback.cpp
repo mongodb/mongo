@@ -23,6 +23,7 @@
 #include "../util/net/listen.h"
 #include "../db/curop.h"
 #include "../db/client.h"
+#include "mongo/util/stacktrace.h"
 
 #include "d_writeback.h"
 

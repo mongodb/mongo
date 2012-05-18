@@ -22,6 +22,7 @@
 #include "taskqueue.h"
 #include "client.h"
 #include "../util/concurrency/threadlocal.h"
+#include "mongo/util/stacktrace.h"
 
 namespace mongo {
 

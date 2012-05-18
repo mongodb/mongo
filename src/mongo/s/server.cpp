@@ -46,6 +46,7 @@
 #include "mongo/util/util.h"
 #include "mongo/util/concurrency/remap_lock.h"
 #include "mongo/db/lasterror.h"
+#include "mongo/util/stacktrace.h"
 
 #if defined(_WIN32)
 # include "../util/ntservice.h"

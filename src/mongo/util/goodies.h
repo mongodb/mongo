@@ -23,7 +23,6 @@
 
 #include "mongo/bson/util/misc.h"
 #include "mongo/util/concurrency/mutex.h"
-#include "mongo/util/stacktrace.h"
 
 namespace mongo {
 

@@ -30,6 +30,7 @@
 #include "mongo/shell/shell_utils_launcher.h"
 #include "mongo/util/file.h"
 #include "mongo/util/password.h"
+#include "mongo/util/stacktrace.h"
 #include "mongo/util/startup_test.h"
 #include "mongo/util/util.h"
 #include "mongo/util/version.h"

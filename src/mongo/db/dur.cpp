@@ -70,6 +70,7 @@
 #include "../util/mongoutils/hash.h"
 #include "../util/mongoutils/str.h"
 #include "../util/timer.h"
+#include "mongo/util/stacktrace.h"
 #include "../server.h"
 
 using namespace mongoutils;
