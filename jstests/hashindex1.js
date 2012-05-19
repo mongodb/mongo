@@ -58,8 +58,7 @@ assert.neq( t.find({c : 1}).explain().cursor ,
 //test creation of index based on hash of _id index
 var goodspec2 = {'_id' : "hashed"};
 t.ensureIndex( goodspec2 );
-assert( db.system.indexes.findOne({"ns" : t , "key" : goodspec2}) ,
-		"index didn't get created");
+assert.eq( t.getIndexes().length , 3 , "_id index didn't get created");
 
 var newid = t.findOne()["_id"];
 assert.eq( t.find( {_id : newid} ).hint( {_id : 1} ).toArray()[0]._id ,
@@ -70,8 +69,7 @@ assert.eq( t.find( {_id : newid} ).hint( {_id : 1} ).toArray()[0]._id ,
 //test creation of sparse hashed index
 var sparseindex = {b : "hashed"};
 t.ensureIndex( sparseindex , {"sparse" : true});
-assert( db.system.indexes.findOne({"ns" : t , "key" : sparseindex , "sparse" : true}) ,
-		"index didn't get created");
+assert.eq( t.getIndexes().length , 4 , "sparse index didn't get created");
 
 //test sparse index has smaller total items on after inserts
 for(i=0; i < 10; i++ ){
