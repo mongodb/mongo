@@ -626,11 +626,14 @@ static int mongoDbMain(int argc, char* argv[]) {
     po::positional_options_description positional_options;
 
     CmdLine::addGlobalOptions( general_options , hidden_options );
+    
+    StringBuilder dbpathBuilder;
+    dbpathBuilder << "directory for datafiles - defaults to " << dbpath;
 
     general_options.add_options()
     ("auth", "run with security")
     ("cpu", "periodically show cpu and iowait utilization")
-    ("dbpath", po::value<string>() , "directory for datafiles")
+    ("dbpath", po::value<string>() , dbpathBuilder.str().c_str())
     ("diaglog", po::value<int>(), "0=off 1=W 2=R 3=both 7=W+some reads")
     ("directoryperdb", "each database will be stored in a separate directory")
     ("ipv6", "enable IPv6 support (disabled by default)")
