@@ -4,19 +4,16 @@ t.drop()
 //test non-single field hashed indexes don't get created (maybe change later)
 var badspec = {a : "hashed" , b : 1};
 t.ensureIndex( badspec );
-assert.eq( db.system.indexes.findOne({"ns" : t , "key" : badspec}) , null ,
-		"bad spec got created");
+assert.eq( t.getIndexes().length , 1 , "only _id index should be created");
 
 //test unique index not created (maybe change later)
 var goodspec = {a : "hashed"};
 t.ensureIndex( goodspec , {"unique" : true});
-assert.eq( db.system.indexes.findOne({"ns" : t , "key" : goodspec}) , null ,
-		"unique index got created.");
+assert.eq( t.getIndexes().length , 1 , "unique index got created.");
 
 //now test that non-unique index does get created
 t.ensureIndex(goodspec);
-assert( db.system.indexes.findOne({"ns" : t , "key" : goodspec}) ,
-		"index didn't get created");
+assert.eq( t.getIndexes().length , 2 , "hashed index didn't get created");
 
 //test basic inserts
 for(i=0; i < 10; i++ ){
