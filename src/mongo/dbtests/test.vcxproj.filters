@@ -588,6 +588,18 @@
     <ClInclude Include="..\util\hook_windows_memory.h">
       <Filter>util\Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\client\authentication_table.h">
+      <Filter>client</Filter>
+    </ClInclude>
+    <ClInclude Include="..\client\authlevel.h">
+      <Filter>client</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\histogram.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\hasher.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\client\connpool.cpp">
@@ -1428,6 +1440,21 @@
     </ClCompile>
     <ClCompile Include="..\util\hook_windows_memory.cpp">
       <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\client\authentication_table.cpp">
+      <Filter>client</Filter>
+    </ClCompile>
+    <ClCompile Include="histogram_test.cpp">
+      <Filter>dbtests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\histogram.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="jsobjhashingtests.cpp">
+      <Filter>dbtests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\hasher.cpp">
+      <Filter>db\Source Files\e to n</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

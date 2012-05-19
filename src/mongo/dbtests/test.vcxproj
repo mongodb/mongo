@@ -480,6 +480,8 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\bson\oid.h" />
     <ClInclude Include="..\bson\ordering.h" />
     <ClInclude Include="..\bson\stringdata.h" />
+    <ClInclude Include="..\client\authentication_table.h" />
+    <ClInclude Include="..\client\authlevel.h" />
     <ClInclude Include="..\client\dbclientmockcursor.h" />
     <ClInclude Include="..\db\collection.h" />
     <ClInclude Include="..\db\databaseholder.h" />
@@ -488,6 +490,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\db\dur_journal.h" />
     <ClInclude Include="..\db\d_concurrency.h" />
     <ClInclude Include="..\db\explain.h" />
+    <ClInclude Include="..\db\hasher.h" />
     <ClInclude Include="..\db\jsobjmanipulator.h" />
     <ClInclude Include="..\db\lockstat.h" />
     <ClInclude Include="..\db\lockstate.h" />
@@ -556,6 +559,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\util\goodies.h" />
     <ClInclude Include="..\util\hashtab.h" />
     <ClInclude Include="..\db\lasterror.h" />
+    <ClInclude Include="..\util\histogram.h" />
     <ClInclude Include="..\util\hook_win32.h" />
     <ClInclude Include="..\util\hook_windows_memory.h" />
     <ClInclude Include="..\util\log.h" />
@@ -1151,6 +1155,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
       <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4334</DisableSpecificWarnings>
     </ClCompile>
     <ClCompile Include="..\bson\oid.cpp" />
+    <ClCompile Include="..\client\authentication_table.cpp" />
     <ClCompile Include="..\client\dbclientcursor.cpp" />
     <ClCompile Include="..\client\dbclient_rs.cpp" />
     <ClCompile Include="..\client\distlock.cpp" />
@@ -1177,6 +1182,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="..\db\explain.cpp" />
     <ClCompile Include="..\db\geo\2d.cpp" />
     <ClCompile Include="..\db\geo\haystack.cpp" />
+    <ClCompile Include="..\db\hasher.cpp" />
     <ClCompile Include="..\db\key.cpp" />
     <ClCompile Include="..\db\lockstat.cpp" />
     <ClCompile Include="..\db\lockstate.cpp" />
@@ -1281,6 +1287,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="..\util\concurrency\vars.cpp" />
     <ClCompile Include="..\util\debug_util.cpp" />
     <ClCompile Include="..\util\file_allocator.cpp" />
+    <ClCompile Include="..\util\histogram.cpp" />
     <ClCompile Include="..\util\hook_win32.cpp" />
     <ClCompile Include="..\util\hook_windows_memory.cpp" />
     <ClCompile Include="..\util\log.cpp" />
@@ -1350,6 +1357,8 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="directclienttests.cpp" />
     <ClCompile Include="d_chunk_manager_tests.cpp" />
     <ClCompile Include="framework.cpp" />
+    <ClCompile Include="histogram_test.cpp" />
+    <ClCompile Include="jsobjhashingtests.cpp" />
     <ClCompile Include="jsobjtests.cpp" />
     <ClCompile Include="jsontests.cpp" />
     <ClCompile Include="jstests.cpp" />
