@@ -260,6 +260,7 @@ __wt_cache_evict_server(void *arg)
 	 */
 	session = conn->default_session;
 	WT_ERR(__wt_open_session(conn, 1, NULL, NULL, &session));
+	session.name = "session.eviction-server";
 
 	while (F_ISSET(conn, WT_SERVER_RUN)) {
 		/*
