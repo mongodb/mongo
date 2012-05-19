@@ -60,7 +60,7 @@ namespace mongo {
                 sleepsecs(30);
             }
         }
-        fassert( 16233, failedAttempts < maxFailedAttempts);
+        if ( failedAttempts >= maxFailedAttempts ) ::abort();
     }
 
     /* todo : progress metering to sethbmsg. */
