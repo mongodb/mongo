@@ -62,15 +62,9 @@ __wt_session_serialize_func(WT_SESSION_IMPL *session,
 static inline void
 __wt_session_serialize_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page, int ret)
 {
-	if (ret == 0 && page != NULL) {
-		/*
-		 * If passed a page and the return value is OK, we modified the
-		 * page.  Wake the eviction server as necessary if the page
-		 * has become too large.
-		 */
+	/* If passed a page and the return value is OK, we modified the page. */
+	if (page != NULL && ret == 0)
 		__wt_page_modify_set(page);
-		(void)__wt_eviction_page_check(session, page);
-	}
 
 	/*
 	 * Publish: there must be a barrier to ensure the return value is set
