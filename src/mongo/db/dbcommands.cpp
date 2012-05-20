@@ -49,6 +49,7 @@
 #include "../s/d_writeback.h"
 #include "dur_stats.h"
 #include "../server.h"
+#include "mongo/s/d_index_locator.h"
 
 namespace mongo {
 
@@ -1179,14 +1180,6 @@ namespace mongo {
         }
     } cmdFileMD5;
 
-    static IndexDetails *cmdIndexDetailsForRange( const char *ns, string &errmsg, BSONObj &min, BSONObj &max, BSONObj &keyPattern ) {
-        if ( ns[ 0 ] == '\0' || min.isEmpty() || max.isEmpty() ) {
-            errmsg = "invalid command syntax (note: min and max are required)";
-            return 0;
-        }
-        return indexDetailsForRange( ns, errmsg, min, max, keyPattern );
-    }
-
     class CmdDatasize : public Command {
         virtual string parseNs(const string& dbname, const BSONObj& cmdObj) const { 
             return parseNsFullyQualified(dbname, cmdObj);
@@ -1238,7 +1231,7 @@ namespace mongo {
                 return false;
             }
             else {
-                IndexDetails *idx = cmdIndexDetailsForRange( ns.c_str(), errmsg, min, max, keyPattern );
+                IndexDetails *idx = locateIndexForChunkRange( ns.c_str(), errmsg, min, max, keyPattern );
                 if ( idx == 0 )
                     return false;
 
