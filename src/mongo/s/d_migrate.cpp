@@ -51,6 +51,7 @@
 #include "d_logic.h"
 #include "config.h"
 #include "chunk.h"
+#include "mongo/s/d_index_locator.h"
 
 using namespace std;
 
@@ -398,10 +399,10 @@ namespace mongo {
             }
 
             BSONObj keyPattern;
-            // the copies are needed because the indexDetailsForRange destroys the input
+            // the copies are needed because the locateIndexForChunkRange destroys the input
             BSONObj min = _min.copy();
             BSONObj max = _max.copy();
-            IndexDetails *idx = indexDetailsForRange( _ns.c_str() , errmsg , min , max , keyPattern );
+            IndexDetails *idx = locateIndexForChunkRange( _ns.c_str() , errmsg , min , max , keyPattern );
             if ( idx == NULL ) {
                 errmsg = (string)"can't find index in storeCurrentLocs" + causedBy( errmsg );
                 return false;

@@ -35,17 +35,9 @@
 #include "chunk.h" // for static genID only
 #include "config.h"
 #include "d_logic.h"
+#include "mongo/s/d_index_locator.h"
 
 namespace mongo {
-
-    // TODO: Fold these checks into each command.
-    static IndexDetails *cmdIndexDetailsForRange( const char *ns, string &errmsg, BSONObj &min, BSONObj &max, BSONObj &keyPattern ) {
-        if ( ns[ 0 ] == '\0' || min.isEmpty() || max.isEmpty() ) {
-            errmsg = "invalid command syntax (note: min and max are required)";
-            return 0;
-        }
-        return indexDetailsForRange( ns, errmsg, min, max, keyPattern );
-    }
 
 
     class CmdMedianKey : public Command {
@@ -67,7 +59,7 @@ namespace mongo {
 
             Client::Context ctx( ns );
 
-            IndexDetails *id = cmdIndexDetailsForRange( ns, errmsg, min, max, keyPattern );
+            IndexDetails *id = locateIndexForChunkRange( ns, errmsg, min, max, keyPattern );
             if ( id == 0 )
                 return false;
 
@@ -173,7 +165,7 @@ namespace mongo {
                 return false;
             }
 
-            IndexDetails *idx = cmdIndexDetailsForRange( ns , errmsg , min , max , keyPattern );
+            IndexDetails *idx = locateIndexForChunkRange( ns , errmsg , min , max , keyPattern );
             if ( idx == NULL ) {
                 errmsg = "couldn't find index over splitting key";
                 return false;
@@ -306,7 +298,7 @@ namespace mongo {
                     return false;
                 }
                 
-                IndexDetails *idx = cmdIndexDetailsForRange( ns , errmsg , min , max , keyPattern );
+                IndexDetails *idx = locateIndexForChunkRange( ns , errmsg , min , max , keyPattern );
                 if ( idx == NULL ) {
                     errmsg = "couldn't find index over splitting key";
                     return false;
