@@ -421,13 +421,13 @@ namespace mongo {
             if ( totalRecs > 0 ) {
                 avgRecSize = d->stats.datasize / totalRecs;
                 maxRecsWhenFull = maxChunkSize / avgRecSize;
-                maxRecsWhenFull = 130 * maxRecsWhenFull / 100; // slack
+                maxRecsWhenFull = std::min( Chunk::MaxObjectPerChunk + 1 , 130 * maxRecsWhenFull / 100 /* slack */ );
             }
             else {
                 avgRecSize = 0;
-                maxRecsWhenFull = numeric_limits<long long>::max();
+                maxRecsWhenFull = Chunk::MaxObjectPerChunk + 1;
             }
-
+            
             // do a full traversal of the chunk and don't stop even if we think it is a large chunk
             // we want the number of records to better report, in that case
             bool isLargeChunk = false;
