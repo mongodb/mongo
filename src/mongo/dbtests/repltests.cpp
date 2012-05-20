@@ -1086,9 +1086,9 @@ namespace ReplTests {
             FieldRangeSetPair frsp( cllNS(), query );
             BSONObj order = BSON( "$natural" << 1 );
             scoped_ptr<QueryPlan> qp( QueryPlan::make( nsd, -1, frsp, &frsp, query, order ) );
-            FindingStartCursor fsc( *qp );
-            ASSERT( fsc.done() );
-            ASSERT_EQUALS( 0, fsc.cursor()->current()[ "o" ].Obj()[ "_id" ].Int() );
+            scoped_ptr<FindingStartCursor> fsc( FindingStartCursor::make( *qp ) );
+            ASSERT( fsc->done() );
+            ASSERT_EQUALS( 0, fsc->cursor()->current()[ "o" ].Obj()[ "_id" ].Int() );
         }
     };
 
@@ -1108,13 +1108,13 @@ namespace ReplTests {
             FieldRangeSetPair frsp( cllNS(), query );
             BSONObj order = BSON( "$natural" << 1 );
             scoped_ptr<QueryPlan> qp( QueryPlan::make( nsd, -1, frsp, &frsp, query, order ) );
-            FindingStartCursor fsc( *qp );
-            ASSERT( !fsc.done() );
-            fsc.next();
-            ASSERT( !fsc.done() );
-            ASSERT( fsc.prepareToYield() );
+            scoped_ptr<FindingStartCursor> fsc( FindingStartCursor::make( *qp ) );
+            ASSERT( !fsc->done() );
+            fsc->next();
+            ASSERT( !fsc->done() );
+            ASSERT( fsc->prepareToYield() );
             ClientCursor::invalidate( "local.oplog.$main" );
-            ASSERT_THROWS( fsc.recoverFromYield(), MsgAssertionException );
+            ASSERT_THROWS( fsc->recoverFromYield(), MsgAssertionException );
         }
     };
 

@@ -72,7 +72,7 @@ namespace mongo {
          * The cursor will attempt to find the first op in the oplog matching the
          * 'ts' field of the qp's query.
          */
-        FindingStartCursor( const QueryPlan & qp );
+        static FindingStartCursor *make( const QueryPlan &qp );
 
         /** @return true if the first matching op in the oplog has been found. */
         bool done() const { return !_findingStart; }
@@ -110,6 +110,9 @@ namespace mongo {
         static shared_ptr<Cursor> getCursor( const char *ns, const BSONObj &query, const BSONObj &order );
 
     private:
+        FindingStartCursor( const QueryPlan &qp );
+        void init();
+
         enum FindingStartMode { Initial, FindExtent, InExtent };
         const QueryPlan &_qp;
         bool _findingStart;
@@ -126,7 +129,6 @@ namespace mongo {
         void destroyClientCursor() {
             _findingStartCursor.reset( 0 );
         }
-        void init();
         bool firstDocMatchesOrEmpty() const;
     };
 

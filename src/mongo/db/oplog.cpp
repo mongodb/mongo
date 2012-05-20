@@ -402,11 +402,17 @@ namespace mongo {
 
     // -------------------------------------
 
-    FindingStartCursor::FindingStartCursor( const QueryPlan & qp ) :
+    FindingStartCursor *FindingStartCursor::make( const QueryPlan &qp ) {
+        auto_ptr<FindingStartCursor> ret( new FindingStartCursor( qp ) );
+        ret->init();
+        return ret.release();
+    }
+
+    FindingStartCursor::FindingStartCursor( const QueryPlan &qp ) :
     _qp( qp ),
     _findingStart( true ),
-    _findingStartMode()
-    { init(); }
+    _findingStartMode() {
+    }
     
     void FindingStartCursor::next() {
         if ( !_findingStartCursor || !_findingStartCursor->ok() ) {
@@ -546,18 +552,18 @@ namespace mongo {
         }
         FieldRangeSetPair frsp( ns, query );
         scoped_ptr<QueryPlan> oplogPlan( QueryPlan::make( d, -1, frsp, 0, query, order ) );
-        FindingStartCursor finder( *oplogPlan );
+        scoped_ptr<FindingStartCursor> finder( FindingStartCursor::make( *oplogPlan ) );
         ElapsedTracker yieldCondition( 256, 20 );
-        while( !finder.done() ) {
+        while( !finder->done() ) {
             if ( yieldCondition.intervalHasElapsed() ) {
-                if ( finder.prepareToYield() ) {
+                if ( finder->prepareToYield() ) {
                     ClientCursor::staticYield( -1, ns, 0 );
-                    finder.recoverFromYield();
+                    finder->recoverFromYield();
                 }
             }
-            finder.next();
+            finder->next();
         }
-        shared_ptr<Cursor> ret = finder.cursor();
+        shared_ptr<Cursor> ret = finder->cursor();
         shared_ptr<CoveredIndexMatcher> matcher( new CoveredIndexMatcher( query, BSONObj() ) );
         ret->setMatcher( matcher );
         return ret;
