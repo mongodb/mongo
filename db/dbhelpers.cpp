@@ -313,7 +313,7 @@ namespace mongo {
             
             int micros = ( t.micros() * 8 ) + Client::recommendedYieldMicros();
             
-            log() << "Helpers::removeRangeUnlocked going to sleep for " << micros << "micros" << endl;
+            LOG(1) << "Helpers::removeRangeUnlocked going to sleep for " << micros << "micros" << endl;
             sleepmicros( micros );
             
             if ( recordToTouch ) {
