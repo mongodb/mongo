@@ -15,7 +15,9 @@
  *    limitations under the License.
  */
 
-#include "pch.h"
+#include "mongo/pch.h"
+
+#include "mongo/shell/shell_utils_launcher.h"
 
 #include <boost/thread/thread.hpp>
 #include <iostream>
@@ -34,11 +36,10 @@
 # include <sys/wait.h>
 #endif
 
-#include "mongo/shell/shell_utils.h"
-#include "mongo/shell/shell_utils_launcher.h"
 #include "mongo/client/clientOnly-private.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/scripting/engine.h"
+#include "mongo/shell/shell_utils.h"
 
 namespace mongo {
 

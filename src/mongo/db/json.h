@@ -18,8 +18,9 @@
 
 #pragma once
 
-#include "../pch.h"
-#include "jsobj.h"
+#include <string>
+
+#include "mongo/bson/bsonobj.h"
 
 namespace mongo {
 
@@ -33,7 +34,7 @@ namespace mongo {
      \throws MsgAssertionException if parsing fails.  The message included with
      this assertion includes a rough indication of where parsing failed.
     */
-    BSONObj fromjson(const string &str);
+    BSONObj fromjson(const std::string &str);
 
     /** len will be size of JSON object in text chars. */
     BSONObj fromjson(const char *str, int* len=NULL);

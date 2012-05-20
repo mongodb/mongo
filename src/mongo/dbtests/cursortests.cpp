@@ -17,12 +17,14 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "pch.h"
-#include "../db/clientcursor.h"
-#include "../db/instance.h"
-#include "../db/btree.h"
-#include "../db/queryutil.h"
-#include "dbtests.h"
+#include "mongo/pch.h"
+
+#include "mongo/db/btree.h"
+#include "mongo/db/clientcursor.h"
+#include "mongo/db/instance.h"
+#include "mongo/db/json.h"
+#include "mongo/db/queryutil.h"
+#include "mongo/dbtests/dbtests.h"
 
 namespace CursorTests {
 

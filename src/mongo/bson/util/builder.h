@@ -18,13 +18,14 @@
 #pragma once
 
 #include <cfloat>
-#include <string>
-#include <sstream>
 #include <iostream>
-#include <string.h>
+#include <sstream>
 #include <stdio.h>
-#include "../inline_decls.h"
-#include "../stringdata.h"
+#include <string>
+#include <string.h>
+
+#include "mongo/bson/inline_decls.h"
+#include "mongo/bson/stringdata.h"
 
 namespace mongo {
     /* Accessing unaligned doubles on ARM generates an alignment trap and aborts with SIGBUS on Linux.

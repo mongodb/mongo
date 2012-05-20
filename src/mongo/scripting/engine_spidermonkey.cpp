@@ -20,12 +20,13 @@
 #include "mongo/scripting/engine_spidermonkey.h"
 
 #include <boost/thread/recursive_mutex.hpp>
-
-#include "mongo/util/mongoutils/str.h"
-
 #ifndef _WIN32
 #include <boost/date_time/posix_time/posix_time.hpp>
 #endif
+
+#include <third_party/js-1.7/jsdate.h>
+
+#include "mongo/util/mongoutils/str.h"
 
 #define smuassert( cx , msg , val ) \
     if ( ! ( val ) ){ \
@@ -1770,5 +1771,4 @@ namespace mongo {
     }
 
 }
-#include "mongo/client/dbclientcursor.h"
 #include "sm_db.cpp"

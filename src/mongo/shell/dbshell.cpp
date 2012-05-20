@@ -15,17 +15,19 @@
  *    limitations under the License.
  */
 
-#include "pch.h"
+#include "mongo/pch.h"
+
+#include <boost/filesystem/operations.hpp>
 #include <fstream>
 #include <pcrecpp.h>
 #include <stdio.h>
 #include <string.h>
-#include <boost/filesystem/operations.hpp>
-#include "linenoise.h"
+
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/cmdline.h"
 #include "mongo/db/repl/rs_member.h"
 #include "mongo/scripting/engine.h"
+#include "mongo/shell/linenoise.h"
 #include "mongo/shell/shell_utils.h"
 #include "mongo/shell/shell_utils_launcher.h"
 #include "mongo/util/file.h"
@@ -34,6 +36,7 @@
 #include "mongo/util/startup_test.h"
 #include "mongo/util/util.h"
 #include "mongo/util/version.h"
+
 #ifdef _WIN32
 #define isatty _isatty
 #else

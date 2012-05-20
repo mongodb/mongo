@@ -17,6 +17,8 @@
 
 #pragma once
 
+#include "mongo/bson/bsonelement.h"
+
 namespace mongo {
 
     int getGtLtOp(const BSONElement& e);

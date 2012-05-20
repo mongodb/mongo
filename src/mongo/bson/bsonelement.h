@@ -1,4 +1,4 @@
-// BSONElement
+// bsonelement.h
 
 /*    Copyright 2009 10gen Inc.
  *
@@ -18,11 +18,11 @@
 #pragma once
 
 #include <string.h> // strlen
+#include <string>
 #include <vector>
 
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/oid.h"
-#include "mongo/bson/util/builder.h"
 #include "mongo/platform/float_utils.h"
 
 namespace mongo {
@@ -76,12 +76,12 @@ namespace mongo {
         void Null()                 const { chk(isNull()); } // throw UserException if not null
         void OK()                   const { chk(ok()); }     // throw UserException if element DNE
 
-	/** @return the embedded object associated with this field.
+        /** @return the embedded object associated with this field.
             Note the returned object is a reference to within the parent bson object. If that 
-	    object is out of scope, this pointer will no longer be valid. Call getOwned() on the 
-	    returned BSONObj if you need your own copy.
-	    throws UserException if the element is not of type object.
-	*/
+            object is out of scope, this pointer will no longer be valid. Call getOwned() on the 
+            returned BSONObj if you need your own copy.
+            throws UserException if the element is not of type object.
+        */
         BSONObj Obj()               const;
 
         /** populate v with the value of the element.  If type does not match, throw exception.
@@ -478,7 +478,6 @@ namespace mongo {
             return *this;
         }
     };
-
 
     inline int BSONElement::canonicalType() const {
         BSONType t = type();

@@ -17,22 +17,19 @@
 
 #pragma once
 
-#include "engine.h"
+#include "mongo/scripting/engine.h"
 
 // START inc hacking
 
 #ifdef WIN32
-#include "jstypes.h"
+#include <third_party/js-1.7/jstypes.h>
 #undef JS_PUBLIC_API
 #undef JS_PUBLIC_DATA
 #define JS_PUBLIC_API(t)    t __cdecl
 #define JS_PUBLIC_DATA(t)   t
 #endif
 
-#include "jsapi.h"
-#include "jsobj.h"
-#include "jsdate.h"
-#include "jsregexp.h"
+#include <third_party/js-1.7/jsapi.h>
 
 // END inc hacking
 
@@ -75,7 +72,6 @@ namespace mongo {
 
     // bson
     JSBool resolveBSONField( JSContext *cx, JSObject *obj, jsval id, uintN flags, JSObject **objp );
-
 
     // mongo
     void initMongoJS( SMScope * scope , JSContext * cx , JSObject * global , bool local );

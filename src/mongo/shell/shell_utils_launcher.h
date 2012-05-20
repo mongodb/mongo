@@ -20,6 +20,13 @@
 
 #include <boost/filesystem/convenience.hpp>
 #include <boost/thread/recursive_mutex.hpp>
+#include <map>
+#include <sstream>
+#include <string>
+#include <vector>
+#include <utility>
+
+#include "mongo/bson/bsonobj.h"
 
 #ifdef _WIN32
 typedef int pid_t;
@@ -47,10 +54,10 @@ namespace mongo {
         public:
             void appendLine( int port, int pid, const char *line );
             /** @return up to 100000 characters of the most recent log output. */
-            string str() const;
+            std::string str() const;
             void clear();
         private:
-            stringstream _buffer;
+            std::stringstream _buffer;
         };
 
         /**
@@ -66,7 +73,7 @@ namespace mongo {
             /** Register an unregistered port. */
             void registerPort( int port, pid_t pid, int output );
             void deletePort( int port );
-            void getRegisteredPorts( vector<int> &ports );
+            void getRegisteredPorts( std::vector<int> &ports );
 
             bool isPidRegistered( pid_t pid ) const;
             /** Register an unregistered pid. */
@@ -75,13 +82,13 @@ namespace mongo {
             void getRegisteredPids( vector<pid_t> &pids );
 
         private:
-            map<int,pair<pid_t,int> > _ports;
-            map<pid_t,int> _pids;
+            std::map<int,std::pair<pid_t,int> > _ports;
+            std::map<pid_t,int> _pids;
             mutable boost::recursive_mutex _mutex;
 
 #ifdef _WIN32
         public:
-            map<pid_t,HANDLE> _handles;
+            std::map<pid_t,HANDLE> _handles;
 #endif
         };
         
@@ -101,7 +108,7 @@ namespace mongo {
             boost::filesystem::path findProgram( const string &prog );
             void launchProcess( int child_stdout );
             
-            vector<string> _argv;
+            std::vector<std::string> _argv;
             int _port;
             int _pipe;
             pid_t _pid;

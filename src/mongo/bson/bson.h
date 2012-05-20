@@ -103,11 +103,11 @@ namespace mongo {
 #endif
 }
 
-#include "util/builder.h"
-#include "bsontypes.h"
-#include "oid.h"
-#include "bsonelement.h"
-#include "bsonobj.h"
-#include "bsonobjbuilder.h"
-#include "bsonobjiterator.h"
-#include "bson-inl.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsonobjiterator.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/bson-inl.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/util/builder.h"

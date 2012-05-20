@@ -19,7 +19,7 @@
 #pragma once
 
 #if defined(_WIN32)
-#  include <windows.h>
+#include "mongo/platform/windows_basic.h"
 #endif
 
 #include "mongo/platform/compiler.h"
