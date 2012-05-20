@@ -776,10 +776,10 @@ namespace mongo {
     }
     
     void CursorGenerator::setMultiPlanScanner() {
-        _mps.reset( new MultiPlanScanner( _ns, _query, _order, _parsedQuery, hint(),
-                                         explain() ? QueryPlanGenerator::Ignore :
+        _mps.reset( MultiPlanScanner::make( _ns, _query, _order, _parsedQuery, hint(),
+                                           explain() ? QueryPlanGenerator::Ignore :
                                                 QueryPlanGenerator::Use,
-                                         min(), max() ) );
+                                           min(), max() ) );
     }
     
     shared_ptr<Cursor> CursorGenerator::singlePlanCursor() {
@@ -831,7 +831,7 @@ namespace mongo {
     ( const char *ns, const BSONObj &query, const BSONObj &order,
      const QueryPlanSelectionPolicy &planPolicy, bool requireOrder,
      const shared_ptr<const ParsedQuery> &parsedQuery ) {
-        auto_ptr<MultiPlanScanner> mps( new MultiPlanScanner( ns, query, order, parsedQuery ) );
+        auto_ptr<MultiPlanScanner> mps( MultiPlanScanner::make( ns, query, order, parsedQuery ) );
         return newQueryOptimizerCursor( mps, planPolicy, requireOrder, false );
     }
         

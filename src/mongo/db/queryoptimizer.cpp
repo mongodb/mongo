@@ -917,6 +917,21 @@ doneCheckOrder:
         return bab.arr().jsonString();
     }
     
+    MultiPlanScanner *MultiPlanScanner::make( const char *ns,
+                                             const BSONObj &query,
+                                             const BSONObj &order,
+                                             const shared_ptr<const ParsedQuery> &parsedQuery,
+                                             const BSONObj &hint,
+                                             QueryPlanGenerator::RecordedPlanPolicy
+                                                    recordedPlanPolicy,
+                                             const BSONObj &min,
+                                             const BSONObj &max ) {
+        auto_ptr<MultiPlanScanner> ret( new MultiPlanScanner( ns, query, parsedQuery, hint,
+                                                             recordedPlanPolicy ) );
+        ret->init( order, min, max );
+        return ret.release();
+    }
+    
     shared_ptr<QueryOp> MultiPlanScanner::iterateRunner( QueryOp &originalOp, bool retried ) {
 
         if ( _runner ) {
@@ -1128,13 +1143,10 @@ doneCheckOrder:
      */
     
     MultiPlanScanner::MultiPlanScanner( const char *ns,
-                                        const BSONObj &query,
-                                        const BSONObj &order,
-                                        const shared_ptr<const ParsedQuery> &parsedQuery,
-                                        const BSONObj &hint,
-                                        QueryPlanGenerator::RecordedPlanPolicy recordedPlanPolicy,
-                                        const BSONObj &min,
-                                        const BSONObj &max ) :
+                                       const BSONObj &query,
+                                       const shared_ptr<const ParsedQuery> &parsedQuery,
+                                       const BSONObj &hint,
+                                       QueryPlanGenerator::RecordedPlanPolicy recordedPlanPolicy ) :
         _ns( ns ),
         _or( !query.getField( "$or" ).eoo() ),
         _query( query.getOwned() ),
@@ -1144,6 +1156,9 @@ doneCheckOrder:
         _hint( hint.getOwned() ),
         _tableScanned(),
         _doneOps() {
+    }
+    
+    void MultiPlanScanner::init( const BSONObj &order, const BSONObj &min, const BSONObj &max ) {
         if ( !order.isEmpty() || !min.isEmpty() || !max.isEmpty() ) {
             _or = false;
         }
@@ -1163,7 +1178,7 @@ doneCheckOrder:
             ++_i;
             auto_ptr<FieldRangeSetPair> frsp( new FieldRangeSetPair( _ns.c_str(), _query, true ) );
             updateCurrentQps( QueryPlanSet::make( _ns.c_str(), frsp, auto_ptr<FieldRangeSetPair>(),
-                                                 _query, order, _parsedQuery, hint,
+                                                 _query, order, _parsedQuery, _hint,
                                                  _recordedPlanPolicy,
                                                  min, max ) );
         }

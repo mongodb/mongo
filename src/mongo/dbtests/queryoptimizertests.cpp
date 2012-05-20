@@ -1374,9 +1374,8 @@ namespace QueryOptimizerTests {
             return QueryPattern( frs, order );
         }
         shared_ptr<MultiPlanScanner> makeMps( const BSONObj &query, const BSONObj &order ) {
-            return shared_ptr<MultiPlanScanner>
-            ( new MultiPlanScanner
-             ( ns(), query, order ) );
+            shared_ptr<MultiPlanScanner> ret( MultiPlanScanner::make( ns(), query, order ) );
+            return ret;
         }
         DBDirectClient &client() { return _client; }
     private:
@@ -1389,8 +1388,9 @@ namespace QueryOptimizerTests {
         class ToString : public Base {
         public:
             void run() {
-                MultiPlanScanner multiPlanScanner( ns(), BSON( "a" << 1 ), BSONObj() );
-                multiPlanScanner.toString(); // Just test that we don't crash.
+                scoped_ptr<MultiPlanScanner> multiPlanScanner
+                        ( MultiPlanScanner::make( ns(), BSON( "a" << 1 ), BSONObj() ) );
+                multiPlanScanner->toString(); // Just test that we don't crash.
             }
         };
         

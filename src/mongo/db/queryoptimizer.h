@@ -490,16 +490,17 @@ namespace mongo {
     /** Handles $or type queries by generating a QueryPlanSet for each $or clause. */
     class MultiPlanScanner {
     public:
-        MultiPlanScanner( const char *ns,
-                          const BSONObj &query,
-                          const BSONObj &order,
-                          const shared_ptr<const ParsedQuery> &parsedQuery =
-                                  shared_ptr<const ParsedQuery>(),
-                          const BSONObj &hint = BSONObj(),
-                          QueryPlanGenerator::RecordedPlanPolicy recordedPlanPolicy =
-                                  QueryPlanGenerator::Use,
-                          const BSONObj &min = BSONObj(),
-                          const BSONObj &max = BSONObj() );
+        
+        static MultiPlanScanner *make( const char *ns,
+                                      const BSONObj &query,
+                                      const BSONObj &order,
+                                      const shared_ptr<const ParsedQuery> &parsedQuery =
+                                             shared_ptr<const ParsedQuery>(),
+                                      const BSONObj &hint = BSONObj(),
+                                      QueryPlanGenerator::RecordedPlanPolicy recordedPlanPolicy =
+                                             QueryPlanGenerator::Use,
+                                      const BSONObj &min = BSONObj(),
+                                      const BSONObj &max = BSONObj() );
 
         /** Set the initial QueryOp for QueryPlanSet iteration. */
         void initialOp( const shared_ptr<QueryOp> &originalOp ) { _baseOp = originalOp; }
@@ -586,6 +587,16 @@ namespace mongo {
         string toString() const;
 
     private:
+
+        MultiPlanScanner( const char *ns,
+                         const BSONObj &query,
+                         const shared_ptr<const ParsedQuery> &parsedQuery,
+                         const BSONObj &hint,
+                         QueryPlanGenerator::RecordedPlanPolicy recordedPlanPolicy );
+        void init( const BSONObj &order,
+                  const BSONObj &min,
+                  const BSONObj &max );
+
         /** Initialize or iterate a runner generated from @param originalOp. */
         shared_ptr<QueryOp> iterateRunner( QueryOp &originalOp, bool retried = false );
 

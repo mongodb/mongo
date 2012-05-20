@@ -662,9 +662,11 @@ namespace Plan {
             hint_ = BSON( "hint" << BSON( "a" << 1 ) );
         }
         void run() {
-            for( int i = 0; i < 10000; ++i )
-                MultiPlanScanner s( ns_.c_str(), BSONObj(), BSONObj(),
-                                   boost::shared_ptr<const ParsedQuery>(), hint_ );
+            for( int i = 0; i < 10000; ++i ) {
+                scoped_ptr<MultiPlanScanner> s
+                        ( MultiPlanScanner::make( ns_.c_str(), BSONObj(), BSONObj(),
+                                                 boost::shared_ptr<const ParsedQuery>(), hint_ ) );
+            }
         }
         string ns_;
         scoped_ptr<Lock::GlobalWrite> _lk;
@@ -684,8 +686,10 @@ namespace Plan {
         }
         void run() {
             Client::Context ctx( ns_ );
-            for( int i = 0; i < 10000; ++i )
-                MultiPlanScanner s( ns_.c_str(), BSONObj(), BSON( "a" << 1 ) );
+            for( int i = 0; i < 10000; ++i ) {
+                scoped_ptr<MultiPlanScanner> s
+                        ( MultiPlanScanner::make( ns_.c_str(), BSONObj(), BSON( "a" << 1 ) ) );
+            }
         }
         string ns_;
         auto_ptr< Lock::GlobalWrite > lk_;
@@ -703,8 +707,10 @@ namespace Plan {
         }
         void run() {
             Client::Context ctx( ns_.c_str() );
-            for( int i = 0; i < 10000; ++i )
-                MultiPlanScanner s( ns_.c_str(), BSON( "a" << 1 ), BSONObj() );
+            for( int i = 0; i < 10000; ++i ) {
+                scoped_ptr<MultiPlanScanner>
+                        s( MultiPlanScanner::make( ns_.c_str(), BSON( "a" << 1 ), BSONObj() ) );
+            }
         }
         string ns_;
         auto_ptr< Lock::GlobalWrite > lk_;

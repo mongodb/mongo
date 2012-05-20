@@ -892,8 +892,8 @@ namespace mongo {
         
         BSONObj oldPlan;
         if ( explain && ! pq.hasIndexSpecifier() ) {
-            MultiPlanScanner mps( ns, query, order );
-            oldPlan = mps.cachedPlanExplainSummary();
+            scoped_ptr<MultiPlanScanner> mps( MultiPlanScanner::make( ns, query, order ) );
+            oldPlan = mps->cachedPlanExplainSummary();
         }
 
         // In some cases the query may be retried if there is an in memory sort size assertion.
