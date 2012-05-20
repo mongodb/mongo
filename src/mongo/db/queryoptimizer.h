@@ -357,18 +357,18 @@ namespace mongo {
          * @param originalFrsp - original constraints for this query clause; if null, frsp will be
          * used.
          */
-        QueryPlanSet( const char *ns,
-                     auto_ptr<FieldRangeSetPair> frsp,
-                     auto_ptr<FieldRangeSetPair> originalFrsp,
-                     const BSONObj &originalQuery,
-                     const BSONObj &order,
-                     const shared_ptr<const ParsedQuery> &parsedQuery =
-                            shared_ptr<const ParsedQuery>(),
-                     const BSONObj &hint = BSONObj(),
-                     QueryPlanGenerator::RecordedPlanPolicy recordedPlanPolicy =
-                            QueryPlanGenerator::Use,
-                     const BSONObj &min = BSONObj(),
-                     const BSONObj &max = BSONObj() );
+        static QueryPlanSet *make( const char *ns,
+                                  auto_ptr<FieldRangeSetPair> frsp,
+                                  auto_ptr<FieldRangeSetPair> originalFrsp,
+                                  const BSONObj &originalQuery,
+                                  const BSONObj &order,
+                                  const shared_ptr<const ParsedQuery> &parsedQuery =
+                                         shared_ptr<const ParsedQuery>(),
+                                  const BSONObj &hint = BSONObj(),
+                                  QueryPlanGenerator::RecordedPlanPolicy recordedPlanPolicy =
+                                         QueryPlanGenerator::Use,
+                                  const BSONObj &min = BSONObj(),
+                                  const BSONObj &max = BSONObj() );
 
         /** @return number of candidate plans. */
         int nPlans() const { return _plans.size(); }
@@ -460,8 +460,20 @@ namespace mongo {
         };
 
     private:
-        void addFallbackPlans();
+
+        QueryPlanSet( const char *ns,
+                     auto_ptr<FieldRangeSetPair> frsp,
+                     auto_ptr<FieldRangeSetPair> originalFrsp,
+                     const BSONObj &originalQuery,
+                     const BSONObj &order,
+                     const shared_ptr<const ParsedQuery> &parsedQuery,
+                     const BSONObj &hint,
+                     QueryPlanGenerator::RecordedPlanPolicy recordedPlanPolicy,
+                     const BSONObj &min,
+                     const BSONObj &max );
         void init();
+
+        void addFallbackPlans();
 
         QueryPlanGenerator _generator;
         BSONObj _originalQuery;

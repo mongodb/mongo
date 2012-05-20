@@ -2832,8 +2832,8 @@ namespace QueryOptimizerCursorTests {
         void nPlans( int n, const BSONObj &query, const BSONObj &order ) {
             auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), query ) );
             auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
-            QueryPlanSet s( ns(), frsp, frspOrig, query, order );
-            ASSERT_EQUALS( n, s.nPlans() );
+            scoped_ptr<QueryPlanSet> s( QueryPlanSet::make( ns(), frsp, frspOrig, query, order ) );
+            ASSERT_EQUALS( n, s->nPlans() );
         }
         static shared_ptr<QueryOptimizerCursor> getCursor( const BSONObj &query,
                                                           const BSONObj &order ) {

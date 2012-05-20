@@ -755,6 +755,24 @@ doneCheckOrder:
             }
         }
     }
+    
+    QueryPlanSet *QueryPlanSet::make( const char *ns,
+                                     auto_ptr<FieldRangeSetPair> frsp,
+                                     auto_ptr<FieldRangeSetPair> originalFrsp,
+                                     const BSONObj &originalQuery,
+                                     const BSONObj &order,
+                                     const shared_ptr<const ParsedQuery> &parsedQuery,
+                                     const BSONObj &hint,
+                                     QueryPlanGenerator::RecordedPlanPolicy recordedPlanPolicy,
+                                     const BSONObj &min,
+                                     const BSONObj &max ) {
+        auto_ptr<QueryPlanSet> ret( new QueryPlanSet( ns, frsp, originalFrsp, originalQuery, order,
+                                                     parsedQuery, hint, recordedPlanPolicy, min,
+                                                     max ) );
+        ret->init();
+        return ret.release();
+    }
+
 
     QueryPlanSet::QueryPlanSet( const char *ns,
                                auto_ptr<FieldRangeSetPair> frsp,
@@ -774,7 +792,6 @@ doneCheckOrder:
         _order( order.getOwned() ),
         _oldNScanned( 0 ),
         _yieldSometimesTracker( 256, 20 ) {
-        init();
     }
 
     bool QueryPlanSet::hasMultiKey() const {
@@ -1145,10 +1162,10 @@ doneCheckOrder:
         if ( !_or ) {
             ++_i;
             auto_ptr<FieldRangeSetPair> frsp( new FieldRangeSetPair( _ns.c_str(), _query, true ) );
-            updateCurrentQps( new QueryPlanSet( _ns.c_str(), frsp, auto_ptr<FieldRangeSetPair>(),
-                                                _query, order, _parsedQuery, hint,
-                                                _recordedPlanPolicy,
-                                                min, max ) );
+            updateCurrentQps( QueryPlanSet::make( _ns.c_str(), frsp, auto_ptr<FieldRangeSetPair>(),
+                                                 _query, order, _parsedQuery, hint,
+                                                 _recordedPlanPolicy,
+                                                 min, max ) );
         }
         else {
             BSONElement e = _query.getField( "$or" );
@@ -1172,9 +1189,9 @@ doneCheckOrder:
         ++_i;
         auto_ptr<FieldRangeSetPair> frsp( _org->topFrsp() );
         auto_ptr<FieldRangeSetPair> originalFrsp( _org->topFrspOriginal() );
-        updateCurrentQps( new QueryPlanSet( _ns.c_str(), frsp, originalFrsp, _query,
-                                           BSONObj(), _parsedQuery, _hint, _recordedPlanPolicy,
-                                           BSONObj(), BSONObj() ) );
+        updateCurrentQps( QueryPlanSet::make( _ns.c_str(), frsp, originalFrsp, _query,
+                                             BSONObj(), _parsedQuery, _hint, _recordedPlanPolicy,
+                                             BSONObj(), BSONObj() ) );
     }
 
     bool MultiPlanScanner::mayHandleBeginningOfClause() {
@@ -1526,9 +1543,10 @@ doneCheckOrder:
         auto_ptr<FieldRangeSetPair> frsp( new FieldRangeSetPair( ns, query, true ) );
         auto_ptr<FieldRangeSetPair> origFrsp( new FieldRangeSetPair( *frsp ) );
 
-        QueryPlanSet qps( ns, frsp, origFrsp, query, sort, shared_ptr<const ParsedQuery>(),
-                         BSONObj(), QueryPlanGenerator::UseIfInOrder );
-        QueryPlanSet::QueryPlanPtr qpp = qps.getBestGuess();
+        scoped_ptr<QueryPlanSet> qps( QueryPlanSet::make( ns, frsp, origFrsp, query, sort,
+                                                         shared_ptr<const ParsedQuery>(), BSONObj(),
+                                                         QueryPlanGenerator::UseIfInOrder ) );
+        QueryPlanSet::QueryPlanPtr qpp = qps->getBestGuess();
         if( ! qpp.get() ) return shared_ptr<Cursor>();
 
         shared_ptr<Cursor> ret = qpp->newCursor();

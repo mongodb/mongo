@@ -804,8 +804,7 @@ namespace QueryOptimizerTests {
                 auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), query ) );
                 auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
                 return shared_ptr<QueryPlanSet>
-                ( new QueryPlanSet
-                 ( ns(), frsp, frspOrig, query, order ) );
+                        ( QueryPlanSet::make( ns(), frsp, frspOrig, query, order ) );
             }
         protected:
             static const char *ns() { return "unittests.QueryPlanSetTests"; }
@@ -822,9 +821,10 @@ namespace QueryOptimizerTests {
             void run() {
                 BSONObj obj = BSON( "a" << 1 );
                 auto_ptr<FieldRangeSetPair> fieldRangeSetPair( new FieldRangeSetPair( ns(), obj ) );
-                QueryPlanSet queryPlanSet( ns(), fieldRangeSetPair, auto_ptr<FieldRangeSetPair>(),
-                                          obj, BSONObj() );
-                queryPlanSet.toString(); // Just test that we don't crash.
+                scoped_ptr<QueryPlanSet> queryPlanSet
+                        ( QueryPlanSet::make( ns(), fieldRangeSetPair,
+                                             auto_ptr<FieldRangeSetPair>(), obj, BSONObj() ) );
+                queryPlanSet->toString(); // Just test that we don't crash.
             }
         };
         
@@ -833,9 +833,10 @@ namespace QueryOptimizerTests {
             void run() {
                 auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), BSON( "a" << 4 ) ) );
                 auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
-                QueryPlanSet s( ns(), frsp, frspOrig, BSON( "a" << 4 ),
-                               BSON( "b" << 1 ) );
-                ASSERT_EQUALS( 1, s.nPlans() );
+                scoped_ptr<QueryPlanSet> s( QueryPlanSet::make( ns(), frsp, frspOrig,
+                                                               BSON( "a" << 4 ),
+                                                               BSON( "b" << 1 ) ) );
+                ASSERT_EQUALS( 1, s->nPlans() );
             }
         };
 
@@ -847,10 +848,11 @@ namespace QueryOptimizerTests {
                 BSONObj query = BSON( "a" << 4 );
                 auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), query ) );
                 auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
-                QueryPlanSet s( ns(), frsp, frspOrig, query, BSONObj() );
+                scoped_ptr<QueryPlanSet> s( QueryPlanSet::make( ns(), frsp, frspOrig, query,
+                                                               BSONObj() ) );
 
                 // Only one optimal plan is added to the plan set.
-                ASSERT_EQUALS( 1, s.nPlans() );
+                ASSERT_EQUALS( 1, s->nPlans() );
 
                 // The optimal plan is recorded in the plan cache.
                 FieldRangeSet frs( ns(), query, true );
@@ -871,9 +873,10 @@ namespace QueryOptimizerTests {
                 Helpers::ensureIndex( ns(), BSON( "b" << 1 ), false, "b_1" );
                 auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), BSON( "a" << 4 ) ) );
                 auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
-                QueryPlanSet s( ns(), frsp, frspOrig, BSON( "a" << 4 ),
-                               BSON( "b" << 1 ) );
-                ASSERT_EQUALS( 3, s.nPlans() );
+                scoped_ptr<QueryPlanSet> s( QueryPlanSet::make( ns(), frsp, frspOrig,
+                                                               BSON( "a" << 4 ),
+                                                               BSON( "b" << 1 ) ) );
+                ASSERT_EQUALS( 3, s->nPlans() );
             }
         };
 
@@ -884,9 +887,9 @@ namespace QueryOptimizerTests {
                 Helpers::ensureIndex( ns(), BSON( "b" << 1 ), false, "b_1" );
                 auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), BSONObj() ) );
                 auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
-                QueryPlanSet s( ns(), frsp, frspOrig, BSONObj(),
-                               BSONObj() );
-                ASSERT_EQUALS( 1, s.nPlans() );
+                scoped_ptr<QueryPlanSet> s( QueryPlanSet::make( ns(), frsp, frspOrig, BSONObj(),
+                                                               BSONObj() ) );
+                ASSERT_EQUALS( 1, s->nPlans() );
             }
         };
 
@@ -898,9 +901,12 @@ namespace QueryOptimizerTests {
                 BSONObj hint = BSON( "hint" << BSON( "a" << 1 ) );
                 auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), BSON( "a" << 1 ) ) );
                 auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
-                QueryPlanSet s( ns(), frsp, frspOrig, BSON( "a" << 1 ),
-                               BSON( "b" << 1 ), shared_ptr<const ParsedQuery>(), hint );
-                ASSERT_EQUALS( 1, s.nPlans() );
+                scoped_ptr<QueryPlanSet> s( QueryPlanSet::make( ns(), frsp, frspOrig,
+                                                               BSON( "a" << 1 ),
+                                                               BSON( "b" << 1 ),
+                                                               shared_ptr<const ParsedQuery>(),
+                                                               hint ) );
+                ASSERT_EQUALS( 1, s->nPlans() );
             }
         };
 
@@ -912,9 +918,12 @@ namespace QueryOptimizerTests {
                 BSONObj hint = BSON( "hint" << "a_1" );
                 auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), BSON( "a" << 1 ) ) );
                 auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
-                QueryPlanSet s( ns(), frsp, frspOrig, BSON( "a" << 1 ),
-                               BSON( "b" << 1 ), shared_ptr<const ParsedQuery>(), hint );
-                ASSERT_EQUALS( 1, s.nPlans() );
+                scoped_ptr<QueryPlanSet> s( QueryPlanSet::make( ns(), frsp, frspOrig,
+                                                               BSON( "a" << 1 ),
+                                                               BSON( "b" << 1 ),
+                                                               shared_ptr<const ParsedQuery>(),
+                                                               hint ) );
+                ASSERT_EQUALS( 1, s->nPlans() );
             }
         };
 
@@ -926,9 +935,12 @@ namespace QueryOptimizerTests {
                 BSONObj hint = BSON( "hint" << BSON( "$natural" << 1 ) );
                 auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), BSON( "a" << 1 ) ) );
                 auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
-                QueryPlanSet s( ns(), frsp, frspOrig, BSON( "a" << 1 ),
-                               BSON( "b" << 1 ), shared_ptr<const ParsedQuery>(), hint );
-                ASSERT_EQUALS( 1, s.nPlans() );
+                scoped_ptr<QueryPlanSet> s( QueryPlanSet::make( ns(), frsp, frspOrig,
+                                                               BSON( "a" << 1 ),
+                                                               BSON( "b" << 1 ),
+                                                               shared_ptr<const ParsedQuery>(),
+                                                               hint ) );
+                ASSERT_EQUALS( 1, s->nPlans() );
             }
         };
 
@@ -939,9 +951,10 @@ namespace QueryOptimizerTests {
                 Helpers::ensureIndex( ns(), BSON( "a" << 1 ), false, "b_2" );
                 auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), BSON( "a" << 1 ) ) );
                 auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
-                QueryPlanSet s( ns(), frsp, frspOrig, BSON( "a" << 1 ),
-                               BSON( "$natural" << 1 ) );
-                ASSERT_EQUALS( 1, s.nPlans() );
+                scoped_ptr<QueryPlanSet> s( QueryPlanSet::make( ns(), frsp, frspOrig,
+                                                               BSON( "a" << 1 ),
+                                                               BSON( "$natural" << 1 ) ) );
+                ASSERT_EQUALS( 1, s->nPlans() );
             }
         };
 
@@ -951,10 +964,10 @@ namespace QueryOptimizerTests {
                 BSONObj hint = BSON( "hint" << "a_1" );
                 auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), BSON( "a" << 1 ) ) );
                 auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
-                ASSERT_THROWS( QueryPlanSet s( ns(), frsp, frspOrig, BSON( "a" << 1 ),
-                                              BSON( "b" << 1 ), shared_ptr<const ParsedQuery>(),
-                                              hint ),
-                                  AssertionException );
+                ASSERT_THROWS( QueryPlanSet::make( ns(), frsp, frspOrig, BSON( "a" << 1 ),
+                                                  BSON( "b" << 1 ), shared_ptr<const ParsedQuery>(),
+                                                  hint ),
+                              AssertionException );
             }
         };
 
@@ -1008,9 +1021,10 @@ namespace QueryOptimizerTests {
                 Helpers::ensureIndex( ns(), BSON( "b" << 1 ), false, "b_1" );
                 auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), BSON( "a" << 1 << "c" << 2 ) ) );
                 auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
-                QueryPlanSet s( ns(), frsp, frspOrig, BSON( "a" << 1 << "c" << 2 ),
-                               BSONObj() );
-                ASSERT_EQUALS( 2, s.nPlans() );
+                scoped_ptr<QueryPlanSet> s( QueryPlanSet::make( ns(), frsp, frspOrig,
+                                                               BSON( "a" << 1 << "c" << 2 ),
+                                                               BSONObj() ) );
+                ASSERT_EQUALS( 2, s->nPlans() );
             }
         };
 
@@ -1094,9 +1108,10 @@ namespace QueryOptimizerTests {
                 auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), query ) );
                 auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
                 auto_ptr< FieldRangeSetPair > frspOrig2( new FieldRangeSetPair( *frsp ) );
-                QueryPlanSet s( ns(), frsp, frspOrig, query, order,
-                               shared_ptr<const ParsedQuery>(), hint );
-                scoped_ptr<QueryPlan> qp( QueryPlan::make( nsd(), 1, s.frsp(), frspOrig2.get(),
+                scoped_ptr<QueryPlanSet> s( QueryPlanSet::make( ns(), frsp, frspOrig, query, order,
+                                                               shared_ptr<const ParsedQuery>(),
+                                                               hint ) );
+                scoped_ptr<QueryPlan> qp( QueryPlan::make( nsd(), 1, s->frsp(), frspOrig2.get(),
                                                           query, order ) );
                 boost::shared_ptr<Cursor> c = qp->newCursor();
                 double expected[] = { 2, 3, 6, 9 };
@@ -1111,9 +1126,11 @@ namespace QueryOptimizerTests {
                     auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), query ) );
                     auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
                     auto_ptr< FieldRangeSetPair > frspOrig2( new FieldRangeSetPair( *frsp ) );
-                    QueryPlanSet s( ns(), frsp, frspOrig, query, order,
-                                   shared_ptr<const ParsedQuery>(), hint );
-                    scoped_ptr<QueryPlan> qp( QueryPlan::make( nsd(), 1, s.frsp(), frspOrig2.get(),
+                    scoped_ptr<QueryPlanSet> s( QueryPlanSet::make( ns(), frsp, frspOrig, query,
+                                                                   order,
+                                                                   shared_ptr<const ParsedQuery>(),
+                                                                   hint ) );
+                    scoped_ptr<QueryPlan> qp( QueryPlan::make( nsd(), 1, s->frsp(), frspOrig2.get(),
                                                               query, order ) );
                     boost::shared_ptr<Cursor> c = qp->newCursor();
                     double expected[] = { 9, 6, 3, 2 };
@@ -1179,11 +1196,12 @@ namespace QueryOptimizerTests {
                 BSONObj query = BSON( "a" << BSON_ARRAY( 0 << 0 ) << "b" << 1 );
                 auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), query ) );
                 auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
-                QueryPlanSet s( ns(), frsp, frspOrig, query, BSONObj() );
+                scoped_ptr<QueryPlanSet> s( QueryPlanSet::make( ns(), frsp, frspOrig, query,
+                                                               BSONObj() ) );
                 // Two query plans, btree and collection scan.
-                ASSERT_EQUALS( 2, s.nPlans() );
+                ASSERT_EQUALS( 2, s->nPlans() );
                 // Not the geo plan.
-                ASSERT( s.firstPlan()->special().empty() );
+                ASSERT( s->firstPlan()->special().empty() );
             }
         };
         
@@ -1195,11 +1213,12 @@ namespace QueryOptimizerTests {
                 BSONObj query = BSON( "a" << BSON_ARRAY( 0 << 0 ) << "b" << 1 );
                 auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), query ) );
                 auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
-                QueryPlanSet s( ns(), frsp, frspOrig, query, BSONObj() );
+                scoped_ptr<QueryPlanSet> s( QueryPlanSet::make( ns(), frsp, frspOrig, query,
+                                                               BSONObj() ) );
                 // Single query plan.
-                ASSERT_EQUALS( 1, s.nPlans() );
+                ASSERT_EQUALS( 1, s->nPlans() );
                 // It's the geo plan.
-                ASSERT( !s.firstPlan()->special().empty() );                
+                ASSERT( !s->firstPlan()->special().empty() );                
             }
         };
         
