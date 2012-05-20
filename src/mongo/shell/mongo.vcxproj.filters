@@ -1160,6 +1160,12 @@
     <ClInclude Include="mk_wcwidth.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\third_party\js-1.7\jsapi.h">
+      <Filter>third_party\SpiderMonkey\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\client\dbclientinterface.h">
+      <Filter>db\Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="..\db\db.rc">
