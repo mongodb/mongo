@@ -128,6 +128,7 @@ namespace mongo {
         // accessors
 
         ShardChunkVersion getVersion() const { return _version; }
+        ShardChunkVersion getCollVersion() const { return _collVersion; }
         BSONObj getKey() const { return _key.getOwned(); }
         unsigned getNumChunks() const { return _chunksMap.size(); }
 

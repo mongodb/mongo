@@ -74,6 +74,7 @@ namespace mongo {
             _currMap = &currMap;
             _maxVersion = &maxVersion;
             _maxShardVersions = &maxShardVersions;
+            _validDiffs = 0;
         }
 
         void detach(){
@@ -81,9 +82,13 @@ namespace mongo {
             _currMap = NULL;
             _maxVersion = NULL;
             _maxShardVersions = NULL;
+            _validDiffs = 0;
         }
 
         void verifyAttached() const { verify( _currMap ); verify( _maxVersion ); verify( _maxShardVersions ); }
+
+        // Call after load for more information
+        int numValidDiffs() const { return _validDiffs; }
 
     protected:
 
@@ -143,13 +148,15 @@ namespace mongo {
         // Needed only if a custom connection is required to the config server
         Query configDiffQuery( const set<ShardChunkVersion>& extraMinorVersions = set<ShardChunkVersion>() ) const;
 
-
     private:
 
         string _ns;
         RangeMap* _currMap;
         ShardChunkVersion* _maxVersion;
         map<ShardType, ShardChunkVersion>* _maxShardVersions;
+
+        // Store for later use
+        int _validDiffs;
 
     };
 

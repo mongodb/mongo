@@ -767,7 +767,7 @@ namespace mongo {
         differ.attach( _ns, chunkMap, _version, shardVersions );
 
         // Diff tracker should *always* find at least one chunk if collection exists
-        int diffsApplied = differ.calculateConfigDiff( configServer.modelServer(), minorVersions );
+        int diffsApplied = differ.calculateConfigDiff( config, minorVersions );
         if( diffsApplied > 0 ){
 
             LOG(2) << "loaded " << diffsApplied << " chunks into new chunk manager for " << _ns
@@ -795,17 +795,27 @@ namespace mongo {
         }
         else { // diffsApplied < 0
 
-            // Inconsistent load (due to yielding cursor during load)
-            warning() << "inconsistent chunks found when reloading "
-                      << _ns << ", previous version was " << _version
-                      << ", this should be rare" << endl;
+            bool allInconsistent = differ.numValidDiffs() == 0;
+
+            if( allInconsistent ){
+                // All versions are different, this can be normal
+                warning() << "major change in chunk information found when reloading "
+                          << _ns << ", previous version was " << _version << endl;
+            }
+            else {
+                // Inconsistent load halfway through (due to yielding cursor during load)
+                // should be rare
+                warning() << "inconsistent chunks found when reloading "
+                          << _ns << ", previous version was " << _version
+                          << ", this should be rare" << endl;
+            }
 
             // Set all our data to empty to be extra safe
             chunkMap.clear();
             shardVersions.clear();
             _version = ShardChunkVersion( 0, OID() );
 
-            return false;
+            return allInconsistent;
         }
 
     }

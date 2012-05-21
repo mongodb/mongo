@@ -120,22 +120,37 @@ namespace mongo {
         //
 
         vector<BSONObj> newTracked;
+        // Store epoch now so it doesn't change when we change max
+        OID currEpoch = _maxVersion->epoch();
 
-        int chunksFound = 0;
+        _validDiffs = 0;
         while( diffCursor.more() ){
 
             BSONObj diffChunkDoc = diffCursor.next();
-            chunksFound++;
+
+            ShardChunkVersion chunkVersion = ShardChunkVersion::fromBSON( diffChunkDoc, "lastmod" );
 
             if( diffChunkDoc[ "min" ].type() != Object || diffChunkDoc[ "max" ].type() != Object ||
-                diffChunkDoc[ "lastmod" ].type() != Timestamp || diffChunkDoc[ "shard" ].type() != String )
+                diffChunkDoc[ "shard" ].type() != String )
             {
-                warning() << "got invalid chunk document " << diffChunkDoc << " when trying to remove overlapping chunks" << endl;
+                warning() << "got invalid chunk document " << diffChunkDoc
+                          << " when trying to load differing chunks" << endl;
                 continue;
             }
 
+            if( ! chunkVersion.isSet() || ! chunkVersion.hasCompatibleEpoch( currEpoch ) ){
+
+                warning() << "got invalid chunk version " << chunkVersion << " in document " << diffChunkDoc
+                          << " when trying to load differing chunks at version "
+                          << ShardChunkVersion( _maxVersion->toLong(), currEpoch ) << endl;
+
+                // Don't keep loading, since we know we'll be broken here
+                return -1;
+            }
+
+            _validDiffs++;
+
             // Get max changed version and chunk version
-            ShardChunkVersion chunkVersion = ShardChunkVersion::fromBSON( diffChunkDoc[ "lastmod" ] );
             if( chunkVersion > *_maxVersion ) *_maxVersion = chunkVersion;
 
             // Chunk version changes
@@ -153,7 +168,7 @@ namespace mongo {
             if( isTracked( diffChunkDoc ) ) newTracked.push_back( diffChunkDoc.getOwned() );
         }
 
-        LOG(3) << "found " << chunksFound << " new chunks for collection " << _ns
+        LOG(3) << "found " << _validDiffs << " new chunks for collection " << _ns
                << " (tracking " << newTracked.size() << "), new version is " << _maxVersion << endl;
 
         for( vector<BSONObj>::iterator it = newTracked.begin(); it != newTracked.end(); it++ ){
@@ -174,7 +189,7 @@ namespace mongo {
             _currMap->insert( rangeFor( chunkDoc, min, max ) );
         }
 
-        return chunksFound;
+        return _validDiffs;
     }
 
     template < class ValType, class ShardType >

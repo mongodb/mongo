@@ -45,12 +45,33 @@ namespace ShardingTests {
         };
     }
 
+    static int rand( int max = -1 ){
+        static unsigned seed = 1337;
+
+#if !defined(_WIN32)
+        int r = rand_r( &seed ) ;
+#else
+        int r = ::rand(); // seed not used in this case
+#endif
+
+        // Modding is bad, but don't really care in this case
+        return max > 0 ? r % max : r;
+    }
+
+    //
+    // Sets up a basic environment for loading chunks to/from the direct database connection
+    // Redirects connections to the direct database for the duration of the test.
+    //
     class ChunkManagerTest : public ConnectionString::ConnectionHook {
     public:
 
         static DBDirectClient _client;
+        Shard _shard;
 
         ChunkManagerTest() {
+
+            DBException::traceExceptions = true;
+
             // Make all connections redirect to the direct client
             ConnectionString::setConnectionHook( this );
 
@@ -62,14 +83,22 @@ namespace ShardingTests {
             client().dropDatabase( nsGetDB( collName() ) );
             client().insert( collName(), BSON( "hello" << "world" ) );
             client().dropCollection( collName() );
-        }
 
-        string collName(){ return "foo.bar"; }
+            // Since we've redirected the conns, the host doesn't matter here
+            // TODO: Separate the Shard stuff out more
+            _shard = Shard( "shard0000", "hostFooBar:27017" );
+            // Need to run this to ensure the shard is in the global lookup table
+            _shard.setAddress( _shard.getAddress() );
+        }
 
         virtual ~ChunkManagerTest() {
             // Reset the redirection
             ConnectionString::setConnectionHook( NULL );
         }
+
+        string collName(){ return "foo.bar"; }
+
+        Shard& shard(){ return _shard; }
 
         DBDirectClient& client(){
             return _client;
@@ -86,21 +115,18 @@ namespace ShardingTests {
 
     DBDirectClient ChunkManagerTest::_client;
 
+    //
+    // Tests creating a new chunk manager and creating the default chunks
+    //
     class ChunkManagerCreateBasicTest : public ChunkManagerTest {
     public:
 
         void run(){
 
-            BSONObj key = BSON( "_id" << 1 );
-            bool unique = false;
+            ChunkManager manager( collName(), ShardKeyPattern( BSON( "_id" << 1 ) ), false );
+            manager.createFirstChunks( shard().getConnString(), shard(), NULL, NULL );
 
-            // Since we've redirected the conns, the host doesn't matter here
-            Shard shard( "shard0000", "hostFooBar:27017" );
-
-            ChunkManager manager( collName(), ShardKeyPattern( key ), unique );
-            manager.createFirstChunks( shard.getConnString(), shard, NULL, NULL );
-
-            BSONObj firstChunk = client().findOne( ShardNS::chunk, BSONObj() );
+            BSONObj firstChunk = client().findOne( ShardNS::chunk, BSONObj() ).getOwned();
 
             ASSERT( firstChunk[ "min" ].Obj()[ "_id" ].type() == MinKey );
             ASSERT( firstChunk[ "max" ].Obj()[ "_id" ].type() == MaxKey );
@@ -111,6 +137,117 @@ namespace ShardingTests {
             ASSERT( version.minorVersion() == 0 );
             ASSERT( version.isEpochSet() );
 
+        }
+
+    };
+
+    //
+    // Tests creating a new chunk manager with random split points.  Creating chunks on multiple shards is not
+    // tested here since there are unresolved race conditions there and probably should be avoided if at all
+    // possible.
+    //
+    class ChunkManagerCreateFullTest : public ChunkManagerTest {
+    public:
+
+        static const int numSplitPoints = 100;
+
+        void genRandomSplitPoints( vector<int>* splitPoints ){
+            for( int i = 0; i < numSplitPoints; i++ ){
+                splitPoints->push_back( rand( numSplitPoints * 10 ) );
+            }
+        }
+
+        void genRandomSplitKeys( const string& keyName, vector<BSONObj>* splitKeys ){
+            vector<int> splitPoints;
+            genRandomSplitPoints( &splitPoints );
+
+            for( vector<int>::iterator it = splitPoints.begin(); it != splitPoints.end(); ++it ){
+                splitKeys->push_back( BSON( keyName << *it ) );
+            }
+        }
+
+        // Uses a chunk manager to create chunks
+        void createChunks( const string& keyName ){
+
+            vector<BSONObj> splitKeys;
+            genRandomSplitKeys( keyName, &splitKeys );
+
+            ChunkManager manager( collName(), ShardKeyPattern( BSON( keyName << 1 ) ), false );
+
+            manager.createFirstChunks( shard().getConnString(), shard(), &splitKeys, NULL );
+        }
+
+        void run(){
+
+            string keyName = "_id";
+            createChunks( keyName );
+
+            auto_ptr<DBClientCursor> cursor =
+                    client().query( ShardNS::chunk, QUERY( "ns" << collName() ) );
+
+            set<int> minorVersions;
+            OID epoch;
+
+            // Check that all chunks were created with version 1|x with consistent epoch and unique minor versions
+            while( cursor->more() ){
+
+                BSONObj chunk = cursor->next();
+
+                ShardChunkVersion version = ShardChunkVersion::fromBSON( chunk, "lastmod" );
+
+                ASSERT( version.majorVersion() == 1 );
+                ASSERT( version.isEpochSet() );
+
+                if( ! epoch.isSet() ) epoch = version.epoch();
+                ASSERT( version.epoch() == epoch );
+
+                ASSERT( minorVersions.find( version.minorVersion() ) == minorVersions.end() );
+                minorVersions.insert( version.minorVersion() );
+
+                ASSERT( chunk[ "shard" ].String() == shard().getName() );
+            }
+        }
+
+    };
+
+    //
+    // Tests that chunks are loaded correctly from the db with no a-priori info and also that they can be reloaded
+    // on top of an old chunk manager with changes.
+    //
+    class ChunkManagerLoadBasicTest : public ChunkManagerCreateFullTest {
+    public:
+
+        void run(){
+
+            string keyName = "_id";
+            createChunks( keyName );
+            int numChunks = static_cast<int>( client().count( ShardNS::chunk, BSON( "ns" << collName() ) ) );
+
+            BSONObj firstChunk = client().findOne( ShardNS::chunk, BSONObj() ).getOwned();
+            ShardChunkVersion version = ShardChunkVersion::fromBSON( firstChunk, "lastmod" );
+
+            // Make manager load existing chunks
+            ChunkManagerPtr manager( new ChunkManager( collName(), ShardKeyPattern( BSON( "_id" << 1 ) ), false ) );
+            ((ChunkManager*) manager.get())->loadExistingRanges( shard().getConnString() );
+
+            ASSERT( manager->getVersion().epoch() == version.epoch() );
+            ASSERT( manager->getVersion().minorVersion() == ( numChunks - 1 ) );
+            ASSERT( static_cast<int>( manager->getChunkMap().size() ) == numChunks );
+
+            // Modify chunks collection
+            BSONObjBuilder b;
+            ShardChunkVersion laterVersion = ShardChunkVersion( 2, 1, version.epoch() );
+            laterVersion.addToBSON( b, "lastmod" );
+
+            client().update( ShardNS::chunk, BSONObj(), BSON( "$set" << b.obj() ) );
+
+            // Make new manager load chunk diff
+            ChunkManager newManager( manager );
+            newManager.loadExistingRanges( shard().getConnString() );
+
+            ASSERT( newManager.getVersion().toLong() == laterVersion.toLong() );
+            ASSERT( newManager.getVersion().epoch() == laterVersion.epoch() );
+            ASSERT( static_cast<int>( newManager.getChunkMap().size() ) == numChunks );
         }
 
     };
@@ -160,19 +297,6 @@ namespace ShardingTests {
                 return make_pair( max, min );
             }
         };
-
-        int rand( int max = -1 ){
-            static unsigned seed = 1337;
-
-#if !defined(_WIN32)
-            int r = rand_r( &seed ) ;
-#else
-            int r = ::rand(); // seed not used in this case
-#endif
-
-            // Modding is bad, but don't really care in this case
-            return max > 0 ? r % max : r;
-        }
 
         // Allow validating with and without ranges (b/c our splits won't actually be updated by the diffs)
         void validate( BSONArray chunks, ShardChunkVersion maxVersion, const VersionMap& maxShardVersions ){
@@ -489,6 +613,8 @@ namespace ShardingTests {
             add< serverandquerytests::test1 >();
             // SERVER-5918
             //add< ChunkManagerCreateBasicTest >();
+            add< ChunkManagerCreateFullTest >();
+            add< ChunkManagerLoadBasicTest >();
             add< ChunkDiffUnitTestNormal >();
             add< ChunkDiffUnitTestInverse >();
         }
