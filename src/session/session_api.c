@@ -36,12 +36,6 @@ __session_close(WT_SESSION *wt_session, const char *config)
 
 	__wt_spin_lock(session, &conn->spinlock);
 
-	/*
-	 * Exclude the session from hazard reference checking; use a barrier to
-	 * ensure the session is ignored before we start freeing resources.
-	 */
-	WT_PUBLISH(session->active, 0);
-
 	/* Discard metadata tracking. */
 	__wt_meta_track_discard(session);
 
@@ -62,10 +56,15 @@ __session_close(WT_SESSION *wt_session, const char *config)
 		(void)__wt_cond_destroy(session, session->cond);
 
 	/*
-	 * Sessions are re-used, clear the structure (which resets the active
-	 * field to 0, so that's OK).
+	 * Sessions are re-used, clear the structure: this code sets the active
+	 * field to 0, which will exclude the hazard array from review by the
+	 * eviction thread.   Note: there's no serialization support around the
+	 * review of the hazard array, which means threads checking for hazard
+	 * references first check the active field (which may be 0) and then use
+	 * the hazard pointer (which cannot be NULL).  For this reason, clear
+	 * the session structure carefully.
 	 */
-	memset(session, 0, sizeof(*session));
+	WT_SESSION_CLEAR(session);
 	session = conn->default_session;
 
 	/*

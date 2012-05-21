@@ -162,7 +162,6 @@ __wt_hazard_empty(WT_SESSION_IMPL *session)
 			__wt_errx(session,
 			    "unexpected hazard reference at session.close");
 		}
-	__wt_free(session, session->hazard);
 }
 
 #ifdef HAVE_DIAGNOSTIC

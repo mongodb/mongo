@@ -93,8 +93,6 @@ struct __wt_session_impl {
 	int	wq_sleeping;		/* Thread is blocked */
 	int	wq_ret;			/* Return value */
 
-	WT_HAZARD *hazard;		/* Hazard reference array */
-
 	void	*reconcile;		/* Reconciliation information */
 
 	WT_REF **excl;			/* Eviction exclusive list */
@@ -107,6 +105,16 @@ struct __wt_session_impl {
 	int syncop;			/* File operation */
 
 	uint32_t flags;
+
+	/*
+	 * The hazard reference must be placed at the end of the structure: the
+	 * structure is cleared when closed, all except the hazard reference.
+	 * Putting the hazard reference at the end of the structure allows us to
+	 * easily call a function to clear memory up to, but not including, the
+	 * hazard reference.
+	 */
+#define	WT_SESSION_CLEAR(s)	memset(s, 0, WT_PTRDIFF(&(s)->hazard, s))
+	WT_HAZARD *hazard;		/* Hazard reference array */
 };
 
 /*******************************************
