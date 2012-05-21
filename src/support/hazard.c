@@ -123,24 +123,23 @@ __wt_hazard_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
 			 * until we've released our hazard reference because our
 			 * hazard reference blocks the page eviction.  A little
 			 * dance: check the page, schedule the forced eviction,
-			 * clear and publish the hazard reference, then wake the
-			 * eviction server.
+			 * clear/publish the hazard reference, wake the eviction
+			 * server.
+			 *
+			 * We don't publish the hazard reference clear in the
+			 * general case.  It's not required for correctness;
+			 * it gives the page server thread faster access to the
+			 * page were the page selected for eviction, but the
+			 * generation number was just set, so it's unlikely the
+			 * page will be selected for eviction.
+			 */
 			 */
 			if (__wt_eviction_page_check(session, page)) {
 				__wt_evict_page_request(session, page);
 				WT_PUBLISH(hp->page, NULL);
 				__wt_evict_server_wake(session);
-				return;
-			}
-
-			/*
-			 * We don't have to flush memory here for correctness;
-			 * it would give the page server thread faster access
-			 * to the block were the block selected to be evicted,
-			 * but the generation number was just set which makes
-			 * it unlikely to be selected for eviction.
-			 */
-			hp->page = NULL;
+			} else
+				hp->page = NULL;
 			return;
 		}
 	__wt_errx(session,
