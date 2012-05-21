@@ -5,7 +5,7 @@ trap 'rm -f $t; exit 0' 0 1 2 3 13 15
 
 build() {
 	# Build the standard typedefs.
-	f=../src/include/wt_internal.in
+	f=../src/include/wt_internal.h
 	(sed -e '/Forward structure declarations .*: BEGIN/{' \
 	    -e 'n' \
 	    -e 'q' \

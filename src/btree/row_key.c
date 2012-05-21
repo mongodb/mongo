@@ -117,12 +117,7 @@ __wt_row_key(
 	rip = rip_arg;
 	unpack = &_unpack;
 
-	/*
-	 * If the caller didn't pass us a buffer, create one.  We don't use
-	 * an existing buffer because the memory will be attached to a page
-	 * for semi-permanent use, and using an existing buffer might waste
-	 * memory if the one allocated from the pool was larger than needed.
-	 */
+	/* If the caller didn't pass us a buffer, create one. */
 	is_local = 0;
 	if (retb == NULL) {
 		is_local = 1;

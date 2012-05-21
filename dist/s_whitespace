@@ -23,5 +23,8 @@ for f in `find examples ext src test \
     -name '*.dox' -o \
     -name '*.in' -o \
     -name 'Makefile.am'`; do
+	if expr "$f" : ".*/Makefile.in" > /dev/null; then
+		continue
+	fi
 	ws $f
 done
