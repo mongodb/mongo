@@ -239,8 +239,10 @@ namespace mongo {
          * @param queryPlan must be supplied if @param cursor is not a QueryOptimizerCursor and
          * results must be sorted or read with a covered index.
          */
-        QueryResponseBuilder( const ParsedQuery &parsedQuery, const shared_ptr<Cursor> &cursor,
-                             const QueryPlanSummary &queryPlan, const BSONObj &oldPlan );
+        static QueryResponseBuilder *make( const ParsedQuery &parsedQuery,
+                                          const shared_ptr<Cursor> &cursor,
+                                          const QueryPlanSummary &queryPlan,
+                                          const BSONObj &oldPlan );
         /** @return true if the current iterate matches and is added. */
         bool addMatch();
         /** Note that a yield occurred. */
@@ -261,7 +263,11 @@ namespace mongo {
         int handoff( Message &result );
         /** A chunk manager found at the beginning of the query. */
         ShardChunkManagerPtr chunkManager() const { return _chunkManager; }
+
     private:
+        QueryResponseBuilder( const ParsedQuery &parsedQuery, const shared_ptr<Cursor> &cursor );
+        void init( const QueryPlanSummary &queryPlan, const BSONObj &oldPlan );
+
         ShardChunkManagerPtr newChunkManager() const;
         shared_ptr<ExplainRecordingStrategy> newExplainRecordingStrategy
         ( const QueryPlanSummary &queryPlan, const BSONObj &oldPlan ) const;

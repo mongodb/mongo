@@ -445,17 +445,27 @@ namespace mongo {
         _queryOptimizerCursor->abortOutOfOrderPlans();
     }
     
+    QueryResponseBuilder *QueryResponseBuilder::make( const ParsedQuery &parsedQuery,
+                                                     const shared_ptr<Cursor> &cursor,
+                                                     const QueryPlanSummary &queryPlan,
+                                                     const BSONObj &oldPlan ) {
+        auto_ptr<QueryResponseBuilder> ret( new QueryResponseBuilder( parsedQuery, cursor ) );
+        ret->init( queryPlan, oldPlan );
+        return ret.release();
+    }
+    
     QueryResponseBuilder::QueryResponseBuilder( const ParsedQuery &parsedQuery,
-                                               const shared_ptr<Cursor> &cursor,
-                                               const QueryPlanSummary &queryPlan,
-                                               const BSONObj &oldPlan ) :
+                                               const shared_ptr<Cursor> &cursor ) :
     _parsedQuery( parsedQuery ),
     _cursor( cursor ),
     _queryOptimizerCursor( dynamic_pointer_cast<QueryOptimizerCursor>( _cursor ) ),
-    _buf( 32768 ), // TODO be smarter here
-    _chunkManager( newChunkManager() ),
-    _explain( newExplainRecordingStrategy( queryPlan, oldPlan ) ),
-    _builder( newResponseBuildStrategy( queryPlan ) ) {
+    _buf( 32768 ) { // TODO be smarter here
+    }
+    
+    void QueryResponseBuilder::init( const QueryPlanSummary &queryPlan, const BSONObj &oldPlan ) {
+        _chunkManager = newChunkManager();
+        _explain = newExplainRecordingStrategy( queryPlan, oldPlan );
+        _builder = newResponseBuildStrategy( queryPlan );
         _builder->resetBuf();
     }
 
@@ -611,7 +621,8 @@ namespace mongo {
         }
         verify( cursor );
         
-        QueryResponseBuilder queryResponseBuilder( pq, cursor, queryPlan, oldPlan );
+        scoped_ptr<QueryResponseBuilder> queryResponseBuilder
+                ( QueryResponseBuilder::make( pq, cursor, queryPlan, oldPlan ) );
         bool saveClientCursor = false;
         const char *exhaust = 0;
         OpTime slaveReadTill;
@@ -624,7 +635,7 @@ namespace mongo {
             if ( !ccPointer->yieldSometimes( ClientCursor::MaybeCovered, &yielded ) ||
                 !cursor->ok() ) {
                 cursor.reset();
-                queryResponseBuilder.noteYield();
+                queryResponseBuilder->noteYield();
                 // !!! TODO The queryResponseBuilder still holds cursor.  Currently it will not do
                 // anything unsafe with the cursor in handoff(), but this is very fragile.
                 //
@@ -637,14 +648,14 @@ namespace mongo {
             }
 
             if ( yielded ) {
-                queryResponseBuilder.noteYield();
+                queryResponseBuilder->noteYield();
             }
             
             if ( pq.getMaxScan() && cursor->nscanned() > pq.getMaxScan() ) {
                 break;
             }
             
-            if ( !queryResponseBuilder.addMatch() ) {
+            if ( !queryResponseBuilder->addMatch() ) {
                 continue;
             }
             
@@ -658,14 +669,14 @@ namespace mongo {
             }
             
             if ( !cursor->supportGetMore() || pq.isExplain() ) {
-                if ( queryResponseBuilder.enoughTotalResults() ) {
+                if ( queryResponseBuilder->enoughTotalResults() ) {
                     break;
                 }
             }
-            else if ( queryResponseBuilder.enoughForFirstBatch() ) {
+            else if ( queryResponseBuilder->enoughForFirstBatch() ) {
                 // if only 1 requested, no cursor saved for efficiency...we assume it is findOne()
                 if ( pq.wantMore() && pq.getNumToReturn() != 1 ) {
-                    queryResponseBuilder.finishedFirstBatch();
+                    queryResponseBuilder->finishedFirstBatch();
                     if ( cursor->advance() ) {
                         saveClientCursor = true;
                     }
@@ -693,7 +704,7 @@ namespace mongo {
             throw SendStaleConfigException( ns , "version changed during initial query", shardingVersionAtStart, shardingState.getVersion( ns ) );
         }
 
-        int nReturned = queryResponseBuilder.handoff( result );
+        int nReturned = queryResponseBuilder->handoff( result );
 
         ccPointer.reset();
         long long cursorid = 0;
@@ -729,7 +740,7 @@ namespace mongo {
             }
             
             // Set attributes for getMore.
-            ccPointer->setChunkManager( queryResponseBuilder.chunkManager() );
+            ccPointer->setChunkManager( queryResponseBuilder->chunkManager() );
             ccPointer->setPos( nReturned );
             ccPointer->pq = pq_shared;
             ccPointer->fields = pq.getFieldPtr();
