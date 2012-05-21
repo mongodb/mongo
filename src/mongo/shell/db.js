@@ -59,7 +59,7 @@ DB.prototype.adminCommand = function( obj ){
 
 DB.prototype._adminCommand = DB.prototype.adminCommand; // alias old name
 
-DB.prototype.addUser = function( username , pass, readOnly ){
+DB.prototype.addUser = function( username , pass, readOnly, replicatedTo ){
     if ( pass == null || pass.length == 0 )
         throw "password can't be empty";
 
@@ -73,14 +73,36 @@ DB.prototype.addUser = function( username , pass, readOnly ){
     c.save( u );
     print( tojson( u ) );
 
+    //
+    // When saving users to replica sets, the shell user will want to know if the user hasn't
+    // been fully replicated everywhere, since this will impact security.  By default, replicate to
+    // majority of nodes with wtimeout 15 secs, though user can override
+    //
+    
+    replicatedTo = replicatedTo != undefined && replicatedTo != null ? replicatedTo : "majority"
+    
     // in mongod version 2.1.0-, this worked
     var le = {};
-    try {
-        le = this.getLastErrorObj();
-        printjson( le )
+    try {        
+        le = this.getLastErrorObj( replicatedTo, 15 * 1000 );
+        // printjson( le )
     }
-    catch (e) {}
-
+    catch (e) {
+        print( "could not find getLastError object : " + tojson( e ) )
+    }
+    
+    // We can't detect replica set shards via mongos, so we'll sometimes get this error
+    // In this case though, we've already checked the local error before returning norepl, so
+    // the user has been written and we're happy
+    if( le.err == "norepl" ){
+        return
+    }        
+    
+    if ( le.err == "timeout" ){
+        throw "timed out while waiting for user authentication to replicate - " +
+              "database will not be fully secured until replication finishes"
+    }
+    
     if ( le.err )
         throw "couldn't add user: " + le.err
 }

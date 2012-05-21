@@ -197,7 +197,8 @@ namespace mongo {
         return pClone;
     }
 
-    void DocumentSourceUnwind::sourceToBson(BSONObjBuilder *pBuilder) const {
+    void DocumentSourceUnwind::sourceToBson(
+        BSONObjBuilder *pBuilder, bool explain) const {
         pBuilder->append(unwindName, unwindPath.getPath(true));
     }
 

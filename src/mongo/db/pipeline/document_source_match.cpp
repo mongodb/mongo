@@ -34,7 +34,8 @@ namespace mongo {
         return matchName;
     }
 
-    void DocumentSourceMatch::sourceToBson(BSONObjBuilder *pBuilder) const {
+    void DocumentSourceMatch::sourceToBson(
+        BSONObjBuilder *pBuilder, bool explain) const {
         const BSONObj *pQuery = matcher.getQuery();
         pBuilder->append(matchName, *pQuery);
     }

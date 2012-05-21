@@ -110,10 +110,8 @@ assert.eq(result.ok, 1, tojson(result));
 s.getDB("admin").runCommand({enableSharding : "test"});
 s.getDB("admin").runCommand({shardCollection : "test.foo", key : {x : 1}});
 
-s.getDB(testUser.db).addUser(testUser.username, testUser.password , false );
-s.getDB(testUser.db).getLastError();
-s.getDB(testUserReadOnly.db).addUser(testUserReadOnly.username, testUserReadOnly.password, true);
-s.getDB(testUser.db).getLastError();
+s.getDB(testUser.db).addUser(testUser.username, testUser.password , false, 3 )
+s.getDB(testUserReadOnly.db).addUser(testUserReadOnly.username, testUserReadOnly.password, true, 3 )
 
 logout(adminUser);
 
@@ -224,8 +222,8 @@ assert.eq(count, 500);
 logout(adminUser);
 
 // add admin on shard itself, hack to prevent localhost auth bypass
-d1.getMaster().getDB(adminUser.db).addUser(adminUser.username, adminUser.password);
-d2.getMaster().getDB(adminUser.db).addUser(adminUser.username, adminUser.password);
+d1.getMaster().getDB(adminUser.db).addUser(adminUser.username, adminUser.password, false, 3);
+d2.getMaster().getDB(adminUser.db).addUser(adminUser.username, adminUser.password, false, 3);
 
 login(testUser);
 print( "testing map reduce" );

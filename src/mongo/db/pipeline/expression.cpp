@@ -957,7 +957,7 @@ namespace mongo {
           inclusion (or exclusion):
           { $project : {
               x : true, // include
-              y : { $const: true }
+              y : { $noOp: true }
           }}
 
           This can happen as a result of optimizations.  For example, the
