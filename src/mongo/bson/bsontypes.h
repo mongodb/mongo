@@ -17,8 +17,6 @@
 
 #pragma once
 
-#include "util/misc.h"
-
 namespace bson { }
 
 namespace mongo {
@@ -97,10 +95,9 @@ namespace mongo {
         Function=1,
         ByteArrayDeprecated=2, /* use BinGeneral instead */
         bdtUUID = 3, /* deprecated */
-	newUUID=4, /* language-independent UUID format across all drivers */
+        newUUID=4, /* language-independent UUID format across all drivers */
         MD5Type=5,
         bdtCustom=128
     };
 
 }
-

@@ -16,7 +16,7 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
+#include "mongo/pch.h"
 
 #define BOOST_SPIRIT_THREADSAFE
 #if BOOST_VERSION >= 103800
@@ -30,11 +30,13 @@
 #include <boost/spirit/utility/lists.hpp>
 #endif
 
-#include "json.h"
-#include "../bson/util/builder.h"
-#include "../util/base64.h"
-#include "../util/hex.h"
-
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/json.h"
+#include "mongo/util/base64.h"
+#include "mongo/util/hex.h"
+#include "mongo/util/optime.h"
 
 using namespace boost::spirit;
 

@@ -22,13 +22,9 @@
 
 #pragma once
 
-#include <limits>
-#include <cmath>
 #include <boost/static_assert.hpp>
-
-//#if defined(MONGO_EXPOSE_MACROS)
-//#define verify MONGO_verify
-//#endif
+#include <cmath>
+#include <limits>
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"

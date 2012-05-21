@@ -1,4 +1,4 @@
-/* @file misc.h 
+/* @file misc.h
 */
 
 /*
@@ -21,6 +21,7 @@
 
 #include <ctime>
 #include <limits>
+#include <string>
 
 #include "mongo/util/assert_util.h"
 

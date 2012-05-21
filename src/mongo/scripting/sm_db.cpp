@@ -17,17 +17,13 @@
 
 // hacked in right now from engine_spidermonkey.cpp
 
-#include "../client/syncclusterconnection.h"
-#include "../util/base64.h"
-#include "../util/text.h"
-#include "../util/hex.h"
-#include "../db/namespacestring.h"
+#include "mongo/client/dbclientcursor.h"
+#include "mongo/db/namespacestring.h"
+#include "mongo/util/base64.h"
+#include "mongo/util/text.h"
 
 #if( BOOST_VERSION >= 104200 )
-//#include <boost/uuid/uuid.hpp>
 #define HAVE_UUID 1
-#else
-;
 #endif
 
 namespace mongo {
@@ -194,13 +190,13 @@ namespace mongo {
         }
 
         try{
-        	ScriptEngine::runConnectCallback( *conn );
+            ScriptEngine::runConnectCallback( *conn );
         }
         catch( std::exception& e ){
-        	// Can happen if connection goes down while we're starting up here
-		// Catch so that we don't get a hard-to-trace segfault from SM
-        	JS_ReportError( cx, ((string)( str::stream() << "Error during mongo startup." << causedBy( e ) )).c_str() );
-        	return JS_FALSE;
+            // Can happen if connection goes down while we're starting up here
+            // Catch so that we don't get a hard-to-trace segfault from SM
+            JS_ReportError( cx, ((string)( str::stream() << "Error during mongo startup." << causedBy( e ) )).c_str() );
+            return JS_FALSE;
         }
 
         verify( JS_SetPrivate( cx , obj , (void*)( new shared_ptr< DBClientWithCommands >( conn ) ) ) );

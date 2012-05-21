@@ -17,14 +17,17 @@
 
 #pragma once
 
-#include <boost/noncopyable.hpp>
 #include <boost/intrusive_ptr.hpp>
+#include <boost/noncopyable.hpp>
 #include <set>
 #include <list>
+#include <string>
 #include <vector>
-#include "util/atomic_int.h"
-#include "util/builder.h"
-#include "stringdata.h"
+
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/stringdata.h"
+#include "mongo/bson/util/atomic_int.h"
+#include "mongo/bson/util/builder.h"
 
 namespace mongo {
 

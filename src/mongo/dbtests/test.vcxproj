@@ -507,6 +507,15 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\..\third_party\pcre-8.30\pcrecpp.h" />
     <ClInclude Include="..\db\repl\bgsync.h" />
     <ClInclude Include="..\server.h" />
+    <ClInclude Include="..\s\chunk.h" />
+    <ClInclude Include="..\s\config.h" />
+    <ClInclude Include="..\s\d_chunk_manager.h" />
+    <ClInclude Include="..\s\d_index_locator.h" />
+    <ClInclude Include="..\s\d_logic.h" />
+    <ClInclude Include="..\s\d_writeback.h" />
+    <ClInclude Include="..\s\grid.h" />
+    <ClInclude Include="..\s\shard.h" />
+    <ClInclude Include="..\s\shardkey.h" />
     <ClInclude Include="..\targetver.h" />
     <ClInclude Include="..\..\third_party\pcre-8.30\config.h" />
     <ClInclude Include="..\..\third_party\pcre-8.30\pcre.h" />
@@ -1266,6 +1275,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="..\s\chunk.cpp" />
     <ClCompile Include="..\s\config.cpp" />
     <ClCompile Include="..\s\d_chunk_manager.cpp" />
+    <ClCompile Include="..\s\d_index_locator.cpp" />
     <ClCompile Include="..\s\d_migrate.cpp" />
     <ClCompile Include="..\s\d_split.cpp" />
     <ClCompile Include="..\s\d_state.cpp" />

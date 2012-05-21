@@ -17,8 +17,7 @@
 
 #pragma once
 
-#include "../pch.h"
-#include "../db/jsobj.h"
+#include "mongo/db/jsobj.h"
 
 namespace mongo {
 

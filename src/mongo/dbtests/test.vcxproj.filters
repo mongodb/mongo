@@ -600,6 +600,33 @@
     <ClInclude Include="..\db\hasher.h">
       <Filter>db\Header Files\e to n</Filter>
     </ClInclude>
+    <ClInclude Include="..\s\chunk.h">
+      <Filter>s</Filter>
+    </ClInclude>
+    <ClInclude Include="..\s\config.h">
+      <Filter>s</Filter>
+    </ClInclude>
+    <ClInclude Include="..\s\d_chunk_manager.h">
+      <Filter>s</Filter>
+    </ClInclude>
+    <ClInclude Include="..\s\d_index_locator.h">
+      <Filter>s</Filter>
+    </ClInclude>
+    <ClInclude Include="..\s\d_logic.h">
+      <Filter>s</Filter>
+    </ClInclude>
+    <ClInclude Include="..\s\d_writeback.h">
+      <Filter>s</Filter>
+    </ClInclude>
+    <ClInclude Include="..\s\grid.h">
+      <Filter>s</Filter>
+    </ClInclude>
+    <ClInclude Include="..\s\shard.h">
+      <Filter>s</Filter>
+    </ClInclude>
+    <ClInclude Include="..\s\shardkey.h">
+      <Filter>s</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\client\connpool.cpp">
@@ -1455,6 +1482,9 @@
     </ClCompile>
     <ClCompile Include="..\db\hasher.cpp">
       <Filter>db\Source Files\e to n</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\d_index_locator.cpp">
+      <Filter>s</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

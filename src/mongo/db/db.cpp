@@ -16,52 +16,51 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
+#include "mongo/pch.h"
 
 #include <boost/thread/thread.hpp>
+#include <boost/filesystem/operations.hpp>
+#include <fstream>
 
-#include "db.h"
-
-#include "introspect.h"
-#include "repl.h"
-#include "../util/startup_test.h"
-#include "../util/file_allocator.h"
-#include "../util/background.h"
-#include "../util/text.h"
-#include "dbmessage.h"
-#include "instance.h"
-#include "clientcursor.h"
-#include "pdfile.h"
-#include "stats/counters.h"
-#include "repl/rs.h"
-#include "../scripting/engine.h"
-#include "module.h"
-#include "cmdline.h"
-#include "stats/snapshots.h"
-#include "../util/concurrency/task.h"
-#include "../util/version.h"
-#include "../util/ramlog.h"
-#include "../util/net/message_server.h"
-#include "client.h"
-#include "restapi.h"
-#include "dbwebserver.h"
-#include "dur.h"
-#include "d_concurrency.h"
-#include "../s/d_writeback.h"
-#include "d_globals.h"
-#include "ttl.h"
+#include "mongo/db/client.h"
+#include "mongo/db/clientcursor.h"
+#include "mongo/db/cmdline.h"
+#include "mongo/db/d_concurrency.h"
+#include "mongo/db/d_globals.h"
+#include "mongo/db/db.h"
+#include "mongo/db/dbmessage.h"
+#include "mongo/db/dbwebserver.h"
+#include "mongo/db/dur.h"
+#include "mongo/db/instance.h"
+#include "mongo/db/introspect.h"
+#include "mongo/db/json.h"
+#include "mongo/db/module.h"
+#include "mongo/db/pdfile.h"
+#include "mongo/db/repl.h"
+#include "mongo/db/repl/rs.h"
+#include "mongo/db/restapi.h"
+#include "mongo/db/stats/counters.h"
+#include "mongo/db/stats/snapshots.h"
+#include "mongo/db/ttl.h"
+#include "mongo/s/d_writeback.h"
+#include "mongo/scripting/engine.h"
+#include "mongo/util/background.h"
+#include "mongo/util/concurrency/task.h"
+#include "mongo/util/file_allocator.h"
+#include "mongo/util/net/message_server.h"
+#include "mongo/util/ramlog.h"
 #include "mongo/util/stacktrace.h"
+#include "mongo/util/startup_test.h"
+#include "mongo/util/text.h"
+#include "mongo/util/version.h"
 
 #if defined(_WIN32)
-# include "mongo/util/ntservice.h"
 # include "mongo/util/hook_windows_memory.h"
+# include "mongo/util/ntservice.h"
 # include <DbgHelp.h>
 #else
 # include <sys/file.h>
 #endif
-
-#include <fstream>
-#include <boost/filesystem/operations.hpp>
 
 namespace mongo {
 
@@ -308,7 +307,7 @@ namespace mongo {
                 if( h->version <= 0 ) {
                     uasserted(14026, 
                       str::stream() << "db " << dbName << " appears corrupt pdfile version: " << h->version 
-							        << " info: " << h->versionMinor << ' ' << h->fileLength);
+                                    << " info: " << h->versionMinor << ' ' << h->fileLength);
                 }
 
                 log() << "****" << endl;

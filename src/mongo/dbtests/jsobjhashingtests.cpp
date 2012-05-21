@@ -18,8 +18,9 @@
  */
 
 
-#include "mongo/dbtests/dbtests.h"
 #include "mongo/db/hasher.h"
+#include "mongo/db/json.h"
+#include "mongo/dbtests/dbtests.h"
 
 namespace JsobjHashingTests {
 
