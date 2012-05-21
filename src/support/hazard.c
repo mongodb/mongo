@@ -133,7 +133,6 @@ __wt_hazard_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
 			 * generation number was just set, so it's unlikely the
 			 * page will be selected for eviction.
 			 */
-			 */
 			if (__wt_eviction_page_check(session, page)) {
 				__wt_evict_page_request(session, page);
 				WT_PUBLISH(hp->page, NULL);
