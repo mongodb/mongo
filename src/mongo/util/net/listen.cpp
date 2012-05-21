@@ -354,9 +354,6 @@ namespace mongo {
 
     // ------ connection ticket and control ------
 
-    const int DEFAULT_MAX_CONN = 20000;
-    const int MAX_MAX_CONN = 20000;
-
     int getMaxConnections() {
 #ifdef _WIN32
         return DEFAULT_MAX_CONN;
