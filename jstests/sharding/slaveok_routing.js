@@ -34,7 +34,7 @@ var nodeCount = replTest.nodes.length;
  * is no admin user.
  */
 var priAdminDB = replTest.getPrimary().getDB( 'admin' );
-priAdminDB.addUser( 'user', 'user' );
+priAdminDB.addUser( 'user', 'user', false, 3 );
 
 coll.drop();
 coll.setSlaveOk( true );

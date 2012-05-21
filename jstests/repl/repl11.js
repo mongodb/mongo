@@ -3,7 +3,7 @@
 var baseName = "jstests_repl11test";
 
 setAdmin = function( n ) {
-    n.getDB( "admin" ).addUser( "super", "super" );
+    n.getDB( "admin" ).addUser( "super", "super", false, 3 );
     n.getDB( "local" ).addUser( "repl", "foo" );
     n.getDB( "local" ).system.users.findOne();
 }
@@ -17,7 +17,7 @@ doTest = function( signal ) {
     rt = new ReplTest( baseName );
     
     m = rt.start( true, {}, false, true );
-    m.getDB( baseName ).addUser( "test", "test" );
+    m.getDB( baseName ).addUser( "test", "test", false, 3 );
     setAdmin( m );
     rt.stop( true );
     
