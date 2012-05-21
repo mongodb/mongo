@@ -11,7 +11,7 @@ var md = master.getDB( 'd' );
 var mdc = md[ 'c' ];
 
 // prep the data
-var doccount = 100000;
+var doccount = 50000;
 for( i = 0; i < doccount; ++i ) {
     mdc.insert( { _id:i, x:i } );
 }
