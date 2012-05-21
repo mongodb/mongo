@@ -44,13 +44,6 @@ namespace mongo {
             if ( method[0] == '~' )
                 method = method.substr(1);
             
-            if ( method == "MultiPlanScanner" || 
-                 method == "QueryPlan" ||
-                 method == "QueryPlanSet" || 
-                 method == "QueryOptimizerCursorImpl" || 
-                 method == "QueryPlanGenerator" )
-                return false;
-            
             if ( name.find( "Geo" ) != string::npos ) 
                 return false;
             
