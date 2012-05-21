@@ -129,6 +129,10 @@ __evict_req_clr(WT_EVICT_ENTRY *r)
 {
 	r->btree = NULL;
 	r->page = NULL;
+	/*
+	 * No publication necessary, all we care about is the page value and
+	 * whenever it's cleared is fine.
+	 */
 }
 
 /*
@@ -191,6 +195,7 @@ __wt_evict_page_request(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_CACHE *cache;
 	WT_EVICT_ENTRY *er, *er_end;
+	int set;
 
 	cache = S2C(session)->cache;
 
@@ -217,12 +222,20 @@ __wt_evict_page_request(WT_SESSION_IMPL *session, WT_PAGE *page)
 	if (!WT_ATOMIC_CAS(page->ref->state, WT_REF_MEM, WT_REF_EVICT_FORCE))
 		return;
 
+	set = 0;
+	__wt_spin_lock(session, &cache->er_lock);
+
 	/* Find an empty slot and enter the eviction request. */
 	WT_EVICT_REQ_FOREACH(er, er_end, cache)
 		if (er->page == NULL) {
 			__evict_req_set(er, session->btree, page);
-			return;
+			set = 1;
+			break;
 		}
+
+	__wt_spin_unlock(session, &cache->er_lock);
+	if (set)
+		return;
 
 	/*
 	 * The request table is full, that's okay for page requests: another

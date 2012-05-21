@@ -56,6 +56,7 @@ struct __wt_cache {
 	/*
 	 * Forced-page eviction request information.
 	 */
+	WT_SPINLOCK	er_lock;	/* Forced page eviction serialization */
 	WT_EVICT_ENTRY *evict_request;	/* Forced page eviction request list */
 	uint32_t max_evict_request;	/* Size of the eviction request array */
 
