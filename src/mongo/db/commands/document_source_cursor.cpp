@@ -14,15 +14,15 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "pch.h"
+#include "mongo/pch.h"
 
-#include "db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source.h"
 
-#include "client/dbclientcursor.h"
-#include "db/clientcursor.h"
-#include "db/cursor.h"
-#include "db/instance.h"
-#include "db/pipeline/document.h"
+#include "mongo/client/dbclientcursor.h"
+#include "mongo/db/clientcursor.h"
+#include "mongo/db/cursor.h"
+#include "mongo/db/instance.h"
+#include "mongo/db/pipeline/document.h"
 
 namespace mongo {
 
