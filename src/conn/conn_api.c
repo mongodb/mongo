@@ -304,18 +304,18 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 	 * Close open, external sessions.
 	 * Additionally, the session's hazard reference memory isn't discarded
 	 * during normal session close because access to it isn't serialized.
-	 * Discard it now.
+	 * Discard it now.  Note the loop for the hazard reference memory, it's
+	 * the entire session array, not only the active session count, as the
+	 * active session count may be less than the maximum session count.
 	 */
-	for (s = conn->sessions, i = 0; i < conn->session_cnt; ++s, ++i) {
-		if (F_ISSET(s, WT_SESSION_INTERNAL))
-			continue;
-
-		if (s->active) {
+	for (s = conn->sessions, i = 0; i < conn->session_cnt; ++s, ++i)
+		if (s->active && !F_ISSET(s, WT_SESSION_INTERNAL)) {
 			wt_session = &s->iface;
 			WT_TRET(wt_session->close(wt_session, config));
 		}
-		__wt_free(NULL, s->hazard);
-	}
+	for (s = conn->sessions, i = 0; i < conn->session_size; ++s, ++i)
+		if (!F_ISSET(s, WT_SESSION_INTERNAL))
+			__wt_free(session, s->hazard);
 
 	/* Close open btree handles. */
 	WT_TRET(__wt_conn_btree_discard(conn));

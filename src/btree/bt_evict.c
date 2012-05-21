@@ -297,8 +297,10 @@ err:		__wt_err(session, ret, "eviction server error");
 
 	__wt_free(session, cache->evict);
 
-	if (session != conn->default_session)
+	if (session != conn->default_session) {
 		(void)session->iface.close(&session->iface, NULL);
+		__wt_free(conn->default_session, session->hazard);
+	}
 
 	return (NULL);
 }

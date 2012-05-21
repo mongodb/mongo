@@ -507,8 +507,14 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
 	TAILQ_INIT(&session_ret->cursors);
 	TAILQ_INIT(&session_ret->btrees);
 
-	WT_ERR(__wt_calloc(session,
-	    conn->hazard_size, sizeof(WT_HAZARD), &session_ret->hazard));
+	/*
+	 * The session's hazard reference memory isn't discarded during normal
+	 * session close because access to it isn't serialized.  Allocate the
+	 * first time we open this session.
+	 */
+	if (session_ret->hazard == NULL)
+		WT_ERR(__wt_calloc(session, conn->hazard_size,
+		    sizeof(WT_HAZARD), &session_ret->hazard));
 
 	/*
 	 * Public sessions are automatically closed during WT_CONNECTION->close.

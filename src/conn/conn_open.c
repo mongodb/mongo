@@ -90,12 +90,18 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	}
 
 	/*
-	 * Close the default session and switch back to the dummy session in
-	 * case of any error messages from the remaining operations while
-	 * destroying the connection handle.
+	 * Close the internal (default) session, and switch back to the dummy
+	 * session in case of any error messages from the remaining operations
+	 * while destroying the connection handle.
+	 *
+	 * Additionally, the session's hazard reference memory isn't discarded
+	 * during normal session close because access to it isn't serialized.
+	 * Discard it now.
 	 */
 	if (session != &conn->dummy_session) {
 		WT_TRET(session->iface.close(&session->iface, NULL));
+		__wt_free(&conn->dummy_session, session->hazard);
+
 		conn->default_session = &conn->dummy_session;
 	}
 
