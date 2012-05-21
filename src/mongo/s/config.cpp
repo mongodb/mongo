@@ -153,6 +153,7 @@ namespace mongo {
         uassert( 8042 , "db doesn't have sharding enabled" , _shardingEnabled );
         uassert( 13648 , str::stream() << "can't shard collection because not all config servers are up" , configServer.allUp() );
 
+        ChunkManagerPtr manager;
         
         {
             scoped_lock lk( _lock );
@@ -168,9 +169,11 @@ namespace mongo {
             ci.shard( cm );
 
             _save();
-        }
 
-        ChunkManagerPtr manager = getChunkManager(ns,true,true);
+            // Save the initial chunk manager for later, no need to reload if we're in this lock
+            manager = ci.getCM();
+            verify( manager.get() );
+        }
 
         // Tell the primary mongod to refresh it's data
         // TODO:  Think the real fix here is for mongos to just assume all collections sharded, when we get there
@@ -299,6 +302,9 @@ namespace mongo {
         
         verify( ! key.isEmpty() );
         
+        // TODO: We need to keep this first one-chunk check in until we have a more efficient way of
+        // creating/reusing a chunk manager, as doing so requires copying the full set of chunks currently
+
         BSONObj newest;
         if ( oldVersion.isSet() && ! forceReload ) {
             scoped_ptr<ScopedDbConnection> conn(
@@ -308,7 +314,7 @@ namespace mongo {
             conn->done();
             
             if ( ! newest.isEmpty() ) {
-                ShardChunkVersion v = ShardChunkVersion::fromBSON( newest["lastmod"] );
+                ShardChunkVersion v = ShardChunkVersion::fromBSON( newest, "lastmod" );
                 if ( v.isEquivalentTo( oldVersion ) ) {
                     scoped_lock lk( _lock );
                     CollectionInfo& ci = _collections[ns];
@@ -337,7 +343,7 @@ namespace mongo {
                 scoped_lock lk( _lock );
                 CollectionInfo& ci = _collections[ns];
                 if ( ci.isSharded() && ci.getCM() ) {
-                    ShardChunkVersion currentVersion = ShardChunkVersion::fromBSON( newest["lastmod"] );
+                    ShardChunkVersion currentVersion = ShardChunkVersion::fromBSON( newest, "lastmod" );
                     if ( currentVersion.isEquivalentTo( ci.getCM()->getVersion() ) ) {
                         return ci.getCM();
                     }
@@ -359,17 +365,34 @@ namespace mongo {
         
         CollectionInfo& ci = _collections[ns];
         uassert( 14822 ,  (string)"state changed in the middle: " + ns , ci.isSharded() );
+
+        // Reset if our versions aren't the same
+        bool shouldReset = ! temp->getVersion().isEquivalentTo( ci.getCM()->getVersion() );
         
-        bool forced = false;
-        if ( temp->getVersion() > ci.getCM()->getVersion() ||
-            (forced = (temp->getVersion().isEquivalentTo( ci.getCM()->getVersion() ) && forceReload ) ) ) {
+        // Also reset if we're forced to do so
+        if( ! shouldReset && forceReload ){
+            shouldReset = true;
+            warning() << "chunk manager reload forced for collection '" << ns
+                      << "', config version is " << temp->getVersion() << endl;
+        }
 
-            if( forced ){
-                warning() << "chunk manager reload forced for collection '" << ns << "', config version is " << temp->getVersion() << endl;
-            }
+        //
+        // LEGACY BEHAVIOR
+        // It's possible to get into a state when dropping collections when our new version is less than our prev
+        // version.  Behave identically to legacy mongos, for now, and warn to draw attention to the problem.
+        // TODO: Assert in next version, to allow smooth upgrades
+        //
 
-            // we only want to reset if we're newer or equal and forced
-            // otherwise we go into a bad cycle
+        if( shouldReset && temp->getVersion() < ci.getCM()->getVersion() ){
+            shouldReset = false;
+            warning() << "not resetting chunk manager for collection '" << ns
+                      << "', config version is " << temp->getVersion() << " and "
+                      << "old version is " << ci.getCM()->getVersion() << endl;
+        }
+
+        // end legacy behavior
+
+        if ( shouldReset ){
             ci.resetCM( temp.release() );
         }
         
