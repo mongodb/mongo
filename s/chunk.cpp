@@ -47,7 +47,7 @@ namespace mongo {
     string Chunk::chunkMetadataNS = "config.chunks";
 
     int Chunk::MaxChunkSize = 1024 * 1024 * 64;
-    int Chunk::MaxObjectPerChunk = 250000;
+    int Chunk::MaxObjectPerChunk = 100000;
     
 
     Chunk::Chunk(const ChunkManager * manager, BSONObj from)
