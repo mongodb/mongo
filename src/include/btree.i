@@ -258,7 +258,7 @@ __wt_page_hazard_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * have been active when we started our check.
 	 */
 	WT_ORDERED_READ(session_cnt, conn->session_cnt);
-	for (s = conn->sessions, i = 0; i < conn->session_cnt; ++s, ++i) {
+	for (s = conn->sessions, i = 0; i < session_cnt; ++s, ++i) {
 		if (!s->active)
 			continue;
 		for (hp = s->hazard; hp < s->hazard + conn->hazard_size; ++hp)
