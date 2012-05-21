@@ -391,7 +391,7 @@ __evict_file_request_walk(WT_SESSION_IMPL *session)
 	WT_CONNECTION_IMPL *conn;
 	WT_SESSION_IMPL *request_session;
 	WT_DECL_RET;
-	uint32_t i;
+	uint32_t i, session_cnt;
 	int syncop;
 
 	conn = S2C(session);
@@ -407,11 +407,12 @@ __evict_file_request_walk(WT_SESSION_IMPL *session)
 	 * If we don't find a request, something went wrong; complain, but don't
 	 * return an error code, the eviction thread doesn't need to exit.
 	 */
+	WT_ORDERED_READ(session_cnt, conn->session_cnt);
 	for (request_session = conn->sessions,
-	    i = 0; i < conn->session_cnt; ++request_session, ++i)
+	    i = 0; i < session_cnt; ++request_session, ++i)
 		if (request_session->active && request_session->syncop != 0)
 			break;
-	if (i == conn->session_cnt) {
+	if (i == session_cnt) {
 		__wt_errx(session,
 		    "failed to find handle's sync operation request");
 		return (0);
