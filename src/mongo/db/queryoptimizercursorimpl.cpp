@@ -327,27 +327,14 @@ namespace mongo {
      */
     class QueryOptimizerCursorImpl : public QueryOptimizerCursor {
     public:
-        QueryOptimizerCursorImpl( auto_ptr<MultiPlanScanner> &mps,
-                                 const QueryPlanSelectionPolicy &planPolicy,
-                                 bool requireOrder,
-                                 bool explain ) :
-        _requireOrder( requireOrder ),
-        _mps( mps ),
-        _initialCandidatePlans( _mps->possibleInOrderPlan(), _mps->possibleOutOfOrderPlan() ),
-        _originalOp( new QueryOptimizerCursorOp( _nscanned, planPolicy, _requireOrder,
-                                                !_initialCandidatePlans.hybridPlanSet() ) ),
-        _currOp(),
-        _completePlanOfHybridSetScanAndOrderRequired(),
-        _nscanned() {
-            _mps->initialOp( _originalOp );
-            if ( explain ) {
-                _explainQueryInfo = _mps->generateExplainInfo();
-            }
-            shared_ptr<QueryOp> op = _mps->nextOp();
-            rethrowOnError( op );
-            if ( !op->complete() ) {
-                _currOp = dynamic_cast<QueryOptimizerCursorOp*>( op.get() );
-            }
+        static QueryOptimizerCursorImpl *make( auto_ptr<MultiPlanScanner> &mps,
+                                              const QueryPlanSelectionPolicy &planPolicy,
+                                              bool requireOrder,
+                                              bool explain ) {
+            auto_ptr<QueryOptimizerCursorImpl> ret( new QueryOptimizerCursorImpl( mps, planPolicy,
+                                                                                 requireOrder ) );
+            ret->init( explain );
+            return ret.release();
         }
         
         virtual bool ok() { return _takeover ? _takeover->ok() : !currLoc().isNull(); }
@@ -590,6 +577,32 @@ namespace mongo {
         }
         
     private:
+        
+        QueryOptimizerCursorImpl( auto_ptr<MultiPlanScanner> &mps,
+                                 const QueryPlanSelectionPolicy &planPolicy,
+                                 bool requireOrder ) :
+        _requireOrder( requireOrder ),
+        _mps( mps ),
+        _initialCandidatePlans( _mps->possibleInOrderPlan(), _mps->possibleOutOfOrderPlan() ),
+        _originalOp( new QueryOptimizerCursorOp( _nscanned, planPolicy, _requireOrder,
+                                                !_initialCandidatePlans.hybridPlanSet() ) ),
+        _currOp(),
+        _completePlanOfHybridSetScanAndOrderRequired(),
+        _nscanned() {
+        }
+        
+        void init( bool explain ) {
+            _mps->initialOp( _originalOp );
+            if ( explain ) {
+                _explainQueryInfo = _mps->generateExplainInfo();
+            }
+            shared_ptr<QueryOp> op = _mps->nextOp();
+            rethrowOnError( op );
+            if ( !op->complete() ) {
+                _currOp = dynamic_cast<QueryOptimizerCursorOp*>( op.get() );
+            }
+        }
+
         /**
          * Advances the QueryPlanSet::Runner.
          * @param force - advance even if the current query op is not valid.  The 'force' param should only be specified
@@ -675,8 +688,9 @@ namespace mongo {
                                                const QueryPlanSelectionPolicy &planPolicy,
                                                bool requireOrder, bool explain ) {
         try {
-            return shared_ptr<Cursor>( new QueryOptimizerCursorImpl( mps, planPolicy,
-                                                                    requireOrder, explain ) );
+            shared_ptr<QueryOptimizerCursorImpl> ret
+                    ( QueryOptimizerCursorImpl::make( mps, planPolicy, requireOrder, explain ) );
+            return ret;
         } catch( const AssertionException &e ) {
             if ( e.getCode() == OutOfOrderDocumentsAssertionCode ) {
                 // If no indexes follow the requested sort order, return an
