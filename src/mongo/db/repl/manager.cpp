@@ -128,9 +128,16 @@ namespace mongo {
                 BSONObj cmd = BSON( "replSetStepDown" << 1 );
                 ScopedConn conn(primary->fullName());
                 BSONObj result;
-                if (!conn.runCommand("admin", cmd, result, 0)) {
-                    log() << "stepping down " << primary->fullName()
-                          << " failed: " << result << endl;
+
+                try {
+                    if (!conn.runCommand("admin", cmd, result, 0)) {
+                        log() << "stepping down " << primary->fullName()
+                              << " failed: " << result << endl;
+                    }
+                }
+                catch (DBException &e) {
+                    log() << "stepping down " << primary->fullName() << " threw exception: "
+                          << e.toString() << endl;
                 }
             }
         }
