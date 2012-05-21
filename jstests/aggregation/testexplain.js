@@ -1,8 +1,8 @@
 /* load the test documents */
-load('jstests/aggregation/articles.js');
+load('jstests/aggregation/data/articles.js');
 
 /* load the test utilities */
-load('jstests/aggregation/utils.js');
+load('jstests/aggregation/extras/utils.js');
 
 function removeVariants(ed) {
     // ignore the timing, since it may vary

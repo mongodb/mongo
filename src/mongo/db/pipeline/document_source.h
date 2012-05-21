@@ -163,9 +163,6 @@ namespace mongo {
           convert the inner part of the object which will be added to the
           array being built here.
 
-          For explain == true, this will automatically append nOut to
-          the output.
-
           @param pBuilder the array builder to add the operation to.
           @param explain create explain output
          */
@@ -214,7 +211,7 @@ namespace mongo {
 
           This is *not* unsigned so it can be passed to BSONObjBuilder.append().
          */
-        long long nOut;
+        long long nRowsOut;
     };
 
 

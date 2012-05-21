@@ -108,10 +108,7 @@ namespace mongo {
         {
             BSONObj bsonObj;
             
-            if (pQuery.get())
-            {
-                pBuilder->append("query", *pQuery.get());
-            }
+            pBuilder->append("query", *pQuery);
 
             if (pSort.get())
             {

@@ -3,10 +3,10 @@
 */
 
 /* load the test documents */
-load('jstests/aggregation/articles.js');
+load('jstests/aggregation/data/articles.js');
 
 /* load the test utilities */
-load('jstests/aggregation/utils.js');
+load('jstests/aggregation/extras/utils.js');
 
 // make sure we're using the right db; this is the same as "use mydb;" in shell
 db = db.getSiblingDB("aggdb");

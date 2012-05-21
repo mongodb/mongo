@@ -26,7 +26,7 @@ namespace mongo {
         pSource(NULL),
         step(-1),
         pExpCtx(pCtx),
-        nOut(0) {
+        nRowsOut(0) {
     }
 
     DocumentSource::~DocumentSource() {
