@@ -144,7 +144,11 @@ namespace mongo {
     }
 
     bool inConstructorChainSupported() {
+#if defined(__linux__)
         return true;
+#else
+        return false;
+#endif
     }
 }
 
