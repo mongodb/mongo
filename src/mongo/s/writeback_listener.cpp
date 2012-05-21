@@ -164,9 +164,15 @@ namespace mongo {
                     massert( 10427 ,  "invalid writeback message" , msg.header()->valid() );
 
                     DBConfigPtr db = grid.getDBConfig( ns );
-                    ShardChunkVersion needVersion = ShardChunkVersion::fromBSON( data["version"] );
+                    ShardChunkVersion needVersion = ShardChunkVersion::fromBSON( data, "version" );
 
-                    // TODO: The logic here could be refactored, but keeping to the original codepath for safety for now
+                    //
+                    // TODO: Refactor the sharded strategy to correctly handle all sharding state changes itself,
+                    // we can't rely on WBL to do this for us b/c anything could reset our state in-between.
+                    // As a 99% optimization though we should def do a single soft reload of the manager if the WB
+                    // indicates a version we need to refresh - in dev mode turn this off for better tests.
+                    //
+
                     ChunkManagerPtr manager = db->getChunkManagerIfExists( ns );
 
                     if ( ! manager ) {
@@ -190,7 +196,7 @@ namespace mongo {
 
                     LOG(1) << msg.toString() << endl;
 
-                    if ( needVersion.isSet() && manager && needVersion <= manager->getVersion() ) {
+                    if ( needVersion.isSet() && manager && needVersion.isWriteCompatibleWith( manager->getVersion() ) ) {
                         // this means when the write went originally, the version was old
                         // if we're here, it means we've already updated the config, so don't need to do again
                         //db->getChunkManager( ns , true ); // SERVER-1349
@@ -199,7 +205,7 @@ namespace mongo {
                         // we received a writeback object that was sent to a previous version of a shard
                         // the actual shard may not have the object the writeback operation is for
                         // we need to reload the chunk manager and get the new shard versions
-                        manager = db->getChunkManager( ns , true );
+                        db->getChunkManagerIfExists( ns , true );
                     }
 
                     // do request and then call getLastError

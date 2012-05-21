@@ -1175,6 +1175,11 @@ namespace mongo {
     }
 
     bool ChunkManager::compatibleWith( const Chunk& other ) const {
+
+        // Do this first, b/c findChunk asserts if the key isn't similar
+        if( ! this->_key.hasShardKey( other.getMin() ) ) return false;
+        // We assume here that chunks will have consistent fields in min/max
+
         ChunkPtr myChunk = this->findChunk( other.getMin() );
 
         if( other.getMin() != myChunk->getMin() ) return false;

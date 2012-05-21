@@ -391,10 +391,12 @@ namespace mongo {
 
         int getCurrentDesiredChunkSize() const;
 
-    private:
         ChunkManagerPtr reload(bool force=true) const; // doesn't modify self!
+
         void markMinorForReload( ShardChunkVersion majorVersion ) const;
         void getMarkedMinorVersions( set<ShardChunkVersion>& minorVersions ) const;
+
+    private:
 
         // helpers for loading
 
