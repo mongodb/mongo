@@ -452,8 +452,6 @@ namespace mongo {
         // next, add the pipeline operators
         writeExplainOps(&opArray);
 
-        const char *pWhichPipeline =
-            pCtx->getInRouter() ? mongosPipelineName : serverPipelineName;
         result.appendArray(serverPipelineName, opArray.arr());
     }
 
