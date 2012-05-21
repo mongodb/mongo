@@ -101,7 +101,6 @@ AC_CONFIG_HEADERS([wiredtiger_config.h:build_posix/config.hin])
 AC_CONFIG_FILES([
 	Makefile
 	wiredtiger.h:src/include/wiredtiger.in
-	wt_internal.h:src/include/wt_internal.in
 	wiredtiger.pc:build_posix/wiredtiger.pc.in
 ])
 AC_OUTPUT
