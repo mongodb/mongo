@@ -885,9 +885,6 @@ __evict_get_page(
 /*
  * __wt_evict_page --
  *	Evict a given page.
- *
- *	Use the current checkpoint context, if available, otherwise use a local
- *	transaction to get read-committed semantics.
  */
 int
 __wt_evict_page(WT_SESSION_IMPL *session, WT_PAGE *page)
@@ -898,6 +895,17 @@ __wt_evict_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 	const char *txn_cfg[] = { "isolation=snapshot", NULL };
 	int was_running;
 
+	/*
+	 * We have to take care when evicting pages not to write changes that:
+	 *  (a) is not yet committed; or
+	 *  (b) is committed more recently than an in-progress checkpoint.
+	 *
+	 * We handle both of these cases by setting up the transaction context
+	 * before evicting.  If a checkpoint is in progress, copy the
+	 * checkpoint's transaction.  Otherwise, we need a snapshot to avoid
+	 * uncommitted changes.  If a transaction is in progress in the
+	 * evicting session, we save and restore its state.
+	 */
 	txn = &session->txn;
 	saved_txn = *txn;
 	was_running = (F_ISSET(txn, TXN_RUNNING) != 0);
@@ -950,9 +958,6 @@ __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app)
 	 * We don't care why eviction failed (maybe the page was dirty and
 	 * we're out of disk space, or the page had an in-memory subtree
 	 * already being evicted).
-	 *
-	 * Also, if a checkpoint is in progress, avoid writing dirty pages:
-	 * only evict if they are clean.
 	 */
 	(void)__wt_evict_page(session, page);
 

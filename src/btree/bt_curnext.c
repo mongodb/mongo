@@ -30,13 +30,18 @@ __cursor_fix_append_next(WT_CURSOR_BTREE *cbt, int newpage)
 			return (WT_NOTFOUND);
 
 	/*
-	 * XXX
 	 * Column store appends are inherently non-transactional.
 	 *
-	 * An "invisible" update by a concurrent or aborted transaction changes
-	 * the effective end of the data.  The effect is subtle because of the
-	 * blurring between deleted and empty values, but ideally we would skip
-	 * all uncommitted changes "at the end" of the data.
+	 * Even a non-visible update by a concurrent or aborted transaction
+	 * changes the effective end of the data.  The effect is subtle because
+	 * of the blurring between deleted and empty values, but ideally we
+	 * would skip all uncommitted changes at the end of the data.
+	 *
+	 * The problem is that we don't know at this point whether there may be
+	 * multiple uncommitted changes at the end of the data, and it would be
+	 * expensive to check every time we hit an aborted update.  If an
+	 * insert is aborted, we simply return zero (empty), regardless of
+	 * whether we are at the end of the data.
 	 */
 	cbt->iface.recno = ++cbt->recno;
 	if (cbt->recno < WT_INSERT_RECNO(cbt->ins) ||

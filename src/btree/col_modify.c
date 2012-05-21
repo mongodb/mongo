@@ -171,6 +171,10 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 err:		if (ins != NULL)
 			__wt_free(session, ins);
 		if (upd != NULL) {
+			/*
+			 * Remove the update from the current transaction, so we
+			 * don't try to modify it on rollback.
+			 */
 			__wt_txn_unmodify(session);
 			__wt_free(session, upd);
 		}

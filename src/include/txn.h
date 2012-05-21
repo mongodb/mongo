@@ -5,9 +5,11 @@
  * See the file LICENSE for redistribution information.
  */
 
-#define	WT_TXN_INVALID	0
-#define	WT_TXN_NONE	1
+/* Transaction ID type. */
 typedef uint32_t wt_txnid_t;
+
+#define	WT_TXN_INVALID	0		/* No txn running in a session. */
+#define	WT_TXN_NONE	1		/* Update rolled back, ignore. */
 
 /* Transaction ID comparison dealing with edge cases and wrapping. */
 #define	TXNID_LT(t1, t2)						\
