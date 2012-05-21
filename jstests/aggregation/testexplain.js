@@ -392,63 +392,84 @@ var edi2 = db.runCommand({ aggregate : "digits", explain: true, pipeline : [
     { $limit : 10 }
 ]});
 
-/*
-Despite edi2 reporting BasicCursor, this pipeline shows the values coming
-out in sorted order, even though db.digits.find() does NOT (because of the
-above insertion order).
-*/
-var di2 = db.runCommand({ aggregate : "digits", pipeline : [
-    { $sort : { d : 1 } },
-    { $skip : 5 },
-    { $limit : 10 }
-]});
-
-
 removeVariants(edi2);
 
 var edi2result = {
-        "serverPipeline" : [
-                {
-                        "query" : {
-
-                        },
-                        "sort" : {
-                                "d" : 1
-                        },
-                        "cursor" : {
-                                "cursor" : "BasicCursor",
-                                "isMultiKey" : false,
-                                "n" : 21,
-                                "nscannedObjects" : 21,
-                                "nscanned" : 21,
-                                "scanAndOrder" : false,
-                                "indexOnly" : false,
-                                "nYields" : 0,
-                                "nChunkSkips" : 0,
-                                "indexBounds" : {
-
-                                },
-                                "allPlans" : [
-                                        {
-                                                "cursor" : "BasicCursor",
-                                                "n" : 21,
-                                                "nscannedObjects" : 21,
-                                                "nscanned" : 21,
-                                                "indexBounds" : {
-
-                                                }
-                                        }
+    "serverPipeline" : [
+        {
+            "query" : {
+                
+            },
+            "sort" : {
+                "d" : 1
+            },
+            "cursor" : {
+                "cursor" : "BtreeCursor d_1",
+                "isMultiKey" : false,
+                "n" : 21,
+                "nscannedObjects" : 21,
+                "nscanned" : 21,
+                "scanAndOrder" : false,
+                "indexOnly" : false,
+                "nYields" : 0,
+                "nChunkSkips" : 0,
+                "indexBounds" : {
+                    "d" : [
+                        [
+                            {
+                                "$minElement" : 1
+                            },
+                            {
+                                "$maxElement" : 1
+                            }
+                        ]
+                    ]
+                },
+                "allPlans" : [
+                    {
+                        "cursor" : "BtreeCursor d_1",
+                        "n" : 21,
+                        "nscannedObjects" : 21,
+                        "nscanned" : 21,
+                        "indexBounds" : {
+                            "d" : [
+                                [
+                                    {
+                                        "$minElement" : 1
+                                    },
+                                    {
+                                        "$maxElement" : 1
+                                    }
                                 ]
+                            ]
                         }
-                },
-                {
-                        "$skip" : NumberLong(5)
-                },
-                {
-                        "$limit" : NumberLong(10)
+                    }
+                ],
+                "oldPlan" : {
+                    "cursor" : "BtreeCursor d_1",
+                    "indexBounds" : {
+                        "d" : [
+                            [
+                                {
+                                    "$minElement" : 1
+                                },
+                                {
+                                    "$maxElement" : 1
+                                }
+                            ]
+                        ]
+                    }
                 }
-        ],
-        "ok" : 1
+            }
+        },
+        {
+            "$skip" : NumberLong(5)
+        },
+        {
+            "$limit" : NumberLong(10)
+        }
+    ],
+    "ok" : 1
 };
 
 assert(documentEq(edi2, edi2result), 'edi2 failed');
@@ -529,7 +550,7 @@ var edi3result = {
                         "$limit" : NumberLong(10)
                 }
         ],
-        "ok" : 1
+    "ok" : 1
 };
 
 assert(documentEq(edi3, edi3result), 'edi3 failed');

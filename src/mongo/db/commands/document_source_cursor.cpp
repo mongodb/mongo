@@ -119,7 +119,7 @@ namespace mongo {
             BSONObjBuilder queryBuilder;
             queryBuilder.append("$query", *pQuery);
             if (pSort.get())
-                queryBuilder.append("$sort", *pSort);
+                queryBuilder.append("$orderby", *pSort);
             queryBuilder.append("$explain", 1);
             Query query(queryBuilder.obj());
 
