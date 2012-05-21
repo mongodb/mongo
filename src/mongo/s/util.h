@@ -144,9 +144,12 @@ namespace mongo {
 
         // Is this in the same epoch?
         bool hasCompatibleEpoch( const ShardChunkVersion& otherVersion ) const {
+            return hasCompatibleEpoch( otherVersion._epoch );
+        }
+
+        bool hasCompatibleEpoch( const OID& otherEpoch ) const {
             // TODO : Change logic from eras are not-unequal to eras are equal
-            if( otherVersion.isEpochSet() && isEpochSet() && otherVersion._epoch != _epoch )
-                return false;
+            if( otherEpoch.isSet() && _epoch.isSet() && otherEpoch != _epoch ) return false;
             return true;
         }
 
@@ -170,6 +173,9 @@ namespace mongo {
             if( type == jstOID ){
                 return ShardChunkVersion( 0, 0, el.OID() );
             }
+            else if( el.isNumber() ){
+                return ShardChunkVersion( static_cast<unsigned long long>( el.numberLong() ), OID() );
+            }
             else if( type == Timestamp || type == Date ){
                 return ShardChunkVersion( el._numberLong(), OID() );
             }
@@ -187,8 +193,6 @@ namespace mongo {
 
         static ShardChunkVersion fromBSON( const BSONObj& obj, const string& prefixIn="" ){
 
-            ShardChunkVersion version;
-
             string prefix = prefixIn;
             if( prefixIn == "" && ! obj[ "version" ].eoo() ){
                 prefix = (string)"version";
@@ -197,9 +201,7 @@ namespace mongo {
                 prefix = (string)"lastmod";
             }
 
-            if( obj[ prefix ].type() == Date || obj[ prefix ].type() == Timestamp ){
-                version._combined = obj[ prefix ]._numberLong();
-            }
+            ShardChunkVersion version = fromBSON( obj[ prefix ] );
 
             if( obj[ prefix + "Epoch" ].type() == jstOID ){
                 version._epoch = obj[ prefix + "Epoch" ].OID();

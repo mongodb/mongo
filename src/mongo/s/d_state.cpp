@@ -369,25 +369,6 @@ namespace mongo {
         _id = id;
     }
 
-    // -----ShardedConnectionInfo END ----
-
-    unsigned long long extractVersion( BSONElement e , string& errmsg ) {
-        if ( e.eoo() ) {
-            errmsg = "no version";
-            return 0;
-        }
-
-        if ( e.isNumber() )
-            return (unsigned long long)e.number();
-
-        if ( e.type() == Date || e.type() == Timestamp )
-            return e._numberLong();
-
-
-        errmsg = "version is not a numeric type";
-        return 0;
-    }
-
     class MongodShardCommand : public Command {
     public:
         MongodShardCommand( const char * n ) : Command( n ) {
@@ -553,9 +534,12 @@ namespace mongo {
                 return false;
             }
 
-            const ConfigVersion version = ConfigVersion( extractVersion( cmdObj["version"] , errmsg ), OID() );
-            if ( errmsg.size() )
+            if( cmdObj[ "version" ].eoo() ){
+                errmsg = "need to specify version";
                 return false;
+            }
+
+            const ConfigVersion version = ConfigVersion::fromBSON( cmdObj, "version" );
             
             // step 3
 
@@ -747,6 +731,7 @@ namespace mongo {
                      or if version for this client is ok
      */
     bool shardVersionOk( const string& ns , string& errmsg, ConfigVersion& received, ConfigVersion& wanted ) {
+
         if ( ! shardingState.enabled() )
             return true;
 
@@ -768,49 +753,56 @@ namespace mongo {
             return true;
         }
 
-        // TODO
-        //   all collections at some point, be sharded or not, will have a version (and a ShardChunkManager)
-        //   for now, we remove the sharding state of dropped collection
-        //   so delayed request may come in. This has to be fixed.
-        ConfigVersion clientVersion = info->getVersion(ns);
-        ConfigVersion version;
-        if ( ! shardingState.hasVersion( ns , version ) && ! clientVersion.isSet() ) {
-            return true;
-        }
+        // TODO : all collections at some point, be sharded or not, will have a version
+        //  (and a ShardChunkManager)
+        received = info->getVersion( ns );
+        wanted = shardingState.getVersion( ns );
 
-        // The versions we're going to compare, saved for future use
-        received = clientVersion;
-        wanted = version;
+        if( received.isWriteCompatibleWith( wanted ) ) return true;
 
-        if ( ! version.isSet() && clientVersion.isSet() ) {
-            stringstream ss;
-            ss << "collection was dropped or this shard no longer valid version";
-            errmsg = ss.str();
+        //
+        // Figure out exactly why not compatible, send appropriate error message
+        // The versions themselves are returned in the error, so not needed in messages here
+        //
+
+        // Check epoch first, to send more meaningful message, since other parameters probably
+        // won't match either
+        if( ! wanted.hasCompatibleEpoch( received ) ){
+            errmsg = str::stream() << "version epoch mismatch detected for " << ns << ", "
+                                   << "the collection may have been dropped and recreated";
             return false;
         }
 
-        if ( clientVersion >= version )
-            return true;
-
-
-        if ( ! clientVersion.isSet() ) {
-            stringstream ss;
-            ss << "client in sharded mode, but doesn't have version set for this collection";
-            errmsg = ss.str();
+        if( ! wanted.isSet() && received.isSet() ){
+            errmsg = str::stream() << "this shard no longer contains chunks for " << ns << ", "
+                                   << "the collection may have been dropped";
             return false;
         }
 
-        if ( version.majorVersion() == clientVersion.majorVersion() ) {
-            // this means there was just a split
-            // since on a split w/o a migrate this server is ok
-            // going to accept 
-            return true;
+        if( wanted.isSet() && ! received.isSet() ){
+            errmsg = str::stream() << "this shard contains versioned chunks for " << ns << ", "
+                                   << "but no version set in request";
+            return false;
         }
 
-        stringstream ss;
-        ss << "your version is too old";
-        errmsg = ss.str();
+        if( wanted.majorVersion() != received.majorVersion() ){
+
+            //
+            // Could be > or < - wanted is > if this is the source of a migration,
+            // wanted < if this is the target of a migration
+            //
+
+            errmsg = str::stream() << "version mismatch detected for " << ns << ", "
+                                   << "stored major version " << wanted.majorVersion()
+                                   << " does not match received " << received.majorVersion();
+            return false;
+        }
+
+        // Those are all the reasons the versions can mismatch
+        verify( false );
+
         return false;
+
     }
 
     void ShardingConnectionHook::onHandedOut( DBClientBase * conn ) {

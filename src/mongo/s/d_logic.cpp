@@ -61,9 +61,13 @@ namespace mongo {
             return false;
         }
 
-        LOG(1) << "connection meta data too old - will retry ns:(" << ns << ") op:(" << opToString(op) << ") " << errmsg << endl;
+        bool getsAResponse = doesOpGetAResponse( op );
 
-        if ( doesOpGetAResponse( op ) ) {
+        LOG(1) << "connection sharding metadata does not match for collection " << ns
+               << ", will retry (wanted : " << wanted << ", received : " << received << ")"
+               << ( getsAResponse ? "" : " (queuing writeback)" ) << endl;
+
+        if( getsAResponse ){
             verify( dbresponse );
             BufBuilder b( 32768 );
             b.skip( sizeof( QueryResult ) );
@@ -98,8 +102,7 @@ namespace mongo {
         const OID& clientID = ShardedConnectionInfo::get(false)->getID();
         massert( 10422 ,  "write with bad shard config and no server id!" , clientID.isSet() );
 
-        LOG(1) << "got write with an old config - writing back ns: " << ns << endl;
-        LOG(1) << m.toString() << endl;
+        LOG(1) << "writeback queued for " << m.toString() << endl;
 
         BSONObjBuilder b;
         b.appendBool( "writeBack" , true );
@@ -107,10 +110,8 @@ namespace mongo {
         b.append( "id" , writebackID );
         b.append( "connectionId" , cc().getConnectionId() );
         b.append( "instanceIdent" , prettyHostName() );
-        shardingState.getVersion( ns ).addToBSON( b );
-        
-        ShardedConnectionInfo* info = ShardedConnectionInfo::get( false );
-        ( info ? info->getVersion(ns) : ConfigVersion( 0, OID() ) ).addToBSON( b, "yourVersion" );
+        wanted.addToBSON( b );
+        received.addToBSON( b, "yourVersion" );
 
         b.appendBinData( "msg" , m.header()->len , bdtCustom , (char*)(m.singleData()) );
         LOG(2) << "writing back msg with len: " << m.header()->len << " op: " << m.operation() << endl;
