@@ -203,6 +203,29 @@ namespace mongo {
         return golive;
     }
 
+    extern SimpleMutex filesLockedFsync;
+
+    class DontLockOnEverySingleOperation : boost::noncopyable { 
+        scoped_ptr<Lock::ScopedLock> lk;
+        scoped_ptr<SimpleMutex::scoped_lock> fsync;
+    public:
+        void reset() {
+            lk.reset();
+            fsync.reset();
+        }
+        void reset(const char *ns) { 
+            reset();
+            verify( !Lock::isLocked() );
+            fsync.reset( new SimpleMutex::scoped_lock(filesLockedFsync) );
+            if( ns == 0 ) {
+                lk.reset( new Lock::GlobalWrite() );
+            }
+            else {
+                lk.reset( new Lock::DBWrite(ns) );
+            }
+        }
+    };
+
     /* tail an oplog.  ok to return, will be re-called. */
     void replset::SyncTail::oplogApplication() {
         while( 1 ) {
@@ -210,7 +233,7 @@ namespace mongo {
             {
                 int count = 0;
                 Timer timeInWriteLock;
-                scoped_ptr<Lock::ScopedLock> lk;
+                DontLockOnEverySingleOperation lk;
                 while( 1 ) {
                     // occasionally check some things
                     if (count-- <= 0 || time(0) % 10 == 0) {
@@ -306,20 +329,20 @@ namespace mongo {
                                 // but can't be 100% sure
                                 lk.reset();
                                 verify( !Lock::isLocked() );
-                                lk.reset( new Lock::GlobalWrite() );
+                                lk.reset(0);
                             }
                             else if( str::contains(ns, ".$cmd") ) {
                                 // a command may need a global write lock. so we will conservatively go ahead and grab one here. suboptimal. :-(
                                 lk.reset();
                                 verify( !Lock::isLocked() );
-                                lk.reset( new Lock::GlobalWrite() );
+                                lk.reset(0);
                             }
                             else if( !Lock::isWriteLocked(ns) || Lock::isW() ) {
                                 // we don't relock on every single op to try to be faster. however if switching collections, we have to.
                                 // note here we must reset to 0 first to assure the old object is destructed before our new operator invocation.
                                 lk.reset();
                                 verify( !Lock::isLocked() );
-                                lk.reset( new Lock::DBWrite(ns) );
+                                lk.reset(ns);
                             }
                         }
 

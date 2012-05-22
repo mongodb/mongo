@@ -10,11 +10,11 @@
 namespace mongo {
     
     class FSyncLockThread : public BackgroundJob {
+        void doRealWork();
     public:
         FSyncLockThread() : BackgroundJob( true ) {}
         virtual ~FSyncLockThread(){}
         virtual string name() const { return "FSyncLockThread"; }
-        void doRealWork();
         virtual void run() {
             Client::initThread( "fsyncLockWorker" );
             try {
@@ -95,7 +95,10 @@ namespace mongo {
         }
     } fsyncCmd;
 
+    SimpleMutex filesLockedFsync("filesLockedFsync");
+
     void FSyncLockThread::doRealWork() {
+        SimpleMutex::scoped_lock lkf(filesLockedFsync);
         Lock::GlobalWrite global(true/*stopGreed*/);
         SimpleMutex::scoped_lock lk(fsyncCmd.m);
         
@@ -146,6 +149,7 @@ namespace mongo {
     
     // @return true if unlocked
     bool _unlockFsync() {
+        verify(!Lock::isLocked());
         SimpleMutex::scoped_lock lk( fsyncCmd.m );
         if( !fsyncCmd.locked ) { 
             return false;

@@ -78,6 +78,7 @@ using namespace mongoutils;
 namespace mongo {
 
     bool lockedForWriting();
+    extern SimpleMutex filesLockedFsync;
 
     namespace dur {
 
@@ -720,6 +721,8 @@ namespace mongo {
         }
 
         static void durThreadGroupCommit() {
+            SimpleMutex::scoped_lock flk(filesLockedFsync);
+
             const int N = 10;
             static int n;
             if( privateMapBytes < UncommittedBytesLimit && ++n % N && (cmdLine.durOptions&CmdLine::DurAlwaysRemap)==0 ) {
