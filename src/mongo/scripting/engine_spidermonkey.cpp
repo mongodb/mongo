@@ -19,6 +19,7 @@
 
 #include "mongo/scripting/engine_spidermonkey.h"
 
+#include <boost/smart_ptr/scoped_array.hpp>
 #include <boost/thread/recursive_mutex.hpp>
 #ifndef _WIN32
 #include <boost/date_time/posix_time/posix_time.hpp>
@@ -43,12 +44,6 @@
     massert( 13615 , "JS allocation failed, either memory leak or using too much memory" , newthing )
 
 namespace mongo {
-
-    class InvalidUTF8Exception : public UserException {
-    public:
-        InvalidUTF8Exception() : UserException( 9006 , "invalid utf8" ) {
-        }
-    };
 
     string trim( string s ) {
         while ( s.size() && isspace( s[0] ) )
@@ -194,37 +189,18 @@ namespace mongo {
             _context = cx;
         }
 
-        string toString( JSString * so ) {
-            jschar * s = JS_GetStringChars( so );
-            size_t srclen = JS_GetStringLength( so );
+        string toString( JSString* jsString ) {
+            size_t srclen = JS_GetStringLength( jsString );
             if( srclen == 0 )
                 return "";
 
-            size_t len = srclen * 6; // we only need *3, but see note on len below
-            char * dst = (char*)malloc( len );
-
-            len /= 2;
-            // doc re weird JS_EncodeCharacters api claims len expected in 16bit
-            // units, but experiments suggest 8bit units expected.  We allocate
-            // enough memory that either will work.
-
-            if ( !JS_EncodeCharacters( _context , s , srclen , dst , &len) ) {
-                StringBuilder temp;
-                temp << "Not proper UTF-16: ";
-                for ( size_t i=0; i<srclen; i++ ) {
-                    if ( i > 0 )
-                        temp << ",";
-                    temp << s[i];
-                }
-                uasserted( 13498 , temp.str() );
+            size_t len = (srclen * 6) + 1;
+            boost::scoped_array<char> utf8Chars( new char[len] );
+            jschar* utf16Chars = JS_GetStringChars( jsString );
+            if ( !JS_EncodeCharacters( _context, utf16Chars, srclen, utf8Chars.get(), &len ) ) {
+                uasserted( 16268, "error converting UTF-16 string to UTF-8" );
             }
-
-            string ss( dst , len );
-            free( dst );
-            if ( !JS_CStringsAreUTF8() )
-                for( string::const_iterator i = ss.begin(); i != ss.end(); ++i )
-                    uassert( 10213 ,  "non ascii character detected", (unsigned char)(*i) <= 127 );
-            return ss;
+            return string( utf8Chars.get(), len );
         }
 
         string toString( jsval v ) {
@@ -305,17 +281,30 @@ namespace mongo {
                 JSIdArray * properties = JS_Enumerate( _context , o );
                 verify( properties );
 
-                for ( jsint i=0; i<properties->length; i++ ) {
-                    jsid id = properties->vector[i];
-                    jsval nameval;
-                    verify( JS_IdToValue( _context ,id , &nameval ) );
-                    string name = toString( nameval );
-                    if ( stack.isTop() && name == "_id" )
-                        continue;
+                try {
+                    for ( jsint i=0; i<properties->length; i++ ) {
+                        jsid id = properties->vector[i];
+                        jsval nameval;
+                        verify( JS_IdToValue( _context, id, &nameval ) );
+                        string name = toString( nameval );
+                        if ( stack.isTop() && name == "_id" )
+                            continue;
 
-                    append( b , name , getProperty( o , name.c_str() ) , orig[name].type() , stack.dive( o ) );
+                        append( b,
+                                name,
+                                getProperty( o, name.c_str() ),
+                                orig[name].type(),
+                                stack.dive( o ) );
+                    }
                 }
-
+                catch ( const AssertionException& ) {
+                    JS_DestroyIdArray( _context , properties );
+                    throw;
+                }
+                catch ( const std::exception& e ) {
+                    log() << "unhandled exception: " << e.what() << ", throwing Fatal Assertion" << endl;
+                    fassertFailed( 16269 );
+                }
                 JS_DestroyIdArray( _context , properties );
             }
 
@@ -323,11 +312,10 @@ namespace mongo {
         }
 
         BSONObj toObject( jsval v ) {
-            if ( JSVAL_IS_NULL( v ) ||
-                    JSVAL_IS_VOID( v ) )
+            if ( JSVAL_IS_NULL( v ) || JSVAL_IS_VOID( v ) )
                 return BSONObj();
 
-            uassert( 10215 ,  "not an object" , JSVAL_IS_OBJECT( v ) );
+            uassert( 10215, "not an object", JSVAL_IS_OBJECT( v ) );
             return toObject( JSVAL_TO_OBJECT( v ) );
         }
 
@@ -336,7 +324,7 @@ namespace mongo {
         }
 
         string getFunctionCode( jsval v ) {
-            uassert( 10216 ,  "not a function" , JS_TypeOfValue( _context , v ) == JSTYPE_FUNCTION );
+            uassert( 10216, "not a function", JS_TypeOfValue( _context, v ) == JSTYPE_FUNCTION );
             return getFunctionCode( JS_ValueToFunction( _context , v ) );
         }
 
@@ -538,7 +526,7 @@ namespace mongo {
                 jsval v;
                 if ( JS_GetPendingException( _context , &v ) )
                     tlog() << "\t why: " << toString( v ) << endl;
-                throw InvalidUTF8Exception();
+                uassert( 16270, "conversion from string to JavaScript value failed", false );
             }
 
             CHECKJSALLOC( s );
@@ -799,80 +787,118 @@ namespace mongo {
 
 
     void bson_finalize( JSContext * cx , JSObject * obj ) {
-        BSONHolder * o = GETHOLDER( cx , obj );
-        if ( o ) {
-            delete o;
-            verify( JS_SetPrivate( cx , obj , 0 ) );
+        try {
+            BSONHolder * o = GETHOLDER( cx , obj );
+            if ( o ) {
+                delete o;
+                verify( JS_SetPrivate( cx , obj , 0 ) );
+            }
+        }
+        catch ( const AssertionException& e ) {
+            if ( ! JS_IsExceptionPending( cx ) ) JS_ReportError( cx, e.what() );
+        }
+        catch ( const std::exception& e ) {
+            log() << "unhandled exception: " << e.what() << ", throwing Fatal Assertion" << endl;
+            fassertFailed( 16271 );
         }
     }
 
     JSBool bson_enumerate( JSContext *cx, JSObject *obj, JSIterateOp enum_op, jsval *statep, jsid *idp ) {
+        try {
+            BSONHolder * o = GETHOLDER( cx , obj );
 
-        BSONHolder * o = GETHOLDER( cx , obj );
-
-        if ( enum_op == JSENUMERATE_INIT ) {
-            if ( o ) {
-                BSONFieldIterator * it = o->it();
-                *statep = PRIVATE_TO_JSVAL( it );
+            if ( enum_op == JSENUMERATE_INIT ) {
+                if ( o ) {
+                    BSONFieldIterator * it = o->it();
+                    *statep = PRIVATE_TO_JSVAL( it );
+                }
+                else {
+                    *statep = 0;
+                }
+                if ( idp )
+                    *idp = JSVAL_ZERO;
+                return JS_TRUE;
             }
-            else {
+
+            BSONFieldIterator * it = (BSONFieldIterator*)JSVAL_TO_PRIVATE( *statep );
+            if ( ! it ) {
                 *statep = 0;
+                return JS_TRUE;
             }
-            if ( idp )
-                *idp = JSVAL_ZERO;
-            return JS_TRUE;
-        }
 
-        BSONFieldIterator * it = (BSONFieldIterator*)JSVAL_TO_PRIVATE( *statep );
-        if ( ! it ) {
-            *statep = 0;
-            return JS_TRUE;
-        }
-
-        if ( enum_op == JSENUMERATE_NEXT ) {
-            if ( it->more() ) {
-                string name = it->next();
-                Convertor c(cx);
-                verify( JS_ValueToId( cx , c.toval( name.c_str() ) , idp ) );
+            if ( enum_op == JSENUMERATE_NEXT ) {
+                if ( it->more() ) {
+                    string name = it->next();
+                    Convertor c(cx);
+                    verify( JS_ValueToId( cx , c.toval( name.c_str() ) , idp ) );
+                }
+                else {
+                    delete it;
+                    *statep = 0;
+                }
+                return JS_TRUE;
             }
-            else {
-                delete it;
-                *statep = 0;
+
+            if ( enum_op == JSENUMERATE_DESTROY ) {
+                if ( it )
+                    delete it;
+                return JS_TRUE;
             }
-            return JS_TRUE;
-        }
 
-        if ( enum_op == JSENUMERATE_DESTROY ) {
-            if ( it )
-                delete it;
-            return JS_TRUE;
+            uassert( 10220 ,  "don't know what to do with this op" , 0 );
+            return JS_FALSE;
         }
-
-        uassert( 10220 ,  "don't know what to do with this op" , 0 );
-        return JS_FALSE;
+        catch ( const AssertionException& e ) {
+            if ( ! JS_IsExceptionPending( cx ) ) {
+                JS_ReportError( cx, e.what() );
+            }
+            return JS_FALSE;
+        }
+        catch ( const std::exception& e ) {
+            log() << "unhandled exception: " << e.what() << ", throwing Fatal Assertion" << endl;
+            fassertFailed( 16272 );
+        }
     }
 
     JSBool noaccess( JSContext *cx, JSObject *obj, jsval idval, jsval *vp) {
-        BSONHolder * holder = GETHOLDER( cx , obj );
-        if ( ! holder ) {
-            // in init code still
-            return JS_TRUE;
+        try {
+            BSONHolder * holder = GETHOLDER( cx , obj );
+            if ( ! holder ) {
+                // in init code still
+                return JS_TRUE;
+            }
+            if ( holder->_inResolve )
+                return JS_TRUE;
+            JS_ReportError( cx , "doing write op on read only operation" );
+            return JS_FALSE;
         }
-        if ( holder->_inResolve )
-            return JS_TRUE;
-        JS_ReportError( cx , "doing write op on read only operation" );
-        return JS_FALSE;
+        catch ( const AssertionException& e ) {
+            if ( ! JS_IsExceptionPending( cx ) ) {
+                JS_ReportError( cx, e.what() );
+            }
+            return JS_FALSE;
+        }
+        catch ( const std::exception& e ) {
+            log() << "unhandled exception: " << e.what() << ", throwing Fatal Assertion" << endl;
+            fassertFailed( 16273 );
+        }
     }
 
     JSClass bson_ro_class = {
-        "bson_ro_object" , JSCLASS_HAS_PRIVATE | JSCLASS_NEW_RESOLVE | JSCLASS_NEW_ENUMERATE ,
-        noaccess, noaccess, JS_PropertyStub, noaccess,
-        (JSEnumerateOp)bson_enumerate, (JSResolveOp)(&resolveBSONField) , JS_ConvertStub, bson_finalize ,
-        JSCLASS_NO_OPTIONAL_MEMBERS
+        "bson_ro_object",                                                   // class name
+        JSCLASS_HAS_PRIVATE | JSCLASS_NEW_RESOLVE | JSCLASS_NEW_ENUMERATE,  // flags
+        noaccess,                                                           // addProperty
+        noaccess,                                                           // delProperty
+        JS_PropertyStub,                                                    // getProperty
+        noaccess,                                                           // setProperty
+        (JSEnumerateOp)bson_enumerate,                                      // enumerate
+        (JSResolveOp)resolveBSONField,                                      // resolve
+        JS_ConvertStub,                                                     // convert
+        bson_finalize,                                                      // finalize
+        JSCLASS_NO_OPTIONAL_MEMBERS                                         // optional members
     };
 
     JSBool bson_cons( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ) {
-        cerr << "bson_cons : shouldn't be here!" << endl;
         JS_ReportError( cx , "can't construct bson object" );
         return JS_FALSE;
     }
@@ -882,169 +908,311 @@ namespace mongo {
     };
 
     JSBool bson_add_prop( JSContext *cx, JSObject *obj, jsval idval, jsval *vp) {
-        BSONHolder * holder = GETHOLDER( cx , obj );
-        if ( ! holder ) {
-            // static init
-            return JS_TRUE;
-        }
-        if ( ! holder->_inResolve ) {
-            Convertor c(cx);
-            string name = c.toString( idval );
-            if ( holder->_obj[name].eoo() ) {
-                holder->_extra.push_back( name );
+        try {
+            BSONHolder * holder = GETHOLDER( cx , obj );
+            if ( ! holder ) {
+                // static init
+                return JS_TRUE;
             }
-            holder->_modified = true;
+            if ( ! holder->_inResolve ) {
+                Convertor c(cx);
+                string name( c.toString( idval ) );
+                if ( holder->_obj[name].eoo() ) {
+                    holder->_extra.push_back( name );
+                }
+                holder->_modified = true;
+            }
+        }
+        catch ( const AssertionException& e ) {
+            if ( ! JS_IsExceptionPending( cx ) ) {
+                JS_ReportError( cx, e.what() );
+            }
+            return JS_FALSE;
+        }
+        catch ( const std::exception& e ) {
+            log() << "unhandled exception: " << e.what() << ", throwing Fatal Assertion" << endl;
+            fassertFailed( 16274 );
         }
         return JS_TRUE;
     }
 
 
     JSBool mark_modified( JSContext *cx, JSObject *obj, jsval idval, jsval *vp) {
-        Convertor c(cx);
-        BSONHolder * holder = GETHOLDER( cx , obj );
-        if ( !holder ) // needed when we're messing with DBRef.prototype
-            return JS_TRUE;
-        if ( holder->_inResolve )
-            return JS_TRUE;
-        holder->_modified = true;
-        holder->_removed.erase( c.toString( idval ) );
+        try {
+            Convertor c(cx);
+            BSONHolder * holder = GETHOLDER( cx , obj );
+            if ( !holder ) // needed when we're messing with DBRef.prototype
+                return JS_TRUE;
+            if ( holder->_inResolve )
+                return JS_TRUE;
+            holder->_modified = true;
+            holder->_removed.erase( c.toString( idval ) );
+        }
+        catch ( const AssertionException& e ) {
+            if ( ! JS_IsExceptionPending( cx ) ) {
+                JS_ReportError( cx, e.what() );
+            }
+            return JS_FALSE;
+        }
+        catch ( const std::exception& e ) {
+            log() << "unhandled exception: " << e.what() << ", throwing Fatal Assertion" << endl;
+            fassertFailed( 16275 );
+        }
         return JS_TRUE;
     }
 
     JSBool mark_modified_remove( JSContext *cx, JSObject *obj, jsval idval, jsval *vp) {
-        Convertor c(cx);
-        BSONHolder * holder = GETHOLDER( cx , obj );
-        if ( holder->_inResolve )
-            return JS_TRUE;
-        holder->_modified = true;
-        holder->_removed.insert( c.toString( idval ) );
+        try {
+            Convertor c(cx);
+            BSONHolder * holder = GETHOLDER( cx , obj );
+            if ( holder->_inResolve )
+                return JS_TRUE;
+            holder->_modified = true;
+            holder->_removed.insert( c.toString( idval ) );
+        }
+        catch ( const AssertionException& e ) {
+            if ( ! JS_IsExceptionPending( cx ) ) {
+                JS_ReportError( cx, e.what() );
+            }
+            return JS_FALSE;
+        }
+        catch ( const std::exception& e ) {
+            log() << "unhandled exception: " << e.what() << ", throwing Fatal Assertion" << endl;
+            fassertFailed( 16276 );
+        }
         return JS_TRUE;
     }
 
     JSClass bson_class = {
-        "bson_object" , JSCLASS_HAS_PRIVATE | JSCLASS_NEW_RESOLVE | JSCLASS_NEW_ENUMERATE ,
-        bson_add_prop, mark_modified_remove, JS_PropertyStub, mark_modified,
-        (JSEnumerateOp)bson_enumerate, (JSResolveOp)(&resolveBSONField) , JS_ConvertStub, bson_finalize ,
-        JSCLASS_NO_OPTIONAL_MEMBERS
+        "bson_object",                                                      // class name
+        JSCLASS_HAS_PRIVATE | JSCLASS_NEW_RESOLVE | JSCLASS_NEW_ENUMERATE,  // flags
+        bson_add_prop,                                                      // addProperty
+        mark_modified_remove,                                               // delProperty
+        JS_PropertyStub,                                                    // getProperty
+        mark_modified,                                                      // setProperty
+        (JSEnumerateOp)bson_enumerate,                                      // enumerate
+        (JSResolveOp)resolveBSONField,                                      // resolve
+        JS_ConvertStub,                                                     // convert
+        bson_finalize,                                                      // finalize
+        JSCLASS_NO_OPTIONAL_MEMBERS                                         // optional members
     };
 
     static JSClass global_class = {
-        "global", JSCLASS_GLOBAL_FLAGS,
-        JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
-        JS_EnumerateStub, JS_ResolveStub, JS_ConvertStub, JS_FinalizeStub,
-        JSCLASS_NO_OPTIONAL_MEMBERS
+        "global",                       // class name
+        JSCLASS_GLOBAL_FLAGS,           // flags
+        JS_PropertyStub,                // addProperty
+        JS_PropertyStub,                // delProperty
+        JS_PropertyStub,                // getProperty
+        JS_PropertyStub,                // setProperty
+        JS_EnumerateStub,               // enumerate
+        JS_ResolveStub,                 // resolve
+        JS_ConvertStub,                 // convert
+        JS_FinalizeStub,                // finalize
+        JSCLASS_NO_OPTIONAL_MEMBERS     // optional members
     };
 
     // --- global helpers ---
 
-    JSBool hexToBinData(JSContext * cx, jsval *rval, int subtype, string s) { 
+    static void hexToBinData( JSContext* cx,
+                              Convertor* c,
+                              jsval* rval,
+                              int subtype,
+                              const string& s ) {
         JSObject * o = JS_NewObject( cx , &bindata_class , 0 , 0 );
         CHECKNEWOBJECT(o,_context,"Bindata_BinData1");
-        int len = s.size() / 2;
-        char * data = new char[len];
-        char *p = data;
+        size_t s_size = s.size();
+        int len = s_size / 2;
+        boost::scoped_array<char> data( new char[len] );
+        char* p = data.get();
         const char *src = s.c_str();
-        for( size_t i = 0; i+1 < s.size(); i += 2 ) { 
-            *p++ = fromHex(src + i);
+        for( size_t i = 0; i+1 < s_size; i += 2 ) { 
+            *p++ = fromHex( src + i );
         }
-        verify( JS_SetPrivate( cx , o , new BinDataHolder( data , len ) ) );
-        Convertor c(cx);
-        c.setProperty( o, "len", c.toval((double)len) );
-        c.setProperty( o, "type", c.toval((double)subtype) );
+        verify( JS_SetPrivate( cx, o, new BinDataHolder( data.get(), len ) ) );
+        c->setProperty( o, "len", c->toval( static_cast<double>(len) ) );
+        c->setProperty( o, "type", c->toval( static_cast<double>(subtype) ) );
         *rval = OBJECT_TO_JSVAL( o );
-        delete data;
-        return JS_TRUE;
+    }
+
+    static bool testHexString( JSContext* cx, const string& hexString ) {
+        size_t len = hexString.length();
+        for ( size_t i = 0; i < len; ++i ) {
+            char ch = hexString[i];
+            if ( (ch>='0' && ch<='9') || (ch>='a' && ch<='f') || (ch>='A' && ch<='F') ) {
+                continue;
+            }
+            JS_ReportError( cx, "invalid hexstring character '%c'", ch );
+            return false;
+        }
+        return true;
     }
 
     JSBool _HexData( JSContext * cx , JSObject * obj , uintN argc, jsval *argv, jsval *rval ) {
-        Convertor c( cx );
-        if ( argc != 2 ) {
-            JS_ReportError( cx , "HexData needs 2 arguments -- HexData(subtype,hexstring)" );
+        try {
+            if ( argc != 2 ) {
+                JS_ReportError( cx , "HexData needs 2 arguments -- HexData(subtype,hexstring)" );
+                return JS_FALSE;
+            }
+            Convertor c( cx );
+            int subtype = static_cast<int>( c.toNumber( argv[ 0 ] ) );
+            if ( subtype == 2 ) {
+                JS_ReportError( cx , "BinData subtype 2 is deprecated" );
+                return JS_FALSE;
+            }
+            else if ( subtype < 0 || subtype > 255 ) {
+                JS_ReportError( cx, "subtype must be between 0 and 255" );
+                return JS_FALSE;
+            }
+            string s( c.toString( argv[1] ) );
+            if ( ! testHexString( cx, s ) ) {
+                return JS_FALSE;
+            }
+            size_t len = s.length();
+            if ( 0 != ( len % 2 ) ) {
+                JS_ReportError( cx, "hexstring must be even length" );
+                return JS_FALSE;
+            }
+            hexToBinData(cx, &c, rval, subtype, s);
+        }
+        catch ( const AssertionException& e ) {
+            if ( ! JS_IsExceptionPending( cx ) ) {
+                JS_ReportError( cx, e.what() );
+            }
             return JS_FALSE;
         }
-        int type = (int)c.toNumber( argv[ 0 ] );
-        if ( type == 2 ) {
-            JS_ReportError( cx , "BinData subtype 2 is deprecated" );
-            return JS_FALSE;
+        catch ( const std::exception& e ) {
+            log() << "unhandled exception: " << e.what() << ", throwing Fatal Assertion" << endl;
+            fassertFailed( 16277 );
         }
-        string s = c.toString(argv[1]);
-        return hexToBinData(cx, rval, type, s);
+        return JS_TRUE;
     }
 
     JSBool _UUID( JSContext * cx , JSObject * obj , uintN argc, jsval *argv, jsval *rval ) {
-        Convertor c( cx );
-        if ( argc != 1 ) {
-            JS_ReportError( cx , "UUID needs argument -- UUID(hexstring)" );
+        try {
+            if ( argc != 1 ) {
+                JS_ReportError( cx , "UUID needs argument -- UUID(hexstring)" );
+                return JS_FALSE;
+            }
+            Convertor c( cx );
+            string s( c.toString( argv[0] ) );
+            if ( ! testHexString( cx, s ) ) {
+                return JS_FALSE;
+            }
+            size_t len = s.length();
+            if ( len != 32 ) {
+                JS_ReportError( cx, "UUID hexstring length is %d, must be 32", len );
+                return JS_FALSE;
+            }
+            hexToBinData(cx, &c, rval, 3, s);
+        }
+        catch ( const AssertionException& e ) {
+            if ( ! JS_IsExceptionPending( cx ) ) {
+                JS_ReportError( cx, e.what() );
+            }
             return JS_FALSE;
         }
-        string s = c.toString(argv[0]);
-        if( s.size() != 32 ) {
-            JS_ReportError( cx , "bad UUID hex string len" );
-            return JS_FALSE;
+        catch ( const std::exception& e ) {
+            log() << "unhandled exception: " << e.what() << ", throwing Fatal Assertion" << endl;
+            fassertFailed( 16278 );
         }
-        return hexToBinData(cx, rval, 3, s);
+        return JS_TRUE;
     }
 
     JSBool _MD5( JSContext * cx , JSObject * obj , uintN argc, jsval *argv, jsval *rval ) {
-        Convertor c( cx );
-        if ( argc != 1 ) {
-            JS_ReportError( cx , "MD5 needs argument -- MD5(hexstring)" );
+        try {
+            if ( argc != 1 ) {
+                JS_ReportError( cx , "MD5 needs argument -- MD5(hexstring)" );
+                return JS_FALSE;
+            }
+            Convertor c( cx );
+            string s( c.toString( argv[0] ) );
+            if ( ! testHexString( cx, s ) ) {
+                return JS_FALSE;
+            }
+            size_t len = s.length();
+            if ( len != 32 ) {
+                JS_ReportError( cx, "MD5 hexstring length is %d, must be 32", len );
+                return JS_FALSE;
+            }
+            hexToBinData(cx, &c, rval, 5, s);
+        }
+        catch ( const AssertionException& e ) {
+            if ( ! JS_IsExceptionPending( cx ) ) {
+                JS_ReportError( cx, e.what() );
+            }
             return JS_FALSE;
         }
-        string s = c.toString(argv[0]);
-        if( s.size() != 32 ) {
-            JS_ReportError( cx , "bad MD5 hex string len" );
-            return JS_FALSE;
+        catch ( const std::exception& e ) {
+            log() << "unhandled exception: " << e.what() << ", throwing Fatal Assertion" << endl;
+            fassertFailed( 16279 );
         }
-        return hexToBinData(cx, rval, 5, s);
+        return JS_TRUE;
     }
 
-    JSBool native_print( JSContext * cx , JSObject * obj , uintN argc, jsval *argv, jsval *rval ) {
+    JSBool native_print( JSContext * cx, JSObject * obj, uintN argc, jsval *argv, jsval *rval ) {
         stringstream ss;
-        Convertor c( cx );
-        for ( uintN i=0; i<argc; i++ ) {
-            if ( i > 0 )
-                ss << " ";
-            ss << c.toString( argv[i] );
+        bool someWritten = false;
+        try {
+            Convertor c( cx );
+            for ( uintN i=0; i<argc; i++ ) {
+                if ( i > 0 )
+                    ss << " ";
+                ss << c.toString( argv[i] );
+                someWritten = true;
+            }
+            ss << "\n";
+            Logstream::logLockless( ss.str() );
         }
-        ss << "\n";
-        Logstream::logLockless( ss.str() );
+        catch ( const AssertionException& ) {
+            if ( someWritten ) {
+                ss << "\n";
+                Logstream::logLockless( ss.str() );
+            }
+            return JS_FALSE;
+        }
+        catch ( const std::exception& e ) {
+            log() << "unhandled exception: " << e.what() << ", throwing Fatal Assertion" << endl;
+            fassertFailed( 16280 );
+        }
         return JS_TRUE;
     }
 
     JSBool native_helper( JSContext *cx , JSObject *obj , uintN argc, jsval *argv , jsval *rval ) {
-        Convertor c(cx);
+        try {
+            Convertor c(cx);
+            NativeFunction func = reinterpret_cast<NativeFunction>(
+                    static_cast<long long>( c.getNumber( obj , "x" ) ) );
+            void* data = reinterpret_cast<void*>(
+                    static_cast<long long>( c.getNumber( obj , "y" ) ) );
+            verify( func );
 
-        NativeFunction func = (NativeFunction)((long long)c.getNumber( obj , "x" ) );
-        void* data = (void*)((long long)c.getNumber( obj , "y" ) );
-        verify( func );
-
-        BSONObj a;
-        if ( argc > 0 ) {
-            BSONObjBuilder args;
-            for ( uintN i=0; i<argc; i++ ) {
-                c.append( args , args.numStr( i ) , argv[i] );
+            BSONObj a;
+            if ( argc > 0 ) {
+                BSONObjBuilder args;
+                for ( uintN i = 0; i < argc; ++i ) {
+                    c.append( args , args.numStr( i ) , argv[i] );
+                }
+                a = args.obj();
             }
 
-            a = args.obj();
+            BSONObj out = func( a, data );
+            if ( out.isEmpty() ) {
+                *rval = JSVAL_VOID;
+            }
+            else {
+                *rval = c.toval( out.firstElement() );
+            }
         }
-
-        BSONObj out;
-        try {
-            out = func( a, data );
-        }
-        catch ( std::exception& e ) {
-            JS_ReportError( cx , e.what() );
+        catch ( const AssertionException& e ) {
+            if ( ! JS_IsExceptionPending( cx ) ) {
+                JS_ReportError( cx, e.what() );
+            }
             return JS_FALSE;
         }
-
-        if ( out.isEmpty() ) {
-            *rval = JSVAL_VOID;
+        catch ( const std::exception& e ) {
+            log() << "unhandled exception: " << e.what() << ", throwing Fatal Assertion" << endl;
+            fassertFailed( 16281 );
         }
-        else {
-            *rval = c.toval( out.firstElement() );
-        }
-
         return JS_TRUE;
     }
 
@@ -1071,35 +1239,43 @@ namespace mongo {
     // Object helpers
 
     JSBool bson_get_size(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {
-        if ( argc != 1 || !JSVAL_IS_OBJECT( argv[ 0 ] ) ) {
-            JS_ReportError( cx , "bsonsize requires one valid object" );
+        try {
+            if ( argc != 1 || !JSVAL_IS_OBJECT( argv[ 0 ] ) ) {
+                JS_ReportError( cx , "bsonsize requires one valid object" );
+                return JS_FALSE;
+            }
+            Convertor c(cx);
+            if ( argv[0] == JSVAL_VOID || argv[0] == JSVAL_NULL ) {
+                *rval = c.toval( 0.0 );
+                return JS_TRUE;
+            }
+
+            JSObject * o = JSVAL_TO_OBJECT( argv[0] );
+            double size = 0.0;
+
+            if ( JS_InstanceOf( cx , o , &bson_ro_class , 0 ) ||
+                    JS_InstanceOf( cx , o , &bson_class , 0 ) ) {
+                BSONHolder * h = GETHOLDER( cx , o );
+                if ( h ) {
+                    size = h->_obj.objsize();
+                }
+            }
+            else {
+                BSONObj temp = c.toObject( o );
+                size = temp.objsize();
+            }
+            *rval = c.toval( size );
+        }
+        catch ( const AssertionException& e ) {
+            if ( ! JS_IsExceptionPending( cx ) ) {
+                JS_ReportError( cx, e.what() );
+            }
             return JS_FALSE;
         }
-
-        Convertor c(cx);
-
-        if ( argv[0] == JSVAL_VOID || argv[0] == JSVAL_NULL ) {
-            *rval = c.toval( 0.0 );
-            return JS_TRUE;
+        catch ( const std::exception& e ) {
+            log() << "unhandled exception: " << e.what() << ", throwing Fatal Assertion" << endl;
+            fassertFailed( 16282 );
         }
-
-        JSObject * o = JSVAL_TO_OBJECT( argv[0] );
-
-        double size = 0;
-
-        if ( JS_InstanceOf( cx , o , &bson_ro_class , 0 ) ||
-                JS_InstanceOf( cx , o , &bson_class , 0 ) ) {
-            BSONHolder * h = GETHOLDER( cx , o );
-            if ( h ) {
-                size = h->_obj.objsize();
-            }
-        }
-        else {
-            BSONObj temp = c.toObject( o );
-            size = temp.objsize();
-        }
-
-        *rval = c.toval( size );
         return JS_TRUE;
     }
 
@@ -1111,55 +1287,68 @@ namespace mongo {
     // end Object helpers
 
     JSBool resolveBSONField( JSContext *cx, JSObject *obj, jsval id, uintN flags, JSObject **objp ) {
-        verify( JS_EnterLocalRootScope( cx ) );
-        Convertor c( cx );
-
-        BSONHolder * holder = GETHOLDER( cx , obj );
-        if ( ! holder ) {
-            // static init
-            *objp = 0;
-            JS_LeaveLocalRootScope( cx );
-            return JS_TRUE;
-        }
-        holder->check();
-
-        string s = c.toString( id );
-
-        BSONElement e = holder->_obj[ s.c_str() ];
-
-        if ( e.type() == EOO || holder->_removed.count( s ) ) {
-            *objp = 0;
-            JS_LeaveLocalRootScope( cx );
-            return JS_TRUE;
-        }
-
-        jsval val;
         try {
-            val = c.toval( e );
+            verify( JS_EnterLocalRootScope( cx ) );
         }
-        catch ( InvalidUTF8Exception& ) {
-            JS_LeaveLocalRootScope( cx );
-            JS_ReportError( cx , "invalid utf8" );
+        catch ( const AssertionException& e ) {
+            JS_ReportError( cx, e.what() );
             return JS_FALSE;
         }
-
-        verify( ! holder->_inResolve );
-        holder->_inResolve = true;
-        verify( JS_SetProperty( cx , obj , s.c_str() , &val ) );
-        holder->_inResolve = false;
-
-        if ( val != JSVAL_NULL && val != JSVAL_VOID && JSVAL_IS_OBJECT( val ) ) {
-            // TODO: this is a hack to get around sub objects being modified
-            // basically right now whenever a sub object is read we mark whole obj as possibly modified
-            JSObject * oo = JSVAL_TO_OBJECT( val );
-            if ( JS_InstanceOf( cx , oo , &bson_class , 0 ) ||
-                    JS_IsArrayObject( cx , oo ) ) {
-                holder->_modified = true;
-            }
+        catch ( const std::exception& e ) {
+            log() << "unhandled exception: " << e.what() << ", throwing Fatal Assertion" << endl;
+            fassertFailed( 16283 );
         }
 
-        *objp = obj;
-        JS_LeaveLocalRootScope( cx );
+        try {
+            BSONHolder * holder = GETHOLDER( cx , obj );
+            if ( ! holder ) {
+                // static init
+                *objp = 0;
+                JS_LeaveLocalRootScope( cx );
+                return JS_TRUE;
+            }
+            holder->check();
+
+            Convertor c( cx );
+            string s( c.toString( id ) );
+            BSONElement e = holder->_obj[ s.c_str() ];
+            if ( e.type() == EOO || holder->_removed.count( s ) ) {
+                *objp = 0;
+                JS_LeaveLocalRootScope( cx );
+                return JS_TRUE;
+            }
+
+            jsval val = c.toval( e );
+
+            verify( ! holder->_inResolve );
+            holder->_inResolve = true;
+            verify( JS_SetProperty( cx , obj , s.c_str() , &val ) );
+            holder->_inResolve = false;
+
+            if ( val != JSVAL_NULL && val != JSVAL_VOID && JSVAL_IS_OBJECT( val ) ) {
+                // TODO: this is a hack to get around sub objects being modified
+                // basically right now whenever a sub object is read we mark whole obj as possibly modified
+                JSObject * oo = JSVAL_TO_OBJECT( val );
+                if ( JS_InstanceOf( cx , oo , &bson_class , 0 ) ||
+                        JS_IsArrayObject( cx , oo ) ) {
+                    holder->_modified = true;
+                }
+            }
+
+            *objp = obj;
+            JS_LeaveLocalRootScope( cx );
+        }
+        catch ( const AssertionException& e ) {
+            JS_LeaveLocalRootScope( cx );
+            if ( ! JS_IsExceptionPending( cx ) ) {
+                JS_ReportError( cx, e.what() );
+            }
+            return JS_FALSE;
+        }
+        catch ( const std::exception& e ) {
+            log() << "unhandled exception: " << e.what() << ", throwing Fatal Assertion" << endl;
+            fassertFailed( 16284 );
+        }
         return JS_TRUE;
     }
 
@@ -1545,7 +1734,12 @@ namespace mongo {
         
         bool isReportingErrors() const { return _reportError; }
 
-        bool exec( const StringData& code , const string& name = "(anon)" , bool printResult = false , bool reportError = true , bool assertOnError = true, int timeoutMs = 0 ) {
+        bool exec( const StringData& code,
+                   const string& name = "(anon)",
+                   bool printResult = false,
+                   bool reportError = true,
+                   bool assertOnError = true,
+                   int timeoutMs = 0 ) {
             smlock;
             precall();
 
@@ -1553,7 +1747,13 @@ namespace mongo {
 
             installInterrupt( timeoutMs );
             _reportError = reportError;
-            JSBool worked = JS_EvaluateScript( _context , _global , code.data() , code.size() , name.c_str() , 1 , &ret );
+            JSBool worked = JS_EvaluateScript( _context,
+                                               _global,
+                                               code.data(),
+                                               code.size(),
+                                               name.c_str(),
+                                               1,
+                                               &ret );
             _reportError = true;
             uninstallInterrupt( timeoutMs );
 
@@ -1566,7 +1766,8 @@ namespace mongo {
                 }
             }
 
-            uassert( 10228 ,  mongoutils::str::stream() << name + " exec failed: " << _error , worked || ! assertOnError );
+            uassert( 10228, mongoutils::str::stream() << name + " exec failed: " << _error,
+                        worked || ! assertOnError );
 
             if ( worked )
                 _convertor->setProperty( _global , "__lastres__" , ret );
@@ -1577,34 +1778,69 @@ namespace mongo {
             return worked;
         }
 
-        int invoke( JSFunction * func , const BSONObj* args, const BSONObj* recv, int timeoutMs , bool ignoreReturn, bool readOnlyArgs, bool readOnlyRecv ) {
+        int invoke( JSFunction* func,
+                    const BSONObj* args,
+                    const BSONObj* recv,
+                    int timeoutMs,
+                    bool ignoreReturn,
+                    bool readOnlyArgs,
+                    bool readOnlyRecv ) {
             smlock;
             precall();
 
-            verify( JS_EnterLocalRootScope( _context ) );
+            try {
+                verify( JS_EnterLocalRootScope( _context ) );
+            }
+            catch ( const AssertionException& e ) {
+                if ( ! JS_IsExceptionPending( _context ) ) {
+                    JS_ReportError( _context, e.what() );
+                }
+                return 0;
+            }
+            catch ( const std::exception& e ) {
+                log() << "unhandled exception: " << e.what() << ", throwing Fatal Assertion" << endl;
+                fassertFailed( 16285 );
+            }
 
             int nargs = args ? args->nFields() : 0;
             scoped_array<jsval> smargsPtr( new jsval[nargs] );
-            if ( nargs ) {
-                BSONObjIterator it( *args );
-                for ( int i=0; i<nargs; i++ ) {
-                    smargsPtr[i] = _convertor->toval( it.next() );
+            try {
+                if ( nargs ) {
+                    BSONObjIterator it( *args );
+                    for ( int i=0; i<nargs; i++ ) {
+                        smargsPtr[i] = _convertor->toval( it.next() );
+                    }
+                }
+
+                if ( !args ) {
+                    _convertor->setProperty( _global , "args" , JSVAL_NULL );
+                }
+                else {
+                    setObject( "args" , *args , true ); // this is for backwards compatability
                 }
             }
-
-            if ( !args ) {
-                _convertor->setProperty( _global , "args" , JSVAL_NULL );
+            catch ( const AssertionException& e ) {
+                JS_LeaveLocalRootScope( _context );
+                if ( ! JS_IsExceptionPending( _context ) ) {
+                    JS_ReportError( _context, e.what() );
+                }
+                return 0;
             }
-            else {
-                setObject( "args" , *args , true ); // this is for backwards compatability
+            catch ( const std::exception& e ) {
+                log() << "unhandled exception: " << e.what() << ", throwing Fatal Assertion" << endl;
+                fassertFailed( 16286 );
             }
-
             JS_LeaveLocalRootScope( _context );
 
             installInterrupt( timeoutMs );
             jsval rval;
             setThis(recv);
-            JSBool ret = JS_CallFunction( _context , _this ? _this : _global , func , nargs , smargsPtr.get() , &rval );
+            JSBool ret = JS_CallFunction( _context,
+                                          _this ? _this : _global,
+                                          func,
+                                          nargs,
+                                          smargsPtr.get(),
+                                          &rval );
             setThis(0);
             uninstallInterrupt( timeoutMs );
 
@@ -1619,8 +1855,20 @@ namespace mongo {
             return 0;
         }
 
-        int invoke( ScriptingFunction funcAddr , const BSONObj* args, const BSONObj* recv, int timeoutMs = 0 , bool ignoreReturn = 0, bool readOnlyArgs = false, bool readOnlyRecv = false ) {
-            return invoke( (JSFunction*)funcAddr , args , recv, timeoutMs , ignoreReturn, readOnlyArgs, readOnlyRecv);
+        int invoke( ScriptingFunction funcAddr,
+                    const BSONObj* args,
+                    const BSONObj* recv,
+                    int timeoutMs = 0,
+                    bool ignoreReturn = 0,
+                    bool readOnlyArgs = false,
+                    bool readOnlyRecv = false ) {
+            return invoke( reinterpret_cast<JSFunction*>( funcAddr ),
+                           args,
+                           recv,
+                           timeoutMs,
+                           ignoreReturn,
+                           readOnlyArgs,
+                           readOnlyRecv );
         }
 
         void gotError( string s ) {
@@ -1634,16 +1882,20 @@ namespace mongo {
         void injectNative( const char *field, NativeFunction func, void* data ) {
             smlock;
             string name = field;
-            _convertor->setProperty( _global , (name + "_").c_str() , _convertor->toval( (double)(long long)func ) );
+            jsval v;
+            v = _convertor->toval( static_cast<double>( reinterpret_cast<long long>(func) ) );
+            _convertor->setProperty( _global, (name + "_").c_str(), v );
 
             stringstream code;
             if (data) {
-                _convertor->setProperty( _global , (name + "_data_").c_str() , _convertor->toval( (double)(long long)data ) );
+                v = _convertor->toval( static_cast<double>( reinterpret_cast<long long>(data) ) );
+                _convertor->setProperty( _global, (name + "_data_").c_str(), v );
                 code << field << "_" << " = { x : " << field << "_ , y: " << field << "_data_ }; ";
             } else {
                 code << field << "_" << " = { x : " << field << "_ }; ";
             }
-            code << field << " = function(){ return nativeHelper.apply( " << field << "_ , arguments ); }";
+            code << field << " = function(){ return nativeHelper.apply( " <<
+                                                    field << "_ , arguments ); }";
             exec( code.str() );
         }
 
@@ -1705,20 +1957,31 @@ namespace mongo {
     }
 
     JSBool native_load( JSContext *cx , JSObject *obj , uintN argc, jsval *argv , jsval *rval ) {
-        Convertor c(cx);
+        try {
+            Convertor c(cx);
 
-        Scope * s = currentScope.get();
+            Scope * s = currentScope.get();
 
-        for ( uintN i=0; i<argc; i++ ) {
-            string filename = c.toString( argv[i] );
-            //cout << "load [" << filename << "]" << endl;
+            for ( uintN i=0; i<argc; i++ ) {
+                string filename( c.toString( argv[i] ) );
+                //cout << "load [" << filename << "]" << endl;
 
-            if ( ! s->execFile( filename , false , true , false ) ) {
-                JS_ReportError( cx , ((string)"error loading js file: " + filename ).c_str() );
-                return JS_FALSE;
+                if ( ! s->execFile( filename, false, true, false ) ) {
+                    JS_ReportError( cx, (string("error loading js file: ") + filename).c_str() );
+                    return JS_FALSE;
+                }
             }
         }
-
+        catch ( const AssertionException& e ) {
+            if ( ! JS_IsExceptionPending( cx ) ) {
+                JS_ReportError( cx, e.what() );
+            }
+            return JS_FALSE;
+        }
+        catch ( const std::exception& e ) {
+            log() << "unhandled exception: " << e.what() << ", throwing Fatal Assertion" << endl;
+            fassertFailed( 16287 );
+        }
         return JS_TRUE;
     }
 
