@@ -1191,10 +1191,13 @@ namespace mongo {
                             uasserted(13281, "File deleted during filemd5 command");
                     }
                 }
-                catch(SendStaleConfigException&){
+                catch(SendStaleConfigException& e){
                     // return partial results.
                     // Mongos will get the error at the start of the next call if it doesn't update first.
                     log() << "Config changed during filemd5 - command will resume " << endl;
+
+                    // useful for debugging but off by default to avoid looking like a scary error.
+                    LOG(1) << "filemd5 stale config exception: " << e.what() << endl;
                     break;
                 }
             }
