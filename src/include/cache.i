@@ -46,7 +46,7 @@ __wt_eviction_page_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	conn = S2C(session);
 
-	return (!WT_PAGE_IS_ROOT(page) &&
+	return (!WT_PAGE_IS_ROOT(page) && __wt_page_is_modified(page) &&
 	    (((int64_t)page->memory_footprint > conn->cache_size / 2) ||
 	    (page->memory_footprint > 20 * session->btree->maxleafpage)));
 }
