@@ -7,7 +7,7 @@ st.stopBalancer()
 
 var coll = st.s.getCollection( jsTest.name() + ".coll" )
 
-var numDocs = 1000000
+var numDocs = 500000
 var numKeys = 1000
 var numTests = 3
 
