@@ -461,6 +461,7 @@ namespace mongo {
 
     void ParallelSortClusteredCursor::_finishCons() {
         _numServers = _servers.size();
+        _lastFrom = 0;
         _cursors = 0;
 
         if( ! _qSpec.isEmpty() ){
@@ -1474,7 +1475,13 @@ namespace mongo {
         BSONObj best = BSONObj();
         int bestFrom = -1;
 
-        for ( int i=0; i<_numServers; i++) {
+        for( int j = 0; j < _numServers; j++ ){
+
+            // Iterate _numServers times, starting one past the last server we used.
+            // This means we actually start at server #1, not #0, but shouldn't matter
+
+            int i = ( j + _lastFrom + 1 ) % _numServers;
+
             if ( ! _cursors[i].more() ){
                 if( _cursors[i].rawMData() )
                     _cursors[i].rawMData()->pcState->done = true;
@@ -1497,6 +1504,8 @@ namespace mongo {
             best = me;
             bestFrom = i;
         }
+
+        _lastFrom = bestFrom;
 
         uassert( 10019 ,  "no more elements" , ! best.isEmpty() );
         _cursors[bestFrom].next();
