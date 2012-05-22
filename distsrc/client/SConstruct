@@ -66,8 +66,23 @@ if nix:
 if linux:
     env.Append(LINKFLAGS=["-Wl,--as-needed", "-Wl,-zdefs", "-pthread"])
 
-boostLibs = ["thread", "filesystem", "system"]
 conf = Configure(env)
+
+# check for environment variables and set corresponding Scons Construction Variables
+
+if 'CXX' in os.environ:
+    conf.env.Replace(CXX = os.environ['CXX'])
+    print(">> Using compiler " + os.environ['CXX'])
+
+if 'CXXFLAGS' in os.environ:
+    conf.env.Append(CXXFLAGS = os.environ['CXXFLAGS'])
+    print(">> Appending custom build flags : " + os.environ['CXXFLAGS'])
+
+if 'LDFLAGS' in os.environ:
+    conf.env.Append(LINKFLAGS = os.environ['LDFLAGS'])
+    print(">> Appending custom link flags : " + os.environ['LDFLAGS'])
+
+boostLibs = ["thread", "filesystem", "system"]
 for lib in boostLibs:
     if not conf.CheckLib(["boost_%s-mt" % lib, "boost_%s" % lib],
                          language="C++"):
