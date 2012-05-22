@@ -581,6 +581,10 @@ namespace mongo {
             // (ok to crash after that)
             commitJob.committingNotifyCommitted();
 
+            // note the higher-up-the-chain locking of filesLockedFsync is important here, 
+            // as we are not in Lock::GlobalRead anymore. private view readers won't see 
+            // anything as we do this, but external viewers of the datafiles will see them 
+            // mutating.
             WRITETODATAFILES(h, ab);
             verify( abLen == ab.len() ); // check again wasn't modded
             ab.reset();
