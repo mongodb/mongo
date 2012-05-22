@@ -129,6 +129,10 @@ __evict_req_clr(WT_EVICT_ENTRY *r)
 {
 	r->btree = NULL;
 	r->page = NULL;
+	/*
+	 * No publication necessary, all we care about is the page value and
+	 * whenever it's cleared is fine.
+	 */
 }
 
 /*
@@ -185,15 +189,13 @@ __wt_sync_file_serial_func(WT_SESSION_IMPL *session)
  * __wt_evict_page_request --
  *	Schedule a page for forced eviction due to a high volume of inserts or
  *	updates.
- *
- *	NOTE: this function is called from inside serialized functions, so it
- *	is holding the serial lock.
  */
-int
+void
 __wt_evict_page_request(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_CACHE *cache;
 	WT_EVICT_ENTRY *er, *er_end;
+	int set;
 
 	cache = S2C(session)->cache;
 
@@ -218,15 +220,22 @@ __wt_evict_page_request(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * time the eviction thread sees it.
 	 */
 	if (!WT_ATOMIC_CAS(page->ref->state, WT_REF_MEM, WT_REF_EVICT_FORCE))
-		return (0);
+		return;
+
+	set = 0;
+	__wt_spin_lock(session, &cache->er_lock);
 
 	/* Find an empty slot and enter the eviction request. */
 	WT_EVICT_REQ_FOREACH(er, er_end, cache)
 		if (er->page == NULL) {
 			__evict_req_set(er, session->btree, page);
-			__wt_evict_server_wake(session);
-			return (0);
+			set = 1;
+			break;
 		}
+
+	__wt_spin_unlock(session, &cache->er_lock);
+	if (set)
+		return;
 
 	/*
 	 * The request table is full, that's okay for page requests: another
@@ -235,7 +244,6 @@ __wt_evict_page_request(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_VERBOSE_VOID(session, evictserver,
 	    "eviction server forced page eviction request table is full");
 	page->ref->state = WT_REF_MEM;
-	return (WT_RESTART);
 }
 
 /*

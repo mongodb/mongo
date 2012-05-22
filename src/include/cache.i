@@ -37,7 +37,7 @@ __wt_eviction_check(WT_SESSION_IMPL *session, int *read_lockoutp, int wake)
 
 /*
  * __wt_eviction_page_check --
- *	Check if a page is too big and wake the eviction server if necessary.
+ *	Return if a page should be forcibly evicted.
  */
 static inline int
 __wt_eviction_page_check(WT_SESSION_IMPL *session, WT_PAGE *page)
@@ -46,21 +46,7 @@ __wt_eviction_page_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	conn = S2C(session);
 
-	/*
-	 * If the page is pathologically large, force eviction.
-	 * Otherwise, if the cache is more than 95% full, wake up the eviction
-	 * thread.
-	 */
-	if (page != NULL && !WT_PAGE_IS_ROOT(page) &&
+	return (!WT_PAGE_IS_ROOT(page) &&
 	    (((int64_t)page->memory_footprint > conn->cache_size / 2) ||
-	    (page->memory_footprint > 20 * session->btree->maxleafpage))) {
-		/*
-		 * We're already inside a serialized function, so we need to
-		 * take some care.
-		 */
-		WT_RET(__wt_evict_page_request(session, page));
-	} else
-		__wt_eviction_check(session, NULL, 1);
-
-	return (0);
+	    (page->memory_footprint > 20 * session->btree->maxleafpage)));
 }
