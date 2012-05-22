@@ -84,7 +84,7 @@ DB.prototype.addUser = function( username , pass, readOnly, replicatedTo ){
     // in mongod version 2.1.0-, this worked
     var le = {};
     try {        
-        le = this.getLastErrorObj( replicatedTo, 15 * 1000 );
+        le = this.getLastErrorObj( replicatedTo, 30 * 1000 );
         // printjson( le )
     }
     catch (e) {
