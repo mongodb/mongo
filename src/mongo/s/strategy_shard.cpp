@@ -89,6 +89,7 @@ namespace mongo {
 
                 BufBuilder buffer( ShardedClientCursor::INIT_REPLY_BUFFER_SIZE );
                 int docCount = 0;
+                const int startFrom = cc->getTotalSent();
                 bool hasMore = cc->sendNextBatch( r, q.ntoreturn, buffer, docCount );
 
                 if ( hasMore ) {
@@ -97,7 +98,7 @@ namespace mongo {
                 }
 
                 replyToQuery( 0, r.p(), r.m(), buffer.buf(), buffer.len(), docCount,
-                        cc->getTotalSent(), hasMore ? cc->getId() : 0 );
+                        startFrom, hasMore ? cc->getId() : 0 );
             }
             else{
                 // TODO:  Better merge this logic.  We potentially can now use the same cursor logic for everything.
@@ -154,6 +155,7 @@ namespace mongo {
                 // TODO: Try to match logic of mongod, where on subsequent getMore() we pull lots more data?
                 BufBuilder buffer( ShardedClientCursor::INIT_REPLY_BUFFER_SIZE );
                 int docCount = 0;
+                const int startFrom = cursor->getTotalSent();
                 bool hasMore = cursor->sendNextBatch( r, ntoreturn, buffer, docCount );
 
                 if ( hasMore ) {
@@ -166,7 +168,7 @@ namespace mongo {
                 }
 
                 replyToQuery( 0, r.p(), r.m(), buffer.buf(), buffer.len(), docCount,
-                        cursor->getTotalSent(), hasMore ? cursor->getId() : 0 );
+                        startFrom, hasMore ? cursor->getId() : 0 );
             }
         }
 
