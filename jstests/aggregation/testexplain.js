@@ -1,3 +1,5 @@
+if ( 0 ) {
+
 /* load the test documents */
 load('jstests/aggregation/data/articles.js');
 
@@ -554,3 +556,5 @@ var edi3result = {
 };
 
 assert(documentEq(edi3, edi3result), 'edi3 failed');
+
+}
