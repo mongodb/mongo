@@ -22,6 +22,7 @@
 #include "../util/password.h"
 #include "../util/processinfo.h"
 #include "../util/net/listen.h"
+#include "../bson/util/builder.h"
 #include "security_common.h"
 #ifdef _WIN32
 #include <direct.h>
@@ -53,15 +54,21 @@ namespace mongo {
             hidden.add_options()(s.c_str(), "verbose");
         }
 
+        StringBuilder portInfoBuilder;
+        StringBuilder maxConnInfoBuilder;
+
+        portInfoBuilder << "specify port number - " << DefaultDBPort << " by default";
+        maxConnInfoBuilder << "max number of simultaneous connections - " << DEFAULT_MAX_CONN << " by default";
+
         general.add_options()
         ("help,h", "show this usage information")
         ("version", "show version information")
         ("config,f", po::value<string>(), "configuration file specifying additional options")
         ("verbose,v", "be more verbose (include multiple times for more verbosity e.g. -vvvvv)")
         ("quiet", "quieter output")
-        ("port", po::value<int>(&cmdLine.port), "specify port number")
+        ("port", po::value<int>(&cmdLine.port), portInfoBuilder.str().c_str())
         ("bind_ip", po::value<string>(&cmdLine.bind_ip), "comma separated list of ip addresses to listen on - all local ips by default")
-        ("maxConns",po::value<int>(), "max number of simultaneous connections")
+        ("maxConns",po::value<int>(), maxConnInfoBuilder.str().c_str())
         ("objcheck", "inspect client data for validity on receipt")
         ("logpath", po::value<string>() , "log file to send write to instead of stdout - has to be a file, not directory" )
         ("logappend" , "append to logpath instead of over-writing" )

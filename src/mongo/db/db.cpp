@@ -630,7 +630,7 @@ static int mongoDbMain(int argc, char* argv[]) {
     general_options.add_options()
     ("auth", "run with security")
     ("cpu", "periodically show cpu and iowait utilization")
-    ("dbpath", po::value<string>() , "directory for datafiles")
+    ("dbpath", po::value<string>() , "directory for datafiles - defaults to /data/db")
     ("diaglog", po::value<int>(), "0=off 1=W 2=R 3=both 7=W+some reads")
     ("directoryperdb", "each database will be stored in a separate directory")
     ("ipv6", "enable IPv6 support (disabled by default)")
