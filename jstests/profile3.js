@@ -14,7 +14,7 @@ function profileCursor( query ) {
 
 try {
     username = "jstests_profile3_user";
-    db.addUser( username, "password" );
+    db.addUser( username, "password", false, 1 );
     db.auth( username, "password" );
     
     db.setProfilingLevel(0);

@@ -4,13 +4,13 @@ users.remove( {} );
 pass = "a" + Math.random();
 //print( "password [" + pass + "]" );
 
-db.addUser( "eliot" , pass );
+db.addUser( "eliot" , pass, false, 1 );
 
 assert( db.auth( "eliot" , pass ) , "auth failed" );
 assert( ! db.auth( "eliot" , pass + "a" ) , "auth should have failed" );
 
 pass2 = "b" + Math.random();
-db.addUser( "eliot" , pass2 );
+db.addUser( "eliot" , pass2, false, 1 );
 
 assert( ! db.auth( "eliot" , pass ) , "failed to change password failed" );
 assert( db.auth( "eliot" , pass2 ) , "new password didn't take" );
@@ -24,7 +24,7 @@ var a = db.getMongo().getDB( "admin" );
 users = a.getCollection( "system.users" );
 users.remove( {} );
 pass = "c" + Math.random();
-a.addUser( "super", pass );
+a.addUser( "super", pass, false, 1 );
 assert( a.auth( "super" , pass ) , "auth failed" );
 assert( !a.auth( "super" , pass + "a" ) , "auth should have failed" );
 
@@ -32,7 +32,7 @@ users = db.getCollection( "system.users" );
 users.remove( {} );
 pass = "a" + Math.random();
 
-db.addUser( "eliot" , pass );
+db.addUser( "eliot" , pass, false, 1 );
 
 assert.commandFailed( db.runCommand( { authenticate: 1, user: "eliot", nonce: "foo", key: "bar" } ) );
 
@@ -41,10 +41,10 @@ assert.commandFailed( db.runCommand( { authenticate: 1, user: "eliot", nonce: "f
 before = db.system.users.count()
 
 assert.throws( function(){
-    db.addUser( "" , "abc" )
+    db.addUser( "" , "abc", false, 1 )
 } , null , "C1" )
 assert.throws( function(){
-    db.addUser( "abc" , "" )
+    db.addUser( "abc" , "", false, 1 )
 } , null , "C2" )
 
 
