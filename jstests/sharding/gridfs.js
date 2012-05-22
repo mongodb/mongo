@@ -34,7 +34,8 @@ function testGridFS() {
     assert(res.ok)
     assert.eq(rawmd5, res.md5)
 
-    var numChunks = d.fs.chunks.count({files_id: fileObj._id})
+    var numChunks = d.fs.chunks.find({files_id: fileObj._id}).itcount()
+    //var numChunks = d.fs.chunks.count({files_id: fileObj._id}) // this is broken for now
     assert.eq(numChunks, res.numChunks)
 }
 
