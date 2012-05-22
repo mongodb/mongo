@@ -1,3 +1,10 @@
+mongodb (2.0.6) unstable; urgency=low
+
+  * see http://www.mongodb.org/display/DOCS/2.0+Release+Notes
+  * see https://jira.mongodb.org/browse/SERVER/fixforversion/11165
+
+ -- Eric Milkie <milkie@10gen.com>  Tue, 22 May 2012 10:52:00 -0500
+
 mongodb (2.0.5) unstable; urgency=low
 
   * see http://www.mongodb.org/display/DOCS/2.0+Release+Notes
