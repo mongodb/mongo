@@ -1004,6 +1004,7 @@ namespace mongo {
             cc->setChunkManager( dqo.getChunkManager() );
 
             cursorid = cc->cursorid();
+            curop.debug().cursorid = cursorid;
             DEV tlog(2) << "query has more, cursorid: " << cursorid << endl;
             cc->setPos( n );
             cc->pq = pq_shared;
@@ -1021,6 +1022,7 @@ namespace mongo {
 
         QueryResult *qr = (QueryResult *) result.header();
         qr->cursorId = cursorid;
+        curop.debug().cursorid = cursorid;
         qr->setResultFlagsToOk();
         // qr->len is updated automatically by appendData()
         curop.debug().responseLength = qr->len;
