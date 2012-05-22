@@ -45,7 +45,7 @@ namespace mongo {
         if ( whyMsg )
             out() << " b/c " << whyMsg << endl;
         out() << "exiting" << endl;
-        ::exit( returnCode );
+        ::_exit( returnCode );
     }
 
     bool inShutdown() {

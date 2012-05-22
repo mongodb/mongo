@@ -194,7 +194,7 @@ namespace mongo {
                         << conn_in->getServerAddress() << ")" );
 
             throw SendStaleConfigException( ns, msg,
-                    refManager->getVersion( shard ), ShardChunkVersion( 0 ));
+                    refManager->getVersion( shard ), ShardChunkVersion( 0, OID() ));
         }
 
         // has the ChunkManager been reloaded since the last time we updated the connection-level version?
@@ -205,12 +205,12 @@ namespace mongo {
         }
 
 
-        ShardChunkVersion version = 0;
+        ShardChunkVersion version = ShardChunkVersion( 0, OID() );
         if ( isSharded && manager ) {
             version = manager->getVersion( Shard::make( conn->getServerAddress() ) );
         }
 
-        if( version == 0 ){
+        if( ! version.isSet() ){
             LOG(0) << "resetting shard version of " << ns << " on " << conn->getServerAddress() << ", " <<
                       ( ! isSharded ? "no longer sharded" :
                       ( ! manager ? "no chunk manager found" :

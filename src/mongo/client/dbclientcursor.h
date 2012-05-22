@@ -171,6 +171,16 @@ namespace mongo {
         Message* getMessage(){ return batch.m.get(); }
 
         /**
+         * Used mainly to run commands on connections that doesn't support lazy initialization and
+         * does not support commands through the call interface.
+         *
+         * @param cmd The BSON representation of the command to send.
+         *
+         * @return true if command was sent successfully
+         */
+        bool initCommand();
+
+        /**
          * actually does the query
          */
         bool init();

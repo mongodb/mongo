@@ -135,14 +135,58 @@ namespace mongo {
 
     private:
         static const char pipelineName[];
+        static const char explainName[];
         static const char fromRouterName[];
         static const char splitMongodPipelineName[];
+        static const char serverPipelineName[];
+        static const char mongosPipelineName[];
 
         Pipeline(const intrusive_ptr<ExpressionContext> &pCtx);
+
+        /*
+          Write the pipeline's operators to the given array, with the
+          explain flag true (for DocumentSource::addToBsonArray()).
+
+          @param pArrayBuilder where to write the ops to
+         */
+        void writeExplainOps(BSONArrayBuilder *pArrayBuilder) const;
+
+        /*
+          Write the pipeline's operators to the given result document,
+          for a shard server (or regular server, in an unsharded setup).
+
+          This uses writeExplainOps() and adds that array to the result
+          with the serverPipelineName.  That will be preceded by explain
+          information for the input source.
+
+          @param result the object to add the explain information to
+          @param pInputSource source for the pipeline
+         */
+        void writeExplainShard(BSONObjBuilder &result,
+            const intrusive_ptr<DocumentSource> &pInputSource) const;
+
+        /*
+          Write the pipeline's operators to the given result document,
+          for a mongos instance.
+
+          This first adds the serverPipeline obtained from the input
+          source.
+
+          Then this uses writeExplainOps() and adds that array to the result
+          with the serverPipelineName.  That will be preceded by explain
+          information for the input source.
+
+          @param result the object to add the explain information to
+          @param pInputSource source for the pipeline; expected to be the
+            output of a shard
+         */
+        void writeExplainMongos(BSONObjBuilder &result,
+            const intrusive_ptr<DocumentSource> &pInputSource) const;
 
         string collectionName;
         typedef vector<intrusive_ptr<DocumentSource> > SourceVector;
         SourceVector sourceVector;
+        bool explain;
 
         bool splitMongodPipeline;
         intrusive_ptr<ExpressionContext> pCtx;

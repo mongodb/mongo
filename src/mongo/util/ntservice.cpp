@@ -68,36 +68,36 @@ namespace mongo {
         if (params.count("install")) {
             if ( badOption != -1 ) {
                 log() << "--install cannot be used with --" << disallowedOptions[badOption] << endl;
-                ::exit( EXIT_BADOPTIONS );
+                ::_exit( EXIT_BADOPTIONS );
             }
             if ( ! params.count( "logpath" ) ) {
                 log() << "--install has to be used with --logpath" << endl;
-                ::exit( EXIT_BADOPTIONS );
+                ::_exit( EXIT_BADOPTIONS );
             }
             installService = true;
         }
         if (params.count("reinstall")) {
             if ( badOption != -1 ) {
                 log() << "--reinstall cannot be used with --" << disallowedOptions[badOption] << endl;
-                ::exit( EXIT_BADOPTIONS );
+                ::_exit( EXIT_BADOPTIONS );
             }
             if ( ! params.count( "logpath" ) ) {
                 log() << "--reinstall has to be used with --logpath" << endl;
-                ::exit( EXIT_BADOPTIONS );
+                ::_exit( EXIT_BADOPTIONS );
             }
             reinstallService = true;
         }
         if (params.count("remove")) {
             if ( badOption != -1 ) {
                 log() << "--remove cannot be used with --" << disallowedOptions[badOption] << endl;
-                ::exit( EXIT_BADOPTIONS );
+                ::_exit( EXIT_BADOPTIONS );
             }
             removeService = true;
         }
         if (params.count("service")) {
             if ( badOption != -1 ) {
                 log() << "--service cannot be used with --" << disallowedOptions[badOption] << endl;
-                ::exit( EXIT_BADOPTIONS );
+                ::_exit( EXIT_BADOPTIONS );
             }
             startService = true;
         }
@@ -105,35 +105,35 @@ namespace mongo {
         if (params.count("serviceName")) {
             if ( badOption != -1 ) {
                 log() << "--serviceName cannot be used with --" << disallowedOptions[badOption] << endl;
-                ::exit( EXIT_BADOPTIONS );
+                ::_exit( EXIT_BADOPTIONS );
             }
             windowsServiceName = toWideString( params[ "serviceName" ].as<string>().c_str() );
         }
         if (params.count("serviceDisplayName")) {
             if ( badOption != -1 ) {
                 log() << "--serviceDisplayName cannot be used with --" << disallowedOptions[badOption] << endl;
-                ::exit( EXIT_BADOPTIONS );
+                ::_exit( EXIT_BADOPTIONS );
             }
             windowsServiceDisplayName = toWideString( params[ "serviceDisplayName" ].as<string>().c_str() );
         }
         if (params.count("serviceDescription")) {
             if ( badOption != -1 ) {
                 log() << "--serviceDescription cannot be used with --" << disallowedOptions[badOption] << endl;
-                ::exit( EXIT_BADOPTIONS );
+                ::_exit( EXIT_BADOPTIONS );
             }
             windowsServiceDescription = toWideString( params[ "serviceDescription" ].as<string>().c_str() );
         }
         if (params.count("serviceUser")) {
             if ( badOption != -1 ) {
                 log() << "--serviceUser cannot be used with --" << disallowedOptions[badOption] << endl;
-                ::exit( EXIT_BADOPTIONS );
+                ::_exit( EXIT_BADOPTIONS );
             }
             windowsServiceUser = toWideString( params[ "serviceUser" ].as<string>().c_str() );
         }
         if (params.count("servicePassword")) {
             if ( badOption != -1 ) {
                 log() << "--servicePassword cannot be used with --" << disallowedOptions[badOption] << endl;
-                ::exit( EXIT_BADOPTIONS );
+                ::_exit( EXIT_BADOPTIONS );
             }
             windowsServicePassword = toWideString( params[ "servicePassword" ].as<string>().c_str() );
         }

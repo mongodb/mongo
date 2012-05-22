@@ -642,6 +642,8 @@ namespace mongo {
                 sleepmillis( delay );
             }
         }
+
+        conn->getLastError();
     }
 
     namespace {

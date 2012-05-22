@@ -113,7 +113,7 @@ namespace mongo {
             if ( conn.setVersion() ) {
                 conn.done();
                 // Deprecated, so we don't care about versions here
-                throw RecvStaleConfigException( _ns , "ClusteredCursor::query" , true, ShardChunkVersion( 0 ), ShardChunkVersion( 0 ) );
+                throw RecvStaleConfigException( _ns , "ClusteredCursor::query" , ShardChunkVersion( 0, OID() ), ShardChunkVersion( 0, OID() ), true );
             }
             
             LOG(5) << "ClusteredCursor::query (" << type() << ") server:" << server
@@ -806,6 +806,8 @@ namespace mongo {
                     log( pc ) << "needed to set remote version on connection to value compatible with " << vinfo << endl;
                 }
 
+                const string& ns = _qSpec.ns();
+
                 // Setup cursor
                 if( ! state->cursor ){
 
@@ -813,7 +815,7 @@ namespace mongo {
                     // or if the number of shards to query is > 1
                     if( ( isVersioned() && ! primary ) || _qShards.size() > 1 ){
 
-                        state->cursor.reset( new DBClientCursor( state->conn->get(), _qSpec.ns(), _qSpec.query(),
+                        state->cursor.reset( new DBClientCursor( state->conn->get(), ns, _qSpec.query(),
                                                                  isCommand() ? 1 : 0, // nToReturn (0 if query indicates multi)
                                                                  0, // nToSkip
                                                                  // Does this need to be a ptr?
@@ -836,7 +838,7 @@ namespace mongo {
                     else{
 
                         // Non-sharded
-                        state->cursor.reset( new DBClientCursor( state->conn->get(), _qSpec.ns(), _qSpec.query(),
+                        state->cursor.reset( new DBClientCursor( state->conn->get(), ns, _qSpec.query(),
                                                                  _qSpec.ntoreturn(), // nToReturn
                                                                  _qSpec.ntoskip(), // nToSkip
                                                                  // Does this need to be a ptr?
@@ -854,10 +856,26 @@ namespace mongo {
                     mdata.retryNext = false;
                     mdata.initialized = true;
                 }
-                else{
+                else {
+                    bool success = false;
+
+                    if( nsGetCollection( ns ) == "$cmd" ){
+                        /* TODO: remove this when config servers don't use
+                         * SyncClusterConnection anymore. This is needed
+                         * because SyncConn doesn't allow the call() method
+                         * to be used for commands.
+                         */
+                        success = state->cursor->initCommand();
+                    }
+                    else {
+                        success = state->cursor->init();
+                    }
 
                     // Without full initialization, throw an exception
-                    uassert( 15987, str::stream() << "could not fully initialize cursor on shard " << shard.toString() << ", current connection state is " << mdata.toBSON().toString(), state->cursor->init() );
+                    uassert( 15987, str::stream() << "could not fully initialize cursor on shard "
+                            << shard.toString() << ", current connection state is "
+                            << mdata.toBSON().toString(), success );
+
                     mdata.retryNext = false;
                     mdata.initialized = true;
                     mdata.finished = true;
@@ -1255,7 +1273,7 @@ namespace mongo {
                 if ( conns[i]->setVersion() ) {
                     conns[i]->done();
                     // Version is zero b/c this is deprecated codepath
-                    staleConfigExs.push_back( (string)"stale config detected for " + RecvStaleConfigException( _ns , "ParallelCursor::_init" , ShardChunkVersion( 0 ), ShardChunkVersion( 0 ), true ).what() + errLoc );
+                    staleConfigExs.push_back( (string)"stale config detected for " + RecvStaleConfigException( _ns , "ParallelCursor::_init" , ShardChunkVersion( 0, OID() ), ShardChunkVersion( 0, OID() ), true ).what() + errLoc );
                     break;
                 }
 
@@ -1409,7 +1427,7 @@ namespace mongo {
 
             if( throwException && staleConfigExs.size() > 0 ){
                 // Version is zero b/c this is deprecated codepath
-                throw RecvStaleConfigException( _ns , errMsg.str() , ! allConfigStale, ShardChunkVersion( 0 ), ShardChunkVersion( 0 ) );
+                throw RecvStaleConfigException( _ns , errMsg.str() , ShardChunkVersion( 0, OID() ), ShardChunkVersion( 0, OID() ), ! allConfigStale );
             }
             else if( throwException )
                 throw DBException( errMsg.str(), 14827 );

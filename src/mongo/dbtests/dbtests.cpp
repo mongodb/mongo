@@ -26,5 +26,5 @@
 int main( int argc, char** argv ) {
     static StaticObserver StaticObserver;
     StartupTest::runTests();
-    return mongo::dbtests::runDbTests( argc, argv, "/tmp/unittest" );
+    _exit(mongo::dbtests::runDbTests( argc, argv, "/tmp/unittest" ));
 }

@@ -145,7 +145,8 @@ namespace mongo {
             BSONElement shardElement(shardIter.next());
             const char *pFieldName = shardElement.fieldName();
 
-            if (strcmp(pFieldName, "result") == 0) {
+            if ((strcmp(pFieldName, "result") == 0) ||
+                (strcmp(pFieldName, "serverPipeline") == 0)) {
                 pShardSource = DocumentSourceBsonArray::create(
                     &shardElement, pCtx);
 

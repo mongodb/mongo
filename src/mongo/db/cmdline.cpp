@@ -22,6 +22,7 @@
 #include "../util/password.h"
 #include "../util/processinfo.h"
 #include "../util/net/listen.h"
+#include "../bson/util/builder.h"
 #include "security_common.h"
 #ifdef _WIN32
 #include <direct.h>
@@ -53,15 +54,21 @@ namespace mongo {
             hidden.add_options()(s.c_str(), "verbose");
         }
 
+        StringBuilder portInfoBuilder;
+        StringBuilder maxConnInfoBuilder;
+
+        portInfoBuilder << "specify port number - " << DefaultDBPort << " by default";
+        maxConnInfoBuilder << "max number of simultaneous connections - " << DEFAULT_MAX_CONN << " by default";
+
         general.add_options()
         ("help,h", "show this usage information")
         ("version", "show version information")
         ("config,f", po::value<string>(), "configuration file specifying additional options")
         ("verbose,v", "be more verbose (include multiple times for more verbosity e.g. -vvvvv)")
         ("quiet", "quieter output")
-        ("port", po::value<int>(&cmdLine.port), "specify port number")
+        ("port", po::value<int>(&cmdLine.port), portInfoBuilder.str().c_str())
         ("bind_ip", po::value<string>(&cmdLine.bind_ip), "comma separated list of ip addresses to listen on - all local ips by default")
-        ("maxConns",po::value<int>(), "max number of simultaneous connections")
+        ("maxConns",po::value<int>(), maxConnInfoBuilder.str().c_str())
         ("objcheck", "inspect client data for validity on receipt")
         ("logpath", po::value<string>() , "log file to send write to instead of stdout - has to be a file, not directory" )
         ("logappend" , "append to logpath instead of over-writing" )
@@ -242,11 +249,11 @@ namespace mongo {
             int newSize = params["maxConns"].as<int>();
             if ( newSize < 5 ) {
                 out() << "maxConns has to be at least 5" << endl;
-                ::exit( EXIT_BADOPTIONS );
+                ::_exit( EXIT_BADOPTIONS );
             }
             else if ( newSize >= 10000000 ) {
                 out() << "maxConns can't be greater than 10000000" << endl;
-                ::exit( EXIT_BADOPTIONS );
+                ::_exit( EXIT_BADOPTIONS );
             }
             connTicketHolder.resize( newSize );
         }
@@ -270,7 +277,7 @@ namespace mongo {
             cmdLine.socket = params["unixSocketPrefix"].as<string>();
             if (!fs::is_directory(cmdLine.socket)) {
                 cout << cmdLine.socket << " must be a directory" << endl;
-                ::exit(-1);
+                ::_exit(-1);
             }
         }
 
@@ -282,7 +289,7 @@ namespace mongo {
             cmdLine.doFork = true;
             if ( ! params.count( "logpath" ) && ! params.count( "syslog" ) ) {
                 cout << "--fork has to be used with --logpath or --syslog" << endl;
-                ::exit(EXIT_BADOPTIONS);
+                ::_exit(EXIT_BADOPTIONS);
             }
 
             if ( params.count( "logpath" ) ) {
@@ -296,7 +303,7 @@ namespace mongo {
                 FILE * test = fopen( logpath.c_str() , "a" );
                 if ( ! test ) {
                     cout << "can't open [" << logpath << "] for log file: " << errnoWithDescription() << endl;
-                    ::exit(-1);
+                    ::_exit(-1);
                 }
                 fclose( test );
                 // if we created a file, unlink it (to avoid confusing log rotation code)
@@ -331,7 +338,7 @@ namespace mongo {
 
             if ( chdir("/") < 0 ) {
                 cout << "Cant chdir() while forking server process: " << strerror(errno) << endl;
-                ::exit(-1);
+                ::_exit(-1);
             }
             setsid();
             
@@ -360,13 +367,13 @@ namespace mongo {
             FILE* f = freopen("/dev/null", "w", stderr);
             if ( f == NULL ) {
                 cout << "Cant reassign stderr while forking server process: " << strerror(errno) << endl;
-                ::exit(-1);
+                ::_exit(-1);
             }
 
             f = freopen("/dev/null", "r", stdin);
             if ( f == NULL ) {
                 cout << "Cant reassign stdin while forking server process: " << strerror(errno) << endl;
-                ::exit(-1);
+                ::_exit(-1);
             }
 
             setupCoreSignals();
@@ -382,7 +389,7 @@ namespace mongo {
         if (params.count("logpath") && !params.count("shutdown")) {
             if ( params.count("syslog") ) {
                 cout << "Cant use both a logpath and syslog " << endl;
-                ::exit(EXIT_BADOPTIONS);
+                ::_exit(EXIT_BADOPTIONS);
             }
             
             if ( logpath.size() == 0 )
@@ -400,7 +407,7 @@ namespace mongo {
 
             if (!setUpSecurityKey(f)) {
                 // error message printed in setUpPrivateKey
-                ::exit(EXIT_BADOPTIONS);
+                ::_exit(EXIT_BADOPTIONS);
             }
 
             cmdLine.keyFile = true;
@@ -416,12 +423,12 @@ namespace mongo {
 
             if ( cmdLine.sslPEMKeyPassword.size() == 0 ) {
                 log() << "need sslPEMKeyPassword" << endl;
-                ::exit(EXIT_BADOPTIONS);
+                ::_exit(EXIT_BADOPTIONS);
             }
             
             if ( cmdLine.sslPEMKeyFile.size() == 0 ) {
                 log() << "need sslPEMKeyFile" << endl;
-                ::exit(EXIT_BADOPTIONS);
+                ::_exit(EXIT_BADOPTIONS);
             }
             
             cmdLine.sslServerManager = new SSLManager( false );
@@ -429,7 +436,7 @@ namespace mongo {
         }
         else if ( cmdLine.sslPEMKeyFile.size() || cmdLine.sslPEMKeyPassword.size() ) {
             log() << "need to enable sslOnNormalPorts" << endl;
-            ::exit(EXIT_BADOPTIONS);
+            ::_exit(EXIT_BADOPTIONS);
         }
 #endif
         

@@ -601,7 +601,14 @@ string arg_error_check(int argc, char* argv[]) {
     return "";
 }
 
+static int mongoDbMain(int argc, char* argv[]);
+
 int main(int argc, char* argv[]) {
+    int exitCode = mongoDbMain(argc, argv);
+    ::_exit(exitCode);
+}
+
+static int mongoDbMain(int argc, char* argv[]) {
     static StaticObserver staticObserver;
     getcurns = ourgetns;
 
@@ -619,11 +626,14 @@ int main(int argc, char* argv[]) {
     po::positional_options_description positional_options;
 
     CmdLine::addGlobalOptions( general_options , hidden_options );
+    
+    StringBuilder dbpathBuilder;
+    dbpathBuilder << "directory for datafiles - defaults to " << dbpath;
 
     general_options.add_options()
     ("auth", "run with security")
     ("cpu", "periodically show cpu and iowait utilization")
-    ("dbpath", po::value<string>() , "directory for datafiles")
+    ("dbpath", po::value<string>() , dbpathBuilder.str().c_str())
     ("diaglog", po::value<int>(), "0=off 1=W 2=R 3=both 7=W+some reads")
     ("directoryperdb", "each database will be stored in a separate directory")
     ("ipv6", "enable IPv6 support (disabled by default)")
@@ -974,7 +984,7 @@ int main(int argc, char* argv[]) {
             dur::DataLimitPerJournalFile = 128 * 1024 * 1024;
             if (cmdLine.usingReplSets() || replSettings.master || replSettings.slave) {
                 log() << "replication should not be enabled on a config server" << endl;
-                ::exit(-1);
+                ::_exit(-1);
             }
             if ( params.count( "nodur" ) == 0 && params.count( "nojournal" ) == 0 )
                 cmdLine.dur = true;
@@ -1067,7 +1077,7 @@ int main(int argc, char* argv[]) {
 
             if (failed) {
                 cerr << "There doesn't seem to be a server running with dbpath: " << dbpath << endl;
-                ::exit(-1);
+                ::_exit(-1);
             }
 
             cout << "killing process with pid: " << pid << endl;
@@ -1075,14 +1085,14 @@ int main(int argc, char* argv[]) {
             if (ret) {
                 int e = errno;
                 cerr << "failed to kill process: " << errnoWithDescription(e) << endl;
-                ::exit(-1);
+                ::_exit(-1);
             }
 
             while (boost::filesystem::exists(procPath)) {
                 sleepsecs(1);
             }
 
-            ::exit(0);
+            ::_exit(0);
         }
 #endif
 

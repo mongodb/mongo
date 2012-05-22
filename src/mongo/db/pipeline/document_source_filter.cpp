@@ -58,7 +58,8 @@ namespace mongo {
         pFilter = pFilter->optimize();
     }
 
-    void DocumentSourceFilter::sourceToBson(BSONObjBuilder *pBuilder) const {
+    void DocumentSourceFilter::sourceToBson(
+        BSONObjBuilder *pBuilder, bool explain) const {
         pFilter->addToBsonObj(pBuilder, filterName, false);
     }
 

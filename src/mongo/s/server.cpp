@@ -467,7 +467,8 @@ namespace mongo {
 
 int main(int argc, char* argv[]) {
     try {
-        return _main(argc, argv);
+        int exitCode = _main(argc, argv);
+        ::_exit(exitCode);
     }
     catch(SocketException& e) {
         cout << "uncaught SocketException in mongos main:" << endl;
@@ -484,7 +485,7 @@ int main(int argc, char* argv[]) {
     catch(...) {
         cout << "uncaught unknown exception in mongos main" << endl;
     }
-    return 20;
+    ::_exit(20);
 }
 
 #undef exit
@@ -506,5 +507,5 @@ void mongo::dbexit( ExitCode rc, const char *why ) {
           << " rc:" << rc
           << " " << ( why ? why : "" )
           << endl;
-    ::exit(rc);
+    ::_exit(rc);
 }

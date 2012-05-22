@@ -164,8 +164,10 @@ namespace mongo {
           array being built here.
 
           @param pBuilder the array builder to add the operation to.
+          @param explain create explain output
          */
-        virtual void addToBsonArray(BSONArrayBuilder *pBuilder) const;
+        virtual void addToBsonArray(BSONArrayBuilder *pBuilder,
+            bool explain = false) const;
         
     protected:
         /**
@@ -180,8 +182,10 @@ namespace mongo {
           to add this object to a pipeline being represented in BSON.
 
           @param pBuilder a blank object builder to write to
+          @param explain create explain output
          */
-        virtual void sourceToBson(BSONObjBuilder *pBuilder) const = 0;
+        virtual void sourceToBson(BSONObjBuilder *pBuilder,
+                                  bool explain) const = 0;
 
         /*
           Most DocumentSources have an underlying source they get their data
@@ -201,6 +205,13 @@ namespace mongo {
         int step;
 
         intrusive_ptr<ExpressionContext> pExpCtx;
+
+        /*
+          for explain: # of rows returned by this source
+
+          This is *not* unsigned so it can be passed to BSONObjBuilder.append().
+         */
+        long long nRowsOut;
     };
 
 
@@ -234,7 +245,7 @@ namespace mongo {
 
     protected:
         // virtuals from DocumentSource
-        virtual void sourceToBson(BSONObjBuilder *pBuilder) const;
+        virtual void sourceToBson(BSONObjBuilder *pBuilder, bool explain) const;
 
     private:
         DocumentSourceBsonArray(BSONElement *pBsonElement,
@@ -275,7 +286,7 @@ namespace mongo {
 
     protected:
         // virtuals from DocumentSource
-        virtual void sourceToBson(BSONObjBuilder *pBuilder) const;
+        virtual void sourceToBson(BSONObjBuilder *pBuilder, bool explain) const;
 
     private:
         DocumentSourceCommandFutures(string &errmsg, FuturesList *pList,
@@ -325,33 +336,42 @@ namespace mongo {
             const string &ns,
             const intrusive_ptr<ExpressionContext> &pExpCtx);
 
-        /**
-           Add a BSONObj dependency.
+        /*
+          Record the namespace.  Required for explain.
 
-           Some Cursor creation functions rely on BSON objects to specify
-           their query predicate or sort.  These often take a BSONObj
-           by reference for these, but to not copy it.  As a result, the
-           BSONObjs specified must outlive the Cursor.  In order to ensure
-           that, use this to preserve a pointer to the BSONObj here.
+          @param namespace the namespace
+        */
+        void setNamespace(const string &ns);
 
-           From the outside, you must also make sure the BSONObjBuilder
-           creates a lasting copy of the data, otherwise it will go away
-           when the builder goes out of scope.  Therefore, the typical usage
-           pattern for this is 
-           {
-               BSONObjBuilder builder;
-               // do stuff to the builder
-               shared_ptr<BSONObj> pBsonObj(new BSONObj(builder.obj()));
-               pDocumentSourceCursor->addBsonDependency(pBsonObj);
-           }
+        /*
+          Record the query that was specified for the cursor this wraps, if
+          any.
 
-           @param pBsonObj pointer to the BSON object to preserve
+          This should be captured after any optimizations are applied to
+          the pipeline so that it reflects what is really used.
+
+          This gets used for explain output.
+
+          @param pBsonObj the query to record
          */
-        void addBsonDependency(const shared_ptr<BSONObj> &pBsonObj);
+        void setQuery(const shared_ptr<BSONObj> &pBsonObj);
+
+        /*
+          Record the sort that was specified for the cursor this wraps, if
+          any.
+
+          This should be captured after any optimizations are applied to
+          the pipeline so that it reflects what is really used.
+
+          This gets used for explain output.
+
+          @param pBsonObj the sort to record
+         */
+        void setSort(const shared_ptr<BSONObj> &pBsonObj);
 
     protected:
         // virtuals from DocumentSource
-        virtual void sourceToBson(BSONObjBuilder *pBuilder) const;
+        virtual void sourceToBson(BSONObjBuilder *pBuilder, bool explain) const;
 
     private:
         DocumentSourceCursor(
@@ -361,11 +381,15 @@ namespace mongo {
         void findNext();
         intrusive_ptr<Document> pCurrent;
 
+        string ns; // namespace
+
         /*
           The bsonDependencies must outlive the Cursor wrapped by this
           source.  Therefore, bsonDependencies must appear before pCursor
           in order cause its destructor to be called *after* pCursor's.
          */
+        shared_ptr<BSONObj> pQuery;
+        shared_ptr<BSONObj> pSort;
         vector<shared_ptr<BSONObj> > bsonDependencies;
         shared_ptr<Cursor> pCursor;
 
@@ -390,6 +414,31 @@ namespace mongo {
           pipeline.
          */
         intrusive_ptr<DependencyTracker> pDependencies;
+
+        /**
+           (5/14/12 - moved this to private because it's not used atm)
+           Add a BSONObj dependency.
+
+           Some Cursor creation functions rely on BSON objects to specify
+           their query predicate or sort.  These often take a BSONObj
+           by reference for these, but do not copy it.  As a result, the
+           BSONObjs specified must outlive the Cursor.  In order to ensure
+           that, use this to preserve a pointer to the BSONObj here.
+
+           From the outside, you must also make sure the BSONObjBuilder
+           creates a lasting copy of the data, otherwise it will go away
+           when the builder goes out of scope.  Therefore, the typical usage
+           pattern for this is 
+           {
+               BSONObjBuilder builder;
+               // do stuff to the builder
+               shared_ptr<BSONObj> pBsonObj(new BSONObj(builder.obj()));
+               pDocumentSourceCursor->addBsonDependency(pBsonObj);
+           }
+
+           @param pBsonObj pointer to the BSON object to preserve
+         */
+        void addBsonDependency(const shared_ptr<BSONObj> &pBsonObj);
     };
 
 
@@ -492,7 +541,7 @@ namespace mongo {
 
     protected:
         // virtuals from DocumentSource
-        virtual void sourceToBson(BSONObjBuilder *pBuilder) const;
+        virtual void sourceToBson(BSONObjBuilder *pBuilder, bool explain) const;
 
         // virtuals from DocumentSourceFilterBase
         virtual bool accept(const intrusive_ptr<Document> &pDocument) const;
@@ -580,7 +629,7 @@ namespace mongo {
 
     protected:
         // virtuals from DocumentSource
-        virtual void sourceToBson(BSONObjBuilder *pBuilder) const;
+        virtual void sourceToBson(BSONObjBuilder *pBuilder, bool explain) const;
 
     private:
         DocumentSourceGroup(const intrusive_ptr<ExpressionContext> &pExpCtx);
@@ -662,7 +711,7 @@ namespace mongo {
 
     protected:
         // virtuals from DocumentSource
-        virtual void sourceToBson(BSONObjBuilder *pBuilder) const;
+        virtual void sourceToBson(BSONObjBuilder *pBuilder, bool explain) const;
 
         // virtuals from DocumentSourceFilterBase
         virtual bool accept(const intrusive_ptr<Document> &pDocument) const;
@@ -703,7 +752,7 @@ namespace mongo {
 
     protected:
         // virtuals from DocumentSource
-        virtual void sourceToBson(BSONObjBuilder *pBuilder) const;
+        virtual void sourceToBson(BSONObjBuilder *pBuilder, bool explain) const;
 
     private:
         DocumentSourceOut(BSONElement *pBsonElement,
@@ -777,7 +826,7 @@ namespace mongo {
 
     protected:
         // virtuals from DocumentSource
-        virtual void sourceToBson(BSONObjBuilder *pBuilder) const;
+        virtual void sourceToBson(BSONObjBuilder *pBuilder, bool explain) const;
 
     private:
         DocumentSourceProject(const intrusive_ptr<ExpressionContext> &pExpCtx);
@@ -913,7 +962,7 @@ namespace mongo {
 
     protected:
         // virtuals from DocumentSource
-        virtual void sourceToBson(BSONObjBuilder *pBuilder) const;
+        virtual void sourceToBson(BSONObjBuilder *pBuilder, bool explain) const;
 
     private:
         DocumentSourceSort(const intrusive_ptr<ExpressionContext> &pExpCtx);
@@ -1008,7 +1057,7 @@ namespace mongo {
 
     protected:
         // virtuals from DocumentSource
-        virtual void sourceToBson(BSONObjBuilder *pBuilder) const;
+        virtual void sourceToBson(BSONObjBuilder *pBuilder, bool explain) const;
 
     private:
         DocumentSourceLimit(
@@ -1059,7 +1108,7 @@ namespace mongo {
 
     protected:
         // virtuals from DocumentSource
-        virtual void sourceToBson(BSONObjBuilder *pBuilder) const;
+        virtual void sourceToBson(BSONObjBuilder *pBuilder, bool explain) const;
 
     private:
         DocumentSourceSkip(const intrusive_ptr<ExpressionContext> &pExpCtx);
@@ -1122,7 +1171,7 @@ namespace mongo {
 
     protected:
         // virtuals from DocumentSource
-        virtual void sourceToBson(BSONObjBuilder *pBuilder) const;
+        virtual void sourceToBson(BSONObjBuilder *pBuilder, bool explain) const;
 
     private:
         DocumentSourceUnwind(const intrusive_ptr<ExpressionContext> &pExpCtx);

@@ -271,8 +271,8 @@ namespace mongo {
             ex->getInfo().append( err );
             if( scex ){
                 err.append( "ns", scex->getns() );
-                err.appendTimestamp( "vReceived", scex->getVersionReceived() );
-                err.appendTimestamp( "vWanted", scex->getVersionWanted() );
+                scex->getVersionReceived().addToBSON( err, "vReceived" );
+                scex->getVersionWanted().addToBSON( err, "vWanted" );
             }
             BSONObj errObj = err.done();
 
@@ -1019,7 +1019,7 @@ namespace mongo {
                 ss << "dbexit: " << why << "; exiting immediately";
                 tryToOutputFatal( ss.str() );
                 if ( c ) c->shutdown();
-                ::exit( rc );
+                ::_exit( rc );
             }
         }
 
@@ -1049,7 +1049,7 @@ namespace mongo {
 
 #ifdef _WIN32
         // Windows Service Controller wants to be told when we are down,
-        //  so don't call ::exit() yet, or say "really exiting now"
+        //  so don't call ::_exit() yet, or say "really exiting now"
         //
         if ( rc == EXIT_WINDOWS_SERVICE_STOP ) {
             if ( c ) c->shutdown();
@@ -1058,7 +1058,7 @@ namespace mongo {
 #endif
         tryToOutputFatal( "dbexit: really exiting now" );
         if ( c ) c->shutdown();
-        ::exit(rc);
+        ::_exit(rc);
     }
 
 #if !defined(__sunos__)

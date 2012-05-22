@@ -421,13 +421,13 @@ namespace mongo {
             if ( totalRecs > 0 ) {
                 avgRecSize = d->stats.datasize / totalRecs;
                 maxRecsWhenFull = maxChunkSize / avgRecSize;
-                maxRecsWhenFull = 130 * maxRecsWhenFull / 100; // slack
+                maxRecsWhenFull = std::min( (unsigned long long)(Chunk::MaxObjectPerChunk + 1) , 130 * maxRecsWhenFull / 100 /* slack */ );
             }
             else {
                 avgRecSize = 0;
-                maxRecsWhenFull = numeric_limits<long long>::max();
+                maxRecsWhenFull = Chunk::MaxObjectPerChunk + 1;
             }
-
+            
             // do a full traversal of the chunk and don't stop even if we think it is a large chunk
             // we want the number of records to better report, in that case
             bool isLargeChunk = false;
@@ -864,7 +864,7 @@ namespace mongo {
                     return false;
                 }
 
-                maxVersion = x["lastmod"];
+                maxVersion = ShardChunkVersion::fromBSON( x, "lastmod" );
                 verify( currChunk["shard"].type() );
                 verify( currChunk["min"].type() );
                 verify( currChunk["max"].type() );
@@ -897,8 +897,8 @@ namespace mongo {
 
                 if ( maxVersion < shardingState.getVersion( ns ) ) {
                     errmsg = "official version less than mine?";
-                    result.appendTimestamp( "officialVersion" , maxVersion );
-                    result.appendTimestamp( "myVersion" , shardingState.getVersion( ns ) );
+                    maxVersion.addToBSON( result, "officialVersion" );
+                    shardingState.getVersion( ns ).addToBSON( result, "myVersion" );
 
                     warning() << "aborted moveChunk because " << errmsg << ": official " << maxVersion
                                       << " mine: " << shardingState.getVersion(ns) << migrateLog;
@@ -1087,7 +1087,7 @@ namespace mongo {
 
                     BSONObjBuilder n( op.subobjStart( "o" ) );
                     n.append( "_id" , Chunk::genID( ns , min ) );
-                    n.appendTimestamp( "lastmod" , myVersion /* same as used on donateChunk */ );
+                    myVersion.addToBSON( n, "lastmod" );
                     n.append( "ns" , ns );
                     n.append( "min" , min );
                     n.append( "max" , max );
@@ -1127,7 +1127,7 @@ namespace mongo {
                     nextVersion.incMinor();  // same as used on donateChunk
                     BSONObjBuilder n( op.subobjStart( "o" ) );
                     n.append( "_id" , Chunk::genID( ns , bumpMin ) );
-                    n.appendTimestamp( "lastmod" , nextVersion );
+                    nextVersion.addToBSON( n, "lastmod" );
                     n.append( "ns" , ns );
                     n.append( "min" , bumpMin );
                     n.append( "max" , bumpMax );
@@ -1158,7 +1158,8 @@ namespace mongo {
                     b.append( "q" , BSON( "query" << BSON( "ns" << ns ) << "orderby" << BSON( "lastmod" << -1 ) ) );
                     {
                         BSONObjBuilder bb( b.subobjStart( "res" ) );
-                        bb.appendTimestamp( "lastmod" , maxVersion );
+                        // TODO: For backwards compatibility, we can't yet require an epoch here
+                        bb.appendTimestamp( "lastmod", maxVersion.toLong() );
                         bb.done();
                     }
                     preCond.append( b.obj() );
@@ -1202,9 +1203,9 @@ namespace mongo {
                         // look for the chunk in this shard whose version got bumped
                         // we assume that if that mod made it to the config, the applyOps was successful
                         BSONObj doc = conn->findOne( ShardNS::chunk , Query(BSON( "ns" << ns )).sort( BSON("lastmod" << -1)));
-                        ShardChunkVersion checkVersion = doc["lastmod"];
+                        ShardChunkVersion checkVersion = ShardChunkVersion::fromBSON( doc["lastmod"] );
 
-                        if ( checkVersion == nextVersion ) {
+                        if ( checkVersion.isEquivalentTo( nextVersion ) ) {
                             log() << "moveChunk commit confirmed" << migrateLog;
 
                         }

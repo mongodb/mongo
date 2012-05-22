@@ -101,6 +101,11 @@ assert.eq( 2 , db.foo.find().limit(-2).itcount() , "N2" );
 assert.eq( 2 , db.foo.find().skip(4).limit(2).itcount() , "N3" );
 assert.eq( 2 , db.foo.find().skip(4).limit(-2).itcount() , "N4" );
 
+// Make sure count command returns error for invalid queries
+var badCmdResult = db.runCommand({ count: 'foo', query: { $c: { $abc: 3 }}});
+assert( ! badCmdResult.ok );
+assert( badCmdResult.errmsg.length > 0 );
+
 s.stop();
 
 

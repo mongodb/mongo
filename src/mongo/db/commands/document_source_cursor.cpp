@@ -14,13 +14,15 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "pch.h"
+#include "mongo/pch.h"
 
-#include "db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source.h"
 
-#include "db/clientcursor.h"
-#include "db/cursor.h"
-#include "db/pipeline/document.h"
+#include "mongo/client/dbclientcursor.h"
+#include "mongo/db/clientcursor.h"
+#include "mongo/db/cursor.h"
+#include "mongo/db/instance.h"
+#include "mongo/db/pipeline/document.h"
 
 namespace mongo {
 
@@ -98,9 +100,34 @@ namespace mongo {
         verify(false);
     }
 
-    void DocumentSourceCursor::sourceToBson(BSONObjBuilder *pBuilder) const {
-        /* this has no analog in the BSON world */
-        verify(false);
+    void DocumentSourceCursor::sourceToBson(
+        BSONObjBuilder *pBuilder, bool explain) const {
+
+        /* this has no analog in the BSON world, so only allow it for explain */
+        if (explain)
+        {
+            BSONObj bsonObj;
+            
+            pBuilder->append("query", *pQuery);
+
+            if (pSort.get())
+            {
+                pBuilder->append("sort", *pSort);
+            }
+
+            // construct query for explain
+            BSONObjBuilder queryBuilder;
+            queryBuilder.append("$query", *pQuery);
+            if (pSort.get())
+                queryBuilder.append("$orderby", *pSort);
+            queryBuilder.append("$explain", 1);
+            Query query(queryBuilder.obj());
+
+            DBDirectClient directClient;
+            BSONObj explainResult(directClient.findOne(ns, query));
+
+            pBuilder->append("cursor", explainResult);
+        }
     }
 
     DocumentSourceCursor::DocumentSourceCursor(
@@ -125,6 +152,18 @@ namespace mongo {
         intrusive_ptr<DocumentSourceCursor> pSource(
             new DocumentSourceCursor(pCursor, ns, pExpCtx));
             return pSource;
+    }
+
+    void DocumentSourceCursor::setNamespace(const string &n) {
+        ns = n;
+    }
+
+    void DocumentSourceCursor::setQuery(const shared_ptr<BSONObj> &pBsonObj) {
+        pQuery = pBsonObj;
+    }
+
+    void DocumentSourceCursor::setSort(const shared_ptr<BSONObj> &pBsonObj) {
+        pSort = pBsonObj;
     }
 
     void DocumentSourceCursor::addBsonDependency(

@@ -22,6 +22,9 @@
 
 namespace mongo {
 
+    const int DEFAULT_MAX_CONN = 20000;
+    const int MAX_MAX_CONN = 20000;
+
     class MessagingPort;
 
     class Listener : boost::noncopyable {

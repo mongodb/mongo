@@ -68,7 +68,7 @@ s.s = s._mongos[0] = s["s0"] = conn;
 
 login(adminUser);
 
-d1 = new ReplSetTest({name : "d1", nodes : 3, startPort : 31100});
+d1 = new ReplSetTest({name : "d1", nodes : 3, startPort : 31100, useHostName : true });
 d1.startSet({keyFile : "jstests/libs/key2"});
 d1.initiate();
 
@@ -110,10 +110,10 @@ assert.eq(result.ok, 1, tojson(result));
 s.getDB("admin").runCommand({enableSharding : "test"});
 s.getDB("admin").runCommand({shardCollection : "test.foo", key : {x : 1}});
 
-s.getDB(testUser.db).addUser(testUser.username, testUser.password , false );
-s.getDB(testUser.db).getLastError();
-s.getDB(testUserReadOnly.db).addUser(testUserReadOnly.username, testUserReadOnly.password, true);
-s.getDB(testUser.db).getLastError();
+d1.waitForState( d1.getSecondaries(), d1.SECONDARY, 5 * 60 * 1000 )
+
+s.getDB(testUser.db).addUser(testUser.username, testUser.password , false, 3 )
+s.getDB(testUserReadOnly.db).addUser(testUserReadOnly.username, testUserReadOnly.password, true, 3 )
 
 logout(adminUser);
 
@@ -143,7 +143,7 @@ assert.eq( 1 , s.getDB( "test" ).foo.find().itcount() , tojson(result) );
 
 logout(testUser);
 
-d2 = new ReplSetTest({name : "d2", nodes : 3, startPort : 31200});
+d2 = new ReplSetTest({name : "d2", nodes : 3, startPort : 31200, useHostName : true });
 d2.startSet({keyFile : "jstests/libs/key1"});
 d2.initiate();
 
@@ -223,9 +223,11 @@ assert.eq(count, 500);
 
 logout(adminUser);
 
+d2.waitForState( d2.getSecondaries(), d2.SECONDARY, 5 * 60 * 1000 )
+
 // add admin on shard itself, hack to prevent localhost auth bypass
-d1.getMaster().getDB(adminUser.db).addUser(adminUser.username, adminUser.password);
-d2.getMaster().getDB(adminUser.db).addUser(adminUser.username, adminUser.password);
+d1.getMaster().getDB(adminUser.db).addUser(adminUser.username, adminUser.password, false, 3);
+d2.getMaster().getDB(adminUser.db).addUser(adminUser.username, adminUser.password, false, 3);
 
 login(testUser);
 print( "testing map reduce" );

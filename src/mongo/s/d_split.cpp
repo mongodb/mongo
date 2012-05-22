@@ -498,7 +498,7 @@ namespace mongo {
         BSONObjBuilder bb( b.subobjStart( name ) );
         bb.append( "min" , min );
         bb.append( "max" , max );
-        bb.appendTimestamp( "lastmod" , lastmod );
+        lastmod.addToBSON( bb, "lastmod" );
         bb.done();
     }
 
@@ -623,7 +623,7 @@ namespace mongo {
                 ScopedDbConnection conn( shardingState.getConfigServer() );
 
                 BSONObj x = conn->findOne( ShardNS::chunk , Query( BSON( "ns" << ns ) ).sort( BSON( "lastmod" << -1 ) ) );
-                maxVersion = x["lastmod"];
+                maxVersion = ShardChunkVersion::fromBSON( x, "lastmod" );
 
                 BSONObj currChunk = conn->findOne( ShardNS::chunk , shardId.wrap( "_id" ) ).getOwned();
                 verify( currChunk["shard"].type() );
@@ -658,8 +658,8 @@ namespace mongo {
 
                 if ( maxVersion < shardingState.getVersion( ns ) ) {
                     errmsg = "official version less than mine?";
-                    result.appendTimestamp( "officialVersion" , maxVersion );
-                    result.appendTimestamp( "myVersion" , shardingState.getVersion( ns ) );
+                    maxVersion.addToBSON( result, "officialVersion" );
+                    shardingState.getVersion( ns ).addToBSON( result, "myVersion" );
 
                     log( LL_WARNING ) << "aborted split because " << errmsg << ": official " << maxVersion
                                       << " mine: " << shardingState.getVersion(ns) << endl;
@@ -668,7 +668,7 @@ namespace mongo {
 
                 origChunk.min = currMin.getOwned();
                 origChunk.max = currMax.getOwned();
-                origChunk.lastmod = currChunk["lastmod"];
+                origChunk.lastmod = ShardChunkVersion::fromBSON( currChunk["lastmod"] );
 
                 // since this could be the first call that enable sharding we also make sure to have the chunk manager up to date
                 shardingState.gotShardName( shard );
@@ -711,7 +711,7 @@ namespace mongo {
                 // add the modified (new) chunk information as the update object
                 BSONObjBuilder n( op.subobjStart( "o" ) );
                 n.append( "_id" , Chunk::genID( ns , startKey ) );
-                n.appendTimestamp( "lastmod" , myVersion );
+                myVersion.addToBSON( n, "lastmod" );
                 n.append( "ns" , ns );
                 n.append( "min" , startKey );
                 n.append( "max" , endKey );
@@ -740,7 +740,8 @@ namespace mongo {
                 b.append( "q" , BSON( "query" << BSON( "ns" << ns ) << "orderby" << BSON( "lastmod" << -1 ) ) );
                 {
                     BSONObjBuilder bb( b.subobjStart( "res" ) );
-                    bb.appendTimestamp( "lastmod" , maxVersion );
+                    // TODO: For backwards compatibility, we can't yet require an epoch here
+                    bb.appendTimestamp( "lastmod", maxVersion.toLong() );
                     bb.done();
                 }
                 preCond.append( b.obj() );

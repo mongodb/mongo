@@ -23,6 +23,7 @@ clientSource = [
     'mongo/db/lasterror.cpp',
     'mongo/db/namespace.cpp',
     'mongo/db/nonce.cpp',
+    'mongo/db/dbmessage.cpp',
     'mongo/pch.cpp',
     'mongo/util/assert_util.cpp',
     'mongo/util/background.cpp',

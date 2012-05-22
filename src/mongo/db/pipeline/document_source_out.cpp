@@ -60,7 +60,8 @@ namespace mongo {
         return pSource;
     }
 
-    void DocumentSourceOut::sourceToBson(BSONObjBuilder *pBuilder) const {
+    void DocumentSourceOut::sourceToBson(
+        BSONObjBuilder *pBuilder, bool explain) const {
         verify(false); // CW TODO
     }
 }

@@ -64,7 +64,7 @@ namespace mongo {
         // serialization support
         //
 
-        void serialize(BSONObjBuilder& to, ShardChunkVersion myLastMod=0);
+        void serialize(BSONObjBuilder& to, ShardChunkVersion myLastMod=ShardChunkVersion(0,OID()));
 
         //
         // chunk boundary support
@@ -302,19 +302,58 @@ namespace mongo {
     public:
         typedef map<Shard,ShardChunkVersion> ShardVersionMap;
 
-        ChunkManager( string ns , ShardKeyPattern pattern , bool unique, ChunkManagerPtr oldManager = ChunkManagerPtr() );
+        // Loads a new chunk manager from a collection document
+        ChunkManager( const BSONObj& collDoc );
+
+        // Creates an empty chunk manager for the namespace
+        ChunkManager( const string& ns, const ShardKeyPattern& pattern, bool unique );
+
+        // Updates a chunk manager based on an older manager
+        ChunkManager( ChunkManagerPtr oldManager );
 
         string getns() const { return _ns; }
 
-        int numChunks() const { return _chunkMap.size(); }
+        const ShardKeyPattern& getShardKey() const {  return _key; }
+
         bool hasShardKey( const BSONObj& obj ) const;
 
-        void createFirstChunks( const Shard& primary , vector<BSONObj>* initPoints , vector<Shard>* initShards ) const; // only call from DBConfig::shardCollection
+        bool isUnique() const { return _unique; }
+
+        /**
+         * this is just an increasing number of how many ChunkManagers we have so we know if something has been updated
+         */
+        unsigned long long getSequenceNumber() const { return _sequenceNumber; }
+
+        //
+        // After constructor is invoked, we need to call loadExistingRanges.  If this is a new
+        // sharded collection, we can call createFirstChunks first.
+        //
+
+        // Creates new chunks based on info in chunk manager
+        void createFirstChunks( const string& config,
+                                const Shard& primary,
+                                const vector<BSONObj>* initPoints,
+                                const vector<Shard>* initShards );
+
+        // Loads existing ranges based on info in chunk manager
+        void loadExistingRanges( const string& config );
+
+
+        // Helpers for load
+        void calcInitSplitsAndShards( const Shard& primary,
+                                      const vector<BSONObj>* initPoints,
+                                      const vector<Shard>* initShards,
+                                      vector<BSONObj>* splitPoints,
+                                      vector<Shard>* shards ) const;
+
+        //
+        // Methods to use once loaded / created
+        //
+
+        int numChunks() const { return _chunkMap.size(); }
+
         ChunkPtr findChunk( const BSONObj& obj ) const;
         ChunkPtr findChunkOnServer( const Shard& shard ) const;
-
-        const ShardKeyPattern& getShardKey() const {  return _key; }
-        bool isUnique() const { return _unique; }
 
         void getShardsForQuery( set<Shard>& shards , const BSONObj& query ) const;
         void getAllShards( set<Shard>& all ) const;
@@ -332,21 +371,15 @@ namespace mongo {
         bool compatibleWith( const Chunk& other ) const;
         bool compatibleWith( ChunkPtr other ) const { if( ! other ) return false; return compatibleWith( *other ); }
 
-
-
         string toString() const;
 
         ShardChunkVersion getVersion( const Shard& shard ) const;
         ShardChunkVersion getVersion() const;
 
-        /**
-         * this is just an increasing number of how many ChunkManagers we have so we know if something has been updated
-         */
-        unsigned long long getSequenceNumber() const { return _sequenceNumber; }
-
         void getInfo( BSONObjBuilder& b ) const {
             b.append( "key" , _key.key() );
             b.appendBool( "unique" , _unique );
+            _version.addEpochToBSON( b, "lastmod" );
         }
 
         /**
@@ -363,10 +396,11 @@ namespace mongo {
         void markMinorForReload( ShardChunkVersion majorVersion ) const;
         void getMarkedMinorVersions( set<ShardChunkVersion>& minorVersions ) const;
 
-        // helpers for constructor
+        // helpers for loading
 
         // returns true if load was consistent
-        bool _load(ChunkMap& chunks, set<Shard>& shards, ShardVersionMap& shardVersions, ChunkManagerPtr oldManager);
+        bool _load( const string& config, ChunkMap& chunks, set<Shard>& shards,
+                                    ShardVersionMap& shardVersions, ChunkManagerPtr oldManager);
         static bool _isValid(const ChunkMap& chunks);
 
         // end helpers
@@ -383,10 +417,14 @@ namespace mongo {
 
         const ShardVersionMap _shardVersions; // max version per shard
 
-        ShardChunkVersion _version; // max version of any chunk
+        // max version of any chunk
+        ShardChunkVersion _version;
+
+        // the previous manager this was based on
+        // cleared after loading chunks
+        ChunkManagerPtr _oldManager;
 
         mutable mutex _mutex; // only used with _nsLock
-        mutable DistributedLock _nsLock;
 
         const unsigned long long _sequenceNumber;
 

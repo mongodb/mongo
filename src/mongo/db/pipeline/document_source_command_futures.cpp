@@ -54,7 +54,7 @@ namespace mongo {
     }
 
     void DocumentSourceCommandFutures::sourceToBson(
-        BSONObjBuilder *pBuilder) const {
+        BSONObjBuilder *pBuilder, bool explain) const {
         /* this has no BSON equivalent */
         verify(false);
     }

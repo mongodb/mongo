@@ -140,7 +140,7 @@ namespace mongo {
             return p->getVersion();
         }
         else {
-            return 0;
+            return ConfigVersion( 0, OID() );
         }
     }
 
@@ -152,7 +152,7 @@ namespace mongo {
         ShardChunkManagerPtr p = it->second;
 
         // empty shards should have version 0
-        version = ( p->getNumChunks() > 1 ) ? version : ShardChunkVersion( 0 , 0 );
+        version = ( p->getNumChunks() > 1 ) ? version : ShardChunkVersion( 0 , OID() );
 
         ShardChunkManagerPtr cloned( p->cloneMinus( min , max , version ) );
         _chunks[ns] = cloned;
@@ -215,7 +215,7 @@ namespace mongo {
             scoped_lock lk( _mutex );
             ChunkManagersMap::const_iterator it = _chunks.find( ns );
             if ( it != _chunks.end() ) currManager = it->second;
-            if ( it != _chunks.end() && ( storedVersion = it->second->getVersion() ) == version )
+            if ( it != _chunks.end() && ( storedVersion = it->second->getVersion() ).isEquivalentTo( version ) )
                 return true;
         }
         
@@ -248,7 +248,7 @@ namespace mongo {
 
             ShardChunkVersion oldVersion = version;
             version = p->getVersion();
-            return oldVersion == version;
+            return oldVersion.isEquivalentTo( version );
         }
     }
 
@@ -268,7 +268,7 @@ namespace mongo {
 
             for ( ChunkManagersMap::iterator it = _chunks.begin(); it != _chunks.end(); ++it ) {
                 ShardChunkManagerPtr p = it->second;
-                bb.appendTimestamp( it->first , p->getVersion() );
+                bb.appendTimestamp( it->first , p->getVersion().toLong() );
             }
             bb.done();
         }
@@ -330,7 +330,7 @@ namespace mongo {
             return it->second;
         }
         else {
-            return 0;
+            return ConfigVersion( 0, OID() );
         }
     }
 
@@ -536,7 +536,7 @@ namespace mongo {
                 return false;
             }
 
-            const ConfigVersion version = extractVersion( cmdObj["version"] , errmsg );
+            const ConfigVersion version = ConfigVersion( extractVersion( cmdObj["version"] , errmsg ), OID() );
             if ( errmsg.size() )
                 return false;
             
@@ -545,15 +545,15 @@ namespace mongo {
             const ConfigVersion oldVersion = info->getVersion(ns);
             const ConfigVersion globalVersion = shardingState.getVersion(ns);
 
-            result.appendTimestamp( "oldVersion" , oldVersion );
+            oldVersion.addToBSON( result, "oldVersion" );
             
-            if ( globalVersion > 0 && version > 0 ) {
+            if ( globalVersion.isSet() && version.isSet() ) {
                 // this means there is no reset going on an either side
                 // so its safe to make some assumptions
 
-                if ( version == globalVersion ) {
+                if ( version.isEquivalentTo( globalVersion ) ) {
                     // mongos and mongod agree!
-                    if ( oldVersion != version ) {
+                    if ( ! oldVersion.isEquivalentTo( version ) ) {
                         if ( oldVersion < globalVersion ) {
                             info->setVersion( ns , version );
                         }
@@ -580,39 +580,39 @@ namespace mongo {
         
             Lock::GlobalWrite setShardVersionLock; // TODO: can we get rid of this??
             
-            if ( oldVersion > 0 && globalVersion == 0 ) {
+            if ( oldVersion.isSet() && ! globalVersion.isSet() ) {
                 // this had been reset
-                info->setVersion( ns , 0 );
+                info->setVersion( ns , ShardChunkVersion( 0, OID() ) );
             }
 
-            if ( version == 0 && globalVersion == 0 ) {
+            if ( ! version.isSet() && ! globalVersion.isSet() ) {
                 // this connection is cleaning itself
-                info->setVersion( ns , 0 );
+                info->setVersion( ns , ShardChunkVersion( 0, OID() ) );
                 return true;
             }
 
-            if ( version == 0 && globalVersion > 0 ) {
+            if ( ! version.isSet() && globalVersion.isSet() ) {
                 if ( ! authoritative ) {
                     result.appendBool( "need_authoritative" , true );
                     result.append( "ns" , ns );
-                    result.appendTimestamp( "globalVersion" , globalVersion );
+                    globalVersion.addToBSON( result, "globalVersion" );
                     errmsg = "dropping needs to be authoritative";
                     return false;
                 }
                 log() << "wiping data for: " << ns << endl;
-                result.appendTimestamp( "beforeDrop" , globalVersion );
+                globalVersion.addToBSON( result, "beforeDrop" );
                 // only setting global version on purpose
                 // need clients to re-find meta-data
                 shardingState.resetVersion( ns );
-                info->setVersion( ns , 0 );
+                info->setVersion( ns , ShardChunkVersion( 0, OID() ) );
                 return true;
             }
 
             if ( version < oldVersion ) {
                 errmsg = "this connection already had a newer version of collection '" + ns + "'";
                 result.append( "ns" , ns );
-                result.appendTimestamp( "newVersion" , version );
-                result.appendTimestamp( "globalVersion" , globalVersion );
+                version.addToBSON( result, "newVersion" );
+                globalVersion.addToBSON( result, "globalVersion" );
                 return false;
             }
 
@@ -624,13 +624,13 @@ namespace mongo {
                 }
                 errmsg = "shard global version for collection is higher than trying to set to '" + ns + "'";
                 result.append( "ns" , ns );
-                result.appendTimestamp( "version" , version );
-                result.appendTimestamp( "globalVersion" , globalVersion );
+                version.addToBSON( result, "version" );
+                globalVersion.addToBSON( result, "globalVersion" );
                 result.appendBool( "reloadConfig" , true );
                 return false;
             }
 
-            if ( globalVersion == 0 && ! authoritative ) {
+            if ( ! globalVersion.isSet() && ! authoritative ) {
                 // Needed b/c when the last chunk is moved off a shard, the version gets reset to zero, which
                 // should require a reload.
                 // TODO: Maybe a more elegant way of doing this
@@ -655,8 +655,8 @@ namespace mongo {
                 if ( ! shardingState.trySetVersion( ns , currVersion ) ) {
                     errmsg = str::stream() << "client version differs from config's for collection '" << ns << "'";
                     result.append( "ns" , ns );
-                    result.appendTimestamp( "version" , version );
-                    result.appendTimestamp( "globalVersion" , currVersion );
+                    version.addToBSON( result, "version" );
+                    globalVersion.addToBSON( result, "globalVersion" );
                     return false;
                 }
             }
@@ -689,12 +689,12 @@ namespace mongo {
 
             result.append( "configServer" , shardingState.getConfigServer() );
 
-            result.appendTimestamp( "global" , shardingState.getVersion(ns) );
+            result.appendTimestamp( "global" , shardingState.getVersion(ns).toLong() );
 
             ShardedConnectionInfo* info = ShardedConnectionInfo::get( false );
             result.appendBool( "inShardedMode" , info != 0 );
             if ( info )
-                result.appendTimestamp( "mine" , info->getVersion(ns) );
+                result.appendTimestamp( "mine" , info->getVersion(ns).toLong() );
             else
                 result.appendTimestamp( "mine" , 0 );
 
@@ -748,7 +748,7 @@ namespace mongo {
         //   so delayed request may come in. This has to be fixed.
         ConfigVersion clientVersion = info->getVersion(ns);
         ConfigVersion version;
-        if ( ! shardingState.hasVersion( ns , version ) && clientVersion == 0 ) {
+        if ( ! shardingState.hasVersion( ns , version ) && ! clientVersion.isSet() ) {
             return true;
         }
 
@@ -756,7 +756,7 @@ namespace mongo {
         received = clientVersion;
         wanted = version;
 
-        if ( version == 0 && clientVersion > 0 ) {
+        if ( ! version.isSet() && clientVersion.isSet() ) {
             stringstream ss;
             ss << "collection was dropped or this shard no longer valid version";
             errmsg = ss.str();
@@ -767,7 +767,7 @@ namespace mongo {
             return true;
 
 
-        if ( clientVersion == 0 ) {
+        if ( ! clientVersion.isSet() ) {
             stringstream ss;
             ss << "client in sharded mode, but doesn't have version set for this collection";
             errmsg = ss.str();
