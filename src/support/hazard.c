@@ -207,26 +207,4 @@ __hazard_dump(WT_SESSION_IMPL *session)
 	if (fail)
 		__wt_errx(session, "unexpected hazard reference");
 }
-
-/*
- * __wt_hazard_validate --
- *	Confirm that a page isn't on the hazard list.
- */
-void
-__wt_hazard_validate(WT_SESSION_IMPL *session, WT_PAGE *page)
-{
-	WT_CONNECTION_IMPL *conn;
-	WT_HAZARD *hp;
-	uint32_t elem, i;
-
-	conn = S2C(session);
-
-	elem = conn->session_size * conn->hazard_size;
-	for (i = 0, hp = conn->hazard; i < elem; ++i, ++hp)
-		if (hp->page == page)
-			__wt_errx(session,
-			    "discarded page has hazard reference: "
-			    "(%p: %s, line %d)",
-			    hp->page, hp->file, hp->line);
-}
 #endif

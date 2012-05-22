@@ -369,10 +369,6 @@ __rec_excl_clear(WT_SESSION_IMPL *session)
 static int
 __hazard_exclusive(WT_SESSION_IMPL *session, WT_REF *ref, int top)
 {
-	WT_CONNECTION_IMPL *conn;
-	WT_HAZARD *hp;
-	uint32_t elem, i;
-
 	/*
 	 * Make sure there is space to track exclusive access so we can unlock
 	 * to clean up.
@@ -396,18 +392,14 @@ __hazard_exclusive(WT_SESSION_IMPL *session, WT_REF *ref, int top)
 
 	session->excl[session->excl_next++] = ref;
 
-	/* Walk the list of hazard references to search for a match. */
-	conn = S2C(session);
-	elem = conn->session_size * conn->hazard_size;
-	for (i = 0, hp = conn->hazard; i < elem; ++i, ++hp)
-		if (hp->page == ref->page) {
-			WT_BSTAT_INCR(session, rec_hazard);
-			WT_CSTAT_INCR(session, cache_evict_hazard);
+	/* Check for a matching hazard reference. */
+	if (__wt_page_hazard_check(session, ref->page) == NULL)
+		return (0);
 
-			WT_VERBOSE_RET(session,
-			    evict, "page %p hazard request failed", ref->page);
-			return (EBUSY);
-		}
+	WT_BSTAT_INCR(session, rec_hazard);
+	WT_CSTAT_INCR(session, cache_evict_hazard);
 
-	return (0);
+	WT_VERBOSE_RET(
+	    session, evict, "page %p hazard request failed", ref->page);
+	return (EBUSY);
 }

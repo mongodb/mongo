@@ -15,13 +15,17 @@
 void
 __wt_session_dump_all(WT_SESSION_IMPL *session)
 {
-	WT_SESSION_IMPL **tp;
+	WT_CONNECTION_IMPL *conn;
+	WT_SESSION_IMPL *s;
+	uint32_t i;
 
 	if (session == NULL)
 		return;
 
-	for (tp = S2C(session)->sessions; *tp != NULL; ++tp)
-		__wt_session_dump(*tp);
+	conn = S2C(session);
+	for (s = conn->sessions, i = 0; i < conn->session_size; ++s, ++i)
+		if (s->active)
+			__wt_session_dump(s);
 }
 
 /*

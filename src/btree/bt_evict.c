@@ -305,8 +305,10 @@ err:		__wt_err(session, ret, "eviction server error");
 
 	__wt_free(session, cache->evict);
 
-	if (session != conn->default_session)
+	if (session != conn->default_session) {
 		(void)session->iface.close(&session->iface, NULL);
+		__wt_free(conn->default_session, session->hazard);
+	}
 
 	return (NULL);
 }
@@ -399,7 +401,7 @@ __evict_file_request_walk(WT_SESSION_IMPL *session)
 	WT_CONNECTION_IMPL *conn;
 	WT_SESSION_IMPL *request_session;
 	WT_DECL_RET;
-	uint32_t i;
+	uint32_t i, session_cnt;
 	int syncop;
 
 	conn = S2C(session);
@@ -408,15 +410,19 @@ __evict_file_request_walk(WT_SESSION_IMPL *session)
 	/* Make progress, regardless of success or failure. */
 	++cache->sync_complete;
 
-	/* The session array requires no lock, it's fixed in size. */
-	request_session = NULL;
-	for (i = 0; i < conn->session_cnt; ++i)
-		if ((request_session = conn->sessions[i]) != NULL &&
-		    request_session->syncop != 0)
+	/*
+	 * No lock is required because the session array is fixed size, but it
+	 * it may contain inactive entries.
+	 *
+	 * If we don't find a request, something went wrong; complain, but don't
+	 * return an error code, the eviction thread doesn't need to exit.
+	 */
+	WT_ORDERED_READ(session_cnt, conn->session_cnt);
+	for (request_session = conn->sessions,
+	    i = 0; i < session_cnt; ++request_session, ++i)
+		if (request_session->active && request_session->syncop != 0)
 			break;
-
-	/* If we don't find an entry, something broke, complain. */
-	if (request_session == NULL) {
+	if (i == session_cnt) {
 		__wt_errx(session,
 		    "failed to find handle's sync operation request");
 		return (0);
@@ -430,8 +436,6 @@ __evict_file_request_walk(WT_SESSION_IMPL *session)
 	 */
 	syncop = request_session->syncop;
 	request_session->syncop = 0;
-
-	WT_ASSERT(session, syncop != 0);
 
 	WT_VERBOSE_RET(session, evictserver,
 	    "file request: %s",

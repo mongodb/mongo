@@ -58,6 +58,8 @@ typedef	enum {
 struct __wt_session_impl {
 	WT_SESSION iface;
 
+	u_int active;			/* Non-zero if the session is in-use */
+
 	WT_CONDVAR *cond;		/* Condition variable */
 
 	const char *name;		/* Name */
@@ -91,8 +93,6 @@ struct __wt_session_impl {
 	int	wq_sleeping;		/* Thread is blocked */
 	int	wq_ret;			/* Return value */
 
-	WT_HAZARD *hazard;		/* Hazard reference array */
-
 	void	*reconcile;		/* Reconciliation information */
 
 	WT_REF **excl;			/* Eviction exclusive list */
@@ -105,6 +105,16 @@ struct __wt_session_impl {
 	int syncop;			/* File operation */
 
 	uint32_t flags;
+
+	/*
+	 * The hazard reference must be placed at the end of the structure: the
+	 * structure is cleared when closed, all except the hazard reference.
+	 * Putting the hazard reference at the end of the structure allows us to
+	 * easily call a function to clear memory up to, but not including, the
+	 * hazard reference.
+	 */
+#define	WT_SESSION_CLEAR(s)	memset(s, 0, WT_PTRDIFF(&(s)->hazard, s))
+	WT_HAZARD *hazard;		/* Hazard reference array */
 };
 
 /*******************************************
@@ -194,22 +204,17 @@ struct __wt_connection_impl {
 	 * the server thread code to avoid walking the entire array when only a
 	 * few threads are running.
 	 */
-	WT_SESSION_IMPL	**sessions;		/* Session reference */
-	void		 *session_array;	/* Session array */
-	uint32_t	  session_cnt;		/* Session count */
+	WT_SESSION_IMPL	*sessions;	/* Session reference */
+	uint32_t	 session_size;	/* Session array size */
+	uint32_t	 session_cnt;	/* Session count */
 
 	/*
 	 * WiredTiger allocates space for 15 hazard references in each thread of
 	 * control, by default.  There's no code path that requires more than 15
 	 * pages at a time (and if we find one, the right change is to increase
 	 * the default).
-	 *
-	 * The hazard array is separate from the WT_SESSION_IMPL array because
-	 * we need to easily copy and search it when evicting pages from memory.
 	 */
-	WT_HAZARD *hazard;		/* Hazard references array */
-	uint32_t   hazard_size;
-	uint32_t   session_size;
+	uint32_t   hazard_size;		/* Hazard array size */
 
 	WT_CACHE  *cache;		/* Page cache */
 	uint64_t   cache_size;
