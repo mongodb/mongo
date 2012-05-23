@@ -30,6 +30,7 @@ __create_file(WT_SESSION_IMPL *session,
 	/* Check if the file already exists. */
 	if (!is_metadata && (ret =
 	    __wt_metadata_read(session, uri, &treeconf)) != WT_NOTFOUND) {
+		__wt_free(session, treeconf);
 		if (exclusive)
 			WT_TRET(EEXIST);
 		return (ret);
