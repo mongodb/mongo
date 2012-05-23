@@ -425,6 +425,6 @@ flags = {
 ###################################################
 # Structure flag declarations
 ###################################################
-	'conn' : [ 'CONN_NOSYNC', 'SERVER_RUN' ],
+	'conn' : [ 'CONN_NOSYNC', 'CONN_TRANSACTIONAL', 'SERVER_RUN' ],
 	'session' : [ 'SESSION_INTERNAL', 'SESSION_SALVAGE_QUIET_ERR' ],
 }

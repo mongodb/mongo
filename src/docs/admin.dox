@@ -1,0 +1,10 @@
+/*! @page admin Administering WiredTiger
+
+- @subpage home
+- @subpage security
+- @subpage file_formats
+- @subpage name_space
+- @subpage signals
+- @subpage tuning
+
+ */

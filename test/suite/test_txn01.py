@@ -37,6 +37,14 @@ class test_txn01(wttest.WiredTigerTestCase):
     nentries = 10000
     session_params = 'key_format=r,value_format=S'
 
+    # Overrides WiredTigerTestCase
+    def setUpConnectionOpen(self, dir):
+        conn = wiredtiger.wiredtiger_open(dir, 'create,' +
+                ('error_prefix="%s: ",' % self.shortid()) +
+                'transactional,')
+        self.pr(`conn`)
+        return conn
+
     def check_count(self, expected):
         s = self.conn.open_session()
         s.checkpoint("snapshot=test")

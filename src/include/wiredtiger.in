@@ -418,8 +418,8 @@ struct __wt_session {
 	/*! Close the session handle.
 	 *
 	 * This will release the resources associated with the session handle,
-	 * including rolling any active transactions and closing any cursors
-	 * that remain open in the session.
+	 * including rolling back any active transactions and closing any
+	 * cursors that remain open in the session.
 	 *
 	 * @snippet ex_all.c session close
 	 *

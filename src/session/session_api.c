@@ -7,6 +7,8 @@
 
 #include "wt_internal.h"
 
+static int __session_rollback_transaction(WT_SESSION *, const char *);
+
 /*
  * __session_close_cursors --
  *	Close all cursors open in a session.
@@ -40,6 +42,9 @@ __session_close(WT_SESSION *wt_session, const char *config)
 
 	SESSION_API_CALL(session, close, config, cfg);
 	WT_UNUSED(cfg);
+
+	if (F_ISSET(&session->txn, TXN_RUNNING))
+		WT_TRET(__session_rollback_transaction(wt_session, NULL));
 
 	WT_TRET(__session_close_cursors(session));
 
@@ -404,6 +409,8 @@ __session_begin_transaction(WT_SESSION *wt_session, const char *config)
 		ret = EINVAL;
 		goto err;
 	}
+	if (!F_ISSET(S2C(session), WT_CONN_TRANSACTIONAL))
+		__wt_errx(session, "Database not configured for transactions");
 
 	ret = __wt_txn_begin(session, cfg);
 

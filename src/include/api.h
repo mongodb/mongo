@@ -305,7 +305,8 @@ extern WT_PROCESS __wt_process;
  * DO NOT EDIT: automatically built by dist/api_flags.py.
  * API flags section: BEGIN
  */
-#define	WT_CONN_NOSYNC					0x00000002
+#define	WT_CONN_NOSYNC					0x00000004
+#define	WT_CONN_TRANSACTIONAL				0x00000002
 #define	WT_DIRECTIO_DATA				0x00000002
 #define	WT_DIRECTIO_LOG					0x00000001
 #define	WT_PAGE_FREE_IGNORE_DISK			0x00000001
