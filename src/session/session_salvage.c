@@ -16,7 +16,7 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
-	WT_SNAPSHOT snapbase[2];
+	WT_SNAPSHOT *snapbase;
 
 	btree = session->btree;
 
@@ -35,9 +35,8 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 	 * file without a snapshot from which to roll-forward, and the contents
 	 * of the file would be discarded.
 	 */
-	memset(snapbase, 0, sizeof(snapbase));
-
-	WT_RET(__wt_strdup(session, WT_INTERNAL_SNAPSHOT, &snapbase[0].name));
+	WT_RET(__wt_calloc_def(session, 2, &snapbase));
+	WT_ERR(__wt_strdup(session, WT_INTERNAL_SNAPSHOT, &snapbase[0].name));
 	F_SET(&snapbase[0], WT_SNAP_ADD);
 
 	WT_ERR(__wt_bt_salvage(session, snapbase, cfg));
