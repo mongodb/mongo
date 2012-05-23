@@ -506,6 +506,9 @@
     <ClCompile Include="..\util\time_support.cpp">
       <Filter>util\Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\db\dbmessage.cpp">
+      <Filter>db\Source FIles</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="collection.js">
