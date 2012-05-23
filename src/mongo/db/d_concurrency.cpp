@@ -63,12 +63,6 @@ namespace mongo {
     	virtual ~DBTryLockTimeoutException() throw() { }
     };
 
-    struct atstartup { 
-        atstartup() { 
-            cerr << "db level locking enabled: " << ( DB_LEVEL_LOCKING_ENABLED ) << endl;
-        }
-    } atst;
-
     Client* curopWaitingForLock( char type );
     void curopGotLock(Client*);
     struct Acquiring { 
