@@ -75,8 +75,8 @@
  * __wt_calloc_def --
  *	Simple calls don't need separate sizeof arguments.
  */
-#define	__wt_calloc_def(a, b, c)					\
-	__wt_calloc(a, (size_t)(b), sizeof(**(c)), c)
+#define	__wt_calloc_def(session, number, addr)				\
+	__wt_calloc(session, (size_t)(number), sizeof(**(addr)), addr)
 /*
  * Our internal free function clears the underlying address atomically so there
  * is a smaller chance of racing threads seeing intermediate results while a
@@ -85,7 +85,7 @@
  * resulting bug is a mother to find -- make sure we get it right, don't make
  * the caller remember to put the & operator on the pointer.
  */
-#define	__wt_free(a, b)			__wt_free_int(a, &(b))
+#define	__wt_free(session, p)		__wt_free_int(session, &(p))
 
 /*
  * Flag set, clear and test.
