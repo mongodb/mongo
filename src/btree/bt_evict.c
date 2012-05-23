@@ -330,12 +330,16 @@ __evict_worker(WT_SESSION_IMPL *session)
 
 	/* Evict pages from the cache. */
 	for (loop = 0;; loop++) {
+		/*
+		 * Walk the eviction-request queue.  It is important to do this
+		 * before closing files, in case a page schedule for eviction
+		 * is freed by closing a file.
+		 */
+		WT_RET(__evict_page_request_walk(session));
+
 		/* If there is a file sync request, satisfy it. */
 		while (cache->sync_complete != cache->sync_request)
 			WT_RET(__evict_file_request_walk(session));
-
-		/* Walk the eviction-request queue. */
-		WT_RET(__evict_page_request_walk(session));
 
 		/*
 		 * Keep evicting until we hit the target cache usage.
