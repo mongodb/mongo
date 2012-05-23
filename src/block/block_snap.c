@@ -424,8 +424,7 @@ __snapshot_process(
 	/* Update snapshots marked for update. */
 	WT_SNAPSHOT_FOREACH(snapbase, snap)
 		if (F_ISSET(snap, WT_SNAP_UPDATE)) {
-			WT_ASSERT(session,
-			    !F_ISSET(snap, WT_SNAP_ADD));
+			WT_ASSERT(session, !F_ISSET(snap, WT_SNAP_ADD));
 			WT_ERR(__snapshot_update(
 			    session, block, snap, snap->bpriv, 0, 0));
 		}
