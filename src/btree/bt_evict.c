@@ -378,6 +378,60 @@ __evict_clear_tree_walk(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __evict_page --
+ *	Evict a given page.
+ */
+static int
+__evict_page(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	WT_DECL_RET;
+	WT_TXN_GLOBAL *txn_global;
+	WT_TXN saved_txn, *txn, *txn_ckpt;
+	const char *txn_cfg[] = { "isolation=snapshot", NULL };
+	int was_running;
+
+	/*
+	 * We have to take care when evicting pages not to write a change that:
+	 *  (a) is not yet committed; or
+	 *  (b) is committed more recently than an in-progress checkpoint.
+	 *
+	 * We handle both of these cases by setting up the transaction context
+	 * before evicting.  If a checkpoint is in progress, copy the
+	 * checkpoint's transaction.  Otherwise, we need a snapshot to avoid
+	 * uncommitted changes.  If a transaction is in progress in the
+	 * evicting session, we save and restore its state.
+	 */
+	txn = &session->txn;
+	was_running = (F_ISSET(txn, TXN_RUNNING) != 0);
+        if (was_running)
+                saved_txn = *txn;
+
+	txn_global = &S2C(session)->txn_global;
+	if ((txn_ckpt = txn_global->checkpoint_txn) == NULL) {
+		if (was_running) {
+			WT_RET(__wt_txn_init(session));
+			WT_ERR(__wt_txn_get_snapshot(session));
+		} else
+			WT_ERR(__wt_txn_begin(session, txn_cfg));
+	} else
+		session->txn = *txn_ckpt;
+
+	ret = __wt_rec_evict(session, page, 0);
+
+err:	if (txn_ckpt == NULL) {
+		if (was_running)
+			__wt_txn_destroy(session);
+		else
+			WT_TRET(__wt_txn_commit(session, NULL));
+	}
+
+        if (was_running)
+                session->txn = saved_txn;
+
+	return (ret);
+}
+
+/*
  * __evict_file_request_walk --
  *      Walk the session list looking for sync/close requests.  If we find a
  *      request, perform it, clear the request, and wake up the requesting
@@ -597,7 +651,7 @@ __evict_page_request_walk(WT_SESSION_IMPL *session)
 		 * while trying to get another (e.g., if they have two cursors
 		 * open), so blocking indefinitely leads to deadlock.
 		 */
-		(void)__wt_evict_page(session, page);
+		(void)__evict_page(session, page);
 
 		__wt_spin_unlock(session, &cache->lru_lock);
 
@@ -883,58 +937,6 @@ __evict_get_page(
 }
 
 /*
- * __wt_evict_page --
- *	Evict a given page.
- */
-int
-__wt_evict_page(WT_SESSION_IMPL *session, WT_PAGE *page)
-{
-	WT_DECL_RET;
-	WT_TXN_GLOBAL *txn_global;
-	WT_TXN saved_txn, *txn, *txn_ckpt;
-	const char *txn_cfg[] = { "isolation=snapshot", NULL };
-	int was_running;
-
-	/*
-	 * We have to take care when evicting pages not to write changes that:
-	 *  (a) is not yet committed; or
-	 *  (b) is committed more recently than an in-progress checkpoint.
-	 *
-	 * We handle both of these cases by setting up the transaction context
-	 * before evicting.  If a checkpoint is in progress, copy the
-	 * checkpoint's transaction.  Otherwise, we need a snapshot to avoid
-	 * uncommitted changes.  If a transaction is in progress in the
-	 * evicting session, we save and restore its state.
-	 */
-	txn = &session->txn;
-	saved_txn = *txn;
-	was_running = (F_ISSET(txn, TXN_RUNNING) != 0);
-
-	txn_global = &S2C(session)->txn_global;
-	if ((txn_ckpt = txn_global->checkpoint_txn) == NULL) {
-		if (was_running) {
-			WT_RET(__wt_txn_init(session));
-			WT_ERR(__wt_txn_get_snapshot(session));
-		} else
-			WT_ERR(__wt_txn_begin(session, txn_cfg));
-	} else
-		session->txn = *txn_ckpt;
-
-	ret = __wt_rec_evict(session, page, 0);
-
-err:	if (txn_ckpt == NULL) {
-		if (was_running)
-			__wt_txn_destroy(session);
-		else
-			WT_TRET(__wt_txn_commit(session, NULL));
-	}
-
-	session->txn = saved_txn;
-
-	return (ret);
-}
-
-/*
  * __wt_evict_lru_page --
  *	Called by both eviction and application threads to evict a page.
  */
@@ -959,7 +961,7 @@ __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app)
 	 * we're out of disk space, or the page had an in-memory subtree
 	 * already being evicted).
 	 */
-	(void)__wt_evict_page(session, page);
+	(void)__evict_page(session, page);
 
 	WT_ATOMIC_ADD(btree->lru_count, -1);
 

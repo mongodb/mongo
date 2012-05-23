@@ -140,6 +140,14 @@ __cursor_fix_append_prev(WT_CURSOR_BTREE *cbt, int newpage)
 		--cbt->recno;
 	}
 
+	/*
+	 * Column store appends are inherently non-transactional.
+	 *
+	 * Even a non-visible update by a concurrent or aborted transaction
+	 * changes the effective end of the data.  The effect is subtle because
+	 * of the blurring between deleted and empty values, but ideally we
+	 * would skip all uncommitted changes at the end of the data.
+	 */
 	cbt->iface.recno = cbt->recno;
 	if (cbt->recno > WT_INSERT_RECNO(cbt->ins) ||
 	    (upd = __wt_txn_read(session, cbt->ins->upd)) == NULL) {

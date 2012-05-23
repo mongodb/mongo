@@ -24,8 +24,8 @@ typedef struct {
 	WT_ITEM	 dsk;			/* Temporary disk-image buffer */
 
 	/* Track whether all changes to the page are written. */
-	uint32_t old_write_gen;
-	uint32_t old_disk_gen;
+	uint32_t orig_write_gen;
+	uint32_t orig_disk_gen;
 	int upd_skipped;
 
 	/*
@@ -398,8 +398,8 @@ __rec_write_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 	r->page = page;
 
 	/* Read the disk generation before we read anything from the page. */
-	r->old_disk_gen = page->modify->disk_gen;
-	WT_ORDERED_READ(r->old_write_gen, page->modify->write_gen);
+	r->orig_disk_gen = page->modify->disk_gen;
+	WT_ORDERED_READ(r->orig_write_gen, page->modify->write_gen);
 	r->upd_skipped = 0;
 
 	return (0);
@@ -1425,7 +1425,7 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	/* Update any changes to the original on-page data items. */
 	WT_SKIP_FOREACH(ins, WT_COL_UPDATE_SINGLE(page)) {
-		upd = __wt_txn_read_int(session, ins->upd, &r->upd_skipped);
+		upd = __wt_txn_read_skip(session, ins->upd, &r->upd_skipped);
 		if (upd == NULL)
 			continue;
 		__bit_setv_recno(
@@ -1449,7 +1449,7 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 	/* Walk any append list. */
 	append = WT_COL_APPEND(page);
 	WT_SKIP_FOREACH(ins, append) {
-		upd = __wt_txn_read_int(session, ins->upd, &r->upd_skipped);
+		upd = __wt_txn_read_skip(session, ins->upd, &r->upd_skipped);
 		if (upd == NULL)
 			continue;
 		for (;;) {
@@ -1756,7 +1756,7 @@ __rec_col_var(
 			nrepeat = __wt_cell_rle(unpack);
 
 			ins = WT_SKIP_FIRST(WT_COL_UPDATE(page, cip));
-			while (ins != NULL && __wt_txn_read_int(
+			while (ins != NULL && __wt_txn_read_skip(
 			    session, ins->upd, &r->upd_skipped) == NULL)
 				ins = WT_SKIP_NEXT(ins);
 
@@ -1820,13 +1820,13 @@ record_loop:	/*
 		    n < nrepeat; n += repeat_count, src_recno += repeat_count) {
 			if (ins != NULL &&
 			    WT_INSERT_RECNO(ins) == src_recno) {
-				upd = __wt_txn_read_int(
+				upd = __wt_txn_read_skip(
 				    session, ins->upd, &r->upd_skipped);
 				WT_ASSERT(session, upd != NULL);
 				do {
 					ins = WT_SKIP_NEXT(ins);
 				} while (ins != NULL &&
-				    __wt_txn_read_int(session,
+				    __wt_txn_read_skip(session,
 				    ins->upd, &r->upd_skipped) == NULL);
 
 				update_no_copy = 1;	/* No data copy */
@@ -1975,7 +1975,7 @@ compare:		/*
 	/* Walk any append list. */
 	append = WT_COL_APPEND(page);
 	WT_SKIP_FOREACH(ins, append) {
-		upd = __wt_txn_read_int(session, ins->upd, &r->upd_skipped);
+		upd = __wt_txn_read_skip(session, ins->upd, &r->upd_skipped);
 		if (upd == NULL)
 			continue;
 		for (n = WT_INSERT_RECNO(ins); src_recno <= n; ++src_recno) {
@@ -2510,7 +2510,7 @@ __rec_row_leaf(
 		/* Build value cell. */
 		if ((val_cell = __wt_row_value(page, rip)) != NULL)
 			__wt_cell_unpack(val_cell, unpack);
-		upd = __wt_txn_read_int(
+		upd = __wt_txn_read_skip(
 		    session, WT_ROW_UPDATE(page, rip), &r->upd_skipped);
 		if (upd == NULL) {
 			/*
@@ -2755,7 +2755,7 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_INSERT *ins)
 
 	for (; ins != NULL; ins = WT_SKIP_NEXT(ins)) {
 		/* Build value cell. */
-		upd = __wt_txn_read_int(session, ins->upd, &r->upd_skipped);
+		upd = __wt_txn_read_skip(session, ins->upd, &r->upd_skipped);
 		if (upd == NULL || WT_UPDATE_DELETED_ISSET(upd))
 			continue;
 		if (upd->size == 0)
@@ -3051,7 +3051,8 @@ err:			__wt_scr_free(&tkey);
 	 * generation when reconciliation started.
 	 */
 	if (ret == 0 && !r->upd_skipped)
-		WT_ATOMIC_CAS(mod->disk_gen, r->old_disk_gen, r->old_write_gen);
+		(void)WT_ATOMIC_CAS(
+		    mod->disk_gen, r->orig_disk_gen, r->orig_write_gen);
 	return (ret);
 }
 

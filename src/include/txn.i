@@ -57,7 +57,7 @@ __wt_txn_visible(WT_SESSION_IMPL *session, wt_txnid_t id)
 
 	/* Nobody sees the results of aborted transactions. */
 	if (id == WT_TXN_INVALID)
-		return 0;
+		return (0);
 
 	/*
 	 * Changes with no associated transaction are always visible, and
@@ -65,34 +65,35 @@ __wt_txn_visible(WT_SESSION_IMPL *session, wt_txnid_t id)
 	 */
 	txn = &session->txn;
 	if (id == WT_TXN_NONE || txn->isolation != TXN_ISO_SNAPSHOT)
-		return 1;
+		return (1);
 
 	/*
 	 * The snapshot test.
 	 */
 	if (TXNID_LT(id, txn->snap_min))
-		return 1;
+		return (1);
 	if (TXNID_LT(txn->id, id))
-		return 0;
+		return (0);
 
 	/*
 	 * Otherwise, the ID is visible if it is not the result of a concurrent
-	 * transaction.  That is, if it is not in the snapshot list.
+	 * transaction.  That is, if it is not in the snapshot list.  Fast path
+	 * the single-threaded case where there are no concurrent transactions.
 	 */
-	return (bsearch(&id, txn->snapshot, txn->snapshot_count,
-	    sizeof(wt_txnid_t), __wt_txnid_cmp) == NULL);
+	return (txn->snapshot_count == 0 || bsearch(&id, txn->snapshot,
+	    txn->snapshot_count, sizeof(wt_txnid_t), __wt_txnid_cmp) == NULL);
 }
 
 /*
- * __wt_txn_read_int --
+ * __wt_txn_read_skip --
  *	Get the first visible update in a list (or NULL if none are visible),
  *	and report whether uncommitted changes were skipped.
  */
 static inline WT_UPDATE *
-__wt_txn_read_int(WT_SESSION_IMPL *session, WT_UPDATE *upd, int *skipp)
+__wt_txn_read_skip(WT_SESSION_IMPL *session, WT_UPDATE *upd, int *skipp)
 {
 	while (upd != NULL && !__wt_txn_visible(session, upd->txnid)) {
-		if (skipp != NULL && upd->txnid != WT_TXN_NONE)
+		if (upd->txnid != WT_TXN_NONE)
 			*skipp = 1;
 		upd = upd->next;
 	}
@@ -107,7 +108,10 @@ __wt_txn_read_int(WT_SESSION_IMPL *session, WT_UPDATE *upd, int *skipp)
 static inline WT_UPDATE *
 __wt_txn_read(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 {
-	return (__wt_txn_read_int(session, upd, NULL));
+	while (upd != NULL && !__wt_txn_visible(session, upd->txnid))
+		upd = upd->next;
+
+	return (upd);
 }
 
 /*

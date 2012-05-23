@@ -8,8 +8,8 @@
 #include "wt_internal.h"
 
 /*
- * wt_metadata_get --
- *	Public entry point to __wt_metadata_read (for wt dump and list).
+ * __wt_meta_btree_apply --
+ *	Apply a function to all files listed in the metadata.
  */
 int
 __wt_meta_btree_apply(WT_SESSION_IMPL *session,
@@ -29,14 +29,15 @@ __wt_meta_btree_apply(WT_SESSION_IMPL *session,
 	if (tret == 0 && cmp < 0)
 		tret = cursor->next(cursor);
 	for (; tret == 0; tret = cursor->next(cursor)) {
-		cursor->get_key(cursor, &uri);
+		if ((tret = cursor->get_key(cursor, &uri)) != 0)
+			break;
 		if (!WT_PREFIX_MATCH(uri, "file:"))
 			break;
 		else if (strcmp(uri, WT_METADATA_URI) == 0)
 			continue;
-		if ((ret =
+		if ((tret =
 		    __wt_session_get_btree(session, uri, NULL, flags)) != 0) {
-			WT_TRET(ret);
+			WT_TRET(tret);
 			continue;
 		}
 		WT_TRET(func(session, cfg));

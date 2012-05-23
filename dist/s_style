@@ -73,7 +73,7 @@ for f in `find examples ext src test -name '*.[chisy]' -o -name '*.in' |
 	    -e 's/\([	 ]\)if(/\1if (/' \
 	    -e 's/\([	 ]\)index(/\1strchr(/' \
 	    -e 's/\([	 ]\)return(/\1return (/' \
-	    -e 's/^\([	 ]+\)return \([^()]*\);/\1return (\2);/' \
+	    -e 's/\([	 ]\)return \([^()]*\);/\1return (\2);/' \
 	    -e 's/\([	 ]\)rindex(/\1strrchr(/' \
 	    -e 's/\([	 ]\)sizeof (/\1sizeof(/g' \
 	    -e 's/\([	 ]\)switch(/\1switch (/' \

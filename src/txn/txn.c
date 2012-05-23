@@ -24,7 +24,7 @@ __wt_txnid_cmp(const void *v1, const void *v2)
 
 /*
  * __wt_txn_get_snapshot --
- *	Set up a snapshot in the current transaction.
+ *	Set up a snapshot in the current transaction, without allocating an ID.
  */
 int
 __wt_txn_get_snapshot(WT_SESSION_IMPL *session)
@@ -33,6 +33,7 @@ __wt_txn_get_snapshot(WT_SESSION_IMPL *session)
 	WT_TXN *txn;
 	WT_TXN_GLOBAL *txn_global;
 	wt_txnid_t id, *lastid;
+	uint32_t i, session_cnt;
 
 	conn = S2C(session);
 	txn = &session->txn;
@@ -43,15 +44,16 @@ __wt_txn_get_snapshot(WT_SESSION_IMPL *session)
 		id = txn_global->current;
 
 		/* Copy the array of concurrent transactions. */
-		memcpy(txn->snapshot, txn_global->ids,
-		    sizeof(wt_txnid_t) * conn->session_size);
+		WT_ORDERED_READ(session_cnt, conn->session_cnt);
+		for (i = 0; i < session_cnt; i++)
+			txn->snapshot[i] = txn_global->ids[i];
 	} while (txn_global->current != id);
 
 	/* Sort the snapshot and size for faster searching. */
-	qsort(txn->snapshot, conn->session_size, sizeof(wt_txnid_t),
+	qsort(txn->snapshot, session_cnt, sizeof(wt_txnid_t),
 	    __wt_txnid_cmp);
-	lastid = bsearch(&id, txn->snapshot, conn->session_size,
-	    sizeof(wt_txnid_t), __wt_txnid_cmp);
+	lastid = bsearch(&id, txn->snapshot, session_cnt, sizeof(wt_txnid_t),
+	    __wt_txnid_cmp);
 	WT_ASSERT(session, lastid != NULL);
 	while (lastid > txn->snapshot && lastid[-1] == lastid[0])
 		--lastid;
@@ -73,6 +75,7 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_TXN *txn;
 	WT_TXN_GLOBAL *txn_global;
 	wt_txnid_t *lastid;
+	uint32_t i, session_cnt;
 
 	conn = S2C(session);
 	txn = &session->txn;
@@ -95,18 +98,20 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 		txn->id = txn_global->current;
 		WT_PUBLISH(txn_global->ids[session->id], txn->id);
 
-		if (txn->isolation == TXN_ISO_SNAPSHOT)
+		if (txn->isolation == TXN_ISO_SNAPSHOT) {
 			/* Copy the array of concurrent transactions. */
-			memcpy(txn->snapshot, txn_global->ids,
-			    sizeof(wt_txnid_t) * conn->session_size);
+			WT_ORDERED_READ(session_cnt, conn->session_cnt);
+			for (i = 0; i < conn->session_cnt; i++)
+				txn->snapshot[i] = txn_global->ids[i];
+		}
 	} while (!WT_ATOMIC_CAS(txn_global->current, txn->id, txn->id + 1) ||
 	    txn->id == WT_TXN_NONE || txn->id == WT_TXN_INVALID);
 
 	if (txn->isolation == TXN_ISO_SNAPSHOT) {
 		/* Sort the snapshot and size for faster searching. */
-		qsort(txn->snapshot, conn->session_size, sizeof(wt_txnid_t),
+		qsort(txn->snapshot, session_cnt, sizeof(wt_txnid_t),
 		    __wt_txnid_cmp);
-		lastid = bsearch(&txn->id, txn->snapshot, conn->session_size,
+		lastid = bsearch(&txn->id, txn->snapshot, session_cnt,
 		    sizeof(wt_txnid_t), __wt_txnid_cmp);
 		WT_ASSERT(session, lastid != NULL);
 		while (lastid > txn->snapshot && lastid[-1] == lastid[0])
@@ -235,7 +240,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/*
 	 * If we're doing an ordinary unnamed checkpoint, we only need to flush
-	 * open files.  If we're creating a named snapshot, we need to walk the
+	 * open files.	If we're creating a named snapshot, we need to walk the
 	 * entire list of files in the metadata.
 	 */
 	WT_TRET((snapshot == NULL) ?

@@ -296,12 +296,8 @@ methods = {
 'session.rollback_transaction' : Method([]),
 
 'session.checkpoint' : Method([
-	Config('archive', 'false', r'''
-		remove log files no longer required for transactional
-		durability''',
-		type='boolean'),
 	Config('snapshot', '', r'''
-		if non-empty, create a named snapshot'''),
+		if non-empty, create named snapshots in files'''),
 ]),
 
 'connection.add_collator' : Method([]),
