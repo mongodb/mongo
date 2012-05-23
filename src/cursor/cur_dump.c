@@ -337,6 +337,7 @@ __wt_curdump_create(WT_CURSOR *child, WT_CURSOR *owner, WT_CURSOR **cursorp)
 	F_SET(cursor,
 	    F_ISSET(child, WT_CURSTD_DUMP_PRINT | WT_CURSTD_DUMP_HEX));
 
+	STATIC_ASSERT(offsetof(WT_CURSOR_DUMP, iface) == 0);
 	WT_RET(__wt_cursor_init(cursor, NULL, owner, cfg, cursorp));
 	return (0);
 }
