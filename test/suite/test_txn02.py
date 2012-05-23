@@ -25,18 +25,30 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_txn01.py
-#	Transactions: basic functionality
+# test_txn02.py
+#   Transactions: commits and rollbacks
 #
 
 import os, struct
 import wiredtiger, wttest
+from wtscenario import multiply_scenarios
 
-class test_txn01(wttest.WiredTigerTestCase):
-    tablename = 'test_txn01'
+class test_txn02(wttest.WiredTigerTestCase):
+    tablename = 'test_txn02'
     uri = 'table:' + tablename
-    nentries = 10000
-    create_params = 'key_format=r,value_format=S'
+
+    types = [
+        ('row', dict(tablekind='row',
+                    create_params = 'key_format=i,value_format=i')),
+        ('var', dict(tablekind='var',
+                    create_params = 'key_format=r,value_format=i')),
+        ('fix', dict(tablekind='fix',
+                    create_params = 'key_format=r,value_format=1t')),
+    ]
+    ops = [
+        ('op1', dict(ops=[('insert', 1), ('insert', 10)]))
+    ]
+    scenarios = multiply_scenarios('.', types, ops)
 
     # Overrides WiredTigerTestCase
     def setUpConnectionOpen(self, dir):
@@ -46,54 +58,25 @@ class test_txn01(wttest.WiredTigerTestCase):
         self.pr(`conn`)
         return conn
 
-    def check_checkpoint(self, expected):
-        s = self.conn.open_session()
-        s.checkpoint("snapshot=test")
-        try:
-            cursor = s.open_cursor(self.uri, None, "snapshot=test")
-            count = 0
-            for r in cursor:
-                count += 1
-        finally:
-            s.close()
-        self.assertEqual(count, expected)
-
-    def check_transaction(self, expected):
-        s = self.conn.open_session()
-        s.begin_transaction('isolation=snapshot')
-        try:
-            cursor = s.open_cursor(self.uri, None)
-            count = 0
-            for r in cursor:
-                count += 1
-        finally:
-            s.close()
-        self.assertEqual(count, expected)
-
-    def check_count(self, expected):
-        self.check_transaction(expected)
-        self.check_checkpoint(expected)
-
-    def test_visibilty(self):
+    def test_ops(self):
         self.session.create(self.uri, self.create_params)
-        committed_inserts = 0
-        self.check_count(committed_inserts)
+        expected = {}
         self.session.begin_transaction()
-        cursor = self.session.open_cursor(self.uri, None, "append")
-        for i in xrange(self.nentries):
-            if i > 0 and (i * 10) % self.nentries == 0:
-                self.check_count(committed_inserts)
-                self.session.commit_transaction()
-                committed_inserts = i
-                self.session.begin_transaction()
-                cursor = self.session.open_cursor(self.uri, None, "append")
-            cursor.set_value(("value%06d" % i) * 100)
-            cursor.insert()
-        cursor.close()
-        self.check_count(committed_inserts)
+        c = self.session.open_cursor(self.uri, None)
+        for op, k in self.ops:
+            if op == 'insert':
+                c.set_key(k)
+                c.set_value(1)
+                c.insert()
+                expected[k] = 1
         self.session.commit_transaction()
-        committed_inserts = self.nentries
-        self.check_count(committed_inserts)
+        c = self.session.open_cursor(self.uri, None)
+        actual = dict((k, v) for k, v in c if v != 0)
+        c.close()
+        print "actual", actual
+        print "expected", expected
+        self.assertEqual(actual, expected)
+        self.session.drop(self.uri)
 
 if __name__ == '__main__':
     wttest.run()
