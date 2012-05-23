@@ -41,7 +41,13 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep, uint32_t flags)
 	WT_ASSERT(session, !F_ISSET_ATOMIC(page, WT_PAGE_EVICT_LRU));
 
 #ifdef HAVE_DIAGNOSTIC
-	__wt_hazard_validate(session, page);
+	{
+	WT_HAZARD *hp;
+	if ((hp = __wt_page_hazard_check(session, page)) != NULL)
+		__wt_errx(session,
+		    "discarded page has hazard reference: (%p: %s, line %d)",
+		    hp->page, hp->file, hp->line);
+	}
 #endif
 	/*
 	 * Pages without a memory footprint aren't associated with the cache

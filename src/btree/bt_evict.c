@@ -128,6 +128,10 @@ __evict_req_clr(WT_EVICT_ENTRY *r)
 {
 	r->btree = NULL;
 	r->page = NULL;
+	/*
+	 * No publication necessary, all we care about is the page value and
+	 * whenever it's cleared is fine.
+	 */
 }
 
 /*
@@ -184,15 +188,13 @@ __wt_sync_file_serial_func(WT_SESSION_IMPL *session)
  * __wt_evict_page_request --
  *	Schedule a page for forced eviction due to a high volume of inserts or
  *	updates.
- *
- *	NOTE: this function is called from inside serialized functions, so it
- *	is holding the serial lock.
  */
-int
+void
 __wt_evict_page_request(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_CACHE *cache;
 	WT_EVICT_ENTRY *er, *er_end;
+	int set;
 
 	cache = S2C(session)->cache;
 
@@ -217,15 +219,22 @@ __wt_evict_page_request(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * time the eviction thread sees it.
 	 */
 	if (!WT_ATOMIC_CAS(page->ref->state, WT_REF_MEM, WT_REF_EVICT_FORCE))
-		return (0);
+		return;
+
+	set = 0;
+	__wt_spin_lock(session, &cache->er_lock);
 
 	/* Find an empty slot and enter the eviction request. */
 	WT_EVICT_REQ_FOREACH(er, er_end, cache)
 		if (er->page == NULL) {
 			__evict_req_set(er, session->btree, page);
-			__wt_evict_server_wake(session);
-			return (0);
+			set = 1;
+			break;
 		}
+
+	__wt_spin_unlock(session, &cache->er_lock);
+	if (set)
+		return;
 
 	/*
 	 * The request table is full, that's okay for page requests: another
@@ -234,7 +243,6 @@ __wt_evict_page_request(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_VERBOSE_VOID(session, evictserver,
 	    "eviction server forced page eviction request table is full");
 	page->ref->state = WT_REF_MEM;
-	return (WT_RESTART);
 }
 
 /*
@@ -296,8 +304,10 @@ err:		__wt_err(session, ret, "eviction server error");
 
 	__wt_free(session, cache->evict);
 
-	if (session != conn->default_session)
+	if (session != conn->default_session) {
 		(void)session->iface.close(&session->iface, NULL);
+		__wt_free(conn->default_session, session->hazard);
+	}
 
 	return (NULL);
 }
@@ -319,12 +329,16 @@ __evict_worker(WT_SESSION_IMPL *session)
 
 	/* Evict pages from the cache. */
 	for (loop = 0;; loop++) {
+		/*
+		 * Walk the eviction-request queue.  It is important to do this
+		 * before closing files, in case a page schedule for eviction
+		 * is freed by closing a file.
+		 */
+		WT_RET(__evict_page_request_walk(session));
+
 		/* If there is a file sync request, satisfy it. */
 		while (cache->sync_complete != cache->sync_request)
 			WT_RET(__evict_file_request_walk(session));
-
-		/* Walk the eviction-request queue. */
-		WT_RET(__evict_page_request_walk(session));
 
 		/*
 		 * Keep evicting until we hit the target cache usage.
@@ -444,7 +458,7 @@ __evict_file_request_walk(WT_SESSION_IMPL *session)
 	WT_CONNECTION_IMPL *conn;
 	WT_SESSION_IMPL *request_session;
 	WT_DECL_RET;
-	uint32_t i;
+	uint32_t i, session_cnt;
 	int syncop;
 
 	conn = S2C(session);
@@ -453,15 +467,19 @@ __evict_file_request_walk(WT_SESSION_IMPL *session)
 	/* Make progress, regardless of success or failure. */
 	++cache->sync_complete;
 
-	/* The session array requires no lock, it's fixed in size. */
-	request_session = NULL;
-	for (i = 0; i < conn->session_cnt; ++i)
-		if ((request_session = conn->sessions[i]) != NULL &&
-		    request_session->syncop != 0)
+	/*
+	 * No lock is required because the session array is fixed size, but it
+	 * it may contain inactive entries.
+	 *
+	 * If we don't find a request, something went wrong; complain, but don't
+	 * return an error code, the eviction thread doesn't need to exit.
+	 */
+	WT_ORDERED_READ(session_cnt, conn->session_cnt);
+	for (request_session = conn->sessions,
+	    i = 0; i < session_cnt; ++request_session, ++i)
+		if (request_session->active && request_session->syncop != 0)
 			break;
-
-	/* If we don't find an entry, something broke, complain. */
-	if (request_session == NULL) {
+	if (i == session_cnt) {
 		__wt_errx(session,
 		    "failed to find handle's sync operation request");
 		return (0);
@@ -475,8 +493,6 @@ __evict_file_request_walk(WT_SESSION_IMPL *session)
 	 */
 	syncop = request_session->syncop;
 	request_session->syncop = 0;
-
-	WT_ASSERT(session, syncop != 0);
 
 	WT_VERBOSE_RET(session, evictserver,
 	    "file request: %s",

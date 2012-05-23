@@ -49,6 +49,7 @@ __wt_cache_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	cache->max_evict_request = conn->session_size;
 	WT_ERR(__wt_calloc_def(
 	    session, cache->max_evict_request, &cache->evict_request));
+	__wt_spin_init(session, &cache->er_lock);
 
 	/*
 	 * We pull some values from the cache statistics (rather than have two
@@ -101,5 +102,7 @@ __wt_cache_destroy(WT_CONNECTION_IMPL *conn)
 	__wt_spin_destroy(session, &cache->lru_lock);
 
 	__wt_free(session, cache->evict_request);
+	__wt_spin_destroy(session, &cache->er_lock);
+
 	__wt_free(session, conn->cache);
 }

@@ -225,14 +225,47 @@ __wt_get_addr(
 
 /*
  * __wt_page_release --
- *	Release a reference to a page, unless it's pinned into memory, in which
- * case we never acquired a hazard reference.
+ *	Release a reference to a page.
  */
 static inline void
 __wt_page_release(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
+	/* We never acquired a hazard reference on the root page. */
 	if (page != NULL && !WT_PAGE_IS_ROOT(page))
 		__wt_hazard_clear(session, page);
+}
+
+/*
+ * __wt_page_hazard_check --
+ *	Return if there's a hazard reference to the page in the system.
+ */
+static inline WT_HAZARD *
+__wt_page_hazard_check(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_HAZARD *hp;
+	WT_SESSION_IMPL *s;
+	uint32_t i, session_cnt;
+
+	conn = S2C(session);
+
+	/*
+	 * No lock is required because the session array is fixed size, but it
+	 * it may contain inactive entries.  We must review any active session
+	 * that might contain a hazard reference, so insert a barrier before
+	 * reading the active session count.  That way, no matter what sessions
+	 * come or go, we'll check the slots for all of the sessions that could
+	 * have been active when we started our check.
+	 */
+	WT_ORDERED_READ(session_cnt, conn->session_cnt);
+	for (s = conn->sessions, i = 0; i < session_cnt; ++s, ++i) {
+		if (!s->active)
+			continue;
+		for (hp = s->hazard; hp < s->hazard + conn->hazard_size; ++hp)
+			if (hp->page == page)
+				return (hp);
+	}
+	return (NULL);
 }
 
 /*

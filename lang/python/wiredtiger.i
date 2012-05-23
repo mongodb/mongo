@@ -282,7 +282,7 @@ SELFHELPER(struct __wt_cursor)
 		
 		@copydoc WT_CURSOR::set_key'''
 		if self.is_column:
-			self._set_recno(args[0])
+			self._set_recno(long(args[0]))
 		else:
 			# Keep the Python string pinned
 			self._key = pack(self.key_format, *args)

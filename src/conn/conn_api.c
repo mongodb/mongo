@@ -292,27 +292,30 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 	WT_NAMED_COMPRESSOR *ncomp;
 	WT_NAMED_DATA_SOURCE *ndsrc;
 	WT_SESSION *wt_session;
-	WT_SESSION_IMPL *s, *session, **tp;
+	WT_SESSION_IMPL *s, *session;
+	uint32_t i;
 
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 
 	CONNECTION_API_CALL(conn, session, close, config, cfg);
 	WT_UNUSED(cfg);
 
-	/* Close open sessions. */
-	for (tp = conn->sessions; (s = *tp) != NULL;) {
-		if (!F_ISSET(s, WT_SESSION_INTERNAL)) {
+	/*
+	 * Close open, external sessions.
+	 * Additionally, the session's hazard reference memory isn't discarded
+	 * during normal session close because access to it isn't serialized.
+	 * Discard it now.  Note the loop for the hazard reference memory, it's
+	 * the entire session array, not only the active session count, as the
+	 * active session count may be less than the maximum session count.
+	 */
+	for (s = conn->sessions, i = 0; i < conn->session_cnt; ++s, ++i)
+		if (s->active && !F_ISSET(s, WT_SESSION_INTERNAL)) {
 			wt_session = &s->iface;
 			WT_TRET(wt_session->close(wt_session, config));
-
-			/*
-			 * We closed a session, which has shuffled pointers
-			 * around.  Restart the search.
-			 */
-			tp = conn->sessions;
-		} else
-			++tp;
-	}
+		}
+	for (s = conn->sessions, i = 0; i < conn->session_size; ++s, ++i)
+		if (!F_ISSET(s, WT_SESSION_INTERNAL))
+			__wt_free(session, s->hazard);
 
 	/* Close open btree handles. */
 	WT_TRET(__wt_conn_btree_discard(conn));
