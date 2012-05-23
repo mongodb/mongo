@@ -56,7 +56,7 @@ __wt_txn_visible(WT_SESSION_IMPL *session, wt_txnid_t id)
 	WT_TXN *txn;
 
 	/* Nobody sees the results of aborted transactions. */
-	if (id == WT_TXN_INVALID)
+	if (id == WT_TXN_ABORTED)
 		return (0);
 
 	/*
@@ -93,7 +93,7 @@ static inline WT_UPDATE *
 __wt_txn_read_skip(WT_SESSION_IMPL *session, WT_UPDATE *upd, int *skipp)
 {
 	while (upd != NULL && !__wt_txn_visible(session, upd->txnid)) {
-		if (upd->txnid != WT_TXN_NONE)
+		if (upd->txnid != WT_TXN_ABORTED)
 			*skipp = 1;
 		upd = upd->next;
 	}
@@ -126,7 +126,7 @@ __wt_txn_update_check(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 	txn = &session->txn;
 	if (txn->isolation == TXN_ISO_SNAPSHOT)
 		while (upd != NULL && !__wt_txn_visible(session, upd->txnid)) {
-			if (upd->txnid != WT_TXN_INVALID)
+			if (upd->txnid != WT_TXN_ABORTED)
 				return (WT_DEADLOCK);
 			upd = upd->next;
 		}

@@ -23,6 +23,30 @@ __wt_txnid_cmp(const void *v1, const void *v2)
 }
 
 /*
+ * __txn_sort_snapshot --
+ *	Sort a snapshot and size for faster searching.
+ */
+static void
+__txn_sort_snapshot(WT_SESSION_IMPL *session, wt_txnid_t id, uint32_t n)
+{
+	WT_TXN *txn;
+	wt_txnid_t *lastid;
+
+	txn = &session->txn;
+
+	/* Sort the snapshot and size for faster searching. */
+	qsort(txn->snapshot, n, sizeof(wt_txnid_t), __wt_txnid_cmp);
+	lastid = bsearch(&id, txn->snapshot, n, sizeof(wt_txnid_t),
+	    __wt_txnid_cmp);
+	WT_ASSERT(session, lastid != NULL);
+	while (lastid > txn->snapshot && lastid[-1] == lastid[0])
+		--lastid;
+	txn->snap_min = txn->snapshot[0];
+	WT_ASSERT(session, txn->snap_min != WT_TXN_NONE);
+	txn->snapshot_count = (u_int)(lastid - txn->snapshot);
+}
+
+/*
  * __wt_txn_get_snapshot --
  *	Set up a snapshot in the current transaction, without allocating an ID.
  */
@@ -32,8 +56,8 @@ __wt_txn_get_snapshot(WT_SESSION_IMPL *session)
 	WT_CONNECTION_IMPL *conn;
 	WT_TXN *txn;
 	WT_TXN_GLOBAL *txn_global;
-	wt_txnid_t id, *lastid;
-	uint32_t i, session_cnt;
+	wt_txnid_t id;
+	uint32_t i, n, session_cnt;
 
 	conn = S2C(session);
 	txn = &session->txn;
@@ -45,21 +69,13 @@ __wt_txn_get_snapshot(WT_SESSION_IMPL *session)
 
 		/* Copy the array of concurrent transactions. */
 		WT_ORDERED_READ(session_cnt, conn->session_cnt);
-		for (i = 0; i < session_cnt; i++)
-			txn->snapshot[i] = txn_global->ids[i];
+		for (i = n = 0; i < session_cnt; i++)
+			if ((txn->snapshot[n] =
+			    txn_global->ids[i]) != WT_TXN_NONE)
+				++n;
 	} while (txn_global->current != id);
 
-	/* Sort the snapshot and size for faster searching. */
-	qsort(txn->snapshot, session_cnt, sizeof(wt_txnid_t),
-	    __wt_txnid_cmp);
-	lastid = bsearch(&id, txn->snapshot, session_cnt, sizeof(wt_txnid_t),
-	    __wt_txnid_cmp);
-	WT_ASSERT(session, lastid != NULL);
-	while (lastid > txn->snapshot && lastid[-1] == lastid[0])
-		--lastid;
-	txn->snap_min = txn->snapshot[0];
-	txn->snapshot_count = (u_int)(lastid - txn->snapshot);
-
+	__txn_sort_snapshot(session, id, n);
 	return (0);
 }
 
@@ -74,8 +90,7 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_CONNECTION_IMPL *conn;
 	WT_TXN *txn;
 	WT_TXN_GLOBAL *txn_global;
-	wt_txnid_t *lastid;
-	uint32_t i, session_cnt;
+	uint32_t i, n, session_cnt;
 
 	conn = S2C(session);
 	txn = &session->txn;
@@ -90,8 +105,8 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 	txn->isolation = (strcmp(cval.str, "snapshot") == 0) ?
 	    TXN_ISO_SNAPSHOT : TXN_ISO_READ_UNCOMMITTED;
 
-	WT_ASSERT(session, txn->id == WT_TXN_INVALID);
-	WT_ASSERT(session, txn_global->ids[session->id] == WT_TXN_INVALID);
+	WT_ASSERT(session, txn->id == WT_TXN_NONE);
+	WT_ASSERT(session, txn_global->ids[session->id] == WT_TXN_NONE);
 
 	do {
 		/* Take a copy of the current session ID. */
@@ -101,24 +116,16 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 		if (txn->isolation == TXN_ISO_SNAPSHOT) {
 			/* Copy the array of concurrent transactions. */
 			WT_ORDERED_READ(session_cnt, conn->session_cnt);
-			for (i = 0; i < conn->session_cnt; i++)
-				txn->snapshot[i] = txn_global->ids[i];
+			for (i = n = 0; i < conn->session_cnt; i++)
+				if ((txn->snapshot[n] =
+				    txn_global->ids[i]) != WT_TXN_NONE)
+					++n;
 		}
 	} while (!WT_ATOMIC_CAS(txn_global->current, txn->id, txn->id + 1) ||
-	    txn->id == WT_TXN_NONE || txn->id == WT_TXN_INVALID);
+	    txn->id == WT_TXN_NONE || txn->id == WT_TXN_ABORTED);
 
-	if (txn->isolation == TXN_ISO_SNAPSHOT) {
-		/* Sort the snapshot and size for faster searching. */
-		qsort(txn->snapshot, session_cnt, sizeof(wt_txnid_t),
-		    __wt_txnid_cmp);
-		lastid = bsearch(&txn->id, txn->snapshot, session_cnt,
-		    sizeof(wt_txnid_t), __wt_txnid_cmp);
-		WT_ASSERT(session, lastid != NULL);
-		while (lastid > txn->snapshot && lastid[-1] == lastid[0])
-			--lastid;
-		txn->snap_min = txn->snapshot[0];
-		txn->snapshot_count = (u_int)(lastid - txn->snapshot);
-	}
+	if (txn->isolation == TXN_ISO_SNAPSHOT)
+		__txn_sort_snapshot(session, txn->id, n);
 
 	F_SET(txn, TXN_RUNNING);
 
@@ -144,9 +151,9 @@ __txn_release(WT_SESSION_IMPL *session)
 	}
 
 	txn_global = &S2C(session)->txn_global;
-	WT_ASSERT(session, txn_global->ids[session->id] != WT_TXN_INVALID &&
-	    txn->id != WT_TXN_INVALID);
-	WT_PUBLISH(txn_global->ids[session->id], txn->id = WT_TXN_INVALID);
+	WT_ASSERT(session, txn_global->ids[session->id] != WT_TXN_NONE &&
+	    txn->id != WT_TXN_NONE);
+	WT_PUBLISH(txn_global->ids[session->id], txn->id = WT_TXN_NONE);
 	F_CLR(txn, TXN_RUNNING);
 
 	return (0);
@@ -200,7 +207,7 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
 	ret = 0;
 
 	for (i = 0, m = txn->mod; i < txn->mod_count; i++, m++)
-		**m = WT_TXN_INVALID;
+		**m = WT_TXN_ABORTED;
 	WT_TRET(__txn_release(session));
 	return (ret);
 }
@@ -269,7 +276,7 @@ __wt_txn_init(WT_SESSION_IMPL *session)
 	WT_TXN *txn;
 
 	txn = &session->txn;
-	txn->id = WT_TXN_INVALID;
+	txn->id = WT_TXN_NONE;
 
 	WT_RET(__wt_calloc_def(session,
 	    S2C(session)->session_size, &txn->snapshot));
@@ -307,7 +314,7 @@ __wt_txn_global_init(WT_CONNECTION_IMPL *conn, const char *cfg[])
 
 	WT_RET(__wt_calloc_def(session, conn->session_size, &txn_global->ids));
 	for (i = 0; i < conn->session_size; i++)
-		txn_global->ids[i] = WT_TXN_INVALID;
+		txn_global->ids[i] = WT_TXN_NONE;
 
 	return (0);
 }
