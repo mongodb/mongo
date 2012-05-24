@@ -271,17 +271,16 @@ methods = {
 ]),
 'session.sync' : Method([
 	Config('snapshot', '', r'''
-		name of the snapshot'''),
+		if non-empty, create a named snapshot'''),
 ]),
 'session.truncate' : Method([]),
 'session.upgrade' : Method([]),
 'session.verify' : Method([]),
 
 'session.begin_transaction' : Method([
-	Config('isolation', 'read-committed', r'''
+	Config('isolation', 'snapshot', r'''
 		the isolation level for this transaction''',
-		choices=['serializable', 'snapshot', 'read-committed',
-		    'read-uncommitted']),
+		choices=['read-uncommitted', 'snapshot']),
 	Config('name', '', r'''
 		name of the transaction for tracing and debugging'''),
 	Config('sync', 'full', r'''
@@ -297,28 +296,8 @@ methods = {
 'session.rollback_transaction' : Method([]),
 
 'session.checkpoint' : Method([
-	Config('archive', 'false', r'''
-		remove log files no longer required for transactional
-		durability''',
-		type='boolean'),
-	Config('flush_cache', 'true', r'''
-		flush the cache''',
-		type='boolean'),
-	Config('flush_log', 'true', r'''
-		flush the log to disk''',
-		type='boolean'),
-	Config('log_size', '0', r'''
-		only proceed if more than the specified number of bytes of log
-		records have been written since the last checkpoint''',
-		min='0'),
-	Config('force', 'false', r'''
-		write a new checkpoint even if nothing has changed since the
-		last one''',
-		type='boolean'),
-	Config('timeout', '0', r'''
-		only proceed if more than the specified number of milliseconds
-		have elapsed since the last checkpoint''',
-		min='0'),
+	Config('snapshot', '', r'''
+		if non-empty, create named snapshots in files'''),
 ]),
 
 'connection.add_collator' : Method([]),
@@ -397,7 +376,7 @@ methods = {
 	Config('sync', 'true', r'''
 		sync files when closing or writing snapshots''',
 		type='boolean'),
-	Config('transactional', 'false', r'''
+	Config('transactional', 'true', r'''
 		support transactional semantics''',
 		type='boolean'),
 	Config('verbose', '', r'''
@@ -446,6 +425,6 @@ flags = {
 ###################################################
 # Structure flag declarations
 ###################################################
-	'conn' : [ 'CONN_NOSYNC', 'SERVER_RUN' ],
+	'conn' : [ 'CONN_NOSYNC', 'CONN_TRANSACTIONAL', 'SERVER_RUN' ],
 	'session' : [ 'SESSION_INTERNAL', 'SESSION_SALVAGE_QUIET_ERR' ],
 }

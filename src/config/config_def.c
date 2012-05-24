@@ -104,24 +104,21 @@ __wt_confchk_index_meta =
 
 const char *
 __wt_confdfl_session_begin_transaction =
-    "isolation=read-committed,name="",priority=0,sync=full";
+    "isolation=snapshot,name="",priority=0,sync=full";
 
 const char *
 __wt_confchk_session_begin_transaction =
-    "isolation=(choices=[\"serializable\",\"snapshot\",\"read-committed\","
-    "\"read-uncommitted\"]),name=(),priority=(type=int,min=-100,max=100),"
-    "sync=(choices=[\"full\",\"flush\",\"write\",\"none\"])";
+    "isolation=(choices=[\"read-uncommitted\",\"snapshot\"]),name=(),"
+    "priority=(type=int,min=-100,max=100),sync=(choices=[\"full\",\"flush\","
+    "\"write\",\"none\"])";
 
 const char *
 __wt_confdfl_session_checkpoint =
-    "archive=false,flush_cache=true,flush_log=true,force=false,log_size=0,"
-    "timeout=0";
+    "snapshot=""";
 
 const char *
 __wt_confchk_session_checkpoint =
-    "archive=(type=boolean),flush_cache=(type=boolean),"
-    "flush_log=(type=boolean),force=(type=boolean),log_size=(type=int,min=0),"
-    "timeout=(type=int,min=0)";
+    "snapshot=()";
 
 const char *
 __wt_confdfl_session_close =
@@ -271,7 +268,7 @@ __wt_confdfl_wiredtiger_open =
     "error_prefix="",eviction_target=80,eviction_trigger=95,extensions=(),"
     "hazard_max=30,home_environment=false,home_environment_priv=false,"
     "logging=false,multiprocess=false,session_max=50,sync=true,"
-    "transactional=false,verbose=()";
+    "transactional=true,verbose=()";
 
 const char *
 __wt_confchk_wiredtiger_open =

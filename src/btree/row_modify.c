@@ -66,7 +66,8 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 			upd_entry = &cbt->ins->upd;
 
 		/* Allocate room for the new value from per-thread memory. */
-		WT_ERR(__wt_update_alloc(session, value, &upd, &upd_size));
+		WT_ERR(__wt_update_alloc(
+		    session, value, &upd, &upd_size, *upd_entry));
 
 		/* Insert the WT_UPDATE structure. */
 		ret = __wt_update_serial(session, page, cbt->write_gen,
@@ -121,7 +122,8 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 		 */
 		WT_ERR(__wt_row_insert_alloc(
 		    session, key, skipdepth, &ins, &ins_size));
-		WT_ERR(__wt_update_alloc(session, value, &upd, &upd_size));
+		WT_ERR(__wt_update_alloc(
+		    session, value, &upd, &upd_size, NULL));
 		ins->upd = upd;
 		ins_size += upd_size;
 		cbt->ins = ins;
@@ -137,8 +139,14 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 	if (ret != 0) {
 err:		if (ins != NULL)
 			__wt_free(session, ins);
-		if (upd != NULL)
+		if (upd != NULL) {
+			/*
+			 * Remove the update from the current transaction, so we
+			 * don't try to modify it on rollback.
+			 */
+			__wt_txn_unmodify(session);
 			__wt_free(session, upd);
+		}
 	}
 
 	/* Free any insert, update arrays. */
@@ -259,10 +267,14 @@ err:	__wt_session_serialize_wrapup(session, page, ret);
  */
 int
 __wt_update_alloc(WT_SESSION_IMPL *session,
-    WT_ITEM *value, WT_UPDATE **updp, size_t *sizep)
+    WT_ITEM *value, WT_UPDATE **updp, size_t *sizep, WT_UPDATE *next)
 {
+	WT_DECL_RET;
 	WT_UPDATE *upd;
 	size_t size;
+
+	/* Before allocating anything, make sure this update is permitted. */
+	WT_RET(__wt_txn_update_check(session, next));
 
 	/*
 	 * Allocate the WT_UPDATE structure and room for the value, then copy
@@ -277,6 +289,17 @@ __wt_update_alloc(WT_SESSION_IMPL *session,
 		memcpy(WT_UPDATE_DATA(upd), value->data, size);
 	}
 
+	/*
+	 * This must come last: after __wt_txn_modify succeeds, we must return
+	 * a non-NULL upd so our callers can call __wt_txn_unmodify on any
+	 * subsequent failure.
+	 */
+	if ((ret = __wt_txn_modify(session, &upd->txnid)) != 0) {
+		__wt_free(session, upd);
+		return (ret);
+	}
+
+	upd->next = next;
 	*updp = upd;
 	if (sizep != NULL)
 		*sizep = sizeof(WT_UPDATE) + size;

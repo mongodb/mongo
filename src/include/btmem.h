@@ -512,8 +512,6 @@ struct __wt_ikey {
  * list.
  */
 struct __wt_update {
-	WT_UPDATE *next;		/* forward-linked list */
-
 	/*
 	 * We use the maximum size as an is-deleted flag, which means we can't
 	 * store 4GB objects; I'd rather do that than increase the size of this
@@ -522,6 +520,9 @@ struct __wt_update {
 #define	WT_UPDATE_DELETED_ISSET(upd)	((upd)->size == UINT32_MAX)
 #define	WT_UPDATE_DELETED_SET(upd)	((upd)->size = UINT32_MAX)
 	uint32_t size;			/* update length */
+	wt_txnid_t txnid;		/* update transaction */
+
+	WT_UPDATE *next;		/* forward-linked list */
 
 	/* The untyped value immediately follows the WT_UPDATE structure. */
 #define	WT_UPDATE_DATA(upd)						\

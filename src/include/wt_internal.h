@@ -148,6 +148,10 @@ struct __wt_stats;
     typedef struct __wt_stats WT_STATS;
 struct __wt_table;
     typedef struct __wt_table WT_TABLE;
+struct __wt_txn;
+    typedef struct __wt_txn WT_TXN;
+struct __wt_txn_global;
+    typedef struct __wt_txn_global WT_TXN_GLOBAL;
 struct __wt_update;
     typedef struct __wt_update WT_UPDATE;
 /*
@@ -161,6 +165,7 @@ struct __wt_update;
 #include "posix.h"
 #include "misc.h"
 #include "mutex.h"
+#include "txn.h"
 
 #include "block.h"
 #include "btmem.h"
@@ -195,6 +200,7 @@ struct __wt_update;
 #include "packing.i"
 #include "serial.i"
 #include "serial_funcs.i"
+#include "txn.i"
 
 #if defined(__cplusplus)
 }

@@ -37,6 +37,9 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 	/* General purpose spinlock. */
 	__wt_spin_init(session, &conn->spinlock);
 
+	/* Checkpoint lock. */
+	WT_RET(__wt_rwlock_alloc(session, "checkpoint", &conn->ckpt_rwlock));
+
 	return (0);
 }
 
@@ -74,6 +77,9 @@ __wt_connection_destroy(WT_CONNECTION_IMPL *conn)
 	__wt_spin_destroy(session, &conn->fh_lock);
 	__wt_spin_destroy(session, &conn->serial_lock);
 	__wt_spin_destroy(session, &conn->spinlock);
+
+	if (conn->ckpt_rwlock != NULL)
+		(void)__wt_rwlock_destroy(session, conn->ckpt_rwlock);
 
 	/* Free allocated memory. */
 	__wt_free(session, conn->home);

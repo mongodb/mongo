@@ -28,6 +28,9 @@ __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	/* Create the cache. */
 	WT_ERR(__wt_cache_create(conn, cfg));
 
+	/* Initialize transaction support. */
+	WT_ERR(__wt_txn_global_init(conn, cfg));
+
 	/*
 	 * Publish: there must be a barrier to ensure the connection structure
 	 * fields are set before other threads read from the pointer.
@@ -82,6 +85,9 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 
 	/* Discard the cache. */
 	__wt_cache_destroy(conn);
+
+	/* Discard transaction state. */
+	__wt_txn_global_destroy(conn);
 
 	/* Close extensions. */
 	while ((dlh = TAILQ_FIRST(&conn->dlhqh)) != NULL) {

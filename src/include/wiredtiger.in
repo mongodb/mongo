@@ -418,8 +418,8 @@ struct __wt_session {
 	/*! Close the session handle.
 	 *
 	 * This will release the resources associated with the session handle,
-	 * including rolling any active transactions and closing any cursors
-	 * that remain open in the session.
+	 * including rolling back any active transactions and closing any
+	 * cursors that remain open in the session.
 	 *
 	 * @snippet ex_all.c session close
 	 *
@@ -705,7 +705,8 @@ struct __wt_session {
 	 * @param session the session handle
 	 * @param name the URI of the file or table to sync
 	 * @configstart{session.sync, see dist/api_data.py}
-	 * @config{snapshot, name of the snapshot.,a string; default empty.}
+	 * @config{snapshot, if non-empty\, create a named snapshot.,a string;
+	 * default empty.}
 	 * @configend
 	 * @errors
 	 */
@@ -767,25 +768,23 @@ struct __wt_session {
 	/*! @name Transactions
 	 * @{
 	 */
-	/*! Start a transaction in this session. @notyet{transactions}
+	/*! Start a transaction in this session.
 	 *
 	 * All cursors opened in this session that support transactional
 	 * semantics will operate in the context of the transaction.  The
 	 * transaction remains active until ended with
 	 * WT_SESSION::commit_transaction or WT_SESSION::rollback_transaction.
 	 *
-	 * Ignored if a transaction is in progress.
-	 *
-	 * @todo describe nested transactions / savepoints
+	 * Not permitted if a transaction is in progress or cursors are open in
+	 * the session.
 	 *
 	 * @snippet ex_all.c session begin transaction
 	 *
 	 * @param session the session handle
 	 * @configstart{session.begin_transaction, see dist/api_data.py}
 	 * @config{isolation, the isolation level for this transaction.,a
-	 * string\, chosen from the following options: \c "serializable"\, \c
-	 * "snapshot"\, \c "read-committed"\, \c "read-uncommitted"; default \c
-	 * read-committed.}
+	 * string\, chosen from the following options: \c "read-uncommitted"\,
+	 * \c "snapshot"; default \c snapshot.}
 	 * @config{name, name of the transaction for tracing and debugging.,a
 	 * string; default empty.}
 	 * @config{priority, priority of the transaction for resolving
@@ -799,12 +798,11 @@ struct __wt_session {
 	 */
 	int __F(begin_transaction)(WT_SESSION *session, const char *config);
 
-	/*! Commit the current transaction. @notyet{transactions}
+	/*! Commit the current transaction.
 	 *
-	 * Any cursors opened during the transaction will be closed before
-	 * the commit is processed.
-	 *
-	 * Ignored if no transaction is in progress.
+	 * A transaction must be in progress when this method is called.  Any
+	 * cursors opened during the transaction will be closed before the
+	 * commit is processed.
 	 *
 	 * @snippet ex_all.c session commit transaction
 	 *
@@ -814,12 +812,11 @@ struct __wt_session {
 	 */
 	int __F(commit_transaction)(WT_SESSION *session, const char *config);
 
-	/*! Roll back the current transaction. @notyet{transactions}
+	/*! Roll back the current transaction.
 	 *
-	 * Any cursors opened during the transaction will be closed before
-	 * the rollback is processed.
-	 *
-	 * Ignored if no transaction is in progress.
+	 * A transaction must be in progress when this method is called.  Any
+	 * cursors opened during the transaction will be closed before the
+	 * rollback is processed.
 	 *
 	 * @snippet ex_all.c session rollback transaction
 	 *
@@ -829,27 +826,17 @@ struct __wt_session {
 	 */
 	int __F(rollback_transaction)(WT_SESSION *session, const char *config);
 
-	/*! Flush the cache and/or the log and optionally archive log files.
-	 * @notyet{checkpoint}
+	/*! Write a transactionally consistent snapshot of a database.
+	 *
+	 * All data files in the database are updated with snapshots that
+	 * reflect the transactions committed before the checkpoint starts.
 	 *
 	 * @snippet ex_all.c session checkpoint
 	 *
 	 * @param session the session handle
 	 * @configstart{session.checkpoint, see dist/api_data.py}
-	 * @config{archive, remove log files no longer required for
-	 * transactional durability.,a boolean flag; default \c false.}
-	 * @config{flush_cache, flush the cache.,a boolean flag; default \c
-	 * true.}
-	 * @config{flush_log, flush the log to disk.,a boolean flag; default \c
-	 * true.}
-	 * @config{force, write a new checkpoint even if nothing has changed
-	 * since the last one.,a boolean flag; default \c false.}
-	 * @config{log_size, only proceed if more than the specified number of
-	 * bytes of log records have been written since the last checkpoint.,an
-	 * integer greater than or equal to 0; default \c 0.}
-	 * @config{timeout, only proceed if more than the specified number of
-	 * milliseconds have elapsed since the last checkpoint.,an integer
-	 * greater than or equal to 0; default \c 0.}
+	 * @config{snapshot, if non-empty\, create named snapshots in files.,a
+	 * string; default empty.}
 	 * @configend
 	 * @errors
 	 */
@@ -937,7 +924,7 @@ struct __wt_connection {
 	int __F(add_data_source)(WT_CONNECTION *connection, const char *prefix,
 	    WT_DATA_SOURCE *data_source, const char *config);
 
-	/*! Add a custom collation function. @notyet{custom collation}
+	/*! Add a custom collation function.
 	 *
 	 * The application must first implement the WT_COLLATOR interface and
 	 * then register the implementation with WiredTiger:
@@ -1088,7 +1075,7 @@ struct __wt_connection {
  * @config{sync, sync files when closing or writing snapshots.,a boolean flag;
  * default \c true.}
  * @config{transactional, support transactional semantics.,a boolean flag;
- * default \c false.}
+ * default \c true.}
  * @config{verbose, enable messages for various events.  Options are given as a
  * list\, such as <code>"verbose=[evictserver\,read]"</code>.,a list\, with
  * values chosen from the following options: \c "block"\, \c "evict"\, \c

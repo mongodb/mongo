@@ -93,6 +93,8 @@ struct __wt_session_impl {
 	int	wq_sleeping;		/* Thread is blocked */
 	int	wq_ret;			/* Return value */
 
+	WT_TXN	txn;			/* Transaction state */
+
 	void	*reconcile;		/* Reconciliation information */
 
 	WT_REF **excl;			/* Eviction exclusive list */
@@ -103,6 +105,8 @@ struct __wt_session_impl {
 #define	WT_SYNC_DISCARD		2	/* Sync the file, discard pages */
 #define	WT_SYNC_DISCARD_NOWRITE	3	/* Discard the file */
 	int syncop;			/* File operation */
+
+	uint32_t id;			/* Offset in conn->session_array */
 
 	uint32_t flags;
 
@@ -171,6 +175,8 @@ struct __wt_connection_impl {
 	WT_SPINLOCK serial_lock;	/* Serial function call spinlock */
 	WT_SPINLOCK spinlock;		/* General purpose spinlock */
 
+	WT_RWLOCK *ckpt_rwlock;		/* Checkpoint lock */
+
 					/* Connection queue */
 	TAILQ_ENTRY(__wt_connection_impl) q;
 
@@ -218,6 +224,8 @@ struct __wt_connection_impl {
 
 	WT_CACHE  *cache;		/* Page cache */
 	uint64_t   cache_size;
+
+	WT_TXN_GLOBAL txn_global;	/* Global transaction state. */
 
 	WT_CONNECTION_STATS *stats;	/* Connection statistics */
 
@@ -302,7 +310,8 @@ extern WT_PROCESS __wt_process;
  * DO NOT EDIT: automatically built by dist/api_flags.py.
  * API flags section: BEGIN
  */
-#define	WT_CONN_NOSYNC					0x00000002
+#define	WT_CONN_NOSYNC					0x00000004
+#define	WT_CONN_TRANSACTIONAL				0x00000002
 #define	WT_DIRECTIO_DATA				0x00000002
 #define	WT_DIRECTIO_LOG					0x00000001
 #define	WT_PAGE_FREE_IGNORE_DISK			0x00000001

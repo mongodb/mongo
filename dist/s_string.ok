@@ -505,6 +505,7 @@ tupdate
 tvalue
 twrite
 txn
+txnid
 typedef
 uB
 uint
@@ -516,6 +517,7 @@ unescaped
 uninstantiated
 unjams
 unlinked
+unmodify
 unpackv
 unreferenced
 unsized

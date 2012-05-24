@@ -397,7 +397,8 @@ extern void __wt_insert_serial_func(WT_SESSION_IMPL *session);
 extern int __wt_update_alloc(WT_SESSION_IMPL *session,
     WT_ITEM *value,
     WT_UPDATE **updp,
-    size_t *sizep);
+    size_t *sizep,
+    WT_UPDATE *next);
 extern void __wt_update_serial_func(WT_SESSION_IMPL *session);
 extern WT_INSERT *__wt_search_insert(WT_SESSION_IMPL *session,
     WT_CURSOR_BTREE *cbt,
@@ -525,6 +526,10 @@ extern int __wt_conn_btree_get(WT_SESSION_IMPL *session,
     const char *config,
     const char *cfg[],
     uint32_t flags);
+extern int __wt_conn_btree_apply(WT_SESSION_IMPL *session,
+    int (*func)(WT_SESSION_IMPL *,
+    const char *[]),
+    const char *cfg[]);
 extern int __wt_conn_btree_close(WT_SESSION_IMPL *session, int locked);
 extern int __wt_conn_btree_close_all(WT_SESSION_IMPL *session,
     const char *name);
@@ -603,6 +608,11 @@ extern int __wt_metadata_get_snaplist( WT_SESSION *session,
     WT_SNAPSHOT **snapbasep);
 extern void __wt_metadata_free_snaplist(WT_SESSION *session,
     WT_SNAPSHOT *snapbase);
+extern int __wt_meta_btree_apply(WT_SESSION_IMPL *session,
+    int (*func)(WT_SESSION_IMPL *,
+    const char *[]),
+    const char *cfg[],
+    uint32_t flags);
 extern int __wt_meta_snapshot_get(WT_SESSION_IMPL *session,
     const char *name,
     const char *snapshot,
@@ -1021,3 +1031,13 @@ extern void __wt_stat_clear_btree_stats(WT_STATS *stats_arg);
 extern int __wt_stat_alloc_connection_stats(WT_SESSION_IMPL *session,
     WT_CONNECTION_STATS **statsp);
 extern void __wt_stat_clear_connection_stats(WT_STATS *stats_arg);
+extern int __wt_txnid_cmp(const void *v1, const void *v2);
+extern int __wt_txn_get_snapshot(WT_SESSION_IMPL *session);
+extern int __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[]);
+extern int __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[]);
+extern int __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[]);
+extern int __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[]);
+extern int __wt_txn_init(WT_SESSION_IMPL *session);
+extern void __wt_txn_destroy(WT_SESSION_IMPL *session);
+extern int __wt_txn_global_init(WT_CONNECTION_IMPL *conn, const char *cfg[]);
+extern void __wt_txn_global_destroy(WT_CONNECTION_IMPL *conn);

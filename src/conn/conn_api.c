@@ -758,6 +758,9 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_ERR(__wt_config_gets(session, cfg, "sync", &cval));
 	if (!cval.val)
 		F_SET(conn, WT_CONN_NOSYNC);
+	WT_ERR(__wt_config_gets(session, cfg, "transactional", &cval));
+	if (cval.val)
+		F_SET(conn, WT_CONN_TRANSACTIONAL);
 
 	/* Configure verbose flags. */
 	conn->verbose = 0;

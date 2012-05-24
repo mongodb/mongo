@@ -29,11 +29,15 @@ For more information about using WiredTiger, see:
 
 - @subpage install\n
 
-- @subpage using\n
+- @subpage programming\n
 
 - @ref wt "WiredTiger API reference manual"
 
 - @subpage command_line\n
+
+- @subpage admin\n
+
+- @subpage license\n
 
 To browse or download the WiredTiger source code, visit our
 

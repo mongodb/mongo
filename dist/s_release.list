@@ -3,7 +3,6 @@
 lang/java
 lang/python/src
 src/server
-src/txn
 test/format
 test/packing
 test/salvage

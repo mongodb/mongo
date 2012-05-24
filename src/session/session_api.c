@@ -7,6 +7,24 @@
 
 #include "wt_internal.h"
 
+static int __session_rollback_transaction(WT_SESSION *, const char *);
+
+/*
+ * __session_close_cursors --
+ *	Close all cursors open in a session.
+ */
+static int
+__session_close_cursors(WT_SESSION_IMPL *session)
+{
+	WT_CURSOR *cursor;
+	WT_DECL_RET;
+
+	ret = 0;
+	while ((cursor = TAILQ_FIRST(&session->cursors)) != NULL)
+		WT_TRET(cursor->close(cursor));
+	return (ret);
+}
+
 /*
  * __session_close --
  *	WT_SESSION->close method.
@@ -16,7 +34,6 @@ __session_close(WT_SESSION *wt_session, const char *config)
 {
 	WT_BTREE_SESSION *btree_session;
 	WT_CONNECTION_IMPL *conn;
-	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
@@ -26,8 +43,10 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	SESSION_API_CALL(session, close, config, cfg);
 	WT_UNUSED(cfg);
 
-	while ((cursor = TAILQ_FIRST(&session->cursors)) != NULL)
-		WT_TRET(cursor->close(cursor));
+	if (F_ISSET(&session->txn, TXN_RUNNING))
+		WT_TRET(__session_rollback_transaction(wt_session, NULL));
+
+	WT_TRET(__session_close_cursors(session));
 
 	while ((btree_session = TAILQ_FIRST(&session->btrees)) != NULL)
 		WT_TRET(__wt_session_discard_btree(session, btree_session));
@@ -41,6 +60,9 @@ __session_close(WT_SESSION *wt_session, const char *config)
 
 	/* Discard scratch buffers. */
 	__wt_scr_discard(session);
+
+	/* Free transaction information. */
+	__wt_txn_destroy(session);
 
 	/* Confirm we're not holding any hazard references. */
 	__wt_hazard_empty(session);
@@ -376,10 +398,22 @@ err:	API_END_NOTFOUND_MAP(session, ret);
 static int
 __session_begin_transaction(WT_SESSION *wt_session, const char *config)
 {
-	WT_UNUSED(wt_session);
-	WT_UNUSED(config);
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
 
-	return (ENOTSUP);
+	session = (WT_SESSION_IMPL *)wt_session;
+
+	SESSION_API_CALL(session, begin_transaction, config, cfg);
+	if (!F_ISSET(S2C(session), WT_CONN_TRANSACTIONAL))
+		WT_ERR_MSG(session, EINVAL,
+		    "Database not configured for transactions");
+	if (TAILQ_FIRST(&session->cursors) != NULL)
+		WT_ERR_MSG(session, EINVAL, "Not permitted with open cursors");
+
+	ret = __wt_txn_begin(session, cfg);
+
+err:	API_END(session);
+	return (ret);
 }
 
 /*
@@ -389,10 +423,20 @@ __session_begin_transaction(WT_SESSION *wt_session, const char *config)
 static int
 __session_commit_transaction(WT_SESSION *wt_session, const char *config)
 {
-	WT_UNUSED(wt_session);
-	WT_UNUSED(config);
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
 
-	return (ENOTSUP);
+	session = (WT_SESSION_IMPL *)wt_session;
+
+	SESSION_API_CALL(session, commit_transaction, config, cfg);
+	WT_TRET(__session_close_cursors(session));
+	if (ret == 0)
+		ret = __wt_txn_commit(session, cfg);
+	else
+		(void)__wt_txn_rollback(session, cfg);
+
+err:	API_END(session);
+	return (ret);
 }
 
 /*
@@ -402,10 +446,16 @@ __session_commit_transaction(WT_SESSION *wt_session, const char *config)
 static int
 __session_rollback_transaction(WT_SESSION *wt_session, const char *config)
 {
-	WT_UNUSED(wt_session);
-	WT_UNUSED(config);
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
 
-	return (ENOTSUP);
+	session = (WT_SESSION_IMPL *)wt_session;
+	SESSION_API_CALL(session, rollback_transaction, config, cfg);
+	WT_TRET(__session_close_cursors(session));
+	WT_TRET(__wt_txn_rollback(session, cfg));
+
+err:	API_END(session);
+	return (ret);
 }
 
 /*
@@ -415,10 +465,14 @@ __session_rollback_transaction(WT_SESSION *wt_session, const char *config)
 static int
 __session_checkpoint(WT_SESSION *wt_session, const char *config)
 {
-	WT_UNUSED(wt_session);
-	WT_UNUSED(config);
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
 
-	return (ENOTSUP);
+	session = (WT_SESSION_IMPL *)wt_session;
+	SESSION_API_CALL(session, checkpoint, config, cfg);
+	WT_TRET(__wt_txn_checkpoint(session, cfg));
+
+err:	API_END_NOTFOUND_MAP(session, ret);
 }
 
 /*
@@ -496,6 +550,7 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
 	if (i >= conn->session_cnt)	/* Defend against off-by-one errors. */
 		conn->session_cnt = i + 1;
 
+	session_ret->id = i;
 	session_ret->iface = stds;
 	session_ret->iface.connection = &conn->iface;
 
@@ -506,6 +561,9 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
 
 	TAILQ_INIT(&session_ret->cursors);
 	TAILQ_INIT(&session_ret->btrees);
+
+	/* Initialize transaction support. */
+	WT_ERR(__wt_txn_init(session_ret));
 
 	/*
 	 * The session's hazard reference memory isn't discarded during normal

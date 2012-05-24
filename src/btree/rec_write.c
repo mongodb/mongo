@@ -23,6 +23,11 @@ typedef struct {
 
 	WT_ITEM	 dsk;			/* Temporary disk-image buffer */
 
+	/* Track whether all changes to the page are written. */
+	uint32_t orig_write_gen;
+	uint32_t orig_disk_gen;
+	int upd_skipped;
+
 	/*
 	 * Reconciliation gets tricky if we have to split a page, that is, if
 	 * the disk image we create exceeds the maximum size of disk images for
@@ -349,9 +354,6 @@ __rec_write_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	btree = session->btree;
 
-	/* Update the disk generation before we read anything from the page. */
-	WT_ORDERED_READ(page->modify->disk_gen, page->modify->write_gen);
-
 	/* Allocate a reconciliation structure if we don't already have one. */
 	if ((r = session->reconcile) == NULL) {
 		WT_RET(__wt_calloc_def(session, 1, &r));
@@ -394,6 +396,11 @@ __rec_write_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 	}
 
 	r->page = page;
+
+	/* Read the disk generation before we read anything from the page. */
+	r->orig_disk_gen = page->modify->disk_gen;
+	WT_ORDERED_READ(r->orig_write_gen, page->modify->write_gen);
+	r->upd_skipped = 0;
 
 	return (0);
 }
@@ -1409,6 +1416,7 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_INSERT *ins;
 	WT_INSERT_HEAD *append;
 	WT_RECONCILE *r;
+	WT_UPDATE *upd;
 	uint64_t recno;
 	uint32_t entry, nrecs;
 
@@ -1416,10 +1424,14 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 	btree = session->btree;
 
 	/* Update any changes to the original on-page data items. */
-	WT_SKIP_FOREACH(ins, WT_COL_UPDATE_SINGLE(page))
+	WT_SKIP_FOREACH(ins, WT_COL_UPDATE_SINGLE(page)) {
+		upd = __wt_txn_read_skip(session, ins->upd, &r->upd_skipped);
+		if (upd == NULL)
+			continue;
 		__bit_setv_recno(
 		    page, WT_INSERT_RECNO(ins), btree->bitcnt,
-		    ((uint8_t *)WT_UPDATE_DATA(ins->upd))[0]);
+		    ((uint8_t *)WT_UPDATE_DATA(upd))[0]);
+	}
 
 	/* Allocate the memory. */
 	WT_RET(__rec_split_init(session,
@@ -1436,7 +1448,10 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	/* Walk any append list. */
 	append = WT_COL_APPEND(page);
-	WT_SKIP_FOREACH(ins, append)
+	WT_SKIP_FOREACH(ins, append) {
+		upd = __wt_txn_read_skip(session, ins->upd, &r->upd_skipped);
+		if (upd == NULL)
+			continue;
 		for (;;) {
 			/*
 			 * The application may have inserted records which left
@@ -1450,7 +1465,7 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 			if (nrecs > 0) {
 				__bit_setv(r->first_free, entry, btree->bitcnt,
-				    ((uint8_t *)WT_UPDATE_DATA(ins->upd))[0]);
+				    ((uint8_t *)WT_UPDATE_DATA(upd))[0]);
 				--nrecs;
 				++entry;
 				++r->recno;
@@ -1471,6 +1486,7 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 			entry = 0;
 			nrecs = r->space_avail / btree->bitcnt;
 		}
+	}
 
 	/* Update the counters. */
 	__rec_incr(session, r, entry, __bitstr_size(entry * btree->bitcnt));
@@ -1737,9 +1753,12 @@ __rec_col_var(
 			orig_deleted = 1;
 		} else {
 			__wt_cell_unpack(cell, unpack);
+			nrepeat = __wt_cell_rle(unpack);
 
 			ins = WT_SKIP_FIRST(WT_COL_UPDATE(page, cip));
-			nrepeat = __wt_cell_rle(unpack);
+			while (ins != NULL && __wt_txn_read_skip(
+			    session, ins->upd, &r->upd_skipped) == NULL)
+				ins = WT_SKIP_NEXT(ins);
 
 			/*
 			 * If the original value is "deleted", there's no value
@@ -1799,9 +1818,16 @@ record_loop:	/*
 		 */
 		for (n = 0;
 		    n < nrepeat; n += repeat_count, src_recno += repeat_count) {
-			if (ins != NULL && WT_INSERT_RECNO(ins) == src_recno) {
-				upd = ins->upd;
-				ins = WT_SKIP_NEXT(ins);
+			if (ins != NULL &&
+			    WT_INSERT_RECNO(ins) == src_recno) {
+				upd = __wt_txn_read_skip(
+				    session, ins->upd, &r->upd_skipped);
+				WT_ASSERT(session, upd != NULL);
+				do {
+					ins = WT_SKIP_NEXT(ins);
+				} while (ins != NULL &&
+				    __wt_txn_read_skip(session,
+				    ins->upd, &r->upd_skipped) == NULL);
 
 				update_no_copy = 1;	/* No data copy */
 
@@ -1948,7 +1974,10 @@ compare:		/*
 
 	/* Walk any append list. */
 	append = WT_COL_APPEND(page);
-	WT_SKIP_FOREACH(ins, append)
+	WT_SKIP_FOREACH(ins, append) {
+		upd = __wt_txn_read_skip(session, ins->upd, &r->upd_skipped);
+		if (upd == NULL)
+			continue;
 		for (n = WT_INSERT_RECNO(ins); src_recno <= n; ++src_recno) {
 			/*
 			 * The application may have inserted records which left
@@ -1957,7 +1986,6 @@ compare:		/*
 			if (src_recno < n)
 				deleted = 1;
 			else {
-				upd = ins->upd;
 				deleted = WT_UPDATE_DELETED_ISSET(upd);
 				if (!deleted) {
 					data = WT_UPDATE_DATA(upd);
@@ -1995,6 +2023,7 @@ compare:		/*
 			last_deleted = deleted;
 			rle = 1;
 		}
+	}
 
 	/* If we were tracking a record, write it. */
 	if (rle != 0)
@@ -2481,7 +2510,9 @@ __rec_row_leaf(
 		/* Build value cell. */
 		if ((val_cell = __wt_row_value(page, rip)) != NULL)
 			__wt_cell_unpack(val_cell, unpack);
-		if ((upd = WT_ROW_UPDATE(page, rip)) == NULL) {
+		upd = __wt_txn_read_skip(
+		    session, WT_ROW_UPDATE(page, rip), &r->upd_skipped);
+		if (upd == NULL) {
 			/*
 			 * Copy the item off the page -- however, when the page
 			 * was read into memory, there may not have been a value
@@ -2723,8 +2754,9 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_INSERT *ins)
 	val = &r->v;
 
 	for (; ins != NULL; ins = WT_SKIP_NEXT(ins)) {
-		upd = ins->upd;				/* Build value cell. */
-		if (WT_UPDATE_DELETED_ISSET(upd))
+		/* Build value cell. */
+		upd = __wt_txn_read_skip(session, ins->upd, &r->upd_skipped);
+		if (upd == NULL || WT_UPDATE_DELETED_ISSET(upd))
 			continue;
 		if (upd->size == 0)
 			val->len = 0;
@@ -3013,6 +3045,14 @@ err:			__wt_scr_free(&tkey);
 		break;
 	}
 
+	/*
+	 * If the write succeeded, no updates were skipped and the disk
+	 * generation has not changed in the meantime, update it to the write
+	 * generation when reconciliation started.
+	 */
+	if (ret == 0 && !r->upd_skipped)
+		(void)WT_ATOMIC_CAS(
+		    mod->disk_gen, r->orig_disk_gen, r->orig_write_gen);
 	return (ret);
 }
 

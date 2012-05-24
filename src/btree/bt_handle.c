@@ -326,11 +326,12 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session)
 	btree->root_page = root;
 
 	/*
-	 * Mark the child page dirty so that if it is evicted, the tree ends
-	 * up sane.
+	 * Mark the child page empty so that if it is evicted, the tree ends up
+	 * sane.  The page should not be dirty, or we will always write empty
+	 * trees on close, including empty snapshots.
 	 */
 	WT_ERR(__wt_page_modify_init(session, leaf));
-	__wt_page_modify_set(leaf);
+	F_SET(leaf->modify, WT_PM_REC_EMPTY);
 
 	return (0);
 

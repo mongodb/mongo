@@ -60,14 +60,17 @@ __cursor_invalid(WT_CURSOR_BTREE *cbt)
 	WT_COL *cip;
 	WT_INSERT *ins;
 	WT_PAGE *page;
+	WT_SESSION_IMPL *session;
+	WT_UPDATE *upd;
 
 	btree = cbt->btree;
 	ins = cbt->ins;
 	page = cbt->page;
+	session = (WT_SESSION_IMPL *)cbt->iface.session;
 
 	/* If we found an item on an insert list, check there. */
-	if (ins != NULL)
-		return (WT_UPDATE_DELETED_ISSET(ins->upd) ? 1 : 0);
+	if (ins != NULL && (upd = __wt_txn_read(session, ins->upd)) != NULL)
+		return (WT_UPDATE_DELETED_ISSET(upd) ? 1 : 0);
 
 	/* The page may be empty, the search routine doesn't check. */
 	if (page->entries == 0)
@@ -86,9 +89,9 @@ __cursor_invalid(WT_CURSOR_BTREE *cbt)
 			return (1);
 		break;
 	case BTREE_ROW:
-		if (page->u.row.upd != NULL &&
-		    page->u.row.upd[cbt->slot] != NULL &&
-		    WT_UPDATE_DELETED_ISSET(page->u.row.upd[cbt->slot]))
+		if (page->u.row.upd != NULL && (upd = __wt_txn_read(session,
+		    page->u.row.upd[cbt->slot])) != NULL &&
+		    WT_UPDATE_DELETED_ISSET(upd))
 			return (1);
 		break;
 	}
