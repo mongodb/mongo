@@ -487,7 +487,8 @@ namespace ShardingTests {
 
         void setupTests() {
             add< serverandquerytests::test1 >();
-            add< ChunkManagerCreateBasicTest >();
+            // SERVER-5918
+            //add< ChunkManagerCreateBasicTest >();
             add< ChunkDiffUnitTestNormal >();
             add< ChunkDiffUnitTestInverse >();
         }
