@@ -8,7 +8,7 @@ fine-grained durability, but requires a recovery step when files are first
 opened, and impacts the performance of every operation; snapshots offer
 durability without recovery or impacting operational performance, but the
 creation of a snapshot is a relatively heavy-weight operation.  WiredTiger
-does not currently support transactional logging.) @notyet{logging}
+does not currently support transactional logging.)
 
 Snapshots may optionally be named: WiredTiger creates and manages unnamed
 snapshots automatically.  Snapshots are created using the WT_SESSION::sync

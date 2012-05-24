@@ -1,8 +1,8 @@
 /*! @page architecture WiredTiger Architecture
 
-The WiredTiger data engine is a high performance, scalable, production
-quality, open source, NoSQL data engine, created to maximize the value
-of each computer you buy:
+The WiredTiger data engine is a high performance, scalable, transactional,
+production quality, open source, NoSQL data engine, created to maximize the
+value of each computer you buy:
 
 - WiredTiger offers both low latency and high throughput (in-cache reads
 require no latching, writes typically require a single latch),
@@ -12,6 +12,8 @@ or resource degradation,
 
 - WiredTiger has predictable behavior under heavy access and large
 volumes of data,
+
+- WiredTiger offers transactional semantics without blocking,
 
 - WiredTiger stores are not corrupted by torn writes, reverting to the
 last snapshot after system failure,
@@ -23,10 +25,15 @@ WiredTiger's design is focused on a few core principles:
 
 @section multi_core Multi-core scaling
 
-WiredTiger scales on modern, multi-CPU architectures.  Using a variety
-of programming techniques such as hazard references, lock-free
-algorithms, fast latching and message passing, WiredTiger performs more
-work per CPU core than alternative engines.
+WiredTiger scales on modern, multi-CPU architectures.  Using a variety of
+programming techniques such as hazard references, lock-free algorithms, fast
+latching and message passing, WiredTiger performs more work per CPU core than
+alternative engines.
+
+WiredTiger's transactions use optimistic concurrency control algorithms that
+avoid the bottleneck of a centralized lock manager.  Transactional operations
+in one thread do not block operations in other threads, but strong isolation is
+provided and update conflicts are detected to preserve data consistency.
 
 @section cache Hot caches
 

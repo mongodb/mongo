@@ -1,10 +1,8 @@
-/*! @page admin Administering WiredTiger
+/*! @page admin Managing a WiredTiger Database
 
 - @subpage home
 - @subpage security
 - @subpage file_formats
-- @subpage name_space
-- @subpage signals
 - @subpage tuning
 
  */
