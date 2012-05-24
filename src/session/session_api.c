@@ -556,8 +556,8 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
 
 	WT_ERR(__wt_cond_alloc(session, "session", 1, &session_ret->cond));
 
-	__wt_event_handler_set(session_ret, (event_handler != NULL) ?
-	    event_handler : session_ret->event_handler);
+	__wt_event_handler_set(session_ret,
+	    event_handler == NULL ? session->event_handler : event_handler);
 
 	TAILQ_INIT(&session_ret->cursors);
 	TAILQ_INIT(&session_ret->btrees);
