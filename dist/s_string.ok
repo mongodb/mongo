@@ -134,6 +134,7 @@ TAILQ
 TODO
 TOOSMALL
 TRK
+TXN
 Timestamp
 UINT
 URI
@@ -490,6 +491,7 @@ toffpage
 toverflow
 tparent
 transactional
+transactionally
 trecno
 treeconfig
 trepeat
