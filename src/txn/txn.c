@@ -60,6 +60,7 @@ __wt_txn_get_snapshot(WT_SESSION_IMPL *session)
 	uint32_t i, n, session_cnt;
 
 	conn = S2C(session);
+	n = 0;
 	txn = &session->txn;
 	txn_global = &conn->txn_global;
 
@@ -69,7 +70,7 @@ __wt_txn_get_snapshot(WT_SESSION_IMPL *session)
 
 		/* Copy the array of concurrent transactions. */
 		WT_ORDERED_READ(session_cnt, conn->session_cnt);
-		for (i = n = 0; i < session_cnt; i++)
+		for (i = 0; i < session_cnt; i++)
 			if ((txn->snapshot[n] =
 			    txn_global->ids[i]) != WT_TXN_NONE)
 				++n;
@@ -93,6 +94,7 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 	uint32_t i, n, session_cnt;
 
 	conn = S2C(session);
+	n = 0;
 	txn = &session->txn;
 	txn_global = &conn->txn_global;
 
@@ -114,7 +116,7 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 		if (txn->isolation == TXN_ISO_SNAPSHOT) {
 			/* Copy the array of concurrent transactions. */
 			WT_ORDERED_READ(session_cnt, conn->session_cnt);
-			for (i = n = 0; i < session_cnt; i++)
+			for (i = 0; i < session_cnt; i++)
 				if ((txn->snapshot[n] =
 				    txn_global->ids[i]) != WT_TXN_NONE)
 					++n;
