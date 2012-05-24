@@ -684,10 +684,32 @@ def main():
                       action="store_true",
                       help='Clear the failfile. Do this if all tests pass')
 
+    # Buildlogger invocation from command line
+    parser.add_option('--buildlogger-builder', dest='buildlogger_builder', default=None,
+                      action="store", help='Set the "builder name" for buildlogger')
+    parser.add_option('--buildlogger-buildnum', dest='buildlogger_buildnum', default=None,
+                      action="store", help='Set the "build number" for buildlogger')
+    parser.add_option('--buildlogger-credentials', dest='buildlogger_credentials', default=None,
+                      action="store", help='Path to Python file containing buildlogger credentials')
+    parser.add_option('--buildlogger-phase', dest='buildlogger_phase', default=None,
+                      action="store", help='Set the "phase" for buildlogger (e.g. "core", "auth") for display in the webapp (optional)')
+
     global tests
     (options, tests) = parser.parse_args()
 
     set_globals(options)
+
+    buildlogger_opts = (options.buildlogger_builder, options.buildlogger_buildnum, options.buildlogger_credentials)
+    if all(buildlogger_opts):
+        os.environ['MONGO_USE_BUILDLOGGER'] = 'true'
+        os.environ['MONGO_BUILDER_NAME'] = options.buildlogger_builder
+        os.environ['MONGO_BUILD_NUMBER'] = options.buildlogger_buildnum
+        os.environ['BUILDLOGGER_CREDENTIALS'] = options.buildlogger_credentials
+        if options.buildlogger_phase:
+            os.environ['MONGO_BUILD_PHASE'] = options.buildlogger_phase
+    elif any(buildlogger_opts):
+        # some but not all of the required options were sete
+        raise Exception("you must set all of --buildlogger-builder, --buildlogger-buildnum, --buildlogger-credentials")
 
     if options.File:
         if options.File == '-':

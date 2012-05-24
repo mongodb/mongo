@@ -14,12 +14,25 @@ The script configures itself from environment variables:
   optional env vars:
     MONGO_PHASE (e.g. "core", "slow nightly", etc)
     MONGO_* (any other environment vars are passed to the web app)
+    BUILDLOGGER_CREDENTIALS (see below)
 
 This script has two modes: a "test" mode, intended to wrap the invocation of
 an individual test file, and a "global" mode, intended to wrap the mongod
 instances that run throughout the duration of a mongo test phase (the logs
 from "global" invocations are displayed interspersed with the logs of each
 test, in order to let the buildlogs web app display the full output sensibly.)
+
+If the BUILDLOGGER_CREDENTIALS environment variable is set, it should be a
+path to a valid Python file containing "username" and "password" variables,
+which should be valid credentials for authenticating to the buildlogger web
+app. For example:
+
+    username = "hello"
+    password = "world"
+
+If BUILDLOGGER_CREDENTIALS is a relative path, then the working directory
+and the directories one, two, and three levels up, are searched, in that
+order.
 """
 
 import functools
@@ -46,27 +59,30 @@ except:
 # try to load the shared secret from settings.py
 # which will be one, two, or three directories up
 # from this file's location
-here = os.path.abspath(os.path.dirname(__file__))
-possible_paths = [
-    os.path.abspath(os.path.join(here, '..')),
-    os.path.abspath(os.path.join(here, '..', '..')),
-    os.path.abspath(os.path.join(here, '..', '..', '..')),
-]
+credentials_file = os.environ.get('BUILDLOGGER_CREDENTIALS', 'buildbot.tac')
+credentials_loc, credentials_name = os.path.split(credentials_file)
+if not credentials_loc:
+    here = os.path.abspath(os.path.dirname(__file__))
+    possible_paths = [
+        os.path.abspath(os.path.join(here, '..')),
+        os.path.abspath(os.path.join(here, '..', '..')),
+        os.path.abspath(os.path.join(here, '..', '..', '..')),
+    ]
+else:
+    possible_paths = [credentials_loc]
 
 username, password = None, None
 for path in possible_paths:
-    buildbot_tac = os.path.join(path, 'buildbot.tac')
-    if os.path.isfile(buildbot_tac):
-        tac_globals = {}
-        tac_locals = {}
+    credentials_path = os.path.join(path, credentials_name)
+    if os.path.isfile(credentials_path):
+        credentials = {}
         try:
-            execfile(buildbot_tac, tac_globals, tac_locals)
-            tac_globals.update(tac_locals)
-            username = tac_globals['slavename']
-            password = tac_globals['passwd']
+            execfile(credentials_path, credentials, credentials)
+            username = credentials.get('slavename', credentials.get('username'))
+            password = credentials.get('passwd', credentials.get('password'))
             break
         except:
-            traceback.print_exc()
+            pass
 
 
 URL_ROOT = 'http://buildlogs.mongodb.org/'
@@ -447,7 +463,7 @@ if __name__ == '__main__':
         wrapper = run_and_echo
 
     elif username is None or password is None:
-        sys.stderr.write('buildlogger: could not find or import buildbot.tac for authentication\n')
+        sys.stderr.write('buildlogger: could not find or import %s for authentication\n' % credentials_file)
         sys.stderr.flush()
         wrapper = run_and_echo
 
