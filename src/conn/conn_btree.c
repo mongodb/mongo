@@ -264,7 +264,8 @@ __wt_conn_btree_get(WT_SESSION_IMPL *session,
 
 /*
  * __wt_conn_btree_apply --
- *	Apply a function to all open, non-snapshot btree handles.
+ *	Apply a function to all open, non-snapshot btree handles apart from the
+ *	metadata file.
  */
 int
 __wt_conn_btree_apply(WT_SESSION_IMPL *session,
@@ -279,12 +280,13 @@ __wt_conn_btree_apply(WT_SESSION_IMPL *session,
 
 	__wt_spin_lock(session, &conn->spinlock);
 	TAILQ_FOREACH(btree, &conn->btqh, q)
-		if (btree->snapshot == NULL) {
+		if (btree->snapshot == NULL &&
+		    strcmp(btree->name, WT_METADATA_URI) != 0) {
 			session->btree = btree;
-			WT_TRET(func(session, cfg));
+			WT_ERR(func(session, cfg));
 		}
 
-	__wt_spin_unlock(session, &conn->spinlock);
+err:	__wt_spin_unlock(session, &conn->spinlock);
 	session->btree = saved_btree;
 	return (ret);
 }

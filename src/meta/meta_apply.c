@@ -25,29 +25,23 @@ __wt_meta_btree_apply(WT_SESSION_IMPL *session,
 	saved_btree = session->btree;
 	WT_RET(__wt_metadata_cursor(session, NULL, &cursor));
 	cursor->set_key(cursor, "file:");
-	tret = cursor->search_near(cursor, &cmp);
-	if (tret == 0 && cmp < 0)
+	if ((tret = cursor->search_near(cursor, &cmp)) == 0 && cmp < 0)
 		tret = cursor->next(cursor);
 	for (; tret == 0; tret = cursor->next(cursor)) {
-		if ((tret = cursor->get_key(cursor, &uri)) != 0)
-			break;
+		WT_ERR(cursor->get_key(cursor, &uri));
 		if (!WT_PREFIX_MATCH(uri, "file:"))
 			break;
 		else if (strcmp(uri, WT_METADATA_URI) == 0)
 			continue;
-		if ((tret =
-		    __wt_session_get_btree(session, uri, NULL, flags)) != 0) {
-			WT_TRET(tret);
-			continue;
-		}
-		WT_TRET(func(session, cfg));
+		WT_ERR(__wt_session_get_btree(session, uri, NULL, flags));
+		WT_ERR(func(session, cfg));
 		if (!LF_ISSET(WT_BTREE_NO_LOCK))
-			WT_TRET(__wt_session_release_btree(session));
+			WT_ERR(__wt_session_release_btree(session));
 	}
 
 	if (tret != WT_NOTFOUND)
 		WT_TRET(tret);
-	WT_TRET(cursor->close(cursor));
+err:	WT_TRET(cursor->close(cursor));
 	session->btree = saved_btree;
 	return (ret);
 }
