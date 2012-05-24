@@ -96,10 +96,8 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 	txn = &session->txn;
 	txn_global = &conn->txn_global;
 
-	if (F_ISSET(txn, TXN_RUNNING)) {
-		__wt_errx(session, "Transaction already running");
-		return (EINVAL);
-	}
+	if (F_ISSET(txn, TXN_RUNNING))
+		WT_RET_MSG(session, EINVAL, "Transaction already running");
 
 	WT_RET(__wt_config_gets(session, cfg, "isolation", &cval));
 	txn->isolation = (strcmp(cval.str, "snapshot") == 0) ?
@@ -145,10 +143,8 @@ __txn_release(WT_SESSION_IMPL *session)
 	txn = &session->txn;
 	txn->mod_count = 0;
 
-	if (!F_ISSET(txn, TXN_RUNNING)) {
-		__wt_errx(session, "No transaction is active");
-		return (EINVAL);
-	}
+	if (!F_ISSET(txn, TXN_RUNNING))
+		WT_RET_MSG(session, EINVAL, "No transaction is active");
 
 	txn_global = &S2C(session)->txn_global;
 	WT_ASSERT(session, txn_global->ids[session->id] != WT_TXN_NONE &&

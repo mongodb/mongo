@@ -404,17 +404,16 @@ __session_begin_transaction(WT_SESSION *wt_session, const char *config)
 	session = (WT_SESSION_IMPL *)wt_session;
 
 	SESSION_API_CALL(session, begin_transaction, config, cfg);
-	if (TAILQ_FIRST(&session->cursors) != NULL) {
-		__wt_errx(session, "Not permitted with open cursors");
-		ret = EINVAL;
-		goto err;
-	}
 	if (!F_ISSET(S2C(session), WT_CONN_TRANSACTIONAL))
-		__wt_errx(session, "Database not configured for transactions");
+		WT_ERR_MSG(session, EINVAL,
+		    "Database not configured for transactions");
+	if (TAILQ_FIRST(&session->cursors) != NULL)
+		WT_ERR_MSG(session, EINVAL, "Not permitted with open cursors");
 
 	ret = __wt_txn_begin(session, cfg);
 
-err:	API_END_NOTFOUND_MAP(session, ret);
+err:	API_END(session);
+	return (ret);
 }
 
 /*
@@ -431,9 +430,13 @@ __session_commit_transaction(WT_SESSION *wt_session, const char *config)
 
 	SESSION_API_CALL(session, commit_transaction, config, cfg);
 	WT_TRET(__session_close_cursors(session));
-	WT_TRET(__wt_txn_commit(session, cfg));
+	if (ret == 0)
+		ret = __wt_txn_commit(session, cfg);
+	else
+		(void)__wt_txn_rollback(session, cfg);
 
-err:	API_END_NOTFOUND_MAP(session, ret);
+err:	API_END(session);
+	return (ret);
 }
 
 /*
@@ -451,7 +454,8 @@ __session_rollback_transaction(WT_SESSION *wt_session, const char *config)
 	WT_TRET(__session_close_cursors(session));
 	WT_TRET(__wt_txn_rollback(session, cfg));
 
-err:	API_END_NOTFOUND_MAP(session, ret);
+err:	API_END(session);
+	return (ret);
 }
 
 /*
