@@ -95,6 +95,10 @@ scratch
 /libmongotestfiles.*
 /libmongoshellfiles.*
 
+
+/emr.jar
+*.class
+
 # examples
 /firstExample
 /secondExample

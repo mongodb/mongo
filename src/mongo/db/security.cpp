@@ -30,26 +30,24 @@
 namespace mongo {
 
     bool AuthenticationInfo::_warned = false;
-    /*
-    void AuthenticationInfo::print() const {
-        cout << "AuthenticationInfo: " << this << '\n';
-        for ( MA::const_iterator i=_dbs.begin(); i!=_dbs.end(); i++ ) {
-            cout << "\t" << i->first << "\t" << i->second.level << '\n';
-        }
-        cout << "END" << endl;
+
+    void AuthenticationInfo::setTemporaryAuthorization( BSONObj& obj ) {
+        fassert( 16232, !_usingTempAuth );
+        scoped_spinlock lk( _lock );
+        _tempAuthTable.setFromBSON( obj );
+        _usingTempAuth = true;
     }
-    */
+
+    void AuthenticationInfo::clearTemporaryAuthorization() {
+        scoped_spinlock lk( _lock );
+        _usingTempAuth = false;
+        _tempAuthTable.clearAuth();
+    }
 
     string AuthenticationInfo::getUser( const string& dbname ) const {
         scoped_spinlock lk(_lock);
-
-        MA::const_iterator i = _dbs.find(dbname);
-        if ( i == _dbs.end() )
-            return "";
-
-        return i->second.user;
+        return _authTable.getAuthForDb( dbname ).user;
     }
-
 
     bool AuthenticationInfo::_isAuthorizedSpecialChecks( const string& dbname ) const {
         if ( cc().isGod() ) 

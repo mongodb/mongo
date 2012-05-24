@@ -162,7 +162,7 @@ namespace mongo {
                     massert( 10427 ,  "invalid writeback message" , msg.header()->valid() );
 
                     DBConfigPtr db = grid.getDBConfig( ns );
-                    ShardChunkVersion needVersion( data["version"] );
+                    ShardChunkVersion needVersion = ShardChunkVersion::fromBSON( data["version"] );
 
                     // TODO: The logic here could be refactored, but keeping to the original codepath for safety for now
                     ChunkManagerPtr manager = db->getChunkManagerIfExists( ns );

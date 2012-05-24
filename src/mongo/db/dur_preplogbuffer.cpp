@@ -33,6 +33,7 @@
 #include "../util/mongoutils/hash.h"
 #include "../util/mongoutils/str.h"
 #include "../util/alignedbuilder.h"
+#include "mongo/util/stacktrace.h"
 #include "../util/timer.h"
 #include "dur_stats.h"
 #include "../server.h"

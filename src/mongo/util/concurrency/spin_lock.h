@@ -17,8 +17,9 @@
 */
 
 #pragma once
+
 #ifdef _WIN32
-#include <windows.h>
+#include "mongo/platform/windows_basic.h"
 #endif
 
 #include "mutex.h"

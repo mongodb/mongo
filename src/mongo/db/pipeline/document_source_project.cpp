@@ -87,7 +87,8 @@ namespace mongo {
         pEO = dynamic_pointer_cast<ExpressionObject>(pE);
     }
 
-    void DocumentSourceProject::sourceToBson(BSONObjBuilder *pBuilder) const {
+    void DocumentSourceProject::sourceToBson(
+        BSONObjBuilder *pBuilder, bool explain) const {
         BSONObjBuilder insides;
         if (excludeId)
             insides.append(Document::idName, false);

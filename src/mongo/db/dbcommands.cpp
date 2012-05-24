@@ -49,6 +49,7 @@
 #include "../s/d_writeback.h"
 #include "dur_stats.h"
 #include "../server.h"
+#include "mongo/s/d_index_locator.h"
 
 namespace mongo {
 
@@ -1029,7 +1030,7 @@ namespace mongo {
             set<string> allShortNames;
             {
                 Lock::GlobalRead lk;
-                dbHolder().getAllShortNames( false, allShortNames );
+                dbHolder().getAllShortNames( allShortNames );
             }
             
             for ( set<string>::iterator i = allShortNames.begin(); i != allShortNames.end(); i++ ) {
@@ -1106,11 +1107,34 @@ namespace mongo {
             }
             ns += ".chunks"; // make this an option in jsobj
 
+            // Check shard version at startup.
+            // This will throw before we've done any work if shard version is outdated
+            Client::Context ctx (ns);
+
             md5digest d;
             md5_state_t st;
             md5_init(&st);
 
-            BSONObj query = BSON( "files_id" << jsobj["filemd5"] );
+            int n = 0;
+
+            bool partialOk = jsobj["partialOk"].trueValue();
+            if (partialOk) {
+                // WARNING: This code depends on the binary layout of md5_state. It will not be
+                // compatible with different md5 libraries or work correctly in an environment with
+                // mongod's of different endians. It is ok for mongos to be a different endian since
+                // it just passes the buffer through to another mongod.
+                BSONElement stateElem = jsobj["md5state"];
+                if (!stateElem.eoo()){
+                    int len;
+                    const char* data = stateElem.binDataClean(len);
+                    massert(16247, "md5 state not correct size", len == sizeof(st));
+                    memcpy(&st, data, sizeof(st));
+                }
+                n = jsobj["startAt"].numberInt();
+            }
+
+
+            BSONObj query = BSON( "files_id" << jsobj["filemd5"] << "n" << GTE << n );
             BSONObj sort = BSON( "files_id" << 1 << "n" << 1 );
 
             shared_ptr<Cursor> cursor = NamespaceDetailsTransient::bestGuessCursor(ns.c_str(),
@@ -1121,7 +1145,6 @@ namespace mongo {
             }
             auto_ptr<ClientCursor> cc (new ClientCursor(QueryOption_NoCursorTimeout, cursor, ns.c_str()));
 
-            int n = 0;
             while ( cursor->ok() ) {
                 if ( ! cursor->matcher()->matchesCurrent( cursor.get() ) ) {
                     log() << "**** NOT MATCHING ****" << endl;
@@ -1137,13 +1160,18 @@ namespace mongo {
                 verify(ne.isNumber());
                 int myn = ne.numberInt();
                 if ( n != myn ) {
+                    if (partialOk) {
+                        break; // skipped chunk is probably on another shard
+                    }
                     log() << "should have chunk: " << n << " have:" << myn << endl;
                     dumpChunks( ns , query , sort );
                     uassert( 10040 ,  "chunks out of order" , n == myn );
                 }
 
+                // make a copy of obj since we access data in it while yielding
+                BSONObj owned = obj.getOwned();
                 int len;
-                const char * data = obj["data"].binDataClean( len );
+                const char * data = owned["data"].binDataClean( len );
 
                 ClientCursor::YieldLock yield (cc.get());
                 try {
@@ -1156,12 +1184,29 @@ namespace mongo {
                     throw;
                 }
 
-                if ( ! yield.stillOk() ) {
-                    cc.release();
-                    uasserted(13281, "File deleted during filemd5 command");
+                try { // SERVER-5752 may make this try unnecessary
+                    if ( ! yield.stillOk() ) { // relocks and checks shard version
+                        cc.release();
+                        if (!partialOk)
+                            uasserted(13281, "File deleted during filemd5 command");
+                    }
+                }
+                catch(SendStaleConfigException& e){
+                    // return partial results.
+                    // Mongos will get the error at the start of the next call if it doesn't update first.
+                    log() << "Config changed during filemd5 - command will resume " << endl;
+
+                    // useful for debugging but off by default to avoid looking like a scary error.
+                    LOG(1) << "filemd5 stale config exception: " << e.what() << endl;
+                    break;
                 }
             }
 
+
+            if (partialOk)
+                result.appendBinData("md5state", sizeof(st), BinDataGeneral, &st);
+
+            // This must be *after* the capture of md5state since it mutates st
             md5_finish(&st, d);
 
             result.append( "numChunks" , n );
@@ -1178,14 +1223,6 @@ namespace mongo {
                 PRINT(c->nextSafe());
         }
     } cmdFileMD5;
-
-    static IndexDetails *cmdIndexDetailsForRange( const char *ns, string &errmsg, BSONObj &min, BSONObj &max, BSONObj &keyPattern ) {
-        if ( ns[ 0 ] == '\0' || min.isEmpty() || max.isEmpty() ) {
-            errmsg = "invalid command syntax (note: min and max are required)";
-            return 0;
-        }
-        return indexDetailsForRange( ns, errmsg, min, max, keyPattern );
-    }
 
     class CmdDatasize : public Command {
         virtual string parseNs(const string& dbname, const BSONObj& cmdObj) const { 
@@ -1238,7 +1275,7 @@ namespace mongo {
                 return false;
             }
             else {
-                IndexDetails *idx = cmdIndexDetailsForRange( ns.c_str(), errmsg, min, max, keyPattern );
+                IndexDetails *idx = locateIndexForChunkRange( ns.c_str(), errmsg, min, max, keyPattern );
                 if ( idx == 0 )
                     return false;
 

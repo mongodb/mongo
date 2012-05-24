@@ -23,6 +23,7 @@ clientSource = [
     'mongo/db/lasterror.cpp',
     'mongo/db/namespace.cpp',
     'mongo/db/nonce.cpp',
+    'mongo/db/dbmessage.cpp',
     'mongo/pch.cpp',
     'mongo/util/assert_util.cpp',
     'mongo/util/background.cpp',
@@ -51,6 +52,7 @@ clientSource = [
     'mongo/util/signal_handlers.cpp',
     'mongo/util/stringutils.cpp',
     'mongo/util/text.cpp',
+    'mongo/util/time_support.cpp',
     'mongo/util/timer.cpp',
     'mongo/util/trace.cpp',
     'mongo/util/util.cpp',
@@ -65,27 +67,31 @@ exampleSourceMap = [
         ('secondExample', 'mongo/client/examples/second.cpp'),
         ('tutorial', 'mongo/client/examples/tutorial.cpp'),
         ('whereExample', 'mongo/client/examples/whereExample.cpp'),
-        ('bsondemo', 'mongo/bson/bsondemo/bsondemo.cpp'),
         ]
 
+clientHeaderDirectories = [
+    "bson/",
+    "bson/util/",
+    "client/",
+    "db/",
+    "db/stats/",
+    "db/repl/",
+    "db/ops/",
+    "platform/",
+    "s/",
+    "scripting/",
+    "shell/",
+    "util/",
+    "util/concurrency/",
+    "util/mongoutils/",
+    "util/net/", 
+    "" 
+    ]
+
 clientHeaders = []
-for id in ["",
-           "util/",
-           "util/net/",
-           "util/mongoutils/",
-           "util/concurrency/",
-           "db/",
-           "db/stats/",
-           "db/repl/",
-           "db/ops/",
-           "client/",
-           "bson/",
-           "bson/util/",
-           "s/",
-           "scripting/",
-           "platform/"]:
-    clientHeaders.extend(Glob('mongo/%s/*.h' % id))
-    clientHeaders.extend(Glob('mongo/%s/*.hpp' % id))
+for path in clientHeaderDirectories:
+    clientHeaders.extend(Glob('mongo/%s/*.h' % path))
+    clientHeaders.extend(Glob('mongo/%s/*.hpp' % path))
 
 env.Install('#/', [
         env.Library('mongoclient', clientSource),
@@ -94,6 +100,11 @@ env.Install('#/', [
 
 clientTests = clientEnv.Install('#/', [
         clientEnv.Program(target, [source]) for (target, source) in exampleSourceMap])
+
+bsonDemoEnv = clientEnv.Clone()
+bsonDemoEnv['LIBS'].remove('mongoclient')
+clientTests.append(
+    bsonDemoEnv.Install('#/', bsonDemoEnv.Program('bsondemo', 'mongo/bson/bsondemo/bsondemo.cpp')))
 
 clientEnv.Alias('clientTests', clientTests, [])
 
@@ -107,7 +118,9 @@ env.Install(
                  '#buildscripts/make_archive.py',
                  clientSource,
                  clientHeaders,
-                 [source for (target, source) in exampleSourceMap]],
+                 [source for (target, source) in exampleSourceMap],
+                 'mongo/bson/bsondemo/bsondemo.cpp',
+                 ],
                 '${PYTHON} ${SOURCES[0]} -o $TARGET '
                 '--transform ${str(Dir(BUILD_DIR))}/client_build=$CLIENT_DIST_BASENAME/src '
                 '--transform ${str(Dir(BUILD_DIR))}=$CLIENT_DIST_BASENAME/src '
@@ -120,18 +133,6 @@ prefix = GetOption("prefix")
 
 env.Install(prefix + "/lib", '${LIBPREFIX}mongoclient${LIBSUFFIX}')
 
-for x in ["",
-          "bson/",
-          "bson/util/",
-          "client/",
-          "s/",
-          "shell/",
-          "db/",
-          "scripting/",
-          "util/",
-          "util/concurrency/",
-          "util/mongoutils/",
-          "util/net/" ]:
+for x in clientHeaderDirectories:
     env.Install(prefix + "/include/mongo/" + x,
                 [Glob('mongo/%s*.h' % x), Glob('mongo/%s*.hpp' % x)])
-

@@ -146,8 +146,8 @@ namespace mongo {
     }
 
     bool AuthenticationInfo::_isAuthorizedSingle_inlock(const string& dbname, Auth::Level level) const {
-        MA::const_iterator i = _dbs.find(dbname);
-        return i != _dbs.end() && i->second.level >= level;
+        const AuthenticationTable& authTable = _usingTempAuth ? _tempAuthTable : _authTable;
+        return authTable.getAuthForDb( dbname ).level >= level;
     }
 
 } // namespace mongo

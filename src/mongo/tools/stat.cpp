@@ -17,6 +17,9 @@
 */
 
 #include "pch.h"
+
+#include <boost/thread/thread.hpp>
+
 #include "db/json.h"
 #include "../util/net/httpclient.h"
 #include "../util/text.h"

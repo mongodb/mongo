@@ -1,5 +1,3 @@
-// compact.h
-
 /**
 *    Copyright (C) 2008 10gen Inc.
 *
@@ -17,6 +15,8 @@
 */
 
 #pragma once
+
+#include "mongo/db/extsort.h"
 
 namespace mongo {
 

@@ -25,8 +25,8 @@
 #include <sys/file.h>
 #endif
 
-#include <boost/program_options.hpp>
 #include <boost/filesystem/operations.hpp>
+#include <boost/program_options.hpp>
 
 #include "mongo/db/client.h"
 #include "mongo/db/cmdline.h"
@@ -36,6 +36,10 @@
 #include "mongo/util/background.h"
 #include "mongo/util/file_allocator.h"
 #include "mongo/util/version.h"
+
+#if defined(_WIN32)
+#include "mongo/util/hook_windows_memory.h"
+#endif
 
 namespace po = boost::program_options;
 
@@ -214,6 +218,15 @@ namespace mongo {
                 log() << "running with journaling enabled to test that. dbtests will do this occasionally even if --dur is not specified." << endl;
                 log() << "****************" << endl;
             }
+
+#if defined(_WIN32)
+            if ( cmdLine.dur ) {
+                // Hook Windows APIs that allocate memory so that we can RemapLock them out while
+                //  remapPrivateView() has a data file unmapped (so only needed when journaling)
+                // This is the last point where we are still single-threaded, makes hooking simpler
+                hookWindowsMemory();
+            }
+#endif
 
             FileAllocator::get()->start();
 

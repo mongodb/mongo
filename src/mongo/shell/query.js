@@ -342,3 +342,18 @@ DBQuery.prototype.toString = function(){
 }
 
 DBQuery.shellBatchSize = 20;
+
+/**
+ * Query option flag bit constants.
+ * @see http://www.mongodb.org/display/DOCS/Mongo+Wire+Protocol#MongoWireProtocol-OPQUERY
+ */
+DBQuery.Option = {
+    tailable: 0x2,
+    slaveOk: 0x4,
+    oplogReplay: 0x8,
+    noTimeout: 0x10,
+    awaitData: 0x20,
+    exhaust: 0x40,
+    partial: 0x80
+};
+

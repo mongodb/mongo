@@ -1,17 +1,13 @@
 // mostly for testing mongos w/replica sets
 
 
-function debug( x ) {
-    print( "RS2-DEBUG: " + x );
-}
-
-s = new ShardingTest( "rs2" , 2 , 0 , 1 , { rs : true , chunksize : 1 } )
+s = new ShardingTest( "rs2" , 2 , 2 , 1 , { rs : true , chunksize : 1 } )
 
 db = s.getDB( "test" )
 t = db.foo
 
 // -------------------------------------------------------------------------------------------
-debug( "test that config server updates when replica set config changes" )
+// ---------- test that config server updates when replica set config changes ----------------
 // -------------------------------------------------------------------------------------------
 
 
@@ -60,46 +56,39 @@ for ( i=0; i<5; i++ ){
     catch ( e ){}
 }
 
-debug( "Awaiting replication of all nodes, so spurious sync'ing queries don't upset our counts..." )
+jsTest.log( "Awaiting replication of all nodes, so spurious sync'ing queries don't upset our counts..." )
 rs.test.awaitReplication()
+// Make sure we wait for secondaries here - otherwise a secondary could come online later and be used for the
+// count command before being fully replicated
+jsTest.log( "Awaiting secondary status of all nodes" )
+rs.test.waitForState( rs.test.getSecondaries(), rs.test.SECONDARY, 180 * 1000 )
 
 // -------------------------------------------------------------------------------------------
-debug( "test routing to slaves" )
+// ---------- test routing to slaves ----------------
 // -------------------------------------------------------------------------------------------
 
 // --- not sharded ----
 
-debug( "Z1" )
-
 m = new Mongo( s.s.name );
 ts = m.getDB( "test" ).foo
-
-debug( "Z1.a" )
 
 before = rs.test.getMaster().adminCommand( "serverStatus" ).opcounters
 
 for ( i=0; i<10; i++ )
     assert.eq( 17 , ts.findOne().x , "B1" )
 
-debug( "Z1.b" )
-
 m.setSlaveOk()
 for ( i=0; i<10; i++ )
     assert.eq( 17 , ts.findOne().x , "B2" )
 
-debug( "Z1.c" )
-
 after = rs.test.getMaster().adminCommand( "serverStatus" ).opcounters
-
-debug( "Z1.d" )
 
 printjson( before )
 printjson( after )
 
-assert( Math.abs( before.query + 10 - after.query ) < 2 , "B3" )
+assert.eq( before.query + 10 , after.query , "B3" )
 
 // --- add more data ----
-debug( "Z2" )
 
 db.foo.ensureIndex( { x : 1 } )
 
@@ -109,18 +98,18 @@ for ( i=0; i<100; i++ ){
 }
 db.getLastError( 3 , 10000 );
 
-debug( "Z2.a" )
+// Counts pass the options of the connection - which is slaveOk'd, so we need to wait for 
+// replication for this and future tests to pass
+rs.test.awaitReplication()
+
 assert.eq( 100 , ts.count() , "B4" )
-debug( "Z2.b" )
 assert.eq( 100 , ts.find().itcount() , "B5" )
-debug( "Z2.c" )
 assert.eq( 100 , ts.find().batchSize(5).itcount() , "B6" )
-debug( "Z2.d" )
 
 t.find().batchSize(3).next();
 gc(); gc(); gc();
 
-debug( "sharded" )
+// --- sharded ----
 
 assert.eq( 100 , db.foo.count() , "C1" )
 
@@ -138,7 +127,7 @@ assert.eq( 100 , t.count() , "C3" )
 
 assert.eq( 50 , rs.test.getMaster().getDB( "test" ).foo.count() , "C4" )
 
-debug( "by non-shard key" )
+// by non-shard key
 
 m = new Mongo( s.s.name );
 ts = m.getDB( "test" ).foo
@@ -156,7 +145,7 @@ after = rs.test.getMaster().adminCommand( "serverStatus" ).opcounters
 
 assert.eq( before.query + 10 , after.query , "D3" )
 
-debug( "by shard key" )
+// by shard key
 
 m = new Mongo( s.s.name );
 ts = m.getDB( "test" ).foo

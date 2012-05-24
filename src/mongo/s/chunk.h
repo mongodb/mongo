@@ -54,13 +54,17 @@ namespace mongo {
     class Chunk : boost::noncopyable {
     public:
         Chunk( const ChunkManager * info , BSONObj from);
-        Chunk( const ChunkManager * info , const BSONObj& min, const BSONObj& max, const Shard& shard);
+        Chunk( const ChunkManager * info ,
+               const BSONObj& min,
+               const BSONObj& max,
+               const Shard& shard,
+               ShardChunkVersion lastmod = ShardChunkVersion() );
 
         //
         // serialization support
         //
 
-        void serialize(BSONObjBuilder& to, ShardChunkVersion myLastMod=0);
+        void serialize(BSONObjBuilder& to, ShardChunkVersion myLastMod=ShardChunkVersion(0,OID()));
 
         //
         // chunk boundary support
@@ -298,19 +302,58 @@ namespace mongo {
     public:
         typedef map<Shard,ShardChunkVersion> ShardVersionMap;
 
-        ChunkManager( string ns , ShardKeyPattern pattern , bool unique );
+        // Loads a new chunk manager from a collection document
+        ChunkManager( const BSONObj& collDoc );
+
+        // Creates an empty chunk manager for the namespace
+        ChunkManager( const string& ns, const ShardKeyPattern& pattern, bool unique );
+
+        // Updates a chunk manager based on an older manager
+        ChunkManager( ChunkManagerPtr oldManager );
 
         string getns() const { return _ns; }
 
-        int numChunks() const { return _chunkMap.size(); }
+        const ShardKeyPattern& getShardKey() const {  return _key; }
+
         bool hasShardKey( const BSONObj& obj ) const;
 
-        void createFirstChunks( const Shard& primary , vector<BSONObj>* initPoints , vector<Shard>* initShards ) const; // only call from DBConfig::shardCollection
+        bool isUnique() const { return _unique; }
+
+        /**
+         * this is just an increasing number of how many ChunkManagers we have so we know if something has been updated
+         */
+        unsigned long long getSequenceNumber() const { return _sequenceNumber; }
+
+        //
+        // After constructor is invoked, we need to call loadExistingRanges.  If this is a new
+        // sharded collection, we can call createFirstChunks first.
+        //
+
+        // Creates new chunks based on info in chunk manager
+        void createFirstChunks( const string& config,
+                                const Shard& primary,
+                                const vector<BSONObj>* initPoints,
+                                const vector<Shard>* initShards );
+
+        // Loads existing ranges based on info in chunk manager
+        void loadExistingRanges( const string& config );
+
+
+        // Helpers for load
+        void calcInitSplitsAndShards( const Shard& primary,
+                                      const vector<BSONObj>* initPoints,
+                                      const vector<Shard>* initShards,
+                                      vector<BSONObj>* splitPoints,
+                                      vector<Shard>* shards ) const;
+
+        //
+        // Methods to use once loaded / created
+        //
+
+        int numChunks() const { return _chunkMap.size(); }
+
         ChunkPtr findChunk( const BSONObj& obj ) const;
         ChunkPtr findChunkOnServer( const Shard& shard ) const;
-
-        const ShardKeyPattern& getShardKey() const {  return _key; }
-        bool isUnique() const { return _unique; }
 
         void getShardsForQuery( set<Shard>& shards , const BSONObj& query ) const;
         void getAllShards( set<Shard>& all ) const;
@@ -328,21 +371,15 @@ namespace mongo {
         bool compatibleWith( const Chunk& other ) const;
         bool compatibleWith( ChunkPtr other ) const { if( ! other ) return false; return compatibleWith( *other ); }
 
-
-
         string toString() const;
 
         ShardChunkVersion getVersion( const Shard& shard ) const;
         ShardChunkVersion getVersion() const;
 
-        /**
-         * this is just an increasing number of how many ChunkManagers we have so we know if something has been updated
-         */
-        unsigned long long getSequenceNumber() const { return _sequenceNumber; }
-
         void getInfo( BSONObjBuilder& b ) const {
             b.append( "key" , _key.key() );
             b.appendBool( "unique" , _unique );
+            _version.addEpochToBSON( b, "lastmod" );
         }
 
         /**
@@ -356,10 +393,17 @@ namespace mongo {
 
     private:
         ChunkManagerPtr reload(bool force=true) const; // doesn't modify self!
+        void markMinorForReload( ShardChunkVersion majorVersion ) const;
+        void getMarkedMinorVersions( set<ShardChunkVersion>& minorVersions ) const;
 
-        // helpers for constructor
-        void _load(ChunkMap& chunks, set<Shard>& shards, ShardVersionMap& shardVersions);
+        // helpers for loading
+
+        // returns true if load was consistent
+        bool _load( const string& config, ChunkMap& chunks, set<Shard>& shards,
+                                    ShardVersionMap& shardVersions, ChunkManagerPtr oldManager);
         static bool _isValid(const ChunkMap& chunks);
+
+        // end helpers
 
         // All members should be const for thread-safety
         const string _ns;
@@ -373,15 +417,62 @@ namespace mongo {
 
         const ShardVersionMap _shardVersions; // max version per shard
 
-        ShardChunkVersion _version; // max version of any chunk
+        // max version of any chunk
+        ShardChunkVersion _version;
+
+        // the previous manager this was based on
+        // cleared after loading chunks
+        ChunkManagerPtr _oldManager;
 
         mutable mutex _mutex; // only used with _nsLock
-        mutable DistributedLock _nsLock;
 
         const unsigned long long _sequenceNumber;
 
-        mutable TicketHolder _splitTickets; // number of concurrent splitVector we can do from a splitIfShould per collection
-        
+        //
+        // Split Heuristic info
+        //
+
+
+        class SplitHeuristics {
+        public:
+
+            SplitHeuristics() :
+                _splitTickets( maxParallelSplits ),
+                _staleMinorSetMutex( "SplitHeuristics::staleMinorSet" ),
+                _staleMinorCount( 0 ) {}
+
+            void markMinorForReload( const string& ns, ShardChunkVersion majorVersion );
+            void getMarkedMinorVersions( set<ShardChunkVersion>& minorVersions );
+
+            TicketHolder _splitTickets;
+
+            mutex _staleMinorSetMutex;
+
+            // mutex protects below
+            int _staleMinorCount;
+            set<ShardChunkVersion> _staleMinorSet;
+
+            // Test whether we should split once data * splitTestFactor > chunkSize (approximately)
+            static const int splitTestFactor = 5;
+            // Maximum number of parallel threads requesting a split
+            static const int maxParallelSplits = 5;
+
+            // The idea here is that we're over-aggressive on split testing by a factor of
+            // splitTestFactor, so we can safely wait until we get to splitTestFactor invalid splits
+            // before changing.  Unfortunately, we also potentially over-request the splits by a
+            // factor of maxParallelSplits, but since the factors are identical it works out
+            // (for now) for parallel or sequential oversplitting.
+            // TODO: Make splitting a separate thread with notifications?
+            static const int staleMinorReloadThreshold = maxParallelSplits;
+
+        };
+
+        mutable SplitHeuristics _splitHeuristics;
+
+        //
+        // End split heuristics
+        //
+
         friend class Chunk;
         friend class ChunkRangeManager; // only needed for CRM::assertValid()
         static AtomicUInt NextSequenceNumber;

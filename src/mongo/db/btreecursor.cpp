@@ -32,18 +32,22 @@ namespace mongo {
         typedef typename V::Key Key;
         typedef typename V::_KeyNode _KeyNode;
 
-        BtreeCursorImpl(NamespaceDetails *a, int b, const IndexDetails& c, const BSONObj &d, const BSONObj &e, bool f, int g) : 
-          BtreeCursor(a,b,c,d,e,f,g) { }
-        BtreeCursorImpl(NamespaceDetails *_d, int _idxNo, const IndexDetails& _id,
-                        const shared_ptr< FieldRangeVector > &_bounds, int singleIntervalLimit,
-                        int _direction ) :
-          BtreeCursor(_d,_idxNo,_id,_bounds,singleIntervalLimit,_direction )
-        { 
+        BtreeCursorImpl( NamespaceDetails* a , int b, const IndexDetails& c )
+            : BtreeCursor(a,b,c){
+        }
+
+        void init(const BSONObj &d, const BSONObj &e, bool f, int g) {
+            BtreeCursor::init(d,e,f,g);
+        }
+        
+        void init( const shared_ptr< FieldRangeVector >& bounds, int singleIntervalLimit, int direction ) {
+            BtreeCursor::init(bounds,singleIntervalLimit,direction );
             pair< DiskLoc, int > noBestParent;
-            indexDetails.head.btree<V>()->customLocate( bucket, keyOfs, startKey, 0, false, _boundsIterator->cmp(), _boundsIterator->inc(), _ordering, _direction, noBestParent );
+            indexDetails.head.btree<V>()->customLocate( bucket, keyOfs, startKey, 0, false, _boundsIterator->cmp(), _boundsIterator->inc(), _ordering, direction, noBestParent );
             skipAndCheck();
             dassert( _dups.size() == 0 );
         }
+
 
         virtual DiskLoc currLoc() { 
             if( bucket.isNull() ) return DiskLoc();
@@ -184,57 +188,6 @@ namespace mongo {
     template class BtreeCursorImpl<V0>;
     template class BtreeCursorImpl<V1>;
 
-    /*
-    class BtreeCursorV1 : public BtreeCursor { 
-    public:
-        typedef BucketBasics<V1>::KeyNode KeyNode;
-        typedef V1::Key Key;
-
-        BtreeCursorV1(NamespaceDetails *a, int b, const IndexDetails& c, const BSONObj &d, const BSONObj &e, bool f, int g) : 
-          BtreeCursor(a,b,c,d,e,f,g) { }
-        BtreeCursorV1(NamespaceDetails *_d, int _idxNo, const IndexDetails& _id, const shared_ptr< FieldRangeVector > &_bounds, int _direction) : 
-          BtreeCursor(_d,_idxNo,_id,_bounds,_direction) 
-        { 
-            pair< DiskLoc, int > noBestParent;
-            indexDetails.head.btree<V1>()->customLocate( bucket, keyOfs, startKey, 0, false, _boundsIterator->cmp(), _boundsIterator->inc(), _ordering, _direction, noBestParent );
-            skipAndCheck();
-            dassert( _dups.size() == 0 );
-        }
-
-        virtual DiskLoc currLoc() { 
-            if( bucket.isNull() ) return DiskLoc();
-            return currKeyNode().recordLoc;
-        }
-
-        virtual BSONObj currKey() const { 
-            verify( !bucket.isNull() );
-            return bucket.btree<V1>()->keyNode(keyOfs).key.toBson();
-        }
-
-    protected:
-        virtual void _advanceTo(DiskLoc &thisLoc, int &keyOfs, const BSONObj &keyBegin, int keyBeginLen, bool afterKey, const vector< const BSONElement * > &keyEnd, const vector< bool > &keyEndInclusive, const Ordering &order, int direction ) {
-            thisLoc.btree<V1>()->advanceTo(thisLoc, keyOfs, keyBegin, keyBeginLen, afterKey, keyEnd, keyEndInclusive, order, direction);
-        }
-        virtual DiskLoc _advance(const DiskLoc& thisLoc, int& keyOfs, int direction, const char *caller) {
-            return thisLoc.btree<V1>()->advance(thisLoc, keyOfs, direction, caller);
-        }
-        virtual void _audit() {
-            out() << "BtreeCursor(). dumping head bucket" << endl;
-            indexDetails.head.btree<V1>()->dump();
-        }
-        virtual DiskLoc _locate(const BSONObj& key, const DiskLoc& loc);
-        virtual const _KeyNode& keyNode(int keyOfs) { 
-            return bucket.btree<V1>()->k(keyOfs);
-        }
-
-    private:
-        const KeyNode currKeyNode() const {
-            verify( !bucket.isNull() );
-            const BtreeBucket<V1> *b = bucket.btree<V1>();
-            return b->keyNode(keyOfs);
-        }
-    };*/
-
     BtreeCursor* BtreeCursor::make(
         NamespaceDetails *_d, const IndexDetails& _id,
         const shared_ptr< FieldRangeVector > &_bounds, int _direction )
@@ -250,74 +203,69 @@ namespace mongo {
     }
 
 
+    BtreeCursor* BtreeCursor::make( NamespaceDetails * nsd , int idxNo , const IndexDetails& indexDetails ) {
+        int v = indexDetails.version();
+        
+        if( v == 1 ) 
+            return new BtreeCursorImpl<V1>( nsd , idxNo , indexDetails );
+        
+        if( v == 0 ) 
+            return new BtreeCursorImpl<V0>( nsd , idxNo , indexDetails );
+
+        dassert( IndexDetails::isASupportedIndexVersionNumber(v) );
+        uasserted(14800, str::stream() << "unsupported index version " << v);
+        return 0; // not reachable
+    }
+    
     BtreeCursor* BtreeCursor::make(
-        NamespaceDetails *_d, int _idxNo, const IndexDetails& _id, 
+        NamespaceDetails *d, int idxNo, const IndexDetails& id, 
         const BSONObj &startKey, const BSONObj &endKey, bool endKeyInclusive, int direction) 
     { 
-        int v = _id.version();
-        BtreeCursor *c = 0;
-        if( v == 1 ) {
-            c = new BtreeCursorImpl<V1>(_d,_idxNo,_id,startKey,endKey,endKeyInclusive,direction);
-        }
-        else if( v == 0 ) {
-            c = new BtreeCursorImpl<V0>(_d,_idxNo,_id,startKey,endKey,endKeyInclusive,direction);
-        }
-        else {
-            uasserted(14800, str::stream() << "unsupported index version " << v);
-        }
+        BtreeCursor *c = make( d , idxNo , id );
+        c->init(startKey,endKey,endKeyInclusive,direction);
         c->initWithoutIndependentFieldRanges();
         dassert( c->_dups.size() == 0 );
         return c;
     }
 
     BtreeCursor* BtreeCursor::make(
-        NamespaceDetails *_d, int _idxNo, const IndexDetails& _id, 
-        const shared_ptr< FieldRangeVector > &_bounds, int singleIntervalLimit, int _direction )
+        NamespaceDetails *d, int idxNo, const IndexDetails& id, 
+        const shared_ptr< FieldRangeVector > &bounds, int singleIntervalLimit, int direction )
     {
-        int v = _id.version();
-        if( v == 1 )
-            return new BtreeCursorImpl<V1>(_d,_idxNo,_id,_bounds,singleIntervalLimit,_direction);
-        if( v == 0 )
-            return new BtreeCursorImpl<V0>(_d,_idxNo,_id,_bounds,singleIntervalLimit,_direction);
-        uasserted(14801, str::stream() << "unsupported index version " << v);
-
-        // just check we are in sync with this method
-        dassert( IndexDetails::isASupportedIndexVersionNumber(v) );
-
-        return 0;
+        BtreeCursor *c = make( d , idxNo , id );
+        c->init(bounds,singleIntervalLimit,direction);
+        return c;
     }
 
-    BtreeCursor::BtreeCursor( NamespaceDetails *_d, int _idxNo, const IndexDetails &_id,
-                              const BSONObj &_startKey, const BSONObj &_endKey, bool endKeyInclusive, int _direction ) :
-        d(_d), idxNo(_idxNo),
-        startKey( _startKey ),
-        endKey( _endKey ),
-        _endKeyInclusive( endKeyInclusive ),
-        _multikey( d->isMultikey( idxNo ) ),
-        indexDetails( _id ),
-        _order( _id.keyPattern() ),
-        _ordering( Ordering::make( _order ) ),
-        _direction( _direction ),
-        _independentFieldRanges( false ),
-        _nscanned( 0 ) {
+    BtreeCursor::BtreeCursor( NamespaceDetails* nsd , int theIndexNo, const IndexDetails& id ) 
+        : d( nsd ) , idxNo( theIndexNo ) , indexDetails( id ) , _ordering(Ordering::make(BSONObj())){
+        _nscanned = 0;
+    }
+
+    void BtreeCursor::_finishConstructorInit() {
+        _multikey = d->isMultikey( idxNo );
+        _order = indexDetails.keyPattern();
+        _ordering = Ordering::make( _order );
+    }
+    
+    void BtreeCursor::init( const BSONObj& sk, const BSONObj& ek, bool endKeyInclusive, int direction ) {
+        _finishConstructorInit();
+        startKey = sk;
+        endKey = ek;
+        _endKeyInclusive =  endKeyInclusive;
+        _direction = direction;
+        _independentFieldRanges = false;
         audit();
     }
 
-    BtreeCursor::BtreeCursor( NamespaceDetails *_d, int _idxNo, const IndexDetails& _id,
-                             const shared_ptr< FieldRangeVector > &_bounds, int singleIntervalLimit,
-                             int _direction )
-        :
-        d(_d), idxNo(_idxNo),
-        _endKeyInclusive( true ),
-        _multikey( d->isMultikey( idxNo ) ),
-        indexDetails( _id ),
-        _order( _id.keyPattern() ),
-        _ordering( Ordering::make( _order ) ),
-        _direction( _direction ),
-        _bounds( ( verify( _bounds.get() ), _bounds ) ),
-        _boundsIterator( new FieldRangeVectorIterator( *_bounds, singleIntervalLimit ) ),
-        _independentFieldRanges( true ),
-        _nscanned( 0 ) {
+    void BtreeCursor::init(  const shared_ptr< FieldRangeVector > &bounds, int singleIntervalLimit, int direction ) {
+        _finishConstructorInit();
+        _bounds = bounds;
+        verify( _bounds );
+        _direction = direction;
+        _endKeyInclusive = true;
+        _boundsIterator.reset( new FieldRangeVectorIterator( *_bounds , singleIntervalLimit ) );
+        _independentFieldRanges = true;
         audit();
         startKey = _bounds->startKey();
         _boundsIterator->advance( startKey ); // handles initialization
@@ -410,9 +358,9 @@ namespace mongo {
         killCurrentOp.checkForInterrupt();
         if ( bucket.isNull() )
             return false;
-
+        
         bucket = _advance(bucket, keyOfs, _direction, "BtreeCursor::advance");
-
+        
         if ( !_independentFieldRanges ) {
             skipUnusedKeys();
             checkEnd();

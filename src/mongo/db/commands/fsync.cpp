@@ -10,11 +10,11 @@
 namespace mongo {
     
     class FSyncLockThread : public BackgroundJob {
+        void doRealWork();
     public:
         FSyncLockThread() : BackgroundJob( true ) {}
         virtual ~FSyncLockThread(){}
         virtual string name() const { return "FSyncLockThread"; }
-        void doRealWork();
         virtual void run() {
             Client::initThread( "fsyncLockWorker" );
             try {
@@ -47,6 +47,12 @@ namespace mongo {
         virtual bool adminOnly() const { return true; }
         virtual void help(stringstream& h) const { h << url(); }
         virtual bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+
+            if (Lock::isLocked()) {
+                errmsg = "fsync: Cannot execute fsync command from contexts that hold a data lock";
+                return false;
+            }
+
             bool sync = !cmdObj["async"].trueValue(); // async means do an fsync, but return immediately
             bool lock = cmdObj["lock"].trueValue();
             log() << "CMD fsync: sync:" << sync << " lock:" << lock << endl;
@@ -89,7 +95,10 @@ namespace mongo {
         }
     } fsyncCmd;
 
+    SimpleMutex filesLockedFsync("filesLockedFsync");
+
     void FSyncLockThread::doRealWork() {
+        SimpleMutex::scoped_lock lkf(filesLockedFsync);
         Lock::GlobalWrite global(true/*stopGreed*/);
         SimpleMutex::scoped_lock lk(fsyncCmd.m);
         
@@ -140,6 +149,7 @@ namespace mongo {
     
     // @return true if unlocked
     bool _unlockFsync() {
+        verify(!Lock::isLocked());
         SimpleMutex::scoped_lock lk( fsyncCmd.m );
         if( !fsyncCmd.locked ) { 
             return false;

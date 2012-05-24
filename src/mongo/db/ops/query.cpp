@@ -81,7 +81,7 @@ namespace mongo {
 
     QueryResult* processGetMore(const char *ns, int ntoreturn, long long cursorid , CurOp& curop, int pass, bool& exhaust ) {
         exhaust = false;
-        ClientCursor::Pointer p(cursorid);
+        ClientCursor::Pin p(cursorid);
         ClientCursor *cc = p.c();
 
         int bufSize = 512 + sizeof( QueryResult ) + MaxBytesToReturnToClientAtOnce;
@@ -170,7 +170,6 @@ namespace mongo {
                     ClientCursor::erase(cursorid);
                     cursorid = 0;
                     cc = 0;
-                    p.deleted();
                     break;
                 }
             }
@@ -616,8 +615,8 @@ namespace mongo {
         bool saveClientCursor = false;
         const char *exhaust = 0;
         OpTime slaveReadTill;
-        ClientCursor::CleanupPointer ccPointer;
-        ccPointer.reset( new ClientCursor( QueryOption_NoCursorTimeout, cursor, ns ) );
+        ClientCursor::Holder ccPointer( new ClientCursor( QueryOption_NoCursorTimeout, cursor,
+                                                         ns ) );
         
         for( ; cursor->ok(); cursor->advance() ) {
 
@@ -686,7 +685,7 @@ namespace mongo {
             }
         }
         
-        if ( shardingState.getVersion( ns ) != shardingVersionAtStart ) {
+        if ( ! shardingState.getVersion( ns ).isEquivalentTo( shardingVersionAtStart ) ) {
             // if the version changed during the query
             // we might be missing some data
             // and its safe to send this as mongos can resend

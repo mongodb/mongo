@@ -18,6 +18,7 @@
 #include "pch.h"
 
 #include <boost/thread/condition.hpp>
+#include <boost/thread/thread.hpp>
 
 #include "concurrency/mutex.h"
 #include "concurrency/spin_lock.h"

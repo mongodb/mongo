@@ -15,11 +15,9 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-
-#include "pch.h"
-#include "engine.h"
-#include "../util/md5.hpp"
-#include "../util/version.h"
+#include "mongo/scripting/engine.h"
+#include "mongo/util/md5.hpp"
+#include "mongo/util/version.h"
 
 namespace mongo {
 
@@ -45,7 +43,6 @@ namespace mongo {
         return BSONObj();
     }
 
-
     BSONObj JSSleep(const mongo::BSONObj &args, void* data) {
         verify( args.nFields() == 1 );
         verify( args.firstElement().isNumber() );
@@ -70,5 +67,3 @@ namespace mongo {
     }
 
 }
-
-

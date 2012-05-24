@@ -32,6 +32,9 @@
 
 #pragma once
 
+#include <vector>
+#include <string>
+
 namespace mongo {
 
     class StringSplitter {
@@ -44,52 +47,18 @@ namespace mongo {
         }
 
         /** @return true if more to be taken via next() */
-        bool more() {
-            return _big[0] != 0;
-        }
+        bool more() const { return _big[0] != 0; }
 
         /** get next split string fragment */
-        string next() {
-            const char * foo = strstr( _big , _splitter );
-            if ( foo ) {
-                string s( _big , foo - _big );
-                _big = foo + 1;
-                while ( *_big && strstr( _big , _splitter ) == _big )
-                    _big++;
-                return s;
-            }
+        std::string next();
 
-            string s = _big;
-            _big += strlen( _big );
-            return s;
-        }
+        void split( std::vector<std::string>& l );
 
-        void split( vector<string>& l ) {
-            while ( more() ) {
-                l.push_back( next() );
-            }
-        }
+        std::vector<std::string> split();
+        
+        static std::vector<std::string> split( const std::string& big , const std::string& splitter );
 
-        vector<string> split() {
-            vector<string> l;
-            split( l );
-            return l;
-        }
-
-        static vector<string> split( const string& big , const string& splitter ) {
-            StringSplitter ss( big.c_str() , splitter.c_str() );
-            return ss.split();
-        }
-
-        static string join( vector<string>& l , const string& split ) {
-            stringstream ss;
-            for ( unsigned i=0; i<l.size(); i++ ) {
-                if ( i > 0 )
-                    ss << split;
-                ss << l[i];
-            }
-            return ss.str();
-        }
+        static std::string join( std::vector<std::string>& l , const std::string& split );
 
     private:
         const char * _big;
@@ -101,7 +70,11 @@ namespace mongo {
      * guarantee that the codepoints are valid.
      */
     bool isValidUTF8(const char *s);
-    inline bool isValidUTF8(string s) { return isValidUTF8(s.c_str()); }
+    bool isValidUTF8(std::string s);
+
+    // expect that n contains a base ten number and nothing else after it
+    // NOTE win version hasn't been tested directly
+    long long parseLL( const char *n );
 
 #if defined(_WIN32)
 
@@ -116,37 +89,6 @@ namespace mongo {
 # else
     inline std::wstring toNativeString(const char *s) { return toWideString(s); }
 # endif
-
-#endif
-
-    // expect that n contains a base ten number and nothing else after it
-    // NOTE win version hasn't been tested directly
-    inline long long parseLL( const char *n ) {
-        long long ret;
-        uassert( 13307, "cannot convert empty string to long long", *n != 0 );
-#if !defined(_WIN32)
-        char *endPtr = 0;
-        errno = 0;
-        ret = strtoll( n, &endPtr, 10 );
-        uassert( 13305, "could not convert string to long long", *endPtr == 0 && errno == 0 );
-#elif _MSC_VER>=1600    // 1600 is VS2k10 1500 is VS2k8
-        size_t endLen = 0;
-        try {
-            ret = stoll( n, &endLen, 10 );
-        }
-        catch ( ... ) {
-            endLen = 0;
-        }
-        uassert( 13306, "could not convert string to long long", endLen != 0 && n[ endLen ] == 0 );
-#else // stoll() wasn't introduced until VS 2010.
-        char* endPtr = 0;
-        ret = _strtoi64( n, &endPtr, 10 );
-        uassert( 13310, "could not convert string to long long", (*endPtr == 0) && (ret != _I64_MAX) && (ret != _I64_MIN) );
-#endif // !defined(_WIN32)
-        return ret;
-    }
-
-#if defined(_WIN32)
 
     class WindowsCommandLine {
         char**  _argv;

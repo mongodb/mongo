@@ -748,13 +748,13 @@ ShardingTest.prototype.chunkCounts = function( collName , dbName ){
     dbName = dbName || "test";
     var x = {}
 
-    s.config.shards.find().forEach( 
+    this.config.shards.find().forEach(
         function(z){
             x[z._id] = 0;
         }
     );
     
-    s.config.chunks.find( { ns : dbName + "." + collName } ).forEach(
+    this.config.chunks.find( { ns : dbName + "." + collName } ).forEach(
         function(z){
             if ( x[z.shard] )
                 x[z.shard]++

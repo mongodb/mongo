@@ -24,10 +24,45 @@
 #include "../db/clientcursor.h"
 
 #include "d_chunk_manager.h"
+#include "../s/chunk_diff.h"
 
 namespace mongo {
 
-    ShardChunkManager::ShardChunkManager( const string& configServer , const string& ns , const string& shardName ) {
+    /**
+     * This is an adapter so we can use config diffs - mongos and mongod do them slightly
+     * differently
+     *
+     * The mongod adapter here tracks only a single shard, and stores ranges by (min, max)
+     */
+    class SCMConfigDiffTracker : public ConfigDiffTracker<BSONObj,string> {
+    public:
+        SCMConfigDiffTracker( const string& currShard ) : _currShard( currShard ) {}
+
+        virtual bool isTracked( const BSONObj& chunkDoc ) const {
+            return chunkDoc["shard"].type() == String && chunkDoc["shard"].String() == _currShard;
+        }
+
+        virtual BSONObj maxFrom( const BSONObj& val ) const {
+            return val;
+        }
+
+        virtual pair<BSONObj,BSONObj> rangeFor( const BSONObj& chunkDoc, const BSONObj& min, const BSONObj& max ) const {
+            return make_pair( min, max );
+        }
+
+        virtual string shardFor( const string& name ) const {
+            return name;
+        }
+
+        virtual string nameFrom( const string& shard ) const {
+            return shard;
+        }
+
+        string _currShard;
+
+    };
+
+    ShardChunkManager::ShardChunkManager( const string& configServer , const string& ns , const string& shardName, ShardChunkManagerPtr oldManager ) {
 
         // have to get a connection to the config db
         // special case if I'm the configdb since I'm locked and if I connect to myself
@@ -46,16 +81,81 @@ namespace mongo {
 
         // get this collection's sharding key
         BSONObj collectionDoc = conn->findOne( "config.collections", BSON( "_id" << ns ) );
-        uassert( 13539 , str::stream() << ns << " does not exist" , !collectionDoc.isEmpty() );
-        uassert( 13540 , str::stream() << ns << " collection config entry corrupted" , collectionDoc["dropped"].type() );
-        uassert( 13541 , str::stream() << ns << " dropped. Re-shard collection first." , !collectionDoc["dropped"].Bool() );
+
+        if( collectionDoc.isEmpty() ){
+            warning() << ns << " does not exist as a sharded collection" << endl;
+            return;
+        }
+
+        if( collectionDoc["dropped"].Bool() ){
+            warning() << ns << " was dropped.  Re-shard collection first." << endl;
+            return;
+        }
+
         _fillCollectionKey( collectionDoc );
 
-        // query for all the chunks for 'ns' that live in this shard, sorting so we can efficiently bucket them
-        BSONObj q = BSON( "ns" << ns << "shard" << shardName );
-        auto_ptr<DBClientCursor> cursor = conn->query( "config.chunks" , Query(q).sort( "min" ) );
-        _fillChunks( cursor.get() );
-        _fillRanges();
+        map<string,ShardChunkVersion> versionMap;
+        versionMap[ shardName ] = _version;
+        _collVersion = ShardChunkVersion( 0, OID() );
+
+        // Check to see if we have an old ShardChunkManager to use
+        if( oldManager && oldManager->_collVersion.isSet() ){
+
+            versionMap[ shardName ] = oldManager->_version;
+            _collVersion = oldManager->_collVersion;
+            // TODO: This could be made more efficient if copying not required, but not as
+            // frequently reloaded as in mongos.
+            _chunksMap = oldManager->_chunksMap;
+
+            LOG(2) << "loading new chunks for collection " << ns << " using old chunk manager w/ version " << _collVersion
+                   << " and " << _chunksMap.size() << " chunks" << endl;
+        }
+
+        // Attach our config diff tracker to our range map and versions
+        SCMConfigDiffTracker differ( shardName );
+        differ.attach( ns, _chunksMap, _collVersion, versionMap );
+
+        // Need to do the query ourselves, since we may use direct conns to the db
+        Query query = differ.configDiffQuery();
+        auto_ptr<DBClientCursor> cursor = conn->query( "config.chunks" , query );
+
+        uassert( 16181, str::stream() << "could not initialize cursor to config server chunks collection for ns " << ns, cursor.get() );
+
+        // Diff tracker should *always* find at least one chunk if collection exists
+        int diffsApplied = differ.calculateConfigDiff( *cursor );
+        if( diffsApplied > 0 ){
+
+            LOG(2) << "loaded " << diffsApplied << " chunks into new chunk manager for " << ns
+                   << " with version " << _collVersion << endl;
+
+            // Save the new version of this shard
+            _version = versionMap[ shardName ];
+            _fillRanges();
+
+        }
+        else if( diffsApplied == 0 ){
+
+            // No chunks were found for the ns
+            warning() << "no chunks found when reloading " << ns << ", previous version was " << _collVersion << endl;
+
+            _version = ShardChunkVersion( 0, OID() );
+            _collVersion = ShardChunkVersion( 0, OID() );
+            _chunksMap.clear();
+        }
+        else{
+
+            // TODO: make this impossible by making sure we don't migrate / split on this shard during the
+            // reload
+            // No chunks were found for the ns
+            warning() << "invalid chunks found when reloading " << ns << ", previous version was " << _collVersion
+                      << ", this should be rare" << endl;
+
+            // Handle the same way as a connectivity error, for now
+            // TODO: handle inline
+            uassert( 16229,
+                     str::stream() << "could not initialize cursor to config server chunks collection for ns "
+                                   << ns, cursor.get() );
+        }
 
         if ( scoped.get() )
             scoped->done();
@@ -92,7 +192,7 @@ namespace mongo {
             BSONObj d = cursor->next();
             _chunksMap.insert( make_pair( d["min"].Obj().getOwned() , d["max"].Obj().getOwned() ) );
 
-            ShardChunkVersion currVersion( d["lastmod"] );
+            ShardChunkVersion currVersion = ShardChunkVersion::fromBSON( d["lastmod"] );
             if ( currVersion > version ) {
                 version = currVersion;
             }
@@ -225,9 +325,10 @@ namespace mongo {
 
         if ( _chunksMap.size() == 1 ) {
             // if left with no chunks, just reset version
-            uassert( 13590 , str::stream() << "setting version to " << version << " on removing last chunk", version == 0 );
+            uassert( 13590 , str::stream() << "setting version to " << version.toString() << " on removing last chunk", ! version.isSet() );
 
-            p->_version = 0;
+            p->_version = ShardChunkVersion( 0, OID() );
+            p->_collVersion = _collVersion;
 
         }
         else {
@@ -240,6 +341,8 @@ namespace mongo {
             p->_chunksMap = this->_chunksMap;
             p->_chunksMap.erase( min );
             p->_version = version;
+            if( version > _collVersion ) p->_collVersion = version;
+            else p->_collVersion = this->_collVersion;
             p->_fillRanges();
         }
 
@@ -254,7 +357,7 @@ namespace mongo {
 
         // it is acceptable to move version backwards (e.g., undoing a migration that went bad during commit)
         // but only cloning away the last chunk may reset the version to 0
-        uassert( 13591 , "version can't be set to zero" , version > 0 );
+        uassert( 13591 , "version can't be set to zero" , version.isSet() );
 
         if ( ! _chunksMap.empty() ) {
 
@@ -278,6 +381,8 @@ namespace mongo {
         p->_chunksMap = this->_chunksMap;
         p->_chunksMap.insert( make_pair( min.getOwned() , max.getOwned() ) );
         p->_version = version;
+        if( version > _collVersion ) p->_collVersion = version;
+        else p->_collVersion = this->_collVersion;
         p->_fillRanges();
 
         return p.release();
@@ -318,6 +423,10 @@ namespace mongo {
             p->_version.incMinor();
             startKey = split;
         }
+
+        if( version > _collVersion ) p->_collVersion = version;
+        else p->_collVersion = this->_collVersion;
+
         p->_fillRanges();
 
         return p.release();
@@ -325,7 +434,7 @@ namespace mongo {
 
     string ShardChunkManager::toString() const {
         StringBuilder ss;
-        ss << " ShardChunkManager version: " << _version << " key: " << _key;
+        ss << " ShardChunkManager version: " << _version.toString() << " key: " << _key;
         bool first = true;
         for ( RangeMap::const_iterator i=_rangesMap.begin(); i!=_rangesMap.end(); ++i ) {
             if ( first ) first = false;

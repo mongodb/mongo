@@ -19,6 +19,7 @@
 
 #include <iostream>
 #include <typeinfo>
+#include <string>
 
 #include "mongo/bson/inline_decls.h"
 #include "mongo/platform/compiler.h"
@@ -161,7 +162,9 @@ namespace mongo {
         a stack trace is logged.
     */
     MONGO_COMPILER_NORETURN void msgassertedNoTrace(int msgid, const char *msg);
-    inline void msgassertedNoTrace(int msgid, const std::string& msg) { msgassertedNoTrace( msgid , msg.c_str() ); }
+    MONGO_COMPILER_NORETURN inline void msgassertedNoTrace(int msgid, const std::string& msg) {
+        msgassertedNoTrace( msgid , msg.c_str() );
+    }
     MONGO_COMPILER_NORETURN void msgasserted(int msgid, const char *msg);
     MONGO_COMPILER_NORETURN void msgasserted(int msgid, const std::string &msg);
 
@@ -194,7 +197,7 @@ namespace mongo {
        could be slow.
     */
 #if defined(_DEBUG)
-# define MONGO_dassert verify
+# define MONGO_dassert(x) fassert(16199, (x))
 #else
 # define MONGO_dassert(x)
 #endif

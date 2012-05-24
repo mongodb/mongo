@@ -116,7 +116,7 @@ namespace mongo {
         FindingStartMode _findingStartMode;
         auto_ptr< CoveredIndexMatcher > _matcher;
         Timer _findingStartTimer;
-        ClientCursor::CleanupPointer _findingStartCursor;
+        ClientCursor::Holder _findingStartCursor;
         shared_ptr<Cursor> _c;
         ClientCursor::YieldData _yieldData;
         DiskLoc extentFirstLoc( const DiskLoc &rec );

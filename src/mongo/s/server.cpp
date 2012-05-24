@@ -17,6 +17,9 @@
 */
 
 #include "pch.h"
+
+#include <boost/thread/thread.hpp>
+
 #include "../util/net/message.h"
 #include "../util/startup_test.h"
 #include "../client/connpool.h"
@@ -43,6 +46,7 @@
 #include "mongo/util/util.h"
 #include "mongo/util/concurrency/remap_lock.h"
 #include "mongo/db/lasterror.h"
+#include "mongo/util/stacktrace.h"
 
 #if defined(_WIN32)
 # include "../util/ntservice.h"
@@ -63,6 +67,7 @@ namespace mongo {
     string mongosCommand;
     bool dbexitCalled = false;
     static bool scriptingEnabled = true;
+    static bool noHttpInterface = false;
     static vector<string> configdbs;
 
     // SERVER-2942 -- We do it this way because RemapLock is used in both mongod and mongos but
@@ -85,7 +90,9 @@ namespace mongo {
     }
 
     void ShardingConnectionHook::onHandedOut( DBClientBase * conn ) {
-        ClientInfo::get()->addShard( conn->getServerAddress() );
+        if( _shardedConnections ){
+            ClientInfo::get()->addShard( conn->getServerAddress() );
+        }
     }
 
     class ShardedMessageHandler : public MessageHandler {
@@ -272,7 +279,8 @@ static bool runMongosServer( bool doUpgrade ) {
     CmdLine::launchOk();
 #endif
 
-    boost::thread web( boost::bind(&webServerThread, new NoAdminAccess() /* takes ownership */) );
+    if ( !noHttpInterface )
+        boost::thread web( boost::bind(&webServerThread, new NoAdminAccess() /* takes ownership */) );
 
     MessageServer::Options opts;
     opts.port = cmdLine.port;
@@ -303,12 +311,17 @@ int _main(int argc, char* argv[]) {
 
     CmdLine::addGlobalOptions( general_options, hidden_options );
 
+    general_options.add_options()
+    ("nohttpinterface", "disable http interface");
+
 #if defined(_WIN32)
     CmdLine::addWindowsOptions( windows_scm_options, hidden_options );
 #endif
 
     sharding_options.add_options()
     ( "configdb" , po::value<string>() , "1 or 3 comma separated config servers" )
+    ( "localThreshold", po::value <int>(), "ping time (in ms) for a node to be "
+                                           "considered local (default 10ms)" )
     ( "test" , "just run unit tests" )
     ( "upgrade" , "upgrade meta data version" )
     ( "chunkSize" , po::value<int>(), "maximum amount of data per chunk" )
@@ -354,6 +367,10 @@ int _main(int argc, char* argv[]) {
         Chunk::MaxChunkSize = csize * 1024 * 1024;
     }
 
+    if ( params.count( "localThreshold" ) ) {
+        cmdLine.defaultLocalThresholdMillis = params["localThreshold"].as<int>();
+    }
+
     if ( params.count( "ipv6" ) ) {
         enableIPv6();
     }
@@ -371,6 +388,10 @@ int _main(int argc, char* argv[]) {
 
     if (params.count("noscripting")) {
         scriptingEnabled = false;
+    }
+
+    if (params.count("nohttpinterface")) {
+        noHttpInterface = true;
     }
 
     if ( ! params.count( "configdb" ) ) {
@@ -446,7 +467,8 @@ namespace mongo {
 
 int main(int argc, char* argv[]) {
     try {
-        return _main(argc, argv);
+        int exitCode = _main(argc, argv);
+        ::_exit(exitCode);
     }
     catch(SocketException& e) {
         cout << "uncaught SocketException in mongos main:" << endl;
@@ -463,7 +485,7 @@ int main(int argc, char* argv[]) {
     catch(...) {
         cout << "uncaught unknown exception in mongos main" << endl;
     }
-    return 20;
+    ::_exit(20);
 }
 
 #undef exit
@@ -485,5 +507,5 @@ void mongo::dbexit( ExitCode rc, const char *why ) {
           << " rc:" << rc
           << " " << ( why ? why : "" )
           << endl;
-    ::exit(rc);
+    ::_exit(rc);
 }

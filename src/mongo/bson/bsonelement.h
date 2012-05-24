@@ -1,4 +1,4 @@
-// BSONElement
+// bsonelement.h
 
 /*    Copyright 2009 10gen Inc.
  *
@@ -17,11 +17,13 @@
 
 #pragma once
 
+#include <string.h> // strlen
+#include <string>
 #include <vector>
-#include <string.h>
-#include "util/builder.h"
-#include "bsontypes.h"
-#include "oid.h"
+
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/oid.h"
+#include "mongo/platform/float_utils.h"
 
 namespace mongo {
     class OpTime;
@@ -74,12 +76,12 @@ namespace mongo {
         void Null()                 const { chk(isNull()); } // throw UserException if not null
         void OK()                   const { chk(ok()); }     // throw UserException if element DNE
 
-	/** @return the embedded object associated with this field.
+        /** @return the embedded object associated with this field.
             Note the returned object is a reference to within the parent bson object. If that 
-	    object is out of scope, this pointer will no longer be valid. Call getOwned() on the 
-	    returned BSONObj if you need your own copy.
-	    throws UserException if the element is not of type object.
-	*/
+            object is out of scope, this pointer will no longer be valid. Call getOwned() on the 
+            returned BSONObj if you need your own copy.
+            throws UserException if the element is not of type object.
+        */
         BSONObj Obj()               const;
 
         /** populate v with the value of the element.  If type does not match, throw exception.
@@ -144,6 +146,13 @@ namespace mongo {
             return data + 1;
         }
 
+
+        int fieldNameSize() const {
+            if ( fieldNameSize_ == -1 )
+                fieldNameSize_ = (int)strlen( fieldName() ) + 1;
+            return fieldNameSize_;
+        }
+
         /** raw data of the element's value (so be careful). */
         const char * value() const {
             return (data + fieldNameSize() + 1);
@@ -192,8 +201,18 @@ namespace mongo {
 
         /** Retrieve int value for the element safely.  Zero returned if not a number. */
         int numberInt() const;
-        /** Retrieve long value for the element safely.  Zero returned if not a number. */
+        /** Retrieve long value for the element safely.  Zero returned if not a number.
+         *  Behavior is not defined for double values that are NaNs, or too large/small
+         *  to be represented by long longs */
         long long numberLong() const;
+
+        /** Like numberLong() but with well-defined behavior for doubles that
+         *  are NaNs, or too large/small to be represented as long longs.
+         *  NaNs -> 0
+         *  very large doubles -> LLONG_MAX
+         *  very small doubles -> LLONG_MIN  */
+        long long safeNumberLong() const;
+
         /** Retrieve the numeric value of the element.  If not of a numeric type, returns 0.
             Note: casts to double, data loss may occur with large (>52 bit) NumberLong values.
         */
@@ -243,12 +262,37 @@ namespace mongo {
 
         /** Get javascript code of a CodeWScope data element. */
         const char * codeWScopeCode() const {
-            return value() + 8;
+            massert( 16177 , "not codeWScope" , type() == CodeWScope );
+            return value() + 4 + 4; //two ints precede code (see BSON spec)
         }
-        /** Get the scope SavedContext of a CodeWScope data element. */
-        const char * codeWScopeScopeData() const {
-            // TODO fix
+
+        /** Get length of the code part of the CodeWScope object
+         *  This INCLUDES the null char at the end */
+        int codeWScopeCodeLen() const {
+            massert( 16178 , "not codeWScope" , type() == CodeWScope );
+            return *(int *)( value() + 4 );
+        }
+
+        /** Get the scope SavedContext of a CodeWScope data element.
+         *
+         *  This function is DEPRECATED, since it can error if there are
+         *  null chars in the codeWScopeCode. However, some existing indexes
+         *  may be based on an incorrect ordering derived from this function,
+         *  so it may still need to be used in certain cases.
+         *   */
+        const char * codeWScopeScopeDataUnsafe() const {
+            //This can error if there are null chars in the codeWScopeCode
             return codeWScopeCode() + strlen( codeWScopeCode() ) + 1;
+        }
+
+        /* Get the scope SavedContext of a CodeWScope data element.
+         *
+         * This is the corrected version of codeWScopeScopeDataUnsafe(),
+         * but note that existing uses might rely on the behavior of
+         * that function so be careful in choosing which version to use.
+         */
+        const char * codeWScopeScopeData() const {
+            return codeWScopeCode() + codeWScopeCodeLen();
         }
 
         /** Get the embedded object this element holds. */
@@ -413,11 +457,7 @@ namespace mongo {
     private:
         const char *data;
         mutable int fieldNameSize_; // cached value
-        int fieldNameSize() const {
-            if ( fieldNameSize_ == -1 )
-                fieldNameSize_ = (int)strlen( fieldName() ) + 1;
-            return fieldNameSize_;
-        }
+
         mutable int totalSize; /* caches the computed size */
 
         friend class BSONObjIterator;
@@ -438,7 +478,6 @@ namespace mongo {
             return *this;
         }
     };
-
 
     inline int BSONElement::canonicalType() const {
         BSONType t = type();
@@ -571,6 +610,30 @@ namespace mongo {
             return _numberLong();
         default:
             return 0;
+        }
+    }
+
+    /** Like numberLong() but with well-defined behavior for doubles that
+     *  are NaNs, or too large/small to be represented as long longs.
+     *  NaNs -> 0
+     *  very large doubles -> LLONG_MAX
+     *  very small doubles -> LLONG_MIN  */
+    inline long long BSONElement::safeNumberLong() const {
+        double d;
+        switch( type() ) {
+        case NumberDouble:
+            d = numberDouble();
+            if ( isNaN( d ) ){
+                return 0;
+            }
+            if ( d > (double) std::numeric_limits<long long>::max() ){
+                return std::numeric_limits<long long>::max();
+            }
+            if ( d < std::numeric_limits<long long>::min() ){
+                return std::numeric_limits<long long>::min();
+            }
+        default:
+            return numberLong();
         }
     }
 

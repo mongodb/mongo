@@ -45,7 +45,9 @@ namespace mongo {
      * When the document at a Cursor's current position is deleted (or moved to a new location) the
      * following pattern is used:
      *     DiskLoc toDelete = cursor->currLoc();
-     *     cursor->advance();
+     *     while( cursor->ok() && cursor->currLoc() == toDelete ) {
+     *         cursor->advance();
+     *     }
      *     cursor->prepareToTouchEarlierIterate();
      *     delete( toDelete );
      *     cursor->recoverFromTouchingEarlierIterate();
@@ -59,7 +61,9 @@ namespace mongo {
      *         else if ( theOp.type() == DELETE ) {
      *             if ( cursor->refLoc() == theOp.toDelete() ) {
      *                 cursor->recoverFromYield();
-     *                 cursor->advance();
+     *                 while ( cursor->ok() && cursor->refLoc() == theOp.toDelete() ) {
+     *                     cursor->advance();
+     *                 }
      *                 cursor->prepareToYield();
      *             }
      *             theOp.run();
@@ -72,6 +76,8 @@ namespace mongo {
      *     cursor->noteLocation();
      *     runOtherOps();
      *     cursor->checkLocation();
+     *
+     * But see SERVER-5725.
      *
      * A Cursor may rely on additional callbacks not listed above to relocate its position after a
      * write.
@@ -241,8 +247,7 @@ namespace mongo {
         }
         BSONObj current() {
             Record *r = _current();
-            BSONObj j(r);
-            return j;
+            return BSONObj::make(r);
         }
         virtual DiskLoc currLoc() { return curr; }
         virtual DiskLoc refLoc()  { return curr.isNull() ? last : curr; }

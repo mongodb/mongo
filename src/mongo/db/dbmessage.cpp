@@ -83,25 +83,30 @@ namespace mongo {
                      (void *) responseObj.objdata(), responseObj.objsize(), 1);
     }
 
-    void replyToQuery(int queryResultFlags, Message &m, DbResponse &dbresponse, BSONObj obj) {
-        BufBuilder b;
-        b.skip(sizeof(QueryResult));
-        b.appendBuf((void*) obj.objdata(), obj.objsize());
-        QueryResult* msgdata = (QueryResult *) b.buf();
-        b.decouple();
-        QueryResult *qr = msgdata;
-        qr->_resultFlags() = queryResultFlags;
-        qr->len = b.len();
-        qr->setOperation(opReply);
-        qr->cursorId = 0;
-        qr->startingFrom = 0;
-        qr->nReturned = 1;
+    void replyToQuery( int queryResultFlags, Message &m, DbResponse &dbresponse, BSONObj obj ) {
         Message *resp = new Message();
-        resp->setData(msgdata, true); // transport will free
+        replyToQuery( queryResultFlags, *resp, obj );
         dbresponse.response = resp;
         dbresponse.responseTo = m.header()->id;
     }
 
+    void replyToQuery( int queryResultFlags, Message& response, const BSONObj& resultObj ) {
+        BufBuilder bufBuilder;
+        bufBuilder.skip( sizeof( QueryResult ));
+        bufBuilder.appendBuf( reinterpret_cast< void *>(
+                const_cast< char* >( resultObj.objdata() )), resultObj.objsize() );
 
+        QueryResult* queryResult = reinterpret_cast< QueryResult* >( bufBuilder.buf() );
+        bufBuilder.decouple();
+
+        queryResult->_resultFlags() = queryResultFlags;
+        queryResult->len = bufBuilder.len();
+        queryResult->setOperation( opReply );
+        queryResult->cursorId = 0;
+        queryResult->startingFrom = 0;
+        queryResult->nReturned = 1;
+
+        response.setData( queryResult, true ); // transport will free
+    }
 
 }

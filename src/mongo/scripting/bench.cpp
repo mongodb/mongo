@@ -22,6 +22,8 @@
 
 #include "mongo/scripting/bench.h"
 
+#include <boost/thread/thread.hpp>
+
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/md5.h"
@@ -394,7 +396,7 @@ namespace mongo {
 
                         if ( e.type() == CodeWScope ) {
                             scopeFunc = scope->createFunction( e["check"].codeWScopeCode() );
-                            scopeObj = BSONObj( e.codeWScopeScopeData() );
+                            scopeObj = BSONObj( e.codeWScopeScopeDataUnsafe() );
                         }
                         else {
                             scopeFunc = scope->createFunction( e["check"].valuestr() );
@@ -640,6 +642,8 @@ namespace mongo {
                 sleepmillis( delay );
             }
         }
+
+        conn->getLastError();
     }
 
     namespace {
@@ -749,6 +753,17 @@ namespace mongo {
         stats->reset();
         for ( size_t i = 0; i < _workers.size(); ++i )
             stats->updateFrom( _workers[i]->stats() );
+        BSONObj before = this->before["opcounters"].Obj();
+        BSONObj after = this->after["opcounters"].Obj();
+        {
+             BSONObjIterator i( after );
+             while ( i.more() ) {
+                 BSONElement e = i.next();
+                 long long delta = e.numberLong();
+                 delta -= before[e.fieldName()].numberLong();
+                 stats->opcounters[e.fieldName()] = delta;
+             }
+        }
     }
 
      static void appendAverageMsIfAvailable(

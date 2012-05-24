@@ -281,6 +281,8 @@ namespace mongo {
                  * The loop is to handle MultiKey indexes where the deleted record is pointed to by multiple adjacent keys.
                  * In that case we need to advance until we get to the next distinct record or EOF.
                  * SERVER-4154
+                 * SERVER-5198
+                 * But see SERVER-5725.
                  */
                 c->advance();
             }
@@ -345,8 +347,9 @@ namespace mongo {
             clientCursorsById.erase(_cursorid);
 
             // defensive:
-            (CursorId&)_cursorid = -1;
+            _cursorid = INVALID_CURSOR_ID;
             _pos = -2;
+            _pinValue = 0;
         }
     }
 
@@ -615,6 +618,7 @@ namespace mongo {
         return ClientCursor::recoverFromYield( data );
     }
 
+    // See SERVER-5726.
     long long ctmLast = 0; // so we don't have to do find() which is a little slow very often.
     long long ClientCursor::allocCursorId_inlock() {
         long long ctm = curTimeMillis64();

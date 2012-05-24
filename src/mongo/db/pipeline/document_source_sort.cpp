@@ -70,7 +70,8 @@ namespace mongo {
         return pCurrent;
     }
 
-    void DocumentSourceSort::sourceToBson(BSONObjBuilder *pBuilder) const {
+    void DocumentSourceSort::sourceToBson(
+        BSONObjBuilder *pBuilder, bool explain) const {
         BSONObjBuilder insides;
         sortKeyToBson(&insides, false);
         pBuilder->append(sortName, insides.done());

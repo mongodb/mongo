@@ -17,7 +17,10 @@
 
 #pragma once
 
-#include "../util/hex.h"
+#include <string>
+
+#include "mongo/bson/util/misc.h"
+#include "mongo/util/hex.h"
 
 namespace mongo {
 

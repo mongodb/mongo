@@ -857,6 +857,66 @@
     <ClCompile Include="..\util\signal_handlers.cpp">
       <Filter>util\Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\client\distlock_test.cpp">
+      <Filter>client\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="driverHelpers.cpp">
+      <Filter>db\Source Files\a to d</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\histogram.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="stats\service_stats.cpp">
+      <Filter>db\stats</Filter>
+    </ClCompile>
+    <ClCompile Include="lockstat.cpp">
+      <Filter>db\Source Files\e to n</Filter>
+    </ClCompile>
+    <ClCompile Include="lockstate.cpp">
+      <Filter>db\Source Files\e to n</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\time_support.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ttl.cpp">
+      <Filter>db\Source Files\o to z</Filter>
+    </ClCompile>
+    <ClCompile Include="ops\update_internal.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="repl\bgsync.cpp">
+      <Filter>db\repl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\stack_introspect.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="commands\touch.cpp">
+      <Filter>db\commands</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\touch_pages.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\hook_win32.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\hook_windows_memory.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\client\authentication_table.cpp">
+      <Filter>client\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="hashindex.cpp">
+      <Filter>db\Source Files\e to n</Filter>
+    </ClCompile>
+    <ClCompile Include="hasher.cpp">
+      <Filter>db\Source Files\e to n</Filter>
+    </ClCompile>
+    <ClCompile Include="commands\hashcmd.cpp">
+      <Filter>db\commands</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\d_index_locator.cpp">
+      <Filter>s</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\targetver.h" />
@@ -1556,6 +1616,51 @@
     </ClInclude>
     <ClInclude Include="..\util\signal_handlers.h">
       <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\histogram.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="stats\service_stats.h">
+      <Filter>db\stats</Filter>
+    </ClInclude>
+    <ClInclude Include="lockstate.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="ttl.h">
+      <Filter>db\Header Files\o to z</Filter>
+    </ClInclude>
+    <ClInclude Include="ops\query.h">
+      <Filter>db\ops</Filter>
+    </ClInclude>
+    <ClInclude Include="ops\update_internal.h">
+      <Filter>db\ops</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\stack_introspect.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\touch_pages.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\hook_win32.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\hook_windows_memory.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\client\authentication_table.h">
+      <Filter>client\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="hashindex.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="hasher.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="..\s\d_index_locator.h">
+      <Filter>s</Filter>
+    </ClInclude>
+    <ClInclude Include="..\s\d_writeback.h">
+      <Filter>s</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

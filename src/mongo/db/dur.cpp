@@ -56,6 +56,9 @@
 */
 
 #include "pch.h"
+
+#include <boost/thread/thread.hpp>
+
 #include "cmdline.h"
 #include "client.h"
 #include "dur.h"
@@ -67,13 +70,15 @@
 #include "../util/mongoutils/hash.h"
 #include "../util/mongoutils/str.h"
 #include "../util/timer.h"
+#include "mongo/util/stacktrace.h"
+#include "../server.h"
 
 using namespace mongoutils;
 
 namespace mongo {
 
     bool lockedForWriting();
-    void runExclusively(void (*f)(void));
+    extern SimpleMutex filesLockedFsync;
 
     namespace dur {
 
@@ -250,46 +255,15 @@ namespace mongo {
             return commitJob.bytes() > UncommittedBytesLimit;
         }
 
-        static int in_f;
-        void f_commitEarlyInRunExclusively() { 
-            dassert( in_f == 0 );
-            in_f++;
-            try { 
-                assertNothingSpooled();
-                getDur().commitNow();
-                assertNothingSpooled(); // a light sanity check that we truly were exclusive
-            }
-            catch(...) { 
-                in_f--;
-                throw;
-            }
-            in_f--;
-        }
-
         void assertLockedForCommitting() { 
             char t = Lock::isLocked();
             if(  t == 'R' || t == 'W' )
                 return;
-            // 'w' case we use runExclusively
-            fassert( 16110, t == 'w' );
-            fassert( 16111, in_f == 1 );
+            // 'w' case we upgrade to exclusive (X).
+            fassertFailed( 16110 );
         }
 
-        /** we may need to commit earlier than normal if data are being written at 
-            very high rates. 
-        
-            note you can call this unlocked, and that is a good idea as if you are in 
-            say, a 'w' lock state, we can't do the commit
-
-	        @param force force a commit now even if seemingly not needed - ie the caller may 
- 	           know something we don't such as that files will be closed
-        */
-        bool DurableImpl::commitIfNeeded(bool force) {
-            unspoolWriteIntents();
-            DEV commitJob._nSinceCommitIfNeededCall = 0;
-            if( commitJob.bytes() < UncommittedBytesLimit && !force ) {
-                return false;
-            }
+        bool NOINLINE_DECL DurableImpl::_aCommitIsNeeded() {
             if( !Lock::isLocked() ) {
                 DEV log() << "commitIfNeeded but we are unlocked that is ok but why do we get here" << endl;
                 Lock::GlobalRead r;
@@ -313,8 +287,12 @@ namespace mongo {
                     return false;
                 }
                 else {
-                    log(1) << "commitIfNeeded calling runExclusively " << force << endl;
-                    runExclusively(f_commitEarlyInRunExclusively);
+                    log(1) << "commitIfNeeded upgrading from shared write to exclusive write state"
+                           << endl;
+                    Lock::DBWrite::UpgradeToExclusive ex;
+                    if (ex.gotUpgrade()) {
+                        commitNow();
+                    }
                 }
             }
             else { 
@@ -322,6 +300,26 @@ namespace mongo {
                 commitNow();
             }
             return true;
+        }
+
+        /** we may need to commit earlier than normal if data are being written at 
+            very high rates. 
+        
+            note you can call this unlocked, and that is a good idea as if you are in 
+            say, a 'w' lock state, we can't do the commit
+
+	        @param force force a commit now even if seemingly not needed - ie the caller may 
+ 	           know something we don't such as that files will be closed
+
+            perf note: this function is called a lot, on every lock_w() ... and usually returns right away
+        */
+        bool DurableImpl::commitIfNeeded(bool force) {
+            unspoolWriteIntents();
+            DEV commitJob._nSinceCommitIfNeededCall = 0;
+            if( likely( commitJob.bytes() < UncommittedBytesLimit && !force ) ) {
+                return false;
+            }
+            return _aCommitIsNeeded();
         }
 
         /** Used in _DEBUG builds to check that we didn't overwrite the last intent
@@ -583,6 +581,10 @@ namespace mongo {
             // (ok to crash after that)
             commitJob.committingNotifyCommitted();
 
+            // note the higher-up-the-chain locking of filesLockedFsync is important here, 
+            // as we are not in Lock::GlobalRead anymore. private view readers won't see 
+            // anything as we do this, but external viewers of the datafiles will see them 
+            // mutating.
             WRITETODATAFILES(h, ab);
             verify( abLen == ab.len() ); // check again wasn't modded
             ab.reset();
@@ -620,40 +622,43 @@ namespace mongo {
         static void _groupCommit(Lock::GlobalWrite *lgw) {
             LOG(4) << "_groupCommit " << endl;
 
-            // runExclusively is in 'w', else we are 'R' or 'W'
+            // We are 'R' or 'W'
             assertLockedForCommitting();
 
             unspoolWriteIntents(); // in case we were doing some writing ourself
-            AlignedBuilder &ab = __theBuilder;
 
-            // we need to make sure two group commits aren't running at the same time
-            // (and we are only read locked in the dbMutex, so it could happen)
-            SimpleMutex::scoped_lock lk(commitJob.groupCommitMutex);
+            {
+                AlignedBuilder &ab = __theBuilder;
 
-            commitJob.commitingBegin();
+                // we need to make sure two group commits aren't running at the same time
+                // (and we are only read locked in the dbMutex, so it could happen)
+                SimpleMutex::scoped_lock lk(commitJob.groupCommitMutex);
 
-            if( !commitJob.hasWritten() ) {
-                // getlasterror request could have came after the data was already committed
-                commitJob.committingNotifyCommitted();
-            }
-            else {
-                JSectHeader h;
-                PREPLOGBUFFER(h,ab);
+                commitJob.commitingBegin();
 
-                // todo : write to the journal outside locks, as this write can be slow.
-                //        however, be careful then about remapprivateview as that cannot be done 
-                //        if new writes are then pending in the private maps.
-                WRITETOJOURNAL(h, ab);
+                if( !commitJob.hasWritten() ) {
+                    // getlasterror request could have came after the data was already committed
+                    commitJob.committingNotifyCommitted();
+                }
+                else {
+                    JSectHeader h;
+                    PREPLOGBUFFER(h,ab);
 
-                // data is now in the journal, which is sufficient for acknowledging getLastError.
-                // (ok to crash after that)
-                commitJob.committingNotifyCommitted();
+                    // todo : write to the journal outside locks, as this write can be slow.
+                    //        however, be careful then about remapprivateview as that cannot be done 
+                    //        if new writes are then pending in the private maps.
+                    WRITETOJOURNAL(h, ab);
 
-                WRITETODATAFILES(h, ab);
-                debugValidateAllMapsMatch();
+                    // data is now in the journal, which is sufficient for acknowledging getLastError.
+                    // (ok to crash after that)
+                    commitJob.committingNotifyCommitted();
 
-                commitJob.committingReset();
-                ab.reset();
+                    WRITETODATAFILES(h, ab);
+                    debugValidateAllMapsMatch();
+
+                    commitJob.committingReset();
+                    ab.reset();
+                }
             }
 
             // REMAPPRIVATEVIEW
@@ -675,12 +680,8 @@ namespace mongo {
                 // to be in W the entire time we were committing about (in particular for WRITETOJOURNAL() which takes time).
                 if( lgw ) { 
                     LOG(4) << "_groupCommit upgrade" << endl;
-                    if( lgw->upgrade() ) {
-                        REMAPPRIVATEVIEW();
-                    }
-                    else {
-                        log() << "info timeout on lock upgrade for REMAPPRIVATEVIEW" << endl;
-                    }
+                    lgw->upgrade();
+                    REMAPPRIVATEVIEW();
                 }
             }
             else {
@@ -724,6 +725,8 @@ namespace mongo {
         }
 
         static void durThreadGroupCommit() {
+            SimpleMutex::scoped_lock flk(filesLockedFsync);
+
             const int N = 10;
             static int n;
             if( privateMapBytes < UncommittedBytesLimit && ++n % N && (cmdLine.durOptions&CmdLine::DurAlwaysRemap)==0 ) {
@@ -750,7 +753,7 @@ namespace mongo {
             if (!cmdLine.dur)
                 return;
 
-	    if( Lock::isLocked() ) {
+            if( Lock::isLocked() ) {
                 getDur().commitIfNeeded(true);
             }
             else {
@@ -789,13 +792,12 @@ namespace mongo {
                 try {
                     stats.rotate();
 
-                    // we do this in a couple blocks (the invoke()), which makes it a tiny bit faster (only a little) on throughput,
-                    // but is likely also less spiky on our cpu usage, which is good.
-
                     // commit sooner if one or more getLastError j:true is pending
                     sleepmillis(oneThird);
                     for( unsigned i = 1; i <= 2; i++ ) {
                         if( commitJob._notify.nWaiting() )
+                            break;
+                        if( commitJob.bytes() > UncommittedBytesLimit / 2  )
                             break;
                         sleepmillis(oneThird);
                     }

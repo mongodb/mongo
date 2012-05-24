@@ -32,15 +32,7 @@ replTest.awaitReplication();
 
 master.foo.insert({x:1});
 
-// make sure the record never appears in the remote slave
-for (var i=0; i<20; i++) {
-    print ("testing for data!");
-    assert.eq(slave[1].foo.findOne(), null);
-    sleep(3000);
-    stat = slave[1]._adminCommand("replSetGetStatus");
-    printjson(stat);
-}
-
-
+// make sure the record still appears in the remote slave
+assert.soon( function() { return slave[1].foo.findOne() != null; } );
 
 replTest.stopSet();

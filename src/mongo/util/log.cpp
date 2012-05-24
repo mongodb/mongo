@@ -39,7 +39,7 @@ using namespace std;
 namespace mongo {
 
     int logLevel = 0;
-    int tlogLevel = 0;
+    int tlogLevel = 0; // test log level. so we avoid overchattiness (somewhat) in the c++ unit tests
     mongo::mutex Logstream::mutex("Logstream");
     int Logstream::doneSetup = Logstream::magicNumber();
 
@@ -274,7 +274,13 @@ namespace mongo {
             int fd = fileno( logfile );
             if ( _isatty( fd ) ) {
                 fflush( logfile );
-                _write( fd, s.data(), s.size() );
+                unsigned int bytesToWrite = s.size();
+                const char* bytePtr = s.data();
+                while ( bytesToWrite > 0 ) {
+                    int bytesWritten = _write( fd, bytePtr, bytesToWrite );
+                    bytePtr += bytesWritten;
+                    bytesToWrite -= bytesWritten;
+                }
                 return;
             }
 #else
@@ -368,7 +374,13 @@ namespace mongo {
             int fd = fileno( logfile );
             if ( _isatty( fd ) ) {
                 fflush( logfile );
-                _write( fd, out.data(), out.size() );
+                unsigned int bytesToWrite = out.size();
+                const char* bytePtr = out.data();
+                while ( bytesToWrite > 0 ) {
+                    int bytesWritten = _write( fd, bytePtr, bytesToWrite );
+                    bytePtr += bytesWritten;
+                    bytesToWrite -= bytesWritten;
+                }
             }
 #else
             if ( isSyslog ) {

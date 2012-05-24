@@ -88,8 +88,8 @@ namespace mongo {
             list<BSONObj> blah;
 
             shared_ptr<Cursor> cursor = NamespaceDetailsTransient::getCursor(ns.c_str() , query);
-            ClientCursor::CleanupPointer ccPointer;
-            ccPointer.reset( new ClientCursor( QueryOption_NoCursorTimeout, cursor, ns ) );
+            ClientCursor::Holder ccPointer( new ClientCursor( QueryOption_NoCursorTimeout, cursor,
+                                                             ns ) );
 
             while ( cursor->ok() ) {
                 
@@ -212,7 +212,7 @@ namespace mongo {
                 finalize = p["finalize"]._asCode();
 
             return group( dbname , ns , q ,
-                          key , keyf , reduce._asCode() , reduce.type() != CodeWScope ? 0 : reduce.codeWScopeScopeData() ,
+                          key , keyf , reduce._asCode() , reduce.type() != CodeWScope ? 0 : reduce.codeWScopeScopeDataUnsafe() ,
                           initial.embeddedObject() , finalize ,
                           errmsg , result );
         }

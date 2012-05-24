@@ -111,7 +111,7 @@ public:
         case Code:
             return csvEscape(object.toString(false));
         case CodeWScope:
-            if (string(object.codeWScopeScopeData()) == "") {
+            if (string(object.codeWScopeScopeDataUnsafe()) == "") {
                 return csvEscape(object.toString(false));
             } else {
                 return csvEscape(object.jsonString(Strict, false));

@@ -1084,6 +1084,24 @@ namespace mongo {
         return b.obj();
     }
 
+
+    bool FieldRangeSet::isPointIntervalSet( const string& fieldname ) const {
+
+        const vector<FieldInterval>& intervals = range( fieldname.c_str() ).intervals();
+
+        if ( intervals.empty() ) {
+            return false;
+        }
+
+        vector<FieldInterval>::const_iterator i;
+        for(i = intervals.begin() ; i != intervals.end(); ++i){
+            if (! i->equality() ) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     QueryPattern FieldRangeSet::pattern( const BSONObj &sort ) const {
         return QueryPattern( *this, sort );
     }

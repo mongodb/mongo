@@ -16,9 +16,6 @@ assert.soon(function() { return conns[1].getDB("admin").isMaster().secondary; })
 
 join = startParallelShell( "db.getSisterDB('bar').runCommand({compact : 'foo'});", replTest.ports[1] );
 
-print("check secondary goes to recovering");
-assert.soon(function() { return !conns[1].getDB("admin").isMaster().secondary; });
-
 print("joining");
 join();
 

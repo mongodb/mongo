@@ -279,7 +279,7 @@ namespace mongo {
         bool _mustAdvance;
         bool _capped;
         shared_ptr<Cursor> _c;
-        ClientCursor::CleanupPointer _cc;
+        ClientCursor::Holder _cc;
         DiskLoc _posBeforeYield;
         ClientCursor::YieldData _yieldData;
         const QueryPlanSelectionPolicy &_selectionPolicy;
@@ -311,9 +311,6 @@ namespace mongo {
      * active, the advance() call preceeding prepareToTouchEarlierIterate() may not properly advance
      * all delegate Cursors, so the calls are forwarded as prepareToYield()/recoverFromYield() to a
      * ClientCursor for each delegate Cursor.
-     *
-     * If the advance() call preceeding prepareToTouchEarlierIterate() may cause _takeover to be
-     * set, the implemenation will internally call _takeover->advance() if necessary.
      *
      * After _takeover is set, consistency after writes is ensured by delegation to the _takeover
      * MultiCursor.
@@ -597,8 +594,6 @@ namespace mongo {
                 return false;
             }
 
-            DiskLoc prevLoc = _currLoc();
-
             _currOp = 0;
             shared_ptr<QueryOp> op = _mps->nextOp();
             rethrowOnError( op );
@@ -613,16 +608,6 @@ namespace mongo {
             }
             else if ( op->stopRequested() ) {
                 if ( qocop->cursor() ) {
-                    // Ensure that prepareToTouchEarlierIterate() may be called safely when a
-                    // BasicCursor takes over.
-                    if ( !prevLoc.isNull() && prevLoc == qocop->currLoc() &&
-                        // If there is an out of order plan, advancing may be incorrect because
-                        // in orer plans must return all results.  And advancing is unnecessary,
-                        // because _mps will not traverse $or clauses.
-                        // TODO Clean this as part of SERVER-5198.
-                        !_mps->possibleOutOfOrderPlan() ) {
-                        qocop->cursor()->advance();
-                    }
                     _takeover.reset( new MultiCursor( _mps,
                                                      qocop->cursor(),
                                                      op->matcher( qocop->cursor() ),

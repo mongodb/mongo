@@ -27,6 +27,9 @@
 
 namespace mongo {
 
+    //
+    // ShardChunkVersions consist of a major/minor version scoped to a version epoch
+    //
     struct ShardChunkVersion {
         union {
             struct {
@@ -35,27 +38,21 @@ namespace mongo {
             };
             unsigned long long _combined;
         };
+        OID _epoch;
 
-        ShardChunkVersion( int major=0, int minor=0 )
-            : _minor(minor),_major(major) {
+        ShardChunkVersion() : _minor(0), _major(0), _epoch(OID()) {}
+
+        //
+        // Constructors shouldn't have default parameters here, since it's vital we track from
+        // here on the epochs of versions, even if not used.
+        //
+
+        ShardChunkVersion( int major, int minor, const OID& epoch )
+            : _minor(minor),_major(major), _epoch(epoch) {
         }
 
-        ShardChunkVersion( unsigned long long ll )
-            : _combined( ll ) {
-        }
-
-        ShardChunkVersion( const BSONElement& e ) {
-            if ( e.type() == Date || e.type() == Timestamp ) {
-                _combined = e._numberLong();
-            }
-            else if ( e.eoo() ) {
-                _combined = 0;
-            }
-            else {
-                _combined = 0;
-                log() << "ShardChunkVersion can't handle type (" << (int)(e.type()) << ") " << e << endl;
-                verify(0);
-            }
+        ShardChunkVersion( unsigned long long ll, const OID& epoch )
+            : _combined( ll ), _epoch(epoch) {
         }
 
         void inc( bool major ) {
@@ -74,6 +71,15 @@ namespace mongo {
             _minor++;
         }
 
+        // Incrementing an epoch creates a new, randomly generated identifier
+        void incEpoch() {
+            _epoch = OID::gen();
+            _major = 0;
+            _minor = 0;
+        }
+
+        // Note: this shouldn't be used as a substitute for version except in specific cases -
+        // epochs make versions more complex
         unsigned long long toLong() const {
             return _combined;
         }
@@ -82,36 +88,154 @@ namespace mongo {
             return _combined > 0;
         }
 
+        bool isEpochSet() const {
+            return _epoch.isSet();
+        }
+
         string toString() const {
             stringstream ss;
-            ss << _major << "|" << _minor;
+            // Similar to month/day/year.  For the most part when debugging, we care about major
+            // so it's first
+            ss << _major << "|" << _minor << "||" << _epoch;
             return ss.str();
         }
 
         int majorVersion() const { return _major; }
         int minorVersion() const { return _minor; }
+        OID epoch() const { return _epoch; }
 
-        operator unsigned long long() const { return _combined; }
+        //
+        // Explicit comparison operators - versions with epochs have non-trivial comparisons.
+        // > < operators do not check epoch cases.  Generally if using == we need to handle
+        // more complex cases.
+        //
 
-        ShardChunkVersion& operator=( const BSONElement& elem ) {
-            switch ( elem.type() ) {
-            case Timestamp:
-            case NumberLong:
-            case Date:
-                _combined = elem._numberLong();
-                break;
-            case EOO:
-                _combined = 0;
-                break;
-            default:
-                massert( 13657 , mongoutils::str::stream() << "unknown type for ShardChunkVersion: " << elem , 0 );
-            }
-            return *this;
+        bool operator>( const ShardChunkVersion& otherVersion ) const {
+            return this->_combined > otherVersion._combined;
         }
+
+        bool operator>=( const ShardChunkVersion& otherVersion ) const {
+            return this->_combined >= otherVersion._combined;
+        }
+
+        bool operator<( const ShardChunkVersion& otherVersion ) const {
+            return this->_combined < otherVersion._combined;
+        }
+
+        bool operator<=( const ShardChunkVersion& otherVersion ) const {
+            return this->_combined < otherVersion._combined;
+        }
+
+        //
+        // Equivalence comparison types.
+        //
+
+        // Can we write to this data and not have a problem?
+        bool isWriteCompatibleWith( const ShardChunkVersion& otherVersion ) const {
+            if( ! hasCompatibleEpoch( otherVersion ) ) return false;
+            return otherVersion._major == _major;
+        }
+
+        // Is this the same version?
+        bool isEquivalentTo( const ShardChunkVersion& otherVersion ) const {
+            if( ! hasCompatibleEpoch( otherVersion ) ) return false;
+            return otherVersion._combined == _combined;
+        }
+
+        // Is this in the same epoch?
+        bool hasCompatibleEpoch( const ShardChunkVersion& otherVersion ) const {
+            // TODO : Change logic from eras are not-unequal to eras are equal
+            if( otherVersion.isEpochSet() && isEpochSet() && otherVersion._epoch != _epoch )
+                return false;
+            return true;
+        }
+
+        //
+        // BSON input/output
+        //
+        // The idea here is to make the BSON input style very flexible right now, so we
+        // can then tighten it up in the next version.  We can accept either a BSONObject field
+        // with version and epoch, or version and epoch in different fields (either is optional).
+        // In this case, epoch always is stored in a field name of the version field name + "Epoch"
+        //
+
+        static ShardChunkVersion fromBSON( const BSONElement& el, const string& prefix="" ){
+
+            int type = el.type();
+
+            if( type == Object ){
+                return fromBSON( el.Obj() );
+            }
+
+            if( type == jstOID ){
+                return ShardChunkVersion( 0, 0, el.OID() );
+            }
+            else if( type == Timestamp || type == Date ){
+                return ShardChunkVersion( el._numberLong(), OID() );
+            }
+            // LEGACY we used to throw if not eoo(), not sure this is useful
+            else if( type == EOO ){
+                return ShardChunkVersion( 0, OID() );
+            }
+
+            log() << "can't load version from element type (" << (int)(el.type()) << ") "
+                  << el << endl;
+
+            verify( 0 );
+            // end legacy
+        }
+
+        static ShardChunkVersion fromBSON( const BSONObj& obj, const string& prefixIn="" ){
+
+            ShardChunkVersion version;
+
+            string prefix = prefixIn;
+            if( prefixIn == "" && ! obj[ "version" ].eoo() ){
+                prefix = (string)"version";
+            }
+            else if( prefixIn == "" && ! obj[ "lastmod" ].eoo() ){
+                prefix = (string)"lastmod";
+            }
+
+            if( obj[ prefix ].type() == Date || obj[ prefix ].type() == Timestamp ){
+                version._combined = obj[ prefix ]._numberLong();
+            }
+
+            if( obj[ prefix + "Epoch" ].type() == jstOID ){
+                version._epoch = obj[ prefix + "Epoch" ].OID();
+            }
+
+            return version;
+        }
+
+        //
+        // Currently our BSON output is to two different fields, to cleanly work with older
+        // versions that know nothing about epochs.
+        //
+
+        BSONObj toBSON( const string& prefixIn="" ) const {
+            BSONObjBuilder b;
+
+            string prefix = prefixIn;
+            if( prefix == "" ) prefix = "version";
+
+            b.appendTimestamp( prefix, _combined );
+            b.append( prefix + "Epoch", _epoch );
+            return b.obj();
+        }
+
+        void addToBSON( BSONObjBuilder& b, const string& prefix="" ) const {
+            b.appendElements( toBSON( prefix ) );
+        }
+
+        void addEpochToBSON( BSONObjBuilder& b, const string& prefix="" ) const {
+            b.append( prefix + "Epoch", _epoch );
+        }
+
     };
 
     inline ostream& operator<<( ostream &s , const ShardChunkVersion& v) {
-        s << v._major << "|" << v._minor;
+        s << v.toString();
         return s;
     }
 
@@ -137,14 +261,14 @@ namespace mongo {
         StaleConfigException( const string& raw , int code, const BSONObj& error, bool justConnection = false )
             : AssertionException(
                     mongoutils::str::stream() << raw << " ( ns : " << error["ns"].String() << // Note, this will fail if we don't have a ns
-                                             ", received : " << ShardChunkVersion( error["vReceived"] ).toString() <<
-                                             ", wanted : " << ShardChunkVersion( error["vWanted"] ).toString() <<
+                                             ", received : " << ShardChunkVersion::fromBSON( error["vReceived"] ).toString() <<
+                                             ", wanted : " << ShardChunkVersion::fromBSON( error["vWanted"] ).toString() <<
                                              ", " << ( code == SendStaleConfigCode ? "send" : "recv" ) << " )",
                     code ),
               _justConnection(justConnection) ,
               _ns( error["ns"].String() ),
-              _received( ShardChunkVersion( error["vReceived"] ) ),
-              _wanted( ShardChunkVersion( error["vWanted"] ) )
+              _received( ShardChunkVersion::fromBSON( error["vReceived"] ) ),
+              _wanted( ShardChunkVersion::fromBSON( error["vWanted"] ) )
         {}
 
         StaleConfigException() : AssertionException( "", 0 ) {}

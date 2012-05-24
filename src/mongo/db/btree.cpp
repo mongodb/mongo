@@ -1442,10 +1442,6 @@ namespace mongo {
         return loc;
     }
 
-    void renameIndexNamespace(const char *oldNs, const char *newNs) {
-        renameNamespace( oldNs, newNs, false );
-    }
-
     template< class V >
     const DiskLoc BtreeBucket<V>::getHead(const DiskLoc& thisLoc) const {
         DiskLoc p = thisLoc;
@@ -1468,8 +1464,8 @@ namespace mongo {
         DiskLoc nextDown = this->childForPos(ko+adj);
         if ( !nextDown.isNull() ) {
             while ( 1 ) {
-	      keyOfs = direction>0 ? 0 : BTREE(nextDown)->n - 1;
-	        DiskLoc loc = BTREE(nextDown)->childForPos(keyOfs + adj);
+                keyOfs = direction>0 ? 0 : BTREE(nextDown)->n - 1;
+                DiskLoc loc = BTREE(nextDown)->childForPos(keyOfs + adj);
                 if ( loc.isNull() )
                     break;
                 nextDown = loc;

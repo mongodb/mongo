@@ -16,10 +16,14 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
-#include "key.h"
-#include "mongo/util/startup_test.h"
+#include "mongo/pch.h"
+
+#include "mongo/db/key.h"
+
 #include "mongo/bson/util/builder.h"
+#include "mongo/platform/float_utils.h"
+#include "mongo/util/startup_test.h"
+
 
 namespace mongo {
 
@@ -118,7 +122,7 @@ namespace mongo {
             f = strcmp( l.codeWScopeCode() , r.codeWScopeCode() );
             if ( f )
                 return f;
-            f = strcmp( l.codeWScopeScopeData() , r.codeWScopeScopeData() );
+            f = strcmp( l.codeWScopeScopeDataUnsafe() , r.codeWScopeScopeDataUnsafe() );
             if ( f )
                 return f;
             return 0;

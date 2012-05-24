@@ -29,6 +29,7 @@
 #include "rs_optime.h"
 #include "rs_member.h"
 #include "rs_config.h"
+#include "mongo/db/repl/rs_sync.h"
 
 /**
  * Order of Events
@@ -80,33 +81,6 @@ namespace mongo {
         const HostAndPort _h;
         HeartbeatInfo _hbinfo;
     };
-
-    namespace replset {
-        /**
-         * "Normal" replica set syncing
-         */
-        class SyncTail : public Sync {
-        public:
-            virtual ~SyncTail() {}
-            SyncTail(const string& host) : Sync(host) {}
-            virtual bool syncApply(const BSONObj &o);
-        };
-
-        /**
-         * Initial clone and sync
-         */
-        class InitialSync : public SyncTail {
-        public:
-            InitialSync(const string& host) : SyncTail(host) {}
-            virtual ~InitialSync() {}
-            bool oplogApplication(OplogReader& r, const Member* source, const OpTime& applyGTE, const OpTime& minValid);
-            virtual void applyOp(const BSONObj& o, const OpTime& minvalid);
-        };
-
-        // TODO: move hbmsg into an error-keeping class (SERVER-4444)
-        void sethbmsg(const string& s, const int logLevel=0);
-
-    } // namespace replset
 
     class Manager : public task::Server {
         ReplSetImpl *rs;
@@ -310,8 +284,7 @@ namespace mongo {
         }
         void noteRemoteIsPrimary(const Member *remote) {
             rwlock lk(m, true);
-            if( !sp.state.secondary() && !sp.state.fatal() )
-                sp.state = MemberState::RS_RECOVERING;
+            verify(!sp.state.primary());
             sp.primary = remote;
         }
         StateBox() : m("StateBox") { }
@@ -356,6 +329,14 @@ namespace mongo {
         OpTime lastOpTimeWritten;
         long long lastH; // hash we use to make sure we are reading the right flow of ops and aren't on an out-of-date "fork"
         bool forceSyncFrom(const string& host, string& errmsg, BSONObjBuilder& result);
+
+        /**
+         * Find the closest member (using ping time) with a higher latest optime.
+         */
+        Member* getMemberToSyncTo();
+        void veto(const string& host, unsigned secs=10);
+        bool gotForceSync();
+        void goStale(const Member* m, const BSONObj& o);
     private:
         set<ReplSetHealthPollTask*> healthTasks;
         void endOldHealthTasks();
@@ -371,13 +352,7 @@ namespace mongo {
         void assumePrimary();
         void loadLastOpTimeWritten(bool quiet=false);
         void changeState(MemberState s);
-        
-        /**
-         * Find the closest member (using ping time) with a higher latest optime.
-         */
-        Member* getMemberToSyncTo();
-        void veto(const string& host, unsigned secs=10);
-        Member* _currentSyncTarget;
+
         Member* _forceSyncTarget;
 
         bool _blockSync;
@@ -452,6 +427,8 @@ namespace mongo {
 
         /* throws exception if a problem initializing. */
         ReplSetImpl(ReplSetCmdline&);
+        // used for testing
+        ReplSetImpl();
 
         /* call afer constructing to start - returns fairly quickly after launching its threads */
         void _go();
@@ -474,7 +451,6 @@ namespace mongo {
         void loadConfig();
 
         list<HostAndPort> memberHostnames() const;
-        const ReplSetConfig::MemberCfg& myConfig() const { return _config; }
         bool iAmArbiterOnly() const { return myConfig().arbiterOnly; }
         bool iAmPotentiallyHot() const {
           return myConfig().potentiallyHot() && // not an arbiter
@@ -519,34 +495,28 @@ namespace mongo {
         friend class Consensus;
 
     private:
-        bool initialSyncOplogApplication(const OpTime& applyGTE, const OpTime& minValid);
         void _syncDoInitialSync();
         void syncDoInitialSync();
         void _syncThread();
-        bool tryToGoLiveAsASecondary(OpTime&); // readlocks
         void syncTail();
         unsigned _syncRollback(OplogReader& r);
-        void syncRollback(OplogReader& r);
         void syncFixUp(HowToFixUp& h, OplogReader& r);
-
-        // get an oplog reader for a server with an oplog entry timestamp greater
-        // than or equal to minTS, if set.
-        Member* _getOplogReader(OplogReader& r, const OpTime& minTS);
-
-        // check lastOpTimeWritten against the remote's earliest op, filling in
-        // remoteOldestOp.
-        bool _isStale(OplogReader& r, const OpTime& minTS, BSONObj& remoteOldestOp);
 
         // keep a list of hosts that we've tried recently that didn't work
         map<string,time_t> _veto;
     public:
+        const ReplSetConfig::MemberCfg& myConfig() const { return _config; }
+        bool tryToGoLiveAsASecondary(OpTime&); // readlocks
+        void syncRollback(OplogReader& r);
         void syncThread();
         const OpTime lastOtherOpTime() const;
     };
 
     class ReplSet : public ReplSetImpl {
     public:
-        ReplSet(ReplSetCmdline& replSetCmdline) : ReplSetImpl(replSetCmdline) {  }
+        ReplSet();
+        ReplSet(ReplSetCmdline& replSetCmdline);
+        virtual ~ReplSet() {}
 
         // for the replSetStepDown command
         bool stepDown(int secs) { return _stepDown(secs); }
@@ -559,17 +529,18 @@ namespace mongo {
             return _self->fullName();
         }
 
-        bool buildIndexes() const { return _buildIndexes; }
+        virtual bool buildIndexes() const { return _buildIndexes; }
 
         /* call after constructing to start - returns fairly quickly after la[unching its threads */
         void go() { _go(); }
+        void shutdown();
 
         void fatal() { _fatal(); }
-        bool isPrimary() { return box.getState().primary(); }
-        bool isSecondary() {  return box.getState().secondary(); }
+        virtual bool isPrimary() { return box.getState().primary(); }
+        virtual bool isSecondary() {  return box.getState().secondary(); }
         MemberState state() const { return ReplSetImpl::state(); }
         string name() const { return ReplSetImpl::name(); }
-        const ReplSetConfig& config() { return ReplSetImpl::config(); }
+        virtual const ReplSetConfig& config() { return ReplSetImpl::config(); }
         void getOplogDiagsAsHtml(unsigned server_id, stringstream& ss) const { _getOplogDiagsAsHtml(server_id,ss); }
         void summarizeAsHtml(stringstream& ss) const { _summarizeAsHtml(ss); }
         void summarizeStatus(BSONObjBuilder& b) const  { _summarizeStatus(b); }

@@ -275,7 +275,15 @@ namespace mongo {
                       BSONObj& responseObj);
 
     /* helper to do a reply using a DbResponse object */
-    void replyToQuery(int queryResultFlags, Message &m, DbResponse &dbresponse, BSONObj obj);
+    void replyToQuery( int queryResultFlags, Message& m, DbResponse& dbresponse, BSONObj obj );
 
-
+    /**
+     * Helper method for setting up a response object.
+     *
+     * @param queryResultFlags The flags to set to the response object.
+     * @param response The object to be used for building the response. The internal buffer of
+     *     this object will contain the raw data from resultObj after a successful call.
+     * @param resultObj The bson object that contains the reply data.
+     */
+    void replyToQuery( int queryResultFlags, Message& response, const BSONObj& resultObj );
 } // namespace mongo

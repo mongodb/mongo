@@ -28,7 +28,7 @@
 
 namespace mongo {
 
-    const BSONObj reverseNaturalObj = BSON( "$natural" << -1 );
+    extern const BSONObj reverseNaturalObj; // {"$natural": -1 }
 
     class Cursor;
     class CoveredIndexMatcher;

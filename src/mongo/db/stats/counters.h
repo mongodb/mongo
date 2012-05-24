@@ -22,6 +22,7 @@
 #include "../../util/net/message.h"
 #include "../../util/processinfo.h"
 #include "../../util/concurrency/spin_lock.h"
+#include "mongo/db/pdfile.h"
 
 namespace mongo {
 
@@ -69,9 +70,7 @@ namespace mongo {
         void btree( char * node ) {
             if ( ! _memSupported )
                 return;
-            if ( _sampling++ % _samplingrate )
-                return;
-            btree( _pi.blockInMemory( node ) );
+            btree( Record::likelyInPhysicalMemory( node ) );
         }
 
         void btree( bool memHit ) {
@@ -87,11 +86,7 @@ namespace mongo {
         void append( BSONObjBuilder& b );
 
     private:
-        ProcessInfo _pi;
         bool _memSupported;
-
-        int _sampling;
-        int _samplingrate;
 
         int _resets;
         long long _maxAllowed;

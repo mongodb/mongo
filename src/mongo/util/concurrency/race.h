@@ -2,6 +2,7 @@
 
 #include "../goodies.h" // printStackTrace
 #include "mutexdebugger.h"
+#include "mongo/util/stacktrace.h"
 
 namespace mongo {
 

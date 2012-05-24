@@ -67,7 +67,8 @@ namespace mongo {
         return pCurrent;
     }
 
-    void DocumentSourceGroup::sourceToBson(BSONObjBuilder *pBuilder) const {
+    void DocumentSourceGroup::sourceToBson(
+        BSONObjBuilder *pBuilder, bool explain) const {
         BSONObjBuilder insides;
 
         /* add the _id */

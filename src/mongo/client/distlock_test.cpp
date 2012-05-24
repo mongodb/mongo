@@ -17,6 +17,7 @@
 
 #include <iostream>
 #include "pch.h"
+#include <boost/thread/thread.hpp>
 #include "distlock.h"
 #include "../db/commands.h"
 #include "../util/bson_util.h"

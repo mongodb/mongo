@@ -21,6 +21,7 @@
 #include "../queryutil.h"
 #include "../oplog.h"
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/util/stacktrace.h"
 
 namespace mongo {
     
@@ -29,7 +30,7 @@ namespace mongo {
        justOne: stop after 1 match
        god:     allow access to system namespaces, and don't yield
     */
-    long long deleteObjects(const char *ns, BSONObj pattern, bool justOneOrig, bool logop, bool god, RemoveSaver * rs ) {
+    long long deleteObjects(const char *ns, BSONObj pattern, bool justOne, bool logop, bool god, RemoveSaver * rs ) {
         if( !god ) {
             if ( strstr(ns, ".system.") ) {
                 /* note a delete from system.indexes would corrupt the db
@@ -64,7 +65,6 @@ namespace mongo {
 
         CursorId id = cc->cursorid();
 
-        bool justOne = justOneOrig;
         bool canYield = !god && !(creal->matcher() && creal->matcher()->docMatcher().atomic());
 
         do {
@@ -98,22 +98,27 @@ namespace mongo {
 
             bool match = creal->currentMatches();
 
-            if ( ! cc->advance() )
-                justOne = true;
-
+            cc->advance();
+            
             if ( ! match )
                 continue;
 
-            if ( !justOne ) {
-                /* NOTE: this is SLOW.  this is not good, noteLocation() was designed to be called across getMore
-                    blocks.  here we might call millions of times which would be bad.
-                    */
+            // SERVER-5198 Advance past the document to be modified, but see SERVER-5725.
+            while( cc->ok() && rloc == cc->currLoc() ) {
+                cc->advance();
+            }
+            
+            bool foundAllResults = ( justOne || !cc->ok() );
+
+            if ( !foundAllResults ) {
+                // NOTE: Saving and restoring a btree cursor's position was historically described
+                // as slow here.
                 cc->c()->prepareToTouchEarlierIterate();
             }
 
             if ( logop ) {
                 BSONElement e;
-                if( BSONObj( rloc.rec() ).getObjectID( e ) ) {
+                if( BSONObj::make( rloc.rec() ).getObjectID( e ) ) {
                     BSONObjBuilder b;
                     b.append( e );
                     bool replJustOne = true;
@@ -129,7 +134,7 @@ namespace mongo {
 
             theDataFileMgr.deleteRecord(ns, rloc.rec(), rloc);
             nDeleted++;
-            if ( justOne ) {
+            if ( foundAllResults ) {
                 break;
             }
             cc->c()->recoverFromTouchingEarlierIterate();

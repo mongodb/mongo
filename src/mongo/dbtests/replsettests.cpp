@@ -27,7 +27,8 @@
 #include "dbtests.h"
 #include "../db/oplog.h"
 
-#include "../db/repl/rs.h"
+#include "mongo/db/repl/rs.h"
+#include "mongo/db/repl/bgsync.h"
 
 namespace mongo {
     void createOplog();
@@ -55,8 +56,21 @@ namespace ReplSetTests {
             Client::Context ctx( ns() );
             theDataFileMgr.insert( ns(), o.objdata(), o.objsize(), god );
         }
+
         BSONObj findOne( const BSONObj &query = BSONObj() ) const {
             return client()->findOne( ns(), query );
+        }
+
+        void drop() {
+            Client::WriteContext c(ns());
+            string errmsg;
+            BSONObjBuilder result;
+
+            if (nsdetails(ns()) == NULL) {
+                return;
+            }
+
+            dropCollection( string(ns()), errmsg, result );
         }
     };
     DBDirectClient Base::client_;
@@ -65,7 +79,7 @@ namespace ReplSetTests {
     class MockInitialSync : public replset::InitialSync {
         int step;
     public:
-        MockInitialSync() : replset::InitialSync(""), step(0), failOnStep(SUCCEED), retry(true) {}
+        MockInitialSync() : InitialSync(0), step(0), failOnStep(SUCCEED), retry(true) {}
 
         enum FailOn {SUCCEED, FAIL_FIRST_APPLY, FAIL_BOTH_APPLY};
 
@@ -94,41 +108,40 @@ namespace ReplSetTests {
         void run() {
             Lock::GlobalWrite lk;
 
-            OpTime o1,o2;
+            OpTime o;
 
             {
                 mongo::mutex::scoped_lock lk2(OpTime::m);
-                o1 = OpTime::now(lk2);
-                o2 = OpTime::now(lk2);
+                o = OpTime::now(lk2);
             }
 
             BSONObjBuilder b;
-            b.appendTimestamp("ts", o2.asLL());
+            b.appendTimestamp("ts", o.asLL());
             BSONObj obj = b.obj();
 
             MockInitialSync mock;
 
             // all three should succeed
-            mock.applyOp(obj, o1);
+            mock.applyOp(obj);
 
             mock.failOnStep = MockInitialSync::FAIL_FIRST_APPLY;
-            mock.applyOp(obj, o1);
+            mock.applyOp(obj);
 
             mock.retry = false;
-            mock.applyOp(obj, o1);
+            mock.applyOp(obj);
 
             // force failure
             MockInitialSync mock2;
             mock2.failOnStep = MockInitialSync::FAIL_BOTH_APPLY;
 
-            ASSERT_THROWS(mock2.applyOp(obj, o2), UserException);
+            ASSERT_THROWS(mock2.applyOp(obj), UserException);
         }
     };
 
     class SyncTest2 : public replset::InitialSync {
     public:
         bool insertOnRetry;
-        SyncTest2() : replset::InitialSync(""), insertOnRetry(false) {}
+        SyncTest2() : InitialSync(0), insertOnRetry(false) {}
         virtual ~SyncTest2() {}
         virtual bool shouldRetry(const BSONObj& o) {
             if (!insertOnRetry) {
@@ -145,11 +158,10 @@ namespace ReplSetTests {
         void run() {
             Lock::GlobalWrite lk;
 
-            OpTime o1 = OpTime::_now();
-            OpTime o2 = OpTime::_now();
+            OpTime o = OpTime::_now();
 
             BSONObjBuilder b;
-            b.appendTimestamp("ts", o2.asLL());
+            b.appendTimestamp("ts", o.asLL());
             b.append("op", "u");
             b.append("o", BSON("$set" << BSON("x" << 456)));
             b.append("o2", BSON("_id" << 123));
@@ -157,11 +169,11 @@ namespace ReplSetTests {
             BSONObj obj = b.obj();
 
             SyncTest2 sync;
-            ASSERT_THROWS(sync.applyOp(obj, o1), UserException);
+            ASSERT_THROWS(sync.applyOp(obj), UserException);
 
             sync.insertOnRetry = true;
             // succeeds
-            sync.applyOp(obj, o1);
+            sync.applyOp(obj);
 
             BSONObj fin = findOne();
             verify(fin["x"].Number() == 456);
@@ -169,7 +181,7 @@ namespace ReplSetTests {
     };
 
     class CappedInitialSync : public Base {
-        string _ns;
+        string _cappedNs;
         Lock::DBWrite _lk;
 
         string spec() const {
@@ -177,17 +189,17 @@ namespace ReplSetTests {
         }
 
         void create() {
-            Client::Context c(_ns);
+            Client::Context c(_cappedNs);
             string err;
-            ASSERT(userCreateNS( _ns.c_str(), fromjson( spec() ), err, false ));
+            ASSERT(userCreateNS( _cappedNs.c_str(), fromjson( spec() ), err, false ));
         }
 
-        void drop() {
-            Client::Context c(_ns);
-            if (nsdetails(_ns.c_str()) != NULL) {
+        void dropCapped() {
+            Client::Context c(_cappedNs);
+            if (nsdetails(_cappedNs.c_str()) != NULL) {
                 string errmsg;
                 BSONObjBuilder result;
-                dropCollection( string(_ns), errmsg, result );
+                dropCollection( string(_cappedNs), errmsg, result );
             }
         }
 
@@ -200,34 +212,34 @@ namespace ReplSetTests {
             b.append("op", "u");
             b.append("o", BSON("$set" << BSON("x" << 456)));
             b.append("o2", BSON("_id" << 123 << "x" << 123));
-            b.append("ns", _ns);
+            b.append("ns", _cappedNs);
             BSONObj o = b.obj();
 
             verify(!apply(o));
             return o;
         }
     public:
-        CappedInitialSync() : _ns("unittests.foo.bar"), _lk(_ns) {
-            drop();
+        CappedInitialSync() : _cappedNs("unittests.foo.bar"), _lk(_cappedNs) {
+            dropCapped();
             create();
         }
         virtual ~CappedInitialSync() {
-            drop();
+            dropCapped();
         }
 
         string& cappedNs() {
-            return _ns;
+            return _cappedNs;
         }
 
         // returns true on success, false on failure
         bool apply(const BSONObj& op) {
-            Client::Context ctx( _ns );
+            Client::Context ctx( _cappedNs );
             // in an annoying twist of api, returns true on failure
             return !applyOperation_inlock(op, true);
         }
 
         void run() {
-            Lock::DBWrite lk(_ns);
+            Lock::DBWrite lk(_cappedNs);
 
             BSONObj op = updateFail();
 
@@ -306,6 +318,178 @@ namespace ReplSetTests {
         }
     };
 
+    class BackgroundSyncTest : public replset::BackgroundSyncInterface {
+        std::queue<BSONObj> _queue;
+    public:
+        BackgroundSyncTest() {}
+        virtual ~BackgroundSyncTest() {}
+        virtual BSONObj* peek() {
+            if (_queue.empty()) {
+                return NULL;
+            }
+            return &_queue.front();
+        }
+        virtual void consume() {
+            _queue.pop();
+        }
+        virtual Member* getSyncTarget() {
+            return 0;
+        }
+        void addDoc(BSONObj doc) {
+            _queue.push(doc.getOwned());
+        }
+    };
+
+    class ReplSetTest : public ReplSet {
+        ReplSetConfig *_config;
+        ReplSetConfig::MemberCfg *_myConfig;
+        replset::BackgroundSyncInterface *_syncTail;
+    public:
+        virtual ~ReplSetTest() {
+            delete _myConfig;
+            delete _config;
+        }
+        ReplSetTest() : _syncTail(0) {
+            BSONArrayBuilder members;
+            members.append(BSON("_id" << 0 << "host" << "host1"));
+            members.append(BSON("_id" << 1 << "host" << "host2"));
+            _config = new ReplSetConfig(BSON("_id" << "foo" << "members" << members.arr()));
+
+            _myConfig = new ReplSetConfig::MemberCfg();
+        }
+        virtual bool isSecondary() {
+            return true;
+        }
+        virtual bool isPrimary() {
+            return _syncTail->peek() == 0;
+        }
+        virtual bool tryToGoLiveAsASecondary(OpTime& minvalid) {
+            return false;
+        }
+        virtual const ReplSetConfig& config() {
+            return *_config;
+        }
+        virtual const ReplSetConfig::MemberCfg& myConfig() {
+            return *_myConfig;
+        }
+        virtual bool buildIndexes() const {
+            return true;
+        }
+        void setSyncTail(replset::BackgroundSyncInterface *syncTail) {
+            _syncTail = syncTail;
+        }
+    };
+
+    class TestRSSync : public Base {
+        BackgroundSyncTest *_bgsync;
+        replset::SyncTail *_tailer;
+
+        void setup() {
+            // setup background sync instance
+            _bgsync = new BackgroundSyncTest();
+
+            // setup tail
+            _tailer = new replset::SyncTail(_bgsync);
+
+            // setup theReplSet
+            ReplSetTest *rst = new ReplSetTest();
+            rst->setSyncTail(_bgsync);
+            theReplSet = rst;
+        }
+
+        void addOp(const string& op, BSONObj o, BSONObj* o2 = 0, const char* coll = 0) {
+            OpTime ts;
+            {
+                Lock::GlobalWrite lk;
+                ts = OpTime::_now();
+            }
+
+            BSONObjBuilder b;
+            b.appendTimestamp("ts", ts.asLL());
+            b.append("op", op);
+            b.append("o", o);
+
+            if (o2) {
+                b.append("o2", *o2);
+            }
+
+            if (coll) {
+                b.append("ns", coll);
+            }
+            else {
+                b.append("ns", ns());
+            }
+
+            _bgsync->addDoc(b.done());
+        }
+
+        void addInserts(int expected) {
+            for (int i=0; i<expected; i++) {
+                addOp("i", BSON("_id" << i << "x" << 123));
+            }
+        }
+
+        void addUpdates() {
+            BSONObj id = BSON("_id" << "123456something");
+            addOp("i", id);
+
+            addOp("u", BSON("$set" << BSON("requests.1000001_2" << BSON(
+                    "id" << "1000001_2" <<
+                    "timestamp" << 1334813340))), &id);
+
+            addOp("u", BSON("$set" << BSON("requests.1000002_2" << BSON(
+                    "id" << "1000002_2" <<
+                    "timestamp" << 1334813368))), &id);
+
+            addOp("u", BSON("$set" << BSON("requests.100002_1" << BSON(
+                    "id" << "100002_1" <<
+                    "timestamp" << 1334810820))), &id);
+        }
+
+        void addUniqueIndex() {
+            addOp("i", BSON("ns" << ns() << "key" << BSON("x" << 1) << "name" << "x1" << "unique" << true), 0, "unittests.system.indexes");
+            addInserts(2);
+        }
+
+        void applyOplog() {
+            _tailer->oplogApplication();
+        }
+    public:
+        ~TestRSSync() {
+            delete _bgsync;
+            delete _tailer;
+        }
+
+        void run() {
+            const int expected = 100;
+
+            setup();
+
+            drop();
+            addInserts(100);
+            applyOplog();
+
+            ASSERT_EQUALS(expected, static_cast<int>(client()->count(ns())));
+
+            drop();
+            addUpdates();
+            applyOplog();
+
+            BSONObj obj = findOne();
+
+            ASSERT_EQUALS(1334813340, obj["requests"]["1000001_2"]["timestamp"].number());
+            ASSERT_EQUALS(1334813368, obj["requests"]["1000002_2"]["timestamp"].number());
+            ASSERT_EQUALS(1334810820, obj["requests"]["100002_1"]["timestamp"].number());
+
+            // test dup key error
+            drop();
+            addUniqueIndex();
+            applyOplog();
+
+            ASSERT_EQUALS(1, static_cast<int>(client()->count(ns())));
+            ASSERT(_bgsync->peek() != NULL);
+        }
+    };
 
     class All : public Suite {
     public:
@@ -318,6 +502,7 @@ namespace ReplSetTests {
             add< CappedInitialSync >();
             add< CappedUpdate >();
             add< CappedInsert >();
+            add< TestRSSync >();
         }
     } myall;
 }

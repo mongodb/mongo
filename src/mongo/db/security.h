@@ -18,9 +18,12 @@
 
 #pragma once
 
-#include "mongo/db/authlevel.h"
+#include <string>
+
 #include "mongo/db/nonce.h"
 #include "mongo/db/security_common.h"
+#include "mongo/client/authentication_table.h"
+#include "mongo/client/authlevel.h"
 #include "mongo/util/concurrency/spin_lock.h"
 
 // this is used by both mongos and mongod
@@ -37,72 +40,84 @@ namespace mongo {
         AuthenticationInfo() {
             _isLocalHost = false; 
             _isLocalHostAndLocalHostIsAuthorizedForAll = false;
+            _usingTempAuth = false;
         }
         ~AuthenticationInfo() {}
         bool isLocalHost() const { return _isLocalHost; } // why are you calling this? makes no sense to be externalized
 
         // -- modifiers ----
         
-        void logout(const string& dbname ) {
+        void logout(const std::string& dbname ) {
             scoped_spinlock lk(_lock);
-            _dbs.erase(dbname);
+            _authTable.removeAuth( dbname );
         }
-        void authorize(const string& dbname , const string& user ) {
+        void authorize(const std::string& dbname , const std::string& user ) {
             scoped_spinlock lk(_lock);
-            _dbs[dbname].level = Auth::WRITE;
-            _dbs[dbname].user = user;
+            _authTable.addAuth( dbname, user, Auth::WRITE );
         }
-        void authorizeReadOnly(const string& dbname , const string& user ) {
+        void authorizeReadOnly(const std::string& dbname , const std::string& user ) {
             scoped_spinlock lk(_lock);
-            _dbs[dbname].level = Auth::READ;
-            _dbs[dbname].user = user;
+            _authTable.addAuth( dbname, user, Auth::READ );
         }
         
         // -- accessors ---
 
-        bool isAuthorized(const string& dbname) const { 
+        bool isAuthorized(const std::string& dbname) const { 
             return _isAuthorized( dbname, Auth::WRITE ); 
         }
         
-        bool isAuthorizedReads(const string& dbname) const { 
+        bool isAuthorizedReads(const std::string& dbname) const { 
             return _isAuthorized( dbname, Auth::READ ); 
         }
         
         /**
          * @param lockType - this is from dbmutex 1 is write, 0 is read
          */
-        bool isAuthorizedForLock(const string& dbname, int lockType ) const { 
+        bool isAuthorizedForLock(const std::string& dbname, int lockType ) const { 
             return _isAuthorized( dbname , lockType > 0 ? Auth::WRITE : Auth::READ ); 
         }
 
-        bool isAuthorizedForLevel( const string& dbname , Auth::Level level ) const {
+        bool isAuthorizedForLevel( const std::string& dbname , Auth::Level level ) const {
             return _isAuthorized( dbname , level );
         }
 
-        string getUser( const string& dbname ) const;
+        std::string getUser( const std::string& dbname ) const;
 
         void print() const;
+
+        BSONObj toBSON() const;
+
+        void setTemporaryAuthorization( BSONObj& obj );
+        void clearTemporaryAuthorization();
 
     private:
         void _checkLocalHostSpecialAdmin();
 
         /** takes a lock */
-        bool _isAuthorized(const string& dbname, Auth::Level level) const;
+        bool _isAuthorized(const std::string& dbname, Auth::Level level) const;
 
-        bool _isAuthorizedSingle_inlock(const string& dbname, Auth::Level level) const;
+        // Must be in _lock
+        bool _isAuthorizedSingle_inlock(const std::string& dbname, Auth::Level level) const;
         
         /** cannot call this locked */
-        bool _isAuthorizedSpecialChecks( const string& dbname ) const ;
+        bool _isAuthorizedSpecialChecks( const std::string& dbname ) const ;
+
+        // Must be in _lock
+        void _addTempAuth_inlock( const std::string& dbname, const std::string& user,
+                                  Auth::Level level);
 
     private:
-        // while most access to _dbs is from our thread (the TLS thread), currentOp() inspects
-        // it too thus we need this
+        // while most access to _authTable is from our thread (the TLS thread), currentOp()
+        // inspects it too thus we need this.
+        // This protects _authTable, _tempAuthTable, and _usingTempAuth.
         mutable SpinLock _lock;
 
         // todo: caching should not last forever
-        typedef map<string,Auth> MA;
-        MA _dbs; // dbname -> auth
+        AuthenticationTable _authTable;
+        // when _usingTempAuth is true, this is used for all auth checks instead of _authTable
+        AuthenticationTable _tempAuthTable;
 
+        bool _usingTempAuth;
         static bool _warned;
     };
 

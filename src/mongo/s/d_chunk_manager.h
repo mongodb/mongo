@@ -27,6 +27,10 @@ namespace mongo {
 
     class ClientCursor;
     class DBClientCursorInterface;
+
+    class ShardChunkManager;
+    typedef shared_ptr<ShardChunkManager> ShardChunkManagerPtr;
+
     /**
      * Controls the boundaries of all the chunks for a given collection that live in this shard.
      *
@@ -53,7 +57,7 @@ namespace mongo {
          *
          * This constructor throws if collection is dropped/malformed and on connectivity errors
          */
-        ShardChunkManager( const string& configServer , const string& ns , const string& shardName );
+        ShardChunkManager( const string& configServer , const string& ns , const string& shardName, ShardChunkManagerPtr oldManager = ShardChunkManagerPtr() );
 
         /**
          * Same as the regular constructor but used in unittest (no access to configDB required).
@@ -135,7 +139,7 @@ namespace mongo {
          */
         bool _belongsToMe( const BSONObj& key ) const;
 
-        
+        ShardChunkVersion _collVersion;
         // highest ShardChunkVersion for which this ShardChunkManager's information is accurate
         ShardChunkVersion _version;
 
@@ -161,7 +165,5 @@ namespace mongo {
         /** can only be used in the cloning calls */
         ShardChunkManager() {}
     };
-
-    typedef shared_ptr<ShardChunkManager> ShardChunkManagerPtr;
 
 }  // namespace mongo

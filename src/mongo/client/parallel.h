@@ -389,6 +389,7 @@ namespace mongo {
 
         // LEGACY BELOW
         int _numServers;
+        int _lastFrom;
         set<ServerAndQuery> _servers;
         BSONObj _sortKey;
 

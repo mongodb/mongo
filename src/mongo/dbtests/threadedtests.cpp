@@ -75,10 +75,11 @@ namespace ThreadedTests {
         enum { N = 4000/*0*/ };
 #endif
         ProgressMeter pm;
+        int wToXSuccessfulUpgradeCount, wToXFailedUpgradeCount;
     public:
-        int upgradeWorked, upgradeFailed;
         MongoMutexTest() : pm(N * nthreads) {
-            upgradeWorked = upgradeFailed = 0;
+            wToXSuccessfulUpgradeCount = 0;
+            wToXFailedUpgradeCount = 0;
         }
         void run() {
             DEV {
@@ -128,10 +129,7 @@ namespace ThreadedTests {
                     }
                     if( sometimes ) { 
                         w.downgrade();
-                        sleepmillis(0);
-                        bool worked = w.upgrade();
-                        if( worked) upgradeWorked++;
-                        else upgradeFailed++;
+                        w.upgrade();
                     }
                 }
                 else if( i % 7 == 2 ) {
@@ -216,6 +214,21 @@ namespace ThreadedTests {
                             Lock::DBRead y("admin");
                             { Lock::TempRelease t; }
                         }
+                        else if ( q > 4 && q < 8 ) {
+                            static const char * const dbnames[] = {
+                                "bar0", "bar1", "bar2", "bar3", "bar4", "bar5",
+                                "bar6", "bar7", "bar8", "bar9", "bar10" };
+                            Lock::DBWrite w(dbnames[q]);
+                            {
+                                Lock::DBWrite::UpgradeToExclusive wToX;
+                                if (wToX.gotUpgrade()) {
+                                    ++wToXSuccessfulUpgradeCount;
+                                }
+                                else {
+                                    ++wToXFailedUpgradeCount;
+                                }
+                            }
+                        }
                         else { 
                             Lock::DBWrite w("foo");
                             {
@@ -241,8 +254,7 @@ namespace ThreadedTests {
         virtual void validate() {
             log() << "mongomutextest validate" << endl;
             ASSERT( ! Lock::isReadLocked() );
-            ASSERT( upgradeWorked > upgradeFailed );
-            ASSERT( upgradeWorked > 4 );
+            ASSERT( wToXSuccessfulUpgradeCount >= 39 * N / 2000 );
             {
                     Lock::GlobalWrite w;
             }
@@ -803,19 +815,12 @@ namespace ThreadedTests {
         }
     };
 
-    static int pass;
     class QLockTest : public ThreadedTest<3> {
     public:
         bool gotW;
         QLockTest() : gotW(false), m() { }
-        void setup() { 
-            if( pass == 1) { 
-                m.stop_greed();
-            }
-        }
-        ~QLockTest() {
-            m.start_greed();
-        }
+        void setup() {}
+        ~QLockTest() {}
     private:
         QLock m;
         virtual void validate() { }

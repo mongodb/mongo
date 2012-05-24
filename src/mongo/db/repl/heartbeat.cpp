@@ -15,6 +15,9 @@
 */
 
 #include "pch.h"
+
+#include <boost/thread/thread.hpp>
+
 #include "rs.h"
 #include "health.h"
 #include "../../util/background.h"
@@ -30,6 +33,7 @@
 #include "connections.h"
 #include "../instance.h"
 #include "../repl.h"
+#include "mongo/db/repl/bgsync.h"
 
 namespace mongo {
 
@@ -383,7 +387,15 @@ namespace mongo {
         task::fork(mgr);
         mgr->send( boost::bind(&Manager::msgCheckNewState, theReplSet->mgr) );
 
+        if (myConfig().arbiterOnly) {
+            return;
+        }
+
         boost::thread t(startSyncThread);
+
+        replset::BackgroundSync* sync = replset::BackgroundSync::get();
+        boost::thread producer(boost::bind(&replset::BackgroundSync::producerThread, sync));
+        boost::thread notifier(boost::bind(&replset::BackgroundSync::notifierThread, sync));
 
         task::fork(ghost);
 

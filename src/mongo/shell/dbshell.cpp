@@ -15,25 +15,33 @@
  *    limitations under the License.
  */
 
-#include "pch.h"
+#include "mongo/pch.h"
+
+#include <boost/filesystem/operations.hpp>
+#include <fstream>
 #include <pcrecpp.h>
 #include <stdio.h>
 #include <string.h>
-
-#include <boost/filesystem/operations.hpp>
 
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/cmdline.h"
 #include "mongo/db/repl/rs_member.h"
 #include "mongo/scripting/engine.h"
+#include "mongo/shell/linenoise.h"
 #include "mongo/shell/shell_utils.h"
 #include "mongo/shell/shell_utils_launcher.h"
 #include "mongo/util/file.h"
 #include "mongo/util/password.h"
+#include "mongo/util/stacktrace.h"
 #include "mongo/util/startup_test.h"
 #include "mongo/util/util.h"
 #include "mongo/util/version.h"
-#include "third_party/linenoise/linenoise.h"
+
+#ifdef _WIN32
+#define isatty _isatty
+#else
+#include <unistd.h>
+#endif
 
 using namespace std;
 using namespace mongo;
@@ -155,7 +163,7 @@ void quitNicely( int sig ) {
 
     killOps();
     shellHistoryDone();
-    exit(0);
+    ::_exit(0);
 }
 
 // the returned string is allocated with strdup() or malloc() and must be freed by calling free()
@@ -210,7 +218,7 @@ void quitAbruptly( int sig ) {
     mongo::rawOut( ossBt.str() );
 
     mongo::shell_utils::KillMongoProgramInstances();
-    exit( 14 );
+    ::_exit( 14 );
 }
 
 // this will be called in certain c++ error cases, for example if there are two active
@@ -218,7 +226,7 @@ void quitAbruptly( int sig ) {
 void myterminate() {
     mongo::rawOut( "terminate() called in shell, printing stack:" );
     mongo::printStackTrace();
-    exit( 14 );
+    ::_exit( 14 );
 }
 
 void setupSignals() {
@@ -254,7 +262,7 @@ string fixHost( string url , string host , string port ) {
 
     if ( url.find( "/" ) != string::npos ) {
         cerr << "url can't have host or port if you specify them individually" << endl;
-        exit(-1);
+        ::_exit(-1);
     }
 
     if ( host.size() == 0 )
@@ -784,9 +792,9 @@ int _main( int argc, char* argv[] ) {
     if ( runShell ) {
 
         mongo::shell_utils::MongoProgramScope s;
-
+        bool hasMongoRC = norc; // If they specify norc, assume it's not their first time
+        string rcLocation;
         if ( !norc ) {
-            string rcLocation;
 #ifndef _WIN32
             if ( getenv( "HOME" ) != NULL )
                 rcLocation = str::stream() << getenv( "HOME" ) << "/.mongorc.js" ;
@@ -795,11 +803,22 @@ int _main( int argc, char* argv[] ) {
                 rcLocation = str::stream() << getenv( "HOMEDRIVE" ) << getenv( "HOMEPATH" ) << "\\.mongorc.js";
 #endif
             if ( !rcLocation.empty() && fileExists(rcLocation) ) {
+                hasMongoRC = true;
                 if ( ! scope->execFile( rcLocation , false , true , false , 0 ) ) {
                     cout << "The \".mongorc.js\" file located in your home folder could not be executed" << endl;
                     return -5;
                 }
             }
+        }
+        
+        if ( !hasMongoRC && isatty(0) ) {
+           cout << "Welcome to the MongoDB shell.\n" 
+                   "For interactive help, type \"help\".\n" 
+                   "For more comprehensive documentation, see\n\thttp://docs.mongodb.org/\n"
+                   "Questions? Try the support group\n\thttp://groups.google.com/group/mongodb-user" << endl; 
+           fstream f;
+           f.open(rcLocation.c_str(), ios_base::out );
+           f.close();
         }
 
         shellHistoryInit();
@@ -947,17 +966,19 @@ int wmain( int argc, wchar_t* argvW[] ) {
     }
     SetConsoleCP( initialConsoleInputCodePage );
     SetConsoleOutputCP( initialConsoleOutputCodePage );
-    return returnValue;
+    ::_exit(returnValue);
 }
 #else // #ifdef _WIN32
 int main( int argc, char* argv[] ) {
     static mongo::StaticObserver staticObserver;
+    int returnCode;
     try {
-        return _main( argc , argv );
+        returnCode = _main( argc , argv );
     }
     catch ( mongo::DBException& e ) {
         cerr << "exception: " << e.what() << endl;
-        return -1;
+        returnCode = 1;
     }
+    _exit(returnCode);
 }
 #endif // #ifdef _WIN32

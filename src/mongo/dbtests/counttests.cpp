@@ -16,6 +16,8 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <boost/thread/thread.hpp>
+
 #include "../db/ops/count.h"
 
 #include "../db/cursor.h"

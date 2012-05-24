@@ -35,7 +35,7 @@ assert.eq(helper(false), null);
 assert.eq(t.count(), 0);
 
 // upsert:false so nothing there before; something there after
-assert.eq(helper(true), {});
+assert.eq(helper(true), null);
 assert.eq(t.count(), 1);
 assert.eq(helper(true),  {_id: 'asdf', val: 1});
 assert.eq(helper(false), {_id: 'asdf', val: 2}); // upsert only matters when obj doesn't exist

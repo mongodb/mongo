@@ -45,6 +45,7 @@ function via_fam() {
         { big: big }
     }});
   }
+  db.getLastError();
 }
 
 // upsert via findAndModify
@@ -54,6 +55,7 @@ function via_fam_upsert() {
         { big: big }
     }, upsert: true});
   }
+  db.getLastError();
 }
 
 // update data using basic update
@@ -67,6 +69,7 @@ function via_update() {
         { big: big }
     });
   }
+  db.getLastError();
 }
 
 // upsert data using basic update
@@ -76,6 +79,7 @@ function via_update_upsert() {
         { big: big }
     }, true);
   }
+  db.getLastError();
 }
 
 print("---------- Update via findAndModify...");
@@ -103,6 +107,8 @@ assert.gt( s.config.chunks.count({ "ns": "test." + col_fam }), minChunks, "findA
 assert.gt( s.config.chunks.count({ "ns": "test." + col_fam_upsert }), minChunks, "findAndModify upsert code path didn't result in splits" );
 assert.gt( s.config.chunks.count({ "ns": "test." + col_update }), minChunks, "update code path didn't result in splits" );
 assert.gt( s.config.chunks.count({ "ns": "test." + col_update_upsert }), minChunks, "upsert code path didn't result in splits" );
+
+printjson( db[col_update].stats() );
 
 // ensure that all chunks are smaller than chunksize
 // make sure not teensy

@@ -19,6 +19,8 @@
 
 #include "mongo/client/distlock.h"
 
+#include <boost/thread/thread.hpp>
+
 #include "mongo/client/dbclientcursor.h"
 
 

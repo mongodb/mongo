@@ -21,6 +21,7 @@
 
 #include <iostream>
 #include <vector>
+#include <boost/thread/thread.hpp>
 
 #include "mongo/client/dbclient.h"
 

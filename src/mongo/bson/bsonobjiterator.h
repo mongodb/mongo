@@ -19,6 +19,8 @@
 
 #include <boost/preprocessor/cat.hpp> // like the ## operator but works with __LINE__
 
+#include "mongo/bson/bsonobj.h"
+
 namespace mongo {
 
     /** iterator for a BSONObj

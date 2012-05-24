@@ -1,10 +1,27 @@
 // @file d_concurrency.h
+
+/**
+*    Copyright (C) 2008 10gen Inc.
+*
+*    This program is free software: you can redistribute it and/or  modify
+*    it under the terms of the GNU Affero General Public License, version 3,
+*    as published by the Free Software Foundation.
+*
+*    This program is distributed in the hope that it will be useful,
+*    but WITHOUT ANY WARRANTY; without even the implied warranty of
+*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+*    GNU Affero General Public License for more details.
+*
+*    You should have received a copy of the GNU Affero General Public License
+*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
+
 // only used by mongod, thus the name ('d')
 // (also used by dbtests test binary, which is running mongod test code)
 
 #pragma once
 
-#include "mongo/util/concurrency/qlock.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/bson/stringdata.h"
 #include "mongo/db/jsobj.h"
@@ -54,7 +71,7 @@ namespace mongo {
 
         // note that for these classes recursive locking is ok if the recursive locking "makes sense"
         // i.e. you could grab globalread after globalwrite.
-
+        
         class GlobalWrite : public ScopedLock {
             bool stoppedGreed;
             bool noop;
@@ -70,7 +87,7 @@ namespace mongo {
             GlobalWrite(bool stopGreed = false, int timeoutms = -1 ); 
             virtual ~GlobalWrite();
             void downgrade(); // W -> R
-            bool upgrade();   // caution see notes
+            void upgrade();   // caution see notes
         };
         class GlobalRead : public ScopedLock { // recursive is ok
         public:
@@ -83,44 +100,71 @@ namespace mongo {
             GlobalRead( int timeoutms = -1 ); 
             virtual ~GlobalRead();
         };
+
         // lock this database. do not shared_lock globally first, that is handledin herein. 
         class DBWrite : public ScopedLock {
-            bool isW(LockState&) const;
+            /**
+             * flow
+             *   1) lockDB
+             *      a) lockTop
+             *      b) lockNestable or lockOther
+             *   2) unlockDB
+             */
+
             void lockTop(LockState&);
             void lockNestable(Nestable db);
             void lockOther(const string& db);
-            bool locked_w;
-            bool locked_W;
-            WrapperForRWLock *weLocked;
-            const string what;
-            bool _nested;
             void lockDB(const string& ns);
             void unlockDB();
+
         protected:
             void tempRelease();
             void relock();
+
         public:
             DBWrite(const StringData& dbOrNs);
             virtual ~DBWrite();
+
+            class UpgradeToExclusive : private boost::noncopyable {
+            public:
+                UpgradeToExclusive();
+                ~UpgradeToExclusive();
+
+                bool gotUpgrade() const { return _gotUpgrade; }
+            private:
+                bool _gotUpgrade;
+            };
+
+        private:
+            bool _locked_w;
+            bool _locked_W;
+            WrapperForRWLock *_weLocked;
+            const string _what;
+            bool _nested;
         };
+
         // lock this database for reading. do not shared_lock globally first, that is handledin herein. 
         class DBRead : public ScopedLock {
-            bool isRW(LockState&) const;
             void lockTop(LockState&);
             void lockNestable(Nestable db);
             void lockOther(const string& db);
-            bool locked_r;
-            WrapperForRWLock *weLocked;
-            string what;
-            bool _nested;
             void lockDB(const string& ns);
             void unlockDB();
+
         protected:
             void tempRelease();
             void relock();
+
         public:
             DBRead(const StringData& dbOrNs);
             virtual ~DBRead();
+
+        private:
+            bool _locked_r;
+            WrapperForRWLock *_weLocked;
+            string _what;
+            bool _nested;
+            
         };
 
     };
@@ -152,64 +196,5 @@ namespace mongo {
         HLMutex(const char *name);
     };
 
-    // implementation stuff
-    // per thread
-    class LockState {
-    public:
-        LockState();
-        void dump();
-        static void Dump();
-        void reportState(BSONObjBuilder& b);
-        
-        unsigned recursiveCount() const { return _recursive; }
-
-        /**
-         * @return 0 rwRW
-         */
-        char threadState() const { return _threadState; }
-        
-        void locked( char newState ); // RWrw
-        void unlocked(); // _threadState = 0
-        
-        /**
-         * you have to be locked already to call this
-         * this is mostly for W_to_R or R_to_W
-         */
-        void changeLockState( char newstate );
-
-        Lock::Nestable whichNestable() const { return _whichNestable; }
-        int nestableCount() const { return _nestableCount; }
-        
-        int otherCount() const { return _otherCount; }
-        string otherName() const { return _otherName; }
-        WrapperForRWLock* otherLock() const { return _otherLock; }
-        
-        void enterScopedLock( Lock::ScopedLock* lock );
-        Lock::ScopedLock* leaveScopedLock();
-
-        void lockedNestable( Lock::Nestable what , int type );
-        void unlockedNestable();
-        void lockedOther( const string& db , int type , WrapperForRWLock* lock );
-        void unlockedOther();
-    private:
-        unsigned _recursive;           // we allow recursively asking for a lock; we track that here
-
-        // global lock related
-        char _threadState;             // 0, 'r', 'w', 'R', 'W'
-
-        // db level locking related
-        Lock::Nestable _whichNestable;
-        int _nestableCount;            // recursive lock count on local or admin db XXX - change name
-        
-        int _otherCount;               //   >0 means write lock, <0 read lock - XXX change name
-        string _otherName;             // which database are we locking and working with (besides local/admin) 
-        WrapperForRWLock* _otherLock;  // so we don't have to check the map too often (the map has a mutex)
-
-        // for temprelease
-        // for the nonrecursive case. otherwise there would be many
-        // the first lock goes here, which is ok since we can't yield recursive locks
-        Lock::ScopedLock* _scopedLk;   
-        
-    };
 
 }

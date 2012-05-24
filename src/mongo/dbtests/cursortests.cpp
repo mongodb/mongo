@@ -17,16 +17,20 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "pch.h"
-#include "../db/clientcursor.h"
-#include "../db/instance.h"
-#include "../db/btree.h"
-#include "../db/queryutil.h"
-#include "dbtests.h"
+#include "mongo/pch.h"
+
+#include "mongo/db/btree.h"
+#include "mongo/db/clientcursor.h"
+#include "mongo/db/instance.h"
+#include "mongo/db/json.h"
+#include "mongo/db/queryutil.h"
+#include "mongo/dbtests/dbtests.h"
 
 namespace CursorTests {
 
-    namespace BtreeCursorTests {
+    namespace BtreeCursor {
+
+        using mongo::BtreeCursor;
 
         // The ranges expressed in these tests are impossible given our query
         // syntax, so going to do them a hacky way.
@@ -55,10 +59,9 @@ namespace CursorTests {
             vector< BSONObj > _objs;
         };
 
-        class MultiRange : public Base {
+        class MultiRangeForward : public Base {
         public:
             void run() {
-                Lock::GlobalWrite lk;
                 const char *ns = "unittests.cursortests.BtreeCursorTests.MultiRange";
                 {
                     DBDirectClient c;
@@ -68,7 +71,7 @@ namespace CursorTests {
                 }
                 int v[] = { 1, 2, 4, 6 };
                 boost::shared_ptr< FieldRangeVector > frv( vec( v, 4 ) );
-                Client::Context ctx( ns );
+                Client::WriteContext ctx( ns );
                 scoped_ptr<BtreeCursor> _c( BtreeCursor::make( nsdetails( ns ), nsdetails( ns )->idx(1), frv, 1 ) );
                 BtreeCursor &c = *_c.get();
                 ASSERT_EQUALS( "BtreeCursor a_1 multi", c.toString() );
@@ -85,7 +88,6 @@ namespace CursorTests {
         class MultiRangeGap : public Base {
         public:
             void run() {
-                Lock::GlobalWrite lk;
                 const char *ns = "unittests.cursortests.BtreeCursorTests.MultiRangeGap";
                 {
                     DBDirectClient c;
@@ -97,7 +99,7 @@ namespace CursorTests {
                 }
                 int v[] = { -50, 2, 40, 60, 109, 200 };
                 boost::shared_ptr< FieldRangeVector > frv( vec( v, 6 ) );
-                Client::Context ctx( ns );
+                Client::WriteContext ctx( ns );
                 scoped_ptr<BtreeCursor> _c( BtreeCursor::make(nsdetails( ns ), nsdetails( ns )->idx(1), frv, 1 ) );
                 BtreeCursor &c = *_c.get();
                 ASSERT_EQUALS( "BtreeCursor a_1 multi", c.toString() );
@@ -114,7 +116,6 @@ namespace CursorTests {
         class MultiRangeReverse : public Base {
         public:
             void run() {
-                Lock::GlobalWrite lk;
                 const char *ns = "unittests.cursortests.BtreeCursorTests.MultiRangeReverse";
                 {
                     DBDirectClient c;
@@ -124,7 +125,7 @@ namespace CursorTests {
                 }
                 int v[] = { 1, 2, 4, 6 };
                 boost::shared_ptr< FieldRangeVector > frv( vec( v, 4, -1 ) );
-                Client::Context ctx( ns );
+                Client::WriteContext ctx( ns );
                 scoped_ptr<BtreeCursor> _c( BtreeCursor::make( nsdetails( ns ), nsdetails( ns )->idx(1), frv, -1 ) );
                 BtreeCursor& c = *_c.get();
                 ASSERT_EQUALS( "BtreeCursor a_1 reverse multi", c.toString() );
@@ -157,7 +158,7 @@ namespace CursorTests {
                     _c.ensureIndex( ns(), idx() );
                 }
 
-                Client::Context ctx( ns() );
+                Client::WriteContext ctx( ns() );
                 FieldRangeSet frs( ns(), spec, true );
                 // orphan spec for this test.
                 IndexSpec *idxSpec = new IndexSpec( idx() );
@@ -179,7 +180,6 @@ namespace CursorTests {
                 ASSERT_EQUALS( expectedCount, count );
             }
         private:
-            Lock::GlobalWrite _lk;
             vector< BSONObj > _objs;
         };
 
@@ -264,7 +264,6 @@ namespace CursorTests {
         class AbortImplicitScan : public Base {
         public:
             void run() {
-                Lock::GlobalWrite lk;
                 IndexSpec idx( BSON( "a" << 1 << "b" << 1 ) );
                 _c.ensureIndex( ns(), idx.keyPattern );
                 for( int i = 0; i < 300; ++i ) {
@@ -272,7 +271,7 @@ namespace CursorTests {
                 }
                 FieldRangeSet frs( ns(), BSON( "b" << 3 ), true );
                 boost::shared_ptr<FieldRangeVector> frv( new FieldRangeVector( frs, idx, 1 ) );
-                Client::Context ctx( ns() );
+                Client::WriteContext ctx( ns() );
                 scoped_ptr<BtreeCursor> c( BtreeCursor::make( nsdetails( ns() ), nsdetails( ns() )->idx(1), frv, 1 ) );
                 long long initialNscanned = c->nscanned();
                 ASSERT( initialNscanned < 200 );
@@ -284,22 +283,199 @@ namespace CursorTests {
             }
         };
 
-    } // namespace BtreeCursorTests
+    } // namespace BtreeCursor
+    
+    namespace ClientCursor {
 
+        using mongo::ClientCursor;
+        
+        static const char * const ns() { return "unittests.cursortests.clientcursor"; }
+        DBDirectClient client;
+
+        class Base {
+        public:
+            virtual ~Base() {
+                client.dropCollection( ns() );
+            }
+        };        
+        
+        /**
+         * ClientCursor::aboutToDelete() advances a ClientCursor with a refLoc() matching the
+         * document to be deleted.
+         */
+        class AboutToDelete : public Base {
+        public:
+            void run() {
+                populateData();
+                Client::WriteContext ctx( ns() );
+
+                // Generate a cursor from the supplied query and advance it to the iterate to be
+                // deleted.
+                boost::shared_ptr<Cursor> cursor = NamespaceDetailsTransient::getCursor( ns(), query() );
+                while( !isExpectedIterate( cursor->current() ) ) {
+                    ASSERT( cursor->advance() );
+                }
+                ClientCursor::Holder clientCursor( new ClientCursor( QueryOption_NoCursorTimeout,
+                                                                    cursor, ns() ) );
+                DiskLoc loc = clientCursor->currLoc();
+                ASSERT( !loc.isNull() );
+                
+                // Yield the cursor.
+                ClientCursor::YieldData data;
+                clientCursor->prepareToYield( data );
+                // The cursor will be advanced in aboutToDelete().
+                ClientCursor::aboutToDelete( loc );
+                clientCursor->recoverFromYield( data );
+                ASSERT( clientCursor->ok() );
+                
+                // Validate the expected cursor advancement.
+                validateIterateAfterYield( clientCursor->current() );
+            }
+        protected:
+            virtual void populateData() const {
+                client.insert( ns(), BSON( "a" << 1 ) );
+                client.insert( ns(), BSON( "a" << 2 ) );
+            }
+            virtual BSONObj query() const { return BSONObj(); }
+            virtual bool isExpectedIterate( const BSONObj &current ) const {
+                return 1 == current[ "a" ].number();
+            }
+            virtual void validateIterateAfterYield( const BSONObj &current ) const {
+                ASSERT_EQUALS( 2, current[ "a" ].number() );
+            }
+        };
+        
+        /** aboutToDelete() advances past a document referenced by adjacent cursor iterates. */
+        class AboutToDeleteDuplicate : public AboutToDelete {
+            virtual void populateData() const {
+                client.insert( ns(), BSON( "a" << BSON_ARRAY( 1 << 2 ) ) );
+                client.insert( ns(), BSON( "a" << 3 ) );
+                client.ensureIndex( ns(), BSON( "a" << 1 ) );
+            }
+            virtual BSONObj query() const { return BSON( "a" << GT << 0 ); }
+            virtual bool isExpectedIterate( const BSONObj &current ) const {
+                return BSON_ARRAY( 1 << 2 ) == current[ "a" ].embeddedObject();
+            }
+            virtual void validateIterateAfterYield( const BSONObj &current ) const {
+                ASSERT_EQUALS( 3, current[ "a" ].number() );                
+            }
+        };
+        
+        /** aboutToDelete() advances past a document referenced by adjacent cursor clauses. */
+        class AboutToDeleteDuplicateNextClause : public AboutToDelete {
+            virtual void populateData() const {
+                for( int i = 119; i >= 0; --i ) {
+                    client.insert( ns(), BSON( "a" << i ) );
+                }
+                client.ensureIndex( ns(), BSON( "a" << 1 ) );
+                client.ensureIndex( ns(), BSON( "a" << 1 << "b" << 1 ) );
+            }
+            virtual BSONObj query() const { return fromjson( "{$or:[{a:{$gte:0}},{b:1}]}" ); }
+            virtual bool isExpectedIterate( const BSONObj &current ) const {
+                // In the absence of the aboutToDelete() call, the next iterate will be a:119 from
+                // an unindexed cursor over the second clause.
+                return 119 == current[ "a" ].number();
+            }
+            virtual void validateIterateAfterYield( const BSONObj &current ) const {
+                // After the aboutToDelete() call, the a:119 iterate of the unindexed cursor is
+                // skipped, advancing to the a:118 iterate.
+                ASSERT_EQUALS( 118, current[ "a" ].number() );                
+            }
+        };
+
+        namespace Pin {
+
+            class Base {
+            public:
+                Base() :
+                    _ctx( ns() ),
+                    _cursor( theDataFileMgr.findAll( ns() ) ) {
+                        ASSERT( _cursor );
+                        _clientCursor.reset( new ClientCursor( 0, _cursor, ns() ) );
+                }
+            protected:
+                CursorId cursorid() const { return _clientCursor->cursorid(); }
+            private:
+                Client::WriteContext _ctx;
+                boost::shared_ptr<Cursor> _cursor;
+                ClientCursor::Holder _clientCursor;
+            };
+            
+            /** Pin pins a ClientCursor over its lifetime. */
+            class PinCursor : public Base {
+            public:
+                void run() {
+                    assertNotPinned();
+                    {
+                        ClientCursor::Pin pin( cursorid() );
+                        assertPinned();
+                        ASSERT_THROWS( erase(), AssertionException );
+                    }
+                    assertNotPinned();
+                    ASSERT( erase() );
+                }
+            private:
+                void assertPinned() const {
+                    ASSERT( ClientCursor::find( cursorid() ) );
+                }
+                void assertNotPinned() const {
+                    ASSERT_THROWS( ClientCursor::find( cursorid() ), AssertionException );
+                }
+                bool erase() const {
+                    return ClientCursor::erase( cursorid() );
+                }
+            };
+            
+            /** A ClientCursor cannot be pinned twice. */
+            class PinTwice : public Base {
+            public:
+                void run() {
+                    ClientCursor::Pin pin( cursorid() );
+                    ASSERT_THROWS( pinCursor(), AssertionException );
+                }
+            private:
+                void pinCursor() const {
+                    ClientCursor::Pin pin( cursorid() );
+                }
+            };
+            
+            /** Pin behaves properly if its ClientCursor is destroyed early. */
+            class CursorDeleted : public Base {
+            public:
+                void run() {
+                    ClientCursor::Pin pin( cursorid() );
+                    ASSERT( pin.c() );
+                    // Delete the pinned cursor.
+                    ClientCursor::invalidate( ns() );
+                    ASSERT( !pin.c() );
+                    // pin is destroyed safely, even though its ClientCursor was already destroyed.
+                }
+            };
+            
+        } // namespace Pin
+
+    } // namespace ClientCursor
+    
     class All : public Suite {
     public:
         All() : Suite( "cursor" ) {}
 
         void setupTests() {
-            add< BtreeCursorTests::MultiRange >();
-            add< BtreeCursorTests::MultiRangeGap >();
-            add< BtreeCursorTests::MultiRangeReverse >();
-            add< BtreeCursorTests::EqEq >();
-            add< BtreeCursorTests::EqRange >();
-            add< BtreeCursorTests::EqIn >();
-            add< BtreeCursorTests::RangeEq >();
-            add< BtreeCursorTests::RangeIn >();
-            add< BtreeCursorTests::AbortImplicitScan >();
+            add<BtreeCursor::MultiRangeForward>();
+            add<BtreeCursor::MultiRangeGap>();
+            add<BtreeCursor::MultiRangeReverse>();
+            add<BtreeCursor::EqEq>();
+            add<BtreeCursor::EqRange>();
+            add<BtreeCursor::EqIn>();
+            add<BtreeCursor::RangeEq>();
+            add<BtreeCursor::RangeIn>();
+            add<BtreeCursor::AbortImplicitScan>();
+            add<ClientCursor::AboutToDelete>();
+            add<ClientCursor::AboutToDeleteDuplicate>();
+            add<ClientCursor::AboutToDeleteDuplicateNextClause>();
+            add<ClientCursor::Pin::PinCursor>();
+            add<ClientCursor::Pin::PinTwice>();
+            add<ClientCursor::Pin::CursorDeleted>();
         }
     } myall;
 } // namespace CursorTests

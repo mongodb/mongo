@@ -169,12 +169,12 @@ namespace mongo {
 
             if ( ! d ) {
                 errmsg = "ns not found";
-                return 0;
+                return false;
             }
 
             result.append( "ns", ns );
             validateNS( ns.c_str() , d, cmdObj, result);
-            return 1;
+            return true;
         }
 
     private:
@@ -266,7 +266,7 @@ namespace mongo {
                         nlen += r->netLength();
 
                         if (full){
-                            BSONObj obj(r);
+                            BSONObj obj = BSONObj::make(r);
                             if (!obj.isValid() || !obj.valid()){ // both fast and deep checks
                                 valid = false;
                                 if (nInvalid == 0) // only log once;

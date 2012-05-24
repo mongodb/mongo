@@ -289,6 +289,7 @@ namespace mongo {
         long long now = Listener::getElapsedTimeMillis();
         scoped_lock lk( _mutex );
         for ( MapSharded::iterator i=_cursors.begin(); i!=_cursors.end(); ++i ) {
+            // Note: cursors with no timeout will always have an idleTime of 0
             long long idleFor = i->second->idleTime( now );
             if ( idleFor < TIMEOUT ) {
                 continue;

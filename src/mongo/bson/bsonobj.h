@@ -17,14 +17,17 @@
 
 #pragma once
 
-#include <boost/noncopyable.hpp>
 #include <boost/intrusive_ptr.hpp>
+#include <boost/noncopyable.hpp>
 #include <set>
 #include <list>
+#include <string>
 #include <vector>
-#include "util/atomic_int.h"
-#include "util/builder.h"
-#include "stringdata.h"
+
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/stringdata.h"
+#include "mongo/bson/util/atomic_int.h"
+#include "mongo/bson/util/builder.h"
 
 namespace mongo {
 
@@ -71,7 +74,7 @@ namespace mongo {
      */
     class BSONObj {
     public:
-
+        
         /** Construct a BSONObj from data in the proper format.
          *  Use this constructor when something else owns msgdata's buffer
         */
@@ -88,10 +91,10 @@ namespace mongo {
             init(holder);
         }
 
-        explicit BSONObj(const Record *r);
-
         /** Construct an empty BSONObj -- that is, {}. */
         BSONObj();
+
+        static BSONObj make( const Record* r );
 
         ~BSONObj() { 
             _objdata = 0; // defensive

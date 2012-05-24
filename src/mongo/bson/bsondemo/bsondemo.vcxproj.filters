@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="bsondemo.cpp" />
@@ -28,12 +28,6 @@
     <ClInclude Include="..\bsontypes.h">
       <Filter>bson</Filter>
     </ClInclude>
-    <ClInclude Include="..\util\builder.h">
-      <Filter>bson</Filter>
-    </ClInclude>
-    <ClInclude Include="..\util\misc.h">
-      <Filter>bson</Filter>
-    </ClInclude>
     <ClInclude Include="..\oid.h">
       <Filter>bson</Filter>
     </ClInclude>
@@ -43,10 +37,19 @@
     <ClInclude Include="..\bson.h">
       <Filter>bson</Filter>
     </ClInclude>
+    <ClInclude Include="..\util\builder.h">
+      <Filter>bson\util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\misc.h">
+      <Filter>bson\util</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="bson">
       <UniqueIdentifier>{ea599740-3c6f-40dd-a121-e825d82ae4aa}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="bson\util">
+      <UniqueIdentifier>{5c397ce3-b900-41cd-8af0-a1d456db6854}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

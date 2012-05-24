@@ -89,8 +89,11 @@ namespace mongo {
     }
 
     ReplicaSetMonitor::ReplicaSetMonitor( const string& name , const vector<HostAndPort>& servers )
-        : _lock( "ReplicaSetMonitor instance" ) , _checkConnectionLock( "ReplicaSetMonitor check connection lock" ), _name( name ) , _master(-1), _nextSlave(0) {
-        
+        : _lock( "ReplicaSetMonitor instance" ),
+          _checkConnectionLock( "ReplicaSetMonitor check connection lock" ),
+          _name( name ), _master(-1),
+          _nextSlave(0), _localThresholdMillis(cmdLine.defaultLocalThresholdMillis) {
+
         uassert( 13642 , "need at least 1 node for a replica set" , servers.size() > 0 );
 
         if ( _name.size() == 0 ) {
@@ -190,7 +193,12 @@ namespace mongo {
         massert( 13610 , "ConfigChangeHook already specified" , _hook == 0 );
         _hook = hook;
     }
-    
+
+    void ReplicaSetMonitor::setLocalThresholdMillis( const int millis ) {
+        scoped_lock lk( _lock );
+        _localThresholdMillis = millis;
+    }
+
     string ReplicaSetMonitor::getServerAddress() const {
         scoped_lock lk( _lock );
         return _getServerAddress_inlock();
@@ -282,24 +290,47 @@ namespace mongo {
         return getSlave();
     }
 
-    HostAndPort ReplicaSetMonitor::getSlave() {
+    HostAndPort ReplicaSetMonitor::getSlave( bool preferLocal ) {
         LOG(2) << "dbclient_rs getSlave " << getServerAddress() << endl;
 
+        HostAndPort fallbackNode;
         scoped_lock lk( _lock );
 
-        for ( unsigned ii = 0; ii < _nodes.size(); ii++ ) {
+        for ( size_t itNode = 0; itNode < _nodes.size(); ++itNode ) {
             _nextSlave = ( _nextSlave + 1 ) % _nodes.size();
             if ( _nextSlave != _master ) {
-                if ( _nodes[ _nextSlave ].okForSecondaryQueries() )
-                    return _nodes[ _nextSlave ].addr;
-                LOG(2) << "dbclient_rs getSlave not selecting " << _nodes[_nextSlave] << ", not currently okForSecondaryQueries" << endl;
+                if ( _nodes[ _nextSlave ].okForSecondaryQueries() ) {
+                    // found an ok slave; may not be local.
+                    fallbackNode = _nodes[ _nextSlave ].addr;
+                    if ( ! preferLocal )
+                        return fallbackNode;
+                    else if ( _nodes[ _nextSlave ].isLocalSecondary_inlock( _localThresholdMillis ) ) {
+                        // found a local slave.  return early.
+                        log(2) << "dbclient_rs getSlave found local secondary for queries: "
+                               << _nextSlave << ", ping time: "
+                               << _nodes[ _nextSlave ].pingTimeMillis << endl;
+                        return fallbackNode;
+                    }
+                }
+                else
+                    log(2) << "dbclient_rs getSlave not selecting " << _nodes[_nextSlave]
+                           << ", not currently okForSecondaryQueries" << endl;
             }
         }
-        uassert(15899, str::stream() << "No suitable member found for slaveOk query in replica set: " << _name, _master >= 0 && _nodes[_master].ok);
+
+        if ( ! fallbackNode.empty() ) {
+            // use a non-local secondary, even if local was preferred
+            log(1) << "dbclient_rs getSlave falling back to a non-local secondary node" << endl;
+            return fallbackNode;
+        }
+
+        massert( 15899, str::stream() << "No suitable secondary found for slaveOk query in replica set: "
+                                      << _name, _master >= 0 && _nodes[_master].ok );
 
         // Fall back to primary
         verify( static_cast<unsigned>(_master) < _nodes.size() );
-        LOG(2) << "dbclient_rs getSlave no member in secondary state found, returning primary " << _nodes[ _master ] << endl;
+        log(1) << "dbclient_rs getSlave no member in secondary state found, "
+                  "returning primary " << _nodes[ _master ] << endl;
         return _nodes[_master].addr;
     }
 
@@ -522,11 +553,15 @@ namespace mongo {
 
                 return false;
             }
+            int commandTime = t.millis();
 
             if ( nodesOffset >= 0 ) {
                 scoped_lock lk( _lock );
 
-                _nodes[nodesOffset].pingTimeMillis = t.millis();
+                // update ping time with smoothed moving averaged (1/4th the delta)
+                _nodes[nodesOffset].pingTimeMillis +=
+                        (commandTime - _nodes[nodesOffset].pingTimeMillis) / 4;
+
                 _nodes[nodesOffset].hidden = o["hidden"].trueValue();
                 _nodes[nodesOffset].secondary = o["secondary"].trueValue();
                 _nodes[nodesOffset].ismaster = o["ismaster"].trueValue();
@@ -755,6 +790,7 @@ namespace mongo {
     mongo::mutex ReplicaSetMonitor::_setsLock( "ReplicaSetMonitor" );
     map<string,ReplicaSetMonitorPtr> ReplicaSetMonitor::_sets;
     ReplicaSetMonitor::ConfigChangeHook ReplicaSetMonitor::_hook;
+
     // --------------------------------
     // ----- DBClientReplicaSet ---------
     // --------------------------------
@@ -794,6 +830,7 @@ namespace mongo {
 
         if ( h == _slaveHost && _slave ) {
             if ( ! _slave->isFailed() )
+                // TODO: SERVER-5082, slave auth credentials may have changed
                 return _slave.get();
             _monitor->notifySlaveFailure( _slaveHost );
             _slaveHost = _monitor->getSlave();

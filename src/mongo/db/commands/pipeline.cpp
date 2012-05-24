@@ -31,8 +31,11 @@ namespace mongo {
 
     const char Pipeline::commandName[] = "aggregate";
     const char Pipeline::pipelineName[] = "pipeline";
+    const char Pipeline::explainName[] = "explain";
     const char Pipeline::fromRouterName[] = "fromRouter";
     const char Pipeline::splitMongodPipelineName[] = "splitMongodPipeline";
+    const char Pipeline::serverPipelineName[] = "serverPipeline";
+    const char Pipeline::mongosPipelineName[] = "mongosPipeline";
 
     Pipeline::~Pipeline() {
     }
@@ -40,10 +43,10 @@ namespace mongo {
     Pipeline::Pipeline(const intrusive_ptr<ExpressionContext> &pTheCtx):
         collectionName(),
         sourceVector(),
-        splitMongodPipeline(DEBUG_BUILD == 1), /* test: always split for DEV */
+        explain(false),
+        splitMongodPipeline(false),
         pCtx(pTheCtx) {
     }
-
 
 
     /* this structure is used to make a lookup table of operators */
@@ -106,6 +109,12 @@ namespace mongo {
             /* check for the collection name */
             if (!strcmp(pFieldName, pipelineName)) {
                 pipeline = cmdElement.Array();
+                continue;
+            }
+
+            /* check for explain option */
+            if (!strcmp(pFieldName, explainName)) {
+                pPipeline->explain = cmdElement.Bool();
                 continue;
             }
 
@@ -259,6 +268,7 @@ namespace mongo {
         /* create an initialize the shard spec we'll return */
         intrusive_ptr<Pipeline> pShardPipeline(new Pipeline(pCtx));
         pShardPipeline->collectionName = collectionName;
+        pShardPipeline->explain = explain;
 
         /* put the source list aside */
         SourceVector tempVector(sourceVector);
@@ -329,10 +339,15 @@ namespace mongo {
         pBuilder->append(commandName, getCollectionName());
         pBuilder->append(pipelineName, arrayBuilder.arr());
 
+        if (explain) {
+            pBuilder->append(explainName, explain);
+        }
+
         bool btemp;
         if ((btemp = getSplitMongodPipeline())) {
             pBuilder->append(splitMongodPipelineName, btemp);
         }
+
         if ((btemp = pCtx->getInRouter())) {
             pBuilder->append(fromRouterName, btemp);
         }
@@ -368,24 +383,36 @@ namespace mongo {
 
         /*
           Iterate through the resulting documents, and add them to the result.
+          We do this even if we're doing an explain, in order to capture
+          the document counts and other stats.  However, we don't capture
+          the result documents for explain.
 
           We wrap all the BSONObjBuilder calls with a try/catch in case the
           objects get too large and cause an exception.
         */
         try {
-            BSONArrayBuilder resultArray; // where we'll stash the results
-            for(bool hasDocument = !pSource->eof(); hasDocument;
-                hasDocument = pSource->advance()) {
-                boost::intrusive_ptr<Document> pDocument(pSource->getCurrent());
-
-                /* add the document to the result set */
-                BSONObjBuilder documentBuilder;
-                pDocument->toBson(&documentBuilder);
-                resultArray.append(documentBuilder.done());
+            if (explain) {
+                if (!pCtx->getInRouter())
+                    writeExplainShard(result, pInputSource);
+                else {
+                    writeExplainMongos(result, pInputSource);
+                }
             }
+            else
+            {
+                BSONArrayBuilder resultArray; // where we'll stash the results
+                for(bool hasDocument = !pSource->eof(); hasDocument;
+                    hasDocument = pSource->advance()) {
+                    intrusive_ptr<Document> pDocument(pSource->getCurrent());
 
-            result.appendArray("result", resultArray.arr());
+                    /* add the document to the result set */
+                    BSONObjBuilder documentBuilder;
+                    pDocument->toBson(&documentBuilder);
+                    resultArray.append(documentBuilder.done());
+                }
 
+                result.appendArray("result", resultArray.arr());
+            }
          } catch(AssertionException &ae) {
             /* 
                If its not the "object too large" error, rethrow.
@@ -403,6 +430,61 @@ namespace mongo {
          }
 
         return true;
+    }
+
+    void Pipeline::writeExplainOps(BSONArrayBuilder *pArrayBuilder) const {
+        for(SourceVector::const_iterator iter(sourceVector.begin()),
+                listEnd(sourceVector.end()); iter != listEnd; ++iter) {
+            intrusive_ptr<DocumentSource> pSource(*iter);
+
+            pSource->addToBsonArray(pArrayBuilder, true);
+        }
+    }
+
+    void Pipeline::writeExplainShard(
+        BSONObjBuilder &result,
+        const intrusive_ptr<DocumentSource> &pInputSource) const {
+        BSONArrayBuilder opArray; // where we'll put the pipeline ops
+
+        // first the cursor, which isn't in the opArray
+        pInputSource->addToBsonArray(&opArray, true);
+
+        // next, add the pipeline operators
+        writeExplainOps(&opArray);
+
+        result.appendArray(serverPipelineName, opArray.arr());
+    }
+
+    void Pipeline::writeExplainMongos(
+        BSONObjBuilder &result,
+        const intrusive_ptr<DocumentSource> &pInputSource) const {
+
+        /*
+          For now, this should be a BSON source array.
+          In future, we might have a more clever way of getting this, when
+          we have more interleaved fetching between shards.  The DocumentSource
+          interface will have to change to accomodate that.
+         */
+        DocumentSourceBsonArray *pSourceBsonArray =
+            dynamic_cast<DocumentSourceBsonArray *>(pInputSource.get());
+        verify(pSourceBsonArray);
+
+        BSONArrayBuilder shardOpArray; // where we'll put the pipeline ops
+        for(bool hasDocument = !pSourceBsonArray->eof(); hasDocument;
+            hasDocument = pSourceBsonArray->advance()) {
+            intrusive_ptr<Document> pDocument(
+                pSourceBsonArray->getCurrent());
+            BSONObjBuilder opBuilder;
+            pDocument->toBson(&opBuilder);
+            shardOpArray.append(opBuilder.obj());
+        }
+
+        BSONArrayBuilder mongosOpArray; // where we'll put the pipeline ops
+        writeExplainOps(&mongosOpArray);
+
+        // now we combine the shard pipelines with the one here
+        result.append(serverPipelineName, shardOpArray.arr());
+        result.append(mongosPipelineName, mongosOpArray.arr());
     }
 
 } // namespace mongo

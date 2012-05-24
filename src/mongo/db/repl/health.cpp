@@ -29,6 +29,7 @@
 #include "connections.h"
 #include "../../util/startup_test.h"
 #include "../dbhelpers.h"
+#include "mongo/db/repl/bgsync.h"
 
 namespace mongo {
     /* decls for connections.h */
@@ -436,9 +437,9 @@ namespace mongo {
         b.append("set", name());
         b.appendTimeT("date", time(0));
         b.append("myState", myState.s);
-        const Member *syncTarget = _currentSyncTarget;
-        if ( syncTarget && 
-            (myState != MemberState::RS_PRIMARY) && 
+        const Member *syncTarget = replset::BackgroundSync::get()->getSyncTarget();
+        if ( syncTarget &&
+            (myState != MemberState::RS_PRIMARY) &&
             (myState != MemberState::RS_SHUNNED) ) {
             b.append("syncingTo", syncTarget->fullName());
         }

@@ -28,6 +28,7 @@ commonFiles = [ "pch.cpp",
                 "db/jsobj.cpp",
                 "bson/oid.cpp",
                 "db/json.cpp",
+                "db/hasher.cpp",
                 "db/lasterror.cpp",
                 "db/namespace.cpp",
                 "db/nonce.cpp",
@@ -37,6 +38,7 @@ commonFiles = [ "pch.cpp",
                 "shell/mongo.cpp",
                 "util/background.cpp",
                 "util/intrusive_counter.cpp",
+                "util/time_support.cpp",
                 "util/timer.cpp",
                 "util/util.cpp",
                 "util/file_allocator.cpp",
@@ -56,6 +58,7 @@ commonFiles = [ "pch.cpp",
                 "util/concurrency/spin_lock.cpp",
                 "util/text.cpp",
                 "util/stringutils.cpp",
+                "util/stack_introspect.cpp",
                 "util/concurrency/synchronization.cpp",
                 "util/net/sock.cpp",
                 "util/net/httpclient.cpp",
@@ -64,6 +67,7 @@ commonFiles = [ "pch.cpp",
                 "util/net/listen.cpp",
                 "util/md5.cpp",
                 "util/startup_test.cpp",
+                "client/authentication_table.cpp",
                 "client/connpool.cpp",
                 "client/dbclient.cpp",
                 "client/dbclient_rs.cpp",
@@ -80,8 +84,6 @@ env.StaticLibrary('mongocommon', commonFiles,
                            '$BUILD_DIR/third_party/murmurhash3/murmurhash3',
                            '$BUILD_DIR/third_party/mongo_boost'],)
 
-#mmap stuff
-
 env.StaticLibrary("coredb", [ "db/commands.cpp" ])
 
 coreServerFiles = [ "util/version.cpp",
@@ -94,6 +96,7 @@ coreServerFiles = [ "util/version.cpp",
                     "db/dbcommands_generic.cpp",
                     "db/commands/cloud.cpp",
                     "db/dbmessage.cpp",
+                    "db/commands/hashcmd.cpp",
                     "db/commands/pipeline.cpp",
                     "db/indexkey.cpp",
                     "db/pipeline/accumulator.cpp",
@@ -135,7 +138,6 @@ coreServerFiles = [ "util/version.cpp",
                     "db/security_commands.cpp",
                     ]
 
-
 env.StaticLibrary('ntservice', ['util/ntservice.cpp'])
 
 scripting_common_files = [ "scripting/engine.cpp",
@@ -154,7 +156,7 @@ elif usev8:
 else:
     env.StaticLibrary('scripting', scripting_common_files + ['scripting/engine_none.cpp'])
 
-mmapFiles = [ "util/mmap.cpp" ]
+mmapFiles = [ "util/mmap.cpp", "util/touch_pages.cpp" ]
 
 if has_option( "mm" ):
     mmapFiles += [ "util/mmap_mm.cpp" ]
@@ -193,7 +195,10 @@ serverOnlyFiles = [ "db/curop.cpp",
                     "db/d_globals.cpp",
                     "db/pagefault.cpp",
                     "util/compress.cpp",
+                    "db/ttl.cpp",
                     "db/d_concurrency.cpp",
+                    "db/lockstat.cpp",
+                    "db/lockstate.cpp",
                     "db/key.cpp",
                     "db/btreebuilder.cpp",
                     "util/logfile.cpp",
@@ -222,6 +227,7 @@ serverOnlyFiles = [ "db/curop.cpp",
                     "db/repl/rs_rollback.cpp",
                     "db/repl/rs_sync.cpp",
                     "db/repl/rs_initialsync.cpp",
+                    "db/repl/bgsync.cpp",
                     "db/oplog.cpp",
                     "db/repl_block.cpp",
                     "db/btreecursor.cpp",
@@ -247,10 +253,12 @@ serverOnlyFiles = [ "db/curop.cpp",
                     "db/explain.cpp",
                     "db/geo/2d.cpp",
                     "db/geo/haystack.cpp",
+                    "db/hashindex.cpp",
                     "db/ops/count.cpp",
                     "db/ops/delete.cpp",
                     "db/ops/query.cpp",
                     "db/ops/update.cpp",
+                    "db/ops/update_internal.cpp",
                     "db/dbcommands.cpp",
                     "db/dbcommands_admin.cpp",
 
@@ -264,6 +272,9 @@ serverOnlyFiles = [ "db/curop.cpp",
                     "db/commands/pipeline_d.cpp",
                     "db/commands/document_source_cursor.cpp",
                     "db/driverHelpers.cpp" ]
+
+if os.sys.platform == 'win32':
+    serverOnlyFiles += [ "util/hook_win32.cpp", "util/hook_windows_memory.cpp" ]
 
 env.Library( "dbcmdline", "db/cmdline.cpp" )
 
@@ -308,6 +319,7 @@ serverOnlyFiles += [ "s/d_logic.cpp",
                      "s/d_migrate.cpp",
                      "s/d_state.cpp",
                      "s/d_split.cpp",
+                     "s/d_index_locator.cpp",
                      "client/distlock_test.cpp",
                      "s/d_chunk_manager.cpp",
                      "db/module.cpp",
@@ -324,7 +336,7 @@ env.StaticLibrary("serveronly", serverOnlyFiles,
 modules = []
 moduleNames = []
 
-mongodOnlyFiles = [ "db/db.cpp", "db/compact.cpp" ]
+mongodOnlyFiles = [ "db/db.cpp", "db/compact.cpp", "db/commands/touch.cpp" ]
 
 # ----- TARGETS ------
 
@@ -356,6 +368,8 @@ for x in normalTools:
 #some special tools
 env.Install( '#/', [
         env.Program( "mongofiles", "tools/files.cpp", LIBDEPS=["alltools", "gridfs"] ),
+        env.Program( "docgen", "tools/docgenerator.cpp", LIBDEPS=["alltools"] ),
+        env.Program( "loadgen", "tools/loadgenerator.cpp", LIBDEPS=["alltools"] ),
         env.Program( "bsondump", "tools/bsondump.cpp", LIBDEPS=["alltools"]),
         env.Program( "mongobridge", "tools/bridge.cpp", LIBDEPS=["alltools"]),
         env.Program( "mongoperf", "client/examples/mongoperf.cpp", LIBDEPS=["alltools"] ),
@@ -380,7 +394,8 @@ env.StaticLibrary('testframework', ['dbtests/framework.cpp'], LIBDEPS=['unittest
 test = testEnv.Install(
     '#/',
     testEnv.Program( "test", [ f for f in Glob( "dbtests/*.cpp" ) if not str( f ).endswith( 'framework.cpp' ) ],
-                     LIBDEPS=["mongocommon", "serveronly", "coreserver", "coredb", "testframework" ] ) )
+                     LIBDEPS=["mongocommon", "serveronly", "coreserver", "coredb", "testframework" ],
+                     _LIBDEPS='$_LIBDEPS_OBJS' ) )
 
 if len(testEnv.subst('$PROGSUFFIX')):
     testEnv.Alias( "test", "#/${PROGPREFIX}test${PROGSUFFIX}" )
@@ -417,9 +432,9 @@ coreShellFiles = [ "shell/dbshell.cpp",
                    "shell/shell_utils_extended.cpp",
                    "shell/shell_utils_launcher.cpp",
                    "shell/mongo-server.cpp",
-                   "../third_party/linenoise/linenoise.cpp",
-                   "../third_party/linenoise/linenoise_utf8.cpp",
-                   "../third_party/linenoise/mk_wcwidth.cpp"]
+                   "shell/linenoise.cpp",
+                   "shell/linenoise_utf8.cpp",
+                   "shell/mk_wcwidth.cpp"]
 
 if shellEnv is not None:
     mongo_shell = shellEnv.Program(

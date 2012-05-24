@@ -77,7 +77,7 @@ if shellEnv is not None:
     addSmoketest( "smokeDisk", [ add_exe( "mongo" ), add_exe( "mongod" ), add_exe( "mongodump" ), add_exe( "mongorestore" ) ] )
     addSmoketest( "smokeAuth", [ add_exe( "mongo" ), add_exe( "mongod" ) ] )
     addSmoketest( "smokeParallel", [ add_exe( "mongo" ), add_exe( "mongod" ) ] )
-    addSmoketest( "smokeSharding", [ add_exe("mongo"), add_exe("mongod"), add_exe("mongos") ] )
+    addSmoketest( "smokeSharding", [ add_exe("mongo"), add_exe("mongod"), add_exe("mongos"), add_exe('mongofiles') ] )
     addSmoketest( "smokeJsPerf", [ add_exe("mongo"), add_exe("mongod") ] )
     addSmoketest( "smokeJsSlowNightly", [add_exe("mongo"), add_exe("mongod"), add_exe("mongos") ])
     addSmoketest( "smokeJsSlowWeekly", [add_exe("mongo"), add_exe("mongod"), add_exe("mongos") ])

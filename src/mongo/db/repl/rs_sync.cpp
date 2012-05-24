@@ -18,12 +18,29 @@
 #include "mongo/db/client.h"
 #include "rs.h"
 #include "mongo/db/repl.h"
-#include "connections.h"
+#include "mongo/db/repl/rs_sync.h"
+#include "mongo/db/repl/bgsync.h"
 
 namespace mongo {
 
     using namespace bson;
     extern unsigned replSetForceInitialSyncFailure;
+
+    replset::SyncTail::SyncTail(BackgroundSyncInterface *q) : Sync(""), _queue(q) {}
+
+    replset::SyncTail::~SyncTail() {}
+
+    BSONObj* replset::SyncTail::peek() {
+        return _queue->peek();
+    }
+
+    void replset::SyncTail::consume() {
+        _queue->consume();
+    }
+
+    replset::InitialSync::InitialSync(BackgroundSyncInterface *q) : SyncTail(q) {}
+
+    replset::InitialSync::~InitialSync() {}
 
     void NOINLINE_DECL blank(const BSONObj& o) {
         if( *o.getStringField("op") != 'n' ) {
@@ -50,118 +67,51 @@ namespace mongo {
        @return false on failure.
        this method returns an error and doesn't throw exceptions (i think).
     */
-    bool ReplSetImpl::initialSyncOplogApplication(const OpTime& applyGTE, const OpTime& minValid) {
-        Member *source = 0;
-        OplogReader r;
+    bool replset::InitialSync::oplogApplication(const BSONObj& applyGTEObj, const BSONObj& minValidObj) {
+        OpTime applyGTE = applyGTEObj["ts"]._opTime();
+        OpTime minValid = minValidObj["ts"]._opTime();
 
-        // keep trying to initial sync from oplog until we run out of targets
-        while ((source = _getOplogReader(r, applyGTE)) != 0) {
-            replset::InitialSync init(source->fullName());
-            if (init.oplogApplication(r, source, applyGTE, minValid)) {
-                return true;
-            }
-
-            r.resetConnection();
-            veto(source->fullName(), 60);
-            log() << "replSet applying oplog from " << source->fullName() << " failed, trying again" << endl;
-        }
-
-        log() << "replSet initial sync error: couldn't find oplog to sync from" << rsLog;
-        return false;
-    }
-
-    bool replset::InitialSync::oplogApplication(OplogReader& r, const Member* source,
-        const OpTime& applyGTE, const OpTime& minValid) {
-
-        const string hn = source->fullName();
-        try {
-            r.tailingQueryGTE( rsoplog, applyGTE );
-            if ( !r.haveCursor() ) {
-                log() << "replSet initial sync oplog query error" << rsLog;
-                return false;
-            }
-
-            {
-                if( !r.more() ) {
-                    sethbmsg("replSet initial sync error reading remote oplog");
-                    log() << "replSet initial sync error remote oplog (" << rsoplog << ") on host " << hn << " is empty?" << rsLog;
-                    return false;
-                }
-                bo op = r.next();
-                OpTime t = op["ts"]._opTime();
-                r.putBack(op);
-
-                if( op.firstElementFieldName() == string("$err") ) {
-                    log() << "replSet initial sync error querying " << rsoplog << " on " << hn << " : " << op.toString() << rsLog;
-                    return false;
-                }
-
-                uassert( 13508 , str::stream() << "no 'ts' in first op in oplog: " << op , !t.isNull() );
-                if( t > applyGTE ) {
-                    sethbmsg(str::stream() << "error " << hn << " oplog wrapped during initial sync");
-                    log() << "replSet initial sync expected first optime of " << applyGTE << rsLog;
-                    log() << "replSet initial sync but received a first optime of " << t << " from " << hn << rsLog;
-                    return false;
-                }
-
-                sethbmsg(str::stream() << "initial oplog application from " << hn << " starting at "
-                         << t.toStringPretty() << " to " << minValid.toStringPretty());
-            }
-        }
-        catch(DBException& e) {
-            log() << "replSet initial sync failing: " << e.toString() << rsLog;
-            return false;
+        if (replSetForceInitialSyncFailure > 0) {
+            log() << "replSet test code invoked, forced InitialSync failure: " << replSetForceInitialSyncFailure << rsLog;
+            replSetForceInitialSyncFailure--;
+            throw DBException("forced error",0);
         }
 
         /* we lock outside the loop to avoid the overhead of locking on every operation. */
         Lock::GlobalWrite lk;
 
-        // todo : use exhaust
+        applyOp(applyGTEObj);
+
+        // if there were no writes during the initial sync, there will be nothing in the queue so
+        // just go live
+        if (minValid == applyGTE) {
+            return true;
+        }
+
         OpTime ts;
         time_t start = time(0);
         unsigned long long n = 0;
         int fails = 0;
         while( ts < minValid ) {
             try {
-                // There are some special cases with initial sync (see the catch block), so we
-                // don't want to break out of this while until we've reached minvalid. Thus, we'll
-                // keep trying to requery.
-                if( !r.more() ) {
-                    OCCASIONALLY log() << "replSet initial sync oplog: no more records" << endl;
-                    sleepsecs(1);
+                BSONObj* o = peek();
 
-                    r.resetCursor();
-                    r.tailingQueryGTE(rsoplog, theReplSet->lastOpTimeWritten);
-                    if ( !r.haveCursor() ) {
-                        if (fails++ > 30) {
-                            log() << "replSet initial sync tried to query oplog 30 times, giving up" << endl;
-                            return false;
-                        }
+                if (!o) {
+                    OCCASIONALLY log() << "replSet initial sync oplog: no more records" << endl;
+                    if (fails++ > 30) {
+                        log() << "replSet initial sync couldn't get records for 30 seconds, giving up" << endl;
+                        log() << "ts: " << ts << " minValid: " << minValid << endl;
+                        return false;
                     }
 
+                    sleepsecs(1);
                     continue;
                 }
+                fails = 0;
 
-                BSONObj o = r.nextSafe(); /* note we might get "not master" at some point */
-                ts = o["ts"]._opTime();
-
-                {
-                    if( (source->state() != MemberState::RS_PRIMARY &&
-                            source->state() != MemberState::RS_SECONDARY) ||
-                            replSetForceInitialSyncFailure ) {
-
-                        int f = replSetForceInitialSyncFailure;
-                        if( f > 0 ) {
-                            replSetForceInitialSyncFailure = f-1;
-                            log() << "replSet test code invoked, replSetForceInitialSyncFailure" << rsLog;
-                            throw DBException("forced error",0);
-                        }
-                        log() << "replSet we are now primary" << rsLog;
-                        throw DBException("primary changed",0);
-                    }
-
-                    applyOp(o, applyGTE);
-                }
+                ts = (*o)["ts"]._opTime();
+                applyOp(*o);
+                consume();
 
                 if ( ++n % 1000 == 0 ) {
                     time_t now = time(0);
@@ -183,18 +133,6 @@ namespace mongo {
                 if( e.getCode() == 11000 || e.getCode() == 11001 || e.getCode() == 12582) {
                     continue;
                 }
-                
-                // handle cursor not found (just requery)
-                if( e.getCode() == 13127 ) {
-                    log() << "replSet requerying oplog after cursor not found condition, ts: " << ts.toStringPretty() << endl;
-                    r.resetCursor();
-                    r.tailingQueryGTE(rsoplog, ts);
-                    if( r.haveCursor() ) {
-                        continue;
-                    }
-                }
-
-                // TODO: handle server restart
 
                 if( ts <= minValid ) {
                     // didn't make it far enough
@@ -209,15 +147,12 @@ namespace mongo {
         return true;
     }
 
-    void replset::InitialSync::applyOp(const BSONObj& o, const OpTime& applyGTE) {
-        OpTime ts = o["ts"]._opTime();
+    void replset::InitialSync::applyOp(const BSONObj& o) {
 
         // optimes before we started copying need not be applied.
-        if( ts >= applyGTE ) {
-            if (!syncApply(o)) {
-                if (shouldRetry(o)) {
-                    uassert(15915, "replSet update still fails after adding missing object", syncApply(o));
-                }
+        if (!syncApply(o)) {
+            if (shouldRetry(o)) {
+                uassert(15915, "replSet update still fails after adding missing object", syncApply(o));
             }
         }
 
@@ -232,8 +167,8 @@ namespace mongo {
     bool ReplSetImpl::tryToGoLiveAsASecondary(OpTime& /*out*/ minvalid) {
         bool golive = false;
 
-        // make sure we're not primary
-        if (box.getState().primary()) {
+        // make sure we're not primary or secondary already
+        if (box.getState().primary() || box.getState().secondary()) {
             return false;
         }
 
@@ -254,6 +189,9 @@ namespace mongo {
                 if( minvalid <= lastOpTimeWritten ) {
                     golive=true;
                 }
+                else {
+                    sethbmsg(str::stream() << "still syncing, not yet to minValid optime " << minvalid.toString());
+                }
             }
             else
                 golive = true; /* must have been the original member */
@@ -265,192 +203,97 @@ namespace mongo {
         return golive;
     }
 
-    bool ReplSetImpl::_isStale(OplogReader& r, const OpTime& startTs, BSONObj& remoteOldestOp) {
-        remoteOldestOp = r.findOne(rsoplog, Query());
-        OpTime remoteTs = remoteOldestOp["ts"]._opTime();
-        DEV log() << "replSet remoteOldestOp:    " << remoteTs.toStringLong() << rsLog;
-        else LOG(3) << "replSet remoteOldestOp: " << remoteTs.toStringLong() << rsLog;
-        DEV {
-            log() << "replSet lastOpTimeWritten: " << lastOpTimeWritten.toStringLong() << rsLog;
-            log() << "replSet our state: " << state().toString() << rsLog;
+    extern SimpleMutex filesLockedFsync;
+
+    class DontLockOnEverySingleOperation : boost::noncopyable { 
+        scoped_ptr<Lock::ScopedLock> lk;
+        scoped_ptr<SimpleMutex::scoped_lock> fsync;
+    public:
+        void reset() {
+            lk.reset();
+            fsync.reset();
         }
-        if( startTs >= remoteTs ) {
-            return false;
-        }
-
-        return true;
-    }
-
-    Member* ReplSetImpl::_getOplogReader(OplogReader& r, const OpTime& minTS) {
-        Member *target = 0, *stale = 0;
-        BSONObj oldest;
-
-        verify(r.conn() == 0);
-
-        while ((target = getMemberToSyncTo()) != 0) {
-            string current = target->fullName();
-
-            if( !r.connect(current) ) {
-                log(2) << "replSet can't connect to " << current << " to read operations" << rsLog;
-                r.resetConnection();
-                veto(current);
-                continue;
+        void reset(const char *ns) { 
+            reset();
+            verify( !Lock::isLocked() );
+            fsync.reset( new SimpleMutex::scoped_lock(filesLockedFsync) );
+            if( ns == 0 ) {
+                lk.reset( new Lock::GlobalWrite() );
             }
-
-            if( !minTS.isNull() && _isStale(r, minTS, oldest) ) {
-                r.resetConnection();
-                veto(current, 600);
-                stale = target;
-                continue;
+            else {
+                lk.reset( new Lock::DBWrite(ns) );
             }
-
-            // if we made it here, the target is up and not stale
-            return target;
         }
-
-        // the only viable sync target was stale
-        if (stale) {
-            log() << "replSet error RS102 too stale to catch up, at least from " << stale->fullName() << rsLog;
-            log() << "replSet our last optime : " << lastOpTimeWritten.toStringLong() << rsLog;
-            log() << "replSet oldest at " << stale->fullName() << " : " << oldest["ts"]._opTime().toStringLong() << rsLog;
-            log() << "replSet See http://www.mongodb.org/display/DOCS/Resyncing+a+Very+Stale+Replica+Set+Member" << rsLog;
-
-            // reset minvalid so that we can't become primary prematurely
-            {
-                Lock::DBWrite lk("local.replset.minvalid");
-                Helpers::putSingleton("local.replset.minvalid", oldest);
-            }
-
-            sethbmsg("error RS102 too stale to catch up");
-            changeState(MemberState::RS_RECOVERING);
-            sleepsecs(120);
-        }
-
-        return 0;
-    }
+    };
 
     /* tail an oplog.  ok to return, will be re-called. */
-    void ReplSetImpl::syncTail() {
-        // todo : locking vis a vis the mgr...
-        OplogReader r;
-        string hn;
-
-        // find a target to sync from the last op time written
-        Member* target = _getOplogReader(r, lastOpTimeWritten);
-
-        // no server found
-        if (target == 0) {
-            // if there is no one to sync from
-            OpTime minvalid;
-            tryToGoLiveAsASecondary(minvalid);
-            return;
-        }
-        
-        r.tailingQueryGTE(rsoplog, lastOpTimeWritten);
-        // if target cut connections between connecting and querying (for
-        // example, because it stepped down) we might not have a cursor
-        if ( !r.haveCursor() ) {
-            return;
-        }
-
-        uassert(1000, "replSet source for syncing doesn't seem to be await capable -- is it an older version of mongodb?", r.awaitCapable() );
-
-        {
-            if( !r.more() ) {
-                /* maybe we are ahead and need to roll back? */
-                try {
-                    bo theirLastOp = r.getLastOp(rsoplog);
-                    if( theirLastOp.isEmpty() ) {
-                        log() << "replSet error empty query result from " << hn << " oplog" << rsLog;
-                        sleepsecs(2);
-                        return;
-                    }
-                    OpTime theirTS = theirLastOp["ts"]._opTime();
-                    if( theirTS < lastOpTimeWritten ) {
-                        log() << "replSet we are ahead of the primary, will try to roll back" << rsLog;
-                        syncRollback(r);
-                        return;
-                    }
-                    /* we're not ahead?  maybe our new query got fresher data.  best to come back and try again */
-                    log() << "replSet syncTail condition 1" << rsLog;
-                    sleepsecs(1);
-                }
-                catch(DBException& e) {
-                    log() << "replSet error querying " << hn << ' ' << e.toString() << rsLog;
-                    veto(target->fullName());
-                    sleepsecs(2);
-                }
-                return;
-            }
-
-            BSONObj o = r.nextSafe();
-            OpTime ts = o["ts"]._opTime();
-            long long h = o["h"].numberLong();
-            if( ts != lastOpTimeWritten || h != lastH ) {
-                log() << "replSet our last op time written: " << lastOpTimeWritten.toStringPretty() << rsLog;
-                log() << "replset source's GTE: " << ts.toStringPretty() << rsLog;
-                syncRollback(r);
-                return;
-            }
-        }
-
-        /* we have now checked if we need to rollback and we either don't have to or did it. */
-        {
-            OpTime minvalid;
-            tryToGoLiveAsASecondary(minvalid);
-        }
-
+    void replset::SyncTail::oplogApplication() {
         while( 1 ) {
             verify( !Lock::isLocked() );
             {
+                int count = 0;
                 Timer timeInWriteLock;
-                scoped_ptr<Lock::ScopedLock> lk;
+                DontLockOnEverySingleOperation lk;
                 while( 1 ) {
-                    if( !r.moreInCurrentBatch() ) {
-                        lk.reset();
-                        timeInWriteLock.reset();
-
-                        {
-                            lock lk(this);
-                            if (_forceSyncTarget) {
-                                return;
-                            }
+                    // occasionally check some things
+                    if (count-- <= 0 || time(0) % 10 == 0) {
+                        if (theReplSet->isPrimary()) {
+                            return;
                         }
 
-                        {
-                            // we need to occasionally check some things. between
-                            // batches is probably a good time.                            
-                            if( state().recovering() ) { // perhaps we should check this earlier? but not before the rollback checks.
-                                /* can we go to RS_SECONDARY state?  we can if not too old and if minvalid achieved */
-                                OpTime minvalid;
-                                bool golive = ReplSetImpl::tryToGoLiveAsASecondary(minvalid);
-                                if( golive ) {
-                                    ;
-                                }
-                                else {
-                                    sethbmsg(str::stream() << "still syncing, not yet to minValid optime" << minvalid.toString());
-                                }
-                                // todo: too stale capability
-                            }
-                            if( !target->hbinfo().hbstate.readable() ) {
-                                return;
-                            }
+                        // can we become secondary?
+                        // we have to check this before calling mgr, as we must be a secondary to
+                        // become primary
+                        if (!theReplSet->isSecondary()) {
+                            OpTime minvalid;
+                            theReplSet->tryToGoLiveAsASecondary(minvalid);
                         }
-                        r.more(); // to make the requestmore outside the db lock, which obviously is quite important
+
+                        // normally msgCheckNewState gets called periodically, but in a single node repl set
+                        // there are no heartbeat threads, so we do it here to be sure.  this is relevant if the
+                        // singleton member has done a stepDown() and needs to come back up.
+                        if (theReplSet->config().members.size() == 1 &&
+                            theReplSet->myConfig().potentiallyHot()) {
+                            theReplSet->mgr->send(boost::bind(&Manager::msgCheckNewState, theReplSet->mgr));
+                            sleepsecs(1);
+                            return;
+                        }
+
+                        count = 200;
                     }
+
                     if( timeInWriteLock.micros() > 1000 ) {
                         lk.reset();
                         timeInWriteLock.reset();
                     }
-                    if( !r.more() )
-                        break;
-                    {
-                        BSONObj o = r.nextSafe(); // note we might get "not master" at some point
 
-                        int sd = myConfig().slaveDelay;
+                    {
+                        const BSONObj *next = peek();
+
+                        if (next == NULL) {
+                            bool golive = false;
+
+                            if (!theReplSet->isSecondary()) {
+                                OpTime minvalid;
+                                golive = theReplSet->tryToGoLiveAsASecondary(minvalid);
+                            }
+
+                            if (!golive) {
+                                lk.reset();
+                                timeInWriteLock.reset();
+                                sleepsecs(1);
+                            }
+
+                            break;
+                        }
+
+                        const BSONObj& o = *next;
+
+                        int sd = theReplSet->myConfig().slaveDelay;
+
                         // ignore slaveDelay if the box is still initializing. once
                         // it becomes secondary we can worry about it.
-                        if( sd && box.getState().secondary() ) {
+                        if( sd && theReplSet->isSecondary() ) {
                             const OpTime ts = o["ts"]._opTime();
                             long long a = ts.getSecs();
                             long long b = time(0);
@@ -471,11 +314,7 @@ namespace mongo {
                                         if( time(0) >= waitUntil )
                                             break;
 
-                                        if( !target->hbinfo().hbstate.readable() ) {
-                                            break;
-                                        }
-                                    
-                                        if( myConfig().slaveDelay != sd ) // reconf
+                                        if( theReplSet->myConfig().slaveDelay != sd ) // reconf
                                             break;
                                     }
                                 }
@@ -490,20 +329,20 @@ namespace mongo {
                                 // but can't be 100% sure
                                 lk.reset();
                                 verify( !Lock::isLocked() );
-                                lk.reset( new Lock::GlobalWrite() );
+                                lk.reset(0);
                             }
-                            else if( str::contains(ns, ".$cmd") ) { 
-                                // a command may need a global write lock. so we will conservatively go ahead and grab one here. suboptimal. :-( 
+                            else if( str::contains(ns, ".$cmd") ) {
+                                // a command may need a global write lock. so we will conservatively go ahead and grab one here. suboptimal. :-(
                                 lk.reset();
                                 verify( !Lock::isLocked() );
-                                lk.reset( new Lock::GlobalWrite() );
+                                lk.reset(0);
                             }
                             else if( !Lock::isWriteLocked(ns) || Lock::isW() ) {
                                 // we don't relock on every single op to try to be faster. however if switching collections, we have to.
                                 // note here we must reset to 0 first to assure the old object is destructed before our new operator invocation.
                                 lk.reset();
                                 verify( !Lock::isLocked() );
-                                lk.reset( new Lock::DBWrite(ns) );
+                                lk.reset(ns);
                             }
                         }
 
@@ -511,20 +350,24 @@ namespace mongo {
                             /* if we have become primary, we dont' want to apply things from elsewhere
                                anymore. assumePrimary is in the db lock so we are safe as long as
                                we check after we locked above. */
-                            if( box.getState().primary() ) {
+                            if( theReplSet->isPrimary() ) {
                                 log(0) << "replSet stopping syncTail we are now primary" << rsLog;
                                 return;
                             }
 
-                            // TODO: make this whole method a member of SyncTail (SERVER-4444)
-                            replset::SyncTail tail("");
-                            tail.syncApply(o);
+                            syncApply(o);
                             _logOpObjRS(o);   // with repl sets we write the ops to our oplog too
                             getDur().commitIfNeeded();
+
+                            // we don't want the catch to reference next after it's been freed
+                            next = NULL;
+                            consume();
                         }
                         catch (DBException& e) {
-                            sethbmsg(str::stream() << "syncTail: " << e.toString() << ", syncing: " << o);
-                            veto(target->fullName(), 300);
+                            sethbmsg(str::stream() << "syncTail: " << e.toString());
+                            if (next) {
+                                log() << "syncing: " << next->toString() << endl;
+                            }
                             lk.reset();
                             sleepsecs(30);
                             return;
@@ -532,18 +375,6 @@ namespace mongo {
                     }
                 } // end while
             } // end writelock scope
-
-            r.tailCheck();
-            if( !r.haveCursor() ) {
-                LOG(1) << "replSet end syncTail pass with " << hn << rsLog;
-                // TODO : reuse our connection to the primary.
-                return;
-            }
-            
-            if( !target->hbinfo().hbstate.readable() ) {
-                return;
-            }
-            // looping back is ok because this is a tailable cursor
         }
     }
 
@@ -598,7 +429,7 @@ namespace mongo {
         }
 
         // record the previous member we were syncing from
-        Member *prev = _currentSyncTarget;
+        Member *prev = replset::BackgroundSync::get()->getSyncTarget();
         if (prev) {
             result.append("prevSyncTarget", prev->fullName());
         }
@@ -606,6 +437,11 @@ namespace mongo {
         // finally, set the new target
         _forceSyncTarget = newTarget;
         return true;
+    }
+
+    bool ReplSetImpl::gotForceSync() {
+        lock lk(this);
+        return _forceSyncTarget != 0;
     }
 
     void ReplSetImpl::_syncThread() {
@@ -626,7 +462,8 @@ namespace mongo {
         }
 
         /* we have some data.  continue tailing. */
-        syncTail();
+        replset::SyncTail tail(replset::BackgroundSync::get());
+        tail.oplogApplication();
     }
 
     void ReplSetImpl::syncThread() {
@@ -658,14 +495,6 @@ namespace mongo {
                 sleepsecs(60);
             }
             sleepsecs(1);
-
-            /* normally msgCheckNewState gets called periodically, but in a single node repl set there
-               are no heartbeat threads, so we do it here to be sure.  this is relevant if the singleton
-               member has done a stepDown() and needs to come back up.
-               */
-            OCCASIONALLY {
-            	mgr->send( boost::bind(&Manager::msgCheckNewState, theReplSet->mgr) );
-            }
         }
     }
 
@@ -729,10 +558,10 @@ namespace mongo {
             OCCASIONALLY warning() << "couldn't update slave " << rid << " no entry" << rsLog;
             return;
         }
-        
+
         GhostSlave& slave = *(i->second);
         if (!slave.init) {
-            OCCASIONALLY log() << "couldn't update slave " << rid << " not init" << rsLog;            
+            OCCASIONALLY log() << "couldn't update slave " << rid << " not init" << rsLog;
             return;
         }
 
@@ -760,7 +589,7 @@ namespace mongo {
 
         verify(slave->slave);
 
-        const Member *target = rs->_currentSyncTarget;
+        const Member *target = replset::BackgroundSync::get()->getSyncTarget();
         if (!target || rs->box.getState().primary()
             // we are currently syncing from someone who's syncing from us
             // the target might end up with a new Member, but s.slave never

@@ -39,7 +39,7 @@ namespace mongo {
         else if ( conn.setVersion() ) {
             conn.done();
             // Version is zero b/c we don't yet have a way to get the local version conflict
-            throw RecvStaleConfigException( r.getns() , "doWrite" , true, ShardChunkVersion( 0 ), ShardChunkVersion( 0 ) );
+            throw RecvStaleConfigException( r.getns() , "doWrite" , ShardChunkVersion( 0, OID() ), ShardChunkVersion( 0, OID() ), true );
         }
         conn->say( r.m() );
         conn.done();
@@ -72,7 +72,7 @@ namespace mongo {
             if ( qr->resultFlags() & ResultFlag_ShardConfigStale ) {
                 dbcon.done();
                 // Version is zero b/c this is deprecated codepath
-                throw RecvStaleConfigException( r.getns() , "Strategy::doQuery", ShardChunkVersion( 0 ), ShardChunkVersion( 0 ) );
+                throw RecvStaleConfigException( r.getns() , "Strategy::doQuery", ShardChunkVersion( 0, OID() ), ShardChunkVersion( 0, OID() ) );
             }
         }
 
@@ -85,7 +85,7 @@ namespace mongo {
         if ( dbcon.setVersion() ) {
             dbcon.done();
             // Version is zero b/c we don't yet have a way to get the local version conflict
-            throw RecvStaleConfigException( ns , "for insert", ShardChunkVersion( 0 ), ShardChunkVersion( 0 ) );
+            throw RecvStaleConfigException( ns , "for insert", ShardChunkVersion( 0, OID() ), ShardChunkVersion( 0, OID() ) );
         }
         dbcon->insert( ns , obj , flags);
         if (safe)
@@ -98,7 +98,7 @@ namespace mongo {
         if ( dbcon.setVersion() ) {
             dbcon.done();
             // Version is zero b/c we don't yet have a way to get the local version conflict
-            throw RecvStaleConfigException( ns , "for insert", ShardChunkVersion( 0 ), ShardChunkVersion( 0 ) );
+            throw RecvStaleConfigException( ns , "for insert", ShardChunkVersion( 0, OID() ), ShardChunkVersion( 0, OID() ) );
         }
         dbcon->insert( ns , v , flags);
         if (safe)
@@ -114,7 +114,7 @@ namespace mongo {
         if ( dbcon.setVersion() ) {
             dbcon.done();
             // Version is zero b/c we don't yet have a way to get the local version conflict
-            throw RecvStaleConfigException( ns , "for insert", ShardChunkVersion( 0 ), ShardChunkVersion( 0 ) );
+            throw RecvStaleConfigException( ns , "for insert", ShardChunkVersion( 0, OID() ), ShardChunkVersion( 0, OID() ) );
         }
         dbcon->update( ns , query , toupdate, upsert, multi);
         if (safe)

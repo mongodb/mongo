@@ -35,6 +35,8 @@
 
 namespace mongo {
 
+    const BSONObj reverseNaturalObj = BSON( "$natural" << -1 );
+
     void Helpers::ensureIndex(const char *ns, BSONObj keyPattern, bool unique, const char *name) {
         NamespaceDetails *d = nsdetails(ns);
         if( d == 0 )
@@ -247,6 +249,8 @@ namespace mongo {
                 callback->goingToDelete( cc->current() );
 
             cc->advance();
+            // SERVER-5198 Additional advancement is unnecessary for a single btree cursor, and see
+            // SERVER-5725.
             c->prepareToTouchEarlierIterate();
 
             logOp( "d" , ns.c_str() , rloc.obj()["_id"].wrap() , 0 , 0 , fromMigrate );

@@ -81,7 +81,13 @@ namespace mongo {
         return pSource;
     }
 
-    void DocumentSourceBsonArray::sourceToBson(BSONObjBuilder *pBuilder) const {
-        verify(false); // this has no analog in the BSON world
+    void DocumentSourceBsonArray::sourceToBson(
+        BSONObjBuilder *pBuilder, bool explain) const {
+
+        if (explain) {
+            BSONObj empty;
+
+            pBuilder->append("bsonArray", empty);
+        }
     }
 }

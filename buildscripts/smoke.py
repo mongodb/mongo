@@ -408,7 +408,7 @@ def run_tests(tests):
                 master.wait_for_repl()
 
             tests_run = 0
-            for tests_run, test in enumerate(tests, 1):
+            for tests_run, test in enumerate(tests):
                 try:
                     fails.append(test)
                     runTest(test)
@@ -418,7 +418,7 @@ def run_tests(tests):
                     if small_oplog:
                         master.wait_for_repl()
                     elif test[1]: # reach inside test and see if startmongod is true
-                        if tests_run % 20 == 0:
+                        if (tests_run+1) % 20 == 0:
                             # restart mongo every 20 times, for our 32-bit machines
                             master.__exit__(None, None, None)
                             master = mongod(small_oplog=small_oplog,no_journal=no_journal,no_preallocj=no_preallocj,auth=auth).__enter__()
@@ -471,13 +471,29 @@ at the end of testing:"""
     if losers or lost_in_slave or lost_in_master or screwy_in_slave:
         raise Exception("Test failures")
 
+suiteGlobalConfig = {"js": ("[!_]*.js", True),
+                     "quota": ("quota/*.js", True),
+                     "jsPerf": ("perf/*.js", True),
+                     "disk": ("disk/*.js", True),
+                     "jsSlowNightly": ("slowNightly/*.js", True),
+                     "jsSlowWeekly": ("slowWeekly/*.js", False),
+                     "parallel": ("parallel/*.js", True),
+                     "clone": ("clone/*.js", False),
+                     "repl": ("repl/*.js", False),
+                     "replSets": ("replsets/*.js", False),
+                     "dur": ("dur/*.js", False),
+                     "auth": ("auth/*.js", False),
+                     "sharding": ("sharding/*.js", False),
+                     "tool": ("tool/*.js", False),
+                     "aggregation": ("aggregation/*.js", True),
+                     }
 
-def expand_suites(suites):
+def expand_suites(suites,expandUseDB=True):
     globstr = None
     tests = []
     for suite in suites:
         if suite == 'all':
-            return expand_suites(['test', 'perf', 'client', 'js', 'jsPerf', 'jsSlowNightly', 'jsSlowWeekly', 'clone', 'parallel', 'repl', 'auth', 'sharding', 'tool'])
+            return expand_suites(['test', 'perf', 'client', 'js', 'jsPerf', 'jsSlowNightly', 'jsSlowWeekly', 'clone', 'parallel', 'repl', 'auth', 'sharding', 'tool'],expandUseDB=expandUseDB)
         if suite == 'test':
             if os.sys.platform == "win32":
                 program = 'test.exe'
@@ -503,38 +519,31 @@ def expand_suites(suites):
                 program = 'mongos'
             tests += [(os.path.join(mongo_repo, program), False)]
         elif os.path.exists( suite ):
-            tests += [ ( os.path.join( mongo_repo , suite ) , True ) ]
+            usedb = True
+            for name in suiteGlobalConfig:
+                if suite in glob.glob( "jstests/" + suiteGlobalConfig[name][0] ):
+                    usedb = suiteGlobalConfig[name][1]
+                    break
+            tests += [ ( os.path.join( mongo_repo , suite ) , usedb ) ]
         else:
             try:
-                globstr, usedb = {"js": ("[!_]*.js", True),
-                                  "quota": ("quota/*.js", True),
-                                  "jsPerf": ("perf/*.js", True),
-                                  "disk": ("disk/*.js", True),
-                                  "jsSlowNightly": ("slowNightly/*.js", True),
-                                  "jsSlowWeekly": ("slowWeekly/*.js", False),
-                                  "parallel": ("parallel/*.js", True),
-                                  "clone": ("clone/*.js", False),
-                                  "repl": ("repl/*.js", False),
-                                  "replSets": ("replsets/*.js", False),
-                                  "dur": ("dur/*.js", False),
-                                  "auth": ("auth/*.js", False),
-                                  "sharding": ("sharding/*.js", False),
-                                  "tool": ("tool/*.js", False),
-                                  "aggregation": ("aggregation/test[ab]*.js", True),
-                                 }[suite]
+                globstr, usedb = suiteGlobalConfig[suite]
             except KeyError:
                 raise Exception('unknown test suite %s' % suite)
 
         if globstr:
-            if globstr.endswith('.js'):
-                loc = 'jstests/'
-            else:
-                loc = ''
-            globstr = os.path.join(mongo_repo, (os.path.join(loc, globstr)))
-            globstr = os.path.normpath(globstr)
-            paths = glob.glob(globstr)
-            paths.sort()
-            tests += [(path, usedb) for path in paths]
+            if usedb and not expandUseDB:
+                tests += [ (suite,False) ]
+            else:                
+                if globstr.endswith('.js'):
+                    loc = 'jstests/'
+                else:
+                    loc = ''
+                globstr = os.path.join(mongo_repo, (os.path.join(loc, globstr)))
+                globstr = os.path.normpath(globstr)
+                paths = glob.glob(globstr)
+                paths.sort()
+                tests += [(path, usedb) for path in paths]
 
     return tests
 
@@ -675,10 +684,32 @@ def main():
                       action="store_true",
                       help='Clear the failfile. Do this if all tests pass')
 
+    # Buildlogger invocation from command line
+    parser.add_option('--buildlogger-builder', dest='buildlogger_builder', default=None,
+                      action="store", help='Set the "builder name" for buildlogger')
+    parser.add_option('--buildlogger-buildnum', dest='buildlogger_buildnum', default=None,
+                      action="store", help='Set the "build number" for buildlogger')
+    parser.add_option('--buildlogger-credentials', dest='buildlogger_credentials', default=None,
+                      action="store", help='Path to Python file containing buildlogger credentials')
+    parser.add_option('--buildlogger-phase', dest='buildlogger_phase', default=None,
+                      action="store", help='Set the "phase" for buildlogger (e.g. "core", "auth") for display in the webapp (optional)')
+
     global tests
     (options, tests) = parser.parse_args()
 
     set_globals(options)
+
+    buildlogger_opts = (options.buildlogger_builder, options.buildlogger_buildnum, options.buildlogger_credentials)
+    if all(buildlogger_opts):
+        os.environ['MONGO_USE_BUILDLOGGER'] = 'true'
+        os.environ['MONGO_BUILDER_NAME'] = options.buildlogger_builder
+        os.environ['MONGO_BUILD_NUMBER'] = options.buildlogger_buildnum
+        os.environ['BUILDLOGGER_CREDENTIALS'] = options.buildlogger_credentials
+        if options.buildlogger_phase:
+            os.environ['MONGO_BUILD_PHASE'] = options.buildlogger_phase
+    elif any(buildlogger_opts):
+        # some but not all of the required options were sete
+        raise Exception("you must set all of --buildlogger-builder, --buildlogger-buildnum, --buildlogger-credentials")
 
     if options.File:
         if options.File == '-':

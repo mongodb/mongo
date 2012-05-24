@@ -24,6 +24,7 @@
 #include "connections.h"
 #include "../repl.h"
 #include "../instance.h"
+#include "mongo/db/repl/bgsync.h"
 
 using namespace std;
 
@@ -65,6 +66,22 @@ namespace mongo {
             lastLogged = _hbmsgTime;
             log(logLevel) << "replSet " << s << rsLog;
         }
+    }
+
+    void ReplSetImpl::goStale(const Member* stale, const BSONObj& oldest) {
+        log() << "replSet error RS102 too stale to catch up, at least from " << stale->fullName() << rsLog;
+        log() << "replSet our last optime : " << lastOpTimeWritten.toStringLong() << rsLog;
+        log() << "replSet oldest at " << stale->fullName() << " : " << oldest["ts"]._opTime().toStringLong() << rsLog;
+        log() << "replSet See http://www.mongodb.org/display/DOCS/Resyncing+a+Very+Stale+Replica+Set+Member" << rsLog;
+
+        // reset minvalid so that we can't become primary prematurely
+        {
+            Lock::DBWrite lk("local.replset.minvalid");
+            Helpers::putSingleton("local.replset.minvalid", oldest);
+        }
+
+        sethbmsg("error RS102 too stale to catch up");
+        changeState(MemberState::RS_RECOVERING);
     }
 
     void ReplSetImpl::assumePrimary() {
@@ -334,7 +351,6 @@ namespace mongo {
     }
 
     ReplSetImpl::ReplSetImpl(ReplSetCmdline& replSetCmdline) : elect(this),
-        _currentSyncTarget(0),
         _forceSyncTarget(0),
         _blockSync(false),
         _hbmsgTime(0),
@@ -370,6 +386,20 @@ namespace mongo {
             }
         }
     }
+
+    ReplSetImpl::ReplSetImpl() :
+        elect(this),
+        _forceSyncTarget(0),
+        _blockSync(false),
+        _hbmsgTime(0),
+        _self(0),
+        _maintenanceMode(0),
+        mgr(0),
+        ghost(0) {
+    }
+
+    ReplSet::ReplSet(ReplSetCmdline& replSetCmdline) : ReplSetImpl(replSetCmdline) {}
+    ReplSet::ReplSet() : ReplSetImpl() {}
 
     void newReplUp();
 
@@ -765,6 +795,10 @@ namespace mongo {
                 theReplSet->fatal();
         }
         cc().shutdown();
+    }
+
+    void ReplSet::shutdown() {
+        replset::BackgroundSync::shutdown();
     }
 
     void replLocalAuth() {

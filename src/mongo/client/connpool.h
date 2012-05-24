@@ -273,8 +273,6 @@ namespace mongo {
             _conn = 0;
         }
 
-        ScopedDbConnection * steal();
-
     private:
 
         void _setSocketTimeout();

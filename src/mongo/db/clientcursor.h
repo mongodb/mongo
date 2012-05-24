@@ -43,6 +43,7 @@ namespace mongo {
 
     typedef boost::recursive_mutex::scoped_lock recursive_scoped_lock;
     typedef long long CursorId; /* passed to the client so it can send back on getMore */
+    static const CursorId INVALID_CURSOR_ID = -1; // But see SERVER-5726.
     class Cursor; /* internal server cursor base class */
     class ClientCursor;
     class ParsedQuery;
@@ -85,42 +86,41 @@ namespace mongo {
            at the same time - which might be bad.  That should never happen, but if a client driver
            had a bug, it could (or perhaps some sort of attack situation).
         */
-        class Pointer : boost::noncopyable {
-            ClientCursor *_c;
+        class Pin : boost::noncopyable {
         public:
-            ClientCursor * c() { return _c; }
+            Pin( long long cursorid ) :
+                _cursorid( INVALID_CURSOR_ID ) {
+                recursive_scoped_lock lock( ccmutex );
+                ClientCursor *cursor = ClientCursor::find_inlock( cursorid, true );
+                if ( cursor ) {
+                    uassert( 12051, "clientcursor already in use? driver problem?",
+                            cursor->_pinValue < 100 );
+                    cursor->_pinValue += 100;
+                    _cursorid = cursorid;
+                }
+            }
             void release() {
-                if( _c ) {
-                    verify( _c->_pinValue >= 100 );
-                    _c->_pinValue -= 100;
-                    _c = 0;
+                ClientCursor *cursor = c();
+                _cursorid = INVALID_CURSOR_ID;
+                if ( cursor ) {
+                    verify( cursor->_pinValue >= 100 );
+                    cursor->_pinValue -= 100;
                 }
             }
-            /**
-             * call this if during a yield, the cursor got deleted
-             * if so, we don't want to use the point address
-             */
-            void deleted() {
-                _c = 0;
-            }
-            ~Pointer() { release(); }
-            Pointer(long long cursorid) {
-                recursive_scoped_lock lock(ccmutex);
-                _c = ClientCursor::find_inlock(cursorid, true);
-                if( _c ) {
-                    if( _c->_pinValue >= 100 ) {
-                        _c = 0;
-                        uasserted(12051, "clientcursor already in use? driver problem?");
-                    }
-                    _c->_pinValue += 100;
-                }
-            }
+            ~Pin() { DESTRUCTOR_GUARD( release(); ) }
+            ClientCursor *c() const { return ClientCursor::find( _cursorid ); }
+        private:
+            CursorId _cursorid;
         };
 
-        // This object assures safe and reliable cleanup of a ClientCursor.
-        class CleanupPointer : boost::noncopyable {
+        /** Assures safe and reliable cleanup of a ClientCursor. */
+        class Holder : boost::noncopyable {
         public:
-            CleanupPointer() : _c( 0 ), _id( -1 ) {}
+            Holder( ClientCursor *c = 0 ) :
+                _c( 0 ),
+                _id( INVALID_CURSOR_ID ) {
+                reset( c );
+            }
             void reset( ClientCursor *c = 0 ) {
                 if ( c == _c )
                     return;
@@ -134,18 +134,19 @@ namespace mongo {
                 }
                 else {
                     _c = 0;
-                    _id = -1;
+                    _id = INVALID_CURSOR_ID;
                 }
             }
-            ~CleanupPointer() {
+            ~Holder() {
                 DESTRUCTOR_GUARD ( reset(); );
             }
             operator bool() { return _c; }
             ClientCursor * operator-> () { return _c; }
+            const ClientCursor * operator-> () const { return _c; }
             /** Release ownership of the ClientCursor. */
             void release() {
                 _c = 0;
-                _id = -1;
+                _id = INVALID_CURSOR_ID;
             }
         private:
             ClientCursor *_c;
@@ -445,8 +446,8 @@ namespace mongo {
 // release()ed after a yield if stillOk() returns false and these pointer types
 // do not support releasing. This will prevent them from being used accidentally
 // Instead of auto_ptr<>, which still requires some degree of manual management
-// of this, consider using ClientCursor::CleanupPointer which handles
-// ClientCursor's unusual self-deletion mechanics
+// of this, consider using ClientCursor::Holder which handles ClientCursor's
+// unusual self-deletion mechanics.
 namespace boost{
     template<> class scoped_ptr<mongo::ClientCursor> {};
     template<> class shared_ptr<mongo::ClientCursor> {};

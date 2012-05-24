@@ -149,10 +149,19 @@ var startSlave = function(n) {
 
 var s1 = startSlave(1);
 
-var me1 = s1.getDB("local").me.findOne();
+var me1 = null;
 
-print("me: " +me1._id);
-assert(me1._id != null);
+// local.me will not be populated until the secondary reports back to the
+// primary that it is syncing
+assert.soon(function() {
+    me1 = s1.getDB("local").me.findOne();
+    if (me1 == null) {
+        return false;
+    }
+
+    print("me: " +me1._id);
+    return me1._id != null;
+});
 
 print("5");
 s1.getDB("admin").runCommand( {fsync:1,lock:1} );

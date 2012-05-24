@@ -392,6 +392,21 @@ namespace mongo {
          */
         bool simpleFiniteSet() const { return _simpleFiniteSet; }
         
+        /* Checks whether this FieldRangeSet is a non-empty union of point-intervals
+         * on a given field.
+         * Examples:
+         *  FieldRangeSet({a : 3}), isPointIntervalSet("a") -> true
+         *  FieldRangeSet({a : {$in : [1 , 2]}}), isPointIntervalSet("a") -> true
+         *  FieldRangeSet({}), isPointIntervalSet("a") -> false
+         *  FieldRangeSet({b : 1}), isPointIntervalSet("a") -> false
+         *
+         * Used in determining "suitability" for hashedindexes, and also in
+         * sharding for determining the relevant shards for a query.
+         *
+         * TODO: move this into FieldRange instead of FieldRangeSet
+         */
+        bool isPointIntervalSet( const string& fieldname ) const;
+
         const char *ns() const { return _ns.c_str(); }
         
         /**
