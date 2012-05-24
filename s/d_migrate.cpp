@@ -220,7 +220,7 @@ namespace mongo {
         }
 
         void start( string ns , const BSONObj& min , const BSONObj& max ) {
-            scoped_lock ll(_workLock);
+            //scoped_lock ll(_workLock);
             scoped_lock l(_m); // reads and writes _active
 
             assert( ! _active );
