@@ -1181,7 +1181,7 @@ namespace mongo {
                 c.max = max.getOwned();
                 c.numDocuments = numberOfDocuments;
                 ClientCursor::find( ns , c.initial );
-                if ( c.initial.size() ) {
+                if ( true || c.initial.size() ) {
                     log() << "forking for cleaning up chunk data" << migrateLog;
                     boost::thread t( boost::bind( &cleanupOldData , c ) );
                 }
