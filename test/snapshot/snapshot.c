@@ -267,9 +267,9 @@ cursor_lock(void)
 	snprintf(buf, sizeof(buf), "snapshot=%s", list[1].name);
 	assert(session->open_cursor(session, URI, NULL, buf, &c2) == 0);
 	assert(session->open_cursor(session, URI, NULL, NULL, &c3) == 0);
-	assert(cursor->close(c2) == 0);
-	assert(cursor->close(c1) == 0);
-	assert(cursor->close(c3) == 0);
+	assert(c2->close(c2) == 0);
+	assert(c1->close(c1) == 0);
+	assert(c3->close(c3) == 0);
 }
 
 /*
