@@ -602,6 +602,12 @@ def run_old_fails():
             # dependencies of the --only-old-fails build phase, just skip
             # tests which we can't safely run at this point
             path, usedb = test
+
+            if not os.path.exists(path):
+                passed.append(i)
+                winners.append(test)
+                continue
+
             filename = os.path.basename(path)
             if filename in ('test', 'test.exe') or filename.endswith('.js'):
                 set_globals(options)
