@@ -712,7 +712,7 @@ def main():
         os.environ['MONGO_BUILD_NUMBER'] = options.buildlogger_buildnum
         os.environ['BUILDLOGGER_CREDENTIALS'] = options.buildlogger_credentials
         if options.buildlogger_phase:
-            os.environ['MONGO_BUILD_PHASE'] = options.buildlogger_phase
+            os.environ['MONGO_PHASE'] = options.buildlogger_phase
     elif any(buildlogger_opts):
         # some but not all of the required options were sete
         raise Exception("you must set all of --buildlogger-builder, --buildlogger-buildnum, --buildlogger-credentials")
