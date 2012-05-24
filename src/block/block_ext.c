@@ -396,7 +396,12 @@ __wt_block_extend(
 
 	fh = block->fh;
 
-	/* We should never be allocating from an empty file. */
+	/*
+	 * Callers of this function are expected to be holding any locks
+	 * required to extend the file.
+	 *
+	 * We should never be allocating from an empty file.
+	 */
 	if (fh->file_size < WT_BLOCK_DESC_SECTOR)
 		WT_RET_MSG(session, EINVAL,
 		    "cannot allocate from a file with no description "
