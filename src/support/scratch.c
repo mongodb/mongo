@@ -387,7 +387,7 @@ __wt_scr_discard(WT_SESSION_IMPL *session)
 			    scratch_track[bufp - session->scratch].line
 #endif
 			    );
-			
+
 		__wt_buf_free(session, *bufp);
 		__wt_free(session, *bufp);
 	}
