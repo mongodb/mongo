@@ -87,7 +87,18 @@ struct __wt_session_impl {
 
 	WT_ITEM	**scratch;		/* Temporary memory for any function */
 	u_int	scratch_alloc;		/* Currently allocated */
-
+#ifdef HAVE_DIAGNOSTIC
+	/*
+	 * It's hard to figure out from where a buffer was allocated after it's
+	 * leaked, so in diagnostic mode we track them; DIAGNOSTIC can't simply
+	 * add additional fields to WT_ITEM structures because they are visible
+	 * to applications, create a parallel structure instead.
+	 */
+	struct __wt_scratch_track {
+		const char *file;	/* Allocating file, line */
+		int line;
+	} *scratch_track;
+#endif
 					/* Serialized operation state */
 	void	*wq_args;		/* Operation arguments */
 	int	wq_sleeping;		/* Thread is blocked */

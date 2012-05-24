@@ -138,6 +138,8 @@ struct __wt_rwlock;
     typedef struct __wt_rwlock WT_RWLOCK;
 struct __wt_salvage_cookie;
     typedef struct __wt_salvage_cookie WT_SALVAGE_COOKIE;
+struct __wt_scratch_track;
+    typedef struct __wt_scratch_track WT_SCRATCH_TRACK;
 struct __wt_session_impl;
     typedef struct __wt_session_impl WT_SESSION_IMPL;
 struct __wt_size;

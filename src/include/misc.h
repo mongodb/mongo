@@ -154,3 +154,19 @@
 /* Function return value and scratch buffer declaration and initialization. */
 #define	WT_DECL_ITEM(i)	WT_ITEM *i = NULL
 #define	WT_DECL_RET	int ret = 0
+
+/*
+ * In diagnostic mode we track the locations from which hazard references and
+ * scratch buffers were acquired.
+ */
+#ifdef HAVE_DIAGNOSTIC
+#define	__wt_scr_alloc(session, size, scratchp)				\
+	__wt_scr_alloc_func(session, size, scratchp, __FILE__, __LINE__)
+#define	__wt_page_in(session, parent, ref)				\
+	__wt_page_in_func(session, parent, ref, __FILE__, __LINE__)
+#else
+#define	__wt_scr_alloc(session, size, scratchp)				\
+	__wt_scr_alloc_func(session, size, scratchp)
+#define	__wt_page_in(session, parent, ref)				\
+	__wt_page_in_func(session, parent, ref)
+#endif
