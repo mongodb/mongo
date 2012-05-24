@@ -789,10 +789,7 @@ def doConfigure(myenv):
     if solaris or conf.CheckDeclaration('clock_gettime', includes='#include <time.h>'):
         conf.CheckLib('rt')
 
-    if freebsd and conf.CheckCXXHeader( "unwind.h" ):
-        myenv.Append( CPPDEFINES=[ "MONGO_HAVE_UNWIND_BACKTRACE" ] )
-
-    elif (conf.CheckCXXHeader( "execinfo.h" ) and
+    if (conf.CheckCXXHeader( "execinfo.h" ) and
         conf.CheckDeclaration('backtrace', includes='#include <execinfo.h>') and
         conf.CheckDeclaration('backtrace_symbols', includes='#include <execinfo.h>')):
 
@@ -811,11 +808,9 @@ def doConfigure(myenv):
         if not conf.CheckLib( v8_lib_choices ):
             Exit(1)
 
-    # requires ports devel/libexecinfo or devel/libunwind to be installed
+    # requires ports devel/libexecinfo to be installed
     if freebsd or openbsd:
-        # CheckLib actually sets the -l argument, so check in the
-        # order of precedence.
-        if not (conf.CheckLib("unwind") or conf.CheckLib("execinfo")):
+        if not conf.CheckLib("execinfo"):
             Exit(1)
 
     # 'tcmalloc' needs to be the last library linked. Please, add new libraries before this 
