@@ -273,6 +273,9 @@ __wt_update_alloc(WT_SESSION_IMPL *session,
 	WT_UPDATE *upd;
 	size_t size;
 
+	/* Before allocating anything, make sure this update is permitted. */
+	WT_RET(__wt_txn_update_check(session, next));
+
 	/*
 	 * Allocate the WT_UPDATE structure and room for the value, then copy
 	 * the value into place.
@@ -286,8 +289,12 @@ __wt_update_alloc(WT_SESSION_IMPL *session,
 		memcpy(WT_UPDATE_DATA(upd), value->data, size);
 	}
 
-	if ((ret = __wt_txn_modify(session, &upd->txnid)) != 0 ||
-	    (ret = __wt_txn_update_check(session, next)) != 0) {
+	/*
+	 * This must come last: after __wt_txn_modify succeeds, we must return
+	 * a non-NULL upd so our callers can call __wt_txn_unmodify on any
+	 * subsequent failure.
+	 */
+	if ((ret = __wt_txn_modify(session, &upd->txnid)) != 0) {
 		__wt_free(session, upd);
 		return (ret);
 	}
