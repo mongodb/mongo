@@ -4,24 +4,20 @@ var test = new ShardingTest({shards: 3, mongos: 1, config: 1, other: {chunksize:
 
 var mongos = test.s0
 
-var d = mongos.getDB("test")
 
 var filename = "mongod" // A large file we are guaranteed to have
 
-function reset() {
-    d.fs.files.drop()
-    d.fs.chunks.drop()
-}
+function testGridFS(name) {
+    var d = mongos.getDB(name)
 
-function testGridFS() {
     // this function should be called on a clean db
-    assert.eq(d.fs.files.count(), 0)
+    assert.eq(d.name.files.count(), 0)
     assert.eq(d.fs.chunks.count(), 0)
 
     var rawmd5 = md5sumFile(filename)
 
     // upload file (currently calls filemd5 internally)
-    runMongoProgram("mongofiles", "--port", mongos.port, "put", filename)
+    runMongoProgram("mongofiles", "--port", mongos.port, "put", filename, '--db', name)
 
     assert.eq(d.fs.files.count(), 1)
     var fileObj = d.fs.files.findOne()
@@ -40,22 +36,24 @@ function testGridFS() {
 }
 
 print('\n\n\t**** unsharded ****\n\n')
-testGridFS()
-reset()
+name = 'unsharded'
+testGridFS(name)
 
 print('\n\n\t**** sharded db, unsharded collection ****\n\n')
-test.adminCommand({enablesharding: 'test'})
-testGridFS()
-reset()
+name = 'sharded_db'
+test.adminCommand({enablesharding: name})
+testGridFS(name)
 
 print('\n\n\t**** sharded collection on files_id ****\n\n')
-test.adminCommand({shardcollection: 'test.fs.chunks', key: {files_id:1}})
-testGridFS()
-reset()
+name = 'sharded_files_id'
+test.adminCommand({enablesharding: name})
+test.adminCommand({shardcollection: name+'.fs.chunks', key: {files_id:1}})
+testGridFS(name)
 
 print('\n\n\t**** sharded collection on files_id,n ****\n\n')
-test.adminCommand({shardcollection: 'test.fs.chunks', key: {files_id:1, n:1}})
-testGridFS()
-reset()
+name = 'sharded_files_id_n'
+test.adminCommand({enablesharding: name})
+test.adminCommand({shardcollection: name+'.fs.chunks', key: {files_id:1, n:1}})
+testGridFS(name)
 
 test.stop()
