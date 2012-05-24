@@ -362,6 +362,7 @@ extern int __wt_rec_track_ovfl_reuse( WT_SESSION_IMPL *session,
     int *foundp);
 extern int __wt_rec_track_init(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_rec_track_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page);
+extern int __wt_rec_track_wrapup_err(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern void __wt_rec_track_discard(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern char *__wt_track_string(WT_PAGE_TRACK *track, char *buf, size_t len);
 extern int __wt_rec_write( WT_SESSION_IMPL *session,

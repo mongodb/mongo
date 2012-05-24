@@ -178,6 +178,7 @@ static int  __rec_split_row_promote(WT_SESSION_IMPL *, uint8_t);
 static int  __rec_split_write(WT_SESSION_IMPL *, WT_BOUNDARY *, WT_ITEM *, int);
 static int  __rec_write_init(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_write_wrapup(WT_SESSION_IMPL *, WT_PAGE *);
+static int  __rec_write_wrapup_err(WT_SESSION_IMPL *, WT_PAGE *);
 
 /*
  * Helper macro to determine whether the given WT_REF has a page with
@@ -225,6 +226,8 @@ int
 __wt_rec_write(
     WT_SESSION_IMPL *session, WT_PAGE *page, WT_SALVAGE_COOKIE *salvage)
 {
+	WT_DECL_RET;
+
 	WT_VERBOSE_RET(session, reconcile,
 	    "page %p %s", page, __wt_page_type_string(page->type));
 
@@ -248,23 +251,32 @@ __wt_rec_write(
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
 		if (salvage != NULL)
-			WT_RET(__rec_col_fix_slvg(session, page, salvage));
+			ret = __rec_col_fix_slvg(session, page, salvage);
 		else
-			WT_RET(__rec_col_fix(session, page));
+			ret = __rec_col_fix(session, page);
 		break;
 	case WT_PAGE_COL_INT:
-		WT_RET(__rec_col_int(session, page));
+		ret =__rec_col_int(session, page);
 		break;
 	case WT_PAGE_COL_VAR:
-		WT_RET(__rec_col_var(session, page, salvage));
+		ret =__rec_col_var(session, page, salvage);
 		break;
 	case WT_PAGE_ROW_INT:
-		WT_RET(__rec_row_int(session, page));
+		ret =__rec_row_int(session, page);
 		break;
 	case WT_PAGE_ROW_LEAF:
-		WT_RET(__rec_row_leaf(session, page, salvage));
+		ret =__rec_row_leaf(session, page, salvage);
 		break;
 	WT_ILLEGAL_VALUE(session);
+	}
+	if (ret != 0) {
+		/*
+		 * The underlying wrapup-on-error functions can fail, and they
+		 * are written to return an error value, but now we discard it,
+		 * we already have one.
+		 */
+		(void)__rec_write_wrapup_err(session, page);
+		return (ret);
 	}
 
 	/* Wrap up the page's reconciliation. */
@@ -400,6 +412,12 @@ __rec_write_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 	/* Read the disk generation before we read anything from the page. */
 	r->orig_disk_gen = page->modify->disk_gen;
 	WT_ORDERED_READ(r->orig_write_gen, page->modify->write_gen);
+
+	/*
+	 * Pages cannot be evicted if they are only partially written, that is,
+	 * if we skipped an update for transactional reasons, the page cannot
+	 * be evicted.
+	 */
 	r->upd_skipped = 0;
 
 	return (0);
@@ -3026,6 +3044,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 				WT_ILLEGAL_VALUE_ERR(session);
 				}
 err:			__wt_scr_free(&tkey);
+			WT_RET(ret);
 		}
 #endif
 		switch (page->type) {
@@ -3050,9 +3069,37 @@ err:			__wt_scr_free(&tkey);
 	 * generation has not changed in the meantime, update it to the write
 	 * generation when reconciliation started.
 	 */
-	if (ret == 0 && !r->upd_skipped)
+	if (!r->upd_skipped)
 		(void)WT_ATOMIC_CAS(
 		    mod->disk_gen, r->orig_disk_gen, r->orig_write_gen);
+
+	return (0);
+}
+
+/*
+ * __rec_write_wrapup_err  --
+ *	Finish the reconciliation on error.
+ */
+static int
+__rec_write_wrapup_err(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	WT_BOUNDARY *bnd;
+	WT_DECL_RET;
+	WT_RECONCILE *r;
+	uint32_t i;
+
+	r = session->reconcile;
+
+	/*
+	 * On error, discard pages we've written, they're unreferenced by the
+	 * tree.  This is not a question of correctness, we're avoiding block
+	 * leaks.
+	 */
+	WT_TRET(__wt_rec_track_wrapup_err(session, page));
+	for (bnd = r->bnd, i = 0; i < r->bnd_next; ++bnd, ++i)
+		if (bnd->addr.addr != NULL)
+			WT_TRET(__wt_bm_free(
+			    session, bnd->addr.addr, bnd->addr.size));
 	return (ret);
 }
 

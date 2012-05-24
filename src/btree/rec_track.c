@@ -125,7 +125,7 @@ __wt_rec_track(WT_SESSION_IMPL *session, WT_PAGE *page,
 	 */
 	WT_RET(__wt_calloc_def(session, addr_size + data_size, &p));
 
-	track->flags = (uint8_t)flags | WT_TRK_OBJECT;
+	track->flags = (uint8_t)flags | WT_TRK_JUST_ADDED | WT_TRK_OBJECT;
 	track->addr.addr = p;
 	track->addr.size = addr_size;
 	memcpy(track->addr.addr, addr, addr_size);
@@ -314,8 +314,8 @@ __wt_rec_track_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		WT_RET(__track_dump(session, page, "reconcile wrapup"));
 
 	/*
-	 * After a sync of a page, some of the objects we're tracking are no
-	 * longer needed -- free what we can free.
+	 * After the successful reconciliation of a page, some of the objects
+	 * we're tracking are no longer needed, free what we can free.
 	 */
 	mod = page->modify;
 	for (track = mod->track, i = 0; i < mod->track_entries; ++track, ++i) {
@@ -325,13 +325,18 @@ __wt_rec_track_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 		/*
 		 * Ignore discarded objects (discarded objects left on the list
-		 * are never in-use, and only include objects found on a page).
+		 * are never just-added, never in-use, and only include objects
+		 * found on a page).
 		 */
 		if (F_ISSET(track, WT_TRK_DISCARD)) {
-			WT_ASSERT(session, !F_ISSET(track, WT_TRK_INUSE));
+			WT_ASSERT(session,
+			    !F_ISSET(track, WT_TRK_JUST_ADDED | WT_TRK_INUSE));
 			WT_ASSERT(session, F_ISSET(track, WT_TRK_ONPAGE));
 			continue;
 		}
+
+		/* Clear the just-added flag, reconciliation succeeded. */
+		F_CLR(track, WT_TRK_JUST_ADDED);
 
 		/*
 		 * Ignore in-use objects, other than to clear the in-use flag
@@ -367,6 +372,43 @@ __wt_rec_track_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		memset(track, 0, sizeof(*track));
 	}
 	return (0);
+}
+
+/*
+ * __wt_rec_track_wrapup_err --
+ *	Resolve the page's list of tracked objects after an error occurs.
+ */
+int
+__wt_rec_track_wrapup_err(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	WT_DECL_RET;
+	WT_PAGE_MODIFY *mod;
+	WT_PAGE_TRACK *track;
+	uint32_t i;
+
+	/*
+	 * After a failed reconciliation of a page, discard entries added in the
+	 * current reconciliation, their information is incorrect, additionally,
+	 * clear the in-use flag in preparation for the next reconciliation.
+	 */
+	mod = page->modify;
+	for (track = mod->track, i = 0; i < mod->track_entries; ++track, ++i)
+		if (F_ISSET(track, WT_TRK_JUST_ADDED)) {
+			/*
+			 * The in-use flag is used to avoid discarding backing
+			 * blocks: if an object is both just-added and in-use,
+			 * we allocated the blocks on this run, and we want to
+			 * discard them on error.
+			 */
+			if (F_ISSET(track, WT_TRK_INUSE))
+				WT_TRET(__wt_bm_free(session,
+				    track->addr.addr, track->addr.size));
+
+			__wt_free(session, track->addr.addr);
+			memset(track, 0, sizeof(*track));
+		} else
+			F_CLR(track, WT_TRK_INUSE);
+	return (ret);
 }
 
 /*
