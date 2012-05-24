@@ -409,14 +409,32 @@ namespace mongo {
                 const string collection = cmdObj.firstElement().valuestrsafe();
                 const string fullns = dbName + "." + collection;
 
+                BSONObjBuilder countCmdBuilder;
+                countCmdBuilder.append( "count", collection );
+
                 BSONObj filter;
                 if( cmdObj["query"].isABSONObj() ){
+                    countCmdBuilder.append( "query", cmdObj["query"].Obj() );
                     filter = cmdObj["query"].Obj();
+                }
+
+                if( cmdObj["limit"].isNumber() ){
+                    long long limit = cmdObj["limit"].numberLong();
+
+                    /* We only need to factor in the skip value when sending to
+                     * the shards if we have a value for limit, otherwise, we
+                     * apply it only once we have collected all counts.
+                     */
+                    if( cmdObj["skip"].isNumber() ){
+                        limit += cmdObj["skip"].numberLong();
+                    }
+
+                    countCmdBuilder.append( "limit", limit );
                 }
 
                 map<Shard, BSONObj> countResult;
 
-                SHARDED->commandOp( dbName, BSON( "count" << collection << "query" << filter ),
+                SHARDED->commandOp( dbName, countCmdBuilder.done(),
                             options, fullns, filter, countResult );
 
                 long long total = 0;
