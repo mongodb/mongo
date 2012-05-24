@@ -1075,7 +1075,7 @@ struct __wt_connection {
  * @config{sync, sync files when closing or writing snapshots.,a boolean flag;
  * default \c true.}
  * @config{transactional, support transactional semantics.,a boolean flag;
- * default \c false.}
+ * default \c true.}
  * @config{verbose, enable messages for various events.  Options are given as a
  * list\, such as <code>"verbose=[evictserver\,read]"</code>.,a list\, with
  * values chosen from the following options: \c "block"\, \c "evict"\, \c

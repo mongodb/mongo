@@ -376,7 +376,7 @@ methods = {
 	Config('sync', 'true', r'''
 		sync files when closing or writing snapshots''',
 		type='boolean'),
-	Config('transactional', 'false', r'''
+	Config('transactional', 'true', r'''
 		support transactional semantics''',
 		type='boolean'),
 	Config('verbose', '', r'''

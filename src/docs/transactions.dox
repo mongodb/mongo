@@ -24,11 +24,6 @@ following caveats to the ACID properties:
 
 @section transactions_api Transactional API
 
-To configure for transactions, the database must be created with
-transaction support enabled.  This is done by passing the configuration
-string <code>"transactional"</code> to ::wiredtiger_open when creating the
-database.
-
 In WiredTiger, the transactional context is managed by the WT_SESSION
 class.  Applications call WT_SESSION::begin_transaction to start a new
 transaction, which is only permitted when no cursors are open.  Operations

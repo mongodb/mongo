@@ -268,7 +268,7 @@ __wt_confdfl_wiredtiger_open =
     "error_prefix="",eviction_target=80,eviction_trigger=95,extensions=(),"
     "hazard_max=30,home_environment=false,home_environment_priv=false,"
     "logging=false,multiprocess=false,session_max=50,sync=true,"
-    "transactional=false,verbose=()";
+    "transactional=true,verbose=()";
 
 const char *
 __wt_confchk_wiredtiger_open =
