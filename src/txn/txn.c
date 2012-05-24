@@ -166,13 +166,10 @@ __txn_release(WT_SESSION_IMPL *session)
 int
 __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 {
-	WT_DECL_RET;
 	WT_TXN *txn;
 
 	WT_UNUSED(cfg);
-
 	txn = &session->txn;
-	ret = 0;
 
 #if 0
 	/*
@@ -185,8 +182,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	for (i = 0, m = txn->mod; i < txn->mod_count; i++, m++)
 		**m = WT_TXN_NONE;
 #endif
-	WT_TRET(__txn_release(session));
-	return (ret);
+	return (__txn_release(session));
 }
 
 /*
@@ -196,7 +192,6 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 int
 __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
 {
-	WT_DECL_RET;
 	WT_TXN *txn;
 	wt_txnid_t **m;
 	u_int i;
@@ -204,12 +199,11 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_UNUSED(cfg);
 
 	txn = &session->txn;
-	ret = 0;
 
 	for (i = 0, m = txn->mod; i < txn->mod_count; i++, m++)
 		**m = WT_TXN_ABORTED;
-	WT_TRET(__txn_release(session));
-	return (ret);
+
+	return (__txn_release(session));
 }
 
 /*
