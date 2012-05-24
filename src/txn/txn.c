@@ -114,7 +114,7 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 		if (txn->isolation == TXN_ISO_SNAPSHOT) {
 			/* Copy the array of concurrent transactions. */
 			WT_ORDERED_READ(session_cnt, conn->session_cnt);
-			for (i = n = 0; i < conn->session_cnt; i++)
+			for (i = n = 0; i < session_cnt; i++)
 				if ((txn->snapshot[n] =
 				    txn_global->ids[i]) != WT_TXN_NONE)
 					++n;
@@ -162,22 +162,22 @@ __txn_release(WT_SESSION_IMPL *session)
 int
 __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 {
-	WT_TXN *txn;
-
-	WT_UNUSED(cfg);
-	txn = &session->txn;
-
 #if 0
 	/*
 	 * We want to avoid this cost in application transactions -- the only
 	 * reason to do it is if 2 billion transactions are executed between
 	 * writes of a page...
 	 */
+	WT_TXN *txn;
 	wt_txnid_t **m;
 	u_int i;
+
+	txn = &session->txn;
 	for (i = 0, m = txn->mod; i < txn->mod_count; i++, m++)
 		**m = WT_TXN_NONE;
 #endif
+
+	WT_UNUSED(cfg);
 	return (__txn_release(session));
 }
 
