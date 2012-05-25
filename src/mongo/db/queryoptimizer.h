@@ -53,23 +53,23 @@ namespace mongo {
                   const BSONObj &endKey = BSONObj(),
                   string special="" );
 
-        /** @return true iff this plan cannot return any documents. */
+        /** @return true if this plan cannot return any documents. */
         bool impossible() const { return _impossible; }
         /**
-         * @return true iff this plan should run as the only candidate plan in the absence of an
+         * @return true if this plan should run as the only candidate plan in the absence of an
          * impossible plan.
          */
         bool optimal() const { return _optimal; }
-        /** @return true iff this plan should not be considered at all. */
+        /** @return true if this plan should not be considered at all. */
         bool unhelpful() const { return _unhelpful; }
-        /** @return true iff ScanAndOrder processing will be required for result set. */
+        /** @return true if ScanAndOrder processing will be required for result set. */
         bool scanAndOrderRequired() const { return _scanAndOrderRequired; }
         /**
-         * @return true iff the index we are using has keys such that it can completely resolve the
+         * @return true if the index we are using has keys such that it can completely resolve the
          * query expression to match by itself without ever checking the main object.
          */
         bool exactKeyMatch() const { return _exactKeyMatch; }
-        /** @return true iff this QueryPlan would perform an unindexed scan. */
+        /** @return true if this QueryPlan would perform an unindexed scan. */
         bool willScanTable() const { return _idxNo < 0 && !_impossible; }
         /** @return 'special' attribute of the plan, which was either set explicitly or generated from the index. */
         const string &special() const { return _special; }
