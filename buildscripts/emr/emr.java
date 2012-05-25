@@ -23,7 +23,9 @@ public class emr {
             mongo = c.mongo;
             code = c.code;
             workingDir = c.workingDir;
+            
             suite = c.suite;
+            
         }
 
         void downloadTo( File localDir ) 
@@ -40,10 +42,12 @@ public class emr {
             dir.mkdirs();
             
             // download
+            System.out.println( "going to download" );
             downloadTo( dir );
-
+            
             
             // explode
+            System.out.println( "going to explode" );
             IOUtil.runCommand( "tar zxvf " + IOUtil.urlFileName( code ) , dir );
             String[] res = IOUtil.runCommand( "tar zxvf " + IOUtil.urlFileName( mongo ) , dir );
             for ( String x : res[0].split( "\n" ) ) {
@@ -54,24 +58,61 @@ public class emr {
                     throw new RuntimeException( "rename failed" );
             }
             
+            List<String> cmd = new ArrayList<String>();
+            cmd.add( "/usr/bin/python" );
+            cmd.add( "buildscripts/smoke.py" );
+            
+            File log_config = new File( dir , "log_config.py" );
+            System.out.println( "log_config: " + log_config.exists() );
+            if ( log_config.exists() ) {
 
-            Process p = Runtime.getRuntime().exec( new String[]{ "/usr/bin/python" , "buildscripts/smoke.py" , suite } , new String[]{} , dir );
+                java.util.Map<String,Object> properties = IOUtil.readPythonSettings( log_config );
+
+                cmd.add( "--buildlogger-builder" );
+                cmd.add( properties.get( "name" ).toString() );
+                
+                cmd.add( "--buildlogger-buildnum" );
+                cmd.add( properties.get( "number" ).toString() );
+                
+                cmd.add( "--buildlogger-credentials" );
+                cmd.add( "log_config.py" );
+                
+                cmd.add( "--buildlogger-phase" );
+                {
+                    int idx = suite.lastIndexOf( "/" );
+                    if ( idx < 0 ) 
+                        cmd.add( suite );
+                    else
+                        cmd.add( suite.substring( 0 , idx ) );
+                }
+
+            }
+
+            cmd.add( suite );
+            
+            System.out.println( cmd );
+
+            Process p = Runtime.getRuntime().exec( cmd.toArray( new String[cmd.size()] ) , new String[]{} , dir );
+
             List<Thread> threads = new ArrayList<Thread>();
             threads.add( new IOUtil.PipingThread( p.getInputStream() , System.out ) );
             threads.add( new IOUtil.PipingThread( p.getErrorStream() , System.out ) );
-            
-            for ( Thread t : threads ) t.start();
-            try {
-                for ( Thread t : threads ) t.join();
-                int rc = p.waitFor();
-                System.out.println( "\n\nResult: " + rc );
 
+            for ( Thread t : threads ) 
+                t.start();
+
+            try {
+                for ( Thread t : threads ) {
+                    t.join();
+                }
+                int rc = p.waitFor();
                 return rc == 0;
             }
             catch ( InterruptedException ie ) {
+                ie.printStackTrace();
                 throw new RuntimeException( "sad" , ie );
             }
-
+            
         }
 
         public void readFields( DataInput in ) 
@@ -79,6 +120,7 @@ public class emr {
             mongo = in.readUTF();
             code = in.readUTF();
             workingDir = in.readUTF();
+            
             suite = in.readUTF();
         }
 
@@ -87,6 +129,7 @@ public class emr {
             out.writeUTF( mongo );            
             out.writeUTF( code );
             out.writeUTF( workingDir );
+
             out.writeUTF( suite );
         }
 
@@ -118,6 +161,14 @@ public class emr {
                 String ip = IOUtil.readStringFully( new URL( "http://myip.10gen.com/" ).openConnection().getInputStream() );
                 ip = ip.substring( ip.indexOf( ":" ) + 1 ).trim();
                 output.collect( new Text( ip ) , new IntWritable(1) );
+            }
+            catch ( RuntimeException re ) {
+                re.printStackTrace();
+                throw re;
+            }
+            catch ( IOException ioe ) {
+                ioe.printStackTrace();
+                throw ioe;
             }
             finally {
                 lock.unlock();
@@ -254,6 +305,7 @@ public class emr {
         
         String workingDir = "/data/db/emr/";
         
+
         // parse args
 
         int pos = 0;
@@ -290,6 +342,16 @@ public class emr {
         System.out.println( "code:\t " + code );
         System.out.println( "output\t: " + output );
         System.out.println( "suites\t: " + suites );
+
+        if ( false ) {
+            MongoSuite s = new MongoSuite();
+            s.mongo = mongo;
+            s.code = code;
+            s.workingDir = workingDir;
+            s.suite = suites;
+            s.runTest();
+            return;
+        }
 
         // main hadoop set
         conf.set( "mongo" , mongo );

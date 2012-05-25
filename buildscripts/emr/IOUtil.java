@@ -2,6 +2,7 @@
 
 import java.io.*;
 import java.net.*;
+import java.util.*;
 
 public class IOUtil {
 
@@ -66,6 +67,37 @@ public class IOUtil {
         pipe( in , bout );
         return new String( bout.toByteArray() , "UTF8" );
         
+    }
+
+    public static Map<String,Object> readPythonSettings( File file ) 
+        throws IOException {
+        
+        String all = readStringFully( new FileInputStream( file ) );
+
+        Map<String,Object> map = new TreeMap<String,Object>();
+        
+        for ( String line : all.split( "\n" ) ) {
+            line = line.trim();
+            if ( line.length() == 0 )
+                continue;
+            
+            String[] pcs = line.split( "=" );
+            if ( pcs.length != 2 )
+                continue;
+            
+            String name = pcs[0].trim();
+            String value = pcs[1].trim();
+            
+            if ( value.startsWith( "\"" ) ) {
+                map.put( name , value.substring( 1 , value.length() - 1 ) );
+            }
+            else {
+                map.put( name , Long.parseLong( value ) );
+            }
+            
+        }
+        
+        return map;
     }
 
     public static String[] runCommand( String cmd , File dir )
