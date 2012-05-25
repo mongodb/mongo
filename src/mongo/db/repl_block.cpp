@@ -134,6 +134,8 @@ namespace mongo {
                 return replicatedToNum(op, w.numberInt());
             }
 
+            uassert( 16250 , "w has to be a string or a number" , w.type() == String );
+
             if (!theReplSet) {
                 return false;
             }
