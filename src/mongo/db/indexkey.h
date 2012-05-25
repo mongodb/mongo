@@ -163,6 +163,8 @@ namespace mongo {
 
         IndexSuitability suitability( const BSONObj& query , const BSONObj& order ) const ;
 
+        bool isSparse() const { return _sparse; }
+
     protected:
 
         int indexVersion() const;
