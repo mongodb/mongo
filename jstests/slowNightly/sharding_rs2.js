@@ -86,7 +86,7 @@ after = rs.test.getMaster().adminCommand( "serverStatus" ).opcounters
 printjson( before )
 printjson( after )
 
-assert.eq( before.query + 10 , after.query , "B3" )
+assert.lte( before.query + 10 , after.query , "B3" )
 
 // --- add more data ----
 
@@ -143,7 +143,7 @@ for ( i=0; i<10; i++ )
 
 after = rs.test.getMaster().adminCommand( "serverStatus" ).opcounters
 
-assert.eq( before.query + 10 , after.query , "D3" )
+assert.lte( before.query + 10 , after.query , "D3" )
 
 // by shard key
 
@@ -161,7 +161,7 @@ for ( i=0; i<10; i++ )
 
 after = rs.test.getMaster().adminCommand( "serverStatus" ).opcounters
 
-assert.eq( before.query + 10 , after.query , "E3" )
+assert.lte( before.query + 10 , after.query , "E3" )
 
 assert.eq( 100 , ts.count() , "E4" )
 assert.eq( 100 , ts.find().itcount() , "E5" )
