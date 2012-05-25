@@ -225,10 +225,7 @@ namespace mongo {
         
     protected:
         /** Call if all results have been found. */
-        void setComplete() {
-            _orConstraint = qp().originalFrv();
-            _complete = true;
-        }
+        void setComplete() { _complete = true; }
         /** Call if the scan is complete even if not all results have been found. */
         void setStop() { setComplete(); _stopRequested = true; }
 
@@ -245,8 +242,6 @@ namespace mongo {
         const QueryPlan *_qp;
         bool _error;
         shared_ptr<CoveredIndexMatcher> _matcher;
-        shared_ptr<CoveredIndexMatcher> _oldMatcher;
-        shared_ptr<FieldRangeVector> _orConstraint;
     };
 
     // temp.  this class works if T::operator< is variant unlike a regular stl priority queue.

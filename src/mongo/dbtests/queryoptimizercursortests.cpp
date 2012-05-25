@@ -4344,13 +4344,13 @@ namespace QueryOptimizerCursorTests {
 
                 BSONObj c2plan1 = clause2[ "allPlans" ].Array()[ 0 ].Obj();
                 ASSERT_EQUALS( "BtreeCursor b_1", c2plan1[ "cursor" ].String() );
-                ASSERT_EQUALS( 1, c2plan1[ "n" ].number() );
+                ASSERT_EQUALS( 5, c2plan1[ "n" ].number() );
                 ASSERT_EQUALS( 5, c2plan1[ "nscannedObjects" ].number() );
                 ASSERT_EQUALS( 5, c2plan1[ "nscanned" ].number() );
                 
                 BSONObj c2plan2 = clause2[ "allPlans" ].Array()[ 1 ].Obj();
                 ASSERT_EQUALS( "BasicCursor", c2plan2[ "cursor" ].String() );
-                ASSERT_EQUALS( 1, c2plan2[ "n" ].number() );
+                ASSERT_EQUALS( 5, c2plan2[ "n" ].number() );
                 ASSERT_EQUALS( 5, c2plan2[ "nscannedObjects" ].number() );
                 ASSERT_EQUALS( 5, c2plan2[ "nscanned" ].number() );
             }

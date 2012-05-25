@@ -386,13 +386,7 @@ doneCheckOrder:
      * after the query op has completed executing.
      */    
     QueryOp *QueryOp::createChild() {
-        if( _orConstraint.get() ) {
-            _matcher->advanceOrClause( _orConstraint );
-            _orConstraint.reset();
-        }
-        QueryOp *ret = _createChild();
-        ret->_oldMatcher = _matcher;
-        return ret;
+        return _createChild();
     }    
 
     string QueryPlan::toString() const {
@@ -410,12 +404,7 @@ doneCheckOrder:
     }
     
     void QueryOp::init() {
-        if ( _oldMatcher.get() ) {
-            _matcher.reset( _oldMatcher->nextClauseMatcher( qp().indexKey() ) );
-        }
-        else {
-            _matcher.reset( new CoveredIndexMatcher( qp().originalQuery(), qp().indexKey() ) );
-        }
+        _matcher.reset( new CoveredIndexMatcher( qp().originalQuery(), qp().indexKey() ) );
         _init();
     }
     
