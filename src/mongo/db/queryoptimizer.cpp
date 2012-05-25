@@ -1248,11 +1248,9 @@ doneCheckOrder:
         _nscanned += _c->nscanned();
         if ( _explainPlanInfo ) _explainPlanInfo->noteDone( *_c );
         _matcher->advanceOrClause( _queryPlan->originalFrv() );
-        shared_ptr<CoveredIndexMatcher> newMatcher
-        ( _matcher->nextClauseMatcher( _queryPlan->indexKey() ) );
         _queryPlan = _mps->nextClauseBestGuessPlan( *_queryPlan );
         if ( _queryPlan ) {
-            _matcher = newMatcher;
+            _matcher.reset( _matcher->nextClauseMatcher( _queryPlan->indexKey() ) );
             _c = _queryPlan->newCursor();
             // All sub cursors must support yields.
             verify( _c->supportYields() );

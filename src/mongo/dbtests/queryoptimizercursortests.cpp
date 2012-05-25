@@ -3410,6 +3410,30 @@ namespace QueryOptimizerCursorTests {
         }
     };
     
+    /** Proper index matching when transitioning between $or clauses after a takeover. */
+    class TakeoverOrDifferentIndex : public PlanChecking {
+    public:
+        void run() {
+            for( int i = 0; i < 120; ++i ) {
+                _cli.insert( ns(), BSON( "a" << 1 << "b" << 2 ) );
+            }
+            _cli.ensureIndex( ns(), BSON( "a" << 1 << "b" << 1 ) );
+            for( int i = 0; i < 130; ++i ) {
+                _cli.insert( ns(), BSON( "b" << 3 << "a" << 4 ) );
+            }
+            _cli.ensureIndex( ns(), BSON( "b" << 1 << "a" << 1 ) );
+            
+            Lock::DBWrite lk(ns());
+            Client::Context ctx( ns() );
+
+            // This $or query will scan index a:1,b:1 then b:1,a:1.  If the key pattern is specified
+            // incorrectly for the second clause, matching will fail.
+            setQueryOptimizerCursor( fromjson( "{$or:[{a:1,b:{$gte:0}},{b:3,a:{$gte:0}}]}" ) );
+            // All documents match, and there are no dups.
+            ASSERT_EQUALS( 250, itcount() );
+        }
+    };
+    
     /**
      * An ordered plan returns all results, including when it takes over, even when it duplicates an
      * entry of an out of order plan.
@@ -4623,6 +4647,7 @@ namespace QueryOptimizerCursorTests {
             add<AbortOutOfOrderPlansBeforeAddOtherPlans>();
             add<TakeoverOrRangeElimination>();
             add<TakeoverOrDedups>();
+            add<TakeoverOrDifferentIndex>();
             add<TakeoverOrderedPlanDupsOutOfOrderPlan>();
             add<ElemMatchKey>();
             add<GetCursor::NoConstraints>();
