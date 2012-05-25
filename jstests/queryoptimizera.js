@@ -85,3 +85,4 @@ t.find( { _id:0, a:0 } ).itcount();
 assertNoNewWarnings();
 
 t.drop(); // cleanup
+notCapped.drop();
