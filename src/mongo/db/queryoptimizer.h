@@ -53,15 +53,18 @@ namespace mongo {
                   const BSONObj &endKey = BSONObj(),
                   string special="" );
 
-        /** @return true if this plan cannot return any documents. */
-        bool impossible() const { return _impossible; }
-        /**
-         * @return true if this plan should run as the only candidate plan in the absence of an
-         * impossible plan.
-         */
-        bool optimal() const { return _optimal; }
-        /** @return true if this plan should not be considered at all. */
-        bool unhelpful() const { return _unhelpful; }
+        /** Categorical classification of a QueryPlan's utility. */
+        enum Utility {
+            Impossible, // The plan cannot produce any matches, so the query must have an empty
+                        // result set.  No other plans need to be considered.
+            Optimal,    // The plan should run as the only candidate plan in the absence of an
+                        // impossible plan.
+            Helpful,    // The plan should be considered.
+            Unhelpful   // The plan should not be considered.
+        };
+
+        Utility utility() const { return _utility; }
+        
         /** @return true if ScanAndOrder processing will be required for result set. */
         bool scanAndOrderRequired() const { return _scanAndOrderRequired; }
         /**
@@ -70,7 +73,7 @@ namespace mongo {
          */
         bool exactKeyMatch() const { return _exactKeyMatch; }
         /** @return true if this QueryPlan would perform an unindexed scan. */
-        bool willScanTable() const { return _idxNo < 0 && !_impossible; }
+        bool willScanTable() const { return _idxNo < 0 && ( _utility != Impossible ); }
         /** @return 'special' attribute of the plan, which was either set explicitly or generated from the index. */
         const string &special() const { return _special; }
                 
@@ -119,7 +122,6 @@ namespace mongo {
         const BSONObj _order;
         shared_ptr<const ParsedQuery> _parsedQuery;
         const IndexDetails * _index;
-        bool _optimal;
         bool _scanAndOrderRequired;
         bool _exactKeyMatch;
         int _direction;
@@ -128,14 +130,15 @@ namespace mongo {
         BSONObj _startKey;
         BSONObj _endKey;
         bool _endKeyInclusive;
-        bool _unhelpful;
-        bool _impossible;
+        Utility _utility;
         string _special;
         IndexType * _type;
         bool _startOrEndSpec;
         shared_ptr<Projection::KeyOnly> _keyFieldsOnly;
         mutable shared_ptr<CoveredIndexMatcher> _matcher; // Lazy initialization.
     };
+
+    std::ostream &operator<< ( std::ostream &out, const QueryPlan::Utility &utility );
 
     /**
      * A QueryPlanSummary owns its own attributes and may be shared.  Currently a QueryPlan

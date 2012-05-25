@@ -122,7 +122,7 @@ namespace QueryOptimizerTests {
             void run() {
                 QueryPlan p( nsd(), -1, FRSP( BSONObj() ), FRSP2( BSONObj() ), BSONObj(),
                             BSONObj() );
-                ASSERT( !p.optimal() );
+                ASSERT_EQUALS( QueryPlan::Helpful, p.utility() );
                 ASSERT( !p.scanAndOrderRequired() );
                 ASSERT( !p.exactKeyMatch() );
             }
@@ -266,45 +266,45 @@ namespace QueryOptimizerTests {
             void run() {
                 QueryPlan p( nsd(), INDEXNO( "a" << 1 ), FRSP( BSONObj() ), FRSP2( BSONObj() ),
                             BSONObj(), BSON( "a" << 1 ) );
-                ASSERT( p.optimal() );
+                ASSERT_EQUALS( QueryPlan::Optimal, p.utility() );
                 QueryPlan p2( nsd(), INDEXNO( "a" << 1 << "b" << 1 ), FRSP( BSONObj() ),
                              FRSP2( BSONObj() ), BSONObj(),
                              BSON( "a" << 1 ) );
-                ASSERT( p2.optimal() );
+                ASSERT_EQUALS( QueryPlan::Optimal, p2.utility() );
                 QueryPlan p3( nsd(), INDEXNO( "a" << 1 << "b" << 1 ), FRSP( BSON( "a" << 1 ) ),
                              FRSP2( BSON( "a" << 1 ) ), BSON( "a" << 1 ),
                              BSON( "a" << 1 ) );
-                ASSERT( p3.optimal() );
+                ASSERT_EQUALS( QueryPlan::Optimal, p3.utility() );
                 QueryPlan p4( nsd(), INDEXNO( "a" << 1 << "b" << 1 ), FRSP( BSON( "b" << 1 ) ),
                              FRSP2( BSON( "b" << 1 ) ), BSON( "b" << 1 ),
                              BSON( "a" << 1 ) );
-                ASSERT( !p4.optimal() );
+                ASSERT_EQUALS( QueryPlan::Helpful, p4.utility() );
                 QueryPlan p5( nsd(), INDEXNO( "a" << 1 << "b" << 1 ), FRSP( BSON( "a" << 1 ) ),
                              FRSP2( BSON( "a" << 1 ) ), BSON( "a" << 1 ),
                              BSON( "b" << 1 ) );
-                ASSERT( p5.optimal() );
+                ASSERT_EQUALS( QueryPlan::Optimal, p5.utility() );
                 QueryPlan p6( nsd(), INDEXNO( "a" << 1 << "b" << 1 ), FRSP( BSON( "b" << 1 ) ),
                              FRSP2( BSON( "b" << 1 ) ), BSON( "b" << 1 ),
                              BSON( "b" << 1 ) );
-                ASSERT( !p6.optimal() );
+                ASSERT_EQUALS( QueryPlan::Unhelpful, p6.utility() );
                 QueryPlan p7( nsd(), INDEXNO( "a" << 1 << "b" << 1 ),
                              FRSP( BSON( "a" << 1 << "b" << 1 ) ),
                              FRSP2( BSON( "a" << 1 << "b" << 1 ) ),
                              BSON( "a" << 1 << "b" << 1 ),
                              BSON( "a" << 1 ) );
-                ASSERT( p7.optimal() );
+                ASSERT_EQUALS( QueryPlan::Optimal, p7.utility() );
                 QueryPlan p8( nsd(), INDEXNO( "a" << 1 << "b" << 1 ),
                              FRSP( BSON( "a" << 1 << "b" << LT << 1 ) ),
                              FRSP2( BSON( "a" << 1 << "b" << LT << 1 ) ),
                              BSON( "a" << 1 << "b" << LT << 1 ),
                              BSON( "a" << 1 )  );
-                ASSERT( p8.optimal() );
+                ASSERT_EQUALS( QueryPlan::Optimal, p8.utility() );
                 QueryPlan p9( nsd(), INDEXNO( "a" << 1 << "b" << 1 << "c" << 1 ),
                              FRSP( BSON( "a" << 1 << "b" << LT << 1 ) ),
                              FRSP2( BSON( "a" << 1 << "b" << LT << 1 ) ),
                              BSON( "a" << 1 << "b" << LT << 1 ),
                              BSON( "a" << 1 ) );
-                ASSERT( p9.optimal() );
+                ASSERT_EQUALS( QueryPlan::Optimal, p9.utility() );
             }
         };
 
@@ -314,34 +314,42 @@ namespace QueryOptimizerTests {
                 QueryPlan p10( nsd(), INDEXNO( "a" << 1 << "b" << 1 << "c" << 1 ),
                               FRSP( BSON( "a" << 1 ) ), FRSP2( BSON( "a" << 1 ) ), BSON( "a" << 1 ),
                               BSONObj() );
-                ASSERT( p10.optimal() );
+                ASSERT_EQUALS( QueryPlan::Optimal, p10.utility() );
                 QueryPlan p11( nsd(), INDEXNO( "a" << 1 << "b" << 1 << "c" << 1 ),
                               FRSP( BSON( "a" << 1 << "b" << LT << 1 ) ),
                               FRSP2( BSON( "a" << 1 << "b" << LT << 1 ) ),
                               BSON( "a" << 1 << "b" << LT << 1 ),
                               BSONObj() );
-                ASSERT( p11.optimal() );
+                ASSERT_EQUALS( QueryPlan::Optimal, p11.utility() );
                 QueryPlan p12( nsd(), INDEXNO( "a" << 1 << "b" << 1 << "c" << 1 ),
                               FRSP( BSON( "a" << LT << 1 ) ),
                               FRSP2( BSON( "a" << LT << 1 ) ), BSON( "a" << LT << 1 ),
                               BSONObj() );
-                ASSERT( p12.optimal() );
+                ASSERT_EQUALS( QueryPlan::Optimal, p12.utility() );
                 QueryPlan p13( nsd(), INDEXNO( "a" << 1 << "b" << 1 << "c" << 1 ),
                               FRSP( BSON( "a" << LT << 1 ) ), FRSP2( BSON( "a" << LT << 1 ) ),
                               BSON( "a" << LT << 1 ), BSON( "a" << 1 ) );
-                ASSERT( p13.optimal() );
-                // When no match is possible, optimal attribute is not set.
+                ASSERT_EQUALS( QueryPlan::Optimal, p13.utility() );
+            }
+        };
+        
+        /** Cases where a QueryPlan's Utility is Impossible. */
+        class Impossible : public Base {
+        public:
+            void run() {
+                // When no match is possible on an indexed field, the plan is Impossible.
                 BSONObj impossibleQuery = BSON( "a" << BSON( "$in" << BSONArray() ) );
-                QueryPlan p14( nsd(), INDEXNO( "a" << 1 ), FRSP( impossibleQuery ),
+                QueryPlan p1( nsd(), INDEXNO( "a" << 1 ), FRSP( impossibleQuery ),
                              FRSP2( impossibleQuery ), impossibleQuery,
-                              BSONObj() );
-                ASSERT( !p14.optimal() );
-                // When no match is possible on an unindexed field, optimal attribute is not set.
-                BSONObj bImpossibleQuery = BSON( "a" << 1 << "b" << GT << 10 << LT << 10 );
-                QueryPlan p15( nsd(), INDEXNO( "a" << 1 ), FRSP( bImpossibleQuery ),
-                              FRSP2( bImpossibleQuery ), bImpossibleQuery,
-                              BSONObj() );
-                ASSERT( !p15.optimal() );
+                             BSONObj() );
+                ASSERT_EQUALS( QueryPlan::Impossible, p1.utility() );
+                // When no match is possible on an unindexed field, the plan is Helpful.
+                // (Descriptive test only.)
+                BSONObj bImpossibleQuery = BSON( "a" << 1 << "b" << BSON( "$in" << BSONArray() ) );
+                QueryPlan p2( nsd(), INDEXNO( "a" << 1 ), FRSP( bImpossibleQuery ),
+                             FRSP2( bImpossibleQuery ), bImpossibleQuery,
+                             BSONObj() );
+                ASSERT_EQUALS( QueryPlan::Helpful, p2.utility() );
             }
         };
 
@@ -454,7 +462,7 @@ namespace QueryOptimizerTests {
                             FRSP2( BSON( "b" << 1 ) ), BSON( "b" << 1 ),
                             BSONObj() );
                 ASSERT( p.multikeyFrs().range( "a" ).universal() );
-                ASSERT( p.unhelpful() );
+                ASSERT_EQUALS( QueryPlan::Unhelpful, p.utility() );
                 QueryPlan p2( nsd(), INDEXNO( "a" << 1 << "b" << 1 ),
                              FRSP( BSON( "b" << 1 << "c" << 1 ) ),
                              FRSP2( BSON( "b" << 1 << "c" << 1 ) ),
@@ -462,18 +470,18 @@ namespace QueryOptimizerTests {
                              BSON( "a" << 1 ) );
                 ASSERT( !p2.scanAndOrderRequired() );
                 ASSERT( p2.multikeyFrs().range( "a" ).universal() );
-                ASSERT( !p2.unhelpful() );
+                ASSERT_EQUALS( QueryPlan::Helpful, p2.utility() );
                 QueryPlan p3( nsd(), INDEXNO( "b" << 1 ), FRSP( BSON( "b" << 1 << "c" << 1 ) ),
                              FRSP2( BSON( "b" << 1 << "c" << 1 ) ), BSON( "b" << 1 << "c" << 1 ),
                              BSONObj() );
                 ASSERT( !p3.multikeyFrs().range( "b" ).universal() );
-                ASSERT( !p3.unhelpful() );
+                ASSERT_EQUALS( QueryPlan::Helpful, p3.utility() );
                 QueryPlan p4( nsd(), INDEXNO( "b" << 1 << "c" << 1 ),
                              FRSP( BSON( "c" << 1 << "d" << 1 ) ),
                              FRSP2( BSON( "c" << 1 << "d" << 1 ) ), BSON( "c" << 1 << "d" << 1 ),
                              BSONObj() );
                 ASSERT( p4.multikeyFrs().range( "b" ).universal() );
-                ASSERT( p4.unhelpful() );
+                ASSERT_EQUALS( QueryPlan::Unhelpful, p4.utility() );
             }
         };
         
@@ -626,7 +634,7 @@ namespace QueryOptimizerTests {
                                shared_ptr<const ParsedQuery>(), BSONObj(), BSONObj(),
                                frsp.getSpecial() );
                 // A 'special' plan is not optimal.
-                ASSERT( !plan.optimal() );
+                ASSERT_EQUALS( QueryPlan::Helpful, plan.utility() );
             }
         };
 
@@ -1352,6 +1360,7 @@ namespace QueryOptimizerTests {
             add<QueryPlanTests::EqualWithOrder>();
             add<QueryPlanTests::Optimal>();
             add<QueryPlanTests::MoreOptimal>();
+            add<QueryPlanTests::Impossible>();
             add<QueryPlanTests::KeyMatch>();
             add<QueryPlanTests::MoreKeyMatch>();
             add<QueryPlanTests::ExactKeyQueryTypes>();

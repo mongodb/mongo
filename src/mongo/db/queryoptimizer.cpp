@@ -97,13 +97,11 @@ namespace mongo {
         _order( order ),
         _parsedQuery( parsedQuery ),
         _index( 0 ),
-        _optimal( false ),
         _scanAndOrderRequired( true ),
         _exactKeyMatch( false ),
         _direction( 0 ),
         _endKeyInclusive( endKey.isEmpty() ),
-        _unhelpful( false ),
-        _impossible( false ),
+        _utility( Helpful ),
         _special( special ),
         _type(0),
         _startOrEndSpec( !startKey.isEmpty() || !endKey.isEmpty() ) {
@@ -111,7 +109,7 @@ namespace mongo {
         BSONObj idxKey = _idxNo < 0 ? BSONObj() : d->idx( _idxNo ).keyPattern();
 
         if ( !_frs.matchPossibleForIndex( idxKey ) ) {
-            _impossible = true;
+            _utility = Impossible;
             _scanAndOrderRequired = false;
             return;
         }
@@ -201,7 +199,7 @@ doneCheckOrder:
         }
         if ( !_scanAndOrderRequired &&
                 ( optimalIndexedQueryCount == _frs.numNonUniversalRanges() ) )
-            _optimal = true;
+            _utility = Optimal;
         if ( exactIndexedQueryCount == _frs.numNonUniversalRanges() &&
             orderFieldsUnindexed.size() == 0 &&
             exactIndexedQueryCount == idxKey.nFields() &&
@@ -230,7 +228,7 @@ doneCheckOrder:
 
         if ( ( _scanAndOrderRequired || _order.isEmpty() ) && 
             _frs.range( idxKey.firstElementFieldName() ).universal() ) { // NOTE SERVER-2140
-            _unhelpful = true;
+            _utility = Unhelpful;
         }
             
         if ( _parsedQuery && _parsedQuery->getFields() && !d->isMultikey( _idxNo ) ) { // Does not check modifiedKeys()
@@ -250,7 +248,7 @@ doneCheckOrder:
             return _type->newCursor( _originalQuery , _order , numWanted );
         }
 
-        if ( _impossible ) {
+        if ( _utility == Impossible ) {
             // Dummy table scan cursor returning no results.  Allowed in --notablescan mode.
             return shared_ptr<Cursor>( new BasicCursor( DiskLoc() ) );
         }
@@ -295,9 +293,9 @@ doneCheckOrder:
 
     void QueryPlan::registerSelf( long long nScanned,
                                  CandidatePlanCharacter candidatePlans ) const {
-        // Impossible query constraints can be detected before scanning, and we
-        // don't have a reserved pattern enum value for impossible constraints.
-        if ( _impossible ) {
+        // Impossible query constraints can be detected before scanning and historically could not
+        // generate a QueryPattern.
+        if ( _utility == Impossible ) {
             return;
         }
 
@@ -398,7 +396,19 @@ doneCheckOrder:
             return false;
         return _d->isMultikey( _idxNo );
     }
-    
+
+    std::ostream &operator<< ( std::ostream &out, const QueryPlan::Utility &utility ) {
+        out << "QueryPlan::";
+        switch( utility ) {
+            case QueryPlan::Impossible: return out << "Impossible";
+            case QueryPlan::Optimal:    return out << "Optimal";
+            case QueryPlan::Helpful:    return out << "Helpful";
+            case QueryPlan::Unhelpful:  return out << "Unhelpful";
+            default:
+                return out << "UNKNOWN(" << utility << ")";
+        }
+    }
+
     QueryPlanGenerator::QueryPlanGenerator( QueryPlanSet &qps,
                                            auto_ptr<FieldRangeSetPair> originalFrsp,
                                            const shared_ptr<const ParsedQuery> &parsedQuery,
@@ -442,16 +452,16 @@ doneCheckOrder:
             }
             
             shared_ptr<QueryPlan> p = newPlan( d, i );
-            if ( p->impossible() ) {
+            if ( p->utility() == QueryPlan::Impossible ) {
                 _qps.setSinglePlan( p );
                 return;
             }
-            if ( p->optimal() ) {
+            if ( p->utility() == QueryPlan::Optimal ) {
                 if ( !optimalPlan.get() ) {
                     optimalPlan = p;
                 }
             }
-            else if ( !p->unhelpful() ) {
+            else if ( p->utility() != QueryPlan::Unhelpful ) {
                 if ( p->special().empty() ) {
                     plans.push_back( p );
                 }
@@ -580,7 +590,7 @@ doneCheckOrder:
             }
             
             massert( 10368 ,  "Unable to locate previously recorded index", p.get() );
-            if ( !p->unhelpful() &&
+            if ( ( p->utility() != QueryPlan::Unhelpful ) &&
                 !( _recordedPlanPolicy == UseIfInOrder && p->scanAndOrderRequired() ) ) {
                 _qps.setCachedPlan( p, best );
                 return true;
@@ -634,7 +644,7 @@ doneCheckOrder:
         if ( d &&
             d->isCapped() &&
             _qps.nPlans() == 1 &&
-            !_qps.firstPlan()->impossible() &&
+            ( _qps.firstPlan()->utility() != QueryPlan::Impossible ) &&
             !_qps.firstPlan()->indexed() &&
             !_qps.firstPlan()->multikeyFrs().range( "_id" ).universal() ) {
             if ( cc().isSyncThread() ||
@@ -717,7 +727,10 @@ doneCheckOrder:
     }
     
     bool QueryPlanSet::hasPossiblyExcludedPlans() const {
-        return _usingCachedPlan && ( nPlans() == 1 ) && !firstPlan()->optimal();
+        return
+            _usingCachedPlan &&
+            ( nPlans() == 1 ) &&
+            ( firstPlan()->utility() != QueryPlan::Optimal );
     }
     
     QueryPlanSet::QueryPlanPtr QueryPlanSet::getBestGuess() const {
