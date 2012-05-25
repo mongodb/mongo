@@ -3956,6 +3956,43 @@ namespace QueryOptimizerCursorTests {
 
         } // namespace IdElseNatural
         
+        /**
+         * Generating a cursor for an invalid query asserts, even if the collection is empty or
+         * missing.
+         */
+        class MatcherValidation : public Base {
+        public:
+            void run() {
+                // Matcher validation with an empty collection.
+                _cli.remove( ns(), BSONObj() );
+                // The historical behavior has been to generate a MsgAssertionException for the
+                // multiple cursors case, but it should be a UserException.
+                checkInvalidQueryAssertions<MsgAssertionException>();
+                
+                // Matcher validation with a missing collection.
+                _cli.dropCollection( ns() );
+                checkInvalidQueryAssertions<UserException>();
+            }
+        private:
+            template<class MultipleCursorException>
+            static void checkInvalidQueryAssertions() {
+                Client::ReadContext ctx( ns() );
+                
+                // An invalid query generaing a single query plan asserts.
+                BSONObj invalidQuery = fromjson( "{$and:[{$atomic:true}]}" );
+                assertInvalidQueryAssertion<UserException>( invalidQuery );
+                
+                // An invalid query generating multiple query plans asserts.
+                BSONObj invalidIdQuery = fromjson( "{_id:0,$and:[{$atomic:true}]}" );
+                assertInvalidQueryAssertion<MultipleCursorException>( invalidIdQuery );                
+            }
+            template<class Exception>
+            static void assertInvalidQueryAssertion( const BSONObj &query ) {
+                ASSERT_THROWS( NamespaceDetailsTransient::getCursor( ns(), query, BSONObj() ),
+                              Exception );
+            }
+        };
+        
     } // namespace GetCursor
     
     namespace Explain {
@@ -4684,6 +4721,7 @@ namespace QueryOptimizerCursorTests {
             add<GetCursor::IdElseNatural::HintedNaturalForQuery>( BSON( "_id" << 1 ) );
             add<GetCursor::IdElseNatural::HintedNaturalForQuery>( BSON( "a" << 1 ) );
             add<GetCursor::IdElseNatural::HintedNaturalForQuery>( BSON( "_id" << 1 << "a" << 1 ) );
+            add<GetCursor::MatcherValidation>();
             add<Explain::ClearRecordedIndex>();
             add<Explain::Initial>();
             add<Explain::Empty>();

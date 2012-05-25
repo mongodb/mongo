@@ -88,6 +88,11 @@ namespace mongo {
             
             _c = qp().newCursor();
 
+            // The query plan must have a matcher.  The matcher's constructor performs some aspects
+            // of query validation that should occur as part of this class's init() if not handled
+            // already.
+            fassert( 16237, qp().matcher() );
+
             // All candidate cursors must support yields for QueryOptimizerCursorImpl's
             // prepareToYield() and prepareToTouchEarlierIterate() to work.
             verify( _c->supportYields() );
