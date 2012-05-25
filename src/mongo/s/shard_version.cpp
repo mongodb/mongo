@@ -218,7 +218,7 @@ namespace mongo {
         }
 
 
-        LOG(2) << " have to set shard version for conn: " << conn << " ns:" << ns
+        LOG(2) << " have to set shard version for conn: " << conn->getServerAddress() << " ns:" << ns
                << " my last seq: " << sequenceNumber << "  current: " << officialSequenceNumber
                << " version: " << version << " manager: " << manager.get()
                << endl;
