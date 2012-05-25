@@ -758,6 +758,9 @@ __evict_walk(WT_SESSION_IMPL *session)
 
 	i = WT_EVICT_WALK_BASE;
 	TAILQ_FOREACH(btree, &conn->btqh, q) {
+		if (F_ISSET(btree, WT_BTREE_NO_EVICTION))
+			continue;
+
 		/* Reference the correct WT_BTREE handle. */
 		WT_SET_BTREE_IN_SESSION(session, btree);
 
