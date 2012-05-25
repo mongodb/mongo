@@ -452,26 +452,29 @@ doneCheckOrder:
             }
             
             shared_ptr<QueryPlan> p = newPlan( d, i );
-            if ( p->utility() == QueryPlan::Impossible ) {
-                _qps.setSinglePlan( p );
-                return;
-            }
-            if ( p->utility() == QueryPlan::Optimal ) {
-                if ( !optimalPlan.get() ) {
-                    optimalPlan = p;
-                }
-            }
-            else if ( p->utility() != QueryPlan::Unhelpful ) {
-                if ( p->special().empty() ) {
-                    plans.push_back( p );
-                }
-                else {
-                    specialPlan = p;
-                }
+            switch( p->utility() ) {
+                case QueryPlan::Impossible:
+                    _qps.setSinglePlan( p );
+                    return;
+                case QueryPlan::Optimal:
+                    if ( !optimalPlan ) {
+                        optimalPlan = p;
+                    }
+                    break;
+                case QueryPlan::Helpful:
+                    if ( !p->special().empty() ) {
+                        specialPlan = p;
+                    }
+                    else {
+                        plans.push_back( p );
+                    }
+                    break;
+                default:
+                    break;
             }
         }
 
-        if ( optimalPlan.get() ) {
+        if ( optimalPlan ) {
             _qps.setSinglePlan( optimalPlan );
             // Record an optimal plan in the query cache immediately, with a small nscanned value
             // that will be ignored.
