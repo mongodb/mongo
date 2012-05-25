@@ -378,17 +378,6 @@ doneCheckOrder:
         return !order.more();
     }
 
-    /**
-     * @return a copy of the inheriting class, which will be run with its own
-     * query plan.  If multiple plan sets are required for an $or query, the
-     * QueryOp of the winning plan from a given set will be cloned to generate
-     * QueryOps for the subsequent plan set.  This function should only be called
-     * after the query op has completed executing.
-     */    
-    QueryOp *QueryOp::createChild() {
-        return _createChild();
-    }    
-
     string QueryPlan::toString() const {
         return BSON(
                     "index" << indexKey() <<
@@ -408,10 +397,6 @@ doneCheckOrder:
         if ( _idxNo < 0 )
             return false;
         return _d->isMultikey( _idxNo );
-    }
-    
-    void QueryOp::init() {
-        _init();
     }
     
     QueryPlanGenerator::QueryPlanGenerator( QueryPlanSet &qps,

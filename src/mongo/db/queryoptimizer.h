@@ -212,25 +212,20 @@ namespace mongo {
         
         /** To be called by QueryPlanSet::Runner only. */
         
-        QueryOp *createChild();
+        /**
+         * @return a copy of the inheriting class, which will be run with its own query plan.  The
+         * child QueryOp will assume its parent QueryOp has completed execution.
+         */
+        virtual QueryOp *createChild() const = 0;
         void setQueryPlan( const QueryPlan *queryPlan ) {
             _queryPlan = queryPlan;
             verify( _queryPlan != NULL );
         }
-        void init();        
+        /** Handle initialization after a QueryPlan has been set. */
+        virtual void init() = 0;
         void setException( const DBException &e ) {
             _error = true;
             _exception = e.getInfo();
-        }
-
-        shared_ptr<CoveredIndexMatcher> matcher( const shared_ptr<Cursor>& c ) const {
-           return matcher( c.get() );
-        }
-        shared_ptr<CoveredIndexMatcher> matcher( Cursor* c ) const {
-            if ( c && c->matcher() ) {
-                return c->matcherPtr();
-            }
-            return queryPlan().matcher();
         }
 
         /** @return an ExplainPlanInfo object that will be updated as the query runs. */
@@ -243,12 +238,6 @@ namespace mongo {
         void setComplete() { _complete = true; }
         /** Call if the scan is complete even if not all results have been found. */
         void setStop() { setComplete(); _stopRequested = true; }
-
-        /** Handle initialization after a QueryPlan has been set. */
-        virtual void _init() = 0;
-
-        /** @return a copy of the inheriting class, which will be run with its own query plan. */
-        virtual QueryOp *_createChild() const = 0;
 
     private:
         bool _complete;

@@ -76,7 +76,7 @@ namespace mongo {
         _alwaysCountMatches( alwaysCountMatches ) {
         }
         
-        virtual void _init() {
+        virtual void init() {
             checkCursorOrdering();
             if ( !_selectionPolicy.permitPlan( queryPlan() ) ) {
                 throw MsgAssertionException( 9011,
@@ -87,6 +87,9 @@ namespace mongo {
             }
             
             _c = queryPlan().newCursor();
+            // The basic and btree cursors used by this implementation do not supply their own
+            // matchers, and a matcher from a query plan will be used instead.
+            fassert( 16238, !_c->matcher() );
 
             // The query plan must have a matcher.  The matcher's constructor performs some aspects
             // of query validation that should occur as part of this class's init() if not handled
@@ -178,7 +181,7 @@ namespace mongo {
             
             _mustAdvance = true;
         }
-        virtual QueryOp *_createChild() const {
+        virtual QueryOp *createChild() const {
             return new QueryOptimizerCursorOp( _matchCounter.aggregateNscanned(), _selectionPolicy, _requireOrder, _alwaysCountMatches, _matchCounter.cumulativeCount() );
         }
         DiskLoc currLoc() const { return _c ? _c->currLoc() : DiskLoc(); }
@@ -194,7 +197,7 @@ namespace mongo {
                 details = &myDetails;
             }
 
-            bool match = matcher( _c.get() )->matchesCurrent( _c.get(), details );
+            bool match = queryPlan().matcher()->matchesCurrent( _c.get(), details );
             // Cache the match, so we can count it in mayAdvance().
             bool newMatch = _matchCounter.setMatch( match );
 
@@ -496,7 +499,7 @@ namespace mongo {
                 return _takeover->matcherPtr();
             }
             assertOk();
-            return _currOp->matcher( _currOp->cursor() );
+            return _currOp->queryPlan().matcher();
         }
 
         virtual CoveredIndexMatcher *matcher() const {
@@ -504,7 +507,7 @@ namespace mongo {
                 return _takeover->matcher();
             }
             assertOk();
-            return _currOp->matcher( _currOp->cursor() ).get();
+            return _currOp->queryPlan().matcher().get();
         }
 
         virtual bool currentMatches( MatchDetails *details = 0 ) {
@@ -617,7 +620,7 @@ namespace mongo {
                 if ( qocop->cursor() ) {
                     _takeover.reset( new MultiCursor( _mps,
                                                      qocop->cursor(),
-                                                     op->matcher( qocop->cursor() ),
+                                                     op->queryPlan().matcher(),
                                                      qocop->explainInfo(),
                                                      *op,
                                                      _nscanned - qocop->cursor()->nscanned() ) );
