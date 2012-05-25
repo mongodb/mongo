@@ -178,6 +178,16 @@ namespace mongo {
         (_compareOp == BSONObj::NIN && _myset->count( staticNull.firstElement()) == 0 );
     }
 
+    void ElementMatcher::visit( MatcherVisitor& visitor ) const {
+        if ( _subMatcher ) {
+            _subMatcher->visit( visitor );
+        }
+        for( vector<shared_ptr<Matcher> >::const_iterator j = _allMatchers.begin();
+            j != _allMatchers.end(); ++j ) {
+            (*j)->visit( visitor );
+        }
+    }
+
     MatchDetails::MatchDetails() :
     _elemMatchKeyRequested() {
         resetOutput();
@@ -466,7 +476,7 @@ namespace mongo {
         // normal, simple case e.g. { a : "foo" }
         addBasic(e, BSONObj::Equality, false);
     }
-    
+
     /* _jsobj          - the query pattern
     */
     Matcher::Matcher(const BSONObj &jsobj, bool nested) :
@@ -1110,6 +1120,29 @@ namespace mongo {
     }
 #endif /* MONGO_LATER_SERVER_4644 */
 
+    static void visitList( MatcherVisitor& visitor,
+                           const list<shared_ptr<Matcher> >& matchers ) {
+        for( list<shared_ptr<Matcher> >::const_iterator i = matchers.begin(); i != matchers.end();
+            ++i ) {
+            (*i)->visit( visitor );
+        }
+    }
+
+    void Matcher::visit( MatcherVisitor& visitor ) const {
+        visitor.visitMatcher( *this );
+        // Visit the _basics ElementMatchers.
+        for( vector<ElementMatcher>::const_iterator i = _basics.begin(); i != _basics.end(); ++i ) {
+            visitor.visitElementMatcher( *i );
+        }
+        // Visit Matchers contained within the _basics ElementMatchers.
+        for( vector<ElementMatcher>::const_iterator i = _basics.begin(); i != _basics.end(); ++i ) {
+            i->visit( visitor );
+        }
+        visitList( visitor, _andMatchers );
+        visitList( visitor, _orMatchers );
+        visitList( visitor, _norMatchers );
+    }
+    
     bool Matcher::keyMatch( const Matcher &docMatcher ) const {
         // Quick check certain non key match cases.
         if ( docMatcher._all

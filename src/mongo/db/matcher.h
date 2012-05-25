@@ -27,6 +27,7 @@ namespace mongo {
 
     class Cursor;
     class CoveredIndexMatcher;
+    class ElementMatcher;
     class Matcher;
     class FieldRangeVector;
 
@@ -50,6 +51,16 @@ namespace mongo {
         }
     };
 
+    /**
+     * An interface for visiting a Matcher and all of its nested Matchers and ElementMatchers.
+     * RegexMatchers are not visited.
+     */
+    class MatcherVisitor {
+    public:
+        virtual ~MatcherVisitor() {}
+        virtual void visitMatcher( const Matcher& matcher ) {}
+        virtual void visitElementMatcher( const ElementMatcher& elementMatcher ) {}
+    };
 
     class ElementMatcher {
     public:
@@ -66,6 +77,8 @@ namespace mongo {
         bool negativeCompareOp() const { return _compareOp == BSONObj::NE || _compareOp == BSONObj::NIN; }
         int inverseOfNegativeCompareOp() const;
         bool negativeCompareOpContainsNull() const;
+        
+        void visit( MatcherVisitor& visitor ) const;
         
         BSONElement _toMatch;
         int _compareOp;
@@ -182,6 +195,13 @@ namespace mongo {
         void visitReferences(FieldSink *pSink) const;
 #endif /* MONGO_LATER_SERVER_4644 */
 
+        /**
+         * Visit this Matcher and all of its nested Matchers and ElementMatchers.  All top level
+         * ElementMatchers of a Matcher are visited immediately after the Matcher itself (before any
+         * other Matcher is visited).
+         */
+        void visit( MatcherVisitor& visitor ) const;
+        
         bool atomic() const { return _atomic; }
 
         string toString() const {
@@ -228,7 +248,7 @@ namespace mongo {
 
         void parseWhere( const BSONElement &e );
         void parseMatchExpressionElement( const BSONElement &e, bool nested );
-        
+
         Where *_where;                    // set if query uses $where
         BSONObj _jsobj;                  // the query pattern.  e.g., { name: "joe" }
         BSONObj _constrainIndexKey;
