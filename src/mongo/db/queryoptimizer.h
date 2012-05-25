@@ -31,7 +31,10 @@ namespace mongo {
     class IndexType;
     class QueryPlanSummary;
     
-    /** A plan for executing a query using the given index spec and FieldRangeSet. */
+    /**
+     * A plan for executing a query using the given index spec and FieldRangeSet.  An object of this
+     * class may only be used by one thread at a time.
+     */
     class QueryPlan : boost::noncopyable {
     public:
 
