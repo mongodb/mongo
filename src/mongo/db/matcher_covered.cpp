@@ -19,7 +19,7 @@
 */
 
 #include "pch.h"
-#include "matcher.h"
+#include "mongo/db/matcher.h"
 #include "mongo/db/cursor.h"
 #include "mongo/db/queryutil.h"
 
