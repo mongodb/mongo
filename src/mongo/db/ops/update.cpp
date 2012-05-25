@@ -320,14 +320,22 @@ namespace mongo {
                 if ( isOperatorUpdate ) {
 
                     if ( multi ) {
-                        c->advance(); // go to next record in case this one moves
-                        if ( autoDedup && seenObjects.count( loc ) ) {
-                            continue;
-                        }
-                        // SERVER-5198 Advance past the document to be modified, but see
-                        // SERVER-5725.
-                        while( c->ok() && loc == c->currLoc() ) {
-                            c->advance();
+                        // go to next record in case this one moves
+                        c->advance();
+
+                        // Update operations are deduped for cursors that implement their own
+                        // deduplication.  In particular, some geo cursors are excluded.
+                        if ( autoDedup ) {
+
+                            if ( seenObjects.count( loc ) ) {
+                                continue;
+                            }
+
+                            // SERVER-5198 Advance past the document to be modified, provided
+                            // deduplication is enabled, but see SERVER-5725.
+                            while( c->ok() && loc == c->currLoc() ) {
+                                c->advance();
+                            }
                         }
                     }
 
