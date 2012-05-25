@@ -86,11 +86,31 @@ namespace mongo {
         return 0;        
     }
 
-    QueryPlan::QueryPlan( NamespaceDetails *d, int idxNo, const FieldRangeSetPair &frsp,
-                         const FieldRangeSetPair *originalFrsp, const BSONObj &originalQuery,
-                         const BSONObj &order, const shared_ptr<const ParsedQuery> &parsedQuery,
-                         const BSONObj &startKey, const BSONObj &endKey , string special ) :
-        _d(d), _idxNo(idxNo),
+    QueryPlan *QueryPlan::make( NamespaceDetails *d,
+                               int idxNo,
+                               const FieldRangeSetPair &frsp,
+                               const FieldRangeSetPair *originalFrsp,
+                               const BSONObj &originalQuery,
+                               const BSONObj &order,
+                               const shared_ptr<const ParsedQuery> &parsedQuery,
+                               const BSONObj &startKey,
+                               const BSONObj &endKey,
+                               string special ) {
+        auto_ptr<QueryPlan> ret( new QueryPlan( d, idxNo, frsp, originalQuery, order, parsedQuery,
+                                               special ) );
+        ret->init( originalFrsp, startKey, endKey );
+        return ret.release();
+    }
+    
+    QueryPlan::QueryPlan( NamespaceDetails *d,
+                         int idxNo,
+                         const FieldRangeSetPair &frsp,
+                         const BSONObj &originalQuery,
+                         const BSONObj &order,
+                         const shared_ptr<const ParsedQuery> &parsedQuery,
+                         string special ) :
+        _d(d),
+        _idxNo(idxNo),
         _frs( frsp.frsForIndex( _d, _idxNo ) ),
         _frsMulti( frsp.frsForIndex( _d, -1 ) ),
         _originalQuery( originalQuery ),
@@ -100,13 +120,20 @@ namespace mongo {
         _scanAndOrderRequired( true ),
         _exactKeyMatch( false ),
         _direction( 0 ),
-        _endKeyInclusive( endKey.isEmpty() ),
+        _endKeyInclusive(),
         _utility( Helpful ),
         _special( special ),
         _type(0),
-        _startOrEndSpec( !startKey.isEmpty() || !endKey.isEmpty() ) {
-
-        BSONObj idxKey = _idxNo < 0 ? BSONObj() : d->idx( _idxNo ).keyPattern();
+        _startOrEndSpec() {
+    }
+    
+    void QueryPlan::init( const FieldRangeSetPair *originalFrsp,
+                         const BSONObj &startKey,
+                         const BSONObj &endKey ) {
+        _endKeyInclusive = endKey.isEmpty();
+        _startOrEndSpec = !startKey.isEmpty() || !endKey.isEmpty();
+        
+        BSONObj idxKey = _idxNo < 0 ? BSONObj() : _d->idx( _idxNo ).keyPattern();
 
         if ( !_frs.matchPossibleForIndex( idxKey ) ) {
             _utility = Impossible;
@@ -120,12 +147,12 @@ namespace mongo {
             return;
         }
 
-        _index = &d->idx(_idxNo);
+        _index = &_d->idx(_idxNo);
 
         // If the parsing or index indicates this is a special query, don't continue the processing
         if ( _special.size() ||
             ( _index->getSpec().getType() &&
-             _index->getSpec().getType()->suitability( originalQuery, order ) != USELESS ) ) {
+             _index->getSpec().getType()->suitability( _originalQuery, _order ) != USELESS ) ) {
 
             _type  = _index->getSpec().getType();
             if( !_special.size() ) _special = _index->getSpec().getType()->getPlugin()->getName();
@@ -133,12 +160,12 @@ namespace mongo {
             massert( 13040 , (string)"no type for special: " + _special , _type );
             // hopefully safe to use original query in these contexts;
             // don't think we can mix special with $or clause separation yet
-            _scanAndOrderRequired = _type->scanAndOrderRequired( _originalQuery , order );
+            _scanAndOrderRequired = _type->scanAndOrderRequired( _originalQuery , _order );
             return;
         }
 
         const IndexSpec &idxSpec = _index->getSpec();
-        BSONObjIterator o( order );
+        BSONObjIterator o( _order );
         BSONObjIterator k( idxKey );
         if ( !o.moreWithEOO() )
             _scanAndOrderRequired = false;
@@ -174,7 +201,7 @@ doneCheckOrder:
         int optimalIndexedQueryCount = 0;
         bool awaitingLastOptimalField = true;
         set<string> orderFieldsUnindexed;
-        order.getFieldNames( orderFieldsUnindexed );
+        _order.getFieldNames( orderFieldsUnindexed );
         while( i.moreWithEOO() ) {
             BSONElement e = i.next();
             if ( e.eoo() )
@@ -235,7 +262,7 @@ doneCheckOrder:
             _utility = Disallowed;
         }
 
-        if ( _parsedQuery && _parsedQuery->getFields() && !d->isMultikey( _idxNo ) ) { // Does not check modifiedKeys()
+        if ( _parsedQuery && _parsedQuery->getFields() && !_d->isMultikey( _idxNo ) ) { // Does not check modifiedKeys()
             _keyFieldsOnly.reset( _parsedQuery->getFields()->checkKey( _index->keyPattern() ) );
         }
     }
@@ -674,9 +701,9 @@ doneCheckOrder:
                                                       const BSONObj &min,
                                                       const BSONObj &max,
                                                       const string &special ) const {
-        shared_ptr<QueryPlan> ret( new QueryPlan( d, idxNo, _qps.frsp(), _originalFrsp.get(),
-                                                 _qps.originalQuery(), _qps.order(), _parsedQuery,
-                                                 min, max, special ) );
+        shared_ptr<QueryPlan> ret( QueryPlan::make( d, idxNo, _qps.frsp(), _originalFrsp.get(),
+                                                   _qps.originalQuery(), _qps.order(), _parsedQuery,
+                                                   min, max, special ) );
         return ret;
     }
 

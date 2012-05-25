@@ -41,17 +41,17 @@ namespace mongo {
         /**
          * @param originalFrsp - original constraints for this query clause.  If null, frsp will be used instead.
          */
-        QueryPlan(NamespaceDetails *d,
-                  int idxNo, // -1 = no index
-                  const FieldRangeSetPair &frsp,
-                  const FieldRangeSetPair *originalFrsp,
-                  const BSONObj &originalQuery,
-                  const BSONObj &order,
-                  const shared_ptr<const ParsedQuery> &parsedQuery =
-                          shared_ptr<const ParsedQuery>(),
-                  const BSONObj &startKey = BSONObj(),
-                  const BSONObj &endKey = BSONObj(),
-                  string special="" );
+        static QueryPlan *make( NamespaceDetails *d,
+                               int idxNo, // -1 = no index
+                               const FieldRangeSetPair &frsp,
+                               const FieldRangeSetPair *originalFrsp,
+                               const BSONObj &originalQuery,
+                               const BSONObj &order,
+                               const shared_ptr<const ParsedQuery> &parsedQuery =
+                                       shared_ptr<const ParsedQuery>(),
+                               const BSONObj &startKey = BSONObj(),
+                               const BSONObj &endKey = BSONObj(),
+                               string special="" );
 
         /** Categorical classification of a QueryPlan's utility. */
         enum Utility {
@@ -113,6 +113,18 @@ namespace mongo {
         bool queryFiniteSetOrderSuffix() const;
 
     private:
+        
+        QueryPlan(NamespaceDetails *d,
+                  int idxNo,
+                  const FieldRangeSetPair &frsp,
+                  const BSONObj &originalQuery,
+                  const BSONObj &order,
+                  const shared_ptr<const ParsedQuery> &parsedQuery,
+                  string special );
+        void init( const FieldRangeSetPair *originalFrsp,
+                  const BSONObj &startKey,
+                  const BSONObj &endKey );
+
         void checkTableScanAllowed() const;
         int independentRangesSingleIntervalLimit() const;
         /** @return true when the plan's query may contains an $exists:false predicate. */
