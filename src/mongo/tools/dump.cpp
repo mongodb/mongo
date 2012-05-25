@@ -461,6 +461,7 @@ public:
         string out = getParam("out");
         if ( out == "-" ) {
             if ( _db != "" && _coll != "" ) {
+                auth( _db );
                 writeCollectionStdout( _db+"."+_coll );
                 return 0;
             }
