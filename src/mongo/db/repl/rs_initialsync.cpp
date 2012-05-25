@@ -15,16 +15,18 @@
 */
 
 #include "pch.h"
-#include "mongo/db/repl.h"
+
+#include "mongo/db/repl/rs.h"
+
 #include "mongo/db/client.h"
-#include "rs.h"
-#include "mongo/db/oplogreader.h"
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/db/dbhelpers.h"
-#include "rs_optime.h"
-#include "mongo/db/repl/rs_sync.h"
-#include "mongo/db/repl/bgsync.h"
 #include "mongo/db/oplog.h"
+#include "mongo/db/oplogreader.h"
+#include "mongo/db/repl.h"
+#include "mongo/db/repl/bgsync.h"
+#include "mongo/db/repl/rs_optime.h"
+#include "mongo/db/repl/rs_sync.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
