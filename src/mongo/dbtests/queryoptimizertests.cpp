@@ -1152,6 +1152,27 @@ namespace QueryOptimizerTests {
                 }                
             }
         };
+
+        /** An unhelpful query plan will not be used if recorded in the query plan cache. */
+        class AvoidUnhelpfulRecordedPlan : public Base {
+        public:
+            void run() {
+                client().ensureIndex( ns(), BSON( "a" << 1 ) );
+
+                // Record the {a:1} index for a {b:1} query.
+                NamespaceDetailsTransient &nsdt = NamespaceDetailsTransient::get( ns() );
+                nsdt.registerCachedQueryPlanForPattern
+                        ( makePattern( BSON( "b" << 1 ), BSONObj() ),
+                         CachedQueryPlan( BSON( "a" << 1 ), 1,
+                                         CandidatePlanCharacter( true, false ) ) );
+
+                // The {a:1} index is not used for a {b:1} query because it generates an unhelpful
+                // plan.
+                shared_ptr<QueryPlanSet> qps = makeQps( BSON( "b" << 1 ), BSONObj() );
+                ASSERT_EQUALS( 1, qps->nPlans() );
+                ASSERT_EQUALS( BSON( "$natural" << 1 ), qps->firstPlan()->indexKey() );
+            }
+        };
         
     } // namespace QueryPlanSetTests
 
@@ -1403,6 +1424,7 @@ namespace QueryOptimizerTests {
             add<QueryPlanSetTests::ExcludeSpecialPlanWhenBtreePlan>();
             add<QueryPlanSetTests::ExcludeUnindexedPlanWhenSpecialPlan>();
             add<QueryPlanSetTests::PossiblePlans>();
+            add<QueryPlanSetTests::AvoidUnhelpfulRecordedPlan>();
             add<MultiPlanScannerTests::ToString>();
             add<MultiPlanScannerTests::PossiblePlans>();
             add<BestGuess>();

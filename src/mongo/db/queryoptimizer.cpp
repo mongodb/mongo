@@ -577,30 +577,36 @@ doneCheckOrder:
 
         CachedQueryPlan best = QueryUtilIndexed::bestIndexForPatterns( _qps.frsp(), _qps.order() );
         BSONObj bestIndex = best.indexKey();
-        if ( !bestIndex.isEmpty() ) {
-            shared_ptr<QueryPlan> p;
-            if ( str::equals( bestIndex.firstElementFieldName(), "$natural" ) ) {
-                p = newPlan( d, -1 );
-            }
-            
-            NamespaceDetails::IndexIterator i = d->ii();
-            while( i.more() ) {
-                int j = i.pos();
-                IndexDetails& ii = i.next();
-                if( ii.keyPattern().woCompare(bestIndex) == 0 ) {
-                    p = newPlan( d, j );
-                }
-            }
-            
-            massert( 10368 ,  "Unable to locate previously recorded index", p.get() );
-            if ( ( p->utility() != QueryPlan::Unhelpful ) &&
-                !( _recordedPlanPolicy == UseIfInOrder && p->scanAndOrderRequired() ) ) {
-                _qps.setCachedPlan( p, best );
-                return true;
-            }
+        if ( bestIndex.isEmpty() ) {
+            return false;
         }
 
-        return false;
+        shared_ptr<QueryPlan> p;
+        if ( str::equals( bestIndex.firstElementFieldName(), "$natural" ) ) {
+            p = newPlan( d, -1 );
+        }
+        
+        NamespaceDetails::IndexIterator i = d->ii();
+        while( i.more() ) {
+            int j = i.pos();
+            IndexDetails& ii = i.next();
+            if( ii.keyPattern().woCompare(bestIndex) == 0 ) {
+                p = newPlan( d, j );
+            }
+        }
+        
+        massert( 10368 ,  "Unable to locate previously recorded index", p );
+
+        if ( p->utility() == QueryPlan::Unhelpful ) {
+            return false;
+        }
+        
+        if ( _recordedPlanPolicy == UseIfInOrder && p->scanAndOrderRequired() ) {
+            return false;
+        }
+
+        _qps.setCachedPlan( p, best );
+        return true;
     }
 
     shared_ptr<QueryPlan> QueryPlanGenerator::newPlan( NamespaceDetails *d,
