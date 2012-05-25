@@ -55,12 +55,14 @@ namespace mongo {
 
         /** Categorical classification of a QueryPlan's utility. */
         enum Utility {
-            Impossible, // The plan cannot produce any matches, so the query must have an empty
-                        // result set.  No other plans need to be considered.
-            Optimal,    // The plan should run as the only candidate plan in the absence of an
-                        // impossible plan.
-            Helpful,    // The plan should be considered.
-            Unhelpful   // The plan should not be considered.
+            Impossible, // Cannot produce any matches, so the query must have an empty result set.
+                        // No other plans need to be considered.
+            Optimal,    // Should run as the only candidate plan in the absence of an Impossible
+                        // plan.
+            Helpful,    // Should be considered.
+            Unhelpful,  // Should not be considered.
+            Disallowed  // Must not be considered unless explicitly hinted.  May produce a
+                        // semantically incorrect result set.
         };
 
         Utility utility() const { return _utility; }
@@ -113,6 +115,8 @@ namespace mongo {
     private:
         void checkTableScanAllowed() const;
         int independentRangesSingleIntervalLimit() const;
+        /** @return true when the plan's query may contains an $exists:false predicate. */
+        bool hasPossibleExistsFalsePredicate() const;
 
         NamespaceDetails * _d;
         int _idxNo;

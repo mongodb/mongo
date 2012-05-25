@@ -84,16 +84,21 @@ namespace QueryOptimizerTests {
                 string name = ss.str();
                 client_.resetIndexCache();
                 client_.ensureIndex( ns(), key, false, name.c_str() );
-                NamespaceDetails *d = nsd();
-                for( int i = 0; i < d->nIndexes; ++i ) {
-                    if ( d->idx(i).keyPattern() == key /*indexName() == name*/ || ( d->idx(i).isIdIndex() && IndexDetails::isIdIndexPattern( key ) ) )
-                        return &d->idx(i);
-                }
-                verify( false );
-                return 0;
+                return &nsd()->idx( existingIndexNo( key ) );
             }
             int indexno( const BSONObj &key ) {
                 return nsd()->idxNo( *index(key) );
+            }
+            int existingIndexNo( const BSONObj &key ) const {
+                NamespaceDetails *d = nsd();
+                for( int i = 0; i < d->nIndexes; ++i ) {
+                    if ( ( d->idx( i ).keyPattern() == key ) ||
+                        ( d->idx( i ).isIdIndex() && IndexDetails::isIdIndexPattern( key ) ) ) {
+                        return i;
+                    }
+                }
+                verify( false );
+                return -1;
             }
             BSONObj startKey( const QueryPlan &p ) const {
                 return p.frv()->startKey();
@@ -101,6 +106,7 @@ namespace QueryOptimizerTests {
             BSONObj endKey( const QueryPlan &p ) const {
                 return p.frv()->endKey();
             }
+            DBDirectClient &client() const { return client_; }
         private:
             Lock::GlobalWrite lk_;
             Client::Context _ctx;
@@ -511,6 +517,72 @@ namespace QueryOptimizerTests {
                 QueryPlan p3( nsd(), idx, FRSP( BSON( "a" << 1 ) ),
                              FRSP2( BSON( "a" << 1 ) ), BSON( "a" << 1 ), BSONObj(), parsedQuery );
                 ASSERT( !p3.keyFieldsOnly() );
+            }
+        };
+        
+        /** $exists:false and some $exists:true predicates disallow sparse index query plans. */
+        class SparseExistsFalse : public Base {
+        public:
+            void run() {
+                client().insert( "unittests.system.indexes",
+                                BSON( "ns" << ns() <<
+                                     "key" << BSON( "a" << 1 ) <<
+                                     "name" << client().genIndexName( BSON( "a" <<  1 ) ) <<
+                                     "sparse" << true ) );
+
+                // Non $exists predicates allow the sparse index.
+                assertAllowed( BSON( "a" << 1 ) );
+                assertAllowed( BSON( "b" << 1 ) );
+
+                // Top level $exists:false and $not:{$exists:true} queries disallow the sparse
+                // index, regardless of query field.  Otherwise the sparse index is allowed.
+                assertDisallowed( BSON( "a" << BSON( "$exists" << false ) ) );
+                assertDisallowed( BSON( "b" << BSON( "$exists" << false ) ) );
+                assertAllowed( BSON( "a" << BSON( "$exists" << true ) ) );
+                assertAllowed( BSON( "b" << BSON( "$exists" << true ) ) );
+                assertAllowed( BSON( "a" << BSON( "$not" << BSON( "$exists" << false ) ) ) );
+                assertAllowed( BSON( "b" << BSON( "$not" << BSON( "$exists" << false ) ) ) );
+                assertDisallowed( BSON( "a" << BSON( "$not" << BSON( "$exists" << true ) ) ) );
+                assertDisallowed( BSON( "b" << BSON( "$not" << BSON( "$exists" << true ) ) ) );
+
+                // All nested non $exists predicates allow the sparse index.
+                assertAllowed( BSON( "$nor" << BSON_ARRAY( BSON( "a" << 1 ) ) ) );
+                assertAllowed( BSON( "$nor" << BSON_ARRAY( BSON( "b" << 1 ) ) ) );
+
+                // All nested $exists predicates disallow the sparse index.
+                assertDisallowed( BSON( "$nor" << BSON_ARRAY
+                                       ( BSON( "a" << BSON( "$exists" << false ) ) ) ) );
+                assertDisallowed( BSON( "$nor" << BSON_ARRAY
+                                       ( BSON( "b" << BSON( "$exists" << false ) ) ) ) );
+                assertDisallowed( BSON( "$nor" << BSON_ARRAY
+                                       ( BSON( "a" << BSON( "$exists" << true ) ) ) ) );
+                assertDisallowed( BSON( "$nor" << BSON_ARRAY
+                                       ( BSON( "b" << BSON( "$exists" << true ) ) ) ) );
+                assertDisallowed( BSON( "$nor" << BSON_ARRAY
+                                       ( BSON( "a" <<
+                                              BSON( "$not" << BSON( "$exists" << false ) ) ) ) ) );
+                assertDisallowed( BSON( "$nor" << BSON_ARRAY
+                                       ( BSON( "b" <<
+                                              BSON( "$not" << BSON( "$exists" << false ) ) ) ) ) );
+                assertDisallowed( BSON( "$nor" << BSON_ARRAY
+                                       ( BSON( "a" <<
+                                              BSON( "$not" << BSON( "$exists" << true ) ) ) ) ) );
+                assertDisallowed( BSON( "$nor" << BSON_ARRAY
+                                       ( BSON( "b" <<
+                                              BSON( "$not" << BSON( "$exists" << true ) ) ) ) ) );
+            }
+        private:
+            shared_ptr<QueryPlan> newPlan( const BSONObj &query ) const {
+                shared_ptr<QueryPlan> ret
+                        ( new QueryPlan( nsd(), existingIndexNo( BSON( "a" << 1 ) ), FRSP( query ),
+                                        FRSP2( query ), query, BSONObj() ) );
+                return ret;
+            }
+            void assertAllowed( const BSONObj &query ) const {
+                ASSERT_NOT_EQUALS( QueryPlan::Disallowed, newPlan( query )->utility() );
+            }
+            void assertDisallowed( const BSONObj &query ) const {
+                ASSERT_EQUALS( QueryPlan::Disallowed, newPlan( query )->utility() );
             }
         };
         
@@ -1174,6 +1246,32 @@ namespace QueryOptimizerTests {
             }
         };
         
+        /** An unhelpful query plan will not be used if recorded in the query plan cache. */
+        class AvoidDisallowedRecordedPlan : public Base {
+        public:
+            void run() {
+                client().insert( "unittests.system.indexes",
+                                BSON( "ns" << ns() <<
+                                     "key" << BSON( "a" << 1 ) <<
+                                     "name" << client().genIndexName( BSON( "a" <<  1 ) ) <<
+                                     "sparse" << true ) );
+
+                // Record the {a:1} index for a {a:null} query.
+                NamespaceDetailsTransient &nsdt = NamespaceDetailsTransient::get( ns() );
+                nsdt.registerCachedQueryPlanForPattern
+                ( makePattern( BSON( "a" << BSONNULL ), BSONObj() ),
+                 CachedQueryPlan( BSON( "a" << 1 ), 1,
+                                 CandidatePlanCharacter( true, false ) ) );
+                
+                // The {a:1} index is not used for an {a:{$exists:false}} query because it generates
+                // a disallowed plan.
+                shared_ptr<QueryPlanSet> qps = makeQps( BSON( "a" << BSON( "$exists" << false ) ),
+                                                       BSONObj() );
+                ASSERT_EQUALS( 1, qps->nPlans() );
+                ASSERT_EQUALS( BSON( "$natural" << 1 ), qps->firstPlan()->indexKey() );
+            }
+        };
+        
     } // namespace QueryPlanSetTests
 
     class Base {
@@ -1387,6 +1485,7 @@ namespace QueryOptimizerTests {
             add<QueryPlanTests::ExactKeyQueryTypes>();
             add<QueryPlanTests::Unhelpful>();
             add<QueryPlanTests::KeyFieldsOnly>();
+            add<QueryPlanTests::SparseExistsFalse>();
             add<QueryPlanTests::QueryFiniteSetOrderSuffix::Unindexed>();
             add<QueryPlanTests::QueryFiniteSetOrderSuffix::RangeQuery>();
             add<QueryPlanTests::QueryFiniteSetOrderSuffix::EqualSort>();
@@ -1425,6 +1524,7 @@ namespace QueryOptimizerTests {
             add<QueryPlanSetTests::ExcludeUnindexedPlanWhenSpecialPlan>();
             add<QueryPlanSetTests::PossiblePlans>();
             add<QueryPlanSetTests::AvoidUnhelpfulRecordedPlan>();
+            add<QueryPlanSetTests::AvoidDisallowedRecordedPlan>();
             add<MultiPlanScannerTests::ToString>();
             add<MultiPlanScannerTests::PossiblePlans>();
             add<BestGuess>();
