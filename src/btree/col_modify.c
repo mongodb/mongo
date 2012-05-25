@@ -79,8 +79,8 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 	 * the WT_INSERT structure.
 	 */
 	if (cbt->compare == 0 && cbt->ins != NULL) {
-		WT_ERR(__wt_update_alloc(
-		    session, value, &upd, &upd_size, cbt->ins->upd));
+		WT_ERR(__wt_update_check(session, page, cbt->ins->upd));
+		WT_ERR(__wt_update_alloc(session, value, &upd, &upd_size));
 
 		/* Insert the WT_UPDATE structure. */
 		ret = __wt_update_serial(session, page,
@@ -134,8 +134,8 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 		 */
 		WT_ERR(__col_insert_alloc(
 		    session, recno, skipdepth, &ins, &ins_size));
-		WT_ERR(__wt_update_alloc(
-		    session, value, &upd, &upd_size, NULL));
+		WT_ERR(__wt_update_check(session, page, NULL));
+		WT_ERR(__wt_update_alloc(session, value, &upd, &upd_size));
 		ins->upd = upd;
 		ins_size += upd_size;
 		cbt->ins = ins;

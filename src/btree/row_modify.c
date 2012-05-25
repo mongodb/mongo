@@ -65,9 +65,11 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 		} else
 			upd_entry = &cbt->ins->upd;
 
+		/* Make sure the update can proceed. */
+		WT_ERR(__wt_update_check(session, page, *upd_entry));
+
 		/* Allocate room for the new value from per-thread memory. */
-		WT_ERR(__wt_update_alloc(
-		    session, value, &upd, &upd_size, *upd_entry));
+		WT_ERR(__wt_update_alloc(session, value, &upd, &upd_size));
 
 		/* Insert the WT_UPDATE structure. */
 		ret = __wt_update_serial(session, page, cbt->write_gen,
@@ -122,8 +124,8 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 		 */
 		WT_ERR(__wt_row_insert_alloc(
 		    session, key, skipdepth, &ins, &ins_size));
-		WT_ERR(__wt_update_alloc(
-		    session, value, &upd, &upd_size, NULL));
+		WT_ERR(__wt_update_check(session, page, NULL));
+		WT_ERR(__wt_update_alloc(session, value, &upd, &upd_size));
 		ins->upd = upd;
 		ins_size += upd_size;
 		cbt->ins = ins;
@@ -261,20 +263,42 @@ err:	__wt_session_serialize_wrapup(session, page, ret);
 }
 
 /*
+ * __wt_update_check --
+ *	Check whether an update can proceed, and maintain the first txnid in
+ *	the page->modify structure.
+ */
+int
+__wt_update_check(WT_SESSION_IMPL *session, WT_PAGE *page, WT_UPDATE *next)
+{
+	WT_TXN *txn;
+
+	/* Before allocating anything, make sure this update is permitted. */
+	WT_RET(__wt_txn_update_check(session, next));
+
+	/*
+	 * Record the transaction ID for the first update to a page.
+	 * We don't care if this races: there is a buffer built into the
+	 * check for ancient updates.
+	 */
+	txn = &session->txn;
+	if (page->modify->first_id == WT_TXN_NONE && txn->id != WT_TXN_NONE)
+		page->modify->first_id = txn->id;
+
+	return (0);
+}
+
+/*
  * __wt_update_alloc --
  *	Allocate a WT_UPDATE structure and associated value from the session's
  *	buffer and fill it in.
  */
 int
 __wt_update_alloc(WT_SESSION_IMPL *session,
-    WT_ITEM *value, WT_UPDATE **updp, size_t *sizep, WT_UPDATE *next)
+    WT_ITEM *value, WT_UPDATE **updp, size_t *sizep)
 {
 	WT_DECL_RET;
 	WT_UPDATE *upd;
 	size_t size;
-
-	/* Before allocating anything, make sure this update is permitted. */
-	WT_RET(__wt_txn_update_check(session, next));
 
 	/*
 	 * Allocate the WT_UPDATE structure and room for the value, then copy
@@ -299,7 +323,6 @@ __wt_update_alloc(WT_SESSION_IMPL *session,
 		return (ret);
 	}
 
-	upd->next = next;
 	*updp = upd;
 	if (sizep != NULL)
 		*sizep = sizeof(WT_UPDATE) + size;

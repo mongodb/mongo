@@ -394,11 +394,13 @@ extern int __wt_row_insert_alloc(WT_SESSION_IMPL *session,
     WT_INSERT **insp,
     size_t *ins_sizep);
 extern void __wt_insert_serial_func(WT_SESSION_IMPL *session);
+extern int __wt_update_check(WT_SESSION_IMPL *session,
+    WT_PAGE *page,
+    WT_UPDATE *next);
 extern int __wt_update_alloc(WT_SESSION_IMPL *session,
     WT_ITEM *value,
     WT_UPDATE **updp,
-    size_t *sizep,
-    WT_UPDATE *next);
+    size_t *sizep);
 extern void __wt_update_serial_func(WT_SESSION_IMPL *session);
 extern WT_INSERT *__wt_search_insert(WT_SESSION_IMPL *session,
     WT_CURSOR_BTREE *cbt,

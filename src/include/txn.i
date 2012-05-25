@@ -133,3 +133,28 @@ __wt_txn_update_check(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 
 	return (0);
 }
+
+/*
+ * __wt_txn_ancient --
+ *	Check if a given transaction ID is "ancient".
+ *      That is, if it is so far behind the current transaction that it could
+ *      soon become invisible.  If so, eviction will be forced on the page.
+ */
+static inline int
+__wt_txn_ancient(WT_SESSION_IMPL *session, wt_txnid_t id)
+{
+	WT_TXN_GLOBAL *txn_global;
+	wt_txnid_t current;
+
+	txn_global = &S2C(session)->txn_global;
+	current = txn_global->current;
+
+	/*
+	 * Call an update "ancient" if it will wrap around in under 1 million
+	 * transactions, to give eviction time to write it.
+	 */
+#define	TXN_WRAP_BUFFER	1000000
+#define	TXN_WINDOW	((UINT32_MAX / 2) - TXN_WRAP_BUFFER)
+
+	return (id != WT_TXN_NONE && TXNID_LT(id, current - TXN_WINDOW));
+}

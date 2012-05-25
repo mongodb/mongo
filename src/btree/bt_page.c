@@ -26,6 +26,7 @@ __wt_page_in_func(
 #endif
     )
 {
+	WT_PAGE *page;
 	int busy, read_lockout, wake;
 
 	/*
@@ -73,13 +74,31 @@ __wt_page_in_func(
 #else
 			WT_RET(__wt_hazard_set(session, ref, &busy));
 #endif
-			if (!busy) {
-				WT_ASSERT(session, !WT_PAGE_IS_ROOT(ref->page));
-				ref->page->read_gen =
-				    __wt_cache_read_gen(session);
-				return (0);
+			if (busy)
+				break;
+
+			page = ref->page;
+			WT_ASSERT(session, !WT_PAGE_IS_ROOT(page));
+
+			/*
+			 * Ensure the page doesn't have ancient updates on it.
+			 * If it did, reading the page could ignore committed
+			 * updates.  This should be extremely unlikely in real
+			 * applications, force eviction of the page to avoid
+			 * the issue.
+			 */
+			if (page->modify != NULL &&
+			    __wt_txn_ancient(session, page->modify->first_id)) {
+				WT_VERBOSE_RET(session, read,
+				    "ancient updates, forcing eviction");
+				__wt_evict_page_request(session, page);
+				__wt_hazard_clear(session, page);
+				__wt_evict_server_wake(session);
+				break;
 			}
-			break;
+
+			page->read_gen = __wt_cache_read_gen(session);
+			return (0);
 		WT_ILLEGAL_VALUE(session);
 		}
 
