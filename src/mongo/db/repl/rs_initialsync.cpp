@@ -111,52 +111,80 @@ namespace mongo {
             buildIndexes = myConfig().buildIndexes;
         }
 
+        // find the member with the lowest ping time that has more data than me
+
+        // Find primary's oplog time. Reject sync candidates that are more than
+        // MAX_SLACK_TIME seconds behind.
+        OpTime primaryOpTime;
+        static const unsigned maxSlackDurationSeconds = 10 * 60; // 10 minutes
+        const Member* primary = box.getPrimary();
+        if (primary) 
+            primaryOpTime = primary->hbinfo().opTime;
+        else
+            // choose a time that will exclude no candidates, since we don't see a primary
+            primaryOpTime = OpTime(maxSlackDurationSeconds, 0);
+        fassert(16250, primaryOpTime.getSecs() >= maxSlackDurationSeconds);
+        OpTime oldestSyncOpTime(primaryOpTime.getSecs() - maxSlackDurationSeconds, 0);
+
         Member *closest = 0;
         time_t now = 0;
-
-        // find the member with the lowest ping time that has more data than me
 
         // Make two attempts.  The first attempt, we ignore those nodes with
         // slave delay higher than our own.  The second attempt includes such
         // nodes, in case those are the only ones we can reach.
+        // This loop attempts to set 'closest'.
         for (int attempts = 0; attempts < 2; ++attempts) {
             for (Member *m = _members.head(); m; m = m->next()) {
-                if (m->hbinfo().up() &&
-                    // make sure members with buildIndexes sync from other members w/indexes
-                    (!buildIndexes || (buildIndexes && m->config().buildIndexes)) &&
-                    (m->state() == MemberState::RS_PRIMARY ||
-                     (m->state() == MemberState::RS_SECONDARY &&
-                      m->hbinfo().opTime > lastOpTimeWritten)) &&
-                    (!closest || m->hbinfo().ping < closest->hbinfo().ping)) {
+                if (!m->hbinfo().up())
+                    continue;
+                // make sure members with buildIndexes sync from other members w/indexes
+                if (buildIndexes && !m->config().buildIndexes)
+                    continue;
 
-                    if ( attempts == 0 &&
-                         myConfig().slaveDelay < m->config().slaveDelay ) {
-                        break; // skip this one in the first attempt
-                    }
+                if (!m->state().readable())
+                    continue;
 
-                    map<string,time_t>::iterator vetoed = _veto.find(m->fullName());
-                    if (vetoed == _veto.end()) {
-                        closest = m;
-                        break;
-                    }
+                if (m->state() == MemberState::RS_SECONDARY) {
+                    // only consider secondaries that are ahead of where we are
+                    if (m->hbinfo().opTime <= lastOpTimeWritten)
+                        continue;
+                    // omit secondaries that are excessively behind, on the first attempt at least.
+                    if (attempts == 0 && 
+                        m->hbinfo().opTime < oldestSyncOpTime)
+                        continue;
+                }
 
+                // omit nodes that are more latent than anything we've already considered
+                if (closest && 
+                    (m->hbinfo().ping > closest->hbinfo().ping))
+                    continue;
+
+                if ( attempts == 0 &&
+                     myConfig().slaveDelay < m->config().slaveDelay ) {
+                    continue; // skip this one in the first attempt
+                }
+
+                map<string,time_t>::iterator vetoed = _veto.find(m->fullName());
+                if (vetoed != _veto.end()) {
+                    // Do some veto housekeeping
                     if (now == 0) {
                         now = time(0);
                     }
 
-                    // if this was on the veto list, check if it was vetoed in the last "while"
-                    if ((*vetoed).second < now) {
-                        _veto.erase(vetoed);
-                        closest = m;
-                        break;
+                    // if this was on the veto list, check if it was vetoed in the last "while".
+                    // if it was, skip.
+                    if (vetoed->second >= now) {
+                        if (time(0) % 5 == 0) {
+                            log() << "replSet not trying to sync from " << (*vetoed).first
+                                  << ", it is vetoed for " << ((*vetoed).second - now) << " more seconds" << rsLog;
+                        }
+                        continue;
                     }
-
-                    // if it was recently vetoed, skip
-                    if (time(0) % 5 == 0) {
-                        log() << "replSet not trying to sync from " << (*vetoed).first
-                              << ", it is vetoed for " << ((*vetoed).second - now) << " more seconds" << rsLog;
-                    }
+                    _veto.erase(vetoed);
+                    // fall through, this is a valid candidate now
                 }
+                // This candidate has passed all tests; set 'closest'
+                closest = m;
             }
             if (closest) break; // no need for second attempt
         }
