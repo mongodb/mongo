@@ -248,10 +248,15 @@ __wt_buf_catfmt(WT_SESSION_IMPL *session, WT_ITEM *buf, const char *fmt, ...)
  *	Scratch buffer allocation function.
  */
 int
-__wt_scr_alloc(WT_SESSION_IMPL *session, uint32_t size, WT_ITEM **scratchp)
+__wt_scr_alloc_func(WT_SESSION_IMPL *session,
+    uint32_t size, WT_ITEM **scratchp
+#ifdef HAVE_DIAGNOSTIC
+    , const char *file, int line
+#endif
+    )
 {
 	WT_DECL_RET;
-	WT_ITEM *buf, **p, *best, **slot;
+	WT_ITEM *buf, **p, **best, **slot;
 	size_t allocated;
 	u_int i;
 
@@ -267,7 +272,7 @@ __wt_scr_alloc(WT_SESSION_IMPL *session, uint32_t size, WT_ITEM **scratchp)
 	 *
 	 * Walk the array, looking for a buffer we can use.
 	 */
-	for (i = 0, best = NULL, slot = NULL,
+	for (i = 0, best = slot = NULL,
 	    p = session->scratch; i < session->scratch_alloc; ++i, ++p) {
 		/* If we find an empty slot, remember it. */
 		if ((buf = *p) == NULL) {
@@ -285,11 +290,13 @@ __wt_scr_alloc(WT_SESSION_IMPL *session, uint32_t size, WT_ITEM **scratchp)
 		 * or the largest buffer if none are large enough.
 		 */
 		if (best == NULL ||
-		    (best->memsize < size && buf->memsize > best->memsize) ||
-		    (buf->memsize >= size && buf->memsize < best->memsize))
-			best = buf;
+		    ((*best)->memsize < size &&
+		    buf->memsize > (*best)->memsize) ||
+		    (buf->memsize >= size && buf->memsize < (*best)->memsize))
+			best = p;
+
 		/* If we find a perfect match, use it. */
-		if (best->memsize == size)
+		if ((*best)->memsize == size)
 			break;
 	}
 
@@ -302,6 +309,12 @@ __wt_scr_alloc(WT_SESSION_IMPL *session, uint32_t size, WT_ITEM **scratchp)
 		WT_ERR(__wt_realloc(session, &allocated,
 		    (session->scratch_alloc + 10) * sizeof(WT_ITEM *),
 		    &session->scratch));
+#ifdef HAVE_DIAGNOSTIC
+		allocated = session->scratch_alloc * sizeof(WT_SCRATCH_TRACK);
+		WT_ERR(__wt_realloc(session, &allocated,
+		    (session->scratch_alloc + 10) * sizeof(WT_SCRATCH_TRACK),
+		    &session->scratch_track));
+#endif
 		slot = session->scratch + session->scratch_alloc;
 		session->scratch_alloc += 10;
 	}
@@ -312,17 +325,24 @@ __wt_scr_alloc(WT_SESSION_IMPL *session, uint32_t size, WT_ITEM **scratchp)
 	 */
 	if (best == NULL) {
 		WT_ASSERT(session, slot != NULL);
-		WT_ERR(__wt_calloc_def(session, 1, slot));
-		best = *slot;
+		best = slot;
+
+		WT_ERR(__wt_calloc_def(session, 1, best));
 
 		/* Scratch buffers must be aligned. */
-		F_SET(best, WT_ITEM_ALIGNED);
+		F_SET(*best, WT_ITEM_ALIGNED);
 	}
 
 	/* Grow the buffer as necessary and return. */
-	WT_ERR(__wt_buf_init(session, best, size));
-	F_SET(best, WT_ITEM_INUSE);
-	*scratchp = best;
+	WT_ERR(__wt_buf_init(session, *best, size));
+	F_SET(*best, WT_ITEM_INUSE);
+
+#ifdef HAVE_DIAGNOSTIC
+	session->scratch_track[best - session->scratch].file = file;
+	session->scratch_track[best - session->scratch].line = line;
+#endif
+
+	*scratchp = *best;
 	return (0);
 
 err:	WT_RET_MSG(session, ret,
@@ -358,12 +378,24 @@ __wt_scr_discard(WT_SESSION_IMPL *session)
 			continue;
 		if (F_ISSET(*bufp, WT_ITEM_INUSE))
 			__wt_errx(session,
-			    "scratch buffer allocated and never discarded");
+			    "scratch buffer allocated and never discarded"
+#ifdef HAVE_DIAGNOSTIC
+			    ": %s: %d",
+			    session->
+			    scratch_track[bufp - session->scratch].file,
+			    session->
+			    scratch_track[bufp - session->scratch].line
+#endif
+			    );
+
 		__wt_buf_free(session, *bufp);
 		__wt_free(session, *bufp);
 	}
 
 	__wt_free(session, session->scratch);
+#ifdef HAVE_DIAGNOSTIC
+	__wt_free(session, session->scratch_track);
+#endif
 }
 
 /*

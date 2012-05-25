@@ -229,6 +229,10 @@ not_compressed:	/*
 	 * distinguishing between extents allocated from the live avail list,
 	 * and those which can't be allocated from the live avail list such as
 	 * blocks for writing the live avail list itself.
+	 *
+	 * In the case of forced extension, we're holding the necessary locks,
+	 * don't re-acquire them (and note that if we have to free the blocks
+	 * should the write fail).
 	 */
 	if (force_extend)
 		WT_ERR(__wt_block_extend(
@@ -236,7 +240,15 @@ not_compressed:	/*
 	else
 		WT_ERR(__wt_block_alloc(
 		    session, block, &offset, (off_t)align_size));
-	WT_ERR(__wt_write(session, block->fh, offset, align_size, dsk));
+	if ((ret =
+	    __wt_write(session, block->fh, offset, align_size, dsk)) != 0) {
+		if (!force_extend)
+			__wt_spin_lock(session, &block->live_lock);
+		(void)__wt_block_off_free(session, block, offset, align_size);
+		if (!force_extend)
+			__wt_spin_unlock(session, &block->live_lock);
+		WT_ERR(ret);
+	}
 
 	WT_BSTAT_INCR(session, page_write);
 	WT_CSTAT_INCR(session, block_write);

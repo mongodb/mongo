@@ -327,15 +327,6 @@ wts_read_scan(void)
 	free(keybuf);
 }
 
-#define	NTF_CHK(a) do {							\
-	switch (a) {							\
-	case 0:								\
-		break;							\
-	case 1:								\
-		return;							\
-	}								\
-} while (0)
-
 /*
  * read_row --
  *	Read and verify a single element in a row- or column-store file.
@@ -399,7 +390,8 @@ read_row(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno)
 		ret = 0;
 	}
 
-	NTF_CHK(notfound_chk("read_row", ret, notfound, keyno));
+	if (notfound_chk("read_row", ret, notfound, keyno))
+		return;
 
 	/* Compare the two. */
 	if (value.size != bdb_value.size ||
@@ -460,8 +452,9 @@ nextprev(WT_CURSOR *cursor, int next, int *notfoundp)
 	/* Retrieve the BDB value. */
 	bdb_np(next, &bdb_key.data, &bdb_key.size,
 	    &bdb_value.data, &bdb_value.size, &notfound);
-	NTF_CHK(notfound_chk(
-	    next ? "nextprev(next)" : "nextprev(prev)", ret, notfound, keyno));
+	if (notfound_chk(
+	    next ? "nextprev(next)" : "nextprev(prev)", ret, notfound, keyno))
+		return;
 
 	/* Compare the two. */
 	if (g.c_file_type == ROW) {
@@ -548,7 +541,7 @@ row_update(
 		return;
 
 	bdb_update(key->data, key->size, value->data, value->size, &notfound);
-	NTF_CHK(notfound_chk("row_update", ret, notfound, keyno));
+	(void)notfound_chk("row_update", ret, notfound, keyno);
 }
 
 /*
@@ -593,7 +586,7 @@ col_update(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t keyno)
 
 	key_gen((uint8_t *)key->data, &key->size, keyno, 0);
 	bdb_update(key->data, key->size, value->data, value->size, &notfound);
-	NTF_CHK(notfound_chk("col_update", ret, notfound, keyno));
+	(void)notfound_chk("col_update", ret, notfound, keyno);
 }
 
 /*
@@ -678,7 +671,7 @@ row_remove(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int *notfoundp)
 		return;
 
 	bdb_remove(keyno, &notfound);
-	NTF_CHK(notfound_chk("row_remove", ret, notfound, keyno));
+	(void)notfound_chk("row_remove", ret, notfound, keyno);
 }
 
 /*
@@ -717,7 +710,7 @@ col_remove(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int *notfoundp)
 	} else
 		bdb_remove(keyno, &notfound);
 
-	NTF_CHK(notfound_chk("col_remove", ret, notfound, keyno));
+	(void)notfound_chk("col_remove", ret, notfound, keyno);
 }
 
 /*

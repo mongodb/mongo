@@ -133,18 +133,6 @@ struct __wt_btree {
 	(WT_BTREE_BULK | WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY)
 
 /*
- * In diagnostic mode we track the locations from which hazard references
- * were acquired.
- */
-#ifdef HAVE_DIAGNOSTIC
-#define	__wt_page_in(a, b, c)						\
-	__wt_page_in_func(a, b, c, __FILE__, __LINE__)
-#else
-#define	__wt_page_in(a, b, c)						\
-	__wt_page_in_func(a, b, c)
-#endif
-
-/*
  * WT_SALVAGE_COOKIE --
  *	Encapsulation of salvage information for reconciliation.
  */

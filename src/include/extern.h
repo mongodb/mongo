@@ -362,6 +362,7 @@ extern int __wt_rec_track_ovfl_reuse( WT_SESSION_IMPL *session,
     int *foundp);
 extern int __wt_rec_track_init(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_rec_track_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page);
+extern int __wt_rec_track_wrapup_err(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern void __wt_rec_track_discard(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern char *__wt_track_string(WT_PAGE_TRACK *track, char *buf, size_t len);
 extern int __wt_rec_write( WT_SESSION_IMPL *session,
@@ -1018,9 +1019,13 @@ extern int __wt_buf_catfmt(WT_SESSION_IMPL *session,
     ...) WT_GCC_ATTRIBUTE((format (printf,
     3,
     4)));
-extern int __wt_scr_alloc(WT_SESSION_IMPL *session,
-    uint32_t size,
-    WT_ITEM **scratchp);
+extern int
+__wt_scr_alloc_func(WT_SESSION_IMPL *session,
+ uint32_t size, WT_ITEM **scratchp
+#ifdef HAVE_DIAGNOSTIC
+ , const char *file, int line
+#endif
+ );
 extern void __wt_scr_free(WT_ITEM **bufp);
 extern void __wt_scr_discard(WT_SESSION_IMPL *session);
 extern void *__wt_scr_alloc_ext(WT_SESSION *wt_session, size_t size);

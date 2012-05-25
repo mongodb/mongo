@@ -7,7 +7,7 @@
 
 #include "wt_internal.h"
 
-static void __evict_clear_tree_walk(WT_SESSION_IMPL *);
+static void __evict_clear_tree_walk(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __evict_file_request(WT_SESSION_IMPL *, int);
 static int  __evict_file_request_walk(WT_SESSION_IMPL *);
 static int  __evict_lru(WT_SESSION_IMPL *);
@@ -375,20 +375,23 @@ __evict_worker(WT_SESSION_IMPL *session)
  *	Clear the tree's current eviction point.
  */
 static void
-__evict_clear_tree_walk(WT_SESSION_IMPL *session)
+__evict_clear_tree_walk(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	WT_PAGE *page;
 	WT_REF *ref;
 
+	/* If no page stack specified, clear the standard eviction stack. */
+	if (page == NULL) {
+		page = session->btree->evict_page;
+		session->btree->evict_page = NULL;
+	}
+
 	/* Clear the current eviction point. */
-	page = session->btree->evict_page;
 	while (page != NULL && !WT_PAGE_IS_ROOT(page)) {
 		ref = page->ref;
 		page = page->parent;
 		if (ref->state == WT_REF_EVICT_WALK)
 			ref->state = WT_REF_MEM;
 	}
-	session->btree->evict_page = NULL;
 }
 
 /*
@@ -513,12 +516,6 @@ __evict_file_request_walk(WT_SESSION_IMPL *session)
 	__evict_list_clr_all(session, 0);
 
 	/*
-	 * Clear the tree's walk reference, we may be about to discard
-	 * the tree.
-	 */
-	__evict_clear_tree_walk(request_session);
-
-	/*
 	 * Wait for LRU eviction activity to drain.  It is much easier
 	 * to reason about sync or forced eviction if we know there are
 	 * no other threads evicting in the tree.
@@ -542,7 +539,11 @@ __evict_file_request_walk(WT_SESSION_IMPL *session)
 static int
 __evict_file_request(WT_SESSION_IMPL *session, int syncop)
 {
+	WT_DECL_RET;
 	WT_PAGE *next_page, *page;
+
+	/* Clear any existing tree walk, we may be about to discard the tree. */
+	__evict_clear_tree_walk(session, NULL);
 
 	/*
 	 * We can't evict the page just returned to us, it marks our place in
@@ -553,14 +554,14 @@ __evict_file_request(WT_SESSION_IMPL *session, int syncop)
 	for (;;) {
 		if ((page = next_page) == NULL)
 			break;
-		WT_RET(__wt_tree_np(session, &next_page, 1, 1));
+		WT_ERR(__wt_tree_np(session, &next_page, 1, 1));
 
 		/* Write dirty pages for sync, and sync with discard. */
 		switch (syncop) {
 		case WT_SYNC:
 		case WT_SYNC_DISCARD:
 			if (__wt_page_is_modified(page))
-				WT_RET(__wt_rec_write(session, page, NULL));
+				WT_ERR(__wt_rec_write(session, page, NULL));
 			break;
 		case WT_SYNC_DISCARD_NOWRITE:
 			break;
@@ -583,7 +584,7 @@ __evict_file_request(WT_SESSION_IMPL *session, int syncop)
 			if (WT_PAGE_IS_ROOT(page) || page->modify == NULL ||
 			    !F_ISSET(page->modify, WT_PM_REC_EMPTY |
 			    WT_PM_REC_SPLIT | WT_PM_REC_SPLIT_MERGE))
-				WT_RET(__wt_rec_evict(
+				WT_ERR(__wt_rec_evict(
 				    session, page, WT_REC_SINGLE));
 			break;
 		case WT_SYNC_DISCARD_NOWRITE:
@@ -593,6 +594,11 @@ __evict_file_request(WT_SESSION_IMPL *session, int syncop)
 	}
 
 	return (0);
+
+	/* On error, clear any left-over tree walk. */
+err:	if (next_page != NULL)
+		__evict_clear_tree_walk(session, next_page);
+	return (ret);
 }
 
 /*
@@ -639,7 +645,7 @@ __evict_page_request_walk(WT_SESSION_IMPL *session)
 		 * The eviction candidate might be part of the current tree's
 		 * walk; clear it.
 		 */
-		__evict_clear_tree_walk(session);
+		__evict_clear_tree_walk(session, NULL);
 
 		/*
 		 * Wait for LRU eviction activity to drain.  It is much easier
