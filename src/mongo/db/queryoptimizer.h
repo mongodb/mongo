@@ -163,14 +163,9 @@ namespace mongo {
      * 5) In one of these calls to next(), setComplete() is called.
      * 6) The QueryPattern for the QueryPlan may be recorded as a winner.
      */
-    class QueryOp {
+    class QueryOp : private boost::noncopyable {
     public:
         QueryOp() : _complete(), _stopRequested(), _qp(), _error() {}
-
-        /** Used when handing off from one QueryOp to another. */
-        QueryOp( const QueryOp &other ) :
-            _complete(), _stopRequested(), _qp(), _error(), _matcher( other._matcher ),
-            _orConstraint( other._orConstraint ) {}
 
         virtual ~QueryOp() {}
 
