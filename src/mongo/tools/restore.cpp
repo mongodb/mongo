@@ -354,6 +354,18 @@ public:
         _curdb = NamespaceString(_curns).db;
         _curcoll = NamespaceString(_curns).coll;
 
+        // If drop is not used, warn if the collection exists.
+         if (!_drop) {
+             scoped_ptr<DBClientCursor> cursor(conn().query(_curdb + ".system.namespaces",
+                                                             Query(BSON("name" << ns))));
+             if (cursor->more()) {
+                 // collection already exists show warning
+                 warning() << "Restoring to " << ns << " without dropping. Restored data "
+                              "will be inserted without raising errors; check your server log"
+                              << endl;
+             }
+         }
+
         if (_restoreOptions && metadataObject.hasField("options")) {
             // Try to create collection with given options
             createCollectionWithOptions(metadataObject["options"].Obj());
