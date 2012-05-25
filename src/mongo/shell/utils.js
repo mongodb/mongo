@@ -1268,7 +1268,7 @@ shellAutocomplete = function ( /*prefix*/ ) { // outer scope function called on 
     builtinMethods[Mongo] = "find update insert remove".split( ' ' );
     builtinMethods[BinData] = "hex base64 length subtype".split( ' ' );
 
-    var extraGlobals = "Infinity NaN undefined null true false decodeURI decodeURIComponent encodeURI encodeURIComponent escape eval isFinite isNaN parseFloat parseInt unescape Array Boolean Date Math Number RegExp String print load gc MinKey MaxKey Mongo NumberInt NumberLong ObjectId DBPointer UUID BinData Map".split( ' ' );
+    var extraGlobals = "Infinity NaN undefined null true false decodeURI decodeURIComponent encodeURI encodeURIComponent escape eval isFinite isNaN parseFloat parseInt unescape Array Boolean Date Math Number RegExp String print load gc MinKey MaxKey Mongo NumberInt NumberLong ObjectId DBPointer UUID BinData HexData MD5 Map".split( ' ' );
 
     var isPrivate = function( name ) {
         if ( shellAutocomplete.showPrivate ) return false;
