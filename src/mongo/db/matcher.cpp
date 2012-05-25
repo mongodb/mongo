@@ -911,15 +911,6 @@ namespace mongo {
                 return false;
         }
 
-        if ( _orDedupConstraints.size() > 0 ) {
-            for( vector< shared_ptr< FieldRangeVector > >::const_iterator i = _orDedupConstraints.begin();
-                i != _orDedupConstraints.end(); ++i ) {
-                if ( (*i)->matches( jsobj ) ) {
-                    return false;
-                }
-            }
-        }
-        
         if ( _andMatchers.size() > 0 ) {
             for( list< shared_ptr< Matcher > >::const_iterator i = _andMatchers.begin();
                 i != _andMatchers.end(); ++i ) {
@@ -1051,15 +1042,6 @@ namespace mongo {
                 return false;
         }
 
-        if ( _orDedupConstraints.size() > 0 ) {
-            for( vector< shared_ptr< FieldRangeVector > >::const_iterator i = _orDedupConstraints.begin();
-                i != _orDedupConstraints.end(); ++i ) {
-                if ( (*i)->matches( jsobj ) ) {
-                    return false;
-                }
-            }
-        }
-        
         if ( _andMatchers.size() > 0 ) {
             for( list< shared_ptr< Matcher > >::const_iterator i = _andMatchers.begin();
                 i != _andMatchers.end(); ++i ) {
@@ -1148,9 +1130,6 @@ namespace mongo {
             return false;
         }
         if ( docMatcher._norMatchers.size() > 0 ) {
-            return false;
-        }
-        if ( docMatcher._orDedupConstraints.size() > 0 ) {
             return false;
         }
         

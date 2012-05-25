@@ -1236,10 +1236,10 @@ doneCheckOrder:
     void MultiCursor::advanceClause() {
         _nscanned += _c->nscanned();
         if ( _explainPlanInfo ) _explainPlanInfo->noteDone( *_c );
-        _matcher->advanceOrClause( _queryPlan->originalFrv() );
+        shared_ptr<FieldRangeVector> oldClauseFrv = _queryPlan->originalFrv();
         _queryPlan = _mps->nextClauseBestGuessPlan( *_queryPlan );
         if ( _queryPlan ) {
-            _matcher.reset( _matcher->nextClauseMatcher( _queryPlan->indexKey() ) );
+            _matcher.reset( _matcher->nextClauseMatcher( oldClauseFrv, _queryPlan->indexKey() ) );
             _c = _queryPlan->newCursor();
             // All sub cursors must support yields.
             verify( _c->supportYields() );

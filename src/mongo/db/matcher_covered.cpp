@@ -20,30 +20,34 @@
 
 #include "pch.h"
 #include "matcher.h"
-#include "../util/goodies.h"
-#include "diskloc.h"
-#include "../scripting/engine.h"
-#include "db.h"
-#include "client.h"
-
-#include "pdfile.h"
+#include "mongo/db/cursor.h"
+#include "mongo/db/queryutil.h"
 
 namespace mongo {
 
-    CoveredIndexMatcher::CoveredIndexMatcher( const BSONObj &jsobj, const BSONObj &indexKeyPattern ) :
+    CoveredIndexMatcher::CoveredIndexMatcher( const BSONObj &jsobj,
+                                             const BSONObj &indexKeyPattern ) :
         _docMatcher( new Matcher( jsobj ) ),
         _keyMatcher( *_docMatcher, indexKeyPattern ) {
         init();
     }
 
-    CoveredIndexMatcher::CoveredIndexMatcher( const shared_ptr< Matcher > &docMatcher, const BSONObj &indexKeyPattern ) :
-        _docMatcher( docMatcher ),
-        _keyMatcher( *_docMatcher, indexKeyPattern ) {
+    CoveredIndexMatcher::CoveredIndexMatcher( const CoveredIndexMatcher &prevClauseMatcher,
+                                             const shared_ptr<FieldRangeVector> &prevClauseFrv,
+                                             const BSONObj &nextClauseIndexKeyPattern ) :
+        _docMatcher( prevClauseMatcher._docMatcher ),
+        _keyMatcher( *_docMatcher, nextClauseIndexKeyPattern ),
+        _orDedupConstraints( prevClauseMatcher._orDedupConstraints ) {
+        if ( prevClauseFrv ) {
+            _orDedupConstraints.push_back( prevClauseFrv );
+        }
         init();
     }
 
     void CoveredIndexMatcher::init() {
-        _needRecord = !_keyMatcher.keyMatch( *_docMatcher );
+        _needRecord =
+            !_keyMatcher.keyMatch( *_docMatcher ) ||
+            !_orDedupConstraints.empty();
     }
 
     bool CoveredIndexMatcher::matchesCurrent( Cursor * cursor , MatchDetails * details ) {
@@ -76,9 +80,24 @@ namespace mongo {
         if ( details )
             details->setLoadedRecord( true );
 
-        bool res = _docMatcher->matches(recLoc.obj() , details );
+        BSONObj obj = recLoc.obj();
+        bool res =
+            _docMatcher->matches( obj, details ) &&
+            !isOrClauseDup( obj );
         LOG(5) << "CoveredIndexMatcher _docMatcher->matches() returns " << res << endl;
         return res;
+    }
+    
+    bool CoveredIndexMatcher::isOrClauseDup( const BSONObj &obj ) const {
+        for( vector<shared_ptr<FieldRangeVector> >::const_iterator i = _orDedupConstraints.begin();
+            i != _orDedupConstraints.end(); ++i ) {
+            if ( (*i)->matches( obj ) ) {
+                // If a document matches a prior $or clause index range, generally it would have
+                // been returned while scanning that range and so is reported as a dup.
+                return true;
+            }
+        }
+        return false;
     }
 
     string CoveredIndexMatcher::toString() const {

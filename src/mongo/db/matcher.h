@@ -188,10 +188,6 @@ namespace mongo {
             return _jsobj.toString();
         }
 
-        void addOrDedupConstraint( const shared_ptr< FieldRangeVector > &frv ) {
-            _orDedupConstraints.push_back( frv );
-        }
-
         /**
          * @return true if this key matcher will return the same true/false
          * value as the provided doc matcher.
@@ -256,7 +252,6 @@ namespace mongo {
         list< shared_ptr< Matcher > > _andMatchers;
         list< shared_ptr< Matcher > > _orMatchers;
         list< shared_ptr< Matcher > > _norMatchers;
-        vector< shared_ptr< FieldRangeVector > > _orDedupConstraints;
 
         friend class CoveredIndexMatcher;
     };
@@ -277,23 +272,29 @@ namespace mongo {
 
         Matcher& docMatcher() { return *_docMatcher; }
 
-        // once this is called, shouldn't use this matcher for matching any more
-        void advanceOrClause( const shared_ptr< FieldRangeVector > &frv ) {
-            _docMatcher->addOrDedupConstraint( frv );
-        }
-
-        CoveredIndexMatcher *nextClauseMatcher( const BSONObj &indexKeyPattern ) {
-            return new CoveredIndexMatcher( _docMatcher, indexKeyPattern );
+        /**
+         * @return a matcher for a following $or clause.
+         * @param prevClauseFrs The index range scanned by the previous $or clause.  May be empty.
+         * @param nextClauseIndexKeyPattern The index key of the following $or clause.
+         */
+        CoveredIndexMatcher *nextClauseMatcher( const shared_ptr<FieldRangeVector> &prevClauseFrv,
+                                               const BSONObj &nextClauseIndexKeyPattern ) const {
+            return new CoveredIndexMatcher( *this, prevClauseFrv, nextClauseIndexKeyPattern );
         }
 
         string toString() const;
 
     private:
-        bool matches(const BSONObj &key, const DiskLoc &recLoc , MatchDetails * details = 0 , bool keyUsable = true );
-        CoveredIndexMatcher(const shared_ptr< Matcher > &docMatcher, const BSONObj &indexKeyPattern);
+        bool matches( const BSONObj &key, const DiskLoc &recLoc, MatchDetails *details = 0,
+                     bool keyUsable = true );
+        bool isOrClauseDup( const BSONObj &obj ) const;
+        CoveredIndexMatcher( const CoveredIndexMatcher &prevClauseMatcher,
+                            const shared_ptr<FieldRangeVector> &prevClauseFrv,
+                            const BSONObj &nextClauseIndexKeyPattern );
         void init();
         shared_ptr< Matcher > _docMatcher;
         Matcher _keyMatcher;
+        vector<shared_ptr<FieldRangeVector> > _orDedupConstraints;
 
         bool _needRecord; // if the key itself isn't good enough to determine a positive match
     };
