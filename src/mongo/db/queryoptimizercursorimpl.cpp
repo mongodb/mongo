@@ -89,12 +89,12 @@ namespace mongo {
             _c = queryPlan().newCursor();
             // The basic and btree cursors used by this implementation do not supply their own
             // matchers, and a matcher from a query plan will be used instead.
-            fassert( 16238, !_c->matcher() );
+            fassert( 16248, !_c->matcher() );
 
             // The query plan must have a matcher.  The matcher's constructor performs some aspects
             // of query validation that should occur as part of this class's init() if not handled
             // already.
-            fassert( 16237, queryPlan().matcher() );
+            fassert( 16249, queryPlan().matcher() );
 
             // All candidate cursors must support yields for QueryOptimizerCursorImpl's
             // prepareToYield() and prepareToTouchEarlierIterate() to work.
