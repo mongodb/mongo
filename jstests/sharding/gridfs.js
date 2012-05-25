@@ -6,6 +6,8 @@ var mongos = test.s0
 
 
 var filename = "mongod" // A large file we are guaranteed to have
+if (_isWindows())
+    filename += ".exe"
 
 function testGridFS(name) {
     var d = mongos.getDB(name)
