@@ -125,7 +125,7 @@ namespace mongo {
         else
             // choose a time that will exclude no candidates, since we don't see a primary
             primaryOpTime = OpTime(maxSlackDurationSeconds, 0);
-        fassert(16250, primaryOpTime.getSecs() >= maxSlackDurationSeconds);
+        fassert(16251, primaryOpTime.getSecs() >= maxSlackDurationSeconds);
         OpTime oldestSyncOpTime(primaryOpTime.getSecs() - maxSlackDurationSeconds, 0);
 
         Member *closest = 0;
