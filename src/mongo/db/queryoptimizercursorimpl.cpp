@@ -78,7 +78,7 @@ namespace mongo {
         
         virtual void _init() {
             checkCursorOrdering();
-            if ( !_selectionPolicy.permitPlan( qp() ) ) {
+            if ( !_selectionPolicy.permitPlan( queryPlan() ) ) {
                 throw MsgAssertionException( 9011,
                                             str::stream()
                                             << "Plan not permitted by query plan selection policy '"
@@ -86,12 +86,12 @@ namespace mongo {
                                             << "'" );
             }
             
-            _c = qp().newCursor();
+            _c = queryPlan().newCursor();
 
             // The query plan must have a matcher.  The matcher's constructor performs some aspects
             // of query validation that should occur as part of this class's init() if not handled
             // already.
-            fassert( 16237, qp().matcher() );
+            fassert( 16237, queryPlan().matcher() );
 
             // All candidate cursors must support yields for QueryOptimizerCursorImpl's
             // prepareToYield() and prepareToTouchEarlierIterate() to work.
@@ -113,7 +113,7 @@ namespace mongo {
         
         virtual void prepareToYield() {
             if ( _c && !_cc ) {
-                _cc.reset( new ClientCursor( QueryOption_NoCursorTimeout, _c, qp().ns() ) );
+                _cc.reset( new ClientCursor( QueryOption_NoCursorTimeout, _c, queryPlan().ns() ) );
                 // Set 'doing deletes' as deletes may occur; if there are no deletes this has no
                 // effect.
                 _cc->setDoingDeletes( true );
@@ -134,7 +134,8 @@ namespace mongo {
                 
                 if ( _capped ) {
                     msgassertedNoTrace( 13338,
-                                       str::stream() << "capped cursor overrun: " << qp().ns() );
+                                       str::stream() << "capped cursor overrun: "
+                                       << queryPlan().ns() );
                 }
                 msgassertedNoTrace( 15892,
                                    str::stream() <<
@@ -215,13 +216,14 @@ namespace mongo {
                 return QueryOp::generateExplainInfo();
             }
             _explainPlanInfo.reset( new ExplainPlanInfo() );
-            _explainPlanInfo->notePlan( *_c, qp().scanAndOrderRequired(), qp().keyFieldsOnly() );
+            _explainPlanInfo->notePlan( *_c, queryPlan().scanAndOrderRequired(),
+                                        queryPlan().keyFieldsOnly() );
             return _explainPlanInfo;
         }
         shared_ptr<ExplainPlanInfo> explainInfo() const { return _explainPlanInfo; }
         
         virtual const Projection::KeyOnly *keyFieldsOnly() const {
-            return qp().keyFieldsOnly().get();
+            return queryPlan().keyFieldsOnly().get();
         }
         
     private:
@@ -254,7 +256,7 @@ namespace mongo {
             return false;
         }
         bool countMatches() const {
-            return _alwaysCountMatches || !qp().scanAndOrderRequired();
+            return _alwaysCountMatches || !queryPlan().scanAndOrderRequired();
         }
 
         void recordCursorLocation() {
@@ -274,7 +276,7 @@ namespace mongo {
             _matchCounter.resetMatch();
         }
         void checkCursorOrdering() {
-            if ( _requireOrder && qp().scanAndOrderRequired() ) {
+            if ( _requireOrder && queryPlan().scanAndOrderRequired() ) {
                 throw MsgAssertionException( OutOfOrderDocumentsAssertionCode, "order spec cannot be satisfied with index" );
             }
         }
@@ -522,7 +524,7 @@ namespace mongo {
                 return 0;
             }
             assertOk();
-            return &_currOp->qp().multikeyFrs();
+            return &_currOp->queryPlan().multikeyFrs();
         }
         
         virtual bool currentPlanScanAndOrderRequired() const {
@@ -530,7 +532,7 @@ namespace mongo {
                 return _takeover->queryPlan().scanAndOrderRequired();
             }
             assertOk();
-            return _currOp->qp().scanAndOrderRequired();
+            return _currOp->queryPlan().scanAndOrderRequired();
         }
         
         virtual const Projection::KeyOnly *keyFieldsOnly() const {
@@ -623,7 +625,8 @@ namespace mongo {
             }
             else {
                 if ( _initialCandidatePlans.hybridPlanSet() ) {
-                    _completePlanOfHybridSetScanAndOrderRequired = op->qp().scanAndOrderRequired();
+                    _completePlanOfHybridSetScanAndOrderRequired =
+                            op->queryPlan().scanAndOrderRequired();
                 }
             }
 

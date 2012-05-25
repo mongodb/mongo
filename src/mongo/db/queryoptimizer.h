@@ -172,12 +172,12 @@ namespace mongo {
      */
     class QueryOp : private boost::noncopyable {
     public:
-        QueryOp() : _complete(), _stopRequested(), _qp(), _error() {}
+        QueryOp() : _complete(), _stopRequested(), _queryPlan(), _error() {}
 
         virtual ~QueryOp() {}
 
         /** @return QueryPlan assigned to this QueryOp by the query optimizer. */
-        const QueryPlan &qp() const { return *_qp; }
+        const QueryPlan &queryPlan() const { return *_queryPlan; }
                 
         /** Advance to next potential matching document (eg using a cursor). */
         virtual void next() = 0;
@@ -210,7 +210,10 @@ namespace mongo {
         /** To be called by QueryPlanSet::Runner only. */
         
         QueryOp *createChild();
-        void setQueryPlan( const QueryPlan *qp ) { _qp = qp; verify( _qp != NULL ); }
+        void setQueryPlan( const QueryPlan *queryPlan ) {
+            _queryPlan = queryPlan;
+            verify( _queryPlan != NULL );
+        }
         void init();        
         void setException( const DBException &e ) {
             _error = true;
@@ -224,7 +227,7 @@ namespace mongo {
             if ( c && c->matcher() ) {
                 return c->matcherPtr();
             }
-            return qp().matcher();
+            return queryPlan().matcher();
         }
 
         /** @return an ExplainPlanInfo object that will be updated as the query runs. */
@@ -248,7 +251,7 @@ namespace mongo {
         bool _complete;
         bool _stopRequested;
         ExceptionInfo _exception;
-        const QueryPlan *_qp;
+        const QueryPlan *_queryPlan;
         bool _error;
     };
 

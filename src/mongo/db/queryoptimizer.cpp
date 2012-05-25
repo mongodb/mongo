@@ -927,7 +927,7 @@ doneCheckOrder:
         nextOp( op );
         if ( op.complete() ) {
             if ( _plans._mayRecordPlan && op.mayRecordPlan() ) {
-                op.qp().registerSelf( op.nscanned(), _plans.characterizeCandidatePlans() );
+                op.queryPlan().registerSelf( op.nscanned(), _plans.characterizeCandidatePlans() );
             }
             _done = true;
             return holder._op;
@@ -1111,7 +1111,7 @@ doneCheckOrder:
             if ( !op->completeWithoutStop() ) {
                 return op;
             }
-            handleEndOfClause( op->qp() );
+            handleEndOfClause( op->queryPlan() );
             _baseOp = op;
         } while( mayHandleBeginningOfClause() );
         return op;
@@ -1216,7 +1216,7 @@ doneCheckOrder:
     _mps( mps ),
     _c( c ),
     _matcher( matcher ),
-    _queryPlan( &op.qp() ),
+    _queryPlan( &op.queryPlan() ),
     _nscanned( nscanned ),
     _explainPlanInfo( explainPlanInfo ) {
         _mps->clearRunner();
