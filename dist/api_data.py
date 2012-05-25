@@ -232,10 +232,6 @@ methods = {
 		load path for empty objects, only empty objects may be
 		bulk-loaded''',
 		type='boolean'),
-	Config('clear_on_close', 'false', r'''
-		for statistics cursors, reset statistics counters when the
-		cursor is closed''',
-		type='boolean'),
 	Config('dump', '', r'''
 		configure the cursor for dump format inputs and outputs:
 		"hex" selects a simple hexadecimal format, "print"
@@ -259,6 +255,10 @@ methods = {
 		the name of a snapshot to open'''),
 	Config('statistics', 'false', r'''
 		configure the cursor for statistics''',
+		type='boolean'),
+	Config('statistics_clear', 'false', r'''
+		statistics cursors only; reset statistics counters when the
+		cursor is closed''',
 		type='boolean'),
 ]),
 

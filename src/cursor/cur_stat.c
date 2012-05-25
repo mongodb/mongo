@@ -333,14 +333,14 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_STATS *stats_first;
 	void (*clear_func)(WT_STATS *);
-	int clear_on_close, stats_count;
+	int statistics_clear, stats_count;
 
 	btree = NULL;
 	clear_func = NULL;
 	cst = NULL;
 
-	WT_RET(__wt_config_gets(session, cfg, "clear_on_close", &cval));
-	clear_on_close = (cval.val != 0);
+	WT_RET(__wt_config_gets(session, cfg, "statistics_clear", &cval));
+	statistics_clear = (cval.val != 0);
 
 	if (!WT_PREFIX_SKIP(uri, "statistics:"))
 		return (EINVAL);
@@ -350,13 +350,13 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_btree_stat_init(session));
 		stats_first = (WT_STATS *)session->btree->stats;
 		stats_count = sizeof(WT_BTREE_STATS) / sizeof(WT_STATS);
-		if (clear_on_close)
+		if (statistics_clear)
 			clear_func = __wt_stat_clear_btree_stats;
 	} else {
 		__wt_conn_stat_init(session);
 		stats_first = (WT_STATS *)S2C(session)->stats;
 		stats_count = sizeof(WT_CONNECTION_STATS) / sizeof(WT_STATS);
-		if (clear_on_close)
+		if (statistics_clear)
 			clear_func = __wt_stat_clear_connection_stats;
 	}
 

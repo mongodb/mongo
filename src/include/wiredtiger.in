@@ -494,9 +494,6 @@ struct __wt_session {
 	 * @config{bulk, configure the cursor for bulk loads; bulk-load is a
 	 * fast load path for empty objects\, only empty objects may be
 	 * bulk-loaded.,a boolean flag; default \c false.}
-	 * @config{clear_on_close, for statistics cursors\, reset statistics
-	 * counters when the cursor is closed.,a boolean flag; default \c
-	 * false.}
 	 * @config{dump, configure the cursor for dump format inputs and
 	 * outputs: "hex" selects a simple hexadecimal format\, "print" selects
 	 * a format where only non-printing characters are hexadecimal encoded.
@@ -517,6 +514,9 @@ struct __wt_session {
 	 * empty.}
 	 * @config{statistics, configure the cursor for statistics.,a boolean
 	 * flag; default \c false.}
+	 * @config{statistics_clear, statistics cursors only; reset statistics
+	 * counters when the cursor is closed.,a boolean flag; default \c
+	 * false.}
 	 * @configend
 	 * @param cursorp a pointer to the newly opened cursor
 	 * @errors
