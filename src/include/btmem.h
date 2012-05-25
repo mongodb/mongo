@@ -169,6 +169,11 @@ struct __wt_page_modify {
 	} *track;			/* Array of tracked objects */
 	uint32_t track_entries;		/* Total track slots */
 
+	wt_txnid_t first_id;		/* Earliest transactional update, used
+					 * to avoid errors from transaction ID
+					 * wraparound.
+					 */
+
 #define	WT_PM_REC_EMPTY		0x01	/* Reconciliation: page empty */
 #define	WT_PM_REC_REPLACE	0x02	/* Reconciliation: page replaced */
 #define	WT_PM_REC_SPLIT		0x04	/* Reconciliation: page split */
