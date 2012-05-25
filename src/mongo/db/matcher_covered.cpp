@@ -58,8 +58,8 @@ namespace mongo {
                        );
     }
 
-    bool CoveredIndexMatcher::matches( const BSONObj &key, const DiskLoc &recLoc,
-                                      MatchDetails * details, bool keyUsable ) const {
+    bool CoveredIndexMatcher::matches( const BSONObj& key, const DiskLoc& recLoc,
+                                       MatchDetails* details, bool keyUsable ) const {
 
         LOG(5) << "CoveredIndexMatcher::matches() " << key.toString() << ' ' << recLoc.toString() << ' ' << keyUsable << endl;
 

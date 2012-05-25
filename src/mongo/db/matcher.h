@@ -260,8 +260,8 @@ namespace mongo {
     class CoveredIndexMatcher : boost::noncopyable {
     public:
         CoveredIndexMatcher(const BSONObj &pattern, const BSONObj &indexKeyPattern);
-        bool matchesWithSingleKeyIndex( const BSONObj &key, const DiskLoc &recLoc,
-                                       MatchDetails * details = 0 ) const {
+        bool matchesWithSingleKeyIndex( const BSONObj& key, const DiskLoc& recLoc,
+                                        MatchDetails* details = 0 ) const {
             return matches( key, recLoc, details, true );   
         }
         /**
@@ -278,16 +278,16 @@ namespace mongo {
          * @param prevClauseFrs The index range scanned by the previous $or clause.  May be empty.
          * @param nextClauseIndexKeyPattern The index key of the following $or clause.
          */
-        CoveredIndexMatcher *nextClauseMatcher( const shared_ptr<FieldRangeVector> &prevClauseFrv,
-                                               const BSONObj &nextClauseIndexKeyPattern ) const {
+        CoveredIndexMatcher *nextClauseMatcher( const shared_ptr<FieldRangeVector>& prevClauseFrv,
+                                                const BSONObj& nextClauseIndexKeyPattern ) const {
             return new CoveredIndexMatcher( *this, prevClauseFrv, nextClauseIndexKeyPattern );
         }
 
         string toString() const;
 
     private:
-        bool matches( const BSONObj &key, const DiskLoc &recLoc, MatchDetails *details = 0,
-                     bool keyUsable = true ) const;
+        bool matches( const BSONObj& key, const DiskLoc& recLoc, MatchDetails* details = 0,
+                      bool keyUsable = true ) const;
         bool isOrClauseDup( const BSONObj &obj ) const;
         CoveredIndexMatcher( const CoveredIndexMatcher &prevClauseMatcher,
                             const shared_ptr<FieldRangeVector> &prevClauseFrv,
