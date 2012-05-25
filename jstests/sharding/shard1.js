@@ -20,6 +20,9 @@ assert.eq( 3 , db.foo.find().length() , "after partitioning count failed" );
 
 s.adminCommand( shardCommand );
 
+assert.throws( function(){ s.adminCommand({ shardCollection: 'test', key: { x: 1 }}); });
+assert.throws( function(){ s.adminCommand({ shardCollection: '.foo', key: { x: 1 }}); });
+
 cconfig = s.config.collections.findOne( { _id : "test.foo" } );
 assert( cconfig , "why no collection entry for test.foo" )
 delete cconfig.lastmod

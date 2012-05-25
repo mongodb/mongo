@@ -437,9 +437,15 @@ namespace mongo {
             }
 
             bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
-                string ns = cmdObj.firstElement().valuestrsafe();
+                const string ns = cmdObj.firstElement().valuestrsafe();
                 if ( ns.size() == 0 ) {
                     errmsg = "no ns";
+                    return false;
+                }
+
+                const NamespaceString nsStr( ns );
+                if ( !nsStr.isValid() ){
+                    errmsg = str::stream() << "bad ns[" << ns << "]";
                     return false;
                 }
 

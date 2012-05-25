@@ -465,6 +465,7 @@ namespace mongo {
     }
 
     void Lock::DBWrite::lockOther(const string& db) {
+        fassert( 16252, !db.empty() );
         LockState& ls = lockState();
 
         // we do checks first, as on assert destructor won't be called so don't want to be half finished with our work.
@@ -505,7 +506,7 @@ namespace mongo {
     }
 
     void Lock::DBWrite::lockDB(const string& ns) {
-        verify( ns.size() );
+        fassert( 16253, !ns.empty() );
         Acquiring a( 'w' );
         _locked_W=false;
         _locked_w=false; 
@@ -539,7 +540,7 @@ namespace mongo {
     }
 
     void Lock::DBRead::lockDB(const string& ns) {
-        verify( ns.size() );
+        fassert( 16254, !ns.empty() );
         Acquiring a( 'r' );
         _locked_r=false; 
         _weLocked=0; 
@@ -645,6 +646,7 @@ namespace mongo {
     }
 
     void Lock::DBRead::lockOther(const string& db) {
+        fassert( 16255, !db.empty() );
         LockState& ls = lockState();
 
         // we do checks first, as on assert destructor won't be called so don't want to be half finished with our work.

@@ -406,6 +406,8 @@ namespace mongo {
         }
         else {
             try {
+                const NamespaceString nsString( ns );
+
                 // The following operations all require authorization.
                 // dbInsert, dbUpdate and dbDelete can be easily pre-authorized,
                 // here, but dbKillCursors cannot.
@@ -413,6 +415,10 @@ namespace mongo {
                     currentOp.ensureStarted();
                     logThreshold = 10;
                     receivedKillCursors(m);
+                }
+                else if ( !nsString.isValid() ) {
+                    // Only killCursors doesn't care about namespaces
+                    uassert( 16257, str::stream() << "Invalid ns [" << ns << "]", false );
                 }
                 else if ( ! c.getAuthenticationInfo()->isAuthorized(
                                   nsToDatabase( m.singleData()->_data + 4 ) ) ) {
@@ -644,6 +650,9 @@ namespace mongo {
         OpTime last;
         while( 1 ) {
             try {
+                const NamespaceString nsString( ns );
+                uassert( 16258, str::stream() << "Invalid ns [" << ns << "]", nsString.isValid() );
+
                 if (str::startsWith(ns, "local.oplog.")){
                     if (pass == 0) {
                         mutex::scoped_lock lk(OpTime::m);

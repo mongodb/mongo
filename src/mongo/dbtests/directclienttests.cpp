@@ -89,6 +89,54 @@ namespace DirectClientTests {
 
     };
 
+    class BadNSCmd : ClientBase {
+    public:
+        virtual void run(){
+            BSONObj result;
+            BSONObj cmdObj = BSON( "count" << "" );
+            ASSERT_THROWS( client().runCommand( "", cmdObj, result ), UserException );
+        }
+    };
+
+    class BadNSQuery : ClientBase {
+    public:
+        virtual void run(){
+            BSONObj result = client().query( "", Query(), 1 )->next();
+            ASSERT( result.hasField( "$err" ));
+        }
+    };
+
+    class BadNSGetMore : ClientBase {
+    public:
+        virtual void run(){
+            ASSERT( !client().getMore( "", 1, 1 )->more() );
+        }
+    };
+
+    class BadNSInsert : ClientBase {
+    public:
+        virtual void run(){
+            client().insert( "", BSONObj(), 0 );
+            ASSERT( !client().getLastError().empty() );
+        }
+    };
+
+    class BadNSUpdate : ClientBase {
+    public:
+        virtual void run(){
+            client().update( "", Query(), BSON( "$set" << BSON( "x" << 1 )) );
+            ASSERT( !client().getLastError().empty() );
+        }
+    };
+    
+    class BadNSRemove : ClientBase {
+    public:
+        virtual void run(){
+            client().remove( "", Query() );
+            ASSERT( !client().getLastError().empty() );
+        }
+    };
+
     class All : public Suite {
     public:
         All() : Suite( "directclient" ) {
@@ -96,6 +144,12 @@ namespace DirectClientTests {
         void setupTests() {
             add< Capped >();
             add< InsertMany >();
+            add< BadNSCmd >();
+            add< BadNSQuery >();
+            add< BadNSGetMore >();
+            add< BadNSInsert >();
+            add< BadNSUpdate >();
+            add< BadNSRemove >();
         }
     } myall;
 }

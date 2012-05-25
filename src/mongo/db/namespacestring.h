@@ -45,6 +45,13 @@ namespace mongo {
         bool isSystem() const { return strncmp(coll.c_str(), "system.", 7) == 0; }
         bool isCommand() const { return coll == "$cmd"; }
 
+        /**
+         * @return true if the namespace is valid. Special namespaces for internal use are considered as valid.
+         */
+        bool isValid() const {
+            return validDBName( db ) && !coll.empty();
+        }
+
         operator string() const { return ns(); }
 
         bool operator==( const string& nsIn ) const { return nsIn == ns(); }
