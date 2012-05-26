@@ -1305,6 +1305,8 @@ namespace mongo {
                 state = CLONE;
 
                 while ( true ) {
+                    assert( dbMutex.getState() == 0 );
+
                     BSONObj res;
                     if ( ! conn->runCommand( "admin" , BSON( "_migrateClone" << 1 ) , res ) ) {  // gets array of objects to copy, in disk order
                         state = FAIL;
@@ -1321,6 +1323,7 @@ namespace mongo {
                     BSONObjIterator i( arr );
                     while( i.more() ) {
                         BSONObj o = i.next().Obj();
+                        Timer t;
                         {
                             writelock lk( ns );
                             Helpers::upsert( ns, o, true );
@@ -1328,6 +1331,14 @@ namespace mongo {
                         thisTime++;
                         numCloned++;
                         clonedBytes += o.objsize();
+                        
+                        int micros =Client::recommendedYieldMicros();
+                        if ( micros == 0 )
+                            micros = 1;
+                        else
+                            micros += t.micros();
+                        sleepmicros( micros );
+                                
                     }
 
                     if ( thisTime == 0 )
