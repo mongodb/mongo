@@ -136,14 +136,29 @@ __wt_bm_close(WT_SESSION_IMPL *session)
  *	Write a buffer into a block, creating a snapshot.
  */
 int
-__wt_bm_snapshot(WT_SESSION_IMPL *session, WT_ITEM *buf, WT_SNAPSHOT *snap)
+__wt_bm_snapshot(WT_SESSION_IMPL *session, WT_ITEM *buf, WT_SNAPSHOT *snapbase)
 {
 	WT_BLOCK *block;
 
 	if ((block = session->btree->block) == NULL)
 		return (__bm_invalid(session));
 
-	return (__wt_block_snapshot(session, block, buf, snap));
+	return (__wt_block_snapshot(session, block, buf, snapbase));
+}
+
+/*
+ * __wt_bm_snapshot_resolve --
+ *	Resolve the snapshot.
+ */
+int
+__wt_bm_snapshot_resolve(WT_SESSION_IMPL *session, WT_SNAPSHOT *snapbase)
+{
+	WT_BLOCK *block;
+
+	if ((block = session->btree->block) == NULL)
+		return (__bm_invalid(session));
+
+	return (__wt_block_snapshot_resolve(session, block, snapbase));
 }
 
 /*

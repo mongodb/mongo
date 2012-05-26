@@ -121,12 +121,13 @@ struct __wt_block_snapshot {
 	off_t	 root_offset;			/* The root */
 	uint32_t root_cksum, root_size;
 
-	WT_EXTLIST  alloc;			/* Extents allocated */
-	WT_EXTLIST  avail;			/* Extents available */
-	WT_EXTLIST  discard;			/* Extents discarded */
+	WT_EXTLIST alloc;			/* Extents allocated */
+	WT_EXTLIST avail;			/* Extents available */
+	WT_EXTLIST discard;			/* Extents discarded */
 
-	off_t	 file_size;			/* Snapshot file size */
-	uint64_t snapshot_size;			/* Snapshot contents */
+	off_t	   file_size;			/* Snapshot file size */
+	uint64_t   snapshot_size;		/* Snapshot byte count */
+	WT_EXTLIST snapshot_avail;		/* Snapshot free'd extents */
 
 	uint64_t write_gen;			/* Write generation */
 };
@@ -143,22 +144,23 @@ struct __wt_block {
 	uint32_t allocsize;		/* Allocation size */
 	int	 checksum;		/* If checksums configured */
 
-	WT_SPINLOCK	  live_lock;	/* Lock to protect the live snapshot. */
+	WT_SPINLOCK	  live_lock;	/* Lock to protect the live snapshot */
 	WT_BLOCK_SNAPSHOT live;		/* Live snapshot */
 	int		  live_load;	/* Live snapshot loaded */
 
 	WT_COMPRESSOR *compressor;	/* Page compressor */
 
-					/* Salvage support */
-	int	slvg;			/* If performing salvage. */
+				/* Salvage support */
+	int	slvg;			/* If performing salvage */
 	off_t	slvg_off;		/* Salvage file offset */
 
-	int	 verify;		/* Verification support */
-	off_t	 verify_size;		/* Snapshot's file size */
+				/* Verification support */
+	int	   verify;		/* If performing verification */
+	off_t	   verify_size;		/* Snapshot's file size */
 	WT_EXTLIST verify_alloc;	/* Verification allocation list */
-	uint32_t frags;			/* Maximum frags in the file */
-	uint8_t *fragfile;		/* Per-file frag tracking list */
-	uint8_t *fragsnap;		/* Per-snapshot frag tracking list */
+	uint32_t   frags;		/* Maximum frags in the file */
+	uint8_t   *fragfile;		/* Per-file frag tracking list */
+	uint8_t   *fragsnap;		/* Per-snapshot frag tracking list */
 };
 
 /*

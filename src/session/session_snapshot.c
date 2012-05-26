@@ -244,8 +244,10 @@ nomatch:		WT_ERR_MSG(session,
 		if (force)
 			WT_ERR_MSG(session,
 			    EINVAL, "cache flush failed to create a snapshot");
-	} else
+	} else {
 		WT_ERR(__wt_meta_snaplist_set(session, btree->name, snapbase));
+		WT_ERR(__wt_bm_snapshot_resolve(session, snapbase));
+	}
 
 err:	__wt_meta_snaplist_free(session, snapbase);
 	__wt_rwunlock(session, btree->snaplock);
