@@ -311,10 +311,12 @@ namespace mongo {
         
         while ( true ) {
             
-            int micros = ( t.micros() * 8 ) + Client::recommendedYieldMicros();
+            int micros = ( t.micros() * 12 ) + ( 2 * Client::recommendedYieldMicros() );
             
             LOG(1) << "Helpers::removeRangeUnlocked going to sleep for " << micros << "micros" << endl;
             sleepmicros( micros );
+
+            t.reset();
             
             if ( recordToTouch ) {
                 assert( fileLock.get() );
@@ -322,8 +324,6 @@ namespace mongo {
                 recordToTouch = NULL;
                 fileLock.reset(0);
             }
-
-            t.reset();
 
             writelock lk( ns );
             Client::Context ctx(ns);
