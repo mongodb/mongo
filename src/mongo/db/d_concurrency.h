@@ -73,16 +73,12 @@ namespace mongo {
         // i.e. you could grab globalread after globalwrite.
         
         class GlobalWrite : public ScopedLock {
-            bool stoppedGreed;
             bool noop;
         protected:
             void tempRelease();
             void relock();
         public:
-            /** @param stopGreed after acquisition stop greediness of other threads for write locks. this 
-                should generally not be used it is for exceptional circumstances. journaling uses it. 
-                perhaps this should go away it makes the software more complicated.
-            */
+            // stopGreed is removed and does NOT work
             // timeoutms is only for writelocktry -- deprecated -- do not use
             GlobalWrite(bool stopGreed = false, int timeoutms = -1 ); 
             virtual ~GlobalWrite();

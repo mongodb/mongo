@@ -54,15 +54,12 @@ namespace mongo {
         boost::mutex m;
         Z r,w,R,W,U,X;
         int numPendingGlobalWrites;  // >0 if someone wants to acquire a write lock
-        bool areGlobalWritesGreedy;
         long long generationX;
         long long generationXExit;
-        void _start_greed();  // we are already inlock for these underscore methods
-        void _stop_greed();
         void _lock_W();
         void _unlock_R();
         bool _areQueueJumpingGlobalWritesPending() const {
-            return areGlobalWritesGreedy && numPendingGlobalWrites > 0;
+            return numPendingGlobalWrites > 0;
         }
 
         bool W_legal() const { return r.n + w.n + R.n + W.n + X.n == 0; }
@@ -78,7 +75,6 @@ namespace mongo {
             return !_areQueueJumpingGlobalWritesPending() && w_legal_ignore_greed();
         }
 
-
         bool r_legal() const {
             return !_areQueueJumpingGlobalWritesPending() && r_legal_ignore_greed();
         }
@@ -90,7 +86,6 @@ namespace mongo {
     public:
         QLock() :
             numPendingGlobalWrites(0),
-            areGlobalWritesGreedy(true),
             generationX(0),
             generationXExit(0) {
         }
@@ -101,11 +96,9 @@ namespace mongo {
         bool lock_R_try(int millis);
         void lock_W();
         bool lock_W_try(int millis);
-        void lock_W_stop_greed();
         void unlock_r();
         void unlock_w();
         void unlock_R();
-        void unlock_R_start_greed();
         void unlock_W();
         void W_to_R();
         void R_to_W(); // caution see notes below
@@ -154,14 +147,6 @@ namespace mongo {
         if ( r_legal_ignore_greed() && i_block(me, 'r') ) {
             r.c.notify_all();
         }
-    }
-
-    inline void QLock::_stop_greed() {
-        areGlobalWritesGreedy = false;
-    }
-
-    inline void QLock::_start_greed() {
-        areGlobalWritesGreedy = true;
     }
 
     // "i will be reading. i promise to coordinate my activities with w's as i go with more 
@@ -256,16 +241,12 @@ namespace mongo {
 
         U.n = 1;
 
-        bool wereGlobalWritesGreedy = areGlobalWritesGreedy;
-        _start_greed();
         ++numPendingGlobalWrites;
 
         while( W.n + R.n + w.n + r.n > 1 ) {
             U.c.wait(m);
         }
         --numPendingGlobalWrites;
-        if (!wereGlobalWritesGreedy)
-            _stop_greed();
 
         fassert(16209, R.n == 1);
         fassert(16210, W.n == 0);
@@ -280,7 +261,6 @@ namespace mongo {
         boost::mutex::scoped_lock lk(m);
 
         fassert( 16212, w.n > 0 );
-        fassert( 16213, areGlobalWritesGreedy );
 
         ++X.n;
         --w.n;
@@ -303,7 +283,6 @@ namespace mongo {
 
         fassert( 16216, R.n == 0 );
         fassert( 16217, w.n > 0 );
-        fassert( 16218, areGlobalWritesGreedy );
         return false;
     }
 
@@ -334,11 +313,6 @@ namespace mongo {
         boost::mutex::scoped_lock lk(m);
         _lock_W();
     }
-    inline void QLock::lock_W_stop_greed() {
-        boost::mutex::scoped_lock lk(m);
-        _lock_W();
-        _stop_greed();
-    }
 
     inline void QLock::unlock_r() {
         boost::mutex::scoped_lock lk(m);
@@ -358,12 +332,6 @@ namespace mongo {
         _unlock_R();
     }
 
-    inline void QLock::unlock_R_start_greed() {
-        boost::mutex::scoped_lock lk(m);
-        _unlock_R();
-        _start_greed();
-    }
-
     inline void QLock::_unlock_R() {
         fassert(16139, R.n > 0);
         --R.n;
@@ -374,7 +342,6 @@ namespace mongo {
         boost::mutex::scoped_lock lk(m);
         fassert(16140, W.n == 1);
         --W.n;
-        _start_greed();
         notifyWeUnlocked('W');
     }
 

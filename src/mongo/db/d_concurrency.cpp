@@ -152,17 +152,6 @@ namespace mongo {
             locked_W();
         }
 
-        void lock_W_stop_greed() {
-            verify( threadState() == 0 );
-            lockState().locked( 'W' );
-            {
-                Acquiring a1('W');
-                LockStat::Acquiring a2(stats,'W'); 
-                q.lock_W_stop_greed(); 
-            }
-            locked_W();
-        }
-
         // how to count try's that fail is an interesting question. we should get rid of try().
         bool lock_R_try(int millis) { 
             verify( threadState() == 0 );
@@ -199,9 +188,7 @@ namespace mongo {
             q.unlock_w(); 
         }
 
-        void unlock_R() { _unlock_R(false); }
-
-        void unlock_R_start_greed() { _unlock_R(true); }
+        void unlock_R() { _unlock_R(); }
 
         void unlock_W() {
             wassert( threadState() == 'W' );
@@ -218,14 +205,11 @@ namespace mongo {
         void X_to_w() { q.X_to_w(); }
 
     private:
-        void _unlock_R(bool startGreed) {
+        void _unlock_R() {
             wassert( threadState() == 'R' );
             lockState().unlocked();
             stats.unlocking('R'); 
-            if (startGreed)
-                q.unlock_R_start_greed();
-            else
-                q.unlock_R(); 
+            q.unlock_R(); 
         }
     };
 
@@ -349,7 +333,6 @@ namespace mongo {
         char ts = threadState();
         fassert(16122, ts != 'R'); // indicates downgraded; not allowed with temprelease
         fassert(16123, ts == 'W');
-        fassert(16124, !stoppedGreed); // not allowed with temprelease
         qlk.unlock_W();
     }
     void Lock::GlobalWrite::relock() { 
@@ -385,23 +368,17 @@ namespace mongo {
         lockDB(_what);
     }
 
-    Lock::GlobalWrite::GlobalWrite(bool sg, int timeoutms) : 
-        stoppedGreed(sg)
+    Lock::GlobalWrite::GlobalWrite(bool sg, int timeoutms)
     {
+        dassert( !sg );
         char ts = threadState();
         noop = false;
         if( ts == 'W' ) { 
             noop = true;
-            DEV if( sg ) { 
-                log() << "info Lock::GlobalWrite does not stop greed on recursive invocation" << endl;
-            }
             return;
         }
         dassert( ts == 0 );
-        if( sg ) {
-            qlk.lock_W_stop_greed();
-        } 
-        else if ( timeoutms != -1 ) {
+        if ( timeoutms != -1 ) {
             bool success = qlk.lock_W_try( timeoutms );
             if ( !success ) throw DBTryLockTimeoutException(); 
         }
@@ -414,10 +391,7 @@ namespace mongo {
             return;
         }
         if( threadState() == 'R' ) { // we downgraded
-            if (stoppedGreed)
-                qlk.unlock_R_start_greed();
-            else
-                qlk.unlock_R();
+            qlk.unlock_R();
         }
         else {
             qlk.unlock_W();
