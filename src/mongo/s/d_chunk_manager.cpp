@@ -75,7 +75,7 @@ namespace mongo {
             conn = direct.get();
         }
         else {
-            scoped.reset( new ScopedDbConnection( configServer, 30.0 ) );
+            scoped.reset( ScopedDbConnection::getScopedDbConnection( configServer, 30.0 ) );
             conn = scoped->get();
         }
 

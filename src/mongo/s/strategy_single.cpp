@@ -100,14 +100,15 @@ namespace mongo {
             // we used ScopedDbConnection because we don't get about config versions
             // not deleting data is handled elsewhere
             // and we don't want to call setShardVersion
-            ScopedDbConnection conn( cursorCache.getRef( id ) );
+            scoped_ptr<ScopedDbConnection> conn(
+                    ScopedDbConnection::getScopedDbConnection( cursorCache.getRef( id ) ) );
 
             Message response;
-            bool ok = conn->callRead( r.m() , response);
+            bool ok = conn->get()->callRead( r.m() , response);
             uassert( 10204 , "dbgrid: getmore: error calling db", ok);
             r.reply( response , "" /*conn->getServerAddress() */ );
 
-            conn.done();
+            conn->done();
 
         }
 
@@ -136,8 +137,9 @@ namespace mongo {
 
                 for ( unsigned i=0; i<shards.size(); i++ ) {
                     Shard shard = shards[i];
-                    ScopedDbConnection conn( shard );
-                    BSONObj temp = conn->findOne( r.getns() , q.query );
+                    scoped_ptr<ScopedDbConnection> conn(
+                            ScopedDbConnection::getScopedDbConnection( shard.getConnString() ) );
+                    BSONObj temp = conn->get()->findOne( r.getns() , q.query );
                     if ( temp["inprog"].isABSONObj() ) {
                         BSONObjIterator i( temp["inprog"].Obj() );
                         while ( i.more() ) {
@@ -161,7 +163,7 @@ namespace mongo {
                             arr.append( x.obj() );
                         }
                     }
-                    conn.done();
+                    conn->done();
                 }
 
                 arr.done();
@@ -190,9 +192,10 @@ namespace mongo {
                         log() << "want to kill op: " << e << endl;
                         Shard s(shard);
 
-                        ScopedDbConnection conn( s );
-                        conn->findOne( r.getns() , BSON( "op" << opid ) );
-                        conn.done();
+                        scoped_ptr<ScopedDbConnection> conn(
+                                ScopedDbConnection::getScopedDbConnection( s.getConnString() ) );
+                        conn->get()->findOne( r.getns() , BSON( "op" << opid ) );
+                        conn->done();
                     }
                 }
             }

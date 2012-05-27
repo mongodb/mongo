@@ -313,13 +313,18 @@ namespace mongo {
                 BSONArrayBuilder barr;
                 barr.append( shardedColls );
 
-                ScopedDbConnection toconn( s.getConnString() );
+                scoped_ptr<ScopedDbConnection> toconn(
+                        ScopedDbConnection::getScopedDbConnection( s.getConnString() ) );
 
                 // TODO ERH - we need a clone command which replays operations from clone start to now
                 //            can just use local.oplog.$main
                 BSONObj cloneRes;
-                bool worked = toconn->runCommand( dbname.c_str() , BSON( "clone" << config->getPrimary().getConnString() << "collsToIgnore" << barr.arr() ) , cloneRes );
-                toconn.done();
+                bool worked = toconn->get()->runCommand(
+                    dbname.c_str(),
+                    BSON( "clone" << config->getPrimary().getConnString() <<
+                          "collsToIgnore" << barr.arr() ),
+                    cloneRes );
+                toconn->done();
 
                 if ( ! worked ) {
                     log() << "clone failed" << cloneRes << endl;
@@ -329,7 +334,9 @@ namespace mongo {
 
                 string oldPrimary = config->getPrimary().getConnString();
 
-                ScopedDbConnection fromconn( config->getPrimary() );
+                scoped_ptr<ScopedDbConnection> fromconn(
+                        ScopedDbConnection::getScopedDbConnection( config->getPrimary()
+                                                                   .getConnString() ) );
 
                 config->setPrimary( s.getConnString() );
 
@@ -339,7 +346,7 @@ namespace mongo {
                     log() << "movePrimary dropping database on " << oldPrimary << ", no sharded collections in " << dbname << endl;
 
                     try {
-                        fromconn->dropDatabase( dbname.c_str() );
+                        fromconn->get()->dropDatabase( dbname.c_str() );
                     }
                     catch( DBException& e ){
                         e.addContext( str::stream() << "movePrimary could not drop the database " << dbname << " on " << oldPrimary );
@@ -365,7 +372,7 @@ namespace mongo {
                         if( el.type() == String ){
                             try {
                                 log() << "movePrimary dropping cloned collection " << el.String() << " on " << oldPrimary << endl;
-                                fromconn->dropCollection( el.String() );
+                                fromconn->get()->dropCollection( el.String() );
                             }
                             catch( DBException& e ){
                                 e.addContext( str::stream() << "movePrimary could not drop the cloned collection " << el.String() << " on " << oldPrimary );
@@ -375,7 +382,7 @@ namespace mongo {
                     }
                 }
 
-                fromconn.done();
+                fromconn->done();
 
                 result << "primary " << s.toString();
 
@@ -504,13 +511,16 @@ namespace mongo {
                     bool hasShardIndex = false;
                     bool hasUniqueShardIndex = false;
 
-                    ScopedDbConnection conn( config->getPrimary() );
+                    scoped_ptr<ScopedDbConnection> conn(
+                            ScopedDbConnection::getScopedDbConnection( config->getPrimary()
+                                                                       .getConnString() ) );
                     BSONObjBuilder b;
                     b.append( "ns" , ns );
 
                     BSONArrayBuilder allIndexes;
 
-                    auto_ptr<DBClientCursor> cursor = conn->query( config->getName() + ".system.indexes" , b.obj() );
+                    auto_ptr<DBClientCursor> cursor = conn->get()->query(
+                        config->getName() + ".system.indexes" , b.obj() );
                     while ( cursor->more() ) {
                         BSONObj idx = cursor->next();
 
@@ -525,7 +535,7 @@ namespace mongo {
 
                             if( idx["sparse"].trueValue() ){
                                 errmsg = (string)"can't shard collection " + ns + " with sparse shard key index";
-                                conn.done();
+                                conn->done();
                                 return false;
                             }
 
@@ -544,20 +554,21 @@ namespace mongo {
 
                         errmsg = str::stream() << "can't shard collection '" << ns << "' with unique index on: " + idx.toString()
                                                << ", uniqueness can't be maintained across unless shard key index is a prefix";
-                        conn.done();
+                        conn->done();
                         return false;
                     }
 
                     if( careAboutUnique && hasShardIndex && ! hasUniqueShardIndex ){
                         errmsg = (string)"can't shard collection " + ns + ", shard key index not unique and unique index explicitly specified";
-                        conn.done();
+                        conn->done();
                         return false;
                     }
 
-                    BSONObj res = conn->findOne( config->getName() + ".system.namespaces" , BSON( "name" << ns ) );
+                    BSONObj res = conn->get()->findOne( config->getName() + ".system.namespaces",
+                                                        BSON( "name" << ns ) );
                     if ( res["options"].type() == Object && res["options"].embeddedObject()["capped"].trueValue() ) {
                         errmsg = "can't shard capped collection";
-                        conn.done();
+                        conn->done();
                         return false;
                     }
 
@@ -567,22 +578,22 @@ namespace mongo {
                         cmd.append( "checkShardingIndex" , ns );
                         cmd.append( "keyPattern" , key );
                         BSONObj cmdObj = cmd.obj();
-                        if ( ! conn->runCommand( "admin" , cmdObj , res )) {
+                        if ( ! conn->get()->runCommand( "admin" , cmdObj , res )) {
                             errmsg = res["errmsg"].str();
-                            conn.done();
+                            conn->done();
                             return false;
                         }
                     }
 
-                    if ( ! hasShardIndex && ( conn->count( ns ) != 0 ) ) {
+                    if ( ! hasShardIndex && ( conn->get()->count( ns ) != 0 ) ) {
                         errmsg = "please create an index over the sharding key before sharding.";
                         result.append( "proposedKey" , key );
                         result.appendArray( "curIndexes" , allIndexes.done() );
-                        conn.done();
+                        conn->done();
                         return false;
                     }
 
-                    conn.done();
+                    conn->done();
                 }
 
                 tlog() << "CMD: shardcollection: " << cmdObj << endl;
@@ -811,17 +822,19 @@ namespace mongo {
                 help << "list all shards of the system";
             }
             bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
-                ScopedDbConnection conn( configServer.getPrimary() );
+                scoped_ptr<ScopedDbConnection> conn(
+                        ScopedDbConnection::getScopedDbConnection( configServer.getPrimary()
+                                                                   .getConnString() ) );
 
                 vector<BSONObj> all;
-                auto_ptr<DBClientCursor> cursor = conn->query( "config.shards" , BSONObj() );
+                auto_ptr<DBClientCursor> cursor = conn->get()->query( "config.shards" , BSONObj() );
                 while ( cursor->more() ) {
                     BSONObj o = cursor->next();
                     all.push_back( o );
                 }
 
                 result.append("shards" , all );
-                conn.done();
+                conn->done();
 
                 return true;
             }
@@ -903,7 +916,10 @@ namespace mongo {
                     return false;
                 }
 
-                ScopedDbConnection conn( configServer.getPrimary() );
+                scoped_ptr<ScopedDbConnection> connPtr(
+                        ScopedDbConnection::getScopedDbConnection( configServer.getPrimary()
+                                                                   .getConnString() ) );
+                ScopedDbConnection& conn = *connPtr;
 
                 if (conn->count("config.shards", BSON("_id" << NE << s.getName() << ShardFields::draining(true)))){
                     conn.done();
@@ -1219,9 +1235,11 @@ namespace mongo {
             }
             
             if ( sizes.find( "config" ) == sizes.end() ){
-                ScopedDbConnection conn( configServer.getPrimary() );
+                scoped_ptr<ScopedDbConnection> conn(
+                        ScopedDbConnection::getScopedDbConnection( configServer.getPrimary()
+                                                                   .getConnString() ) );
                 BSONObj x;
-                if ( conn->simpleCommand( "config" , &x , "dbstats" ) ){
+                if ( conn->get()->simpleCommand( "config" , &x , "dbstats" ) ){
                     BSONObjBuilder b;
                     b.append( "name" , "config" );
                     b.appendBool( "empty" , false );
@@ -1234,7 +1252,7 @@ namespace mongo {
                 else {
                     bb.append( BSON( "name" << "config" ) );
                 }
-                conn.done();
+                conn->done();
             }
 
             bb.done();

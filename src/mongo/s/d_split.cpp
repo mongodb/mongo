@@ -620,17 +620,21 @@ namespace mongo {
             string shard;
             ChunkInfo origChunk;
             {
-                ScopedDbConnection conn( shardingState.getConfigServer() );
+                scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::getScopedDbConnection(
+                        shardingState.getConfigServer() ) );
 
-                BSONObj x = conn->findOne( ShardNS::chunk , Query( BSON( "ns" << ns ) ).sort( BSON( "lastmod" << -1 ) ) );
+                BSONObj x = conn->get()->findOne( ShardNS::chunk,
+                                                  Query( BSON( "ns" << ns ) )
+                                                      .sort( BSON( "lastmod" << -1 ) ) );
                 maxVersion = ShardChunkVersion::fromBSON( x, "lastmod" );
 
-                BSONObj currChunk = conn->findOne( ShardNS::chunk , shardId.wrap( "_id" ) ).getOwned();
+                BSONObj currChunk = conn->get()->findOne( ShardNS::chunk , shardId.wrap( "_id" ) )
+                    .getOwned();
                 verify( currChunk["shard"].type() );
                 verify( currChunk["min"].type() );
                 verify( currChunk["max"].type() );
                 shard = currChunk["shard"].String();
-                conn.done();
+                conn->done();
 
                 BSONObj currMin = currChunk["min"].Obj();
                 BSONObj currMax = currChunk["max"].Obj();
@@ -759,9 +763,10 @@ namespace mongo {
             bool ok;
             BSONObj cmdResult;
             {
-                ScopedDbConnection conn( shardingState.getConfigServer() );
-                ok = conn->runCommand( "config" , cmd , cmdResult );
-                conn.done();
+                scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::getScopedDbConnection(
+                        shardingState.getConfigServer() ) );
+                ok = conn->get()->runCommand( "config" , cmd , cmdResult );
+                conn->done();
             }
 
             if ( ! ok ) {

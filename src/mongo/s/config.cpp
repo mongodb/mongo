@@ -301,10 +301,11 @@ namespace mongo {
         
         BSONObj newest;
         if ( oldVersion.isSet() && ! forceReload ) {
-            ScopedDbConnection conn( configServer.modelServer() , 30.0 );
-            newest = conn->findOne( ShardNS::chunk , 
-                                    Query( BSON( "ns" << ns ) ).sort( "lastmod" , -1 ) );
-            conn.done();
+            scoped_ptr<ScopedDbConnection> conn(
+                    ScopedDbConnection::getScopedDbConnection( configServer.modelServer(), 30.0 ) );
+            newest = conn->get()->findOne( ShardNS::chunk ,
+                                           Query( BSON( "ns" << ns ) ).sort( "lastmod" , -1 ) );
+            conn->done();
             
             if ( ! newest.isEmpty() ) {
                 ShardChunkVersion v = ShardChunkVersion::fromBSON( newest["lastmod"] );
@@ -409,12 +410,13 @@ namespace mongo {
     }
 
     bool DBConfig::_load() {
-        ScopedDbConnection conn( configServer.modelServer(), 30.0 );
+        scoped_ptr<ScopedDbConnection> conn(
+                ScopedDbConnection::getScopedDbConnection( configServer.modelServer(), 30.0 ) );
 
-        BSONObj o = conn->findOne( ShardNS::database , BSON( "_id" << _name ) );
+        BSONObj o = conn->get()->findOne( ShardNS::database , BSON( "_id" << _name ) );
 
         if ( o.isEmpty() ) {
-            conn.done();
+            conn->done();
             return false;
         }
 
@@ -423,7 +425,7 @@ namespace mongo {
         BSONObjBuilder b;
         b.appendRegex( "_id" , (string)"^" + pcrecpp::RE::QuoteMeta( _name ) + "\\." );
 
-        auto_ptr<DBClientCursor> cursor = conn->query( ShardNS::collection, b.obj() );
+        auto_ptr<DBClientCursor> cursor = conn->get()->query( ShardNS::collection, b.obj() );
         verify( cursor.get() );
         while ( cursor->more() ) {
             BSONObj o = cursor->next();
@@ -431,13 +433,14 @@ namespace mongo {
             else _collections[o["_id"].String()] = CollectionInfo( o );
         }
 
-        conn.done();
+        conn->done();
 
         return true;
     }
 
     void DBConfig::_save( bool db, bool coll ) {
-        ScopedDbConnection conn( configServer.modelServer(), 30.0 );
+        scoped_ptr<ScopedDbConnection> conn(
+                ScopedDbConnection::getScopedDbConnection( configServer.modelServer(), 30.0 ) );
 
         if( db ){
 
@@ -448,8 +451,8 @@ namespace mongo {
                 n = b.obj();
             }
 
-            conn->update( ShardNS::database , BSON( "_id" << _name ) , n , true );
-            string err = conn->getLastError();
+            conn->get()->update( ShardNS::database , BSON( "_id" << _name ) , n , true );
+            string err = conn->get()->getLastError();
             uassert( 13396 , (string)"DBConfig save failed: " + err , err.size() == 0 );
 
         }
@@ -459,12 +462,12 @@ namespace mongo {
             for ( Collections::iterator i=_collections.begin(); i!=_collections.end(); ++i ) {
                 if ( ! i->second.isDirty() )
                     continue;
-                i->second.save( i->first , conn.get() );
+                i->second.save( i->first , conn->get() );
             }
 
         }
 
-        conn.done();
+        conn->done();
     }
 
     bool DBConfig::reload() {
@@ -498,16 +501,17 @@ namespace mongo {
         // 2
         grid.removeDB( _name );
         {
-            ScopedDbConnection conn( configServer.modelServer(), 30.0 );
-            conn->remove( ShardNS::database , BSON( "_id" << _name ) );
-            errmsg = conn->getLastError();
+            scoped_ptr<ScopedDbConnection> conn(
+                    ScopedDbConnection::getScopedDbConnection(configServer.modelServer(), 30.0 ) );
+            conn->get()->remove( ShardNS::database , BSON( "_id" << _name ) );
+            errmsg = conn->get()->getLastError();
             if ( ! errmsg.empty() ) {
                 log() << "could not drop '" << _name << "': " << errmsg << endl;
-                conn.done();
+                conn->done();
                 return false;
             }
 
-            conn.done();
+            conn->done();
         }
 
         if ( ! configServer.allUp( errmsg ) ) {
@@ -530,24 +534,26 @@ namespace mongo {
 
         // 4
         {
-            ScopedDbConnection conn( _primary, 30.0 );
+            scoped_ptr<ScopedDbConnection> conn(
+                    ScopedDbConnection::getScopedDbConnection( _primary.getConnString(), 30.0 ) );
             BSONObj res;
-            if ( ! conn->dropDatabase( _name , &res ) ) {
+                if ( ! conn->get()->dropDatabase( _name , &res ) ) {
                 errmsg = res.toString();
                 return 0;
             }
-            conn.done();
+            conn->done();
         }
 
         // 5
         for ( set<Shard>::iterator i=allServers.begin(); i!=allServers.end(); i++ ) {
-            ScopedDbConnection conn( *i, 30.0 );
+            scoped_ptr<ScopedDbConnection> conn(
+                    ScopedDbConnection::getScopedDbConnection( i->getConnString(), 30.0 ) );
             BSONObj res;
-            if ( ! conn->dropDatabase( _name , &res ) ) {
+            if ( ! conn->get()->dropDatabase( _name , &res ) ) {
                 errmsg = res.toString();
                 return 0;
             }
-            conn.done();
+            conn->done();
         }
 
         LOG(1) << "\t dropped primary db for: " << _name << endl;
@@ -678,17 +684,18 @@ namespace mongo {
         for ( unsigned i=0; i<_config.size(); i++ ) {
             BSONObj x;
             try {
-                ScopedDbConnection conn( _config[i], 30.0 );
+                scoped_ptr<ScopedDbConnection> conn(
+                        ScopedDbConnection::getScopedDbConnection( _config[i], 30.0 ) );
 
                 // check auth
-                conn->update("config.foo.bar", BSONObj(), BSON("x" << 1));
-                conn->simpleCommand( "admin", &x, "getlasterror");
+                conn->get()->update("config.foo.bar", BSONObj(), BSON("x" << 1));
+                conn->get()->simpleCommand( "admin", &x, "getlasterror");
                 if (x["err"].type() == String && x["err"].String() == "unauthorized") {
                     errmsg = "not authorized, did you start with --keyFile?";
                     return false;
                 }
 
-                if ( ! conn->simpleCommand( "config" , &x , "dbhash" ) )
+                if ( ! conn->get()->simpleCommand( "config" , &x , "dbhash" ) )
                     x = BSONObj();
                 else {
                     x = x.getOwned();
@@ -696,7 +703,7 @@ namespace mongo {
                         firstGood = i;
                     up++;
                 }
-                conn.done();
+                conn->done();
             }
             catch ( SocketException& e ) {
                 warning() << " couldn't check on config server:" << _config[i] << " ok for now : " << e.toString() << endl;
@@ -768,9 +775,10 @@ namespace mongo {
 
     bool ConfigServer::allUp( string& errmsg ) {
         try {
-            ScopedDbConnection conn( _primary, 30.0 );
-            conn->getLastError();
-            conn.done();
+            scoped_ptr<ScopedDbConnection> conn(
+                    ScopedDbConnection::getScopedDbConnection( _primary.getConnString(), 30.0 ) );
+            conn->get()->getLastError();
+            conn->done();
             return true;
         }
         catch ( DBException& ) {
@@ -782,9 +790,10 @@ namespace mongo {
     }
 
     int ConfigServer::dbConfigVersion() {
-        ScopedDbConnection conn( _primary, 30.0 );
-        int version = dbConfigVersion( conn.conn() );
-        conn.done();
+        scoped_ptr<ScopedDbConnection> conn(
+                ScopedDbConnection::getScopedDbConnection( _primary.getConnString(), 30.0 ) );
+        int version = dbConfigVersion( conn->conn() );
+        conn->done();
         return version;
     }
 
@@ -808,11 +817,12 @@ namespace mongo {
     void ConfigServer::reloadSettings() {
         set<string> got;
 
-        ScopedDbConnection conn( _primary, 30.0 );
+        scoped_ptr<ScopedDbConnection> conn(
+                ScopedDbConnection::getScopedDbConnection( _primary.getConnString(), 30.0 ) );
         
         try {
             
-            auto_ptr<DBClientCursor> c = conn->query( ShardNS::settings , BSONObj() );
+            auto_ptr<DBClientCursor> c = conn->get()->query( ShardNS::settings , BSONObj() );
             verify( c.get() );
             while ( c->more() ) {
                 
@@ -841,17 +851,20 @@ namespace mongo {
             }
 
             if ( ! got.count( "chunksize" ) ) {
-                conn->insert( ShardNS::settings , BSON( "_id" << "chunksize"  <<
-                                                        "value" << (Chunk::MaxChunkSize / ( 1024 * 1024 ) ) ) );
+                conn->get()->insert( ShardNS::settings,
+                                     BSON( "_id" << "chunksize"  <<
+                                           "value" << (Chunk::MaxChunkSize / ( 1024 * 1024 ) ) ) );
             }
 
             // indexes
-            conn->ensureIndex( ShardNS::chunk , BSON( "ns" << 1 << "min" << 1 ) , true );
-            conn->ensureIndex( ShardNS::chunk , BSON( "ns" << 1 << "shard" << 1 << "min" << 1 ) , true );
-            conn->ensureIndex( ShardNS::chunk , BSON( "ns" << 1 << "lastmod" << 1 ) , true );
-            conn->ensureIndex( ShardNS::shard , BSON( "host" << 1 ) , true );
-                
-            conn.done();
+            conn->get()->ensureIndex( ShardNS::chunk, BSON( "ns" << 1 << "min" << 1 ), true );
+            conn->get()->ensureIndex( ShardNS::chunk,
+                                      BSON( "ns" << 1 << "shard" << 1 << "min" << 1 ),
+                                      true );
+            conn->get()->ensureIndex( ShardNS::chunk, BSON( "ns" << 1 << "lastmod" << 1 ), true );
+            conn->get()->ensureIndex( ShardNS::shard, BSON( "host" << 1 ), true );
+
+            conn->done();
         }
         catch ( DBException& e ) {
             warning() << "couldn't load settings or create indexes on config db: " << e.what() << endl;
@@ -893,12 +906,13 @@ namespace mongo {
 
             verify( _primary.ok() );
 
-            ScopedDbConnection conn( _primary, 30.0 );
+            scoped_ptr<ScopedDbConnection> conn(
+                    ScopedDbConnection::getScopedDbConnection( _primary.getConnString(), 30.0 ) );
 
             static bool createdCapped = false;
             if ( ! createdCapped ) {
                 try {
-                    conn->createCollection( "config.changelog" , 1024 * 1024 * 10 , true );
+                    conn->get()->createCollection( "config.changelog" , 1024 * 1024 * 10 , true );
                 }
                 catch ( UserException& e ) {
                     LOG(1) << "couldn't create changelog (like race condition): " << e << endl;
@@ -907,9 +921,9 @@ namespace mongo {
                 createdCapped = true;
             }
 
-            conn->insert( "config.changelog" , msg );
+            conn->get()->insert( "config.changelog" , msg );
 
-            conn.done();
+            conn->done();
 
         }
 
@@ -926,9 +940,12 @@ namespace mongo {
                 log(1) << "replicaSetChange: shard not found for set: " << monitor->getServerAddress() << endl;
                 return;
             }
-            ScopedDbConnection conn( configServer.getConnectionString(), 30.0 );
-            conn->update( ShardNS::shard , BSON( "_id" << s.getName() ) , BSON( "$set" << BSON( "host" << monitor->getServerAddress() ) ) );
-            conn.done();
+            scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::getScopedDbConnection(
+                    configServer.getConnectionString().toString(), 30.0 ) );
+            conn->get()->update( ShardNS::shard,
+                                 BSON( "_id" << s.getName() ),
+                                 BSON( "$set" << BSON( "host" << monitor->getServerAddress() ) ) );
+            conn->done();
         }
         catch ( DBException & ) {
             error() << "RSChangeWatcher: could not update config db for set: " << monitor->getName() << " to: " << monitor->getServerAddress() << endl;

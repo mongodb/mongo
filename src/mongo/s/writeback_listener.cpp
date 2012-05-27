@@ -122,17 +122,18 @@ namespace mongo {
             }
 
             try {
-                ScopedDbConnection conn( _addr );
+                scoped_ptr<ScopedDbConnection> conn(
+                        ScopedDbConnection::getScopedDbConnection( _addr ) );
 
                 BSONObj result;
 
                 {
                     BSONObjBuilder cmd;
                     cmd.appendOID( "writebacklisten" , &serverID ); // Command will block for data
-                    if ( ! conn->runCommand( "admin" , cmd.obj() , result ) ) {
+                    if ( ! conn->get()->runCommand( "admin" , cmd.obj() , result ) ) {
                         result = result.getOwned();
                         log() <<  "writebacklisten command failed!  "  << result << endl;
-                        conn.done();
+                        conn->done();
                         continue;
                     }
 
@@ -267,7 +268,7 @@ namespace mongo {
                     log() << "unknown writeBack result: " << result << endl;
                 }
 
-                conn.done();
+                conn->done(); // TODO: move this further up?
                 secsToSleep = 0;
                 continue;
             }

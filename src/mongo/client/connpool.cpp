@@ -403,16 +403,6 @@ namespace mongo {
         }
     }
 
-    ScopedDbConnection::ScopedDbConnection(const Shard& shard, double socketTimeout )
-        : _host( shard.getConnString() ) , _conn( pool.get(_host, socketTimeout) ), _socketTimeout( socketTimeout ) {
-        _setSocketTimeout();
-    }
-
-    ScopedDbConnection::ScopedDbConnection(const Shard* shard, double socketTimeout )
-        : _host( shard->getConnString() ) , _conn( pool.get(_host, socketTimeout) ), _socketTimeout( socketTimeout ) {
-        _setSocketTimeout();
-    }
-
     AtomicUInt AScopedConnection::_numConnections;
 
 } // namespace mongo

@@ -155,7 +155,8 @@ namespace mongo {
 
     void Chunk::pickMedianKey( BSONObj& medianKey ) const {
         // Ask the mongod holding this chunk to figure out the split points.
-        ScopedDbConnection conn( getShard().getConnString() );
+        scoped_ptr<ScopedDbConnection> conn(
+                ScopedDbConnection::getScopedDbConnection( getShard().getConnString() ) );
         BSONObj result;
         BSONObjBuilder cmd;
         cmd.append( "splitVector" , _manager->getns() );
@@ -165,8 +166,8 @@ namespace mongo {
         cmd.appendBool( "force" , true );
         BSONObj cmdObj = cmd.obj();
 
-        if ( ! conn->runCommand( "admin" , cmdObj , result )) {
-            conn.done();
+        if ( ! conn->get()->runCommand( "admin" , cmdObj , result )) {
+            conn->done();
             ostringstream os;
             os << "splitVector command (median key) failed: " << result;
             uassert( 13503 , os.str() , 0 );
@@ -177,12 +178,13 @@ namespace mongo {
             medianKey = it.next().Obj().getOwned();
         }
 
-        conn.done();
+        conn->done();
     }
 
     void Chunk::pickSplitVector( vector<BSONObj>& splitPoints , int chunkSize /* bytes */, int maxPoints, int maxObjs ) const {
         // Ask the mongod holding this chunk to figure out the split points.
-        ScopedDbConnection conn( getShard().getConnString() );
+        scoped_ptr<ScopedDbConnection> conn(
+                ScopedDbConnection::getScopedDbConnection( getShard().getConnString() ) );
         BSONObj result;
         BSONObjBuilder cmd;
         cmd.append( "splitVector" , _manager->getns() );
@@ -194,8 +196,8 @@ namespace mongo {
         cmd.append( "maxChunkObjects" , maxObjs );
         BSONObj cmdObj = cmd.obj();
 
-        if ( ! conn->runCommand( "admin" , cmdObj , result )) {
-            conn.done();
+        if ( ! conn->get()->runCommand( "admin" , cmdObj , result )) {
+            conn->done();
             ostringstream os;
             os << "splitVector command failed: " << result;
             uassert( 13345 , os.str() , 0 );
@@ -205,7 +207,7 @@ namespace mongo {
         while ( it.more() ) {
             splitPoints.push_back( it.next().Obj().getOwned() );
         }
-        conn.done();
+        conn->done();
     }
 
     BSONObj Chunk::singleSplit( bool force , BSONObj& res ) const {
@@ -278,7 +280,8 @@ namespace mongo {
         uassert( 13333 , "can't split a chunk in that many parts", m.size() < maxSplitPoints );
         uassert( 13003 , "can't split a chunk with only one distinct value" , _min.woCompare(_max) );
 
-        ScopedDbConnection conn( getShard().getConnString() );
+        scoped_ptr<ScopedDbConnection> conn(
+                ScopedDbConnection::getScopedDbConnection( getShard().getConnString() ) );
 
         BSONObjBuilder cmd;
         cmd.append( "splitChunk" , _manager->getns() );
@@ -291,9 +294,9 @@ namespace mongo {
         cmd.append( "configdb" , configServer.modelServer() );
         BSONObj cmdObj = cmd.obj();
 
-        if ( ! conn->runCommand( "admin" , cmdObj , res )) {
+        if ( ! conn->get()->runCommand( "admin" , cmdObj , res )) {
             warning() << "splitChunk failed - cmd: " << cmdObj << " result: " << res << endl;
-            conn.done();
+            conn->done();
 
             // Mark the minor version for *eventual* reload
             _manager->markMinorForReload( this->_lastmod );
@@ -301,7 +304,7 @@ namespace mongo {
             return false;
         }
 
-        conn.done();
+        conn->done();
         
         // force reload of config
         _manager->reload();
@@ -316,25 +319,26 @@ namespace mongo {
 
         Shard from = _shard;
 
-        ScopedDbConnection fromconn( from);
+        scoped_ptr<ScopedDbConnection> fromconn(
+                ScopedDbConnection::getScopedDbConnection( from.getConnString() ) );
 
-        bool worked = fromconn->runCommand( "admin" ,
-                                            BSON( "moveChunk" << _manager->getns() <<
-                                                    "from" << from.getAddress().toString() <<
-                                                    "to" << to.getAddress().toString() <<
-                                                    // NEEDED FOR 2.0 COMPATIBILITY
-                                                    "fromShard" << from.getName() <<
-                                                    "toShard" << to.getName() <<
-                                                    ///////////////////////////////
-                                                    "min" << _min <<
-                                                    "max" << _max <<
-                                                    "maxChunkSizeBytes" << chunkSize <<
-                                                    "shardId" << genID() <<
-                                                    "configdb" << configServer.modelServer()
-                                                ) ,
-                                            res
-                                          );
-        fromconn.done();
+        bool worked = fromconn->get()->runCommand( "admin" ,
+                                                   BSON( "moveChunk" << _manager->getns() <<
+                                                         "from" << from.getAddress().toString() <<
+                                                         "to" << to.getAddress().toString() <<
+                                                         // NEEDED FOR 2.0 COMPATIBILITY
+                                                         "fromShard" << from.getName() <<
+                                                         "toShard" << to.getName() <<
+                                                         ///////////////////////////////
+                                                         "min" << _min <<
+                                                         "max" << _max <<
+                                                         "maxChunkSizeBytes" << chunkSize <<
+                                                         "shardId" << genID() <<
+                                                         "configdb" << configServer.modelServer()
+                                                         ) ,
+                                                   res
+                                                   );
+        fromconn->done();
 
         log( worked ) << "moveChunk result: " << res << endl;
 
@@ -445,10 +449,11 @@ namespace mongo {
     }
 
     long Chunk::getPhysicalSize() const {
-        ScopedDbConnection conn( getShard().getConnString() );
+        scoped_ptr<ScopedDbConnection> conn(
+                ScopedDbConnection::getScopedDbConnection( getShard().getConnString() ) );
 
         BSONObj result;
-        uassert( 10169 ,  "datasize failed!" , conn->runCommand( "admin" ,
+        uassert( 10169 ,  "datasize failed!" , conn->get()->runCommand( "admin" ,
                  BSON( "datasize" << _manager->getns()
                        << "keyPattern" << _manager->getShardKey().key()
                        << "min" << getMin()
@@ -457,7 +462,7 @@ namespace mongo {
                        << "estimate" << true
                      ) , result ) );
 
-        conn.done();
+        conn->done();
         return (long)result["size"].number();
     }
 
@@ -525,9 +530,13 @@ namespace mongo {
         _jumbo = true;
 
         try {
-            ScopedDbConnection conn( configServer.modelServer() );
-            conn->update( chunkMetadataNS , BSON( "_id" << genID() ) , BSON( "$set" << BSON( "jumbo" << true ) ) );
-            conn.done();
+            scoped_ptr<ScopedDbConnection> conn(
+                    ScopedDbConnection::getScopedDbConnection( configServer.modelServer() ) );
+
+            conn->get()->update( chunkMetadataNS,
+                                 BSON( "_id" << genID() ),
+                                 BSON( "$set" << BSON( "jumbo" << true ) ) );
+            conn->done();
         }
         catch ( DBException& e ) {
             warning() << "couldn't set jumbo for chunk: " << genID() << causedBy( e ) << endl;
@@ -910,9 +919,11 @@ namespace mongo {
             // discover split points
             {
                 // get stats to see if there is any data
-                ScopedDbConnection shardConn( primary.getConnString() );
-                numObjects = shardConn->count( getns() );
-                shardConn.done();
+                scoped_ptr<ScopedDbConnection> shardConn(
+                        ScopedDbConnection::getScopedDbConnection( primary.getConnString() ) );
+
+                numObjects = shardConn->get()->count( getns() );
+                shardConn->done();
             }
 
             if ( numObjects > 0 )
@@ -967,11 +978,11 @@ namespace mongo {
         log() << "going to create " << splitPoints.size() + 1 << " chunk(s) for: " << _ns
               << " using new epoch " << version.epoch() << endl;
         
-        ScopedDbConnection conn( config );
+        scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::getScopedDbConnection( config ) );
 
         // Make sure we don't have any chunks that already exist here
         unsigned long long existingChunks =
-                conn->count( Chunk::chunkMetadataNS, BSON( "ns" << _ns ) );
+            conn->get()->count( Chunk::chunkMetadataNS, BSON( "ns" << _ns ) );
 
         uassert( 13449 , str::stream() << "collection " << _ns << " already sharded with "
                                        << existingChunks << " chunks", existingChunks == 0 );
@@ -985,28 +996,35 @@ namespace mongo {
             if( i < shards.size() ){
                 // the ensure index will have the (desired) indirect effect of creating the collection on the
                 // assigned shard, as it sets up the index over the sharding keys.
-                ScopedDbConnection shardConn( temp.getShard().getConnString() );
-                shardConn->ensureIndex( getns() , getShardKey().key() , _unique , "" , false ); // do not cache ensureIndex SERVER-1691
-                shardConn.done();
+                scoped_ptr<ScopedDbConnection> shardConn(
+                        ScopedDbConnection::getScopedDbConnection( temp.getShard()
+                                                                   .getConnString() ) );
+                // do not cache ensureIndex SERVER-1691
+                shardConn->get()->ensureIndex( getns(), getShardKey().key(), _unique, "", false );
+                shardConn->done();
             }
 
             BSONObjBuilder chunkBuilder;
             temp.serialize( chunkBuilder );
             BSONObj chunkObj = chunkBuilder.obj();
         
-            conn->update( Chunk::chunkMetadataNS, QUERY( "_id" << temp.genID() ), chunkObj,  true, false );
+            conn->get()->update( Chunk::chunkMetadataNS,
+                                 QUERY( "_id" << temp.genID() ),
+                                 chunkObj,
+                                 true,
+                                 false );
 
             version.incMinor();
         }
 
-        string errmsg = conn->getLastError();
+        string errmsg = conn->get()->getLastError();
         if ( errmsg.size() ) {
             string ss = str::stream() << "creating first chunks failed. result: " << errmsg;
             error() << ss << endl;
             msgasserted( 15903 , ss );
         }
         
-        conn.done();
+        conn->done();
 
         _version = ShardChunkVersion( 0, version.epoch() );
     }
@@ -1189,31 +1207,34 @@ namespace mongo {
 
         // delete data from mongod
         for ( set<Shard>::iterator i=seen.begin(); i!=seen.end(); i++ ) {
-            ScopedDbConnection conn( *i );
-            conn->dropCollection( _ns );
-            conn.done();
+            scoped_ptr<ScopedDbConnection> conn(
+                    ScopedDbConnection::getScopedDbConnection( i->getConnString() ));
+            conn->get()->dropCollection( _ns );
+            conn->done();
         }
 
         LOG(1) << "ChunkManager::drop : " << _ns << "\t removed shard data" << endl;
 
         // remove chunk data
-        ScopedDbConnection conn( configServer.modelServer() );
-        conn->remove( Chunk::chunkMetadataNS , BSON( "ns" << _ns ) );
-        conn.done();
+        scoped_ptr<ScopedDbConnection> conn(
+                ScopedDbConnection::getScopedDbConnection( configServer.modelServer() ) );
+        conn->get()->remove( Chunk::chunkMetadataNS , BSON( "ns" << _ns ) );
+        conn->done();
         LOG(1) << "ChunkManager::drop : " << _ns << "\t removed chunk data" << endl;
 
         for ( set<Shard>::iterator i=seen.begin(); i!=seen.end(); i++ ) {
-            ScopedDbConnection conn( *i );
+            scoped_ptr<ScopedDbConnection> conn(
+                    ScopedDbConnection::getScopedDbConnection( i->getConnString() ) );
             BSONObj res;
 
             // this is horrible
             // we need a special command for dropping on the d side
             // this hack works for the moment
 
-            if ( ! setShardVersion( conn.conn() , _ns , ShardChunkVersion( 0, OID() ) , true , res ) )
+            if ( ! setShardVersion( conn->conn(), _ns, ShardChunkVersion( 0, OID() ), true, res ) )
                 throw UserException( 8071 , str::stream() << "cleaning up after drop failed: " << res );
-            conn->simpleCommand( "admin", 0, "unsetSharding" );
-            conn.done();
+            conn->get()->simpleCommand( "admin", 0, "unsetSharding" );
+            conn->done();
         }
 
         LOG(1) << "ChunkManager::drop : " << _ns << "\t DONE" << endl;

@@ -22,10 +22,11 @@
 namespace mongo {
 
     bool Model::load(BSONObj& query) {
-        ScopedDbConnection conn( modelServer() );
+        scoped_ptr<ScopedDbConnection> conn(
+                ScopedDbConnection::getScopedDbConnection (modelServer() ) );
 
-        BSONObj b = conn->findOne(getNS(), query);
-        conn.done();
+        BSONObj b = conn->get()->findOne(getNS(), query);
+        conn->done();
 
         if ( b.isEmpty() )
             return false;
@@ -38,21 +39,23 @@ namespace mongo {
     void Model::remove( bool safe ) {
         uassert( 10016 ,  "_id isn't set - needed for remove()" , _id["_id"].type() );
 
-        ScopedDbConnection conn( modelServer() );
-        conn->remove( getNS() , _id );
+        scoped_ptr<ScopedDbConnection> conn(
+                ScopedDbConnection::getScopedDbConnection (modelServer() ) );
+        conn->get()->remove( getNS() , _id );
 
         string errmsg = "";
         if ( safe )
-            errmsg = conn->getLastError();
+            errmsg = conn->get()->getLastError();
 
-        conn.done();
+        conn->done();
 
         if ( safe && errmsg.size() )
             throw UserException( 9002 , (string)"error on Model::remove: " + errmsg );
     }
 
     void Model::save( bool safe ) {
-        ScopedDbConnection conn( modelServer() );
+        scoped_ptr<ScopedDbConnection> conn(
+                ScopedDbConnection::getScopedDbConnection (modelServer() ) );
 
         BSONObjBuilder b;
         serialize( b );
@@ -88,7 +91,7 @@ namespace mongo {
             b.appendOID( "_id" , &oid );
 
             BSONObj o = b.obj();
-            conn->insert( getNS() , o );
+            conn->get()->insert( getNS() , o );
             _id = o["_id"].wrap().getOwned();
 
             log(4) << "inserted new model " << getNS() << "  " << o << endl;
@@ -109,15 +112,15 @@ namespace mongo {
 
             log(4) << "updated model" << getNS() << "  " << q << " " << o << endl;
 
-            conn->update( getNS() , q , o , true );
+            conn->get()->update( getNS() , q , o , true );
 
         }
 
         string errmsg = "";
         if ( safe )
-            errmsg = conn->getLastError();
+            errmsg = conn->get()->getLastError();
 
-        conn.done();
+        conn->done();
 
         if ( safe && errmsg.size() )
             throw UserException( 9003 , (string)"error on Model::save: " + errmsg );

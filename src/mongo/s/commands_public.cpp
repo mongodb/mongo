@@ -504,13 +504,16 @@ namespace mongo {
                 int nindexes=0;
                 bool warnedAboutIndexes = false;
                 for ( set<Shard>::iterator i=servers.begin(); i!=servers.end(); i++ ) {
-                    ScopedDbConnection conn( *i );
                     BSONObj res;
-                    if ( ! conn->runCommand( dbName , cmdObj , res ) ) {
-                        errmsg = "failed on shard: " + res.toString();
-                        return false;
+                    {
+                        scoped_ptr<ScopedDbConnection> conn(
+                                ScopedDbConnection::getScopedDbConnection( i->getConnString() ) );
+                        if ( ! conn->get()->runCommand( dbName , cmdObj , res ) ) {
+                            errmsg = "failed on shard: " + res.toString();
+                            return false;
+                        }
+                        conn->done();
                     }
-                    conn.done();
                     
                     BSONObjIterator j( res );
                     while ( j.more() ) {
@@ -669,10 +672,11 @@ namespace mongo {
                 set<Shard> shards;
                 cm->getShardsForRange(shards, min, max);
                 for ( set<Shard>::iterator i=shards.begin(), end=shards.end() ; i != end; ++i ) {
-                    ScopedDbConnection conn( *i );
+                    scoped_ptr<ScopedDbConnection> conn(
+                            ScopedDbConnection::getScopedDbConnection( i->getConnString() ) );
                     BSONObj res;
-                    bool ok = conn->runCommand( conf->getName() , cmdObj , res );
-                    conn.done();
+                    bool ok = conn->get()->runCommand( conf->getName() , cmdObj , res );
+                    conn->done();
 
                     if ( ! ok ) {
                         result.appendElements( res );
@@ -1058,9 +1062,10 @@ namespace mongo {
                 try {
                     // drop collections with tmp results on each shard
                     for ( set<ServerAndQuery>::iterator i=servers.begin(); i!=servers.end(); i++ ) {
-                        ScopedDbConnection conn( i->_server );
-                        conn->dropCollection( dbName + "." + shardResultCollection );
-                        conn.done();
+                        scoped_ptr<ScopedDbConnection> conn(
+                                ScopedDbConnection::getScopedDbConnection( i->_server ) );
+                        conn->get()->dropCollection( dbName + "." + shardResultCollection );
+                        conn->done();
                     }
                 } catch ( std::exception e ) {
                     log() << "Cannot cleanup shard results" << causedBy( e ) << endl;

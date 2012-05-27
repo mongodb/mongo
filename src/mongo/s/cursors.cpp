@@ -271,9 +271,10 @@ namespace mongo {
             LOG(_myLogLevel) << "CursorCache::found gotKillCursors id: " << id << " server: " << server << endl;
 
             verify( server.size() );
-            ScopedDbConnection conn( server );
-            conn->killCursor( id );
-            conn.done();
+            scoped_ptr<ScopedDbConnection> conn(
+                    ScopedDbConnection::getScopedDbConnection( server ) );
+            conn->get()->killCursor( id );
+            conn->done();
         }
     }
 

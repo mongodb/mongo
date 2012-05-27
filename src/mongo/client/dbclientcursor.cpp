@@ -140,13 +140,14 @@ namespace mongo {
         }
         else {
             verify( _scopedHost.size() );
-            ScopedDbConnection conn( _scopedHost );
-            conn->call( toSend , *response );
-            _client = conn.get();
+            scoped_ptr<ScopedDbConnection> conn(
+                    ScopedDbConnection::getScopedDbConnection( _scopedHost ) );
+            conn->get()->call( toSend , *response );
+            _client = conn->get();
             this->batch.m = response;
             dataReceived();
             _client = 0;
-            conn.done();
+            conn->done();
         }
     }
 
@@ -333,14 +334,15 @@ namespace mongo {
             }
             else {
                 verify( _scopedHost.size() );
-                ScopedDbConnection conn( _scopedHost );
+                scoped_ptr<ScopedDbConnection> conn(
+                        ScopedDbConnection::getScopedDbConnection( _scopedHost ) );
 
                 if( DBClientConnection::getLazyKillCursor() )
-                    conn->sayPiggyBack( m );
+                    conn->get()->sayPiggyBack( m );
                 else
-                    conn->say( m );
+                    conn->get()->say( m );
 
-                conn.done();
+                conn->done();
             }
         }
 

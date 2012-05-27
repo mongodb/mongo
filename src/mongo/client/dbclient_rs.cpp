@@ -351,16 +351,19 @@ namespace mongo {
         /* replSetGetStatus requires admin auth so use a connection from the pool,
          * which are authenticated with the keyFile credentials.
          */
-        ScopedDbConnection authenticatedConn( hostAddr );
+        scoped_ptr<ScopedDbConnection> authenticatedConn(
+                ScopedDbConnection::getScopedDbConnection( hostAddr ) );
 
-        if ( !authenticatedConn->runCommand( "admin", BSON( "replSetGetStatus" << 1 ), status )) {
+        if ( !authenticatedConn->get()->runCommand( "admin",
+                                                    BSON( "replSetGetStatus" << 1 ),
+                                                    status )) {
             LOG(1) << "dbclient_rs replSetGetStatus failed" << endl;
-            authenticatedConn.done(); // connection worked properly, but we got an error from server
+            authenticatedConn->done(); // connection worked properly, but we got an error from server
             return;
         }
 
         // Make sure we return when finished
-        authenticatedConn.done();
+        authenticatedConn->done();
 
         if( !status.hasField("members") ) { 
             log() << "dbclient_rs error expected members field in replSetGetStatus result" << endl;

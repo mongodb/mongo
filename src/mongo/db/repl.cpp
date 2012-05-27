@@ -203,17 +203,20 @@ namespace mongo {
                 if ( level > 1 ) {
                     wassert( !Lock::isLocked() );
                     // note: there is no so-style timeout on this connection; perhaps we should have one.
-                    ScopedDbConnection conn( s["host"].valuestr() );
-                    DBClientConnection *cliConn = dynamic_cast< DBClientConnection* >( &conn.conn() );
+                    scoped_ptr<ScopedDbConnection> conn(
+                            ScopedDbConnection::getScopedDbConnection( s["host"].valuestr() ) );
+                    DBClientConnection *cliConn = dynamic_cast< DBClientConnection* >( &conn->conn() );
                     if ( cliConn && replAuthenticate( cliConn ) ) {
-                        BSONObj first = conn->findOne( (string)"local.oplog.$" + sourcename , Query().sort( BSON( "$natural" << 1 ) ) );
-                        BSONObj last = conn->findOne( (string)"local.oplog.$" + sourcename , Query().sort( BSON( "$natural" << -1 ) ) );
+                        BSONObj first = conn->get()->findOne( (string)"local.oplog.$" + sourcename,
+                                                              Query().sort( BSON( "$natural" << 1 ) ) );
+                        BSONObj last = conn->get()->findOne( (string)"local.oplog.$" + sourcename,
+                                                             Query().sort( BSON( "$natural" << -1 ) ) );
                         bb.appendDate( "masterFirst" , first["ts"].timestampTime() );
                         bb.appendDate( "masterLast" , last["ts"].timestampTime() );
                         double lag = (double) (last["ts"].timestampTime() - s["syncedTo"].timestampTime());
                         bb.append( "lagSeconds" , lag / 1000 );
                     }
-                    conn.done();
+                    conn->done();
                 }
 
                 sources.append( BSONObjBuilder::numStr( n++ ) , bb.obj() );

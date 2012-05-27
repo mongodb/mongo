@@ -42,23 +42,24 @@ namespace mongo {
 
             static BSONObj userPattern = BSON("user" << 1);
 
-            ScopedDbConnection conn( s, 30.0 );
-            OCCASIONALLY conn->ensureIndex(systemUsers, userPattern, false, "user_1");
+            scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::
+                                                 getScopedDbConnection( s.getConnString(), 30.0 ) );
+            OCCASIONALLY conn->get()->ensureIndex(systemUsers, userPattern, false, "user_1");
             {
                 BSONObjBuilder b;
                 b << "user" << user;
                 BSONObj query = b.done();
-                userObj = conn->findOne(systemUsers, query, 0, QueryOption_SlaveOk);
+                userObj = conn->get()->findOne(systemUsers, query, 0, QueryOption_SlaveOk);
                 if( userObj.isEmpty() ) {
                     log() << "auth: couldn't find user " << user << ", " << systemUsers << endl;
-                    conn.done(); // return to pool
+                    conn->done(); // return to pool
                     return false;
                 }
             }
 
             pwd = userObj.getStringField("pwd");
 
-            conn.done(); // return to pool
+            conn->done(); // return to pool
         }
         return true;
     }

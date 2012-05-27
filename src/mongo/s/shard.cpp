@@ -36,13 +36,14 @@ namespace mongo {
 
             list<BSONObj> all;
             {
-                ScopedDbConnection conn( configServer.getPrimary() );
-                auto_ptr<DBClientCursor> c = conn->query( ShardNS::shard , Query() );
+                scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::getScopedDbConnection(
+                        configServer.getPrimary().getConnString() ) );
+                auto_ptr<DBClientCursor> c = conn->get()->query( ShardNS::shard , Query() );
                 massert( 13632 , "couldn't get updated shard list from config server" , c.get() );
                 while ( c->more() ) {
                     all.push_back( c->next().getOwned() );
                 }
-                conn.done();
+                conn->done();
             }
 
             scoped_lock lk( _mutex );
@@ -319,16 +320,17 @@ namespace mongo {
     }
 
     BSONObj Shard::runCommand( const string& db , const BSONObj& cmd ) const {
-        ScopedDbConnection conn( this );
+        scoped_ptr<ScopedDbConnection> conn(
+                ScopedDbConnection::getScopedDbConnection( getConnString() ) );
         BSONObj res;
-        bool ok = conn->runCommand( db , cmd , res );
+        bool ok = conn->get()->runCommand( db , cmd , res );
         if ( ! ok ) {
             stringstream ss;
             ss << "runCommand (" << cmd << ") on shard (" << _name << ") failed : " << res;
             throw UserException( 13136 , ss.str() );
         }
         res = res.getOwned();
-        conn.done();
+        conn->done();
         return res;
     }
 

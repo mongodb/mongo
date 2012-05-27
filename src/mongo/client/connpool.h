@@ -198,7 +198,7 @@ namespace mongo {
        scopeddbconnection goes out of scope).
     */
     class ScopedDbConnection : public AScopedConnection {
-    public:
+    private:
         /** the main constructor you want to use
             throws UserException if can't connect
             */
@@ -212,15 +212,16 @@ namespace mongo {
         ScopedDbConnection(const string& host, DBClientBase* conn, double socketTimeout = 0 ) : _host( host ) , _conn( conn ), _socketTimeout( socketTimeout ) {
             _setSocketTimeout();
         }
+    public:
 
-        /** throws UserException if can't connect */
-        explicit ScopedDbConnection(const ConnectionString& url, double socketTimeout = 0 ) : _host(url.toString()), _conn( pool.get(url, socketTimeout) ), _socketTimeout( socketTimeout ) {
-            _setSocketTimeout();
-        }
-
-        /** throws UserException if can't connect */
-        explicit ScopedDbConnection(const Shard& shard, double socketTimeout = 0 );
-        explicit ScopedDbConnection(const Shard* shard, double socketTimeout = 0 );
+        // Factory functions for getting ScopedDbConnections.  The caller owns the resulting object
+        // and is responsible for deleting it when finished.
+        static ScopedDbConnection* getScopedDbConnection(const string& host,
+                                                         double socketTimeout = 0);
+        static ScopedDbConnection* getScopedDbConnection();
+        static ScopedDbConnection* getScopedDbConnection(const string& host,
+                                                         DBClientBase* conn,
+                                                         double socketTimeout = 0);
 
         ~ScopedDbConnection();
 

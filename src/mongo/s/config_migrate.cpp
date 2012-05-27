@@ -36,13 +36,14 @@ namespace mongo {
             return 0;
 
         if ( cur == 0 ) {
-            ScopedDbConnection conn( _primary );
+            scoped_ptr<ScopedDbConnection> conn(
+                    ScopedDbConnection::getScopedDbConnection( _primary.getConnString() ) );
 
             // If the cluster has not previously been initialized, we need to set the version before using so
             // subsequent mongoses use the config data the same way.  This requires all three config servers online
             // initially.
             try {
-                conn->insert( "config.version" , BSON( "_id" << 1 << "version" << VERSION ) );
+                conn->get()->insert( "config.version" , BSON( "_id" << 1 << "version" << VERSION ) );
             }
             catch( DBException& ){
                 error() << "All config servers must initially be reachable for the cluster to be initialized." << endl;
@@ -50,8 +51,8 @@ namespace mongo {
             }
 
             pool.flush();
-            verify( VERSION == dbConfigVersion( conn.conn() ) );
-            conn.done();
+            verify( VERSION == dbConfigVersion( conn->conn() ) );
+            conn->done();
             return 0;
         }
 
@@ -66,7 +67,9 @@ namespace mongo {
                 return -9;
             }
 
-            ScopedDbConnection conn( _primary );
+            scoped_ptr<ScopedDbConnection> connPtr(
+                    ScopedDbConnection::getScopedDbConnection( _primary.getConnString() ) );
+            ScopedDbConnection& conn = *connPtr;
 
             // do a backup
             string backupName;
