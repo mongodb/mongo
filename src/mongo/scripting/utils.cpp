@@ -23,9 +23,11 @@ namespace mongo {
 
     void installBenchmarkSystem( Scope& scope );
 
-    BSONObj jsmd5( const BSONObj &a, void* data ) {
-        uassert( 10261 ,  "js md5 needs a string" , a.firstElement().type() == String );
-        const char * s = a.firstElement().valuestrsafe();
+    static BSONObj native_hex_md5( const BSONObj& args, void* data ) {
+        uassert( 10261,
+                 "hex_md5 takes a single string argument -- hex_md5(string)",
+                 args.nFields() == 1 && args.firstElement().type() == String );
+        const char * s = args.firstElement().valuestrsafe();
 
         md5digest d;
         md5_state_t st;
@@ -36,32 +38,32 @@ namespace mongo {
         return BSON( "" << digestToString( d ) );
     }
 
-    BSONObj JSVersion( const BSONObj& args, void* data ) {
+    static BSONObj native_version( const BSONObj& args, void* data ) {
         cout << "version: " << versionString << endl;
         if ( strstr( versionString , "+" ) )
             printGitVersion();
         return BSONObj();
     }
 
-    BSONObj JSSleep(const mongo::BSONObj &args, void* data) {
-        verify( args.nFields() == 1 );
-        verify( args.firstElement().isNumber() );
-        int ms = int( args.firstElement().number() );
-        sleepmillis( ms );
+    static BSONObj native_sleep( const mongo::BSONObj& args, void* data ) {
+        uassert( 16259,
+                 "sleep takes a single numeric argument -- sleep(milliseconds)",
+                 args.nFields() == 1 && args.firstElement().isNumber() );
+        sleepmillis( static_cast<long long>( args.firstElement().number() ) );
 
         BSONObjBuilder b;
         b.appendUndefined( "" );
         return b.obj();
     }
-    
+
     // ---------------------------------
     // ---- installer           --------
     // ---------------------------------
 
     void installGlobalUtils( Scope& scope ) {
-        scope.injectNative( "hex_md5" , jsmd5 );
-        scope.injectNative( "version" , JSVersion );
-        scope.injectNative( "sleep" , JSSleep );
+        scope.injectNative( "hex_md5" , native_hex_md5 );
+        scope.injectNative( "version" , native_version );
+        scope.injectNative( "sleep" , native_sleep );
 
         installBenchmarkSystem( scope );
     }
