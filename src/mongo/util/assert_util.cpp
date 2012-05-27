@@ -46,8 +46,8 @@ namespace mongo {
     }
 
     void AssertionCount::condrollover( int newvalue ) {
-        static int max = (int)pow( 2.0 , 30 );
-        if ( newvalue >= max )
+        static const int rolloverPoint = ( 1 << 30 );
+        if ( newvalue >= rolloverPoint )
             rollover();
     }
 
