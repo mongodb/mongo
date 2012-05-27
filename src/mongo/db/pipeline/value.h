@@ -141,6 +141,13 @@ namespace mongo {
         */
         BSONType getType() const;
 
+	/*
+	  Get the BinData Type of the field.
+	  If the data is not binary it will fail (but it shouldn't be called in that case).
+	  @return the Binary Data type of the field
+	 */
+	BinDataType getBinType() const;
+
         /*
           Getters.
 
@@ -152,6 +159,7 @@ namespace mongo {
         intrusive_ptr<Document> getDocument() const;
         intrusive_ptr<ValueIterator> getArray() const;
         OID getOid() const;
+	const char * getBinData() const;
         bool getBool() const;
         Date_t getDate() const;
         string getRegex() const;
@@ -313,6 +321,7 @@ namespace mongo {
         void addToBson(Builder *pBuilder) const;
 
         BSONType type;
+	BinDataType binType;
 
         /* store value in one of these */
         union {
@@ -326,9 +335,10 @@ namespace mongo {
         OID oidValue;
         Date_t dateValue;
         string stringValue; // String, Regex, Symbol
+	const char * pBinData; // Contains Binary Data, danger
         intrusive_ptr<Document> pDocumentValue;
         vector<intrusive_ptr<const Value> > vpValue; // for arrays
-
+	
 
         /*
         These are often used as the result of boolean or comparison
@@ -408,6 +418,11 @@ namespace mongo {
 
     inline BSONType Value::getType() const {
         return type;
+    }
+    
+    inline BinDataType Value::getBinType() const{
+      verify( getType() == BinData );
+      return binType;
     }
 
     inline size_t Value::getArrayLength() const {

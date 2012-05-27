@@ -167,6 +167,10 @@ namespace mongo {
             break;
 
         case BinData:
+	    binType=pBsonElement->binDataType();
+	    pBinData = pBsonElement->value();
+	    break;
+	    
         case Symbol:
         case CodeWScope:
 
@@ -283,6 +287,11 @@ namespace mongo {
         return stringValue;
     }
 
+  const char *Value::getBinData() const {
+    verify(getType() == BinData);
+    return pBinData;
+  }
+
     intrusive_ptr<Document> Value::getDocument() const {
         verify(getType() == Object);
         return pDocumentValue;
@@ -391,14 +400,15 @@ namespace mongo {
             break;
         }
 
-        case BinData:
-            // pBuilder->appendBinData(fieldName, ...);
-            verify(false); // CW TODO unimplemented
-            break;
-
+        case BinData:{
+	  pBuilder->append(getBinData());
+	  break;
+	}
+	  
         case jstOID:
             pBuilder->append(getOid());
             break;
+	    
 
         case Bool:
             pBuilder->append(getBool());
@@ -785,9 +795,50 @@ namespace mongo {
         }
 
         case BinData:
+	  {
+	    // Get BinType
+	    BinDataType rBinType = rL->getBinType();
+	    BinDataType lBinType = rR->getBinType();
+	    if (rBinType != lBinType ){
+	      uassert(16017, str::stream() <<
+		      "comparisons of mixed BinData type " << rBinType <<
+		      " and BinData type" << lBinType << " are not supported", false);
+	    }
+	    switch( rBinType ){
+	    case bdtUUID:
+	    case newUUID:
+	    case MD5Type:
+	      {
+		// Compare by lexicographical order, the 3 data types have 16 bytes
+		const char* lData = rL->getBinData();
+		const char* rData = rR->getBinData();
+		for(int i = 0; i < 16; i++){		  
+		  if( lData[i]>rData[i] )
+		    {
+		      return 1;
+		    }
+		  if( lData[i]<rData[i] )
+		    {
+		      return -1;
+		    }
+		}
+		return 0;
+		break;
+	      }
+	    case BinDataGeneral:
+	    case Function:
+	    case ByteArrayDeprecated:
+	    case bdtCustom:
+	      uassert(16050, str::stream() <<
+		      "comparisons of BinData type " << rBinType <<
+		      " are not supported", false);
+	    }
+	    break;
+	  }
+	    
         case Symbol:
         case CodeWScope:
-            uassert(16017, str::stream() <<
+            uassert(16051, str::stream() <<
                     "comparisons of values of BSON type " << lType <<
                     " are not supported", false);
             // pBuilder->appendBinData(fieldName, ...);
@@ -883,6 +934,27 @@ namespace mongo {
         }
 
         case BinData:
+	  {	    
+	    BinDataType binType = getBinType();
+	    switch( binType ){
+	    case bdtUUID:
+	    case newUUID:
+	    case MD5Type:
+	      {
+		const char* binData = getBinData();
+		boost::hash_combine(seed, binData);
+	      }
+	    case BinDataGeneral:
+	    case Function:
+	    case ByteArrayDeprecated:
+	    case bdtCustom:
+	      uassert(160146, str::stream() <<
+		      "hashes of values of BinData type " << binType <<
+		      " are not supported", false);
+	    }
+	    break;
+	  }
+	  break;
         case Symbol:
         case CodeWScope:
             uassert(16018, str::stream() <<
