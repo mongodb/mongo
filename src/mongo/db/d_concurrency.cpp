@@ -370,7 +370,6 @@ namespace mongo {
 
     Lock::GlobalWrite::GlobalWrite(bool sg, int timeoutms)
     {
-        dassert( !sg );
         char ts = threadState();
         noop = false;
         if( ts == 'W' ) { 
@@ -728,7 +727,7 @@ namespace mongo {
     void locked_W() {
         d.dbMutex._minfo.entered(); // hopefully eliminate one day 
     }
-    void unlocking_w() { 
+    void unlocking_w() {
         // we can't commit early in this case; so a bit more to do here.
         dur::releasingWriteLock();
     }
