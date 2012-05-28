@@ -35,7 +35,7 @@ file_drop(void)
 
 	if ((ret = session->drop(session, FNAME, NULL)) != 0)
 		if (ret != ENOENT)
-			die("session.create", ret);
+			die("session.drop", ret);
 
 	if ((ret = session->close(session, NULL)) != 0)
 		die("session.close", ret);
@@ -52,7 +52,7 @@ file_sync(void)
 
 	if ((ret = session->sync(session, FNAME, NULL)) != 0)
 		if (ret != ENOENT)
-			die("session.create", ret);
+			die("session.sync", ret);
 
 	if ((ret = session->close(session, NULL)) != 0)
 		die("session.close", ret);
@@ -69,7 +69,7 @@ file_upgrade(void)
 
 	if ((ret = session->upgrade(session, FNAME, NULL)) != 0)
 		if (ret != ENOENT)
-			die("session.create", ret);
+			die("session.upgrade", ret);
 
 	if ((ret = session->close(session, NULL)) != 0)
 		die("session.close", ret);
@@ -86,7 +86,7 @@ file_verify(void)
 
 	if ((ret = session->verify(session, FNAME, NULL)) != 0)
 		if (ret != ENOENT)
-			die("session.create", ret);
+			die("session.verify", ret);
 
 	if ((ret = session->close(session, NULL)) != 0)
 		die("session.close", ret);
