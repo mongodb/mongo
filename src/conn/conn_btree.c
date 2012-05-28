@@ -135,7 +135,7 @@ __conn_btree_get(WT_SESSION_IMPL *session,
 			    session, btree->rwlock);
 		__wt_free(session, btree->name);
 		__wt_free(session, btree->snapshot);
-		__wt_free(session, btree);
+		__wt_overwrite_and_free(session, btree);
 	}
 
 	return (ret);
@@ -411,7 +411,7 @@ __conn_btree_discard(WT_SESSION_IMPL *session, WT_BTREE *btree)
 	__wt_free(session, btree->config);
 	__wt_free(session, btree->name);
 	__wt_free(session, btree->snapshot);
-	__wt_free(session, btree);
+	__wt_overwrite_and_free(session, btree);
 
 	return (ret);
 }

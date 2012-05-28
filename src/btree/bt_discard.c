@@ -89,10 +89,7 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep, uint32_t flags)
 	if (!LF_ISSET(WT_PAGE_FREE_IGNORE_DISK))	/* Disk image */
 		__wt_free(session, page->dsk);
 
-#ifdef HAVE_DIAGNOSTIC
-	memset(page, WT_DEBUG_BYTE, sizeof(WT_PAGE));
-#endif
-	__wt_free(session, page);
+	__wt_overwrite_and_free(session, page);
 }
 
 /*

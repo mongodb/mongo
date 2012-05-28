@@ -234,8 +234,9 @@ __wt_session_discard_btree(
     WT_SESSION_IMPL *session, WT_BTREE_SESSION *btree_session)
 {
 	TAILQ_REMOVE(&session->btrees, btree_session, q);
+
 	session->btree = btree_session->btree;
-	__wt_free(session, btree_session);
+	__wt_overwrite_and_free(session, btree_session);
 
 	return (__wt_conn_btree_close(session, 0));
 }
