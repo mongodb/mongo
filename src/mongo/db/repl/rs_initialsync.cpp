@@ -125,6 +125,10 @@ namespace mongo {
         else
             // choose a time that will exclude no candidates, since we don't see a primary
             primaryOpTime = OpTime(maxSlackDurationSeconds, 0);
+
+        if ( primaryOpTime.getSecs() < maxSlackDurationSeconds ) {
+            error() << "primaryOpTime is too low??, going to shutdown  primaryOpTime: " << primaryOpTime << endl;
+        }
         fassert(16251, primaryOpTime.getSecs() >= maxSlackDurationSeconds);
         OpTime oldestSyncOpTime(primaryOpTime.getSecs() - maxSlackDurationSeconds, 0);
 
