@@ -64,9 +64,10 @@ extern int __wt_block_insert_ext( WT_SESSION_IMPL *session,
 extern int __wt_block_extlist_read( WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     WT_EXTLIST *el);
-extern int __wt_block_extlist_write( WT_SESSION_IMPL *session,
+extern int __wt_block_extlist_write(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
-    WT_EXTLIST *el);
+    WT_EXTLIST *el,
+    WT_EXTLIST *additional);
 extern int __wt_block_extlist_truncate( WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     WT_EXTLIST *el);
@@ -94,7 +95,9 @@ extern int __wt_bm_open(WT_SESSION_IMPL *session,
 extern int __wt_bm_close(WT_SESSION_IMPL *session);
 extern int __wt_bm_snapshot(WT_SESSION_IMPL *session,
     WT_ITEM *buf,
-    WT_SNAPSHOT *snap);
+    WT_SNAPSHOT *snapbase);
+extern int __wt_bm_snapshot_resolve(WT_SESSION_IMPL *session,
+    WT_SNAPSHOT *snapbase);
 extern int __wt_bm_snapshot_load(WT_SESSION_IMPL *session,
     WT_ITEM *buf,
     const uint8_t *addr,
@@ -175,6 +178,9 @@ extern int __wt_block_snapshot_unload(WT_SESSION_IMPL *session,
 extern int __wt_block_snapshot(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     WT_ITEM *buf,
+    WT_SNAPSHOT *snapbase);
+extern int __wt_block_snapshot_resolve( WT_SESSION_IMPL *session,
+    WT_BLOCK *block,
     WT_SNAPSHOT *snapbase);
 extern int __wt_block_verify_start( WT_SESSION_IMPL *session,
     WT_BLOCK *block,

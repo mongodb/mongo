@@ -168,6 +168,8 @@ __wt_block_snapshot_unload(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	__wt_block_extlist_free(session, &si->avail);
 	__wt_block_extlist_free(session, &si->discard);
 
+	__wt_block_extlist_free(session, &si->snapshot_avail);
+
 	block->live_load = 0;
 
 	return (ret);
@@ -246,6 +248,7 @@ __snapshot_process(
 	uint64_t snapshot_size;
 	int deleting, locked;
 
+	si = &block->live;
 	locked = 0;
 
 	/*
@@ -254,10 +257,18 @@ __snapshot_process(
 	 * snapshot allocation and discard information from the snapshots we're
 	 * deleting, those operations will change the underlying byte counts.
 	 */
-	si = &block->live;
 	snapshot_size = si->snapshot_size;
 	snapshot_size += si->alloc.bytes;
 	snapshot_size -= si->discard.bytes;
+
+	/*
+	 * Extents that become newly available as a result of deleting previous
+	 * snapshots are added to a list of extents.  The list should be empty,
+	 * but there's no explicit "free the snapshot information" call into the
+	 * block manager; if there was an error in an upper level resulting in
+	 * the snapshot never being "resolved", the list might not be empty.
+	 */
+	__wt_block_extlist_free(session, &si->snapshot_avail);
 
 	/*
 	 * To delete a snapshot, we'll need snapshot information for it, and we
@@ -393,10 +404,9 @@ __snapshot_process(
 			continue;
 
 		/*
-		 * Check for blocks we can re-use: any place the "to" snapshot's
-		 * allocate and discard lists overlap is fair game: if a range
-		 * appears on both lists, move it to the live system's available
-		 * list, it can be re-used.
+		 * Find blocks for re-use: wherever the "to" snapshot's allocate
+		 * and discard lists overlap is fair game, move ranges appearing
+		 * on both lists to the live snapshot's newly available list.
 		 */
 		WT_ERR(__wt_block_extlist_overlap(session, block, b));
 
@@ -450,7 +460,7 @@ live_update:
 			 * its components, and that's a fair amount of work.
 			 * (We could just read the system time in the session
 			 * layer when updating the metadata file, but that won't
-			 * work for the snapshot size, and so we do both here.
+			 * work for the snapshot size, and so we do both here.)
 			 */
 			snap->snapshot_size = si->snapshot_size;
 			WT_ERR(__wt_epoch(session, &snap->sec, NULL));
@@ -517,12 +527,17 @@ __snapshot_update(
 	/*
 	 * Write the snapshot's extent lists; we only write an avail list for
 	 * the live system, other snapshot's avail lists are static and never
-	 * change.
+	 * change.  When we do write the avail list for the live system it's
+	 * two lists: the current avail list plus the list of blocks that are
+	 * being made available as of the new snapshot.  We can't merge that
+	 * second list into the real list yet, it's not truly available until
+	 * the new snapshot location has been saved to the metadata.
 	 */
-	WT_RET(__wt_block_extlist_write(session, block, &si->alloc));
+	WT_RET(__wt_block_extlist_write(session, block, &si->alloc, NULL));
 	if (is_live)
-		WT_RET(__wt_block_extlist_write(session, block, &si->avail));
-	WT_RET(__wt_block_extlist_write(session, block, &si->discard));
+		WT_RET(__wt_block_extlist_write(
+		    session, block, &si->avail, &si->snapshot_avail));
+	WT_RET(__wt_block_extlist_write(session, block, &si->discard, NULL));
 
 	/*
 	 * Set the file size for the live system.
@@ -536,9 +551,9 @@ __snapshot_update(
 	 * application opens that snapshot for writing (discarding subsequent
 	 * snapshots), we would truncate the file to the early chunk, discarding
 	 * the re-written snapshot information.  The alternative, updating the
-	 * file size has it's own problems, in that case we'd work correctly,
-	 * but we'd lose all of the blocks between the original snapshot and
-	 * the re-written snapshot.  Currently, there's no API to roll-forward
+	 * file size has its own problems, in that case we'd work correctly, but
+	 * we'd lose all of the blocks between the original snapshot and the
+	 * re-written snapshot.  Currently, there's no API to roll-forward
 	 * intermediate snapshots, if there ever is, this will need to be fixed.
 	 */
 	if (is_live)
@@ -566,6 +581,48 @@ __snapshot_update(
 	}
 
 err:	__wt_scr_free(&tmp);
+	return (ret);
+}
+
+/*
+ * __wt_block_snapshot_resolve --
+ *	Resolve a snapshot.
+ */
+int
+__wt_block_snapshot_resolve(
+    WT_SESSION_IMPL *session, WT_BLOCK *block, WT_SNAPSHOT *snapbase)
+{
+	WT_BLOCK_SNAPSHOT *si;
+	WT_DECL_RET;
+
+	si = &block->live;
+
+	/*
+	 * Snapshots are a two-step process: first, we write a new snapshot to
+	 * disk (including all the new extent lists for modified snapshots and
+	 * the live system).  As part of this we create a list of file blocks
+	 * newly available for re-allocation, based on snapshots being deleted.
+	 * We then return the locations of the new snapshot information to our
+	 * caller.  Our caller has to write that information into some kind of
+	 * stable storage, and once that's done, we can actually allocate from
+	 * that list of newly available file blocks.  (We can't allocate from
+	 * that list immediately because the allocation might happen before our
+	 * caller saves the new snapshot information, and if we crashed before
+	 * the new snapshot information was saved, we'd have overwritten blocks
+	 * still referenced by snapshots in the system.)  In summary, there is
+	 * a second step, after our caller saves the snapshot information, we
+	 * are called to add the newly available blocks into the live system's
+	 * available list.
+	 */
+	__wt_spin_lock(session, &block->live_lock);
+	ret =
+	    __wt_block_extlist_merge(session, &si->snapshot_avail, &si->avail);
+	__wt_spin_unlock(session, &block->live_lock);
+
+	/* Discard the list. */
+	__wt_block_extlist_free(session, &si->snapshot_avail);
+
+	WT_UNUSED(snapbase);
 	return (ret);
 }
 

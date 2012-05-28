@@ -523,7 +523,7 @@ __wt_block_extlist_check(
 /*
  * __wt_block_extlist_overlap --
  *	Review a snapshot's alloc/discard extent lists, move overlaps into the
- * live system's avail list.
+ * live system's snapshot-avail list.
  */
 int
 __wt_block_extlist_overlap(
@@ -568,7 +568,7 @@ __block_ext_overlap(WT_SESSION_IMPL *session,
 	WT_EXTLIST *avail, *el;
 	off_t off, size;
 
-	avail = &block->live.avail;
+	avail = &block->live.snapshot_avail;
 
 	/*
 	 * The ranges overlap, choose the range we're going to take from each.
@@ -942,22 +942,26 @@ err:	__wt_scr_free(&tmp);
  *	Write an extent list at the tail of the file.
  */
 int
-__wt_block_extlist_write(
-    WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el)
+__wt_block_extlist_write(WT_SESSION_IMPL *session,
+    WT_BLOCK *block, WT_EXTLIST *el, WT_EXTLIST *additional)
 {
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
 	WT_EXT *ext;
 	WT_PAGE_HEADER *dsk;
-	uint32_t datasize, size;
+	uint32_t datasize, entries, size;
 	uint8_t *p;
 
 	if (WT_VERBOSE_ISSET(session, block))
 		WT_RET(
 		    __wt_block_extlist_dump(session, "write extlist", el, 0));
 
-	/* If there aren't any entries, we're done. */
-	if (el->entries == 0) {
+	/*
+	 * Figure out how many entries we're writing -- if there aren't any
+	 * entries, we're done.
+	 */
+	entries = el->entries + (additional == NULL ? 0 : additional->entries);
+	if (entries == 0) {
 		el->offset = WT_BLOCK_INVALID_OFFSET;
 		el->cksum = el->size = 0;
 		return (0);
@@ -969,11 +973,11 @@ __wt_block_extlist_write(
 	 * block write function can zero-out unused bytes and write it without
 	 * copying to something larger.
 	 *
-	 * Allocate memory for the extent list's entries plus two additional
+	 * Allocate memory for the extent list entries plus two additional
 	 * entries: the initial WT_BLOCK_EXTLIST_MAGIC/0 pair and the list-
 	 * terminating WT_BLOCK_INVALID_OFFSET/0 pair.
 	 */
-	datasize = size = (el->entries + 2) * WT_STORE_SIZE(sizeof(off_t)  * 2);
+	datasize = size = (entries + 2) * WT_STORE_SIZE(sizeof(off_t)  * 2);
 	WT_RET(__wt_block_write_size(session, block, &size));
 	WT_RET(__wt_scr_alloc(session, size, &tmp));
 	dsk = tmp->mem;
@@ -991,10 +995,15 @@ __wt_block_extlist_write(
 	p = WT_BLOCK_HEADER_BYTE(dsk);
 	WT_EXTLIST_WRITE(p, WT_BLOCK_EXTLIST_MAGIC);	/* Initial value */
 	WT_EXTLIST_WRITE(p, 0);
-	WT_EXT_FOREACH(ext, el->off) {		/* Free ranges */
+	WT_EXT_FOREACH(ext, el->off) {			/* Free ranges */
 		WT_EXTLIST_WRITE(p, ext->off);
 		WT_EXTLIST_WRITE(p, ext->size);
 	}
+	if (additional != NULL)
+		WT_EXT_FOREACH(ext, additional->off) {	/* Free ranges */
+			WT_EXTLIST_WRITE(p, ext->off);
+			WT_EXTLIST_WRITE(p, ext->size);
+		}
 	WT_EXTLIST_WRITE(p, WT_BLOCK_INVALID_OFFSET);	/* Ending value */
 	WT_EXTLIST_WRITE(p, 0);
 
