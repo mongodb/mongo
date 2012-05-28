@@ -425,8 +425,13 @@ namespace mongo {
                      * the shards if we have a value for limit, otherwise, we
                      * apply it only once we have collected all counts.
                      */
-                    if( cmdObj["skip"].isNumber() ){
-                        limit += cmdObj["skip"].numberLong();
+                    if( limit != 0 && cmdObj["skip"].isNumber() ){
+                        long long skip = cmdObj["skip"].numberLong();
+                        verify( skip >= 0 );
+                        if ( limit > 0 )
+                            limit += skip;
+                        else
+                            limit -= skip;
                     }
 
                     countCmdBuilder.append( "limit", limit );
