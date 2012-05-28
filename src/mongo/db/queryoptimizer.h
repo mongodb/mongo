@@ -357,18 +357,16 @@ namespace mongo {
          * @param originalFrsp - original constraints for this query clause; if null, frsp will be
          * used.
          */
-        static QueryPlanSet *make( const char *ns,
-                                  auto_ptr<FieldRangeSetPair> frsp,
-                                  auto_ptr<FieldRangeSetPair> originalFrsp,
-                                  const BSONObj &originalQuery,
-                                  const BSONObj &order,
-                                  const shared_ptr<const ParsedQuery> &parsedQuery =
-                                         shared_ptr<const ParsedQuery>(),
-                                  const BSONObj &hint = BSONObj(),
-                                  QueryPlanGenerator::RecordedPlanPolicy recordedPlanPolicy =
-                                         QueryPlanGenerator::Use,
-                                  const BSONObj &min = BSONObj(),
-                                  const BSONObj &max = BSONObj() );
+        static QueryPlanSet* make( const char* ns,
+                                   auto_ptr<FieldRangeSetPair> frsp,
+                                   auto_ptr<FieldRangeSetPair> originalFrsp,
+                                   const BSONObj& originalQuery,
+                                   const BSONObj& order,
+                                   const shared_ptr<const ParsedQuery>& parsedQuery,
+                                   const BSONObj& hint,
+                                   QueryPlanGenerator::RecordedPlanPolicy recordedPlanPolicy,
+                                   const BSONObj& min,
+                                   const BSONObj& max );
 
         /** @return number of candidate plans. */
         int nPlans() const { return _plans.size(); }

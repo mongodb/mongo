@@ -756,16 +756,16 @@ doneCheckOrder:
         }
     }
     
-    QueryPlanSet *QueryPlanSet::make( const char *ns,
-                                     auto_ptr<FieldRangeSetPair> frsp,
-                                     auto_ptr<FieldRangeSetPair> originalFrsp,
-                                     const BSONObj &originalQuery,
-                                     const BSONObj &order,
-                                     const shared_ptr<const ParsedQuery> &parsedQuery,
-                                     const BSONObj &hint,
-                                     QueryPlanGenerator::RecordedPlanPolicy recordedPlanPolicy,
-                                     const BSONObj &min,
-                                     const BSONObj &max ) {
+    QueryPlanSet* QueryPlanSet::make( const char* ns,
+                                      auto_ptr<FieldRangeSetPair> frsp,
+                                      auto_ptr<FieldRangeSetPair> originalFrsp,
+                                      const BSONObj& originalQuery,
+                                      const BSONObj& order,
+                                      const shared_ptr<const ParsedQuery>& parsedQuery,
+                                      const BSONObj& hint,
+                                      QueryPlanGenerator::RecordedPlanPolicy recordedPlanPolicy,
+                                      const BSONObj& min,
+                                      const BSONObj& max ) {
         auto_ptr<QueryPlanSet> ret( new QueryPlanSet( ns, frsp, originalFrsp, originalQuery, order,
                                                      parsedQuery, hint, recordedPlanPolicy, min,
                                                      max ) );
@@ -1560,7 +1560,8 @@ doneCheckOrder:
 
         scoped_ptr<QueryPlanSet> qps( QueryPlanSet::make( ns, frsp, origFrsp, query, sort,
                                                          shared_ptr<const ParsedQuery>(), BSONObj(),
-                                                         QueryPlanGenerator::UseIfInOrder ) );
+                                                         QueryPlanGenerator::UseIfInOrder,
+                                                         BSONObj(), BSONObj() ) );
         QueryPlanSet::QueryPlanPtr qpp = qps->getBestGuess();
         if( ! qpp.get() ) return shared_ptr<Cursor>();
 
