@@ -85,6 +85,9 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	 * references first check the active field (which may be 0) and then use
 	 * the hazard pointer (which cannot be NULL).  For this reason, clear
 	 * the session structure carefully.
+	 *
+	 * We don't need to publish here, because regardless of the active field
+	 * being non-zero, the hazard reference is always valid.
 	 */
 	WT_SESSION_CLEAR(session);
 	session = conn->default_session;
