@@ -275,6 +275,10 @@ namespace mongo {
         _cursor->noteIterate( orderedMatch, loadedRecord, chunkSkip );
     }
 
+    void QueryOptimizerCursorExplainStrategy::noteYield() {
+        _cursor->noteYield();
+    }
+
     shared_ptr<ExplainQueryInfo> QueryOptimizerCursorExplainStrategy::_doneQueryInfo() {
         return _cursor->explainQueryInfo();
     }

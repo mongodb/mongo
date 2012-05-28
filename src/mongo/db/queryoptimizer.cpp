@@ -1385,7 +1385,6 @@ doneCheckOrder:
     }
 
     void MultiCursor::recoverFromYield() {
-        noteYield();
         Cursor::recoverFromYield();
         advanceExhaustedClauses();
     }
@@ -1423,10 +1422,6 @@ doneCheckOrder:
         if ( _explainPlanInfo ) _explainPlanInfo->noteIterate( match, loadedRecord, *_c );
     }
     
-    void MultiCursor::noteYield() {
-        if ( _explainPlanInfo ) _explainPlanInfo->noteYield();
-    }
-
     bool indexWorks( const BSONObj &idxPattern, const BSONObj &sampleKey, int direction, int firstSignificantField ) {
         BSONObjIterator p( idxPattern );
         BSONObjIterator k( sampleKey );

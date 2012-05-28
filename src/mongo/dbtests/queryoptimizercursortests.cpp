@@ -2450,9 +2450,9 @@ namespace QueryOptimizerCursorTests {
     };
 
     namespace ClientCursor {
-        
+
         using mongo::ClientCursor;
-        
+
         /** Test that a ClientCursor holding a QueryOptimizerCursor may be safely invalidated. */
         class Invalidate : public Base {
         public:
@@ -4001,7 +4001,7 @@ namespace QueryOptimizerCursorTests {
     } // namespace GetCursor
     
     namespace Explain {
-        
+
         class ClearRecordedIndex : public QueryOptimizerCursorTests::Base {
         public:
             void run() {
@@ -4307,6 +4307,7 @@ namespace QueryOptimizerCursorTests {
                     _cursor->prepareToYield();
                     ++_nYields;
                     _cursor->recoverFromYield();
+                    _cursor->noteYield();
                     MatchDetails matchDetails;
                     if ( _cursor->currentMatches( &matchDetails ) &&
                         !_cursor->getsetdup( _cursor->currLoc() ) ) {
@@ -4576,8 +4577,136 @@ namespace QueryOptimizerCursorTests {
                 ASSERT_EQUALS( 3000000000000LL, explain->bson()[ "n" ].Long() );
             }
         };
-        
-        // test takeover w/ mixed plan clause ? necessary?
+
+        /**
+         * Base class to test yield count when a cursor yields and its current iterate is deleted.
+         */
+        class NYieldsAdvanceBase : public Base {
+        protected:
+            virtual int aValueToDelete() const = 0;
+            virtual int numDocuments() const {
+                // Above the takeover threshold at 101 matches.
+                return 200;
+            }
+        private:
+            virtual void setupCollection() {
+                // Insert some matching documents.
+                for( int i = 0; i < numDocuments(); ++i ) {
+                    _cli.insert( ns(), BSON( "a" << i << "b" << 0 ) );
+                }
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+            }
+            virtual BSONObj query() const {
+                // A query that will match all inserted documents and generate a
+                // QueryOptimizerCursor with a single candidate plan, on the a:1 index.
+                return BSON( "a" << GTE << 0 << "b" << 0 );
+            }
+            virtual void handleCursor() {
+                _clientCursor.reset
+                        ( new mongo::ClientCursor( QueryOption_NoCursorTimeout, _cursor,
+                                                   ns() ) );
+                // Advance to the document with the specified 'a' value.
+                while( _cursor->current()[ "a" ].number() != aValueToDelete() ) {
+                    _cursor->advance();
+                }
+
+                // Yield the cursor.
+                mongo::ClientCursor::YieldData yieldData;
+                _clientCursor->prepareToYield( yieldData );
+
+                // Remove the document with the specified 'a' value.
+                _cli.remove( ns(), BSON( "a" << aValueToDelete() ) );
+
+                // Recover the cursor and note that a yield occurred.
+                _clientCursor->recoverFromYield( yieldData );
+                _cursor->noteYield();
+
+                // Exhaust the cursor (not strictly necessary).
+                while( _cursor->advance() );
+            }
+            virtual void checkExplain() {
+                // The cursor was yielded once.
+                ASSERT_EQUALS( 1, _explain[ "nYields" ].number() );
+            }
+            mongo::ClientCursor::Holder _clientCursor;
+        };
+
+        /** nYields reporting of a QueryOptimizerCursor before it enters takeover mode. */
+        class NYieldsAdvanceBasic : public NYieldsAdvanceBase {
+            virtual int aValueToDelete() const {
+                // Before the MutiCursor takes over at 101 matches.
+                return 50;
+            }
+        };
+
+        /** nYields reporting of a QueryOptimizerCursor after it enters takeover mode. */
+        class NYieldsAdvanceTakeover : public NYieldsAdvanceBase {
+            virtual int aValueToDelete() const { return 150; }
+        };
+
+        /** nYields reporting when a cursor is exhausted during a yield. */
+        class NYieldsAdvanceDeleteLast : public NYieldsAdvanceBase {
+            virtual int aValueToDelete() const { return 0; }
+            virtual int numDocuments() const { return 1; }
+        };
+
+        /** nYields reporting when a takeover cursor is exhausted during a yield. */
+        class NYieldsAdvanceDeleteLastTakeover : public NYieldsAdvanceBase {
+            virtual int aValueToDelete() const { return 199; }
+        };
+
+        /** Explain reporting on yield recovery failure. */
+        class YieldRecoveryFailure : public Base {
+            virtual void setupCollection() {
+                // Insert some matching documents.
+                for( int i = 0; i < 10; ++i ) {
+                    _cli.insert( ns(), BSON( "a" << 1 << "b" << 1 ) );
+                }
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+            }
+            virtual void handleCursor() {
+                _clientCursor.reset
+                        ( new mongo::ClientCursor( QueryOption_NoCursorTimeout, _cursor,
+                                                   ns() ) );
+
+                // Scan 5 matches.
+                int numMatches = 0;
+                while( numMatches < 5 ) {
+                    if ( _cursor->currentMatches() && !_cursor->getsetdup( _cursor->currLoc() ) ) {
+                        _cursor->noteIterate( true, true, false );
+                        ++numMatches;
+                    }
+                    _cursor->noteIterate( false, true, false );
+                    _cursor->advance();
+                }
+
+                // Yield the cursor.
+                mongo::ClientCursor::YieldData yieldData;
+                _clientCursor->prepareToYield( yieldData );
+
+                // Drop the collection and invalidate the ClientCursor.
+                {
+                    dbtemprelease release;
+                    _cli.dropCollection( ns() );
+                }
+                ASSERT( !_clientCursor->recoverFromYield( yieldData ) );
+
+                // Note a yield after the ClientCursor was invalidated.
+                _cursor->noteYield();
+            }
+            virtual void checkExplain() {
+                // The cursor was yielded once.
+                ASSERT_EQUALS( 1, _explain[ "nYields" ].number() );
+                // Five matches were scanned.
+                ASSERT_EQUALS( 5, _explain[ "n" ].number() );
+                // Matches were identified for each plan.
+                BSONObjIterator plans( _explain[ "allPlans" ].embeddedObject() );
+                while( plans.more() ) {
+                    ASSERT( 0 < plans.next().Obj()[ "n" ].number() );
+                }
+            }
+            mongo::ClientCursor::Holder _clientCursor;
+        };
 
     } // namespace Explain
     
@@ -4745,6 +4874,11 @@ namespace QueryOptimizerCursorTests {
             add<Explain::CoveredIndexTakeover>();
             add<Explain::VirtualPickedPlan>();
             add<Explain::LargeN>();
+            add<Explain::NYieldsAdvanceBasic>();
+            add<Explain::NYieldsAdvanceTakeover>();
+            add<Explain::NYieldsAdvanceDeleteLast>();
+            add<Explain::NYieldsAdvanceDeleteLastTakeover>();
+            add<Explain::YieldRecoveryFailure>();
         }
     } myall;
     

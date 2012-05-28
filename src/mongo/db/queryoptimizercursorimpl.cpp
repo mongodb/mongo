@@ -130,7 +130,6 @@ namespace mongo {
         }
         
         virtual void recoverFromYield() {
-            if ( _explainPlanInfo ) _explainPlanInfo->noteYield();
             if ( _cc && !ClientCursor::recoverFromYield( _yieldData ) ) {
                 // !!! The collection may be gone, and any namespace or index specific memory may
                 // have become invalid.
@@ -564,13 +563,19 @@ namespace mongo {
         virtual void abortOutOfOrderPlans() {
             _requireOrder = true;
         }
-        
+
         virtual void noteIterate( bool match, bool loadedDocument, bool chunkSkip ) {
             if ( _explainQueryInfo ) {
                 _explainQueryInfo->noteIterate( match, loadedDocument, chunkSkip );
             }
             if ( _takeover ) {
                 _takeover->noteIterate( match, loadedDocument );
+            }
+        }
+        
+        virtual void noteYield() {
+            if ( _explainQueryInfo ) {
+                _explainQueryInfo->noteYield();
             }
         }
         

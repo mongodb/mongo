@@ -118,6 +118,7 @@ namespace mongo {
     private:
         virtual void _noteIterate( bool match, bool orderedMatch, bool loadedRecord,
                                   bool chunkSkip );
+        virtual void noteYield();
         virtual shared_ptr<ExplainQueryInfo> _doneQueryInfo();
         shared_ptr<QueryOptimizerCursor> _cursor;
     };

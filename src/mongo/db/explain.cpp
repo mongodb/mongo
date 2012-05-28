@@ -32,7 +32,6 @@ namespace mongo {
     _nscanned(),
     _scanAndOrder(),
     _indexOnly(),
-    _nYields(),
     _picked(),
     _done() {
     }
@@ -54,8 +53,6 @@ namespace mongo {
         }
         noteCursorUpdate( cursor );
     }
-    
-    void ExplainPlanInfo::noteYield() { ++_nYields; }
     
     void ExplainPlanInfo::noteDone( const Cursor &cursor ) {
         _done = true;
@@ -88,7 +85,7 @@ namespace mongo {
         bob.appendNumber( "nscanned", clauseInfo.nscanned() );
         bob.append( "scanAndOrder", _scanAndOrder );
         bob.append( "indexOnly", _indexOnly );
-        bob.appendNumber( "nYields", _nYields );
+        bob.appendNumber( "nYields", clauseInfo.nYields() );
         bob.appendNumber( "nChunkSkips", clauseInfo.nChunkSkips() );
         bob.appendNumber( "millis", clauseInfo.millis() );
         bob.append( "indexBounds", _indexBounds );
@@ -104,7 +101,8 @@ namespace mongo {
     ExplainClauseInfo::ExplainClauseInfo() :
     _n(),
     _nscannedObjects(),
-    _nChunkSkips() {
+    _nChunkSkips(),
+    _nYields() {
     }
     
     BSONObj ExplainClauseInfo::bson() const {
@@ -122,6 +120,8 @@ namespace mongo {
     void ExplainClauseInfo::addPlanInfo( const shared_ptr<ExplainPlanInfo> &info ) {
         _plans.push_back( info );
     }
+    
+    void ExplainClauseInfo::noteYield() { ++_nYields; }
     
     void ExplainClauseInfo::noteIterate( bool match, bool loadedRecord, bool chunkSkip ) {
         if ( match ) {
@@ -187,6 +187,11 @@ namespace mongo {
         _clauses.back()->noteIterate( match, loadedRecord, chunkSkip );
     }
 
+    void ExplainQueryInfo::noteYield() {
+        verify( !_clauses.empty() );
+        _clauses.back()->noteYield();
+    }
+    
     void ExplainQueryInfo::reviseN( long long n ) {
         verify( !_clauses.empty() );
         _clauses.back()->reviseN( n );

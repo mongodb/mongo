@@ -118,6 +118,8 @@ namespace mongo {
 
         /** Note match information for the current iterate, to generate explain output. */
         virtual void noteIterate( bool match, bool loadedDocument, bool chunkSkip ) = 0;
+        /** Note a lock yield for explain output reporting. */
+        virtual void noteYield() = 0;
         /** @return explain output for the query run by this cursor. */
         virtual shared_ptr<ExplainQueryInfo> explainQueryInfo() const = 0;
     };

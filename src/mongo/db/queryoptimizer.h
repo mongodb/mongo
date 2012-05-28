@@ -684,8 +684,6 @@ namespace mongo {
         
         void noteIterate( bool match, bool loadedRecord );
         
-        void noteYield();
-        
         const QueryPlan &queryPlan() const {
             verify( _c->ok() && _queryPlan );
             return *_queryPlan;
