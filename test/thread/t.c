@@ -189,10 +189,6 @@ handle_error(WT_EVENT_HANDLER *handler, int error, const char *errmsg)
 	UNUSED(handler);
 	UNUSED(error);
 
-	/* Ignore complaints about truncation of missing files. */
-	if (strcmp(errmsg,
-	    "session.truncate: __wt: No such file or directory") == 0)
-		return (0);
 	return (fprintf(stderr, "%s\n", errmsg) < 0 ? -1 : 0);
 }
 
