@@ -127,9 +127,11 @@ namespace mongo {
             primaryOpTime = OpTime(maxSlackDurationSeconds, 0);
 
         if ( primaryOpTime.getSecs() < maxSlackDurationSeconds ) {
-            error() << "primaryOpTime is too low??, going to shutdown  primaryOpTime: " << primaryOpTime << endl;
+            // erh - I think this means there was just a new election
+            // and we don't yet know the new primary's optime
+            primaryOpTime = OpTime(maxSlackDurationSeconds, 0);
         }
-        fassert(16251, primaryOpTime.getSecs() >= maxSlackDurationSeconds);
+
         OpTime oldestSyncOpTime(primaryOpTime.getSecs() - maxSlackDurationSeconds, 0);
 
         Member *closest = 0;
