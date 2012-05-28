@@ -34,7 +34,7 @@ file_drop(void)
 		die("conn.session", ret);
 
 	if ((ret = session->drop(session, FNAME, NULL)) != 0)
-		if (ret != ENOENT)
+		if (ret != ENOENT && ret != EBUSY)
 			die("session.drop", ret);
 
 	if ((ret = session->close(session, NULL)) != 0)
