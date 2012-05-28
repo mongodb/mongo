@@ -427,7 +427,7 @@ namespace mongo {
                      */
                     if( limit != 0 && cmdObj["skip"].isNumber() ){
                         long long skip = cmdObj["skip"].numberLong();
-                        verify( skip >= 0 );
+                        uassert( 16260 , "skip has to be positive" , skip >= 0 );
                         if ( limit > 0 )
                             limit += skip;
                         else
