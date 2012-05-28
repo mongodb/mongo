@@ -9,9 +9,10 @@ bench/tcbench
 examples/c
 ext/collators/reverse
 ext/compressors/bzip2_compress BZIP2
-ext/compressors/snappy_compress SNAPPY
 ext/compressors/nop_compress
+ext/compressors/snappy_compress SNAPPY
 lang/python PYTHON
+test/fops
 test/format HAVE_BDB
 test/salvage
 test/snapshot

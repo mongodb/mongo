@@ -7,7 +7,7 @@
 
 #include "thread.h"
 
-void
+static void
 file_create(void)
 {
 	WT_SESSION *session;
@@ -29,74 +29,6 @@ file_create(void)
 
 	if ((ret = session->create(session, FNAME, config)) != 0)
 		if (ret != EEXIST)
-			die("session.create", ret);
-
-	if ((ret = session->close(session, NULL)) != 0)
-		die("session.close", ret);
-}
-
-void
-file_drop(void)
-{
-	WT_SESSION *session;
-	int ret;
-
-	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		die("conn.session", ret);
-
-	if ((ret = session->drop(session, FNAME, NULL)) != 0)
-		if (ret != ENOENT)
-			die("session.create", ret);
-
-	if ((ret = session->close(session, NULL)) != 0)
-		die("session.close", ret);
-}
-
-void
-file_sync(void)
-{
-	WT_SESSION *session;
-	int ret;
-
-	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		die("conn.session", ret);
-
-	if ((ret = session->sync(session, FNAME, NULL)) != 0)
-		if (ret != ENOENT)
-			die("session.create", ret);
-
-	if ((ret = session->close(session, NULL)) != 0)
-		die("session.close", ret);
-}
-
-void
-file_truncate(void)
-{
-	WT_SESSION *session;
-	int ret;
-
-	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		die("conn.session", ret);
-
-	if ((ret = session->truncate(session, FNAME, NULL, NULL, NULL)) != 0)
-		if (ret != ENOENT)
-			die("session.create", ret);
-
-	if ((ret = session->close(session, NULL)) != 0)
-		die("session.close", ret);
-}
-
-void
-file_verify(void)
-{
-	WT_SESSION *session;
-	int ret;
-
-	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		die("conn.session", ret);
-
-	if ((ret = session->verify(session, FNAME, NULL)) != 0)
-		if (ret != ENOENT)
 			die("session.create", ret);
 
 	if ((ret = session->close(session, NULL)) != 0)

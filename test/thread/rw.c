@@ -19,6 +19,31 @@ typedef struct {
 
 static STATS *run_stats;
 
+/*
+ * r --
+ *	Return a 32-bit pseudo-random number.
+ *
+ * This is an implementation of George Marsaglia's multiply-with-carry pseudo-
+ * random number generator.  Computationally fast, with reasonable randomness
+ * properties.
+ */
+static inline uint32_t
+r(void)
+{
+	static uint32_t m_w = 0, m_z = 0;
+
+	if (m_w == 0) {
+		struct timeval t;
+		(void)gettimeofday(&t, NULL);
+		m_w = (uint32_t)t.tv_sec;
+		m_z = (uint32_t)t.tv_usec;
+	}
+
+	m_z = 36969 * (m_z & 65535) + (m_z >> 16);
+	m_w = 18000 * (m_w & 65535) + (m_w >> 16);
+	return (m_z << 16) + (m_w & 65535);
+}
+
 int
 rw_start(u_int readers, u_int writers)
 {

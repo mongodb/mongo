@@ -8,9 +8,7 @@
 #include "thread.h"
 
 WT_CONNECTION *conn;				/* WiredTiger connection */
-__ftype ftype;					/* File type */
-u_int nkeys, nops;				/* Keys, Operations */
-int session_per_op;				/* New session per operation */
+u_int nops;					/* Operations */
 
 static char *progname;				/* Program name */
 static FILE *logfp;				/* Log file */
@@ -26,7 +24,7 @@ static void wt_shutdown(void);
 int
 main(int argc, char *argv[])
 {
-	u_int readers, writers;
+	u_int nthreads;
 	int ch, cnt, runs;
 	char *config_open;
 
@@ -36,24 +34,17 @@ main(int argc, char *argv[])
 		++progname;
 
 	config_open = NULL;
-	ftype = ROW;
-	nkeys = 1000;
-	nops = 10000;
-	readers = 10;
+	nops = 1000;
+	nthreads = 10;
 	runs = 0;
-	session_per_op = 0;
-	writers = 10;
 
-	while ((ch = getopt(argc, argv, "1C:k:l:n:R:r:St:W:")) != EOF)
+	while ((ch = getopt(argc, argv, "1C:l:n:r:t:")) != EOF)
 		switch (ch) {
 		case '1':			/* One run */
 			runs = 1;
 			break;
 		case 'C':			/* wiredtiger_open config */
 			config_open = optarg;
-			break;
-		case 'k':			/* rows */
-			nkeys = (u_int)atoi(optarg);
 			break;
 		case 'l':			/* log */
 			if ((logfp = fopen(optarg, "w")) == NULL) {
@@ -65,32 +56,11 @@ main(int argc, char *argv[])
 		case 'n':			/* operations */
 			nops = (u_int)atoi(optarg);
 			break;
-		case 'R':
-			readers = (u_int)atoi(optarg);
-			break;
 		case 'r':			/* runs */
 			runs = atoi(optarg);
 			break;
-		case 'S':			/* new session per operation */
-			session_per_op = 1;
-			break;
 		case 't':
-			switch (optarg[0]) {
-			case 'f':
-				ftype = FIX;
-				break;
-			case 'r':
-				ftype = ROW;
-				break;
-			case 'v':
-				ftype = VAR;
-				break;
-			default:
-				return (usage());
-			}
-			break;
-		case 'W':
-			writers = (u_int)atoi(optarg);
+			nthreads = (u_int)atoi(optarg);
 			break;
 		default:
 			return (usage());
@@ -106,19 +76,14 @@ main(int argc, char *argv[])
 
 	printf("%s: process %" PRIu64 "\n", progname, (uint64_t)getpid());
 	for (cnt = 1; runs == 0 || cnt <= runs; ++cnt) {
-		printf(
-		    "    %d: %u readers, %u writers\n", cnt, readers, writers);
+		printf("    %d: %u threads\n", cnt, nthreads);
 
 		shutdown();			/* Clean up previous runs */
 
 		wt_connect(config_open);	/* WiredTiger connection */
 
-		load();				/* Load initial records */
-						/* Loop operations */
-		if (rw_start(readers, writers))
+		if (fop_start(nthreads))
 			return (EXIT_FAILURE);
-
-		stats();			/* Statistics */
 
 		wt_shutdown();			/* WiredTiger shut down */
 	}
@@ -248,13 +213,9 @@ usage(void)
 	fprintf(stderr, "%s",
 	    "\t-1 run once\n"
 	    "\t-C specify wiredtiger_open configuration arguments\n"
-	    "\t-k set number of keys to load\n"
 	    "\t-l specify a log file\n"
 	    "\t-n set number of operations each thread does\n"
-	    "\t-R set number of reading threads\n"
 	    "\t-r set number of runs\n"
-	    "\t-S open/close a session on every operation\n"
-	    "\t-t set a file type (fix | row | var)\n"
-	    "\t-W set number of writing threads\n");
+	    "\t-t set number of threads\n");
 	return (EXIT_FAILURE);
 }
