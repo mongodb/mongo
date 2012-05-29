@@ -30,10 +30,8 @@ static void
 __txn_sort_snapshot(WT_SESSION_IMPL *session, uint32_t n, wt_txnid_t id)
 {
 	WT_TXN *txn;
-	WT_TXN_GLOBAL *txn_global;
 
 	txn = &session->txn;
-	txn_global = &S2C(session)->txn_global;
 
 	/* Sort the snapshot and size for faster searching. */
 	qsort(txn->snapshot, n, sizeof(wt_txnid_t), __wt_txnid_cmp);
