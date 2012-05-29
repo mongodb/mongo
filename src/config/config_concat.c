@@ -59,9 +59,7 @@ __wt_config_concat(
 	 * with no bytes to copy -- that's OK, the underlying string copy can
 	 * handle empty strings.
 	 */
-	WT_ERR(__wt_strndup(session, tmp->data, tmp->size, config_ret));
-
-	return (0);
+	ret = __wt_strndup(session, tmp->data, tmp->size, config_ret);
 
 err:	__wt_scr_free(&tmp);
 	return (ret);
