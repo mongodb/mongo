@@ -377,7 +377,7 @@ __wt_block_alloc(
 	}
 
 	/* Add the newly allocated extent to the list of allocations. */
-done:	WT_RET(__block_merge(
+done:	WT_ERR(__block_merge(
 	    session, &block->live.alloc, *offp, (off_t)size));
 
 err:	__wt_spin_unlock(session, &block->live_lock);
