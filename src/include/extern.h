@@ -459,7 +459,7 @@ extern  int __wt_config_subgets(WT_SESSION_IMPL *session,
 extern int __wt_config_check(WT_SESSION_IMPL *session,
     const char *checks,
     const char *config);
-extern int __wt_config_collapse(WT_SESSION_IMPL *session,
+extern int __wt_config_collapse( WT_SESSION_IMPL *session,
     const char **cfg,
     const char **config_ret);
 extern int __wt_config_concat( WT_SESSION_IMPL *session,

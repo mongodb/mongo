@@ -14,8 +14,8 @@
  *	memory.
  */
 int
-__wt_config_collapse(WT_SESSION_IMPL *session,
-    const char **cfg, const char **config_ret)
+__wt_config_collapse(
+    WT_SESSION_IMPL *session, const char **cfg, const char **config_ret)
 {
 	WT_CONFIG cparser;
 	WT_CONFIG_ITEM k, v;
@@ -49,7 +49,11 @@ __wt_config_collapse(WT_SESSION_IMPL *session,
 	 * If the caller passes us no valid configuration strings, we get here
 	 * with no bytes to copy -- that's OK, the underlying string copy can
 	 * handle empty strings.
+	 *
+	 * Strip any trailing comma.
 	 */
+	if (tmp->size != 0)
+		--tmp->size;
 	ret = __wt_strndup(session, tmp->data, tmp->size, config_ret);
 
 err:	__wt_scr_free(&tmp);

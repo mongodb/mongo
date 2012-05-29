@@ -58,7 +58,11 @@ __wt_config_concat(
 	 * If the caller passes us no valid configuration strings, we get here
 	 * with no bytes to copy -- that's OK, the underlying string copy can
 	 * handle empty strings.
+	 *
+	 * Strip any trailing comma.
 	 */
+	if (tmp->size != 0)
+		--tmp->size;
 	ret = __wt_strndup(session, tmp->data, tmp->size, config_ret);
 
 err:	__wt_scr_free(&tmp);
