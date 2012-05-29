@@ -8,8 +8,8 @@
 #include "wt_internal.h"
 
 static int  __hazard_exclusive(WT_SESSION_IMPL *, WT_REF *, int);
-static int  __rec_discard_page(WT_SESSION_IMPL *, WT_PAGE *, int);
-static int  __rec_discard_tree(WT_SESSION_IMPL *, WT_PAGE *, int);
+static void __rec_discard_page(WT_SESSION_IMPL *, WT_PAGE *, int);
+static void __rec_discard_tree(WT_SESSION_IMPL *, WT_PAGE *, int);
 static void __rec_excl_clear(WT_SESSION_IMPL *);
 static void __rec_page_clean_update(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_page_dirty_update(WT_SESSION_IMPL *, WT_PAGE *);
@@ -65,7 +65,7 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 			__rec_page_clean_update(session, page);
 
 		/* Discard the page. */
-		WT_RET(__rec_discard_page(session, page, single));
+		__rec_discard_page(session, page, single);
 	} else {
 		WT_STAT_INCR(conn->stats, cache_evict_modified);
 
@@ -75,7 +75,7 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 			WT_ERR(__rec_page_dirty_update(session, page));
 
 		/* Discard the tree rooted in this page. */
-		WT_ERR(__rec_discard_tree(session, page, single));
+		__rec_discard_tree(session, page, single);
 	}
 	if (0) {
 err:		/*
@@ -175,7 +175,7 @@ __rec_page_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page)
  *	Discard the tree rooted a page (that is, any pages merged into it),
  * then the page itself.
  */
-static int
+static void
 __rec_discard_tree(WT_SESSION_IMPL *session, WT_PAGE *page, int single)
 {
 	WT_REF *ref;
@@ -190,21 +190,20 @@ __rec_discard_tree(WT_SESSION_IMPL *session, WT_PAGE *page, int single)
 				continue;
 			WT_ASSERT(session,
 			    single || ref->state == WT_REF_LOCKED);
-			WT_RET(__rec_discard_tree(session, ref->page, single));
+			__rec_discard_tree(session, ref->page, single);
 		}
 		/* FALLTHROUGH */
 	default:
-		WT_RET(__rec_discard_page(session, page, single));
+		__rec_discard_page(session, page, single);
 		break;
 	}
-	return (0);
 }
 
 /*
  * __rec_discard_page --
  *	Discard the page.
  */
-static int
+static void
 __rec_discard_page(WT_SESSION_IMPL *session, WT_PAGE *page, int single)
 {
 	/* We should never evict the file's current eviction point. */
@@ -216,8 +215,6 @@ __rec_discard_page(WT_SESSION_IMPL *session, WT_PAGE *page, int single)
 
 	/* Discard the page. */
 	__wt_page_out(session, &page, 0);
-
-	return (0);
 }
 
 /*
