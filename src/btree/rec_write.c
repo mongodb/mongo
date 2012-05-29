@@ -2645,10 +2645,6 @@ __rec_row_leaf(
 				 * We aren't actually creating the key so we
 				 * can't use bytes from this key to provide
 				 * prefix information for a subsequent key.
-				 *
-				 * This is already true, based on the test and
-				 * and code above, but I'm leaving the code as
-				 * a place to hang this comment.
 				 */
 				tmpkey->size = 0;
 			}
