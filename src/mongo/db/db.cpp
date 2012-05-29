@@ -876,9 +876,15 @@ static int mongoDbMain(int argc, char* argv[]) {
             return 0;
         }
         if (params.count("repair")) {
+            if (journalExplicit && cmdLine.dur) {
+                log() << "Can't specify both --journal and --repair options." << endl;
+                return EXIT_BADOPTIONS;
+            }
+
             Record::MemoryTrackingEnabled = false;
             shouldRepairDatabases = 1;
             forceRepair = 1;
+            cmdLine.dur = false;
         }
         if (params.count("upgrade")) {
             Record::MemoryTrackingEnabled = false;

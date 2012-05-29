@@ -1125,7 +1125,15 @@ namespace mongo {
             // if we can't, then its probably just another mongod running
             
             string errmsg;
-            if (cmdLine.dur) {
+            if (doingRepair && dur::haveJournalFiles()) {
+                errmsg = "************** \n"
+                         "You specified --repair but there are dirty journal files. Please\n"
+                         "restart without --repair to allow the journal files to be replayed.\n"
+                         "If you wish to repair all databases, please shutdown cleanly and\n"
+                         "run with --repair again.\n"
+                         "**************";
+            }
+            else if (cmdLine.dur) {
                 if (!dur::haveJournalFiles()) {
                     
                     vector<string> dbnames;
