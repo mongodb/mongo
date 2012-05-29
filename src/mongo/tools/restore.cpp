@@ -89,6 +89,11 @@ public:
             return -1;
         }
 
+        if (isMongos() && _db == "" && exists(root / "config")) {
+            log() << "Cannot do a full restore on a sharded system" << endl;
+            return -1;
+        }
+
         _drop = hasParam( "drop" );
         _keepIndexVersion = hasParam("keepIndexVersion");
         _restoreOptions = !hasParam("noOptionRestore");
