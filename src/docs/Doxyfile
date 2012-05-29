@@ -702,7 +702,8 @@ EXCLUDE                = \
                          design.dox \
                          processes.dox \
                          sql-map.dox \
-			 tools
+			 tools \
+			 top
 
 # The EXCLUDE_SYMLINKS tag can be used select whether or not files or 
 # directories that are symbolic links (a Unix file system feature) are excluded 
