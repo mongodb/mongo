@@ -146,7 +146,7 @@ not_compressed:	/*
 		if (block->compressor->pre_size == NULL)
 			len = src_len;
 		else
-			WT_ERR(block->compressor->pre_size(block->compressor,
+			WT_RET(block->compressor->pre_size(block->compressor,
 			    &session->iface, src, src_len, &len));
 		WT_RET(__wt_scr_alloc(
 		    session, (uint32_t)len + WT_BLOCK_COMPRESS_SKIP, &tmp));
