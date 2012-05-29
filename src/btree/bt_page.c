@@ -369,7 +369,7 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 			ref->addr = cell;
 			++ref;
 			continue;
-		WT_ILLEGAL_VALUE(session);
+		WT_ILLEGAL_VALUE_ERR(session);
 		}
 
 		/*
