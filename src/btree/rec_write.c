@@ -2079,11 +2079,13 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	btree = session->btree;
 	unpack = &_unpack;
 
-	WT_RET(__wt_scr_alloc(session, 0, &tmpkey));
 	key = &r->k;
 	val = &r->v;
 
 	WT_RET(__rec_split_init(session, page, 0ULL, btree->maxintlpage));
+
+	/* Temporary buffer in which to instantiate any uninstantiated keys. */
+	WT_RET(__wt_scr_alloc(session, 0, &tmpkey));
 
 	/*
 	 * Ideally, we'd never store the 0th key on row-store internal pages
@@ -2305,7 +2307,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 			 * about to promote it.
 			 */
 			if (onpage_ovfl)
-				WT_RET(__wt_cell_copy(session, cell, r->cur));
+				WT_ERR(__wt_cell_copy(session, cell, r->cur));
 			WT_ERR(__rec_split(session));
 
 			r->key_pfx_compress = 0;
@@ -2473,7 +2475,6 @@ __rec_row_leaf(
 
 	r = session->reconcile;
 	btree = session->btree;
-	tmpkey = NULL;
 	unpack = &_unpack;
 	slvg_skip = salvage == NULL ? 0 : salvage->skip;
 
@@ -2489,11 +2490,7 @@ __rec_row_leaf(
 	if ((ins = WT_SKIP_FIRST(WT_ROW_INSERT_SMALLEST(page))) != NULL)
 		WT_RET(__rec_row_leaf_insert(session, ins));
 
-	/*
-	 * A temporary buffer in which to instantiate any uninstantiated keys.
-	 * From this point on, we need to jump to the err label on error so the
-	 * buffer is discarded.
-	 */
+	/* Temporary buffer in which to instantiate any uninstantiated keys. */
 	WT_RET(__wt_scr_alloc(session, 0, &tmpkey));
 
 	/* For each entry in the page... */
@@ -2725,7 +2722,7 @@ __rec_row_leaf(
 			 * about to promote it.
 			 */
 			if (onpage_ovfl)
-				WT_RET(__wt_cell_unpack_copy(
+				WT_ERR(__wt_cell_unpack_copy(
 				    session, unpack, r->cur));
 			WT_ERR(__rec_split(session));
 
