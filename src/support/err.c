@@ -119,11 +119,14 @@ __eventv(WT_SESSION_IMPL *session, int msg_event, int error,
 {
 	WT_EVENT_HANDLER *handler;
 	WT_DECL_RET;
-	size_t len;
+	size_t len, remain, wlen;
 	const char *err, *prefix1, *prefix2;
 	char *end, *p;
 
 	/*
+	 * We're using a stack buffer because we want error messages no matter
+	 * what, and allocating a WT_ITEM, or the memory it needs, might fail.
+	 *
 	 * !!!
 	 * SECURITY:
 	 * Buffer placed at the end of the stack in case snprintf overflows.
@@ -136,19 +139,30 @@ __eventv(WT_SESSION_IMPL *session, int msg_event, int error,
 	prefix1 = (session->btree != NULL) ? session->btree->name : NULL;
 	prefix2 = session->name;
 
-	if (prefix1 != NULL && prefix2 != NULL && p < end)
-		p += snprintf(p, (size_t)(end - p),
-		    "%s [%s]: ", prefix1, prefix2);
-	else if (prefix1 != NULL && p < end)
-		p += snprintf(p, (size_t)(end - p), "%s: ", prefix1);
-	else if (prefix2 != NULL && p < end)
-		p += snprintf(p, (size_t)(end - p), "%s: ", prefix2);
-	if (file_name != NULL && p < end)
-		p += snprintf(p, (size_t)(end - p),
-		    "%s, %d: ", file_name, line_number);
-	if (p < end)
-		p += vsnprintf(p, (size_t)(end - p), fmt, ap);
-	if (error != 0 && p < end) {
+	remain = WT_PTRDIFF(end, p);
+	if (prefix1 != NULL && prefix2 != NULL)
+		wlen =
+		    (size_t)snprintf(p, remain, "%s [%s]: ", prefix1, prefix2);
+	else if (prefix1 != NULL)
+		wlen = (size_t)snprintf(p, remain, "%s: ", prefix1);
+	else if (prefix2 != NULL)
+		wlen = (size_t)snprintf(p, remain, "%s: ", prefix2);
+	else
+		wlen = 0;
+	p = wlen >= remain ? end : p + wlen;
+
+	if (file_name != NULL) {
+		remain = WT_PTRDIFF(end, p);
+		wlen = (size_t)
+		    snprintf(p, remain, "%s, %d: ", file_name, line_number);
+		p = wlen >= remain ? end : p + wlen;
+	}
+
+	remain = WT_PTRDIFF(end, p);
+	wlen = (size_t)vsnprintf(p, remain, fmt, ap);
+	p = wlen >= remain ? end : p + wlen;
+
+	if (error != 0) {
 		/*
 		 * When the engine calls __wt_err on error, it often outputs an
 		 * error message including the string associated with the error
@@ -161,8 +175,10 @@ __eventv(WT_SESSION_IMPL *session, int msg_event, int error,
 		 */
 		err = wiredtiger_strerror(error);
 		len = strlen(err);
-		if ((size_t)(p - s) < len || strcmp(p - len, err) != 0)
-			p += snprintf(p, (size_t)(end - p), ": %s", err);
+		if (WT_PTRDIFF(p, s) < len || strcmp(p - len, err) != 0) {
+			remain = WT_PTRDIFF(end, p);
+			(void)snprintf(p, remain, ": %s", err);
+		}
 	}
 
 	/*
