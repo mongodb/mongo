@@ -41,6 +41,7 @@ var checkInvalidAuthStates = function() {
     assert.soon(function() {
         try {
             var result = m.getDB("admin").runCommand({isMaster: 1});
+            printjson(result);
             return !result.ismaster && !result.secondary;
         }
         catch ( e ) {
@@ -54,6 +55,7 @@ var checkInvalidAuthStates = function() {
 
     assert.soon(function() {
         var result = m.getDB("admin").runCommand({isMaster: 1});
+        printjson(result);
         return !result.ismaster && !result.secondary;
     });
 
@@ -62,6 +64,7 @@ var checkInvalidAuthStates = function() {
 
     assert.soon(function() {
         var result = m.getDB("admin").runCommand({isMaster: 1});
+        printjson(result);
         return result.secondary;
     });
 
@@ -72,6 +75,7 @@ var checkInvalidAuthStates = function() {
 var checkValidAuthState = function() {
     assert.soon(function() {
         var result = m.getDB("admin").runCommand({isMaster : 1});
+        printjson(result);
         return result.secondary;
     });
 };
