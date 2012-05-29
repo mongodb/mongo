@@ -932,6 +932,7 @@ __evict_get_page(
 		 * on.
 		 */
 		ref = evict->page->ref;
+		WT_ASSERT(session, evict->page == ref->page);
 		if (!WT_ATOMIC_CAS(ref->state, WT_REF_MEM, WT_REF_LOCKED))
 			continue;
 
