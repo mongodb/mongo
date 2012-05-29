@@ -182,7 +182,7 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 		    session, uri, snapshot, treeconf, cfg, flags));
 		WT_RET(__wt_session_add_btree(session, NULL));
 	} else {
-		WT_RET(__wt_conn_btree_open_lock(session, flags));
+		__wt_conn_btree_open_lock(session, flags);
 		ret = __wt_conn_btree_open(session, treeconf, cfg, flags);
 		if (ret != 0 || LF_ISSET(WT_BTREE_NO_LOCK))
 			__wt_rwunlock(session, btree->rwlock);

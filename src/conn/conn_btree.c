@@ -12,7 +12,7 @@
  *	Spin on the current btree handle until either (a) it is open, read
  *	locked; or (b) it is closed, write locked.
  */
-int
+void
 __wt_conn_btree_open_lock(WT_SESSION_IMPL *session, uint32_t flags)
 {
 	WT_BTREE *btree;
@@ -63,8 +63,6 @@ __wt_conn_btree_open_lock(WT_SESSION_IMPL *session, uint32_t flags)
 		/* Give other threads a chance to make progress. */
 		__wt_yield();
 	}
-
-	return (0);
 }
 
 /*
@@ -102,7 +100,8 @@ __conn_btree_get(WT_SESSION_IMPL *session,
 	}
 	if (matched) {
 		__wt_spin_unlock(session, &conn->spinlock);
-		return (__wt_conn_btree_open_lock(session, flags));
+		__wt_conn_btree_open_lock(session, flags);
+		return (0);
 	}
 
 	/*
@@ -217,7 +216,7 @@ __wt_conn_btree_open(WT_SESSION_IMPL *session,
 		if (!LF_ISSET(WT_BTREE_EXCLUSIVE)) {
 			F_CLR(btree, WT_BTREE_EXCLUSIVE);
 			__wt_rwunlock(session, btree->rwlock);
-			WT_ERR(__wt_conn_btree_open_lock(session, flags));
+			__wt_conn_btree_open_lock(session, flags);
 		}
 	} while (!F_ISSET(btree, WT_BTREE_OPEN));
 
