@@ -168,7 +168,7 @@ __verify_dsk_row(
 		 * Check the raw cell type, then collapse the short key/data
 		 * types.
 		 */
-		WT_RET(__err_cell_type(
+		WT_ERR(__err_cell_type(
 		    session, cell_num, addr, unpack->raw, dsk->type));
 		cell_type = unpack->type;
 
