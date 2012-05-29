@@ -1,0 +1,8 @@
+# Override settings in the normal documentation build for the landing page.
+
+PROJECT_NUMBER         = "Developer Site"
+OUTPUT_DIRECTORY       = ../../docs/top
+INPUT                  = top license.dox
+
+GENERATE_TREEVIEW      = NO
+USE_INLINE_TREES       = NO
