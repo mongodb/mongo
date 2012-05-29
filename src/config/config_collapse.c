@@ -10,8 +10,8 @@
 /*
  * __wt_config_collapse --
  *	Given a NULL-terminated list of configuration strings, where the first
- *	one contains all the defaults, collapse them into a newly allocated
- *	buffer.
+ *	one contains all the defaults, collapse them into newly allocated
+ *	memory.
  */
 int
 __wt_config_collapse(WT_SESSION_IMPL *session,
@@ -19,12 +19,12 @@ __wt_config_collapse(WT_SESSION_IMPL *session,
 {
 	WT_CONFIG cparser;
 	WT_CONFIG_ITEM k, v;
+	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
-	WT_ITEM buf;
 
-	WT_CLEAR(buf);
+	WT_RET(__wt_scr_alloc(session, 0, &tmp));
 
-	WT_RET(__wt_config_init(session, &cparser, cfg[0]));
+	WT_ERR(__wt_config_init(session, &cparser, cfg[0]));
 	while ((ret = __wt_config_next(&cparser, &k, &v)) == 0) {
 		if (k.type != ITEM_STRING && k.type != ITEM_ID)
 			WT_RET_MSG(session, EINVAL,
@@ -39,28 +39,19 @@ __wt_config_collapse(WT_SESSION_IMPL *session,
 			--v.str;
 			v.len += 2;
 		}
-		WT_ERR(__wt_buf_catfmt(session, &buf, "%.*s=%.*s,",
+		WT_ERR(__wt_buf_catfmt(session, tmp, "%.*s=%.*s,",
 		    (int)k.len, k.str, (int)v.len, v.str));
 	}
-
 	if (ret != WT_NOTFOUND)
 		goto err;
 
 	/*
-	 * If the caller passes us no valid configuration strings, we end up
-	 * here with no allocated memory to return.  Check the final buffer
-	 * size: empty configuration strings are possible, and paranoia is
-	 * good.
+	 * If the caller passes us no valid configuration strings, we get here
+	 * with no bytes to copy -- that's OK, the underlying string copy can
+	 * handle empty strings.
 	 */
-	if (buf.size == 0)
-		WT_RET(__wt_buf_initsize(session, &buf, 1));
+	ret = __wt_strndup(session, tmp->data, tmp->size, config_ret);
 
-	/* Strip the trailing comma and NUL-terminate */
-	((char *)buf.data)[buf.size - 1] = '\0';
-
-	*config_ret = buf.data;
-	return (0);
-
-err:	__wt_buf_free(session, &buf);
+err:	__wt_scr_free(&tmp);
 	return (ret);
 }
