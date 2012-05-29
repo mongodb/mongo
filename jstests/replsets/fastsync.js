@@ -97,9 +97,21 @@ var startSlave = function(n) {
     config.version++;
     config.members.push({_id:n, host:hostname+":"+ports[n]});
 
-    result = admin.runCommand({replSetReconfig : config});
-    printjson(result);
-    assert(result.ok, "reconfig worked");
+    // When the slave is started, it'll try to load the config and find that it's
+    // not in the config and close all connections in preparation for transitioning
+    // to "removed" state.  If the reconfig adding it to the set happens to occur at
+    // this point, the heartbeat request's connection will be cut off, causing the
+    // reconfig to fail..
+    assert.soon(function() {
+        try {
+            result = admin.runCommand({replSetReconfig : config});
+        }
+        catch (e) {
+            print("failed to reconfig: "+e);
+            return false;
+        }
+        return result.ok;
+    });
     reconnect(p);
 
     print("4");
