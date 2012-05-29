@@ -1057,7 +1057,7 @@ __slvg_col_build_internal(
 	page->u.intl.recno = 1;
 	page->entries = leaf_cnt;
 	page->type = WT_PAGE_COL_INT;
-	WT_RET(__wt_page_modify_init(session, page));
+	WT_ERR(__wt_page_modify_init(session, page));
 	__wt_page_modify_set(page);
 
 	for (ref = page->u.intl.t, i = 0; i < ss->pages_next; ++i) {
