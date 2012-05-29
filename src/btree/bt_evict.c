@@ -90,7 +90,7 @@ __wt_evict_list_clr_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 		return;
 
 	cache = S2C(session)->cache;
-	__wt_spin_lock(session, &cache->lru_lock);
+	__wt_spin_lock(session, &cache->evict_lock);
 
 	elem = cache->evict_entries;
 	for (evict = cache->evict, i = 0; i < elem; i++, evict++)
@@ -101,7 +101,7 @@ __wt_evict_list_clr_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	WT_ASSERT(session, !F_ISSET_ATOMIC(page, WT_PAGE_EVICT_LRU));
 
-	__wt_spin_unlock(session, &cache->lru_lock);
+	__wt_spin_unlock(session, &cache->evict_lock);
 }
 
 /*
@@ -198,6 +198,12 @@ __wt_evict_page_request(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	cache = S2C(session)->cache;
 
+	/* Do a cheap test before acquiring the lock. */
+	if (page->ref->state != WT_REF_MEM)
+		return;
+
+	__wt_spin_lock(session, &cache->evict_lock);
+
 	/*
 	 * Application threads request forced eviction of pages when they
 	 * become too big.  The application thread must hold a hazard reference
@@ -218,11 +224,12 @@ __wt_evict_page_request(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * put it on the request queue because the memory may be freed by the
 	 * time the eviction thread sees it.
 	 */
-	if (!WT_ATOMIC_CAS(page->ref->state, WT_REF_MEM, WT_REF_EVICT_FORCE))
+	if (!WT_ATOMIC_CAS(page->ref->state, WT_REF_MEM, WT_REF_EVICT_FORCE)) {
+		__wt_spin_unlock(session, &cache->evict_lock);
 		return;
+	}
 
 	set = 0;
-	__wt_spin_lock(session, &cache->er_lock);
 
 	/* Find an empty slot and enter the eviction request. */
 	WT_EVICT_REQ_FOREACH(er, er_end, cache)
@@ -232,17 +239,17 @@ __wt_evict_page_request(WT_SESSION_IMPL *session, WT_PAGE *page)
 			break;
 		}
 
-	__wt_spin_unlock(session, &cache->er_lock);
-	if (set)
-		return;
+	if (!set) {
+		/*
+		 * The request table is full, that's okay for page requests:
+		 * another thread will see this later.
+		 */
+		WT_VERBOSE_VOID(session, evictserver,
+		    "page eviction request table is full");
+		page->ref->state = WT_REF_MEM;
+	}
 
-	/*
-	 * The request table is full, that's okay for page requests: another
-	 * thread will see this later.
-	 */
-	WT_VERBOSE_VOID(session, evictserver,
-	    "eviction server forced page eviction request table is full");
-	page->ref->state = WT_REF_MEM;
+	__wt_spin_unlock(session, &cache->evict_lock);
 }
 
 /*
@@ -330,6 +337,11 @@ __evict_worker(WT_SESSION_IMPL *session)
 	/* Evict pages from the cache. */
 	for (loop = 0;; loop++) {
 		/*
+		 * Block out concurrent eviction while we are handling requests.
+		 */
+		__wt_spin_lock(session, &cache->evict_lock);
+
+		/*
 		 * Walk the eviction-request queue.  It is important to do this
 		 * before closing files, in case a page schedule for eviction
 		 * is freed by closing a file.
@@ -339,6 +351,8 @@ __evict_worker(WT_SESSION_IMPL *session)
 		/* If there is a file sync request, satisfy it. */
 		while (cache->sync_complete != cache->sync_request)
 			WT_RET(__evict_file_request_walk(session));
+
+		__wt_spin_unlock(session, &cache->evict_lock);
 
 		/*
 		 * Keep evicting until we hit the target cache usage.
@@ -502,12 +516,6 @@ __evict_file_request_walk(WT_SESSION_IMPL *session)
 	    "sync-discard" : "sync-discard-nowrite")));
 
 	/*
-	 * Block out concurrent eviction while we are handling this
-	 * request.
-	 */
-	__wt_spin_lock(session, &cache->lru_lock);
-
-	/*
 	 * The eviction candidate list might reference pages we are
 	 * about to discard; clear it.
 	 */
@@ -522,8 +530,6 @@ __evict_file_request_walk(WT_SESSION_IMPL *session)
 		__wt_yield();
 
 	ret = __evict_file_request(request_session, syncop);
-
-	__wt_spin_unlock(session, &cache->lru_lock);
 
 	__wt_session_serialize_wrapup(request_session, NULL, ret);
 
@@ -628,12 +634,6 @@ __evict_page_request_walk(WT_SESSION_IMPL *session)
 		    "forcing eviction of page %p", page);
 
 		/*
-		 * Block out concurrent eviction while we are handling this
-		 * request.
-		 */
-		__wt_spin_lock(session, &cache->lru_lock);
-
-		/*
 		 * The eviction candidate list might reference pages we are
 		 * about to discard; clear it.
 		 */
@@ -673,8 +673,6 @@ __evict_page_request_walk(WT_SESSION_IMPL *session)
 		 */
 		(void)__evict_page(session, page);
 
-		__wt_spin_unlock(session, &cache->lru_lock);
-
 		/* Clear the reference to the btree handle. */
 		WT_CLEAR_BTREE_IN_SESSION(session);
 
@@ -699,12 +697,12 @@ __evict_lru(WT_SESSION_IMPL *session)
 	WT_RET(__evict_walk(session));
 
 	/* Sort the list into LRU order and restart. */
-	__wt_spin_lock(session, &cache->lru_lock);
+	__wt_spin_lock(session, &cache->evict_lock);
 	__evict_lru_sort(session);
 	__evict_list_clr_all(session, WT_EVICT_WALK_BASE);
 
 	cache->evict_current = cache->evict;
-	__wt_spin_unlock(session, &cache->lru_lock);
+	__wt_spin_unlock(session, &cache->evict_lock);
 
 	/* Reconcile and discard some pages. */
 	while (__wt_evict_lru_page(session, 0) == 0)
@@ -744,14 +742,14 @@ __evict_walk(WT_SESSION_IMPL *session)
 	elem = WT_EVICT_WALK_BASE + (conn->btqcnt * WT_EVICT_WALK_PER_TABLE);
 	if (elem > cache->evict_entries) {
 		/* Save the offset of the eviction point. */
-		__wt_spin_lock(session, &cache->lru_lock);
+		__wt_spin_lock(session, &cache->evict_lock);
 		i = (u_int)(cache->evict_current - cache->evict);
 		WT_ERR(__wt_realloc(session, &cache->evict_allocated,
 		    elem * sizeof(WT_EVICT_ENTRY), &cache->evict));
 		cache->evict_entries = elem;
 		if (cache->evict_current != NULL)
 			cache->evict_current = cache->evict + i;
-		__wt_spin_unlock(session, &cache->lru_lock);
+		__wt_spin_unlock(session, &cache->evict_lock);
 	}
 
 	i = WT_EVICT_WALK_BASE;
@@ -771,7 +769,7 @@ __evict_walk(WT_SESSION_IMPL *session)
 	}
 
 	if (0) {
-err:		__wt_spin_unlock(session, &cache->lru_lock);
+err:		__wt_spin_unlock(session, &cache->evict_lock);
 	}
 	__wt_spin_unlock(session, &conn->spinlock);
 	return (ret);
@@ -901,7 +899,7 @@ __evict_get_page(
 		if (cache->evict_current == NULL ||
 		    cache->evict_current >= cache->evict + candidates)
 			return;
-		if (__wt_spin_trylock(session, &cache->lru_lock) == 0)
+		if (__wt_spin_trylock(session, &cache->evict_lock) == 0)
 			break;
 		__wt_yield();
 	}
@@ -956,7 +954,7 @@ __evict_get_page(
 
 	if (is_app && *pagep == NULL)
 		cache->evict_current = NULL;
-	__wt_spin_unlock(session, &cache->lru_lock);
+	__wt_spin_unlock(session, &cache->evict_lock);
 }
 
 /*

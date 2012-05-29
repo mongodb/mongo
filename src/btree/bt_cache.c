@@ -40,7 +40,7 @@ __wt_cache_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 
 	WT_ERR(__wt_cond_alloc(session,
 	    "cache eviction server", 1, &cache->evict_cond));
-	__wt_spin_init(session, &cache->lru_lock);
+	__wt_spin_init(session, &cache->evict_lock);
 
 	/*
 	 * Allocate the forced page eviction request array.  We size it to
@@ -49,7 +49,6 @@ __wt_cache_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	cache->max_evict_request = conn->session_size;
 	WT_ERR(__wt_calloc_def(
 	    session, cache->max_evict_request, &cache->evict_request));
-	__wt_spin_init(session, &cache->er_lock);
 
 	/*
 	 * We pull some values from the cache statistics (rather than have two
@@ -99,10 +98,9 @@ __wt_cache_destroy(WT_CONNECTION_IMPL *conn)
 
 	if (cache->evict_cond != NULL)
 		(void)__wt_cond_destroy(session, cache->evict_cond);
-	__wt_spin_destroy(session, &cache->lru_lock);
+	__wt_spin_destroy(session, &cache->evict_lock);
 
 	__wt_free(session, cache->evict_request);
-	__wt_spin_destroy(session, &cache->er_lock);
 
 	__wt_free(session, conn->cache);
 }

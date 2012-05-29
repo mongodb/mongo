@@ -40,6 +40,7 @@ struct __wt_cache {
 	 * Eviction thread information.
 	 */
 	WT_CONDVAR *evict_cond;		/* Cache eviction server mutex */
+	WT_SPINLOCK evict_lock;		/* Eviction serialization */
 
 	u_int eviction_trigger;		/* Percent to trigger eviction. */
 	u_int eviction_target;		/* Percent to end eviction */
@@ -47,7 +48,6 @@ struct __wt_cache {
 	/*
 	 * LRU eviction list information.
 	 */
-	WT_SPINLOCK	lru_lock;	/* LRU serialization */
 	WT_EVICT_ENTRY *evict;		/* LRU pages being tracked */
 	WT_EVICT_ENTRY *evict_current;	/* LRU current page to be evicted */
 	size_t   evict_allocated;	/* LRU list bytes allocated */
@@ -56,7 +56,6 @@ struct __wt_cache {
 	/*
 	 * Forced-page eviction request information.
 	 */
-	WT_SPINLOCK	er_lock;	/* Forced page eviction serialization */
 	WT_EVICT_ENTRY *evict_request;	/* Forced page eviction request list */
 	uint32_t max_evict_request;	/* Size of the eviction request array */
 
