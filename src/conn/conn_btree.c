@@ -177,7 +177,7 @@ __wt_conn_btree_open(WT_SESSION_IMPL *session,
     const char *config, const char *cfg[], uint32_t flags)
 {
 	WT_BTREE *btree;
-	WT_DECL_ITEM addr;
+	WT_DECL_ITEM(addr);
 	WT_DECL_RET;
 
 	btree = session->btree;
