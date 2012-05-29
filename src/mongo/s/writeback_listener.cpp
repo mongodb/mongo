@@ -138,6 +138,7 @@ namespace mongo {
                     }
 
                 }
+                conn->done();
 
                 LOG(1) << "writebacklisten result: " << result << endl;
 
@@ -268,7 +269,6 @@ namespace mongo {
                     log() << "unknown writeBack result: " << result << endl;
                 }
 
-                conn->done(); // TODO: move this further up?
                 secsToSleep = 0;
                 continue;
             }

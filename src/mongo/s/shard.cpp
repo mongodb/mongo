@@ -327,6 +327,7 @@ namespace mongo {
         if ( ! ok ) {
             stringstream ss;
             ss << "runCommand (" << cmd << ") on shard (" << _name << ") failed : " << res;
+            conn->done();
             throw UserException( 13136 , ss.str() );
         }
         res = res.getOwned();
