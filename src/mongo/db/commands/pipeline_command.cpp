@@ -44,6 +44,69 @@ namespace mongo {
         virtual void help(stringstream &help) const;
 
         PipelineCommand();
+
+    private:
+        /*
+          For the case of explain, we don't want to hold any lock at all,
+          because it generates warnings about recursive locks.  However,
+          the getting the explain information for the underlying cursor uses
+          the direct client cursor, and that gets a lock.  Therefore, we need
+          to take steps to avoid holding a lock while we use that.  On the
+          other hand, we need to have a READ lock for normal explain execution.
+          Therefore, the lock is managed manually, and not through the virtual
+          locktype() above.
+
+          In order to achieve this, locktype() returns NONE, but the lock that
+          would be managed for reading (for executing the pipeline in the
+          regular way),  will be managed manually here.  This code came from
+          dbcommands.cpp, where objects are constructed to hold the lock
+          and automatically release it on destruction.  The use of this
+          pattern requires extra functions to hold the lock scope and from
+          within which to execute the other steps of the explain.
+
+          The arguments for these are all the same, and come from run(), but
+          are passed in so that new blocks can be created to hold the
+          automatic locking objects.
+         */
+
+        /*
+          Execute the pipeline for the explain.  This is common to both the
+          locked and unlocked code path.  However, the results are different.
+          For an explain, with no lock, it really outputs the pipeline
+          chain rather than fetching the data.
+         */
+        bool executePipeline(
+            BSONObjBuilder &result, string &errmsg, const string &ns,
+            intrusive_ptr<Pipeline> &pPipeline,
+            intrusive_ptr<DocumentSourceCursor> &pSource,
+            intrusive_ptr<ExpressionContext> &pCtx);
+
+        /*
+          The explain code path holds a lock while the original cursor is
+          parsed; we still need to take that step, because that is how we
+          determine whether or not indexes will allow the optimization of
+          early $match and/or $sort.
+
+          Once the Cursor is identified, it is released, and then the lock
+          is released (automatically, via end of a block), and then the
+          pipeline is executed.
+         */
+        bool runExplain(
+            BSONObjBuilder &result, string &errmsg,
+            const string &ns, const string &db,
+            intrusive_ptr<Pipeline> &pPipeline,
+            intrusive_ptr<ExpressionContext> &pCtx);
+
+        /*
+          The execute code path holds a READ lock for its entire duration.
+          The Cursor is created, and then documents are pulled out of it until
+          they are exhausted (or some other error occurs).
+         */
+        bool runExecute(
+            BSONObjBuilder &result, string &errmsg,
+            const string &ns, const string &db,
+            intrusive_ptr<Pipeline> &pPipeline,
+            intrusive_ptr<ExpressionContext> &pCtx);
     };
 
     // self-registering singleton static instance
@@ -54,7 +117,14 @@ namespace mongo {
     }
 
     Command::LockType PipelineCommand::locktype() const {
-        return READ;
+        /*
+          The locks for this are managed manually.  The problem is that the
+          explain execution uses the direct client interface, and this
+          causes recursive lock warnings if the lock is already held.  As
+          a result, there are two code paths for this.  See the comments in
+          the private section of PipelineCommand for more details.
+         */
+        return NONE;
     }
 
     bool PipelineCommand::slaveOk() const {
@@ -68,21 +138,66 @@ namespace mongo {
     PipelineCommand::~PipelineCommand() {
     }
 
-    bool PipelineCommand::run(const string &db, BSONObj &cmdObj,
-                              int options, string &errmsg,
-                              BSONObjBuilder &result, bool fromRepl) {
+    bool PipelineCommand::runExplain(
+        BSONObjBuilder &result, string &errmsg,
+        const string &ns, const string &db,
+        intrusive_ptr<Pipeline> &pPipeline,
+        intrusive_ptr<ExpressionContext> &pCtx) {
 
-        intrusive_ptr<ExpressionContext> pCtx(
-            ExpressionContext::create(&InterruptStatusMongod::status));
+        intrusive_ptr<DocumentSourceCursor> pSource;
+        
+        /*
+          For EXPLAIN:
 
-        /* try to parse the command; if this fails, then we didn't run */
-        intrusive_ptr<Pipeline> pPipeline(
-            Pipeline::parseCommand(errmsg, cmdObj, pCtx));
-        if (!pPipeline.get())
-            return false;
+          This block is here to contain the scope of the lock.  We need the lock
+          while we prepare the cursor, but we need to have released it by the
+          time the recursive call is made to get the explain information using
+          the direct client interface under the execution phase.
+         */
+        {
+            scoped_ptr<Lock::GlobalRead> lk;
+            if(lockGlobally())
+                lk.reset(new Lock::GlobalRead());
+            Client::ReadContext ctx(ns, dbpath, requiresAuth()); // read lock
 
-        intrusive_ptr<DocumentSource> pSource(
-            PipelineD::prepareCursorSource(pPipeline, db, pCtx));
+            PipelineD::prepareCursorSource(&pSource, pPipeline, db, pCtx);
+
+            /* release the Cursor before the lock gets released */
+            pSource->releaseCursor();
+        }
+
+        /*
+          For EXPLAIN this just uses the direct client to do an explain on
+          what the underlying Cursor was, based on its query and sort
+          settings, and then wraps it with JSON from the pipeline definition.
+          That does not require the lock or cursor, both of which were
+          released above.
+         */
+        return executePipeline(result, errmsg, ns, pPipeline, pSource, pCtx);
+    }
+
+    bool PipelineCommand::runExecute(
+        BSONObjBuilder &result, string &errmsg,
+        const string &ns, const string &db,
+        intrusive_ptr<Pipeline> &pPipeline,
+        intrusive_ptr<ExpressionContext> &pCtx) {
+
+        intrusive_ptr<DocumentSourceCursor> pSource;
+
+        scoped_ptr<Lock::GlobalRead> lk;
+        if(lockGlobally())
+            lk.reset(new Lock::GlobalRead());
+        Client::ReadContext ctx(ns, dbpath, requiresAuth()); // read lock
+
+        PipelineD::prepareCursorSource(&pSource, pPipeline, db, pCtx);
+        return executePipeline(result, errmsg, ns, pPipeline, pSource, pCtx);
+    }
+
+    bool PipelineCommand::executePipeline(
+        BSONObjBuilder &result, string &errmsg, const string &ns,
+        intrusive_ptr<Pipeline> &pPipeline,
+        intrusive_ptr<DocumentSourceCursor> &pSource,
+        intrusive_ptr<ExpressionContext> &pCtx) {
 
         /* this is the normal non-debug path */
         if (!pPipeline->getSplitMongodPipeline())
@@ -161,6 +276,35 @@ namespace mongo {
         /* NOTREACHED */
         verify(false);
         return false;
+    }
+
+    bool PipelineCommand::run(const string &db, BSONObj &cmdObj,
+                              int options, string &errmsg,
+                              BSONObjBuilder &result, bool fromRepl) {
+
+        intrusive_ptr<ExpressionContext> pCtx(
+            ExpressionContext::create(&InterruptStatusMongod::status));
+
+        /* try to parse the command; if this fails, then we didn't run */
+        intrusive_ptr<Pipeline> pPipeline(
+            Pipeline::parseCommand(errmsg, cmdObj, pCtx));
+        if (!pPipeline.get())
+            return false;
+
+        string ns(parseNs(db, cmdObj));
+
+        if (pPipeline->getExplain())
+            return runExplain(result, errmsg, ns, db, pPipeline, pCtx);
+        else
+            return runExecute(result, errmsg, ns, db, pPipeline, pCtx);
+
+#ifdef NEVER
+        intrusive_ptr<DocumentSourceCursor> pSource;
+        PipelineD::prepareCursorSource(
+            &pSource, pPipeline, db, pCtx);
+
+        return executePipeline(result, errmsg, ns, pPipeline, pSource, pCtx);
+#endif
     }
 
 } // namespace mongo

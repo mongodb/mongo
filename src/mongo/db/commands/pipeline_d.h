@@ -19,7 +19,7 @@
 #include "pch.h"
 
 namespace mongo {
-    class DocumentSource;
+    class DocumentSourceCursor;
     class Pipeline;
 
     /*
@@ -35,7 +35,7 @@ namespace mongo {
     public:
 
         /**
-           Create a Cursor wrapped in a DocumentSource, which is suitable
+           Create a Cursor wrapped in a DocumentSourceCursor, which is suitable
            to be the first source for a pipeline to begin with.  This source
            will feed the execution of the pipeline.
 
@@ -45,13 +45,13 @@ namespace mongo {
            early match can be removed and replaced with a Cursor that will
            do an index scan.
 
+           @param ppSource where to put the wrapped Cursor
            @param pPipeline the logical "this" for this operation
            @param dbName the name of the database
            @param pExpCtx the expression context for this pipeline
-           @returns a document source that wraps an appropriate cursor to
-             be at the beginning of this pipeline
          */
-        static intrusive_ptr<DocumentSource> prepareCursorSource(
+        static void prepareCursorSource(
+            intrusive_ptr<DocumentSourceCursor> *ppSource,
             const intrusive_ptr<Pipeline> &pPipeline,
             const string &dbName,
             const intrusive_ptr<ExpressionContext> &pExpCtx);

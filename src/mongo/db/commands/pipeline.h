@@ -118,6 +118,13 @@ namespace mongo {
         bool getSplitMongodPipeline() const;
 
         /**
+           Ask if this is for an explain request.
+
+           @returns true if this is an explain
+         */
+        bool getExplain() const;
+
+        /**
           The aggregation command name.
          */
         static const char commandName[];
@@ -208,6 +215,10 @@ namespace mongo {
             return false;
 
         return splitMongodPipeline;
+    }
+
+    inline bool  Pipeline::getExplain() const {
+        return explain;
     }
 
 } // namespace mongo

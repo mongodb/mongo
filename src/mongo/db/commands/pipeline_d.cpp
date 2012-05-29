@@ -24,7 +24,8 @@
 
 namespace mongo {
 
-    intrusive_ptr<DocumentSource> PipelineD::prepareCursorSource(
+    void PipelineD::prepareCursorSource(
+        intrusive_ptr<DocumentSourceCursor> *ppSource,
         const intrusive_ptr<Pipeline> &pPipeline,
         const string &dbName,
         const intrusive_ptr<ExpressionContext> &pExpCtx) {
@@ -133,10 +134,9 @@ namespace mongo {
         }
 
         /* wrap the cursor with a DocumentSource and return that */
-        intrusive_ptr<DocumentSourceCursor> pSource(
-            DocumentSourceCursor::create(pCursor, dbName, pExpCtx));
+        *ppSource = DocumentSourceCursor::create(pCursor, dbName, pExpCtx);
 
-        pSource->setNamespace(fullName);
+        (*ppSource)->setNamespace(fullName);
 
         /*
           Note the query and sort
@@ -145,11 +145,9 @@ namespace mongo {
           referenced (by reference) by the cursor, which doesn't make its
           own copies of them.
         */
-        pSource->setQuery(pQueryObj);
+        (*ppSource)->setQuery(pQueryObj);
         if (initSort)
-            pSource->setSort(pSortObj);
-
-        return pSource;
+            (*ppSource)->setSort(pSortObj);
     }
 
 } // namespace mongo

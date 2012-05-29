@@ -369,6 +369,12 @@ namespace mongo {
          */
         void setSort(const shared_ptr<BSONObj> &pBsonObj);
 
+        /**
+           Release the cursor, but without changing the other data.  This
+           is used for the explain version of pipeline execution.
+         */
+        void releaseCursor();
+
     protected:
         // virtuals from DocumentSource
         virtual void sourceToBson(BSONObjBuilder *pBuilder, bool explain) const;

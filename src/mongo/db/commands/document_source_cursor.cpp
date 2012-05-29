@@ -29,6 +29,12 @@ namespace mongo {
     DocumentSourceCursor::~DocumentSourceCursor() {
     }
 
+    void DocumentSourceCursor::releaseCursor() {
+        // note the order here; the cursor holder has to go first
+        pClientCursor.reset();
+        pCursor.reset();
+    }
+
     bool DocumentSourceCursor::eof() {
         /* if we haven't gotten the first one yet, do so now */
         if (!pCurrent.get())
