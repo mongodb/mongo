@@ -47,7 +47,6 @@ public:
     bool _keepIndexVersion;
     bool _restoreOptions;
     bool _restoreIndexes;
-    bool _restoreShardingConfig;
     int _w;
     string _curns;
     string _curdb;
@@ -62,13 +61,11 @@ public:
         ("keepIndexVersion" , "don't upgrade indexes to newest version")
         ("noOptionsRestore" , "don't restore collection options")
         ("noIndexRestore" , "don't restore indexes")
-        ("restoreShardingConfig", "restore sharding configuration before doing the full import")
         ("w" , po::value<int>()->default_value(1) , "minimum number of replicas per write" )
         ;
         add_hidden_options()
         ("dir", po::value<string>()->default_value("dump"), "directory to restore from")
         ("indexesLast" , "wait to add indexes (now default)") // left in for backwards compatibility
-        ("forceConfigRestore", "don't use confirmation prompt when doing --restoreShardingConfig") // For testing
         ;
         addPositionArg("dir", 1);
     }
@@ -97,8 +94,6 @@ public:
         _restoreOptions = !hasParam("noOptionRestore");
         _restoreIndexes = !hasParam("noIndexRestore");
         _w = getParam( "w" , 1 );
-        _restoreShardingConfig = hasParam("restoreShardingConfig");
-        bool forceConfigRestore = hasParam("forceConfigRestore");
 
         bool doOplog = hasParam( "oplogReplay" );
 
@@ -147,49 +142,6 @@ public:
             }
         }
 
-        if (_restoreShardingConfig) {
-            if (_db != "" && _db != "config") {
-                log() << "Can only setup sharding configuration on full restore or on restoring config database" << endl;
-                return -1;
-            }
-
-            // make sure we're talking to a mongos
-            if (!isMongos()) {
-                log() << "Can only use --restoreShardingConfig on a mongos" << endl;
-                return -1;
-            }
-
-            if ( ! exists(root / "config") ) {
-                log() << "No config directory to restore sharding setup from." << endl;
-                return -1;
-            }
-
-            // Make sure this isn't an active cluster.
-            log() << "WARNING: this will drop the config database, overriding any sharding configuration you currently have." << endl
-                 << "DO NOT RUN THIS COMMAND WHILE YOUR CLUSTER IS ACTIVE" << endl;
-            if (forceConfigRestore) {
-                log() << "Running with --forceConfigRestore. Continuing." << endl;
-            } else {
-                if (!confirmAction()) {
-                    log() << "aborting" << endl;
-                    return -1;
-                }
-            }
-
-            // Restore config database
-            BSONObj info;
-            bool ok = conn().runCommand( "config" , BSON( "dropDatabase" << 1 ) , info );
-            if (!ok) {
-                log() << "Error dropping config database. Aborting" << endl;
-                return -1;
-            }
-            drillDown(root / "config", false, false);
-
-            log() << "Finished restoring config database." << endl
-                 << "Calling flushRouterConfig on this connection" << endl;
-            conn().runCommand( "config" , BSON( "flushRouterConfig" << 1 ) , info );
-        }
-
         /* If _db is not "" then the user specified a db name to restore as.
          *
          * In that case we better be given either a root directory that
@@ -200,13 +152,6 @@ public:
          * .bson file, or a single .bson file itself (a collection).
          */
         drillDown(root, _db != "", _coll != "", true);
-
-        if (_restoreShardingConfig) {
-            log() << "Flushing routing configuration from all mongos that we're aware of" << endl;
-            flushAllMongos();
-            log(1) << "Finished flushing the sharding configuration on all mongos' that the dumped config data knew of." << endl
-                 << "If there are new mongos' that weren't just flushed, make sure to call flushRouterConfig on them." << endl;
-        }
 
         // should this happen for oplog replay as well?
         conn().getLastError();
@@ -259,12 +204,7 @@ public:
 
                 if ( p.leaf() == "system.indexes.bson" ) {
                     indexes = p;
-                }
-                else if (_restoreShardingConfig && is_directory(p) && p.leaf() == "config") {
-                    // Config directory should have already been restored. Skip it here.
-                    continue;
-                }
-                else {
+                } else {
                     drillDown(p, use_db, use_coll);
                 }
             }
@@ -547,55 +487,6 @@ private:
 
             ::abort();
         }
-    }
-
-    // Calls flushRouterConfig on all mongos' in the config db's mongos collection, as well as on the one
-    // we're currently connected to.
-    void flushAllMongos() {
-        BSONObj info;
-
-        auto_ptr<DBClientCursor> cursor = conn().query ("config.mongos", Query());
-        while (cursor->more()) {
-            BSONObj obj = cursor->nextSafe();
-            string mongos = obj.getField("_id").valuestr();
-            string errmsg;
-            ConnectionString cs = ConnectionString::parse( mongos , errmsg );
-
-            if ( ! cs.isValid() ) {
-                error() << "invalid mongos hostname [" << mongos << "] " << errmsg << endl;
-                continue;
-            }
-
-            DBClientBase* mongosConn = cs.connect( errmsg );
-            if ( ! mongosConn ) {
-                error() << "Error connecting to mongos [" << mongos << "]: " << errmsg << endl;
-                continue;
-            }
-
-            log(1) << "Calling flushRouterConfig on mongos: " << mongos << endl;
-            mongosConn->runCommand( "config" , BSON( "flushRouterConfig" << 1 ) , info );
-        }
-    }
-
-    bool confirmAction() {
-        string userInput;
-        int attemptCount = 0;
-        while (attemptCount < 3) {
-            log() << "Are you sure you want to continue? [y/n]: ";
-            cin >> userInput;
-            if (userInput == "Y" || userInput == "y" || userInput == "yes" || userInput == "Yes" || userInput == "YES") {
-                return true;
-            }
-            else if (userInput == "N" || userInput == "n" || userInput == "no" || userInput == "No" || userInput == "NO") {
-                return false;
-            }
-            else {
-                log() << "Invalid input." << endl;
-                attemptCount++;
-            }
-        }
-        log() << "Entered invalid input 3 times in a row." << endl;
-        return false;
     }
 };
 

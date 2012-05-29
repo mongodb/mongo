@@ -1,3 +1,4 @@
+if (0) { // Test disabled until SERVER-3853 is finished.
 var name = "dumprestore9";
 function step(msg) {
     msg = msg || "";
@@ -75,3 +76,4 @@ for (var i = 0; i < s._connections.length; i++) {
 step("Stop cluster");
 s.stop();
 step("SUCCESS");
+}
