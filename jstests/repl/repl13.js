@@ -35,8 +35,10 @@ for( i = 99999; i >= 90000; --i ) {
 // The initial sync completes and subsequent writes succeed, in spite of any assertions that occur
 // when the update operations above are replicated.
 mc.save( {} );
+assert.eq( 100001 , mc.count() );
 assert.soon( function() { return sc.count() == 100001; } );
 mc.save( {} );
+assert.eq( 100002 , mc.count() );
 assert.soon( function() { return sc.count() == 100002; } );
 
 debug( sc.findOne( {_id:99999} ) );
@@ -44,3 +46,9 @@ debug( sc.findOne( {_id:90000} ) );
 
 assert.eq( 1, sc.findOne( {_id:99999} ).a );
 assert.eq( 1, sc.findOne( {_id:90000} ).a );
+
+m_hash = m.getDB( "d" ).runCommand( "dbhash" );
+s_hash = s.getDB( "d" ).runCommand( "dbhash" );
+
+assert.eq( m_hash.collections.c , s_hash.collections.c , "sad " + tojson( m_hash ) + " " + tojson( s_hash ) );
+
