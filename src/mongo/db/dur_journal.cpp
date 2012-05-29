@@ -166,15 +166,18 @@ namespace mongo {
         }
 
         /** never throws
+            @param anyFiles by default we only look at j._* files. If anyFiles is true, return true
+                   if there are any files in the journal directory. acquirePathLock() uses this to
+                   make sure that the journal directory is mounted.
             @return true if journal dir is not empty
         */
-        bool haveJournalFiles() {
+        bool haveJournalFiles(bool anyFiles) {
             try {
                 for ( boost::filesystem::directory_iterator i( getJournalDir() );
                         i != boost::filesystem::directory_iterator();
                         ++i ) {
                     string fileName = boost::filesystem::path(*i).leaf();
-                    if( str::startsWith(fileName, "j._") )
+                    if( anyFiles || str::startsWith(fileName, "j._") )
                         return true;
                 }
             }

@@ -1134,7 +1134,12 @@ namespace mongo {
                          "**************";
             }
             else if (cmdLine.dur) {
-                if (!dur::haveJournalFiles()) {
+                if (!dur::haveJournalFiles(/*anyFiles=*/true)) {
+                    // Passing anyFiles=true as we are trying to protect against starting in an
+                    // unclean state with the journal directory unmounted. If there are any files,
+                    // even prealloc files, then it means that it is mounted so we can continue.
+                    // Previously there was an issue (SERVER-5056) where we would fail to start up
+                    // if killed during prealloc.
                     
                     vector<string> dbnames;
                     getDatabaseNames( dbnames );
@@ -1150,6 +1155,7 @@ namespace mongo {
                             << "old lock file: " << name << ".  probably means unclean shutdown,\n"
                             << "but there are no journal files to recover.\n"
                             << "this is likely human error or filesystem corruption.\n"
+                            << "please make sure that your journal directory is mounted.\n"
                             << "found " << dbnames.size() << " dbs.\n"
                             << "see: http://dochub.mongodb.org/core/repair for more information\n"
                             << "*************";
