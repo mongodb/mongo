@@ -487,15 +487,27 @@ err:	__wt_scr_free(&buf);
 char *
 __wt_track_string(WT_PAGE_TRACK *track, char *buf, size_t len)
 {
-	(void)snprintf(buf, len,
-	    "%s%s%s%s%s",
-	    F_ISSET(track, WT_TRK_DISCARD) ? "discard" : "",
-	    F_ISSET(track, WT_TRK_DISCARD) &&
-	    F_ISSET(track, WT_TRK_INUSE | WT_TRK_ONPAGE) ? ", " : "",
-	    F_ISSET(track, WT_TRK_INUSE) ? "inuse" : "",
-	    F_ISSET(track, WT_TRK_INUSE) &&
-	    F_ISSET(track, WT_TRK_ONPAGE) ?  ", " : "",
-	    F_ISSET(track, WT_TRK_ONPAGE) ? "onpage" : "");
+	size_t remain, wlen;
+	char *p, *end;
+	const char *sep;
+
+	p = buf;
+	end = buf + len;
+
+#define	WT_APPEND_FLAG(f, name)						\
+	if (F_ISSET(track, f)) {					\
+		remain = WT_PTRDIFF(end, p);				\
+		wlen = (size_t)snprintf(p, remain, "%s%s", sep, name);	\
+		p = wlen >= remain ? end : p + wlen;			\
+		sep = ", ";						\
+	}
+
+	sep = NULL;
+	WT_APPEND_FLAG(WT_TRK_DISCARD, "discard");
+	WT_APPEND_FLAG(WT_TRK_INUSE, "inuse");
+	WT_APPEND_FLAG(WT_TRK_JUST_ADDED, "just-added");
+	WT_APPEND_FLAG(WT_TRK_ONPAGE, "onpage");
+
 	return (buf);
 }
 #endif
