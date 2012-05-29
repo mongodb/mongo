@@ -40,6 +40,8 @@ namespace mongo {
             
             if ( ! isMasterNs( dbName.c_str() ) )
                 return;
+            
+            Client::GodScope god;
 
             vector<BSONObj> indexes;
             {
