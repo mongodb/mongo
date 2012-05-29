@@ -177,10 +177,9 @@ __wt_conn_btree_open(WT_SESSION_IMPL *session,
     const char *config, const char *cfg[], uint32_t flags)
 {
 	WT_BTREE *btree;
+	WT_DECL_ITEM addr;
 	WT_DECL_RET;
-	WT_ITEM *addr;
 
-	addr = NULL;
 	btree = session->btree;
 
 	WT_ASSERT(session, F_ISSET(btree, WT_BTREE_EXCLUSIVE));
@@ -218,7 +217,7 @@ __wt_conn_btree_open(WT_SESSION_IMPL *session,
 		if (!LF_ISSET(WT_BTREE_EXCLUSIVE)) {
 			F_CLR(btree, WT_BTREE_EXCLUSIVE);
 			__wt_rwunlock(session, btree->rwlock);
-			WT_RET(__wt_conn_btree_open_lock(session, flags));
+			WT_ERR(__wt_conn_btree_open_lock(session, flags));
 		}
 	} while (!F_ISSET(btree, WT_BTREE_OPEN));
 
