@@ -27,7 +27,7 @@ __wt_txnid_cmp(const void *v1, const void *v2)
  *	Sort a snapshot and size for faster searching.
  */
 static void
-__txn_sort_snapshot(WT_SESSION_IMPL *session, uint32_t n)
+__txn_sort_snapshot(WT_SESSION_IMPL *session, uint32_t n, wt_txnid_t id)
 {
 	WT_TXN *txn;
 	WT_TXN_GLOBAL *txn_global;
@@ -38,8 +38,8 @@ __txn_sort_snapshot(WT_SESSION_IMPL *session, uint32_t n)
 	/* Sort the snapshot and size for faster searching. */
 	qsort(txn->snapshot, n, sizeof(wt_txnid_t), __wt_txnid_cmp);
 	txn->snapshot_count = n;
-	txn->snap_min = (n == 0) ? txn_global->current : txn->snapshot[0];
-	txn->snap_max = (n == 0) ? txn->snap_min : txn->snapshot[n - 1];
+	txn->snap_min = (n == 0) ? id : txn->snapshot[0];
+	txn->snap_max = (n == 0) ? id : txn->snapshot[n - 1];
 	WT_ASSERT(session, txn->snap_min != WT_TXN_NONE);
 }
 
@@ -73,7 +73,8 @@ __wt_txn_get_snapshot(WT_SESSION_IMPL *session, wt_txnid_t max_id)
 				txn->snapshot[n++] = id;
 	} while (current_id != txn_global->current);
 
-	__txn_sort_snapshot(session, n);
+	__txn_sort_snapshot(
+	    session, n, (max_id != WT_TXN_NONE) ? max_id : current_id);
 	return (0);
 }
 
@@ -123,7 +124,7 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 	    txn->id == WT_TXN_NONE || txn->id == WT_TXN_ABORTED);
 
 	if (txn->isolation == TXN_ISO_SNAPSHOT)
-		__txn_sort_snapshot(session, n);
+		__txn_sort_snapshot(session, n, txn->id);
 
 	F_SET(txn, TXN_RUNNING);
 
