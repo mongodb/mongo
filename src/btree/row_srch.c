@@ -129,7 +129,7 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 				item->data = WT_IKEY_DATA(ikey);
 				item->size = ikey->size;
 
-				WT_RET(WT_BTREE_CMP(
+				WT_ERR(WT_BTREE_CMP(
 				    session, btree, srch_key, item, cmp));
 				if (cmp == 0)
 					break;
@@ -165,7 +165,7 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 	 */
 	if (is_modify) {
 		/* Initialize the page's modification information */
-		WT_RET(__wt_page_modify_init(session, page));
+		WT_ERR(__wt_page_modify_init(session, page));
 
 		WT_ORDERED_READ(cbt->write_gen, page->modify->write_gen);
 	}
