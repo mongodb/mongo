@@ -70,6 +70,7 @@ struct __wt_txn {
 		TXN_ISO_SNAPSHOT
 	} isolation;
 
-#define	TXN_RUNNING	0x01
+#define	TXN_ERROR	0x01
+#define	TXN_RUNNING	0x02
 	uint32_t flags;
 };

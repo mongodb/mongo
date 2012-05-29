@@ -121,7 +121,7 @@ __curfile_insert(WT_CURSOR *cursor)
 		WT_CURSOR_NEEDKEY(cursor);
 	WT_CURSOR_NEEDVALUE(cursor);
 	ret = __wt_btcur_insert((WT_CURSOR_BTREE *)cursor);
-err:	API_END(session);
+err:	API_END_TXN_ERROR(session, ret);
 
 	return (ret);
 }
@@ -142,7 +142,7 @@ __curfile_update(WT_CURSOR *cursor)
 	WT_CURSOR_NEEDKEY(cursor);
 	WT_CURSOR_NEEDVALUE(cursor);
 	ret = __wt_btcur_update((WT_CURSOR_BTREE *)cursor);
-err:	API_END(session);
+err:	API_END_TXN_ERROR(session, ret);
 
 	return (ret);
 }
@@ -162,7 +162,7 @@ __curfile_remove(WT_CURSOR *cursor)
 	CURSOR_API_CALL(cursor, session, remove, cbt->btree);
 	WT_CURSOR_NEEDKEY(cursor);
 	ret = __wt_btcur_remove((WT_CURSOR_BTREE *)cursor);
-err:	API_END(session);
+err:	API_END_TXN_ERROR(session, ret);
 
 	return (ret);
 }
@@ -186,7 +186,7 @@ __curfile_close(WT_CURSOR *cursor)
 	/* The URI is owned by the btree handle. */
 	cursor->uri = NULL;
 	WT_TRET(__wt_cursor_close(cursor));
-	API_END(session);
+	API_END_TXN_ERROR(session, ret);
 
 	return (ret);
 }

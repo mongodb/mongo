@@ -428,10 +428,16 @@ __session_commit_transaction(WT_SESSION *wt_session, const char *config)
 {
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
+	WT_TXN *txn;
 
 	session = (WT_SESSION_IMPL *)wt_session;
 
 	SESSION_API_CALL(session, commit_transaction, config, cfg);
+	txn = &session->txn;
+	if (F_ISSET(txn, TXN_ERROR)) {
+		__wt_errx(session, "failed transaction requires rollback");
+		ret = EINVAL;
+	}
 	WT_TRET(__session_close_cursors(session));
 	if (ret == 0)
 		ret = __wt_txn_commit(session, cfg);

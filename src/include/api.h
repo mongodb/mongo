@@ -290,6 +290,12 @@ struct __wt_connection_impl {
 	}								\
 } while (0)
 
+/* If an error is returned, mark that the transaction requires abort. */
+#define	API_END_TXN_ERROR(s, ret)					\
+	API_END(s);							\
+	if ((ret) != 0 && (ret) != WT_NOTFOUND && (ret) != WT_DUPLICATE_KEY) \
+		F_SET(&(s)->txn, TXN_ERROR)
+
 /*
  * If a session or connection method is about to return WT_NOTFOUND (some
  * underlying object was not found), map it to ENOENT, only cursor methods

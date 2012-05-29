@@ -149,7 +149,7 @@ __txn_release(WT_SESSION_IMPL *session)
 	WT_ASSERT(session, txn_global->ids[session->id] != WT_TXN_NONE &&
 	    txn->id != WT_TXN_NONE);
 	WT_PUBLISH(txn_global->ids[session->id], txn->id = WT_TXN_NONE);
-	F_CLR(txn, TXN_RUNNING);
+	F_CLR(txn, TXN_ERROR | TXN_RUNNING);
 
 	return (0);
 }
@@ -161,22 +161,8 @@ __txn_release(WT_SESSION_IMPL *session)
 int
 __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 {
-#if 0
-	/*
-	 * We want to avoid this cost in application transactions -- the only
-	 * reason to do it is if 2 billion transactions are executed between
-	 * writes of a page...
-	 */
-	WT_TXN *txn;
-	wt_txnid_t **m;
-	u_int i;
-
-	txn = &session->txn;
-	for (i = 0, m = txn->mod; i < txn->mod_count; i++, m++)
-		**m = WT_TXN_NONE;
-#endif
-
 	WT_UNUSED(cfg);
+
 	return (__txn_release(session));
 }
 
@@ -194,7 +180,6 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_UNUSED(cfg);
 
 	txn = &session->txn;
-
 	for (i = 0, m = txn->mod; i < txn->mod_count; i++, m++)
 		**m = WT_TXN_ABORTED;
 
