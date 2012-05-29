@@ -594,7 +594,7 @@ namespace mongo {
         op.debug().query = pattern;
         op.setQuery(pattern);
 
-        //PageFaultRetryableSection s;
+        PageFaultRetryableSection s;
         while ( 1 ) {
             try {
                 Lock::DBWrite lk(ns);
