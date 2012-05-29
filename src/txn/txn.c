@@ -24,7 +24,7 @@ __wt_txnid_cmp(const void *v1, const void *v2)
 
 /*
  * __txn_sort_snapshot --
- *	Sort a snapshot and size for faster searching.
+ *	Sort a snapshot for faster searching and set the min/max bounds.
  */
 static void
 __txn_sort_snapshot(WT_SESSION_IMPL *session, uint32_t n, wt_txnid_t id)
@@ -33,7 +33,6 @@ __txn_sort_snapshot(WT_SESSION_IMPL *session, uint32_t n, wt_txnid_t id)
 
 	txn = &session->txn;
 
-	/* Sort the snapshot and size for faster searching. */
 	qsort(txn->snapshot, n, sizeof(wt_txnid_t), __wt_txnid_cmp);
 	txn->snapshot_count = n;
 	txn->snap_min = (n == 0) ? id : txn->snapshot[0];
