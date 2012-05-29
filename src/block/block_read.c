@@ -103,7 +103,7 @@ __wt_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 		if (block->compressor == NULL)
 			WT_ERR(__wt_illegal_value(session, block->name));
 
-		WT_RET(__wt_buf_init(session, buf, dsk->size));
+		WT_ERR(__wt_buf_init(session, buf, dsk->size));
 		buf->size = dsk->size;
 
 		/*
