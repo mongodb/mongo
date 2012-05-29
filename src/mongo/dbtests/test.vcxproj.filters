@@ -1486,6 +1486,9 @@
     <ClCompile Include="..\s\d_index_locator.cpp">
       <Filter>s</Filter>
     </ClCompile>
+    <ClCompile Include="..\client\connection_factory.cpp">
+      <Filter>client</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="btreetests.inl">

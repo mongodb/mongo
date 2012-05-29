@@ -972,6 +972,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     </ClCompile>
     <ClCompile Include="..\bson\oid.cpp" />
     <ClCompile Include="..\client\authentication_table.cpp" />
+    <ClCompile Include="..\client\connection_factory.cpp" />
     <ClCompile Include="..\client\dbclientcursor.cpp" />
     <ClCompile Include="..\client\dbclient_rs.cpp" />
     <ClCompile Include="..\client\distlock.cpp" />
@@ -1191,6 +1192,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\db\pipeline\field_path.h" />
     <ClInclude Include="..\db\pipeline\value.h" />
     <ClInclude Include="..\db\projection.h" />
+    <ClInclude Include="..\util\assert_util.h" />
     <ClInclude Include="..\util\concurrency\rwlockimpl.h" />
     <ClInclude Include="..\util\concurrency\simplerwlock.h" />
     <ClInclude Include="..\util\intrusive_counter.h" />
