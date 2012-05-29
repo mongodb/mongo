@@ -91,7 +91,7 @@ __wt_block_open(WT_SESSION_IMPL *session, const char *filename,
 	block->checksum = cval.val == 0 ? 0 : 1;
 
 	/* Page compressor */
-	WT_RET(__wt_config_getones(session, config, "block_compressor", &cval));
+	WT_ERR(__wt_config_getones(session, config, "block_compressor", &cval));
 	if (cval.len > 0) {
 		WT_CONNECTION_IMPL *conn;
 		WT_NAMED_COMPRESSOR *ncomp;
