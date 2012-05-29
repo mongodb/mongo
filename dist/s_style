@@ -6,7 +6,7 @@ trap 'rm -f $t; exit 0' 0 1 2 3 13 15
 
 cd ..
 
-# Returns in functions after a jump to error lable.
+# Returns in functions after a jump to the error lable.
 for f in `find examples ext src test -name '*.[ci]'`; do
 	sed -n \
 	    -e '/^{$/,/^}$/{=;p;}' $f |
@@ -14,10 +14,9 @@ for f in `find examples ext src test -name '*.[ci]'`; do
 	sed -e '/./{H;/^[0-9][0-9]*:}$/!d;}' \
 	    -e x \
 	    -e 's/\n/ /g' \
-	    -e 's/\/\*.*\*\///g' \
 	    -e p \
 	    -e '{s/.*//;x;}' |
-	egrep 'WT_ERR\(.*WT_RET.*err:|WT_ERR_MSG\(.*WT_RET.*err:|WT_ERR_TEST\(.*WT_RET.*err:|WT_ERR\(.*WT_ILLEGAL_VALUE\(.*err:|WT_ERR_MSG\(.*WT_ILLEGAL_VALUE\(.*err:|WT_ERR_TEST\(.*WT_ILLEGAL_VALUE\(.*err:' |
+	egrep 'WT_ERR\(.*WT_RET.*err:|WT_ERR\(.*WT_RET_MSG.*err:|WT_ERR\(.*WT_ILLEGAL_VALUE\(.*err:|WT_ERR\(.*WT_VERBOSE_RET\(.*err:|WT_ERR\(.*WT_VERBOSE_RETVAL\(.*err:|WT_ERR_MSG\(.*WT_RET.*err:|WT_ERR_MSG\(.*WT_RET_MSG.*err:|WT_ERR_MSG\(.*WT_ILLEGAL_VALUE\(.*err:|WT_ERR_MSG\(.*WT_VERBOSE_RET\(.*err:|WT_ERR_MSG\(.*WT_VERBOSE_RETVAL\(.*err:|WT_ERR_TEST\(.*WT_RET.*err:|WT_ERR_TEST\(.*WT_RET_MSG.*err:|WT_ERR_TEST\(.*WT_ILLEGAL_VALUE\(.*err:|WT_ERR_TEST\(.*WT_VERBOSE_RET\(.*err:|WT_ERR_TEST\(.*WT_VERBOSE_RETVAL\(.*err:'|
 	    sed 's/:.*//' > $t
 	test -s $t && {
 		echo "$f: function with return after a jump to an error label"
