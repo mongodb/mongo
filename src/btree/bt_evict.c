@@ -419,9 +419,8 @@ __evict_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * evicting session, we save and restore its state.
 	 */
 	txn = &session->txn;
+	saved_txn = *txn;
 	was_running = (F_ISSET(txn, TXN_RUNNING) != 0);
-	if (was_running)
-		saved_txn = *txn;
 
 	txn_global = &S2C(session)->txn_global;
 	if ((txn_ckpt = txn_global->checkpoint_txn) == NULL) {
@@ -442,8 +441,7 @@ err:	if (txn_ckpt == NULL) {
 			WT_TRET(__wt_txn_commit(session, NULL));
 	}
 
-	if (was_running)
-		session->txn = saved_txn;
+	session->txn = saved_txn;
 
 	return (ret);
 }
