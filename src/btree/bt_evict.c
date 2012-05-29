@@ -417,8 +417,7 @@ __evict_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_DECL_RET;
 	WT_TXN_GLOBAL *txn_global;
-	WT_TXN saved_txn, *txn, *txn_ckpt;
-	const char *txn_cfg[] = { "isolation=snapshot", NULL };
+	WT_TXN saved_txn, *txn;
 	int was_running;
 
 	/*
@@ -437,22 +436,17 @@ __evict_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 	was_running = (F_ISSET(txn, TXN_RUNNING) != 0);
 
 	txn_global = &S2C(session)->txn_global;
-	if ((txn_ckpt = txn_global->checkpoint_txn) == NULL) {
-		if (was_running) {
-			WT_RET(__wt_txn_init(session));
-			WT_ERR(__wt_txn_get_snapshot(session));
-		} else
-			WT_ERR(__wt_txn_begin(session, txn_cfg));
-	} else
-		session->txn = *txn_ckpt;
+	if (was_running)
+		WT_RET(__wt_txn_init(session));
+
+	WT_ERR(__wt_txn_get_snapshot(session, txn_global->ckpt_txnid));
 
 	ret = __wt_rec_evict(session, page, 0);
 
-err:	if (txn_ckpt == NULL) {
-		if (was_running)
-			__wt_txn_destroy(session);
-		else
-			WT_TRET(__wt_txn_commit(session, NULL));
+err:	if (was_running) {
+		WT_ASSERT(session, txn->snapshot == NULL ||
+		    txn->snapshot != saved_txn.snapshot);
+		__wt_txn_destroy(session);
 	}
 
 	session->txn = saved_txn;

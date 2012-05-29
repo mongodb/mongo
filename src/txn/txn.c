@@ -27,23 +27,20 @@ __wt_txnid_cmp(const void *v1, const void *v2)
  *	Sort a snapshot and size for faster searching.
  */
 static void
-__txn_sort_snapshot(WT_SESSION_IMPL *session, wt_txnid_t id, uint32_t n)
+__txn_sort_snapshot(WT_SESSION_IMPL *session, uint32_t n)
 {
 	WT_TXN *txn;
-	wt_txnid_t *lastid;
+	WT_TXN_GLOBAL *txn_global;
 
 	txn = &session->txn;
+	txn_global = &S2C(session)->txn_global;
 
 	/* Sort the snapshot and size for faster searching. */
 	qsort(txn->snapshot, n, sizeof(wt_txnid_t), __wt_txnid_cmp);
-	lastid = bsearch(&id, txn->snapshot, n, sizeof(wt_txnid_t),
-	    __wt_txnid_cmp);
-	WT_ASSERT(session, lastid != NULL);
-	while (lastid > txn->snapshot && lastid[-1] == lastid[0])
-		--lastid;
-	txn->snap_min = txn->snapshot[0];
+	txn->snapshot_count = n;
+	txn->snap_min = (n == 0) ? txn_global->current : txn->snapshot[0];
+	txn->snap_max = (n == 0) ? txn->snap_min : txn->snapshot[n - 1];
 	WT_ASSERT(session, txn->snap_min != WT_TXN_NONE);
-	txn->snapshot_count = (u_int)(lastid - txn->snapshot);
 }
 
 /*
@@ -51,12 +48,12 @@ __txn_sort_snapshot(WT_SESSION_IMPL *session, wt_txnid_t id, uint32_t n)
  *	Set up a snapshot in the current transaction, without allocating an ID.
  */
 int
-__wt_txn_get_snapshot(WT_SESSION_IMPL *session)
+__wt_txn_get_snapshot(WT_SESSION_IMPL *session, wt_txnid_t max_id)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_TXN *txn;
 	WT_TXN_GLOBAL *txn_global;
-	wt_txnid_t id;
+	wt_txnid_t current_id, id;
 	uint32_t i, n, session_cnt;
 
 	conn = S2C(session);
@@ -66,17 +63,17 @@ __wt_txn_get_snapshot(WT_SESSION_IMPL *session)
 
 	do {
 		/* Take a copy of the current session ID. */
-		id = txn_global->current;
+		current_id = txn_global->current;
 
 		/* Copy the array of concurrent transactions. */
 		WT_ORDERED_READ(session_cnt, conn->session_cnt);
 		for (i = 0; i < session_cnt; i++)
-			if ((txn->snapshot[n] =
-			    txn_global->ids[i]) != WT_TXN_NONE)
-				++n;
-	} while (txn_global->current != id);
+			if ((id = txn_global->ids[i]) != WT_TXN_NONE &&
+			    (max_id == WT_TXN_NONE || TXNID_LT(id, max_id)))
+				txn->snapshot[n++] = id;
+	} while (current_id != txn_global->current);
 
-	__txn_sort_snapshot(session, id, n);
+	__txn_sort_snapshot(session, n);
 	return (0);
 }
 
@@ -91,6 +88,7 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_CONNECTION_IMPL *conn;
 	WT_TXN *txn;
 	WT_TXN_GLOBAL *txn_global;
+	wt_txnid_t id;
 	uint32_t i, n, session_cnt;
 
 	conn = S2C(session);
@@ -117,15 +115,15 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 			/* Copy the array of concurrent transactions. */
 			WT_ORDERED_READ(session_cnt, conn->session_cnt);
 			for (i = 0; i < session_cnt; i++)
-				if ((txn->snapshot[n] =
-				    txn_global->ids[i]) != WT_TXN_NONE)
-					++n;
+				if ((id = txn_global->ids[i]) != WT_TXN_NONE &&
+				    TXNID_LT(id, txn->id))
+					txn->snapshot[n++] = id;
 		}
 	} while (!WT_ATOMIC_CAS(txn_global->current, txn->id, txn->id + 1) ||
 	    txn->id == WT_TXN_NONE || txn->id == WT_TXN_ABORTED);
 
 	if (txn->isolation == TXN_ISO_SNAPSHOT)
-		__txn_sort_snapshot(session, txn->id, n);
+		__txn_sort_snapshot(session, n);
 
 	F_SET(txn, TXN_RUNNING);
 
@@ -234,8 +232,8 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 
 	WT_ERR(__wt_txn_begin(session, txn_cfg));
 
-	/* TODO: prevent eviction from evicting anything newer than this... */
-	txn_global->checkpoint_txn = &session->txn;
+	/* Prevent eviction from evicting anything newer than this. */
+	txn_global->ckpt_txnid = session->txn.snap_min;
 
 	/*
 	 * If we're doing an ordinary unnamed checkpoint, we only need to flush
@@ -249,7 +247,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	if (cursor != NULL)
 		WT_TRET(cursor->close(cursor));
 
-	txn_global->checkpoint_txn = NULL;
+	txn_global->ckpt_txnid = WT_TXN_NONE;
 
 	WT_TRET(__txn_release(session));
 
@@ -303,6 +301,8 @@ __wt_txn_global_init(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	WT_UNUSED(cfg);
 	session = conn->default_session;
 	txn_global = &conn->txn_global;
+	txn_global->current = 1;
+	txn_global->ckpt_txnid = WT_TXN_NONE;
 
 	WT_RET(__wt_calloc_def(session, conn->session_size, &txn_global->ids));
 	for (i = 0; i < conn->session_size; i++)

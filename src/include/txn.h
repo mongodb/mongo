@@ -41,11 +41,9 @@ typedef uint32_t wt_txnid_t;
 	 (t2) - (t1) < (UINT32_MAX / 2))
 
 struct __wt_txn_global {
-	volatile wt_txnid_t current;
-
-	wt_txnid_t *ids;
-
-	WT_TXN *checkpoint_txn;
+	volatile wt_txnid_t current;	/* Current transaction ID. */
+	wt_txnid_t *ids;		/* Per-session transaction IDs */
+	wt_txnid_t ckpt_txnid;		/* ID of checkpoint, or WT_TXN_NONE */
 };
 
 struct __wt_txn {
@@ -57,9 +55,9 @@ struct __wt_txn {
 	 *     everything > id is invisible
 	 *     everything in between is visible unless it is in snap_overlap.
 	 */
-	wt_txnid_t snap_min;
+	wt_txnid_t snap_min, snap_max;
 	wt_txnid_t *snapshot;
-	u_int snapshot_count;
+	uint32_t snapshot_count;
 
 	/* Array of txn IDs in items created or modified by this txn. */
 	wt_txnid_t **mod;
