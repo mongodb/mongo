@@ -34,7 +34,6 @@
 #include "mongo/util/password.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/startup_test.h"
-#include "mongo/util/util.h"
 #include "mongo/util/version.h"
 
 #ifdef _WIN32

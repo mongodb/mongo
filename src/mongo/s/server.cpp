@@ -43,7 +43,6 @@
 #include "cursors.h"
 #include "shard_version.h"
 #include "../util/processinfo.h"
-#include "mongo/util/util.h"
 #include "mongo/util/concurrency/remap_lock.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/util/stacktrace.h"

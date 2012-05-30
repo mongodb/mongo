@@ -33,8 +33,8 @@
 #include "mongo/db/namespace-inl.h"
 #include "mongo/db/namespace_details-inl.h"
 #include "mongo/db/namespacestring.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mmap.h"
-#include "mongo/util/util.h"
 
 namespace mongo {
 
@@ -501,7 +501,7 @@ namespace mongo {
         if ( _nextOfs != DiskLoc::NullOfs ) {
             /* defensive */
             if ( _nextOfs >= 0 && _nextOfs < 10 ) {
-                sayDbContext("Assertion failure - Record::getNext() referencing a deleted record?");
+                logContext("Assertion failure - Record::getNext() referencing a deleted record?");
                 return DiskLoc();
             }
 

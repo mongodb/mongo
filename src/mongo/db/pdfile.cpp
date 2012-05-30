@@ -962,7 +962,7 @@ namespace mongo {
                 out() << "  obj:" << obj.toString() << '\n';
                 out() << "  key:" << j.toString() << '\n';
                 out() << "  dl:" << dl.toString() << endl;
-                sayDbContext();
+                logContext();
             }
 
             if ( !ok && logMissing ) {

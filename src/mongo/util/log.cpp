@@ -19,6 +19,8 @@
 #include "pch.h"
 #include "assert_util.h"
 #include "time_support.h"
+#include "mongo/util/stacktrace.h"
+
 using namespace std;
 
 #ifdef _WIN32
@@ -445,6 +447,13 @@ namespace mongo {
         Logstream::logLockless(buf);
         Logstream::logLockless(s);
         Logstream::logLockless("\n");
+    }
+
+    void logContext(const char *errmsg) {
+        if ( errmsg ) {
+            problem() << errmsg << endl;
+        }
+        printStackTrace();
     }
 
 }

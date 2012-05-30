@@ -446,4 +446,9 @@ namespace mongo {
     string errnoWithDescription(int errorcode = -1);
     void rawOut( const string &s );
 
+    /**
+     * Write the current context (backtrace), along with the optional "msg".
+     */
+    void logContext(const char *msg = NULL);
+
 } // namespace mongo

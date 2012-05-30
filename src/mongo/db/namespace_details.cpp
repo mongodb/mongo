@@ -31,9 +31,6 @@
 #include "mongo/db/pdfile.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/hashtab.h"
-#include "mongo/util/util.h"
-
-
 
 namespace mongo {
 
@@ -336,7 +333,7 @@ namespace mongo {
                 if ( a < -1 || a >= 100000 ) {
                     problem() << "~~ Assertion - cur out of range in _alloc() " << cur.toString() <<
                               " a:" << a << " b:" << b << " chain:" << chain << '\n';
-                    sayDbContext();
+                    logContext();
                     if ( cur == *prev )
                         prev->Null();
                     cur.Null();

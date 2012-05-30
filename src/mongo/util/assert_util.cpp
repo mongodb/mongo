@@ -16,7 +16,9 @@
  */
 
 #include "pch.h"
-#include "assert_util.h"
+
+#include "mongo/util/assert_util.h"
+
 using namespace std;
 
 #ifndef _WIN32
@@ -27,7 +29,6 @@ using namespace std;
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/util/stacktrace.h"
-#include "mongo/util/util.h"
 
 namespace mongo {
 
@@ -75,8 +76,6 @@ namespace mongo {
             b.append( c , code );
     }
 
-    string getDbContext();
-
     /* "warning" assert -- safe to continue, so we don't throw exception. */
     NOINLINE_DECL void wasserted(const char *msg, const char *file, unsigned line) {
         static bool rateLimited;
@@ -93,7 +92,7 @@ namespace mongo {
         lastLine = line;
 
         problem() << "warning assertion failure " << msg << ' ' << file << ' ' << dec << line << endl;
-        sayDbContext();
+        logContext();
         setLastError(0,msg && *msg ? msg : "wassertion failure");
         assertionCount.condrollover( ++assertionCount.warning );
 #if defined(_DEBUG) || defined(_DURABLEDEFAULTON) || defined(_DURABLEDEFAULTOFF)
@@ -106,7 +105,7 @@ namespace mongo {
     NOINLINE_DECL void verifyFailed(const char *msg, const char *file, unsigned line) {
         assertionCount.condrollover( ++assertionCount.regular );
         problem() << "Assertion failure " << msg << ' ' << file << ' ' << dec << line << endl;
-        sayDbContext();
+        logContext();
         setLastError(0,msg && *msg ? msg : "assertion failure");
         stringstream temp;
         temp << "assertion " << file << ":" << line;
@@ -122,7 +121,7 @@ namespace mongo {
 
     NOINLINE_DECL void fassertFailed( int msgid ) {
         problem() << "Fatal Assertion " << msgid << endl;
-        sayDbContext();
+        logContext();
         breakpoint();
         log() << "\n\n***aborting after fassert() failure\n\n" << endl;
         abort();
@@ -151,7 +150,7 @@ namespace mongo {
         tlog() << "Assertion: " << msgid << ":" << msg << endl;
         setLastError(msgid,msg && *msg ? msg : "massert failure");
         //breakpoint();
-        printStackTrace();
+        logContext();
         throw MsgAssertionException(msgid, msg);
     }
 
