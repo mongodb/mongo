@@ -48,28 +48,6 @@ namespace mongo {
         }
     }
 
-    struct CloneOptions {
-
-        CloneOptions() :
-            logForRepl( true ),
-            slaveOk( false ),
-            useReplAuth( false ),
-            snapshot( true ),
-            mayYield( true ),
-            mayBeInterrupted( false ) {}
-
-        string fromDB;
-        set<string> collsToIgnore;
-
-        bool logForRepl;
-        bool slaveOk;
-        bool useReplAuth;
-        bool snapshot;
-        bool mayYield;
-        bool mayBeInterrupted;
-
-    };
-
     class Cloner: boost::noncopyable {
         auto_ptr< DBClientBase > conn;
         void copy(const char *from_ns, const char *to_ns, bool isindex, bool logForRepl,
@@ -509,6 +487,23 @@ namespace mongo {
         Cloner c;
         return c.go(masterHost, errmsg, fromdb, logForReplication, slaveOk, useReplAuth, snapshot, mayYield, mayBeInterrupted, errCode);
     }
+
+    bool cloneFrom( const string& masterHost , 
+                    const CloneOptions& options , 
+                    string& errmsg /* out */ , 
+                    int* errCode  /* out */ , 
+                    set<string>* clonedCollections /* out */ ) {
+        
+        scoped_ptr< set<string> > myset;
+        if ( ! clonedCollections ) {
+            myset.reset( new set<string>() );
+            clonedCollections = myset.get();
+        }
+        
+        Cloner c;
+        return c.go( masterHost.c_str() , options , *clonedCollections, errmsg , errCode );
+    }
+
 
     /* Usage:
        mydb.$cmd.findOne( { clone: "fromhost" } );

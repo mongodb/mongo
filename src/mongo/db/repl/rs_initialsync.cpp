@@ -68,9 +68,19 @@ namespace mongo {
 
     /* todo : progress metering to sethbmsg. */
     static bool clone(const char *master, string db) {
+        CloneOptions options;
+
+        options.fromDB = db;
+
+        options.logForRepl = false;
+        options.slaveOk = true;
+        options.useReplAuth = true;
+        options.snapshot = false;
+        options.mayYield = true;
+        options.mayBeInterrupted = false;
+        
         string err;
-        return cloneFrom(master, err, db, false,
-                         /* slave_ok */ true, true, false, /*mayYield*/true, /*mayBeInterrupted*/false);
+        return cloneFrom(master, options , err );
     }
 
     void _logOpObjRS(const BSONObj& op);

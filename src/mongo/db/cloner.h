@@ -21,6 +21,37 @@
 #include "jsobj.h"
 
 namespace mongo {
+
+    struct CloneOptions {
+
+        CloneOptions() {
+            logForRepl = true;
+            slaveOk = false;
+            useReplAuth = false;
+            snapshot = true;
+            mayYield = true;
+            mayBeInterrupted = false;
+
+            syncData = true;
+            syncIndexes = true;
+        }
+            
+        string fromDB;
+        set<string> collsToIgnore;
+
+        bool logForRepl;
+        bool slaveOk;
+        bool useReplAuth;
+        bool snapshot;
+        bool mayYield;
+        bool mayBeInterrupted;
+    };
+
+    bool cloneFrom( const string& masterHost , 
+                    const CloneOptions& options , 
+                    string& errmsg /* out */ , 
+                    int* errCode = 0 /* out */ , 
+                    set<string>* clonedCollections = 0 /* out */ );
     
     /**
      * @param slaveOk     - if true it is ok if the source of the data is !ismaster.
