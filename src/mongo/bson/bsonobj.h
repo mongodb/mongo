@@ -242,12 +242,19 @@ namespace mongo {
          */
         bool getBoolField(const char *name) const;
 
-        /**
-           sets element field names to empty string
-           If a field in pattern is missing, it is omitted from the returned
-           object.
+        /** @param pattern a BSON obj indicating a set of (un-dotted) field
+         *  names.  Element values are ignored.
+         *  @return a BSON obj constructed by taking the elements of this obj
+         *  that correspond to the fields in pattern. Field names of the
+         *  returned object are replaced with the empty string. If field in
+         *  pattern is missing, it is omitted from the returned object.
+         *
+         *  Example: if this = {a : 4 , b : 5 , c : 6})
+         *    this.extractFieldsUnDotted({a : 1 , c : 1}) -> {"" : 4 , "" : 6 }
+         *    this.extractFieldsUnDotted({b : "blah"}) -> {"" : 5}
+         *
         */
-        BSONObj extractFieldsUnDotted(BSONObj pattern) const;
+        BSONObj extractFieldsUnDotted(const BSONObj pattern) const;
 
         /** extract items from object which match a pattern object.
             e.g., if pattern is { x : 1, y : 1 }, builds an object with

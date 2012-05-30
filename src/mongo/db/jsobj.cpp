@@ -644,12 +644,7 @@ namespace mongo {
             return eooElement;
     }
 
-    /**
-     sets element field names to empty string
-     If a field in pattern is missing, it is omitted from the returned
-     object.
-     */
-    BSONObj BSONObj::extractFieldsUnDotted(BSONObj pattern) const {
+    BSONObj BSONObj::extractFieldsUnDotted(const BSONObj pattern) const {
         BSONObjBuilder b;
         BSONObjIterator i(pattern);
         while ( i.moreWithEOO() ) {
