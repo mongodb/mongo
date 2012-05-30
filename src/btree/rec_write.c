@@ -2650,11 +2650,10 @@ __rec_row_leaf(
 			}
 		} else {
 			/*
-			 * If the key is already instantiated, use it.
-			 * Else, if the key is available from the page, use it.
-			 * Else, if we can construct the key from a previous
-			 *	key, do so.
-			 * Else, instantiate the key.
+			 * Use an already instantiated key, or
+			 * Use the key from the disk image, or
+			 * Build a key from a previous key, or
+			 * Instantiate the key from scratch.
 			 */
 			if (ikey != NULL) {
 				tmpkey->data = WT_IKEY_DATA(ikey);
@@ -2668,19 +2667,25 @@ __rec_row_leaf(
 			    unpack->type == WT_CELL_KEY &&
 			    tmpkey->size >= unpack->prefix) {
 				/*
+				 * The previous clause checked for a prefix of
+				 * zero, which means the temporary buffer must
+				 * have a non-zero size, and it references a
+				 * valid key.
+				 */
+				WT_ASSERT(session, tmpkey->size != 0);
+
+				/*
 				 * If we previously built a prefix-compressed
 				 * key in the temporary buffer, WT_ITEM->data
 				 * will be the same as WT_ITEM->mem: grow the
-				 * buffer if necessary and copy the suffix into
-				 * place.
+				 * buffer and copy the suffix into place.
 				 *
 				 * If we previously pointed the temporary buffer
-				 * at an on-page key, WT_ITEM->data will not be
-				 * the same as WT_ITEM->mem: grow the buffer if
-				 * necessary, copy the prefix into place, then
-				 * re-point the WT_ITEM->data field to the newly
-				 * constructed memory, and then copy the suffix
-				 * into place.
+				 * at an in-memory or on-page key, WT_ITEM->data
+				 * will not be the same as WT_ITEM->mem: grow
+				 * the buffer, copy the prefix into place, reset
+				 * the data field to point to the buffer memory,
+				 * then copy the suffix into place.
 				 */
 				WT_ERR(__wt_buf_grow(session,
 				    tmpkey, unpack->prefix + unpack->size));
