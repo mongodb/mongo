@@ -2262,7 +2262,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 				key->buf.data = cell;
 				key->buf.size = unpack->len;
 				key->cell_len = 0;
-				key->len = key->buf.size;
+				key->len = unpack->len;
 				ovfl_key = 1;
 			}
 		} else
@@ -2534,6 +2534,7 @@ __rec_row_leaf(
 			 * item, that is, it may have been zero length.
 			 */
 			if (val_cell == NULL)
+				val->buf.data = NULL;
 				val->buf.size = 0;
 			else {
 				val->buf.data = val_cell;
@@ -2638,7 +2639,7 @@ __rec_row_leaf(
 				key->buf.data = cell;
 				key->buf.size = unpack->len;
 				key->cell_len = 0;
-				key->len = key->buf.size;
+				key->len = unpack->len;
 				ovfl_key = 1;
 
 				/*
