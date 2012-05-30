@@ -66,7 +66,9 @@ var db = mongos.getDB("foo");
 var collA = mongos.getCollection("foo.bar")
 
 // enable sharding on a collection
-admin.runCommand( { enableSharding : "" + collA.getDB() } )
+printjson( admin.runCommand( { enableSharding : "" + collA.getDB() } ) )
+printjson( admin.runCommand( { movePrimary : "foo", to : "shard0000" } ) );
+
 admin.runCommand( { shardCollection : "" + collA, key : { _id : 1 } } )
 
 // add data to the sharded collection
@@ -75,7 +77,7 @@ for (i=0; i<4; i++) {
   printjson(admin.runCommand( { split : "" + collA, middle : { _id : i } }) )
 }
 // move a chunk 
-printjson( admin.runCommand( { moveChunk : "foo.bar", find : { _id : 1 }, to : "shard0000" }) )
+printjson( admin.runCommand( { moveChunk : "foo.bar", find : { _id : 1 }, to : "shard0001" }) )
 
 //verify the chunk was moved
 admin.runCommand( { flushRouterConfig : 1 } )
@@ -95,14 +97,9 @@ assert.eq(result.ok, 1, "failed to start draining shard");
 assert.soon(function() {
     var result = admin.runCommand( {removeShard : getHostName() + ":" + conn.port} );
     printjson(result);
-    return result.ok && result.remaining.chunks == 0
+    return result.ok && result.state == "completed"
 }, "failed to drain shard completely", 5 * 60 * 1000)
 
-// drop the database, now run remove shard again and make sure it was removed
-mongos.getDB("foo").dropDatabase();
-var result = admin.runCommand( {removeShard : getHostName() + ":" + conn.port} );
-printjson(result);
-assert.eq(result.ok, 1, "failed to remove shard");
 assert.eq( 1, st.config.shards.count() , "removed server still appears in count" );
 
 MongoRunner.stopMongod( conn );
