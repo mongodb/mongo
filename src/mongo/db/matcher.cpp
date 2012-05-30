@@ -56,38 +56,87 @@ namespace mongo {
 
     extern BSONObj staticNull;
 
-    class Where {
+    class Where : boost::noncopyable {
     public:
-        Where() {
-            jsScope = 0;
-            func = 0;
+
+        Where( const string& ns ) {
+            _ns = ns;
+            _func = 0;
+            _initCalled = false;
         }
+        
         ~Where() {
 
-            if ( scope.get() ){
+            if ( _scope.get() ){
                 try {
-                    scope->execSetup( "_mongo.readOnly = false;" , "make not read only" );
+                    _scope->execSetup( "_mongo.readOnly = false;" , "make not read only" );
                 }
                 catch( DBException& e ){
                     warning() << "javascript scope cleanup interrupted" << causedBy( e ) << endl;
                 }
             }
+            _func = 0;
+        }
 
-            if ( jsScope ) {
-                delete jsScope;
-                jsScope = 0;
+        void init() {
+            if ( _initCalled )
+                return;
+            _initCalled = true;
+
+            _scope = globalScriptEngine->getPooledScope( _ns );
+            NamespaceString ns( _ns );
+            _scope->localConnect( ns.db.c_str() );
+            
+            massert( 10341 ,  "code has to be set first!" , ! _jsCode.empty() );
+
+            _func = _scope->createFunction( _jsCode.c_str() );
+            _scope->execSetup( "_mongo.readOnly = true;" , "make read only" );
+        }
+
+        void setScope( const BSONObj& scope ) {
+            _jsScope = scope.copy();
+        }
+
+        void setCode( const string& code ) {
+            _jsCode = code;
+        }
+
+        bool exec( const BSONObj& obj ) {
+            init();
+            uassert( 10070 , "$where compile error", _func != 0 );
+
+            if ( ! _jsScope.isEmpty() ) {
+                _scope->init( &_jsScope );
             }
-            func = 0;
-        }
+            _scope->setObject( "obj", const_cast< BSONObj & >( obj ) );
+            _scope->setBoolean( "fullObject" , true ); // this is a hack b/c fullObject used to be relevant
+                
 
-        auto_ptr<Scope> scope;
-        ScriptingFunction func;
-        BSONObj *jsScope;
-
-        void setFunc(const char *code) {
-            massert( 10341 ,  "scope has to be created first!" , scope.get() );
-            func = scope->createFunction( code );
+            int err = _scope->invoke( _func , 0, &obj , 1000 * 60 , false );
+            if ( err == -3 ) { // INVOKE_ERROR
+                stringstream ss;
+                ss << "error on invocation of $where function:\n"
+                   << _scope->getError();
+                uassert( 10071 , ss.str(), false);
+            }
+            else if ( err != 0 ) {   // ! INVOKE_SUCCESS
+                uassert( 10072 , "unknown error in invocation of $where function", false);
+            }
+            
+            return _scope->getBoolean( "return" ) != 0;
         }
+        
+    private:
+        bool _initCalled;
+
+        string _ns;
+
+        BSONObj _jsScope;
+        string _jsCode;
+        
+        auto_ptr<Scope> _scope;
+        ScriptingFunction _func;
+
 
     };
 
@@ -364,27 +413,23 @@ namespace mongo {
 
         return false;
     }
-
+    bool inConstructorChain( bool printOffending=false );
     // $where: function()...
     NOINLINE_DECL void Matcher::parseWhere( const BSONElement &e ) { 
         uassert(15902 , "$where expression has an unexpected type", e.type() == String || e.type() == CodeWScope || e.type() == Code );
         uassert( 10066 , "$where may only appear once in query", _where == 0 );
         uassert( 10067 , "$where query, but no script engine", globalScriptEngine );
         massert( 13089 , "no current client needed for $where" , haveClient() );
-        _where = new Where();
-        _where->scope = globalScriptEngine->getPooledScope( cc().ns() );
-        _where->scope->localConnect( cc().database()->name.c_str() );
-            
+        _where = new Where( cc().ns() );
+
         if ( e.type() == CodeWScope ) {
-            _where->setFunc( e.codeWScopeCode() );
-            _where->jsScope = new BSONObj( e.codeWScopeScopeDataUnsafe() );
+            _where->setCode( e.codeWScopeCode() );
+            _where->setScope( BSONObj( e.codeWScopeScopeDataUnsafe() ) );
         }
         else {
-            const char *code = e.valuestr();
-            _where->setFunc(code);
+            _where->setCode( e.valuestr() );
         }
-            
-        _where->scope->execSetup( "_mongo.readOnly = true;" , "make read only" );
+
     }
     
     void Matcher::parseMatchExpressionElement( const BSONElement &e, bool nested ) {
@@ -960,31 +1005,7 @@ namespace mongo {
         }
 
         if ( _where ) {
-            if ( _where->func == 0 ) {
-                uassert( 10070 , "$where compile error", false);
-                return false; // didn't compile
-            }
-
-            if ( _where->jsScope ) {
-                _where->scope->init( _where->jsScope );
-            }
-            _where->scope->setObject( "obj", const_cast< BSONObj & >( jsobj ) );
-            _where->scope->setBoolean( "fullObject" , true ); // this is a hack b/c fullObject used to be relevant
-
-            int err = _where->scope->invoke( _where->func , 0, &jsobj , 1000 * 60 , false );
-            if ( err == -3 ) { // INVOKE_ERROR
-                stringstream ss;
-                ss << "error on invocation of $where function:\n"
-                   << _where->scope->getError();
-                uassert( 10071 , ss.str(), false);
-                return false;
-            }
-            else if ( err != 0 ) {   // ! INVOKE_SUCCESS
-                uassert( 10072 , "unknown error in invocation of $where function", false);
-                return false;
-            }
-            return _where->scope->getBoolean( "return" ) != 0;
-
+            return _where->exec( jsobj );
         }
 
         return true;

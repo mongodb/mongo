@@ -729,6 +729,9 @@
     <ClCompile Include="..\client\authentication_table.cpp">
       <Filter>client</Filter>
     </ClCompile>
+    <ClCompile Include="..\client\connection_factory.cpp">
+      <Filter>client</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\pch.h" />
@@ -1034,6 +1037,9 @@
     </ClInclude>
     <ClInclude Include="..\client\authlevel.h">
       <Filter>client</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\assert_util.h">
+      <Filter>util\Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

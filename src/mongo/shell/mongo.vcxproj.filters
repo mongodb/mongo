@@ -509,6 +509,9 @@
     <ClCompile Include="..\db\dbmessage.cpp">
       <Filter>db\Source FIles</Filter>
     </ClCompile>
+    <ClCompile Include="..\client\connection_factory.cpp">
+      <Filter>client</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="collection.js">
