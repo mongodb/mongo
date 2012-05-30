@@ -79,35 +79,34 @@ namespace mongo {
 
     class LabeledLevel {
     public:
+        LabeledLevel( int level ) : _level( level ) {}
+        LabeledLevel( const char* label, int level ) : _label( label ), _level( level ) {}
+        LabeledLevel( const string& label, int level ) : _label( label ), _level( level ) {}
 
-	LabeledLevel( int level ) : _level( level ) {}
-	LabeledLevel( const char* label, int level ) : _label( label ), _level( level ) {}
-	LabeledLevel( const string& label, int level ) : _label( label ), _level( level ) {}
+        LabeledLevel operator+( int i ) const {
+            return LabeledLevel( _label, _level + i );
+        }
 
-	LabeledLevel operator+( int i ) const {
-	    return LabeledLevel( _label, _level + i );
-	}
+        LabeledLevel operator+( const char* label ) const {
+            if( _label == "" )
+                return LabeledLevel( label, _level );
+            return LabeledLevel( _label + string("::") + label, _level );
+        }
 
-	LabeledLevel operator+( const char* label ) const {
-	    if( _label == "" )
-		return LabeledLevel( label, _level );
-	    return LabeledLevel( _label + string("::") + label, _level );
-	}
+        LabeledLevel operator+( string& label ) const {
+            return LabeledLevel( _label + string("::") + label, _level );
+        }
 
-	LabeledLevel operator+( string& label ) const {
-	    return LabeledLevel( _label + string("::") + label, _level );
-	}
+        LabeledLevel operator-( int i ) const {
+            return LabeledLevel( _label, _level - i );
+        }
 
-	LabeledLevel operator-( int i ) const {
-	    return LabeledLevel( _label, _level - i );
-	}
-
-	const string& getLabel() const { return _label; }
-	int getLevel() const { return _level; }
+        const string& getLabel() const { return _label; }
+        int getLevel() const { return _level; }
 
     private:
-	string _label;
-	int _level;
+        string _label;
+        int _level;
     };
 
     class LazyString {
