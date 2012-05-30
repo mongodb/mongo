@@ -744,7 +744,7 @@ __debug_col_skip(WT_DBG *ds, WT_INSERT_HEAD *head, const char *tag, int hexbyte)
 
 /*
  * __debug_row_skip --
- *	Dump an insert array.
+ *	Dump an insert list.
  */
 static void
 __debug_row_skip(WT_DBG *ds, WT_INSERT_HEAD *head)
@@ -760,7 +760,7 @@ __debug_row_skip(WT_DBG *ds, WT_INSERT_HEAD *head)
 
 /*
  * __debug_update --
- *	Dump an update array.
+ *	Dump an update list.
  */
 static void
 __debug_update(WT_DBG *ds, WT_UPDATE *upd, int hexbyte)
