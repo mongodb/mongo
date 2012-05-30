@@ -338,6 +338,12 @@ namespace mongo {
             }
             return JS_FALSE;
         }
+        catch ( const SocketException& e ) {
+            if ( ! JS_IsExceptionPending( cx ) ) {
+                JS_ReportError( cx, e.toString().c_str() );
+            }
+            return JS_FALSE;
+        }
         catch ( const std::exception& e ) {
             log() << "unhandled exception: " << e.what() << ", throwing Fatal Assertion" << endl;
             fassertFailed( 16297 );
@@ -381,6 +387,12 @@ namespace mongo {
             }
             return JS_FALSE;
         }
+        catch ( const SocketException& e ) {
+            if ( ! JS_IsExceptionPending( cx ) ) {
+                JS_ReportError( cx, e.toString().c_str() );
+            }
+            return JS_FALSE;
+        }
         catch ( const std::exception& e ) {
             log() << "unhandled exception: " << e.what() << ", throwing Fatal Assertion" << endl;
             fassertFailed( 16298 );
@@ -413,6 +425,12 @@ namespace mongo {
         catch ( const AssertionException& e ) {
             if ( ! JS_IsExceptionPending( cx ) ) {
                 JS_ReportError( cx, e.what() );
+            }
+            return JS_FALSE;
+        }
+        catch ( const SocketException& e ) {
+            if ( ! JS_IsExceptionPending( cx ) ) {
+                JS_ReportError( cx, e.toString().c_str() );
             }
             return JS_FALSE;
         }
@@ -472,6 +490,12 @@ namespace mongo {
             }
             return JS_FALSE;
         }
+        catch ( const SocketException& e ) {
+            if ( ! JS_IsExceptionPending( cx ) ) {
+                JS_ReportError( cx, e.toString().c_str() );
+            }
+            return JS_FALSE;
+        }
         catch ( const std::exception& e ) {
             log() << "unhandled exception: " << e.what() << ", throwing Fatal Assertion" << endl;
             fassertFailed( 16300 );
@@ -504,6 +528,12 @@ namespace mongo {
         catch ( const AssertionException& e ) {
             if ( ! JS_IsExceptionPending( cx ) ) {
                 JS_ReportError( cx, e.what() );
+            }
+            return JS_FALSE;
+        }
+        catch ( const SocketException& e ) {
+            if ( ! JS_IsExceptionPending( cx ) ) {
+                JS_ReportError( cx, e.toString().c_str() );
             }
             return JS_FALSE;
         }
