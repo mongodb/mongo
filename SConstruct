@@ -822,6 +822,26 @@ def getSysInfo():
     else:
         return " ".join( os.uname() )
 
+def run(cmd):
+    res = os.system(cmd)
+    if(os.WIFEXITED(res)):
+        code = os.WEXITSTATUS(res)
+        if code != 0:
+            print "Error: " + str(code)
+            sys.exit(code)
+
+def execConfigure(path):
+    print("Configure to generate platform.hpp")
+    baseDir = Dir("#.").abspath
+    print(baseDir)
+    startDir = os.getcwd()
+    destDir = baseDir + "/" + path
+    print "CWD: " + startDir + " Will change to: " + destDir
+    os.chdir(destDir)
+    run("./configure")
+    os.chdir(startDir)
+    
+
 def doConfigure( myenv , shell=False ):
     conf = Configure(myenv)
     myenv["LINKFLAGS_CLEAN"] = list( myenv["LINKFLAGS"] )
@@ -897,6 +917,20 @@ def doConfigure( myenv , shell=False ):
             myCheckLib( [ l + boostCompiler + "-mt" + boostVersion ,
                           l + boostCompiler + boostVersion ] ,
                         release or not shell)
+
+    
+    if has_option('use-system-all') or has_option('use-system-zeromq'):
+        if not conf.CheckCXXHeader( "zmq.hpp" ):
+            print( "can't find zeromq headers" )
+            if shell:
+                print( "\tshell might not compile" )
+            else:
+                Exit(1)
+
+        # this will add it if it exists and works
+        myCheckLib( [ "zmq" ] )
+    else:
+        execConfigure("src/third_party/zeromq-" + env["ZEROMQ_VERSION"])
 
     if not conf.CheckCXXHeader( "execinfo.h" ):
         myenv.Append( CPPDEFINES=[ "NOEXECINFO" ] )

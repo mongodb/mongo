@@ -1,6 +1,7 @@
 # -*- mode: python -*-
 
 Import( "env" )
+
 env.StaticLibrary("zeromq", [
     "src/clock.cpp",
     "src/command.cpp",
@@ -59,5 +60,4 @@ env.StaticLibrary("zeromq", [
     "src/zmq_engine.cpp",
     "src/zmq_init.cpp",
     "src/zmq_listener.cpp"])
-
 
