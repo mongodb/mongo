@@ -832,10 +832,8 @@ def run(cmd):
 
 def execConfigure(path):
     print("Configure to generate platform.hpp")
-    baseDir = Dir("#.").abspath
-    print(baseDir)
     startDir = os.getcwd()
-    destDir = baseDir + "/" + path
+    destDir = startDir + "/" + path
     print "CWD: " + startDir + " Will change to: " + destDir
     os.chdir(destDir)
     run("./configure")
