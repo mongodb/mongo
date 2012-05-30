@@ -179,6 +179,11 @@ namespace mongo {
                 // we're not actually going live
                 return true;
             }
+
+            // if we're blocking sync, don't change state
+            if (_blockSync) {
+                return false;
+            }
         }
 
         {
