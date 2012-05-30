@@ -19,8 +19,11 @@
 #ifndef _WIN32
 #include <signal.h>
 #endif
+
+#if defined(USE_GDBSERVER)
 #include "mongo/db/cmdline.h"
 #include "mongo/db/jsobj.h"
+#endif  // defined(USE_GDBSERVER)
 
 namespace mongo {
     void mongo_breakpoint() {
@@ -43,6 +46,7 @@ namespace mongo {
     }
 
 #if defined(USE_GDBSERVER)
+
     /* Magic gdb trampoline
      * Do not call directly! call setupSIGTRAPforGDB()
      * Assumptions:
