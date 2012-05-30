@@ -21,6 +21,7 @@
 #include "text.h"
 #include "mongoutils/str.h"
 #include "mongo/util/startup_test.h"
+#include "mongo/util/mmap.h"
 
 using namespace mongoutils;
 
@@ -112,7 +113,7 @@ namespace mongo {
     void LogFile::synchronousAppend(const void *_buf, size_t _len) {
         const size_t BlockSize = 8 * 1024 * 1024;
         verify(_fd);
-        verify(_len % 4096 == 0);
+        verify(_len % g_minOSPageSizeBytes == 0);
         const char *buf = (const char *) _buf;
         size_t left = _len;
         while( left ) {
@@ -196,7 +197,7 @@ namespace mongo {
     }
 
     void LogFile::writeAt(unsigned long long offset, const void *buf, size_t len) { 
-        verify(((size_t)buf)%4096==0); // aligned
+        verify(((size_t)buf) % g_minOSPageSizeBytes == 0); // aligned
         ssize_t written = pwrite(_fd, buf, len, offset);
         if( written != (ssize_t) len ) {
             log() << "writeAt fails " << errnoWithDescription() << endl;
@@ -209,7 +210,7 @@ namespace mongo {
     }
 
     void LogFile::readAt(unsigned long long offset, void *_buf, size_t _len) { 
-        verify(((size_t)_buf)%4096==0); // aligned
+        verify(((size_t)_buf) % g_minOSPageSizeBytes == 0); // aligned
         ssize_t rd = pread(_fd, _buf, _len, offset);
         verify( rd != -1 );
     }
@@ -221,7 +222,7 @@ namespace mongo {
 
         fassert( 16144, charsToWrite >= 0 );
         fassert( 16142, _fd >= 0 );
-        fassert( 16143, reinterpret_cast<ssize_t>( buf ) % 4096 == 0 );  // aligned
+        fassert( 16143, reinterpret_cast<ssize_t>( buf ) % g_minOSPageSizeBytes == 0 );  // aligned
 
 #ifdef POSIX_FADV_DONTNEED
         const off_t pos = lseek(_fd, 0, SEEK_CUR); // doesn't actually seek, just get current position

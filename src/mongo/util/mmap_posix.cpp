@@ -29,6 +29,8 @@
 using namespace mongoutils;
 
 namespace mongo {
+    
+    const size_t g_minOSPageSizeBytes = sysconf( _SC_PAGESIZE );
 
     MemoryMappedFile::MemoryMappedFile() {
         fd = 0;
@@ -64,11 +66,7 @@ namespace mongo {
 #else
     MAdvise::MAdvise(void *p, unsigned len, Advice a) {
         
-        static long pageSize = 0;
-        if ( pageSize == 0 ) {
-            pageSize = sysconf( _SC_PAGESIZE );
-        }
-        _p = (void*)((long)p & ~(pageSize-1));
+        _p = (void*)((long)p & ~(g_minOSPageSizeBytes-1));
         
         _len = len +((unsigned long long)p-(unsigned long long)_p);
         

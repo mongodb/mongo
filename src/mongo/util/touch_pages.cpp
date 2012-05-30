@@ -82,7 +82,7 @@ namespace mongo {
     void touch_pages( HANDLE fd, int offset, size_t length, const Extent* ext ) {
         // read first byte of every page, in order
         const char *p = static_cast<const char *>(static_cast<const void *> (ext));
-        for( size_t i = 0; i < length; i += 4096 /*pagesize*/ ) { 
+        for( size_t i = 0; i < length; i += g_minOSPageSizeBytes ) { 
             _touch_pages_char_reader += p[i];
         }
   
