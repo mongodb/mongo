@@ -288,7 +288,16 @@ namespace mongo {
     bool Lock::dbLevelLockingEnabled() {
         return DB_LEVEL_LOCKING_ENABLED;
     }
-    
+
+    RWLockRecursive &Lock::ParallelBatchWriterMode::_batchLock = *(new RWLockRecursive("special"));
+    void Lock::ParallelBatchWriterMode::iAmABatchParticipant() {
+        lockState()._batchWriter = true;
+    }
+    Lock::ParallelBatchWriterSupport::ParallelBatchWriterSupport() :
+        _lk( lockState()._batchWriter ? 0 : new RWLockRecursive::Shared(ParallelBatchWriterMode::_batchLock) )
+    {
+    }
+
     Lock::ScopedLock::ScopedLock() {
         LockState& ls = lockState();
         ls.enterScopedLock( this );

@@ -22,10 +22,11 @@
 
 #pragma once
 
-#include "mongo/util/concurrency/mutex.h"
 #include "mongo/bson/stringdata.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/lockstat.h"
+#include "mongo/util/concurrency/mutex.h"
+#include "mongo/util/concurrency/rwlock.h"
 
 namespace mongo {
 
@@ -59,7 +60,29 @@ namespace mongo {
             ScopedLock *scopedLk;
         };
 
+        /** turn on "parallel batch writer mode".  blocks all other threads. this mode is off
+            by default. note only one thread creates a ParallelBatchWriterMode object; the rest just
+            call iAmABatchParticipant().  Note that this lock is not released on a temprelease, just
+            the normal lock things below.
+            */
+        class ParallelBatchWriterMode : boost::noncopyable {
+            RWLockRecursive::Exclusive _lk;
+        public:
+            ParallelBatchWriterMode() : _lk(_batchLock) {}
+            static void iAmABatchParticipant();
+            static RWLockRecursive &_batchLock;
+        };
+
+    private:
+        class ParallelBatchWriterSupport : boost::noncopyable {
+            scoped_ptr<RWLockRecursive::Shared> _lk;
+        public:
+            ParallelBatchWriterSupport();
+        };
+
+    public:
         class ScopedLock : boost::noncopyable {
+            ParallelBatchWriterSupport _lk;
         protected: 
             friend struct TempRelease;
             ScopedLock(); 

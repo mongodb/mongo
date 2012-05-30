@@ -27,7 +27,8 @@
 namespace mongo {
 
     LockState::LockState() 
-        : _recursive(0), 
+        : _batchWriter(false),
+          _recursive(0),
           _threadState(0),
           _whichNestable( Lock::notnestable ),
           _nestableCount(0), 

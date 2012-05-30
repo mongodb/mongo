@@ -71,6 +71,7 @@ namespace mongo {
         void lockedOther( const string& db , int type , WrapperForRWLock* lock );
         void lockedOther( int type );  // "same lock as last time" case 
         void unlockedOther();
+        bool _batchWriter;
     private:
         unsigned _recursive;           // we allow recursively asking for a lock; we track that here
 
