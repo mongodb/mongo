@@ -690,6 +690,7 @@ __debug_page_row_leaf(WT_DBG *ds, WT_PAGE *page)
 	WT_ROW *rip;
 	WT_UPDATE *upd;
 	uint32_t i;
+	void *ripkey;
 
 	unpack = &_unpack;
 
@@ -702,10 +703,11 @@ __debug_page_row_leaf(WT_DBG *ds, WT_PAGE *page)
 
 	/* Dump the page's K/V pairs. */
 	WT_ROW_FOREACH(page, rip, i) {
-		if (__wt_off_page(page, rip->key))
-			__debug_ikey(ds, rip->key);
+		ripkey = WT_ROW_KEY_COPY(rip);
+		if (__wt_off_page(page, ripkey))
+			__debug_ikey(ds, ripkey);
 		else {
-			__wt_cell_unpack(rip->key, unpack);
+			__wt_cell_unpack(ripkey, unpack);
 			WT_RET(__debug_cell_data(ds, "K", unpack));
 		}
 

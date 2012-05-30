@@ -23,6 +23,7 @@ __wt_kv_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int key_ret)
 	WT_ROW *rip;
 	WT_UPDATE *upd;
 	uint8_t v;
+	void *ripkey;
 
 	btree = session->btree;
 	unpack = &_unpack;
@@ -74,8 +75,9 @@ __wt_kv_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int key_ret)
 		 */
 		if (cbt->ins == NULL) {
 			if (key_ret) {
-				if (__wt_off_page(page, rip->key)) {
-					ikey = rip->key;
+				ripkey = WT_ROW_KEY_COPY(rip);
+				if (__wt_off_page(page, ripkey)) {
+					ikey = ripkey;
 					cursor->key.data = WT_IKEY_DATA(ikey);
 					cursor->key.size = ikey->size;
 				} else

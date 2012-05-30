@@ -126,13 +126,7 @@ __wt_row_key(
 
 	direction = BACKWARD;
 	for (slot_offset = 0;;) {
-		/*
-		 * Multiple threads of control may be searching this page, which
-		 * means the key may change underfoot, and here's where it gets
-		 * tricky: first, copy the key.  We don't need any barriers, the
-		 * key is updated atomically, and we just need a valid copy.
-		 */
-		key = rip->key;
+		key = WT_ROW_KEY_COPY(rip);
 
 		/*
 		 * Key copied.
@@ -312,9 +306,9 @@ next:		switch (direction) {
 	 * Allocate and initialize a WT_IKEY structure, we're instantiating
 	 * this key.
 	 */
+	key = WT_ROW_KEY_COPY(rip_arg);
 	WT_ERR(__wt_row_ikey_alloc(session,
-	    WT_PAGE_DISK_OFFSET(page, rip_arg->key),
-	    retb->data, retb->size, &ikey));
+	    WT_PAGE_DISK_OFFSET(page, key), retb->data, retb->size, &ikey));
 
 	/* Serialize the swap of the key into place. */
 	ret = __wt_row_key_serial(session, page, rip_arg, ikey);
@@ -323,7 +317,8 @@ next:		switch (direction) {
 	 * Free the WT_IKEY structure if the serialized call didn't use it for
 	 * the key.
 	 */
-	if (rip_arg->key != ikey)
+	key = WT_ROW_KEY_COPY(rip_arg);
+	if (key != ikey)
 		__wt_free(session, ikey);
 
 	__wt_scr_free(&retb);
@@ -349,13 +344,7 @@ __wt_row_value(WT_PAGE *page, WT_ROW *rip)
 
 	unpack = &_unpack;
 
-	/*
-	 * Multiple threads of control may be searching this page, which means
-	 * the key may change underfoot, and here's where it gets tricky: first,
-	 * copy the key.
-	 */
-	cell = rip->key;
-
+	cell = WT_ROW_KEY_COPY(rip);
 	/*
 	 * Key copied.
 	 *
@@ -422,8 +411,8 @@ __wt_row_key_serial_func(WT_SESSION_IMPL *session)
 	 * test, if the key we're interested in still needs to be instantiated,
 	 * because it can only be in one of two states.
 	 */
-	if (!__wt_off_page(page, rip->key)) {
-		rip->key = ikey;
+	if (!__wt_off_page(page, WT_ROW_KEY_COPY(rip))) {
+		WT_ROW_KEY_SET(rip, ikey);
 		__wt_cache_page_inmem_incr(
 		    session, page, sizeof(WT_IKEY) + ikey->size);
 	}

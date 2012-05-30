@@ -175,14 +175,7 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 		indx = base + (limit >> 1);
 		rip = page->u.row.d + indx;
 
-retry:		/*
-		 * Multiple threads of control may be searching this page, which
-		 * means the key may change underfoot, and here's where it gets
-		 * tricky: first, copy the key.  We don't need any barriers, the
-		 * key is updated atomically, and we just need a valid copy.
-		 */
-		key = rip->key;
-
+retry:		key = WT_ROW_KEY_COPY(rip);
 		/*
 		 * Key copied.
 		 *

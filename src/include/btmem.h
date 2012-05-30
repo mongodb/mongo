@@ -402,8 +402,21 @@ struct __wt_ref {
  * sorted by key, fixed in size, and references data on the page.
  */
 struct __wt_row {
-	void	*key;			/* On-page cell or off-page WT_IKEY */
+	void	*__key;			/* On-page cell or off-page WT_IKEY */
 };
+
+/*
+ * Multiple threads of control may be searching the in-memory row-store pages,
+ * and the key may be instantiated at any time.  Code must be able to handle
+ * both when the key has not been instantiated (the key field points into the
+ * page's disk image), and when the key has been instantiated (the key field
+ * points outside the page's disk image).  We don't need barriers because the
+ * key is updated atomically, but code that reads the key field multiple times
+ * is a very, very bad idea.  We obscure the field name and use a copy macro in
+ * all references to the field to make sure we don't introduce this bug (again).
+ */
+#define	WT_ROW_KEY_COPY(rip)	((rip)->__key)
+#define	WT_ROW_KEY_SET(rip, v)	((rip)->__key) = (v)
 
 /*
  * WT_ROW_FOREACH --

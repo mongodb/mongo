@@ -493,7 +493,7 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 		switch (unpack->type) {
 		case WT_CELL_KEY:
 		case WT_CELL_KEY_OVFL:
-			rip->key = cell;
+			WT_ROW_KEY_SET(rip, cell);
 			++rip;
 			break;
 		case WT_CELL_VALUE:

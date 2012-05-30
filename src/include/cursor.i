@@ -104,14 +104,9 @@ __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip)
 
 	/*
 	 * Return the WT_ROW slot's K/V pair.
-	 *
-	 * Multiple threads of control may be searching this page, which
-	 * means the key may change underfoot, and here's where it gets
-	 * tricky: first, copy the key.  We don't need any barriers, the
-	 * key is updated atomically, and we just need a valid copy.
 	 */
-	key = rip->key;
 
+	key = WT_ROW_KEY_COPY(rip);
 	/*
 	 * Key copied.
 	 *
