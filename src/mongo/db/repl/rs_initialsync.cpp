@@ -46,7 +46,7 @@ namespace mongo {
     }
 
     void ReplSetImpl::syncDoInitialSync() {
-        const static int maxFailedAttempts = 3;
+        const static int maxFailedAttempts = 10;
         createOplog();
         int failedAttempts = 0;
         while ( failedAttempts < maxFailedAttempts ) {
