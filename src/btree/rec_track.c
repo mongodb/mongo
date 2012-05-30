@@ -502,7 +502,7 @@ __wt_track_string(WT_PAGE_TRACK *track, char *buf, size_t len)
 		sep = ", ";						\
 	}
 
-	sep = NULL;
+	sep = "";
 	WT_APPEND_FLAG(WT_TRK_DISCARD, "discard");
 	WT_APPEND_FLAG(WT_TRK_INUSE, "inuse");
 	WT_APPEND_FLAG(WT_TRK_JUST_ADDED, "just-added");
