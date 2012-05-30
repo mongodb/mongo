@@ -1791,6 +1791,9 @@ namespace mongo {
             Database::closeDatabase( dbName, reservedPathString.c_str() );
         }
 
+        getDur().syncDataAndTruncateJournal(); // Must be done before and after repair
+        MongoFile::flushAll(true); // need both in case journaling is disabled
+
         if ( !res ) {
             errmsg = str::stream() << "clone failed for " << dbName << " with error: " << errmsg;
             problem() << errmsg << endl;
@@ -1798,12 +1801,8 @@ namespace mongo {
             if ( !preserveClonedFilesOnFailure )
                 MONGO_ASSERT_ON_EXCEPTION( boost::filesystem::remove_all( reservedPath ) );
 
-            getDur().syncDataAndTruncateJournal(); // Must be done before and after repair
-
             return false;
         }
-
-        MongoFile::flushAll(true);
 
         Client::Context ctx( dbName );
         Database::closeDatabase( dbName, dbpath );
@@ -1820,8 +1819,6 @@ namespace mongo {
 
         if ( !backupOriginalFiles )
             MONGO_ASSERT_ON_EXCEPTION( boost::filesystem::remove_all( reservedPath ) );
-
-        getDur().syncDataAndTruncateJournal(); // Must be done before and after repair
 
         return true;
     }
