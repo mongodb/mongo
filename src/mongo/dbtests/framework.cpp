@@ -34,6 +34,7 @@
 #include "mongo/db/instance.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/background.h"
+#include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/file_allocator.h"
 #include "mongo/util/version.h"
 
@@ -49,6 +50,9 @@ namespace mongo {
 
     namespace dbtests {
 
+        mutex globalCurrentTestNameMutex("globalCurrentTestNameMutex");
+        std::string globalCurrentTestName;
+
         void show_help_text(const char* name, po::options_description options) {
             cout << "usage: " << name << " [options] [suite]..." << endl
                  << options << "suite: run the specified test suite(s) only" << endl;
@@ -60,13 +64,21 @@ namespace mongo {
             virtual void run(){
 
                 int minutesRunning = 0;
-                std::string lastRunningTestName = ::mongo::unittest::getExecutingTestName();
+                std::string lastRunningTestName, currentTestName;
+
+                {
+                    scoped_lock lk( globalCurrentTestNameMutex );
+                    lastRunningTestName = globalCurrentTestName;
+                }
 
                 while (true) {
                     sleepsecs(60);
                     minutesRunning++;
 
-                    std::string currentTestName = ::mongo::unittest::getExecutingTestName();
+                    {
+                        scoped_lock lk( globalCurrentTestNameMutex );
+                        currentTestName = globalCurrentTestName;
+                    }
 
                     if (currentTestName != lastRunningTestName) {
                         minutesRunning = 0;
@@ -251,6 +263,9 @@ namespace mongo {
             TestWatchDog twd;
             twd.go();
 
+            // set tlogLevel to -1 to suppress tlog() output in a test program
+            tlogLevel = -1;
+
             int ret = ::mongo::unittest::Suite::run(suites,filter);
 
 #if !defined(_WIN32) && !defined(__sunos__)
@@ -267,3 +282,7 @@ namespace mongo {
 
 }  // namespace mongo
 
+void mongo::unittest::onCurrentTestNameChange( const std::string &testName ) {
+    scoped_lock lk( mongo::dbtests::globalCurrentTestNameMutex );
+    mongo::dbtests::globalCurrentTestName = testName;
+}

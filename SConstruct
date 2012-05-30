@@ -1085,4 +1085,4 @@ def clean_old_dist_builds(env, target, source):
 env.Alias("dist_clean", [], [clean_old_dist_builds])
 env.AlwaysBuild("dist_clean")
 
-env.Alias('all', ['core', 'tools', 'clientTests', 'test'])
+env.Alias('all', ['core', 'tools', 'clientTests', 'test', 'unittests'])

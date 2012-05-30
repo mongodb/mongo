@@ -1,5 +1,3 @@
-// mongo/unittest/unittest.cpp
-
 /**
 *    Copyright (C) 2008 10gen Inc.
 *
@@ -16,25 +14,28 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "mongo/pch.h"
 
-#include "pch.h"
 #include "mongo/unittest/unittest.h"
 
 #include <iostream>
 #include <map>
 
 #include "mongo/util/assert_util.h"
-#include "mongo/util/concurrency/mutex.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
     namespace unittest {
 
         namespace {
-            std::map<std::string, Suite *> *_suites = 0;
+            typedef std::map<std::string, Suite*> SuiteMap;
 
-            mutex currentTestNameMutex("currentTestNameMutex");
-            std::string currentTestName;
+            inline SuiteMap &_allSuites() {
+                static SuiteMap allSuites;
+                return allSuites;
+            }
+
         }  // namespace
 
         class Result {
@@ -72,9 +73,17 @@ namespace mongo {
 
         Result *Result::cur = 0;
 
-        TestCase::~TestCase() {}
-        void TestCase::setUp() {}
-        void TestCase::tearDown() {}
+        Test::Test() {}
+        Test::~Test() {}
+
+        void Test::run() {
+            setUp();
+            _doTest();
+            tearDown();
+        }
+
+        void Test::setUp() {}
+        void Test::tearDown() {}
 
         Suite::Suite( const std::string &name ) : _name( name ) {
             registerSuite( name , this );
@@ -82,9 +91,11 @@ namespace mongo {
 
         Suite::~Suite() {}
 
+        void Suite::add(const std::string& name, const TestFunction& testFn) {
+            _tests.push_back(new TestHolder(name, testFn));
+        }
+
         Result * Suite::run( const std::string& filter ) {
-            // set tlogLevel to -1 to suppress tlog() output in a test program
-            tlogLevel = -1;
 
             log(1) << "\t about to setupTests" << std::endl;
             setupTests();
@@ -93,11 +104,8 @@ namespace mongo {
             Result * r = new Result( _name );
             Result::cur = r;
 
-            /* see note in SavedContext */
-            //writelock lk("");
-
-            for ( std::vector<TestCase*>::iterator i=_tests.begin(); i!=_tests.end(); i++ ) {
-                TestCase * tc = *i;
+            for ( std::vector<TestHolder*>::iterator i=_tests.begin(); i!=_tests.end(); i++ ) {
+                TestHolder * tc = *i;
                 if ( filter.size() && tc->getName().find( filter ) == std::string::npos ) {
                     log(1) << "\t skipping test: " << tc->getName() << " because doesn't match filter" << std::endl;
                     continue;
@@ -107,12 +115,9 @@ namespace mongo {
 
                 bool passes = false;
 
-                {
-                    scoped_lock lk(currentTestNameMutex);
-                    currentTestName = tc->getName();
-                }
+                onCurrentTestNameChange( tc->getName() );
 
-                log(1) << "\t going to run test: " << tc->getName() << std::endl;
+                std::cout << "\t going to run test: " << tc->getName() << std::endl;
 
                 std::stringstream err;
                 err << tc->getName() << "\t";
@@ -121,23 +126,22 @@ namespace mongo {
                     tc->run();
                     passes = true;
                 }
-                catch ( MyAssertionException * ae ) {
-                    err << ae->ss.str();
-                    delete( ae );
+                catch ( const TestAssertionFailureException & ae ) {
+                    err << ae.toString();
                 }
-                catch ( std::exception& e ) {
-                    err << " exception: " << e.what();
+                catch ( const std::exception& e ) {
+                    err << " std::exception: " << e.what() << " in test " << tc->getName();
                 }
                 catch ( int x ) {
-                    err << " caught int : " << x << std::endl;
+                    err << " caught int " << x << " in test " << tc->getName();
                 }
                 catch ( ... ) {
-                    err << "unknown exception in test: " << tc->getName() << std::endl;
+                    err << "unknown exception in test: " << tc->getName();
                 }
 
                 if ( ! passes ) {
                     std::string s = err.str();
-                    log() << "FAIL: " << s << std::endl;
+                    std::cout << "FAIL: " << s << std::endl;
                     r->_fails++;
                     r->_messages.push_back( s );
                 }
@@ -147,43 +151,47 @@ namespace mongo {
                 r->_rc = 17;
 
 
-            {
-                scoped_lock lk(currentTestNameMutex);
-                currentTestName = "";
-            }
+            onCurrentTestNameChange( "" );
 
-            log(1) << "\t DONE running tests" << std::endl;
+            std::cout << "\t DONE running tests" << std::endl;
 
             return r;
         }
 
         int Suite::run( const std::vector<std::string> &suites , const std::string& filter ) {
+
+            if (_allSuites().empty()) {
+                std::cout << "error: no suites registered.";
+                return 1;
+            }
+
             for ( unsigned int i = 0; i < suites.size(); i++ ) {
-                if ( _suites->find( suites[i] ) == _suites->end() ) {
+                if ( _allSuites().count( suites[i] ) == 0 ) {
                     std::cout << "invalid test suite [" << suites[i] << "], use --list to see valid names" << std::endl;
-                    return -1;
+                    return 1;
                 }
             }
 
             std::vector<std::string> torun(suites);
 
             if ( torun.empty() ) {
-                for ( std::map<std::string,Suite*>::iterator i=_suites->begin() ; i!=_suites->end(); i++ )
+                for ( SuiteMap::const_iterator i = _allSuites().begin();
+                      i !=_allSuites().end(); ++i ) {
+
                     torun.push_back( i->first );
+                }
             }
 
             std::vector<Result*> results;
 
             for ( std::vector<std::string>::iterator i=torun.begin(); i!=torun.end(); i++ ) {
                 std::string name = *i;
-                Suite * s = (*_suites)[name];
+                Suite* s = _allSuites()[name];
                 fassert( 16145,  s );
 
-                log() << "going to run suite: " << name << std::endl;
+                std::cout << "going to run suite: " << name << std::endl;
                 results.push_back( s->run( filter ) );
             }
-
-            Logstream::get().flush();
 
             std::cout << "**************************************************" << std::endl;
 
@@ -215,53 +223,60 @@ namespace mongo {
         }
 
         void Suite::registerSuite( const std::string &name , Suite * s ) {
-            if ( ! _suites )
-                _suites = new std::map<std::string,Suite*>();
-            Suite*& m = (*_suites)[name];
+            Suite*& m = _allSuites()[name];
             fassert( 10162, ! m );
             m = s;
         }
 
-        void assert_pass() {
-            Result::cur->_asserts++;
+        Suite* Suite::getSuite(const std::string& name) {
+            Suite* result = _allSuites()[name];
+            if (!result)
+                result = new Suite(name);  // Suites are self-registering.
+            return result;
         }
 
-        void assert_fail( const char * exp , const char * file , unsigned line ) {
-            Result::cur->_asserts++;
+        void Suite::setupTests() {}
 
-            MyAssertionException * e = new MyAssertionException();
-            e->ss << "ASSERT FAILED! " << file << ":" << line << std::endl;
-            std::cout << e->ss.str() << std::endl;
-            throw e;
+        TestAssertionFailureDetails::TestAssertionFailureDetails(
+                const std::string &theFile,
+                unsigned theLine,
+                const std::string &theMessage )
+            : file( theFile ), line( theLine ), message( theMessage ) {
         }
 
-        MyAssertionException * MyAsserts::getBase() {
-            MyAssertionException * e = new MyAssertionException();
-            e->ss << _file << ":" << _line << " " << _aexp << " != " << _bexp << " ";
-            return e;
+        TestAssertionFailureException::TestAssertionFailureException(
+                const std::string &theFile,
+                unsigned theLine,
+                const std::string &theFailingExpression )
+            : _details( new TestAssertionFailureDetails( theFile, theLine, theFailingExpression ) ) {
         }
 
-        void MyAsserts::printLocation() {
-            log() << _file << ":" << _line << " " << _aexp << " != " << _bexp << " ";
+        std::string TestAssertionFailureException::toString() const {
+            std::ostringstream os;
+            os << getMessage() << " @" << getFile() << ":" << getLine();
+            return os.str();
         }
 
-        void MyAsserts::_gotAssert() {
-            Result::cur->_asserts++;
+        TestAssertion::TestAssertion( const std::string &file, unsigned line )
+            : _file( file ), _line( line ) {
+
+            ++Result::cur->_asserts;
         }
 
-        std::string getExecutingTestName() {
-            scoped_lock lk(currentTestNameMutex);
-            return currentTestName;
+        TestAssertion::~TestAssertion() {}
+
+        void TestAssertion::fail( const std::string &message ) const {
+            throw TestAssertionFailureException( _file, _line, message );
         }
+
+        ComparisonAssertion::ComparisonAssertion( const std::string &aexp, const std::string &bexp,
+                                                  const std::string &file, unsigned line )
+            : TestAssertion( file, line ), _aexp( aexp ), _bexp( bexp ) {}
 
         std::vector<std::string> getAllSuiteNames() {
             std::vector<std::string> result;
-            if (_suites) {
-                for ( std::map<std::string, Suite *>::const_iterator i = _suites->begin();
-                      i != _suites->end(); ++i ) {
-
+            for (SuiteMap::const_iterator i = _allSuites().begin(); i != _allSuites().end(); ++i) {
                     result.push_back(i->first);
-                }
             }
             return result;
         }
