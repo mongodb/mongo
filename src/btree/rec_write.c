@@ -2533,10 +2533,10 @@ __rec_row_leaf(
 			 * was read into memory, there may not have been a value
 			 * item, that is, it may have been zero length.
 			 */
-			if (val_cell == NULL)
+			if (val_cell == NULL) {
 				val->buf.data = NULL;
 				val->buf.size = 0;
-			else {
+			} else {
 				val->buf.data = val_cell;
 				val->buf.size = unpack->len;
 			}
