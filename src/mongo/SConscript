@@ -20,8 +20,16 @@ def add_exe( v ):
 
 # ------    SOURCE FILE SETUP -----------
 
-env.StaticLibrary('log', [ 'util/assert_util.cpp',
-                           'util/log.cpp', ])
+env.StaticLibrary('foundation',
+                  [ 'util/assert_util.cpp',
+                    'util/debug_util.cpp',
+                    'util/log.cpp',
+                    'util/signal_handlers.cpp',
+                    'util/time_support.cpp', ],
+                  LIBDEPS=['stacktrace',
+                           '$BUILD_DIR/third_party/boost/boost_system',
+                           '$BUILD_DIR/third_party/boost/boost_filesystem',
+                           '$BUILD_DIR/third_party/boost/boost_thread'])
 
 commonFiles = [ "pch.cpp",
                 "buildinfo.cpp",
@@ -38,7 +46,6 @@ commonFiles = [ "pch.cpp",
                 "shell/mongo.cpp",
                 "util/background.cpp",
                 "util/intrusive_counter.cpp",
-                "util/time_support.cpp",
                 "util/timer.cpp",
                 "util/util.cpp",
                 "util/file_allocator.cpp",
@@ -49,10 +56,8 @@ commonFiles = [ "pch.cpp",
                 "util/base64.cpp",
                 "util/concurrency/vars.cpp",
                 "util/concurrency/task.cpp",
-                "util/debug_util.cpp",
                 "util/concurrency/thread_pool.cpp",
                 "util/password.cpp",
-                "util/signal_handlers.cpp",
                 "util/concurrency/rwlockimpl.cpp",
                 "util/histogram.cpp",
                 "util/concurrency/spin_lock.cpp",
@@ -79,7 +84,7 @@ commonFiles = [ "pch.cpp",
                 "s/shardconnection.cpp"]
 
 env.StaticLibrary('mongocommon', commonFiles,
-                  LIBDEPS=['log',
+                  LIBDEPS=['foundation',
                            'stacktrace',
                            '$BUILD_DIR/third_party/pcrecpp',
                            '$BUILD_DIR/third_party/murmurhash3/murmurhash3',
