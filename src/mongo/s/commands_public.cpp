@@ -309,6 +309,11 @@ namespace mongo {
         public:
             DropDBCmd() : PublicGridCommand( "dropDatabase" ) {}
             bool run(const string& dbName , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+                // disallow dropping the config database from mongos
+                if( dbName == "config" ) {
+                    errmsg = "Cannot drop 'config' database via mongos";
+                    return false;
+                }
 
                 BSONElement e = cmdObj.firstElement();
 
