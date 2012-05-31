@@ -807,12 +807,17 @@ namespace mongo {
                 return 1;
             return -1;
 
-        case Date:
-            if (rL->dateValue < rR->dateValue)
+        case Date: {
+            // need to convert to long long to handle dates before 1970
+            // see BSONElement::compareElementValues
+            long long l = static_cast<long long>(rL->dateValue.millis);
+            long long r = static_cast<long long>(rR->dateValue.millis);
+            if (l < r)
                 return -1;
-            if (rL->dateValue > rR->dateValue)
+            if (l > r)
                 return 1;
             return 0;
+        }
 
         case RegEx:
             return rL->stringValue.compare(rR->stringValue);
