@@ -488,6 +488,8 @@ for t in ["mongo" + x for x in normalTools] + ["mongofiles", "bsondump", "mongop
     installBinary( env, t )
     env.Alias("tools", '#/' + add_exe(t))
 
+env.Alias("tools", "#/" + add_exe("mongobridge"))
+
 if mongosniff_built:
     installBinary(env, "mongosniff")
     env.Alias("tools", '#/' + add_exe("mongosniff"))
