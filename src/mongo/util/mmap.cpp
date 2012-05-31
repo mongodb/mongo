@@ -15,7 +15,7 @@
  *    limitations under the License.
  */
 
-#include "pch.h"
+#include "mongo/pch.h"
 
 #include "mongo/util/mmap.h"
 
@@ -27,8 +27,16 @@
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/progress_meter.h"
+#include "mongo/util/startup_test.h"
 
 namespace mongo {
+
+    void minOSPageSizeBytesTest(size_t minOSPageSizeBytes) {
+        fassert( 16325, minOSPageSizeBytes > 0 );
+        fassert( 16326, minOSPageSizeBytes < 1000000 );
+        // check to see if the page size is a power of 2
+        fassert( 16327, (minOSPageSizeBytes & (minOSPageSizeBytes - 1)) == 0);
+    }
 
     set<MongoFile*> MongoFile::mmfiles;
     map<string,MongoFile*> MongoFile::pathToFile;

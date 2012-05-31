@@ -29,8 +29,12 @@
 using namespace mongoutils;
 
 namespace mongo {
-    
-    const size_t g_minOSPageSizeBytes = sysconf( _SC_PAGESIZE );
+    static size_t fetchMinOSPageSizeBytes() {
+        size_t minOSPageSizeBytes = sysconf( _SC_PAGESIZE );
+        minOSPageSizeBytesTest(minOSPageSizeBytes);
+        return minOSPageSizeBytes;
+    }
+    const size_t g_minOSPageSizeBytes = fetchMinOSPageSizeBytes();
 
     MemoryMappedFile::MemoryMappedFile() {
         fd = 0;

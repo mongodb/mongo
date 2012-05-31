@@ -29,9 +29,11 @@ namespace mongo {
     static size_t fetchMinOSPageSizeBytes() {
         SYSTEM_INFO si;
         GetSystemInfo(&si);
-        return si.dwPageSize;
+        size_t minOSPageSizeBytes = si.dwPageSize;
+        minOSPageSizeBytesTest(minOSPageSizeBytes);
+        return minOSPageSizeBytes;
     }
-    const size_t g_pageSize = fetchMinOSPageSizeBytes();
+    const size_t g_minOSPageSizeBytes = fetchMinOSPageSizeBytes();
 
 
     mutex mapViewMutex("mapView");

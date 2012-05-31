@@ -22,7 +22,8 @@
 namespace mongo {
 
     extern const size_t g_minOSPageSizeBytes;
-    
+    void minOSPageSizeBytesTest(size_t minOSPageSizeBytes);  // lame-o
+
     class MAdvise { 
         void *_p;
         unsigned _len;
