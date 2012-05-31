@@ -56,7 +56,10 @@ namespace mongo {
 
         /*
           Look for an initial sort; we'll try to add this to the
-          Cursor we create.  If we're successful, then 
+          Cursor we create.  If we're successful in doing that (further down),
+          we'll remove the $sort from the pipeline, because the documents
+          will already come sorted in the specified order as a result of the
+          index scan.
         */
         const DocumentSourceSort *pSort = NULL;
         BSONObjBuilder sortBuilder;
