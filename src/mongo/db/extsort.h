@@ -136,5 +136,6 @@ namespace mongo {
         bool _sorted;
 
         static unsigned long long _compares;
+        static unsigned long long _uniqueNumber;
     };
 }

@@ -33,6 +33,8 @@ namespace mongo {
     IndexInterface *BSONObjExternalSorter::extSortIdxInterface;
     Ordering BSONObjExternalSorter::extSortOrder( Ordering::make(BSONObj()) );
     unsigned long long BSONObjExternalSorter::_compares = 0;
+    unsigned long long BSONObjExternalSorter::_uniqueNumber = 0;
+    static SimpleMutex _uniqueNumberMutex( "uniqueNumberMutex" );
 
     /*static*/
     int BSONObjExternalSorter::_compare(IndexInterface& i, const Data& l, const Data& r, const Ordering& order) { 
@@ -62,7 +64,14 @@ namespace mongo {
         rootpath << dbpath;
         if ( dbpath[dbpath.size()-1] != '/' )
             rootpath << "/";
-        rootpath << "_tmp/esort." << time(0) << "." << rand() << "/";
+
+        unsigned long long thisUniqueNumber;
+        {
+            SimpleMutex::scoped_lock lk(_uniqueNumberMutex);
+            thisUniqueNumber = _uniqueNumber;
+            ++_uniqueNumber;
+        }
+        rootpath << "_tmp/esort." << time(0) << "." << thisUniqueNumber << "/";
         _root = rootpath.str();
 
         log(1) << "external sort root: " << _root.string() << endl;
