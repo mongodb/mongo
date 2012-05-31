@@ -24,7 +24,6 @@
 #include "mongo/util/net/listen.h"
 #include "mongo/util/net/message.h"
 #include "mongo/util/stacktrace.h"
-#include "mongo/util/util.h"
 
 using namespace mongo;
 using namespace std;
