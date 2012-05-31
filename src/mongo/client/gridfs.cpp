@@ -66,8 +66,12 @@ namespace mongo {
     }
 
     void GridFS::setChunkSize(unsigned int size) {
-        massert( 13296 , "invalid chunk size is specified", (size == 0));
+        massert( 13296 , "invalid chunk size is specified", (size != 0 ));
         _chunkSize = size;
+    }
+
+    unsigned int GridFS::getChunkSize() const {
+        return _chunkSize;
     }
 
     BSONObj GridFS::storeFile( const char* data , size_t length , const string& remoteName , const string& contentType) {

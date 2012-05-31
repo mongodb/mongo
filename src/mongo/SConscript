@@ -402,7 +402,7 @@ env.StaticLibrary('testframework', ['dbtests/framework.cpp'], LIBDEPS=['unittest
 test = testEnv.Install(
     '#/',
     testEnv.Program( "test", [ f for f in Glob( "dbtests/*.cpp" ) if not str( f ).endswith( 'framework.cpp' ) ],
-                     LIBDEPS=["mongocommon", "serveronly", "coreserver", "coredb", "testframework" ],
+                     LIBDEPS=["mongocommon", "serveronly", "coreserver", "coredb", "testframework", "gridfs" ],
                      _LIBDEPS='$_LIBDEPS_OBJS' ) )
 
 if len(testEnv.subst('$PROGSUFFIX')):

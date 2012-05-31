@@ -68,6 +68,8 @@ namespace mongo {
          */
         void setChunkSize(unsigned int size);
 
+        unsigned int getChunkSize() const;
+
         /**
          * puts the file reference by fileName into the db
          * @param fileName local filename relative to process
