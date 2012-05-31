@@ -389,9 +389,9 @@ __cursor_row_prev(WT_CURSOR_BTREE *cbt, int newpage)
 		if (cbt->ins != NULL)
 			__cursor_skip_prev(cbt);
 
-new_insert:	if ((ins = cbt->ins) != NULL &&
-		    (upd = __wt_txn_read(session, ins->upd)) != NULL) {
-			if (WT_UPDATE_DELETED_ISSET(upd))
+new_insert:	if ((ins = cbt->ins) != NULL) {
+			if ((upd = __wt_txn_read(session, ins->upd)) == NULL ||
+			    WT_UPDATE_DELETED_ISSET(upd))
 				continue;
 			key->data = WT_INSERT_KEY(ins);
 			key->size = WT_INSERT_KEY_SIZE(ins);

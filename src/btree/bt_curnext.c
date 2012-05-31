@@ -234,6 +234,7 @@ new_page:	*recnop = cbt->recno;
 static inline int
 __cursor_row_next(WT_CURSOR_BTREE *cbt, int newpage)
 {
+	WT_INSERT *ins;
 	WT_ITEM *key, *val;
 	WT_ROW *rip;
 	WT_SESSION_IMPL *session;
@@ -271,12 +272,12 @@ __cursor_row_next(WT_CURSOR_BTREE *cbt, int newpage)
 		if (cbt->ins != NULL)
 			cbt->ins = WT_SKIP_NEXT(cbt->ins);
 
-new_insert:	if (cbt->ins != NULL &&
-		    (upd = __wt_txn_read(session, cbt->ins->upd)) != NULL) {
-			if (WT_UPDATE_DELETED_ISSET(upd))
+new_insert:	if ((ins = cbt->ins) != NULL) {
+			if ((upd = __wt_txn_read(session, ins->upd)) == NULL ||
+			    WT_UPDATE_DELETED_ISSET(upd))
 				continue;
-			key->data = WT_INSERT_KEY(cbt->ins);
-			key->size = WT_INSERT_KEY_SIZE(cbt->ins);
+			key->data = WT_INSERT_KEY(ins);
+			key->size = WT_INSERT_KEY_SIZE(ins);
 			val->data = WT_UPDATE_DATA(upd);
 			val->size = upd->size;
 			return (0);
