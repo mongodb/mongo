@@ -41,7 +41,7 @@ namespace mongo {
         if (!populated)
             populate();
 
-        return (listIterator == documents.end());
+        return (docIterator == documents.end());
     }
 
     bool DocumentSourceSort::advance() {
@@ -50,15 +50,15 @@ namespace mongo {
         if (!populated)
             populate();
 
-        verify(listIterator != documents.end());
+        verify(docIterator != documents.end());
 
-        ++listIterator;
-        if (listIterator == documents.end()) {
+        ++docIterator;
+        if (docIterator == documents.end()) {
             pCurrent.reset();
             count = 0;
             return false;
         }
-        pCurrent = listIterator->pDocument;
+        pCurrent = *docIterator;
 
         return true;
     }
@@ -159,19 +159,20 @@ namespace mongo {
         for(bool hasNext = !pSource->eof(); hasNext;
             hasNext = pSource->advance()) {
             intrusive_ptr<Document> pDocument(pSource->getCurrent());
-            documents.push_back(Carrier(this, pDocument));
+            documents.push_back(pDocument);
 
             dmm.addToTotal(pDocument->getApproximateSize());
         }
 
         /* sort the list */
-        documents.sort(Carrier::lessThan);
+        Comparator comparator(this);
+        sort(documents.begin(), documents.end(), comparator);
 
         /* start the sort iterator */
-        listIterator = documents.begin();
+        docIterator = documents.begin();
 
-        if (listIterator != documents.end())
-            pCurrent = listIterator->pDocument;
+        if (docIterator != documents.end())
+            pCurrent = *docIterator;
         populated = true;
     }
 
@@ -211,15 +212,6 @@ namespace mongo {
           consider the documents equal for purposes of this sort.
         */
         return 0;
-    }
-
-    bool DocumentSourceSort::Carrier::lessThan(
-        const Carrier &rL, const Carrier &rR) {
-        /* make sure these aren't from different lists */
-        verify(rL.pSort == rR.pSort);
-
-        /* compare the documents according to the sort key */
-        return (rL.pSort->compare(rL.pDocument, rR.pDocument) < 0);
     }
 
     void DocumentSourceSort::manageDependencies(

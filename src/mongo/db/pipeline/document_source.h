@@ -988,22 +988,6 @@ namespace mongo {
         SortPaths vSortKey;
         vector<bool> vAscending;
 
-        class Carrier {
-        public:
-            /*
-              We need access to the key for compares, so we have to carry
-              this around.
-            */
-            DocumentSourceSort *pSort;
-
-            intrusive_ptr<Document> pDocument;
-
-            Carrier(DocumentSourceSort *pSort,
-                    const intrusive_ptr<Document> &pDocument);
-
-            static bool lessThan(const Carrier &rL, const Carrier &rR);
-        };
-
         /*
           Compare two documents according to the specified sort key.
 
@@ -1015,10 +999,30 @@ namespace mongo {
         int compare(const intrusive_ptr<Document> &pL,
                     const intrusive_ptr<Document> &pR);
 
-        typedef list<Carrier> ListType;
-        ListType documents;
+        /*
+          This is a utility class just for the STL sort that is done
+          inside.
+         */
+        class Comparator {
+        public:
+            bool operator()(
+                const intrusive_ptr<Document> &pL,
+                const intrusive_ptr<Document> &pR) {
+                return (pSort->compare(pL, pR) < 0);
+            }
 
-        ListType::iterator listIterator;
+            inline Comparator(DocumentSourceSort *pS):
+                pSort(pS) {
+                }
+
+        private:
+            DocumentSourceSort *pSort;
+        };
+
+        typedef vector<intrusive_ptr<Document> > VectorType;
+        VectorType documents;
+
+        VectorType::iterator docIterator;
         intrusive_ptr<Document> pCurrent;
     };
 
@@ -1257,10 +1261,4 @@ namespace mongo {
         pUnwindValue.reset();
     }
 
-    inline DocumentSourceSort::Carrier::Carrier(
-        DocumentSourceSort *pTheSort,
-        const intrusive_ptr<Document> &pTheDocument):
-        pSort(pTheSort),
-        pDocument(pTheDocument) {
-    }
 }
