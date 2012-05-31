@@ -260,10 +260,9 @@ namespace mongo {
     }
 
     void Record::_accessing() const {
-        if ( cc().allowedToThrowPageFaultException() ) {
+        if ( cc().allowedToThrowPageFaultException() && ! likelyInPhysicalMemory() ) {
             DEV fassert( 16236 , ! inConstructorChain(true) );
-            if ( ! likelyInPhysicalMemory() ) 
-                throw PageFaultException(this);
+            throw PageFaultException(this);
         }
     }
 
