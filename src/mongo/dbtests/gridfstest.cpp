@@ -33,10 +33,12 @@ namespace {
             GridFS grid( _client, "gridtest" );
             grid.setChunkSize( 5 );
 
-            ASSERT_EQUALS( 5, grid.getChunkSize() );
+            ASSERT_EQUALS( 5U, grid.getChunkSize() );
             ASSERT_THROWS( grid.setChunkSize( 0 ), MsgAssertionException );
-            ASSERT_EQUALS( 5, grid.getChunkSize() );
+            ASSERT_EQUALS( 5U, grid.getChunkSize() );
         }
+
+        virtual ~SetChunkSizeTest() {}
     };
 
     class All : public Suite {
