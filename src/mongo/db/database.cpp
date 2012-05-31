@@ -223,25 +223,11 @@ namespace mongo {
     //        if one datafile were missing we should keep going for 
     //        repair purposes yet we do not.
     void Database::openAllFiles() {
-        //log() << "TEMP openallfiles " << path << ' ' << name << endl;
         verify(this);
         int n = 0;
         while( openExistingFile(n) ) {
             n++;
         }
-
-        /*
-        int n = 0;
-        while( exists(n) ) {
-            getFile(n);
-            n++;
-        }
-        // If last file is empty, consider it preallocated and make sure it's not mapped
-        // until a write is requested
-        if ( n > 1 && getFile( n - 1 )->getHeader()->isEmpty() ) {
-            delete _files[ n - 1 ];
-            _files.pop_back();
-        }*/
     }
 
     // todo: this is called a lot. streamline the common case
