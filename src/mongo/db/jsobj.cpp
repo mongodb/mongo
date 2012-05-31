@@ -644,7 +644,7 @@ namespace mongo {
             return eooElement;
     }
 
-    BSONObj BSONObj::extractFieldsUnDotted(const BSONObj pattern) const {
+    BSONObj BSONObj::extractFieldsUnDotted(const BSONObj& pattern) const {
         BSONObjBuilder b;
         BSONObjIterator i(pattern);
         while ( i.moreWithEOO() ) {

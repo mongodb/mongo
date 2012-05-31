@@ -254,7 +254,7 @@ namespace mongo {
          *    this.extractFieldsUnDotted({b : "blah"}) -> {"" : 5}
          *
         */
-        BSONObj extractFieldsUnDotted(const BSONObj pattern) const;
+        BSONObj extractFieldsUnDotted(const BSONObj& pattern) const;
 
         /** extract items from object which match a pattern object.
             e.g., if pattern is { x : 1, y : 1 }, builds an object with
