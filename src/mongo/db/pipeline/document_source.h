@@ -1013,7 +1013,7 @@ namespace mongo {
 
             inline Comparator(DocumentSourceSort *pS):
                 pSort(pS) {
-                }
+            }
 
         private:
             DocumentSourceSort *pSort;
