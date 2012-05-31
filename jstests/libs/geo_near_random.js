@@ -25,12 +25,12 @@ GeoNearRandomTest.prototype.mkPt = function mkPt(scale, indexBounds){
     
 }
 
-GeoNearRandomTest.prototype.insertPts = function(nPts, indexBounds) {
+GeoNearRandomTest.prototype.insertPts = function(nPts, indexBounds, scale) {
     assert.eq(this.nPts, 0, "insertPoints already called");
     this.nPts = nPts;
 
     for (var i=0; i<nPts; i++){
-        this.t.insert({_id: i, loc: this.mkPt(undefined, indexBounds)});
+        this.t.insert({_id: i, loc: this.mkPt(scale, indexBounds)});
     }
     
     if(!indexBounds)

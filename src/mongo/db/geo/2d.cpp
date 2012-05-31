@@ -353,7 +353,14 @@ namespace mongo {
         }
 
         unsigned _convert( double in ) const {
-            uassert( 13027 , str::stream() << "point not in interval of [ " << _min << ", " << _max << " )", in < _max && in >= _min );
+            uassert( 13027 , str::stream() << "point not in interval of [ " << _min << ", " << _max << " ]", in <= _max && in >= _min );
+
+            if (in == _max) {
+                // prevent aliasing with _min by moving inside the "box"
+                // makes 180 == 179.999 (roughly)
+                in -= _error / 2;
+            }
+
             in -= _min;
             verify( in >= 0 );
             return (unsigned)(in * _scaling);
