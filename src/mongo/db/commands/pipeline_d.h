@@ -45,13 +45,12 @@ namespace mongo {
            early match can be removed and replaced with a Cursor that will
            do an index scan.
 
-           @param ppSource where to put the wrapped Cursor
            @param pPipeline the logical "this" for this operation
            @param dbName the name of the database
            @param pExpCtx the expression context for this pipeline
+           @returns the cursor that was created
          */
-        static void prepareCursorSource(
-            intrusive_ptr<DocumentSourceCursor> *ppSource,
+        static intrusive_ptr<DocumentSourceCursor> prepareCursorSource(
             const intrusive_ptr<Pipeline> &pPipeline,
             const string &dbName,
             const intrusive_ptr<ExpressionContext> &pExpCtx);

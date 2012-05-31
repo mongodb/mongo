@@ -122,7 +122,7 @@ namespace mongo {
 
            @returns true if this is an explain
          */
-        bool getExplain() const;
+        bool isExplain() const;
 
         /**
           The aggregation command name.
@@ -217,7 +217,7 @@ namespace mongo {
         return splitMongodPipeline;
     }
 
-    inline bool  Pipeline::getExplain() const {
+    inline bool  Pipeline::isExplain() const {
         return explain;
     }
 

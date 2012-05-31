@@ -160,7 +160,7 @@ namespace mongo {
                 lk.reset(new Lock::GlobalRead());
             Client::ReadContext ctx(ns, dbpath, requiresAuth()); // read lock
 
-            PipelineD::prepareCursorSource(&pSource, pPipeline, db, pCtx);
+            pSource = PipelineD::prepareCursorSource(pPipeline, db, pCtx);
 
             /* release the Cursor before the lock gets released */
             pSource->releaseCursor();
@@ -182,14 +182,13 @@ namespace mongo {
         intrusive_ptr<Pipeline> &pPipeline,
         intrusive_ptr<ExpressionContext> &pCtx) {
 
-        intrusive_ptr<DocumentSourceCursor> pSource;
-
         scoped_ptr<Lock::GlobalRead> lk;
         if(lockGlobally())
             lk.reset(new Lock::GlobalRead());
         Client::ReadContext ctx(ns, dbpath, requiresAuth()); // read lock
 
-        PipelineD::prepareCursorSource(&pSource, pPipeline, db, pCtx);
+        intrusive_ptr<DocumentSourceCursor> pSource(
+            PipelineD::prepareCursorSource(pPipeline, db, pCtx));
         return executePipeline(result, errmsg, ns, pPipeline, pSource, pCtx);
     }
 
@@ -293,18 +292,10 @@ namespace mongo {
 
         string ns(parseNs(db, cmdObj));
 
-        if (pPipeline->getExplain())
+        if (pPipeline->isExplain())
             return runExplain(result, errmsg, ns, db, pPipeline, pCtx);
         else
             return runExecute(result, errmsg, ns, db, pPipeline, pCtx);
-
-#ifdef NEVER
-        intrusive_ptr<DocumentSourceCursor> pSource;
-        PipelineD::prepareCursorSource(
-            &pSource, pPipeline, db, pCtx);
-
-        return executePipeline(result, errmsg, ns, pPipeline, pSource, pCtx);
-#endif
     }
 
 } // namespace mongo
