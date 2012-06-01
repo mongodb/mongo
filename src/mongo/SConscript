@@ -13,7 +13,8 @@ Import("usesm usev8")
 Import("installSetup")
 Import("darwin windows solaris linux nix")
 
-env.SConscript('unittest/SConscript')
+env.SConscript(['platform/SConscript',
+                'unittest/SConscript'])
 
 def add_exe( v ):
     return "${PROGPREFIX}%s${PROGSUFFIX}" % v
