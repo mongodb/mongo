@@ -32,20 +32,26 @@ typedef struct __wt_meta_track {
 static int
 __meta_track_next(WT_SESSION_IMPL *session, WT_META_TRACK **trkp)
 {
-	size_t offset;
+	size_t offset, sub_off;
 
 	if (!WT_META_TRACKING(session))
 		session->meta_track_next = session->meta_track;
 
 	offset = WT_PTRDIFF(session->meta_track_next, session->meta_track);
+	if (session->meta_track_sub != NULL)
+		sub_off =
+		    WT_PTRDIFF(session->meta_track_sub, session->meta_track);
 	if (offset == session->meta_track_alloc) {
 		WT_RET(__wt_realloc(session, &session->meta_track_alloc,
 		    WT_MAX(2 * session->meta_track_alloc,
 		    20 * sizeof(WT_META_TRACK)), &session->meta_track));
 
-		/* Maintain the position in the new chunk of memory. */
+		/* Maintain positions in the new chunk of memory. */
 		session->meta_track_next =
 		    (uint8_t *)session->meta_track + offset;
+		if (session->meta_track_sub != NULL)
+			session->meta_track_sub =
+			    (uint8_t *)session->meta_track + sub_off;
 	}
 
 	WT_ASSERT(session, session->meta_track_next != NULL);
