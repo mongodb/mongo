@@ -40,15 +40,12 @@ main(int argc, char *argv[])
 	nkeys = 1000;
 	nops = 10000;
 	readers = 10;
-	runs = 0;
+	runs = 1;
 	session_per_op = 0;
 	writers = 10;
 
-	while ((ch = getopt(argc, argv, "1C:k:l:n:R:r:St:W:")) != EOF)
+	while ((ch = getopt(argc, argv, "C:k:l:n:R:r:St:W:")) != EOF)
 		switch (ch) {
-		case '1':			/* One run */
-			runs = 1;
-			break;
 		case 'C':			/* wiredtiger_open config */
 			config_open = optarg;
 			break;
@@ -238,17 +235,16 @@ usage(void)
 {
 	fprintf(stderr,
 	    "usage: %s "
-	    "[-1S] [-C wiredtiger-config] [-k keys] [-l log]\n\t"
+	    "[-S] [-C wiredtiger-config] [-k keys] [-l log]\n\t"
 	    "[-n ops] [-R readers] [-r runs] [-t f|r|v] [-W writers]\n",
 	    progname);
 	fprintf(stderr, "%s",
-	    "\t-1 run once\n"
 	    "\t-C specify wiredtiger_open configuration arguments\n"
 	    "\t-k set number of keys to load\n"
 	    "\t-l specify a log file\n"
 	    "\t-n set number of operations each thread does\n"
 	    "\t-R set number of reading threads\n"
-	    "\t-r set number of runs\n"
+	    "\t-r set number of runs (0 for continuous)\n"
 	    "\t-S open/close a session on every operation\n"
 	    "\t-t set a file type (fix | row | var)\n"
 	    "\t-W set number of writing threads\n");

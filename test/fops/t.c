@@ -36,13 +36,10 @@ main(int argc, char *argv[])
 	config_open = NULL;
 	nops = 1000;
 	nthreads = 10;
-	runs = 0;
+	runs = 1;
 
-	while ((ch = getopt(argc, argv, "1C:l:n:r:t:")) != EOF)
+	while ((ch = getopt(argc, argv, "C:l:n:r:t:")) != EOF)
 		switch (ch) {
-		case '1':			/* One run */
-			runs = 1;
-			break;
 		case 'C':			/* wiredtiger_open config */
 			config_open = optarg;
 			break;
@@ -196,11 +193,10 @@ usage(void)
 {
 	fprintf(stderr,
 	    "usage: %s "
-	    "[-1S] [-C wiredtiger-config] [-k keys] [-l log]\n\t"
+	    "[-S] [-C wiredtiger-config] [-k keys] [-l log]\n\t"
 	    "[-n ops] [-R readers] [-r runs] [-t f|r|v] [-W writers]\n",
 	    progname);
 	fprintf(stderr, "%s",
-	    "\t-1 run once\n"
 	    "\t-C specify wiredtiger_open configuration arguments\n"
 	    "\t-l specify a log file\n"
 	    "\t-n set number of operations each thread does\n"
