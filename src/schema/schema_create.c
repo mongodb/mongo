@@ -31,8 +31,10 @@ __create_file(WT_SESSION_IMPL *session,
 	WT_RET(__wt_session_get_btree(
 	    session, uri, cfg, WT_BTREE_EXCLUSIVE | WT_BTREE_LOCK_ONLY));
 
-	if (WT_META_TRACKING(session))
+	if (WT_META_TRACKING(session)) {
 		WT_RET(__wt_meta_track_handle_lock(session));
+		session->created_btree = session->btree;
+	}
 
 	/* Check if the file already exists. */
 	if (!is_metadata && (ret =
@@ -178,12 +180,9 @@ __create_colgroup(WT_SESSION_IMPL *session,
 		goto err;
 	}
 	WT_ERR(__create_file(session, fileuri, exclusive, fileconf));
-
-	session->created_btree = session->btree;
 	WT_ERR(__wt_schema_open_colgroups(session, table));
 
-err:    session->created_btree = NULL;
-	__wt_free(session, cgconf);
+err:    __wt_free(session, cgconf);
 	__wt_free(session, fileconf);
 	__wt_free(session, oldconf);
 	__wt_buf_free(session, &fmt);
@@ -393,7 +392,6 @@ __wt_schema_create(
 	else if ((ret = __wt_schema_get_source(session, name, &dsrc)) == 0)
 		ret = dsrc->create(dsrc, &session->iface, name, config);
 
-	WT_ASSERT(session, session->created_btree == NULL);
 	session->btree = NULL;
 	WT_TRET(__wt_meta_track_off(session, ret != 0));
 

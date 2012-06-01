@@ -103,6 +103,8 @@ __meta_track_apply(WT_SESSION_IMPL *session, WT_META_TRACK *trk, int unroll)
 	case WT_ST_LOCK:	/* Handle lock, see above */
 		saved_btree = session->btree;
 		session->btree = trk->btree;
+		if (session->created_btree == trk->btree)
+			session->created_btree = NULL;
 		WT_TRET(__wt_session_release_btree(session));
 		session->btree = saved_btree;
 		break;
@@ -120,14 +122,19 @@ __meta_track_apply(WT_SESSION_IMPL *session, WT_META_TRACK *trk, int unroll)
 			    "metadata unroll rename %s to %s",
 			    trk->b, trk->a);
 			WT_TRET(tret);
-		} else if (trk->a == NULL && ((tret =
-		    __wt_conn_btree_close_all(session, trk->b)) != 0 ||
-		    (tret = __wt_remove(session,
-		    trk->b + strlen("file:"))) != 0)) {
-			__wt_err(session, tret,
-			    "metadata unroll create %s",
-			    trk->b);
-			WT_TRET(tret);
+		} else if (trk->a == NULL) {
+			saved_btree = session->btree;
+			if ((session->btree = session->created_btree) != NULL)
+				WT_TRET(
+				    __wt_conn_btree_sync_and_close(session));
+			session->btree = saved_btree;
+			if ((tret = __wt_remove(session,
+			    trk->b + strlen("file:"))) != 0) {
+				__wt_err(session, tret,
+				    "metadata unroll create %s",
+				    trk->b);
+				WT_TRET(tret);
+			}
 		}
 		/*
 		 * We can't undo removes yet: that would imply

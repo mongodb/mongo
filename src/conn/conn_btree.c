@@ -243,14 +243,18 @@ __wt_conn_btree_get(WT_SESSION_IMPL *session,
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	const char *treeconf;
+	int locked;
 
 	conn = S2C(session);
 
 	WT_STAT_INCR(conn->stats, file_open);
 
+	locked = 1;
 	if ((btree = session->btree) != NULL) {
 		if (!F_ISSET(btree, WT_BTREE_EXCLUSIVE))
 			__wt_conn_btree_open_lock(session, flags);
+		else
+			locked = 0;
 	} else {
 		WT_RET(__conn_btree_get(session, name, snapshot, flags));
 		btree = session->btree;
@@ -267,7 +271,7 @@ __wt_conn_btree_get(WT_SESSION_IMPL *session,
 		ret = __wt_conn_btree_open(session, treeconf, cfg, flags);
 	}
 
-err:	if (ret != 0) {
+err:	if (ret != 0 && locked) {
 		F_CLR(btree, WT_BTREE_EXCLUSIVE);
 		__wt_rwunlock(session, btree->rwlock);
 	}
