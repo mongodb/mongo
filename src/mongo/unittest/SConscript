@@ -10,6 +10,6 @@ env.StaticLibrary("unittest_main", ['unittest_main.cpp'],
 
 env.StaticLibrary("unittest_crutch", ['crutch.cpp'])
 
-env.Alias('unittests',
-          env.Program('unittest_test', 'unittest_test.cpp',
-                      LIBDEPS=['unittest_main', 'unittest_crutch'])
+
+env.CppUnitTest('unittest_test', 'unittest_test.cpp')
+

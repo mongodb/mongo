@@ -290,7 +290,9 @@ env = Environment( BUILD_DIR=variantDir,
                    PYTHON=utils.find_python(),
                    SERVER_ARCHIVE='${SERVER_DIST_BASENAME}${DIST_ARCHIVE_SUFFIX}',
                    TARGET_ARCH=msarch ,
-                   tools=["default", "gch", "jsheader", "mergelib"],
+                   tools=["default", "gch", "jsheader", "mergelib", "unittest"],
+                   UNITTEST_ALIAS='unittests',
+                   UNITTEST_LIST='#build/unittests.txt',
                    PYSYSPLATFORM=os.sys.platform,
 
                    PCRE_VERSION='8.30',
@@ -1085,4 +1087,4 @@ def clean_old_dist_builds(env, target, source):
 env.Alias("dist_clean", [], [clean_old_dist_builds])
 env.AlwaysBuild("dist_clean")
 
-env.Alias('all', ['core', 'tools', 'clientTests', 'test', 'unittests'])
+env.Alias('all', ['core', 'tools', 'clientTests', 'test', '$UNITTEST_ALIAS'])
