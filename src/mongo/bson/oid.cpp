@@ -15,23 +15,26 @@
  *    limitations under the License.
  */
 
-#include "pch.h"
-#include "oid.h"
-#include "util/atomic_int.h"
-#include "../db/nonce.h"
-#include "bsonobjbuilder.h"
+#include "mongo/pch.h"
+
 #include <boost/functional/hash.hpp>
+
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/util/atomic_int.h"
+#include "mongo/db/nonce.h"
+
 #define verify MONGO_verify
 
 BOOST_STATIC_ASSERT( sizeof(mongo::OID) == 12 );
 
 namespace mongo {
 
-	void OID::hash_combine(size_t &seed) const {
-	    boost::hash_combine(seed, x);
-	    boost::hash_combine(seed, y);
-	    boost::hash_combine(seed, z);
-	}
+    void OID::hash_combine(size_t &seed) const {
+        boost::hash_combine(seed, x);
+        boost::hash_combine(seed, y);
+        boost::hash_combine(seed, z);
+    }
 
     // machine # before folding in the process id
     OID::MachineAndPid OID::ourMachine;
