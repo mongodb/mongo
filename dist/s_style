@@ -16,7 +16,7 @@ for f in `find examples ext src test -name '*.[ci]'`; do
 	    -e 's/\n/ /g' \
 	    -e p \
 	    -e '{s/.*//;x;}' |
-	egrep 'WT_ERR\(.*WT_RET.*err:|WT_ERR\(.*WT_RET_MSG.*err:|WT_ERR\(.*WT_ILLEGAL_VALUE\(.*err:|WT_ERR\(.*WT_VERBOSE_RET\(.*err:|WT_ERR\(.*WT_VERBOSE_RETVAL\(.*err:|WT_ERR_MSG\(.*WT_RET.*err:|WT_ERR_MSG\(.*WT_RET_MSG.*err:|WT_ERR_MSG\(.*WT_ILLEGAL_VALUE\(.*err:|WT_ERR_MSG\(.*WT_VERBOSE_RET\(.*err:|WT_ERR_MSG\(.*WT_VERBOSE_RETVAL\(.*err:|WT_ERR_TEST\(.*WT_RET.*err:|WT_ERR_TEST\(.*WT_RET_MSG.*err:|WT_ERR_TEST\(.*WT_ILLEGAL_VALUE\(.*err:|WT_ERR_TEST\(.*WT_VERBOSE_RET\(.*err:|WT_ERR_TEST\(.*WT_VERBOSE_RETVAL\(.*err:'|
+	egrep '(WT_ERR|WT_ERR_MSG|WT_ERR_TEST|WT_ILLEGAL_VALUE_ERR)\(.*(WT_ASSERT_RET|WT_ILLEGAL_VALUE|WT_RET|WT_RET_MSG|WT_RET_TEST|WT_VERBOSE_RET|WT_VERBOSE_RETVAL)\(.*err:' |
 	    sed 's/:.*//' > $t
 	test -s $t && {
 		echo "$f: function with return after a jump to an error label"

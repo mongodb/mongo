@@ -58,13 +58,20 @@
 } while (0)
 
 /*
- * WT_ASSERT, WT_ASSERT_RET --
+ * WT_ASSERT, WT_ASSERT_ERR, WT_ASSERT_RET --
  *	Assert an expression, abort in diagnostic mode, otherwise, optionally
- * return an error.
+ *	return an error.
  */
 #define	WT_ASSERT(session, exp) do {					\
 	if (!(exp))							\
 		__wt_assert(session, 0, __FILE__, __LINE__, "%s", #exp);\
+} while (0)
+#define	WT_ASSERT_ERR(session, exp) do {				\
+	if (!(exp)) {							\
+		__wt_assert(						\
+		    session, WT_ERROR, __FILE__, __LINE__, "%s", #exp);	\
+		WT_ERR(WT_ERROR);					\
+	}								\
 } while (0)
 #define	WT_ASSERT_RET(session, exp) do {				\
 	if (!(exp)) {							\

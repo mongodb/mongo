@@ -938,7 +938,7 @@ __rec_split_fixup(WT_SESSION_IMPL *session)
 	 * Fix up our caller's information.
 	 */
 	len = WT_PTRDIFF32(r->first_free, bnd->start);
-	WT_ASSERT_RET(
+	WT_ASSERT_ERR(
 	    session, len < r->split_size - WT_PAGE_HEADER_BYTE_SIZE(btree));
 
 	dsk = r->dsk.mem;

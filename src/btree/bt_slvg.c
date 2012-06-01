@@ -1808,7 +1808,7 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 	 * least one cell on the page we want.  This is a change from previous
 	 * behavior, so I'm asserting it.
 	 */
-	WT_ASSERT_RET(session, skip_start + skip_stop < page->entries);
+	WT_ASSERT_ERR(session, skip_start + skip_stop < page->entries);
 
 	/*
 	 * Take a copy of this page's first key to define the start of
