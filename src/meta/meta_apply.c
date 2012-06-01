@@ -34,9 +34,9 @@ __wt_meta_btree_apply(WT_SESSION_IMPL *session,
 		else if (strcmp(uri, WT_METADATA_URI) == 0)
 			continue;
 		WT_ERR(__wt_session_get_btree(session, uri, NULL, flags));
-		WT_ERR(func(session, cfg));
-		if (!LF_ISSET(WT_BTREE_NO_LOCK))
-			WT_ERR(__wt_session_release_btree(session));
+		ret = func(session, cfg);
+		WT_TRET(__wt_session_release_btree(session));
+		WT_ERR(ret);
 	}
 
 	if (tret != WT_NOTFOUND)

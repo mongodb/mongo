@@ -27,17 +27,24 @@ __create_file(WT_SESSION_IMPL *session,
 	if (!WT_PREFIX_SKIP(filename, "file:"))
 		WT_RET_MSG(session, EINVAL, "Expected a 'file:' URI: %s", uri);
 
+	/* Get an exclusive handle lock to protect the name. */
+	WT_RET(__wt_session_get_btree(
+	    session, uri, cfg, WT_BTREE_EXCLUSIVE | WT_BTREE_LOCK_ONLY));
+
+	if (WT_META_TRACKING(session))
+		WT_RET(__wt_meta_track_handle_lock(session));
+
 	/* Check if the file already exists. */
 	if (!is_metadata && (ret =
 	    __wt_metadata_read(session, uri, &treeconf)) != WT_NOTFOUND) {
 		__wt_free(session, treeconf);
 		if (exclusive)
 			WT_TRET(EEXIST);
-		return (ret);
+		goto err;
 	}
 
 	/* Create the file. */
-	WT_RET(__wt_btree_create(session, filename));
+	WT_ERR(__wt_btree_create(session, filename));
 	if (WT_META_TRACKING(session))
 		WT_ERR(__wt_meta_track_fileop(session, NULL, uri));
 
@@ -52,13 +59,25 @@ __create_file(WT_SESSION_IMPL *session,
 		    WT_BTREE_MAJOR_VERSION, WT_BTREE_MINOR_VERSION));
 		filecfg[2] = val->data;
 		WT_ERR(__wt_config_collapse(session, filecfg, &treeconf));
-		WT_ERR(__wt_metadata_insert(session, uri, treeconf));
+		if ((ret = __wt_metadata_insert(session, uri, treeconf)) != 0) {
+			if (ret == WT_DUPLICATE_KEY)
+				ret = EEXIST;
+			goto err;
+		}
 	}
 
-	/* Open the file to check that that everything was setup correctly. */
-	WT_ERR(__wt_session_get_btree(session, uri, cfg, WT_BTREE_NO_LOCK));
+	/*
+	 * Open the file to check that it was setup correctly.
+	 *
+	 * Keep the handle exclusive until it is released at the end of the
+	 * call, otherwise we could race with a drop.
+	 */
+	ret = __wt_conn_btree_get(session, uri, NULL, cfg, WT_BTREE_EXCLUSIVE);
 
-err:	__wt_scr_free(&val);
+err:	if (!WT_META_TRACKING(session))
+		WT_TRET(__wt_session_release_btree(session));
+
+	__wt_scr_free(&val);
 	__wt_free(session, treeconf);
 
 	return (ret);
@@ -160,9 +179,11 @@ __create_colgroup(WT_SESSION_IMPL *session,
 	}
 	WT_ERR(__create_file(session, fileuri, exclusive, fileconf));
 
+	session->created_btree = session->btree;
 	WT_ERR(__wt_schema_open_colgroups(session, table));
 
-err:    __wt_free(session, cgconf);
+err:    session->created_btree = NULL;
+	__wt_free(session, cgconf);
 	__wt_free(session, fileconf);
 	__wt_free(session, oldconf);
 	__wt_buf_free(session, &fmt);
@@ -372,6 +393,8 @@ __wt_schema_create(
 	else if ((ret = __wt_schema_get_source(session, name, &dsrc)) == 0)
 		ret = dsrc->create(dsrc, &session->iface, name, config);
 
+	WT_ASSERT(session, session->created_btree == NULL);
+	session->btree = NULL;
 	WT_TRET(__wt_meta_track_off(session, ret != 0));
 
 	return (ret);

@@ -218,14 +218,14 @@ __session_drop(WT_SESSION *wt_session, const char *uri, const char *config)
 
 	WT_ERR(__wt_meta_track_on(session));
 
-	/* If dropping snapshots, that's a different code path. */
+	/* Dropping snapshots is a different code path. */
 	WT_ERR(__wt_config_gets(session, cfg, "snapshot", &cval));
-	ret = (cval.len != 0) ?
+	ret = (cval.len == 0) ? __wt_schema_drop(session, uri, cfg) :
 	    __wt_schema_worker(
-		session, uri, cfg, __wt_snapshot_drop, WT_BTREE_SNAPSHOT_OP) :
-	    __wt_schema_drop(session, uri, cfg);
+		session, uri, cfg, __wt_snapshot_drop, WT_BTREE_SNAPSHOT_OP);
 
-err:    WT_TRET(__wt_meta_track_off(session, ret != 0));
+err:	/* Note: drop operations cannot be unrolled (yet?). */
+	WT_TRET(__wt_meta_track_off(session, 0));
 	API_END_NOTFOUND_MAP(session, ret);
 }
 

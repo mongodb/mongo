@@ -41,7 +41,7 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 
 		for (i = 0; i < WT_COLGROUPS(table); i++) {
 			cgname = table->cg_name[i];
-			WT_TRET(__wt_schema_get_btree(session,
+			WT_RET(__wt_schema_get_btree(session,
 			    cgname, strlen(cgname), cfg, open_flags));
 			ret = func(session, cfg);
 			WT_TRET(__wt_session_release_btree(session));

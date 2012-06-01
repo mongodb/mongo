@@ -53,9 +53,13 @@ __truncate_table(WT_SESSION_IMPL *session, const char *name)
 
 	/* Truncate the column groups. */
 	for (i = 0; i < WT_COLGROUPS(table); i++) {
+		/*
+		 * Get an exclusive lock on the handle: it will be released by
+		 * __wt_conn_btree_close_all.
+		 */
 		if ((tret = __wt_schema_get_btree(session,
 		    table->cg_name[i], strlen(table->cg_name[i]),
-		    NULL, WT_BTREE_NO_LOCK)) != 0) {
+		    NULL, WT_BTREE_EXCLUSIVE)) != 0) {
 			WT_TRET(tret);
 			continue;
 		}
@@ -68,9 +72,13 @@ __truncate_table(WT_SESSION_IMPL *session, const char *name)
 	/* Truncate the indices. */
 	WT_TRET(__wt_schema_open_index(session, table, NULL, 0));
 	for (i = 0; i < table->nindices; i++) {
+		/*
+		 * Get an exclusive lock on the handle: it will be released by
+		 * __wt_conn_btree_close_all.
+		 */
 		if ((tret = __wt_schema_get_btree(session,
 		    table->idx_name[i], strlen(table->idx_name[i]),
-		    NULL, WT_BTREE_NO_LOCK)) != 0) {
+		    NULL, WT_BTREE_EXCLUSIVE)) != 0) {
 			WT_TRET(tret);
 			continue;
 		}

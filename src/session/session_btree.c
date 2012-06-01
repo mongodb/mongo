@@ -98,6 +98,10 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 
 	btree = session->btree;
 
+	/* If the tree is being created, it is already locked and tracked. */
+	if (btree == session->created_btree)
+		return (0);
+
 	/*
 	 * If we had special flags set, close the handle so that future access
 	 * can get a handle without special flags.
@@ -128,11 +132,10 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 	WT_BTREE_SESSION *btree_session;
 	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
-	const char *snapshot, *treeconf;
+	const char *snapshot;
 	size_t snaplen;
 
 	btree = NULL;
-	treeconf = NULL;
 
 	/* Is this a snapshot operation? */
 	if (!LF_ISSET(WT_BTREE_SNAPSHOT_OP) && cfg != NULL &&
@@ -156,38 +159,30 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 			break;
 	}
 
-	if (btree_session != NULL) {
+	if (btree_session == NULL)
+		session->btree = NULL;
+	else {
 		session->btree = btree;
+		/*
+		 * If the tree is being created, it is already locked and
+		 * tracked.
+		 */
+		if (btree == session->created_btree)
+			return (0);
+
 		if ((ret =
-		    __wt_session_lock_btree(session, flags)) != WT_NOTFOUND) {
-			if (ret == 0 && LF_ISSET(WT_BTREE_NO_LOCK))
-				ret = __wt_session_release_btree(session);
+		    __wt_session_lock_btree(session, flags)) != WT_NOTFOUND)
 			return (ret);
-		}
+		ret = 0;
 	}
 
-	/*
-	 * Reading the metadata doubles as an existence check.  If it fails, we
-	 * can't open the file anyway, so it might as well not exist.
-	 */
-	if ((ret = __wt_metadata_read(session, uri, &treeconf)) == WT_NOTFOUND)
-		ret = ENOENT;
-	WT_RET(ret);
+	WT_RET(__wt_conn_btree_get(session, uri, snapshot, cfg, flags));
 
-	if (LF_ISSET(WT_BTREE_LOCK_ONLY) && btree_session != NULL)
-		return (0);
-
-	if (btree_session == NULL) {
-		WT_RET(__wt_conn_btree_get(
-		    session, uri, snapshot, treeconf, cfg, flags));
+	if (btree_session == NULL)
 		WT_RET(__wt_session_add_btree(session, NULL));
-	} else {
-		__wt_conn_btree_open_lock(session, flags);
-		ret = __wt_conn_btree_open(session, treeconf, cfg, flags);
-		if (ret != 0 || LF_ISSET(WT_BTREE_NO_LOCK))
-			__wt_rwunlock(session, btree->rwlock);
-		WT_RET(ret);
-	}
+
+	WT_ASSERT(session, LF_ISSET(WT_BTREE_LOCK_ONLY) ||
+	    F_ISSET(session->btree, WT_BTREE_OPEN));
 
 	return (0);
 }

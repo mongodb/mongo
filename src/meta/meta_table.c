@@ -40,8 +40,13 @@ __wt_metadata_open(WT_SESSION_IMPL *session)
 		return (0);
 
 	WT_RET(__wt_session_get_btree(
-	    session, WT_METADATA_URI, NULL, WT_BTREE_NO_LOCK));
+	    session, WT_METADATA_URI, NULL, 0));
+
 	session->metafile = session->btree;
+	WT_ASSERT(session, session->metafile != NULL);
+
+	/* The metafile doesn't need to stay locked -- release it. */
+	WT_RET(__wt_session_release_btree(session));
 	return (0);
 }
 
@@ -77,15 +82,14 @@ __wt_metadata_insert(
 		WT_RET_MSG(session, EINVAL,
 		    "%s: insert not supported on the turtle file", key);
 
-	if (WT_META_TRACKING(session))
-		WT_RET(__wt_meta_track_insert(session, key));
-
 	/* Save the caller's btree: the metadata cursor will overwrite it. */
 	btree = session->btree;
 	WT_ERR(__wt_metadata_cursor(session, NULL, &cursor));
 	cursor->set_key(cursor, key);
 	cursor->set_value(cursor, value);
 	WT_TRET(cursor->insert(cursor));
+	if (ret == 0 && WT_META_TRACKING(session))
+		ret = __wt_meta_track_insert(session, key);
 	WT_TRET(cursor->close(cursor));
 
 	/* Restore the caller's btree. */

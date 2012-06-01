@@ -181,7 +181,8 @@ __wt_conn_btree_open(WT_SESSION_IMPL *session,
 
 	btree = session->btree;
 
-	WT_ASSERT(session, F_ISSET(btree, WT_BTREE_EXCLUSIVE));
+	WT_ASSERT(session, F_ISSET(btree, WT_BTREE_EXCLUSIVE) &&
+	    !LF_ISSET(WT_BTREE_LOCK_ONLY));
 
 	/* Open the underlying file, free any old config. */
 	__wt_free(session, btree->config);
@@ -196,21 +197,22 @@ __wt_conn_btree_open(WT_SESSION_IMPL *session,
 	if (F_ISSET(btree, WT_BTREE_OPEN))
 		WT_RET(__wt_conn_btree_sync_and_close(session));
 
+	WT_RET(__wt_scr_alloc(
+	    session, WT_BTREE_MAX_ADDR_COOKIE, &addr));
+
 	/* Set any special flags on the handle. */
 	F_SET(btree, LF_ISSET(WT_BTREE_SPECIAL_FLAGS));
 
+	/* The metadata file is never evicted. */
+	if (strcmp(btree->name, WT_METADATA_URI) == 0)
+		F_SET(btree, WT_BTREE_NO_EVICTION);
+
 	do {
-		WT_ERR(__wt_scr_alloc(
-		    session, WT_BTREE_MAX_ADDR_COOKIE, &addr));
 		WT_ERR(__wt_meta_snapshot_get(
 		    session, btree->name, btree->snapshot, addr));
 		WT_ERR(__wt_btree_open(session, addr->data, addr->size, cfg,
 		    btree->snapshot == NULL ? 0 : 1));
 		F_SET(btree, WT_BTREE_OPEN);
-
-		/* The metadata file is never evicted. */
-		if (strcmp(btree->name, WT_METADATA_URI) == 0)
-			F_SET(btree, WT_BTREE_NO_EVICTION);
 
 		/* Drop back to a readlock if that is all that was needed. */
 		if (!LF_ISSET(WT_BTREE_EXCLUSIVE)) {
@@ -234,30 +236,41 @@ err:		(void)__wt_conn_btree_close(session, 1);
  */
 int
 __wt_conn_btree_get(WT_SESSION_IMPL *session,
-    const char *name, const char *snapshot, const char *config,
+    const char *name, const char *snapshot,
     const char *cfg[], uint32_t flags)
 {
 	WT_BTREE *btree;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
+	const char *treeconf;
 
 	conn = S2C(session);
 
 	WT_STAT_INCR(conn->stats, file_open);
 
-	if ((ret = __conn_btree_get(session, name, snapshot, flags)) != 0) {
-		__wt_free(session, config);
-		return (ret);
+	if ((btree = session->btree) != NULL) {
+		if (!F_ISSET(btree, WT_BTREE_EXCLUSIVE))
+			__wt_conn_btree_open_lock(session, flags);
+	} else {
+		WT_RET(__conn_btree_get(session, name, snapshot, flags));
+		btree = session->btree;
 	}
-	btree = session->btree;
 
-	if (F_ISSET(btree, WT_BTREE_OPEN) || LF_ISSET(WT_BTREE_LOCK_ONLY))
-		__wt_free(session, config);
-	else
-		ret = __wt_conn_btree_open(session, config, cfg, flags);
+	if (!LF_ISSET(WT_BTREE_LOCK_ONLY) &&
+	    (!F_ISSET(session->btree, WT_BTREE_OPEN) ||
+	    LF_ISSET(WT_BTREE_SPECIAL_FLAGS))) {
+		if ((ret = __wt_metadata_read(session, name, &treeconf)) != 0) {
+			if (ret == WT_NOTFOUND)
+				ret = ENOENT;
+			goto err;
+		}
+		ret = __wt_conn_btree_open(session, treeconf, cfg, flags);
+	}
 
-	if (ret != 0 || LF_ISSET(WT_BTREE_NO_LOCK))
+err:	if (ret != 0) {
+		F_CLR(btree, WT_BTREE_EXCLUSIVE);
 		__wt_rwunlock(session, btree->rwlock);
+	}
 
 	WT_ASSERT(session, ret != 0 ||
 	    LF_ISSET(WT_BTREE_EXCLUSIVE) == F_ISSET(btree, WT_BTREE_EXCLUSIVE));
@@ -323,6 +336,14 @@ __wt_conn_btree_close(WT_SESSION_IMPL *session, int locked)
 	__wt_spin_unlock(session, &conn->spinlock);
 
 	if (!inuse) {
+		/*
+		 * We should only close the metadata file when closing the
+		 * last session (i.e., the default session for the connection).
+		 */
+		WT_ASSERT(session,
+		    btree != session->metafile ||
+		    session == conn->default_session);
+
 		if (F_ISSET(btree, WT_BTREE_OPEN))
 			WT_TRET(__wt_conn_btree_sync_and_close(session));
 		if (!locked)
@@ -340,52 +361,63 @@ __wt_conn_btree_close(WT_SESSION_IMPL *session, int locked)
 int
 __wt_conn_btree_close_all(WT_SESSION_IMPL *session, const char *name)
 {
-	WT_BTREE *btree;
+	WT_BTREE *btree, *saved_btree;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 
 	conn = S2C(session);
+	saved_btree = session->btree;
 
 	__wt_spin_lock(session, &conn->spinlock);
-	TAILQ_FOREACH(btree, &conn->btqh, q)
-		if (strcmp(btree->name, name) == 0) {
+	TAILQ_FOREACH(btree, &conn->btqh, q) {
+		if (strcmp(btree->name, name) != 0)
+			continue;
+
+		/*
+		 * The caller may have this tree locked to prevent
+		 * concurrent schema operations.
+		 */
+		if (btree == saved_btree)
+			WT_ASSERT(session, F_ISSET(btree, WT_BTREE_EXCLUSIVE));
+		else {
 			WT_ERR(__wt_try_writelock(session, btree->rwlock));
 			F_SET(btree, WT_BTREE_EXCLUSIVE);
+		}
+
+		session->btree = btree;
+		if (WT_META_TRACKING(session))
+			WT_ERR(__wt_meta_track_handle_lock(session));
+
+		/*
+		 * We have an exclusive lock, which means there are no
+		 * cursors open at this point.  Close the handle, if
+		 * necessary.
+		 */
+		if (F_ISSET(btree, WT_BTREE_OPEN)) {
+			__wt_spin_unlock(session, &conn->spinlock);
+
+			ret = __wt_meta_track_sub_on(session);
+			if (ret == 0)
+				ret = __wt_conn_btree_sync_and_close(session);
 
 			/*
-			 * We have an exclusive lock, which means there are no
-			 * cursors open at this point.  Close the handle, if
-			 * necessary.
+			 * If the close succeeded, drop any locks it
+			 * acquired.  If there was a failure, this
+			 * function will fail and the whole transaction
+			 * will be rolled back.
 			 */
-			session->btree = btree;
-			if (F_ISSET(btree, WT_BTREE_OPEN)) {
-				__wt_spin_unlock(session, &conn->spinlock);
+			if (ret == 0)
+				ret = __wt_meta_track_sub_off(session);
 
-				ret = __wt_meta_track_sub_on(session);
-				if (ret == 0)
-					ret = __wt_conn_btree_sync_and_close(
-					session);
-
-				/*
-				 * If the close succeeded, drop any locks it
-				 * acquired.  If there was a failure, this
-				 * function will fail and the whole transaction
-				 * will be rolled back.
-				 */
-				if (ret == 0)
-					ret = __wt_meta_track_sub_off(session);
-
-				__wt_spin_lock(session, &conn->spinlock);
-			}
-
-			if (WT_META_TRACKING(session))
-				WT_TRET(__wt_meta_track_handle_lock(session));
-			else
-				WT_TRET(__wt_session_release_btree(session));
-			session->btree = NULL;
-
-			WT_ERR(ret);
+			__wt_spin_lock(session, &conn->spinlock);
 		}
+
+		if (!WT_META_TRACKING(session))
+			WT_TRET(__wt_session_release_btree(session));
+		session->btree = NULL;
+
+		WT_ERR(ret);
+	}
 
 err:	__wt_spin_unlock(session, &conn->spinlock);
 	return (ret);

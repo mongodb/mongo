@@ -12,7 +12,8 @@
  *	Drop a file.
  */
 static int
-__drop_file(WT_SESSION_IMPL *session, const char *uri, int force)
+__drop_file(
+    WT_SESSION_IMPL *session, const char *uri, int force, const char *cfg[])
 {
 	WT_DECL_RET;
 	int exist;
@@ -21,6 +22,14 @@ __drop_file(WT_SESSION_IMPL *session, const char *uri, int force)
 	filename = uri;
 	if (!WT_PREFIX_SKIP(filename, "file:"))
 		return (EINVAL);
+
+	if (session->btree == NULL &&
+	    (ret = __wt_session_get_btree(
+	    session, uri, cfg, WT_BTREE_EXCLUSIVE | WT_BTREE_LOCK_ONLY)) != 0) {
+		if (ret == WT_NOTFOUND || ret == ENOENT)
+			ret = 0;
+		return (ret);
+	}
 
 	/* Close all btree handles associated with this file. */
 	WT_RET(__wt_conn_btree_close_all(session, uri));
@@ -33,8 +42,13 @@ __drop_file(WT_SESSION_IMPL *session, const char *uri, int force)
 	/* Remove the underlying physical file. */
 	exist = 0;
 	WT_TRET(__wt_exist(session, filename, &exist));
-	if (exist)
+	if (exist) {
+		/*
+		 * There is no point tracking this operation: there is no going
+		 * back from here.
+		 */
 		WT_TRET(__wt_remove(session, filename));
+	}
 
 	return (ret);
 }
@@ -45,7 +59,7 @@ __drop_file(WT_SESSION_IMPL *session, const char *uri, int force)
  */
 static int
 __drop_tree(
-    WT_SESSION_IMPL *session, const char *uri, int force)
+    WT_SESSION_IMPL *session, const char *uri, int force, const char *cfg[])
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
@@ -67,7 +81,7 @@ __drop_tree(
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));
 	WT_ERR(__wt_buf_set(
 	    session, buf, btree->name, strlen(btree->name) + 1));
-	WT_ERR(__drop_file(session, buf->data, force));
+	WT_ERR(__drop_file(session, buf->data, force, cfg));
 
 err:	__wt_scr_free(&buf);
 
@@ -98,30 +112,24 @@ __drop_colgroup(
 		tlen = strlen(tablename);
 
 	/*
-	 * Try to get the btree handle.  Ideally, we would use an exclusive
-	 * lock here to prevent access to the table while we are dropping it,
-	 * but that conflicts with the exclusive lock taken by
-	 * __wt_conn_btree_close_all.  If two threads race dropping
-	 * the same object, it will be caught there.
-	 *
-	 * If we can't get a tree, try to remove it from the metadata.
+	 * Try to get the btree handle.  It will be unlocked by
+	 * __wt_conn_btree_close_all.
 	 */
 	if ((ret = __wt_schema_get_btree(
-	    session, uri, strlen(uri), cfg, WT_BTREE_NO_LOCK)) != 0) {
+	    session, uri, strlen(uri), cfg, WT_BTREE_EXCLUSIVE)) != 0) {
 		if (ret == WT_NOTFOUND || ret == ENOENT)
 			ret = 0;
-		(void)__wt_metadata_remove(session, uri);
 		return (ret);
 	}
 
 	/* If we can get the table, detach the colgroup from it. */
-	if ((ret = __wt_schema_get_table(
-	    session, tablename, tlen, &table)) == 0)
+	if ((ret =
+	    __wt_schema_get_table(session, tablename, tlen, &table)) == 0)
 		table->cg_complete = 0;
 	else if (ret == WT_NOTFOUND)
 		ret = 0;
 
-	WT_TRET(__drop_tree(session, uri, force));
+	WT_TRET(__drop_tree(session, uri, force, cfg));
 
 	return (ret);
 }
@@ -147,19 +155,13 @@ __drop_index(
 	++idxname;
 
 	/*
-	 * Try to get the btree handle.  Ideally, we would use an exclusive
-	 * lock here to prevent access to the table while we are dropping it,
-	 * but that conflicts with the exclusive lock taken by
-	 * __wt_conn_btree_close_all.  If two threads race dropping
-	 * the same object, it will be caught there.
-	 *
-	 * If we can't get a tree, try to remove it from the metadata.
+	 * Try to get the btree handle.  It will be unlocked by
+	 * __wt_conn_btree_close_all.
 	 */
 	if ((ret = __wt_schema_get_btree(
-	    session, uri, strlen(uri), cfg, WT_BTREE_NO_LOCK)) != 0) {
+	    session, uri, strlen(uri), cfg, WT_BTREE_EXCLUSIVE)) != 0) {
 		if (ret == WT_NOTFOUND || ret == ENOENT)
 			ret = 0;
-		(void)__wt_metadata_remove(session, uri);
 		return (ret);
 	}
 
@@ -170,7 +172,7 @@ __drop_index(
 	else if (ret == WT_NOTFOUND)
 		ret = 0;
 
-	WT_TRET(__drop_tree(session, uri, force));
+	WT_TRET(__drop_tree(session, uri, force, cfg));
 
 	return (ret);
 }
@@ -239,7 +241,7 @@ __wt_schema_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 	if (WT_PREFIX_MATCH(uri, "colgroup:"))
 		ret = __drop_colgroup(session, uri, force, cfg);
 	else if (WT_PREFIX_MATCH(uri, "file:"))
-		ret = __drop_file(session, uri, force);
+		ret = __drop_file(session, uri, force, cfg);
 	else if (WT_PREFIX_MATCH(uri, "index:"))
 		ret = __drop_index(session, uri, force, cfg);
 	else if (WT_PREFIX_MATCH(uri, "table:"))

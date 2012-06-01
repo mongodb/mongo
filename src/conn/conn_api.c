@@ -839,6 +839,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	if ((ret = __wt_meta_turtle_init(session, &exist)) == 0 && !exist)
 		ret = __wt_schema_create(session, WT_METADATA_URI, NULL);
 	WT_ERR(ret);
+	WT_ERR(__wt_metadata_open(session));
 
 	STATIC_ASSERT(offsetof(WT_CONNECTION_IMPL, iface) == 0);
 	*wt_connp = &conn->iface;

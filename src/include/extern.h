@@ -532,7 +532,6 @@ extern int __wt_conn_btree_open(WT_SESSION_IMPL *session,
 extern int __wt_conn_btree_get(WT_SESSION_IMPL *session,
     const char *name,
     const char *snapshot,
-    const char *config,
     const char *cfg[],
     uint32_t flags);
 extern int __wt_conn_btree_apply(WT_SESSION_IMPL *session,

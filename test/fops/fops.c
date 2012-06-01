@@ -112,12 +112,10 @@ fop(void *arg)
 			++s->create;
 			file_create();
 			break;
-#if 0
 		case 1:
 			++s->drop;
 			file_drop();
 			break;
-#endif
 		case 2:
 			++s->sync;
 			file_sync();

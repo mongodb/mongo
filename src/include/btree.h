@@ -120,12 +120,11 @@ struct __wt_btree {
 #define	WT_BTREE_EXCLUSIVE	0x0002	/* Need exclusive access to handle */
 #define	WT_BTREE_LOCK_ONLY	0x0004	/* Handle is only needed for locking */
 #define	WT_BTREE_NO_EVICTION	0x0008	/* The file isn't evicted */
-#define	WT_BTREE_NO_LOCK	0x0010	/* Do not lock the handle */
-#define	WT_BTREE_OPEN		0x0020	/* Handle is open */
-#define	WT_BTREE_SALVAGE	0x0040	/* Handle is for salvage */
-#define	WT_BTREE_SNAPSHOT_OP	0x0080	/* Handle is for a snapshot operation */
-#define	WT_BTREE_UPGRADE	0x0100	/* Handle is for upgrade */
-#define	WT_BTREE_VERIFY		0x0200	/* Handle is for verify */
+#define	WT_BTREE_OPEN		0x0010	/* Handle is open */
+#define	WT_BTREE_SALVAGE	0x0020	/* Handle is for salvage */
+#define	WT_BTREE_SNAPSHOT_OP	0x0040	/* Handle is for a snapshot operation */
+#define	WT_BTREE_UPGRADE	0x0080	/* Handle is for upgrade */
+#define	WT_BTREE_VERIFY		0x0100	/* Handle is for verify */
 	uint32_t flags;
 };
 

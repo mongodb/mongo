@@ -69,6 +69,8 @@ struct __wt_session_impl {
 	WT_BTREE *btree;		/* Current file */
 	TAILQ_HEAD(__btrees, __wt_btree_session) btrees;
 
+	WT_BTREE *created_btree;	/* File being created */
+
 	WT_CURSOR *cursor;		/* Current cursor */
 					/* Cursors closed with the session */
 	TAILQ_HEAD(__cursors, __wt_cursor) cursors;
