@@ -398,8 +398,7 @@ namespace mongo {
             opNEAR = 0x13,
             opWITHIN = 0x14,
             opMAX_DISTANCE=0x15,
-            opBITAND = 0x16,
-            opBITOR = 0x17
+            opBITAND = 0x16
         };
 
         /** add all elements of the object to the specified vector */

@@ -108,7 +108,7 @@ namespace mongo {
         else if ( op == BSONObj::opTYPE ) {
             _type = (BSONType)(e.numberInt());
         }
-        else if ( op == BSONObj::opBITAND || op == BSONObj::opBITOR ) {
+        else if ( op == BSONObj::opBITAND ) {
         	_bitCmp = e.numberInt();
         }
         else if ( op == BSONObj::opELEM_MATCH ) {
@@ -306,8 +306,7 @@ namespace mongo {
             flags = fe.valuestrsafe();
             break;
         }
-        case BSONObj::opBITAND:
-        case BSONObj::opBITOR: {
+        case BSONObj::opBITAND: {
             shared_ptr< BSONObjBuilder > b( new BSONObjBuilder() );
             _builders.push_back( b );
             b->appendAs(fe, e.fieldName());
@@ -599,14 +598,11 @@ namespace mongo {
             return l.numberLong() % bm._mod == bm._modm;
         }
 
-        if ( op == BSONObj::opBITOR || op == BSONObj::opBITAND) {
+        if ( op == BSONObj::opBITAND) {
             if ( ! l.isNumber() )
                 return false;
 
-            if ( op == BSONObj::opBITOR )
-            	return l.numberLong() | bm._bitCmp;
-            else
-            	return l.numberLong() & bm._bitCmp;
+            return l.numberLong() & bm._bitCmp;
         }
 
         if ( op == BSONObj::opTYPE ) {
