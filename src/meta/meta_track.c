@@ -38,9 +38,7 @@ __meta_track_next(WT_SESSION_IMPL *session, WT_META_TRACK **trkp)
 		session->meta_track_next = session->meta_track;
 
 	offset = WT_PTRDIFF(session->meta_track_next, session->meta_track);
-	if (session->meta_track_sub != NULL)
-		sub_off =
-		    WT_PTRDIFF(session->meta_track_sub, session->meta_track);
+	sub_off = WT_PTRDIFF(session->meta_track_sub, session->meta_track);
 	if (offset == session->meta_track_alloc) {
 		WT_RET(__wt_realloc(session, &session->meta_track_alloc,
 		    WT_MAX(2 * session->meta_track_alloc,
