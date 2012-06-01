@@ -557,7 +557,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\..\third_party\snappy\snappy-stubs-internal.h" />
     <ClInclude Include="..\..\third_party\snappy\snappy-stubs-public.h" />
     <ClInclude Include="..\..\third_party\snappy\snappy.h" />
-    <ClInclude Include="..\util\builder.h" />
+    <ClInclude Include="..\unittest\unittest.h" />
     <ClInclude Include="..\util\checksum.h" />
     <ClInclude Include="..\util\compress.h" />
     <ClInclude Include="..\util\concurrency\list.h" />
@@ -587,7 +587,6 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\util\timer.h" />
     <ClInclude Include="..\util\time_support.h" />
     <ClInclude Include="..\util\touch_pages.h" />
-    <ClInclude Include="..\util\unittest.h" />
     <ClInclude Include="framework.h" />
   </ItemGroup>
   <ItemGroup>

@@ -1217,6 +1217,8 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\..\third_party\js-1.7\prmjtime.h" />
     <ClInclude Include="..\..\third_party\js-1.7\resource.h" />
     <ClInclude Include="..\client\authentication_table.h" />
+    <ClInclude Include="..\scripting\bench.h" />
+    <ClInclude Include="..\s\chunk.h" />
     <ClInclude Include="..\s\d_index_locator.h" />
     <ClInclude Include="..\s\d_writeback.h" />
     <ClInclude Include="..\util\histogram.h" />
@@ -1473,7 +1475,6 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\util\assert_util.h" />
     <ClInclude Include="..\util\background.h" />
     <ClInclude Include="..\util\base64.h" />
-    <ClInclude Include="..\util\builder.h" />
     <ClInclude Include="..\util\debug_util.h" />
     <ClInclude Include="..\util\embedded_builder.h" />
     <ClInclude Include="..\util\file.h" />
@@ -1489,10 +1490,8 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\util\optime.h" />
     <ClInclude Include="..\util\processinfo.h" />
     <ClInclude Include="..\util\queue.h" />
-    <ClInclude Include="..\util\unittest.h" />
     <ClInclude Include="..\util\concurrency\list.h" />
     <ClInclude Include="..\util\concurrency\value.h" />
-    <ClInclude Include="..\util\web\html.h" />
     <ClInclude Include="..\util\net\httpclient.h" />
     <ClInclude Include="..\util\md5.h" />
     <ClInclude Include="..\util\md5.hpp" />

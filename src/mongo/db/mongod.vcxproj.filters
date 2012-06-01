@@ -1010,9 +1010,6 @@
     <ClInclude Include="..\util\mongoutils\checksum.h">
       <Filter>util\mongoutils</Filter>
     </ClInclude>
-    <ClInclude Include="..\util\builder.h">
-      <Filter>util\Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="repl\connections.h">
       <Filter>db\repl</Filter>
     </ClInclude>
@@ -1078,9 +1075,6 @@
     </ClInclude>
     <ClInclude Include="..\util\net\hostandport.h">
       <Filter>util\net</Filter>
-    </ClInclude>
-    <ClInclude Include="..\util\web\html.h">
-      <Filter>util\web</Filter>
     </ClInclude>
     <ClInclude Include="..\util\mongoutils\html.h">
       <Filter>util\mongoutils</Filter>
@@ -1279,9 +1273,6 @@
       <Filter>util\Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\util\trace.h">
-      <Filter>util\Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\util\unittest.h">
       <Filter>util\Header Files</Filter>
     </ClInclude>
     <ClInclude Include="ops\update.h">
@@ -1668,6 +1659,12 @@
     <ClInclude Include="..\s\d_writeback.h">
       <Filter>s</Filter>
     </ClInclude>
+    <ClInclude Include="..\scripting\bench.h">
+      <Filter>scripting</Filter>
+    </ClInclude>
+    <ClInclude Include="..\s\chunk.h">
+      <Filter>s</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="mongo.ico">
@@ -1764,9 +1761,6 @@
     </Filter>
     <Filter Include="util\net">
       <UniqueIdentifier>{74bf499c-8890-436e-a1f9-8bbaf9d5799a}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="util\web">
-      <UniqueIdentifier>{632cc03d-e07c-4c1c-9e01-455bd1b8d2f1}</UniqueIdentifier>
     </Filter>
     <Filter Include="util\concurrency">
       <UniqueIdentifier>{97d24b2e-60a3-41d4-a9d5-97c05002e0a5}</UniqueIdentifier>

@@ -124,12 +124,6 @@
     <ClInclude Include="..\util\concurrency\task.h">
       <Filter>util\concurrency</Filter>
     </ClInclude>
-    <ClInclude Include="..\util\builder.h">
-      <Filter>util\Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\util\unittest.h">
-      <Filter>util\Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\util\file.h">
       <Filter>util\Header Files</Filter>
     </ClInclude>
@@ -626,6 +620,9 @@
     </ClInclude>
     <ClInclude Include="..\s\shardkey.h">
       <Filter>s</Filter>
+    </ClInclude>
+    <ClInclude Include="..\unittest\unittest.h">
+      <Filter>unittest</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
