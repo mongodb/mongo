@@ -790,8 +790,15 @@ namespace mongo {
                     continue;
 
                 if ( e.type() == Object && e.embeddedObject().firstElementFieldName()[0] == '$' ) {
-                    // this means this is a $gt type filter, so don't make part of the new object
-                    continue;
+                    // we have something like { x : { $gt : 5 } }
+                    // this can be a query piece
+                    // or can be a dbref or something
+                    
+                    int op = e.embeddedObject().firstElement().getGtLtOp( -1 );
+                    if ( op >= 0 ) {
+                        // this means this is a $gt type filter, so don't make part of the new object
+                        continue;
+                    }
                 }
 
                 eb.appendAs( e , e.fieldName() );
