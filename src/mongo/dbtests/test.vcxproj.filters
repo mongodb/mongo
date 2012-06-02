@@ -624,6 +624,12 @@
     <ClInclude Include="..\unittest\unittest.h">
       <Filter>unittest</Filter>
     </ClInclude>
+    <ClInclude Include="..\db\index_update.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\prefetch.h">
+      <Filter>db\Header Files\o to z</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\client\connpool.cpp">
@@ -1488,6 +1494,12 @@
     </ClCompile>
     <ClCompile Include="..\scripting\sm_db.cpp">
       <Filter>scripting</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\index_update.cpp">
+      <Filter>db\Source Files\e to n</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\prefetch.cpp">
+      <Filter>db\Source Files\o to z</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

@@ -1123,6 +1123,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="geo\haystack.cpp" />
     <ClCompile Include="hasher.cpp" />
     <ClCompile Include="hashindex.cpp" />
+    <ClCompile Include="index_update.cpp" />
     <ClCompile Include="interrupt_status_mongod.cpp" />
     <ClCompile Include="key.cpp" />
     <ClCompile Include="lockstat.cpp" />
@@ -1166,6 +1167,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="pipeline\expression_context.cpp" />
     <ClCompile Include="pipeline\field_path.cpp" />
     <ClCompile Include="pipeline\value.cpp" />
+    <ClCompile Include="prefetch.cpp" />
     <ClCompile Include="projection.cpp" />
     <ClCompile Include="repl\bgsync.cpp" />
     <ClCompile Include="ttl.cpp" />
@@ -1236,12 +1238,14 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="hasher.h" />
     <ClInclude Include="hashindex.h" />
     <ClInclude Include="index_insertion_continuation.h" />
+    <ClInclude Include="index_update.h" />
     <ClInclude Include="lockstat.h" />
     <ClInclude Include="lockstate.h" />
     <ClInclude Include="namespace_details-inl.h" />
     <ClInclude Include="namespace_details.h" />
     <ClInclude Include="ops\query.h" />
     <ClInclude Include="ops\update_internal.h" />
+    <ClInclude Include="prefetch.h" />
     <ClInclude Include="queryoptimizercursorimpl.h" />
     <ClCompile Include="queryoptimizercursorimpl.cpp" />
     <ClCompile Include="querypattern.cpp" />

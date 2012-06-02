@@ -491,6 +491,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\db\d_concurrency.h" />
     <ClInclude Include="..\db\explain.h" />
     <ClInclude Include="..\db\hasher.h" />
+    <ClInclude Include="..\db\index_update.h" />
     <ClInclude Include="..\db\jsobjmanipulator.h" />
     <ClInclude Include="..\db\lockstat.h" />
     <ClInclude Include="..\db\lockstate.h" />
@@ -505,6 +506,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\db\ops\update_internal.h" />
     <ClInclude Include="..\db\pagefault.h" />
     <ClInclude Include="..\..\third_party\pcre-8.30\pcrecpp.h" />
+    <ClInclude Include="..\db\prefetch.h" />
     <ClInclude Include="..\db\repl\bgsync.h" />
     <ClInclude Include="..\server.h" />
     <ClInclude Include="..\s\chunk.h" />
@@ -1192,6 +1194,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="..\db\geo\2d.cpp" />
     <ClCompile Include="..\db\geo\haystack.cpp" />
     <ClCompile Include="..\db\hasher.cpp" />
+    <ClCompile Include="..\db\index_update.cpp" />
     <ClCompile Include="..\db\key.cpp" />
     <ClCompile Include="..\db\lockstat.cpp" />
     <ClCompile Include="..\db\lockstate.cpp" />
@@ -1203,6 +1206,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="..\db\ops\update.cpp" />
     <ClCompile Include="..\db\ops\update_internal.cpp" />
     <ClCompile Include="..\db\pagefault.cpp" />
+    <ClCompile Include="..\db\prefetch.cpp" />
     <ClCompile Include="..\db\projection.cpp" />
     <ClCompile Include="..\db\queryoptimizercursorimpl.cpp" />
     <ClInclude Include="..\db\queryoptimizercursorimpl.h" />
