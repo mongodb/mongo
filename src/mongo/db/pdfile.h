@@ -605,8 +605,6 @@ namespace mongo {
 
     void ensureHaveIdIndex(const char *ns);
 
-    bool dropIndexes( NamespaceDetails *d, const char *ns, const char *name, string &errmsg, BSONObjBuilder &anObjBuilder, bool maydeleteIdIndex );
-
     inline BSONObj BSONObj::make(const Record* r ) {
         return BSONObj( r->data() );
     }

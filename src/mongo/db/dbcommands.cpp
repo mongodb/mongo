@@ -50,6 +50,7 @@
 #include "dur_stats.h"
 #include "../server.h"
 #include "mongo/s/d_index_locator.h"
+#include "mongo/db/index_update.h"
 
 namespace mongo {
 
@@ -698,103 +699,6 @@ namespace mongo {
         }
     } cmddiaglogging;
 
-    /* remove bit from a bit array - actually remove its slot, not a clear
-       note: this function does not work with x == 63 -- that is ok
-             but keep in mind in the future if max indexes were extended to
-             exactly 64 it would be a problem
-    */
-    unsigned long long removeBit(unsigned long long b, int x) {
-        unsigned long long tmp = b;
-        return
-            (tmp & ((((unsigned long long) 1) << x)-1)) |
-            ((tmp >> (x+1)) << x);
-    }
-
-    struct DBCommandsUnitTest {
-        DBCommandsUnitTest() {
-            verify( removeBit(1, 0) == 0 );
-            verify( removeBit(2, 0) == 1 );
-            verify( removeBit(2, 1) == 0 );
-            verify( removeBit(255, 1) == 127 );
-            verify( removeBit(21, 2) == 9 );
-            verify( removeBit(0x4000000000000001ULL, 62) == 1 );
-        }
-    } dbc_unittest;
-
-    void assureSysIndexesEmptied(const char *ns, IndexDetails *exceptForIdIndex);
-    int removeFromSysIndexes(const char *ns, const char *idxName);
-
-    bool dropIndexes( NamespaceDetails *d, const char *ns, const char *name, string &errmsg, BSONObjBuilder &anObjBuilder, bool mayDeleteIdIndex ) {
-
-        BackgroundOperation::assertNoBgOpInProgForNs(ns);
-
-        d = d->writingWithExtra();
-        d->aboutToDeleteAnIndex();
-
-        /* there may be pointers pointing at keys in the btree(s).  kill them. */
-        ClientCursor::invalidate(ns);
-
-        // delete a specific index or all?
-        if ( *name == '*' && name[1] == 0 ) {
-            log(4) << "  d->nIndexes was " << d->nIndexes << '\n';
-            anObjBuilder.append("nIndexesWas", (double)d->nIndexes);
-            IndexDetails *idIndex = 0;
-            if( d->nIndexes ) {
-                for ( int i = 0; i < d->nIndexes; i++ ) {
-                    if ( !mayDeleteIdIndex && d->idx(i).isIdIndex() ) {
-                        idIndex = &d->idx(i);
-                    }
-                    else {
-                        d->idx(i).kill_idx();
-                    }
-                }
-                d->nIndexes = 0;
-            }
-            if ( idIndex ) {
-                d->addIndex(ns) = *idIndex;
-                wassert( d->nIndexes == 1 );
-            }
-            /* assuming here that id index is not multikey: */
-            d->multiKeyIndexBits = 0;
-            assureSysIndexesEmptied(ns, idIndex);
-            anObjBuilder.append("msg", mayDeleteIdIndex ?
-                                "indexes dropped for collection" :
-                                "non-_id indexes dropped for collection");
-        }
-        else {
-            // delete just one index
-            int x = d->findIndexByName(name);
-            if ( x >= 0 ) {
-                log(4) << "  d->nIndexes was " << d->nIndexes << endl;
-                anObjBuilder.append("nIndexesWas", (double)d->nIndexes);
-
-                /* note it is  important we remove the IndexDetails with this
-                 call, otherwise, on recreate, the old one would be reused, and its
-                 IndexDetails::info ptr would be bad info.
-                 */
-                IndexDetails *id = &d->idx(x);
-                if ( !mayDeleteIdIndex && id->isIdIndex() ) {
-                    errmsg = "may not delete _id index";
-                    return false;
-                }
-                id->kill_idx();
-                d->multiKeyIndexBits = removeBit(d->multiKeyIndexBits, x);
-                d->nIndexes--;
-                for ( int i = x; i < d->nIndexes; i++ )
-                    d->idx(i) = d->idx(i+1);
-            }
-            else {
-                int n = removeFromSysIndexes(ns, name); // just in case an orphaned listing there - i.e. should have been repaired but wasn't
-                if( n ) {
-                    log() << "info: removeFromSysIndexes cleaned up " << n << " entries" << endl;
-                }
-                log() << "dropIndexes: " << name << " not found" << endl;
-                errmsg = "index not found";
-                return false;
-            }
-        }
-        return true;
-    }
 
     /* drop collection */
     class CmdDrop : public Command {

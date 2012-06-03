@@ -255,4 +255,9 @@ namespace mongo {
     void getIndexChanges(vector<IndexChanges>& v, const char *ns, NamespaceDetails& d,
                          BSONObj newObj, BSONObj oldObj, bool &cangedId);
     void dupCheck(vector<IndexChanges>& v, NamespaceDetails& d, DiskLoc curObjLoc);
+
+    void assureSysIndexesEmptied(const char *ns, IndexDetails *exceptForIdIndex);
+    int removeFromSysIndexes(const char *ns, const char *idxName);
+
+
 } // namespace mongo

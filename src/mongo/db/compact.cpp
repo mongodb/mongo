@@ -28,6 +28,7 @@
 #include "mongo/db/curop-inl.h"
 #include "mongo/db/extsort.h"
 #include "mongo/db/index.h"
+#include "mongo/db/index_update.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/util/concurrency/task.h"
 #include "mongo/util/timer.h"
