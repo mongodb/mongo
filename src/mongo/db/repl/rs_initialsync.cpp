@@ -67,7 +67,7 @@ namespace mongo {
     }
 
     /* todo : progress metering to sethbmsg. */
-    static bool clone(const char *master, string db) {
+    static bool clone(const char *master, string db, bool dataPass ) {
         CloneOptions options;
 
         options.fromDB = db;
@@ -79,8 +79,35 @@ namespace mongo {
         options.mayYield = true;
         options.mayBeInterrupted = false;
         
+        options.syncData = dataPass;
+        options.syncIndexes = ! dataPass;
+
         string err;
         return cloneFrom(master, options , err );
+    }
+
+
+    bool ReplSetImpl::_syncDoInitialSync_clone( const char *master, const list<string>& dbs , bool dataPass ) {
+        for( list<string>::const_iterator i = dbs.begin(); i != dbs.end(); i++ ) {
+            string db = *i;
+            if( db == "local" ) 
+                continue;
+            
+            if ( dataPass )
+                sethbmsg( str::stream() << "initial sync cloning db: " << db , 0);
+            else
+                sethbmsg( str::stream() << "initial sync cloning indexes for : " << db , 0);
+
+            Client::WriteContext ctx(db);
+            if ( ! clone( master, db, dataPass ) ) {
+                sethbmsg( str::stream() 
+                              << "initial sync error clone of " << db 
+                              << " dataPass: " << dataPass << " failed sleeping 5 minutes" ,0);
+                return false;
+            }
+        }
+
+        return true;
     }
 
     void _logOpObjRS(const BSONObj& op);
@@ -221,6 +248,65 @@ namespace mongo {
         _veto[host] = time(0)+secs;
     }
 
+    bool ReplSetImpl::_syncDoInitialSync_applyToHead( replset::InitialSync& init, OplogReader* r, 
+                                                      const Member* source, const BSONObj& lastOp , 
+                                                      BSONObj& minValid ) {
+        /* our cloned copy will be strange until we apply oplog events that occurred
+           through the process.  we note that time point here. */
+
+        try {
+            // It may have been a long time since we last used this connection to
+            // query the oplog, depending on the size of the databases we needed to clone.
+            // A common problem is that TCP keepalives are set too infrequent, and thus
+            // our connection here is terminated by a firewall due to inactivity.
+            // Solution is to increase the TCP keepalive frequency.
+            minValid = r->getLastOp(rsoplog);
+        } catch ( SocketException & ) {
+            log() << "connection lost to " << source->h().toString() << "; is your tcp keepalive interval set appropriately?";
+            if( !r->connect(source->h().toString()) ) {
+                sethbmsg( str::stream() << "initial sync couldn't connect to " << source->h().toString() , 0);
+                throw;
+            }
+            // retry
+            minValid = r->getLastOp(rsoplog);
+        }
+
+        isyncassert( "getLastOp is empty ", !minValid.isEmpty() );
+
+        OpTime mvoptime = minValid["ts"]._opTime();
+        verify( !mvoptime.isNull() );
+
+        OpTime startingTS = lastOp["ts"]._opTime();
+        verify( mvoptime >= startingTS );
+
+        // apply startingTS..mvoptime portion of the oplog
+        {
+            // note we assume here that this call does not throw
+            if (!init.oplogApplication(lastOp, minValid)) {
+                log() << "replSet initial sync failed during oplog application phase" << rsLog;
+
+                emptyOplog(); // otherwise we'll be up!
+
+                lastOpTimeWritten = OpTime();
+                lastH = 0;
+
+                log() << "replSet cleaning up [1]" << rsLog;
+                {
+                    Client::WriteContext cx( "local." );
+                    cx.ctx().db()->flushFiles(true);
+                }
+                log() << "replSet cleaning up [2]" << rsLog;
+
+                log() << "replSet initial sync failed will try again" << endl;
+
+                sleepsecs(5);
+                return false;
+            }
+        }
+        
+        return true;
+    }
+
     /**
      * Do the initial sync for this member.
      */
@@ -255,7 +341,6 @@ namespace mongo {
             sleepsecs(15);
             return;
         }
-        OpTime startingTS = lastOp["ts"]._opTime();
 
         if (replSettings.fastsync) {
             log() << "fastsync: skipping database clone" << rsLog;
@@ -271,77 +356,44 @@ namespace mongo {
             sethbmsg("initial sync clone all databases", 0);
 
             list<string> dbs = r.conn()->getDatabaseNames();
-            for( list<string>::iterator i = dbs.begin(); i != dbs.end(); i++ ) {
-                string db = *i;
-                if( db != "local" ) {
-                    sethbmsg( str::stream() << "initial sync cloning db: " << db , 0);
-                    bool ok;
-                    {
-                        Client::WriteContext ctx(db);
-                        ok = clone(sourceHostname.c_str(), db);
-                    }
-                    if( !ok ) {
-                        sethbmsg( str::stream() << "initial sync error clone of " << db << " failed sleeping 5 minutes" ,0);
-                        veto(source->fullName(), 600);
-                        sleepsecs(300);
-                        return;
-                    }
-                }
+
+            if ( ! _syncDoInitialSync_clone( sourceHostname.c_str(), dbs, true ) ) {
+                veto(source->fullName(), 600);
+                sleepsecs(300);
+                return;
+            }
+
+            sethbmsg("initial sync data copy, starting syncup",0);
+            
+            BSONObj minValid;
+            if ( ! _syncDoInitialSync_applyToHead( init, &r , source , lastOp , minValid ) ) {
+                return;
+            }
+
+            lastOp = minValid;
+
+            // reset state, as that "didn't count"
+            emptyOplog(); 
+            lastOpTimeWritten = OpTime();
+            lastH = 0;
+
+            sethbmsg("initial sync building indexes",0);
+            if ( ! _syncDoInitialSync_clone( sourceHostname.c_str(), dbs, false ) ) {
+                veto(source->fullName(), 600);
+                sleepsecs(300);
+                return;
             }
         }
 
         sethbmsg("initial sync query minValid",0);
 
-        /* our cloned copy will be strange until we apply oplog events that occurred
-           through the process.  we note that time point here. */
         BSONObj minValid;
-        try {
-            // It may have been a long time since we last used this connection to
-            // query the oplog, depending on the size of the databases we needed to clone.
-            // A common problem is that TCP keepalives are set too infrequent, and thus
-            // our connection here is terminated by a firewall due to inactivity.
-            // Solution is to increase the TCP keepalive frequency.
-            minValid = r.getLastOp(rsoplog);
-        } catch ( SocketException & ) {
-            log() << "connection lost to " << source->h().toString() << "; is your tcp keepalive interval set appropriately?";
-            if( !r.connect(sourceHostname) ) {
-                sethbmsg( str::stream() << "initial sync couldn't connect to " << source->h().toString() , 0);
-                throw;
-            }
-            // retry
-            minValid = r.getLastOp(rsoplog);
+        if ( ! _syncDoInitialSync_applyToHead( init, &r, source, lastOp, minValid ) ) {
+            return;
         }
+        
+        // ---------
 
-
-        isyncassert( "getLastOp is empty ", !minValid.isEmpty() );
-        OpTime mvoptime = minValid["ts"]._opTime();
-        verify( !mvoptime.isNull() );
-        verify( mvoptime >= startingTS );
-
-        // apply startingTS..mvoptime portion of the oplog
-        {
-            // note we assume here that this call does not throw
-            if (!init.oplogApplication(lastOp, minValid)) {
-                log() << "replSet initial sync failed during oplog application phase" << rsLog;
-
-                emptyOplog(); // otherwise we'll be up!
-
-                lastOpTimeWritten = OpTime();
-                lastH = 0;
-
-                log() << "replSet cleaning up [1]" << rsLog;
-                {
-                    Client::WriteContext cx( "local." );
-                    cx.ctx().db()->flushFiles(true);
-                }
-                log() << "replSet cleaning up [2]" << rsLog;
-
-                log() << "replSet initial sync failed will try again" << endl;
-
-                sleepsecs(5);
-                return;
-            }
-        }
 
         sethbmsg("initial sync finishing up",0);
 
