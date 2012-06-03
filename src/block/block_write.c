@@ -254,7 +254,8 @@ not_compressed:	/*
 	WT_CSTAT_INCR(session, block_write);
 
 	WT_VERBOSE_ERR(session, write,
-	    "off %" PRIuMAX ", size %" PRIu32 ", cksum %" PRIu32,
+	    "%s (off %" PRIuMAX ", size %" PRIu32 ", cksum %" PRIu32 ")",
+	    __wt_page_type_string(dsk->type),
 	    (uintmax_t)offset, align_size, blk->cksum);
 
 	*offsetp = offset;
