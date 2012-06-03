@@ -160,6 +160,31 @@ namespace JsobjTests {
             }
         };
 
+        class IsPrefixOf : public Base {
+        public:
+            void run() {
+                {
+                    BSONObj k = BSON( "x" << 1 );
+                    verify( ! k.isPrefixOf( BSON( "a" << 1 ) ) );
+                    verify( k.isPrefixOf( BSON( "x" << 1 ) ) );
+                        verify( k.isPrefixOf( BSON( "x" << 1 << "a" << 1 ) ) );
+                        verify( ! k.isPrefixOf( BSON( "a" << 1 << "x" << 1 ) ) );
+                }
+                {
+                    BSONObj k = BSON( "x" << 1 << "y" << 1 );
+                    verify( ! k.isPrefixOf( BSON( "x" << 1 ) ) );
+                    verify( ! k.isPrefixOf( BSON( "x" << 1 << "z" << 1 ) ) );
+                    verify( k.isPrefixOf( BSON( "x" << 1 << "y" << 1 ) ) );
+                    verify( k.isPrefixOf( BSON( "x" << 1 << "y" << 1 << "z" << 1 ) ) );
+                }
+                {
+                    BSONObj k = BSON( "x" << 1 );
+                    verify( ! k.isPrefixOf( BSON( "x" << "hi" ) ) );
+                    verify( k.isPrefixOf( BSON( "x" << 1 << "a" << "hi" ) ) );
+                }
+            }
+        };
+
         class NumericCompareBasic : public Base {
         public:
             void run() {
@@ -2214,6 +2239,7 @@ namespace JsobjTests {
             add< BSONObjTests::WoCompareOrdered >();
             add< BSONObjTests::WoCompareDifferentLength >();
             add< BSONObjTests::WoSortOrder >();
+            add< BSONObjTests::IsPrefixOf >();
             add< BSONObjTests::MultiKeySortOrder > ();
             add< BSONObjTests::TimestampTest >();
             add< BSONObjTests::Nan >();

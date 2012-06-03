@@ -323,6 +323,14 @@ namespace mongo {
 
         bool equal(const BSONObj& r) const;
 
+        /**
+         * @param otherObj
+         * @return true if 'this' is a prefix of otherObj- in other words if
+         * otherObj contains the same field names and field vals in the same
+         * order as 'this', plus optionally some additional elements.
+         */
+        bool isPrefixOf( const BSONObj& otherObj ) const;
+
         /** This is "shallow equality" -- ints and doubles won't match.  for a
            deep equality test use woCompare (which is slower).
         */

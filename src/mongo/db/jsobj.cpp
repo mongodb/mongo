@@ -562,6 +562,20 @@ namespace mongo {
         return -1;
     }
 
+    bool BSONObj::isPrefixOf( const BSONObj& otherObj ) const {
+        BSONObjIterator a( *this );
+        BSONObjIterator b( otherObj );
+
+        while ( a.more() && b.more() ) {
+            BSONElement x = a.next();
+            BSONElement y = b.next();
+            if ( x != y )
+                return false;
+        }
+
+        return ! a.more();
+    }
+
     template <typename BSONElementColl>
     void _getFieldsDotted( const BSONObj* obj, const StringData& name, BSONElementColl &ret, bool expandLastArray ) {
         BSONElement e = obj->getField( name );

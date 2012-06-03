@@ -68,17 +68,7 @@ namespace mongo {
     }
 
     bool ShardKeyPattern::isPrefixOf( const BSONObj& otherPattern ) const {
-        BSONObjIterator a( pattern );
-        BSONObjIterator b( otherPattern );
-
-        while ( a.more() && b.more() ) {
-            BSONElement x = a.next();
-            BSONElement y = b.next();
-            if ( strcmp( x.fieldName() , y.fieldName() ) )
-                return false;
-        }
-
-        return ! a.more();
+        return pattern.isPrefixOf( otherPattern );
     }
 
     string ShardKeyPattern::toString() const {
@@ -153,23 +143,6 @@ namespace mongo {
     */
     class ShardKeyUnitTest : public StartupTest {
     public:
-
-        void testIsPrefixOf() {
-            {
-                ShardKeyPattern k( BSON( "x" << 1 ) );
-                verify( ! k.isPrefixOf( BSON( "a" << 1 ) ) );
-                verify( k.isPrefixOf( BSON( "x" << 1 ) ) );
-                verify( k.isPrefixOf( BSON( "x" << 1 << "a" << 1 ) ) );
-                verify( ! k.isPrefixOf( BSON( "a" << 1 << "x" << 1 ) ) );
-            }
-            {
-                ShardKeyPattern k( BSON( "x" << 1 << "y" << 1 ) );
-                verify( ! k.isPrefixOf( BSON( "x" << 1 ) ) );
-                verify( ! k.isPrefixOf( BSON( "x" << 1 << "z" << 1 ) ) );
-                verify( k.isPrefixOf( BSON( "x" << 1 << "y" << 1 ) ) );
-                verify( k.isPrefixOf( BSON( "x" << 1 << "y" << 1 << "z" << 1 ) ) );
-            }
-        }
 
         void hasshardkeytest() {
             BSONObj x = fromjson("{ zid : \"abcdefg\", num: 1.0, name: \"eliot\" }");
@@ -270,7 +243,6 @@ namespace mongo {
 
             verify( k.compare(a,b) < 0 );
 
-            testIsPrefixOf();
             // add middle multitype tests
 
             moveToFrontTest();
