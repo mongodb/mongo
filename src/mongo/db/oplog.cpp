@@ -763,7 +763,13 @@ namespace mongo {
                 }
                 else {
                     /* erh 10/16/2009 - this is probably not relevant any more since its auto-created, but not worth removing */
-                    RARELY if (nsd && !nsd->isCapped()) { ensureHaveIdIndex(ns); } // otherwise updates will be slow
+                    
+                    // this is the old version that doesn't create _id indexes on capped collections
+                    //RARELY if (nsd && !nsd->isCapped()) { ensureHaveIdIndex(ns); } // otherwise updates will be slow
+                    
+                    // this version creates indexes on all collections, including capped
+                    // as long we apply inserts as updates, this is needed for performance
+                    RARELY if ( nsd ) { ensureHaveIdIndex(ns); } // otherwise updates will be slow
 
                     /* todo : it may be better to do an insert here, and then catch the dup key exception and do update
                               then.  very few upserts will not be inserts...
