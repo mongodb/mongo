@@ -69,7 +69,7 @@ namespace mongo {
     CmdLogout cmdLogout;
 
     bool CmdAuthenticate::run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-        log() << " authenticate db: " << dbname << " " << cmdObj << endl;
+        log() << " authenticate: " << cmdObj << endl;
 
         string user = cmdObj.getStringField("user");
         string key = cmdObj.getStringField("key");
@@ -83,7 +83,7 @@ namespace mongo {
             sleepmillis(10);
             return false;
         }
-
+		
         stringstream digestBuilder;
 
         {
@@ -133,15 +133,26 @@ namespace mongo {
             return false;
         }
 
-        bool readOnly = userObj["readOnly"].trueValue();
-        authenticate(dbname, user, readOnly );
-        
-        
-        result.append( "dbname" , dbname );
-        result.append( "user" , user );
-        result.appendBool( "readOnly" , readOnly );
-        
-
+        authenticate(dbname, user, userObj[ "readOnly" ].isBoolean() && userObj[ "readOnly" ].boolean());
+	if(user == "__system") {
+		return true;
+	}
+	if(!cdsIfWhiteIP(dbname,cc().clientAddress())) {
+		log() << "[cds][ip:" 
+		      << cc().clientAddress()
+		      << "] not in white ip list";
+		errmsg = "not in white ip list";
+		return false;
+	}
+	if(cdsIfExceedDBMaxConn(dbname)) {
+		log() << "[cds][db:"
+		      << dbname
+		      << "] exceeded max db connections";
+		errmsg = "exceed max db conns";
+		return false;
+	}
+	cdsSetMaxCpuCost(dbname);
+	cdsSetMaxFileNum(dbname);
         return true;
     }
 

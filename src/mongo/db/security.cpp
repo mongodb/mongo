@@ -30,66 +30,47 @@
 namespace mongo {
 
     bool AuthenticationInfo::_warned = false;
-
-    void AuthenticationInfo::setTemporaryAuthorization( BSONObj& obj ) {
-        fassert( 16232, !_usingTempAuth );
-        scoped_spinlock lk( _lock );
-        _tempAuthTable.setFromBSON( obj );
-        _usingTempAuth = true;
+    /*
+    void AuthenticationInfo::print() const {
+        cout << "AuthenticationInfo: " << this << '\n';
+        for ( MA::const_iterator i=_dbs.begin(); i!=_dbs.end(); i++ ) {
+            cout << "\t" << i->first << "\t" << i->second.level << '\n';
+        }
+        cout << "END" << endl;
     }
-
-    void AuthenticationInfo::clearTemporaryAuthorization() {
-        scoped_spinlock lk( _lock );
-        _usingTempAuth = false;
-        _tempAuthTable.clearAuth();
-    }
-
+    */
+    bool specialDB(const string& dbname);
     string AuthenticationInfo::getUser( const string& dbname ) const {
         scoped_spinlock lk(_lock);
-        return _authTable.getAuthForDb( dbname ).user;
+
+        MA::const_iterator i = _dbs.find(dbname);
+        if ( i == _dbs.end() )
+            return "";
+
+        return i->second.user;
     }
+
 
     bool AuthenticationInfo::_isAuthorizedSpecialChecks( const string& dbname ) const {
         if ( cc().isGod() ) 
             return true;
-        return _isLocalHostAndLocalHostIsAuthorizedForAll;
-    }
 
-    void AuthenticationInfo::setIsALocalHostConnectionWithSpecialAuthPowers() {
-        verify(!_isLocalHost);
-        _isLocalHost = true;
-        _isLocalHostAndLocalHostIsAuthorizedForAll = true;
-        _checkLocalHostSpecialAdmin();
-    }
-
-    void AuthenticationInfo::_checkLocalHostSpecialAdmin() {
-        if ( ! _isLocalHost )
-            return;
-        
-        if ( ! _isLocalHostAndLocalHostIsAuthorizedForAll )
-            return;
-        
-        if ( ! noauth ) {
+        if ( isLocalHost ) {
+            atleastreadlock l("");
             Client::GodScope gs;
-            Client::ReadContext ctx("admin.system.users");
+            Client::Context c("admin.system.users");
             BSONObj result;
-            if( Helpers::getSingleton("admin.system.users", result) ) {
-                _isLocalHostAndLocalHostIsAuthorizedForAll = false;
-            }
-            else if ( ! _warned ) {
-                // you could get a few of these in a race, but that's ok
-                _warned = true;
-                log() << "note: no users configured in admin.system.users, allowing localhost access" << endl;
+            if( ! Helpers::getSingleton("admin.system.users", result) ) {
+                if( ! _warned ) {
+                    // you could get a few of these in a race, but that's ok
+                    _warned = true;
+                    log() << "note: no users configured in admin.system.users, allowing localhost access" << endl;
+                }
+                return true;
             }
         }
-        
-        
-    }
 
-    void AuthenticationInfo::startRequest() {
-        if ( ! Lock::isLocked() ) {
-            _checkLocalHostSpecialAdmin();
-        }
+        return false;
     }
 
     bool CmdAuthenticate::getUserObj(const string& dbname, const string& user, BSONObj& userObj, string& pwd) {
@@ -98,9 +79,12 @@ namespace mongo {
             pwd = internalSecurity.pwd;
         }
         else {
+            // static BSONObj userPattern = fromjson("{\"user\":1}");
             string systemUsers = dbname + ".system.users";
+            // OCCASIONALLY Helpers::ensureIndex(systemUsers.c_str(), userPattern, false, "user_1");
             {
-                Client::ReadContext ctx( systemUsers , dbpath, false );
+                mongolock lk(false);
+                Client::Context c(systemUsers, dbpath, &lk, false);
 
                 BSONObjBuilder b;
                 b << "user" << user;
@@ -114,6 +98,141 @@ namespace mongo {
             pwd = userObj.getStringField("pwd");
         }
         return true;
+    }
+	string DecIP2BinIP(string ip) { 
+		int i,j,k;
+		string ans = "";
+		int len = ip.length();
+		for(i = 0 ; i < len ; i ++) {
+			if(ip[i] >= '0' && ip[i] <= '9') {
+				int value = 0;
+				while(i < len && ip[i] >= '0' && ip[i] <= '9') {
+					value = value * 10 + ip[i]-'0';
+					i ++;
+				}
+				j = 0;
+				char str[16];
+				while(value > 0) {
+					str[j] = (value&1)+'0';
+					value = value >> 1;
+					j ++;
+				}
+				while(j < 8) {
+					str[j] = '0';
+					j ++;
+				}
+				for(k = j-1 ; k >= 0 ; k --) {
+					ans += str[k];
+				}
+			}
+		}
+		return ans;
+	}
+	bool CmdAuthenticate::cdsIfWhiteIP(const string& dbname,const string& ip) {
+		if(ip == "127.0.0.1"
+		   || specialDB(dbname)) {
+			return true;
+		}
+		string cdsWhiteIP = dbname + ".cds.whiteip";
+		string binIP = mongo::DecIP2BinIP(ip);
+		string nowBinIP = "";
+		int i;
+		int len = binIP.length();
+		for(i = 0 ; i < len ; i ++) {
+			nowBinIP += binIP[i];
+			mongolock lk(false);
+			Client::Context c(cdsWhiteIP, dbpath, &lk, false);
+			BSONObjBuilder b;
+			b << "value" << nowBinIP;
+			BSONObj query = b.done();
+			BSONObj result;
+			if( Helpers::findOne(cdsWhiteIP.c_str(), query, result) ) {
+                    		return true;
+                	}
+		}
+		return false;
+	}
+	bool specialDB(const string& dbname) {
+		if(dbname == "admin"
+		   || dbname == ""
+		   || dbname == "local"
+		   || dbname == "config") {
+			return true;
+		}
+		return false;
+	}
+	bool CmdAuthenticate::cdsIfExceedDBMaxConn(const string& dbname) {
+		if(specialDB(dbname)) {
+			return false;
+		}
+		string dbMaxConn = dbname+".cds.dbmaxconn";
+		int maxConn = 99999999;
+		{
+               		mongolock lk(false);
+                	Client::Context c(dbMaxConn, dbpath, &lk, false);
+			BSONObj result;
+                	if (Helpers::getSingleton(dbMaxConn.c_str(),  result)) {
+				maxConn = result.getIntField("value");
+			}
+		}
+		int curDBUserCount = 0;
+		for( set<Client*>::iterator i = Client::clients.begin(); i != Client::clients.end(); i++ ) {
+			Client *c = *i;
+			assert( c );
+			string db = c->getCdsDB();
+			mongo::log() << "[cds] db = " << db << endl;
+			if( db == dbname ) {
+				curDBUserCount ++;
+			}
+	}
+		mongo::log() << "[cds]curDBUserCount=" << curDBUserCount
+			     << "maxConn=" << maxConn 
+			     << "client_count=" <<  Client::clients.size() << endl; 
+		cc().setCdsDB(dbname);
+		return (curDBUserCount >= maxConn);
+	}
+	void CmdAuthenticate::cdsSetMaxCpuCost(const string& dbname) {
+		if(specialDB(dbname)) {
+			return ;
+		}
+		string dbMaxCpuCost = dbname+".cds.maxcpucost";
+		
+		{
+			mongolock lk(false);
+			Client::Context c(dbMaxCpuCost, dbpath, &lk, false);
+			BSONObj result;
+			if (Helpers::getSingleton(dbMaxCpuCost.c_str(),  result)) {
+				cc().setCdsMaxCpuCost(result.getIntField("value"));
+			}
+		}
+		mongo::log() << "[cds] maxcpucost = "
+			     << cc().getCdsMaxCpuCost() << endl;
+	}
+	void CmdAuthenticate::cdsSetMaxFileNum(const string& dbname) {
+		if(specialDB(dbname)) {
+			return ;
+		}
+		string dbMaxFileNum = dbname+".cds.maxfilenum";
+		{
+			mongolock lk(false);
+			Client::Context c(dbMaxFileNum, dbpath, &lk, false);
+			BSONObj result;
+			if (Helpers::getSingleton(dbMaxFileNum.c_str(),  result)) {
+				cc().setCdsMaxFileNum(result.getIntField("value"));
+			}
+		}
+		mongo::log() << "[cds] maxfilenum = "
+			     << cc().getCdsMaxFileNum() << endl;
+	}
+    void CmdAuthenticate::authenticate(const string& dbname, const string& user, const bool readOnly) {
+        AuthenticationInfo *ai = cc().getAuthenticationInfo();
+
+        if ( readOnly ) {
+            ai->authorizeReadOnly( dbname.c_str() , user );
+        }
+        else {
+            ai->authorize( dbname.c_str() , user );
+        }
     }
 
     bool CmdLogout::run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
