@@ -311,10 +311,11 @@ namespace ReplSetTests {
                 insertSucceed();
             }
 
-            // Just to be sure, no _id index, right?
+            // this changed in 2.1.2
+            // we know have indexes on capped collections
             Client::Context ctx(cappedNs());
             NamespaceDetails *nsd = nsdetails(cappedNs().c_str());
-            verify(nsd->findIdIndex() == -1);
+            verify(nsd->findIdIndex() >= 0);
         }
     };
 
