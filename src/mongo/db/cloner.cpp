@@ -319,42 +319,45 @@ namespace mongo {
                 return false;
             }
         }
+
+        {
+            // setup connection
+            if ( conn.get() ) {
+                // nothing to do
+            }
+            else if ( !masterSameProcess ) {
+                ConnectionString cs = ConnectionString::parse( masterHost, errmsg );
+                auto_ptr<DBClientBase> con( cs.connect( errmsg ));
+                if ( !con.get() )
+                    return false;
+                if( !replAuthenticate(con.get()) )
+                    return false;
+                
+                conn = con;
+            }
+            else {
+                conn.reset( new DBDirectClient() );
+            }
+        }
+
         /* todo: we can put these releases inside dbclient or a dbclient specialization.
            or just wait until we get rid of global lock anyway.
            */
         string ns = opts.fromDB + ".system.namespaces";
         list<BSONObj> toClone;
         clonedColls.clear();
-        {
+        if ( opts.syncData ) {
             mayInterrupt( opts.mayBeInterrupted );
             dbtempreleaseif r( opts.mayYield );
 
             // just using exhaust for collection copying right now
-            auto_ptr<DBClientCursor> c;
-            {
-                if ( conn.get() ) {
-                    // nothing to do
-                }
-                else if ( !masterSameProcess ) {
-                    ConnectionString cs = ConnectionString::parse( masterHost, errmsg );
-                    auto_ptr<DBClientBase> con( cs.connect( errmsg ));
-                    if ( !con.get() )
-                        return false;
-                    if( !replAuthenticate(con.get()) )
-                        return false;
-
-                    conn = con;
-                }
-                else {
-                    conn.reset( new DBDirectClient() );
-                }
-                // todo: if snapshot (bool param to this func) is true, we need to snapshot this query?
-                //       only would be relevant if a thousands of collections -- maybe even then it is hard
-                //       to exceed a single cursor batch.
-                //       for repl it is probably ok as we apply oplog section after the clone (i.e. repl 
-                //       doesnt not use snapshot=true).
-                c = conn->query( ns.c_str(), BSONObj(), 0, 0, 0, opts.slaveOk ? QueryOption_SlaveOk : 0 );
-            }
+            
+            // todo: if snapshot (bool param to this func) is true, we need to snapshot this query?
+            //       only would be relevant if a thousands of collections -- maybe even then it is hard
+            //       to exceed a single cursor batch.
+            //       for repl it is probably ok as we apply oplog section after the clone (i.e. repl 
+            //       doesnt not use snapshot=true).
+            auto_ptr<DBClientCursor> c = conn->query( ns.c_str(), BSONObj(), 0, 0, 0, opts.slaveOk ? QueryOption_SlaveOk : 0 );
 
             if ( c.get() == 0 ) {
                 errmsg = "query failed " + ns;
@@ -459,25 +462,27 @@ namespace mongo {
         }
 
         // now build the indexes
-
-        string system_indexes_from = opts.fromDB + ".system.indexes";
-        string system_indexes_to = todb + ".system.indexes";
-        /* [dm]: is the ID index sometimes not called "_id_"?  There is other code in the system that looks for a "_id" prefix
-                 rather than this exact value.  we should standardize.  OR, remove names - which is in the bugdb.  Anyway, this
-                 is dubious here at the moment.
-        */
-
-        // build a $nin query filter for the collections we *don't* want
-        BSONArrayBuilder barr;
-        barr.append( opts.collsToIgnore );
-        BSONArray arr = barr.arr();
-
-        // Also don't copy the _id_ index
-        BSONObj query = BSON( "name" << NE << "_id_" << "ns" << NIN << arr );
-
-        // won't need a snapshot of the query of system.indexes as there can never be very many.
-        copy(system_indexes_from.c_str(), system_indexes_to.c_str(), true, opts.logForRepl, masterSameProcess, opts.slaveOk, opts.mayYield, opts.mayBeInterrupted, query );
-
+        
+        if ( opts.syncIndexes ) {
+            string system_indexes_from = opts.fromDB + ".system.indexes";
+            string system_indexes_to = todb + ".system.indexes";
+            
+            /* [dm]: is the ID index sometimes not called "_id_"?  There is other code in the system that looks for a "_id" prefix
+               rather than this exact value.  we should standardize.  OR, remove names - which is in the bugdb.  Anyway, this
+               is dubious here at the moment.
+            */
+            
+            // build a $nin query filter for the collections we *don't* want
+            BSONArrayBuilder barr;
+            barr.append( opts.collsToIgnore );
+            BSONArray arr = barr.arr();
+            
+            // Also don't copy the _id_ index
+            BSONObj query = BSON( "name" << NE << "_id_" << "ns" << NIN << arr );
+            
+            // won't need a snapshot of the query of system.indexes as there can never be very many.
+            copy(system_indexes_from.c_str(), system_indexes_to.c_str(), true, opts.logForRepl, masterSameProcess, opts.slaveOk, opts.mayYield, opts.mayBeInterrupted, query );
+        }
         return true;
     }
 

@@ -45,6 +45,9 @@ namespace mongo {
         bool snapshot;
         bool mayYield;
         bool mayBeInterrupted;
+
+        bool syncData;
+        bool syncIndexes;
     };
 
     bool cloneFrom( const string& masterHost , 
