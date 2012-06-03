@@ -133,6 +133,25 @@ namespace mongo {
         return i.idxInterface().findSingle(i , i.head , key);
     }
 
+    vector<BSONObj> Helpers::findAll( const string& ns , const BSONObj& query ) {
+        Lock::assertAtLeastReadLocked( ns );
+
+        vector<BSONObj> all;
+
+        Client::Context tx( ns );
+        
+        shared_ptr<Cursor> c = NamespaceDetailsTransient::getCursor( ns.c_str(), query );
+
+        while( c->ok() ) {
+            if ( c->currentMatches() && !c->getsetdup( c->currLoc() ) ) {
+                all.push_back( c->current() );
+            }
+            c->advance();
+        }
+
+        return all;
+    }
+
     bool Helpers::isEmpty(const char *ns, bool doAuth) {
         Client::Context context(ns, dbpath, doAuth);
         shared_ptr<Cursor> c = DataFileMgr::findAll(ns);

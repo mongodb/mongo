@@ -66,6 +66,11 @@ namespace mongo {
         static DiskLoc findOne(const char *ns, const BSONObj &query, bool requireIndex);
 
         /**
+         * have to be locked already
+         */
+        static vector<BSONObj> findAll( const string& ns , const BSONObj& query );
+
+        /**
          * @param foundIndex if passed in will be set to 1 if ns and index found
          * @return true if object found
          */
