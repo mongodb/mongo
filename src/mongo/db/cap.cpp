@@ -28,6 +28,7 @@
 #include <list>
 #include "json.h"
 #include "clientcursor.h"
+#include "index_update.h"
 
 /*
  capped collection layout
@@ -417,7 +418,18 @@ namespace mongo {
         DEV verify( this == nsdetails(ns) );
         massert( 13424, "collection must be capped", isCapped() );
         massert( 13425, "background index build in progress", !indexBuildInProgress );
-        massert( 13426, "indexes present", nIndexes == 0 );
+        
+        vector<BSONObj> indexes = Helpers::findAll( Namespace( ns ).getSisterNS( "system.indexes" ) , BSON( "ns" << ns ) );
+        for ( unsigned i=0; i<indexes.size(); i++ ) {
+            indexes[i] = indexes[i].copy();
+        }
+
+        if ( nIndexes ) {
+            string errmsg;
+            BSONObjBuilder note;
+            bool res = dropIndexes( this , ns , "*" , errmsg , note , true );
+            massert( 13426 , str::stream() << "failed during index drop: " << errmsg , res );
+        }
 
         // Clear all references to this namespace.
         ClientCursor::invalidate( ns );
@@ -459,6 +471,11 @@ namespace mongo {
             ext.ext()->xnext.writing() = next;
             addDeletedRec( empty.drec(), empty );
         }
+
+        for ( unsigned i=0; i<indexes.size(); i++ ) {
+            theDataFileMgr.insertWithObjMod( Namespace( ns ).getSisterNS( "system.indexes" ).c_str() , indexes[i] , true );
+        }
+        
     }
 
 }
