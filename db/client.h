@@ -48,7 +48,6 @@ namespace mongo {
     class Client : boost::noncopyable {
     public:
         class Context;
-
         static mongo::mutex clientsMutex;
         static set<Client*> clients; // always be in clientsMutex when manipulating this
         static int recommendedYieldMicros( int * writers = 0 , int * readers = 0 );
@@ -98,7 +97,14 @@ namespace mongo {
         BSONObj getHandshake() const { return _handshake; }
         AbstractMessagingPort * port() const { return _mp; }
         ConnectionId getConnectionId() const { return _connectionId; }
-
+	string getCdsDB() const {return _cds_db; }
+	void setCdsDB(string db) { _cds_db = db; }
+	int getCdsLastCpuTime()const  { return _cds_last_cpu_time; }
+	void setCdsLastCpuTime(int t) { _cds_last_cpu_time = t; }
+	int getCdsMaxCpuCost()const  { return _cds_max_cpu_cost; }
+	void setCdsMaxCpuCost( int v ) { _cds_max_cpu_cost = v; }
+	int getCdsMaxFileNum() const { return _cds_max_file_num; }
+	void setCdsMaxFileNum( int n ) { _cds_max_file_num = n; }
     private:
         ConnectionId _connectionId; // > 0 for things "conn", 0 otherwise
         string _threadId; // "" on non support systems
@@ -112,7 +118,10 @@ namespace mongo {
         BSONObj _handshake;
         BSONObj _remoteId;
         AbstractMessagingPort * const _mp;
-
+	string _cds_db;
+	int _cds_last_cpu_time;
+	int _cds_max_cpu_cost;
+	int _cds_max_file_num;
         Client(const char *desc, AbstractMessagingPort *p = 0);
 
         friend class CurOp;

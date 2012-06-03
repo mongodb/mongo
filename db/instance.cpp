@@ -31,6 +31,7 @@
 #include "../util/file_allocator.h"
 #include "../util/goodies.h"
 #include "cmdline.h"
+#include <time.h>
 #if !defined(_WIN32)
 #include <sys/file.h>
 #endif
@@ -52,7 +53,7 @@ namespace mongo {
     void receivedDelete(Message& m, CurOp& op);
     void receivedInsert(Message& m, CurOp& op);
     bool receivedGetMore(DbResponse& dbresponse, Message& m, CurOp& curop );
-
+    bool specialDB(const string& dbname);
     int nloggedsome = 0;
 #define LOGSOME if( ++nloggedsome < 1000 || nloggedsome % 100 == 0 )
 
@@ -228,7 +229,60 @@ namespace mongo {
         rawOut(msg);
         ::abort();
     }
-
+    bool cdsFindOne(const string& ns,int &result) {
+        Message m;
+        m.reset();
+        BufBuilder b;
+        b.appendNum(0);
+        b.appendStr(ns.c_str());
+        b.appendNum(0);
+        b.appendNum(1);
+	BSONObj obj;
+	obj = BSON("_id" << "cds");
+	obj.appendSelfToBufBuilder(b);
+        m.setData(dbQuery,b.buf(),b.len());
+        Client& c = cc();
+        DbResponse p;
+        receivedQuery(c, p, m);
+        try {
+                QueryResult *qr = (QueryResult *) p.response->singleData();
+                if(qr->nReturned){
+			BSONObj o(qr->data());
+			result = o.getIntField("value");
+			cc().curop()->debug().reset();
+                        return true;
+                }
+        }catch(...) {
+                mongo::log() << "[cds] cdsFindOne Exception"
+			     << "ns=" << ns << endl;
+        }
+	cc().curop()->debug().reset();
+        return false;
+    }
+	bool cdsIfRequestTimeout(const string& ns) {
+#ifdef _WIN32
+			return false;
+#else
+	if(specialDB(NamespaceString( ns ).db)) {
+		return false;
+	}
+	if(!cc().getAuthenticationInfo()->isAuthorized(NamespaceString( ns ).db)) {
+		return false;
+	}
+	if(cc().getCdsMaxCpuCost() == 0 ) {
+		return false;
+	}
+	struct timespec ts;
+        clock_gettime( CLOCK_THREAD_CPUTIME_ID, &ts );
+	if(ts.tv_sec - cc().getCdsLastCpuTime() > cc().getCdsMaxCpuCost() ) {
+		sleep(ts.tv_sec - cc().getCdsLastCpuTime());
+		cc().setCdsLastCpuTime(ts.tv_sec);
+		mongo::log() << "[cds] sleep a while "<< endl;
+		return true;
+	}
+	return false;
+#endif
+	}
     // Returns false when request includes 'end'
     void assembleResponse( Message &m, DbResponse &dbresponse, const HostAndPort& remote ) {
 
@@ -318,6 +372,9 @@ namespace mongo {
             if( ! c.getAuthenticationInfo()->isAuthorized(cl) ) {
                 uassert_nothrow("unauthorized");
             }
+			else if( strstr(ns, ".cds.") && !c.getAuthenticationInfo()->isAuthorized("admin")) {
+				uassert_nothrow("unauthorized");
+			}
             else {
                 try {
                     if ( op == dbInsert ) {
@@ -383,6 +440,7 @@ namespace mongo {
         }
         
         debug.reset();
+	cdsIfRequestTimeout(ns);
     } /* assembleResponse() */
 
     void receivedKillCursors(Message& m) {

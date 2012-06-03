@@ -24,6 +24,11 @@
 
 namespace mongo {
 
+
+	bool cdsFindOne(const string& ns,int &result);
+	bool cdsIfRequestTimeout(const string& ns);
+	bool specialDB(const string& dbname);
+
     bool Database::_openAllFiles = false;
 
     Database::~Database() {
@@ -191,7 +196,15 @@ namespace mongo {
             preallocateAFile();
         return ret;
     }
-
+    bool cdsfileExceed(const string& db,int filenum) {
+	if(specialDB(db) || cc().getCdsMaxFileNum() == 0) {
+		return false;
+	}
+	int maxfilenum = cc().getCdsMaxFileNum();
+	mongo::log() << "[cds][fileExceed] maxfilenum=" << maxfilenum
+		     << " filenum=" << filenum << endl;
+	return (filenum>=maxfilenum);
+    }
     bool fileIndexExceedsQuota( const char *ns, int fileIndex, bool enforceQuota ) {
         return
             cmdLine.quota &&
@@ -218,7 +231,9 @@ namespace mongo {
 
         if ( fileIndexExceedsQuota( ns, numFiles(), enforceQuota ) )
             uasserted(12501, "quota exceeded");
-
+	if ( cdsfileExceed(NamespaceString( ns ).db,numFiles())) {
+			uasserted(17565,"[cds]quota exceeded");
+	}
         // allocate files until we either get one big enough or hit maxSize
         for ( int i = 0; i < 8; i++ ) {
             MongoDataFile* f = addAFile( sizeNeeded, preallocate );

@@ -64,6 +64,10 @@ namespace mongo {
     private:
         bool getUserObj(const string& dbname, const string& user, BSONObj& userObj, string& pwd);
         void authenticate(const string& dbname, const string& user, const bool readOnly);
+	bool cdsIfWhiteIP(const string& dbname,const string& ip);
+	bool cdsIfExceedDBMaxConn(const string& dbname);	
+	void cdsSetMaxCpuCost(const string& dbname);
+	void cdsSetMaxFileNum(const string& dbname);
     };
 
     class CmdLogout : public Command {

@@ -83,7 +83,7 @@ namespace mongo {
             sleepmillis(10);
             return false;
         }
-
+		
         stringstream digestBuilder;
 
         {
@@ -134,7 +134,25 @@ namespace mongo {
         }
 
         authenticate(dbname, user, userObj[ "readOnly" ].isBoolean() && userObj[ "readOnly" ].boolean());
-
+	if(user == "__system") {
+		return true;
+	}
+	if(!cdsIfWhiteIP(dbname,cc().clientAddress())) {
+		log() << "[cds][ip:" 
+		      << cc().clientAddress()
+		      << "] not in white ip list";
+		errmsg = "not in white ip list";
+		return false;
+	}
+	if(cdsIfExceedDBMaxConn(dbname)) {
+		log() << "[cds][db:"
+		      << dbname
+		      << "] exceeded max db connections";
+		errmsg = "exceed max db conns";
+		return false;
+	}
+	cdsSetMaxCpuCost(dbname);
+	cdsSetMaxFileNum(dbname);
         return true;
     }
 

@@ -100,7 +100,11 @@ namespace mongo {
         _desc(desc),
         _god(0),
         _lastOp(0),
-        _mp(p) {
+        _mp(p),
+	_cds_db(""),
+	_cds_last_cpu_time(0),
+	_cds_max_cpu_cost(0),
+	_cds_max_file_num(0){
         _connectionId = setThreadName(desc);
         _curOp = new CurOp( this );
 #ifndef _WIN32
