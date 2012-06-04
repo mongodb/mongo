@@ -26,6 +26,11 @@
 #include "mongo/db/replutil.h"
 
 namespace mongo {
+    
+    // this is defined in fsync.cpp
+    // need to figure out where to put for real
+    bool lockedForWriting();
+    
 
     class TTLMonitor : public BackgroundJob {
     public:
@@ -89,9 +94,14 @@ namespace mongo {
 
             while ( ! inShutdown() ) {
                 sleepsecs( 60 );
-
+                
                 LOG(3) << "TTLMonitor thread awake" << endl;
                 
+                if ( lockedForWriting() ) {
+                    LOG(3) << " locked for writing" << endl;
+                    continue;
+                }
+
                 set<string> dbs;
                 {
                     Lock::DBRead lk( "local" );
