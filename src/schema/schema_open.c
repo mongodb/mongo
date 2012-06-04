@@ -170,14 +170,13 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table,
 
 	ret = __wt_session_get_btree(
 	    session, fileuri, NULL, WT_BTREE_EXCLUSIVE);
+	btree = session->btree;
 	if (ret == ENOENT)
 		__wt_errx(session,
 		    "Index '%s' created but '%s' is missing", uri, fileuri);
 	/* Other errors will already have generated an error message. */
 	if (ret != 0)
 		goto err;
-
-	btree = session->btree;
 
 	/*
 	 * The key format for an index is somewhat subtle: the application
