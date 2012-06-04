@@ -1121,16 +1121,17 @@ namespace mongo {
 
             virtual bool run(const string& dbName, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 LastError *le = lastError.disableForCommand();
+                verify( le );
                 {
-                    verify( le );
                     if ( le->msg.size() && le->nPrev == 1 ) {
                         le->appendSelf( result );
                         return true;
                     }
                 }
-
                 ClientInfo * client = ClientInfo::get();
-                return client->getLastError( cmdObj , result );
+                bool res = client->getLastError( cmdObj , result );
+                client->disableForCommand();
+                return res;
             }
         } cmdGetLastError;
 
@@ -1292,8 +1293,10 @@ namespace mongo {
         virtual void help( stringstream& help ) const { help << "Not supported through mongos"; }
 
         bool run(const string& , BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
-            if ( jsobj["forShell"].trueValue() )
+            if ( jsobj["forShell"].trueValue() ) {
                 lastError.disableForCommand();
+                ClientInfo::get()->disableForCommand();
+            }
 
             errmsg = "replSetGetStatus is not supported through mongos";
             result.append("info", "mongos"); // see sayReplSetMemberState

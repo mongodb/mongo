@@ -130,7 +130,11 @@ namespace mongo {
         return res;
     }
 
-
+    void ClientInfo::disableForCommand() {
+        set<string> * temp = _cur;
+        _cur = _prev;
+        _prev = temp;
+    }
 
     bool ClientInfo::getLastError( const BSONObj& options , BSONObjBuilder& result , bool fromWriteBackListener ) {
         set<string> * shards = getPrev();

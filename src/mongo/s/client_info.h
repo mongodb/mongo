@@ -74,6 +74,8 @@ namespace mongo {
          */
         void clearCurrentShards(){ _cur->clear(); }
 
+        void disableForCommand();
+
         /**
          * calls getLastError
          * resets shards since get last error
