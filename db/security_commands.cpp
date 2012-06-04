@@ -84,7 +84,7 @@ namespace mongo {
             return false;
         }
 	if (cc().getCdsDB() != "" && dbname != cc().getCdsDB()) {
-		log() << "auth:refuse to change db by normal user" << endl;
+		log() << "[cds] auth:refuse to change db by normal user" << endl;
 		return false;
 	}
         stringstream digestBuilder;
