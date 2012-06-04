@@ -18,7 +18,6 @@
 #include "pch.h"
 
 #include "mongo/util/text.h"
-#include "mongo/util/startup_test.h"
 #include "mongo/util/mongoutils/str.h"
 #include <boost/smart_ptr/scoped_array.hpp>
 
@@ -229,13 +228,6 @@ namespace mongo {
     }
 
 #endif // #if defined(_WIN32)
-
-    struct TextUnitTest : public StartupTest {
-        void run() {
-            verify( parseLL("123") == 123 );
-            verify( parseLL("-123000000000") == -123000000000LL );
-        }
-    } textUnitTest;
 
 }
 
