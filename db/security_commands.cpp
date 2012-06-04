@@ -83,7 +83,7 @@ namespace mongo {
             sleepmillis(10);
             return false;
         }
-	if (cc()->getCdsDB() != "" && dbname != cc()->getCdsDB()) {
+	if (cc().getCdsDB() != "" && dbname != cc().getCdsDB()) {
 		log() << "auth:refuse to change db by normal user" << endl;
 		return false;
 	}

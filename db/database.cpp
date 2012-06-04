@@ -232,7 +232,7 @@ namespace mongo {
 	if ( cdsfileExceed(NamespaceString( ns ).db,numFiles())) {
 	    uasserted(17565,"[cds]quota exceeded");
 	}
-	if (numFiles() > 1 && (cc()->getCdsDB() != NamespaceString( ns ).db)) {
+	if (numFiles() > 1 && (cc().getCdsDB() != NamespaceString( ns ).db)) {
 	    uasserted(17566,"[cds] quota exceeded [only current db user can allocate file] ");	
 	}
         // allocate files until we either get one big enough or hit maxSize
