@@ -644,15 +644,21 @@ namespace mongo {
         */
         bool resetError() { return simpleCommand("admin", 0, "reseterror"); }
 
-        /** Delete the specified collection. */
-        virtual bool dropCollection( const string &ns ) {
+        /** Delete the specified collection.
+         *  @param info An optional output parameter that receives the result object the database
+         *  returns from the drop command.  May be null if the caller doesn't need that info.
+         */
+        virtual bool dropCollection( const string &ns, BSONObj* info = NULL ) {
             string db = nsGetDB( ns );
             string coll = nsGetCollection( ns );
             uassert( 10011 ,  "no collection name", coll.size() );
 
-            BSONObj info;
+            BSONObj temp;
+            if ( info == NULL ) {
+                info = &temp;
+            }
 
-            bool res = runCommand( db.c_str() , BSON( "drop" << coll ) , info );
+            bool res = runCommand( db.c_str() , BSON( "drop" << coll ) , *info );
             resetIndexCache();
             return res;
         }

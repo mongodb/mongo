@@ -1226,12 +1226,28 @@ namespace mongo {
 
         LOG(1) << "ChunkManager::drop : " << _ns << "\t all locked" << endl;
 
+        map<string,BSONObj> errors;
         // delete data from mongod
         for ( set<Shard>::iterator i=seen.begin(); i!=seen.end(); i++ ) {
             scoped_ptr<ScopedDbConnection> conn(
                     ScopedDbConnection::getScopedDbConnection( i->getConnString() ));
-            conn->get()->dropCollection( _ns );
+            BSONObj info;
+            if ( !conn->get()->dropCollection( _ns, &info ) ) {
+                errors[ i->getConnString() ] = info;
+            }
             conn->done();
+        }
+        if ( !errors.empty() ) {
+            stringstream ss;
+            ss << "Dropping collection failed on the following hosts: ";
+            for ( map<string,BSONObj>::const_iterator it = errors.begin(); it != errors.end(); ) {
+                ss << it->first << ": " << it->second;
+                ++it;
+                if ( it != errors.end() ) {
+                    ss << ", ";
+                }
+            }
+            uasserted( 16330, ss.str() );
         }
 
         LOG(1) << "ChunkManager::drop : " << _ns << "\t removed shard data" << endl;
