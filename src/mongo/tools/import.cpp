@@ -47,7 +47,7 @@ class Import : public Tool {
     bool _doimport;
     bool _jsonArray;
     vector<string> _upsertFields;
-    static const int BUF_SIZE = 1024 * 1024 * 16;
+    static const int BUF_SIZE;
 
     void csvTokenizeRow(const string& row, vector<string>& tokens) {
         bool inQuotes = false;
@@ -473,3 +473,4 @@ int main( int argc , char ** argv ) {
     Import import;
     return import.main( argc , argv );
 }
+const int Import::BUF_SIZE(1024 * 1024 * 16);
