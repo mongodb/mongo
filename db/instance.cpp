@@ -246,7 +246,7 @@ namespace mongo {
         clock_gettime( CLOCK_THREAD_CPUTIME_ID, &ts );
 	if(ts.tv_sec - cc().getCdsLastCpuTime() > cc().getCdsMaxCpuCost() ) {
 		sleep(ts.tv_sec - cc().getCdsLastCpuTime() - cc().getCdsMaxCpuCost());
-		mongo::log() << "[cds] sleep for a while "
+		mongo::log(2) << "[cds] sleep for a while "
 			     << "ts.tv_sec=" << ts.tv_sec
 			     << "CdsLastCpuTime=" << cc().getCdsLastCpuTime()
 			     << "CdsMaxCpuCost=" << cc().getCdsMaxCpuCost()

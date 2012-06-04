@@ -199,7 +199,7 @@ namespace mongo {
 		return false;
 	}
 	int maxfilenum = cc().getCdsMaxFileNum();
-	mongo::log() << "[cds][fileExceed] maxfilenum=" << maxfilenum
+	mongo::log(2) << "[cds][fileExceed] maxfilenum=" << maxfilenum
 		     << " filenum=" << filenum << endl;
 	return (filenum>=maxfilenum);
     }
