@@ -229,36 +229,6 @@ namespace mongo {
         rawOut(msg);
         ::abort();
     }
-    bool cdsFindOne(const string& ns,int &result) {
-        Message m;
-        m.reset();
-        BufBuilder b;
-        b.appendNum(0);
-        b.appendStr(ns.c_str());
-        b.appendNum(0);
-        b.appendNum(1);
-	BSONObj obj;
-	obj = BSON("_id" << "cds");
-	obj.appendSelfToBufBuilder(b);
-        m.setData(dbQuery,b.buf(),b.len());
-        Client& c = cc();
-        DbResponse p;
-        receivedQuery(c, p, m);
-        try {
-                QueryResult *qr = (QueryResult *) p.response->singleData();
-                if(qr->nReturned){
-			BSONObj o(qr->data());
-			result = o.getIntField("value");
-			cc().curop()->debug().reset();
-                        return true;
-                }
-        }catch(...) {
-                mongo::log() << "[cds] cdsFindOne Exception"
-			     << "ns=" << ns << endl;
-        }
-	cc().curop()->debug().reset();
-        return false;
-    }
 	bool cdsIfRequestTimeout(const string& ns) {
 #ifdef _WIN32
 			return false;
@@ -276,8 +246,12 @@ namespace mongo {
         clock_gettime( CLOCK_THREAD_CPUTIME_ID, &ts );
 	if(ts.tv_sec - cc().getCdsLastCpuTime() > cc().getCdsMaxCpuCost() ) {
 		sleep(ts.tv_sec - cc().getCdsLastCpuTime());
-		cc().setCdsLastCpuTime(ts.tv_sec);
-		mongo::log() << "[cds] sleep a while "<< endl;
+		mongo::log() << "[cds] sleep for a while "
+			     << "ts.tv_sec=" << ts.tv_sec
+			     << "CdsLastCpuTime=" << cc().getCdsLastCpuTime()
+			     << "CdsMaxCpuCost=" << cc().getCdsMaxCpuCost()
+			     << endl;
+		cc().setCdsLastCpuTime(ts.tv_sec); 
 		return true;
 	}
 	return false;

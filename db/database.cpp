@@ -25,9 +25,7 @@
 namespace mongo {
 
 
-	bool cdsFindOne(const string& ns,int &result);
-	bool cdsIfRequestTimeout(const string& ns);
-	bool specialDB(const string& dbname);
+    bool specialDB(const string& dbname);
 
     bool Database::_openAllFiles = false;
 
