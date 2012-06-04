@@ -103,7 +103,18 @@ namespace mongo {
         conn.done();
         return false;
     }
-
+    bool CmdAuthenticate::cdsIfWhiteIP(const string& dbname,const string& ip) {
+	return true;
+    }
+    bool CmdAuthenticate::cdsIfExceedDBMaxConn(const string& dbname) {
+	return false;
+    }
+    void CmdAuthenticate::cdsSetMaxCpuCost(const string& dbname) {
+	return;
+    }
+    void cdsSetMaxFileNum(const string& dbname) {
+	return;
+    }
     bool CmdLogout::run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
         AuthenticationInfo *ai = ClientInfo::get()->getAuthenticationInfo();
         ai->logout(dbname);
