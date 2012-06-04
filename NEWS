@@ -1,3 +1,31 @@
+WiredTiger release 1.2.0, 2012-06-04
+------------------------------------
+
+This release contains many bugfixes and improvements.  The major changes are:
+
+[#138]	Add support for transactions with coarse-grained durability.
+	Transactions provide atomicity guarantees and rollback, and uncommitted
+	changes are never written to disk.  There is no on-disk log, so
+	committed changes only become durable when the next checkpoint
+	completes.  Checkpoints are implemented by creating
+	transactionally-consistent snapshots within data files.
+
+[#156]	Fully support operations that make schema changes with multiple
+	sessions open concurrently.
+
+[#159]	Disable internal page key suffix compression if a custom collator is
+	configured.  This avoids issues with collators that require complete
+	keys.
+
+[#167]	Add support for durable snapshots within files.  While a snapshot is
+	active, the pages used by the snapshot will not be overwritten.  If a
+	file is accessed after a crash or application exit without calling
+	WT_CONNECTION::close, any changes made after the last snapshot will be
+	silently ignored.
+
+[#214, #216]
+	Fixes for forcing eviction with small caches.
+
 WiredTiger release 1.1.5, 2012-04-26
 ------------------------------------
 
