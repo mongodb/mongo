@@ -520,8 +520,11 @@ __evict_file_request_walk(WT_SESSION_IMPL *session)
 	 * to reason about sync or forced eviction if we know there are
 	 * no other threads evicting in the tree.
 	 */
-	while (request_session->btree->lru_count > 0)
+	while (request_session->btree->lru_count > 0) {
+		__wt_spin_unlock(session, &cache->evict_lock);
 		__wt_yield();
+		__wt_spin_lock(session, &cache->evict_lock);
+	}
 
 	ret = __evict_file_request(request_session, syncop);
 
@@ -644,20 +647,16 @@ __evict_page_request_walk(WT_SESSION_IMPL *session)
 		 * to reason about sync or forced eviction if we know there are
 		 * no other threads evicting in the tree.
 		 */
-		while (session->btree->lru_count > 0)
+		while (session->btree->lru_count > 0) {
+			__wt_spin_unlock(session, &cache->evict_lock);
 			__wt_yield();
+			__wt_spin_lock(session, &cache->evict_lock);
+		}
 
 		ref = page->ref;
 		WT_ASSERT(session, ref->page == page);
 		WT_ASSERT(session, ref->state == WT_REF_EVICT_FORCE);
 		ref->state = WT_REF_LOCKED;
-
-		/*
-		 * At this point, the page is locked, which stalls new readers.
-		 * Pause before attempting to evict it to give existing readers
-		 * a chance to drop their references.
-		 */
-		__wt_yield();
 
 		/*
 		 * If eviction fails, it will free up the page: hope it works
