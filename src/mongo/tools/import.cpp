@@ -118,7 +118,7 @@ class Import : public Tool {
         }
         else {
             in->getline( buf , BUF_SIZE );
-            uassert(16325, str::stream() << "input line too long (max length: "
+            uassert(16325, str::stream() << "read error, or input line too long (max length: "
                     << BUF_SIZE << ")", !(in->rdstate() & ios_base::failbit));
             log(1) << "got line:" << buf << endl;
         }
