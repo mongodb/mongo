@@ -160,6 +160,7 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table,
 	u_int cursor_key_cols;
 	int i;
 
+	btree = NULL;
 	WT_CLEAR(uribuf);
 
 	/* Get the filename from the index config. */
