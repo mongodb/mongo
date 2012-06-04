@@ -1,4 +1,8 @@
 
+function debug( msg ) {
+    print( "fsync2: " + msg );
+}
+
 function doTest() {
     db.fsync2.drop();
     
@@ -7,13 +11,18 @@ function doTest() {
     d = db.getSisterDB( "admin" );
     
     assert.commandWorked( d.runCommand( {fsync:1, lock: 1 } ) );
+
+    debug( "after lock" );
     
     for ( i=0; i<200; i++) {
+        debug( "loop: " + i );
         assert.eq(1, db.fsync2.count());
-        sleep(1);
+        sleep(100);
     }
     
+    debug( "about to save" );
     db.fsync2.save( {x:1} );
+    debug( "save done" );
     
     m = new Mongo( db.getMongo().host );
     
