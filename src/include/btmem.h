@@ -61,7 +61,6 @@ struct __wt_page_header {
  * WT_ADDR --
  *	A block location.
  */
-#define	WT_NOADDR	""		/* No address */
 struct __wt_addr {
 	uint8_t *addr;			/* Cookie */
 	uint32_t size;			/* Cookie length */
@@ -72,14 +71,6 @@ struct __wt_addr {
  *	When a page is modified, there's additional information maintained as it
  * is written to disk.
  */
-typedef enum {
-	WT_PT_EMPTY=0,			/* Unused slot */
-	WT_PT_BLOCK,			/* Block: inactive */
-	WT_PT_BLOCK_EVICT,		/* Block: inactive on eviction */
-	WT_PT_OVFL,			/* Overflow: active */
-	WT_PT_OVFL_DISCARD		/* Overflow: inactive */
-} __wt_pt_type_t;
-
 struct __wt_page_modify {
 	/*
 	 * The write generation is incremented after a page is modified.  That
@@ -169,20 +160,29 @@ struct __wt_page_modify {
 		uint8_t *data;		/* Overflow data reference */
 		uint32_t size;		/* Overflow data length */
 
-		__wt_pt_type_t type;	/* Type */
+#define	WT_TRK_DISCARD		0x001	/* Object was discarded */
+#define	WT_TRK_INUSE		0x002	/* Object is currently in-use */
+#define	WT_TRK_JUST_ADDED	0x004	/* Object added this reconciliation */
+#define	WT_TRK_OBJECT		0x008	/* Slot set (not empty) */
+#define	WT_TRK_ONPAGE		0x010	/* Object was referenced from a page */
+		uint8_t  flags;
 	} *track;			/* Array of tracked objects */
 	uint32_t track_entries;		/* Total track slots */
+
+	wt_txnid_t first_id;		/* Earliest transactional update, used
+					 * to avoid errors from transaction ID
+					 * wraparound.
+					 */
 
 #define	WT_PM_REC_EMPTY		0x01	/* Reconciliation: page empty */
 #define	WT_PM_REC_REPLACE	0x02	/* Reconciliation: page replaced */
 #define	WT_PM_REC_SPLIT		0x04	/* Reconciliation: page split */
 #define	WT_PM_REC_SPLIT_MERGE	0x08	/* Reconciliation: page split merge */
-	uint8_t flags;			/* Page flags */
-};
-
 #define	WT_PM_REC_MASK							\
 	(WT_PM_REC_EMPTY |						\
 	    WT_PM_REC_REPLACE | WT_PM_REC_SPLIT | WT_PM_REC_SPLIT_MERGE)
+	uint8_t flags;			/* Page flags */
+};
 
 /*
  * WT_PAGE --
@@ -284,13 +284,13 @@ struct __wt_page {
 	uint32_t memory_footprint;
 
 #define	WT_PAGE_INVALID		0	/* Invalid page */
-#define	WT_PAGE_COL_FIX		1	/* Col-store fixed-len leaf */
-#define	WT_PAGE_COL_INT		2	/* Col-store internal page */
-#define	WT_PAGE_COL_VAR		3	/* Col-store var-length leaf page */
-#define	WT_PAGE_OVFL		4	/* Overflow page */
-#define	WT_PAGE_ROW_INT		5	/* Row-store internal page */
-#define	WT_PAGE_ROW_LEAF	6	/* Row-store leaf page */
-#define	WT_PAGE_FREELIST	7	/* Free-list page */
+#define	WT_PAGE_BLOCK_MANAGER	1	/* Block-manager page */
+#define	WT_PAGE_COL_FIX		2	/* Col-store fixed-len leaf */
+#define	WT_PAGE_COL_INT		3	/* Col-store internal page */
+#define	WT_PAGE_COL_VAR		4	/* Col-store var-length leaf page */
+#define	WT_PAGE_OVFL		5	/* Overflow page */
+#define	WT_PAGE_ROW_INT		6	/* Row-store internal page */
+#define	WT_PAGE_ROW_LEAF	7	/* Row-store leaf page */
 	uint8_t type;			/* Page type */
 
 #define	WT_PAGE_BUILD_KEYS	0x01	/* Keys have been built in memory */
@@ -402,8 +402,21 @@ struct __wt_ref {
  * sorted by key, fixed in size, and references data on the page.
  */
 struct __wt_row {
-	void	*key;			/* On-page cell or off-page WT_IKEY */
+	void	*__key;			/* On-page cell or off-page WT_IKEY */
 };
+
+/*
+ * Multiple threads of control may be searching the in-memory row-store pages,
+ * and the key may be instantiated at any time.  Code must be able to handle
+ * both when the key has not been instantiated (the key field points into the
+ * page's disk image), and when the key has been instantiated (the key field
+ * points outside the page's disk image).  We don't need barriers because the
+ * key is updated atomically, but code that reads the key field multiple times
+ * is a very, very bad idea.  We obscure the field name and use a copy macro in
+ * all references to the field to make sure we don't introduce this bug (again).
+ */
+#define	WT_ROW_KEY_COPY(rip)	((rip)->__key)
+#define	WT_ROW_KEY_SET(rip, v)	((rip)->__key) = (v)
 
 /*
  * WT_ROW_FOREACH --
@@ -518,8 +531,6 @@ struct __wt_ikey {
  * list.
  */
 struct __wt_update {
-	WT_UPDATE *next;		/* forward-linked list */
-
 	/*
 	 * We use the maximum size as an is-deleted flag, which means we can't
 	 * store 4GB objects; I'd rather do that than increase the size of this
@@ -528,6 +539,9 @@ struct __wt_update {
 #define	WT_UPDATE_DELETED_ISSET(upd)	((upd)->size == UINT32_MAX)
 #define	WT_UPDATE_DELETED_SET(upd)	((upd)->size = UINT32_MAX)
 	uint32_t size;			/* update length */
+	wt_txnid_t txnid;		/* update transaction */
+
+	WT_UPDATE *next;		/* forward-linked list */
 
 	/* The untyped value immediately follows the WT_UPDATE structure. */
 #define	WT_UPDATE_DATA(upd)						\

@@ -10,8 +10,8 @@
 /*
  * __wt_config_concat --
  *	Given a NULL-terminated list of configuration strings, concatenate them
- *	into a newly allocated buffer.  Nothing special is assumed about any
- *	of the config strings, they are simply combined in order.
+ *	into newly allocated memory.  Nothing special is assumed about any of
+ *	the config strings, they are simply combined in order.
  *
  *	This code deals with the case where some of the config strings are
  *	wrapped in brackets but others aren't: the resulting string does not
@@ -23,12 +23,11 @@ __wt_config_concat(
 {
 	WT_CONFIG cparser;
 	WT_CONFIG_ITEM k, v;
-	WT_ITEM buf;
-	int ret;
+	WT_DECL_ITEM(tmp);
+	WT_DECL_RET;
 	const char **cp;
 
-	WT_CLEAR(buf);
-	ret = 0;
+	WT_RET(__wt_scr_alloc(session, 0, &tmp));
 
 	for (cp = cfg; *cp != NULL; ++cp) {
 		WT_ERR(__wt_config_init(session, &cparser, *cp));
@@ -46,7 +45,7 @@ __wt_config_concat(
 				--v.str;
 				v.len += 2;
 			}
-			WT_ERR(__wt_buf_catfmt(session, &buf, "%.*s%s%.*s,",
+			WT_ERR(__wt_buf_catfmt(session, tmp, "%.*s%s%.*s,",
 			    (int)k.len, k.str,
 			    (v.len > 0) ? "=" : "",
 			    (int)v.len, v.str));
@@ -56,20 +55,16 @@ __wt_config_concat(
 	}
 
 	/*
-	 * If the caller passes us no valid configuration strings, we end up
-	 * here with no allocated memory to return.  Check the final buffer
-	 * size: empty configuration strings are possible, and paranoia is
-	 * good.
+	 * If the caller passes us no valid configuration strings, we get here
+	 * with no bytes to copy -- that's OK, the underlying string copy can
+	 * handle empty strings.
+	 *
+	 * Strip any trailing comma.
 	 */
-	if (buf.size == 0)
-		WT_RET(__wt_buf_initsize(session, &buf, 1));
+	if (tmp->size != 0)
+		--tmp->size;
+	ret = __wt_strndup(session, tmp->data, tmp->size, config_ret);
 
-	/* Strip the trailing comma and NUL-terminate */
-	((char *)buf.data)[buf.size - 1] = '\0';
-
-	*config_ret = buf.data;
-	return (0);
-
-err:	__wt_buf_free(session, &buf);
+err:	__wt_scr_free(&tmp);
 	return (ret);
 }

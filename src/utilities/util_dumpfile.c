@@ -12,7 +12,8 @@ static int usage(void);
 int
 util_dumpfile(WT_SESSION *session, int argc, char *argv[])
 {
-	int ch, ret;
+	WT_DECL_RET;
+	int ch;
 	char *name;
 
 	name = NULL;

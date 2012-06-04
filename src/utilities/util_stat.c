@@ -13,9 +13,10 @@ int
 util_stat(WT_SESSION *session, int argc, char *argv[])
 {
 	WT_CURSOR *cursor;
+	WT_DECL_RET;
 	uint64_t v;
 	size_t urilen;
-	int ch, objname_free, ret;
+	int ch, objname_free;
 	const char *pval, *desc;
 	char *objname, *uri;
 

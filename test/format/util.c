@@ -63,6 +63,8 @@ key_gen(uint8_t *key, uint32_t *sizep, uint64_t keyno, int insert)
 	*sizep = (uint32_t)len;
 }
 
+static uint32_t val_dup_data_len;	/* Length of duplicate data items */
+
 void
 val_gen_setup(uint8_t **valp)
 {
@@ -83,13 +85,13 @@ val_gen_setup(uint8_t **valp)
 		val[i] = (uint8_t)("ABCDEFGHIJKLMNOPQRSTUVWXYZ"[i % 26]);
 
 	*valp = val;
+
+	val_dup_data_len = MMRAND(g.c_value_min, g.c_value_max);
 }
 
 void
 value_gen(uint8_t *val, uint32_t *sizep, uint64_t keyno)
 {
-	static const char *dup_data = "duplicate data item";
-
 	/*
 	 * Fixed-length records: take the low N bits from the last digit of
 	 * the record number.
@@ -113,7 +115,7 @@ value_gen(uint8_t *val, uint32_t *sizep, uint64_t keyno)
 	 * WiredTiger doesn't store zero-length data items in row-store files,
 	 * test that by inserting a zero-length data item every so often.
 	 */
-	if (++keyno % 63 == 0) {
+	if (keyno % 63 == 0) {
 		val[0] = '\0';
 		*sizep = 0;
 		return;
@@ -129,15 +131,15 @@ value_gen(uint8_t *val, uint32_t *sizep, uint64_t keyno)
 	 */
 	if (g.c_file_type == VAR &&
 	    g.c_repeat_data_pct != 0 &&
-	    (u_int)wts_rand() % 100 > g.c_repeat_data_pct) {
-		(void)strcpy((char *)val, dup_data);
-		*sizep = (uint32_t)strlen(dup_data);
-		return;
+	    MMRAND(1, 100) > g.c_repeat_data_pct) {
+		(void)strcpy((char *)val, "DUPLICATEV");
+		val[10] = '/';
+		*sizep = val_dup_data_len;
+	} else {
+		(void)sprintf((char *)val, "%010" PRIu64, keyno);
+		val[10] = '/';
+		*sizep = MMRAND(g.c_value_min, g.c_value_max);
 	}
-
-	sprintf((char *)val, "%010" PRIu64, keyno);
-	val[10] = '/';
-	*sizep = MMRAND(g.c_value_min, g.c_value_max);
 }
 
 void
@@ -168,8 +170,10 @@ track(const char *tag, uint64_t cnt, TINFO *tinfo)
 	}
 	lastlen = len;
 
-	(void)printf("%s\r", msg);
-	(void)fflush(stdout);
+	if (printf("%s\r", msg) < 0)
+		die(EIO, "printf");
+	if (fflush(stdout) == EOF)
+		die(errno, "fflush");
 }
 
 /*

@@ -134,11 +134,11 @@ static int __wt_huffman_read(WT_SESSION_IMPL *,
 int
 __wt_btree_huffman_open(WT_SESSION_IMPL *session, const char *config)
 {
-	WT_BTREE *btree;
-	u_int entries, numbytes;
 	struct __wt_huffman_table *table;
+	WT_BTREE *btree;
 	WT_CONFIG_ITEM key_conf, value_conf;
-	int ret;
+	WT_DECL_RET;
+	u_int entries, numbytes;
 
 	btree = session->btree;
 
@@ -226,12 +226,11 @@ __wt_huffman_read(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *ip,
 {
 	struct __wt_huffman_table *table, *tp;
 	FILE *fp;
+	WT_DECL_RET;
 	uint64_t symbol, frequency;
 	u_int entries, lineno;
-	int ret;
 	char *file;
 
-	ret = 0;
 	file = NULL;
 	table = NULL;
 
@@ -242,7 +241,7 @@ __wt_huffman_read(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *ip,
 	if (strncasecmp(ip->str, "utf8", 4) == 0) {
 		entries = UINT8_MAX;
 		*numbytesp = 1;
-		WT_RET(__wt_calloc_def(session, entries, &table));
+		WT_ERR(__wt_calloc_def(session, entries, &table));
 
 		if (ip->len == 4)
 			WT_ERR_MSG(session, EINVAL,
@@ -252,7 +251,7 @@ __wt_huffman_read(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *ip,
 	} else if (strncasecmp(ip->str, "utf16", 5) == 0) {
 		entries = UINT16_MAX;
 		*numbytesp = 2;
-		WT_RET(__wt_calloc_def(session, entries, &table));
+		WT_ERR(__wt_calloc_def(session, entries, &table));
 
 		if (ip->len == 5)
 			WT_ERR_MSG(session, EINVAL,

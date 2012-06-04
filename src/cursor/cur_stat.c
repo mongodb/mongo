@@ -37,13 +37,12 @@ static int
 __curstat_get_key(WT_CURSOR *cursor, ...)
 {
 	WT_CURSOR_STAT *cst;
+	WT_DECL_RET;
 	WT_ITEM *item;
 	WT_SESSION_IMPL *session;
 	size_t size;
 	va_list ap;
-	int ret;
 
-	ret = 0;
 	cst = (WT_CURSOR_STAT *)cursor;
 	CURSOR_API_CALL(cursor, session, get_key, cst->btree);
 	va_start(ap, cursor);
@@ -51,7 +50,8 @@ __curstat_get_key(WT_CURSOR *cursor, ...)
 	WT_CURSOR_NEEDKEY(cursor);
 
 	if (F_ISSET(cursor, WT_CURSTD_RAW)) {
-		size = __wt_struct_size(session, cursor->key_format, cst->key);
+		WT_ERR(__wt_struct_size(
+		    session, &size, cursor->key_format, cst->key));
 		WT_ERR(__wt_buf_initsize(session, &cursor->key, size));
 		WT_ERR(__wt_struct_pack(session, cursor->key.mem, size,
 		    cursor->key_format, cst->key));
@@ -75,13 +75,12 @@ static int
 __curstat_get_value(WT_CURSOR *cursor, ...)
 {
 	WT_CURSOR_STAT *cst;
+	WT_DECL_RET;
 	WT_ITEM *item;
 	WT_SESSION_IMPL *session;
 	va_list ap;
 	size_t size;
-	int ret;
 
-	ret = 0;
 	cst = (WT_CURSOR_STAT *)cursor;
 	CURSOR_API_CALL(cursor, session, get_value, cst->btree);
 	va_start(ap, cursor);
@@ -89,8 +88,8 @@ __curstat_get_value(WT_CURSOR *cursor, ...)
 	WT_CURSOR_NEEDVALUE(cursor);
 
 	if (F_ISSET(cursor, WT_CURSTD_RAW)) {
-		size = __wt_struct_size(session, cursor->value_format,
-		    cst->stats_first[cst->key].desc, cst->pv.data, cst->v);
+		WT_ERR(__wt_struct_size(session, &size, cursor->value_format,
+		    cst->stats_first[cst->key].desc, cst->pv.data, cst->v));
 		WT_ERR(__wt_buf_initsize(session, &cursor->value, size));
 		WT_ERR(__wt_struct_pack(session, cursor->value.mem, size,
 		    cursor->value_format,
@@ -118,12 +117,11 @@ static void
 __curstat_set_key(WT_CURSOR *cursor, ...)
 {
 	WT_CURSOR_STAT *cst;
+	WT_DECL_RET;
 	WT_ITEM *item;
 	WT_SESSION_IMPL *session;
 	va_list ap;
-	int ret;
 
-	ret = 0;
 	cst = (WT_CURSOR_STAT *)cursor;
 	CURSOR_API_CALL(cursor, session, set_key, cst->btree);
 
@@ -163,10 +161,9 @@ static int
 __curstat_next(WT_CURSOR *cursor)
 {
 	WT_CURSOR_STAT *cst;
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int ret;
 
-	ret = 0;
 	cst = (WT_CURSOR_STAT *)cursor;
 	CURSOR_API_CALL(cursor, session, next, cst->btree);
 
@@ -196,10 +193,9 @@ static int
 __curstat_prev(WT_CURSOR *cursor)
 {
 	WT_CURSOR_STAT *cst;
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int ret;
 
-	ret = 0;
 	cst = (WT_CURSOR_STAT *)cursor;
 	CURSOR_API_CALL(cursor, session, prev, cst->btree);
 
@@ -244,10 +240,9 @@ static int
 __curstat_search(WT_CURSOR *cursor)
 {
 	WT_CURSOR_STAT *cst;
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int ret;
 
-	ret = 0;
 	cst = (WT_CURSOR_STAT *)cursor;
 	CURSOR_API_CALL(cursor, session, search, cst->btree);
 
@@ -273,10 +268,9 @@ static int
 __curstat_close(WT_CURSOR *cursor)
 {
 	WT_CURSOR_STAT *cst;
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int ret;
 
-	ret = 0;
 	cst = (WT_CURSOR_STAT *)cursor;
 	CURSOR_API_CALL(cursor, session, close, cst->btree);
 
@@ -333,37 +327,36 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 		0			/* uint32_t flags */
 	};
 	WT_BTREE *btree;
-	WT_CURSOR_STAT *cst;
 	WT_CONFIG_ITEM cval;
 	WT_CURSOR *cursor;
+	WT_CURSOR_STAT *cst;
+	WT_DECL_RET;
 	WT_STATS *stats_first;
 	void (*clear_func)(WT_STATS *);
-	int clear_on_close, ret, stats_count;
+	int statistics_clear, stats_count;
 
 	btree = NULL;
 	clear_func = NULL;
 	cst = NULL;
-	ret = 0;
 
-	WT_RET(__wt_config_gets(session, cfg, "clear_on_close", &cval));
-	clear_on_close = (cval.val != 0);
+	WT_RET(__wt_config_gets(session, cfg, "statistics_clear", &cval));
+	statistics_clear = (cval.val != 0);
 
 	if (!WT_PREFIX_SKIP(uri, "statistics:"))
 		return (EINVAL);
 	if (WT_PREFIX_MATCH(uri, "file:")) {
-		WT_ERR(
-		    __wt_session_get_btree(session, uri, uri, NULL, NULL, 0));
+		WT_ERR(__wt_session_get_btree(session, uri, NULL, 0));
 		btree = session->btree;
 		WT_ERR(__wt_btree_stat_init(session));
 		stats_first = (WT_STATS *)session->btree->stats;
 		stats_count = sizeof(WT_BTREE_STATS) / sizeof(WT_STATS);
-		if (clear_on_close)
+		if (statistics_clear)
 			clear_func = __wt_stat_clear_btree_stats;
 	} else {
 		__wt_conn_stat_init(session);
 		stats_first = (WT_STATS *)S2C(session)->stats;
 		stats_count = sizeof(WT_CONNECTION_STATS) / sizeof(WT_STATS);
-		if (clear_on_close)
+		if (statistics_clear)
 			clear_func = __wt_stat_clear_connection_stats;
 	}
 

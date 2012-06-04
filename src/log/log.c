@@ -9,34 +9,31 @@
 
 static int
 __log_record_size(WT_SESSION_IMPL *session,
-    WT_LOGREC_DESC *recdesc, va_list ap, size_t *sizep)
+    size_t *sizep, WT_LOGREC_DESC *recdesc, va_list ap)
 {
-	WT_UNUSED(session);
-
-	*sizep = wiredtiger_struct_size(recdesc->fmt, ap);
-	return (0);
+	return (__wt_struct_sizev(session, sizep, recdesc->fmt, ap));
 }
 
 int
 __wt_log_put(WT_SESSION_IMPL *session, WT_LOGREC_DESC *recdesc, ...)
 {
+	WT_DECL_RET;
 	WT_ITEM *buf;
 	va_list ap;
 	size_t size;
-	int ret;
 
 	buf = &session->logrec_buf;
 
 	va_start(ap, recdesc);
-	WT_ERR(__log_record_size(session, recdesc, ap, &size));
+	ret = __log_record_size(session, &size, recdesc, ap);
 	va_end(ap);
+	WT_RET(ret);
 
 	WT_RET(__wt_buf_initsize(session, buf, size));
 
 	va_start(ap, recdesc);
-	WT_ERR(__wt_struct_packv(session, buf->mem, size, recdesc->fmt, ap));
-err:	va_end(ap);
-
+	ret = __wt_struct_packv(session, buf->mem, size, recdesc->fmt, ap);
+	va_end(ap);
 	return (ret);
 }
 
@@ -80,8 +77,8 @@ int
 __wt_log_printf(WT_SESSION_IMPL *session, const char *fmt, ...)
     WT_GCC_FUNC_ATTRIBUTE((format (printf, 2, 3)))
 {
+	WT_DECL_RET;
 	va_list ap;
-	int ret;
 
 	va_start(ap, fmt);
 	ret = __wt_log_vprintf(session, fmt, ap);

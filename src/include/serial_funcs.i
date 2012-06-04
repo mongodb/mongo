@@ -2,7 +2,8 @@
 
 typedef struct {
 	WT_PAGE *page;
-	WT_INSERT_HEAD **inshead;
+	uint32_t write_gen;
+	WT_INSERT_HEAD **insheadp;
 	WT_INSERT ***ins_stack;
 	WT_INSERT_HEAD **new_inslist;
 	size_t new_inslist_size;
@@ -18,18 +19,20 @@ typedef struct {
 
 static inline int
 __wt_col_append_serial(
-	WT_SESSION_IMPL *session, WT_PAGE *page, WT_INSERT_HEAD **inshead,
-	WT_INSERT ***ins_stack, WT_INSERT_HEAD ***new_inslistp, size_t
-	new_inslist_size, WT_INSERT_HEAD **new_insheadp, size_t
-	new_inshead_size, WT_INSERT **new_insp, size_t new_ins_size, u_int
-	skipdepth)
+	WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t write_gen,
+	WT_INSERT_HEAD **insheadp, WT_INSERT ***ins_stack, WT_INSERT_HEAD
+	***new_inslistp, size_t new_inslist_size, WT_INSERT_HEAD
+	**new_insheadp, size_t new_inshead_size, WT_INSERT **new_insp, size_t
+	new_ins_size, u_int skipdepth)
 {
 	__wt_col_append_args _args, *args = &_args;
-	int ret;
+	WT_DECL_RET;
 
 	args->page = page;
 
-	args->inshead = inshead;
+	args->write_gen = write_gen;
+
+	args->insheadp = insheadp;
 
 	args->ins_stack = ins_stack;
 
@@ -76,16 +79,17 @@ __wt_col_append_serial(
 
 static inline void
 __wt_col_append_unpack(
-	WT_SESSION_IMPL *session, WT_PAGE **pagep, WT_INSERT_HEAD ***insheadp,
-	WT_INSERT ****ins_stackp, WT_INSERT_HEAD ***new_inslistp,
-	WT_INSERT_HEAD **new_insheadp, WT_INSERT **new_insp, u_int
-	*skipdepthp)
+	WT_SESSION_IMPL *session, WT_PAGE **pagep, uint32_t *write_genp,
+	WT_INSERT_HEAD ***insheadpp, WT_INSERT ****ins_stackp, WT_INSERT_HEAD
+	***new_inslistp, WT_INSERT_HEAD **new_insheadp, WT_INSERT **new_insp,
+	u_int *skipdepthp)
 {
 	__wt_col_append_args *args =
 	    (__wt_col_append_args *)session->wq_args;
 
 	*pagep = args->page;
-	*insheadp = args->inshead;
+	*write_genp = args->write_gen;
+	*insheadpp = args->insheadp;
 	*ins_stackp = args->ins_stack;
 	*new_inslistp = args->new_inslist;
 	*new_insheadp = args->new_inshead;
@@ -130,35 +134,6 @@ __wt_col_append_new_ins_taken(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 typedef struct {
-	int discard;
-} __wt_evict_file_args;
-
-static inline int
-__wt_evict_file_serial(
-	WT_SESSION_IMPL *session, int discard)
-{
-	__wt_evict_file_args _args, *args = &_args;
-	int ret;
-
-	args->discard = discard;
-
-	ret = __wt_session_serialize_func(session,
-	    WT_SERIAL_EVICT, __wt_evict_file_serial_func, args);
-
-	return (ret);
-}
-
-static inline void
-__wt_evict_file_unpack(
-	WT_SESSION_IMPL *session, int *discardp)
-{
-	__wt_evict_file_args *args =
-	    (__wt_evict_file_args *)session->wq_args;
-
-	*discardp = args->discard;
-}
-
-typedef struct {
 	WT_PAGE *page;
 	uint32_t write_gen;
 	WT_INSERT_HEAD **inshead;
@@ -184,7 +159,7 @@ __wt_insert_serial(
 	new_ins_size, u_int skipdepth)
 {
 	__wt_insert_args _args, *args = &_args;
-	int ret;
+	WT_DECL_RET;
 
 	args->page = page;
 
@@ -303,7 +278,7 @@ __wt_row_key_serial(
 	*ikey)
 {
 	__wt_row_key_args _args, *args = &_args;
-	int ret;
+	WT_DECL_RET;
 
 	args->page = page;
 
@@ -331,6 +306,35 @@ __wt_row_key_unpack(
 }
 
 typedef struct {
+	int syncop;
+} __wt_sync_file_args;
+
+static inline int
+__wt_sync_file_serial(
+	WT_SESSION_IMPL *session, int syncop)
+{
+	__wt_sync_file_args _args, *args = &_args;
+	WT_DECL_RET;
+
+	args->syncop = syncop;
+
+	ret = __wt_session_serialize_func(session,
+	    WT_SERIAL_EVICT, __wt_sync_file_serial_func, args);
+
+	return (ret);
+}
+
+static inline void
+__wt_sync_file_unpack(
+	WT_SESSION_IMPL *session, int *syncopp)
+{
+	__wt_sync_file_args *args =
+	    (__wt_sync_file_args *)session->wq_args;
+
+	*syncopp = args->syncop;
+}
+
+typedef struct {
 	WT_PAGE *page;
 	uint32_t write_gen;
 	WT_UPDATE **srch_upd;
@@ -349,7 +353,7 @@ __wt_update_serial(
 	**updp, size_t upd_size)
 {
 	__wt_update_args _args, *args = &_args;
-	int ret;
+	WT_DECL_RET;
 
 	args->page = page;
 

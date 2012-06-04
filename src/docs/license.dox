@@ -1,0 +1,54 @@
+/*! @page license WiredTiger license
+
+The WiredTiger software is Open Source software: you may redistribute
+it and modify it under the terms of version 3 of the
+<a href="http://www.gnu.org/licenses/gpl-3.0-standalone.html">
+<b>GNU General Public License</b></a>
+as published by the Free Software Foundation.  The WiredTiger library
+binary also includes software copyrighted under the terms of the
+<a href="http://www.opensource.org/licenses/BSD-3-Clause">
+<b>University of California, Berkeley (BSD) 3-Clause License</b></a>.
+Any redistribution should comply with both copyrights.
+
+This program is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+<a href="http://www.gnu.org/licenses/gpl-3.0-standalone.html">
+<b>GNU General Public License</b></a> for details.
+
+For a license to use the WiredTiger software under conditions other than
+those described above, or for technical support for this software, please
+contact WiredTiger, Inc. at
+<a mailto="info@wiredtiger.com">info@wiredtiger.com</a>.
+
+@section library 3rd party software included in the WiredTiger library binary
+
+The WiredTiger library binary includes the following 3rd party software,
+distributed under the following licenses:
+
+<table>
+@hrow{Distribution File, License}
+@row{src/include/bitstring.i, University of California\, Berkeley (BSD) 3-Clause License}
+@row{src/include/queue.h, University of California\, Berkeley (BSD) 3-Clause License}
+@row{src/utilities/util_getopt.c, University of California\, Berkeley (BSD) 3-Clause License}
+</table>
+
+@section distribution 3rd party software included in the WiredTiger distribution
+
+The WiredTiger distribution includes additional 3rd party software
+licensed under a variety of licenses.   This software is not included
+in the WiredTiger library binary as built by the distribution, it is
+only used to build and test the WiredTiger documentation and software.
+If you extract portions of the WiredTiger distribution for inclusion in
+other packages, or redistribute selected portions of the WiredTiger
+sources, please review the copyright notices and LICENSE files included
+in the WiredTiger distribution for the terms and conditions of such
+redistribution.
+
+@section pd Public domain software
+
+Portions of this program are public domain software.  Public domain
+files have copyright notices releasing the software into the public
+domain and may be freely used.
+
+*/

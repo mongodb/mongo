@@ -13,6 +13,7 @@
  */
 void
 __wt_abort(WT_SESSION_IMPL *session)
+    WT_GCC_FUNC_ATTRIBUTE((noreturn))
 {
 	__wt_errx(session, "aborting WiredTiger library");
 

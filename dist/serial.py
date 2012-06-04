@@ -18,16 +18,13 @@ class Serial:
 msgtypes = [
 Serial('col_append', 'WT_SERIAL_FUNC', [
 		SerialArg('WT_PAGE *', 'page'),
-		SerialArg('WT_INSERT_HEAD **', 'inshead'),
+		SerialArg('uint32_t', 'write_gen'),
+		SerialArg('WT_INSERT_HEAD **', 'insheadp'),
 		SerialArg('WT_INSERT ***', 'ins_stack'),
 		SerialArg('WT_INSERT_HEAD **', 'new_inslist', 1),
 		SerialArg('WT_INSERT_HEAD *', 'new_inshead', 1),
 		SerialArg('WT_INSERT *', 'new_ins', 1),
 		SerialArg('u_int', 'skipdepth'),
-	]),
-
-Serial('evict_file', 'WT_SERIAL_EVICT', [
-		SerialArg('int', 'discard'),
 	]),
 
 Serial('insert', 'WT_SERIAL_FUNC', [
@@ -45,6 +42,10 @@ Serial('row_key', 'WT_SERIAL_FUNC', [
 		SerialArg('WT_PAGE *', 'page'),
 		SerialArg('WT_ROW *', 'row_arg'),
 		SerialArg('WT_IKEY *', 'ikey'),
+	]),
+
+Serial('sync_file', 'WT_SERIAL_EVICT', [
+		SerialArg('int', 'syncop'),
 	]),
 
 Serial('update', 'WT_SERIAL_FUNC', [
@@ -100,7 +101,7 @@ typedef struct {
 	f.write('''
 {
 \t__wt_''' + entry.name + '''_args _args, *args = &_args;
-\tint ret;
+\tWT_DECL_RET;
 
 ''')
 	for l in entry.args:

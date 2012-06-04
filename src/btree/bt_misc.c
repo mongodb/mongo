@@ -17,6 +17,8 @@ __wt_page_type_string(u_int type)
 	switch (type) {
 	case WT_PAGE_INVALID:
 		return ("invalid");
+	case WT_PAGE_BLOCK_MANAGER:
+		return ("block manager");
 	case WT_PAGE_COL_FIX:
 		return ("column-store fixed-length leaf");
 	case WT_PAGE_COL_INT:
@@ -29,8 +31,6 @@ __wt_page_type_string(u_int type)
 		return ("row-store internal");
 	case WT_PAGE_ROW_LEAF:
 		return ("row-store leaf");
-	case WT_PAGE_FREELIST:
-		return ("freelist");
 	default:
 		return ("unknown");
 	}

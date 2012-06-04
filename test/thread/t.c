@@ -15,6 +15,7 @@ int session_per_op;				/* New session per operation */
 static char *progname;				/* Program name */
 static FILE *logfp;				/* Log file */
 
+static int  handle_error(WT_EVENT_HANDLER *, int, const char *);
 static int  handle_message(WT_EVENT_HANDLER *, const char *);
 static void onint(int);
 static void shutdown(void);
@@ -39,15 +40,12 @@ main(int argc, char *argv[])
 	nkeys = 1000;
 	nops = 10000;
 	readers = 10;
-	runs = 0;
+	runs = 1;
 	session_per_op = 0;
 	writers = 10;
 
-	while ((ch = getopt(argc, argv, "1C:k:l:n:R:r:St:W:")) != EOF)
+	while ((ch = getopt(argc, argv, "C:k:l:n:R:r:St:W:")) != EOF)
 		switch (ch) {
-		case '1':			/* One run */
-			runs = 1;
-			break;
 		case 'C':			/* wiredtiger_open config */
 			config_open = optarg;
 			break;
@@ -114,7 +112,7 @@ main(int argc, char *argv[])
 
 		load();				/* Load initial records */
 						/* Loop operations */
-		if (run(readers, writers))
+		if (rw_start(readers, writers))
 			return (EXIT_FAILURE);
 
 		stats();			/* Statistics */
@@ -132,7 +130,7 @@ static void
 wt_connect(char *config_open)
 {
 	static WT_EVENT_HANDLER event_handler = {
-		NULL,
+		handle_error,
 		handle_message,
 		NULL
 	};
@@ -183,15 +181,23 @@ shutdown(void)
 }
 
 static int
+handle_error(WT_EVENT_HANDLER *handler, int error, const char *errmsg)
+{
+	UNUSED(handler);
+	UNUSED(error);
+
+	return (fprintf(stderr, "%s\n", errmsg) < 0 ? -1 : 0);
+}
+
+static int
 handle_message(WT_EVENT_HANDLER *handler, const char *message)
 {
 	UNUSED(handler);
 
-	if (logfp == NULL)
-		printf("%s\n", message);
-	else
-		fprintf(logfp, "%s\n", message);
-	return (0);
+	if (logfp != NULL)
+		return (fprintf(logfp, "%s\n", message) < 0 ? -1 : 0);
+
+	return (printf("%s\n", message) < 0 ? -1 : 0);
 }
 
 /*
@@ -229,17 +235,16 @@ usage(void)
 {
 	fprintf(stderr,
 	    "usage: %s "
-	    "[-1S] [-C wiredtiger-config] [-k keys] [-l log]\n\t"
+	    "[-S] [-C wiredtiger-config] [-k keys] [-l log]\n\t"
 	    "[-n ops] [-R readers] [-r runs] [-t f|r|v] [-W writers]\n",
 	    progname);
 	fprintf(stderr, "%s",
-	    "\t-1 run once\n"
 	    "\t-C specify wiredtiger_open configuration arguments\n"
 	    "\t-k set number of keys to load\n"
 	    "\t-l specify a log file\n"
 	    "\t-n set number of operations each thread does\n"
 	    "\t-R set number of reading threads\n"
-	    "\t-r set number of runs\n"
+	    "\t-r set number of runs (0 for continuous)\n"
 	    "\t-S open/close a session on every operation\n"
 	    "\t-t set a file type (fix | row | var)\n"
 	    "\t-W set number of writing threads\n");

@@ -14,27 +14,22 @@
 int
 __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[])
 {
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int ret;
 
 	/* Default session. */
-	conn->default_session.iface.connection = &conn->iface;
+	session = conn->default_session;
+	session->iface.connection = &conn->iface;
 
-	session = &conn->default_session;
-	ret = 0;
-
-	/* WT_SESSION_IMPL and hazard arrays. */
+	/* WT_SESSION_IMPL array. */
 	WT_ERR(__wt_calloc(session,
-	    conn->session_size, sizeof(WT_SESSION_IMPL *), &conn->sessions));
-	WT_ERR(__wt_calloc(session,
-	    conn->session_size, sizeof(WT_SESSION_IMPL),
-	    &conn->session_array));
-	WT_ERR(__wt_calloc(session,
-	   conn->session_size * conn->hazard_size, sizeof(WT_HAZARD),
-	   &conn->hazard));
+	    conn->session_size, sizeof(WT_SESSION_IMPL), &conn->sessions));
 
 	/* Create the cache. */
 	WT_ERR(__wt_cache_create(conn, cfg));
+
+	/* Initialize transaction support. */
+	WT_ERR(__wt_txn_global_init(conn, cfg));
 
 	/*
 	 * Publish: there must be a barrier to ensure the connection structure
@@ -61,12 +56,11 @@ int
 __wt_connection_close(WT_CONNECTION_IMPL *conn)
 {
 	WT_SESSION_IMPL *session;
+	WT_DECL_RET;
 	WT_DLH *dlh;
 	WT_FH *fh;
-	int ret;
 
-	session = &conn->default_session;
-	ret = 0;
+	session = conn->default_session;
 
 	/*
 	 * Complain if files weren't closed (ignoring the lock and logging
@@ -92,10 +86,29 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	/* Discard the cache. */
 	__wt_cache_destroy(conn);
 
+	/* Discard transaction state. */
+	__wt_txn_global_destroy(conn);
+
 	/* Close extensions. */
 	while ((dlh = TAILQ_FIRST(&conn->dlhqh)) != NULL) {
 		TAILQ_REMOVE(&conn->dlhqh, dlh, q);
 		WT_TRET(__wt_dlclose(session, dlh));
+	}
+
+	/*
+	 * Close the internal (default) session, and switch back to the dummy
+	 * session in case of any error messages from the remaining operations
+	 * while destroying the connection handle.
+	 *
+	 * Additionally, the session's hazard reference memory isn't discarded
+	 * during normal session close because access to it isn't serialized.
+	 * Discard it now.
+	 */
+	if (session != &conn->dummy_session) {
+		WT_TRET(session->iface.close(&session->iface, NULL));
+		__wt_free(&conn->dummy_session, session->hazard);
+
+		conn->default_session = &conn->dummy_session;
 	}
 
 	/* Destroy the handle. */

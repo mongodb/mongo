@@ -1,0 +1,16 @@
+/*! @page programming Writing WiredTiger applications
+
+This section explains how to write applications that use WiredTiger:
+
+- @subpage basic_api
+- @subpage config_strings
+- @subpage schema
+- @subpage cursors
+- @subpage threads
+- @subpage snapshots
+- @subpage transactions
+- @subpage compression
+- @subpage name_space
+- @subpage signals
+
+ */

@@ -32,6 +32,14 @@
 #define	WT_BTREE_MAX_OBJECT_SIZE	(UINT32_MAX - 512)
 
 /*
+ * A location in a file is a variable-length cookie, but it has a maximum size
+ * so it's easy to create temporary space in which to store them.  (Locations
+ * can't be much larger than this anyway, they must fit onto the minimum size
+ * page because a reference to an overflow page is itself a location.)
+ */
+#define	WT_BTREE_MAX_ADDR_COOKIE	255	/* Maximum address cookie */
+
+/*
  * Split page size calculation -- we don't want to repeatedly split every time
  * a new entry is added, so we split to a smaller-than-maximum page size.
  */
@@ -62,9 +70,12 @@ struct __wt_btree {
 
 	volatile uint32_t lru_count;	/* Count of threads in LRU eviction. */
 
-	const char *name;		/* Logical name */
-	const char *filename;		/* File name */
+	const char *name;		/* Object name as a URI */
 	const char *config;		/* Configuration string */
+	const char *snapshot;		/* Snapshot name (or NULL) */
+
+	/* XXX Should move into the session-level handle information. */
+	WT_RWLOCK   *snaplock;		/* Lock for snapshot creation */
 
 	enum {	BTREE_COL_FIX=1,	/* Fixed-length column store */
 		BTREE_COL_VAR=2,	/* Variable-length column store */
@@ -95,10 +106,8 @@ struct __wt_btree {
 	uint64_t last_recno;		/* Column-store last record number */
 
 	WT_PAGE *root_page;		/* Root page */
-	WT_ADDR  root_addr;		/* Replacement root address */
-	int	 root_update;		/* 0: free original root blocks
-					   1: free saved root blocks and
-					      update on close */
+
+	WT_SNAPSHOT *snap;		/* Snapshot information */
 
 	void *block;			/* Block manager */
 	u_int block_header;		/* Block manager header length */
@@ -107,27 +116,21 @@ struct __wt_btree {
 
 	WT_BTREE_STATS *stats;		/* Btree statistics */
 
-#define	WT_BTREE_BULK		0x01	/* Bulk-load handle */
-#define	WT_BTREE_EXCLUSIVE	0x02	/* Need exclusive access to handle */
-#define	WT_BTREE_NO_LOCK	0x04	/* Do not lock the handle */
-#define	WT_BTREE_OPEN		0x08	/* Handle is open */
-#define	WT_BTREE_SALVAGE	0x10	/* Handle is for salvage */
-#define	WT_BTREE_UPGRADE	0x20	/* Handle is for upgrade */
-#define	WT_BTREE_VERIFY		0x40	/* Handle is for verify */
+#define	WT_BTREE_BULK		0x0001	/* Bulk-load handle */
+#define	WT_BTREE_EXCLUSIVE	0x0002	/* Need exclusive access to handle */
+#define	WT_BTREE_LOCK_ONLY	0x0004	/* Handle is only needed for locking */
+#define	WT_BTREE_NO_EVICTION	0x0008	/* The file isn't evicted */
+#define	WT_BTREE_OPEN		0x0010	/* Handle is open */
+#define	WT_BTREE_SALVAGE	0x0020	/* Handle is for salvage */
+#define	WT_BTREE_SNAPSHOT_OP	0x0040	/* Handle is for a snapshot operation */
+#define	WT_BTREE_UPGRADE	0x0080	/* Handle is for upgrade */
+#define	WT_BTREE_VERIFY		0x0100	/* Handle is for verify */
 	uint32_t flags;
 };
 
-/*
- * In diagnostic mode we track the locations from which hazard references
- * were acquired.
- */
-#ifdef HAVE_DIAGNOSTIC
-#define	__wt_page_in(a, b, c)						\
-	__wt_page_in_func(a, b, c, __FILE__, __LINE__)
-#else
-#define	__wt_page_in(a, b, c)						\
-	__wt_page_in_func(a, b, c)
-#endif
+/* Flags that make a btree handle special (not for normal use). */
+#define	WT_BTREE_SPECIAL_FLAGS	 					\
+	(WT_BTREE_BULK | WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY)
 
 /*
  * WT_SALVAGE_COOKIE --

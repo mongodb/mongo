@@ -20,12 +20,12 @@ int
 main(int argc, char *argv[])
 {
 	WT_CONNECTION *conn;
+	WT_DECL_RET;
 	WT_SESSION *session;
-	int ch, major_v, minor_v, ret, tret;
+	int ch, major_v, minor_v, tret;
 	const char *config;
 
 	conn = NULL;
-	ret = 0;
 
 	/* Get the program name. */
 	if ((progname = strrchr(argv[0], '/')) == NULL)
@@ -186,7 +186,7 @@ static int
 usage(void)
 {
 	fprintf(stderr,
-	    "WiredTiger Data Engine (version %d.%d)\n", 
+	    "WiredTiger Data Engine (version %d.%d)\n",
 	    WIREDTIGER_VERSION_MAJOR, WIREDTIGER_VERSION_MINOR);
 	fprintf(stderr,
 	    "global options:\n"

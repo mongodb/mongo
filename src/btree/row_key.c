@@ -17,13 +17,12 @@ int
 __wt_row_leaf_keys(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BTREE *btree;
-	WT_ITEM *tmp;
+	WT_DECL_ITEM(tmp);
+	WT_DECL_RET;
 	WT_ROW *rip;
 	uint32_t i;
-	int ret;
 
 	btree = session->btree;
-	ret = 0;
 
 	if (page->entries == 0) {			/* Just checking... */
 		F_SET_ATOMIC(page, WT_PAGE_BUILD_KEYS);
@@ -108,22 +107,17 @@ __wt_row_key(
 {
 	enum { FORWARD, BACKWARD } direction;
 	WT_CELL_UNPACK *unpack, _unpack;
+	WT_DECL_ITEM(tmp);
+	WT_DECL_RET;
 	WT_IKEY *ikey;
-	WT_ITEM *tmp;
 	WT_ROW *rip;
-	int is_local, ret, slot_offset;
+	int is_local, slot_offset;
 	void *key;
 
 	rip = rip_arg;
-	tmp = NULL;
 	unpack = &_unpack;
 
-	/*
-	 * If the caller didn't pass us a buffer, create one.  We don't use
-	 * an existing buffer because the memory will be attached to a page
-	 * for semi-permanent use, and using an existing buffer might waste
-	 * memory if the one allocated from the pool was larger than needed.
-	 */
+	/* If the caller didn't pass us a buffer, create one. */
 	is_local = 0;
 	if (retb == NULL) {
 		is_local = 1;
@@ -132,13 +126,7 @@ __wt_row_key(
 
 	direction = BACKWARD;
 	for (slot_offset = 0;;) {
-		/*
-		 * Multiple threads of control may be searching this page, which
-		 * means the key may change underfoot, and here's where it gets
-		 * tricky: first, copy the key.  We don't need any barriers, the
-		 * key is updated atomically, and we just need a valid copy.
-		 */
-		key = rip->key;
+		key = WT_ROW_KEY_COPY(rip);
 
 		/*
 		 * Key copied.
@@ -318,9 +306,9 @@ next:		switch (direction) {
 	 * Allocate and initialize a WT_IKEY structure, we're instantiating
 	 * this key.
 	 */
+	key = WT_ROW_KEY_COPY(rip_arg);
 	WT_ERR(__wt_row_ikey_alloc(session,
-	    WT_PAGE_DISK_OFFSET(page, rip_arg->key),
-	    retb->data, retb->size, &ikey));
+	    WT_PAGE_DISK_OFFSET(page, key), retb->data, retb->size, &ikey));
 
 	/* Serialize the swap of the key into place. */
 	ret = __wt_row_key_serial(session, page, rip_arg, ikey);
@@ -329,7 +317,8 @@ next:		switch (direction) {
 	 * Free the WT_IKEY structure if the serialized call didn't use it for
 	 * the key.
 	 */
-	if (rip_arg->key != ikey)
+	key = WT_ROW_KEY_COPY(rip_arg);
+	if (key != ikey)
 		__wt_free(session, ikey);
 
 	__wt_scr_free(&retb);
@@ -355,13 +344,7 @@ __wt_row_value(WT_PAGE *page, WT_ROW *rip)
 
 	unpack = &_unpack;
 
-	/*
-	 * Multiple threads of control may be searching this page, which means
-	 * the key may change underfoot, and here's where it gets tricky: first,
-	 * copy the key.
-	 */
-	cell = rip->key;
-
+	cell = WT_ROW_KEY_COPY(rip);
 	/*
 	 * Key copied.
 	 *
@@ -393,7 +376,7 @@ __wt_row_value(WT_PAGE *page, WT_ROW *rip)
  */
 int
 __wt_row_ikey_alloc(WT_SESSION_IMPL *session,
-    uint32_t cell_offset, const void *key, uint32_t size, WT_IKEY **ikeyp)
+    uint32_t cell_offset, const void *key, uint32_t size, void *ikeyp)
 {
 	WT_IKEY *ikey;
 
@@ -406,7 +389,7 @@ __wt_row_ikey_alloc(WT_SESSION_IMPL *session,
 	ikey->cell_offset = cell_offset;
 	memcpy(WT_IKEY_DATA(ikey), key, size);
 
-	*ikeyp = ikey;
+	*(WT_IKEY **)ikeyp = ikey;
 	return (0);
 }
 
@@ -428,8 +411,8 @@ __wt_row_key_serial_func(WT_SESSION_IMPL *session)
 	 * test, if the key we're interested in still needs to be instantiated,
 	 * because it can only be in one of two states.
 	 */
-	if (!__wt_off_page(page, rip->key)) {
-		rip->key = ikey;
+	if (!__wt_off_page(page, WT_ROW_KEY_COPY(rip))) {
+		WT_ROW_KEY_SET(rip, ikey);
 		__wt_cache_page_inmem_incr(
 		    session, page, sizeof(WT_IKEY) + ikey->size);
 	}

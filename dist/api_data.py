@@ -112,7 +112,8 @@ file_config = format_meta + [
 		"utf16<file>".  See @ref huffman for more information'''),
 	Config('internal_key_truncate', 'true', r'''
 		configure internal key truncation, discarding unnecessary
-		trailing bytes on internal keys''',
+		trailing bytes on internal keys (ignored for custom
+		collators)''',
 		type='boolean'),
 	Config('internal_page_max', '2KB', r'''
 		the maximum page size for internal nodes, in bytes; the size
@@ -157,8 +158,8 @@ file_config = format_meta + [
 
 # File metadata, including both configurable and non-configurable (internal)
 file_meta = file_config + [
-	Config('root', '', r'''
-		the root page address'''),
+	Config('snapshot', '', r'''
+		the file snapshot entries'''),
 	Config('version', '(major=0,minor=0)', r'''
 		the file version'''),
 ]
@@ -206,8 +207,19 @@ methods = {
 	Config('force', 'false', r'''
 		return success if the object does not exist''',
 		type='boolean'),
+	Config('snapshot', '', r'''
+		specify one or more snapshots to drop.
+
+		The value must be either the name of a single snapshot to drop
+		(a string), or a list containing one of the following keys:
+		\c "all" to drop all snapshots,
+		\c "from=<snapshot>" to drop all snapshots after and including
+		the named snapshots, or
+		\c "to=<snapshot>" to drop all snapshots before and including
+		the named snapshot'''),
 	]),
 
+'session.dumpfile' : Method([]),
 'session.log_printf' : Method([]),
 
 'session.open_cursor' : Method([
@@ -219,10 +231,6 @@ methods = {
 		configure the cursor for bulk loads; bulk-load is a fast
 		load path for empty objects, only empty objects may be
 		bulk-loaded''',
-		type='boolean'),
-	Config('clear_on_close', 'false', r'''
-		for statistics cursors, reset statistics counters when the
-		cursor is closed''',
 		type='boolean'),
 	Config('dump', '', r'''
 		configure the cursor for dump format inputs and outputs:
@@ -243,8 +251,14 @@ methods = {
 		ignore the encodings for the key and value, manage data as if
 		the formats were \c "u".  See @ref cursor_raw for details''',
 		type='boolean'),
+	Config('snapshot', '', r'''
+		the name of a snapshot to open'''),
 	Config('statistics', 'false', r'''
 		configure the cursor for statistics''',
+		type='boolean'),
+	Config('statistics_clear', 'false', r'''
+		statistics cursors only; reset statistics counters when the
+		cursor is closed''',
 		type='boolean'),
 ]),
 
@@ -255,17 +269,18 @@ methods = {
 		files''',
 		type='boolean'),
 ]),
-'session.sync' : Method([]),
+'session.sync' : Method([
+	Config('snapshot', '', r'''
+		if non-empty, create a named snapshot'''),
+]),
 'session.truncate' : Method([]),
 'session.upgrade' : Method([]),
 'session.verify' : Method([]),
-'session.dumpfile' : Method([]),
 
 'session.begin_transaction' : Method([
-	Config('isolation', 'read-committed', r'''
+	Config('isolation', 'snapshot', r'''
 		the isolation level for this transaction''',
-		choices=['serializable', 'snapshot', 'read-committed',
-		    'read-uncommitted']),
+		choices=['read-uncommitted', 'snapshot']),
 	Config('name', '', r'''
 		name of the transaction for tracing and debugging'''),
 	Config('sync', 'full', r'''
@@ -281,33 +296,13 @@ methods = {
 'session.rollback_transaction' : Method([]),
 
 'session.checkpoint' : Method([
-	Config('archive', 'false', r'''
-		remove log files no longer required for transactional
-		durability''',
-		type='boolean'),
-	Config('flush_cache', 'true', r'''
-		flush the cache''',
-		type='boolean'),
-	Config('flush_log', 'true', r'''
-		flush the log to disk''',
-		type='boolean'),
-	Config('log_size', '0', r'''
-		only proceed if more than the specified number of bytes of log
-		records have been written since the last checkpoint''',
-		min='0'),
-	Config('force', 'false', r'''
-		write a new checkpoint even if nothing has changed since the
-		last one''',
-		type='boolean'),
-	Config('timeout', '0', r'''
-		only proceed if more than the specified number of milliseconds
-		have elapsed since the last checkpoint''',
-		min='0'),
+	Config('snapshot', '', r'''
+		if non-empty, create named snapshots in files'''),
 ]),
 
-'connection.add_cursor_type' : Method([]),
 'connection.add_collator' : Method([]),
 'connection.add_compressor' : Method([]),
+'connection.add_data_source' : Method([]),
 'connection.add_extractor' : Method([]),
 'connection.close' : Method([]),
 
@@ -378,7 +373,10 @@ methods = {
 		maximum expected number of sessions (including server
 		threads)''',
 		min='1'),
-	Config('transactional', 'false', r'''
+	Config('sync', 'true', r'''
+		sync files when closing or writing snapshots''',
+		type='boolean'),
+	Config('transactional', 'true', r'''
 		support transactional semantics''',
 		type='boolean'),
 	Config('verbose', '', r'''
@@ -395,6 +393,7 @@ methods = {
 		    'readserver',
 		    'reconcile',
 		    'salvage',
+		    'snapshot',
 		    'verify',
 		    'write']),
 ]),
@@ -418,6 +417,7 @@ flags = {
 		'VERB_readserver',
 		'VERB_reconcile',
 		'VERB_salvage',
+		'VERB_snapshot',
 		'VERB_verify',
 		'VERB_write'
 	],
@@ -425,6 +425,6 @@ flags = {
 ###################################################
 # Structure flag declarations
 ###################################################
-	'conn' : [ 'SERVER_RUN' ],
+	'conn' : [ 'CONN_NOSYNC', 'CONN_TRANSACTIONAL', 'SERVER_RUN' ],
 	'session' : [ 'SESSION_INTERNAL', 'SESSION_SALVAGE_QUIET_ERR' ],
 }

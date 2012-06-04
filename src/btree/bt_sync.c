@@ -8,18 +8,30 @@
 #include "wt_internal.h"
 
 /*
- * __wt_btree_sync --
- *	Sync the tree.
+ * __wt_bt_cache_flush --
+ *	Write dirty pages from the cache, optionally discarding the file.
  */
 int
-__wt_btree_sync(WT_SESSION_IMPL *session, const char *cfg[])
+__wt_bt_cache_flush(
+    WT_SESSION_IMPL *session, WT_SNAPSHOT *snapbase, int op, int force)
 {
-	int ret;
+	WT_DECL_RET;
+	WT_BTREE *btree;
 
-	WT_UNUSED(cfg);
+	btree = session->btree;
 
 	/*
-	 * Ask the eviction thread to flush any dirty pages.
+	 * If we need a new snapshot, mark the root page dirty to ensure a
+	 * write.
+	 */
+	if (force) {
+		WT_RET(__wt_page_modify_init(session, btree->root_page));
+		__wt_page_modify_set(btree->root_page);
+	}
+
+	/*
+	 * Ask the eviction thread to flush any dirty pages, and optionally
+	 * discard the file from the cache.
 	 *
 	 * Reconciliation is just another reader of the page, so it's probably
 	 * possible to do this work in the current thread, rather than poking
@@ -39,9 +51,30 @@ __wt_btree_sync(WT_SESSION_IMPL *session, const char *cfg[])
 	 * already works that way.   None of these problems can't be fixed, but
 	 * I don't see a reason to change at this time, either.
 	 */
-	do {
-		ret = __wt_evict_file_serial(session, 0);
-	} while (ret == WT_RESTART);
+	btree->snap = snapbase;
+	ret = __wt_sync_file_serial(session, op);
+	btree->snap = NULL;
+	WT_RET(ret);
 
-	return (ret);
+	switch (op) {
+	case WT_SYNC:
+		break;
+	case WT_SYNC_DISCARD:
+		/* If discarding the tree, the root page should be gone. */
+		WT_ASSERT(session, btree->root_page == NULL);
+		break;
+	case WT_SYNC_DISCARD_NOWRITE:
+		/*
+		 * XXX
+		 * I'm not sure this is the right place to do this, but it's
+		 * the point in the btree engine where we know the root page
+		 * is gone.  Unlike WT_SYNC_DISCARD, which writes, evicts and
+		 * discards the root page, WT_SYNC_DISCARD_NOWRITE simply
+		 * discards the pages, which means "eviction" never happens.
+		 */
+		btree->root_page = NULL;
+		break;
+	}
+
+	return (0);
 }

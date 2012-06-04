@@ -96,6 +96,7 @@ typedef struct {
 	uint64_t update;
 	uint64_t remove;
 
+	int       id;					/* simple thread ID */
 	pthread_t tid;					/* thread ID */
 
 #define	TINFO_RUNNING	1				/* Running */
@@ -105,12 +106,12 @@ typedef struct {
 } TINFO;
 
 void	 bdb_close(void);
-void	 bdb_del(uint64_t, int *);
 void	 bdb_insert(const void *, uint32_t, const void *, uint32_t);
 void	 bdb_np(int, void *, uint32_t *, void *, uint32_t *, int *);
 void	 bdb_open(void);
-void	 bdb_put(const void *, uint32_t, const void *, uint32_t, int *);
 void	 bdb_read(uint64_t, void *, uint32_t *, int *);
+void	 bdb_remove(uint64_t, int *);
+void	 bdb_update(const void *, uint32_t, const void *, uint32_t, int *);
 
 void	 config_error(void);
 const char *

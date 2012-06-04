@@ -112,7 +112,7 @@ __dmsg_wrapup(WT_DBG *ds)
 	 */
 	if (msg != NULL) {
 		if (msg->size != 0)
-			__wt_msg(session, "%s", (char *)msg->mem);
+			(void)__wt_msg(session, "%s", (char *)msg->mem);
 		__wt_scr_free(&ds->msg);
 	}
 
@@ -170,7 +170,7 @@ __dmsg(WT_DBG *ds, const char *fmt, ...)
 		}
 		if (((uint8_t *)msg->mem)[msg->size - 1] == '\n') {
 			((uint8_t *)msg->mem)[msg->size - 1] = '\0';
-			__wt_msg(session, "%s", (char *)msg->mem);
+			(void)__wt_msg(session, "%s", (char *)msg->mem);
 			msg->size = 0;
 		}
 	} else {
@@ -182,21 +182,38 @@ __dmsg(WT_DBG *ds, const char *fmt, ...)
 
 /*
  * __wt_debug_addr --
- *	Read and dump a disk page in debugging mode.
+ *	Read and dump a disk page in debugging mode, using an addr/size pair.
  */
 int
-__wt_debug_addr(
-    WT_SESSION_IMPL *session, uint32_t addr, uint32_t size, const char *ofile)
+__wt_debug_addr(WT_SESSION_IMPL *session,
+    const uint8_t *addr, uint32_t addr_size, const char *ofile)
 {
-	WT_ITEM *buf;
-	int ret;
+	WT_DECL_ITEM(buf);
+	WT_DECL_RET;
 
-	buf = NULL;
-	ret = 0;
+	WT_RET(__wt_scr_alloc(session, 1024, &buf));
+	WT_ERR(__wt_block_read(
+	    session, session->btree->block, buf, addr, addr_size));
+	ret = __wt_debug_disk(session, buf->mem, ofile);
+err:	__wt_scr_free(&buf);
+
+	return (ret);
+}
+
+/*
+ * __wt_debug_off --
+ *	Read and dump a disk page in debugging mode, using an offset/size pair.
+ */
+int
+__wt_debug_off(
+    WT_SESSION_IMPL *session, uint32_t offset, uint32_t size, const char *ofile)
+{
+	WT_DECL_ITEM(buf);
+	WT_DECL_RET;
 
 	WT_RET(__wt_scr_alloc(session, size, &buf));
-	WT_ERR(__wt_block_read(
-	    session, session->btree->block, buf, addr, size, 0));
+	WT_ERR(__wt_block_read_off(
+	    session, session->btree->block, buf, offset, size, 0));
 	ret = __wt_debug_disk(session, buf->mem, ofile);
 err:	__wt_scr_free(&buf);
 
@@ -212,9 +229,7 @@ __wt_debug_disk(
     WT_SESSION_IMPL *session, WT_PAGE_HEADER *dsk, const char *ofile)
 {
 	WT_DBG *ds, _ds;
-	int ret;
-
-	ret = 0;
+	WT_DECL_RET;
 
 	ds = &_ds;
 	WT_RET(__debug_config(session, ds, ofile));
@@ -329,7 +344,7 @@ int
 __wt_debug_page(WT_SESSION_IMPL *session, WT_PAGE *page, const char *ofile)
 {
 	WT_DBG *ds, _ds;
-	int ret;
+	WT_DECL_RET;
 
 	ds = &_ds;
 	WT_RET(__debug_config(session, ds, ofile));
@@ -350,7 +365,7 @@ __debug_tree(
     WT_SESSION_IMPL *session, WT_PAGE *page, const char *ofile, uint32_t flags)
 {
 	WT_DBG *ds, _ds;
-	int ret;
+	WT_DECL_RET;
 
 	ds = &_ds;
 	WT_RET(__debug_config(session, ds, ofile));
@@ -477,6 +492,7 @@ __debug_page_modify(WT_DBG *ds, WT_PAGE *page)
 	WT_PAGE_TRACK *track;
 	WT_SESSION_IMPL *session;
 	uint32_t i;
+	char buf[64];
 
 	session = ds->session;
 
@@ -510,27 +526,13 @@ __debug_page_modify(WT_DBG *ds, WT_PAGE *page)
 
 	if (mod->track_entries != 0)
 		__dmsg(ds, "\t" "tracking list:\n");
-	for (track = mod->track, i = 0; i < mod->track_entries; ++track, ++i) {
-		switch (track->type) {
-		case WT_PT_BLOCK:
-			__dmsg(ds, "\t\t" "block");
-			break;
-		case WT_PT_BLOCK_EVICT:
-			__dmsg(ds, "\t\t" "block-evict");
-			break;
-		case WT_PT_OVFL:
-			__dmsg(ds, "\t\t" "overflow (on)");
-			break;
-		case WT_PT_OVFL_DISCARD:
-			__dmsg(ds, "\t\t" "overflow (off)");
-			break;
-		case WT_PT_EMPTY:
-			continue;
-		WT_ILLEGAL_VALUE(session);
+	for (track = mod->track, i = 0; i < mod->track_entries; ++track, ++i)
+		if (F_ISSET(track, WT_TRK_OBJECT)) {
+			__dmsg(ds, "\t\t%s %s\n",
+			    __wt_track_string(track, buf, sizeof(buf)),
+			    __wt_addr_string(session,
+			    ds->tmp, track->addr.addr, track->addr.size));
 		}
-		__dmsg(ds, " %s\n", __wt_addr_string(
-		    session, ds->tmp, track->addr.addr, track->addr.size));
-	}
 
 	return (0);
 }
@@ -688,6 +690,7 @@ __debug_page_row_leaf(WT_DBG *ds, WT_PAGE *page)
 	WT_ROW *rip;
 	WT_UPDATE *upd;
 	uint32_t i;
+	void *ripkey;
 
 	unpack = &_unpack;
 
@@ -700,10 +703,11 @@ __debug_page_row_leaf(WT_DBG *ds, WT_PAGE *page)
 
 	/* Dump the page's K/V pairs. */
 	WT_ROW_FOREACH(page, rip, i) {
-		if (__wt_off_page(page, rip->key))
-			__debug_ikey(ds, rip->key);
+		ripkey = WT_ROW_KEY_COPY(rip);
+		if (__wt_off_page(page, ripkey))
+			__debug_ikey(ds, ripkey);
 		else {
-			__wt_cell_unpack(rip->key, unpack);
+			__wt_cell_unpack(ripkey, unpack);
 			WT_RET(__debug_cell_data(ds, "K", unpack));
 		}
 
@@ -742,7 +746,7 @@ __debug_col_skip(WT_DBG *ds, WT_INSERT_HEAD *head, const char *tag, int hexbyte)
 
 /*
  * __debug_row_skip --
- *	Dump an insert array.
+ *	Dump an insert list.
  */
 static void
 __debug_row_skip(WT_DBG *ds, WT_INSERT_HEAD *head)
@@ -758,7 +762,7 @@ __debug_row_skip(WT_DBG *ds, WT_INSERT_HEAD *head)
 
 /*
  * __debug_update --
- *	Dump an update array.
+ *	Dump an update list.
  */
 static void
 __debug_update(WT_DBG *ds, WT_UPDATE *upd, int hexbyte)
@@ -829,32 +833,43 @@ __debug_ref(WT_DBG *ds, WT_REF *ref, WT_PAGE *page)
 static int
 __debug_cell(WT_DBG *ds, WT_PAGE_HEADER *dsk, WT_CELL_UNPACK *unpack)
 {
-	WT_ITEM *buf;
+	WT_DECL_ITEM(buf);
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int ret;
 
 	session = ds->session;
-	buf = NULL;
 
 	__dmsg(ds, "\t%s: len %" PRIu32,
 	    __wt_cell_type_string(unpack->raw), unpack->size);
 
+	switch (dsk->type) {
+	case WT_PAGE_COL_INT:
+		switch (unpack->type) {
+		case WT_CELL_VALUE:
+			__dmsg(ds, ", recno: %" PRIu64, unpack->v);
+			break;
+		}
+		break;
+	case WT_PAGE_COL_VAR:
+		switch (unpack->type) {
+		case WT_CELL_DEL:
+		case WT_CELL_VALUE:
+		case WT_CELL_VALUE_OVFL:
+			__dmsg(ds, ", rle: %" PRIu64, __wt_cell_rle(unpack));
+			break;
+		}
+		break;
+	case WT_PAGE_ROW_INT:
+	case WT_PAGE_ROW_LEAF:
+		switch (unpack->type) {
+		case WT_CELL_KEY:
+			__dmsg(ds, ", pfx: %" PRIu8, unpack->prefix);
+			break;
+		}
+		break;
+	}
+
 	switch (unpack->type) {
-	case WT_CELL_DEL:
-	case WT_CELL_VALUE:
-		/*
-		 * Column-store internal page value cells include a record
-		 * number, column-store leaf page value cells include a RLE;
-		 * row-store leaf page value cells have no associated value.
-		 */
-		if (unpack->v != 0)
-			__dmsg(ds, ", %s: %" PRIu64,
-			    dsk->type == WT_PAGE_COL_INT ? "recno" : "rle",
-			    unpack->v);
-		break;
-	case WT_CELL_KEY:
-		__dmsg(ds, ", pfx: %" PRIu8, unpack->prefix);
-		break;
 	case WT_CELL_ADDR:
 	case WT_CELL_KEY_OVFL:
 	case WT_CELL_VALUE_OVFL:
@@ -867,7 +882,6 @@ __debug_cell(WT_DBG *ds, WT_PAGE_HEADER *dsk, WT_CELL_UNPACK *unpack)
 		__wt_scr_free(&buf);
 		WT_RET(ret);
 		break;
-	WT_ILLEGAL_VALUE(session);
 	}
 	__dmsg(ds, "\n");
 
@@ -881,13 +895,11 @@ __debug_cell(WT_DBG *ds, WT_PAGE_HEADER *dsk, WT_CELL_UNPACK *unpack)
 static int
 __debug_cell_data(WT_DBG *ds, const char *tag, WT_CELL_UNPACK *unpack)
 {
-	WT_ITEM *buf;
+	WT_DECL_ITEM(buf);
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int ret;
 
 	session = ds->session;
-	buf = NULL;
-	ret = 0;
 
 	/*
 	 * Column-store references to deleted cells return a NULL cell

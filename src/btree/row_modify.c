@@ -14,6 +14,7 @@
 int
 __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 {
+	WT_DECL_RET;
 	WT_INSERT *ins;
 	WT_INSERT_HEAD **inshead, *new_inshead, **new_inslist;
 	WT_ITEM *key, *value;
@@ -23,7 +24,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 	size_t new_inshead_size, new_inslist_size, new_upd_size;
 	uint32_t ins_slot;
 	u_int skipdepth;
-	int i, ret;
+	int i;
 
 	key = &cbt->iface.key;
 	value = is_remove ? NULL : &cbt->iface.value;
@@ -35,7 +36,6 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 	new_inslist = NULL;
 	new_upd = NULL;
 	upd = NULL;
-	ret = 0;
 
 	/*
 	 * Modify: allocate an update array as necessary, build a WT_UPDATE
@@ -64,6 +64,9 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 				upd_entry = &page->u.row.upd[cbt->slot];
 		} else
 			upd_entry = &cbt->ins->upd;
+
+		/* Make sure the update can proceed. */
+		WT_ERR(__wt_update_check(session, page, *upd_entry));
 
 		/* Allocate room for the new value from per-thread memory. */
 		WT_ERR(__wt_update_alloc(session, value, &upd, &upd_size));
@@ -121,6 +124,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 		 */
 		WT_ERR(__wt_row_insert_alloc(
 		    session, key, skipdepth, &ins, &ins_size));
+		WT_ERR(__wt_update_check(session, page, NULL));
 		WT_ERR(__wt_update_alloc(session, value, &upd, &upd_size));
 		ins->upd = upd;
 		ins_size += upd_size;
@@ -137,8 +141,14 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 	if (ret != 0) {
 err:		if (ins != NULL)
 			__wt_free(session, ins);
-		if (upd != NULL)
+		if (upd != NULL) {
+			/*
+			 * Remove the update from the current transaction, so we
+			 * don't try to modify it on rollback.
+			 */
+			__wt_txn_unmodify(session);
 			__wt_free(session, upd);
+		}
 	}
 
 	/* Free any insert, update arrays. */
@@ -186,24 +196,57 @@ __wt_row_insert_alloc(WT_SESSION_IMPL *session,
 void
 __wt_insert_serial_func(WT_SESSION_IMPL *session)
 {
+	WT_DECL_RET;
 	WT_INSERT *new_ins, ***ins_stack;
-	WT_INSERT_HEAD **inshead, **new_inslist, *new_inshead;
+	WT_INSERT_HEAD *inshead, **insheadp, **new_inslist, *new_inshead;
 	WT_PAGE *page;
 	uint32_t write_gen;
 	u_int i, skipdepth;
-	int  ret;
 
-	ret = 0;
-
-	__wt_insert_unpack(session, &page, &write_gen, &inshead,
+	__wt_insert_unpack(session, &page, &write_gen, &insheadp,
 	    &ins_stack, &new_inslist, &new_inshead, &new_ins, &skipdepth);
 
 	/* Check the page's write-generation. */
-	WT_ERR(__wt_page_write_gen_check(page, write_gen));
+	WT_ERR(__wt_page_write_gen_check(session, page, write_gen));
+
+	/*
+	 * Publish: First, point the new WT_INSERT item's skiplist references
+	 * to the next elements in the insert list, then flush memory.  Second,
+	 * update the skiplist elements that reference the new WT_INSERT item,
+	 * this ensures the list is never inconsistent.
+	 */
+	if ((inshead = *insheadp) == NULL)
+		inshead = new_inshead;
+	for (i = 0; i < skipdepth; i++)
+		new_ins->next[i] = *ins_stack[i];
+	WT_WRITE_BARRIER();
+	for (i = 0; i < skipdepth; i++) {
+		if (inshead->tail[i] == NULL ||
+		    ins_stack[i] == &inshead->tail[i]->next[i])
+			inshead->tail[i] = new_ins;
+		*ins_stack[i] = new_ins;
+	}
+
+	__wt_insert_new_ins_taken(session, page);
+
+	/*
+	 * If the insert head does not yet have an insert list, our caller
+	 * passed us one.
+	 *
+	 * NOTE: it is important to do this after the item has been added to
+	 * the list.  Code can assume that if the list is set, it is non-empty.
+	 */
+	if (*insheadp == NULL) {
+		WT_PUBLISH(*insheadp, new_inshead);
+		__wt_insert_new_inshead_taken(session, page);
+	}
 
 	/*
 	 * If the page does not yet have an insert array, our caller passed
 	 * us one.
+	 *
+	 * NOTE: it is important to do this after publishing the list entry.
+	 * Code can assume that if the array is set, it is non-empty.
 	 */
 	if (page->type == WT_PAGE_ROW_LEAF) {
 		if (page->u.row.ins == NULL) {
@@ -216,34 +259,32 @@ __wt_insert_serial_func(WT_SESSION_IMPL *session)
 			__wt_insert_new_inslist_taken(session, page);
 		}
 
-	/*
-	 * If the insert head does not yet have an insert list, our caller
-	 * passed us one.
-	 */
-	if (*inshead == NULL) {
-		*inshead = new_inshead;
-		__wt_insert_new_inshead_taken(session, page);
-	}
-
-	/*
-	 * Publish: First, point the new WT_INSERT item's skiplist references
-	 * to the next elements in the insert list, then flush memory.  Second,
-	 * update the skiplist elements that reference the new WT_INSERT item,
-	 * this ensures the list is never inconsistent.
-	 */
-	for (i = 0; i < skipdepth; i++)
-		new_ins->next[i] = *ins_stack[i];
-	WT_WRITE_BARRIER();
-	for (i = 0; i < skipdepth; i++) {
-		if ((*inshead)->tail[i] == NULL ||
-		    ins_stack[i] == &(*inshead)->tail[i]->next[i])
-			(*inshead)->tail[i] = new_ins;
-		*ins_stack[i] = new_ins;
-	}
-
-	__wt_insert_new_ins_taken(session, page);
-
 err:	__wt_session_serialize_wrapup(session, page, ret);
+}
+
+/*
+ * __wt_update_check --
+ *	Check whether an update can proceed, and maintain the first txnid in
+ *	the page->modify structure.
+ */
+int
+__wt_update_check(WT_SESSION_IMPL *session, WT_PAGE *page, WT_UPDATE *next)
+{
+	WT_TXN *txn;
+
+	/* Before allocating anything, make sure this update is permitted. */
+	WT_RET(__wt_txn_update_check(session, next));
+
+	/*
+	 * Record the transaction ID for the first update to a page.
+	 * We don't care if this races: there is a buffer built into the
+	 * check for ancient updates.
+	 */
+	txn = &session->txn;
+	if (page->modify->first_id == WT_TXN_NONE && txn->id != WT_TXN_NONE)
+		page->modify->first_id = txn->id;
+
+	return (0);
 }
 
 /*
@@ -255,6 +296,7 @@ int
 __wt_update_alloc(WT_SESSION_IMPL *session,
     WT_ITEM *value, WT_UPDATE **updp, size_t *sizep)
 {
+	WT_DECL_RET;
 	WT_UPDATE *upd;
 	size_t size;
 
@@ -271,6 +313,16 @@ __wt_update_alloc(WT_SESSION_IMPL *session,
 		memcpy(WT_UPDATE_DATA(upd), value->data, size);
 	}
 
+	/*
+	 * This must come last: after __wt_txn_modify succeeds, we must return
+	 * a non-NULL upd so our callers can call __wt_txn_unmodify on any
+	 * subsequent failure.
+	 */
+	if ((ret = __wt_txn_modify(session, &upd->txnid)) != 0) {
+		__wt_free(session, upd);
+		return (ret);
+	}
+
 	*updp = upd;
 	if (sizep != NULL)
 		*sizep = sizeof(WT_UPDATE) + size;
@@ -284,29 +336,16 @@ __wt_update_alloc(WT_SESSION_IMPL *session,
 void
 __wt_update_serial_func(WT_SESSION_IMPL *session)
 {
+	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_UPDATE **new_upd, *upd, **upd_entry;
 	uint32_t write_gen;
-	int ret;
-
-	ret = 0;
 
 	__wt_update_unpack(
 	    session, &page, &write_gen, &upd_entry, &new_upd, &upd);
 
 	/* Check the page's write-generation. */
-	WT_ERR(__wt_page_write_gen_check(page, write_gen));
-
-	/*
-	 * If the page needs an update array (column-store pages and inserts on
-	 * row-store pages do not use the update array), our caller passed us
-	 * one of the correct size.   Check the page still needs one (the write
-	 * generation test should have caught that, though).
-	 */
-	if (new_upd != NULL && page->u.row.upd == NULL) {
-		page->u.row.upd = new_upd;
-		__wt_update_new_upd_taken(session, page);
-	}
+	WT_ERR(__wt_page_write_gen_check(session, page, write_gen));
 
 	upd->next = *upd_entry;
 	/*
@@ -314,8 +353,21 @@ __wt_update_serial_func(WT_SESSION_IMPL *session)
 	 * pointer is set before we update the linked list.
 	 */
 	WT_PUBLISH(*upd_entry, upd);
-
 	__wt_update_upd_taken(session, page);
+
+	/*
+	 * If the page needs an update array (column-store pages and inserts on
+	 * row-store pages do not use the update array), our caller passed us
+	 * one of the correct size.   Check the page still needs one (the write
+	 * generation test should have caught that, though).
+	 *
+	 * NOTE: it is important to do this after publishing that the update is
+	 * set.  Code can assume that if the array is set, it is non-empty.
+	 */
+	if (new_upd != NULL && page->u.row.upd == NULL) {
+		page->u.row.upd = new_upd;
+		__wt_update_new_upd_taken(session, page);
+	}
 
 err:	__wt_session_serialize_wrapup(session, page, ret);
 }

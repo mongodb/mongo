@@ -13,13 +13,13 @@ int
 util_write(WT_SESSION *session, int argc, char *argv[])
 {
 	WT_CURSOR *cursor;
+	WT_DECL_RET;
 	uint64_t recno;
-	int append, ch, overwrite, rkey, ret;
+	int append, ch, overwrite, rkey;
 	const char *uri;
 	char config[100];
 
-	append = overwrite = ret = 0;
-
+	append = overwrite = 0;
 	while ((ch = util_getopt(argc, argv, "ao")) != EOF)
 		switch (ch) {
 		case 'a':
@@ -93,7 +93,7 @@ util_write(WT_SESSION *session, int argc, char *argv[])
 		if ((ret = cursor->insert(cursor)) != 0)
 			return (util_cerr(uri, "search", ret));
 	}
-		
+
 	return (0);
 }
 

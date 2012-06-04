@@ -77,7 +77,7 @@
 +                './wttest vlcswrite -rnd file:casket.vlwt_r ' . RECNUM,
 +                './wttest vlcsread -rnd file:casket.vlwt_r ' . RECNUM,
 +
-+                './wttest flcswrite file:casket.flwt_b ' . RECNUM,
++                './wttest flcswrite -bulk file:casket.flwt_b ' . RECNUM,
 +                './wttest flcsread file:casket.flwt_b ' . RECNUM,
 +                './wttest flcswrite file:casket.flwt_a ' . RECNUM,
 +                './wttest flcsread file:casket.flwt_a ' . RECNUM,

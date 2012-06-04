@@ -6,9 +6,14 @@
  */
 
 /* Basic constants. */
-#define	WT_BILLION	(1000000000)
-#define	WT_MEGABYTE	(1048576)
 #define	WT_MILLION	(1000000)
+#define	WT_BILLION	(1000000000)
+
+#define	WT_KILOBYTE	(1024)
+#define	WT_MEGABYTE	(1048576)
+#define	WT_GIGABYTE	(1073741824)
+#define	WT_TERABYTE	(1099511627776)
+#define	WT_PETABYTE	(1125899906842624)
 
 /*
  * Sizes that cannot be larger than 2**32 are stored in uint32_t fields in
@@ -70,8 +75,8 @@
  * __wt_calloc_def --
  *	Simple calls don't need separate sizeof arguments.
  */
-#define	__wt_calloc_def(a, b, c)					\
-	__wt_calloc(a, (size_t)(b), sizeof(**(c)), c)
+#define	__wt_calloc_def(session, number, addr)				\
+	__wt_calloc(session, (size_t)(number), sizeof(**(addr)), addr)
 /*
  * Our internal free function clears the underlying address atomically so there
  * is a smaller chance of racing threads seeing intermediate results while a
@@ -80,14 +85,22 @@
  * resulting bug is a mother to find -- make sure we get it right, don't make
  * the caller remember to put the & operator on the pointer.
  */
-#define	__wt_free(a, b)			__wt_free_int(a, &(b))
+#define	__wt_free(session, p)		__wt_free_int(session, &(p))
+#ifdef HAVE_DIAGNOSTIC
+#define	__wt_overwrite_and_free(session, p) do {			\
+	memset(p, WT_DEBUG_BYTE, sizeof(*(p)));				\
+	__wt_free(session, p);						\
+} while (0)
+#else
+#define	__wt_overwrite_and_free(session, p)	__wt_free(session, p)
+#endif
 
 /*
  * Flag set, clear and test.
  *
  * They come in 3 flavors: F_XXX (handles a field named "flags" in the structure
  * referenced by its argument), LF_XXX (handles a local variable named "flags"),
- * and FLD_XXX (handles any variable, anywhere.
+ * and FLD_XXX (handles any variable, anywhere).
  *
  * Flags are unsigned 32-bit values -- we cast to keep the compiler quiet (the
  * hex constant might be a negative integer), and to ensure the hex constant is
@@ -109,18 +122,28 @@
 #ifdef HAVE_VERBOSE
 #define	WT_VERBOSE_ISSET(session, f)					\
 	(FLD_ISSET(S2C(session)->verbose, WT_VERB_##f))
-#define	WT_VERBOSE(session, f, ...) do {				\
+#define	WT_VERBOSE_ERR(session, f, ...) do {				\
 	if (WT_VERBOSE_ISSET(session, f))				\
-		__wt_verbose(session, #f ": " __VA_ARGS__);		\
+		WT_ERR(__wt_verbose(session, #f ": " __VA_ARGS__));	\
 } while (0)
-#define	WT_VERBOSE_CALL(session, f, func) do {				\
+#define	WT_VERBOSE_RET(session, f, ...) do {				\
 	if (WT_VERBOSE_ISSET(session, f))				\
-		func;							\
+		WT_RET(__wt_verbose(session, #f ": " __VA_ARGS__));	\
+} while (0)
+#define	WT_VERBOSE_RETVAL(session, f, ret, ...) do {			\
+	if (WT_VERBOSE_ISSET(session, f))				\
+		(ret) = __wt_verbose(session, #f ": " __VA_ARGS__);	\
+} while (0)
+#define	WT_VERBOSE_VOID(session, f, ...) do {				\
+	if (WT_VERBOSE_ISSET(session, f))				\
+		(void)__wt_verbose(session, #f ": " __VA_ARGS__);	\
 } while (0)
 #else
 #define	WT_VERBOSE_ISSET(session, f)	0
-#define	WT_VERBOSE(session, f, ...)
-#define	WT_VERBOSE_CALL(session, f, func)
+#define	WT_VERBOSE_ERR(session, f, ...)
+#define	WT_VERBOSE_RET(session, f, ...)
+#define	WT_VERBOSE_RETVAL(session, f, ret, ...)
+#define	WT_VERBOSE_VOID(session, f, ...)
 #endif
 
 /* Clear a structure. */
@@ -135,3 +158,23 @@
 #define	WT_PREFIX_SKIP(str, pre)					\
 	((strncmp((str), (pre), strlen(pre)) == 0) ?			\
 	    ((str) += strlen(pre), 1) : 0)
+
+/* Function return value and scratch buffer declaration and initialization. */
+#define	WT_DECL_ITEM(i)	WT_ITEM *i = NULL
+#define	WT_DECL_RET	int ret = 0
+
+/*
+ * In diagnostic mode we track the locations from which hazard references and
+ * scratch buffers were acquired.
+ */
+#ifdef HAVE_DIAGNOSTIC
+#define	__wt_scr_alloc(session, size, scratchp)				\
+	__wt_scr_alloc_func(session, size, scratchp, __FILE__, __LINE__)
+#define	__wt_page_in(session, parent, ref)				\
+	__wt_page_in_func(session, parent, ref, __FILE__, __LINE__)
+#else
+#define	__wt_scr_alloc(session, size, scratchp)				\
+	__wt_scr_alloc_func(session, size, scratchp)
+#define	__wt_page_in(session, parent, ref)				\
+	__wt_page_in_func(session, parent, ref)
+#endif

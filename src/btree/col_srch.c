@@ -16,13 +16,13 @@ __wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 {
 	WT_BTREE *btree;
 	WT_COL *cip;
+	WT_DECL_RET;
 	WT_INSERT *ins;
 	WT_INSERT_HEAD *ins_head;
 	WT_PAGE *page;
 	WT_REF *ref;
 	uint64_t recno;
 	uint32_t base, indx, limit;
-	int ret;
 
 	__cursor_search_clear(cbt);
 
@@ -81,7 +81,7 @@ __wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 	 */
 	if (is_modify) {
 		/* Initialize the page's modification information */
-		WT_RET(__wt_page_modify_init(session, page));
+		WT_ERR(__wt_page_modify_init(session, page));
 
 		WT_ORDERED_READ(cbt->write_gen, page->modify->write_gen);
 	}

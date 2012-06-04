@@ -16,10 +16,11 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 {
 	WT_SESSION_IMPL *session;
 
-	session = &conn->default_session;
+	session = conn->default_session;
 
 	TAILQ_INIT(&conn->btqh);		/* WT_BTREE list */
 	TAILQ_INIT(&conn->dlhqh);		/* Library list */
+	TAILQ_INIT(&conn->dsrcqh);		/* Data source list */
 	TAILQ_INIT(&conn->fhqh);		/* File list */
 	TAILQ_INIT(&conn->collqh);		/* Collator list */
 	TAILQ_INIT(&conn->compqh);		/* Compressor list */
@@ -30,11 +31,17 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 	/* File handle spinlock. */
 	__wt_spin_init(session, &conn->fh_lock);
 
+	/* Schema operation spinlock. */
+	__wt_spin_init(session, &conn->schema_lock);
+
 	/* Serialized function call spinlock. */
 	__wt_spin_init(session, &conn->serial_lock);
 
 	/* General purpose spinlock. */
 	__wt_spin_init(session, &conn->spinlock);
+
+	/* Checkpoint lock. */
+	WT_RET(__wt_rwlock_alloc(session, "checkpoint", &conn->ckpt_rwlock));
 
 	return (0);
 }
@@ -48,7 +55,7 @@ __wt_connection_destroy(WT_CONNECTION_IMPL *conn)
 {
 	WT_SESSION_IMPL *session;
 
-	session = &conn->default_session;
+	session = conn->default_session;
 
 	/* Check there's something to destroy. */
 	if (conn == NULL)
@@ -72,13 +79,15 @@ __wt_connection_destroy(WT_CONNECTION_IMPL *conn)
 
 	__wt_spin_destroy(session, &conn->fh_lock);
 	__wt_spin_destroy(session, &conn->serial_lock);
+	__wt_spin_destroy(session, &conn->schema_lock);
 	__wt_spin_destroy(session, &conn->spinlock);
+
+	if (conn->ckpt_rwlock != NULL)
+		(void)__wt_rwlock_destroy(session, conn->ckpt_rwlock);
 
 	/* Free allocated memory. */
 	__wt_free(session, conn->home);
 	__wt_free(session, conn->sessions);
-	__wt_free(session, conn->session_array);
-	__wt_free(session, conn->hazard);
 	__wt_free(session, conn->stats);
 
 	__wt_free(NULL, conn);

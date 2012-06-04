@@ -5,12 +5,6 @@
  * See the file LICENSE for redistribution information.
  */
 
-#define	WT_SCHEMA_FILENAME	"WiredTiger.wt"		/* Schema file name */
-#define	WT_SCHEMA_URI		"file:WiredTiger.wt"	/* Schema file URI */
-
-#define	WT_SCHEMA_VERSION	"WiredTiger version"	/* Version keys */
-#define	WT_SCHEMA_VERSION_STR	"WiredTiger version string"
-
 /* Character constants for projection plans. */
 #define	WT_PROJ_KEY	'k' /* Go to key in cursor <arg>. */
 #define	WT_PROJ_NEXT	'n' /* Process the next item (<arg> repeats). */
@@ -31,9 +25,8 @@ struct __wt_table {
 
 	WT_CONFIG_ITEM cgconf, colconf;
 
-	WT_BTREE **colgroup;
-	WT_BTREE **index;
-	size_t index_alloc;
+	const char **cg_name, **idx_name;
+	size_t idx_name_alloc;
 
 	TAILQ_ENTRY(__wt_table) q;
 

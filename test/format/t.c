@@ -27,10 +27,8 @@ main(int argc, char *argv[])
 	(void)setenv("MALLOC_OPTIONS", "AJZ", 1);
 
 	/* Set values from the "CONFIG" file, if it exists. */
-	if (access("CONFIG", R_OK) == 0) {
-		printf("... reading CONFIG file\n");
+	if (access("CONFIG", R_OK) == 0)
 		config_file("CONFIG");
-	}
 
 	/* Track progress unless we're re-directing output to a file. */
 	g.track = isatty(STDOUT_FILENO) ? 1 : 0;
@@ -68,13 +66,6 @@ main(int argc, char *argv[])
 		default:
 			usage();
 		}
-
-	/* Multi-threaded runs cannot be replayed. */
-	if (g.c_threads != 1 && g.replay) {
-		fprintf(stderr,
-		    "%s: -r and -t are mutually exclusive\n", g.progname);
-		return (EXIT_FAILURE);
-	}
 
 	argc -= optind;
 	argv += optind;

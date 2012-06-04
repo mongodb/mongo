@@ -11,10 +11,10 @@
 /* Return and branch-to-err-label cases for switch statements. */
 #define	WT_ILLEGAL_VALUE(session)					\
 	default:							\
-		return (__wt_illegal_value(session))
+		return (__wt_illegal_value(session, NULL))
 #define	WT_ILLEGAL_VALUE_ERR(session)					\
 	default:							\
-		ret = __wt_illegal_value(session);			\
+		ret = __wt_illegal_value(session, NULL);		\
 		goto err
 
 /* Set "ret" and branch-to-err-label tests. */
@@ -58,17 +58,25 @@
 } while (0)
 
 /*
- * WT_ASSERT, WT_ASSERT_RET --
+ * WT_ASSERT, WT_ASSERT_ERR, WT_ASSERT_RET --
  *	Assert an expression, abort in diagnostic mode, otherwise, optionally
- * return an error.
+ *	return an error.
  */
 #define	WT_ASSERT(session, exp) do {					\
 	if (!(exp))							\
-		(void)__wt_assert(					\
-		    session, 0, __FILE__, __LINE__, "%s", #exp);	\
+		__wt_assert(session, 0, __FILE__, __LINE__, "%s", #exp);\
+} while (0)
+#define	WT_ASSERT_ERR(session, exp) do {				\
+	if (!(exp)) {							\
+		__wt_assert(						\
+		    session, WT_ERROR, __FILE__, __LINE__, "%s", #exp);	\
+		WT_ERR(WT_ERROR);					\
+	}								\
 } while (0)
 #define	WT_ASSERT_RET(session, exp) do {				\
-	if (!(exp))							\
-		return (__wt_assert(					\
-		    session, WT_ERROR, __FILE__, __LINE__, "%s", #exp));\
+	if (!(exp)) {							\
+		__wt_assert(						\
+		    session, WT_ERROR, __FILE__, __LINE__, "%s", #exp);	\
+		return (WT_ERROR);					\
+	}								\
 } while (0)

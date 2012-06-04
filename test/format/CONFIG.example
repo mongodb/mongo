@@ -49,6 +49,9 @@
 #runs
 #	the number of runs
 
+#threads
+#	the number of threads
+
 #value_max
 #	maximum size of values
 

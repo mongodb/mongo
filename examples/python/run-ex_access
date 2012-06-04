@@ -1,0 +1,5 @@
+#!/bin/sh
+
+rm -rf WT_TEST ; mkdir WT_TEST
+
+exec env LD_LIBRARY_PATH=../../.libs DYLD_LIBRARY_PATH=../../.libs PYTHONPATH=.:${srcdir} python ${srcdir}/../../examples/python/ex_access.py 

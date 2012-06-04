@@ -1,7 +1,6 @@
 # filelist --
 #	List of source files for WiredTiger library.
 
-src/api/api_event.c
 src/api/api_strerror.c
 src/api/api_version.c
 src/block/block_addr.c
@@ -11,6 +10,7 @@ src/block/block_mgr.c
 src/block/block_open.c
 src/block/block_read.c
 src/block/block_slvg.c
+src/block/block_snap.c
 src/block/block_vrfy.c
 src/block/block_write.c
 src/btree/bt_bulk.c
@@ -64,6 +64,12 @@ src/cursor/cur_std.c
 src/cursor/cur_table.c
 src/log/log.c
 src/log/log_desc.c
+src/meta/meta_api.c
+src/meta/meta_apply.c
+src/meta/meta_snapshot.c
+src/meta/meta_table.c
+src/meta/meta_track.c
+src/meta/meta_turtle.c
 src/os_posix/os_abort.c
 src/os_posix/os_alloc.c
 src/os_posix/os_dlopen.c
@@ -92,14 +98,13 @@ src/schema/schema_open.c
 src/schema/schema_plan.c
 src/schema/schema_project.c
 src/schema/schema_rename.c
-src/schema/schema_table.c
-src/schema/schema_track.c
 src/schema/schema_truncate.c
 src/schema/schema_util.c
 src/schema/schema_worker.c
 src/session/session_api.c
 src/session/session_btree.c
-src/session/session_root.c
+src/session/session_salvage.c
+src/session/session_snapshot.c
 src/support/err.c
 src/support/filename.c
 src/support/global.c
@@ -111,3 +116,4 @@ src/support/rand.c
 src/support/scratch.c
 src/support/sess_dump.c
 src/support/stat.c
+src/txn/txn.c

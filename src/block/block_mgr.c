@@ -39,8 +39,8 @@ __wt_bm_addr_stderr(
     WT_SESSION_IMPL *session, const uint8_t *addr, uint32_t addr_size)
 {
 	WT_BLOCK *block;
-	WT_ITEM *buf;
-	int ret;
+	WT_DECL_ITEM(buf);
+	WT_DECL_RET;
 
 	if ((block = session->btree->block) == NULL)
 		return (__bm_invalid(session));
@@ -86,22 +86,30 @@ __wt_bm_create(WT_SESSION_IMPL *session, const char *filename)
  *	Open a file.
  */
 int
-__wt_bm_open(WT_SESSION_IMPL *session,
-    const char *filename, const char *config, const char *cfg[], int salvage)
+__wt_bm_open(WT_SESSION_IMPL *session, const char *filename,
+    const char *config, const char *cfg[], int forced_salvage)
 {
+	WT_BTREE *btree;
+
+	btree = session->btree;
+
+	WT_RET(__wt_block_open(
+	    session, filename, config, cfg, forced_salvage, &btree->block));
+
 	/*
 	 * !!!
 	 * As part of block-manager configuration, we need to return the maximum
 	 * sized address cookie that a block manager will ever return.  There's
-	 * a limit of WT_BM_MAX_ADDR_COOKIE, but at 255B, WT_BM_MAX_ADDR_COOKIE
-	 * is too large for a Btree with 512B internal pages.  The default block
-	 * manager packs an off_t and 2 uint32_t's into its cookie, so there's
-	 * no problem now, but when we create a block manager extension API,
-	 * we need some way to consider the block manager's maximum cookie size
-	 * vs. the minimum Btree internal node size.
+	 * a limit of WT_BTREE_MAX_ADDR_COOKIE, but at 255B, it's too large for
+	 * a Btree with 512B internal pages.  The default block manager packs
+	 * an off_t and 2 uint32_t's into its cookie, so there's no problem now,
+	 * but when we create a block manager extension API, we need some way to
+	 * consider the block manager's maximum cookie size versus the minimum
+	 * Btree internal node size.
 	 */
-	return (__wt_block_open(
-	    session, filename, config, cfg, salvage, &session->btree->block));
+	btree->block_header = __wt_block_header(session);
+
+	return (0);
 }
 
 /*
@@ -112,7 +120,7 @@ int
 __wt_bm_close(WT_SESSION_IMPL *session)
 {
 	WT_BLOCK *block;
-	int ret;
+	WT_DECL_RET;
 
 	if ((block = session->btree->block) == NULL)
 		return (0);
@@ -121,6 +129,68 @@ __wt_bm_close(WT_SESSION_IMPL *session)
 	session->btree->block = NULL;
 
 	return (ret);
+}
+
+/*
+ * __wt_bm_snapshot --
+ *	Write a buffer into a block, creating a snapshot.
+ */
+int
+__wt_bm_snapshot(WT_SESSION_IMPL *session, WT_ITEM *buf, WT_SNAPSHOT *snapbase)
+{
+	WT_BLOCK *block;
+
+	if ((block = session->btree->block) == NULL)
+		return (__bm_invalid(session));
+
+	return (__wt_block_snapshot(session, block, buf, snapbase));
+}
+
+/*
+ * __wt_bm_snapshot_resolve --
+ *	Resolve the snapshot.
+ */
+int
+__wt_bm_snapshot_resolve(WT_SESSION_IMPL *session, WT_SNAPSHOT *snapbase)
+{
+	WT_BLOCK *block;
+
+	if ((block = session->btree->block) == NULL)
+		return (__bm_invalid(session));
+
+	return (__wt_block_snapshot_resolve(session, block, snapbase));
+}
+
+/*
+ * __wt_bm_snapshot_load --
+ *	Load a snapshot point.
+ */
+int
+__wt_bm_snapshot_load(WT_SESSION_IMPL *session,
+    WT_ITEM *buf, const uint8_t *addr, uint32_t addr_size, int readonly)
+{
+	WT_BLOCK *block;
+
+	if ((block = session->btree->block) == NULL)
+		return (__bm_invalid(session));
+
+	return (__wt_block_snapshot_load(
+	    session, block, buf, addr, addr_size, readonly));
+}
+
+/*
+ * __wt_bm_snapshot_unload --
+ *	Unload a snapshot point.
+ */
+int
+__wt_bm_snapshot_unload(WT_SESSION_IMPL *session)
+{
+	WT_BLOCK *block;
+
+	if ((block = session->btree->block) == NULL)
+		return (__bm_invalid(session));
+
+	return (__wt_block_snapshot_unload(session, block));
 }
 
 /*
@@ -145,7 +215,7 @@ __wt_bm_free(WT_SESSION_IMPL *session, const uint8_t *addr, uint32_t addr_size)
 	if ((block = session->btree->block) == NULL)
 		return (__bm_invalid(session));
 
-	return (__wt_block_free_buf(session, block, addr, addr_size));
+	return (__wt_block_free(session, block, addr, addr_size));
 }
 
 /*
@@ -161,22 +231,7 @@ __wt_bm_read(WT_SESSION_IMPL *session,
 	if ((block = session->btree->block) == NULL)
 		return (__bm_invalid(session));
 
-	return (__wt_block_read_buf(session, block, buf, addr, addr_size));
-}
-
-/*
- * __wt_bm_block_header --
- *	Return the size of the block manager's header.
- */
-int
-__wt_bm_block_header(WT_SESSION_IMPL *session, uint32_t *headerp)
-{
-	WT_BLOCK *block;
-
-	if ((block = session->btree->block) == NULL)
-		return (__bm_invalid(session));
-
-	return (__wt_block_header(session, block, headerp));
+	return (__wt_block_read(session, block, buf, addr, addr_size));
 }
 
 /*
@@ -207,7 +262,7 @@ __wt_bm_write(
 	if ((block = session->btree->block) == NULL)
 		return (__bm_invalid(session));
 
-	return (__wt_block_write_buf(session, block, buf, addr, addr_size));
+	return (__wt_block_write(session, block, buf, addr, addr_size));
 }
 
 /*
@@ -263,14 +318,14 @@ __wt_bm_salvage_next(WT_SESSION_IMPL *session, WT_ITEM *buf,
  *	End a block manager salvage.
  */
 int
-__wt_bm_salvage_end(WT_SESSION_IMPL *session, int success)
+__wt_bm_salvage_end(WT_SESSION_IMPL *session)
 {
 	WT_BLOCK *block;
 
 	if ((block = session->btree->block) == NULL)
 		return (__bm_invalid(session));
 
-	return (__wt_block_salvage_end(session, block, success));
+	return (__wt_block_salvage_end(session, block));
 }
 
 /*
@@ -278,14 +333,14 @@ __wt_bm_salvage_end(WT_SESSION_IMPL *session, int success)
  *	Start a block manager salvage.
  */
 int
-__wt_bm_verify_start(WT_SESSION_IMPL *session, int *emptyp)
+__wt_bm_verify_start(WT_SESSION_IMPL *session, WT_SNAPSHOT *snapbase)
 {
 	WT_BLOCK *block;
 
 	if ((block = session->btree->block) == NULL)
 		return (__bm_invalid(session));
 
-	return (__wt_block_verify_start(session, block, emptyp));
+	return (__wt_block_verify_start(session, block, snapbase));
 }
 
 /*

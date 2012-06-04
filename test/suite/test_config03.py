@@ -83,9 +83,9 @@ class test_config03(test_base03.test_base03):
     scenarios = wtscenario.prune_scenarios(all_scenarios, 1000)
     scenarios = wtscenario.number_scenarios(scenarios)
 
-    wttest.WiredTigerTestCase.printVerbose(2, 'test_config03: running ' + \
-                          str(len(scenarios)) + ' of ' + \
-                          str(len(all_scenarios)) + ' possible scenarios')
+    #wttest.WiredTigerTestCase.printVerbose(2, 'test_config03: running ' + \
+    #                      str(len(scenarios)) + ' of ' + \
+    #                      str(len(all_scenarios)) + ' possible scenarios')
 
     def setUpConnectionOpen(self, dir):
         args = ''

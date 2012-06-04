@@ -1,0 +1,38 @@
+/*! @page snapshots Snapshots
+
+WiredTiger supports snapshots, a read-only, static view of a data source.
+
+Snapshots offer basic operation durability without transactional logging,
+across application or system failure.  (Transactional logging offers
+fine-grained durability, but requires a recovery step when files are first
+opened, and impacts the performance of every operation; snapshots offer
+durability without recovery or impacting operational performance, but the
+creation of a snapshot is a relatively heavy-weight operation.  WiredTiger
+does not currently support transactional logging.)
+
+Snapshots may optionally be named: WiredTiger creates and manages unnamed
+snapshots automatically.  Snapshots are created using the WT_SESSION::sync
+method, read using the WT_SESSION::open_cursor method, and discarded using the
+WT_SESSION::drop method.  Additionally, the \c -s option to the \c wt command
+line utility will list a data source's snapshots in a human-readable format.
+
+When WiredTiger data sources are first opened, they are opened in the state of
+the most recent snapshot taken on the file, in other words, updates after the
+most recent snapshot will not appear in the data source.  If no snapshot is
+found when the data source is opened, the data source will appear empty.
+
+Cursors are opened in the current working version of a data source unless a
+snapshot name is provided to WT_SESSION::open_cursor.  Cursors opened in the
+current working version snapshot support write operations, snapshots opened in
+a snapshot are read-only.
+
+Named snapshots persist until they are explicitly dropped.  Snapshots share
+pages, and deleting a snapshot may or may not make pages available for re-use,
+depending on whether the dropped snapshot contained the last reference to a
+block of data.  Creating a named snapshot drops all previous snapshots with
+the same name.  Snapshots cannot be dropped if they are currently open
+in a cursor.
+
+Unnamed snapshots managed by WiredTiger are given the name
+"WiredTigerInternal".
+ */

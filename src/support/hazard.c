@@ -16,7 +16,7 @@ static void __hazard_dump(WT_SESSION_IMPL *);
  *	Set a hazard reference.
  */
 int
-__wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref
+__wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, int *busyp
 #ifdef HAVE_DIAGNOSTIC
     , const char *file, int line
 #endif
@@ -26,6 +26,7 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref
 	WT_HAZARD *hp;
 
 	conn = S2C(session);
+	*busyp = 0;
 
 	/*
 	 * Do the dance:
@@ -60,7 +61,7 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref
 		 */
 		if (ref->state == WT_REF_MEM ||
 		    ref->state == WT_REF_EVICT_WALK) {
-			WT_VERBOSE(session, hazard,
+			WT_VERBOSE_RET(session, hazard,
 			    "session %p hazard %p: set", session, ref->page);
 			return (0);
 		}
@@ -78,7 +79,8 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref
 		 * again until it loops around through the tree.
 		 */
 		hp->page = NULL;
-		return (EBUSY);
+		*busyp = 1;
+		return (0);
 	}
 
 	__wt_errx(session,
@@ -109,24 +111,39 @@ __wt_hazard_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 */
 	WT_ASSERT(session, page != NULL);
 
-	WT_VERBOSE(session, hazard,
-	    "session %p hazard %p: clr", session, page);
-
 	/* Clear the caller's hazard pointer. */
 	for (hp = session->hazard;
 	    hp < session->hazard + conn->hazard_size; ++hp)
 		if (hp->page == page) {
-			hp->page = NULL;
 			/*
-			 * We don't have to flush memory here for correctness;
-			 * it would give the page server thread faster access
-			 * to the block were the block selected to be evicted,
-			 * but the generation number was just set which makes
-			 * it unlikely to be selected for eviction.
+			 * Check to see if the page has grown too big and force
+			 * eviction.  We have to request eviction while holding
+			 * a hazard reference (else the page might disappear out
+			 * from under us), but we can't wake the eviction server
+			 * until we've released our hazard reference because our
+			 * hazard reference blocks the page eviction.  A little
+			 * dance: check the page, schedule the forced eviction,
+			 * clear/publish the hazard reference, wake the eviction
+			 * server.
+			 *
+			 * We don't publish the hazard reference clear in the
+			 * general case.  It's not required for correctness;
+			 * it gives the page server thread faster access to the
+			 * page were the page selected for eviction, but the
+			 * generation number was just set, so it's unlikely the
+			 * page will be selected for eviction.
 			 */
+			if (__wt_eviction_page_check(session, page)) {
+				__wt_evict_page_request(session, page);
+				WT_PUBLISH(hp->page, NULL);
+				__wt_evict_server_wake(session);
+			} else
+				hp->page = NULL;
 			return;
 		}
-	__wt_errx(session, "hazard reference not found");
+	__wt_errx(session,
+	    "clear hazard reference: session: %p reference %p: not found",
+	    session, page);
 }
 
 /*
@@ -189,27 +206,5 @@ __hazard_dump(WT_SESSION_IMPL *session)
 
 	if (fail)
 		__wt_errx(session, "unexpected hazard reference");
-}
-
-/*
- * __wt_hazard_validate --
- *	Confirm that a page isn't on the hazard list.
- */
-void
-__wt_hazard_validate(WT_SESSION_IMPL *session, WT_PAGE *page)
-{
-	WT_CONNECTION_IMPL *conn;
-	WT_HAZARD *hp;
-	uint32_t elem, i;
-
-	conn = S2C(session);
-
-	elem = conn->session_size * conn->hazard_size;
-	for (i = 0, hp = conn->hazard; i < elem; ++i, ++hp)
-		if (hp->page == page)
-			__wt_errx(session,
-			    "discarded page has hazard reference: "
-			    "(%p: %s, line %d)",
-			    hp->page, hp->file, hp->line);
 }
 #endif

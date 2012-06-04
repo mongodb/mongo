@@ -13,11 +13,10 @@ int
 util_read(WT_SESSION *session, int argc, char *argv[])
 {
 	WT_CURSOR *cursor;
+	WT_DECL_RET;
 	uint64_t recno;
-	int ch, rkey, ret, rval;
+	int ch, rkey, rval;
 	const char *uri, *value;
-
-	ret = 0;
 
 	while ((ch = util_getopt(argc, argv, "")) != EOF)
 		switch (ch) {
@@ -87,7 +86,7 @@ util_read(WT_SESSION *session, int argc, char *argv[])
 			return (util_cerr(uri, "search", ret));
 		}
 	}
-		
+
 	return (rval);
 }
 

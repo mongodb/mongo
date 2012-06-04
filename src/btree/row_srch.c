@@ -88,13 +88,14 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 {
 	WT_BTREE *btree;
 	WT_CELL_UNPACK *unpack, _unpack;
+	WT_DECL_RET;
 	WT_IKEY *ikey;
 	WT_ITEM *item, _item, *srch_key;
 	WT_PAGE *page;
 	WT_REF *ref;
 	WT_ROW *rip;
 	uint32_t base, indx, limit;
-	int cmp, ret;
+	int cmp;
 	void *key;
 
 	__cursor_search_clear(cbt);
@@ -128,7 +129,7 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 				item->data = WT_IKEY_DATA(ikey);
 				item->size = ikey->size;
 
-				WT_RET(WT_BTREE_CMP(
+				WT_ERR(WT_BTREE_CMP(
 				    session, btree, srch_key, item, cmp));
 				if (cmp == 0)
 					break;
@@ -164,7 +165,7 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 	 */
 	if (is_modify) {
 		/* Initialize the page's modification information */
-		WT_RET(__wt_page_modify_init(session, page));
+		WT_ERR(__wt_page_modify_init(session, page));
 
 		WT_ORDERED_READ(cbt->write_gen, page->modify->write_gen);
 	}
@@ -174,14 +175,7 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 		indx = base + (limit >> 1);
 		rip = page->u.row.d + indx;
 
-retry:		/*
-		 * Multiple threads of control may be searching this page, which
-		 * means the key may change underfoot, and here's where it gets
-		 * tricky: first, copy the key.  We don't need any barriers, the
-		 * key is updated atomically, and we just need a valid copy.
-		 */
-		key = rip->key;
-
+retry:		key = WT_ROW_KEY_COPY(rip);
 		/*
 		 * Key copied.
 		 *

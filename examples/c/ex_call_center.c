@@ -57,9 +57,9 @@ const char *home = "WT_TEST";
 /* Customer records. */
 typedef struct {
 	uint64_t id;
-	char *name;
-	char *address;
-	char *phone;
+	const char *name;
+	const char *address;
+	const char *phone;
 } CUSTOMER;
 
 /* Call records. */
@@ -68,8 +68,8 @@ typedef struct {
 	uint64_t call_date;
 	uint64_t cust_id;
 	uint64_t emp_id;
-	char *call_type;
-	char *notes;
+	const char *call_type;
+	const char *notes;
 } CALL;
 /*! [call-center decl] */
 
@@ -79,8 +79,18 @@ int main(void)
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
 	WT_CURSOR *cursor;
-	CUSTOMER cust;
-	CALL call;
+	CUSTOMER cust, *custp, cust_sample[] = {
+		{ 0, "Professor Oak", "LeafGreen Avenue", "123-456-7890" },
+		{ 0, "Lorelei", "Sevii Islands", "098-765-4321" },
+		{ 0, NULL, NULL, NULL }
+	};
+	CALL call, *callp, call_sample[] = {
+		{ 0, 32, 1, 2, "billing", "unavailable" },
+		{ 0, 33, 1, 2, "billing", "available" },
+		{ 0, 34, 1, 2, "reminder", "unavailable" },
+		{ 0, 35, 1, 2, "reminder", "available" },
+		{ 0, 0, 0, 0, NULL, NULL }
+	};
 
 	ret = wiredtiger_open(home, NULL, "create", &conn);
 	if (ret != 0) {
@@ -99,7 +109,7 @@ int main(void)
 	 * created below.
 	 */
 	ret = session->create(session, "table:customers",
-	    "key_format=S,"
+	    "key_format=r,"
 	    "value_format=SSS,"
 	    "columns=(id,name,address,phone),"
 	    "colgroups=(main,address)");
@@ -116,10 +126,19 @@ int main(void)
 	ret = session->create(session,
 	    "index:customers:phone", "columns=(phone)");
 
+	/* Populate the customers table with some data. */
+	ret = session->open_cursor(
+	    session, "table:customers", NULL, "append", &cursor);
+	for (custp = cust_sample; custp->name != NULL; custp++) {
+		cursor->set_value(cursor,
+		    custp->name, custp->address, custp->phone);
+		ret = cursor->insert(cursor);
+	}
+	ret = cursor->close(cursor);
+
 	/*
-	 * Create the calls table, give names and types to the columns.
-	 * All of the columns will be stored together, so no column groups are
-	 * declared.
+	 * Create the calls table, give names and types to the columns.  All the
+	 * columns will be stored together, so no column groups are declared.
 	 */
 	ret = session->create(session, "table:calls",
 	    "key_format=r,"
@@ -133,19 +152,14 @@ int main(void)
 	ret = session->create(session, "index:calls:cust_date",
 	    "columns=(cust_id,call_date)");
 
-	/* Populate the customers table with some data. */
+	/* Populate the calls table with some data. */
 	ret = session->open_cursor(
-	    session, "table:customers", NULL, NULL, &cursor);
-
-	cursor->set_key(cursor, "customer #1");
-	cursor->set_value(cursor,
-	    "Professor Oak", "LeafGreen Avenue", "123-456-7890");
-	ret = cursor->insert(cursor);
-
-	cursor->set_key(cursor, "customer #2");
-	cursor->set_value(cursor, "Lorelei", "Sevii Islands", "098-765-4321");
-	ret = cursor->insert(cursor);
-
+	    session, "table:calls", NULL, "append", &cursor);
+	for (callp = call_sample; callp->call_type != NULL; callp++) {
+		cursor->set_value(cursor, callp->call_date, callp->cust_id,
+		    callp->emp_id, callp->call_type, callp->notes);
+		ret = cursor->insert(cursor);
+	}
 	ret = cursor->close(cursor);
 
 	/*
@@ -162,13 +176,13 @@ int main(void)
 	 * means the cursor's value format will be "rS".
 	 */
 	ret = session->open_cursor(session,
-	    "index:customers:phone(id,name)",
-	    NULL, NULL, &cursor);
-	cursor->set_key(cursor, "212-555-1000");
+	    "index:customers:phone(id,name)", NULL, NULL, &cursor);
+	cursor->set_key(cursor, "123-456-7890");
 	ret = cursor->search(cursor);
 	if (ret == 0) {
 		ret = cursor->get_value(cursor, &cust.id, &cust.name);
-		printf("Got customer record for %s\n", cust.name);
+		printf("Read customer record for %s (ID %" PRIu64 ")\n",
+		    cust.name, cust.id);
 	}
 	ret = cursor->close(cursor);
 
@@ -181,9 +195,9 @@ int main(void)
 	 * is in increasing order by date for a given customer, we want to start
 	 * with the last record for the customer and work backwards.
 	 *
-	 * Specify a subset of columns to be returned.  If these were all
-	 * covered by the index, the primary would not be accessed.  Stop after
-	 * getting 3 records.
+	 * Specify a subset of columns to be returned.  (Note that if these were
+	 * all covered by the index, the primary would not have to be accessed.)
+	 * Stop after getting 3 records.
 	 */
 	ret = session->open_cursor(session,
 	    "index:calls:cust_date(cust_id,call_type,notes)",
@@ -194,31 +208,26 @@ int main(void)
 	 * call date for a given cust_id.  Search for (cust_id+1,0), then work
 	 * backwards.
 	 */
+	cust.id = 1;
 	cursor->set_key(cursor, cust.id + 1, 0);
 	ret = cursor->search_near(cursor, &exact);
 
 	/*
-	 * If the table is empty, search_near will return WT_NOTFOUND.
-	 * Otherwise the cursor will on a matching key if one exists, or on an
-	 * adjacent key.  If the key we find is equal or larger than the search
-	 * key, go back one.
+	 * If the table is empty, search_near will return WT_NOTFOUND, else the
+	 * cursor will be positioned on a matching key if one exists, or an
+	 * adjacent key if one does not.  If the positioned key is equal to or
+	 * larger than the search key, go back one.
 	 */
 	if (ret == 0 && exact >= 0)
 		ret = cursor->prev(cursor);
-	if (ret == 0)
+	for (count = 0; ret == 0 && count < 3; ++count) {
 		ret = cursor->get_value(cursor,
 		    &call.cust_id, &call.call_type, &call.notes);
-
-	count = 0;
-	while (ret == 0 && call.cust_id == cust.id) {
-		printf("Got call record on date %lu: type %s: %s\n",
-		    (unsigned long)call.call_date, call.call_type, call.notes);
-		if (++count == 3)
+		if (call.cust_id != cust.id)
 			break;
-
+		printf("Call record: customer %" PRIu64 " (%s: %s)\n",
+		    call.cust_id, call.call_type, call.notes);
 		ret = cursor->prev(cursor);
-		ret = cursor->get_value(cursor,
-		    &call.cust_id, &call.call_type, &call.notes);
 	}
 	/*! [call-center work] */
 

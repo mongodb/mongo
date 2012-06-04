@@ -15,7 +15,10 @@ static inline int
 __cursor_fix_append_next(WT_CURSOR_BTREE *cbt, int newpage)
 {
 	WT_ITEM *val;
+	WT_SESSION_IMPL *session;
+	WT_UPDATE *upd;
 
+	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	val = &cbt->iface.value;
 
 	if (newpage) {
@@ -26,12 +29,27 @@ __cursor_fix_append_next(WT_CURSOR_BTREE *cbt, int newpage)
 		    (cbt->ins = WT_SKIP_NEXT(cbt->ins)) == NULL)
 			return (WT_NOTFOUND);
 
+	/*
+	 * Column store appends are inherently non-transactional.
+	 *
+	 * Even a non-visible update by a concurrent or aborted transaction
+	 * changes the effective end of the data.  The effect is subtle because
+	 * of the blurring between deleted and empty values, but ideally we
+	 * would skip all uncommitted changes at the end of the data.
+	 *
+	 * The problem is that we don't know at this point whether there may be
+	 * multiple uncommitted changes at the end of the data, and it would be
+	 * expensive to check every time we hit an aborted update.  If an
+	 * insert is aborted, we simply return zero (empty), regardless of
+	 * whether we are at the end of the data.
+	 */
 	cbt->iface.recno = ++cbt->recno;
-	if (cbt->recno < WT_INSERT_RECNO(cbt->ins)) {
+	if (cbt->recno < WT_INSERT_RECNO(cbt->ins) ||
+	    (upd = __wt_txn_read(session, cbt->ins->upd)) == NULL) {
 		cbt->v = 0;
 		val->data = &cbt->v;
 	} else
-		val->data = WT_UPDATE_DATA(cbt->ins->upd);
+		val->data = WT_UPDATE_DATA(upd);
 	val->size = 1;
 	return (0);
 }
@@ -47,6 +65,7 @@ __cursor_fix_next(WT_CURSOR_BTREE *cbt, int newpage)
 	WT_INSERT *ins;
 	WT_ITEM *val;
 	WT_SESSION_IMPL *session;
+	WT_UPDATE *upd;
 	uint64_t *recnop;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
@@ -73,8 +92,9 @@ new_page:	*recnop = cbt->recno;
 
 		/* Check any insert list for a matching record. */
 		if ((ins = __col_insert_search_match(
-		    WT_COL_UPDATE_SINGLE(cbt->page), cbt->recno)) != NULL) {
-			val->data = WT_UPDATE_DATA(ins->upd);
+		    WT_COL_UPDATE_SINGLE(cbt->page), cbt->recno)) != NULL &&
+		    (upd = __wt_txn_read(session, ins->upd)) != NULL) {
+			val->data = WT_UPDATE_DATA(upd);
 			val->size = 1;
 			return (0);
 		}
@@ -95,11 +115,15 @@ static inline int
 __cursor_var_append_next(WT_CURSOR_BTREE *cbt, int newpage)
 {
 	WT_ITEM *val;
+	WT_SESSION_IMPL *session;
+	WT_UPDATE *upd;
 
+	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	val = &cbt->iface.value;
 
 	if (newpage) {
 		cbt->ins = WT_SKIP_FIRST(cbt->ins_head);
+		WT_ASSERT(session, cbt->ins != NULL);
 		goto new_page;
 	}
 
@@ -108,10 +132,11 @@ __cursor_var_append_next(WT_CURSOR_BTREE *cbt, int newpage)
 			return (WT_NOTFOUND);
 
 new_page:	cbt->iface.recno = WT_INSERT_RECNO(cbt->ins);
-		if (WT_UPDATE_DELETED_ISSET(cbt->ins->upd))
+		if ((upd = __wt_txn_read(session, cbt->ins->upd)) == NULL ||
+		    WT_UPDATE_DELETED_ISSET(upd))
 			continue;
-		val->data = WT_UPDATE_DATA(cbt->ins->upd);
-		val->size = cbt->ins->upd->size;
+		val->data = WT_UPDATE_DATA(upd);
+		val->size = upd->size;
 		break;
 	}
 	return (0);
@@ -130,6 +155,7 @@ __cursor_var_next(WT_CURSOR_BTREE *cbt, int newpage)
 	WT_INSERT *ins;
 	WT_ITEM *val;
 	WT_SESSION_IMPL *session;
+	WT_UPDATE *upd;
 	uint64_t *recnop;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
@@ -158,18 +184,21 @@ new_page:	*recnop = cbt->recno;
 
 		/* Check any insert list for a matching record. */
 		if ((ins = __col_insert_search_match(
-		    WT_COL_UPDATE(cbt->page, cip), cbt->recno)) != NULL) {
-			if (WT_UPDATE_DELETED_ISSET(ins->upd))
+		    WT_COL_UPDATE(cbt->page, cip), cbt->recno)) != NULL &&
+		    (upd = __wt_txn_read(session, ins->upd)) != NULL) {
+			if (WT_UPDATE_DELETED_ISSET(upd))
 				continue;
-			val->data = WT_UPDATE_DATA(ins->upd);
-			val->size = ins->upd->size;
+			val->data = WT_UPDATE_DATA(upd);
+			val->size = upd->size;
 			return (0);
 		}
 
 		/*
 		 * If we're at the same slot as the last reference and there's
-		 * no matching insert list item, re-use the return information.
-		 * Otherwise, unpack the cell and build the return information.
+		 * no matching insert list item, re-use the return information
+		 * (so encoded items with large repeat counts aren't repeatedly
+		 * decoded).  Otherwise, unpack the cell and build the return
+		 * information.
 		 */
 		if (cbt->cip_saved != cip) {
 			if ((cell = WT_COL_PTR(cbt->page, cip)) == NULL)
@@ -205,12 +234,15 @@ new_page:	*recnop = cbt->recno;
 static inline int
 __cursor_row_next(WT_CURSOR_BTREE *cbt, int newpage)
 {
+	WT_INSERT *ins;
 	WT_ITEM *key, *val;
 	WT_ROW *rip;
+	WT_SESSION_IMPL *session;
 	WT_UPDATE *upd;
 
 	key = &cbt->iface.key;
 	val = &cbt->iface.value;
+	session = (WT_SESSION_IMPL *)cbt->iface.session;
 
 	/*
 	 * For row-store pages, we need a single item that tells us the part
@@ -240,12 +272,12 @@ __cursor_row_next(WT_CURSOR_BTREE *cbt, int newpage)
 		if (cbt->ins != NULL)
 			cbt->ins = WT_SKIP_NEXT(cbt->ins);
 
-new_insert:	if (cbt->ins != NULL) {
-			upd = cbt->ins->upd;
-			if (WT_UPDATE_DELETED_ISSET(upd))
+new_insert:	if ((ins = cbt->ins) != NULL) {
+			if ((upd = __wt_txn_read(session, ins->upd)) == NULL ||
+			    WT_UPDATE_DELETED_ISSET(upd))
 				continue;
-			key->data = WT_INSERT_KEY(cbt->ins);
-			key->size = WT_INSERT_KEY_SIZE(cbt->ins);
+			key->data = WT_INSERT_KEY(ins);
+			key->size = WT_INSERT_KEY_SIZE(ins);
 			val->data = WT_UPDATE_DATA(upd);
 			val->size = upd->size;
 			return (0);
@@ -270,7 +302,7 @@ new_insert:	if (cbt->ins != NULL) {
 		cbt->ins = NULL;
 
 		rip = &cbt->page->u.row.d[cbt->slot / 2 - 1];
-		upd = WT_ROW_UPDATE(cbt->page, rip);
+		upd = __wt_txn_read(session, WT_ROW_UPDATE(cbt->page, rip));
 		if (upd != NULL && WT_UPDATE_DELETED_ISSET(upd))
 			continue;
 
@@ -351,8 +383,9 @@ __wt_btcur_iterate_setup(WT_CURSOR_BTREE *cbt, int next)
 int
 __wt_btcur_next(WT_CURSOR_BTREE *cbt)
 {
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int newpage, ret;
+	int newpage;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	WT_BSTAT_INCR(session, cursor_read_next);

@@ -39,5 +39,5 @@ void die(const char *, int) __attribute__((noreturn));
 void die(const char *, int);
 #endif
 void load(void);
-int  run(u_int, u_int);
+int  rw_start(u_int, u_int);
 void stats(void);

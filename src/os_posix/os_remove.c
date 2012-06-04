@@ -14,15 +14,15 @@
 int
 __wt_remove(WT_SESSION_IMPL *session, const char *name)
 {
-	const char *path;
 	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
 	WT_FH *fh;
-	int ret;
+	const char *path;
 
 	conn = S2C(session);
 	fh = NULL;
 
-	WT_VERBOSE(session, fileops, "%s: remove", name);
+	WT_VERBOSE_RET(session, fileops, "%s: remove", name);
 
 	/* If the file is open, close/free it. */
 	__wt_spin_lock(session, &conn->fh_lock);

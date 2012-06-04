@@ -1,0 +1,8 @@
+/*! @page admin Managing a WiredTiger Database
+
+- @subpage home
+- @subpage security
+- @subpage file_formats
+- @subpage tuning
+
+ */

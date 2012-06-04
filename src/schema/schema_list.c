@@ -52,7 +52,7 @@ int
 __wt_schema_get_table(WT_SESSION_IMPL *session,
     const char *name, size_t namelen, WT_TABLE **tablep)
 {
-	int ret;
+	WT_DECL_RET;
 
 	ret = __wt_schema_find_table(session, name, namelen, tablep);
 
@@ -71,13 +71,23 @@ __wt_schema_get_table(WT_SESSION_IMPL *session,
 void
 __wt_schema_destroy_table(WT_SESSION_IMPL *session, WT_TABLE *table)
 {
+	int i;
+
 	__wt_free(session, table->name);
 	__wt_free(session, table->config);
 	__wt_free(session, table->plan);
 	__wt_free(session, table->key_format);
 	__wt_free(session, table->value_format);
-	__wt_free(session, table->colgroup);
-	__wt_free(session, table->index);
+	if (table->cg_name != NULL) {
+		for (i = 0; i < WT_COLGROUPS(table); i++)
+			__wt_free(session, table->cg_name[i]);
+		__wt_free(session, table->cg_name);
+	}
+	if (table->idx_name != NULL) {
+		for (i = 0; i < table->nindices; i++)
+			__wt_free(session, table->idx_name[i]);
+		__wt_free(session, table->idx_name);
+	}
 	__wt_free(session, table);
 }
 
@@ -102,44 +112,11 @@ __wt_schema_remove_table(
 int
 __wt_schema_close_tables(WT_SESSION_IMPL *session)
 {
+	WT_DECL_RET;
 	WT_TABLE *table;
-	int ret;
 
-	ret = 0;
 	while ((table = TAILQ_FIRST(&session->tables)) != NULL)
 		WT_TRET(__wt_schema_remove_table(session, table));
 
 	return (ret);
-}
-
-/*
- * __wt_schema_detach tree --
- *	Remove any references to a tree from a table in the session.
- *
- * Note: this function should be called with an exclusive lock on the btree
- * handle to prevent races.
- */
-void
-__wt_schema_detach_tree(WT_SESSION_IMPL *session, WT_BTREE *btree)
-{
-	WT_TABLE *table;
-	int i;
-
-	TAILQ_FOREACH(table, &session->tables, q) {
-		/* Check the column groups. */
-		for (i = 0; i < WT_COLGROUPS(table); i++)
-			if (table->colgroup[i] == btree) {
-				table->colgroup[i] = NULL;
-				table->cg_complete = 0;
-				return;
-			}
-
-		/* Check the indices. */
-		for (i = 0; i < table->nindices; i++)
-			if (table->index[i] == btree) {
-				table->index[i] = NULL;
-				table->idx_complete = 0;
-				return;
-			}
-	}
 }

@@ -8,27 +8,40 @@
 #include "wt_internal.h"
 
 /*
- * __wt_block_buffer_to_addr --
- *	Convert a filesystem address cookie into its components.
+ * __block_buffer_to_addr --
+ *	Convert a filesystem address cookie into its components, UPDATING the
+ * caller's buffer reference so it can be called repeatedly to load a buffer.
  */
-int
-__wt_block_buffer_to_addr(WT_BLOCK *block,
-    const uint8_t *p, off_t *offsetp, uint32_t *sizep, uint32_t *cksump)
+static int
+__block_buffer_to_addr(WT_BLOCK *block,
+    const uint8_t **pp, off_t *offsetp, uint32_t *sizep, uint32_t *cksump)
 {
-	uint64_t a;
+	uint64_t o, s, c;
 
-	WT_RET(__wt_vunpack_uint(&p, 0, &a));
-	if (offsetp != NULL)
-		*offsetp = (off_t)a * block->allocsize + WT_BLOCK_DESC_SECTOR;
-	WT_RET(__wt_vunpack_uint(&p, 0, &a));
-	if (sizep != NULL)
-		*sizep = (uint32_t)a * block->allocsize;
+	WT_RET(__wt_vunpack_uint(pp, 0, &o));
+	WT_RET(__wt_vunpack_uint(pp, 0, &s));
+	WT_RET(__wt_vunpack_uint(pp, 0, &c));
 
-	if (cksump != NULL) {
-		WT_RET(__wt_vunpack_uint(&p, 0, &a));
-		*cksump = (uint32_t)a;
+	/*
+	 * To avoid storing large offsets, we minimize the value by subtracting
+	 * 512B (the size of the description sector), and then storing a count
+	 * of block allocation units.   That implies there is no such thing as
+	 * an "invalid" offset though, they could all be valid (other than very
+	 * large numbers), which is what we didn't want to store in the first
+	 * place.  Use the size: writing a block of size 0 makes no sense, so
+	 * that's the out-of-band value.  Once we're out of this function and
+	 * are working with a real file offset, size and checksum triplet, there
+	 * are invalid offsets, that's simpler than testing sizes of 0 all over
+	 * the place.
+	 */
+	if (s == 0) {
+		*offsetp = 0;
+		*sizep = *cksump = 0;
+	} else {
+		*offsetp = (off_t)o * block->allocsize + WT_BLOCK_DESC_SECTOR;
+		*sizep = (uint32_t)s * block->allocsize;
+		*cksump = (uint32_t)c;
 	}
-
 	return (0);
 }
 
@@ -38,17 +51,36 @@ __wt_block_buffer_to_addr(WT_BLOCK *block,
  */
 int
 __wt_block_addr_to_buffer(WT_BLOCK *block,
-    uint8_t **p, off_t offset, uint32_t size, uint32_t cksum)
+    uint8_t **pp, off_t offset, uint32_t size, uint32_t cksum)
 {
-	uint64_t a;
+	uint64_t o, s, c;
 
-	a = (uint64_t)(offset - WT_BLOCK_DESC_SECTOR) / block->allocsize;
-	WT_RET(__wt_vpack_uint(p, 0, a));
-	a = size / block->allocsize;
-	WT_RET(__wt_vpack_uint(p, 0, a));
-	a = cksum;
-	WT_RET(__wt_vpack_uint(p, 0, a));
+	/* See the comment above: this is the reverse operation. */
+	if (size == 0) {
+		o = WT_BLOCK_INVALID_OFFSET;
+		s = c = 0;
+	} else {
+		o = (uint64_t)
+		    (offset - WT_BLOCK_DESC_SECTOR) / block->allocsize;
+		s = size / block->allocsize;
+		c = cksum;
+	}
+	WT_RET(__wt_vpack_uint(pp, 0, o));
+	WT_RET(__wt_vpack_uint(pp, 0, s));
+	WT_RET(__wt_vpack_uint(pp, 0, c));
 	return (0);
+}
+
+/*
+ * __wt_block_buffer_to_addr --
+ *	Convert a filesystem address cookie into its components NOT UPDATING
+ * the caller's buffer reference.
+ */
+int
+__wt_block_buffer_to_addr(WT_BLOCK *block,
+    const uint8_t *p, off_t *offsetp, uint32_t *sizep, uint32_t *cksump)
+{
+	return (__block_buffer_to_addr(block, &p, offsetp, sizep, cksump));
 }
 
 /*
@@ -60,13 +92,13 @@ __wt_block_addr_valid(WT_SESSION_IMPL *session,
     WT_BLOCK *block, const uint8_t *addr, uint32_t addr_size)
 {
 	off_t offset;
-	uint32_t size;
+	uint32_t cksum, size;
 
 	WT_UNUSED(session);
 	WT_UNUSED(addr_size);
 
 	/* Crack the cookie. */
-	WT_RET(__wt_block_buffer_to_addr(block, addr, &offset, &size, NULL));
+	WT_RET(__wt_block_buffer_to_addr(block, addr, &offset, &size, &cksum));
 
 	/* All we care about is if it's past the end of the file. */
 	return (offset + size > block->fh->file_size ? 0 : 1);
@@ -92,6 +124,74 @@ __wt_block_addr_string(WT_SESSION_IMPL *session,
 	WT_RET(__wt_buf_fmt(session, buf,
 	    "[%" PRIuMAX "-%" PRIuMAX ", %" PRIu32 ", %" PRIu32 "]",
 	    (uintmax_t)offset, (uintmax_t)offset + size, size, cksum));
+
+	return (0);
+}
+
+/*
+ * __wt_block_buffer_to_snapshot --
+ *	Convert a filesystem snapshot cookie into its components.
+ */
+int
+__wt_block_buffer_to_snapshot(WT_SESSION_IMPL *session,
+    WT_BLOCK *block, const uint8_t *p, WT_BLOCK_SNAPSHOT *si)
+{
+	uint64_t a;
+	const uint8_t **pp;
+
+	si->version = *p++;
+	if (si->version != WT_BM_SNAPSHOT_VERSION)
+		WT_RET_MSG(session, WT_ERROR, "illegal snapshot address");
+
+	pp = &p;
+	WT_RET(__block_buffer_to_addr(block, pp,
+	    &si->root_offset, &si->root_size, &si->root_cksum));
+	WT_RET(__block_buffer_to_addr(block, pp,
+	    &si->alloc.offset, &si->alloc.size, &si->alloc.cksum));
+	WT_RET(__block_buffer_to_addr(block, pp,
+	    &si->avail.offset, &si->avail.size, &si->avail.cksum));
+	WT_RET(__block_buffer_to_addr(block, pp,
+	    &si->discard.offset, &si->discard.size, &si->discard.cksum));
+	WT_RET(__wt_vunpack_uint(pp, 0, &a));
+	si->file_size = (off_t)a;
+	WT_RET(__wt_vunpack_uint(pp, 0, &a));
+	si->snapshot_size = a;
+	WT_RET(__wt_vunpack_uint(pp, 0, &a));
+	si->write_gen = a;
+
+	return (0);
+}
+
+/*
+ * __wt_block_snapshot_to_buffer --
+ *	Convert the filesystem components into its snapshot cookie.
+ */
+int
+__wt_block_snapshot_to_buffer(WT_SESSION_IMPL *session,
+    WT_BLOCK *block, uint8_t **pp, WT_BLOCK_SNAPSHOT *si)
+{
+	uint64_t a;
+
+	if (si->version != WT_BM_SNAPSHOT_VERSION)
+		WT_RET_MSG(session, WT_ERROR, "illegal snapshot address");
+
+	(*pp)[0] = si->version;
+	(*pp)++;
+
+	WT_RET(__wt_block_addr_to_buffer(block, pp,
+	    si->root_offset, si->root_size, si->root_cksum));
+	WT_RET(__wt_block_addr_to_buffer(block, pp,
+	    si->alloc.offset, si->alloc.size, si->alloc.cksum));
+	WT_RET(__wt_block_addr_to_buffer(block, pp,
+	    si->avail.offset, si->avail.size, si->avail.cksum));
+	WT_RET(__wt_block_addr_to_buffer(block, pp,
+	    si->discard.offset, si->discard.size, si->discard.cksum));
+	a = (uint64_t)si->file_size;
+	WT_RET(__wt_vpack_uint(pp, 0, a));
+	a = (uint64_t)si->snapshot_size;
+	WT_RET(__wt_vpack_uint(pp, 0, a));
+	a = si->write_gen;
+	WT_RET(__wt_vpack_uint(pp, 0, a));
 
 	return (0);
 }

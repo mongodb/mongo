@@ -55,7 +55,7 @@ __wt_curconfig_open(WT_SESSION_IMPL *session,
 	};
 	WT_CURSOR_CONFIG *cconfig;
 	WT_CURSOR *cursor;
-	int ret;
+	WT_DECL_RET;
 
 	WT_UNUSED(uri);
 

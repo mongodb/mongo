@@ -62,7 +62,6 @@ typedef struct __wt_huffman_obj {
 	 * memory: code2symbol[1 << max_code_length]
 	 */
 	uint8_t *code2symbol;
-
 } WT_HUFFMAN_OBJ;
 
 /*
@@ -296,17 +295,16 @@ __wt_huffman_open(WT_SESSION_IMPL *session,
 {
 	INDEXED_SYMBOL *indexed_freqs, *sym;
 	NODE_QUEUE *combined_nodes, *leaves;
+	WT_DECL_RET;
 	WT_FREQTREE_NODE *node, *node2, **refnode, *tempnode;
 	WT_HUFFMAN_OBJ *huffman;
 	uint64_t w1, w2;
 	uint16_t i;
-	int ret;
 
 	indexed_freqs = symbol_frequency_array;
 
 	combined_nodes = leaves = NULL;
 	node = node2 = tempnode = NULL;
-	ret = 0;
 
 	WT_RET(__wt_calloc_def(session, 1, &huffman));
 
@@ -337,12 +335,12 @@ __wt_huffman_open(WT_SESSION_IMPL *session,
 		if (i > 0 &&
 		    indexed_freqs[i].symbol == indexed_freqs[i - 1].symbol)
 			WT_ERR_MSG(session, EINVAL,
-			    "duplicate symbol %" PRIx16
+			    "duplicate symbol %" PRIx32
 			    " specified in a huffman table",
 			    indexed_freqs[i].symbol);
 		if (indexed_freqs[i].symbol > huffman->numSymbols)
 			WT_ERR_MSG(session, EINVAL,
-			    "illegal symbol %" PRIx16
+			    "illegal symbol %" PRIx32
 			    " specified in a huffman table",
 			    indexed_freqs[i].symbol);
 	}
@@ -590,6 +588,7 @@ int
 __wt_huffman_encode(WT_SESSION_IMPL *session, void *huffman_arg,
     const uint8_t *from_arg, uint32_t from_len, WT_ITEM *to_buf)
 {
+	WT_DECL_RET;
 	WT_HUFFMAN_CODE code;
 	WT_HUFFMAN_OBJ *huffman;
 	WT_ITEM *tmp;
@@ -597,7 +596,6 @@ __wt_huffman_encode(WT_SESSION_IMPL *session, void *huffman_arg,
 	uint32_t max_len, outlen, bytes;
 	const uint8_t *from;
 	uint8_t len, *out, padding_info, symbol;
-	int ret;
 
 	/*
 	 * Shift register to accumulate bits from input.
@@ -612,7 +610,6 @@ __wt_huffman_encode(WT_SESSION_IMPL *session, void *huffman_arg,
 	huffman = huffman_arg;
 	from = from_arg;
 	tmp = NULL;
-	ret = 0;
 
 	/*
 	 * We don't want to find all of our callers and ensure they don't pass
@@ -729,6 +726,7 @@ int
 __wt_huffman_decode(WT_SESSION_IMPL *session, void *huffman_arg,
     const uint8_t *from_arg, uint32_t from_len, WT_ITEM *to_buf)
 {
+	WT_DECL_RET;
 	WT_ITEM *tmp;
 	WT_HUFFMAN_OBJ *huffman;
 	uint64_t from_len_bits;
@@ -736,12 +734,10 @@ __wt_huffman_decode(WT_SESSION_IMPL *session, void *huffman_arg,
 	uint16_t pattern;
 	const uint8_t *from;
 	uint8_t padding_info, symbol, *to, valid;
-	int ret;
 
 	huffman = huffman_arg;
 	from = from_arg;
 	tmp = NULL;
-	ret = 0;
 
 	/*
 	 * We don't want to find all of our callers and ensure they don't pass
