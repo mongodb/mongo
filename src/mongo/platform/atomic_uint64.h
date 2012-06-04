@@ -37,6 +37,7 @@ namespace mongo {
 
         inline void set(unsigned long long newValue);
         inline void add(unsigned long long by );
+        inline unsigned long long fetchAndAdd( unsigned long long by = 1 );
         AtomicUInt64& operator+=( unsigned long long by ){ add( by ); return *this; }
         
         inline void zero() { set(0); }
@@ -61,6 +62,13 @@ namespace mongo {
     inline void AtomicUInt64::add(unsigned long long by) {
         boost::mutex::scoped_lock lk( _mutex );
         _counter += by;
+    }
+
+    inline unsigned long long AtomicUInt64::fetchAndAdd(unsigned long long by) {
+        boost::mutex::scoped_lock lk( _mutex );
+        unsigned long long old = _counter;
+        _counter += by;
+        return old;
     }
     
 }
