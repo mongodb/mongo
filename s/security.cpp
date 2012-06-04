@@ -112,7 +112,7 @@ namespace mongo {
     void CmdAuthenticate::cdsSetMaxCpuCost(const string& dbname) {
 	return;
     }
-    void cdsSetMaxFileNum(const string& dbname) {
+    void CmdAuthenticate::cdsSetMaxFileNum(const string& dbname) {
 	return;
     }
     bool CmdLogout::run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
