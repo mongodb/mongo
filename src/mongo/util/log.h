@@ -26,6 +26,7 @@
 #include <boost/thread/tss.hpp>
 
 #include "mongo/bson/util/builder.h"
+#include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/exit_code.h"
 
