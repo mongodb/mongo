@@ -117,7 +117,7 @@ namespace mongo {
 
                 onCurrentTestNameChange( tc->getName() );
 
-                std::cout << "\t going to run test: " << tc->getName() << std::endl;
+                log() << "\t going to run test: " << tc->getName() << std::endl;
 
                 std::stringstream err;
                 err << tc->getName() << "\t";
@@ -135,13 +135,10 @@ namespace mongo {
                 catch ( int x ) {
                     err << " caught int " << x << " in test " << tc->getName();
                 }
-                catch ( ... ) {
-                    err << "unknown exception in test: " << tc->getName();
-                }
 
                 if ( ! passes ) {
                     std::string s = err.str();
-                    std::cout << "FAIL: " << s << std::endl;
+                    log() << "FAIL: " << s << std::endl;
                     r->_fails++;
                     r->_messages.push_back( s );
                 }
@@ -153,7 +150,7 @@ namespace mongo {
 
             onCurrentTestNameChange( "" );
 
-            std::cout << "\t DONE running tests" << std::endl;
+            log() << "\t DONE running tests" << std::endl;
 
             return r;
         }
@@ -161,14 +158,14 @@ namespace mongo {
         int Suite::run( const std::vector<std::string>& suites , const std::string& filter ) {
 
             if (_allSuites().empty()) {
-                std::cout << "error: no suites registered.";
-                return 1;
+                log() << "error: no suites registered.";
+                return EXIT_FAILURE;
             }
 
             for ( unsigned int i = 0; i < suites.size(); i++ ) {
                 if ( _allSuites().count( suites[i] ) == 0 ) {
-                    std::cout << "invalid test suite [" << suites[i] << "], use --list to see valid names" << std::endl;
-                    return 1;
+                    log() << "invalid test suite [" << suites[i] << "], use --list to see valid names" << std::endl;
+                    return EXIT_FAILURE;
                 }
             }
 
@@ -189,11 +186,11 @@ namespace mongo {
                 Suite* s = _allSuites()[name];
                 fassert( 16145,  s );
 
-                std::cout << "going to run suite: " << name << std::endl;
+                log() << "going to run suite: " << name << std::endl;
                 results.push_back( s->run( filter ) );
             }
 
-            std::cout << "**************************************************" << std::endl;
+            log() << "**************************************************" << std::endl;
 
             int rc = 0;
 
@@ -203,7 +200,7 @@ namespace mongo {
 
             for ( std::vector<Result*>::iterator i=results.begin(); i!=results.end(); i++ ) {
                 Result* r = *i;
-                std::cout << r->toString();
+                log() << r->toString();
                 if ( abs( r->rc() ) > abs( rc ) )
                     rc = r->rc();
 
@@ -217,7 +214,7 @@ namespace mongo {
             totals._fails = fails;
             totals._asserts = asserts;
 
-            std::cout << totals.toString(); // includes endl
+            log() << totals.toString(); // includes endl
 
             return rc;
         }
