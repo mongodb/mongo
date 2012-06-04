@@ -24,8 +24,8 @@ __drop_file(
 		return (EINVAL);
 
 	if (session->btree == NULL &&
-	    (ret = __wt_session_get_btree(
-	    session, uri, cfg, WT_BTREE_EXCLUSIVE | WT_BTREE_LOCK_ONLY)) != 0) {
+	    (ret = __wt_session_get_btree(session, uri, cfg,
+	    WT_BTREE_EXCLUSIVE | WT_BTREE_LOCK_ONLY)) != 0) {
 		if (ret == WT_NOTFOUND || ret == ENOENT)
 			ret = 0;
 		return (ret);
@@ -115,8 +115,8 @@ __drop_colgroup(
 	 * Try to get the btree handle.  It will be unlocked by
 	 * __wt_conn_btree_close_all.
 	 */
-	if ((ret = __wt_schema_get_btree(
-	    session, uri, strlen(uri), cfg, WT_BTREE_EXCLUSIVE)) != 0) {
+	if ((ret = __wt_schema_get_btree(session, uri, strlen(uri), cfg,
+	    WT_BTREE_EXCLUSIVE | WT_BTREE_LOCK_ONLY)) != 0) {
 		if (ret == WT_NOTFOUND || ret == ENOENT)
 			ret = 0;
 		return (ret);
@@ -158,8 +158,8 @@ __drop_index(
 	 * Try to get the btree handle.  It will be unlocked by
 	 * __wt_conn_btree_close_all.
 	 */
-	if ((ret = __wt_schema_get_btree(
-	    session, uri, strlen(uri), cfg, WT_BTREE_EXCLUSIVE)) != 0) {
+	if ((ret = __wt_schema_get_btree(session, uri, strlen(uri), cfg,
+	    WT_BTREE_EXCLUSIVE | WT_BTREE_LOCK_ONLY)) != 0) {
 		if (ret == WT_NOTFOUND || ret == ENOENT)
 			ret = 0;
 		return (ret);
@@ -199,22 +199,22 @@ __drop_table(
 	for (i = 0; i < WT_COLGROUPS(table); i++) {
 		if (table->cg_name[i] == NULL)
 			continue;
-		WT_TRET(__drop_colgroup(
+		WT_ERR(__drop_colgroup(
 		    session, table->cg_name[i], force, cfg));
 	}
 
 	/* Drop the indices. */
-	WT_TRET(__wt_schema_open_index(session, table, NULL, 0));
+	WT_ERR(__wt_schema_open_index(session, table, NULL, 0));
 	for (i = 0; i < table->nindices; i++) {
 		if (table->idx_name[i] == NULL)
 			continue;
 		WT_TRET(__drop_index(session, table->idx_name[i], force, cfg));
 	}
 
-	WT_TRET(__wt_schema_remove_table(session, table));
+	WT_ERR(__wt_schema_remove_table(session, table));
 
 	/* Remove the metadata entry (ignore missing items). */
-	WT_TRET(__wt_metadata_remove(session, uri));
+	WT_ERR(__wt_metadata_remove(session, uri));
 
 err:	if (force && ret == WT_NOTFOUND)
 		ret = 0;

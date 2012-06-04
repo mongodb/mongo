@@ -290,7 +290,7 @@ __wt_curfile_open(WT_SESSION_IMPL *session, const char *uri,
 		WT_RET(__wt_session_get_btree(session,
 		     uri, cfg, bulk ? WT_BTREE_EXCLUSIVE : 0));
 	else
-		return (EINVAL);
+		WT_RET_MSG(session, EINVAL, "Unexpected object type");
 
 	return (__wt_curfile_create(session, owner, cfg, cursorp));
 }

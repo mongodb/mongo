@@ -242,8 +242,10 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table,
 
 err:	__wt_buf_free(session, &cols);
 	__wt_buf_free(session, &uribuf);
-	if (session->btree != NULL)
+	if (btree != NULL) {
+		session->btree = btree;
 		WT_TRET(__wt_session_release_btree(session));
+	}
 
 	return (ret);
 }
@@ -401,7 +403,6 @@ __wt_schema_open_table(WT_SESSION_IMPL *session,
 
 	WT_ERR(__wt_calloc_def(session, WT_COLGROUPS(table), &table->cg_name));
 	WT_ERR(__wt_schema_open_colgroups(session, table));
-
 	*tablep = table;
 
 	if (0) {

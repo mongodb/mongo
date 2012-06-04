@@ -335,8 +335,10 @@ __wt_conn_btree_close(WT_SESSION_IMPL *session, int locked)
 	 */
 	__wt_spin_lock(session, &conn->spinlock);
 	inuse = --btree->refcnt > 0;
-	if (!inuse && !locked)
+	if (!inuse && !locked) {
 		__wt_writelock(session, btree->rwlock);
+		F_SET(btree, WT_BTREE_EXCLUSIVE);
+	}
 	__wt_spin_unlock(session, &conn->spinlock);
 
 	if (!inuse) {
@@ -350,8 +352,10 @@ __wt_conn_btree_close(WT_SESSION_IMPL *session, int locked)
 
 		if (F_ISSET(btree, WT_BTREE_OPEN))
 			WT_TRET(__wt_conn_btree_sync_and_close(session));
-		if (!locked)
+		if (!locked) {
+			F_CLR(btree, WT_BTREE_EXCLUSIVE);
 			__wt_rwunlock(session, btree->rwlock);
+		}
 	}
 
 	return (ret);

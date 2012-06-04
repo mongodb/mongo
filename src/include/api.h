@@ -185,6 +185,7 @@ struct __wt_connection_impl {
 	WT_SESSION_IMPL  dummy_session;
 
 	WT_SPINLOCK fh_lock;		/* File handle queue spinlock */
+	WT_SPINLOCK schema_lock;	/* Schema operation spinlock */
 	WT_SPINLOCK serial_lock;	/* Serial function call spinlock */
 	WT_SPINLOCK spinlock;		/* General purpose spinlock */
 

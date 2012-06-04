@@ -170,6 +170,7 @@ __create_colgroup(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_buf_fmt(session, &uribuf, "file:%s", filename));
 	fileuri = uribuf.data;
 
+	WT_ERR(__create_file(session, fileuri, exclusive, fileconf));
 	if ((ret = __wt_metadata_insert(session, name, cgconf)) != 0) {
 		/*
 		 * If the entry already exists in the metadata, we're done.
@@ -179,10 +180,9 @@ __create_colgroup(WT_SESSION_IMPL *session,
 			ret = exclusive ? EEXIST : 0;
 		goto err;
 	}
-	WT_ERR(__create_file(session, fileuri, exclusive, fileconf));
 	WT_ERR(__wt_schema_open_colgroups(session, table));
 
-err:    __wt_free(session, cgconf);
+err:	__wt_free(session, cgconf);
 	__wt_free(session, fileconf);
 	__wt_free(session, oldconf);
 	__wt_buf_free(session, &fmt);
@@ -279,6 +279,7 @@ __create_index(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_buf_fmt(session, &uribuf, "file:%s", filename));
 	fileuri = uribuf.data;
 
+	WT_ERR(__create_file(session, fileuri, exclusive, fileconf));
 	if ((ret = __wt_metadata_insert(session, name, idxconf)) != 0) {
 		/*
 		 * If the entry already exists in the metadata, we're done.
@@ -288,7 +289,6 @@ __create_index(WT_SESSION_IMPL *session,
 			ret = exclusive ? EEXIST : 0;
 		goto err;
 	}
-	WT_ERR(__create_file(session, fileuri, exclusive, fileconf));
 
 err:	__wt_free(session, fileconf);
 	__wt_free(session, idxconf);
@@ -340,7 +340,15 @@ __create_table(WT_SESSION_IMPL *session,
 		return (ret);
 
 	WT_RET(__wt_config_collapse(session, cfg, &tableconf));
-	WT_ERR(__wt_metadata_insert(session, name, tableconf));
+	if ((ret = __wt_metadata_insert(session, name, tableconf)) != 0) {
+		/*
+		 * If the entry already exists in the metadata, we're done.
+		 * This is an error for exclusive creates but okay otherwise.
+		 */
+		if (ret == WT_DUPLICATE_KEY)
+			ret = exclusive ? EEXIST : 0;
+		goto err;
+	}
 
 	/* Attempt to open the table now to catch any errors. */
 	WT_ERR(__wt_schema_get_table(

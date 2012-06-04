@@ -28,6 +28,7 @@ main(int argc, char *argv[])
 	u_int nthreads;
 	int ch, cnt, runs;
 	char *config_open;
+	const char **objp, *objs[] = { "file:__wt", "table:__wt", NULL };
 
 	if ((progname = strrchr(argv[0], '/')) == NULL)
 		progname = argv[0];
@@ -76,21 +77,15 @@ main(int argc, char *argv[])
 	for (cnt = 1; runs == 0 || cnt <= runs; ++cnt) {
 		shutdown();			/* Clean up previous runs */
 
-		uri = "file:__wt";
-		printf("    %d: %u threads on %s\n", cnt, nthreads, uri);
-		wt_startup(config_open);
-		if (fop_start(nthreads))
-			return (EXIT_FAILURE);
-		wt_shutdown();
-		printf("\n");
-
-		uri = "table:__wt";
-		printf("    %d: %u threads on %s\n", cnt, nthreads, uri);
-		wt_startup(config_open);
-		if (fop_start(nthreads))
-			return (EXIT_FAILURE);
-		wt_shutdown();
-		printf("\n");
+		for (objp = objs; *objp != NULL; objp++) {
+			uri = *objp;
+			printf("%5d: %u threads on %s\n", cnt, nthreads, uri);
+			wt_startup(config_open);
+			if (fop_start(nthreads))
+				return (EXIT_FAILURE);
+			wt_shutdown();
+			printf("\n");
+		}
 	}
 	return (0);
 }

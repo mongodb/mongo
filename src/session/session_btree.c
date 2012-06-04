@@ -116,6 +116,7 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 		F_CLR(btree, WT_BTREE_EXCLUSIVE);
 
 	__wt_rwunlock(session, btree->rwlock);
+	session->btree = NULL;
 
 	return (ret);
 }
@@ -171,8 +172,12 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 			return (0);
 
 		if ((ret =
-		    __wt_session_lock_btree(session, flags)) != WT_NOTFOUND)
+		    __wt_session_lock_btree(session, flags)) != WT_NOTFOUND) {
+			WT_ASSERT(session, ret != 0 ||
+			    LF_ISSET(WT_BTREE_EXCLUSIVE) ==
+			    F_ISSET(session->btree, WT_BTREE_EXCLUSIVE));
 			return (ret);
+		}
 		ret = 0;
 	}
 
@@ -183,6 +188,8 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 
 	WT_ASSERT(session, LF_ISSET(WT_BTREE_LOCK_ONLY) ||
 	    F_ISSET(session->btree, WT_BTREE_OPEN));
+	WT_ASSERT(session, LF_ISSET(WT_BTREE_EXCLUSIVE) ==
+	    F_ISSET(session->btree, WT_BTREE_EXCLUSIVE));
 
 	return (0);
 }

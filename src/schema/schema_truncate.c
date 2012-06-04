@@ -45,11 +45,6 @@ __truncate_table(WT_SESSION_IMPL *session, const char *name)
 
 	WT_RET(__wt_schema_get_table(session, name, strlen(name), &table));
 	WT_RET(__wt_scr_alloc(session, 0, &namebuf));
-	/*
-	 * We are closing the column groups, they must be reopened for future
-	 * accesses to the table.
-	 */
-	table->cg_complete = 0;
 
 	/* Truncate the column groups. */
 	for (i = 0; i < WT_COLGROUPS(table); i++) {

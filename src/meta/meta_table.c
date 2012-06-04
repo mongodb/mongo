@@ -46,8 +46,7 @@ __wt_metadata_open(WT_SESSION_IMPL *session)
 	WT_ASSERT(session, session->metafile != NULL);
 
 	/* The metafile doesn't need to stay locked -- release it. */
-	WT_RET(__wt_session_release_btree(session));
-	return (0);
+	return (__wt_session_release_btree(session));
 }
 
 /*
@@ -58,12 +57,20 @@ int
 __wt_metadata_cursor(
     WT_SESSION_IMPL *session, const char *config, WT_CURSOR **cursorp)
 {
+	WT_BTREE *saved_btree;
+	WT_DECL_RET;
 	const char *cfg[] = API_CONF_DEFAULTS(session, open_cursor, config);
 
-	WT_RET(__wt_metadata_open(session));
+	saved_btree = session->btree;
+	WT_ERR(__wt_metadata_open(session));
+
 	session->btree = session->metafile;
-	WT_RET(__wt_session_lock_btree(session, 0));
-	return (__wt_curfile_create(session, NULL, cfg, cursorp));
+	WT_ERR(__wt_session_lock_btree(session, 0));
+	ret = __wt_curfile_create(session, NULL, cfg, cursorp);
+
+	/* Restore the caller's btree. */
+err:	session->btree = saved_btree;
+	return (ret);
 }
 
 /*
@@ -74,7 +81,6 @@ int
 __wt_metadata_insert(
     WT_SESSION_IMPL *session, const char *key, const char *value)
 {
-	WT_BTREE *btree;
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 
@@ -82,8 +88,6 @@ __wt_metadata_insert(
 		WT_RET_MSG(session, EINVAL,
 		    "%s: insert not supported on the turtle file", key);
 
-	/* Save the caller's btree: the metadata cursor will overwrite it. */
-	btree = session->btree;
 	WT_ERR(__wt_metadata_cursor(session, NULL, &cursor));
 	cursor->set_key(cursor, key);
 	cursor->set_value(cursor, value);
@@ -92,9 +96,7 @@ __wt_metadata_insert(
 		ret = __wt_meta_track_insert(session, key);
 	WT_TRET(cursor->close(cursor));
 
-	/* Restore the caller's btree. */
-err:	session->btree = btree;
-	return (ret);
+err:	return (ret);
 }
 
 /*
@@ -105,7 +107,6 @@ int
 __wt_metadata_update(
     WT_SESSION_IMPL *session, const char *key, const char *value)
 {
-	WT_BTREE *btree;
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 
@@ -115,16 +116,12 @@ __wt_metadata_update(
 	if (WT_META_TRACKING(session))
 		WT_RET(__wt_meta_track_update(session, key));
 
-	/* Save the caller's btree: the metadata cursor will overwrite it. */
-	btree = session->btree;
 	WT_RET(__wt_metadata_cursor(session, "overwrite", &cursor));
 	cursor->set_key(cursor, key);
 	cursor->set_value(cursor, value);
 	WT_TRET(cursor->insert(cursor));
 	WT_TRET(cursor->close(cursor));
 
-	/* Restore the caller's btree. */
-	session->btree = btree;
 	return (ret);
 }
 
@@ -135,7 +132,6 @@ __wt_metadata_update(
 int
 __wt_metadata_remove(WT_SESSION_IMPL *session, const char *key)
 {
-	WT_BTREE *btree;
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 
@@ -143,8 +139,6 @@ __wt_metadata_remove(WT_SESSION_IMPL *session, const char *key)
 		WT_RET_MSG(session, EINVAL,
 		    "%s: remove not supported on the turtle file", key);
 
-	/* Save the caller's btree: the metadata cursor will overwrite it. */
-	btree = session->btree;
 	WT_RET(__wt_metadata_cursor(session, NULL, &cursor));
 	cursor->set_key(cursor, key);
 	WT_TRET(cursor->search(cursor));
@@ -155,8 +149,6 @@ __wt_metadata_remove(WT_SESSION_IMPL *session, const char *key)
 	}
 	WT_TRET(cursor->close(cursor));
 
-	/* Restore the caller's btree. */
-	session->btree = btree;
 	return (ret);
 }
 
@@ -169,7 +161,6 @@ int
 __wt_metadata_read(
     WT_SESSION_IMPL *session, const char *key, const char **valuep)
 {
-	WT_BTREE *btree;
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	const char *value;
@@ -177,16 +168,12 @@ __wt_metadata_read(
 	if (__metadata_turtle(key))
 		return (__wt_meta_turtle_read(session, key, valuep));
 
-	/* Save the caller's btree: the metadata cursor will overwrite it. */
-	btree = session->btree;
 	WT_RET(__wt_metadata_cursor(session, NULL, &cursor));
 	cursor->set_key(cursor, key);
 	WT_ERR(cursor->search(cursor));
 	WT_ERR(cursor->get_value(cursor, &value));
 	WT_ERR(__wt_strdup(session, value, valuep));
 
-err:    WT_TRET(cursor->close(cursor));
-	/* Restore the caller's btree. */
-	session->btree = btree;
+err:	WT_TRET(cursor->close(cursor));
 	return (ret);
 }

@@ -178,8 +178,9 @@ __session_create(WT_SESSION *wt_session, const char *uri, const char *config)
 
 	/* Disallow objects in the WiredTiger name space. */
 	WT_ERR(__wt_schema_name_check(session, uri));
-
-	WT_ERR(__wt_schema_create(session, uri, config));
+	__wt_spin_lock(session, &S2C(session)->schema_lock);
+	ret = __wt_schema_create(session, uri, config);
+	__wt_spin_unlock(session, &S2C(session)->schema_lock);
 
 err:	API_END_NOTFOUND_MAP(session, ret);
 }
@@ -197,9 +198,12 @@ __session_rename(WT_SESSION *wt_session,
 
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_API_CALL(session, rename, config, cfg);
+
+	WT_ERR(__wt_meta_track_on(session));
 	ret = __wt_schema_rename(session, uri, newname, cfg);
 
-err:	API_END_NOTFOUND_MAP(session, ret);
+err:	WT_TRET(__wt_meta_track_off(session, ret != 0));
+	API_END_NOTFOUND_MAP(session, ret);
 }
 
 /*
@@ -220,9 +224,11 @@ __session_drop(WT_SESSION *wt_session, const char *uri, const char *config)
 
 	/* Dropping snapshots is a different code path. */
 	WT_ERR(__wt_config_gets(session, cfg, "snapshot", &cval));
+	__wt_spin_lock(session, &S2C(session)->schema_lock);
 	ret = (cval.len == 0) ? __wt_schema_drop(session, uri, cfg) :
 	    __wt_schema_worker(
 		session, uri, cfg, __wt_snapshot_drop, WT_BTREE_SNAPSHOT_OP);
+	__wt_spin_unlock(session, &S2C(session)->schema_lock);
 
 err:	/* Note: drop operations cannot be unrolled (yet?). */
 	WT_TRET(__wt_meta_track_off(session, 0));
@@ -241,8 +247,10 @@ __session_dumpfile(WT_SESSION *wt_session, const char *uri, const char *config)
 
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_API_CALL(session, dumpfile, config, cfg);
+	__wt_spin_lock(session, &S2C(session)->schema_lock);
 	ret = __wt_schema_worker(session, uri, cfg,
 	    __wt_dumpfile, WT_BTREE_EXCLUSIVE | WT_BTREE_VERIFY);
+	__wt_spin_unlock(session, &S2C(session)->schema_lock);
 
 err:	API_END_NOTFOUND_MAP(session, ret);
 }
@@ -260,8 +268,10 @@ __session_salvage(WT_SESSION *wt_session, const char *uri, const char *config)
 	session = (WT_SESSION_IMPL *)wt_session;
 
 	SESSION_API_CALL(session, salvage, config, cfg);
+	__wt_spin_lock(session, &S2C(session)->schema_lock);
 	ret = __wt_schema_worker(session, uri, cfg,
 	    __wt_salvage, WT_BTREE_EXCLUSIVE | WT_BTREE_SALVAGE);
+	__wt_spin_unlock(session, &S2C(session)->schema_lock);
 
 err:	API_END_NOTFOUND_MAP(session, ret);
 }
@@ -281,10 +291,12 @@ __session_sync(WT_SESSION *wt_session, const char *uri, const char *config)
 	SESSION_API_CALL(session, sync, config, cfg);
 	WT_ERR(__wt_meta_track_on(session));
 
+	__wt_spin_lock(session, &S2C(session)->schema_lock);
 	ret = __wt_schema_worker(
 	    session, uri, cfg, __wt_snapshot, WT_BTREE_SNAPSHOT_OP);
+	__wt_spin_unlock(session, &S2C(session)->schema_lock);
 
-err:    WT_TRET(__wt_meta_track_off(session, ret != 0));
+err:	WT_TRET(__wt_meta_track_off(session, ret != 0));
 	API_END_NOTFOUND_MAP(session, ret);
 }
 
@@ -369,8 +381,10 @@ __session_upgrade(WT_SESSION *wt_session, const char *uri, const char *config)
 	session = (WT_SESSION_IMPL *)wt_session;
 
 	SESSION_API_CALL(session, upgrade, config, cfg);
+	__wt_spin_lock(session, &S2C(session)->schema_lock);
 	ret = __wt_schema_worker(session, uri, cfg,
 	    __wt_upgrade, WT_BTREE_EXCLUSIVE | WT_BTREE_UPGRADE);
+	__wt_spin_unlock(session, &S2C(session)->schema_lock);
 
 err:	API_END_NOTFOUND_MAP(session, ret);
 }
@@ -388,8 +402,10 @@ __session_verify(WT_SESSION *wt_session, const char *uri, const char *config)
 	session = (WT_SESSION_IMPL *)wt_session;
 
 	SESSION_API_CALL(session, verify, config, cfg);
+	__wt_spin_lock(session, &S2C(session)->schema_lock);
 	ret = __wt_schema_worker(session, uri, cfg,
 	    __wt_verify, WT_BTREE_EXCLUSIVE | WT_BTREE_VERIFY);
+	__wt_spin_unlock(session, &S2C(session)->schema_lock);
 
 err:	API_END_NOTFOUND_MAP(session, ret);
 }
