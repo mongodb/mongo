@@ -26,7 +26,6 @@
 
 #include "mongo/bson/inline_decls.h"
 #include "mongo/bson/stringdata.h"
-#include "mongo/util/assert_util.h"
 
 namespace mongo {
     /* Accessing unaligned doubles on ARM generates an alignment trap and aborts with SIGBUS on Linux.
@@ -56,6 +55,8 @@ namespace mongo {
     const int BSONObjMaxInternalSize = BSONObjMaxUserSize + ( 16 * 1024 );
 
     const int BufferMaxSize = 64 * 1024 * 1024;
+
+    void msgasserted(int msgid, const char *msg);
 
     template <typename Allocator>
     class StringBuilderImpl;
