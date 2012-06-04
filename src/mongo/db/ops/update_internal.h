@@ -20,6 +20,7 @@
 
 #include "mongo/bson/bson_builder_base.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/jsobjmanipulator.h"
 #include "mongo/db/matcher.h"
 #include "mongo/util/embedded_builder.h"
 #include "mongo/util/stringutils.h"
