@@ -82,7 +82,7 @@
         ::mongo::unittest::TestAssertion _testAssertion( __FILE__, __LINE__ ); \
         try {                                                            \
             EXPRESSION;                                               \
-        } catch ( const EXCEPTION_TYPE & ) { threw = true; }            \
+        } catch ( const EXCEPTION_TYPE& ) { threw = true; }            \
         if (!threw)                                                     \
             _testAssertion.fail("Expected expression " #EXPRESSION      \
                                 " to throw " #EXCEPTION_TYPE " but it threw nothing."); \
@@ -198,7 +198,7 @@ namespace mongo {
          */
         class Suite : private boost::noncopyable {
         public:
-            Suite( const string &name );
+            Suite( const string& name );
             virtual ~Suite();
 
             template<class T>
@@ -218,7 +218,7 @@ namespace mongo {
 
             Result * run( const std::string& filter );
 
-            static int run( const std::vector<std::string> &suites , const std::string& filter );
+            static int run( const std::vector<std::string>& suites , const std::string& filter );
 
             /**
              * Get a suite with the given name, creating it if necessary.
@@ -250,7 +250,7 @@ namespace mongo {
             TestHolderList _tests;
             bool _ran;
 
-            void registerSuite( const std::string &name , Suite *s );
+            void registerSuite( const std::string& name , Suite* s );
         };
 
         /**
@@ -259,9 +259,9 @@ namespace mongo {
          */
         class TestAssertionFailureDetails : private boost::noncopyable {
         public:
-            TestAssertionFailureDetails( const std::string &theFile,
+            TestAssertionFailureDetails( const std::string& theFile,
                                          unsigned theLine,
-                                         const std::string &theMessage );
+                                         const std::string& theMessage );
 
             const std::string file;
             const unsigned line;
@@ -279,13 +279,13 @@ namespace mongo {
          */
         class TestAssertionFailureException {
         public:
-            TestAssertionFailureException( const std::string &theFile,
+            TestAssertionFailureException( const std::string& theFile,
                                            unsigned theLine,
-                                           const std::string &theMessage );
+                                           const std::string& theMessage );
 
-            const std::string &getFile() const { return _details->file; }
+            const std::string& getFile() const { return _details->file; }
             unsigned getLine() const { return _details->line; }
-            const std::string &getMessage() const { return _details->message; }
+            const std::string& getMessage() const { return _details->message; }
 
             std::string toString() const;
 
@@ -299,14 +299,14 @@ namespace mongo {
         class TestAssertion : private boost::noncopyable {
 
         public:
-            TestAssertion( const std::string &file, unsigned line );
+            TestAssertion( const std::string& file, unsigned line );
             ~TestAssertion();
 
-            void fail( const std::string &message) const;
+            void fail( const std::string& message) const;
             void failIf( bool flag, const std::string &message ) const {
                 if ( flag ) fail( message );
             }
-            void failUnless( bool flag, const std::string &message ) const {
+            void failUnless( bool flag, const std::string& message ) const {
                 failIf( !flag, message );
             }
 
@@ -320,43 +320,43 @@ namespace mongo {
          */
         class ComparisonAssertion : private TestAssertion {
         public:
-            ComparisonAssertion( const std::string &aexp , const std::string &bexp ,
-                                 const std::string &file , unsigned line );
+            ComparisonAssertion( const std::string& aexp , const std::string& bexp ,
+                                 const std::string& file , unsigned line );
 
             template<typename A,typename B>
-            void assertEqual( const A &a , const B &b ) {
+            void assertEqual( const A& a , const B& b ) {
                 failUnless(a == b, getComparisonFailureMessage("==", a, b));
             }
 
             template<typename A,typename B>
-            void assertNotEqual( const A &a , const B &b ) {
+            void assertNotEqual( const A& a , const B& b ) {
                 failUnless(a != b, getComparisonFailureMessage("!=", a, b));
             }
 
             template<typename A,typename B>
-            void assertLessThan( const A &a , const B &b ) {
+            void assertLessThan( const A& a , const B& b ) {
                 failUnless(a < b, getComparisonFailureMessage("<", a, b));
             }
 
             template<typename A,typename B>
-            void assertNotLessThan( const A &a , const B &b ) {
+            void assertNotLessThan( const A& a , const B& b ) {
                 failUnless(a >= b, getComparisonFailureMessage(">=", a, b));
             }
 
             template<typename A,typename B>
-            void assertGreaterThan( const A &a , const B &b ) {
+            void assertGreaterThan( const A& a , const B& b ) {
                 failUnless(a > b, getComparisonFailureMessage(">", a, b));
             }
 
             template<typename A,typename B>
-            void assertNotGreaterThan( const A &a , const B &b ) {
+            void assertNotGreaterThan( const A& a , const B& b ) {
                 failUnless(a <= b, getComparisonFailureMessage("<=", a, b));
             }
 
         private:
             template< typename A, typename B>
             std::string getComparisonFailureMessage(const std::string &theOperator,
-                                                    const A &a, const B &b);
+                                                    const A& a, const B& b);
 
             std::string _aexp;
             std::string _bexp;
@@ -366,7 +366,7 @@ namespace mongo {
          * Hack to support the runaway test observer in dbtests.  This is a hook that
          * unit test running harnesses (unittest_main and dbtests) must implement.
          */
-        void onCurrentTestNameChange( const std::string &testName );
+        void onCurrentTestNameChange( const std::string& testName );
 
         /**
          * Return a list of suite names.

@@ -31,7 +31,7 @@ namespace mongo {
         namespace {
             typedef std::map<std::string, Suite*> SuiteMap;
 
-            inline SuiteMap &_allSuites() {
+            inline SuiteMap& _allSuites() {
                 static SuiteMap allSuites;
                 return allSuites;
             }
@@ -40,7 +40,7 @@ namespace mongo {
 
         class Result {
         public:
-            Result( const std::string &name ) : _name( name ) , _rc(0) , _tests(0) , _fails(0) , _asserts(0) {}
+            Result( const std::string& name ) : _name( name ) , _rc(0) , _tests(0) , _fails(0) , _asserts(0) {}
 
             std::string toString() {
                 std::stringstream ss;
@@ -71,7 +71,7 @@ namespace mongo {
             static Result * cur;
         };
 
-        Result *Result::cur = 0;
+        Result* Result::cur = 0;
 
         Test::Test() {}
         Test::~Test() {}
@@ -85,7 +85,7 @@ namespace mongo {
         void Test::setUp() {}
         void Test::tearDown() {}
 
-        Suite::Suite( const std::string &name ) : _name( name ) {
+        Suite::Suite( const std::string& name ) : _name( name ) {
             registerSuite( name , this );
         }
 
@@ -105,7 +105,7 @@ namespace mongo {
             Result::cur = r;
 
             for ( std::vector<TestHolder*>::iterator i=_tests.begin(); i!=_tests.end(); i++ ) {
-                TestHolder * tc = *i;
+                TestHolder* tc = *i;
                 if ( filter.size() && tc->getName().find( filter ) == std::string::npos ) {
                     log(1) << "\t skipping test: " << tc->getName() << " because doesn't match filter" << std::endl;
                     continue;
@@ -126,7 +126,7 @@ namespace mongo {
                     tc->run();
                     passes = true;
                 }
-                catch ( const TestAssertionFailureException & ae ) {
+                catch ( const TestAssertionFailureException& ae ) {
                     err << ae.toString();
                 }
                 catch ( const std::exception& e ) {
@@ -158,7 +158,7 @@ namespace mongo {
             return r;
         }
 
-        int Suite::run( const std::vector<std::string> &suites , const std::string& filter ) {
+        int Suite::run( const std::vector<std::string>& suites , const std::string& filter ) {
 
             if (_allSuites().empty()) {
                 std::cout << "error: no suites registered.";
@@ -202,7 +202,7 @@ namespace mongo {
             int asserts = 0;
 
             for ( std::vector<Result*>::iterator i=results.begin(); i!=results.end(); i++ ) {
-                Result * r = *i;
+                Result* r = *i;
                 std::cout << r->toString();
                 if ( abs( r->rc() ) > abs( rc ) )
                     rc = r->rc();
@@ -222,7 +222,7 @@ namespace mongo {
             return rc;
         }
 
-        void Suite::registerSuite( const std::string &name , Suite * s ) {
+        void Suite::registerSuite( const std::string& name , Suite* s ) {
             Suite*& m = _allSuites()[name];
             fassert( 10162, ! m );
             m = s;
@@ -238,16 +238,16 @@ namespace mongo {
         void Suite::setupTests() {}
 
         TestAssertionFailureDetails::TestAssertionFailureDetails(
-                const std::string &theFile,
+                const std::string& theFile,
                 unsigned theLine,
-                const std::string &theMessage )
+                const std::string& theMessage )
             : file( theFile ), line( theLine ), message( theMessage ) {
         }
 
         TestAssertionFailureException::TestAssertionFailureException(
-                const std::string &theFile,
+                const std::string& theFile,
                 unsigned theLine,
-                const std::string &theFailingExpression )
+                const std::string& theFailingExpression )
             : _details( new TestAssertionFailureDetails( theFile, theLine, theFailingExpression ) ) {
         }
 
@@ -257,7 +257,7 @@ namespace mongo {
             return os.str();
         }
 
-        TestAssertion::TestAssertion( const std::string &file, unsigned line )
+        TestAssertion::TestAssertion( const std::string& file, unsigned line )
             : _file( file ), _line( line ) {
 
             ++Result::cur->_asserts;
@@ -265,12 +265,12 @@ namespace mongo {
 
         TestAssertion::~TestAssertion() {}
 
-        void TestAssertion::fail( const std::string &message ) const {
+        void TestAssertion::fail( const std::string& message ) const {
             throw TestAssertionFailureException( _file, _line, message );
         }
 
-        ComparisonAssertion::ComparisonAssertion( const std::string &aexp, const std::string &bexp,
-                                                  const std::string &file, unsigned line )
+        ComparisonAssertion::ComparisonAssertion( const std::string& aexp, const std::string& bexp,
+                                                  const std::string& file, unsigned line )
             : TestAssertion( file, line ), _aexp( aexp ), _bexp( bexp ) {}
 
         std::vector<std::string> getAllSuiteNames() {
