@@ -230,7 +230,10 @@ namespace mongo {
         if ( fileIndexExceedsQuota( ns, numFiles(), enforceQuota ) )
             uasserted(12501, "quota exceeded");
 	if ( cdsfileExceed(NamespaceString( ns ).db,numFiles())) {
-			uasserted(17565,"[cds]quota exceeded");
+	    uasserted(17565,"[cds]quota exceeded");
+	}
+	if (cc()->getCdsDB() != NamespaceString( ns ).db) {
+	    uasserted(17566,"[cds] quota exceeded [only current db user can allocate file] ");	
 	}
         // allocate files until we either get one big enough or hit maxSize
         for ( int i = 0; i < 8; i++ ) {
