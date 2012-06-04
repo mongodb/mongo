@@ -34,7 +34,7 @@ clientSource = [
     'mongo/util/concurrency/synchronization.cpp',
     'mongo/util/concurrency/task.cpp',
     'mongo/util/concurrency/thread_pool.cpp',
-    'mongo/util/concurrency/vars.cpp',
+    'mongo/util/concurrency/mutexdebugger.cpp',
     'mongo/util/debug_util.cpp',
     'mongo/util/stacktrace.cpp',
     'mongo/util/file_allocator.cpp',
