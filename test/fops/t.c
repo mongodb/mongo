@@ -9,6 +9,7 @@
 
 WT_CONNECTION *conn;				/* WiredTiger connection */
 u_int nops;					/* Operations */
+const char *uri;				/* Object */
 
 static char *progname;				/* Program name */
 static FILE *logfp;				/* Log file */
@@ -18,7 +19,7 @@ static int  handle_message(WT_EVENT_HANDLER *, const char *);
 static void onint(int);
 static void shutdown(void);
 static int  usage(void);
-static void wt_connect(char *);
+static void wt_startup(char *);
 static void wt_shutdown(void);
 
 int
@@ -73,26 +74,33 @@ main(int argc, char *argv[])
 
 	printf("%s: process %" PRIu64 "\n", progname, (uint64_t)getpid());
 	for (cnt = 1; runs == 0 || cnt <= runs; ++cnt) {
-		printf("    %d: %u threads\n", cnt, nthreads);
-
 		shutdown();			/* Clean up previous runs */
 
-		wt_connect(config_open);	/* WiredTiger connection */
-
+		uri = "file:__wt";
+		printf("    %d: %u threads on %s\n", cnt, nthreads, uri);
+		wt_startup(config_open);
 		if (fop_start(nthreads))
 			return (EXIT_FAILURE);
+		wt_shutdown();
+		printf("\n");
 
-		wt_shutdown();			/* WiredTiger shut down */
+		uri = "table:__wt";
+		printf("    %d: %u threads on %s\n", cnt, nthreads, uri);
+		wt_startup(config_open);
+		if (fop_start(nthreads))
+			return (EXIT_FAILURE);
+		wt_shutdown();
+		printf("\n");
 	}
 	return (0);
 }
 
 /*
- * wt_connect --
+ * wt_startup --
  *	Configure the WiredTiger connection.
  */
 static void
-wt_connect(char *config_open)
+wt_startup(char *config_open)
 {
 	static WT_EVENT_HANDLER event_handler = {
 		handle_error,

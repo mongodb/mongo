@@ -19,13 +19,13 @@
 
 #include <wiredtiger.h>
 
-#define	FNAME		"file:__wt"		/* File name */
-
 #define	UNUSED(v)	(void)(v)		/* Quiet unused var warnings */
 
 extern WT_CONNECTION *conn;			/* WiredTiger connection */
 
 extern u_int nops;				/* Operations per thread */
+
+extern const char *uri;				/* Object */
 
 #if defined (__GNUC__)
 void die(const char *, int) __attribute__((noreturn));
@@ -33,8 +33,8 @@ void die(const char *, int) __attribute__((noreturn));
 void die(const char *, int);
 #endif
 int  fop_start(u_int);
-void file_create(void);
-void file_drop(void);
-void file_sync(void);
-void file_upgrade(void);
-void file_verify(void);
+void obj_create(void);
+void obj_drop(void);
+void obj_sync(void);
+void obj_upgrade(void);
+void obj_verify(void);

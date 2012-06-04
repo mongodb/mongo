@@ -8,7 +8,7 @@
 #include "thread.h"
 
 void
-file_create(void)
+obj_create(void)
 {
 	WT_SESSION *session;
 	int ret;
@@ -16,7 +16,7 @@ file_create(void)
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die("conn.session", ret);
 
-	if ((ret = session->create(session, FNAME, NULL)) != 0)
+	if ((ret = session->create(session, uri, NULL)) != 0)
 		if (ret != EEXIST)
 			die("session.create", ret);
 
@@ -25,7 +25,7 @@ file_create(void)
 }
 
 void
-file_drop(void)
+obj_drop(void)
 {
 	WT_SESSION *session;
 	int ret;
@@ -33,7 +33,7 @@ file_drop(void)
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die("conn.session", ret);
 
-	if ((ret = session->drop(session, FNAME, NULL)) != 0)
+	if ((ret = session->drop(session, uri, NULL)) != 0)
 		if (ret != ENOENT && ret != EBUSY)
 			die("session.drop", ret);
 
@@ -42,7 +42,7 @@ file_drop(void)
 }
 
 void
-file_sync(void)
+obj_sync(void)
 {
 	WT_SESSION *session;
 	int ret;
@@ -50,7 +50,7 @@ file_sync(void)
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die("conn.session", ret);
 
-	if ((ret = session->sync(session, FNAME, NULL)) != 0)
+	if ((ret = session->sync(session, uri, NULL)) != 0)
 		if (ret != ENOENT)
 			die("session.sync", ret);
 
@@ -59,7 +59,7 @@ file_sync(void)
 }
 
 void
-file_upgrade(void)
+obj_upgrade(void)
 {
 	WT_SESSION *session;
 	int ret;
@@ -67,7 +67,7 @@ file_upgrade(void)
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die("conn.session", ret);
 
-	if ((ret = session->upgrade(session, FNAME, NULL)) != 0)
+	if ((ret = session->upgrade(session, uri, NULL)) != 0)
 		if (ret != ENOENT)
 			die("session.upgrade", ret);
 
@@ -76,7 +76,7 @@ file_upgrade(void)
 }
 
 void
-file_verify(void)
+obj_verify(void)
 {
 	WT_SESSION *session;
 	int ret;
@@ -84,7 +84,7 @@ file_verify(void)
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die("conn.session", ret);
 
-	if ((ret = session->verify(session, FNAME, NULL)) != 0)
+	if ((ret = session->verify(session, uri, NULL)) != 0)
 		if (ret != ENOENT)
 			die("session.verify", ret);
 

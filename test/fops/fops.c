@@ -110,23 +110,23 @@ fop(void *arg)
 		switch (r() % 5) {
 		case 0:
 			++s->create;
-			file_create();
+			obj_create();
 			break;
 		case 1:
 			++s->drop;
-			file_drop();
+			obj_drop();
 			break;
 		case 2:
 			++s->sync;
-			file_sync();
+			obj_sync();
 			break;
 		case 3:
 			++s->upgrade;
-			file_upgrade();
+			obj_upgrade();
 			break;
 		case 4:
 			++s->verify;
-			file_verify();
+			obj_verify();
 			break;
 		default:
 			break;
