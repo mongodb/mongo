@@ -352,8 +352,11 @@ namespace mongo {
                 regex = fe.regex();
                 flags = fe.regexFlags();
             }
-            else {
+            else if ( fe.type() == String ) {
                 regex = fe.valuestrsafe();
+            }
+            else {
+                uassert( 16330, "invalid regex pattern, must be BSON regex or string", 0 );
             }
             break;
         }
