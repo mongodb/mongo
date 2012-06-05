@@ -1010,7 +1010,7 @@ namespace mongo {
 
             // Make sure all state is in shards
             verify( todo.find( shard ) != todo.end() );
-            verify( mdata.initialized = true );
+            verify( mdata.initialized == true );
             if( ! mdata.completed ) verify( mdata.pcState->conn->ok() );
             verify( mdata.pcState->cursor );
             if( isVersioned() ) verify( mdata.pcState->primary || mdata.pcState->manager );
@@ -1181,9 +1181,9 @@ namespace mongo {
             else ++i;
 
             // Make sure all state is in shards
-            verify( mdata.initialized = true );
-            verify( mdata.finished = true );
-            verify( mdata.completed = true );
+            verify( mdata.initialized == true );
+            verify( mdata.finished == true );
+            verify( mdata.completed == true );
             verify( ! mdata.pcState->conn->ok() );
             verify( mdata.pcState->cursor );
             if( isVersioned() ) verify( mdata.pcState->primary || mdata.pcState->manager );
