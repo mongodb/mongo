@@ -136,7 +136,14 @@ namespace ShardingTests {
     class ChunkManagerTest : public ConnectionString::ConnectionHook {
     public:
 
-        static DBDirectClient _client;
+        class CustomDirectClient : public DBDirectClient {
+        public:
+            virtual ConnectionString::ConnectionType type() const {
+                return ConnectionString::CUSTOM;
+            }
+        };
+
+        CustomDirectClient _client;
         Shard _shard;
 
         ChunkManagerTest() {
@@ -155,9 +162,9 @@ namespace ShardingTests {
             client().insert( collName(), BSON( "hello" << "world" ) );
             client().dropCollection( collName() );
 
-            // Since we've redirected the conns, the host doesn't matter here
-            // TODO: Separate the Shard stuff out more
-            _shard = Shard( "shard0000", "hostFooBar:27017" );
+            // Since we've redirected the conns, the host doesn't matter here so long as it's
+            // prefixed with a "$"
+            _shard = Shard( "shard0000", "$hostFooBar:27017" );
             // Need to run this to ensure the shard is in the global lookup table
             _shard.setAddress( _shard.getAddress() );
         }
@@ -176,15 +183,13 @@ namespace ShardingTests {
         }
 
         virtual DBClientBase* connect( const ConnectionString& connStr,
-                                         string& errmsg,
-                                         double socketTimeout )
+                                       string& errmsg,
+                                       double socketTimeout )
         {
             // Note - must be new, since it gets owned elsewhere
-            return new DBDirectClient();
+            return new CustomDirectClient();
         }
     };
-
-    DBDirectClient ChunkManagerTest::_client;
 
     //
     // Tests creating a new chunk manager and creating the default chunks
@@ -683,8 +688,7 @@ namespace ShardingTests {
         void setupTests() {
             add< serverandquerytests::test1 >();
             add< ShardVersionParsingTest >();
-            // SERVER-5918
-            //add< ChunkManagerCreateBasicTest >();
+            add< ChunkManagerCreateBasicTest >();
             add< ChunkManagerCreateFullTest >();
             add< ChunkManagerLoadBasicTest >();
             add< ChunkDiffUnitTestNormal >();

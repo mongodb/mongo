@@ -86,6 +86,9 @@ namespace mongo {
         case ConnectionString::SYNC:
            massert( 15906, str::stream() << "cannot set version or shard on sync connection " << conn->toString(), false );
            return NULL;
+        case ConnectionString::CUSTOM:
+           massert( 16331, str::stream() << "cannot set version or shard on custom connection " << conn->toString(), false );
+           return NULL;
         case ConnectionString::SET:
            DBClientReplicaSet* set = (DBClientReplicaSet*) conn;
            return &( set->masterConn() );

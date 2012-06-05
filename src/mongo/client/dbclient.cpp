@@ -38,12 +38,20 @@ namespace mongo {
 
     void ConnectionString::_fillServers( string s ) {
         
+        //
+        // Custom-handled servers/replica sets start with '$'
+        // According to RFC-1123/952, this will not overlap with valid hostnames
+        // (also disallows $replicaSetName hosts)
+        //
+
+        if( s.find( '$' ) == 0 ) _type = CUSTOM;
+
         {
             string::size_type idx = s.find( '/' );
             if ( idx != string::npos ) {
                 _setName = s.substr( 0 , idx );
                 s = s.substr( idx + 1 );
-                _type = SET;
+                if( _type != CUSTOM ) _type = SET;
             }
         }
 
@@ -57,6 +65,15 @@ namespace mongo {
     }
     
     void ConnectionString::_finishInit() {
+
+        // Needed here as well b/c the parsing logic isn't used in all constructors
+        // TODO: Refactor so that the parsing logic *is* used in all constructors
+        if ( _type == MASTER && _servers.size() > 0 ){
+            if( _servers[0].host().find( '$' ) == 0 ){
+                _type = CUSTOM;
+            }
+        }
+
         stringstream ss;
         if ( _type == SET )
             ss << _setName << "/";
@@ -72,23 +89,6 @@ namespace mongo {
     ConnectionString::ConnectionHook* ConnectionString::_connectHook = NULL;
 
     DBClientBase* ConnectionString::connect( string& errmsg, double socketTimeout ) const {
-
-        // Allow the replacement of connections with other connections - useful for testing.
-        // TODO: Potentially make a new connection type?  Difficult in the case of direct connections b/c these
-        // aren't always available in all configurations, and this is a shared library.
-        if( _connectHook ){
-            scoped_lock lk( _connectHookMutex );
-
-            // Double-checked lock, since this will never be active during normal operation
-            if( _connectHook ){
-                DBClientBase* replacementConn = _connectHook->connect( *this, errmsg, socketTimeout );
-                if( replacementConn ){
-                    log() << "replacing connection to " << toString() << " with "
-                          << replacementConn->getServerAddress() << endl;
-                    return replacementConn;
-                }
-            }
-        }
 
         switch ( _type ) {
         case MASTER: {
@@ -122,6 +122,25 @@ namespace mongo {
                 l.push_back( _servers[i] );
             SyncClusterConnection* c = new SyncClusterConnection( l, socketTimeout );
             return c;
+        }
+
+        case CUSTOM: {
+
+            // Lock in case other things are modifying this at the same time
+            scoped_lock lk( _connectHookMutex );
+
+            // Allow the replacement of connections with other connections - useful for testing.
+
+            uassert( 16330, "custom connection to " + this->toString() +
+                        " specified with no connection hook", _connectHook );
+
+            // Double-checked lock, since this will never be active during normal operation
+            DBClientBase* replacementConn = _connectHook->connect( *this, errmsg, socketTimeout );
+
+            log() << "replacing connection to " << this->toString() << " with "
+                  << ( replacementConn ? replacementConn->getServerAddress() : "(empty)" ) << endl;
+
+            return replacementConn;
         }
 
         case INVALID:
@@ -168,6 +187,8 @@ namespace mongo {
             return "set";
         case SYNC:
             return "sync";
+        case CUSTOM:
+            return "custom";
         }
         verify(0);
         return "";

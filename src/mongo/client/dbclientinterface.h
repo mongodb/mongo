@@ -150,7 +150,7 @@ namespace mongo {
      */
     class ConnectionString {
     public:
-        enum ConnectionType { INVALID , MASTER , PAIR , SET , SYNC };
+        enum ConnectionType { INVALID , MASTER , PAIR , SET , SYNC, CUSTOM };
 
         ConnectionString() {
             _type = INVALID;
