@@ -70,7 +70,7 @@ namespace mongo {
     /* fetch a single object from collection ns that matches query
        set your db SavedContext first
     */
-    bool Helpers::findOne(const char *ns, const BSONObj &query, BSONObj& result, bool requireIndex) {
+    bool Helpers::findOne(const StringData& ns, const BSONObj &query, BSONObj& result, bool requireIndex) {
         DiskLoc loc = findOne( ns, query, requireIndex );
         if ( loc.isNull() )
             return false;
@@ -81,12 +81,12 @@ namespace mongo {
     /* fetch a single object from collection ns that matches query
        set your db SavedContext first
     */
-    DiskLoc Helpers::findOne(const char *ns, const BSONObj &query, bool requireIndex) {
+    DiskLoc Helpers::findOne(const StringData& ns, const BSONObj &query, bool requireIndex) {
         shared_ptr<Cursor> c =
-        NamespaceDetailsTransient::getCursor( ns, query, BSONObj(),
-                                             requireIndex ?
-                                             QueryPlanSelectionPolicy::indexOnly() :
-                                             QueryPlanSelectionPolicy::any() );
+            NamespaceDetailsTransient::getCursor( ns.data() , query, BSONObj(),
+                                                  requireIndex ?
+                                                  QueryPlanSelectionPolicy::indexOnly() :
+                                                  QueryPlanSelectionPolicy::any() );
         while( c->ok() ) {
             if ( c->currentMatches() && !c->getsetdup( c->currLoc() ) ) {
                 return c->currLoc();
