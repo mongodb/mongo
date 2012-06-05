@@ -465,7 +465,6 @@ __wt_block_off_free(
     WT_SESSION_IMPL *session, WT_BLOCK *block, off_t off, off_t size)
 {
 	WT_DECL_RET;
-	WT_EXTLIST *el;
 
 	/*
 	 * Callers of this function are expected to have already acquired any
