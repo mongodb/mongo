@@ -644,20 +644,17 @@ namespace mongo {
     }
 
     void ParallelSortClusteredCursor::_markStaleNS( const NamespaceString& staleNS, const StaleConfigException& e, bool& forceReload, bool& fullReload ){
-        if( _staleNSMap.find( staleNS ) == _staleNSMap.end() ){
-            forceReload = false;
-            fullReload = false;
-            _staleNSMap[ staleNS ] = 1;
-        }
-        else{
-            int tries = ++_staleNSMap[ staleNS ];
 
-            if( tries >= 5 ) throw SendStaleConfigException( staleNS, str::stream() << "too many retries of stale version info",
-                                                             e.getVersionReceived(), e.getVersionWanted() );
+        fullReload = e.requiresFullReload();
 
-            forceReload = tries > 1;
-            fullReload = tries > 2;
-        }
+        if( _staleNSMap.find( staleNS ) == _staleNSMap.end() ) _staleNSMap[ staleNS ] = 1;
+
+        int tries = ++_staleNSMap[ staleNS ];
+
+        if( tries >= 5 ) throw SendStaleConfigException( staleNS, str::stream() << "too many retries of stale version info",
+                                                         e.getVersionReceived(), e.getVersionWanted() );
+
+        forceReload = tries > 2;
     }
 
     void ParallelSortClusteredCursor::_handleStaleNS( const NamespaceString& staleNS, bool forceReload, bool fullReload ){
