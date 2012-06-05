@@ -95,7 +95,28 @@ namespace mongo {
     class AtomicIntrinsics<T, typename boost::disable_if_c<sizeof(T) <= sizeof(void*)>::type> {
     public:
         static T compareAndSwap(volatile T* dest, T expected, T newValue) {
-            return __sync_val_compare_and_swap(dest, expected, newValue);
+            T result = expected;
+            asm volatile ("push %%eax\n"
+                          "push %%ebx\n"
+                          "push %%ecx\n"
+                          "push %%edx\n"
+                          "mov (%%edx), %%ebx\n"
+                          "mov 4(%%edx), %%ecx\n"
+                          "mov (%%edi), %%eax\n"
+                          "mov 4(%%edi), %%edx\n"
+                          "lock cmpxchg8b (%%esi)\n"
+                          "mov %%eax, (%%edi)\n"
+                          "mov %%edx, 4(%%edi)\n"
+                          "pop %%edx\n"
+                          "pop %%ecx\n"
+                          "pop %%ebx\n"
+                          "pop %%eax\n"
+                          :
+                          : "S" (dest),
+                            "D" (&result),
+                            "d" (&newValue)
+                          : "memory", "cc");
+            return result;
         }
 
         static T swap(volatile T* dest, T newValue) {
