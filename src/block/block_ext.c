@@ -471,7 +471,7 @@ __wt_block_off_free(
 	 * required to manipulate the extent lists.
 	 *
 	 * We can reuse this extent immediately if it was allocated during this
-	 * snapshot,  merge it into the avail list (which slows file growth in
+	 * snapshot, merge it into the avail list (which slows file growth in
 	 * workloads including repeated overflow record modification).  If this
 	 * extent is referenced in a previous snapshot, merge into the discard
 	 * list.
