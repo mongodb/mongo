@@ -66,6 +66,7 @@ addSmoketest( "smokeClient", [
         add_exe('clientTest'),
         ] )
 addSmoketest( "mongosTest", [ add_exe( 'mongos' ) ])
+addSmoketest( "smokeCppUnittests", "$UNITTEST_LIST" )
 
 # These tests require the mongo shell
 if shellEnv is not None:

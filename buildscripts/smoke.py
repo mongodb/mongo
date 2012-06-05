@@ -60,6 +60,7 @@ except ImportError:
 # TODO clean this up so we don't need globals...
 mongo_repo = os.getcwd() #'./'
 failfile = os.path.join(mongo_repo, 'failfile.smoke')
+cpp_unittest_list = os.path.join(mongo_repo, 'build', 'unittests.txt')
 test_path = None
 mongod_executable = None
 mongod_port = None
@@ -500,6 +501,9 @@ def expand_suites(suites,expandUseDB=True):
             else:
                 program = 'test'
             (globstr, usedb) = (program, False)
+        elif suite == "cppUnittests":
+            if os.path.exists(cpp_unittest_list):
+                tests += [(line.strip(), False) for line in file(cpp_unittest_list)]
         elif suite == 'perf':
             if os.sys.platform == "win32":
                 program = 'perftest.exe'
