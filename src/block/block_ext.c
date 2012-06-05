@@ -397,8 +397,8 @@ __wt_block_extend(
 	fh = block->fh;
 
 	/*
-	 * Callers of this function are expected to be holding any locks
-	 * required to extend the file.
+	 * Callers of this function are expected to have already acquired any
+	 * locks required to extend the file.
 	 *
 	 * We should never be allocating from an empty file.
 	 */
@@ -464,11 +464,12 @@ int
 __wt_block_off_free(
     WT_SESSION_IMPL *session, WT_BLOCK *block, off_t off, off_t size)
 {
+	WT_DECL_RET;
 	WT_EXTLIST *el;
 
 	/*
-	 * Callers of this function are expected to be holding any locks
-	 * required to manipulate the extent lists.
+	 * Callers of this function are expected to have already acquired any
+	 * locks required to manipulate the extent lists.
 	 *
 	 * We can reuse this extent immediately if it was allocated during this
 	 * snapshot, merge it into the avail list (which slows file growth in
@@ -476,12 +477,14 @@ __wt_block_off_free(
 	 * extent is referenced in a previous snapshot, merge into the discard
 	 * list.
 	 */
-	el = __wt_block_off_remove_overlap(
-	    session, &block->live.alloc, off, size) == 0 ?
-	    &block->live.avail : &block->live.discard;
-	WT_RET(__block_merge(session, el, off, (off_t)size));
-
-	return (0);
+	if ((ret = __wt_block_off_remove_overlap(
+	    session, &block->live.alloc, off, size)) == 0)
+		ret = __block_merge(
+		    session, &block->live.avail, off, (off_t)size);
+	else if (ret == WT_NOTFOUND)
+		ret = __block_merge(
+		    session, &block->live.discard, off, (off_t)size);
+	return (ret);
 }
 
 #ifdef HAVE_DIAGNOSTIC
@@ -771,15 +774,15 @@ __wt_block_insert_ext(
     WT_SESSION_IMPL *session, WT_EXTLIST *el, off_t off, off_t size)
 {
 	/*
-	 * There are currently two copies of this function (this code is a
-	 * one-liner that calls the internal version of the function, which
-	 * means the compiler should compress out the function call).  It's
-	 * that way because the interface is still fluid, I'm not convinced
-	 * there won't be a need for a functional split between the internal
-	 * and external versions in the future.
+	 * There are currently two copies of this function (this code is a one-
+	 * liner that calls the internal version of the function, which means
+	 * the compiler should compress out the function call).  It's that way
+	 * because the interface is still fluid, I'm not convinced there won't
+	 * be a need for a functional split between the internal and external
+	 * versions in the future.
 	 *
-	 * Callers of this function are expected to be holding any locks
-	 * required to manipulate the extent list.
+	 * Callers of this function are expected to have already acquired any
+	 * locks required to manipulate the extent list.
 	 */
 	return (__block_merge(session, el, off, size));
 }
