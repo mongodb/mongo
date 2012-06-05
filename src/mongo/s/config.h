@@ -130,7 +130,7 @@ namespace mongo {
             return _shardingEnabled;
         }
 
-        void enableSharding();
+        void enableSharding( bool save = true );
         ChunkManagerPtr shardCollection( const string& ns , ShardKeyPattern fieldsAndOrder , bool unique , vector<BSONObj>* initPoints=0, vector<Shard>* initShards=0 );
 
         /**

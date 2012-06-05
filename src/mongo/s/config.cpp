@@ -68,11 +68,23 @@ namespace mongo {
         // Do this *first* so we're invisible to everyone else
         manager->loadExistingRanges( configServer.getPrimary().getConnString() );
 
-        _cm = ChunkManagerPtr( manager );
-        _key = manager->getShardKey().key().getOwned();
-        _unqiue = manager->isUnique();
-        _dirty = true;
-        _dropped = false;
+        //
+        // Collections with no chunks are unsharded, no matter what the collections entry says
+        // This helps prevent errors when dropping in a different process
+        //
+
+        if( manager->numChunks() != 0 ){
+            _cm = ChunkManagerPtr( manager );
+            _key = manager->getShardKey().key().getOwned();
+            _unqiue = manager->isUnique();
+            _dirty = true;
+            _dropped = false;
+        }
+        else{
+            warning() << "no chunks found for collection " << manager->getns()
+                      << ", assuming unsharded" << endl;
+            unshard();
+        }
     }
 
     void DBConfig::CollectionInfo::unshard() {
@@ -135,7 +147,7 @@ namespace mongo {
         return _primary;
     }
 
-    void DBConfig::enableSharding() {
+    void DBConfig::enableSharding( bool save ) {
         if ( _shardingEnabled )
             return;
         
@@ -143,7 +155,7 @@ namespace mongo {
 
         scoped_lock lk( _lock );
         _shardingEnabled = true;
-        _save();
+        if( save ) _save();
     }
 
     /**
@@ -201,6 +213,9 @@ namespace mongo {
 
     bool DBConfig::removeSharding( const string& ns ) {
         if ( ! _shardingEnabled ) {
+
+            warning() << "could not remove sharding for collection " << ns
+                      << ", sharding not enabled for db" << endl;
             return false;
         }
 
@@ -212,8 +227,12 @@ namespace mongo {
             return false;
 
         CollectionInfo& ci = _collections[ns];
-        if ( ! ci.isSharded() )
+        if ( ! ci.isSharded() ){
+
+            warning() << "could not remove sharding for collection " << ns
+                      << ", no sharding information found" << endl;
             return false;
+        }
 
         ci.unshard();
         _save( false, true );
@@ -343,8 +362,15 @@ namespace mongo {
                 scoped_lock lk( _lock );
                 CollectionInfo& ci = _collections[ns];
                 if ( ci.isSharded() && ci.getCM() ) {
-                    ShardChunkVersion currentVersion = ShardChunkVersion::fromBSON( newest, "lastmod" );
-                    if ( currentVersion.isEquivalentTo( ci.getCM()->getVersion() ) ) {
+
+                    ShardChunkVersion currentVersion =
+                            ShardChunkVersion::fromBSON( newest, "lastmod" );
+
+                    // Only reload if the version we found is newer than our own in the same
+                    // epoch
+                    if( currentVersion <= ci.getCM()->getVersion() &&
+                        ci.getCM()->getVersion().hasCompatibleEpoch( currentVersion ) )
+                    {
                         return ci.getCM();
                     }
                 }
@@ -448,13 +474,28 @@ namespace mongo {
         BSONObjBuilder b;
         b.appendRegex( "_id" , (string)"^" + pcrecpp::RE::QuoteMeta( _name ) + "\\." );
 
+        int numCollsErased = 0;
+        int numCollsSharded = 0;
+
         auto_ptr<DBClientCursor> cursor = conn->get()->query( ShardNS::collection, b.obj() );
         verify( cursor.get() );
         while ( cursor->more() ) {
+
             BSONObj o = cursor->next();
-            if( o["dropped"].trueValue() ) _collections.erase( o["_id"].String() );
-            else _collections[o["_id"].String()] = CollectionInfo( o );
+            string collName = o["_id"].String();
+
+            if( o["dropped"].trueValue() ){
+                _collections.erase( collName );
+                numCollsErased++;
+            }
+            else{
+                _collections[ collName ] = CollectionInfo( o );
+                if( _collections[ collName ].isSharded() ) numCollsSharded++;
+            }
         }
+
+        LOG(2) << "found " << numCollsErased << " dropped collections and "
+               << numCollsSharded << " sharded collections for database " << _name << endl;
 
         conn->done();
 
@@ -494,8 +535,21 @@ namespace mongo {
     }
 
     bool DBConfig::reload() {
-        scoped_lock lk( _lock );
-        return _reload();
+        bool successful = false;
+
+        {
+            scoped_lock lk( _lock );
+            successful = _reload();
+        }
+
+        //
+        // If we aren't successful loading the database entry, we don't want to keep the stale
+        // object around which has invalid data.  We should remove it instead.
+        //
+
+        if( ! successful ) grid.removeDB( *this );
+
+        return successful;
     }
 
     bool DBConfig::_reload() {
@@ -609,7 +663,14 @@ namespace mongo {
 
             i->second.getCM()->getAllShards( allServers );
             i->second.getCM()->drop( i->second.getCM() );
-            uassert( 10176 , str::stream() << "shard state missing for " << i->first , removeSharding( i->first ) );
+
+            // We should warn, but it's not a fatal error if someone else reloaded the db/coll as
+            // unsharded in the meantime
+            if( ! removeSharding( i->first ) ){
+                warning() << "collection " << i->first
+                          << " was reloaded as unsharded before drop completed"
+                          << " during drop of all collections" << endl;
+            }
 
             num++;
             uassert( 10184 ,  "_dropShardedCollections too many collections - bailing" , num < 100000 );

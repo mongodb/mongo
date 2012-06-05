@@ -117,6 +117,23 @@ namespace mongo {
 
     }
 
+    void Grid::removeDB( const DBConfig& database ) {
+
+        scoped_lock l( _lock );
+
+        map<string,DBConfigPtr>::iterator it = _databases.find( database.getName() );
+        if( it != _databases.end() && it->second.get() == &database ){
+
+            _databases.erase( it );
+            log() << "erased database " << database.getName() << " from registry" << endl;
+        }
+        else{
+
+            log() << "did not erase database " << database.getName() << " from registry" << endl;
+        }
+
+    }
+
     bool Grid::allowLocalHost() const {
         return _allowLocalShard;
     }
