@@ -32,10 +32,6 @@ __wt_block_verify_start(
 {
 	off_t file_size;
 
-	memset(&block->verify_alloc, 0, sizeof(block->verify_alloc));
-	block->verify_alloc.name = "verify_alloc";
-	block->verify_alloc.offset = WT_BLOCK_INVALID_OFFSET;
-
 	/*
 	 * We're done if the file has no data pages (this happens if we verify
 	 * a file immediately after creation).
@@ -79,6 +75,13 @@ __wt_block_verify_start(
 
 	block->frags = (uint32_t)(file_size / block->allocsize);
 	WT_RET(__bit_alloc(session, block->frags, &block->fragfile));
+
+	/*
+	 * We maintain an allocation list that is rolled forward through the
+	 * set of snapshots.
+	 */
+	WT_RET(__wt_block_extlist_init(
+	    session, &block->verify_alloc, "verify", "alloc"));
 
 	/*
 	 * The only snapshot avail list we care about is the last one written;
@@ -160,20 +163,20 @@ __verify_start_avail(
 	--snap;
 
 	si = &_si;
-	WT_RET(__wt_block_snap_init(session, block, si, 0));
-	WT_RET(__wt_block_buffer_to_snapshot(
-	    session, block, snap->raw.data, si));
+	WT_RET(__wt_block_snap_init(session, block, si, snap->name, 0));
+	WT_ERR(
+	    __wt_block_buffer_to_snapshot(session, block, snap->raw.data, si));
+
 	el = &si->avail;
-	if (el->offset == WT_BLOCK_INVALID_OFFSET)
-		return (0);
+	if (el->offset != WT_BLOCK_INVALID_OFFSET) {
+		WT_ERR(__wt_block_extlist_read(session, block, el));
+		WT_EXT_FOREACH(ext, el->off)
+			if ((ret = __verify_filefrag_add(
+			    session, block, ext->off, ext->size, 1)) != 0)
+				break;
+	}
 
-	WT_RET(__wt_block_extlist_read(session, block, el));
-	WT_EXT_FOREACH(ext, el->off)
-		if ((ret = __verify_filefrag_add(
-		    session, block, ext->off, ext->size, 1)) != 0)
-			break;
-
-	__wt_block_extlist_free(session, el);
+err:	__wt_block_snap_destroy(session, si);
 	return (ret);
 }
 

@@ -71,6 +71,10 @@ extern int __wt_block_extlist_write(WT_SESSION_IMPL *session,
 extern int __wt_block_extlist_truncate( WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     WT_EXTLIST *el);
+extern int __wt_block_extlist_init(WT_SESSION_IMPL *session,
+    WT_EXTLIST *el,
+    const char *name,
+    const char *extname);
 extern void __wt_block_extlist_free(WT_SESSION_IMPL *session, WT_EXTLIST *el);
 extern int __wt_block_extlist_dump( WT_SESSION_IMPL *session,
     const char *tag,
@@ -166,6 +170,7 @@ extern int __wt_block_salvage_next( WT_SESSION_IMPL *session,
 extern int __wt_block_snap_init(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     WT_BLOCK_SNAPSHOT *si,
+    const char *name,
     int is_live);
 extern int __wt_block_snapshot_load(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
@@ -175,6 +180,8 @@ extern int __wt_block_snapshot_load(WT_SESSION_IMPL *session,
     int readonly);
 extern int __wt_block_snapshot_unload(WT_SESSION_IMPL *session,
     WT_BLOCK *block);
+extern void __wt_block_snap_destroy(WT_SESSION_IMPL *session,
+    WT_BLOCK_SNAPSHOT *si);
 extern int __wt_block_snapshot(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     WT_ITEM *buf,

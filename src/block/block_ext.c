@@ -1052,6 +1052,25 @@ __wt_block_extlist_truncate(
 
 	return (0);
 }
+
+/*
+ * __wt_block_extlist_init --
+ *	Initialize an extent list.
+ */
+int
+__wt_block_extlist_init(WT_SESSION_IMPL *session,
+    WT_EXTLIST *el, const char *name, const char *extname)
+{
+	char buf[128];
+
+	(void)snprintf(buf, sizeof(buf), "%s.%s",
+	    name == NULL ? "" : name, extname == NULL ? "" : extname);
+	WT_RET(__wt_strdup(session, buf, &el->name));
+
+	el->offset = WT_BLOCK_INVALID_OFFSET;
+	return (0);
+}
+
 /*
  * __wt_block_extlist_free --
  *	Discard an extent list.
@@ -1062,19 +1081,19 @@ __wt_block_extlist_free(WT_SESSION_IMPL *session, WT_EXTLIST *el)
 	WT_EXT *ext, *next;
 	WT_SIZE *szp, *nszp;
 
+	__wt_free(session, el->name);
+
 	for (ext = el->off[0]; ext != NULL; ext = next) {
 		next = ext->next[0];
 		__wt_free(session, ext);
 	}
-	memset(el->off, 0, sizeof(el->off));
 	for (szp = el->sz[0]; szp != NULL; szp = nszp) {
 		nszp = szp->next[0];
 		__wt_free(session, szp);
 	}
-	memset(el->sz, 0, sizeof(el->sz));
 
-	el->bytes = 0;
-	el->entries = 0;
+	/* Extent lists are re-used, clear them. */
+	memset(el, 0, sizeof(*el));
 }
 
 #ifdef HAVE_VERBOSE

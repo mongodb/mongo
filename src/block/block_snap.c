@@ -19,7 +19,7 @@ static int __snapshot_update(WT_SESSION_IMPL *,
  */
 int
 __wt_block_snap_init(WT_SESSION_IMPL *session,
-    WT_BLOCK *block, WT_BLOCK_SNAPSHOT *si, int is_live)
+    WT_BLOCK *block, WT_BLOCK_SNAPSHOT *si, const char *name, int is_live)
 {
 	WT_DECL_RET;
 
@@ -43,16 +43,13 @@ __wt_block_snap_init(WT_SESSION_IMPL *session,
 
 	si->root_offset = WT_BLOCK_INVALID_OFFSET;
 
-	si->alloc.name = "alloc";
-	si->alloc.offset = WT_BLOCK_INVALID_OFFSET;
-
-	si->avail.name = "avail";
-	si->avail.offset = WT_BLOCK_INVALID_OFFSET;
-
-	si->discard.name = "discard";
-	si->discard.offset = WT_BLOCK_INVALID_OFFSET;
+	WT_RET(__wt_block_extlist_init(session, &si->alloc, name, "alloc"));
+	WT_RET(__wt_block_extlist_init(session, &si->avail, name, "avail"));
+	WT_RET(__wt_block_extlist_init(session, &si->discard, name, "discard"));
 
 	si->file_size = WT_BLOCK_DESC_SECTOR;
+	WT_RET(__wt_block_extlist_init(
+	    session, &si->snapshot_avail, name, "snapshot_avail"));
 
 	return (0);
 }
@@ -80,7 +77,7 @@ __wt_block_snapshot_load(WT_SESSION_IMPL *session,
 	dsk->size = 0;
 
 	si = &block->live;
-	WT_RET(__wt_block_snap_init(session, block, si, 1));
+	WT_RET(__wt_block_snap_init(session, block, si, "live", 1));
 
 	if (WT_VERBOSE_ISSET(session, snapshot)) {
 		if (addr != NULL) {
@@ -163,16 +160,25 @@ __wt_block_snapshot_unload(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	if (block->verify)
 		WT_TRET(__wt_verify_snap_unload(session, block, si));
 
-	/* Discard the extent lists. */
-	__wt_block_extlist_free(session, &si->alloc);
-	__wt_block_extlist_free(session, &si->avail);
-	__wt_block_extlist_free(session, &si->discard);
-
-	__wt_block_extlist_free(session, &si->snapshot_avail);
+	__wt_block_snap_destroy(session, si);
 
 	block->live_load = 0;
 
 	return (ret);
+}
+
+/*
+ * __wt_block_snap_destroy --
+ *	Clear a snapshot structure.
+ */
+void
+__wt_block_snap_destroy(WT_SESSION_IMPL *session, WT_BLOCK_SNAPSHOT *si)
+{
+	/* Discard the extent lists. */
+	__wt_block_extlist_free(session, &si->alloc);
+	__wt_block_extlist_free(session, &si->avail);
+	__wt_block_extlist_free(session, &si->discard);
+	__wt_block_extlist_free(session, &si->snapshot_avail);
 }
 
 /*
@@ -309,7 +315,7 @@ __snapshot_process(
 		WT_ERR(__wt_calloc(
 		    session, 1, sizeof(WT_BLOCK_SNAPSHOT), &snap->bpriv));
 		si = snap->bpriv;
-		WT_ERR(__wt_block_snap_init(session, block, si, 0));
+		WT_ERR(__wt_block_snap_init(session, block, si, snap->name, 0));
 		WT_ERR(__wt_block_buffer_to_snapshot(
 		    session, block, snap->raw.data, si));
 		WT_ERR(__wt_block_extlist_read(session, block, &si->alloc));
@@ -467,11 +473,14 @@ live_update:
 		}
 
 	/*
-	 * Discard the live system's alloc and discard extent lists, leave the
+	 * Reset the live system's alloc and discard extent lists, leave the
 	 * avail list alone.
 	 */
 	__wt_block_extlist_free(session, &si->alloc);
+	WT_ERR(__wt_block_extlist_init(session, &si->alloc, "live", "alloc"));
 	__wt_block_extlist_free(session, &si->discard);
+	WT_ERR(
+	    __wt_block_extlist_init(session, &si->discard, "live", "discard"));
 
 #ifdef HAVE_DIAGNOSTIC
 	/*
@@ -638,7 +647,7 @@ __snapshot_string(WT_SESSION_IMPL *session,
 
 	/* Initialize the snapshot, crack the cookie. */
 	si = &_si;
-	WT_RET(__wt_block_snap_init(session, block, si, 0));
+	WT_RET(__wt_block_snap_init(session, block, si, "string", 0));
 	WT_RET(__wt_block_buffer_to_snapshot(session, block, addr, si));
 
 	WT_RET(__wt_buf_fmt(session, buf,
