@@ -161,7 +161,8 @@ namespace mongo {
             BSONElement m = e;
             uassert( 12517 , "$elemMatch needs an Object" , m.type() == Object );
             BSONObj x = m.embeddedObject();
-            if ( x.firstElement().getGtLtOp() == 0 ) {
+            if ( x.firstElement().getGtLtOp() == BSONObj::Equality &&
+                !str::equals( x.firstElement().fieldName(), "$not" ) ) {
                 _subMatcher.reset( new Matcher( x ) );
                 _subMatcherOnPrimitives = false;
             }
@@ -544,8 +545,11 @@ namespace mongo {
                 case BSONObj::opALL:
                 case BSONObj::NE:
                 case BSONObj::NIN:
-                case BSONObj::opEXISTS: // We can't match on index in this case.
-                case BSONObj::opTYPE: // For $type:10 (null), a null key could be a missing field or a null value field.
+                case BSONObj::opEXISTS:     // We can't match on index in this case.
+                case BSONObj::opTYPE:       // For $type:10 (null), a null key could be a missing
+                                            // field or a null value field.
+                case BSONObj::opELEM_MATCH: // $elemMatch operates on arrays and no key match
+                                            // version has been implemented.
                     break;
                 case BSONObj::opIN: {
                     bool inContainsArray = false;
@@ -602,7 +606,7 @@ namespace mongo {
     }
 
     inline int Matcher::valuesMatch(const BSONElement& l, const BSONElement& r, int op, const ElementMatcher& bm) const {
-        verify( op != BSONObj::NE && op != BSONObj::NIN );
+        verify( op != BSONObj::NE && op != BSONObj::NIN && op != BSONObj::opELEM_MATCH );
 
         if ( op == BSONObj::Equality ) {
             return l.valuesEqual(r);
@@ -800,7 +804,8 @@ namespace mongo {
                         if ( compareOp == BSONObj::opEXISTS ) {
                                 return retExistsFound( em );
                         }
-                        if (valuesMatch(z, toMatch, compareOp, em) ) {
+                        if ( compareOp != BSONObj::opELEM_MATCH &&
+                             valuesMatch(z, toMatch, compareOp, em) ) {
                                 // "field.<n>" array notation was used
                             if ( details )
                                     details->setElemMatchKey( z.fieldName() );
@@ -841,39 +846,34 @@ namespace mongo {
             }
         }
         else if ( ( e.type() != Array || indexed || compareOp == BSONObj::opSIZE ) &&
+                  compareOp != BSONObj::opELEM_MATCH &&
                   valuesMatch(e, toMatch, compareOp, em ) ) {
             return 1;
         }
         else if ( e.type() == Array && compareOp != BSONObj::opSIZE ) {
             BSONObjIterator ai(e.embeddedObject());
 
-            while ( ai.moreWithEOO() ) {
+            while ( ai.more() ) {
                 BSONElement z = ai.next();
+                bool match = false;
 
                 if ( compareOp == BSONObj::opELEM_MATCH ) {
-                    if ( z.type() == Object ) {
-                        if ( em._subMatcher->matches( z.embeddedObject() ) ) {
-                            if ( details )
-                                details->setElemMatchKey( z.fieldName() );
-                            return 1;
-                        }
+                    if ( em._subMatcherOnPrimitives ) {
+                        match = em._subMatcher->matches( z.wrap( "" ) );
                     }
-                    else if ( em._subMatcherOnPrimitives ) {
-                        if ( z.type() && em._subMatcher->matches( z.wrap( "" ) ) ) {
-                            if ( details )
-                                details->setElemMatchKey( z.fieldName() );
-                            return 1;
-                        }
+                    else {
+                        match = ( z.isABSONObj() && em._subMatcher->matches( z.embeddedObject() ) );
                     }
                 }
                 else {
-                    if ( valuesMatch( z, toMatch, compareOp, em) ) {
-                        if ( details )
-                            details->setElemMatchKey( z.fieldName() );
-                        return 1;
-                    }
+                    match = valuesMatch( z, toMatch, compareOp, em );
                 }
-
+                if ( match ) {
+                    if ( details ) {
+                        details->setElemMatchKey( z.fieldName() );
+                    }
+                    return 1;
+                }
             }
 
             // match an entire array to itself

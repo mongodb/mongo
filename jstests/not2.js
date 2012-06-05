@@ -71,10 +71,10 @@ check( {i:{$not:{$all:["a","b"]}}}, null, 0 );
 check( {i:{$not:{$all:["c"]}}}, ["a","b"] );
 
 t.remove( {} );
-t.save( {i:{j:"a"}} );
-t.save( {i:{j:"b"}} );
-check( {i:{$not:{$elemMatch:{j:"a"}}}}, {j:"b"} );
-check( {i:{$not:{$elemMatch:{j:"f"}}}}, {j:"a"}, 2 );
+t.save( {i:[{j:"a"}]} );
+t.save( {i:[{j:"b"}]} );
+check( {i:{$not:{$elemMatch:{j:"a"}}}}, [{j:"b"}] );
+check( {i:{$not:{$elemMatch:{j:"f"}}}}, [{j:"a"}], 2 );
 
 }
 
