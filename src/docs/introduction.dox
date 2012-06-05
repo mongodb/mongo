@@ -29,6 +29,8 @@ For more information about using WiredTiger, see:
 
 - @subpage install\n
 
+- @subpage upgrading\n
+
 - @subpage programming\n
 
 - @ref wt "WiredTiger API reference manual"
