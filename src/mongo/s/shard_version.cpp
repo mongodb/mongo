@@ -223,7 +223,6 @@ namespace mongo {
                                     "version is zero" ) ) << endl;
         }
 
-
         LOG(2) << " have to set shard version for conn: " << conn->getServerAddress() << " ns:" << ns
                << " my last seq: " << sequenceNumber << "  current: " << officialSequenceNumber
                << " version: " << version << " manager: " << manager.get()
@@ -249,6 +248,10 @@ namespace mongo {
         
         if ( result["reloadConfig"].trueValue() ) {
             if( result["version"].timestampTime() == 0 ){
+
+                warning() << "reloading full configuration for " << conf->getName()
+                          << ", connection state indicates significant version changes" << endl;
+
                 // reload db
                 conf->reload();
             }
