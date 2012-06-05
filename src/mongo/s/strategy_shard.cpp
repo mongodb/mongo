@@ -136,8 +136,44 @@ namespace mongo {
             // for now has same semantics as legacy request
             ChunkManagerPtr info = r.getChunkManager();
 
+            //
+            // TODO: Cleanup and consolidate into single codepath
+            //
+
             if( ! info ){
-                SINGLE->getMore( r );
+
+                const char *ns = r.getns();
+
+                LOG(3) << "single getmore: " << ns << endl;
+
+                long long id = r.d().getInt64( 4 );
+
+                string host = cursorCache.getRef( id );
+
+                if( host.size() == 0 ){
+
+                    //
+                    // Match legacy behavior here by throwing an exception when we can't find
+                    // the cursor, but make the exception more informative
+                    //
+
+                    uasserted( 16332,
+                               str::stream() << "could not find cursor in cache for id " << id
+                                             << " over collection " << ns );
+                }
+
+                // we used ScopedDbConnection because we don't get about config versions
+                // not deleting data is handled elsewhere
+                // and we don't want to call setShardVersion
+                scoped_ptr<ScopedDbConnection> conn(
+                        ScopedDbConnection::getScopedDbConnection( host ) );
+
+                Message response;
+                bool ok = conn->get()->callRead( r.m() , response);
+                uassert( 10204 , "dbgrid: getmore: error calling db", ok);
+                r.reply( response , "" /*conn->getServerAddress() */ );
+
+                conn->done();
                 return;
             }
             else {

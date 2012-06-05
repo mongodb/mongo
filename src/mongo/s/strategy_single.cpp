@@ -95,26 +95,10 @@ namespace mongo {
             doQuery( r , r.primaryShard() );
         }
 
+        // Deprecated
         virtual void getMore( Request& r ) {
-            const char *ns = r.getns();
-
-            LOG(3) << "single getmore: " << ns << endl;
-
-            long long id = r.d().getInt64( 4 );
-            
-            // we used ScopedDbConnection because we don't get about config versions
-            // not deleting data is handled elsewhere
-            // and we don't want to call setShardVersion
-            scoped_ptr<ScopedDbConnection> conn(
-                    ScopedDbConnection::getScopedDbConnection( cursorCache.getRef( id ) ) );
-
-            Message response;
-            bool ok = conn->get()->callRead( r.m() , response);
-            uassert( 10204 , "dbgrid: getmore: error calling db", ok);
-            r.reply( response , "" /*conn->getServerAddress() */ );
-
-            conn->done();
-
+            // Don't use anymore, moved logic to strategy_shard, will remove in larger refactor
+            verify( 0 );
         }
 
         // Deprecated
