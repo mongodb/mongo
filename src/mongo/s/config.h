@@ -121,7 +121,7 @@ namespace mongo {
         }
         virtual ~DBConfig() {}
 
-        string getName() { return _name; };
+        string getName() const { return _name; };
 
         /**
          * @return if anything in this db is partitioned or not

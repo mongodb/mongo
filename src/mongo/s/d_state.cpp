@@ -534,7 +534,7 @@ namespace mongo {
                 return false;
             }
 
-            if( cmdObj[ "version" ].eoo() ){
+            if( ! ConfigVersion::canParseBSON( cmdObj, "version" ) ){
                 errmsg = "need to specify version";
                 return false;
             }
@@ -609,7 +609,8 @@ namespace mongo {
                 return true;
             }
 
-            if ( version < oldVersion ) {
+            // TODO: Refactor all of this
+            if ( version < oldVersion && version.hasCompatibleEpoch( oldVersion ) ) {
                 errmsg = "this connection already had a newer version of collection '" + ns + "'";
                 result.append( "ns" , ns );
                 version.addToBSON( result, "newVersion" );
@@ -617,7 +618,8 @@ namespace mongo {
                 return false;
             }
 
-            if ( version < globalVersion ) {
+            // TODO: Refactor all of this
+            if ( version < globalVersion && version.hasCompatibleEpoch( globalVersion ) ) {
                 while ( shardingState.inCriticalMigrateSection() ) {
                     dbtemprelease r;
                     sleepmillis(2);
