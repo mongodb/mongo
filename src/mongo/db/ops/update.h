@@ -19,6 +19,8 @@
 #include "pch.h"
 
 #include "mongo/db/jsobj.h"
+#include "mongo/db/curop.h"
+#include "mongo/db/queryoptimizercursor.h"
 
 namespace mongo {
 
@@ -68,4 +70,14 @@ namespace mongo {
                                 bool fromMigrate = false,
                                 const QueryPlanSelectionPolicy& planPolicy = QueryPlanSelectionPolicy::any());
 
+
+    /**
+     * takes the from document and returns a new document
+     * after apply all the operators 
+     * e.g. 
+     *   applyUpdateOperators( BSON( "x" << 1 ) , BSON( "$inc" << BSON( "x" << 1 ) ) );
+     *   returns: { x : 2 }
+     */
+    BSONObj applyUpdateOperators( const BSONObj& from, const BSONObj& operators );
+    
 }  // namespace mongo

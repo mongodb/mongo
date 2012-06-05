@@ -510,4 +510,9 @@ namespace mongo {
         return ur;
     }
 
+    BSONObj applyUpdateOperators( const BSONObj& from, const BSONObj& operators ) {
+        ModSet mods( operators );
+        return mods.prepare( from )->createNewFromMods();
+    }
+    
 }  // namespace mongo
