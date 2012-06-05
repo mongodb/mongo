@@ -20,6 +20,10 @@ config.shards.find().forEach( function( doc ){
     shards[ doc._id ] = new Mongo( doc.host )
 })
 
+//
+// Test that inserts and queries go to the correct shard even when the collection has been sharded
+// in the background
+//
 
 jsTest.log( "Enabling sharding for the first time..." )
 
@@ -32,6 +36,11 @@ assert.eq( null, insertMongos.getDB( coll.getDB() + "" ).getLastError() )
 assert.eq( 100, staleMongos.getCollection( coll + "" ).find({ test : "a" }).itcount() )
 
 coll.drop()
+
+//
+// Test that inserts and queries go to the correct shard even when the collection has been 
+// re-sharded in the background
+//
 
 jsTest.log( "Re-enabling sharding with a different key..." )
 
@@ -46,6 +55,11 @@ assert.eq( 100, staleMongos.getCollection( coll + "" ).find({ test : "b" }).itco
 assert.eq( 0, staleMongos.getCollection( coll + "" ).find({ test : { $in : [ "a" ] } }).itcount() )
 
 coll.drop()
+
+//
+// Test that inserts and queries go to the correct shard even when the collection has been 
+// unsharded and moved to a different primary
+//
 
 jsTest.log( "Re-creating unsharded collection from a sharded collection on different primary..." )
 
@@ -70,6 +84,11 @@ assert.eq( 100, staleMongos.getCollection( coll + "" ).find({ test : "c" }).itco
 assert.eq( 0, staleMongos.getCollection( coll + "" ).find({ test : { $in : [ "a", "b" ] } }).itcount() )
 
 coll.drop()
+
+//
+// Test that inserts and queries go to correct shard even when the collection has been unsharded, 
+// resharded, and moved to a different primary
+//
 
 jsTest.log( "Re-creating sharded collection with different primary..." )
 

@@ -1,4 +1,8 @@
 // Tests that resharding a collection is detected correctly by all operation types
+// 
+// The idea here is that a collection may be resharded / unsharded at any point, and any type of
+// operation on a mongos may be active when it happens.  All operations should handle gracefully.
+//
 
 var st = new ShardingTest({ shards : 2, mongos : 5, verbose : 1, separateConfig : 1  })
 // Stop balancer, it'll interfere
@@ -21,6 +25,9 @@ config.shards.find().forEach( function( doc ){
     shards[ doc._id ] = new Mongo( doc.host )
 })
 
+//
+// Set up a sharded collection
+//
 
 jsTest.log( "Enabling sharding for the first time..." )
 
@@ -44,12 +51,21 @@ printjson( admin.runCommand({ moveChunk : coll + "", find : { _id : 0 },
 
 st.printShardingStatus()
 
+//
+// Force all mongoses to load the current status of the cluster
+//
+
 jsTest.log( "Loading this status in all mongoses..." )
 
 for( var i = 0; i < st._mongos.length; i++ ){
     printjson( st._mongos[i].getDB( "admin" ).runCommand({ flushRouterConfig : 1 }) )
     assert.neq( null, st._mongos[i].getCollection( coll + "" ).findOne() )
 }
+
+//
+// Drop and recreate a new sharded collection in the same namespace, where the shard and collection
+// versions are the same, but the split is at a different point.
+//
 
 jsTest.log( "Rebuilding sharded collection with different split..." )
 
@@ -65,6 +81,10 @@ printjson( admin.runCommand({ split : coll + "", middle : { _id : 200 } }) )
 printjson( admin.runCommand({ moveChunk : coll + "", find : { _id : 200 },
                               to : getOtherShard( config.databases.findOne({ _id : coll.getDB() + "" }).primary ) }) )
 
+//
+// Make sure all operations on mongoses aren't tricked by the change
+//                              
+                              
 jsTest.log( "Checking other mongoses for detection of change..." )
 
 jsTest.log( "Checking find..." )
@@ -87,9 +107,6 @@ jsTest.log( "Checking remove..." )
 // Ensure that removing an element finds the right shard, verified by the mongos doing the sharding
 removeMongos.getCollection( coll + "" ).remove({ _id : 2 })
 assert.eq( null, removeMongos.getDB( coll.getDB() + "" ).getLastError() )
-
-sleep( 4000 )
-
 assert.eq( null, coll.findOne({ _id : 2 }) )
 
 coll.drop()
