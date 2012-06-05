@@ -220,7 +220,7 @@ namespace mongo {
                 ++width;
             }
             os << traceList[i].symbol << "+0x" << std::hex << traceList[i].instructionOffset;
-            os << std::endl;
+            os << std::dec << std::endl;
         }
     }
 }
