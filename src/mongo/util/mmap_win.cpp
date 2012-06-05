@@ -53,6 +53,26 @@ namespace mongo {
         _remapLock.unlock();
     }
 
+    static unsigned long long _nextMemoryMappedFileLocation = 256LL * 1024LL * 1024LL * 1024LL;
+    static SimpleMutex _nextMemoryMappedFileLocationMutex( "nextMemoryMappedFileLocationMutex" );
+
+    static void* getNextMemoryMappedFileLocation( unsigned long long mmfSize ) {
+        if ( 4 == sizeof(void*) ) {
+            return 0;
+        }
+        SimpleMutex::scoped_lock lk( _nextMemoryMappedFileLocationMutex );
+        static unsigned long long granularity = 0;
+        if ( 0 == granularity ) {
+            SYSTEM_INFO systemInfo;
+            GetSystemInfo( &systemInfo );
+            granularity = static_cast<unsigned long long>( systemInfo.dwAllocationGranularity );
+        }
+        unsigned long long thisMemoryMappedFileLocation = _nextMemoryMappedFileLocation;
+        mmfSize = ( mmfSize + granularity - 1) & ~( granularity - 1 );
+        _nextMemoryMappedFileLocation += mmfSize;
+        return reinterpret_cast<void*>( static_cast<uintptr_t>( thisMemoryMappedFileLocation ) );
+    }
+
     /** notification on unmapping so we can clear writable bits */
     void MemoryMappedFile::clearWritableBits(void *p) {
         for( unsigned i = ((size_t)p)/ChunkSize; i <= (((size_t)p)+len)/ChunkSize; i++ ) {
@@ -91,14 +111,16 @@ namespace mongo {
     void* MemoryMappedFile::createReadOnlyMap() {
         verify( maphandle );
         scoped_lock lk(mapViewMutex);
-        void* readOnlyMapAddress = MapViewOfFile(
+        LPVOID thisAddress = getNextMemoryMappedFileLocation( len );
+        void* readOnlyMapAddress = MapViewOfFileEx(
                 maphandle,          // file mapping handle
                 FILE_MAP_READ,      // access
                 0, 0,               // file offset, high and low
-                0 );                // bytes to map, 0 == all
+                0,                  // bytes to map, 0 == all
+                thisAddress );      // address to place file
         if ( 0 == readOnlyMapAddress ) {
             DWORD dosError = GetLastError();
-            log() << "MapViewOfFile for " << filename()
+            log() << "MapViewOfFileEx for " << filename()
                     << " failed with error " << errnoWithDescription( dosError )
                     << " (file size is " << len << ")"
                     << " in MemoryMappedFile::createReadOnlyMap"
@@ -179,14 +201,16 @@ namespace mongo {
         {
             scoped_lock lk(mapViewMutex);
             DWORD access = ( options & READONLY ) ? FILE_MAP_READ : FILE_MAP_ALL_ACCESS;
-            view = MapViewOfFile(
-                    maphandle,  // file mapping handle
-                    access,     // access
-                    0, 0,       // file offset, high and low
-                    0 );        // bytes to map, 0 == all
+            LPVOID thisAddress = getNextMemoryMappedFileLocation( length );
+            view = MapViewOfFileEx(
+                    maphandle,      // file mapping handle
+                    access,         // access
+                    0, 0,           // file offset, high and low
+                    0,              // bytes to map, 0 == all
+                    thisAddress );  // address to place file
             if ( view == 0 ) {
                 DWORD dosError = GetLastError();
-                log() << "MapViewOfFile for " << filename
+                log() << "MapViewOfFileEx for " << filename
                         << " failed with " << errnoWithDescription( dosError )
                         << " (file size is " << length << ")"
                         << " in MemoryMappedFile::map"
@@ -248,14 +272,16 @@ namespace mongo {
     void* MemoryMappedFile::createPrivateMap() {
         verify( maphandle );
         scoped_lock lk(mapViewMutex);
-        void* privateMapAddress = MapViewOfFile(
+        LPVOID thisAddress = getNextMemoryMappedFileLocation( len );
+        void* privateMapAddress = MapViewOfFileEx(
                 maphandle,          // file mapping handle
                 FILE_MAP_READ,      // access
                 0, 0,               // file offset, high and low
-                0 );                // bytes to map, 0 == all
+                0,                  // bytes to map, 0 == all
+                thisAddress );      // address to place file
         if ( privateMapAddress == 0 ) {
             DWORD dosError = GetLastError();
-            log() << "MapViewOfFile for " << filename()
+            log() << "MapViewOfFileEx for " << filename()
                     << " failed with error " << errnoWithDescription( dosError )
                     << " (file size is " << len << ")"
                     << " in MemoryMappedFile::createPrivateMap"
