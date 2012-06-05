@@ -841,7 +841,15 @@ namespace mongo {
         Message toSend;
 
         BufBuilder b;
-        b.appendNum( flags );
+
+        int reservedFlags = 0;
+        if( flags & InsertOption_ContinueOnError )
+            reservedFlags |= Reserved_InsertOption_ContinueOnError;
+
+        if( flags & WriteOption_FromWriteback )
+            reservedFlags |= Reserved_FromWriteback;
+
+        b.appendNum( reservedFlags );
         b.appendStr( ns );
         obj.appendSelfToBufBuilder( b );
 
@@ -850,11 +858,22 @@ namespace mongo {
         say( toSend );
     }
 
+    // TODO: Merge with other insert implementation?
     void DBClientBase::insert( const string & ns , const vector< BSONObj > &v , int flags) {
         Message toSend;
 
         BufBuilder b;
-        b.appendNum( flags );
+
+        int reservedFlags = 0;
+        if( flags & InsertOption_ContinueOnError )
+            reservedFlags |= Reserved_InsertOption_ContinueOnError;
+
+        if( flags & WriteOption_FromWriteback ){
+            reservedFlags |= Reserved_FromWriteback;
+            flags ^= WriteOption_FromWriteback;
+        }
+
+        b.appendNum( reservedFlags );
         b.appendStr( ns );
         for( vector< BSONObj >::const_iterator i = v.begin(); i != v.end(); ++i )
             i->appendSelfToBufBuilder( b );

@@ -157,7 +157,7 @@ namespace mongo {
                     // the cursor, but make the exception more informative
                     //
 
-                    uasserted( 16332,
+                    uasserted( 16336,
                                str::stream() << "could not find cursor in cache for id " << id
                                              << " over collection " << ns );
                 }
@@ -209,12 +209,48 @@ namespace mongo {
             }
         }
 
-        ChunkManagerPtr _groupInserts( const string& ns,
-                                       vector<BSONObj>& inserts,
-                                       map<ChunkPtr,vector<BSONObj> >& insertsForChunks,
-                                       ChunkManagerPtr& manager,
-                                       ShardPtr& primary,
-                                       bool reloadedConfigData = false )
+        void _handleRetries( const string& op,
+                             int retries,
+                             const string& ns,
+                             const BSONObj& query,
+                             const StaleConfigException& e,
+                             Request& r ) // TODO: remove
+        {
+
+            static const int MAX_RETRIES = 5;
+            if( retries >= MAX_RETRIES ) throw e;
+
+            // Assume the inserts did *not* succeed, so we don't want to erase them
+
+            int logLevel = retries < 2;
+            LOG( logLevel ) << "retrying bulk insert of "
+                            << query << " documents "
+                            << " because of StaleConfigException: " << e << endl;
+
+            //
+            // On a stale config exception, we have to assume that the entire collection could have
+            // become unsharded, or sharded with a different shard key - we need to re-run all the
+            // targeting we've done earlier
+            //
+
+            log( retries == 0 ) << op << " will be retried b/c sharding config info is stale, "
+                                << " retries: " << retries
+                                << " ns: " << ns
+                                << " data: " << query << endl;
+
+            if( retries > 2 ){
+                versionManager.forceRemoteCheckShardVersionCB( ns );
+            }
+
+            r.reset();
+        }
+
+        void _groupInserts( const string& ns,
+                            vector<BSONObj>& inserts,
+                            map<ChunkPtr,vector<BSONObj> >& insertsForChunks,
+                            ChunkManagerPtr& manager,
+                            ShardPtr& primary,
+                            bool reloadedConfigData = false )
         {
 
             grid.getDBConfig( ns )->getChunkManagerOrPrimary( ns, manager, primary );
@@ -285,10 +321,15 @@ namespace mongo {
 
                         // If this is our retry, force talking to the config server
                         grid.getDBConfig( ns )->getChunkManagerIfExists( ns, true );
-                        return _groupInserts( ns, inserts, insertsForChunks, manager, primary, true );
+                        _groupInserts( ns, inserts, insertsForChunks, manager, primary, true );
+                        return;
                     }
 
                     if( bad ){
+
+                        // Sleep to avoid DOS'ing config server when we have invalid inserts
+                        sleepsecs( 1 );
+
                         log() << "tried to insert object with no valid shard key for " << manager->getShardKey() << " : " << o << endl;
                         uassert( 8011, str::stream() << "tried to insert object with no valid shard key for " << manager->getShardKey().toString() << " : " << o.toString(), false );
                     }
@@ -305,25 +346,64 @@ namespace mongo {
             }
 
             inserts.clear();
-            return manager;
+            return;
         }
 
-        void _insert( Request& r , DbMessage& d, vector<BSONObj>& insertsRemaining, map<ChunkPtr, vector<BSONObj> > insertsForChunks, int retries = 0 ) {
+        /**
+         * This insert function now handes all inserts, unsharded or sharded, through mongos.
+         *
+         * Semantics for insert are ContinueOnError - to match mongod semantics :
+         * 1) Error is thrown immediately for corrupt objects
+         * 2) Error is thrown only for UserExceptions during the insert process, if last obj had error that's thrown
+         */
+        void _insert( Request& r , DbMessage& d ){
 
+            const string& ns = r.getns();
+
+            vector<BSONObj> insertsRemaining;
+            while ( d.moreJSObjs() ){
+                insertsRemaining.push_back( d.nextJsObj() );
+            }
+
+            int flags = 0;
+
+            if( d.reservedField() & Reserved_InsertOption_ContinueOnError )
+                flags |= InsertOption_ContinueOnError;
+
+            if( d.reservedField() & Reserved_FromWriteback )
+                flags |= WriteOption_FromWriteback;
+
+            _insert( ns, insertsRemaining, flags, r, d );
+        }
+
+        void _insert( const string& ns,
+                      vector<BSONObj>& inserts,
+                      int flags,
+                      Request& r , DbMessage& d ) // TODO: remove
+        {
+            map<ChunkPtr, vector<BSONObj> > insertsForChunks; // Map for bulk inserts to diff chunks
+            _insert( ns, inserts, insertsForChunks, flags, r, d );
+        }
+
+        void _insert( const string& ns,
+                      vector<BSONObj>& insertsRemaining,
+                      map<ChunkPtr, vector<BSONObj> > insertsForChunks,
+                      int flags,
+                      Request& r, DbMessage& d, // TODO: remove
+                      int retries = 0 )
+        {
             // TODO: Replace this with a better check to see if we're making progress
             uassert( 16055, str::stream() << "too many retries during bulk insert, " << insertsRemaining.size() << " inserts remaining", retries < 30 );
             uassert( 16056, str::stream() << "shutting down server during bulk insert, " << insertsRemaining.size() << " inserts remaining", ! inShutdown() );
 
             ChunkManagerPtr manager;
             ShardPtr primary;
-            const string& ns = r.getns();
 
             // This function handles grouping the inserts per-shard whether the collection is sharded or not.
             _groupInserts( ns, insertsRemaining, insertsForChunks, manager, primary );
 
             // ContinueOnError is always on when using sharding.
-            const int flags = d.reservedField() |
-                              ( manager ? InsertOption_ContinueOnError : 0 );
+            flags |= manager ? InsertOption_ContinueOnError : 0;
 
             while( ! insertsForChunks.empty() ){
 
@@ -340,13 +420,26 @@ namespace mongo {
 
                 try {
 
-                    LOG(4) << "  server:" << shard << " bulk insert " << objs.size() << " documents" << endl;
+                    LOG(4) << "inserting " << objs.size() << " documents to shard " << shard
+                           << " at version "
+                           << ( manager.get() ? manager->getVersion().toString() :
+                                                ShardChunkVersion( 0, OID() ).toString() ) << endl;
 
                     // Taken from single-shard bulk insert, should not need multiple methods in future
                     // insert( c->getShard() , r.getns() , objs , flags);
 
                     // It's okay if the version is set here, an exception will be thrown if the version is incompatible
-                    dbcon.setVersion();
+                    try{
+                        dbcon.setVersion();
+                    }
+                    catch ( StaleConfigException& e ) {
+                        // External try block is still needed to match bulk insert mongod
+                        // behavior
+                        dbcon.done();
+                        _handleRetries( "insert", retries, ns, objs[0], e, r );
+                        _insert( ns, insertsRemaining, insertsForChunks, flags, r, d, retries + 1 );
+                        return;
+                    }
 
                     // Certain conn types can't handle bulk inserts, so don't use unless we need to
                     if( objs.size() == 1 ){
@@ -373,33 +466,7 @@ namespace mongo {
                         c->splitIfShould( bytesWritten );
 
                 }
-                catch ( StaleConfigException& e ) {
-                    // Cleanup the connection
-                    dbcon.done();
-
-                    // For legacy reasons, we may not always get a namespace in the exception :-(
-                    string staleNS = e.getns();
-                    if( staleNS.size() == 0 ) staleNS = ns;
-
-                    // Assume the inserts did *not* succeed, so we don't want to erase them
-
-                    int logLevel = retries < 2;
-                    LOG( logLevel ) << "retrying bulk insert of " << objs.size() << " documents to chunk " << c << " because of StaleConfigException: " << e << endl;
-
-                    if( retries > 2 ){
-                        versionManager.forceRemoteCheckShardVersionCB( staleNS );
-                    }
-
-                    // TODO: Replace with actual chunk handling code, simplify request
-                    // TODO: The way in which we clear shards here needs to change.  Not an issue for single-inserts
-                    r.reset();
-
-                    // We may need to regroup at least some of our inserts since our chunk manager may have changed,
-                    // or may no longer exist
-                    _insert( r, d, insertsRemaining, insertsForChunks, retries + 1 );
-                    return;
-                }
-                catch( UserException& ){
+                catch( UserException& e ){
                     // Unexpected exception, so don't clean up the conn
                     dbcon.kill();
 
@@ -410,29 +477,20 @@ namespace mongo {
                     if( insertsForChunks.empty() ){
                         throw;
                     }
+
+                    //
+                    // WE SWALLOW THE EXCEPTION HERE BY DESIGN
+                    // to match mongod behavior
+                    //
+                    // TODO: Make better semantics
+                    //
+
+                    warning() << "swallowing exception during batch insert"
+                              << causedBy( e ) << endl;
                 }
 
                 insertsForChunks.erase( insertsForChunks.begin() );
             }
-        }
-
-        /**
-         * This insert function now handes all inserts, unsharded or sharded, through mongos.
-         *
-         * Semantics for insert are ContinueOnError - to match mongod semantics :
-         * 1) Error is thrown immediately for corrupt objects
-         * 2) Error is thrown only for UserExceptions during the insert process, if last obj had error that's thrown
-         */
-        void _insert( Request& r , DbMessage& d ){
-
-            vector<BSONObj> insertsRemaining;
-            while ( d.moreJSObjs() ){
-                insertsRemaining.push_back( d.nextJsObj() );
-            }
-
-            map<ChunkPtr, vector<BSONObj> > insertsForChunks; // Map for bulk inserts to diff chunks
-
-            _insert( r, d, insertsRemaining, insertsForChunks );
         }
 
         void _update( Request& r , DbMessage& d, ChunkManagerPtr manager ) {
