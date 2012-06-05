@@ -229,12 +229,6 @@ namespace mongo {
         const char *theEnd;
 
         const char * mark;
-
-    public:
-        enum ReservedOptions {
-            Reserved_InsertOption_ContinueOnError = 1 << 0 , 
-            Reserved_FromWriteback = 1 << 1 
-        };
     };
 
 

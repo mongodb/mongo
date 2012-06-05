@@ -113,6 +113,25 @@ namespace mongo {
         InsertOption_ContinueOnError = 1 << 0
     };
 
+    /**
+     * Start from *top* of bits, these are generic write options that apply to all
+     */
+    enum WriteOptions {
+        /** logical writeback option */
+        WriteOption_FromWriteback = 1 << 31
+    };
+
+    //
+    // For legacy reasons, the reserved field pre-namespace of certain types of messages is used
+    // to store options as opposed to the flags after the namespace.  This should be transparent to
+    // the api user, but we need these constants to disassemble/reassemble the messages correctly.
+    //
+
+    enum ReservedOptions {
+        Reserved_InsertOption_ContinueOnError = 1 << 0 ,
+        Reserved_FromWriteback = 1 << 1
+    };
+
     class DBClientBase;
 
     /**

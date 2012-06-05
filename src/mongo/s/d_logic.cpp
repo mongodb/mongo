@@ -101,7 +101,7 @@ namespace mongo {
             return true;
         }
         
-        uassert( 9517 , "writeback" , ( d.reservedField() & DbMessage::Reserved_FromWriteback ) == 0 );
+        uassert( 9517 , "writeback" , ( d.reservedField() & Reserved_FromWriteback ) == 0 );
 
         OID writebackID;
         writebackID.initSequential();
