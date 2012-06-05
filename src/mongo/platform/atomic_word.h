@@ -31,7 +31,7 @@ namespace mongo {
      * semantics are visible to other processors only after the effects of previous operations on
      * the current thread are visible.
      *
-     * NOTE(schwerin): This implementation makes assumes that instances are naturally aligned.
+     * NOTE(schwerin): This implementation assumes that instances are naturally aligned.
      * Instances that are not naturally aligned may operate incorrectly, or not at all.  Natural
      * alignment for this purpose means that the byte address of the beginning of the object is an
      * integer multiple of the size of the type, in bytes.
@@ -98,6 +98,39 @@ namespace mongo {
          */
         WordType fetchAndAdd(WordType increment) {
             return AtomicIntrinsics<WordType>::fetchAndAdd(&_value, increment);
+        }
+
+        /**
+         * Get the current value of this, subtract "decrement" and store it, atomically.
+         *
+         * Returns the value of this before decrementing.
+         *
+         * Has acquire and release semantics.
+         */
+        WordType fetchAndSubtract(WordType decrement) {
+            return fetchAndAdd(-decrement);
+        }
+
+        /**
+         * Get the current value of this, add "increment" and store it, atomically.
+         *
+         * Returns the value of this after incrementing.
+         *
+         * Has acquire and release semantics.
+         */
+        WordType addAndFetch(WordType increment) {
+            return fetchAndAdd(increment) + increment;
+        }
+
+        /**
+         * Get the current value of this, subtract "decrement" and store it, atomically.
+         *
+         * Returns the value of this after decrementing.
+         *
+         * Has acquire and release semantics.
+         */
+        WordType subtractAndFetch(WordType decrement) {
+            return fetchAndSubtract(decrement) - decrement;
         }
 
     private:

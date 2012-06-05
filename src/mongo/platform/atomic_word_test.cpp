@@ -44,6 +44,9 @@ namespace mongo {
             ASSERT_EQUALS(WordType(1), w.load());
 
             ASSERT_EQUALS(WordType(1), w.fetchAndAdd(14));
+            ASSERT_EQUALS(WordType(17), w.addAndFetch(2));
+            ASSERT_EQUALS(WordType(16), w.subtractAndFetch(1));
+            ASSERT_EQUALS(WordType(16), w.fetchAndSubtract(1));
             ASSERT_EQUALS(WordType(15), w.compareAndSwap(15, 0));
             ASSERT_EQUALS(WordType(0), w.load());
         }
