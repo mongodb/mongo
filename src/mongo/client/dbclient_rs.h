@@ -303,6 +303,7 @@ namespace mongo {
     public:
         using DBClientBase::query;
         using DBClientBase::update;
+        using DBClientBase::remove;
 
         /** Call connect() after constructing. autoReconnect is always on for DBClientReplicaSet connections. */
         DBClientReplicaSet( const string& name , const vector<HostAndPort>& servers, double so_timeout=0 );
@@ -334,7 +335,7 @@ namespace mongo {
             is only nominally faster and not worth a special effort to try to use.  */
         virtual void insert( const string &ns, const vector< BSONObj >& v , int flags=0);
 
-        virtual void remove( const string &ns , Query obj , bool justOne = 0 );
+        virtual void remove( const string &ns , Query obj , int flags );
 
         virtual void update( const string &ns , Query query , BSONObj obj , int flags );
 
