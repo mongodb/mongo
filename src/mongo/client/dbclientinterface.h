@@ -473,7 +473,12 @@ namespace mongo {
 
         virtual void remove( const string &ns , Query query, bool justOne = 0 ) = 0;
 
-        virtual void update( const string &ns , Query query , BSONObj obj , bool upsert = 0 , bool multi = 0 ) = 0;
+        virtual void update( const string &ns,
+                             Query query,
+                             BSONObj obj,
+                             bool upsert = false, bool multi = false ) = 0;
+
+        virtual void update( const string &ns, Query query, BSONObj obj, int flags ) = 0;
 
         virtual ~DBClientInterface() { }
 
@@ -903,15 +908,20 @@ namespace mongo {
         virtual void insert( const string &ns, const vector< BSONObj >& v , int flags=0);
 
         /**
+           updates objects matching query
+         */
+        virtual void update( const string &ns,
+                             Query query,
+                             BSONObj obj,
+                             bool upsert = false, bool multi = false );
+
+        virtual void update( const string &ns, Query query, BSONObj obj, int flags );
+
+        /**
            remove matching objects from the database
            @param justOne if this true, then once a single match is found will stop
          */
         virtual void remove( const string &ns , Query q , bool justOne = 0 );
-
-        /**
-           updates objects matching query
-         */
-        virtual void update( const string &ns , Query query , BSONObj obj , bool upsert = false , bool multi = false );
 
         virtual bool isFailed() const = 0;
 

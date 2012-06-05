@@ -946,8 +946,8 @@ namespace mongo {
         checkMaster()->remove(ns, obj, justOne);
     }
 
-    void DBClientReplicaSet::update( const string &ns , Query query , BSONObj obj , bool upsert , bool multi ) {
-        return checkMaster()->update(ns, query, obj, upsert,multi);
+    void DBClientReplicaSet::update( const string &ns , Query query , BSONObj obj , int flags ) {
+        return checkMaster()->update( ns, query, obj, flags );
     }
 
     auto_ptr<DBClientCursor> DBClientReplicaSet::query(const string &ns, Query query, int nToReturn, int nToSkip,
