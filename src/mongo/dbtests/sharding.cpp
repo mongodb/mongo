@@ -58,6 +58,77 @@ namespace ShardingTests {
         return max > 0 ? r % max : r;
     }
 
+    /**
+     * Tests parsing of BSON for versions.  In version 2.2, this parsing is meant to be very
+     * flexible so different formats can be tried and enforced later.
+     *
+     * Formats are:
+     *
+     * A) { vFieldName : <TSTYPE>, [ vFieldNameEpoch : <OID> ], ... }
+     * B) { fieldName : [ <TSTYPE>, <OID> ], ... }
+     *
+     * vFieldName is a specifyable name - usually "version" (default) or "lastmod".  <TSTYPE> is a
+     * type convertible to Timestamp, ideally Timestamp but also numeric.
+     * <OID> is a value of type OID.
+     *
+     */
+    class ShardVersionParsingTest {
+    public:
+        void run(){
+
+            {
+                // Legacy compatibility format (A)
+
+                BSONObjBuilder versionObjB;
+                versionObjB.appendTimestamp( "testVersion",
+                                             ShardChunkVersion( 1, 1, OID() ).toLong() );
+                versionObjB.append( "testVersionEpoch", OID::gen() );
+                BSONObj versionObj = versionObjB.obj();
+
+                ShardChunkVersion parsed =
+                        ShardChunkVersion::fromBSON( versionObj[ "testVersion" ] );
+
+                ASSERT( ShardChunkVersion::canParseBSON( versionObj[ "testVersion" ] ) );
+                ASSERT( parsed.majorVersion() == 1 );
+                ASSERT( parsed.minorVersion() == 1 );
+                ASSERT( ! parsed.epoch().isSet() );
+
+                parsed = ShardChunkVersion::fromBSON( versionObj, "testVersion" );
+
+                ASSERT( ShardChunkVersion::canParseBSON( versionObj, "testVersion" ) );
+                ASSERT( parsed.majorVersion() == 1 );
+                ASSERT( parsed.minorVersion() == 1 );
+                ASSERT( parsed.epoch().isSet() );
+            }
+
+            {
+                // Sub-array format (B)
+
+                BSONObjBuilder tsObjB;
+                tsObjB.appendTimestamp( "ts", ShardChunkVersion( 1, 1, OID() ).toLong() );
+                BSONObj tsObj = tsObjB.obj();
+
+                BSONObjBuilder versionObjB;
+                BSONArrayBuilder subArrB( versionObjB.subarrayStart( "testVersion" ) );
+                // Append this weird way so we're sure we get a timestamp type
+                subArrB.append( tsObj.firstElement() );
+                subArrB.append( OID::gen() );
+                subArrB.done();
+                BSONObj versionObj = versionObjB.obj();
+
+                ShardChunkVersion parsed =
+                        ShardChunkVersion::fromBSON( versionObj[ "testVersion" ] );
+
+                ASSERT( ShardChunkVersion::canParseBSON( versionObj[ "testVersion" ] ) );
+                ASSERT( ShardChunkVersion::canParseBSON( BSONArray( versionObj[ "testVersion" ].Obj() ) ) );
+                ASSERT( parsed.majorVersion() == 1 );
+                ASSERT( parsed.minorVersion() == 1 );
+                ASSERT( parsed.epoch().isSet() );
+            }
+        }
+
+    };
+
     //
     // Sets up a basic environment for loading chunks to/from the direct database connection
     // Redirects connections to the direct database for the duration of the test.
@@ -611,6 +682,7 @@ namespace ShardingTests {
 
         void setupTests() {
             add< serverandquerytests::test1 >();
+            add< ShardVersionParsingTest >();
             // SERVER-5918
             //add< ChunkManagerCreateBasicTest >();
             add< ChunkManagerCreateFullTest >();

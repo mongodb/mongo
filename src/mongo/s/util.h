@@ -162,36 +162,74 @@ namespace mongo {
         // In this case, epoch always is stored in a field name of the version field name + "Epoch"
         //
 
+        //
+        // { version : <TS> } and { version : [<TS>,<OID>] } format
+        //
+
+        static bool canParseBSON( const BSONElement& el, const string& prefix="" ){
+            bool canParse;
+            fromBSON( el, prefix, &canParse );
+            return canParse;
+        }
+
         static ShardChunkVersion fromBSON( const BSONElement& el, const string& prefix="" ){
+            bool canParse;
+            return fromBSON( el, prefix, &canParse );
+        }
+
+        static ShardChunkVersion fromBSON( const BSONElement& el,
+                                           const string& prefix,
+                                           bool* canParse )
+        {
+            *canParse = true;
 
             int type = el.type();
 
-            if( type == Object ){
-                return fromBSON( el.Obj() );
+            if( type == Array ){
+                return fromBSON( BSONArray( el.Obj() ), canParse );
             }
 
             if( type == jstOID ){
                 return ShardChunkVersion( 0, 0, el.OID() );
             }
-            else if( el.isNumber() ){
+
+            if( el.isNumber() ){
                 return ShardChunkVersion( static_cast<unsigned long long>( el.numberLong() ), OID() );
             }
-            else if( type == Timestamp || type == Date ){
+
+            if( type == Timestamp || type == Date ){
                 return ShardChunkVersion( el._numberLong(), OID() );
             }
-            // LEGACY we used to throw if not eoo(), not sure this is useful
-            else if( type == EOO ){
-                return ShardChunkVersion( 0, OID() );
-            }
 
-            log() << "can't load version from element type (" << (int)(el.type()) << ") "
-                  << el << endl;
+            // Note - we used to throw here, we can't anymore b/c debug builds will be unhappy
+            warning() << "can't load version from element type (" << (int)(el.type()) << ") "
+                      << el << endl;
 
-            verify( 0 );
-            // end legacy
+            *canParse = false;
+
+            return ShardChunkVersion( 0, OID() );
         }
 
-        static ShardChunkVersion fromBSON( const BSONObj& obj, const string& prefixIn="" ){
+        //
+        // { version : <TS>, versionEpoch : <OID> } object format
+        //
+
+        static bool canParseBSON( const BSONObj& obj, const string& prefix="" ){
+            bool canParse;
+            fromBSON( obj, prefix, &canParse );
+            return canParse;
+        }
+
+        static ShardChunkVersion fromBSON( const BSONObj& obj, const string& prefix="" ){
+            bool canParse;
+            return fromBSON( obj, prefix, &canParse );
+        }
+
+        static ShardChunkVersion fromBSON( const BSONObj& obj,
+                                           const string& prefixIn,
+                                           bool* canParse )
+        {
+            *canParse = true;
 
             string prefix = prefixIn;
             if( prefixIn == "" && ! obj[ "version" ].eoo() ){
@@ -201,11 +239,51 @@ namespace mongo {
                 prefix = (string)"lastmod";
             }
 
-            ShardChunkVersion version = fromBSON( obj[ prefix ] );
+            ShardChunkVersion version = fromBSON( obj[ prefix ], prefixIn, canParse );
 
             if( obj[ prefix + "Epoch" ].type() == jstOID ){
                 version._epoch = obj[ prefix + "Epoch" ].OID();
+                *canParse = true;
             }
+
+            return version;
+        }
+
+        //
+        // { version : [<TS>, <OID>] } format
+        //
+
+        static bool canParseBSON( const BSONArray& arr ){
+            bool canParse;
+            fromBSON( arr, &canParse );
+            return canParse;
+        }
+
+        static ShardChunkVersion fromBSON( const BSONArray& arr ){
+            bool canParse;
+            return fromBSON( arr, &canParse );
+        }
+
+        static ShardChunkVersion fromBSON( const BSONArray& arr,
+                                           bool* canParse )
+        {
+            *canParse = false;
+
+            ShardChunkVersion version;
+
+            BSONObjIterator it( arr );
+            if( ! it.more() ) return version;
+
+            version = fromBSON( it.next(), "", canParse );
+            if( ! canParse ) return version;
+
+            *canParse = true;
+
+            if( ! it.more() ) return version;
+            BSONElement next = it.next();
+            if( next.type() != jstOID ) return version;
+
+            version._epoch = next.OID();
 
             return version;
         }
@@ -261,21 +339,24 @@ namespace mongo {
 
         // Preferred if we're rebuilding this from a thrown exception
         StaleConfigException( const string& raw , int code, const BSONObj& error, bool justConnection = false )
-            : AssertionException(
-                    mongoutils::str::stream()
-                  << raw << " ( ns : " << ( error["ns"].type() == String ? error["ns"].String() : string("<unknown>") )
-                  << ", received : " << ShardChunkVersion::fromBSON( error["vReceived"] ).toString()
-                  << ", wanted : " << ShardChunkVersion::fromBSON( error["vWanted"] ).toString()
-                  << ", " << ( code == SendStaleConfigCode ? "send" : "recv" ) << " )", code ),
+            : AssertionException( mongoutils::str::stream()
+                << raw << " ( ns : " << ( error["ns"].type() == String ? error["ns"].String() : string("<unknown>") )
+                << ", received : " << ShardChunkVersion::fromBSON( error, "vReceived" ).toString()
+                << ", wanted : " << ShardChunkVersion::fromBSON( error, "vWanted" ).toString()
+                << ", " << ( code == SendStaleConfigCode ? "send" : "recv" ) << " )",
+                code ),
 
               _justConnection(justConnection) ,
               // For legacy reasons, we may not always get a namespace here
               _ns( error["ns"].type() == String ? error["ns"].String() : "" ),
-              _received( ShardChunkVersion::fromBSON( error["vReceived"] ) ),
-              _wanted( ShardChunkVersion::fromBSON( error["vWanted"] ) )
+              _received( ShardChunkVersion::fromBSON( error, "vReceived" ) ),
+              _wanted( ShardChunkVersion::fromBSON( error, "vWanted" ) )
         {}
 
-        StaleConfigException() : AssertionException( "", 0 ) {}
+        // Needs message so when we trace all exceptions on construction we get a useful
+        // message
+        StaleConfigException() :
+            AssertionException( "initializing empty stale config exception object", 0 ) {}
 
         virtual ~StaleConfigException() throw() {}
 
@@ -284,6 +365,14 @@ namespace mongo {
         bool justConnection() const { return _justConnection; }
 
         string getns() const { return _ns; }
+
+        /**
+         * true if this exception would require a full reload of config data to resolve
+         */
+        bool requiresFullReload() const {
+            return ! _received.hasCompatibleEpoch( _wanted ) ||
+                     _received.isSet() != _wanted.isSet();
+        }
 
         static bool parse( const string& big , string& ns , string& raw ) {
             string::size_type start = big.find( '[' );
