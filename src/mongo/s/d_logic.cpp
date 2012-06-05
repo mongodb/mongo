@@ -92,7 +92,7 @@ namespace mongo {
         uassert( 9517 , "writeback" , ( d.reservedField() & DbMessage::Reserved_FromWriteback ) == 0 );
 
         OID writebackID;
-        writebackID.init();
+        writebackID.initSequential();
         lastError.getSafe()->writeback( writebackID );
 
         const OID& clientID = ShardedConnectionInfo::get(false)->getID();
