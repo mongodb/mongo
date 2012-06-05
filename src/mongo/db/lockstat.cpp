@@ -26,17 +26,17 @@ namespace mongo {
     BSONObj LockStat::report() const { 
         BSONObjBuilder x;
         BSONObjBuilder y;
-        x.append("R", (long long) timeLocked[0]);
-        x.append("W", (long long) timeLocked[1]);
-        if( timeLocked[2] || timeLocked[3] ) {
-            x.append("r", (long long) timeLocked[2]);
-            x.append("w", (long long) timeLocked[3]);
+        x.append("R", timeLocked[0].load());
+        x.append("W", timeLocked[1].load());
+        if( timeLocked[2].load() || timeLocked[3].load() ) {
+            x.append("r", timeLocked[2].load());
+            x.append("w", timeLocked[3].load());
         }
-        y.append("R", (long long) timeAcquiring[0]);
-        y.append("W", (long long) timeAcquiring[1]);
-        if( timeAcquiring[2] || timeAcquiring[3] ) {
-            y.append("r", (long long) timeAcquiring[2]);
-            y.append("w", (long long) timeAcquiring[3]);
+        y.append("R", timeAcquiring[0].load());
+        y.append("W", timeAcquiring[1].load());
+        if( timeAcquiring[2].load() || timeAcquiring[3].load() ) {
+            y.append("r", timeAcquiring[2].load());
+            y.append("w", timeAcquiring[3].load());
         }
         return BSON(
             "timeLocked" << x.obj() << 
@@ -65,7 +65,7 @@ namespace mongo {
     // hmmm....
 
     LockStat::Acquiring::~Acquiring() { 
-        ls.timeAcquiring[type] += tmr.micros();
+        ls.timeAcquiring[type].fetchAndAdd(static_cast<long long>(tmr.micros()));
         if( type == 1 ) 
             ls.W_Timer.reset();
     }
@@ -73,7 +73,7 @@ namespace mongo {
     void LockStat::unlocking(char tp) { 
         unsigned type = mapNo(tp);
         if( type == 1 ) 
-            timeLocked[type] += W_Timer.micros();
+            timeLocked[type].fetchAndAdd(static_cast<long long>(W_Timer.micros()));
     }
 
 }

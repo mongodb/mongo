@@ -20,7 +20,7 @@
 #pragma once
 
 #include "util/timer.h"
-#include "mongo/platform/atomic_uint64.h"
+#include "mongo/platform/atomic_word.h"
 
 namespace mongo { 
 
@@ -45,8 +45,8 @@ namespace mongo {
 
     private:
         // RWrw
-        AtomicUInt64 timeAcquiring[N];
-        AtomicUInt64 timeLocked[N];
+        AtomicInt64 timeAcquiring[N];
+        AtomicInt64 timeLocked[N];
 
         static unsigned mapNo(char type);
     };

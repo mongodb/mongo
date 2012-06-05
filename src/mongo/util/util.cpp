@@ -24,7 +24,7 @@
 #include "time_support.h"
 #include "mongoutils/str.h"
 #include "timer.h"
-#include "platform/atomic_uint64.h"
+#include "platform/atomic_word.h"
 
 namespace mongo {
 
@@ -44,10 +44,10 @@ namespace mongo {
 
     boost::thread_specific_ptr<string> _threadName;
 
+    static AtomicInt64 _setThreadNameCounter;
+
     long long _setThreadName( const char * name ) {
         if ( ! name ) name = "NONE";
-
-        static AtomicUInt64 N;
 
         if ( strcmp( name , "conn" ) == 0 ) {
             string* x = _threadName.get();
@@ -61,8 +61,7 @@ namespace mongo {
                     return n;
                 warning() << "unexpected thread name [" << *x << "] parsed to " << n << endl;
             }
-            N.add(1);
-            long long n = N.get();
+            long long n = _setThreadNameCounter.addAndFetch(1);
             stringstream ss;
             ss << name << n;
             _threadName.reset( new string( ss.str() ) );
