@@ -19,6 +19,7 @@
 
 #include <boost/functional/hash.hpp>
 
+#include "mongo/platform/atomic_uint64.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/util/atomic_int.h"
@@ -132,6 +133,27 @@ namespace mongo {
             _inc[0] = T[2];
             _inc[1] = T[1];
             _inc[2] = T[0];
+        }
+    }
+
+    void OID::initSequential() {
+        static AtomicUInt64 sequence;
+
+        {
+            unsigned t = (unsigned) time(0);
+            unsigned char *T = (unsigned char *) &t;
+            _time[0] = T[3]; // big endian order because we use memcmp() to compare OID's
+            _time[1] = T[2];
+            _time[2] = T[1];
+            _time[3] = T[0];
+        }
+        
+        {
+            unsigned long long nextNumber = sequence.fetchAndAdd();
+            unsigned char* numberData = reinterpret_cast<unsigned char*>(&nextNumber);
+            for ( int i=0; i<8; i++ ) {
+                data[4+i] = numberData[7-i];
+            }
         }
     }
 

@@ -66,6 +66,13 @@ namespace mongo {
         /** sets the contents to a new oid / randomized value */
         void init();
 
+        /** sets the contents to a new oid
+         * guaranteed to be sequential
+         * NOT guaranteed to be globally unique
+         *     only unique for this process
+         * */
+        void initSequential();
+
         /** init from a 24 char hex string */
         void init( std::string s );
 
