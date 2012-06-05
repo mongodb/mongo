@@ -533,9 +533,6 @@
     <ClCompile Include="..\scripting\utils.cpp">
       <Filter>scripting</Filter>
     </ClCompile>
-    <ClCompile Include="..\util\concurrency\vars.cpp">
-      <Filter>util\concurrency</Filter>
-    </ClCompile>
     <ClCompile Include="pipeline\value.cpp">
       <Filter>db\pipeline\Source Files</Filter>
     </ClCompile>
@@ -928,6 +925,9 @@
     </ClCompile>
     <ClCompile Include="prefetch.cpp">
       <Filter>db\Source Files\o to z</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\concurrency\mutexdebugger.cpp">
+      <Filter>util\concurrency</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1676,6 +1676,9 @@
     </ClInclude>
     <ClInclude Include="prefetch.h">
       <Filter>db\Header Files\o to z</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\concurrency\mutexdebugger.h">
+      <Filter>util\concurrency</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

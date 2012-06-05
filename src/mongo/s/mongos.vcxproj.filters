@@ -311,9 +311,6 @@
     <ClCompile Include="..\util\concurrency\thread_pool.cpp">
       <Filter>util\concurrency</Filter>
     </ClCompile>
-    <ClCompile Include="..\util\concurrency\vars.cpp">
-      <Filter>util\concurrency</Filter>
-    </ClCompile>
     <ClCompile Include="..\pch.cpp" />
     <ClCompile Include="..\..\third_party\pcre-8.30\pcre_chartables.c">
       <Filter>third_party\pcre</Filter>
@@ -735,6 +732,9 @@
     <ClCompile Include="..\scripting\sm_db.cpp">
       <Filter>scripting</Filter>
     </ClCompile>
+    <ClCompile Include="..\util\concurrency\mutexdebugger.cpp">
+      <Filter>util\concurrency</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\pch.h" />
@@ -1043,6 +1043,9 @@
     </ClInclude>
     <ClInclude Include="..\util\assert_util.h">
       <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\concurrency\mutexdebugger.h">
+      <Filter>util\concurrency</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -563,6 +563,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\util\checksum.h" />
     <ClInclude Include="..\util\compress.h" />
     <ClInclude Include="..\util\concurrency\list.h" />
+    <ClInclude Include="..\util\concurrency\mutexdebugger.h" />
     <ClInclude Include="..\util\concurrency\qlock.h" />
     <ClInclude Include="..\util\concurrency\task.h" />
     <ClInclude Include="..\util\concurrency\value.h" />
@@ -1303,12 +1304,12 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="..\unittest\unittest.cpp" />
     <ClCompile Include="..\util\alignedbuilder.cpp" />
     <ClCompile Include="..\util\compress.cpp" />
+    <ClCompile Include="..\util\concurrency\mutexdebugger.cpp" />
     <ClCompile Include="..\util\concurrency\rwlockimpl.cpp" />
     <ClCompile Include="..\util\concurrency\spin_lock.cpp" />
     <ClCompile Include="..\util\concurrency\synchronization.cpp" />
     <ClCompile Include="..\util\concurrency\task.cpp" />
     <ClCompile Include="..\util\concurrency\thread_pool.cpp" />
-    <ClCompile Include="..\util\concurrency\vars.cpp" />
     <ClCompile Include="..\util\debug_util.cpp" />
     <ClCompile Include="..\util\file_allocator.cpp" />
     <ClCompile Include="..\util\histogram.cpp" />

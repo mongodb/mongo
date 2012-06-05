@@ -1058,12 +1058,12 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="..\..\third_party\snappy\snappy.cc" />
     <ClCompile Include="..\util\alignedbuilder.cpp" />
     <ClCompile Include="..\util\compress.cpp" />
+    <ClCompile Include="..\util\concurrency\mutexdebugger.cpp" />
     <ClCompile Include="..\util\concurrency\rwlockimpl.cpp" />
     <ClCompile Include="..\util\concurrency\spin_lock.cpp" />
     <ClCompile Include="..\util\concurrency\synchronization.cpp" />
     <ClCompile Include="..\util\concurrency\task.cpp" />
     <ClCompile Include="..\util\concurrency\thread_pool.cpp" />
-    <ClCompile Include="..\util\concurrency\vars.cpp" />
     <ClCompile Include="..\util\debug_util.cpp" />
     <ClCompile Include="..\util\file_allocator.cpp" />
     <ClCompile Include="..\util\histogram.cpp" />
@@ -1223,6 +1223,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\s\chunk.h" />
     <ClInclude Include="..\s\d_index_locator.h" />
     <ClInclude Include="..\s\d_writeback.h" />
+    <ClInclude Include="..\util\concurrency\mutexdebugger.h" />
     <ClInclude Include="..\util\histogram.h" />
     <ClInclude Include="..\util\hook_win32.h" />
     <ClInclude Include="..\util\hook_windows_memory.h" />

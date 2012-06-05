@@ -94,9 +94,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\util\concurrency\vars.cpp">
-      <Filter>util\concurrency</Filter>
-    </ClCompile>
     <ClCompile Include="..\scripting\engine.cpp">
       <Filter>scripting</Filter>
     </ClCompile>
@@ -511,6 +508,9 @@
     </ClCompile>
     <ClCompile Include="..\client\connection_factory.cpp">
       <Filter>client</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\concurrency\mutexdebugger.cpp">
+      <Filter>util\concurrency</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

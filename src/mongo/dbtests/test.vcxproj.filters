@@ -630,6 +630,9 @@
     <ClInclude Include="..\db\prefetch.h">
       <Filter>db\Header Files\o to z</Filter>
     </ClInclude>
+    <ClInclude Include="..\util\concurrency\mutexdebugger.h">
+      <Filter>util\concurrency</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\client\connpool.cpp">
@@ -736,9 +739,6 @@
     </ClCompile>
     <ClCompile Include="..\db\stats\top.cpp">
       <Filter>db\stats</Filter>
-    </ClCompile>
-    <ClCompile Include="..\util\concurrency\vars.cpp">
-      <Filter>util\concurrency</Filter>
     </ClCompile>
     <ClCompile Include="..\util\concurrency\task.cpp">
       <Filter>util\concurrency</Filter>
@@ -1500,6 +1500,9 @@
     </ClCompile>
     <ClCompile Include="..\db\prefetch.cpp">
       <Filter>db\Source Files\o to z</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\concurrency\mutexdebugger.cpp">
+      <Filter>util\concurrency</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

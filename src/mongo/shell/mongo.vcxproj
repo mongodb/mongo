@@ -861,6 +861,7 @@ cscript //Nologo createCPPfromJavaScriptFiles.js "$(ProjectDir).."</Command>
     </ClCompile>
     <ClCompile Include="..\client\connection_factory.cpp" />
     <ClCompile Include="..\db\dbmessage.cpp" />
+    <ClCompile Include="..\util\concurrency\mutexdebugger.cpp" />
     <ClCompile Include="..\util\time_support.cpp" />
     <ClCompile Include="linenoise_utf8.cpp" />
     <ClCompile Include="mk_wcwidth.cpp" />
@@ -996,7 +997,6 @@ cscript //Nologo createCPPfromJavaScriptFiles.js "$(ProjectDir).."</Command>
     <ClCompile Include="..\db\json.cpp" />
     <ClCompile Include="..\pch.cpp" />
     <ClCompile Include="..\scripting\engine.cpp" />
-    <ClCompile Include="..\util\concurrency\vars.cpp" />
     <ClCompile Include="..\util\timer.cpp" />
     <ClCompile Include="..\util\util.cpp" />
     <ClCompile Include="..\util\version.cpp" />

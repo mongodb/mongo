@@ -1029,11 +1029,11 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="..\util\alignedbuilder.cpp" />
+    <ClCompile Include="..\util\concurrency\mutexdebugger.cpp" />
     <ClCompile Include="..\util\concurrency\rwlockimpl.cpp" />
     <ClCompile Include="..\util\concurrency\spin_lock.cpp" />
     <ClCompile Include="..\util\concurrency\task.cpp" />
     <ClCompile Include="..\util\concurrency\thread_pool.cpp" />
-    <ClCompile Include="..\util\concurrency\vars.cpp" />
     <ClCompile Include="..\util\intrusive_counter.cpp" />
     <ClCompile Include="..\util\log.cpp" />
     <ClCompile Include="..\util\net\miniwebserver.cpp" />
@@ -1203,6 +1203,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\db\pipeline\value.h" />
     <ClInclude Include="..\db\projection.h" />
     <ClInclude Include="..\util\assert_util.h" />
+    <ClInclude Include="..\util\concurrency\mutexdebugger.h" />
     <ClInclude Include="..\util\concurrency\rwlockimpl.h" />
     <ClInclude Include="..\util\concurrency\simplerwlock.h" />
     <ClInclude Include="..\util\intrusive_counter.h" />
