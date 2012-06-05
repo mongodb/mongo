@@ -9,6 +9,7 @@
 #include <vector>
 
 #ifdef _WIN32
+#include <stdio.h>
 #include <boost/smart_ptr/scoped_array.hpp>
 #include "mongo/platform/windows_basic.h"
 #include <DbgHelp.h>
@@ -20,8 +21,13 @@
 
 namespace mongo {
     static const int maxBackTraceFrames = 20;
-    
-    void printStackTrace( std::ostream &os ) {
+
+    /**
+     * Print a stack backtrace for the current thread to the specified ostream.
+     * 
+     * @param os    ostream& to receive printed stack backtrace
+     */
+    void printStackTrace( std::ostream& os ) {
         
         void *b[maxBackTraceFrames];
         
@@ -44,18 +50,107 @@ namespace mongo {
 
 namespace mongo {
 
+    /**
+     * Get the display name of the executable module containing the specified address.
+     * 
+     * @param process               Process handle
+     * @param address               Address to find
+     * @param returnedModuleName    Returned module name
+     */
+    static void getModuleName( HANDLE process, DWORD64 address, std::string* returnedModuleName ) {
+        IMAGEHLP_MODULE64 module64;
+        memset ( &module64, 0, sizeof(module64) );
+        module64.SizeOfStruct = sizeof(module64);
+        BOOL ret = SymGetModuleInfo64( process, address, &module64 );
+        if ( FALSE == ret ) {
+            returnedModuleName->clear();
+            return;
+        }
+        char* moduleName = module64.LoadedImageName;
+        char* backslash = strrchr( moduleName, '\\' );
+        if ( backslash ) {
+            moduleName = backslash + 1;
+        }
+        *returnedModuleName = moduleName;
+    }
+
+    /**
+     * Get the display name and line number of the source file containing the specified address.
+     * 
+     * @param process               Process handle
+     * @param address               Address to find
+     * @param returnedSourceAndLine Returned source code file name with line number
+     */
+    static void getSourceFileAndLineNumber( HANDLE process,
+                                            DWORD64 address,
+                                            std::string* returnedSourceAndLine ) {
+        IMAGEHLP_LINE64 line64;
+        memset( &line64, 0, sizeof(line64) );
+        line64.SizeOfStruct = sizeof(line64);
+        DWORD displacement32;
+        BOOL ret = SymGetLineFromAddr64( process, address, &displacement32, &line64 );
+        if ( FALSE == ret ) {
+            returnedSourceAndLine->clear();
+            return;
+        }
+
+        std::string filename( line64.FileName );
+        std::string::size_type start = filename.find( "\\src\\mongo\\" );
+        if ( start == std::string::npos ) {
+            start = filename.find( "\\src\\third_party\\" );
+        }
+        if ( start != std::string::npos ) {
+            std::string shorter( "..." );
+            shorter += filename.substr( start );
+            filename.swap( shorter );
+        }
+        static const size_t bufferSize = 32;
+        boost::scoped_array<char> lineNumber( new char[bufferSize] );
+        _snprintf( lineNumber.get(), bufferSize, "(%u)", line64.LineNumber );
+        filename += lineNumber.get();
+        returnedSourceAndLine->swap( filename );
+    }
+
+    /**
+     * Get the display text of the symbol and offset of the specified address.
+     * 
+     * @param process                   Process handle
+     * @param address                   Address to find
+     * @param symbolInfo                Caller's pre-built SYMBOL_INFO struct (for efficiency)
+     * @param returnedSymbolAndOffset   Returned symbol and offset
+     */
+    static void getsymbolAndOffset( HANDLE process,
+                                    DWORD64 address,
+                                    SYMBOL_INFO* symbolInfo,
+                                    std::string* returnedSymbolAndOffset ) {
+        DWORD64 displacement64;
+        BOOL ret = SymFromAddr( process, address, &displacement64, symbolInfo );
+        if ( FALSE == ret ) {
+            *returnedSymbolAndOffset = "???";
+            return;
+        }
+        std::string symbolString( symbolInfo->Name );
+        static const size_t bufferSize = 32;
+        boost::scoped_array<char> symbolOffset( new char[bufferSize] );
+        _snprintf( symbolOffset.get(), bufferSize, "+0x%x", displacement64 );
+        symbolString += symbolOffset.get();
+        returnedSymbolAndOffset->swap( symbolString );
+    }
+
     struct TraceItem {
-        std::string module;
-        std::string sourceFile;
-        std::string symbol;
-        size_t lineNumber;
-        size_t instructionOffset;
-        size_t sourceLength;
+        std::string moduleName;
+        std::string sourceAndLine;
+        std::string symbolAndOffset;
     };
 
     static const int maxBackTraceFrames = 20;
 
-    void printStackTrace( std::ostream &os ) {
+    /**
+     * Print a stack backtrace for the current thread to the specified ostream.
+     * 
+     * @param os    ostream& to receive printed stack backtrace
+     */
+    void printStackTrace( std::ostream& os ) {
         HANDLE process = GetCurrentProcess();
         BOOL ret = SymInitialize( process, NULL, TRUE );
         if ( ret == FALSE ) {
@@ -94,17 +189,18 @@ namespace mongo {
         frame64.AddrStack.Mode = AddrModeFlat;
 
         const size_t nameSize = 1024;
-        const size_t symbolRecordSize = sizeof(SYMBOL_INFO) + nameSize;
-        boost::scoped_array<char> symbolBuffer( new char[symbolRecordSize] );
-        memset( symbolBuffer.get(), 0, symbolRecordSize );
-        SYMBOL_INFO* symbol = reinterpret_cast<SYMBOL_INFO*>( symbolBuffer.get() );
-        symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
-        symbol->MaxNameLen = nameSize;
+        const size_t symbolBufferSize = sizeof(SYMBOL_INFO) + nameSize;
+        boost::scoped_array<char> symbolCharBuffer( new char[symbolBufferSize] );
+        memset( symbolCharBuffer.get(), 0, symbolBufferSize );
+        SYMBOL_INFO* symbolBuffer = reinterpret_cast<SYMBOL_INFO*>( symbolCharBuffer.get() );
+        symbolBuffer->SizeOfStruct = sizeof(SYMBOL_INFO);
+        symbolBuffer->MaxNameLen = nameSize;
 
+        // build list
         std::vector<TraceItem> traceList;
         TraceItem traceItem;
         size_t moduleWidth = 0;
-        size_t fileWidth = 0;
+        size_t sourceWidth = 0;
         size_t frameCount = 0;
         for ( size_t i = 0; i < maxBackTraceFrames; ++i ) {
             ret = StackWalk64( imageType,
@@ -120,107 +216,40 @@ namespace mongo {
                 frameCount = i;
                 break;
             }
-
-            // module (executable) name
-            IMAGEHLP_MODULE64 module;
-            memset ( &module, 0, sizeof(module) );
-            module.SizeOfStruct = sizeof(module);
-            ret = SymGetModuleInfo64( process, frame64.AddrPC.Offset, &module );
-            char* moduleName = module.LoadedImageName;
-            char* backslash = strrchr( moduleName, '\\' );
-            if ( backslash ) {
-                moduleName = backslash + 1;
+            DWORD64 address = frame64.AddrPC.Offset;
+            getModuleName( process, address, &traceItem.moduleName );
+            size_t width = traceItem.moduleName.length();
+            if ( width > moduleWidth ) {
+                moduleWidth = width;
             }
-            traceItem.module = moduleName;
-            size_t len = traceItem.module.length();
-            if ( len > moduleWidth ) {
-                moduleWidth = len;
+            getSourceFileAndLineNumber( process, address, &traceItem.sourceAndLine );
+            width = traceItem.sourceAndLine.length();
+            if ( width > sourceWidth ) {
+                sourceWidth = width;
             }
-
-            // source code filename and line number
-            IMAGEHLP_LINE64 line;
-            memset( &line, 0, sizeof(line) );
-            line.SizeOfStruct = sizeof(line);
-            DWORD displacement32;
-            ret = SymGetLineFromAddr64( process, frame64.AddrPC.Offset, &displacement32, &line );
-            if ( ret ) {
-                std::string filename( line.FileName );
-                std::string::size_type start = filename.find( "\\src\\mongo\\" );
-                if ( start == std::string::npos ) {
-                    start = filename.find( "\\src\\third_party\\" );
-                }
-                if ( start != std::string::npos ) {
-                    std::string shorter( "..." );
-                    shorter += filename.substr( start );
-                    traceItem.sourceFile.swap( shorter );
-                }
-                else {
-                    traceItem.sourceFile.swap( filename );
-                }
-                len = traceItem.sourceFile.length() + 3;
-                traceItem.lineNumber = line.LineNumber;
-                if ( traceItem.lineNumber < 10 ) {
-                    len += 1;
-                }
-                else if ( traceItem.lineNumber < 100 ) {
-                    len += 2;
-                }
-                else if ( traceItem.lineNumber < 1000 ) {
-                    len += 3;
-                }
-                else if ( traceItem.lineNumber < 10000 ) {
-                    len += 4;
-                }
-                else {
-                    len += 5;
-                }
-                traceItem.sourceLength = len;
-                if ( len > fileWidth ) {
-                    fileWidth = len;
-                }
-            }
-            else {
-                traceItem.sourceFile.clear();
-                traceItem.sourceLength = 0;
-            }
-
-            // symbol name and offset from symbol
-            DWORD64 displacement;
-            ret = SymFromAddr( process, frame64.AddrPC.Offset, &displacement, symbol );
-            if ( ret ) {
-                traceItem.symbol = symbol->Name;
-                traceItem.instructionOffset = displacement;
-            }
-            else {
-                traceItem.symbol = "???";
-                traceItem.instructionOffset = 0;
-            }
-
-            // add to list
+            getsymbolAndOffset( process, address, symbolBuffer, &traceItem.symbolAndOffset );
             traceList.push_back( traceItem );
         }
         SymCleanup( process );
 
         // print list
         ++moduleWidth;
-        ++fileWidth;
+        ++sourceWidth;
         for ( size_t i = 0; i < frameCount; ++i ) {
-            os << traceList[i].module << " ";
-            size_t width = traceList[i].module.length();
+            os << traceList[i].moduleName << " ";
+            size_t width = traceList[i].moduleName.length();
             while ( width < moduleWidth ) {
                 os << " ";
                 ++width;
             }
-            if ( traceList[i].sourceFile.length() ) {
-                os << traceList[i].sourceFile << "(" << std::dec << traceList[i].lineNumber << ") ";
-            }
-            width = traceList[i].sourceLength;
-            while ( width < fileWidth ) {
+            os << traceList[i].sourceAndLine << " ";
+            width = traceList[i].sourceAndLine.length();
+            while ( width < sourceWidth ) {
                 os << " ";
                 ++width;
             }
-            os << traceList[i].symbol << "+0x" << std::hex << traceList[i].instructionOffset;
-            os << std::dec << std::endl;
+            os << traceList[i].symbolAndOffset;
+            os << std::endl;
         }
     }
 }
