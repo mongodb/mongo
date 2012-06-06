@@ -6,6 +6,7 @@
 #include "../util/net/listen.h"
 #include "pagefault.h"
 #include "mongo/util/stack_introspect.h"
+#include "mongo/db/curop.h"
 
 namespace mongo {
 
@@ -283,10 +284,21 @@ namespace mongo {
     }
 
     void Record::_accessing() const {
-        if ( cc().allowedToThrowPageFaultException() && ! likelyInPhysicalMemory() ) {
-            DEV fassert( 16236 , ! inConstructorChain(true) );
-            throw PageFaultException(this);
+        const Client& client = cc();
+        if ( ! client.allowedToThrowPageFaultException() )
+            return;
+        
+        if ( likelyInPhysicalMemory() )
+            return;
+        
+        if ( client.curop() && client.curop()->elapsedMillis() > 50 ) {
+            // this means we've been going too long to restart
+            // we should track how often this happens
+            return;
         }
+
+        DEV fassert( 16236 , ! inConstructorChain(true) );
+        throw PageFaultException(this);
     }
 
     void DeletedRecord::_accessing() const {
