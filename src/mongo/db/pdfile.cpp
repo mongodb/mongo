@@ -312,7 +312,7 @@ namespace mongo {
 
         NamespaceDetails *d = nsdetails(ns);
         verify(d);
-
+        
         bool ensure = false;
         if ( options.getField( "autoIndexId" ).type() ) {
             if ( options["autoIndexId"].trueValue() ) {
@@ -337,6 +337,10 @@ namespace mongo {
         bool isFreeList = strstr(ns, FREELIST_NS) != 0;
         if( !isFreeList )
             addNewNamespaceToCatalog(ns, options.isEmpty() ? 0 : &options);
+        
+        if ( options["flags"].numberInt() ) {
+            d->replaceUserFlags( options["flags"].numberInt() );
+        }
 
         return true;
     }

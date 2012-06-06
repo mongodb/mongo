@@ -1342,6 +1342,8 @@ namespace mongo {
                 return false;
             }
 
+            int oldFlags = nsd->userFlags();
+
             if ( jsobj["usePowerOf2Sizes"].type() ) {
                 result.appendBool( "usePowerOf2Sizes_old" , nsd->isUserFlagSet( NamespaceDetails::Flag_UsePowerOf2Sizes ) );
                 if ( jsobj["usePowerOf2Sizes"].trueValue() ) {
@@ -1350,6 +1352,11 @@ namespace mongo {
                 else {
                     nsd->clearUserFlag( NamespaceDetails::Flag_UsePowerOf2Sizes );
                 }
+                
+            }
+            
+            if ( oldFlags != nsd->userFlags() ) {
+                nsd->syncUserFlags( ns );
             }
 
             return true;

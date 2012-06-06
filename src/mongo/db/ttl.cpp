@@ -79,7 +79,10 @@ namespace mongo {
                 {
                     string ns = idx["ns"].String();
                     Client::WriteContext ctx( ns );
-                    nsdetails( ns.c_str() )->setUserFlag( NamespaceDetails::Flag_UsePowerOf2Sizes );
+                    NamespaceDetails* nsd = nsdetails( ns.c_str() );
+                    if ( nsd->setUserFlag( NamespaceDetails::Flag_UsePowerOf2Sizes ) ) {
+                        nsd->syncUserFlags( ns );
+                    }
                     n = deleteObjects( ns.c_str() , query , false , true );
                 }
 
