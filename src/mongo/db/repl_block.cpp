@@ -30,6 +30,10 @@
 
 namespace mongo {
 
+    // this is defined in fsync.cpp
+    // need to figure out where to put for real
+    bool lockedForWriting();
+
     using namespace mongoutils;
 
     class SlaveTracking : public BackgroundJob { // SERVER-4328 todo review
@@ -72,6 +76,13 @@ namespace mongo {
 
                 if ( inShutdown() )
                     return;
+                
+                if ( lockedForWriting() ) {
+                    // note: there is still a race here
+                    // since we could call fsyncLock between this and the last lock
+                    RARELY log() << "can't update local.slaves because locked for writing" << endl;
+                    continue;
+                }
 
                 list< pair<BSONObj,BSONObj> > todo;
 
