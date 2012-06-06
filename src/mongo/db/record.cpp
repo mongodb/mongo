@@ -216,7 +216,30 @@ namespace mongo {
     }
 
     bool Record::likelyInPhysicalMemory( const char* data ) {
-        DEV if ( rand() % 100 == 0 ) return false;
+        DEV {
+            // we don't want to do this too often as it makes DEBUG builds very slow
+            // at some point we might want to pass in what type of Record this is and
+            // then we can use that to make a more intelligent decision
+            int mod;
+            if ( Lock::isReadLocked() ) {
+                // we'll check read locks less often
+                // since its a lower probability of error
+                mod = 1000;
+            }
+            else if ( Lock::isLocked() ) {
+                // write lock's can more obviously cause issues
+                // check more often than reads
+                mod = 100;
+            }
+            else {
+                // no lock???
+                // if we get here we should be very paranoid
+                mod = 50;
+            }
+            
+            if ( rand() % mod == 0 ) 
+                return false;
+        } // end DEV test code
 
         if ( ! MemoryTrackingEnabled )
             return true;
