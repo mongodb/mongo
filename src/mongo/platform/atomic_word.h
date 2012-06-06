@@ -15,7 +15,6 @@
 
 #pragma once
 
-#include <boost/noncopyable.hpp>
 #include <boost/static_assert.hpp>
 
 #include "mongo/platform/atomic_intrinsics.h"
@@ -38,9 +37,12 @@ namespace mongo {
      *
      * NOTE(schwerin): This is a low level concurrency type, it is very hard to use correctly, and
      * you should not decide to use it lightly.
+     *
+     * NOTE(schwerin): This type is and must be a POD type, or per C++11 rules, a "Standard-layout"
+     * type.
      */
     template <typename _WordType>
-    class AtomicWord : private boost::noncopyable {
+    class AtomicWord {
     public:
         /**
          * Underlying value type.
