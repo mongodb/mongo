@@ -24,6 +24,7 @@
 #include "../util/net/listen.h"
 #include "../bson/util/builder.h"
 #include "security_common.h"
+#include "mongo/util/mongoutils/str.h"
 #ifdef _WIN32
 #include <direct.h>
 #else
@@ -452,7 +453,7 @@ namespace mongo {
                         if (value.as<string>().empty())
                             b.appendBool(key, true); // boost po uses empty string for flags like --quiet
                         else {
-                            if ( key == "servicePassword" ) {
+                            if ( key == "servicePassword" || key == "sslPEMKeyPassword" ) {
                                 b.append( key, "<password>" );
                             }
                             else {
@@ -483,8 +484,22 @@ namespace mongo {
 
         {
             BSONArrayBuilder b;
-            for (int i=0; i < argc; i++)
+            for (int i=0; i < argc; i++) {
                 b << argv[i];
+                if ( mongoutils::str::equals(argv[i], "--sslPEMKeyPassword")
+                     || mongoutils::str::equals(argv[i], "-sslPEMKeyPassword")
+                     || mongoutils::str::equals(argv[i], "--servicePassword")
+                     || mongoutils::str::equals(argv[i], "-servicePassword")) {
+                    b << "<password>";
+                    i++;
+
+                    // hide password from ps output
+                    char* arg = argv[i];
+                    while (*arg) {
+                        *arg++ = 'x';
+                    }
+                }
+            }
             argvArray = b.arr();
         }
 
