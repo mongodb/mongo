@@ -28,6 +28,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/mongommf.h"
 #include "mongo/db/ops/delete.h"
+#include "mongo/db/ops/update.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/hashtab.h"
@@ -698,14 +699,49 @@ namespace mongo {
     void NamespaceDetails::clearSystemFlag( int flag ) {
         getDur().writingInt(_systemFlags) &= ~flag;
     }
+    
+    /**
+     * keeping things in sync this way is a bit of a hack
+     * and the fact that we have to pass in ns again
+     * should be changed, just not sure to what
+     */
+    void NamespaceDetails::syncUserFlags( const string& ns ) {
+        Lock::assertWriteLocked( ns );
+        
+        string system_namespaces = NamespaceString( ns ).db + ".system.namespaces";
 
-    void NamespaceDetails::setUserFlag( int flag ) {
-        getDur().writingInt(_userFlags) |= flag;
+        BSONObj oldEntry;
+        verify( Helpers::findOne( system_namespaces , BSON( "name" << ns ) , oldEntry ) );
+        BSONObj newEntry = applyUpdateOperators( oldEntry , BSON( "$set" << BSON( "options.flags" << userFlags() ) ) );
+        
+        verify( 1 == deleteObjects( system_namespaces.c_str() , oldEntry , true , false , true ) );
+        theDataFileMgr.insert( system_namespaces.c_str() , newEntry.objdata() , newEntry.objsize() , true );
     }
 
-    void NamespaceDetails::clearUserFlag( int flag ) {
-        getDur().writingInt(_userFlags) &= ~flag;
+    bool NamespaceDetails::setUserFlag( int flags ) {
+        if ( ( _userFlags & flags ) == flags )
+            return false;
+        
+        getDur().writingInt(_userFlags) |= flags;
+        return true;
     }
+
+    bool NamespaceDetails::clearUserFlag( int flags ) {
+        if ( ( _userFlags & flags ) == 0 )
+            return false;
+
+        getDur().writingInt(_userFlags) &= ~flags;
+        return true;
+    }
+jj
+    bool NamespaceDetails::replaceUserFlags( int flags ) {
+        if ( flags == _userFlags )
+            return false;
+
+        getDur().writingInt(_userFlags) = flags;
+        return true;
+    }
+
 
 
     int NamespaceDetails::getRecordAllocationSize( int minRecordSize ) {

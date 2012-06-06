@@ -305,8 +305,23 @@ namespace mongo {
 
         const int userFlags() const { return _userFlags; }
         bool isUserFlagSet( int flag ) const { return _userFlags & flag; }
-        void setUserFlag( int flag );
-        void clearUserFlag( int flag );
+        
+        
+        /**
+         * these methods only modify NamespaceDetails and do not 
+         * sync changes back to system.namespaces
+         * a typical call might
+         if ( nsd->setUserFlag( 4 ) ) {
+            nsd->syncUserFlags();
+         }
+         * these methods all return true iff only something was modified
+         */
+        
+        bool setUserFlag( int flag );
+        bool clearUserFlag( int flag );
+        bool replaceUserFlags( int flags );
+
+        void syncUserFlags( const string& ns );
 
         /* @return -1 = not found
            generally id is first index, so not that expensive an operation (assuming present).
