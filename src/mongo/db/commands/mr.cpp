@@ -504,7 +504,7 @@ namespace mongo {
                 BSONList values;
 
                 op->setMessage( "m/r: reduce post processing" , _db.count( _config.tempLong, BSONObj() ) );
-                auto_ptr<DBClientCursor> cursor = _db.query( _config.tempLong , BSONObj() );
+                auto_ptr<DBClientCursor> cursor = _db.query( _config.tempLong , BSONObj() , 0, 0, 0, QueryOption_NoCursorTimeout );
                 while ( cursor->more() ) {
                     Lock::GlobalWrite lock; // TODO(erh) why global?
                     BSONObj temp = cursor->next();
