@@ -89,7 +89,9 @@ namespace mongo {
             _c = queryPlan().newCursor();
             // The basic and btree cursors used by this implementation do not supply their own
             // matchers, and a matcher from a query plan will be used instead.
-            fassert( 16248, !_c->matcher() );
+            verify( !_c->matcher() );
+            // Such cursors all support deduplication.
+            verify( _c->autoDedup() );
 
             // The query plan must have a matcher.  The matcher's constructor performs some aspects
             // of query validation that should occur as part of this class's init() if not handled

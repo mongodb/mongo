@@ -671,8 +671,6 @@ namespace mongo {
         /** Deduping documents from a prior cursor is handled by the matcher. */
         virtual bool getsetdup(DiskLoc loc) { return _c->getsetdup( loc ); }
 
-        virtual bool autoDedup() const { return _c->autoDedup(); }
-
         virtual bool modifiedKeys() const { return true; }
 
         virtual bool isMultiKey() const { return _mps->hasMultiKey(); }

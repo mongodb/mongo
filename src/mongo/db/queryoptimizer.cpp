@@ -1398,6 +1398,8 @@ doneCheckOrder:
         if ( _queryPlan ) {
             _matcher.reset( _matcher->nextClauseMatcher( oldClauseFrv, _queryPlan->indexKey() ) );
             _c = _queryPlan->newCursor();
+            // The basic and btree cursors used by this implementation support deduplication.
+            verify( _c->autoDedup() );
             // All sub cursors must support yields.
             verify( _c->supportYields() );
             if ( _explainPlanInfo ) {
