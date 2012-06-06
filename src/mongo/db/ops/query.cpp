@@ -883,6 +883,7 @@ namespace mongo {
             uassert( 10110 , "bad query object", false);
         }
 
+        bool hasRetried = false;
         scoped_ptr<PageFaultRetryableSection> pgfs;
         if ( ! cc().getPageFaultRetryableSection() )
             pgfs.reset( new PageFaultRetryableSection() );
@@ -921,20 +922,16 @@ namespace mongo {
                     oldPlan = mps->cachedPlanExplainSummary();
                 }
                 
-                // In some cases the query may be retried if there is an in memory sort size assertion.
-                for( int retry = 0; retry < 2; ++retry ) {
-                    try {
-                        return queryWithQueryOptimizer( m, queryOptions, ns, jsobj, curop, query, order,
-                                                        pq_shared, oldPlan, shardingVersionAtStart, result );
-                    } catch ( const QueryRetryException & ) {
-                        verify( retry == 0 );
-                    }
-                }
-                verify( false );
-                return 0;
+                return queryWithQueryOptimizer( m, queryOptions, ns, jsobj, curop, query, order,
+                                                pq_shared, oldPlan, shardingVersionAtStart, result );
             }
             catch ( PageFaultException& e ) {
                 e.touch();
+            }
+            catch ( const QueryRetryException & ) {
+                // In some cases the query may be retried if there is an in memory sort size assertion.
+                verify( ! hasRetried );
+                hasRetried = true;
             }
         }
     }
