@@ -182,7 +182,7 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
 
     var hasRS = false
     for( var k in otherParams ){
-        if( k.startsWith( "rs" ) ){
+        if( k.startsWith( "rs" ) && otherParams[k] != undefined ){
             hasRS = true
             break
         }
