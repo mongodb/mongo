@@ -75,7 +75,7 @@ namespace mongo {
         string key = cmdObj.getStringField("key");
         string received_nonce = cmdObj.getStringField("nonce");
 	if (cc().clientAddress() == "127.0.0.1" && user.empty()) {
-                authenticate("admin", "__cds_system",false);
+                authenticate("admin", "__cds_system",2); // 2 for write 1 for read 0 is null
                 return true;
         }   
         if( user.empty() || key.empty() || received_nonce.empty() ) {
