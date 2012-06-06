@@ -273,8 +273,15 @@ __snapshot_process(
 	 * but there's no explicit "free the snapshot information" call into the
 	 * block manager; if there was an error in an upper level resulting in
 	 * the snapshot never being "resolved", the list might not be empty.
+	 *
+	 * XXX
+	 * This isn't sufficient, actually: we're going to leak all the blocks
+	 * that were written as part of the last snapshot because it was never
+	 * resolved.
 	 */
 	__wt_block_extlist_free(session, &si->snapshot_avail);
+	WT_RET(__wt_block_extlist_init(
+	    session, &si->snapshot_avail, "live", "snapshot_avail"));
 
 	/*
 	 * To delete a snapshot, we'll need snapshot information for it, and we
