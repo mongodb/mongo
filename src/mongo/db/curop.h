@@ -220,6 +220,7 @@ namespace mongo {
         void kill() { _killed = true; }
         bool killed() const { return _killed; }
         void yielded() { _numYields++; }
+        int numYields() const { return _numYields; }
         void setNS(const char *ns) {
             strncpy(_ns, ns, Namespace::MaxNsLen);
             _ns[Namespace::MaxNsLen] = 0;
