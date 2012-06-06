@@ -15,9 +15,11 @@
  */
 
 #include "mongo/pch.h"
-#include "mongo/db/repl/rs_sync.h"
-#include "mongo/db/repl/bgsync.h"
+
 #include "mongo/db/client.h"
+#include "mongo/db/commands/fsync.h"
+#include "mongo/db/repl/bgsync.h"
+#include "mongo/db/repl/rs_sync.h"
 
 namespace mongo {
 namespace replset {
@@ -140,9 +142,12 @@ namespace replset {
 
     bool BackgroundSync::hasCursor() {
         {
-            // we don't need the global write lock yet, but it's needed by OplogReader::connect
+            // prevent writers from blocking readers during fsync
+            SimpleMutex::scoped_lock fsynclk(filesLockedFsync); 
+            // we don't need the local write lock yet, but it's needed by OplogReader::connect
             // so we take it preemptively to avoid deadlocking.
-            Lock::GlobalWrite gwl;
+            Lock::DBWrite lk("local");
+
             boost::unique_lock<boost::mutex> lock(_mutex);
 
             if (!_oplogMarkerTarget || _currentSyncTarget != _oplogMarkerTarget) {

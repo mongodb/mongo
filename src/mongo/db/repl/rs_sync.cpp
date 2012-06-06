@@ -14,12 +14,14 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
+#include "mongo/pch.h"
+
 #include "mongo/db/client.h"
-#include "rs.h"
+#include "mongo/db/commands/fsync.h"
 #include "mongo/db/repl.h"
-#include "mongo/db/repl/rs_sync.h"
 #include "mongo/db/repl/bgsync.h"
+#include "mongo/db/repl/rs.h"
+#include "mongo/db/repl/rs_sync.h"
 
 namespace mongo {
 
@@ -207,8 +209,6 @@ namespace mongo {
         }
         return golive;
     }
-
-    extern SimpleMutex filesLockedFsync;
 
     class DontLockOnEverySingleOperation : boost::noncopyable { 
         scoped_ptr<Lock::ScopedLock> lk;

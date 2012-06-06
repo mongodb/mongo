@@ -51,6 +51,7 @@
 #include <fstream>
 #include <boost/filesystem/operations.hpp>
 #include "dur_commitjob.h"
+#include "mongo/db/commands/fsync.h"
 
 namespace mongo {
     
@@ -78,8 +79,6 @@ namespace mongo {
     HANDLE lockFileHandle;
 #endif
 
-    // see FSyncCommand:
-    extern bool lockedForWriting();
 
     /*static*/ OpTime OpTime::_now() {
         OpTime result;

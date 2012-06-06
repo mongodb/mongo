@@ -72,13 +72,11 @@
 #include "../util/timer.h"
 #include "mongo/util/stacktrace.h"
 #include "../server.h"
+#include "mongo/db/commands/fsync.h"
 
 using namespace mongoutils;
 
 namespace mongo {
-
-    bool lockedForWriting();
-    extern SimpleMutex filesLockedFsync;
 
     namespace dur {
 

@@ -1093,7 +1093,7 @@ namespace mongo {
         BSONObj me;
         {
             
-            Lock::GlobalWrite l;
+            Lock::DBWrite l("local");
             // local.me is an identifier for a server for getLastError w:2+
             if ( ! Helpers::getSingleton( "local.me" , me ) ||
                  ! me.hasField("host") ||

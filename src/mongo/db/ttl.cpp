@@ -18,6 +18,7 @@
 
 #include "pch.h"
 
+#include "mongo/db/commands/fsync.h"
 #include "mongo/db/ttl.h"
 #include "mongo/db/databaseholder.h"
 #include "mongo/db/instance.h"
@@ -27,11 +28,6 @@
 
 namespace mongo {
     
-    // this is defined in fsync.cpp
-    // need to figure out where to put for real
-    bool lockedForWriting();
-    
-
     class TTLMonitor : public BackgroundJob {
     public:
         TTLMonitor(){}
