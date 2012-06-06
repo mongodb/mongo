@@ -767,6 +767,51 @@ namespace mongo {
 
         return exhaust;
     }
+
+    bool queryIdHack_locked( const char* ns, const BSONObj& query, const ParsedQuery& pq, CurOp& curop, Message& result ) {
+        int n = 0;
+        bool nsFound = false;
+        bool indexFound = false;
+        
+        BSONObj resObject;
+        Client& c = cc();
+        bool found = Helpers::findById( c, ns , query , resObject , &nsFound , &indexFound );
+        if ( nsFound && ! indexFound ) 
+            return false;
+        
+        if ( shardingState.needShardChunkManager( ns ) ) {
+            ShardChunkManagerPtr m = shardingState.getShardChunkManager( ns );
+            if ( m && ! m->belongsToMe( resObject ) ) {
+                // I have something this _id
+                // but it doesn't belong to me
+                // so return nothing
+                resObject = BSONObj();
+                found = false;
+            }
+        }
+        
+        BufBuilder bb(sizeof(QueryResult)+resObject.objsize()+32);
+        bb.skip(sizeof(QueryResult));
+        
+        curop.debug().idhack = true;
+        if ( found ) {
+            n = 1;
+            fillQueryResultFromObj( bb , pq.getFields() , resObject );
+        }
+        auto_ptr< QueryResult > qr;
+        qr.reset( (QueryResult *) bb.buf() );
+        bb.decouple();
+        qr->setResultFlagsToOk();
+        qr->len = bb.len();
+        
+        curop.debug().responseLength = bb.len();
+        qr->setOperation(opReply);
+        qr->cursorId = 0;
+        qr->startingFrom = 0;
+        qr->nReturned = n;
+        result.setData( qr.release(), true );
+        return true;
+    }
     
     /**
      * Run a query -- includes checking for and running a Command.
@@ -857,47 +902,7 @@ namespace mongo {
         // Run a simple id query.
         
         if ( ! (explain || pq.showDiskLoc()) && isSimpleIdQuery( query ) && !pq.hasOption( QueryOption_CursorTailable ) ) {
-
-            int n = 0;
-            bool nsFound = false;
-            bool indexFound = false;
-
-            BSONObj resObject;
-            Client& c = cc();
-            bool found = Helpers::findById( c, ns , query , resObject , &nsFound , &indexFound );
-            if ( nsFound == false || indexFound == true ) {
-                
-                if ( shardingState.needShardChunkManager( ns ) ) {
-                    ShardChunkManagerPtr m = shardingState.getShardChunkManager( ns );
-                    if ( m && ! m->belongsToMe( resObject ) ) {
-                        // I have something this _id
-                        // but it doesn't belong to me
-                        // so return nothing
-                        resObject = BSONObj();
-                        found = false;
-                    }
-                }
-
-                BufBuilder bb(sizeof(QueryResult)+resObject.objsize()+32);
-                bb.skip(sizeof(QueryResult));
-                
-                curop.debug().idhack = true;
-                if ( found ) {
-                    n = 1;
-                    fillQueryResultFromObj( bb , pq.getFields() , resObject );
-                }
-                auto_ptr< QueryResult > qr;
-                qr.reset( (QueryResult *) bb.buf() );
-                bb.decouple();
-                qr->setResultFlagsToOk();
-                qr->len = bb.len();
-                
-                curop.debug().responseLength = bb.len();
-                qr->setOperation(opReply);
-                qr->cursorId = 0;
-                qr->startingFrom = 0;
-                qr->nReturned = n;
-                result.setData( qr.release(), true );
+            if ( queryIdHack_locked( ns, query, pq, curop, result ) ) {
                 return NULL;
             }
         }
