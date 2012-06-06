@@ -69,8 +69,13 @@ namespace mongo {
 
                         loops--;
                         log() << "retrying command: " << q.query << endl;
-                        ShardConnection::checkMyConnectionVersions( e.getns() );
-                        if( loops < 4 ) versionManager.forceRemoteCheckShardVersionCB( e.getns() );
+
+                        // For legacy reasons, ns may not actually be set in the exception :-(
+                        string staleNS = e.getns();
+                        if( staleNS.size() == 0 ) staleNS = q.ns;
+
+                        ShardConnection::checkMyConnectionVersions( staleNS );
+                        if( loops < 4 ) versionManager.forceRemoteCheckShardVersionCB( staleNS );
                     }
                     catch ( AssertionException& e ) {
                         e.getInfo().append( builder , "assertion" , "assertionCode" );

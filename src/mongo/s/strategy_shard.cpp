@@ -267,13 +267,17 @@ namespace mongo {
                     // Cleanup the connection
                     dbcon.done();
 
+                    // For legacy reasons, we may not always get a namespace in the exception :-(
+                    string staleNS = e.getns();
+                    if( staleNS.size() == 0 ) staleNS = ns;
+
                     // Assume the inserts did *not* succeed, so we don't want to erase them
 
                     int logLevel = retries < 2;
                     LOG( logLevel ) << "retrying bulk insert of " << objs.size() << " documents to chunk " << c << " because of StaleConfigException: " << e << endl;
 
                     if( retries > 2 ){
-                        versionManager.forceRemoteCheckShardVersionCB( e.getns() );
+                        versionManager.forceRemoteCheckShardVersionCB( staleNS );
                     }
 
                     // TODO:  Replace with actual chunk handling code, simplify request

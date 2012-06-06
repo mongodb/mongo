@@ -260,13 +260,15 @@ namespace mongo {
         // Preferred if we're rebuilding this from a thrown exception
         StaleConfigException( const string& raw , int code, const BSONObj& error, bool justConnection = false )
             : AssertionException(
-                    mongoutils::str::stream() << raw << " ( ns : " << error["ns"].String() << // Note, this will fail if we don't have a ns
-                                             ", received : " << ShardChunkVersion::fromBSON( error["vReceived"] ).toString() <<
-                                             ", wanted : " << ShardChunkVersion::fromBSON( error["vWanted"] ).toString() <<
-                                             ", " << ( code == SendStaleConfigCode ? "send" : "recv" ) << " )",
-                    code ),
+                    mongoutils::str::stream()
+                  << raw << " ( ns : " << ( error["ns"].type() == String ? error["ns"].String() : string("<unknown>") )
+                  << ", received : " << ShardChunkVersion::fromBSON( error["vReceived"] ).toString()
+                  << ", wanted : " << ShardChunkVersion::fromBSON( error["vWanted"] ).toString()
+                  << ", " << ( code == SendStaleConfigCode ? "send" : "recv" ) << " )", code ),
+
               _justConnection(justConnection) ,
-              _ns( error["ns"].String() ),
+              // For legacy reasons, we may not always get a namespace here
+              _ns( error["ns"].type() == String ? error["ns"].String() : "" ),
               _received( ShardChunkVersion::fromBSON( error["vReceived"] ) ),
               _wanted( ShardChunkVersion::fromBSON( error["vWanted"] ) )
         {}

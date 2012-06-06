@@ -891,6 +891,9 @@ namespace mongo {
                 // Our version isn't compatible with the current version anymore on at least one shard, need to retry immediately
                 NamespaceString staleNS = e.getns();
 
+                // For legacy reasons, this may not be set in the exception :-(
+                if( staleNS.size() == 0 ) staleNS = ns; // ns is the *versioned* namespace, be careful of this
+
                 // Probably need to retry fully
                 bool forceReload, fullReload;
                 _markStaleNS( staleNS, e, forceReload, fullReload );
@@ -1035,8 +1038,12 @@ namespace mongo {
             catch( RecvStaleConfigException& e ){
                 retry = true;
 
+                string staleNS = e.getns();
+                // For legacy reasons, ns may not always be set in exception :-(
+                if( staleNS.size() == 0 ) staleNS = ns; // ns is versioned namespace, be careful of this
+
                 // Will retry all at once
-                staleNSExceptions[ e.getns() ] = e;
+                staleNSExceptions[ staleNS ] = e;
 
                 // Fully clear this cursor, as it needs to be re-established
                 mdata.cleanup();
@@ -1590,19 +1597,32 @@ namespace mongo {
 
                 verify( versionManager.isVersionableCB( _conn ) );
 
+                // For legacy reasons, we may not always have a namespace :-(
+                string staleNS = e.getns();
+                if( staleNS.size() == 0 ) staleNS = _db;
+
                 if( i >= maxRetries ){
                     error() << "Future::spawnComand (part 2) stale config exception" << causedBy( e ) << endl;
                     throw e;
                 }
 
                 if( i >= maxRetries / 2 ){
-                    if( ! versionManager.forceRemoteCheckShardVersionCB( e.getns() ) ){
+                    if( ! versionManager.forceRemoteCheckShardVersionCB( staleNS ) ){
                         error() << "Future::spawnComand (part 2) no config detected" << causedBy( e ) << endl;
                         throw e;
                     }
                 }
 
-                versionManager.checkShardVersionCB( _conn, e.getns(), false, 1 );
+                // We may not always have a collection, since we don't know from a generic command what collection
+                // is supposed to be acted on, if any
+                if( nsGetCollection( staleNS ).size() == 0 ){
+                    warning() << "no collection namespace in stale config exception "
+                              << "for lazy command " << _cmd << ", could not refresh "
+                              << staleNS << endl;
+                }
+                else {
+                    versionManager.checkShardVersionCB( _conn, staleNS, false, 1 );
+                }
 
                 LOG( i > 1 ? 0 : 1 ) << "retrying lazy command" << causedBy( e ) << endl;
 

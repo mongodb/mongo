@@ -139,6 +139,9 @@ namespace mongo {
         if ( ! conf ) return false;
         conf->reload();
 
+        // If we don't have a collection, don't refresh the chunk manager
+        if( nsGetCollection( ns ).size() == 0 ) return false;
+
         ChunkManagerPtr manager = conf->getChunkManagerIfExists( ns, true, true );
         if( ! manager ) return false;
 
