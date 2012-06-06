@@ -229,7 +229,7 @@ namespace mongo {
         rawOut(msg);
         ::abort();
     }
-    bool cdsIfRequestTimeout(const string& ns , Message& m) {
+    bool cdsIfRequestTimeout(const string& ns) {
 #ifdef _WIN32
 		return false;
 #else
@@ -249,15 +249,12 @@ namespace mongo {
 	if( cds_priod_end_time - cc().getCdsPriodStartTime() <= cc().getCdsPriodLength()
 	    && (ts.tv_sec - cc().getCdsLastCpuTime() > cc().getCdsMaxCpuCost())) {
 		sleep(ts.tv_sec - cc().getCdsLastCpuTime() - cc().getCdsMaxCpuCost());
-		DbMessage d(m);
-        	QueryMessage q(d);
 		mongo::log() << "[cds] sleep for a while "
 			     << " ts.tv_sec = " << ts.tv_sec
 			     << " CdsLastCpuTime = " << cc().getCdsLastCpuTime()
 			     << " CdsMaxCpuCost =" << cc().getCdsMaxCpuCost()
 			     << " CdsPriodStartTime = " << cc().getCdsPriodStartTime()
-			     << " ns = " << ns
-			     << " query = " << q.query.toString() << endl;
+			     << " ns = " << ns << endl;
 		cc().setCdsLastCpuTime(ts.tv_sec); 
 		return true;
 	}
@@ -427,7 +424,7 @@ namespace mongo {
         }
         
         debug.reset();
-	cdsIfRequestTimeout(ns,m);
+	cdsIfRequestTimeout(ns);
     } /* assembleResponse() */
 
     void receivedKillCursors(Message& m) {
