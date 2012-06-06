@@ -26,8 +26,8 @@
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/stringdata.h"
-#include "mongo/bson/util/atomic_int.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/platform/atomic_word.h"
 
 namespace mongo {
 
@@ -458,22 +458,27 @@ namespace mongo {
         }
 
 #pragma pack(1)
-        class Holder : boost::noncopyable {
+        // NOTE(schwerin): This class is a POD.  Layout matters.
+        class Holder {
         private:
             Holder(); // this class should never be explicitly created
-            AtomicUInt refCount;
+            Holder(const Holder&);
+            Holder& operator=(const Holder&);
+
         public:
+            AtomicUInt32 refCount;
             char data[4]; // start of object
 
-            void zero() { refCount.zero(); }
+            void zero() { refCount.store(0U); }
 
             // these are called automatically by boost::intrusive_ptr
-            friend void intrusive_ptr_add_ref(Holder* h) { h->refCount++; }
+            friend void intrusive_ptr_add_ref(Holder* h) { h->refCount.fetchAndAdd(1); }
             friend void intrusive_ptr_release(Holder* h) {
+                unsigned decrementedRefCount = h->refCount.subtractAndFetch(1);
 #if defined(_DEBUG) // cant use dassert or DEV here
-                verify((int)h->refCount > 0); // make sure we haven't already freed the buffer
+                verify((int)decrementedRefCount > 0); // make sure we haven't already freed the buffer
 #endif
-                if(--(h->refCount) == 0){
+                if(decrementedRefCount == 0U) {
 #if defined(_DEBUG)
                     unsigned sz = (unsigned&) *h->data;
                     verify(sz < BSONObjMaxInternalSize * 3);
@@ -484,6 +489,11 @@ namespace mongo {
             }
         };
 #pragma pack()
+
+        BOOST_STATIC_ASSERT(sizeof(Holder) == 8);
+        BOOST_STATIC_ASSERT(offsetof(Holder, refCount) == 0);
+        BOOST_STATIC_ASSERT(offsetof(Holder, data) == 4);
+
 
     BSONObj(const BSONObj &rO):
         _objdata(rO._objdata), _holder(rO._holder) {
