@@ -733,7 +733,7 @@ namespace mongo {
         getDur().writingInt(_userFlags) &= ~flags;
         return true;
     }
-jj
+
     bool NamespaceDetails::replaceUserFlags( int flags ) {
         if ( flags == _userFlags )
             return false;
