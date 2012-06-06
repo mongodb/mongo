@@ -229,9 +229,9 @@ namespace mongo {
         rawOut(msg);
         ::abort();
     }
-	bool cdsIfRequestTimeout(const string& ns) {
+    bool cdsIfRequestTimeout(const string& ns , Message& m) {
 #ifdef _WIN32
-			return false;
+		return false;
 #else
 	if(specialDB(NamespaceString( ns ).db)) {
 		return false;
@@ -239,20 +239,33 @@ namespace mongo {
 	if(!cc().getAuthenticationInfo()->isAuthorized(NamespaceString( ns ).db)) {
 		return false;
 	}
-	if(cc().getCdsMaxCpuCost() == 0 ) {
+	if(cc().getCdsPriodLength() == 0) { //limit not set
 		return false;
 	}
 	struct timespec ts;
         clock_gettime( CLOCK_THREAD_CPUTIME_ID, &ts );
-	if(ts.tv_sec - cc().getCdsLastCpuTime() > cc().getCdsMaxCpuCost() ) {
+	int cds_priod_end_time = time(NULL);
+	
+	if( cds_priod_end_time - cc().getCdsPriodStartTime() <= cc().getCdsPriodLength()
+	    && (ts.tv_sec - cc().getCdsLastCpuTime() > cc().getCdsMaxCpuCost())) {
 		sleep(ts.tv_sec - cc().getCdsLastCpuTime() - cc().getCdsMaxCpuCost());
-		mongo::log(2) << "[cds] sleep for a while "
-			     << "ts.tv_sec=" << ts.tv_sec
-			     << "CdsLastCpuTime=" << cc().getCdsLastCpuTime()
-			     << "CdsMaxCpuCost=" << cc().getCdsMaxCpuCost()
-			     << endl;
+		DbMessage d(m);
+        	QueryMessage q(d);
+		mongo::log() << "[cds] sleep for a while "
+			     << " ts.tv_sec = " << ts.tv_sec
+			     << " CdsLastCpuTime = " << cc().getCdsLastCpuTime()
+			     << " CdsMaxCpuCost =" << cc().getCdsMaxCpuCost()
+			     << " CdsPriodStartTime = " << cc().getCdsPriodStartTime()
+			     << " ns = " << ns
+			     << " query = " << q.query.toString() << endl;
 		cc().setCdsLastCpuTime(ts.tv_sec); 
 		return true;
+	}
+	if (cds_priod_end_time - cc().getCdsPriodStartTime() > cc().getCdsPriodLength()) {
+		int v = cds_priod_end_time - cc().getCdsPriodStartTime() ;
+		v = (v / cc().getCdsPriodLength()) * cc().getCdsPriodLength() ;
+		cc().setCdsPriodStartTime(cc().getCdsPriodStartTime()+v);
+		cc().setCdsLastCpuTime(ts.tv_sec);
 	}
 	return false;
 #endif
@@ -414,7 +427,7 @@ namespace mongo {
         }
         
         debug.reset();
-	cdsIfRequestTimeout(ns);
+	cdsIfRequestTimeout(ns,m);
     } /* assembleResponse() */
 
     void receivedKillCursors(Message& m) {

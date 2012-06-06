@@ -195,13 +195,10 @@ namespace mongo {
         return ret;
     }
     bool cdsfileExceed(const string& db,int filenum) {
-	if(specialDB(db) || cc().getCdsMaxFileNum() == 0) {
+	if(specialDB(db) || cc().getCdsMaxFileNum() == Client::CDS_RESOURCE_UNLIMIT) {
 		return false;
 	}
-	int maxfilenum = cc().getCdsMaxFileNum();
-	mongo::log(2) << "[cds][fileExceed] maxfilenum=" << maxfilenum
-		     << " filenum=" << filenum << endl;
-	return (filenum>=maxfilenum);
+	return (filenum>=cc().getCdsMaxFileNum());
     }
     bool fileIndexExceedsQuota( const char *ns, int fileIndex, bool enforceQuota ) {
         return

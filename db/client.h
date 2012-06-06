@@ -47,6 +47,7 @@ namespace mongo {
     /** the database's concept of an outside "client" */
     class Client : boost::noncopyable {
     public:
+	static const int CDS_RESOURCE_UNLIMIT = INT_MAX;
         class Context;
         static mongo::mutex clientsMutex;
         static set<Client*> clients; // always be in clientsMutex when manipulating this
@@ -105,6 +106,10 @@ namespace mongo {
 	void setCdsMaxCpuCost( int v ) { _cds_max_cpu_cost = v; }
 	int getCdsMaxFileNum() const { return _cds_max_file_num; }
 	void setCdsMaxFileNum( int n ) { _cds_max_file_num = n; }
+	int getCdsPriodStartTime() { return _cds_priod_start_time; }
+	void setCdsPriodStartTime( int v ) { _cds_priod_start_time = v; } 
+	int getCdsPriodLength() { return _cds_priod_length; }
+	void setCdsPriodLength( int v ) { _cds_priod_length = v; }
     private:
         ConnectionId _connectionId; // > 0 for things "conn", 0 otherwise
         string _threadId; // "" on non support systems
@@ -122,6 +127,8 @@ namespace mongo {
 	int _cds_last_cpu_time;
 	int _cds_max_cpu_cost;
 	int _cds_max_file_num;
+	int _cds_priod_start_time;
+	int _cds_priod_length;
         Client(const char *desc, AbstractMessagingPort *p = 0);
 
         friend class CurOp;

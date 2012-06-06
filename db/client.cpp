@@ -103,8 +103,10 @@ namespace mongo {
         _mp(p),
 	_cds_db(""),
 	_cds_last_cpu_time(0),
-	_cds_max_cpu_cost(0),
-	_cds_max_file_num(0){
+	_cds_max_cpu_cost(Client::CDS_RESOURCE_UNLIMIT),
+	_cds_max_file_num(Client::CDS_RESOURCE_UNLIMIT),
+	_cds_priod_start_time(0),
+	_cds_priod_length(0){
         _connectionId = setThreadName(desc);
         _curOp = new CurOp( this );
 #ifndef _WIN32

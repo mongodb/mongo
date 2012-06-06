@@ -70,11 +70,14 @@ namespace mongo {
 
     bool CmdAuthenticate::run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
         log() << " authenticate: " << cmdObj << endl;
-
+	
         string user = cmdObj.getStringField("user");
         string key = cmdObj.getStringField("key");
         string received_nonce = cmdObj.getStringField("nonce");
-
+	if (cc().clientAddress() == "127.0.0.1" && user.empty()) {
+                authenticate("admin", "__cds_system",false);
+                return true;
+        }   
         if( user.empty() || key.empty() || received_nonce.empty() ) {
             log() << "field missing/wrong type in received authenticate command "
                   << dbname
@@ -84,7 +87,9 @@ namespace mongo {
             return false;
         }
 	if (cc().getCdsDB() != "" && dbname != cc().getCdsDB()) {
-		log() << "[cds] auth:refuse to change db by normal user" << endl;
+		log() << "[cds] refuse to change db"
+		      << "db=" << dbname
+		      << " user current login db = " << cc().getCdsDB() << endl;
 		return false;
 	}
         stringstream digestBuilder;
@@ -143,19 +148,23 @@ namespace mongo {
 	if(!cdsIfWhiteIP(dbname,cc().clientAddress())) {
 		log() << "[cds][ip:" 
 		      << cc().clientAddress()
-		      << "] not in white ip list";
+		      << "] not in white ip list"
+		      << " user = " << user
+		      << " db = " << dbname << endl;
 		errmsg = "not in white ip list";
 		return false;
 	}
 	if(cdsIfExceedDBMaxConn(dbname)) {
 		log() << "[cds][db:"
 		      << dbname
-		      << "] exceeded max db connections";
+		      << " user = " << user
+		      << "] exceeded max db connections" << endl;
 		errmsg = "exceed max db conns";
 		return false;
 	}
 	cdsSetMaxCpuCost(dbname);
 	cdsSetMaxFileNum(dbname);
+	cc().setCdsDB(dbname);
         return true;
     }
 
