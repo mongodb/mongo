@@ -356,7 +356,7 @@ namespace mongo {
                 regex = fe.valuestrsafe();
             }
             else {
-                uassert( 16330, "invalid regex pattern, must be BSON regex or string", 0 );
+                uasserted( 16330, "$regex patterns must have BSON regex or string type" );
             }
             break;
         }
