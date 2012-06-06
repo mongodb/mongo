@@ -596,10 +596,21 @@ namespace mongo {
     }
 
     bool Client::allowedToThrowPageFaultException() const {
-        return 
-            _hasWrittenThisPass == false && 
-            _pageFaultRetryableSection != 0 && 
-            _pageFaultRetryableSection->laps() < 100; 
+        if ( _hasWrittenThisPass )
+            return false;
+        
+        if ( ! _pageFaultRetryableSection )
+            return false;
+
+        if ( _pageFaultRetryableSection->laps() >= 100 )
+            return false;
+        
+        // if we've done a normal yield, it means we're in a ClientCursor or something similar
+        // in that case, that code should be handling yielding, not us
+        if ( _curOp && _curOp->numYields() > 0 ) 
+            return false;
+
+        return true;
     }
 
     void OpDebug::reset() {
