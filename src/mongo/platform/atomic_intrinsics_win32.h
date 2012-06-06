@@ -51,11 +51,16 @@ namespace mongo {
         }
 
         static T load(volatile const T* value) {
-            return *value;
+            MemoryBarrier();
+            T result = *value;
+            MemoryBarrier();
+            return result;
         }
 
         static void store(volatile T* dest, T newValue) {
+            MemoryBarrier();
             *dest = newValue;
+            MemoryBarrier();
         }
 
         static T fetchAndAdd(volatile T* dest, T increment) {
@@ -86,11 +91,11 @@ namespace mongo {
         }
 
         static T load(volatile const T* value) {
-            return *value;
+            return LoadStoreImpl<T>::load(value);
         }
 
         static void store(volatile T* dest, T newValue) {
-            *dest = newValue;
+            LoadStoreImpl<T>::store(dest, newValue);
         }
 
         static T fetchAndAdd(volatile T* dest, T increment) {
@@ -101,6 +106,47 @@ namespace mongo {
     private:
         AtomicIntrinsics();
         ~AtomicIntrinsics();
+
+        // On 32-bit IA-32 systems, 64-bit load and store must be implemented in terms of
+        // Interlocked operations, but on 64-bit systems they support a simpler, native
+        // implementation.  The LoadStoreImpl type represents the abstract implementation of
+        // loading and storing 64-bit values.
+        template <typename T, typename _IsTTooBig=void>
+        class LoadStoreImpl{};
+
+        // Implementation on 64-bit systems.
+        template <typename U>
+        class LoadStoreImpl<U, typename boost::enable_if_c<sizeof(U) <= sizeof(void*)>::type> {
+        public:
+            static U load(volatile const U* value) {
+                MemoryBarrier();
+                U result = *value;
+                MemoryBarrier();
+                return result;
+            }
+
+
+            static void store(volatile U* dest, U newValue) {
+                MemoryBarrier();
+                *dest = newValue;
+                MemoryBarrier();
+            }
+        };
+
+        // Implementation on 32-bit systems.
+        template <typename U>
+        class LoadStoreImpl<U, typename boost::disable_if_c<sizeof(U) <= sizeof(void*)>::type> {
+        public:
+            static U load(volatile const U* value) {
+                return AtomicIntrinsics<U>::compareAndSwap(const_cast<volatile U*>(value),
+                                                           U(0),
+                                                           U(0));
+            }
+
+            static void store(volatile U* dest, U newValue) {
+                AtomicIntrinsics<U>::swap(dest, newValue);
+            }
+        };
     };
 
 }  // namespace mongo

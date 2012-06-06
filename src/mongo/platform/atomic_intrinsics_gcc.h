@@ -54,16 +54,21 @@ namespace mongo {
                           : [dest] "+m" (*dest),
                             [r] "+r" (result)
                           :
-                          : "memory", "cc");
+                          : "memory");
             return result;
         }
 
         static T load(volatile const T* value) {
-            return *value;
+            asm volatile ("mfence" ::: "memory");
+            T result = *value;
+            asm volatile ("mfence" ::: "memory");
+            return result;
         }
 
         static void store(volatile T* dest, T newValue) {
+            asm volatile ("mfence" ::: "memory");
             *dest = newValue;
+            asm volatile ("mfence" ::: "memory");
         }
 
         static T fetchAndAdd(volatile T* dest, T increment) {

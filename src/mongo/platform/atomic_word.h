@@ -55,14 +55,14 @@ namespace mongo {
         /**
          * Gets the current value of this AtomicWord.
          *
-         * Provides neither acquire nor release semantics.
+         * Has acquire and release semantics.
          */
         WordType load() const { return AtomicIntrinsics<WordType>::load(&_value); }
 
         /**
          * Sets the value of this AtomicWord to "newValue".
          *
-         * Provides neither acquire nor release semantics.
+         * Has acquire and release semantics.
          */
         void store(WordType newValue) { AtomicIntrinsics<WordType>::store(&_value, newValue); }
 
@@ -108,7 +108,7 @@ namespace mongo {
          * Has acquire and release semantics.
          */
         WordType fetchAndSubtract(WordType decrement) {
-            return fetchAndAdd(-decrement);
+            return fetchAndAdd(WordType(0) - decrement);
         }
 
         /**
