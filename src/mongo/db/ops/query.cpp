@@ -882,8 +882,10 @@ namespace mongo {
             out() << query.toString() << endl;
             uassert( 10110 , "bad query object", false);
         }
-        
-        PageFaultRetryableSection pgfs;
+
+        scoped_ptr<PageFaultRetryableSection> pgfs;
+        if ( ! cc().getPageFaultRetryableSection() )
+            pgfs.reset( new PageFaultRetryableSection() );
         while ( 1 ) {
             try {
                 Client::ReadContext ctx( ns , dbpath ); // read locks
