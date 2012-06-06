@@ -803,13 +803,15 @@ namespace QueryOptimizerTests {
             }
             shared_ptr<QueryPlanSet> makeQps( const BSONObj& query = BSONObj(),
                                               const BSONObj& order = BSONObj(),
-                                              const BSONObj& hint = BSONObj() ) {
+                                              const BSONObj& hint = BSONObj(),
+                                              bool allowSpecial = true ) {
                 auto_ptr<FieldRangeSetPair> frsp( new FieldRangeSetPair( ns(), query ) );
                 auto_ptr<FieldRangeSetPair> frspOrig( new FieldRangeSetPair( *frsp ) );
                 return shared_ptr<QueryPlanSet>
                         ( QueryPlanSet::make( ns(), frsp, frspOrig, query, order,
                                               shared_ptr<const ParsedQuery>(), hint,
-                                              QueryPlanGenerator::Use, BSONObj(), BSONObj() ) );
+                                              QueryPlanGenerator::Use, BSONObj(), BSONObj(),
+                                              allowSpecial ) );
             }
             static const char *ns() { return "unittests.QueryPlanSetTests"; }
             static NamespaceDetails *nsd() { return nsdetails( ns() ); }
@@ -1283,6 +1285,46 @@ namespace QueryOptimizerTests {
                 ASSERT_EQUALS( BSON( "$natural" << 1 ), qps->firstPlan()->indexKey() );
             }
         };
+
+        /** Special plans are only selected when allowed. */
+        class AllowSpecial : public Base {
+        public:
+            void run() {
+                BSONObj naturalIndex = BSON( "$natural" << 1 );
+                BSONObj specialIndex = BSON( "a" << "2d" );
+                BSONObj query = BSON( "a" << BSON_ARRAY( 0 << 0 ) );
+                client().ensureIndex( ns(), specialIndex );
+
+                // The special plan is chosen if allowed.
+                assertSingleIndex( specialIndex, makeQps( query ) );
+
+                // The special plan is not chosen if not allowed
+                assertSingleIndex( naturalIndex, makeQps( query, BSONObj(), BSONObj(), false ) );
+
+                // Attempting to hint a special plan when not allowed triggers an assertion.
+                ASSERT_THROWS( makeQps( query, BSONObj(), BSON( "$hint" << specialIndex ), false ),
+                               UserException );
+
+                // Attempting to use a geo operator when special plans are not allowed triggers an
+                // assertion.
+                ASSERT_THROWS( makeQps( BSON( "a" << BSON( "$near" << BSON_ARRAY( 0 << 0 ) ) ),
+                                        BSONObj(), BSONObj(), false ),
+                               UserException );
+
+                // The special plan is not chosen if not allowed, even if cached.
+                NamespaceDetailsTransient &nsdt = NamespaceDetailsTransient::get( ns() );
+                nsdt.registerCachedQueryPlanForPattern
+                        ( makePattern( query, BSONObj() ),
+                          CachedQueryPlan( specialIndex, 1,
+                                           CandidatePlanCharacter( true, false ) ) );
+                assertSingleIndex( naturalIndex, makeQps( query, BSONObj(), BSONObj(), false ) );
+            }
+        private:
+            void assertSingleIndex( const BSONObj& index, const shared_ptr<QueryPlanSet>& set ) {
+                ASSERT_EQUALS( 1, set->nPlans() );
+                ASSERT_EQUALS( index, set->firstPlan()->indexKey() );
+            }
+        };
         
     } // namespace QueryPlanSetTests
 
@@ -1537,6 +1579,7 @@ namespace QueryOptimizerTests {
             add<QueryPlanSetTests::PossiblePlans>();
             add<QueryPlanSetTests::AvoidUnhelpfulRecordedPlan>();
             add<QueryPlanSetTests::AvoidDisallowedRecordedPlan>();
+            add<QueryPlanSetTests::AllowSpecial>();
             add<MultiPlanScannerTests::ToString>();
             add<MultiPlanScannerTests::PossiblePlans>();
             add<BestGuess>();

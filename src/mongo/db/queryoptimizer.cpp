@@ -501,14 +501,16 @@ doneCheckOrder:
                                            const BSONObj &hint,
                                            RecordedPlanPolicy recordedPlanPolicy,
                                            const BSONObj &min,
-                                           const BSONObj &max ) :
+                                           const BSONObj &max,
+                                           bool allowSpecial ) :
         _qps( qps ),
         _originalFrsp( originalFrsp ),
         _parsedQuery( parsedQuery ),
         _hint( hint.getOwned() ),
         _recordedPlanPolicy( recordedPlanPolicy ),
         _min( min.getOwned() ),
-        _max( max.getOwned() ) {
+        _max( max.getOwned() ),
+        _allowSpecial( allowSpecial ) {
     }
 
     void QueryPlanGenerator::addInitialPlans() {
@@ -548,11 +550,12 @@ doneCheckOrder:
                     }
                     break;
                 case QueryPlan::Helpful:
-                    if ( !p->special().empty() ) {
-                        specialPlan = p;
-                    }
-                    else {
+                    if ( p->special().empty() ) {
+                        // Not a 'special' plan.
                         plans.push_back( p );
+                    }
+                    else if ( _allowSpecial ) {
+                        specialPlan = p;
                     }
                     break;
                 default:
@@ -606,7 +609,7 @@ doneCheckOrder:
         if ( !hint.eoo() ) {
             IndexDetails *id = parseHint( hint, d );
             if ( id ) {
-                setHintedPlan( *id );
+                setHintedPlanForIndex( *id );
             }
             else {
                 uassert( 10366, "natural order cannot be specified with $min/$max",
@@ -615,14 +618,14 @@ doneCheckOrder:
             }
             return true;
         }
-        
+
         if ( !_min.isEmpty() || !_max.isEmpty() ) {
             string errmsg;
             BSONObj keyPattern;
             IndexDetails *idx = indexDetailsForRange( _qps.frsp().ns(), errmsg, _min, _max,
                                                      keyPattern );
             uassert( 10367 ,  errmsg, idx );
-            _qps.setSinglePlan( newPlan( d, d->idxNo( *idx ), _min, _max ) );
+            validateAndSetHintedPlan( newPlan( d, d->idxNo( *idx ), _min, _max ) );
             return true;
         }
         
@@ -640,6 +643,7 @@ doneCheckOrder:
                 const IndexSpec& spec = ii.getSpec();
                 if ( spec.getTypeName() == special &&
                     spec.suitability( _qps.originalQuery(), _qps.order() ) ) {
+                    uassert( 16330, "'special' query operator not allowed", _allowSpecial );
                     _qps.setSinglePlan( newPlan( d, j, BSONObj(), BSONObj(), special ) );
                     return true;
                 }
@@ -692,6 +696,10 @@ doneCheckOrder:
             return false;
         }
 
+        if ( !_allowSpecial && !p->special().empty() ) {
+            return false;
+        }
+
         _qps.setCachedPlan( p, best );
         return true;
     }
@@ -718,7 +726,7 @@ doneCheckOrder:
         _qps.setSinglePlan( newPlan( d, -1 ) );
     }
     
-    void QueryPlanGenerator::setHintedPlan( IndexDetails &id ) {
+    void QueryPlanGenerator::setHintedPlanForIndex( IndexDetails& id ) {
         if ( !_min.isEmpty() || !_max.isEmpty() ) {
             string errmsg;
             BSONObj keyPattern = id.keyPattern();
@@ -727,9 +735,15 @@ doneCheckOrder:
                                                            keyPattern ) );
         }
         NamespaceDetails *d = nsdetails( _qps.frsp().ns() );
-        _qps.setSinglePlan( newPlan( d, d->idxNo( id ), _min, _max ) );
+        validateAndSetHintedPlan( newPlan( d, d->idxNo( id ), _min, _max ) );
     }
-    
+
+    void QueryPlanGenerator::validateAndSetHintedPlan( const shared_ptr<QueryPlan>& plan ) {
+        uassert( 16331, "'special' plan hint not allowed",
+                 _allowSpecial || plan->special().empty() );
+        _qps.setSinglePlan( plan );
+    }
+
     void QueryPlanGenerator::warnOnCappedIdTableScan() const {
         // if we are doing a table scan on _id
         // and it's a capped collection
@@ -765,10 +779,11 @@ doneCheckOrder:
                                       const BSONObj& hint,
                                       QueryPlanGenerator::RecordedPlanPolicy recordedPlanPolicy,
                                       const BSONObj& min,
-                                      const BSONObj& max ) {
+                                      const BSONObj& max,
+                                      bool allowSpecial ) {
         auto_ptr<QueryPlanSet> ret( new QueryPlanSet( ns, frsp, originalFrsp, originalQuery, order,
                                                      parsedQuery, hint, recordedPlanPolicy, min,
-                                                     max ) );
+                                                     max, allowSpecial ) );
         ret->init();
         return ret.release();
     }
@@ -783,15 +798,18 @@ doneCheckOrder:
                                const BSONObj &hint,
                                QueryPlanGenerator::RecordedPlanPolicy recordedPlanPolicy,
                                const BSONObj &min,
-                               const BSONObj &max ) :
-        _generator( *this, originalFrsp, parsedQuery, hint, recordedPlanPolicy, min, max ),
+                               const BSONObj &max,
+                               bool allowSpecial ) :
+        _generator( *this, originalFrsp, parsedQuery, hint, recordedPlanPolicy, min, max,
+                    allowSpecial ),
         _originalQuery( originalQuery ),
         _frsp( frsp ),
         _mayRecordPlan(),
         _usingCachedPlan(),
         _order( order.getOwned() ),
         _oldNScanned( 0 ),
-        _yieldSometimesTracker( 256, 20 ) {
+        _yieldSometimesTracker( 256, 20 ),
+        _allowSpecial( allowSpecial ) {
     }
 
     bool QueryPlanSet::hasMultiKey() const {
@@ -811,7 +829,7 @@ doneCheckOrder:
 
     void QueryPlanSet::setSinglePlan( const QueryPlanPtr &plan ) {
         if ( nPlans() == 0 ) {
-            _plans.push_back( plan );
+            pushPlan( plan );
         }
     }
     
@@ -821,7 +839,7 @@ doneCheckOrder:
         _usingCachedPlan = true;
         _oldNScanned = cachedPlan.nScanned();
         _cachedPlanCharacter = cachedPlan.planCharacter();
-        _plans.push_back( plan );
+        pushPlan( plan );
     }
 
     void QueryPlanSet::addCandidatePlan( const QueryPlanPtr &plan ) {
@@ -830,7 +848,7 @@ doneCheckOrder:
         if ( nPlans() > 0 && plan->indexKey() == firstPlan()->indexKey() ) {
             return;
         }
-        _plans.push_back( plan );
+        pushPlan( plan );
         _mayRecordPlan = true;
     }
     
@@ -838,7 +856,12 @@ doneCheckOrder:
         _generator.addFallbackPlans();
         _mayRecordPlan = true;
     }
-    
+
+    void QueryPlanSet::pushPlan( const QueryPlanSet::QueryPlanPtr& plan ) {
+        verify( _allowSpecial || plan->special().empty() );
+        _plans.push_back( plan );
+    }
+
     bool QueryPlanSet::hasPossiblyExcludedPlans() const {
         return
             _usingCachedPlan &&
@@ -1180,7 +1203,7 @@ doneCheckOrder:
             updateCurrentQps( QueryPlanSet::make( _ns.c_str(), frsp, auto_ptr<FieldRangeSetPair>(),
                                                  _query, order, _parsedQuery, _hint,
                                                  _recordedPlanPolicy,
-                                                 min, max ) );
+                                                 min, max, true ) );
         }
         else {
             BSONElement e = _query.getField( "$or" );
@@ -1206,7 +1229,9 @@ doneCheckOrder:
         auto_ptr<FieldRangeSetPair> originalFrsp( _org->topFrspOriginal() );
         updateCurrentQps( QueryPlanSet::make( _ns.c_str(), frsp, originalFrsp, _query,
                                              BSONObj(), _parsedQuery, _hint, _recordedPlanPolicy,
-                                             BSONObj(), BSONObj() ) );
+                                             BSONObj(), BSONObj(),
+                                             // 'Special' plans are not supported within $or.
+                                             false ) );
     }
 
     bool MultiPlanScanner::mayHandleBeginningOfClause() {
@@ -1561,7 +1586,7 @@ doneCheckOrder:
         scoped_ptr<QueryPlanSet> qps( QueryPlanSet::make( ns, frsp, origFrsp, query, sort,
                                                          shared_ptr<const ParsedQuery>(), BSONObj(),
                                                          QueryPlanGenerator::UseIfInOrder,
-                                                         BSONObj(), BSONObj() ) );
+                                                         BSONObj(), BSONObj(), true ) );
         QueryPlanSet::QueryPlanPtr qpp = qps->getBestGuess();
         if( ! qpp.get() ) return shared_ptr<Cursor>();
 

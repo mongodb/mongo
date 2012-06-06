@@ -313,7 +313,8 @@ namespace mongo {
                            const BSONObj &hint,
                            RecordedPlanPolicy recordedPlanPolicy,
                            const BSONObj &min,
-                           const BSONObj &max );
+                           const BSONObj &max,
+                           bool allowSpecial );
         /** Populate the provided QueryPlanSet with an initial set of plans. */
         void addInitialPlans();
         /** Supplement a cached plan provided earlier by adding additional query plans. */
@@ -333,7 +334,8 @@ namespace mongo {
                                       const string &special = "" ) const;
         bool setUnindexedPlanIf( bool set, NamespaceDetails *d );
         void setSingleUnindexedPlan( NamespaceDetails *d );
-        void setHintedPlan( IndexDetails &id );
+        void setHintedPlanForIndex( IndexDetails& id );
+        void validateAndSetHintedPlan( const shared_ptr<QueryPlan>& plan );
         void warnOnCappedIdTableScan() const;
         QueryPlanSet &_qps;
         auto_ptr<FieldRangeSetPair> _originalFrsp;
@@ -342,6 +344,7 @@ namespace mongo {
         RecordedPlanPolicy _recordedPlanPolicy;
         BSONObj _min;
         BSONObj _max;
+        bool _allowSpecial;
     };
 
     /**
@@ -366,7 +369,8 @@ namespace mongo {
                                    const BSONObj& hint,
                                    QueryPlanGenerator::RecordedPlanPolicy recordedPlanPolicy,
                                    const BSONObj& min,
-                                   const BSONObj& max );
+                                   const BSONObj& max,
+                                   bool allowSpecial );
 
         /** @return number of candidate plans. */
         int nPlans() const { return _plans.size(); }
@@ -468,10 +472,12 @@ namespace mongo {
                      const BSONObj &hint,
                      QueryPlanGenerator::RecordedPlanPolicy recordedPlanPolicy,
                      const BSONObj &min,
-                     const BSONObj &max );
+                     const BSONObj &max,
+                     bool allowSpecial );
         void init();
 
         void addFallbackPlans();
+        void pushPlan( const QueryPlanPtr& plan );
 
         QueryPlanGenerator _generator;
         BSONObj _originalQuery;
@@ -483,6 +489,7 @@ namespace mongo {
         BSONObj _order;
         long long _oldNScanned;
         ElapsedTracker _yieldSometimesTracker;
+        bool _allowSpecial;
     };
 
     /** Handles $or type queries by generating a QueryPlanSet for each $or clause. */

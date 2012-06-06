@@ -2835,7 +2835,7 @@ namespace QueryOptimizerCursorTests {
             scoped_ptr<QueryPlanSet> s( QueryPlanSet::make( ns(), frsp, frspOrig, query, order,
                                                             shared_ptr<const ParsedQuery>(),
                                                             BSONObj(), QueryPlanGenerator::Use,
-                                                            BSONObj(), BSONObj() ) );
+                                                            BSONObj(), BSONObj(), true ) );
             ASSERT_EQUALS( n, s->nPlans() );
         }
         static shared_ptr<QueryOptimizerCursor> getCursor( const BSONObj &query,
