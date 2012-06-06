@@ -154,16 +154,22 @@ scripting_common_files = [ "scripting/engine.cpp",
                            "scripting/bench.cpp",
                            ]
 
+env.StaticLibrary('bson_template_evaluator', ["scripting/bson_template_evaluator.cpp"])
+env.CppUnitTest('bson_template_evaluator_test', ['scripting/bson_template_evaluator_test.cpp'],
+                LIBDEPS=['bson_template_evaluator','#/mongoclient'])
+
 if usesm:
     env.StaticLibrary('scripting', scripting_common_files + ['scripting/engine_spidermonkey.cpp'],
-                      LIBDEPS=['$BUILD_DIR/third_party/js-1.7/js'])
+                      LIBDEPS=['$BUILD_DIR/third_party/js-1.7/js', 'bson_template_evaluator'])
 elif usev8:
     env.StaticLibrary('scripting', scripting_common_files + ['scripting/engine_v8.cpp',
                                                              'scripting/v8_db.cpp',
                                                              'scripting/v8_utils.cpp',
-                                                             'scripting/v8_wrapper.cpp'])
+                                                             'scripting/v8_wrapper.cpp'],
+                       LIBDEPS=['bson_template_evaluator'])
 else:
-    env.StaticLibrary('scripting', scripting_common_files + ['scripting/engine_none.cpp'])
+    env.StaticLibrary('scripting', scripting_common_files + ['scripting/engine_none.cpp'],
+                      LIBDEPS=['bson_template_evaluator'])
 
 mmapFiles = [ "util/mmap.cpp", "util/touch_pages.cpp" ]
 
