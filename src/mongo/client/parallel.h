@@ -395,6 +395,19 @@ namespace mongo {
 
         FilteringClientCursor * _cursors;
         int _needToSkip;
+
+    private:
+        /**
+         * Setups the shard version of the connection. When using a replica
+         * set connection and the primary cannot be reached, the version
+         * will not be set if the slaveOk flag is set.
+         */
+        void setupVersionAndHandleSlaveOk( PCStatePtr state /* in & out */,
+                           const Shard& shard,
+                           ShardPtr primary /* in */,
+                           const NamespaceString& ns,
+                           const std::string& vinfo,
+                           ChunkManagerPtr manager /* in */ );
     };
 
     /**

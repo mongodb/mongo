@@ -623,9 +623,9 @@ namespace mongo {
 
             if ( !checkAllSecondaries ) {
                 scoped_lock lk( _lock );
-                if ( _master >= 0 ) {
+                if ( _master >= 0 && _nodes[_master].ok ) {
                   /* Nothing else to do since another thread already
-                   * found the _master
+                   * found a usable _master
                    */
                   return;
                 }

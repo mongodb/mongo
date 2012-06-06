@@ -681,6 +681,79 @@ namespace mongo {
 
     }
 
+    void ParallelSortClusteredCursor::setupVersionAndHandleSlaveOk(
+        PCStatePtr state,
+        const Shard& shard,
+        ShardPtr primary,
+        const NamespaceString& ns,
+        const string& vinfo,
+        ChunkManagerPtr manager ) {
+
+        if ( manager ) {
+            state->manager = manager;
+        }
+        else if ( primary ) {
+            state->primary = primary;
+        }
+
+        verify( ! primary || shard == *primary || ! isVersioned() );
+
+        // Setup conn
+        if ( !state->conn ){
+            state->conn.reset( new ShardConnection( shard, ns, manager ) );
+        }
+
+        const DBClientBase* rawConn = state->conn->getRawConn();
+        if (( _options & QueryOption_SlaveOk ) &&
+                rawConn->type() == ConnectionString::SET &&
+                rawConn->isFailed() ) {
+            /* A side effect of this short circuiting is this will not be
+             * able figure out that the primary is now up on it's own and
+             * has to rely on other threads to refresh the node states.
+             */
+
+            OCCASIONALLY {
+                const DBClientReplicaSet* repl =
+                    dynamic_cast<const DBClientReplicaSet*>( rawConn );
+                warning() << "Primary for " << repl->getServerAddress()
+                          << " was down before, bypassing setShardVersion."
+                          << " Local config view can be stale." << endl;
+            }
+        } else {
+            try {
+                /* TODO: Undo SERVER-5797. This try-catch is a temporary hack until
+                 * secondaries can properly handle shard versioning
+                 */
+                if ( state->conn->setVersion() ) {
+                    // It's actually okay if we set the version here, since either the
+                    // manager will be verified as compatible, or if the manager doesn't
+                    // exist, we don't care about version consistency
+                    log( pc ) << "needed to set remote version on connection to value "
+                              << "compatible with " << vinfo << endl;
+                }
+            } catch ( const DBException& dbEx ) {
+                if ( (dbEx.getCode() == 10009 /* no master */ &&
+                        ( _options & QueryOption_SlaveOk )) ) {
+
+                    OCCASIONALLY {
+                        const DBClientReplicaSet* repl =
+                            dynamic_cast<const DBClientReplicaSet*>(
+                                    state->conn->getRawConn() );
+
+                        warning() << "Cannot contact primary for "
+                                  << repl->getServerAddress()
+                                  << " to check shard version. "
+                                  << "SlaveOk query can be sent to the wrong shard."
+                                  << endl;
+                    }
+                }
+                else {
+                    throw;
+                }
+            }
+        }
+    }
+    
     void ParallelSortClusteredCursor::startInit() {
 
         bool returnPartial = ( _qSpec.options() & QueryOption_PartialResults );
@@ -791,21 +864,7 @@ namespace mongo {
 
                 mdata.pcState.reset( new PCState() );
                 PCStatePtr state = mdata.pcState;
-
-                // Setup manager / primary
-                if( manager ) state->manager = manager;
-                else if( primary ) state->primary = primary;
-
-                verify( ! primary || shard == *primary || ! isVersioned() );
-
-                // Setup conn
-                if( ! state->conn ) state->conn.reset( new ShardConnection( shard, ns, manager ) );
-
-                if( state->conn->setVersion() ){
-                    // It's actually okay if we set the version here, since either the manager will be verified as
-                    // compatible, or if the manager doesn't exist, we don't care about version consistency
-                    log( pc ) << "needed to set remote version on connection to value compatible with " << vinfo << endl;
-                }
+                setupVersionAndHandleSlaveOk( state, shard, primary, ns, vinfo, manager );
 
                 const string& ns = _qSpec.ns();
 

@@ -243,6 +243,15 @@ namespace mongo {
             return _conn;
         }
 
+        /**
+         * @return the connection object underneath without setting the shard version.
+         * @throws AssertionException if _conn is uninitialized.
+         */
+        DBClientBase* getRawConn() const {
+            verify( _conn );
+            return _conn;
+        }
+
         string getHost() const {
             return _addr;
         }
