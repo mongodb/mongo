@@ -29,6 +29,7 @@
 #include "../../s/d_logic.h"
 #include "../../server.h"
 #include "../queryoptimizercursor.h"
+#include "../pagefault.h"
 
 namespace mongo {
 
@@ -881,51 +882,59 @@ namespace mongo {
             out() << query.toString() << endl;
             uassert( 10110 , "bad query object", false);
         }
-
-        Client::ReadContext ctx( ns , dbpath ); // read locks
-        const ConfigVersion shardingVersionAtStart = shardingState.getVersion( ns );
-
-        replVerifyReadsOk(&pq);
-
-        if ( pq.hasOption( QueryOption_CursorTailable ) ) {
-            NamespaceDetails *d = nsdetails( ns );
-            uassert( 13051, "tailable cursor requested on non capped collection", d && d->isCapped() );
-            const BSONObj nat1 = BSON( "$natural" << 1 );
-            if ( order.isEmpty() ) {
-                order = nat1;
-            }
-            else {
-                uassert( 13052, "only {$natural:1} order allowed for tailable cursor", order == nat1 );
-            }
-        }
-
-        // Run a simple id query.
         
-        if ( ! (explain || pq.showDiskLoc()) && isSimpleIdQuery( query ) && !pq.hasOption( QueryOption_CursorTailable ) ) {
-            if ( queryIdHack_locked( ns, query, pq, curop, result ) ) {
-                return NULL;
-            }
-        }
-        
-        // Run a regular query.
-        
-        BSONObj oldPlan;
-        if ( explain && ! pq.hasIndexSpecifier() ) {
-            scoped_ptr<MultiPlanScanner> mps( MultiPlanScanner::make( ns, query, order ) );
-            oldPlan = mps->cachedPlanExplainSummary();
-        }
-
-        // In some cases the query may be retried if there is an in memory sort size assertion.
-        for( int retry = 0; retry < 2; ++retry ) {
+        PageFaultRetryableSection pgfs;
+        while ( 1 ) {
             try {
-                return queryWithQueryOptimizer( m, queryOptions, ns, jsobj, curop, query, order,
-                                               pq_shared, oldPlan, shardingVersionAtStart, result );
-            } catch ( const QueryRetryException & ) {
-                verify( retry == 0 );
+                Client::ReadContext ctx( ns , dbpath ); // read locks
+                const ConfigVersion shardingVersionAtStart = shardingState.getVersion( ns );
+                
+                replVerifyReadsOk(&pq);
+                
+                if ( pq.hasOption( QueryOption_CursorTailable ) ) {
+                    NamespaceDetails *d = nsdetails( ns );
+                    uassert( 13051, "tailable cursor requested on non capped collection", d && d->isCapped() );
+                    const BSONObj nat1 = BSON( "$natural" << 1 );
+                    if ( order.isEmpty() ) {
+                        order = nat1;
+                    }
+                    else {
+                        uassert( 13052, "only {$natural:1} order allowed for tailable cursor", order == nat1 );
+                    }
+                }
+                
+                // Run a simple id query.
+                
+                if ( ! (explain || pq.showDiskLoc()) && isSimpleIdQuery( query ) && !pq.hasOption( QueryOption_CursorTailable ) ) {
+                    if ( queryIdHack_locked( ns, query, pq, curop, result ) ) {
+                        return NULL;
+                    }
+                }
+                
+                // Run a regular query.
+                
+                BSONObj oldPlan;
+                if ( explain && ! pq.hasIndexSpecifier() ) {
+                    scoped_ptr<MultiPlanScanner> mps( MultiPlanScanner::make( ns, query, order ) );
+                    oldPlan = mps->cachedPlanExplainSummary();
+                }
+                
+                // In some cases the query may be retried if there is an in memory sort size assertion.
+                for( int retry = 0; retry < 2; ++retry ) {
+                    try {
+                        return queryWithQueryOptimizer( m, queryOptions, ns, jsobj, curop, query, order,
+                                                        pq_shared, oldPlan, shardingVersionAtStart, result );
+                    } catch ( const QueryRetryException & ) {
+                        verify( retry == 0 );
+                    }
+                }
+                verify( false );
+                return 0;
+            }
+            catch ( PageFaultException& e ) {
+                e.touch();
             }
         }
-        verify( false );
-        return 0;
     }
 
 } // namespace mongo
