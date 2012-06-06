@@ -53,7 +53,6 @@ namespace mongo {
 
     void checkTicketNumbers();
 
-    
     // ----- Listener -------
 
     const Listener* Listener::_timeTracker;
@@ -239,7 +238,6 @@ namespace mongo {
 #endif
 
         static long connNumber = 0;
-        struct timeval maxSelectTime;
         while ( ! inShutdown() ) {
             fd_set fds[1];
             FD_ZERO(fds);
@@ -248,16 +246,12 @@ namespace mongo {
                 FD_SET(*it, fds);
             }
 
-            maxSelectTime.tv_sec = 0;
-            maxSelectTime.tv_usec = 10000;
-            const int ret = select(maxfd+1, fds, NULL, NULL, &maxSelectTime);
+            unsigned long long selectStartTime = curTimeMillis64();
+            const int ret = select(maxfd+1, fds, NULL, NULL, NULL);
+            unsigned long long selectEndTime = curTimeMillis64();
+            _elapsedTime += (selectEndTime - selectStartTime);
 
             if (ret == 0) {
-#if defined(__linux__)
-                _elapsedTime += ( 10000 - maxSelectTime.tv_usec ) / 1000;
-#else
-                _elapsedTime += 10;
-#endif
                 continue;
             }
 
@@ -273,12 +267,6 @@ namespace mongo {
                     log() << "select() failure: ret=" << ret << " " << errnoWithDescription(x) << endl;
                 return;
             }
-
-#if defined(__linux__)
-            _elapsedTime += max(ret, (int)(( 10000 - maxSelectTime.tv_usec ) / 1000));
-#else
-            _elapsedTime += ret; // assume 1ms to grab connection. very rough
-#endif
 
             for (vector<SOCKET>::iterator it=socks.begin(), end=socks.end(); it != end; ++it) {
                 if (! (FD_ISSET(*it, fds)))
