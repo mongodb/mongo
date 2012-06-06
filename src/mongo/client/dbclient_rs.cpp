@@ -789,6 +789,29 @@ namespace mongo {
             conn->getServerAddress() == _nodes[nodeOffset].conn->getServerAddress() );
     }
 
+    bool ReplicaSetMonitor::Node::matchesTag( const BSONObj& tag ) const {
+        if ( tag.isEmpty() ){
+           return true;
+        }
+
+        const BSONElement& myTagElem = lastIsMaster["tags"];
+        if( !myTagElem.isABSONObj() ){
+            return false;
+        }
+
+        const BSONObj& myTagObj = myTagElem.Obj();
+        for( BSONObjIterator iter( tag ); iter.more(); ) {
+            const BSONElement& tagCriteria( iter.next() );
+            const char* field = tagCriteria.fieldName();
+
+            if ( !myTagObj.hasField( field ) ||
+                    !tagCriteria.valuesEqual( myTagObj[field] )) {
+                return false;
+            }
+        }
+
+        return true;
+    }
 
     mongo::mutex ReplicaSetMonitor::_setsLock( "ReplicaSetMonitor" );
     map<string,ReplicaSetMonitorPtr> ReplicaSetMonitor::_sets;

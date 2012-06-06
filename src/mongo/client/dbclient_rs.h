@@ -46,6 +46,89 @@ namespace mongo {
         typedef boost::function1<void,const ReplicaSetMonitor*> ConfigChangeHook;
 
         /**
+         * Data structure for keeping track of the states of individual replica
+         * members. This class is not thread-safe so proper measures should be taken
+         * when sharing this object across multiple threads.
+         *
+         * Note: these get copied around in the nodes vector so be sure to maintain
+         * copyable semantics here
+         */
+        struct Node {
+            Node( const HostAndPort& a , DBClientConnection* c ) :
+                addr( a ),
+                conn(c),
+                ok( c != NULL ),
+                ismaster(false),
+                secondary( false ),
+                hidden( false ),
+                pingTimeMillis( 0 ) {
+            }
+
+            bool okForSecondaryQueries() const {
+                return ok && secondary && ! hidden;
+            }
+
+            /**
+             * Checks if the given tag matches the tag attached to this node.
+             *
+             * Example:
+             *
+             * Tag of this node: { "dc": "nyc", "region": "na", "rack": "4" }
+             *
+             * match: {}
+             * match: { "dc": "nyc", "rack": 4 }
+             * match: { "region": "na", "dc": "nyc" }
+             * not match: { "dc: "nyc", "rack": 2 }
+             * not match: { "dc": "sf" }
+             *
+             * @param tag the tag to use to compare. Should not contain any
+             *     embedded documents.
+             *
+             * @return true if the given tag matches the this node's tag
+             *     specification
+             */
+            bool matchesTag( const BSONObj& tag ) const;
+
+            /**
+             * @param  threshold  max ping time (in ms) to be considered local
+             * @return true if node is a local secondary, and can handle queries
+             **/
+            bool isLocalSecondary_inlock( const int threshold ) const {
+                return pingTimeMillis < threshold;
+            }
+
+            BSONObj toBSON() const {
+                return BSON( "addr" << addr.toString() <<
+                        "isMaster" << ismaster <<
+                        "secondary" << secondary <<
+                        "hidden" << hidden <<
+                        "tags" << lastIsMaster["tags"] <<
+                        "ok" << ok );
+            }
+
+            string toString() const {
+                return toBSON().toString();
+            }
+
+            HostAndPort addr;
+            boost::shared_ptr<DBClientConnection> conn;
+
+            // if this node is in a failure state
+            // used for slave routing
+            // this is too simple, should make it better
+            bool ok;
+
+            // as reported by ismaster
+            BSONObj lastIsMaster;
+
+            bool ismaster;
+            bool secondary;
+            bool hidden;
+
+            int pingTimeMillis;
+        };
+
+        /**
          * gets a cached Monitor per name or will create if doesn't exist
          */
         static ReplicaSetMonitorPtr get( const string& name , const vector<HostAndPort>& servers );
@@ -201,60 +284,10 @@ namespace mongo {
 
         string _name;
 
-        // note these get copied around in the nodes vector so be sure to maintain copyable semantics here
-        struct Node {
-            Node( const HostAndPort& a , DBClientConnection* c ) 
-                : addr( a ) , conn(c) , ok( c != NULL ),
-                  ismaster(false), secondary( false ) , hidden( false ) , pingTimeMillis(0) {
-            }
-
-            bool okForSecondaryQueries() const {
-                return ok && secondary && ! hidden;
-            }
-
-            /**
-             * @param  threshold  max ping time (in ms) to be considered local
-             * @return true if node is a local secondary, and can handle queries
-            **/
-            bool isLocalSecondary_inlock( const int threshold ) const {
-                return pingTimeMillis < threshold;
-            }
-
-            BSONObj toBSON() const {
-                return BSON( "addr" << addr.toString() <<
-                             "isMaster" << ismaster <<
-                             "secondary" << secondary <<
-                             "hidden" << hidden <<
-                             "ok" << ok );
-            }
-
-            string toString() const {
-                return toBSON().toString();
-            }
-
-            HostAndPort addr;
-            shared_ptr<DBClientConnection> conn;
-
-            // if this node is in a failure state
-            // used for slave routing
-            // this is too simple, should make it better
-            bool ok;
-
-            // as reported by ismaster
-            BSONObj lastIsMaster;
-
-            bool ismaster;
-            bool secondary; 
-            bool hidden;
-
-            int pingTimeMillis;
-
-        };
-
         /**
          * Host list.
          */
-        vector<Node> _nodes;
+        std::vector<Node> _nodes;
 
         int _master; // which node is the current master.  -1 means no master is known
         int _nextSlave; // which node is the current slave
