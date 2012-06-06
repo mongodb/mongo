@@ -116,6 +116,9 @@ assert.eq( 100 , db.foo.count() , "C1" )
 s.adminCommand( { enablesharding : "test" } );
 s.adminCommand( { shardcollection : "test.foo" , key : { x : 1 } } );
 
+// We're doing some manual chunk stuff, so stop the balancer first
+s.stopBalancer()
+
 assert.eq( 100 , t.count() , "C2" )
 s.adminCommand( { split : "test.foo" , middle : { x : 50 } } )
 
@@ -126,6 +129,9 @@ s.adminCommand( { moveChunk : "test.foo" , find : { x : 10 } , to : other._id } 
 assert.eq( 100 , t.count() , "C3" )
 
 assert.eq( 50 , rs.test.getMaster().getDB( "test" ).foo.count() , "C4" )
+
+// Let the balancer start again
+s.setBalancer( true )
 
 // by non-shard key
 
