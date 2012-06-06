@@ -176,18 +176,21 @@ namespace mongo {
 			}
 		}
 		int curDBUserCount = 0;
-		for( set<Client*>::iterator i = Client::clients.begin(); i != Client::clients.end(); i++ ) {
-			Client *c = *i;
-			assert( c );
-			string db = c->getCdsDB();
-			mongo::log() << "[cds] db = " << db << endl;
-			if( db == dbname ) {
-				curDBUserCount ++;
+		{
+			scoped_lock l( Client::clientsMutex );
+			for( set<Client*>::iterator i = Client::clients.begin(); i != Client::clients.end(); i++ ) {
+				Client *c = *i;
+				assert( c );
+				string db = c->getCdsDB();
+				mongo::log() << "[cds] db = " << db << endl;
+				if( db == dbname ) {
+					curDBUserCount ++;
+				}
 			}
-	}
+		}
 		mongo::log() << "[cds]curDBUserCount=" << curDBUserCount
-			     << "maxConn=" << maxConn 
-			     << "client_count=" <<  Client::clients.size() << endl; 
+			     << " maxConn=" << maxConn 
+			     << " client_count=" <<  Client::clients.size() << endl; 
 		cc().setCdsDB(dbname);
 		return (curDBUserCount >= maxConn);
 	}
