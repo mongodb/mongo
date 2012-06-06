@@ -61,7 +61,7 @@ namespace mongo {
     HashedIndexType::~HashedIndexType() { }
 
     IndexSuitability HashedIndexType::suitability( const BSONObj& query , const BSONObj& order ) const {
-        FieldRangeSet frs( "" , query , true );
+        FieldRangeSet frs( "" , query , true, true );
         if ( frs.isPointIntervalSet( _hashedField ) )
             return HELPFUL;
         return USELESS;
@@ -92,7 +92,7 @@ namespace mongo {
         //Use FieldRangeSet to parse the query into a vector of intervals
         //These should be point-intervals if this cursor is ever used
         //So the FieldInterval vector will be, e.g. <[1,1], [3,3], [6,6]>
-        FieldRangeSet frs( "" , query , true );
+        FieldRangeSet frs( "" , query , true, true );
         const vector<FieldInterval>& intervals = frs.range( _hashedField.c_str() ).intervals();
 
         //Force a match of the query against the actual document by giving
@@ -127,7 +127,7 @@ namespace mongo {
         BSONObj newQuery = newQueryBuilder.obj();
 
         //Use the point-intervals of the new query to create a Btree cursor
-        FieldRangeSet newfrs( "" , newQuery , true );
+        FieldRangeSet newfrs( "" , newQuery , true, true );
         shared_ptr<FieldRangeVector> newVector(
                 new FieldRangeVector( newfrs , *_spec , 1 ) );
 

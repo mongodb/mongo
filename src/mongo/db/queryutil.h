@@ -277,7 +277,7 @@ namespace mongo {
      */
     class FieldRange {
     public:
-        FieldRange( const BSONElement &e , bool singleKey , bool isNot=false , bool optimize=true );
+        FieldRange( const BSONElement &e , bool singleKey , bool isNot, bool optimize );
 
         /** @return Range intersection with 'other'. */
         const FieldRange &operator&=( const FieldRange &other );
@@ -361,7 +361,7 @@ namespace mongo {
     public:
         friend class OrRangeGenerator;
         friend class FieldRangeVector;
-        FieldRangeSet( const char *ns, const BSONObj &query , bool singleKey , bool optimize=true );
+        FieldRangeSet( const char *ns, const BSONObj &query , bool singleKey , bool optimize );
         
         /** @return range for the given field. */
         const FieldRange &range( const char *fieldName ) const;

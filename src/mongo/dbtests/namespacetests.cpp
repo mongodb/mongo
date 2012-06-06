@@ -1224,7 +1224,7 @@ namespace NamespaceTests {
         class CachedPlanBase : public Base {
         public:
             CachedPlanBase() :
-                _fieldRangeSet( ns(), BSON( "a" << 1 ), true ),
+                _fieldRangeSet( ns(), BSON( "a" << 1 ), true, true ),
                 _pattern( _fieldRangeSet, BSONObj() ) {
                 create();
             }

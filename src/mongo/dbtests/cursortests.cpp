@@ -39,10 +39,10 @@ namespace CursorTests {
         protected:
             static const char *ns() { return "unittests.cursortests.Base"; }
             FieldRangeVector *vec( int *vals, int len, int direction = 1 ) {
-                FieldRangeSet s( "", BSON( "a" << 1 ), true );
+                FieldRangeSet s( "", BSON( "a" << 1 ), true, true );
                 for( int i = 0; i < len; i += 2 ) {
                     _objs.push_back( BSON( "a" << BSON( "$gte" << vals[ i ] << "$lte" << vals[ i + 1 ] ) ) );
-                    FieldRangeSet s2( "", _objs.back(), true );
+                    FieldRangeSet s2( "", _objs.back(), true, true );
                     if ( i == 0 ) {
                         s.range( "a" ) = s2.range( "a" );
                     }
@@ -159,7 +159,7 @@ namespace CursorTests {
                 }
 
                 Client::WriteContext ctx( ns() );
-                FieldRangeSet frs( ns(), spec, true );
+                FieldRangeSet frs( ns(), spec, true, true );
                 // orphan spec for this test.
                 IndexSpec *idxSpec = new IndexSpec( idx() );
                 boost::shared_ptr< FieldRangeVector > frv( new FieldRangeVector( frs, *idxSpec, direction() ) );
@@ -269,7 +269,7 @@ namespace CursorTests {
                 for( int i = 0; i < 300; ++i ) {
                     _c.insert( ns(), BSON( "a" << i << "b" << 5 ) );
                 }
-                FieldRangeSet frs( ns(), BSON( "b" << 3 ), true );
+                FieldRangeSet frs( ns(), BSON( "b" << 3 ), true, true );
                 boost::shared_ptr<FieldRangeVector> frv( new FieldRangeVector( frs, idx, 1 ) );
                 Client::WriteContext ctx( ns() );
                 scoped_ptr<BtreeCursor> c( BtreeCursor::make( nsdetails( ns() ), nsdetails( ns() )->idx(1), frv, 1 ) );

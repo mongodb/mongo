@@ -798,7 +798,7 @@ namespace QueryOptimizerTests {
                 toSend.setData(dbQuery, b.buf(), b.len());
             }
             QueryPattern makePattern( const BSONObj &query, const BSONObj &order ) {
-                FieldRangeSet frs( ns(), query, true );
+                FieldRangeSet frs( ns(), query, true, true );
                 return QueryPattern( frs, order );
             }
             shared_ptr<QueryPlanSet> makeQps( const BSONObj& query = BSONObj(),
@@ -848,7 +848,7 @@ namespace QueryOptimizerTests {
                 ASSERT_EQUALS( 1, makeQps( query )->nPlans() );
 
                 // The optimal plan is recorded in the plan cache.
-                FieldRangeSet frs( ns(), query, true );
+                FieldRangeSet frs( ns(), query, true, true );
                 CachedQueryPlan cachedPlan =
                         NamespaceDetailsTransient::get( ns() ).cachedQueryPlanForPattern
                             ( QueryPattern( frs, BSONObj() ) );
@@ -1004,7 +1004,7 @@ namespace QueryOptimizerTests {
                 deleteObjects( ns(), delSpec, false );
                 
                 NamespaceDetailsTransient &nsdt = NamespaceDetailsTransient::get( ns() );
-                QueryPattern queryPattern = FieldRangeSet( ns(), delSpec, true ).pattern();
+                QueryPattern queryPattern = FieldRangeSet( ns(), delSpec, true, true ).pattern();
                 CachedQueryPlan cachedQueryPlan = nsdt.cachedQueryPlanForPattern( queryPattern ); 
                 ASSERT_EQUALS( BSON( "a" << 1 ), cachedQueryPlan.indexKey() );
                 ASSERT_EQUALS( 1, cachedQueryPlan.nScanned() );
@@ -1344,7 +1344,7 @@ namespace QueryOptimizerTests {
         static const char *ns() { return "unittests.QueryOptimizerTests"; }
         static NamespaceDetails *nsd() { return nsdetails( ns() ); }
         QueryPattern makePattern( const BSONObj &query, const BSONObj &order ) {
-            FieldRangeSet frs( ns(), query, true );
+            FieldRangeSet frs( ns(), query, true, true );
             return QueryPattern( frs, order );
         }
         shared_ptr<MultiPlanScanner> makeMps( const BSONObj &query, const BSONObj &order ) {
@@ -1501,7 +1501,7 @@ namespace QueryOptimizerTests {
                                                          BSON( "b" << 1 ) );
             ASSERT_EQUALS( string( "b" ), c->indexKeyPattern().firstElementFieldName() );
 
-            FieldRangeSet frs( "ns", BSON( "a" << 1 ), true );
+            FieldRangeSet frs( "ns", BSON( "a" << 1 ), true, true );
             {
                 SimpleMutex::scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
                 NamespaceDetailsTransient::get_inlock( ns() ).

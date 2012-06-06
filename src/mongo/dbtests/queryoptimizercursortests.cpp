@@ -261,7 +261,7 @@ namespace QueryOptimizerCursorTests {
             return nsCursors.size();
         }
         BSONObj cachedIndexForQuery( const BSONObj &query, const BSONObj &order = BSONObj() ) {
-            QueryPattern queryPattern = FieldRangeSet( ns(), query, true ).pattern( order );
+            QueryPattern queryPattern = FieldRangeSet( ns(), query, true, true ).pattern( order );
             NamespaceDetailsTransient &nsdt = NamespaceDetailsTransient::get( ns() );
             return nsdt.cachedQueryPlanForPattern( queryPattern ).indexKey();
         }
@@ -3313,7 +3313,7 @@ namespace QueryOptimizerCursorTests {
             nsdt.clearQueryCache();
             shared_ptr<QueryOptimizerCursor> c = getCursor( _aPreferableQuery, BSON( "a" << 1 ) );
             while( c->advance() );
-            FieldRangeSet aPreferableFields( ns(), _aPreferableQuery, true );
+            FieldRangeSet aPreferableFields( ns(), _aPreferableQuery, true, true );
             ASSERT_EQUALS( BSON( "a" << 1 ),
                           nsdt.cachedQueryPlanForPattern
                           ( aPreferableFields.pattern( BSON( "a" << 1 ) ) ).indexKey() );

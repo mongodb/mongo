@@ -44,7 +44,7 @@ namespace QueryUtilTests {
         public:
             void run() {
                 BSONObj obj = BSON( "a" << 1 );
-                FieldRange fieldRange( obj.firstElement(), true );
+                FieldRange fieldRange( obj.firstElement(), true, false, true );
                 fieldRange.toString(); // Just test that we don't crash.
             }
         };        
@@ -53,7 +53,7 @@ namespace QueryUtilTests {
         public:
             virtual ~Base() {}
             void run() {
-                const FieldRangeSet s( "ns", query(), true );
+                const FieldRangeSet s( "ns", query(), true, true );
                 checkElt( lower(), s.range( "a" ).min() );
                 checkElt( upper(), s.range( "a" ).max() );
                 ASSERT_EQUALS( lowerInclusive(), s.range( "a" ).minInclusive() );
@@ -152,14 +152,14 @@ namespace QueryUtilTests {
         class EqGteInvalid {
         public:
             void run() {
-                FieldRangeSet frs( "ns", BSON( "a" << 1 << "a" << GTE << 2 ), true );
+                FieldRangeSet frs( "ns", BSON( "a" << 1 << "a" << GTE << 2 ), true, true );
                 ASSERT( !frs.matchPossible() );
             }
         };
 
         struct RegexBase : Base {
             void run() { //need to only look at first interval
-                FieldRangeSet s( "ns", query(), true );
+                FieldRangeSet s( "ns", query(), true, true );
                 checkElt( lower(), s.range( "a" ).intervals()[0]._lower._bound );
                 checkElt( upper(), s.range( "a" ).intervals()[0]._upper._bound );
                 ASSERT_EQUALS( lowerInclusive(), s.range( "a" ).intervals()[0]._lower._inclusive );
@@ -239,7 +239,7 @@ namespace QueryUtilTests {
             And() : _o1( BSON( "-" << 0 ) ), _o2( BSON( "-" << 10 ) ) {}
             void run() {
                 Base::run();
-                const FieldRangeSet s( "ns", query(), true );
+                const FieldRangeSet s( "ns", query(), true, true );
                 // There should not be an index constraint recorded for the $and field.
                 ASSERT( s.range( "$and" ).universal() );
             }
@@ -257,7 +257,7 @@ namespace QueryUtilTests {
         class Empty {
         public:
             void run() {
-                FieldRangeSet s( "ns", BSON( "a" << GT << 5 << LT << 5 ), true );
+                FieldRangeSet s( "ns", BSON( "a" << GT << 5 << LT << 5 ), true, true );
                 const FieldRange &r = s.range( "a" );
                 ASSERT( r.empty() );
                 ASSERT( !r.equality() );
@@ -268,17 +268,19 @@ namespace QueryUtilTests {
         class Equality {
         public:
             void run() {
-                FieldRangeSet s( "ns", BSON( "a" << 1 ), true );
+                FieldRangeSet s( "ns", BSON( "a" << 1 ), true, true );
                 ASSERT( s.range( "a" ).equality() );
-                FieldRangeSet s2( "ns", BSON( "a" << GTE << 1 << LTE << 1 ), true );
+                FieldRangeSet s2( "ns", BSON( "a" << GTE << 1 << LTE << 1 ), true, true );
                 ASSERT( s2.range( "a" ).equality() );
-                FieldRangeSet s3( "ns", BSON( "a" << GT << 1 << LTE << 1 ), true );
+                FieldRangeSet s3( "ns", BSON( "a" << GT << 1 << LTE << 1 ), true, true );
                 ASSERT( !s3.range( "a" ).equality() );
-                FieldRangeSet s4( "ns", BSON( "a" << GTE << 1 << LT << 1 ), true );
+                FieldRangeSet s4( "ns", BSON( "a" << GTE << 1 << LT << 1 ), true, true );
                 ASSERT( !s4.range( "a" ).equality() );
-                FieldRangeSet s5( "ns", BSON( "a" << GTE << 1 << LTE << 1 << GT << 1 ), true );
+                FieldRangeSet s5( "ns", BSON( "a" << GTE << 1 << LTE << 1 << GT << 1 ), true,
+                                  true );
                 ASSERT( !s5.range( "a" ).equality() );
-                FieldRangeSet s6( "ns", BSON( "a" << GTE << 1 << LTE << 1 << LT << 1 ), true );
+                FieldRangeSet s6( "ns", BSON( "a" << GTE << 1 << LTE << 1 << LT << 1 ), true,
+                                  true );
                 ASSERT( !s6.range( "a" ).equality() );
             }
         };
@@ -293,7 +295,7 @@ namespace QueryUtilTests {
                                        "d" << GTE << 0 << GT << 0 <<
                                        "e" << GTE << 0 << LTE << 10 <<
                                        "f" << NE << 9 ),
-                                  true );
+                                  true, true );
                 BSONObj simple = frs.simplifiedQuery();
                 ASSERT_EQUALS( fromjson( "{$gt:5,$lt:10}" ), simple.getObjectField( "a" ) );
                 ASSERT_EQUALS( 4, simple.getIntField( "b" ) );
@@ -311,7 +313,7 @@ namespace QueryUtilTests {
         class QueryPatternBase {
         protected:
             static QueryPattern p( const BSONObj &query, const BSONObj &sort = BSONObj() ) {
-                return FieldRangeSet( "", query, true ).pattern( sort );
+                return FieldRangeSet( "", query, true, true ).pattern( sort );
             }
         };
 
@@ -373,14 +375,15 @@ namespace QueryUtilTests {
         class NoWhere {
         public:
             void run() {
-                ASSERT_EQUALS( 0, FieldRangeSet( "ns", BSON( "$where" << 1 ), true ).numNonUniversalRanges() );
+                ASSERT_EQUALS( 0, FieldRangeSet( "ns", BSON( "$where" << 1 ), true, true )
+                                       .numNonUniversalRanges() );
             }
         };
 
         class Numeric {
         public:
             void run() {
-                FieldRangeSet f( "", BSON( "a" << 1 ), true );
+                FieldRangeSet f( "", BSON( "a" << 1 ), true, true );
                 ASSERT( f.range( "a" ).min().woCompare( BSON( "a" << 2.0 ).firstElement() ) < 0 );
                 ASSERT( f.range( "a" ).min().woCompare( BSON( "a" << 0.0 ).firstElement() ) > 0 );
             }
@@ -389,7 +392,7 @@ namespace QueryUtilTests {
         class InLowerBound {
         public:
             void run() {
-                FieldRangeSet f( "", fromjson( "{a:{$gt:4,$in:[1,2,3,4,5,6]}}" ), true );
+                FieldRangeSet f( "", fromjson( "{a:{$gt:4,$in:[1,2,3,4,5,6]}}" ), true, true );
                 ASSERT( f.range( "a" ).min().woCompare( BSON( "a" << 5.0 ).firstElement(), false ) == 0 );
                 ASSERT( f.range( "a" ).max().woCompare( BSON( "a" << 6.0 ).firstElement(), false ) == 0 );
             }
@@ -398,7 +401,7 @@ namespace QueryUtilTests {
         class InUpperBound {
         public:
             void run() {
-                FieldRangeSet f( "", fromjson( "{a:{$lt:4,$in:[1,2,3,4,5,6]}}" ), true );
+                FieldRangeSet f( "", fromjson( "{a:{$lt:4,$in:[1,2,3,4,5,6]}}" ), true, true );
                 ASSERT( f.range( "a" ).min().woCompare( BSON( "a" << 1.0 ).firstElement(), false ) == 0 );
                 ASSERT( f.range( "a" ).max().woCompare( BSON( "a" << 3.0 ).firstElement(), false ) == 0 );
             }
@@ -408,7 +411,8 @@ namespace QueryUtilTests {
         class BoundUnion {
         public:
             void run() {
-                FieldRangeSet frs( "", fromjson( "{a:{$gt:1,$lt:9},b:{$gt:9,$lt:12}}" ), true );
+                FieldRangeSet frs( "", fromjson( "{a:{$gt:1,$lt:9},b:{$gt:9,$lt:12}}" ), true,
+                                   true );
                 FieldRange ret = frs.range( "a" );
                 ret |= frs.range( "b" );
                 ASSERT_EQUALS( 2U, ret.intervals().size() );
@@ -419,7 +423,9 @@ namespace QueryUtilTests {
         class BoundUnionFullyContained {
         public:
             void run() {
-                FieldRangeSet frs( "", fromjson( "{a:{$gt:1,$lte:9},b:{$gt:2,$lt:8},c:{$gt:2,$lt:9},d:{$gt:2,$lte:9}}" ), true );
+                FieldRangeSet frs( "",
+                                   fromjson( "{a:{$gt:1,$lte:9},b:{$gt:2,$lt:8},"
+                                             "c:{$gt:2,$lt:9},d:{$gt:2,$lte:9}}" ), true, true );
                 FieldRange u = frs.range( "a" );
                 u |= frs.range( "b" );
                 ASSERT_EQUALS( 1U, u.intervals().size() );
@@ -440,11 +446,12 @@ namespace QueryUtilTests {
         class BoundUnionOverlapWithInclusivity {
         public:
             void run() {
-                FieldRangeSet frs( "", fromjson( "{a:{$gt:1,$lt:9},b:{$gt:2,$lte:9}}" ), true );
+                FieldRangeSet frs( "", fromjson( "{a:{$gt:1,$lt:9},b:{$gt:2,$lte:9}}" ), true,
+                                   true );
                 FieldRange u = frs.range( "a" );
                 u |= frs.range( "b" );
                 ASSERT_EQUALS( 1U, u.intervals().size() );
-                FieldRangeSet expected( "", fromjson( "{a:{$gt:1,$lte:9}}" ), true );
+                FieldRangeSet expected( "", fromjson( "{a:{$gt:1,$lte:9}}" ), true, true );
                 ASSERT_EQUALS( expected.range( "a" ).toString(), u.toString() );
             }
         };
@@ -453,7 +460,7 @@ namespace QueryUtilTests {
         class BoundUnionEmpty {
         public:
             void run() {
-                FieldRangeSet frs( "", fromjson( "{a:{$in:[]},b:{$in:[]}}" ), true );
+                FieldRangeSet frs( "", fromjson( "{a:{$in:[]},b:{$in:[]}}" ), true, true );
                 FieldRange a = frs.range( "a" );
                 a |= frs.range( "b" );
                 ASSERT( a.empty() );
@@ -464,8 +471,8 @@ namespace QueryUtilTests {
         class MultiBound {
         public:
             void run() {
-                FieldRangeSet frs1( "", fromjson( "{a:{$in:[1,3,5,7,9]}}" ), true );
-                FieldRangeSet frs2( "", fromjson( "{a:{$in:[2,3,5,8,9]}}" ), true );
+                FieldRangeSet frs1( "", fromjson( "{a:{$in:[1,3,5,7,9]}}" ), true, true );
+                FieldRangeSet frs2( "", fromjson( "{a:{$in:[2,3,5,8,9]}}" ), true, true );
                 FieldRange fr1 = frs1.range( "a" );
                 FieldRange fr2 = frs2.range( "a" );
                 fr1 &= fr2;
@@ -487,7 +494,7 @@ namespace QueryUtilTests {
         public:
             virtual ~DiffBase() {}
             void run() {
-                FieldRangeSet frs( "", fromjson( obj().toString() ), true );
+                FieldRangeSet frs( "", fromjson( obj().toString() ), true, true );
                 FieldRange ret = frs.range( "a" );
                 ret -= frs.range( "b" );
                 check( ret );
@@ -825,7 +832,9 @@ namespace QueryUtilTests {
         class DiffMulti1 : public DiffBase {
         public:
             void run() {
-                FieldRangeSet frs( "", fromjson( "{a:{$gt:1,$lt:9},b:{$gt:0,$lt:2},c:3,d:{$gt:4,$lt:5},e:{$gt:7,$lt:10}}" ), true );
+                FieldRangeSet frs( "", fromjson( "{a:{$gt:1,$lt:9},b:{$gt:0,$lt:2},"
+                                                 "c:3,d:{$gt:4,$lt:5},e:{$gt:7,$lt:10}}" ), true,
+                                   true );
                 FieldRange ret = frs.range( "a" );
                 FieldRange other = frs.range( "b" );
                 other |= frs.range( "c" );
@@ -844,7 +853,9 @@ namespace QueryUtilTests {
         class DiffMulti2 : public DiffBase {
         public:
             void run() {
-                FieldRangeSet frs( "", fromjson( "{a:{$gt:1,$lt:9},b:{$gt:0,$lt:2},c:3,d:{$gt:4,$lt:5},e:{$gt:7,$lt:10}}" ), true );
+                FieldRangeSet frs( "", fromjson( "{a:{$gt:1,$lt:9},b:{$gt:0,$lt:2},"
+                                                 "c:3,d:{$gt:4,$lt:5},e:{$gt:7,$lt:10}}" ), true,
+                                   true );
                 FieldRange mask = frs.range( "a" );
                 FieldRange ret = frs.range( "b" );
                 ret |= frs.range( "c" );
@@ -863,20 +874,20 @@ namespace QueryUtilTests {
         class Universal {
         public:
             void run() {
-                FieldRangeSet frs1( "", BSON( "a" << 1 ), true );
+                FieldRangeSet frs1( "", BSON( "a" << 1 ), true, true );
                 FieldRange f1 = frs1.range( "a" );
                 ASSERT( !f1.universal() );
                 ASSERT( frs1.range( "b" ).universal() );
                 
-                FieldRangeSet frs2( "", BSON( "a" << GT << 1 ), true );
+                FieldRangeSet frs2( "", BSON( "a" << GT << 1 ), true, true );
                 FieldRange f2 = frs2.range( "a" );
                 ASSERT( !f2.universal() );
 
-                FieldRangeSet frs3( "", BSON( "a" << LT << 1 ), true );
+                FieldRangeSet frs3( "", BSON( "a" << LT << 1 ), true, true );
                 FieldRange f3 = frs3.range( "a" );
                 ASSERT( !frs3.range( "a" ).universal() );
 
-                FieldRangeSet frs4( "", BSON( "a" << NE << 1 ), true );
+                FieldRangeSet frs4( "", BSON( "a" << NE << 1 ), true, true );
                 FieldRange f4 = frs4.range( "a" );
                 ASSERT( !f4.universal() );
 
@@ -885,11 +896,11 @@ namespace QueryUtilTests {
                 f1 &= f2;
                 ASSERT( !f1.universal() );
 
-                FieldRangeSet frs5( "", BSON( "a" << GT << 1 << LTE << 2 ), true );
+                FieldRangeSet frs5( "", BSON( "a" << GT << 1 << LTE << 2 ), true, true );
                 FieldRange f5 = frs5.range( "a" );
                 ASSERT( !f5.universal() );
                 
-                FieldRangeSet frs6( "", BSONObj(), true );
+                FieldRangeSet frs6( "", BSONObj(), true, true );
                 FieldRange f6 = frs6.range( "a" );
                 ASSERT( f6.universal() );
                 
@@ -905,8 +916,8 @@ namespace QueryUtilTests {
                 NotSimpleFiniteSet( const BSONObj &query ) : _query( query ) {}
                 virtual ~NotSimpleFiniteSet() {}
                 void run() {
-                    ASSERT( !FieldRangeSet( "", _query,
-                                           !multikey() ).range( "a" ).simpleFiniteSet() );
+                    ASSERT( !FieldRangeSet( "", _query, !multikey(),
+                                            true ).range( "a" ).simpleFiniteSet() );
                 }
             protected:
                 virtual bool multikey() const { return false; }
@@ -958,7 +969,7 @@ namespace QueryUtilTests {
             class Intersection {
             public:
                 void run() {
-                    FieldRangeSet set( "", BSON( "left" << 1 << "right" << GT << 2 ), true );
+                    FieldRangeSet set( "", BSON( "left" << 1 << "right" << GT << 2 ), true, true );
                     FieldRange &left = set.range( "left" );
                     FieldRange &right = set.range( "right" );
                     FieldRange &missing = set.range( "missing" );
@@ -979,7 +990,7 @@ namespace QueryUtilTests {
             class Union {
             public:
                 void run() {
-                    FieldRangeSet set( "", BSON( "left" << 1 << "right" << GT << 2 ), true );
+                    FieldRangeSet set( "", BSON( "left" << 1 << "right" << GT << 2 ), true, true );
                     FieldRange &left = set.range( "left" );
                     FieldRange &right = set.range( "right" );
                     left |= right;
@@ -990,7 +1001,7 @@ namespace QueryUtilTests {
             class Difference {
             public:
                 void run() {
-                    FieldRangeSet set( "", BSON( "left" << 1 << "right" << GT << 2 ), true );
+                    FieldRangeSet set( "", BSON( "left" << 1 << "right" << GT << 2 ), true, true );
                     FieldRange &left = set.range( "left" );
                     FieldRange &right = set.range( "right" );
                     left -= right;
@@ -1008,7 +1019,7 @@ namespace QueryUtilTests {
         public:
             void run() {
                 BSONObj obj = BSON( "a" << 1 );
-                FieldRangeSet fieldRangeSet( "", obj, true );
+                FieldRangeSet fieldRangeSet( "", obj, true, true );
                 fieldRangeSet.toString(); // Just test that we don't crash.
             }
         };
@@ -1019,7 +1030,7 @@ namespace QueryUtilTests {
                 boost::shared_ptr<FieldRangeSet> frs;
                 {
                     string ns = str::stream() << "foo";
-                    frs.reset( new FieldRangeSet( ns.c_str(), BSONObj(), true ) );
+                    frs.reset( new FieldRangeSet( ns.c_str(), BSONObj(), true, true ) );
                 }
                 ASSERT_EQUALS( string( "foo" ), frs->ns() );
             }
@@ -1028,8 +1039,10 @@ namespace QueryUtilTests {
         class Intersect {
         public:
             void run() {
-                FieldRangeSet frs1( "", fromjson( "{b:{$in:[5,6]},c:7,d:{$in:[8,9]}}" ), true );
-                FieldRangeSet frs2( "", fromjson( "{a:1,b:5,c:{$in:[7,8]},d:{$in:[8,9]},e:10}" ), true );
+                FieldRangeSet frs1( "", fromjson( "{b:{$in:[5,6]},c:7,d:{$in:[8,9]}}" ), true,
+                                    true );
+                FieldRangeSet frs2( "", fromjson( "{a:1,b:5,c:{$in:[7,8]},d:{$in:[8,9]},e:10}" ),
+                                    true, true );
                 frs1 &= frs2;
                 ASSERT_EQUALS( fromjson( "{a:1,b:5,c:7,d:{$gte:8,$lte:9},e:10}" ), frs1.simplifiedQuery( BSONObj() ) );
             }
@@ -1038,9 +1051,9 @@ namespace QueryUtilTests {
         class MultiKeyIntersect {
         public:
             void run() {
-                FieldRangeSet frs1( "", BSONObj(), false );
-                FieldRangeSet frs2( "", BSON( "a" << GT << 4 ), false );
-                FieldRangeSet frs3( "", BSON( "a" << LT << 6 ), false );
+                FieldRangeSet frs1( "", BSONObj(), false, true );
+                FieldRangeSet frs2( "", BSON( "a" << GT << 4 ), false, true );
+                FieldRangeSet frs3( "", BSON( "a" << LT << 6 ), false, true );
                 // An intersection with a universal range is allowed.
                 frs1 &= frs2;
                 ASSERT_EQUALS( frs2.simplifiedQuery( BSONObj() ),
@@ -1051,7 +1064,7 @@ namespace QueryUtilTests {
                 ASSERT_EQUALS( frs2.simplifiedQuery( BSONObj() ),
                               frs1.simplifiedQuery( BSONObj() ) );
                 // Now intersect with a fully contained range.
-                FieldRangeSet frs4( "", BSON( "a" << GT << 6 ), false );
+                FieldRangeSet frs4( "", BSON( "a" << GT << 6 ), false, true );
                 frs1 &= frs4;
                 ASSERT_EQUALS( frs4.simplifiedQuery( BSONObj() ),
                               frs1.simplifiedQuery( BSONObj() ) );                
@@ -1062,8 +1075,8 @@ namespace QueryUtilTests {
         class EmptyMultiKeyIntersect {
         public:
             void run() {
-                FieldRangeSet frs1( "", BSON( "a" << BSON( "$in" << BSONArray() ) ), false );
-                FieldRangeSet frs2( "", BSON( "a" << 5 ), false );
+                FieldRangeSet frs1( "", BSON( "a" << BSON( "$in" << BSONArray() ) ), false, true );
+                FieldRangeSet frs2( "", BSON( "a" << 5 ), false, true );
                 ASSERT( frs1.range( "a" ).empty() );
                 frs1 &= frs2;
                 ASSERT( frs1.range( "a" ).empty() );
@@ -1073,8 +1086,8 @@ namespace QueryUtilTests {
         class MultiKeyDiff {
         public:
             void run() {
-                FieldRangeSet frs1( "", BSON( "a" << GT << 4 ), false );
-                FieldRangeSet frs2( "", BSON( "a" << GT << 6 ), false );
+                FieldRangeSet frs1( "", BSON( "a" << GT << 4 ), false, true );
+                FieldRangeSet frs2( "", BSON( "a" << GT << 6 ), false, true );
                 // Range subtraction is no different for multikey ranges.
                 frs1 -= frs2;
                 ASSERT_EQUALS( BSON( "a" << GT << 4 << LTE << 6 ), frs1.simplifiedQuery( BSONObj() ) );
@@ -1084,13 +1097,13 @@ namespace QueryUtilTests {
         class MatchPossible {
         public:
             void run() {
-                FieldRangeSet frs1( "", BSON( "a" << GT << 4 ), true );
+                FieldRangeSet frs1( "", BSON( "a" << GT << 4 ), true, true );
                 ASSERT( frs1.matchPossible() );
                 // Conflicting constraints invalid for a single key set.
-                FieldRangeSet frs2( "", BSON( "a" << GT << 4 << LT << 2 ), true );
+                FieldRangeSet frs2( "", BSON( "a" << GT << 4 << LT << 2 ), true, true );
                 ASSERT( !frs2.matchPossible() );
                 // Conflicting constraints not possible for a multi key set.
-                FieldRangeSet frs3( "", BSON( "a" << GT << 4 << LT << 2 ), false );
+                FieldRangeSet frs3( "", BSON( "a" << GT << 4 << LT << 2 ), false, true );
                 ASSERT( frs3.matchPossible() );
             }
         };
@@ -1099,10 +1112,10 @@ namespace QueryUtilTests {
         public:
             void run() {
                 // Conflicting constraints not possible for a multi key set.
-                FieldRangeSet frs1( "", BSON( "a" << GT << 4 << LT << 2 ), false );
+                FieldRangeSet frs1( "", BSON( "a" << GT << 4 << LT << 2 ), false, true );
                 ASSERT( frs1.matchPossibleForIndex( BSON( "a" << 1 ) ) );
                 // Conflicting constraints for a multi key set.
-                FieldRangeSet frs2( "", BSON( "a" << GT << 4 << LT << 2 ), true );
+                FieldRangeSet frs2( "", BSON( "a" << GT << 4 << LT << 2 ), true, true );
                 ASSERT( !frs2.matchPossibleForIndex( BSON( "a" << 1 ) ) );
                 // If the index doesn't include the key, it is not single key invalid.
                 ASSERT( frs2.matchPossibleForIndex( BSON( "b" << 1 ) ) );
@@ -1117,7 +1130,7 @@ namespace QueryUtilTests {
             void run() {
                 _frs1.reset
                 ( new FieldRangeSet
-                 ( "", BSON( "a" << GT << 4 << LT << 4 << "b" << 5 << "c" << 6 ), true ) );
+                 ( "", BSON( "a" << GT << 4 << LT << 4 << "b" << 5 << "c" << 6 ), true, true ) );
                 _frs2.reset( _frs1->subset( BSON( "a" << 1 << "b" << 1 << "d" << 1 ) ) );
 
                 // An empty range should be copied.
@@ -1146,7 +1159,7 @@ namespace QueryUtilTests {
         class Prefixed {
         public:
             void run() {
-                FieldRangeSet original( "", BSON( "a" << 1 ), true );
+                FieldRangeSet original( "", BSON( "a" << 1 ), true, true );
                 scoped_ptr<FieldRangeSet> prefixed( original.prefixed( "prefix" ) );
                 ASSERT( prefixed->singleKey() );
                 ASSERT( prefixed->range( "a" ).universal() );
@@ -1160,7 +1173,8 @@ namespace QueryUtilTests {
             class Ranges {
             public:
                 void run() {
-                    FieldRangeSet set( "", fromjson( "{ a:{ $elemMatch:{ b:1, c:2 } } }" ), true );
+                    FieldRangeSet set( "", fromjson( "{ a:{ $elemMatch:{ b:1, c:2 } } }" ), true,
+                                       true );
                     ASSERT( set.range( "a.b" ).equality() );
                     ASSERT( set.range( "a.c" ).equality() );
                     ASSERT( !set.range( "a.d" ).equality() );
@@ -1176,7 +1190,7 @@ namespace QueryUtilTests {
             public:
                 void run() {
                     FieldRangeSet set( "", fromjson( "{ a:{ $elemMatch:{ $gte:5, $lte:5 } } }" ),
-                                      true );
+                                       true, true );
                     // No constraints exist for operator based field names like "a.$gte".
                     ASSERT( set.range( "a.$gte" ).universal() );
                     ASSERT( set.range( "a.$lte" ).universal() );
@@ -1194,7 +1208,7 @@ namespace QueryUtilTests {
             public:
                 void run() {
                     FieldRangeSet set( "", fromjson( "{ a:{ $elemMatch:{ $not:{ $ne:5 } } } }" ),
-                                      true );
+                                       true, true );
                     // No constraints exist for operator based field names like "a.$not".
                     ASSERT( set.range( "a.$not" ).universal() );
                     ASSERT( set.range( "a.$not.$ne" ).universal() );
@@ -1209,8 +1223,8 @@ namespace QueryUtilTests {
             public:
                 void run() {
                     FieldRangeSet set( "",
-                                      fromjson( "{ a:{ $not:{ $elemMatch:{ b:{ $ne:1 } } } } }" ),
-                                      true );
+                                       fromjson( "{ a:{ $not:{ $elemMatch:{ b:{ $ne:1 } } } } }" ),
+                                       true, true );
                     ASSERT( !set.range( "a.b" ).equality() );
                     ASSERT( set.range( "a.b" ).universal() );
                 }
@@ -1221,9 +1235,9 @@ namespace QueryUtilTests {
             public:
                 void run() {
                     FieldRangeSet set( "",
-                                      fromjson( "{ a:{ $elemMatch:{ b:{ $elemMatch:{ c:1"
-                                               " } } } } }" ),
-                                      true );
+                                       fromjson( "{ a:{ $elemMatch:{ b:{ $elemMatch:{ c:1"
+                                                " } } } } }" ),
+                                       true, true );
                     // No constraints are generated for the following fields.
                     BSONArray universalFields = BSON_ARRAY( "a" << "a.b" << "b" << "b.c" << "c" );
                     BSONObjIterator i( universalFields );
@@ -1241,10 +1255,10 @@ namespace QueryUtilTests {
             public:
                 void run() {
                     FieldRangeSet set( "",
-                                      fromjson( "{ a:{ $elemMatch:{ b:{ $all:"
-                                               "[ { $elemMatch:{ c:1 } }, { $elemMatch:{ d:2 } } ]"
-                                               " } } } }" ),
-                                      true );
+                                       fromjson( "{ a:{ $elemMatch:{ b:{ $all:"
+                                                 "[ { $elemMatch:{ c:1 } }, { $elemMatch:{ d:2 } } ]"
+                                                 " } } } }" ),
+                                       true, true );
                     // No constraints are generated for the following fields.
                     BSONArray universalFields = BSON_ARRAY( "a" << "a.b" << "b" << "b.c" << "c"
                                                            << "b.d" << "d" << "a.b.d" );
@@ -1266,7 +1280,7 @@ namespace QueryUtilTests {
             public:
                 SimpleFiniteSet( const BSONObj &query ) : _query( query ) {}
                 void run() {
-                    ASSERT( FieldRangeSet( "", _query, true ).simpleFiniteSet() );
+                    ASSERT( FieldRangeSet( "", _query, true, true ).simpleFiniteSet() );
                 }
             private:
                 BSONObj _query;
@@ -1276,7 +1290,7 @@ namespace QueryUtilTests {
             public:
                 NotSimpleFiniteSet( const BSONObj &query ) : _query( query ) {}
                 void run() {
-                    ASSERT( !FieldRangeSet( "", _query, true ).simpleFiniteSet() );
+                    ASSERT( !FieldRangeSet( "", _query, true, true ).simpleFiniteSet() );
                 }
             private:
                 BSONObj _query;
@@ -1449,11 +1463,11 @@ namespace QueryUtilTests {
                 
                 // Record the a:1 index for the query's single and multi key query patterns.
                 NamespaceDetailsTransient &nsdt = NamespaceDetailsTransient::get( ns() );
-                QueryPattern singleKey = FieldRangeSet( ns(), query, true ).pattern( sort );
+                QueryPattern singleKey = FieldRangeSet( ns(), query, true, true ).pattern( sort );
                 nsdt.registerCachedQueryPlanForPattern( singleKey,
                                                        CachedQueryPlan( BSON( "a" << 1 ), 1,
                                                         CandidatePlanCharacter( true, true ) ) );
-                QueryPattern multiKey = FieldRangeSet( ns(), query, false ).pattern( sort );
+                QueryPattern multiKey = FieldRangeSet( ns(), query, false, true ).pattern( sort );
                 nsdt.registerCachedQueryPlanForPattern( multiKey,
                                                        CachedQueryPlan( BSON( "a" << 1 ), 5,
                                                         CandidatePlanCharacter( true, true ) ) );
@@ -1488,7 +1502,7 @@ namespace QueryUtilTests {
                               QueryUtilIndexed::bestIndexForPatterns( frsp, sort ).indexKey() );
                 
                 // A multikey index query plan is returned if recorded.
-                QueryPattern multiKey = FieldRangeSet( ns(), query, false ).pattern( sort );
+                QueryPattern multiKey = FieldRangeSet( ns(), query, false, true ).pattern( sort );
                 nsdt.registerCachedQueryPlanForPattern( multiKey,
                                                        CachedQueryPlan( BSON( "a" << 1 ), 5,
                                                         CandidatePlanCharacter( true, true ) ) );
@@ -1496,7 +1510,7 @@ namespace QueryUtilTests {
                               QueryUtilIndexed::bestIndexForPatterns( frsp, sort ).indexKey() );
 
                 // A non multikey index query plan is preferentially returned if recorded.
-                QueryPattern singleKey = FieldRangeSet( ns(), query, true ).pattern( sort );
+                QueryPattern singleKey = FieldRangeSet( ns(), query, true, true ).pattern( sort );
                 nsdt.registerCachedQueryPlanForPattern( singleKey,
                                                        CachedQueryPlan( BSON( "b" << 1 ), 5,
                                                         CandidatePlanCharacter( true, true ) ) );
@@ -1516,7 +1530,7 @@ namespace QueryUtilTests {
         public:
             void run() {
                 BSONObj obj = BSON( "a" << 1 );
-                FieldRangeSet fieldRangeSet( "", obj, true );
+                FieldRangeSet fieldRangeSet( "", obj, true, true );
                 IndexSpec indexSpec( BSON( "a" << 1 ) );
                 FieldRangeVector fieldRangeVector( fieldRangeSet, indexSpec, 1 );
                 fieldRangeVector.toString(); // Just test that we don't crash.
@@ -1531,7 +1545,7 @@ namespace QueryUtilTests {
         public:
             virtual ~Base() {}
             void run() {
-                FieldRangeSet fieldRangeSet( "", query(), true );
+                FieldRangeSet fieldRangeSet( "", query(), true, true );
                 IndexSpec indexSpec( index(), BSONObj() );
                 FieldRangeVector fieldRangeVector( fieldRangeSet, indexSpec, 1 );
                 _iterator.reset( new FieldRangeVectorIterator( fieldRangeVector,
@@ -1938,7 +1952,7 @@ namespace QueryUtilTests {
                 bool isEqInclusiveUpperBound( const BSONObj &intervalSpec,
                                              const BSONObj &elementSpec,
                                              bool reverse ) {
-                    FieldRange range( intervalSpec.firstElement(), true );
+                    FieldRange range( intervalSpec.firstElement(), true, false, true );
                     BSONElement element = elementSpec.firstElement();
                     FieldRangeVectorIterator::FieldIntervalMatcher matcher
                             ( range.intervals()[ 0 ], element, reverse );
@@ -1967,7 +1981,7 @@ namespace QueryUtilTests {
             private:
                 bool isGteUpperBound( const BSONObj &intervalSpec, const BSONObj &elementSpec,
                                      bool reverse ) {
-                    FieldRange range( intervalSpec.firstElement(), true );
+                    FieldRange range( intervalSpec.firstElement(), true, false, true );
                     BSONElement element = elementSpec.firstElement();
                     FieldRangeVectorIterator::FieldIntervalMatcher matcher
                             ( range.intervals()[ 0 ], element, reverse );
@@ -1999,7 +2013,7 @@ namespace QueryUtilTests {
                 bool isEqExclusiveLowerBound( const BSONObj &intervalSpec,
                                              const BSONObj &elementSpec,
                                              bool reverse ) {
-                    FieldRange range( intervalSpec.firstElement(), true );
+                    FieldRange range( intervalSpec.firstElement(), true, false, true );
                     BSONElement element = elementSpec.firstElement();
                     FieldRangeVectorIterator::FieldIntervalMatcher matcher
                             ( range.intervals()[ 0 ], element, reverse );
@@ -2028,7 +2042,7 @@ namespace QueryUtilTests {
             private:
                 bool isLtLowerBound( const BSONObj &intervalSpec, const BSONObj &elementSpec,
                                      bool reverse ) {
-                    FieldRange range( intervalSpec.firstElement(), true );
+                    FieldRange range( intervalSpec.firstElement(), true, false, true );
                     BSONElement element = elementSpec.firstElement();
                     FieldRangeVectorIterator::FieldIntervalMatcher matcher
                             ( range.intervals()[ 0 ], element, reverse );
@@ -2041,7 +2055,7 @@ namespace QueryUtilTests {
                 void run() {
                     BSONObj intervalSpec = BSON( "$in" << BSON_ARRAY( 1 << 2 ) );
                     BSONObj elementSpec = BSON( "" << 1 );
-                    FieldRange range( intervalSpec.firstElement(), true );
+                    FieldRange range( intervalSpec.firstElement(), true, false, true );
                     BSONElement element = elementSpec.firstElement();
                     FieldRangeVectorIterator::FieldIntervalMatcher matcher
                             ( range.intervals()[ 0 ], element, false );
