@@ -785,7 +785,7 @@ namespace mongo {
         }
 
         if ( d->isCapped() )
-            return shared_ptr<Cursor>( new ForwardCappedCursor( d , startLoc ) );
+            return shared_ptr<Cursor>( ForwardCappedCursor::make( d , startLoc ) );
 
         if ( !startLoc.isNull() )
             return shared_ptr<Cursor>(new BasicCursor( startLoc ));

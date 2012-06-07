@@ -294,13 +294,16 @@ namespace mongo {
 
     class ForwardCappedCursor : public BasicCursor, public AdvanceStrategy {
     public:
-        ForwardCappedCursor( NamespaceDetails *nsd = 0, const DiskLoc &startLoc = DiskLoc() );
+        static ForwardCappedCursor* make( NamespaceDetails* nsd = 0,
+                                          const DiskLoc& startLoc = DiskLoc() );
         virtual string toString() {
             return "ForwardCappedCursor";
         }
         virtual DiskLoc next( const DiskLoc &prev ) const;
         virtual bool capped() const { return true; }
     private:
+        ForwardCappedCursor( NamespaceDetails* nsd );
+        void init( const DiskLoc& startLoc );
         NamespaceDetails *nsd;
     };
 

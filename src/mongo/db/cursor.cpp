@@ -74,8 +74,18 @@ namespace mongo {
         return nsd->lastRecord();
     }
 
-    ForwardCappedCursor::ForwardCappedCursor( NamespaceDetails *_nsd, const DiskLoc &startLoc ) :
+    ForwardCappedCursor* ForwardCappedCursor::make( NamespaceDetails* nsd,
+                                                    const DiskLoc& startLoc ) {
+        auto_ptr<ForwardCappedCursor> ret( new ForwardCappedCursor( nsd ) );
+        ret->init( startLoc );
+        return ret.release();
+    }
+
+    ForwardCappedCursor::ForwardCappedCursor( NamespaceDetails* _nsd ) :
         nsd( _nsd ) {
+    }
+
+    void ForwardCappedCursor::init( const DiskLoc& startLoc ) {
         if ( !nsd )
             return;
         DiskLoc start = startLoc;

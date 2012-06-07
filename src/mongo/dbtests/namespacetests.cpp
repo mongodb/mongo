@@ -1131,8 +1131,8 @@ namespace NamespaceTests {
                     ASSERT( !last.isNull() );
                 }
                 {
-                    ForwardCappedCursor c(nsd);
-                    first = c.currLoc();
+                    scoped_ptr<ForwardCappedCursor> c( ForwardCappedCursor::make( nsd ) );
+                    first = c->currLoc();
                     ASSERT( !first.isNull() );
                     ASSERT( first != last ) ;
                 }
@@ -1141,8 +1141,8 @@ namespace NamespaceTests {
                 ASSERT_EQUALS( nsd->stats.nrecords , 28 );
 
                 {
-                    ForwardCappedCursor c(nsd);
-                    ASSERT( first == c.currLoc() );
+                    scoped_ptr<ForwardCappedCursor> c( ForwardCappedCursor::make( nsd ) );
+                    ASSERT( first == c->currLoc() );
                 }
                 {
                     ReverseCappedCursor c(nsd);
