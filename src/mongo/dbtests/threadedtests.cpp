@@ -31,6 +31,7 @@
 #include "../util/concurrency/qlock.h"
 #include "dbtests.h"
 #include "mongo/util/concurrency/ticketholder.h"
+#include "mongo/platform/atomic_word.h"
 
 namespace mongo { 
     void testNonGreedy();
@@ -294,6 +295,36 @@ namespace ThreadedTests {
         }
     };
 
+    template <typename _AtomicUInt>
+    class IsAtomicWordAtomic : public ThreadedTest<> {
+        static const int iterations = 1000000;
+        typedef typename _AtomicUInt::WordType WordType;
+        _AtomicUInt target;
+
+        void subthread(int) {
+            for(int i=0; i < iterations; i++) {
+                target.fetchAndAdd(WordType(1));
+            }
+        }
+        void validate() {
+            ASSERT_EQUALS(target.load() , unsigned(nthreads * iterations));
+
+            _AtomicUInt u;
+            ASSERT_EQUALS(0u, u.load());
+            ASSERT_EQUALS(0u, u.fetchAndAdd(WordType(1)));
+            ASSERT_EQUALS(2u, u.addAndFetch(WordType(1)));
+            ASSERT_EQUALS(2u, u.fetchAndSubtract(WordType(1)));
+            ASSERT_EQUALS(0u, u.subtractAndFetch(WordType(1)));
+            ASSERT_EQUALS(0u, u.load());
+
+            u.fetchAndAdd(WordType(1));
+            ASSERT_GREATER_THAN(u.load(), WordType(0));
+
+            u.fetchAndSubtract(WordType(1));
+            ASSERT_NOT_GREATER_THAN(u.load(), WordType(0));
+        }
+    };
+
     class MVarTest : public ThreadedTest<> {
         static const int iterations = 10000;
         MVar<int> target;
@@ -316,13 +347,13 @@ namespace ThreadedTests {
     };
 
     class ThreadPoolTest {
-        static const int iterations = 10000;
-        static const int nThreads = 8;
+        static const unsigned iterations = 10000;
+        static const unsigned nThreads = 8;
 
-        AtomicUInt counter;
-        void increment(int n) {
-            for (int i=0; i<n; i++) {
-                counter++;
+        AtomicUInt32 counter;
+        void increment(unsigned n) {
+            for (unsigned i=0; i<n; i++) {
+                counter.fetchAndAdd(1);
             }
         }
 
@@ -330,13 +361,13 @@ namespace ThreadedTests {
         void run() {
             ThreadPool tp(nThreads);
 
-            for (int i=0; i < iterations; i++) {
+            for (unsigned i=0; i < iterations; i++) {
                 tp.schedule(&ThreadPoolTest::increment, this, 2);
             }
 
             tp.join();
 
-            ASSERT(counter == (unsigned)(iterations * 2));
+            ASSERT_EQUALS(counter.load(), iterations * 2);
         }
     };
 
@@ -345,9 +376,9 @@ namespace ThreadedTests {
         void run() {
             // quick atomicint wrap test
             // MSGID likely assumes this semantic
-            AtomicUInt counter = 0xffffffff;
-            counter++;
-            ASSERT( counter == 0 );
+            AtomicUInt32 counter(0xffffffff);
+            counter.fetchAndAdd(1);
+            ASSERT_EQUALS(counter.load(), 0U);
 
             writelocktry lk( 0 );
             ASSERT( lk.got() );
@@ -367,14 +398,14 @@ namespace ThreadedTests {
 
     class RWLockTest2 { 
     public:
-        static void worker1( RWLockRecursiveNongreedy * lk , AtomicUInt * x ) {
-            (*x)++; // 1
+        static void worker1( RWLockRecursiveNongreedy * lk , AtomicUInt32 * x ) {
+            x->fetchAndAdd(1); // 1
             RWLockRecursiveNongreedy::Exclusive b(*lk);
-            (*x)++; // 2
+            x->fetchAndAdd(1); // 2
         }
-        static void worker2( RWLockRecursiveNongreedy * lk , AtomicUInt * x ) {
+        static void worker2( RWLockRecursiveNongreedy * lk , AtomicUInt32 * x ) {
             RWLockRecursiveNongreedy::Shared c(*lk);
-            (*x)++;
+            x->fetchAndAdd(1);
         }
         void run() { 
             /**
@@ -383,34 +414,34 @@ namespace ThreadedTests {
             RWLockRecursiveNongreedy lk( "eliot2" , 120 * 1000 );
             cout << "RWLock impl: " << lk.implType() << endl;
             auto_ptr<RWLockRecursiveNongreedy::Shared> a( new RWLockRecursiveNongreedy::Shared(lk) );            
-            AtomicUInt x1 = 0;
+            AtomicUInt32 x1(0);
             cout << "A : " << &x1 << endl;
             boost::thread t1( boost::bind( worker1 , &lk , &x1 ) );
-            while ( ! x1 );
-            verify( x1 == 1 );
+            while ( ! x1.load() );
+            verify( x1.load() == 1 );
             sleepmillis( 500 );
-            verify( x1 == 1 );            
-            AtomicUInt x2 = 0;
+            verify( x1.load() == 1 );            
+            AtomicUInt32 x2(0);
             boost::thread t2( boost::bind( worker2, &lk , &x2 ) );
             t2.join();
-            verify( x2 == 1 );
+            verify( x2.load() == 1 );
             a.reset();
             for ( int i=0; i<2000; i++ ) {
-                if ( x1 == 2 )
+                if ( x1.load() == 2 )
                     break;
                 sleepmillis(1);
             }
-            verify( x1 == 2 );
+            verify( x1.load() == 2 );
             t1.join();            
         }
     };
 
     class RWLockTest3 { 
     public:        
-        static void worker2( RWLockRecursiveNongreedy * lk , AtomicUInt * x ) {
+        static void worker2( RWLockRecursiveNongreedy * lk , AtomicUInt32 * x ) {
     	    verify( ! lk->__lock_try(0) );
             RWLockRecursiveNongreedy::Shared c( *lk  );
-            (*x)++;
+            x->fetchAndAdd(1);
         }
 
         void run() { 
@@ -422,11 +453,11 @@ namespace ThreadedTests {
             
             auto_ptr<RWLockRecursiveNongreedy::Shared> a( new RWLockRecursiveNongreedy::Shared( lk ) );
             
-            AtomicUInt x2 = 0;
+            AtomicUInt32 x2(0);
 
             boost::thread t2( boost::bind( worker2, &lk , &x2 ) );
             t2.join();
-            verify( x2 == 1 );
+            verify( x2.load() == 1 );
 
             a.reset();            
         }
@@ -436,8 +467,8 @@ namespace ThreadedTests {
     public:
         
 #if defined(__linux__) || defined(__APPLE__)
-        static void worker1( pthread_rwlock_t * lk , AtomicUInt * x ) {
-            (*x)++; // 1
+        static void worker1( pthread_rwlock_t * lk , AtomicUInt32 * x ) {
+            x->fetchAndAdd(1); // 1
             cout << "lock b try" << endl;
             while ( 1 ) {
                 if ( pthread_rwlock_trywrlock( lk ) == 0 )
@@ -445,14 +476,14 @@ namespace ThreadedTests {
                 sleepmillis(10);
             }
             cout << "lock b got" << endl;
-            (*x)++; // 2
+            x->fetchAndAdd(1); // 2
             pthread_rwlock_unlock( lk );
         }
 
-        static void worker2( pthread_rwlock_t * lk , AtomicUInt * x ) {
+        static void worker2( pthread_rwlock_t * lk , AtomicUInt32 * x ) {
             cout << "lock c try" << endl;
             pthread_rwlock_rdlock( lk );
-            (*x)++;
+            x->fetchAndAdd(1);
             cout << "lock c got" << endl;
             pthread_rwlock_unlock( lk );
         }
@@ -471,28 +502,28 @@ namespace ThreadedTests {
             // read lock
             verify( pthread_rwlock_rdlock( &lk ) == 0 );
             
-            AtomicUInt x1 = 0;
+            AtomicUInt32 x1(0);
             boost::thread t1( boost::bind( worker1 , &lk , &x1 ) );
-            while ( ! x1 );
-            verify( x1 == 1 );
+            while ( ! x1.load() );
+            verify( x1.load() == 1 );
             sleepmillis( 500 );
-            verify( x1 == 1 );
+            verify( x1.load() == 1 );
             
-            AtomicUInt x2 = 0;
+            AtomicUInt32 x2(0);
 
             boost::thread t2( boost::bind( worker2, &lk , &x2 ) );
             t2.join();
-            verify( x2 == 1 );
+            verify( x2.load() == 1 );
 
             pthread_rwlock_unlock( &lk );
 
             for ( int i=0; i<2000; i++ ) {
-                if ( x1 == 2 )
+                if ( x1.load() == 2 )
                     break;
                 sleepmillis(1);
             }
 
-            verify( x1 == 2 );
+            verify( x1.load() == 2 );
             t1.join();
 #endif            
         }
@@ -955,6 +986,8 @@ namespace ThreadedTests {
             add< List1Test2 >();
 
             add< IsAtomicUIntAtomic >();
+            add< IsAtomicWordAtomic<AtomicUInt32> >();
+            add< IsAtomicWordAtomic<AtomicUInt64> >();
             add< MVarTest >();
             add< ThreadPoolTest >();
             add< LockTest >();
