@@ -32,6 +32,8 @@ namespace mongo{
 	
 	void MongodbChangeNotifier::stop()
 	{
+		if(!started_)
+	    		return;
 		stopped_ = 1;
 
 		zmq::socket_t producer(context_, ZMQ_PUSH);
