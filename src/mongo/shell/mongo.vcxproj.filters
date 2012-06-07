@@ -92,6 +92,9 @@
     <Filter Include="db\Source FIles">
       <UniqueIdentifier>{9e8a8d7a-2910-4943-b8ed-0247d6221434}</UniqueIdentifier>
     </Filter>
+    <Filter Include="platform">
+      <UniqueIdentifier>{de9ce563-1b79-44a3-a88b-2ca15f134666}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\scripting\engine.cpp">
@@ -1171,6 +1174,30 @@
     </ClInclude>
     <ClInclude Include="..\client\dbclientinterface.h">
       <Filter>db\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\atomic_intrinsics.h">
+      <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\atomic_intrinsics_win32.h">
+      <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\atomic_word.h">
+      <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\basic.h">
+      <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\compiler.h">
+      <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\compiler_msvc.h">
+      <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\float_utils.h">
+      <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\windows_basic.h">
+      <Filter>platform</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

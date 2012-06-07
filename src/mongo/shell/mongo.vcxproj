@@ -1073,6 +1073,14 @@ cscript //Nologo createCPPfromJavaScriptFiles.js "$(ProjectDir).."</Command>
     <ClInclude Include="..\..\third_party\js-1.7\prmjtime.h" />
     <ClInclude Include="..\..\third_party\js-1.7\resource.h" />
     <ClInclude Include="..\client\dbclientinterface.h" />
+    <ClInclude Include="..\platform\atomic_intrinsics.h" />
+    <ClInclude Include="..\platform\atomic_intrinsics_win32.h" />
+    <ClInclude Include="..\platform\atomic_word.h" />
+    <ClInclude Include="..\platform\basic.h" />
+    <ClInclude Include="..\platform\compiler.h" />
+    <ClInclude Include="..\platform\compiler_msvc.h" />
+    <ClInclude Include="..\platform\float_utils.h" />
+    <ClInclude Include="..\platform\windows_basic.h" />
     <ClInclude Include="linenoise_utf8.h" />
     <ClInclude Include="mk_wcwidth.h" />
     <ClInclude Include="..\..\third_party\pcre-8.30\config.h" />

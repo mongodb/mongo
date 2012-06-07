@@ -1202,6 +1202,14 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\db\pipeline\field_path.h" />
     <ClInclude Include="..\db\pipeline\value.h" />
     <ClInclude Include="..\db\projection.h" />
+    <ClInclude Include="..\platform\atomic_intrinsics.h" />
+    <ClInclude Include="..\platform\atomic_intrinsics_win32.h" />
+    <ClInclude Include="..\platform\atomic_word.h" />
+    <ClInclude Include="..\platform\basic.h" />
+    <ClInclude Include="..\platform\compiler.h" />
+    <ClInclude Include="..\platform\compiler_msvc.h" />
+    <ClInclude Include="..\platform\float_utils.h" />
+    <ClInclude Include="..\platform\windows_basic.h" />
     <ClInclude Include="..\util\assert_util.h" />
     <ClInclude Include="..\util\concurrency\mutexdebugger.h" />
     <ClInclude Include="..\util\concurrency\rwlockimpl.h" />

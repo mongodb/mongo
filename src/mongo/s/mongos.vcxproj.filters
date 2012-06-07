@@ -78,6 +78,9 @@
     <Filter Include="db\Source Files">
       <UniqueIdentifier>{833d56ed-aadd-457d-9acc-71cbdc4bab42}</UniqueIdentifier>
     </Filter>
+    <Filter Include="platform">
+      <UniqueIdentifier>{f7e60655-4a96-47e5-9f39-98d2f11ebc1a}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="balance.cpp">
@@ -1046,6 +1049,30 @@
     </ClInclude>
     <ClInclude Include="..\util\concurrency\mutexdebugger.h">
       <Filter>util\concurrency</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\atomic_intrinsics.h">
+      <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\atomic_intrinsics_win32.h">
+      <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\atomic_word.h">
+      <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\basic.h">
+      <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\compiler.h">
+      <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\compiler_msvc.h">
+      <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\windows_basic.h">
+      <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\float_utils.h">
+      <Filter>platform</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

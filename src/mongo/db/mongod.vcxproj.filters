@@ -1680,6 +1680,33 @@
     <ClInclude Include="..\util\concurrency\mutexdebugger.h">
       <Filter>util\concurrency</Filter>
     </ClInclude>
+    <ClInclude Include="..\util\concurrency\simplerwlock.h">
+      <Filter>util\concurrency</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\atomic_intrinsics.h">
+      <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\atomic_intrinsics_win32.h">
+      <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\atomic_word.h">
+      <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\basic.h">
+      <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\compiler.h">
+      <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\compiler_msvc.h">
+      <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\windows_basic.h">
+      <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\float_utils.h">
+      <Filter>platform</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="mongo.ico">
@@ -1815,6 +1842,9 @@
     </Filter>
     <Filter Include="db\Source Files\o to z">
       <UniqueIdentifier>{7fe0aa15-cf1b-47e0-9043-9fdcbe59d253}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="platform">
+      <UniqueIdentifier>{e29a0f06-8d7b-426f-b055-3c36af62b8a8}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

@@ -104,6 +104,9 @@
     <Filter Include="unittest">
       <UniqueIdentifier>{d2430c63-63e6-4ec5-80a5-337e004d7e01}</UniqueIdentifier>
     </Filter>
+    <Filter Include="platform">
+      <UniqueIdentifier>{4358f1ff-2299-4965-8cb9-ccd23666364e}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\client\connpool.h">
@@ -632,6 +635,30 @@
     </ClInclude>
     <ClInclude Include="..\util\concurrency\mutexdebugger.h">
       <Filter>util\concurrency</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\atomic_intrinsics.h">
+      <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\atomic_intrinsics_win32.h">
+      <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\atomic_word.h">
+      <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\basic.h">
+      <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\compiler.h">
+      <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\compiler_msvc.h">
+      <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\float_utils.h">
+      <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\windows_basic.h">
+      <Filter>platform</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
