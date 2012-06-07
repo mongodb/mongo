@@ -999,7 +999,7 @@ namespace QueryOptimizerCursorTests {
                                       BSONObj() ) );
             return NamespaceDetailsTransient::getCursor( ns(), query, order,
                                                         QueryPlanSelectionPolicy::any(), 0,
-                                                        parsedQuery );
+                                                        parsedQuery, false );
         }
     };
 
@@ -2846,7 +2846,8 @@ namespace QueryOptimizerCursorTests {
                                       BSONObj() ) );
             shared_ptr<Cursor> cursor =
             NamespaceDetailsTransient::getCursor( ns(), query, order,
-                                                 QueryPlanSelectionPolicy::any(), 0, parsedQuery );
+                                                  QueryPlanSelectionPolicy::any(), 0, parsedQuery,
+                                                  false );
             shared_ptr<QueryOptimizerCursor> ret =
             dynamic_pointer_cast<QueryOptimizerCursor>( cursor );
             ASSERT( ret );
@@ -2898,7 +2899,8 @@ namespace QueryOptimizerCursorTests {
                                       BSON( "b" << 1 ) ) );
             shared_ptr<Cursor> cursor =
             NamespaceDetailsTransient::getCursor( ns(), BSON( "a" << 4 ), BSONObj(),
-                                                 QueryPlanSelectionPolicy::any(), 0, parsedQuery );
+                                                  QueryPlanSelectionPolicy::any(), 0, parsedQuery,
+                                                  false );
             while( cursor->advance() );
             // No plan recorded when a hint is used.
             nPlans( 3 );
@@ -2912,7 +2914,7 @@ namespace QueryOptimizerCursorTests {
             NamespaceDetailsTransient::getCursor( ns(), BSON( "a" << 4 ),
                                                  BSON( "b" << 1 << "c" << 1 ),
                                                  QueryPlanSelectionPolicy::any(), 0,
-                                                 parsedQuery2 );
+                                                 parsedQuery2, false );
             while( cursor2->advance() );
             // Plan recorded was for a different query pattern (different sort spec).
             nPlans( 3 );
@@ -3514,7 +3516,7 @@ namespace QueryOptimizerCursorTests {
                 }
                 shared_ptr<Cursor> c =
                 NamespaceDetailsTransient::getCursor( ns(), extractedQuery, order(), planPolicy(),
-                                                     &simpleEqualityMatch, _parsedQuery );
+                                                      &simpleEqualityMatch, _parsedQuery, false );
                 ASSERT_EQUALS( expectSimpleEquality(), simpleEqualityMatch );
                 string type = c->toString().substr( 0, expectedType().length() );
                 ASSERT_EQUALS( expectedType(), type );
@@ -3656,7 +3658,7 @@ namespace QueryOptimizerCursorTests {
                 shared_ptr<Cursor> c =
                 NamespaceDetailsTransient::getCursor( ns(), BSONObj(), BSON( "a" << 1 ),
                                                      QueryPlanSelectionPolicy::any(), 0,
-                                                     parsedQuery );
+                                                     parsedQuery, false );
                 ASSERT( c );
             }
         };
@@ -4021,7 +4023,7 @@ namespace QueryOptimizerCursorTests {
                                           BSON( "$query" << query << "$explain" << true ),
                                           BSONObj() ) );
                 c = NamespaceDetailsTransient::getCursor( ns(), query, BSONObj(), QueryPlanSelectionPolicy::any(), 0,
-                                                         parsedQuery );
+                                                          parsedQuery, false );
                 set<BSONObj> indexKeys;
                 while( c->ok() ) {
                     indexKeys.insert( c->indexKeyPattern() );
@@ -4046,7 +4048,7 @@ namespace QueryOptimizerCursorTests {
                 _cursor =
                 dynamic_pointer_cast<QueryOptimizerCursor>
                 ( NamespaceDetailsTransient::getCursor( ns(), query(), BSONObj(), QueryPlanSelectionPolicy::any(), 0,
-                                                       parsedQuery ) );
+                                                        parsedQuery, false ) );
                 ASSERT( _cursor );
                 
                 handleCursor();

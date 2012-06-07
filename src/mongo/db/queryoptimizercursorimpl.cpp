@@ -716,10 +716,11 @@ namespace mongo {
                                          const QueryPlanSelectionPolicy &planPolicy,
                                          bool *simpleEqualityMatch,
                                          const shared_ptr<const ParsedQuery> &parsedQuery,
+                                         bool requireOrder,
                                          QueryPlanSummary *singlePlanSummary ) {
 
         CursorGenerator generator( ns, query, order, planPolicy, simpleEqualityMatch, parsedQuery,
-                        singlePlanSummary );
+                                   requireOrder, singlePlanSummary );
         return generator.generate();
     }
     
@@ -729,6 +730,7 @@ namespace mongo {
                                      const QueryPlanSelectionPolicy &planPolicy,
                                      bool *simpleEqualityMatch,
                                      const shared_ptr<const ParsedQuery> &parsedQuery,
+                                     bool requireOrder,
                                      QueryPlanSummary *singlePlanSummary ) :
     _ns( ns ),
     _query( query ),
@@ -736,6 +738,7 @@ namespace mongo {
     _planPolicy( planPolicy ),
     _simpleEqualityMatch( simpleEqualityMatch ),
     _parsedQuery( parsedQuery ),
+    _requireOrder( requireOrder ),
     _singlePlanSummary( singlePlanSummary ) {
         // Initialize optional return variables.
         if ( _simpleEqualityMatch ) {
@@ -805,7 +808,7 @@ namespace mongo {
     
     shared_ptr<Cursor> CursorGenerator::singlePlanCursor() {
         const QueryPlan *singlePlan = _mps->singlePlan();
-        if ( !singlePlan || ( requireOrder() && singlePlan->scanAndOrderRequired() ) ) {
+        if ( !singlePlan || ( isOrderRequired() && singlePlan->scanAndOrderRequired() ) ) {
             return shared_ptr<Cursor>();
         }
         if ( !_planPolicy.permitPlan( *singlePlan ) ) {
@@ -844,7 +847,7 @@ namespace mongo {
             return cursor;
         }
         
-        return newQueryOptimizerCursor( _mps, _planPolicy, requireOrder(), explain() );
+        return newQueryOptimizerCursor( _mps, _planPolicy, isOrderRequired(), explain() );
     }
 
     /** This interface is just available for testing. */

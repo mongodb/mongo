@@ -454,9 +454,11 @@ namespace mongo {
          * @param simpleEqualityMatch - Set to true for certain simple queries - see
          * queryoptimizer.cpp.
          *
-         * @param parsedQuery - Additional query parameters, as from a client query request.  If
-         * specified, the resulting cursor may return results from out of order plans.  See
-         * queryoptimizercursor.h for information on handling these results.
+         * @param parsedQuery - Additional query parameters, as from a client query request.
+         *
+         * @param requireOrder - If false, the resulting cursor may return results in an order
+         * inconsistent with the @param order spec.  See queryoptimizercursor.h for information on
+         * handling these results properly.
          *
          * @param singlePlanSummary - Query plan summary information that may be provided when a
          * cursor running a single plan is returned.
@@ -478,6 +480,7 @@ namespace mongo {
                                             bool *simpleEqualityMatch = 0,
                                             const shared_ptr<const ParsedQuery> &parsedQuery =
                                             shared_ptr<const ParsedQuery>(),
+                                            bool requireOrder = true,
                                             QueryPlanSummary *singlePlanSummary = 0 );
 
         /**
