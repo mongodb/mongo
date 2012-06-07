@@ -298,7 +298,51 @@ namespace CursorTests {
                 client.dropCollection( ns() );
             }
         };        
-        
+
+        /**
+         * A cursor is advanced when the document at its current iterate is removed.
+         */
+        class HandleDelete : public Base {
+        public:
+            void run() {
+                for( int i = 0; i < 150; ++i ) {
+                    client.insert( ns(), BSON( "_id" << i ) );
+                }
+
+                boost::shared_ptr<Cursor> cursor;
+                ClientCursor::Holder clientCursor;
+                ClientCursor::YieldData yieldData;
+
+                {
+                    Client::ReadContext ctx( ns() );
+                    // The query will utilize the _id index for both the first and second clauses.
+                    cursor = NamespaceDetailsTransient::getCursor
+                            ( ns(), fromjson( "{$or:[{_id:{$gte:0,$lte:148}},{_id:149}]}" ) );
+                    clientCursor.reset( new ClientCursor( QueryOption_NoCursorTimeout, cursor,
+                                                          ns() ) );
+                    // Advance to the last iterate of the first clause.
+                    ASSERT( cursor->ok() );
+                    while( cursor->current()[ "_id" ].number() != 148 ) {
+                        ASSERT( cursor->advance() );
+                    }
+                    clientCursor->prepareToYield( yieldData );
+                }
+
+                // Remove the document at the cursor's current position, which will cause the
+                // cursor to be advanced.
+                client.remove( ns(), BSON( "_id" << 148 ) );
+
+                {
+                    Client::ReadContext ctx( ns() );
+                    clientCursor->recoverFromYield( yieldData );
+                    // Verify that the cursor has another iterate, _id:149, after it is advanced due
+                    // to _id:148's removal.
+                    ASSERT( cursor->ok() );
+                    ASSERT_EQUALS( 149, cursor->current()[ "_id" ].number() );
+                }
+            }
+        };
+
         /**
          * ClientCursor::aboutToDelete() advances a ClientCursor with a refLoc() matching the
          * document to be deleted.
@@ -470,6 +514,7 @@ namespace CursorTests {
             add<BtreeCursor::RangeEq>();
             add<BtreeCursor::RangeIn>();
             add<BtreeCursor::AbortImplicitScan>();
+            add<ClientCursor::HandleDelete>();
             add<ClientCursor::AboutToDelete>();
             add<ClientCursor::AboutToDeleteDuplicate>();
             add<ClientCursor::AboutToDeleteDuplicateNextClause>();
