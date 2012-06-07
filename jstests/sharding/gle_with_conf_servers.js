@@ -3,7 +3,7 @@
  * cause an error.
  */
 function writeToConfigTest(){
-    var st = new ShardingTest({ shards: 1 });
+    var st = new ShardingTest({ shards: 2 });
     var confDB = st.s.getDB( 'config' );
 
     confDB.settings.update({ _id: 'balancer' }, { $set: { stopped: true }});
@@ -11,6 +11,7 @@ function writeToConfigTest(){
 
     assert( gleObj.ok );
 
+    printjson( gleObj );
     assert( gleObj.hasOwnProperty( 'shardRawGLE' ),
         'missing shardRawGLE from get last error fields!' );
     
