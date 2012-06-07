@@ -229,7 +229,7 @@ namespace mongo {
         rawOut(msg);
         ::abort();
     }
-    bool cdsIfRequestTimeout(const string& ns) {
+    bool ifRequestTimeout(const string& ns) {
 #ifdef _WIN32
 		return false;
 #else
@@ -239,30 +239,30 @@ namespace mongo {
 	if(!cc().getAuthenticationInfo()->isAuthorized(NamespaceString( ns ).db)) {
 		return false;
 	}
-	if(cc().getCdsPriodLength() == 0) { //limit not set
+	if(cc().getPriodLength() == 0) { //limit not set
 		return false;
 	}
 	struct timespec ts;
         clock_gettime( CLOCK_THREAD_CPUTIME_ID, &ts );
-	int cds_priod_end_time = time(NULL);
+	int priod_end_time = time(NULL);
 	
-	if( cds_priod_end_time - cc().getCdsPriodStartTime() <= cc().getCdsPriodLength()
-	    && (ts.tv_sec - cc().getCdsLastCpuTime() > cc().getCdsMaxCpuCost())) {
-		sleep(ts.tv_sec - cc().getCdsLastCpuTime() - cc().getCdsMaxCpuCost());
-		mongo::log() << "[cds] sleep for a while "
+	if( priod_end_time - cc().getPriodStartTime() <= cc().getPriodLength()
+	    && (ts.tv_sec - cc().getLastCpuTime() > cc().getMaxCpuCost())) {
+		sleep(ts.tv_sec - cc().getLastCpuTime() - cc().getMaxCpuCost());
+		mongo::log() << "[ifRequestTimeout] sleep for a while "
 			     << " ts.tv_sec = " << ts.tv_sec
-			     << " CdsLastCpuTime = " << cc().getCdsLastCpuTime()
-			     << " CdsMaxCpuCost =" << cc().getCdsMaxCpuCost()
-			     << " CdsPriodStartTime = " << cc().getCdsPriodStartTime()
+			     << " LastCpuTime = " << cc().getLastCpuTime()
+			     << " MaxCpuCost =" << cc().getMaxCpuCost()
+			     << " PriodStartTime = " << cc().getPriodStartTime()
 			     << " ns = " << ns << endl;
-		cc().setCdsLastCpuTime(ts.tv_sec); 
+		cc().setLastCpuTime(ts.tv_sec); 
 		return true;
 	}
-	if (cds_priod_end_time - cc().getCdsPriodStartTime() > cc().getCdsPriodLength()) {
-		int v = cds_priod_end_time - cc().getCdsPriodStartTime() ;
-		v = (v / cc().getCdsPriodLength()) * cc().getCdsPriodLength() ;
-		cc().setCdsPriodStartTime(cc().getCdsPriodStartTime()+v);
-		cc().setCdsLastCpuTime(ts.tv_sec);
+	if (priod_end_time - cc().getPriodStartTime() > cc().getPriodLength()) {
+		int v = priod_end_time - cc().getPriodStartTime() ;
+		v = (v / cc().getPriodLength()) * cc().getPriodLength() ;
+		cc().setPriodStartTime(cc().getPriodStartTime()+v);
+		cc().setLastCpuTime(ts.tv_sec);
 	}
 	return false;
 #endif
@@ -356,7 +356,7 @@ namespace mongo {
             if( ! c.getAuthenticationInfo()->isAuthorized(cl) ) {
                 uassert_nothrow("unauthorized");
             }
-			else if( strstr(ns, ".cds.") && !c.getAuthenticationInfo()->isAuthorized("admin")) {
+			else if( strstr(ns, ".system.limit.") && !c.getAuthenticationInfo()->isAuthorized("admin")) {
 				uassert_nothrow("unauthorized");
 			}
             else {
@@ -424,7 +424,7 @@ namespace mongo {
         }
         
         debug.reset();
-	cdsIfRequestTimeout(ns);
+	ifRequestTimeout(ns);
     } /* assembleResponse() */
 
     void receivedKillCursors(Message& m) {

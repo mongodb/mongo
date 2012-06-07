@@ -87,10 +87,10 @@ namespace mongo {
             sleepmillis(10);
             return false;
         }
-	if (cc().getCdsDB() != "" && dbname != cc().getCdsDB()) {
-		log() << "[cds] refuse to change db"
+	if (cc().getLoginDB() != "" && dbname != cc().getLoginDB()) {
+		log() << "[authenticate:run] refuse to change db"
 		      << "db=" << dbname
-		      << " user current login db = " << cc().getCdsDB() << endl;
+		      << " user current login db = " << cc().getLoginDB() << endl;
 		return false;
 	}
         stringstream digestBuilder;
@@ -146,8 +146,8 @@ namespace mongo {
 	if(user == "__system") {
 		return true;
 	}
-	if(!cdsIfWhiteIP(dbname,cc().clientAddress())) {
-		log() << "[cds][ip:" 
+	if(!isWhiteIP(dbname,cc().clientAddress())) {
+		log() << "[auth:run][ip:" 
 		      << cc().clientAddress()
 		      << "] not in white ip list"
 		      << " user = " << user
@@ -155,17 +155,17 @@ namespace mongo {
 		errmsg = "not in white ip list";
 		return false;
 	}
-	if(cdsIfExceedDBMaxConn(dbname)) {
-		log() << "[cds][db:"
+	if(isExceedDBMaxConn(dbname)) {
+		log() << "[auth:run][db:"
 		      << dbname
 		      << " user = " << user
 		      << "] exceeded max db connections" << endl;
 		errmsg = "exceed max db conns";
 		return false;
 	}
-	cdsSetMaxCpuCost(dbname);
-	cdsSetMaxFileNum(dbname);
-	cc().setCdsDB(dbname);
+	setMaxCpuCost(dbname);
+	setMaxFileNum(dbname);
+	cc().setLoginDB(dbname);
         return true;
     }
 

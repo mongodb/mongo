@@ -133,20 +133,20 @@ namespace mongo {
     }
     // we change dec ip to binip and use function findOne to search ip table
     // if find return true otherwise return false
-    bool CmdAuthenticate::cdsIfWhiteIP(const string& dbname,const string& ip) {
+    bool CmdAuthenticate::isWhiteIP(const string& dbname,const string& ip) {
 	if(ip == "127.0.0.1"
 	   || specialDB(dbname)) {
 		return true;
 	}
-	string cdsWhiteIP = dbname + ".cds.whiteip";
+	string whiteIP = dbname + ".system.limit.whiteip";
 	{
 		mongolock lk(false);
-		Client::Context c(cdsWhiteIP, dbpath, &lk, false);
+		Client::Context c(whiteIP, dbpath, &lk, false);
 		BSONObjBuilder b;
 		b << "value" << "*"; // this symbol means unlimit access ip
 		BSONObj query = b.done();
 		BSONObj result;
-		if( Helpers::findOne(cdsWhiteIP.c_str(), query, result) ) {
+		if( Helpers::findOne(whiteIP.c_str(), query, result) ) {
 			return true;
 		}
 	}
@@ -157,12 +157,12 @@ namespace mongo {
 	for(i = 0 ; i < len ; i ++) {
 		nowBinIP += binIP[i];
 		mongolock lk(false);
-		Client::Context c(cdsWhiteIP, dbpath, &lk, false);
+		Client::Context c(whiteIP, dbpath, &lk, false);
 		BSONObjBuilder b;
 		b << "value" << nowBinIP;
 		BSONObj query = b.done();
 		BSONObj result;
-		if( Helpers::findOne(cdsWhiteIP.c_str(), query, result) ) {
+		if( Helpers::findOne(whiteIP.c_str(), query, result) ) {
               		return true;
                 }
 	}
@@ -177,12 +177,12 @@ namespace mongo {
 	}
 	return false;
     }
-    bool CmdAuthenticate::cdsIfExceedDBMaxConn(const string& dbname) {
+    bool CmdAuthenticate::isExceedDBMaxConn(const string& dbname) {
 	if(specialDB(dbname)) {
 		return false;
 	}
-	string dbMaxConn = dbname+".cds.dbmaxconn";
-	int maxConn = Client::CDS_RESOURCE_UNLIMIT;
+	string dbMaxConn = dbname+".system.limit.dbmaxconn";
+	int maxConn = Client::RESOURCE_UNLIMIT;
 	{
                	mongolock lk(false);
                 Client::Context c(dbMaxConn, dbpath, &lk, false);
@@ -197,49 +197,49 @@ namespace mongo {
 		for( set<Client*>::iterator i = Client::clients.begin(); i != Client::clients.end(); i++ ) {
 			Client *c = *i;
 			assert( c );
-			string db = c->getCdsDB();
+			string db = c->getLoginDB();
 			if( db == dbname ) {
 				curDBUserCount ++;
 			}
 	  	}
 	}
-	mongo::log() << "[cds]curDBUserCount = " << curDBUserCount
+	mongo::log() << "[ifExceedDBMaxConn]curDBUserCount = " << curDBUserCount
 		     << " dbmaxConn = " << maxConn 
 		     << " total_client_counts = " <<  Client::clients.size()
 		     << " dbname = " << dbname << endl;
 	return (curDBUserCount >= maxConn);
     }
-    void CmdAuthenticate::cdsSetMaxCpuCost(const string& dbname) {
+    void CmdAuthenticate::setMaxCpuCost(const string& dbname) {
 	if(specialDB(dbname)) {
 		return ;
 	}
-	string dbMaxCpuCost = dbname+".cds.maxcpucost";	
+	string dbMaxCpuCost = dbname+".system.limit.maxcpucost";	
 	{
 		mongolock lk(false);
 		Client::Context c(dbMaxCpuCost, dbpath, &lk, false);
 		BSONObj result;
 		if (Helpers::getSingleton(dbMaxCpuCost.c_str(),  result)) {
-			cc().setCdsMaxCpuCost(result.getIntField("cpu_cost"));
-			cc().setCdsPriodLength(result.getIntField("time_priod"));
+			cc().setMaxCpuCost(result.getIntField("cpu_cost"));
+			cc().setPriodLength(result.getIntField("time_priod"));
 		}
 	}
-	mongo::log() << "[cds] set maxcpucost = " << cc().getCdsMaxCpuCost()
+	mongo::log() << "[setMaxCpuCost] set maxcpucost = " << cc().getMaxCpuCost()
 		     << " where dbname = " << dbname << endl;
     }
-    void CmdAuthenticate::cdsSetMaxFileNum(const string& dbname) {
+    void CmdAuthenticate::setMaxFileNum(const string& dbname) {
 	if(specialDB(dbname)) {
 		return ;
 	}
-	string dbMaxFileNum = dbname+".cds.maxfilenum";
+	string dbMaxFileNum = dbname+".system.limit.maxfilenum";
 	{
 		mongolock lk(false);
 		Client::Context c(dbMaxFileNum, dbpath, &lk, false);
 		BSONObj result;
 		if (Helpers::getSingleton(dbMaxFileNum.c_str(),  result)) {
-			cc().setCdsMaxFileNum(result.getIntField("value"));
+			cc().setMaxFileNum(result.getIntField("value"));
 		}
 	}
-	mongo::log() << "[cds] set maxfilenum = " << cc().getCdsMaxFileNum()
+	mongo::log() << "[setMaxFileNum] set maxfilenum = " << cc().getMaxFileNum()
 		     << " where dbname = " << dbname << endl;
     }
     void CmdAuthenticate::authenticate(const string& dbname, const string& user, const bool readOnly) {

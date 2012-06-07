@@ -194,11 +194,11 @@ namespace mongo {
             preallocateAFile();
         return ret;
     }
-    bool cdsfileExceed(const string& db,int filenum) {
-	if(specialDB(db) || cc().getCdsMaxFileNum() == Client::CDS_RESOURCE_UNLIMIT) {
+    bool fileExceed(const string& db,int filenum) {
+	if(specialDB(db) || cc().getMaxFileNum() == Client::RESOURCE_UNLIMIT) {
 		return false;
 	}
-	return (filenum>=cc().getCdsMaxFileNum());
+	return (filenum>=cc().getMaxFileNum());
     }
     bool fileIndexExceedsQuota( const char *ns, int fileIndex, bool enforceQuota ) {
         return
@@ -226,11 +226,11 @@ namespace mongo {
 
         if ( fileIndexExceedsQuota( ns, numFiles(), enforceQuota ) )
             uasserted(12501, "quota exceeded");
-	if ( cdsfileExceed(NamespaceString( ns ).db,numFiles())) {
-	    uasserted(17565,"[cds]quota exceeded");
+	if ( fileExceed(NamespaceString( ns ).db,numFiles())) {
+	    uasserted(17565,"[system.limit]quota exceeded");
 	}
-	if (numFiles() > 1 && (cc().getCdsDB() != NamespaceString( ns ).db)) {
-	    uasserted(17566,"[cds] quota exceeded [only current db user can allocate file] ");	
+	if (numFiles() > 1 && (cc().getLoginDB() != NamespaceString( ns ).db)) {
+	    uasserted(17566,"quota exceeded [only current db user can allocate file] ");	
 	}
         // allocate files until we either get one big enough or hit maxSize
         for ( int i = 0; i < 8; i++ ) {
