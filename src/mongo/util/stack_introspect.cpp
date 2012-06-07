@@ -53,6 +53,9 @@ namespace mongo {
             if ( name.find( "ForwardCappedCursor" ) != string::npos ) 
                 return false;
 
+            if ( name.find( "ReorderBuildStrategy" ) != string::npos ) 
+                return false;
+
             return method == clazz;
         }
         
