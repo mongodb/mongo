@@ -56,6 +56,9 @@ namespace mongo {
             if ( name.find( "ReorderBuildStrategy" ) != string::npos ) 
                 return false;
 
+            if ( name.find( "HybridBuildStrategy" ) != string::npos ) 
+                return false;
+
             return method == clazz;
         }
         
