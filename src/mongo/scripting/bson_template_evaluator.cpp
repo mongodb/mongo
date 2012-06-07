@@ -89,7 +89,7 @@ namespace mongo {
         const int max  = range["1"].numberInt();
         if (max <= min)
             return StatusOpEvaluationError;
-        int randomNum = min + (random() % (max - min));
+        int randomNum = min + (rand() % (max - min));
         if (range.nFields() == 3) {
             if (!range[2].isNumber())
                 return StatusOpEvaluationError;
