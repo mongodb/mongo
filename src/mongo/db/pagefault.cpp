@@ -50,4 +50,13 @@ namespace mongo {
         }
     }
 
+
+    NoPageFaultsAllowed::NoPageFaultsAllowed() {
+        _saved = cc()._pageFaultRetryableSection;
+        cc()._pageFaultRetryableSection = 0;
+    }
+
+    NoPageFaultsAllowed::~NoPageFaultsAllowed() {
+        cc()._pageFaultRetryableSection = _saved;
+    }
 }

@@ -23,6 +23,20 @@ namespace mongo {
         PageFaultRetryableSection();
         ~PageFaultRetryableSection();
     };
+
+    /**
+     * this turns off page faults in a scope
+     * there are just certain arease where its dangerous
+     * this might mean the code is dangerous anyway....
+     */
+    class NoPageFaultsAllowed : boost::noncopyable {
+    public:
+        NoPageFaultsAllowed();
+        ~NoPageFaultsAllowed();
+    private:
+        PageFaultRetryableSection* _saved;
+    };
+
 #if 0
     inline void how_to_use_example() {
         // ...

@@ -151,6 +151,7 @@ namespace mongo {
         LockState _ls;
         
         friend class PageFaultRetryableSection; // TEMP
+        friend class NoPageFaultsAllowed; // TEMP
     public:
 
         /** the concept here is the same as MONGO_SOMETIMES.  however that 
