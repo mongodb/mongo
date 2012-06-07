@@ -18,6 +18,7 @@
 
 #include "mongo/scripting/bson_template_evaluator.h"
 
+#include <cstddef>
 #include <cstdlib>
 
 #include "mongo/util/map_util.h"
@@ -26,6 +27,8 @@ namespace mongo {
 
     void BsonTemplateEvaluator::initializeEvaluator() {
         addOperator("RAND_INT", &BsonTemplateEvaluator::evalRandInt);
+        addOperator("RAND_STRING", &BsonTemplateEvaluator::evalRandString);
+        addOperator("CONCAT", &BsonTemplateEvaluator::evalConcat);
     }
 
     BsonTemplateEvaluator::BsonTemplateEvaluator() {
@@ -96,6 +99,58 @@ namespace mongo {
             randomNum *= range[2].numberInt();
         }
         out.append(fieldName, randomNum);
+        return StatusSuccess;
+    }
+
+    BsonTemplateEvaluator::Status BsonTemplateEvaluator::evalRandString(BsonTemplateEvaluator* btl,
+                                                                        const char* fieldName,
+                                                                        const BSONObj in,
+                                                                        BSONObjBuilder& out) {
+        // in = { #RAND_STRING: [10] }
+        BSONObj range = in.firstElement().embeddedObject();
+        if (range.nFields() != 1)
+            return StatusOpEvaluationError;
+        if (!range[0].isNumber())
+            return StatusOpEvaluationError;
+        const int length = range["0"].numberInt();
+        if (length <= 0)
+            return StatusOpEvaluationError;
+        static const char alphanum[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                                       "abcdefghijklmnopqrstuvwxyz"
+                                       "0123456789+/";
+        static const size_t alphaNumLength = sizeof(alphanum) - 1;
+        BOOST_STATIC_ASSERT(alphaNumLength == 64);
+        unsigned currentRand = 0;
+        std::string str;
+        for (int i = 0; i < length; ++i, currentRand >>= 6) {
+            if (i % 5 == 0)
+                currentRand = rand();
+            str.push_back(alphanum[currentRand % alphaNumLength]);
+        }
+        out.append(fieldName, str);
+        return StatusSuccess;
+    }
+
+    BsonTemplateEvaluator::Status BsonTemplateEvaluator::evalConcat(BsonTemplateEvaluator* btl,
+                                                                    const char* fieldName,
+                                                                    const BSONObj in,
+                                                                    BSONObjBuilder& out) {
+        // in = { #CONCAT: ["hello", " ", "world"] }
+        BSONObjBuilder objectBuilder;
+        Status status = btl->evaluate(in.firstElement().embeddedObject(), objectBuilder);
+        if (status != StatusSuccess)
+            return status;
+        BSONObj parts = objectBuilder.obj();
+        if (parts.nFields() <= 1)
+            return StatusOpEvaluationError;
+        StringBuilder stringBuilder;
+        BSONForEach(part, parts) {
+            if (part.type() == String)
+                stringBuilder << part.String();
+            else
+                part.toString(stringBuilder,false);
+        }
+        out.append(fieldName, stringBuilder.str());
         return StatusSuccess;
     }
 

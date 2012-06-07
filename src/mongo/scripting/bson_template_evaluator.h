@@ -19,7 +19,7 @@
 /*
  * This library supports a templating language that helps in generating BSON documents from a
  * template. The language supports the following template:
- * #RAND_INT #LITERAL, #CONCAT, #RAND_STRING.
+ * #RAND_INT, #RAND_STRING and #CONCAT.
  *
  * The language will help in quickly expressing richer documents  for use in benchRun.
  * Ex. : { key : { #RAND_INT: [10, 20] } } or  { key : { #CONCAT: ["hello", " ", "world"] } }
@@ -119,9 +119,33 @@ namespace mongo {
         // evaluates a BSON element. This is internally called by the top level evaluate method.
         Status _evalElem(BSONElement in, BSONObjBuilder& out);
 
-        // operator methods
+        /*
+         * Operator method to support #RAND_INT :  { key : { #RAND_INT: [10, 20] } }
+         * The array arguments to #RAND_INT are the min and mix range between which a random number
+         * will be chosen. The chosen random number is inclusive at the lower end but not at the
+         * upper end.
+         * This will evaluate to something like { key : 14 }
+         * #RAND_INT also supports a third optional argument which is a multiplier.
+         * Thus for an input { key : { #RAND_INT: [10, 20, 4] } }, the method will
+         * choose a random number between 10 and 20 and then multiple the chosen value with 4.
+         */
         static Status evalRandInt(BsonTemplateEvaluator* btl, const char* fieldName,
                                   const BSONObj in, BSONObjBuilder& out);
+        /*
+         * Operator method to support #RAND_STRING : { key : { #RAND_STRING: [12] } }
+         * The array argument to RAND_STRING is the length of the string that is desired.
+         * This will evaluate to something like { key : "randomstring" }
+         */
+        static Status evalRandString(BsonTemplateEvaluator* btl, const char* fieldName,
+                                     const BSONObj in, BSONObjBuilder& out);
+        /*
+         * Operator method to support #CONCAT : { key : { #CONCAT: ["hello", " ", "world", 2012] } }
+         * The array argument to CONCAT are the strings to be concatenated. If the argument is not
+         * a string it will be stringified and concatendated.
+         * This will evaluate to { key : "hello world2012" }
+         */
+        static Status evalConcat(BsonTemplateEvaluator* btl, const char* fieldName,
+                                 const BSONObj in, BSONObjBuilder& out);
 
     };
 
