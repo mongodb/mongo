@@ -54,7 +54,8 @@
  *       sync {boolean}: Use SyncClusterConnection, and readies
  *          3 config servers.
  *       separateConfig {boolean}: if false, recycle one of the running mongod
- *          as a config server. The config property can override this.
+ *          as a config server. The config property can override this. False by
+ *          default.
  *       configOptions {Object}: same as the config property above.
  *          Can be used to specify options that are common all config servers.
  *       mongosOptions {Object}: same as the mongos property above.

@@ -4,7 +4,7 @@
 
 // Note: count command uses call
 
-var st = new ShardingTest({ shards: [], other: { sync: true }});
+var st = new ShardingTest({ shards: [], other: { sync: true, separateConfig: true }});
 var configDB = st.config;
 var coll = configDB.test;
 
