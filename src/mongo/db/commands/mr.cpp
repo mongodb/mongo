@@ -514,11 +514,13 @@ namespace mongo {
 
                     bool found;
                     {
+                        boost::scoped_ptr<Lock::DBRead> lk;
                         // read lock only for findOne operation, if "nonAtomic" options set
                         // otherwise global lock earlier
                         if (_config.outNonAtomic) {
-                            Lock::DBRead lk( _config.finalLong );
+                            lk.reset(new Lock::DBRead( _config.finalLong ));
                         }
+
                         Client::Context tx( _config.finalLong );
                         found = Helpers::findOne( _config.finalLong.c_str() , temp["_id"].wrap() , old , true );
                     }
