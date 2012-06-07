@@ -160,7 +160,7 @@ namespace mongo {
             BSONObj obj12 = builder12.obj();
             ASSERT_EQUALS(obj12.nFields(), 1);
             ASSERT_GREATER_THAN_OR_EQUALS(obj12.firstElement().numberInt(), 0);
-            ASSERT_LESS_THAN(obj12.firstElement().numberInt(), 16);
+            ASSERT_LESS_THAN_OR_EQUALS(obj12.firstElement().numberInt(), 16);
         }
     } // end anonymous namespace
 } // end namespace mongo
