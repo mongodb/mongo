@@ -506,7 +506,9 @@ namespace mongo {
                 op->setMessage( "m/r: reduce post processing" , _db.count( _config.tempLong, BSONObj() ) );
                 auto_ptr<DBClientCursor> cursor = _db.query( _config.tempLong , BSONObj() , 0, 0, 0, QueryOption_NoCursorTimeout );
                 while ( cursor->more() ) {
-                    Lock::GlobalWrite lock; // TODO(erh) why global?
+                    if (!_config.outNonAtomic) {
+                        Lock::GlobalWrite lock; // TODO(erh) why global?
+                    }
                     BSONObj temp = cursor->next();
                     BSONObj old;
 
@@ -521,11 +523,17 @@ namespace mongo {
                         values.clear();
                         values.push_back( temp );
                         values.push_back( old );
-                        Helpers::upsert( _config.finalLong , _config.reducer->finalReduce( values , _config.finalizer.get() ) );
+
+                        temp = _config.reducer->finalReduce( values , _config.finalizer.get() );
                     }
-                    else {
-                        Helpers::upsert( _config.finalLong , temp );
+
+                    // block only for upsert operation, if "nonAtomic" options set
+                    // otherwise lock earlier
+                    if (_config.outNonAtomic) {
+                        Lock::GlobalWrite lock; // TODO(erh) why global?
                     }
+                    Helpers::upsert( _config.finalLong , temp );
+                    
                     getDur().commitIfNeeded();
                     pm.hit();
                 }
