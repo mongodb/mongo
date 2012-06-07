@@ -34,13 +34,14 @@ namespace mongo{
 	{
 		if(!started_)
 	    		return;
-		stopped_ = 1;
-
 		zmq::socket_t producer(context_, ZMQ_PUSH);
 		producer.connect("inproc://manager");
 		zmq::message_t message(1);
 		memcpy(message.data(),"S",1);
 		producer.send(message);
+		while(!stopped_){
+			log() << "[notifier] on the way to exit. waiting..."<< std::endl;
+		}
 
 	}
 
@@ -95,6 +96,7 @@ namespace mongo{
 
 				if(items[1].revents & ZMQ_POLLIN){
 					manager_.recv(&message);
+					stopped_ = 1;
 					break;
 				}
 
