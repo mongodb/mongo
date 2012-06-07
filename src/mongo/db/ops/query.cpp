@@ -831,6 +831,8 @@ namespace mongo {
         BSONObj jsobj = q.query;
         int queryOptions = q.queryOptions;
         const char *ns = q.ns;
+        
+        uassert( 16332 , "can't have an empty ns" , ns[0] );
 
         if( logLevel >= 2 )
             log() << "runQuery called " << ns << " " << jsobj << endl;
