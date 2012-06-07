@@ -33,6 +33,7 @@
 #include "../util/timer.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/scanandorder.h"
+#include "pagefault.h"
 
 namespace mongo {
 
@@ -210,6 +211,8 @@ namespace mongo {
 
     /* must call this on a delete so we clean up the cursors. */
     void ClientCursor::aboutToDelete(const DiskLoc& dl) {
+        NoPageFaultsAllowed npfa;
+
         recursive_scoped_lock lock(ccmutex);
 
         Database *db = cc().database();
