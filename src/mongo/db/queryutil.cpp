@@ -162,8 +162,7 @@ namespace mongo {
     }
 
 
-    FieldRange::FieldRange( const BSONElement &e, bool singleKey, bool isNot, bool optimize ) :
-    _singleKey( singleKey ),
+    FieldRange::FieldRange( const BSONElement &e, bool isNot, bool optimize ) :
     _simpleFiniteSet() {
         int op = e.getGtLtOp();
 
@@ -181,7 +180,7 @@ namespace mongo {
                          ie.embeddedObject().firstElement().getGtLtOp() != BSONObj::opELEM_MATCH );
                 if ( ie.type() == RegEx ) {
                     exactMatchesOnly = false;
-                    regexes.push_back( FieldRange( ie, singleKey, false, optimize ) );
+                    regexes.push_back( FieldRange( ie, false, optimize ) );
                 }
                 else {
                     // A document array may be indexed by its first element, by undefined
@@ -484,9 +483,9 @@ namespace mongo {
         return result.strictValid();
     }
 
-    const FieldRange &FieldRange::operator&=( const FieldRange &other ) {
+    const FieldRange &FieldRange::intersect( const FieldRange &other, bool singleKey ) {
         // Range intersections are not taken for multikey indexes.  See SERVER-958.
-        if ( !_singleKey && !universal() ) {
+        if ( !singleKey && !universal() ) {
             // Pick 'other' range if it is smaller than or equal to 'this'.
             if ( other <= *this ) {
              	*this = other;
@@ -717,7 +716,7 @@ namespace mongo {
 
     string FieldRange::toString() const {
         StringBuilder buf;
-        buf << "(FieldRange special: " << _special << " singleKey: " << _singleKey << " intervals: ";
+        buf << "(FieldRange special: " << _special << " intervals: ";
         for( vector<FieldInterval>::const_iterator i = _intervals.begin(); i != _intervals.end(); ++i ) {
             buf << i->toString() << " ";
         }
@@ -800,7 +799,7 @@ namespace mongo {
             int cmp = i->first.compare( j->first );
             if ( cmp == 0 ) {
                 // Same field name, so find range intersection.
-                i->second &= j->second;
+                i->second.intersect( j->second, _singleKey );
                 ++i;
                 ++j;
             }
@@ -885,6 +884,9 @@ namespace mongo {
     void FieldRangeSet::handleElemMatch( const char* matchFieldName, const BSONElement& elemMatch,
                                          bool isNot, bool optimize ) {
         adjustMatchField();
+        if ( !_boundElemMatch ) {
+            return;
+        }
         if ( isNot ) {
             // SERVER-5740 $elemMatch queries may depend on multiple fields, so $not:$elemMatch
             // cannot in general generate range constraints for a single field.
@@ -894,8 +896,18 @@ namespace mongo {
         BSONElement firstElemMatchElement = elemMatchObj.firstElement();
         if ( firstElemMatchElement.getGtLtOp() != BSONObj::Equality ||
             str::equals( firstElemMatchElement.fieldName(), "$not" ) ) {
-            // TODO SERVER-1264 Handle $elemMatch applied to top level elements (where $elemMatch
-            // fields are operators).
+            // Handle $elemMatch applied to top level elements (where $elemMatch fields are
+            // operators).  SERVER-1264
+            BSONObj namedMatchExpression = elemMatch.wrap( matchFieldName );
+            FieldRangeSet elemMatchRanges( _ns.c_str(),
+                                           namedMatchExpression,
+                                           true, // SERVER-4180 Generate single key index bounds.
+                                           optimize,
+                                           false // Prevent computing FieldRanges for nested
+                                                 // $elemMatch expressions, which the index key
+                                                 // generation implementation does not support.
+                                           );
+            *this &= elemMatchRanges;
         }
         else {
             // Handle $elemMatch applied to nested elements ($elemMatch fields are not operators).
@@ -984,7 +996,22 @@ namespace mongo {
     _ns( ns ),
     _queries( 1, query.getOwned() ),
     _singleKey( singleKey ),
-    _simpleFiniteSet( true ) {
+    _simpleFiniteSet( true ),
+    _boundElemMatch( true ) {
+        init( optimize );
+    }
+
+    FieldRangeSet::FieldRangeSet( const char* ns, const BSONObj& query, bool singleKey,
+                                  bool optimize, bool boundElemMatch ) :
+        _ns( ns ),
+        _queries( 1, query.getOwned() ),
+        _singleKey( singleKey ),
+        _simpleFiniteSet( true ),
+        _boundElemMatch( boundElemMatch ) {
+        init( optimize );
+    }
+    
+    void FieldRangeSet::init( bool optimize ) {
         BSONObjIterator i( _queries[ 0 ] );
         while( i.more() ) {
             handleMatchField( i.next(), optimize );
@@ -1002,7 +1029,7 @@ namespace mongo {
     void FieldRangeSet::intersectMatchField( const char *fieldName, const BSONElement &matchElement,
                                             bool isNot, bool optimize ) {
         FieldRange &selectedRange = range( fieldName );
-        selectedRange &= FieldRange( matchElement, _singleKey, isNot, optimize );
+        selectedRange.intersect( FieldRange( matchElement, isNot, optimize ), _singleKey );
         if ( !selectedRange.simpleFiniteSet() ) {
             _simpleFiniteSet = false;
         }
@@ -1037,8 +1064,7 @@ namespace mongo {
                 _ranges.push_back( *range );
             }
             else {
-                _ranges.push_back( FieldRange( BSONObj().firstElement(), frs.singleKey(), false,
-                                              true ) );
+                _ranges.push_back( FieldRange( BSONObj().firstElement(), false, true ) );
                 range->reverse( _ranges.back() );
             }
             verify( !_ranges.back().empty() );
@@ -1079,12 +1105,12 @@ namespace mongo {
         return b.obj();
     }
     
-    FieldRange *FieldRangeSet::__singleKeyUniversalRange = 0;
-    FieldRange *FieldRangeSet::__multiKeyUniversalRange = 0;
+    FieldRange *FieldRangeSet::__universalRange = 0;
     const FieldRange &FieldRangeSet::universalRange() const {
-        FieldRange *&ret = _singleKey ? __singleKeyUniversalRange : __multiKeyUniversalRange;
+        FieldRange *&ret = __universalRange;
         if ( ret == 0 ) {
-            ret = new FieldRange( BSONObj().firstElement(), _singleKey, false, true );
+            // TODO: SERVER-5112
+            ret = new FieldRange( BSONObj().firstElement(), false, true );
         }
         return *ret;
     }

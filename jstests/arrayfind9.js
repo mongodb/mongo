@@ -22,3 +22,13 @@ t.drop();
 t.save( { a:[ [ 'x' ] ] } );
 assert.eq( 1, t.count( { a:{ $elemMatch:{ '0':'x' } } } ) );
 
+// Matching multiple values of a nested array.
+t.drop();
+t.save( { a:[ { b:[ 0, 2 ] } ] } );
+t.ensureIndex( { a:1 } );
+t.ensureIndex( { 'a.b':1 } );
+plans = [ { $natural:1 }, { a:1 }, { 'a.b':1 } ];
+for( i in plans ) {
+    p = plans[ i ];
+    assert.eq( 1, t.find( { a:{ $elemMatch:{ b:{ $gte:1, $lte:1 } } } } ).hint( p ).itcount() );
+}

@@ -44,7 +44,7 @@ namespace QueryUtilTests {
         public:
             void run() {
                 BSONObj obj = BSON( "a" << 1 );
-                FieldRange fieldRange( obj.firstElement(), true, false, true );
+                FieldRange fieldRange( obj.firstElement(), false, true );
                 fieldRange.toString(); // Just test that we don't crash.
             }
         };        
@@ -475,7 +475,7 @@ namespace QueryUtilTests {
                 FieldRangeSet frs2( "", fromjson( "{a:{$in:[2,3,5,8,9]}}" ), true, true );
                 FieldRange fr1 = frs1.range( "a" );
                 FieldRange fr2 = frs2.range( "a" );
-                fr1 &= fr2;
+                fr1.intersect( fr2, true );
                 ASSERT( fr1.min().woCompare( BSON( "a" << 3.0 ).firstElement(), false ) == 0 );
                 ASSERT( fr1.max().woCompare( BSON( "a" << 9.0 ).firstElement(), false ) == 0 );
                 vector< FieldInterval > intervals = fr1.intervals();
@@ -893,7 +893,7 @@ namespace QueryUtilTests {
 
                 f1 |= f4;
                 ASSERT( f1.universal() );
-                f1 &= f2;
+                f1.intersect( f2, true );
                 ASSERT( !f1.universal() );
 
                 FieldRangeSet frs5( "", BSON( "a" << GT << 1 << LTE << 2 ), true, true );
@@ -906,6 +906,16 @@ namespace QueryUtilTests {
                 
                 f6 -= f5;
                 ASSERT( !f6.universal() );
+            }
+        };
+
+        /** Field range calculation for an untyped $regex within a $elemMatch. */
+        class ElemMatchRegex {
+        public:
+            void run() {
+                FieldRangeSet frs( "", fromjson( "{a:{$elemMatch:{$regex:'^x'}}}" ), true, true );
+                ASSERT( !frs.range( "a" ).universal() );
+                ASSERT_EQUALS( "x", frs.range( "a" ).min().String() );
             }
         };
         
@@ -978,11 +988,11 @@ namespace QueryUtilTests {
                     ASSERT( !missing.simpleFiniteSet() );
                     
                     // Replacing a universal range preserves the simpleFiniteSet property.
-                    missing &= left;
+                    missing.intersect( left, true );
                     ASSERT( missing.simpleFiniteSet() );
                     
                     // Other operations clear the simpleFiniteSet property.
-                    left &= right;
+                    left.intersect( right, true );
                     ASSERT( !left.simpleFiniteSet() );                    
                 }
             };
@@ -1194,9 +1204,9 @@ namespace QueryUtilTests {
                     // No constraints exist for operator based field names like "a.$gte".
                     ASSERT( set.range( "a.$gte" ).universal() );
                     ASSERT( set.range( "a.$lte" ).universal() );
-                    if ( 0 ) { // SERVER-1264
-                        ASSERT( set.range( "a" ).equality() );
-                    }
+                    // The index ranges for the $elemMatch subexpressions are intersected in a
+                    // single value context, generating an equality index bound.  SERVER-4180
+                    ASSERT( set.range( "a" ).equality() );
                 }
             };
             
@@ -1212,9 +1222,22 @@ namespace QueryUtilTests {
                     // No constraints exist for operator based field names like "a.$not".
                     ASSERT( set.range( "a.$not" ).universal() );
                     ASSERT( set.range( "a.$not.$ne" ).universal() );
-                    if ( 0 ) { // SERVER-1264
-                        ASSERT( set.range( "a" ).equality() );
-                    }
+                    ASSERT( set.range( "a" ).equality() );
+                }
+            };
+            
+            /** Field ranges generated for $elemMatch nested within a top level $elemMatch. */
+            class TopLevelNested {
+            public:
+                void run() {
+                    FieldRangeSet set( "", fromjson( "{ a:{ $elemMatch:{ $elemMatch:{ $in:[ 5 ] "
+                                                     "} } } }" ),
+                                       true, true );
+                    ASSERT_EQUALS( 0, set.numNonUniversalRanges() );
+                    FieldRangeSet set2( "", fromjson( "{ a:{ $elemMatch:{ $elemMatch:{ b:{ "
+                                                      "$in:[ 5 ] } } } } }" ),
+                                       true, true );
+                    ASSERT_EQUALS( 0, set2.numNonUniversalRanges() );
                 }
             };
 
@@ -1952,7 +1975,7 @@ namespace QueryUtilTests {
                 bool isEqInclusiveUpperBound( const BSONObj &intervalSpec,
                                              const BSONObj &elementSpec,
                                              bool reverse ) {
-                    FieldRange range( intervalSpec.firstElement(), true, false, true );
+                    FieldRange range( intervalSpec.firstElement(), false, true );
                     BSONElement element = elementSpec.firstElement();
                     FieldRangeVectorIterator::FieldIntervalMatcher matcher
                             ( range.intervals()[ 0 ], element, reverse );
@@ -1981,7 +2004,7 @@ namespace QueryUtilTests {
             private:
                 bool isGteUpperBound( const BSONObj &intervalSpec, const BSONObj &elementSpec,
                                      bool reverse ) {
-                    FieldRange range( intervalSpec.firstElement(), true, false, true );
+                    FieldRange range( intervalSpec.firstElement(), false, true );
                     BSONElement element = elementSpec.firstElement();
                     FieldRangeVectorIterator::FieldIntervalMatcher matcher
                             ( range.intervals()[ 0 ], element, reverse );
@@ -2013,7 +2036,7 @@ namespace QueryUtilTests {
                 bool isEqExclusiveLowerBound( const BSONObj &intervalSpec,
                                              const BSONObj &elementSpec,
                                              bool reverse ) {
-                    FieldRange range( intervalSpec.firstElement(), true, false, true );
+                    FieldRange range( intervalSpec.firstElement(), false, true );
                     BSONElement element = elementSpec.firstElement();
                     FieldRangeVectorIterator::FieldIntervalMatcher matcher
                             ( range.intervals()[ 0 ], element, reverse );
@@ -2042,7 +2065,7 @@ namespace QueryUtilTests {
             private:
                 bool isLtLowerBound( const BSONObj &intervalSpec, const BSONObj &elementSpec,
                                      bool reverse ) {
-                    FieldRange range( intervalSpec.firstElement(), true, false, true );
+                    FieldRange range( intervalSpec.firstElement(), false, true );
                     BSONElement element = elementSpec.firstElement();
                     FieldRangeVectorIterator::FieldIntervalMatcher matcher
                             ( range.intervals()[ 0 ], element, reverse );
@@ -2055,7 +2078,7 @@ namespace QueryUtilTests {
                 void run() {
                     BSONObj intervalSpec = BSON( "$in" << BSON_ARRAY( 1 << 2 ) );
                     BSONObj elementSpec = BSON( "" << 1 );
-                    FieldRange range( intervalSpec.firstElement(), true, false, true );
+                    FieldRange range( intervalSpec.firstElement(), false, true );
                     BSONElement element = elementSpec.firstElement();
                     FieldRangeVectorIterator::FieldIntervalMatcher matcher
                             ( range.intervals()[ 0 ], element, false );
@@ -2308,6 +2331,7 @@ namespace QueryUtilTests {
             add<FieldRangeTests::DiffMulti1>();
             add<FieldRangeTests::DiffMulti2>();
             add<FieldRangeTests::Universal>();
+            add<FieldRangeTests::ElemMatchRegex>();
             add<FieldRangeTests::SimpleFiniteSet::EqualArray>();
             add<FieldRangeTests::SimpleFiniteSet::EqualEmptyArray>();
             add<FieldRangeTests::SimpleFiniteSet::InArray>();
@@ -2333,6 +2357,7 @@ namespace QueryUtilTests {
             add<FieldRangeSetTests::ElemMatch::Ranges>();
             add<FieldRangeSetTests::ElemMatch::TopLevelElements>();
             add<FieldRangeSetTests::ElemMatch::TopLevelNotElement>();
+            add<FieldRangeSetTests::ElemMatch::TopLevelNested>();
             add<FieldRangeSetTests::ElemMatch::Not>();
             add<FieldRangeSetTests::ElemMatch::Nested>();
             add<FieldRangeSetTests::ElemMatch::AllNested>();

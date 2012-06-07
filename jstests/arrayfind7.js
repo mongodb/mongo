@@ -39,6 +39,13 @@ checkIndexCharacterBasedBounds( { 'a.b.c':1 },
                                [ [ 1, 1 ] ],
                                [ [ 1, 1.7976931348623157e+308 ] ] );
 
+// Two constraints within a nested $elemMatch expression, one of which contains the other.
+checkIndexCharacterBasedBounds( { 'a.b.c':1 },
+                               { a:[ { b:[ { c:2 } ] } ] },
+                               { a:{ $elemMatch:{ b:{ $elemMatch:{ c:{ $gte:1, $in:[2] } } } } } },
+                               [ [ 2, 2 ] ],
+                               [ [ 2, 2 ] ] );
+
 // Two nested $elemMatch expressions.
 checkIndexCharacterBasedBounds( { 'a.d.e':1, 'a.b.c':1 },
                                { a:[ { b:[ { c:1 } ], d:[ { e:1 } ] } ] },
@@ -53,3 +60,10 @@ checkIndexCharacterBasedBounds( { 'a.x':1, 'a.b.c':1 },
                                { 'a.x':1, a:{ $elemMatch:{ b:{ $elemMatch:{ c:{ $gte:1 } } } } } },
                                [ [ 1, 1.7976931348623157e+308 ] ],
                                [ [ { $minElement:1 }, { $maxElement:1 } ] ] );
+
+// $elemMatch is applied directly to a top level field.
+checkIndexCharacterBasedBounds( { 'a.b.c':1 },
+                               { a:[ { b:[ { c:[ 1 ] } ] } ] },
+                               { a:{ $elemMatch:{ 'b.c':{ $elemMatch:{ $gte:1, $lte:1 } } } } },
+                               [ [ 1, 1 ] ],
+                               [ [ 1, 1 ] ] );

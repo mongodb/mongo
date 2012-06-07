@@ -277,10 +277,14 @@ namespace mongo {
      */
     class FieldRange {
     public:
-        FieldRange( const BSONElement &e , bool singleKey , bool isNot, bool optimize );
+        FieldRange( const BSONElement &e , bool isNot, bool optimize );
 
-        /** @return Range intersection with 'other'. */
-        const FieldRange &operator&=( const FieldRange &other );
+        /**
+         * @return Range intersection with 'other'.
+         * @param singleKey - Indicate whether intersection will be performed in a single value or
+         *     multi value context.
+         */
+        const FieldRange &intersect( const FieldRange &other, bool singleKey );
         /** @return Range union with 'other'. */
         const FieldRange &operator|=( const FieldRange &other );
         /** @return Range of elements elements included in 'this' but not 'other'. */
@@ -338,7 +342,6 @@ namespace mongo {
         // Owns memory for our BSONElements.
         vector<BSONObj> _objData;
         string _special;
-        bool _singleKey;
         bool _simpleFiniteSet;
     };
     
@@ -460,7 +463,18 @@ namespace mongo {
         BSONObj originalQuery() const { return _queries[ 0 ]; }
         
         string toString() const;
+
     private:
+        /**
+         * Private constructor for implementation specific delegate objects.
+         * @param boundElemMatch - If false, FieldRanges will not be computed for $elemMatch
+         *     expressions.
+         */
+        FieldRangeSet( const char* ns, const BSONObj& query, bool singleKey, bool optimize,
+                       bool boundElemMatch );
+        /** Initializer shared by the constructors. */
+        void init( bool optimize );
+
         void appendQueries( const FieldRangeSet &other );
         void makeEmpty();
 
@@ -479,8 +493,7 @@ namespace mongo {
         void adjustMatchField();
         void intersectMatchField( const char *fieldName, const BSONElement &matchElement,
                                  bool isNot, bool optimize );
-        static FieldRange *__singleKeyUniversalRange;
-        static FieldRange *__multiKeyUniversalRange;
+        static FieldRange *__universalRange;
         const FieldRange &universalRange() const;
         map<string,FieldRange> _ranges;
         string _ns;
@@ -488,6 +501,7 @@ namespace mongo {
         vector<BSONObj> _queries;
         bool _singleKey;
         bool _simpleFiniteSet;
+        bool _boundElemMatch;
     };
 
     class NamespaceDetails;
