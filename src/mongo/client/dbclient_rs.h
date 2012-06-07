@@ -97,14 +97,7 @@ namespace mongo {
                 return pingTimeMillis < threshold;
             }
 
-            BSONObj toBSON() const {
-                return BSON( "addr" << addr.toString() <<
-                        "isMaster" << ismaster <<
-                        "secondary" << secondary <<
-                        "hidden" << hidden <<
-                        "tags" << lastIsMaster["tags"] <<
-                        "ok" << ok );
-            }
+            BSONObj toBSON() const;
 
             string toString() const {
                 return toBSON().toString();

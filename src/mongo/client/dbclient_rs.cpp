@@ -813,6 +813,23 @@ namespace mongo {
         return true;
     }
 
+    BSONObj ReplicaSetMonitor::Node::toBSON() const {
+        BSONObjBuilder builder;
+        builder.append( "addr", addr.toString() );
+        builder.append( "isMaster", ismaster );
+        builder.append( "secondary", secondary );
+        builder.append( "hidden", hidden );
+
+        const BSONElement& tagElem = lastIsMaster["tags"];
+        if ( tagElem.ok() && tagElem.isABSONObj() ){
+            builder.append( "tags", tagElem.Obj() );
+        }
+
+        builder.append( "ok", ok );
+
+        return builder.obj();
+    }
+
     mongo::mutex ReplicaSetMonitor::_setsLock( "ReplicaSetMonitor" );
     map<string,ReplicaSetMonitorPtr> ReplicaSetMonitor::_sets;
     ReplicaSetMonitor::ConfigChangeHook ReplicaSetMonitor::_hook;

@@ -139,9 +139,31 @@ namespace {
         }
     };
 
+    class SimpleToStringTest {
+    public:
+        void run() {
+            ReplicaSetMonitor::Node node( HostAndPort( "dummy", 3 ), NULL );
+            node.lastIsMaster = SampleIsMasterDoc.copy();
+
+            // Should not throw any exceptions
+            ASSERT( !node.toString().empty() );
+        }
+    };
+
+    class SimpleToStringWithNoTagTest {
+    public:
+        void run() {
+            ReplicaSetMonitor::Node node( HostAndPort( "dummy", 3 ), NULL );
+            node.lastIsMaster = NoTagIsMasterDoc.copy();
+
+            // Should not throw any exceptions
+            ASSERT( !node.toString().empty() );
+        }
+    };
+
     class All : public Suite {
     public:
-        All() : Suite( "replicaSetMonitor" ){
+        All() : Suite( "replicaSetMonitor_node" ){
         }
 
         void setupTests(){
@@ -157,7 +179,9 @@ namespace {
             add< BadSingleTagCritTest >();
             add< NonExistingFieldTagTest >();
             add< UnorederedMatchingTest >();
+            add< SimpleToStringTest >();
+            add< SimpleToStringWithNoTagTest >();
         }
-    } myAll;
+    } allNode;
 }
 
