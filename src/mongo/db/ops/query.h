@@ -182,16 +182,20 @@ namespace mongo {
     /** Build strategy for a cursor returning out of order results. */
     class ReorderBuildStrategy : public ResponseBuildStrategy {
     public:
-        ReorderBuildStrategy( const ParsedQuery &parsedQuery,
-                             const shared_ptr<Cursor> &cursor,
-                             BufBuilder &buf,
-                             const QueryPlanSummary &queryPlan );
+        static ReorderBuildStrategy* make( const ParsedQuery& parsedQuery,
+                                           const shared_ptr<Cursor>& cursor,
+                                           BufBuilder& buf,
+                                           const QueryPlanSummary& queryPlan );
         virtual bool handleMatch( bool &orderedMatch );
         /** Handle a match without performing deduping. */
         void _handleMatchNoDedup();
         virtual int rewriteMatches();
         virtual int bufferedMatches() const { return _bufferedMatches; }
     private:
+        ReorderBuildStrategy( const ParsedQuery& parsedQuery,
+                              const shared_ptr<Cursor>& cursor,
+                              BufBuilder& buf );
+        void init( const QueryPlanSummary& queryPlan );
         ScanAndOrder *newScanAndOrder( const QueryPlanSummary &queryPlan ) const;
         shared_ptr<ScanAndOrder> _scanAndOrder;
         int _bufferedMatches;
@@ -226,7 +230,7 @@ namespace mongo {
         bool handleReorderMatch();
         DiskLocDupSet _scanAndOrderDups;
         OrderedBuildStrategy _orderedBuild;
-        ReorderBuildStrategy _reorderBuild;
+        scoped_ptr<ReorderBuildStrategy> _reorderBuild;
         bool _reorderedMatches;
     };
 
