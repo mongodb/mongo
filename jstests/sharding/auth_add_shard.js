@@ -45,7 +45,7 @@ print (conn);
 
 // --------------- Test 1 --------------------
 // Add shard to the existing cluster
-var result = admin.runCommand( {addShard : getHostName() + ":" + conn.port} );
+var result = admin.runCommand( {addShard : conn.host} );
 printjson(result);
 // make sure the shard wasn't added
 assert.eq(result.ok, 0, "added shard without keyfile");
@@ -56,7 +56,7 @@ MongoRunner.stopMongod( conn );
 //start mongod again, this time with keyfile 
 var conn = MongoRunner.runMongod( {keyFile : "jstests/libs/key1"} );
 //try adding the new shard
-var result = admin.runCommand( {addShard : getHostName() + ":" + conn.port} );
+var result = admin.runCommand( {addShard : conn.host} );
 printjson(result);
 //make sure the shard was added successfully
 assert.eq(result.ok, 1, "failed to add shard with keyfile");
@@ -89,13 +89,13 @@ st.startBalancer();
 
 //--------------- Test 3 --------------------
 // now drain the shard
-var result = admin.runCommand( {removeShard : getHostName() + ":" + conn.port} );
+var result = admin.runCommand( {removeShard : conn.host} );
 printjson(result);
 assert.eq(result.ok, 1, "failed to start draining shard");
 
 // give it some time to drain
 assert.soon(function() {
-    var result = admin.runCommand( {removeShard : getHostName() + ":" + conn.port} );
+    var result = admin.runCommand( {removeShard : conn.host} );
     printjson(result);
     return result.ok && result.state == "completed"
 }, "failed to drain shard completely", 5 * 60 * 1000)
