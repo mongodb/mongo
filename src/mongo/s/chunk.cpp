@@ -1058,7 +1058,8 @@ namespace mongo {
             }
         }
 
-        throw UserException( 8070 , str::stream() << "couldn't find a chunk which should be impossible: " << key );
+        msgasserted( 8070 ,
+                     str::stream() << "couldn't find a chunk which should be impossible: " << key );
     }
 
     ChunkPtr ChunkManager::findChunkOnServer( const Shard& shard ) const {
