@@ -514,9 +514,12 @@ namespace mongo {
 
                     bool found;
                     {
-                        Lock::DBRead lk( _config.finalLong );
+                        // read lock only for findOne operation, if "nonAtomic" options set
+                        // otherwise global lock earlier
+                        if (_config.outNonAtomic) {
+                            Lock::DBRead lk( _config.finalLong );
+                        }
                         Client::Context tx( _config.finalLong );
-
                         found = Helpers::findOne( _config.finalLong.c_str() , temp["_id"].wrap() , old , true );
                     }
 
@@ -530,7 +533,7 @@ namespace mongo {
                     }
 
                     // block only for upsert operation, if "nonAtomic" options set
-                    // otherwise lock earlier
+                    // otherwise global lock earlier
                     if (_config.outNonAtomic) {
                         Lock::GlobalWrite lock; // TODO(erh) why global?
                     }
