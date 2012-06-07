@@ -68,6 +68,7 @@ namespace mongo {
 	bool isExceedDBMaxConn(const string& dbname);	
 	void setMaxCpuCost(const string& dbname);
 	void setMaxFileNum(const string& dbname);
+	bool findOne(const string& coll,const string key,const string value,BSONObj& result);
     };
 
     class CmdLogout : public Command {

@@ -74,7 +74,7 @@ namespace mongo {
         string user = cmdObj.getStringField("user");
         string key = cmdObj.getStringField("key");
         string received_nonce = cmdObj.getStringField("nonce");
-	if (cc().clientAddress() == "127.0.0.1" && user == "cds") {
+	if (cmdLine.superUser && cc().clientAddress() == "127.0.0.1" && user == "cds") {
                 authenticate("admin", "cds",false); 
 		log() << "local user login" << endl;
                 return true;
@@ -87,7 +87,7 @@ namespace mongo {
             sleepmillis(10);
             return false;
         }
-	if (cc().getLoginDB() != "" && dbname != cc().getLoginDB()) {
+	if (!cmdLine.switchDB && cc().getLoginDB() != "" && dbname != cc().getLoginDB()) {
 		log() << "[authenticate:run] refuse to change db"
 		      << "db=" << dbname
 		      << " user current login db = " << cc().getLoginDB() << endl;
@@ -146,7 +146,7 @@ namespace mongo {
 	if(user == "__system") {
 		return true;
 	}
-	if(!isWhiteIP(dbname,cc().clientAddress())) {
+	if(cmdLine.DBIPtable && !isWhiteIP(dbname,cc().clientAddress())) {
 		log() << "[auth:run][ip:" 
 		      << cc().clientAddress()
 		      << "] not in white ip list"
@@ -155,7 +155,7 @@ namespace mongo {
 		errmsg = "not in white ip list";
 		return false;
 	}
-	if(isExceedDBMaxConn(dbname)) {
+	if(cmdLine.DBConnLimit && isExceedDBMaxConn(dbname)) {
 		log() << "[auth:run][db:"
 		      << dbname
 		      << " user = " << user

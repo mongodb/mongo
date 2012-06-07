@@ -590,6 +590,10 @@ int main(int argc, char* argv[]) {
     ("syncdelay",po::value<double>(&cmdLine.syncdelay)->default_value(60), "seconds between disk syncs (0=never, but not recommended)")
     ("sysinfo", "print some diagnostic system information")
     ("upgrade", "upgrade db if needed")
+    ("dbiptable","limits each database access ip(default false)")
+    ("dbconnlimit","limits each database to a certain number of connection(default false)")
+    ("noswitchdb","not allow user to swith db after login except admin user(default false)")
+    ("superuser","allow local user use cds and any password to login admin db(default false)")
     ;
 
 #if defined(_WIN32)
@@ -816,6 +820,18 @@ int main(int argc, char* argv[]) {
             Record::MemoryTrackingEnabled = false;
             shouldRepairDatabases = 1;
         }
+	if (params.count("dbiptable")) {
+		cmdLine.DBIPtable = true;
+	}
+	if (params.count("dbconnlimit")) {
+		cmdLine.DBConnLimit = true;
+	}
+	if (params.count("noswitchdb")) {
+		cmdLine.switchDB = false;
+	}
+	if (params.count("superuser")) {
+		cmdLine.superUser = true;
+	}
         if (params.count("notablescan")) {
             cmdLine.noTableScan = true;
         }

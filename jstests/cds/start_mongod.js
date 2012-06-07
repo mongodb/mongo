@@ -18,4 +18,4 @@ db.cds.maxfilenum.save({"_id":"cds","value":2});
 db.cds.maxcpucost.save({"_id":"cds","cpu_cost":2,"time_priod":10});
 db.cds.whiteip.save({"value":"*","ip":"0.0.0.0/32"});
 
-sleep(100000);
+sleep(10000000);

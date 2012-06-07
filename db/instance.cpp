@@ -53,7 +53,6 @@ namespace mongo {
     void receivedDelete(Message& m, CurOp& op);
     void receivedInsert(Message& m, CurOp& op);
     bool receivedGetMore(DbResponse& dbresponse, Message& m, CurOp& curop );
-    bool specialDB(const string& dbname);
     int nloggedsome = 0;
 #define LOGSOME if( ++nloggedsome < 1000 || nloggedsome % 100 == 0 )
 
@@ -233,9 +232,6 @@ namespace mongo {
 #ifdef _WIN32
 		return false;
 #else
-	if(specialDB(NamespaceString( ns ).db)) {
-		return false;
-	}
 	if(!cc().getAuthenticationInfo()->isAuthorized(NamespaceString( ns ).db)) {
 		return false;
 	}
@@ -356,9 +352,6 @@ namespace mongo {
             if( ! c.getAuthenticationInfo()->isAuthorized(cl) ) {
                 uassert_nothrow("unauthorized");
             }
-			else if( strstr(ns, ".systemlimit.") && !c.getAuthenticationInfo()->isAuthorized("admin")) {
-				uassert_nothrow("unauthorized");
-			}
             else {
                 try {
                     if ( op == dbInsert ) {
