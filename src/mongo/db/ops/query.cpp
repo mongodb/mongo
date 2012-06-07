@@ -284,8 +284,8 @@ namespace mongo {
     }
 
     ResponseBuildStrategy::ResponseBuildStrategy( const ParsedQuery &parsedQuery,
-                                                 const shared_ptr<Cursor> &cursor, BufBuilder &buf,
-                                                 const QueryPlanSummary &queryPlan ) :
+                                                  const shared_ptr<Cursor> &cursor,
+                                                  BufBuilder &buf ) :
     _parsedQuery( parsedQuery ),
     _cursor( cursor ),
     _queryOptimizerCursor( dynamic_pointer_cast<QueryOptimizerCursor>( _cursor ) ),
@@ -316,9 +316,8 @@ namespace mongo {
 
     OrderedBuildStrategy::OrderedBuildStrategy( const ParsedQuery &parsedQuery,
                                                const shared_ptr<Cursor> &cursor,
-                                               BufBuilder &buf,
-                                               const QueryPlanSummary &queryPlan ) :
-    ResponseBuildStrategy( parsedQuery, cursor, buf, queryPlan ),
+                                               BufBuilder &buf ) :
+    ResponseBuildStrategy( parsedQuery, cursor, buf ),
     _skip( _parsedQuery.getSkip() ),
     _bufferedMatches() {
     }
@@ -345,7 +344,7 @@ namespace mongo {
                                                const shared_ptr<Cursor> &cursor,
                                                BufBuilder &buf,
                                                const QueryPlanSummary &queryPlan ) :
-    ResponseBuildStrategy( parsedQuery, cursor, buf, queryPlan ),
+    ResponseBuildStrategy( parsedQuery, cursor, buf ),
     _scanAndOrder( newScanAndOrder( queryPlan ) ),
     _bufferedMatches() {
     }
@@ -394,8 +393,8 @@ namespace mongo {
     HybridBuildStrategy::HybridBuildStrategy( const ParsedQuery &parsedQuery,
                                              const shared_ptr<QueryOptimizerCursor> &cursor,
                                              BufBuilder &buf ) :
-    ResponseBuildStrategy( parsedQuery, cursor, buf, QueryPlanSummary() ),
-    _orderedBuild( _parsedQuery, _cursor, _buf, QueryPlanSummary() ),
+    ResponseBuildStrategy( parsedQuery, cursor, buf ),
+    _orderedBuild( _parsedQuery, _cursor, _buf ),
     _reorderBuild( _parsedQuery, _cursor, _buf, QueryPlanSummary() ),
     _reorderedMatches() {
     }
@@ -568,7 +567,7 @@ namespace mongo {
             singleOrderedPlan ||
             ( !singlePlan && !queryOptimizerPlans.mayRunOutOfOrderPlan() ) ) {
             return shared_ptr<ResponseBuildStrategy>
-            ( new OrderedBuildStrategy( _parsedQuery, _cursor, _buf, queryPlan ) );
+            ( new OrderedBuildStrategy( _parsedQuery, _cursor, _buf ) );
         }
         if ( singlePlan ||
             !queryOptimizerPlans.mayRunInOrderPlan() ) {

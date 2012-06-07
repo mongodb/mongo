@@ -131,7 +131,7 @@ namespace mongo {
          * results must be sorted or read with a covered index.
          */
         ResponseBuildStrategy( const ParsedQuery &parsedQuery, const shared_ptr<Cursor> &cursor,
-                              BufBuilder &buf, const QueryPlanSummary &queryPlan );
+                              BufBuilder &buf );
         virtual ~ResponseBuildStrategy() {}
         /**
          * Handle the current iterate of the supplied cursor as a (possibly duplicate) match.
@@ -169,7 +169,7 @@ namespace mongo {
     class OrderedBuildStrategy : public ResponseBuildStrategy {
     public:
         OrderedBuildStrategy( const ParsedQuery &parsedQuery, const shared_ptr<Cursor> &cursor,
-                             BufBuilder &buf, const QueryPlanSummary &queryPlan );
+                             BufBuilder &buf );
         virtual bool handleMatch( bool &orderedMatch );
         virtual int bufferedMatches() const { return _bufferedMatches; }
     private:
