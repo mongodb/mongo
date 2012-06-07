@@ -514,7 +514,9 @@ namespace mongo {
 
                     bool found;
                     {
+                        Lock::DBRead lk( _config.finalLong );
                         Client::Context tx( _config.finalLong );
+
                         found = Helpers::findOne( _config.finalLong.c_str() , temp["_id"].wrap() , old , true );
                     }
 
