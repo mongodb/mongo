@@ -19,7 +19,9 @@ namespace mongo {
     }
 
     void PageFaultException::touch() { 
-        verify( ! Lock::isLocked() );
+        if ( Lock::isLocked() ) {
+            warning() << "PageFaultException::touch happening with a lock" << endl;
+        }
         LockMongoFilesShared lk;
         if( LockMongoFilesShared::getEra() != era ) {
             // files opened and closed.  we don't try to handle but just bail out; this is much simpler
