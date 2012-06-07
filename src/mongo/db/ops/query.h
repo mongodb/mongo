@@ -219,10 +219,14 @@ namespace mongo {
      */
     class HybridBuildStrategy : public ResponseBuildStrategy {
     public:
+        static HybridBuildStrategy* make( const ParsedQuery& parsedQuery,
+                                          const shared_ptr<QueryOptimizerCursor>& cursor,
+                                          BufBuilder& buf );
+    private:
         HybridBuildStrategy( const ParsedQuery &parsedQuery,
                             const shared_ptr<QueryOptimizerCursor> &cursor,
                             BufBuilder &buf );
-    private:
+        void init();
         virtual bool handleMatch( bool &orderedMatch );
         virtual int rewriteMatches();
         virtual int bufferedMatches() const;

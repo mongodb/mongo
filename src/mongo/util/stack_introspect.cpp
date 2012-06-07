@@ -50,9 +50,6 @@ namespace mongo {
             if ( name.find( "Tests" ) != string::npos )
                 return false;
             
-            if ( name.find( "HybridBuildStrategy" ) != string::npos ) 
-                return false;
-
             if ( name.find( "ShardChunkManager" ) != string::npos )
                 return false;
 
