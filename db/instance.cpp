@@ -356,7 +356,7 @@ namespace mongo {
             if( ! c.getAuthenticationInfo()->isAuthorized(cl) ) {
                 uassert_nothrow("unauthorized");
             }
-			else if( strstr(ns, ".system.limit.") && !c.getAuthenticationInfo()->isAuthorized("admin")) {
+			else if( strstr(ns, ".systemlimit.") && !c.getAuthenticationInfo()->isAuthorized("admin")) {
 				uassert_nothrow("unauthorized");
 			}
             else {

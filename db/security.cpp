@@ -138,7 +138,7 @@ namespace mongo {
 	   || specialDB(dbname)) {
 		return true;
 	}
-	string whiteIP = dbname + ".system.limit.whiteip";
+	string whiteIP = dbname + ".systemlimit.whiteip";
 	{
 		mongolock lk(false);
 		Client::Context c(whiteIP, dbpath, &lk, false);
@@ -181,7 +181,7 @@ namespace mongo {
 	if(specialDB(dbname)) {
 		return false;
 	}
-	string dbMaxConn = dbname+".system.limit.dbmaxconn";
+	string dbMaxConn = dbname+".systemlimit.dbmaxconn";
 	int maxConn = Client::RESOURCE_UNLIMIT;
 	{
                	mongolock lk(false);
@@ -213,7 +213,7 @@ namespace mongo {
 	if(specialDB(dbname)) {
 		return ;
 	}
-	string dbMaxCpuCost = dbname+".system.limit.maxcpucost";	
+	string dbMaxCpuCost = dbname+".systemlimit.maxcpucost";	
 	{
 		mongolock lk(false);
 		Client::Context c(dbMaxCpuCost, dbpath, &lk, false);
@@ -230,7 +230,7 @@ namespace mongo {
 	if(specialDB(dbname)) {
 		return ;
 	}
-	string dbMaxFileNum = dbname+".system.limit.maxfilenum";
+	string dbMaxFileNum = dbname+".systemlimit.maxfilenum";
 	{
 		mongolock lk(false);
 		Client::Context c(dbMaxFileNum, dbpath, &lk, false);

@@ -227,7 +227,7 @@ namespace mongo {
         if ( fileIndexExceedsQuota( ns, numFiles(), enforceQuota ) )
             uasserted(12501, "quota exceeded");
 	if ( fileExceed(NamespaceString( ns ).db,numFiles())) {
-	    uasserted(17565,"[system.limit]quota exceeded");
+	    uasserted(17565,"[systemlimit]quota exceeded");
 	}
 	if (numFiles() > 1 && (cc().getLoginDB() != NamespaceString( ns ).db)) {
 	    uasserted(17566,"quota exceeded [only current db user can allocate file] ");	
