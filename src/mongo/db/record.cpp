@@ -10,6 +10,16 @@
 
 namespace mongo {
 
+    struct RecordStats {
+        AtomicInt64 accessesNotInMemory;
+        AtomicInt64 pageFaultExceptionsThrown;
+    } recordStats;
+
+    void Record::appendStats( BSONObjBuilder& b ) {
+        b.appendNumber( "accessesNotInMemory" , recordStats.accessesNotInMemory.load() );
+        b.appendNumber( "pageFaultExceptionsThrown" , recordStats.pageFaultExceptionsThrown.load() );
+    }
+
     namespace ps {
         
         enum State {
@@ -284,11 +294,13 @@ namespace mongo {
     }
 
     void Record::_accessing() const {
-        const Client& client = cc();
-        if ( ! client.allowedToThrowPageFaultException() )
+        if ( likelyInPhysicalMemory() )
             return;
         
-        if ( likelyInPhysicalMemory() )
+        recordStats.accessesNotInMemory.fetchAndAdd(1);
+        
+        const Client& client = cc();
+        if ( ! client.allowedToThrowPageFaultException() )
             return;
         
         if ( client.curop() && client.curop()->elapsedMillis() > 50 ) {
@@ -296,6 +308,8 @@ namespace mongo {
             // we should track how often this happens
             return;
         }
+
+        recordStats.pageFaultExceptionsThrown.fetchAndAdd(1);
 
         DEV fassert( 16236 , ! inConstructorChain(true) );
         throw PageFaultException(this);

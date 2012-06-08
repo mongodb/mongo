@@ -278,6 +278,12 @@ namespace mongo {
         
         static bool blockCheckSupported();
 
+        /**
+         * this adds stats about page fault exceptions currently
+         * specically how many times we call _accessing where the record is not in memory
+         * and how many times we throw a PageFaultException
+         */
+        static void appendStats( BSONObjBuilder& b );
     private:
         
         int _netLength() const { return _lengthWithHeaders - HeaderSize; }

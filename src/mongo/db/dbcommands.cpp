@@ -619,6 +619,12 @@ namespace mongo {
             if( cmdLine.dur ) {
                 result.append("dur", dur::stats.asObj());
             }
+            
+            {
+                BSONObjBuilder record( result.subobjStart( "recordStats" ) );
+                Record::appendStats( record );
+                record.done();
+            }
 
             timeBuilder.appendNumber( "after dur" , Listener::getElapsedTimeMillis() - start );
 
