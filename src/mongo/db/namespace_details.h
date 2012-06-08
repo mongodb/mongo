@@ -298,6 +298,14 @@ namespace mongo {
             }
         }
 
+        /* Returns the index entry for the first index whose prefix contains
+         * 'keyPattern'. If 'requireSingleKey' is true, skip indices that contain
+         * array attributes. Otherwise, returns NULL.
+         */
+        const IndexDetails* findIndexByPrefix( const BSONObj &keyPattern ,
+                                               bool requireSingleKey );
+
+
         const int systemFlags() const { return _systemFlags; }
         bool isSystemFlagSet( int flag ) const { return _systemFlags & flag; }
         void setSystemFlag( int flag );

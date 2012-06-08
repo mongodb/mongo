@@ -116,6 +116,31 @@ namespace mongo {
          */
         static BSONObj toKeyFormat( const BSONObj& o , BSONObj& key );
 
+        /* Takes a BSONObj indicating the min or max boundary of a range,
+         * and a keyPattern corresponding to an index that is useful
+         * for locating items in the range, and returns an "extension"
+         * of the bound, modified to fit the given pattern.  In other words,
+         * it appends MinKey or MaxKey values to the bound, so that the extension
+         * has the same number of fields as keyPattern.
+         * minOrMax should be -1/+1 to indicate whether the extension
+         * corresponds to the min or max bound for the range.
+         * Also, strips out the field names to put the bound in key format.
+         * Examples:
+         *   {a : 55}, {a :1}, -1 --> {"" : 55}
+         *   {a : 55}, {a : 1, b : 1}, -1 -> {"" : 55, "" : minKey}
+         *   {a : 55}, {a : 1, b : 1}, 1 -> {"" : 55, "" : maxKey}
+         *   {a : 55}, {a : 1, b : -1}, -1 -> {"" : 55, "" : maxKey}
+         *   {a : 55}, {a : 1, b : -1}, 1 -> {"" : 55, "" : minKey}
+         *
+         * This function is useful for modifying chunk ranges in sharding,
+         * when the shard key is a prefix of the index actually used
+         * (also useful when the shard key is equal to the index used,
+         * since it strips out the field names).
+         */
+        static BSONObj modifiedRangeBound( const BSONObj& bound ,
+                                           const BSONObj& keyPattern ,
+                                           int minOrMax );
+
         class RemoveCallback {
         public:
             virtual ~RemoveCallback() {}

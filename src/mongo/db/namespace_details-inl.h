@@ -65,6 +65,23 @@ namespace mongo {
         return -1;
     }
 
+    inline const IndexDetails* NamespaceDetails::findIndexByPrefix( const BSONObj &keyPattern ,
+                                                                    bool requireSingleKey ) {
+        const IndexDetails* bestMultiKeyIndex = NULL;
+        IndexIterator i = ii();
+        while( i.more() ) {
+            const IndexDetails& currentIndex = i.next();
+            if( keyPattern.isPrefixOf( currentIndex.keyPattern() ) ){
+                if( ! isMultikey( i.pos()-1 ) ){
+                    return &currentIndex;
+                } else {
+                    bestMultiKeyIndex = &currentIndex;
+                }
+            }
+        }
+        return requireSingleKey ? NULL : bestMultiKeyIndex;
+    }
+
     // @return offset in indexes[]
     inline int NamespaceDetails::findIndexByName(const char *name) {
         IndexIterator i = ii();

@@ -224,6 +224,35 @@ namespace mongo {
         return me.obj();
     }
 
+    BSONObj Helpers::modifiedRangeBound( const BSONObj& bound ,
+                                         const BSONObj& keyPattern ,
+                                         int minOrMax ){
+        BSONObjBuilder newBound;
+
+        BSONObjIterator src( bound );
+        BSONObjIterator pat( keyPattern );
+
+        while( src.more() ){
+            BSONElement srcElt = src.next();
+            BSONElement patElt = pat.next();
+            massert( 16333 , "bound " + bound.toString() +
+                             "not extendible to pattern" + keyPattern.toString(),
+                     strcmp( srcElt.fieldName() , patElt.fieldName() ) == 0 );
+            newBound.appendAs( srcElt , "" );
+        }
+        while( pat.more() ){
+            BSONElement patElt = pat.next();
+            verify( patElt.isNumber() );
+            if( minOrMax * patElt.numberInt() == 1){
+                newBound.appendMaxKey("");
+            }
+            else {
+                newBound.appendMinKey("");
+            }
+        }
+        return newBound.obj();
+    }
+
     long long Helpers::removeRange( const string& ns , const BSONObj& min , const BSONObj& max , bool yield , bool maxInclusive , RemoveCallback * callback, bool fromMigrate ) {
         BSONObj keya , keyb;
         BSONObj minClean = toKeyFormat( min , keya );
