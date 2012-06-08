@@ -277,6 +277,15 @@ namespace mongo {
      */
     class FieldRange {
     public:
+        /**
+         * Creates a FieldRange representing a superset of the BSONElement values matching a query
+         *     expression element.
+         * @param e - The query expression element.
+         * @param isNot - Indicates that 'e' appears within a query $not clause and its matching
+         *     semantics are inverted.
+         * @param optimize - If true, the range may be bracketed by 'e''s data type.
+         *     TODO It is unclear why 'optimize' is optional, see SERVER-5165.
+         */
         FieldRange( const BSONElement &e , bool isNot, bool optimize );
 
         /**
@@ -364,6 +373,15 @@ namespace mongo {
     public:
         friend class OrRangeGenerator;
         friend class FieldRangeVector;
+        /**
+         * Creates a FieldRangeSet representing a superset of the documents matching a query.
+         * @param ns - The query's namespace.
+         * @param query - The query.
+         * @param singleKey - Indicates that document fields contain single values (there are no
+         *     multiply valued fields).
+         * @param optimize - If true, each field's value range may be bracketed by data type.
+         *     TODO It is unclear why 'optimize' is optional, see SERVER-5165.
+         */
         FieldRangeSet( const char *ns, const BSONObj &query , bool singleKey , bool optimize );
         
         /** @return range for the given field. */
