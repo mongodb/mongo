@@ -132,6 +132,38 @@ namespace mongo {
         Reserved_FromWriteback = 1 << 1
     };
 
+    enum ReadPreference {
+        /**
+         * Read from primary only. All operations produce an error (throw an
+         * exception where applicable) if primary is unavailable. Cannot be
+         * combined with tags.
+         */
+        ReadPreference_PrimaryOnly = 0,
+
+        /**
+         * Read from primary if available, otherwise a secondary. Tags will
+         * only be applied in the event that the primary is unavailable and
+         * a secondary is read from. In this event only secondaries matching
+         * the tags provided would be read from.
+         */
+        ReadPreference_PrimaryPreferred,
+
+        /**
+         * Read from secondary if available, otherwise error.
+         */
+        ReadPreference_SecondaryOnly,
+
+        /**
+         * Read from a secondary if available, otherwise read from the primary.
+         */
+        ReadPreference_SecondaryPreferred,
+
+        /**
+         * Read from any member.
+         */
+        ReadPreference_Nearest,
+    };
+
     class DBClientBase;
 
     /**

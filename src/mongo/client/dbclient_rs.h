@@ -93,7 +93,7 @@ namespace mongo {
              * @param  threshold  max ping time (in ms) to be considered local
              * @return true if node is a local secondary, and can handle queries
              **/
-            bool isLocalSecondary_inlock( const int threshold ) const {
+            bool isLocalSecondary( const int threshold ) const {
                 return pingTimeMillis < threshold;
             }
 
@@ -120,6 +120,29 @@ namespace mongo {
 
             int pingTimeMillis;
         };
+
+        /**
+         * Selects the right node given the nodes to pick from and the preference.
+         *
+         * @param nodes the nodes to select from
+         * @param readPreference the read mode to use
+         * @param readPreferenceTag the tags used for filtering nodes
+         * @param localThresholdMillis the exclusive upper bound of ping time to be
+         *     considered as a local node. Local nodes are favored over non-local
+         *     nodes if multiple nodes matches the other criteria.
+         * @param primaryNodeIndex the index of the primary node
+         * @param nextNodeIndex the index of the next node to begin from checking.
+         *     Can advance to a different index (mainly used for doing round-robin).
+         *
+         * @return the host object of the node selected. If none of the nodes are
+         *     eligible, returns an empty host.
+         */
+        static HostAndPort selectNode( const std::vector<Node>& nodes,
+                ReadPreference readPreference,
+                const BSONObj& readPreferenceTag,
+                int localThresholdMillis,
+                int primaryNodeIndex,
+                int& nextNodeIndex );
 
         /**
          * gets a cached Monitor per name or will create if doesn't exist
@@ -261,6 +284,34 @@ namespace mongo {
          * a mutex.
          */
         bool _checkConnMatch_inlock( DBClientConnection* conn, size_t nodeOffset ) const;
+
+        /**
+         * Selects the right node given the nodes to pick from and the preference.
+         *
+         * @param nodes the nodes to select from
+         * @param readPreferenceTag the tags to use for choosing the right node
+         * @param secOnly never select a primary if true
+         * @param localThresholdMillis the exclusive upper bound of ping time to be
+         *     considered as a local node. Local nodes are favored over non-local
+         *     nodes if multiple nodes matches the other criteria.
+         * @param nextNodeIndex the index of the next node to begin from checking.
+         *     Can advance to a different index (mainly used for doing round-robin).
+         *
+         * @return the host object of the node selected. If none of the nodes are
+         *     eligible, returns an empty host.
+         */
+        static HostAndPort selectNode( const std::vector<Node>& nodes,
+                const BSONObj& readPreferenceTag,
+                bool secOnly,
+                int localThresholdMillis,
+                int& nextNodeIndex );
+
+        /**
+         * @return the primary if it is ok to use, otherwise returns an empty
+         *     HostAndPort object.
+         */
+        static HostAndPort checkPrimary( const std::vector<Node>& nodes,
+                int primaryNodeIndex );
 
         // protects _localThresholdMillis, _nodes and refs to _nodes (eg. _master & _nextSlave)
         mutable mongo::mutex _lock;

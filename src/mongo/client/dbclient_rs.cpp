@@ -304,7 +304,7 @@ namespace mongo {
                     fallbackNode = _nodes[ _nextSlave ].addr;
                     if ( ! preferLocal )
                         return fallbackNode;
-                    else if ( _nodes[ _nextSlave ].isLocalSecondary_inlock( _localThresholdMillis ) ) {
+                    else if ( _nodes[ _nextSlave ].isLocalSecondary( _localThresholdMillis ) ) {
                         // found a local slave.  return early.
                         log(2) << "dbclient_rs getSlave found local secondary for queries: "
                                << _nextSlave << ", ping time: "
@@ -787,6 +787,107 @@ namespace mongo {
         
         return ( nodeOffset < _nodes.size() &&
             conn->getServerAddress() == _nodes[nodeOffset].conn->getServerAddress() );
+    }
+
+    HostAndPort ReplicaSetMonitor::selectNode( const vector<Node>& nodes,
+            const BSONObj& readPreferenceTag,
+            bool secOnly,
+            int localThresholdMillis,
+            int& nextNodeIndex /* in/out */ ) {
+
+        HostAndPort fallbackNode;
+
+        for ( size_t itNode = 0; itNode < nodes.size(); ++itNode ) {
+            nextNodeIndex = ( nextNodeIndex + 1 ) % nodes.size();
+            const Node& node = nodes[nextNodeIndex];
+
+            if ( !node.ok ){
+                log(2) << "dbclient_rs not selecting " << node
+                       << ", not currently ok" << endl;
+                continue;
+            }
+
+            if ( secOnly && !node.okForSecondaryQueries() ) {
+                continue;
+            }
+
+            if ( node.matchesTag( readPreferenceTag )) {
+                // found an ok candidate; may not be local.
+                fallbackNode = node.addr;
+
+                if ( node.isLocalSecondary( localThresholdMillis )){
+                    // found a local node.  return early.
+                    log(2) << "dbclient_rs getSlave found local secondary for queries: "
+                            << nextNodeIndex << ", ping time: "
+                            << node.pingTimeMillis << endl;
+                    return fallbackNode;
+                }
+            }
+        }
+
+        return fallbackNode;
+    }
+
+    HostAndPort ReplicaSetMonitor::selectNode( const std::vector<Node>& nodes,
+            ReadPreference readPreference,
+            const BSONObj& readPreferenceTag,
+            int localThresholdMillis,
+            int primaryNodeIndex,
+            int& nextNodeIndex /* in/out */ ) {
+
+        switch ( readPreference ) {
+        case ReadPreference_PrimaryOnly:
+            return checkPrimary( nodes, primaryNodeIndex );
+
+        case ReadPreference_PrimaryPreferred:
+        {
+            HostAndPort candidatePri = checkPrimary( nodes, primaryNodeIndex );
+
+            if ( !candidatePri.empty() ){
+                return candidatePri;
+            }
+
+            return selectNode( nodes, readPreferenceTag, true, localThresholdMillis,
+                    nextNodeIndex );
+        }
+
+        case ReadPreference_SecondaryOnly:
+            return selectNode( nodes, readPreferenceTag, true, localThresholdMillis,
+                    nextNodeIndex );
+
+        case ReadPreference_SecondaryPreferred:
+        {
+            HostAndPort candidateSec = selectNode( nodes, readPreferenceTag, true,
+                    localThresholdMillis, nextNodeIndex );
+
+            if ( !candidateSec.empty() ){
+                return candidateSec;
+            }
+
+            return checkPrimary( nodes, primaryNodeIndex );
+        }
+
+        case ReadPreference_Nearest:
+            return selectNode( nodes, readPreferenceTag, false, localThresholdMillis,
+                    nextNodeIndex );
+
+        default:
+            uassert( 16337, "Unknown read preference", false );
+            break;
+        }
+
+        return HostAndPort();
+    }
+
+    HostAndPort ReplicaSetMonitor::checkPrimary(
+            const vector<Node>& nodes,
+            int primaryNodeIndex ){
+
+        if ( primaryNodeIndex >= 0 && nodes[primaryNodeIndex].ok ){
+            return nodes[primaryNodeIndex].addr;
+        }
+
+        return HostAndPort();
     }
 
     bool ReplicaSetMonitor::Node::matchesTag( const BSONObj& tag ) const {
