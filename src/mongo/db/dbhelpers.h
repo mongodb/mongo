@@ -107,6 +107,13 @@ namespace mongo {
         static bool isEmpty(const char *ns, bool doAuth=true);
 
         // TODO: this should be somewhere else probably
+        /* Takes object o, and returns a new object with the
+         * same field elements but the names stripped out.  Also,
+         * fills in "key" with an ascending keyPattern that matches o
+         * Example:
+         *    o = {a : 5 , b : 6} -->
+         *      sets key= {a : 1, b :1}, returns {"" : 5, "" : 6}
+         */
         static BSONObj toKeyFormat( const BSONObj& o , BSONObj& key );
 
         class RemoveCallback {
