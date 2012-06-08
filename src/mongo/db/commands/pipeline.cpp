@@ -133,7 +133,7 @@ namespace mongo {
             /* we didn't recognize a field in the command */
             ostringstream sb;
             sb <<
-               "Pipeline::parseCommand(): unrecognized field \"" <<
+               "unrecognized field \"" <<
                cmdElement.fieldName();
             errmsg = sb.str();
             return intrusive_ptr<Pipeline>();
@@ -252,14 +252,24 @@ namespace mongo {
             */
             intrusive_ptr<DocumentSource> &pLastSource = pSourceVector->back();
             intrusive_ptr<DocumentSource> &pTemp = tempVector.at(tempi);
+            if (!pTemp || !pLastSource) {
+                errmsg = "Pipeline received empty document as argument";
+                return intrusive_ptr<Pipeline>();
+            }
             if (!pLastSource->coalesce(pTemp))
                 pSourceVector->push_back(pTemp);
         }
 
         /* optimize the elements in the pipeline */
         for(SourceVector::iterator iter(pSourceVector->begin()),
-                listEnd(pSourceVector->end()); iter != listEnd; ++iter)
+                listEnd(pSourceVector->end()); iter != listEnd; ++iter) {
+            if (!*iter) {
+                errmsg = "Pipeline received empty document as argument";
+                return intrusive_ptr<Pipeline>();
+            }
+
             (*iter)->optimize();
+        }
 
         return pPipeline;
     }
