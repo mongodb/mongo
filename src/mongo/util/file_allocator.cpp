@@ -30,6 +30,10 @@
 #include <sys/vfs.h>
 #endif
 
+#if defined(_WIN32)
+#   include <io.h>
+#endif
+
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
 #include "mongo/util/mongoutils/str.h"
@@ -46,9 +50,18 @@ using namespace mongoutils;
 
 namespace mongo {
 
+    /**
+     * Aliases for Win32 CRT functions
+     */
+#if defined(_WIN32)
+    static inline long lseek(int fd, long offset, int origin) { return _lseek(fd, offset, origin); }
+    static inline int write(int fd, const void *data, int count) { return _write(fd, data, count); }
+    static inline int close(int fd) { return _close(fd); }
+#endif
+
     boost::filesystem::path ensureParentDirCreated(const boost::filesystem::path& p){
         const boost::filesystem::path parent = p.branch_path();
-		
+
         if (! boost::filesystem::exists(parent)){
             ensureParentDirCreated(parent);
             log() << "creating directory " << parent.string() << endl;
@@ -59,39 +72,6 @@ namespace mongo {
         verify(boost::filesystem::is_directory(parent));
         return parent;
     }
-
-#if defined(_WIN32)
-    FileAllocator::FileAllocator() {
-    }
-
-    void FileAllocator::start() {
-    }
-
-    void FileAllocator::requestAllocation( const string &name, long &size ) {
-        /* Some of the system calls in the file allocator don't work in win,
-           so no win support - 32 or 64 bit.  Plus we don't seem to need preallocation
-           on windows anyway as we don't have to pre-zero the file there.
-        */
-    }
-
-    void FileAllocator::allocateAsap( const string &name, unsigned long long &size ) {
-        // no-op
-    }
-
-    void FileAllocator::waitUntilFinished() const {
-        // no-op
-    }
-
-    void FileAllocator::ensureLength(int fd , long size) {
-        // we don't zero on windows
-        // TODO : we should to avoid fragmentation
-    }
-
-    bool FileAllocator::hasFailed() const {
-        return false;
-    }
-
-#else
 
     FileAllocator::FileAllocator()
         : _pendingMutex("FileAllocator"), _failed() {
@@ -172,12 +152,14 @@ namespace mongo {
     }
 
     void FileAllocator::ensureLength(int fd , long size) {
+#if !defined(_WIN32)
         if (useSparseFiles(fd)) {
             log(1) << "using ftruncate to create a sparse file" << endl;
             int ret = ftruncate(fd, size);
             uassert(16063, "ftruncate failed: " + errnoWithDescription(), ret == 0);
             return;
         }
+#endif
 
 #if defined(__linux__)
         int ret = posix_fallocate(fd,0,size);
@@ -187,7 +169,7 @@ namespace mongo {
         log() << "FileAllocator: posix_fallocate failed: " << errnoWithDescription( ret ) << " falling back" << endl;
 #endif
 
-        off_t filelen = lseek(fd, 0, SEEK_END);
+        off_t filelen = lseek( fd, 0, SEEK_END );
         if ( filelen < size ) {
             if (filelen != 0) {
                 stringstream ss;
@@ -287,8 +269,12 @@ namespace mongo {
                     tmp = makeTempFileName( parent );
                     ensureParentDirCreated(tmp);
 
+#if defined(_WIN32)
+                    fd = _open( tmp.c_str(), _O_RDWR | _O_CREAT | O_NOATIME, _S_IREAD | _S_IWRITE );
+#else
                     fd = open(tmp.c_str(), O_CREAT | O_RDWR | O_NOATIME, S_IRUSR | S_IWUSR);
-                    if ( fd <= 0 ) {
+#endif
+                    if ( fd < 0 ) {
                         log() << "FileAllocator: couldn't create " << name << " (" << tmp << ") " << errnoWithDescription() << endl;
                         uasserted(10439, "");
                     }
@@ -353,8 +339,6 @@ namespace mongo {
             }
         }
     }
-
-#endif
 
     FileAllocator* FileAllocator::_instance = 0;
 

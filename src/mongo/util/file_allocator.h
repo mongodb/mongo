@@ -54,7 +54,7 @@ namespace mongo {
         
         bool hasFailed() const;
 
-        static void ensureLength(int fd , long size);
+        static void ensureLength(int fd, long size);
 
         /** @return the singletone */
         static FileAllocator * get();
@@ -63,7 +63,6 @@ namespace mongo {
 
         FileAllocator();
 
-#if !defined(_WIN32)
         void checkFailure();
 
         // caller must hold pendingMutex_ lock.  Returns size if allocated or
@@ -83,8 +82,7 @@ namespace mongo {
         mutable map< string, long > _pendingSize;
 
         bool _failed;
-#endif
-        
+
         static FileAllocator* _instance;
 
     };
