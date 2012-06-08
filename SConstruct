@@ -525,6 +525,7 @@ elif os.sys.platform.startswith( "freebsd" ):
     env.Append( EXTRACPPPATH=[ "/usr/local/include" ] )
     env.Append( EXTRALIBPATH=[ "/usr/local/lib" ] )
     env.Append( CPPDEFINES=[ "__freebsd__" ] )
+    env.Append( CCFLAGS=[ "-fno-omit-frame-pointer" ] )
 
 elif os.sys.platform.startswith( "openbsd" ):
     nix = True
