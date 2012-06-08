@@ -243,6 +243,7 @@ namespace mongo {
 
     void FileAllocator::run( FileAllocator * fa ) {
         setThreadName( "FileAllocator" );
+        srand( static_cast <unsigned>( curTimeMicros() ) );
         while( 1 ) {
             {
                 scoped_lock lk( fa->_pendingMutex );
@@ -293,9 +294,11 @@ namespace mongo {
                     close( fd );
                     fd = 0;
 
-                    if( rename(tmp.c_str(), name.c_str()) ) { 
-                        log() << "error: couldn't rename " << tmp << " to " << name << ' ' << errnoWithDescription() << endl;
-                        uasserted(13653, "");
+                    if( rename(tmp.c_str(), name.c_str()) ) {
+                        const string& errStr = errnoWithDescription();
+                        log() << "error: couldn't rename " << tmp 
+                              << " to " << name << ' ' << errStr << endl;
+                        msgasserted(13653, "");
                     }
                     flushMyDirectory(name);
 
@@ -310,9 +313,9 @@ namespace mongo {
                 catch ( ... ) {
                     if ( fd > 0 )
                         close( fd );
-                    log() << "error failed to allocate new file: " << name
-                          << " size: " << size << ' ' << errnoWithDescription() << warnings;
-                    log() << "    will try again in 10 seconds" << endl; // not going to warning logs
+                    log() << "error: failed to allocate new file: " << name
+                          << " size: " << size << ' ' << errnoWithDescription() << warnings
+                          << ".  will try again in 10 seconds" << endl;
                     try {
                         if ( tmp.size() )
                             MONGO_ASSERT_ON_EXCEPTION( boost::filesystem::remove( tmp ) );
