@@ -16,3 +16,7 @@ assert.eq( t.findOne() , { _id : 1 , a : [ 6 , 5 , 4 , 3 , 2 , 1 , 7 , 9 ] } , "
 t.update( { _id : 1 } , { $addToSet : { a : { $each : [ 12 , 13 , 12 ] } } } )
 assert.eq( t.findOne() , { _id : 1 , a : [ 6 , 5 , 4 , 3 , 2 , 1 , 7 , 9 , 12 , 13 ] } , "A4" )
 
+// SERVER-4509
+t.update( { _id : 1 }, { $addToSet : { a : { $each : { "0":3 } } } })
+assert.eq( "$each requires array", db.getLastError(), "SERVER4509");
+
