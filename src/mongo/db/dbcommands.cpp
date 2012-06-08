@@ -49,7 +49,6 @@
 #include "../s/d_writeback.h"
 #include "dur_stats.h"
 #include "../server.h"
-#include "mongo/s/d_index_locator.h"
 #include "mongo/db/index_update.h"
 
 namespace mongo {
@@ -1145,7 +1144,10 @@ namespace mongo {
             help <<
                  "determine data size for a set of data in a certain range"
                  "\nexample: { dataSize:\"blog.posts\", keyPattern:{x:1}, min:{x:10}, max:{x:55} }"
-                 "\nkeyPattern, min, and max parameters are optional."
+                 "\nmin and max parameters are optional. They must either both be included or both omitted"
+                 "\nkeyPattern is an optional parameter indicating an index pattern that would be useful"
+                 "for iterating over the min/max bounds. If keyPattern is omitted, it is inferred from "
+                 "the structure of min. "
                  "\nnote: This command may take a while to run";
         }
         bool run(const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
@@ -1184,9 +1186,19 @@ namespace mongo {
                 return false;
             }
             else {
-                IndexDetails *idx = locateIndexForChunkRange( ns.c_str(), errmsg, min, max, keyPattern );
-                if ( idx == 0 )
+
+                if ( keyPattern.isEmpty() ){
+                    Helpers::toKeyFormat( min , keyPattern );
+                }
+
+                const IndexDetails *idx = d->findIndexByPrefix( keyPattern ,
+                                                                true );  /* require single key */
+                if ( idx == NULL ) {
+                    errmsg = "couldn't find valid index containing key pattern";
                     return false;
+                }
+                min = Helpers::modifiedRangeBound( min , idx->keyPattern() , -1 );
+                max = Helpers::modifiedRangeBound( max , idx->keyPattern() , 1 );
 
                 c.reset( BtreeCursor::make( d, d->idxNo(*idx), *idx, min, max, false, 1 ) );
             }

@@ -35,7 +35,6 @@
 #include "chunk.h" // for static genID only
 #include "config.h"
 #include "d_logic.h"
-#include "mongo/s/d_index_locator.h"
 
 namespace mongo {
 
@@ -57,15 +56,23 @@ namespace mongo {
             BSONObj max = jsobj.getObjectField( "max" );
             BSONObj keyPattern = jsobj.getObjectField( "keyPattern" );
 
-            Client::Context ctx( ns );
-
-            IndexDetails *id = locateIndexForChunkRange( ns, errmsg, min, max, keyPattern );
-            if ( id == 0 )
+            if ( keyPattern.isEmpty() ) {
+                errmsg = "no key pattern found in medianKey";
                 return false;
+            }
+
+            Client::Context ctx( ns );
+            NamespaceDetails *d = nsdetails(ns);
+
+            const IndexDetails *id = d->findIndexByPrefix( keyPattern ,
+                                                           true );  /* require single key */
+            if ( id == NULL )
+                return false;
+            min = Helpers::modifiedRangeBound( min , id->keyPattern() , -1 );
+            max = Helpers::modifiedRangeBound( max , id->keyPattern() , 1 );
 
             Timer timer;
             int num = 0;
-            NamespaceDetails *d = nsdetails(ns);
             int idxNo = d->idxNo(*id);
 
             // only yielding on first half for now
@@ -135,6 +142,11 @@ namespace mongo {
             const char* ns = jsobj.getStringField( "checkShardingIndex" );
             BSONObj keyPattern = jsobj.getObjectField( "keyPattern" );
 
+            if ( keyPattern.isEmpty() ) {
+                errmsg = "no key pattern found in checkShardingindex";
+                return false;
+            }
+
             if ( keyPattern.nFields() == 1 && str::equals( "_id" , keyPattern.firstElementFieldName() ) ) {
                 result.appendBool( "idskip" , true );
                 return true;
@@ -165,16 +177,14 @@ namespace mongo {
                 return false;
             }
 
-            IndexDetails *idx = locateIndexForChunkRange( ns , errmsg , min , max , keyPattern );
+            const IndexDetails *idx = d->findIndexByPrefix( keyPattern ,
+                                                            true );  /* require single key */
             if ( idx == NULL ) {
-                errmsg = "couldn't find index over splitting key";
+                errmsg = "couldn't find valid index for shard key";
                 return false;
             }
-
-            if( d->isMultikey( d->idxNo( *idx ) ) ) {
-                errmsg = "index is multikey, cannot use for sharding";
-                return false;
-            }
+            min = Helpers::modifiedRangeBound( min , idx->keyPattern() , -1 );
+            max = Helpers::modifiedRangeBound( max , idx->keyPattern() , 1 );
 
             BtreeCursor * bc = BtreeCursor::make( d , d->idxNo(*idx) , *idx , min , max , false , 1 );
             shared_ptr<Cursor> c( bc );
@@ -257,6 +267,11 @@ namespace mongo {
             const char* ns = jsobj.getStringField( "splitVector" );
             BSONObj keyPattern = jsobj.getObjectField( "keyPattern" );
 
+            if ( keyPattern.isEmpty() ) {
+                errmsg = "no key pattern found in splitVector";
+                return false;
+            }
+
             // If min and max are not provided use the "minKey" and "maxKey" for the sharding key pattern.
             BSONObj min = jsobj.getObjectField( "min" );
             BSONObj max = jsobj.getObjectField( "max" );
@@ -298,11 +313,14 @@ namespace mongo {
                     return false;
                 }
                 
-                IndexDetails *idx = locateIndexForChunkRange( ns , errmsg , min , max , keyPattern );
+                const IndexDetails *idx = d->findIndexByPrefix( keyPattern ,
+                                                                true ); /* require single key */
                 if ( idx == NULL ) {
                     errmsg = "couldn't find index over splitting key";
                     return false;
                 }
+                min = Helpers::modifiedRangeBound( min , idx->keyPattern() , -1 );
+                max = Helpers::modifiedRangeBound( max , idx->keyPattern() , 1 );
                 
                 const long long recCount = d->stats.nrecords;
                 const long long dataSize = d->stats.datasize;

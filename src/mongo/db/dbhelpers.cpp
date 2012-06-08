@@ -253,7 +253,15 @@ namespace mongo {
         return newBound.obj();
     }
 
-    long long Helpers::removeRange( const string& ns , const BSONObj& min , const BSONObj& max , bool yield , bool maxInclusive , RemoveCallback * callback, bool fromMigrate ) {
+    long long Helpers::removeRange( const string& ns ,
+                                    const BSONObj& min ,
+                                    const BSONObj& max ,
+                                    const BSONObj& keyPattern ,
+                                    bool yield ,
+                                    bool maxInclusive ,
+                                    RemoveCallback * callback,
+                                    bool fromMigrate ) {
+        fassert( 16251, Lock::isWriteLocked( ns ) );
         BSONObj keya , keyb;
         BSONObj minClean = toKeyFormat( min , keya );
         BSONObj maxClean = toKeyFormat( max , keyb );

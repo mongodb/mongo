@@ -29,6 +29,7 @@
 
 #include <boost/thread/thread.hpp>
 
+#include "mongo/db/dbhelpers.h"
 #include "../db/commands.h"
 #include "../db/jsobj.h"
 #include "../db/cmdline.h"
@@ -51,7 +52,6 @@
 #include "d_logic.h"
 #include "config.h"
 #include "chunk.h"
-#include "mongo/s/d_index_locator.h"
 
 using namespace std;
 
@@ -148,6 +148,7 @@ namespace mongo {
         string ns;
         BSONObj min;
         BSONObj max;
+        BSONObj shardKeyPattern;
         set<CursorId> initial;
 
         OldDataCleanup(){
@@ -157,6 +158,7 @@ namespace mongo {
             ns = other.ns;
             min = other.min.getOwned();
             max = other.max.getOwned();
+            shardKeyPattern = other.shardKeyPattern.getOwned();
             initial = other.initial;
             _numThreads++;
         }
@@ -171,9 +173,21 @@ namespace mongo {
         void doRemove() {
             ShardForceVersionOkModeBlock sf;
             {
-                Lock::DBWrite lk(ns);
+                Client::WriteContext ctx( ns );
                 RemoveSaver rs("moveChunk",ns,"post-cleanup");
-                long long numDeleted = Helpers::removeRange( ns , min , max , true , false , cmdLine.moveParanoia ? &rs : 0, true );
+                NamespaceDetails* nsd = nsdetails( ns.c_str() );
+                const IndexDetails* chunkRangeIndex =
+                        nsd->findIndexByPrefix( shardKeyPattern ,
+                                                true );  /* require single key */
+                long long numDeleted =
+                        Helpers::removeRange( ns ,
+                                              min ,
+                                              max ,
+                                              chunkRangeIndex->keyPattern() ,
+                                              true , /*yield*/
+                                              false , /*maxInclusive*/
+                                              cmdLine.moveParanoia ? &rs : 0 , /*callback*/
+                                              true ); /*fromMigrate*/
                 log() << "moveChunk deleted: " << numDeleted << migrateLog;
             }
             
@@ -228,7 +242,10 @@ namespace mongo {
             _memoryUsed = 0;
         }
 
-        void start( string ns , const BSONObj& min , const BSONObj& max ) {
+        void start( string ns ,
+                    const BSONObj& min ,
+                    const BSONObj& max ,
+                    const BSONObj& shardKeyPattern ) {
             scoped_lock ll(_workLock);
             scoped_lock l(_m); // reads and writes _active
 
@@ -241,6 +258,7 @@ namespace mongo {
             _ns = ns;
             _min = min;
             _max = max;
+            _shardKeyPattern = shardKeyPattern;
 
             verify( _cloneLocs.size() == 0 );
             verify( _deleted.size() == 0 );
@@ -398,19 +416,21 @@ namespace mongo {
                 return false;
             }
 
-            BSONObj keyPattern;
-            // the copies are needed because the locateIndexForChunkRange destroys the input
-            BSONObj min = _min.copy();
-            BSONObj max = _max.copy();
-            IndexDetails *idx = locateIndexForChunkRange( _ns.c_str() , errmsg , min , max , keyPattern );
+            const IndexDetails *idx = d->findIndexByPrefix( _shardKeyPattern ,
+                                                            true );  /* require single key */
+
             if ( idx == NULL ) {
                 errmsg = (string)"can't find index in storeCurrentLocs" + causedBy( errmsg );
                 return false;
             }
 
-            auto_ptr<ClientCursor> cc( new ClientCursor( QueryOption_NoCursorTimeout ,
-                                                         shared_ptr<Cursor>( BtreeCursor::make( d , d->idxNo(*idx) , *idx , min , max , false , 1 ) ) ,
-                                                         _ns ) );
+            BSONObj min = Helpers::modifiedRangeBound( _min , idx->keyPattern() , -1 );
+            BSONObj max = Helpers::modifiedRangeBound( _max , idx->keyPattern() , 1 );
+
+            BtreeCursor* btreeCursor = BtreeCursor::make( d , *idx , min , max , false , 1 );
+            auto_ptr<ClientCursor> cc(
+                    new ClientCursor( QueryOption_NoCursorTimeout ,
+                            shared_ptr<Cursor>( btreeCursor ) ,  _ns ) );
 
             // use the average object size to estimate how many objects a full chunk would carry
             // do that while traversing the chunk's range using the sharding index, below
@@ -591,6 +611,7 @@ namespace mongo {
         string _ns;
         BSONObj _min;
         BSONObj _max;
+        BSONObj _shardKeyPattern;
 
         // we need the lock in case there is a malicious _migrateClone for example
         // even though it shouldn't be needed under normal operation
@@ -615,8 +636,11 @@ namespace mongo {
     } migrateFromStatus;
 
     struct MigrateStatusHolder {
-        MigrateStatusHolder( string ns , const BSONObj& min , const BSONObj& max ) {
-            migrateFromStatus.start( ns , min , max );
+        MigrateStatusHolder( string ns ,
+                             const BSONObj& min ,
+                             const BSONObj& max ,
+                             const BSONObj& shardKeyPattern ) {
+            migrateFromStatus.start( ns , min , max , shardKeyPattern );
         }
         ~MigrateStatusHolder() {
             migrateFromStatus.done();
@@ -844,7 +868,7 @@ namespace mongo {
                 return false;
             }
 
-            BSONObj chunkInfo = BSON("min" << min << "max" << max << "from" << fromShard.getName() << "to" << toShard.getName());
+            BSONObj chunkInfo = BSON("min" << min << "max" << max << "from" << fromShard.getName() << "to" << toShard.getName() );
             configServer.logChange( "moveChunk.start" , ns , chunkInfo );
 
             ShardChunkVersion maxVersion;
@@ -919,7 +943,16 @@ namespace mongo {
             timing.done(2);
 
             // 3.
-            MigrateStatusHolder statusHolder( ns , min , max );
+
+            ShardChunkManagerPtr chunkManager = shardingState.getShardChunkManager( ns );
+            verify( chunkManager != NULL );
+            BSONObj shardKeyPattern = chunkManager->getKey();
+            if ( shardKeyPattern.isEmpty() ){
+                errmsg = "no shard key found";
+                return false;
+            }
+
+            MigrateStatusHolder statusHolder( ns , min , max , shardKeyPattern );
             {
                 // this gets a read lock, so we know we have a checkpoint for mods
                 if ( ! migrateFromStatus.storeCurrentLocs( maxChunkSize , errmsg , result ) )
@@ -935,6 +968,7 @@ namespace mongo {
                                                           "from" << fromShard.getConnString() <<
                                                           "min" << min <<
                                                           "max" << max <<
+                                                          "shardKeyPattern" << shardKeyPattern <<
                                                           "configServer" << configServer.modelServer()
                                                           ) ,
                                                     res );
@@ -1255,6 +1289,7 @@ namespace mongo {
                 c.ns = ns;
                 c.min = min.getOwned();
                 c.max = max.getOwned();
+                c.shardKeyPattern = shardKeyPattern.getOwned();
                 ClientCursor::find( ns , c.initial );
                 if ( c.initial.size() ) {
                     log() << "forking for cleaning up chunk data" << migrateLog;
@@ -1367,9 +1402,20 @@ namespace mongo {
 
             {
                 // 2. delete any data already in range
-                Lock::DBWrite lk( ns );
+                Client::WriteContext ctx( ns );
                 RemoveSaver rs( "moveChunk" , ns , "preCleanup" );
-                long long num = Helpers::removeRange( ns , min , max , true , false , cmdLine.moveParanoia ? &rs : 0, true /* flag fromMigrate in oplog */ );
+                NamespaceDetails* nsd = nsdetails( ns.c_str() );
+                const IndexDetails* chunkRangeIndex =
+                        nsd->findIndexByPrefix( shardKeyPattern ,
+                                                true );  /* require single key */
+                long long num = Helpers::removeRange( ns ,
+                                                      min ,
+                                                      max ,
+                                                      chunkRangeIndex->keyPattern() ,
+                                                      true , /*yield*/
+                                                      false , /*maxInclusive*/
+                                                      cmdLine.moveParanoia ? &rs : 0 , /*callback*/
+                                                      true ); /* flag fromMigrate in oplog */
                 if ( num )
                     warning() << "moveChunkCmd deleted data already in chunk # objects: " << num << migrateLog;
 
@@ -1525,6 +1571,7 @@ namespace mongo {
             b.append( "from" , from );
             b.append( "min" , min );
             b.append( "max" , max );
+            b.append( "shardKeyPattern" , shardKeyPattern );
 
             b.append( "state" , stateString() );
             if ( state == FAIL )
@@ -1568,7 +1615,18 @@ namespace mongo {
                         }
                     }
 
-                    Helpers::removeRange( ns , id , id, false , true , cmdLine.moveParanoia ? &rs : 0, true );
+                    NamespaceDetails* nsd = nsdetails( ns.c_str() );
+                    const IndexDetails* chunkRangeIndex =
+                            nsd->findIndexByPrefix( shardKeyPattern ,
+                                                    true );  /* require single key */
+                    Helpers::removeRange( ns ,
+                                          id ,
+                                          id,
+                                          chunkRangeIndex->keyPattern() ,
+                                          false , /*yield*/
+                                          true , /*maxInclusive*/
+                                          cmdLine.moveParanoia ? &rs : 0 , /*callback*/
+                                          true ); /*fromMigrate*/
 
                     *lastOpApplied = cx.ctx().getClient()->getLastOp().asDate();
                     didAnything = true;
@@ -1671,6 +1729,7 @@ namespace mongo {
 
         BSONObj min;
         BSONObj max;
+        BSONObj shardKeyPattern;
 
         long long numCloned;
         long long clonedBytes;
@@ -1724,6 +1783,7 @@ namespace mongo {
             migrateStatus.from = cmdObj["from"].String();
             migrateStatus.min = cmdObj["min"].Obj().getOwned();
             migrateStatus.max = cmdObj["max"].Obj().getOwned();
+            migrateStatus.shardKeyPattern = cmdObj["shardKeyPattern"].Obj().getOwned();
 
             boost::thread m( migrateThread );
 

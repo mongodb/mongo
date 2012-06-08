@@ -43,7 +43,10 @@ namespace RemoveTests {
                 // Remove _id range [_min, _max).
                 Lock::DBWrite lk(ns);
                 Client::Context ctx( ns );
-                Helpers::removeRange( ns, BSON( "_id" << _min ), BSON( "_id" << _max ) );
+                Helpers::removeRange( ns,
+                                      BSON( "_id" << _min ),
+                                      BSON( "_id" << _max ),
+                                      BSON( "_id" << 1 ) );
             }
 
             // Check that the expected documents remain.

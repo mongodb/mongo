@@ -148,12 +148,18 @@ namespace mongo {
         };
 
         /**
-         * Remove all documents in the range.
+         * Takes a range, specified by a min and max, and an index,
+         * specified by keyPattern, and removes all the documents
+         * in that range found by iterating over the given index.
+         *
+         * Caller must hold a write lock on 'ns'
+         *
          * Does oplog the individual document deletions.
          */
         static long long removeRange( const string& ns , 
                                       const BSONObj& min , 
                                       const BSONObj& max , 
+                                      const BSONObj& keyPattern ,
                                       bool yield = false , 
                                       bool maxInclusive = false , 
                                       RemoveCallback * callback = 0, 
