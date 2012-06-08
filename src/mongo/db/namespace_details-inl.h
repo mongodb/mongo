@@ -46,7 +46,7 @@ namespace mongo {
         return e->details[i];
     }
 
-    inline int NamespaceDetails::idxNo(IndexDetails& idx) {
+    inline int NamespaceDetails::idxNo(const IndexDetails& idx) {
         IndexIterator i = ii();
         while( i.more() ) {
             if( &i.next() == &idx )

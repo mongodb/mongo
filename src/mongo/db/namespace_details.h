@@ -216,7 +216,7 @@ namespace mongo {
         IndexIterator ii() { return IndexIterator(this); }
 
         /* hackish - find our index # in the indexes array */
-        int idxNo(IndexDetails& idx);
+        int idxNo(const IndexDetails& idx);
 
         /* multikey indexes are indexes where there are more than one key in the index
              for a single document. see multikey in wiki.
