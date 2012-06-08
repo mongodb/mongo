@@ -520,7 +520,6 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\s\chunk.h" />
     <ClInclude Include="..\s\config.h" />
     <ClInclude Include="..\s\d_chunk_manager.h" />
-    <ClInclude Include="..\s\d_index_locator.h" />
     <ClInclude Include="..\s\d_logic.h" />
     <ClInclude Include="..\s\d_writeback.h" />
     <ClInclude Include="..\s\grid.h" />
@@ -1298,7 +1297,6 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="..\s\chunk.cpp" />
     <ClCompile Include="..\s\config.cpp" />
     <ClCompile Include="..\s\d_chunk_manager.cpp" />
-    <ClCompile Include="..\s\d_index_locator.cpp" />
     <ClCompile Include="..\s\d_migrate.cpp" />
     <ClCompile Include="..\s\d_split.cpp" />
     <ClCompile Include="..\s\d_state.cpp" />

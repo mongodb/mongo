@@ -911,9 +911,6 @@
     <ClCompile Include="commands\hashcmd.cpp">
       <Filter>db\commands</Filter>
     </ClCompile>
-    <ClCompile Include="..\s\d_index_locator.cpp">
-      <Filter>s</Filter>
-    </ClCompile>
     <ClCompile Include="..\client\connection_factory.cpp">
       <Filter>client\Source Files</Filter>
     </ClCompile>
@@ -1658,9 +1655,6 @@
     </ClInclude>
     <ClInclude Include="hasher.h">
       <Filter>db\Header Files\e to n</Filter>
-    </ClInclude>
-    <ClInclude Include="..\s\d_index_locator.h">
-      <Filter>s</Filter>
     </ClInclude>
     <ClInclude Include="..\s\d_writeback.h">
       <Filter>s</Filter>

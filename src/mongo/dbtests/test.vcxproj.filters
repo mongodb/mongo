@@ -606,9 +606,6 @@
     <ClInclude Include="..\s\d_chunk_manager.h">
       <Filter>s</Filter>
     </ClInclude>
-    <ClInclude Include="..\s\d_index_locator.h">
-      <Filter>s</Filter>
-    </ClInclude>
     <ClInclude Include="..\s\d_logic.h">
       <Filter>s</Filter>
     </ClInclude>
@@ -1512,9 +1509,6 @@
     </ClCompile>
     <ClCompile Include="..\db\hasher.cpp">
       <Filter>db\Source Files\e to n</Filter>
-    </ClCompile>
-    <ClCompile Include="..\s\d_index_locator.cpp">
-      <Filter>s</Filter>
     </ClCompile>
     <ClCompile Include="..\client\connection_factory.cpp">
       <Filter>client</Filter>
