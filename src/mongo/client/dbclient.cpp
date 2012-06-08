@@ -131,7 +131,7 @@ namespace mongo {
 
             // Allow the replacement of connections with other connections - useful for testing.
 
-            uassert( 16330, "custom connection to " + this->toString() +
+            uassert( 16335, "custom connection to " + this->toString() +
                         " specified with no connection hook", _connectHook );
 
             // Double-checked lock, since this will never be active during normal operation
