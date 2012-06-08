@@ -280,6 +280,20 @@ namespace mongo {
             }
         } DBStatsCmdObj;
 
+        class CreateCmd : public PublicGridCommand {
+        public:
+            CreateCmd() : PublicGridCommand( "create" ) {}
+            bool run(const string& dbName,
+                     BSONObj& cmdObj,
+                     int,
+                     string&,
+                     BSONObjBuilder& result,
+                     bool) {
+                DBConfigPtr conf = grid.getDBConfig( dbName , false );
+                return passthrough( conf , cmdObj , result );
+            }
+        } createCmd;
+
         class DropCmd : public PublicGridCommand {
         public:
             DropCmd() : PublicGridCommand( "drop" ) {}
@@ -1480,6 +1494,21 @@ namespace mongo {
             }
         } compactCmd;
 
+        class EvalCmd : public PublicGridCommand {
+        public:
+            EvalCmd() : PublicGridCommand( "$eval" ) {}
+            virtual bool run(const string& dbName,
+                             BSONObj& cmdObj,
+                             int,
+                             string&,
+                             BSONObjBuilder& result,
+                             bool) {
+                // $eval isn't allowed to access sharded collections, but we need to leave the
+                // shard to detect that.
+                DBConfigPtr conf = grid.getDBConfig( dbName , false );
+                return passthrough( conf , cmdObj , result );
+            }
+        } evalCmd;
 
         /*
           Note these are in the pub_grid_cmds namespace, so they don't

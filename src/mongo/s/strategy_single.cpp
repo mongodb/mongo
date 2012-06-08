@@ -27,10 +27,7 @@ namespace mongo {
     class SingleStrategy : public Strategy {
 
     public:
-        SingleStrategy() {
-            _commandsSafeToPass.insert( "$eval" );
-            _commandsSafeToPass.insert( "create" );
-        }
+        SingleStrategy() {}
 
     private:
         virtual void queryOp( Request& r ) {
@@ -89,7 +86,7 @@ namespace mongo {
 
                 string commandName = q.query.firstElementFieldName();
 
-                uassert(13390, "unrecognized command: " + commandName, _commandsSafeToPass.count(commandName) != 0);
+                uasserted(13390, "unrecognized command: " + commandName);
             }
 
             doQuery( r , r.primaryShard() );
@@ -200,8 +197,6 @@ namespace mongo {
             replyToQuery(0, r.p(), r.m(), x);
             return true;
         }
-
-        set<string> _commandsSafeToPass;
     };
 
     Strategy * SINGLE = new SingleStrategy();
