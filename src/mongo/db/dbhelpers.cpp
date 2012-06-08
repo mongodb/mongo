@@ -232,51 +232,51 @@ namespace mongo {
 
         Client::Context ctx(ns);
 
-        shared_ptr<Cursor> c;
-        auto_ptr<ClientCursor> cc;
+        shared_ptr<Cursor> cursor;
+        auto_ptr<ClientCursor> clientCursor;
         {
             NamespaceDetails* nsd = nsdetails( ns.c_str() );
             if ( ! nsd )
                 return 0;
-            
+
             int ii = nsd->findIndexByKeyPattern( keya );
             verify( ii >= 0 );
-            
+
             IndexDetails& i = nsd->idx( ii );
-            
-            c.reset( BtreeCursor::make( nsd , ii , i , minClean , maxClean , maxInclusive, 1 ) );
-            cc.reset( new ClientCursor( QueryOption_NoCursorTimeout , c , ns ) );
-            cc->setDoingDeletes( true );
+
+            cursor.reset( BtreeCursor::make( nsd , ii , i , minClean , maxClean , maxInclusive, 1 ) );
+            clientCursor.reset( new ClientCursor( QueryOption_NoCursorTimeout , cursor , ns ) );
+            clientCursor->setDoingDeletes( true );
         }
 
         long long num = 0;
 
-        while ( cc->ok() ) {
+        while ( clientCursor->ok() ) {
 
-            if ( yield && ! cc->yieldSometimes( ClientCursor::WillNeed) ) {
+            if ( yield && ! clientCursor->yieldSometimes( ClientCursor::WillNeed) ) {
                 // cursor got finished by someone else, so we're done
-                cc.release(); // if the collection/db is dropped, cc may be deleted
+                clientCursor.release(); // if the collection/db is dropped, cc may be deleted
                 break;
             }
 
-            if ( ! cc->ok() )
+            if ( ! clientCursor->ok() )
                 break;
 
-            DiskLoc rloc = cc->currLoc();
+            DiskLoc rloc = clientCursor->currLoc();
 
             if ( callback )
-                callback->goingToDelete( cc->current() );
+                callback->goingToDelete( clientCursor->current() );
 
-            cc->advance();
+            clientCursor->advance();
             // SERVER-5198 Additional advancement is unnecessary for a single btree cursor, and see
             // SERVER-5725.
-            c->prepareToTouchEarlierIterate();
+            cursor->prepareToTouchEarlierIterate();
 
             logOp( "d" , ns.c_str() , rloc.obj()["_id"].wrap() , 0 , 0 , fromMigrate );
             theDataFileMgr.deleteRecord(ns.c_str() , rloc.rec(), rloc);
             num++;
 
-            c->recoverFromTouchingEarlierIterate();
+            cursor->recoverFromTouchingEarlierIterate();
 
             getDur().commitIfNeeded();
 
