@@ -387,7 +387,7 @@ namespace mongo {
 
         void _insert( const string& ns,
                       vector<BSONObj>& insertsRemaining,
-                      map<ChunkPtr, vector<BSONObj> > insertsForChunks,
+                      map<ChunkPtr, vector<BSONObj> >& insertsForChunks,
                       int flags,
                       Request& r, DbMessage& d, // TODO: remove
                       int retries = 0 )
