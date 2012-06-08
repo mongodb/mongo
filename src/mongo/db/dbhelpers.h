@@ -160,7 +160,6 @@ namespace mongo {
                                       const BSONObj& min , 
                                       const BSONObj& max , 
                                       const BSONObj& keyPattern ,
-                                      bool yield = false , 
                                       bool maxInclusive = false , 
                                       RemoveCallback * callback = 0, 
                                       bool fromMigrate = false );

@@ -27,6 +27,7 @@
 #include "ops/delete.h"
 #include "queryoptimizercursor.h"
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/db/pagefault.h"
 
 #include <fstream>
 
@@ -257,70 +258,69 @@ namespace mongo {
                                     const BSONObj& min ,
                                     const BSONObj& max ,
                                     const BSONObj& keyPattern ,
-                                    bool yield ,
                                     bool maxInclusive ,
                                     RemoveCallback * callback,
                                     bool fromMigrate ) {
-        fassert( 16251, Lock::isWriteLocked( ns ) );
         BSONObj keya , keyb;
         BSONObj minClean = toKeyFormat( min , keya );
         BSONObj maxClean = toKeyFormat( max , keyb );
         verify( keya == keyb );
 
-        Client::Context ctx(ns);
+        long long numDeleted = 0;
+        PageFaultRetryableSection pgrs;
+        
+        while ( 1 ) {
+            try {
 
-        shared_ptr<Cursor> cursor;
-        auto_ptr<ClientCursor> clientCursor;
-        {
-            NamespaceDetails* nsd = nsdetails( ns.c_str() );
-            if ( ! nsd )
-                return 0;
-
-            int ii = nsd->findIndexByKeyPattern( keya );
-            verify( ii >= 0 );
-
-            IndexDetails& i = nsd->idx( ii );
-
-            cursor.reset( BtreeCursor::make( nsd , ii , i , minClean , maxClean , maxInclusive, 1 ) );
-            clientCursor.reset( new ClientCursor( QueryOption_NoCursorTimeout , cursor , ns ) );
-            clientCursor->setDoingDeletes( true );
-        }
-
-        long long num = 0;
-
-        while ( clientCursor->ok() ) {
-
-            if ( yield && ! clientCursor->yieldSometimes( ClientCursor::WillNeed) ) {
-                // cursor got finished by someone else, so we're done
-                clientCursor.release(); // if the collection/db is dropped, cc may be deleted
-                break;
+                Client::WriteContext ctx(ns);
+                
+                scoped_ptr<Cursor> c;
+                
+                {
+                    NamespaceDetails* nsd = nsdetails( ns.c_str() );
+                    if ( ! nsd )
+                        break;
+                    
+                    int ii = nsd->findIndexByKeyPattern( keya );
+                    verify( ii >= 0 );
+                    
+                    IndexDetails& i = nsd->idx( ii );
+                    
+                    c.reset( BtreeCursor::make( nsd , ii , i , minClean , maxClean , maxInclusive , 1 ) );
+                }
+                
+                if ( ! c->ok() ) {
+                    // we're done
+                    break;
+                }
+                
+                DiskLoc rloc = c->currLoc();
+                BSONObj obj = c->current();
+                
+                // this is so that we don't have to handle this cursor in the delete code
+                c.reset(0);
+                
+                if ( callback )
+                    callback->goingToDelete( obj );
+                
+                logOp( "d" , ns.c_str() , rloc.obj()["_id"].wrap() , 0 , 0 , fromMigrate );
+                theDataFileMgr.deleteRecord(ns.c_str() , rloc.rec(), rloc);
+                numDeleted++;
+            }
+            catch( PageFaultException& e ) {
+                e.touch();
+                continue;
             }
 
-            if ( ! clientCursor->ok() )
-                break;
-
-            DiskLoc rloc = clientCursor->currLoc();
-
-            if ( callback )
-                callback->goingToDelete( clientCursor->current() );
-
-            clientCursor->advance();
-            // SERVER-5198 Additional advancement is unnecessary for a single btree cursor, and see
-            // SERVER-5725.
-            cursor->prepareToTouchEarlierIterate();
-
-            logOp( "d" , ns.c_str() , rloc.obj()["_id"].wrap() , 0 , 0 , fromMigrate );
-            theDataFileMgr.deleteRecord(ns.c_str() , rloc.rec(), rloc);
-            num++;
-
-            cursor->recoverFromTouchingEarlierIterate();
-
-            getDur().commitIfNeeded();
-
-
+            if ( ! Lock::isLocked() ) {
+                int micros = 2 * Client::recommendedYieldMicros();
+                LOG(1) << "Helpers::removeRangeUnlocked going to sleep for " << micros << " micros" << endl;
+                sleepmicros( micros );
+            }
+                
         }
 
-        return num;
+        return numDeleted;
     }
 
     void Helpers::emptyCollection(const char *ns) {

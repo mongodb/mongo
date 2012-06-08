@@ -57,6 +57,21 @@ using namespace std;
 
 namespace mongo {
 
+    BSONObj findShardKeyIndexPattern_locked( const string& ns , const BSONObj& shardKeyPattern ) {
+        verify( Lock::isLocked() );
+        NamespaceDetails* nsd = nsdetails( ns.c_str() );
+        verify( nsd );
+        const IndexDetails* idx = nsd->findIndexByPrefix( shardKeyPattern , true );  /* require single key */
+        verify( idx );
+        return idx->keyPattern().getOwned();
+    }
+
+
+    BSONObj findShardKeyIndexPattern_unlocked( const string& ns , const BSONObj& shardKeyPattern ) {
+        Client::ReadContext context( ns );
+        return findShardKeyIndexPattern_locked( ns , shardKeyPattern ).getOwned();
+    }
+    
     Tee* migrateLog = new RamLog( "migrate" );
 
     class MoveTimingHelper {
@@ -173,18 +188,12 @@ namespace mongo {
         void doRemove() {
             ShardForceVersionOkModeBlock sf;
             {
-                Client::WriteContext ctx( ns );
                 RemoveSaver rs("moveChunk",ns,"post-cleanup");
-                NamespaceDetails* nsd = nsdetails( ns.c_str() );
-                const IndexDetails* chunkRangeIndex =
-                        nsd->findIndexByPrefix( shardKeyPattern ,
-                                                true );  /* require single key */
                 long long numDeleted =
                         Helpers::removeRange( ns ,
                                               min ,
                                               max ,
-                                              chunkRangeIndex->keyPattern() ,
-                                              true , /*yield*/
+                                              findShardKeyIndexPattern_unlocked( ns , shardKeyPattern ) , 
                                               false , /*maxInclusive*/
                                               cmdLine.moveParanoia ? &rs : 0 , /*callback*/
                                               true ); /*fromMigrate*/
@@ -1402,17 +1411,11 @@ namespace mongo {
 
             {
                 // 2. delete any data already in range
-                Client::WriteContext ctx( ns );
                 RemoveSaver rs( "moveChunk" , ns , "preCleanup" );
-                NamespaceDetails* nsd = nsdetails( ns.c_str() );
-                const IndexDetails* chunkRangeIndex =
-                        nsd->findIndexByPrefix( shardKeyPattern ,
-                                                true );  /* require single key */
                 long long num = Helpers::removeRange( ns ,
                                                       min ,
                                                       max ,
-                                                      chunkRangeIndex->keyPattern() ,
-                                                      true , /*yield*/
+                                                      findShardKeyIndexPattern_unlocked( ns , shardKeyPattern ) , 
                                                       false , /*maxInclusive*/
                                                       cmdLine.moveParanoia ? &rs : 0 , /*callback*/
                                                       true ); /* flag fromMigrate in oplog */
@@ -1615,15 +1618,10 @@ namespace mongo {
                         }
                     }
 
-                    NamespaceDetails* nsd = nsdetails( ns.c_str() );
-                    const IndexDetails* chunkRangeIndex =
-                            nsd->findIndexByPrefix( shardKeyPattern ,
-                                                    true );  /* require single key */
                     Helpers::removeRange( ns ,
                                           id ,
                                           id,
-                                          chunkRangeIndex->keyPattern() ,
-                                          false , /*yield*/
+                                          findShardKeyIndexPattern_locked( ns , shardKeyPattern ), 
                                           true , /*maxInclusive*/
                                           cmdLine.moveParanoia ? &rs : 0 , /*callback*/
                                           true ); /*fromMigrate*/
