@@ -234,7 +234,7 @@ namespace mongo {
 
         // Can't lock default mutex while creating ShardChunkManager, b/c may have to create a new connection to myself
         const string c = (_configServer == _shardHost) ? "" /* local */ : _configServer;
-        ShardChunkManagerPtr p( new ShardChunkManager( c , ns , _shardName, currManager ) );
+        ShardChunkManagerPtr p( ShardChunkManager::make( c , ns , _shardName, currManager ) );
 
         {
             scoped_lock lk( _mutex );

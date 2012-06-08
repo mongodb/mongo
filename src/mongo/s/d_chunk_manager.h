@@ -57,7 +57,7 @@ namespace mongo {
          *
          * This constructor throws if collection is dropped/malformed and on connectivity errors
          */
-        ShardChunkManager( const string& configServer , const string& ns , const string& shardName, ShardChunkManagerPtr oldManager = ShardChunkManagerPtr() );
+        static ShardChunkManager* make( const string& configServer , const string& ns , const string& shardName, ShardChunkManagerPtr oldManager = ShardChunkManagerPtr() );
 
         /**
          * Same as the regular constructor but used in unittest (no access to configDB required).
@@ -133,6 +133,7 @@ namespace mongo {
 
         string toString() const;
     private:
+        void _init( const string& configServer , const string& ns , const string& shardName, ShardChunkManagerPtr oldManager = ShardChunkManagerPtr() );
 
         /**
          * @same as belongsToMe to but key has to be the shard key

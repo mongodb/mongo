@@ -61,8 +61,14 @@ namespace mongo {
         string _currShard;
 
     };
+    
+    ShardChunkManager* ShardChunkManager::make( const string& configServer , const string& ns , const string& shardName, ShardChunkManagerPtr oldManager ) {
+        auto_ptr<ShardChunkManager> m( new ShardChunkManager() );
+        m->_init( configServer , ns , shardName , oldManager );
+        return m.release();
+    }
 
-    ShardChunkManager::ShardChunkManager( const string& configServer , const string& ns , const string& shardName, ShardChunkManagerPtr oldManager ) {
+    void ShardChunkManager::_init( const string& configServer , const string& ns , const string& shardName, ShardChunkManagerPtr oldManager ) {
 
         // have to get a connection to the config db
         // special case if I'm the configdb since I'm locked and if I connect to myself
