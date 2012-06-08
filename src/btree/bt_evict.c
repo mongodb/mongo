@@ -724,8 +724,12 @@ __evict_walk(WT_SESSION_IMPL *session)
 	 * We hold a spinlock for the entire walk -- it's slow, but (1) how
 	 * often do new files get added or removed to/from the system, and (2)
 	 * it's all in-memory stuff, so it's not that slow.
+	 *
+	 * If the connection spinlock is not available, don't block: another
+	 * thread may be holding it and waiting on eviction (e.g., checkpoint).
 	 */
-	__wt_spin_lock(session, &conn->spinlock);
+	if (__wt_spin_trylock(session, &conn->spinlock) != 0)
+		return (0);
 
 	/*
 	 * Resize the array in which we're tracking pages, as necessary, then
@@ -734,8 +738,8 @@ __evict_walk(WT_SESSION_IMPL *session)
 	 */
 	elem = WT_EVICT_WALK_BASE + (conn->btqcnt * WT_EVICT_WALK_PER_TABLE);
 	if (elem > cache->evict_entries) {
-		/* Save the offset of the eviction point. */
 		__wt_spin_lock(session, &cache->evict_lock);
+		/* Save the offset of the eviction point. */
 		i = (u_int)(cache->evict_current - cache->evict);
 		WT_ERR(__wt_realloc(session, &cache->evict_allocated,
 		    elem * sizeof(WT_EVICT_ENTRY), &cache->evict));
