@@ -954,8 +954,6 @@ namespace mongo {
     class DBClientConnection : public DBClientBase {
     public:
         using DBClientBase::query;
-        using DBClientBase::update;
-        using DBClientBase::remove;
 
         /**
            @param _autoReconnect if true, automatically reconnect on a connection failure

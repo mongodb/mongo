@@ -86,8 +86,6 @@ namespace mongo {
     class DBDirectClient : public DBClientBase {
     public:
         using DBClientBase::query;
-        using DBClientBase::update;
-        using DBClientBase::remove;
 
         virtual auto_ptr<DBClientCursor> query(const string &ns, Query query, int nToReturn = 0, int nToSkip = 0,
                                                const BSONObj *fieldsToReturn = 0, int queryOptions = 0, int batchSize = 0);
