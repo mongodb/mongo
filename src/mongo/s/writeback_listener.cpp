@@ -319,7 +319,8 @@ namespace mongo {
                         catch ( DBException& e ) {
                             error() << "error processing writeback: " << e << endl;
                             BSONObjBuilder b;
-                            e.getInfo().append( b, "err", "code" );
+                            b.append( "err" , e.toString() );
+                            e.getInfo().append( b );
                             gle = b.obj();
                         }
 
