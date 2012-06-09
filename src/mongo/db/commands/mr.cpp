@@ -504,14 +504,20 @@ namespace mongo {
                 BSONList values;
 
                 op->setMessage( "m/r: reduce post processing" , _db.count( _config.tempLong, BSONObj() ) );
-                auto_ptr<DBClientCursor> cursor = _db.query( _config.tempLong , BSONObj() );
+                auto_ptr<DBClientCursor> cursor = _db.query( _config.tempLong , BSONObj() , 0, 0, 0, QueryOption_NoCursorTimeout );
                 while ( cursor->more() ) {
-                    Lock::GlobalWrite lock; // TODO(erh) why global?
                     BSONObj temp = cursor->next();
                     BSONObj old;
 
                     bool found;
                     {
+                        boost::scoped_ptr<Lock::DBRead> lkRead;
+                        // read lock only for findOne operation, if "nonAtomic" options set
+                        // otherwise global lock earlier
+                        if (_config.outNonAtomic) {
+                            lkRead.reset(new Lock::DBRead( _config.finalLong ));
+                        }
+
                         Client::Context tx( _config.finalLong );
                         found = Helpers::findOne( _config.finalLong.c_str() , temp["_id"].wrap() , old , true );
                     }
@@ -521,12 +527,23 @@ namespace mongo {
                         values.clear();
                         values.push_back( temp );
                         values.push_back( old );
-                        Helpers::upsert( _config.finalLong , _config.reducer->finalReduce( values , _config.finalizer.get() ) );
+
+                        temp = _config.reducer->finalReduce( values , _config.finalizer.get() );
                     }
-                    else {
+
+                    // block only for upsert operation, if "nonAtomic" options set
+                    // otherwise global lock earlier
+                    {
+                        boost::scoped_ptr<Lock::DBWrite> lkWrite;
+                        if (_config.outNonAtomic) {
+                            lkWrite.reset(new Lock::DBWrite( _config.finalLong ));
+                        }
                         Helpers::upsert( _config.finalLong , temp );
                     }
+
+                    Lock::DBRead lkRead( _config.finalLong );
                     getDur().commitIfNeeded();
+
                     pm.hit();
                 }
                 _db.dropCollection( _config.tempLong );
