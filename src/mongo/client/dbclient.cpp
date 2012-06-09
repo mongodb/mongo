@@ -903,25 +903,15 @@ namespace mongo {
         say( toSend );
     }
 
-    void DBClientBase::update( const string & ns , Query query , BSONObj obj , bool upsert, bool multi ) {
+    void DBClientBase::update( const string & ns , Query query , BSONObj obj , bool upsert , bool multi ) {
+
+        BufBuilder b;
+        b.appendNum( (int)0 ); // reserved
+        b.appendStr( ns );
+
         int flags = 0;
         if ( upsert ) flags |= UpdateOption_Upsert;
         if ( multi ) flags |= UpdateOption_Multi;
-        update( ns, query, obj, flags );
-    }
-
-    void DBClientBase::update( const string & ns , Query query , BSONObj obj , int flags ) {
-
-        BufBuilder b;
-
-        int reservedFlags = 0;
-        if( flags & WriteOption_FromWriteback ){
-            reservedFlags |= Reserved_FromWriteback;
-            flags ^= WriteOption_FromWriteback;
-        }
-
-        b.appendNum( reservedFlags ); // reserved
-        b.appendStr( ns );
         b.appendNum( flags );
 
         query.obj.appendSelfToBufBuilder( b );
@@ -931,7 +921,10 @@ namespace mongo {
         toSend.setData( dbUpdate , b.buf() , b.len() );
 
         say( toSend );
+
+
     }
+
 
     
     auto_ptr<DBClientCursor> DBClientWithCommands::getIndexes( const string &ns ) {

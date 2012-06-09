@@ -302,7 +302,6 @@ namespace mongo {
     class DBClientReplicaSet : public DBClientBase {
     public:
         using DBClientBase::query;
-        using DBClientBase::update;
 
         /** Call connect() after constructing. autoReconnect is always on for DBClientReplicaSet connections. */
         DBClientReplicaSet( const string& name , const vector<HostAndPort>& servers, double so_timeout=0 );
@@ -336,7 +335,7 @@ namespace mongo {
 
         virtual void remove( const string &ns , Query obj , bool justOne = 0 );
 
-        virtual void update( const string &ns , Query query , BSONObj obj , int flags );
+        virtual void update( const string &ns , Query query , BSONObj obj , bool upsert = 0 , bool multi = 0 );
 
         virtual void killCursor( long long cursorID );
 
