@@ -1141,7 +1141,125 @@ namespace QueryUtilTests {
             auto_ptr<FieldRangeSet> _frs1;
             auto_ptr<FieldRangeSet> _frs2;
         };
-          
+
+        /** Duplicate a FieldRangeSet, but with prefixed field names. */
+        class Prefixed {
+        public:
+            void run() {
+                FieldRangeSet original( "", BSON( "a" << 1 ), true );
+                scoped_ptr<FieldRangeSet> prefixed( original.prefixed( "prefix" ) );
+                ASSERT( prefixed->singleKey() );
+                ASSERT( prefixed->range( "a" ).universal() );
+                ASSERT( prefixed->range( "prefix.a" ).equality() );
+            }
+        };
+
+        namespace ElemMatch {
+            
+            /** Field ranges generated for the $elemMatch operator. */
+            class Ranges {
+            public:
+                void run() {
+                    FieldRangeSet set( "", fromjson( "{ a:{ $elemMatch:{ b:1, c:2 } } }" ), true );
+                    ASSERT( set.range( "a.b" ).equality() );
+                    ASSERT( set.range( "a.c" ).equality() );
+                    ASSERT( !set.range( "a.d" ).equality() );
+                    ASSERT( !set.range( "a" ).equality() );
+                }
+            };
+            
+            /**
+             * Field ranges generated when the $elemMatch operator is applied to top level
+             * elements.
+             */
+            class TopLevelElements {
+            public:
+                void run() {
+                    FieldRangeSet set( "", fromjson( "{ a:{ $elemMatch:{ $gte:5, $lte:5 } } }" ),
+                                      true );
+                    // No constraints exist for operator based field names like "a.$gte".
+                    ASSERT( set.range( "a.$gte" ).universal() );
+                    ASSERT( set.range( "a.$lte" ).universal() );
+                    if ( 0 ) { // SERVER-1264
+                        ASSERT( set.range( "a" ).equality() );
+                    }
+                }
+            };
+            
+            /**
+             * Field ranges generated when the $elemMatch operator is applied to a top level
+             * $not meta operator.
+             */
+            class TopLevelNotElement {
+            public:
+                void run() {
+                    FieldRangeSet set( "", fromjson( "{ a:{ $elemMatch:{ $not:{ $ne:5 } } } }" ),
+                                      true );
+                    // No constraints exist for operator based field names like "a.$not".
+                    ASSERT( set.range( "a.$not" ).universal() );
+                    ASSERT( set.range( "a.$not.$ne" ).universal() );
+                    if ( 0 ) { // SERVER-1264
+                        ASSERT( set.range( "a" ).equality() );
+                    }
+                }
+            };
+
+            /** Field ranges generated for $not:$elemMatch queries. */
+            class Not {
+            public:
+                void run() {
+                    FieldRangeSet set( "",
+                                      fromjson( "{ a:{ $not:{ $elemMatch:{ b:{ $ne:1 } } } } }" ),
+                                      true );
+                    ASSERT( !set.range( "a.b" ).equality() );
+                    ASSERT( set.range( "a.b" ).universal() );
+                }
+            };
+            
+            /** Field ranges generated for nested $elemMatch expressions. */
+            class Nested {
+            public:
+                void run() {
+                    FieldRangeSet set( "",
+                                      fromjson( "{ a:{ $elemMatch:{ b:{ $elemMatch:{ c:1"
+                                               " } } } } }" ),
+                                      true );
+                    // No constraints are generated for the following fields.
+                    BSONArray universalFields = BSON_ARRAY( "a" << "a.b" << "b" << "b.c" << "c" );
+                    BSONObjIterator i( universalFields );
+                    while( i.more() ) {
+                        ASSERT( set.range( i.next().String().c_str() ).universal() );
+                    }
+                    // A correct constraint is generated for a nested $elemMatch field.
+                    ASSERT( set.range( "a.b.c" ).equality() );
+                    ASSERT_EQUALS( 1, set.range( "a.b.c" ).min().number() );
+                }
+            };
+
+            /** Field ranges generated for an $elemMatch expression nested within $all. */
+            class AllNested {
+            public:
+                void run() {
+                    FieldRangeSet set( "",
+                                      fromjson( "{ a:{ $elemMatch:{ b:{ $all:"
+                                               "[ { $elemMatch:{ c:1 } }, { $elemMatch:{ d:2 } } ]"
+                                               " } } } }" ),
+                                      true );
+                    // No constraints are generated for the following fields.
+                    BSONArray universalFields = BSON_ARRAY( "a" << "a.b" << "b" << "b.c" << "c"
+                                                           << "b.d" << "d" << "a.b.d" );
+                    BSONObjIterator i( universalFields );
+                    while( i.more() ) {
+                        ASSERT( set.range( i.next().String().c_str() ).universal() );
+                    }
+                    // A correct constraint is generated for the first nested $elemMatch field.
+                    ASSERT( set.range( "a.b.c" ).equality() );
+                    ASSERT_EQUALS( 1, set.range( "a.b.c" ).min().number() );
+                }
+            };
+            
+        } // namespace ElemMatch
+
         namespace SimpleFiniteSet {
 
             class SimpleFiniteSet {
@@ -2197,6 +2315,13 @@ namespace QueryUtilTests {
             add<FieldRangeSetTests::MatchPossible>();
             add<FieldRangeSetTests::MatchPossibleForIndex>();
             add<FieldRangeSetTests::Subset>();
+            add<FieldRangeSetTests::Prefixed>();
+            add<FieldRangeSetTests::ElemMatch::Ranges>();
+            add<FieldRangeSetTests::ElemMatch::TopLevelElements>();
+            add<FieldRangeSetTests::ElemMatch::TopLevelNotElement>();
+            add<FieldRangeSetTests::ElemMatch::Not>();
+            add<FieldRangeSetTests::ElemMatch::Nested>();
+            add<FieldRangeSetTests::ElemMatch::AllNested>();
             add<FieldRangeSetTests::SimpleFiniteSet::EmptyQuery>();
             add<FieldRangeSetTests::SimpleFiniteSet::Equal>();
             add<FieldRangeSetTests::SimpleFiniteSet::In>();

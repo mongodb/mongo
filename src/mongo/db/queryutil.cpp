@@ -412,7 +412,8 @@ namespace mongo {
         }
         case BSONObj::opREGEX:
         case BSONObj::opOPTIONS:
-            // do nothing
+            // These operators are handled via their encapsulating object, so no bounds are
+            // generated for them individually.
             break;
         case BSONObj::opELEM_MATCH: {
             log() << "warning: shouldn't get here?" << endl;
@@ -834,58 +835,92 @@ namespace mongo {
         }
     }    
     
-    void FieldRangeSet::processOpElement( const char *fieldName, const BSONElement &f, bool isNot, bool optimize ) {
-        BSONElement g = f;
-        int op2 = g.getGtLtOp();
-        if ( op2 == BSONObj::opALL ) {
-            BSONElement h = g;
-            uassert( 13050 ,  "$all requires array", h.type() == Array );
-            BSONObjIterator i( h.embeddedObject() );
-            if( i.more() ) {
-                BSONElement x = i.next();
-                if ( x.type() == Object && x.embeddedObject().firstElement().getGtLtOp() == BSONObj::opELEM_MATCH ) {
-                    g = x.embeddedObject().firstElement();
-                    op2 = g.getGtLtOp();
+    void FieldRangeSet::handleOp( const char* matchFieldName, const BSONElement& op, bool isNot,
+                                  bool optimize ) {
+        int opType = op.getGtLtOp();
+
+        // If the first $all element's first op is an $elemMatch, generate bounds for it
+        // and ignore the remaining $all elements.  SERVER-664
+        if ( opType == BSONObj::opALL ) {
+            uassert( 13050, "$all requires array", op.type() == Array );
+            BSONElement firstAllClause = op.embeddedObject().firstElement();
+            if ( firstAllClause.type() == Object ) {
+                BSONElement firstAllClauseOp = firstAllClause.embeddedObject().firstElement();
+                if ( firstAllClauseOp.getGtLtOp() == BSONObj::opELEM_MATCH ) {
+                    handleElemMatch( matchFieldName, firstAllClauseOp, isNot, optimize );
+                    return;
                 }
             }
         }
-        if ( op2 == BSONObj::opELEM_MATCH ) {
-            adjustMatchField();
-            BSONObjIterator k( g.embeddedObjectUserCheck() );
-            while ( k.more() ) {
-                BSONElement h = k.next();
-                StringBuilder buf;
-                buf << fieldName << "." << h.fieldName();
-                string fullname = buf.str();
 
-                int op3 = getGtLtOp( h );
-                if ( op3 == BSONObj::Equality ) {
-                    intersectMatchField( fullname.c_str(), h, isNot, optimize );
-                }
-                else {
-                    BSONObjIterator l( h.embeddedObject() );
-                    while ( l.more() ) {
-                        intersectMatchField( fullname.c_str(), l.next(), isNot, optimize );
-                    }
-                }
-            }
+        if ( opType == BSONObj::opELEM_MATCH ) {
+            handleElemMatch( matchFieldName, op, isNot, optimize );
         }
         else {
-            intersectMatchField( fieldName, f, isNot, optimize );
+            intersectMatchField( matchFieldName, op, isNot, optimize );
         }
     }
 
-    void FieldRangeSet::processQueryField( const BSONElement &e, bool optimize ) {
-        if ( e.fieldName()[ 0 ] == '$' ) {
-            if ( str::equals( e.fieldName(), "$and" ) ) {
-                uassert( 14816 , "$and expression must be a nonempty array" , e.type() == Array && e.embeddedObject().nFields() > 0 );
-                BSONObjIterator i( e.embeddedObject() );
-                while( i.more() ) {
-                    BSONElement e = i.next();
-                    uassert( 14817 , "$and elements must be objects" , e.type() == Object );
-                    BSONObjIterator j( e.embeddedObject() );
-                    while( j.more() ) {
-                        processQueryField( j.next(), optimize );
+    void FieldRangeSet::handleNotOp( const char* matchFieldName, const BSONElement& notOp,
+                                     bool optimize ) {
+        switch( notOp.type() ) {
+            case Object: {
+                BSONObjIterator notOpIterator( notOp.embeddedObject() );
+                while( notOpIterator.more() ) {
+                    BSONElement opToNegate = notOpIterator.next();
+                    uassert( 13034, "invalid use of $not",
+                             opToNegate.getGtLtOp() != BSONObj::Equality );
+                    handleOp( matchFieldName, opToNegate, true, optimize );
+                }
+                break;
+            }
+            case RegEx:
+                handleOp( matchFieldName, notOp, true, optimize );
+                break;
+            default:
+                uassert( 13041, "invalid use of $not", false );
+        }
+    }
+
+    void FieldRangeSet::handleElemMatch( const char* matchFieldName, const BSONElement& elemMatch,
+                                         bool isNot, bool optimize ) {
+        adjustMatchField();
+        if ( isNot ) {
+            // SERVER-5740 $elemMatch queries may depend on multiple fields, so $not:$elemMatch
+            // cannot in general generate range constraints for a single field.
+            return;
+        }
+        BSONObj elemMatchObj = elemMatch.embeddedObjectUserCheck();
+        BSONElement firstElemMatchElement = elemMatchObj.firstElement();
+        if ( firstElemMatchElement.getGtLtOp() != BSONObj::Equality ||
+            str::equals( firstElemMatchElement.fieldName(), "$not" ) ) {
+            // TODO SERVER-1264 Handle $elemMatch applied to top level elements (where $elemMatch
+            // fields are operators).
+        }
+        else {
+            // Handle $elemMatch applied to nested elements ($elemMatch fields are not operators).
+            FieldRangeSet elemMatchRanges( _ns.c_str(), elemMatchObj, _singleKey, optimize );
+            scoped_ptr<FieldRangeSet> prefixedRanges
+                    ( elemMatchRanges.prefixed( matchFieldName ) );
+            *this &= *prefixedRanges;
+        }
+    }
+
+    void FieldRangeSet::handleMatchField( const BSONElement& matchElement, bool optimize ) {
+        const char* matchFieldName = matchElement.fieldName();
+        if ( matchFieldName[ 0 ] == '$' ) {
+            if ( str::equals( matchFieldName, "$and" ) ) {
+                uassert( 14816, "$and expression must be a nonempty array",
+                         matchElement.type() == Array &&
+                         matchElement.embeddedObject().nFields() > 0 );
+                BSONObjIterator andExpressionIterator( matchElement.embeddedObject() );
+                while( andExpressionIterator.more() ) {
+                    BSONElement andClause = andExpressionIterator.next();
+                    uassert( 14817, "$and elements must be objects", andClause.type() == Object );
+                    BSONObjIterator andClauseIterator( andClause.embeddedObject() );
+                    while( andClauseIterator.more() ) {
+                        BSONElement andMatchElement = andClauseIterator.next();
+                        handleMatchField( andMatchElement, optimize );
                     }
                 }
                 return;
@@ -893,52 +928,53 @@ namespace mongo {
         
             adjustMatchField();
 
-            if ( str::equals( e.fieldName(), "$where" ) ) {
+            if ( str::equals( matchFieldName, "$where" ) ) {
                 return;
             }
         
-            if ( str::equals( e.fieldName(), "$or" ) ) {
+            if ( str::equals( matchFieldName, "$or" ) ) {
                 return;
             }
         
-            if ( str::equals( e.fieldName(), "$nor" ) ) {
+            if ( str::equals( matchFieldName, "$nor" ) ) {
                 return;
             }
         }
         
-        bool equality = ( getGtLtOp( e ) == BSONObj::Equality );
-        if ( equality && e.type() == Object ) {
-            equality = !str::equals( e.embeddedObject().firstElementFieldName(), "$not" );
+        bool equality =
+            // Check for a parsable '$' operator within a match element, indicating the object
+            // should not be matched as is but parsed.
+            // NOTE This only checks for a '$' prefix in the first embedded field whereas Matcher
+            // checks all embedded fields.
+            ( getGtLtOp( matchElement ) == BSONObj::Equality ) &&
+            // Similarly check for the $not meta operator.
+            !( matchElement.type() == Object &&
+               str::equals( matchElement.embeddedObject().firstElementFieldName(), "$not" ) );
+
+        if ( equality ) {
+            intersectMatchField( matchFieldName, matchElement, false, optimize );
+            return;
         }
 
-        if ( equality || ( e.type() == Object && e.embeddedObject().hasField( "$regex" ) ) ) {
-            intersectMatchField( e.fieldName(), e, false, optimize );
+        bool untypedRegex =
+            ( matchElement.type() == Object ) &&
+            matchElement.embeddedObject().hasField( "$regex" );
+
+        if ( untypedRegex ) {
+            // $regex/$options pairs must be handled together and so are passed via the
+            // element encapsulating them.
+            intersectMatchField( matchFieldName, matchElement, false, optimize );
+            // Other elements may remain to be handled, below.
         }
-        if ( !equality ) {
-            BSONObjIterator j( e.embeddedObject() );
-            while( j.more() ) {
-                BSONElement f = j.next();
-                if ( str::equals( f.fieldName(), "$not" ) ) {
-                    switch( f.type() ) {
-                    case Object: {
-                        BSONObjIterator k( f.embeddedObject() );
-                        while( k.more() ) {
-                            BSONElement g = k.next();
-                            uassert( 13034, "invalid use of $not", g.getGtLtOp() != BSONObj::Equality );
-                            processOpElement( e.fieldName(), g, true, optimize );
-                        }
-                        break;
-                    }
-                    case RegEx:
-                        processOpElement( e.fieldName(), f, true, optimize );
-                        break;
-                    default:
-                        uassert( 13041, "invalid use of $not", false );
-                    }
-                }
-                else {
-                    processOpElement( e.fieldName(), f, false, optimize );
-                }
+
+        BSONObjIterator matchExpressionIterator( matchElement.embeddedObject() );
+        while( matchExpressionIterator.more() ) {
+            BSONElement opElement = matchExpressionIterator.next();
+            if ( str::equals( opElement.fieldName(), "$not" ) ) {
+                handleNotOp( matchFieldName, opElement, optimize );
+            }
+            else {
+                handleOp( matchFieldName, opElement, false, optimize );
             }
         }
     }
@@ -950,9 +986,8 @@ namespace mongo {
     _singleKey( singleKey ),
     _simpleFiniteSet( true ) {
         BSONObjIterator i( _queries[ 0 ] );
-
         while( i.more() ) {
-            processQueryField( i.next(), optimize );
+            handleMatchField( i.next(), optimize );
         }
     }
     
@@ -1192,7 +1227,18 @@ namespace mongo {
         ret->_queries = _queries;
         return ret;
     }
-    
+
+    FieldRangeSet* FieldRangeSet::prefixed( const string& prefix ) const {
+        auto_ptr<FieldRangeSet> ret( new FieldRangeSet( ns(), BSONObj(), _singleKey, true ) );
+        for( map<string,FieldRange>::const_iterator i = ranges().begin(); i != ranges().end();
+            ++i ) {
+            string prefixedFieldName = prefix + "." + i->first;
+            ret->range( prefixedFieldName.c_str() ) = i->second;
+        }
+        ret->_queries = _queries;
+        return ret.release();
+    }
+
     string FieldRangeSet::toString() const {
         BSONObjBuilder bob;
         for( map<string,FieldRange>::const_iterator i = _ranges.begin(); i != _ranges.end(); ++i ) {

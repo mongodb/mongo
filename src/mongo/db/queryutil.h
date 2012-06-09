@@ -365,7 +365,7 @@ namespace mongo {
         
         /** @return range for the given field. */
         const FieldRange &range( const char *fieldName ) const;
-        /** @return range for the given field. */
+        /** @return range for the given field.  Public for testing. */
         FieldRange &range( const char *fieldName );
         /** @return the number of non universal ranges. */
         int numNonUniversalRanges() const;
@@ -449,6 +449,12 @@ namespace mongo {
          */
         FieldRangeSet *subset( const BSONObj &fields ) const;
         
+        /**
+         * @return A new FieldRangeSet based on this FieldRangeSet, but with all field names
+         * prefixed by the specified @param prefix field name.
+         */
+        FieldRangeSet* prefixed( const string& prefix ) const;
+        
         bool singleKey() const { return _singleKey; }
         
         BSONObj originalQuery() const { return _queries[ 0 ]; }
@@ -457,8 +463,18 @@ namespace mongo {
     private:
         void appendQueries( const FieldRangeSet &other );
         void makeEmpty();
-        void processQueryField( const BSONElement &e, bool optimize );
-        void processOpElement( const char *fieldName, const BSONElement &f, bool isNot, bool optimize );
+
+        /**
+         * Query parsing routines.
+         * TODO integrate these with an external query parser shared by the matcher.  SERVER-1009
+         */
+        void handleMatchField( const BSONElement& matchElement, bool optimize );
+        void handleOp( const char* matchFieldName, const BSONElement& op, bool isNot,
+                       bool optimize );
+        void handleNotOp( const char* matchFieldName, const BSONElement& notOp, bool optimize );
+        void handleElemMatch( const char* matchFieldName, const BSONElement& elemMatch, bool isNot,
+                              bool optimize );
+
         /** Must be called when a match element is skipped or modified to generate a FieldRange. */
         void adjustMatchField();
         void intersectMatchField( const char *fieldName, const BSONElement &matchElement,

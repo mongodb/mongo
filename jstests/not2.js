@@ -140,4 +140,4 @@ t.ensureIndex( {"i.j":1} );
 indexed( {i:{$elemMatch:{j:1}}}, 1, 1 );
 //indexed( {i:{$not:{$elemMatch:{j:1}}}}, {$minElement:1}, {$maxElement:1} );
 not( {i:{$not:{$elemMatch:{j:1}}}} );
-indexed( {i:{$not:{$elemMatch:{j:{$ne:1}}}}}, 1, 1 );
+not( {i:{$not:{$elemMatch:{j:{$ne:1}}}}}, 1, 1 );
