@@ -112,11 +112,7 @@ namespace mongo {
     }
 
     void WriteBackListener::run() {
-
         int secsToSleep = 0;
-        scoped_ptr<ShardChunkVersion> lastNeededVersion;
-        int lastNeededCount = 0;
-
         while ( ! inShutdown() ) {
 
             if ( ! Shard::isAShardNode( _addr ) ) {
@@ -173,80 +169,43 @@ namespace mongo {
                     //
                     // TODO: Refactor the sharded strategy to correctly handle all sharding state changes itself,
                     // we can't rely on WBL to do this for us b/c anything could reset our state in-between.
-                    // We should always reload here for efficiency when possible, but staleness is also caught in the
-                    // loop below.
+                    // As a 99% optimization though we should def do a single soft reload of the manager if the WB
+                    // indicates a version we need to refresh - in dev mode turn this off for better tests.
                     //
 
-                    ChunkManagerPtr manager;
-                    ShardPtr primary;
-                    db->getChunkManagerOrPrimary( ns, manager, primary );
+                    ChunkManagerPtr manager = db->getChunkManagerIfExists( ns );
 
-                    ShardChunkVersion currVersion;
-                    if( manager ) currVersion = manager->getVersion();
+                    if ( ! manager ) {
+                        // I don't trust the above code
+                        // for this to be valid, we would have to have gotten a writeback because
+                        // a collection was sharded
+                        // and then for the collection to be dropped between the time the write hit mongod
+                        // and the time it gets here
+                        // possible - but I think there are more likely cases
+                        // and in that case a little slowness isn't a horrible issue
+                        manager = db->getChunkManagerIfExists( ns , true , true );
+                        if ( manager ) {
+                            warning() << "after reload, getChunkManagerIfExists works, this is inefficient, but should be" << endl;
+                        }
+
+                    }
 
                     LOG(1) << "connectionId: " << cid << " writebackId: " << wid << " needVersion : " << needVersion.toString()
-                           << " mine : " << currVersion.toString() << endl;
+                           << " mine : " << ( manager ? manager->getVersion().toString() : "(unknown)" )
+                           << endl;
 
                     LOG(1) << msg.toString() << endl;
 
-                    //
-                    // We should reload only if we need to update our version to be compatible *and* we
-                    // haven't already done so.  This avoids lots of reloading when we remove/add a sharded collection
-                    //
-
-                    bool alreadyReloaded = lastNeededVersion &&
-                                           lastNeededVersion->isEquivalentTo( needVersion );
-
-                    if( alreadyReloaded ){
-
-                        LOG(1) << "wbl already reloaded config information for version "
-                               << needVersion << ", at version " << currVersion << endl;
+                    if ( needVersion.isSet() && manager && needVersion.isWriteCompatibleWith( manager->getVersion() ) ) {
+                        // this means when the write went originally, the version was old
+                        // if we're here, it means we've already updated the config, so don't need to do again
+                        //db->getChunkManager( ns , true ); // SERVER-1349
                     }
-                    else if( lastNeededVersion ) {
-
-                        log() << "new version change detected to " << needVersion.toString()
-                              << ", " << lastNeededCount << " writebacks processed at "
-                              << lastNeededVersion->toString() << endl;
-
-                        lastNeededCount = 0;
-                    }
-
-                    //
-                    // Set our lastNeededVersion for next time
-                    //
-
-                    lastNeededVersion.reset( new ShardChunkVersion( needVersion ) );
-                    lastNeededCount++;
-
-                    //
-                    // Determine if we should reload, if so, reload
-                    //
-
-                    bool shouldReload = ! needVersion.isWriteCompatibleWith( currVersion ) &&
-                                        ! alreadyReloaded;
-
-                    if( shouldReload && currVersion.isSet()
-                                     && needVersion.isSet()
-                                     && currVersion.hasCompatibleEpoch( needVersion ) )
-                    {
-
-                        //
-                        // If we disagree about versions only, reload the chunk manager
-                        //
-
-                        db->getChunkManagerIfExists( ns, true );
-                    }
-                    else if( shouldReload ){
-
-                        //
-                        // If we disagree about anything else, reload the full db
-                        //
-
-                        warning() << "reloading config data for " << db->getName() << ", "
-                                  << "wanted version " << needVersion.toString()
-                                  << " but currently have version " << currVersion.toString() << endl;
-
-                        db->reload();
+                    else {
+                        // we received a writeback object that was sent to a previous version of a shard
+                        // the actual shard may not have the object the writeback operation is for
+                        // we need to reload the chunk manager and get the new shard versions
+                        db->getChunkManagerIfExists( ns , true );
                     }
 
                     // do request and then call getLastError
@@ -281,36 +240,11 @@ namespace mongo {
                             gle = b.obj();
 
                             if ( gle["code"].numberInt() == 9517 ) {
-
-                                log() << "new version change detected, "
-                                      << lastNeededCount << " writebacks processed previously" << endl;
-
-                                lastNeededVersion.reset();
-                                lastNeededCount = 1;
-
                                 log() << "writeback failed because of stale config, retrying attempts: " << attempts << endl;
-                                LOG(1) << "writeback error : " << gle << endl;
-
-                                //
-                                // Bringing this in line with the similar retry logic elsewhere
-                                //
-                                // TODO: Reloading the chunk manager may not help if we dropped a
-                                // collection, but we don't actually have that info in the writeback
-                                // error
-                                //
-
-                                if( attempts <= 2 ){
-                                    db->getChunkManagerIfExists( ns, true );
-                                }
-                                else{
-                                    versionManager.forceRemoteCheckShardVersionCB( ns );
+                                if( ! db->getChunkManagerIfExists( ns , true, attempts > 2 ) ){
+                                    uassert( 15884, str::stream() << "Could not reload chunk manager after " << attempts << " attempts.", attempts <= 4 );
                                     sleepsecs( attempts - 1 );
                                 }
-
-                                uassert( 15884, str::stream()
-                                         << "Could not reload chunk manager after "
-                                         << attempts << " attempts.", attempts <= 4 );
-
                                 continue;
                             }
 
