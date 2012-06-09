@@ -33,10 +33,6 @@ namespace mongo {
     // ----- Strategy ------
 
     void Strategy::doWrite( int op , Request& r , const Shard& shard , bool checkVersion ) {
-
-        // Now only used for index and broadcast writes
-        // TODO: Remove
-
         ShardConnection conn( shard , r.getns() );
         if ( ! checkVersion )
             conn.donotCheckVersion();

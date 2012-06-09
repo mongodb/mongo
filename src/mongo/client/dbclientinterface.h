@@ -473,8 +473,6 @@ namespace mongo {
 
         virtual void remove( const string &ns , Query query, bool justOne = 0 ) = 0;
 
-        virtual void remove( const string &ns , Query query, int flags ) = 0;
-
         virtual void update( const string &ns,
                              Query query,
                              BSONObj obj,
@@ -924,8 +922,6 @@ namespace mongo {
            @param justOne if this true, then once a single match is found will stop
          */
         virtual void remove( const string &ns , Query q , bool justOne = 0 );
-
-        virtual void remove( const string &ns , Query query, int flags );
 
         virtual bool isFailed() const = 0;
 

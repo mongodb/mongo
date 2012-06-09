@@ -278,13 +278,13 @@ namespace mongo {
         uassert( 10023 , "SyncClusterConnection bulk insert not implemented" , 0);
     }
 
-    void SyncClusterConnection::remove( const string &ns , Query query, int flags ) {
+    void SyncClusterConnection::remove( const string &ns , Query query, bool justOne ) {
         string errmsg;
         if ( ! prepare( errmsg ) )
             throw UserException( 8020 , (string)"SyncClusterConnection::remove prepare failed: " + errmsg );
 
         for ( size_t i=0; i<_conns.size(); i++ ) {
-            _conns[i]->remove( ns , query , flags );
+            _conns[i]->remove( ns , query , justOne );
         }
 
         _checkLast();

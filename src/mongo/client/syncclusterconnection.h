@@ -44,7 +44,6 @@ namespace mongo {
 
         using DBClientBase::query;
         using DBClientBase::update;
-        using DBClientBase::remove;
 
         /**
          * @param commaSeparated should be 3 hosts comma separated
@@ -77,7 +76,7 @@ namespace mongo {
 
         virtual void insert( const string &ns, const vector< BSONObj >& v, int flags=0);
 
-        virtual void remove( const string &ns , Query query, int flags );
+        virtual void remove( const string &ns , Query query, bool justOne );
 
         virtual void update( const string &ns , Query query , BSONObj obj , int flags );
 

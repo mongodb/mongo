@@ -759,161 +759,78 @@ namespace mongo {
                 chunk->splitIfShould( d.msg().header()->dataLen() );
         }
 
+        void _delete( Request& r , DbMessage& d, ChunkManagerPtr manager ) {
 
-        void _prepareDelete( const string& ns,
-                             const BSONObj& query,
-                             int flags,
-                             ShardPtr& shard,
-                             ChunkManagerPtr& manager,
-                             ShardPtr& primary,
-                             bool reloadConfigData = false )
-        {
-
-            //
-            // Deletes also have three basic targeting options :
-            // 1) Primary shard
-            // 2) Single shard in collection
-            // 3) All shards in cluster
-            //
-            // We don't (currently) target just a few shards because on retry we'd need to ensure that we didn't send
-            // the delete to a shard twice.
-            //
-            // TODO: Think this is fixable, if we better track where we're sending requests.
-            // TODO: Async connection layer with error checking would make this much simpler.
-            //
-
-            // Refresh config if specified
-            if( reloadConfigData ) grid.getDBConfig( ns )->getChunkManagerIfExists( ns, true );
-
-            bool justOne = flags & RemoveOption_JustOne;
-
-            shard.reset();
-            grid.getDBConfig( ns )->getChunkManagerOrPrimary( ns, manager, primary );
-
-            if( primary ){
-
-                shard = primary;
-                return;
-            }
-
-            set<Shard> shards;
-            manager->getShardsForQuery( shards, query );
-
-            LOG(2) << "delete : " << query << " \t " << shards.size() << " justOne: " << justOne << endl;
-
-            if( shards.size() == 1 ){
-
-                shard = ShardPtr( new Shard( *shards.begin() ) );
-                return;
-            }
-
-            if( ! justOne || query.hasField( "_id" ) ) return;
-
-            // Retry reloading the config data once
-            if( ! reloadConfigData ){
-                _prepareDelete( ns, query, flags, shard, manager, primary, true );
-                return;
-            }
-
-            // Sleep so we don't DOS config server
-            sleepsecs( 1 );
-
-            throw UserException( 8015,
-                                 "can only delete with a non-shard key pattern if can delete as many as we find" );
-            return;
-        }
-
-        void _delete( Request& r , DbMessage& d ) {
-
-            // details of the request
-            const string& ns = r.getns();
             int flags = d.pullInt();
+            bool justOne = flags & 1;
 
             uassert( 10203 ,  "bad delete message" , d.moreJSObjs() );
+            BSONObj pattern = d.nextJsObj();
+            uassert( 13505 ,  "$atomic not supported sharded" , pattern["$atomic"].eoo() );
 
-            const BSONObj query = d.nextJsObj();
+            const int LEFT_START = 5;
+            int left = LEFT_START;
+            while ( true ) {
+                try {
+                    set<Shard> shards;
+                    manager->getShardsForQuery( shards , pattern );
+                    LOG(2) << "delete : " << pattern << " \t " << shards.size() << " justOne: " << justOne << endl;
 
-            if( d.reservedField() & Reserved_FromWriteback ){
-                flags |= WriteOption_FromWriteback;
+                    if ( shards.size() != 1 ) {
+                        // data could be on more than one shard. must send to all
+                        if ( justOne && ! pattern.hasField( "_id" ) )
+                            throw UserException( 8015 , "can only delete with a non-shard key pattern if can delete as many as we find" );
+
+                        int * x = (int*)(r.d().afterNS());
+                        x[0] |= RemoveOption_Broadcast; // this means don't check shard version in mongod
+                        broadcastWrite(dbUpdate, r);
+                        return;
+                    }
+
+                    doWrite( dbDelete , r , *shards.begin() );
+                    return;
+                }
+                catch ( StaleConfigException& e ) {
+                    if ( left <= 0 )
+                        throw e;
+                    log( left == LEFT_START ) << "delete will be retried b/c of StaleConfigException, "
+                                              << " left:" << left - 1 << " ns: " << r.getns() << " patt: " << pattern << endl;
+                    left--;
+                    r.reset();
+                    manager = r.getChunkManager();
+                    uassert(14805, "collection no longer sharded", manager);
+                }
             }
-
-            _delete( ns, query, flags, r, d );
         }
-
-        void _delete( const string &ns,
-                      const BSONObj& query,
-                      int flags,
-                      Request& r, DbMessage& d, // todo : remove
-                      int retries = 0 )
-        {
-
-            uassert( 13505 , "$atomic not supported sharded" , query["$atomic"].eoo() );
-
-            ShardPtr shard;
-            ChunkManagerPtr manager;
-            ShardPtr primary;
-
-            _prepareDelete( ns, query, flags, shard, manager, primary );
-
-            if( ! shard ){
-
-                int * x = (int*)(r.d().afterNS());
-                x[0] |= RemoveOption_Broadcast; // this means don't check shard version in mongod
-                // TODO: Why is this an update op here?
-                broadcastWrite( dbUpdate, r );
-                return;
-            }
-
-            ShardConnection dbcon( *shard, ns, manager );
-
-            try {
-                // An exception will be thrown if the version is incompatible
-                dbcon.setVersion();
-            }
-            catch ( StaleConfigException& e ) {
-                dbcon.done();
-                _handleRetries( "delete", retries, query, e, r );
-                _delete( ns, query, flags, r, d, retries + 1 );
-                return;
-            }
-
-            dbcon->remove( ns, query, flags );
-
-            dbcon.done();
-        }
-
-
 
         virtual void writeOp( int op , Request& r ) {
 
+            ChunkManagerPtr info;
+            ShardPtr primary;
+
             const char *ns = r.getns();
 
+            r.getConfig()->getChunkManagerOrPrimary( r.getns(), info, primary );
             // TODO: Index write logic needs to be audited
-            bool isIndexWrite =
-                    strstr( ns , ".system.indexes" ) == strchr( ns , '.' ) && strchr( ns , '.' );
+            bool isIndexWrite = strstr( ns , ".system.indexes" ) == strchr( ns , '.' ) && strchr( ns , '.' );
 
-            // TODO: This block goes away, system.indexes needs to handle better
-            if( isIndexWrite ){
+            // TODO: This block goes away, we need to handle the case where we go sharded->unsharded or
+            // vice-versa for all types of write operations.  System.indexes may be the only special case.
+            if( primary && ( isIndexWrite || op == dbDelete ) ){
 
-                ShardPtr primary;
-                ChunkManagerPtr manager;
-
-                r.getConfig()->getChunkManagerOrPrimary( ns, manager, primary );
-
-                if ( manager ){
-                    LOG(1) << "sharded index write for " << ns << endl;
+                if ( r.isShardingEnabled() && isIndexWrite ){
+                    LOG(1) << " .system.indexes write for: " << ns << endl;
                     handleIndexWrite( op , r );
                     return;
                 }
 
-                LOG(3) << "single index write for " << ns << endl;
+                LOG(3) << "single write: " << ns << endl;
                 SINGLE->doWrite( op , r , *primary );
                 r.gotInsert(); // Won't handle mulit-insert correctly. Not worth parsing the request.
 
                 return;
             }
             else{
-
                 LOG(3) << "write: " << ns << endl;
 
                 DbMessage& d = r.d();
@@ -925,7 +842,7 @@ namespace mongo {
                     _update( r , d );
                 }
                 else if ( op == dbDelete ) {
-                    _delete( r , d );
+                    _delete( r , d , info );
                 }
                 else {
                     log() << "sharding can't do write op: " << op << endl;

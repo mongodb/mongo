@@ -884,23 +884,16 @@ namespace mongo {
     }
 
     void DBClientBase::remove( const string & ns , Query obj , bool justOne ) {
-        int flags = 0;
-        if( justOne ) flags |= RemoveOption_JustOne;
-        remove( ns, obj, flags );
-    }
-
-    void DBClientBase::remove( const string & ns , Query obj , int flags ) {
         Message toSend;
 
         BufBuilder b;
-        int reservedFlags = 0;
-        if( flags & WriteOption_FromWriteback ){
-            reservedFlags |= WriteOption_FromWriteback;
-            flags ^= WriteOption_FromWriteback;
-        }
-
-        b.appendNum( reservedFlags );
+        int opts = 0;
+        b.appendNum( opts );
         b.appendStr( ns );
+
+        int flags = 0;
+        if ( justOne )
+            flags |= RemoveOption_JustOne;
         b.appendNum( flags );
 
         obj.obj.appendSelfToBufBuilder( b );
