@@ -888,14 +888,19 @@ namespace mongo {
             // TODO: This block goes away, system.indexes needs to handle better
             if( isIndexWrite ){
 
-                if ( r.getConfig()->isShardingEnabled() ){
+                ShardPtr primary;
+                ChunkManagerPtr manager;
+
+                r.getConfig()->getChunkManagerOrPrimary( ns, manager, primary );
+
+                if ( manager ){
                     LOG(1) << "sharded index write for " << ns << endl;
                     handleIndexWrite( op , r );
                     return;
                 }
 
                 LOG(3) << "single index write for " << ns << endl;
-                SINGLE->doWrite( op , r , Shard( r.getConfig()->getPrimary() ) );
+                SINGLE->doWrite( op , r , *primary );
                 r.gotInsert(); // Won't handle mulit-insert correctly. Not worth parsing the request.
 
                 return;
