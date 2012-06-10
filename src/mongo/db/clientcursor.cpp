@@ -541,6 +541,9 @@ namespace mongo {
                 if ( micros > 0 )
                     sleepmicros( micros );
             }
+            else if ( Listener::getTimeTracker() == 0 ) {
+                // we aren't running a server, so likely a repair, so don't complain
+            }
             else {
                 CurOp * c = cc().curop();
                 while ( c->parent() )
