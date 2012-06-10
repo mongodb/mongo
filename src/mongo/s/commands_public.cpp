@@ -1204,6 +1204,7 @@ namespace mongo {
                 set<ServerAndQuery> servers;
                 map<Shard,BSONObj> results;
 
+                BSONObjBuilder shardResultsB;
                 BSONObjBuilder shardCountsB;
                 BSONObjBuilder aggCountsB;
                 map<string,long long> countsMap;
@@ -1257,6 +1258,7 @@ namespace mongo {
                         ok = singleResult["ok"].trueValue();
                         if ( !ok ) continue;
 
+                        shardResultsB.append( server , singleResult );
                         BSONObj counts = singleResult["counts"].embeddedObjectUserCheck();
                         shardCountsB.append( server , counts );
 
@@ -1288,8 +1290,9 @@ namespace mongo {
                 // build the sharded finish command
                 BSONObjBuilder finalCmd;
                 finalCmd.append( "mapreduce.shardedfinish" , cmdObj );
-                finalCmd.append( "inputNS" , dbName + "." + shardResultCollection );
+                finalCmd.append( "shardedOutputCollection" , shardResultCollection );
 
+                finalCmd.append( "shards" , shardResultsB.done() );
                 BSONObj shardCounts = shardCountsB.done();
                 finalCmd.append( "shardCounts" , shardCounts );
                 timingBuilder.append( "shardProcessing" , t.millis() );
