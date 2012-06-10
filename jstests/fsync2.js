@@ -3,6 +3,14 @@ function debug( msg ) {
     print( "fsync2: " + msg );
 }
 
+var loops = 200;
+if ( db.getSisterDB("local").slaves.count() > 0 ) {
+    // replication can cause some write locks on local
+    // therefore this test is flaky with replication on
+    loops = 1;
+}
+
+
 function doTest() {
     db.fsync2.drop();
     
@@ -14,7 +22,8 @@ function doTest() {
 
     debug( "after lock" );
     
-    for ( i=0; i<200; i++) {
+
+    for ( var i=0; i<loops; i++) {
         debug( "loop: " + i );
         assert.eq(1, db.fsync2.count());
         sleep(100);
