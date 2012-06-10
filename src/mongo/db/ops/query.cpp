@@ -626,13 +626,13 @@ namespace mongo {
      * Run a query with a cursor provided by the query optimizer, or FindingStartCursor.
      * @yields the db lock.
      */
-    const char *queryWithQueryOptimizer( Message &m, int queryOptions, const char *ns,
-                                        const BSONObj &jsobj, CurOp& curop,
-                                        const BSONObj &query, const BSONObj &order,
-                                        const shared_ptr<ParsedQuery> &pq_shared,
-                                        const BSONObj &oldPlan,
-                                        const ConfigVersion &shardingVersionAtStart,
-                                        Message &result ) {
+    const char *queryWithQueryOptimizer( const Message &m, int queryOptions, const char *ns,
+                                         const BSONObj &jsobj, CurOp& curop,
+                                         const BSONObj &query, const BSONObj &order,
+                                         const shared_ptr<ParsedQuery> &pq_shared,
+                                         const BSONObj &oldPlan,
+                                         const ConfigVersion &shardingVersionAtStart,
+                                         Message &result ) {
 
         const ParsedQuery &pq( *pq_shared );
         shared_ptr<Cursor> cursor;
@@ -749,9 +749,6 @@ namespace mongo {
                 ccPointer->c()->noteLocation();
             }
             
-            // !!! Save the original message buffer, so it can be referenced in getMore.
-            ccPointer->originalMessage = m;
-
             // Save slave's position in the oplog.
             if ( pq.hasOption( QueryOption_OplogReplay ) && !slaveReadTill.isNull() ) {
                 ccPointer->slaveReadTill( slaveReadTill );
@@ -949,7 +946,10 @@ namespace mongo {
                     scoped_ptr<MultiPlanScanner> mps( MultiPlanScanner::make( ns, query, order ) );
                     oldPlan = mps->cachedPlanExplainSummary();
                 }
-                
+             
+                jsobj = jsobj.getOwned();
+                order = order.getOwned();
+   
                 return queryWithQueryOptimizer( m, queryOptions, ns, jsobj, curop, query, order,
                                                 pq_shared, oldPlan, shardingVersionAtStart, result );
             }

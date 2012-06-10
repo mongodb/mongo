@@ -149,6 +149,8 @@ namespace mongo {
             else {
                 _filter = q;
             }
+
+            _filter = _filter.getOwned();
         }
         
         void _reset() {
@@ -215,7 +217,7 @@ namespace mongo {
             if ( fields.isEmpty() )
                 return;
             _fields.reset( new Projection() );
-            _fields->init( fields );
+            _fields->init( fields.getOwned() );
         }
         
         const char * const _ns;
