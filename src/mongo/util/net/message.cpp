@@ -42,20 +42,6 @@ namespace mongo {
         }
     }
 
-
-    Message& Message::operator=(const Message& r) {
-        verify( empty() );
-        verify( r._data.size() == 0 );
-        verify( r._buf );
-        
-        int x = r.size();
-        char* buf = (char*)malloc(x);
-        verify(buf);
-        memcpy( buf , r._buf->_data , x );
-        setData( reinterpret_cast<MsgData*>(buf) , true );
-        return *this;
-    }
-
     MSGID NextMsgId;
 
     /*struct MsgStart {
