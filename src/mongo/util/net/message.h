@@ -223,6 +223,8 @@ namespace mongo {
             return *this;
         }
 
+        Message& operator=(const Message& r);
+
         void reset() {
             if ( _freeIt ) {
                 if ( _buf ) {

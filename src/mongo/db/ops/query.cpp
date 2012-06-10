@@ -626,7 +626,7 @@ namespace mongo {
      * Run a query with a cursor provided by the query optimizer, or FindingStartCursor.
      * @yields the db lock.
      */
-    const char *queryWithQueryOptimizer( Message &m, int queryOptions, const char *ns,
+    const char *queryWithQueryOptimizer( const Message &originalMessage, int queryOptions, const char *ns,
                                         const BSONObj &jsobj, CurOp& curop,
                                         const BSONObj &query, const BSONObj &order,
                                         const shared_ptr<ParsedQuery> &pq_shared,
@@ -750,7 +750,7 @@ namespace mongo {
             }
             
             // !!! Save the original message buffer, so it can be referenced in getMore.
-            ccPointer->originalMessage = m;
+            ccPointer->originalMessage = originalMessage;
 
             // Save slave's position in the oplog.
             if ( pq.hasOption( QueryOption_OplogReplay ) && !slaveReadTill.isNull() ) {
