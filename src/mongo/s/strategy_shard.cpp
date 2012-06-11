@@ -213,19 +213,12 @@ namespace mongo {
                              int retries,
                              const string& ns,
                              const BSONObj& query,
-                             const StaleConfigException& e,
+                             StaleConfigException& e,
                              Request& r ) // TODO: remove
         {
 
             static const int MAX_RETRIES = 5;
             if( retries >= MAX_RETRIES ) throw e;
-
-            // Assume the inserts did *not* succeed, so we don't want to erase them
-
-            int logLevel = retries < 2;
-            LOG( logLevel ) << "retrying bulk insert of "
-                            << query << " documents "
-                            << " because of StaleConfigException: " << e << endl;
 
             //
             // On a stale config exception, we have to assume that the entire collection could have
@@ -746,7 +739,7 @@ namespace mongo {
             catch ( StaleConfigException& e ) {
 
                 dbcon.done();
-                _handleRetries( "update", retries, query, e, r );
+                _handleRetries( "update", retries, ns, query, e, r );
                 _update( ns, query, toUpdate, flags, r, d, retries + 1 );
                 return;
             }
@@ -872,7 +865,7 @@ namespace mongo {
             }
             catch ( StaleConfigException& e ) {
                 dbcon.done();
-                _handleRetries( "delete", retries, query, e, r );
+                _handleRetries( "delete", retries, ns, query, e, r );
                 _delete( ns, query, flags, r, d, retries + 1 );
                 return;
             }
