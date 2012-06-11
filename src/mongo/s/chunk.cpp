@@ -1247,7 +1247,7 @@ namespace mongo {
                     ss << ", ";
                 }
             }
-            uasserted( 16330, ss.str() );
+            uasserted( 16338, ss.str() );
         }
 
         LOG(1) << "ChunkManager::drop : " << _ns << "\t removed shard data" << endl;
