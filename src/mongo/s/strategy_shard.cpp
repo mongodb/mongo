@@ -490,9 +490,12 @@ namespace mongo {
                              const BSONObj& query,
                              const BSONObj& toUpdate,
                              int flags,
-                             BSONObj& shardKey,
+                             // Output
+                             ChunkPtr& chunk,
+                             ShardPtr& shard,
                              ChunkManagerPtr& manager,
                              ShardPtr& primary,
+                             // Input
                              bool reloadConfigData = false )
         {
             //
@@ -514,12 +517,18 @@ namespace mongo {
             bool multi = flags & UpdateOption_Multi;
             bool upsert = flags & UpdateOption_Upsert;
 
-            shardKey = BSONObj();
             grid.getDBConfig( ns )->getChunkManagerOrPrimary( ns, manager, primary );
 
-            // Unsharded updates just go to the one primary shard
-            if( ! manager ) return;
+            chunk.reset();
+            shard.reset();
 
+            // Unsharded updates just go to the one primary shard
+            if( ! manager ){
+                shard = primary;
+                return;
+            }
+
+            BSONObj shardKey;
             const ShardKeyPattern& skPattern = manager->getShardKey();
 
             if( toUpdate.firstElementFieldName()[0] == '$') {
@@ -560,7 +569,7 @@ namespace mongo {
                         // Retry reloading the config data once, in case the shard key
                         // has changed on us in the meantime
                         if( ! reloadConfigData ){
-                            _prepareUpdate( ns, query, toUpdate, flags, shardKey, manager, primary, true );
+                            _prepareUpdate( ns, query, toUpdate, flags, chunk, shard, manager, primary, true );
                             return;
                         }
 
@@ -585,7 +594,7 @@ namespace mongo {
 
                     // Retry reloading the config data once
                     if( ! reloadConfigData ){
-                        _prepareUpdate( ns, query, toUpdate, flags, shardKey, manager, primary, true );
+                        _prepareUpdate( ns, query, toUpdate, flags, chunk, shard, manager, primary, true );
                         return;
                     }
 
@@ -607,9 +616,9 @@ namespace mongo {
 
                         // Retry reloading the config data once
                         if( ! reloadConfigData ){
-                            _prepareUpdate( ns, query, toUpdate, flags, shardKey, manager, primary, true );
-                                         return;
-                                     }
+                            _prepareUpdate( ns, query, toUpdate, flags, chunk, shard, manager, primary, true );
+                            return;
+                        }
 
                         // Sleep here
                         sleepsecs( 1 );
@@ -623,18 +632,66 @@ namespace mongo {
                 }
             }
 
-            // Check to see if we have a shard key for upsert
-            if( manager && shardKey.isEmpty() && upsert ){
+            //
+            // We've now collected an exact shard key from the update or not.
+            // If we've collected an exact shard key, find the chunk it goes to.
+            // If we haven't collected an exact shard key, find the shard we go to
+            //   If we don't have a single shard to go to, don't send back a shard
+            //
 
-                // Retry reloading the config data once
-                if( ! reloadConfigData ){
-                    _prepareUpdate( ns, query, toUpdate, flags, shardKey, manager, primary, true );
+            verify( manager );
+            if( ! shardKey.isEmpty() ){
+
+                chunk = manager->findChunk( shardKey );
+                shard = ShardPtr( new Shard( chunk->getShard() ) );
+                return;
+            }
+            else {
+
+                if( upsert ){
+
+                    // We need a shard key for upsert
+
+                    // Retry reloading the config data once
+                    if( ! reloadConfigData ){
+                        _prepareUpdate( ns, query, toUpdate, flags, chunk, shard, manager, primary, true );
+                        return;
+                    }
+
+                    sleepsecs( 1 );
+
+                    throw UserException( 8012, str::stream() <<
+                            "can't upsert something without full valid shard key : " << query );
+                }
+
+                set<Shard> shards;
+                manager->getShardsForQuery( shards, query );
+
+                verify( shards.size() > 0 );
+
+                // Return if we have a single shard
+                if( shards.size() == 1 ){
+                    shard = ShardPtr( new Shard( *shards.begin() ) );
                     return;
                 }
 
-                sleepsecs( 1 );
+                if( query.hasField("$atomic") ){
 
-                uassert( 8012, "can't upsert something without full valid shard key", false );
+                    // We can't run an atomic operation on more than one shard
+
+                    // Retry reloading the config data once
+                    if( ! reloadConfigData ){
+                        _prepareUpdate( ns, query, toUpdate, flags, chunk, shard, manager, primary, true );
+                        return;
+                    }
+
+                    sleepsecs( 1 );
+
+                    throw UserException( 13506, str::stream() <<
+                            "$atomic not supported sharded : " << query );
+                }
+
+                return;
             }
         }
 
@@ -664,65 +721,29 @@ namespace mongo {
                       int retries = 0 )
         {
 
-            uassert( 13506, "$atomic not supported sharded" , ! query.hasField("$atomic") );
-
-            BSONObj shardKey;
+            ChunkPtr chunk;
+            ShardPtr shard;
             ChunkManagerPtr manager;
             ShardPtr primary;
 
-            _prepareUpdate( ns, query, toUpdate, flags,
-                            shardKey, manager, primary );
+            _prepareUpdate( ns, query, toUpdate, flags, chunk, shard, manager, primary );
 
-            ChunkPtr chunk;
-            ShardPtr shard;
-
-            if( manager && shardKey.isEmpty() ){
+            if( ! shard ){
 
                 //
-                // Without a key (could indicate a partial key), target all shards unless the query
-                // lets us target only one
+                // Without a shard, target all shards
                 //
 
-                set<Shard> shards;
-                manager->getShardsForQuery( shards, query );
-
-                verify( shards.size() > 0 );
-
-                if( shards.size() > 1 ){
-
-                    //
-                    // data could be on more than one shard. must send to all
-                    // TODO: make this safer w/ shard add/remove
-                    //
-
-                    int* opts = (int*)( r.d().afterNS() );
-                    opts[0] |= UpdateOption_Broadcast; // this means don't check shard version in mongod
-                    broadcastWrite( dbUpdate, r );
-                    return;
-                }
-
-                shard = ShardPtr( new Shard( *shards.begin() ) );
-            }
-            else if( manager && ! shardKey.isEmpty() ) {
-
                 //
-                // With a key, target a shard
+                // data could be on more than one shard. must send to all
+                // TODO: make this safer w/ shard add/remove
                 //
 
-                chunk = manager->findChunk( shardKey );
-                shard = ShardPtr( new Shard( chunk->getShard() ) );
-
+                int* opts = (int*)( r.d().afterNS() );
+                opts[0] |= UpdateOption_Broadcast; // this means don't check shard version in mongod
+                broadcastWrite( dbUpdate, r );
+                return;
             }
-            else if( primary ){
-
-                shard = primary;
-            }
-            else{
-
-                verify( false );
-            }
-
-            verify( shard );
 
             ShardConnection dbcon( *shard, ns, manager );
 
@@ -800,20 +821,36 @@ namespace mongo {
                 return;
             }
 
-            if( ! justOne || query.hasField( "_id" ) ) return;
+            if( query.hasField( "$atomic" ) ){
 
-            // Retry reloading the config data once
-            if( ! reloadConfigData ){
-                _prepareDelete( ns, query, flags, shard, manager, primary, true );
+                // Retry reloading the config data once
+                if( ! reloadConfigData ){
+                    _prepareDelete( ns, query, flags, shard, manager, primary, true );
+                    return;
+                }
+
+                // Sleep so we don't DOS config server
+                sleepsecs( 1 );
+
+                throw UserException( 13505, str::stream() <<
+                        "$atomic not supported for sharded delete : " << query );
+            }
+            else if( justOne && ! query.hasField( "_id" ) ){
+
+                // Retry reloading the config data once
+                if( ! reloadConfigData ){
+                    _prepareDelete( ns, query, flags, shard, manager, primary, true );
+                    return;
+                }
+
+                // Sleep so we don't DOS config server
+                sleepsecs( 1 );
+
+                throw UserException( 8015, str::stream() <<
+                        "can only delete with a non-shard key pattern if can " <<
+                        "delete as many as we find : " << query );
                 return;
             }
-
-            // Sleep so we don't DOS config server
-            sleepsecs( 1 );
-
-            throw UserException( 8015,
-                                 "can only delete with a non-shard key pattern if can delete as many as we find" );
-            return;
         }
 
         void _delete( Request& r , DbMessage& d ) {
@@ -839,9 +876,6 @@ namespace mongo {
                       Request& r, DbMessage& d, // todo : remove
                       int retries = 0 )
         {
-
-            uassert( 13505 , "$atomic not supported sharded" , query["$atomic"].eoo() );
-
             ShardPtr shard;
             ChunkManagerPtr manager;
             ShardPtr primary;
