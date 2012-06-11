@@ -942,8 +942,8 @@ namespace mongo {
         checkMaster()->insert(ns, v, flags);
     }
 
-    void DBClientReplicaSet::remove( const string &ns , Query obj , bool justOne ) {
-        checkMaster()->remove(ns, obj, justOne);
+    void DBClientReplicaSet::remove( const string &ns , Query obj , int flags ) {
+        checkMaster()->remove(ns, obj, flags);
     }
 
     void DBClientReplicaSet::update( const string &ns , Query query , BSONObj obj , int flags ) {
