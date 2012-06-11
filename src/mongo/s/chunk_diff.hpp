@@ -200,15 +200,28 @@ namespace mongo {
 
         //
         // Basic idea behind the query is to find all the chunks $gt the current max version, and
-        // then also update chunks that we need minor versions for - i.e. max chunks on shards and
-        // extra versions we pass in (for splits)
+        // then also update chunks that we need minor versions - splits and (2.0) max chunks on
+        // shards
         //
 
+        static const int maxMinorVersionClauses = 50;
         BSONObjBuilder queryB;
-        {
+
+        int numStaleMinorClauses = extraMinorVersions.size() + _maxShardVersions->size();
+
+#ifdef _DEBUG
+        // In debug builds, randomly trigger full reloads to exercise both codepaths
+        if( rand() % 2 ) numStaleMinorClauses = maxMinorVersionClauses;
+#endif
+
+        if( numStaleMinorClauses < maxMinorVersionClauses ){
+
             BSONArrayBuilder queryOrB( queryB.subarrayStart( "$or" ) );
 
+            //
             // Get any version changes higher than we know currently
+            //
+
             {
                 BSONObjBuilder queryNewB( queryOrB.subobjStart() );
 
@@ -242,7 +255,7 @@ namespace mongo {
             }
 
             // Get any minor version changes we've marked as interesting
-            // TODO: Ideally, we shouldn't care about these
+            // TODO: Ideally we shouldn't care about these
             for( set<ShardChunkVersion>::const_iterator it = extraMinorVersions.begin(); it != extraMinorVersions.end(); it++ ){
                 BSONObjBuilder queryShardB( queryOrB.subobjStart() );
 
@@ -258,6 +271,14 @@ namespace mongo {
             }
 
             queryOrB.done();
+        }
+        else{
+
+            //
+            // We don't want to send a giant $or query to the server, so just get all the chunks
+            //
+
+            queryB.append( "ns", _ns );
         }
 
         BSONObj query = queryB.obj();
