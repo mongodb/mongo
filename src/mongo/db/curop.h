@@ -155,10 +155,7 @@ namespace mongo {
         BSONObj query() { return _query.get();  }
         void appendQuery( BSONObjBuilder& b , const StringData& name ) const { _query.append( b , name ); }
         
-        void ensureStarted() {
-            if ( _start == 0 )
-                _start = _checkpoint = curTimeMicros64();
-        }
+        void ensureStarted();
         bool isStarted() const { return _start > 0; }
         void enter( Client::Context * context );
         void leave( Client::Context * context );
@@ -221,16 +218,12 @@ namespace mongo {
         bool killed() const { return _killed; }
         void yielded() { _numYields++; }
         int numYields() const { return _numYields; }
-        void setNS(const char *ns) {
-            strncpy(_ns, ns, Namespace::MaxNsLen);
-            _ns[Namespace::MaxNsLen] = 0;
-        }
-        
         void suppressFromCurop() { _suppressFromCurop = true; }
         
         long long getExpectedLatencyMs() const { return _expectedLatencyMs; }
         void setExpectedLatencyMs( long long latency ) { _expectedLatencyMs = latency; }
 
+        void recordGlobalTime( long long micros ) const;
     private:
         friend class Client;
         void _reset();
@@ -239,7 +232,6 @@ namespace mongo {
         Client * _client;
         CurOp * _wrapped;
         unsigned long long _start;
-        unsigned long long _checkpoint;
         unsigned long long _end;
         bool _active;
         bool _suppressFromCurop; // unless $all is set

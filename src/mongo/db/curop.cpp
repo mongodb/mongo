@@ -29,7 +29,7 @@ namespace mongo {
         _lockType = 0;
         if ( _wrapped )
             _client->_curOp = this;
-        _start = _checkpoint = 0;
+        _start = 0;
         _active = false;
         _reset();
         _op = 0;
@@ -55,7 +55,7 @@ namespace mongo {
 
     void CurOp::reset() {
         _reset();
-        _start = _checkpoint = 0;
+        _start = 0;
         _opNum = _nextOpNum++;
         _ns[0] = 0;
         _debug.reset();
@@ -105,16 +105,26 @@ namespace mongo {
         _client = 0;
     }
 
+    void CurOp::ensureStarted() {
+        if ( _start == 0 )
+            _start = curTimeMicros64();
+    }
+
     void CurOp::enter( Client::Context * context ) {
         ensureStarted();
-        setNS( context->ns() );
-        _dbprofile = context->_db ? context->_db->profile : 0;
+
+        strncpy( _ns, context->ns(), Namespace::MaxNsLen);
+        _ns[Namespace::MaxNsLen] = 0;
+
+        _dbprofile = std::max( context->_db ? context->_db->profile : 0 , _dbprofile );
     }
     
     void CurOp::leave( Client::Context * context ) {
-        unsigned long long now = curTimeMicros64();
-        Top::global.record( _ns , _op , _lockType , now - _checkpoint , _command );
-        _checkpoint = now;
+        _ns[0] = 0;
+    }
+
+    void CurOp::recordGlobalTime( long long micros ) const {
+        Top::global.record( _ns , _op , _lockType , micros , _command );
     }
 
     BSONObj CurOp::infoNoauth() {

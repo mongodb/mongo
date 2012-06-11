@@ -239,6 +239,8 @@ namespace mongo {
             bool _doVersion;
             const string _ns;
             Database * _db;
+            
+            Timer _timer;
         }; // class Client::Context
 
         class WriteContext : boost::noncopyable {
