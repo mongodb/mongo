@@ -15,6 +15,10 @@ if (hostinfo.os.type == "Windows") {
 } else if (hostinfo.os.type == "Darwin") {
     assert.neq( hostinfo.os.name, "" || null, "Missing Darwin os name" );
     assert.neq( hostinfo.os.version, "" || null, "Missing Darwin version" );
+
+} else if (hostinfo.os.type == "BSD") {
+    assert.neq( hostinfo.os.name, "" || null, "Missing FreeBSD os name" );
+    assert.neq( hostinfo.os.version, "" || null, "Missing FreeBSD version" );
 }
 
 // comment out this block for systems which have not implemented hostinfo.  
