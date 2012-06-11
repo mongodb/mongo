@@ -562,10 +562,12 @@ namespace mongo {
                 // this means there is no reset going on an either side
                 // so its safe to make some assumptions
 
-                if ( version.isEquivalentTo( globalVersion ) ) {
+                if ( version.isWriteCompatibleWith( globalVersion ) ) {
                     // mongos and mongod agree!
-                    if ( ! oldVersion.isEquivalentTo( version ) ) {
-                        if ( oldVersion < globalVersion ) {
+                    if ( ! oldVersion.isWriteCompatibleWith( version ) ) {
+                        if ( oldVersion < globalVersion &&
+                             oldVersion.hasCompatibleEpoch(globalVersion) )
+                        {
                             info->setVersion( ns , version );
                         }
                         else if ( authoritative ) {
