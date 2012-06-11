@@ -442,6 +442,11 @@ namespace mongo {
 
         }
         catch ( DBException& e ) {
+
+            // TODO: Make this better - there are lots of reasons a split could fail
+            // Random so that we don't sync up with other failed splits
+            _dataWritten = mkDataWritten();
+
             // if the collection lock is taken (e.g. we're migrating), it is fine for the split to fail.
             warning() << "could not autosplit collection " << _manager->getns() << causedBy( e ) << endl;
             return false;
