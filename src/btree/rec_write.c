@@ -2471,7 +2471,6 @@ __rec_row_leaf(
 	uint64_t slvg_skip;
 	uint32_t i;
 	int found, onpage_ovfl, ovfl_key;
-	void *ripkey;
 
 	r = session->reconcile;
 	btree = session->btree;
@@ -2514,13 +2513,12 @@ __rec_row_leaf(
 		 * Set the WT_IKEY reference (if the key was instantiated), and
 		 * the key cell reference.
 		 */
-		ripkey = WT_ROW_KEY_COPY(rip);
-		if (__wt_off_page(page, ripkey)) {
-			ikey = ripkey;
+		ikey = WT_ROW_KEY_COPY(rip);
+		if (__wt_off_page(page, ikey))
 			cell = WT_PAGE_REF_OFFSET(page, ikey->cell_offset);
-		} else {
+		else {
+			cell = (WT_CELL *)ikey;
 			ikey = NULL;
-			cell = ripkey;
 		}
 
 		/* Build value cell. */

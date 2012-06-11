@@ -93,7 +93,6 @@ __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip)
 	WT_IKEY *ikey;
 	WT_SESSION_IMPL *session;
 	WT_UPDATE *upd;
-	void *key;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	btree = session->btree;
@@ -106,7 +105,7 @@ __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip)
 	 * Return the WT_ROW slot's K/V pair.
 	 */
 
-	key = WT_ROW_KEY_COPY(rip);
+	ikey = WT_ROW_KEY_COPY(rip);
 	/*
 	 * Key copied.
 	 *
@@ -119,8 +118,7 @@ __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip)
 	 * If the key points on-page, we have a copy of a WT_CELL value that can
 	 * be processed, regardless of what any other thread is doing.
 	 */
-	if (__wt_off_page(cbt->page, key)) {
-		ikey = key;
+	if (__wt_off_page(cbt->page, ikey)) {
 		kb->data = WT_IKEY_DATA(ikey);
 		kb->size = ikey->size;
 	} else {
@@ -133,7 +131,7 @@ __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip)
 		 */
 		if (btree->huffman_key != NULL)
 			goto slow;
-		__wt_cell_unpack(key, unpack);
+		__wt_cell_unpack((WT_CELL *)ikey, unpack);
 		if (unpack->type == WT_CELL_KEY && unpack->prefix == 0) {
 			kb->data = cbt->tmp.data = unpack->data;
 			kb->size = cbt->tmp.size = unpack->size;

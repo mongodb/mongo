@@ -96,7 +96,6 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 	WT_ROW *rip;
 	uint32_t base, indx, limit;
 	int cmp;
-	void *key;
 
 	__cursor_search_clear(cbt);
 
@@ -175,7 +174,7 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 		indx = base + (limit >> 1);
 		rip = page->u.row.d + indx;
 
-retry:		key = WT_ROW_KEY_COPY(rip);
+retry:		ikey = WT_ROW_KEY_COPY(rip);
 		/*
 		 * Key copied.
 		 *
@@ -189,8 +188,7 @@ retry:		key = WT_ROW_KEY_COPY(rip);
 		 * that can be processed, regardless of what any other thread is
 		 * doing.
 		 */
-		if (__wt_off_page(page, key)) {
-			ikey = key;
+		if (__wt_off_page(page, ikey)) {
 			_item.data = WT_IKEY_DATA(ikey);
 			_item.size = ikey->size;
 			item = &_item;
@@ -199,7 +197,7 @@ retry:		key = WT_ROW_KEY_COPY(rip);
 				WT_ERR(__wt_row_key(session, page, rip, NULL));
 				goto retry;
 			}
-			__wt_cell_unpack(key, unpack);
+			__wt_cell_unpack((WT_CELL *)ikey, unpack);
 			if (unpack->type == WT_CELL_KEY &&
 			    unpack->prefix == 0) {
 				_item.data = unpack->data;

@@ -1525,7 +1525,6 @@ __slvg_row_trk_update_start(
 	WT_TRACK *trk;
 	uint32_t i;
 	int cmp, found;
-	void *ripkey;
 
 	btree = session->btree;
 	page = NULL;
@@ -1563,9 +1562,8 @@ __slvg_row_trk_update_start(
 	 */
 	WT_ERR(__wt_scr_alloc(session, 0, &key));
 	WT_ROW_FOREACH(page, rip, i) {
-		ripkey = WT_ROW_KEY_COPY(rip);
-		if (__wt_off_page(page, ripkey)) {
-			ikey = ripkey;
+		ikey = WT_ROW_KEY_COPY(rip);
+		if (__wt_off_page(page, ikey)) {
 			_item.data = WT_IKEY_DATA(ikey);
 			_item.size = ikey->size;
 			item = &_item;
@@ -1706,7 +1704,6 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 	WT_SALVAGE_COOKIE *cookie, _cookie;
 	uint32_t i, skip_start, skip_stop;
 	int cmp;
-	void *ripkey;
 
 	btree = session->btree;
 	page = NULL;
@@ -1739,9 +1736,8 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 	skip_start = skip_stop = 0;
 	if (F_ISSET(trk, WT_TRACK_CHECK_START))
 		WT_ROW_FOREACH(page, rip, i) {
-			ripkey = WT_ROW_KEY_COPY(rip);
-			if (__wt_off_page(page, ripkey)) {
-				ikey = ripkey;
+			ikey = WT_ROW_KEY_COPY(rip);
+			if (__wt_off_page(page, ikey)) {
 				_item.data = WT_IKEY_DATA(ikey);
 				_item.size = ikey->size;
 				item = &_item;
@@ -1771,9 +1767,8 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 		}
 	if (F_ISSET(trk, WT_TRACK_CHECK_STOP))
 		WT_ROW_FOREACH_REVERSE(page, rip, i) {
-			ripkey = WT_ROW_KEY_COPY(rip);
-			if (__wt_off_page(page, ripkey)) {
-				ikey = ripkey;
+			ikey = WT_ROW_KEY_COPY(rip);
+			if (__wt_off_page(page, ikey)) {
 				_item.data = WT_IKEY_DATA(ikey);
 				_item.size = ikey->size;
 				item = &_item;
@@ -1816,12 +1811,11 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 	 * a copy from the page.
 	 */
 	rip = page->u.row.d + skip_start;
-	ripkey = WT_ROW_KEY_COPY(rip);
-	if (__wt_off_page(page, ripkey)) {
-		ikey = ripkey;
+	ikey = WT_ROW_KEY_COPY(rip);
+	if (__wt_off_page(page, ikey))
 		WT_ERR(__wt_row_ikey_alloc(session, 0,
 		    WT_IKEY_DATA(ikey), ikey->size, &ref->u.key));
-	} else {
+	else {
 		WT_ERR(__wt_row_key(session, page, rip, key));
 		WT_ERR(__wt_row_ikey_alloc(session, 0,
 		    key->data, key->size, &ref->u.key));
@@ -1901,18 +1895,17 @@ __slvg_row_merge_ovfl(WT_SESSION_IMPL *session,
 {
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
+	WT_IKEY *ikey;
 	WT_ROW *rip;
-	void *ripkey;
 
 	unpack = &_unpack;
 
 	for (rip = page->u.row.d + start; start < stop; ++start) {
-		ripkey = WT_ROW_KEY_COPY(rip);
-		if (__wt_off_page(page, ripkey))
-			cell = WT_PAGE_REF_OFFSET(
-			    page, ((WT_IKEY *)ripkey)->cell_offset);
+		ikey = WT_ROW_KEY_COPY(rip);
+		if (__wt_off_page(page, ikey))
+			cell = WT_PAGE_REF_OFFSET(page, ikey->cell_offset);
 		else
-			cell = ripkey;
+			cell = (WT_CELL *)ikey;
 		__wt_cell_unpack(cell, unpack);
 		if (unpack->type == WT_CELL_KEY_OVFL) {
 			WT_VERBOSE_RET(session, salvage,
