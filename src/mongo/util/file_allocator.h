@@ -18,7 +18,7 @@
 #include "pch.h"
 
 #include <list>
-
+#include <boost/filesystem/path.hpp>
 #include <boost/thread/condition.hpp>
 
 namespace mongo {
@@ -75,11 +75,17 @@ namespace mongo {
         /** called from the worked thread */
         static void run( FileAllocator * fa );
 
+        // generate a unique name for temporary files
+        string makeTempFileName( boost::filesystem::path root );
+
         mutable mongo::mutex _pendingMutex;
         mutable boost::condition _pendingUpdated;
 
         std::list< string > _pending;
         mutable map< string, long > _pendingSize;
+
+        // unique number for temporary files
+        static unsigned long long _uniqueNumber;
 
         bool _failed;
 

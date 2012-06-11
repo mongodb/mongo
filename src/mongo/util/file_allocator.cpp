@@ -15,19 +15,19 @@
  *    limitations under the License.
  */
 
-#include "pch.h"
-
+#include "mongo/pch.h"
+#include "mongo/util/file_allocator.h"
+#include <boost/thread.hpp>
+#include <boost/filesystem/operations.hpp>
 #include <fcntl.h>
 #include <errno.h>
 
-#include <boost/thread.hpp>
-
 #if defined(__freebsd__) || defined(__openbsd__)
-#include <sys/stat.h>
+#   include <sys/stat.h>
 #endif
 
 #if defined(__linux__)
-#include <sys/vfs.h>
+#   include <sys/vfs.h>
 #endif
 
 #if defined(_WIN32)
@@ -37,18 +37,19 @@
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/paths.h"
+
 using namespace mongoutils;
 
 #ifndef O_NOATIME
 #define O_NOATIME (0)
 #endif
 
-#include "file_allocator.h"
-#include "paths.h"
-
-#include <boost/filesystem/operations.hpp>
-
 namespace mongo {
+
+    // unique number for temporary file names
+    unsigned long long FileAllocator::_uniqueNumber = 0;
+    static SimpleMutex _uniqueNumberMutex( "uniqueNumberMutex" );
 
     /**
      * Aliases for Win32 CRT functions
@@ -228,11 +229,19 @@ namespace mongo {
         return false;
     }
 
-    string makeTempFileName( boost::filesystem::path root ) {
+    string FileAllocator::makeTempFileName( boost::filesystem::path root ) {
         while( 1 ) {
             boost::filesystem::path p = root / "_tmp";
             stringstream ss;
-            ss << (unsigned) rand();
+            unsigned long long thisUniqueNumber;
+            {
+                // increment temporary file name counter
+                // TODO: SERVER-6055 -- Unify temporary file name selection
+                SimpleMutex::scoped_lock lk(_uniqueNumberMutex);
+                thisUniqueNumber = _uniqueNumber;
+                ++_uniqueNumber;
+            }
+            ss << thisUniqueNumber;
             p /= ss.str();
             string fn = p.string();
             if( !boost::filesystem::exists(p) )
@@ -243,7 +252,12 @@ namespace mongo {
 
     void FileAllocator::run( FileAllocator * fa ) {
         setThreadName( "FileAllocator" );
-        srand( static_cast <unsigned>( curTimeMicros() ) );
+        {
+            // initialize unique temporary file name counter
+            // TODO: SERVER-6055 -- Unify temporary file name selection
+            SimpleMutex::scoped_lock lk(_uniqueNumberMutex);
+            _uniqueNumber = curTimeMicros64();
+        }
         while( 1 ) {
             {
                 scoped_lock lk( fa->_pendingMutex );
@@ -267,7 +281,7 @@ namespace mongo {
                     log() << "allocating new datafile " << name << ", filling with zeroes..." << endl;
                     
                     boost::filesystem::path parent = ensureParentDirCreated(name);
-                    tmp = makeTempFileName( parent );
+                    tmp = fa->makeTempFileName( parent );
                     ensureParentDirCreated(tmp);
 
 #if defined(_WIN32)
@@ -296,9 +310,10 @@ namespace mongo {
 
                     if( rename(tmp.c_str(), name.c_str()) ) {
                         const string& errStr = errnoWithDescription();
-                        log() << "error: couldn't rename " << tmp 
-                              << " to " << name << ' ' << errStr << endl;
-                        msgasserted(13653, "");
+                        const string& errMessage = str::stream()
+                                << "error: couldn't rename " << tmp
+                                << " to " << name << ' ' << errStr;
+                        msgasserted(13653, errMessage);
                     }
                     flushMyDirectory(name);
 
@@ -310,18 +325,18 @@ namespace mongo {
                     // no longer in a failed state. allow new writers.
                     fa->_failed = false;
                 }
-                catch ( ... ) {
+                catch ( const std::exception& e ) {
+                    log() << "error: failed to allocate new file: " << name
+                          << " size: " << size << ' ' << e.what()
+                          << ".  will try again in 10 seconds" << endl;
                     if ( fd > 0 )
                         close( fd );
-                    log() << "error: failed to allocate new file: " << name
-                          << " size: " << size << ' ' << errnoWithDescription() << warnings
-                          << ".  will try again in 10 seconds" << endl;
                     try {
-                        if ( tmp.size() )
-                            MONGO_ASSERT_ON_EXCEPTION( boost::filesystem::remove( tmp ) );
-                        MONGO_ASSERT_ON_EXCEPTION( boost::filesystem::remove( name ) );
-                    }
-                    catch ( ... ) {
+                        if ( ! tmp.empty() )
+                            boost::filesystem::remove( tmp );
+                        boost::filesystem::remove( name );
+                    } catch ( const std::exception& e ) {
+                        log() << "error removing files: " << e.what() << endl;
                     }
                     scoped_lock lk( fa->_pendingMutex );
                     fa->_failed = true;

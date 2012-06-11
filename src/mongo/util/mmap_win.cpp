@@ -23,6 +23,7 @@
 #include "../db/memconcept.h"
 #include "mongo/util/timer.h"
 #include "mongo/util/concurrency/remap_lock.h"
+#include "mongo/util/file_allocator.h"
 
 namespace mongo {
 
@@ -135,6 +136,7 @@ namespace mongo {
     void* MemoryMappedFile::map(const char *filenameIn, unsigned long long &length, int options) {
         verify( fd == 0 && len == 0 ); // can't open more than once
         setFilename(filenameIn);
+        FileAllocator::get()->allocateAsap( filenameIn, length );
         /* big hack here: Babble uses db names with colons.  doesn't seem to work on windows.  temporary perhaps. */
         char filename[256];
         strncpy(filename, filenameIn, 255);
