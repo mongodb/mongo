@@ -43,6 +43,7 @@ namespace mongo {
     public:
 
         using DBClientBase::query;
+        using DBClientBase::update;
 
         /**
          * @param commaSeparated should be 3 hosts comma separated
@@ -77,7 +78,7 @@ namespace mongo {
 
         virtual void remove( const string &ns , Query query, bool justOne );
 
-        virtual void update( const string &ns , Query query , BSONObj obj , bool upsert , bool multi );
+        virtual void update( const string &ns , Query query , BSONObj obj , int flags );
 
         virtual bool call( Message &toSend, Message &response, bool assertOk , string * actualServer );
         virtual void say( Message &toSend, bool isRetry = false , string * actualServer = 0 );
