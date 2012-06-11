@@ -42,7 +42,7 @@ namespace mongo {
         _id = _m.header()->id;
 
         _clientInfo = ClientInfo::get();
-        _clientInfo->newRequest( p );
+        _clientInfo->newPeerRequest( p->remote() );
     }
 
     void Request::checkAuth( Auth::Level levelNeeded , const char * need ) const {

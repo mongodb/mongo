@@ -17,10 +17,12 @@
  */
 #pragma once
 
-#include "../pch.h"
-#include "writeback_listener.h"
-#include "../db/security.h"
-#include "../db/client_common.h"
+#include "mongo/pch.h"
+
+#include "mongo/db/client_common.h"
+#include "mongo/db/security.h"
+#include "mongo/s/writeback_listener.h"
+#include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 
@@ -34,8 +36,12 @@ namespace mongo {
         ClientInfo();
         ~ClientInfo();
 
-        /** new request from client, adjusts internal state */
-        void newRequest( AbstractMessagingPort* p = 0 );
+        /** new request on behalf of a client, adjusts internal state */
+        void newPeerRequest( const HostAndPort& peer );
+
+        /** new request not associated (yet or ever) with a client */
+        void newRequest();
+
 
         /** client disconnected */
         void disconnect();
@@ -92,6 +98,7 @@ namespace mongo {
         const AuthenticationInfo* getAuthenticationInfo() const { return (AuthenticationInfo*)&_ai; }
         AuthenticationInfo* getAuthenticationInfo() { return (AuthenticationInfo*)&_ai; }
         bool isAdmin() { return _ai.isAuthorized( "admin" ); }
+
     private:
         AuthenticationInfo _ai;
         struct WBInfo {

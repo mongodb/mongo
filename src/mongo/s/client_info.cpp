@@ -51,19 +51,19 @@ namespace mongo {
         _sinceLastGetError.insert( shard );
     }
 
-    void ClientInfo::newRequest( AbstractMessagingPort* p ) {
-
-        if ( p ) {
-            HostAndPort r = p->remote();
-            if ( ! _remote.hasPort() )
-                _remote = r;
-            else if ( _remote != r ) {
-                stringstream ss;
-                ss << "remotes don't match old [" << _remote.toString() << "] new [" << r.toString() << "]";
-                throw UserException( 13134 , ss.str() );
-            }
+    void ClientInfo::newPeerRequest( const HostAndPort& peer ) {
+        if ( ! _remote.hasPort() )
+            _remote = peer;
+        else if ( _remote != peer ) {
+            stringstream ss;
+            ss << "remotes don't match old [" << _remote.toString() << "] new [" << peer.toString() << "]";
+            throw UserException( 13134 , ss.str() );
         }
 
+        newRequest();
+    }
+
+    void ClientInfo::newRequest() {
         _lastAccess = (int) time(0);
 
         set<string> * temp = _cur;
