@@ -947,7 +947,12 @@ namespace mongo {
 
                 // since this could be the first call that enable sharding we also make sure to have the chunk manager up to date
                 shardingState.gotShardName( myOldShard );
-                ShardChunkVersion shardVersion;
+
+                // Using the maxVersion we just found will enforce a check - if we use zero version,
+                // it's possible this shard will be *at* zero version from a previous migrate and
+                // no refresh will be done
+                // TODO: Make this less fragile
+                ShardChunkVersion shardVersion = maxVersion;
                 shardingState.trySetVersion( ns , shardVersion /* will return updated */ );
 
                 log() << "moveChunk request accepted at version " << shardVersion << migrateLog;
