@@ -42,5 +42,4 @@ namespace mongo {
 // this redefines 'malloc' to 'MONGO_malloc', etc
 #include "mongo/client/redef_macros.h"
 
-
 } // namespace mongo

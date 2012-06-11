@@ -46,6 +46,7 @@
 #include "../util/md5main.cpp"
 
 #define MONGO_EXPOSE_MACROS
+
 #include "../pch.h"
 
 #include "../util/assert_util.cpp"
@@ -58,26 +59,48 @@
 #include "../util/password.cpp"
 #include "../util/net/message_port.cpp"
 #include "../util/concurrency/thread_pool.cpp"
-#include "../util/concurrency/vars.cpp"
 #include "../util/concurrency/task.cpp"
 #include "../util/concurrency/spin_lock.cpp"
+
+// in client/ directory:
 #include "connpool.cpp"
 #include "syncclusterconnection.cpp"
 #include "dbclient.cpp"
 #include "clientOnly.cpp"
 #include "gridfs.cpp"
 #include "dbclientcursor.cpp"
-#include "../util/text.cpp"
 #include "dbclient_rs.cpp"
+
+#include "../util/text.cpp"
 #include "../bson/oid.cpp"
 #include "../db/lasterror.cpp"
 #include "../db/json.cpp"
 #include "../db/jsobj.cpp"
 #include "../db/nonce.cpp"
+#include "../db/dbmessage.cpp"
+
 #include "../pch.cpp"
 
 extern "C" {
 #include "../util/md5.cpp"
 }
 
-#include "client/clientAndShell.cpp"
+// in client/ directory:
+#include "clientAndShell.cpp"
+#include "connection_factory.cpp"
+
+#include "../util/time_support.cpp"
+#include "../util/timer.cpp"
+#include "../util/concurrency/mutexdebugger.cpp"
+#include "../util/stringutils.cpp"
+
+/* these should probably be in clientOnly.cpp. however as a first step putting here so that there 
+   is no risk we break the LIB build of cpp client.  so this is interim.
+   */
+namespace mongo {
+    void printStackTrace(class std::basic_ostream<char,struct std::char_traits<char> > &) { }
+    void mongo_breakpoint() { }
+    void printStackAndExit( int signalNum ) {
+        ::_exit( EXIT_ABRUPT );
+    }
+}
