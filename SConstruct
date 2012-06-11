@@ -313,7 +313,7 @@ libdeps.setup_environment( env )
 
 if env['PYSYSPLATFORM'] == 'linux3':
     env['PYSYSPLATFORM'] = 'linux2'
-if env['PYSYSPLATFORM'] in ('freebsd9', ):
+if 'freebsd' in env['PYSYSPLATFORM']:
     env['PYSYSPLATFORM'] = 'freebsd'
 
 if os.sys.platform == 'win32':
@@ -522,6 +522,7 @@ elif "sunos5" == os.sys.platform:
 elif os.sys.platform.startswith( "freebsd" ):
     nix = True
     freebsd = True
+    env.Append( LIBS=[ "kvm" ] )
     env.Append( EXTRACPPPATH=[ "/usr/local/include" ] )
     env.Append( EXTRALIBPATH=[ "/usr/local/lib" ] )
     env.Append( CPPDEFINES=[ "__freebsd__" ] )
