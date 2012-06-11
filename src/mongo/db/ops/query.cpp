@@ -796,14 +796,16 @@ namespace mongo {
         // notes:
         //  do not touch result inside of PageFaultRetryableSection area
 
-        Client& c = cc(); // only here since its safe and takes time
+        Client& currentClient = cc(); // only here since its safe and takes time
         auto_ptr< QueryResult > qr;
         
         {
             // this extra bracing is not strictly needed
             // but makes it clear what the rules are in different spots
-            
-            PageFaultRetryableSection pfrs;
+ 
+            scoped_ptr<PageFaultRetryableSection> pgfs;
+            if ( ! currentClient.getPageFaultRetryableSection() )
+                pgfs.reset( new PageFaultRetryableSection() );
             while ( 1 ) {
                 try {
                     
@@ -816,7 +818,7 @@ namespace mongo {
                     Client::ReadContext ctx( ns , dbpath ); // read locks
                     replVerifyReadsOk(&pq);
                     
-                    bool found = Helpers::findById( c, ns , query , resObject , &nsFound , &indexFound );
+                    bool found = Helpers::findById( currentClient, ns, query, resObject, &nsFound, &indexFound );
                     if ( nsFound && ! indexFound ) {
                         // we have to resort to a table scan
                         return false;
