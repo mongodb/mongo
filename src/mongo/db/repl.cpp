@@ -1555,7 +1555,7 @@ namespace mongo {
     } replApplyBatchSizeValidator;
     
     /** we allow queries to SimpleSlave's */
-    void replVerifyReadsOk(ParsedQuery* pq) {
+    void replVerifyReadsOk(const ParsedQuery* pq) {
         if( replSet ) {
             // todo: speed up the secondary case.  as written here there are 2 mutex entries, it
             // can b 1.

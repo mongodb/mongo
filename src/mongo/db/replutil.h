@@ -84,6 +84,6 @@ namespace mongo {
 
     class ParsedQuery;
     
-    void replVerifyReadsOk(ParsedQuery* pq = 0);
+    void replVerifyReadsOk(const ParsedQuery* pq = 0);
 
 } // namespace mongo
