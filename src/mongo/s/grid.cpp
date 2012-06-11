@@ -41,73 +41,96 @@ namespace mongo {
         if ( database == "config" )
             return configServerPtr;
 
-        uassert( 15918 , str::stream() << "invalid database name: " << database , NamespaceString::validDBName( database ) );
+        uassert( 15918,
+                 str::stream() << "invalid database name: " << database,
+                 NamespaceString::validDBName( database ) );
 
         scoped_lock l( _lock );
 
-        DBConfigPtr& cc = _databases[database];
-        if ( !cc ) {
-            cc.reset(new DBConfig( database ));
-            if ( ! cc->load() ) {
-                if ( create ) {
-                    // note here that cc->primary == 0.
-                    log() << "couldn't find database [" << database << "] in config db" << endl;
+        DBConfigPtr& dbConfig = _databases[database];
+        if( ! dbConfig ){
 
-                    {
-                        // lets check case
-                        scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::getScopedDbConnection(
-                                configServer.modelServer() ));
-                        BSONObjBuilder b;
-                        b.appendRegex( "_id" , (string)"^" +
-                                       pcrecpp::RE::QuoteMeta( database ) + "$" , "i" );
-                        BSONObj d = conn->get()->findOne( ShardNS::database , b.obj() );
-                        conn->done();
+            dbConfig.reset(new DBConfig( database ));
 
-                        if ( ! d.isEmpty() ) {
-                            cc.reset();
-                            stringstream ss;
-                            ss <<  "can't have 2 databases that just differ on case "
-                               << " have: " << d["_id"].String()
-                               << " want to add: " << database;
+            // Protect initial load from connectivity errors
+            bool loaded = false;
+            try {
+                loaded = dbConfig->load();
+            }
+            catch( DBException& e ){
+                e.addContext( "error loading initial database config information" );
+                warning() << e.what() << endl;
+                dbConfig.reset();
+                throw;
+            }
 
-                            uasserted( DatabaseDifferCaseCode ,ss.str() );
+            if( ! loaded ){
+
+                if( create ){
+
+                    // Protect creation of initial db doc from connectivity errors
+                    try{
+
+                        // note here that cc->primary == 0.
+                        log() << "couldn't find database [" << database << "] in config db" << endl;
+
+                        {
+                            // lets check case
+                            scoped_ptr<ScopedDbConnection> conn(
+                                ScopedDbConnection::getScopedDbConnection( configServer.modelServer() ));
+
+                            BSONObjBuilder b;
+                            b.appendRegex( "_id" , (string)"^" +
+                                           pcrecpp::RE::QuoteMeta( database ) + "$" , "i" );
+                            BSONObj d = conn->get()->findOne( ShardNS::database , b.obj() );
+                            conn->done();
+
+                            if ( ! d.isEmpty() ) {
+                                uasserted( DatabaseDifferCaseCode, str::stream()
+                                    <<  "can't have 2 databases that just differ on case "
+                                    << " have: " << d["_id"].String()
+                                    << " want to add: " << database );
+                            }
+                        }
+
+                        Shard primary;
+                        if ( database == "admin" ) {
+                            primary = configServer.getPrimary();
+
+                        }
+                        else if ( shardNameHint.empty() ) {
+                            primary = Shard::pick();
+
+                        }
+                        else {
+                            // use the shard name if provided
+                            Shard shard;
+                            shard.reset( shardNameHint );
+                            primary = shard;
+                        }
+
+                        if ( primary.ok() ) {
+                            dbConfig->setPrimary( primary.getName() ); // saves 'cc' to configDB
+                            log() << "\t put [" << database << "] on: " << primary << endl;
+                        }
+                        else {
+                            uasserted( 10185 ,  "can't find a shard to put new db on" );
                         }
                     }
-
-                    Shard primary;
-                    if ( database == "admin" ) {
-                        primary = configServer.getPrimary();
-
-                    }
-                    else if ( shardNameHint.empty() ) {
-                        primary = Shard::pick();
-
-                    }
-                    else {
-                        // use the shard name if provided
-                        Shard shard;
-                        shard.reset( shardNameHint );
-                        primary = shard;
-                    }
-
-                    if ( primary.ok() ) {
-                        cc->setPrimary( primary.getName() ); // saves 'cc' to configDB
-                        log() << "\t put [" << database << "] on: " << primary << endl;
-                    }
-                    else {
-                        cc.reset();
-                        log() << "\t can't find a shard to put new db on" << endl;
-                        uasserted( 10185 ,  "can't find a shard to put new db on" );
+                    catch( DBException& e ){
+                        e.addContext( "error creating initial database config information" );
+                        warning() << e.what() << endl;
+                        dbConfig.reset();
+                        throw;
                     }
                 }
                 else {
-                    cc.reset();
+                    dbConfig.reset();
                 }
             }
-
         }
 
-        return cc;
+        return dbConfig;
     }
 
     void Grid::removeDB( string database ) {
