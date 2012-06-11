@@ -792,47 +792,75 @@ namespace mongo {
         return exhaust;
     }
 
-    bool queryIdHack_locked( const char* ns, const BSONObj& query, const ParsedQuery& pq, CurOp& curop, Message& result ) {
-        int n = 0;
-        bool nsFound = false;
-        bool indexFound = false;
+    bool queryIdHack( const char* ns, const BSONObj& query, const ParsedQuery& pq, CurOp& curop, Message& result ) {
+        // notes:
+        //  do not touch result inside of PageFaultRetryableSection area
+
+        Client& c = cc(); // only here since its safe and takes time
+        auto_ptr< QueryResult > qr;
         
-        BSONObj resObject;
-        Client& c = cc();
-        bool found = Helpers::findById( c, ns , query , resObject , &nsFound , &indexFound );
-        if ( nsFound && ! indexFound ) 
-            return false;
-        
-        if ( shardingState.needShardChunkManager( ns ) ) {
-            ShardChunkManagerPtr m = shardingState.getShardChunkManager( ns );
-            if ( m && ! m->belongsToMe( resObject ) ) {
-                // I have something this _id
-                // but it doesn't belong to me
-                // so return nothing
-                resObject = BSONObj();
-                found = false;
+        {
+            // this extra bracing is not strictly needed
+            // but makes it clear what the rules are in different spots
+            
+            PageFaultRetryableSection pfrs;
+            while ( 1 ) {
+                try {
+                    
+                    int n = 0;
+                    bool nsFound = false;
+                    bool indexFound = false;
+                    
+                    BSONObj resObject; // put inside since we don't own the memory
+                    
+                    Client::ReadContext ctx( ns , dbpath ); // read locks
+                    replVerifyReadsOk(&pq);
+                    
+                    bool found = Helpers::findById( c, ns , query , resObject , &nsFound , &indexFound );
+                    if ( nsFound && ! indexFound ) {
+                        // we have to resort to a table scan
+                        return false;
+                    }
+                    
+                    if ( shardingState.needShardChunkManager( ns ) ) {
+                        ShardChunkManagerPtr m = shardingState.getShardChunkManager( ns );
+                        if ( m && ! m->belongsToMe( resObject ) ) {
+                            // I have something this _id
+                            // but it doesn't belong to me
+                            // so return nothing
+                            resObject = BSONObj();
+                            found = false;
+                        }
+                    }
+                    
+                    BufBuilder bb(sizeof(QueryResult)+resObject.objsize()+32);
+                    bb.skip(sizeof(QueryResult));
+                    
+                    curop.debug().idhack = true;
+                    if ( found ) {
+                        n = 1;
+                        fillQueryResultFromObj( bb , pq.getFields() , resObject );
+                    }
+                    
+                    qr.reset( (QueryResult *) bb.buf() );
+                    bb.decouple();
+                    qr->setResultFlagsToOk();
+                    qr->len = bb.len();
+                    
+                    curop.debug().responseLength = bb.len();
+                    qr->setOperation(opReply);
+                    qr->cursorId = 0;
+                    qr->startingFrom = 0;
+                    qr->nReturned = n;
+                    
+                    break;
+                }
+                catch ( PageFaultException& e ) {
+                    e.touch();
+                }
             }
         }
-        
-        BufBuilder bb(sizeof(QueryResult)+resObject.objsize()+32);
-        bb.skip(sizeof(QueryResult));
-        
-        curop.debug().idhack = true;
-        if ( found ) {
-            n = 1;
-            fillQueryResultFromObj( bb , pq.getFields() , resObject );
-        }
-        auto_ptr< QueryResult > qr;
-        qr.reset( (QueryResult *) bb.buf() );
-        bb.decouple();
-        qr->setResultFlagsToOk();
-        qr->len = bb.len();
-        
-        curop.debug().responseLength = bb.len();
-        qr->setOperation(opReply);
-        qr->cursorId = 0;
-        qr->startingFrom = 0;
-        qr->nReturned = n;
+
         result.setData( qr.release(), true );
         return true;
     }
@@ -908,6 +936,15 @@ namespace mongo {
             uassert( 10110 , "bad query object", false);
         }
 
+
+        // Run a simple id query.
+        if ( ! (explain || pq.showDiskLoc()) && isSimpleIdQuery( query ) && !pq.hasOption( QueryOption_CursorTailable ) ) {
+            if ( queryIdHack( ns, query, pq, curop, result ) ) {
+                return NULL;
+            }
+        }
+
+
         bool hasRetried = false;
         scoped_ptr<PageFaultRetryableSection> pgfs;
         if ( ! cc().getPageFaultRetryableSection() )
@@ -931,13 +968,6 @@ namespace mongo {
                     }
                 }
                 
-                // Run a simple id query.
-                
-                if ( ! (explain || pq.showDiskLoc()) && isSimpleIdQuery( query ) && !pq.hasOption( QueryOption_CursorTailable ) ) {
-                    if ( queryIdHack_locked( ns, query, pq, curop, result ) ) {
-                        return NULL;
-                    }
-                }
                 
                 // Run a regular query.
                 
