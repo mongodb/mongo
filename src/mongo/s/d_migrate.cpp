@@ -841,10 +841,14 @@ namespace mongo {
 
             MoveTimingHelper timing( "from" , ns , min , max , 6 /* steps */ , errmsg );
 
+            // Make sure we're as up-to-date as possible with shard information
+            // This catches the case where we had to previously changed a shard's host by
+            // removing/adding a shard with the same name
+            Shard::reloadShardInfo();
 
-            // Also, so 2.2 mongod can interact with 2.0 mongos, mongod needs to handle either a conn string or a
-            // shard in the to/from fields.  The Shard constructor handles this, eventually we should break the
-            // compatibility.
+            // So 2.2 mongod can interact with 2.0 mongos, mongod needs to handle either a conn
+            // string or a shard in the to/from fields.  The Shard constructor handles this,
+            // eventually we should break the compatibility.
 
             Shard fromShard( from );
             Shard toShard( to );
