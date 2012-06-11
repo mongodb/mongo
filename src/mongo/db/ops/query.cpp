@@ -632,6 +632,7 @@ namespace mongo {
                                          const shared_ptr<ParsedQuery> &pq_shared,
                                          const BSONObj &oldPlan,
                                          const ConfigVersion &shardingVersionAtStart,
+                                         scoped_ptr<PageFaultRetryableSection>& parentPageFaultSection,
                                          Message &result ) {
 
         const ParsedQuery &pq( *pq_shared );
@@ -730,7 +731,8 @@ namespace mongo {
             // at this point
             throw SendStaleConfigException( ns , "version changed during initial query", shardingVersionAtStart, shardingState.getVersion( ns ) );
         }
-
+        
+        parentPageFaultSection.reset(0);
         int nReturned = queryResponseBuilder->handoff( result );
 
         ccPointer.reset();
@@ -949,9 +951,13 @@ namespace mongo {
 
         bool hasRetried = false;
         scoped_ptr<PageFaultRetryableSection> pgfs;
-        if ( ! cc().getPageFaultRetryableSection() )
-            pgfs.reset( new PageFaultRetryableSection() );
         while ( 1 ) {
+
+            if ( ! cc().getPageFaultRetryableSection() ) {
+                verify( ! pgfs );
+                pgfs.reset( new PageFaultRetryableSection() );
+            }
+                
             try {
                 Client::ReadContext ctx( ns , dbpath ); // read locks
                 const ConfigVersion shardingVersionAtStart = shardingState.getVersion( ns );
@@ -983,7 +989,7 @@ namespace mongo {
                 order = order.getOwned();
    
                 return queryWithQueryOptimizer( m, queryOptions, ns, jsobj, curop, query, order,
-                                                pq_shared, oldPlan, shardingVersionAtStart, result );
+                                                pq_shared, oldPlan, shardingVersionAtStart, pgfs, result );
             }
             catch ( PageFaultException& e ) {
                 e.touch();
