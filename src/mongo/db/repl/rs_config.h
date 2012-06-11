@@ -103,7 +103,7 @@ namespace mongo {
 
                 return _id==r._id && votes == r.votes && h == r.h && priority == r.priority &&
                        arbiterOnly == r.arbiterOnly && slaveDelay == r.slaveDelay && hidden == r.hidden &&
-                       buildIndexes == buildIndexes;
+                       buildIndexes == r.buildIndexes;
             }
             bool operator!=(const MemberCfg& r) const { return !(*this == r); }
         };
