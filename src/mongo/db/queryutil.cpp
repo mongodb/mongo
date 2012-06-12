@@ -460,27 +460,32 @@ namespace mongo {
         _simpleFiniteSet = simpleFiniteSet;
     }
 
-    // as called, these functions find the max/min of a bound in the
-    // opposite direction, so inclusive bounds are considered less
-    // superlative
-    FieldBound maxFieldBound( const FieldBound &a, const FieldBound &b ) {
+    /** @return the maximum of two lower bounds, considering inclusivity. */
+    static FieldBound maxLowerBound( const FieldBound& a, const FieldBound& b ) {
         int cmp = a._bound.woCompare( b._bound, false );
         if ( ( cmp == 0 && !b._inclusive ) || cmp < 0 )
             return b;
         return a;
     }
 
-    FieldBound minFieldBound( const FieldBound &a, const FieldBound &b ) {
+    /** @return the minimum of two upper bounds, considering inclusivity. */
+    static FieldBound minUpperBound( const FieldBound& a, const FieldBound& b ) {
         int cmp = a._bound.woCompare( b._bound, false );
         if ( ( cmp == 0 && !b._inclusive ) || cmp > 0 )
             return b;
         return a;
     }
 
-    bool fieldIntervalOverlap( const FieldInterval &one, const FieldInterval &two, FieldInterval &result ) {
-        result._lower = maxFieldBound( one._lower, two._lower );
-        result._upper = minFieldBound( one._upper, two._upper );
-        return result.strictValid();
+    /**
+     * @return true when the overlap of two intervals is a valid interval.
+     * @param one, @param two - The intervals.
+     * @param result - The resulting overlap.
+     */
+    static bool fieldIntervalOverlap( const FieldInterval& one, const FieldInterval& two,
+                                      FieldInterval& result ) {
+        result._lower = maxLowerBound( one._lower, two._lower );
+        result._upper = minUpperBound( one._upper, two._upper );
+        return result.isStrictValid();
     }
 
     const FieldRange &FieldRange::intersect( const FieldRange &other, bool singleKey ) {
@@ -499,9 +504,13 @@ namespace mongo {
         while( i != _intervals.end() && j != other._intervals.end() ) {
             FieldInterval overlap;
             if ( fieldIntervalOverlap( *i, *j, overlap ) ) {
+                // If the two intervals overlap, add the overlap to the result.
                 newIntervals.push_back( overlap );
             }
-            if ( i->_upper == minFieldBound( i->_upper, j->_upper ) ) {
+            // Increment the iterator with the current interval having the lower upper bound.  The
+            // next interval of this iterator may overlap with the current interval of the other
+            // iterator.
+            if ( i->_upper == minUpperBound( i->_upper, j->_upper ) ) {
                 ++i;
             }
             else {

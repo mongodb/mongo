@@ -261,12 +261,15 @@ namespace mongo {
         }
         FieldBound _lower;
         FieldBound _upper;
-        /** @return true iff no single element can be contained in the interval. */
-        bool strictValid() const {
+        /**
+         * @return true when the interval can contain one or more values.
+         * NOTE May also return true in certain 'empty' discrete cases like x > false && x < true.
+         */
+        bool isStrictValid() const {
             int cmp = _lower._bound.woCompare( _upper._bound, false );
             return ( cmp < 0 || ( cmp == 0 && _lower._inclusive && _upper._inclusive ) );
         }
-        /** @return true iff the interval is an equality constraint. */
+        /** @return true if the interval is an equality constraint. */
         bool equality() const;
         mutable int _cachedEquality;
 
