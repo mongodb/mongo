@@ -38,9 +38,12 @@ for( var i = 0; i < 2; i++ ){
         assert( false )
     }
     catch( e ){
+        
+        printjson( e )
+        
         // Make sure we get a transport error, and not a no-primary error
         // Unfortunately e gets stringified so we have to test this way
-        assert( e.indexOf( "10276" ) >= 0 )
+        assert( e.indexOf( "10276" ) >= 0 || e.indexOf( "socket" ) >= 0 )
     }
 }
 
