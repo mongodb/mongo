@@ -75,12 +75,23 @@ assert.soon(
             print( "Shell ==== Wait satisfied: db.currentOp().inprog.length is " + len );
             print( "Shell ==== Dump of db.currentOp:" );
             print( tojson( currentOp ) );
+            print( "Shell ==== Checking if this currentOp is the query we are waiting for" );
+            if ( currentOp.inprog[0].ns == "test.query_yield2" && currentOp.inprog[0].query["$where"] ) {
+                print( "Shell ==== Yes, we found the query we are waiting for" );
+                return true;
+            }
+            if ( currentOp.inprog[0].ns == "" && currentOp.inprog[0].query["whatsmyuri"] ) {
+                print( "Shell ==== No, we found a \"whatsmyuri\" query, waiting some more" );
+                return false;
+            }
+            print( "Shell ==== No, we found something other than our query or a \"whatsmyuri\", waiting some more" );
+            return false;
         }
         return len > 0;
     } , "Wait failed, db.currentOp().inprog never became non-empty" , 2000 , 1 
 );
 
-print( "Shell ==== Now that db.currentOp().inprog is non-empty, we start the real test" );
+print( "Shell ==== Now that we have seen db.currentOp().inprog show that our query is running, we start the real test" );
 num = 0;
 start = new Date();
 while ( ( (new Date()).getTime() - start ) < ( time * 2 ) ) {
