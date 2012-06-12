@@ -6,7 +6,7 @@
 #include "mongo/unittest/unittest.h"
 
 int main( int argc, char **argv ) {
-    return ::mongo::unittest::Suite::run(std::vector<std::string>(), "");
+    return ::mongo::unittest::Suite::run(std::vector<std::string>(), "", 1);
 }
 
 void mongo::unittest::onCurrentTestNameChange( const std::string &testName ) {}

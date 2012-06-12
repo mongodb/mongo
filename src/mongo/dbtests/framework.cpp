@@ -100,6 +100,7 @@ namespace mongo {
 
         int runDbTests( int argc , char** argv , string default_dbpath ) {
             unsigned long long seed = time( 0 );
+            int runsPerTest = 1;
             string dbpathSpec;
 
             po::options_description shell_options("options");
@@ -120,6 +121,7 @@ namespace mongo {
             ("dur", "enable journaling (currently the default)")
             ("nodur", "disable journaling")
             ("seed", po::value<unsigned long long>(&seed), "random number seed")
+            ("runs", po::value<int>(&runsPerTest), "number of times to run each test")
             ("perfHist", po::value<unsigned>(&perfHist), "number of back runs of perf stats to display")
             ;
 
@@ -266,7 +268,7 @@ namespace mongo {
             // set tlogLevel to -1 to suppress tlog() output in a test program
             tlogLevel = -1;
 
-            int ret = ::mongo::unittest::Suite::run(suites,filter);
+            int ret = ::mongo::unittest::Suite::run(suites,filter,runsPerTest);
 
 #if !defined(_WIN32) && !defined(__sunos__)
             flock( lockFile, LOCK_UN );

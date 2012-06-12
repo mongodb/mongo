@@ -216,9 +216,9 @@ namespace mongo {
 
             void add(const std::string& name, const TestFunction& testFn);
 
-            Result * run( const std::string& filter );
+            Result * run( const std::string& filter , int runsPerTest );
 
-            static int run( const std::vector<std::string>& suites , const std::string& filter );
+            static int run( const std::vector<std::string>& suites , const std::string& filter , int runsPerTest );
 
             /**
              * Get a suite with the given name, creating it if necessary.

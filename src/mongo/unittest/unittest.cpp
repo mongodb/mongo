@@ -95,7 +95,7 @@ namespace mongo {
             _tests.push_back(new TestHolder(name, testFn));
         }
 
-        Result * Suite::run( const std::string& filter ) {
+        Result * Suite::run( const std::string& filter, int runsPerTest ) {
 
             log(1) << "\t about to setupTests" << std::endl;
             setupTests();
@@ -123,7 +123,8 @@ namespace mongo {
                 err << tc->getName() << "\t";
 
                 try {
-                    tc->run();
+                    for ( int x=0; x<runsPerTest; x++ )
+                        tc->run();
                     passes = true;
                 }
                 catch ( const TestAssertionFailureException& ae ) {
@@ -155,7 +156,7 @@ namespace mongo {
             return r;
         }
 
-        int Suite::run( const std::vector<std::string>& suites , const std::string& filter ) {
+        int Suite::run( const std::vector<std::string>& suites , const std::string& filter , int runsPerTest ) {
 
             if (_allSuites().empty()) {
                 log() << "error: no suites registered.";
@@ -187,7 +188,7 @@ namespace mongo {
                 fassert( 16145,  s );
 
                 log() << "going to run suite: " << name << std::endl;
-                results.push_back( s->run( filter ) );
+                results.push_back( s->run( filter, runsPerTest ) );
             }
 
             log() << "**************************************************" << std::endl;

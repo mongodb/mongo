@@ -1098,9 +1098,9 @@ namespace PerfTests {
     public:
         All() : Suite( "perf" ) { }
 
-        Result * run( const string& filter ) {
+        Result * run( const string& filter, int runsPerTest ) {
             boost::thread a(t);
-            Result * res = Suite::run(filter);
+            Result * res = Suite::run(filter, runsPerTest);
             a.join();
             return res;
         }
