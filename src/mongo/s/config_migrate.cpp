@@ -68,7 +68,7 @@ namespace mongo {
             }
 
             scoped_ptr<ScopedDbConnection> connPtr(
-                    ScopedDbConnection::getScopedDbConnection( _primary.getConnString() ) );
+                    ScopedDbConnection::getInternalScopedDbConnection( _primary.getConnString() ) );
             ScopedDbConnection& conn = *connPtr;
 
             // do a backup

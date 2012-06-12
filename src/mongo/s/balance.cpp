@@ -290,7 +290,7 @@ namespace mongo {
             try {
                 
                 scoped_ptr<ScopedDbConnection> connPtr(
-                        ScopedDbConnection::getScopedDbConnection( config.toString() ) );
+                        ScopedDbConnection::getInternalScopedDbConnection( config.toString() ) );
                 ScopedDbConnection& conn = *connPtr;
 
                 // ping has to be first so we keep things in the config server in sync

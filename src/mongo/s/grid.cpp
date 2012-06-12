@@ -182,7 +182,7 @@ namespace mongo {
         vector<string> dbNames;
         try {
             scoped_ptr<ScopedDbConnection> newShardConnPtr(
-                    ScopedDbConnection::getScopedDbConnection( servers.toString() ) );
+                    ScopedDbConnection::getInternalScopedDbConnection( servers.toString() ) );
             ScopedDbConnection& newShardConn = *newShardConnPtr;
             newShardConn->getLastError();
 
@@ -359,7 +359,7 @@ namespace mongo {
         BSONObj shardDoc = b.obj();
 
         {
-            scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::getScopedDbConnection(
+            scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::getInternalScopedDbConnection(
                     configServer.getPrimary().getConnString() ) );
 
             // check whether the set of hosts (or single host) is not an already a known shard
@@ -529,7 +529,7 @@ namespace mongo {
     }
 
     unsigned long long Grid::getNextOpTime() const {
-        scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::getScopedDbConnection(
+        scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::getInternalScopedDbConnection(
                 configServer.getPrimary().getConnString() ) );
 
         BSONObj result;

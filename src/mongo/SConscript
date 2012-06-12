@@ -76,7 +76,6 @@ commonFiles = [ "pch.cpp",
                 "util/md5.cpp",
                 "util/startup_test.cpp",
                 "client/authentication_table.cpp",
-                "client/connection_factory.cpp",
                 "client/connpool.cpp",
                 "client/dbclient.cpp",
                 "client/dbclient_rs.cpp",
@@ -349,6 +348,18 @@ env.StaticLibrary("serveronly", serverOnlyFiles,
                            "defaultversion",
                            '$BUILD_DIR/third_party/mongo_snappy'])
 
+# These files go into mongos and mongod only, not into the shell or any tools.
+mongodAndMongosFiles = [
+    "db/connection_factory.cpp",
+    ]
+env.StaticLibrary("mongodandmongos", mongodAndMongosFiles)
+
+# These files go into the tools, tests, shell, etc. but not mongod or mongos
+everythingButMongodAndMongosFiles = [
+    "client/connection_factory.cpp",
+    ]
+env.StaticLibrary("notmongodormongos", everythingButMongodAndMongosFiles)
+
 modules = []
 moduleNames = []
 
@@ -367,13 +378,15 @@ env.StaticLibrary("coreserver", coreServerFiles, LIBDEPS=["mongocommon", "script
 # main db target
 mongod = env.Install(
     '#/', env.Program( "mongod", mongodOnlyFiles,
-                       LIBDEPS=["coreserver", "serveronly", "coredb", "ntservice"],
+                       LIBDEPS=["coreserver", "serveronly", "coredb", "ntservice",
+                                "mongodandmongos"],
                        _LIBDEPS='$_LIBDEPS_OBJS' ) )
 Default( mongod )
 
 # tools
 allToolFiles = [ "tools/tool.cpp", "tools/stat_util.cpp" ]
-env.StaticLibrary("alltools", allToolFiles, LIBDEPS=["serveronly", "coreserver", "coredb"])
+env.StaticLibrary("alltools", allToolFiles, LIBDEPS=["serveronly", "coreserver", "coredb",
+                                                     "notmongodormongos"])
 
 normalTools = [ "dump", "restore", "export", "import", "stat", "top", "oplog" ]
 env.Alias( "tools", [ "#/${PROGPREFIX}mongo" + x + "${PROGSUFFIX}" for x in normalTools ] )
@@ -396,11 +409,12 @@ env.Install( '#/', [
 # mongos
 mongos = env.Program(
     "mongos", shardServerFiles,
-    LIBDEPS=["coreserver", "coredb", "mongocommon", "coreshard", "dbcmdline", "ntservice"],
+    LIBDEPS=["coreserver", "coredb", "mongocommon", "coreshard", "dbcmdline", "ntservice",
+             "mongodandmongos"],
     _LIBDEPS='$_LIBDEPS_OBJS')
 env.Install( '#/', mongos )
 
-env.Library("clientandshell", "client/clientAndShell.cpp", LIBDEPS=["mongocommon", "coredb", "defaultversion", "gridfs"])
+env.Library("clientandshell", ["client/clientAndShell.cpp"], LIBDEPS=["mongocommon", "coredb", "defaultversion", "gridfs", "notmongodormongos"])
 env.Library("allclient", "client/clientOnly.cpp", LIBDEPS=["clientandshell"])
 
 if has_option( "sharedclient" ):
@@ -412,7 +426,7 @@ env.StaticLibrary('testframework', ['dbtests/framework.cpp'], LIBDEPS=['unittest
 test = testEnv.Install(
     '#/',
     testEnv.Program( "test", [ f for f in Glob( "dbtests/*.cpp" ) if not str( f ).endswith( 'framework.cpp' ) ],
-                     LIBDEPS=["mongocommon", "serveronly", "coreserver", "coredb", "testframework", "gridfs" ],
+                     LIBDEPS=["mongocommon", "serveronly", "coreserver", "coredb", "testframework", "gridfs", "notmongodormongos" ],
                      _LIBDEPS='$_LIBDEPS_OBJS' ) )
 
 if len(testEnv.subst('$PROGSUFFIX')):

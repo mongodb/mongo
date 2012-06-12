@@ -769,7 +769,7 @@ namespace mongo {
             BSONObj x;
             try {
                 scoped_ptr<ScopedDbConnection> conn(
-                        ScopedDbConnection::getScopedDbConnection( _config[i], 30.0 ) );
+                        ScopedDbConnection::getInternalScopedDbConnection( _config[i], 30.0 ) );
 
                 // check auth
                 conn->get()->update("config.foo.bar", BSONObj(), BSON("x" << 1));
@@ -860,7 +860,8 @@ namespace mongo {
     bool ConfigServer::allUp( string& errmsg ) {
         try {
             scoped_ptr<ScopedDbConnection> conn(
-                    ScopedDbConnection::getScopedDbConnection( _primary.getConnString(), 30.0 ) );
+                    ScopedDbConnection::getInternalScopedDbConnection( _primary.getConnString(),
+                                                                       30.0 ) );
             conn->get()->getLastError();
             conn->done();
             return true;
@@ -875,7 +876,8 @@ namespace mongo {
 
     int ConfigServer::dbConfigVersion() {
         scoped_ptr<ScopedDbConnection> conn(
-                ScopedDbConnection::getScopedDbConnection( _primary.getConnString(), 30.0 ) );
+                ScopedDbConnection::getInternalScopedDbConnection( _primary.getConnString(),
+                                                                   30.0 ) );
         int version = dbConfigVersion( conn->conn() );
         conn->done();
         return version;
@@ -902,7 +904,8 @@ namespace mongo {
         set<string> got;
 
         scoped_ptr<ScopedDbConnection> conn(
-                ScopedDbConnection::getScopedDbConnection( _primary.getConnString(), 30.0 ) );
+                ScopedDbConnection::getInternalScopedDbConnection( _primary.getConnString(),
+                                                                   30.0 ) );
         
         try {
             
@@ -991,7 +994,8 @@ namespace mongo {
             verify( _primary.ok() );
 
             scoped_ptr<ScopedDbConnection> conn(
-                    ScopedDbConnection::getScopedDbConnection( _primary.getConnString(), 30.0 ) );
+                    ScopedDbConnection::getInternalScopedDbConnection( _primary.getConnString(),
+                                                                       30.0 ) );
 
             static bool createdCapped = false;
             if ( ! createdCapped ) {

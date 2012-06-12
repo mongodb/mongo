@@ -156,7 +156,7 @@ namespace mongo {
     void Chunk::pickMedianKey( BSONObj& medianKey ) const {
         // Ask the mongod holding this chunk to figure out the split points.
         scoped_ptr<ScopedDbConnection> conn(
-                ScopedDbConnection::getScopedDbConnection( getShard().getConnString() ) );
+                ScopedDbConnection::getInternalScopedDbConnection( getShard().getConnString() ) );
         BSONObj result;
         BSONObjBuilder cmd;
         cmd.append( "splitVector" , _manager->getns() );
@@ -184,7 +184,7 @@ namespace mongo {
     void Chunk::pickSplitVector( vector<BSONObj>& splitPoints , int chunkSize /* bytes */, int maxPoints, int maxObjs ) const {
         // Ask the mongod holding this chunk to figure out the split points.
         scoped_ptr<ScopedDbConnection> conn(
-                ScopedDbConnection::getScopedDbConnection( getShard().getConnString() ) );
+                ScopedDbConnection::getInternalScopedDbConnection( getShard().getConnString() ) );
         BSONObj result;
         BSONObjBuilder cmd;
         cmd.append( "splitVector" , _manager->getns() );
@@ -281,7 +281,7 @@ namespace mongo {
         uassert( 13003 , "can't split a chunk with only one distinct value" , _min.woCompare(_max) );
 
         scoped_ptr<ScopedDbConnection> conn(
-                ScopedDbConnection::getScopedDbConnection( getShard().getConnString() ) );
+                ScopedDbConnection::getInternalScopedDbConnection( getShard().getConnString() ) );
 
         BSONObjBuilder cmd;
         cmd.append( "splitChunk" , _manager->getns() );
@@ -320,7 +320,7 @@ namespace mongo {
         Shard from = _shard;
 
         scoped_ptr<ScopedDbConnection> fromconn(
-                ScopedDbConnection::getScopedDbConnection( from.getConnString() ) );
+                ScopedDbConnection::getInternalScopedDbConnection( from.getConnString() ) );
 
         bool worked = fromconn->get()->runCommand( "admin" ,
                                                    BSON( "moveChunk" << _manager->getns() <<
@@ -455,7 +455,7 @@ namespace mongo {
 
     long Chunk::getPhysicalSize() const {
         scoped_ptr<ScopedDbConnection> conn(
-                ScopedDbConnection::getScopedDbConnection( getShard().getConnString() ) );
+                ScopedDbConnection::getInternalScopedDbConnection( getShard().getConnString() ) );
 
         BSONObj result;
         uassert( 10169 ,  "datasize failed!" , conn->get()->runCommand( "admin" ,
@@ -536,7 +536,7 @@ namespace mongo {
 
         try {
             scoped_ptr<ScopedDbConnection> conn(
-                    ScopedDbConnection::getScopedDbConnection( configServer.modelServer() ) );
+                    ScopedDbConnection::getInternalScopedDbConnection( configServer.modelServer() ) );
 
             conn->get()->update( chunkMetadataNS,
                                  BSON( "_id" << genID() ),
@@ -935,7 +935,8 @@ namespace mongo {
             {
                 // get stats to see if there is any data
                 scoped_ptr<ScopedDbConnection> shardConn(
-                        ScopedDbConnection::getScopedDbConnection( primary.getConnString() ) );
+                        ScopedDbConnection::getInternalScopedDbConnection( primary
+                                                                           .getConnString() ) );
 
                 numObjects = shardConn->get()->count( getns() );
                 shardConn->done();
@@ -993,7 +994,8 @@ namespace mongo {
         log() << "going to create " << splitPoints.size() + 1 << " chunk(s) for: " << _ns
               << " using new epoch " << version.epoch() << endl;
         
-        scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::getScopedDbConnection( config ) );
+        scoped_ptr<ScopedDbConnection> conn(
+                ScopedDbConnection::getInternalScopedDbConnection( config ) );
 
         // Make sure we don't have any chunks that already exist here
         unsigned long long existingChunks =
@@ -1261,7 +1263,7 @@ namespace mongo {
 
         for ( set<Shard>::iterator i=seen.begin(); i!=seen.end(); i++ ) {
             scoped_ptr<ScopedDbConnection> conn(
-                    ScopedDbConnection::getScopedDbConnection( i->getConnString() ) );
+                    ScopedDbConnection::getInternalScopedDbConnection( i->getConnString() ) );
             BSONObj res;
 
             // this is horrible

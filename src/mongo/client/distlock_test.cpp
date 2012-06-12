@@ -374,7 +374,7 @@ namespace mongo {
 
                 ConnectionString server( cluster.getServers()[s] );
                 scoped_ptr<ScopedDbConnection> conn(
-                        ScopedDbConnection::getScopedDbConnection( server.toString() ) );
+                        ScopedDbConnection::getInternalScopedDbConnection( server.toString() ) );
 
                 BSONObj result;
                 try {

@@ -349,10 +349,10 @@ namespace mongo {
         BSONObj status;
 
         /* replSetGetStatus requires admin auth so use a connection from the pool,
-         * which are authenticated with the keyFile credentials.
+         * and tell it to use the internal credentials.
          */
         scoped_ptr<ScopedDbConnection> authenticatedConn(
-                ScopedDbConnection::getScopedDbConnection( hostAddr ) );
+                ScopedDbConnection::getInternalScopedDbConnection( hostAddr ) );
 
         if ( !authenticatedConn->get()->runCommand( "admin",
                                                     BSON( "replSetGetStatus" << 1 ),

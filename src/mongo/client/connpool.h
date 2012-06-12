@@ -219,9 +219,14 @@ namespace mongo {
         static ScopedDbConnection* getScopedDbConnection(const string& host,
                                                          double socketTimeout = 0);
         static ScopedDbConnection* getScopedDbConnection();
-        static ScopedDbConnection* getScopedDbConnection(const string& host,
-                                                         DBClientBase* conn,
-                                                         double socketTimeout = 0);
+
+        // Gets a ScopedDbConnection designed to be used for internal communication within a cluster
+        // The mongod/mongos implementations of these set the AuthenticationTable on the underlying
+        // connection to the internalSecurity permissions.  These should not be called by consumers
+        // of the C++ client library
+        static ScopedDbConnection* getInternalScopedDbConnection(const string& host,
+                                                                 double socketTimeout = 0);
+        static ScopedDbConnection* getInternalScopedDbConnection();
 
         ~ScopedDbConnection();
 

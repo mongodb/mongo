@@ -98,7 +98,8 @@ namespace mongo {
 
                 try {
                     scoped_ptr<ScopedDbConnection> connPtr(
-                            ScopedDbConnection::getScopedDbConnection( addr.toString(), 30.0 ) );
+                            ScopedDbConnection::getInternalScopedDbConnection( addr.toString(),
+                                                                               30.0 ) );
                     ScopedDbConnection& conn = *connPtr;
 
                     pingTime = jsTime();
@@ -359,7 +360,7 @@ namespace mongo {
 
         ConnectionString server( *cluster.getServers().begin() );
         scoped_ptr<ScopedDbConnection> conn(
-                ScopedDbConnection::getScopedDbConnection( server.toString() ) );
+                ScopedDbConnection::getInternalScopedDbConnection( server.toString() ) );
 
         BSONObj result;
         long long delay;
@@ -497,7 +498,7 @@ namespace mongo {
             other = &dummyOther;
 
         scoped_ptr<ScopedDbConnection> connPtr(
-                ScopedDbConnection::getScopedDbConnection( _conn.toString() ) );
+                ScopedDbConnection::getInternalScopedDbConnection( _conn.toString() ) );
         ScopedDbConnection& conn = *connPtr;
 
         BSONObjBuilder queryBuilder;
@@ -759,7 +760,7 @@ namespace mongo {
             for ( unsigned i = 0; i < up.size(); i++ ) {
 
                 scoped_ptr<ScopedDbConnection> indDBPtr(
-                        ScopedDbConnection::getScopedDbConnection( up[i].first ) );
+                        ScopedDbConnection::getInternalScopedDbConnection( up[i].first ) );
                 ScopedDbConnection& indDB = *indDBPtr;
                 BSONObj indUpdate;
 
@@ -915,7 +916,7 @@ namespace mongo {
         while ( ++attempted <= maxAttempts ) {
 
             scoped_ptr<ScopedDbConnection> connPtr(
-                    ScopedDbConnection::getScopedDbConnection( _conn.toString() ) );
+                    ScopedDbConnection::getInternalScopedDbConnection( _conn.toString() ) );
             ScopedDbConnection& conn = *connPtr;
 
             try {

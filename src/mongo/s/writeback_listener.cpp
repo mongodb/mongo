@@ -127,7 +127,7 @@ namespace mongo {
 
             try {
                 scoped_ptr<ScopedDbConnection> conn(
-                        ScopedDbConnection::getScopedDbConnection( _addr ) );
+                        ScopedDbConnection::getInternalScopedDbConnection( _addr ) );
 
                 BSONObj result;
 

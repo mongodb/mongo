@@ -8,6 +8,7 @@ Import('env clientEnv')
 clientSource = [
     'mongo/bson/oid.cpp',
     'mongo/buildinfo.cpp',
+    "mongo/client/authentication_table.cpp",
     'mongo/client/clientAndShell.cpp',
     'mongo/client/clientOnly.cpp',
     'mongo/client/connection_factory.cpp',
