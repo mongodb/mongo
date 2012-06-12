@@ -633,6 +633,7 @@ namespace mongo {
                                          const BSONObj &oldPlan,
                                          const ConfigVersion &shardingVersionAtStart,
                                          scoped_ptr<PageFaultRetryableSection>& parentPageFaultSection,
+                                         scoped_ptr<NoPageFaultsAllowed>& noPageFault,
                                          Message &result ) {
 
         const ParsedQuery &pq( *pq_shared );
@@ -733,6 +734,8 @@ namespace mongo {
         }
         
         parentPageFaultSection.reset(0);
+        noPageFault.reset( new NoPageFaultsAllowed() );
+
         int nReturned = queryResponseBuilder->handoff( result );
 
         ccPointer.reset();
@@ -951,6 +954,7 @@ namespace mongo {
 
         bool hasRetried = false;
         scoped_ptr<PageFaultRetryableSection> pgfs;
+        scoped_ptr<NoPageFaultsAllowed> npfe;
         while ( 1 ) {
 
             if ( ! cc().getPageFaultRetryableSection() ) {
@@ -989,7 +993,8 @@ namespace mongo {
                 order = order.getOwned();
    
                 return queryWithQueryOptimizer( m, queryOptions, ns, jsobj, curop, query, order,
-                                                pq_shared, oldPlan, shardingVersionAtStart, pgfs, result );
+                                                pq_shared, oldPlan, shardingVersionAtStart, 
+                                                pgfs, npfe, result );
             }
             catch ( PageFaultException& e ) {
                 e.touch();
