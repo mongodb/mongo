@@ -80,6 +80,7 @@ screwy_in_slave = {}
 
 smoke_db_prefix = ''
 small_oplog = False
+small_oplog_rs = False
 
 # This class just implements the with statement API, for a sneaky
 # purpose below.
@@ -178,6 +179,8 @@ class mongod(object):
         argv = [mongod_executable, "--port", str(self.port), "--dbpath", dir_name]
         if self.kwargs.get('small_oplog'):
             argv += ["--master", "--oplogSize", "511"]
+        if self.kwargs.get('small_oplog_rs'):
+            argv += ["--replSet", "foo", "--oplogSize", "511"]
         if self.slave:
             argv += ['--slave', '--source', 'localhost:' + str(srcport)]
         if self.kwargs.get('no_journal'):
@@ -309,7 +312,7 @@ def runTest(test):
         argv = [shell_executable, "--port", mongod_port]
         if not usedb:
             argv += ["--nodb"]
-        if small_oplog:
+        if small_oplog or small_oplog_rs:
             argv += ["--eval", 'testingReplication = true;']
         argv += [path]
     elif ext in ["", ".exe"]:
@@ -398,14 +401,28 @@ def run_tests(tests):
     # The reason we want to use "with" is so that we get __exit__ semantics
     # but "with" is only supported on Python 2.5+
 
-    master = mongod(small_oplog=small_oplog,no_journal=no_journal,no_preallocj=no_preallocj,auth=auth).__enter__()
+    master = mongod(small_oplog_rs=small_oplog_rs,small_oplog=small_oplog,no_journal=no_journal,no_preallocj=no_preallocj,auth=auth).__enter__()
     try:
         if small_oplog:
             slave = mongod(slave=True).__enter__()
+        elif small_oplog_rs:
+            slave = mongod(slave=True,small_oplog_rs=small_oplog_rs,small_oplog=small_oplog,no_journal=no_journal,no_preallocj=no_preallocj,auth=auth).__enter__()
+            primary = Connection(port=master.port, slave_okay=True);
+
+            primary.admin.command({'replSetInitiate' : {'_id' : 'foo', 'members' : [
+                            {'_id': 0, 'host':'localhost:%s' % master.port},
+                            {'_id': 1, 'host':'localhost:%s' % slave.port,'priority':0}]}})
+
+            ismaster = False
+            while not ismaster:
+                result = primary.admin.command("ismaster");
+                ismaster = result["ismaster"]
+                time.sleep(1)
         else:
             slave = Nothing()
+
         try:
-            if small_oplog:
+            if small_oplog or small_oplog_rs:
                 master.wait_for_repl()
 
             tests_run = 0
@@ -416,13 +433,13 @@ def run_tests(tests):
                     fails.pop()
                     winners.append(test)
 
-                    if small_oplog:
+                    if small_oplog or small_oplog_rs:
                         master.wait_for_repl()
                     elif test[1]: # reach inside test and see if startmongod is true
                         if (tests_run+1) % 20 == 0:
                             # restart mongo every 20 times, for our 32-bit machines
                             master.__exit__(None, None, None)
-                            master = mongod(small_oplog=small_oplog,no_journal=no_journal,no_preallocj=no_preallocj,auth=auth).__enter__()
+                            master = mongod(small_oplog_rs=small_oplog_rs,small_oplog=small_oplog,no_journal=no_journal,no_preallocj=no_preallocj,auth=auth).__enter__()
 
                 except TestFailure, f:
                     try:
@@ -467,7 +484,7 @@ at the end of testing:""" % (src, dst)
 at the end of testing:"""
         for db in screwy_in_slave.keys():
             print "%s\t %s" % (db, screwy_in_slave[db])
-    if small_oplog and not (lost_in_master or lost_in_slave or screwy_in_slave):
+    if (small_oplog or small_oplog_rs) and not (lost_in_master or lost_in_slave or screwy_in_slave):
         print "replication ok for %d collections" % (len(replicated_collections))
     if losers or lost_in_slave or lost_in_master or screwy_in_slave:
         raise Exception("Test failures")
@@ -557,7 +574,7 @@ def add_exe(e):
     return e
 
 def set_globals(options):
-    global mongod_executable, mongod_port, shell_executable, continue_on_failure, small_oplog, no_journal, no_preallocj, auth, keyFile, smoke_db_prefix, test_path
+    global mongod_executable, mongod_port, shell_executable, continue_on_failure, small_oplog, small_oplog_rs, no_journal, no_preallocj, auth, keyFile, smoke_db_prefix, test_path
     #Careful, this can be called multiple times
     test_path = options.test_path
 
@@ -574,6 +591,7 @@ def set_globals(options):
     continue_on_failure = options.continue_on_failure
     smoke_db_prefix = options.smoke_db_prefix
     small_oplog = options.small_oplog
+    small_oplog_rs = options.small_oplog_rs
     no_journal = options.no_journal
     no_preallocj = options.no_preallocj
     auth = options.auth
@@ -674,6 +692,9 @@ def main():
     parser.add_option('--small-oplog', dest='small_oplog', default=False,
                       action="store_true",
                       help='Run tests with master/slave replication & use a small oplog')
+    parser.add_option('--small-oplog-rs', dest='small_oplog_rs', default=False,
+                      action="store_true",
+                      help='Run tests with replica set replication & use a small oplog')
     parser.add_option('--nojournal', dest='no_journal', default=False,
                       action="store_true",
                       help='Do not turn on journaling in tests')
