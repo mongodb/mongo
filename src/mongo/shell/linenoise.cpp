@@ -1828,7 +1828,7 @@ int InputBuffer::incrementalHistorySearch( PromptBase& pi, int startChar ) {
     pb.promptCursorRowOffset = dp.promptCursorRowOffset;
     pb.promptScreenColumns = pi.promptScreenColumns;
     pb.promptPreviousLen = dp.promptChars;
-    if ( useSearchedLine ) {
+    if ( useSearchedLine && activeHistoryLine ) {
         historyRecallMostRecent = true;
         copyString32( buf32, activeHistoryLine, buflen + 1 );
         len = historyLineLength;
