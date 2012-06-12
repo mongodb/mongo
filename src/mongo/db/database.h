@@ -20,6 +20,7 @@
 
 #include "mongo/db/cmdline.h"
 #include "mongo/db/namespace_details.h"
+#include "mongo/db/record.h"
 
 namespace mongo {
 
@@ -109,6 +110,10 @@ namespace mongo {
                 return false;
             return ns[name.size()] == '.';
         }
+
+        const RecordStats& recordStats() const { return _recordStats; }
+        RecordStats& recordStats() { return _recordStats; }
+
     private:
         /**
          * @throws DatabaseDifferCaseCode if the name is a duplicate based on
@@ -140,6 +145,10 @@ namespace mongo {
         const string profileName; // "alleyinsider.system.profile"
         CCByLoc ccByLoc;
         int magic; // used for making sure the object is still loaded in memory
+
+    private:
+        RecordStats _recordStats;
+        
     };
 
 } // namespace mongo

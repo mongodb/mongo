@@ -1,23 +1,26 @@
 // record.cpp
 
 #include "pch.h"
-#include "pdfile.h"
-#include "../util/processinfo.h"
-#include "../util/net/listen.h"
-#include "pagefault.h"
-#include "mongo/util/stack_introspect.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/pagefault.h"
+#include "mongo/db/pdfile.h"
+#include "mongo/db/record.h"
+#include "mongo/util/net/listen.h"
+#include "mongo/util/processinfo.h"
+#include "mongo/util/stack_introspect.h"
 
 namespace mongo {
 
-    struct RecordStats {
-        AtomicInt64 accessesNotInMemory;
-        AtomicInt64 pageFaultExceptionsThrown;
-    } recordStats;
+    RecordStats recordStats;
+
+    void RecordStats::record( BSONObjBuilder& b ) {
+        b.appendNumber( "accessesNotInMemory" , accessesNotInMemory.load() );
+        b.appendNumber( "pageFaultExceptionsThrown" , pageFaultExceptionsThrown.load() );
+
+    }
 
     void Record::appendStats( BSONObjBuilder& b ) {
-        b.appendNumber( "accessesNotInMemory" , recordStats.accessesNotInMemory.load() );
-        b.appendNumber( "pageFaultExceptionsThrown" , recordStats.pageFaultExceptionsThrown.load() );
+        recordStats.record( b );
     }
 
     namespace ps {
@@ -296,10 +299,14 @@ namespace mongo {
     void Record::_accessing() const {
         if ( likelyInPhysicalMemory() )
             return;
+
+        const Client& client = cc();
+        Database* db = client.database();
         
         recordStats.accessesNotInMemory.fetchAndAdd(1);
+        if ( db )
+            db->recordStats().accessesNotInMemory.fetchAndAdd(1);
         
-        const Client& client = cc();
         if ( ! client.allowedToThrowPageFaultException() )
             return;
         
@@ -310,6 +317,8 @@ namespace mongo {
         }
 
         recordStats.pageFaultExceptionsThrown.fetchAndAdd(1);
+        if ( db )
+            db->recordStats().pageFaultExceptionsThrown.fetchAndAdd(1);
 
         DEV fassert( 16236 , ! inConstructorChain(true) );
         throw PageFaultException(this);

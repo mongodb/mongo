@@ -617,6 +617,21 @@ namespace mongo {
             {
                 BSONObjBuilder record( result.subobjStart( "recordStats" ) );
                 Record::appendStats( record );
+
+                set<string> dbs;
+                {
+                    Lock::DBRead read( "local" );
+                    dbHolder().getAllShortNames( dbs );
+                }
+
+                for ( set<string>::iterator i = dbs.begin(); i != dbs.end(); ++i ) {
+                    string db = *i;
+                    Client::ReadContext ctx( db );
+                    BSONObjBuilder temp( record.subobjStart( db ) );
+                    ctx.ctx().db()->recordStats().record( temp );
+                    temp.done();
+                }
+
                 record.done();
             }
 
