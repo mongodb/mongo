@@ -13,6 +13,7 @@ db.getLastError();
 print("count:" + t.count());
 
 function ops(q) {
+    printjson( db.currentOp().inprog );
     return db.currentOp(q).inprog;
 }
 
@@ -35,8 +36,8 @@ print()
 // need to wait for read to start
 print("wait have some ops");
 assert.soon( function(){
-    return ops( { "lockType": "r", "ns": "test.jstests_currentop" } ).length + 
-        ops({ "lockType": "R", "ns": "test.jstests_currentop" }).length >= 1;
+    return ops( { "locks.^test": "r", "ns": "test.jstests_currentop" } ).length + 
+        ops({ "locks.^test": "R", "ns": "test.jstests_currentop" }).length >= 1;
 }, "have_some_ops");
 print("ok");
     
@@ -49,9 +50,9 @@ function f() {
 
     printjson(o);
 
-    var writes = ops({ "lockType": "w", "ns": "test.jstests_currentop" }).length;
+    var writes = ops({ "locks.^test": "w", "ns": "test.jstests_currentop" }).length;
 
-    var readops = ops({ "lockType": "r", "ns": "test.jstests_currentop" });
+    var readops = ops({ "locks.^test": "r", "ns": "test.jstests_currentop" });
     print("readops:");
     printjson(readops);
     var reads = readops.length;

@@ -109,20 +109,20 @@ namespace mongo {
             char buf[2];
             buf[0] = _threadState; 
             buf[1] = 0;
-            b.append(".", buf);
+            b.append("^", buf);
         }
         if( _nestableCount ) {
             string s = "?";
             if( _whichNestable == Lock::local ) 
-                s = ".local";
+                s = "^local";
             else if( _whichNestable == Lock::admin ) 
-                s = ".admin";
+                s = "^admin";
             b.append(s, kind(_nestableCount));
         }
         if( _otherCount ) { 
             WrapperForRWLock *k = _otherLock;
             if( k ) {
-                string s = ".";
+                string s = "^";
                 s += k->name();
                 b.append(s, kind(_otherCount));
             }
