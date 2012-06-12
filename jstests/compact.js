@@ -15,7 +15,7 @@ t.ensureIndex({ x: 1 });
 
 print("1");
 
-var res = db.runCommand({ compact: 'compacttest', dev: true });
+var res = db.runCommand({ compact: 'compacttest', dev: true, force: true });
 printjson(res);
 assert(res.ok);
 assert(t.count() == 9);
@@ -27,7 +27,7 @@ assert(t.getIndexes().length == 2);
 var ssize = t.stats().storageSize;
 
 print("2");
-res = db.runCommand({ compact: 'compacttest', dev: true,paddingBytes:1000 });
+res = db.runCommand({ compact: 'compacttest', dev: true,paddingBytes:1000, force:true });
 assert(res.ok);
 assert(t.count() == 9);
 var v = t.validate(true);
@@ -55,7 +55,7 @@ t.ensureIndex({ z: 1, k: 1 });
 //t.ensureIndex({ z: 1, k: 1 }, { unique: true });
 //t.ensureIndex({ z: 1, k: 1 }, { dropDups: true, unique:true });
 
-res = db.runCommand({ compact: 'compacttest', dev: true, paddingFactor: 1.2 });
+res = db.runCommand({ compact: 'compacttest', dev: true, paddingFactor: 1.2, force:true });
 assert(res.ok);
 assert(t.count() > 13);
 var v = t.validate(true);
@@ -65,7 +65,7 @@ print("3");
 
 // works on an empty collection?
 t.remove({});
-assert(db.runCommand({ compact: 'compacttest', dev: true }).ok);
+assert(db.runCommand({ compact: 'compacttest', dev: true, force:true }).ok);
 assert(t.count() == 0);
 v = t.validate(true);
 assert(v.ok);
