@@ -117,7 +117,6 @@ namespace mongo {
     }
     
     void CurOp::leave( Client::Context * context ) {
-        _ns[0] = 0;
     }
 
     void CurOp::recordGlobalTime( long long micros ) const {
