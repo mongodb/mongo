@@ -23,12 +23,16 @@
 
 namespace mongo {
 
+    class Acquiring;
+
     // per thread
     class LockState {
     public:
         LockState();
+
         void dump();
-        static void Dump();
+        static void Dump(); 
+        BSONObj reportState();
         void reportState(BSONObjBuilder& b);
         
         unsigned recursiveCount() const { return _recursive; }
@@ -41,13 +45,17 @@ namespace mongo {
         bool isRW() const; // RW
         bool isW() const; // W
         bool hasAnyReadLock() const; // explicitly rR
+        bool hasAnyWriteLock() const; // wWX
         
         bool isLocked( const StringData& ns ); // rwRW
+
+        /** pending means we are currently trying to get a lock */
+        bool hasLockPending() const { return _lockPending; }
 
         // ----
 
 
-        void locked( char newState ); // RWrw
+        void lockedStart( char newState ); // RWrw
         void unlocked(); // _threadState = 0
         
         /**
@@ -72,6 +80,8 @@ namespace mongo {
         void lockedOther( int type );  // "same lock as last time" case 
         void unlockedOther();
         bool _batchWriter;
+
+        LockStat* getRelevantLockStat();
     private:
         unsigned _recursive;           // we allow recursively asking for a lock; we track that here
 
@@ -91,6 +101,9 @@ namespace mongo {
         // the first lock goes here, which is ok since we can't yield recursive locks
         Lock::ScopedLock* _scopedLk;   
         
+        bool _lockPending;
+
+        friend class Acquiring;
     };
 
     class WrapperForRWLock : boost::noncopyable { 
@@ -99,11 +112,23 @@ namespace mongo {
         string name() const { return r.name; }
         LockStat stats;
         WrapperForRWLock(const char *name) : r(name) { }
-        void lock()          { LockStat::Acquiring a(stats,'W'); r.lock();          }
-        void lock_shared()   { LockStat::Acquiring a(stats,'R'); r.lock_shared();   }
-        void unlock()        { stats.unlocking('W');             r.unlock();        }
-        void unlock_shared() { stats.unlocking('R');             r.unlock_shared(); }
+        void lock()          { r.lock(); }
+        void lock_shared()   { r.lock_shared(); }
+        void unlock()        { r.unlock(); }
+        void unlock_shared() { r.unlock_shared(); }
     };
+
+    class ScopedLock;
+
+    class Acquiring {
+    public:
+        Acquiring( Lock::ScopedLock* lock, LockState& ls );
+        ~Acquiring();
+    private:
+        Lock::ScopedLock* _lock;
+        LockState& _ls;
+    };
+        
 
 
 

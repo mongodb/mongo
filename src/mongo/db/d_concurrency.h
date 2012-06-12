@@ -49,6 +49,9 @@ namespace mongo {
         static void assertWriteLocked(const StringData& ns);
 
         static bool dbLevelLockingEnabled(); 
+        
+        static LockStat* globalLockStat();
+        static LockStat* nestableLockStat( Nestable db );
 
         class ScopedLock;
 
@@ -82,14 +85,29 @@ namespace mongo {
 
     public:
         class ScopedLock : boost::noncopyable {
-            ParallelBatchWriterSupport _lk;
-        protected: 
-            friend struct TempRelease;
-            ScopedLock(); 
-            virtual void tempRelease() = 0;
-            virtual void relock() = 0;
         public:
             virtual ~ScopedLock();
+
+            /** @return micros since we started acquiring */
+            long long acquireFinished( LockStat* stat );
+
+        protected:
+            friend struct TempRelease;
+
+            explicit ScopedLock( char type ); 
+
+            void tempRelease();
+            void relock();
+
+            virtual void _tempRelease() = 0;
+            virtual void _relock() = 0;
+
+            ParallelBatchWriterSupport _lk;
+
+        private:
+            Timer _timer; // this is counting the current state
+            char _type;
+            LockStat* _stat; // the stat for the relevant lock to increment when we're done
         };
 
         // note that for these classes recursive locking is ok if the recursive locking "makes sense"
@@ -98,8 +116,8 @@ namespace mongo {
         class GlobalWrite : public ScopedLock {
             bool noop;
         protected:
-            void tempRelease();
-            void relock();
+            void _tempRelease();
+            void _relock();
         public:
             // stopGreed is removed and does NOT work
             // timeoutms is only for writelocktry -- deprecated -- do not use
@@ -112,8 +130,8 @@ namespace mongo {
         public:
             bool noop;
         protected:
-            void tempRelease();
-            void relock();
+            void _tempRelease();
+            void _relock();
         public:
             // timeoutms is only for readlocktry -- deprecated -- do not use
             GlobalRead( int timeoutms = -1 ); 
@@ -137,8 +155,8 @@ namespace mongo {
             void unlockDB();
 
         protected:
-            void tempRelease();
-            void relock();
+            void _tempRelease();
+            void _relock();
 
         public:
             DBWrite(const StringData& dbOrNs);
@@ -171,8 +189,8 @@ namespace mongo {
             void unlockDB();
 
         protected:
-            void tempRelease();
-            void relock();
+            void _tempRelease();
+            void _relock();
 
         public:
             DBRead(const StringData& dbOrNs);

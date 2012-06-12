@@ -162,11 +162,6 @@ namespace mongo {
         void reset();
         void reset( const HostAndPort& remote, int op );
         void markCommand() { _command = true; }
-        void waitingForLock( char type ) {
-            _waitingForLock = true;
-            _lockType = type;
-        }
-        void gotLock()             { _waitingForLock = false; }
         OpDebug& debug()           { return _debug; }
         int profileLevel() const   { return _dbprofile; }
         const char * getNS() const { return _ns; }
@@ -183,9 +178,7 @@ namespace mongo {
         /** if this op is running */
         bool active() const { return _active; }
 
-        char lockType() const { return _lockType; }
         bool displayInCurop() const { return _active && ! _suppressFromCurop; }
-        bool isWaitingForLock() const { return _waitingForLock; }
         int getOp() const { return _op; }
         unsigned long long startTime() { // micros
             ensureStarted();
@@ -237,8 +230,6 @@ namespace mongo {
         bool _suppressFromCurop; // unless $all is set
         int _op;
         bool _command;
-        char _lockType;                   // r w R W
-        bool _waitingForLock;
         int _dbprofile;                  // 0=off, 1=slow, 2=all
         AtomicUInt _opNum;               // todo: simple being "unsigned" may make more sense here
         char _ns[Namespace::MaxNsLen+2];

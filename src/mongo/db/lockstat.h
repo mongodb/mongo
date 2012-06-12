@@ -29,22 +29,17 @@ namespace mongo {
     class LockStat { 
         enum { N = 4 };
     public:
-        Timer W_Timer;
-
-        struct Acquiring {
-            Timer tmr;
-            LockStat& ls;
-            unsigned type;
-            explicit Acquiring(LockStat&, char type);
-            ~Acquiring();
-        };
-
-        void unlocking(char type);
+        void recordAcquireTimeMicros( char type , long long micros );
+        void recordLockTimeMicros( char type , long long micros );
 
         BSONObj report() const;
 
+        long long getTimeLocked( char type ) const { return timeLocked[mapNo(type)].load(); }
     private:
+        static void _append( BSONObjBuilder& builder, const AtomicInt64* data );
+        
         // RWrw
+        // in micros
         AtomicInt64 timeAcquiring[N];
         AtomicInt64 timeLocked[N];
 

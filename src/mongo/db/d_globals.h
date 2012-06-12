@@ -16,7 +16,7 @@ namespace mongo {
         DGlobals();
 
         // these are intentionally never deleted:
-        MongoMutex &dbMutex;
+        //MongoMutex &dbMutex;
         ClientCursorMonitor& clientCursorMonitor;
 
     };

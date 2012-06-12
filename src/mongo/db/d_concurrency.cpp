@@ -63,17 +63,6 @@ namespace mongo {
     	virtual ~DBTryLockTimeoutException() throw() { }
     };
 
-    Client* curopWaitingForLock( char type );
-    void curopGotLock(Client*);
-    struct Acquiring { 
-        Client* c;
-        ~Acquiring() { curopGotLock(c); }
-        Acquiring(char type)
-        {
-            c = curopWaitingForLock(type);
-        }
-    };
-
     namespace dur { 
         void assertNothingSpooled();
         void releasingWriteLock();
@@ -103,6 +92,10 @@ namespace mongo {
         new WrapperForRWLock("admin")
     };
 
+    LockStat* Lock::nestableLockStat( Nestable db ) {
+        return &nestableLocks[db]->stats;
+    }
+
     static void locked_W();
     static void unlocking_w();
     static void unlocking_W();
@@ -114,25 +107,21 @@ namespace mongo {
 
         void lock_r() { 
             verify( threadState() == 0 );
-            lockState().locked( 'r' );
-            LockStat::Acquiring a(stats,'r'); 
+            lockState().lockedStart( 'r' );
             q.lock_r(); 
         }
         
         void lock_w() { 
             verify( threadState() == 0 );
             getDur().commitIfNeeded();
-            lockState().locked( 'w' );
-            LockStat::Acquiring a(stats,'w'); 
+            lockState().lockedStart( 'w' );
             q.lock_w(); 
         }
         
         void lock_R() {
             LockState& ls = lockState();
             massert(16103, str::stream() << "can't lock_R, threadState=" << (int) ls.threadState(), ls.threadState() == 0);
-            ls.locked( 'R' );
-            Acquiring a1('R');
-            LockStat::Acquiring a2(stats,'R'); 
+            ls.lockedStart( 'R' );
             q.lock_R(); 
         }
 
@@ -143,10 +132,8 @@ namespace mongo {
                 fassert(16114,false);
             }
             getDur().commitIfNeeded(); // check before locking - will use an R lock for the commit if need to do one, which is better than W
-            ls.locked( 'W' );
+            ls.lockedStart( 'W' );
             {
-                LockStat::Acquiring a1(stats,'W'); 
-                Acquiring a2('W');
                 q.lock_W();
             }
             locked_W();
@@ -155,19 +142,17 @@ namespace mongo {
         // how to count try's that fail is an interesting question. we should get rid of try().
         bool lock_R_try(int millis) { 
             verify( threadState() == 0 );
-            LockStat::Acquiring a(stats,'R'); 
             bool got = q.lock_R_try(millis); 
             if( got ) 
-                lockState().locked( 'R' );
+                lockState().lockedStart( 'R' );
             return got;
         }
         
         bool lock_W_try(int millis) { 
             verify( threadState() == 0 );
-            LockStat::Acquiring a(stats,'W'); 
             bool got = q.lock_W_try(millis); 
             if( got ) {
-                lockState().locked( 'W' );
+                lockState().lockedStart( 'W' );
                 locked_W();
             }
             return got;
@@ -176,7 +161,6 @@ namespace mongo {
         void unlock_r() {
             wassert( threadState() == 'r' );
             lockState().unlocked();
-            stats.unlocking('r'); 
             q.unlock_r(); 
         }
 
@@ -184,7 +168,6 @@ namespace mongo {
             unlocking_w();
             wassert( threadState() == 'w' );
             lockState().unlocked();
-            stats.unlocking('w'); 
             q.unlock_w(); 
         }
 
@@ -194,7 +177,6 @@ namespace mongo {
             wassert( threadState() == 'W' );
             unlocking_W();
             lockState().unlocked();
-            stats.unlocking('W'); 
             q.unlock_W(); 
         }
 
@@ -208,13 +190,15 @@ namespace mongo {
         void _unlock_R() {
             wassert( threadState() == 'R' );
             lockState().unlocked();
-            stats.unlocking('R'); 
             q.unlock_R(); 
         }
     };
 
     static WrapperForQLock& qlk = *new WrapperForQLock();
-
+    LockStat* Lock::globalLockStat() {
+        return &qlk.stats;
+    }
+    
     void reportLockStats(BSONObjBuilder& result) {
         BSONObjBuilder b;
         b.append(".", qlk.stats.report());
@@ -298,7 +282,8 @@ namespace mongo {
     {
     }
 
-    Lock::ScopedLock::ScopedLock() {
+    Lock::ScopedLock::ScopedLock( char type ) 
+        : _type(type), _stat(0) {
         LockState& ls = lockState();
         ls.enterScopedLock( this );
     }
@@ -307,7 +292,31 @@ namespace mongo {
         int prevCount = ls.recursiveCount();
         Lock::ScopedLock* what = ls.leaveScopedLock();
         fassert( 16171 , prevCount != 1 || what == this );
+
+        if ( _stat )
+            _stat->recordLockTimeMicros( _type , _timer.micros() );
+
     }
+    
+    long long Lock::ScopedLock::acquireFinished( LockStat* stat ) {
+        long long acquisitionTime = _timer.micros();
+        _timer.reset();
+        _stat = stat;
+        return acquisitionTime;
+    }
+
+    void Lock::ScopedLock::tempRelease() {
+        if ( _stat )
+            _stat->recordLockTimeMicros( _type , _timer.micros() );
+        _tempRelease();
+    }
+    
+    void Lock::ScopedLock::relock() {
+        _timer.reset();
+        _relock();
+    }
+
+
 
     Lock::TempRelease::TempRelease() : cant( Lock::nested() )
     {
@@ -337,48 +346,50 @@ namespace mongo {
         scopedLk->relock();
     }
 
-    void Lock::GlobalWrite::tempRelease() { 
+    void Lock::GlobalWrite::_tempRelease() { 
         fassert(16121, !noop);
         char ts = threadState();
         fassert(16122, ts != 'R'); // indicates downgraded; not allowed with temprelease
         fassert(16123, ts == 'W');
         qlk.unlock_W();
     }
-    void Lock::GlobalWrite::relock() { 
+    void Lock::GlobalWrite::_relock() { 
         fassert(16125, !noop);
         char ts = threadState();
         fassert(16126, ts == 0);
+        Acquiring a(this,lockState());
         qlk.lock_W();
     }
 
-    void Lock::GlobalRead::tempRelease() { 
+    void Lock::GlobalRead::_tempRelease() { 
         fassert(16127, !noop);
         char ts = threadState();
         fassert(16128, ts == 'R');
         qlk.unlock_R();
     }
-    void Lock::GlobalRead::relock() { 
+    void Lock::GlobalRead::_relock() { 
         fassert(16129, !noop);
         char ts = threadState();
         fassert(16130, ts == 0);
+        Acquiring a(this,lockState());
         qlk.lock_R();
     }
 
-    void Lock::DBWrite::tempRelease() { 
+    void Lock::DBWrite::_tempRelease() { 
         unlockDB();
     }
-    void Lock::DBWrite::relock() { 
+    void Lock::DBWrite::_relock() { 
         lockDB(_what);
     }
-    void Lock::DBRead::tempRelease() {
+    void Lock::DBRead::_tempRelease() {
         unlockDB();
     }
-    void Lock::DBRead::relock() { 
+    void Lock::DBRead::_relock() { 
         lockDB(_what);
     }
 
     Lock::GlobalWrite::GlobalWrite(bool sg, int timeoutms)
-    {
+        : ScopedLock('W') {
         char ts = threadState();
         noop = false;
         if( ts == 'W' ) { 
@@ -386,6 +397,9 @@ namespace mongo {
             return;
         }
         dassert( ts == 0 );
+
+        Acquiring a(this,lockState());
+        
         if ( timeoutms != -1 ) {
             bool success = qlk.lock_W_try( timeoutms );
             if ( !success ) throw DBTryLockTimeoutException(); 
@@ -420,7 +434,8 @@ namespace mongo {
         lockState().changeLockState( 'W' );
     }
 
-    Lock::GlobalRead::GlobalRead( int timeoutms ) {
+    Lock::GlobalRead::GlobalRead( int timeoutms ) 
+        : ScopedLock( 'R' ) {
         LockState& ls = lockState();
         char ts = ls.threadState();
         noop = false;
@@ -428,6 +443,9 @@ namespace mongo {
             noop = true;
             return;
         }
+
+        Acquiring a(this,ls);
+
         if ( timeoutms != -1 ) {
             bool success = qlk.lock_R_try( timeoutms );
             if ( !success ) throw DBTryLockTimeoutException(); 
@@ -516,12 +534,14 @@ namespace mongo {
 
     void Lock::DBWrite::lockDB(const string& ns) {
         fassert( 16253, !ns.empty() );
-        Acquiring a( 'w' );
+        LockState& ls = lockState();
+        
+        Acquiring a(this,ls);
         _locked_W=false;
         _locked_w=false; 
         _weLocked=0;
 
-        LockState& ls = lockState();
+
         massert( 16186 , "can't get a DBWrite while having a read lock" , ! ls.hasAnyReadLock() );
         if( ls.isW() )
             return;
@@ -550,10 +570,12 @@ namespace mongo {
 
     void Lock::DBRead::lockDB(const string& ns) {
         fassert( 16254, !ns.empty() );
-        Acquiring a( 'r' );
+        LockState& ls = lockState();
+        
+        Acquiring a(this,ls);
         _locked_r=false; 
         _weLocked=0; 
-        LockState& ls = lockState();
+
         if ( ls.isRW() )
             return;
         if (DB_LEVEL_LOCKING_ENABLED) {
@@ -572,11 +594,13 @@ namespace mongo {
         }
     }
 
-    Lock::DBWrite::DBWrite( const StringData& ns ) : _what(ns.data()), _nested(false) {
+    Lock::DBWrite::DBWrite( const StringData& ns ) 
+        : ScopedLock( 'w' ), _what(ns.data()), _nested(false) {
         lockDB( _what );
     }
 
-    Lock::DBRead::DBRead( const StringData& ns )   : _what(ns.data()), _nested(false) {
+    Lock::DBRead::DBRead( const StringData& ns )   
+        : ScopedLock( 'r' ), _what(ns.data()), _nested(false) {
         lockDB( _what );
     }
 
@@ -690,14 +714,14 @@ namespace mongo {
         fassert( 16187, lockState().threadState() == 'w' );
         _gotUpgrade = qlk.w_to_X();
         if ( _gotUpgrade )
-            lockState().locked('W');
+            lockState().changeLockState('W');
     }
 
     Lock::DBWrite::UpgradeToExclusive::~UpgradeToExclusive() {
         if ( _gotUpgrade ) {
             fassert( 16188, lockState().threadState() == 'W' );
             qlk.X_to_w();
-            lockState().locked('w');
+            lockState().changeLockState('w');
         }
         else {
             fassert( 16189, lockState().threadState() == 'w' );
@@ -736,14 +760,12 @@ namespace mongo {
     }
 
     void locked_W() {
-        d.dbMutex._minfo.entered(); // hopefully eliminate one day 
     }
     void unlocking_w() {
         // we can't commit early in this case; so a bit more to do here.
         dur::releasingWriteLock();
     }
     void unlocking_W() {
-        d.dbMutex._minfo.leaving();
         dur::releasingWriteLock();
     }
     MongoMutex::MongoMutex() {

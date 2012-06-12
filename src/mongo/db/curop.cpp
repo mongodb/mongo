@@ -26,7 +26,6 @@ namespace mongo {
         _client(client), 
         _wrapped(wrapped) 
     {
-        _lockType = 0;
         if ( _wrapped )
             _client->_curOp = this;
         _start = 0;
@@ -42,10 +41,8 @@ namespace mongo {
     void CurOp::_reset() {
         _suppressFromCurop = false;
         _command = false;
-        _lockType = 0;
         _dbprofile = 0;
         _end = 0;
-        _waitingForLock = false;
         _message = "";
         _progressMeter.finished();
         _killed = false;
@@ -124,7 +121,11 @@ namespace mongo {
     }
 
     void CurOp::recordGlobalTime( long long micros ) const {
-        Top::global.record( _ns , _op , _lockType , micros , _command );
+        if ( _client ) {
+            const LockState& ls = _client->lockState();
+            verify( ls.threadState() );
+            Top::global.record( _ns , _op , ls.hasAnyWriteLock() ? 1 : -1 , micros , _command );
+        }
     }
 
     BSONObj CurOp::infoNoauth() {
@@ -132,13 +133,6 @@ namespace mongo {
         b.append("opid", _opNum);
         bool a = _active && _start;
         b.append("active", a);
-        if ( _lockType ) {
-            char str[2];
-            str[0] = _lockType;
-            str[1] = 0;
-            b.append("lockType" , str);
-        }
-        b.append("waitingForLock" , _waitingForLock );
 
         if( a ) {
             b.append("secs_running", elapsedSeconds() );

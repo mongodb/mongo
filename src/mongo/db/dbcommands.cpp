@@ -466,15 +466,9 @@ namespace mongo {
 
             {
                 BSONObjBuilder t;
-
-                unsigned long long last, start, timeLocked;
-                d.dbMutex.info().getTimingInfo(start, timeLocked);
-                last = curTimeMicros64();
-                double tt = (double) last-start;
-                double tl = (double) timeLocked;
-                t.append("totalTime", tt);
-                t.append("lockTime", tl);
-                t.append("ratio", (tt ? tl/tt : 0));
+                
+                t.append( "totalTime" , (long long)(1000 * ( curTimeMillis64() - _started ) ) );
+                t.append( "lockTime" , Lock::globalLockStat()->getTimeLocked( 'W' ) );
 
                 {
                     BSONObjBuilder ttt( t.subobjStart( "currentQueue" ) );

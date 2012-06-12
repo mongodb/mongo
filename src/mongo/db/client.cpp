@@ -379,23 +379,6 @@ namespace mongo {
         return c->toString();
     }
 
-    Client* curopWaitingForLock( char type ) {
-        Client * c = currentClient.get();
-        verify( c );
-        CurOp * co = c->curop();
-        if ( co ) {
-            co->waitingForLock( type );
-        }
-        return c;
-    }
-
-    void curopGotLock(Client *c) {
-        verify(c);
-        CurOp * co = c->curop();
-        if ( co )
-            co->gotLock();
-    }
-
     void KillCurrentOp::interruptJs( AtomicUInt *op ) {
         if ( !globalScriptEngine )
             return;
@@ -486,8 +469,7 @@ namespace mongo {
             ss << "<tr align='left'>"
                << th( a("", "Connections to the database, both internal and external.", "Client") )
                << th( a("http://www.mongodb.org/display/DOCS/Viewing+and+Terminating+Current+Operation", "", "OpId") )
-               << "<th>Active</th>"
-               << "<th>LockType</th>"
+               << "<th>Locking</th>"
                << "<th>Waiting</th>"
                << "<th>SecsRunning</th>"
                << "<th>Op</th>"
@@ -507,11 +489,7 @@ namespace mongo {
 
                     tablecell( ss , co.opNum() );
                     tablecell( ss , co.active() );
-                    {
-                        char lt = co.lockType();
-                        tablecell(ss, lt ? lt : ' ');
-                    }
-                    tablecell( ss , co.isWaitingForLock() );
+                    tablecell( ss , c->lockState().reportState() );
                     if ( co.active() )
                         tablecell( ss , co.elapsedSeconds() );
                     else
@@ -546,10 +524,9 @@ namespace mongo {
             scoped_lock bl(clientsMutex);
             for ( set<Client*>::iterator i=clients.begin(); i!=clients.end(); ++i ) {
                 Client* c = *i;
-                if ( c->curop()->isWaitingForLock() ) {
+                if ( c->lockState().hasLockPending() ) {
                     num++;
-                    char lt = c->curop()->lockType();
-                    if( lt == 'w' || lt == 'W' )
+                    if ( c->lockState().hasAnyWriteLock() )
                         w++;
                     else
                         r++;
@@ -586,10 +563,9 @@ namespace mongo {
             if ( ! c->curop()->active() )
                 continue;
 
-            char lt = c->curop()->lockType();
-            if ( lt == 'w' || lt == 'W' )
+            if ( c->lockState().hasAnyWriteLock() )
                 writers++;
-            else if ( lt == 'r' || lt == 'R' )
+            if ( c->lockState().hasAnyReadLock() )
                 readers++;
         }
 

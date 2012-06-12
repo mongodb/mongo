@@ -46,12 +46,12 @@ namespace mongo {
             if ( locked == 0 )
                 timeLocked += curTimeMicros64() - enter;
         }
-        int isLocked() const { return locked; }
+
         void getTimingInfo(unsigned long long &s, unsigned long long &tl) const {
             s = start;
             tl = timeLocked;
         }
-        unsigned long long getTimeLocked() const { return timeLocked; }
+
     };
 
     /** old. see Lock class in d_concurrency.h instead. */

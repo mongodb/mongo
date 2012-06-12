@@ -1446,13 +1446,6 @@ namespace mongo {
         }
     }
 
-    void tempThread() {
-        while ( 1 ) {
-            out() << d.dbMutex.info().isLocked() << endl;
-            sleepmillis(100);
-        }
-    }
-
     void newRepl();
     void oldRepl();
     void startReplSets(ReplSetCmdline*);
@@ -1474,11 +1467,6 @@ namespace mongo {
         }
 
         oldRepl();
-
-        /* this was just to see if anything locks for longer than it should -- we need to be careful
-           not to be locked when trying to connect() or query() the other side.
-           */
-        //boost::thread tempt(tempThread);
 
         if( !replSettings.slave && !replSettings.master )
             return;
