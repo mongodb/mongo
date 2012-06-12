@@ -246,7 +246,8 @@ namespace mongo {
             }
             if( cmdObj.hasElement( "replMonitorMaxFailedChecks" ) ) {
                 if( s == 0 ) result.append( "was", ReplicaSetMonitor::getMaxFailedChecks() );
-                ReplicaSetMonitor::setMaxFailedChecks( cmdObj["replMonitorMaxFailedChecks"].Number() );
+                ReplicaSetMonitor::setMaxFailedChecks(
+                        cmdObj["replMonitorMaxFailedChecks"].numberInt() );
                 s++;
             }
 
