@@ -457,7 +457,7 @@ namespace mongo {
         logThreshold += currentOp.getExpectedLatencyMs();
 
         if ( shouldLog || debug.executionTime > logThreshold ) {
-            mongo::tlog() << debug << endl;
+            mongo::tlog() << debug.report( currentOp ) << endl;
         }
 
         if ( currentOp.shouldDBProfile( debug.executionTime ) ) {

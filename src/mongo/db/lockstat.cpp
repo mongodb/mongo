@@ -37,6 +37,24 @@ namespace mongo {
         return b.obj();
     }
 
+    void LockStat::report( StringBuilder& builder ) const {
+        bool prefixPrinted = false;
+        for ( int i=0; i < N; i++ ) {
+            if ( timeLocked[i].load() == 0 )
+                continue;
+            
+            if ( ! prefixPrinted ) {
+                builder << "locks";
+                prefixPrinted = true;
+            }
+
+            builder << ' ' << nameFor( i ) << ':' << timeLocked[i].load();
+        }
+        
+        if ( prefixPrinted )
+            builder << " micros";
+    }
+
     void LockStat::_append( BSONObjBuilder& builder, const AtomicInt64* data ) {
         if ( data[0].load() || data[1].load() ) {
             builder.append( "R" , data[0].load() );
@@ -60,6 +78,17 @@ namespace mongo {
         fassert(16146,false);
         return 0;
     }
+
+    char LockStat::nameFor(unsigned offset) {
+        switch ( offset ) {
+        case 0: return 'R';
+        case 1: return 'W';
+        case 2: return 'r';
+        case 3: return 'w';
+        }
+        fassertFailed(16339);
+    }
+
 
     void LockStat::recordAcquireTimeMicros( char type , long long micros ) {
         timeAcquiring[mapNo(type)].fetchAndAdd( micros );

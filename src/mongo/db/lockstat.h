@@ -33,6 +33,7 @@ namespace mongo {
         void recordLockTimeMicros( char type , long long micros );
 
         BSONObj report() const;
+        void report( StringBuilder& builder ) const;
 
         long long getTimeLocked( char type ) const { return timeLocked[mapNo(type)].load(); }
     private:
@@ -44,6 +45,7 @@ namespace mongo {
         AtomicInt64 timeLocked[N];
 
         static unsigned mapNo(char type);
+        static char nameFor(unsigned offset);
     };
 
 }

@@ -24,6 +24,7 @@
 #include "../util/concurrency/mapsf.h"
 #include "../util/assert_util.h"
 #include "client.h"
+#include "curop.h"
 #include "namespacestring.h"
 #include "d_globals.h"
 #include "server.h"
@@ -292,22 +293,27 @@ namespace mongo {
         Lock::ScopedLock* what = ls.leaveScopedLock();
         fassert( 16171 , prevCount != 1 || what == this );
 
-        if ( _stat )
-            _stat->recordLockTimeMicros( _type , _timer.micros() );
-
+        _recordTime( _timer.micros() );
     }
     
     long long Lock::ScopedLock::acquireFinished( LockStat* stat ) {
         long long acquisitionTime = _timer.micros();
         _timer.reset();
         _stat = stat;
+        cc().curop()->lockStat().recordAcquireTimeMicros( _type , acquisitionTime );
         return acquisitionTime;
     }
 
     void Lock::ScopedLock::tempRelease() {
-        if ( _stat )
-            _stat->recordLockTimeMicros( _type , _timer.micros() );
+        long long micros = _timer.micros();
         _tempRelease();
+        _recordTime( micros ); // might as well do after we unlock
+    }
+
+    void Lock::ScopedLock::_recordTime( long long micros ) {
+        if ( _stat )
+            _stat->recordLockTimeMicros( _type , micros );
+        cc().curop()->lockStat().recordLockTimeMicros( _type , micros );
     }
     
     void Lock::ScopedLock::relock() {

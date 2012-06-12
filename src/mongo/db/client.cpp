@@ -624,7 +624,7 @@ namespace mongo {
 
 #define OPDEBUG_TOSTRING_HELP(x) if( x >= 0 ) s << " " #x ":" << (x)
 #define OPDEBUG_TOSTRING_HELP_BOOL(x) if( x ) s << " " #x ":" << (x)
-    string OpDebug::toString() const {
+    string OpDebug::report( const CurOp& curop ) const {
         StringBuilder s;
         if ( iscommand )
             s << "command ";
@@ -673,6 +673,11 @@ namespace mongo {
         if ( responseLength > 0 )
             s << " reslen:" << responseLength;
         s << " " << executionTime << "ms";
+        
+        if ( curop.numYields() )
+            s << " numYields: " << curop.numYields();
+        
+        curop.lockStat().report( s );
 
         return s.str();
     }
@@ -708,6 +713,9 @@ namespace mongo {
         OPDEBUG_APPEND_BOOL( upsert );
         OPDEBUG_APPEND_NUMBER( keyUpdates );
 
+        b.appendNumber( "numYield" , curop.numYields() );
+        b.append( "lockStatMillis" , curop.lockStat().report() );
+        
         if ( ! exceptionInfo.empty() ) 
             exceptionInfo.append( b , "exception" , "exceptionCode" );
         

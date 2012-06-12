@@ -38,7 +38,7 @@ namespace mongo {
 
         void reset();
         
-        string toString() const;
+        string report( const CurOp& curop ) const;
         void append( const CurOp& curop, BSONObjBuilder& b ) const;
 
         // -------------------
@@ -217,6 +217,9 @@ namespace mongo {
         void setExpectedLatencyMs( long long latency ) { _expectedLatencyMs = latency; }
 
         void recordGlobalTime( long long micros ) const;
+        
+        const LockStat& lockStat() const { return _lockStat; }
+        LockStat& lockStat() { return _lockStat; }
     private:
         friend class Client;
         void _reset();
@@ -240,7 +243,8 @@ namespace mongo {
         ProgressMeter _progressMeter;
         volatile bool _killed;
         int _numYields;
-
+        LockStat _lockStat;
+        
         // this is how much "extra" time a query might take
         // a writebacklisten for example will block for 30s 
         // so this should be 30000 in that case

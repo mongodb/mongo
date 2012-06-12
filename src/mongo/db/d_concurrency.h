@@ -99,6 +99,8 @@ namespace mongo {
             void tempRelease();
             void relock();
 
+            void _recordTime( long long micros );
+
             virtual void _tempRelease() = 0;
             virtual void _relock() = 0;
 
