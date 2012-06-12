@@ -1198,7 +1198,14 @@ namespace mongo {
                 ShardedConnectionInfo::addHook();
                 // legacy name
                 string shardedOutputCollection = cmdObj["shardedOutputCollection"].valuestrsafe();
-                string inputNS = dbname + "." + shardedOutputCollection;
+                verify( shardedOutputCollection.size() > 0 );
+                string inputNS;
+                if ( cmdObj["inputDB"].type() == String ) {
+                    inputNS = cmdObj["inputDB"].String() + "." + shardedOutputCollection;
+                }
+                else {
+                    inputNS = dbname + "." + shardedOutputCollection;
+                }
 
                 Client& client = cc();
                 CurOp * op = client.curop();

@@ -1290,6 +1290,7 @@ namespace mongo {
                 // build the sharded finish command
                 BSONObjBuilder finalCmd;
                 finalCmd.append( "mapreduce.shardedfinish" , cmdObj );
+                finalCmd.append( "inputDB" , dbName );
                 finalCmd.append( "shardedOutputCollection" , shardResultCollection );
 
                 finalCmd.append( "shards" , shardResultsB.done() );
