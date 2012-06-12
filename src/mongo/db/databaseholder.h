@@ -70,6 +70,7 @@ namespace mongo {
 
         /**
          * gets all unique db names, ignoring paths
+         * need some lock
          */
         void getAllShortNames( set<string>& all ) const {
             SimpleMutex::scoped_lock lk(_m);
