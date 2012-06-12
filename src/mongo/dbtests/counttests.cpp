@@ -177,10 +177,10 @@ namespace CountTests {
         };
         void runDummyWriter() {
             Client::initThread( "dummy writer" );
-            // Register a write lock request.
-            cc().curop()->waitingForLock( 'W' );
             _state.set( Ready );
+            scoped_ptr<Acquiring> a( new Acquiring( 0 , cc().lockState() ) );
             _state.await( Finished );
+            a.reset(0);
             cc().shutdown();
         }
         PendingValue _state;
