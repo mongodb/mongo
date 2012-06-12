@@ -26,7 +26,6 @@
 #include "dur.h"
 #include "dur_journalformat.h"
 #include "../util/mongoutils/str.h"
-#include "mongomutex.h"
 #include "d_globals.h"
 #include "memconcept.h"
 #include "d_concurrency.h"

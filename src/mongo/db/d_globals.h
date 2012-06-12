@@ -9,14 +9,12 @@
 namespace mongo { 
 
     class RWLockRecursive;
-    class MongoMutex;
     class ClientCursorMonitor;
 
     struct DGlobals : boost::noncopyable { 
         DGlobals();
 
         // these are intentionally never deleted:
-        //MongoMutex &dbMutex;
         ClientCursorMonitor& clientCursorMonitor;
 
     };

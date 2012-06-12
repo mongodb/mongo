@@ -26,7 +26,6 @@
 #include "client.h"
 #include "namespacestring.h"
 #include "d_globals.h"
-#include "mongomutex.h"
 #include "server.h"
 #include "dur.h"
 #include "lockstat.h"
@@ -768,8 +767,5 @@ namespace mongo {
     void unlocking_W() {
         dur::releasingWriteLock();
     }
-    MongoMutex::MongoMutex() {
-        static int n = 0;
-        verify( ++n == 1 );
-    }
+
 }

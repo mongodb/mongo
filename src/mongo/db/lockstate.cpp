@@ -225,7 +225,7 @@ namespace mongo {
         if ( _whichNestable )
             return Lock::nestableLockStat( _whichNestable );
 
-        fassertFailed( 16337 );
+        return 0;
     }
 
 
@@ -237,7 +237,8 @@ namespace mongo {
     Acquiring::~Acquiring() {
         _ls._lockPending = false;
         LockStat* stat = _ls.getRelevantLockStat();
-        stat->recordAcquireTimeMicros( _ls.threadState(), _lock->acquireFinished( stat ) );
+        if ( stat && _lock )
+            stat->recordAcquireTimeMicros( _ls.threadState(), _lock->acquireFinished( stat ) );
     }
     
 }
