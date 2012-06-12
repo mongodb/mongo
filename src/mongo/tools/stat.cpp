@@ -273,7 +273,8 @@ namespace mongo {
                     state->error = errmsg;
                 long long cycleNumber = 0;
                 
-                conn.auth("admin", state->username, state->password, errmsg);
+                if (! (state->username.empty() && state->password.empty()))
+                    conn.auth("admin", state->username, state->password, errmsg);
 
                 while ( ++cycleNumber ) {
                     try {
