@@ -152,19 +152,19 @@ namespace mongo {
                         argc,
                         argv )
             ) {
-                dbexit( EXIT_NTSERVICE_ERROR );
+                ::_exit( EXIT_NTSERVICE_ERROR );
             }
-            dbexit( EXIT_CLEAN );
+            ::_exit( EXIT_CLEAN );
         }
         else if ( removeService ) {
             if ( !ServiceController::removeService( windowsServiceName ) ) {
-                dbexit( EXIT_NTSERVICE_ERROR );
+                ::_exit( EXIT_NTSERVICE_ERROR );
             }
-            dbexit( EXIT_CLEAN );
+            ::_exit( EXIT_CLEAN );
         }
         else if ( startService ) {
             if ( !ServiceController::startService( windowsServiceName , mongo::initService ) ) {
-                dbexit( EXIT_NTSERVICE_ERROR );
+                ::_exit( EXIT_NTSERVICE_ERROR );
             }
             return true;
         }
@@ -464,9 +464,8 @@ namespace mongo {
         reportStatus( SERVICE_START_PENDING, 1000 );
 
         _serviceCallback();
-        dbexit( EXIT_CLEAN );
-
         reportStatus( SERVICE_STOPPED );
+        ::_exit( EXIT_CLEAN );
     }
 
     static void serviceShutdown( const char* controlCodeName ) {
