@@ -30,6 +30,42 @@ namespace po = boost::program_options;
 namespace mongo {
 
     class TopTool : public Tool {
+
+        struct NSStat {
+            string ns;
+
+            // these need to be in millis
+            long long read;
+            long long write;
+
+            string toString() const {
+                stringstream ss;
+                ss << ns << " r: " << read << " w: " << write;
+                return ss.str();
+            }
+        };
+
+        struct Diff {
+            string ns;
+
+            long long read;
+            long long write;
+
+            Diff( NSStat prev , NSStat now ) {
+                ns = prev.ns;
+                read = now.read - prev.read;
+                write = now.write - prev.write;
+            }
+
+            long long total() const { return read + write; }
+
+            bool operator<(const Diff& r) const {
+                return total() < r.total();
+            }
+        };
+
+        typedef map<string,NSStat> Stats;
+
     public:
 
         TopTool() : Tool( "top" , REMOTE_SERVER , "admin" ) {
@@ -37,6 +73,7 @@ namespace mongo {
 
             add_hidden_options()
             ( "sleep" , po::value<int>() , "time to sleep between calls" )
+            ( "locks" , "use db lock info instead of top" )
             ;
             addPositionArg( "sleep" , 1 );
 
@@ -47,66 +84,130 @@ namespace mongo {
             out << "View live MongoDB collection statistics.\n" << endl;
         }
         
-        BSONObj getData() {
+        bool useLocks() {
+            return hasParam( "locks" );
+        }
+
+        Stats getData() {
+            if ( useLocks() )
+                return getDataLocks();
+            return getDataTop();
+        }
+
+        Stats getDataLocks() {
+            Stats stats;
+
+            BSONObj out;
+            if ( ! conn().simpleCommand( _db , &out , "serverStatus" ) ) {
+                cout << "error: " << out << endl;
+                return stats;
+            }
+
+            out = out.getOwned();
+
+            if ( ! out["locks"].isABSONObj() ) {
+                cout << "locks doesn't exist, old mongod? (<2.2?)" << endl;
+                return stats;
+            }
+
+            out = out["locks"].Obj();
+
+            BSONObjIterator i( out );
+            while ( i.more() ) {
+                BSONElement e = i.next();
+
+                NSStat& s = stats[e.fieldName()];
+                s.ns = e.fieldName();
+
+                BSONObj temp = e.Obj()["timeLocked"].Obj();
+                s.read = ( temp["r"].numberLong() + temp["R"].numberLong() ) / 1000;
+                s.write = ( temp["w"].numberLong() + temp["W"].numberLong() ) / 1000;
+            }
+
+            return stats;
+        }
+
+        Stats getDataTop() {
+            Stats stats;
+
             BSONObj out;
             if ( ! conn().simpleCommand( _db , &out , "top" ) ) {
                 cout << "error: " << out << endl;
-                return BSONObj();
+                return stats;
             }
-            return out.getOwned();
+
+            if ( ! out["totals"].isABSONObj() ) {
+                cout << "error: invalid top\n" << out << endl;
+                return stats;
+            }
+
+            out = out.getOwned();
+            out = out["totals"].Obj();
+
+            BSONObjIterator i( out );
+            while ( i.more() ) {
+                BSONElement e = i.next();
+                if ( ! e.isABSONObj() )
+                    continue;
+
+                NSStat& s = stats[e.fieldName()];
+                s.ns = e.fieldName();
+                s.read = e.Obj()["readLock"].Obj()["time"].numberLong() / 1000;
+                s.write = e.Obj()["writeLock"].Obj()["time"].numberLong() / 1000;
+            }
+
+            return stats;
         }
         
-        void printDiff( BSONObj prev , BSONObj now ) { 
-            if ( ! prev["totals"].isABSONObj() ||
-                 ! now["totals"].isABSONObj() ) {
+        void printDiff( const Stats& prev , const Stats& now ) {
+            if ( prev.size() == 0 || now.size() == 0 ) {
                 cout << "." << endl;
                 return;
             }
-
-            prev = prev["totals"].Obj();
-            now = now["totals"].Obj();
             
-            vector<NSInfo> data;
+            vector<Diff> data;
             
             unsigned longest = 30;
 
-            BSONObjIterator i( now );
-            while ( i.more() ) {
-                BSONElement e = i.next();
+            for ( Stats::const_iterator i=now.begin() ; i != now.end(); ++i ) {
+                const string& ns = i->first;
+                const NSStat& b = i->second;
+                if ( prev.find( ns ) == prev.end() )
+                    continue;
+                const NSStat& a = prev.find( ns )->second;
                 
                 // invalid, data fixed in 1.8.0
-                if ( e.fieldName()[0] == '?' )
+                if ( ns[0] == '?' )
                     continue;
                 
-                if ( ! str::contains( e.fieldName() , '.' ) )
+                if ( ! useLocks() && ns.find( '.' ) == string::npos )
                     continue;
                 
-                BSONElement old = prev[e.fieldName()];
-                if ( old.eoo() ) 
-                    continue;
-                
-                if ( strlen( e.fieldName() ) > longest )
-                    longest = strlen(e.fieldName());
+                if ( ns.size() > longest )
+                    longest = ns.size();
 
-                data.push_back( NSInfo( e.fieldName() , old.Obj() , e.Obj() ) );
+                data.push_back( Diff( a , b ) );
             }
             
             std::sort( data.begin() , data.end() );
 
+            int numberWidth = 10;
+
             cout << "\n"
-                 << setw(longest) << "ns" 
-                 << "\ttotal"  
-                 << "\tread"    
-                 << "\twrite"  
+                 << setw(longest) << "ns"
+                 << setw(numberWidth+2) << "total"
+                 << setw(numberWidth+2) << "read"
+                 << setw(numberWidth+2) << "write"
                  << "\t\t" << terseCurrentTime()
                  << endl;
             for ( int i=data.size()-1; i>=0 && data.size() - i < 10 ; i-- ) {
                 cout << setw(longest) << data[i].ns 
-                     << "\t" << setprecision(3) << data[i].diffTimeMS( "total" ) << "ms" 
-                     << "\t" << setprecision(3) << data[i].diffTimeMS( "readLock" ) << "ms" 
-                     << "\t" << setprecision(3) << data[i].diffTimeMS( "writeLock" ) << "ms" 
+                     << setw(numberWidth) << setprecision(3) << data[i].total() << "ms"
+                     << setw(numberWidth) << setprecision(3) << data[i].read << "ms"
+                     << setw(numberWidth) << setprecision(3) << data[i].write << "ms"
                      << endl;
             }
+
         }
 
         int run() {
@@ -114,12 +215,12 @@ namespace mongo {
 
             auth();
             
-            BSONObj prev = getData();
+            Stats prev = getData();
 
             while ( true ) {
                 sleepsecs( _sleep );
                 
-                BSONObj now;
+                Stats now;
                 try {
                     now = getData();
                 }
@@ -128,66 +229,21 @@ namespace mongo {
                     continue;
                 }
 
-                if ( now.isEmpty() )
+                if ( now.size() == 0 )
                     return -2;
                 
                 try {
                     printDiff( prev , now );
                 }
                 catch ( AssertionException& e ) {
-                    cout << "\nerror: " << e.what() << "\n"
-                         << now
-                         << endl;
+                    cout << "\nerror: " << e.what() << endl;
                 }
-
 
                 prev = now;
             }
 
             return 0;
         }
-
-        struct NSInfo {
-            NSInfo( string thens , BSONObj a , BSONObj b ) {
-                ns = thens;
-                prev = a;
-                cur = b;
-                
-                timeDiff = diffTime( "total" );
-            }
-            
-            
-            int diffTimeMS( const char * field  ) const {
-                return (int)(diffTime( field ) / 1000);
-            }
-
-            double diffTime( const char * field ) const {
-                return diff( field , "time" );
-            }
-            
-            double diffCount( const char * field ) const {
-                return diff( field , "count" );
-            }
-
-            /**
-             * @param field total,readLock, etc...
-             * @param type time or count
-             */
-            double diff( const char * field , const char * type ) const {
-                return cur[field].Obj()[type].number() - prev[field].Obj()[type].number();
-            }
-
-            bool operator<(const NSInfo& r) const {
-                return timeDiff < r.timeDiff;
-            }
-            
-            string ns;
-            
-            BSONObj prev;
-            BSONObj cur;
-
-            double timeDiff; // time diff between prev and cur
-        };
 
     private:
         int _sleep;
