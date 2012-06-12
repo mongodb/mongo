@@ -143,6 +143,7 @@ namespace mongo {
         scoped_lock lk ( _lock );
         log() << "deleting replica set monitor for: " << _getServerAddress_inlock() << endl;
         _cacheServerAddresses_inlock();
+        pool.removeHost( _getServerAddress_inlock() );
         _nodes.clear();
         _master = -1;
     }

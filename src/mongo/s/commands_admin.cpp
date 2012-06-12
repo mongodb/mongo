@@ -1028,8 +1028,10 @@ namespace mongo {
                         return false;
                     }
 
-                    Shard::removeShard( shardDoc[ "_id" ].str() );
-                    ReplicaSetMonitor::remove( shardDoc[ "_id" ].str(), true );
+                    string shardName = shardDoc[ "_id" ].str();
+                    Shard::removeShard( shardName );
+                    shardConnectionPool.removeHost( shardName );
+                    ReplicaSetMonitor::remove( shardName, true );
                     Shard::reloadShardInfo();
 
                     result.append( "msg"   , "removeshard completed successfully" );

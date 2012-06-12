@@ -133,6 +133,9 @@ namespace mongo {
         void addHook( DBConnectionHook * hook ); // we take ownership
         void appendInfo( BSONObjBuilder& b );
 
+        // Removes and deletes all connections from the pool for the host (regardless of timeout)
+        void removeHost( const string& host );
+
         /** compares server namees, but is smart about replica set names */
         struct serverNameCompare {
             bool operator()( const string& a , const string& b ) const;

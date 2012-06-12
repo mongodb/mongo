@@ -228,6 +228,18 @@ namespace mongo {
         }
     }
 
+    void DBConnectionPool::removeHost( const string& host ) {
+        scoped_lock L(_mutex);
+        LOG(2) << "Removing connections from all pools for host: " << host << endl;
+        for ( PoolMap::iterator i = _pools.begin(); i != _pools.end(); ++i ) {
+            const string& poolHost = i->first.ident;
+            if ( !serverNameCompare()(host, poolHost) && !serverNameCompare()(poolHost, host) ) {
+                // hosts are the same
+                i->second.clear();
+            }
+        }
+    }
+
     void DBConnectionPool::addHook( DBConnectionHook * hook ) {
         _hooks->push_back( hook );
     }
