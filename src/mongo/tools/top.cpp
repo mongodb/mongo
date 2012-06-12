@@ -21,6 +21,7 @@
 #include "db/json.h"
 #include "../util/text.h"
 #include "tool.h"
+#include "stat_util.h"
 #include <fstream>
 #include <iostream>
 #include <boost/program_options.hpp>
@@ -30,42 +31,6 @@ namespace po = boost::program_options;
 namespace mongo {
 
     class TopTool : public Tool {
-
-        struct NSStat {
-            string ns;
-
-            // these need to be in millis
-            long long read;
-            long long write;
-
-            string toString() const {
-                stringstream ss;
-                ss << ns << " r: " << read << " w: " << write;
-                return ss.str();
-            }
-        };
-
-        struct Diff {
-            string ns;
-
-            long long read;
-            long long write;
-
-            Diff( NSStat prev , NSStat now ) {
-                ns = prev.ns;
-                read = now.read - prev.read;
-                write = now.write - prev.write;
-            }
-
-            long long total() const { return read + write; }
-
-            bool operator<(const Diff& r) const {
-                return total() < r.total();
-            }
-        };
-
-        typedef map<string,NSStat> Stats;
-
     public:
 
         TopTool() : Tool( "top" , REMOTE_SERVER , "admin" ) {
@@ -88,47 +53,25 @@ namespace mongo {
             return hasParam( "locks" );
         }
 
-        Stats getData() {
+        NamespaceStats getData() {
             if ( useLocks() )
                 return getDataLocks();
             return getDataTop();
         }
 
-        Stats getDataLocks() {
-            Stats stats;
+        NamespaceStats getDataLocks() {
 
             BSONObj out;
             if ( ! conn().simpleCommand( _db , &out , "serverStatus" ) ) {
                 cout << "error: " << out << endl;
-                return stats;
+                return NamespaceStats();
             }
 
-            out = out.getOwned();
-
-            if ( ! out["locks"].isABSONObj() ) {
-                cout << "locks doesn't exist, old mongod? (<2.2?)" << endl;
-                return stats;
-            }
-
-            out = out["locks"].Obj();
-
-            BSONObjIterator i( out );
-            while ( i.more() ) {
-                BSONElement e = i.next();
-
-                NSStat& s = stats[e.fieldName()];
-                s.ns = e.fieldName();
-
-                BSONObj temp = e.Obj()["timeLocked"].Obj();
-                s.read = ( temp["r"].numberLong() + temp["R"].numberLong() ) / 1000;
-                s.write = ( temp["w"].numberLong() + temp["W"].numberLong() ) / 1000;
-            }
-
-            return stats;
+            return StatUtil::parseServerStatusLocks( out.getOwned() );
         }
 
-        Stats getDataTop() {
-            Stats stats;
+        NamespaceStats getDataTop() {
+            NamespaceStats stats;
 
             BSONObj out;
             if ( ! conn().simpleCommand( _db , &out , "top" ) ) {
@@ -150,7 +93,7 @@ namespace mongo {
                 if ( ! e.isABSONObj() )
                     continue;
 
-                NSStat& s = stats[e.fieldName()];
+                NamespaceInfo& s = stats[e.fieldName()];
                 s.ns = e.fieldName();
                 s.read = e.Obj()["readLock"].Obj()["time"].numberLong() / 1000;
                 s.write = e.Obj()["writeLock"].Obj()["time"].numberLong() / 1000;
@@ -159,38 +102,26 @@ namespace mongo {
             return stats;
         }
         
-        void printDiff( const Stats& prev , const Stats& now ) {
+        void printDiff( const NamespaceStats& prev , const NamespaceStats& now ) {
             if ( prev.size() == 0 || now.size() == 0 ) {
                 cout << "." << endl;
                 return;
             }
             
-            vector<Diff> data;
+            vector<NamespaceDiff> data = StatUtil::computeDiff( prev , now );
             
             unsigned longest = 30;
+            
+            for ( unsigned i=0; i < data.size(); i++ ) {
+                const string& ns = data[i].ns;
 
-            for ( Stats::const_iterator i=now.begin() ; i != now.end(); ++i ) {
-                const string& ns = i->first;
-                const NSStat& b = i->second;
-                if ( prev.find( ns ) == prev.end() )
-                    continue;
-                const NSStat& a = prev.find( ns )->second;
-                
-                // invalid, data fixed in 1.8.0
-                if ( ns[0] == '?' )
-                    continue;
-                
                 if ( ! useLocks() && ns.find( '.' ) == string::npos )
                     continue;
-                
+
                 if ( ns.size() > longest )
                     longest = ns.size();
-
-                data.push_back( Diff( a , b ) );
             }
             
-            std::sort( data.begin() , data.end() );
-
             int numberWidth = 10;
 
             cout << "\n"
@@ -201,6 +132,10 @@ namespace mongo {
                  << "\t\t" << terseCurrentTime()
                  << endl;
             for ( int i=data.size()-1; i>=0 && data.size() - i < 10 ; i-- ) {
+                
+                if ( ! useLocks() && data[i].ns.find( '.' ) == string::npos )
+                    continue;
+
                 cout << setw(longest) << data[i].ns 
                      << setw(numberWidth) << setprecision(3) << data[i].total() << "ms"
                      << setw(numberWidth) << setprecision(3) << data[i].read << "ms"
@@ -215,12 +150,12 @@ namespace mongo {
 
             auth();
             
-            Stats prev = getData();
+            NamespaceStats prev = getData();
 
             while ( true ) {
                 sleepsecs( _sleep );
                 
-                Stats now;
+                NamespaceStats now;
                 try {
                     now = getData();
                 }

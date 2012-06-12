@@ -120,7 +120,39 @@ namespace mongo {
         }
 
         if (!isMongos) {
-            _append( result , "locked %" , 8 , percent( "globalLock.totalTime" , "globalLock.lockTime" , a , b ) );
+            
+            if ( b["locks"].isABSONObj() ) {
+                NamespaceStats prevStats = parseServerStatusLocks( a );
+                NamespaceStats curStats = parseServerStatusLocks( b );
+                vector<NamespaceDiff> diffs = computeDiff( prevStats , curStats );
+
+                if ( diffs.size() == 0 ) {
+                    _append( result , "locked %" , 8 , 0 );
+                }
+                else {
+
+                    double globalTime = 0;
+
+                    for ( unsigned i = 0; i < diffs.size(); i++ ) {
+                        if ( diffs[i].ns != "." )
+                            continue;
+                        globalTime = diffs[i].write;
+                    }
+
+                    double uptimeMillis = diff( "uptimeMillis" , a , b );
+                    unsigned idx = diffs.size()-1;
+                    
+                    stringstream ss;
+                    ss.setf( ios::fixed );
+                    ss << diffs[idx].ns << ":" << setprecision(1) << ( 100.0 * ( globalTime + diffs[idx].write ) / uptimeMillis ) << "%";
+                    _append( result , "locked db" , 10 , ss.str() );
+                }
+            }
+            else {
+                _append( result , "locked %" , 8 , percent( "globalLock.totalTime" , "globalLock.lockTime" , a , b ) );
+            }
+
+            
             _append( result , "idx miss %" , 8 , percent( "indexCounters.btree.accesses" , "indexCounters.btree.misses" , a , b ) );
         }
 
@@ -265,5 +297,52 @@ namespace mongo {
         _append( result , name , width , ss.str() );
     }
 
+    NamespaceStats StatUtil::parseServerStatusLocks( const BSONObj& serverStatus ) {
+        NamespaceStats stats;
+
+        if ( ! serverStatus["locks"].isABSONObj() ) {
+            cout << "locks doesn't exist, old mongod? (<2.2?)" << endl;
+            return stats;
+        }
+        
+        BSONObj locks = serverStatus["locks"].Obj();
+        
+        BSONObjIterator i( locks );
+        while ( i.more() ) {
+            BSONElement e = i.next();
+            
+            NamespaceInfo& s = stats[e.fieldName()];
+            s.ns = e.fieldName();
+            
+            BSONObj temp = e.Obj()["timeLocked"].Obj();
+            s.read = ( temp["r"].numberLong() + temp["R"].numberLong() ) / 1000;
+            s.write = ( temp["w"].numberLong() + temp["W"].numberLong() ) / 1000;
+        }
+        
+        return stats;
+        
+    }
+
+    vector<NamespaceDiff> StatUtil::computeDiff( const NamespaceStats& prev , const NamespaceStats& current ) {
+        vector<NamespaceDiff> data;
+        
+        for ( NamespaceStats::const_iterator i = current.begin() ; i != current.end(); ++i ) {
+            const string& ns = i->first;
+            const NamespaceInfo& b = i->second;
+            if ( prev.find( ns ) == prev.end() )
+                    continue;
+            const NamespaceInfo& a = prev.find( ns )->second;
+            
+            // invalid, data fixed in 1.8.0
+            if ( ns[0] == '?' )
+                continue;
+            
+            data.push_back( NamespaceDiff( a , b ) );
+        }
+
+        std::sort( data.begin() , data.end() );
+
+        return data;
+    }
 }
 

@@ -23,6 +23,43 @@
 
 namespace mongo {
 
+
+    struct NamespaceInfo {
+        string ns;
+        
+        // these need to be in millis
+        long long read;
+        long long write;
+        
+        string toString() const {
+            stringstream ss;
+            ss << ns << " r: " << read << " w: " << write;
+            return ss.str();
+        }
+
+    };
+
+    struct NamespaceDiff {
+        string ns;
+        
+        long long read;
+        long long write;
+        
+        NamespaceDiff( NamespaceInfo prev , NamespaceInfo now ) {
+            ns = prev.ns;
+            read = now.read - prev.read;
+            write = now.write - prev.write;
+        }
+        
+        long long total() const { return read + write; }
+        
+        bool operator<(const NamespaceDiff& r) const {
+            return total() < r.total();
+        }
+    };
+
+    typedef map<string,NamespaceInfo> NamespaceStats;
+
     /**
      * static methods useful for computing status from serverStatus type things
      */
@@ -46,6 +83,8 @@ namespace mongo {
         void setSeconds( double seconds ) { _seconds = seconds; }
         void setAll( bool all ) { _all = all; }
 
+        static NamespaceStats parseServerStatusLocks( const BSONObj& serverStatus );
+        static vector<NamespaceDiff> computeDiff( const NamespaceStats& prev , const NamespaceStats& current );
     private:
 
 
@@ -73,6 +112,5 @@ namespace mongo {
         bool _all;
         
     };
-    
 }
 
