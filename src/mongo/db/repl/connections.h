@@ -47,9 +47,9 @@ namespace mongo {
             // conLock releases...
         }
         void reconnect() {
-            x->cc.reset(new DBClientConnection(true, 0, 10));
-            x->cc->_logLevel = 2;
-            x->connected = false;
+            connInfo->cc.reset(new DBClientConnection(true, 0, 10));
+            connInfo->cc->_logLevel = 2;
+            connInfo->connected = false;
             connect();
         }
 
@@ -70,33 +70,39 @@ namespace mongo {
     private:
         auto_ptr<scoped_lock> connLock;
         static mongo::mutex mapMutex;
-        struct X {
-            mongo::mutex z;
+        struct ConnectionInfo {
+            mongo::mutex lock;
             scoped_ptr<DBClientConnection> cc;
             bool connected;
-            X() : z("X"), cc(new DBClientConnection(/*reconnect*/ true, 0, /*timeout*/ 10.0)), connected(false) {
+            ConnectionInfo() : lock("ConnectionInfo"),
+                               cc(new DBClientConnection(/*reconnect*/ true, 0, /*timeout*/ 10.0)),
+                               connected(false) {
                 cc->_logLevel = 2;
             }
-        } *x;
-        typedef map<string,ScopedConn::X*> M;
+        } *connInfo;
+        typedef map<string,ScopedConn::ConnectionInfo*> M;
         static M& _map;
-        scoped_ptr<DBClientConnection>& conn() { return x->cc; }
+        scoped_ptr<DBClientConnection>& conn() { return connInfo->cc; }
         const string _hostport;
 
         // we should already be locked...
         bool connect() {
           string err;
-          if (!x->cc->connect(_hostport, err)) {
+          if (!connInfo->cc->connect(_hostport, err)) {
             log() << "couldn't connect to " << _hostport << ": " << err << rsLog;
             return false;
           }
-          x->connected = true;
+          connInfo->connected = true;
 
           // if we cannot authenticate against a member, then either its key file
           // or our key file has to change.  if our key file has to change, we'll
           // be rebooting. if their file has to change, they'll be rebooted so the
           // connection created above will go dead, reconnect, and reauth.
-          if (!noauth && !x->cc->auth("local", internalSecurity.user, internalSecurity.pwd, err, false)) {
+          if (!noauth && !connInfo->cc->auth("local",
+                                             internalSecurity.user,
+                                             internalSecurity.pwd,
+                                             err,
+                                             false)) {
             log() << "could not authenticate against " << _hostport << ", " << err << rsLog;
             return false;
           }
@@ -109,11 +115,11 @@ namespace mongo {
         bool first = false;
         {
             scoped_lock lk(mapMutex);
-            x = _map[_hostport];
-            if( x == 0 ) {
-                x = _map[_hostport] = new X();
+            connInfo = _map[_hostport];
+            if( connInfo == 0 ) {
+                connInfo = _map[_hostport] = new ConnectionInfo();
                 first = true;
-                connLock.reset( new scoped_lock(x->z) );
+                connLock.reset( new scoped_lock(connInfo->lock) );
             }
         }
 
@@ -123,8 +129,8 @@ namespace mongo {
             return;
         }
 
-        connLock.reset( new scoped_lock(x->z) );
-        if (x->connected) {
+        connLock.reset( new scoped_lock(connInfo->lock) );
+        if (connInfo->connected) {
             return;
         }
 
