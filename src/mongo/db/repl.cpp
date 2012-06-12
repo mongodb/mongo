@@ -205,8 +205,8 @@ namespace mongo {
                     wassert( !Lock::isLocked() );
                     // note: there is no so-style timeout on this connection; perhaps we should have one.
                     scoped_ptr<ScopedDbConnection> conn(
-                            ScopedDbConnection::getInternalScopedDbConnection( s["host"]
-                                                                               .valuestr() ) );
+                            ScopedDbConnection::getInternalScopedDbConnection(
+                                    s["host"].valuestr() ) );
                     DBClientConnection *cliConn = dynamic_cast< DBClientConnection* >( &conn->conn() );
                     if ( cliConn && replAuthenticate( cliConn ) ) {
                         BSONObj first = conn->get()->findOne( (string)"local.oplog.$" + sourcename,
