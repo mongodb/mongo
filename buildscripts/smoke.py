@@ -591,7 +591,8 @@ def set_globals(options):
     continue_on_failure = options.continue_on_failure
     smoke_db_prefix = options.smoke_db_prefix
     small_oplog = options.small_oplog
-    small_oplog_rs = options.small_oplog_rs
+    if hasattr(options, "small_oplog_rs"):
+        small_oplog_rs = options.small_oplog_rs
     no_journal = options.no_journal
     no_preallocj = options.no_preallocj
     auth = options.auth
