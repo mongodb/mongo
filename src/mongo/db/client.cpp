@@ -668,17 +668,18 @@ namespace mongo {
             if ( exceptionInfo.code )
                 s << " code:" << exceptionInfo.code;
         }
+
+        if ( curop.numYields() )
+            s << " numYields: " << curop.numYields();
+        
+        s << " ";
+        curop.lockStat().report( s );
         
         OPDEBUG_TOSTRING_HELP( nreturned );
         if ( responseLength > 0 )
             s << " reslen:" << responseLength;
         s << " " << executionTime << "ms";
         
-        if ( curop.numYields() )
-            s << " numYields: " << curop.numYields();
-        
-        curop.lockStat().report( s );
-
         return s.str();
     }
 
