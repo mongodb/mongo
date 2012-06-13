@@ -44,14 +44,6 @@ namespace mongo {
 
     boost::thread_specific_ptr<string> _threadName;
 
-    static AtomicInt64 _setThreadNameCounter;
-
-    void _setThreadName( const char * name ) {
-        if ( ! name ) 
-            name = "NONE";
-        _threadName.reset( new string(name) );
-    }
-
 #if defined(_WIN32)
 
 #define MS_VC_EXCEPTION 0x406D1388
