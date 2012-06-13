@@ -19,6 +19,7 @@
 #include "pch.h"
 #include "listen.h"
 #include "message_port.h"
+#include "mongo/platform/atomic_word.h"
 
 #ifndef _WIN32
 
@@ -238,7 +239,7 @@ namespace mongo {
         _logListen( _port , false );
 #endif
 
-        static long long connNumber = 0;
+        static AtomicInt64 connNumber;
         struct timeval maxSelectTime;
         while ( ! inShutdown() ) {
             fd_set fds[1];
@@ -314,7 +315,7 @@ namespace mongo {
                 setsockopt( s , SOL_SOCKET, SO_NOSIGPIPE, &one, sizeof(int));
 #endif
 
-                long long myConnectionNumber = ++connNumber;
+                long long myConnectionNumber = connNumber.addAndFetch(1);
 
                 if ( _logConnect && ! cmdLine.quiet ){
                     int conns = connTicketHolder.used()+1;
