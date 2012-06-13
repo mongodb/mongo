@@ -32,8 +32,8 @@ namespace mongo {
 
     replset::SyncTail::~SyncTail() {}
 
-    BSONObj* replset::SyncTail::peek() {
-        return _queue->peek();
+    bool replset::SyncTail::peek(BSONObj* obj) {
+        return _queue->peek(obj);
     }
 
     void replset::SyncTail::consume() {
@@ -96,9 +96,10 @@ namespace mongo {
         int fails = 0;
         while( ts < minValid ) {
             try {
-                BSONObj* o = peek();
+                BSONObj obj;
+                bool peekStatus = peek(&obj);
 
-                if (!o) {
+                if (!peekStatus) {
                     OCCASIONALLY log() << "replSet initial sync oplog: no more records" << endl;
                     if (fails++ > 30) {
                         log() << "replSet initial sync couldn't get records for 30 seconds, giving up" << endl;
@@ -111,8 +112,8 @@ namespace mongo {
                 }
                 fails = 0;
 
-                ts = (*o)["ts"]._opTime();
-                applyOp(*o);
+                ts = obj["ts"]._opTime();
+                applyOp(obj);
                 consume();
 
                 if ( ++n % 1000 == 0 ) {
@@ -273,9 +274,10 @@ namespace mongo {
                     }
 
                     {
-                        const BSONObj *next = peek();
+                        BSONObj nextobj;
+                        bool peekStatus(peek(&nextobj));
 
-                        if (next == NULL) {
+                        if (!peekStatus) {
                             bool golive = false;
 
                             if (!theReplSet->isSecondary()) {
@@ -292,14 +294,12 @@ namespace mongo {
                             break;
                         }
 
-                        const BSONObj& o = *next;
-
                         int sd = theReplSet->myConfig().slaveDelay;
 
                         // ignore slaveDelay if the box is still initializing. once
                         // it becomes secondary we can worry about it.
                         if( sd && theReplSet->isSecondary() ) {
-                            const OpTime ts = o["ts"]._opTime();
+                            const OpTime ts = nextobj["ts"]._opTime();
                             long long a = ts.getSecs();
                             long long b = time(0);
                             long long lag = b - a;
@@ -326,7 +326,7 @@ namespace mongo {
                             }
                         } // endif slaveDelay
 
-                        const char *ns = o.getStringField("ns");
+                        const char *ns = nextobj.getStringField("ns");
                         if( ns ) {
                             if ( strlen(ns) == 0 ) {
                                 // this is ugly
@@ -360,19 +360,15 @@ namespace mongo {
                                 return;
                             }
 
-                            syncApply(o);
-                            _logOpObjRS(o);   // with repl sets we write the ops to our oplog too
+                            syncApply(nextobj);
+                            _logOpObjRS(nextobj);   // with repl sets we write the ops to our oplog too
                             getDur().commitIfNeeded();
 
-                            // we don't want the catch to reference next after it's been freed
-                            next = NULL;
                             consume();
                         }
                         catch (DBException& e) {
                             sethbmsg(str::stream() << "syncTail: " << e.toString());
-                            if (next) {
-                                log() << "syncing: " << next->toString() << endl;
-                            }
+                            log() << "syncing: " << nextobj.toString() << endl;
                             lk.reset();
                             sleepsecs(30);
                             return;

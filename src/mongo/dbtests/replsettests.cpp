@@ -324,11 +324,12 @@ namespace ReplSetTests {
     public:
         BackgroundSyncTest() {}
         virtual ~BackgroundSyncTest() {}
-        virtual BSONObj* peek() {
+        virtual bool peek(BSONObj* op) {
             if (_queue.empty()) {
-                return NULL;
+                return false;
             }
-            return &_queue.front();
+            *op = _queue.front();
+            return true;
         }
         virtual void consume() {
             _queue.pop();
@@ -362,7 +363,8 @@ namespace ReplSetTests {
             return true;
         }
         virtual bool isPrimary() {
-            return _syncTail->peek() == 0;
+            BSONObj obj;
+            return _syncTail->peek(&obj) == false;
         }
         virtual bool tryToGoLiveAsASecondary(OpTime& minvalid) {
             return false;
@@ -488,7 +490,8 @@ namespace ReplSetTests {
             applyOplog();
 
             ASSERT_EQUALS(1, static_cast<int>(client()->count(ns())));
-            ASSERT(_bgsync->peek() != NULL);
+            BSONObj obj2;
+            ASSERT(_bgsync->peek(&obj2));
         }
     };
 

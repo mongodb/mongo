@@ -26,11 +26,23 @@
 namespace mongo {
 namespace replset {
 
+
+    // This interface exists to facilitate easier testing;
+    // the test infrastructure implements these functions with stubs.
     class BackgroundSyncInterface {
     public:
         virtual ~BackgroundSyncInterface();
-        virtual BSONObj* peek() = 0;
+
+        // Gets the head of the buffer, but does not remove it. 
+        // Returns true if an element was present at the head;
+        // false if the queue was empty.
+        virtual bool peek(BSONObj* op) = 0;
+
+        // Deletes objects in the queue;
+        // called by sync thread after it has applied an op
         virtual void consume() = 0;
+
+        // Returns the member we're currently syncing from (or NULL)
         virtual Member* getSyncTarget() = 0;
     };
 
@@ -55,7 +67,6 @@ namespace replset {
         // Production thread
         BlockingQueue<BSONObj> _buffer;
 
-        BSONObj _currentOp;
         OpTime _lastOpTimeFetched;
         long long _lastH;
         // if produce thread should be running
@@ -91,7 +102,8 @@ namespace replset {
         void stop();
         // restart syncing
         void start();
-
+        // wait up to 1 second for more ops to appear
+        void waitForMore();
 
         // Tracker thread
         // tells the sync target where this member is synced to
@@ -109,17 +121,9 @@ namespace replset {
         // starts the sync target notifying thread
         void notifierThread();
 
-
         // Interface implementation
-
-        // Gets the head of the buffer, but does not remove it. Returns a pointer to the list
-        // element.
-        virtual BSONObj* peek();
-
-        // called by sync thread when it has applied an op
+        virtual bool peek(BSONObj* op);
         virtual void consume();
-
-        // return the member we're currently syncing from (or NULL)
         virtual Member* getSyncTarget();
     };
 

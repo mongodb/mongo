@@ -85,7 +85,7 @@ namespace replset {
             try {
                 {
                     boost::unique_lock<boost::mutex> lock(_lastOpMutex);
-                    if (_consumedOpTime == theReplSet->lastOpTimeWritten) {
+                    while (_consumedOpTime == theReplSet->lastOpTimeWritten) {
                         _lastOpCond.wait(lock);
                     }
                 }
@@ -198,8 +198,6 @@ namespace replset {
                 sethbmsg(str::stream() << "exception in producer: " << e2.what());
                 sleepsecs(60);
             }
-
-            sleepsecs(1);
         }
 
         cc().shutdown();
@@ -249,6 +247,7 @@ namespace replset {
             boost::unique_lock<boost::mutex> lock(_mutex);
 
             if (_currentSyncTarget == NULL) {
+                lock.unlock();
                 sleepsecs(1);
                 // if there is no one to sync from
                 return;
@@ -294,10 +293,9 @@ namespace replset {
                 if (!r.more())
                     break;
 
-                BSONObj o = r.nextSafe();
-
+                BSONObj o = r.nextSafe().getOwned();
                 // the blocking queue will wait (forever) until there's room for us to push
-                _buffer.push(o.getOwned());
+                _buffer.push(o);
 
                 {
                     boost::unique_lock<boost::mutex> lock(_mutex);
@@ -323,7 +321,7 @@ namespace replset {
         }
     }
 
-    BSONObj* BackgroundSync::peek() {
+    bool BackgroundSync::peek(BSONObj* op) {
         {
             boost::unique_lock<boost::mutex> lock(_mutex);
 
@@ -332,16 +330,22 @@ namespace replset {
                 _oplogMarkerTarget = NULL;
             }
         }
+        // block for up to 1 second, waiting for an op
+        // to appear off the network
+        waitForMore();
+        return _buffer.peek(*op);
+    }
 
-        if (!_buffer.blockingPeek(_currentOp, 1)) {
-            return NULL;
-        }
-
-        return &_currentOp;
+    void BackgroundSync::waitForMore() {
+        BSONObj op;
+        // Block for one second before timing out.
+        // Ignore the value of the op we peeked at.
+        _buffer.blockingPeek(op, 1);
     }
 
     void BackgroundSync::consume() {
-        // this is just to get the op off the queue, it's been peeked at and applied already
+        // this is just to get the op off the queue, it's been peeked at 
+        // and queued for application already
         _buffer.blockingPop();
     }
 

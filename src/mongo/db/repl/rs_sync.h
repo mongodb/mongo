@@ -34,7 +34,7 @@ namespace replset {
         SyncTail(BackgroundSyncInterface *q);
         virtual bool syncApply(const BSONObj &o);
         void oplogApplication();
-        BSONObj* peek();
+        bool peek(BSONObj* obj);
         void consume();
     };
 
