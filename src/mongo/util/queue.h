@@ -134,6 +134,8 @@ namespace mongo {
             return true;
         }
 
+        // Obviously, this should only be used when you have
+        // only one consumer
         bool blockingPeek(T& t, int maxSecondsToWait) {
             Timer timer;
 
@@ -151,6 +153,8 @@ namespace mongo {
             return true;
         }
 
+        // Obviously, this should only be used when you have
+        // only one consumer
         bool peek(T& t) {
 
             scoped_lock l( _lock );
