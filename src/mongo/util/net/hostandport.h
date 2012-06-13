@@ -45,10 +45,7 @@ namespace mongo {
 
         HostAndPort(const SockAddr& sock ) : _host( sock.getAddr() ) , _port( sock.getPort() ) { }
 
-        static HostAndPort me() { return HostAndPort("localhost", cmdLine.port); }
-
-        /* uses real hostname instead of localhost */
-        static HostAndPort Me();
+        static HostAndPort me();
 
         bool operator<(const HostAndPort& r) const {
             string h = host();
@@ -132,7 +129,7 @@ namespace mongo {
         int _port; // -1 indicates unspecified
     };
 
-    inline HostAndPort HostAndPort::Me() {
+    inline HostAndPort HostAndPort::me() {
         {
             string s = dynHostMyName();
             if( !s.empty() ) 
