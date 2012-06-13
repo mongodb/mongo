@@ -781,10 +781,8 @@ namespace mongo {
                 int e = errno;
 # if defined(EINTR)
                 if( e == EINTR ) {
-                    if( ++retries == 1 ) {
-                        log() << "EINTR retry" << endl;
-                        continue;
-                    }
+                    log() << "EINTR retry " << ++retries << endl;
+                    continue;
                 }
 # endif
 #endif
