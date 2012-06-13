@@ -45,7 +45,7 @@ namespace mongo {
         virtual string name() const { return "Balancer"; }
 
     private:
-        typedef BalancerPolicy::ChunkInfo CandidateChunk;
+        typedef BalancerPolicy::MigrateInfo CandidateChunk;
         typedef shared_ptr<CandidateChunk> CandidateChunkPtr;
 
         // hostname:port of my mongos

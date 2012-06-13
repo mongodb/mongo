@@ -52,17 +52,15 @@ namespace mongo {
             ChunkManagerPtr cm = cfg->getChunkManager( chunkInfo.ns );
             verify( cm );
 
-            const BSONObj& chunkToMove = chunkInfo.chunk;
-            ChunkPtr c = cm->findChunk( chunkToMove["min"].Obj() );
-            if ( c->getMin().woCompare( chunkToMove["min"].Obj() ) || c->getMax().woCompare( chunkToMove["max"].Obj() ) ) {
+            ChunkPtr c = cm->findChunk( chunkInfo.chunk.min );
+            if ( c->getMin().woCompare( chunkInfo.chunk.min ) || c->getMax().woCompare( chunkInfo.chunk.max ) ) {
                 // likely a split happened somewhere
                 cm = cfg->getChunkManager( chunkInfo.ns , true /* reload */);
                 verify( cm );
 
-                c = cm->findChunk( chunkToMove["min"].Obj() );
-                if ( c->getMin().woCompare( chunkToMove["min"].Obj() ) || c->getMax().woCompare( chunkToMove["max"].Obj() ) ) {
-                    log() << "chunk mismatch after reload, ignoring will retry issue cm: "
-                          << c->getMin() << " min: " << chunkToMove["min"].Obj() << endl;
+                c = cm->findChunk( chunkInfo.chunk.min );
+                if ( c->getMin().woCompare( chunkInfo.chunk.min ) || c->getMax().woCompare( chunkInfo.chunk.max ) ) {
+                    log() << "chunk mismatch after reload, ignoring will retry issue " << chunkInfo.chunk.toString() << endl;
                     continue;
                 }
             }
@@ -75,13 +73,13 @@ namespace mongo {
 
             // the move requires acquiring the collection metadata's lock, which can fail
             log() << "balancer move failed: " << res << " from: " << chunkInfo.from << " to: " << chunkInfo.to
-                  << " chunk: " << chunkToMove << endl;
+                  << " chunk: " << chunkInfo.chunk << endl;
 
             if ( res["chunkTooBig"].trueValue() ) {
                 // reload just to be safe
                 cm = cfg->getChunkManager( chunkInfo.ns );
                 verify( cm );
-                c = cm->findChunk( chunkToMove["min"].Obj() );
+                c = cm->findChunk( chunkInfo.chunk.min );
                 
                 log() << "forcing a split because migrate failed for size reasons" << endl;
                 
@@ -186,19 +184,16 @@ namespace mongo {
             LOG(1) << "can't balance without more active shards" << endl;
             return;
         }
-
-        map< string, BSONObj > shardLimitsMap;
+        
+        BalancerPolicy::ShardInfoMap shardInfo;
         for ( vector<Shard>::const_iterator it = allShards.begin(); it != allShards.end(); ++it ) {
             const Shard& s = *it;
             ShardStatus status = s.getStatus();
-
-            BSONObj limitsObj = BSON( ShardFields::maxSize( s.getMaxSize() ) <<
-                                      LimitsFields::currSize( status.mapped() ) <<
-                                      ShardFields::draining( s.isDraining() )  <<
-                                      LimitsFields::hasOpsQueued( status.hasOpsQueued() )
-                                    );
-
-            shardLimitsMap[ s.getName() ] = limitsObj;
+            shardInfo[ s.getName() ] = BalancerPolicy::ShardInfo( s.getMaxSize(),
+                                                                  status.mapped(),
+                                                                  s.isDraining(),
+                                                                  status.hasOpsQueued()
+                                                                  );
         }
 
         //
@@ -230,7 +225,7 @@ namespace mongo {
                 shardToChunksMap[s.getName()].size();
             }
 
-            CandidateChunk* p = _policy->balance( ns , shardLimitsMap , shardToChunksMap , _balancedLastTime );
+            CandidateChunk* p = _policy->balance( ns , shardInfo , shardToChunksMap , _balancedLastTime );
             if ( p ) candidateChunks->push_back( CandidateChunkPtr( p ) );
         }
     }

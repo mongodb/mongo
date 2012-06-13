@@ -18,39 +18,46 @@
 
 #include "pch.h"
 
-#include "config.h"
-
-#include "../util/stringutils.h"
-
-#include "balancer_policy.h"
+#include "mongo/s/balancer_policy.h"
+#include "mongo/s/config.h"
+#include "mongo/util/stringutils.h"
 
 namespace mongo {
 
-    // limits map fields
-    BSONField<long long> LimitsFields::currSize( "currSize" );
-    BSONField<bool> LimitsFields::hasOpsQueued( "hasOpsQueued" );
+    BalancerPolicy::MigrateInfo* BalancerPolicy::balance( const string& ns,
+                                                          const ShardInfoMap& shardToLimitsMap,
+                                                          const ShardToChunksMap& shardToChunksMap,
+                                                          int balancedLastTime ) {
+        
+        log() << "---- ShardInfoMap" << endl;
+        for ( ShardInfoMap::const_iterator i = shardToLimitsMap.begin(); i != shardToLimitsMap.end(); ++i ) {
+            log() << "\t" << i->first << "\t" << i->second << endl;
+        }
+        log() << "---- ShardToChunksMap" << endl;
+        for ( ShardToChunksMap::const_iterator i=shardToChunksMap.begin(); i != shardToChunksMap.end(); ++i ) {
+            log() << "\t" << i->first << endl;
+            const vector<BSONObj>& v = i->second;
+            for ( unsigned j=0; j<v.size(); j++ ) {
+                log() << "\t\t" << v[j] << endl;
+            }
+        }
+        log() << "----" << endl;
+        
 
-    BalancerPolicy::ChunkInfo* BalancerPolicy::balance( const string& ns,
-            const ShardToLimitsMap& shardToLimitsMap,
-            const ShardToChunksMap& shardToChunksMap,
-            int balancedLastTime ) {
         pair<string,unsigned> min("",numeric_limits<unsigned>::max());
         pair<string,unsigned> max("",0);
         vector<string> drainingShards;
 
         bool maxOpsQueued = false;
 
-        for (ShardToChunksIter i = shardToChunksMap.begin(); i!=shardToChunksMap.end(); ++i ) {
+        for (ShardToChunksMap::const_iterator i = shardToChunksMap.begin(); i!=shardToChunksMap.end(); ++i ) {
 
             // Find whether this shard's capacity or availability are exhausted
             const string& shard = i->first;
-            BSONObj shardLimits;
-            ShardToLimitsIter it = shardToLimitsMap.find( shard );
-            if ( it != shardToLimitsMap.end() ) shardLimits = it->second;
-            const bool maxedOut = isSizeMaxed( shardLimits );
-            const bool draining = isDraining( shardLimits );
-            const bool opsQueued = hasOpsQueued( shardLimits );
-
+            ShardInfo shardInfo;
+            ShardInfoMap::const_iterator it = shardToLimitsMap.find( shard );
+            if ( it != shardToLimitsMap.end() ) 
+                shardInfo = it->second;
             
             // Is this shard a better chunk receiver then the current one?
             // Shards that would be bad receiver candidates:
@@ -58,15 +65,15 @@ namespace mongo {
             // + draining shards
             // + shards with operations queued for writeback
             const unsigned size = i->second.size();
-            if ( ! maxedOut && ! draining && ! opsQueued ) {
+            if ( ! shardInfo.isSizeMaxed() && ! shardInfo.isDraining() && ! shardInfo.hasOpsQueued() ) {
                 if ( size < min.second ) {
                     min = make_pair( shard , size );
                 }
             }
-            else if ( opsQueued ) {
+            else if ( shardInfo.hasOpsQueued() ) {
                 LOG(1) << "won't send a chunk to: " << shard << " because it has ops queued" << endl;
             }
-            else if ( maxedOut ) {
+            else if ( shardInfo.isSizeMaxed() ) {
                 LOG(1) << "won't send a chunk to: " << shard << " because it is maxedOut" << endl;
             }
 
@@ -75,9 +82,9 @@ namespace mongo {
             // Draining shards take a lower priority than overloaded shards.
             if ( size > max.second ) {
                 max = make_pair( shard , size );
-                maxOpsQueued = opsQueued;
+                maxOpsQueued = shardInfo.hasOpsQueued();
             }
-            if ( draining && (size > 0)) {
+            if ( shardInfo.isDraining() && (size > 0)) {
                 drainingShards.push_back( shard );
             }
         }
@@ -131,7 +138,7 @@ namespace mongo {
         BSONObj chunkToMove = pickChunk( chunksFrom , chunksTo );
         log() << "chose [" << from << "] to [" << to << "] " << chunkToMove << endl;
 
-        return new ChunkInfo( ns, to, from, chunkToMove );
+        return new MigrateInfo( ns, to, from, chunkToMove );
     }
 
     BSONObj BalancerPolicy::pickChunk( const vector<BSONObj>& from, const vector<BSONObj>& to ) {
@@ -150,41 +157,41 @@ namespace mongo {
         return from[0];
     }
 
-    bool BalancerPolicy::isSizeMaxed( BSONObj limits ) {
-        // If there's no limit information for the shard, assume it can be a chunk receiver
-        // (i.e., there's not bound on space utilization)
-        if ( limits.isEmpty() ) {
-            return false;
-        }
-
-        long long maxUsage = limits[ ShardFields::maxSize.name() ].Long();
-        if ( maxUsage == 0 ) {
-            return false;
-        }
-
-        long long currUsage = limits[ LimitsFields::currSize.name() ].Long();
-        if ( currUsage < maxUsage ) {
-            return false;
-        }
-
-        return true;
+    BalancerPolicy::ShardInfo::ShardInfo( long long maxSize, long long currSize, bool draining, bool opsQueued )
+        : _maxSize( maxSize ), 
+          _currSize( currSize ),
+          _draining( draining ),
+          _hasOpsQueued( opsQueued ) {
     }
 
-    bool BalancerPolicy::isDraining( BSONObj limits ) {
-        BSONElement draining = limits[ ShardFields::draining.name() ];
-        if ( draining.eoo() || ! draining.trueValue() ) {
-            return false;
-        }
-
-        return true;
+    BalancerPolicy::ShardInfo::ShardInfo()
+        : _maxSize( 0 ), 
+          _currSize( 0 ),
+          _draining( false ),
+          _hasOpsQueued( false ) {
     }
 
-    bool BalancerPolicy::hasOpsQueued( BSONObj limits ) {
-        BSONElement opsQueued = limits[ LimitsFields::hasOpsQueued.name() ];
-        if ( opsQueued.eoo() || ! opsQueued.trueValue() ) {
+    bool BalancerPolicy::ShardInfo::isSizeMaxed() const {
+        if ( _maxSize == 0 || _currSize == 0 )
             return false;
-        }
-        return true;
+        
+        return _currSize >= _maxSize;
+    }
+
+    string BalancerPolicy::ShardInfo::toString() const {
+        StringBuilder ss;
+        ss << " maxSize: " << _maxSize;
+        ss << " currSize: " << _currSize;
+        ss << " draining: " << _draining;
+        ss << " hasOpsQueued: " << _hasOpsQueued;
+        return ss.str();
+    }
+
+    string BalancerPolicy::ChunkInfo::toString() const {
+        StringBuilder buf;
+        buf << " min: " << min;
+        buf << " max: " << min;
+        return buf.str();
     }
 
 }  // namespace mongo
