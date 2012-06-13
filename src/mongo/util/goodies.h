@@ -29,11 +29,7 @@ namespace mongo {
     /* @return a dump of the buffer as hex byte ascii output */
     string hexdump(const char *data, unsigned len);
 
-    /**
-     * @return if this name has an increasing counter associated, return the value
-     *         otherwise 0
-     */
-    long long setThreadName(const char * name);
+    void setThreadName(const char * name);
     string getThreadName();
 
     template<class T>

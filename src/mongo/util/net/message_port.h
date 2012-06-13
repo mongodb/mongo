@@ -29,7 +29,7 @@ namespace mongo {
 
     class AbstractMessagingPort : boost::noncopyable {
     public:
-        AbstractMessagingPort() : tag(0) {}
+        AbstractMessagingPort() : tag(0), _connectionId(0) {}
         virtual ~AbstractMessagingPort() { }
         virtual void reply(Message& received, Message& response, MSGID responseTo) = 0; // like the reply below, but doesn't rely on received.data still being available
         virtual void reply(Message& received, Message& response) = 0;
@@ -38,6 +38,9 @@ namespace mongo {
         virtual unsigned remotePort() const = 0;
 
         virtual void assertStillConnected() = 0;
+        
+        long long connectionId() const { return _connectionId; }
+        void setConnectionId( long long connectionId );
 
     public:
         // TODO make this private with some helpers
@@ -45,6 +48,8 @@ namespace mongo {
         /* ports can be tagged with various classes.  see closeAllSockets(tag). defaults to 0. */
         unsigned tag;
 
+    private:
+        long long _connectionId;
     };
 
     class MessagingPort : public AbstractMessagingPort {

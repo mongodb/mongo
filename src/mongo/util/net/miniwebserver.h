@@ -53,7 +53,7 @@ namespace mongo {
         static string urlDecode(string s) {return urlDecode(s.c_str());}
 
     private:
-        void accepted(boost::shared_ptr<Socket> psocket);
+        void accepted(boost::shared_ptr<Socket> psocket, long long connectionId );
         static bool fullReceive( const char *buf );
     };
 

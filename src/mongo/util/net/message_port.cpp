@@ -45,6 +45,11 @@ namespace mongo {
 // if you want trace output:
 #define mmm(x)
 
+    void AbstractMessagingPort::setConnectionId( long long connectionId ) { 
+        verify( _connectionId == 0 );
+        _connectionId = connectionId; 
+    }
+
     /* messagingport -------------------------------------------------------------- */
 
     class PiggyBackData {

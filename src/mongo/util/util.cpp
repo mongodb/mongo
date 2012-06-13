@@ -46,33 +46,14 @@ namespace mongo {
 
     static AtomicInt64 _setThreadNameCounter;
 
-    long long _setThreadName( const char * name ) {
-        if ( ! name ) name = "NONE";
-
-        if ( strcmp( name , "conn" ) == 0 ) {
-            string* x = _threadName.get();
-            if ( x && mongoutils::str::startsWith( *x , "conn" ) ) {
-#if defined(_WIN32)
-                long long n = _atoi64( x->c_str() + 4 );
-#else
-                long long n = atoll( x->c_str() + 4 );
-#endif
-                if ( n > 0 )
-                    return n;
-                warning() << "unexpected thread name [" << *x << "] parsed to " << n << endl;
-            }
-            long long n = _setThreadNameCounter.addAndFetch(1);
-            stringstream ss;
-            ss << name << n;
-            _threadName.reset( new string( ss.str() ) );
-            return n;
-        }
-
+    void _setThreadName( const char * name ) {
+        if ( ! name ) 
+            name = "NONE";
         _threadName.reset( new string(name) );
-        return 0;
     }
 
 #if defined(_WIN32)
+
 #define MS_VC_EXCEPTION 0x406D1388
 #pragma pack(push,8)
     typedef struct tagTHREADNAME_INFO {
@@ -98,25 +79,20 @@ namespace mongo {
         __except(EXCEPTION_EXECUTE_HANDLER) {
         }
     }
+#endif
 
-    long long setThreadName(const char *name) {
-        long long n = _setThreadName( name );
-#if !defined(_DEBUG)
+    void setThreadName(const char *name) {
+        if ( ! name ) 
+            name = "NONE";
+        
+        _threadName.reset( new string(name) );
+        
+#if defined( DEBUG ) && defined( _WIN32 )
         // naming might be expensive so don't do "conn*" over and over
-        if( string("conn") == name )
-            return n;
-#endif
         setWinThreadName(name);
-        return n;
-    }
-
-#else
-
-    long long setThreadName(const char * name ) {
-        return _setThreadName( name );
-    }
-
 #endif
+
+    }
 
     string getThreadName() {
         string * s = _threadName.get();

@@ -136,7 +136,7 @@ namespace mongo {
         CurOp * _curOp;
         Context * _context;
         bool _shutdown; // to track if Client::shutdown() gets called
-        const std::string _desc;
+        std::string _desc;
         bool _god;
         AuthenticationInfo _ai;
         OpTime _lastOp;

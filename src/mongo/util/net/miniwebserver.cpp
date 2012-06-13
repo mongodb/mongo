@@ -108,7 +108,7 @@ namespace mongo {
         return false;
     }
 
-    void MiniWebServer::accepted(boost::shared_ptr<Socket> psock) {
+    void MiniWebServer::accepted(boost::shared_ptr<Socket> psock, long long connectionId ) {
         psock->postFork();
         psock->setTimeout(8);
         char buf[4096];

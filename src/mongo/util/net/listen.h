@@ -47,7 +47,7 @@ namespace mongo {
         void initAndListen(); // never returns unless error (start a thread)
 
         /* spawn a thread, etc., then return */
-        virtual void accepted(boost::shared_ptr<Socket> psocket);
+        virtual void accepted(boost::shared_ptr<Socket> psocket, long long connectionId );
         virtual void acceptedMP(MessagingPort *mp);
 
         const int _port;

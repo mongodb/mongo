@@ -126,7 +126,11 @@ namespace mongo {
     {
         _hasWrittenThisPass = false;
         _pageFaultRetryableSection = 0;
-        _connectionId = setThreadName(desc);
+        _connectionId = p ? p->connectionId() : 0;
+        
+        if ( str::equals( "conn" , desc ) && _connectionId > 0 )
+            _desc = str::stream() << desc << _connectionId;
+        setThreadName(_desc.c_str());
         _curOp = new CurOp( this );
 #ifndef _WIN32
         stringstream temp;
