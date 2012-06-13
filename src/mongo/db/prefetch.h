@@ -20,12 +20,12 @@
 
 namespace mongo {
     class NamespaceDetails;
+    // page in both index and data pages for an op from the oplog
+    void prefetchPagesForReplicatedOp(const BSONObj& op);
+
     // page in pages needed for all index lookups on a given object
-    void prefetchIndexPages(const char *ns, const BSONObj& obj);
+    void prefetchIndexPages(NamespaceDetails *nsd, const BSONObj& obj);
 
     // page in the data pages for a record associated with an object
     void prefetchRecordPages(const char *ns, const BSONObj& obj);
-
-    // page in both index and data pages for an op from the oplog
-    void prefetchPagesForReplicatedOp(const BSONObj& op);
 }

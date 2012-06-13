@@ -31,45 +31,52 @@ namespace mongo {
     void prefetchPagesForReplicatedOp(const BSONObj& op) {
         const char *opField;
         const char *opType = op.getStringField("op");
-        if ( *opType == 'i' )
+        switch (*opType) {
+        case 'i': // insert
+        case 'd': // delete
             opField = "o";
-        else if( *opType == 'u' )
+            break;
+        case 'u': // update
             opField = "o2";
-        else
+            break;
+        default:
             // prefetch ignores other ops
             return;
+        }
          
         BSONObj obj = op.getObjectField(opField);
         const char *ns = op.getStringField("ns");
+        NamespaceDetails *nsd = nsdetails(ns);
+        if (!nsd) return; // maybe not opened yet
 
-        prefetchIndexPages(ns, obj);
+        log(4) << "index prefetch for op " << *opType << endl;
+        prefetchIndexPages(nsd, obj);
 
         // do not prefetch the data for inserts; it doesn't exist yet
-        if (*opType == 'u') {
+        if ((*opType == 'u') &&
+            // do not prefetch the data for capped collections because
+            // they typically do not have an _id index for findById() to use.
+            !nsd->isCapped()) {
             prefetchRecordPages(ns, obj);
         }
     }
 
-    void prefetchIndexPages(const char *ns, const BSONObj& obj) {
+    void prefetchIndexPages(NamespaceDetails *nsd, const BSONObj& obj) {
         DiskLoc unusedDl; // unused
         IndexInterface::IndexInserter inserter;
-        NamespaceDetails *nsd = nsdetails(ns);
 
         // includes all indexes, including ones
         // in the process of being built
         int indexCount = nsd->nIndexesBeingBuilt(); 
         BSONObjSet unusedKeys;
-        //vector<int> multi;
-        //vector<BSONObjSet> multiKeys;
         for ( int indexNo = 0; indexNo < indexCount; indexNo++ ) {
             // This will page in all index pages for the given object.
-            fetchIndexInserters(/*out*/unusedKeys, inserter, nsd, indexNo, obj, unusedDl);
-            // do something with multikeys later?
-            // if( keys.size() > 1 ) {
-            //     multi.push_back(i);
-            //     multiKeys.push_back(BSONObjSet());
-            //     multiKeys[multiKeys.size()-1].swap(keys);
-            // }
+            try {
+                fetchIndexInserters(/*out*/unusedKeys, inserter, nsd, indexNo, obj, unusedDl);
+            }
+            catch (const DBException& e) {
+                LOG(2) << "exception in prefetcher: " << e.what() << endl;
+            }
             unusedKeys.clear();
         }
     }
