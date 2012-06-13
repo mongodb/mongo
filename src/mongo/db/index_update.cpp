@@ -92,8 +92,6 @@ namespace mongo {
         bool dupsAllowed = !idx.unique();
         Ordering ordering = Ordering::make(idx.keyPattern());
         
-        verify( !recordLoc.isNull() );
-
         try {
             // we can't do the two step method with multi keys as insertion of one key changes the indexes 
             // structure.  however we can do the first key of the set so we go ahead and do that FWIW
