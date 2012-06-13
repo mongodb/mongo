@@ -19,6 +19,7 @@
 
 namespace mongo {
 
+    // these are all crutch and hopefully will eventually go away
     CmdLine cmdLine;
     bool inShutdown() { return false; }
     void setupSignals( bool inFork ) {}
