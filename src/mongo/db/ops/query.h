@@ -36,7 +36,7 @@ namespace mongo {
     
     QueryResult* processGetMore(const char *ns, int ntoreturn, long long cursorid , CurOp& op, int pass, bool& exhaust);
 
-    const char * runQuery(Message& m, QueryMessage& q, CurOp& curop, Message &result);
+    string runQuery(Message& m, QueryMessage& q, CurOp& curop, Message &result);
 
     /** Exception indicating that a query should be retried from the beginning. */
     class QueryRetryException : public DBException {

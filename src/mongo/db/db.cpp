@@ -199,13 +199,13 @@ namespace mongo {
 
                 if ( dbresponse.response ) {
                     port->reply(m, *dbresponse.response, dbresponse.responseTo);
-                    if( dbresponse.exhaust ) {
+                    if( dbresponse.exhaustNS.size() > 0 ) {
                         MsgData *header = dbresponse.response->header();
                         QueryResult *qr = (QueryResult *) header;
                         long long cursorid = qr->cursorId;
                         if( cursorid ) {
-                            verify( dbresponse.exhaust && *dbresponse.exhaust != 0 );
-                            string ns = dbresponse.exhaust; // before reset() free's it...
+                            verify( dbresponse.exhaustNS.size() && dbresponse.exhaustNS[0] );
+                            string ns = dbresponse.exhaustNS; // before reset() free's it...
                             m.reset();
                             BufBuilder b(512);
                             b.appendNum((int) 0 /*size set later in appendData()*/);

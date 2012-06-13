@@ -626,34 +626,33 @@ namespace mongo {
      * Run a query with a cursor provided by the query optimizer, or FindingStartCursor.
      * @yields the db lock.
      */
-    const char *queryWithQueryOptimizer( const Message &m, int queryOptions, const char *ns,
-                                         const BSONObj &jsobj, CurOp& curop,
-                                         const BSONObj &query, const BSONObj &order,
-                                         const shared_ptr<ParsedQuery> &pq_shared,
-                                         const BSONObj &oldPlan,
-                                         const ConfigVersion &shardingVersionAtStart,
-                                         scoped_ptr<PageFaultRetryableSection>& parentPageFaultSection,
-                                         scoped_ptr<NoPageFaultsAllowed>& noPageFault,
-                                         Message &result ) {
+    string queryWithQueryOptimizer( int queryOptions, const string& ns,
+                                    const BSONObj &jsobj, CurOp& curop,
+                                    const BSONObj &query, const BSONObj &order,
+                                    const shared_ptr<ParsedQuery> &pq_shared,
+                                    const BSONObj &oldPlan,
+                                    const ConfigVersion &shardingVersionAtStart,
+                                    scoped_ptr<PageFaultRetryableSection>& parentPageFaultSection,
+                                    scoped_ptr<NoPageFaultsAllowed>& noPageFault,
+                                    Message &result ) {
 
         const ParsedQuery &pq( *pq_shared );
         shared_ptr<Cursor> cursor;
         QueryPlanSummary queryPlan;
         
         if ( pq.hasOption( QueryOption_OplogReplay ) ) {
-            cursor = FindingStartCursor::getCursor( ns, query, order );
+            cursor = FindingStartCursor::getCursor( ns.c_str(), query, order );
         }
         else {
             cursor =
-            NamespaceDetailsTransient::getCursor( ns, query, order, QueryPlanSelectionPolicy::any(),
-                                                  0, pq_shared, false, &queryPlan );
+                NamespaceDetailsTransient::getCursor( ns.c_str(), query, order, QueryPlanSelectionPolicy::any(),
+                                                      0, pq_shared, false, &queryPlan );
         }
         verify( cursor );
         
         scoped_ptr<QueryResponseBuilder> queryResponseBuilder
                 ( QueryResponseBuilder::make( pq, cursor, queryPlan, oldPlan ) );
         bool saveClientCursor = false;
-        const char *exhaust = 0;
         OpTime slaveReadTill;
         ClientCursor::Holder ccPointer( new ClientCursor( QueryOption_NoCursorTimeout, cursor,
                                                          ns ) );
@@ -764,7 +763,6 @@ namespace mongo {
             }
             
             if( queryOptions & QueryOption_Exhaust ) {
-                exhaust = ns;
                 curop.debug().exhaust = true;
             }
             
@@ -794,7 +792,7 @@ namespace mongo {
         }
         curop.debug().nreturned = nReturned;
 
-        return exhaust;
+        return curop.debug().exhaust ? ns : "";
     }
 
     bool queryIdHack( const char* ns, const BSONObj& query, const ParsedQuery& pq, CurOp& curop, Message& result ) {
@@ -879,7 +877,7 @@ namespace mongo {
      * @yields the db mutex periodically after acquiring it.
      * @asserts on scan and order memory exhaustion and other cases.
      */
-    const char *runQuery(Message& m, QueryMessage& q, CurOp& curop, Message &result) {
+    string runQuery(Message& m, QueryMessage& q, CurOp& curop, Message &result) {
         shared_ptr<ParsedQuery> pq_shared( new ParsedQuery(q) );
         ParsedQuery& pq( *pq_shared );
         BSONObj jsobj = q.query;
@@ -925,7 +923,7 @@ namespace mongo {
             else {
                 uasserted(13530, "bad or malformed command request?");
             }
-            return 0;
+            return "";
         }
 
         bool explain = pq.isExplain();
@@ -947,10 +945,15 @@ namespace mongo {
         // Run a simple id query.
         if ( ! (explain || pq.showDiskLoc()) && isSimpleIdQuery( query ) && !pq.hasOption( QueryOption_CursorTailable ) ) {
             if ( queryIdHack( ns, query, pq, curop, result ) ) {
-                return NULL;
+                return "";
             }
         }
-
+        
+        // these now may stored in a ClientCursor or somewhere else,
+        // so make sure we use a real copy
+        jsobj = jsobj.getOwned();
+        query = query.getOwned();
+        order = order.getOwned();
 
         bool hasRetried = false;
         scoped_ptr<PageFaultRetryableSection> pgfs;
@@ -984,15 +987,13 @@ namespace mongo {
                 // Run a regular query.
                 
                 BSONObj oldPlan;
-                if ( explain && ! pq.hasIndexSpecifier() ) {
+                if ( ! hasRetried && explain && ! pq.hasIndexSpecifier() ) {
                     scoped_ptr<MultiPlanScanner> mps( MultiPlanScanner::make( ns, query, order ) );
                     oldPlan = mps->cachedPlanExplainSummary();
                 }
              
-                jsobj = jsobj.getOwned();
-                order = order.getOwned();
    
-                return queryWithQueryOptimizer( m, queryOptions, ns, jsobj, curop, query, order,
+                return queryWithQueryOptimizer( queryOptions, ns, jsobj, curop, query, order,
                                                 pq_shared, oldPlan, shardingVersionAtStart, 
                                                 pgfs, npfe, result );
             }

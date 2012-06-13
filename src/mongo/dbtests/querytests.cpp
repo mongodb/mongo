@@ -1268,8 +1268,8 @@ namespace QueryTests {
             DbMessage dbMessage( message );
             QueryMessage queryMessage( dbMessage );
             Message result;
-            const char *exhaust = runQuery( message, queryMessage, *cc().curop(), result );
-            ASSERT( exhaust );
+            string exhaust = runQuery( message, queryMessage, *cc().curop(), result );
+            ASSERT( exhaust.size() );
             ASSERT_EQUALS( string( ns() ), exhaust );
         }
     };

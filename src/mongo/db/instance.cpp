@@ -241,7 +241,7 @@ namespace mongo {
         shared_ptr<AssertionException> ex;
 
         try {
-            dbresponse.exhaust = runQuery(m, q, op, *resp);
+            dbresponse.exhaustNS = runQuery(m, q, op, *resp);
             verify( !resp->empty() );
         }
         catch ( SendStaleConfigException& e ){
@@ -734,7 +734,7 @@ namespace mongo {
         
         if( exhaust ) {
             curop.debug().exhaust = true;
-            dbresponse.exhaust = ns;
+            dbresponse.exhaustNS = ns;
         }
 
         return ok;

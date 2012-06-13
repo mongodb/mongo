@@ -62,11 +62,10 @@ namespace mongo {
     struct DbResponse {
         Message *response;
         MSGID responseTo;
-        const char *exhaust; /* points to ns if exhaust mode. 0=normal mode*/
-        DbResponse(Message *r, MSGID rt) : response(r), responseTo(rt), exhaust(0) { }
+        string exhaustNS; /* points to ns if exhaust mode. 0=normal mode*/
+        DbResponse(Message *r, MSGID rt) : response(r), responseTo(rt){ }
         DbResponse() {
             response = 0;
-            exhaust = 0;
         }
         ~DbResponse() { delete response; }
     };
