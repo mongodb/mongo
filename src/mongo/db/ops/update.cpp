@@ -253,7 +253,7 @@ namespace mongo {
                         if ( ! d )
                             break;
                         nsdt = &NamespaceDetailsTransient::get(ns);
-                        if ( ! mods->isIndexed() ) {
+                        if ( mods.get() && ! mods->isIndexed() ) {
                             // we need to re-check indexes
                             set<string> bgKeys;
                             if ( d->indexBuildInProgress )
