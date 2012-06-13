@@ -123,6 +123,7 @@ assert.eq( 6, simpleQuery( {}, { b:1 }, { a:1, b:-1 } ).limit( -1 ).explain().ns
 t.drop();
 t.ensureIndex( { a:1, b:1, c:1 } );
 t.save( { a:0, b:0, c:-1 } );
+t.save( { a:0, b:2, c:1 } );
 t.save( { a:1, b:1, c:1 } );
 t.save( { a:1, b:1, c:2 } );
 t.save( { a:1, b:1, c:3 } );
@@ -153,3 +154,21 @@ assert.eq( 5, eqInQueryWithLimit( -2 ).explain().nscanned );
 assert.eq( 0, andEqInQueryWithLimit( -2 )[ 0 ].c );
 assert.eq( 1, andEqInQueryWithLimit( -2 )[ 1 ].c );
 assert.eq( 5, andEqInQueryWithLimit( -2 ).explain().nscanned );
+
+function inQueryWithLimit( limit, sort ) {
+    sort = sort || { b:1 };
+    return t.find( { a:{ $in:[ 0, 1 ] } } ).sort( sort ).hint( { a:1, b:1, c:1 } ).limit( limit );
+}
+
+// The index has two suffix fields unconstrained by the query.
+assert.eq( 0, inQueryWithLimit( -1 )[ 0 ].b );
+assert.eq( 3, inQueryWithLimit( -1 ).explain().nscanned );
+
+// The index has two ordered suffix fields unconstrained by the query.
+assert.eq( 0, inQueryWithLimit( -1, { b:1, c:1 } )[ 0 ].b );
+assert.eq( 3, inQueryWithLimit( -1, { b:1, c:1 } ).explain().nscanned );
+
+// The index has two ordered suffix fields unconstrained by the query and the limit is -2.
+assert.eq( 0, inQueryWithLimit( -2, { b:1, c:1 } )[ 0 ].b );
+assert.eq( 1, inQueryWithLimit( -2, { b:1, c:1 } )[ 1 ].b );
+assert.eq( 4, inQueryWithLimit( -2, { b:1, c:1 } ).explain().nscanned );

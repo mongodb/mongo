@@ -58,7 +58,10 @@ namespace QueryUtilTests {
                 checkElt( upper(), s.range( "a" ).max() );
                 ASSERT_EQUALS( lowerInclusive(), s.range( "a" ).minInclusive() );
                 ASSERT_EQUALS( upperInclusive(), s.range( "a" ).maxInclusive() );
-                ASSERT_EQUALS( simpleFiniteSet(), s.range( "a" ).simpleFiniteSet() );
+                ASSERT_EQUALS( mustBeExactMatchRepresentation(),
+                               s.range( "a" ).mustBeExactMatchRepresentation() );
+                ASSERT_EQUALS( isPointIntervalSet(),
+                               s.range( "a" ).isPointIntervalSet() );
             }
         protected:
             virtual BSONObj query() = 0;
@@ -66,7 +69,8 @@ namespace QueryUtilTests {
             virtual bool lowerInclusive() { return true; }
             virtual BSONElement upper() { return maxKey.firstElement(); }
             virtual bool upperInclusive() { return true; }
-            virtual bool simpleFiniteSet() { return false; }
+            virtual bool mustBeExactMatchRepresentation() { return false; }
+            virtual bool isPointIntervalSet() { return false; }
             static void checkElt( BSONElement expected, BSONElement actual ) {
                 if ( expected.woCompare( actual, false ) ) {
                     log() << "expected: " << expected << ", got: " << actual;
@@ -90,6 +94,7 @@ namespace QueryUtilTests {
 
         class EmptyQuery : public Base {
             virtual BSONObj query() { return BSONObj(); }
+            virtual bool mustBeExactMatchRepresentation() { return true; }
         };
 
         class Eq : public Base {
@@ -98,14 +103,14 @@ namespace QueryUtilTests {
             virtual BSONObj query() { return o_; }
             virtual BSONElement lower() { return o_.firstElement(); }
             virtual BSONElement upper() { return o_.firstElement(); }
-            virtual bool simpleFiniteSet() { return true; }
+            virtual bool mustBeExactMatchRepresentation() { return true; }
+            virtual bool isPointIntervalSet() { return true; }
             BSONObj o_;
         };
 
         class DupEq : public Eq {
         public:
             virtual BSONObj query() { return BSON( "a" << 1 << "b" << 2 << "a" << 1 ); }
-            virtual bool simpleFiniteSet() { return false; }
         };
 
         class Lt : public NumericBase {
@@ -114,12 +119,14 @@ namespace QueryUtilTests {
             virtual BSONObj query() { return BSON( "a" << LT << 1 ); }
             virtual BSONElement upper() { return o_.firstElement(); }
             virtual bool upperInclusive() { return false; }
+            virtual bool mustBeExactMatchRepresentation() { return true; }
             BSONObj o_;
         };
 
         class Lte : public Lt {
             virtual BSONObj query() { return BSON( "a" << LTE << 1 ); }
             virtual bool upperInclusive() { return true; }
+            virtual bool mustBeExactMatchRepresentation() { return true; }
         };
 
         class Gt : public NumericBase {
@@ -128,11 +135,13 @@ namespace QueryUtilTests {
             virtual BSONObj query() { return BSON( "a" << GT << 1 ); }
             virtual BSONElement lower() { return o_.firstElement(); }
             virtual bool lowerInclusive() { return false; }
+            virtual bool mustBeExactMatchRepresentation() { return true; }
             BSONObj o_;
         };
 
         class Gte : public Gt {
             virtual BSONObj query() { return BSON( "a" << GTE << 1 ); }
+            virtual bool mustBeExactMatchRepresentation() { return true; }
             virtual bool lowerInclusive() { return true; }
         };
 
@@ -146,7 +155,6 @@ namespace QueryUtilTests {
 
         class EqGte : public Eq {
             virtual BSONObj query() { return BSON( "a" << 1 << "a" << GTE << 1 ); }
-            virtual bool simpleFiniteSet() { return false; }
         };
 
         class EqGteInvalid {
@@ -230,7 +238,8 @@ namespace QueryUtilTests {
             }
             virtual BSONElement lower() { return o1_.firstElement(); }
             virtual BSONElement upper() { return o2_.firstElement(); }
-            virtual bool simpleFiniteSet() { return true; }
+            virtual bool mustBeExactMatchRepresentation() { return true; }
+            virtual bool isPointIntervalSet() { return true; }
             BSONObj o1_, o2_;
         };
 
@@ -248,6 +257,7 @@ namespace QueryUtilTests {
                 return BSON( "$and" <<
                             BSON_ARRAY( BSON( "a" << GT << 0 ) << BSON( "a" << LTE << 10 ) ) );
             }
+            virtual bool mustBeExactMatchRepresentation() { return true; }
             virtual BSONElement lower() { return _o1.firstElement(); }
             virtual bool lowerInclusive() { return false; }
             virtual BSONElement upper() { return _o2.firstElement(); }
@@ -262,6 +272,7 @@ namespace QueryUtilTests {
                 ASSERT( r.empty() );
                 ASSERT( !r.equality() );
                 ASSERT( !r.universal() );
+                ASSERT( r.mustBeExactMatchRepresentation() );
             }
         };
         
@@ -919,15 +930,15 @@ namespace QueryUtilTests {
             }
         };
         
-        namespace SimpleFiniteSet {
+        namespace ExactMatchRepresentation {
 
-            class NotSimpleFiniteSet {
+            class NotExactMatchRepresentation {
             public:
-                NotSimpleFiniteSet( const BSONObj &query ) : _query( query ) {}
-                virtual ~NotSimpleFiniteSet() {}
+                NotExactMatchRepresentation( const BSONObj &query ) : _query( query ) {}
+                virtual ~NotExactMatchRepresentation() {}
                 void run() {
                     ASSERT( !FieldRangeSet( "", _query, !multikey(),
-                                            true ).range( "a" ).simpleFiniteSet() );
+                                            true ).range( "a" ).mustBeExactMatchRepresentation() );
                 }
             protected:
                 virtual bool multikey() const { return false; }
@@ -935,42 +946,51 @@ namespace QueryUtilTests {
                 BSONObj _query;
             };
             
-            struct EqualArray : public NotSimpleFiniteSet {
-                EqualArray() : NotSimpleFiniteSet( BSON( "a" << BSON_ARRAY( "1" ) ) ) {}
+            struct EqualArray : public NotExactMatchRepresentation {
+                EqualArray() : NotExactMatchRepresentation( BSON( "a" << BSON_ARRAY( "1" ) ) ) {}
             };
             
-            struct EqualEmptyArray : public NotSimpleFiniteSet {
-                EqualEmptyArray() : NotSimpleFiniteSet( fromjson( "{a:[]}" ) ) {}
+            struct EqualEmptyArray : public NotExactMatchRepresentation {
+                EqualEmptyArray() : NotExactMatchRepresentation( fromjson( "{a:[]}" ) ) {}
             };
             
-            struct InArray : public NotSimpleFiniteSet {
-                InArray() : NotSimpleFiniteSet( fromjson( "{a:{$in:[[1]]}}" ) ) {}
+            struct InArray : public NotExactMatchRepresentation {
+                InArray() : NotExactMatchRepresentation( fromjson( "{a:{$in:[[1]]}}" ) ) {}
             };
             
-            struct InRegex : public NotSimpleFiniteSet {
-                InRegex() : NotSimpleFiniteSet( fromjson( "{a:{$in:[/^a/]}}" ) ) {}
+            struct InRegex : public NotExactMatchRepresentation {
+                InRegex() : NotExactMatchRepresentation( fromjson( "{a:{$in:[/^a/]}}" ) ) {}
             };
             
-            struct Exists : public NotSimpleFiniteSet {
-                Exists() : NotSimpleFiniteSet( fromjson( "{a:{$exists:false}}" ) ) {}
+            struct Exists : public NotExactMatchRepresentation {
+                Exists() : NotExactMatchRepresentation( fromjson( "{a:{$exists:false}}" ) ) {}
             };
 
-            struct UntypedRegex : public NotSimpleFiniteSet {
-                UntypedRegex() : NotSimpleFiniteSet( fromjson( "{a:{$regex:/^a/}}" ) ) {}
+            struct UntypedRegex : public NotExactMatchRepresentation {
+                UntypedRegex() : NotExactMatchRepresentation( fromjson( "{a:{$regex:/^a/}}" ) ) {}
             };
 
-            struct NotIn : public NotSimpleFiniteSet {
-                NotIn() : NotSimpleFiniteSet( fromjson( "{a:{$not:{$in:[0]}}}" ) ) {}
+            struct NotIn : public NotExactMatchRepresentation {
+                NotIn() : NotExactMatchRepresentation( fromjson( "{a:{$not:{$in:[0]}}}" ) ) {}
             };
 
+            struct NotGt : public NotExactMatchRepresentation {
+                NotGt() : NotExactMatchRepresentation( fromjson( "{a:{$not:{$gt:0}}}" ) ) {}
+            };
+            
+            struct GtArray : public NotExactMatchRepresentation {
+                GtArray() : NotExactMatchRepresentation( fromjson( "{a:{$gt:[0]}}" ) ) {}
+            };
+            
             /** Descriptive test - behavior could potentially be different. */
-            struct NotNe : public NotSimpleFiniteSet {
-                NotNe() : NotSimpleFiniteSet( fromjson( "{a:{$not:{$ne:4}}}" ) ) {}
+            struct NotNe : public NotExactMatchRepresentation {
+                NotNe() : NotExactMatchRepresentation( fromjson( "{a:{$not:{$ne:4}}}" ) ) {}
             };
             
-            class MultikeyIntersection : public NotSimpleFiniteSet {
+            class MultikeyIntersection : public NotExactMatchRepresentation {
             public:
-                MultikeyIntersection() : NotSimpleFiniteSet( BSON( "a" << GTE << 0 << "a" << 0 ) ) {
+                MultikeyIntersection() : NotExactMatchRepresentation
+                        ( BSON( "a" << GTE << 0 << "a" << 0 ) ) {
                 }
             private:
                 virtual bool multikey() const { return true; }                
@@ -979,21 +999,27 @@ namespace QueryUtilTests {
             class Intersection {
             public:
                 void run() {
-                    FieldRangeSet set( "", BSON( "left" << 1 << "right" << GT << 2 ), true, true );
-                    FieldRange &left = set.range( "left" );
-                    FieldRange &right = set.range( "right" );
+                    FieldRangeSet set( "", BSON( "a" << 1 << "b" << GT << 2 << "c" << NE << 10 ),
+                                       true, true );
+                    FieldRange &a = set.range( "a" );
+                    FieldRange &b = set.range( "b" );
+                    FieldRange &c = set.range( "c" );
                     FieldRange &missing = set.range( "missing" );
-                    ASSERT( left.simpleFiniteSet() );
-                    ASSERT( !right.simpleFiniteSet() );
-                    ASSERT( !missing.simpleFiniteSet() );
+                    ASSERT( a.mustBeExactMatchRepresentation() );
+                    ASSERT( b.mustBeExactMatchRepresentation() );
+                    ASSERT( !c.mustBeExactMatchRepresentation() );
+                    ASSERT( missing.mustBeExactMatchRepresentation() );
                     
-                    // Replacing a universal range preserves the simpleFiniteSet property.
-                    missing.intersect( left, true );
-                    ASSERT( missing.simpleFiniteSet() );
+                    // Intersecting two exact matches preserves the mustBeExactMatchRepresentation
+                    // property.
+                    a.intersect( missing, true );
+                    ASSERT( a.mustBeExactMatchRepresentation() );
+                    a.intersect( b, true );
+                    ASSERT( a.mustBeExactMatchRepresentation() );
                     
-                    // Other operations clear the simpleFiniteSet property.
-                    left.intersect( right, true );
-                    ASSERT( !left.simpleFiniteSet() );                    
+                    // Other operations clear the mustBeExactMatchRepresentation property.
+                    b.intersect( c, true );
+                    ASSERT( !b.mustBeExactMatchRepresentation() );                    
                 }
             };
             
@@ -1004,7 +1030,7 @@ namespace QueryUtilTests {
                     FieldRange &left = set.range( "left" );
                     FieldRange &right = set.range( "right" );
                     left |= right;
-                    ASSERT( !left.simpleFiniteSet() );
+                    ASSERT( !left.mustBeExactMatchRepresentation() );
                 }
             };
 
@@ -1015,11 +1041,11 @@ namespace QueryUtilTests {
                     FieldRange &left = set.range( "left" );
                     FieldRange &right = set.range( "right" );
                     left -= right;
-                    ASSERT( !left.simpleFiniteSet() );
+                    ASSERT( !left.mustBeExactMatchRepresentation() );
                 }
             };
 
-        } // namespace SimpleFiniteSet
+        } // namespace ExactMatchRepresentation
         
     } // namespace FieldRangeTests
 
@@ -1297,79 +1323,81 @@ namespace QueryUtilTests {
             
         } // namespace ElemMatch
 
-        namespace SimpleFiniteSet {
+        namespace ExactMatchRepresentation {
 
-            class SimpleFiniteSet {
+            class ExactMatchRepresentation {
             public:
-                SimpleFiniteSet( const BSONObj &query ) : _query( query ) {}
+                ExactMatchRepresentation( const BSONObj &query ) : _query( query ) {}
                 void run() {
-                    ASSERT( FieldRangeSet( "", _query, true, true ).simpleFiniteSet() );
+                    ASSERT( FieldRangeSet( "", _query, true, true )
+                            .mustBeExactMatchRepresentation() );
                 }
             private:
                 BSONObj _query;
             };
 
-            class NotSimpleFiniteSet {
+            class NotExactMatchRepresentation {
             public:
-                NotSimpleFiniteSet( const BSONObj &query ) : _query( query ) {}
+                NotExactMatchRepresentation( const BSONObj &query ) : _query( query ) {}
                 void run() {
-                    ASSERT( !FieldRangeSet( "", _query, true, true ).simpleFiniteSet() );
+                    ASSERT( !FieldRangeSet( "", _query, true, true )
+                            .mustBeExactMatchRepresentation() );
                 }
             private:
                 BSONObj _query;
             };
 
-            struct EmptyQuery : public SimpleFiniteSet {
-                EmptyQuery() : SimpleFiniteSet( BSONObj() ) {}
+            struct EmptyQuery : public ExactMatchRepresentation {
+                EmptyQuery() : ExactMatchRepresentation( BSONObj() ) {}
             };
             
-            struct Equal : public SimpleFiniteSet {
-                Equal() : SimpleFiniteSet( BSON( "a" << 0 ) ) {}
+            struct Equal : public ExactMatchRepresentation {
+                Equal() : ExactMatchRepresentation( BSON( "a" << 0 ) ) {}
             };
             
-            struct In : public SimpleFiniteSet {
-                In() : SimpleFiniteSet( fromjson( "{a:{$in:[0,1]}}" ) ) {}
+            struct In : public ExactMatchRepresentation {
+                In() : ExactMatchRepresentation( fromjson( "{a:{$in:[0,1]}}" ) ) {}
             };
             
-            struct Where : public NotSimpleFiniteSet {
-                Where() : NotSimpleFiniteSet( BSON( "a" << 0 << "$where" << "foo" ) ) {}
+            struct Where : public NotExactMatchRepresentation {
+                Where() : NotExactMatchRepresentation( BSON( "a" << 0 << "$where" << "foo" ) ) {}
             };
 
-            struct Not : public NotSimpleFiniteSet {
-                Not() : NotSimpleFiniteSet( fromjson( "{a:{$not:{$in:[0]}}}" ) ) {}
+            struct Not : public NotExactMatchRepresentation {
+                Not() : NotExactMatchRepresentation( fromjson( "{a:{$not:{$in:[0]}}}" ) ) {}
             };
 
-            struct Regex : public NotSimpleFiniteSet {
-                Regex() : NotSimpleFiniteSet( fromjson( "{a:/^a/}" ) ) {}
+            struct Regex : public NotExactMatchRepresentation {
+                Regex() : NotExactMatchRepresentation( fromjson( "{a:/^a/}" ) ) {}
             };
             
-            struct UntypedRegex : public NotSimpleFiniteSet {
-                UntypedRegex() : NotSimpleFiniteSet( fromjson( "{a:{$regex:'^a'}}" ) ) {}
+            struct UntypedRegex : public NotExactMatchRepresentation {
+                UntypedRegex() : NotExactMatchRepresentation( fromjson( "{a:{$regex:'^a'}}" ) ) {}
             };
             
-            struct And : public SimpleFiniteSet {
-                And() : SimpleFiniteSet( fromjson( "{$and:[{a:{$in:[0,1]}}]}" ) ) {}
+            struct And : public ExactMatchRepresentation {
+                And() : ExactMatchRepresentation( fromjson( "{$and:[{a:{$in:[0,1]}}]}" ) ) {}
             };
 
-            struct All : public NotSimpleFiniteSet {
-                All() : NotSimpleFiniteSet( fromjson( "{a:{$all:[0]}}" ) ) {}
+            struct All : public NotExactMatchRepresentation {
+                All() : NotExactMatchRepresentation( fromjson( "{a:{$all:[0]}}" ) ) {}
             };
 
-            struct ElemMatch : public NotSimpleFiniteSet {
-                ElemMatch() : NotSimpleFiniteSet( fromjson( "{a:{$elemMatch:{b:1}}}" ) ) {}
+            struct ElemMatch : public NotExactMatchRepresentation {
+                ElemMatch() : NotExactMatchRepresentation( fromjson( "{a:{$elemMatch:{b:1}}}" ) ) {}
             };
 
-            struct AllElemMatch : public NotSimpleFiniteSet {
+            struct AllElemMatch : public NotExactMatchRepresentation {
                 AllElemMatch() :
-                        NotSimpleFiniteSet( fromjson( "{a:{$all:[{$elemMatch:{b:1}}]}}" ) ) {}
+                        NotExactMatchRepresentation( fromjson( "{a:{$all:[{$elemMatch:{b:1}}]}}" ) ) {}
             };
             
-            struct NotSecondField : public NotSimpleFiniteSet {
+            struct NotSecondField : public NotExactMatchRepresentation {
                 NotSecondField() :
-                        NotSimpleFiniteSet( fromjson( "{a:{$in:[1],$not:{$in:[0]}}}" ) ) {}
+                        NotExactMatchRepresentation( fromjson( "{a:{$in:[1],$not:{$in:[0]}}}" ) ) {}
             };
             
-        } // namespace SimpleFiniteSet
+        } // namespace ExactMatchRepresentation
         
     } // namespace FieldRangeSetTests
     
@@ -1611,6 +1639,8 @@ namespace QueryUtilTests {
             void assertDoneAdvancing( const BSONObj &current ) {
                 ASSERT_EQUALS( -2, advance( current ) );                    
             }
+            BSONElement minElt() const { return minKey.firstElement(); }
+            BSONElement maxElt() const { return maxKey.firstElement(); }
         private:
             static bool equalWithoutFieldNames( const BSONObj &one, const BSONObj &two ) {
                 return one.woCompare( two, BSONObj(), false ) == 0;
@@ -1868,7 +1898,7 @@ namespace QueryUtilTests {
 
                     _counter.setUnknowns( 0 );
                     checkValues( -1, -1 );
-
+                    
                     _counter.set( 0, 3 );
                     checkValues( 3, -1 );
 
@@ -2204,12 +2234,108 @@ namespace QueryUtilTests {
                 }
             };
 
+            class InGte : public Base {
+                BSONObj query() { return fromjson( "{a:{$in:[0,1]},b:{$gte:5}}" ); }
+                BSONObj index() { return BSON( "a" << 1 << "b" << 1 ); }
+                int singleIntervalLimit() { return 1; }
+                void check() {
+                    assertAdvanceToNext( BSON( "a" << 0 << "b" << 5 ) );
+                    assertAdvanceToAfter( BSON( "a" << 0 << "b" << 5 ), BSON( "a" << 0 ) );
+                    assertAdvanceTo( BSON( "a" << 0.5 << "b" << 6 ), BSON( "a" << 1 << "b" << 5 ) );
+                    assertAdvanceToNext( BSON( "a" << 1 << "b" << 7 ) );
+                    assertDoneAdvancing( BSON( "a" << 1 << "b" << 7 ) );
+                }
+            };
+            
+            class InEmptyGte : public Base {
+                BSONObj query() { return fromjson( "{a:{$in:[0,1,2,3,4]},b:{$gte:5}}" ); }
+                BSONObj index() { return BSON( "a" << 1 << "b" << 1 ); }
+                int singleIntervalLimit() { return 1; }
+                void check() {
+                    assertAdvanceToNext( BSON( "a" << 1 << "b" << 5 ) );
+                    assertAdvanceToAfter( BSON( "a" << 1 << "b" << 5 ), BSON( "a" << 1 ) );
+                    assertAdvanceTo( BSON( "a" << 2 << "b" << 2 ),
+                                    BSON( "a" << 2 << "b" << 5 ) );
+                    assertAdvanceToNext( BSON( "a" << 3 << "b" << 5 ) );
+                    assertDoneAdvancing( BSON( "a" << 4.1 << "b" << 2 ) );
+                }
+            };
+            
+            class InGt : public Base {
+                BSONObj query() { return fromjson( "{a:{$in:[0,1]},b:{$gt:5}}" ); }
+                BSONObj index() { return BSON( "a" << 1 << "b" << 1 ); }
+                int singleIntervalLimit() { return 1; }
+                void check() {
+                    assertAdvanceToNext( BSON( "a" << 0 << "b" << 5.1 ) );
+                    assertAdvanceToAfter( BSON( "a" << 0 << "b" << 5.1 ), BSON( "a" << 0 ) );
+                    assertAdvanceToAfter( BSON( "a" << 1 << "b" << 5 ),
+                                          BSON( "a" << 1 << "b" << 5 ) );
+                    assertAdvanceToNext( BSON( "a" << 1 << "b" << 5.01 ) );
+                    assertDoneAdvancing( BSON( "a" << 1 << "b" << 5.01 ) );
+                }
+            };
+
+            class InEmptyGt : public Base {
+                BSONObj query() { return fromjson( "{a:{$in:[0,1,2,3,4]},b:{$gt:5}}" ); }
+                BSONObj index() { return BSON( "a" << 1 << "b" << 1 ); }
+                int singleIntervalLimit() { return 1; }
+                void check() {
+                    assertAdvanceToNext( BSON( "a" << 1 << "b" << 5.1 ) );
+                    assertAdvanceToAfter( BSON( "a" << 1 << "b" << 5.1 ), BSON( "a" << 1 ) );
+                    assertAdvanceTo( BSON( "a" << 2 << "b" << 2 ),
+                                     BSON( "a" << 2 << "b" << 5 ) );
+                    assertAdvanceToNext( BSON( "a" << 3 << "b" << 5.01 ) );
+                    assertDoneAdvancing( BSON( "a" << 4.1 << "b" << 2 ) );
+                }
+            };
+
+            class InLt : public Base {
+                BSONObj query() { return fromjson( "{a:{$in:[0,1]},b:{$lt:5}}" ); }
+                BSONObj index() { return BSON( "a" << 1 << "b" << 1 ); }
+                int singleIntervalLimit() { return 1; }
+                void check() {
+                    assertAdvanceToNext( BSON( "a" << 0 << "b" << 2 ) );
+                    assertAdvanceToAfter( BSON( "a" << 0 << "b" << 2 ), BSON( "a" << 0 ) );
+                    assertDoneAdvancing( BSON( "a" << 1 << "b" << 5 ) );
+                }
+            };
+
+            class InGteLt : public Base {
+                BSONObj query() { return fromjson( "{a:{$in:[0,1,2]},b:{$gte:2,$lt:5}}" ); }
+                BSONObj index() { return BSON( "a" << 1 << "b" << 1 ); }
+                int singleIntervalLimit() { return 1; }
+                void check() {
+                    assertAdvanceToNext( BSON( "a" << 0 << "b" << 3 ) );
+                    assertAdvanceToAfter( BSON( "a" << 0 << "b" << 4 ), BSON( "a" << 0 ) );
+                    assertAdvanceToAfter( BSON( "a" << 1 << "b" << 5 ), BSON( "a" << 1 ) );
+                    assertAdvanceToNext( BSON( "a" << 2 << "b" << 4 ) );
+                    assertDoneAdvancing( BSON( "a" << 2 << "b" << 4 ) );
+                }
+            };
+
+            class InGtHigherLimit : public Base {
+                BSONObj query() { return fromjson( "{a:{$in:[0,1,2]},b:{$gt:5}}" ); }
+                BSONObj index() { return BSON( "a" << 1 << "b" << 1 ); }
+                int singleIntervalLimit() { return 2; }
+                void check() {
+                    assertAdvanceToNext( BSON( "a" << 0 << "b" << 5.1 ) );
+                    assertAdvanceToNext( BSON( "a" << 0 << "b" << 6 ) );
+                    assertAdvanceToAfter( BSON( "a" << 0 << "b" << 7 ), BSON( "a" << 0 ) );
+                    assertAdvanceToAfter( BSON( "a" << 1 << "b" << 5 ),
+                                         BSON( "a" << 1 << "b" << 5 ) );
+                    assertAdvanceToAfter( BSON( "a" << 2 << "b" << 5 ),
+                                         BSON( "a" << 2 << "b" << 5 ) );
+                    assertAdvanceToNext( BSON( "a" << 2 << "b" << 5.01 ) );
+                    assertAdvanceToNext( BSON( "a" << 2 << "b" << 5.02 ) );
+                    assertDoneAdvancing( BSON( "a" << 2 << "b" << 5.02 ) );
+                }
+            };
+
             /**
-             * The singleIntervalLimit feature should not be used with range bounds, in spite of
-             * the corner case checked in this test.
+             * The singleIntervalLimit feature should not be used with multiple range bounds, in
+             * spite of the corner case checked in this test.
              */
             class TwoRange : public Base {
-                // The singleIntervalLimit feature should not 
                 BSONObj query() { return fromjson( "{a:{$in:[/^a/,/^c/]}}" ); }
                 BSONObj index() { return BSON( "a" << 1 ); }
                 int singleIntervalLimit() { return 2; }
@@ -2221,6 +2347,46 @@ namespace QueryUtilTests {
                 }
             };
 
+            class IndexPrefix : public Base {
+                BSONObj query() { return fromjson( "{a:{$in:[1,2]}}" ); }
+                BSONObj index() { return BSON( "a" << 1 << "b" << 1 ); }
+                int singleIntervalLimit() { return 1; }
+                void check() {
+                    assertAdvanceToNext( BSON( "a" << 1 << "b" << 1 ) );
+                    assertAdvanceTo( BSON( "a" << 1 << "b" << 3 ),
+                                     BSON( "a" << 2 << "b" << minElt() ) );
+                    assertAdvanceToNext( BSON( "a" << 2 << "b" << 0 ) );
+                    assertDoneAdvancing( BSON( "a" << 2 << "b" << 1 ) );
+                }
+            };
+            
+            class IndexPrefixReverseOrder : public Base {
+                BSONObj query() { return fromjson( "{a:{$in:[1,2]}}" ); }
+                BSONObj index() { return BSON( "a" << 1 << "b" << -1 ); }
+                int singleIntervalLimit() { return 1; }
+                void check() {
+                    assertAdvanceToNext( BSON( "a" << 1 << "b" << 1 ) );
+                    assertAdvanceTo( BSON( "a" << 1 << "b" << 0 ),
+                                    BSON( "a" << 2 << "b" << maxElt() ) );
+                    assertAdvanceToNext( BSON( "a" << 2 << "b" << 1 ) );
+                    assertDoneAdvancing( BSON( "a" << 2 << "b" << 0 ) );
+                }
+            };
+            
+            class LongerIndexPrefix : public Base {
+                BSONObj query() { return fromjson( "{a:{$in:[1,2,3]}}" ); }
+                BSONObj index() { return BSON( "a" << 1 << "b" << 1 << "c" << 1 ); }
+                int singleIntervalLimit() { return 1; }
+                void check() {
+                    assertAdvanceToNext( BSON( "a" << 1 << "b" << 1 << "c" << 1 ) );
+                    assertAdvanceTo( BSON( "a" << 1 << "b" << 1 << "c" << 1 ),
+                                     BSON( "a" << 2 << "b" << minElt() << "c" << minElt() ) );
+                    assertAdvanceTo( BSON( "a" << 2.5 << "b" << 1 << "c" << 2 ),
+                                     BSON( "a" << 3 << "b" << minElt() << "c" << minElt() ) );
+                    assertDoneAdvancing( BSON( "a" << 4 << "b" << 1 << "c" << 1 ) );
+                }
+            };
+            
         } // namespace SameRangeLimit
         
     } // namespace FieldRangeVectorIteratorTests
@@ -2332,18 +2498,20 @@ namespace QueryUtilTests {
             add<FieldRangeTests::DiffMulti2>();
             add<FieldRangeTests::Universal>();
             add<FieldRangeTests::ElemMatchRegex>();
-            add<FieldRangeTests::SimpleFiniteSet::EqualArray>();
-            add<FieldRangeTests::SimpleFiniteSet::EqualEmptyArray>();
-            add<FieldRangeTests::SimpleFiniteSet::InArray>();
-            add<FieldRangeTests::SimpleFiniteSet::InRegex>();
-            add<FieldRangeTests::SimpleFiniteSet::Exists>();
-            add<FieldRangeTests::SimpleFiniteSet::UntypedRegex>();
-            add<FieldRangeTests::SimpleFiniteSet::NotIn>();
-            add<FieldRangeTests::SimpleFiniteSet::NotNe>();
-            add<FieldRangeTests::SimpleFiniteSet::MultikeyIntersection>();
-            add<FieldRangeTests::SimpleFiniteSet::Intersection>();
-            add<FieldRangeTests::SimpleFiniteSet::Union>();
-            add<FieldRangeTests::SimpleFiniteSet::Difference>();
+            add<FieldRangeTests::ExactMatchRepresentation::EqualArray>();
+            add<FieldRangeTests::ExactMatchRepresentation::EqualEmptyArray>();
+            add<FieldRangeTests::ExactMatchRepresentation::InArray>();
+            add<FieldRangeTests::ExactMatchRepresentation::InRegex>();
+            add<FieldRangeTests::ExactMatchRepresentation::Exists>();
+            add<FieldRangeTests::ExactMatchRepresentation::UntypedRegex>();
+            add<FieldRangeTests::ExactMatchRepresentation::NotIn>();
+            add<FieldRangeTests::ExactMatchRepresentation::NotGt>();
+            add<FieldRangeTests::ExactMatchRepresentation::GtArray>();
+            add<FieldRangeTests::ExactMatchRepresentation::NotNe>();
+            add<FieldRangeTests::ExactMatchRepresentation::MultikeyIntersection>();
+            add<FieldRangeTests::ExactMatchRepresentation::Intersection>();
+            add<FieldRangeTests::ExactMatchRepresentation::Union>();
+            add<FieldRangeTests::ExactMatchRepresentation::Difference>();
             add<FieldRangeSetTests::ToString>();
             add<FieldRangeSetTests::Namespace>();
             add<FieldRangeSetTests::Intersect>();
@@ -2361,18 +2529,18 @@ namespace QueryUtilTests {
             add<FieldRangeSetTests::ElemMatch::Not>();
             add<FieldRangeSetTests::ElemMatch::Nested>();
             add<FieldRangeSetTests::ElemMatch::AllNested>();
-            add<FieldRangeSetTests::SimpleFiniteSet::EmptyQuery>();
-            add<FieldRangeSetTests::SimpleFiniteSet::Equal>();
-            add<FieldRangeSetTests::SimpleFiniteSet::In>();
-            add<FieldRangeSetTests::SimpleFiniteSet::Where>();
-            add<FieldRangeSetTests::SimpleFiniteSet::Not>();
-            add<FieldRangeSetTests::SimpleFiniteSet::Regex>();
-            add<FieldRangeSetTests::SimpleFiniteSet::UntypedRegex>();
-            add<FieldRangeSetTests::SimpleFiniteSet::And>();
-            add<FieldRangeSetTests::SimpleFiniteSet::All>();
-            add<FieldRangeSetTests::SimpleFiniteSet::ElemMatch>();
-            add<FieldRangeSetTests::SimpleFiniteSet::AllElemMatch>();
-            add<FieldRangeSetTests::SimpleFiniteSet::NotSecondField>();
+            add<FieldRangeSetTests::ExactMatchRepresentation::EmptyQuery>();
+            add<FieldRangeSetTests::ExactMatchRepresentation::Equal>();
+            add<FieldRangeSetTests::ExactMatchRepresentation::In>();
+            add<FieldRangeSetTests::ExactMatchRepresentation::Where>();
+            add<FieldRangeSetTests::ExactMatchRepresentation::Not>();
+            add<FieldRangeSetTests::ExactMatchRepresentation::Regex>();
+            add<FieldRangeSetTests::ExactMatchRepresentation::UntypedRegex>();
+            add<FieldRangeSetTests::ExactMatchRepresentation::And>();
+            add<FieldRangeSetTests::ExactMatchRepresentation::All>();
+            add<FieldRangeSetTests::ExactMatchRepresentation::ElemMatch>();
+            add<FieldRangeSetTests::ExactMatchRepresentation::AllElemMatch>();
+            add<FieldRangeSetTests::ExactMatchRepresentation::NotSecondField>();
             add<FieldRangeSetPairTests::ToString>();
             add<FieldRangeSetPairTests::NoNonUniversalRanges>();
             add<FieldRangeSetPairTests::MatchPossible>();
@@ -2421,7 +2589,17 @@ namespace QueryUtilTests {
                     FirstIntervalNotExhaustedAtLimit>();
             add<FieldRangeVectorIteratorTests::SingleIntervalLimit::EqualIn>();
             add<FieldRangeVectorIteratorTests::SingleIntervalLimit::TwoIntervalIntermediateValue>();
+            add<FieldRangeVectorIteratorTests::SingleIntervalLimit::InGte>();
+            add<FieldRangeVectorIteratorTests::SingleIntervalLimit::InEmptyGte>();
+            add<FieldRangeVectorIteratorTests::SingleIntervalLimit::InGt>();
+            add<FieldRangeVectorIteratorTests::SingleIntervalLimit::InEmptyGt>();
+            add<FieldRangeVectorIteratorTests::SingleIntervalLimit::InLt>();
+            add<FieldRangeVectorIteratorTests::SingleIntervalLimit::InGteLt>();
+            add<FieldRangeVectorIteratorTests::SingleIntervalLimit::InGtHigherLimit>();
             add<FieldRangeVectorIteratorTests::SingleIntervalLimit::TwoRange>();
+            add<FieldRangeVectorIteratorTests::SingleIntervalLimit::IndexPrefix>();
+            add<FieldRangeVectorIteratorTests::SingleIntervalLimit::IndexPrefixReverseOrder>();
+            add<FieldRangeVectorIteratorTests::SingleIntervalLimit::LongerIndexPrefix>();
         }
     } myall;
 

@@ -110,7 +110,7 @@ namespace mongo {
         shared_ptr<FieldRangeVector> frv() const { return _frv; }
         bool isMultiKey() const;
         string toString() const;
-        bool queryFiniteSetOrderSuffix() const;
+        bool queryBoundsExactOrderSuffix() const;
 
     private:
         
