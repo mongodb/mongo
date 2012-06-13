@@ -234,11 +234,16 @@ namespace mongo {
         BSONObjIterator pat( keyPattern );
 
         while( src.more() ){
+            massert( 16341 ,
+                     str::stream() << "keyPattern " << keyPattern
+                                   << " shorter than bound " << bound ,
+                     pat.more() );
             BSONElement srcElt = src.next();
             BSONElement patElt = pat.next();
-            massert( 16333 , "bound " + bound.toString() +
-                             "not extendible to pattern" + keyPattern.toString(),
-                     strcmp( srcElt.fieldName() , patElt.fieldName() ) == 0 );
+            massert( 16333 ,
+                     str::stream() << "field names of bound " << bound
+                                   << " do not match those of keyPattern " << keyPattern ,
+                     str::equals( srcElt.fieldName() , patElt.fieldName() ) );
             newBound.appendAs( srcElt , "" );
         }
         while( pat.more() ){
@@ -261,10 +266,6 @@ namespace mongo {
                                     bool maxInclusive ,
                                     RemoveCallback * callback,
                                     bool fromMigrate ) {
-        BSONObj keya , keyb;
-        BSONObj minClean = toKeyFormat( min , keya );
-        BSONObj maxClean = toKeyFormat( max , keyb );
-        verify( keya == keyb );
 
         long long numDeleted = 0;
         PageFaultRetryableSection pgrs;
@@ -281,12 +282,15 @@ namespace mongo {
                     if ( ! nsd )
                         break;
                     
-                    int ii = nsd->findIndexByKeyPattern( keya );
+                    int ii = nsd->findIndexByKeyPattern( keyPattern );
                     verify( ii >= 0 );
                     
                     IndexDetails& i = nsd->idx( ii );
+
+                    BSONObj newMin = Helpers::modifiedRangeBound( min , keyPattern , -1 );
+                    BSONObj newMax = Helpers::modifiedRangeBound( max , keyPattern , 1 );
                     
-                    c.reset( BtreeCursor::make( nsd , ii , i , minClean , maxClean , maxInclusive , 1 ) );
+                    c.reset( BtreeCursor::make( nsd , ii , i , newMin , newMax , maxInclusive , 1 ) );
                 }
                 
                 if ( ! c->ok() ) {
