@@ -44,15 +44,13 @@ namespace mongo {
                 continue;
             
             if ( ! prefixPrinted ) {
-                builder << "locks";
+                builder << "locks(micros)";
                 prefixPrinted = true;
             }
 
             builder << ' ' << nameFor( i ) << ':' << timeLocked[i].load();
         }
         
-        if ( prefixPrinted )
-            builder << " micros";
     }
 
     void LockStat::_append( BSONObjBuilder& builder, const AtomicInt64* data ) {
