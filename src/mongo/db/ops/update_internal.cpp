@@ -969,4 +969,9 @@ namespace mongo {
         return n;
     }
 
+    void ModSet::updateIsIndexed( const set<string>& idxKeys, const set<string>* backgroundKeys ) {
+        for ( ModHolder::const_iterator i = _mods.begin(); i != _mods.end(); ++i )
+            updateIsIndexed( i->second, idxKeys , backgroundKeys );
+    }
+
 } // namespace mongo

@@ -250,7 +250,18 @@ namespace mongo {
 
                     if ( didYield ) {
                         d = nsdetails(ns);
+                        if ( ! d )
+                            break;
                         nsdt = &NamespaceDetailsTransient::get(ns);
+                        if ( ! mods->isIndexed() ) {
+                            // we need to re-check indexes
+                            set<string> bgKeys;
+                            if ( d->indexBuildInProgress )
+                                d->inProgIdx().keyPattern().getFieldNames(bgKeys);
+                            mods->updateIsIndexed( nsdt->indexKeys() , &bgKeys );
+                            modsIsIndexed = mods->isIndexed();
+                        }
+
                     }
 
                 } // end yielding block

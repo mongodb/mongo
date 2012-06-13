@@ -333,6 +333,13 @@ namespace mongo {
                 const set<string>& idxKeys = set<string>(),
                 const set<string>* backgroundKeys = 0 );
 
+        /**
+         * re-check if this mod is impacted by indexes
+         */
+        void updateIsIndexed( const set<string>& idxKeys, const set<string>* backgroundKeys );
+
+
+
         // TODO: this is inefficient - should probably just handle when iterating
         ModSet * fixDynamicArray( const string& elemMatchKey ) const;
 
