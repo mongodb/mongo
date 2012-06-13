@@ -26,7 +26,6 @@
 namespace mongo {
 namespace replset {
 
-
     // This interface exists to facilitate easier testing;
     // the test infrastructure implements these functions with stubs.
     class BackgroundSyncInterface {
@@ -44,6 +43,9 @@ namespace replset {
 
         // Returns the member we're currently syncing from (or NULL)
         virtual Member* getSyncTarget() = 0;
+
+        // wait up to 1 second for more ops to appear
+        virtual void waitForMore() = 0;
     };
 
 
@@ -102,8 +104,6 @@ namespace replset {
         void stop();
         // restart syncing
         void start();
-        // wait up to 1 second for more ops to appear
-        void waitForMore();
 
         // Tracker thread
         // tells the sync target where this member is synced to
@@ -122,9 +122,11 @@ namespace replset {
         void notifierThread();
 
         // Interface implementation
+
         virtual bool peek(BSONObj* op);
         virtual void consume();
         virtual Member* getSyncTarget();
+        virtual void waitForMore();
     };
 
 
