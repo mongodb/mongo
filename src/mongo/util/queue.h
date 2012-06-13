@@ -151,6 +151,17 @@ namespace mongo {
             return true;
         }
 
+        bool peek(T& t) {
+
+            scoped_lock l( _lock );
+            if (_queue.empty()) {
+                return false;
+            }
+
+            t = _queue.front();
+            return true;
+        }
+
     private:
         mutable mongo::mutex _lock;
         std::queue<T> _queue;
