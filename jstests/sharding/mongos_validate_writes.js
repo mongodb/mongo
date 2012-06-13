@@ -11,6 +11,13 @@ var mongos = st.s0
 var staleMongosA = st.s1
 var staleMongosB = st.s2
 
+// Additional logging
+printjson( mongos.getDB( "admin" ).runCommand({ setParameter : 1, logLevel : 2 }) )
+printjson( staleMongosA.getDB( "admin" ).runCommand({ setParameter : 1, logLevel : 2 }) )
+printjson( staleMongosB.getDB( "admin" ).runCommand({ setParameter : 1, logLevel : 2 }) )
+printjson( st._connections[0].getDB( "admin" ).runCommand({ setParameter : 1, logLevel : 2 }) )
+printjson( st._connections[1].getDB( "admin" ).runCommand({ setParameter : 1, logLevel : 2 }) )
+
 var admin = mongos.getDB( "admin" )
 var config = mongos.getDB( "config" )
 var coll = mongos.getCollection( "foo.bar" )
@@ -79,6 +86,8 @@ printjson( admin.runCommand({ moveChunk : coll + "", find : { e : 0 }, to : "sha
 
 // Make sure we can successfully remove, even though we have stale state
 coll.insert({ e : "e" })
+// Need to make sure the insert makes it to the shard
+assert.eq( null, coll.getDB().getLastError() )
 
 staleCollA.remove({ e : "e" }, true)
 assert.eq( null, staleCollA.getDB().getLastError() )
