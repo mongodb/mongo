@@ -340,6 +340,9 @@ namespace ReplSetTests {
         void addDoc(BSONObj doc) {
             _queue.push(doc.getOwned());
         }
+        virtual void waitForMore() {
+            return;
+        }
     };
 
     class ReplSetTest : public ReplSet {
