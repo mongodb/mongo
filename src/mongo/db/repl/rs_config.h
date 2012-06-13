@@ -20,9 +20,10 @@
 
 #pragma once
 
-#include "../../util/net/hostandport.h"
-#include "../../util/concurrency/race.h"
-#include "health.h"
+#include "mongo/db/repl/health.h"
+#include "mongo/util/concurrency/list.h"
+#include "mongo/util/concurrency/race.h"
+#include "mongo/util/net/hostandport.h"
 
 namespace mongo {
     class Member;
