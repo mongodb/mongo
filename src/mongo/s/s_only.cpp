@@ -28,6 +28,12 @@
  */
 namespace mongo {
 
+    void ShardingConnectionHook::onHandedOut( DBClientBase * conn ) {
+        if( _shardedConnections ){
+            ClientInfo::get()->addShard( conn->getServerAddress() );
+        }
+    }
+
     TSP_DEFINE(Client,currentClient)
 
     LockState::LockState(){} // ugh

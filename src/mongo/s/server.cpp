@@ -88,12 +88,6 @@ namespace mongo {
         return false;
     }
 
-    void ShardingConnectionHook::onHandedOut( DBClientBase * conn ) {
-        if( _shardedConnections ){
-            ClientInfo::get()->addShard( conn->getServerAddress() );
-        }
-    }
-
     class ShardedMessageHandler : public MessageHandler {
     public:
         virtual ~ShardedMessageHandler() {}

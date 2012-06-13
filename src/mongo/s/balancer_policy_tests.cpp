@@ -1,41 +1,41 @@
-// @file balancer_policy_test.cpp
-
-/**
- *    Copyright (C) 2010 10gen Inc.
+/*    Copyright 2012 10gen Inc.
  *
- *    This program is free software: you can redistribute it and/or  modify
- *    it under the terms of the GNU Affero General Public License, version 3,
- *    as published by the Free Software Foundation.
+ *    Licensed under the Apache License, Version 2.0 (the "License");
+ *    you may not use this file except in compliance with the License.
+ *    You may obtain a copy of the License at
  *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    GNU Affero General Public License for more details.
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- *    You should have received a copy of the GNU Affero General Public License
- *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *    Unless required by applicable law or agreed to in writing, software
+ *    distributed under the License is distributed on an "AS IS" BASIS,
+ *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *    See the License for the specific language governing permissions and
+ *    limitations under the License.
  */
 
-#include "pch.h"
-#include "dbtests.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/s/config.h"
+#include "mongo/s/balancer_policy.h"
 
-// TODO SERVER-1822
-//#include "../s/config.h" // for ShardFields
-//#include "../s/balancer_policy.h"
+namespace mongo {
 
-namespace BalancerPolicyTests {
+    CmdLine cmdLine;
+    bool inShutdown() { return false; }
+    void setupSignals( bool inFork ) {}
+    DBClientBase *createDirectClient() { return 0; }
+    void dbexit( ExitCode rc, const char *why ){
+        log()  << "dbexit called? :(" << endl;
+        ::_exit(-1);
+    }
 
-//
-// TODO SERVER-1822
-//
-#if 0
 
-    typedef mongo::ShardFields sf;  // fields from 'shards' colleciton
-    typedef mongo::LimitsFields lf; // fields from the balancer's limits map
+    namespace {
+        
 
-    class SizeMaxedShardTest {
-    public:
-        void run() {
+        typedef mongo::ShardFields sf;  // fields from 'shards' colleciton
+        typedef mongo::LimitsFields lf; // fields from the balancer's limits map
+
+        TEST( BalancerPolicyTests , SizeMaxedShardTest ) {
             BSONObj shard0 = BSON( sf::maxSize(0LL) << lf::currSize(0LL) );
             ASSERT( ! BalancerPolicy::isSizeMaxed( shard0 ) );
 
@@ -48,11 +48,8 @@ namespace BalancerPolicyTests {
             BSONObj empty;
             ASSERT( ! BalancerPolicy::isSizeMaxed( empty ) );
         }
-    };
 
-    class DrainingShardTest {
-    public:
-        void run() {
+        TEST( BalancerPolicyTests , DrainingShardTest ) {
             BSONObj shard0 = BSON( sf::draining(true) );
             ASSERT( BalancerPolicy::isDraining( shard0 ) );
 
@@ -62,11 +59,9 @@ namespace BalancerPolicyTests {
             BSONObj empty;
             ASSERT( ! BalancerPolicy::isDraining( empty ) );
         }
-    };
 
-    class BalanceNormalTest {
-    public:
-        void run() {
+
+        TEST( BalancerPolicyTests , BalanceNormalTest  ) {
             // 2 chunks and 0 chunk shards
             BalancerPolicy::ShardToChunksMap chunkMap;
             vector<BSONObj> chunks;
@@ -89,11 +84,8 @@ namespace BalancerPolicyTests {
             c = BalancerPolicy::balance( "ns", limitsMap, chunkMap, 1 );
             ASSERT( c );
         }
-    };
 
-    class BalanceDrainingTest {
-    public:
-        void run() {
+        TEST( BalanceNormalTests ,  BalanceDrainingTest ) {
             // one normal, one draining
             // 2 chunks and 0 chunk shards
             BalancerPolicy::ShardToChunksMap chunkMap;
@@ -120,11 +112,8 @@ namespace BalancerPolicyTests {
             ASSERT_EQUALS( c->from , "shard0" );
             ASSERT( ! c->chunk.isEmpty() );
         }
-    };
 
-    class BalanceEndedDrainingTest {
-    public:
-        void run() {
+        TEST( BalancerPolicyTests , BalanceEndedDrainingTest ) {
             // 2 chunks and 0 chunk (drain completed) shards
             BalancerPolicy::ShardToChunksMap chunkMap;
             vector<BSONObj> chunks;
@@ -147,11 +136,8 @@ namespace BalancerPolicyTests {
             c = BalancerPolicy::balance( "ns", limitsMap, chunkMap, 0 );
             ASSERT( ! c );
         }
-    };
 
-    class BalanceImpasseTest {
-    public:
-        void run() {
+        TEST( BalancerPolicyTests , BalanceImpasseTest ) {
             // one maxed out, one draining
             // 2 chunks and 0 chunk shards
             BalancerPolicy::ShardToChunksMap chunkMap;
@@ -177,27 +163,6 @@ namespace BalancerPolicyTests {
             c = BalancerPolicy::balance( "ns", limitsMap, chunkMap, 0 );
             ASSERT( ! c );
         }
-    };
 
-//
-// TODO SERVER-1822
-//
-#endif // #if 0
-
-    class All : public Suite {
-    public:
-        All() : Suite( "balancer_policy" ) {
-        }
-
-        void setupTests() {
-            // TODO SERVER-1822
-            // add< SizeMaxedShardTest >();
-            // add< DrainingShardTest >();
-            // add< BalanceNormalTest >();
-            // add< BalanceDrainingTest >();
-            // add< BalanceEndedDrainingTest >();
-            // add< BalanceImpasseTest >();
-        }
-    } allTests;
-
-} // namespace BalancerPolicyTests
+    }
+}

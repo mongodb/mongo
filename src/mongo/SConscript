@@ -309,7 +309,7 @@ env.Library( "coreshard", [ "s/config.cpp",
                             "s/shard.cpp",
                             "s/shardkey.cpp"] )
 
-shardServerFiles = [
+mongosLibraryFiles = [
     "s/interrupt_status_mongos.cpp",
     "s/strategy.cpp",
     "s/strategy_shard.cpp",
@@ -319,7 +319,6 @@ shardServerFiles = [
     "s/request.cpp",
     "s/client_info.cpp",
     "s/cursors.cpp",
-    "s/server.cpp",
     "s/config_migrate.cpp",
     "s/s_only.cpp",
     "s/stats.cpp",
@@ -329,6 +328,13 @@ shardServerFiles = [
     "s/shard_version.cpp",
     "s/security.cpp",
     ]
+
+env.Library( "mongoscore" , mongosLibraryFiles )
+
+
+env.CppUnitTest( "balancer_policy_test" , [ "s/balancer_policy_tests.cpp" ] ,
+                 LIBDEPS=["mongoscore", "coreshard","mongocommon","coreserver","coredb","dbcmdline","mongodandmongos"] ,
+                 NO_CRUTCH=True)
 
 serverOnlyFiles += [ "s/d_logic.cpp",
                      "s/d_writeback.cpp",
@@ -408,8 +414,8 @@ env.Install( '#/', [
 
 # mongos
 mongos = env.Program(
-    "mongos", shardServerFiles,
-    LIBDEPS=["coreserver", "coredb", "mongocommon", "coreshard", "dbcmdline", "ntservice",
+    "mongos", [ "s/server.cpp"] ,
+    LIBDEPS=["mongoscore", "coreserver", "coredb", "mongocommon", "coreshard", "dbcmdline", "ntservice",
              "mongodandmongos"],
     _LIBDEPS='$_LIBDEPS_OBJS')
 env.Install( '#/', mongos )
