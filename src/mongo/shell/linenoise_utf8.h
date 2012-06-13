@@ -16,6 +16,7 @@
  */
 
 #include <boost/smart_ptr/scoped_array.hpp>
+#include <string.h>
 
 namespace linenoise_utf8 {
 
@@ -108,6 +109,7 @@ int strncmp32( UChar32* first32, UChar32* second32, size_t length );
  * @param fileHandle                File handle to write to
  * @param string32                  Source UChar32 character array, may not be null terminated
  * @param sourceLengthInCharacters  Number of source characters to convert and write
+ * @return                          Number of bytes written, -1 on error
  */
 int write32( int fileHandle, const UChar32* string32, unsigned int sourceLengthInCharacters );
 

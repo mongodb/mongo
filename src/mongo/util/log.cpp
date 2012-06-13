@@ -26,6 +26,7 @@ using namespace std;
 #ifdef _WIN32
 # include <io.h>
 # include <fcntl.h>
+# include "mongo/util/text.h"
 #else
 # include <cxxabi.h>
 # include <sys/file.h>
@@ -267,22 +268,10 @@ namespace mongo {
         if ( doneSetup == 1717 ) {
 
 #if defined(_WIN32)
-            // fwrite() has a behavior problem in Windows when writing to the console
-            //  when the console is in the UTF-8 code page: fwrite() sends a single
-            //  byte and then the rest of the string.  If the first character is
-            //  non-ASCII, the console then displays two UTF-8 replacement characters
-            //  instead of the single UTF-8 character we want.  write() doesn't have
-            //  this problem.
             int fd = fileno( logfile );
             if ( _isatty( fd ) ) {
                 fflush( logfile );
-                unsigned int bytesToWrite = s.size();
-                const char* bytePtr = s.data();
-                while ( bytesToWrite > 0 ) {
-                    int bytesWritten = _write( fd, bytePtr, bytesToWrite );
-                    bytePtr += bytesWritten;
-                    bytesToWrite -= bytesWritten;
-                }
+                writeUtf8ToWindowsConsole( s.data(), s.size() );
                 return;
             }
 #else
@@ -367,22 +356,10 @@ namespace mongo {
                     (*globalTees)[i]->write(logLevel,out);
             }
 #if defined(_WIN32)
-            // fwrite() has a behavior problem in Windows when writing to the console
-            //  when the console is in the UTF-8 code page: fwrite() sends a single
-            //  byte and then the rest of the string.  If the first character is
-            //  non-ASCII, the console then displays two UTF-8 replacement characters
-            //  instead of the single UTF-8 character we want.  write() doesn't have
-            //  this problem.
             int fd = fileno( logfile );
             if ( _isatty( fd ) ) {
                 fflush( logfile );
-                unsigned int bytesToWrite = out.size();
-                const char* bytePtr = out.data();
-                while ( bytesToWrite > 0 ) {
-                    int bytesWritten = _write( fd, bytePtr, bytesToWrite );
-                    bytePtr += bytesWritten;
-                    bytesToWrite -= bytesWritten;
-                }
+                writeUtf8ToWindowsConsole( out.data(), out.size() );
             }
 #else
             if ( isSyslog ) {

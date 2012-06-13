@@ -82,6 +82,8 @@ namespace mongo {
 
     std::wstring toWideString(const char *s);
 
+    bool writeUtf8ToWindowsConsole( const char* utf8String, unsigned int utf8StringSize );
+
     /* like toWideString but UNICODE macro sensitive */
 # if !defined(_UNICODE)
 #error temp error 

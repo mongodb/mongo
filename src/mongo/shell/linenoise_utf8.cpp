@@ -15,17 +15,14 @@
  *    limitations under the License.
  */
 
+#include "mongo/shell/linenoise_utf8.h"
+
 #ifdef _WIN32
 #include <io.h>
+#include "mongo/platform/windows_basic.h"
+#include "mongo/util/text.h"
 #else
 #include <unistd.h>
-#endif
-
-#include <string.h>
-#include "linenoise_utf8.h"
-
-#ifdef _WIN32
-#define write _write  // Microsoft headers use underscores in some names
 #endif
 
 namespace linenoise_utf8 {
@@ -323,12 +320,29 @@ int strncmp32( UChar32* first32, UChar32* second32, size_t length ) {
  * @param fileHandle                File handle to write to
  * @param string32                  Source UChar32 characters, may not be null terminated
  * @param sourceLengthInCharacters  Number of source characters to convert and write
+ * @return                          Number of bytes written, -1 on error
  */
 int write32( int fileHandle, const UChar32* string32, unsigned int sourceLengthInCharacters ) {
-    size_t tempBufferBytes = sizeof( UChar32 ) * sourceLengthInCharacters + 1;
-    boost::scoped_array< UChar8 > tempCharString( new UChar8[ tempBufferBytes ] );
-    size_t count = copyString32to8counted( tempCharString.get(), string32, tempBufferBytes, sourceLengthInCharacters );
+    size_t tempBufferBytes = 4 * sourceLengthInCharacters + 1;
+    boost::scoped_array<char> tempCharString( new char[ tempBufferBytes ] );
+    size_t count = copyString32to8counted( reinterpret_cast<UChar8*>( tempCharString.get() ),
+                                           string32,
+                                           tempBufferBytes,
+                                           sourceLengthInCharacters );
+#if defined(_WIN32)
+    if ( _isatty( fileHandle ) ) {
+        bool success = mongo::writeUtf8ToWindowsConsole( tempCharString.get(), count );
+        if ( ! success ) {
+            return -1;
+        }
+        return count;
+    }
+    else {
+        return _write( fileHandle, tempCharString.get(), count );
+    }
+#else
     return write( fileHandle, tempCharString.get(), count );
+#endif
 }
 
 } // namespace linenoise_utf8
