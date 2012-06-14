@@ -132,7 +132,7 @@ namespace mongo {
         BSONObj chunkToMove = pickChunk( chunksFrom , chunksTo );
         log() << "chose [" << from << "] to [" << to << "] " << chunkToMove << endl;
 
-        return new MigrateInfo( ns, to, from, chunkToMove );
+        return new MigrateInfo( ns, to, from, chunkToMove.getOwned() );
     }
 
     BSONObj BalancerPolicy::pickChunk( const vector<BSONObj>& from, const vector<BSONObj>& to ) {
