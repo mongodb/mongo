@@ -1009,17 +1009,6 @@ namespace mongo {
             BSONObj max = i < splitPoints.size() ? splitPoints[i] : _key.globalMax();
 
             Chunk temp( this , min , max , shards[ i % shards.size() ], version );
-        
-            if( i < shards.size() ){
-                // the ensure index will have the (desired) indirect effect of creating the collection on the
-                // assigned shard, as it sets up the index over the sharding keys.
-                scoped_ptr<ScopedDbConnection> shardConn(
-                        ScopedDbConnection::getScopedDbConnection( temp.getShard()
-                                                                   .getConnString() ) );
-                // do not cache ensureIndex SERVER-1691
-                shardConn->get()->ensureIndex( getns(), getShardKey().key(), _unique, "", false );
-                shardConn->done();
-            }
 
             BSONObjBuilder chunkBuilder;
             temp.serialize( chunkBuilder );

@@ -467,13 +467,13 @@ namespace mongo {
                     return false;
                 }
 
-                BSONObj key = cmdObj.getObjectField( "key" );
-                if ( key.isEmpty() ) {
+                BSONObj proposedKey = cmdObj.getObjectField( "key" );
+                if ( proposedKey.isEmpty() ) {
                     errmsg = "no shard key";
                     return false;
                 }
 
-                BSONForEach(e, key) {
+                BSONForEach(e, proposedKey) {
                     if (!e.isNumber() || e.number() != 1.0) {
                         errmsg = "shard keys must all be ascending";
                         return false;
@@ -488,133 +488,154 @@ namespace mongo {
                 if ( ! okForConfigChanges( errmsg ) )
                     return false;
 
-                // Sharding interacts with indexing in at least three ways:
-                //
-                // 1. A unique index must have the sharding key as its prefix. Otherwise maintaining uniqueness would
-                // require coordinated access to all shards. Trying to shard a collection with such an index is not
-                // allowed.
-                //
-                // 2. Sharding a collection requires an index over the sharding key. That index must be create upfront.
-                // The rationale is that sharding a non-empty collection would need to create the index and that could
-                // be slow. Requiring the index upfront allows the admin to plan before sharding and perhaps use
-                // background index construction. One exception to the rule: empty collections. It's fairly easy to
-                // create the index as part of the sharding process.
-                //
-                // 3. If unique : true is specified, we require that the sharding index be unique or created as unique.
-                //
-                // We enforce both these conditions in what comes next.
+                //the rest of the checks require a connection to the primary db
+                scoped_ptr<ScopedDbConnection> conn(
+                        ScopedDbConnection::getScopedDbConnection(
+                                        config->getPrimary().getConnString() ) );
 
+                //check that collection is not capped
+                BSONObj res = conn->get()->findOne( config->getName() + ".system.namespaces",
+                                                    BSON( "name" << ns ) );
+                if ( res["options"].type() == Object &&
+                     res["options"].embeddedObject()["capped"].trueValue() ) {
+                    errmsg = "can't shard capped collection";
+                    conn->done();
+                    return false;
+                }
+
+                // The proposed shard key must be validated against the set of existing indexes.
+                // In particular, we must ensure the following constraints
+                //
+                // 1. All existing unique indexes, except those which start with the _id index,
+                //    must contain the proposed key as a prefix (uniqueness of the _id index is
+                //    ensured by the _id generation process or guaranteed by the user).
+                //
+                // 2. If the collection is not empty, there must exist at least one index that
+                //    is "useful" for the proposed key.  A "useful" index is defined as follows
+                //    Useful Index:
+                //         i. contains proposedKey as a prefix
+                //         ii. is not sparse
+                //         iii. contains no null values
+                //         iv. is not multikey (maybe lift this restriction later)
+                //
+                // 3. If the proposed shard key is specified as unique, there must exist a useful,
+                //    unique index exactly equal to the proposedKey (not just a prefix).
+                //
+                // After validating these constraint:
+                //
+                // 4. If there is no useful index, and the collection is non-empty, we
+                //    must fail.
+                //
+                // 5. If the collection is empty, and it's still possible to create an index
+                //    on the proposed key, we go ahead and do so.
+
+                string indexNS = config->getName() + ".system.indexes";
+
+                // 1.  Verify consistency with existing unique indexes
+                BSONObj uniqueQuery = BSON( "ns" << ns << "unique" << true );
+                auto_ptr<DBClientCursor> uniqueQueryResult =
+                                conn->get()->query( indexNS , uniqueQuery );
+
+                while ( uniqueQueryResult->more() ) {
+                    BSONObj idx = uniqueQueryResult->next();
+                    BSONObj currentKey = idx["key"].embeddedObject();
+                    bool isCurrentID = str::equals( currentKey.firstElementFieldName() , "_id" );
+                    if( ! isCurrentID && ! proposedKey.isPrefixOf( currentKey) ) {
+                        errmsg = str::stream() << "can't shard collection '" << ns << "' "
+                                               << "with unique index on " << currentKey << " "
+                                               << "and proposed shard key " << proposedKey << ". "
+                                               << "Uniqueness can't be maintained unless "
+                                               << "shard key is a prefix";
+                        conn->done();
+                        return false;
+                    }
+                }
+
+                // 2. Check for a useful index
+                bool hasUsefulIndexForKey = false;
+
+                BSONObj allQuery = BSON( "ns" << ns );
+                auto_ptr<DBClientCursor> allQueryResult =
+                                conn->get()->query( indexNS , allQuery );
+
+                BSONArrayBuilder allIndexes;
+                while ( allQueryResult->more() ) {
+                    BSONObj idx = allQueryResult->next();
+                    allIndexes.append( idx );
+                    BSONObj currentKey = idx["key"].embeddedObject();
+                    // Check 2.i. and 2.ii.
+                    if ( ! idx["sparse"].trueValue() && proposedKey.isPrefixOf( currentKey ) ) {
+                        hasUsefulIndexForKey = true;
+                    }
+                }
+
+                // 3. If proposed key is required to be unique, additionally check for exact match.
                 bool careAboutUnique = cmdObj["unique"].trueValue();
-
-                {
-                    ShardKeyPattern proposedKey( key );
-                    bool hasShardIndex = false;
-                    bool hasUniqueShardIndex = false;
-
-                    scoped_ptr<ScopedDbConnection> conn(
-                            ScopedDbConnection::getScopedDbConnection( config->getPrimary()
-                                                                       .getConnString() ) );
-                    BSONObjBuilder b;
-                    b.append( "ns" , ns );
-
-                    BSONArrayBuilder allIndexes;
-
-                    auto_ptr<DBClientCursor> cursor = conn->get()->query(
-                        config->getName() + ".system.indexes" , b.obj() );
-                    while ( cursor->more() ) {
-                        BSONObj idx = cursor->next();
-
-                        allIndexes.append( idx );
-
-                        bool idIndex = ! idx["name"].eoo() && idx["name"].String() == "_id_";
-                        bool uniqueIndex = ( ! idx["unique"].eoo() && idx["unique"].trueValue() ) ||
-                        		           idIndex;
-
-                        // Is index key over the sharding key? Remember that.
-                        if ( key.woCompare( idx["key"].embeddedObjectUserCheck() ) == 0 ) {
-
-                            if( idx["sparse"].trueValue() ){
-                                errmsg = (string)"can't shard collection " + ns + " with sparse shard key index";
-                                conn->done();
-                                return false;
-                            }
-
-                            hasShardIndex = true;
-                            hasUniqueShardIndex = uniqueIndex;
-                            continue;
-                        }
-
-                        // Not a unique index? Move on.
-                        if ( ! uniqueIndex || idIndex )
-                            continue;
-
-                        // Shard key is prefix of unique index? Move on.
-                        if ( proposedKey.isPrefixOf( idx["key"].embeddedObjectUserCheck() ) )
-                            continue;
-
-                        errmsg = str::stream() << "can't shard collection '" << ns << "' with unique index on: " + idx.toString()
-                                               << ", uniqueness can't be maintained across unless shard key index is a prefix";
-                        conn->done();
-                        return false;
+                if ( hasUsefulIndexForKey && careAboutUnique ) {
+                    BSONObj eqQuery = BSON( "ns" << ns << "key" << proposedKey );
+                    BSONObj eqQueryResult = conn->get()->findOne( indexNS, eqQuery );
+                    if ( eqQueryResult.isEmpty() ) {
+                        hasUsefulIndexForKey = false;  // if no exact match, index not useful,
+                                                       // but still possible to create one later
                     }
-
-                    if( careAboutUnique && hasShardIndex && ! hasUniqueShardIndex ){
-                        errmsg = (string)"can't shard collection " + ns + ", shard key index not unique and unique index explicitly specified";
-                        conn->done();
-                        return false;
-                    }
-
-                    BSONObj res = conn->get()->findOne( config->getName() + ".system.namespaces",
-                                                        BSON( "name" << ns ) );
-                    if ( res["options"].type() == Object && res["options"].embeddedObject()["capped"].trueValue() ) {
-                        errmsg = "can't shard capped collection";
-                        conn->done();
-                        return false;
-                    }
-
-                    if ( hasShardIndex ) {
-                        // make sure there are no null entries in the sharding index
-                        BSONObjBuilder cmd;
-                        cmd.append( "checkShardingIndex" , ns );
-                        cmd.append( "keyPattern" , key );
-                        BSONObj cmdObj = cmd.obj();
-                        if ( ! conn->get()->runCommand( "admin" , cmdObj , res )) {
-                            errmsg = res["errmsg"].str();
+                    else {
+                        bool isExplicitlyUnique = eqQueryResult["unique"].trueValue();
+                        BSONObj currKey = eqQueryResult["key"].embeddedObject();
+                        bool isCurrentID = str::equals( currKey.firstElementFieldName() , "_id" );
+                        if ( ! isExplicitlyUnique && ! isCurrentID ) {
+                            errmsg = str::stream() << "can't shard collection " << ns << ", "
+                                                   << proposedKey << " index not unique, "
+                                                   << "and unique index explicitly specified";
                             conn->done();
                             return false;
                         }
                     }
+                }
 
-                    if ( ! hasShardIndex && ( conn->get()->count( ns ) != 0 ) ) {
-                        errmsg = "please create an index over the sharding key before sharding.";
-                        result.append( "proposedKey" , key );
-                        result.appendArray( "curIndexes" , allIndexes.done() );
+                if ( hasUsefulIndexForKey ) {
+                    // Check 2.iii and 2.iv. Make sure no null entries in the sharding index
+                    // and that there is a useful, non-multikey index available
+                    BSONObjBuilder cmd;
+                    cmd.append( "checkShardingIndex" , ns );
+                    cmd.append( "keyPattern" , proposedKey );
+                    BSONObj cmdObj = cmd.obj();
+                    if ( ! conn->get()->runCommand( "admin" , cmdObj , res ) ) {
+                        errmsg = res["errmsg"].str();
                         conn->done();
                         return false;
                     }
-
-                    conn->done();
                 }
+                // 4. if no useful index, and collection is non-empty, fail
+                else if ( conn->get()->count( ns ) != 0 ) {
+                    errmsg = str::stream() << "please create an index that starts with the "
+                                           << "shard key before sharding.";
+                    result.append( "proposedKey" , proposedKey );
+                    result.appendArray( "curIndexes" , allIndexes.done() );
+                    conn->done();
+                    return false;
+                }
+                // 5. If no useful index exists, and collection empty, create one on proposedKey.
+                //    Only need to call ensureIndex on primary shard, since indexes get copied to
+                //    receiving shard whenever a migrate occurs.
+                else {
+                    // call ensureIndex with cache=false, see SERVER-1691
+                    bool ensureSuccess = conn->get()->ensureIndex( ns ,
+                                                                   proposedKey ,
+                                                                   careAboutUnique ,
+                                                                   "" ,
+                                                                   false );
+                    if ( ! ensureSuccess ) {
+                        errmsg = "ensureIndex failed to create index on primary shard";
+                        conn->done();
+                        return false;
+                    }
+                }
+
+                conn->done();
 
                 tlog() << "CMD: shardcollection: " << cmdObj << endl;
 
-//                vector<BSONObj> pts;
-//                if (cmdObj.hasField("splitPoints")) {
-//                    if ( cmdObj.getField("splitPoints").type() != Array ) {
-//                        errmsg = "Value of splitPoints must be an array of objects";
-//                        return false;
-//                    }
-//
-//                    vector<BSONElement> elmts = cmdObj.getField("splitPoints").Array();
-//                    for ( unsigned i = 0 ; i < elmts.size() ; ++i) {
-//                        if ( elmts[i].type() != Object ) {
-//                            errmsg = "Elements in the splitPoints array must be objects";
-//                            return false;
-//                        }
-//                        pts.push_back( elmts[i].Obj() );
-//                    }
-//                }
-                config->shardCollection( ns , key , careAboutUnique );
+                config->shardCollection( ns , proposedKey , careAboutUnique );
 
                 result << "collectionsharded" << ns;
                 return true;

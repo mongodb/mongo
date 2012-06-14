@@ -3,7 +3,7 @@
 s = new ShardingTest( "shard_index", 2, 0, 1 )
 
 // Regenerate fully because of SERVER-2782
-for ( var i = 0; i < 10; i++ ) {
+for ( var i = 0; i < 13; i++ ) {
 		
 	var coll = s.admin._mongo.getDB( "test" ).getCollection( "foo" + i )
 	coll.drop()
@@ -177,6 +177,72 @@ for ( var i = 0; i < 10; i++ ) {
 		}
         assert( !passed, "Should not shard collection when another unique index exists!" )
 	}
+    if ( i == 10 ){
+
+        //try sharding non-empty collection without any index
+        passed = false;
+        try{
+            s.adminCommand( { shardcollection : "" + coll, key : { num : 1 } } );
+            passed = true;
+        }
+        catch( e ){
+            print(e);
+        }
+        assert( !passed , "Should not be able to shard without index");
+
+        //now add containing index and try sharding by prefix
+        coll.ensureIndex( {num : 1, x : 1} );
+
+		try{
+			s.adminCommand( { shardcollection : "" + coll, key : { num : 1 } } );
+			passed = true;
+		}
+		catch( e ){
+			print(e);
+		}
+		assert( passed , "Should be able to shard collection with prefix of existing index");
+
+        printjson( coll.getIndexes() );
+
+        //make sure no extra index is created
+        assert.eq( 2, coll.getIndexes().length );
+    }
+    if ( i == 11 ){
+        coll.remove({})
+
+        //empty collection with useful index. check new index not created
+        coll.ensureIndex( {num : 1, x : 1} );
+
+        try{
+            s.adminCommand( { shardcollection : "" + coll, key : { num : 1 } } );
+            passed = true;
+        }
+        catch( e ){
+            print(e);
+        }
+        assert( passed , "Should be able to shard collection with prefix of existing index");
+
+        printjson( coll.getIndexes() );
+
+        //make sure no extra index is created
+        assert.eq( 2, coll.getIndexes().length );
+    }
+    if ( i == 12 ){
+
+        //check multikey values for x make index unusable for shard key
+        coll.save({num : 100 , x : [2,3] });
+        coll.ensureIndex( {num : 1, x : 1} );
+
+        passed = false;
+        try{
+            s.adminCommand( { shardcollection : "" + coll, key : { num : 1 } } );
+            passed = true;
+        }
+        catch( e ){
+            print(e);
+        }
+        assert( !passed , "Should not be able to shard collection with mulikey index");
+    }
 }
 
 s.stop();

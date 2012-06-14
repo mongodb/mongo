@@ -77,20 +77,9 @@ namespace mongo {
                 return true;
             }
 
-            // If min and max are not provided use the "minKey" and "maxKey" for the sharding key pattern.
             BSONObj min = jsobj.getObjectField( "min" );
             BSONObj max = jsobj.getObjectField( "max" );
-            if ( min.isEmpty() && max.isEmpty() ) {
-                BSONObjBuilder minBuilder;
-                BSONObjBuilder maxBuilder;
-                BSONForEach(key, keyPattern) {
-                    minBuilder.appendMinKey( key.fieldName() );
-                    maxBuilder.appendMaxKey( key.fieldName() );
-                }
-                min = minBuilder.obj();
-                max = maxBuilder.obj();
-            }
-            else if ( min.isEmpty() || max.isEmpty() ) {
+            if ( min.isEmpty() != max.isEmpty() ) {
                 errmsg = "either provide both min and max or leave both empty";
                 return false;
             }
@@ -108,6 +97,7 @@ namespace mongo {
                 errmsg = "couldn't find valid index for shard key";
                 return false;
             }
+            //has the effect of extending empty min/max to match selected index
             min = Helpers::modifiedRangeBound( min , idx->keyPattern() , -1 );
             max = Helpers::modifiedRangeBound( max , idx->keyPattern() , 1 );
 
@@ -122,22 +112,27 @@ namespace mongo {
             // for now, the only check is that all shard keys are filled
             // null is ok, 
             // TODO if $exist for nulls were picking the index, it could be used instead efficiently
+            int keyPatternLength = keyPattern.nFields();
             while ( cc->ok() ) {
                 BSONObj currKey = c->currKey();
                 
+                //check that current key contains non-null elements for all fields in keyPattern
                 BSONObjIterator i( currKey );
-                int n = 0;
-                while ( i.more() ) {
-                    BSONElement key = i.next();
-                    n++;
+                for( int k = 0; k < keyPatternLength ; k++ ) {
+                    if( ! i.more() ) {
+                        errmsg = str::stream() << "index key " << currKey
+                                               << " too short for pattern " << keyPattern;
+                        return false;
+                    }
+                    BSONElement currKeyElt = i.next();
 
-                    if ( key.type() && key.type() != jstNULL )
+                    if ( currKeyElt.type() && currKeyElt.type() != jstNULL )
                         continue;
 
                     BSONObj obj = c->current();
                     BSONObjIterator j( keyPattern );
                     BSONElement real;
-                    for ( int x=0; x<n; x++ )
+                    for ( int x=0; x <= k; x++ )
                         real = j.next();
 
                     real = obj.getFieldDotted( real.fieldName() );
@@ -146,7 +141,8 @@ namespace mongo {
                         continue;
                     
                     ostringstream os;
-                    os << "found null value in key " << bc->prettyKey( currKey ) << " for doc: " << ( obj["_id"].eoo() ? obj.toString() : obj["_id"].toString() );
+                    os << "found null value in key " << bc->prettyKey( currKey ) << " for doc: "
+                       << ( obj.hasField( "_id" ) ? obj.toString() : obj["_id"].toString() );
                     log() << "checkShardingIndex for '" << ns << "' failed: " << os.str() << endl;
                     
                     errmsg = os.str();
