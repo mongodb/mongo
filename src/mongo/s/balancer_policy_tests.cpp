@@ -161,6 +161,18 @@ namespace mongo {
 
         }
 
+        void moveChunk( ShardToChunksMap& map, MigrateInfo* m ) {
+            vector<BSONObj>& chunks = map[m->from];
+            for ( vector<BSONObj>::iterator i = chunks.begin(); i != chunks.end(); ++i ) {
+                if ( i->getField("min").Obj() == m->chunk.min ) {
+                    map[m->to].push_back( *i );
+                    chunks.erase( i );
+                    return;
+                }
+            }
+            verify(0);
+        }
+
         TEST( BalancerPolicyTests, MultipleDraining ) {
             ShardToChunksMap chunks;
             addShard( chunks, 5 , false );
@@ -177,6 +189,71 @@ namespace mongo {
             ASSERT( m );
             ASSERT_EQUALS( "shard1" , m->from );
             ASSERT_EQUALS( "shard2" , m->to );
+        }
+
+
+        TEST( BalancerPolicyTests, Tags2 ) {
+
+            ShardToChunksMap chunks;
+            addShard( chunks, 5 , false );
+            addShard( chunks, 5 , false );
+            addShard( chunks, 5 , true );
+            
+            ShardInfoMap shards;
+            shards["shard0"] = ShardInfo( 0, 5, false, false );
+            shards["shard1"] = ShardInfo( 0, 5, true, false );
+            shards["shard2"] = ShardInfo( 0, 5, false, false );
+            
+            shards["shard0"].addTag( "a" );
+            shards["shard1"].addTag( "a" );
+            shards["shard1"].addTag( "b" );
+            shards["shard2"].addTag( "b" );
+            
+            while ( true ) {
+                DistributionStatus d( shards, chunks );
+                d.addTagRange( TagRange( BSON( "x" << -1 ), BSON( "x" << 7 ) , "a" ) );
+                d.addTagRange( TagRange( BSON( "x" << 7 ), BSON( "x" << 1000 ) , "b" ) );
+                
+                MigrateInfo* m = BalancerPolicy::balance( "ns", d, 0 );
+                if ( ! m ) 
+                    break;
+
+                if ( m->chunk.min["x"].numberInt() < 7 )
+                    ASSERT_EQUALS( "shard0" , m->to );
+                else
+                    ASSERT_EQUALS( "shard2" , m->to );
+
+                moveChunk( chunks, m );
+            }
+
+            ASSERT_EQUALS( 7U , chunks["shard0"].size() );
+            ASSERT_EQUALS( 0U , chunks["shard1"].size() );
+            ASSERT_EQUALS( 8U , chunks["shard2"].size() );
+        }
+
+
+        TEST( BalancerPolicyTests, Tags1 ) {
+            /*
+            ShardToChunksMap chunks;
+            addShard( chunks, 5 , false );
+            addShard( chunks, 5 , false );
+            addShard( chunks, 5 , true );
+            
+            ShardInfoMap shards;
+            shards["shard0"] = ShardInfo( 0, 5, false, false );
+            shards["shard1"] = ShardInfo( 0, 5, false, false );
+            shards["shard2"] = ShardInfo( 0, 5, false, false );
+            
+            shards["shard0"].addTag( "a" );
+            shards["shard1"].addTag( "a" );
+            
+            DistributionStatus d( shards, chunks );
+            d.addTagRange( TagRange( BSON( "x" << -1 ), BSON( "x" << 1000 ) , "a" ) );
+            d.dump();
+
+            MigrateInfo* m = BalancerPolicy::balance( "ns", d, 0 );
+            ASSERT( m );
+            */
         }
     }
 }

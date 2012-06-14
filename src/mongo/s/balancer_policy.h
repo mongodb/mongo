@@ -37,11 +37,25 @@ namespace mongo {
         
         string toString() const;
     };
+
+    struct TagRange {
+        BSONObj min;
+        BSONObj max;
+        string tag;
+
+        TagRange( const BSONObj& a_min, const BSONObj& a_max, const string& a_tag ) 
+            : min( a_min.getOwned() ), max( a_max.getOwned() ), tag( a_tag ){}
+        string toString() const;
+    };
     
     class ShardInfo {
     public:
         ShardInfo();
         ShardInfo( long long maxSize, long long currSize, bool draining, bool opsQueued );
+
+        void addTag( const string& tag );
+
+        bool hasTag( const string& tag ) const { return _tags.count( tag ) > 0; }
         
         /**
          * @return true if a shard cannot receive any new chunks bacause it reache 'shardLimits'.
@@ -68,6 +82,7 @@ namespace mongo {
         long long _currSize;
         bool _draining;
         bool _hasOpsQueued;
+        set<string> _tags;
     };
     
     struct MigrateInfo {
@@ -85,11 +100,13 @@ namespace mongo {
     typedef map< string,ShardInfo > ShardInfoMap;
     typedef map< string,vector<BSONObj> > ShardToChunksMap;
 
-    class DistributionStatus {
+    class DistributionStatus : boost::noncopyable {
     public:
         DistributionStatus( const ShardInfoMap& shardInfo,
                             const ShardToChunksMap& shardToChunksMap );
 
+
+        void addTagRange( const TagRange& range );
 
         /**
          * this could be because of draining, or over capacity
@@ -98,9 +115,10 @@ namespace mongo {
         string getShardRequiredToShed() const;
         
         /**
+         * @param forTag "" if you don't care, or a tag
          * @return shard best suited to receive a chunk
          */
-        string getBestReceieverShard() const;
+        string getBestReceieverShard( const string& forTag ) const;
 
         /**
          * @return the shard with the most chunks
@@ -109,7 +127,17 @@ namespace mongo {
 
         /** @return number of chunks in this shard */
         unsigned numberOfChunks( const string& shard ) const;
+        
         const vector<BSONObj>& getChunks( const string& shard ) const;
+
+        /**
+         * @return map of shard -> number of chunks for a given tag
+         */
+        //map<string,unsigned> getTagDistribution( const string& shard ) const;
+
+        const set<string>& tags() const { return _allTags; }
+
+        string getTagForChunk( const BSONObj& chunk ) const;
         
         /**
          * writes to log()
@@ -119,6 +147,8 @@ namespace mongo {
     private:
         const ShardInfoMap& _shardInfo;
         const ShardToChunksMap& _shardChunks;
+        vector<TagRange> _tagRanges;
+        set<string> _allTags;
     };
 
     class BalancerPolicy {
@@ -145,6 +175,11 @@ namespace mongo {
         static BSONObj pickChunk( const vector<BSONObj>& from, const vector<BSONObj>& to );
 
     private:
+
+        static MigrateInfo* shed( const string& ns,
+                                  const DistributionStatus& distributionstatus,
+                                  const string& from );
+                                  
 
         static MigrateInfo* finishBalance( const string& ns,
                                            const DistributionStatus& distribution, 
