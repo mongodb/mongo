@@ -43,14 +43,17 @@ namespace mongo {
         BlockingQueue() :
             _lock("BlockingQueue"),
             _maxSize(std::numeric_limits<std::size_t>::max()),
+            _currentSize(0),
             _getSize(&_getSizeDefault) {}
         BlockingQueue(size_t size) :
             _lock("BlockingQueue(bounded)"),
             _maxSize(size),
+            _currentSize(0),
             _getSize(&_getSizeDefault) {}
         BlockingQueue(size_t size, getSizeFunc f) :
             _lock("BlockingQueue(custom size)"),
             _maxSize(size),
+            _currentSize(0),
             _getSize(f) {}
 
         void push(T const& t) {
