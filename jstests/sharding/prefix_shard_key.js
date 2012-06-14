@@ -24,6 +24,7 @@ coll.ensureIndex({num : 1, x : 1});
 
 //usable index, but doc with empty 'num' value, so still should throw
 coll.save({x : -5});
+assert( ! db.getLastError() , "save bad value didn't succeed");
 assert.throws( function(){ s.adminCommand( { shardCollection : coll, key : { num : 1 } } ) } )
 
 //remove the bad doc.  now should finally succeed
