@@ -33,14 +33,14 @@ namespace mongo {
     namespace {
         
         TEST( BalancerPolicyTests , SizeMaxedShardTest ) {
-            ASSERT( ! BalancerPolicy::ShardInfo( 0, 0, false, false ).isSizeMaxed() );
-            ASSERT( ! BalancerPolicy::ShardInfo( 100LL, 80LL, false, false ).isSizeMaxed() );
-            ASSERT( BalancerPolicy::ShardInfo( 100LL, 110LL, false, false ).isSizeMaxed() );
+            ASSERT( ! ShardInfo( 0, 0, false, false ).isSizeMaxed() );
+            ASSERT( ! ShardInfo( 100LL, 80LL, false, false ).isSizeMaxed() );
+            ASSERT( ShardInfo( 100LL, 110LL, false, false ).isSizeMaxed() );
         }
 
         TEST( BalancerPolicyTests , BalanceNormalTest  ) {
             // 2 chunks and 0 chunk shards
-            BalancerPolicy::ShardToChunksMap chunkMap;
+            ShardToChunksMap chunkMap;
             vector<BSONObj> chunks;
             chunks.push_back(BSON( "min" << BSON( "x" << BSON( "$minKey"<<1) ) <<
                                    "max" << BSON( "x" << 49 )));
@@ -51,11 +51,11 @@ namespace mongo {
             chunkMap["shard1"] = chunks;
 
             // no limits
-            BalancerPolicy::ShardInfoMap info;
-            info["shard0"] = BalancerPolicy::ShardInfo( 0, 2, false, false );
-            info["shard1"] = BalancerPolicy::ShardInfo( 0, 0, false, false );
+            ShardInfoMap info;
+            info["shard0"] = ShardInfo( 0, 2, false, false );
+            info["shard1"] = ShardInfo( 0, 0, false, false );
 
-            BalancerPolicy::MigrateInfo* c = NULL;
+            MigrateInfo* c = NULL;
             c = BalancerPolicy::balance( "ns", info, chunkMap, 1 );
             ASSERT( c );
         }
@@ -63,7 +63,7 @@ namespace mongo {
         TEST( BalanceNormalTests ,  BalanceDrainingTest ) {
             // one normal, one draining
             // 2 chunks and 0 chunk shards
-            BalancerPolicy::ShardToChunksMap chunkMap;
+            ShardToChunksMap chunkMap;
             vector<BSONObj> chunks;
             chunks.push_back(BSON( "min" << BSON( "x" << BSON( "$minKey"<<1) ) <<
                                    "max" << BSON( "x" << 49 )));
@@ -74,11 +74,11 @@ namespace mongo {
             chunkMap["shard1"] = chunks;
 
             // shard0 is draining
-            BalancerPolicy::ShardInfoMap limitsMap;
-            limitsMap["shard0"] = BalancerPolicy::ShardInfo( 0LL, 2LL, true, false );
-            limitsMap["shard1"] = BalancerPolicy::ShardInfo( 0LL, 0LL, false, false );
+            ShardInfoMap limitsMap;
+            limitsMap["shard0"] = ShardInfo( 0LL, 2LL, true, false );
+            limitsMap["shard1"] = ShardInfo( 0LL, 0LL, false, false );
 
-            BalancerPolicy::MigrateInfo* c = NULL;
+            MigrateInfo* c = NULL;
             c = BalancerPolicy::balance( "ns", limitsMap, chunkMap, 0 );
             ASSERT( c );
             ASSERT_EQUALS( c->to , "shard1" );
@@ -88,7 +88,7 @@ namespace mongo {
 
         TEST( BalancerPolicyTests , BalanceEndedDrainingTest ) {
             // 2 chunks and 0 chunk (drain completed) shards
-            BalancerPolicy::ShardToChunksMap chunkMap;
+            ShardToChunksMap chunkMap;
             vector<BSONObj> chunks;
             chunks.push_back(BSON( "min" << BSON( "x" << BSON( "$minKey"<<1) ) <<
                                    "max" << BSON( "x" << 49 )));
@@ -99,11 +99,11 @@ namespace mongo {
             chunkMap["shard1"] = chunks;
 
             // no limits
-            BalancerPolicy::ShardInfoMap limitsMap;
-            limitsMap["shard0"] = BalancerPolicy::ShardInfo( 0, 2, false, false );
-            limitsMap["shard1"] = BalancerPolicy::ShardInfo( 0, 0, true, false );
+            ShardInfoMap limitsMap;
+            limitsMap["shard0"] = ShardInfo( 0, 2, false, false );
+            limitsMap["shard1"] = ShardInfo( 0, 0, true, false );
 
-            BalancerPolicy::MigrateInfo* c = NULL;
+            MigrateInfo* c = NULL;
             c = BalancerPolicy::balance( "ns", limitsMap, chunkMap, 0 );
             ASSERT( ! c );
         }
@@ -111,7 +111,7 @@ namespace mongo {
         TEST( BalancerPolicyTests , BalanceImpasseTest ) {
             // one maxed out, one draining
             // 2 chunks and 0 chunk shards
-            BalancerPolicy::ShardToChunksMap chunkMap;
+            ShardToChunksMap chunkMap;
             vector<BSONObj> chunks;
             chunks.push_back(BSON( "min" << BSON( "x" << BSON( "$minKey"<<1) ) <<
                                    "max" << BSON( "x" << 49 )));
@@ -122,12 +122,12 @@ namespace mongo {
             chunkMap["shard1"] = chunks;
 
             // shard0 is draining, shard1 is maxed out, shard2 has writebacks pending
-            BalancerPolicy::ShardInfoMap limitsMap;
-            limitsMap["shard0"] = BalancerPolicy::ShardInfo( 0, 2, true, false );
-            limitsMap["shard1"] = BalancerPolicy::ShardInfo( 1, 1, false, false );
-            limitsMap["shard2"] = BalancerPolicy::ShardInfo( 0, 1, true, false );
+            ShardInfoMap limitsMap;
+            limitsMap["shard0"] = ShardInfo( 0, 2, true, false );
+            limitsMap["shard1"] = ShardInfo( 1, 1, false, false );
+            limitsMap["shard2"] = ShardInfo( 0, 1, true, false );
 
-            BalancerPolicy::MigrateInfo* c = NULL;
+            MigrateInfo* c = NULL;
             c = BalancerPolicy::balance( "ns", limitsMap, chunkMap, 0 );
             ASSERT( ! c );
         }

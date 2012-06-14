@@ -24,7 +24,7 @@
 
 namespace mongo {
 
-    BalancerPolicy::MigrateInfo* BalancerPolicy::balance( const string& ns,
+    MigrateInfo* BalancerPolicy::balance( const string& ns,
                                                           const ShardInfoMap& shardToLimitsMap,
                                                           const ShardToChunksMap& shardToChunksMap,
                                                           int balancedLastTime ) {
@@ -142,28 +142,28 @@ namespace mongo {
         return from[0];
     }
 
-    BalancerPolicy::ShardInfo::ShardInfo( long long maxSize, long long currSize, bool draining, bool opsQueued )
+    ShardInfo::ShardInfo( long long maxSize, long long currSize, bool draining, bool opsQueued )
         : _maxSize( maxSize ), 
           _currSize( currSize ),
           _draining( draining ),
           _hasOpsQueued( opsQueued ) {
     }
 
-    BalancerPolicy::ShardInfo::ShardInfo()
+    ShardInfo::ShardInfo()
         : _maxSize( 0 ), 
           _currSize( 0 ),
           _draining( false ),
           _hasOpsQueued( false ) {
     }
 
-    bool BalancerPolicy::ShardInfo::isSizeMaxed() const {
+    bool ShardInfo::isSizeMaxed() const {
         if ( _maxSize == 0 || _currSize == 0 )
             return false;
         
         return _currSize >= _maxSize;
     }
 
-    string BalancerPolicy::ShardInfo::toString() const {
+    string ShardInfo::toString() const {
         StringBuilder ss;
         ss << " maxSize: " << _maxSize;
         ss << " currSize: " << _currSize;
@@ -172,7 +172,7 @@ namespace mongo {
         return ss.str();
     }
 
-    string BalancerPolicy::ChunkInfo::toString() const {
+    string ChunkInfo::toString() const {
         StringBuilder buf;
         buf << " min: " << min;
         buf << " max: " << min;

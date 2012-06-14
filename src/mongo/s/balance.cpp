@@ -185,15 +185,15 @@ namespace mongo {
             return;
         }
         
-        BalancerPolicy::ShardInfoMap shardInfo;
+        ShardInfoMap shardInfo;
         for ( vector<Shard>::const_iterator it = allShards.begin(); it != allShards.end(); ++it ) {
             const Shard& s = *it;
             ShardStatus status = s.getStatus();
-            shardInfo[ s.getName() ] = BalancerPolicy::ShardInfo( s.getMaxSize(),
-                                                                  status.mapped(),
-                                                                  s.isDraining(),
-                                                                  status.hasOpsQueued()
-                                                                  );
+            shardInfo[ s.getName() ] = ShardInfo( s.getMaxSize(),
+                                                  status.mapped(),
+                                                  s.isDraining(),
+                                                  status.hasOpsQueued()
+                                                  );
         }
 
         //
