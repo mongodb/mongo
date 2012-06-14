@@ -28,21 +28,6 @@ namespace mongo {
                                                           const ShardInfoMap& shardToLimitsMap,
                                                           const ShardToChunksMap& shardToChunksMap,
                                                           int balancedLastTime ) {
-        
-        log() << "---- ShardInfoMap" << endl;
-        for ( ShardInfoMap::const_iterator i = shardToLimitsMap.begin(); i != shardToLimitsMap.end(); ++i ) {
-            log() << "\t" << i->first << "\t" << i->second << endl;
-        }
-        log() << "---- ShardToChunksMap" << endl;
-        for ( ShardToChunksMap::const_iterator i=shardToChunksMap.begin(); i != shardToChunksMap.end(); ++i ) {
-            log() << "\t" << i->first << endl;
-            const vector<BSONObj>& v = i->second;
-            for ( unsigned j=0; j<v.size(); j++ ) {
-                log() << "\t\t" << v[j] << endl;
-            }
-        }
-        log() << "----" << endl;
-        
 
         pair<string,unsigned> min("",numeric_limits<unsigned>::max());
         pair<string,unsigned> max("",0);
