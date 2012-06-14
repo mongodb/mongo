@@ -134,6 +134,7 @@ namespace mongo {
          * is { }.
          * @param balancedLastTime is the number of chunks effectively moved in the last round.
          * @returns NULL or MigrateInfo of the best move to make towards balacing the collection.
+         *          caller owns the MigrateInfo instance
          */
         static MigrateInfo* balance( const string& ns, 
                                      const DistributionStatus& distribution,

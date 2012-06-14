@@ -40,7 +40,7 @@ namespace mongo {
 
     string DistributionStatus::getShardRequiredToShed() const {
         string shard;
-        unsigned minChunks = 0;
+        unsigned maxChunks = 0;
         
         for ( ShardInfoMap::const_iterator i = _shardInfo.begin(); i != _shardInfo.end(); ++i ) {
 
@@ -56,11 +56,11 @@ namespace mongo {
                 continue;
             }
             
-            if ( myChunks <= minChunks )
+            if ( myChunks <= maxChunks )
                 continue;
             
             shard = i->first;
-            minChunks = myChunks;
+            maxChunks = myChunks;
         }
         
         return shard;
