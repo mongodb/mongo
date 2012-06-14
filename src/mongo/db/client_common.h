@@ -29,7 +29,7 @@ namespace mongo {
     /**
      * this is the base class for Client and ClientInfo
      * Client is for mongod
-     * Client is for mongos
+     * ClientInfo is for mongos
      * They should converge slowly
      * The idea is this has the basic api so that not all code has to be duplicated
      */

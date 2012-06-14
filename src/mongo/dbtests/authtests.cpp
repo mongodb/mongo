@@ -41,17 +41,34 @@ namespace AuthTests {
             ASSERT( ai.isAuthorizedReads( "test" ) );
             ASSERT( ai.isAuthorizedReads( "admin" ) );
 
-            BSONObj input = BSON(
-                                 "admin" << BSON( "adminRO" << 1 ) <<
-                                 "test" << BSON( "testRW" << 2 )
-                                 );
-            ai.setTemporaryAuthorization( input );
-            ASSERT( ai.isAuthorized( "test" ) );
-            ASSERT( ! ai.isAuthorized( "admin" ) );
-            ASSERT( ! ai.isAuthorized( "test2" ) );
-            ASSERT( ai.isAuthorizedReads( "test" ) );
-            ASSERT( ai.isAuthorizedReads( "admin" ) );
-            ASSERT( ai.isAuthorizedReads( "test2" ) );
+            {
+                AuthenticationInfo::TemporaryAuthReleaser authRelease( &ai );
+                BSONObj input = BSON(
+                                     "admin" << BSON( "adminRO" << 1 ) <<
+                                     "test" << BSON( "testRW" << 2 )
+                                     );
+                ai.setTemporaryAuthorization( input );
+                ASSERT( ai.isAuthorized( "test" ) );
+                ASSERT( ! ai.isAuthorized( "admin" ) );
+                ASSERT( ! ai.isAuthorized( "test2" ) );
+                ASSERT( ai.isAuthorizedReads( "test" ) );
+                ASSERT( ai.isAuthorizedReads( "admin" ) );
+                ASSERT( ai.isAuthorizedReads( "test2" ) );
+
+                {
+                    // This shouldn't actually clear the temporary auth when it goes out of scope
+                    // because there is already temporary auth set at this point.
+                    AuthenticationInfo::TemporaryAuthReleaser authRelease( &ai );
+                }
+
+                // Auth should be the same as before the second TemporaryAuthReleaser
+                ASSERT( ai.isAuthorized( "test" ) );
+                ASSERT( ! ai.isAuthorized( "admin" ) );
+                ASSERT( ! ai.isAuthorized( "test2" ) );
+                ASSERT( ai.isAuthorizedReads( "test" ) );
+                ASSERT( ai.isAuthorizedReads( "admin" ) );
+                ASSERT( ai.isAuthorizedReads( "test2" ) );
+            }
 
             ai.clearTemporaryAuthorization();
             ASSERT( ! ai.isAuthorized( "test" ) );
@@ -81,6 +98,32 @@ namespace AuthTests {
         }
     };
 
+    /** Simple test for AuthenticationTable::copyCommandObjAddingAuth. */
+    class AddAuth {
+    public:
+        void run() {
+            AuthenticationTable at;
+            at.addAuth("test", "testUser", Auth::WRITE);
+
+            BSONObj cmd = BSON( "commandName" << "commandValue" );
+            BSONObj cmdWithAuth = at.copyCommandObjAddingAuth( cmd );
+            BSONObj expected = BSON(
+                                    "commandName" << "commandValue" <<
+                                    "$auth" << BSON( "test" << BSON( "testUser" << 2 ) )
+                                 );
+
+            // Make sure a malicious user can't set their own $auth
+            BSONObj bogusAuthCmd = BSON(
+                                        "commandName" << "commandValue" <<
+                                        "$auth" << BSON( "admin" << BSON( "adminUser" << 2 ) )
+                                        );
+            BSONObj bogusAuthCmdWithAuth = at.copyCommandObjAddingAuth( bogusAuthCmd );
+            log() << "bogusAuthCmd: " << bogusAuthCmd << endl;
+            log() << "bogusAuthCmdWithAuth: " << bogusAuthCmdWithAuth << endl;
+            ASSERT( bson2set(expected) == bson2set(bogusAuthCmdWithAuth) );
+        }
+    };
+
     class All : public Suite {
     public:
         All() : Suite( "auth" ) {
@@ -88,6 +131,7 @@ namespace AuthTests {
         void setupTests() {
             add<TempAuth>();
             add<ToBSON>();
+            add<AddAuth>();
         }
     } myall;
 

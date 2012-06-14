@@ -22,8 +22,9 @@
 
 #include "pch.h"
 
-#include "mongo/db/jsobj.h"
 #include "mongo/client/authlevel.h"
+#include "mongo/client/authentication_table.h"
+#include "mongo/db/jsobj.h"
 #include "mongo/util/net/message.h"
 #include "mongo/util/net/message_port.h"
 
@@ -543,7 +544,10 @@ namespace mongo {
         /** controls how chatty the client is about network errors & such.  See log.h */
         int _logLevel;
 
-        DBClientWithCommands() : _logLevel(0), _cachedAvailableOptions( (enum QueryOptions)0 ), _haveCachedAvailableOptions(false) { }
+        DBClientWithCommands() : _logLevel(0),
+                _cachedAvailableOptions( (enum QueryOptions)0 ),
+                _haveCachedAvailableOptions(false),
+                _hasAuthentication(false) { }
 
         /** helper function.  run a simple command where the command expression is simply
               { command : 1 }
@@ -555,16 +559,21 @@ namespace mongo {
 
         /** Run a database command.  Database commands are represented as BSON objects.  Common database
             commands have prebuilt helper functions -- see below.  If a helper is not available you can
-            directly call runCommand.
+            directly call runCommand.  If _authTable has been set, will append a BSON representation of
+            that AuthenticationTable to the command object, unless an AuthenticationTable object has been
+            passed to this method directly, in which case it will use that instead of _authTable.
 
             @param dbname database name.  Use "admin" for global administrative commands.
             @param cmd  the command object to execute.  For example, { ismaster : 1 }
             @param info the result object the database returns. Typically has { ok : ..., errmsg : ... } fields
                    set.
             @param options see enum QueryOptions - normally not needed to run a command
+            @param auth if set, the BSONObj representation will be appended to the command object sent
+
             @return true if the command returned "ok".
         */
-        virtual bool runCommand(const string &dbname, const BSONObj& cmd, BSONObj &info, int options=0);
+        virtual bool runCommand(const string &dbname, const BSONObj& cmd, BSONObj &info,
+                                int options=0, const AuthenticationTable* auth = NULL);
 
         /** Authorize access to a particular database.
             Authentication is separate for each database on the server -- you may authenticate for any
@@ -810,6 +819,9 @@ namespace mongo {
 
         bool exists( const string& ns );
 
+        void setAuthenticationTable ( const AuthenticationTable& auth );
+        void clearAuthenticationTable ();
+
         /** Create an index if it does not already exist.
             ensureIndex calls are remembered so it is safe/fast to call this function many
             times in your code.
@@ -874,6 +886,8 @@ namespace mongo {
     private:
         enum QueryOptions _cachedAvailableOptions;
         bool _haveCachedAvailableOptions;
+        AuthenticationTable _authTable;
+        bool _hasAuthentication;
     };
 
     /**
@@ -1064,7 +1078,11 @@ namespace mongo {
                                           const BSONObj *fieldsToReturn,
                                           int queryOptions );
 
-        virtual bool runCommand(const string &dbname, const BSONObj& cmd, BSONObj &info, int options=0);
+        virtual bool runCommand(const string &dbname,
+                                const BSONObj& cmd,
+                                BSONObj &info,
+                                int options=0,
+                                const AuthenticationTable* auth=NULL);
 
         /**
            @return true if this connection is currently in a failed state.  When autoreconnect is on,

@@ -266,6 +266,7 @@ namespace mongo {
 
                             ClientInfo * ci = r.getClientInfo();
                             if (!noauth) {
+                                // TODO: Figure out why this is 'admin' instead of 'local'.
                                 ci->getAuthenticationInfo()->authorize("admin", internalSecurity.user);
                             }
                             ci->noAutoSplit();
@@ -275,7 +276,8 @@ namespace mongo {
                             ci->newRequest(); // this so we flip prev and cur shards
 
                             BSONObjBuilder b;
-                            if ( ! ci->getLastError( BSON( "getLastError" << 1 ) , b , true ) ) {
+                            if ( ! ci->getLastError( "admin", BSON( "getLastError" << 1 ) , b ,
+                                                     true ) ) {
                                 b.appendBool( "commandFailed" , true );
                             }
                             gle = b.obj();

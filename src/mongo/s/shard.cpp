@@ -318,9 +318,14 @@ namespace mongo {
         out.flush();
     }
 
-    BSONObj Shard::runCommand( const string& db , const BSONObj& cmd ) const {
-        scoped_ptr<ScopedDbConnection> conn(
-                ScopedDbConnection::getScopedDbConnection( getConnString() ) );
+    BSONObj Shard::runCommand( const string& db , const BSONObj& cmd , bool internal ) const {
+        scoped_ptr<ScopedDbConnection> conn;
+
+        if ( internal ) {
+            conn.reset( ScopedDbConnection::getInternalScopedDbConnection( getConnString() ) );
+        } else {
+            conn.reset( ScopedDbConnection::getScopedDbConnection( getConnString() ) );
+        }
         BSONObj res;
         bool ok = conn->get()->runCommand( db , cmd , res );
         if ( ! ok ) {
@@ -335,7 +340,7 @@ namespace mongo {
     }
 
     ShardStatus Shard::getStatus() const {
-        return ShardStatus( *this , runCommand( "admin" , BSON( "serverStatus" << 1 ) ) );
+        return ShardStatus( *this , runCommand( "admin" , BSON( "serverStatus" << 1 ) , true ) );
     }
 
     void Shard::reloadShardInfo() {

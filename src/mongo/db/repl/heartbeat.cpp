@@ -34,6 +34,7 @@
 #include "../instance.h"
 #include "../repl.h"
 #include "mongo/db/repl/bgsync.h"
+#include "mongo/db/security.h"
 
 namespace mongo {
 
@@ -150,7 +151,11 @@ namespace mongo {
                 !Lock::somethingWriteLocked() || theReplSet == 0 || !theReplSet->lockedByMe() );
 
         ScopedConn conn(memberFullName);
-        return conn.runCommand("admin", cmd, result, 0);
+        return conn.runCommand("admin",
+                               cmd,
+                               result,
+                               0,
+                               &AuthenticationTable::getInternalSecurityAuthenticationTable());
     }
 
     /**

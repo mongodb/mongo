@@ -222,9 +222,12 @@ namespace mongo {
                 return false;
             }
 
-            if (!noauth && cmdLine.keyFile &&
-                !conn.auth("local", internalSecurity.user, internalSecurity.pwd, errmsg, false)) {
-                return false;
+            if (!noauth && cmdLine.keyFile ) {
+                if (!conn.auth("local", internalSecurity.user, internalSecurity.pwd, errmsg, false)) {
+                    return false;
+                }
+                conn.setAuthenticationTable(
+                        AuthenticationTable::getInternalSecurityAuthenticationTable() );
             }
 
             BSONObj out;

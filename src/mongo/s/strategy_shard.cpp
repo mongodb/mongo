@@ -113,8 +113,15 @@ namespace mongo {
                                 const string& versionedNS, const BSONObj& filter,
                                 map<Shard,BSONObj>& results )
         {
+            const BSONObj& commandWithAuth = ClientBasic::getCurrent()->getAuthenticationInfo()->
+                    getAuthTable().copyCommandObjAddingAuth( command );
 
-            QuerySpec qSpec( db + ".$cmd", command, BSONObj(), 0, 1, options );
+            QuerySpec qSpec( db + ".$cmd",
+                             noauth ? command : commandWithAuth,
+                             BSONObj(),
+                             0,
+                             1,
+                             options );
 
             ParallelSortClusteredCursor cursor( qSpec, CommandInfo( versionedNS, filter ) );
 

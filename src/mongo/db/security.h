@@ -90,6 +90,8 @@ namespace mongo {
         void setTemporaryAuthorization( BSONObj& obj );
         void clearTemporaryAuthorization();
 
+        const AuthenticationTable getAuthTable() const;
+
     private:
         void _checkLocalHostSpecialAdmin();
 

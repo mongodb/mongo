@@ -57,8 +57,12 @@ namespace mongo {
            So here what we do is wrapper known safe methods and not allow cursor-style queries at all.  This makes
            ScopedConn limited in functionality but very safe.  More non-cursor wrappers can be added here if needed.
            */
-        bool runCommand(const string &dbname, const BSONObj& cmd, BSONObj &info, int options=0) {
-            return conn()->runCommand(dbname, cmd, info, options);
+        bool runCommand(const string &dbname,
+                        const BSONObj& cmd,
+                        BSONObj &info,
+                        int options=0,
+                        const AuthenticationTable* auth=NULL) {
+            return conn()->runCommand(dbname, cmd, info, options, auth);
         }
         unsigned long long count(const string &ns) {
             return conn()->count(ns);
@@ -98,13 +102,17 @@ namespace mongo {
           // or our key file has to change.  if our key file has to change, we'll
           // be rebooting. if their file has to change, they'll be rebooted so the
           // connection created above will go dead, reconnect, and reauth.
-          if (!noauth && !connInfo->cc->auth("local",
-                                             internalSecurity.user,
-                                             internalSecurity.pwd,
-                                             err,
-                                             false)) {
-            log() << "could not authenticate against " << _hostport << ", " << err << rsLog;
-            return false;
+          if (!noauth) {
+              if (!connInfo->cc->auth("local",
+                                      internalSecurity.user,
+                                      internalSecurity.pwd,
+                                      err,
+                                      false)) {
+                  log() << "could not authenticate against " << _hostport << ", " << err << rsLog;
+                  return false;
+              }
+              connInfo->cc->setAuthenticationTable(
+                      AuthenticationTable::getInternalSecurityAuthenticationTable() );
           }
 
           return true;

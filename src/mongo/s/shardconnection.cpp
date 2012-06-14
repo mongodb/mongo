@@ -20,6 +20,8 @@
 #include "shard.h"
 #include "config.h"
 #include "request.h"
+#include "mongo/db/client.h"
+#include "mongo/db/security.h"
 #include <set>
 
 namespace mongo {
@@ -70,21 +72,20 @@ namespace mongo {
             if ( ! s )
                 s = new Status();
 
+            auto_ptr<DBClientBase> c; // Handles cleanup if there's an exception thrown
             if ( s->avail ) {
-                DBClientBase* c = s->avail;
+                c.reset( s->avail );
                 s->avail = 0;
-                try {
-                    shardConnectionPool.onHandedOut( c );
-                }
-                catch ( std::exception& ) {
-                    delete c;
-                    throw;
-                }
-                return c;
+                shardConnectionPool.onHandedOut( c.get() ); // May throw an exception
+            } else {
+                s->created++;
+                c.reset( shardConnectionPool.get( addr ) );
             }
-
-            s->created++;
-            return shardConnectionPool.get( addr );
+            if ( !noauth ) {
+                c->setAuthenticationTable( ClientBasic::getCurrent()->getAuthenticationInfo()->
+                                           getAuthTable() );
+            }
+            return c.release();
         }
 
         void done( const string& addr , DBClientBase* conn ) {
@@ -131,6 +132,7 @@ namespace mongo {
         }
 
         void release( const string& addr , DBClientBase * conn ) {
+            conn->clearAuthenticationTable();
             shardConnectionPool.release( addr , conn );
         }
 

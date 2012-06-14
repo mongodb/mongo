@@ -21,6 +21,7 @@
 #include "rs.h"
 #include "connections.h"
 #include "../client.h"
+#include "mongo/db/security.h"
 
 namespace mongo {
 
@@ -130,7 +131,12 @@ namespace mongo {
                 BSONObj result;
 
                 try {
-                    if (!conn.runCommand("admin", cmd, result, 0)) {
+                    if (!conn.runCommand(
+                            "admin",
+                            cmd,
+                            result,
+                            0,
+                            &AuthenticationTable::getInternalSecurityAuthenticationTable())) {
                         log() << "stepping down " << primary->fullName()
                               << " failed: " << result << endl;
                     }

@@ -286,6 +286,7 @@ namespace mongo {
                 kill();
             else
             */
+            _conn->clearAuthenticationTable();
             pool.release(_host, _conn);
             _conn = 0;
         }

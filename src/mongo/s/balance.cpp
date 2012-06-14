@@ -121,7 +121,7 @@ namespace mongo {
 
         for ( vector<Shard>::iterator i=all.begin(); i!=all.end(); ++i ) {
             Shard s = *i;
-            BSONObj f = s.runCommand( "admin" , "features" );
+            BSONObj f = s.runCommand( "admin" , "features" , true );
             if ( f["oidMachine"].isNumber() ) {
                 int x = f["oidMachine"].numberInt();
                 if ( oids.count(x) == 0 ) {
@@ -129,8 +129,8 @@ namespace mongo {
                 }
                 else {
                     log() << "error: 2 machines have " << x << " as oid machine piece " << s.toString() << " and " << oids[x].toString() << endl;
-                    s.runCommand( "admin" , BSON( "features" << 1 << "oidReset" << 1 ) );
-                    oids[x].runCommand( "admin" , BSON( "features" << 1 << "oidReset" << 1 ) );
+                    s.runCommand( "admin" , BSON( "features" << 1 << "oidReset" << 1 ) , true );
+                    oids[x].runCommand( "admin" , BSON( "features" << 1 << "oidReset" << 1 ) , true );
                     return false;
                 }
             }
@@ -301,7 +301,7 @@ namespace mongo {
         while ( ! inShutdown() ) {
 
             try {
-                
+
                 scoped_ptr<ScopedDbConnection> connPtr(
                         ScopedDbConnection::getInternalScopedDbConnection( config.toString() ) );
                 ScopedDbConnection& conn = *connPtr;

@@ -51,8 +51,14 @@ namespace mongo {
 
         BSONObj toBSON() const;
 
+        BSONObj copyCommandObjAddingAuth( const BSONObj& cmdObj ) const;
+
+        static const AuthenticationTable& getInternalSecurityAuthenticationTable();
+        // Only used once at startup to setup the authentication table.
+        static AuthenticationTable& getMutableInternalSecurityAuthenticationTable();
     private:
         typedef map<std::string,Auth> DBAuthMap;
         DBAuthMap _dbs; // dbname -> auth
     };
+
 }

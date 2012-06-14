@@ -87,7 +87,10 @@ namespace mongo {
          * resets shards since get last error
          * @return if the command was ok or if there was an error
          */
-        bool getLastError( const BSONObj& options , BSONObjBuilder& result , bool fromWriteBackListener = false );
+        bool getLastError( const string& dbName,
+                           const BSONObj& options ,
+                           BSONObjBuilder& result ,
+                           bool fromWriteBackListener = false );
 
         /** @return if its ok to auto split from this client */
         bool autoSplitOk() const { return _autoSplitOk; }

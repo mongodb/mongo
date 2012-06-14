@@ -18,8 +18,19 @@
 
 #include "mongo/client/authentication_table.h"
 #include "mongo/util/map_util.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+
+    AuthenticationTable internalSecurityAuthenticationTable;
+
+    const AuthenticationTable& AuthenticationTable::getInternalSecurityAuthenticationTable() {
+        return internalSecurityAuthenticationTable;
+    }
+
+    AuthenticationTable& AuthenticationTable::getMutableInternalSecurityAuthenticationTable() {
+        return internalSecurityAuthenticationTable;
+    }
 
     void AuthenticationTable::addAuth(const std::string& dbname , const std::string& user,
                                       const Auth::Level& level ) {
@@ -68,6 +79,21 @@ namespace mongo {
             temp.done();
         }
         return b.obj();
+    }
+
+    BSONObj AuthenticationTable::copyCommandObjAddingAuth( const BSONObj& cmdObj ) const {
+        BSONObjBuilder cmdWithAuth;
+
+        // Copy all elements of the original command object, but don't take user-provided $auth.
+        BSONObjIterator it(cmdObj);
+        while ( it.more() ) {
+            BSONElement e = it.next();
+            if ( mongoutils::str::equals( e.fieldName(), "$auth" ) ) continue;
+            cmdWithAuth.append(e);
+        }
+
+        cmdWithAuth.append( "$auth", toBSON() );
+        return cmdWithAuth.obj();
     }
 
 }

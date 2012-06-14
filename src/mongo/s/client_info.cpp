@@ -136,7 +136,8 @@ namespace mongo {
         _prev = temp;
     }
 
-    bool ClientInfo::getLastError( const BSONObj& options , BSONObjBuilder& result , bool fromWriteBackListener ) {
+    bool ClientInfo::getLastError( const string& dbName, const BSONObj& options ,
+                                   BSONObjBuilder& result , bool fromWriteBackListener ) {
         set<string> * shards = getPrev();
 
         if ( shards->size() == 0 ) {
@@ -157,7 +158,7 @@ namespace mongo {
             {
                 ShardConnection conn( theShard , "" );
                 try {
-                    ok = conn->runCommand( "admin" , options , res );
+                    ok = conn->runCommand( dbName , options , res );
                 }
                 catch( std::exception &e ) {
 
@@ -241,7 +242,7 @@ namespace mongo {
             bool ok = false;
             try {
                 conn.reset( new ShardConnection( theShard , "" ) ); // constructor can throw if shard is down
-                ok = (*conn)->runCommand( "admin" , options , res );
+                ok = (*conn)->runCommand( dbName , options , res );
                 shardRawGLE.append( theShard , res );
             }
             catch( std::exception &e ){
