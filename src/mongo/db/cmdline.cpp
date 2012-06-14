@@ -74,7 +74,7 @@ namespace mongo {
         ("logpath", po::value<string>() , "log file to send write to instead of stdout - has to be a file, not directory" )
         ("logappend" , "append to logpath instead of over-writing" )
         ("pidfilepath", po::value<string>(), "full path to pidfile (if not set, no pidfile is created)")
-        ("keyFile", po::value<string>(), "private key for cluster authentication (only for replica sets)")
+        ("keyFile", po::value<string>(), "private key for cluster authentication")
 #ifndef _WIN32
         ("nounixsocket", "disable listening on unix sockets")
         ("unixSocketPrefix", po::value<string>(), "alternative directory for UNIX domain sockets (defaults to /tmp)")
