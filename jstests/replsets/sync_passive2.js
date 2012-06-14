@@ -171,21 +171,4 @@ assert.soon(function() {
     return checkSyncingFrom(nodes[3], replTest.host+":"+replTest.ports[2])
 });
 
-print("sync primary on stepdown");
-result = replTest.nodes[0].getDB("admin").runCommand({replSetSyncFrom: replTest.host+":"+replTest.ports[3]});
-printjson(result)
-assert.eq(result.ok, 1);
-
-try {
-    replTest.nodes[0].getDB("admin").runCommand({replSetStepDown:60});
-}
-catch (e) {
-    print(e);
-}
-
-// hammer this, because it's probably not going to stick to it for long
-assert.soon(function() {
-    return checkSyncingFrom(nodes[0], replTest.host+":"+replTest.ports[3])
-}, "stepdown", 30000, 0);
-
 replTest.stopSet();
