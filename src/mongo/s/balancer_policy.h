@@ -29,10 +29,10 @@ namespace mongo {
         const BSONObj max;
         
         ChunkInfo( const BSONObj& a_min, const BSONObj& a_max ) 
-            : min( a_min ), max( a_max ){}
+            : min( a_min.getOwned() ), max( a_max.getOwned() ){}
         
         ChunkInfo( const BSONObj& chunk ) 
-            : min( chunk["min"].Obj() ), max( chunk["max"].Obj() ) {
+            : min( chunk["min"].Obj().getOwned() ), max( chunk["max"].Obj().getOwned() ) {
         }
         
         string toString() const;
