@@ -24,10 +24,19 @@
 
 namespace mongo {
 
+    DistributionStatus::DistributionStatus( const ShardInfoMap& shardInfo,
+                                            const ShardToChunksMap& shardToChunksMap )
+        : _shardInfo( shardInfo ), _shardChunks( shardToChunksMap ) {
+    }
+        
+
+
     MigrateInfo* BalancerPolicy::balance( const string& ns,
-                                                          const ShardInfoMap& shardToLimitsMap,
-                                                          const ShardToChunksMap& shardToChunksMap,
-                                                          int balancedLastTime ) {
+                                          const DistributionStatus& distribution, 
+                                          int balancedLastTime ) {
+        
+        const ShardInfoMap& shardToLimitsMap = distribution.shardInfo();
+        const ShardToChunksMap& shardToChunksMap = distribution.shardChunks();
 
         pair<string,unsigned> min("",numeric_limits<unsigned>::max());
         pair<string,unsigned> max("",0);

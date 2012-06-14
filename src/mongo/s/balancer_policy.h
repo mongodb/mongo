@@ -85,6 +85,21 @@ namespace mongo {
     typedef map< string,ShardInfo > ShardInfoMap;
     typedef map< string,vector<BSONObj> > ShardToChunksMap;
 
+    class DistributionStatus {
+    public:
+        DistributionStatus( const ShardInfoMap& shardInfo,
+                            const ShardToChunksMap& shardToChunksMap );
+
+
+        const ShardInfoMap& shardInfo() const { return _shardInfo; }
+        const ShardToChunksMap& shardChunks() const { return _shardChunks; }
+
+        
+    private:
+        const ShardInfoMap& _shardInfo;
+        const ShardToChunksMap& _shardChunks;
+    };
+
     class BalancerPolicy {
     public:
 
@@ -100,9 +115,8 @@ namespace mongo {
          * @returns NULL or MigrateInfo of the best move to make towards balacing the collection.
          */
         static MigrateInfo* balance( const string& ns, 
-                                   const ShardInfoMap& shardInfo,
-                                   const ShardToChunksMap& shardToChunksMap, 
-                                   int balancedLastTime );
+                                     const DistributionStatus& distribution,
+                                     int balancedLastTime );
 
         // below exposed for testing purposes only -- treat it as private --
 
