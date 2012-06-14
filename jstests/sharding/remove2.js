@@ -174,5 +174,19 @@ assert.eq( 300, coll.find().itcount() );
 conn.getDB('test2').foo.insert({a:1});
 assert.eq( 1, conn.getDB('test2').foo.find().itcount() );
 
+// Can't shut down with rst2 in the set or ShardingTest will fail trying to cleanup on shutdown.
+// Have to take out rst2 and put rst1 back into the set so that it can clean up.
+jsTestLog( "Putting ShardingTest back to state it expects" );
+printjson( st.admin.runCommand({movePrimary : 'test2', to : rst0.name}) );
+removeShard( st, rst2 );
+rst2.stopSet();
+
+rst1.startSet();
+rst1.initiate();
+rst1.awaitReplication();
+
+assert.eq( originalSeed, seedString(rst1), "Set didn't come back up with the same hosts as before" );
+addShard( st, rst1 );
+
 jsTestLog( "finishing!" )
 st.stop()
