@@ -76,6 +76,7 @@ namespace mongo {
         bool wantMore() const { return _wantMore; }
         int getOptions() const { return _options; }
         bool hasOption( int x ) const { return ( x & _options ) != 0; }
+        bool hasReadPref() const { return _hasReadPref; }
         
         bool isExplain() const { return _explain; }
         bool isSnapshot() const { return _snapshot; }
@@ -151,6 +152,8 @@ namespace mongo {
             }
 
             _filter = _filter.getOwned();
+
+            _hasReadPref = q.hasField("$readPreference");
         }
         
         void _reset() {
@@ -232,6 +235,7 @@ namespace mongo {
         bool _snapshot;
         bool _returnKey;
         bool _showDiskLoc;
+        bool _hasReadPref;
         BSONObj _min;
         BSONObj _max;
         BSONObj _hint;

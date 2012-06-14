@@ -346,9 +346,15 @@ ReplSetTest.awaitRSClientHosts = function( conn, host, hostOk, rs ) {
                 // Check that *all* host properties are set correctly
                 var propOk = true
                 for( var prop in hostOk ){
-                    if( clientHost[prop] != hostOk[prop] ){ 
-                        propOk = false
-                        break
+                    if ( isObject( hostOk[prop] )) {
+                        if ( !friendlyEqual( hostOk[prop], clientHost[prop] )){
+                            propOk = false;
+                            break;
+                        }
+                    }
+                    else if ( clientHost[prop] != hostOk[prop] ){
+                        propOk = false;
+                        break;
                     }
                 }
                 

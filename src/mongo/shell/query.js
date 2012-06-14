@@ -238,6 +238,26 @@ DBQuery.prototype.showDiskLoc = function() {
     return this._addSpecial( "$showDiskLoc" , true);
 }
 
+/**
+ * Sets the read preference for this cursor.
+ * 
+ * @param mode {string} read prefrence mode to use.
+ * @param tagSet {Array.<Object>} optional. The list of tags to use, order matters.
+ * 
+ * @return this cursor
+ */
+DBQuery.prototype.readPref = function( mode, tagSet ) {
+    var readPrefObj = {
+        mode: mode
+    };
+
+    if ( tagSet ){
+        readPrefObj.tags = tagSet;
+    }
+
+    return this._addSpecial( "$readPreference", readPrefObj );
+};
+
 DBQuery.prototype.forEach = function( func ){
     while ( this.hasNext() )
         func( this.next() );

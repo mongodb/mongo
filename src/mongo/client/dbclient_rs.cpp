@@ -32,6 +32,132 @@
 #include "mongo/util/timer.h"
 
 namespace mongo {
+    /**
+     * Selects the right node given the nodes to pick from and the preference.
+     * This method does strict tag matching, and will not implicitly fallback
+     * to matching anything.
+     *
+     * @param nodes the nodes to select from
+     * @param readPreferenceTag the tags to use for choosing the right node
+     * @param secOnly never select a primary if true
+     * @param localThresholdMillis the exclusive upper bound of ping time to be
+     *     considered as a local node. Local nodes are favored over non-local
+     *     nodes if multiple nodes matches the other criteria.
+     * @param nextNodeIndex the index of the next node to begin from checking.
+     *     Can advance to a different index (mainly used for doing round-robin).
+     *
+     * @return the host object of the node selected. If none of the nodes are
+     *     eligible, returns an empty host.
+     */
+    HostAndPort _selectNode(const vector<ReplicaSetMonitor::Node>& nodes,
+                            const BSONObj& readPreferenceTag,
+                            bool secOnly,
+                            int localThresholdMillis,
+                            const HostAndPort& lastHost) {
+        HostAndPort fallbackNode;
+
+        // Implicit: start from index 0 if lastHost doesn't exist anymore
+        size_t nextNodeIndex = 0;
+
+        if (!lastHost.empty()) {
+            for (size_t x = 0; x < nodes.size(); x++) {
+                if (lastHost == nodes[x].addr) {
+                    nextNodeIndex = x;
+                    break;
+                }
+            }
+        }
+
+        for (size_t itNode = 0; itNode < nodes.size(); ++itNode) {
+            nextNodeIndex = (nextNodeIndex + 1) % nodes.size();
+            const ReplicaSetMonitor::Node& node = nodes[nextNodeIndex];
+
+            if (!node.ok) {
+                log(2) << "dbclient_rs not selecting " << node << ", not currently ok" << endl;
+                continue;
+            }
+
+            if (secOnly && !node.okForSecondaryQueries()) {
+                continue;
+            }
+
+            if (node.matchesTag(readPreferenceTag)) {
+                // found an ok candidate; may not be local.
+                fallbackNode = node.addr;
+
+                if (node.isLocalSecondary(localThresholdMillis)) {
+                    // found a local node.  return early.
+                    log(2) << "dbclient_rs getSlave found local secondary for queries: "
+                           << nextNodeIndex << ", ping time: " << node.pingTimeMillis << endl;
+                    return fallbackNode;
+                }
+            }
+        }
+
+        return fallbackNode;
+    }
+
+    /**
+     * Extracts the read preference settings from the query document.
+     *
+     * @param query the raw query document
+     * @param pref an out parameter and will contain the read preference mode extracted
+     *      from the query object.
+     *
+     * @return the tag set list. If the tags field was not present, it will contain one
+     *      empty tag document {} which matches any tag. Caller owns the TagSet object
+     *      and is responsible for deletion.
+     *
+     * @throws AssertionException if the read preference object is malformed
+     */
+    TagSet* _extractReadPref(const BSONObj& query, ReadPreference* pref) {
+        if (!query.hasField("$readPreference")) {
+            *pref = mongo::ReadPreference_SecondaryPreferred;
+        }
+        else {
+            uassert(16381, "$readPreference should be an object",
+                    query["$readPreference"].isABSONObj());
+            const BSONObj& prefDoc = query["$readPreference"].Obj();
+
+            uassert(16382, "mode not specified for read preference", prefDoc.hasField("mode"));
+
+            const string mode = prefDoc["mode"].String();
+
+            if (mode == "primary") {
+                *pref = mongo::ReadPreference_PrimaryOnly;
+            }
+            else if (mode == "primaryPreferred") {
+                *pref = mongo::ReadPreference_PrimaryPreferred;
+            }
+            else if (mode == "secondary") {
+                *pref = mongo::ReadPreference_SecondaryOnly;
+            }
+            else if (mode == "secondaryPreferred") {
+                *pref = mongo::ReadPreference_SecondaryPreferred;
+            }
+            else if (mode == "nearest") {
+                *pref = mongo::ReadPreference_Nearest;
+            }
+            else {
+                uasserted(16383, str::stream() << "Unknown read preference mode: " << mode);
+            }
+
+            if (prefDoc.hasField("tags")) {
+                uassert(16384, "Cannot specify tags for primary only read preference",
+                        *pref != mongo::ReadPreference_PrimaryOnly);
+
+                const BSONElement& tagsElem = prefDoc["tags"];
+                uassert(16385, "tags for read preference should be an array",
+                        tagsElem.type() == mongo::Array);
+
+                return new TagSet(BSONArray(tagsElem.Obj()));
+            }
+        }
+
+        BSONArrayBuilder arrayBuilder;
+        arrayBuilder.append(BSONObj());
+        return new TagSet(arrayBuilder.arr());
+    }
 
     // --------------------------------
     // ----- ReplicaSetMonitor ---------
@@ -319,8 +445,7 @@ namespace mongo {
                 if ( _nodes[i].okForSecondaryQueries() )
                     return prev;
 
-                wasMaster = _nodes[i].ok && ! _nodes[i].secondary;
-
+                wasMaster = _nodes[i].ok && !_nodes[i].secondary;
                 break;
             }
         }
@@ -762,6 +887,10 @@ namespace mongo {
             scoped_lock lk( _lock );
             _master = -1;
 
+            for (vector<Node>::iterator iter = _nodes.begin(); iter < _nodes.end(); ++iter) {
+                iter->ismaster = false;
+            }
+
             if (checkAllSecondaries) {
                 for ( unsigned i = 0; i < _nodes.size(); i++ ) {
                     if ( _nodes[i].ok ) {
@@ -820,23 +949,35 @@ namespace mongo {
         return -1;
     }
 
-    void ReplicaSetMonitor::appendInfo( BSONObjBuilder& b ) const {
-        scoped_lock lk( _lock );
-        BSONArrayBuilder hosts( b.subarrayStart( "hosts" ) );
-        for ( unsigned i=0; i<_nodes.size(); i++ ) {
-            hosts.append( BSON( "addr" << _nodes[i].addr <<
-                                // "lastIsMaster" << _nodes[i].lastIsMaster << // this is a potential race, so only used when debugging
-                                "ok" << _nodes[i].ok <<
-                                "ismaster" << _nodes[i].ismaster <<
-                                "hidden" << _nodes[i].hidden <<
-                                "secondary" << _nodes[i].secondary <<
-                                "pingTimeMillis" << _nodes[i].pingTimeMillis  ) );
-            
+    void ReplicaSetMonitor::appendInfo(BSONObjBuilder& bsonObjBuilder) const {
+        scoped_lock lk(_lock);
+        BSONArrayBuilder hosts(bsonObjBuilder.subarrayStart("hosts"));
+        for (unsigned i = 0; i < _nodes.size(); i++) {
+            const Node& node = _nodes[i];
+
+            /* Note: cannot use toBSON helper method due to backwards compatibility.
+             * In particular, toBSON method uses "isMaster" while this method
+             * uses "ismaster"
+             */
+            BSONObjBuilder builder;
+            builder.append("addr", node.addr.toString());
+            builder.append("ok", node.ok);
+            builder.append("ismaster", node.ismaster);
+            builder.append("hidden", node.hidden);
+            builder.append("secondary", node.secondary);
+            builder.append("pingTimeMillis", node.pingTimeMillis);
+
+            const BSONElement& tagElem = node.lastIsMaster["tags"];
+            if (tagElem.ok() && tagElem.isABSONObj()) {
+                builder.append("tags", tagElem.Obj());
+            }
+
+            hosts.append(builder.obj());
         }
         hosts.done();
-        
-        b.append( "master" , _master );
-        b.append( "nextSlave" , _nextSlave );
+
+        bsonObjBuilder.append("master", _master);
+        bsonObjBuilder.append("nextSlave", _nextSlave);
     }
     
     bool ReplicaSetMonitor::_checkConnMatch_inlock( DBClientConnection* conn,
@@ -846,87 +987,116 @@ namespace mongo {
             conn->getServerAddress() == _nodes[nodeOffset].conn->getServerAddress() );
     }
 
-    HostAndPort ReplicaSetMonitor::selectNode( const vector<Node>& nodes,
-            const BSONObj& readPreferenceTag,
-            bool secOnly,
-            int localThresholdMillis,
-            int& nextNodeIndex /* in/out */ ) {
+    HostAndPort ReplicaSetMonitor::selectAndCheckNode(ReadPreference preference,
+                                                      TagSet* tags,
+                                                      const HostAndPort& lastHost) {
 
-        HostAndPort fallbackNode;
+        HostAndPort candidate;
+        bool tryRefreshing = false;
 
-        for ( size_t itNode = 0; itNode < nodes.size(); ++itNode ) {
-            nextNodeIndex = ( nextNodeIndex + 1 ) % nodes.size();
-            const Node& node = nodes[nextNodeIndex];
-
-            if ( !node.ok ){
-                log(2) << "dbclient_rs not selecting " << node
-                       << ", not currently ok" << endl;
-                continue;
-            }
-
-            if ( secOnly && !node.okForSecondaryQueries() ) {
-                continue;
-            }
-
-            if ( node.matchesTag( readPreferenceTag )) {
-                // found an ok candidate; may not be local.
-                fallbackNode = node.addr;
-
-                if ( node.isLocalSecondary( localThresholdMillis )){
-                    // found a local node.  return early.
-                    log(2) << "dbclient_rs getSlave found local secondary for queries: "
-                            << nextNodeIndex << ", ping time: "
-                            << node.pingTimeMillis << endl;
-                    return fallbackNode;
-                }
-            }
+        {
+            scoped_lock lk(_lock);
+            candidate = ReplicaSetMonitor::selectNode(_nodes, preference, tags,
+                    _localThresholdMillis, lastHost, &tryRefreshing);
         }
 
-        return fallbackNode;
+        if (tryRefreshing) {
+            // mimic checkMaster behavior, which refreshes the local view of the replica set
+            // and try to find a good primary again.
+            _check(false);
+
+            scoped_lock lk(_lock);
+            uassert(16386, str::stream() << "Cannot contact primary of set " << _name,
+                    _master >= 0);
+
+            return ReplicaSetMonitor::selectNode(_nodes, preference, tags, _localThresholdMillis,
+                    lastHost, &tryRefreshing);
+        }
+
+        return candidate;
     }
 
-    HostAndPort ReplicaSetMonitor::selectNode( const std::vector<Node>& nodes,
-            ReadPreference readPreference,
-            const BSONObj& readPreferenceTag,
-            int localThresholdMillis,
-            int primaryNodeIndex,
-            int& nextNodeIndex /* in/out */ ) {
-
-        switch ( readPreference ) {
+    // static
+    HostAndPort ReplicaSetMonitor::selectNode(const std::vector<Node>& nodes,
+                                              ReadPreference preference,
+                                              TagSet* tags,
+                                              int localThresholdMillis,
+                                              const HostAndPort& lastHost,
+                                              bool* tryRefreshing) {
+        switch (preference) {
         case ReadPreference_PrimaryOnly:
-            return checkPrimary( nodes, primaryNodeIndex );
+            for (vector<Node>::const_iterator iter = nodes.begin(); iter != nodes.end(); ++iter) {
+                if (iter->ismaster && iter->ok) {
+                    return iter->addr;
+                }
+            }
+
+            *tryRefreshing = true;
+            return HostAndPort();
 
         case ReadPreference_PrimaryPreferred:
         {
-            HostAndPort candidatePri = checkPrimary( nodes, primaryNodeIndex );
+            HostAndPort candidatePri = selectNode(nodes, ReadPreference_PrimaryOnly, tags,
+                    localThresholdMillis, lastHost, tryRefreshing);
 
-            if ( !candidatePri.empty() ){
+            if (!candidatePri.empty()) {
                 return candidatePri;
             }
 
-            return selectNode( nodes, readPreferenceTag, true, localThresholdMillis,
-                    nextNodeIndex );
+            return selectNode(nodes, ReadPreference_SecondaryOnly, tags, localThresholdMillis,
+                    lastHost, tryRefreshing);
         }
 
         case ReadPreference_SecondaryOnly:
-            return selectNode( nodes, readPreferenceTag, true, localThresholdMillis,
-                    nextNodeIndex );
+        {
+            HostAndPort candidate;
+
+            while (!tags->isExhausted()) {
+                candidate = _selectNode(nodes, tags->getCurrentTag(), true, localThresholdMillis,
+                        lastHost);
+
+                if (candidate.empty()) {
+                    tags->next();
+                }
+                else {
+                    return candidate;
+                }
+            }
+
+            return candidate;
+        }
 
         case ReadPreference_SecondaryPreferred:
         {
-            HostAndPort candidateSec = selectNode( nodes, readPreferenceTag, true,
-                    localThresholdMillis, nextNodeIndex );
+            HostAndPort candidateSec = selectNode(nodes, ReadPreference_SecondaryOnly, tags,
+                    localThresholdMillis, lastHost, tryRefreshing);
 
-            if ( !candidateSec.empty() ){
+            if (!candidateSec.empty()) {
                 return candidateSec;
             }
 
-            return checkPrimary( nodes, primaryNodeIndex );
+            return selectNode(nodes, ReadPreference_PrimaryOnly, tags, localThresholdMillis,
+                    lastHost, tryRefreshing);
         }
 
         case ReadPreference_Nearest:
-            return selectNode( nodes, readPreferenceTag, false, localThresholdMillis,
-                    nextNodeIndex );
+        {
+            HostAndPort candidate;
+
+            while (!tags->isExhausted()) {
+                candidate = _selectNode(nodes, tags->getCurrentTag(), false, localThresholdMillis,
+                        lastHost);
+
+                if (candidate.empty()) {
+                    tags->next();
+                }
+                else {
+                    return candidate;
+                }
+            }
+
+            return candidate;
+        }
 
         default:
             uassert( 16337, "Unknown read preference", false );
@@ -936,39 +1106,77 @@ namespace mongo {
         return HostAndPort();
     }
 
-    HostAndPort ReplicaSetMonitor::checkPrimary(
-            const vector<Node>& nodes,
-            int primaryNodeIndex ){
-
-        if ( primaryNodeIndex >= 0 && nodes[primaryNodeIndex].ok ){
-            return nodes[primaryNodeIndex].addr;
+    bool ReplicaSetMonitor::isHostCompatible(const HostAndPort& host,
+                                             ReadPreference readPreference,
+                                             const TagSet* tagSet) const {
+        scoped_lock lk(_lock);
+        for (vector<Node>::const_iterator iter = _nodes.begin(); iter != _nodes.end(); ++iter) {
+            if (iter->addr == host) {
+                return iter->isCompatible(readPreference, tagSet);
+            }
         }
 
-        return HostAndPort();
+        // host is not part of the set anymore!
+        return false;
     }
 
-    bool ReplicaSetMonitor::Node::matchesTag( const BSONObj& tag ) const {
-        if ( tag.isEmpty() ){
-           return true;
+    bool ReplicaSetMonitor::Node::matchesTag(const BSONObj& tag) const {
+        if (tag.isEmpty()) {
+            return true;
         }
 
         const BSONElement& myTagElem = lastIsMaster["tags"];
-        if( !myTagElem.isABSONObj() ){
+        if (!myTagElem.isABSONObj()) {
             return false;
         }
 
         const BSONObj& myTagObj = myTagElem.Obj();
-        for( BSONObjIterator iter( tag ); iter.more(); ) {
-            const BSONElement& tagCriteria( iter.next() );
+        for (BSONObjIterator iter(tag); iter.more();) {
+            const BSONElement& tagCriteria(iter.next());
             const char* field = tagCriteria.fieldName();
 
-            if ( !myTagObj.hasField( field ) ||
-                    !tagCriteria.valuesEqual( myTagObj[field] )) {
+            if (!myTagObj.hasField(field) ||
+                    !tagCriteria.valuesEqual(myTagObj[field])) {
                 return false;
             }
         }
 
         return true;
+    }
+
+    bool ReplicaSetMonitor::Node::isCompatible(ReadPreference readPreference,
+                                               const TagSet* tags) const {
+        if (!ok) {
+            return false;
+        }
+
+        if (readPreference == ReadPreference_SecondaryOnly &&
+                !okForSecondaryQueries()) {
+            return false;
+        }
+
+        if ((readPreference == ReadPreference_PrimaryOnly ||
+                readPreference == ReadPreference_PrimaryPreferred) &&
+                secondary) {
+            return false;
+        }
+
+        scoped_ptr<BSONObjIterator> bsonIter(tags->getIterator());
+        if (!bsonIter->more()) {
+            // Empty tag set
+            return true;
+        }
+
+        while (bsonIter->more()) {
+            const BSONElement& nextTag = bsonIter->next();
+            uassert(16358, "Tags should be a BSON object", nextTag.isABSONObj());
+
+            if (matchesTag(nextTag.Obj())) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     BSONObj ReplicaSetMonitor::Node::toBSON() const {
@@ -997,6 +1205,8 @@ namespace mongo {
     // --------------------------------
     // ----- DBClientReplicaSet ---------
     // --------------------------------
+
+    const size_t DBClientReplicaSet::MAX_RETRY = 3;
 
     DBClientReplicaSet::DBClientReplicaSet( const string& name , const vector<HostAndPort>& servers, double so_timeout )
         : _setName( name ), _so_timeout( so_timeout ) {
@@ -1047,27 +1257,22 @@ namespace mongo {
         return _master.get();
     }
 
-    DBClientConnection * DBClientReplicaSet::checkSlave() {
-        ReplicaSetMonitorPtr monitor = _getMonitor();
-        HostAndPort h = monitor->getSlave( _slaveHost );
-
-        if ( h == _slaveHost && _slave ) {
-            if ( ! _slave->isFailed() )
-                // TODO: SERVER-5082, slave auth credentials may have changed
-                return _slave.get();
-            monitor->notifySlaveFailure( _slaveHost );
-            _slaveHost = monitor->getSlave();
-        } 
-        else {
-            _slaveHost = h;
+    bool DBClientReplicaSet::checkLastHost(ReadPreference preference, const TagSet* tags) {
+        if (_lastSlaveOkHost.empty()) {
+            return false;
         }
 
-        _slave.reset( new DBClientConnection( true , this , _so_timeout ) );
-        _slave->connect( _slaveHost );
-        _auth( _slave.get() );
-        return _slave.get();
-    }
+        ReplicaSetMonitorPtr monitor = _getMonitor();
 
+        if (_lastSlaveOkConn && _lastSlaveOkConn->isFailed()) {
+            monitor->notifySlaveFailure(_lastSlaveOkHost);
+            _lastSlaveOkHost = HostAndPort();
+            _lastSlaveOkConn.reset();
+            return false;
+        }
+
+        return _lastSlaveOkConn && monitor->isHostCompatible(_lastSlaveOkHost, preference, tags);
+    }
 
     void DBClientReplicaSet::_auth( DBClientConnection * conn ) {
         for ( list<AuthInfo>::iterator i=_auths.begin(); i!=_auths.end(); ++i ) {
@@ -1084,7 +1289,15 @@ namespace mongo {
     }
 
     DBClientConnection& DBClientReplicaSet::slaveConn() {
-        return *checkSlave();
+        BSONArray emptyArray;
+        TagSet tags( emptyArray );
+        DBClientConnection* conn = selectNodeUsingTags( ReadPreference_SecondaryPreferred,
+                &tags );
+
+        uassert( 16369, str::stream() << "No good nodes available for set: "
+                 << _getMonitor()->getName(), conn != NULL );
+
+        return *conn;
     }
 
     bool DBClientReplicaSet::connect() {
@@ -1133,39 +1346,73 @@ namespace mongo {
         return checkMaster()->update( ns, query, obj, flags );
     }
 
-    auto_ptr<DBClientCursor> DBClientReplicaSet::query(const string &ns, Query query, int nToReturn, int nToSkip,
-            const BSONObj *fieldsToReturn, int queryOptions, int batchSize) {
+    auto_ptr<DBClientCursor> DBClientReplicaSet::query(const string &ns,
+                                                       Query query,
+                                                       int nToReturn,
+                                                       int nToSkip,
+                                                       const BSONObj *fieldsToReturn,
+                                                       int queryOptions,
+                                                       int batchSize) {
+        if ((queryOptions & QueryOption_SlaveOk) ||
+                query.obj.hasField("$readPreference")) {
+            ReadPreference pref;
+            scoped_ptr<TagSet> tags(_extractReadPref(query.obj, &pref));
 
-        if ( queryOptions & QueryOption_SlaveOk ) {
-            // we're ok sending to a slave
-            // we'll try 2 slaves before just using master
-            // checkSlave will try a different slave automatically after a failure
-            for ( int i=0; i<3; i++ ) {
-                try {
-                    return checkSlaveQueryResult( checkSlave()->query(ns,query,nToReturn,nToSkip,fieldsToReturn,queryOptions,batchSize) );
+            for (size_t retry = 0; retry < MAX_RETRY; retry++) {
+                DBClientConnection* conn = selectNodeUsingTags(pref, tags.get());
+
+                if (conn == NULL) {
+                    break;
                 }
-                catch ( DBException &e ) {
-                    LOG(1) << "can't query replica set slave " << i << " : " << _slaveHost << causedBy( e ) << endl;
+
+                try {
+                    auto_ptr<DBClientCursor> cursor = conn->query(ns, query,
+                            nToReturn, nToSkip, fieldsToReturn, queryOptions,
+                            batchSize);
+
+                    return checkSlaveQueryResult(cursor);
+                }
+                catch (const DBException &dbExcep) {
+                    LOG(1) << "can't query replica set slave " << _lastSlaveOkHost
+                           << ": " << causedBy(dbExcep) << endl;
                 }
             }
+
+            uasserted(16370, str::stream() << "Failed to do query, no good nodes in "
+                        << _getMonitor()->getName());
         }
 
-        return checkMaster()->query(ns,query,nToReturn,nToSkip,fieldsToReturn,queryOptions,batchSize);
+        return checkMaster()->query(ns, query, nToReturn, nToSkip, fieldsToReturn,
+                queryOptions, batchSize);
     }
 
-    BSONObj DBClientReplicaSet::findOne(const string &ns, const Query& query, const BSONObj *fieldsToReturn, int queryOptions) {
-        if ( queryOptions & QueryOption_SlaveOk ) {
-            // we're ok sending to a slave
-            // we'll try 2 slaves before just using master
-            // checkSlave will try a different slave automatically after a failure
-            for ( int i=0; i<3; i++ ) {
-                try {
-                    return checkSlave()->findOne(ns,query,fieldsToReturn,queryOptions);
+    BSONObj DBClientReplicaSet::findOne(const string &ns,
+                                        const Query& query,
+                                        const BSONObj *fieldsToReturn,
+                                        int queryOptions) {
+        if ((queryOptions & QueryOption_SlaveOk) ||
+                query.obj.hasField("$readPreference")) {
+            ReadPreference pref;
+            scoped_ptr<TagSet> tags(_extractReadPref(query.obj, &pref));
+
+            for (size_t retry = 0; retry < MAX_RETRY; retry++) {
+                DBClientConnection* conn = selectNodeUsingTags(pref, tags.get());
+
+                if (conn == NULL) {
+                    break;
                 }
-                catch ( DBException &e ) {
-                	LOG(1) << "can't findone replica set slave " << i << " : " << _slaveHost << causedBy( e ) << endl;
+
+                try {
+                    return conn->findOne(ns,query,fieldsToReturn,queryOptions);
+                }
+                catch (const DBException &dbExcep) {
+                    LOG(1) << "can't findone replica set slave " << _lastSlaveOkHost
+                           << ": " << causedBy(dbExcep) << endl;
                 }
             }
+
+            uasserted(16379, str::stream() << "Failed to call findOne, no good nodes in "
+                        << _getMonitor()->getName());
         }
 
         return checkMaster()->findOne(ns,query,fieldsToReturn,queryOptions);
@@ -1203,63 +1450,109 @@ namespace mongo {
         BSONElement code = error["code"];
         if( code.isNumber() && code.Int() == 13436 /* not master or secondary */ ){
             isntSecondary();
-            throw DBException( str::stream() << "slave " << _slaveHost.toString() << " is no longer secondary", 14812 );
+            throw DBException( str::stream() << "slave " << _lastSlaveOkHost.toString()
+                    << " is no longer secondary", 14812 );
         }
 
         return result;
     }
 
     void DBClientReplicaSet::isntSecondary() {
-        log() << "slave no longer has secondary status: " << _slaveHost << endl;
+        log() << "slave no longer has secondary status: " << _lastSlaveOkHost << endl;
         // Failover to next slave
-        _getMonitor()->notifySlaveFailure( _slaveHost );
-        _slave.reset();
+        _getMonitor()->notifySlaveFailure( _lastSlaveOkHost );
+        _lastSlaveOkConn.reset();
     }
 
-    void DBClientReplicaSet::say( Message& toSend, bool isRetry , string * actualServer ) {
+    DBClientConnection* DBClientReplicaSet::selectNodeUsingTags(ReadPreference preference,
+                                                                TagSet* tags) {
+        if (checkLastHost(preference, tags)) {
+            // TODO: SERVER-5082, slave auth credentials may have changed
+            return _lastSlaveOkConn.get();
+        }
 
-        if( ! isRetry )
+        ReplicaSetMonitorPtr monitor = _getMonitor();
+        _lastSlaveOkHost = monitor->selectAndCheckNode(preference, tags, _lastSlaveOkHost);
+
+        if ( _lastSlaveOkHost.empty() ){
+            return NULL;
+        }
+
+        _lastSlaveOkConn.reset(new DBClientConnection(true , this , _so_timeout));
+
+        try {
+            _lastSlaveOkConn->connect(_lastSlaveOkHost);
+        }
+        catch (const ConnectException& connEx) {
+            // Note: a failed connect will also mark the connection as failed.
+            return NULL;
+        }
+
+        _auth(_lastSlaveOkConn.get());
+        return _lastSlaveOkConn.get();
+    }
+
+    void DBClientReplicaSet::say(Message& toSend, bool isRetry, string* actualServer) {
+
+        if (!isRetry)
             _lazyState = LazyState();
 
-        int lastOp = -1;
+        const int lastOp = toSend.operation();
         bool slaveOk = false;
 
-        if ( ( lastOp = toSend.operation() ) == dbQuery ) {
+        if (lastOp == dbQuery) {
             // TODO: might be possible to do this faster by changing api
-            DbMessage dm( toSend );
-            QueryMessage qm( dm );
-            if ( ( slaveOk = ( qm.queryOptions & QueryOption_SlaveOk ) ) ) {
+            DbMessage dm(toSend);
+            QueryMessage qm(dm);
+            const bool slaveOk = qm.queryOptions & QueryOption_SlaveOk;
+            if (slaveOk || qm.query.hasField("$readPreference")) {
+                ReadPreference pref;
+                scoped_ptr<TagSet> tags(_extractReadPref(qm.query, &pref));
 
-                for ( int i = _lazyState._retries; i < 3; i++ ) {
+                for (size_t retry = 0; retry < MAX_RETRY; retry++) {
+                    _lazyState._retries = retry;
+                    DBClientConnection* conn = selectNodeUsingTags(pref, tags.get());
+
+                    if (conn == NULL) {
+                        break;
+                    }
+
+                    if (actualServer != NULL) {
+                        *actualServer = conn->getServerAddress();
+                    }
+
                     try {
-                        DBClientConnection* slave = checkSlave();
-                        if ( actualServer )
-                            *actualServer = slave->getServerAddress();
-                        slave->say( toSend );
+                        conn->say(toSend);
+                    }
+                    catch (const DBException& DBExcep) {
+                        LOG(1) << "can't callLazy replica set slave " << _lastSlaveOkHost
+                                << ": " << causedBy(DBExcep) << endl;
+                        continue;
+                    }
 
-                        _lazyState._lastOp = lastOp;
-                        _lazyState._slaveOk = slaveOk;
-                        _lazyState._retries = i;
-                        _lazyState._lastClient = slave;
-                        return;
-                    }
-                    catch ( DBException &e ) {
-                       LOG(1) << "can't callLazy replica set slave " << i << " : " << _slaveHost << causedBy( e ) << endl;
-                    }
+                    _lazyState._lastOp = lastOp;
+                    _lazyState._slaveOk = slaveOk;
+                    _lazyState._lastClient = conn;
+
+                    return;
                 }
+
+                uasserted(16380, str::stream() << "Failed to call say, no good nodes in "
+                         << _getMonitor()->getName());
             }
         }
 
         DBClientConnection* master = checkMaster();
-        if ( actualServer )
+        if (actualServer)
             *actualServer = master->getServerAddress();
-
-        master->say( toSend );
 
         _lazyState._lastOp = lastOp;
         _lazyState._slaveOk = slaveOk;
-        _lazyState._retries = 3;
+        // Don't retry requests to primary since there is only one host to try
+        _lazyState._retries = MAX_RETRY;
         _lazyState._lastClient = master;
+
+        master->say(toSend);
         return;
     }
 
@@ -1306,7 +1599,7 @@ namespace mongo {
                 ( hasErrField( dataObj ) &&  ! dataObj["code"].eoo() && dataObj["code"].Int() == 13436 ) ){
 
                 bool wasMaster = false;
-                if( _lazyState._lastClient == _slave.get() ){
+                if( _lazyState._lastClient == _lastSlaveOkConn.get() ){
                     isntSecondary();
                 }
                 else if( _lazyState._lastClient == _master.get() ){
@@ -1342,29 +1635,48 @@ namespace mongo {
     }
 
 
-    bool DBClientReplicaSet::call( Message &toSend, Message &response, bool assertOk , string * actualServer ) {
+    bool DBClientReplicaSet::call(Message &toSend,
+                                  Message &response,
+                                  bool assertOk,
+                                  string * actualServer) {
         const char * ns = 0;
 
-        if ( toSend.operation() == dbQuery ) {
+        if (toSend.operation() == dbQuery) {
             // TODO: might be possible to do this faster by changing api
-            DbMessage dm( toSend );
-            QueryMessage qm( dm );
+            DbMessage dm(toSend);
+            QueryMessage qm(dm);
             ns = qm.ns;
 
-            if ( qm.queryOptions & QueryOption_SlaveOk ) {
-                for ( int i=0; i<3; i++ ) {
-                    try {
-                        DBClientConnection* s = checkSlave();
-                        if ( actualServer )
-                            *actualServer = s->getServerAddress();
-                        return s->call( toSend , response , assertOk );
+            if ((qm.queryOptions & QueryOption_SlaveOk) ||
+                    qm.query.hasField("$readPreference")) {
+                ReadPreference pref;
+                scoped_ptr<TagSet> tags(_extractReadPref(qm.query, &pref));
+
+                for (size_t retry = 0; retry < MAX_RETRY; retry++) {
+                    DBClientConnection* conn = selectNodeUsingTags(pref, tags.get());
+
+                    if (conn == NULL) {
+                        return false;
                     }
-                    catch ( DBException &e ) {
-                    	LOG(1) << "can't call replica set slave " << i << " : " << _slaveHost << causedBy( e ) << endl;
-                        if ( actualServer )
+
+                    if (actualServer != NULL) {
+                        *actualServer = conn->getServerAddress();
+                    }
+
+                    try {
+                        return conn->call(toSend, response, assertOk);
+                    }
+                    catch (const DBException& dbExcep) {
+                        LOG(1) << "can't call replica set slave " << _lastSlaveOkHost
+                               << ": " << causedBy(dbExcep) << endl;
+
+                        if (actualServer)
                             *actualServer = "";
                     }
                 }
+
+                // Was not able to successfully send after max retries
+                return false;
             }
         }
         
@@ -1393,4 +1705,37 @@ namespace mongo {
         return true;
     }
 
+    TagSet::TagSet() : _isExhausted(true), _tagIterator(_tags) {
+    }
+
+    TagSet::TagSet(const BSONArray& tags) :
+            _isExhausted(false),
+            _tags(tags.getOwned()),
+            _tagIterator(_tags) {
+        next();
+    }
+
+    void TagSet::next() {
+        if (_tagIterator.more()) {
+            const BSONElement& nextTag = _tagIterator.next();
+            uassert(16357, "Tags should be a BSON object", nextTag.isABSONObj());
+            _currentTag = nextTag.Obj();
+        }
+        else {
+            _isExhausted = true;
+        }
+    }
+
+    const BSONObj& TagSet::getCurrentTag() const {
+        verify(!_isExhausted);
+        return _currentTag;
+    }
+
+    bool TagSet::isExhausted() const {
+        return _isExhausted;
+    }
+
+    BSONObjIterator* TagSet::getIterator() const {
+        return new BSONObjIterator(_tags);
+    }
 }

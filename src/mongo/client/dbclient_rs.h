@@ -30,6 +30,7 @@
 namespace mongo {
 
     class ReplicaSetMonitor;
+    class TagSet;
     typedef shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorPtr;
     typedef pair<set<string>,set<int> > NodeDiff;
 
@@ -87,7 +88,7 @@ namespace mongo {
              * @return true if the given tag matches the this node's tag
              *     specification
              */
-            bool matchesTag( const BSONObj& tag ) const;
+            bool matchesTag(const BSONObj& tag) const;
 
             /**
              * @param  threshold  max ping time (in ms) to be considered local
@@ -96,6 +97,11 @@ namespace mongo {
             bool isLocalSecondary( const int threshold ) const {
                 return pingTimeMillis < threshold;
             }
+
+            /**
+             * @return true if this node is compatible with the read preference and tags.
+             */
+            bool isCompatible(ReadPreference readPreference, const TagSet* tag) const;
 
             BSONObj toBSON() const;
 
@@ -126,24 +132,45 @@ namespace mongo {
          * Selects the right node given the nodes to pick from and the preference.
          *
          * @param nodes the nodes to select from
-         * @param readPreference the read mode to use
-         * @param readPreferenceTag the tags used for filtering nodes
+         * @param preference the read mode to use
+         * @param tags the tags used for filtering nodes
          * @param localThresholdMillis the exclusive upper bound of ping time to be
          *     considered as a local node. Local nodes are favored over non-local
          *     nodes if multiple nodes matches the other criteria.
-         * @param primaryNodeIndex the index of the primary node
-         * @param nextNodeIndex the index of the next node to begin from checking.
-         *     Can advance to a different index (mainly used for doing round-robin).
+         * @param lastHost the host used in the last successful request. This is used for
+         *     selecting a different node as much as possible, by doing a simple round
+         *     robin, starting from the node next to this lastHost.
+         * @param tryRefreshing an out parameter for notifying the caller that it needs
+         *     to refresh the view of the nodes.
          *
          * @return the host object of the node selected. If none of the nodes are
          *     eligible, returns an empty host.
          */
-        static HostAndPort selectNode( const std::vector<Node>& nodes,
-                ReadPreference readPreference,
-                const BSONObj& readPreferenceTag,
-                int localThresholdMillis,
-                int primaryNodeIndex,
-                int& nextNodeIndex );
+        static HostAndPort selectNode(const std::vector<Node>& nodes,
+                                      ReadPreference preference,
+                                      TagSet* tags,
+                                      int localThresholdMillis,
+                                      const HostAndPort& lastHost,
+                                      bool* tryRefreshing);
+
+        /**
+         * Selects the right node given the nodes to pick from and the preference. This
+         * will also attempt to refresh the local view of the replica set configuration
+         * if the primary node needs to be returned but is not currently available (except
+         * for ReadPrefrence_Nearest).
+         *
+         * @param preference the read mode to use
+         * @param tags the tags used for filtering nodes
+         * @param lastHost the host used in the last successful request. This is used for
+         *     selecting a different node as much as possible, by doing a simple round
+         *     robin, starting from the node next to this lastHost.
+         *
+         * @return the host object of the node selected. If none of the nodes are
+         *     eligible, returns an empty host.
+         */
+        HostAndPort selectAndCheckNode(ReadPreference preference,
+                                       TagSet* tags,
+                                       const HostAndPort& lastHost);
 
         /**
          * Creates a new ReplicaSetMonitor, if it doesn't already exist.
@@ -192,7 +219,10 @@ namespace mongo {
          */
         void notifyFailure( const HostAndPort& server );
 
-        /** @return prev if its still ok, and if not returns a random slave that is ok for reads */
+        /**
+         * @deprecated use #getCandidateNode instead
+         * @return prev if its still ok, and if not returns a random slave that is ok for reads
+         */
         HostAndPort getSlave( const HostAndPort& prev );
 
         /**
@@ -225,6 +255,12 @@ namespace mongo {
          * NOTE:  This function acquires the _lock mutex.
          **/
         void setLocalThresholdMillis( const int millis );
+
+        /**
+         * @return true if the host is compatible with the given readPreference and tag set.
+         */
+        bool isHostCompatible(const HostAndPort& host, ReadPreference readPreference,
+                const TagSet* tagSet) const;
 
     private:
         /**
@@ -301,34 +337,6 @@ namespace mongo {
          * a mutex.
          */
         bool _checkConnMatch_inlock( DBClientConnection* conn, size_t nodeOffset ) const;
-
-        /**
-         * Selects the right node given the nodes to pick from and the preference.
-         *
-         * @param nodes the nodes to select from
-         * @param readPreferenceTag the tags to use for choosing the right node
-         * @param secOnly never select a primary if true
-         * @param localThresholdMillis the exclusive upper bound of ping time to be
-         *     considered as a local node. Local nodes are favored over non-local
-         *     nodes if multiple nodes matches the other criteria.
-         * @param nextNodeIndex the index of the next node to begin from checking.
-         *     Can advance to a different index (mainly used for doing round-robin).
-         *
-         * @return the host object of the node selected. If none of the nodes are
-         *     eligible, returns an empty host.
-         */
-        static HostAndPort selectNode( const std::vector<Node>& nodes,
-                const BSONObj& readPreferenceTag,
-                bool secOnly,
-                int localThresholdMillis,
-                int& nextNodeIndex );
-
-        /**
-         * @return the primary if it is ok to use, otherwise returns an empty
-         *     HostAndPort object.
-         */
-        static HostAndPort checkPrimary( const std::vector<Node>& nodes,
-                int primaryNodeIndex );
 
         // protects _localThresholdMillis, _nodes and refs to _nodes (eg. _master & _nextSlave)
         mutable mongo::mutex _lock;
@@ -459,14 +467,43 @@ namespace mongo {
         virtual void sayPiggyBack( Message &toSend ) { checkMaster()->say( toSend ); }
 
     private:
-
-        // Used to simplify slave-handling logic on errors
+        /**
+         * Used to simplify slave-handling logic on errors
+         *
+         * @return back the passed cursor
+         * @throws DBException if the directed node cannot accept the query because it
+         *     is not a master
+         */
         auto_ptr<DBClientCursor> checkSlaveQueryResult( auto_ptr<DBClientCursor> result );
 
         DBClientConnection * checkMaster();
-        DBClientConnection * checkSlave();
+
+        /**
+         * Helper method for selecting a node based on the read preference. Will advance
+         * the tag tags object if it cannot find a node that matches the current tag.
+         *
+         * @param preference the preference to use for selecting a node
+         * @param tags pointer to the list of tags.
+         *
+         * @return a pointer to the new connection object if it can find a good connection.
+         *      Otherwise it returns NULL.
+         */
+        DBClientConnection* selectNodeUsingTags(ReadPreference preference,
+                                                TagSet* tags);
+
+        /**
+         * @return true if the last host used in the last slaveOk query is still in the
+         * set and can be used for the given read preference.
+         */
+        bool checkLastHost( ReadPreference preference, const TagSet* tags );
 
         void _auth( DBClientConnection * conn );
+
+        /**
+         * Maximum number of retries to make for auto-retry logic when performing a slave ok
+         * operation.
+         */
+        static const size_t MAX_RETRY;
 
         // Throws a DBException if the monitor doesn't exist and there isn't a cached seed to use.
         ReplicaSetMonitorPtr _getMonitor() const;
@@ -476,8 +513,10 @@ namespace mongo {
         HostAndPort _masterHost;
         scoped_ptr<DBClientConnection> _master;
 
-        HostAndPort _slaveHost;
-        scoped_ptr<DBClientConnection> _slave;
+        // Last used host in a slaveOk query (can be a primary)
+        HostAndPort _lastSlaveOkHost;
+        // Last used connection in a slaveOk query (can be a primary)
+        scoped_ptr<DBClientConnection> _lastSlaveOkConn;
         
         double _so_timeout;
 
@@ -517,5 +556,59 @@ namespace mongo {
 
     };
 
+    /**
+     * A simple object for representing the list of tags. The initial state will
+     * have a valid current tag as long as the list is not empty.
+     */
+    class TagSet : public boost::noncopyable { // because of BSONArrayIteratorSorted
+    public:
+        /**
+         * Creates an empty tag list that is initially exhausted.
+         */
+        TagSet();
 
+        /**
+         * Creates a tag set object that lazily iterates over the tag list.
+         *
+         * @param tags the list of tags associated with this option. This object
+         *     will get a shared copy of the list. Therefore, it is important
+         *     for the the given tag to live longer than the created tag set.
+         */
+        explicit TagSet(const BSONArray& tags);
+
+        /**
+         * Advance to the next tag.
+         *
+         * @throws AssertionException if iterator is exhausted before this is called.
+         */
+        void next();
+
+        //
+        // Getters
+        //
+
+        /**
+         * @return the current tag. Returned tag is invalid if isExhausted is true.
+         */
+        const BSONObj& getCurrentTag() const;
+
+        /**
+         * @return true if the iterator has been exhausted.
+         */
+        bool isExhausted() const;
+
+        /**
+         * @return an unordered iterator to the tag list. The caller is responsible for
+         *     destroying the returned iterator.
+         */
+        BSONObjIterator* getIterator() const;
+
+    private:
+        BSONObj _currentTag;
+        bool _isExhausted;
+
+        // Important: do not re-order _tags & _tagIterator
+        BSONArray _tags;
+        BSONArrayIteratorSorted _tagIterator;
+    };
 }

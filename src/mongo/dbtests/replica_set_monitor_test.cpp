@@ -15,8 +15,8 @@
  */
 
 /**
- * This file contains test for ReplicaSetMonitor::Node and
- * ReplicaSetMonitor::NodeSelector
+ * This file contains test for ReplicaSetMonitor::Node,
+ * ReplicaSetMonitor::selectNode and TagSet
  */
 
 #include <vector>
@@ -26,11 +26,13 @@
 
 namespace {
     using std::vector;
+    using boost::scoped_ptr;
     
     using mongo::BSONObj;
     using mongo::ReplicaSetMonitor;
     using mongo::HostAndPort;
     using mongo::ReadPreference;
+    using mongo::TagSet;
 
     const BSONObj SampleIsMasterDoc = BSON( "tags"
                                             << BSON( "dc" << "NYC"
@@ -149,6 +151,15 @@ namespace {
         }
     };
 
+    class SameValueDiffKeyTest {
+    public:
+        void run() {
+            ReplicaSetMonitor::Node node( HostAndPort(), NULL );
+            node.lastIsMaster = SampleIsMasterDoc.copy();
+            ASSERT( !node.matchesTag( BSON( "datacenter" << "NYC" )));
+        }
+    };
+
     class SimpleToStringTest {
     public:
         void run() {
@@ -168,6 +179,194 @@ namespace {
 
             // Should not throw any exceptions
             ASSERT( !node.toString().empty() );
+        }
+    };
+
+    class PriNodeCompatibleTagTest {
+    public:
+        void run(){
+            ReplicaSetMonitor::Node node( HostAndPort( "dummy", 3 ), NULL );
+            node.lastIsMaster = SampleIsMasterDoc.copy();
+
+            node.ok = true;
+            node.ismaster = true;
+            node.secondary = false;
+
+            BSONArrayBuilder builder;
+            builder.append( BSON( "dc" << "NYC" ));
+
+            TagSet tags( BSONArray( builder.done() ));
+
+            ASSERT( node.isCompatible( ReadPreference_PrimaryOnly, &tags ));
+            ASSERT( node.isCompatible( ReadPreference_PrimaryPreferred, &tags ));
+            ASSERT( node.isCompatible( ReadPreference_SecondaryPreferred, &tags ));
+            ASSERT( !node.isCompatible( ReadPreference_SecondaryOnly, &tags ));
+            ASSERT( node.isCompatible( ReadPreference_Nearest, &tags ));
+        }
+    };
+
+    class SecNodeCompatibleTagTest {
+    public:
+        void run(){
+            ReplicaSetMonitor::Node node( HostAndPort( "dummy", 3 ), NULL );
+            node.lastIsMaster = SampleIsMasterDoc.copy();
+
+            node.ok = true;
+            node.ismaster = false;
+            node.secondary = true;
+
+            BSONArrayBuilder builder;
+            builder.append( BSON( "dc" << "NYC" ));
+
+            TagSet tags( BSONArray( builder.done() ));
+
+            ASSERT( !node.isCompatible( ReadPreference_PrimaryOnly, &tags ));
+            ASSERT( !node.isCompatible( ReadPreference_PrimaryPreferred, &tags ));
+            ASSERT( node.isCompatible( ReadPreference_SecondaryPreferred, &tags ));
+            ASSERT( node.isCompatible( ReadPreference_SecondaryOnly, &tags ));
+            ASSERT( node.isCompatible( ReadPreference_Nearest, &tags ));
+        }
+    };
+
+    class PriNodeNotCompatibleTagTest {
+    public:
+        void run(){
+            ReplicaSetMonitor::Node node( HostAndPort( "dummy", 3 ), NULL );
+            node.lastIsMaster = SampleIsMasterDoc.copy();
+
+            node.ok = true;
+            node.ismaster = true;
+            node.secondary = false;
+
+            BSONArrayBuilder builder;
+            builder.append( BSON( "dc" << "SF" ));
+
+            TagSet tags( BSONArray( builder.done() ));
+
+            ASSERT( !node.isCompatible( ReadPreference_PrimaryOnly, &tags ));
+            ASSERT( !node.isCompatible( ReadPreference_PrimaryPreferred, &tags ));
+            ASSERT( !node.isCompatible( ReadPreference_SecondaryPreferred, &tags ));
+            ASSERT( !node.isCompatible( ReadPreference_SecondaryOnly, &tags ));
+            ASSERT( !node.isCompatible( ReadPreference_Nearest, &tags ));
+        }
+    };
+
+    class SecNodeNotCompatibleTagTest {
+    public:
+        void run(){
+            ReplicaSetMonitor::Node node( HostAndPort( "dummy", 3 ), NULL );
+            node.lastIsMaster = SampleIsMasterDoc.copy();
+
+            node.ok = true;
+            node.ismaster = false;
+            node.secondary = true;
+
+            BSONArrayBuilder builder;
+            builder.append( BSON( "dc" << "SF" ));
+
+            TagSet tags( BSONArray( builder.done() ));
+
+            ASSERT( !node.isCompatible( ReadPreference_PrimaryOnly, &tags ));
+            ASSERT( !node.isCompatible( ReadPreference_PrimaryPreferred, &tags ));
+            ASSERT( !node.isCompatible( ReadPreference_SecondaryPreferred, &tags ));
+            ASSERT( !node.isCompatible( ReadPreference_SecondaryOnly, &tags ));
+            ASSERT( !node.isCompatible( ReadPreference_Nearest, &tags ));
+        }
+    };
+
+    class PriNodeCompatiblMultiTagTest {
+    public:
+        void run(){
+            ReplicaSetMonitor::Node node( HostAndPort( "dummy", 3 ), NULL );
+            node.lastIsMaster = SampleIsMasterDoc.copy();
+
+            node.ok = true;
+            node.ismaster = true;
+            node.secondary = false;
+
+            BSONArrayBuilder builder;
+            builder.append( BSON( "dc" << "RP" ));
+            builder.append( BSON( "dc" << "NYC" << "p" << "2" ));
+
+            TagSet tags( BSONArray( builder.done() ));
+
+            ASSERT( node.isCompatible( ReadPreference_PrimaryOnly, &tags ));
+            ASSERT( node.isCompatible( ReadPreference_PrimaryPreferred, &tags ));
+            ASSERT( node.isCompatible( ReadPreference_SecondaryPreferred, &tags ));
+            ASSERT( !node.isCompatible( ReadPreference_SecondaryOnly, &tags ));
+            ASSERT( node.isCompatible( ReadPreference_Nearest, &tags ));
+        }
+    };
+
+    class SecNodeCompatibleMultiTagTest {
+    public:
+        void run(){
+            ReplicaSetMonitor::Node node( HostAndPort( "dummy", 3 ), NULL );
+            node.lastIsMaster = SampleIsMasterDoc.copy();
+
+            node.ok = true;
+            node.ismaster = false;
+            node.secondary = true;
+
+            BSONArrayBuilder builder;
+            builder.append( BSON( "dc" << "RP" ));
+            builder.append( BSON( "dc" << "NYC" << "p" << "2" ));
+
+            TagSet tags( BSONArray( builder.done() ));
+
+            ASSERT( !node.isCompatible( ReadPreference_PrimaryOnly, &tags ));
+            ASSERT( !node.isCompatible( ReadPreference_PrimaryPreferred, &tags ));
+            ASSERT( node.isCompatible( ReadPreference_SecondaryPreferred, &tags ));
+            ASSERT( node.isCompatible( ReadPreference_SecondaryOnly, &tags ));
+            ASSERT( node.isCompatible( ReadPreference_Nearest, &tags ));
+        }
+    };
+
+    class PriNodeNotCompatibleMultiTagTest {
+    public:
+        void run(){
+            ReplicaSetMonitor::Node node( HostAndPort( "dummy", 3 ), NULL );
+            node.lastIsMaster = SampleIsMasterDoc.copy();
+
+            node.ok = true;
+            node.ismaster = true;
+            node.secondary = false;
+
+            BSONArrayBuilder builder;
+            builder.append( BSON( "dc" << "sf" ));
+            builder.append( BSON( "dc" << "NYC" << "P" << "4" ));
+
+            TagSet tags( BSONArray( builder.done() ));
+
+            ASSERT( !node.isCompatible( ReadPreference_PrimaryOnly, &tags ));
+            ASSERT( !node.isCompatible( ReadPreference_PrimaryPreferred, &tags ));
+            ASSERT( !node.isCompatible( ReadPreference_SecondaryPreferred, &tags ));
+            ASSERT( !node.isCompatible( ReadPreference_SecondaryOnly, &tags ));
+            ASSERT( !node.isCompatible( ReadPreference_Nearest, &tags ));
+        }
+    };
+
+    class SecNodeNotCompatibleMultiTagTest {
+    public:
+        void run(){
+            ReplicaSetMonitor::Node node( HostAndPort( "dummy", 3 ), NULL );
+            node.lastIsMaster = SampleIsMasterDoc.copy();
+
+            node.ok = true;
+            node.ismaster = false;
+            node.secondary = true;
+
+            BSONArrayBuilder builder;
+            builder.append( BSON( "dc" << "sf" ));
+            builder.append( BSON( "dc" << "NYC" << "P" << "4" ));
+
+            TagSet tags( BSONArray( builder.done() ));
+
+            ASSERT( !node.isCompatible( ReadPreference_PrimaryOnly, &tags ));
+            ASSERT( !node.isCompatible( ReadPreference_PrimaryPreferred, &tags ));
+            ASSERT( !node.isCompatible( ReadPreference_SecondaryPreferred, &tags ));
+            ASSERT( !node.isCompatible( ReadPreference_SecondaryOnly, &tags ));
+            ASSERT( !node.isCompatible( ReadPreference_Nearest, &tags ));
         }
     };
 
@@ -191,12 +390,44 @@ namespace {
         nodes[1].ismaster = true;
         nodes[2].secondary = true;
 
-        nodes[0].lastIsMaster = BSON( "tags" << BSON( "dc" << "nyc"
-                                                      << "p" << "1" ));
+        nodes[0].lastIsMaster = BSON( "tags" << BSON( "dc" << "nyc" << "p" << "1" ));
         nodes[1].lastIsMaster = BSON( "tags" << BSON( "dc" << "sf" ));
-        nodes[2].lastIsMaster = BSON( "tags" << BSON( "dc" << "nyc"
-                                                      << "p" << "2" ));
+        nodes[2].lastIsMaster = BSON( "tags" << BSON( "dc" << "nyc" << "p" << "2" ));
+
         return nodes;
+    }
+
+    class TagSetFixtures {
+    public:
+        static BSONArray getDefaultSet();
+        static BSONArray getP2Tag();
+        static BSONArray getSingleNoMatchTag();
+        static BSONArray getMultiNoMatchTag();
+    };
+
+    BSONArray TagSetFixtures::getDefaultSet() {
+        BSONArrayBuilder arrayBuilder;
+        arrayBuilder.append( BSONObj() );
+        return arrayBuilder.arr();
+    }
+
+    BSONArray TagSetFixtures::getP2Tag() {
+        BSONArrayBuilder arrayBuilder;
+        arrayBuilder.append( BSON( "p" << "2" ) );
+        return arrayBuilder.arr();
+    }
+
+    BSONArray TagSetFixtures::getSingleNoMatchTag() {
+        BSONArrayBuilder arrayBuilder;
+        arrayBuilder.append( BSON( "k" << "x" ) );
+        return arrayBuilder.arr();
+    }
+
+    BSONArray TagSetFixtures::getMultiNoMatchTag() {
+        BSONArrayBuilder arrayBuilder;
+        arrayBuilder.append( BSON( "mongo" << "db" ) );
+        arrayBuilder.append( BSON( "by" << "10gen" ) );
+        return arrayBuilder.arr();
     }
 
     class PrimaryOnlyTest {
@@ -204,14 +435,15 @@ namespace {
         void run() {
             vector<ReplicaSetMonitor::Node> nodes =
                     NodeSetFixtures::getThreeMemberWithTags();
-            int dummyIdx = 0;
+            TagSet tags( TagSetFixtures::getDefaultSet() );
+            bool shouldRefresh = false;
 
-            HostAndPort host =
-                ReplicaSetMonitor::selectNode( nodes,
-                    ReadPreference_PrimaryOnly,
-                    BSONObj(), 1, 1, dummyIdx );
+            HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
+                ReadPreference_PrimaryOnly, &tags, 3,
+                nodes[0].addr, &shouldRefresh );
 
             ASSERT_EQUALS( "b", host.host() );
+            ASSERT( !shouldRefresh );
         }
     };
 
@@ -220,14 +452,36 @@ namespace {
         void run() {
             vector<ReplicaSetMonitor::Node> nodes =
                     NodeSetFixtures::getThreeMemberWithTags();
-            int dummyIdx = 0;
+            TagSet tags( TagSetFixtures::getDefaultSet() );
+            bool shouldRefresh = false;
 
             nodes[1].ok = false;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_PrimaryOnly, BSONObj(), 1, 1, dummyIdx );
+                ReadPreference_PrimaryOnly, &tags, 3,
+                nodes[0].addr, &shouldRefresh );
 
             ASSERT( host.empty() );
+            ASSERT( shouldRefresh );
+        }
+    };
+
+    class PrimaryMissingTest {
+    public:
+        void run() {
+            vector<ReplicaSetMonitor::Node> nodes =
+                    NodeSetFixtures::getThreeMemberWithTags();
+            TagSet tags( TagSetFixtures::getDefaultSet() );
+            bool shouldRefresh = false;
+
+            nodes[1].ismaster = false;
+
+            HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
+                ReadPreference_PrimaryOnly, &tags, 3,
+                nodes[0].addr, &shouldRefresh );
+
+            ASSERT( host.empty() );
+            ASSERT( shouldRefresh );
         }
     };
 
@@ -236,14 +490,16 @@ namespace {
         void run() {
             vector<ReplicaSetMonitor::Node> nodes =
                     NodeSetFixtures::getThreeMemberWithTags();
-            int dummyIdx = 0;
 
-            HostAndPort host =
-                ReplicaSetMonitor::selectNode( nodes,
-                    ReadPreference_PrimaryPreferred,
-                    BSONObj(), 1, 1, dummyIdx );
+            TagSet tags( TagSetFixtures::getDefaultSet() );
+            bool shouldRefresh = false;
+
+            HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
+                ReadPreference_PrimaryPreferred, &tags, 1,
+                nodes[0].addr, &shouldRefresh );
 
             ASSERT_EQUALS( "b", host.host() );
+            ASSERT( !shouldRefresh );
         }
     };
 
@@ -252,16 +508,17 @@ namespace {
         void run() {
             vector<ReplicaSetMonitor::Node> nodes =
                     NodeSetFixtures::getThreeMemberWithTags();
-            int nextSecondaryIdx = 1;
+            TagSet tags( TagSetFixtures::getDefaultSet() );
+            bool shouldRefresh = false;
 
             nodes[1].ok = false;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_PrimaryPreferred,
-                BSONObj(), 1, 1, nextSecondaryIdx );
+                ReadPreference_PrimaryPreferred, &tags, 1,
+                nodes[1].addr, &shouldRefresh );
 
             ASSERT_EQUALS( "c", host.host() );
-            ASSERT_EQUALS( 2, nextSecondaryIdx );
+            ASSERT( shouldRefresh );
         }
     };
 
@@ -270,17 +527,17 @@ namespace {
         void run() {
             vector<ReplicaSetMonitor::Node> nodes =
                     NodeSetFixtures::getThreeMemberWithTags();
-            int nextSecondaryIdx = 0;
+            TagSet tags( TagSetFixtures::getDefaultSet() );
+            bool shouldRefresh = false;
 
             nodes[2].ok = false;
 
-            HostAndPort host =
-                ReplicaSetMonitor::selectNode( nodes,
-                    ReadPreference_SecondaryOnly,
-                    BSONObj(), false, 1, nextSecondaryIdx );
+            HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
+                ReadPreference_SecondaryOnly, &tags, 1,
+                nodes[1].addr, &shouldRefresh );
 
             ASSERT_EQUALS( "a", host.host() );
-            ASSERT_EQUALS( 0, nextSecondaryIdx );
+            ASSERT( !shouldRefresh );
         }
     };
 
@@ -289,15 +546,18 @@ namespace {
         void run() {
             vector<ReplicaSetMonitor::Node> nodes =
                     NodeSetFixtures::getThreeMemberWithTags();
-            int nextSecondaryIdx = 0;
+            TagSet tags( TagSetFixtures::getDefaultSet() );
+            bool shouldRefresh = false;
 
             nodes[0].ok = false;
             nodes[2].ok = false;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_SecondaryOnly, BSONObj(), 1, 1, nextSecondaryIdx );
+                ReadPreference_SecondaryOnly, &tags, 1,
+                nodes[1].addr, &shouldRefresh );
 
             ASSERT( host.empty() );
+            ASSERT( !shouldRefresh );
         }
     };
 
@@ -306,16 +566,17 @@ namespace {
         void run() {
             vector<ReplicaSetMonitor::Node> nodes =
                     NodeSetFixtures::getThreeMemberWithTags();
-            int nextSecondaryIdx = 0;
+            TagSet tags( TagSetFixtures::getDefaultSet() );
+            bool shouldRefresh = false;
 
             nodes[2].ok = false;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_SecondaryPreferred,
-                BSONObj(), false, 1, nextSecondaryIdx );
+                ReadPreference_SecondaryPreferred, &tags, 1,
+                nodes[1].addr, &shouldRefresh );
 
             ASSERT_EQUALS( "a", host.host() );
-            ASSERT_EQUALS( 0, nextSecondaryIdx );
+            ASSERT( !shouldRefresh );
         }
     };
 
@@ -324,16 +585,39 @@ namespace {
         void run() {
             vector<ReplicaSetMonitor::Node> nodes =
                     NodeSetFixtures::getThreeMemberWithTags();
-            int nextSecondaryIdx = 0;
+            TagSet tags( TagSetFixtures::getDefaultSet() );
+            bool shouldRefresh = false;
 
             nodes[0].ok = false;
             nodes[2].ok = false;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_SecondaryPreferred, BSONObj(),
-                1, 1, nextSecondaryIdx );
+                ReadPreference_SecondaryPreferred, &tags, 1,
+                nodes[1].addr, &shouldRefresh );
 
             ASSERT_EQUALS( "b", host.host() );
+            ASSERT( !shouldRefresh );
+        }
+    };
+
+    class SecPrefWithNoNodeOkTest {
+    public:
+        void run() {
+            vector<ReplicaSetMonitor::Node> nodes =
+                    NodeSetFixtures::getThreeMemberWithTags();
+            TagSet tags( TagSetFixtures::getDefaultSet() );
+            bool shouldRefresh = false;
+
+            nodes[0].ok = false;
+            nodes[1].ok = false;
+            nodes[2].ok = false;
+
+            HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
+                ReadPreference_SecondaryPreferred, &tags, 1,
+                nodes[1].addr, &shouldRefresh );
+
+            ASSERT( host.empty() );
+            ASSERT( shouldRefresh );
         }
     };
 
@@ -342,16 +626,19 @@ namespace {
         void run() {
             vector<ReplicaSetMonitor::Node> nodes =
                     NodeSetFixtures::getThreeMemberWithTags();
-            int nextSecondaryIdx = 0;
+            TagSet tags( TagSetFixtures::getDefaultSet() );
+            bool shouldRefresh = false;
 
             nodes[0].pingTimeMillis = 1;
             nodes[1].pingTimeMillis = 2;
             nodes[2].pingTimeMillis = 3;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_Nearest, BSONObj(), 3, 1, nextSecondaryIdx );
+                ReadPreference_Nearest, &tags, 3,
+                nodes[0].addr, &shouldRefresh );
 
             ASSERT_EQUALS( "b", host.host() );
+            ASSERT( !shouldRefresh );
         }
     };
 
@@ -360,16 +647,19 @@ namespace {
         void run() {
             vector<ReplicaSetMonitor::Node> nodes =
                     NodeSetFixtures::getThreeMemberWithTags();
-            int nextSecondaryIdx = 0;
+            TagSet tags( TagSetFixtures::getDefaultSet() );
+            bool shouldRefresh = false;
 
             nodes[0].pingTimeMillis = 10;
             nodes[1].pingTimeMillis = 20;
             nodes[2].pingTimeMillis = 30;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_Nearest, BSONObj(), 3, 1, nextSecondaryIdx );
+                ReadPreference_Nearest, &tags, 3,
+                nodes[0].addr, &shouldRefresh );
 
             ASSERT( !host.empty() );
+            ASSERT( !shouldRefresh );
         }
     };
 
@@ -378,13 +668,16 @@ namespace {
         void run() {
             vector<ReplicaSetMonitor::Node> nodes =
                     NodeSetFixtures::getThreeMemberWithTags();
-            int nextSecondaryIdx = 2;
+            TagSet tags( TagSetFixtures::getP2Tag() );
+            bool shouldRefresh = false;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_PrimaryOnly, BSON( "p" << "2" ),
-                3, 1, nextSecondaryIdx );
+                ReadPreference_PrimaryOnly, &tags, 3,
+                nodes[2].addr, &shouldRefresh );
 
+            // Note: PrimaryOnly ignores tag
             ASSERT_EQUALS( "b", host.host() );
+            ASSERT( !shouldRefresh );
         }
     };
 
@@ -393,16 +686,17 @@ namespace {
         void run() {
             vector<ReplicaSetMonitor::Node> nodes =
                     NodeSetFixtures::getThreeMemberWithTags();
-            int nextSecondaryIdx = 2;
+            TagSet tags( TagSetFixtures::getP2Tag() );
+            bool shouldRefresh = false;
 
             nodes[1].ok = false;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_PrimaryPreferred,
-                BSON( "p" << "2" ), 3, 1, nextSecondaryIdx );
+                ReadPreference_PrimaryPreferred, &tags, 3,
+                nodes[2].addr, &shouldRefresh );
 
             ASSERT_EQUALS( "c", host.host() );
-            ASSERT_EQUALS( 2, nextSecondaryIdx );
+            ASSERT( shouldRefresh );
         }
     };
 
@@ -411,13 +705,15 @@ namespace {
         void run() {
             vector<ReplicaSetMonitor::Node> nodes =
                     NodeSetFixtures::getThreeMemberWithTags();
-            int nextSecondaryIdx = 2;
+            TagSet tags( TagSetFixtures::getSingleNoMatchTag() );
+            bool shouldRefresh = false;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_PrimaryPreferred,
-                BSON( "k" << "x" ), 3, 1, nextSecondaryIdx );
+                ReadPreference_PrimaryPreferred, &tags, 3,
+                nodes[2].addr, &shouldRefresh );
 
             ASSERT_EQUALS( "b", host.host() );
+            ASSERT( !shouldRefresh );
         }
     };
 
@@ -426,15 +722,17 @@ namespace {
         void run() {
             vector<ReplicaSetMonitor::Node> nodes =
                     NodeSetFixtures::getThreeMemberWithTags();
-            int nextSecondaryIdx = 2;
+            TagSet tags( TagSetFixtures::getSingleNoMatchTag() );
+            bool shouldRefresh = false;
 
             nodes[1].ok = false;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_PrimaryPreferred,
-                BSON( "k" << "x" ), 3, 1, nextSecondaryIdx );
+                ReadPreference_PrimaryPreferred, &tags, 3,
+                nodes[2].addr, &shouldRefresh );
 
             ASSERT( host.empty() );
+            ASSERT( shouldRefresh );
         }
     };
     
@@ -443,14 +741,15 @@ namespace {
         void run() {
             vector<ReplicaSetMonitor::Node> nodes =
                     NodeSetFixtures::getThreeMemberWithTags();
-            int nextSecondaryIdx = 2;
+            TagSet tags( TagSetFixtures::getP2Tag() );
+            bool shouldRefresh = false;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_SecondaryOnly,
-                BSON( "p" << "2" ), 3, 1, nextSecondaryIdx );
+                ReadPreference_SecondaryOnly, &tags, 3,
+                nodes[2].addr, &shouldRefresh );
 
             ASSERT_EQUALS( "c", host.host() );
-            ASSERT_EQUALS( 2, nextSecondaryIdx );
+            ASSERT( !shouldRefresh );
         }
     };
 
@@ -459,13 +758,18 @@ namespace {
         void run() {
             vector<ReplicaSetMonitor::Node> nodes =
                     NodeSetFixtures::getThreeMemberWithTags();
-            int nextSecondaryIdx = 2;
+            bool shouldRefresh = false;
+
+            BSONArrayBuilder arrayBuilder;
+            arrayBuilder.append( BSON( "dc" << "sf" ));
+            TagSet tags( arrayBuilder.arr() );
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                 ReadPreference_SecondaryOnly,
-                 BSON( "dc" << "sf" ), 3, 1, nextSecondaryIdx );
+                 ReadPreference_SecondaryOnly, &tags, 3,
+                 nodes[2].addr, &shouldRefresh );
 
             ASSERT( host.empty() );
+            ASSERT( !shouldRefresh );
         }
     };
 
@@ -474,14 +778,15 @@ namespace {
         void run() {
             vector<ReplicaSetMonitor::Node> nodes =
                     NodeSetFixtures::getThreeMemberWithTags();
-            int nextSecondaryIdx = 2;
+            TagSet tags( TagSetFixtures::getP2Tag() );
+            bool shouldRefresh = false;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_SecondaryPreferred,
-                BSON( "p" << "2" ), 3, 1, nextSecondaryIdx );
+                ReadPreference_SecondaryPreferred, &tags, 3,
+                nodes[2].addr, &shouldRefresh );
 
             ASSERT_EQUALS( "c", host.host() );
-            ASSERT_EQUALS( 2, nextSecondaryIdx );
+            ASSERT( !shouldRefresh );
         }
     };
 
@@ -490,15 +795,20 @@ namespace {
         void run() {
             vector<ReplicaSetMonitor::Node> nodes =
                     NodeSetFixtures::getThreeMemberWithTags();
-            int nextSecondaryIdx = 1;
+            bool shouldRefresh = false;
+
+            BSONArrayBuilder arrayBuilder;
+            arrayBuilder.append( BSON( "dc" << "nyc" ));
+            TagSet tags( arrayBuilder.arr() );
 
             nodes[2].ok = false;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_SecondaryPreferred,
-                BSON( "p" << "2" ), 3, 1, nextSecondaryIdx );
+                ReadPreference_SecondaryPreferred, &tags, 3,
+                nodes[1].addr, &shouldRefresh );
 
-            ASSERT_EQUALS( "b", host.host() );
+            ASSERT_EQUALS( "a", host.host() );
+            ASSERT( !shouldRefresh );
         }
     };
 
@@ -507,13 +817,15 @@ namespace {
         void run() {
             vector<ReplicaSetMonitor::Node> nodes =
                     NodeSetFixtures::getThreeMemberWithTags();
-            int nextSecondaryIdx = 2;
+            TagSet tags( TagSetFixtures::getSingleNoMatchTag() );
+            bool shouldRefresh = false;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_SecondaryPreferred,
-                BSON( "k" << "x" ), 3, 1, nextSecondaryIdx );
+                ReadPreference_SecondaryPreferred, &tags, 3,
+                nodes[2].addr, &shouldRefresh );
 
             ASSERT_EQUALS( "b", host.host() );
+            ASSERT( !shouldRefresh );
         }
     };
 
@@ -522,15 +834,34 @@ namespace {
         void run() {
             vector<ReplicaSetMonitor::Node> nodes =
                     NodeSetFixtures::getThreeMemberWithTags();
-            int nextSecondaryIdx = 2;
+            TagSet tags( TagSetFixtures::getSingleNoMatchTag() );
+            bool shouldRefresh = false;
 
             nodes[1].ok = false;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_SecondaryPreferred,
-                BSON( "k" << "x" ), 3, 1, nextSecondaryIdx );
+                ReadPreference_SecondaryPreferred, &tags, 3,
+                nodes[2].addr, &shouldRefresh );
 
             ASSERT( host.empty() );
+            ASSERT( shouldRefresh );
+        }
+    };
+
+    class SecPrefPriOkWithSecNotMatchTagTest {
+    public:
+        void run() {
+            vector<ReplicaSetMonitor::Node> nodes =
+                    NodeSetFixtures::getThreeMemberWithTags();
+            TagSet tags( TagSetFixtures::getSingleNoMatchTag() );
+            bool shouldRefresh = false;
+
+            HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
+                ReadPreference_SecondaryPreferred, &tags, 3,
+                nodes[2].addr, &shouldRefresh );
+
+            ASSERT_EQUALS( "b", host.host() );
+            ASSERT( !shouldRefresh );
         }
     };
 
@@ -539,14 +870,18 @@ namespace {
         void run() {
             vector<ReplicaSetMonitor::Node> nodes =
                     NodeSetFixtures::getThreeMemberWithTags();
-            int nextSecondaryIdx = 1;
+            bool shouldRefresh = false;
+
+            BSONArrayBuilder arrayBuilder;
+            arrayBuilder.append( BSON( "p" << "1" ));
+            TagSet tags( arrayBuilder.arr() );
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_Nearest, BSON( "p" << "1" ),
-                3, 1, nextSecondaryIdx );
+                ReadPreference_Nearest, &tags, 3,
+                nodes[1].addr, &shouldRefresh );
 
             ASSERT_EQUALS( "a", host.host() );
-            ASSERT_EQUALS( 0, nextSecondaryIdx );
+            ASSERT( !shouldRefresh );
         }
     };
 
@@ -555,13 +890,792 @@ namespace {
         void run() {
             vector<ReplicaSetMonitor::Node> nodes =
                     NodeSetFixtures::getThreeMemberWithTags();
-            int nextSecondaryIdx = 2;
+            TagSet tags( TagSetFixtures::getSingleNoMatchTag() );
+            bool shouldRefresh = false;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_Nearest, BSON( "c" << "2" ),
-                3, 1, nextSecondaryIdx );
+                ReadPreference_Nearest, &tags, 3,
+                nodes[1].addr, &shouldRefresh );
 
             ASSERT( host.empty() );
+            ASSERT( !shouldRefresh );
+        }
+    };
+
+    class MultiPriOnlyTagTest {
+    public:
+        void run() {
+            vector<ReplicaSetMonitor::Node> nodes =
+                    NodeSetFixtures::getThreeMemberWithTags();
+            TagSet tags( TagSetFixtures::getMultiNoMatchTag() );
+            bool shouldRefresh = false;
+
+            HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
+                ReadPreference_PrimaryOnly, &tags, 3,
+                nodes[1].addr, &shouldRefresh );
+
+            ASSERT_EQUALS( "b", host.host() );
+            ASSERT( !shouldRefresh );
+        }
+    };
+
+    class MultiPriOnlyPriNotOkTagTest {
+    public:
+        void run() {
+            vector<ReplicaSetMonitor::Node> nodes =
+                    NodeSetFixtures::getThreeMemberWithTags();
+            TagSet tags( TagSetFixtures::getMultiNoMatchTag() );
+            bool shouldRefresh = false;
+
+            nodes[1].ok = false;
+
+            HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
+                ReadPreference_PrimaryOnly, &tags, 3,
+                nodes[1].addr, &shouldRefresh );
+
+            ASSERT( host.empty() );
+            ASSERT( shouldRefresh );
+        }
+    };
+
+    class PriPrefPriOkWithMultiTags {
+    public:
+        void run() {
+            vector<ReplicaSetMonitor::Node> nodes =
+                    NodeSetFixtures::getThreeMemberWithTags();
+
+            BSONArrayBuilder arrayBuilder;
+            arrayBuilder.append( BSON( "p" << "1" ));
+            arrayBuilder.append( BSON( "p" << "2" ));
+
+            TagSet tags( arrayBuilder.arr() );
+            bool shouldRefresh = false;
+
+            HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
+                ReadPreference_PrimaryPreferred, &tags, 3,
+                nodes[2].addr, &shouldRefresh );
+
+            ASSERT_EQUALS( "b", host.host() );
+            ASSERT( !shouldRefresh );
+        }
+    };
+
+    class MultiTagsMatchesFirstTest {
+    public:
+        MultiTagsMatchesFirstTest() {
+            BSONArrayBuilder arrayBuilder;
+            arrayBuilder.append( BSON( "p" << "1" ));
+            arrayBuilder.append( BSON( "p" << "2" ));
+
+            tags.reset( new TagSet( arrayBuilder.arr() ));
+        }
+
+        virtual ~MultiTagsMatchesFirstTest() {}
+
+        vector<ReplicaSetMonitor::Node> getNodes() const {
+            return NodeSetFixtures::getThreeMemberWithTags();
+        }
+
+        TagSet* getTagSet() {
+            return tags.get();
+        }
+
+    private:
+        scoped_ptr<TagSet> tags;
+    };
+
+    class MultiTagsMatchesSecondTest {
+    public:
+        MultiTagsMatchesSecondTest() {
+            BSONArrayBuilder arrayBuilder;
+            arrayBuilder.append( BSON( "p" << "3" ));
+            arrayBuilder.append( BSON( "p" << "2" ));
+            arrayBuilder.append( BSON( "p" << "1" ));
+
+            tags.reset( new TagSet( arrayBuilder.arr() ));
+        }
+
+        virtual ~MultiTagsMatchesSecondTest() {};
+
+        vector<ReplicaSetMonitor::Node> getNodes() const {
+            return NodeSetFixtures::getThreeMemberWithTags();
+        }
+
+        TagSet* getTagSet() {
+            return tags.get();
+        }
+
+    private:
+        scoped_ptr<TagSet> tags;
+    };
+
+    class MultiTagsMatchesLastTest {
+    public:
+        MultiTagsMatchesLastTest() {
+            BSONArrayBuilder arrayBuilder;
+            arrayBuilder.append( BSON( "p" << "12" ));
+            arrayBuilder.append( BSON( "p" << "23" ));
+            arrayBuilder.append( BSON( "p" << "19" ));
+            arrayBuilder.append( BSON( "p" << "34" ));
+            arrayBuilder.append( BSON( "p" << "1" ));
+
+            tags.reset( new TagSet( arrayBuilder.arr() ));
+        }
+
+        virtual ~MultiTagsMatchesLastTest() {}
+
+        vector<ReplicaSetMonitor::Node> getNodes() const {
+            return NodeSetFixtures::getThreeMemberWithTags();
+        }
+
+        TagSet* getTagSet() {
+            return tags.get();
+        }
+
+    private:
+        scoped_ptr<TagSet> tags;
+    };
+
+    class MultiTagsMatchesPriTest {
+    public:
+        MultiTagsMatchesPriTest() {
+            BSONArrayBuilder arrayBuilder;
+            arrayBuilder.append( BSON( "dc" << "sf" ));
+            arrayBuilder.append( BSON( "p" << "1" ));
+            tags.reset( new TagSet( arrayBuilder.arr() ));
+        }
+
+        virtual ~MultiTagsMatchesPriTest() {};
+
+        vector<ReplicaSetMonitor::Node> getNodes() const {
+            return NodeSetFixtures::getThreeMemberWithTags();
+        }
+
+        TagSet* getTagSet() {
+            return tags.get();
+        }
+
+    private:
+        scoped_ptr<TagSet> tags;
+    };
+
+    class PriPrefPriNotOkWithMultiTagsMatchesFirstTest : public MultiTagsMatchesFirstTest {
+    public:
+        void run() {
+            vector<ReplicaSetMonitor::Node> nodes = getNodes();
+            bool shouldRefresh = false;
+
+            nodes[1].ok = false;
+
+            HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
+                ReadPreference_PrimaryPreferred, getTagSet(), 3,
+                nodes[2].addr, &shouldRefresh );
+
+            ASSERT_EQUALS( "a", host.host() );
+            ASSERT( shouldRefresh );
+        }
+    };
+
+    class PriPrefPriNotOkWithMultiTagsMatchesFirstNotOkTest : public MultiTagsMatchesFirstTest {
+    public:
+        void run() {
+            vector<ReplicaSetMonitor::Node> nodes = getNodes();
+            bool shouldRefresh = false;
+
+            nodes[0].ok = false;
+            nodes[1].ok = false;
+
+            HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
+                ReadPreference_PrimaryPreferred, getTagSet(), 3,
+                nodes[2].addr, &shouldRefresh );
+
+            ASSERT_EQUALS( "c", host.host() );
+            ASSERT( shouldRefresh );
+        }
+    };
+
+    class PriPrefPriNotOkWithMultiTagsMatchesSecondTest : public MultiTagsMatchesSecondTest {
+    public:
+        void run() {
+            vector<ReplicaSetMonitor::Node> nodes = getNodes();
+            bool shouldRefresh = false;
+
+            nodes[1].ok = false;
+
+            HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
+                ReadPreference_PrimaryPreferred, getTagSet(), 3,
+                nodes[2].addr, &shouldRefresh );
+
+            ASSERT_EQUALS( "c", host.host() );
+            ASSERT( shouldRefresh );
+        }
+    };
+
+    class PriPrefPriNotOkWithMultiTagsMatchesSecondNotOkTest : public MultiTagsMatchesSecondTest {
+    public:
+        void run() {
+            vector<ReplicaSetMonitor::Node> nodes = getNodes();
+            bool shouldRefresh = false;
+
+            nodes[1].ok = false;
+            nodes[2].ok = false;
+
+            HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
+                ReadPreference_PrimaryPreferred, getTagSet(), 3,
+                nodes[2].addr, &shouldRefresh );
+
+            ASSERT_EQUALS( "a", host.host() );
+            ASSERT( shouldRefresh );
+        }
+    };
+
+    class PriPrefPriNotOkWithMultiTagsMatchesLastTest : public MultiTagsMatchesLastTest {
+    public:
+        void run() {
+            vector<ReplicaSetMonitor::Node> nodes = getNodes();
+            bool shouldRefresh = false;
+
+            nodes[1].ok = false;
+
+            HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
+                ReadPreference_PrimaryPreferred, getTagSet(), 3,
+                nodes[2].addr, &shouldRefresh );
+
+            ASSERT_EQUALS( "a", host.host() );
+            ASSERT( shouldRefresh );
+        }
+    };
+
+    class PriPrefPriNotOkWithMultiTagsMatchesLastNotOkTest : public MultiTagsMatchesLastTest {
+    public:
+        void run() {
+            vector<ReplicaSetMonitor::Node> nodes = getNodes();
+            bool shouldRefresh = false;
+
+            nodes[0].ok = false;
+            nodes[1].ok = false;
+
+            HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
+                ReadPreference_PrimaryPreferred, getTagSet(), 3,
+                nodes[2].addr, &shouldRefresh );
+
+            ASSERT( host.empty() );
+            ASSERT( shouldRefresh );
+        }
+    };
+
+    class PriPrefPriOkWithMultiTagsNoMatchTest {
+    public:
+        void run() {
+            vector<ReplicaSetMonitor::Node> nodes =
+                    NodeSetFixtures::getThreeMemberWithTags();
+
+            TagSet tags( TagSetFixtures::getMultiNoMatchTag() );
+            bool shouldRefresh = false;
+
+            HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
+                ReadPreference_PrimaryPreferred, &tags, 3,
+                nodes[2].addr, &shouldRefresh );
+
+            ASSERT_EQUALS( "b", host.host() );
+            ASSERT( !shouldRefresh );
+        }
+    };
+
+    class PriPrefPriNotOkWithMultiTagsNoMatchTest {
+    public:
+        void run() {
+            vector<ReplicaSetMonitor::Node> nodes =
+                    NodeSetFixtures::getThreeMemberWithTags();
+            TagSet tags( TagSetFixtures::getMultiNoMatchTag() );
+            bool shouldRefresh = false;
+
+            nodes[1].ok = false;
+
+            HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
+                ReadPreference_PrimaryPreferred, &tags, 3,
+                nodes[2].addr, &shouldRefresh );
+
+            ASSERT( host.empty() );
+            ASSERT( shouldRefresh );
+        }
+    };
+
+    class SecOnlyWithMultiTagsMatchesFirstTest : public MultiTagsMatchesFirstTest {
+    public:
+        void run() {
+            vector<ReplicaSetMonitor::Node> nodes = getNodes();
+            bool shouldRefresh = false;
+
+            HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
+                ReadPreference_SecondaryOnly, getTagSet(), 3,
+                nodes[2].addr, &shouldRefresh );
+
+            ASSERT_EQUALS( "a", host.host() );
+            ASSERT( !shouldRefresh );
+        }
+    };
+
+    class SecOnlyWithMultiTagsMatchesFirstNotOkTest : public MultiTagsMatchesFirstTest {
+    public:
+        void run() {
+            vector<ReplicaSetMonitor::Node> nodes = getNodes();
+            bool shouldRefresh = false;
+
+            nodes[0].ok = false;
+
+            HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
+                ReadPreference_SecondaryOnly, getTagSet(), 3,
+                nodes[2].addr, &shouldRefresh );
+
+            ASSERT_EQUALS( "c", host.host() );
+            ASSERT( !shouldRefresh );
+        }
+    };
+
+    class SecOnlyWithMultiTagsMatchesSecondTest : public MultiTagsMatchesSecondTest {
+    public:
+        void run() {
+            vector<ReplicaSetMonitor::Node> nodes = getNodes();
+            bool shouldRefresh = false;
+
+            HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
+                ReadPreference_SecondaryOnly, getTagSet(), 3,
+                nodes[2].addr, &shouldRefresh );
+
+            ASSERT_EQUALS( "c", host.host() );
+            ASSERT( !shouldRefresh );
+        }
+    };
+
+    class SecOnlyWithMultiTagsMatchesSecondNotOkTest : public MultiTagsMatchesSecondTest {
+    public:
+        void run() {
+            vector<ReplicaSetMonitor::Node> nodes = getNodes();
+            bool shouldRefresh = false;
+
+            nodes[2].ok = false;
+
+            HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
+                ReadPreference_SecondaryOnly, getTagSet(), 3,
+                nodes[2].addr, &shouldRefresh );
+
+            ASSERT_EQUALS( "a", host.host() );
+            ASSERT( !shouldRefresh );
+        }
+    };
+
+    class SecOnlyWithMultiTagsMatchesLastTest : public MultiTagsMatchesLastTest {
+    public:
+        void run() {
+            vector<ReplicaSetMonitor::Node> nodes = getNodes();
+            bool shouldRefresh = false;
+
+            HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
+                ReadPreference_SecondaryOnly, getTagSet(), 3,
+                nodes[2].addr, &shouldRefresh );
+
+            ASSERT_EQUALS( "a", host.host() );
+            ASSERT( !shouldRefresh );
+        }
+    };
+
+    class SecOnlyWithMultiTagsMatchesLastNotOkTest : public MultiTagsMatchesLastTest {
+    public:
+        void run() {
+            vector<ReplicaSetMonitor::Node> nodes = getNodes();
+            bool shouldRefresh = false;
+
+            nodes[0].ok = false;
+
+            HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
+                ReadPreference_SecondaryOnly, getTagSet(), 3,
+                nodes[2].addr, &shouldRefresh );
+
+            ASSERT( host.empty() );
+            ASSERT( !shouldRefresh );
+        }
+    };
+
+    class SecOnlyMultiTagsWithPriMatchTest : public MultiTagsMatchesPriTest {
+    public:
+        void run() {
+            vector<ReplicaSetMonitor::Node> nodes =
+                    NodeSetFixtures::getThreeMemberWithTags();
+            bool shouldRefresh = false;
+
+            HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
+                 ReadPreference_SecondaryOnly, getTagSet(), 3,
+                 nodes[2].addr, &shouldRefresh );
+
+            ASSERT_EQUALS( "a", host.host() );
+            ASSERT( !shouldRefresh );
+        }
+    };
+
+    class SecOnlyMultiTagsNoMatchTest {
+    public:
+        void run() {
+            vector<ReplicaSetMonitor::Node> nodes =
+                    NodeSetFixtures::getThreeMemberWithTags();
+            TagSet tags( TagSetFixtures::getMultiNoMatchTag() );
+            bool shouldRefresh = false;
+
+            HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
+                 ReadPreference_SecondaryOnly, &tags, 3,
+                 nodes[2].addr, &shouldRefresh );
+
+            ASSERT( host.empty() );
+            ASSERT( !shouldRefresh );
+        }
+    };
+
+    class SecPrefWithMultiTagsMatchesFirstTest : public MultiTagsMatchesFirstTest {
+    public:
+        void run() {
+            vector<ReplicaSetMonitor::Node> nodes = getNodes();
+            bool shouldRefresh = false;
+
+            HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
+                ReadPreference_SecondaryPreferred, getTagSet(), 3,
+                nodes[2].addr, &shouldRefresh );
+
+            ASSERT_EQUALS( "a", host.host() );
+            ASSERT( !shouldRefresh );
+        }
+    };
+
+    class SecPrefWithMultiTagsMatchesFirstNotOkTest : public MultiTagsMatchesFirstTest {
+    public:
+        void run() {
+            vector<ReplicaSetMonitor::Node> nodes = getNodes();
+            bool shouldRefresh = false;
+
+            nodes[0].ok = false;
+
+            HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
+                ReadPreference_SecondaryPreferred, getTagSet(), 3,
+                nodes[2].addr, &shouldRefresh );
+
+            ASSERT_EQUALS( "c", host.host() );
+            ASSERT( !shouldRefresh );
+        }
+    };
+
+    class SecPrefWithMultiTagsMatchesSecondTest : public MultiTagsMatchesSecondTest {
+    public:
+        void run() {
+            vector<ReplicaSetMonitor::Node> nodes = getNodes();
+            bool shouldRefresh = false;
+
+            HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
+                ReadPreference_SecondaryPreferred, getTagSet(), 3,
+                nodes[2].addr, &shouldRefresh );
+
+            ASSERT_EQUALS( "c", host.host() );
+            ASSERT( !shouldRefresh );
+        }
+    };
+
+    class SecPrefWithMultiTagsMatchesSecondNotOkTest : public MultiTagsMatchesSecondTest {
+    public:
+        void run() {
+            vector<ReplicaSetMonitor::Node> nodes = getNodes();
+            bool shouldRefresh = false;
+
+            nodes[2].ok = false;
+
+            HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
+                ReadPreference_SecondaryPreferred, getTagSet(), 3,
+                nodes[2].addr, &shouldRefresh );
+
+            ASSERT_EQUALS( "a", host.host() );
+            ASSERT( !shouldRefresh );
+        }
+    };
+
+    class SecPrefWithMultiTagsMatchesLastTest : public MultiTagsMatchesLastTest {
+    public:
+        void run() {
+            vector<ReplicaSetMonitor::Node> nodes = getNodes();
+            bool shouldRefresh = false;
+
+            HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
+                ReadPreference_SecondaryPreferred, getTagSet(), 3,
+                nodes[2].addr, &shouldRefresh );
+
+            ASSERT_EQUALS( "a", host.host() );
+            ASSERT( !shouldRefresh );
+        }
+    };
+
+    class SecPrefWithMultiTagsMatchesLastNotOkTest : public MultiTagsMatchesLastTest {
+    public:
+        void run() {
+            vector<ReplicaSetMonitor::Node> nodes = getNodes();
+            bool shouldRefresh = false;
+
+            nodes[0].ok = false;
+
+            HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
+                ReadPreference_SecondaryPreferred, getTagSet(), 3,
+                nodes[2].addr, &shouldRefresh );
+
+            ASSERT_EQUALS( "b", host.host() );
+            ASSERT( !shouldRefresh );
+        }
+    };
+
+    class SecPrefMultiTagsWithPriMatchTest : public MultiTagsMatchesPriTest {
+    public:
+        void run() {
+            vector<ReplicaSetMonitor::Node> nodes =
+                    NodeSetFixtures::getThreeMemberWithTags();
+            bool shouldRefresh = false;
+
+            HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
+                 ReadPreference_SecondaryPreferred, getTagSet(), 3,
+                 nodes[2].addr, &shouldRefresh );
+
+            ASSERT_EQUALS( "a", host.host() );
+            ASSERT( !shouldRefresh );
+        }
+    };
+
+    class SecPrefMultiTagsNoMatchTest {
+    public:
+        void run() {
+            vector<ReplicaSetMonitor::Node> nodes =
+                    NodeSetFixtures::getThreeMemberWithTags();
+            TagSet tags( TagSetFixtures::getMultiNoMatchTag() );
+            bool shouldRefresh = false;
+
+            HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
+                 ReadPreference_SecondaryPreferred, &tags, 3,
+                 nodes[2].addr, &shouldRefresh );
+
+            ASSERT_EQUALS( "b", host.host() );
+            ASSERT( !shouldRefresh );
+        }
+    };
+
+    class SecPrefMultiTagsNoMatchPriNotOkTest {
+    public:
+        void run() {
+            vector<ReplicaSetMonitor::Node> nodes =
+                    NodeSetFixtures::getThreeMemberWithTags();
+            TagSet tags( TagSetFixtures::getMultiNoMatchTag() );
+            bool shouldRefresh = false;
+
+            nodes[1].ok = false;
+
+            HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
+                 ReadPreference_SecondaryPreferred, &tags, 3,
+                 nodes[2].addr, &shouldRefresh );
+
+            ASSERT( host.empty() );
+            ASSERT( shouldRefresh );
+        }
+    };
+
+    class NearestWithMultiTagsMatchesFirstTest : public MultiTagsMatchesFirstTest {
+    public:
+        void run() {
+            vector<ReplicaSetMonitor::Node> nodes = getNodes();
+            bool shouldRefresh = false;
+
+            HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
+                ReadPreference_Nearest, getTagSet(), 3,
+                nodes[2].addr, &shouldRefresh );
+
+            ASSERT_EQUALS( "a", host.host() );
+            ASSERT( !shouldRefresh );
+        }
+    };
+
+    class NearestWithMultiTagsMatchesFirstNotOkTest {
+    public:
+        void run() {
+            vector<ReplicaSetMonitor::Node> nodes = NodeSetFixtures::getThreeMemberWithTags();
+
+            BSONArrayBuilder arrayBuilder;
+            arrayBuilder.append( BSON( "p" << "1" ));
+            arrayBuilder.append( BSON( "dc" << "sf" ));
+
+            TagSet tags( arrayBuilder.arr() );
+            bool shouldRefresh = false;
+
+            nodes[0].ok = false;
+
+            HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
+                ReadPreference_Nearest, &tags, 3,
+                nodes[2].addr, &shouldRefresh );
+
+            ASSERT_EQUALS( "b", host.host() );
+            ASSERT( !shouldRefresh );
+        }
+    };
+
+    class NearestWithMultiTagsMatchesSecondTest : public MultiTagsMatchesSecondTest {
+    public:
+        void run() {
+            vector<ReplicaSetMonitor::Node> nodes = getNodes();
+            bool shouldRefresh = false;
+
+            HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
+                ReadPreference_Nearest, getTagSet(), 3,
+                nodes[2].addr, &shouldRefresh );
+
+            ASSERT_EQUALS( "c", host.host() );
+            ASSERT( !shouldRefresh );
+        }
+    };
+
+    class NearestWithMultiTagsMatchesSecondNotOkTest {
+    public:
+        void run() {
+            vector<ReplicaSetMonitor::Node> nodes = NodeSetFixtures::getThreeMemberWithTags();
+            bool shouldRefresh = false;
+
+            BSONArrayBuilder arrayBuilder;
+            arrayBuilder.append( BSON( "z" << "2" ));
+            arrayBuilder.append( BSON( "p" << "2" ));
+            arrayBuilder.append( BSON( "dc" << "sf" ));
+
+            TagSet tags( arrayBuilder.arr() );
+
+            nodes[2].ok = false;
+
+            HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
+                ReadPreference_Nearest, &tags, 3,
+                nodes[2].addr, &shouldRefresh );
+
+            ASSERT_EQUALS( "b", host.host() );
+            ASSERT( !shouldRefresh );
+        }
+    };
+
+    class NearestWithMultiTagsMatchesLastTest : public MultiTagsMatchesLastTest {
+    public:
+        void run() {
+            vector<ReplicaSetMonitor::Node> nodes = getNodes();
+            bool shouldRefresh = false;
+
+            HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
+                ReadPreference_Nearest, getTagSet(), 3,
+                nodes[2].addr, &shouldRefresh );
+
+            ASSERT_EQUALS( "a", host.host() );
+            ASSERT( !shouldRefresh );
+        }
+    };
+
+    class NeatestWithMultiTagsMatchesLastNotOkTest : public MultiTagsMatchesLastTest {
+    public:
+        void run() {
+            vector<ReplicaSetMonitor::Node> nodes = getNodes();
+            bool shouldRefresh = false;
+
+            nodes[0].ok = false;
+
+            HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
+                ReadPreference_Nearest, getTagSet(), 3,
+                nodes[2].addr, &shouldRefresh );
+
+            ASSERT( host.empty() );
+            ASSERT( !shouldRefresh );
+        }
+    };
+
+    class NearestMultiTagsWithPriMatchTest : public MultiTagsMatchesPriTest {
+    public:
+        void run() {
+            vector<ReplicaSetMonitor::Node> nodes =
+                    NodeSetFixtures::getThreeMemberWithTags();
+            bool shouldRefresh = false;
+
+            HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
+                 ReadPreference_Nearest, getTagSet(), 3,
+                 nodes[2].addr, &shouldRefresh );
+
+            ASSERT_EQUALS( "b", host.host() );
+            ASSERT( !shouldRefresh );
+        }
+    };
+
+    class NearestMultiTagsNoMatchTest {
+    public:
+        void run() {
+            vector<ReplicaSetMonitor::Node> nodes =
+                    NodeSetFixtures::getThreeMemberWithTags();
+            TagSet tags( TagSetFixtures::getMultiNoMatchTag() );
+            bool shouldRefresh = false;
+
+            HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
+                 ReadPreference_Nearest, &tags, 3,
+                 nodes[2].addr, &shouldRefresh );
+
+            ASSERT( host.empty() );
+            ASSERT( !shouldRefresh );
+        }
+    };
+
+    class SingleTagSetTest {
+    public:
+        void run(){
+            BSONArrayBuilder builder;
+            builder.append( BSON( "dc" << "nyc" ));
+
+            TagSet tags( BSONArray( builder.done() ));
+
+            ASSERT( !tags.isExhausted() );
+            ASSERT( tags.getCurrentTag().equal( BSON( "dc" << "nyc" )) );
+
+            ASSERT( !tags.isExhausted() );
+            tags.next();
+
+            ASSERT( tags.isExhausted() );
+            ASSERT_THROWS( tags.getCurrentTag(), AssertionException );
+        }
+    };
+
+    class MultiTagSetTest {
+    public:
+        void run(){
+            BSONArrayBuilder builder;
+            builder.append( BSON( "dc" << "nyc" ));
+            builder.append( BSON( "dc" << "sf" ));
+            builder.append( BSON( "dc" << "ma" ));
+
+            TagSet tags( BSONArray( builder.done() ));
+
+            ASSERT( !tags.isExhausted() );
+            ASSERT( tags.getCurrentTag().equal( BSON( "dc" << "nyc" )) );
+
+            ASSERT( !tags.isExhausted() );
+            tags.next();
+            ASSERT( tags.getCurrentTag().equal( BSON( "dc" << "sf" )) );
+
+            ASSERT( !tags.isExhausted() );
+            tags.next();
+            ASSERT( tags.getCurrentTag().equal( BSON( "dc" << "ma" )) );
+
+            ASSERT( !tags.isExhausted() );
+            tags.next();
+
+            ASSERT( tags.isExhausted() );
+            ASSERT_THROWS( tags.getCurrentTag(), AssertionException );
+        }
+    };
+
+    class EmptyArrayTagsTest {
+    public:
+        void run() {
+            BSONArray emptyArray;
+            TagSet tags( emptyArray );
+
+            ASSERT( tags.isExhausted() );
+            ASSERT_THROWS( tags.getCurrentTag(), AssertionException );
         }
     };
 
@@ -583,44 +1697,108 @@ namespace {
             add< BadSingleTagCritTest >();
             add< NonExistingFieldTagTest >();
             add< UnorederedMatchingTest >();
+            add< SameValueDiffKeyTest >();
             add< SimpleToStringTest >();
             add< SimpleToStringWithNoTagTest >();
+
+            add< PriNodeCompatibleTagTest >();
+            add< SecNodeCompatibleTagTest >();
+            add< PriNodeNotCompatibleTagTest >();
+            add< SecNodeNotCompatibleTagTest >();
+            add< PriNodeCompatiblMultiTagTest >();
+            add< SecNodeCompatibleMultiTagTest >();
+            add< PriNodeNotCompatibleMultiTagTest >();
+            add< SecNodeNotCompatibleMultiTagTest >();
         }
     } allNode;
 
     class AllNodeSelectorSuite : public Suite {
     public:
-        AllNodeSelectorSuite() : Suite( "replicaSetMonitor_node_selector" ){
+        AllNodeSelectorSuite() : Suite( "replicaSetMonitor_select_node" ){
         }
 
         void setupTests() {
             add< PrimaryOnlyTest >();
             add< PrimaryOnlyPriNotOkTest >();
             add< PriOnlyWithTagsNoMatchTest >();
+            add< PrimaryMissingTest >();
+            add< MultiPriOnlyTagTest >();
+            add< MultiPriOnlyPriNotOkTagTest >();
             
             add< PriPrefWithPriOkTest >();
             add< PriPrefWithPriNotOkTest >();
             add< PriPrefPriNotOkWithTagsTest >();
             add< PriPrefPriOkWithTagsNoMatchTest >();
             add< PriPrefPriNotOkWithTagsNoMatchTest >();
+            add< PriPrefPriOkWithMultiTags >();
+
+            add< PriPrefPriNotOkWithMultiTagsMatchesFirstTest >();
+            add< PriPrefPriNotOkWithMultiTagsMatchesFirstNotOkTest >();
+            add< PriPrefPriNotOkWithMultiTagsMatchesSecondTest >();
+            add< PriPrefPriNotOkWithMultiTagsMatchesSecondNotOkTest >();
+            add< PriPrefPriNotOkWithMultiTagsMatchesLastTest >();
+            add< PriPrefPriNotOkWithMultiTagsMatchesLastNotOkTest >();
+            add< PriPrefPriOkWithMultiTagsNoMatchTest >();
+            add< PriPrefPriNotOkWithMultiTagsNoMatchTest >();
             
             add< SecOnlyTest >();
             add< SecOnlyOnlyPriOkTest >();
             add< SecOnlyWithTagsTest >();
             add< SecOnlyWithTagsMatchOnlyPriTest >();
 
+            add< SecOnlyWithMultiTagsMatchesFirstTest >();
+            add< SecOnlyWithMultiTagsMatchesFirstNotOkTest >();
+            add< SecOnlyWithMultiTagsMatchesSecondTest >();
+            add< SecOnlyWithMultiTagsMatchesSecondNotOkTest >();
+            add< SecOnlyWithMultiTagsMatchesLastTest >();
+            add< SecOnlyWithMultiTagsMatchesLastNotOkTest >();
+            add< SecOnlyMultiTagsWithPriMatchTest >();
+            add< SecOnlyMultiTagsNoMatchTest >();
+
             add< SecPrefTest >();
             add< SecPrefWithNoSecOkTest >();
+            add< SecPrefWithNoNodeOkTest >();
             add< SecPrefWithTagsTest >();
             add< SecPrefSecNotOkWithTagsTest >();
             add< SecPrefPriOkWithTagsNoMatchTest >();
             add< SecPrefPriNotOkWithTagsNoMatchTest >();
+            add< SecPrefPriOkWithSecNotMatchTagTest >();
+
+            add< SecPrefWithMultiTagsMatchesFirstTest >();
+            add< SecPrefWithMultiTagsMatchesFirstNotOkTest >();
+            add< SecPrefWithMultiTagsMatchesSecondTest >();
+            add< SecPrefWithMultiTagsMatchesSecondNotOkTest >();
+            add< SecPrefWithMultiTagsMatchesLastTest >();
+            add< SecPrefWithMultiTagsMatchesLastNotOkTest >();
+            add< SecPrefMultiTagsWithPriMatchTest >();
+            add< SecPrefMultiTagsNoMatchTest >();
+            add< SecPrefMultiTagsNoMatchPriNotOkTest >();
 
             add< NearestTest >();
             add< NearestNoLocalTest >();
             add< NearestWithTagsTest >();
             add< NearestWithTagsNoMatchTest >();
+
+            add< NearestWithMultiTagsMatchesFirstTest >();
+            add< NearestWithMultiTagsMatchesFirstNotOkTest >();
+            add< NearestWithMultiTagsMatchesSecondTest >();
+            add< NearestWithMultiTagsMatchesSecondNotOkTest >();
+            add< NearestWithMultiTagsMatchesLastTest >();
+            add< NearestMultiTagsWithPriMatchTest >();
+            add< NearestMultiTagsNoMatchTest >();
         }
     } allNodeSelectorSuite;
+
+    class TagSetSuite : public Suite {
+    public:
+        TagSetSuite() : Suite( "tagSet" ) {
+        }
+
+        void setupTests() {
+            add< SingleTagSetTest >();
+            add< MultiTagSetTest >();
+            add< EmptyArrayTagsTest >();
+        }
+    } tagSetSuite;
 }
 
