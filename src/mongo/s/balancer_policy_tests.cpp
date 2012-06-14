@@ -131,5 +131,52 @@ namespace mongo {
             c = BalancerPolicy::balance( "ns", DistributionStatus(limitsMap, chunkMap), 0 );
             ASSERT( ! c );
         }
+
+
+        void addShard( ShardToChunksMap& map, unsigned numChunks, bool last ) {
+            unsigned total = 0;
+            for ( ShardToChunksMap::const_iterator i = map.begin(); i != map.end(); ++i ) 
+                total += i->second.size();
+            
+            stringstream ss;
+            ss << "shard" << map.size();
+            string myName = ss.str();
+            vector<BSONObj>& chunks = map[myName];
+            
+            for ( unsigned i=0; i<numChunks; i++ ) {
+                BSONObj min,max;
+                
+                if ( i == 0 && total == 0 )
+                    min = BSON( "x" << BSON( "$minKey" << 1 ) );
+                else
+                    min = BSON( "x" << total + i );
+                
+                if ( last && i == ( numChunks - 1 ) )
+                    max = BSON( "x" << BSON( "$maxKey" << 1 ) );
+                else
+                    max = BSON( "x" << 1 + total + i );
+                
+                chunks.push_back( BSON( "min" << min << "max" << max ) );
+            }
+
+        }
+
+        TEST( BalancerPolicyTests, MultipleDraining ) {
+            ShardToChunksMap chunks;
+            addShard( chunks, 5 , false );
+            addShard( chunks, 10 , false );
+            addShard( chunks, 5 , true );
+
+            ShardInfoMap shards;
+            shards["shard0"] = ShardInfo( 0, 5, true, false );
+            shards["shard1"] = ShardInfo( 0, 5, true, false );
+            shards["shard2"] = ShardInfo( 0, 5, false, false );
+            
+            DistributionStatus d( shards, chunks );
+            MigrateInfo* m = BalancerPolicy::balance( "ns", d, 0 );
+            ASSERT( m );
+            ASSERT_EQUALS( "shard1" , m->from );
+            ASSERT_EQUALS( "shard2" , m->to );
+        }
     }
 }

@@ -21,6 +21,7 @@
 #include "mongo/s/balancer_policy.h"
 #include "mongo/s/config.h"
 #include "mongo/util/stringutils.h"
+#include "mongo/util/text.h"
 
 namespace mongo {
 
@@ -30,10 +31,109 @@ namespace mongo {
     }
         
 
+    unsigned DistributionStatus::numberOfChunks( const string& shard ) const {
+        ShardToChunksMap::const_iterator i = _shardChunks.find( shard );
+        if ( i == _shardChunks.end() )
+            return 0;
+        return i->second.size();
+    }
+
+    string DistributionStatus::getShardRequiredToShed() const {
+        string shard;
+        unsigned minChunks = 0;
+        
+        for ( ShardInfoMap::const_iterator i = _shardInfo.begin(); i != _shardInfo.end(); ++i ) {
+
+            if ( ! i->second.isSizeMaxed() && ! i->second.isDraining() )
+                continue;
+
+            unsigned myChunks = numberOfChunks( i->first );
+            if ( myChunks == 0 )
+                continue;
+
+            if ( i->second.hasOpsQueued() ) {
+                warning() << "want to shed load from " << i->first << " but can't because it has ops queued" << endl;
+                continue;
+            }
+            
+            if ( myChunks <= minChunks )
+                continue;
+            
+            shard = i->first;
+            minChunks = myChunks;
+        }
+        
+        return shard;
+    }
+
+
+    string DistributionStatus::getBestReceieverShard() const {
+        string best;
+        unsigned minChunks = numeric_limits<unsigned>::max();
+        
+        for ( ShardInfoMap::const_iterator i = _shardInfo.begin(); i != _shardInfo.end(); ++i ) {
+            
+            if ( i->second.isSizeMaxed() || i->second.isDraining() || i->second.hasOpsQueued() )
+                continue;
+            
+            unsigned myChunks = numberOfChunks( i->first );
+            if ( myChunks >= minChunks )
+                continue;
+            
+            best = i->first;
+            minChunks = myChunks;
+        }
+
+        return best;
+    }
+
+    const vector<BSONObj>& DistributionStatus::getChunks( const string& shard ) const { 
+        ShardToChunksMap::const_iterator i = _shardChunks.find(shard);
+        verify( i != _shardChunks.end() );
+        return i->second;
+    }
+
+    void DistributionStatus::dump() const {
+        log() << "DistributionStatus" << endl;
+        log() << "  shards" << endl;
+        for ( ShardInfoMap::const_iterator i = _shardInfo.begin(); i != _shardInfo.end(); ++i ) {
+            log() << "      " << i->first << "\t" << i->second.toString() << endl;
+            ShardToChunksMap::const_iterator j = _shardChunks.find( i->first );
+            verify( j != _shardChunks.end() );
+            const vector<BSONObj>& v = j->second;
+            for ( unsigned x = 0; x < v.size(); x++ )
+                log() << "          " << v[x] << endl;
+        }
+        
+    }
 
     MigrateInfo* BalancerPolicy::balance( const string& ns,
                                           const DistributionStatus& distribution, 
                                           int balancedLastTime ) {
+
+
+        // 1) check for shards that policy require to us to move off of
+        //    draining, maxSize
+        // 2) then we look for "local" in balance for a tag
+        // 3) then we look for global in balance
+        
+        // ----
+
+        // 1) check things we have to move
+        string shardWeHaveToDrain = distribution.getShardRequiredToShed();
+        if ( shardWeHaveToDrain.size() > 0 ) {
+            string to = distribution.getBestReceieverShard();
+            if ( to.size() == 0 ) {
+                // we have no where to put stuff :(
+                warning() << " we want have to drain " << shardWeHaveToDrain
+                          << " but have no where to put chunks" << endl;
+                return NULL;
+            }
+
+            log() << "need to shed load from " << shardWeHaveToDrain << " will move to " << to << endl;
+            
+            return finishBalance( ns, distribution, shardWeHaveToDrain, to );
+        }
         
         const ShardInfoMap& shardToLimitsMap = distribution.shardInfo();
         const ShardToChunksMap& shardToChunksMap = distribution.shardChunks();
@@ -58,7 +158,8 @@ namespace mongo {
             // + maxed out shards
             // + draining shards
             // + shards with operations queued for writeback
-            const unsigned size = i->second.size();
+            const unsigned size = distribution.numberOfChunks( shard );
+
             if ( ! shardInfo.isSizeMaxed() && ! shardInfo.isDraining() && ! shardInfo.hasOpsQueued() ) {
                 if ( size < min.second ) {
                     min = make_pair( shard , size );
@@ -127,13 +228,22 @@ namespace mongo {
             return NULL;
         }
 
-        const vector<BSONObj>& chunksFrom = shardToChunksMap.find( from )->second;
-        const vector<BSONObj>& chunksTo = shardToChunksMap.find( to )->second;
+        return finishBalance( ns, distribution, from, to );
+    }
+
+    MigrateInfo* BalancerPolicy::finishBalance( const string& ns,
+                                                const DistributionStatus& distribution, 
+                                                const string& from,
+                                                const string& to ) {
+
+        const vector<BSONObj>& chunksFrom = distribution.getChunks( from );
+        const vector<BSONObj>& chunksTo = distribution.getChunks( to );
         BSONObj chunkToMove = pickChunk( chunksFrom , chunksTo );
         log() << "chose [" << from << "] to [" << to << "] " << chunkToMove << endl;
 
         return new MigrateInfo( ns, to, from, chunkToMove.getOwned() );
     }
+
 
     BSONObj BalancerPolicy::pickChunk( const vector<BSONObj>& from, const vector<BSONObj>& to ) {
         // It is possible for a donor ('from') shard to have less chunks than a receiver one ('to')

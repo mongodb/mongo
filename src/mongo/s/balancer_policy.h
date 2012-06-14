@@ -91,9 +91,24 @@ namespace mongo {
                             const ShardToChunksMap& shardToChunksMap );
 
 
-        const ShardInfoMap& shardInfo() const { return _shardInfo; }
-        const ShardToChunksMap& shardChunks() const { return _shardChunks; }
+        /**
+         * this could be because of draining, or over capacity
+         * NOT because of balance issues
+         */
+        string getShardRequiredToShed() const;
 
+        string getBestReceieverShard() const;
+
+        unsigned numberOfChunks( const string& shard ) const;
+        const vector<BSONObj>& getChunks( const string& shard ) const;
+        
+        const ShardInfoMap& shardInfo() const { return _shardInfo; } // TEMP
+        const ShardToChunksMap& shardChunks() const { return _shardChunks; } // TEMP
+
+        /**
+         * writes to log()
+         */
+        void dump() const;
         
     private:
         const ShardInfoMap& _shardInfo;
@@ -117,11 +132,17 @@ namespace mongo {
         static MigrateInfo* balance( const string& ns, 
                                      const DistributionStatus& distribution,
                                      int balancedLastTime );
-
+        
         // below exposed for testing purposes only -- treat it as private --
 
         static BSONObj pickChunk( const vector<BSONObj>& from, const vector<BSONObj>& to );
 
+    private:
+
+        static MigrateInfo* finishBalance( const string& ns,
+                                           const DistributionStatus& distribution, 
+                                           const string& from,
+                                           const string& to );
     };
 
 
