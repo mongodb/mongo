@@ -96,15 +96,21 @@ namespace mongo {
          * NOT because of balance issues
          */
         string getShardRequiredToShed() const;
-
+        
+        /**
+         * @return shard best suited to receive a chunk
+         */
         string getBestReceieverShard() const;
 
+        /**
+         * @return the shard with the most chunks
+         */
+        string getMostOverloadedShard() const;
+
+        /** @return number of chunks in this shard */
         unsigned numberOfChunks( const string& shard ) const;
         const vector<BSONObj>& getChunks( const string& shard ) const;
         
-        const ShardInfoMap& shardInfo() const { return _shardInfo; } // TEMP
-        const ShardToChunksMap& shardChunks() const { return _shardChunks; } // TEMP
-
         /**
          * writes to log()
          */

@@ -87,6 +87,29 @@ namespace mongo {
         return best;
     }
 
+    string DistributionStatus::getMostOverloadedShard() const {
+        string worst;
+        unsigned maxChunks = 0;
+
+        for ( ShardInfoMap::const_iterator i = _shardInfo.begin(); i != _shardInfo.end(); ++i ) {
+            
+            if ( i->second.hasOpsQueued() ) {
+                // we can't move stuff off anyway
+                continue;
+            }
+            
+            unsigned myChunks = numberOfChunks( i->first );
+            if ( myChunks <= maxChunks )
+                continue;
+            
+            worst = i->first;
+            maxChunks = myChunks;
+        }
+        
+        return worst;
+    }
+    
+
     const vector<BSONObj>& DistributionStatus::getChunks( const string& shard ) const { 
         ShardToChunksMap::const_iterator i = _shardChunks.find(shard);
         verify( i != _shardChunks.end() );
@@ -134,76 +157,27 @@ namespace mongo {
             
             return finishBalance( ns, distribution, shardWeHaveToDrain, to );
         }
-        
-        const ShardInfoMap& shardToLimitsMap = distribution.shardInfo();
-        const ShardToChunksMap& shardToChunksMap = distribution.shardChunks();
 
         pair<string,unsigned> min("",numeric_limits<unsigned>::max());
         pair<string,unsigned> max("",0);
-        vector<string> drainingShards;
-
-        bool maxOpsQueued = false;
-
-        for (ShardToChunksMap::const_iterator i = shardToChunksMap.begin(); i!=shardToChunksMap.end(); ++i ) {
-
-            // Find whether this shard's capacity or availability are exhausted
-            const string& shard = i->first;
-            ShardInfo shardInfo;
-            ShardInfoMap::const_iterator it = shardToLimitsMap.find( shard );
-            if ( it != shardToLimitsMap.end() ) 
-                shardInfo = it->second;
-            
-            // Is this shard a better chunk receiver then the current one?
-            // Shards that would be bad receiver candidates:
-            // + maxed out shards
-            // + draining shards
-            // + shards with operations queued for writeback
-            const unsigned size = distribution.numberOfChunks( shard );
-
-            if ( ! shardInfo.isSizeMaxed() && ! shardInfo.isDraining() && ! shardInfo.hasOpsQueued() ) {
-                if ( size < min.second ) {
-                    min = make_pair( shard , size );
-                }
-            }
-            else if ( shardInfo.hasOpsQueued() ) {
-                LOG(1) << "won't send a chunk to: " << shard << " because it has ops queued" << endl;
-            }
-            else if ( shardInfo.isSizeMaxed() ) {
-                LOG(1) << "won't send a chunk to: " << shard << " because it is maxedOut" << endl;
-            }
-
-
-            // Check whether this shard is a better chunk donor then the current one.
-            // Draining shards take a lower priority than overloaded shards.
-            if ( size > max.second ) {
-                max = make_pair( shard , size );
-                maxOpsQueued = shardInfo.hasOpsQueued();
-            }
-            if ( shardInfo.isDraining() && (size > 0)) {
-                drainingShards.push_back( shard );
-            }
-        }
-
-        // If there is no candidate chunk receiver -- they may have all been maxed out,
-        // draining, ... -- there's not much that the policy can do.
-        if ( min.second == numeric_limits<unsigned>::max() ) {
+        
+        min.first = distribution.getBestReceieverShard();
+        if ( min.first.size() == 0 ) {
             log() << "no available shards to take chunks" << endl;
             return NULL;
         }
+        min.second = distribution.numberOfChunks( min.first );
 
-        if ( maxOpsQueued ) {
-            log() << "biggest shard " << max.first << " has unprocessed writebacks, waiting for completion of migrate" << endl;
+        max.first = distribution.getMostOverloadedShard();
+        if ( max.first.size() == 0 ) {
+            LOG(1) << "no shards overloaded" << endl;
             return NULL;
         }
+        max.second = distribution.numberOfChunks( max.first );
 
         LOG(1) << "collection : " << ns << endl;
         LOG(1) << "donor      : " << max.second << " chunks on " << max.first << endl;
         LOG(1) << "receiver   : " << min.second << " chunks on " << min.first << endl;
-        if ( ! drainingShards.empty() ) {
-            string drainingStr;
-            joinStringDelim( drainingShards, &drainingStr, ',' );
-            LOG(1) << "draining           : " << ! drainingShards.empty() << "(" << drainingShards.size() << ")" << endl;
-        }
 
         // Solving imbalances takes a higher priority than draining shards. Many shards can
         // be draining at once but we choose only one of them to cater to per round.
@@ -215,11 +189,6 @@ namespace mongo {
         string from, to;
         if ( imbalance >= threshold ) {
             from = max.first;
-            to = min.first;
-
-        }
-        else if ( ! drainingShards.empty() ) {
-            from = drainingShards[ rand() % drainingShards.size() ];
             to = min.first;
 
         }
