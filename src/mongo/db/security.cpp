@@ -44,6 +44,16 @@ namespace mongo {
         _tempAuthTable.clearAuth();
     }
 
+    bool AuthenticationInfo::hasTemporaryAuthorization() {
+        scoped_spinlock lk( _lock );
+        return _usingTempAuth;
+    }
+
+    bool AuthenticationInfo::usingInternalUser() {
+        return getUser("local") == internalSecurity.user ||
+            getUser("admin") == internalSecurity.user;
+    }
+
     string AuthenticationInfo::getUser( const string& dbname ) const {
         scoped_spinlock lk(_lock);
         return _authTable.getAuthForDb( dbname ).user;
@@ -89,6 +99,18 @@ namespace mongo {
     void AuthenticationInfo::startRequest() {
         if ( ! Lock::isLocked() ) {
             _checkLocalHostSpecialAdmin();
+        }
+    }
+
+    AuthenticationInfo::TemporaryAuthReleaser::TemporaryAuthReleaser ( AuthenticationInfo* ai ) :
+        _ai (ai), _hadTempAuthFromStart( ai->hasTemporaryAuthorization() ) {}
+
+    AuthenticationInfo::TemporaryAuthReleaser::~TemporaryAuthReleaser() {
+        // Some commands can run other commands using the DBDirectClient, which leads to the
+        // temporary auth already being set when the inner command runs.  If that's the case, we
+        // shouldn't clear the temporary auth set by a command higher up in the call stack.
+        if ( !_hadTempAuthFromStart ) {
+            _ai->clearTemporaryAuthorization();
         }
     }
 

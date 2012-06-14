@@ -70,7 +70,6 @@ namespace AuthTests {
                 ASSERT( ai.isAuthorizedReads( "test2" ) );
             }
 
-            ai.clearTemporaryAuthorization();
             ASSERT( ! ai.isAuthorized( "test" ) );
             ASSERT( ! ai.isAuthorized( "admin" ) );
             ASSERT( ai.isAuthorizedReads( "test" ) );
