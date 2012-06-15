@@ -31,7 +31,7 @@ s.config.tags.insert( { ns : "test.foo" , min : { _id : -1 } , max : { _id : 100
 assert.soon( function() {
     counts = s.chunkCounts( "foo" );
     printjson( counts )
-    return counts["shard0002"] == 2;
+    return counts["shard0002"] == 0;
 } , "balance 2 didn't happen" , 1000 * 60 * 10 , 1000 )
 
 
