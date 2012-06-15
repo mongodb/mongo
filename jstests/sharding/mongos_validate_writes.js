@@ -65,6 +65,7 @@ printjson( admin.runCommand({ shardCollection : coll + "", key : { d : 1 } }) )
 
 // Make sure we can successfully update, even though we have stale state
 coll.insert({ d : "d" })
+coll.getDB().getLastError();
 
 staleCollA.update({ d : "d" }, { $set : { x : "x" } }, false, false )
 assert.eq( null, staleCollA.getDB().getLastError() )
