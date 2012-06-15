@@ -1,3 +1,17 @@
+WiredTiger release 1.2.1, 2012-06-15
+------------------------------------
+
+This is a bugfix release.  The changes are as follows:
+
+* Avoid a deadlock between eviction and checkpoint on the connection spinlock.
+
+* Allocate "desc" buffers in heap memory so that they are correctly aligned
+  (fixes direct_io support on Linux).
+
+* Initialize the snapshot-avail list after cleaning it out, else we'll try and
+  print a NULL pointer in VERBOSE mode.
+
+
 WiredTiger release 1.2.0, 2012-06-04
 ------------------------------------
 
