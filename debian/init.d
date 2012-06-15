@@ -96,7 +96,7 @@ DIETIME=10                   # Time to wait for the server to die, in seconds
                             # 'restart' will not work
 
 DAEMONUSER=${DAEMONUSER:-mongodb}
-DAEMON_OPTS=${DAEMON_OPTS:-"--config $CONF"}
+DAEMON_OPTS=${DAEMON_OPTS:-"run --config $CONF"}
 
 set -e
 
