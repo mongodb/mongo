@@ -56,7 +56,8 @@ namespace mongo {
             info["shard1"] = ShardInfo( 0, 0, false, false );
 
             MigrateInfo* c = NULL;
-            c = BalancerPolicy::balance( "ns", DistributionStatus( info, chunkMap ), 1 );
+            DistributionStatus status( info, chunkMap );
+            c = BalancerPolicy::balance( "ns", status, 1 );
             ASSERT( c );
         }
 
@@ -78,8 +79,8 @@ namespace mongo {
             limitsMap["shard0"] = ShardInfo( 0LL, 2LL, true, false );
             limitsMap["shard1"] = ShardInfo( 0LL, 0LL, false, false );
 
-            MigrateInfo* c = NULL;
-            c = BalancerPolicy::balance( "ns", DistributionStatus( limitsMap, chunkMap), 0 );
+            DistributionStatus status( limitsMap, chunkMap );
+            MigrateInfo* c = BalancerPolicy::balance( "ns", status, 0 );
             ASSERT( c );
             ASSERT_EQUALS( c->to , "shard1" );
             ASSERT_EQUALS( c->from , "shard0" );
@@ -103,8 +104,8 @@ namespace mongo {
             limitsMap["shard0"] = ShardInfo( 0, 2, false, false );
             limitsMap["shard1"] = ShardInfo( 0, 0, true, false );
 
-            MigrateInfo* c = NULL;
-            c = BalancerPolicy::balance( "ns", DistributionStatus( limitsMap, chunkMap), 0 );
+            DistributionStatus status( limitsMap, chunkMap );
+            MigrateInfo* c = BalancerPolicy::balance( "ns", status, 0 );
             ASSERT( ! c );
         }
 
@@ -127,8 +128,8 @@ namespace mongo {
             limitsMap["shard1"] = ShardInfo( 1, 1, false, false );
             limitsMap["shard2"] = ShardInfo( 0, 1, true, false );
 
-            MigrateInfo* c = NULL;
-            c = BalancerPolicy::balance( "ns", DistributionStatus(limitsMap, chunkMap), 0 );
+            DistributionStatus status(limitsMap, chunkMap);
+            MigrateInfo* c = BalancerPolicy::balance( "ns", status, 0 );
             ASSERT( ! c );
         }
 
