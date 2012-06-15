@@ -209,6 +209,19 @@ namespace mongo {
             }
         }
 
+        /**
+         * Invoked before mongos needs to throw an error relating to an operation which cannot
+         * be performed on a sharded collection.
+         *
+         * This prevents mongos from refreshing config data too quickly in response to bad requests,
+         * since doing so is expensive.
+         *
+         * TODO: Can we restructure to make this simpler?
+         */
+        void _sleepForVerifiedLocalError(){
+            sleepsecs( 1 );
+        }
+
         void _handleRetries( const string& op,
                              int retries,
                              const string& ns,
@@ -321,10 +334,15 @@ namespace mongo {
                     if( bad ){
 
                         // Sleep to avoid DOS'ing config server when we have invalid inserts
-                        sleepsecs( 1 );
+                        _sleepForVerifiedLocalError();
 
-                        log() << "tried to insert object with no valid shard key for " << manager->getShardKey() << " : " << o << endl;
-                        uassert( 8011, str::stream() << "tried to insert object with no valid shard key for " << manager->getShardKey().toString() << " : " << o.toString(), false );
+                        // TODO: Matching old behavior, but do we need this log line?
+                        log() << "tried to insert object with no valid shard key for "
+                              << manager->getShardKey() << " : " << o << endl;
+
+                        uasserted( 8011,
+                              str::stream() << "tried to insert object with no valid shard key for "
+                                            << manager->getShardKey().toString() << " : " << o.toString() );
                     }
                 }
 
@@ -540,7 +558,9 @@ namespace mongo {
                 // Validate all top-level is of style $op
                 BSONForEach(op, toUpdate){
 
-                    uassert(16064, "can't mix $operator style update with non-$op fields", op.fieldName()[0] == '$');
+                    uassert( 16064,
+                             "can't mix $operator style update with non-$op fields",
+                             op.fieldName()[0] == '$' );
 
                     if( op.type() != Object ) continue;
 
@@ -575,10 +595,11 @@ namespace mongo {
 
                         // Sleep here, to rate-limit the amount of bad updates we process and avoid pounding the
                         // config server
-                        sleepsecs( 1 );
+                        _sleepForVerifiedLocalError();
 
-                        uassert( 8013, str::stream() << "For non-multi updates, must have _id or full shard key "
-                                                    << "(" << skPattern.toString() << ") in query", false );
+                        uasserted( 8013,
+                          str::stream() << "For non-multi updates, must have _id or full shard key "
+                                        << "(" << skPattern.toString() << ") in query" );
                     }
                 }
             }
@@ -599,10 +620,11 @@ namespace mongo {
                     }
 
                     // Sleep here
-                    sleepsecs( 1 );
+                    _sleepForVerifiedLocalError();
 
-                    uassert(12376, str::stream() << "full shard key must be in update object for collection: "
-                                                 << manager->getns(), false );
+                    uasserted( 12376,
+                         str::stream() << "full shard key must be in update object for collection: "
+                                       << manager->getns() );
                 }
 
                 shardKey = skPattern.extractKey( toUpdate );
@@ -621,13 +643,12 @@ namespace mongo {
                         }
 
                         // Sleep here
-                        sleepsecs( 1 );
+                        _sleepForVerifiedLocalError();
 
-                        uassert( 8014, str::stream() << "cannot modify shard key for collection "
-                                                     << manager->getns()
-                                                     << ", found new value for "
-                                                     << field.fieldName(),
-                                 false );
+                        uasserted( 8014, str::stream() << "cannot modify shard key for collection "
+                                                       << manager->getns()
+                                                       << ", found new value for "
+                                                       << field.fieldName() );
                     }
                 }
             }
@@ -658,10 +679,10 @@ namespace mongo {
                         return;
                     }
 
-                    sleepsecs( 1 );
+                    _sleepForVerifiedLocalError();
 
-                    throw UserException( 8012, str::stream() <<
-                            "can't upsert something without full valid shard key : " << query );
+                    uasserted( 8012, str::stream()
+                        << "can't upsert something without full valid shard key : " << query );
                 }
 
                 set<Shard> shards;
@@ -685,10 +706,10 @@ namespace mongo {
                         return;
                     }
 
-                    sleepsecs( 1 );
+                    _sleepForVerifiedLocalError();
 
-                    throw UserException( 13506, str::stream() <<
-                            "$atomic not supported sharded : " << query );
+                    uasserted( 13506, str::stream()
+                        << "$atomic not supported sharded : " << query );
                 }
 
                 return;
@@ -830,10 +851,10 @@ namespace mongo {
                 }
 
                 // Sleep so we don't DOS config server
-                sleepsecs( 1 );
+                _sleepForVerifiedLocalError();
 
-                throw UserException( 13505, str::stream() <<
-                        "$atomic not supported for sharded delete : " << query );
+                uasserted( 13505, str::stream()
+                    << "$atomic not supported for sharded delete : " << query );
             }
             else if( justOne && ! query.hasField( "_id" ) ){
 
@@ -844,12 +865,11 @@ namespace mongo {
                 }
 
                 // Sleep so we don't DOS config server
-                sleepsecs( 1 );
+                _sleepForVerifiedLocalError();
 
-                throw UserException( 8015, str::stream() <<
-                        "can only delete with a non-shard key pattern if can " <<
-                        "delete as many as we find : " << query );
-                return;
+                uasserted( 8015, str::stream()
+                    << "can only delete with a non-shard key pattern if can " <<
+                       "delete as many as we find : " << query );
             }
         }
 
@@ -989,15 +1009,14 @@ namespace mongo {
                 }
             }
             else if ( op == dbUpdate ) {
-                throw UserException( 8050 , "can't update system.indexes" );
+                uasserted( 8050 , "can't update system.indexes" );
             }
             else if ( op == dbDelete ) {
-                // TODO
-                throw UserException( 8051 , "can't delete indexes on sharded collection yet" );
+                uasserted( 8051 , "can't delete indexes on sharded collection yet" );
             }
             else {
                 log() << "handleIndexWrite invalid write op: " << op << endl;
-                throw UserException( 8052 , "handleIndexWrite invalid write op" );
+                uasserted( 8052 , "handleIndexWrite invalid write op" );
             }
 
         }
