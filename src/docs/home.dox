@@ -2,56 +2,30 @@
 
 WiredTiger file naming is based on the \c home argument specified to the
 ::wiredtiger_open function and the \c WIREDTIGER_HOME environment
-variable.
+variable, determined by the following steps:
 
-If a \c home argument is specified to the ::wiredtiger_open function,
-its value is used as the database directory and the \c WIREDTIGER_HOME
-environment variable is always ignored.
-
-If no \c home argument is specified to the ::wiredtiger_open function
-and the WIREDTIGER_HOME environment variable is not set, the database
+-# If a \c home argument is specified to the ::wiredtiger_open function,
+its value is used as the database directory.
+-# If the \c WIREDTIGER_HOME environment variable is not set, the database
 directory is the process' current working directory.  No current working
 directory path is maintained by the WiredTiger software and changing the
-working directory after opening the WiredTiger database may cause
-failure.
-
-If no \c home argument is specified to the ::wiredtiger_open function,
-the WIREDTIGER_HOME environment variable is set, and the
-::wiredtiger_open function was configured with the \c home_environment
-string, the WIREDTIGER_HOME environment variable value is used as the
-database directory.
-
-If no \c home argument is specified to the ::wiredtiger_open function,
-the WIREDTIGER_HOME environment variable is set, the ::wiredtiger_open
-function was configured with the \c home_environment_priv string, and
-the user has appropriate privileges, the WIREDTIGER_HOME environment
-value is used as the database directory.  (The \c home_environment_priv
-string is intended for applications that have or acquire special
-privileges and wish to ensure an environment-specified home directory
-is ignored unless the program is executed by a user with appropriate
-permissions: if such an application does not configure the
-::wiredtiger_open function with the \c home_environment_priv string,
-setting an environment value will cause the open to fail unless the user
-has appropriate permissions.  On ISO/IEC 9945-1:1990 (POSIX.1) systems,
-"appropriate permissions" is defined as a real user ID of 0.)
-
-If no \c home argument is specified to the ::wiredtiger_open function,
-the WIREDTIGER_HOME environment variable is set, and the
-::wiredtiger_open function was not configured with either the \c
-home_environment or \c home_environment_priv strings, the open will
-fail.
+working directory after opening the WiredTiger database may cause failure.
+-# If the process is running with special privileges, the ::wiredtiger_open
+function must be configured with the \c use_environment_priv flag.  The
+\c use_environment_priv flag is intended for applications that have or
+acquire special privileges and wish to use an environment-specified home
+directory: if such an application does not configure the ::wiredtiger_open
+function with the \c use_environment_priv flag, setting an environment
+value will cause the open to fail.  On ISO/IEC 9945-1:1990 (POSIX.1)
+systems, "special privileges" is defined as a real user ID not equal to the
+effective user ID, or the real group ID not equal to the effective group
+ID.
+-# Otherwise, the value of the \c WIREDTIGER_HOME environment variable is
+used as the database directory.
 
 Finally, consider security when configuring WiredTiger to use the
-WIREDTIGER_HOME environment variable, especially in applications which
+\c WIREDTIGER_HOME environment variable, especially in applications which
 run with permissions other than the user's.  Such applications are
-potentially vulnerable to allowing users access to databases they could
-not otherwise access.
-
-@section home_config Home directory configuration strings
-
-The WiredTiger home directory optionally includes a file named \c
-WiredTiger.config.  If this file exists when ::wiredtiger_open is
-called, it is read for configuration strings.  See @subpage config_file
-for details.
-
+potentially vulnerable to allowing users access to databases they could not
+otherwise access.
 */

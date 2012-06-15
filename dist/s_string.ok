@@ -60,6 +60,7 @@ FreeBSD
 FreeBSD's
 Freelist
 GCC
+GIDs
 IKEY
 IMPL
 IMPL's
@@ -136,6 +137,7 @@ TOOSMALL
 TRK
 TXN
 Timestamp
+UIDs
 UINT
 URI
 URIs
@@ -249,6 +251,7 @@ endian
 english
 enqueue
 enum's
+env
 eof
 eop
 errhandler
