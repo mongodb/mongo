@@ -372,7 +372,6 @@ err:	API_END_NOTFOUND_MAP(session, ret);
 static int
 __conn_config_file(WT_SESSION_IMPL *session, const char **cfg, WT_ITEM **cbufp)
 {
-	WT_CONNECTION_IMPL *conn;
 	WT_DECL_ITEM(cbuf);
 	WT_DECL_RET;
 	WT_FH *fh;
@@ -383,7 +382,6 @@ __conn_config_file(WT_SESSION_IMPL *session, const char **cfg, WT_ITEM **cbufp)
 
 	*cbufp = NULL;				/* Returned buffer */
 
-	conn = S2C(session);
 	fh = NULL;
 
 	/* Check for an optional configuration file. */
@@ -568,10 +566,7 @@ __conn_config_env(WT_SESSION_IMPL *session, const char **cfg)
 static int
 __conn_home(WT_SESSION_IMPL *session, const char *home, const char **cfg)
 {
-	WT_CONNECTION_IMPL *conn;
 	WT_CONFIG_ITEM cval;
-
-	conn = S2C(session);
 
 	/* If the application specifies a home directory, use it. */
 	if (home != NULL)
@@ -595,7 +590,7 @@ __conn_home(WT_SESSION_IMPL *session, const char *home, const char **cfg)
 		    "WIREDTIGER_HOME environment variable set but process "
 		    "lacks privileges to use that environment variable");
 
-copy:	return (__wt_strdup(session, home, &conn->home));
+copy:	return (__wt_strdup(session, home, &S2C(session)->home));
 }
 
 /*
