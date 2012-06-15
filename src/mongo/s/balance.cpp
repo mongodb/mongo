@@ -225,7 +225,9 @@ namespace mongo {
                 shardToChunksMap[s.getName()].size();
             }
 
-            CandidateChunk* p = _policy->balance( ns , DistributionStatus( shardInfo , shardToChunksMap ) , _balancedLastTime );
+            DistributionStatus status( shardInfo, shardToChunksMap );
+            
+            CandidateChunk* p = _policy->balance( ns, status, _balancedLastTime );
             if ( p ) candidateChunks->push_back( CandidateChunkPtr( p ) );
         }
     }
