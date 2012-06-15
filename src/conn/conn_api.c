@@ -564,7 +564,7 @@ __conn_home(WT_CONNECTION_IMPL *conn, const char *home, const char **cfg)
 		    "WIREDTIGER_HOME environment variable set but process "
 		    "lacks privileges to use that environment variable");
 
-copy:	return (__wt_strdup(session, home, &conn->home));
+copy:	return (__wt_strdup(session, home, &S2C(session)->home));
 }
 
 /*
