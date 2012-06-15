@@ -9,10 +9,11 @@
 
 /*
  * __wt_has_priv --
- *	Return if the process has special privileges.
+ *	Return if the process has special privileges, defined as having
+ *	different effective and read UIDs or GIDs.
  */
 int
 __wt_has_priv(void)
 {
-	return (getuid() == 0 ? 1 : 0);
+	return (getuid() != geteuid() || getgid() != getegid());
 }

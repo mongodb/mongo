@@ -525,10 +525,24 @@ err:		if (cbuf != NULL)
 static int
 __conn_config_env(WT_SESSION_IMPL *session, const char **cfg)
 {
+	WT_CONFIG_ITEM cval;
 	const char *env_config;
 
-	if ((env_config = getenv("WIREDTIGER_CONFIG")) == NULL)
+	if ((env_config = getenv("WIREDTIGER_CONFIG")) == NULL ||
+	    strlen(env_config) == 0)
 		return (0);
+
+	/*
+	 * Security stuff:
+	 *
+	 * If the "use_environment_priv" configuration string is set, use the
+	 * environment variable if the process has appropriate privileges.
+	 */
+	WT_RET(__wt_config_gets(session, cfg, "use_environment_priv", &cval));
+	if (cval.val == 0 && __wt_has_priv())
+		WT_RET_MSG(session, WT_ERROR, "%s",
+		    "WIREDTIGER_CONFIG environment variable set but process "
+		    "lacks privileges to use that environment variable");
 
 	/* Check the configuration string. */
 	WT_RET(__wt_config_check(
@@ -564,7 +578,7 @@ __conn_home(WT_SESSION_IMPL *session, const char *home, const char **cfg)
 		goto copy;
 
 	/* If there's no WIREDTIGER_HOME environment variable, use ".". */
-	if ((home = getenv("WIREDTIGER_HOME")) == NULL) {
+	if ((home = getenv("WIREDTIGER_HOME")) == NULL || strlen(home) == 0) {
 		home = ".";
 		goto copy;
 	}
@@ -572,24 +586,11 @@ __conn_home(WT_SESSION_IMPL *session, const char *home, const char **cfg)
 	/*
 	 * Security stuff:
 	 *
-	 * If the "home_environment" configuration string is set, use the
-	 * environment variable for all processes.
+	 * Unless the "use_environment_priv" configuration string is set,
+	 * fail if the process is running with special privileges.
 	 */
-	WT_RET(__wt_config_gets(session, cfg, "home_environment", &cval));
-	if (cval.val != 0)
-		goto copy;
-
-	/*
-	 * If the "home_environment_priv" configuration string is set, use the
-	 * environment variable if the process has appropriate privileges.
-	 */
-	WT_RET(__wt_config_gets(session, cfg, "home_environment_priv", &cval));
-	if (cval.val == 0)
-		WT_RET_MSG(session, WT_ERROR, "%s",
-		    "WIREDTIGER_HOME environment variable set but WiredTiger "
-		    "not configured to use that environment variable");
-
-	if (!__wt_has_priv())
+	WT_RET(__wt_config_gets(session, cfg, "use_environment_priv", &cval));
+	if (cval.val == 0 && __wt_has_priv())
 		WT_RET_MSG(session, WT_ERROR, "%s",
 		    "WIREDTIGER_HOME environment variable set but process "
 		    "lacks privileges to use that environment variable");

@@ -47,4 +47,8 @@ Configuration values specified in the \c config argument to
 \c WIREDTIGER_CONFIG environment variable, which in turn override values
 in the \c WiredTiger.config file.
 
+If the process is running with special privileges and \c WIREDTIGER_CONFIG
+is set, the ::wiredtiger_open function must be configured with the
+\c use_environment_priv flag, or the call to ::wiredtiger_open will fail.
+See @ref home for more details.
 */
