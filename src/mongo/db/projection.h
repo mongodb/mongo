@@ -108,13 +108,11 @@ namespace mongo {
         bool includeID() const { return _includeID; }
 
         /**
-         *  get the type of array operator in the projection
-         *  @param      spec  Optional specifier to check (uses _source if unspecified)
+         *  get the type of array operator for the projection
          *  @return     ARRAY_OP_NORMAL if no array projection modifier,
-         *              ARRAY_OP_ELEM_MATCH if $elemMatch specifier,
-         *              ARRAY_OP_POSITIONAL if '.$' projection specified
+         *              ARRAY_OP_ELEM_MATCH if one or more $elemMatch specifier,
+         *              ARRAY_OP_POSITIONAL if one '.$' projection specified
          */
-        static ArrayOpType getArrayOpType( const BSONObj spec );
         ArrayOpType getArrayOpType() const;
 
         /**

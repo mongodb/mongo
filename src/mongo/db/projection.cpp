@@ -103,7 +103,7 @@ namespace mongo {
                 }
             }
             if ( mongoutils::str::contains( e.fieldName(), ".$" ) ) {
-                // positional op found; add parent fields
+                // positional op found; verify dependencies
                 uassert( 16345, "Cannot exclude array elements with the positional operator"
                                 " (currently unsupported).", e.trueValue() );
                 uassert( 16346, "Cannot specify more than one positional array element per query"
@@ -111,7 +111,6 @@ namespace mongo {
                 uassert( 16347, "Cannot specify positional operator and $elemMatch"
                                 " (currently unsupported).", _arrayOpType != ARRAY_OP_ELEM_MATCH );
                 _arrayOpType = ARRAY_OP_POSITIONAL;
-                add( mongoutils::str::before( e.fieldName(), ".$"), e.trueValue() );
             }
         }
     }
@@ -307,28 +306,6 @@ namespace mongo {
 
     Projection::ArrayOpType Projection::getArrayOpType( ) const {
         return _arrayOpType;
-    }
-
-    Projection::ArrayOpType Projection::getArrayOpType( const BSONObj spec ) {
-        BSONObjIterator iq( spec );
-        while ( iq.more() ) {
-            // iterate through each element
-            const BSONElement& elem = iq.next();
-            const char* const& fieldName = elem.fieldName();
-            if ( mongoutils::str::contains( fieldName, ".$" ) ) {
-                // projection contains positional or $elemMatch operator
-                return ARRAY_OP_POSITIONAL;
-            }
-            if ( mongoutils::str::contains( fieldName, "$elemMatch" ) ) {
-                // projection contains positional or $elemMatch operator
-                return ARRAY_OP_ELEM_MATCH;
-            }
-
-            // check nested elements
-            if ( elem.type() == Object )
-                return getArrayOpType( elem.embeddedObject() );
-        }
-        return ARRAY_OP_NORMAL;
     }
 
     void Projection::validateQuery( const BSONObj query ) const {

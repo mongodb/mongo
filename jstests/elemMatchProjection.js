@@ -32,9 +32,9 @@ assert.eq( 1,
            t.find( { group:3, 'x.a':2 }, { 'x.$':1 } ).toArray()[0].x.length,
            "single object match (array length match)" );
 
-assert.eq( 1,
-          t.find( { group:3, 'x.a':2 }, { _id:0, 'x.$':1 } ).toArray()[0].x.length,
-          "single object match with filtered _id (array length match)" );
+assert.eq( undefined,
+          t.find( { group:3, 'x.a':2 }, { _id:0, 'x.$':1 } ).toArray()[0]._id,
+          "single object match with filtered _id" );
 
 assert.eq( 1,
         t.find( { group:3, 'x.a':2 }, { 'x.$':1 } ).sort( { _id:1 } ).toArray()[0].x.length,
@@ -55,6 +55,10 @@ assert.throws( function() {
 assert.throws( function() {
                    t.find( { group:3, 'x.a':2 }, { 'y.$':1 } ).sort( { x:1 } ).toArray()[0].x.length;
                }, [], "throw on invalid sorted projection (field mismatch)" );
+
+assert.throws( function() {
+                  t.find( { group:3, 'x.a':2 }, { 'x.$':1, group:0 } ).sort( { x:1 } ).toArray()[0].x.length;
+              }, [], "throw on invalid projection combination (include and exclude)" );
 
 assert.eq( { aa:1, dd:5 },
            t.find( { group:11, 'covered.dd':5 }, { 'covered.$':1 } ).toArray()[0].covered[0],
