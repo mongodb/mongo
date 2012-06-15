@@ -20,6 +20,8 @@
 
 #include "pch.h"
 #include "scanandorder.h"
+#include "mongo/db/matcher.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
@@ -55,15 +57,27 @@ namespace mongo {
     }
 
 
-    void ScanAndOrder::fill(BufBuilder& b, const Projection *filter, int& nout ) const {
+    void ScanAndOrder::fill( BufBuilder& b, const ParsedQuery *parsedQuery, int& nout ) const {
         int n = 0;
         int nFilled = 0;
+        Projection *projection = parsedQuery ? parsedQuery->getFields() : NULL;
+        scoped_ptr<Matcher> arrayMatcher;
+        scoped_ptr<MatchDetails> details;
+        if ( projection && projection->getArrayOpType() == Projection::ARRAY_OP_POSITIONAL ) {
+            // the projection specified an array positional match operator; create a new matcher
+            // for the projected array
+            arrayMatcher.reset( new Matcher( parsedQuery->getFilter() ) );
+            details.reset( new MatchDetails );
+            details->requestElemMatchKey();
+        }
         for ( BestMap::const_iterator i = _best.begin(); i != _best.end(); i++ ) {
             n++;
             if ( n <= _startFrom )
                 continue;
             const BSONObj& o = i->second;
-            fillQueryResultFromObj(b, filter, o);
+            massert( 16355, "positional operator specified, but no array match",
+                     ! arrayMatcher || arrayMatcher->matches( o, details.get() ) );
+            fillQueryResultFromObj( b, projection, o, details.get() );
             nFilled++;
             if ( nFilled >= _limit )
                 break;

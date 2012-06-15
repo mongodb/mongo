@@ -17,7 +17,8 @@
 
 #include "pch.h"
 #include "projection.h"
-#include "../util/mongoutils/str.h"
+#include "mongo/db/matcher.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
@@ -36,7 +37,7 @@ namespace mongo {
             if (e.type() == Object) {
                 BSONObj obj = e.embeddedObject();
                 BSONElement e2 = obj.firstElement();
-                if ( strcmp(e2.fieldName(), "$slice") == 0 ) {
+                if ( mongoutils::str::equals( e2.fieldName(), "$slice" ) ) {
                     if (e2.isNumber()) {
                         int i = e2.numberInt();
                         if (i < 0)
@@ -60,18 +61,35 @@ namespace mongo {
                         uassert(13098, "$slice only supports numbers and [skip, limit] arrays", false);
                     }
                 }
+                else if ( mongoutils::str::equals( e2.fieldName(), "$elemMatch" ) ) {
+                    // validate $elemMatch arguments and dependancies
+                    uassert( 16342, "elemMatch: invalid argument.  object required.",
+                             e2.type() == Object );
+                    uassert( 16343, "Cannot specify positional operator and $elemMatch"
+                                    " (currently unsupported).",
+                             _arrayOpType != ARRAY_OP_POSITIONAL );
+                    uassert( 16344, "Cannot use $elemMatch projection on a nested field"
+                                    " (currently unsupported).",
+                             ! mongoutils::str::contains( e.fieldName(), '.' ) );
+                    _arrayOpType = ARRAY_OP_ELEM_MATCH;
+
+                    // initialize new Matcher object(s)
+
+                    _matchers.insert( make_pair( mongoutils::str::before( e.fieldName(), '.' ),
+                                                 new Matcher( e.wrap(), true ) ) );
+                    add( e.fieldName(), true );
+                }
                 else {
-                    uassert(13097, string("Unsupported projection option: ") + obj.firstElementFieldName(), false);
+                    uasserted(13097, string("Unsupported projection option: ") +
+                                     obj.firstElementFieldName() );
                 }
 
             }
             else if (!strcmp(e.fieldName(), "_id") && !e.trueValue()) {
                 _includeID = false;
-
             }
             else {
-
-                add (e.fieldName(), e.trueValue());
+                add( e.fieldName(), e.trueValue() );
 
                 // validate input
                 if (true_false == -1) {
@@ -79,9 +97,21 @@ namespace mongo {
                     _include = !e.trueValue();
                 }
                 else {
-                    uassert( 10053 , "You cannot currently mix including and excluding fields. Contact us if this is an issue." ,
+                    uassert( 10053 , "You cannot currently mix including and excluding fields. "
+                                     "Contact us if this is an issue." ,
                              (bool)true_false == e.trueValue() );
                 }
+            }
+            if ( mongoutils::str::contains( e.fieldName(), ".$" ) ) {
+                // positional op found; add parent fields
+                uassert( 16345, "Cannot exclude array elements with the positional operator"
+                                " (currently unsupported).", e.trueValue() );
+                uassert( 16346, "Cannot specify more than one positional array element per query"
+                                " (currently unsupported).", _arrayOpType != ARRAY_OP_POSITIONAL );
+                uassert( 16347, "Cannot specify positional operator and $elemMatch"
+                                " (currently unsupported).", _arrayOpType != ARRAY_OP_ELEM_MATCH );
+                _arrayOpType = ARRAY_OP_POSITIONAL;
+                add( mongoutils::str::before( e.fieldName(), ".$"), e.trueValue() );
             }
         }
     }
@@ -125,7 +155,9 @@ namespace mongo {
         }
     }
 
-    void Projection::transform( const BSONObj& in , BSONObjBuilder& b ) const {
+    void Projection::transform( const BSONObj& in , BSONObjBuilder& b, const MatchDetails* details ) const {
+        const ArrayOpType& arrayOpType = getArrayOpType();
+
         BSONObjIterator i(in);
         while ( i.more() ) {
             BSONElement e = i.next();
@@ -134,14 +166,44 @@ namespace mongo {
                     b.append( e );
             }
             else {
-                append( b , e );
+                Matchers::const_iterator matcher = _matchers.find( e.fieldName() );
+                if ( matcher == _matchers.end() ) {
+                    // no array projection matchers for this field
+                    append( b, e, details, arrayOpType );
+                } else {
+                    // field has array projection with $elemMatch specified.
+                    massert( 16348, "matchers are only supported for $elemMatch", 
+                             arrayOpType == ARRAY_OP_ELEM_MATCH );
+                    MatchDetails arrayDetails;
+                    arrayDetails.requestElemMatchKey();
+                    if ( matcher->second->matches( in, &arrayDetails ) ) {
+                        log(4) << "Matched array on field: " << matcher->first  << endl
+                               << " from array: " << in.getField( matcher->first ) << endl
+                               << " in object: " << in << endl
+                               << " at position: " << arrayDetails.elemMatchKey() << endl;
+                        FieldMap::const_iterator field = _fields.find( e.fieldName()  );
+                        massert( 16349, "$elemMatch specified, but projection field not found.",
+                            field != _fields.end() );
+                        BSONArrayBuilder a;
+                        BSONObjBuilder o;
+                        massert( 16350, "$elemMatch called on document element with eoo",
+                                 ! in.getField( e.fieldName() ).eoo() );
+                        massert( 16351, "$elemMatch called on array element with eoo",
+                                 ! in.getField( e.fieldName() ).Obj().getField(
+                                        arrayDetails.elemMatchKey() ).eoo() );
+                        a.append( in.getField( e.fieldName() ).Obj()
+                                    .getField( arrayDetails.elemMatchKey() ) );
+                        o.appendArray( matcher->first, a.arr() );
+                        append( b, o.done().firstElement(), details, arrayOpType );
+                    }
+                }
             }
         }
     }
 
-    BSONObj Projection::transform( const BSONObj& in ) const {
+    BSONObj Projection::transform( const BSONObj& in, const MatchDetails* details ) const {
         BSONObjBuilder b;
-        transform( in , b );
+        transform( in , b, details );
         return b.obj();
     }
 
@@ -192,17 +254,19 @@ namespace mongo {
         }
     }
 
-    void Projection::append( BSONObjBuilder& b , const BSONElement& e ) const {
-        FieldMap::const_iterator field = _fields.find( e.fieldName() );
+    void Projection::append( BSONObjBuilder& b , const BSONElement& e, const MatchDetails* details,
+                             const ArrayOpType arrayOpType ) const {
 
+        FieldMap::const_iterator field = _fields.find( e.fieldName() );
         if (field == _fields.end()) {
             if (_include)
                 b.append(e);
         }
         else {
             Projection& subfm = *field->second;
-
-            if ((subfm._fields.empty() && !subfm._special) || !(e.type()==Object || e.type()==Array) ) {
+            if ( ( subfm._fields.empty() && !subfm._special ) ||
+                 !(e.type()==Object || e.type()==Array) ) {
+                // field map empty, or element is not an array/object
                 if (subfm._include)
                     b.append(e);
             }
@@ -210,17 +274,96 @@ namespace mongo {
                 BSONObjBuilder subb;
                 BSONObjIterator it(e.embeddedObject());
                 while (it.more()) {
-                    subfm.append(subb, it.next());
+                    subfm.append(subb, it.next(), details, arrayOpType);
                 }
                 b.append(e.fieldName(), subb.obj());
-
             }
             else { //Array
-                BSONObjBuilder subb;
-                subfm.appendArray(subb, e.embeddedObject());
-                b.appendArray(e.fieldName(), subb.obj());
+                BSONObjBuilder matchedBuilder;
+                if ( details && arrayOpType == ARRAY_OP_POSITIONAL ) {
+                    // $ positional operator specified
+
+                    log(4) << "projection: checking if element " << e << " matched spec: "
+                           << getSpec() << " match details: " << *details << endl;
+                    uassert( 16352, mongoutils::str::stream() << "positional operator ("
+                                        << e.fieldName()
+                                        << ".$) requires corresponding field in query specifier",
+                                   details && details->hasElemMatchKey() );
+
+                    uassert( 16353, "positional operator element mismatch",
+                             ! e.embeddedObject()[details->elemMatchKey()].eoo() );
+
+                    // append as the first and only element in the projected array
+                    matchedBuilder.appendAs( e.embeddedObject()[details->elemMatchKey()], "0" );
+                }
+                else {
+                    // append exact array; no subarray matcher specified
+                    subfm.appendArray( matchedBuilder, e.embeddedObject() );
+                }
+                b.appendArray( e.fieldName(), matchedBuilder.obj() );
             }
         }
+    }
+
+    Projection::ArrayOpType Projection::getArrayOpType( ) const {
+        return _arrayOpType;
+    }
+
+    Projection::ArrayOpType Projection::getArrayOpType( const BSONObj spec ) {
+        BSONObjIterator iq( spec );
+        while ( iq.more() ) {
+            // iterate through each element
+            const BSONElement& elem = iq.next();
+            const char* const& fieldName = elem.fieldName();
+            if ( mongoutils::str::contains( fieldName, ".$" ) ) {
+                // projection contains positional or $elemMatch operator
+                return ARRAY_OP_POSITIONAL;
+            }
+            if ( mongoutils::str::contains( fieldName, "$elemMatch" ) ) {
+                // projection contains positional or $elemMatch operator
+                return ARRAY_OP_ELEM_MATCH;
+            }
+
+            // check nested elements
+            if ( elem.type() == Object )
+                return getArrayOpType( elem.embeddedObject() );
+        }
+        return ARRAY_OP_NORMAL;
+    }
+
+    void Projection::validateQuery( const BSONObj query ) const {
+        // this function only validates positional operator ($) projections
+        if ( getArrayOpType() != ARRAY_OP_POSITIONAL )
+            return;
+
+        BSONObjIterator querySpecIter( query );
+        while ( querySpecIter.more() ) {
+            // for each query element
+
+            BSONElement queryElement = querySpecIter.next();
+            if ( mongoutils::str::equals( queryElement.fieldName(), "$and" ) )
+                // don't check $and to avoid deep comparison of the arguments.
+                // TODO: can be replaced with Matcher::FieldSink when complete (SERVER-4644)
+                return;
+
+            BSONObjIterator projectionSpecIter( getSpec() );
+            while ( projectionSpecIter.more() ) {
+                // for each projection element
+
+                BSONElement projectionElement = projectionSpecIter.next();
+                if ( mongoutils::str::contains( projectionElement.fieldName(), ".$" ) &&
+                        mongoutils::str::before( queryElement.fieldName(), '.' ) ==
+                        mongoutils::str::before( projectionElement.fieldName(), "." ) ) {
+
+                    // found query spec that matches positional array projection spec
+                    log(4) << "Query specifies field named for positional operator: "
+                           << queryElement.fieldName() << endl;
+                    return;
+                }
+            }
+        }
+
+        uasserted( 16354, "Positional operator does not match the query specifier." );
     }
 
     Projection::KeyOnly* Projection::checkKey( const BSONObj& keyPattern ) const {

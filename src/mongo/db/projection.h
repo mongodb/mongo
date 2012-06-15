@@ -22,6 +22,10 @@
 
 namespace mongo {
 
+    // fwd decls
+    class Matcher;
+    class MatchDetails;
+
     /**
      * given a document and a projection specification
      * can transform the document
@@ -54,12 +58,19 @@ namespace mongo {
             int _stringSize;
         };
 
+        enum ArrayOpType {
+            ARRAY_OP_NORMAL = 0,
+            ARRAY_OP_ELEM_MATCH,
+            ARRAY_OP_POSITIONAL
+        };
+
         Projection() :
             _include(true) ,
             _special(false) ,
             _includeID(true) ,
             _skip(0) ,
             _limit(-1) ,
+            _arrayOpType(ARRAY_OP_NORMAL),
             _hasNonSimple(false) {
         }
 
@@ -77,13 +88,13 @@ namespace mongo {
         /**
          * transforms in according to spec
          */
-        BSONObj transform( const BSONObj& in ) const;
+        BSONObj transform( const BSONObj& in, const MatchDetails* details = NULL ) const;
 
 
         /**
          * transforms in according to spec
          */
-        void transform( const BSONObj& in , BSONObjBuilder& b ) const;
+        void transform( const BSONObj& in , BSONObjBuilder& b, const MatchDetails* details = NULL ) const;
 
 
         /**
@@ -96,14 +107,32 @@ namespace mongo {
 
         bool includeID() const { return _includeID; }
 
+        /**
+         *  get the type of array operator in the projection
+         *  @param      spec  Optional specifier to check (uses _source if unspecified)
+         *  @return     ARRAY_OP_NORMAL if no array projection modifier,
+         *              ARRAY_OP_ELEM_MATCH if $elemMatch specifier,
+         *              ARRAY_OP_POSITIONAL if '.$' projection specified
+         */
+        static ArrayOpType getArrayOpType( const BSONObj spec );
+        ArrayOpType getArrayOpType() const;
+
+        /**
+         * Validate the given query satisfies this projection's positional operator.
+         * NOTE: this function is only used to validate projections with a positional operator.
+         * @param   query       User-supplied query specifier
+         * @return  Field name if found, empty string otherwise.
+         */
+        void validateQuery( const BSONObj query ) const;
+
     private:
 
         /**
          * appends e to b if user wants it
          * will descend into e if needed
          */
-        void append( BSONObjBuilder& b , const BSONElement& e ) const;
-
+        void append( BSONObjBuilder& b , const BSONElement& e, const MatchDetails* details = NULL,
+                     const ArrayOpType arrayOpType = ARRAY_OP_NORMAL ) const;
 
         void add( const string& field, bool include );
         void add( const string& field, int skip, int limit );
@@ -121,6 +150,11 @@ namespace mongo {
         // used for $slice operator
         int _skip;
         int _limit;
+
+        // used for $elemMatch and positional operator ($)
+        typedef map<string, shared_ptr<Matcher> > Matchers;
+        Matchers _matchers;
+        ArrayOpType _arrayOpType;
 
         bool _hasNonSimple;
     };

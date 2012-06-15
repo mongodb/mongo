@@ -415,21 +415,21 @@ namespace mongo {
             }
 
             if ( fillWithNull ) 
-                b.appendNull( key.fieldName() );            
+                b.appendNull( key.fieldName() );
             
         }
 
         return b.obj();
     }
     
-    void ClientCursor::fillQueryResultFromObj( BufBuilder &b ) const {
+    void ClientCursor::fillQueryResultFromObj( BufBuilder &b, const MatchDetails* details ) const {
         const Projection::KeyOnly *keyFieldsOnly = c()->keyFieldsOnly();
         if ( keyFieldsOnly ) {
-            mongo::fillQueryResultFromObj( b, 0, keyFieldsOnly->hydrate( c()->currKey() ) );
+            mongo::fillQueryResultFromObj( b, 0, keyFieldsOnly->hydrate( c()->currKey() ), details );
         }
         else {
             DiskLoc loc = c()->currLoc();
-            mongo::fillQueryResultFromObj( b, fields.get(), c()->current(),
+            mongo::fillQueryResultFromObj( b, fields.get(), c()->current(), details,
                                           ( ( pq && pq->showDiskLoc() ) ? &loc : 0 ) );
         }
     }

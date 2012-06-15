@@ -141,8 +141,14 @@ namespace mongo {
                     break;
                 }
 
+                MatchDetails details;
+                if ( cc->fields && cc->fields->getArrayOpType() == Projection::ARRAY_OP_POSITIONAL ) {
+                    // field projection specified, and contains an array operator
+                    details.requestElemMatchKey();
+                }
+
                 // in some cases (clone collection) there won't be a matcher
-                if ( !c->currentMatches() ) {
+                if ( !c->currentMatches( &details ) ) {
                 }
                 else if ( manager && ! manager->belongsToMe( cc ) ){
                     LOG(2) << "cursor skipping document in un-owned chunk: " << c->current() << endl;
@@ -155,7 +161,7 @@ namespace mongo {
                         last = c->currLoc();
                         n++;
 
-                        cc->fillQueryResultFromObj( b );
+                        cc->fillQueryResultFromObj( b, &details );
 
                         if ( ( ntoreturn && n >= ntoreturn ) || b.len() > MaxBytesToReturnToClientAtOnce ) {
                             c->advance();
@@ -322,7 +328,7 @@ namespace mongo {
     _bufferedMatches() {
     }
     
-    bool OrderedBuildStrategy::handleMatch( bool &orderedMatch ) {
+    bool OrderedBuildStrategy::handleMatch( bool &orderedMatch, MatchDetails& details ) {
         DiskLoc loc = _cursor->currLoc();
         if ( _cursor->getsetdup( loc ) ) {
             return orderedMatch = false;
@@ -333,7 +339,8 @@ namespace mongo {
         }
         // Explain does not obey soft limits, so matches should not be buffered.
         if ( !_parsedQuery.isExplain() ) {
-            fillQueryResultFromObj( _buf, _parsedQuery.getFields(), current( true ),
+            fillQueryResultFromObj( _buf, _parsedQuery.getFields(),
+                                    current( true ), &details,
                                    ( _parsedQuery.showDiskLoc() ? &loc : 0 ) );
             ++_bufferedMatches;
         }
@@ -360,7 +367,7 @@ namespace mongo {
         _scanAndOrder.reset( newScanAndOrder( queryPlan ) );
     }
 
-    bool ReorderBuildStrategy::handleMatch( bool &orderedMatch ) {
+    bool ReorderBuildStrategy::handleMatch( bool &orderedMatch, MatchDetails& details ) {
         orderedMatch = false;
         if ( _cursor->getsetdup( _cursor->currLoc() ) ) {
             return false;
@@ -377,7 +384,7 @@ namespace mongo {
     int ReorderBuildStrategy::rewriteMatches() {
         cc().curop()->debug().scanAndOrder = true;
         int ret = 0;
-        _scanAndOrder->fill( _buf, _parsedQuery.getFields(), ret );
+        _scanAndOrder->fill( _buf, &_parsedQuery, ret );
         _bufferedMatches = ret;
         return ret;
     }
@@ -422,9 +429,9 @@ namespace mongo {
                                                          QueryPlanSummary() ) );
     }
 
-    bool HybridBuildStrategy::handleMatch( bool &orderedMatch ) {
+    bool HybridBuildStrategy::handleMatch( bool &orderedMatch, MatchDetails& details ) {
         if ( !_queryOptimizerCursor->currentPlanScanAndOrderRequired() ) {
-            return _orderedBuild.handleMatch( orderedMatch );
+            return _orderedBuild.handleMatch( orderedMatch, details );
         }
         orderedMatch = false;
         return handleReorderMatch();
@@ -497,14 +504,21 @@ namespace mongo {
     }
 
     bool QueryResponseBuilder::addMatch() {
-        if ( !currentMatches() ) {
+        MatchDetails details;
+
+        if ( _parsedQuery.getFields() && _parsedQuery.getFields()->getArrayOpType() == Projection::ARRAY_OP_POSITIONAL ) {
+            // field projection specified, and contains an array operator
+            details.requestElemMatchKey();
+        }
+
+        if ( !currentMatches( details ) ) {
             return false;
         }
         if ( !chunkMatches() ) {
             return false;
         }
         bool orderedMatch = false;
-        bool match = _builder->handleMatch( orderedMatch );
+        bool match = _builder->handleMatch( orderedMatch, details );
         _explain->noteIterate( match, orderedMatch, true, false );
         return match;
     }
@@ -601,8 +615,7 @@ namespace mongo {
         ( HybridBuildStrategy::make( _parsedQuery, _queryOptimizerCursor, _buf ) );
     }
 
-    bool QueryResponseBuilder::currentMatches() {
-        MatchDetails details;
+    bool QueryResponseBuilder::currentMatches( MatchDetails& details ) {
         if ( _cursor->currentMatches( &details ) ) {
             return true;
         }
@@ -948,7 +961,11 @@ namespace mongo {
                 return "";
             }
         }
-        
+
+        // sanity check the query and projection
+        if ( pq.getFields() != NULL )
+            pq.getFields()->validateQuery( query );
+
         // these now may stored in a ClientCursor or somewhere else,
         // so make sure we use a real copy
         jsobj = jsobj.getOwned();

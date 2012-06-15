@@ -808,7 +808,7 @@ namespace mongo {
                              valuesMatch(z, toMatch, compareOp, em) ) {
                                 // "field.<n>" array notation was used
                             if ( details )
-                                    details->setElemMatchKey( z.fieldName() );
+                                details->setElemMatchKey( z.fieldName() );
                             return 1;
                         }
                     }

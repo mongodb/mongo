@@ -53,10 +53,11 @@ namespace mongo {
     */
 
     inline void fillQueryResultFromObj(BufBuilder& bb, const Projection *filter, const BSONObj& js,
+                                       const MatchDetails* details = NULL,
                                        const DiskLoc* loc=NULL) {
         if ( filter ) {
             BSONObjBuilder b( bb );
-            filter->transform( js , b );
+            filter->transform( js , b, details );
             if (loc)
                 b.append("$diskLoc", loc->toBSONObj());
             b.done();
@@ -93,7 +94,7 @@ namespace mongo {
         void add(const BSONObj &o, const DiskLoc* loc);
 
         /* scanning complete. stick the query result in b for n objects. */
-        void fill(BufBuilder& b, const Projection *filter, int& nout ) const;
+        void fill(BufBuilder& b, const ParsedQuery *query, int& nout) const;
 
     /** Functions for testing. */
     protected:
