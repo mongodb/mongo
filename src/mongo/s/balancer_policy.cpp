@@ -23,6 +23,8 @@
 #include "mongo/util/stringutils.h"
 #include "mongo/util/text.h"
 
+#include <algorithm>
+
 namespace mongo {
 
     string TagRange::toString() const {
@@ -263,10 +265,20 @@ namespace mongo {
         else if ( distribution.totalChunks() < 80 )
             threshold = 4;
 
-        set<string> tags = distribution.tags();
-        tags.insert( "" );
-        for ( set<string>::const_iterator i = tags.begin(); i != tags.end(); ++i ) {
-            string tag = *i;
+        // randomize the order in which we balance the tags
+        // this is so that one bad tag doesn't prevent others from getting balanced
+        vector<string> tags;
+        {
+            set<string> t = distribution.tags();
+            for ( set<string>::const_iterator i = t.begin(); i != t.end(); ++i )
+                tags.push_back( *i );
+            tags.push_back( "" );
+            
+            std::random_shuffle( tags.begin(), tags.end() );
+        }
+
+        for ( unsigned i=0; i<tags.size(); i++ ) {
+            string tag = tags[i];
 
             string from = distribution.getMostOverloadedShard( tag );
             if ( from.size() == 0 )
