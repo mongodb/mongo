@@ -33,44 +33,45 @@ namespace mongo {
     DistributionStatus::DistributionStatus( const ShardInfoMap& shardInfo,
                                             const ShardToChunksMap& shardToChunksMap )
         : _shardInfo( shardInfo ), _shardChunks( shardToChunksMap ) {
+        
+        for ( ShardInfoMap::const_iterator i = _shardInfo.begin(); i != _shardInfo.end(); ++i ) {
+            _shards.insert( i->first );
+        }
+
     }
         
+    const ShardInfo& DistributionStatus::shardInfo( const string& shard ) const {
+        ShardInfoMap::const_iterator i = _shardInfo.find( shard );
+        verify( i != _shardInfo.end() );
+        return i->second;
+    }
 
-    unsigned DistributionStatus::numberOfChunks( const string& shard ) const {
+    unsigned DistributionStatus::totalChunks() const {
+        unsigned total = 0;
+        for ( ShardToChunksMap::const_iterator i = _shardChunks.begin(); i != _shardChunks.end(); ++i ) 
+            total += i->second.size();
+        return total;
+    }
+
+    unsigned DistributionStatus::numberOfChunksInShard( const string& shard ) const {
         ShardToChunksMap::const_iterator i = _shardChunks.find( shard );
         if ( i == _shardChunks.end() )
             return 0;
         return i->second.size();
     }
 
-    string DistributionStatus::getShardRequiredToShed() const {
-        string shard;
-        unsigned maxChunks = 0;
+    unsigned DistributionStatus::numberOfChunksInShardWithTag( const string& shard , const string& tag ) const {
+        ShardToChunksMap::const_iterator i = _shardChunks.find( shard );
+        if ( i == _shardChunks.end() )
+            return 0;
         
-        for ( ShardInfoMap::const_iterator i = _shardInfo.begin(); i != _shardInfo.end(); ++i ) {
+        unsigned total = 0;
+        for ( unsigned j=0; j<i->second.size(); j++ ) 
+            if ( tag == getTagForChunk( i->second[j] ) )
+                total++;
 
-            if ( ! i->second.isSizeMaxed() && ! i->second.isDraining() )
-                continue;
-
-            unsigned myChunks = numberOfChunks( i->first );
-            if ( myChunks == 0 )
-                continue;
-
-            if ( i->second.hasOpsQueued() ) {
-                warning() << "want to shed load from " << i->first << " but can't because it has ops queued" << endl;
-                continue;
-            }
-            
-            if ( myChunks <= maxChunks )
-                continue;
-            
-            shard = i->first;
-            maxChunks = myChunks;
-        }
-        
-        return shard;
+        return total;
     }
-
 
     string DistributionStatus::getBestReceieverShard( const string& tag ) const {
         string best;
@@ -78,15 +79,21 @@ namespace mongo {
         
         for ( ShardInfoMap::const_iterator i = _shardInfo.begin(); i != _shardInfo.end(); ++i ) {
             
-            if ( i->second.isSizeMaxed() || i->second.isDraining() || i->second.hasOpsQueued() )
+            if ( i->second.isSizeMaxed() || i->second.isDraining() || i->second.hasOpsQueued() ) {
+                log() << i->first << " is unavailable" << endl;
                 continue;
+            }
             
-            if ( tag.size() > 0 && ! i->second.hasTag( tag ) )
+            if ( ! i->second.hasTag( tag ) ) {
+                log() << i->first << " doesn't have right tag" << endl;
                 continue;
+            }
 
-            unsigned myChunks = numberOfChunks( i->first );
-            if ( myChunks >= minChunks )
+            unsigned myChunks = numberOfChunksInShard( i->first );
+            if ( myChunks >= minChunks ) {
+                log() << i->first << " has more chunks me:" << myChunks << " best: " << best << ":" << minChunks << endl;
                 continue;
+            }
             
             best = i->first;
             minChunks = myChunks;
@@ -95,7 +102,7 @@ namespace mongo {
         return best;
     }
 
-    string DistributionStatus::getMostOverloadedShard() const {
+    string DistributionStatus::getMostOverloadedShard( const string& tag ) const {
         string worst;
         unsigned maxChunks = 0;
 
@@ -106,7 +113,7 @@ namespace mongo {
                 continue;
             }
             
-            unsigned myChunks = numberOfChunks( i->first );
+            unsigned myChunks = numberOfChunksInShardWithTag( i->first, tag );
             if ( myChunks <= maxChunks )
                 continue;
             
@@ -134,7 +141,7 @@ namespace mongo {
         for ( unsigned i=0 ; i<_tagRanges.size(); i++ ) {
             if ( chunk["min"].Obj() < _tagRanges[i].min )
                 continue;
-            if ( chunk["max"].Obj() > _tagRanges[i].max )
+            if ( chunk["min"].Obj() >= _tagRanges[i].max )
                 continue;
             return _tagRanges[i].tag;
         }
@@ -168,126 +175,138 @@ namespace mongo {
 
         // 1) check for shards that policy require to us to move off of
         //    draining, maxSize
-        // 2) then we look for "local" in balance for a tag
-        // 3) then we look for global in balance
+        // 2) check tag policy violations
+        // 3) then we make sure chunks are balanced for each tag
         
         // ----
 
         // 1) check things we have to move
-        string shardWeHaveToDrain = distribution.getShardRequiredToShed();
-        if ( shardWeHaveToDrain.size() > 0 ) {
-            return shed( ns, distribution, shardWeHaveToDrain );
-        }
-        
-
-        // 2) lets look at tags
-        if ( distribution.tags().size() > 0 ) {
-            log() << "we've got tags!" << endl;
-        }
-
-
-        // 3)
-        pair<string,unsigned> min("",numeric_limits<unsigned>::max());
-        pair<string,unsigned> max("",0);
-        
-        min.first = distribution.getBestReceieverShard( "" );
-        if ( min.first.size() == 0 ) {
-            log() << "no available shards to take chunks" << endl;
-            return NULL;
-        }
-        min.second = distribution.numberOfChunks( min.first );
-
-        max.first = distribution.getMostOverloadedShard();
-        if ( max.first.size() == 0 ) {
-            LOG(1) << "no shards overloaded" << endl;
-            return NULL;
-        }
-        max.second = distribution.numberOfChunks( max.first );
-
-        LOG(1) << "collection : " << ns << endl;
-        LOG(1) << "donor      : " << max.second << " chunks on " << max.first << endl;
-        LOG(1) << "receiver   : " << min.second << " chunks on " << min.first << endl;
-
-        // Solving imbalances takes a higher priority than draining shards. Many shards can
-        // be draining at once but we choose only one of them to cater to per round.
-        // Important to start balanced, so when there are few chunks any imbalance must be fixed.
-        const int imbalance = max.second - min.second;
-        int threshold = 8;
-        if (balancedLastTime || max.second < 20) threshold = 2;
-        else if (max.second < 80) threshold = 4;
-        string from, to;
-        if ( imbalance >= threshold ) {
-            from = max.first;
-            to = min.first;
-
-        }
-        else {
-            // Everything is balanced here!
-            return NULL;
-        }
-
-        return finishBalance( ns, distribution, from, to );
-    }
-
-    MigrateInfo* BalancerPolicy::shed( const string& ns,
-                                       const DistributionStatus& distribution,
-                                       const string& from ) {
-        // need to find a chunk on from that i can move somewhere good
-        // but I HAVE to move chunk if at all possible 
-        // so can overload someone, but can't violate a policy
-        
-        const vector<BSONObj>& chunks = distribution.getChunks( from );
-
-        // since we have to move all chunks, lets just do in order
-        for ( unsigned i=0; i<chunks.size(); i++ ) {
-            BSONObj chunkToMove = distribution.getChunks( from )[i];
-            string tag = distribution.getTagForChunk( chunkToMove );
-            string to = distribution.getBestReceieverShard( tag );
+        {
+            const set<string>& shards = distribution.shards();
+            for ( set<string>::const_iterator z = shards.begin(); z != shards.end(); ++z ) {
+                string shard = *z;
+                const ShardInfo& info = distribution.shardInfo( shard );
+                
+                if ( ! info.isSizeMaxed() && ! info.isDraining() )
+                    continue;
+                
+                if ( distribution.numberOfChunksInShard( shard ) == 0 )
+                    continue;
+                
+                // now we know we need to move to chunks off this shard
+                // we will if we are allowed
+                
+                if ( info.hasOpsQueued() ) {
+                    warning() << "want to shed load from " << shard << " but can't because it has ops queued" << endl;
+                    continue;
+                }
+                
+                const vector<BSONObj>& chunks = distribution.getChunks( shard );
             
-            if ( to.size() == 0 ) {
-                warning() << "want to move chunk: " << chunkToMove << "(" << tag << ") "
-                          << "from " << from << " but can't find anywhere to put it" << endl;
+                // since we have to move all chunks, lets just do in order
+                for ( unsigned i=0; i<chunks.size(); i++ ) {
+                    BSONObj chunkToMove = chunks[i];
+                    string tag = distribution.getTagForChunk( chunkToMove );
+                    string to = distribution.getBestReceieverShard( tag );
+                    
+                    if ( to.size() == 0 ) {
+                        warning() << "want to move chunk: " << chunkToMove << "(" << tag << ") "
+                                  << "from " << shard << " but can't find anywhere to put it" << endl;
+                        continue;
+                    }
+                
+                    log() << "going to move " << chunkToMove << " from " << shard << "(" << tag << ")" << " to " << to << endl;
+                
+                    return new MigrateInfo( ns, to, shard, chunkToMove.getOwned() );
+                }
+                
+                warning() << "can't find any chunk to move from: " << shard << " but we want to" << endl;
+            }
+        }
+        
+
+        // 2) tag violations
+        if ( distribution.tags().size() > 0 ) {
+            const set<string>& shards = distribution.shards();
+            
+            for ( set<string>::const_iterator i = shards.begin(); i != shards.end(); ++i ) {
+                string shard = *i;
+                const ShardInfo& info = distribution.shardInfo( shard );
+                
+                const vector<BSONObj>& chunks = distribution.getChunks( shard );
+                for ( unsigned j = 0; j < chunks.size(); j++ ) {
+                    string tag = distribution.getTagForChunk( chunks[j] );
+                    
+                    if ( info.hasTag( tag ) )
+                        continue;
+                    
+                    // uh oh, this chunk is in the wrong place
+                    log() << "chunk " << chunks[j] << " is not on a shard with the right tag: " << tag << endl;
+                    
+                    string to = distribution.getBestReceieverShard( tag );
+                    if ( to.size() == 0 ) {
+                        log() << "no where to put it :(" << endl;
+                        continue;
+                    }
+                    verify( to != shard );
+                    log() << " going to move to: " << to << endl;
+                    return new MigrateInfo( ns, to, shard, chunks[j].getOwned() );
+                }
+            }
+        }
+
+        // 3) for each tag balance
+        
+        int threshold = 8;
+        if ( balancedLastTime || distribution.totalChunks() < 20 ) 
+            threshold = 2;
+        else if ( distribution.totalChunks() < 80 )
+            threshold = 4;
+
+        set<string> tags = distribution.tags();
+        tags.insert( "" );
+        for ( set<string>::const_iterator i = tags.begin(); i != tags.end(); ++i ) {
+            string tag = *i;
+
+            string from = distribution.getMostOverloadedShard( tag );
+            if ( from.size() == 0 )
                 continue;
+
+            string to = distribution.getBestReceieverShard( tag );
+            if ( to.size() == 0 ) {
+                log() << "no available shards to take chunks for tag [" << tag << "]" << endl;
+                return NULL;
             }
             
-            log() << "going to move " << chunkToMove << " from " << from << "(" << tag << ")" << " to " << to << endl;
+            unsigned max = distribution.numberOfChunksInShardWithTag( from, tag );
+            unsigned min = distribution.numberOfChunksInShardWithTag( to, tag );
             
-            return new MigrateInfo( ns, to, from, chunkToMove.getOwned() );
+            const int imbalance = max - min;
+            
+            LOG(1) << "collection : " << ns << endl;
+            LOG(1) << "donor      : " << from << " chunks on " << max << endl;
+            LOG(1) << "receiver   : " << to << " chunks on " << min << endl;
+            LOG(1) << "threshold  : " << threshold << endl;
+
+            if ( imbalance < threshold )
+                continue;
+
+            const vector<BSONObj>& chunks = distribution.getChunks( from );
+            for ( unsigned j = 0; j < chunks.size(); j++ ) {
+                if ( distribution.getTagForChunk( chunks[j] ) != tag )
+                    continue;
+                log() << " ns: " << ns << " going to move " << chunks[j] 
+                      << " from: " << from << " to: " << to << " tag [" << tag << "]"
+                      << endl;
+                return new MigrateInfo( ns, to, from, chunks[j] );
+            }
+            verify( false ); // should be impossible
         }
-        warning() << "can't find any chunk to move from: " << from << endl;
+
+        // Everything is balanced here!        
         return NULL;
     }
 
-
-    MigrateInfo* BalancerPolicy::finishBalance( const string& ns,
-                                                const DistributionStatus& distribution, 
-                                                const string& from,
-                                                const string& to ) {
-
-        const vector<BSONObj>& chunksFrom = distribution.getChunks( from );
-        const vector<BSONObj>& chunksTo = distribution.getChunks( to );
-        BSONObj chunkToMove = pickChunk( chunksFrom , chunksTo );
-        log() << "chose [" << from << "] to [" << to << "] " << chunkToMove << endl;
-
-        return new MigrateInfo( ns, to, from, chunkToMove.getOwned() );
-    }
-
-
-    BSONObj BalancerPolicy::pickChunk( const vector<BSONObj>& from, const vector<BSONObj>& to ) {
-        // It is possible for a donor ('from') shard to have less chunks than a receiver one ('to')
-        // if the donor is in draining mode.
-
-        if ( to.size() == 0 )
-            return from[0];
-
-        if ( from[0]["min"].Obj().woCompare( to[to.size()-1]["max"].Obj() , BSONObj() , false ) == 0 )
-            return from[0];
-
-        if ( from[from.size()-1]["max"].Obj().woCompare( to[0]["min"].Obj() , BSONObj() , false ) == 0 )
-            return from[from.size()-1];
-
-        return from[0];
-    }
 
     ShardInfo::ShardInfo( long long maxSize, long long currSize, bool draining, bool opsQueued )
         : _maxSize( maxSize ), 
@@ -313,6 +332,12 @@ namespace mongo {
             return false;
         
         return _currSize >= _maxSize;
+    }
+
+    bool ShardInfo::hasTag( const string& tag ) const { 
+        if ( tag.size() == 0 )
+            return true;
+        return _tags.count( tag ) > 0; 
     }
 
     string ShardInfo::toString() const {

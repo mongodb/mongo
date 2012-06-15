@@ -55,7 +55,8 @@ namespace mongo {
 
         void addTag( const string& tag );
 
-        bool hasTag( const string& tag ) const { return _tags.count( tag ) > 0; }
+        /** @return true if we have the tag OR if the tag is "" */
+        bool hasTag( const string& tag ) const;
         
         /**
          * @return true if a shard cannot receive any new chunks bacause it reache 'shardLimits'.
@@ -105,14 +106,11 @@ namespace mongo {
         DistributionStatus( const ShardInfoMap& shardInfo,
                             const ShardToChunksMap& shardToChunksMap );
 
-
+        // only used when building
+        
         void addTagRange( const TagRange& range );
 
-        /**
-         * this could be because of draining, or over capacity
-         * NOT because of balance issues
-         */
-        string getShardRequiredToShed() const;
+        // ---- these methods might be better suiting in BalancerPolicy
         
         /**
          * @param forTag "" if you don't care, or a tag
@@ -122,26 +120,38 @@ namespace mongo {
 
         /**
          * @return the shard with the most chunks
+         *         based on # of chunks with the given tag
          */
-        string getMostOverloadedShard() const;
+        string getMostOverloadedShard( const string& forTag ) const;
+
+
+        // ---- basic accessors, counters, etc...
+
+        /** @return total number of chunks  */
+        unsigned totalChunks() const;
 
         /** @return number of chunks in this shard */
-        unsigned numberOfChunks( const string& shard ) const;
-        
+        unsigned numberOfChunksInShard( const string& shard ) const;
+
+        /** @return number of chunks in this shard with the given tag */
+        unsigned numberOfChunksInShardWithTag( const string& shard, const string& tag ) const;
+
+        /** @return chunks for the shard */
         const vector<BSONObj>& getChunks( const string& shard ) const;
 
-        /**
-         * @return map of shard -> number of chunks for a given tag
-         */
-        //map<string,unsigned> getTagDistribution( const string& shard ) const;
-
+        /** @return all tags we know about, not include "" */
         const set<string>& tags() const { return _allTags; }
 
+        /** @return the right tag for chunk, possibly "" */
         string getTagForChunk( const BSONObj& chunk ) const;
         
-        /**
-         * writes to log()
-         */
+        /** @return all shards we know about */
+        const set<string>& shards() const { return _shards; }
+
+        /** @return the ShardInfo for the shard */
+        const ShardInfo& shardInfo( const string& shard ) const;
+        
+        /** writes all state to log() */
         void dump() const;
         
     private:
@@ -149,6 +159,7 @@ namespace mongo {
         const ShardToChunksMap& _shardChunks;
         vector<TagRange> _tagRanges;
         set<string> _allTags;
+        set<string> _shards;
     };
 
     class BalancerPolicy {
@@ -160,8 +171,7 @@ namespace mongo {
          * moving, it returns NULL.
          *
          * @param ns is the collections namepace.
-         * @param shardToChunksMap is a map from shardId to chunks that live there. A chunk's format
-         * is { }.
+         * @param DistributionStatus holds all the info about the current state of the cluster/namespace
          * @param balancedLastTime is the number of chunks effectively moved in the last round.
          * @returns NULL or MigrateInfo of the best move to make towards balacing the collection.
          *          caller owns the MigrateInfo instance
@@ -170,21 +180,7 @@ namespace mongo {
                                      const DistributionStatus& distribution,
                                      int balancedLastTime );
         
-        // below exposed for testing purposes only -- treat it as private --
 
-        static BSONObj pickChunk( const vector<BSONObj>& from, const vector<BSONObj>& to );
-
-    private:
-
-        static MigrateInfo* shed( const string& ns,
-                                  const DistributionStatus& distributionstatus,
-                                  const string& from );
-                                  
-
-        static MigrateInfo* finishBalance( const string& ns,
-                                           const DistributionStatus& distribution, 
-                                           const string& from,
-                                           const string& to );
     };
 
 

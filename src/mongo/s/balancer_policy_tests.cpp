@@ -187,12 +187,11 @@ namespace mongo {
             DistributionStatus d( shards, chunks );
             MigrateInfo* m = BalancerPolicy::balance( "ns", d, 0 );
             ASSERT( m );
-            ASSERT_EQUALS( "shard1" , m->from );
             ASSERT_EQUALS( "shard2" , m->to );
         }
 
 
-        TEST( BalancerPolicyTests, Tags2 ) {
+        TEST( BalancerPolicyTests, TagsDraining ) {
 
             ShardToChunksMap chunks;
             addShard( chunks, 5 , false );
@@ -232,8 +231,7 @@ namespace mongo {
         }
 
 
-        TEST( BalancerPolicyTests, Tags1 ) {
-            /*
+        TEST( BalancerPolicyTests, TagsPolicyChange ) {
             ShardToChunksMap chunks;
             addShard( chunks, 5 , false );
             addShard( chunks, 5 , false );
@@ -247,13 +245,22 @@ namespace mongo {
             shards["shard0"].addTag( "a" );
             shards["shard1"].addTag( "a" );
             
-            DistributionStatus d( shards, chunks );
-            d.addTagRange( TagRange( BSON( "x" << -1 ), BSON( "x" << 1000 ) , "a" ) );
-            d.dump();
+            while ( true ) {
+                
+                DistributionStatus d( shards, chunks );
+                d.addTagRange( TagRange( BSON( "x" << -1 ), BSON( "x" << 1000 ) , "a" ) );
+                
+                MigrateInfo* m = BalancerPolicy::balance( "ns", d, 0 );
+                if ( ! m )
+                    break;
 
-            MigrateInfo* m = BalancerPolicy::balance( "ns", d, 0 );
-            ASSERT( m );
-            */
+                moveChunk( chunks, m );
+            }
+            
+            ASSERT_EQUALS( 15U , chunks["shard0"].size() + chunks["shard1"].size() );
+            ASSERT( chunks["shard0"].size() == 7U || chunks["shard0"].size() == 8U );
+            ASSERT_EQUALS( 0U , chunks["shard2"].size() );
+
         }
     }
 }
