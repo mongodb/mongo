@@ -1,6 +1,7 @@
 /*! @page admin Managing WiredTiger databases
 
 - @subpage home
+- @subpage database_config
 - @subpage security
 - @subpage file_formats
 - @subpage tuning

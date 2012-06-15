@@ -119,7 +119,7 @@ class test_config02(wttest.WiredTigerTestCase):
         edir = 'envdir'
         os.mkdir(hdir)
         os.mkdir(edir)
-        self.common_test(hdir, edir, 'home_environment=true')
+        self.common_test(hdir, edir, None)
         self.checkfiles(hdir)
         self.checknofiles(edir)
 
@@ -127,28 +127,19 @@ class test_config02(wttest.WiredTigerTestCase):
         # If homedir is set, it is used no matter what
         hdir = 'homedir'
         os.mkdir(hdir)
-        self.common_test(hdir, None, 'home_environment=true')
+        self.common_test(hdir, None, None)
         self.checkfiles(hdir)
 
     def test_env_conf(self):
         edir = 'envdir'
         os.mkdir(edir)
-        self.common_test(None, edir, 'home_environment=true')
+        self.common_test(None, edir, None)
         self.checkfiles(edir)
 
     def test_env_conf_without_env_var(self):
         # no env var set, so should use current directory
-        self.common_test(None, None, 'home_environment=true')
+        self.common_test(None, None, None)
         self.checkfiles(".")
-
-    def test_env_no_conf(self):
-	# env var, but no open configuration string, should fail
-        edir = 'envdir'
-        os.mkdir(edir)
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.common_test(None, edir, None),
-            '/WIREDTIGER_HOME environment variable set but'
-            ' WiredTiger not configured to use that environment variable/')
 
     def test_home_does_not_exist(self):
         dir = 'nondir'

@@ -1,14 +1,22 @@
-/*! @page config_file WiredTiger Configuration File
+/*! @page database_config Database Configuration
+
+WiredTiger databases are accessed through the ::wiredtiger_open call,
+which takes a configuration string argument.  In addition to this, the
+database configuration can be specified in a file or an environment
+variable.
+
+@section config_file \c WiredTiger.config File
 
 If a file named \c WiredTiger.config appears in the WiredTiger home
 directory, it is read as a configuration string.  Configuration values
-specified in the config argument to the wiredtiger_open function
-override configuration values specified in the \c WiredTiger.config file.
+specified in the \c config argument to ::wiredtiger_open override
+configuration values specified in the \c WIREDTIGER_CONFIG environment
+variable, which in turn override values in the \c WiredTiger.config file.
 
 The file is minimally parsed in order to build configuration strings
 for the WiredTiger configuration parser:
-<ul>
 
+<ul>
 <li>A backslash (<b><tt>\\</tt></b>) followed by any character other
 than a newline character leaves both characters untouched; otherwise,
 if a backslash is followed by a newline character, both the backslash
@@ -28,7 +36,19 @@ are simply discarded.
 
 <li>Otherwise, all lines are concatenated and the newline characters
 replaced with commas.
-
 </ul>
 
+@section config_env Configuring with an environment variable
+
+If set, the \c WIREDTIGER_CONFIG environment variable will read, and the
+string added to the configuration values for ::wiredtiger_open.
+Configuration values specified in the \c config argument to
+::wiredtiger_open override configuration values specified in the
+\c WIREDTIGER_CONFIG environment variable, which in turn override values
+in the \c WiredTiger.config file.
+
+If the process is running with special privileges and \c WIREDTIGER_CONFIG
+is set, the ::wiredtiger_open function must be configured with the
+\c use_environment_priv flag, or the call to ::wiredtiger_open will fail.
+See @ref home for more details.
 */

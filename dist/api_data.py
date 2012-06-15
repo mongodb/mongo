@@ -332,16 +332,6 @@ methods = {
 		Use \c O_DIRECT to access files.  Options are given as a
 		list, such as <code>"direct_io=[data]"</code>''',
 		type='list', choices=['data', 'log']),
-	Config('home_environment', 'false', r'''
-		use the \c WIREDTIGER_HOME environment variable for naming
-		unless the process is running with special privileges.
-		See @ref home for more information''',
-		type='boolean'),
-	Config('home_environment_priv', 'false', r'''
-		use the \c WIREDTIGER_HOME environment variable for naming
-		regardless of whether or not the process is running with
-		special privileges.  See @ref home for more information''',
-		type='boolean'),
 	Config('extensions', '', r'''
 		list of extensions to load.  Optional values are passed as the
 		\c config parameter to WT_CONNECTION::load_extension.  Complex
@@ -378,6 +368,11 @@ methods = {
 		type='boolean'),
 	Config('transactional', 'true', r'''
 		support transactional semantics''',
+		type='boolean'),
+	Config('use_environment_priv', 'false', r'''
+		use the \c WIREDTIGER_CONFIG and \c WIREDTIGER_HOME environment
+		variables regardless of whether or not the process is running with
+		special privileges.  See @ref home for more information''',
 		type='boolean'),
 	Config('verbose', '', r'''
 		enable messages for various events.  Options are given as a

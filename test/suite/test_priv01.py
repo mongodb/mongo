@@ -39,7 +39,7 @@ class test_priv01(wttest.WiredTigerTestCase):
     """
     This tests privileged operations.
     The only part of WiredTiger that currently cares about privilege
-    levels is the 'home_environment_priv' configuration option for
+    levels is the 'use_environment_priv' configuration option for
     wiredtiger_open, which by design, behaves differently depending on
     whether the current process is running as a privileged user or
     not.  This test should be run as both normal and privileged
@@ -101,50 +101,13 @@ class test_priv01(wttest.WiredTigerTestCase):
         self.session = self.conn.open_session(None)
         self.populate_and_check()
 
-    def test_home_and_env(self):
-        hdir = 'homedir'
-        edir = 'envdir'
-        os.mkdir(hdir)
-        os.mkdir(edir)
-        self.common_test(hdir, edir, None)
-        self.checkfiles(hdir)
-        self.checknofiles(edir)
-
-    def test_home_and_env_conf(self):
-        # If homedir is set, the environment is ignored
-        hdir = 'homedir'
-        edir = 'envdir'
-        os.mkdir(hdir)
-        os.mkdir(edir)
-        self.common_test(hdir, edir, 'home_environment=true')
-        self.checkfiles(hdir)
-        self.checknofiles(edir)
-
-    def test_home_and_missing_env(self):
-        # If homedir is set, it is used no matter what
-        hdir = 'homedir'
-        os.mkdir(hdir)
-        self.common_test(hdir, None, 'home_environment=true')
-        self.checkfiles(hdir)
-
-    def test_env_conf(self):
-        edir = 'envdir'
-        os.mkdir(edir)
-        self.common_test(None, edir, 'home_environment=true')
-        self.checkfiles(edir)
-
-    def test_env_conf_without_env_var(self):
-        # no env var set, so should use current directory
-        self.common_test(None, None, 'home_environment=true')
-        self.checkfiles(".")
-
     def test_home_and_env_conf_priv(self):
         # If homedir is set, the environment is ignored
         hdir = 'homedir'
         edir = 'envdir'
         os.mkdir(hdir)
         os.mkdir(edir)
-        self.common_test(hdir, edir, 'home_environment_priv=true')
+        self.common_test(hdir, edir, 'use_environment_priv=true')
         self.checkfiles(hdir)
         self.checknofiles(edir)
 
@@ -152,28 +115,32 @@ class test_priv01(wttest.WiredTigerTestCase):
         # If homedir is set, it is used no matter what
         hdir = 'homedir'
         os.mkdir(hdir)
-        self.common_test(hdir, None, 'home_environment_priv=true')
+        self.common_test(hdir, None, 'use_environment_priv=true')
         self.checkfiles(hdir)
 
-    def test_env_conf_priv(self):
-        euid = os.geteuid()
+    def test_env_conf_nopriv(self):
         edir = 'envdir'
         os.mkdir(edir)
-        privarg = 'home_environment_priv=true'
-        if euid == 0:
+        if os.getuid() != os.geteuid():
+            print 'Running ' + str(self) + ' as privileged user'
+            self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+                lambda: self.common_test(None, edir, None),
+                '/WIREDTIGER_HOME environment variable set but\
+ process lacks privileges to use that environment variable/')
+    
+    def test_env_conf_priv(self):
+        edir = 'envdir'
+        os.mkdir(edir)
+        privarg = 'use_environment_priv=true'
+        if os.getuid() != os.geteuid():
             print 'Running ' + str(self) + ' as privileged user'
             self.common_test(None, edir, privarg)
             self.checkfiles(edir)
             self.checknofiles(".")
-        else:
-            self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-                lambda: self.common_test(None, edir, privarg),
-                '/WIREDTIGER_HOME environment variable set but\
- process lacks privileges to use that environment variable/')
 
     def test_env_conf_without_env_var_priv(self):
         # no env var set, so should use current directory
-        self.common_test(None, None, 'home_environment_priv=true')
+        self.common_test(None, None, 'use_environment_priv=true')
         self.checkfiles(".")
 
 

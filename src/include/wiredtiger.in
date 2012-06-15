@@ -1058,13 +1058,6 @@ struct __wt_connection {
  * strings; default empty.}
  * @config{hazard_max, number of simultaneous hazard references per session
  * handle.,an integer greater than or equal to 15; default \c 30.}
- * @config{home_environment, use the \c WIREDTIGER_HOME environment variable for
- * naming unless the process is running with special privileges. See @ref home
- * for more information.,a boolean flag; default \c false.}
- * @config{home_environment_priv, use the \c WIREDTIGER_HOME environment
- * variable for naming regardless of whether or not the process is running with
- * special privileges.  See @ref home for more information.,a boolean flag;
- * default \c false.}
  * @config{logging, enable logging.,a boolean flag; default \c false.}
  * @config{multiprocess, permit sharing between processes (will automatically
  * start an RPC server for primary processes and use RPC for secondary
@@ -1076,6 +1069,10 @@ struct __wt_connection {
  * default \c true.}
  * @config{transactional, support transactional semantics.,a boolean flag;
  * default \c true.}
+ * @config{use_environment_priv, use the \c WIREDTIGER_CONFIG and \c
+ * WIREDTIGER_HOME environment variables regardless of whether or not the
+ * process is running with special privileges.  See @ref home for more
+ * information.,a boolean flag; default \c false.}
  * @config{verbose, enable messages for various events.  Options are given as a
  * list\, such as <code>"verbose=[evictserver\,read]"</code>.,a list\, with
  * values chosen from the following options: \c "block"\, \c "evict"\, \c
