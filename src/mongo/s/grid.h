@@ -48,15 +48,21 @@ namespace mongo {
         void removeDB( string db );
 
         /**
-          * removes db entry - only this DBConfig object will be removed,
-          *  other DBConfigs which may have been created in the meantime will not be harmed
-          *
-          *  Using this method avoids race conditions where multiple threads detect a database
-          *  reload has failed.
-          *
-          * on next getDBConfig call will fetch from db
-          */
-        void removeDB( const DBConfig& database );
+         * removes db entry - only this DBConfig object will be removed,
+         *  other DBConfigs which may have been created in the meantime will not be harmed
+         *  on next getDBConfig call will fetch from db
+         *
+         *  Using this method avoids race conditions where multiple threads detect a database
+         *  reload has failed.
+         *
+         *  Example : N threads receive version exceptions and dbConfig.reload(), while
+         *  simultaneously a dropDatabase is occurring.  In the meantime, the dropDatabase call
+         *  attempts to create a DBConfig object if one does not exist, to load the db info,
+         *  but the config is repeatedly deleted as soon as it is created.  Using this method
+         *  prevents the deletion of configs we don't know about.
+         *
+         */
+        void removeDBIfExists( const DBConfig& database );
 
         /**
          * @return true if shards and config servers are allowed to use 'localhost' in address

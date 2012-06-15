@@ -548,7 +548,7 @@ namespace mongo {
         // object around which has invalid data.  We should remove it instead.
         //
 
-        if( ! successful ) grid.removeDB( *this );
+        if( ! successful ) grid.removeDBIfExists( *this );
 
         return successful;
     }

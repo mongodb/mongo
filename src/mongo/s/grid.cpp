@@ -140,7 +140,7 @@ namespace mongo {
 
     }
 
-    void Grid::removeDB( const DBConfig& database ) {
+    void Grid::removeDBIfExists( const DBConfig& database ) {
 
         scoped_lock l( _lock );
 
@@ -148,11 +148,11 @@ namespace mongo {
         if( it != _databases.end() && it->second.get() == &database ){
 
             _databases.erase( it );
-            log() << "erased database " << database.getName() << " from registry" << endl;
+            log() << "erased database " << database.getName() << " from local registry" << endl;
         }
         else{
 
-            log() << "did not erase database " << database.getName() << " from registry" << endl;
+            log() << database.getName() << "already erased from local registry" << endl;
         }
 
     }

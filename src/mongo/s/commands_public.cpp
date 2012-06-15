@@ -348,7 +348,7 @@ namespace mongo {
                 // TODO: This won't work with parallel dropping
                 //
 
-                grid.removeDB( *conf );
+                grid.removeDBIfExists( *conf );
                 grid.getDBConfig( dbName );
 
                 // TODO: Make dropping logic saner and more tolerant of partial drops.  This is
