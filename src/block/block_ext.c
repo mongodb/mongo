@@ -397,8 +397,8 @@ __wt_block_extend(
 	fh = block->fh;
 
 	/*
-	 * Callers of this function are expected to be holding any locks
-	 * required to extend the file.
+	 * Callers of this function are expected to have already acquired any
+	 * locks required to extend the file.
 	 *
 	 * We should never be allocating from an empty file.
 	 */
@@ -464,24 +464,26 @@ int
 __wt_block_off_free(
     WT_SESSION_IMPL *session, WT_BLOCK *block, off_t off, off_t size)
 {
-	WT_EXTLIST *el;
+	WT_DECL_RET;
 
 	/*
-	 * Callers of this function are expected to be holding any locks
-	 * required to manipulate the extent lists.
+	 * Callers of this function are expected to have already acquired any
+	 * locks required to manipulate the extent lists.
 	 *
 	 * We can reuse this extent immediately if it was allocated during this
-	 * snapshot,  merge it into the avail list (which slows file growth in
+	 * snapshot, merge it into the avail list (which slows file growth in
 	 * workloads including repeated overflow record modification).  If this
 	 * extent is referenced in a previous snapshot, merge into the discard
 	 * list.
 	 */
-	el = __wt_block_off_remove_overlap(
-	    session, &block->live.alloc, off, size) == 0 ?
-	    &block->live.avail : &block->live.discard;
-	WT_RET(__block_merge(session, el, off, (off_t)size));
-
-	return (0);
+	if ((ret = __wt_block_off_remove_overlap(
+	    session, &block->live.alloc, off, size)) == 0)
+		ret = __block_merge(
+		    session, &block->live.avail, off, (off_t)size);
+	else if (ret == WT_NOTFOUND)
+		ret = __block_merge(
+		    session, &block->live.discard, off, (off_t)size);
+	return (ret);
 }
 
 #ifdef HAVE_DIAGNOSTIC
@@ -771,15 +773,15 @@ __wt_block_insert_ext(
     WT_SESSION_IMPL *session, WT_EXTLIST *el, off_t off, off_t size)
 {
 	/*
-	 * There are currently two copies of this function (this code is a
-	 * one-liner that calls the internal version of the function, which
-	 * means the compiler should compress out the function call).  It's
-	 * that way because the interface is still fluid, I'm not convinced
-	 * there won't be a need for a functional split between the internal
-	 * and external versions in the future.
+	 * There are currently two copies of this function (this code is a one-
+	 * liner that calls the internal version of the function, which means
+	 * the compiler should compress out the function call).  It's that way
+	 * because the interface is still fluid, I'm not convinced there won't
+	 * be a need for a functional split between the internal and external
+	 * versions in the future.
 	 *
-	 * Callers of this function are expected to be holding any locks
-	 * required to manipulate the extent list.
+	 * Callers of this function are expected to have already acquired any
+	 * locks required to manipulate the extent list.
 	 */
 	return (__block_merge(session, el, off, size));
 }
@@ -1052,6 +1054,25 @@ __wt_block_extlist_truncate(
 
 	return (0);
 }
+
+/*
+ * __wt_block_extlist_init --
+ *	Initialize an extent list.
+ */
+int
+__wt_block_extlist_init(WT_SESSION_IMPL *session,
+    WT_EXTLIST *el, const char *name, const char *extname)
+{
+	char buf[128];
+
+	(void)snprintf(buf, sizeof(buf), "%s.%s",
+	    name == NULL ? "" : name, extname == NULL ? "" : extname);
+	WT_RET(__wt_strdup(session, buf, &el->name));
+
+	el->offset = WT_BLOCK_INVALID_OFFSET;
+	return (0);
+}
+
 /*
  * __wt_block_extlist_free --
  *	Discard an extent list.
@@ -1062,19 +1083,19 @@ __wt_block_extlist_free(WT_SESSION_IMPL *session, WT_EXTLIST *el)
 	WT_EXT *ext, *next;
 	WT_SIZE *szp, *nszp;
 
+	__wt_free(session, el->name);
+
 	for (ext = el->off[0]; ext != NULL; ext = next) {
 		next = ext->next[0];
 		__wt_free(session, ext);
 	}
-	memset(el->off, 0, sizeof(el->off));
 	for (szp = el->sz[0]; szp != NULL; szp = nszp) {
 		nszp = szp->next[0];
 		__wt_free(session, szp);
 	}
-	memset(el->sz, 0, sizeof(el->sz));
 
-	el->bytes = 0;
-	el->entries = 0;
+	/* Extent lists are re-used, clear them. */
+	memset(el, 0, sizeof(*el));
 }
 
 #ifdef HAVE_VERBOSE

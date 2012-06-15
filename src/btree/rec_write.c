@@ -968,7 +968,6 @@ __rec_split_write(
 	uint8_t addr[WT_BTREE_MAX_ADDR_COOKIE];
 
 	dsk = buf->mem;
-	WT_VERBOSE_RET(session, write, "%s", __wt_page_type_string(dsk->type));
 
 	/*
 	 * We always write an additional byte on row-store leaf pages after the
