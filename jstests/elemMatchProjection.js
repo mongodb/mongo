@@ -37,7 +37,7 @@ assert.eq( 1,
           "single object match with filtered _id (array length match)" );
 
 assert.eq( 1,
-        t.find( { group:3, 'x.a':2 }, { _id:0, 'x.$':1 } ).sort( { _id:1 } ).toArray()[0].x.length,
+        t.find( { group:3, 'x.a':2 }, { 'x.$':1 } ).sort( { _id:1 } ).toArray()[0].x.length,
         "sorted single object match with filtered _id (array length match)" );
 
 assert.eq( 1,
