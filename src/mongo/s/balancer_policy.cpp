@@ -308,11 +308,14 @@ namespace mongo {
     }
 
 
-    ShardInfo::ShardInfo( long long maxSize, long long currSize, bool draining, bool opsQueued )
+    ShardInfo::ShardInfo( long long maxSize, long long currSize, 
+                          bool draining, bool opsQueued, 
+                          const set<string>& tags )
         : _maxSize( maxSize ), 
           _currSize( currSize ),
           _draining( draining ),
-          _hasOpsQueued( opsQueued ) {
+          _hasOpsQueued( opsQueued ),
+          _tags( tags ) {
     }
 
     ShardInfo::ShardInfo()
@@ -346,6 +349,11 @@ namespace mongo {
         ss << " currSize: " << _currSize;
         ss << " draining: " << _draining;
         ss << " hasOpsQueued: " << _hasOpsQueued;
+        if ( _tags.size() > 0 ) {
+            ss << "tags : ";
+            for ( set<string>::const_iterator i = _tags.begin(); i != _tags.end(); ++i ) 
+                ss << *i << ",";
+        }
         return ss.str();
     }
 

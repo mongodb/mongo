@@ -192,7 +192,8 @@ namespace mongo {
             shardInfo[ s.getName() ] = ShardInfo( s.getMaxSize(),
                                                   status.mapped(),
                                                   s.isDraining(),
-                                                  status.hasOpsQueued()
+                                                  status.hasOpsQueued(),
+                                                  s.tags()
                                                   );
         }
 
@@ -218,7 +219,7 @@ namespace mongo {
                 LOG(1) << "skipping empty collection (" << ns << ")";
                 continue;
             }
-
+            
             for ( vector<Shard>::iterator i=allShards.begin(); i!=allShards.end(); ++i ) {
                 // this just makes sure there is an entry in shardToChunksMap for every shard
                 Shard s = *i;
@@ -226,6 +227,17 @@ namespace mongo {
             }
 
             DistributionStatus status( shardInfo, shardToChunksMap );
+            
+            // load tags
+            conn.ensureIndex( ShardNS::tags, BSON( "ns" << 1 << "min" << 1 ), true );
+            cursor = conn.query( ShardNS::tags , QUERY( "ns" << ns ).sort( "min" ) );
+            while ( cursor->more() ) {
+                BSONObj tag = cursor->nextSafe();
+                status.addTagRange( TagRange( tag["min"].Obj().getOwned(), 
+                                              tag["max"].Obj().getOwned(), 
+                                              tag["tag"].String() ) );
+            }
+            cursor.reset();
             
             CandidateChunk* p = _policy->balance( ns, status, _balancedLastTime );
             if ( p ) candidateChunks->push_back( CandidateChunkPtr( p ) );
@@ -277,6 +289,8 @@ namespace mongo {
             break;
         }
 
+        int sleepTime = 30;
+
         // getConnectioString and dist lock constructor does not throw, which is what we expect on while
         // on the balancer thread
         ConnectionString config = configServer.getConnectionString();
@@ -299,8 +313,9 @@ namespace mongo {
                 // refresh chunk size (even though another balancer might be active)
                 Chunk::refreshChunkSize();
 
+                BSONObj balancerConfig;
                 // now make sure we should even be running
-                if ( ! grid.shouldBalance() ) {
+                if ( ! grid.shouldBalance( "", &balancerConfig ) ) {
                     LOG(1) << "skipping balancing round because balancing is disabled" << endl;
 
                     // Ping again so scripts can determine if we're active without waiting
@@ -308,9 +323,11 @@ namespace mongo {
 
                     conn.done();
                     
-                    sleepsecs( 30 );
+                    sleepsecs( sleepTime );
                     continue;
                 }
+
+                sleepTime = balancerConfig["_nosleep"].trueValue() ? 30 : 6;
                 
                 uassert( 13258 , "oids broken after resetting!" , _checkOIDs() );
 
@@ -324,7 +341,7 @@ namespace mongo {
 
                         conn.done();
                         
-                        sleepsecs( 30 ); // no need to wake up soon
+                        sleepsecs( sleepTime ); // no need to wake up soon
                         continue;
                     }
                     
@@ -348,7 +365,7 @@ namespace mongo {
                 
                 conn.done();
 
-                sleepsecs( _balancedLastTime ? 5 : 10 );
+                sleepsecs( _balancedLastTime ? sleepTime / 6 : sleepTime );
             }
             catch ( std::exception& e ) {
                 log() << "caught exception while doing balance: " << e.what() << endl;
@@ -356,7 +373,7 @@ namespace mongo {
                 // Just to match the opening statement if in log level 1
                 LOG(1) << "*** End of balancing round" << endl;
 
-                sleepsecs( 30 ); // sleep a fair amount b/c of error
+                sleepsecs( sleepTime ); // sleep a fair amount b/c of error
                 continue;
             }
         }

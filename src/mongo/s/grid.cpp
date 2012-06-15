@@ -437,7 +437,7 @@ namespace mongo {
      * Returns whether balancing is enabled, with optional namespace "ns" parameter for balancing on a particular
      * collection.
      */
-    bool Grid::shouldBalance( const string& ns ) const {
+    bool Grid::shouldBalance( const string& ns, BSONObj* balancerDocOut ) const {
 
         scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::getScopedDbConnection(
                 configServer.getPrimary().getConnString() ) );
@@ -458,6 +458,9 @@ namespace mongo {
             // if anything goes wrong, we shouldn't try balancing
             return false;
         }
+
+        if ( balancerDocOut )
+            *balancerDocOut = balancerDoc;
 
         boost::posix_time::ptime now = boost::posix_time::second_clock::local_time();
         if ( _balancerStopped( balancerDoc ) || ! _inBalancingWindow( balancerDoc , now ) ) {

@@ -48,7 +48,8 @@ namespace mongo {
 
         Shard( const Shard& other )
             : _name( other._name ) , _addr( other._addr ) , _cs( other._cs ) , 
-              _maxSize( other._maxSize ) , _isDraining( other._isDraining ) {
+              _maxSize( other._maxSize ) , _isDraining( other._isDraining ),
+              _tags( other._tags ) {
         }
 
         Shard( const Shard* other )
@@ -140,6 +141,9 @@ namespace mongo {
          */
         bool containsNode( const string& node ) const;
 
+        const set<string>& tags() const { return _tags; }
+        void addTag( const string& tag ) { _tags.insert( tag ); }
+
         static void getAllShards( vector<Shard>& all );
         static void printShardInfo( ostream& out );
         static Shard lookupRSName( const string& name);
@@ -167,6 +171,7 @@ namespace mongo {
         ConnectionString _cs;
         long long _maxSize;    // in MBytes, 0 is unlimited
         bool      _isDraining; // shard is currently being removed
+        set<string> _tags;
     };
 
     class ShardStatus {

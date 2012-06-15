@@ -41,6 +41,7 @@ namespace mongo {
     string ShardNS::database = "config.databases";
     string ShardNS::collection = "config.collections";
     string ShardNS::chunk = "config.chunks";
+    string ShardNS::tags = "config.tags";
 
     string ShardNS::mongos = "config.mongos";
     string ShardNS::settings = "config.settings";

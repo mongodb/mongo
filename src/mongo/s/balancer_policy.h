@@ -51,7 +51,9 @@ namespace mongo {
     class ShardInfo {
     public:
         ShardInfo();
-        ShardInfo( long long maxSize, long long currSize, bool draining, bool opsQueued );
+        ShardInfo( long long maxSize, long long currSize, 
+                   bool draining, bool opsQueued, 
+                   const set<string>& tags = set<string>() );
 
         void addTag( const string& tag );
 

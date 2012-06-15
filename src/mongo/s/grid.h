@@ -91,7 +91,7 @@ namespace mongo {
         /**
          * @return true if the chunk balancing functionality is enabled
          */
-        bool shouldBalance( const string& ns = "" ) const;
+        bool shouldBalance( const string& ns = "", BSONObj* balancerDocOut = 0 ) const;
 
         /**
          * 
