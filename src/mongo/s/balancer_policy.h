@@ -42,6 +42,8 @@ namespace mongo {
         BSONObj min;
         BSONObj max;
         string tag;
+        
+        TagRange(){}
 
         TagRange( const BSONObj& a_min, const BSONObj& a_max, const string& a_tag ) 
             : min( a_min.getOwned() ), max( a_max.getOwned() ), tag( a_tag ){}
@@ -159,7 +161,7 @@ namespace mongo {
     private:
         const ShardInfoMap& _shardInfo;
         const ShardToChunksMap& _shardChunks;
-        vector<TagRange> _tagRanges;
+        map<BSONObj,TagRange> _tagRanges;
         set<string> _allTags;
         set<string> _shards;
     };

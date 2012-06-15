@@ -263,5 +263,27 @@ namespace mongo {
             ASSERT_EQUALS( 0U , chunks["shard2"].size() );
 
         }
+
+
+        TEST( BalancerPolicyTests, TagsSelector ) {
+            ShardToChunksMap chunks;
+            ShardInfoMap shards;
+            DistributionStatus d( shards, chunks );
+            d.addTagRange( TagRange( BSON( "x" << 1 ), BSON( "x" << 10 ) , "a" ) );
+            d.addTagRange( TagRange( BSON( "x" << 10 ), BSON( "x" << 20 ) , "b" ) );
+            d.addTagRange( TagRange( BSON( "x" << 20 ), BSON( "x" << 30 ) , "c" ) );
+            
+            ASSERT_EQUALS( "" , d.getTagForChunk( BSON( "min" << BSON( "x" << -4 ) ) ) );
+            ASSERT_EQUALS( "" , d.getTagForChunk( BSON( "min" << BSON( "x" << 0 ) ) ) );
+            ASSERT_EQUALS( "a" , d.getTagForChunk( BSON( "min" << BSON( "x" << 1 ) ) ) );
+            ASSERT_EQUALS( "b" , d.getTagForChunk( BSON( "min" << BSON( "x" << 10 ) ) ) );
+            ASSERT_EQUALS( "b" , d.getTagForChunk( BSON( "min" << BSON( "x" << 15 ) ) ) );
+            ASSERT_EQUALS( "c" , d.getTagForChunk( BSON( "min" << BSON( "x" << 25 ) ) ) );
+            ASSERT_EQUALS( "" , d.getTagForChunk( BSON( "min" << BSON( "x" << 35 ) ) ) );
+
+
+        }
+
+
     }
 }

@@ -134,20 +134,25 @@ namespace mongo {
     }
 
     void DistributionStatus::addTagRange( const TagRange& range ) {
-        _tagRanges.push_back( range );
+        _tagRanges[range.max.getOwned()] = range;
         _allTags.insert( range.tag );
     }
 
     string DistributionStatus::getTagForChunk( const BSONObj& chunk ) const {
-        // TODO, use a map or set or something
-        for ( unsigned i=0 ; i<_tagRanges.size(); i++ ) {
-            if ( chunk["min"].Obj() < _tagRanges[i].min )
-                continue;
-            if ( chunk["min"].Obj() >= _tagRanges[i].max )
-                continue;
-            return _tagRanges[i].tag;
-        }
-        return "";
+        if ( _tagRanges.size() == 0 )
+            return "";
+
+        BSONObj min = chunk["min"].Obj();
+
+        map<BSONObj,TagRange>::const_iterator i = _tagRanges.upper_bound( min );
+        if ( i == _tagRanges.end() )
+            return "";
+        
+        const TagRange& range = i->second;
+        if ( min < range.min )
+            return "";
+        
+        return range.tag;
     }
 
     void DistributionStatus::dump() const {
@@ -165,8 +170,10 @@ namespace mongo {
         if ( _tagRanges.size() > 0 ) {
             log() << " tag ranges" << endl;
             
-            for ( unsigned i=0; i<_tagRanges.size(); i++ ) 
-                log() << "     " << _tagRanges[i].toString() << endl;
+            for ( map<BSONObj,TagRange>::const_iterator i = _tagRanges.begin(); 
+                  i != _tagRanges.end(); 
+                  ++i )
+                log() << i->second.toString() << endl;
         }
     }
 
