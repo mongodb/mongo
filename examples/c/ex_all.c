@@ -294,9 +294,33 @@ session_ops(WT_SESSION *session)
 	    "key_format=S,value_format=S");
 	/*! [Create a table] */
 
-	/*! [session checkpoint] */
+	/*! [session database checkpoint] */
+	/* Checkpoint the database. */
 	ret = session->checkpoint(session, NULL);
-	/*! [session checkpoint] */
+	/*! [session database checkpoint] */
+
+	/*! [session named database checkpoint] */
+	/* Named checkpoint of the database. */
+	ret = session->checkpoint(session, "name=june01");
+	/*! [session named database checkpoint] */
+
+	/*! [session target checkpoint] */
+	/*
+	 * Checkpoint a list of objects.
+	 * JSON parsing requires quoting the list of target URIs.
+	 */
+	ret = session->
+	    checkpoint(session, "target=(\"table:table1\",\"table:table2\")");
+	/*! [session target checkpoint] */
+
+	/*! [session named target checkpoint] */
+	/*
+	 * Named checkpoint for a list of objects.
+	 * JSON parsing requires quoting the list of target URIs.
+	 */
+	ret = session->
+	    checkpoint(session, "target=(\"table:mytable\"),name=midnight");
+	/*! [session named target checkpoint] */
 
 	/*! [session drop] */
 	/* Discard a table. */

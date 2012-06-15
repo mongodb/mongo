@@ -187,31 +187,39 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
 
 /*
  * __wt_txn_checkpoint --
- *	Write a checkpoint.
+ *	Checkpoint a database or a list of objects in the database.
  */
 int
 __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 {
-	WT_CONFIG_ITEM cval;
-	WT_CURSOR *cursor;
+	WT_CONFIG targetconf;
+	WT_CONFIG_ITEM cval, k, v;
+	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
 	WT_TXN_GLOBAL *txn_global;
+	int target_list;
 	const char *snapshot;
 	const char *txn_cfg[] = { "isolation=snapshot", NULL };
 
-	cursor = NULL;
 	txn_global = &S2C(session)->txn_global;
-
-	if ((ret = __wt_config_gets(
-	    session, cfg, "snapshot", &cval)) != 0 && ret != WT_NOTFOUND)
-		WT_RET(ret);
-	if (cval.len != 0)
-		WT_RET(__wt_strndup(session, cval.str, cval.len, &snapshot));
-	else
-		snapshot = NULL;
+	target_list = 0;
+	snapshot = NULL;
 
 	/* Only one checkpoint can be active at a time. */
 	__wt_writelock(session, S2C(session)->ckpt_rwlock);
+
+	/* Possible checkpoint name. */
+	WT_ERR_NOTFOUND_OK(__wt_config_gets(session, cfg, "snapshot", &cval));
+	if (cval.len != 0)
+		WT_ERR(__wt_strndup(session, cval.str, cval.len, &snapshot));
+
+	/* Possible checkpoint target list. */
+	WT_ERR_NOTFOUND_OK(__wt_config_gets(session, cfg, "target", &cval));
+	if (cval.len != 0) {
+		WT_ERR(__wt_scr_alloc(session, 512, &tmp));
+		WT_ERR(__wt_config_subinit(session, &targetconf, &cval));
+		target_list = 1;
+	}
 
 	WT_ERR(__wt_txn_begin(session, txn_cfg));
 
@@ -219,23 +227,54 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	txn_global->ckpt_txnid = session->txn.snap_min;
 
 	/*
-	 * If we're doing an ordinary unnamed checkpoint, we only need to flush
-	 * open files.	If we're creating a named snapshot, we need to walk the
-	 * entire list of files in the metadata.
+	 * If the checkpoint is named, we must snapshot both open and closed
+	 * files; if the checkpoint is not named, we only snapshot open files.
+	 *
+	 * XXX
+	 * We don't optimize for unnamed checkpoints of a list of targets, we
+	 * open the targets and checkpoint them even if they are quiescent and
+	 * don't need a checkpoint, applications are unlikely to checkpoint a
+	 * list of closed targets.
 	 */
-	WT_TRET((snapshot == NULL) ?
-	    __wt_conn_btree_apply(session, __wt_snapshot, cfg) :
-	    __wt_meta_btree_apply(session, __wt_snapshot, cfg, 0));
+	if (target_list) {
+		/* Step through the list of targets and snapshot each one. */
+		while ((ret = __wt_config_next(&targetconf, &k, &v)) == 0) {
+			if (v.len != 0)
+				WT_ERR_MSG(session, EINVAL,
+				    "invalid checkpoint target "
+				    "\"%.*s\": URIs may require quoting",
+				    (int)k.len, k.str);
+			WT_ERR(__wt_buf_fmt(
+			    session, tmp, "%.*s", (int)k.len, k.str));
 
-	if (cursor != NULL)
-		WT_TRET(cursor->close(cursor));
+			WT_ERR(__wt_meta_track_on(session));
+			__wt_spin_lock(session, &S2C(session)->schema_lock);
 
-	txn_global->ckpt_txnid = WT_TXN_NONE;
+			ret = __wt_schema_worker(session, (char *)tmp->data,
+			    __wt_snapshot, cfg, WT_BTREE_SNAPSHOT_OP);
+
+			__wt_spin_unlock(session, &S2C(session)->schema_lock);
+			WT_TRET(__wt_meta_track_off(session, ret == 0 ? 0 : 1));
+
+			if (ret != 0)
+				WT_ERR_MSG(
+				    session, ret, "%s", (char *)tmp->data);
+		}
+		if (ret == WT_NOTFOUND)
+			ret = 0;
+	} else
+		WT_ERR((snapshot == NULL) ?
+		    __wt_conn_btree_apply(session, __wt_snapshot, cfg) :
+		    __wt_meta_btree_apply(session, __wt_snapshot, cfg, 0));
+
+err:	txn_global->ckpt_txnid = WT_TXN_NONE;
 
 	WT_TRET(__txn_release(session));
 
-err:	__wt_rwunlock(session, S2C(session)->ckpt_rwlock);
+	__wt_rwunlock(session, S2C(session)->ckpt_rwlock);
 	__wt_free(session, snapshot);
+	__wt_scr_free(&tmp);
+
 	return (ret);
 }
 

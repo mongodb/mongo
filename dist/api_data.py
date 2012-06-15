@@ -298,6 +298,8 @@ methods = {
 'session.checkpoint' : Method([
 	Config('snapshot', '', r'''
 		if non-empty, create named snapshots in files'''),
+	Config('target', '', r'''
+		if non-empty, checkpoint the list of objects''', type='list'),
 ]),
 
 'connection.add_collator' : Method([]),

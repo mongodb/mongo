@@ -19,7 +19,7 @@ static int __snapshot_worker(WT_SESSION_IMPL *, const char *, int, snapshot_op);
 
 /*
  * __wt_snapshot --
- *	Snapshot the tree.
+ *	Snapshot a file.
  */
 int
 __wt_snapshot(WT_SESSION_IMPL *session, const char *cfg[])

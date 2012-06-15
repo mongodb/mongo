@@ -114,11 +114,11 @@ __wt_confchk_session_begin_transaction =
 
 const char *
 __wt_confdfl_session_checkpoint =
-    "snapshot=""";
+    "snapshot="",target=()";
 
 const char *
 __wt_confchk_session_checkpoint =
-    "snapshot=()";
+    "snapshot=(),target=(type=list)";
 
 const char *
 __wt_confdfl_session_close =

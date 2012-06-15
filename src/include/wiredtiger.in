@@ -826,17 +826,21 @@ struct __wt_session {
 	 */
 	int __F(rollback_transaction)(WT_SESSION *session, const char *config);
 
-	/*! Write a transactionally consistent snapshot of a database.
+	/*! Write a transactionally consistent snapshot of a database or set of
+	 * objects.  The checkpoint includes all transactions committed before
+	 * the checkpoint starts.
 	 *
-	 * All data files in the database are updated with snapshots that
-	 * reflect the transactions committed before the checkpoint starts.
-	 *
-	 * @snippet ex_all.c session checkpoint
+	 * @snippet ex_all.c session database checkpoint
+	 * @snippet ex_all.c session named database checkpoint
+	 * @snippet ex_all.c session target checkpoint
+	 * @snippet ex_all.c session named target checkpoint
 	 *
 	 * @param session the session handle
 	 * @configstart{session.checkpoint, see dist/api_data.py}
 	 * @config{snapshot, if non-empty\, create named snapshots in files.,a
 	 * string; default empty.}
+	 * @config{target, if non-empty\, checkpoint the list of objects.,a list
+	 * of strings; default empty.}
 	 * @configend
 	 * @errors
 	 */

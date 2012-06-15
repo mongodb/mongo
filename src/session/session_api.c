@@ -227,7 +227,7 @@ __session_drop(WT_SESSION *wt_session, const char *uri, const char *config)
 	__wt_spin_lock(session, &S2C(session)->schema_lock);
 	ret = (cval.len == 0) ? __wt_schema_drop(session, uri, cfg) :
 	    __wt_schema_worker(
-		session, uri, cfg, __wt_snapshot_drop, WT_BTREE_SNAPSHOT_OP);
+		session, uri, __wt_snapshot_drop, cfg, WT_BTREE_SNAPSHOT_OP);
 	__wt_spin_unlock(session, &S2C(session)->schema_lock);
 
 err:	/* Note: drop operations cannot be unrolled (yet?). */
@@ -248,8 +248,8 @@ __session_dumpfile(WT_SESSION *wt_session, const char *uri, const char *config)
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_API_CALL(session, dumpfile, config, cfg);
 	__wt_spin_lock(session, &S2C(session)->schema_lock);
-	ret = __wt_schema_worker(session, uri, cfg,
-	    __wt_dumpfile, WT_BTREE_EXCLUSIVE | WT_BTREE_VERIFY);
+	ret = __wt_schema_worker(session, uri,
+	    __wt_dumpfile, cfg, WT_BTREE_EXCLUSIVE | WT_BTREE_VERIFY);
 	__wt_spin_unlock(session, &S2C(session)->schema_lock);
 
 err:	API_END_NOTFOUND_MAP(session, ret);
@@ -269,8 +269,8 @@ __session_salvage(WT_SESSION *wt_session, const char *uri, const char *config)
 
 	SESSION_API_CALL(session, salvage, config, cfg);
 	__wt_spin_lock(session, &S2C(session)->schema_lock);
-	ret = __wt_schema_worker(session, uri, cfg,
-	    __wt_salvage, WT_BTREE_EXCLUSIVE | WT_BTREE_SALVAGE);
+	ret = __wt_schema_worker(session, uri,
+	    __wt_salvage, cfg, WT_BTREE_EXCLUSIVE | WT_BTREE_SALVAGE);
 	__wt_spin_unlock(session, &S2C(session)->schema_lock);
 
 err:	API_END_NOTFOUND_MAP(session, ret);
@@ -293,7 +293,7 @@ __session_sync(WT_SESSION *wt_session, const char *uri, const char *config)
 
 	__wt_spin_lock(session, &S2C(session)->schema_lock);
 	ret = __wt_schema_worker(
-	    session, uri, cfg, __wt_snapshot, WT_BTREE_SNAPSHOT_OP);
+	    session, uri, __wt_snapshot, cfg, WT_BTREE_SNAPSHOT_OP);
 	__wt_spin_unlock(session, &S2C(session)->schema_lock);
 
 err:	WT_TRET(__wt_meta_track_off(session, ret != 0));
@@ -382,8 +382,8 @@ __session_upgrade(WT_SESSION *wt_session, const char *uri, const char *config)
 
 	SESSION_API_CALL(session, upgrade, config, cfg);
 	__wt_spin_lock(session, &S2C(session)->schema_lock);
-	ret = __wt_schema_worker(session, uri, cfg,
-	    __wt_upgrade, WT_BTREE_EXCLUSIVE | WT_BTREE_UPGRADE);
+	ret = __wt_schema_worker(session, uri,
+	    __wt_upgrade, cfg, WT_BTREE_EXCLUSIVE | WT_BTREE_UPGRADE);
 	__wt_spin_unlock(session, &S2C(session)->schema_lock);
 
 err:	API_END_NOTFOUND_MAP(session, ret);
@@ -403,8 +403,8 @@ __session_verify(WT_SESSION *wt_session, const char *uri, const char *config)
 
 	SESSION_API_CALL(session, verify, config, cfg);
 	__wt_spin_lock(session, &S2C(session)->schema_lock);
-	ret = __wt_schema_worker(session, uri, cfg,
-	    __wt_verify, WT_BTREE_EXCLUSIVE | WT_BTREE_VERIFY);
+	ret = __wt_schema_worker(session, uri,
+	    __wt_verify, cfg, WT_BTREE_EXCLUSIVE | WT_BTREE_VERIFY);
 	__wt_spin_unlock(session, &S2C(session)->schema_lock);
 
 err:	API_END_NOTFOUND_MAP(session, ret);

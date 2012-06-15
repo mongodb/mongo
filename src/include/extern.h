@@ -882,9 +882,9 @@ extern int __wt_schema_get_source( WT_SESSION_IMPL *session,
 extern int __wt_schema_name_check(WT_SESSION_IMPL *session, const char *uri);
 extern int __wt_schema_worker(WT_SESSION_IMPL *session,
     const char *uri,
-    const char *cfg[],
     int (*func)(WT_SESSION_IMPL *,
     const char *[]),
+    const char *cfg[],
     uint32_t open_flags);
 extern int __wt_session_create_strip( WT_SESSION *session,
     const char *v1,
