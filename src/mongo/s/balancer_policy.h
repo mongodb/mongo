@@ -112,7 +112,10 @@ namespace mongo {
 
         // only used when building
         
-        void addTagRange( const TagRange& range );
+        /**
+         * @return if range is valid
+         */
+        bool addTagRange( const TagRange& range );
 
         // ---- these methods might be better suiting in BalancerPolicy
         

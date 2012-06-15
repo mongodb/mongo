@@ -133,9 +133,39 @@ namespace mongo {
         return i->second;
     }
 
-    void DistributionStatus::addTagRange( const TagRange& range ) {
+    bool DistributionStatus::addTagRange( const TagRange& range ) {
+        // first check for overlaps
+        
+        for ( map<BSONObj,TagRange>::const_iterator i = _tagRanges.begin();
+              i != _tagRanges.end(); 
+              ++i ) {
+            const TagRange& tocheck = i->second;
+
+            if ( range.min == tocheck.min ) {
+                LOG(1) << "have 2 ranges with the same min " << range << " " << tocheck << endl;
+                return false;
+            }
+            
+            if ( range.min < tocheck.min ) {
+                if ( range.max > tocheck.min ) {
+                    LOG(1) << "have overlapping ranges " << range << " " << tocheck << endl;
+                    return false;
+                }
+            }
+            else {
+                // range.min > tocheck.min
+                if ( tocheck.max > range.min ) {
+                    LOG(1) << "have overlapping ranges " << range << " " << tocheck << endl;
+                    return false;
+                }
+            }
+            
+        }
+
         _tagRanges[range.max.getOwned()] = range;
         _allTags.insert( range.tag );
+
+        return true;
     }
 
     string DistributionStatus::getTagForChunk( const BSONObj& chunk ) const {

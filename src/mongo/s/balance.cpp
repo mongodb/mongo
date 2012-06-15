@@ -233,9 +233,11 @@ namespace mongo {
             cursor = conn.query( ShardNS::tags , QUERY( "ns" << ns ).sort( "min" ) );
             while ( cursor->more() ) {
                 BSONObj tag = cursor->nextSafe();
-                status.addTagRange( TagRange( tag["min"].Obj().getOwned(), 
-                                              tag["max"].Obj().getOwned(), 
-                                              tag["tag"].String() ) );
+                uassert( 16356 , str::stream() << "tag ranges not valid for: " << ns ,
+                         status.addTagRange( TagRange( tag["min"].Obj().getOwned(), 
+                                                       tag["max"].Obj().getOwned(), 
+                                                       tag["tag"].String() ) ) );
+                    
             }
             cursor.reset();
             

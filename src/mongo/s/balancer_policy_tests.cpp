@@ -269,10 +269,14 @@ namespace mongo {
             ShardToChunksMap chunks;
             ShardInfoMap shards;
             DistributionStatus d( shards, chunks );
-            d.addTagRange( TagRange( BSON( "x" << 1 ), BSON( "x" << 10 ) , "a" ) );
-            d.addTagRange( TagRange( BSON( "x" << 10 ), BSON( "x" << 20 ) , "b" ) );
-            d.addTagRange( TagRange( BSON( "x" << 20 ), BSON( "x" << 30 ) , "c" ) );
-            
+            ASSERT( d.addTagRange( TagRange( BSON( "x" << 1 ), BSON( "x" << 10 ) , "a" ) ) );
+            ASSERT( d.addTagRange( TagRange( BSON( "x" << 10 ), BSON( "x" << 20 ) , "b" ) ) );
+            ASSERT( d.addTagRange( TagRange( BSON( "x" << 20 ), BSON( "x" << 30 ) , "c" ) ) );
+
+            ASSERT( ! d.addTagRange( TagRange( BSON( "x" << 20 ), BSON( "x" << 30 ) , "c" ) ) );
+            ASSERT( ! d.addTagRange( TagRange( BSON( "x" << 22 ), BSON( "x" << 28 ) , "c" ) ) );
+            ASSERT( ! d.addTagRange( TagRange( BSON( "x" << 28 ), BSON( "x" << 33 ) , "c" ) ) );
+
             ASSERT_EQUALS( "" , d.getTagForChunk( BSON( "min" << BSON( "x" << -4 ) ) ) );
             ASSERT_EQUALS( "" , d.getTagForChunk( BSON( "min" << BSON( "x" << 0 ) ) ) );
             ASSERT_EQUALS( "a" , d.getTagForChunk( BSON( "min" << BSON( "x" << 1 ) ) ) );
