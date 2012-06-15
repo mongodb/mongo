@@ -14,8 +14,7 @@ s.adminCommand( { shardcollection : "test.foo" , key : { _id : 1 } } );
 for ( i=0; i<20; i++ )
     s.adminCommand( { split : "test.foo" , middle : { _id : i } } );
 
-db.printShardingStatus( true )
-
+sh.status( true )
 assert.soon( function() {
     counts = s.chunkCounts( "foo" );
     return counts["shard0000"] == 7 && 
@@ -23,10 +22,19 @@ assert.soon( function() {
         counts["shard0002"] == 7;
 } , "balance 1 didn't happen" , 1000 * 60 * 10 , 1000 )
 
-s.config.shards.update( { _id : "shard0000" } , { $push : { tags : "a" } } );
-s.config.shards.update( { _id : "shard0001" } , { $push : { tags : "a" } } );
+// quick test of some shell helpers and setting up state
+sh.addShardTag( "shard0000" , "a" )
+assert.eq( [ "a" ] , s.config.shards.findOne( { _id : "shard0000" } ).tags );
+sh.addShardTag( "shard0000" , "b" )
+assert.eq( [ "a" , "b" ] , s.config.shards.findOne( { _id : "shard0000" } ).tags );
+sh.removeShardTag( "shard0000" , "b" )
+assert.eq( [ "a" ] , s.config.shards.findOne( { _id : "shard0000" } ).tags );
 
-s.config.tags.insert( { ns : "test.foo" , min : { _id : -1 } , max : { _id : 1000 } , tag : "a" } )
+sh.addShardTag( "shard0001" , "a" )
+
+sh.addTagRange( "test.foo" , { _id : -1 } , { _id : 1000 } , "a" )
+
+sh.status( true );
 
 assert.soon( function() {
     counts = s.chunkCounts( "foo" );

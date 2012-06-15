@@ -651,6 +651,12 @@ printShardingStatus = function( configDB , verbose ){
                             else {
                                 output( "\t\t\ttoo many chunks to print, use verbose if you want to force print" );
                             }
+
+                            configDB.tags.find( { ns : coll._id } ).sort( { min : 1 } ).forEach( 
+                                function( tag ) {
+                                    output( "\t\t\t tag: " + tag.tag + "  " + tojson( tag.min ) + " -->> " + tojson( tag.max ) );
+                                }
+                            )
                         }
                     }
                 )

@@ -49,6 +49,9 @@ sh.help = function() {
     print( "\tsh.setBalancerState( <bool on or not> )   turns the balancer on or off true=on, false=off" );
     print( "\tsh.getBalancerState()                     return true if on, off if not" );
     print( "\tsh.isBalancerRunning()                    return true if the balancer is running on any mongos" );
+
+    print( "\tsh.addShardTag(shard,tag)                 adds the tag to the shard" );
+    print( "\tsh.removeShardTag(shard,tag)              removes the tag from the shard" );
     
     print( "\tsh.status()                               prints a general overview of the cluster" )
 }
@@ -318,3 +321,34 @@ sh._lastMigration = function( ns ){
     else return null
 }
 
+sh._checkLastError = function( mydb ) {
+    var err = mydb.getLastError();
+    if ( err )
+        throw "error: " + err;
+}
+
+sh.addShardTag = function( shard, tag ) {
+    var config = db.getSisterDB( "config" );
+    if ( config.shards.findOne( { _id : shard } ) == null ) {
+        throw "can't find a shard with name: " + shard;
+    }
+    config.shards.update( { _id : shard } , { $addToSet : { tags : tag } } );
+    sh._checkLastError( config );
+}
+
+sh.removeShardTag = function( shard, tag ) {
+    var config = db.getSisterDB( "config" );
+    if ( config.shards.findOne( { _id : shard } ) == null ) {
+        throw "can't find a shard with name: " + shard;
+    }
+    config.shards.update( { _id : shard } , { $pull : { tags : tag } } );
+    sh._checkLastError( config );
+}
+
+sh.addTagRange = function( ns, min, max, tag ) {
+    var config = db.getSisterDB( "config" );
+    config.tags.update( { ns : ns , min : min } , 
+                        { ns : ns , min : min , max : max , tag : tag } , 
+                        true );
+    sh._checkLastError( config );    
+}
