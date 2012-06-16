@@ -49,6 +49,9 @@ for ( i=0; i<20; i+= 2 ) {
 
 db.printShardingStatus()
 
+
+s.config.settings.update( { _id: "balancer" }, { $set : { stopped: false } } , true );
+
 assert.soon( function(){ var x = s.chunkDiff( "foo" , "test" ); print( "chunk diff: " + x ); return x < 2; } , "no balance happened" , 8 * 60 * 1000 , 2000 ) 
 
 assert.eq( coll.count() , coll.find().itcount() );
