@@ -20,5 +20,4 @@ WT_SESSION::checkpoint method, specifically, creating a snapshot of a
 one or more objects is done using the WT_SESSION::checkpoint method's
 \c target configuration string.
 
-
 */
