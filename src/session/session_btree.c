@@ -138,8 +138,14 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 
 	btree = NULL;
 
-	/* Is this a snapshot operation? */
-	if (!LF_ISSET(WT_BTREE_SNAPSHOT_OP) && cfg != NULL &&
+	/*
+	 * Optionally open a snapshot.  This function is called from lots of
+	 * places, for example, session.checkpoint: the only method currently
+	 * having a "snapshot" configuration string is session.open_cursor,
+	 * so we don't need to check further than if that configuration string
+	 * is set.
+	 */
+	if (cfg != NULL &&
 	    __wt_config_gets(session, cfg, "snapshot", &cval) == 0 &&
 	    cval.len != 0) {
 		snapshot = cval.str;

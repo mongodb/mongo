@@ -231,8 +231,8 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 			WT_ERR(__wt_meta_track_on(session));
 			__wt_spin_lock(session, &S2C(session)->schema_lock);
 
-			ret = __wt_schema_worker(session, (char *)tmp->data,
-			    __wt_snapshot, cfg, WT_BTREE_SNAPSHOT_OP);
+			ret = __wt_schema_worker(
+			    session, (char *)tmp->data, __wt_snapshot, cfg, 0);
 
 			__wt_spin_unlock(session, &S2C(session)->schema_lock);
 			WT_TRET(__wt_meta_track_off(session, ret == 0 ? 0 : 1));
