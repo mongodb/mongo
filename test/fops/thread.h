@@ -33,8 +33,8 @@ void die(const char *, int) __attribute__((noreturn));
 void die(const char *, int);
 #endif
 int  fop_start(u_int);
+void obj_checkpoint(void);
 void obj_create(void);
 void obj_drop(void);
-void obj_sync(void);
 void obj_upgrade(void);
 void obj_verify(void);

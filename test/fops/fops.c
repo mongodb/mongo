@@ -13,7 +13,7 @@ static void  print_stats(u_int);
 typedef struct {
 	int create;				/* session.create */
 	int drop;				/* session.drop */
-	int sync;				/* session.sync */
+	int ckpt;				/* session.checkpoint */
 	int upgrade;				/* session.upgrade */
 	int verify;				/* session.verify */
 } STATS;
@@ -117,8 +117,8 @@ fop(void *arg)
 			obj_drop();
 			break;
 		case 2:
-			++s->sync;
-			obj_sync();
+			++s->ckpt;
+			obj_checkpoint();
 			break;
 		case 3:
 			++s->upgrade;
@@ -148,7 +148,7 @@ print_stats(u_int nthreads)
 	s = run_stats;
 	for (id = 0; id < nthreads; ++id, ++s)
 		printf(
-		    "%3d: create %6d, drop %6d, sync %6d, upgrade %6d, "
+		    "%3d: create %6d, drop %6d, ckpt %6d, upgrade %6d, "
 		    "verify %6d\n",
-		    id, s->create, s->drop, s->sync, s->upgrade, s->verify);
+		    id, s->create, s->drop, s->ckpt, s->upgrade, s->verify);
 }

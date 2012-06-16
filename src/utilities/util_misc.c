@@ -113,3 +113,28 @@ format:		return (util_err(EINVAL, "%s: invalid record number", p));
 	*recnop = recno;
 	return (0);
 }
+
+/*
+ * util_flush --
+ *	Flush the file successfully, or drop it.
+ */
+int
+util_flush(WT_SESSION *session, const char *uri)
+{
+	WT_DECL_RET;
+	size_t len;
+	char *buf;
+
+	len = strlen(uri) + 100;
+	if ((buf = malloc(len)) == NULL)
+		return (util_err(errno, NULL));
+
+	(void)snprintf(buf, len, "target=(\"%s\")", uri);
+	if ((ret = session->checkpoint(session, buf)) != 0) {
+		ret = util_err(ret, "%s: session.checkpoint", uri);
+		(void)session->drop(session, uri, NULL);
+	}
+
+	free(buf);
+	return (ret);
+}

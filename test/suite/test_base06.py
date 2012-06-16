@@ -35,7 +35,7 @@ import wiredtiger, wttest
 class test_base06(wttest.WiredTigerTestCase):
     """
     Test various session level operations on tables, including
-    rename, drop, sync, truncate
+    rename, drop, truncate
 
     """
 
@@ -182,15 +182,6 @@ class test_base06(wttest.WiredTigerTestCase):
                 self.session.drop('table:' + self.table_name1, None)
         self.truncateRangeAndCheck(self.table_name1, 10, 10)
         self.session.drop('table:' + self.table_name1, None)
-
-    def test_sync(self):
-        self.populate(self.table_name1)
-        origmtime = os.path.getmtime(self.table_name1 + ".wt")
-        time.sleep(2)
-        self.session.sync('table:' + self.table_name1, None)
-        newmtime = os.path.getmtime(self.table_name1 + ".wt")
-        self.assertGreater(newmtime, origmtime)
-        self.checkContents(self.table_name1)
 
 
 if __name__ == '__main__':

@@ -157,7 +157,7 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session)
 
 	if (!F_ISSET(btree,
 	    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY))
-		ret = __wt_snapshot_close(session);
+		ret = __wt_snapshot(session, NULL);
 
 	WT_TRET(__wt_btree_close(session));
 

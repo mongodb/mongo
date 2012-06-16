@@ -114,11 +114,11 @@ __wt_confchk_session_begin_transaction =
 
 const char *
 __wt_confdfl_session_checkpoint =
-    "snapshot="",target=()";
+    "drop="",name="",target=()";
 
 const char *
 __wt_confchk_session_checkpoint =
-    "snapshot=(),target=(type=list)";
+    "drop=(),name=(),target=(type=list)";
 
 const char *
 __wt_confdfl_session_close =
@@ -162,11 +162,11 @@ __wt_confchk_session_create =
 
 const char *
 __wt_confdfl_session_drop =
-    "force=false,snapshot=""";
+    "force=false";
 
 const char *
 __wt_confchk_session_drop =
-    "force=(type=boolean),snapshot=()";
+    "force=(type=boolean)";
 
 const char *
 __wt_confdfl_session_dumpfile =
@@ -219,14 +219,6 @@ __wt_confdfl_session_salvage =
 const char *
 __wt_confchk_session_salvage =
     "force=(type=boolean)";
-
-const char *
-__wt_confdfl_session_sync =
-    "snapshot=""";
-
-const char *
-__wt_confchk_session_sync =
-    "snapshot=()";
 
 const char *
 __wt_confdfl_session_truncate =

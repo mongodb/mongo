@@ -153,8 +153,8 @@ load_dump(WT_SESSION *session)
 		if (ret == 0)
 			ret = tret;
 	}
-	if (ret == 0 && (ret = session->sync(session, uri, NULL)) != 0)
-		ret = util_err(ret, "%s: session.sync", uri);
+	if (ret == 0)
+		ret = util_flush(session, uri);
 
 	return (ret == 0 ? 0 : 1);
 }

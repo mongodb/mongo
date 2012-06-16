@@ -198,47 +198,28 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_DECL_RET;
 	WT_TXN_GLOBAL *txn_global;
 	int target_list;
-	const char *snapshot;
 	const char *txn_cfg[] = { "isolation=snapshot", NULL };
 
 	txn_global = &S2C(session)->txn_global;
 	target_list = 0;
-	snapshot = NULL;
 
 	/* Only one checkpoint can be active at a time. */
 	__wt_writelock(session, S2C(session)->ckpt_rwlock);
-
-	/* Possible checkpoint name. */
-	WT_ERR_NOTFOUND_OK(__wt_config_gets(session, cfg, "snapshot", &cval));
-	if (cval.len != 0)
-		WT_ERR(__wt_strndup(session, cval.str, cval.len, &snapshot));
-
-	/* Possible checkpoint target list. */
-	WT_ERR_NOTFOUND_OK(__wt_config_gets(session, cfg, "target", &cval));
-	if (cval.len != 0) {
-		WT_ERR(__wt_scr_alloc(session, 512, &tmp));
-		WT_ERR(__wt_config_subinit(session, &targetconf, &cval));
-		target_list = 1;
-	}
 
 	WT_ERR(__wt_txn_begin(session, txn_cfg));
 
 	/* Prevent eviction from evicting anything newer than this. */
 	txn_global->ckpt_txnid = session->txn.snap_min;
 
-	/*
-	 * If the checkpoint is named, we must snapshot both open and closed
-	 * files; if the checkpoint is not named, we only snapshot open files.
-	 *
-	 * XXX
-	 * We don't optimize for unnamed checkpoints of a list of targets, we
-	 * open the targets and checkpoint them even if they are quiescent and
-	 * don't need a checkpoint, applications are unlikely to checkpoint a
-	 * list of closed targets.
-	 */
-	if (target_list) {
-		/* Step through the list of targets and snapshot each one. */
+	/* Step through the list of targets and snapshot each one. */
+	cval.len = 0;
+	WT_ERR_NOTFOUND_OK(__wt_config_gets(session, cfg, "target", &cval));
+	if (cval.len != 0) {
+		WT_ERR(__wt_scr_alloc(session, 512, &tmp));
+		WT_ERR(__wt_config_subinit(session, &targetconf, &cval));
 		while ((ret = __wt_config_next(&targetconf, &k, &v)) == 0) {
+			target_list = 1;
+
 			if (v.len != 0)
 				WT_ERR_MSG(session, EINVAL,
 				    "invalid checkpoint target "
@@ -262,17 +243,33 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 		}
 		if (ret == WT_NOTFOUND)
 			ret = 0;
-	} else
-		WT_ERR((snapshot == NULL) ?
+	}
+
+	if (!target_list) {
+		/*
+		 * Possible checkpoint snapshot name.  If snapshots are named,
+		 * we must snapshot both open and closed files; if snapshots
+		 * are not named, we only snapshot open files.
+		 *
+		 * XXX
+		 * We don't optimize unnamed checkpoints of a list of targets,
+		 * we open the targets and snapshot them even if they are
+		 * quiescent and don't need a snapshot, believing applications
+		 * unlikely to checkpoint a list of closed targets.
+		 */
+		cval.len = 0;
+		WT_ERR_NOTFOUND_OK(
+		    __wt_config_gets(session, cfg, "name", &cval));
+		WT_ERR(cval.len == 0 ?
 		    __wt_conn_btree_apply(session, __wt_snapshot, cfg) :
 		    __wt_meta_btree_apply(session, __wt_snapshot, cfg, 0));
+	}
 
 err:	txn_global->ckpt_txnid = WT_TXN_NONE;
 
 	WT_TRET(__txn_release(session));
 
 	__wt_rwunlock(session, S2C(session)->ckpt_rwlock);
-	__wt_free(session, snapshot);
 	__wt_scr_free(&tmp);
 
 	return (ret);

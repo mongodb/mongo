@@ -518,8 +518,6 @@ extern const char *__wt_confdfl_session_rollback_transaction;
 extern const char *__wt_confchk_session_rollback_transaction;
 extern const char *__wt_confdfl_session_salvage;
 extern const char *__wt_confchk_session_salvage;
-extern const char *__wt_confdfl_session_sync;
-extern const char *__wt_confchk_session_sync;
 extern const char *__wt_confdfl_session_truncate;
 extern const char *__wt_confchk_session_truncate;
 extern const char *__wt_confdfl_session_upgrade;
@@ -910,8 +908,6 @@ extern int __wt_session_discard_btree( WT_SESSION_IMPL *session,
     WT_BTREE_SESSION *btree_session);
 extern int __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_snapshot(WT_SESSION_IMPL *session, const char *cfg[]);
-extern int __wt_snapshot_close(WT_SESSION_IMPL *session);
-extern int __wt_snapshot_drop(WT_SESSION_IMPL *session, const char *cfg[]);
 extern void __wt_event_handler_set(WT_SESSION_IMPL *session,
     WT_EVENT_HANDLER *handler);
 extern void __wt_err(WT_SESSION_IMPL *session,

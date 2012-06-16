@@ -283,6 +283,62 @@ cursor_search_near(WT_CURSOR *cursor)
 }
 
 int
+checkpoint_ops(WT_SESSION *session)
+{
+	int ret;
+
+	/*! [session checkpoint] */
+	/* Checkpoint the database. */
+	ret = session->checkpoint(session, NULL);
+
+	/* Checkpoint of the database, creating a named snapshot. */
+	ret = session->checkpoint(session, "name=June01");
+
+	/*
+	 * Checkpoint a list of objects.
+	 * JSON parsing requires quoting the list of target URIs.
+	 */
+	ret = session->
+	    checkpoint(session, "target=(\"table:table1\",\"table:table2\")");
+
+	/*
+	 * Checkpoint a list of objects, creating a named snapshot.
+	 * JSON parsing requires quoting the list of target URIs.
+	 */
+	ret = session->
+	    checkpoint(session, "target=(\"table:mytable\"),name=midnight");
+
+	/* Checkpoint the database, discarding all previous snapshots. */
+	ret = session->checkpoint(session, "drop=(from=all)");
+
+	/* Checkpoint the database, discarding the "midnight" snapshot. */
+	ret = session->checkpoint(session, "drop=(midnight)");
+
+	/*
+	 * Checkpoint the database, discarding all snapshots after and
+	 * including "noon".
+	 */
+	ret = session->checkpoint(session, "drop=(from=noon)");
+
+	/*
+	 * Checkpoint the database, discarding all snapshots before and
+	 * including "midnight".
+	 */
+	ret = session->checkpoint(session, "drop=(to=midnight)");
+
+	/*
+	 * Create a checkpoint of a table, creating the "July01" snapshot and
+	 * discarding the "May01" and "June01" snapshots.
+	 * JSON parsing requires quoting the list of target URIs.
+	 */
+	ret = session->checkpoint(session,
+	    "target=(\"table:mytable\"),name=July01,drop=(May01,June01)");
+	/*! [session checkpoint] */
+
+	return (ret);
+}
+
+int
 session_ops(WT_SESSION *session)
 {
 	int ret;
@@ -294,49 +350,11 @@ session_ops(WT_SESSION *session)
 	    "key_format=S,value_format=S");
 	/*! [Create a table] */
 
-	/*! [session database checkpoint] */
-	/* Checkpoint the database. */
-	ret = session->checkpoint(session, NULL);
-	/*! [session database checkpoint] */
-
-	/*! [session named database checkpoint] */
-	/* Named checkpoint of the database. */
-	ret = session->checkpoint(session, "name=june01");
-	/*! [session named database checkpoint] */
-
-	/*! [session target checkpoint] */
-	/*
-	 * Checkpoint a list of objects.
-	 * JSON parsing requires quoting the list of target URIs.
-	 */
-	ret = session->
-	    checkpoint(session, "target=(\"table:table1\",\"table:table2\")");
-	/*! [session target checkpoint] */
-
-	/*! [session named target checkpoint] */
-	/*
-	 * Named checkpoint for a list of objects.
-	 * JSON parsing requires quoting the list of target URIs.
-	 */
-	ret = session->
-	    checkpoint(session, "target=(\"table:mytable\"),name=midnight");
-	/*! [session named target checkpoint] */
+	checkpoint_ops(session);
 
 	/*! [session drop] */
 	/* Discard a table. */
 	ret = session->drop(session, "table:mytable", NULL);
-
-	/* Drop the "midnight" snapshot. */
-	ret = session->drop(session, "table:mytable", "snapshot=midnight");
-
-	/* Drop all snapshots from a table. */
-	ret = session->drop(session, "table:mytable", "snapshot=(all)");
-
-	/* Drop all snapshots after and including "noon". */
-	ret = session->drop(session, "table:mytable", "snapshot=(from=noon)");
-
-	/* Drop all snapshots before and including "midnight". */
-	ret = session->drop(session, "table:mytable", "snapshot=(to=midnight)");
 	/*! [session drop] */
 
 	/*! [session dumpfile] */
@@ -355,10 +373,6 @@ session_ops(WT_SESSION *session)
 	/*! [session salvage] */
 	ret = session->salvage(session, "table:mytable", NULL);
 	/*! [session salvage] */
-
-	/*! [session sync] */
-	ret = session->sync(session, "table:mytable", NULL);
-	/*! [session sync] */
 
 	/*! [session truncate] */
 	ret = session->truncate(session, "table:mytable", NULL, NULL, NULL);

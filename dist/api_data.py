@@ -207,16 +207,6 @@ methods = {
 	Config('force', 'false', r'''
 		return success if the object does not exist''',
 		type='boolean'),
-	Config('snapshot', '', r'''
-		specify one or more snapshots to drop.
-
-		The value must be either the name of a single snapshot to drop
-		(a string), or a list containing one of the following keys:
-		\c "all" to drop all snapshots,
-		\c "from=<snapshot>" to drop all snapshots after and including
-		the named snapshots, or
-		\c "to=<snapshot>" to drop all snapshots before and including
-		the named snapshot'''),
 	]),
 
 'session.dumpfile' : Method([]),
@@ -269,10 +259,6 @@ methods = {
 		files''',
 		type='boolean'),
 ]),
-'session.sync' : Method([
-	Config('snapshot', '', r'''
-		if non-empty, create a named snapshot'''),
-]),
 'session.truncate' : Method([]),
 'session.upgrade' : Method([]),
 'session.verify' : Method([]),
@@ -296,8 +282,16 @@ methods = {
 'session.rollback_transaction' : Method([]),
 
 'session.checkpoint' : Method([
-	Config('snapshot', '', r'''
-		if non-empty, create named snapshots in files'''),
+	Config('drop', '', r'''
+		specify a list of snapshots to drop.
+		The list may additionally contain one of the following keys:
+		\c "from=all" to drop all snapshots,
+		\c "from=<snapshot>" to drop all snapshots after and
+		including the named snapshot, or
+		\c "to=<snapshot>" to drop all snapshots before and
+		including the named snapshot'''),
+	Config('name', '', r'''
+		if non-empty, specify a name for the snapshot'''),
 	Config('target', '', r'''
 		if non-empty, checkpoint the list of objects''', type='list'),
 ]),
