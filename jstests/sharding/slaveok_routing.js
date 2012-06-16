@@ -33,8 +33,11 @@ var nodeCount = replTest.nodes.length;
  * connections to access the server from localhost connections if there
  * is no admin user.
  */
+var adminDB = mongos.getDB( 'admin' )
+adminDB.addUser( 'user', 'password', false, 3 );
+adminDB.auth( 'user', 'password' );
 var priAdminDB = replTest.getPrimary().getDB( 'admin' );
-priAdminDB.addUser( 'user', 'user', false, 3 );
+priAdminDB.addUser( 'user', 'password', false, 3 );
 
 coll.drop();
 coll.setSlaveOk( true );
