@@ -1,6 +1,6 @@
 
 s = new ShardingTest( "migrateBig" , 2 , 0 , 1 , { chunksize : 1 } );
-
+s.config.settings.update( { _id: "balancer" }, { $set : { stopped: true } } , true );
 s.adminCommand( { enablesharding : "test" } );
 s.adminCommand( { shardcollection : "test.foo" , key : { x : 1 } } );
 
@@ -13,6 +13,7 @@ while ( big.length < 10000 )
 
 for ( x=0; x<100; x++ )
     coll.insert( { x : x , big : big } )
+db.getLastError();
 
 s.adminCommand( { split : "test.foo" , middle : { x : 33 } } )
 s.adminCommand( { split : "test.foo" , middle : { x : 66 } } )
