@@ -41,7 +41,7 @@ assert.soon( function(){
 }, "have_some_ops");
 print("ok");
     
-s2 = startParallelShell( "db.jstests_currentop.update( { '$where': function() { sleep(1000); } }, { 'num': 1 }, false, true )" );
+s2 = startParallelShell( "db.jstests_currentop.update( { '$where': function() { sleep(150); } }, { 'num': 1 }, false, true ); db.getLastError()" );
 
 o = [];
 
