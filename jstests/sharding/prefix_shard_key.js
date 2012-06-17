@@ -15,12 +15,14 @@ for( i=0 ; i<100; i++){
     coll.save( {num : i} );
     coll.save( {num : i+100 , x : i})
 }
+db.getLastError();
 
 //no usable index yet, should throw
 assert.throws( function(){ s.adminCommand( { shardCollection : coll, key : { num : 1 } } ) } )
 
 //create usable index
 coll.ensureIndex({num : 1, x : 1});
+db.getLastError();
 
 //usable index, but doc with empty 'num' value, so still should throw
 coll.save({x : -5});
