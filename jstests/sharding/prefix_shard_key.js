@@ -18,7 +18,7 @@ for( i=0 ; i<100; i++){
 db.getLastError();
 
 //no usable index yet, should throw
-assert.throws( function(){ s.adminCommand( { shardCollection : coll, key : { num : 1 } } ) } )
+assert.throws( function(){ s.adminCommand( { shardCollection : coll.getFullName(), key : { num : 1 } } ) } )
 
 //create usable index
 coll.ensureIndex({num : 1, x : 1});
@@ -27,12 +27,12 @@ db.getLastError();
 //usable index, but doc with empty 'num' value, so still should throw
 coll.save({x : -5});
 assert( ! db.getLastError() , "save bad value didn't succeed");
-assert.throws( function(){ s.adminCommand( { shardCollection : coll, key : { num : 1 } } ) } )
+assert.throws( function(){ s.adminCommand( { shardCollection : coll.getFullName(), key : { num : 1 } } ) } )
 
 //remove the bad doc.  now should finally succeed
 coll.remove( {x : -5});
 assert( ! db.getLastError() , "remove bad value didn't succeed");
-var result1 = admin.runCommand( { shardCollection : coll, key : { num : 1 } } );
+var result1 = admin.runCommand( { shardCollection : coll.getFullName(), key : { num : 1 } } );
 printjson( result1 );
 assert.eq( 1, result1.ok , "sharding didn't succeed");
 
@@ -40,12 +40,12 @@ assert.eq( 1, result1.ok , "sharding didn't succeed");
 assert.eq( 2, coll.getIndexes().length );
 
 //test splitting
-var result2 = admin.runCommand( { split : coll , middle : { num : 50 } } );
+var result2 = admin.runCommand( { split : coll.getFullName() , middle : { num : 50 } } );
 printjson( result2 );
 assert.eq( 1, result2.ok , "splitting didn't succeed");
 
 //test moving
-var result3 = admin.runCommand( { movechunk : coll , find : { num : 20 } , to : s.getOther( s.getServer( "test" ) ).name } );
+var result3 = admin.runCommand( { movechunk : coll.getFullName() , find : { num : 20 } , to : s.getOther( s.getServer( "test" ) ).name } );
 printjson( result3 );
 assert.eq( 1, result3.ok , "moveChunk didn't succeed");
 
