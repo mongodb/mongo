@@ -82,7 +82,8 @@ namespace CountTests {
             insert( "{\"a\":\"b\"}" );
             BSONObj cmd = fromjson( "{\"query\":{}}" );
             string err;
-            ASSERT_EQUALS( 1, runCount( ns(), cmd, err ) );
+            int errCode;
+            ASSERT_EQUALS( 1, runCount( ns(), cmd, err, errCode ) );
         }
     };
     
@@ -94,7 +95,8 @@ namespace CountTests {
             insert( "{\"a\":\"c\"}" );
             BSONObj cmd = fromjson( "{\"query\":{\"a\":\"b\"}}" );
             string err;
-            ASSERT_EQUALS( 2, runCount( ns(), cmd, err ) );
+            int errCode;
+            ASSERT_EQUALS( 2, runCount( ns(), cmd, err, errCode ) );
         }
     };
     
@@ -105,7 +107,8 @@ namespace CountTests {
             insert( "{\"c\":\"d\"}" );
             BSONObj cmd = fromjson( "{\"query\":{},\"fields\":{\"a\":1}}" );
             string err;
-            ASSERT_EQUALS( 2, runCount( ns(), cmd, err ) );
+            int errCode;
+            ASSERT_EQUALS( 2, runCount( ns(), cmd, err, errCode ) );
         }
     };
     
@@ -117,7 +120,8 @@ namespace CountTests {
             insert( "{\"d\":\"e\"}" );
             BSONObj cmd = fromjson( "{\"query\":{\"a\":\"b\"},\"fields\":{\"a\":1}}" );
             string err;
-            ASSERT_EQUALS( 1, runCount( ns(), cmd, err ) );
+            int errCode;
+            ASSERT_EQUALS( 1, runCount( ns(), cmd, err, errCode ) );
         }
     };
     
@@ -128,7 +132,8 @@ namespace CountTests {
             insert( "{\"a\":\"c\"}" );
             BSONObj cmd = fromjson( "{\"query\":{\"a\":/^b/}}" );
             string err;
-            ASSERT_EQUALS( 1, runCount( ns(), cmd, err ) );
+            int errCode;
+            ASSERT_EQUALS( 1, runCount( ns(), cmd, err, errCode ) );
         }
     };
 
@@ -207,7 +212,8 @@ namespace CountTests {
             int numYieldsBeforeCount = numYields();
             
             string err;
-            ASSERT_EQUALS( 1000, runCount( ns(), countCommand( BSON( "a" << 1 ) ), err ) );
+            int errCode;
+            ASSERT_EQUALS( 1000, runCount( ns(), countCommand( BSON( "a" << 1 ) ), err, errCode ) );
             ASSERT_EQUALS( "", err );
 
             int numYieldsAfterCount = numYields();

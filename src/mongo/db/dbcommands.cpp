@@ -761,7 +761,8 @@ namespace mongo {
         virtual bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             string ns = parseNs(dbname, cmdObj);
             string err;
-            long long n = runCount(ns.c_str(), cmdObj, err);
+            int errCode;
+            long long n = runCount(ns.c_str(), cmdObj, err, errCode);
             long long nn = n;
             bool ok = true;
             if ( n == -1 ) {

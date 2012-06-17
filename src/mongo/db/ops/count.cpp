@@ -26,7 +26,7 @@
 
 namespace mongo {
     
-    long long runCount( const char *ns, const BSONObj &cmd, string &err ) {
+    long long runCount( const char *ns, const BSONObj &cmd, string &err, int &errCode ) {
         Client::Context cx(ns);
         NamespaceDetails *d = nsdetails( ns );
         if ( !d ) {
@@ -40,7 +40,6 @@ namespace mongo {
             return applySkipLimit( d->stats.nrecords , cmd );
         }
         
-        string exceptionInfo;
         long long count = 0;
         long long skip = cmd["skip"].numberLong();
         long long limit = cmd["limit"].numberLong();
@@ -94,18 +93,19 @@ namespace mongo {
             ccPointer.reset();
             return count;
             
-        } catch ( const DBException &e ) {
-            exceptionInfo = e.toString();
-        } catch ( const std::exception &e ) {
-            exceptionInfo = e.what();
-        } catch ( ... ) {
-            exceptionInfo = "unknown exception";
         }
+        catch ( const DBException &e ) {
+            err = e.toString();
+            errCode = e.getCode();
+        } 
+        catch ( const std::exception &e ) {
+            err = e.what();
+            errCode = 0;
+        } 
         // Historically we have returned zero in many count assertion cases - see SERVER-2291.
         log() << "Count with ns: " << ns << " and query: " << query
-              << " failed with exception: " << exceptionInfo
+              << " failed with exception: " << err << " code: " << errCode
               << endl;
-        err = exceptionInfo;
         return -2;
     }
     
