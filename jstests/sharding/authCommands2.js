@@ -27,6 +27,11 @@ adminDB.addUser( roUser, password, true, st.rs0.numNodes );
 testDB.addUser( rwUser, password, false, st.rs0.numNodes );
 testDB.addUser( roUser, password, true, st.rs0.numNodes );
 
+// Add user to shards to prevent localhost connections from having automatic full access
+st.rs0.getPrimary().getDB( 'admin' ).addUser( 'user', 'password', false, 3 );
+st.rs1.getPrimary().getDB( 'admin' ).addUser( 'user', 'password', false, 3 );
+
+
 
 jsTestLog('Creating initial data');
 
