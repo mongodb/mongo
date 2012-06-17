@@ -897,8 +897,10 @@ namespace mongo {
         Lock::DBRead lk( ns );
         string errmsg;
         long long res = runCount( ns.c_str() , _countCmd( ns , query , options , limit , skip ) , errmsg );
-        if ( res == -1 )
+        if ( res == -1 ) {
+            // namespace doesn't exist
             return 0;
+        }
         uassert( 13637 , str::stream() << "count failed in DBDirectClient: " << errmsg , res >= 0 );
         return (unsigned long long )res;
     }

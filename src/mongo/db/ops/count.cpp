@@ -103,9 +103,10 @@ namespace mongo {
         }
         // Historically we have returned zero in many count assertion cases - see SERVER-2291.
         log() << "Count with ns: " << ns << " and query: " << query
-        << " failed with exception: " << exceptionInfo
-        << endl;
-        return 0;
+              << " failed with exception: " << exceptionInfo
+              << endl;
+        err = exceptionInfo;
+        return -2;
     }
     
 } // namespace mongo
