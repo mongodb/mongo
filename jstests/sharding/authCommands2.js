@@ -56,15 +56,22 @@ var reduce = function( key, values ) {
     return jCount;
 };
 
-var checkCommandSucceeded = function( resultObj ) {
+var checkCommandSucceeded = function( db, cmdObj ) {
+    print( "Running command that should succeed: " );
+    printjson( cmdObj );
+    resultObj = db.runCommand( cmdObj );
     printjson( resultObj )
     assert ( resultObj.ok );
+    return resultObj;
 }
 
-var checkCommandFailed = function( resultObj ) {
-    print("INTHETHING")
+var checkCommandFailed = function( db, cmdObj ) {
+    print( "Running command that should fail: " );
+    printjson( cmdObj );
+    resultObj = db.runCommand( cmdObj );
     printjson( resultObj )
     assert ( !resultObj.ok );
+    return resultObj;
 }
 
 var checkReadOps = function( shouldWork ) {
@@ -73,8 +80,8 @@ var checkReadOps = function( shouldWork ) {
         assert.eq( 1000, testDB.foo.find().itcount() );
         assert.eq( 1000, testDB.foo.count() );
         assert.eq( null, testDB.runCommand({getlasterror : 1}).err );
-        checkCommandSucceeded( testDB.runCommand({dbstats : 1}) );
-        checkCommandSucceeded( testDB.runCommand({collstats : 'foo'}) );
+        checkCommandSucceeded( testDB, {dbstats : 1} );
+        checkCommandSucceeded( testDB, {collstats : 'foo'} );
 
         // TODO: Uncomment this once inline mapreduce has been handled.
         /*var res = testDB.runCommand({mapreduce : 'foo', map : map, reduce : reduce,
@@ -87,10 +94,10 @@ var checkReadOps = function( shouldWork ) {
         print( "Checking read operations, should fail" );
         assert.throws( function() { testDB.foo.find().itcount(); } );
         assert.eq(0, testDB.runCommand({getlasterror : 1}).err.indexOf('unauthorized') );
-        checkCommandFailed( testDB.runCommand({dbstats : 1}) );
-        checkCommandFailed( testDB.runCommand({collstats : 'foo'}) );
-        checkCommandFailed( testDB.runCommand({mapreduce : 'foo', map : map, reduce : reduce,
-                                               out : { inline : 1 }}) );
+        checkCommandFailed( testDB, {dbstats : 1} );
+        checkCommandFailed( testDB, {collstats : 'foo'} );
+        checkCommandFailed( testDB, {mapreduce : 'foo', map : map, reduce : reduce,
+                                     out : { inline : 1 }} );
     }
 }
 
@@ -98,26 +105,25 @@ var checkWriteOps = function( shouldWork ) {
     if ( shouldWork ) {
         print( "Checking write operations, should work" );
         testDB.foo.insert({a : 1, i : 1, j : 1});
-        res = testDB.runCommand({ findAndModify: "foo", query: {a:1, i:1, j:1},
-                                                   update: {$set: {b:1}}});
-        checkCommandSucceeded(res);
+        res = checkCommandSucceeded( testDB, { findAndModify: "foo", query: {a:1, i:1, j:1},
+                                               update: {$set: {b:1}}});
         assert.eq(1, res.value.a);
         assert.eq(null, res.value.b);
         assert.eq(1, testDB.foo.findOne({a:1}).b);
         testDB.foo.remove({a : 1});
         assert.eq( null, testDB.runCommand({getlasterror : 1}).err );
-        checkCommandSucceeded( testDB.runCommand({reIndex:'foo'}) );
-        checkCommandSucceeded( testDB.runCommand({repairDatabase : 1}) );
-        checkCommandSucceeded( testDB.runCommand({mapreduce : 'foo', map : map, reduce : reduce,
-                                                  out : 'mrOutput'}) );
+        checkCommandSucceeded( testDB, {reIndex:'foo'} );
+        checkCommandSucceeded( testDB, {repairDatabase : 1} );
+        checkCommandSucceeded( testDB, {mapreduce : 'foo', map : map, reduce : reduce,
+                                        out : 'mrOutput'} );
         assert.eq( 100, testDB.mrOutput.count() );
         assert.eq( 45, testDB.mrOutput.findOne().value );
 
-        checkCommandSucceeded( testDB.runCommand({drop : 'foo'}) );
+        checkCommandSucceeded( testDB, {drop : 'foo'} );
         assert.eq( 0, testDB.foo.count() );
         testDB.foo.insert({a:1});
         assert.eq( 1, testDB.foo.count() );
-        checkCommandSucceeded( testDB.runCommand({dropDatabase : 1}) );
+        checkCommandSucceeded( testDB, {dropDatabase : 1} );
         assert.eq( 0, testDB.foo.count() );
         // TODO: Uncomment this once create follows regular command codepath
         //checkCommandSucceeded( testDB.runCommand({create : 'bar'}) );
@@ -125,18 +131,18 @@ var checkWriteOps = function( shouldWork ) {
         print( "Checking write operations, should fail" );
         testDB.foo.insert({a : 1, i : 1, j : 1});
         assert.eq(0, testDB.runCommand({getlasterror:1}).err.indexOf('unauthorized') );
-        checkCommandFailed( testDB.runCommand({ findAndModify: "foo", query: {a:1, i:1, j:1},
-                                                update: {$set: {b:1}}}) );
-        checkCommandFailed( testDB.runCommand({reIndex:'foo'}) );
-        checkCommandFailed( testDB.runCommand({repairDatabase : 1}) );
-        checkCommandFailed( testDB.runCommand({mapreduce : 'foo', map : map, reduce : reduce,
-                                               out : 'mrOutput'}) );
-        checkCommandFailed( testDB.runCommand({drop : 'foo'}) );
-        checkCommandFailed( testDB.runCommand({dropDatabase : 1}) );
+        checkCommandFailed( testDB, { findAndModify: "foo", query: {a:1, i:1, j:1},
+                                      update: {$set: {b:1}}} );
+        checkCommandFailed( testDB, {reIndex:'foo'} );
+        checkCommandFailed( testDB, {repairDatabase : 1} );
+        checkCommandFailed( testDB, {mapreduce : 'foo', map : map, reduce : reduce,
+                                     out : 'mrOutput'} );
+        checkCommandFailed( testDB, {drop : 'foo'} );
+        checkCommandFailed( testDB, {dropDatabase : 1} );
         passed = true;
         try {
             // For some reason when create fails it throws an exception instead of just returning ok:0
-            checkCommandFailed( testDB.runCommand({create : 'bar'}) );
+            checkCommandFailed( testDB, {create : 'bar'} );
             passed = false;
         } catch (e) {
             // expected
@@ -149,20 +155,20 @@ var checkWriteOps = function( shouldWork ) {
 
 var checkAdminReadOps = function( shouldWork ) {
     if ( shouldWork ) {
-        checkCommandSucceeded( adminDB.runCommand('getCmdLineOpts') );
-        checkCommandSucceeded( adminDB.runCommand('serverStatus') );
+        checkCommandSucceeded( adminDB, {getCmdLineOpts : 1} );
+        checkCommandSucceeded( adminDB, {serverStatus : 1} );
     } else {
-        checkCommandFailed( adminDB.runCommand('getCmdLineOpts') );
-        checkCommandFailed( adminDB.runCommand('serverStatus') );
+        checkCommandFailed( adminDB, {getCmdLineOpts : 1} );
+        checkCommandFailed( adminDB, {serverStatus : 1} );
     }
 }
 
 var checkAdminWriteOps = function( shouldWork ) {
     if ( shouldWork ) {
-        checkCommandSucceeded( adminDB.runCommand({split : 'test.foo', find : {i : 1, j : 1}}) );
+        checkCommandSucceeded( adminDB, {split : 'test.foo', find : {i : 1, j : 1}} );
         chunk = configDB.chunks.findOne({ shard : st.rs0.name });
-        checkCommandSucceeded( adminDB.runCommand({moveChunk : 'test.foo', find : chunk.min,
-                                                   to : st.rs1.name}) );
+        checkCommandSucceeded( adminDB, {moveChunk : 'test.foo', find : chunk.min,
+                                         to : st.rs1.name} );
     } else {
         // TODO(spencer): Either uncomment these or remove them once the proper behavior is established.
         /*checkCommandFailed( adminDB.runCommand({split : 'test.foo', find : {i : 1, j : 1}}) );
