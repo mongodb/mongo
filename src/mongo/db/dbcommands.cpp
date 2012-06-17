@@ -771,8 +771,10 @@ namespace mongo {
             else if ( n < 0 ) {
                 nn = 0;
                 ok = false;
-                if ( !err.empty() )
+                if ( !err.empty() ) {
                     errmsg = err;
+                    return false;
+                }
             }
             result.append("n", (double) nn);
             return ok;
