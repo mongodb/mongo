@@ -222,8 +222,8 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 
 			if (v.len != 0)
 				WT_ERR_MSG(session, EINVAL,
-				    "invalid checkpoint target "
-				    "\"%.*s\": URIs may require quoting",
+				    "invalid checkpoint target \"%.*s\": URIs "
+				    "may require quoting",
 				    (int)k.len, k.str);
 			WT_ERR(__wt_buf_fmt(
 			    session, tmp, "%.*s", (int)k.len, k.str));
