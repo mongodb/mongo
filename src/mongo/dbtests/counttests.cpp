@@ -177,8 +177,8 @@ namespace CountTests {
         };
         void runDummyWriter() {
             Client::initThread( "dummy writer" );
-            _state.set( Ready );
             scoped_ptr<Acquiring> a( new Acquiring( 0 , cc().lockState() ) );
+            _state.set( Ready );
             _state.await( Finished );
             a.reset(0);
             cc().shutdown();
