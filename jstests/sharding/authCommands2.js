@@ -142,8 +142,10 @@ var checkWriteOps = function( shouldWork ) {
         passed = true;
         try {
             // For some reason when create fails it throws an exception instead of just returning ok:0
-            checkCommandFailed( testDB, {create : 'bar'} );
-            passed = false;
+            res = testDB.runCommand( {create : 'bar'} );
+            if ( !res.ok ) {
+                passed = false;
+            }
         } catch (e) {
             // expected
             printjson(e);
