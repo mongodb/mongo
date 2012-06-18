@@ -45,6 +45,7 @@ while ( str.length < 1024 * 16 ) {
 for ( var i = 0; i < 100; i++ ) {
     for ( var j = 0; j < 10; j++ ) {
         testDB.foo.save({i:i, j:j, str:str});
+        testDB.bar.save({i:i, j:j, str:str}); // non-sharded collection with same data
     }
 }
 testDB.getLastError( 'majority' );
@@ -52,7 +53,7 @@ assert.soon( function() {
     var x = st.chunkDiff( "foo", "test" );
     print( "chunk diff: " + x );
     return x < 2 && configDB.locks.findOne({ _id : 'test.foo' }).state == 0;
-}, "no balance happened" );
+}, "no balance happened", 60000 );
 
 var map = function() { emit (this.i, this.j) };
 var reduce = function( key, values ) {
@@ -79,8 +80,8 @@ var checkCommandFailed = function( db, cmdObj ) {
     return resultObj;
 }
 
-var checkReadOps = function( shouldWork ) {
-    if ( shouldWork ) {
+var checkReadOps = function( hasReadAuth ) {
+    if ( hasReadAuth ) {
         print( "Checking read operations, should work" );
         assert.eq( 1000, testDB.foo.find().itcount() );
         assert.eq( 1000, testDB.foo.count() );
@@ -88,12 +89,11 @@ var checkReadOps = function( shouldWork ) {
         checkCommandSucceeded( testDB, {dbstats : 1} );
         checkCommandSucceeded( testDB, {collstats : 'foo'} );
 
-        // TODO: Uncomment this once inline mapreduce has been handled.
-        /*var res = testDB.runCommand({mapreduce : 'foo', map : map, reduce : reduce,
-                                     out : {inline : 1}});
-        checkCommandSucceeded( res );
+        // inline map-reduce works read-only on non-sharded collections
+        var res = checkCommandSucceeded( testDB, {mapreduce : 'bar', map : map, reduce : reduce,
+                                                  out : {inline : 1}});
         assert.eq( 100, res.results.length );
-        assert.eq( 45, res.results[0].value );*/
+        assert.eq( 45, res.results[0].value );
 
     } else {
         print( "Checking read operations, should fail" );
@@ -106,8 +106,8 @@ var checkReadOps = function( shouldWork ) {
     }
 }
 
-var checkWriteOps = function( shouldWork ) {
-    if ( shouldWork ) {
+var checkWriteOps = function( hasWriteAuth ) {
+    if ( hasWriteAuth ) {
         print( "Checking write operations, should work" );
         testDB.foo.insert({a : 1, i : 1, j : 1});
         res = checkCommandSucceeded( testDB, { findAndModify: "foo", query: {a:1, i:1, j:1},
@@ -119,6 +119,11 @@ var checkWriteOps = function( shouldWork ) {
         assert.eq( null, testDB.runCommand({getlasterror : 1}).err );
         checkCommandSucceeded( testDB, {reIndex:'foo'} );
         checkCommandSucceeded( testDB, {repairDatabase : 1} );
+        // Test both inline and regular map-reduce
+        var res = checkCommandSucceeded( testDB, {mapreduce : 'foo', map : map, reduce : reduce,
+                                                  out : {inline : 1}});
+        assert.eq( 100, res.results.length );
+        assert.eq( 45, res.results[0].value );
         checkCommandSucceeded( testDB, {mapreduce : 'foo', map : map, reduce : reduce,
                                         out : 'mrOutput'} );
         assert.eq( 100, testDB.mrOutput.count() );
@@ -140,6 +145,9 @@ var checkWriteOps = function( shouldWork ) {
                                       update: {$set: {b:1}}} );
         checkCommandFailed( testDB, {reIndex:'foo'} );
         checkCommandFailed( testDB, {repairDatabase : 1} );
+        // Test both inline and regular map-reduce.  Inline MR on sharded collections requires write access.
+        checkCommandFailed( testDB, {mapreduce : 'foo', map : map, reduce : reduce,
+                                     out : {inline : 1}} );
         checkCommandFailed( testDB, {mapreduce : 'foo', map : map, reduce : reduce,
                                      out : 'mrOutput'} );
         checkCommandFailed( testDB, {drop : 'foo'} );
@@ -160,28 +168,38 @@ var checkWriteOps = function( shouldWork ) {
     }
 }
 
-var checkAdminReadOps = function( shouldWork ) {
-    if ( shouldWork ) {
+var checkAdminReadOps = function( hasReadAuth ) {
+    if ( hasReadAuth ) {
+        checkCommandSucceeded( adminDB, {getShardVersion : 'test.foo'} );
         checkCommandSucceeded( adminDB, {getCmdLineOpts : 1} );
         checkCommandSucceeded( adminDB, {serverStatus : 1} );
+        checkCommandSucceeded( adminDB, {listShards : 1} );
+        checkCommandSucceeded( adminDB, {whatsmyuri : 1} );
+        checkCommandSucceeded( adminDB, {isdbgrid : 1} );
+        checkCommandSucceeded( adminDB, {ismaster : 1} );
     } else {
+        checkCommandFailed( adminDB, {getShardVersion : 'test.foo'} );
         checkCommandFailed( adminDB, {getCmdLineOpts : 1} );
         checkCommandFailed( adminDB, {serverStatus : 1} );
+        checkCommandFailed( adminDB, {listShards : 1} );
+        checkCommandFailed( adminDB, {whatsmyuri : 1} );
+        // isdbgrid and ismaster don't require any auth
+        checkCommandSucceeded( adminDB, {isdbgrid : 1} );
+        checkCommandSucceeded( adminDB, {ismaster : 1} );
     }
 }
 
-var checkAdminWriteOps = function( shouldWork ) {
-    if ( shouldWork ) {
+var checkAdminWriteOps = function( hasWriteAuth ) {
+    if ( hasWriteAuth ) {
         checkCommandSucceeded( adminDB, {split : 'test.foo', find : {i : 1, j : 1}} );
         chunk = configDB.chunks.findOne({ shard : st.rs0.name });
         checkCommandSucceeded( adminDB, {moveChunk : 'test.foo', find : chunk.min,
                                          to : st.rs1.name} );
     } else {
-        // TODO(spencer): Either uncomment these or remove them once the proper behavior is established.
-        /*checkCommandFailed( adminDB.runCommand({split : 'test.foo', find : {i : 1, j : 1}}) );
+        checkCommandFailed( adminDB, {split : 'test.foo', find : {i : 1, j : 1}} );
         chunkKey = { i : { $minKey : 1 }, j : { $minKey : 1 } };
-        checkCommandFailed( adminDB.runCommand({moveChunk : 'test.foo', find : chunkKey,
-                                                to : st.rs1.name}) );*/
+        checkCommandFailed( adminDB, {moveChunk : 'test.foo', find : chunkKey,
+                                      to : st.rs1.name} );
     }
 }
 
