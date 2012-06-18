@@ -494,6 +494,8 @@ struct __wt_session {
 	 * @config{bulk, configure the cursor for bulk loads; bulk-load is a
 	 * fast load path for empty objects\, only empty objects may be
 	 * bulk-loaded.,a boolean flag; default \c false.}
+	 * @config{checkpoint, the name of a checkpoint to open.,a string;
+	 * default empty.}
 	 * @config{dump, configure the cursor for dump format inputs and
 	 * outputs: "hex" selects a simple hexadecimal format\, "print" selects
 	 * a format where only non-printing characters are hexadecimal encoded.
@@ -510,8 +512,6 @@ struct __wt_session {
 	 * @config{raw, ignore the encodings for the key and value\, manage data
 	 * as if the formats were \c "u".  See @ref cursor_raw for details.,a
 	 * boolean flag; default \c false.}
-	 * @config{snapshot, the name of a snapshot to open.,a string; default
-	 * empty.}
 	 * @config{statistics, configure the cursor for statistics.,a boolean
 	 * flag; default \c false.}
 	 * @config{statistics_clear, statistics cursors only; reset statistics
@@ -810,13 +810,13 @@ struct __wt_session {
 	 *
 	 * @param session the session handle
 	 * @configstart{session.checkpoint, see dist/api_data.py}
-	 * @config{drop, specify a list of snapshots to drop. The list may
+	 * @config{drop, specify a list of checkpoints to drop. The list may
 	 * additionally contain one of the following keys: \c "from=all" to drop
-	 * all snapshots\, \c "from=<snapshot>" to drop all snapshots after and
-	 * including the named snapshot\, or \c "to=<snapshot>" to drop all
-	 * snapshots before and including the named snapshot.,a list of strings;
-	 * default empty.}
-	 * @config{name, if non-empty\, specify a name for the snapshot.,a
+	 * all checkpoints\, \c "from=<checkpoint>" to drop all checkpoints
+	 * after and including the named checkpoint\, or \c "to=<checkpoint>" to
+	 * drop all checkpoints before and including the named checkpoint.,a
+	 * list of strings; default empty.}
+	 * @config{name, if non-empty\, specify a name for the checkpoint.,a
 	 * string; default empty.}
 	 * @config{target, if non-empty\, checkpoint the list of objects.,a list
 	 * of strings; default empty.}
@@ -1048,8 +1048,8 @@ struct __wt_connection {
  * \c false.}
  * @config{session_max, maximum expected number of sessions (including server
  * threads).,an integer greater than or equal to 1; default \c 50.}
- * @config{sync, sync files when closing or writing snapshots.,a boolean flag;
- * default \c true.}
+ * @config{sync, flush files to stable storage when closing or writing
+ * checkpoints.,a boolean flag; default \c true.}
  * @config{transactional, support transactional semantics.,a boolean flag;
  * default \c true.}
  * @config{use_environment_priv, use the \c WIREDTIGER_CONFIG and \c

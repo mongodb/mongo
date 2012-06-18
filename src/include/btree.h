@@ -72,10 +72,11 @@ struct __wt_btree {
 
 	const char *name;		/* Object name as a URI */
 	const char *config;		/* Configuration string */
-	const char *snapshot;		/* Snapshot name (or NULL) */
+	const char *ckpt;		/* Checkpoint name (or NULL) */
 
 	/* XXX Should move into the session-level handle information. */
 	WT_RWLOCK   *snaplock;		/* Lock for snapshot creation */
+	WT_SNAPSHOT *snap;		/* Snapshot information */
 
 	enum {	BTREE_COL_FIX=1,	/* Fixed-length column store */
 		BTREE_COL_VAR=2,	/* Variable-length column store */
@@ -106,8 +107,6 @@ struct __wt_btree {
 	uint64_t last_recno;		/* Column-store last record number */
 
 	WT_PAGE *root_page;		/* Root page */
-
-	WT_SNAPSHOT *snap;		/* Snapshot information */
 
 	void *block;			/* Block manager */
 	u_int block_header;		/* Block manager header length */

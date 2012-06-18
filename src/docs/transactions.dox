@@ -71,10 +71,10 @@ Recovery is run automatically when a data source is opened.  Any changes since
 the last checkpoint are discarded, and the application restarts from a
 consistent point in the transaction history.
 
-This suggests the importance of regular checkpoints: they limit the volume of
-commits that may be lost in a crash.  Checkpoints create a snapshot in every
-data source in the database.  See WT_SESSION::checkpoint for information about
-checkpoints, and @ref snapshots for information about snapshots.
+This suggests the importance of regular checkpoints: they limit the
+volume of commits that may be lost in a crash.  See
+WT_SESSION::checkpoint and @ref checkpoints for further information
+about checkpoints.
 
 @section transaction_example Code samples
 

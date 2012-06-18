@@ -12,8 +12,8 @@ ext/compressors/bzip2_compress BZIP2
 ext/compressors/nop_compress
 ext/compressors/snappy_compress SNAPPY
 lang/python PYTHON
+test/checkpoint
 test/fops
 test/format HAVE_BDB
 test/salvage
-test/snapshot
 test/thread

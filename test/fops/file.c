@@ -51,7 +51,7 @@ obj_checkpoint(void)
 		die("conn.session", ret);
 
 	/*
-	 * Name the checkpoint so a snapshot has to be taken, don't specify
+	 * Name the checkpoint so the checkpoint has to be taken, don't specify
 	 * a target, it might not exist.
 	 */
 	if ((ret = session->checkpoint(session, "name=fops")) != 0)

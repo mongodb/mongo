@@ -56,12 +56,15 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 	WT_DECL_RET;
 	size_t len;
 	int ch, hex, reverse;
-	char *config, *name, *snapshot;
+	char *checkpoint, *config, *name;
 
 	hex = reverse = 0;
-	config = name = snapshot = NULL;
-	while ((ch = util_getopt(argc, argv, "f:rs:x")) != EOF)
+	checkpoint = config = name = NULL;
+	while ((ch = util_getopt(argc, argv, "c:f:rx")) != EOF)
 		switch (ch) {
+		case 'c':
+			checkpoint = util_optarg;
+			break;
 		case 'f':			/* output file */
 			if (freopen(util_optarg, "w", stdout) == NULL)
 				return (
@@ -69,9 +72,6 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 			break;
 		case 'r':
 			reverse = 1;
-			break;
-		case 's':
-			snapshot = util_optarg;
 			break;
 		case 'x':
 			hex = 1;
@@ -95,15 +95,16 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 	    dump_suffix() != 0)
 		goto err;
 
-	len = snapshot == NULL ? 0 : strlen("snapshot=") + strlen(snapshot);
+	len =
+	    checkpoint == NULL ? 0 : strlen("checkpoint=") + strlen(checkpoint);
 	len += strlen(hex ? "dump=hex" : "dump=print");
 	if ((config = malloc(len + 10)) == NULL)
 		goto err;
-	if (snapshot == NULL)
+	if (checkpoint == NULL)
 		config[0] = '\0';
 	else {
-		(void)strcpy(config, "snapshot=");
-		(void)strcat(config, snapshot);
+		(void)strcpy(config, "checkpoint=");
+		(void)strcat(config, checkpoint);
 		(void)strcat(config, ",");
 	}
 	(void)strcat(config, hex ? "dump=hex" : "dump=print");
@@ -376,7 +377,7 @@ usage(void)
 {
 	(void)fprintf(stderr,
 	    "usage: %s %s "
-	    "dump [-rx] [-f output-file] [-s snapshot] uri\n",
+	    "dump [-rx] [-c checkpoint] [-f output-file] uri\n",
 	    progname, usage_prefix);
 	return (1);
 }

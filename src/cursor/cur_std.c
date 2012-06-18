@@ -427,7 +427,7 @@ __wt_cursor_init(WT_CURSOR *cursor,
 		F_SET(cursor, WT_CURSTD_RAW);
 
 	/* Snapshot cursors are read-only. */
-	WT_RET(__wt_config_gets(session, cfg, "snapshot", &cval));
+	WT_RET(__wt_config_gets(session, cfg, "checkpoint", &cval));
 	if (cval.len != 0) {
 		cursor->insert = (int (*)(WT_CURSOR *))__wt_cursor_notsup;
 		cursor->update = (int (*)(WT_CURSOR *))__wt_cursor_notsup;

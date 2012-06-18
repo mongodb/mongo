@@ -162,7 +162,7 @@ ops(void *arg)
 			track("read/write ops", 0ULL, tinfo);
 
 		if (cnt == ckpt_op) {
-			/* Half the time we name the snapshot. */
+			/* Half the time we name the checkpoint. */
 			if (MMRAND(1, 2) == 1)
 				ckpt_config = NULL;
 			else {
