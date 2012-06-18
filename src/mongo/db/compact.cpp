@@ -328,9 +328,10 @@ namespace mongo {
         virtual void help( stringstream& help ) const {
             help << "compact collection\n"
                 "warning: this operation blocks the server and is slow. you can cancel with cancelOp()\n"
-                "{ compact : <collection_name>, [force:true], [validate:true] }\n"
+                "{ compact : <collection_name>, [force:<bool>], [validate:<bool>],\n"
+                "  [paddingFactor:<num>], [paddingBytes:<num>] }\n"
                 "  force - allows to run on a replica set primary\n"
-                "  validate - check records are noncorrupt before adding to newly compacting extents. slower but safer (default is true in this version)\n";
+                "  validate - check records are noncorrupt before adding to newly compacting extents. slower but safer (defaults to true in this version)\n";
         }
         virtual bool requiresAuth() { return true; }
         CompactCmd() : Command("compact") { }
