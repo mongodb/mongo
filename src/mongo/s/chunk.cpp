@@ -1232,7 +1232,7 @@ namespace mongo {
 
         // remove chunk data
         scoped_ptr<ScopedDbConnection> conn(
-                ScopedDbConnection::getScopedDbConnection( configServer.modelServer() ) );
+                ScopedDbConnection::getInternalScopedDbConnection( configServer.modelServer() ) );
         conn->get()->remove( Chunk::chunkMetadataNS , BSON( "ns" << _ns ) );
         conn->done();
         LOG(1) << "ChunkManager::drop : " << _ns << "\t removed chunk data" << endl;

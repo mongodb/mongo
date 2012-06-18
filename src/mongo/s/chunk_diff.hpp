@@ -81,7 +81,8 @@ namespace mongo {
         // Get the diff query required
         Query diffQuery = configDiffQuery( extraMinorVersions );
 
-        scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::getScopedDbConnection( config ) );
+        scoped_ptr<ScopedDbConnection> conn(
+                ScopedDbConnection::getInternalScopedDbConnection( config ) );
 
         try {
 

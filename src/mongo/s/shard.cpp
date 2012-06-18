@@ -37,8 +37,9 @@ namespace mongo {
 
             list<BSONObj> all;
             {
-                scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::getScopedDbConnection(
-                        configServer.getPrimary().getConnString() ) );
+                scoped_ptr<ScopedDbConnection> conn(
+                        ScopedDbConnection::getInternalScopedDbConnection(
+                                configServer.getPrimary().getConnString() ) );
                 auto_ptr<DBClientCursor> c = conn->get()->query( ShardNS::shard , Query() );
                 massert( 13632 , "couldn't get updated shard list from config server" , c.get() );
                 while ( c->more() ) {
@@ -391,6 +392,11 @@ namespace mongo {
             LOG(2) << "calling onCreate auth for " << conn->toString() << endl;
             uassert( 15847, "can't authenticate to shard server",
                     conn->auth("local", internalSecurity.user, internalSecurity.pwd, err, false));
+            if ( conn->type() == ConnectionString::SYNC ) {
+                // Connections to the config servers should always have full access.
+                conn->setAuthenticationTable(
+                        AuthenticationTable::getInternalSecurityAuthenticationTable() );
+            }
         }
 
         if ( _shardedConnections && versionManager.isVersionableCB( conn ) ) {

@@ -819,8 +819,8 @@ namespace mongo {
 
         bool exists( const string& ns );
 
-        void setAuthenticationTable ( const AuthenticationTable& auth );
-        void clearAuthenticationTable ();
+        virtual void setAuthenticationTable( const AuthenticationTable& auth );
+        virtual void clearAuthenticationTable();
 
         /** Create an index if it does not already exist.
             ensureIndex calls are remembered so it is safe/fast to call this function many
@@ -882,6 +882,9 @@ namespace mongo {
         QueryOptions availableOptions();
 
         virtual QueryOptions _lookupAvailableOptions();
+
+        bool hasAuthenticationTable();
+        AuthenticationTable& getAuthenticationTable();
 
     private:
         enum QueryOptions _cachedAvailableOptions;

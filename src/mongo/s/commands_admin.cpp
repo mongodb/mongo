@@ -868,8 +868,8 @@ namespace mongo {
             }
             bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 scoped_ptr<ScopedDbConnection> conn(
-                        ScopedDbConnection::getScopedDbConnection( configServer.getPrimary()
-                                                                   .getConnString() ) );
+                        ScopedDbConnection::getInternalScopedDbConnection( configServer.getPrimary()
+                                                                           .getConnString() ) );
 
                 vector<BSONObj> all;
                 auto_ptr<DBClientCursor> cursor = conn->get()->query( "config.shards" , BSONObj() );
@@ -973,8 +973,8 @@ namespace mongo {
                 }
 
                 scoped_ptr<ScopedDbConnection> connPtr(
-                        ScopedDbConnection::getScopedDbConnection( configServer.getPrimary()
-                                                                   .getConnString() ) );
+                        ScopedDbConnection::getInternalScopedDbConnection( configServer.getPrimary()
+                                                                           .getConnString() ) );
                 ScopedDbConnection& conn = *connPtr;
 
                 if (conn->count("config.shards", BSON("_id" << NE << s.getName() << ShardFields::draining(true)))){
@@ -1296,8 +1296,8 @@ namespace mongo {
             
             if ( sizes.find( "config" ) == sizes.end() ){
                 scoped_ptr<ScopedDbConnection> conn(
-                        ScopedDbConnection::getScopedDbConnection( configServer.getPrimary()
-                                                                   .getConnString() ) );
+                        ScopedDbConnection::getInternalScopedDbConnection( configServer.getPrimary()
+                                                                           .getConnString() ) );
                 BSONObj x;
                 if ( conn->get()->simpleCommand( "config" , &x , "dbstats" ) ){
                     BSONObjBuilder b;

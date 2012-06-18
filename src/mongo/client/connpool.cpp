@@ -80,7 +80,11 @@ namespace mongo {
             _pool.pop();
             all.push_back( c );
             bool res;
+            // When a connection is in the pool it doesn't have an AuthenticationTable set.
+            c.conn->setAuthenticationTable(
+                    AuthenticationTable::getInternalSecurityAuthenticationTable() );
             c.conn->isMaster( res );
+            c.conn->clearAuthenticationTable();
         }
 
         for ( vector<StoredConnection>::iterator i=all.begin(); i != all.end(); ++i ) {

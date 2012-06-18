@@ -559,8 +559,9 @@ namespace mongo {
             string shard;
             ChunkInfo origChunk;
             {
-                scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::getScopedDbConnection(
-                        shardingState.getConfigServer() ) );
+                scoped_ptr<ScopedDbConnection> conn(
+                        ScopedDbConnection::getInternalScopedDbConnection(
+                                shardingState.getConfigServer() ) );
 
                 BSONObj x = conn->get()->findOne( ShardNS::chunk,
                                                   Query( BSON( "ns" << ns ) )
@@ -702,8 +703,9 @@ namespace mongo {
             bool ok;
             BSONObj cmdResult;
             {
-                scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::getScopedDbConnection(
-                        shardingState.getConfigServer() ) );
+                scoped_ptr<ScopedDbConnection> conn(
+                        ScopedDbConnection::getInternalScopedDbConnection(
+                                shardingState.getConfigServer() ) );
                 ok = conn->get()->runCommand( "config" , cmd , cmdResult );
                 conn->done();
             }

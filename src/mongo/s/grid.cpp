@@ -77,7 +77,8 @@ namespace mongo {
                         {
                             // lets check case
                             scoped_ptr<ScopedDbConnection> conn(
-                                ScopedDbConnection::getScopedDbConnection( configServer.modelServer() ));
+                                    ScopedDbConnection::getInternalScopedDbConnection(
+                                            configServer.modelServer() ));
 
                             BSONObjBuilder b;
                             b.appendRegex( "_id" , (string)"^" +
@@ -398,7 +399,7 @@ namespace mongo {
     }
 
     bool Grid::knowAboutShard( const string& name ) const {
-        scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::getScopedDbConnection(
+        scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::getInternalScopedDbConnection(
                 configServer.getPrimary().getConnString() ) );
         BSONObj shard = conn->get()->findOne( ShardNS::shard , BSON( "host" << name ) );
         conn->done();
@@ -411,7 +412,7 @@ namespace mongo {
         bool ok = false;
         int count = 0;
 
-        scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::getScopedDbConnection(
+        scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::getInternalScopedDbConnection(
                 configServer.getPrimary().getConnString() ) );
         BSONObj o = conn->get()->findOne( ShardNS::shard ,
                                           Query( fromjson ( "{_id: /^shard/}" ) )
@@ -439,7 +440,7 @@ namespace mongo {
      */
     bool Grid::shouldBalance( const string& ns, BSONObj* balancerDocOut ) const {
 
-        scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::getScopedDbConnection(
+        scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::getInternalScopedDbConnection(
                 configServer.getPrimary().getConnString() ) );
         BSONObj balancerDoc;
         BSONObj collDoc;
@@ -554,7 +555,7 @@ namespace mongo {
     }
 
     BSONObj Grid::getConfigSetting( string name ) const {
-        scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::getScopedDbConnection(
+        scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::getInternalScopedDbConnection(
                 configServer.getPrimary().getConnString() ) );
         BSONObj result = conn->get()->findOne( ShardNS::settings, BSON( "_id" << name ) );
         conn->done();

@@ -2,9 +2,9 @@
  * This tests using DB commands with authentication enabled when sharded.
  */
 
-var rsOpts = { oplogSize: 10 };
-var st = new ShardingTest({ keyFile : 'jstests/libs/key1', shards : 2, chunksize : 1,
-                            rs : rsOpts, other : { nopreallocj : 1, verbose :1 }});
+var rsOpts = { oplogSize: 10, verbose : 2 };
+var st = new ShardingTest({ keyFile : 'jstests/libs/key1', shards : 2, chunksize : 1, config : 3,
+                            rs : rsOpts, other : { nopreallocj : 1, verbose :2 }});
 
 var mongos = st.s;
 var adminDB = mongos.getDB( 'admin' );
@@ -16,12 +16,15 @@ var testDB = mongos.getDB( 'test' );
 ReplSetTest.awaitRSClientHosts( mongos, st.rs0.getSecondaries(), { ok : true, secondary : true });
 ReplSetTest.awaitRSClientHosts( mongos, st.rs1.getSecondaries(), { ok : true, secondary : true });
 
+jsTestLog('Setting up initial users');
 var rwUser = 'rwUser';
 var roUser = 'roUser';
 var password = 'password';
 
-jsTestLog('Setting up initial users');
-adminDB.addUser( rwUser, password, false, st.rs0.numNodes );
+try {
+    adminDB.addUser( rwUser, password, false, st.rs0.numNodes );
+} catch (e) {} // expected b/c of SERVER-6101.  TODO: remove try/catch once SERVER-6101 is fixed.
+
 assert( adminDB.auth( rwUser, password ) );
 adminDB.addUser( roUser, password, true, st.rs0.numNodes );
 testDB.addUser( rwUser, password, false, st.rs0.numNodes );

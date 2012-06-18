@@ -37,7 +37,7 @@ namespace mongo {
 
         if ( cur == 0 ) {
             scoped_ptr<ScopedDbConnection> conn(
-                    ScopedDbConnection::getScopedDbConnection( _primary.getConnString() ) );
+                    ScopedDbConnection::getInternalScopedDbConnection( _primary.getConnString() ) );
 
             // If the cluster has not previously been initialized, we need to set the version before using so
             // subsequent mongoses use the config data the same way.  This requires all three config servers online

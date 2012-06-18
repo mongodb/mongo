@@ -21,6 +21,7 @@
 #include "mongo/client/syncclusterconnection.h"
 
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/client/dbclientinterface.h"
 #include "mongo/db/dbmessage.h"
 
 // error codes 8000-8009
@@ -210,6 +211,20 @@ namespace mongo {
         return true;
     }
 
+    void SyncClusterConnection::setAuthenticationTable( const AuthenticationTable& auth ) {
+        for( size_t i = 0; i < _conns.size(); ++i ) {
+            _conns[i]->setAuthenticationTable( auth );
+        }
+        DBClientWithCommands::setAuthenticationTable( auth );
+    }
+
+    void SyncClusterConnection::clearAuthenticationTable() {
+        for( size_t i = 0; i < _conns.size(); ++i ) {
+            _conns[i]->clearAuthenticationTable( auth );
+        }
+        DBClientWithCommands::clearAuthenticationTable();
+    }
+
     auto_ptr<DBClientCursor> SyncClusterConnection::query(const string &ns, Query query, int nToReturn, int nToSkip,
             const BSONObj *fieldsToReturn, int queryOptions, int batchSize ) {
         _lastErrors.clear();
@@ -223,7 +238,11 @@ namespace mongo {
     }
 
     bool SyncClusterConnection::_commandOnActive(const string &dbname, const BSONObj& cmd, BSONObj &info, int options ) {
-        auto_ptr<DBClientCursor> cursor = _queryOnActive( dbname + ".$cmd" , cmd , 1 , 0 , 0 , options , 0 );
+        BSONObj actualCmd = cmd;
+        if ( hasAuthenticationTable() ) {
+            actualCmd = getAuthenticationTable().copyCommandObjAddingAuth( cmd );
+        }
+        auto_ptr<DBClientCursor> cursor = _queryOnActive( dbname + ".$cmd" , actualCmd , 1 , 0 , 0 , options , 0 );
         if ( cursor->more() )
             info = cursor->next().copy();
         else

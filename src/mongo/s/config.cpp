@@ -327,8 +327,8 @@ namespace mongo {
 
         BSONObj newest;
         if ( oldVersion.isSet() && ! forceReload ) {
-            scoped_ptr<ScopedDbConnection> conn(
-                    ScopedDbConnection::getScopedDbConnection( configServer.modelServer(), 30.0 ) );
+            scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::getInternalScopedDbConnection(
+                    configServer.modelServer(), 30.0 ) );
             newest = conn->get()->findOne( ShardNS::chunk ,
                                            Query( BSON( "ns" << ns ) ).sort( "lastmod" , -1 ) );
             conn->done();
@@ -460,8 +460,8 @@ namespace mongo {
     }
 
     bool DBConfig::_load() {
-        scoped_ptr<ScopedDbConnection> conn(
-                ScopedDbConnection::getScopedDbConnection( configServer.modelServer(), 30.0 ) );
+        scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::getInternalScopedDbConnection(
+                configServer.modelServer(), 30.0 ) );
 
         BSONObj o = conn->get()->findOne( ShardNS::database , BSON( "_id" << _name ) );
 
@@ -504,8 +504,8 @@ namespace mongo {
     }
 
     void DBConfig::_save( bool db, bool coll ) {
-        scoped_ptr<ScopedDbConnection> conn(
-                ScopedDbConnection::getScopedDbConnection( configServer.modelServer(), 30.0 ) );
+        scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::getInternalScopedDbConnection(
+                configServer.modelServer(), 30.0 ) );
 
         if( db ){
 
@@ -579,8 +579,8 @@ namespace mongo {
         // 2
         grid.removeDB( _name );
         {
-            scoped_ptr<ScopedDbConnection> conn(
-                    ScopedDbConnection::getScopedDbConnection(configServer.modelServer(), 30.0 ) );
+            scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::getInternalScopedDbConnection(
+                    configServer.modelServer(), 30.0 ) );
             conn->get()->remove( ShardNS::database , BSON( "_id" << _name ) );
             errmsg = conn->get()->getLastError();
             if ( ! errmsg.empty() ) {
