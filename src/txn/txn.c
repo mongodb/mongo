@@ -198,6 +198,8 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	const char *snapshot;
 	const char *txn_cfg[] = { "isolation=snapshot", NULL };
 
+	txn_global = &S2C(session)->txn_global;
+
 	if ((ret = __wt_config_gets(
 	    session, cfg, "snapshot", &cval)) != 0 && ret != WT_NOTFOUND)
 		WT_RET(ret);
@@ -211,7 +213,6 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_ERR(__wt_txn_begin(session, txn_cfg));
 
 	/* Prevent eviction from evicting anything newer than this. */
-	txn_global = &S2C(session)->txn_global;
 	txn_global->ckpt_txnid = session->txn.snap_min;
 
 	WT_ERR(__wt_meta_track_on(session));
