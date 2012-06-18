@@ -300,8 +300,15 @@ __wt_conn_btree_apply(WT_SESSION_IMPL *session,
 
 	__wt_spin_lock(session, &conn->spinlock);
 	TAILQ_FOREACH(btree, &conn->btqh, q)
-		if (btree->snapshot == NULL &&
+		if (F_ISSET(btree, WT_BTREE_OPEN) &&
+		    btree->snapshot == NULL &&
 		    strcmp(btree->name, WT_METADATA_URI) != 0) {
+			/*
+			 * We have the connection spinlock, which prevents
+			 * handles being opened or closed, so there is no need
+			 * for additional handle locking here, or pulling every
+			 * tree into this session's handle cache.
+			 */
 			session->btree = btree;
 			WT_ERR(func(session, cfg));
 		}

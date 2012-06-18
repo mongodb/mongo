@@ -45,6 +45,7 @@ int add_collator(WT_CONNECTION *conn);
 int add_compressor(WT_CONNECTION *conn);
 int add_data_source(WT_CONNECTION *conn);
 int add_extractor(WT_CONNECTION *conn);
+int checkpoint_ops(WT_SESSION *session);
 int connection_ops(WT_CONNECTION *conn);
 int cursor_ops(WT_SESSION *session);
 int cursor_search_near(WT_CURSOR *cursor);

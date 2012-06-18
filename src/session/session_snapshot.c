@@ -134,8 +134,7 @@ __wt_snapshot(WT_SESSION_IMPL *session, const char *cfg[])
 	 */
 	cval.len = 0;
 	if (cfg != NULL)
-		WT_ERR_NOTFOUND_OK(
-		    __wt_config_gets(session, cfg, "name", &cval));
+		WT_ERR(__wt_config_gets(session, cfg, "name", &cval));
 	if (cval.len == 0)
 		name = WT_INTERNAL_SNAPSHOT;
 	else {
@@ -151,8 +150,7 @@ __wt_snapshot(WT_SESSION_IMPL *session, const char *cfg[])
 	 */
 	if (cfg != NULL) {
 		cval.len = 0;
-		WT_ERR_NOTFOUND_OK(
-		    __wt_config_gets(session, cfg, "drop", &cval));
+		WT_ERR(__wt_config_gets(session, cfg, "drop", &cval));
 		if (cval.len != 0) {
 			WT_ERR(__wt_config_subinit(session, &dropconf, &cval));
 			while ((ret =

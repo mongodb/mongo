@@ -814,8 +814,8 @@ struct __wt_session {
 	 * additionally contain one of the following keys: \c "from=all" to drop
 	 * all snapshots\, \c "from=<snapshot>" to drop all snapshots after and
 	 * including the named snapshot\, or \c "to=<snapshot>" to drop all
-	 * snapshots before and including the named snapshot.,a string; default
-	 * empty.}
+	 * snapshots before and including the named snapshot.,a list of strings;
+	 * default empty.}
 	 * @config{name, if non-empty\, specify a name for the snapshot.,a
 	 * string; default empty.}
 	 * @config{target, if non-empty\, checkpoint the list of objects.,a list

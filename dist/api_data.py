@@ -289,7 +289,7 @@ methods = {
 		\c "from=<snapshot>" to drop all snapshots after and
 		including the named snapshot, or
 		\c "to=<snapshot>" to drop all snapshots before and
-		including the named snapshot'''),
+		including the named snapshot''', type='list'),
 	Config('name', '', r'''
 		if non-empty, specify a name for the snapshot'''),
 	Config('target', '', r'''

@@ -125,7 +125,7 @@ __wt_txn_update_check(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 	WT_TXN *txn;
 
 	txn = &session->txn;
-	if (txn->isolation == TXN_ISO_SNAPSHOT)
+	if (F_ISSET(txn, TXN_RUNNING) && txn->isolation == TXN_ISO_SNAPSHOT)
 		while (upd != NULL && !__wt_txn_visible(session, upd->txnid)) {
 			if (upd->txnid != WT_TXN_ABORTED)
 				return (WT_DEADLOCK);
