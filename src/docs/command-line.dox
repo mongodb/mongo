@@ -106,7 +106,7 @@ output; the \c -f option re-directs the output to the specified
 file.
 
 <hr>
-@section utility_read wt list
+@section utility_list wt list
 List the tables and files in the database.
 
 By default, the \c list command prints out the tables and files stored
@@ -126,18 +126,6 @@ in a human-readable format.
 @par <code>-v</code>
 If the \c -v option is specified, the object's complete schema table
 value is printed.
-
-<hr>
-@section utility_rename wt rename
-Rename a table or file.
-
-The \c rename command renames the specified table or file.
-
-@subsection utility_rename_synopsis Synopsis
-<code>wt [-Vv] [-C config] [-h directory] rename uri name</code>
-
-@subsection utility_rename_options Options
-The \c rename command has no command-specific options.
 
 <hr>
 @section utility_load wt load
@@ -248,6 +236,18 @@ The \c read command exits non-zero if a specified record is not found.
 
 @subsection utility_read_options Options
 The \c read command has no command-specific options.
+
+<hr>
+@section utility_rename wt rename
+Rename a table or file.
+
+The \c rename command renames the specified table or file.
+
+@subsection utility_rename_synopsis Synopsis
+<code>wt [-Vv] [-C config] [-h directory] rename uri name</code>
+
+@subsection utility_rename_options Options
+The \c rename command has no command-specific options.
 
 <hr>
 @section utility_salvage wt salvage
