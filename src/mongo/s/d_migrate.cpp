@@ -38,6 +38,7 @@
 #include "../db/repl_block.h"
 #include "../db/dur.h"
 #include "../db/clientcursor.h"
+#include "../db/pagefault.h"
 
 #include "../client/connpool.h"
 #include "../client/distlock.h"
@@ -1462,8 +1463,17 @@ namespace mongo {
                     while( i.more() ) {
                         BSONObj o = i.next().Obj();
                         {
-                            Lock::DBWrite lk( ns );
-                            Helpers::upsert( ns, o, true );
+                            PageFaultRetryableSection pgrs;
+                            while ( 1 ) {
+                                try {
+                                    Lock::DBWrite lk( ns );
+                                    Helpers::upsert( ns, o, true );
+                                    break;
+                                }
+                                catch ( PageFaultException& e ) {
+                                    e.touch();
+                                }
+                            }
                         }
                         thisTime++;
                         numCloned++;
