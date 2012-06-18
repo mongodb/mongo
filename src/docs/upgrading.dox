@@ -20,4 +20,8 @@ WT_SESSION::checkpoint method, specifically, creating a snapshot of a
 one or more objects is done using the WT_SESSION::checkpoint method's
 \c target configuration string.
 
+@par wt drop -s
+The \c -s option to the \c drop command for the command line utility
+\c wt has been removed.
+
 */
