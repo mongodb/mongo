@@ -249,19 +249,19 @@ err:		__wt_err(session, ret, "rwlock unlock failed");
  * __wt_rwlock_destroy --
  *	Destroy a mutex.
  */
-int
-__wt_rwlock_destroy(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
+void
+__wt_rwlock_destroy(WT_SESSION_IMPL *session, WT_RWLOCK **rwlockp)
 {
-	WT_DECL_RET;
+	WT_RWLOCK *rwlock;
+
+	rwlock = *rwlockp;		/* Clear our caller's reference. */
+	*rwlockp = NULL;
 
 	WT_VERBOSE_VOID(session, mutex,
 	    "rwlock: destroy %s (%p)", rwlock->name, rwlock);
 
-	ret = pthread_rwlock_destroy(&rwlock->rwlock);
-	if (ret == EBUSY)
-		ret = 0;
-	WT_ASSERT(session, ret == 0);
-	__wt_free(session, rwlock);
+	/* Errors are possible, but we're discarding memory, ignore them. */
+	(void)pthread_rwlock_destroy(&rwlock->rwlock);
 
-	return (ret);
+	__wt_free(session, rwlock);
 }

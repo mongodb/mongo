@@ -130,8 +130,7 @@ __conn_btree_get(WT_SESSION_IMPL *session,
 		session->btree = btree;
 	else if (btree != NULL) {
 		if (btree->rwlock != NULL)
-			(void)__wt_rwlock_destroy(
-			    session, btree->rwlock);
+			__wt_rwlock_destroy(session, &btree->rwlock);
 		__wt_free(session, btree->name);
 		__wt_free(session, btree->snapshot);
 		__wt_overwrite_and_free(session, btree);
@@ -452,7 +451,7 @@ __conn_btree_discard(WT_SESSION_IMPL *session, WT_BTREE *btree)
 		WT_TRET(__wt_conn_btree_sync_and_close(session));
 		WT_CLEAR_BTREE_IN_SESSION(session);
 	}
-	WT_TRET(__wt_rwlock_destroy(session, btree->rwlock));
+	__wt_rwlock_destroy(session, &btree->rwlock);
 	__wt_free(session, btree->config);
 	__wt_free(session, btree->name);
 	__wt_free(session, btree->snapshot);
