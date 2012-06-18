@@ -201,13 +201,13 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	const char *txn_cfg[] = { "isolation=snapshot", NULL };
 
 	target_list = tracking = 0;
+	txn_global = &S2C(session)->txn_global;
 
 	/* Only one checkpoint can be active at a time. */
 	__wt_writelock(session, S2C(session)->ckpt_rwlock);
 	WT_ERR(__wt_txn_begin(session, txn_cfg));
 
 	/* Prevent eviction from evicting anything newer than this. */
-	txn_global = &S2C(session)->txn_global;
 	txn_global->ckpt_txnid = session->txn.snap_min;
 
 	WT_ERR(__wt_meta_track_on(session));
