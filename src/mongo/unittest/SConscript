@@ -12,4 +12,4 @@ env.StaticLibrary("unittest_crutch", ['crutch.cpp'])
 
 
 env.CppUnitTest('unittest_test', 'unittest_test.cpp')
-
+env.CppUnitTest('fixture_test', 'fixture_test.cpp')

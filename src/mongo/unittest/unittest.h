@@ -110,6 +110,33 @@
     void _TEST_TYPE_NAME(CASE_NAME, TEST_NAME)::_doTest()
 
 /**
+ * Construct a single test named TEST_NAME that has access to a common class (a "fixture")
+ * named "FIXTURE_NAME".
+ *
+ * Usage:
+ *
+ * class FixtureClass : public mongo::unittest::Test {
+ * protected:
+ *   int myVar;
+ *   void setUp() { myVar = 10; }
+ * };
+ *
+ * TEST(FixtureClass, TestThatUsesFixture) {
+ *     ASSERT_EQUALS(10, myVar);
+ * }
+ */
+#define TEST_F(FIXTURE_NAME, TEST_NAME) \
+    class _TEST_TYPE_NAME(FIXTURE_NAME, TEST_NAME) : public FIXTURE_NAME { \
+    private:                                                            \
+        virtual void _doTest();                                         \
+                                                                        \
+        static const RegistrationAgent<_TEST_TYPE_NAME(FIXTURE_NAME, TEST_NAME) > _agent; \
+    };                                                                  \
+    const ::mongo::unittest::Test::RegistrationAgent<_TEST_TYPE_NAME(FIXTURE_NAME, TEST_NAME) > \
+            _TEST_TYPE_NAME(FIXTURE_NAME, TEST_NAME)::_agent(#FIXTURE_NAME, #TEST_NAME); \
+    void _TEST_TYPE_NAME(FIXTURE_NAME, TEST_NAME)::_doTest()
+
+/**
  * Macro to construct a type name for a test, from its "CASE_NAME" and "TEST_NAME".
  * Do not use directly in test code.
  */
@@ -148,11 +175,6 @@ namespace mongo {
         /**
          * Base type for unit test fixtures.  Also, the default fixture type used
          * by the TEST() macro.
-         *
-         * TODO(schwerin): Implement a TEST_F macro that allows testers to specify
-         * different subclasses of Test to be used as the test fixture.  These subclasses
-         * could then provide per-test set-up and tear-down code by overriding the
-         * setUp and tearDown methods.
          */
         class Test : private boost::noncopyable {
         public:
@@ -169,6 +191,13 @@ namespace mongo {
             class RegistrationAgent : private boost::noncopyable {
             public:
                 RegistrationAgent(const std::string& suiteName, const std::string& testName);
+            };
+
+            /**
+             * This exception class is used to exercise the testing framework itself. If a test
+             * case throws it, the framework would not consider it an error.
+             */
+            class FixtureExceptionForTesting : public std::exception {
             };
 
         private:

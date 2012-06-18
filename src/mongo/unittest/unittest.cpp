@@ -78,7 +78,23 @@ namespace mongo {
 
         void Test::run() {
             setUp();
-            _doTest();
+
+            // An uncaught exception does not prevent the tear down from running. But
+            // such an event still constitutes an error. To test this behavior we use a
+            // special exception here that when thrown does trigger the tear down but is
+            // not considered an error.
+            try {
+                _doTest();
+            }
+            catch (FixtureExceptionForTesting&) {
+                tearDown();
+                return;
+            }
+            catch (TestAssertionFailureException&) {
+                tearDown();
+                throw;
+            }
+
             tearDown();
         }
 
