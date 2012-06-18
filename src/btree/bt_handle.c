@@ -133,8 +133,10 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 	__wt_btree_huffman_close(session);
 
 	/* Snapshot lock. */
-	if (btree->snaplock != NULL)
+	if (btree->snaplock != NULL) {
 		(void)__wt_rwlock_destroy(session, btree->snaplock);
+		btree->snaplock = NULL;
+	}
 
 	/* Free allocated memory. */
 	__wt_free(session, btree->key_format);
