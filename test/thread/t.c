@@ -163,8 +163,8 @@ wt_shutdown(void)
 	if ((ret = session->verify(session, FNAME, NULL)) != 0)
 		die("session.verify", ret);
 
-	if ((ret = session->sync(session, FNAME, NULL)) != 0)
-		die("session.sync", ret);
+	if ((ret = session->checkpoint(session, NULL)) != 0)
+		die("session.checkpoint", ret);
 
 	if ((ret = conn->close(conn, NULL)) != 0)
 		die("conn.close", ret);
