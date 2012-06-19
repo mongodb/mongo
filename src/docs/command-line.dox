@@ -51,18 +51,10 @@ The \c drop command drops the specified \c uri.  It is equivalent to a
 call to WT_SESSION::drop with the "force" configuration argument.
 
 @subsection utility_drop_synopsis Synopsis
-<code>wt [-Vv] [-C config] [-h directory] drop [-s snapshot] uri</code>
+<code>wt [-Vv] [-C config] [-h directory] drop uri</code>
 
 @subsection utility_drop_options Options
-The following are command-specific options for the \c drop command:
-
-@par <code>-s</code>
-Specify one more more snapshots to drop; the argument must be either the
-name of a single snapshot to drop (a string), or a list containing one
-of the following keys: "all" to drop all snapshots, "from=<snapshot>"
-to drop all snapshots after and including the named snapshots, or
-"to=<snapshot>" to drop all snapshots before and including the named
-snapshot.
+The \c drop command has no command-specific options.
 
 <hr>
 @section utility_dump wt dump
@@ -74,10 +66,14 @@ which can be re-loaded into a new table using the \c load command.
 See @subpage dump_formats for details of the dump file formats.
 
 @subsection utility_dump_synopsis Synopsis
-<code>wt [-Vv] [-C config] [-h directory] dump [-rx] [-f output] [-s snapshot] uri</code>
+<code>wt [-Vv] [-C config] [-h directory] dump [-rx] [-c checkpoint] [-f output] uri</code>
 
 @subsection utility_dump_options Options
 The following are command-specific options for the \c dump command:
+
+@par <code>-c</code>
+By default, the \c dump command opens the most recent version of the object;
+the \c -c option changes the \c dump command to open the named checkpoint.
 
 @par <code>-f</code>
 By default, the \c dump command output is written to the standard output;
@@ -85,10 +81,6 @@ the \c -f option re-directs the output to the specified file.
 
 @par <code>-r</code>
 Dump in reverse order, from largest to smallest.
-
-@par <code>-s</code>
-By default, the \c dump command opens the most recent snapshot of the object;
-the \c -s option changes the \c dump command to open the named snapshot.
 
 @par <code>-x</code>
 Dump all characters in a hexadecimal encoding (the default is to leave
@@ -114,7 +106,7 @@ output; the \c -f option re-directs the output to the specified
 file.
 
 <hr>
-@section utility_read wt list
+@section utility_list wt list
 List the tables and files in the database.
 
 By default, the \c list command prints out the tables and files stored
@@ -122,30 +114,18 @@ in the database.  If an object name is specified as an argument, only
 information about that object is printed.
 
 @subsection utility_list_synopsis Synopsis
-<code>wt [-Vv] [-C config] [-h directory] list [-sv] [uri]</code>
+<code>wt [-Vv] [-C config] [-h directory] list [-cv] [uri]</code>
 
 @subsection utility_list_options Options
 The following are command-specific options for the \c list command:
 
-@par <code>-s</code>
-If the \c -s option is specified, the object's snapshots are printed
+@par <code>-c</code>
+If the \c -c option is specified, the object's checkpoints are printed
 in a human-readable format.
 
 @par <code>-v</code>
 If the \c -v option is specified, the object's complete schema table
 value is printed.
-
-<hr>
-@section utility_rename wt rename
-Rename a table or file.
-
-The \c rename command renames the specified table or file.
-
-@subsection utility_rename_synopsis Synopsis
-<code>wt [-Vv] [-C config] [-h directory] rename uri name</code>
-
-@subsection utility_rename_options Options
-The \c rename command has no command-specific options.
 
 <hr>
 @section utility_load wt load
@@ -256,6 +236,18 @@ The \c read command exits non-zero if a specified record is not found.
 
 @subsection utility_read_options Options
 The \c read command has no command-specific options.
+
+<hr>
+@section utility_rename wt rename
+Rename a table or file.
+
+The \c rename command renames the specified table or file.
+
+@subsection utility_rename_synopsis Synopsis
+<code>wt [-Vv] [-C config] [-h directory] rename uri name</code>
+
+@subsection utility_rename_options Options
+The \c rename command has no command-specific options.
 
 <hr>
 @section utility_salvage wt salvage

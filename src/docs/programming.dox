@@ -7,7 +7,7 @@ This section explains how to write applications that use WiredTiger:
 - @subpage schema
 - @subpage cursors
 - @subpage threads
-- @subpage snapshots
+- @subpage checkpoints
 - @subpage transactions
 - @subpage compression
 - @subpage name_space

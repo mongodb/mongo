@@ -111,12 +111,12 @@ ops(void *arg)
 	WT_CURSOR *cursor, *cursor_insert;
 	WT_SESSION *session;
 	WT_ITEM key, value;
-	uint64_t cnt, keyno, sync_op, thread_ops;
+	uint64_t cnt, keyno, ckpt_op, thread_ops;
 	uint32_t op;
 	uint8_t *keybuf, *valbuf;
 	u_int np;
-	int dir, insert, notfound, ret, sync_drop;
-	char sync_name[64];
+	int dir, insert, notfound, ret;
+	char *ckpt_config, buf[64];
 
 	conn = g.wts_conn;
 
@@ -154,35 +154,33 @@ ops(void *arg)
 	/* Each thread does its share of the total operations. */
 	thread_ops = g.c_ops / g.c_threads;
 
-	/* Pick an operation where we'll do a sync and create the name. */
-	sync_drop = 0;
-	sync_op = MMRAND(1, thread_ops);
-	snprintf(sync_name, sizeof(sync_name), "snapshot=thread-%d", tinfo->id);
+	/* Pick an operation where we'll do a checkpoint. */
+	ckpt_op = MMRAND(1, thread_ops);
 
 	for (cnt = 0; cnt < thread_ops; ++cnt) {
 		if (SINGLETHREADED && cnt % 100 == 0)
 			track("read/write ops", 0ULL, tinfo);
 
-		if (cnt == sync_op) {
-			if (sync_drop && (int)MMRAND(1, 4) == 1) {
-				if ((ret = session->drop(
-				    session, WT_TABLENAME, sync_name)) != 0)
-					die(ret, "session.drop: %s: %s",
-					    WT_TABLENAME, sync_name);
-				sync_drop = 0;
-			} else {
-				if ((ret = session->checkpoint(
-				    session, sync_name)) != 0)
-					die(ret, "session.checkpoint: %s",
-					    sync_name);
-				sync_drop = 1;
+		if (cnt == ckpt_op) {
+			/* Half the time we name the checkpoint. */
+			if (MMRAND(1, 2) == 1)
+				ckpt_config = NULL;
+			else {
+				(void)snprintf(buf, sizeof(buf),
+				    "name=thread-%d", tinfo->id);
+				ckpt_config = buf;
 			}
+			if ((ret =
+			    session->checkpoint(session, ckpt_config)) != 0)
+				die(ret, "session.checkpoint%s%s",
+				    ckpt_config == NULL ? "" : ": ",
+				    ckpt_config == NULL ? "" : ckpt_config);
 
 			/*
-			 * Pick the next sync operation, try for roughly five
-			 * snapshot operations per thread run.
+			 * Pick the next checkpoint operation, try for roughly
+			 * five checkpoint operations per thread run.
 			 */
-			sync_op += MMRAND(1, thread_ops) / 5;
+			ckpt_op += MMRAND(1, thread_ops) / 5;
 		}
 
 		insert = notfound = 0;

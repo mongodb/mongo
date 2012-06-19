@@ -207,16 +207,6 @@ methods = {
 	Config('force', 'false', r'''
 		return success if the object does not exist''',
 		type='boolean'),
-	Config('snapshot', '', r'''
-		specify one or more snapshots to drop.
-
-		The value must be either the name of a single snapshot to drop
-		(a string), or a list containing one of the following keys:
-		\c "all" to drop all snapshots,
-		\c "from=<snapshot>" to drop all snapshots after and including
-		the named snapshots, or
-		\c "to=<snapshot>" to drop all snapshots before and including
-		the named snapshot'''),
 	]),
 
 'session.dumpfile' : Method([]),
@@ -232,6 +222,8 @@ methods = {
 		load path for empty objects, only empty objects may be
 		bulk-loaded''',
 		type='boolean'),
+	Config('checkpoint', '', r'''
+		the name of a checkpoint to open'''),
 	Config('dump', '', r'''
 		configure the cursor for dump format inputs and outputs:
 		"hex" selects a simple hexadecimal format, "print"
@@ -251,8 +243,6 @@ methods = {
 		ignore the encodings for the key and value, manage data as if
 		the formats were \c "u".  See @ref cursor_raw for details''',
 		type='boolean'),
-	Config('snapshot', '', r'''
-		the name of a snapshot to open'''),
 	Config('statistics', 'false', r'''
 		configure the cursor for statistics''',
 		type='boolean'),
@@ -268,10 +258,6 @@ methods = {
 		force salvage even of files that do not appear to be WiredTiger
 		files''',
 		type='boolean'),
-]),
-'session.sync' : Method([
-	Config('snapshot', '', r'''
-		if non-empty, create a named snapshot'''),
 ]),
 'session.truncate' : Method([]),
 'session.upgrade' : Method([]),
@@ -296,8 +282,18 @@ methods = {
 'session.rollback_transaction' : Method([]),
 
 'session.checkpoint' : Method([
-	Config('snapshot', '', r'''
-		if non-empty, create named snapshots in files'''),
+	Config('drop', '', r'''
+		specify a list of checkpoints to drop.
+		The list may additionally contain one of the following keys:
+		\c "from=all" to drop all checkpoints,
+		\c "from=<checkpoint>" to drop all checkpoints after and
+		including the named checkpoint, or
+		\c "to=<checkpoint>" to drop all checkpoints before and
+		including the named checkpoint''', type='list'),
+	Config('name', '', r'''
+		if non-empty, specify a name for the checkpoint'''),
+	Config('target', '', r'''
+		if non-empty, checkpoint the list of objects''', type='list'),
 ]),
 
 'connection.add_collator' : Method([]),
@@ -364,7 +360,8 @@ methods = {
 		threads)''',
 		min='1'),
 	Config('sync', 'true', r'''
-		sync files when closing or writing snapshots''',
+		flush files to stable storage when closing or writing
+		checkpoints''',
 		type='boolean'),
 	Config('transactional', 'true', r'''
 		support transactional semantics''',

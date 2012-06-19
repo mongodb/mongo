@@ -42,7 +42,7 @@ obj_drop(void)
 }
 
 void
-obj_sync(void)
+obj_checkpoint(void)
 {
 	WT_SESSION *session;
 	int ret;
@@ -50,9 +50,13 @@ obj_sync(void)
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die("conn.session", ret);
 
-	if ((ret = session->sync(session, uri, NULL)) != 0)
+	/*
+	 * Name the checkpoint so the checkpoint has to be taken, don't specify
+	 * a target, it might not exist.
+	 */
+	if ((ret = session->checkpoint(session, "name=fops")) != 0)
 		if (ret != ENOENT)
-			die("session.sync", ret);
+			die("session.checkpoint", ret);
 
 	if ((ret = session->close(session, NULL)) != 0)
 		die("session.close", ret);

@@ -14,8 +14,9 @@
  */
 int
 __wt_schema_worker(WT_SESSION_IMPL *session,
-   const char *uri, const char *cfg[],
-   int (*func)(WT_SESSION_IMPL *, const char *[]), uint32_t open_flags)
+   const char *uri,
+   int (*func)(WT_SESSION_IMPL *, const char *[]),
+   const char *cfg[], uint32_t open_flags)
 {
 	WT_DECL_RET;
 	WT_TABLE *table;

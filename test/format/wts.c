@@ -7,8 +7,6 @@
 
 #include "format.h"
 
-static void wts_sync(void);
-
 static int
 handle_message(WT_EVENT_HANDLER *handler, const char *message)
 {
@@ -136,8 +134,6 @@ wts_close()
 
 	conn = g.wts_conn;
 
-	wts_sync();
-
 	if ((ret = conn->close(conn, NULL)) != 0)
 		die(ret, "connection.close");
 }
@@ -190,26 +186,6 @@ wts_salvage(void)
 		die(ret, "connection.open_session");
 	if ((ret = session->salvage(session, WT_TABLENAME, NULL)) != 0)
 		die(ret, "session.salvage: %s", WT_TABLENAME);
-	if ((ret = session->close(session, NULL)) != 0)
-		die(ret, "session.close");
-}
-
-static void
-wts_sync(void)
-{
-	WT_CONNECTION *conn;
-	WT_SESSION *session;
-	int ret;
-
-	conn = g.wts_conn;
-
-	track("sync", 0ULL, NULL);
-
-	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		die(ret, "connection.open_session");
-	if ((ret = session->sync(
-	    session, WT_TABLENAME, NULL)) != 0 && ret != EBUSY)
-		die(ret, "session.sync: %s", WT_TABLENAME);
 	if ((ret = session->close(session, NULL)) != 0)
 		die(ret, "session.close");
 }

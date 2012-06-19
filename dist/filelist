@@ -104,7 +104,6 @@ src/schema/schema_worker.c
 src/session/session_api.c
 src/session/session_btree.c
 src/session/session_salvage.c
-src/session/session_snapshot.c
 src/support/err.c
 src/support/filename.c
 src/support/global.c
@@ -117,3 +116,4 @@ src/support/scratch.c
 src/support/sess_dump.c
 src/support/stat.c
 src/txn/txn.c
+src/txn/txn_snapshot.c

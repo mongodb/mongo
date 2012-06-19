@@ -73,6 +73,7 @@ control's
 cpp
 crashless
 cursortype
+cv
 dN
 dNLen
 dNOff
@@ -257,7 +258,6 @@ structs
 subdatabases
 subpage
 superset
-sv
 tablename
 tcl
 tcmalloc

@@ -2,7 +2,36 @@
 
 @section version13 Version 1.3
 
- - There were no API changes in release 1.3.
- - There were no file format changes in release 1.3.
+The checkpoint functionality supported by WT_SESSION::checkpoint and the
+snapshot functionality supported by WT_SESSION::sync have been merged
+into a single piece of functionality, and applications no longer have
+access to object-level snapshots.
+
+@par WT_SESSION.checkpoint
+The WT_SESSION::checkpoint method's \c snapshot configuration string has
+been renamed to \c name.
+
+@par WT_SESSION.drop
+In releases before 1.3, the WT_SESSION::drop method was used to delete
+snapshots.  In 1.3, the functionality of deleting snapshots has been
+moved to the WT_SESSION::checkpoint method, specifically, snapshots are
+discarded using the WT_SESSION::checkpoint method's \c drop configuration
+string.
+
+@par WT_SESSION.sync
+The WT_SESSION::sync method has been removed from the 1.3 release; the
+functionality of creating an object snapshot has moved to the
+WT_SESSION::checkpoint method, specifically, creating a snapshot of a
+one or more objects is done using the WT_SESSION::checkpoint method's
+\c target configuration string.
+
+@par wt drop -s
+The \c -s option to the \c drop command for the \c wt command line
+utility has been removed, and object snapshots may no longer be removed
+from the command line.
+
+@par wt dump, list -s
+The \c -s options to the \c dump and \c list commands for the \c wt
+command line utility have been renamed to be \c -c.
 
 */

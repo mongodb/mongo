@@ -133,30 +133,36 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 	WT_BTREE_SESSION *btree_session;
 	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
-	const char *snapshot;
-	size_t snaplen;
+	const char *ckpt;
+	size_t ckptlen;
 
 	btree = NULL;
 
-	/* Is this a snapshot operation? */
-	if (!LF_ISSET(WT_BTREE_SNAPSHOT_OP) && cfg != NULL &&
-	    __wt_config_gets(session, cfg, "snapshot", &cval) == 0 &&
+	/*
+	 * Optionally open a checkpoint.  This function is called from lots of
+	 * places, for example, session.checkpoint: the only method currently
+	 * with a "checkpoint" configuration string is session.open_cursor, so
+	 * we don't need to check further than if that configuration string is
+	 * set.
+	 */
+	if (cfg != NULL &&
+	    __wt_config_gets(session, cfg, "checkpoint", &cval) == 0 &&
 	    cval.len != 0) {
-		snapshot = cval.str;
-		snaplen = cval.len;
+		ckpt = cval.str;
+		ckptlen = cval.len;
 	} else {
-		snapshot = NULL;
-		snaplen = 0;
+		ckpt = NULL;
+		ckptlen = 0;
 	}
 
 	TAILQ_FOREACH(btree_session, &session->btrees, q) {
 		btree = btree_session->btree;
 		if (strcmp(uri, btree->name) != 0)
 			continue;
-		if ((snapshot == NULL && btree->snapshot == NULL) ||
-		    (snapshot != NULL && btree->snapshot != NULL &&
-		    (strncmp(snapshot, btree->snapshot, snaplen) == 0 &&
-		    btree->snapshot[snaplen] == '\0')))
+		if ((ckpt == NULL && btree->ckpt == NULL) ||
+		    (ckpt != NULL && btree->ckpt != NULL &&
+		    (strncmp(ckpt, btree->ckpt, ckptlen) == 0 &&
+		    btree->ckpt[ckptlen] == '\0')))
 			break;
 	}
 
@@ -181,7 +187,7 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 		ret = 0;
 	}
 
-	WT_RET(__wt_conn_btree_get(session, uri, snapshot, cfg, flags));
+	WT_RET(__wt_conn_btree_get(session, uri, ckpt, cfg, flags));
 
 	if (btree_session == NULL)
 		WT_RET(__wt_session_add_btree(session, NULL));
@@ -211,7 +217,7 @@ __wt_session_lock_snapshot(
 	btree = session->btree;
 
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));
-	WT_ERR(__wt_buf_fmt(session, buf, "snapshot=\"%s\"", snapshot));
+	WT_ERR(__wt_buf_fmt(session, buf, "checkpoint=\"%s\"", snapshot));
 	cfg[0] = buf->data;
 
 	LF_SET(WT_BTREE_LOCK_ONLY);

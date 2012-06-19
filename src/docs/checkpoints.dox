@@ -1,0 +1,44 @@
+/*! @page checkpoints Checkpoints
+
+WiredTiger supports checkpoints, a read-only, static view of one or
+more data sources.
+
+Checkpoints offer basic operation durability without transactional
+logging, across application or system failure.  (Transactional logging
+offers fine-grained durability, but requires a recovery step when files
+are first opened, and impacts the performance of every operation;
+checkpoints offer durability without recovery or impacting performance,
+but the creation of a checkpoint is a relatively heavy-weight operation.
+WiredTiger does not yet support transactional logging.)
+
+Checkpoints are automatically created whenever a modified data source is
+closed.
+
+When WiredTiger data sources are first opened, they are opened in the
+state of the most recent checkpoint taken on the file, in other words,
+updates after the most recent checkpoint will not appear in the data
+source.  If no checkpoint is found when the data source is opened, the
+data source will appear empty.
+
+Checkpoints may optionally be named.  Named checkpoints are created and
+discarded using the WT_SESSION::checkpoint method and read using the
+WT_SESSION::open_cursor method.  Additionally, the \c -c option to the
+\c wt command line utility \c list command will list a data source's
+checkpoints in a human-readable format.
+
+Cursors are opened in the most recent version of a data source unless a
+checkpoint name is provided to WT_SESSION::open_cursor.  Cursors opened
+in the most recent version of a data source support write operations,
+cursors opened in a checkpoint are read-only.
+
+Named checkpoints persist until explicitly dropped.  Checkpoints share
+pages, and deleting a checkpoint may or may not make pages available for
+re-use, depending on whether the dropped checkpoint contained the last
+reference to a block of data.  Creating a named checkpoint automatically
+discards any other checkpoint with the same name (unless they are
+currently open in a cursor).
+
+Unnamed checkpoints managed by WiredTiger are given the name
+"WiredTigerInternal".
+
+ */

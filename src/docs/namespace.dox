@@ -1,5 +1,9 @@
 /*! @page name_space WiredTiger name spaces
 
+@section env Process environment name space
+
+WiredTiger's environment variables begin with the string "WIREDTIGER".
+
 @section c C language name space
 
 WiredTiger's public function names begin with the string "wiredtiger".

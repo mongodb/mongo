@@ -75,7 +75,7 @@ __wt_conn_btree_open_lock(WT_SESSION_IMPL *session, uint32_t flags)
  */
 static int
 __conn_btree_get(WT_SESSION_IMPL *session,
-    const char *name, const char *snapshot, uint32_t flags)
+    const char *name, const char *ckpt, uint32_t flags)
 {
 	WT_BTREE *btree;
 	WT_CONNECTION_IMPL *conn;
@@ -89,9 +89,9 @@ __conn_btree_get(WT_SESSION_IMPL *session,
 	__wt_spin_lock(session, &conn->spinlock);
 	TAILQ_FOREACH(btree, &conn->btqh, q) {
 		if (strcmp(name, btree->name) == 0 &&
-		    ((snapshot == NULL && btree->snapshot == NULL) ||
-		    (snapshot != NULL && btree->snapshot != NULL &&
-		    strcmp(snapshot, btree->snapshot) == 0))) {
+		    ((ckpt == NULL && btree->ckpt == NULL) ||
+		    (ckpt != NULL && btree->ckpt != NULL &&
+		    strcmp(ckpt, btree->ckpt) == 0))) {
 			++btree->refcnt;
 			session->btree = btree;
 			matched = 1;
@@ -113,8 +113,8 @@ __conn_btree_get(WT_SESSION_IMPL *session,
 	    (ret = __wt_rwlock_alloc(
 		session, "btree handle", &btree->rwlock)) == 0 &&
 	    (ret = __wt_strdup(session, name, &btree->name)) == 0 &&
-	    (snapshot == NULL ||
-	    (ret = __wt_strdup(session, snapshot, &btree->snapshot)) == 0)) {
+	    (ckpt == NULL ||
+	    (ret = __wt_strdup(session, ckpt, &btree->ckpt)) == 0)) {
 		/* Lock the handle before it is inserted in the list. */
 		__wt_writelock(session, btree->rwlock);
 		F_SET(btree, WT_BTREE_EXCLUSIVE);
@@ -130,10 +130,9 @@ __conn_btree_get(WT_SESSION_IMPL *session,
 		session->btree = btree;
 	else if (btree != NULL) {
 		if (btree->rwlock != NULL)
-			(void)__wt_rwlock_destroy(
-			    session, btree->rwlock);
+			__wt_rwlock_destroy(session, &btree->rwlock);
 		__wt_free(session, btree->name);
-		__wt_free(session, btree->snapshot);
+		__wt_free(session, btree->ckpt);
 		__wt_overwrite_and_free(session, btree);
 	}
 
@@ -157,7 +156,7 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session)
 
 	if (!F_ISSET(btree,
 	    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY))
-		ret = __wt_snapshot_close(session);
+		ret = __wt_snapshot(session, NULL);
 
 	WT_TRET(__wt_btree_close(session));
 
@@ -209,9 +208,9 @@ __wt_conn_btree_open(WT_SESSION_IMPL *session,
 
 	do {
 		WT_ERR(__wt_meta_snapshot_get(
-		    session, btree->name, btree->snapshot, addr));
+		    session, btree->name, btree->ckpt, addr));
 		WT_ERR(__wt_btree_open(session, addr->data, addr->size, cfg,
-		    btree->snapshot == NULL ? 0 : 1));
+		    btree->ckpt == NULL ? 0 : 1));
 		F_SET(btree, WT_BTREE_OPEN);
 
 		/* Drop back to a readlock if that is all that was needed. */
@@ -236,8 +235,7 @@ err:		(void)__wt_conn_btree_close(session, 1);
  */
 int
 __wt_conn_btree_get(WT_SESSION_IMPL *session,
-    const char *name, const char *snapshot,
-    const char *cfg[], uint32_t flags)
+    const char *name, const char *ckpt, const char *cfg[], uint32_t flags)
 {
 	WT_BTREE *btree;
 	WT_CONNECTION_IMPL *conn;
@@ -256,7 +254,7 @@ __wt_conn_btree_get(WT_SESSION_IMPL *session,
 		else
 			locked = 0;
 	} else {
-		WT_RET(__conn_btree_get(session, name, snapshot, flags));
+		WT_RET(__conn_btree_get(session, name, ckpt, flags));
 		btree = session->btree;
 	}
 
@@ -284,8 +282,8 @@ err:	if (ret != 0 && locked) {
 
 /*
  * __wt_conn_btree_apply --
- *	Apply a function to all open, non-snapshot btree handles apart from the
- *	metadata file.
+ *	Apply a function to all open, non-checkpoint btree handles apart from
+ * the metadata file.
  */
 int
 __wt_conn_btree_apply(WT_SESSION_IMPL *session,
@@ -301,7 +299,7 @@ __wt_conn_btree_apply(WT_SESSION_IMPL *session,
 	__wt_spin_lock(session, &conn->spinlock);
 	TAILQ_FOREACH(btree, &conn->btqh, q)
 		if (F_ISSET(btree, WT_BTREE_OPEN) &&
-		    btree->snapshot == NULL &&
+		    btree->ckpt == NULL &&
 		    strcmp(btree->name, WT_METADATA_URI) != 0) {
 			/*
 			 * We have the connection spinlock, which prevents
@@ -371,7 +369,7 @@ __wt_conn_btree_close(WT_SESSION_IMPL *session, int locked)
 /*
  * __wt_conn_btree_close_all --
  *	Close all btree handles handles with matching name (including all
- *	snapshot handles).
+ *	checkpoint handles).
  */
 int
 __wt_conn_btree_close_all(WT_SESSION_IMPL *session, const char *name)
@@ -452,10 +450,10 @@ __conn_btree_discard(WT_SESSION_IMPL *session, WT_BTREE *btree)
 		WT_TRET(__wt_conn_btree_sync_and_close(session));
 		WT_CLEAR_BTREE_IN_SESSION(session);
 	}
-	WT_TRET(__wt_rwlock_destroy(session, btree->rwlock));
+	__wt_rwlock_destroy(session, &btree->rwlock);
 	__wt_free(session, btree->config);
 	__wt_free(session, btree->name);
-	__wt_free(session, btree->snapshot);
+	__wt_free(session, btree->ckpt);
 	__wt_overwrite_and_free(session, btree);
 
 	return (ret);

@@ -16,7 +16,7 @@ volumes of data,
 - WiredTiger offers transactional semantics without blocking,
 
 - WiredTiger stores are not corrupted by torn writes, reverting to the
-last snapshot after system failure,
+last checkpoint after system failure,
 
 - WiredTiger supports petabyte tables, records up to 4GB, and record
 numbers up to 64-bits.

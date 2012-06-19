@@ -114,11 +114,11 @@ __wt_confchk_session_begin_transaction =
 
 const char *
 __wt_confdfl_session_checkpoint =
-    "snapshot=""";
+    "drop=(),name="",target=()";
 
 const char *
 __wt_confchk_session_checkpoint =
-    "snapshot=()";
+    "drop=(type=list),name=(),target=(type=list)";
 
 const char *
 __wt_confdfl_session_close =
@@ -162,11 +162,11 @@ __wt_confchk_session_create =
 
 const char *
 __wt_confdfl_session_drop =
-    "force=false,snapshot=""";
+    "force=false";
 
 const char *
 __wt_confchk_session_drop =
-    "force=(type=boolean),snapshot=()";
+    "force=(type=boolean)";
 
 const char *
 __wt_confdfl_session_dumpfile =
@@ -186,15 +186,16 @@ __wt_confchk_session_log_printf =
 
 const char *
 __wt_confdfl_session_open_cursor =
-    "append=false,bulk=false,dump="",isolation=read-committed,overwrite=false"
-    ",raw=false,snapshot="",statistics=false,statistics_clear=false";
+    "append=false,bulk=false,checkpoint="",dump="",isolation=read-committed,"
+    "overwrite=false,raw=false,statistics=false,statistics_clear=false";
 
 const char *
 __wt_confchk_session_open_cursor =
-    "append=(type=boolean),bulk=(type=boolean),dump=(choices=[\"hex\","
-    "\"print\"]),isolation=(choices=[\"snapshot\",\"read-committed\","
-    "\"read-uncommitted\"]),overwrite=(type=boolean),raw=(type=boolean),"
-    "snapshot=(),statistics=(type=boolean),statistics_clear=(type=boolean)";
+    "append=(type=boolean),bulk=(type=boolean),checkpoint=(),"
+    "dump=(choices=[\"hex\",\"print\"]),isolation=(choices=[\"snapshot\","
+    "\"read-committed\",\"read-uncommitted\"]),overwrite=(type=boolean),"
+    "raw=(type=boolean),statistics=(type=boolean),"
+    "statistics_clear=(type=boolean)";
 
 const char *
 __wt_confdfl_session_rename =
@@ -219,14 +220,6 @@ __wt_confdfl_session_salvage =
 const char *
 __wt_confchk_session_salvage =
     "force=(type=boolean)";
-
-const char *
-__wt_confdfl_session_sync =
-    "snapshot=""";
-
-const char *
-__wt_confchk_session_sync =
-    "snapshot=()";
 
 const char *
 __wt_confdfl_session_truncate =

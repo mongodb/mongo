@@ -72,10 +72,11 @@ struct __wt_btree {
 
 	const char *name;		/* Object name as a URI */
 	const char *config;		/* Configuration string */
-	const char *snapshot;		/* Snapshot name (or NULL) */
+	const char *ckpt;		/* Checkpoint name (or NULL) */
 
 	/* XXX Should move into the session-level handle information. */
 	WT_RWLOCK   *snaplock;		/* Lock for snapshot creation */
+	WT_SNAPSHOT *snap;		/* Snapshot information */
 
 	enum {	BTREE_COL_FIX=1,	/* Fixed-length column store */
 		BTREE_COL_VAR=2,	/* Variable-length column store */
@@ -107,8 +108,6 @@ struct __wt_btree {
 
 	WT_PAGE *root_page;		/* Root page */
 
-	WT_SNAPSHOT *snap;		/* Snapshot information */
-
 	void *block;			/* Block manager */
 	u_int block_header;		/* Block manager header length */
 
@@ -122,9 +121,8 @@ struct __wt_btree {
 #define	WT_BTREE_NO_EVICTION	0x0008	/* The file isn't evicted */
 #define	WT_BTREE_OPEN		0x0010	/* Handle is open */
 #define	WT_BTREE_SALVAGE	0x0020	/* Handle is for salvage */
-#define	WT_BTREE_SNAPSHOT_OP	0x0040	/* Handle is for a snapshot operation */
-#define	WT_BTREE_UPGRADE	0x0080	/* Handle is for upgrade */
-#define	WT_BTREE_VERIFY		0x0100	/* Handle is for verify */
+#define	WT_BTREE_UPGRADE	0x0040	/* Handle is for upgrade */
+#define	WT_BTREE_VERIFY		0x0080	/* Handle is for verify */
 	uint32_t flags;
 };
 

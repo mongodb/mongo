@@ -518,8 +518,6 @@ extern const char *__wt_confdfl_session_rollback_transaction;
 extern const char *__wt_confchk_session_rollback_transaction;
 extern const char *__wt_confdfl_session_salvage;
 extern const char *__wt_confchk_session_salvage;
-extern const char *__wt_confdfl_session_sync;
-extern const char *__wt_confchk_session_sync;
 extern const char *__wt_confdfl_session_truncate;
 extern const char *__wt_confchk_session_truncate;
 extern const char *__wt_confdfl_session_upgrade;
@@ -538,7 +536,7 @@ extern int __wt_conn_btree_open(WT_SESSION_IMPL *session,
     uint32_t flags);
 extern int __wt_conn_btree_get(WT_SESSION_IMPL *session,
     const char *name,
-    const char *snapshot,
+    const char *ckpt,
     const char *cfg[],
     uint32_t flags);
 extern int __wt_conn_btree_apply(WT_SESSION_IMPL *session,
@@ -723,7 +721,7 @@ extern void __wt_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock);
 extern int __wt_try_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock);
 extern void __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock);
 extern void __wt_rwunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock);
-extern int __wt_rwlock_destroy(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock);
+extern void __wt_rwlock_destroy(WT_SESSION_IMPL *session, WT_RWLOCK **rwlockp);
 extern int __wt_open(WT_SESSION_IMPL *session,
     const char *name,
     int ok_create,
@@ -883,9 +881,9 @@ extern int __wt_schema_get_source( WT_SESSION_IMPL *session,
 extern int __wt_schema_name_check(WT_SESSION_IMPL *session, const char *uri);
 extern int __wt_schema_worker(WT_SESSION_IMPL *session,
     const char *uri,
-    const char *cfg[],
     int (*func)(WT_SESSION_IMPL *,
     const char *[]),
+    const char *cfg[],
     uint32_t open_flags);
 extern int __wt_session_create_strip( WT_SESSION *session,
     const char *v1,
@@ -910,9 +908,6 @@ extern int __wt_session_lock_snapshot( WT_SESSION_IMPL *session,
 extern int __wt_session_discard_btree( WT_SESSION_IMPL *session,
     WT_BTREE_SESSION *btree_session);
 extern int __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[]);
-extern int __wt_snapshot(WT_SESSION_IMPL *session, const char *cfg[]);
-extern int __wt_snapshot_close(WT_SESSION_IMPL *session);
-extern int __wt_snapshot_drop(WT_SESSION_IMPL *session, const char *cfg[]);
 extern void __wt_event_handler_set(WT_SESSION_IMPL *session,
     WT_EVENT_HANDLER *handler);
 extern void __wt_err(WT_SESSION_IMPL *session,
@@ -1060,3 +1055,4 @@ extern int __wt_txn_init(WT_SESSION_IMPL *session);
 extern void __wt_txn_destroy(WT_SESSION_IMPL *session);
 extern int __wt_txn_global_init(WT_CONNECTION_IMPL *conn, const char *cfg[]);
 extern void __wt_txn_global_destroy(WT_CONNECTION_IMPL *conn);
+extern int __wt_snapshot(WT_SESSION_IMPL *session, const char *cfg[]);
