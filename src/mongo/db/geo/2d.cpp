@@ -2908,10 +2908,15 @@ namespace mongo {
             verify( &id == g->getDetails() );
 
             int numWanted = 100;
-            if ( cmdObj["num"].isNumber() ) {
-                numWanted = cmdObj["num"].numberInt();
-                verify( numWanted >= 0 );
+            if (cmdObj["num"].isNumber() && cmdObj["limit"].isNumber()) {
+                errmsg = "geoNear cannot use both limit and num because they serve the same purpose";
+                return false;
             }
+            else if ( cmdObj["limit"].isNumber() )
+                numWanted = cmdObj["limit"].numberInt();
+            else if ( cmdObj["num"].isNumber() )
+                numWanted = cmdObj["num"].numberInt();
+            verify( numWanted >= 0 );
 
             bool uniqueDocs = false;
             if( ! cmdObj["uniqueDocs"].eoo() ) uniqueDocs = cmdObj["uniqueDocs"].trueValue();
