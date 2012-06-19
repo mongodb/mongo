@@ -52,7 +52,7 @@ printjson( before )
 sleep( 6000 )
 assert( cur.next() , "T3" )
 assert( cur.next() , "T4" );
-sleep( 22000 )
+sleep( 24000 )
 assert.throws( function(){ cur.next(); } , null , "T5" )
 after = db.runCommand( { "cursorInfo" : 1 , "setTimeout" : 10000 } ) // 10 seconds
 gc(); gc()
