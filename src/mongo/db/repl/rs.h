@@ -509,7 +509,17 @@ namespace mongo {
 
         // keep a list of hosts that we've tried recently that didn't work
         map<string,time_t> _veto;
+        // persistent pool of worker threads for writing ops to the databases
+        threadpool::ThreadPool _writerPool;
+        // persistent pool of worker threads for prefetching
+        threadpool::ThreadPool _prefetcherPool;
+
     public:
+        static const int replWriterThreadCount = 16;
+        static const int replPrefetcherThreadCount = 16;
+        threadpool::ThreadPool& getPrefetchPool() { return _prefetcherPool; }
+        threadpool::ThreadPool& getWriterPool() { return _writerPool; }
+
         const ReplSetConfig::MemberCfg& myConfig() const { return _config; }
         bool tryToGoLiveAsASecondary(OpTime&); // readlocks
         void syncRollback(OplogReader& r);
@@ -550,6 +560,8 @@ namespace mongo {
         void summarizeAsHtml(stringstream& ss) const { _summarizeAsHtml(ss); }
         void summarizeStatus(BSONObjBuilder& b) const  { _summarizeStatus(b); }
         void fillIsMaster(BSONObjBuilder& b) { _fillIsMaster(b); }
+        threadpool::ThreadPool& getPrefetchPool() { return ReplSetImpl::getPrefetchPool(); }
+        threadpool::ThreadPool& getWriterPool() { return ReplSetImpl::getWriterPool(); }
 
         /**
          * We have a new config (reconfig) - apply it.

@@ -16,8 +16,16 @@
 
 #include "mongo/pch.h"
 
+#include "mongo/db/repl/rs_sync.h"
+
+#include <vector>
+
+#include "third_party/murmurhash3/MurmurHash3.h"
+
 #include "mongo/db/client.h"
 #include "mongo/db/commands/fsync.h"
+#include "mongo/db/d_concurrency.h"
+#include "mongo/db/prefetch.h"
 #include "mongo/db/repl.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/rs.h"
@@ -28,48 +36,192 @@ namespace mongo {
     using namespace bson;
     extern unsigned replSetForceInitialSyncFailure;
 
-    replset::SyncTail::SyncTail(BackgroundSyncInterface *q) : Sync(""), _queue(q) {}
+namespace replset {
 
-    replset::SyncTail::~SyncTail() {}
+    SyncTail::SyncTail(BackgroundSyncInterface *q) :
+        Sync(""), _networkQueue(q)
+    {}
 
-    bool replset::SyncTail::peek(BSONObj* obj) {
-        return _queue->peek(obj);
+    SyncTail::~SyncTail() {}
+
+    bool SyncTail::peek(BSONObj* op) {
+        return _networkQueue->peek(op);
     }
-
-    void replset::SyncTail::consume() {
-        _queue->consume();
-    }
-
-    replset::InitialSync::InitialSync(BackgroundSyncInterface *q) : SyncTail(q) {}
-
-    replset::InitialSync::~InitialSync() {}
-
-    void NOINLINE_DECL blank(const BSONObj& o) {
-        if( *o.getStringField("op") != 'n' ) {
-            log() << "replSet skipping bad op in oplog: " << o.toString() << rsLog;
-        }
-    }
-
     /* apply the log op that is in param o
        @return bool success (true) or failure (false)
     */
-    bool replset::SyncTail::syncApply(const BSONObj &o) {
-        const char *ns = o.getStringField("ns");
-        if ( *ns == '.' || *ns == 0 ) {
-            blank(o);
+    bool SyncTail::syncApply(const BSONObj &op) {
+        const char *ns = op.getStringField("ns");
+        verify(ns);
+
+        if ( (*ns == '\0') || (*ns == '.') ) {
+            // this is ugly
+            // this is often a no-op
+            // but can't be 100% sure
+            if( *op.getStringField("op") != 'n' ) {
+                error() << "replSet skipping bad op in oplog: " << op.toString() << rsLog;
+            }
             return true;
         }
 
-        Client::Context ctx(ns);
+        bool isCommand(op["op"].valuestrsafe()[0] == 'c');
+
+        boost::scoped_ptr<Lock::ScopedLock> lk;
+
+        if(isCommand) {
+            // a command may need a global write lock. so we will conservatively go 
+            // ahead and grab one here. suboptimal. :-(
+            lk.reset(new Lock::GlobalWrite());
+        } else {
+            // DB level lock for this operation
+            lk.reset(new Lock::DBWrite(ns)); 
+        }
+
+        Client::Context ctx(ns, dbpath, false);
         ctx.getClient()->curop()->reset();
-        return !applyOperation_inlock(o);
+        bool ok = !applyOperation_inlock(op);
+        getDur().commitIfNeeded();
+
+        return ok;
     }
 
+    void initializeWriterThread() {
+        // Only do this once per thread
+        if (!ClientBasic::getCurrent()) {
+            Client::initThread("repl writer worker");
+            // allow us to get through the magic barrier
+            Lock::ParallelBatchWriterMode::iAmABatchParticipant();
+        }
+    }
+
+    // This free function is used by the writer threads to apply each op
+    void multiSyncApply(const std::vector<BSONObj>& ops, SyncTail* st) {
+        initializeWriterThread();
+        for (std::vector<BSONObj>::const_iterator it = ops.begin();
+             it != ops.end();
+             ++it) {
+            try {
+                fassert(16359, st->syncApply(*it));
+            } catch (DBException& e) {
+                error() << "writer worker caught exception: " << e.what() 
+                        << " on: " << it->toString() << endl;
+                fassertFailed(16360);
+            }
+        }
+    }
+
+    // This free function is used by the initial sync writer threads to apply each op
+    void multiInitialSyncApply(const std::vector<BSONObj>& ops, SyncTail* st) {
+        initializeWriterThread();
+        for (std::vector<BSONObj>::const_iterator it = ops.begin();
+             it != ops.end();
+             ++it) {
+            try {
+                if (!st->syncApply(*it)) {
+                    if (st->shouldRetry(*it)) {
+                        fassert(15915, st->syncApply(*it));
+                    }
+                }
+            }
+            catch (DBException& e) {
+                // Skip duplicate key exceptions.
+                // These are relatively common on initial sync: if a document is inserted
+                // early in the clone step, the insert will be replayed but the document
+                // will probably already have been cloned over.
+                if( e.getCode() == 11000 || e.getCode() == 11001 || e.getCode() == 12582) {
+                    return; // ignore
+                }
+                error() << "exception: " << e.what() << " on: " << it->toString() << endl;
+                fassertFailed(16361);
+            }
+        }
+    }
+
+
+    // The pool threads call this to prefetch each op
+    void SyncTail::prefetchOp(const BSONObj& op) {
+        if (!ClientBasic::getCurrent()) {
+            Client::initThread("repl prefetch worker");
+        }
+        const char *ns = op.getStringField("ns");
+        if (ns && (ns[0] != '\0')) {
+            Client::ReadContext ctx(ns);
+            prefetchPagesForReplicatedOp(op);
+        }
+    }
+
+    // Doles out all the work to the reader pool threads and waits for them to complete
+    void SyncTail::prefetchOps(const std::deque<BSONObj>& ops) {
+        threadpool::ThreadPool& prefetcherPool = theReplSet->getPrefetchPool();
+        for (std::deque<BSONObj>::const_iterator it = ops.begin();
+             it != ops.end();
+             ++it) {
+            prefetcherPool.schedule(&prefetchOp, *it);
+        }
+        prefetcherPool.join();
+    }
+    
+    // Doles out all the work to the writer pool threads and waits for them to complete
+    void SyncTail::applyOps(const std::vector< std::vector<BSONObj> >& writerVectors, 
+                                     MultiSyncApplyFunc applyFunc) {
+        ThreadPool& writerPool = theReplSet->getWriterPool();
+        for (std::vector< std::vector<BSONObj> >::const_iterator it = writerVectors.begin();
+             it != writerVectors.end();
+             ++it) {
+            if (!it->empty()) {
+                writerPool.schedule(applyFunc, boost::cref(*it), this);
+            }
+        }
+        writerPool.join();
+    }
+
+    // Doles out all the work to the writer pool threads and waits for them to complete
+    void SyncTail::multiApply( std::deque<BSONObj>& ops, MultiSyncApplyFunc applyFunc ) {
+
+        // Use a ThreadPool to prefetch all the operations in a batch.
+        prefetchOps(ops);
+        
+        std::vector< std::vector<BSONObj> > writerVectors(theReplSet->replWriterThreadCount);
+        fillWriterVectors(ops, &writerVectors);
+        LOG(1) << "replication batch size is " << ops.size() << endl;
+        // We must grab this because we're going to grab write locks later.
+        // We hold this mutex the entire time we're writing; it doesn't matter
+        // because all readers are blocked anyway.
+        SimpleMutex::scoped_lock fsynclk(filesLockedFsync);
+
+        // stop all readers until we're done
+        Lock::ParallelBatchWriterMode pbwm;
+
+        applyOps(writerVectors, applyFunc);
+    }
+
+
+    void SyncTail::fillWriterVectors(const std::deque<BSONObj>& ops, 
+                                              std::vector< std::vector<BSONObj> >* writerVectors) {
+        for (std::deque<BSONObj>::const_iterator it = ops.begin();
+             it != ops.end();
+             ++it) {
+            const BSONElement e = it->getField("ns");
+            verify(e.type() == String);
+            const char* ns = e.valuestr();
+            int len = e.valuestrsize();
+            uint32_t hash = 0;
+            MurmurHash3_x86_32( ns, len, 0, &hash);
+
+            (*writerVectors)[hash % writerVectors->size()].push_back(*it);
+        }
+    }
+
+
+    InitialSync::InitialSync(BackgroundSyncInterface *q) : 
+        SyncTail(q) {}
+
+    InitialSync::~InitialSync() {}
+
+
     /* initial oplog application, during initial sync, after cloning.
-       @return false on failure.
-       this method returns an error and doesn't throw exceptions (i think).
     */
-    bool replset::InitialSync::oplogApplication(const BSONObj& applyGTEObj, const BSONObj& minValidObj) {
+    void InitialSync::oplogApplication(const BSONObj& applyGTEObj, const BSONObj& minValidObj) {
         OpTime applyGTE = applyGTEObj["ts"]._opTime();
         OpTime minValid = minValidObj["ts"]._opTime();
 
@@ -79,89 +231,206 @@ namespace mongo {
             throw DBException("forced error",0);
         }
 
-        /* we lock outside the loop to avoid the overhead of locking on every operation. */
-        Lock::GlobalWrite lk;
+        syncApply(applyGTEObj);
+        _logOpObjRS(applyGTEObj);
 
-        applyOp(applyGTEObj);
 
         // if there were no writes during the initial sync, there will be nothing in the queue so
         // just go live
         if (minValid == applyGTE) {
-            return true;
+            return;
         }
 
         OpTime ts;
         time_t start = time(0);
-        unsigned long long n = 0;
-        int fails = 0;
+        unsigned long long n = 0, lastN = 0;
         while( ts < minValid ) {
-            try {
-                BSONObj obj;
-                bool peekStatus = peek(&obj);
+            deque<BSONObj> ops;
 
-                if (!peekStatus) {
-                    OCCASIONALLY log() << "replSet initial sync oplog: no more records" << endl;
-                    if (fails++ > 30) {
-                        log() << "replSet initial sync couldn't get records for 30 seconds, giving up" << endl;
-                        log() << "ts: " << ts << " minValid: " << minValid << endl;
-                        return false;
-                    }
-
-                    sleepsecs(1);
-                    continue;
+            while (ops.size() < replBatchSize) {
+                if (tryPopAndWaitForMore(&ops)) {
+                    break;
                 }
-                fails = 0;
-
-                ts = obj["ts"]._opTime();
-                applyOp(obj);
-                consume();
-
-                if ( ++n % 1000 == 0 ) {
-                    time_t now = time(0);
-                    if (now - start > 10) {
-                        // simple progress metering
-                        log() << "replSet initialSyncOplogApplication applied " << n << " operations, synced to "
-                              << ts.toStringPretty() << rsLog;
-                        start = now;
-                    }
-                }
-
-                getDur().commitIfNeeded();
             }
-            catch (DBException& e) {
-                // Skip duplicate key exceptions.
-                // These are relatively common on initial sync: if a document is inserted
-                // early in the clone step, the insert will be replayed but the document
-                // will probably already have been cloned over.
-                if( e.getCode() == 11000 || e.getCode() == 11001 || e.getCode() == 12582) {
-                    continue;
-                }
 
-                if( ts <= minValid ) {
-                    // didn't make it far enough
-                    log() << "replSet initial sync failing, error applying oplog : " << e.toString() << rsLog;
-                    return false;
-                }
+            
+            multiApply(ops, multiInitialSyncApply);
 
-                // otherwise, whatever, we'll break out of the loop and catch
-                // anything that's really wrong in syncTail
+            n += ops.size();
+
+            if ( n > lastN + 1000 ) {
+                time_t now = time(0);
+                if (now - start > 10) {
+                    // simple progress metering
+                    log() << "replSet initialSyncOplogApplication applied " << n << " operations, synced to "
+                          << ts.toStringPretty() << rsLog;
+                    start = now;
+                    lastN = n;
+                }
             }
+
+            // we want to keep a record of the last op applied, to compare with minvalid
+            const BSONObj& lastOp = ops[ops.size()-1];
+            OpTime tempTs = lastOp["ts"]._opTime();
+            applyOpsToOplog(&ops);
+
+            ts = tempTs;
         }
-        return true;
     }
 
-    void replset::InitialSync::applyOp(const BSONObj& o) {
+    /* tail an oplog.  ok to return, will be re-called. */
+    void SyncTail::oplogApplication() {
+        while( 1 ) {
+            deque<BSONObj> ops;
+            time_t lastTimeChecked = time(0);
 
-        // optimes before we started copying need not be applied.
-        if (!syncApply(o)) {
-            if (shouldRetry(o)) {
-                uassert(15915, "replSet update still fails after adding missing object", syncApply(o));
+            verify( !Lock::isLocked() );
+
+            // always fetch a few ops first
+            tryPopAndWaitForMore(&ops);
+
+            while (ops.size() < replBatchSize) {
+
+                if (theReplSet->isPrimary()) {
+                    return;
+                }
+                time_t now = time(0);
+                // occasionally check some things
+                if (ops.empty() || now > lastTimeChecked) {
+                    lastTimeChecked = now;
+                    // can we become secondary?
+                    // we have to check this before calling mgr, as we must be a secondary to
+                    // become primary
+                    if (!theReplSet->isSecondary()) {
+                        OpTime minvalid;
+                        theReplSet->tryToGoLiveAsASecondary(minvalid);
+                    }
+
+                    // normally msgCheckNewState gets called periodically, but in a single node repl set
+                    // there are no heartbeat threads, so we do it here to be sure.  this is relevant if the
+                    // singleton member has done a stepDown() and needs to come back up.
+                    if (theReplSet->config().members.size() == 1 &&
+                        theReplSet->myConfig().potentiallyHot()) {
+                        Manager* mgr = theReplSet->mgr;
+                        // When would mgr be null?  During replsettest'ing.
+                        if (mgr) mgr->send(boost::bind(&Manager::msgCheckNewState, theReplSet->mgr));
+                        sleepsecs(1);
+                        return;
+                    }
+                }
+
+                if (tryPopAndWaitForMore(&ops)) {
+                    break;
+                }
             }
+            const BSONObj& lastOp = ops.back();
+            handleSlaveDelay(lastOp);
+
+            // Set minValid to the last op to be applied in this next batch.
+            // This will cause this node to go into RECOVERING state
+            // if we should crash and restart before updating the oplog
+            { 
+                Client::WriteContext cx( "local" );   
+                Helpers::putSingleton("local.replset.minvalid", lastOp);
+            }
+            multiApply(ops, multiSyncApply);
+
+            applyOpsToOplog(&ops);
+        }
+    }
+
+    // Copies ops out of the bgsync queue into the deque passed in as a parameter.
+    // Returns true if the batch should be ended early.
+    // Batch should end early if we encounter a command, or if
+    // there are no further ops in the bgsync queue to read.
+    // This function also blocks 1 second waiting for new ops to appear in the bgsync
+    // queue.  We can't block forever because there are maintenance things we need
+    // to periodically check in the loop.
+    bool SyncTail::tryPopAndWaitForMore(std::deque<BSONObj>* ops) {
+        BSONObj op;
+        // Check to see if there are ops waiting in the bgsync queue
+        bool peek_success = peek(&op);
+
+        if (!peek_success) {
+            // if we don't have anything in the queue, wait a bit for something to appear
+            if (ops->empty()) {
+                // block 1 second
+                _networkQueue->waitForMore();
+                return false;
+            }
+
+            // otherwise, apply what we have
+            return true;
+        }
+        // check for commands
+        if (op["op"].valuestrsafe()[0] == 'c') {
+            if (ops->empty()) {
+                // apply commands one-at-a-time
+                ops->push_back(op);
+                _networkQueue->consume();
+            }
+
+            // otherwise, apply what we have so far and come back for the command
+            return true;
         }
 
-        // with repl sets we write the ops to our oplog, too
-        _logOpObjRS(o);
+        // Copy the op to the deque and remove it from the bgsync queue.
+        ops->push_back(op);
+        _networkQueue->consume();
+
+        // Go back for more ops
+        return false;
     }
+
+    void SyncTail::applyOpsToOplog(std::deque<BSONObj>* ops) {
+        {
+            Lock::DBWrite lk("local");
+            while (!ops->empty()) {
+                const BSONObj& op = ops->front();
+                // this updates theReplSet->lastOpTimeWritten
+                _logOpObjRS(op);
+                ops->pop_front();
+             }
+        }
+
+        // Update write concern on primary
+        BackgroundSync::notify();
+    }
+
+    void SyncTail::handleSlaveDelay(const BSONObj& lastOp) {
+        int sd = theReplSet->myConfig().slaveDelay;
+
+        // ignore slaveDelay if the box is still initializing. once
+        // it becomes secondary we can worry about it.
+        if( sd && theReplSet->isSecondary() ) {
+            const OpTime ts = lastOp["ts"]._opTime();
+            long long a = ts.getSecs();
+            long long b = time(0);
+            long long lag = b - a;
+            long long sleeptime = sd - lag;
+            if( sleeptime > 0 ) {
+                uassert(12000, "rs slaveDelay differential too big check clocks and systems", sleeptime < 0x40000000);
+                if( sleeptime < 60 ) {
+                    sleepsecs((int) sleeptime);
+                }
+                else {
+                    log() << "replSet slavedelay sleep long time: " << sleeptime << rsLog;
+                    // sleep(hours) would prevent reconfigs from taking effect & such!
+                    long long waitUntil = b + sleeptime;
+                    while( 1 ) {
+                        sleepsecs(6);
+                        if( time(0) >= waitUntil )
+                            break;
+
+                        if( theReplSet->myConfig().slaveDelay != sd ) // reconf
+                            break;
+                    }
+                }
+            }
+        } // endif slaveDelay
+    }
+
+} // namespace replset
 
     /* should be in RECOVERING state on arrival here.
        readlocks
@@ -211,173 +480,6 @@ namespace mongo {
         return golive;
     }
 
-    class DontLockOnEverySingleOperation : boost::noncopyable { 
-        scoped_ptr<Lock::ScopedLock> lk;
-        scoped_ptr<SimpleMutex::scoped_lock> fsync;
-    public:
-        void reset() {
-            lk.reset();
-            fsync.reset();
-        }
-        void reset(const char *ns) { 
-            reset();
-            verify( !Lock::isLocked() );
-            fsync.reset( new SimpleMutex::scoped_lock(filesLockedFsync) );
-            if( ns == 0 ) {
-                lk.reset( new Lock::GlobalWrite() );
-            }
-            else {
-                lk.reset( new Lock::DBWrite(ns) );
-            }
-        }
-    };
-
-    /* tail an oplog.  ok to return, will be re-called. */
-    void replset::SyncTail::oplogApplication() {
-        while( 1 ) {
-            verify( !Lock::isLocked() );
-            {
-                int count = 0;
-                Timer timeInWriteLock;
-                DontLockOnEverySingleOperation lk;
-                while( 1 ) {
-                    // occasionally check some things
-                    if (count-- <= 0 || time(0) % 10 == 0) {
-                        if (theReplSet->isPrimary()) {
-                            return;
-                        }
-
-                        // can we become secondary?
-                        // we have to check this before calling mgr, as we must be a secondary to
-                        // become primary
-                        if (!theReplSet->isSecondary()) {
-                            OpTime minvalid;
-                            theReplSet->tryToGoLiveAsASecondary(minvalid);
-                        }
-
-                        // normally msgCheckNewState gets called periodically, but in a single node repl set
-                        // there are no heartbeat threads, so we do it here to be sure.  this is relevant if the
-                        // singleton member has done a stepDown() and needs to come back up.
-                        if (theReplSet->config().members.size() == 1 &&
-                            theReplSet->myConfig().potentiallyHot()) {
-                            theReplSet->mgr->send(boost::bind(&Manager::msgCheckNewState, theReplSet->mgr));
-                            sleepsecs(1);
-                            return;
-                        }
-
-                        count = 200;
-                    }
-
-                    if( timeInWriteLock.micros() > 1000 ) {
-                        lk.reset();
-                        timeInWriteLock.reset();
-                    }
-
-                    {
-                        BSONObj nextobj;
-                        bool peekStatus(peek(&nextobj));
-
-                        if (!peekStatus) {
-                            bool golive = false;
-
-                            if (!theReplSet->isSecondary()) {
-                                OpTime minvalid;
-                                golive = theReplSet->tryToGoLiveAsASecondary(minvalid);
-                            }
-
-                            if (!golive) {
-                                lk.reset();
-                                timeInWriteLock.reset();
-                                sleepsecs(1);
-                            }
-
-                            break;
-                        }
-
-                        int sd = theReplSet->myConfig().slaveDelay;
-
-                        // ignore slaveDelay if the box is still initializing. once
-                        // it becomes secondary we can worry about it.
-                        if( sd && theReplSet->isSecondary() ) {
-                            const OpTime ts = nextobj["ts"]._opTime();
-                            long long a = ts.getSecs();
-                            long long b = time(0);
-                            long long lag = b - a;
-                            long long sleeptime = sd - lag;
-                            if( sleeptime > 0 ) {
-                                lk.reset();
-                                uassert(12000, "rs slaveDelay differential too big check clocks and systems", sleeptime < 0x40000000);
-                                if( sleeptime < 60 ) {
-                                    sleepsecs((int) sleeptime);
-                                }
-                                else {
-                                    log() << "replSet slavedelay sleep long time: " << sleeptime << rsLog;
-                                    // sleep(hours) would prevent reconfigs from taking effect & such!
-                                    long long waitUntil = b + sleeptime;
-                                    while( 1 ) {
-                                        sleepsecs(6);
-                                        if( time(0) >= waitUntil )
-                                            break;
-
-                                        if( theReplSet->myConfig().slaveDelay != sd ) // reconf
-                                            break;
-                                    }
-                                }
-                            }
-                        } // endif slaveDelay
-
-                        const char *ns = nextobj.getStringField("ns");
-                        if( ns ) {
-                            if ( strlen(ns) == 0 ) {
-                                // this is ugly
-                                // this is often a no-op
-                                // but can't be 100% sure
-                                lk.reset();
-                                verify( !Lock::isLocked() );
-                                lk.reset(0);
-                            }
-                            else if( str::contains(ns, ".$cmd") ) {
-                                // a command may need a global write lock. so we will conservatively go ahead and grab one here. suboptimal. :-(
-                                lk.reset();
-                                verify( !Lock::isLocked() );
-                                lk.reset(0);
-                            }
-                            else if( !Lock::isWriteLocked(ns) || Lock::isW() ) {
-                                // we don't relock on every single op to try to be faster. however if switching collections, we have to.
-                                // note here we must reset to 0 first to assure the old object is destructed before our new operator invocation.
-                                lk.reset();
-                                verify( !Lock::isLocked() );
-                                lk.reset(ns);
-                            }
-                        }
-
-                        try {
-                            /* if we have become primary, we dont' want to apply things from elsewhere
-                               anymore. assumePrimary is in the db lock so we are safe as long as
-                               we check after we locked above. */
-                            if( theReplSet->isPrimary() ) {
-                                log(0) << "replSet stopping syncTail we are now primary" << rsLog;
-                                return;
-                            }
-
-                            syncApply(nextobj);
-                            _logOpObjRS(nextobj);   // with repl sets we write the ops to our oplog too
-                            getDur().commitIfNeeded();
-
-                            consume();
-                        }
-                        catch (DBException& e) {
-                            sethbmsg(str::stream() << "syncTail: " << e.toString());
-                            log() << "syncing: " << nextobj.toString() << endl;
-                            lk.reset();
-                            sleepsecs(30);
-                            return;
-                        }
-                    }
-                } // end while
-            } // end writelock scope
-        }
-    }
 
     bool ReplSetImpl::forceSyncFrom(const string& host, string& errmsg, BSONObjBuilder& result) {
         lock lk(this);

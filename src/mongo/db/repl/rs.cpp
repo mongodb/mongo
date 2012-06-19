@@ -350,14 +350,17 @@ namespace mongo {
         }
     }
 
-    ReplSetImpl::ReplSetImpl(ReplSetCmdline& replSetCmdline) : elect(this),
+    ReplSetImpl::ReplSetImpl(ReplSetCmdline& replSetCmdline) : 
+        elect(this),
         _forceSyncTarget(0),
         _blockSync(false),
         _hbmsgTime(0),
         _self(0),
         _maintenanceMode(0),
         mgr( new Manager(this) ),
-        ghost( new GhostSync(this) ) {
+        ghost( new GhostSync(this) ),
+        _writerPool(replWriterThreadCount),
+        _prefetcherPool(replPrefetcherThreadCount) {
 
         _cfg = 0;
         memset(_hbmsg, 0, sizeof(_hbmsg));
@@ -395,7 +398,9 @@ namespace mongo {
         _self(0),
         _maintenanceMode(0),
         mgr(0),
-        ghost(0) {
+        ghost(0),
+        _writerPool(replWriterThreadCount),
+        _prefetcherPool(replPrefetcherThreadCount) {
     }
 
     ReplSet::ReplSet(ReplSetCmdline& replSetCmdline) : ReplSetImpl(replSetCmdline) {}
@@ -807,6 +812,5 @@ namespace mongo {
         cc().getAuthenticationInfo()->authorize("local","_repl");
     }
     
-
 }
 

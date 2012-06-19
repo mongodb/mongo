@@ -35,14 +35,91 @@ namespace mongo {
 }
 
 namespace ReplSetTests {
+    const int replWriterThreadCount(32);
+    const int replPrefetcherThreadCount(32);
+    class ReplSetTest : public ReplSet {
+        ReplSetConfig *_config;
+        ReplSetConfig::MemberCfg *_myConfig;
+        replset::BackgroundSyncInterface *_syncTail;
+    public:
+        static const int replWriterThreadCount;
+        static const int replPrefetcherThreadCount;
+        virtual ~ReplSetTest() {
+            delete _myConfig;
+            delete _config;
+        }
+        ReplSetTest() : _syncTail(0) {
+            BSONArrayBuilder members;
+            members.append(BSON("_id" << 0 << "host" << "host1"));
+            _config = new ReplSetConfig(BSON("_id" << "foo" << "members" << members.arr()));
+            _myConfig = new ReplSetConfig::MemberCfg();
+        }
+        virtual bool isSecondary() {
+            return true;
+        }
+        virtual bool isPrimary() {
+            return false;
+        }
+        virtual bool tryToGoLiveAsASecondary(OpTime& minvalid) {
+            return false;
+        }
+        virtual const ReplSetConfig& config() {
+            return *_config;
+        }
+        virtual const ReplSetConfig::MemberCfg& myConfig() {
+            return *_myConfig;
+        }
+        virtual bool buildIndexes() const {
+            return true;
+        }
+        void setSyncTail(replset::BackgroundSyncInterface *syncTail) {
+            _syncTail = syncTail;
+        }
+    };
+
+    class BackgroundSyncTest : public replset::BackgroundSyncInterface {
+        std::queue<BSONObj> _queue;
+    public:
+        BackgroundSyncTest() {}
+        virtual ~BackgroundSyncTest() {}
+        virtual bool peek(BSONObj* op) {
+            if (_queue.empty()) {
+                return false;
+            }
+            *op = _queue.front();
+            return true;
+        }
+        virtual void consume() {
+            _queue.pop();
+        }
+        virtual Member* getSyncTarget() {
+            return 0;
+        }
+        void addDoc(BSONObj doc) {
+            _queue.push(doc.getOwned());
+        }
+        virtual void waitForMore() {
+            return;
+        }
+    };
+
 
     class Base {
+    private:
         static DBDirectClient client_;
+    protected:
+        BackgroundSyncTest* _bgsync;
+        replset::SyncTail* _tailer;
     public:
         Base() {
             cmdLine._replSet = "foo";
             cmdLine.oplogSize = 5;
             createOplog();
+            setup();
+        }
+        ~Base() {
+            delete _bgsync;
+            delete _tailer;
         }
 
         static const char *ns() {
@@ -72,7 +149,21 @@ namespace ReplSetTests {
 
             dropCollection( string(ns()), errmsg, result );
         }
+        void setup() {
+            // setup background sync instance
+            _bgsync = new BackgroundSyncTest();
+
+            // setup tail
+            _tailer = new replset::SyncTail(_bgsync);
+
+            // setup theReplSet
+            ReplSetTest *rst = new ReplSetTest();
+            rst->setSyncTail(_bgsync);
+            delete theReplSet;
+            theReplSet = rst;
+        }
     };
+
     DBDirectClient Base::client_;
 
 
@@ -106,7 +197,6 @@ namespace ReplSetTests {
     class TestInitApplyOp : public Base {
     public:
         void run() {
-            Lock::GlobalWrite lk;
 
             OpTime o;
 
@@ -116,25 +206,23 @@ namespace ReplSetTests {
             }
 
             BSONObjBuilder b;
+            b.append("ns","dummy");
             b.appendTimestamp("ts", o.asLL());
             BSONObj obj = b.obj();
-
             MockInitialSync mock;
 
             // all three should succeed
-            mock.applyOp(obj);
+            std::vector<BSONObj> ops;
+            ops.push_back(obj);
+            replset::multiInitialSyncApply(ops, &mock);
 
             mock.failOnStep = MockInitialSync::FAIL_FIRST_APPLY;
-            mock.applyOp(obj);
+            replset::multiInitialSyncApply(ops, &mock);
 
             mock.retry = false;
-            mock.applyOp(obj);
+            replset::multiInitialSyncApply(ops, &mock);
 
-            // force failure
-            MockInitialSync mock2;
-            mock2.failOnStep = MockInitialSync::FAIL_BOTH_APPLY;
-
-            ASSERT_THROWS(mock2.applyOp(obj), UserException);
+            drop();
         }
     };
 
@@ -156,8 +244,6 @@ namespace ReplSetTests {
     class TestInitApplyOp2 : public Base {
     public:
         void run() {
-            Lock::GlobalWrite lk;
-
             OpTime o = OpTime::_now();
 
             BSONObjBuilder b;
@@ -167,16 +253,18 @@ namespace ReplSetTests {
             b.append("o2", BSON("_id" << 123));
             b.append("ns", ns());
             BSONObj obj = b.obj();
+            SyncTest2 sync2;
+            std::vector<BSONObj> ops;
+            ops.push_back(obj);
 
-            SyncTest2 sync;
-            ASSERT_THROWS(sync.applyOp(obj), UserException);
-
-            sync.insertOnRetry = true;
+            sync2.insertOnRetry = true;
             // succeeds
-            sync.applyOp(obj);
+            multiInitialSyncApply(ops, &sync2);
 
             BSONObj fin = findOne();
             verify(fin["x"].Number() == 456);
+
+            drop();
         }
     };
 
@@ -312,96 +400,14 @@ namespace ReplSetTests {
             }
 
             // this changed in 2.1.2
-            // we know have indexes on capped collections
+            // we now have indexes on capped collections
             Client::Context ctx(cappedNs());
             NamespaceDetails *nsd = nsdetails(cappedNs().c_str());
             verify(nsd->findIdIndex() >= 0);
         }
     };
 
-    class BackgroundSyncTest : public replset::BackgroundSyncInterface {
-        std::queue<BSONObj> _queue;
-    public:
-        BackgroundSyncTest() {}
-        virtual ~BackgroundSyncTest() {}
-        virtual bool peek(BSONObj* op) {
-            if (_queue.empty()) {
-                return false;
-            }
-            *op = _queue.front();
-            return true;
-        }
-        virtual void consume() {
-            _queue.pop();
-        }
-        virtual Member* getSyncTarget() {
-            return 0;
-        }
-        void addDoc(BSONObj doc) {
-            _queue.push(doc.getOwned());
-        }
-        virtual void waitForMore() {
-            return;
-        }
-    };
-
-    class ReplSetTest : public ReplSet {
-        ReplSetConfig *_config;
-        ReplSetConfig::MemberCfg *_myConfig;
-        replset::BackgroundSyncInterface *_syncTail;
-    public:
-        virtual ~ReplSetTest() {
-            delete _myConfig;
-            delete _config;
-        }
-        ReplSetTest() : _syncTail(0) {
-            BSONArrayBuilder members;
-            members.append(BSON("_id" << 0 << "host" << "host1"));
-            members.append(BSON("_id" << 1 << "host" << "host2"));
-            _config = new ReplSetConfig(BSON("_id" << "foo" << "members" << members.arr()));
-
-            _myConfig = new ReplSetConfig::MemberCfg();
-        }
-        virtual bool isSecondary() {
-            return true;
-        }
-        virtual bool isPrimary() {
-            BSONObj obj;
-            return _syncTail->peek(&obj) == false;
-        }
-        virtual bool tryToGoLiveAsASecondary(OpTime& minvalid) {
-            return false;
-        }
-        virtual const ReplSetConfig& config() {
-            return *_config;
-        }
-        virtual const ReplSetConfig::MemberCfg& myConfig() {
-            return *_myConfig;
-        }
-        virtual bool buildIndexes() const {
-            return true;
-        }
-        void setSyncTail(replset::BackgroundSyncInterface *syncTail) {
-            _syncTail = syncTail;
-        }
-    };
-
     class TestRSSync : public Base {
-        BackgroundSyncTest *_bgsync;
-        replset::SyncTail *_tailer;
-
-        void setup() {
-            // setup background sync instance
-            _bgsync = new BackgroundSyncTest();
-
-            // setup tail
-            _tailer = new replset::SyncTail(_bgsync);
-
-            // setup theReplSet
-            ReplSetTest *rst = new ReplSetTest();
-            rst->setSyncTail(_bgsync);
-            theReplSet = rst;
-        }
 
         void addOp(const string& op, BSONObj o, BSONObj* o2 = 0, const char* coll = 0) {
             OpTime ts;
@@ -431,7 +437,7 @@ namespace ReplSetTests {
 
         void addInserts(int expected) {
             for (int i=0; i<expected; i++) {
-                addOp("i", BSON("_id" << i << "x" << 123));
+                addOp("i", BSON("_id" << i << "x" << 789));
             }
         }
 
@@ -461,15 +467,8 @@ namespace ReplSetTests {
             _tailer->oplogApplication();
         }
     public:
-        ~TestRSSync() {
-            delete _bgsync;
-            delete _tailer;
-        }
-
         void run() {
             const int expected = 100;
-
-            setup();
 
             drop();
             addInserts(100);
@@ -487,14 +486,7 @@ namespace ReplSetTests {
             ASSERT_EQUALS(1334813368, obj["requests"]["1000002_2"]["timestamp"].number());
             ASSERT_EQUALS(1334810820, obj["requests"]["100002_1"]["timestamp"].number());
 
-            // test dup key error
             drop();
-            addUniqueIndex();
-            applyOplog();
-
-            ASSERT_EQUALS(1, static_cast<int>(client()->count(ns())));
-            BSONObj obj2;
-            ASSERT(_bgsync->peek(&obj2));
         }
     };
 

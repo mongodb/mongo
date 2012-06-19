@@ -281,8 +281,10 @@ namespace mongo {
 
         // apply startingTS..mvoptime portion of the oplog
         {
-            // note we assume here that this call does not throw
-            if (!init.oplogApplication(lastOp, minValid)) {
+            try {
+                init.oplogApplication(lastOp, minValid);
+            }
+            catch (const DBException& e) {
                 log() << "replSet initial sync failed during oplog application phase" << rsLog;
 
                 emptyOplog(); // otherwise we'll be up!
