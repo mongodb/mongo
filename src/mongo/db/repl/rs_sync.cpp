@@ -287,9 +287,10 @@ namespace replset {
             verify( !Lock::isLocked() );
 
             // always fetch a few ops first
-            tryPopAndWaitForMore(&ops);
-
-            while (ops.size() < replBatchSize) {
+            
+            // tryPopAndWaitForMore returns true when we need to end a batch early
+            while (!tryPopAndWaitForMore(&ops) && 
+                   (ops.size() < replBatchSize)) {
 
                 if (theReplSet->isPrimary()) {
                     return;
@@ -317,10 +318,6 @@ namespace replset {
                         sleepsecs(1);
                         return;
                     }
-                }
-
-                if (tryPopAndWaitForMore(&ops)) {
-                    break;
                 }
             }
             const BSONObj& lastOp = ops.back();
