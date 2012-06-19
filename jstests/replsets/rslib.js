@@ -78,7 +78,9 @@ var waitForAllMembers = function(master) {
     occasionally(function() { printjson(state); }, 10);
 
     for (var m in state.members) {
-      if (state.members[m].state != 2 && state.members[m].state != 1) {
+      if (state.members[m].state != 1 && // PRIMARY 
+          state.members[m].state != 2 && // SECONDARY
+          state.members[m].state != 7) { // ARBITER
         sleep(1000);
         continue outer;
       }
