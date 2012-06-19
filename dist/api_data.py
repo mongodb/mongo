@@ -190,8 +190,8 @@ methods = {
 
 'table.meta' : Method(table_meta),
 
-'cursor.close' : Method([
-]),
+'cursor.close' : Method([]),
+'cursor.config' : Method([]),
 
 'session.close' : Method([]),
 
@@ -216,7 +216,7 @@ methods = {
 	Config('append', 'false', r'''
 		only supported by cursors with record number keys: append the
 		value as a new record, creating a new record number key''',
-		type='boolean'),
+		type='boolean', runtime=1),
 	Config('bulk', 'false', r'''
 		configure the cursor for bulk loads; bulk-load is a fast
 		load path for empty objects, only empty objects may be
@@ -238,7 +238,7 @@ methods = {
 	Config('overwrite', 'false', r'''
 		change the behavior of the cursor's insert method to
 		overwrite previously existing values''',
-		type='boolean'),
+		type='boolean', runtime=1),
 	Config('raw', 'false', r'''
 		ignore the encodings for the key and value, manage data as if
 		the formats were \c "u".  See @ref cursor_raw for details''',
@@ -301,6 +301,7 @@ methods = {
 'connection.add_data_source' : Method([]),
 'connection.add_extractor' : Method([]),
 'connection.close' : Method([]),
+'connection.config' : Method([]),
 
 'connection.load_extension' : Method([
 	Config('entry', 'wiredtiger_extension_init', r'''
@@ -320,7 +321,7 @@ methods = {
 		min='-1', max='1MB'),
 	Config('cache_size', '100MB', r'''
 		maximum heap memory to allocate for the cache''',
-		min='1MB', max='10TB'),
+		min='1MB', max='10TB', runtime=1),
 	Config('create', 'false', r'''
 		create the database if it does not exist''',
 		type='boolean'),
@@ -335,15 +336,15 @@ methods = {
 		<code>extensions=("/path/to/ext.so"="entry=my_entry")</code>''',
 		type='list'),
 	Config('error_prefix', '', r'''
-		prefix string for error messages'''),
+		prefix string for error messages''', runtime=1),
 	Config('eviction_target', '80', r'''
 		continue evicting until the cache becomes less full than this
 		(as a percentage).  Must be less than \c eviction_trigger''',
-		min=10, max=99),
+		min=10, max=99, runtime=1),
 	Config('eviction_trigger', '95', r'''
 		trigger eviction when the cache becomes this full (as a
 		percentage)''',
-		min=10, max=99),
+		min=10, max=99, runtime=1),
 	Config('hazard_max', '30', r'''
 		number of simultaneous hazard references per session handle''',
 		min='15'),
@@ -368,13 +369,13 @@ methods = {
 		type='boolean'),
 	Config('use_environment_priv', 'false', r'''
 		use the \c WIREDTIGER_CONFIG and \c WIREDTIGER_HOME environment
-		variables regardless of whether or not the process is running with
-		special privileges.  See @ref home for more information''',
+		variables regardless of whether or not the process is running
+		with special privileges.  See @ref home for more information''',
 		type='boolean'),
 	Config('verbose', '', r'''
 		enable messages for various events.  Options are given as a
 		list, such as <code>"verbose=[evictserver,read]"</code>''',
-		type='list', choices=[
+		type='list', runtime=1, choices=[
 		    'block',
 		    'ckpt',
 		    'evict',

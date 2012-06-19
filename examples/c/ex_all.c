@@ -220,6 +220,10 @@ cursor_ops(WT_SESSION *session)
 	/*! [Display an error] */
 	}
 
+	/*! [Configure the cursor] */
+	ret = cursor->config(cursor, "append=true");
+	/*! [Configure the cursor] */
+
 	/*! [Close the cursor] */
 	ret = cursor->close(cursor);
 	/*! [Close the cursor] */
@@ -703,6 +707,10 @@ connection_ops(WT_CONNECTION *conn)
 	/*! [conn close] */
 	ret = conn->close(conn, NULL);
 	/*! [conn close] */
+
+	/*! [conn config] */
+	ret = conn->config(conn, "eviction_target=75");
+	/*! [conn config] */
 
 	/*! [conn get_home] */
 	printf("The database home is %s\n", conn->get_home(conn));

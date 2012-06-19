@@ -308,16 +308,20 @@ struct __wt_connection_impl {
 	API_END(s);							\
 	return ((ret) == WT_NOTFOUND ? ENOENT : (ret))
 
+#define	CONNECTION_API_CALL(conn, s, n, cfg, cfgvar)			\
+	s = (conn)->default_session;					\
+	API_CALL(s, connection, n, NULL, NULL, cfg, cfgvar);		\
+
 #define	SESSION_API_CALL(s, n, cfg, cfgvar)				\
 	API_CALL(s, session, n, NULL, NULL, cfg, cfgvar);
 
-#define	CONNECTION_API_CALL(conn, s, n, cfg, cfgvar)			\
-	s = conn->default_session;					\
-	API_CALL(s, connection, n, NULL, NULL, cfg, cfgvar);		\
-
-#define	CURSOR_API_CALL(cur, s, n, bt)					\
+#define	CURSOR_API_CALL(cur, s, n, bt, cfg, cfgvar)			\
 	(s) = (WT_SESSION_IMPL *)(cur)->session;			\
-	API_CALL_NOCONF(s, cursor, n, (cur), bt);			\
+	API_CALL(s, cursor, n, cur, bt, cfg, cfgvar)
+
+#define	CURSOR_API_CALL_NOCONF(cur, s, n, bt)				\
+	(s) = (WT_SESSION_IMPL *)(cur)->session;			\
+	API_CALL_NOCONF(s, cursor, n, cur, bt);				\
 
 /*******************************************
  * Global variables.

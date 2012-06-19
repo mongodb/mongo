@@ -340,6 +340,27 @@ err:	API_END_NOTFOUND_MAP(session, ret);
 }
 
 /*
+ * __conn_config --
+ *	WT_CONNECTION->config method.
+ */
+static int
+__conn_config(WT_CONNECTION *wt_conn, const char *config)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+
+	conn = (WT_CONNECTION_IMPL *)wt_conn;
+
+	CONNECTION_API_CALL(conn, session, config, config, cfg);
+
+	WT_ERR(__wt_cache_config(conn, cfg));
+
+err:	API_END(session);
+	return (ret);
+}
+
+/*
  * __conn_open_session --
  *	WT_CONNECTION->open_session method.
  */
@@ -696,6 +717,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		__conn_add_compressor,
 		__conn_add_extractor,
 		__conn_close,
+		__conn_config,
 		__conn_get_home,
 		__conn_is_new,
 		__conn_open_session

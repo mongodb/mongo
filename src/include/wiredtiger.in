@@ -371,6 +371,23 @@ struct __wt_cursor {
 	 */
 	int __F(close)(WT_CURSOR *cursor);
 
+	/*! Configure a cursor at run-time.
+	 *
+	 * @snippet ex_all.c Configure the cursor
+	 *
+	 * @param cursor the cursor handle
+	 * @configstart{cursor.config, see dist/api_data.py}
+	 * @config{append, only supported by cursors with record number keys:
+	 * append the value as a new record\, creating a new record number
+	 * key.,a boolean flag; default \c false.}
+	 * @config{overwrite, change the behavior of the cursor's insert method
+	 * to overwrite previously existing values.,a boolean flag; default \c
+	 * false.}
+	 * @configend
+	 * @errors
+	 */
+	int __F(config)(WT_CURSOR *cursor, const char *config);
+
 	/*
 	 * Protected fields, only to be used by cursor implementations.
 	 */
@@ -970,6 +987,34 @@ struct __wt_connection {
 	 * @errors
 	 */
 	int __F(close)(WT_CONNECTION *connection, const char *config);
+
+	/*! Configure a connection at run-time.
+	 *
+	 * @snippet ex_all.c conn config
+	 *
+	 * @param connection the connection handle
+	 * @configstart{connection.config, see dist/api_data.py}
+	 * @config{cache_size, maximum heap memory to allocate for the cache.,an
+	 * integer between 1MB and 10TB; default \c 100MB.}
+	 * @config{error_prefix, prefix string for error messages.,a string;
+	 * default empty.}
+	 * @config{eviction_target, continue evicting until the cache becomes
+	 * less full than this (as a percentage).  Must be less than \c
+	 * eviction_trigger.,an integer between 10 and 99; default \c 80.}
+	 * @config{eviction_trigger, trigger eviction when the cache becomes
+	 * this full (as a percentage).,an integer between 10 and 99; default \c
+	 * 95.}
+	 * @config{verbose, enable messages for various events.  Options are
+	 * given as a list\, such as
+	 * <code>"verbose=[evictserver\,read]"</code>.,a list\, with values
+	 * chosen from the following options: \c "block"\, \c "ckpt"\, \c
+	 * "evict"\, \c "evictserver"\, \c "fileops"\, \c "hazard"\, \c
+	 * "mutex"\, \c "read"\, \c "readserver"\, \c "reconcile"\, \c
+	 * "salvage"\, \c "verify"\, \c "write"; default empty.}
+	 * @configend
+	 * @errors
+	 */
+	int __F(config)(WT_CONNECTION *connection, const char *config);
 
 	/*! The home directory of the connection.
 	 *

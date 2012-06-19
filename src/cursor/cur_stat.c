@@ -44,7 +44,7 @@ __curstat_get_key(WT_CURSOR *cursor, ...)
 	va_list ap;
 
 	cst = (WT_CURSOR_STAT *)cursor;
-	CURSOR_API_CALL(cursor, session, get_key, cst->btree);
+	CURSOR_API_CALL_NOCONF(cursor, session, get_key, cst->btree);
 	va_start(ap, cursor);
 
 	WT_CURSOR_NEEDKEY(cursor);
@@ -82,7 +82,7 @@ __curstat_get_value(WT_CURSOR *cursor, ...)
 	size_t size;
 
 	cst = (WT_CURSOR_STAT *)cursor;
-	CURSOR_API_CALL(cursor, session, get_value, cst->btree);
+	CURSOR_API_CALL_NOCONF(cursor, session, get_value, cst->btree);
 	va_start(ap, cursor);
 
 	WT_CURSOR_NEEDVALUE(cursor);
@@ -123,7 +123,7 @@ __curstat_set_key(WT_CURSOR *cursor, ...)
 	va_list ap;
 
 	cst = (WT_CURSOR_STAT *)cursor;
-	CURSOR_API_CALL(cursor, session, set_key, cst->btree);
+	CURSOR_API_CALL_NOCONF(cursor, session, set_key, cst->btree);
 
 	va_start(ap, cursor);
 	if (F_ISSET(cursor, WT_CURSTD_RAW)) {
@@ -165,7 +165,7 @@ __curstat_next(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	cst = (WT_CURSOR_STAT *)cursor;
-	CURSOR_API_CALL(cursor, session, next, cst->btree);
+	CURSOR_API_CALL_NOCONF(cursor, session, next, cst->btree);
 
 	/* Move to the next item. */
 	if (cst->notpositioned) {
@@ -197,7 +197,7 @@ __curstat_prev(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	cst = (WT_CURSOR_STAT *)cursor;
-	CURSOR_API_CALL(cursor, session, prev, cst->btree);
+	CURSOR_API_CALL_NOCONF(cursor, session, prev, cst->btree);
 
 	/* Move to the previous item. */
 	if (cst->notpositioned) {
@@ -244,7 +244,7 @@ __curstat_search(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	cst = (WT_CURSOR_STAT *)cursor;
-	CURSOR_API_CALL(cursor, session, search, cst->btree);
+	CURSOR_API_CALL_NOCONF(cursor, session, search, cst->btree);
 
 	WT_CURSOR_NEEDKEY(cursor);
 	F_CLR(cursor, WT_CURSTD_VALUE_SET);
@@ -272,7 +272,7 @@ __curstat_close(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	cst = (WT_CURSOR_STAT *)cursor;
-	CURSOR_API_CALL(cursor, session, close, cst->btree);
+	CURSOR_API_CALL_NOCONF(cursor, session, close, cst->btree);
 
 	if (ret == 0 && cst->clear_func)
 		cst->clear_func(cst->stats_first);
@@ -318,6 +318,8 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 		__wt_cursor_notsup,	/* update */
 		__wt_cursor_notsup,	/* remove */
 		__curstat_close,
+		(int (*)		/* config */
+		    (WT_CURSOR *, const char *))__wt_cursor_notsup,
 		{ NULL, NULL },		/* TAILQ_ENTRY q */
 		0,			/* recno key */
 		{ 0 },                  /* recno raw buffer */

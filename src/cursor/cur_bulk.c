@@ -21,7 +21,7 @@ __curbulk_insert(WT_CURSOR *cursor)
 
 	cbulk = (WT_CURSOR_BULK *)cursor;
 	btree = cbulk->cbt.btree;
-	CURSOR_API_CALL(cursor, session, insert, btree);
+	CURSOR_API_CALL_NOCONF(cursor, session, insert, btree);
 	if (btree->type == BTREE_ROW)
 		WT_CURSOR_NEEDKEY(cursor);
 	WT_CURSOR_NEEDVALUE(cursor);
@@ -46,7 +46,7 @@ __curbulk_close(WT_CURSOR *cursor)
 	cbulk = (WT_CURSOR_BULK *)cursor;
 	btree = cbulk->cbt.btree;
 
-	CURSOR_API_CALL(cursor, session, close, btree);
+	CURSOR_API_CALL_NOCONF(cursor, session, close, btree);
 	WT_TRET(__wt_bulk_end(cbulk));
 	if (session->btree != NULL)
 		WT_TRET(__wt_session_release_btree(session));

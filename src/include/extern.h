@@ -226,6 +226,7 @@ extern int __wt_block_write_off(WT_SESSION_IMPL *session,
 extern int __wt_bulk_init(WT_CURSOR_BULK *cbulk);
 extern int __wt_bulk_insert(WT_CURSOR_BULK *cbulk);
 extern int __wt_bulk_end(WT_CURSOR_BULK *cbulk);
+extern int __wt_cache_config(WT_CONNECTION_IMPL *conn, const char *cfg[]);
 extern int __wt_cache_create(WT_CONNECTION_IMPL *conn, const char *cfg[]);
 extern void __wt_cache_stats_update(WT_CONNECTION_IMPL *conn);
 extern void __wt_cache_destroy(WT_CONNECTION_IMPL *conn);
@@ -481,12 +482,16 @@ extern const char *__wt_confdfl_connection_add_extractor;
 extern const char *__wt_confchk_connection_add_extractor;
 extern const char *__wt_confdfl_connection_close;
 extern const char *__wt_confchk_connection_close;
+extern const char *__wt_confdfl_connection_config;
+extern const char *__wt_confchk_connection_config;
 extern const char *__wt_confdfl_connection_load_extension;
 extern const char *__wt_confchk_connection_load_extension;
 extern const char *__wt_confdfl_connection_open_session;
 extern const char *__wt_confchk_connection_open_session;
 extern const char *__wt_confdfl_cursor_close;
 extern const char *__wt_confchk_cursor_close;
+extern const char *__wt_confdfl_cursor_config;
+extern const char *__wt_confchk_cursor_config;
 extern const char *__wt_confdfl_file_meta;
 extern const char *__wt_confchk_file_meta;
 extern const char *__wt_confdfl_index_meta;
@@ -582,6 +587,7 @@ extern void __wt_cursor_set_key(WT_CURSOR *cursor, ...);
 extern void __wt_cursor_set_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap);
 extern void __wt_cursor_set_value(WT_CURSOR *cursor, ...);
 extern int __wt_cursor_close(WT_CURSOR *cursor);
+extern int __wt_cursor_config(WT_CURSOR *cursor, const char *config);
 extern int __wt_cursor_dup(WT_SESSION_IMPL *session,
     WT_CURSOR *to_dup,
     const char *config,

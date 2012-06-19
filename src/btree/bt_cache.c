@@ -8,6 +8,46 @@
 #include "wt_internal.h"
 
 /*
+ * __wt_cache_config --
+ *	Configure the underlying cache.
+ */
+int
+__wt_cache_config(WT_CONNECTION_IMPL *conn, const char *cfg[])
+{
+	WT_CACHE *cache;
+	WT_CONFIG_ITEM cval;
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+
+	session = conn->default_session;
+	cache = conn->cache;
+
+	switch (ret =
+	    __wt_config_gets(session, cfg, "eviction_target", &cval)) {
+	case 0:
+		cache->eviction_target = (u_int)cval.val;
+		break;
+	case WT_NOTFOUND:
+		break;
+	default:
+		return (ret);
+	}
+
+	switch (ret =
+	    __wt_config_gets(session, cfg, "eviction_trigger", &cval)) {
+	case 0:
+		cache->eviction_trigger = (u_int)cval.val;
+		break;
+	case WT_NOTFOUND:
+		break;
+	default:
+		return (ret);
+	}
+
+	return (0);
+}
+
+/*
  * __wt_cache_create --
  *	Create the underlying cache.
  */
@@ -15,7 +55,6 @@ int
 __wt_cache_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 {
 	WT_CACHE *cache;
-	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
@@ -24,11 +63,8 @@ __wt_cache_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	WT_RET(__wt_calloc_def(session, 1, &conn->cache));
 	cache = conn->cache;
 
-	/* Configure the cache. */
-	WT_ERR(__wt_config_gets(session, cfg, "eviction_target", &cval));
-	cache->eviction_target = (u_int)cval.val;
-	WT_ERR(__wt_config_gets(session, cfg, "eviction_trigger", &cval));
-	cache->eviction_trigger = (u_int)cval.val;
+	/* Use a common routine for run-time configuration options. */
+	WT_RET(__wt_cache_config(conn, cfg));
 
 	/*
 	 * The target size must be lower than the trigger size or we will never
