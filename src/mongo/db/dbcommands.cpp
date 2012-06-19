@@ -50,6 +50,7 @@
 #include "dur_stats.h"
 #include "../server.h"
 #include "mongo/db/index_update.h"
+#include "mongo/db/repl/bgsync.h"
 
 namespace mongo {
 
@@ -590,6 +591,9 @@ namespace mongo {
                     result.append( "opcountersRepl" , replOpCounters.getObj() );
                 }
 
+                if (theReplSet) {
+                    result.append( "replNetworkQueue", replset::BackgroundSync::get()->getCounters());
+                }
             }
 
             timeBuilder.appendNumber( "after repl" , Listener::getElapsedTimeMillis() - start );
