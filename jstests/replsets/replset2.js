@@ -1,4 +1,4 @@
-print("\n\nreplset2.js BEGIN");
+load("jstests/replsets/rslib.js");
 
 doTest = function (signal) {
 
@@ -28,8 +28,8 @@ doTest = function (signal) {
     // Wait for replication to a single node
     master.getDB(testDB).bar.insert({ n: 1 });
 
-    // Wait for initial sync
-    replTest.awaitReplication();
+    // Wait for states to become PRI,SEC,SEC
+    waitForAllMembers(master.getDB(testDB));
 
     var slaves = replTest.liveNodes.slaves;
     slaves.forEach(function (slave) { slave.setSlaveOk(); });
