@@ -88,7 +88,7 @@ ReplSetTest.prototype.addServer = function() {
     var conn = this.add()
     nextPort++
     this.reInitiate()
-    this.awaitReplication()
+    this.awaitReplication(60000)
     assert.soon(function() {
         var doc = conn.getDB('admin').isMaster()
         return doc['ismaster'] || doc['secondary']
