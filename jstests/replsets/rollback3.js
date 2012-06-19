@@ -4,6 +4,7 @@
 // 
 //   mongo --nodb rollback.js | tee out | grep -v ^m31
 //
+load("jstests/replsets/rslib.js");
 
 var debugging = 0;
 
@@ -232,7 +233,8 @@ doTest = function (signal) {
     assert(A.isMaster().ismaster || A.isMaster().secondary, "A up");
     assert(B.isMaster().ismaster || B.isMaster().secondary, "B up");
     replTest.awaitReplication();
-    
+    waitForAllMembers(A);
+
     assert( dbs_match(a,b), "server data sets do not match after rollback, something is wrong");
 
     pause("rollback3.js SUCCESS");
