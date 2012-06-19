@@ -329,6 +329,7 @@ namespace mongo {
             memset((void*)b.buf(), 0, BLKSZ);
 
             ProgressMeter m(len, 3/*secs*/, 10/*hits between time check (once every 6.4MB)*/);
+            m.setName("File Preallocator Progress");
 
             File f;
             f.open( p.string().c_str() , /*read-only*/false , /*direct-io*/false );

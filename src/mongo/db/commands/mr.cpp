@@ -483,6 +483,7 @@ namespace mongo {
             else if ( _config.outputOptions.outType == Config::MERGE ) {
                 // merge: upsert new docs into old collection
                 op->setMessage("m/r: merge post processing",
+                               "M/R Merge Post Processing Progress",
                                _safeCount(_db, _config.tempNamespace, BSONObj()));
                 auto_ptr<DBClientCursor> cursor = _db.query( _config.tempNamespace , BSONObj() );
                 while ( cursor->more() ) {
@@ -500,6 +501,7 @@ namespace mongo {
                 BSONList values;
 
                 op->setMessage("m/r: reduce post processing",
+                               "M/R Reduce Post Processing Progress",
                                _safeCount(_db, _config.tempNamespace, BSONObj()));
                 auto_ptr<DBClientCursor> cursor = _db.query( _config.tempNamespace , BSONObj() );
                 while ( cursor->more() ) {
@@ -742,7 +744,9 @@ namespace mongo {
             BSONObj prev;
             BSONList all;
 
-            verify( pm == op->setMessage( "m/r: (3/3) final reduce to collection" , _safeCount( _db, _config.incLong, BSONObj(), QueryOption_SlaveOk ) ) );
+            verify(pm == op->setMessage("m/r: (3/3) final reduce to collection",
+                                        "M/R Final Reduce Progress",
+                                        _db.count(_config.incLong, BSONObj(), QueryOption_SlaveOk)));
 
             shared_ptr<Cursor> temp =
             NamespaceDetailsTransient::bestGuessCursor( _config.incLong.c_str() , BSONObj() ,
@@ -1058,7 +1062,9 @@ namespace mongo {
                 try {
                     state.init();
                     state.prepTempCollection();
-                    ProgressMeterHolder pm( op->setMessage( "m/r: (1/3) emit phase" , state.incomingDocuments() ) );
+                    ProgressMeterHolder pm(op->setMessage("m/r: (1/3) emit phase",
+                                                          "M/R: Emit Progress",
+                                                          state.incomingDocuments()));
 
                     wassert( config.limit < 0x4000000 ); // see case on next line to 32 bit unsigned
                     long long mapTime = 0;
@@ -1139,7 +1145,8 @@ namespace mongo {
                     timingBuilder.appendNumber( "mapTime" , mapTime / 1000 );
                     timingBuilder.append( "emitLoop" , t.millis() );
 
-                    op->setMessage( "m/r: (2/3) final reduce in memory" );
+                    op->setMessage("m/r: (2/3) final reduce in memory",
+                                   "M/R Final In-Memory Reduce Progress");
                     Timer rt;
                     // do reduce in memory
                     // this will be the last reduce needed for inline mode
@@ -1234,7 +1241,8 @@ namespace mongo {
                 BSONObj shardCounts = cmdObj["shardCounts"].embeddedObjectUserCheck();
                 BSONObj counts = cmdObj["counts"].embeddedObjectUserCheck();
 
-                ProgressMeterHolder pm( op->setMessage( "m/r: merge sort and reduce" ) );
+                ProgressMeterHolder pm(op->setMessage("m/r: merge sort and reduce",
+                                                      "M/R Merge Sort and Reduce Progress"));
                 set<ServerAndQuery> servers;
                 vector< auto_ptr<DBClientCursor> > shardCursors;
 

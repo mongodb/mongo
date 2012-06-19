@@ -126,7 +126,8 @@ public:
         FilePtr f (fopen(outputFile.string().c_str(), "wb"));
         uassert(10262, errnoWithPrefix("couldn't open file"), f);
 
-        ProgressMeter m( conn( true ).count( coll.c_str() , BSONObj() , QueryOption_SlaveOk ) );
+        ProgressMeter m(conn(true).count(coll.c_str(), BSONObj(), QueryOption_SlaveOk));
+        m.setName("Collection File Writing Progress");
         m.setUnits("objects");
 
         doCollection(coll, f, &m);
@@ -352,6 +353,7 @@ public:
 
         // init with double the docs count because we make two passes 
         ProgressMeter m( nsd->stats.nrecords * 2 );
+        m.setName("Repair Progress");
         m.setUnits("objects");
         
         Writer w( f , &m );

@@ -118,7 +118,7 @@ namespace {
 
         LockMongoFilesExclusive lk;
 
-        ProgressMeter pm( mmfiles.size() , 2 , 1 );
+        ProgressMeter pm(mmfiles.size(), 2, 1, "File Closing Progress");
         set<MongoFile*> temp = mmfiles;
         for ( set<MongoFile*>::iterator i = temp.begin(); i != temp.end(); i++ ) {
             (*i)->close(); // close() now removes from mmfiles

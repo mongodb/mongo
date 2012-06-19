@@ -73,13 +73,17 @@ namespace mongo {
         _op = op;
     }
         
-    ProgressMeter& CurOp::setMessage( const char * msg , unsigned long long progressMeterTotal , int secondsBetween ) {
+    ProgressMeter& CurOp::setMessage(const char * msg,
+                                     std::string name,
+                                     unsigned long long progressMeterTotal,
+                                     int secondsBetween) {
         if ( progressMeterTotal ) {
             if ( _progressMeter.isActive() ) {
                 cout << "about to assert, old _message: " << _message << " new message:" << msg << endl;
                 verify( ! _progressMeter.isActive() );
             }
             _progressMeter.reset( progressMeterTotal , secondsBetween );
+            _progressMeter.setName(name);
         }
         else {
             _progressMeter.finished();
