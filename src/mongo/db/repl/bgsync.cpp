@@ -294,7 +294,11 @@ namespace replset {
                     break;
 
                 BSONObj o = r.nextSafe().getOwned();
+                
                 // the blocking queue will wait (forever) until there's room for us to push
+                OCCASIONALLY {
+                    LOG(2) << "bgsync buffer has " << _buffer.size() << " bytes" << rsLog;
+                }
                 _buffer.push(o);
 
                 {
@@ -310,6 +314,7 @@ namespace replset {
                     return;
                 }
             }
+
 
             r.tailCheck();
             if( !r.haveCursor() ) {
