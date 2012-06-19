@@ -15,6 +15,7 @@
 typedef struct __wt_meta_track {
 	enum {
 		WT_ST_EMPTY,		/* Unused slot */
+		WT_ST_CHECKPOINT,	/* Complete a checkpoint */
 		WT_ST_FILEOP,		/* File operation */
 		WT_ST_LOCK,		/* Lock a handle */
 		WT_ST_REMOVE,		/* Remove a metadata entry */
@@ -91,12 +92,24 @@ __meta_track_apply(WT_SESSION_IMPL *session, WT_META_TRACK *trk, int unroll)
 	WT_DECL_RET;
 	int tret;
 
-	/* Unlock handles regardless of whether we are unrolling. */
-	if (!unroll && trk->op != WT_ST_LOCK)
+	/*
+	 * Unlock handles and complete checkpoints regardless of whether we are
+	 * unrolling.
+	 */
+	if (!unroll && trk->op != WT_ST_CHECKPOINT && trk->op != WT_ST_LOCK)
 		goto free;
 
 	switch (trk->op) {
 	case WT_ST_EMPTY:	/* Unused slot */
+		break;
+	case WT_ST_CHECKPOINT:	/* Checkpoint, see above */
+		saved_btree = session->btree;
+		session->btree = trk->btree;
+		if (!unroll)
+			WT_TRET(__wt_bm_snapshot_resolve(session, NULL));
+		/* Release the snapshot lock */
+		__wt_rwunlock(session, session->btree->snaplock);
+		session->btree = saved_btree;
 		break;
 	case WT_ST_LOCK:	/* Handle lock, see above */
 		saved_btree = session->btree;
@@ -233,6 +246,23 @@ __wt_meta_track_sub_off(WT_SESSION_IMPL *session)
 	return (ret);
 }
 
+/*
+ * __wt_meta_track_checkpoint --
+ *	Track a handle involved in a checkpoint.
+ */
+int
+__wt_meta_track_checkpoint(WT_SESSION_IMPL *session)
+{
+	WT_META_TRACK *trk;
+
+	WT_ASSERT(session, session->btree != NULL);
+
+	WT_RET(__meta_track_next(session, &trk));
+
+	trk->op = WT_ST_CHECKPOINT;
+	trk->btree = session->btree;
+	return (0);
+}
 /*
  * __wt_meta_track_insert --
  *	Track an insert operation.
