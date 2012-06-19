@@ -705,6 +705,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		uint32_t flag;
 	} *ft, verbtypes[] = {
 		{ "block",	WT_VERB_block },
+		{ "ckpt",	WT_VERB_ckpt },
 		{ "evict",	WT_VERB_evict },
 		{ "evictserver",WT_VERB_evictserver },
 		{ "fileops",	WT_VERB_fileops },
@@ -715,7 +716,6 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		{ "reconcile",	WT_VERB_reconcile },
 		{ "salvage",	WT_VERB_salvage },
 		{ "verify",	WT_VERB_verify },
-		{ "snapshot",	WT_VERB_snapshot },
 		{ "write",	WT_VERB_write },
 		{ NULL, 0 }
 	}, directio_types[] = {

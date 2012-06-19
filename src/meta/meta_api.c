@@ -18,23 +18,23 @@ __wt_metadata_get(WT_SESSION *session, const char *uri, const char **valuep)
 }
 
 /*
- * __wt_snaplist_get --
- *	Public entry point to __wt_meta_snaplist_get (for wt list).
+ * __wt_metadata_get_ckptlist --
+ *	Public entry point to __wt_meta_ckptlist_get (for wt list).
  */
 int
-__wt_metadata_get_snaplist(
-    WT_SESSION *session, const char *name, WT_SNAPSHOT **snapbasep)
+__wt_metadata_get_ckptlist(
+    WT_SESSION *session, const char *name, WT_CKPT **ckptbasep)
 {
-	return (__wt_meta_snaplist_get(
-	    (WT_SESSION_IMPL *)session, name, snapbasep));
+	return (__wt_meta_ckptlist_get(
+	    (WT_SESSION_IMPL *)session, name, ckptbasep));
 }
 
 /*
- * __wt_snaplist_free --
- *	Public entry point to __wt_snapshot_list_free (for wt list).
+ * __wt_metadata_free_ckptlist --
+ *	Public entry point to __wt_meta_ckptlist_free (for wt list).
  */
 void
-__wt_metadata_free_snaplist(WT_SESSION *session, WT_SNAPSHOT *snapbase)
+__wt_metadata_free_ckptlist(WT_SESSION *session, WT_CKPT *ckptbase)
 {
-	__wt_meta_snaplist_free((WT_SESSION_IMPL *)session, snapbase);
+	__wt_meta_ckptlist_free((WT_SESSION_IMPL *)session, ckptbase);
 }

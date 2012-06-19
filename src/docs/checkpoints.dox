@@ -39,6 +39,6 @@ discards any other checkpoint with the same name (unless they are
 currently open in a cursor).
 
 Unnamed checkpoints managed by WiredTiger are given the name
-"WiredTigerInternal".
+"WiredTigerInternalCheckpoint".
 
  */

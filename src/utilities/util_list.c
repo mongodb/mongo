@@ -154,7 +154,7 @@ static int
 list_print_checkpoint(WT_SESSION *session, const char *key)
 {
 	WT_DECL_RET;
-	WT_SNAPSHOT *snap, *snapbase;
+	WT_CKPT *ckpt, *ckptbase;
 	size_t len;
 	time_t t;
 	uint64_t v;
@@ -163,24 +163,23 @@ list_print_checkpoint(WT_SESSION *session, const char *key)
 	/*
 	 * We may not find any checkpoints for this file, in which case we don't
 	 * report an error, and continue our caller's loop.  Otherwise, read the
-	 * list of snapshots (which is the same as the list of checkpoints), and
-	 * print each snapshot's name and time.
+	 * list of checkpoints and print each checkpoint's name and time.
 	 */
-	if ((ret = __wt_metadata_get_snaplist(session, key, &snapbase)) != 0)
+	if ((ret = __wt_metadata_get_ckptlist(session, key, &ckptbase)) != 0)
 		return (ret == WT_NOTFOUND ? 0 : ret);
 
 	/* Find the longest name, so we can pretty-print. */
 	len = 0;
-	WT_SNAPSHOT_FOREACH(snapbase, snap)
-		if (strlen(snap->name) > len)
-			len = strlen(snap->name);
+	WT_CKPT_FOREACH(ckptbase, ckpt)
+		if (strlen(ckpt->name) > len)
+			len = strlen(ckpt->name);
 	++len;
 
-	WT_SNAPSHOT_FOREACH(snapbase, snap) {
-		t = (time_t)snap->sec;
-		printf("\t%*s: %.24s", (int)len, snap->name, ctime_r(&t, buf));
+	WT_CKPT_FOREACH(ckptbase, ckpt) {
+		t = (time_t)ckpt->sec;
+		printf("\t%*s: %.24s", (int)len, ckpt->name, ctime_r(&t, buf));
 
-		v = snap->snapshot_size;
+		v = ckpt->ckpt_size;
 		if (v >= WT_PETABYTE)
 			printf(" (%" PRIu64 " PB)\n", v / WT_PETABYTE);
 		else if (v >= WT_TERABYTE)
@@ -195,7 +194,7 @@ list_print_checkpoint(WT_SESSION *session, const char *key)
 			printf(" (%" PRIu64 " B)\n", v);
 	}
 
-	__wt_metadata_free_snaplist(session, snapbase);
+	__wt_metadata_free_ckptlist(session, ckptbase);
 	return (0);
 }
 

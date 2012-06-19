@@ -132,41 +132,41 @@ __wt_bm_close(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_bm_snapshot --
- *	Write a buffer into a block, creating a snapshot.
+ * __wt_bm_checkpoint --
+ *	Write a buffer into a block, creating a checkpoint.
  */
 int
-__wt_bm_snapshot(WT_SESSION_IMPL *session, WT_ITEM *buf, WT_SNAPSHOT *snapbase)
+__wt_bm_checkpoint(WT_SESSION_IMPL *session, WT_ITEM *buf, WT_CKPT *ckptbase)
 {
 	WT_BLOCK *block;
 
 	if ((block = session->btree->block) == NULL)
 		return (__bm_invalid(session));
 
-	return (__wt_block_snapshot(session, block, buf, snapbase));
+	return (__wt_block_checkpoint(session, block, buf, ckptbase));
 }
 
 /*
- * __wt_bm_snapshot_resolve --
- *	Resolve the snapshot.
+ * __wt_bm_checkpoint_resolve --
+ *	Resolve the checkpoint.
  */
 int
-__wt_bm_snapshot_resolve(WT_SESSION_IMPL *session, WT_SNAPSHOT *snapbase)
+__wt_bm_checkpoint_resolve(WT_SESSION_IMPL *session)
 {
 	WT_BLOCK *block;
 
 	if ((block = session->btree->block) == NULL)
 		return (__bm_invalid(session));
 
-	return (__wt_block_snapshot_resolve(session, block, snapbase));
+	return (__wt_block_checkpoint_resolve(session, block));
 }
 
 /*
- * __wt_bm_snapshot_load --
- *	Load a snapshot point.
+ * __wt_bm_checkpoint_load --
+ *	Load a checkpoint point.
  */
 int
-__wt_bm_snapshot_load(WT_SESSION_IMPL *session,
+__wt_bm_checkpoint_load(WT_SESSION_IMPL *session,
     WT_ITEM *buf, const uint8_t *addr, uint32_t addr_size, int readonly)
 {
 	WT_BLOCK *block;
@@ -174,23 +174,23 @@ __wt_bm_snapshot_load(WT_SESSION_IMPL *session,
 	if ((block = session->btree->block) == NULL)
 		return (__bm_invalid(session));
 
-	return (__wt_block_snapshot_load(
+	return (__wt_block_checkpoint_load(
 	    session, block, buf, addr, addr_size, readonly));
 }
 
 /*
- * __wt_bm_snapshot_unload --
- *	Unload a snapshot point.
+ * __wt_bm_checkpoint_unload --
+ *	Unload a checkpoint point.
  */
 int
-__wt_bm_snapshot_unload(WT_SESSION_IMPL *session)
+__wt_bm_checkpoint_unload(WT_SESSION_IMPL *session)
 {
 	WT_BLOCK *block;
 
 	if ((block = session->btree->block) == NULL)
 		return (__bm_invalid(session));
 
-	return (__wt_block_snapshot_unload(session, block));
+	return (__wt_block_checkpoint_unload(session, block));
 }
 
 /*
@@ -333,14 +333,14 @@ __wt_bm_salvage_end(WT_SESSION_IMPL *session)
  *	Start a block manager salvage.
  */
 int
-__wt_bm_verify_start(WT_SESSION_IMPL *session, WT_SNAPSHOT *snapbase)
+__wt_bm_verify_start(WT_SESSION_IMPL *session, WT_CKPT *ckptbase)
 {
 	WT_BLOCK *block;
 
 	if ((block = session->btree->block) == NULL)
 		return (__bm_invalid(session));
 
-	return (__wt_block_verify_start(session, block, snapbase));
+	return (__wt_block_verify_start(session, block, ckptbase));
 }
 
 /*

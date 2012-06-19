@@ -13,7 +13,7 @@
  */
 int
 __wt_bt_cache_flush(
-    WT_SESSION_IMPL *session, WT_SNAPSHOT *snapbase, int op, int force)
+    WT_SESSION_IMPL *session, WT_CKPT *ckptbase, int op, int force)
 {
 	WT_DECL_RET;
 	WT_BTREE *btree;
@@ -21,7 +21,7 @@ __wt_bt_cache_flush(
 	btree = session->btree;
 
 	/*
-	 * If we need a new snapshot, mark the root page dirty to ensure a
+	 * If we need a new checkpoint, mark the root page dirty to ensure a
 	 * write.
 	 */
 	if (force) {
@@ -51,9 +51,9 @@ __wt_bt_cache_flush(
 	 * already works that way.   None of these problems can't be fixed, but
 	 * I don't see a reason to change at this time, either.
 	 */
-	btree->snap = snapbase;
+	btree->ckpt = ckptbase;
 	ret = __wt_sync_file_serial(session, op);
-	btree->snap = NULL;
+	btree->ckpt = NULL;
 	WT_RET(ret);
 
 	switch (op) {

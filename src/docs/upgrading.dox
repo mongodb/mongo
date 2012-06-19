@@ -1,6 +1,6 @@
 /*! @page upgrading Upgrading WiredTiger applications
 
-@section version13 Version 1.3
+@section version13api Version 1.3 API changes
 
 The checkpoint functionality supported by WT_SESSION::checkpoint and the
 snapshot functionality supported by WT_SESSION::sync have been merged
@@ -33,5 +33,10 @@ from the command line.
 @par wt dump, list -s
 The \c -s options to the \c dump and \c list commands for the \c wt
 command line utility have been renamed to be \c -c.
+
+@section version13file Version 1.3 file format changes
+
+The underlying file formats changed in the 1.3 release; tables and files
+should be dumped and re-loaded into a new database.
 
 */

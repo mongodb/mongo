@@ -305,7 +305,7 @@ __wt_rec_write(
 	/*
 	 * Root pages are trickier.  First, if the page is empty or we performed
 	 * a 1-for-1 page swap, we're done, we've written the root (and done the
-	 * snapshot).
+	 * checkpoint).
 	 */
 	switch (F_ISSET(page->modify, WT_PM_REC_MASK)) {
 	case WT_PM_REC_EMPTY:				/* Page is empty */
@@ -337,10 +337,10 @@ __wt_rec_write(
 	 * root page, pointing to a chain of pages, each of which are flagged as
 	 * "split" pages, up to a final replacement page.  We don't use those
 	 * pages again, they are discarded in the next root page reconciliation.
-	 * We could discard them immediately (because the snapshot is complete,
-	 * any pages we discard go on the next snapshot's free list, it's safe
-	 * to do), but the code is simpler this way, and this operation should
-	 * not be common.
+	 * We could discard them immediately (as the checkpoint is complete, any
+	 * pages we discard go on the next checkpoint's free list, it's safe to
+	 * do), but the code is simpler this way, and this operation should not
+	 * be common.
 	 */
 	WT_VERBOSE_RET(session, reconcile,
 	    "root page split %p -> %p", page, page->modify->u.split);
@@ -822,7 +822,7 @@ __rec_split_finish(WT_SESSION_IMPL *session)
 	WT_BOUNDARY *bnd;
 	WT_PAGE_HEADER *dsk;
 	WT_RECONCILE *r;
-	int snapshot;
+	int checkpoint;
 
 	r = session->reconcile;
 
@@ -861,18 +861,18 @@ __rec_split_finish(WT_SESSION_IMPL *session)
 	}
 
 	/*
-	 * Third, check to see if we're creating a snapshot: any time we write
+	 * Third, check to see if we're creating a checkpoint: any time we write
 	 * the root page of the tree, we tell the underlying block manager so it
-	 * can write and return the additional information a snapshot requires.
+	 * can write and return any additional information checkpoints require.
 	 */
-	snapshot = r->bnd_next == 1 && WT_PAGE_IS_ROOT(r->page);
+	checkpoint = r->bnd_next == 1 && WT_PAGE_IS_ROOT(r->page);
 
 	/* Finalize the header information and write the page. */
 	dsk = r->dsk.mem;
 	dsk->recno = bnd->recno;
 	dsk->u.entries = r->entries;
 	r->dsk.size = WT_PTRDIFF32(r->first_free, dsk);
-	return (__rec_split_write(session, bnd, &r->dsk, snapshot));
+	return (__rec_split_write(session, bnd, &r->dsk, checkpoint));
 }
 
 /*
@@ -960,7 +960,7 @@ err:	__wt_scr_free(&tmp);
  */
 static int
 __rec_split_write(
-    WT_SESSION_IMPL *session, WT_BOUNDARY *bnd, WT_ITEM *buf, int snapshot)
+    WT_SESSION_IMPL *session, WT_BOUNDARY *bnd, WT_ITEM *buf, int checkpoint)
 {
 	WT_CELL *cell;
 	WT_PAGE_HEADER *dsk;
@@ -992,16 +992,16 @@ __rec_split_write(
 
 	/*
 	 * Write the chunk and save the location information.  There is one big
-	 * question: if this is a snapshot, then we're going to have to wrap up
+	 * question: if this is a checkpoint, we're going to have to wrap up
 	 * our tracking information (freeing blocks we no longer need) before we
-	 * can create the snapshot, because snapshots write extent lists, that
-	 * is, the whole system has to be consistent.   We have to handle empty
-	 * tree snapshots elsewhere (because we don't write anything for empty
-	 * tree snapshots, they don't come through this path).  Given that fact,
-	 * clear the boundary information as a reminder, and do the snapshot at
-	 * a later time, during wrapup.
+	 * can create the checkpoint, because checkpoints may write additional
+	 * information.   We have to handle empty tree checkpoints elsewhere
+	 * (because we don't write anything for empty tree checkpoints, they
+	 * don't come through this path).  Given that fact, clear the boundary
+	 * information as a reminder, and do the checkpoint at a later time,
+	 * during wrapup.
 	 */
-	if (snapshot) {
+	if (checkpoint) {
 		bnd->addr.addr = NULL;
 		bnd->addr.size = 0;
 	} else {
@@ -2866,7 +2866,7 @@ __rec_split_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
 			/*
 			 * Root page split: the last entry on the list.  There
 			 * won't be a page to discard because writing the page
-			 * created a snapshot, not a replacement page.
+			 * created a checkpoint, not a replacement page.
 			 */
 			WT_ASSERT(session, mod->u.replace.addr == NULL);
 			break;
@@ -2906,7 +2906,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * address blocks (if any).
 		 *
 		 * The exception is root pages are never tracked or free'd, they
-		 * are snapshots, and must be explicitly dropped.
+		 * are checkpoints, and must be explicitly dropped.
 		 */
 		if (!WT_PAGE_IS_ROOT(page) && page->ref->addr != NULL) {
 			__wt_get_addr(page->parent, page->ref, &addr, &size);
@@ -2921,7 +2921,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * Discard the replacement leaf page's blocks.
 		 *
 		 * The exception is root pages are never tracked or free'd, they
-		 * are snapshots, and must be explicitly dropped.
+		 * are checkpoints, and must be explicitly dropped.
 		 */
 		if (!WT_PAGE_IS_ROOT(page))
 			WT_RET(__wt_rec_track(session, page,
@@ -2952,10 +2952,10 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	/*
 	 * Wrap up discarded block and overflow tracking.  If we are about to
-	 * create a snapshot, the system must be entirely consistent at that
+	 * create a checkpoint, the system must be entirely consistent at that
 	 * point, the underlying block manager is presumably going to do some
 	 * action to resolve the list of allocated/free/whatever blocks that
-	 * are associated with the snapshot.
+	 * are associated with the checkpoint.
 	 */
 	WT_RET(__wt_rec_track_wrapup(session, page));
 
@@ -2966,7 +2966,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 		/* If this is the root page, we need to create a sync point. */
 		if (WT_PAGE_IS_ROOT(page))
-			WT_RET(__wt_bm_snapshot(session, NULL, btree->snap));
+			WT_RET(__wt_bm_checkpoint(session, NULL, btree->ckpt));
 
 		/*
 		 * If the page was empty, we want to discard it from the tree
@@ -2989,7 +2989,8 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 */
 		bnd = &r->bnd[0];
 		if (bnd->addr.addr == NULL)
-			WT_RET(__wt_bm_snapshot(session, &r->dsk, btree->snap));
+			WT_RET(
+			    __wt_bm_checkpoint(session, &r->dsk, btree->ckpt));
 		else {
 			mod->u.replace = bnd->addr;
 			bnd->addr.addr = NULL;

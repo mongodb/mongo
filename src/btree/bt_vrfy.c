@@ -25,6 +25,7 @@ typedef struct {
 	WT_ITEM *tmp2;				/* Temporary buffer */
 } WT_VSTUFF;
 
+static void __verify_checkpoint_reset(WT_VSTUFF *);
 static int  __verify_int(WT_SESSION_IMPL *, int);
 static int  __verify_overflow(
 	WT_SESSION_IMPL *, const uint8_t *, uint32_t, WT_VSTUFF *);
@@ -33,7 +34,6 @@ static int  __verify_row_int_key_order(
 	WT_SESSION_IMPL *, WT_PAGE *, WT_REF *, uint32_t, WT_VSTUFF *);
 static int  __verify_row_leaf_key_order(
 	WT_SESSION_IMPL *, WT_PAGE *, WT_VSTUFF *);
-static void __verify_snapshot_reset(WT_VSTUFF *);
 static int  __verify_tree(WT_SESSION_IMPL *, WT_PAGE *, uint64_t, WT_VSTUFF *);
 
 /*
@@ -79,13 +79,13 @@ static int
 __verify_int(WT_SESSION_IMPL *session, int dumpfile)
 {
 	WT_BTREE *btree;
+	WT_CKPT *ckptbase, *ckpt;
 	WT_DECL_RET;
 	WT_ITEM dsk;
-	WT_SNAPSHOT *snapbase, *snap;
 	WT_VSTUFF *vs, _vstuff;
 
 	btree = session->btree;
-	snapbase = NULL;
+	ckptbase = NULL;
 
 	WT_CLEAR(_vstuff);
 	vs = &_vstuff;
@@ -95,22 +95,22 @@ __verify_int(WT_SESSION_IMPL *session, int dumpfile)
 	WT_ERR(__wt_scr_alloc(session, 0, &vs->tmp1));
 	WT_ERR(__wt_scr_alloc(session, 0, &vs->tmp2));
 
-	/* Get a list of the snapshots for this file. */
-	WT_ERR(__wt_meta_snaplist_get(session, btree->name, &snapbase));
+	/* Get a list of the checkpoints for this file. */
+	WT_ERR(__wt_meta_ckptlist_get(session, btree->name, &ckptbase));
 
 	/* Inform the underlying block manager we're verifying. */
-	WT_ERR(__wt_bm_verify_start(session, snapbase));
+	WT_ERR(__wt_bm_verify_start(session, ckptbase));
 
-	/* Loop through the file's snapshots, verifying each one. */
-	WT_SNAPSHOT_FOREACH(snapbase, snap) {
+	/* Loop through the file's checkpoints, verifying each one. */
+	WT_CKPT_FOREACH(ckptbase, ckpt) {
 		WT_VERBOSE_ERR(session, verify,
-		    "%s: snapshot %s", btree->name, snap->name);
+		    "%s: checkpoint %s", btree->name, ckpt->name);
 
-		/* House-keeping between snapshots. */
-		__verify_snapshot_reset(vs);
+		/* House-keeping between checkpoints. */
+		__verify_checkpoint_reset(vs);
 
 		/*
-		 * Load the snapshot -- if the size of the root page is 0, the
+		 * Load the checkpoint -- if the size of the root page is 0, the
 		 * file is empty.
 		 *
 		 * Clearing the root page reference here is not an error: any
@@ -120,10 +120,10 @@ __verify_int(WT_SESSION_IMPL *session, int dumpfile)
 		 * we can't ever use it again.
 		 */
 		WT_CLEAR(dsk);
-		WT_ERR(__wt_bm_snapshot_load(
-		    session, &dsk, snap->raw.data, snap->raw.size, 1));
+		WT_ERR(__wt_bm_checkpoint_load(
+		    session, &dsk, ckpt->raw.data, ckpt->raw.size, 1));
 		if (dsk.size != 0) {
-			/* Verify, then discard the snapshot from the cache. */
+			/* Verify then discard the checkpoint from the cache. */
 			if ((ret = __wt_btree_tree_open(session, &dsk)) == 0) {
 				ret = __verify_tree(
 				    session, btree->root_page, (uint64_t)1, vs);
@@ -132,13 +132,13 @@ __verify_int(WT_SESSION_IMPL *session, int dumpfile)
 			}
 		}
 
-		/* Unload the snapshot. */
-		WT_TRET(__wt_bm_snapshot_unload(session));
+		/* Unload the checkpoint. */
+		WT_TRET(__wt_bm_checkpoint_unload(session));
 		WT_ERR(ret);
 	}
 
-	/* Discard the list of snapshots. */
-err:	__wt_meta_snaplist_free(session, snapbase);
+	/* Discard the list of checkpoints. */
+err:	__wt_meta_ckptlist_free(session, ckptbase);
 
 	/* Inform the underlying block manager we're done. */
 	WT_TRET(__wt_bm_verify_end(session));
@@ -158,19 +158,19 @@ err:	__wt_meta_snaplist_free(session, snapbase);
 }
 
 /*
- * __verify_snapshot_reset --
- *	Reset anything needing to be reset for each new snapshot verification.
+ * __verify_checkpoint_reset --
+ *	Reset anything needing to be reset for each new checkpoint verification.
  */
 static void
-__verify_snapshot_reset(WT_VSTUFF *vs)
+__verify_checkpoint_reset(WT_VSTUFF *vs)
 {
 	/*
-	 * Key order is per snapshot, reset the data length that serves as a
+	 * Key order is per checkpoint, reset the data length that serves as a
 	 * flag value.
 	 */
 	vs->max_addr->size = 0;
 
-	/* Record total is per snapshot, reset the record count. */
+	/* Record total is per checkpoint, reset the record count. */
 	vs->record_total = 0;
 }
 

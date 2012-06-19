@@ -19,14 +19,35 @@ extern int __wt_block_addr_string(WT_SESSION_IMPL *session,
     WT_ITEM *buf,
     const uint8_t *addr,
     uint32_t addr_size);
-extern int __wt_block_buffer_to_snapshot(WT_SESSION_IMPL *session,
+extern int __wt_block_buffer_to_ckpt(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     const uint8_t *p,
-    WT_BLOCK_SNAPSHOT *si);
-extern int __wt_block_snapshot_to_buffer(WT_SESSION_IMPL *session,
+    WT_BLOCK_CKPT *ci);
+extern int __wt_block_ckpt_to_buffer(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     uint8_t **pp,
-    WT_BLOCK_SNAPSHOT *si);
+    WT_BLOCK_CKPT *ci);
+extern int __wt_block_ckpt_init(WT_SESSION_IMPL *session,
+    WT_BLOCK *block,
+    WT_BLOCK_CKPT *ci,
+    const char *name,
+    int is_live);
+extern int __wt_block_checkpoint_load(WT_SESSION_IMPL *session,
+    WT_BLOCK *block,
+    WT_ITEM *dsk,
+    const uint8_t *addr,
+    uint32_t addr_size,
+    int readonly);
+extern int __wt_block_checkpoint_unload(WT_SESSION_IMPL *session,
+    WT_BLOCK *block);
+extern void __wt_block_ckpt_destroy(WT_SESSION_IMPL *session,
+    WT_BLOCK_CKPT *ci);
+extern int __wt_block_checkpoint(WT_SESSION_IMPL *session,
+    WT_BLOCK *block,
+    WT_ITEM *buf,
+    WT_CKPT *ckptbase);
+extern int __wt_block_checkpoint_resolve(WT_SESSION_IMPL *session,
+    WT_BLOCK *block);
 extern uint32_t __wt_cksum(const void *chunk, size_t len);
 extern int __wt_block_off_remove_overlap( WT_SESSION_IMPL *session,
     WT_EXTLIST *el,
@@ -53,7 +74,7 @@ extern int __wt_block_extlist_check( WT_SESSION_IMPL *session,
     WT_EXTLIST *bl);
 extern int __wt_block_extlist_overlap( WT_SESSION_IMPL *session,
     WT_BLOCK *block,
-    WT_BLOCK_SNAPSHOT *si);
+    WT_BLOCK_CKPT *ci);
 extern int __wt_block_extlist_merge(WT_SESSION_IMPL *session,
     WT_EXTLIST *a,
     WT_EXTLIST *b);
@@ -97,17 +118,16 @@ extern int __wt_bm_open(WT_SESSION_IMPL *session,
     const char *cfg[],
     int forced_salvage);
 extern int __wt_bm_close(WT_SESSION_IMPL *session);
-extern int __wt_bm_snapshot(WT_SESSION_IMPL *session,
+extern int __wt_bm_checkpoint(WT_SESSION_IMPL *session,
     WT_ITEM *buf,
-    WT_SNAPSHOT *snapbase);
-extern int __wt_bm_snapshot_resolve(WT_SESSION_IMPL *session,
-    WT_SNAPSHOT *snapbase);
-extern int __wt_bm_snapshot_load(WT_SESSION_IMPL *session,
+    WT_CKPT *ckptbase);
+extern int __wt_bm_checkpoint_resolve(WT_SESSION_IMPL *session);
+extern int __wt_bm_checkpoint_load(WT_SESSION_IMPL *session,
     WT_ITEM *buf,
     const uint8_t *addr,
     uint32_t addr_size,
     int readonly);
-extern int __wt_bm_snapshot_unload(WT_SESSION_IMPL *session);
+extern int __wt_bm_checkpoint_unload(WT_SESSION_IMPL *session);
 extern int __wt_bm_truncate(WT_SESSION_IMPL *session, const char *filename);
 extern int __wt_bm_free(WT_SESSION_IMPL *session,
     const uint8_t *addr,
@@ -130,8 +150,7 @@ extern int __wt_bm_salvage_next(WT_SESSION_IMPL *session,
     uint64_t *write_genp,
     int *eofp);
 extern int __wt_bm_salvage_end(WT_SESSION_IMPL *session);
-extern int __wt_bm_verify_start(WT_SESSION_IMPL *session,
-    WT_SNAPSHOT *snapbase);
+extern int __wt_bm_verify_start(WT_SESSION_IMPL *session, WT_CKPT *ckptbase);
 extern int __wt_bm_verify_end(WT_SESSION_IMPL *session);
 extern int __wt_bm_verify_addr(WT_SESSION_IMPL *session,
     const uint8_t *addr,
@@ -167,38 +186,16 @@ extern int __wt_block_salvage_next( WT_SESSION_IMPL *session,
     uint32_t *addr_sizep,
     uint64_t *write_genp,
     int *eofp);
-extern int __wt_block_snap_init(WT_SESSION_IMPL *session,
-    WT_BLOCK *block,
-    WT_BLOCK_SNAPSHOT *si,
-    const char *name,
-    int is_live);
-extern int __wt_block_snapshot_load(WT_SESSION_IMPL *session,
-    WT_BLOCK *block,
-    WT_ITEM *dsk,
-    const uint8_t *addr,
-    uint32_t addr_size,
-    int readonly);
-extern int __wt_block_snapshot_unload(WT_SESSION_IMPL *session,
-    WT_BLOCK *block);
-extern void __wt_block_snap_destroy(WT_SESSION_IMPL *session,
-    WT_BLOCK_SNAPSHOT *si);
-extern int __wt_block_snapshot(WT_SESSION_IMPL *session,
-    WT_BLOCK *block,
-    WT_ITEM *buf,
-    WT_SNAPSHOT *snapbase);
-extern int __wt_block_snapshot_resolve( WT_SESSION_IMPL *session,
-    WT_BLOCK *block,
-    WT_SNAPSHOT *snapbase);
 extern int __wt_block_verify_start( WT_SESSION_IMPL *session,
     WT_BLOCK *block,
-    WT_SNAPSHOT *snapbase);
+    WT_CKPT *ckptbase);
 extern int __wt_block_verify_end(WT_SESSION_IMPL *session, WT_BLOCK *block);
-extern int __wt_verify_snap_load( WT_SESSION_IMPL *session,
+extern int __wt_verify_ckpt_load( WT_SESSION_IMPL *session,
     WT_BLOCK *block,
-    WT_BLOCK_SNAPSHOT *si);
-extern int __wt_verify_snap_unload( WT_SESSION_IMPL *session,
+    WT_BLOCK_CKPT *ci);
+extern int __wt_verify_ckpt_unload( WT_SESSION_IMPL *session,
     WT_BLOCK *block,
-    WT_BLOCK_SNAPSHOT *si);
+    WT_BLOCK_CKPT *ci);
 extern int __wt_block_verify(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     WT_ITEM *buf,
@@ -322,11 +319,11 @@ extern int __wt_kv_return(WT_SESSION_IMPL *session,
     WT_CURSOR_BTREE *cbt,
     int key_ret);
 extern int __wt_bt_salvage( WT_SESSION_IMPL *session,
-    WT_SNAPSHOT *snapbase,
+    WT_CKPT *ckptbase,
     const char *cfg[]);
 extern int __wt_btree_stat_init(WT_SESSION_IMPL *session);
 extern int __wt_bt_cache_flush( WT_SESSION_IMPL *session,
-    WT_SNAPSHOT *snapbase,
+    WT_CKPT *ckptbase,
     int op,
     int force);
 extern int __wt_upgrade(WT_SESSION_IMPL *session, const char *cfg[]);
@@ -616,29 +613,29 @@ extern WT_LOGREC_DESC __wt_logdesc_debug;
 extern int __wt_metadata_get(WT_SESSION *session,
     const char *uri,
     const char **valuep);
-extern int __wt_metadata_get_snaplist( WT_SESSION *session,
+extern int __wt_metadata_get_ckptlist( WT_SESSION *session,
     const char *name,
-    WT_SNAPSHOT **snapbasep);
-extern void __wt_metadata_free_snaplist(WT_SESSION *session,
-    WT_SNAPSHOT *snapbase);
+    WT_CKPT **ckptbasep);
+extern void __wt_metadata_free_ckptlist(WT_SESSION *session, WT_CKPT *ckptbase);
 extern int __wt_meta_btree_apply(WT_SESSION_IMPL *session,
     int (*func)(WT_SESSION_IMPL *,
     const char *[]),
     const char *cfg[],
     uint32_t flags);
-extern int __wt_meta_snapshot_get(WT_SESSION_IMPL *session,
+extern int __wt_meta_checkpoint_get(WT_SESSION_IMPL *session,
     const char *name,
-    const char *snapshot,
+    const char *checkpoint,
     WT_ITEM *addr);
-extern int __wt_meta_snapshot_clear(WT_SESSION_IMPL *session, const char *name);
-extern int __wt_meta_snaplist_get( WT_SESSION_IMPL *session,
+extern int __wt_meta_checkpoint_clear(WT_SESSION_IMPL *session,
+    const char *name);
+extern int __wt_meta_ckptlist_get( WT_SESSION_IMPL *session,
     const char *name,
-    WT_SNAPSHOT **snapbasep);
-extern int __wt_meta_snaplist_set( WT_SESSION_IMPL *session,
+    WT_CKPT **ckptbasep);
+extern int __wt_meta_ckptlist_set( WT_SESSION_IMPL *session,
     const char *name,
-    WT_SNAPSHOT *snapbase);
-extern void __wt_meta_snaplist_free(WT_SESSION_IMPL *session,
-    WT_SNAPSHOT *snapbase);
+    WT_CKPT *ckptbase);
+extern void __wt_meta_ckptlist_free(WT_SESSION_IMPL *session,
+    WT_CKPT *ckptbase);
 extern int __wt_metadata_open(WT_SESSION_IMPL *session);
 extern int __wt_metadata_cursor( WT_SESSION_IMPL *session,
     const char *config,
@@ -902,8 +899,8 @@ extern int __wt_session_get_btree(WT_SESSION_IMPL *session,
     const char *uri,
     const char *cfg[],
     uint32_t flags);
-extern int __wt_session_lock_snapshot( WT_SESSION_IMPL *session,
-    const char *snapshot,
+extern int __wt_session_lock_checkpoint( WT_SESSION_IMPL *session,
+    const char *checkpoint,
     uint32_t flags);
 extern int __wt_session_discard_btree( WT_SESSION_IMPL *session,
     WT_BTREE_SESSION *btree_session);
@@ -1048,11 +1045,12 @@ extern void __wt_stat_clear_connection_stats(WT_STATS *stats_arg);
 extern int __wt_txnid_cmp(const void *v1, const void *v2);
 extern int __wt_txn_get_snapshot(WT_SESSION_IMPL *session, wt_txnid_t max_id);
 extern int __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[]);
+extern int __wt_txn_release(WT_SESSION_IMPL *session);
 extern int __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[]);
-extern int __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_txn_init(WT_SESSION_IMPL *session);
 extern void __wt_txn_destroy(WT_SESSION_IMPL *session);
 extern int __wt_txn_global_init(WT_CONNECTION_IMPL *conn, const char *cfg[]);
 extern void __wt_txn_global_destroy(WT_CONNECTION_IMPL *conn);
-extern int __wt_snapshot(WT_SESSION_IMPL *session, const char *cfg[]);
+extern int __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[]);
+extern int __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[]);

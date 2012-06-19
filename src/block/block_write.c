@@ -225,7 +225,7 @@ not_compressed:	/*
 
 	/*
 	 * Allocate space from the underlying file and write the block.  Always
-	 * extend the file when writing snapshot extents, that's easier than
+	 * extend the file when writing checkpoint extents, that's easier than
 	 * distinguishing between extents allocated from the live avail list,
 	 * and those which can't be allocated from the live avail list such as
 	 * blocks for writing the live avail list itself.

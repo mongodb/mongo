@@ -159,10 +159,10 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 		btree = btree_session->btree;
 		if (strcmp(uri, btree->name) != 0)
 			continue;
-		if ((ckpt == NULL && btree->ckpt == NULL) ||
-		    (ckpt != NULL && btree->ckpt != NULL &&
-		    (strncmp(ckpt, btree->ckpt, ckptlen) == 0 &&
-		    btree->ckpt[ckptlen] == '\0')))
+		if ((ckpt == NULL && btree->checkpoint == NULL) ||
+		    (ckpt != NULL && btree->checkpoint != NULL &&
+		    (strncmp(ckpt, btree->checkpoint, ckptlen) == 0 &&
+		    btree->checkpoint[ckptlen] == '\0')))
 			break;
 	}
 
@@ -201,12 +201,12 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 }
 
 /*
- * __wt_session_lock_snapshot --
- *	Lock the btree handle for the given snapshot name.
+ * __wt_session_lock_checkpoint --
+ *	Lock the btree handle for the given checkpoint name.
  */
 int
-__wt_session_lock_snapshot(
-    WT_SESSION_IMPL *session, const char *snapshot, uint32_t flags)
+__wt_session_lock_checkpoint(
+    WT_SESSION_IMPL *session, const char *checkpoint, uint32_t flags)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
@@ -217,7 +217,7 @@ __wt_session_lock_snapshot(
 	btree = session->btree;
 
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));
-	WT_ERR(__wt_buf_fmt(session, buf, "checkpoint=\"%s\"", snapshot));
+	WT_ERR(__wt_buf_fmt(session, buf, "checkpoint=\"%s\"", checkpoint));
 	cfg[0] = buf->data;
 
 	LF_SET(WT_BTREE_LOCK_ONLY);

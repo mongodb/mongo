@@ -112,7 +112,7 @@ __wt_block_open(WT_SESSION_IMPL *session, const char *filename,
 	/* Open the underlying file handle. */
 	WT_ERR(__wt_open(session, filename, 0, 0, 1, &block->fh));
 
-	/* Initialize the live snapshot lock. */
+	/* Initialize the live checkpoint's lock. */
 	__wt_spin_init(session, &block->live_lock);
 
 	/*
@@ -142,7 +142,7 @@ __wt_block_close(WT_SESSION_IMPL *session, WT_BLOCK *block)
 
 	WT_VERBOSE_RETVAL(session, block, ret, "close");
 
-	ret = __wt_block_snapshot_unload(session, block);
+	ret = __wt_block_checkpoint_unload(session, block);
 
 	if (block->name != NULL)
 		__wt_free(session, block->name);

@@ -7,14 +7,14 @@
 
 #include "wt_internal.h"
 
+static int __verify_ckptfrag_add(WT_SESSION_IMPL *, WT_BLOCK *, off_t, off_t);
+static int __verify_ckptfrag_chk(WT_SESSION_IMPL *, WT_BLOCK *);
 static int __verify_filefrag_add(
 	WT_SESSION_IMPL *, WT_BLOCK *, off_t, off_t, int);
 static int __verify_filefrag_chk(WT_SESSION_IMPL *, WT_BLOCK *);
-static int __verify_snapfrag_add(WT_SESSION_IMPL *, WT_BLOCK *, off_t, off_t);
-static int __verify_snapfrag_chk(WT_SESSION_IMPL *, WT_BLOCK *);
-static int __verify_start_avail(WT_SESSION_IMPL *, WT_BLOCK *, WT_SNAPSHOT *);
+static int __verify_start_avail(WT_SESSION_IMPL *, WT_BLOCK *, WT_CKPT *);
 static int __verify_start_filesize(
-	WT_SESSION_IMPL *, WT_BLOCK *, WT_SNAPSHOT *, off_t *);
+	WT_SESSION_IMPL *, WT_BLOCK *, WT_CKPT *, off_t *);
 
 /* The bit list ignores the first sector: convert to/from a frag/offset. */
 #define	WT_OFF_TO_FRAG(block, off)					\
@@ -28,7 +28,7 @@ static int __verify_start_filesize(
  */
 int
 __wt_block_verify_start(
-    WT_SESSION_IMPL *session, WT_BLOCK *block, WT_SNAPSHOT *snapbase)
+    WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase)
 {
 	off_t file_size;
 
@@ -40,12 +40,12 @@ __wt_block_verify_start(
 		return (0);
 
 	/*
-	 * Opening a WiredTiger file truncates it back to the snapshot we are
+	 * Opening a WiredTiger file truncates it back to the checkpoint we are
 	 * rolling forward, which means it's OK if there are blocks written
-	 * after that snapshot, they'll be ignored.  Find the largest file size
-	 * referenced by any snapshot.
+	 * after that checkpoint, they'll be ignored.  Find the largest file
+	 * size referenced by any checkpoint.
 	 */
-	WT_RET(__verify_start_filesize(session, block, snapbase, &file_size));
+	WT_RET(__verify_start_filesize(session, block, ckptbase, &file_size));
 
 	/*
 	 * Allocate a bit array, where each bit represents a single allocation
@@ -78,16 +78,16 @@ __wt_block_verify_start(
 
 	/*
 	 * We maintain an allocation list that is rolled forward through the
-	 * set of snapshots.
+	 * set of checkpoints.
 	 */
 	WT_RET(__wt_block_extlist_init(
 	    session, &block->verify_alloc, "verify", "alloc"));
 
 	/*
-	 * The only snapshot avail list we care about is the last one written;
+	 * The only checkpoint avail list we care about is the last one written;
 	 * get it now and initialize the list of file fragments.
 	 */
-	WT_RET(__verify_start_avail(session, block, snapbase));
+	WT_RET(__verify_start_avail(session, block, ckptbase));
 
 	block->verify = 1;
 	return (0);
@@ -95,36 +95,36 @@ __wt_block_verify_start(
 
 /*
  * __verify_start_filesize --
- *	Set the file size for the last snapshot.
+ *	Set the file size for the last checkpoint.
  */
 static int
 __verify_start_filesize(WT_SESSION_IMPL *session,
-    WT_BLOCK *block, WT_SNAPSHOT *snapbase, off_t *file_sizep)
+    WT_BLOCK *block, WT_CKPT *ckptbase, off_t *file_sizep)
 {
-	WT_BLOCK_SNAPSHOT *si, _si;
-	WT_SNAPSHOT *snap;
+	WT_BLOCK_CKPT *ci, _ci;
+	WT_CKPT *ckpt;
 	off_t file_size;
 
-	si = &_si;
+	ci = &_ci;
 
 	/*
-	 * Find the largest file size referenced by any snapshot -- that should
-	 * be the last snapshot taken, but out of sheer, raving paranoia, look
-	 * through the list, future changes to snapshots might break this code
+	 * Find the largest file size referenced by any checkpoint: that should
+	 * be the last checkpoint taken, but out of sheer, raving paranoia, look
+	 * through the list, future changes to checkpoints might break this code
 	 * if we make that assumption.
 	 */
 	file_size = 0;
-	WT_SNAPSHOT_FOREACH(snapbase, snap) {
-		WT_RET(__wt_block_buffer_to_snapshot(
-		    session, block, snap->raw.data, si));
-		if (si->file_size > file_size)
-			file_size = si->file_size;
+	WT_CKPT_FOREACH(ckptbase, ckpt) {
+		WT_RET(__wt_block_buffer_to_ckpt(
+		    session, block, ckpt->raw.data, ci));
+		if (ci->file_size > file_size)
+			file_size = ci->file_size;
 	}
 
-	/* Verify doesn't make any sense if we don't have a snapshot. */
+	/* Verify doesn't make any sense if we don't have a checkpoint. */
 	if (file_size <= WT_BLOCK_DESC_SECTOR)
 		WT_RET_MSG(session, WT_ERROR,
-		    "%s has no snapshots to verify", block->name);
+		    "%s has no checkpoints to verify", block->name);
 
 	/*
 	 * The file size should be a multiple of the allocsize, offset by the
@@ -133,7 +133,7 @@ __verify_start_filesize(WT_SESSION_IMPL *session,
 	file_size -= WT_BLOCK_DESC_SECTOR;
 	if (file_size % block->allocsize != 0)
 		WT_RET_MSG(session, WT_ERROR,
-		    "the snapshot file size is not a multiple of the "
+		    "the checkpoint file size is not a multiple of the "
 		    "allocation size");
 
 	*file_sizep = file_size;
@@ -142,32 +142,31 @@ __verify_start_filesize(WT_SESSION_IMPL *session,
 
 /*
  * __verify_start_avail --
- *	Get the last snapshot's avail list and load it into the list of file
+ *	Get the last checkpoint's avail list and load it into the list of file
  * fragments.
  */
 static int
 __verify_start_avail(
-    WT_SESSION_IMPL *session, WT_BLOCK *block, WT_SNAPSHOT *snapbase)
+    WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase)
 {
-	WT_BLOCK_SNAPSHOT *si, _si;
+	WT_BLOCK_CKPT *ci, _ci;
+	WT_CKPT *ckpt;
 	WT_DECL_RET;
 	WT_EXT *ext;
 	WT_EXTLIST *el;
-	WT_SNAPSHOT *snap;
 
-	/* Get the last on-disk snapshot, if one exists. */
-	WT_SNAPSHOT_FOREACH(snapbase, snap)
+	/* Get the last on-disk checkpoint, if one exists. */
+	WT_CKPT_FOREACH(ckptbase, ckpt)
 		;
-	if (snap == snapbase)
+	if (ckpt == ckptbase)
 		return (0);
-	--snap;
+	--ckpt;
 
-	si = &_si;
-	WT_RET(__wt_block_snap_init(session, block, si, snap->name, 0));
-	WT_ERR(
-	    __wt_block_buffer_to_snapshot(session, block, snap->raw.data, si));
+	ci = &_ci;
+	WT_RET(__wt_block_ckpt_init(session, block, ci, ckpt->name, 0));
+	WT_ERR(__wt_block_buffer_to_ckpt(session, block, ckpt->raw.data, ci));
 
-	el = &si->avail;
+	el = &ci->avail;
 	if (el->offset != WT_BLOCK_INVALID_OFFSET) {
 		WT_ERR(__wt_block_extlist_read(session, block, el));
 		WT_EXT_FOREACH(ext, el->off)
@@ -176,7 +175,7 @@ __verify_start_avail(
 				break;
 	}
 
-err:	__wt_block_snap_destroy(session, si);
+err:	__wt_block_ckpt_destroy(session, ci);
 	return (ret);
 }
 
@@ -197,59 +196,59 @@ __wt_block_verify_end(WT_SESSION_IMPL *session, WT_BLOCK *block)
 
 	/* Discard the fragment tracking lists. */
 	__wt_free(session, block->fragfile);
-	__wt_free(session, block->fragsnap);
+	__wt_free(session, block->fragckpt);
 
 	block->verify = 0;
 	return (ret);
 }
 
 /*
- * __wt_verify_snap_load --
- *	Verify work done when a snapshot is loaded.
+ * __wt_verify_ckpt_load --
+ *	Verify work done when a checkpoint is loaded.
  */
 int
-__wt_verify_snap_load(
-    WT_SESSION_IMPL *session, WT_BLOCK *block, WT_BLOCK_SNAPSHOT *si)
+__wt_verify_ckpt_load(
+    WT_SESSION_IMPL *session, WT_BLOCK *block, WT_BLOCK_CKPT *ci)
 {
 	WT_EXTLIST *el;
 	WT_EXT *ext;
 	uint32_t frag, frags;
 
-	/* Set the maximum file size for this snapshot. */
-	block->verify_size = si->file_size;
+	/* Set the maximum file size for this checkpoint. */
+	block->verify_size = ci->file_size;
 
 	/*
 	 * Add the root page and disk blocks used to store the extent lists to
 	 * the list of blocks we've "seen" from the file.
 	 */
-	if (si->root_offset != WT_BLOCK_INVALID_OFFSET)
+	if (ci->root_offset != WT_BLOCK_INVALID_OFFSET)
 		WT_RET(__verify_filefrag_add(session,
-		    block, si->root_offset, (off_t)si->root_size, 1));
-	if (si->alloc.offset != WT_BLOCK_INVALID_OFFSET)
+		    block, ci->root_offset, (off_t)ci->root_size, 1));
+	if (ci->alloc.offset != WT_BLOCK_INVALID_OFFSET)
 		WT_RET(__verify_filefrag_add(session,
-		    block, si->alloc.offset, (off_t)si->alloc.size, 1));
-	if (si->avail.offset != WT_BLOCK_INVALID_OFFSET)
+		    block, ci->alloc.offset, (off_t)ci->alloc.size, 1));
+	if (ci->avail.offset != WT_BLOCK_INVALID_OFFSET)
 		WT_RET(__verify_filefrag_add(session,
-		    block, si->avail.offset, (off_t)si->avail.size, 1));
-	if (si->discard.offset != WT_BLOCK_INVALID_OFFSET)
+		    block, ci->avail.offset, (off_t)ci->avail.size, 1));
+	if (ci->discard.offset != WT_BLOCK_INVALID_OFFSET)
 		WT_RET(__verify_filefrag_add(session,
-		    block, si->discard.offset, (off_t)si->discard.size, 1));
+		    block, ci->discard.offset, (off_t)ci->discard.size, 1));
 
 	/*
-	 * Snapshot verification is similar to deleting snapshots.  As we read
-	 * each new snapshot, we merge the allocation lists (accumulating all
-	 * allocated pages as we move through the system), and then remove any
-	 * pages found in the discard list.   The result should be a one-to-one
-	 * mapping to the pages we find in this particular snapshot.
+	 * Checkpoint verification is similar to deleting checkpoints.  As we
+	 * read each new checkpoint, we merge the allocation lists (accumulating
+	 * all allocated pages as we move through the system), and then remove
+	 * any pages found in the discard list.   The result should be a
+	 * one-to-one mapping to the pages we find in this specific checkpoint.
 	 */
-	el = &si->alloc;
+	el = &ci->alloc;
 	if (el->offset != WT_BLOCK_INVALID_OFFSET) {
 		WT_RET(__wt_block_extlist_read(session, block, el));
 		WT_RET(__wt_block_extlist_merge(
 		    session, el, &block->verify_alloc));
 		__wt_block_extlist_free(session, el);
 	}
-	el = &si->discard;
+	el = &ci->discard;
 	if (el->offset != WT_BLOCK_INVALID_OFFSET) {
 		WT_RET(__wt_block_extlist_read(session, block, el));
 		WT_EXT_FOREACH(ext, el->off)
@@ -259,50 +258,51 @@ __wt_verify_snap_load(
 	}
 
 	/*
-	 * The root page of the snapshot appears on the alloc list, but not, at
-	 * least until the snapshot is deleted, on a discard list.   To handle
-	 * this case, remove the root page from the accumulated list of snapshot
-	 * pages, so it doesn't add a new requirement for subsequent snapshots.
+	 * The root page of the checkpoint appears on the alloc list, but not,
+	 * at least until the checkpoint is deleted, on a discard list.   To
+	 * handle this case, remove the root page from the accumulated list of
+	 * checkpoint pages, so it doesn't add a new requirement for subsequent
+	 * checkpoints.
 	 */
-	if (si->root_offset != WT_BLOCK_INVALID_OFFSET)
+	if (ci->root_offset != WT_BLOCK_INVALID_OFFSET)
 		WT_RET(__wt_block_off_remove_overlap(session,
-		    &block->verify_alloc, si->root_offset, si->root_size));
+		    &block->verify_alloc, ci->root_offset, ci->root_size));
 
 	/*
-	 * Allocate the per-snapshot bit map.  The per-snapshot bit map is the
-	 * opposite of the per-file bit map, that is, we set all the bits that
-	 * we expect to be set based on the snapshot's allocation and discard
-	 * lists, then clear bits as we verify blocks.  When finished verifying
-	 * the snapshot, the bit list should be empty.
+	 * Allocate the per-checkpoint bit map.  The per-checkpoint bit map is
+	 * the opposite of the per-file bit map, that is, we set all the bits
+	 * that we expect to be set based on the checkpoint's allocation and
+	 * discard lists, then clear bits as we verify blocks.  When finished
+	 * verifying the checkpoint, the bit list should be empty.
 	 */
-	WT_RET(__bit_alloc(session, block->frags, &block->fragsnap));
+	WT_RET(__bit_alloc(session, block->frags, &block->fragckpt));
 	el = &block->verify_alloc;
 	WT_EXT_FOREACH(ext, el->off) {
 		frag = (uint32_t)WT_OFF_TO_FRAG(block, ext->off);
 		frags = (uint32_t)(ext->size / block->allocsize);
-		__bit_nset(block->fragsnap, frag, frag + (frags - 1));
+		__bit_nset(block->fragckpt, frag, frag + (frags - 1));
 	}
 
 	return (0);
 }
 
 /*
- * __wt_verify_snap_unload --
- *	Verify work done when a snapshot is unloaded.
+ * __wt_verify_ckpt_unload --
+ *	Verify work done when a checkpoint is unloaded.
  */
 int
-__wt_verify_snap_unload(
-    WT_SESSION_IMPL *session, WT_BLOCK *block, WT_BLOCK_SNAPSHOT *si)
+__wt_verify_ckpt_unload(
+    WT_SESSION_IMPL *session, WT_BLOCK *block, WT_BLOCK_CKPT *ci)
 {
 	WT_DECL_RET;
 
-	WT_UNUSED(si);
+	WT_UNUSED(ci);
 
-	/* Confirm we verified every snapshot block. */
-	ret = __verify_snapfrag_chk(session, block);
+	/* Confirm we verified every checkpoint block. */
+	ret = __verify_ckptfrag_chk(session, block);
 
-	/* Discard the per-snapshot fragment list. */
-	__wt_free(session, block->fragsnap);
+	/* Discard the per-checkpoint fragment list. */
+	__wt_free(session, block->fragckpt);
 
 	return (ret);
 }
@@ -354,7 +354,7 @@ err:	__wt_scr_free(&tmp);
 
 /*
  * __wt_block_verify_addr --
- *	Update an address in a snapshot as verified.
+ *	Update an address in a checkpoint as verified.
  */
 int
 __wt_block_verify_addr(WT_SESSION_IMPL *session,
@@ -374,18 +374,19 @@ __wt_block_verify_addr(WT_SESSION_IMPL *session,
 	/*
 	 * It's tempting to try and flag a page as "verified" when we read it.
 	 * That doesn't work because we may visit a page multiple times when
-	 * verifying a single snapshot (for example, when verifying the physical
-	 * image of a row-store leaf page with overflow keys, the overflow keys
-	 * are read when checking for key sort issues, and read again when more
-	 * general overflow item checking is done).  This function is called by
-	 * the btree verification code, once per logical visit in a snapshot, so
-	 * we can detect if a page is referenced multiple times within a single
-	 * snapshot.  This doesn't apply to the per-file list, because it is
-	 * expected for the same btree blocks to appear in multiple snapshots.
+	 * verifying a single checkpoint (for example, when verifying the
+	 * physical image of a row-store leaf page with overflow keys, the
+	 * overflow keys are read when checking for key sort issues, and read
+	 * again when more general overflow item checking is done).  This
+	 * function is called by the btree verification code, once per logical
+	 * visit in a checkpoint, so we can detect if a page is referenced
+	 * multiple times within a single checkpoint.  This doesn't apply to
+	 * the per-file list, because it is expected for the same btree blocks
+	 * to appear in multiple checkpoints.
 	 *
-	 * Add the block to the per-snapshot list.
+	 * Add the block to the per-checkpoint list.
 	 */
-	WT_RET(__verify_snapfrag_add(session, block, offset, size));
+	WT_RET(__verify_ckptfrag_add(session, block, offset, size));
 
 	return (0);
 }
@@ -457,7 +458,7 @@ __verify_filefrag_chk(WT_SESSION_IMPL *session, WT_BLOCK *block)
 		}
 
 		__wt_errx(session,
-		    "file range %" PRIuMAX "-%" PRIuMAX " was never verified",
+		    "file range %" PRIuMAX "-%" PRIuMAX " never verified",
 		    (uintmax_t)WT_FRAG_TO_OFF(block, first),
 		    (uintmax_t)WT_FRAG_TO_OFF(block, last));
 		ret = WT_ERROR;
@@ -466,28 +467,28 @@ __verify_filefrag_chk(WT_SESSION_IMPL *session, WT_BLOCK *block)
 }
 
 /*
- * __verify_snapfrag_add --
- *	Clear the fragments in the per-snapshot fragment list, and complain if
- * we've already verified this chunk of the snapshot.
+ * __verify_ckptfrag_add --
+ *	Clear the fragments in the per-checkpoint fragment list, and complain if
+ * we've already verified this chunk of the checkpoint.
  */
 static int
-__verify_snapfrag_add(
+__verify_ckptfrag_add(
     WT_SESSION_IMPL *session, WT_BLOCK *block, off_t offset, off_t size)
 {
 	uint32_t f, frag, frags, i;
 
 	WT_VERBOSE_RET(session, verify,
-	    "adding snapshot block at %" PRIuMAX "-%" PRIuMAX " (%" PRIuMAX ")",
+	    "add checkpoint block at %" PRIuMAX "-%" PRIuMAX " (%" PRIuMAX ")",
 	    (uintmax_t)offset, (uintmax_t)(offset + size), (uintmax_t)size);
 
 	/*
-	 * Check each chunk against the snapshot's size, a snapshot should never
-	 * reference a block outside of the snapshot's stored size.
+	 * Check each chunk against the checkpoint's size, a checkpoint should
+	 * never reference a block outside of the checkpoint's stored size.
 	 */
 	if (offset + size > block->verify_size)
 		WT_RET_MSG(session, WT_ERROR,
 		    "fragment %" PRIuMAX "-%" PRIuMAX " references "
-		    "file blocks outside the snapshot",
+		    "file blocks outside the checkpoint",
 		    (uintmax_t)offset, (uintmax_t)(offset + size));
 
 	frag = (uint32_t)WT_OFF_TO_FRAG(block, offset);
@@ -495,49 +496,48 @@ __verify_snapfrag_add(
 
 	/* It is illegal to reference a particular chunk more than once. */
 	for (f = frag, i = 0; i < frags; ++f, ++i)
-		if (!__bit_test(block->fragsnap, f))
+		if (!__bit_test(block->fragckpt, f))
 			WT_RET_MSG(session, WT_ERROR,
-			    "snapshot fragment at %" PRIuMAX " referenced "
-			    "multiple times in a single snapshot or found in "
-			    "the snapshot but not listed in the snapshot's "
+			    "checkpoint fragment at %" PRIuMAX " referenced "
+			    "multiple times in a single checkpoint or found in "
+			    "the checkpoint but not listed in the checkpoint's "
 			    "allocation list",
 			    (uintmax_t)offset);
 
-	/* Remove fragments from the snapshot's allocation list. */
-	__bit_nclr(block->fragsnap, frag, frag + (frags - 1));
+	/* Remove fragments from the checkpoint's allocation list. */
+	__bit_nclr(block->fragckpt, frag, frag + (frags - 1));
 
 	return (0);
 }
 
 /*
- * __verify_snapfrag_chk --
- *	Verify we've checked all the fragments in the snapshot.
+ * __verify_ckptfrag_chk --
+ *	Verify we've checked all the fragments in the checkpoint.
  */
 static int
-__verify_snapfrag_chk(WT_SESSION_IMPL *session, WT_BLOCK *block)
+__verify_ckptfrag_chk(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
 	WT_DECL_RET;
 	uint32_t first, last;
 
 	/*
-	 * Check for snapshot fragments we haven't verified -- every time we
+	 * Check for checkpoint fragments we haven't verified -- every time we
 	 * find a bit that's set, complain.  We re-start the search each time
 	 * after clearing the set bit(s) we found: it's simpler and this isn't
 	 * supposed to happen a lot.
 	 */
 	for (;;) {
-		if (__bit_ffs(block->fragsnap, block->frags, &first) != 0)
+		if (__bit_ffs(block->fragckpt, block->frags, &first) != 0)
 			break;
-		__bit_clear(block->fragsnap, first);
+		__bit_clear(block->fragckpt, first);
 		for (last = first + 1; last < block->frags; ++last) {
-			if (!__bit_test(block->fragsnap, last))
+			if (!__bit_test(block->fragckpt, last))
 				break;
-			__bit_clear(block->fragsnap, last);
+			__bit_clear(block->fragckpt, last);
 		}
 
 		__wt_errx(session,
-		    "snapshot range %" PRIuMAX "-%" PRIuMAX " was never "
-		    "verified",
+		    "checkpoint range %" PRIuMAX "-%" PRIuMAX " never verified",
 		    (uintmax_t)WT_FRAG_TO_OFF(block, first),
 		    (uintmax_t)WT_FRAG_TO_OFF(block, last));
 		ret = WT_ERROR;

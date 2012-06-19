@@ -129,11 +129,11 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 }
 
 /*
- * __txn_release --
+ * __wt_txn_release --
  *	Release the resources associated with the current transaction.
  */
-static int
-__txn_release(WT_SESSION_IMPL *session)
+int
+__wt_txn_release(WT_SESSION_IMPL *session)
 {
 	WT_TXN *txn;
 	WT_TXN_GLOBAL *txn_global;
@@ -162,7 +162,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_UNUSED(cfg);
 
-	return (__txn_release(session));
+	return (__wt_txn_release(session));
 }
 
 /*
@@ -182,107 +182,7 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
 	for (i = 0, m = txn->mod; i < txn->mod_count; i++, m++)
 		**m = WT_TXN_ABORTED;
 
-	return (__txn_release(session));
-}
-
-/*
- * __wt_txn_checkpoint --
- *	Checkpoint a database or a list of objects in the database.
- */
-int
-__wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
-{
-	WT_CONFIG targetconf;
-	WT_CONFIG_ITEM cval, k, v;
-	WT_DECL_ITEM(tmp);
-	WT_DECL_RET;
-	WT_TXN_GLOBAL *txn_global;
-	int target_list, tracking;
-	const char *txn_cfg[] = { "isolation=snapshot", NULL };
-
-	target_list = tracking = 0;
-	txn_global = &S2C(session)->txn_global;
-
-	/* Only one checkpoint can be active at a time. */
-	__wt_writelock(session, S2C(session)->ckpt_rwlock);
-	WT_ERR(__wt_txn_begin(session, txn_cfg));
-
-	/* Prevent eviction from evicting anything newer than this. */
-	txn_global->ckpt_txnid = session->txn.snap_min;
-
-	WT_ERR(__wt_meta_track_on(session));
-	tracking = 1;
-
-	/* Step through the list of targets and snapshot each one. */
-	cval.len = 0;
-	WT_ERR(__wt_config_gets(session, cfg, "target", &cval));
-	if (cval.len != 0) {
-		WT_ERR(__wt_scr_alloc(session, 512, &tmp));
-		WT_ERR(__wt_config_subinit(session, &targetconf, &cval));
-		while ((ret = __wt_config_next(&targetconf, &k, &v)) == 0) {
-			target_list = 1;
-			WT_ERR(__wt_buf_fmt(session, tmp, "%.*s",
-			    (int)k.len, k.str));
-
-			if (v.len != 0)
-				WT_ERR_MSG(session, EINVAL,
-				    "invalid checkpoint target \"%s\": "
-				    "URIs may require quoting",
-				    (const char *)tmp->data);
-
-			__wt_spin_lock(session, &S2C(session)->schema_lock);
-			ret = __wt_schema_worker(
-			    session, tmp->data, __wt_snapshot, cfg, 0);
-			__wt_spin_unlock(session, &S2C(session)->schema_lock);
-
-			if (ret != 0)
-				WT_ERR_MSG(session, ret, "%s",
-				    (const char *)tmp->data);
-		}
-		if (ret == WT_NOTFOUND)
-			ret = 0;
-	}
-
-	if (!target_list) {
-		/*
-		 * Possible checkpoint snapshot name.  If snapshots are named,
-		 * we must snapshot both open and closed files; if snapshots
-		 * are not named, we only snapshot open files.
-		 *
-		 * XXX
-		 * We don't optimize unnamed checkpoints of a list of targets,
-		 * we open the targets and snapshot them even if they are
-		 * quiescent and don't need a snapshot, believing applications
-		 * unlikely to checkpoint a list of closed targets.
-		 */
-		cval.len = 0;
-		WT_ERR(__wt_config_gets(session, cfg, "name", &cval));
-		WT_ERR(cval.len == 0 ?
-		    __wt_conn_btree_apply(session, __wt_snapshot, cfg) :
-		    __wt_meta_btree_apply(session, __wt_snapshot, cfg, 0));
-	}
-
-err:	/*
-	 * XXX Rolling back the changes here is problematic.
-	 *
-	 * If we unroll here, we need a way to roll back changes to the avail
-	 * list for each tree that was successfully synced before the error
-	 * occurred.  Otherwise, the next time we try this operation, we will
-	 * try to free an old snapshot again.
-	 *
-	 * OTOH, if we commit the changes after a failure, we have partially
-	 * overwritten the checkpoint, so what ends up on disk is not
-	 * consistent.
-	 */
-	if (tracking)
-		WT_TRET(__wt_meta_track_off(session, ret != 0));
-
-	txn_global->ckpt_txnid = WT_TXN_NONE;
-	if (F_ISSET(&session->txn, TXN_RUNNING))
-		WT_TRET(__txn_release(session));
-	__wt_rwunlock(session, S2C(session)->ckpt_rwlock);
-	__wt_scr_free(&tmp);
-	return (ret);
+	return (__wt_txn_release(session));
 }
 
 /*

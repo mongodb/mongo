@@ -74,19 +74,20 @@ __wt_btree_open(WT_SESSION_IMPL *session,
 	    session, filename, btree->config, cfg, forced_salvage));
 
 	/*
-	 * Open the specified snapshot unless it's a special command (special
-	 * commands are responsible for loading their own snapshots, if any).
+	 * Open the specified checkpoint unless it's a special command (special
+	 * commands are responsible for loading their own checkpoints, if any).
 	 */
 	if (F_ISSET(btree,
 	    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY))
 		return (0);
 
 	/*
-	 * There are two reasons to load an empty tree rather than a snapshot:
-	 * either there is no snapshot (the file is being created), or the load
-	 * call returns no root page (the snapshot is empty).
+	 * There are two reasons to load an empty tree rather than a checkpoint:
+	 * either there is no checkpoint (the file is being created), or the
+	 * load call returns no root page (the checkpoint is for an empty file).
 	 */
-	WT_ERR(__wt_bm_snapshot_load(session, &dsk, addr, addr_size, readonly));
+	WT_ERR(
+	    __wt_bm_checkpoint_load(session, &dsk, addr, addr_size, readonly));
 	if (addr == NULL || addr_size == 0 || dsk.size == 0)
 		WT_ERR(__btree_tree_open_empty(session));
 	else {
@@ -117,14 +118,11 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 
 	btree = session->btree;
 
-	/*
-	 * Discard the tree and, if the tree is modified, create a new snapshot
-	 * for the underlying object, unless it's a special command.
-	 */
+	/* Unload the checkpoint, unless it's a special command. */
 	if (F_ISSET(btree, WT_BTREE_OPEN) &&
 	    !F_ISSET(btree,
 	    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY))
-		WT_TRET(__wt_bm_snapshot_unload(session));
+		WT_TRET(__wt_bm_checkpoint_unload(session));
 
 	/* Close the underlying block manager reference. */
 	WT_TRET(__wt_bm_close(session));
@@ -132,9 +130,9 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 	/* Close the Huffman tree. */
 	__wt_btree_huffman_close(session);
 
-	/* Snapshot lock. */
-	if (btree->snaplock != NULL)
-		__wt_rwlock_destroy(session, &btree->snaplock);
+	/* Checkpoint lock. */
+	if (btree->ckptlock != NULL)
+		__wt_rwlock_destroy(session, &btree->ckptlock);
 
 	/* Free allocated memory. */
 	__wt_free(session, btree->key_format);
@@ -212,8 +210,9 @@ __btree_conf(WT_SESSION_IMPL *session)
 		}
 	}
 
-	/* Snapshot lock. */
-	WT_RET(__wt_rwlock_alloc(session, "btree snapshot", &btree->snaplock));
+	/* Checkpoint lock. */
+	WT_RET(
+	    __wt_rwlock_alloc(session, "btree checkpoint", &btree->ckptlock));
 
 	/* Page sizes */
 	WT_RET(__btree_page_sizes(session, config));
@@ -327,8 +326,8 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session)
 
 	/*
 	 * Mark the child page empty so that if it is evicted, the tree ends up
-	 * sane.  The page should not be dirty, or we will always write empty
-	 * trees on close, including empty snapshots.
+	 * sane.  The page should not be dirty, else we would write empty trees
+	 * on close, including empty checkpoints.
 	 */
 	WT_ERR(__wt_page_modify_init(session, leaf));
 	F_SET(leaf->modify, WT_PM_REC_EMPTY);

@@ -137,7 +137,7 @@ static int  __slvg_trk_ovfl(WT_SESSION_IMPL *,
  */
 int
 __wt_bt_salvage(
-    WT_SESSION_IMPL *session, WT_SNAPSHOT *snapbase, const char *cfg[])
+    WT_SESSION_IMPL *session, WT_CKPT *ckptbase, const char *cfg[])
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
@@ -270,12 +270,12 @@ __wt_bt_salvage(
 
 	/*
 	 * Step 9:
-	 * Evict the newly created root page, creating a snapshot.
+	 * Evict the newly created root page, creating a checkpoint.
 	 */
 	if (ss->root_page != NULL) {
-		btree->snap = snapbase;
+		btree->ckpt = ckptbase;
 		ret = __wt_rec_evict(session, ss->root_page, WT_REC_SINGLE);
-		btree->snap = NULL;
+		btree->ckpt = NULL;
 		ss->root_page = NULL;
 	}
 

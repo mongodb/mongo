@@ -25,6 +25,7 @@ Btree
 CAS
 CELL's
 CELLs
+CKPT
 CLR
 COL's
 CONCAT
@@ -150,7 +151,7 @@ WIREDTIGER
 WinNT
 WiredTiger
 WiredTiger's
-WiredTigerInternalSnapshot
+WiredTigerInternalCheckpoint
 Wuninitialized
 XP
 __wt_epoch
@@ -197,6 +198,9 @@ checksum
 checksums
 chk
 cip
+ckpt
+ckptfrag
+ckptlist
 cksum
 clr
 cmp
@@ -447,11 +451,6 @@ sizev
 skiplist
 skiplists
 slvg
-snapall
-snapfrag
-snapfrom
-snaplist
-snapto
 snprintf
 sp
 spinlock

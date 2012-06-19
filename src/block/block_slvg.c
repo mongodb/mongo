@@ -21,10 +21,10 @@ __wt_block_salvage_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	WT_RET(__wt_desc_init(session, block->fh));
 
 	/*
-	 * Salvage creates a new snapshot when it's finished, set up for
+	 * Salvage creates a new checkpoint when it's finished, set up for
 	 * rolling an empty file forward.
 	 */
-	WT_RET(__wt_block_snap_init(session, block, &block->live, "live", 1));
+	WT_RET(__wt_block_ckpt_init(session, block, &block->live, "live", 1));
 
 	/*
 	 * Truncate the file to an initial sector plus N allocation size
@@ -48,9 +48,9 @@ __wt_block_salvage_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	block->slvg_off = WT_BLOCK_DESC_SECTOR;
 
 	/*
-	 * The only snapshot extent we care about is the allocation list.  Start
-	 * with the entire file on the allocation list, we'll "free" any blocks
-	 * we don't want as we process the file.
+	 * The only checkpoint extent we care about is the allocation list.
+	 * Start with the entire file on the allocation list, we'll "free"
+	 * any blocks we don't want as we process the file.
 	 */
 	WT_RET(__wt_block_insert_ext(session, &block->live.alloc,
 	    WT_BLOCK_DESC_SECTOR, len - WT_BLOCK_DESC_SECTOR));
@@ -70,8 +70,8 @@ __wt_block_salvage_end(WT_SESSION_IMPL *session, WT_BLOCK *block)
 
 	block->slvg = 0;
 
-	/* Discard the snapshot. */
-	return (__wt_block_snapshot_unload(session, block));
+	/* Discard the checkpoint. */
+	return (__wt_block_checkpoint_unload(session, block));
 }
 
 /*

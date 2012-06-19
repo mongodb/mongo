@@ -68,15 +68,13 @@ struct __wt_btree {
 	uint32_t   refcnt;		/* Sessions using this tree. */
 	TAILQ_ENTRY(__wt_btree) q;	/* Linked list of handles */
 
-	volatile uint32_t lru_count;	/* Count of threads in LRU eviction. */
-
 	const char *name;		/* Object name as a URI */
+	const char *checkpoint;		/* Checkpoint name (or NULL) */
 	const char *config;		/* Configuration string */
-	const char *ckpt;		/* Checkpoint name (or NULL) */
 
 	/* XXX Should move into the session-level handle information. */
-	WT_RWLOCK   *snaplock;		/* Lock for snapshot creation */
-	WT_SNAPSHOT *snap;		/* Snapshot information */
+	WT_RWLOCK *ckptlock;		/* Lock for checkpoint creation */
+	WT_CKPT	  *ckpt;		/* Checkpoint information */
 
 	enum {	BTREE_COL_FIX=1,	/* Fixed-length column store */
 		BTREE_COL_VAR=2,	/* Variable-length column store */
@@ -112,6 +110,7 @@ struct __wt_btree {
 	u_int block_header;		/* Block manager header length */
 
 	WT_PAGE *evict_page;		/* Eviction thread's location */
+	volatile uint32_t lru_count;	/* Count of threads in LRU eviction. */
 
 	WT_BTREE_STATS *stats;		/* Btree statistics */
 

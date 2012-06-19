@@ -129,68 +129,68 @@ __wt_block_addr_string(WT_SESSION_IMPL *session,
 }
 
 /*
- * __wt_block_buffer_to_snapshot --
- *	Convert a filesystem snapshot cookie into its components.
+ * __wt_block_buffer_to_ckpt --
+ *	Convert a checkpoint cookie into its components.
  */
 int
-__wt_block_buffer_to_snapshot(WT_SESSION_IMPL *session,
-    WT_BLOCK *block, const uint8_t *p, WT_BLOCK_SNAPSHOT *si)
+__wt_block_buffer_to_ckpt(WT_SESSION_IMPL *session,
+    WT_BLOCK *block, const uint8_t *p, WT_BLOCK_CKPT *ci)
 {
 	uint64_t a;
 	const uint8_t **pp;
 
-	si->version = *p++;
-	if (si->version != WT_BM_SNAPSHOT_VERSION)
-		WT_RET_MSG(session, WT_ERROR, "illegal snapshot address");
+	ci->version = *p++;
+	if (ci->version != WT_BM_CHECKPOINT_VERSION)
+		WT_RET_MSG(session, WT_ERROR, "illegal checkpoint address");
 
 	pp = &p;
 	WT_RET(__block_buffer_to_addr(block, pp,
-	    &si->root_offset, &si->root_size, &si->root_cksum));
+	    &ci->root_offset, &ci->root_size, &ci->root_cksum));
 	WT_RET(__block_buffer_to_addr(block, pp,
-	    &si->alloc.offset, &si->alloc.size, &si->alloc.cksum));
+	    &ci->alloc.offset, &ci->alloc.size, &ci->alloc.cksum));
 	WT_RET(__block_buffer_to_addr(block, pp,
-	    &si->avail.offset, &si->avail.size, &si->avail.cksum));
+	    &ci->avail.offset, &ci->avail.size, &ci->avail.cksum));
 	WT_RET(__block_buffer_to_addr(block, pp,
-	    &si->discard.offset, &si->discard.size, &si->discard.cksum));
+	    &ci->discard.offset, &ci->discard.size, &ci->discard.cksum));
 	WT_RET(__wt_vunpack_uint(pp, 0, &a));
-	si->file_size = (off_t)a;
+	ci->file_size = (off_t)a;
 	WT_RET(__wt_vunpack_uint(pp, 0, &a));
-	si->snapshot_size = a;
+	ci->ckpt_size = a;
 	WT_RET(__wt_vunpack_uint(pp, 0, &a));
-	si->write_gen = a;
+	ci->write_gen = a;
 
 	return (0);
 }
 
 /*
- * __wt_block_snapshot_to_buffer --
- *	Convert the filesystem components into its snapshot cookie.
+ * __wt_block_ckpt_to_buffer --
+ *	Convert the components into its checkpoint cookie.
  */
 int
-__wt_block_snapshot_to_buffer(WT_SESSION_IMPL *session,
-    WT_BLOCK *block, uint8_t **pp, WT_BLOCK_SNAPSHOT *si)
+__wt_block_ckpt_to_buffer(WT_SESSION_IMPL *session,
+    WT_BLOCK *block, uint8_t **pp, WT_BLOCK_CKPT *ci)
 {
 	uint64_t a;
 
-	if (si->version != WT_BM_SNAPSHOT_VERSION)
-		WT_RET_MSG(session, WT_ERROR, "illegal snapshot address");
+	if (ci->version != WT_BM_CHECKPOINT_VERSION)
+		WT_RET_MSG(session, WT_ERROR, "illegal checkpoint address");
 
-	(*pp)[0] = si->version;
+	(*pp)[0] = ci->version;
 	(*pp)++;
 
 	WT_RET(__wt_block_addr_to_buffer(block, pp,
-	    si->root_offset, si->root_size, si->root_cksum));
+	    ci->root_offset, ci->root_size, ci->root_cksum));
 	WT_RET(__wt_block_addr_to_buffer(block, pp,
-	    si->alloc.offset, si->alloc.size, si->alloc.cksum));
+	    ci->alloc.offset, ci->alloc.size, ci->alloc.cksum));
 	WT_RET(__wt_block_addr_to_buffer(block, pp,
-	    si->avail.offset, si->avail.size, si->avail.cksum));
+	    ci->avail.offset, ci->avail.size, ci->avail.cksum));
 	WT_RET(__wt_block_addr_to_buffer(block, pp,
-	    si->discard.offset, si->discard.size, si->discard.cksum));
-	a = (uint64_t)si->file_size;
+	    ci->discard.offset, ci->discard.size, ci->discard.cksum));
+	a = (uint64_t)ci->file_size;
 	WT_RET(__wt_vpack_uint(pp, 0, a));
-	a = (uint64_t)si->snapshot_size;
+	a = (uint64_t)ci->ckpt_size;
 	WT_RET(__wt_vpack_uint(pp, 0, a));
-	a = si->write_gen;
+	a = ci->write_gen;
 	WT_RET(__wt_vpack_uint(pp, 0, a));
 
 	return (0);

@@ -158,8 +158,8 @@ file_config = format_meta + [
 
 # File metadata, including both configurable and non-configurable (internal)
 file_meta = file_config + [
-	Config('snapshot', '', r'''
-		the file snapshot entries'''),
+	Config('checkpoint', '', r'''
+		the file checkpoint entries'''),
 	Config('version', '(major=0,minor=0)', r'''
 		the file version'''),
 ]
@@ -376,6 +376,7 @@ methods = {
 		list, such as <code>"verbose=[evictserver,read]"</code>''',
 		type='list', choices=[
 		    'block',
+		    'ckpt',
 		    'evict',
 		    'evictserver',
 		    'fileops',
@@ -385,7 +386,6 @@ methods = {
 		    'readserver',
 		    'reconcile',
 		    'salvage',
-		    'snapshot',
 		    'verify',
 		    'write']),
 ]),
@@ -400,6 +400,7 @@ flags = {
 	'rec_evict' : [ 'REC_SINGLE' ],
 	'verbose' : [
 		'VERB_block',
+		'VERB_ckpt',
 		'VERB_evict',
 		'VERB_evictserver',
 		'VERB_fileops',
@@ -409,7 +410,6 @@ flags = {
 		'VERB_readserver',
 		'VERB_reconcile',
 		'VERB_salvage',
-		'VERB_snapshot',
 		'VERB_verify',
 		'VERB_write'
 	],
