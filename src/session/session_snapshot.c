@@ -246,7 +246,13 @@ nomatch:		WT_ERR_MSG(session,
 			    EINVAL, "cache flush failed to create a snapshot");
 	} else {
 		WT_ERR(__wt_meta_snaplist_set(session, btree->name, snapbase));
-		if (WT_META_TRACKING(session)) {
+		/*
+		 * If tracking is enabled, defer making pages available until
+		 * the end of the transaction.  The exception is if the handle
+		 * is being discarded: in that case, it will be gone by the
+		 * time we try to apply or unroll the meta tracking event.
+		 */
+		if (WT_META_TRACKING(session) && !discard) {
 			WT_ERR(__wt_meta_track_checkpoint(session));
 			tracked = 1;
 		} else
