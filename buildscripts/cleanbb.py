@@ -89,3 +89,4 @@ if __name__ == "__main__":
         root = args[0]
         
     cleanup( root , options.nokill )
+    cleanup("./build/coverage", True)
