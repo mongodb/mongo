@@ -52,16 +52,6 @@ def typedesc(c):
 		desc += ' of strings'
 	return desc
 
-# Some configuration strings can be modified at run-time: instead of listing
-# the strings multiple times in api_data.py, review the open methods and copy
-# the information into the handle's configuration method.
-for a in sorted(api_data.methods['wiredtiger_open'].config):
-	if 'runtime' in a.flags:
-		api_data.methods['connection.config'].config.append(a)
-for a in sorted(api_data.methods['session.open_cursor'].config):
-	if 'runtime' in a.flags:
-		api_data.methods['cursor.config'].config.append(a)
-
 skip = False
 for line in open(f, 'r'):
 	if skip:

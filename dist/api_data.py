@@ -181,6 +181,52 @@ index_meta = column_meta + filename_meta
 
 table_meta = format_meta + table_only_meta
 
+# Cursor runtime config, shared by cursor.reconfigure and session.open_cursor
+cursor_runtime_config = [
+	Config('append', 'false', r'''
+		only supported by cursors with record number keys: append the
+		value as a new record, creating a new record number key''',
+		type='boolean'),
+	Config('overwrite', 'false', r'''
+		change the behavior of the cursor's insert method to
+		overwrite previously existing values''',
+		type='boolean'),
+]
+
+# Connection runtime config, shared by conn.reconfigure and wiredtiger_open
+connection_runtime_config = [
+	Config('cache_size', '100MB', r'''
+		maximum heap memory to allocate for the cache''',
+		min='1MB', max='10TB'),
+	Config('error_prefix', '', r'''
+		prefix string for error messages'''),
+	Config('eviction_target', '80', r'''
+		continue evicting until the cache becomes less full than this
+		(as a percentage).  Must be less than \c eviction_trigger''',
+		min=10, max=99),
+	Config('eviction_trigger', '95', r'''
+		trigger eviction when the cache becomes this full (as a
+		percentage)''',
+		min=10, max=99),
+	Config('verbose', '', r'''
+		enable messages for various events.  Options are given as a
+		list, such as <code>"verbose=[evictserver,read]"</code>''',
+		type='list', choices=[
+		    'block',
+		    'ckpt',
+		    'evict',
+		    'evictserver',
+		    'fileops',
+		    'hazard',
+		    'mutex',
+		    'read',
+		    'readserver',
+		    'reconcile',
+		    'salvage',
+		    'verify',
+		    'write']),
+]
+
 methods = {
 'file.meta' : Method(file_meta),
 
@@ -191,7 +237,8 @@ methods = {
 'table.meta' : Method(table_meta),
 
 'cursor.close' : Method([]),
-'cursor.config' : Method([]),
+
+'cursor.reconfigure' : Method(cursor_runtime_config),
 
 'session.close' : Method([]),
 
@@ -212,11 +259,7 @@ methods = {
 'session.dumpfile' : Method([]),
 'session.log_printf' : Method([]),
 
-'session.open_cursor' : Method([
-	Config('append', 'false', r'''
-		only supported by cursors with record number keys: append the
-		value as a new record, creating a new record number key''',
-		type='boolean', runtime=1),
+'session.open_cursor' : Method(cursor_runtime_config + [
 	Config('bulk', 'false', r'''
 		configure the cursor for bulk loads; bulk-load is a fast
 		load path for empty objects, only empty objects may be
@@ -235,10 +278,6 @@ methods = {
 		the isolation level for this cursor, ignored for transactional
 		cursors''',
 		choices=['snapshot', 'read-committed', 'read-uncommitted']),
-	Config('overwrite', 'false', r'''
-		change the behavior of the cursor's insert method to
-		overwrite previously existing values''',
-		type='boolean', runtime=1),
 	Config('raw', 'false', r'''
 		ignore the encodings for the key and value, manage data as if
 		the formats were \c "u".  See @ref cursor_raw for details''',
@@ -301,7 +340,7 @@ methods = {
 'connection.add_data_source' : Method([]),
 'connection.add_extractor' : Method([]),
 'connection.close' : Method([]),
-'connection.config' : Method([]),
+'connection.reconfigure' : Method(connection_runtime_config),
 
 'connection.load_extension' : Method([
 	Config('entry', 'wiredtiger_extension_init', r'''
@@ -313,15 +352,12 @@ methods = {
 
 'connection.open_session' : Method([]),
 
-'wiredtiger_open' : Method([
+'wiredtiger_open' : Method(connection_runtime_config + [
 	Config('buffer_alignment', '-1', r'''
 		in-memory alignment (in bytes) for buffers used for I/O.  By
 		default, a platform-specific alignment value is used (512 bytes
 		on Linux systems, zero elsewhere)''',
 		min='-1', max='1MB'),
-	Config('cache_size', '100MB', r'''
-		maximum heap memory to allocate for the cache''',
-		min='1MB', max='10TB', runtime=1),
 	Config('create', 'false', r'''
 		create the database if it does not exist''',
 		type='boolean'),
@@ -335,16 +371,6 @@ methods = {
 		paths may need quoting, for example,
 		<code>extensions=("/path/to/ext.so"="entry=my_entry")</code>''',
 		type='list'),
-	Config('error_prefix', '', r'''
-		prefix string for error messages''', runtime=1),
-	Config('eviction_target', '80', r'''
-		continue evicting until the cache becomes less full than this
-		(as a percentage).  Must be less than \c eviction_trigger''',
-		min=10, max=99, runtime=1),
-	Config('eviction_trigger', '95', r'''
-		trigger eviction when the cache becomes this full (as a
-		percentage)''',
-		min=10, max=99, runtime=1),
 	Config('hazard_max', '30', r'''
 		number of simultaneous hazard references per session handle''',
 		min='15'),
@@ -372,23 +398,6 @@ methods = {
 		variables regardless of whether or not the process is running
 		with special privileges.  See @ref home for more information''',
 		type='boolean'),
-	Config('verbose', '', r'''
-		enable messages for various events.  Options are given as a
-		list, such as <code>"verbose=[evictserver,read]"</code>''',
-		type='list', runtime=1, choices=[
-		    'block',
-		    'ckpt',
-		    'evict',
-		    'evictserver',
-		    'fileops',
-		    'hazard',
-		    'mutex',
-		    'read',
-		    'readserver',
-		    'reconcile',
-		    'salvage',
-		    'verify',
-		    'write']),
 ]),
 }
 

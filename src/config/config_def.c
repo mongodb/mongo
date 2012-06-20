@@ -51,19 +51,6 @@ __wt_confchk_connection_close =
     "";
 
 const char *
-__wt_confdfl_connection_config =
-    "cache_size=100MB,error_prefix="",eviction_target=80,eviction_trigger=95,"
-    "verbose=()";
-
-const char *
-__wt_confchk_connection_config =
-    "cache_size=(type=int,min=1MB,max=10TB),error_prefix=(),"
-    "eviction_target=(type=int,min=10,max=99),eviction_trigger=(type=int,"
-    "min=10,max=99),verbose=(type=list,choices=[\"block\",\"ckpt\",\"evict\","
-    "\"evictserver\",\"fileops\",\"hazard\",\"mutex\",\"read\",\"readserver\""
-    ",\"reconcile\",\"salvage\",\"verify\",\"write\"])";
-
-const char *
 __wt_confdfl_connection_load_extension =
     "entry=wiredtiger_extension_init,prefix=""";
 
@@ -80,6 +67,19 @@ __wt_confchk_connection_open_session =
     "";
 
 const char *
+__wt_confdfl_connection_reconfigure =
+    "cache_size=100MB,error_prefix="",eviction_target=80,eviction_trigger=95,"
+    "verbose=()";
+
+const char *
+__wt_confchk_connection_reconfigure =
+    "cache_size=(type=int,min=1MB,max=10TB),error_prefix=(),"
+    "eviction_target=(type=int,min=10,max=99),eviction_trigger=(type=int,"
+    "min=10,max=99),verbose=(type=list,choices=[\"block\",\"ckpt\",\"evict\","
+    "\"evictserver\",\"fileops\",\"hazard\",\"mutex\",\"read\",\"readserver\""
+    ",\"reconcile\",\"salvage\",\"verify\",\"write\"])";
+
+const char *
 __wt_confdfl_cursor_close =
     "";
 
@@ -88,11 +88,11 @@ __wt_confchk_cursor_close =
     "";
 
 const char *
-__wt_confdfl_cursor_config =
+__wt_confdfl_cursor_reconfigure =
     "append=false,overwrite=false";
 
 const char *
-__wt_confchk_cursor_config =
+__wt_confchk_cursor_reconfigure =
     "append=(type=boolean),overwrite=(type=boolean)";
 
 const char *
