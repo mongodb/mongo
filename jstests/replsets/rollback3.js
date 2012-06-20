@@ -233,7 +233,8 @@ doTest = function (signal) {
     assert(A.isMaster().ismaster || A.isMaster().secondary, "A up");
     assert(B.isMaster().ismaster || B.isMaster().secondary, "B up");
     replTest.awaitReplication();
-    waitForAllMembers(B);
+
+    assert.soon(function() { return B.isMaster().secondary; });
 
     assert( dbs_match(a,b), "server data sets do not match after rollback, something is wrong");
 
