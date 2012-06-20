@@ -63,6 +63,7 @@
 #include "../util/concurrency/spin_lock.cpp"
 
 // in client/ directory:
+#include "authentication_table.cpp"
 #include "connpool.cpp"
 #include "syncclusterconnection.cpp"
 #include "dbclient.cpp"
