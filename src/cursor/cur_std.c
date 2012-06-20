@@ -411,7 +411,7 @@ __wt_cursor_init(WT_CURSOR *cursor,
 
 	WT_RET(__wt_config_gets(session, cfg, "dump", &cval));
 	if (cval.len != 0) {
-		F_SET(cursor, (strncmp(cval.str, "print", cval.len) == 0) ?
+		F_SET(cursor, (__wt_config_strcmp(&cval, "print") == 0) ?
 		    WT_CURSTD_DUMP_PRINT : WT_CURSTD_DUMP_HEX);
 		WT_RET(__wt_curdump_create(cursor, owner, &cdump));
 		owner = cdump;

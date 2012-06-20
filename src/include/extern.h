@@ -463,6 +463,7 @@ extern  int __wt_config_subgets(WT_SESSION_IMPL *session,
     WT_CONFIG_ITEM *cfg,
     const char *key,
     WT_CONFIG_ITEM *value);
+extern int __wt_config_strcmp(WT_CONFIG_ITEM *cfg, const char *str);
 extern int __wt_config_check(WT_SESSION_IMPL *session,
     const char *checks,
     const char *config);

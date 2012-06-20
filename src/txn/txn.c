@@ -98,7 +98,7 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 		WT_RET_MSG(session, EINVAL, "Transaction already running");
 
 	WT_RET(__wt_config_gets(session, cfg, "isolation", &cval));
-	txn->isolation = (strcmp(cval.str, "snapshot") == 0) ?
+	txn->isolation = (__wt_config_strcmp(&cval, "snapshot") == 0) ?
 	    TXN_ISO_SNAPSHOT : TXN_ISO_READ_UNCOMMITTED;
 
 	WT_ASSERT(session, txn->id == WT_TXN_NONE);
