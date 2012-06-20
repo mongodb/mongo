@@ -220,7 +220,7 @@ namespace mongo {
 
     void SyncClusterConnection::clearAuthenticationTable() {
         for( size_t i = 0; i < _conns.size(); ++i ) {
-            _conns[i]->clearAuthenticationTable( auth );
+            _conns[i]->clearAuthenticationTable();
         }
         DBClientWithCommands::clearAuthenticationTable();
     }
