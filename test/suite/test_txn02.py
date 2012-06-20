@@ -69,8 +69,9 @@ class test_txn02(wttest.WiredTigerTestCase):
     txn2s = [('t2c', dict(txn2='commit')), ('t2r', dict(txn2='rollback'))]
     txn3s = [('t3c', dict(txn3='commit')), ('t3r', dict(txn3='rollback'))]
     txn4s = [('t4c', dict(txn4='commit')), ('t4r', dict(txn4='rollback'))]
+
     scenarios = number_scenarios(multiply_scenarios('.', types,
-        op1s, txn1s, op2s, txn2s, op3s, txn3s, op4s, txn4s))
+        op1s, txn1s, op2s, txn2s, op3s, txn3s, op4s, txn4s)) # [:1]
 
     # Overrides WiredTigerTestCase
     def setUpConnectionOpen(self, dir):
@@ -78,12 +79,17 @@ class test_txn02(wttest.WiredTigerTestCase):
                 ('error_prefix="%s: ",' % self.shortid()) +
                 'transactional,')
         self.pr(`conn`)
+        self.session2 = conn.open_session()
         return conn
 
-    def check(self, expected):
-        c = self.session.open_cursor(self.uri, None)
+    def check(self, session, txn_config, expected):
+        if txn_config:
+            session.begin_transaction(txn_config)
+        c = session.open_cursor(self.uri, None)
         actual = dict((k, v) for k, v in c if v != 0)
         c.close()
+        if txn_config:
+            session.commit_transaction()
         self.assertEqual(actual, expected)
 
     def test_ops(self):
@@ -100,34 +106,47 @@ class test_txn02(wttest.WiredTigerTestCase):
 
         ops = (self.op1, self.op2, self.op3, self.op4)
         txns = (self.txn1, self.txn2, self.txn3, self.txn4)
+        # print ', '.join('%s(%d)[%s]' % (ok[0], ok[1], txn)
+        #                 for ok, txn in zip(ops, txns))
         for i, ot in enumerate(zip(ops, txns)):
             self.session.begin_transaction()
             c = self.session.open_cursor(self.uri, None, 'overwrite')
             ok, txn = ot
             op, k = ok
+            # print '%s(%d)[%s]' % (ok[0], ok[1], txn)
             # We use the overwrite config so insert can update as needed.
             if op == 'insert' or op == 'update':
                 c.set_key(k)
                 c.set_value(i + 2)
                 c.insert()
+                # A snapshot transaction should not see the changes
+                self.check(self.session2, "isolation=snapshot", expected)
                 if txn == 'commit':
                     expected[k] = i + 2
             elif op == 'remove':
                 c.set_key(k)
                 c.remove()
+                # A snapshot transaction should not see the changes
+                self.check(self.session2, "isolation=snapshot", expected)
                 if txn == 'commit' and k in expected:
                     del expected[k]
             else:
                 print "UNKNOWN op", op
             if txn == 'commit':
                 # The transaction should see its own changes
-                self.check(expected)
+                self.check(self.session, None, expected)
+                # A read-uncommitted transaction should see the changes already
+                self.check(self.session2, "isolation=read-uncommitted", expected)
                 self.session.commit_transaction()
             elif txn == 'rollback':
                 self.session.rollback_transaction()
             else:
                 print "UNKNOWN op", op
-            self.check(expected)
+
+            # The change should be (in)visible in the same session
+            self.check(self.session, None, expected)
+            # The change should be (in)visible to snapshot transactions
+            self.check(self.session2, "isolation=snapshot", expected)
         self.session.drop(self.uri)
 
 if __name__ == '__main__':

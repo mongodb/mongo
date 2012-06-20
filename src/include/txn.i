@@ -73,7 +73,7 @@ __wt_txn_visible(WT_SESSION_IMPL *session, wt_txnid_t id)
 	 */
 	if (TXNID_LT(id, txn->snap_min))
 		return (1);
-	if (TXNID_LT(txn->id, txn->snap_max))
+	if (TXNID_LT(txn->snap_max, id))
 		return (0);
 
 	/*
@@ -125,7 +125,7 @@ __wt_txn_update_check(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 	WT_TXN *txn;
 
 	txn = &session->txn;
-	if (F_ISSET(txn, TXN_RUNNING) && txn->isolation == TXN_ISO_SNAPSHOT)
+	if (txn->isolation == TXN_ISO_SNAPSHOT)
 		while (upd != NULL && !__wt_txn_visible(session, upd->txnid)) {
 			if (upd->txnid != WT_TXN_ABORTED)
 				return (WT_DEADLOCK);

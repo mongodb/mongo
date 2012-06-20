@@ -144,10 +144,14 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 	if (!F_ISSET(txn, TXN_RUNNING))
 		WT_RET_MSG(session, EINVAL, "No transaction is active");
 
+	/* Clear the transaction's ID from the global table. */
 	txn_global = &S2C(session)->txn_global;
 	WT_ASSERT(session, txn_global->ids[session->id] != WT_TXN_NONE &&
 	    txn->id != WT_TXN_NONE);
 	WT_PUBLISH(txn_global->ids[session->id], txn->id = WT_TXN_NONE);
+
+	/* Reset the transaction state to not running. */
+	txn->isolation = TXN_ISO_READ_UNCOMMITTED;
 	F_CLR(txn, TXN_ERROR | TXN_RUNNING);
 
 	return (0);
