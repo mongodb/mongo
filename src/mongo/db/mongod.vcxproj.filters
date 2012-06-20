@@ -926,6 +926,9 @@
     <ClCompile Include="..\util\concurrency\mutexdebugger.cpp">
       <Filter>util\concurrency</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\third_party\murmurhash3\MurmurHash3.cpp">
+      <Filter>third_party\MurmurHash3</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\targetver.h" />
@@ -1701,6 +1704,9 @@
     <ClInclude Include="..\platform\float_utils.h">
       <Filter>platform</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\third_party\murmurhash3\MurmurHash3.h">
+      <Filter>third_party\MurmurHash3</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="mongo.ico">
@@ -1839,6 +1845,9 @@
     </Filter>
     <Filter Include="platform">
       <UniqueIdentifier>{e29a0f06-8d7b-426f-b055-3c36af62b8a8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="third_party\MurmurHash3">
+      <UniqueIdentifier>{7034e006-ad70-4939-9b1b-cf2b448eec6b}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

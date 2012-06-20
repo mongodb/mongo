@@ -107,6 +107,9 @@
     <Filter Include="platform">
       <UniqueIdentifier>{4358f1ff-2299-4965-8cb9-ccd23666364e}</UniqueIdentifier>
     </Filter>
+    <Filter Include="third_party\MurmurHash3">
+      <UniqueIdentifier>{d2669cd3-de27-4ff1-9be1-8a32191e91a8}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\client\connpool.h">
@@ -656,6 +659,9 @@
     </ClInclude>
     <ClInclude Include="..\platform\windows_basic.h">
       <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\murmurhash3\MurmurHash3.h">
+      <Filter>third_party\MurmurHash3</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -1524,6 +1530,9 @@
     </ClCompile>
     <ClCompile Include="..\util\concurrency\mutexdebugger.cpp">
       <Filter>util\concurrency</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\murmurhash3\MurmurHash3.cpp">
+      <Filter>third_party\MurmurHash3</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
