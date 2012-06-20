@@ -167,7 +167,7 @@ __btree_conf(WT_SESSION_IMPL *session)
 	/* Validate file types and check the data format plan. */
 	WT_RET(__wt_config_getones(session, config, "key_format", &cval));
 	WT_RET(__wt_struct_check(session, cval.str, cval.len, NULL, NULL));
-	if (cval.len > 0 && strncmp(cval.str, "r", cval.len) == 0)
+	if (__wt_config_strcmp(&cval, "r") == 0)
 		btree->type = BTREE_COL_VAR;
 	else
 		btree->type = BTREE_ROW;
@@ -182,8 +182,8 @@ __btree_conf(WT_SESSION_IMPL *session)
 		    session, config, "collator", &cval));
 		if (cval.len > 0) {
 			TAILQ_FOREACH(ncoll, &conn->collqh, q) {
-				if (strncmp(
-				    ncoll->name, cval.str, cval.len) == 0) {
+				if (__wt_config_strcmp(
+				    &cval, ncoll->name) == 0) {
 					btree->collator = ncoll->collator;
 					break;
 				}
