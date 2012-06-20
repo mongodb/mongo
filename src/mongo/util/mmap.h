@@ -42,10 +42,11 @@ namespace mongo {
     public:
         LockMongoFilesShared() : lk(mmmutex) { }
 
-        /** era changes anytime memory maps come and go.  thus you can use this as a cheap way to verify 
-            that things are still in the condition you expected. of course you must be shared locked 
-            otherwise someone could be in progress.  if you have unlocked this is a reasonable way to 
-            check your memory mapped pointer is still good.
+        /** era changes anytime memory maps come and go.  thus you can use this as a cheap way to check 
+            if nothing has changed since the last time you locked.  Of course you must be shared locked 
+            at the time of this call, otherwise someone could be in progress.  
+            
+            This is used for yielding; see PageFaultException::touch().
         */
         static unsigned getEra() { return era; }
 
