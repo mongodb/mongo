@@ -7,6 +7,8 @@
 
 #include "wt_internal.h"
 
+static int __conn_verbose_config(WT_SESSION_IMPL *, const char *[]);
+
 /*
  * api_err_printf --
  *	Extension API call to print to the error stream.
@@ -337,6 +339,34 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 	session = NULL;
 
 err:	API_END_NOTFOUND_MAP(session, ret);
+}
+
+/*
+ * __conn_reconfigure --
+ *	WT_CONNECTION->reconfigure method.
+ */
+static int
+__conn_reconfigure(WT_CONNECTION *wt_conn, const char *config)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+	const char *raw_cfg[] = { config, NULL };
+
+	conn = (WT_CONNECTION_IMPL *)wt_conn;
+
+	CONNECTION_API_CALL(conn, session, reconfigure, config, cfg);
+	WT_UNUSED(cfg);
+
+	/*
+	 * Don't include the default config: only override values the
+	 * application sets explicitly.
+	 */
+	WT_ERR(__wt_cache_config(conn, raw_cfg));
+	WT_ERR(__conn_verbose_config(session, raw_cfg));
+
+err:	API_END(session);
+	return (ret);
 }
 
 /*
@@ -681,25 +711,16 @@ err:	if (conn->lock_fh != NULL) {
 }
 
 /*
- * wiredtiger_open --
- *	Main library entry point: open a new connection to a WiredTiger
- *	database.
+ * __conn_verbose_config --
+ *      Set verbose configuration.
  */
-int
-wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
-    const char *config, WT_CONNECTION **wt_connp)
+static int
+__conn_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 {
-	static WT_CONNECTION stdc = {
-		__conn_load_extension,
-		__conn_add_data_source,
-		__conn_add_collator,
-		__conn_add_compressor,
-		__conn_add_extractor,
-		__conn_close,
-		__conn_get_home,
-		__conn_is_new,
-		__conn_open_session
-	};
+#ifdef HAVE_VERBOSE
+	WT_CONFIG_ITEM cval, sval;
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
 	static struct {
 		const char *name;
 		uint32_t flag;
@@ -718,7 +739,50 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		{ "verify",	WT_VERB_verify },
 		{ "write",	WT_VERB_write },
 		{ NULL, 0 }
-	}, directio_types[] = {
+	};
+
+	conn = S2C(session);
+
+	WT_RET_NOTFOUND_OK(__wt_config_gets(session, cfg, "verbose", &cval));
+	for (ft = verbtypes; ft->name != NULL; ft++) {
+		if ((ret = __wt_config_subgets(
+		    session, &cval, ft->name, &sval)) == 0 && sval.val != 0)
+			FLD_SET(conn->verbose, ft->flag);
+		else
+			FLD_CLR(conn->verbose, ft->flag);
+
+		WT_RET_NOTFOUND_OK(ret);
+	}
+#endif
+
+	return (0);
+}
+
+/*
+ * wiredtiger_open --
+ *	Main library entry point: open a new connection to a WiredTiger
+ *	database.
+ */
+int
+wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
+    const char *config, WT_CONNECTION **wt_connp)
+{
+	static WT_CONNECTION stdc = {
+		__conn_load_extension,
+		__conn_add_data_source,
+		__conn_add_collator,
+		__conn_add_compressor,
+		__conn_add_extractor,
+		__conn_close,
+		__conn_get_home,
+		__conn_is_new,
+		__conn_open_session,
+		__conn_reconfigure
+	};
+	static struct {
+		const char *name;
+		uint32_t flag;
+	} *ft, directio_types[] = {
 		{ "data",	WT_DIRECTIO_DATA },
 		{ "log",	WT_DIRECTIO_LOG },
 		{ NULL, 0 }
@@ -777,8 +841,6 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	/* Read the environment variable configuration. */
 	WT_ERR(__conn_config_env(session, cfg));
 
-	WT_ERR(__wt_config_gets(session, cfg, "cache_size", &cval));
-	conn->cache_size = cval.val;
 	WT_ERR(__wt_config_gets(session, cfg, "hazard_max", &cval));
 	conn->hazard_size = (uint32_t)cval.val;
 	WT_ERR(__wt_config_gets(session, cfg, "session_max", &cval));
@@ -791,18 +853,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		F_SET(conn, WT_CONN_TRANSACTIONAL);
 
 	/* Configure verbose flags. */
-	conn->verbose = 0;
-#ifdef HAVE_VERBOSE
-	WT_ERR(__wt_config_gets(session, cfg, "verbose", &cval));
-	for (ft = verbtypes; ft->name != NULL; ft++) {
-		ret = __wt_config_subgets(session, &cval, ft->name, &sval);
-		if (ret == 0) {
-			if (sval.val)
-				FLD_SET(conn->verbose, ft->flag);
-		} else if (ret != WT_NOTFOUND)
-			goto err;
-	}
-#endif
+	WT_ERR(__conn_verbose_config(session, cfg));
 
 	WT_ERR(__wt_config_gets(session, cfg, "logging", &cval));
 	if (cval.val != 0)

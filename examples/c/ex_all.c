@@ -220,6 +220,10 @@ cursor_ops(WT_SESSION *session)
 	/*! [Display an error] */
 	}
 
+	/*! [Reconfigure the cursor] */
+	ret = cursor->reconfigure(cursor, "append=true");
+	/*! [Reconfigure the cursor] */
+
 	/*! [Close the cursor] */
 	ret = cursor->close(cursor);
 	/*! [Close the cursor] */
@@ -288,7 +292,7 @@ checkpoint_ops(WT_SESSION *session)
 {
 	int ret;
 
-	/*! [session checkpoint] */
+	/*! [Checkpoint examples] */
 	/* Checkpoint the database. */
 	ret = session->checkpoint(session, NULL);
 
@@ -334,7 +338,7 @@ checkpoint_ops(WT_SESSION *session)
 	 */
 	ret = session->checkpoint(session,
 	    "target=(\"table:mytable\"),name=July01,drop=(May01,June01)");
-	/*! [session checkpoint] */
+	/*! [Checkpoint examples] */
 
 	return (ret);
 }
@@ -353,34 +357,33 @@ session_ops(WT_SESSION *session)
 
 	checkpoint_ops(session);
 
-	/*! [session drop] */
-	/* Discard a table. */
+	/*! [Drop a table] */
 	ret = session->drop(session, "table:mytable", NULL);
-	/*! [session drop] */
+	/*! [Drop a table] */
 
-	/*! [session dumpfile] */
+	/*! [Dump a file] */
 	ret = session->dumpfile(session, "file:myfile", NULL);
-	/*! [session dumpfile] */
+	/*! [Dump a file] */
 
-	/*! [session msg_printf] */
+	/*! [Print to the message stream] */
 	ret = session->msg_printf(
 	    session, "process ID %" PRIuMAX, (uintmax_t)getpid());
-	/*! [session msg_printf] */
+	/*! [Print to the message stream] */
 
-	/*! [session rename] */
+	/*! [Rename a table] */
 	ret = session->rename(session, "table:old", "table:new", NULL);
-	/*! [session rename] */
+	/*! [Rename a table] */
 
-	/*! [session salvage] */
+	/*! [Salvage a table] */
 	ret = session->salvage(session, "table:mytable", NULL);
-	/*! [session salvage] */
+	/*! [Salvage a table] */
 
-	/*! [session truncate] */
+	/*! [Truncate a table] */
 	ret = session->truncate(session, "table:mytable", NULL, NULL, NULL);
-	/*! [session truncate] */
+	/*! [Truncate a table] */
 
 	{
-	/*! [session range truncate] */
+	/*! [Truncate a range] */
 	WT_CURSOR *start, *stop;
 
 	ret = session->open_cursor(
@@ -394,32 +397,32 @@ session_ops(WT_SESSION *session)
 	ret = stop->search(stop);
 
 	ret = session->truncate(session, NULL, start, stop, NULL);
-	/*! [session range truncate] */
+	/*! [Truncate a range] */
 	}
 
-	/*! [session upgrade] */
+	/*! [Upgrade a table] */
 	ret = session->upgrade(session, "table:mytable", NULL);
-	/*! [session upgrade] */
+	/*! [Upgrade a table] */
 
-	/*! [session verify] */
+	/*! [Verify a table] */
 	ret = session->verify(session, "table:mytable", NULL);
-	/*! [session verify] */
+	/*! [Verify a table] */
 
-	/*! [session begin transaction] */
+	/*! [Begin a transaction] */
 	ret = session->begin_transaction(session, NULL);
-	/*! [session begin transaction] */
+	/*! [Begin a transaction] */
 
-	/*! [session commit transaction] */
+	/*! [Commit a transaction] */
 	ret = session->commit_transaction(session, NULL);
-	/*! [session commit transaction] */
+	/*! [Commit a transaction] */
 
-	/*! [session rollback transaction] */
+	/*! [Rollback a transaction] */
 	ret = session->rollback_transaction(session, NULL);
-	/*! [session rollback transaction] */
+	/*! [Rollback a transaction] */
 
-	/*! [session close] */
+	/*! [Close a session] */
 	ret = session->close(session, NULL);
-	/*! [session close] */
+	/*! [Close a session] */
 
 	return (ret);
 }
@@ -692,27 +695,27 @@ connection_ops(WT_CONNECTION *conn)
 {
 	int ret;
 
-	/*! [conn load extension] */
+	/*! [Load an extension] */
 	ret = conn->load_extension(conn, "my_extension.dll", NULL);
-	/*! [conn load extension] */
+	/*! [Load an extension] */
 
 	add_collator(conn);
 	add_data_source(conn);
 	add_extractor(conn);
 
-	/*! [conn close] */
-	ret = conn->close(conn, NULL);
-	/*! [conn close] */
+	/*! [Reconfigure a connection] */
+	ret = conn->reconfigure(conn, "eviction_target=75");
+	/*! [Reconfigure a connection] */
 
-	/*! [conn get_home] */
+	/*! [Get the database home directory] */
 	printf("The database home is %s\n", conn->get_home(conn));
-	/*! [conn get_home] */
+	/*! [Get the database home directory] */
 
-	/*! [is_new] */
+	/*! [Check if the database is newly created] */
 	if (conn->is_new(conn)) {
 		/* First time initialization. */
 	}
-	/*! [is_new] */
+	/*! [Check if the database is newly created] */
 
 	{
 	/*! [Open a session] */
@@ -722,6 +725,10 @@ connection_ops(WT_CONNECTION *conn)
 
 	session_ops(session);
 	}
+
+	/*! [Close a connection] */
+	ret = conn->close(conn, NULL);
+	/*! [Close a connection] */
 
 	return (ret);
 }

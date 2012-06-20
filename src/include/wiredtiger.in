@@ -371,6 +371,23 @@ struct __wt_cursor {
 	 */
 	int __F(close)(WT_CURSOR *cursor);
 
+	/*! Reconfigure a cursor at run-time.
+	 *
+	 * @snippet ex_all.c Reconfigure the cursor
+	 *
+	 * @param cursor the cursor handle
+	 * @configstart{cursor.reconfigure, see dist/api_data.py}
+	 * @config{append, only supported by cursors with record number keys:
+	 * append the value as a new record\, creating a new record number
+	 * key.,a boolean flag; default \c false.}
+	 * @config{overwrite, change the behavior of the cursor's insert method
+	 * to overwrite previously existing values.,a boolean flag; default \c
+	 * false.}
+	 * @configend
+	 * @errors
+	 */
+	int __F(reconfigure)(WT_CURSOR *cursor, const char *config);
+
 	/*
 	 * Protected fields, only to be used by cursor implementations.
 	 */
@@ -421,7 +438,7 @@ struct __wt_session {
 	 * including rolling back any active transactions and closing any
 	 * cursors that remain open in the session.
 	 *
-	 * @snippet ex_all.c session close
+	 * @snippet ex_all.c Close a session
 	 *
 	 * @param session the session handle
 	 * @configempty{session.close, see dist/api_data.py}
@@ -635,7 +652,7 @@ struct __wt_session {
 
 	/*! Drop (delete) an object.
 	 *
-	 * @snippet ex_all.c session drop
+	 * @snippet ex_all.c Drop a table
 	 *
 	 * @param session the session handle
 	 * @param name the URI of the object to drop, such as \c "table:stock"
@@ -650,7 +667,7 @@ struct __wt_session {
 
 	/*! Rename an object.
 	 *
-	 * @snippet ex_all.c session rename
+	 * @snippet ex_all.c Rename a table
 	 *
 	 * @param session the session handle
 	 * @param oldname the current URI of the object, such as \c "table:old"
@@ -675,7 +692,7 @@ struct __wt_session {
 	 * Files are rebuilt in place, the salvage method overwrites the
 	 * existing files.
 	 *
-	 * @snippet ex_all.c session salvage
+	 * @snippet ex_all.c Salvage a table
 	 *
 	 * @param session the session handle
 	 * @param name the URI of the file or table to salvage
@@ -690,9 +707,9 @@ struct __wt_session {
 
 	/*! Truncate a file, table or a cursor range.
 	 *
-	 * @snippet ex_all.c session truncate
+	 * @snippet ex_all.c Truncate a table
 	 *
-	 * @snippet ex_all.c session range truncate
+	 * @snippet ex_all.c Truncate a range
 	 *
 	 * @param session the session handle
 	 * @param name the URI of the file or table to truncate
@@ -713,7 +730,7 @@ struct __wt_session {
 	 *
 	 * Upgrade upgrades a file or table, if upgrade is required.
 	 *
-	 * @snippet ex_all.c session upgrade
+	 * @snippet ex_all.c Upgrade a table
 	 *
 	 * @param session the session handle
 	 * @param name the URI of the file or table to upgrade
@@ -729,7 +746,7 @@ struct __wt_session {
 	 * comprised, have been corrupted.  The WT_SESSION::salvage method
 	 * can be used to repair a corrupted file,
 	 *
-	 * @snippet ex_all.c session verify
+	 * @snippet ex_all.c Verify a table
 	 *
 	 * @param session the session handle
 	 * @param name the URI of the file or table to verify
@@ -753,7 +770,7 @@ struct __wt_session {
 	 * Not permitted if a transaction is in progress or cursors are open in
 	 * the session.
 	 *
-	 * @snippet ex_all.c session begin transaction
+	 * @snippet ex_all.c Begin a transaction
 	 *
 	 * @param session the session handle
 	 * @configstart{session.begin_transaction, see dist/api_data.py}
@@ -779,7 +796,7 @@ struct __wt_session {
 	 * cursors opened during the transaction will be closed before the
 	 * commit is processed.
 	 *
-	 * @snippet ex_all.c session commit transaction
+	 * @snippet ex_all.c Commit a transaction
 	 *
 	 * @param session the session handle
 	 * @configempty{session.commit_transaction, see dist/api_data.py}
@@ -793,7 +810,7 @@ struct __wt_session {
 	 * cursors opened during the transaction will be closed before the
 	 * rollback is processed.
 	 *
-	 * @snippet ex_all.c session rollback transaction
+	 * @snippet ex_all.c Rollback a transaction
 	 *
 	 * @param session the session handle
 	 * @configempty{session.rollback_transaction, see dist/api_data.py}
@@ -806,7 +823,7 @@ struct __wt_session {
 	 * the checkpoint starts.  Additionally, checkpoints may optionally be
 	 * discarded.
 	 *
-	 * @snippet ex_all.c session checkpoint
+	 * @snippet ex_all.c Checkpoint examples
 	 *
 	 * @param session the session handle
 	 * @configstart{session.checkpoint, see dist/api_data.py}
@@ -835,7 +852,7 @@ struct __wt_session {
 	 * The specified file is displayed in a non-portable debugging mode to
 	 * the application's standard output.
 	 *
-	 * @snippet ex_all.c session dumpfile
+	 * @snippet ex_all.c Dump a file
 	 *
 	 * @param session the session handle
 	 * @param name the URI of the file to dump
@@ -847,7 +864,7 @@ struct __wt_session {
 
 	/*! Send a string to the message handler for debugging.
 	 *
-	 * @snippet ex_all.c session msg_printf
+	 * @snippet ex_all.c Print to the message stream
 	 *
 	 * @param session the session handle
 	 * @param fmt a printf-like format specification
@@ -874,7 +891,7 @@ struct __wt_session {
 struct __wt_connection {
 	/*! Load an extension.
 	 *
-	 * @snippet ex_all.c conn load extension
+	 * @snippet ex_all.c Load an extension
 	 *
 	 * @param connection the connection handle
 	 * @param path the filename of the extension module
@@ -963,7 +980,7 @@ struct __wt_connection {
 	 *
 	 * Any open sessions will be closed.
 	 *
-	 * @snippet ex_all.c conn close
+	 * @snippet ex_all.c Close a connection
 	 *
 	 * @param connection the connection handle
 	 * @configempty{connection.close, see dist/api_data.py}
@@ -973,7 +990,7 @@ struct __wt_connection {
 
 	/*! The home directory of the connection.
 	 *
-	 * @snippet ex_all.c conn get_home
+	 * @snippet ex_all.c Get the database home directory
 	 *
 	 * @param connection the connection handle
 	 * @returns a pointer to a string naming the home directory
@@ -982,7 +999,7 @@ struct __wt_connection {
 
 	/*! Return if opening this handle created the database.
 	 *
-	 * @snippet ex_all.c is_new
+	 * @snippet ex_all.c Check if the database is newly created
 	 *
 	 * @param connection the connection handle
 	 * @returns false (zero) if the connection existed before the call to
@@ -1005,6 +1022,34 @@ struct __wt_connection {
 	int __F(open_session)(WT_CONNECTION *connection,
 	    WT_EVENT_HANDLER *errhandler, const char *config,
 	    WT_SESSION **sessionp);
+
+	/*! Reconfigure a connection at run-time.
+	 *
+	 * @snippet ex_all.c Reconfigure a connection
+	 *
+	 * @param connection the connection handle
+	 * @configstart{connection.reconfigure, see dist/api_data.py}
+	 * @config{cache_size, maximum heap memory to allocate for the cache.,an
+	 * integer between 1MB and 10TB; default \c 100MB.}
+	 * @config{error_prefix, prefix string for error messages.,a string;
+	 * default empty.}
+	 * @config{eviction_target, continue evicting until the cache becomes
+	 * less full than this (as a percentage).  Must be less than \c
+	 * eviction_trigger.,an integer between 10 and 99; default \c 80.}
+	 * @config{eviction_trigger, trigger eviction when the cache becomes
+	 * this full (as a percentage).,an integer between 10 and 99; default \c
+	 * 95.}
+	 * @config{verbose, enable messages for various events.  Options are
+	 * given as a list\, such as
+	 * <code>"verbose=[evictserver\,read]"</code>.,a list\, with values
+	 * chosen from the following options: \c "block"\, \c "ckpt"\, \c
+	 * "evict"\, \c "evictserver"\, \c "fileops"\, \c "hazard"\, \c
+	 * "mutex"\, \c "read"\, \c "readserver"\, \c "reconcile"\, \c
+	 * "salvage"\, \c "verify"\, \c "write"; default empty.}
+	 * @configend
+	 * @errors
+	 */
+	int __F(reconfigure)(WT_CONNECTION *connection, const char *config);
 };
 
 /*! Open a connection to a database.

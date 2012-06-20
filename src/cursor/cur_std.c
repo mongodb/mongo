@@ -48,7 +48,7 @@ __wt_cursor_get_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 	size_t size;
 	const char *fmt;
 
-	CURSOR_API_CALL(cursor, session, get_key, NULL);
+	CURSOR_API_CALL_NOCONF(cursor, session, get_key, NULL);
 	WT_CURSOR_NEEDKEY(cursor);
 
 	if (WT_CURSOR_RECNO(cursor)) {
@@ -87,7 +87,7 @@ __wt_cursor_get_value(WT_CURSOR *cursor, ...)
 	const char *fmt;
 	va_list ap;
 
-	CURSOR_API_CALL(cursor, session, get_value, NULL);
+	CURSOR_API_CALL_NOCONF(cursor, session, get_value, NULL);
 	WT_CURSOR_NEEDVALUE(cursor);
 
 	va_start(ap, cursor);
@@ -130,7 +130,7 @@ __wt_cursor_set_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 	va_list ap_copy;
 	const char *fmt, *str;
 
-	CURSOR_API_CALL(cursor, session, set_key, NULL);
+	CURSOR_API_CALL_NOCONF(cursor, session, set_key, NULL);
 
 	/* Fast path some common cases: single strings or byte arrays. */
 	if (WT_CURSOR_RECNO(cursor)) {
@@ -202,7 +202,7 @@ __wt_cursor_set_value(WT_CURSOR *cursor, ...)
 	size_t sz;
 	va_list ap;
 
-	CURSOR_API_CALL(cursor, session, set_value, NULL);
+	CURSOR_API_CALL_NOCONF(cursor, session, set_value, NULL);
 
 	va_start(ap, cursor);
 	fmt = F_ISSET(cursor,
@@ -262,7 +262,7 @@ __cursor_equals(WT_CURSOR *cursor, WT_CURSOR *other)
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
-	CURSOR_API_CALL(cursor, session, equals, NULL);
+	CURSOR_API_CALL_NOCONF(cursor, session, equals, NULL);
 
 	/* Both cursors must refer to the same source. */
 	if (other == NULL || strcmp(cursor->uri, other->uri) != 0)
@@ -292,7 +292,7 @@ __wt_cursor_close(WT_CURSOR *cursor)
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
-	CURSOR_API_CALL(cursor, session, close, NULL);
+	CURSOR_API_CALL_NOCONF(cursor, session, close, NULL);
 
 	__wt_buf_free(session, &cursor->key);
 	__wt_buf_free(session, &cursor->value);
@@ -304,6 +304,66 @@ __wt_cursor_close(WT_CURSOR *cursor)
 	__wt_free(session, cursor);
 
 	API_END(session);
+	return (ret);
+}
+
+/*
+ * __cursor_runtime_config --
+ *	Set runtime-configurable settings.
+ */
+static int
+__cursor_runtime_config(WT_CURSOR *cursor, const char *cfg[])
+{
+	WT_DECL_RET;
+	WT_CONFIG_ITEM cval;
+	WT_SESSION_IMPL *session;
+
+	session = (WT_SESSION_IMPL *)cursor->session;
+
+	/* The append flag is only relevant to column stores. */
+	if (WT_CURSOR_RECNO(cursor)) {
+		if ((ret =
+		    __wt_config_gets(session, cfg, "append", &cval)) == 0) {
+			if (cval.val)
+				F_SET(cursor, WT_CURSTD_APPEND);
+			else
+				F_CLR(cursor, WT_CURSTD_APPEND);
+		}
+		WT_RET_NOTFOUND_OK(ret);
+	}
+
+	if ((ret = __wt_config_gets(session, cfg, "overwrite", &cval)) == 0) {
+		if (cval.val)
+			F_SET(cursor, WT_CURSTD_OVERWRITE);
+		else
+			F_CLR(cursor, WT_CURSTD_OVERWRITE);
+	}
+	WT_RET_NOTFOUND_OK(ret);
+
+	return (0);
+}
+
+/*
+ * __cursor_reconfigure --
+ *	WT_CURSOR->reconfigure default implementation.
+ */
+static int
+__cursor_reconfigure(WT_CURSOR *cursor, const char *config)
+{
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+	const char *raw_cfg[] = { config, NULL };
+
+	CURSOR_API_CALL(cursor, session, reconfigure, NULL, config, cfg);
+
+	/*
+	 * We need to take care here: only override with values that appear in
+	 * the config string from the application, not with defaults.
+	 */
+	WT_UNUSED(cfg);
+	ret = __cursor_runtime_config(cursor, raw_cfg);
+
+err:	API_END(session);
 	return (ret);
 }
 
@@ -395,6 +455,8 @@ __wt_cursor_init(WT_CURSOR *cursor,
 		cursor->equals = __cursor_equals;
 	if (cursor->search == NULL)
 		cursor->search = __cursor_search;
+	if (cursor->reconfigure == NULL)
+		cursor->reconfigure = __cursor_reconfigure;
 
 	if (cursor->uri == NULL)
 		WT_RET(__wt_strdup(session, uri, &cursor->uri));
@@ -402,12 +464,8 @@ __wt_cursor_init(WT_CURSOR *cursor,
 	WT_CLEAR(cursor->key);
 	WT_CLEAR(cursor->value);
 
-	/* The append flag is only relevant to column stores. */
-	if (WT_CURSOR_RECNO(cursor)) {
-		WT_RET(__wt_config_gets(session, cfg, "append", &cval));
-		if (cval.val != 0)
-			F_SET(cursor, WT_CURSTD_APPEND);
-	}
+	/* Set runtime-configurable settings. */
+	WT_RET(__cursor_runtime_config(cursor, cfg));
 
 	WT_RET(__wt_config_gets(session, cfg, "dump", &cval));
 	if (cval.len != 0) {
@@ -417,10 +475,6 @@ __wt_cursor_init(WT_CURSOR *cursor,
 		owner = cdump;
 	} else
 		cdump = NULL;
-
-	WT_RET(__wt_config_gets(session, cfg, "overwrite", &cval));
-	if (cval.val != 0)
-		F_SET(cursor, WT_CURSTD_OVERWRITE);
 
 	WT_RET(__wt_config_gets(session, cfg, "raw", &cval));
 	if (cval.val != 0)

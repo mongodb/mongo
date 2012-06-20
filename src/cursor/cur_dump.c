@@ -59,7 +59,7 @@ __curdump_get_key(WT_CURSOR *cursor, ...)
 
 	cdump = (WT_CURSOR_DUMP *)cursor;
 	child = cdump->child;
-	CURSOR_API_CALL(cursor, session, get_key, NULL);
+	CURSOR_API_CALL_NOCONF(cursor, session, get_key, NULL);
 
 	if (WT_CURSOR_RECNO(cursor) && !F_ISSET(cursor, WT_CURSTD_RAW)) {
 		WT_ERR(child->get_key(child, &recno));
@@ -131,7 +131,7 @@ __curdump_set_key(WT_CURSOR *cursor, ...)
 
 	cdump = (WT_CURSOR_DUMP *)cursor;
 	child = cdump->child;
-	CURSOR_API_CALL(cursor, session, set_key, NULL);
+	CURSOR_API_CALL_NOCONF(cursor, session, set_key, NULL);
 
 	va_start(ap, cursor);
 	if (F_ISSET(cursor, WT_CURSTD_RAW))
@@ -175,7 +175,7 @@ __curdump_get_value(WT_CURSOR *cursor, ...)
 
 	cdump = (WT_CURSOR_DUMP *)cursor;
 	child = cdump->child;
-	CURSOR_API_CALL(cursor, session, get_value, NULL);
+	CURSOR_API_CALL_NOCONF(cursor, session, get_value, NULL);
 
 	WT_ERR(child->get_value(child, &item));
 
@@ -211,7 +211,7 @@ __curdump_set_value(WT_CURSOR *cursor, ...)
 
 	cdump = (WT_CURSOR_DUMP *)cursor;
 	child = cdump->child;
-	CURSOR_API_CALL(cursor, session, set_value, NULL);
+	CURSOR_API_CALL_NOCONF(cursor, session, set_value, NULL);
 
 	va_start(ap, cursor);
 	if (F_ISSET(cursor, WT_CURSTD_RAW))
@@ -273,7 +273,7 @@ __curdump_close(WT_CURSOR *cursor)
 	cdump = (WT_CURSOR_DUMP *)cursor;
 	child = cdump->child;
 
-	CURSOR_API_CALL(cursor, session, get_key, NULL);
+	CURSOR_API_CALL_NOCONF(cursor, session, get_key, NULL);
 	if (child != NULL)
 		WT_TRET(child->close(child));
 	/* We shared the child's URI. */
@@ -310,6 +310,8 @@ __wt_curdump_create(WT_CURSOR *child, WT_CURSOR *owner, WT_CURSOR **cursorp)
 		__curdump_update,
 		__curdump_remove,
 		__curdump_close,
+		(int (*)		/* config */
+		    (WT_CURSOR *, const char *))__wt_cursor_notsup,
 		{ NULL, NULL },		/* TAILQ_ENTRY q */
 		0,			/* recno key */
 		{ 0 },                  /* recno raw buffer */
