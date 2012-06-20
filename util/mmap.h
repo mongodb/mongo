@@ -274,7 +274,7 @@ namespace mongo {
             }
         }
     }
-
+    extern void* getNextMemoryMappedFileLocation( unsigned long long mmfSize );
 #endif
 
 } // namespace mongo

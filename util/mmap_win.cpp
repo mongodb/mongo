@@ -30,6 +30,26 @@ namespace mongo {
     MAdvise::MAdvise(void *,unsigned, Advice) { }
     MAdvise::~MAdvise() { }
 
+    static unsigned long long _nextMemoryMappedFileLocation = 256LL * 1024LL * 1024LL * 1024LL;
+    static SimpleMutex _nextMemoryMappedFileLocationMutex( "nextMemoryMappedFileLocationMutex" );
+
+    void* getNextMemoryMappedFileLocation( unsigned long long mmfSize ) {
+        if ( 4 == sizeof(void*) ) {
+            return 0;
+        }
+        SimpleMutex::scoped_lock lk( _nextMemoryMappedFileLocationMutex );
+        static unsigned long long granularity = 0;
+        if ( 0 == granularity ) {
+            SYSTEM_INFO systemInfo;
+            GetSystemInfo( &systemInfo );
+            granularity = static_cast<unsigned long long>( systemInfo.dwAllocationGranularity );
+        }
+        unsigned long long thisMemoryMappedFileLocation = _nextMemoryMappedFileLocation;
+        mmfSize = ( mmfSize + granularity - 1) & ~( granularity - 1 );
+        _nextMemoryMappedFileLocation += mmfSize;
+        return reinterpret_cast<void*>( static_cast<uintptr_t>( thisMemoryMappedFileLocation ) );
+    }
+
     /** notification on unmapping so we can clear writable bits */
     void MemoryMappedFile::clearWritableBits(void *p) {
         for( unsigned i = ((size_t)p)/ChunkSize; i <= (((size_t)p)+len)/ChunkSize; i++ ) {
@@ -67,15 +87,24 @@ namespace mongo {
     void* MemoryMappedFile::createReadOnlyMap() {
         assert( maphandle );
         scoped_lock lk(mapViewMutex);
-        void *p = MapViewOfFile(maphandle, FILE_MAP_READ, /*f ofs hi*/0, /*f ofs lo*/ 0, /*dwNumberOfBytesToMap 0 means to eof*/0);
-        if ( p == 0 ) {
-            DWORD e = GetLastError();
-            log() << "FILE_MAP_READ MapViewOfFile failed " << filename() << " " << errnoWithDescription(e) << endl;
+        LPVOID thisAddress = getNextMemoryMappedFileLocation( len );
+        void* readOnlyMapAddress = MapViewOfFileEx(
+                maphandle,          // file mapping handle
+                FILE_MAP_READ,      // access
+                0, 0,               // file offset, high and low
+                0,                  // bytes to map, 0 == all
+                thisAddress );      // address to place file
+        if ( 0 == readOnlyMapAddress ) {
+            DWORD dosError = GetLastError();
+            log() << "MapViewOfFileEx for " << filename()
+                    << " failed with " << errnoWithDescription( dosError )
+                    << " (file size is " << len << ")"
+                    << " in MemoryMappedFile::createReadOnlyMap, terminating"
+                    << endl;
+            ::abort();
         }
-        else {
-            views.push_back(p);
-        }
-        return p;
+        views.push_back( readOnlyMapAddress );
+        return readOnlyMapAddress;
     }
 
     void* MemoryMappedFile::map(const char *filenameIn, unsigned long long &length, int options) {
@@ -138,18 +167,28 @@ namespace mongo {
         void *view = 0;
         {
             scoped_lock lk(mapViewMutex);
-            DWORD access = (options&READONLY)? FILE_MAP_READ : FILE_MAP_ALL_ACCESS;
-            view = MapViewOfFile(maphandle, access, /*f ofs hi*/0, /*f ofs lo*/ 0, /*dwNumberOfBytesToMap 0 means to eof*/0);
+            DWORD access = ( options & READONLY ) ? FILE_MAP_READ : FILE_MAP_ALL_ACCESS;
+            LPVOID thisAddress = getNextMemoryMappedFileLocation( length );
+            view = MapViewOfFileEx(
+                    maphandle,      // file mapping handle
+                    access,         // access
+                    0, 0,           // file offset, high and low
+                    0,              // bytes to map, 0 == all
+                    thisAddress );  // address to place file
         }
-        if ( view == 0 ) {
-            DWORD e = GetLastError();
-            log() << "MapViewOfFile failed " << filename << " " << errnoWithDescription(e) << 
-                ((sizeof(void*)==4)?" (32 bit build)":"") << endl;
-            close();
+        {
+            if ( view == 0 ) {
+                DWORD dosError = GetLastError();
+                log() << "MapViewOfFileEx for " << filename
+                        << " failed with " << errnoWithDescription( dosError )
+                        << " (file size is " << length << ")"
+                        << " in MemoryMappedFile::map, terminating"
+                        << endl;
+                close();
+                ::abort();
+            }
         }
-        else {
-            views.push_back(view);
-        }
+        views.push_back(view);
         len = length;
 
         return view;
