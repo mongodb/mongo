@@ -400,22 +400,32 @@ struct __wt_ref {
  * Each in-memory page row-store leaf page has an array of WT_ROW structures:
  * this is created from on-page data when a page is read from the file.  It's
  * sorted by key, fixed in size, and references data on the page.
- */
-struct __wt_row {
-	void	*__key;			/* On-page cell or off-page WT_IKEY */
-};
-
-/*
+ *
  * Multiple threads of control may be searching the in-memory row-store pages,
  * and the key may be instantiated at any time.  Code must be able to handle
  * both when the key has not been instantiated (the key field points into the
  * page's disk image), and when the key has been instantiated (the key field
  * points outside the page's disk image).  We don't need barriers because the
  * key is updated atomically, but code that reads the key field multiple times
- * is a very, very bad idea.  We obscure the field name and use a copy macro in
- * all references to the field to make sure we don't introduce this bug (again).
+ * is a very, very bad idea.  Specifically, do not do this:
+ *
+ *	key = rip->key;
+ *	if (key_is_on_page(key)) {
+ *		cell = rip->key;
+ *	}
+ *
+ * The field is declared volatile (so the compiler knows it shouldn't read it
+ * multiple times), and we obscure the field name and use a copy macro in all
+ * references to the field (so the code doesn't read it multiple times), all
+ * to make sure we don't introduce this bug (again).
+ *
+ * Casting the ared to a (void *) is safe as we are not taking the address of
+ * the object.
  */
-#define	WT_ROW_KEY_COPY(rip)	((rip)->__key)
+struct __wt_row {
+	volatile void *__key;		/* On-page cell or off-page WT_IKEY */
+};
+#define	WT_ROW_KEY_COPY(rip)	((void *)((rip)->__key))
 #define	WT_ROW_KEY_SET(rip, v)	((rip)->__key) = (v)
 
 /*
