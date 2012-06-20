@@ -587,7 +587,6 @@ extern void __wt_cursor_set_key(WT_CURSOR *cursor, ...);
 extern void __wt_cursor_set_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap);
 extern void __wt_cursor_set_value(WT_CURSOR *cursor, ...);
 extern int __wt_cursor_close(WT_CURSOR *cursor);
-extern int __wt_cursor_config(WT_CURSOR *cursor, const char *config);
 extern int __wt_cursor_dup(WT_SESSION_IMPL *session,
     WT_CURSOR *to_dup,
     const char *config,

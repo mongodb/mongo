@@ -57,6 +57,11 @@
 	__wt_err(session, __ret, __VA_ARGS__);				\
 	return (__ret);							\
 } while (0)
+#define	WT_RET_NOTFOUND_OK(a) do {					\
+	int __ret;							\
+	if ((__ret = (a)) != 0 && __ret != WT_NOTFOUND)			\
+		return (__ret);						\
+} while (0)
 
 /* Set "ret" if not already set. */
 #define	WT_TRET(a) do {							\

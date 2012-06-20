@@ -22,27 +22,19 @@ __wt_cache_config(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	session = conn->default_session;
 	cache = conn->cache;
 
-	switch (ret =
-	    __wt_config_gets(session, cfg, "eviction_target", &cval)) {
-	case 0:
-		cache->eviction_target = (u_int)cval.val;
-		break;
-	case WT_NOTFOUND:
-		break;
-	default:
-		return (ret);
-	}
+	if ((ret = __wt_config_gets(session, cfg, "cache_size", &cval)) == 0)
+		conn->cache_size = cval.val;
+	WT_RET_NOTFOUND_OK(ret);
 
-	switch (ret =
-	    __wt_config_gets(session, cfg, "eviction_trigger", &cval)) {
-	case 0:
+	if ((ret =
+	    __wt_config_gets(session, cfg, "eviction_target", &cval)) == 0)
+		cache->eviction_target = (u_int)cval.val;
+	WT_RET_NOTFOUND_OK(ret);
+
+	if ((ret =
+	    __wt_config_gets(session, cfg, "eviction_trigger", &cval)) == 0)
 		cache->eviction_trigger = (u_int)cval.val;
-		break;
-	case WT_NOTFOUND:
-		break;
-	default:
-		return (ret);
-	}
+	WT_RET_NOTFOUND_OK(ret);
 
 	return (0);
 }

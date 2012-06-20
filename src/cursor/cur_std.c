@@ -308,55 +308,60 @@ __wt_cursor_close(WT_CURSOR *cursor)
 }
 
 /*
- * __cursor_config --
- *	Configure a cursor in run-time.
+ * __cursor_runtime_config --
+ *	Set runtime-configurable settings.
  */
 static int
-__cursor_config(WT_CURSOR *cursor, const char *cfg[])
+__cursor_runtime_config(WT_CURSOR *cursor, const char *cfg[])
 {
-	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
+	WT_CONFIG_ITEM cval;
 	WT_SESSION_IMPL *session;
 
 	session = (WT_SESSION_IMPL *)cursor->session;
 
 	/* The append flag is only relevant to column stores. */
-	if (WT_CURSOR_RECNO(cursor))
-		switch (ret = __wt_config_gets(session, cfg, "append", &cval)) {
-		case 0:
-			F_SET(cursor, WT_CURSTD_APPEND);
-			break;
-		case WT_NOTFOUND:
-			break;
-		default:
-			return (ret);
+	if (WT_CURSOR_RECNO(cursor)) {
+		if ((ret =
+		    __wt_config_gets(session, cfg, "append", &cval)) == 0) {
+			if (cval.val)
+				F_SET(cursor, WT_CURSTD_APPEND);
+			else
+				F_CLR(cursor, WT_CURSTD_APPEND);
 		}
-
-	switch (ret = __wt_config_gets(session, cfg, "overwrite", &cval)) {
-	case 0:
-		F_SET(cursor, WT_CURSTD_OVERWRITE);
-		break;
-	case WT_NOTFOUND:
-		break;
-	default:
-		return (ret);
+		WT_RET_NOTFOUND_OK(ret);
 	}
+
+	if ((ret = __wt_config_gets(session, cfg, "overwrite", &cval)) == 0) {
+		if (cval.val)
+			F_SET(cursor, WT_CURSTD_OVERWRITE);
+		else
+			F_CLR(cursor, WT_CURSTD_OVERWRITE);
+	}
+	WT_RET_NOTFOUND_OK(ret);
 
 	return (0);
 }
 
 /*
- * __wt_cursor_config --
- *	Configure a cursor in run-time.
+ * __cursor_reconfigure --
+ *	WT_CURSOR->reconfigure default implementation.
  */
-int
-__wt_cursor_config(WT_CURSOR *cursor, const char *config)
+static int
+__cursor_reconfigure(WT_CURSOR *cursor, const char *config)
 {
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
+	const char *raw_cfg[] = { config, NULL };
 
-	CURSOR_API_CALL(cursor, session, config, NULL, config, cfg);
-	WT_ERR(__cursor_config(cursor, cfg));
+	CURSOR_API_CALL(cursor, session, reconfigure, NULL, config, cfg);
+
+	/*
+	 * We need to take care here: only override with values that appear in
+	 * the config string from the application, not with defaults.
+	 */
+	WT_UNUSED(cfg);
+	ret = __cursor_runtime_config(cursor, raw_cfg);
 
 err:	API_END(session);
 	return (ret);
@@ -450,6 +455,8 @@ __wt_cursor_init(WT_CURSOR *cursor,
 		cursor->equals = __cursor_equals;
 	if (cursor->search == NULL)
 		cursor->search = __cursor_search;
+	if (cursor->reconfigure == NULL)
+		cursor->reconfigure = __cursor_reconfigure;
 
 	if (cursor->uri == NULL)
 		WT_RET(__wt_strdup(session, uri, &cursor->uri));
@@ -457,8 +464,8 @@ __wt_cursor_init(WT_CURSOR *cursor,
 	WT_CLEAR(cursor->key);
 	WT_CLEAR(cursor->value);
 
-	/* Use a common routine for run-time configuration options. */
-	WT_RET(__cursor_config(cursor, cfg));
+	/* Set runtime-configurable settings. */
+	WT_RET(__cursor_runtime_config(cursor, cfg));
 
 	WT_RET(__wt_config_gets(session, cfg, "dump", &cval));
 	if (cval.len != 0) {
