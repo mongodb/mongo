@@ -183,7 +183,7 @@ namespace mongo {
         vector<string> dbNames;
         try {
             scoped_ptr<ScopedDbConnection> newShardConnPtr(
-                    ScopedDbConnection::getScopedDbConnection( servers.toString() ) );
+                    ScopedDbConnection::getInternalScopedDbConnection( servers.toString() ) );
             ScopedDbConnection& newShardConn = *newShardConnPtr;
             newShardConn->getLastError();
 
