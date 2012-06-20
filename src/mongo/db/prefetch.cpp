@@ -75,7 +75,7 @@ namespace mongo {
                 fetchIndexInserters(/*out*/unusedKeys, inserter, nsd, indexNo, obj, unusedDl);
             }
             catch (const DBException& e) {
-                LOG(2) << "exception in prefetcher: " << e.what() << endl;
+                LOG(2) << "ignoring exception in prefetchIndexPages(): " << e.what() << endl;
             }
             unusedKeys.clear();
         }
@@ -87,8 +87,8 @@ namespace mongo {
             BSONObjBuilder builder;
             builder.append(_id);
             BSONObj result;
-            Client::ReadContext ctx( ns );
             try {
+                Client::ReadContext ctx( ns );
                 if( Helpers::findById(cc(), ns, builder.done(), result) ) {
                     volatile char _dummy_char;       
                     // Touch the first word on every page in order to fault it into memory
@@ -99,8 +99,8 @@ namespace mongo {
                     _dummy_char += *(result.objdata() + result.objsize());
                 }
             }
-            catch( AssertionException& ) {
-                log() << "ignoring assertion in prefetchRecord()" << endl;
+            catch(const DBException& e) {
+                LOG(2) << "ignoring exception in prefetchRecordPages(): " << e.what() << endl;
             }
         }
     }

@@ -145,8 +145,13 @@ namespace replset {
         }
         const char *ns = op.getStringField("ns");
         if (ns && (ns[0] != '\0')) {
-            Client::ReadContext ctx(ns);
-            prefetchPagesForReplicatedOp(op);
+            try {
+                Client::ReadContext ctx(ns);
+                prefetchPagesForReplicatedOp(op);
+            }
+            catch (const DBException& e) {
+                LOG(2) << "ignoring exception in prefetchOp(): " << e.what() << endl;
+            }
         }
     }
 
