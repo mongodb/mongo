@@ -417,6 +417,14 @@ flags = {
 ###################################################
 # Structure flag declarations
 ###################################################
-	'conn' : [ 'CONN_NOSYNC', 'CONN_TRANSACTIONAL', 'SERVER_RUN' ],
-	'session' : [ 'SESSION_INTERNAL', 'SESSION_SALVAGE_QUIET_ERR' ],
+	'conn' : [
+		'CONN_NOSYNC',
+		'CONN_TRANSACTIONAL',
+		'SERVER_RUN'
+	],
+	'session' : [
+		'SESSION_HAS_CONNLOCK',
+		'SESSION_INTERNAL',
+		'SESSION_SALVAGE_QUIET_ERR'
+	],
 }
