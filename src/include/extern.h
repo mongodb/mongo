@@ -463,6 +463,7 @@ extern  int __wt_config_subgets(WT_SESSION_IMPL *session,
     WT_CONFIG_ITEM *cfg,
     const char *key,
     WT_CONFIG_ITEM *value);
+extern int __wt_config_strcmp(WT_CONFIG_ITEM *cfg, const char *str);
 extern int __wt_config_check(WT_SESSION_IMPL *session,
     const char *checks,
     const char *config);
@@ -660,6 +661,7 @@ extern int __wt_meta_track_on(WT_SESSION_IMPL *session);
 extern int __wt_meta_track_off(WT_SESSION_IMPL *session, int unroll);
 extern int __wt_meta_track_sub_on(WT_SESSION_IMPL *session);
 extern int __wt_meta_track_sub_off(WT_SESSION_IMPL *session);
+extern int __wt_meta_track_checkpoint(WT_SESSION_IMPL *session);
 extern int __wt_meta_track_insert(WT_SESSION_IMPL *session, const char *key);
 extern int __wt_meta_track_update(WT_SESSION_IMPL *session, const char *key);
 extern int __wt_meta_track_fileop( WT_SESSION_IMPL *session,

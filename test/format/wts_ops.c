@@ -171,10 +171,10 @@ ops(void *arg)
 					    WT_TABLENAME, sync_name);
 				sync_drop = 0;
 			} else {
-				if ((ret = session->sync(
-				    session, WT_TABLENAME, sync_name)) != 0)
-					die(ret, "session.sync: %s: %s",
-					    WT_TABLENAME, sync_name);
+				if ((ret = session->checkpoint(
+				    session, sync_name)) != 0)
+					die(ret, "session.checkpoint: %s",
+					    sync_name);
 				sync_drop = 1;
 			}
 

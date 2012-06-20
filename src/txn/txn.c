@@ -98,7 +98,7 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 		WT_RET_MSG(session, EINVAL, "Transaction already running");
 
 	WT_RET(__wt_config_gets(session, cfg, "isolation", &cval));
-	txn->isolation = (strcmp(cval.str, "snapshot") == 0) ?
+	txn->isolation = (__wt_config_strcmp(&cval, "snapshot") == 0) ?
 	    TXN_ISO_SNAPSHOT : TXN_ISO_READ_UNCOMMITTED;
 
 	WT_ASSERT(session, txn->id == WT_TXN_NONE);
@@ -144,10 +144,14 @@ __txn_release(WT_SESSION_IMPL *session)
 	if (!F_ISSET(txn, TXN_RUNNING))
 		WT_RET_MSG(session, EINVAL, "No transaction is active");
 
+	/* Clear the transaction's ID from the global table. */
 	txn_global = &S2C(session)->txn_global;
 	WT_ASSERT(session, txn_global->ids[session->id] != WT_TXN_NONE &&
 	    txn->id != WT_TXN_NONE);
 	WT_PUBLISH(txn_global->ids[session->id], txn->id = WT_TXN_NONE);
+
+	/* Reset the transaction state to not running. */
+	txn->isolation = TXN_ISO_READ_UNCOMMITTED;
 	F_CLR(txn, TXN_ERROR | TXN_RUNNING);
 
 	return (0);
@@ -193,13 +197,11 @@ int
 __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_CONFIG_ITEM cval;
-	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	WT_TXN_GLOBAL *txn_global;
 	const char *snapshot;
 	const char *txn_cfg[] = { "isolation=snapshot", NULL };
 
-	cursor = NULL;
 	txn_global = &S2C(session)->txn_global;
 
 	if ((ret = __wt_config_gets(
@@ -212,11 +214,12 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/* Only one checkpoint can be active at a time. */
 	__wt_writelock(session, S2C(session)->ckpt_rwlock);
-
 	WT_ERR(__wt_txn_begin(session, txn_cfg));
 
 	/* Prevent eviction from evicting anything newer than this. */
 	txn_global->ckpt_txnid = session->txn.snap_min;
+
+	WT_ERR(__wt_meta_track_on(session));
 
 	/*
 	 * If we're doing an ordinary unnamed checkpoint, we only need to flush
@@ -225,16 +228,27 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 */
 	WT_TRET((snapshot == NULL) ?
 	    __wt_conn_btree_apply(session, __wt_snapshot, cfg) :
-	    __wt_meta_btree_apply(session, __wt_snapshot, cfg, 0));
+	    __wt_meta_btree_apply(session,
+		__wt_snapshot, cfg, WT_BTREE_SNAPSHOT_OP));
 
-	if (cursor != NULL)
-		WT_TRET(cursor->close(cursor));
+	/*
+	 * XXX Rolling back the changes here is problematic.
+	 *
+	 * If we unroll here, we need a way to roll back changes to the avail
+	 * list for each tree that was successfully synced before the error
+	 * occurred.  Otherwise, the next time we try this operation, we will
+	 * try to free an old snapshot again.
+	 *
+	 * OTOH, if we commit the changes after a failure, we have partially
+	 * overwritten the checkpoint, so what ends up on disk is not
+	 * consistent.
+	 */
+	WT_TRET(__wt_meta_track_off(session, ret != 0));
 
-	txn_global->ckpt_txnid = WT_TXN_NONE;
-
-	WT_TRET(__txn_release(session));
-
-err:	__wt_rwunlock(session, S2C(session)->ckpt_rwlock);
+err:	txn_global->ckpt_txnid = WT_TXN_NONE;
+	if (F_ISSET(&session->txn, TXN_RUNNING))
+		WT_TRET(__txn_release(session));
+	__wt_rwunlock(session, S2C(session)->ckpt_rwlock);
 	__wt_free(session, snapshot);
 	return (ret);
 }

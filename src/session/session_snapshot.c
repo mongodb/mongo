@@ -101,10 +101,10 @@ __snapshot_worker(
 	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_SNAPSHOT *deleted, *snap, *snapbase;
-	int force, matched;
+	int force, matched, tracked;
 
 	btree = session->btree;
-	matched = 0;
+	matched = tracked = 0;
 	snap = snapbase = NULL;
 
 	/* Snapshots are single-threaded. */
@@ -246,11 +246,22 @@ nomatch:		WT_ERR_MSG(session,
 			    EINVAL, "cache flush failed to create a snapshot");
 	} else {
 		WT_ERR(__wt_meta_snaplist_set(session, btree->name, snapbase));
-		WT_ERR(__wt_bm_snapshot_resolve(session, snapbase));
+		/*
+		 * If tracking is enabled, defer making pages available until
+		 * the end of the transaction.  The exception is if the handle
+		 * is being discarded: in that case, it will be gone by the
+		 * time we try to apply or unroll the meta tracking event.
+		 */
+		if (WT_META_TRACKING(session) && !discard) {
+			WT_ERR(__wt_meta_track_checkpoint(session));
+			tracked = 1;
+		} else
+			WT_ERR(__wt_bm_snapshot_resolve(session, snapbase));
 	}
 
 err:	__wt_meta_snaplist_free(session, snapbase);
-	__wt_rwunlock(session, btree->snaplock);
+	if (!tracked)
+		__wt_rwunlock(session, btree->snaplock);
 
 	return (ret);
 }

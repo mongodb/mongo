@@ -73,7 +73,7 @@ __wt_txn_visible(WT_SESSION_IMPL *session, wt_txnid_t id)
 	 */
 	if (TXNID_LT(id, txn->snap_min))
 		return (1);
-	if (TXNID_LT(txn->id, txn->snap_max))
+	if (TXNID_LT(txn->snap_max, id))
 		return (0);
 
 	/*

@@ -84,9 +84,15 @@ __conn_btree_get(WT_SESSION_IMPL *session,
 
 	conn = S2C(session);
 
+	/*
+	 * If we aren't holding the connection spinlock at a higher level,
+	 * acquire it now.
+	 */
+	if (!F_ISSET(session, WT_SESSION_HAS_CONNLOCK))
+		__wt_spin_lock(session, &conn->spinlock);
+
 	/* Increment the reference count if we already have the btree open. */
 	matched = 0;
-	__wt_spin_lock(session, &conn->spinlock);
 	TAILQ_FOREACH(btree, &conn->btqh, q) {
 		if (strcmp(name, btree->name) == 0 &&
 		    ((snapshot == NULL && btree->snapshot == NULL) ||
@@ -99,7 +105,8 @@ __conn_btree_get(WT_SESSION_IMPL *session,
 		}
 	}
 	if (matched) {
-		__wt_spin_unlock(session, &conn->spinlock);
+		if (!F_ISSET(session, WT_SESSION_HAS_CONNLOCK))
+			__wt_spin_unlock(session, &conn->spinlock);
 		__wt_conn_btree_open_lock(session, flags);
 		return (0);
 	}
@@ -124,7 +131,9 @@ __conn_btree_get(WT_SESSION_IMPL *session,
 		TAILQ_INSERT_TAIL(&conn->btqh, btree, q);
 		++conn->btqcnt;
 	}
-	__wt_spin_unlock(session, &conn->spinlock);
+
+	if (!F_ISSET(session, WT_SESSION_HAS_CONNLOCK))
+		__wt_spin_unlock(session, &conn->spinlock);
 
 	if (ret == 0)
 		session->btree = btree;
@@ -299,14 +308,23 @@ __wt_conn_btree_apply(WT_SESSION_IMPL *session,
 	saved_btree = session->btree;
 
 	__wt_spin_lock(session, &conn->spinlock);
+	F_SET(session, WT_SESSION_HAS_CONNLOCK);
 	TAILQ_FOREACH(btree, &conn->btqh, q)
-		if (btree->snapshot == NULL &&
+		if (F_ISSET(btree, WT_BTREE_OPEN) &&
+		    btree->snapshot == NULL &&
 		    strcmp(btree->name, WT_METADATA_URI) != 0) {
+			/*
+			 * We have the connection spinlock, which prevents
+			 * handles being opened or closed, so there is no need
+			 * for additional handle locking here, or pulling every
+			 * tree into this session's handle cache.
+			 */
 			session->btree = btree;
 			WT_ERR(func(session, cfg));
 		}
 
-err:	__wt_spin_unlock(session, &conn->spinlock);
+err:	F_CLR(session, WT_SESSION_HAS_CONNLOCK);
+	__wt_spin_unlock(session, &conn->spinlock);
 	session->btree = saved_btree;
 	return (ret);
 }
@@ -328,6 +346,8 @@ __wt_conn_btree_close(WT_SESSION_IMPL *session, int locked)
 
 	if (F_ISSET(btree, WT_BTREE_OPEN))
 		WT_STAT_DECR(conn->stats, file_open);
+
+	WT_ASSERT(session, !F_ISSET(session, WT_SESSION_HAS_CONNLOCK));
 
 	/*
 	 * Decrement the reference count.  If we really are the last reference,
@@ -376,7 +396,10 @@ __wt_conn_btree_close_all(WT_SESSION_IMPL *session, const char *name)
 	conn = S2C(session);
 	saved_btree = session->btree;
 
+	WT_ASSERT(session, !F_ISSET(session, WT_SESSION_HAS_CONNLOCK));
+
 	__wt_spin_lock(session, &conn->spinlock);
+	F_SET(session, WT_SESSION_HAS_CONNLOCK);
 	TAILQ_FOREACH(btree, &conn->btqh, q) {
 		if (strcmp(btree->name, name) != 0)
 			continue;
@@ -402,8 +425,6 @@ __wt_conn_btree_close_all(WT_SESSION_IMPL *session, const char *name)
 		 * necessary.
 		 */
 		if (F_ISSET(btree, WT_BTREE_OPEN)) {
-			__wt_spin_unlock(session, &conn->spinlock);
-
 			ret = __wt_meta_track_sub_on(session);
 			if (ret == 0)
 				ret = __wt_conn_btree_sync_and_close(session);
@@ -416,8 +437,6 @@ __wt_conn_btree_close_all(WT_SESSION_IMPL *session, const char *name)
 			 */
 			if (ret == 0)
 				ret = __wt_meta_track_sub_off(session);
-
-			__wt_spin_lock(session, &conn->spinlock);
 		}
 
 		if (!WT_META_TRACKING(session))
@@ -427,7 +446,8 @@ __wt_conn_btree_close_all(WT_SESSION_IMPL *session, const char *name)
 		WT_ERR(ret);
 	}
 
-err:	__wt_spin_unlock(session, &conn->spinlock);
+err:	F_CLR(session, WT_SESSION_HAS_CONNLOCK);
+	__wt_spin_unlock(session, &conn->spinlock);
 	return (ret);
 }
 
