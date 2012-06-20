@@ -419,7 +419,7 @@ struct __wt_ref {
  * references to the field (so the code doesn't read it multiple times), all
  * to make sure we don't introduce this bug (again).
  *
- * Casting the ared to a (void *) is safe as we are not taking the address of
+ * Casting the read to a (void *) is safe as we are not taking the address of
  * the object.
  */
 struct __wt_row {
