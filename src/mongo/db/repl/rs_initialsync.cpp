@@ -284,7 +284,7 @@ namespace mongo {
             try {
                 init.oplogApplication(lastOp, minValid);
             }
-            catch (const DBException& e) {
+            catch (const DBException&) {
                 log() << "replSet initial sync failed during oplog application phase" << rsLog;
 
                 emptyOplog(); // otherwise we'll be up!
