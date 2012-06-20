@@ -360,6 +360,7 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
                 print( "ShardingTest " + this._testName + " going to add shard : " + n )
                 x = admin.runCommand( { addshard : n } );
                 printjson( x )
+                assert( x.ok );
                 shardNames.push( x.shardAdded )
                 z.shardName = x.shardAdded
             }

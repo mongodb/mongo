@@ -16,6 +16,8 @@ var testDB = mongos.getDB( 'test' );
 ReplSetTest.awaitRSClientHosts( mongos, st.rs0.getSecondaries(), { ok : true, secondary : true });
 ReplSetTest.awaitRSClientHosts( mongos, st.rs1.getSecondaries(), { ok : true, secondary : true });
 
+st.printShardingStatus();
+
 jsTestLog('Setting up initial users');
 var rwUser = 'rwUser';
 var roUser = 'roUser';
