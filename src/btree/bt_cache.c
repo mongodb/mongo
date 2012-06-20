@@ -23,7 +23,7 @@ __wt_cache_config(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	cache = conn->cache;
 
 	if ((ret = __wt_config_gets(session, cfg, "cache_size", &cval)) == 0)
-		conn->cache_size = cval.val;
+		conn->cache_size = (uint64_t)cval.val;
 	WT_RET_NOTFOUND_OK(ret);
 
 	if ((ret =
