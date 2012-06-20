@@ -1,3 +1,22 @@
+WiredTiger release 1.2.2, 2012-06-20
+------------------------------------
+
+This is a bugfix release.  The changes are as follows:
+
+* Defer making free pages available until the end of a checkpoint, in case
+  there is a failure after processing some files.
+
+* When checking the value of the "isolation" key, don't assume it is NUL
+  terminated.  This bug could cause transactions to run with incorrect
+  isolation.
+
+* Fix two bugs with snapshot isolation:
+
+  1. reset the isolation level when the transaction completes;
+  2. when checking visibility, check item's ID against the maximum snapshot ID
+     (not the transaction's ID).
+
+
 WiredTiger release 1.2.1, 2012-06-15
 ------------------------------------
 
