@@ -78,13 +78,27 @@ namespace mongo {
         while ( ! _pool.empty() ) {
             StoredConnection c = _pool.top();
             _pool.pop();
-            all.push_back( c );
             bool res;
+            bool alive = false;
             // When a connection is in the pool it doesn't have an AuthenticationTable set.
+            // Set the table temporarily for the isMaster command.
             c.conn->setAuthenticationTable(
                     AuthenticationTable::getInternalSecurityAuthenticationTable() );
-            c.conn->isMaster( res );
-            c.conn->clearAuthenticationTable();
+            try {
+                c.conn->isMaster( res );
+                alive = true;
+            } catch ( const DBException e ) {
+                // There's something wrong with this connection, swallow the exception and do not
+                // put the connection back in the pool.
+                LOG(1) << "Exception thrown when checking pooled connection to " <<
+                    c.conn->getServerAddress() << ": " << causedBy(e) << endl;
+                delete c.conn;
+                c.conn = NULL;
+            }
+            if ( alive ) {
+                c.conn->clearAuthenticationTable();
+                all.push_back( c );
+            }
         }
 
         for ( vector<StoredConnection>::iterator i=all.begin(); i != all.end(); ++i ) {
