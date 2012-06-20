@@ -137,6 +137,7 @@ TODO
 TOOSMALL
 TRK
 TXN
+TXNID
 Timestamp
 UIDs
 UINT
@@ -432,6 +433,7 @@ rle
 rpc
 rref
 runlength
+runtime
 rwlock
 rwlocks
 rwunlock
