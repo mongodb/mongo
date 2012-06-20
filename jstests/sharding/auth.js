@@ -124,10 +124,7 @@ var e = assert.throws(function() {
 printjson(e);
 
 print("cmd try");
-e = assert.throws(function() {
-    conn.getDB("foo").runCommand({listdbs:1});
-});
-printjson(e);
+assert.eq( 0, conn.getDB("foo").runCommand({listDatabases:1}).ok );
 
 print("insert try 1");
 s.getDB("test").foo.insert({x:1});
