@@ -34,6 +34,7 @@
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/scanandorder.h"
 #include "pagefault.h"
+#include "mongo/db/repl/rs.h"
 
 namespace mongo {
 
@@ -694,9 +695,9 @@ namespace mongo {
 
     struct Mem { 
         Mem() { res = virt = mapped = 0; }
-        int res;
-        int virt;
-        int mapped;
+        long long res;
+        long long virt;
+        long long mapped;
         bool grew(const Mem& r) { 
             return (r.res && (((double)res)/r.res)>1.1 ) ||
               (r.virt && (((double)virt)/r.virt)>1.1 ) ||
@@ -714,18 +715,30 @@ namespace mongo {
                 Mem m;
                 m.res = p.getResidentSize();
                 m.virt = p.getVirtualMemorySize();
-                m.mapped = (int) (MemoryMappedFile::totalMappedLength() / ( 1024 * 1024 ));
-                if( time(0)-last >= 300 || m.grew(mlast) ) { 
-                    log() << "mem (MB) res:" << m.res << " virt:" << m.virt << " mapped:" << m.mapped << endl;
-                    if( m.virt - (cmdLine.dur?2:1)*m.mapped > 5000 ) { 
-                        ONCE log() << "warning virtual/mapped memory differential is large. journaling:" << cmdLine.dur << endl;
+                m.mapped = MemoryMappedFile::totalMappedLength() / (1024 * 1024);
+                time_t now = time(0);
+                if( now - last >= 300 || m.grew(mlast) ) { 
+                    log() << "mem (MB) res:" << m.res << " virt:" << m.virt;
+                    long long totalMapped = m.mapped;
+                    if (cmdLine.dur) {
+                        totalMapped *= 2;
+                        log() << " mapped (incl journal view):" << totalMapped;
                     }
-                    last = time(0);
+                    else {
+                        log() << " mapped:" << totalMapped;
+                    }
+                    log() << " connections:" << connTicketHolder.used();
+                    if (theReplSet) {
+                        log() << " replication threads:" << 
+                            ReplSetImpl::replWriterThreadCount + 
+                            ReplSetImpl::replPrefetcherThreadCount;
+                    }
+                    last = now;
                     mlast = m;
                 }
             }
         }
-        catch(...) {
+        catch(const std::exception&) {
             log() << "ProcessInfo exception" << endl;
         }
     }
