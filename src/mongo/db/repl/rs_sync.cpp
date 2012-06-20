@@ -85,12 +85,20 @@ namespace replset {
         return ok;
     }
 
+    void initializePrefetchThread() {
+        if (!ClientBasic::getCurrent()) {
+            Client::initThread("repl prefetch worker");
+            replLocalAuth();
+        }
+    }
+
     void initializeWriterThread() {
         // Only do this once per thread
         if (!ClientBasic::getCurrent()) {
             Client::initThread("repl writer worker");
             // allow us to get through the magic barrier
             Lock::ParallelBatchWriterMode::iAmABatchParticipant();
+            replLocalAuth();
         }
     }
 
@@ -140,9 +148,8 @@ namespace replset {
 
     // The pool threads call this to prefetch each op
     void SyncTail::prefetchOp(const BSONObj& op) {
-        if (!ClientBasic::getCurrent()) {
-            Client::initThread("repl prefetch worker");
-        }
+        initializePrefetchThread();
+
         const char *ns = op.getStringField("ns");
         if (ns && (ns[0] != '\0')) {
             try {
