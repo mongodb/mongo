@@ -32,7 +32,7 @@ namespace mongo {
 
         bool isDefault() const { return *this == HealthOptions(); }
 
-        // see http://www.mongodb.org/display/DOCS/Replica+Set+Internals
+        // see http://dochub.mongodb.org/core/replicasetinternals
         unsigned heartbeatSleepMillis;
         unsigned heartbeatTimeoutMillis;
         unsigned heartbeatConnRetries ;

@@ -728,7 +728,7 @@ namespace mongo {
 
         /** Run a map/reduce job on the server.
 
-            See http://www.mongodb.org/display/DOCS/MapReduce
+            See http://dochub.mongodb.org/core/mapreduce
 
             ns        namespace (db+collection name) of input data
             jsmapf    javascript map function code

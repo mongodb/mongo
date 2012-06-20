@@ -481,7 +481,7 @@ namespace mongo {
             ss << "*********************************************************************" << endl;
             ss << " ERROR: dbpath (" << dbpath << ") does not exist." << endl;
             ss << " Create this directory or give existing directory in --dbpath." << endl;
-            ss << " See http://www.mongodb.org/display/DOCS/Starting+and+Stopping+Mongo" << endl;
+            ss << " See http://dochub.mongodb.org/core/startingandstoppingmongo" << endl;
             ss << "*********************************************************************" << endl;
             uassert( 10296 ,  ss.str().c_str(), boost::filesystem::exists( dbpath ) );
         }
@@ -914,7 +914,7 @@ static int mongoDbMain(int argc, char* argv[]) {
             replSettings.autoresync = true;
             if( params.count("replSet") ) {
                 out() << "--autoresync is not used with --replSet" << endl;
-                out() << "see http://www.mongodb.org/display/DOCS/Resyncing+a+Very+Stale+Replica+Set+Member" << endl;
+                out() << "see http://dochub.mongodb.org/core/resyncingaverystalereplicasetmember" << endl;
                 dbexit( EXIT_BADOPTIONS );
             }
         }
@@ -1014,7 +1014,7 @@ static int mongoDbMain(int argc, char* argv[]) {
         if (params.count("pairwith") || params.count("arbiter") || params.count("opIdMem")) {
             out() << "****" << endl;
             out() << "Replica Pairs have been deprecated. Invalid options: --pairwith, --arbiter, and/or --opIdMem" << endl;
-            out() << "<http://www.mongodb.org/display/DOCS/Replica+Pairs>" << endl;
+            out() << "<http://dochub.mongodb.org/core/replicapairs>" << endl;
             out() << "****" << endl;
             dbexit( EXIT_BADOPTIONS );
         }

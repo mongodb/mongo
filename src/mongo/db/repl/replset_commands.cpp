@@ -115,7 +115,7 @@ namespace mongo {
         virtual void help( stringstream &help ) const {
             help << "Report status of a replica set from the POV of this server\n";
             help << "{ replSetGetStatus : 1 }";
-            help << "\nhttp://www.mongodb.org/display/DOCS/Replica+Set+Commands";
+            help << "\nhttp://dochub.mongodb.org/core/replicasetcommands";
         }
         CmdReplSetGetStatus() : ReplSetCommand("replSetGetStatus", true) { }
         virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
@@ -135,7 +135,7 @@ namespace mongo {
         virtual void help( stringstream &help ) const {
             help << "Adjust configuration of a replica set\n";
             help << "{ replSetReconfig : config_object }";
-            help << "\nhttp://www.mongodb.org/display/DOCS/Replica+Set+Commands";
+            help << "\nhttp://dochub.mongodb.org/core/replicasetcommands";
         }
         CmdReplSetReconfig() : ReplSetCommand("replSetReconfig"), mutex("rsreconfig") { }
         virtual bool run(const string& a, BSONObj& b, int e, string& errmsg, BSONObjBuilder& c, bool d) {
@@ -225,7 +225,7 @@ namespace mongo {
             help << "this node will not attempt to become primary until the time period specified expires.\n";
             help << "You can call again with {replSetFreeze:0} to unfreeze sooner.\n";
             help << "A process restart unfreezes the member also.\n";
-            help << "\nhttp://www.mongodb.org/display/DOCS/Replica+Set+Commands";
+            help << "\nhttp://dochub.mongodb.org/core/replicasetcommands";
         }
 
         CmdReplSetFreeze() : ReplSetCommand("replSetFreeze") { }
@@ -249,7 +249,7 @@ namespace mongo {
             help << "{ replSetStepDown : <seconds> }\n";
             help << "Step down as primary.  Will not try to reelect self for the specified time period (1 minute if no numeric secs value specified).\n";
             help << "(If another member with same priority takes over in the meantime, it will stay primary.)\n";
-            help << "http://www.mongodb.org/display/DOCS/Replica+Set+Commands";
+            help << "http://dochub.mongodb.org/core/replicasetcommands";
         }
 
         CmdReplSetStepDown() : ReplSetCommand("replSetStepDown") { }
@@ -368,7 +368,7 @@ namespace mongo {
                 if( cmdLine._replSet.empty() )
                     s << p("Not using --replSet");
                 else  {
-                    s << p("Still starting up, or else set is not yet " + a("http://www.mongodb.org/display/DOCS/Replica+Set+Configuration#InitialSetup", "", "initiated")
+                    s << p("Still starting up, or else set is not yet " + a("http://dochub.mongodb.org/core/replicasetconfiguration#ReplicaSetConfiguration-InitialSetup", "", "initiated")
                            + ".<br>" + ReplSet::startupStatusMsg.get());
                 }
             }
@@ -392,14 +392,14 @@ namespace mongo {
             s << p( a("/", "back", "Home") + " | " +
                     a("/local/system.replset/?html=1", "", "View Replset Config") + " | " +
                     a("/replSetGetStatus?text=1", "", "replSetGetStatus") + " | " +
-                    a("http://www.mongodb.org/display/DOCS/Replica+Sets", "", "Docs")
+                    a("http://dochub.mongodb.org/core/replicasets", "", "Docs")
                   );
 
             if( theReplSet == 0 ) {
                 if( cmdLine._replSet.empty() )
                     s << p("Not using --replSet");
                 else  {
-                    s << p("Still starting up, or else set is not yet " + a("http://www.mongodb.org/display/DOCS/Replica+Set+Configuration#InitialSetup", "", "initiated")
+                    s << p("Still starting up, or else set is not yet " + a("http://dochub.mongodb.org/core/replicasetconfiguration#ReplicaSetConfiguration-InitialSetup", "", "initiated")
                            + ".<br>" + ReplSet::startupStatusMsg.get());
                 }
             }

@@ -239,7 +239,7 @@ namespace mongo {
             /*
                 ss << "HTTP <a "
                     "title=\"click for documentation on this http interface\""
-                    "href=\"http://www.mongodb.org/display/DOCS/Http+Interface\">admin port</a>:" << _port << "<p>\n";
+                    "href=\"http://dochub.mongodb.org/core/httpinterface\">admin port</a>:" << _port << "<p>\n";
             */
 
             doUnlockedStuff(ss);
@@ -448,7 +448,7 @@ namespace mongo {
             stringstream ss;
             ss << start("Commands List");
             ss << p( a("/", "back", "Home") );
-            ss << p( "<b>MongoDB List of <a href=\"http://www.mongodb.org/display/DOCS/Commands\">Commands</a></b>\n" );
+            ss << p( "<b>MongoDB List of <a href=\"http://dochub.mongodb.org/core/commands\">Commands</a></b>\n" );
             const map<string, Command*> *m = Command::commandsByBestName();
             ss << "S:slave-ok  R:read-lock  W:write-lock  A:admin-only<br>\n";
             ss << table();

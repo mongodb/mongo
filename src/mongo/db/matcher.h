@@ -261,7 +261,7 @@ namespace mongo {
         /* $atomic - if true, a multi document operation (some removes, updates)
                      should be done atomically.  in that case, we do not yield -
                      i.e. we stay locked the whole time.
-                     http://www.mongodb.org/display/DOCS/Removing[
+                     http://dochub.mongodb.org/core/remove
         */
         bool _atomic;
 

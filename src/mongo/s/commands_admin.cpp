@@ -951,7 +951,7 @@ namespace mongo {
         } addServer;
 
         /* See usage docs at:
-         * http://www.mongodb.org/display/DOCS/Configuring+Sharding#ConfiguringSharding-Removingashard
+         * http://dochub.mongodb.org/core/configuringsharding#ConfiguringSharding-Removingashard
          */
         class RemoveShardCmd : public GridAdminCmd {
         public:

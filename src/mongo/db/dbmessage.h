@@ -106,7 +106,7 @@ namespace mongo {
     /* For the database/server protocol, these objects and functions encapsulate
        the various messages transmitted over the connection.
 
-       See http://www.mongodb.org/display/DOCS/Mongo+Wire+Protocol
+       See http://dochub.mongodb.org/core/mongowireprotocol
     */
     class DbMessage {
     public:

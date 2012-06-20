@@ -403,7 +403,7 @@ namespace mongo {
             help << "{ profile : <n> }\n";
             help << "0=off 1=log slow ops 2=log all\n";
             help << "-1 to get current values\n";
-            help << "http://www.mongodb.org/display/DOCS/Database+Profiler";
+            help << "http://dochub.mongodb.org/core/databaseprofiler";
         }
         virtual LockType locktype() const { return WRITE; }
         CmdProfile() : Command("profile") {}
@@ -698,7 +698,7 @@ namespace mongo {
         bool adminOnly() const {
             return true;
         }
-        void help(stringstream& h) const { h << "http://www.mongodb.org/display/DOCS/Monitoring+and+Diagnostics#MonitoringandDiagnostics-DatabaseRecord%2FReplay"; }
+        void help(stringstream& h) const { h << "http://dochub.mongodb.org/core/monitoring#MonitoringandDiagnostics-DatabaseRecord%2FReplay%28diagLoggingcommand%29"; }
         virtual LockType locktype() const { return WRITE; }
         bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             int was = _diaglog.setLevel( cmdObj.firstElement().numberInt() );

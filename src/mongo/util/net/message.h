@@ -85,7 +85,7 @@ namespace mongo {
     }
 
 #pragma pack(1)
-    /* see http://www.mongodb.org/display/DOCS/Mongo+Wire+Protocol
+    /* see http://dochub.mongodb.org/core/mongowireprotocol
     */
     struct MSGHEADER {
         int messageLength; // total message size, including this

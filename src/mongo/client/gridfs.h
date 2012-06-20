@@ -51,7 +51,7 @@ namespace mongo {
 
     /**
       GridFS is for storing large file-style objects in MongoDB.
-      @see http://www.mongodb.org/display/DOCS/GridFS+Specification
+      @see http://dochub.mongodb.org/core/gridfsspec
      */
     class GridFS {
     public:

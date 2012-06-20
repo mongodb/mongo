@@ -195,7 +195,7 @@ namespace mongo {
 
             ss << "<table border=1 cellpadding=2 cellspacing=0>";
             ss << "<tr align='left'><th>";
-            ss << a("http://www.mongodb.org/display/DOCS/Developer+FAQ#DeveloperFAQ-What%27sa%22namespace%22%3F", "namespace") <<
+            ss << a("http://dochub.mongodb.org/core/whatisanamespace", "namespace") <<
                "NS</a></th>"
                "<th colspan=2>total</th>"
                "<th colspan=2>Reads</th>"

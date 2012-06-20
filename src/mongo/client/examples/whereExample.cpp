@@ -1,5 +1,5 @@
 // @file whereExample.cpp
-// @see http://www.mongodb.org/display/DOCS/Server-side+Code+Execution
+// @see http://dochub.mongodb.org/core/serversidecodeexecution
 
 /*    Copyright 2009 10gen Inc.
  *

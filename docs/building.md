@@ -5,7 +5,7 @@ Building MongoDB
 SCONS
 ---------------
 
-For detail information about building, please see [the wiki](http://www.mongodb.org/display/DOCS/Building).
+For detail information about building, please see [the wiki](http://dochub.mongodb.org/core/building).
 
 If you want to build everything (mongod, mongo, tools, etc):
 
@@ -39,7 +39,7 @@ of GCC may not be happy.
 WINDOWS
 --------------
 
-See http://www.mongodb.org/display/DOCS/Building+for+Windows
+See http://dochub.mongodb.org/core/buildingforwindows
 
 Build requirements:
 * vc++ express or visual studio

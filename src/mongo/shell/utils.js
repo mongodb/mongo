@@ -1816,7 +1816,7 @@ rs.debug.getLastOpWritten = function(server) {
 
 help = shellHelper.help = function (x) {
     if (x == "mr") {
-        print("\nSee also http://www.mongodb.org/display/DOCS/MapReduce");
+        print("\nSee also http://dochub.mongodb.org/core/mapreduce");
         print("\nfunction mapf() {");
         print("  // 'this' holds current document to inspect");
         print("  emit(key, value);");

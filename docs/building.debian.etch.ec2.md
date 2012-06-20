@@ -7,7 +7,7 @@ ami-f2f6159b
     apt-get install python-setuptools libpcre3-dev
     apt-get install libboost-filesystem-dev libboost-dev libboost-thread-dev libboost-program-options-dev libboost-date-time-dev
 
-See: http://www.mongodb.org/display/DOCS/Building+Spider+Monkey
+See: http://dochub.mongodb.org/core/buildingspidermonkey
 
     ln -s /usr/bin/g++-4.1 /usr/bin/g++
     ln -s /usr/bin/gcc-4.1 /usr/bin/gcc

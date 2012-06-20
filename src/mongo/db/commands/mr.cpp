@@ -1008,7 +1008,7 @@ namespace mongo {
             virtual void help( stringstream &help ) const {
                 help << "Run a map/reduce operation on the server.\n";
                 help << "Note this is used for aggregation, not querying, in MongoDB.\n";
-                help << "http://www.mongodb.org/display/DOCS/MapReduce";
+                help << "http://dochub.mongodb.org/core/mapreduce";
             }
 
             virtual LockType locktype() const { return NONE; }

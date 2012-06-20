@@ -35,7 +35,7 @@ namespace mongo {
     */
     class FSyncCommand : public Command {
     public:
-        static const char* url() { return "http://www.mongodb.org/display/DOCS/fsync+Command"; }
+        static const char* url() { return "http://dochub.mongodb.org/core/fsynccommand"; }
         bool locked;
         bool pendingUnlock;
         SimpleMutex m; // protects locked var above

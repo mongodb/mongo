@@ -81,7 +81,7 @@ namespace mongo {
         log() << "replSet error RS102 too stale to catch up, at least from " << stale->fullName() << rsLog;
         log() << "replSet our last optime : " << lastOpTimeWritten.toStringLong() << rsLog;
         log() << "replSet oldest at " << stale->fullName() << " : " << oldest["ts"]._opTime().toStringLong() << rsLog;
-        log() << "replSet See http://www.mongodb.org/display/DOCS/Resyncing+a+Very+Stale+Replica+Set+Member" << rsLog;
+        log() << "replSet See http://dochub.mongodb.org/core/resyncingaverystalereplicasetmember" << rsLog;
 
         // reset minvalid so that we can't become primary prematurely
         {

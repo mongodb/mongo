@@ -978,7 +978,7 @@ namespace mongo {
         class Geo2dFindNearCmd : public PublicGridCommand {
         public:
             Geo2dFindNearCmd() : PublicGridCommand( "geoNear" ) {}
-            void help(stringstream& h) const { h << "http://www.mongodb.org/display/DOCS/Geospatial+Indexing#GeospatialIndexing-geoNearCommand"; }
+            void help(stringstream& h) const { h << "http://dochub.mongodb.org/core/geo#GeospatialIndexing-geoNearCommand"; }
             virtual bool passOptions() const { return true; }
             bool run(const string& dbName , BSONObj& cmdObj, int options, string& errmsg, BSONObjBuilder& result, bool) {
                 string collection = cmdObj.firstElement().valuestrsafe();

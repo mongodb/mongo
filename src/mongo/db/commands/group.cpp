@@ -30,7 +30,7 @@ namespace mongo {
         virtual bool slaveOk() const { return false; }
         virtual bool slaveOverrideOk() const { return true; }
         virtual void help( stringstream &help ) const {
-            help << "http://www.mongodb.org/display/DOCS/Aggregation";
+            help << "http://dochub.mongodb.org/core/aggregation";
         }
 
         BSONObj getKey( const BSONObj& obj , const BSONObj& keyPattern , ScriptingFunction func , double avgSize , Scope * s ) {

@@ -1,5 +1,5 @@
 /** @file jsobj.cpp - BSON implementation
-    http://www.mongodb.org/display/DOCS/BSON
+    http://dochub.mongodb.org/core/bson
 */
 
 /*    Copyright 2009 10gen Inc.
