@@ -1247,12 +1247,7 @@ namespace mongo {
 
         sigaddset( &asyncSignals, SIGINT );
         sigaddset( &asyncSignals, SIGTERM );
-#ifndef __ANDROID__        
         verify( pthread_sigmask( SIG_SETMASK, &asyncSignals, 0 ) == 0 );
-#else
-        pthread_sigmask( SIG_SETMASK, &asyncSignals, 0 ); // Android implementation of sigmask sets errno instead of returning error code
-        verify(errno == 0);
-#endif
         boost::thread it( interruptThread );
 
         set_terminate( myterminate );
