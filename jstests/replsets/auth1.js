@@ -160,7 +160,7 @@ conn.start();
 
 master.getSisterDB("admin").auth("foo", "bar");
 var config = master.getSisterDB("local").system.replset.findOne();
-config.members.push({_id : 3, host : getHostName()+":"+port[3]});
+config.members.push({_id : 3, host : rs.host+":"+port[3]});
 config.version++;
 try {
     master.adminCommand({replSetReconfig:config});

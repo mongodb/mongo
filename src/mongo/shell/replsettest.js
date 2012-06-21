@@ -43,7 +43,7 @@
  */
 ReplSetTest = function( opts ){
     this.name  = opts.name || "testReplSet";
-    this.useHostName = opts.useHostName
+    this.useHostName = opts.useHostName == undefined ? true : opts.useHostName;
     this.host  = this.useHostName ? (opts.host || getHostName()) : 'localhost';
     this.numNodes = opts.nodes || 0;
     this.oplogSize = opts.oplogSize || 40;
