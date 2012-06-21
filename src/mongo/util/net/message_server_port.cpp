@@ -45,7 +45,12 @@ namespace mongo {
         void threadRun( MessagingPort * inPort) {
             TicketHolderReleaser connTicketReleaser( &connTicketHolder );
 
-            setThreadName( "conn" );
+            {
+                string threadName = "conn";
+                if ( inPort->connectionId() > 0 )
+                    threadName = str::stream() << threadName << inPort->connectionId();
+                setThreadName( threadName.c_str() );
+            }
             
             verify( inPort );
             inPort->psock->setLogLevel(1);
