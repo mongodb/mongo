@@ -19,9 +19,6 @@ def aggregate(inputs, output):
     
     return subprocess.call(args)  
 
-def die(message):
-    sys.stderr.write(message + "\n")
-    return 1
 
 def main ():
     inputs = []
@@ -33,7 +30,7 @@ def main ():
 
     (options, args) = parser.parse_args()
     if len(args) == 0:
-        return die("must supply input files")
+        return "must supply input files"
 
     for path in args:
         name, ext = os.path.splitext(path)
@@ -46,10 +43,9 @@ def main ():
             inputs += [line.strip() for line in open(path) 
                         if os.path.getsize(line.strip()) > 0]
         else:
-            return die("unrecognized file type")
+            return "unrecognized file type"
 
     return aggregate(inputs, options.output)
 
 if __name__ == '__main__':
-    rc = main() or 0
-    sys.exit(rc)
+    sys.exit(main())
