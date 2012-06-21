@@ -23,16 +23,14 @@ def aggregate(inputs, output):
 def main ():
     inputs = []
 
-    usage = "usage: %prog [options] input1.info input2.info ..." 
+    usage = "usage: %prog input1.info input2.info ... output.info" 
     parser = OptionParser(usage=usage)
-    parser.add_option('-o', '--output', dest="output",
-                      help="tracefile to which output will be written")
 
     (options, args) = parser.parse_args()
-    if len(args) == 0:
+    if len(args) < 2:
         return "must supply input files"
 
-    for path in args:
+    for path in args[:-1]:
         name, ext = os.path.splitext(path)
 
         if ext == '.info':
@@ -45,7 +43,7 @@ def main ():
         else:
             return "unrecognized file type"
 
-    return aggregate(inputs, options.output)
+    return aggregate(inputs, args[-1])
 
 if __name__ == '__main__':
     sys.exit(main())
