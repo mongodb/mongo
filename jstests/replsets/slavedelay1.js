@@ -120,6 +120,10 @@ doTest = function( signal ) {
           return conn.getDB("local").system.replset.findOne().version == config.version;
       });
 
+  assert.soon(function() {
+      return conn.getDB("admin").isMaster().secondary;
+  });
+
   master.foo.insert({_id : 124, "x" : "foo"});
   assert(master.foo.findOne({_id:124}) != null);
 
