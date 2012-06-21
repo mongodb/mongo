@@ -391,7 +391,7 @@ def runTest(test):
         # with the extension change to .info
         tracefile = os.path.join(lcov_dir,  testname + '.info')
         sys.stdout.write("    Tracefile : %s\n" % tracefile)
-        devnull = open('/dev/null', 'w')
+        devnull = open(os.devnull, 'w')
         
         # lcov generates a lot of output, redirect it to /dev/null so we don't see it
         call(['lcov', '-c', '-d', build_dir, '-b', mongo_repo, '-o', tracefile], 
