@@ -89,4 +89,6 @@ if __name__ == "__main__":
         root = args[0]
         
     cleanup( root , options.nokill )
-    cleanup("./build/coverage", True)
+    mongo_repo=os.path.dirname(os.path.abspath(os.path.dirname(__file__)))
+    cleanup(os.path.join(mongo_repo, 'build', 'coverage'), True)
+
