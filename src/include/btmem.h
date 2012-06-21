@@ -423,9 +423,9 @@ struct __wt_ref {
  * the object.
  */
 struct __wt_row {
-	volatile void *__key;		/* On-page cell or off-page WT_IKEY */
+	void * volatile __key;		/* On-page cell or off-page WT_IKEY */
 };
-#define	WT_ROW_KEY_COPY(rip)	((void *)((rip)->__key))
+#define	WT_ROW_KEY_COPY(rip)	((rip)->__key)
 #define	WT_ROW_KEY_SET(rip, v)	((rip)->__key) = (v)
 
 /*
