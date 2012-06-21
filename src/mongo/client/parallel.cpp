@@ -942,7 +942,7 @@ namespace mongo {
                 log( pc ) << "initialized " << ( isCommand() ? "command " : "query " ) << ( lazyInit ? "(lazily) " : "(full) " ) << "on shard " << shard << ", current connection state is " << mdata.toBSON() << endl;
 
             }
-            catch( SendStaleConfigException& e ){
+            catch( StaleConfigException& e ){
 
                 // Our version isn't compatible with the current version anymore on at least one shard, need to retry immediately
                 NamespaceString staleNS = e.getns();
