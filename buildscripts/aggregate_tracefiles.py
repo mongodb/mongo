@@ -1,6 +1,7 @@
 import subprocess
 import os
 import sys
+from optparse import OptionParser
 
 """ This script aggregates several tracefiles into one tracefile
  All but the last argument are input tracefiles or .txt files which list tracefiles.
@@ -16,21 +17,25 @@ def aggregate(inputs, output):
     args += ['-o', output]
 
     
-    if subprocess.call(args) != 0:
-        die("lcov failed")
+    return subprocess.call(args)  
 
 def die(message):
     sys.stderr.write(message + "\n")
-    sys.exit(1)
+    return 1
 
-def main (argv):
+def main ():
     inputs = []
 
-    if len(argv) < 3:
-        print "Usage: " + argv[0] + " input.(info|txt) ... output.info"
-        sys.exit(1)
+    usage = "usage: %prog [options] input1.info input2.info ..." 
+    parser = OptionParser(usage=usage)
+    parser.add_option('-o', '--output', dest="output",
+                      help="tracefile to which output will be written")
 
-    for path in argv[1:-1]:
+    (options, args) = parser.parse_args()
+    if len(args) == 0:
+        return die("must supply input files")
+
+    for path in args:
         name, ext = os.path.splitext(path)
 
         if ext == '.info':
@@ -41,12 +46,10 @@ def main (argv):
             inputs += [line.strip() for line in open(path) 
                         if os.path.getsize(line.strip()) > 0]
         else:
-            die("unrecognized file type")
+            return die("unrecognized file type")
 
-    aggregate(inputs, argv[-1])
-
-    return 0
+    return aggregate(inputs, options.output)
 
 if __name__ == '__main__':
-    rc = main(sys.argv) or 0
+    rc = main() or 0
     sys.exit(rc)
