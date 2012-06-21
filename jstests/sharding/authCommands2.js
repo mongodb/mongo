@@ -44,7 +44,7 @@ st.adminCommand( { enablesharding : "test" } );
 st.adminCommand( { shardcollection : "test.foo" , key : { i : 1, j : 1 } } );
 
 var str = 'a';
-while ( str.length < 1024 * 16 ) {
+while ( str.length < 8000 ) {
     str += str;
 }
 for ( var i = 0; i < 100; i++ ) {
@@ -216,6 +216,30 @@ var checkAdminWriteOps = function( hasWriteAuth ) {
     }
 }
 
+var checkRemoveShard = function( hasWriteAuth ) {
+    if ( hasWriteAuth ) {
+        // start draining
+        checkCommandSucceeded( adminDB, { removeshard : st.rs1.name } );
+        // Wait for shard to be completely removed
+        checkRemoveShard = function() {
+            res = checkCommandSucceeded( adminDB, { removeshard : st.rs1.name } );
+            return res.msg == 'removeshard completed successfully';
+        }
+        assert.soon( checkRemoveShard , "failed to remove shard" );
+    } else {
+        checkCommandFailed( adminDB, { removeshard : st.rs1.name } );
+    }
+}
+
+var checkAddShard = function( hasWriteAuth ) {
+    if ( hasWriteAuth ) {
+        checkCommandSucceeded( adminDB, { addshard : st.rs1.getURL() } );
+    } else {
+        checkCommandFailed( adminDB, { addshard : st.rs1.getURL() } );
+    }
+}
+
+
 st.stopBalancer();
 
 jsTestLog("Checking admin commands with read-write auth credentials");
@@ -247,5 +271,26 @@ jsTestLog("Checking commands with read-write auth credentials");
 assert( testDB.auth( rwUser, password ) );
 checkReadOps( true );
 checkWriteOps( true );
+
+
+jsTestLog("Check drainging/removing a shard");
+assert( testDB.logout().ok );
+checkRemoveShard( false );
+assert( adminDB.auth( roUser, password ) );
+checkRemoveShard( false );
+assert( adminDB.auth( rwUser, password ) );
+assert( testDB.dropDatabase().ok );
+checkRemoveShard( true );
+adminDB.printShardingStatus();
+
+jsTestLog("Check adding a shard")
+assert( adminDB.logout().ok );
+checkAddShard( false );
+assert( adminDB.auth( roUser, password ) );
+checkAddShard( false );
+assert( adminDB.auth( rwUser, password ) );
+checkAddShard( true );
+adminDB.printShardingStatus();
+
 
 st.stop();
