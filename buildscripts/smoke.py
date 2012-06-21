@@ -174,6 +174,7 @@ class mongod(object):
                 argv = [utils.find_python(), "buildscripts/cleanbb.py", '--nokill', dir_name]
             else:
                 argv = [utils.find_python(), "buildscripts/cleanbb.py", dir_name]
+            argv.append("--no-gcov")
             call(argv)
         utils.ensureDir(dir_name)
         argv = [mongod_executable, "--port", str(self.port), "--dbpath", dir_name]
