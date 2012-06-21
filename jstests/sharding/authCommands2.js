@@ -99,7 +99,8 @@ var checkReadOps = function( hasReadAuth ) {
                                                   out : {inline : 1}});
         assert.eq( 100, res.results.length );
         assert.eq( 45, res.results[0].value );
-
+        res = checkCommandSucceeded( testDB, { $eval : 'return db.bar.findOne();'} );
+        assert.eq(str, res.retval.str);
     } else {
         print( "Checking read operations, should fail" );
         assert.throws( function() { testDB.foo.find().itcount(); } );
@@ -108,6 +109,7 @@ var checkReadOps = function( hasReadAuth ) {
         checkCommandFailed( testDB, {collstats : 'foo'} );
         checkCommandFailed( testDB, {mapreduce : 'foo', map : map, reduce : reduce,
                                      out : { inline : 1 }} );
+        checkCommandFailed( testDB, { $eval : 'return db.bar.findOne();'} );
     }
 }
 
@@ -140,8 +142,9 @@ var checkWriteOps = function( hasWriteAuth ) {
         assert.eq( 1, testDB.foo.count() );
         checkCommandSucceeded( testDB, {dropDatabase : 1} );
         assert.eq( 0, testDB.foo.count() );
-        // TODO: Uncomment this once create follows regular command codepath
-        //checkCommandSucceeded( testDB.runCommand({create : 'bar'}) );
+        checkCommandSucceeded( testDB, {create : 'baz'} );
+        checkCommandSucceeded( testDB, { $eval : 'db.baz.insert({a:1});'} );
+        assert.eq(1, testDB.baz.findOne().a);
     } else {
         print( "Checking write operations, should fail" );
         testDB.foo.insert({a : 1, i : 1, j : 1});
@@ -160,7 +163,7 @@ var checkWriteOps = function( hasWriteAuth ) {
         passed = true;
         try {
             // For some reason when create fails it throws an exception instead of just returning ok:0
-            res = testDB.runCommand( {create : 'bar'} );
+            res = testDB.runCommand( {create : 'baz'} );
             if ( !res.ok ) {
                 passed = false;
             }
@@ -170,6 +173,11 @@ var checkWriteOps = function( hasWriteAuth ) {
             passed = false;
         }
         assert( !passed );
+        var res = testDB.runCommand( { $eval : 'db.baz.insert({a:1});'} );
+        printjson( res );
+        // If you have read-only auth and try to do a $eval that writes, the $eval command succeeds,
+        // but the write fails
+        assert( !res.ok || testDB.baz.count() == 0 );
     }
 }
 
