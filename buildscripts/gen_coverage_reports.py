@@ -8,6 +8,7 @@ if index file, read through all info files listed in index file and generate htm
 
 mongo_repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 html_dir = os.path.join(os.getcwd(), 'build', 'coverage', 'html')
+tests = []
 
 def processList(listname):
     """Read through a file listing tracefiles line by line.
@@ -20,7 +21,18 @@ def processList(listname):
             return rc
     
     return 0
-        
+
+def genIndex():
+    f = open(os.path.join(html_dir, 'index.html'), 'w')
+    
+    f.write('<html>\n<head><title>Coverage Reports</title></head>\n<body>\n')
+
+    for name in tests:
+        f.write('<p><a href="%(name)s/index.html">%(name)s</a></p>\n' % {'name': name})
+
+    f.write('</body></html>')
+
+
 def genHTML(path):
     """Take the path to a tracefile and generate coverage report html for it.
     The html is placed in a subdirectory of ./build/coverage/html"""
@@ -28,7 +40,8 @@ def genHTML(path):
         print "Processing " + path
         devnull = open(os.devnull, 'w')
         bname = os.path.basename(path)
-        name,ext= os.path.splitext(bname)
+        name, ext= os.path.splitext(bname)
+        tests.append(name)
         return subprocess.call(['genhtml', path, '-o', os.path.join(html_dir, name)],
                                stdout = devnull, stderr = devnull)    
     return 0
@@ -50,6 +63,8 @@ def main():
         
         if rc != 0:
             return "Failed to process " + fullname
+
+    genIndex()
 
 if __name__ == "__main__":
     sys.exit(main())
