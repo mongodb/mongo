@@ -35,6 +35,9 @@ if 'startMongodSmallOplog' in COMMAND_LINE_TARGETS:
 if has_option('smokeauth'):
     smokeFlags += ['--auth']
 
+if has_option('gcov'):
+    smokeFlags += ['--gcov', '--build-dir', env.Dir('$BUILD_DIR')]
+
 def addTest(name, deps, actions):
     smokeEnv.Alias( name, deps, actions )
     smokeEnv.AlwaysBuild( name )
