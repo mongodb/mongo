@@ -857,16 +857,12 @@ int _main( int argc, char* argv[] ) {
                     linePtr[--lineLen] = 0;
             }
 
-            if ( ! linePtr || ( strlen( linePtr ) == 4 && strstr( linePtr , "exit" ) ) ) {
+            string code = linePtr;
+            if ( ! linePtr || 
+                code == "exit" || code == "exit;"  || 
+                code == "quit" || code == "quit;") {
                 if ( ! mongo::cmdLine.quiet )
                     cout << "bye" << endl;
-                if ( line )
-                    free( line );
-                break;
-            }
-
-            string code = linePtr;
-            if ( code == "exit" || code == "exit;" ) {
                 free( line );
                 break;
             }
