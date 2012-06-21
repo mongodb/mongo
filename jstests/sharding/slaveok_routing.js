@@ -64,7 +64,7 @@ jsTest.log( 'First query to SEC' );
 assert( doesRouteToSec( coll, { v: vToFind++ }));
 
 var SIG_TERM = 15;
-replTest.stopSet( SIG_TERM, true, { auth: { user: 'user', pwd: 'user' }});
+replTest.stopSet( SIG_TERM, true, { auth: { user: 'user', pwd: 'password' }});
 
 for ( var n = 0; n < nodeCount; n++ ) {
     replTest.restart( n, rsOpts );
@@ -96,7 +96,7 @@ assert( doesRouteToSec( coll, { v: vToFind++ }));
 
 // Cleanup auth so Windows will be able to shutdown gracefully
 priAdminDB = replTest.getPrimary().getDB( 'admin' );
-priAdminDB.auth( 'user', 'user' );
+priAdminDB.auth( 'user', 'password' );
 priAdminDB.removeUser( 'user' );
 
 st.stop();
