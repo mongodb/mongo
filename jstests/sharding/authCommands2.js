@@ -208,6 +208,8 @@ var checkAdminWriteOps = function( hasWriteAuth ) {
     }
 }
 
+st.stopBalancer();
+
 jsTestLog("Checking admin commands with read-write auth credentials");
 checkAdminWriteOps( true );
 assert( adminDB.logout().ok );
