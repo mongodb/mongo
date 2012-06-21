@@ -265,16 +265,9 @@ __wt_cache_evict_server(void *arg)
 	WT_SESSION_IMPL *session;
 	int read_lockout;
 
-	conn = arg;
+	session = arg;
+	conn = S2C(session);
 	cache = conn->cache;
-
-	/*
-	 * We need a session handle because we're reading/writing pages.
-	 * Start with the default session to keep error handling simple.
-	 */
-	session = conn->default_session;
-	WT_ERR(__wt_open_session(conn, 1, NULL, NULL, &session));
-	session->name = "session.eviction-server";
 
 	while (F_ISSET(conn, WT_SERVER_RUN)) {
 		/*
@@ -311,10 +304,9 @@ err:		__wt_err(session, ret, "eviction server error");
 
 	__wt_free(session, cache->evict);
 
-	if (session != conn->default_session) {
-		(void)session->iface.close(&session->iface, NULL);
-		__wt_free(conn->default_session, session->hazard);
-	}
+	/* Close the eviction session and free its hazard array. */
+	(void)session->iface.close(&session->iface, NULL);
+	__wt_free(conn->default_session, session->hazard);
 
 	return (NULL);
 }
