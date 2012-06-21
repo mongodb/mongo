@@ -374,7 +374,7 @@ def runTest(test):
     sys.stdout.flush()
     
     # clear out leftover .gcda files before a run
-    if gcov:
+    if gcov and build_dir:
         delete_gcda(build_dir)
 
     os.environ['MONGO_TEST_FILENAME'] = os.path.basename(path)
@@ -384,14 +384,19 @@ def runTest(test):
     del os.environ['MONGO_TEST_FILENAME']
 
     # running lcov if test ran successfuly (return code is 0)
-    if gcov and r == 0:
+    if gcov and build_dir and r == 0:
         
         testname, ext = os.path.splitext(os.path.basename(path))
         # the name of the tracefile is the name of the test
         # with the extension change to .info
-        tracefile = lcov_dir + '/' + testname + '.info'
-        print "Create tracefile " + tracefile
-        call(['lcov', '-c', '-d', build_dir, '-b', mongo_repo, '-o', tracefile])
+        tracefile = os.path.join(lcov_dir,  testname + '.info')
+        sys.stdout.write("    Tracefile : %s\n" % tracefile)
+        devnull = open('/dev/null', 'w')
+        
+        # lcov generates a lot of output, redirect it to /dev/null so we don't see it
+        call(['lcov', '-c', '-d', build_dir, '-b', mongo_repo, '-o', tracefile], 
+             stderr=devnull, stdout=devnull)
+        
         index_file.write(tracefile + '\n')
 
     sys.stdout.write("                %fms\n" % ((t2 - t1) * 1000))
@@ -408,7 +413,7 @@ def runTest(test):
     print ""
 
 def delete_gcda(root):
-    for (dirpath, dirnames, filenames) in os.walk(root, topdown=False):
+    for (dirpath, dirnames, filenames) in os.walk(root):
         for fn in filenames:
             if fn.endswith('.gcda'):
                 filepath = dirpath + '/' + fn
