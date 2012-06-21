@@ -397,7 +397,9 @@ def runTest(test):
         call(['lcov', '-c', '-d', build_dir, '-b', mongo_repo, '-o', tracefile], 
              stderr=devnull, stdout=devnull)
         
-        index_file.write(tracefile + '\n')
+        if tracefile not in index_set: 
+            index_file.write(tracefile + '\n')
+            index_set.add(tracefile)
 
     sys.stdout.write("                %fms\n" % ((t2 - t1) * 1000))
     sys.stdout.flush()
@@ -634,12 +636,23 @@ def set_globals(options):
 
 def setup_coverage_directory():
     global index_file, lcov_dir
-
+    global index_set
+    index_set = set()
+    
     lcov_dir = os.path.join(mongo_repo, 'build', 'coverage', 'tracefiles')
+    index_path= os.path.join(lcov_dir, "index.txt")
+
+    
     if not os.path.isdir(lcov_dir):
         os.makedirs(lcov_dir)
+    elif os.path.isfile(index_path):
+        f = open(index_path, 'r')
+        for line in f:
+            index_set.add(line.strip())
+        f.close()
 
-    index_file = open(os.path.join(lcov_dir, 'index.txt'), 'w')
+    index_file = open(os.path.join(lcov_dir, 'index.txt'), 'a')
+
 
 def clear_failfile():
     if os.path.exists(failfile):
