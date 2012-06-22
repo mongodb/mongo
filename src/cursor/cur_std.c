@@ -443,6 +443,11 @@ __wt_cursor_init(WT_CURSOR *cursor,
 
 	session = (WT_SESSION_IMPL *)cursor->session;
 
+	/*
+	 * Fill in unspecified cursor methods: get/set key/value, equality,
+	 * search and reconfiguration are all standard.  Otherwise, if the
+	 * method isn't set, assume it's unsupported.
+	 */
 	if (cursor->get_key == NULL)
 		cursor->get_key = __wt_cursor_get_key;
 	if (cursor->get_value == NULL)
@@ -453,8 +458,25 @@ __wt_cursor_init(WT_CURSOR *cursor,
 		cursor->set_value = __wt_cursor_set_value;
 	if (cursor->equals == NULL)
 		cursor->equals = __cursor_equals;
+	if (cursor->next == NULL)
+		cursor->next = __wt_cursor_notsup;
+	if (cursor->prev == NULL)
+		cursor->prev = __wt_cursor_notsup;
+	if (cursor->reset == NULL)
+		cursor->reset = __wt_cursor_notsup;
 	if (cursor->search == NULL)
 		cursor->search = __cursor_search;
+	if (cursor->search_near == NULL)
+		cursor->search_near =
+		    (int (*)(WT_CURSOR *, int *))__wt_cursor_notsup;
+	if (cursor->insert == NULL)
+		cursor->insert = __wt_cursor_notsup;
+	if (cursor->update == NULL)
+		cursor->update = __wt_cursor_notsup;
+	if (cursor->remove == NULL)
+		cursor->remove = __wt_cursor_notsup;
+	if (cursor->close == NULL)
+		WT_RET_MSG(session, EINVAL, "cursor lacks a close method");
 	if (cursor->reconfigure == NULL)
 		cursor->reconfigure = __cursor_reconfigure;
 
