@@ -352,9 +352,6 @@ namespace replset {
                 _oplogMarkerTarget = NULL;
             }
         }
-        // block for up to 1 second, waiting for an op
-        // to appear off the network
-        waitForMore();
         return _buffer.peek(*op);
     }
 
