@@ -66,7 +66,7 @@ mongod_executable = None
 mongod_port = None
 shell_executable = None
 continue_on_failure = None
-
+build_dir = None
 tests = []
 winners = []
 losers = {}
@@ -372,12 +372,39 @@ def runTest(test):
     sys.stdout.write("      Command : %s\n" % ' '.join(argv))
     sys.stdout.write("         Date : %s\n" % datetime.now().ctime())
     sys.stdout.flush()
+    
+    # clear out leftover .gcda files before a run
+    if gcov and build_dir:
+        delete_gcda(build_dir)
 
     os.environ['MONGO_TEST_FILENAME'] = os.path.basename(path)
     t1 = time.time()
     r = call(buildlogger(argv), cwd=test_path)
     t2 = time.time()
     del os.environ['MONGO_TEST_FILENAME']
+
+    # running lcov if test ran successfuly (return code is 0)
+    if gcov and build_dir and r == 0:
+        
+        testname, ext = os.path.splitext(os.path.basename(path))
+        # the name of the tracefile is the name of the test
+        # with the extension change to .info
+        tracefile = os.path.join(lcov_dir,  testname + '.info')
+        sys.stdout.write("    Tracefile : %s\n" % tracefile)
+        devnull = open(os.devnull, 'w')
+        tempfile= os.path.join(lcov_dir, "temp.info")
+
+        # lcov generates a lot of output, redirect it to /dev/null so we don't see it
+        call(['lcov', '-c', '-d', build_dir, '-b', mongo_repo, '-o', tempfile], 
+             stderr=devnull, stdout=devnull)
+        
+        call(['lcov', '-e', tempfile, mongo_repo + '/*', '-o', tracefile], 
+             stderr=devnull, stdout=devnull)
+        os.remove(tempfile)
+
+        if tracefile not in index_set: 
+            index_file.write(tracefile + '\n')
+            index_set.add(tracefile)
 
     sys.stdout.write("                %fms\n" % ((t2 - t1) * 1000))
     sys.stdout.flush()
@@ -391,6 +418,14 @@ def runTest(test):
         raise TestServerFailure(path)
 
     print ""
+
+def delete_gcda(root):
+    for (dirpath, dirnames, filenames) in os.walk(root):
+        for fn in filenames:
+            if fn.endswith('.gcda'):
+                filepath = dirpath + '/' + fn
+                os.remove(filepath)
+
 
 def run_tests(tests):
     # FIXME: some suites of tests start their own mongod, so don't
@@ -574,7 +609,11 @@ def add_exe(e):
     return e
 
 def set_globals(options):
-    global mongod_executable, mongod_port, shell_executable, continue_on_failure, small_oplog, small_oplog_rs, no_journal, no_preallocj, auth, keyFile, smoke_db_prefix, test_path
+    global mongod_executable, mongod_port, shell_executable
+    global continue_on_failure, small_oplog, small_oplog_rs 
+    global no_journal, no_preallocj, auth, keyFile, smoke_db_prefix
+    global test_path, gcov, build_dir
+
     #Careful, this can be called multiple times
     test_path = options.test_path
 
@@ -597,6 +636,28 @@ def set_globals(options):
     no_preallocj = options.no_preallocj
     auth = options.auth
     keyFile = options.keyFile
+    gcov = options.gcov
+    build_dir = options.build_dir
+
+def setup_coverage_directory():
+    global index_file, lcov_dir
+    global index_set
+    index_set = set()
+    
+    lcov_dir = os.path.join(mongo_repo, 'build', 'coverage', 'tracefiles')
+    index_path= os.path.join(lcov_dir, "index.txt")
+
+    
+    if not os.path.isdir(lcov_dir):
+        os.makedirs(lcov_dir)
+    elif os.path.isfile(index_path):
+        f = open(index_path, 'r')
+        for line in f:
+            index_set.add(line.strip())
+        f.close()
+
+    index_file = open(os.path.join(lcov_dir, 'index.txt'), 'a')
+
 
 def clear_failfile():
     if os.path.exists(failfile):
@@ -667,7 +728,10 @@ def add_to_failfile(tests, options):
 
 
 def main():
-    global mongod_executable, mongod_port, shell_executable, continue_on_failure, small_oplog, no_journal, no_preallocj, auth, keyFile, smoke_db_prefix, test_path
+    global mongod_executable, mongod_port, shell_executable
+    global continue_on_failure, small_oplog, no_journal, no_preallocj
+    global auth, keyFile, smoke_db_prefix, test_path
+
     parser = OptionParser(usage="usage: smoke.py [OPTIONS] ARGS*")
     parser.add_option('--mode', dest='mode', default='suite',
                       help='If "files", ARGS are filenames; if "suite", ARGS are sets of tests (%default)')
@@ -715,6 +779,11 @@ def main():
     parser.add_option('--reset-old-fails', dest='reset_old_fails', default=False,
                       action="store_true",
                       help='Clear the failfile. Do this if all tests pass')
+    parser.add_option('--gcov', dest='gcov', default=False,
+                      action="store_true",
+                      help='Run lcov after every test')
+    parser.add_option('--build-dir', dest='build_dir', default=build_dir,
+                      help='Build directory (%default)')
 
     # Buildlogger invocation from command line
     parser.add_option('--buildlogger-builder', dest='buildlogger_builder', default=None,
@@ -730,6 +799,7 @@ def main():
     (options, tests) = parser.parse_args()
 
     set_globals(options)
+    setup_coverage_directory()
 
     buildlogger_opts = (options.buildlogger_builder, options.buildlogger_buildnum, options.buildlogger_credentials)
     if all(buildlogger_opts):
