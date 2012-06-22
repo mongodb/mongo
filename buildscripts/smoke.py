@@ -392,11 +392,16 @@ def runTest(test):
         tracefile = os.path.join(lcov_dir,  testname + '.info')
         sys.stdout.write("    Tracefile : %s\n" % tracefile)
         devnull = open(os.devnull, 'w')
-        
+        tempfile= os.path.join(lcov_dir, "temp.info")
+
         # lcov generates a lot of output, redirect it to /dev/null so we don't see it
-        call(['lcov', '-c', '-d', build_dir, '-b', mongo_repo, '-o', tracefile], 
+        call(['lcov', '-c', '-d', build_dir, '-b', mongo_repo, '-o', tempfile], 
              stderr=devnull, stdout=devnull)
         
+        call(['lcov', '-e', tempfile, mongo_repo + '/*', '-o', tracefile], 
+             stderr=devnull, stdout=devnull)
+        os.remove(tempfile)
+
         if tracefile not in index_set: 
             index_file.write(tracefile + '\n')
             index_set.add(tracefile)
