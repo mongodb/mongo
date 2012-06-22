@@ -747,8 +747,9 @@ namespace mongo {
 
         /* check to see if optimizing comparison operator is supported */
         CmpOp newOp = pCmp->cmpOp;
-        if (newOp == CMP)
-            return pE; // not reversible: there's nothing more we can do
+        // CMP and NE cannot use ExpressionFieldRange which is what this optimization uses
+        if (newOp == CMP || newOp == NE)
+            return pE;
 
         /*
           There's one localized optimization we recognize:  a comparison
