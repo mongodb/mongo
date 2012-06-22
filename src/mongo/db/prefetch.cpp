@@ -90,7 +90,7 @@ namespace mongo {
             try {
                 Client::ReadContext ctx( ns );
                 if( Helpers::findById(cc(), ns, builder.done(), result) ) {
-                    volatile char _dummy_char;       
+                    volatile char _dummy_char = '\0';
                     // Touch the first word on every page in order to fault it into memory
                     for (int i = 0; i < result.objsize(); i += g_minOSPageSizeBytes) {                        
                         _dummy_char += *(result.objdata() + i); 
