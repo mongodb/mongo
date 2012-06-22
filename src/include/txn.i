@@ -127,8 +127,10 @@ __wt_txn_update_check(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 	txn = &session->txn;
 	if (txn->isolation == TXN_ISO_SNAPSHOT)
 		while (upd != NULL && !__wt_txn_visible(session, upd->txnid)) {
-			if (upd->txnid != WT_TXN_ABORTED)
+			if (upd->txnid != WT_TXN_ABORTED) {
+				WT_BSTAT_INCR(session, update_conflict);
 				return (WT_DEADLOCK);
+			}
 			upd = upd->next;
 		}
 

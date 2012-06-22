@@ -1592,22 +1592,30 @@ extern int wiredtiger_extension_init(WT_SESSION *session,
 #define	WT_STAT_cache_evict_hazard			8
 /*! cache: unmodified pages evicted */
 #define	WT_STAT_cache_evict_unmodified			9
+/*! checkpoints */
+#define	WT_STAT_checkpoint				10
 /*! condition wait calls */
-#define	WT_STAT_cond_wait				10
+#define	WT_STAT_cond_wait				11
 /*! files currently open */
-#define	WT_STAT_file_open				11
+#define	WT_STAT_file_open				12
 /*! rwlock readlock calls */
-#define	WT_STAT_rwlock_rdlock				12
+#define	WT_STAT_rwlock_rdlock				13
 /*! rwlock writelock calls */
-#define	WT_STAT_rwlock_wrlock				13
+#define	WT_STAT_rwlock_wrlock				14
 /*! total memory allocations */
-#define	WT_STAT_memalloc				14
+#define	WT_STAT_memalloc				15
 /*! total memory frees */
-#define	WT_STAT_memfree					15
+#define	WT_STAT_memfree					16
 /*! total read I/Os */
-#define	WT_STAT_total_read_io				16
+#define	WT_STAT_total_read_io				17
 /*! total write I/Os */
-#define	WT_STAT_total_write_io				17
+#define	WT_STAT_total_write_io				18
+/*! transactions */
+#define	WT_STAT_txn_begin				19
+/*! transactions committed */
+#define	WT_STAT_txn_commit				20
+/*! transactions rolled-back */
+#define	WT_STAT_txn_rollback				21
 
 /*!
  * @}
@@ -1697,8 +1705,10 @@ extern int wiredtiger_extension_init(WT_SESSION *session,
 #define	WT_STAT_file_row_leaf_pages			39
 /*! total entries */
 #define	WT_STAT_file_entries				40
+/*! update conflicts */
+#define	WT_STAT_update_conflict				41
 /*! write generation conflicts */
-#define	WT_STAT_file_write_conflicts			41
+#define	WT_STAT_file_write_conflicts			42
 /*! @} */
 /*
  * Statistics section: END

@@ -54,6 +54,7 @@ __wt_stat_alloc_btree_stats(WT_SESSION_IMPL *session, WT_BTREE_STATS **statsp)
 	stats->rec_split_intl.desc = "reconcile: internal pages split";
 	stats->rec_split_leaf.desc = "reconcile: leaf pages split";
 	stats->rec_written.desc = "reconcile: pages written";
+	stats->update_conflict.desc = "update conflicts";
 
 	*statsp = stats;
 	return (0);
@@ -107,6 +108,7 @@ __wt_stat_clear_btree_stats(WT_STATS *stats_arg)
 	stats->rec_split_intl.v = 0;
 	stats->rec_split_leaf.v = 0;
 	stats->rec_written.v = 0;
+	stats->update_conflict.v = 0;
 }
 
 int
@@ -130,6 +132,7 @@ __wt_stat_alloc_connection_stats(WT_SESSION_IMPL *session, WT_CONNECTION_STATS *
 	stats->cache_evict_unmodified.desc = "cache: unmodified pages evicted";
 	stats->cache_pages_inuse.desc =
 	    "cache: pages currently held in the cache";
+	stats->checkpoint.desc = "checkpoints";
 	stats->cond_wait.desc = "condition wait calls";
 	stats->file_open.desc = "files currently open";
 	stats->memalloc.desc = "total memory allocations";
@@ -138,6 +141,9 @@ __wt_stat_alloc_connection_stats(WT_SESSION_IMPL *session, WT_CONNECTION_STATS *
 	stats->rwlock_wrlock.desc = "rwlock writelock calls";
 	stats->total_read_io.desc = "total read I/Os";
 	stats->total_write_io.desc = "total write I/Os";
+	stats->txn_begin.desc = "transactions";
+	stats->txn_commit.desc = "transactions committed";
+	stats->txn_rollback.desc = "transactions rolled-back";
 
 	*statsp = stats;
 	return (0);
@@ -156,6 +162,7 @@ __wt_stat_clear_connection_stats(WT_STATS *stats_arg)
 	stats->cache_evict_modified.v = 0;
 	stats->cache_evict_slow.v = 0;
 	stats->cache_evict_unmodified.v = 0;
+	stats->checkpoint.v = 0;
 	stats->cond_wait.v = 0;
 	stats->file_open.v = 0;
 	stats->memalloc.v = 0;
@@ -164,4 +171,7 @@ __wt_stat_clear_connection_stats(WT_STATS *stats_arg)
 	stats->rwlock_wrlock.v = 0;
 	stats->total_read_io.v = 0;
 	stats->total_write_io.v = 0;
+	stats->txn_begin.v = 0;
+	stats->txn_commit.v = 0;
+	stats->txn_rollback.v = 0;
 }

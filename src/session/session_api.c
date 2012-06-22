@@ -392,6 +392,7 @@ __session_begin_transaction(WT_SESSION *wt_session, const char *config)
 	WT_SESSION_IMPL *session;
 
 	session = (WT_SESSION_IMPL *)wt_session;
+	WT_CSTAT_INCR(session, txn_begin);
 
 	SESSION_API_CALL(session, begin_transaction, config, cfg);
 	if (!F_ISSET(S2C(session), WT_CONN_TRANSACTIONAL))
@@ -418,6 +419,7 @@ __session_commit_transaction(WT_SESSION *wt_session, const char *config)
 	WT_TXN *txn;
 
 	session = (WT_SESSION_IMPL *)wt_session;
+	WT_CSTAT_INCR(session, txn_commit);
 
 	SESSION_API_CALL(session, commit_transaction, config, cfg);
 	txn = &session->txn;
@@ -446,6 +448,8 @@ __session_rollback_transaction(WT_SESSION *wt_session, const char *config)
 	WT_SESSION_IMPL *session;
 
 	session = (WT_SESSION_IMPL *)wt_session;
+	WT_CSTAT_INCR(session, txn_rollback);
+
 	SESSION_API_CALL(session, rollback_transaction, config, cfg);
 	WT_TRET(__session_close_cursors(session));
 	WT_TRET(__wt_txn_rollback(session, cfg));
@@ -465,6 +469,8 @@ __session_checkpoint(WT_SESSION *wt_session, const char *config)
 	WT_SESSION_IMPL *session;
 
 	session = (WT_SESSION_IMPL *)wt_session;
+	WT_CSTAT_INCR(session, checkpoint);
+
 	SESSION_API_CALL(session, checkpoint, config, cfg);
 	WT_TRET(__wt_txn_checkpoint(session, cfg));
 
