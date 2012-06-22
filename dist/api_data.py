@@ -262,8 +262,9 @@ methods = {
 		type='boolean'),
 	Config('bulk', 'false', r'''
 		configure the cursor for bulk loads; bulk-load is a fast
-		load path for empty objects, only empty objects may be
-		bulk-loaded''',
+		load path for empty objects and only empty objects may
+		be bulk-loaded.  Cursors configured for bulk load only
+		support the WT_CURSOR::insert and WT_CURSOR::close methods''',
 		type='boolean'),
 	Config('checkpoint', '', r'''
 		the name of a checkpoint to open'''),
@@ -278,6 +279,11 @@ methods = {
 		the isolation level for this cursor, ignored for transactional
 		cursors''',
 		choices=['snapshot', 'read-committed', 'read-uncommitted']),
+	Config('next_random', 'false', r'''
+		configure the cursor to return a pseudo-random record from
+		the object.  Cursors configured for random retrieval only
+		support the WT_CURSOR::next and WT_CURSOR::close methods''',
+		type='boolean'),
 	Config('raw', 'false', r'''
 		ignore the encodings for the key and value, manage data as if
 		the formats were \c "u".  See @ref cursor_raw for details''',
