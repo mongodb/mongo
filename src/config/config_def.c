@@ -89,11 +89,11 @@ __wt_confchk_cursor_close =
 
 const char *
 __wt_confdfl_cursor_reconfigure =
-    "append=false,overwrite=false";
+    "overwrite=false";
 
 const char *
 __wt_confchk_cursor_reconfigure =
-    "append=(type=boolean),overwrite=(type=boolean)";
+    "overwrite=(type=boolean)";
 
 const char *
 __wt_confdfl_file_meta =

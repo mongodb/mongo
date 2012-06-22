@@ -320,18 +320,6 @@ __cursor_runtime_config(WT_CURSOR *cursor, const char *cfg[])
 
 	session = (WT_SESSION_IMPL *)cursor->session;
 
-	/* The append flag is only relevant to column stores. */
-	if (WT_CURSOR_RECNO(cursor)) {
-		if ((ret =
-		    __wt_config_gets(session, cfg, "append", &cval)) == 0) {
-			if (cval.val)
-				F_SET(cursor, WT_CURSTD_APPEND);
-			else
-				F_CLR(cursor, WT_CURSTD_APPEND);
-		}
-		WT_RET_NOTFOUND_OK(ret);
-	}
-
 	if ((ret = __wt_config_gets(session, cfg, "overwrite", &cval)) == 0) {
 		if (cval.val)
 			F_SET(cursor, WT_CURSTD_OVERWRITE);
@@ -485,6 +473,13 @@ __wt_cursor_init(WT_CURSOR *cursor,
 
 	WT_CLEAR(cursor->key);
 	WT_CLEAR(cursor->value);
+
+	/* The append flag is only relevant to column stores. */
+	if (WT_CURSOR_RECNO(cursor)) {
+		WT_RET(__wt_config_gets(session, cfg, "append", &cval));
+		if (cval.val != 0)
+			F_SET(cursor, WT_CURSTD_APPEND);
+	}
 
 	/* Set runtime-configurable settings. */
 	WT_RET(__cursor_runtime_config(cursor, cfg));

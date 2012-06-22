@@ -183,10 +183,6 @@ table_meta = format_meta + table_only_meta
 
 # Cursor runtime config, shared by cursor.reconfigure and session.open_cursor
 cursor_runtime_config = [
-	Config('append', 'false', r'''
-		only supported by cursors with record number keys: append the
-		value as a new record, creating a new record number key''',
-		type='boolean'),
 	Config('overwrite', 'false', r'''
 		change the behavior of the cursor's insert method to
 		overwrite previously existing values''',
@@ -260,6 +256,10 @@ methods = {
 'session.log_printf' : Method([]),
 
 'session.open_cursor' : Method(cursor_runtime_config + [
+	Config('append', 'false', r'''
+		only supported by cursors with record number keys: append the
+		value as a new record, creating a new record number key''',
+		type='boolean'),
 	Config('bulk', 'false', r'''
 		configure the cursor for bulk loads; bulk-load is a fast
 		load path for empty objects, only empty objects may be

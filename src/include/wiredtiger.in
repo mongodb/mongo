@@ -377,9 +377,6 @@ struct __wt_cursor {
 	 *
 	 * @param cursor the cursor handle
 	 * @configstart{cursor.reconfigure, see dist/api_data.py}
-	 * @config{append, only supported by cursors with record number keys:
-	 * append the value as a new record\, creating a new record number
-	 * key.,a boolean flag; default \c false.}
 	 * @config{overwrite, change the behavior of the cursor's insert method
 	 * to overwrite previously existing values.,a boolean flag; default \c
 	 * false.}
