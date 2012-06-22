@@ -49,7 +49,7 @@ namespace mongo {
             }
         }
 
-        cin >> password;
+        getline( cin, password );
 
         if ( isatty( stdinfd ) ) {
             termio.c_lflag = old;
@@ -78,13 +78,12 @@ namespace mongo {
             return string();
         }
 
-        cin >> password;
+        getline( cin, password );
 
         if ( !SetConsoleMode( stdinh, old ) ) {
             cerr << "Cannot set console mode " << GetLastError() << "\n";
             return string();
         }
-        cin.get();
 #endif
         cout << "\n";
         return password;
