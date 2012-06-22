@@ -609,7 +609,7 @@ namespace mongo {
 
         case jstNULL:
         case Undefined:
-            break;
+            uassert(16362, "can't convert from Null (or Undefined) value type to Date_t", false);
 
         default:
             uassert(16006, str::stream() <<
@@ -617,9 +617,6 @@ namespace mongo {
                     " to double",
                     false);
         } // switch(type)
-
-            verify(false); // CW TODO no conversion available
-        return jstNULL; 
     }
 
     string Value::coerceToString() const {
