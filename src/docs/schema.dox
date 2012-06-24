@@ -49,8 +49,9 @@ into fields and mapped onto rows and columns.
 By default, WiredTiger works as a traditional key/value store, where the
 keys and values are raw byte arrays accessed using a WT_ITEM structure.
 Keys and values may be up to (4GB - 512B) bytes in size, but depending
-on how @ref WT_SESSION::create "maximum item sizes" are configured,
-large key and value items will be stored on overflow pages.
+on how @ref WT_SESSION::create "internal_item_max" or @ref
+WT_SESSION::create "leaf_item_max" are configured, large key and value
+items will be stored on overflow pages.
 
 See @subpage keyvalue for more details on raw key / value items.
 
