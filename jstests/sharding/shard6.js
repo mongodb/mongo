@@ -18,6 +18,7 @@ function poolStats( where ){
         msg += z.created + " ";
         total += z.created
     }
+    printjson( x );
     print( "****\n" + msg + "\n*****" )
     summary += msg + "\n";
     return total
