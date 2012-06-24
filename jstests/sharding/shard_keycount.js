@@ -2,6 +2,9 @@
 
 s = new ShardingTest( "shard_keycount" , 2, 0, 1, /* chunkSize */1);
 
+// Kill balancer
+s.config.settings.update({ _id: "balancer" }, { $set : { stopped: true } }, true )
+
 dbName = "test"
 collName = "foo"
 ns = dbName + "." + collName
@@ -18,8 +21,6 @@ s.adminCommand( { enablesharding : dbName } );
 // Enable sharding on collection
 s.adminCommand( { shardcollection : ns, key : { _id : 1 } } );
 
-// Kill balancer
-s.config.settings.update({ _id: "balancer" }, { $set : { stopped: true } }, true )
 
 // Split into two chunks
 s.adminCommand({ split : ns, find : { _id : 3 } })
