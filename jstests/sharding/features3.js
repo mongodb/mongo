@@ -45,9 +45,11 @@ print( "about to fork shell: " + Date() )
 
 // TODO:  Still potential problem when our sampling of current ops misses when $where is active - 
 // solution is to increase sleep time
-parallelCommand = "try { while(true){" +
-                  " db.foo.find( function(){ x = ''; for ( i=0; i<10000; i++ ){ x+=i; } sleep( 1000 ); return true; } ).itcount() " +
-                  "}} catch(e){ print('PShell execution ended:'); printjson( e ) }"
+whereKillSleepTime = 10000;
+parallelCommand = 
+    "try { " +
+    "  db.foo.find( function(){ sleep( " + whereKillSleepTime + " ); return false; } ).itcount(); " +
+    "} catch(e){ print('PShell execution ended:'); printjson( e ) }"
 
 join = startParallelShell( parallelCommand )
 print( "after forking shell: " + Date() )
@@ -105,8 +107,8 @@ assert.eq( 2 , state , "failed killing" );
 
 killTime = (new Date()).getTime() - killTime.getTime()
 print( "killTime: " + killTime );
-
-assert.gt( 10000 , killTime , "took too long to kill" )
+print( "time if run full: " + ( N * whereKillSleepTime ) );
+assert.gt( whereKillSleepTime * N / 20 , killTime , "took too long to kill" )
 
 join()
 
