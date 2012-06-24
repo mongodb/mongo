@@ -183,8 +183,12 @@ table is modified.
 A cursor can be opened on an index by passing the index URI to
 WT_SESSION::open_cursor.  Index cursors use the specified index key columns
 for WT_CURSOR::get_key and WT_CURSOR::set_key, and by default return all of
-the table value columns in WT_CURSOR::get_value.  Index cursors are
-read-only: they cannot be used to perform updates.
+the table value columns in WT_CURSOR::get_value.
+
+Index cursors are read-only: they cannot be used to perform updates.
+
+Index cursors for column-store objects may not be created using the
+record number as the index key.
 
 @section schema_examples Code samples
 

@@ -273,6 +273,14 @@ __create_index(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_buf_fmt(session, &fmt, "value_format=,key_format="));
 	WT_ERR(__wt_struct_reformat(session, table,
 	     icols.str, icols.len, (const char *)extra_cols.data, 0, &fmt));
+
+	/* Check for a record number index key, which makes no sense. */
+	WT_ERR(__wt_config_getones(session, fmt.data, "key_format", &cval));
+	if (cval.len == 1 && cval.str[0] == 'r')
+		WT_ERR_MSG(session, EINVAL,
+		    "column-store index may not use the record number as its "
+		    "index key");
+
 	filecfg[1] = fmt.data;
 	WT_ERR(__wt_config_concat(session, filecfg, &fileconf));
 
