@@ -19,6 +19,10 @@ def aggregate(inputs, output):
     
     return subprocess.call(args)  
 
+def getfilesize(path):
+    if not os.path.isfile(path):
+        return 0
+    return os.path.getsize(path)
 
 def main ():
     inputs = []
@@ -34,12 +38,12 @@ def main ():
         name, ext = os.path.splitext(path)
 
         if ext == '.info':
-            if os.path.getsize(path) > 0:
+            if getfilesize(path) > 0:
                 inputs.append(path)
 
         elif ext == '.txt':
             inputs += [line.strip() for line in open(path) 
-                        if os.path.getsize(line.strip()) > 0]
+                        if getfilesize(line.strip()) > 0]
         else:
             return "unrecognized file type"
 
