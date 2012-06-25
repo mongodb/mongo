@@ -479,7 +479,7 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
 	__cursor_func_init(cbt, 1);
 
 	/*
-	 * Only supports btrees: applications can trivially select a random
+	 * Only supports row-store: applications can trivially select a random
 	 * value from a column-store, if there were any reason to do so.
 	 */
 	WT_ERR(btree->type == BTREE_ROW ?
