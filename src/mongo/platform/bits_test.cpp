@@ -23,9 +23,9 @@ namespace mongo {
 
     TEST( BitsTest, HeaderCorrect ) {
 #if defined(MONGO_PLATFORM_64)
-        ASSERT_EQUALS( 8, sizeof(char*) );
+        ASSERT_EQUALS( 8U, sizeof(char*) );
 #elif defined(MONGO_PLATFORM_32)
-        ASSERT_EQUALS( 4, sizeof(char*) );
+        ASSERT_EQUALS( 4U, sizeof(char*) );
 #else
         ASSERT( false );
 #endif
