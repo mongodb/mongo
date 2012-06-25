@@ -209,14 +209,15 @@ __wt_confchk_session_log_printf =
 const char *
 __wt_confdfl_session_open_cursor =
     "append=false,bulk=false,checkpoint="",dump="",isolation=read-committed,"
-    "overwrite=false,raw=false,statistics=false,statistics_clear=false";
+    "next_random=false,overwrite=false,raw=false,statistics=false,"
+    "statistics_clear=false";
 
 const char *
 __wt_confchk_session_open_cursor =
     "append=(type=boolean),bulk=(type=boolean),checkpoint=(),"
     "dump=(choices=[\"hex\",\"print\"]),isolation=(choices=[\"snapshot\","
-    "\"read-committed\",\"read-uncommitted\"]),overwrite=(type=boolean),"
-    "raw=(type=boolean),statistics=(type=boolean),"
+    "\"read-committed\",\"read-uncommitted\"]),next_random=(type=boolean),"
+    "overwrite=(type=boolean),raw=(type=boolean),statistics=(type=boolean),"
     "statistics_clear=(type=boolean)";
 
 const char *

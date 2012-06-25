@@ -193,6 +193,42 @@ __curtable_next(WT_CURSOR *cursor)
 }
 
 /*
+ * __curtable_next_random --
+ *	WT_CURSOR->insert method for the table cursor type when configured with
+ * next_random.
+ */
+static int
+__curtable_next_random(WT_CURSOR *cursor)
+{
+	WT_CURSOR *primary, **cp;
+	WT_CURSOR_TABLE *ctable;
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+	int i;
+
+	ctable = (WT_CURSOR_TABLE *)cursor;
+	CURSOR_API_CALL_NOCONF(cursor, session, next, NULL);
+	cp = ctable->cg_cursors;
+
+	/* Split out the first next, it retrieves the random record. */
+	primary = *cp++;
+	WT_ERR(primary->next(primary));
+
+	/* Fill in the rest of the columns. */
+	for (i = 1; i < WT_COLGROUPS(ctable->table); i++, cp++) {
+		(*cp)->key.data = primary->key.data;
+		(*cp)->key.size = primary->key.size;
+		(*cp)->recno = primary->recno;
+		F_SET(*cp, WT_CURSTD_KEY_SET);
+		WT_ERR((*cp)->search(*cp));
+	}
+
+err:	API_END(session);
+
+	return (ret);
+}
+
+/*
  * __curtable_prev --
  *	WT_CURSOR->prev method for the table cursor type.
  */
@@ -444,17 +480,21 @@ __curtable_open_colgroups(WT_CURSOR_TABLE *ctable, const char *cfg[])
 	WT_SESSION_IMPL *session;
 	WT_TABLE *table;
 	WT_CURSOR **cp;
-	const char *cfg_no_overwrite[4];
+	const char *cfg_override[5];
 	int i;
 
 	session = (WT_SESSION_IMPL *)ctable->iface.session;
 	table = ctable->table;
 
-	/* Underlying column groups are always opened without overwrite */
-	cfg_no_overwrite[0] = cfg[0];
-	cfg_no_overwrite[1] = cfg[1];
-	cfg_no_overwrite[2] = "overwrite=false";
-	cfg_no_overwrite[3] = NULL;
+	/*
+	 * Underlying column groups are always opened without overwrite, and
+	 * only the primary is opened with next_random.
+	 */
+	cfg_override[0] = cfg[0];
+	cfg_override[1] = cfg[1];
+	cfg_override[2] = "overwrite=false";
+	cfg_override[3] = NULL;
+	cfg_override[4] = NULL;
 
 	if (!table->cg_complete)
 		WT_RET_MSG(session, EINVAL,
@@ -466,9 +506,11 @@ __curtable_open_colgroups(WT_CURSOR_TABLE *ctable, const char *cfg[])
 
 	for (i = 0, cp = ctable->cg_cursors;
 	    i < WT_COLGROUPS(table);
-	    i++, cp++)
+	    i++, cp++) {
 		WT_RET(__wt_curfile_open(session, table->cg_name[i],
-		    &ctable->iface, cfg_no_overwrite, cp));
+		    &ctable->iface, cfg_override, cp));
+		cfg_override[3] = "next_random=false";
+	}
 	return (0);
 }
 
@@ -537,6 +579,7 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 		0,			/* int saved_err */
 		0			/* uint32_t flags */
 	};
+	WT_CONFIG_ITEM cval;
 	WT_CURSOR *cursor;
 	WT_CURSOR_TABLE *ctable;
 	WT_DECL_RET;
@@ -597,6 +640,16 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_struct_plan(session, table,
 		    columns, strlen(columns), 0, &plan));
 		ctable->plan = __wt_buf_steal(session, &plan, NULL);
+	}
+
+	/*
+	 * random_retrieval
+	 * Random retrieval cursors only support next and close.
+	 */
+	WT_ERR(__wt_config_gets(session, cfg, "next_random", &cval));
+	if (cval.val != 0) {
+		__wt_cursor_set_notsup(cursor);
+		cursor->next = __curtable_next_random;
 	}
 
 	STATIC_ASSERT(offsetof(WT_CURSOR_TABLE, iface) == 0);

@@ -67,16 +67,10 @@ __wt_curbulk_init(WT_CURSOR_BULK *cbulk)
 {
 	WT_CURSOR *c = &cbulk->cbt.iface;
 
-	c->equals = (int (*)(WT_CURSOR *, WT_CURSOR *))__wt_cursor_notsup;
-	c->next = __wt_cursor_notsup;
-	c->prev = __wt_cursor_notsup;
-	c->reset = __wt_cursor_notsup;
-	c->search = __wt_cursor_notsup;
-	c->search_near = (int (*)(WT_CURSOR *, int *))__wt_cursor_notsup;
-	c->insert = __curbulk_insert;		/* Insert OK */
-	c->update = __wt_cursor_notsup;
-	c->remove = __wt_cursor_notsup;
-	c->close = __curbulk_close;		/* Close OK */
+	/* Bulk cursors only support insert and close. */
+	__wt_cursor_set_notsup(c);
+	c->insert = __curbulk_insert;
+	c->close = __curbulk_close;
 
 	return (__wt_bulk_init(cbulk));
 }

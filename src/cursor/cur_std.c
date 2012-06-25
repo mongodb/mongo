@@ -20,6 +20,24 @@ __wt_cursor_notsup(WT_CURSOR *cursor)
 }
 
 /*
+ * __wt_cursor_set_notsup --
+ *	Set all of the cursor methods (except for close), to not-supported.
+ */
+void
+__wt_cursor_set_notsup(WT_CURSOR *cursor)
+{
+	cursor->equals = (int (*)(WT_CURSOR *, WT_CURSOR *))__wt_cursor_notsup;
+	cursor->next = __wt_cursor_notsup;
+	cursor->prev = __wt_cursor_notsup;
+	cursor->reset = __wt_cursor_notsup;
+	cursor->search = __wt_cursor_notsup;
+	cursor->search_near = (int (*)(WT_CURSOR *, int *))__wt_cursor_notsup;
+	cursor->insert = __wt_cursor_notsup;
+	cursor->update = __wt_cursor_notsup;
+	cursor->remove = __wt_cursor_notsup;
+}
+
+/*
  * __wt_cursor_get_key --
  *	WT_CURSOR->get_key default implementation.
  */
@@ -474,16 +492,31 @@ __wt_cursor_init(WT_CURSOR *cursor,
 	WT_CLEAR(cursor->key);
 	WT_CLEAR(cursor->value);
 
-	/* The append flag is only relevant to column stores. */
+	/* Set runtime-configurable settings. */
+	WT_RET(__cursor_runtime_config(cursor, cfg));
+
+	/*
+	 * append
+	 * The append flag is only relevant to column stores.
+	 */
 	if (WT_CURSOR_RECNO(cursor)) {
 		WT_RET(__wt_config_gets(session, cfg, "append", &cval));
 		if (cval.val != 0)
 			F_SET(cursor, WT_CURSTD_APPEND);
 	}
 
-	/* Set runtime-configurable settings. */
-	WT_RET(__cursor_runtime_config(cursor, cfg));
+	/*
+	 * checkpoint
+	 * Checkpoint cursors are read-only.
+	 */
+	WT_RET(__wt_config_gets(session, cfg, "checkpoint", &cval));
+	if (cval.len != 0) {
+		cursor->insert = (int (*)(WT_CURSOR *))__wt_cursor_notsup;
+		cursor->update = (int (*)(WT_CURSOR *))__wt_cursor_notsup;
+		cursor->remove = (int (*)(WT_CURSOR *))__wt_cursor_notsup;
+	}
 
+	/* dump */
 	WT_RET(__wt_config_gets(session, cfg, "dump", &cval));
 	if (cval.len != 0) {
 		F_SET(cursor, (__wt_config_strcmp(&cval, "print") == 0) ?
@@ -493,17 +526,10 @@ __wt_cursor_init(WT_CURSOR *cursor,
 	} else
 		cdump = NULL;
 
+	/* raw */
 	WT_RET(__wt_config_gets(session, cfg, "raw", &cval));
 	if (cval.val != 0)
 		F_SET(cursor, WT_CURSTD_RAW);
-
-	/* Checkpoint cursors are read-only. */
-	WT_RET(__wt_config_gets(session, cfg, "checkpoint", &cval));
-	if (cval.len != 0) {
-		cursor->insert = (int (*)(WT_CURSOR *))__wt_cursor_notsup;
-		cursor->update = (int (*)(WT_CURSOR *))__wt_cursor_notsup;
-		cursor->remove = (int (*)(WT_CURSOR *))__wt_cursor_notsup;
-	}
 
 	/*
 	 * Cursors that are internal to some other cursor (such as file cursors

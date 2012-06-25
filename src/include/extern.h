@@ -238,6 +238,7 @@ extern int __wt_cell_unpack_copy( WT_SESSION_IMPL *session,
     WT_ITEM *retb);
 extern void __wt_btcur_iterate_setup(WT_CURSOR_BTREE *cbt, int next);
 extern int __wt_btcur_next(WT_CURSOR_BTREE *cbt);
+extern int __wt_btcur_next_random(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_prev(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_reset(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_search(WT_CURSOR_BTREE *cbt);
@@ -421,6 +422,7 @@ extern WT_INSERT *__wt_search_insert(WT_SESSION_IMPL *session,
 extern int __wt_row_search(WT_SESSION_IMPL *session,
     WT_CURSOR_BTREE *cbt,
     int is_modify);
+extern int __wt_row_random(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt);
 extern int __wt_config_initn( WT_SESSION_IMPL *session,
     WT_CONFIG *conf,
     const char *str,
@@ -581,6 +583,7 @@ extern int __wt_curstat_open(WT_SESSION_IMPL *session,
     const char *cfg[],
     WT_CURSOR **cursorp);
 extern int __wt_cursor_notsup(WT_CURSOR *cursor);
+extern void __wt_cursor_set_notsup(WT_CURSOR *cursor);
 extern int __wt_cursor_get_key(WT_CURSOR *cursor, ...);
 extern int __wt_cursor_get_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap);
 extern int __wt_cursor_get_value(WT_CURSOR *cursor, ...);
