@@ -410,18 +410,18 @@ namespace mongo {
             }
             else
             {
-                BSONArrayBuilder resultArray; // where we'll stash the results
-                for(bool hasDocument = !pSource->eof(); hasDocument;
-                    hasDocument = pSource->advance()) {
+                // the array in which the aggregation results reside
+                BSONArrayBuilder resultArray (result.subarrayStart("result"));
+                for(bool hasDoc = !pSource->eof(); hasDoc; hasDoc = pSource->advance()) {
                     intrusive_ptr<Document> pDocument(pSource->getCurrent());
 
                     /* add the document to the result set */
-                    BSONObjBuilder documentBuilder;
+                    BSONObjBuilder documentBuilder (resultArray.subobjStart());
                     pDocument->toBson(&documentBuilder);
-                    resultArray.append(documentBuilder.done());
+                    documentBuilder.doneFast();
                 }
 
-                result.appendArray("result", resultArray.arr());
+                resultArray.doneFast();
             }
          } catch(AssertionException &ae) {
             /* 
