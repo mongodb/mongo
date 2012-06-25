@@ -36,7 +36,7 @@ def genIndex():
 def genHTML(path):
     """Take the path to a tracefile and generate coverage report html for it.
     The html is placed in a subdirectory of ./build/coverage/html"""
-    if os.path.getsize(path) > 0:
+    if os.path.isfile(path) and os.path.getsize(path) > 0:
         print "Processing " + path
         devnull = open(os.devnull, 'w')
         bname = os.path.basename(path)
