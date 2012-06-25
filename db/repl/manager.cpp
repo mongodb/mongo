@@ -72,12 +72,23 @@ namespace mongo {
         if( rs->box.getPrimary() == m )
             return;
         rs->_self->lhb() = "";
+
+        // this is what actually puts arbiters into ARBITER state
         if( rs->iAmArbiterOnly() ) {
             rs->box.set(MemberState::RS_ARBITER, m);
+            return;
         }
-        else {
-            rs->box.noteRemoteIsPrimary(m);
+
+        if (rs->box.getState().primary()) {
+            // make sure exactly one primary steps down
+            if (rs->selfId() < m->id()) {
+                return;
+            }
+
+            rs->relinquish();
         }
+
+        rs->box.noteRemoteIsPrimary(m);
     }
 
     void Manager::checkElectableSet() {
@@ -192,32 +203,7 @@ namespace mongo {
             }
 
             if( p2 ) {
-                /* someone else thinks they are primary. */
-                if( p == p2 ) {
-                    // we thought the same; all set.
-                    return;
-                }
-                if( p == 0 ) {
-                    noteARemoteIsPrimary(p2);
-                    return;
-                }
-                // todo xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-                if( p != rs->_self ) {
-                    // switch primary from oldremotep->newremotep2
-                    noteARemoteIsPrimary(p2);
-                    return;
-                }
-                /* we thought we were primary, yet now someone else thinks they are. */
-                if( !rs->elect.aMajoritySeemsToBeUp() ) {
-                    /* we can't see a majority.  so the other node is probably the right choice. */
-                    noteARemoteIsPrimary(p2);
-                    return;
-                }
-                /* ignore for now, keep thinking we are master.
-                   this could just be timing (we poll every couple seconds) or could indicate
-                   a problem?  if it happens consistently for a duration of time we should
-                   alert the sysadmin.
-                */
+                noteARemoteIsPrimary(p2);
                 return;
             }
 

@@ -282,8 +282,7 @@ namespace mongo {
         }
         void noteRemoteIsPrimary(const Member *remote) {
             rwlock lk(m, true);
-            if( !sp.state.secondary() && !sp.state.fatal() )
-                sp.state = MemberState::RS_RECOVERING;
+            assert(!sp.state.primary());
             sp.primary = remote;
         }
         StateBox() : m("StateBox") { }
