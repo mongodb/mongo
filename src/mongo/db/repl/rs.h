@@ -515,8 +515,8 @@ namespace mongo {
         threadpool::ThreadPool _prefetcherPool;
 
     public:
-        static const int replWriterThreadCount = 16;
-        static const int replPrefetcherThreadCount = 16;
+        static const int replWriterThreadCount;
+        static const int replPrefetcherThreadCount;
         threadpool::ThreadPool& getPrefetchPool() { return _prefetcherPool; }
         threadpool::ThreadPool& getWriterPool() { return _writerPool; }
 
