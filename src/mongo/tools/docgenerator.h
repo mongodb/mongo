@@ -17,12 +17,13 @@
 
 /**
 *   This is a simple document generator. It generates documents of the format
-*   { id:xxx, counterUp:xxx, hashIdUp: hashof(counterUp), blob: xxx, counterDown:xxx,
-*     hashIdUp: hashof(counterDown) }
+*   { _id: xxx, blob: "xxx", nestedDoc: {xxx}, list: [xxx,yyy,zzz], counter: xxx }
 */
 
-#include <limits>
+#pragma once
+
 #include <string>
+#include <vector>
 
 #include "mongo/db/jsobj.h"
 
@@ -43,15 +44,15 @@ namespace mongo {
 
     struct DocConfig {
         DocConfig() :
-            counterUp( 0 ),
-            counterDown( std::numeric_limits<long long>::max() ),
+            id( 0 ),
             blob( "" ),
-            md5seed( "" )
+            counter( 0 )
         { }
-        long long counterUp;
-        long long counterDown;
+        long long id;
         std::string blob;
-        std::string md5seed;
+        BSONObj nestedDoc;
+        std::vector<std::string> list;
+        long long counter;
     };
 
     // Creates a documentGenerator that can be used to create sample documents

@@ -17,9 +17,8 @@
 
 /**
 *   Uses the DocumentGenerator class to populate databases with documents of the format
-*   { id:xxx, counterUp:xxx, hashIdUp: hashof(counterUp), blob: xxx, counterDown:xxx,
-*     hashIdUp: hashof(counterDown) }
-*   The document size is 176 bytes.
+*   { _id: xxx, blob: "xxx", nestedDoc: {xxx}, list: [xxx,yyy,zzz], counter: xxx }
+*
 */
 
 #include <iostream>
@@ -42,8 +41,6 @@ namespace po = boost::program_options;
 
 // global options object
 DocGeneratorOptions globalDocGenOption;
-// size of a sample document in bytes
-const double documentSize = 176.0;
 
 //----------- End globals and constants------------
 
@@ -98,15 +95,34 @@ int main( int argc, char* argv[] ) {
     if( parseCmdLineOptions( argc, argv) )
         return 1;
 
-    // create a config object
+    BSONObj nestedDoc =  BSON("Firstname" << "David" <<
+                              "Lastname" << "Smith" <<
+                              "Address" << BSON( "Street" << "5th Av" <<
+                                                 "City" << "New York" )
+                              );
+    std::vector<std::string> list;
+    list.push_back("mongo new york city");
+    list.push_back("mongo rome");
+    list.push_back("mongo dublin");
+    list.push_back("mongo seoul");
+    list.push_back("mongo barcelona");
+    list.push_back("mongo madrid");
+    list.push_back("mongo chicago");
+    list.push_back("mongo amsterdam");
+    list.push_back("mongo delhi");
+    list.push_back("mongo beijing");
+
     BSONObj args = BSONObjBuilder()
-                   .append( "blob", "MongoDB is an open source document-oriented database system." )
-                   .append( "md5seed", "newyork" )
-                   .append( "counterUp", 0 )
-                   .append( "counterDown", numeric_limits<long long>::max() ).obj();
+                   .append( "_id", 0 )
+                   .append( "blob", "MongoDB is an open source document-oriented database "
+                                    "system designed with scalability and developer." )
+                   .append( "nestedDoc", nestedDoc )
+                   .append( "list", list )
+                   .append( "counter", 0 ).obj();
 
     const int numDocsPerDB =
-            static_cast<int>( globalDocGenOption.dbSize * 1024 * 1024 / documentSize );
+            static_cast<int>( globalDocGenOption.dbSize * 1024 * 1024 / args.objsize() );
+    cout << "numDocsPerDB:" << numDocsPerDB << endl;
     try {
         DBClientConnection conn;
         conn.connect( globalDocGenOption.hostname );
@@ -121,6 +137,10 @@ int main( int argc, char* argv[] ) {
                 conn.insert( ns, doc );
                 ++j;
             }
+            BSONObj blobIndex = BSON("blob" << 1);
+            conn.ensureIndex(ns, blobIndex);
+            BSONObj listIndex = BSON("list" << 1);
+            conn.ensureIndex(ns, listIndex);
         }
     } catch( DBException &e ) {
         cout << "caught " << e.what() << endl;

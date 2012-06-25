@@ -24,39 +24,36 @@
 namespace mongo {
 
     void DocumentGenerator::init( BSONObj& args ) {
-        uassert( 16261, "blob is not a string", (args["blob"].type() == String) );
+        uassert( 16363, "_id is not a number", args["_id"].isNumber() );
+        config.id = args["_id"].numberLong();
+
+        uassert( 16364, "blob is not a string", (args["blob"].type() == String) );
         config.blob = args["blob"].String();
 
-        uassert( 16262, "md5 seed is not a string", (args["md5seed"].type() == String) );
-        config.md5seed = args["md5seed"].String();
+        uassert( 16365, "nestedDoc is not an object", (args["nestedDoc"].type() == Object) );
+        config.nestedDoc = args["nestedDoc"].embeddedObject();
 
-        uassert( 16263, "counterUp is not a number", args["counterUp"].isNumber() );
-        config.counterUp = args["counterUp"].numberLong();
+        uassert( 16366, "list is not an array", args["list"].type() == Array );
+        BSONObj list = args["list"].embeddedObject();
+        for( int i = 0; i < 10; i++ ) {
+            uassert( 16367, "list member is not a string", list[i].type() == String );
+            config.list.push_back( list[i].String() );
+        }
 
-        uassert( 16264, "counterDown is not a number", args["counterDown"].isNumber() );
-        config.counterDown = args["counterDown"].numberLong();
+        uassert( 16368, "counter is not a number", args["counter"].isNumber() );
+        config.counter = args["counter"].numberLong();
     }
 
 
     BSONObj DocumentGenerator::createDocument() {
         BSONObjBuilder doc;
-        doc.genOID();
-
-        doc.append( "counterUp" , config.counterUp );
-        string hashUp = md5simpledigest( mongoutils::str::stream() << config.md5seed <<  config.counterUp );
-        hashUp = hashUp.substr( 0, 8 );
-        doc.append( "hashIdUp", atoll(hashUp.c_str()) );
-        config.counterUp++;
-
-        doc.append( "blobData" , config.blob );
-
-        doc.append( "counterDown" , config.counterDown );
-        string hashDown = md5simpledigest(  mongoutils::str::stream() << config.md5seed <<  config.counterDown );
-        hashDown = hashDown.substr( 0, 16 );
-        doc.append( "hashIdDown", atoll(hashDown.c_str()) );
-
-        config.counterDown--;
-
+        doc.append( "_id", config.id );
+        config.id++;
+        doc.append( "blob", config.blob );
+        doc.append( "nestedDoc", config.nestedDoc );
+        doc.append( "list", config.list );
+        doc.append( "counter", config.counter );
+        config.counter++;
         return doc.obj();
     }
 }
