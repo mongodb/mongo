@@ -63,7 +63,7 @@ __wt_eviction_page_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * between page reconciliations, but is technically possible), forcibly
 	 * evict the page.
 	 */
-	if (mod->write_gen + 1 == mod->disk_gen)
+	if (mod != NULL && mod->write_gen + 1 == mod->disk_gen)
 		return (1);
 
 	return (0);
