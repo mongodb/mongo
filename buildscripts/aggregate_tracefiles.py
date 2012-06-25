@@ -16,6 +16,7 @@ def aggregate(inputs, output):
 
     args += ['-o', output]
 
+    print ' '.join(args)
     
     return subprocess.call(args)  
 
