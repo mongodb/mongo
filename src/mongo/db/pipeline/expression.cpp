@@ -1650,13 +1650,8 @@ namespace mongo {
 
             return Value::createArray(result);
         }
-
-        uassert(16015, str::stream() <<
-                "can't navigate into value of type " << type <<
-                "at \"" << fieldPath.getFieldName(index) <<
-                "\" in dotted path \"" << fieldPath.getPath(false),
-                false);
-        return intrusive_ptr<const Value>();
+        // subdocument field does not exist, return undefined
+        return Value::getUndefined();
     }
 
     intrusive_ptr<const Value> ExpressionFieldPath::evaluate(
