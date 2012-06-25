@@ -3,3 +3,4 @@
 Import("env")
 
 env.CppUnitTest('atomic_word_test', 'atomic_word_test.cpp')
+env.CppUnitTest('bits_test', 'bits_test.cpp')
