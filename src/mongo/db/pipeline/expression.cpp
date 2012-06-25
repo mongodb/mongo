@@ -2286,21 +2286,50 @@ namespace mongo {
 
     intrusive_ptr<const Value> ExpressionMod::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
-        BSONType productType;
         checkArgCount(2);
         intrusive_ptr<const Value> pLeft(vpOperand[0]->evaluate(pDocument));
         intrusive_ptr<const Value> pRight(vpOperand[1]->evaluate(pDocument));
 
-        productType = Value::getWidestNumeric(pRight->getType(), pLeft->getType());
+        BSONType leftType = pLeft->getType();
+        BSONType rightType = pRight->getType();
 
-        long long right = pRight->coerceToLong();
+        // pass along jstNULLs and Undefineds
+        if (leftType == jstNULL || leftType == Undefined)
+            return pLeft;
+        if (rightType == jstNULL || rightType == Undefined)
+            return pRight;
+        // ensure we aren't modding by 0
+        double right = pRight->coerceToDouble();
         if (right == 0)
             return Value::getUndefined();
 
-        long long left = pLeft->coerceToLong();
-        if (productType == NumberLong)
-            return Value::createLong(left % right);
-        return Value::createInt((int)left % right);
+        if (leftType == NumberDouble) {
+            // left is a double, return a double
+            double left = pLeft->coerceToDouble();
+            return Value::createDouble(fmod(left, right));
+        }
+        else if (rightType == NumberDouble) {
+            if (trunc(right) != right || right > numeric_limits<int>::max()) {
+                // the shell converts ints to doubles so if right is larger than int max or
+                // if right truncates to something other than itself, it is a real double
+                double left = pLeft->coerceToDouble();
+                return Value::createDouble(fmod(left, right));
+            }
+            else {
+                // otherwise it was an int that got misplaced so we cast it back to an int
+                verify(right == pRight->coerceToInt()); // ensure the cast wont break anything
+            }
+        }
+        if (leftType == NumberLong || rightType == NumberLong) {
+            // if either is long, return long
+            long long left = pLeft->coerceToLong();
+            long long rightLong = pRight->coerceToLong();
+            return Value::createLong(left % rightLong);
+        }
+        // lastly they must both be ints, return int
+        int left = pLeft->coerceToInt();
+        int rightInt = pRight->coerceToInt();
+        return Value::createInt(left % rightInt);
     }
 
     const char *ExpressionMod::getOpName() const {

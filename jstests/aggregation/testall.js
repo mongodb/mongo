@@ -906,15 +906,15 @@ var p14 = db.runCommand(
 var p14result = [
     {
         "_id" : ObjectId("4de54958bf1505139918fce6"),
-        "theRemainder" : 0
+        "theRemainder" : NumberLong("0")
     },
     {
         "_id" : ObjectId("4de54958bf1505139918fce7"),
-        "theRemainder" : 0
+        "theRemainder" : NumberLong("0")
     },
     {
         "_id" : ObjectId("4de54958bf1505139918fce8"),
-        "theRemainder" : 2
+        "theRemainder" : NumberLong("2")
     }
 ];
 
