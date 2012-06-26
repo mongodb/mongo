@@ -1,4 +1,4 @@
-/*! @page file_formats WiredTiger files
+/*! @page file_formats File formats
 
 @section formats File formats
 
@@ -51,22 +51,5 @@ be up to (4GB - 512B) in length.
 
 Fixed-length values are limited to 8-bits (that is, only values between
 0 and 255 may be stored in fixed-length column-store files).
-
-@section remote Remote file systems
-
-WiredTiger objects may be stored on remote file systems if the remote
-file system conforms to ISO/IEC 9945-1:1996 (POSIX.1).  In the case of
-read-only objects, multiple systems may access the objects
-simultaneously; objects which are written cannot be accessed by more
-than a single system.  Because remote file systems are often slower than
-local file systems, using a remote file system for storage may degrade
-performance.
-
-@section file File permissions
-
-WiredTiger creates file system objects readable and writable by the
-process owner, group and user, as modified by the process' umask value.
-The group ownership of created file system objects may vary depending
-on the system, and is not controlled by WiredTiger.
 
 */

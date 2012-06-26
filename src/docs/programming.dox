@@ -1,16 +1,27 @@
 /*! @page programming Writing WiredTiger applications
 
-This section explains how to write applications that use WiredTiger:
+This section covers topics of interest for programmers writing
+WiredTiger applications:
 
 - @subpage basic_api
 - @subpage config_strings
-- @subpage schema
+
 - @subpage cursors
 - @subpage threads
-- @subpage checkpoints
+
+- @subpage file_formats
+- @subpage schema
+
 - @subpage transactions
+- @subpage checkpoints
+
 - @subpage compression
+
+- @subpage home
+- @subpage database_config
 - @subpage name_space
+- @subpage security
 - @subpage signals
+- @subpage tuning
 
  */
