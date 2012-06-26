@@ -49,8 +49,9 @@ into fields and mapped onto rows and columns.
 By default, WiredTiger works as a traditional key/value store, where the
 keys and values are raw byte arrays accessed using a WT_ITEM structure.
 Keys and values may be up to (4GB - 512B) bytes in size, but depending
-on how @ref WT_SESSION::create "maximum item sizes" are configured,
-large key and value items will be stored on overflow pages.
+on how @ref WT_SESSION::create "internal_item_max" or @ref
+WT_SESSION::create "leaf_item_max" are configured, large key and value
+items will be stored on overflow pages.
 
 See @subpage keyvalue for more details on raw key / value items.
 
@@ -182,8 +183,12 @@ table is modified.
 A cursor can be opened on an index by passing the index URI to
 WT_SESSION::open_cursor.  Index cursors use the specified index key columns
 for WT_CURSOR::get_key and WT_CURSOR::set_key, and by default return all of
-the table value columns in WT_CURSOR::get_value.  Index cursors are
-read-only: they cannot be used to perform updates.
+the table value columns in WT_CURSOR::get_value.
+
+Index cursors are read-only: they cannot be used to perform updates.
+
+Index cursors for column-store objects may not be created using the
+record number as the index key.
 
 @section schema_examples Code samples
 

@@ -25,7 +25,6 @@ typedef struct {
 
 	/* Track whether all changes to the page are written. */
 	uint32_t orig_write_gen;
-	uint32_t orig_disk_gen;
 	int upd_skipped;
 
 	/*
@@ -410,7 +409,6 @@ __rec_write_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 	r->page = page;
 
 	/* Read the disk generation before we read anything from the page. */
-	r->orig_disk_gen = page->modify->disk_gen;
 	WT_ORDERED_READ(r->orig_write_gen, page->modify->write_gen);
 
 	/*
@@ -3064,13 +3062,11 @@ err:			__wt_scr_free(&tkey);
 	}
 
 	/*
-	 * If the write succeeded, no updates were skipped and the disk
-	 * generation has not changed in the meantime, update it to the write
-	 * generation when reconciliation started.
+	 * If reconciliation succeeded and no updates were skipped, set the disk
+	 * generation to the write generation as of when reconciliation started.
 	 */
 	if (!r->upd_skipped)
-		(void)WT_ATOMIC_CAS(
-		    mod->disk_gen, r->orig_disk_gen, r->orig_write_gen);
+		mod->disk_gen = r->orig_write_gen;
 
 	return (0);
 }

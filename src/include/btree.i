@@ -173,7 +173,18 @@ static inline int
 __wt_page_write_gen_check(
     WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t write_gen)
 {
-	if (page->modify->write_gen == write_gen)
+	WT_PAGE_MODIFY *mod;
+
+	mod = page->modify;
+
+	/*
+	 * If the page's write generation matches the search generation, we can
+	 * proceed.  Except, if the page's write generation has wrapped and
+	 * caught up with the disk generation (wildly unlikely but technically
+	 * possible as it implies 4B updates between page reconciliations), fail
+	 * the update.
+	 */
+	if (mod->write_gen == write_gen && mod->write_gen + 1 != mod->disk_gen)
 		return (0);
 
 	WT_BSTAT_INCR(session, file_write_conflicts);

@@ -506,8 +506,10 @@ struct __wt_session {
 	 * append the value as a new record\, creating a new record number
 	 * key.,a boolean flag; default \c false.}
 	 * @config{bulk, configure the cursor for bulk loads; bulk-load is a
-	 * fast load path for empty objects\, only empty objects may be
-	 * bulk-loaded.,a boolean flag; default \c false.}
+	 * fast load path for empty objects and only empty objects may be
+	 * bulk-loaded.  Cursors configured for bulk load only support the
+	 * WT_CURSOR::insert and WT_CURSOR::close methods.,a boolean flag;
+	 * default \c false.}
 	 * @config{checkpoint, the name of a checkpoint to open.,a string;
 	 * default empty.}
 	 * @config{dump, configure the cursor for dump format inputs and
@@ -520,6 +522,10 @@ struct __wt_session {
 	 * transactional cursors.,a string\, chosen from the following options:
 	 * \c "snapshot"\, \c "read-committed"\, \c "read-uncommitted"; default
 	 * \c read-committed.}
+	 * @config{next_random, configure the cursor to return a pseudo-random
+	 * record from the object.  Cursors configured for random retrieval only
+	 * support the WT_CURSOR::next and WT_CURSOR::close methods.,a boolean
+	 * flag; default \c false.}
 	 * @config{overwrite, change the behavior of the cursor's insert method
 	 * to overwrite previously existing values.,a boolean flag; default \c
 	 * false.}
