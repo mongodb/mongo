@@ -13,12 +13,20 @@ static inline void
 __wt_cache_page_inmem_incr(
     WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 {
-	WT_CACHE *cache;
-
-	cache = S2C(session)->cache;
-
-	WT_ATOMIC_ADD(cache->bytes_inmem, size);
+	WT_ATOMIC_ADD(S2C(session)->cache->bytes_inmem, size);
 	WT_ATOMIC_ADD(page->memory_footprint, WT_STORE_SIZE(size));
+}
+
+/*
+ * __wt_cache_page_inmem_decr --
+ *	Decrement a page's memory footprint in the cache.
+ */
+static inline void
+__wt_cache_page_inmem_decr(
+    WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
+{
+	WT_ATOMIC_SUB(S2C(session)->cache->bytes_inmem, size);
+	WT_ATOMIC_SUB(page->memory_footprint, WT_STORE_SIZE(size));
 }
 
 /*

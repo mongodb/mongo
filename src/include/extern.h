@@ -413,6 +413,9 @@ extern int __wt_update_alloc(WT_SESSION_IMPL *session,
     WT_ITEM *value,
     WT_UPDATE **updp,
     size_t *sizep);
+extern void __wt_update_obsolete(WT_SESSION_IMPL *session,
+    WT_PAGE *page,
+    WT_INSERT *ins);
 extern void __wt_update_serial_func(WT_SESSION_IMPL *session);
 extern WT_INSERT *__wt_search_insert(WT_SESSION_IMPL *session,
     WT_CURSOR_BTREE *cbt,
