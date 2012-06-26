@@ -76,6 +76,10 @@ namespace mongo {
                     string ns = idx["ns"].String();
                     Client::WriteContext ctx( ns );
                     NamespaceDetails* nsd = nsdetails( ns.c_str() );
+                    if ( ! nsd ) {
+                        // collection was dropped
+                        continue;
+                    }
                     if ( nsd->setUserFlag( NamespaceDetails::Flag_UsePowerOf2Sizes ) ) {
                         nsd->syncUserFlags( ns );
                     }
