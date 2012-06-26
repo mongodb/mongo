@@ -118,7 +118,12 @@ namespace mongo {
                 
                 for ( set<string>::const_iterator i=dbs.begin(); i!=dbs.end(); ++i ) {
                     string db = *i;
-                    doTTLForDB( db );
+                    try {
+                        doTTLForDB( db );
+                    }
+                    catch ( DBException& e ) {
+                        error() << "error processing ttl for db: " << db << " " << e << endl;
+                    }
                 }
 
             }
