@@ -1726,6 +1726,34 @@ namespace JsobjTests {
             }
         };
 
+
+        class Big3 {
+        public:
+            void run() {
+                const int total = 1000 * 1000;
+                BSONObjExternalSorter sorter( indexInterfaceForTheseTests, BSONObj() , total * 2 );
+                for ( int i=0; i<total; i++ ) {
+                    sorter.add( BSON( "abcabcabcabd" << "basdasdasdasdasdasdadasdasd" << "x" << i ) , 5  , i );
+                }
+
+                sorter.sort();
+
+                auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
+                int num=0;
+                double prev = 0;
+                while ( i->more() ) {
+                    pair<BSONObj,DiskLoc> p = i->next();
+                    num++;
+                    double cur = p.first["x"].number();
+                    verify( cur >= prev );
+                    prev = cur;
+                }
+                verify( num == total );
+                ASSERT( sorter.numFiles() > 2 );
+            }
+        };
+
+
         class D1 {
         public:
             void run() {
@@ -2332,6 +2360,7 @@ namespace JsobjTests {
             add< external_sort::ByDiskLock >();
             add< external_sort::Big1 >();
             add< external_sort::Big2 >();
+            add< external_sort::Big3 >();
             add< external_sort::D1 >();
             add< CompatBSON >();
             add< CompareDottedFieldNamesTest >();

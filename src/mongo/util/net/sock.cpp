@@ -627,27 +627,6 @@ namespace mongo {
         return ::send( _fd , data , len , portSendFlags );
     }
 
-    bool Socket::stillConnected() { 
-#ifdef MONGO_SSL
-        DEV log() << "TODO stillConnected() w/SSL" << endl;
-#else
-        int r = _send("", 0);
-        if( r < 0 ) {
-#if defined(_WIN32)
-            if ( WSAGetLastError() == WSAETIMEDOUT ) {
-#else
-            if ( ( errno == EAGAIN || errno == EWOULDBLOCK ) ) {
-#endif
-                ;
-            }
-            else {
-                return false;
-            }
-        }
-#endif
-        return true;
-    }
-
     // sends all data or throws an exception
     void Socket::send( const char * data , int len, const char *context ) {
         while( len > 0 ) {

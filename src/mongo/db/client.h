@@ -143,7 +143,6 @@ namespace mongo {
         BSONObj _handshake;
         BSONObj _remoteId;
         AbstractMessagingPort * const _mp;
-        unsigned _sometimes;
 
         bool _hasWrittenThisPass;
         PageFaultRetryableSection *_pageFaultRetryableSection;
@@ -153,13 +152,6 @@ namespace mongo {
         friend class PageFaultRetryableSection; // TEMP
         friend class NoPageFaultsAllowed; // TEMP
     public:
-
-        /** the concept here is the same as MONGO_SOMETIMES.  however that 
-            macro uses a static that will be shared by all threads, and each 
-            time incremented it might eject that line from the other cpu caches (?),
-            so idea is that this is better.
-            */
-        bool sometimes(unsigned howOften) { return ++_sometimes % howOften == 0; }
 
         /* set _god=true temporarily, safely */
         class GodScope {

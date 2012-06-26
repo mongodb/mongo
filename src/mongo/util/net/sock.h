@@ -210,8 +210,6 @@ namespace mongo {
         
         void setTimeout( double secs );
 
-        bool stillConnected();
-
 #ifdef MONGO_SSL
         /** secures inline */
         void secure( SSLManager * ssl );

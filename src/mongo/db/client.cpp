@@ -125,8 +125,7 @@ namespace mongo {
         _desc(desc),
         _god(0),
         _lastOp(0),
-        _mp(p),
-        _sometimes(0)
+        _mp(p)
     {
         _hasWrittenThisPass = false;
         _pageFaultRetryableSection = 0;

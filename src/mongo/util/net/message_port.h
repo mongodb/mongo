@@ -37,8 +37,6 @@ namespace mongo {
         virtual HostAndPort remote() const = 0;
         virtual unsigned remotePort() const = 0;
 
-        virtual void assertStillConnected() = 0;
-        
         long long connectionId() const { return _connectionId; }
         void setConnectionId( long long connectionId );
 
@@ -92,8 +90,6 @@ namespace mongo {
 
         unsigned remotePort() const { return psock->remotePort(); }
         virtual HostAndPort remote() const;
-
-        void assertStillConnected();
 
         boost::shared_ptr<Socket> psock;
                 

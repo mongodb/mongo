@@ -245,10 +245,6 @@ again:
         return true;
     }
 
-    void MessagingPort::assertStillConnected() { 
-        uassert(15901, "client disconnected during operation", psock->stillConnected());
-    }
-
     void MessagingPort::say(Message& toSend, int responseTo) {
         verify( !toSend.empty() );
         mmm( log() << "*  say()  thr:" << GetCurrentThreadId() << endl; )

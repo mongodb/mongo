@@ -70,6 +70,7 @@ namespace mongo {
         int indexCount = nsd->nIndexesBeingBuilt(); 
         BSONObjSet unusedKeys;
         for ( int indexNo = 0; indexNo < indexCount; indexNo++ ) {
+            log() << "eliot : " << indexNo << endl;
             // This will page in all index pages for the given object.
             try {
                 fetchIndexInserters(/*out*/unusedKeys, inserter, nsd, indexNo, obj, unusedDl);
