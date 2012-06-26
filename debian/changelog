@@ -1,8 +1,8 @@
-mongodb (2.1.0) unstable; urgency=low
+mongodb (2.1.2) unstable; urgency=low
 
-  * see http://jira.mongodb.org/browse/SERVER/fixforversion/10483
+  * see http://jira.mongodb.org/browse/SERVER/fixforversion/10894
 
- -- Richard Kreuter <richard@10gen.com>  Fri, 03 Feb 2012 16:56:28 -0500
+ -- Richard Kreuter <richard@10gen.com>  Tue, 26 Jun 2012 16:56:28 -0500
 
 mongodb (1.9.2) unstable; urgency=low
 
