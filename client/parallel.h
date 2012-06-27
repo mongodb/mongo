@@ -241,6 +241,7 @@ namespace mongo {
         virtual void _explain( map< string,list<BSONObj> >& out );
 
         int _numServers;
+        int _lastFrom;
         set<ServerAndQuery> _servers;
         BSONObj _sortKey;
 
