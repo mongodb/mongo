@@ -12,7 +12,7 @@
  *	Return a page referenced key/value pair to the application.
  */
 int
-__wt_kv_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int key_ret)
+__wt_kv_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 {
 	WT_BTREE *btree;
 	WT_CELL *cell;
@@ -32,8 +32,7 @@ __wt_kv_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int key_ret)
 
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
-		if (key_ret)
-			cursor->recno = cbt->recno;
+		cursor->recno = cbt->recno;
 
 		/*
 		 * If the cursor references a WT_INSERT item, take the related
@@ -48,8 +47,7 @@ __wt_kv_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int key_ret)
 		v = __bit_getv_recno(page, cbt->iface.recno, btree->bitcnt);
 		return (__wt_buf_set(session, &cursor->value, &v, 1));
 	case WT_PAGE_COL_VAR:
-		if (key_ret)
-			cursor->recno = cbt->recno;
+		cursor->recno = cbt->recno;
 
 		/*
 		 * If the cursor references a WT_INSERT item, take the related
@@ -73,21 +71,26 @@ __wt_kv_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int key_ret)
 		 * or the page if the key was never updated.
 		 */
 		if (cbt->ins == NULL) {
-			if (key_ret) {
-				ikey = WT_ROW_KEY_COPY(rip);
-				if (__wt_off_page(page, ikey)) {
-					cursor->key.data = WT_IKEY_DATA(ikey);
-					cursor->key.size = ikey->size;
+			ikey = WT_ROW_KEY_COPY(rip);
+			if (__wt_off_page(page, ikey)) {
+				cursor->key.data = WT_IKEY_DATA(ikey);
+				cursor->key.size = ikey->size;
+			} else {
+				cell = (WT_CELL *)ikey;
+				__wt_cell_unpack(cell, unpack);
+				if (btree->huffman_key == NULL &&
+				    unpack->type == WT_CELL_KEY &&
+				    unpack->prefix == 0) {
+					cursor->key.data = unpack->data;
+					cursor->key.size = unpack->size;
 				} else
 					WT_RET(__wt_row_key(
 					    session, page, rip, &cursor->key));
 			}
 			upd = WT_ROW_UPDATE(page, rip);
 		} else {
-			if (key_ret) {
-				cursor->key.data = WT_INSERT_KEY(cbt->ins);
-				cursor->key.size = WT_INSERT_KEY_SIZE(cbt->ins);
-			}
+			cursor->key.data = WT_INSERT_KEY(cbt->ins);
+			cursor->key.size = WT_INSERT_KEY_SIZE(cbt->ins);
 			upd = cbt->ins->upd;
 		}
 		if (upd != NULL) {
