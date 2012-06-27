@@ -485,7 +485,7 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
 	WT_ERR(btree->type == BTREE_ROW ?
 	    __wt_row_random(session, cbt) : ENOTSUP);
 	ret = cbt->compare == 0 ?
-	    __wt_kv_return(session, cbt, 1) : WT_NOTFOUND;
+	    __wt_kv_return(session, cbt) : WT_NOTFOUND;
 
 err:	__cursor_func_resolve(cbt, ret);
 
