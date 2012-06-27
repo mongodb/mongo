@@ -172,7 +172,7 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 		indx = base + (limit >> 1);
 		rip = page->u.row.d + indx;
 
-		WT_ERR(__wt_row_key_ref(session, page, rip, item, 1));
+		WT_ERR(__wt_row_key(session, page, rip, item, 1));
 		WT_ERR(WT_BTREE_CMP(session, btree, srch_key, item, cmp));
 		if (cmp == 0)
 			break;

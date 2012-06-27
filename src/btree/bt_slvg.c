@@ -515,9 +515,9 @@ __slvg_trk_leaf(WT_SESSION_IMPL *session, WT_PAGE_HEADER *dsk,
 		 * it's probably a great place to start.
 		 */
 		WT_ERR(__wt_page_inmem(session, NULL, NULL, dsk, &page));
-		WT_ERR(__wt_row_key(session,
+		WT_ERR(__wt_row_key_copy(session,
 		    page, &page->u.row.d[0], &trk->row_start));
-		WT_ERR(__wt_row_key(session,
+		WT_ERR(__wt_row_key_copy(session,
 		    page, &page->u.row.d[page->entries - 1], &trk->row_stop));
 
 		if (WT_VERBOSE_ISSET(session, salvage)) {
@@ -1559,7 +1559,7 @@ __slvg_row_trk_update_start(
 	 */
 	WT_ERR(__wt_scr_alloc(session, 0, &key));
 	WT_ROW_FOREACH(page, rip, i) {
-		WT_ERR(__wt_row_key_ref(session, page, rip, key, 0));
+		WT_ERR(__wt_row_key(session, page, rip, key, 0));
 		WT_ERR(WT_BTREE_CMP(session, btree, key, stop, cmp));
 		if (cmp > 0) {
 			found = 1;
@@ -1723,7 +1723,7 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 	skip_start = skip_stop = 0;
 	if (F_ISSET(trk, WT_TRACK_CHECK_START))
 		WT_ROW_FOREACH(page, rip, i) {
-			WT_ERR(__wt_row_key_ref(session, page, rip, key, 0));
+			WT_ERR(__wt_row_key(session, page, rip, key, 0));
 
 			/*
 			 * >= is correct: see the comment above.
@@ -1746,7 +1746,7 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 		}
 	if (F_ISSET(trk, WT_TRACK_CHECK_STOP))
 		WT_ROW_FOREACH_REVERSE(page, rip, i) {
-			WT_ERR(__wt_row_key_ref(session, page, rip, key, 0));
+			WT_ERR(__wt_row_key(session, page, rip, key, 0));
 
 			/*
 			 * < is correct: see the comment above.
@@ -1782,7 +1782,7 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 	 * a copy from the page.
 	 */
 	rip = page->u.row.d + skip_start;
-	WT_ERR(__wt_row_key_ref(session, page, rip, key, 0));
+	WT_ERR(__wt_row_key(session, page, rip, key, 0));
 	WT_ERR(
 	    __wt_row_ikey_alloc(session, 0, key->data, key->size, &ref->u.key));
 

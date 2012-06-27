@@ -69,8 +69,8 @@ __wt_kv_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 		 * or the page if the key was never updated.
 		 */
 		if (cbt->ins == NULL) {
-			WT_RET(__wt_row_key_ref(
-			    session, page, rip, &cursor->key, 0));
+			WT_RET(
+			    __wt_row_key(session, page, rip, &cursor->key, 0));
 			upd = WT_ROW_UPDATE(page, rip);
 		} else {
 			cursor->key.data = WT_INSERT_KEY(cbt->ins);

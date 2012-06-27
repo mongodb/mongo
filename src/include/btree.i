@@ -205,11 +205,11 @@ __wt_off_page(WT_PAGE *page, const void *p)
 }
 
 /*
- * __wt_row_key_ref --
+ * __wt_row_key --
  *	Set a buffer to reference a key as cheaply as possible.
  */
 static inline int
-__wt_row_key_ref(WT_SESSION_IMPL *session,
+__wt_row_key(WT_SESSION_IMPL *session,
     WT_PAGE *page, WT_ROW *rip, WT_ITEM *key, int instantiate)
 {
 	WT_BTREE *btree;
@@ -244,7 +244,7 @@ retry:	ikey = WT_ROW_KEY_COPY(rip);
 	 * If we're instantiating the key on the page, do that, and then look
 	 * it up again, else, we have a copy and we can return.
 	 */
-	WT_RET(__wt_row_key(session, page, rip, instantiate ? NULL : key));
+	WT_RET(__wt_row_key_copy(session, page, rip, instantiate ? NULL : key));
 	if (instantiate)
 		goto retry;
 	return (0);

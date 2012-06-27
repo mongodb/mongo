@@ -2696,8 +2696,8 @@ __rec_row_leaf(
 				    unpack->data, unpack->size);
 				tmpkey->size = unpack->prefix + unpack->size;
 			} else
-				WT_ERR(
-				    __wt_row_key(session, page, rip, tmpkey));
+				WT_ERR(__wt_row_key_copy(
+				    session, page, rip, tmpkey));
 
 			WT_ERR(__rec_cell_build_key(
 			    session, tmpkey->data, tmpkey->size, 0, &ovfl_key));
