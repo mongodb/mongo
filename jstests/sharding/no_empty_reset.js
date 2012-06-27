@@ -25,6 +25,7 @@ jsTestLog( "Migrating via first mongos..." )
 var fullShard = st.getShard( coll, { _id : 1 } )
 var emptyShard = st.getShard( coll, { _id : -1 } )
 
+fullShard.shardName = st.s.getDB( "config" ).chunks.findOne({ "min._id" : 0 }).shard
 var admin = st.s.getDB( "admin" )
 printjson( admin.runCommand({ moveChunk : "" + coll, find : { _id : -1 }, to : fullShard.shardName }) )
 
