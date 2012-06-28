@@ -281,7 +281,9 @@ namespace mongo {
         Logstream& operator<<(char *x)       { ss << x; return *this; }
         Logstream& operator<<(char x)        { ss << x; return *this; }
         Logstream& operator<<(int x)         { ss << x; return *this; }
-        Logstream& operator<<(ExitCode x)    { ss << x; return *this; }
+        Logstream& operator<<(ExitCode x)    {
+          ss << static_cast<long>(x); return *this;
+        }
         Logstream& operator<<(long x)          { ss << x; return *this; }
         Logstream& operator<<(unsigned long x) { ss << x; return *this; }
         Logstream& operator<<(unsigned x)      { ss << x; return *this; }
