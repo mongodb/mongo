@@ -372,7 +372,10 @@ namespace replset {
             return true;
         }
         // check for commands
-        if (op["op"].valuestrsafe()[0] == 'c') {
+        if ((op["op"].valuestrsafe()[0] == 'c') ||
+            // Index builds are acheived through the use of an insert op, not a command op.
+            // The following line is the same as what the insert code uses to detect an index build.
+            (strstr(op["ns"].valuestrsafe(), ".system.indexes"))) {
             if (ops->empty()) {
                 // apply commands one-at-a-time
                 ops->push_back(op);
