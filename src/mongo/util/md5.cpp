@@ -312,7 +312,7 @@ md5_process(md5_state_t *pms, const md5_byte_t *data /*[64]*/)
 }
 
 void
-md5_init(md5_state_t *pms)
+mongo_md5_init(md5_state_t *pms)
 {
     pms->count[0] = pms->count[1] = 0;
     pms->abcd[0] = 0x67452301;
@@ -322,7 +322,7 @@ md5_init(md5_state_t *pms)
 }
 
 void
-md5_append(md5_state_t *pms, const md5_byte_t *data, int nbytes)
+mongo_md5_append(md5_state_t *pms, const md5_byte_t *data, int nbytes)
 {
     const md5_byte_t *p = data;
     int left = nbytes;
@@ -360,7 +360,7 @@ md5_append(md5_state_t *pms, const md5_byte_t *data, int nbytes)
 }
 
 void
-md5_finish(md5_state_t *pms, md5_byte_t digest[16])
+mongo_md5_finish(md5_state_t *pms, md5_byte_t digest[16])
 {
     static const md5_byte_t pad[64] = {
 	0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -375,9 +375,9 @@ md5_finish(md5_state_t *pms, md5_byte_t digest[16])
     for (i = 0; i < 8; ++i)
 	data[i] = (md5_byte_t)(pms->count[i >> 2] >> ((i & 3) << 3));
     /* Pad to 56 bytes mod 64. */
-    md5_append(pms, pad, ((55 - (pms->count[0] >> 3)) & 63) + 1);
+    mongo_md5_append(pms, pad, ((55 - (pms->count[0] >> 3)) & 63) + 1);
     /* Append the length. */
-    md5_append(pms, data, 8);
+    mongo_md5_append(pms, data, 8);
     for (i = 0; i < 16; ++i)
 	digest[i] = (md5_byte_t)(pms->abcd[i >> 2] >> ((i & 3) << 3));
 }

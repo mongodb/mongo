@@ -438,11 +438,11 @@ namespace mongo {
         md5digest d;
         {
             md5_state_t st;
-            md5_init(&st);
-            md5_append(&st, (const md5_byte_t *) username.data(), username.length());
-            md5_append(&st, (const md5_byte_t *) ":mongo:", 7 );
-            md5_append(&st, (const md5_byte_t *) clearTextPassword.data(), clearTextPassword.length());
-            md5_finish(&st, d);
+            mongo_md5_init(&st);
+            mongo_md5_append(&st, (const md5_byte_t *) username.data(), username.length());
+            mongo_md5_append(&st, (const md5_byte_t *) ":mongo:", 7 );
+            mongo_md5_append(&st, (const md5_byte_t *) clearTextPassword.data(), clearTextPassword.length());
+            mongo_md5_finish(&st, d);
         }
         return digestToString( d );
     }
@@ -475,11 +475,11 @@ namespace mongo {
             md5digest d;
             {
                 md5_state_t st;
-                md5_init(&st);
-                md5_append(&st, (const md5_byte_t *) nonce.c_str(), nonce.size() );
-                md5_append(&st, (const md5_byte_t *) username.data(), username.length());
-                md5_append(&st, (const md5_byte_t *) password.c_str(), password.size() );
-                md5_finish(&st, d);
+                mongo_md5_init(&st);
+                mongo_md5_append(&st, (const md5_byte_t *) nonce.c_str(), nonce.size() );
+                mongo_md5_append(&st, (const md5_byte_t *) username.data(), username.length());
+                mongo_md5_append(&st, (const md5_byte_t *) password.c_str(), password.size() );
+                mongo_md5_finish(&st, d);
             }
             b << "key" << digestToString( d );
             authCmd = b.done();

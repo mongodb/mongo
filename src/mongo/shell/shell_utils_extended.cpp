@@ -148,16 +148,16 @@ namespace mongo {
 
             md5digest d;
             md5_state_t st;
-            md5_init(&st);
+            mongo_md5_init(&st);
 
             enum {BUFLEN = 4*1024};
             char buffer[BUFLEN];
             int bytes_read;
             while( (bytes_read = fread(buffer, 1, BUFLEN, f)) ) {
-                md5_append( &st , (const md5_byte_t*)(buffer) , bytes_read );
+                mongo_md5_append( &st , (const md5_byte_t*)(buffer) , bytes_read );
             }
 
-            md5_finish(&st, d);
+            mongo_md5_finish(&st, d);
             return BSON( "" << digestToString( d ) );
         }
 
