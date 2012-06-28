@@ -16,16 +16,14 @@ __wt_kv_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 {
 	WT_BTREE *btree;
 	WT_CELL *cell;
-	WT_CELL_UNPACK *unpack, _unpack;
+	WT_CELL_UNPACK unpack;
 	WT_CURSOR *cursor;
-	WT_IKEY *ikey;
 	WT_PAGE *page;
 	WT_ROW *rip;
 	WT_UPDATE *upd;
 	uint8_t v;
 
 	btree = session->btree;
-	unpack = &_unpack;
 
 	page = cbt->page;
 	cursor = &cbt->iface;
@@ -71,22 +69,8 @@ __wt_kv_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 		 * or the page if the key was never updated.
 		 */
 		if (cbt->ins == NULL) {
-			ikey = WT_ROW_KEY_COPY(rip);
-			if (__wt_off_page(page, ikey)) {
-				cursor->key.data = WT_IKEY_DATA(ikey);
-				cursor->key.size = ikey->size;
-			} else {
-				cell = (WT_CELL *)ikey;
-				__wt_cell_unpack(cell, unpack);
-				if (btree->huffman_key == NULL &&
-				    unpack->type == WT_CELL_KEY &&
-				    unpack->prefix == 0) {
-					cursor->key.data = unpack->data;
-					cursor->key.size = unpack->size;
-				} else
-					WT_RET(__wt_row_key(
-					    session, page, rip, &cursor->key));
-			}
+			WT_RET(
+			    __wt_row_key(session, page, rip, &cursor->key, 0));
 			upd = WT_ROW_UPDATE(page, rip);
 		} else {
 			cursor->key.data = WT_INSERT_KEY(cbt->ins);
@@ -108,12 +92,12 @@ __wt_kv_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 	WT_ILLEGAL_VALUE(session);
 	}
 
-	/* It's a cell, unpack and expand it as necessary. */
-	__wt_cell_unpack(cell, unpack);
-	if (btree->huffman_value == NULL && unpack->type == WT_CELL_VALUE) {
-		cursor->value.data = unpack->data;
-		cursor->value.size = unpack->size;
+	/* The value is an on-page cell, unpack and expand it as necessary. */
+	__wt_cell_unpack(cell, &unpack);
+	if (btree->huffman_value == NULL && unpack.type == WT_CELL_VALUE) {
+		cursor->value.data = unpack.data;
+		cursor->value.size = unpack.size;
 		return (0);
-	} else
-		return (__wt_cell_unpack_copy(session, unpack, &cursor->value));
+	}
+	return (__wt_cell_unpack_copy(session, &unpack, &cursor->value));
 }

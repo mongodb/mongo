@@ -54,7 +54,7 @@ __wt_row_leaf_keys(WT_SESSION_IMPL *session, WT_PAGE *page)
 	/* Instantiate the keys. */
 	for (rip = page->u.row.d, i = 0; i < page->entries; ++rip, ++i)
 		if (__bit_test(tmp->mem, i))
-			WT_ERR(__wt_row_key(session, page, rip, NULL));
+			WT_ERR(__wt_row_key_copy(session, page, rip, NULL));
 
 	F_SET_ATOMIC(page, WT_PAGE_BUILD_KEYS);
 
@@ -97,12 +97,12 @@ __inmem_row_leaf_slots(
 }
 
 /*
- * __wt_row_key --
+ * __wt_row_key_copy --
  *	Copy an on-page key into a return buffer, or, if no return buffer
  * is specified, instantiate the key into the in-memory page.
  */
 int
-__wt_row_key(
+__wt_row_key_copy(
     WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW *rip_arg, WT_ITEM *retb)
 {
 	enum { FORWARD, BACKWARD } direction;

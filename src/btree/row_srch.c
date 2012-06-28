@@ -87,7 +87,6 @@ int
 __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 {
 	WT_BTREE *btree;
-	WT_CELL_UNPACK *unpack, _unpack;
 	WT_DECL_RET;
 	WT_IKEY *ikey;
 	WT_ITEM *item, _item, *srch_key;
@@ -102,7 +101,6 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 	srch_key = &cbt->iface.key;
 
 	btree = session->btree;
-	unpack = &_unpack;
 	rip = NULL;
 
 	cmp = -1;				/* Assume we don't match. */
@@ -174,41 +172,7 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 		indx = base + (limit >> 1);
 		rip = page->u.row.d + indx;
 
-retry:		ikey = WT_ROW_KEY_COPY(rip);
-		/*
-		 * Key copied.
-		 *
-		 * If another thread instantiated the key, we don't have any
-		 * work to do.  Figure this out using the key's value:
-		 *
-		 * If the key points off-page, the key has been instantiated,
-		 * just use it.
-		 *
-		 * If the key points on-page, we have a copy of a WT_CELL value
-		 * that can be processed, regardless of what any other thread is
-		 * doing.
-		 */
-		if (__wt_off_page(page, ikey)) {
-			_item.data = WT_IKEY_DATA(ikey);
-			_item.size = ikey->size;
-			item = &_item;
-		} else {
-			if (btree->huffman_key != NULL) {
-				WT_ERR(__wt_row_key(session, page, rip, NULL));
-				goto retry;
-			}
-			__wt_cell_unpack((WT_CELL *)ikey, unpack);
-			if (unpack->type == WT_CELL_KEY &&
-			    unpack->prefix == 0) {
-				_item.data = unpack->data;
-				_item.size = unpack->size;
-				item = &_item;
-			} else {
-				WT_ERR(__wt_row_key(session, page, rip, NULL));
-				goto retry;
-			}
-		}
-
+		WT_ERR(__wt_row_key(session, page, rip, item, 1));
 		WT_ERR(WT_BTREE_CMP(session, btree, srch_key, item, cmp));
 		if (cmp == 0)
 			break;

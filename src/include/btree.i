@@ -205,6 +205,52 @@ __wt_off_page(WT_PAGE *page, const void *p)
 }
 
 /*
+ * __wt_row_key --
+ *	Set a buffer to reference a key as cheaply as possible.
+ */
+static inline int
+__wt_row_key(WT_SESSION_IMPL *session,
+    WT_PAGE *page, WT_ROW *rip, WT_ITEM *key, int instantiate)
+{
+	WT_BTREE *btree;
+	WT_IKEY *ikey;
+	WT_CELL_UNPACK unpack;
+
+	btree = session->btree;
+
+retry:	ikey = WT_ROW_KEY_COPY(rip);
+
+	/* If the key has been instantiated for any reason, off-page, use it. */
+	if (__wt_off_page(page, ikey)) {
+		key->data = WT_IKEY_DATA(ikey);
+		key->size = ikey->size;
+		return (0);
+	}
+
+	/* If the key isn't compressed or an overflow, take it from the page. */
+	if (btree->huffman_key == NULL)
+		__wt_cell_unpack((WT_CELL *)ikey, &unpack);
+	if (btree->huffman_key == NULL &&
+	    unpack.type == WT_CELL_KEY && unpack.prefix == 0) {
+		key->data = unpack.data;
+		key->size = unpack.size;
+		return (0);
+	}
+
+	/*
+	 * We're going to have to build the key (it's never been instantiated,
+	 * and it's compressed or an overflow key).
+	 *
+	 * If we're instantiating the key on the page, do that, and then look
+	 * it up again, else, we have a copy and we can return.
+	 */
+	WT_RET(__wt_row_key_copy(session, page, rip, instantiate ? NULL : key));
+	if (instantiate)
+		goto retry;
+	return (0);
+}
+
+/*
  * __wt_get_addr --
  *	Return the addr/size pair for a reference.
  */
