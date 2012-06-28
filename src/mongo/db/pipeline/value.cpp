@@ -609,7 +609,7 @@ namespace mongo {
 
         case jstNULL:
         case Undefined:
-            uassert(16362, "can't convert from Null (or Undefined) value type to Date_t", false);
+            uassert(16371, "can't convert from Null (or Undefined) value type to Date_t", false);
 
         default:
             uassert(16006, str::stream() <<
