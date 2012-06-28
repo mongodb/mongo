@@ -412,6 +412,7 @@ namespace mongo {
             cx.ctx().db()->flushFiles(true);
         }
 
+        changeState(MemberState::RS_RECOVERING);
         sethbmsg("initial sync done",0);
     }
 
