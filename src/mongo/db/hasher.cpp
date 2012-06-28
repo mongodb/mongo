@@ -26,16 +26,16 @@
 namespace mongo {
 
     Hasher::Hasher( HashSeed seed ) : _seed( seed ) {
-        md5_init( &_md5State );
-        md5_append( &_md5State , reinterpret_cast< const md5_byte_t * >( & _seed ) , sizeof( _seed ) );
+        mongo_md5_init( &_md5State );
+        mongo_md5_append( &_md5State , reinterpret_cast< const md5_byte_t * >( & _seed ) , sizeof( _seed ) );
     }
 
     void Hasher::addData( const void * keyData , size_t numBytes ) {
-        md5_append( &_md5State , static_cast< const md5_byte_t * >( keyData ), numBytes );
+        mongo_md5_append( &_md5State , static_cast< const md5_byte_t * >( keyData ), numBytes );
     }
 
     void Hasher::finish( HashDigest out ) {
-        md5_finish( &_md5State , out );
+        mongo_md5_finish( &_md5State , out );
     }
 
     long long int BSONElementHasher::hash64( const BSONElement& e , HashSeed seed ){
