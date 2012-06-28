@@ -110,6 +110,22 @@ namespace JsobjTests {
         }
     };
 
+    class BufBuilderReallocLimit {
+    public:
+        void run() {
+            BufBuilder b;
+            unsigned int written = 0;
+            try {
+                for (; written <= 64 * 1024 * 1024 + 1; ++written)
+                    // (re)alloc past the buffer 64mb limit
+                    b.appendStr("a");
+            }
+            catch (const AssertionException &e) { }
+            // assert half of max buffer size was allocated before exception is thrown
+            ASSERT(written == mongo::BufferMaxSize / 2);
+        }
+    };
+
     class BSONElementBasic {
     public:
         void run() {
@@ -2272,6 +2288,7 @@ namespace JsobjTests {
 
         void setupTests() {
             add< BufBuilderBasic >();
+            add< BufBuilderReallocLimit >();
             add< BSONElementBasic >();
             add< BSONObjTests::NullString >();
             add< BSONObjTests::Create >();
