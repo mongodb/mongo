@@ -790,7 +790,11 @@ namespace mongo {
                 }
                 conn->done();
             }
-            catch ( SocketException& e ) {
+            catch ( const DBException& e ) {
+
+                // We need to catch DBExceptions b/c sometimes we throw them
+                // instead of socket exceptions when findN fails
+
                 warning() << " couldn't check on config server:" << _config[i] << " ok for now : " << e.toString() << endl;
             }
             res.push_back(x);
