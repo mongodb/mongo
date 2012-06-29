@@ -212,6 +212,15 @@ namespace mongo {
             uassert( 10134 ,  "$pull/$pullAll can only be applied to an array" , in.type() == Array );
             BSONObjBuilder bb( builder.subarrayStart( shortFieldName ) );
 
+            //temporarily record the things to pull. only use this set while 'elt' in scope.
+            BSONElementSet toPull;
+            if ( op == PULL_ALL ) {
+                BSONObjIterator j( elt.embeddedObject() );
+                while ( j.more() ) {
+                    toPull.insert( j.next() );
+                }
+            }
+
             int n = 0;
 
             BSONObjIterator i( in.embeddedObject() );
@@ -223,14 +232,7 @@ namespace mongo {
                     allowed = ! _pullElementMatch( e );
                 }
                 else {
-                    BSONObjIterator j( elt.embeddedObject() );
-                    while( j.more() ) {
-                        BSONElement arrJ = j.next();
-                        if ( e.woCompare( arrJ, false ) == 0 ) {
-                            allowed = false;
-                            break;
-                        }
-                    }
+                    allowed = ( toPull.find( e ) == toPull.end() );
                 }
 
                 if ( allowed )
@@ -430,6 +432,16 @@ namespace mongo {
                 uassert( 10142,
                          "Cannot apply $pull/$pullAll modifier to non-array",
                          e.type() == Array || e.eoo() );
+
+                //temporarily record the things to pull. only use this set while 'm.elt' in scope.
+                BSONElementSet toPull;
+                if ( m.op == Mod::PULL_ALL ) {
+                    BSONObjIterator j( m.elt.embeddedObject() );
+                    while ( j.more() ) {
+                        toPull.insert( j.next() );
+                    }
+                }
+
                 BSONObjIterator i( e.embeddedObject() );
                 while( mss->_inPlacePossible && i.more() ) {
                     BSONElement arrI = i.next();
@@ -437,13 +449,7 @@ namespace mongo {
                         mss->amIInPlacePossible( ! m._pullElementMatch( arrI ) );
                     }
                     else if ( m.op == Mod::PULL_ALL ) {
-                        BSONObjIterator j( m.elt.embeddedObject() );
-                        while( mss->_inPlacePossible && j.moreWithEOO() ) {
-                            BSONElement arrJ = j.next();
-                            if ( arrJ.eoo() )
-                                break;
-                            mss->amIInPlacePossible( arrI.woCompare( arrJ, false ) );
-                        }
+                        mss->amIInPlacePossible( toPull.find( arrI ) == toPull.end() );
                     }
                 }
                 break;
