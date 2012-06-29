@@ -6,18 +6,17 @@ load('jstests/aggregation/data/articles.js');
 load('jstests/aggregation/extras/utils.js');
 
 // test all the bug test cases
-load('jstests/aggregation/bugs/server3832.js');
-load('jstests/aggregation/bugs/server4508.js');
-load('jstests/aggregation/bugs/server4638.js');
-load('jstests/aggregation/bugs/server4738.js');
-load('jstests/aggregation/bugs/server5012.js');
-load('jstests/aggregation/bugs/server5209.js');
-load('jstests/aggregation/bugs/server5369.js');
-load('jstests/aggregation/bugs/server5782.js');
-load('jstests/aggregation/bugs/server5973.js');
-load('jstests/aggregation/bugs/server6045.js');
-load('jstests/aggregation/bugs/server6127.js');
-load('jstests/aggregation/bugs/server6147.js');
-load('jstests/aggregation/bugs/server6120.js');
-load('jstests/aggregation/bugs/server6186.js');
-load('jstests/aggregation/bugs/server6190.js');
+var files = listFiles("jstests/aggregation/bugs");
+files.forEach(
+    function(x) {
+        // skip files starting with _ and only test *.js files
+        if (/[\/\\]_/.test(x.name) || ! /\.js$/.test(x.name ) ) {
+            print(" >>>>>>>>>>>>>>> skipping " + x.name);
+            return;
+        }
+
+        print(" *******************************************");
+        print("         Test : " + x.name + " ...");
+        print("                " + Date.timeFunc(function(){ load(x.name); }, 1) + "ms");
+    }
+);
