@@ -1851,8 +1851,8 @@ namespace mongo {
         // but we already have temporary auth credentials set.
         if ( ai->usingInternalUser() && !ai->hasTemporaryAuthorization() ) {
             // The temporary authentication will be cleared when authRelease goes out of scope
-            if ( cmdObj.hasField("$auth") ) {
-                BSONObj authObj = cmdObj["$auth"].Obj();
+            if ( cmdObj.hasField(AuthenticationTable::fieldName.c_str()) ) {
+                BSONObj authObj = cmdObj[AuthenticationTable::fieldName].Obj();
                 ai->setTemporaryAuthorization( authObj );
             } else {
                 result.append( "errmsg" ,

@@ -99,6 +99,13 @@ var checkReadOps = function( hasReadAuth ) {
                                                   out : {inline : 1}});
         assert.eq( 100, res.results.length );
         assert.eq( 45, res.results[0].value );
+
+        res = checkCommandSucceeded( testDB,
+                                     {aggregate:'foo',
+                                      pipeline: [ {$project : {j : 1}},
+                                                  {$group : {_id : 'j', sum : {$sum : '$j'}}}]} );
+        assert.eq( 4500, res.result[0].sum );
+
         res = checkCommandSucceeded( testDB, { $eval : 'return db.bar.findOne();'} );
         assert.eq(str, res.retval.str);
     } else {
@@ -109,6 +116,10 @@ var checkReadOps = function( hasReadAuth ) {
         checkCommandFailed( testDB, {collstats : 'foo'} );
         checkCommandFailed( testDB, {mapreduce : 'foo', map : map, reduce : reduce,
                                      out : { inline : 1 }} );
+        checkCommandFailed( testDB, {aggregate:'foo',
+                                     pipeline: [ {$project : {j : 1}},
+                                                 {$group : {_id : 'j', sum : {$sum : '$j'}}}]} );
+
         checkCommandFailed( testDB, { $eval : 'return db.bar.findOne();'} );
     }
 }

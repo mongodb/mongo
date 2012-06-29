@@ -23,6 +23,7 @@
 namespace mongo {
 
     AuthenticationTable internalSecurityAuthenticationTable;
+    const string AuthenticationTable::fieldName = "$auth";
 
     const AuthenticationTable& AuthenticationTable::getInternalSecurityAuthenticationTable() {
         return internalSecurityAuthenticationTable;
@@ -88,11 +89,11 @@ namespace mongo {
         BSONObjIterator it(cmdObj);
         while ( it.more() ) {
             BSONElement e = it.next();
-            if ( mongoutils::str::equals( e.fieldName(), "$auth" ) ) continue;
+            if ( mongoutils::str::equals( e.fieldName(), fieldName.c_str() ) ) continue;
             cmdWithAuth.append(e);
         }
 
-        cmdWithAuth.append( "$auth", toBSON() );
+        cmdWithAuth.append( fieldName, toBSON() );
         return cmdWithAuth.obj();
     }
 

@@ -17,6 +17,7 @@
 #include "pch.h"
 #include "db/commands/pipeline.h"
 
+#include "mongo/client/authentication_table.h"
 #include "db/cursor.h"
 #include "db/pipeline/accumulator.h"
 #include "db/pipeline/dependency_tracker.h"
@@ -127,6 +128,13 @@ namespace mongo {
             /* check for debug options */
             if (!strcmp(pFieldName, splitMongodPipelineName)) {
                 pPipeline->splitMongodPipeline = true;
+                continue;
+            }
+
+            /* Ignore $auth information sent along with the command. The authentication system will
+             * use it, it's not a part of the pipeline.
+             */
+            if (!strcmp(pFieldName, AuthenticationTable::fieldName.c_str())) {
                 continue;
             }
 

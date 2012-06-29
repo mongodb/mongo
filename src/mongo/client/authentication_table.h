@@ -56,6 +56,8 @@ namespace mongo {
         static const AuthenticationTable& getInternalSecurityAuthenticationTable();
         // Only used once at startup to setup the authentication table.
         static AuthenticationTable& getMutableInternalSecurityAuthenticationTable();
+
+        static const string fieldName;
     private:
         typedef map<std::string,Auth> DBAuthMap;
         DBAuthMap _dbs; // dbname -> auth
