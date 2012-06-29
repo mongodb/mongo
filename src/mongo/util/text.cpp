@@ -21,6 +21,10 @@
 #include "mongo/util/mongoutils/str.h"
 #include <boost/smart_ptr/scoped_array.hpp>
 
+#ifdef _WIN32
+#include <io.h>
+#endif
+
 using namespace std;
 
 namespace mongo {
@@ -248,6 +252,19 @@ namespace mongo {
                                           &numberOfCharactersWritten,
                                           NULL );
             if ( 0 == success ) {
+                DWORD dosError = GetLastError();
+                static bool errorMessageShown = false;
+                if ( ERROR_GEN_FAILURE == dosError ) {
+                    if ( ! errorMessageShown ) {
+                        std::cout << "\n---\nUnicode text could not be correctly displayed.\n"
+                                "Please change your console font to a Unicode font "
+                                "(e.g. Lucida Console).\n---\n" << std::endl;
+                        errorMessageShown = true;
+                    }
+                    // we can't display the text properly using a raster font,
+                    // but we can display the bits that will display ...
+                    _write( 1, utf8String, utf8StringSize );
+                }
                 return false;
             }
             numberOfCharactersToWrite -= numberOfCharactersWritten;
