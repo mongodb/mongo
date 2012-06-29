@@ -39,6 +39,7 @@ namespace mongo {
         virtual ~Builder() {};
 
         virtual void append() = 0; // append a null
+        virtual void appendUndefined() = 0;
         virtual void append(bool b) = 0;
         virtual void append(int i) = 0;
         virtual void append(long long ll) = 0;
@@ -55,6 +56,7 @@ namespace mongo {
     public:
         // virtuals from Builder
         virtual void append();
+        virtual void appendUndefined();
         virtual void append(bool b);
         virtual void append(int i);
         virtual void append(long long ll);
@@ -77,6 +79,7 @@ namespace mongo {
     public:
         // virtuals from Builder
         virtual void append();
+        virtual void appendUndefined();
         virtual void append(bool b);
         virtual void append(int i);
         virtual void append(long long ll);

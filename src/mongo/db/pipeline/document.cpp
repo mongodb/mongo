@@ -111,9 +111,6 @@ namespace mongo {
 
     void Document::addField(const string &fieldName,
                             const intrusive_ptr<const Value> &pValue) {
-        uassert(15945, str::stream() << "cannot add undefined field " <<
-                fieldName << " to document", pValue->getType() != Undefined);
-
         vFieldName.push_back(fieldName);
         vpValue.push_back(pValue);
     }
@@ -127,10 +124,6 @@ namespace mongo {
             vpValue.erase(vpValue.begin() + index);
             return;
         }
-
-        /* make sure we have a valid value */
-        uassert(15968, str::stream() << "cannot set undefined field " <<
-                fieldName << " to document", pValue->getType() != Undefined);
 
         /* set the indicated field */
         vFieldName[index] = fieldName;

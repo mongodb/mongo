@@ -719,6 +719,10 @@ namespace mongo {
             _b.appendNull(num());
         }
 
+        void appendUndefined() {
+            _b.appendUndefined(num());
+        }
+
         /**
          * destructive - ownership moves to returned BSONArray
          * @return owned BSONArray

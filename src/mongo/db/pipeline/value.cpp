@@ -163,6 +163,7 @@ namespace mongo {
             simple.longValue = pBsonElement->numberLong();
             break;
 
+        case Undefined:
         case jstNULL:
             break;
 
@@ -173,7 +174,6 @@ namespace mongo {
             /* these shouldn't happen in this context */
         case MinKey:
         case EOO:
-        case Undefined:
         case DBRef:
         case Code:
         case MaxKey:
@@ -432,6 +432,10 @@ namespace mongo {
             pBuilder->append(getLong());
             break;
 
+        case Undefined:
+            pBuilder->appendUndefined();
+            break;
+
         case jstNULL:
             pBuilder->append();
             break;
@@ -439,7 +443,6 @@ namespace mongo {
             /* these shouldn't appear in this context */
         case MinKey:
         case EOO:
-        case Undefined:
         case DBRef:
         case Code:
         case MaxKey:

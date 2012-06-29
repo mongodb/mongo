@@ -26,6 +26,10 @@ namespace mongo {
         pBuilder->appendNull(fieldName);
     }
 
+    void BuilderObj::appendUndefined() {
+        pBuilder->appendUndefined(fieldName);
+    }
+
     void BuilderObj::append(bool b) {
         pBuilder->append(fieldName, b);
     }
@@ -71,6 +75,10 @@ namespace mongo {
 
     void BuilderArray::append() {
         pBuilder->appendNull();
+    }
+
+    void BuilderArray::appendUndefined() {
+        pBuilder->appendUndefined();
     }
 
     void BuilderArray::append(bool b) {

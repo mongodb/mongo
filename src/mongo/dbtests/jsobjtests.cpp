@@ -1907,6 +1907,9 @@ namespace JsobjTests {
             objb << objb.numStr(i++) << oid;
             arrb                     << oid;
 
+            objb.appendUndefined(objb.numStr(i++));
+            arrb.appendUndefined();
+
             BSONObj obj = objb.obj();
             BSONArray arr = arrb.arr();
 

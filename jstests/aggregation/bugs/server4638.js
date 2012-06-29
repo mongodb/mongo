@@ -15,3 +15,10 @@ printjson(res)
 
 assert(res.ok, 'server4638 failed');
 
+res = t.aggregate( { $project : { undef : 1 } } )
+printjson(res)
+
+assert(res.ok, 'server4638 failed 2');
+assert.eq(res.result[0].undef, undefined);
+// assert.eq(typeof(res.result[0].undef), "undefined"); // Commented out due to SERVER-6102
+
