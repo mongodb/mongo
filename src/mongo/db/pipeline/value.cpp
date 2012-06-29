@@ -670,7 +670,7 @@ namespace mongo {
             return timestampValue;
 
         default:
-            uassert(16373, str::stream() <<
+            uassert(16378, str::stream() <<
                     "can't convert from BSON type " << typeName(type) <<
                     " to timestamp",
                     false);

@@ -402,16 +402,7 @@ namespace mongo {
                 ++dateCount;
         }
 
-        /* 
-           We don't allow adding two dates because it doesn't make sense
-           especially since they are in epoch time. However, if there is a
-           string present then we would be appending the dates to a string so
-           having many would not be not a problem.
-        */
-        if ((dateCount > 1) && !stringCount) {
-            uassert(16000, "can't add two dates together", false);
-            return Value::getNull();
-        }
+        uassert(16377, "$add does not support dates", !dateCount);
 
         /*
           If there are non-constant strings, and we've got a copy of the
@@ -437,19 +428,6 @@ namespace mongo {
             }
 
             return Value::createString(stringTotal.str());
-        }
-
-        if (dateCount) {
-            long long dateTotal = 0;
-            for (size_t i = 0; i < n; ++i) {
-                intrusive_ptr<const Value> pValue(vpValue[i]);
-                if (pValue->getType() == Date) 
-                    dateTotal += pValue->coerceToDate();
-                else 
-                    dateTotal += static_cast<long long>(pValue->coerceToDouble()*24*60*60*1000);
-            }
-
-            return Value::createDate(Date_t(dateTotal));
         }
 
         /*
@@ -1127,6 +1105,10 @@ namespace mongo {
         checkArgCount(2);
         intrusive_ptr<const Value> pLeft(vpOperand[0]->evaluate(pDocument));
         intrusive_ptr<const Value> pRight(vpOperand[1]->evaluate(pDocument));
+
+        uassert(16373,
+                "$divide does not support dates",
+                pLeft->getType() != Date && pRight->getType() != Date);
 
         double right = pRight->coerceToDouble();
         if (right == 0)
@@ -2293,6 +2275,8 @@ namespace mongo {
         BSONType leftType = pLeft->getType();
         BSONType rightType = pRight->getType();
 
+        uassert(16374, "$mod does not support dates", leftType != Date && rightType != Date);
+
         // pass along jstNULLs and Undefineds
         if (leftType == jstNULL || leftType == Undefined)
             return pLeft;
@@ -2397,6 +2381,8 @@ namespace mongo {
         const size_t n = vpOperand.size();
         for(size_t i = 0; i < n; ++i) {
             intrusive_ptr<const Value> pValue(vpOperand[i]->evaluate(pDocument));
+
+            uassert(16375, "$multiply does not support dates", pValue->getType() != Date);
 
             productType = Value::getWidestNumeric(productType, pValue->getType());
             doubleProduct *= pValue->coerceToDouble();
@@ -3009,22 +2995,13 @@ namespace mongo {
         checkArgCount(2);
         intrusive_ptr<const Value> pLeft(vpOperand[0]->evaluate(pDocument));
         intrusive_ptr<const Value> pRight(vpOperand[1]->evaluate(pDocument));
-        if (pLeft->getType() == Date) {
-            long long right;
-            long long left = pLeft->coerceToDate();
-            if (pRight->getType() == Date)
-                right = pRight->coerceToDate();
-            else 
-                right = static_cast<long long>(pRight->coerceToDouble()*24*60*60*1000);
-            return Value::createDate(Date_t(left-right));
-        }
             
-        uassert(15996, "cannot subtract one date from another",
-                pRight->getType() != Date);
-
         productType = Value::getWidestNumeric(
             pRight->getType(), pLeft->getType());
         
+        uassert(16376,
+                "$subtract does not support dates",
+                pLeft->getType() != Date && pRight->getType() != Date);
 
         if (productType == NumberDouble) {
             double right = pRight->coerceToDouble();
