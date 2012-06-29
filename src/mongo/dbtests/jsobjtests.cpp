@@ -120,7 +120,7 @@ namespace JsobjTests {
                     // (re)alloc past the buffer 64mb limit
                     b.appendStr("a");
             }
-            catch (const AssertionException &e) { }
+            catch (const AssertionException&) { }
             // assert half of max buffer size was allocated before exception is thrown
             ASSERT(written == mongo::BufferMaxSize / 2);
         }
