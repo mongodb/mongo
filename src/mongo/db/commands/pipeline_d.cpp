@@ -55,6 +55,28 @@ namespace mongo {
          */
         shared_ptr<BSONObj> pQueryObj(new BSONObj(queryBuilder.obj()));
 
+        /* Look for an initial simple project; we'll avoid constructing Values
+         * for fields that won't make it through the projection.
+         *
+         * Currently this only supports the basic projections that mongod
+         * already supports natively.
+         * TODO: support any $project
+         */
+
+        BSONObj projection;
+        if (pSources->size()) {
+            const intrusive_ptr<DocumentSource> &source = pSources->front();
+            const DocumentSourceProject *projectSource =
+                dynamic_cast<DocumentSourceProject*>(source.get());
+
+            if (projectSource && projectSource->isSimple()) {
+                projection = projectSource->getRaw();
+
+                // remove the projection from the pipeline
+                pSources->erase(pSources->begin());
+            }
+        }
+
         /*
           Look for an initial sort; we'll try to add this to the
           Cursor we create.  If we're successful in doing that (further down),
@@ -162,6 +184,9 @@ namespace mongo {
         pSource->setQuery(pQueryObj);
         if (initSort)
             pSource->setSort(pSortObj);
+
+        if (!projection.isEmpty())
+            pSource->setProjection(projection);
 
         return pSource;
     }

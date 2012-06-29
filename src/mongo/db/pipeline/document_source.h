@@ -28,6 +28,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "db/pipeline/value.h"
 #include "util/string_writer.h"
+#include "mongo/db/projection.h"
 
 namespace mongo {
     class Accumulator;
@@ -420,6 +421,7 @@ namespace mongo {
          */
         void setSort(const shared_ptr<BSONObj> &pBsonObj);
 
+        void setProjection(BSONObj projection);
     protected:
         // virtuals from DocumentSource
         virtual void sourceToBson(BSONObjBuilder *pBuilder, bool explain) const;
@@ -442,6 +444,7 @@ namespace mongo {
          */
         shared_ptr<BSONObj> pQuery;
         shared_ptr<BSONObj> pSort;
+        scoped_ptr<Projection> _projection;
 
         shared_ptr<CursorWithContext> _cursorWithContext;
 
@@ -795,15 +798,6 @@ namespace mongo {
             const intrusive_ptr<DependencyTracker> &pTracker);
 
         /**
-          Create a new DocumentSource that can implement projection.
-
-          @param pExpCtx the expression context for the pipeline
-          @returns the projection DocumentSource
-        */
-        static intrusive_ptr<DocumentSourceProject> create(
-            const intrusive_ptr<ExpressionContext> &pExpCtx);
-
-        /**
           Include a field path in a projection.
 
           @param fieldPath the path of the field to include
@@ -845,6 +839,13 @@ namespace mongo {
 
         static const char projectName[];
 
+        /** projection as specified by the user */
+        BSONObj getRaw() const { return _raw; }
+
+        /** true if just include/exclude, no renames */
+        bool isSimple() const { return _isSimple; }
+
+
     protected:
         // virtuals from DocumentSource
         virtual void sourceToBson(BSONObjBuilder *pBuilder, bool explain) const;
@@ -855,6 +856,8 @@ namespace mongo {
         // configuration state
         bool excludeId;
         intrusive_ptr<ExpressionObject> pEO;
+        BSONObj _raw;
+        bool _isSimple;
 
         /*
           Utility object used by manageDependencies().

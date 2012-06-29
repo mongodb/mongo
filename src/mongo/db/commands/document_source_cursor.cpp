@@ -119,6 +119,9 @@ namespace mongo {
             if ( chunkMgr() && ! chunkMgr()->belongsToMe( documentObj ) )
                 continue;
 
+            if (_projection)
+                documentObj = _projection->transform(documentObj);
+
             pCurrent = Document::createFromBsonObj(
                 &documentObj, NULL /* LATER pDependencies.get()*/);
 
@@ -151,6 +154,9 @@ namespace mongo {
             {
                 pBuilder->append("sort", *pSort);
             }
+
+            if (_projection)
+                pBuilder->append("projection", _projection->getSpec());
 
             // construct query for explain
             BSONObjBuilder queryBuilder;
@@ -196,6 +202,12 @@ namespace mongo {
 
     void DocumentSourceCursor::setSort(const shared_ptr<BSONObj> &pBsonObj) {
         pSort = pBsonObj;
+    }
+
+    void DocumentSourceCursor::setProjection(BSONObj projection) {
+        verify(!_projection);
+        _projection.reset(new Projection);
+        _projection->init(projection);
     }
 
     void DocumentSourceCursor::manageDependencies(

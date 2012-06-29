@@ -33,8 +33,9 @@ namespace mongo {
         const intrusive_ptr<ExpressionContext> &pExpCtx):
         DocumentSource(pExpCtx),
         excludeId(false),
-        pEO(ExpressionObject::create()) {
-    }
+        pEO(ExpressionObject::create()),
+        _isSimple(true) // set to false in addField
+    { }
 
     const char *DocumentSourceProject::getSourceName() const {
         return projectName;
@@ -96,19 +97,13 @@ namespace mongo {
         pBuilder->append(projectName, insides.done());
     }
 
-    intrusive_ptr<DocumentSourceProject> DocumentSourceProject::create(
-        const intrusive_ptr<ExpressionContext> &pExpCtx) {
-        intrusive_ptr<DocumentSourceProject> pSource(
-            new DocumentSourceProject(pExpCtx));
-        return pSource;
-    }
-
     void DocumentSourceProject::addField(
         const string &fieldName, const intrusive_ptr<Expression> &pExpression) {
         uassert(15960,
                 "projection fields must be defined by non-empty expressions",
                 pExpression);
 
+        _isSimple = false; // this projection is no longer just inclusion/exclusion
         pEO->addField(fieldName, pExpression);
     }
 
@@ -142,8 +137,7 @@ namespace mongo {
                 pBsonElement->type() == Object);
 
         /* chain the projection onto the original source */
-        intrusive_ptr<DocumentSourceProject> pProject(
-            DocumentSourceProject::create(pExpCtx));
+        intrusive_ptr<DocumentSourceProject> pProject(new DocumentSourceProject(pExpCtx));
 
         /*
           Pull out the $project object.  This should just be a list of
@@ -151,6 +145,7 @@ namespace mongo {
           both, except for the case of _id.
          */
         BSONObj projectObj(pBsonElement->Obj());
+        pProject->_raw = projectObj.getOwned(); // probably not necessary, but better to be safe
         BSONObjIterator fieldIterator(projectObj);
         Expression::ObjectCtx objectCtx(
             Expression::ObjectCtx::DOCUMENT_OK);
