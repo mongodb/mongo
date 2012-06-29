@@ -87,6 +87,11 @@ class test_txn02(wttest.WiredTigerTestCase):
             session.begin_transaction(txn_config)
         c = session.open_cursor(self.uri, None)
         actual = dict((k, v) for k, v in c if v != 0)
+		# Search for the expected items as well as iterating
+        for k, v in expected.iteritems():
+            c.set_key(k)
+            c.search()
+            self.assertEqual(c.get_value(), v)
         c.close()
         if txn_config:
             session.commit_transaction()

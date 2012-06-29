@@ -36,8 +36,8 @@ __wt_kv_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 		 * If the cursor references a WT_INSERT item, take the related
 		 * WT_UPDATE item.
 		 */
-		if (cbt->ins != NULL) {
-			upd = cbt->ins->upd;
+		if (cbt->ins != NULL &&
+		    (upd = __wt_txn_read(session, cbt->ins->upd)) != NULL) {
 			cursor->value.data = WT_UPDATE_DATA(upd);
 			cursor->value.size = upd->size;
 			return (0);
@@ -51,8 +51,8 @@ __wt_kv_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 		 * If the cursor references a WT_INSERT item, take the related
 		 * WT_UPDATE item.
 		 */
-		if (cbt->ins != NULL) {
-			upd = cbt->ins->upd;
+		if (cbt->ins != NULL &&
+		    (upd = __wt_txn_read(session, cbt->ins->upd)) != NULL) {
 			cursor->value.data = WT_UPDATE_DATA(upd);
 			cursor->value.size = upd->size;
 			return (0);
@@ -68,14 +68,14 @@ __wt_kv_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 		 * original page, and the value from any related WT_UPDATE item,
 		 * or the page if the key was never updated.
 		 */
-		if (cbt->ins == NULL) {
-			WT_RET(
-			    __wt_row_key(session, page, rip, &cursor->key, 0));
-			upd = WT_ROW_UPDATE(page, rip);
-		} else {
+		if (cbt->ins != NULL &&
+		    (upd = __wt_txn_read(session, cbt->ins->upd)) != NULL) {
 			cursor->key.data = WT_INSERT_KEY(cbt->ins);
 			cursor->key.size = WT_INSERT_KEY_SIZE(cbt->ins);
-			upd = cbt->ins->upd;
+		} else {
+			WT_RET(
+			    __wt_row_key(session, page, rip, &cursor->key, 0));
+			upd = __wt_txn_read(session, WT_ROW_UPDATE(page, rip));
 		}
 		if (upd != NULL) {
 			cursor->value.data = WT_UPDATE_DATA(upd);
