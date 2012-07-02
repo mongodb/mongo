@@ -63,14 +63,6 @@ print("last op: "+tojson(master.getDB("local").oplog.rs.find().sort({$natural:-1
 rs.restart(0);
 
 print("doing rollback!");
-assert.soon(function() {
-    var result = rs.nodes[0].getDB("admin").runCommand({isMaster : 1});
-    printjson(result);
-    return !result.secondary && !result.ismaster;
-});
-
-print("make sure 0 successfully rolls back");
-m = rs.nodes[0];
 
 checkValidState(0);
 checkValidState(1);
