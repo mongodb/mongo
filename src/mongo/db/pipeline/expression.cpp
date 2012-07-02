@@ -2938,6 +2938,11 @@ namespace mongo {
                  || pLength->getType() == NumberDouble));
         string::size_type lower = static_cast< string::size_type >( pLower->coerceToLong() );
         string::size_type length = static_cast< string::size_type >( pLength->coerceToLong() );
+        if ( lower >= str.length() ) {
+            // If lower > str.length() then string::substr() will throw out_of_range, so return an
+            // empty string if lower is not a valid string index.
+            return Value::createString( "" );
+        }
         return Value::createString( str.substr(lower, length) );
     }
 
