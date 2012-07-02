@@ -616,6 +616,14 @@ namespace mongo {
                                           ModState& modState,
                                           BSONBuilderBase& builder,
                                           set<string>& onedownseen ) {
+        
+        switch () {
+        // unset/pull/pullAll on nothing does nothing, so don't append anything
+        case Mod::UNSET:
+        case Mod::PULL:
+        case Mod::PULL_ALL:
+            return;
+        }
         const char*  temp = modState.fieldName();
         temp += root.size();
         const char* dot = strchr( temp , '.' );
