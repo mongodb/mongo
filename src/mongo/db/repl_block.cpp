@@ -104,6 +104,7 @@ namespace mongo {
                 }
                 _currentlyUpdatingCache = false;
 
+                _threadsWaitingForReplication.notify_all();
             }
         }
 
@@ -133,7 +134,8 @@ namespace mongo {
                 _started = true;
                 go();
             }
-
+            
+            _threadsWaitingForReplication.notify_all();
         }
 
         bool opReplicatedEnough( OpTime op , BSONElement w ) {
@@ -171,16 +173,39 @@ namespace mongo {
 
             w--; // now this is the # of slaves i need
             scoped_lock mylk(_mutex);
+            return _replicatedToNum_slaves_locked( op, w );
+        }
+
+        bool waitForReplication(OpTime& op, int w, int maxSecondsToWait) {
+            if ( w <= 1 || ! _isMaster() )
+                return true;
+
+            w--; // now this is the # of slaves i need
+
+            boost::xtime xt;
+            boost::xtime_get(&xt, boost::TIME_UTC);
+            xt.sec += maxSecondsToWait;
+            
+            scoped_lock mylk(_mutex);
+            while ( ! _replicatedToNum_slaves_locked( op, w ) ) {
+                if ( ! _threadsWaitingForReplication.timed_wait( mylk.boost() , xt ) )
+                    return false;
+            }
+            return true;
+        }
+
+        bool _replicatedToNum_slaves_locked(OpTime& op, int numSlaves ) {
             for ( map<Ident,OpTime>::iterator i=_slaves.begin(); i!=_slaves.end(); i++) {
                 OpTime s = i->second;
                 if ( s < op ) {
                     continue;
                 }
-                if ( --w == 0 )
+                if ( --numSlaves == 0 )
                     return true;
             }
-            return w <= 0;
+            return numSlaves <= 0;
         }
+
 
         unsigned getSlaveCount() const {
             scoped_lock mylk(_mutex);
@@ -190,6 +215,8 @@ namespace mongo {
 
         // need to be careful not to deadlock with this
         mutable mongo::mutex _mutex;
+        boost::condition _threadsWaitingForReplication;
+
         map<Ident,OpTime> _slaves;
         bool _dirty;
         bool _started;
@@ -228,6 +255,11 @@ namespace mongo {
     bool opReplicatedEnough( OpTime op , int w ) {
         return slaveTracking.replicatedToNum( op , w );
     }
+
+    bool waitForReplication( OpTime op , int w , int maxSecondsToWait ) {
+        return slaveTracking.waitForReplication( op, w, maxSecondsToWait );
+    }
+
 
     void resetSlaveCache() {
         slaveTracking.reset();

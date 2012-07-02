@@ -34,6 +34,8 @@ namespace mongo {
     bool opReplicatedEnough( OpTime op , int w );
     bool opReplicatedEnough( OpTime op , BSONElement w );
 
+    bool waitForReplication( OpTime op , int w , int maxSecondsToWait );
+
     void resetSlaveCache();
     unsigned getSlaveCount();
 }
