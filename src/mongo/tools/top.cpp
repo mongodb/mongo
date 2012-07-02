@@ -38,6 +38,8 @@ namespace mongo {
 
             add_hidden_options()
             ( "sleep" , po::value<int>() , "time to sleep between calls" )
+            ;
+            add_options()
             ( "locks" , "use db lock info instead of top" )
             ;
             addPositionArg( "sleep" , 1 );
@@ -125,7 +127,7 @@ namespace mongo {
             int numberWidth = 10;
 
             cout << "\n"
-                 << setw(longest) << "ns"
+                 << setw(longest) << ( useLocks() ? "db" : "ns" )
                  << setw(numberWidth+2) << "total"
                  << setw(numberWidth+2) << "read"
                  << setw(numberWidth+2) << "write"
