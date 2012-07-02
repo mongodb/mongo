@@ -274,6 +274,7 @@ fblocks
 fcntl
 ffc
 ffs
+fgetln
 fh
 filefrag
 filename
@@ -295,6 +296,7 @@ func
 funcs
 gcc
 gdb
+getline
 getone
 getoneraw
 getones
