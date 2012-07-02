@@ -267,7 +267,7 @@ namespace mongo {
                         else continue;
                     }
 
-                    _hash( locObj ).append( b , "" );
+                    _hash( locObj, &obj ).append( b , "" );
 
                     // Go through all the other index keys
                     for ( vector<string>::const_iterator i = _other.begin(); i != _other.end(); ++i ) {
@@ -324,15 +324,25 @@ namespace mongo {
         }
 
         GeoHash _hash( const BSONObj& o ) const {
+            return _hash( o , NULL );
+        }
+
+        GeoHash _hash( const BSONObj& o, const BSONObj* src ) const {
+            string doc( "" );
+            
+            if( src != NULL ) {
+                doc = (*src).toString();
+            }
+            
             BSONObjIterator i(o);
-            uassert( 13067 , "geo field is empty" , i.more() );
+            uassert( 13067 , str::stream() << "geo field is empty\n" << doc, i.more() );
             BSONElement x = i.next();
-            uassert( 13068 , "geo field only has 1 element" , i.more() );
+            uassert( 13068 , str::stream() << "geo field only has 1 element\n" << doc, i.more() );
             BSONElement y = i.next();
-
-            uassert( 13026 , "geo values have to be numbers: " + o.toString() , x.isNumber() && y.isNumber() );
-
-            return hash( x.number() , y.number() );
+            uassert( 13026 , str::stream() << "geo values have to be numbers\n" << doc , x.isNumber() && y.isNumber() );
+            uassert( 13027 , str::stream() << "point not in interval of [ " << _min << ", " << _max << " ]\n" << doc, 
+                    x.number() <= _max && x.number() >= _min && y.number() <= _max && y.number() >= _min ); 
+            return hash( x.number(), y.number() );
         }
 
         GeoHash hash( const Point& p ) const {
@@ -353,7 +363,6 @@ namespace mongo {
         }
 
         unsigned _convert( double in ) const {
-            uassert( 13027 , str::stream() << "point not in interval of [ " << _min << ", " << _max << " ]", in <= _max && in >= _min );
 
             if (in == _max) {
                 // prevent aliasing with _min by moving inside the "box"
