@@ -199,13 +199,6 @@ namespace mongo {
         bool coerceToBool() const;
 
         /*
-          Coerce (cast) a value to a Boolean Value, using JSON rules.
-
-          @returns the Boolean Value value
-        */
-        intrusive_ptr<const Value> coerceToBoolean() const;
-
-        /*
           Coerce (cast) a value to an int, using JSON rules.
 
           @returns the int value

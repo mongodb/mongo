@@ -514,15 +514,6 @@ namespace mongo {
         return false;
     }
 
-    intrusive_ptr<const Value> Value::coerceToBoolean() const {
-        bool result = coerceToBool();
-
-        /* always normalize to the singletons */
-        if (result)
-            return Value::getTrue();
-        return Value::getFalse();
-    }
-
     int Value::coerceToInt() const {
         switch(type) {
         case NumberDouble:
