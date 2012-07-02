@@ -623,6 +623,17 @@ namespace mongo {
 
     template< class Builder >
     void ModSetState::_appendNewFromMods( const string& root , ModState& m , Builder& b , set<string>& onedownseen ) {
+        Mod& m2 = *((Mod*)(m.m)); // HACK
+        switch (m2.op) {
+        // unset/pull/pullAll on nothing does nothing, so don't append anything
+        case Mod::UNSET:
+        case Mod::PULL:
+        case Mod::PULL_ALL:
+            return;
+        default:
+            ;// fall through
+        }
+
         const char * temp = m.fieldName();
         temp += root.size();
         const char * dot = strchr( temp , '.' );
