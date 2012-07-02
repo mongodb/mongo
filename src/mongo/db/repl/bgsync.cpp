@@ -54,7 +54,7 @@ namespace replset {
         BSONObjBuilder counters;
         {
             boost::unique_lock<boost::mutex> lock(_mutex);
-            counters.appendIntOrLL("waitTime", _queueCounter.waitTime);
+            counters.appendIntOrLL("waitTimeMs", _queueCounter.waitTime);
             counters.append("numElems", _queueCounter.numElems);
         }
         // _buffer is protected by its own mutex
