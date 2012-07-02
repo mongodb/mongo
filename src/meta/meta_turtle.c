@@ -61,50 +61,44 @@ __wt_meta_turtle_read(
 {
 	FILE *fp;
 	WT_DECL_RET;
+	size_t buflen, len;
+	int match;
 	const char *path;
-	char *p, line[4096];
+	char *buf;
 
 	fp = NULL;
 	path = NULL;
+	buf = NULL;
 
 	/* Open the turtle file. */
 	WT_RET(__wt_filename(session, WT_METADATA_TURTLE, &path));
 	WT_ERR_TEST((fp = fopen(path, "r")) == NULL, WT_NOTFOUND);
 
 	/* Search for the key. */
-	ret = WT_NOTFOUND;
-	while (fgets(line, sizeof(line), fp) != NULL) {
-		if ((p = strchr(line, '\n')) == NULL)
-			goto format;
-		*p = '\0';
-		if (strcmp(key, line) == 0)
-			ret = 0;
+	for (buflen = 0, match = 0;;) {
+		WT_ERR(__wt_getline(session, &buf, &buflen, &len, fp));
+		if (len == 0)
+			WT_ERR(WT_NOTFOUND);
+		if (strcmp(key, buf) == 0)
+			match = 1;
 
 		/* Key matched: read the subsequent line for the value. */
-		if (fgets(line, sizeof(line), fp) == NULL)
-			goto format;
-		if ((p = strchr(line, '\n')) == NULL)
-			goto format;
-		*p = '\0';
-		if (ret == 0)
+		WT_ERR(__wt_getline(session, &buf, &buflen, &len, fp));
+		if (len == 0)
+			WT_ERR(__wt_illegal_value(session, WT_METADATA_TURTLE));
+		if (match)
 			break;
 	}
 
-	/* Check for an I/O error. */
-	if (ferror(fp))
-		WT_ERR(__wt_errno());
-	WT_ERR(ret);
-
-	/* Successful: copy the value for the caller. */
-	WT_ERR(__wt_strdup(session, line, valuep));
-
-	if (0) {
-format:		return (__wt_illegal_value(session, WT_METADATA_TURTLE));
-	}
+	/* Copy the value for the caller. */
+	WT_ERR(__wt_strdup(session, buf, valuep));
 
 err:	if (fp != NULL)
 		WT_TRET(fclose(fp));
-	__wt_free(session, path);
+	if (path != NULL)
+		__wt_free(session, path);
+	if (buf != NULL)
+		__wt_free(session, buf);
 	return (ret);
 }
 
@@ -140,8 +134,9 @@ __wt_meta_turtle_update(
 	    WT_METADATA_VERSION, vmajor, vminor, vpatch,
 	    key, value) < 0), __wt_errno());
 
-	WT_ERR_TEST(fclose(fp) == EOF, __wt_errno());
+	ret = fclose(fp);
 	fp = NULL;
+	WT_ERR_TEST(ret == EOF, __wt_errno());
 
 	ret = __wt_rename(session, WT_METADATA_TURTLE_SET, WT_METADATA_TURTLE);
 
