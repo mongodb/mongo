@@ -14,6 +14,8 @@
 int
 __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 {
+	WT_CONNECTION_IMPL *conn;
+	WT_BTREE *btree, *saved_btree;
 	WT_CONFIG targetconf;
 	WT_CONFIG_ITEM cval, k, v;
 	WT_DECL_ITEM(tmp);
@@ -22,11 +24,12 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	int target_list, tracking;
 	const char *txn_cfg[] = { "isolation=snapshot", NULL };
 
+	conn = S2C(session);
 	target_list = tracking = 0;
-	txn_global = &S2C(session)->txn_global;
+	txn_global = &conn->txn_global;
 
 	/* Only one checkpoint can be active at a time. */
-	__wt_writelock(session, S2C(session)->ckpt_rwlock);
+	__wt_writelock(session, conn->ckpt_rwlock);
 	WT_ERR(__wt_txn_begin(session, txn_cfg));
 
 	/* Prevent eviction from evicting anything newer than this. */
@@ -52,17 +55,16 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 				    "URIs may require quoting",
 				    (const char *)tmp->data);
 
-			__wt_spin_lock(session, &S2C(session)->schema_lock);
+			__wt_spin_lock(session, &conn->schema_lock);
 			ret = __wt_schema_worker(
 			    session, tmp->data, __wt_checkpoint, cfg, 0);
-			__wt_spin_unlock(session, &S2C(session)->schema_lock);
+			__wt_spin_unlock(session, &conn->schema_lock);
 
 			if (ret != 0)
 				WT_ERR_MSG(session, ret, "%s",
 				    (const char *)tmp->data);
 		}
-		if (ret == WT_NOTFOUND)
-			ret = 0;
+		WT_ERR_NOTFOUND_OK(ret);
 	}
 
 	if (!target_list) {
@@ -84,6 +86,19 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 		    __wt_meta_btree_apply(session, __wt_checkpoint, cfg, 0));
 	}
 
+	/* Checkpoint the metadata file. */
+	TAILQ_FOREACH(btree, &conn->btqh, q)
+		if (strcmp(btree->name, WT_METADATA_URI) == 0)
+			break;
+	if (btree == NULL)
+		WT_ERR_MSG(session, EINVAL,
+		    "checkpoint unable to find open meta-data handle");
+	saved_btree = session->btree;
+	session->btree = btree;
+	ret = __wt_checkpoint(session, cfg);
+	session->btree = saved_btree;
+	WT_ERR(ret);
+
 err:	/*
 	 * XXX Rolling back the changes here is problematic.
 	 *
@@ -102,7 +117,7 @@ err:	/*
 	txn_global->ckpt_txnid = WT_TXN_NONE;
 	if (F_ISSET(&session->txn, TXN_RUNNING))
 		WT_TRET(__wt_txn_release(session));
-	__wt_rwunlock(session, S2C(session)->ckpt_rwlock);
+	__wt_rwunlock(session, conn->ckpt_rwlock);
 	__wt_scr_free(&tmp);
 	return (ret);
 }
