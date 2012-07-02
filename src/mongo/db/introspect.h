@@ -31,4 +31,13 @@ namespace mongo {
 
     void profile( const Client& c , CurOp& currentOp );
 
+    /**
+     * Get (or create) the profile collection
+     *
+     * @param   db      Database in which to create the profile collection
+     * @param   force   Always create the collection if it does not exist
+     * @return  NamespaceDetails for the newly created collection, or NULL on error
+    **/
+    NamespaceDetails* getOrCreateProfileCollection(Database *db, bool force = false);
+
 } // namespace mongo

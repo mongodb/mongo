@@ -20,6 +20,7 @@
 #include "pdfile.h"
 #include "database.h"
 #include "instance.h"
+#include "introspect.h"
 #include "clientcursor.h"
 #include "databaseholder.h"
 
@@ -91,7 +92,7 @@ namespace mongo {
             checkDuplicateUncasedNames(true);
             // If already exists, open.  Otherwise behave as if empty until
             // there's a write, then open.
-            if ( ! newDb || cmdLine.defaultProfile ) {
+            if (!newDb) {
                 namespaceIndex.init();
                 if( _openAllFiles )
                     openAllFiles();
@@ -378,15 +379,9 @@ namespace mongo {
 
         verify( cc().database() == this );
 
-        if ( ! namespaceIndex.details( profileName.c_str() ) ) {
-            log() << "creating profile collection: " << profileName << endl;
-            BSONObjBuilder spec;
-            spec.appendBool( "capped", true );
-            spec.append( "size", 1024*1024 );
-            if ( ! userCreateNS( profileName.c_str(), spec.done(), errmsg , false /* we don't replica profile messages */ ) ) {
-                return false;
-            }
-        }
+        if (!getOrCreateProfileCollection(this, true))
+            return false;
+
         profile = newLevel;
         return true;
     }

@@ -70,19 +70,39 @@ namespace mongo {
         }
 
         // write: not replicated
-        NamespaceDetails *d = db->namespaceIndex.details(ns);
-        if( d ) {
+        // get or create the profiling collection
+        NamespaceDetails *details = getOrCreateProfileCollection(db);
+        if (details) {
             int len = p.objsize();
-            Record *r = theDataFileMgr.fast_oplog_insert(d, ns, len);
+            Record *r = theDataFileMgr.fast_oplog_insert(details, ns, len);
             memcpy(getDur().writingPtr(r->data(), len), p.objdata(), len);
         }
-        else { 
-            static time_t last;
+    }
+
+    NamespaceDetails* getOrCreateProfileCollection(Database *db, bool force) {
+        fassert(16363, db);
+        const char* profileName = db->profileName.c_str();
+        NamespaceDetails* details = db->namespaceIndex.details(profileName);
+        if (!details && (cmdLine.defaultProfile || force)) {
+            // system.profile namespace doesn't exist; create it
+            log() << "creating profile collection: " << profileName << endl;
+            string errmsg;
+            if (!userCreateNS(db->profileName.c_str(),
+                              BSON("capped" << true << "size" << 1024 * 1024), errmsg , false)) {
+                log() << "could not create ns " << db->profileName << ": " << errmsg << endl;
+                return NULL;
+            }
+            details = db->namespaceIndex.details(profileName);
+        }
+        if (!details) {
+            // failed to get or create profile collection
+            static time_t last = time(0) - 10;  // warn the first time
             if( time(0) > last+10 ) {
-                log() << "profile: warning ns " << ns << " does not exist" << endl;
+                log() << "profile: warning ns " << profileName << " does not exist" << endl;
                 last = time(0);
             }
         }
+        return details;
     }
 
 } // namespace mongo
