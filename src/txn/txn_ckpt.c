@@ -21,6 +21,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
 	WT_TXN_GLOBAL *txn_global;
+	void *saved_meta_next;
 	int target_list, tracking;
 	const char *txn_cfg[] = { "isolation=snapshot", NULL };
 
@@ -93,14 +94,26 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	if (btree == NULL)
 		WT_ERR_MSG(session, EINVAL,
 		    "checkpoint unable to find open meta-data handle");
+
+	/*
+	 * Disable metadata tracking during the metadata checkpoint.
+	 *
+	 * We don't lock old checkpoints in the metadata file: there is no way
+	 * to open one.  We are holding other handle locks, it is not safe to
+	 * lock conn->spinlock.
+	 */
+	saved_meta_next = session->meta_track_next;
+	session->meta_track_next = NULL;
 	saved_btree = session->btree;
 	session->btree = btree;
 	ret = __wt_checkpoint(session, cfg);
 	session->btree = saved_btree;
+	session->meta_track_next = saved_meta_next;
 	WT_ERR(ret);
 
 err:	/*
-	 * XXX Rolling back the changes here is problematic.
+	 * XXX
+	 * Rolling back the changes here is problematic.
 	 *
 	 * If we unroll here, we need a way to roll back changes to the avail
 	 * list for each tree that was successfully synced before the error

@@ -62,7 +62,7 @@ __wt_meta_turtle_read(
 	FILE *fp;
 	WT_DECL_RET;
 	const char *path;
-	char *p, line[1024];
+	char *p, line[4096];
 
 	fp = NULL;
 	path = NULL;
