@@ -525,6 +525,7 @@ namespace mongo {
     }
 
     inline bool BSONElement::trueValue() const {
+        // NOTE Behavior changes must be replicated in Value::coerceToBool().
         switch( type() ) {
         case NumberLong:
             return *reinterpret_cast< const long long* >( value() ) != 0;

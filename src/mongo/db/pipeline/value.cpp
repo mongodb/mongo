@@ -459,6 +459,7 @@ namespace mongo {
     }
 
     bool Value::coerceToBool() const {
+        // TODO Unify the implementation with BSONElement::trueValue().
         BSONType type = getType();
         switch(type) {
         case NumberDouble:
