@@ -334,7 +334,8 @@ namespace mongo {
                         if ( left <= 0 )
                             throw e;
                         left--;
-                        log() << "update will be retried b/c sharding config info is stale, "
+                        int logLevel = left >= 3;
+                        LOG( logLevel ) << "update will be retried b/c sharding config info is stale, "
                               << " left:" << left << " ns: " << r.getns() << " query: " << query << endl;
                         r.reset( false );
                         manager = r.getChunkManager();
@@ -425,7 +426,8 @@ namespace mongo {
                         if ( left <= 0 )
                             throw e;
                         left--;
-                        log() << "update will be retried b/c sharding config info is stale, "
+                        int logLevel = left >= 3;
+                        LOG( logLevel ) << "update will be retried b/c sharding config info is stale, "
                               << " left:" << left << " ns: " << ns << " query: " << query << endl;
                         manager = conf->getChunkManager(ns);
                         uassert(14849, "collection no longer sharded", manager);
@@ -461,7 +463,8 @@ namespace mongo {
                     if ( left <= 0 )
                         throw e;
                     left--;
-                    log() << "delete failed b/c of StaleConfigException, retrying "
+                    int logLevel = left >= 3;
+                    LOG( logLevel ) << "delete failed b/c of StaleConfigException, retrying "
                           << " left:" << left << " ns: " << r.getns() << " patt: " << pattern << endl;
                     r.reset( false );
                     shards.clear();
