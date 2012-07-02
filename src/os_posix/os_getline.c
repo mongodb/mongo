@@ -11,9 +11,8 @@
  * __wt_getline --
  *	Get a line from a stream.
  *
- * Implementation of the POSIX getline or BSD fgetln functions (getting to the
- * right function in portable ways is hard, and it's simple enough to write it
- * instead).
+ * Implementation of the POSIX getline or BSD fgetln functions (finding the
+ * function in a portable way is hard, it's simple enough to write it instead).
  *
  * Note: Unlike the standard getline calls, this function doesn't include the
  * trailing newline character in the returned buffer and discards empty lines
