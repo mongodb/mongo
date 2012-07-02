@@ -927,6 +927,8 @@ def doConfigure( myenv , shell=False ):
 
         # this will add it if it exists and works
         myCheckLib( [ "zmq" ] )
+	myCheckLib( [ "uuid" ] )
+	myCheckLib( [ "rt" ] )
     else:
         execConfigure("src/third_party/zeromq-" + env["ZEROMQ_VERSION"])
 
