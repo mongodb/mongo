@@ -80,7 +80,7 @@ namespace mongo {
     }
 
     NamespaceDetails* getOrCreateProfileCollection(Database *db, bool force) {
-        fassert(16363, db);
+        fassert(16372, db);
         const char* profileName = db->profileName.c_str();
         NamespaceDetails* details = db->namespaceIndex.details(profileName);
         if (!details && (cmdLine.defaultProfile || force)) {
