@@ -20,3 +20,4 @@ load('jstests/aggregation/bugs/server6127.js');
 load('jstests/aggregation/bugs/server6147.js');
 load('jstests/aggregation/bugs/server6120.js');
 load('jstests/aggregation/bugs/server6186.js');
+load('jstests/aggregation/bugs/server6190.js');

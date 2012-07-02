@@ -3100,16 +3100,23 @@ namespace mongo {
         intrusive_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
         tm date;
         (pDate->coerceToDate()).toTm(&date);
-        int dayOfWeek = date.tm_wday+1;
+        int dayOfWeek = date.tm_wday;
         int dayOfYear = date.tm_yday;
-        int week = 0;
-        int janFirst = 0;
-        int offset = 0;
+        int prevSundayDayOfYear = dayOfYear - dayOfWeek; // may be negative
+        int nextSundayDayOfYear = prevSundayDayOfYear + 7; // must be positive
 
-        janFirst = dayOfWeek - dayOfYear % 7;
-        offset = (janFirst + 6) % 7;
-        week = (dayOfYear + offset) / 7;
-        return Value::createInt(week);
+        // Return the zero based index of the week of the next sunday, equal to the one based index
+        // of the week of the previous sunday, which is to be returned.
+        int nextSundayWeek = nextSundayDayOfYear / 7;
+
+        // Verify that the week calculation is consistent with strftime "%U".
+        DEV{
+            char buf[3];
+            verify(strftime(buf,3,"%U",&date));
+            verify(int(str::toUnsigned(buf))==nextSundayWeek);
+        }
+
+        return Value::createInt(nextSundayWeek);
     }
 
     const char *ExpressionWeek::getOpName() const {
