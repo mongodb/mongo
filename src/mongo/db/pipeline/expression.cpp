@@ -161,7 +161,7 @@ namespace mongo {
                 }
                 else { /* nothing else is allowed */
                     uassert(15992, str::stream() <<
-                            "disallowed field type " << fieldType <<
+                            "disallowed field type " << typeName(fieldType) <<
                             " in object expression (at \"" <<
                             fieldName << "\")", false);
                 }
@@ -801,7 +801,7 @@ namespace mongo {
         BSONType rightType = pRight->getType();
         uassert(15994, str::stream() << getOpName() <<
                 ":  no automatic conversion for types " <<
-                leftType << " and " << rightType,
+                typeName(leftType) << " and " << typeName(rightType),
                 leftType == rightType);
         // CW TODO at least for now.  later, handle automatic conversions
 
@@ -842,7 +842,7 @@ namespace mongo {
 
         default:
             uassert(15995, str::stream() <<
-                    "can't compare values of type " << leftType, false);
+                    "can't compare values of type " << typeName(leftType), false);
             break;
         }
 
@@ -2926,13 +2926,13 @@ namespace mongo {
         string str = pString->coerceToString();
         uassert(16034, str::stream() << getOpName() <<
                 ":  starting index must be a numeric type (is BSON type " <<
-                pLower->getType() << ")",
+                typeName(pLower->getType()) << ")",
                 (pLower->getType() == NumberInt 
                  || pLower->getType() == NumberLong 
                  || pLower->getType() == NumberDouble));
         uassert(16035, str::stream() << getOpName() <<
                 ":  length must be a numeric type (is BSON type " <<
-                pLength->getType() << ")",
+                typeName(pLength->getType() )<< ")",
                 (pLength->getType() == NumberInt 
                  || pLength->getType() == NumberLong 
                  || pLength->getType() == NumberDouble));

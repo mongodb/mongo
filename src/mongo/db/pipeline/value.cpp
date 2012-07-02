@@ -84,7 +84,7 @@ namespace mongo {
         default:
             // nothing else is allowed
             uassert(16001, str::stream() <<
-                    "can't create empty Value of type " << type, false);
+                    "can't create empty Value of type " << typeName(type), false);
             break;
         }
     }
@@ -178,7 +178,7 @@ namespace mongo {
         case Code:
         case MaxKey:
             uassert(16002, str::stream() <<
-                    "can't create Value of BSON type " << type, false);
+                    "can't create Value of BSON type " << typeName(type), false);
             break;
         }
     }
@@ -536,7 +536,7 @@ namespace mongo {
         case String:
         default:
             uassert(16003, str::stream() <<
-                    "can't convert from BSON type " << type <<
+                    "can't convert from BSON type " << typeName(type) <<
                     " to int",
                     false);
         } // switch(type)
@@ -562,7 +562,7 @@ namespace mongo {
         case String:
         default:
             uassert(16004, str::stream() <<
-                    "can't convert from BSON type " << type <<
+                    "can't convert from BSON type " << typeName(type) <<
                     " to long",
                     false);
         } // switch(type)
@@ -588,7 +588,7 @@ namespace mongo {
         case String:
         default:
             uassert(16005, str::stream() <<
-                    "can't convert from BSON type " << type <<
+                    "can't convert from BSON type " << typeName(type) <<
                     " to double",
                     false);
         } // switch(type)
@@ -602,14 +602,9 @@ namespace mongo {
         case Date:
             return dateValue; 
 
-        case jstNULL:
-        case Undefined:
-            uassert(16371, "can't convert from Null (or Undefined) value type to Date_t", false);
-
         default:
             uassert(16006, str::stream() <<
-                    "can't convert from BSON type " << type <<
-                    " to double",
+                    "can't convert from BSON type " << typeName(type) << " to Date",
                     false);
         } // switch(type)
     }
@@ -641,8 +636,8 @@ namespace mongo {
 
         default:
             uassert(16007, str::stream() <<
-                    "can't convert from BSON type " << type <<
-                    " to double",
+                    "can't convert from BSON type " << typeName(type) <<
+                    " to String",
                     false);
         } // switch(type)
 
@@ -729,8 +724,8 @@ namespace mongo {
 
         // CW TODO for now, only compare like values
         uassert(16016, str::stream() <<
-                "can't compare values of BSON types " << lType <<
-                " and " << rType,
+                "can't compare values of BSON types " << typeName(lType) <<
+                " and " << typeName(rType),
                 lType == rType);
 
         switch(lType) {
@@ -780,7 +775,7 @@ namespace mongo {
         case Symbol:
         case CodeWScope:
             uassert(16017, str::stream() <<
-                    "comparisons of values of BSON type " << lType <<
+                    "comparisons of values of BSON type " << typeName(lType) <<
                     " are not supported", false);
             // pBuilder->appendBinData(fieldName, ...);
             break;
@@ -883,7 +878,7 @@ namespace mongo {
         case Symbol:
         case CodeWScope:
             uassert(16018, str::stream() <<
-                    "hashes of values of BSON type " << type <<
+                    "hashes of values of BSON type " << typeName(type) <<
                     " are not supported", false);
             break;
 

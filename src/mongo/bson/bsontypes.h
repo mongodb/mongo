@@ -86,6 +86,12 @@ namespace mongo {
         MaxKey=127
     };
 
+    /**
+     * returns the name of the argument's type
+     * defined in jsobj.cpp
+     */
+    const char* typeName (BSONType type);
+
     /* subtypes of BinData.
        bdtCustom and above are ones that the JS compiler understands, but are
        opaque to the database.
