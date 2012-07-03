@@ -50,7 +50,7 @@ namespace mongo {
 
           We create a pointer to a shared object instead of a local
           object so that we can preserve it for the Cursor we're going to
-          create below.  See DocumentSourceCursor::addBsonDependency().
+          create below.
          */
         shared_ptr<BSONObj> pQueryObj(new BSONObj(queryBuilder.obj()));
 

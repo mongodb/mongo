@@ -390,13 +390,12 @@ namespace mongo {
         string ns; // namespace
 
         /*
-          The bsonDependencies must outlive the Cursor wrapped by this
-          source.  Therefore, bsonDependencies must appear before pCursor
+          The bson dependencies must outlive the Cursor wrapped by this
+          source.  Therefore, bson dependencies must appear before pCursor
           in order cause its destructor to be called *after* pCursor's.
          */
         shared_ptr<BSONObj> pQuery;
         shared_ptr<BSONObj> pSort;
-        vector<shared_ptr<BSONObj> > bsonDependencies;
         shared_ptr<Cursor> pCursor;
 
         /*
@@ -420,31 +419,6 @@ namespace mongo {
           pipeline.
          */
         intrusive_ptr<DependencyTracker> pDependencies;
-
-        /**
-           (5/14/12 - moved this to private because it's not used atm)
-           Add a BSONObj dependency.
-
-           Some Cursor creation functions rely on BSON objects to specify
-           their query predicate or sort.  These often take a BSONObj
-           by reference for these, but do not copy it.  As a result, the
-           BSONObjs specified must outlive the Cursor.  In order to ensure
-           that, use this to preserve a pointer to the BSONObj here.
-
-           From the outside, you must also make sure the BSONObjBuilder
-           creates a lasting copy of the data, otherwise it will go away
-           when the builder goes out of scope.  Therefore, the typical usage
-           pattern for this is 
-           {
-               BSONObjBuilder builder;
-               // do stuff to the builder
-               shared_ptr<BSONObj> pBsonObj(new BSONObj(builder.obj()));
-               pDocumentSourceCursor->addBsonDependency(pBsonObj);
-           }
-
-           @param pBsonObj pointer to the BSON object to preserve
-         */
-        void addBsonDependency(const shared_ptr<BSONObj> &pBsonObj);
     };
 
 

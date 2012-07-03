@@ -142,7 +142,6 @@ namespace mongo {
         const intrusive_ptr<ExpressionContext> &pCtx):
         DocumentSource(pCtx),
         pCurrent(),
-        bsonDependencies(),
         pCursor(pTheCursor),
         pClientCursor(),
         pDependencies() {
@@ -170,11 +169,6 @@ namespace mongo {
 
     void DocumentSourceCursor::setSort(const shared_ptr<BSONObj> &pBsonObj) {
         pSort = pBsonObj;
-    }
-
-    void DocumentSourceCursor::addBsonDependency(
-        const shared_ptr<BSONObj> &pBsonObj) {
-        bsonDependencies.push_back(pBsonObj);
     }
 
     void DocumentSourceCursor::manageDependencies(
