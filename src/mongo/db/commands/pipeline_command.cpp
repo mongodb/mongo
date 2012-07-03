@@ -155,9 +155,6 @@ namespace mongo {
           the direct client interface under the execution phase.
          */
         {
-            scoped_ptr<Lock::GlobalRead> lk;
-            if(lockGlobally())
-                lk.reset(new Lock::GlobalRead());
             Client::ReadContext ctx(ns, dbpath, requiresAuth()); // read lock
 
             pSource = PipelineD::prepareCursorSource(pPipeline, db, pCtx);
@@ -182,9 +179,6 @@ namespace mongo {
         intrusive_ptr<Pipeline> &pPipeline,
         intrusive_ptr<ExpressionContext> &pCtx) {
 
-        scoped_ptr<Lock::GlobalRead> lk;
-        if(lockGlobally())
-            lk.reset(new Lock::GlobalRead());
         Client::ReadContext ctx(ns, dbpath, requiresAuth()); // read lock
 
         intrusive_ptr<DocumentSourceCursor> pSource(
