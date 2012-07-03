@@ -28,6 +28,9 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 	/* Statistics. */
 	WT_RET(__wt_stat_alloc_connection_stats(session, &conn->stats));
 
+	/* API spinlock. */
+	__wt_spin_init(session, &conn->api_lock);
+
 	/* File handle spinlock. */
 	__wt_spin_init(session, &conn->fh_lock);
 
@@ -36,12 +39,6 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 
 	/* Serialized function call spinlock. */
 	__wt_spin_init(session, &conn->serial_lock);
-
-	/* General purpose spinlock. */
-	__wt_spin_init(session, &conn->spinlock);
-
-	/* Checkpoint lock. */
-	WT_RET(__wt_rwlock_alloc(session, "checkpoint", &conn->ckpt_rwlock));
 
 	return (0);
 }
@@ -77,13 +74,10 @@ __wt_connection_destroy(WT_CONNECTION_IMPL *conn)
 	TAILQ_REMOVE(&__wt_process.connqh, conn, q);
 	__wt_spin_unlock(session, &__wt_process.spinlock);
 
+	__wt_spin_destroy(session, &conn->api_lock);
 	__wt_spin_destroy(session, &conn->fh_lock);
 	__wt_spin_destroy(session, &conn->serial_lock);
 	__wt_spin_destroy(session, &conn->schema_lock);
-	__wt_spin_destroy(session, &conn->spinlock);
-
-	if (conn->ckpt_rwlock != NULL)
-		__wt_rwlock_destroy(session, &conn->ckpt_rwlock);
 
 	/* Free allocated memory. */
 	__wt_free(session, conn->home);

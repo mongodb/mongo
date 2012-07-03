@@ -713,14 +713,14 @@ __evict_walk(WT_SESSION_IMPL *session)
 	cache = S2C(session)->cache;
 
 	/*
-	 * We hold a spinlock for the entire walk -- it's slow, but (1) how
-	 * often do new files get added or removed to/from the system, and (2)
-	 * it's all in-memory stuff, so it's not that slow.
+	 * We hold the schema lock for the entire walk -- it's slow, but
+	 * (1) how often do new files get added or removed to/from the system?
+	 * and (2) it's all in-memory stuff, so it's not that slow.
 	 *
-	 * If the connection spinlock is not available, don't block: another
-	 * thread may be holding it and waiting on eviction (e.g., checkpoint).
+	 * If the schema lock is not available, don't block: another thread may
+	 * be holding it and waiting on eviction (e.g., checkpoint).
 	 */
-	if (__wt_spin_trylock(session, &conn->spinlock) != 0)
+	if (__wt_spin_trylock(session, &conn->schema_lock) != 0)
 		return (0);
 
 	/*
@@ -760,7 +760,7 @@ __evict_walk(WT_SESSION_IMPL *session)
 	if (0) {
 err:		__wt_spin_unlock(session, &cache->evict_lock);
 	}
-	__wt_spin_unlock(session, &conn->spinlock);
+	__wt_spin_unlock(session, &conn->schema_lock);
 	return (ret);
 }
 
