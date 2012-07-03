@@ -42,6 +42,9 @@ namespace replset {
                                        _consumedOpTime(0, 0) {
     }
 
+    BackgroundSync::QueueCounter::QueueCounter() : waitTime(0), numElems(0) {
+    }
+
     BackgroundSync* BackgroundSync::get() {
         boost::unique_lock<boost::mutex> lock(s_mutex);
         if (s_instance == NULL && !inShutdown()) {

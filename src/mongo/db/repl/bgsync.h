@@ -86,7 +86,8 @@ namespace replset {
         OplogReader _oplogMarker; // not locked, only used by notifier thread
         OpTime _consumedOpTime; // not locked, only used by notifier thread
 
-        struct {
+        struct QueueCounter {
+            QueueCounter();
             unsigned long long waitTime;
             unsigned int numElems;
         } _queueCounter;
