@@ -40,7 +40,6 @@ class SnapShotTest(wttest.WiredTigerTestCase):
         self.create_session()
         self.build_file_with_snapshots() # build set of snapshots
         for snapshot_names, sizes in self.snapshots.iteritems():
-            print 'snapshot-name= %s' % snapshot_names
             self.check(snapshot_names)
         self.cursor_lock()
         self.drop()
