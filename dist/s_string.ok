@@ -45,6 +45,7 @@ EINVAL
 ENOENT
 ENOMEM
 ENOTSUP
+EOF
 ETIME
 ETIMEDOUT
 EXTLIST
@@ -218,6 +219,7 @@ connectionp
 crc
 cref
 ctype
+curbackup
 curbtree
 curbulk
 curconfig

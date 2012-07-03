@@ -17,6 +17,8 @@ The following are the builtin cursor types:
 
 <table>
   @hrow{URI, Type}
+   @row{<tt>backup:</tt>,
+hot backup cursor}
    @row{<tt>colgroup:\<tablename\>.\<columnset\></tt>,
 column group cursor}
    @row{<tt>config:[\<uri\>]</tt>,
@@ -34,6 +36,10 @@ join cursor @notyet{join cursors}}
   database or file statistics (key=(int)\,
   value=(string)description\, (string)value\, (uint64_t)value)}
 </table>
+
+@subsection hot_backup_cursors Hot backup cursors
+
+See @ref hot_backup for more information.
 
 @subsection data_files Raw Files
 

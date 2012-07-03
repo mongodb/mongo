@@ -5,6 +5,16 @@
  * See the file LICENSE for redistribution information.
  */
 
+struct __wt_cursor_backup {
+	WT_CURSOR iface;
+
+	size_t next;			/* Cursor position */
+
+	size_t list_allocated;		/* List of files */
+	size_t list_next;
+	char **list;
+};
+
 struct __wt_cursor_btree {
 	WT_CURSOR iface;
 

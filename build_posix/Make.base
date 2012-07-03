@@ -8,6 +8,7 @@ LDADD = $(lib_LTLIBRARIES)
 
 bin_PROGRAMS = wt
 wt_SOURCES =\
+	src/utilities/util_backup.c \
 	src/utilities/util_cpyright.c \
 	src/utilities/util_create.c \
 	src/utilities/util_drop.c \

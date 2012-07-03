@@ -21,6 +21,7 @@ typedef struct {
 	size_t	memsize;			/* Managed memory size */
 } ULINE;
 
+extern const char *home;			/* Home directory */
 extern const char *progname;			/* Program name */
 extern const char *usage_prefix;		/* Global arguments */
 extern int verbose;				/* Verbose flag */
@@ -37,6 +38,7 @@ extern int   util_optopt;		/* character checked for validity */
 extern int   util_optreset;		/* reset getopt */
 extern char *util_optarg;		/* argument associated with option */
 
+int	 util_backup(WT_SESSION *, int, char *[]);
 int	 util_cerr(const char *, const char *, int);
 void	 util_copyright(void);
 int	 util_create(WT_SESSION *, int, char *[]);

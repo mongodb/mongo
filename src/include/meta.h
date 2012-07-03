@@ -5,10 +5,14 @@
  * See the file LICENSE for redistribution information.
  */
 
-#define	WT_METADATA_URI		"file:WiredTiger.wt"
+#define	WT_SINGLETHREAD		"WiredTiger"		/* Locking file */
+
+#define	WT_METADATA_BACKUP	"WiredTiger.backup"	/* Hot backup file */
 
 #define	WT_METADATA_TURTLE	"WiredTiger.turtle"	/* Metadata metadata */
 #define	WT_METADATA_TURTLE_SET	"WiredTiger.turtle.set"	/* Turtle temp file */
+
+#define	WT_METADATA_URI		"file:WiredTiger.wt"	/* Metadata file URI */
 
 #define	WT_METADATA_VERSION	"WiredTiger version"	/* Version keys */
 #define	WT_METADATA_VERSION_STR	"WiredTiger version string"

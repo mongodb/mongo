@@ -172,6 +172,7 @@ memfree
 memp
 metadata
 minkey
+mkdir
 mmap
 mpool
 mpoolfile
@@ -237,6 +238,7 @@ reconf
 recs
 rerequests
 ret
+rf
 ro
 rpc
 rwlock

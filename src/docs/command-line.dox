@@ -27,6 +27,27 @@ on success and non-zero on error.
 The \c wt tool supports several commands.
 
 <hr>
+@section utility_backup wt backup
+Perform a hot backup of a database or set of database objects.
+
+The \c backup command performs a hot backup of the database, copying the
+database files to a \c specified directory, which can be subsequently
+opened as a WiredTiger database.  See @ref hot_backup for more
+information, and @ref file_permissions for specifics on the copied file
+permissions.
+
+@subsection utility_backup_synopsis Synopsis
+<code>wt [-Vv] [-C config] [-h directory] backup [-t uri] directory</code>
+
+@subsection utility_backup_options Options
+The following are command-specific options for the \c backup command:
+
+@par <code>-t uri</code>
+By default, the \c backup command does a hot backup of the entire
+database; the \c -t option changes the \c backup command to do a hot
+backup of only the listed \c file: and \c table: objects.
+
+<hr>
 @section utility_create wt create
 Create a table or file.
 
@@ -80,7 +101,7 @@ By default, the \c dump command output is written to the standard output;
 the \c -f option re-directs the output to the specified file.
 
 @par <code>-r</code>
-Dump in reverse order, from largest to smallest.
+Dump in reverse order, from largest key to smallest.
 
 @par <code>-x</code>
 Dump all characters in a hexadecimal encoding (the default is to leave

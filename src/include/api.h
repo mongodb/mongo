@@ -190,6 +190,7 @@ struct __wt_connection_impl {
 	WT_SPINLOCK spinlock;		/* General purpose spinlock */
 
 	WT_RWLOCK *ckpt_rwlock;		/* Checkpoint lock */
+	int	   ckpt_backup;		/* Backup: don't delete checkpoints */
 
 					/* Connection queue */
 	TAILQ_ENTRY(__wt_connection_impl) q;

@@ -49,8 +49,11 @@ int checkpoint_ops(WT_SESSION *session);
 int connection_ops(WT_CONNECTION *conn);
 int cursor_ops(WT_SESSION *session);
 int cursor_search_near(WT_CURSOR *cursor);
+int hot_backup(WT_SESSION *session);
 int pack_ops(WT_SESSION *session);
 int session_ops(WT_SESSION *session);
+
+const char *progname;
 
 int
 cursor_ops(WT_SESSION *session)
@@ -767,7 +770,49 @@ pack_ops(WT_SESSION *session)
 	return (ret);
 }
 
-int main(void)
+int
+hot_backup(WT_SESSION *session)
+{
+	char buf[1024];
+
+	/*! [Hot backup]*/
+	WT_CURSOR *cursor;
+	const char *filename;
+	int ret;
+
+	/* Create the backup directory. */
+	ret = mkdir("/path/database.backup");
+
+	/* Open the hot backup data source. */
+	ret = session->open_cursor(session, "backup:", NULL, NULL, &cursor);
+
+	/* Copy the list of files. */
+	while (
+	    (ret = cursor->next(cursor)) == 0 &&
+	    (ret = cursor->get_key(cursor, &filename)) == 0) {
+		(void)snprintf(buf, sizeof(buf),
+		    "cp /path/database/%s /path/database.backup/%s",
+		    filename, filename);
+		ret = system(buf);
+	}
+	if (ret == WT_NOTFOUND)
+		ret = 0;
+	if (ret != 0)
+		fprintf(stderr, "%s: cursor next(backup:) failed: %s\n",
+		    progname, wiredtiger_strerror(ret));
+
+	ret = cursor->close(cursor);
+	/*! [Hot backup]*/
+
+	/*! [Hot backup of a checkpoint]*/
+	ret = session->checkpoint(session, "drop=(from=June01),name=June01");
+	/*! [Hot backup of a checkpoint]*/
+
+	return (0);
+}
+
+int
+main(void)
 {
 	int ret;
 

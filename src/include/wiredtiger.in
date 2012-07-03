@@ -481,6 +481,9 @@ struct __wt_session {
 	 *  The following are the builtin cursor types:
 	 *  <table>
 	 *  @hrow{URI, Type, Key/Value types}
+	 *  @row{<tt>backup:</tt>,
+	 *	hot backup cursor,
+	 *	key=<code>string</code>\, see @ref hot_backup for details}
 	 *  @row{<tt>colgroup:\<tablename\>.\<columnset\></tt>,
 	 *	column group cursor,
 	 *	table key\, column group value(s)}
@@ -502,9 +505,9 @@ struct __wt_session {
 	 * @param to_dup a cursor to duplicate
 	 * @param session the session handle
 	 * @configstart{session.open_cursor, see dist/api_data.py}
-	 * @config{append, only supported by cursors with record number keys:
-	 * append the value as a new record\, creating a new record number
-	 * key.,a boolean flag; default \c false.}
+	 * @config{append, append the value as a new record\, creating a new
+	 * record number key; valid only for cursors with record number keys.,a
+	 * boolean flag; default \c false.}
 	 * @config{bulk, configure the cursor for bulk loads; bulk-load is a
 	 * fast load path for empty objects and only empty objects may be
 	 * bulk-loaded.  Cursors configured for bulk load only support the
@@ -523,9 +526,9 @@ struct __wt_session {
 	 * \c "snapshot"\, \c "read-committed"\, \c "read-uncommitted"; default
 	 * \c read-committed.}
 	 * @config{next_random, configure the cursor to return a pseudo-random
-	 * record from the object.  Cursors configured for random retrieval only
-	 * support the WT_CURSOR::next and WT_CURSOR::close methods.,a boolean
-	 * flag; default \c false.}
+	 * record from the object; valid only for row-store cursors.  Cursors
+	 * configured with next_random only support the WT_CURSOR::next and
+	 * WT_CURSOR::close methods.,a boolean flag; default \c false.}
 	 * @config{overwrite, change the behavior of the cursor's insert method
 	 * to overwrite previously existing values.,a boolean flag; default \c
 	 * false.}
@@ -534,9 +537,11 @@ struct __wt_session {
 	 * boolean flag; default \c false.}
 	 * @config{statistics, configure the cursor for statistics.,a boolean
 	 * flag; default \c false.}
-	 * @config{statistics_clear, statistics cursors only; reset statistics
-	 * counters when the cursor is closed.,a boolean flag; default \c
-	 * false.}
+	 * @config{statistics_clear, reset statistics counters when the cursor
+	 * is closed; valid only for statistics cursors.,a boolean flag; default
+	 * \c false.}
+	 * @config{target, if non-empty\, backup the list of objects; valid only
+	 * for a backup data source.,a list of strings; default empty.}
 	 * @configend
 	 * @param cursorp a pointer to the newly opened cursor
 	 * @errors
