@@ -155,7 +155,7 @@ namespace mongo {
           the direct client interface under the execution phase.
          */
         {
-            Client::ReadContext ctx(ns, dbpath, requiresAuth()); // read lock
+            Client::ReadContext ctx(ns); // read lock
 
             pSource = PipelineD::prepareCursorSource(pPipeline, db, pCtx);
 
@@ -179,7 +179,7 @@ namespace mongo {
         intrusive_ptr<Pipeline> &pPipeline,
         intrusive_ptr<ExpressionContext> &pCtx) {
 
-        Client::ReadContext ctx(ns, dbpath, requiresAuth()); // read lock
+        Client::ReadContext ctx(ns); // read lock
 
         intrusive_ptr<DocumentSourceCursor> pSource(
             PipelineD::prepareCursorSource(pPipeline, db, pCtx));
