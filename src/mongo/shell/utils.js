@@ -1129,22 +1129,10 @@ jsTest.addAuth = function(conn) {
 
 jsTest.authenticate = function(conn) {
     conn.authenticated = true;
-    result1 = null;
-    result2 = null;
-    if (jsTest.options().auth) {
+    if (jsTest.options().auth || jsTest.options().keyFile) {
         print ("Authenticating to admin user on connection: " + conn);
-        result1 = conn.getDB('admin').auth(jsTestOptions().adminUser, jsTestOptions().adminPassword);
+        return conn.getDB('admin').auth(jsTestOptions().adminUser, jsTestOptions().adminPassword);
     }
-    if (jsTest.options().keyFile && !jsTest.isMongos(conn)) {
-        print ("Authenticating to system user on connection: " + conn);
-        result2 = conn.getDB('local').auth(jsTestOptions().authUser, jsTestOptions().authPassword);
-    }
-
-    if (result1 == 1 || result2 == 1) {
-        return 1;
-    }
-
-    return result2 != null ? result2 : result1;
 }
 
 jsTest.authenticateNodes = function(nodes) {

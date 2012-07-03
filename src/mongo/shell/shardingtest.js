@@ -369,8 +369,6 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
 
     if (jsTestOptions().keyFile && !keyFile) {
         jsTest.addAuth(this._mongos[0]);
-        jsTest.authenticateNodes(this._connections);
-        jsTest.authenticateNodes(this._configServers);
         jsTest.authenticateNodes(this._mongos);
     }
 }
