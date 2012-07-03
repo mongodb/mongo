@@ -396,12 +396,11 @@ namespace mongo {
          */
         shared_ptr<BSONObj> pQuery;
         shared_ptr<BSONObj> pSort;
-        shared_ptr<Cursor> pCursor;
 
         /*
           In order to yield, we need a ClientCursor.
          */
-        ClientCursor::Holder pClientCursor;
+        ClientCursor::Holder _cursor;
 
         /*
           Advance the cursor, and yield sometimes.

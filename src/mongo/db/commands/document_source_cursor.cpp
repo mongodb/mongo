@@ -30,9 +30,7 @@ namespace mongo {
     }
 
     void DocumentSourceCursor::releaseCursor() {
-        // note the order here; the cursor holder has to go first
-        pClientCursor.reset();
-        pCursor.reset();
+        _cursor.reset();
     }
 
     bool DocumentSourceCursor::eof() {
@@ -63,31 +61,24 @@ namespace mongo {
     }
 
     void DocumentSourceCursor::advanceAndYield() {
-        pCursor->advance();
+        _cursor->advance();
         /*
           TODO ask for index key pattern in order to determine which index
           was used for this particular document; that will allow us to
           sometimes use ClientCursor::MaybeCovered.
           See https://jira.mongodb.org/browse/SERVER-5224 .
         */
-        bool cursorOk = pClientCursor->yieldSometimes(ClientCursor::WillNeed);
-        if (!cursorOk) {
-            uassert(16028,
-                    "collection or database disappeared when cursor yielded",
-                    false);
-        }
+        bool cursorOk = _cursor->yieldSometimes( ClientCursor::WillNeed );
+        uassert( 16028, "collection or database disappeared when cursor yielded", cursorOk );
     }
 
     void DocumentSourceCursor::findNext() {
-        /* standard cursor usage pattern */
-        while(pCursor->ok()) {
-            CoveredIndexMatcher *pCIM; // save intermediate result
-            if ((!(pCIM = pCursor->matcher()) ||
-                 pCIM->matchesCurrent(pCursor.get())) &&
-                !pCursor->getsetdup(pCursor->currLoc())) {
+
+        while( _cursor->ok() ) {
+            if ( _cursor->currentMatches() && !_cursor->currentIsDup() ) {
 
                 /* grab the matching document */
-                BSONObj documentObj(pCursor->current());
+                BSONObj documentObj( _cursor->current() );
                 pCurrent = Document::createFromBsonObj(
                     &documentObj, NULL /* LATER pDependencies.get()*/);
                 advanceAndYield();
@@ -142,11 +133,8 @@ namespace mongo {
         const intrusive_ptr<ExpressionContext> &pCtx):
         DocumentSource(pCtx),
         pCurrent(),
-        pCursor(pTheCursor),
-        pClientCursor(),
+        _cursor( new ClientCursor( QueryOption_NoCursorTimeout, pTheCursor, ns ) ),
         pDependencies() {
-        pClientCursor.reset(
-            new ClientCursor(QueryOption_NoCursorTimeout, pTheCursor, ns));
     }
 
     intrusive_ptr<DocumentSourceCursor> DocumentSourceCursor::create(
