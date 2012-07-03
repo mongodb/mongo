@@ -295,7 +295,13 @@ def skipTest(path):
         if basename in ["cursor8.js", "indexh.js", "dropdb.js"]:
             return True
     if auth or keyFile: # For tests running with auth
-        return os.path.join(parentDir,basename) in ["sharding/sync3.js", "sharding/sync6.js"]
+        # Skip any tests that run with auth explicitly
+        if parentDir == "auth" or "auth" in basename:
+            return True
+        # These tests don't pass with authentication due to limitations of the test infrastructure,
+        # not due to actual bugs.
+        if os.path.join(parentDir,basename) in ["sharding/sync3.js", "sharding/sync6.js"]:
+            return True
     return False
 
 def runTest(test):

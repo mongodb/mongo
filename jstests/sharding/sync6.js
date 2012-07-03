@@ -3,6 +3,9 @@
 
 // Note that this test will always have random factors, since we can't control the
 // thread scheduling.
+
+// NOTE: this test is skipped when running smoke.py with --auth or --keyFile to force authentication
+// in all tests.
 var bitbucket;
 if ( _isWindows() ) {
     bitbucket = "NUL:";
