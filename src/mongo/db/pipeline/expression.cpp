@@ -840,6 +840,10 @@ namespace mongo {
             cmp = signum(Value::compare(pLeft, pRight));
             break;
 
+        case Timestamp:
+            cmp = signum(Value::compare(pLeft, pRight));
+            break;
+
         default:
             uassert(15995, str::stream() <<
                     "can't compare values of type " << typeName(leftType), false);

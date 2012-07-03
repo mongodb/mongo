@@ -74,7 +74,7 @@ namespace mongo {
             break;
 
         case Timestamp:
-            simple.timestampValue = 0;
+            timestampValue = OpTime();
             break;
 
         case NumberLong:
@@ -156,7 +156,7 @@ namespace mongo {
             break;
 
         case Timestamp:
-            dateValue = pBsonElement->timestampTime();
+            timestampValue = pBsonElement->_opTime();
             break;
 
         case NumberLong:
@@ -227,6 +227,18 @@ namespace mongo {
     }
 
     intrusive_ptr<const Value> Value::createDate(const Date_t &value) {
+        intrusive_ptr<const Value> pValue(new Value(value));
+        return pValue;
+    }
+
+    Value::Value(const OpTime& value):
+        type(Timestamp),
+        pDocumentValue(),
+        vpValue() {
+        timestampValue = value;
+    }
+
+    intrusive_ptr<const Value> Value::createTimestamp(const OpTime& value) {
         intrusive_ptr<const Value> pValue(new Value(value));
         return pValue;
     }
@@ -332,6 +344,11 @@ namespace mongo {
         return dateValue;
     }
 
+    OpTime Value::getTimestamp() const {
+        verify(getType() == Timestamp);
+        return timestampValue;
+    }
+
     string Value::getRegex() const {
         verify(getType() == RegEx);
         return stringValue;
@@ -345,11 +362,6 @@ namespace mongo {
     int Value::getInt() const {
         verify(getType() == NumberInt);
         return simple.intValue;
-    }
-
-    unsigned long long Value::getTimestamp() const {
-        verify(getType() == Timestamp);
-        return dateValue;
     }
 
     long long Value::getLong() const {
@@ -425,7 +437,7 @@ namespace mongo {
             break;
 
         case Timestamp:
-            pBuilder->append((long long)getTimestamp());
+            pBuilder->append(getTimestamp());
             break;
 
         case NumberLong:
@@ -602,6 +614,9 @@ namespace mongo {
         case Date:
             return dateValue; 
 
+        case Timestamp:
+            return Date_t(timestampValue.getSecs() * 1000ULL);
+
         default:
             uassert(16006, str::stream() <<
                     "can't convert from BSON type " << typeName(type) << " to Date",
@@ -627,6 +642,10 @@ namespace mongo {
         case String:
             return stringValue;
 
+        case Timestamp:
+            ss << timestampValue.toStringPretty();
+            return ss.str();
+
         case Date:
             return dateValue.toString();
 
@@ -642,6 +661,20 @@ namespace mongo {
         } // switch(type)
 
         return "";
+    }
+
+    OpTime Value::coerceToTimestamp() const {
+        switch(type) {
+
+        case Timestamp:
+            return timestampValue;
+
+        default:
+            uassert(16373, str::stream() <<
+                    "can't convert from BSON type " << typeName(type) <<
+                    " to timestamp",
+                    false);
+        } // switch(type)
     }
 
     int Value::compare(const intrusive_ptr<const Value> &rL,
@@ -810,9 +843,9 @@ namespace mongo {
             return rL->stringValue.compare(rR->stringValue);
 
         case Timestamp:
-            if (rL->dateValue < rR->dateValue)
+            if (rL->timestampValue < rR->timestampValue)
                 return -1;
-            if (rL->dateValue > rR->dateValue)
+            if (rL->timestampValue > rR->timestampValue)
                 return 1;
             return 0;
 
@@ -899,7 +932,7 @@ namespace mongo {
             break;
 
         case Timestamp:
-            boost::hash_combine(seed, (unsigned long long)dateValue);
+            boost::hash_combine(seed, timestampValue.asLL());
             break;
 
         case Undefined:

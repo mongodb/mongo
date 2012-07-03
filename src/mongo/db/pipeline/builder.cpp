@@ -66,6 +66,10 @@ namespace mongo {
         pBuilder->append(fieldName, pDone->arr());
     }
 
+    void BuilderObj::append(const OpTime& ot) {
+        pBuilder->appendTimestamp(fieldName, ot.getSecs(), ot.getInc());
+    }
+
     BuilderObj::BuilderObj(
         BSONObjBuilder *pObjBuilder, string theFieldName):
         pBuilder(pObjBuilder),
@@ -115,6 +119,10 @@ namespace mongo {
 
     void BuilderArray::append(BSONArrayBuilder *pDone) {
         pBuilder->append(pDone->arr());
+    }
+
+    void BuilderArray::append(const OpTime& ot) {
+        pBuilder->appendTimestamp(ot.getSecs(), ot.getInc());
     }
 
     BuilderArray::BuilderArray(

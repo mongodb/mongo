@@ -20,6 +20,7 @@
 #include "bson/bsontypes.h"
 #include "bson/oid.h"
 #include "util/intrusive_counter.h"
+#include "util/optime.h"
 
 namespace mongo {
     class BSONElement;
@@ -114,6 +115,8 @@ namespace mongo {
         */
         static intrusive_ptr<const Value> createDate(const Date_t &value);
 
+        static intrusive_ptr<const Value> createTimestamp(const OpTime& value);
+
         /*
           Construct a document-valued Value.
 
@@ -154,10 +157,10 @@ namespace mongo {
         OID getOid() const;
         bool getBool() const;
         Date_t getDate() const;
+        OpTime getTimestamp() const;
         string getRegex() const;
         string getSymbol() const;
         int getInt() const;
-        unsigned long long getTimestamp() const;
         long long getLong() const;
 
         /*
@@ -225,6 +228,8 @@ namespace mongo {
           @returns the date value
         */
         Date_t coerceToDate() const;
+
+        OpTime coerceToTimestamp() const;
 
         /*
           Coerce (cast) a value to a string, using JSON rules.
@@ -299,6 +304,7 @@ namespace mongo {
         Value(long long longValue);
         Value(double doubleValue);
         Value(const Date_t &dateValue);
+        Value(const OpTime& timestampValue);
         Value(const string &stringValue);
         Value(const intrusive_ptr<Document> &pDocument);
         Value(const vector<intrusive_ptr<const Value> > &vpValue);
@@ -312,13 +318,12 @@ namespace mongo {
             double doubleValue;
             bool boolValue;
             int intValue;
-            unsigned long long timestampValue;
             long long longValue;
-
         } simple; // values that don't need a ctor/dtor
         OID oidValue;
         Date_t dateValue;
         string stringValue; // String, Regex, Symbol
+        OpTime timestampValue;
         intrusive_ptr<Document> pDocumentValue;
         vector<intrusive_ptr<const Value> > vpValue; // for arrays
 

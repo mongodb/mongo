@@ -47,6 +47,7 @@ namespace mongo {
         virtual void append(string s) = 0;
         virtual void append(const OID &o) = 0;
         virtual void append(const Date_t &d) = 0;
+        virtual void append(const OpTime& ot) = 0;
         virtual void append(BSONObjBuilder *pDone) = 0;
         virtual void append(BSONArrayBuilder *pDone) = 0;
     };
@@ -64,6 +65,7 @@ namespace mongo {
         virtual void append(string s);
         virtual void append(const OID &o);
         virtual void append(const Date_t &d);
+        virtual void append(const OpTime& ot);
         virtual void append(BSONObjBuilder *pDone);
         virtual void append(BSONArrayBuilder *pDone);
 
@@ -87,6 +89,7 @@ namespace mongo {
         virtual void append(string s);
         virtual void append(const OID &o);
         virtual void append(const Date_t &d);
+        virtual void append(const OpTime& ot);
         virtual void append(BSONObjBuilder *pDone);
         virtual void append(BSONArrayBuilder *pDone);
 
