@@ -18,9 +18,7 @@
 
 #include "db/commands/pipeline.h"
 #include "db/commands/pipeline_d.h"
-#include "db/cursor.h"
 #include "db/interrupt_status_mongod.h"
-#include "db/pdfile.h"
 #include "db/pipeline/accumulator.h"
 #include "db/pipeline/document.h"
 #include "db/pipeline/document_source.h"

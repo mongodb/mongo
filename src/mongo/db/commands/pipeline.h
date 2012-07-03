@@ -18,14 +18,13 @@
 
 #include "pch.h"
 
-#include "db/commands.h"
-#include "db/jsobj.h"
 #include "util/intrusive_counter.h"
 #include "util/timer.h"
 
 namespace mongo {
     class BSONObj;
     class BSONObjBuilder;
+    class BSONArrayBuilder;
     class DocumentSource;
     class DocumentSourceProject;
     class Expression;

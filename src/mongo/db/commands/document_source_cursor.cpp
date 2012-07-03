@@ -18,9 +18,7 @@
 
 #include "mongo/db/pipeline/document_source.h"
 
-#include "mongo/client/dbclientcursor.h"
 #include "mongo/db/clientcursor.h"
-#include "mongo/db/cursor.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/pipeline/document.h"
 

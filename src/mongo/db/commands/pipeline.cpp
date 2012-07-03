@@ -18,14 +18,13 @@
 #include "db/commands/pipeline.h"
 
 #include "mongo/client/authentication_table.h"
-#include "db/cursor.h"
+#include "db/jsobj.h"
 #include "db/pipeline/accumulator.h"
 #include "db/pipeline/dependency_tracker.h"
 #include "db/pipeline/document.h"
 #include "db/pipeline/document_source.h"
 #include "db/pipeline/expression.h"
 #include "db/pipeline/expression_context.h"
-#include "db/pdfile.h"
 #include "util/mongoutils/str.h"
 
 namespace mongo {
