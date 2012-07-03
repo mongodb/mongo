@@ -107,7 +107,7 @@ namespace mongo {
     }
 
     BSONObj Chunk::_getExtremeKey( int sort ) const {
-        ShardConnection conn( getShard().getConnString() , _manager->getns() );
+        ScopedDbConnection conn( getShard().getConnString() );
         Query q;
         if ( sort == 1 ) {
             q.sort( _manager->getShardKey().key() );
