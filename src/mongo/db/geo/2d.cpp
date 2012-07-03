@@ -328,19 +328,13 @@ namespace mongo {
         }
 
         GeoHash _hash( const BSONObj& o, const BSONObj* src ) const {
-            string doc( "" );
-            
-            if( src != NULL ) {
-                doc = (*src).toString();
-            }
-            
             BSONObjIterator i(o);
-            uassert( 13067 , str::stream() << "geo field is empty\n" << doc, i.more() );
+            uassert( 13067 , str::stream() << "geo field is empty\n" << ( src ? (*src).toString() : "" ), i.more() );
             BSONElement x = i.next();
-            uassert( 13068 , str::stream() << "geo field only has 1 element\n" << doc, i.more() );
+            uassert( 13068 , str::stream() << "geo field only has 1 element\n" << ( src ? (*src).toString() : "" ), i.more() );
             BSONElement y = i.next();
-            uassert( 13026 , str::stream() << "geo values have to be numbers\n" << doc , x.isNumber() && y.isNumber() );
-            uassert( 13027 , str::stream() << "point not in interval of [ " << _min << ", " << _max << " ]\n" << doc, 
+            uassert( 13026 , str::stream() << "geo values have to be numbers\n" << ( src ? (*src).toString() : "" ), x.isNumber() && y.isNumber() );
+            uassert( 13027 , str::stream() << "point not in interval of [ " << _min << ", " << _max << " ]\n" << ( src ? (*src).toString() : "" ), 
                     x.number() <= _max && x.number() >= _min && y.number() <= _max && y.number() >= _min ); 
             return hash( x.number(), y.number() );
         }
@@ -363,6 +357,7 @@ namespace mongo {
         }
 
         unsigned _convert( double in ) const {
+            verify( in <= _max && in >= _min );
 
             if (in == _max) {
                 // prevent aliasing with _min by moving inside the "box"
