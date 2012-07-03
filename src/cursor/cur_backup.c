@@ -186,8 +186,8 @@ __wt_backup_start(
 	cb->next = 0;
 	cb->list = NULL;
 
-	/* Acquire the checkpoint lock, we need a quiescent view. */
-	__wt_writelock(session, conn->ckpt_rwlock);
+	/* Acquire the API lock, we need a quiescent view. */
+	__wt_spin_lock(session, &conn->schema_lock);
 
 	/*
 	 * Checkpoints cannot be deleted until the backup finishes; no barrier
@@ -223,7 +223,7 @@ __wt_backup_start(
 err:	if (bfp != NULL)
 		(void)fclose(bfp);
 
-	__wt_rwunlock(session, conn->ckpt_rwlock);
+	__wt_spin_unlock(session, &conn->schema_lock);
 	return (ret);
 }
 
@@ -239,7 +239,7 @@ __wt_backup_stop(WT_SESSION_IMPL *session)
 
 	conn = S2C(session);
 
-	__wt_writelock(session, conn->ckpt_rwlock);
+	__wt_spin_lock(session, &conn->schema_lock);
 
 	/* Remove any backup metadata file. */
 	(void)__wt_remove(session, WT_METADATA_BACKUP);
@@ -251,7 +251,7 @@ __wt_backup_stop(WT_SESSION_IMPL *session)
 	} else
 		--conn->ckpt_backup;
 
-	__wt_rwunlock(session, conn->ckpt_rwlock);
+	__wt_spin_unlock(session, &conn->schema_lock);
 
 	return (ret);
 }
