@@ -40,11 +40,17 @@ printjson( stats )
 
 ss = []
 
+// Stop balancer for manual move
+s.stopBalancer()
+
 for ( var f = 0; f<num; f += ( 2 * num / t.stats().nchunks ) ){
     ss.push( s.getServer( "test" ).getDB( "admin" ).serverStatus() )
     print( f )
     s.adminCommand( { movechunk : "test.foo" , find : { _id : f } , to : to } )
 }
+
+// Re-enable balancer
+s.setBalancer( true )
 
 for ( i=0; i<ss.length; i++ )
     printjson( ss[i].mem );
