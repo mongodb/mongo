@@ -73,7 +73,6 @@ struct __wt_btree {
 	const char *config;		/* Configuration string */
 
 	/* XXX Should move into the session-level handle information. */
-	WT_RWLOCK *ckptlock;		/* Lock for checkpoint creation */
 	WT_CKPT	  *ckpt;		/* Checkpoint information */
 
 	enum {	BTREE_COL_FIX=1,	/* Fixed-length column store */

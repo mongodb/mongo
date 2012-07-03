@@ -39,3 +39,11 @@ struct __wt_table {
  * containing all of the columns.
  */
 #define	WT_COLGROUPS(t)	WT_MAX((t)->ncolgroups, 1)
+
+#define	WT_WITH_SCHEMA_LOCK(session, op)	do {			\
+	__wt_spin_lock(session, &S2C(session)->schema_lock);		\
+	F_SET(session, WT_SESSION_SCHEMA_LOCKED);			\
+	op;								\
+	F_CLR(session, WT_SESSION_SCHEMA_LOCKED);			\
+	__wt_spin_unlock(session, &S2C(session)->schema_lock);		\
+} while (0)
