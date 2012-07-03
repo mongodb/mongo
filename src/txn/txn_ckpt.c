@@ -225,11 +225,11 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_DECL_RET;
 	const char *name;
 	char *name_alloc;
-	int force, tracked;
+	int force;
 
 	conn = S2C(session);
 	btree = session->btree;
-	force = tracked = 0;
+	force = 0;
 	ckpt = ckptbase = NULL;
 	name_alloc = NULL;
 
@@ -339,10 +339,9 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 		 * is being discarded: in that case, it will be gone by the
 		 * time we try to apply or unroll the meta tracking event.
 		 */
-		if (WT_META_TRACKING(session) && cfg != NULL) {
+		if (WT_META_TRACKING(session) && cfg != NULL)
 			WT_ERR(__wt_meta_track_checkpoint(session));
-			tracked = 1;
-		} else
+		else
 			WT_ERR(__wt_bm_checkpoint_resolve(session));
 	}
 
