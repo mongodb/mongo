@@ -248,10 +248,21 @@ namespace mongo {
                         << rlnofile.rlim_cur
                         << ", should be at least " << minNumFiles << startupWarningsLog;
             }
-            if(rlnproc.rlim_cur < rlnofile.rlim_cur/filesToProcsRatio){
+
+            if(false){
+                // juse to make things cleaner
+            }
+#ifdef __APPLE__
+            else if(rlnproc.rlim_cur >= 709){
+                // os x doesn't make it easy to go higher
+                // ERH thinks its ok not to add the warning in this case 7/3/2012
+            }
+#endif
+            else if(rlnproc.rlim_cur < rlnofile.rlim_cur/filesToProcsRatio){
                 log() << startupWarningsLog;
                 log() << "** WARNING: soft rlimits too low. rlimits set to " << rlnproc.rlim_cur << " processes, "
                         << rlnofile.rlim_cur << " files. Number of processes should be at least "
+                        << rlnofile.rlim_cur/filesToProcsRatio << " : " 
                         << 1/filesToProcsRatio << " times number of files." << startupWarningsLog;
             }
         } else {
