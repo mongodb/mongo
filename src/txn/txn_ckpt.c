@@ -30,7 +30,8 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	txn_global = &conn->txn_global;
 
 	/* Only one checkpoint can be active at a time. */
-	__wt_writelock(session, conn->ckpt_rwlock);
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
+
 	WT_ERR(__wt_txn_begin(session, txn_cfg));
 
 	/* Prevent eviction from evicting anything newer than this. */
@@ -56,10 +57,8 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 				    "URIs may require quoting",
 				    (const char *)tmp->data);
 
-			__wt_spin_lock(session, &conn->schema_lock);
 			ret = __wt_schema_worker(
 			    session, tmp->data, __wt_checkpoint, cfg, 0);
-			__wt_spin_unlock(session, &conn->schema_lock);
 
 			if (ret != 0)
 				WT_ERR_MSG(session, ret, "%s",
@@ -130,7 +129,6 @@ err:	/*
 	txn_global->ckpt_txnid = WT_TXN_NONE;
 	if (F_ISSET(&session->txn, TXN_RUNNING))
 		WT_TRET(__wt_txn_release(session));
-	__wt_rwunlock(session, conn->ckpt_rwlock);
 	__wt_scr_free(&tmp);
 	return (ret);
 }
@@ -238,9 +236,6 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	force = tracked = 0;
 	ckpt = ckptbase = NULL;
 	name_alloc = NULL;
-
-	/* Checkpoints are single-threaded. */
-	__wt_writelock(session, btree->ckptlock);
 
 	/*
 	 * Get the list of checkpoints for this file.  If there's no reference,
@@ -352,8 +347,6 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	}
 
 err:	__wt_meta_ckptlist_free(session, ckptbase);
-	if (!tracked)
-		__wt_rwunlock(session, btree->ckptlock);
 
 	__wt_free(session, name_alloc);
 

@@ -184,12 +184,10 @@ struct __wt_connection_impl {
 	WT_SESSION_IMPL *default_session;
 	WT_SESSION_IMPL  dummy_session;
 
+	WT_SPINLOCK api_lock;		/* Connection API spinlock */
 	WT_SPINLOCK fh_lock;		/* File handle queue spinlock */
 	WT_SPINLOCK schema_lock;	/* Schema operation spinlock */
 	WT_SPINLOCK serial_lock;	/* Serial function call spinlock */
-	WT_SPINLOCK spinlock;		/* General purpose spinlock */
-
-	WT_RWLOCK *ckpt_rwlock;		/* Checkpoint lock */
 
 					/* Connection queue */
 	TAILQ_ENTRY(__wt_connection_impl) q;
@@ -341,9 +339,9 @@ extern WT_PROCESS __wt_process;
 #define	WT_PAGE_FREE_IGNORE_DISK			0x00000001
 #define	WT_REC_SINGLE					0x00000001
 #define	WT_SERVER_RUN					0x00000001
-#define	WT_SESSION_HAS_CONNLOCK				0x00000004
-#define	WT_SESSION_INTERNAL				0x00000002
-#define	WT_SESSION_SALVAGE_QUIET_ERR			0x00000001
+#define	WT_SESSION_INTERNAL				0x00000004
+#define	WT_SESSION_SALVAGE_QUIET_ERR			0x00000002
+#define	WT_SESSION_SCHEMA_LOCKED			0x00000001
 #define	WT_VERB_block					0x00001000
 #define	WT_VERB_ckpt					0x00000800
 #define	WT_VERB_evict					0x00000400
