@@ -93,7 +93,7 @@ namespace mongo {
 
             unsigned myChunks = numberOfChunksInShard( i->first );
             if ( myChunks >= minChunks ) {
-                log() << i->first << " has more chunks me:" << myChunks << " best: " << best << ":" << minChunks << endl;
+                LOG(1) << i->first << " has more chunks me:" << myChunks << " best: " << best << ":" << minChunks << endl;
                 continue;
             }
             
@@ -321,13 +321,17 @@ namespace mongo {
             if ( from.size() == 0 )
                 continue;
 
+            unsigned max = distribution.numberOfChunksInShardWithTag( from, tag );
+            if ( max == 0 )
+                continue;
+
             string to = distribution.getBestReceieverShard( tag );
             if ( to.size() == 0 ) {
                 log() << "no available shards to take chunks for tag [" << tag << "]" << endl;
                 return NULL;
             }
             
-            unsigned max = distribution.numberOfChunksInShardWithTag( from, tag );
+
             unsigned min = distribution.numberOfChunksInShardWithTag( to, tag );
             
             const int imbalance = max - min;
