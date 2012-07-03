@@ -105,7 +105,7 @@ namespace mongo {
         }
 
         bool runNoDirectClient( const string& ns , 
-                                const BSONObj& query , const BSONObj& fields , const BSONObj& update , 
+                                const BSONObj& queryOriginal , const BSONObj& fields , const BSONObj& update , 
                                 bool upsert , bool returnNew , bool remove ,
                                 BSONObjBuilder& result ) {
             
@@ -115,11 +115,16 @@ namespace mongo {
 
             BSONObj doc;
             
-            bool found = Helpers::findOne( ns.c_str() , query , doc );
+            bool found = Helpers::findOne( ns.c_str() , queryOriginal , doc );
+
+            BSONObj queryModified = queryOriginal;
+            if ( found && doc["_id"].type() )
+                queryModified = doc["_id"].wrap();
+
             if ( remove ) {
                 _appendHelper( result , doc , found , fields );
                 if ( found ) {
-                    deleteObjects( ns.c_str() , query , true , true );
+                    deleteObjects( ns.c_str() , queryModified , true , true );
                 }
             }
             else {
@@ -135,10 +140,10 @@ namespace mongo {
                         _appendHelper( result , doc , found , fields );
                     }
                     
-                    updateObjects( ns.c_str() , update , query , upsert , false , true , cc().curop()->debug() );
+                    updateObjects( ns.c_str() , update , queryModified , upsert , false , true , cc().curop()->debug() );
                     
                     if ( returnNew ) {
-                        verify( Helpers::findOne( ns.c_str() , query , doc ) );
+                        verify( Helpers::findOne( ns.c_str() , queryModified , doc ) );
                         _appendHelper( result , doc , true , fields );
                     }
                     
