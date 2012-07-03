@@ -95,4 +95,10 @@ namespace mongo {
         timeLocked[mapNo(type)].fetchAndAdd( micros );
     }
 
+    void LockStat::reset() {
+        for ( int i = 0; i < N; i++ ) {
+            timeAcquiring[i].store(0);
+            timeLocked[i].store(0);
+        }
+    }
 }

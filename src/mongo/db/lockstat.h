@@ -32,6 +32,8 @@ namespace mongo {
         void recordAcquireTimeMicros( char type , long long micros );
         void recordLockTimeMicros( char type , long long micros );
 
+        void reset();
+
         BSONObj report() const;
         void report( StringBuilder& builder ) const;
 

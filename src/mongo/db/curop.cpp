@@ -48,6 +48,7 @@ namespace mongo {
         _killed = false;
         _numYields = 0;
         _expectedLatencyMs = 0;
+        _lockStat.reset();
     }
 
     void CurOp::reset() {
