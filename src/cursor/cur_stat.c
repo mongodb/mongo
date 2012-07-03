@@ -274,7 +274,7 @@ __curstat_close(WT_CURSOR *cursor)
 	cst = (WT_CURSOR_STAT *)cursor;
 	CURSOR_API_CALL_NOCONF(cursor, session, close, cst->btree);
 
-	if (ret == 0 && cst->clear_func)
+	if (cst->clear_func)
 		cst->clear_func(cst->stats_first);
 
 	__wt_buf_free(session, &cst->pv);
