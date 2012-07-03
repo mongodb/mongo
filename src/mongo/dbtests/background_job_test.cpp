@@ -68,13 +68,13 @@ namespace BackgroundJobTests {
     class TimeOutCase {
     public:
         void run() {
-            IncTester tester( 1000 /* wait 1sec before inc-ing */ );
+            IncTester tester( 2000 /* wait 2 sec before inc-ing */ );
             tester.go();
             ASSERT( ! tester.wait( 100 /* ms */ ) ); // should time out
             ASSERT_EQUALS( tester.getVal() , 0 );
 
             // if we wait longer than the IncTester, we should see the increment
-            ASSERT( tester.wait( 1500 /* ms */ ) );  // should not time out
+            ASSERT( tester.wait( 4000 /* ms */ ) );  // should not time out
             ASSERT_EQUALS( tester.getVal() , 1 );
         }
     };
@@ -99,9 +99,10 @@ namespace BackgroundJobTests {
         BackgroundJobSuite() : Suite( "background_job" ) {}
 
         void setupTests() {
+            // SelfDeletingCase uses a global value, so we run it first
+            add< SelfDeletingCase >();
             add< NormalCase >();
             add< TimeOutCase >();
-            add< SelfDeletingCase >();
         }
 
     } backgroundJobSuite;
