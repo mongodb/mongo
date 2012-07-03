@@ -603,6 +603,16 @@ ReplSetTest.prototype.start = function( n , options , restart , wait ){
     // TODO : should we do something special if we don't currently know about this node?
     n = this.getNodeId( n )
     
+    //
+    // Note : this replaces the binVersion of the shared startSet() options the first time 
+    // through, so the full set is guaranteed to have different versions if size > 1.  If using
+    // start() independently, independent version choices will be made
+    //
+    if( options && options.binVersion ){
+        options.binVersion = 
+            MongoRunner.versionIterator( options.binVersion )
+    }
+    
     options = Object.merge( defaults, options )
     options = Object.merge( options, this.nodeOptions[ "n" + n ] )
     
@@ -739,7 +749,7 @@ ReplSetTest.prototype.stop = function( n , signal, wait /* wait for stop */, opt
  * @param {Object} opts @see MongoRunner.stopMongod
  */
 ReplSetTest.prototype.stopSet = function( signal , forRestart, opts ) {
-    for(i=0; i < this.ports.length; i++) {
+    for(var i=0; i < this.ports.length; i++) {
         this.stop( i, signal, false, opts );
     }
     if ( forRestart ) { return; }

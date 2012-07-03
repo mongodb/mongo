@@ -243,6 +243,11 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
                             keyFile : keyFile
                           }
             
+            if( otherParams.shardOptions && otherParams.shardOptions.binVersion ){
+                otherParams.shardOptions.binVersion = 
+                    MongoRunner.versionIterator( otherParams.shardOptions.binVersion )
+            }
+            
             options = Object.merge( options, otherParams.shardOptions )
             options = Object.merge( options, otherParams["d" + i] )
             
@@ -295,6 +300,11 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
                             configsvr : ""
                           }
             
+            if( otherParams.configOptions && otherParams.configOptions.binVersion ){
+                otherParams.configOptions.binVersion = 
+                    MongoRunner.versionIterator( otherParams.configOptions.binVersion )
+            }
+            
             options = Object.merge( options, otherParams.configOptions )
             options = Object.merge( options, otherParams["c" + i] )
                         
@@ -341,6 +351,11 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
             options.chunkSize = otherParams.chunksize || otherParams.chunkSize || 50;
         }
 
+        if( otherParams.mongosOptions && otherParams.mongosOptions.binVersion ){
+            otherParams.mongosOptions.binVersion = 
+                MongoRunner.versionIterator( otherParams.mongosOptions.binVersion )
+        }
+        
         options = Object.merge( options, otherParams.mongosOptions )
         options = Object.merge( options, otherParams.extraOptions )
         options = Object.merge( options, otherParams["s" + i] )

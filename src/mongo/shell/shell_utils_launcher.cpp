@@ -199,7 +199,13 @@ namespace mongo {
                 _argv.push_back(str);
             }
 
-            if ( program != "mongod" && program != "mongos" && program != "mongobridge" )
+            string prefix( "mongod" );
+            bool isMongodProgram = program.compare( 0, prefix.size(), prefix ) == 0;
+
+            prefix = "mongos";
+            bool isMongosProgram = program.compare( 0, prefix.size(), prefix ) == 0;
+
+            if ( ! isMongodProgram && ! isMongosProgram && program != "mongobridge" )
                 _port = 0;
             else {
                 if ( _port <= 0 )

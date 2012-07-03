@@ -116,7 +116,8 @@ MongoRunner.logicalOptions = { runId : true,
                                forgetPort : true,
                                arbiter : true,
                                noJournalPrealloc : true,
-                               noJournal : true }
+                               noJournal : true,
+                               binVersion : true }
 
 MongoRunner.toRealPath = function( path, pathOpts ){
     
@@ -163,6 +164,36 @@ MongoRunner.nextOpenPort = function(){
 }
 
 /**
+ * Returns an iterator object which yields successive versions on toString(), starting from a
+ * random initial position, from an array of versions.
+ * 
+ * If passed a single version string or an already-existing version iterator, just returns the 
+ * object itself, since it will yield correctly on toString()
+ * 
+ * @param {Array.<String>}|{String}|{versionIterator}
+ */
+MongoRunner.versionIterator = function( arr ){
+    
+    // If this isn't an array of versions, or is already an iterator, just use it
+    if( typeof arr == "string" ) return arr
+    if( arr.isVersionIterator ) return arr
+    
+    // Starting pos
+    var i = parseInt( Random.rand() * arr.length )
+    
+    var it = {
+        toString : function(){
+            i = ( i + 1 ) % arr.length
+            print( "Returning next version : " + i + " from " + tojson( arr ) + "..." )
+            return arr[ i ]
+        },
+        isVersionIterator : true
+    }
+    
+    return it
+}
+
+/**
  * Converts the args object by pairing all keys with their value and appending
  * dash-dash (--) to the keys. The only exception to this rule are keys that
  * are defined in MongoRunner.logicalOptions, of which they will be ignored.
@@ -175,14 +206,36 @@ MongoRunner.nextOpenPort = function(){
  */
 MongoRunner.arrOptions = function( binaryName , args ){
 
-    var fullArgs = [ binaryName ]
+    var fullArgs = [ "" ]
 
     if ( isObject( args ) || ( args.length == 1 && isObject( args[0] ) ) ){
 
         var o = isObject( args ) ? args : args[0]
+                
+        // If we've specified a particular binary version, use that
+        if( o.binVersion && o.binVersion != "latest" && o.binVersion != "" ) 
+            binaryName += "-" + o.binVersion
+        
+        // Manage legacy options
+        var isValidOptionForBinary = function( option, value ){
+            
+            if( ! o.binVersion ) return true
+            
+            // Version 1.x options
+            if( o.binVersion.startsWith( "1." ) ){
+                
+                return [ "nopreallocj" ].indexOf( option ) < 0
+            }
+            
+            return true
+        }
+        
         for ( var k in o ){
             
-            if( ! o.hasOwnProperty(k) || k in MongoRunner.logicalOptions ) continue
+            // Make sure our logical option should be added to the array of options
+            if( ! o.hasOwnProperty( k ) ||
+                  k in MongoRunner.logicalOptions || 
+                ! isValidOptionForBinary( k, o[k] ) ) continue
             
             if ( ( k == "v" || k == "verbose" ) && isNumber( o[k] ) ){
                 var n = o[k]
@@ -206,6 +259,7 @@ MongoRunner.arrOptions = function( binaryName , args ){
             fullArgs.push( args[i] )
     }
 
+    fullArgs[ 0 ] = binaryName    
     return fullArgs
 }
 
@@ -279,6 +333,21 @@ MongoRunner.mongoOptions = function( opts ){
     
     opts.pathOpts = Object.merge( opts.pathOpts || {}, { port : "" + opts.port, runId : "" + opts.runId } )
     
+    // Normalize the binary version if it exists
+    if( opts.binVersion ){
+        
+        // Convert to string
+        opts.binVersion = opts.binVersion + ""
+        
+        // opts.binVersion = ( opts.binVersion + "" ).replace( /r|v/g, "" )
+        
+        var numSeps = opts.binVersion.replace( /[^\.]/g, "" ).length
+        if( numSeps == 0 ) opts.binVersion += ".0.0"
+        else if( numSeps == 1 ) opts.binVersion += ".0"
+            
+        // opts.binVersion = "r" + opts.binVersion
+    }
+    
     return opts
 }
 
@@ -333,6 +402,11 @@ MongoRunner.mongosOptions = function( opts ){
     
     opts = MongoRunner.mongoOptions( opts )
     
+    // Normalize configdb option to be host string if currently a host
+    if( opts.configdb && opts.configdb.getDB ){
+        opts.configdb = opts.configdb.host
+    }
+    
     opts.pathOpts = Object.merge( opts.pathOpts, 
                                 { configdb : opts.configdb.replace( /:|,/g, "-" ) } )
     
@@ -347,7 +421,7 @@ MongoRunner.mongosOptions = function( opts ){
     if( jsTestOptions().keyFile && !opts.keyFile) {
         opts.keyFile = jsTestOptions().keyFile
     }
-
+    
     return opts
 }
 
