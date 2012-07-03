@@ -88,6 +88,11 @@ DB.prototype.addUser = function( username , pass, readOnly, replicatedTo ){
         // printjson( le )
     }
     catch (e) {
+        if ( tojson(e).indexOf( "login" ) >= 0 ) {
+            // TODO: this check is a hack
+            print( "addUser succeeded, but cannot wait for replication since we no longer have auth" );
+            return "";
+        }
         print( "could not find getLastError object : " + tojson( e ) )
     }
     
