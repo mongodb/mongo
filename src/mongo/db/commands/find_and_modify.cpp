@@ -111,7 +111,8 @@ namespace mongo {
             
             
             Lock::DBWrite lk( ns );
-            
+            Client::Context cx( ns );
+
             BSONObj doc;
             
             bool found = Helpers::findOne( ns.c_str() , query , doc );
