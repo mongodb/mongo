@@ -62,6 +62,14 @@ namespace mongo {
         return false;
     }
 
+    void DocumentSource::dispose() {
+        if ( pSource ) {
+            // This is requried for the DocumentSourceCursor to release its read lock, see
+            // SERVER-6123.
+            pSource->dispose();
+        }
+    }
+
     void DocumentSource::addToBsonArray(
         BSONArrayBuilder *pBuilder, bool explain) const {
         BSONObjBuilder insides;

@@ -88,7 +88,12 @@ namespace mongo {
             (log() << "\n---- fullName\n" <<
              fullName << "\n----\n").flush();
         }
-        
+
+        // Create the necessary context to use a Cursor, including taking a namespace read lock,
+        // see SERVER-6123.
+        shared_ptr<DocumentSourceCursor::CursorWithContext> cursorWithContext
+                ( new DocumentSourceCursor::CursorWithContext( fullName ) );
+
         /*
           Create the cursor.
 
@@ -135,9 +140,13 @@ namespace mongo {
             pCursor = pUnsortedCursor;
         }
 
+        // Now add the Cursor to cursorWithContext.
+        cursorWithContext->_cursor.reset
+                ( new ClientCursor( QueryOption_NoCursorTimeout, pCursor, fullName ) );
+
         /* wrap the cursor with a DocumentSource and return that */
         intrusive_ptr<DocumentSourceCursor> pSource(
-            DocumentSourceCursor::create(pCursor, dbName, pExpCtx));
+            DocumentSourceCursor::create( cursorWithContext, pExpCtx ) );
 
         pSource->setNamespace(fullName);
 

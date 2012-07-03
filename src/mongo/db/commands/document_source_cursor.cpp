@@ -24,11 +24,12 @@
 
 namespace mongo {
 
-    DocumentSourceCursor::~DocumentSourceCursor() {
+    DocumentSourceCursor::CursorWithContext::CursorWithContext( const string& ns ) :
+        // Take a read lock.
+        _readContext( ns ) {
     }
 
-    void DocumentSourceCursor::releaseCursor() {
-        _cursor.reset();
+    DocumentSourceCursor::~DocumentSourceCursor() {
     }
 
     bool DocumentSourceCursor::eof() {
@@ -58,25 +59,40 @@ namespace mongo {
         return pCurrent;
     }
 
+    void DocumentSourceCursor::dispose() {
+        _cursorWithContext.reset();
+    }
+
+    ClientCursor::Holder& DocumentSourceCursor::cursor() {
+        verify( _cursorWithContext );
+        verify( _cursorWithContext->_cursor );
+        return _cursorWithContext->_cursor;
+    }
+
     void DocumentSourceCursor::advanceAndYield() {
-        _cursor->advance();
+        cursor()->advance();
         /*
           TODO ask for index key pattern in order to determine which index
           was used for this particular document; that will allow us to
           sometimes use ClientCursor::MaybeCovered.
           See https://jira.mongodb.org/browse/SERVER-5224 .
         */
-        bool cursorOk = _cursor->yieldSometimes( ClientCursor::WillNeed );
+        bool cursorOk = cursor()->yieldSometimes( ClientCursor::WillNeed );
         uassert( 16028, "collection or database disappeared when cursor yielded", cursorOk );
     }
 
     void DocumentSourceCursor::findNext() {
 
-        while( _cursor->ok() ) {
-            if ( _cursor->currentMatches() && !_cursor->currentIsDup() ) {
+        if ( !_cursorWithContext ) {
+            pCurrent.reset();
+            return;
+        }
+
+        while( cursor()->ok() ) {
+            if ( cursor()->currentMatches() && !cursor()->currentIsDup() ) {
 
                 /* grab the matching document */
-                BSONObj documentObj( _cursor->current() );
+                BSONObj documentObj( cursor()->current() );
                 pCurrent = Document::createFromBsonObj(
                     &documentObj, NULL /* LATER pDependencies.get()*/);
                 advanceAndYield();
@@ -86,7 +102,9 @@ namespace mongo {
             advanceAndYield();
         }
 
-        /* if we got here, there aren't any more documents */
+        // If we got here, there aren't any more documents.
+        // The CursorWithContext (and its read lock) must be released, see SERVER-6123.
+        dispose();
         pCurrent.reset();
     }
 
@@ -126,23 +144,22 @@ namespace mongo {
     }
 
     DocumentSourceCursor::DocumentSourceCursor(
-        const shared_ptr<Cursor> &pTheCursor,
-        const string &ns,
+        const shared_ptr<CursorWithContext>& cursorWithContext,
         const intrusive_ptr<ExpressionContext> &pCtx):
         DocumentSource(pCtx),
         pCurrent(),
-        _cursor( new ClientCursor( QueryOption_NoCursorTimeout, pTheCursor, ns ) ),
+        _cursorWithContext( cursorWithContext ),
         pDependencies() {
     }
 
     intrusive_ptr<DocumentSourceCursor> DocumentSourceCursor::create(
-        const shared_ptr<Cursor> &pCursor,
-        const string &ns,
+        const shared_ptr<CursorWithContext>& cursorWithContext,
         const intrusive_ptr<ExpressionContext> &pExpCtx) {
-        verify(pCursor.get());
+        verify( cursorWithContext );
+        verify( cursorWithContext->_cursor );
         intrusive_ptr<DocumentSourceCursor> pSource(
-            new DocumentSourceCursor(pCursor, ns, pExpCtx));
-            return pSource;
+            new DocumentSourceCursor( cursorWithContext, pExpCtx ) );
+        return pSource;
     }
 
     void DocumentSourceCursor::setNamespace(const string &n) {
