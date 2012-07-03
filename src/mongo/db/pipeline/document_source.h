@@ -444,12 +444,14 @@ namespace mongo {
          */
         shared_ptr<BSONObj> pQuery;
         shared_ptr<BSONObj> pSort;
-        scoped_ptr<Projection> _projection;
+        shared_ptr<Projection> _projection; // shared with pClientCursor
 
         shared_ptr<CursorWithContext> _cursorWithContext;
 
         ClientCursor::Holder& cursor();
         const ShardChunkManager* chunkMgr() { return _cursorWithContext->_chunkMgr.get(); }
+
+        bool canUseCoveredIndex();
 
         /*
           Yield the cursor sometimes.
