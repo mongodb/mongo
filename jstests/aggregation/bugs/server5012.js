@@ -12,6 +12,8 @@ var r3 = db.runCommand({ aggregate:"article", pipeline:[
     }}
 ]});
 
+printjson(r3);
+
 var r3result = [
     {
         "Writer" : "bob"
@@ -24,4 +26,4 @@ var r3result = [
     }
 ];
 
-assert(arrayEq(r3.result, r3result), 's5012 failed');
+assert.eq(r3.result, r3result, 's5012 failed');
