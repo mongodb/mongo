@@ -1,7 +1,4 @@
 
-/* load the test documents */
-load('jstests/aggregation/data/articles.js');
-
 // load utils
 load('jstests/aggregation/extras/utils.js');
 
@@ -14,6 +11,9 @@ files.forEach(
             print(" >>>>>>>>>>>>>>> skipping " + x.name);
             return;
         }
+
+        /* load the test documents */
+        load('jstests/aggregation/data/articles.js');
 
         print(" *******************************************");
         print("         Test : " + x.name + " ...");
