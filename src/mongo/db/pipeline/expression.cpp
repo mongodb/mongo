@@ -2292,17 +2292,12 @@ namespace mongo {
             double left = pLeft->coerceToDouble();
             return Value::createDouble(fmod(left, right));
         }
-        else if (rightType == NumberDouble) {
-            if (trunc(right) != right || right > numeric_limits<int>::max()) {
-                // the shell converts ints to doubles so if right is larger than int max or
-                // if right truncates to something other than itself, it is a real double
-                double left = pLeft->coerceToDouble();
-                return Value::createDouble(fmod(left, right));
-            }
-            else {
-                // otherwise it was an int that got misplaced so we cast it back to an int
-                verify(right == pRight->coerceToInt()); // ensure the cast wont break anything
-            }
+        else if (rightType == NumberDouble && pRight->coerceToInt() != right) {
+            // the shell converts ints to doubles so if right is larger than int max or
+            // if right truncates to something other than itself, it is a real double.
+            // Integer-valued double case is handled below
+            double left = pLeft->coerceToDouble();
+            return Value::createDouble(fmod(left, right));
         }
         if (leftType == NumberLong || rightType == NumberLong) {
             // if either is long, return long
