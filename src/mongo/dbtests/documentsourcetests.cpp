@@ -48,9 +48,9 @@ namespace DocumentSourceTests {
             }
         protected:
             void createSource() {
-                shared_ptr<DocumentSourceCursor::CursorWithContext> cursorWithContext
+                boost::shared_ptr<DocumentSourceCursor::CursorWithContext> cursorWithContext
                         ( new DocumentSourceCursor::CursorWithContext( ns ) );
-                shared_ptr<Cursor> cursor = theDataFileMgr.findAll( ns );
+                boost::shared_ptr<Cursor> cursor = theDataFileMgr.findAll( ns );
                 cursorWithContext->_cursor.reset
                         ( new ClientCursor( QueryOption_NoCursorTimeout, cursor, ns ) );
                 _source = DocumentSourceCursor::create( cursorWithContext, _ctx );
