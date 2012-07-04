@@ -26,11 +26,11 @@ namespace mongo {
     BSONObj LockStat::report() const { 
         BSONObjBuilder b;
 
-        BSONObjBuilder t( b.subobjStart( "timeLocked" ) );
+        BSONObjBuilder t( b.subobjStart( "timeLockedMicros" ) );
         _append( b , timeLocked );
         t.done();
         
-        BSONObjBuilder a( b.subobjStart( "timeAcquiring" ) );
+        BSONObjBuilder a( b.subobjStart( "timeAcquiringMicros" ) );
         _append( a , timeAcquiring );
         a.done();
         

@@ -314,7 +314,7 @@ namespace mongo {
             NamespaceInfo& s = stats[e.fieldName()];
             s.ns = e.fieldName();
             
-            BSONObj temp = e.Obj()["timeLocked"].Obj();
+            BSONObj temp = e.Obj()["timeLockedMicros"].Obj();
             s.read = ( temp["r"].numberLong() + temp["R"].numberLong() ) / 1000;
             s.write = ( temp["w"].numberLong() + temp["W"].numberLong() ) / 1000;
         }

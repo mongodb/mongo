@@ -49,6 +49,24 @@ try {
                   [ "responseLength", 20 ] ] );
     
     t.save( {} );
+
+    // check write lock stats are set
+    o = lastOp();
+    assert.eq('insert', o.op);
+    assert.eq( 0, o.lockStats.timeLockedMicros.r );
+    assert.lt( 0, o.lockStats.timeLockedMicros.w );
+    assert.eq( 0, o.lockStats.timeAcquiringMicros.r );
+    assert.lt( 0, o.lockStats.timeAcquiringMicros.w );
+
+    // check read lock stats are set
+    t.find();
+    o = lastOp();
+    assert.eq('query', o.op);
+    assert.eq( 0, o.lockStats.timeLockedMicros.w );
+    assert.lt( 0, o.lockStats.timeLockedMicros.r );
+    assert.lt( 0, o.lockStats.timeAcquiringMicros.r );
+    assert.lt( 0, o.lockStats.timeAcquiringMicros.w );
+
     t.save( {} );
     t.save( {} );
     t.find().skip( 1 ).limit( 4 ).itcount();

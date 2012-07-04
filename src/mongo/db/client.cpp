@@ -722,7 +722,7 @@ namespace mongo {
         OPDEBUG_APPEND_NUMBER( keyUpdates );
 
         b.appendNumber( "numYield" , curop.numYields() );
-        b.append( "lockStatMillis" , curop.lockStat().report() );
+        b.append( "lockStats" , curop.lockStat().report() );
         
         if ( ! exceptionInfo.empty() ) 
             exceptionInfo.append( b , "exception" , "exceptionCode" );

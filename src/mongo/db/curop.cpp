@@ -176,7 +176,7 @@ namespace mongo {
             b.append("killed", true);
         
         b.append( "numYields" , _numYields );
-        b.append( "lockStatMillis" , _lockStat.report() );
+        b.append( "lockStats" , _lockStat.report() );
 
         return b.obj();
     }
