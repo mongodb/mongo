@@ -207,7 +207,8 @@ __session_rename(WT_SESSION *wt_session,
 	SESSION_API_CALL(session, rename, config, cfg);
 
 	WT_ERR(__wt_meta_track_on(session));
-	ret = __wt_schema_rename(session, uri, newname, cfg);
+	WT_WITH_SCHEMA_LOCK(session,
+	    ret = __wt_schema_rename(session, uri, newname, cfg));
 
 err:	WT_TRET(__wt_meta_track_off(session, ret != 0));
 	API_END_NOTFOUND_MAP(session, ret);
@@ -337,7 +338,8 @@ __session_truncate(WT_SESSION *wt_session,
 				}
 			}
 	} else
-		ret = __wt_schema_truncate(session, uri, cfg);
+		WT_WITH_SCHEMA_LOCK(session,
+		    ret = __wt_schema_truncate(session, uri, cfg));
 
 err:	API_END_NOTFOUND_MAP(session, ret);
 }
