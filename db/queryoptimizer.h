@@ -479,7 +479,7 @@ namespace mongo {
             virtual shared_ptr<Cursor> newCursor() const = 0;
         };
         /** takes ownership of 'op' */
-        MultiCursor( const char *ns, const BSONObj &pattern, const BSONObj &order, shared_ptr<CursorOp> op = shared_ptr<CursorOp>(), bool mayYield = false );
+        MultiCursor( const char *ns, const BSONObj &pattern, const BSONObj &order, shared_ptr<CursorOp> op = shared_ptr<CursorOp>(), bool mayYield = false, bool hintIdElseNatural = false );
         /**
          * Used
          * 1. To handoff a query to a getMore()
@@ -539,8 +539,11 @@ namespace mongo {
             virtual long long nscanned() { assert( false ); return 0; }
         };
         void nextClause();
+        static BSONObj idElseNaturalHint( const char *ns );
         shared_ptr<CursorOp> _op;
         shared_ptr<Cursor> _c;
+        BSONObj _hint;
+        BSONElement _hintElt;
         auto_ptr<MultiPlanScanner> _mps;
         shared_ptr<CoveredIndexMatcher> _matcher;
         long long _nscanned;

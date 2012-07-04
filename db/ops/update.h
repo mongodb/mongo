@@ -50,9 +50,10 @@ namespace mongo {
        multi - update multiple objects - mostly useful with things like $set
        god - allow access to system namespaces
     */
-    UpdateResult updateObjects(const char *ns, const BSONObj& updateobj, BSONObj pattern, bool upsert, bool multi , bool logop , OpDebug& debug );
+    UpdateResult updateObjects(const char *ns, const BSONObj& updateobj, BSONObj pattern, bool upsert, bool multi , bool logop , OpDebug& debug, bool hintIdElseNatural = false );
     UpdateResult _updateObjects(bool god, const char *ns, const BSONObj& updateobj, BSONObj pattern,
-                                bool upsert, bool multi , bool logop , OpDebug& debug , RemoveSaver * rs = 0 );
+                                bool upsert, bool multi , bool logop , OpDebug& debug , RemoveSaver * rs = 0,
+                                bool hintIdElseNatural = false);
 
 
 

@@ -1006,8 +1006,12 @@ doneCheckOrder:
         return QueryUtilIndexed::uselessOr( *_org, nsd, -1 );
     }
     
-    MultiCursor::MultiCursor( const char *ns, const BSONObj &pattern, const BSONObj &order, shared_ptr<CursorOp> op, bool mayYield )
-    : _mps( new MultiPlanScanner( ns, pattern, order, 0, true, BSONObj(), BSONObj(), !op.get(), mayYield ) ), _nscanned() {
+    MultiCursor::MultiCursor( const char *ns, const BSONObj &pattern, const BSONObj &order, shared_ptr<CursorOp> op, bool mayYield, bool hintIdElseNatural ) :
+        _hint( hintIdElseNatural ? idElseNaturalHint( ns ) : BSONObj() ),
+        _hintElt( _hint.firstElement() ),
+        _mps( new MultiPlanScanner( ns, pattern, order, _hintElt.eoo() ? 0 : &_hintElt, true,
+                                   BSONObj(), BSONObj(), !op.get(), mayYield ) ),
+        _nscanned() {
         if ( op.get() ) {
             _op = op;
         }
@@ -1046,7 +1050,15 @@ doneCheckOrder:
         _matcher = best->matcher( _c );
         _op = best;
     }    
-    
+
+    BSONObj MultiCursor::idElseNaturalHint( const char *ns ) {
+        NamespaceDetails *nsd = nsdetails( ns );
+        if ( !nsd || !nsd->haveIdIndex() ) {
+            return BSON( "$hint" << BSON( "$natural" << 1 ) );
+        }
+        return BSON( "$hint" << nsd->idx( nsd->findIdIndex() ).indexName() );
+    }
+
     bool indexWorks( const BSONObj &idxPattern, const BSONObj &sampleKey, int direction, int firstSignificantField ) {
         BSONObjIterator p( idxPattern );
         BSONObjIterator k( sampleKey );

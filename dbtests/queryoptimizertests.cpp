@@ -935,9 +935,11 @@ namespace QueryOptimizerTests {
     protected:
         static const char *ns() { return "unittests.QueryOptimizerTests"; }
         static NamespaceDetails *nsd() { return nsdetails( ns() ); }
+        DBDirectClient &client() { return _client; }
     private:
         dblock lk_;
         Client::Context _ctx;
+        DBDirectClient _client;
     };
 
     class BestGuess : public Base {
@@ -968,6 +970,79 @@ namespace QueryOptimizerTests {
             ASSERT_EQUALS( string( "b" ), m->sub_c()->indexKeyPattern().firstElement().fieldName() );
         }
     };
+    
+    namespace MultiCursorTests {
+        
+        /**
+         * Helper class for validating a set of attempted candidate plans  The boiler plate
+         * implementation is similar to MultiCursor::NoOp.
+         */
+        class PlanValidatingCursorOp : public MultiCursor::CursorOp {
+        public:
+            PlanValidatingCursorOp( const BSONObj &expectedIndexKey ) :
+                _expectedIndexKey( expectedIndexKey ) {
+            }
+            virtual void _init() {
+                ASSERT_EQUALS( _expectedIndexKey, qp().indexKey() );
+            }
+            virtual void next() { setComplete(); }
+            virtual bool mayRecordPlan() const { return false; }
+            virtual QueryOp *_createChild() const {
+                return new PlanValidatingCursorOp( _expectedIndexKey );
+            }
+            virtual shared_ptr<Cursor> newCursor() const { return qp().newCursor(); }
+            virtual long long nscanned() { return 0; }
+        private:
+            BSONObj _expectedIndexKey;
+        };
+        
+        /** Test MultiCursor with hintIdElseNatural set to true. */
+        class HintIdElseNaturalBase : public Base {
+        public:
+            virtual ~HintIdElseNaturalBase() {}
+            void run() {
+                client().insert( ns(), BSON( "a" << 1 << "b" << 1 ) );
+                client().insert( ns(), BSON( "a" << 1 << "b" << 1 ) );
+                client().ensureIndex( ns(), BSON( "a" << 1 ) );
+
+                // Create a MultiCursor and validate its plans in the planValidator.
+                shared_ptr<MultiCursor::CursorOp> planValidator
+                        ( new PlanValidatingCursorOp( expectedPlanIndexKey() ) );
+                MultiCursor cursor( ns(), BSON( "a" << 1 << "b" << 1 ), BSONObj(), planValidator,
+                                   false, /* hintIdElseNatural */ true );
+                
+                // Validate the index key returned by the cursor iterates.
+                do {
+                    ASSERT_EQUALS( expectedCursorIndexKey(), cursor.indexKeyPattern() );
+                } while( cursor.advance() );
+            }
+        protected:
+            virtual BSONObj expectedPlanIndexKey() const = 0;
+            virtual BSONObj expectedCursorIndexKey() const { return expectedPlanIndexKey(); }
+        };
+        
+        /** An _id hint is used when possible if hintIdElseNatural is specified. */
+        class IdHint : public HintIdElseNaturalBase {
+            virtual BSONObj expectedPlanIndexKey() const { return BSON( "_id" << 1 ); }
+        };
+        
+        /**
+         * An $natural hint is used when hintIdElseNatural is specified and no _id index is
+         * available.
+         */
+        class NaturalHintFallback : public HintIdElseNaturalBase {
+        public:
+            NaturalHintFallback() {
+                client().dropCollection( ns() );
+                // Recreate the collection as capped, without an _id index.
+                client().createCollection( ns(), 5000, true );
+            }
+        private:
+            virtual BSONObj expectedPlanIndexKey() const { return BSON( "$natural" << 1 ); }
+            virtual BSONObj expectedCursorIndexKey() const { return BSONObj(); }
+        };
+        
+    } // namespace MultiCursorTests
     
     namespace QueryOptimizerCursorTests {
         
@@ -2755,6 +2830,8 @@ namespace QueryOptimizerTests {
             add<QueryPlanSetTests::EqualityThenIn>();
             add<QueryPlanSetTests::NotEqualityThenIn>();
             add<BestGuess>();
+            add<MultiCursorTests::IdHint>();
+            add<MultiCursorTests::NaturalHintFallback>();
             add<QueryOptimizerCursorTests::Empty>();
             add<QueryOptimizerCursorTests::Unindexed>();
             add<QueryOptimizerCursorTests::Basic>();
