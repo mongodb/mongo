@@ -7,18 +7,19 @@
 
 #include "wt_internal.h"
 
-static int __backup_open(WT_SESSION_IMPL *, FILE **);
+static int __backup_all(WT_SESSION_IMPL *, WT_CURSOR_BACKUP *, FILE *);
+static int __backup_file_create(WT_SESSION_IMPL *, FILE **);
+static int __backup_file_remove(WT_SESSION_IMPL *);
 static int __backup_list_append(
     WT_SESSION_IMPL *, WT_CURSOR_BACKUP *, const char *);
+static int __backup_start(
+    WT_SESSION_IMPL *, WT_CURSOR_BACKUP *, const char *[]);
+static int __backup_stop(WT_SESSION_IMPL *);
 static int __backup_table(
     WT_SESSION_IMPL *, WT_CURSOR_BACKUP *, const char *, FILE *);
 static int __backup_table_element(WT_SESSION_IMPL *,
     WT_CURSOR_BACKUP *, WT_CURSOR *, const char *, const char *, FILE *);
-static int __wt_backup_all(WT_SESSION_IMPL *, WT_CURSOR_BACKUP *, FILE *);
-static int __wt_backup_start(
-    WT_SESSION_IMPL *, WT_CURSOR_BACKUP *, const char *[]);
-static int __wt_backup_stop(WT_SESSION_IMPL *);
-static int __wt_backup_uri(
+static int __backup_uri(
     WT_SESSION_IMPL *, WT_CURSOR_BACKUP *, const char *[], FILE *, int *);
 
 /*
@@ -93,7 +94,7 @@ __curbackup_close(WT_CURSOR *cursor)
 
 	ret = __wt_cursor_close(cursor);
 
-	WT_TRET(__wt_backup_stop(session));		/* Stop the backup. */
+	WT_TRET(__backup_stop(session));		/* Stop the backup. */
 
 	API_END(session);
 	return (ret);
@@ -157,22 +158,21 @@ __wt_curbackup_open(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_cursor_init(cursor, uri, NULL, cfg, cursorp));
 
 	/* Start the backup and fill in the cursor's list. */
-	WT_ERR(__wt_backup_start(session, cb, cfg));
+	WT_ERR(__backup_start(session, cb, cfg));
 
 	if (0) {
-err:		(void)__wt_backup_stop(session);
-		__wt_free(session, cb);
+err:		__wt_free(session, cb);
 	}
 
 	return (ret);
 }
 
 /*
- * __wt_backup_start --
+ * __backup_start --
  *	Start a backup.
  */
 static int
-__wt_backup_start(
+__backup_start(
     WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb, const char *cfg[])
 {
 	FILE *bfp;
@@ -198,41 +198,45 @@ __wt_backup_start(
 	 * have multiple hot backups proceeding in parallel, even thought it's
 	 * an unlikely choice to make.  Bound it out of paranoia.
 	 */
-	if (conn->ckpt_backup > 10)
+	if (conn->ckpt_backup >= 10)
 		WT_ERR_MSG(session, EINVAL,
 		    "there are already %d backups running", conn->ckpt_backup);
-	++conn->ckpt_backup;
 
-	/* Open the hot backup file. */
-	WT_ERR(__backup_open(session, &bfp));
+	/* Create the hot backup file. */
+	WT_ERR(__backup_file_create(session, &bfp));
 
 	/*
 	 * If a list of targets was specified, work our way through them.
 	 * Else, generate a list of all database objects.
 	 */
 	target_list = 0;
-	WT_ERR(__wt_backup_uri(session, cb, cfg, bfp, &target_list));
+	WT_ERR(__backup_uri(session, cb, cfg, bfp, &target_list));
 	if (!target_list)
-		WT_ERR(__wt_backup_all(session, cb, bfp));
+		WT_ERR(__backup_all(session, cb, bfp));
 
 	/* Close the hot backup file. */
 	ret = fclose(bfp);
 	bfp = NULL;
 	WT_ERR_TEST(ret == EOF, __wt_errno());
 
+	++conn->ckpt_backup;
+
 err:	if (bfp != NULL)
 		(void)fclose(bfp);
+
+	if (ret != 0)
+		(void)__backup_file_remove(session);
 
 	__wt_spin_unlock(session, &conn->schema_lock);
 	return (ret);
 }
 
 /*
- * __wt_backup_stop --
+ * __backup_stop --
  *	Stop a backup.
  */
 static int
-__wt_backup_stop(WT_SESSION_IMPL *session)
+__backup_stop(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
@@ -241,9 +245,6 @@ __wt_backup_stop(WT_SESSION_IMPL *session)
 
 	__wt_spin_lock(session, &conn->schema_lock);
 
-	/* Remove any backup metadata file. */
-	(void)__wt_remove(session, WT_METADATA_BACKUP);
-
 	/* Checkpoint deletion can proceed. */
 	if (conn->ckpt_backup == 0) {
 		ret = EINVAL;
@@ -251,17 +252,20 @@ __wt_backup_stop(WT_SESSION_IMPL *session)
 	} else
 		--conn->ckpt_backup;
 
+	/* Remove any backup metadata file. */
+	WT_TRET(__backup_file_remove(session));
+
 	__wt_spin_unlock(session, &conn->schema_lock);
 
 	return (ret);
 }
 
 /*
- * __wt_backup_all --
+ * __backup_all --
  *	Backup all objects in the database.
  */
 static int
-__wt_backup_all(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb, FILE *bfp)
+__backup_all(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb, FILE *bfp)
 {
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
@@ -317,11 +321,11 @@ err:
 }
 
 /*
- * __wt_backup_uri --
+ * __backup_uri --
  *	Backup a list of objects.
  */
 static int
-__wt_backup_uri(WT_SESSION_IMPL *session,
+__backup_uri(WT_SESSION_IMPL *session,
     WT_CURSOR_BACKUP *cb, const char *cfg[], FILE *bfp, int *foundp)
 {
 	WT_CONFIG targetconf;
@@ -491,14 +495,16 @@ err:	__wt_scr_free(&tmp);
 }
 
 /*
- * __backup_open --
- *	Open the meta-data backup file.
+ * __backup_file_create --
+ *	Create the meta-data backup file.
  */
 static int
-__backup_open(WT_SESSION_IMPL *session, FILE **fpp)
+__backup_file_create(WT_SESSION_IMPL *session, FILE **fpp)
 {
 	WT_DECL_RET;
 	const char *path;
+
+	*fpp = NULL;
 
 	/* Open the hot backup file. */
 	WT_RET(__wt_filename(session, WT_METADATA_BACKUP, &path));
@@ -506,6 +512,16 @@ __backup_open(WT_SESSION_IMPL *session, FILE **fpp)
 
 err:	__wt_free(session, path);
 	return (ret);
+}
+
+/*
+ * __backup_file_remove --
+ *	Remove the meta-data backup file.
+ */
+static int
+__backup_file_remove(WT_SESSION_IMPL *session)
+{
+	return (__wt_remove(session, WT_METADATA_BACKUP));
 }
 
 /*
