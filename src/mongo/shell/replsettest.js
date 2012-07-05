@@ -462,8 +462,8 @@ ReplSetTest.prototype.initiate = function( cfg , initCmd , timeout ) {
         if (!this.shardSvr) {
             master = this.getMaster();
             jsTest.addAuth(master);
+            jsTest.authenticateNodes(this.nodes);
         }
-        jsTest.authenticateNodes(this.nodes);
     }
 }
 
