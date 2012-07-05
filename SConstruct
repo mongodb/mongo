@@ -1051,8 +1051,6 @@ if not use_system_version_of_library("boost"):
     clientEnv.Append(LIBS=['boost_thread', 'boost_filesystem', 'boost_system'])
     clientEnv.Prepend(LIBPATH=['$BUILD_DIR/third_party/boost/'])
 
-clientEnv.Prepend(LIBS=['mongoclient'], LIBPATH=['.'])
-
 # The following symbols are exported for use in subordinate SConscript files.
 # Ideally, the SConscript files would be purely declarative.  They would only
 # import build environment objects, and would contain few or no conditional

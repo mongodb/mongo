@@ -77,7 +77,6 @@ conf.Finish()
 
 clientEnv = env.Clone()
 clientEnv['CPPDEFINES'].remove('MONGO_EXPOSE_MACROS')
-clientEnv.Prepend(LIBS=['mongoclient'], LIBPATH=['.'])
 
 Export("env clientEnv")
 env.SConscript('src/SConscript.client', variant_dir='$BUILD_DIR', duplicate=False)
