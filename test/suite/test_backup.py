@@ -103,15 +103,14 @@ class test_util13(wttest.WiredTigerTestCase, suite_subprocess):
             session.open_cursor('table:' + self.namepfx + '1', None, None))
         conn.close()
 
-    """
     # Test backup of random object types.
     def test_illegal_objects(self):
-        self.assertRaises(wiredtiger.WiredTigerError, lambda:
-            self.session.open_cursor(
-            'backup:', None, 'target=("colgroup:xxx")'))
-        self.assertRaises(wiredtiger.WiredTigerError, lambda:
-            self.session.open_cursor('backup:', None, 'target=("index:xxx")'))
-    """
+        for target in ('colgroup:xxx', 'index:xxx'):
+            msg = 'session.open_cursor: %s: ' % target
+            msg += 'invalid backup target object: Invalid argument\n'
+            config =  'target=("%s")' % target
+            self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda:
+                self.session.open_cursor('backup:', None, config), msg)
 
 if __name__ == '__main__':
     wttest.run()
