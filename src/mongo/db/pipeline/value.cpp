@@ -98,8 +98,20 @@ namespace mongo {
 
     intrusive_ptr<const Value> Value::createFromBsonElement(
         BSONElement *pBsonElement) {
-        intrusive_ptr<const Value> pValue(new Value(pBsonElement));
-        return pValue;
+        switch (pBsonElement->type()) {
+            case Undefined:
+                return getUndefined();
+            case jstNULL:
+                return getNull();
+            case Bool:
+                if (pBsonElement->boolean())
+                    return getTrue();
+                else
+                    return getFalse();
+            default:
+                intrusive_ptr<const Value> pValue(new Value(pBsonElement));
+                return pValue;
+        }
     }
 
     Value::Value(BSONElement *pBsonElement):
