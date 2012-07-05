@@ -81,8 +81,8 @@ public:
             return -1;
         }
 
-        GridFS g( conn() , _db );
         auth();
+        GridFS g( conn() , _db );
 
         string filename = getParam( "file" );
 
