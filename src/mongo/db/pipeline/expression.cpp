@@ -117,53 +117,41 @@ namespace mongo {
                 BSONType fieldType = fieldElement.type();
                 string fieldName(pFieldName);
                 int inclusion = -1;
-                if (fieldType == Object) {
-                    /* it's a nested document */
-                    ObjectCtx oCtx(
-                        (pCtx->documentOk() ? ObjectCtx::DOCUMENT_OK : 0));
-                    intrusive_ptr<Expression> pNested(
-                        parseObject(&fieldElement, &oCtx));
-                    pExpressionObject->addField(fieldName, pNested);
-                }
-                else if (fieldType == String) {
-                    /* it's a renamed field */
-                    // CW TODO could also be a constant
-                    intrusive_ptr<Expression> pPath(
-                        ExpressionFieldPath::create(
-                            removeFieldPrefix(fieldElement.String())));
-                    pExpressionObject->addField(fieldName, pPath);
-                }
-                else if (fieldType == NumberDouble) {
-                    /* it's an inclusion specification */
-                    inclusion = static_cast<int>(fieldElement.Double());
-                field_inclusion:
-                    if (inclusion == 0)
-                        pExpressionObject->excludePath(fieldName);
-                    else if (inclusion == 1)
-                        pExpressionObject->includePath(fieldName);
-                    else
-                        uassert(15991, str::stream() <<
-                                "\"" << fieldName <<
-                                "\" numeric inclusion or exclusion must be 1 or 0 (or boolean)",
-                                false);
-                }
-                else if (fieldType == Bool) {
-                    inclusion = fieldElement.Bool() ? 1 : 0;
-                    goto field_inclusion;
-                }
-                else if (fieldType == NumberInt) {
-                    inclusion = fieldElement.Int();
-                    goto field_inclusion;
-                }
-                else if (fieldType == NumberLong) {
-                    inclusion = fieldElement.numberInt();
-                    goto field_inclusion;
-                }
-                else { /* nothing else is allowed */
-                    uassert(15992, str::stream() <<
-                            "disallowed field type " << typeName(fieldType) <<
-                            " in object expression (at \"" <<
-                            fieldName << "\")", false);
+                switch (fieldType){
+                    case Object: {
+                        /* it's a nested document */
+                        ObjectCtx oCtx(
+                            (pCtx->documentOk() ? ObjectCtx::DOCUMENT_OK : 0));
+                        intrusive_ptr<Expression> pNested(
+                            parseObject(&fieldElement, &oCtx));
+                        pExpressionObject->addField(fieldName, pNested);
+                        break;
+                    }
+                    case String: {
+                        /* it's a renamed field */
+                        // CW TODO could also be a constant
+                        intrusive_ptr<Expression> pPath(
+                            ExpressionFieldPath::create(
+                                removeFieldPrefix(fieldElement.String())));
+                        pExpressionObject->addField(fieldName, pPath);
+                        break;
+                    }
+                    case Bool:
+                    case NumberDouble:
+                    case NumberLong:
+                    case NumberInt: {
+                        /* it's an inclusion specification */
+                        if (fieldElement.trueValue())
+                            pExpressionObject->includePath(fieldName);
+                        else if (inclusion == 1)
+                            pExpressionObject->excludePath(fieldName);
+                        break;
+                    }
+                    default:
+                        uassert(15992, str::stream() <<
+                                "disallowed field type " << typeName(fieldType) <<
+                                " in object expression (at \"" <<
+                                fieldName << "\")", false);
                 }
             }
         }
