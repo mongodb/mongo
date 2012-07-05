@@ -43,6 +43,29 @@ namespace mongo {
     void sleepmillis(long long ms);
     void sleepmicros(long long micros);
 
+    class Backoff {
+    public:
+
+        Backoff( int maxSleepMillis, int resetAfter ) :
+            _maxSleepMillis( maxSleepMillis ),
+            _resetAfterMillis( maxSleepMillis + resetAfter ), // Don't reset < the max sleep
+            _lastSleepMillis( 0 ),
+            _lastErrorTimeMillis( 0 )
+        {}
+
+        void nextSleepMillis();
+
+    private:
+
+        // Parameters
+        int _maxSleepMillis;
+        int _resetAfterMillis;
+
+        // Last sleep information
+        int _lastSleepMillis;
+        unsigned long long _lastErrorTimeMillis;
+    };
+
     // DO NOT TOUCH except for testing
     void jsTimeVirtualSkew( long long skew );
 

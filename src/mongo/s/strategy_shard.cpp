@@ -216,6 +216,9 @@ namespace mongo {
             }
         }
 
+        static const int maxWaitMillis = 500;
+        boost::thread_specific_ptr<Backoff> perThreadBackoff;
+
         /**
          * Invoked before mongos needs to throw an error relating to an operation which cannot
          * be performed on a sharded collection.
@@ -223,10 +226,15 @@ namespace mongo {
          * This prevents mongos from refreshing config data too quickly in response to bad requests,
          * since doing so is expensive.
          *
-         * TODO: Can we restructure to make this simpler?
+         * Each thread gets its own backoff wait sequence, to avoid interfering with other valid
+         * operations.
          */
         void _sleepForVerifiedLocalError(){
-            sleepsecs( 1 );
+
+            if( ! perThreadBackoff.get() )
+                perThreadBackoff.reset( new Backoff( maxWaitMillis, maxWaitMillis * 2 ) );
+
+            perThreadBackoff.get()->nextSleepMillis();
         }
 
         void _handleRetries( const string& op,

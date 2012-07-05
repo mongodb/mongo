@@ -171,6 +171,42 @@ namespace mongo {
     }
 #endif
 
+    void Backoff::nextSleepMillis(){
+
+        // Get the current time
+        unsigned long long currTimeMillis = curTimeMillis64();
+
+        int lastSleepMillis = _lastSleepMillis;
+
+        if( _lastErrorTimeMillis == 0 || _lastErrorTimeMillis > currTimeMillis /* VM bugs exist */ )
+            _lastErrorTimeMillis = currTimeMillis;
+        unsigned long long lastErrorTimeMillis = _lastErrorTimeMillis;
+        _lastErrorTimeMillis = currTimeMillis;
+
+        // Backoff logic
+
+        // Get the time since the last error
+        unsigned long long timeSinceLastErrorMillis = currTimeMillis - lastErrorTimeMillis;
+
+        // Makes the cast below safe
+        verify( _resetAfterMillis >= 0 );
+
+        // If we haven't seen another error recently (3x the max wait time), reset our
+        // wait counter.
+        if( timeSinceLastErrorMillis > (unsigned)( _resetAfterMillis ) ) lastSleepMillis = 0;
+
+        // Makes the test below sane
+        verify( _maxSleepMillis > 0 );
+
+        // Wait a power of two millis
+        if( lastSleepMillis == 0 ) lastSleepMillis = 1;
+        else lastSleepMillis = std::min( lastSleepMillis * 2, _maxSleepMillis );
+
+        // Store the last slept time
+        _lastSleepMillis = lastSleepMillis;
+        sleepmillis( lastSleepMillis );
+    }
+
     extern long long jsTime_virtual_skew;
     extern boost::thread_specific_ptr<long long> jsTime_virtual_thread_skew;
 

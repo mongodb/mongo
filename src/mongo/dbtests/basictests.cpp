@@ -27,6 +27,7 @@
 #include "../util/paths.h"
 #include "../util/stringutils.h"
 #include "../util/compress.h"
+#include "../util/time_support.h"
 #include "../db/db.h"
 
 namespace BasicTests {
@@ -258,6 +259,56 @@ namespace BasicTests {
 
         }
 
+    };
+
+    class SleepBackoffTest {
+    public:
+        void run() {
+
+            int maxSleepTimeMillis = 1000;
+            int lastSleepTimeMillis = -1;
+            int epsMillis = 50; // Allowable inprecision for timing
+
+            Backoff backoff( maxSleepTimeMillis, maxSleepTimeMillis * 2 );
+
+            Timer t;
+
+            // Make sure our backoff increases to the maximum value
+            int maxSleepCount = 0;
+            while( maxSleepCount < 3 ){
+
+                t.reset();
+
+                backoff.nextSleepMillis();
+
+                int elapsedMillis = t.millis();
+
+                log() << "Slept for " << elapsedMillis << endl;
+
+                ASSERT( almostGTE( elapsedMillis, lastSleepTimeMillis, epsMillis ) );
+                lastSleepTimeMillis = elapsedMillis;
+
+                if( almostEq( elapsedMillis, maxSleepTimeMillis, epsMillis ) ) maxSleepCount++;
+            }
+
+            // Make sure that our backoff gets reset if we wait much longer than the maximum wait
+            sleepmillis( maxSleepTimeMillis * 4 );
+
+            t.reset();
+            backoff.nextSleepMillis();
+
+            ASSERT( almostEq( t.millis(), 0, epsMillis ) );
+
+        }
+
+        bool almostEq( int a, int b, int eps ){
+            return std::abs( a - b ) <= eps;
+        }
+
+        bool almostGTE( int a, int b, int eps ){
+            if( almostEq( a, b, eps ) ) return true;
+            return a > b;
+        }
     };
 
     class AssertTests {
@@ -723,7 +774,6 @@ namespace BasicTests {
         Tee _tee;
     };
 
-
     class All : public Suite {
     public:
         All() : Suite( "basic" ) {
@@ -739,6 +789,7 @@ namespace BasicTests {
             add< stringbuildertests::reset2 >();
 
             add< sleeptest >();
+            add< SleepBackoffTest >();
             add< AssertTests >();
 
             add< ArrayTests::basic1 >();
