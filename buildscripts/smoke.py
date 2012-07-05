@@ -604,6 +604,11 @@ def set_globals(options):
     auth = options.auth
     keyFile = options.keyFile
 
+    if auth and not keyFile:
+        # if only --auth was given to smoke.py, load the
+        # default keyFile from jstests/libs/authTestsKey
+        keyFile = os.path.join(mongo_repo, 'jstests', 'libs', 'authTestsKey')
+
 def clear_failfile():
     if os.path.exists(failfile):
         os.remove(failfile)
