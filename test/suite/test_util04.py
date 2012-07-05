@@ -48,12 +48,8 @@ class test_util04(wttest.WiredTigerTestCase, suite_subprocess):
         self.runWt(["drop", "table:" + self.tablename])
 
         self.assertFalse(os.path.exists(self.tablename + ".wt"))
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.session.open_cursor('table:' + self.tablename,
-                                             None, None),
-            "/Cannot open cursor 'table:" + self.tablename +
-            "' on unknown table/")
-
+        self.assertRaises(wiredtiger.WiredTigerError, lambda:
+            self.session.open_cursor('table:' + self.tablename, None, None))
 
 if __name__ == '__main__':
     wttest.run()
