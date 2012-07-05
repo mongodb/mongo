@@ -68,6 +68,7 @@ __wt_curconfig_open(WT_SESSION_IMPL *session,
 	cursor->session = &session->iface;
 	cursor->key_format = cursor->value_format = "S";
 
+	/* __wt_cursor_init is last so we don't have to clean up on error. */
 	STATIC_ASSERT(offsetof(WT_CURSOR_CONFIG, iface) == 0);
 	WT_ERR(__wt_cursor_init(cursor, uri, 0, cfg, cursorp));
 

@@ -380,6 +380,7 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 	cst->notpositioned = 1;
 	cst->clear_func = clear_func;
 
+	/* __wt_cursor_init is last so we don't have to clean up on error. */
 	STATIC_ASSERT(offsetof(WT_CURSOR_STAT, iface) == 0);
 	WT_ERR(__wt_cursor_init(cursor, uri, NULL, cfg, cursorp));
 
