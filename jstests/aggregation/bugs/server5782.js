@@ -16,14 +16,12 @@
 // Load the test documents
 load('jstests/aggregation/data/articles.js');
 
-// Load the test utilities
-load('jstests/aggregation/extras/utils.js');
-
 // Make sure we're using the right db; this is the same as "use mydb;" in shell
 db = db.getSiblingDB("aggdb");
 
 // Make an article where the author is $author
 db.article.save( {
+    _id : 4,
     title : "this is the fourth title" ,
     author : "$author" ,
     posted : new Date(1079895594000) ,
@@ -51,22 +49,22 @@ var l1 = db.runCommand(
 // All should be true since we are comparing a field to itself
 var l1result = [
     {
-        "_id" : ObjectId("4dc07fedd8420ab8d0d4066d"),
+        "_id" : 1,
         "author" : "bob",
         "$authorWroteIt" : true
     },
     {
-        "_id" : ObjectId("4dc07fedd8420ab8d0d4066e"),
+        "_id" : 2,
         "author" : "dave",
         "$authorWroteIt" : true
     },
     {
-        "_id" : ObjectId("4dc07fedd8420ab8d0d4066f"),
+        "_id" : 3,
         "author" : "jane",
         "$authorWroteIt" : true
     },
     {
-        "_id" : ObjectId("4dc07fedd8420ab8d0d40670"),
+        "_id" : 4,
         "author" : "$author",
         "$authorWroteIt" : true
     }
@@ -84,27 +82,27 @@ var l2 = db.runCommand(
 // Only the one written by $author should be true
 var l2result = [
     {
-        "_id" : ObjectId("4dc07fedd8420ab8d0d4066d"),
+        "_id" : 1,
         "author" : "bob",
         "$authorWroteIt" : false
     },
     {
-        "_id" : ObjectId("4dc07fedd8420ab8d0d4066e"),
+        "_id" : 2,
         "author" : "dave",
         "$authorWroteIt" : false
     },
     {
-        "_id" : ObjectId("4dc07fedd8420ab8d0d4066f"),
+        "_id" : 3,
         "author" : "jane",
         "$authorWroteIt" : false
     },
     {
-        "_id" : ObjectId("4dc07fedd8420ab8d0d40670"),
+        "_id" : 4,
         "author" : "$author",
         "$authorWroteIt" : true
     }
 ];
 
 // Asserts
-assert(arrayEq(l1.result, l1result), 'l1 failed');
-assert(arrayEq(l2.result, l2result), 'l2 failed');
+assert.eq(l1.result, l1result, 'l1 failed');
+assert.eq(l2.result, l2result, 'l2 failed');

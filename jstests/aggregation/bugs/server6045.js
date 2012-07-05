@@ -16,9 +16,6 @@
  * 5) Assert that all four position return the expected error
  */
 
-// load the test utilities
-load('jstests/aggregation/extras/utils.js');
-
 // Use aggdb
 db = db.getSiblingDB('aggdb');
 
@@ -60,7 +57,7 @@ var a6045 = {
 };
 
 // Asserts
-assert(documentEq(s6045p1, a6045), 'server6045 failed' + s6045p1);
-assert(documentEq(s6045p2, a6045), 'server6045 failed' + s6045p2);
-assert(documentEq(s6045p3, a6045), 'server6045 failed' + s6045p3);
-assert(documentEq(s6045p4, a6045), 'server6045 failed' + s6045p4);
+assert.eq(s6045p1, a6045, 'server6045 failed' + s6045p1);
+assert.eq(s6045p2, a6045, 'server6045 failed' + s6045p2);
+assert.eq(s6045p3, a6045, 'server6045 failed' + s6045p3);
+assert.eq(s6045p4, a6045, 'server6045 failed' + s6045p4);

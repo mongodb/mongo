@@ -1,7 +1,3 @@
-
-// load utils
-load('jstests/aggregation/extras/utils.js');
-
 // test all the bug test cases
 var files = listFiles("jstests/aggregation/bugs");
 files.forEach(

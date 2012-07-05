@@ -12,9 +12,6 @@
  * 3) Assert that the result is what we expected
  */
 
-// Load the test utilities
-load('jstests/aggregation/extras/utils.js');
-
 // Clear db
 db.s6147.drop();
 
@@ -56,4 +53,4 @@ var s6147result = [
 ];
 
 // Assert
-assert(arrayEq(s6147.result, s6147result), 's6147 failed');
+assert.eq(s6147.result, s6147result, 's6147 failed');

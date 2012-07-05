@@ -5,6 +5,7 @@ db = db.getSiblingDB("aggdb");
 db.article.drop();
 
 db.article.save( {
+    _id : 1,
     title : "this is my title" , 
     author : "bob" , 
     posted : new Date(1079895594000) , 
@@ -18,6 +19,7 @@ db.article.save( {
 });
 
 db.article.save( {
+    _id : 2,
     title : "this is your title" , 
     author : "dave" , 
     posted : new Date(1912392670000) , 
@@ -31,6 +33,7 @@ db.article.save( {
 });
 
 db.article.save( {
+    _id : 3,
     title : "this is some other title" , 
     author : "jane" , 
     posted : new Date(978239834000) , 
