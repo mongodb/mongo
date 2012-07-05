@@ -1635,7 +1635,10 @@ namespace {
             tags.next();
 
             ASSERT( tags.isExhausted() );
+#ifndef _DEBUG
+            // TODO: remove this guard once SERVER-6317 is fixed
             ASSERT_THROWS( tags.getCurrentTag(), AssertionException );
+#endif
         }
     };
 
@@ -1664,7 +1667,10 @@ namespace {
             tags.next();
 
             ASSERT( tags.isExhausted() );
+#ifndef _DEBUG
+            // TODO: remove this guard once SERVER-6317 is fixed
             ASSERT_THROWS( tags.getCurrentTag(), AssertionException );
+#endif
         }
     };
 
@@ -1675,7 +1681,10 @@ namespace {
             TagSet tags( emptyArray );
 
             ASSERT( tags.isExhausted() );
+#ifndef _DEBUG
+            // TODO: remove this guard once SERVER-6317 is fixed
             ASSERT_THROWS( tags.getCurrentTag(), AssertionException );
+#endif
         }
     };
 
