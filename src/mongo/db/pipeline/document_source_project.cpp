@@ -159,46 +159,21 @@ namespace mongo {
             string outFieldPath(outFieldElement.fieldName());
             string inFieldName(outFieldPath);
             BSONType specType = outFieldElement.type();
-            int fieldInclusion = -1;
 
             switch(specType) {
-            case NumberDouble: {
-                double inclusion = outFieldElement.numberDouble();
-                fieldInclusion = static_cast<int>(inclusion);
-                goto IncludeExclude;
-            }
-
-            case NumberLong: {
-                long long inclusion = outFieldElement.numberLong();
-                fieldInclusion = static_cast<int>(inclusion);
-                goto IncludeExclude;
-            }
-
-            case NumberInt:
-                /* just a plain integer include/exclude specification */
-                fieldInclusion = outFieldElement.numberInt();
-
-IncludeExclude:
-                uassert(15970, str::stream() <<
-                        "field inclusion or exclusion specification for \"" <<
-                        outFieldPath <<
-                        "\" must be true, 1, false, or zero",
-                        ((fieldInclusion == 0) || (fieldInclusion == 1)));
-
-                if (fieldInclusion == 0)
-                    pProject->excludePath(outFieldPath);
-                else 
-                    pProject->includePath(outFieldPath);
-                break;
-
             case Bool:
-                /* just a plain boolean include/exclude specification */
-                fieldInclusion = (outFieldElement.Bool() ? 1 : 0);
-                goto IncludeExclude;
+            case NumberDouble:
+            case NumberLong:
+            case NumberInt:
+                /* simple include/exclude specification */
+                if (outFieldElement.trueValue())
+                    pProject->includePath(outFieldPath);
+                else
+                    pProject->excludePath(outFieldPath);
+                break;
 
             case String:
                 /* include a field, with rename */
-                fieldInclusion = 1;
                 inFieldName = outFieldElement.String();
                 pProject->addField(
                     outFieldPath,
