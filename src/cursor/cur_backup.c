@@ -154,11 +154,11 @@ __wt_curbackup_open(WT_SESSION_IMPL *session,
 
 	cursor->key_format = "S";	/* Return the file names as the key. */
 
-	STATIC_ASSERT(offsetof(WT_CURSOR_BACKUP, iface) == 0);
-	WT_ERR(__wt_cursor_init(cursor, uri, NULL, cfg, cursorp));
-
 	/* Start the backup and fill in the cursor's list. */
 	WT_ERR(__backup_start(session, cb, cfg));
+
+	STATIC_ASSERT(offsetof(WT_CURSOR_BACKUP, iface) == 0);
+	WT_ERR(__wt_cursor_init(cursor, uri, NULL, cfg, cursorp));
 
 	if (0) {
 err:		__wt_free(session, cb);
