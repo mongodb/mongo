@@ -4,6 +4,8 @@
 // load('utils.js')
 // this is loaded by testbugs.js which calls us
 
+load('jstests/aggregation/extras/utils.js');
+
 // use the aggregation test db
 db = db.getSiblingDB('aggdb');
 

@@ -12,9 +12,6 @@
  * 3) Assert that the result is what we expected
  */
 
-// Load the test utilities
-load('jstests/aggregation/extras/utils.js');
-
 // Clear db
 db.s6127.drop();
 

@@ -1,3 +1,5 @@
+load('jstests/aggregation/extras/utils.js');
+
 db.s3832.drop();
 
 db.s3832.save({a:"foo", b:"bar"});

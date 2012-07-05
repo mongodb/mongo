@@ -11,9 +11,6 @@
  * 3) Assert that we get the correct error
  */
 
-// Load the test utilities
-load('jstests/aggregation/extras/utils.js');
-
 // Clear db
 db.s6143.drop();
 

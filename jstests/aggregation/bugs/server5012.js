@@ -1,6 +1,7 @@
 // use aggdb
 db = db.getSiblingDB("aggdb");
 
+load('jstests/aggregation/data/articles.js');
 // original crash from ticket
 var r3 = db.runCommand({ aggregate:"article", pipeline:[
     { $project: {
