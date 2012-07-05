@@ -28,7 +28,7 @@ doTest = function( signal ) {
         master.getDB("foo").foo.save({a: i});
     }
 
-    replTest.waitForAllMembers();
+    waitForAllMembers(master.getDB("foo"));
     // This method will check the oplogs of the master
     // and slaves in the set and wait until the change has replicated.
     replTest.awaitReplication();
