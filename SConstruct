@@ -26,6 +26,7 @@ import types
 import urllib
 import urllib2
 from buildscripts import utils
+from buildscripts import moduleconfig
 
 import libdeps
 
@@ -834,6 +835,14 @@ def doConfigure(myenv):
 
         myenv.Append( CPPDEFINES=[ "HEAP_CHECKING" ] )
         myenv.Append( CCFLAGS=["-fno-omit-frame-pointer"] )
+
+    # discover modules (subdirectories of db/modules/), and
+    # load the (python) module for each module's build.py
+    modules = moduleconfig.discover_modules('.')
+
+    # ask each module to configure itself, and return a
+    # dictionary of name => list_of_sources for each module.
+    env["MONGO_MODULES"] = moduleconfig.configure_modules(modules, conf, env)
 
     return conf.Finish()
 
