@@ -23,7 +23,7 @@ hot backup cursor}
 column group cursor}
    @row{<tt>config:[\<uri\>]</tt>,
 object configuration cursor (key=config string\,
-value=config value}
+value=config value)}
   @row{<tt>table:\<tablename\></tt>,
 table cursor (key=table key\, value=table value)}
   @row{<tt>file:\<filename\></tt>,
