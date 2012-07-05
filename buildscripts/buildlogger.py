@@ -48,6 +48,11 @@ import traceback
 import urllib2
 import utils
 
+# suppress deprecation warnings that happen when
+# we import the 'buildbot.tac' file below
+import warnings
+warnings.simplefilter('ignore', DeprecationWarning)
+
 try:
     import json
 except:
