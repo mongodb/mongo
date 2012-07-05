@@ -226,9 +226,15 @@ static int
 __curstat_reset(WT_CURSOR *cursor)
 {
 	WT_CURSOR_STAT *cst;
+	WT_SESSION_IMPL *session;
 
 	cst = (WT_CURSOR_STAT *)cursor;
+	CURSOR_API_CALL_NOCONF(cursor, session, reset, cst->btree);
+
 	cst->notpositioned = 1;
+	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+
+	API_END(session);
 	return (0);
 }
 
