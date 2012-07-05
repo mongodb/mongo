@@ -766,7 +766,7 @@ namespace mongo {
         }
     }
 
-     static void appendAverageMsIfAvailable(
+     static void appendAverageMicrosIfAvailable(
              BSONObjBuilder &buf, const std::string &name, const BenchRunEventCounter &counter) {
 
          if (counter.getNumEvents() > 0)
@@ -795,11 +795,11 @@ namespace mongo {
          buf.append( "note" , "values per second" );
          buf.append( "errCount", (long long) stats.errCount );
          buf.append( "trapped", "error: not implemented" );
-         appendAverageMsIfAvailable(buf, "findOneLatencyAverageMs", stats.findOneCounter);
-         appendAverageMsIfAvailable(buf, "insertLatencyAverageMs", stats.insertCounter);
-         appendAverageMsIfAvailable(buf, "deleteLatencyAverageMs", stats.deleteCounter);
-         appendAverageMsIfAvailable(buf, "updateLatencyAverageMs", stats.updateCounter);
-         appendAverageMsIfAvailable(buf, "queryLatencyAverageMs", stats.queryCounter);
+         appendAverageMicrosIfAvailable(buf, "findOneLatencyAverageMicros", stats.findOneCounter);
+         appendAverageMicrosIfAvailable(buf, "findOneLatencyAverageMicros", stats.insertCounter);
+         appendAverageMicrosIfAvailable(buf, "findOneLatencyAverageMicros", stats.deleteCounter);
+         appendAverageMicrosIfAvailable(buf, "findOneLatencyAverageMicros", stats.updateCounter);
+         appendAverageMicrosIfAvailable(buf, "findOneLatencyAverageMicros", stats.queryCounter);
 
          {
              BSONObjIterator i( after );
