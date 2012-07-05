@@ -21,6 +21,7 @@
 
 #include "mongo/db/client_common.h"
 #include "mongo/db/security.h"
+#include "mongo/s/chunk.h"
 #include "mongo/s/writeback_listener.h"
 #include "mongo/util/net/hostandport.h"
 
@@ -93,7 +94,7 @@ namespace mongo {
                            bool fromWriteBackListener = false );
 
         /** @return if its ok to auto split from this client */
-        bool autoSplitOk() const { return _autoSplitOk; }
+        bool autoSplitOk() const { return _autoSplitOk && Chunk::ShouldAutoSplit; }
 
         void noAutoSplit() { _autoSplitOk = false; }
 

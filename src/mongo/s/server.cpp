@@ -307,6 +307,9 @@ int _main(int argc, char* argv[]) {
     general_options.add_options()
     ("nohttpinterface", "disable http interface");
 
+    hidden_options.add_options()
+    ("noAutoSplit", "do not send split commands with writes");
+
 #if defined(_WIN32)
     CmdLine::addWindowsOptions( windows_scm_options, hidden_options );
 #endif
@@ -385,6 +388,11 @@ int _main(int argc, char* argv[]) {
 
     if (params.count("nohttpinterface")) {
         noHttpInterface = true;
+    }
+
+    if (params.count("noAutoSplit")) {
+        warning() << "running with auto-splitting disabled" << endl;
+        Chunk::ShouldAutoSplit = false;
     }
 
     if ( ! params.count( "configdb" ) ) {

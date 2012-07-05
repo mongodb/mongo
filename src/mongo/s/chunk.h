@@ -176,6 +176,8 @@ namespace mongo {
         static string chunkMetadataNS;
         static int MaxChunkSize;
         static int MaxObjectPerChunk;
+        static bool ShouldAutoSplit;
+
         //
         // accessors and helpers
         //
