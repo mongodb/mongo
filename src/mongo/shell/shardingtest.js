@@ -214,6 +214,7 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
                            oplogSize : 40,
                            pathOpts : Object.merge( pathOpts, { shard : i } )}
             
+            rsDefaults = Object.merge( rsDefaults, ShardingTest.rsOptions || {} )
             rsDefaults = Object.merge( rsDefaults, otherParams.rs )
             rsDefaults = Object.merge( rsDefaults, otherParams.rsOptions )
             rsDefaults = Object.merge( rsDefaults, otherParams["rs" + i] )
@@ -242,6 +243,8 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
                             dbpath : "$testName$shard",
                             keyFile : keyFile
                           }
+            
+            options = Object.merge( options, ShardingTest.shardOptions || {} )
             
             if( otherParams.shardOptions && otherParams.shardOptions.binVersion ){
                 otherParams.shardOptions.binVersion = 
@@ -300,6 +303,8 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
                             configsvr : ""
                           }
             
+            options = Object.merge( options, ShardingTest.configOptions || {} )
+            
             if( otherParams.configOptions && otherParams.configOptions.binVersion ){
                 otherParams.configOptions.binVersion = 
                     MongoRunner.versionIterator( otherParams.configOptions.binVersion )
@@ -351,6 +356,8 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
             options.chunkSize = otherParams.chunksize || otherParams.chunkSize || 50;
         }
 
+        options = Object.merge( options, ShardingTest.mongosOptions || {} )
+        
         if( otherParams.mongosOptions && otherParams.mongosOptions.binVersion ){
             otherParams.mongosOptions.binVersion = 
                 MongoRunner.versionIterator( otherParams.mongosOptions.binVersion )

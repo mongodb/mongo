@@ -334,7 +334,7 @@ MongoRunner.mongoOptions = function( opts ){
     opts.pathOpts = Object.merge( opts.pathOpts || {}, { port : "" + opts.port, runId : "" + opts.runId } )
     
     // Normalize the binary version if it exists
-    if( opts.binVersion ){
+    if( opts.binVersion && opts.binVersion != "latest" && opts.binVersion != "" ){
         
         // Convert to string
         opts.binVersion = opts.binVersion + ""
