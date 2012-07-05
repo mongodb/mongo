@@ -25,7 +25,6 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <errno.h>
 #include <snappy-c.h>
 #include <stdlib.h>
 #include <string.h>
