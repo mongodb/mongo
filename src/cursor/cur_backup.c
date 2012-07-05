@@ -65,6 +65,7 @@ __curbackup_reset(WT_CURSOR *cursor)
 	CURSOR_API_CALL_NOCONF(cursor, session, reset, NULL);
 
 	cb->next = 0;
+	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
 	API_END(session);
 	return (0);
