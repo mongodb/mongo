@@ -77,7 +77,7 @@ namespace mongo {
             out << "   vsize    \t- virtual size of process in megabytes\n";
             out << "   res      \t- resident size of process in megabytes\n";
             out << "   faults   \t- # of pages faults per sec\n";
-            out << "   locked   \t- percent of time in global write lock\n";
+            out << "   locked   \t- locked db and lock time for db with most lock use\n";
             out << "   idx miss \t- percent of btree page misses (sampled)\n";
             out << "   qr|qw    \t- queue lengths for clients waiting (read|write)\n";
             out << "   ar|aw    \t- active clients (read|write)\n";
@@ -272,7 +272,7 @@ namespace mongo {
                 if ( ! conn.connect( state->host , errmsg ) )
                     state->error = errmsg;
                 long long cycleNumber = 0;
-                
+
                 if (! (state->username.empty() && state->password.empty()))
                     conn.auth("admin", state->username, state->password, errmsg);
 
@@ -392,7 +392,7 @@ namespace mongo {
 
         int runMany() {
             StateMap threads;
-            
+
             {
                 string orig = getParam( "host" );
                 bool showPorts = false;
@@ -549,4 +549,3 @@ int main( int argc , char ** argv ) {
     mongo::Stat stat;
     return stat.main( argc , argv );
 }
-
