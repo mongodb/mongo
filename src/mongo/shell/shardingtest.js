@@ -291,7 +291,8 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
                             port : 29000 + i,
                             pathOpts : Object.merge( pathOpts, { config : i } ),
                             dbpath : "$testName-config$config",
-                            keyFile : keyFile
+                            keyFile : keyFile,
+                            configsvr : ""
                           }
             
             options = Object.merge( options, otherParams.configOptions )

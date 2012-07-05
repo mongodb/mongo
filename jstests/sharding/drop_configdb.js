@@ -1,15 +1,8 @@
-var shardA = startMongodEmpty("--shardsvr", "--port", 30001, "--dbpath", "/data/db/drop_config_shardA", "--nopreallocj");
-var shardB = startMongodEmpty("--shardsvr", "--port", 30002, "--dbpath", "/data/db/drop_config_shardB", "--nopreallocj");
-var configsvr = startMongodEmpty("--configsvr", "--port", 29999, "--dbpath", "/data/db/drop_config_configC", "--nopreallocj");
-
-var mongos = startMongos({ port : 30000, configdb : "localhost:29999" })
-
-var admin = mongos.getDB("admin")
-
-admin.runCommand({ addshard : "localhost:30001" })
-admin.runCommand({ addshard : "localhost:30002" })
-
-var config = configsvr.getDB( "config" )
+// Test that dropping the config database is completely disabled via
+// mongos and via mongod, if started with --configsvr
+var st = new ShardingTest({ shards : 2, config : 1, other : {separateConfig : true}});
+var mongos = st.s;
+var config = st._configServers[0].getDB('config');
 
 // Try to drop config db via configsvr
 
@@ -30,9 +23,4 @@ config.dropDatabase()
 print ( "2: Ensure it wasn't dropped" )
 assert.eq( 1, config.databases.find({ _id : "admin", partitioned : false, primary : "config"}).toArray().length )
 
-
-// Finish
-stopMongod( 30000 );
-stopMongod( 29999 );
-stopMongod( 30001 );
-stopMongod( 30002 );
+st.stop();
