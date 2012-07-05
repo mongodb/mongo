@@ -36,8 +36,10 @@
 #include <errno.h>
 #include <inttypes.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/stat.h>
 
 #include <wiredtiger.h>
 
@@ -781,7 +783,7 @@ hot_backup(WT_SESSION *session)
 	int ret;
 
 	/* Create the backup directory. */
-	ret = mkdir("/path/database.backup");
+	ret = mkdir("/path/database.backup", 077);
 
 	/* Open the hot backup data source. */
 	ret = session->open_cursor(session, "backup:", NULL, NULL, &cursor);
