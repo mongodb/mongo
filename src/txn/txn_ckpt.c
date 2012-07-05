@@ -55,6 +55,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 			    "require quoting",
 			    (const char *)tmp->data);
 
+		WT_ERR(__wt_buf_fmt(session, tmp, "%.*s", (int)k.len, k.str));
 		if ((ret = __wt_schema_worker(
 		    session, tmp->data, __wt_checkpoint, cfg, 0)) != 0)
 			WT_ERR_MSG(session, ret, "%s", (const char *)tmp->data);
