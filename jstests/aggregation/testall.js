@@ -1067,37 +1067,6 @@ var p19 = db.runCommand({aggregate : "article", pipeline : [
         month: {$month: "$posted"},
         week: {$week: "$posted"},
         year: {$year: "$posted"}
-    }},
-    { $project : {
-        authors: 1,
-        posted: 1,
-        seconds: 1,
-        minutes: 1,
-        hour: 1,
-        dayOfYear: 1,
-        dayOfMonth: 1,
-        dayOfWeek: 1,
-        month: 1,
-        week: 1,
-        year: 1,
-        testDate: {$isoDate:{
-            year: "$year", month: "$month", dayOfMonth: "$dayOfMonth",
-            hour: "$hour", minute: "$minutes", second: "$seconds"}}
-    }},
-    { $project : {
-        authors: 1,
-        posted: 1,
-        seconds: 1,
-        minutes: 1,
-        hour: 1,
-        dayOfYear: 1,
-        dayOfMonth: 1,
-        dayOfWeek: 1,
-        month: 1,
-        week: 1,
-        year: 1,
-        testDate: 1,
-        isEqual: {$eq:["$posted", "$testDate"]}
     }}
 ]});
 
@@ -1114,8 +1083,6 @@ var p19result = [
         "month" : 3,
         "week" : 12,
         "year" : 2004,
-        "testDate" : ISODate("2004-03-21T18:59:54Z"),
-        "isEqual" : true
     },
     {
         "_id" : 2,
@@ -1129,8 +1096,6 @@ var p19result = [
         "month" : 8,
         "week" : 31,
         "year" : 2030,
-        "testDate" : ISODate("2030-08-08T04:11:10Z"),
-        "isEqual" : true
     },
     {
         "_id" : 3,
@@ -1144,8 +1109,6 @@ var p19result = [
         "month" : 12,
         "week" : 53,
         "year" : 2000,
-        "testDate" : ISODate("2000-12-31T05:17:14Z"),
-        "isEqual" : true
     }
 ];
 

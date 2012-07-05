@@ -770,61 +770,6 @@ namespace mongo {
     };
 
 
-    class ExpressionIsoDate :
-        public ExpressionNary {
-    public:
-        // virtuals from ExpressionNary
-        virtual ~ExpressionIsoDate();
-        virtual intrusive_ptr<const Value> evaluate(
-            const intrusive_ptr<Document> &pDocument) const;
-        virtual const char *getOpName() const;
-        virtual void addOperand(const intrusive_ptr<Expression> &pExpression);
-
-        static intrusive_ptr<ExpressionNary> create();
-
-    private:
-        ExpressionIsoDate();
-
-        static const char argYear[];
-        static const char argMonth[];
-        static const char argDayOfMonth[];
-        static const char argHour[];
-        static const char argMinute[];
-        static const char argSecond[];
-
-        static const unsigned flagYear;
-        static const unsigned flagMonth;
-        static const unsigned flagDayOfMonth;
-        static const unsigned flagHour;
-        static const unsigned flagMinute;
-        static const unsigned flagSecond;
-        unsigned flag;
-
-        /**
-           Get a named long argument out of the given document.
-
-           @param pArgs the evaluated document with the named arguments in it
-           @param pName the name of the argument
-           @param defaultValue the value to return if the argument isn't found
-           @returns the value if found, otherwise zero
-           @throws uassert for non-whole numbers or non-numbers
-         */
-        int getIntArg(
-            const intrusive_ptr<Document> &pArgs,
-            const char *pName, int defaultValue) const;
-
-        /**
-           Check that the named argument fits in an integer.
-
-           @params pName the name of the argument
-           @params value the long value of the argument
-           @returns the integer value
-           @throws uassert if the value is out of range
-         */
-        int checkIntRange(const char *pName, long long value) const;
-    };
-
-
     class ExpressionLiteral :
         public ExpressionNary {
     public:
