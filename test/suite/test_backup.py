@@ -25,7 +25,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_util13.py
+# test_backup.py
 # 	Utilities: wt backup
 #
 
@@ -35,8 +35,8 @@ import wiredtiger, wttest
 from helper import compareFiles
 
 # Test backup (both backup cursors and the wt backup command).
-class test_util13(wttest.WiredTigerTestCase, suite_subprocess):
-    namepfx = 'test_util13.'
+class test_backup(wttest.WiredTigerTestCase, suite_subprocess):
+    namepfx = 'test_backup.'
 
     objs=4                      # Number of objects
     dir='backup.dir'            # Backup directory name
@@ -106,11 +106,62 @@ class test_util13(wttest.WiredTigerTestCase, suite_subprocess):
     # Test backup of random object types.
     def test_illegal_objects(self):
         for target in ('colgroup:xxx', 'index:xxx'):
-            msg = 'session.open_cursor: %s: ' % target
-            msg += 'invalid backup target object: Invalid argument\n'
-            config =  'target=("%s")' % target
-            self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda:
-                self.session.open_cursor('backup:', None, config), msg)
+            msg = '/invalid backup target object/'
+            config = 'target=("%s")' % target
+            self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+                lambda: self.session.open_cursor('backup:', None, config), msg)
+
+    # Test simple backup cursor open/close; it's OK to have more than one
+    # backup cursor open at a time.
+    def test_cursor_simple(self):
+        c1 = self.session.open_cursor('backup:', None, None)
+        c2 = self.session.open_cursor('backup:', None, None)
+        c3 = self.session.open_cursor('backup:', None, None)
+        c2.close()
+        c3.close()
+        c1.close()
+
+    # Test that cursor reset runs through the list again.
+    def test_cursor_reset(self):
+        self.populate()
+        cursor = self.session.open_cursor('backup:', None, None)
+        i = 0
+        while True:
+            ret = cursor.next()
+            if ret != 0:
+                break;
+            i += 1
+        self.assertEqual(ret, wiredtiger.WT_NOTFOUND)
+        self.assertEqual(i, self.objs *  2)
+        cursor.reset()
+        while True:
+            ret = cursor.next()
+            if ret != 0:
+                break;
+            i += 1
+        self.assertEqual(ret, wiredtiger.WT_NOTFOUND)
+        self.assertEqual(i, self.objs * 4)
+
+    # Checkpoints shouldn't be deleted while backup cursors are open.
+    def test_checkpoint_delete(self):
+        self.populate()
+
+        # Confirm checkpoints are being deleted.
+        self.session.checkpoint("name=one")
+        self.session.checkpoint("name=two,drop=(one)")
+        msg = '/no "one" checkpoint found/'
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda:
+            self.session.open_cursor(
+            'table:' + self.namepfx + '1', None, "checkpoint=one"), msg)
+
+        # Confirm opening a backup cursor stops that from happening.
+        self.session.checkpoint("name=three")
+        backup = self.session.open_cursor('backup:', None, None)
+        self.session.checkpoint("name=four,drop=(three)")
+        cursor = self.session.open_cursor(
+            'table:' + self.namepfx + '1', None, "checkpoint=three")
+        cursor.close()
+        backup.close()
 
 if __name__ == '__main__':
     wttest.run()
