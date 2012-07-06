@@ -43,8 +43,9 @@ namespace mongo {
      * @param localThresholdMillis the exclusive upper bound of ping time to be
      *     considered as a local node. Local nodes are favored over non-local
      *     nodes if multiple nodes matches the other criteria.
-     * @param nextNodeIndex the index of the next node to begin from checking.
-     *     Can advance to a different index (mainly used for doing round-robin).
+     * @param lastHost the last host returned (mainly used for doing round-robin).
+     *     Will be overwritten with the newly returned host if not empty. Should
+     *     never be NULL.
      *
      * @return the host object of the node selected. If none of the nodes are
      *     eligible, returns an empty host.
@@ -53,15 +54,15 @@ namespace mongo {
                             const BSONObj& readPreferenceTag,
                             bool secOnly,
                             int localThresholdMillis,
-                            const HostAndPort& lastHost) {
-        HostAndPort fallbackNode;
+                            HostAndPort* lastHost /* in/out */) {
+        HostAndPort fallbackHost;
 
         // Implicit: start from index 0 if lastHost doesn't exist anymore
         size_t nextNodeIndex = 0;
 
-        if (!lastHost.empty()) {
+        if (!lastHost->empty()) {
             for (size_t x = 0; x < nodes.size(); x++) {
-                if (lastHost == nodes[x].addr) {
+                if (*lastHost == nodes[x].addr) {
                     nextNodeIndex = x;
                     break;
                 }
@@ -83,18 +84,23 @@ namespace mongo {
 
             if (node.matchesTag(readPreferenceTag)) {
                 // found an ok candidate; may not be local.
-                fallbackNode = node.addr;
+                fallbackHost = node.addr;
 
                 if (node.isLocalSecondary(localThresholdMillis)) {
                     // found a local node.  return early.
                     log(2) << "dbclient_rs getSlave found local secondary for queries: "
                            << nextNodeIndex << ", ping time: " << node.pingTimeMillis << endl;
-                    return fallbackNode;
+                    *lastHost = fallbackHost;
+                    return fallbackHost;
                 }
             }
         }
 
-        return fallbackNode;
+        if (!fallbackHost.empty()) {
+            *lastHost = fallbackHost;
+        }
+
+        return fallbackHost;
     }
 
     /**
@@ -988,8 +994,7 @@ namespace mongo {
     }
 
     HostAndPort ReplicaSetMonitor::selectAndCheckNode(ReadPreference preference,
-                                                      TagSet* tags,
-                                                      const HostAndPort& lastHost) {
+                                                      TagSet* tags) {
 
         HostAndPort candidate;
         bool tryRefreshing = false;
@@ -997,7 +1002,7 @@ namespace mongo {
         {
             scoped_lock lk(_lock);
             candidate = ReplicaSetMonitor::selectNode(_nodes, preference, tags,
-                    _localThresholdMillis, lastHost, &tryRefreshing);
+                    _localThresholdMillis, &_lastReadPrefHost, &tryRefreshing);
         }
 
         if (tryRefreshing) {
@@ -1010,7 +1015,7 @@ namespace mongo {
                     _master >= 0);
 
             return ReplicaSetMonitor::selectNode(_nodes, preference, tags, _localThresholdMillis,
-                    lastHost, &tryRefreshing);
+                    &_lastReadPrefHost, &tryRefreshing);
         }
 
         return candidate;
@@ -1021,7 +1026,7 @@ namespace mongo {
                                               ReadPreference preference,
                                               TagSet* tags,
                                               int localThresholdMillis,
-                                              const HostAndPort& lastHost,
+                                              HostAndPort* lastHost,
                                               bool* tryRefreshing) {
         switch (preference) {
         case ReadPreference_PrimaryOnly:
@@ -1472,7 +1477,7 @@ namespace mongo {
         }
 
         ReplicaSetMonitorPtr monitor = _getMonitor();
-        _lastSlaveOkHost = monitor->selectAndCheckNode(preference, tags, _lastSlaveOkHost);
+        _lastSlaveOkHost = monitor->selectAndCheckNode(preference, tags);
 
         if ( _lastSlaveOkHost.empty() ){
             return NULL;

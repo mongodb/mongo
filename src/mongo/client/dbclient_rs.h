@@ -139,7 +139,9 @@ namespace mongo {
          *     nodes if multiple nodes matches the other criteria.
          * @param lastHost the host used in the last successful request. This is used for
          *     selecting a different node as much as possible, by doing a simple round
-         *     robin, starting from the node next to this lastHost.
+         *     robin, starting from the node next to this lastHost. This will be overwritten
+         *     with the newly chosen host if not empty, not primary and when preference
+         *     is not Nearest.
          * @param tryRefreshing an out parameter for notifying the caller that it needs
          *     to refresh the view of the nodes.
          *
@@ -150,7 +152,7 @@ namespace mongo {
                                       ReadPreference preference,
                                       TagSet* tags,
                                       int localThresholdMillis,
-                                      const HostAndPort& lastHost,
+                                      HostAndPort* lastHost,
                                       bool* tryRefreshing);
 
         /**
@@ -161,16 +163,12 @@ namespace mongo {
          *
          * @param preference the read mode to use
          * @param tags the tags used for filtering nodes
-         * @param lastHost the host used in the last successful request. This is used for
-         *     selecting a different node as much as possible, by doing a simple round
-         *     robin, starting from the node next to this lastHost.
          *
          * @return the host object of the node selected. If none of the nodes are
          *     eligible, returns an empty host.
          */
         HostAndPort selectAndCheckNode(ReadPreference preference,
-                                       TagSet* tags,
-                                       const HostAndPort& lastHost);
+                                       TagSet* tags);
 
         /**
          * Creates a new ReplicaSetMonitor, if it doesn't already exist.
@@ -338,7 +336,8 @@ namespace mongo {
          */
         bool _checkConnMatch_inlock( DBClientConnection* conn, size_t nodeOffset ) const;
 
-        // protects _localThresholdMillis, _nodes and refs to _nodes (eg. _master & _nextSlave)
+        // protects _localThresholdMillis, _nodes and refs to _nodes
+        // (eg. _master & _lastReadPrefHost)
         mutable mongo::mutex _lock;
 
         /**
@@ -357,9 +356,12 @@ namespace mongo {
          * Host list.
          */
         std::vector<Node> _nodes;
-
         int _master; // which node is the current master.  -1 means no master is known
-        int _nextSlave; // which node is the current slave
+        int _nextSlave; // which node is the current slave, only used by the deprecated getSlave
+
+        // last host returned by _selectNode, used for round robin selection
+        HostAndPort _lastReadPrefHost;
+
         // The number of consecutive times the set has been checked and every member in the set was down.
         int _failedChecks;
 
