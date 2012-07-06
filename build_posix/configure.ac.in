@@ -50,9 +50,12 @@ fi
 
 AM_CONDITIONAL([DEBUG], [test "$wt_cv_enable_debug" = "yes"])
 
-# Python API
+# Java and Python APIs
 if test "$wt_cv_enable_python" = "yes"; then
 	AM_PATH_PYTHON([2.6])
+fi
+
+if test "$wt_cv_enable_java" = "yes" -o "$wt_cv_enable_python" = "yes"; then
         AC_PATH_PROG([SWIG], [swig], [swig])
 fi
 
