@@ -640,7 +640,6 @@ __conn_single(WT_SESSION_IMPL *session, const char **cfg)
 
 	conn = S2C(session);
 
-#define	WT_FLAGFILE	"WiredTiger"
 	/*
 	 * Optionally create the wiredtiger flag file if it doesn't already
 	 * exist.  We don't actually care if we create it or not, the "am I the
@@ -648,7 +647,7 @@ __conn_single(WT_SESSION_IMPL *session, const char **cfg)
 	 */
 	WT_RET(__wt_config_gets(session, cfg, "create", &cval));
 	WT_RET(__wt_open(session,
-	    WT_FLAGFILE, cval.val == 0 ? 0 : 1, 0, 0, &conn->lock_fh));
+	    WT_SINGLETHREAD, cval.val == 0 ? 0 : 1, 0, 0, &conn->lock_fh));
 
 	/*
 	 * Lock a byte of the file: if we don't get the lock, some other process
@@ -684,7 +683,7 @@ __conn_single(WT_SESSION_IMPL *session, const char **cfg)
 	WT_ERR(__wt_filesize(session, conn->lock_fh, &size));
 	if (size == 0) {
 		len = (uint32_t)snprintf(buf, sizeof(buf), "%s\n%s\n",
-		    WT_FLAGFILE, wiredtiger_version(NULL, NULL, NULL));
+		    WT_SINGLETHREAD, wiredtiger_version(NULL, NULL, NULL));
 		WT_ERR(__wt_write(
 		    session, conn->lock_fh, (off_t)0, (uint32_t)len, buf));
 		created = 1;
@@ -894,9 +893,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		WT_ERR(conn->iface.load_extension(&conn->iface,
 		    expath.data, (sval.len > 0) ? exconfig.data : NULL));
 	}
-	if (ret == WT_NOTFOUND)
-		ret = 0;
-	WT_ERR(ret);
+	WT_ERR_NOTFOUND_OK(ret);
 
 	/*
 	 * Open the connection; if that fails, the connection handle has been
@@ -907,18 +904,22 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		WT_ERR(ret);
 	}
 
+	/* Open the default session. */
 	WT_ERR(__wt_open_session(conn, 1, NULL, NULL, &conn->default_session));
 	session = conn->default_session;
 
 	/*
 	 * Check on the turtle and metadata files, creating them if necessary
 	 * (which avoids application threads racing to create the metadata file
-	 * later).  We need a session handle for this, open one.
+	 * later).
 	 */
-	if ((ret = __wt_meta_turtle_init(session, &exist)) == 0 && !exist)
-		ret = __wt_schema_create(session, WT_METADATA_URI, NULL);
-	WT_ERR(ret);
+	WT_ERR(__wt_meta_turtle_init(session, &exist));
+	if (!exist)
+		WT_ERR(__wt_schema_create(session, WT_METADATA_URI, NULL));
 	WT_ERR(__wt_metadata_open(session));
+
+	/* If there's a hot-backup file, load it. */
+	WT_ERR(__wt_metadata_load_backup(session));
 
 	STATIC_ASSERT(offsetof(WT_CONNECTION_IMPL, iface) == 0);
 	*wt_connp = &conn->iface;

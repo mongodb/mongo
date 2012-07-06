@@ -5,6 +5,7 @@ managing WiredTiger applications:
 
 - @subpage home
 - @subpage database_config
+- @subpage hot_backup
 - @subpage filesystems
 - @subpage security
 

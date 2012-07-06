@@ -189,6 +189,8 @@ struct __wt_connection_impl {
 	WT_SPINLOCK schema_lock;	/* Schema operation spinlock */
 	WT_SPINLOCK serial_lock;	/* Serial function call spinlock */
 
+	int ckpt_backup;		/* Backup: don't delete checkpoints */
+
 					/* Connection queue */
 	TAILQ_ENTRY(__wt_connection_impl) q;
 

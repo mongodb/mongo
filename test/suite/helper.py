@@ -25,31 +25,25 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_util04.py
-# 	Utilities: wt drop
-#
 
 import os
-from suite_subprocess import suite_subprocess
-import wiredtiger, wttest
 
-class test_util04(wttest.WiredTigerTestCase, suite_subprocess):
-    tablename = 'test_util04.a'
-    nentries = 1000
-
-    def test_drop_process(self):
-        """
-        Test drop in a 'wt' process
-        """
-        params = 'key_format=S,value_format=S'
-        self.session.create('table:' + self.tablename, params)
-
-        self.assertTrue(os.path.exists(self.tablename + ".wt"))
-        self.runWt(["drop", "table:" + self.tablename])
-
-        self.assertFalse(os.path.exists(self.tablename + ".wt"))
-        self.assertRaises(wiredtiger.WiredTigerError, lambda:
-            self.session.open_cursor('table:' + self.tablename, None, None))
-
-if __name__ == '__main__':
-    wttest.run()
+# python has a filecmp.cmp function, but different versions of python approach
+# file comparison differently.  To make sure we get byte for byte comparison,
+# we define it here.
+def compareFiles(filename1, filename2):
+    bufsize = 4096
+    if os.path.getsize(filename1) != os.path.getsize(filename2):
+        print filename1 + ' size = ' + str(os.path.getsize(filename1))
+        print filename2 + ' size = ' + str(os.path.getsize(filename2))
+        return False
+    with open(filename1, "rb") as fp1:
+        with open(filename2, "rb") as fp2:
+            while True:
+                b1 = fp1.read(bufsize)
+                b2 = fp2.read(bufsize)
+                if b1 != b2:
+                    return False
+                # files are identical size
+                if not b1:
+                    return True

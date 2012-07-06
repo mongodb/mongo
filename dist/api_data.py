@@ -257,8 +257,8 @@ methods = {
 
 'session.open_cursor' : Method(cursor_runtime_config + [
 	Config('append', 'false', r'''
-		only supported by cursors with record number keys: append the
-		value as a new record, creating a new record number key''',
+		append the value as a new record, creating a new record
+		number key; valid only for cursors with record number keys''',
 		type='boolean'),
 	Config('bulk', 'false', r'''
 		configure the cursor for bulk loads; bulk-load is a fast
@@ -281,8 +281,9 @@ methods = {
 		choices=['snapshot', 'read-committed', 'read-uncommitted']),
 	Config('next_random', 'false', r'''
 		configure the cursor to return a pseudo-random record from
-		the object.  Cursors configured for random retrieval only
-		support the WT_CURSOR::next and WT_CURSOR::close methods''',
+		the object; valid only for row-store cursors.  Cursors
+		configured with next_random only support the WT_CURSOR::next
+		and WT_CURSOR::close methods''',
 		type='boolean'),
 	Config('raw', 'false', r'''
 		ignore the encodings for the key and value, manage data as if
@@ -292,9 +293,13 @@ methods = {
 		configure the cursor for statistics''',
 		type='boolean'),
 	Config('statistics_clear', 'false', r'''
-		statistics cursors only; reset statistics counters when the
-		cursor is closed''',
+		reset statistics counters when the cursor is closed; valid
+		only for statistics cursors''',
 		type='boolean'),
+	Config('target', '', r'''
+		if non-empty, backup the list of objects; valid only for a
+		backup data source''',
+		type='list'),
 ]),
 
 'session.rename' : Method([]),

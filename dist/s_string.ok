@@ -219,6 +219,7 @@ connectionp
 crc
 cref
 ctype
+curbackup
 curbtree
 curbulk
 curconfig

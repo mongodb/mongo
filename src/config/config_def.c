@@ -210,7 +210,7 @@ const char *
 __wt_confdfl_session_open_cursor =
     "append=false,bulk=false,checkpoint="",dump="",isolation=read-committed,"
     "next_random=false,overwrite=false,raw=false,statistics=false,"
-    "statistics_clear=false";
+    "statistics_clear=false,target=()";
 
 const char *
 __wt_confchk_session_open_cursor =
@@ -218,7 +218,7 @@ __wt_confchk_session_open_cursor =
     "dump=(choices=[\"hex\",\"print\"]),isolation=(choices=[\"snapshot\","
     "\"read-committed\",\"read-uncommitted\"]),next_random=(type=boolean),"
     "overwrite=(type=boolean),raw=(type=boolean),statistics=(type=boolean),"
-    "statistics_clear=(type=boolean)";
+    "statistics_clear=(type=boolean),target=(type=list)";
 
 const char *
 __wt_confdfl_session_rename =

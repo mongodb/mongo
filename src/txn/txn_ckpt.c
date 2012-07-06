@@ -41,31 +41,26 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	tracking = 1;
 
 	/* Step through the list of targets and checkpoint each one. */
-	cval.len = 0;
 	WT_ERR(__wt_config_gets(session, cfg, "target", &cval));
-	if (cval.len != 0) {
-		WT_ERR(__wt_scr_alloc(session, 512, &tmp));
-		WT_ERR(__wt_config_subinit(session, &targetconf, &cval));
-		while ((ret = __wt_config_next(&targetconf, &k, &v)) == 0) {
+	WT_ERR(__wt_config_subinit(session, &targetconf, &cval));
+	while ((ret = __wt_config_next(&targetconf, &k, &v)) == 0) {
+		if (!target_list) {
+			WT_ERR(__wt_scr_alloc(session, 512, &tmp));
 			target_list = 1;
-			WT_ERR(__wt_buf_fmt(session, tmp, "%.*s",
-			    (int)k.len, k.str));
-
-			if (v.len != 0)
-				WT_ERR_MSG(session, EINVAL,
-				    "invalid checkpoint target \"%s\": "
-				    "URIs may require quoting",
-				    (const char *)tmp->data);
-
-			ret = __wt_schema_worker(
-			    session, tmp->data, __wt_checkpoint, cfg, 0);
-
-			if (ret != 0)
-				WT_ERR_MSG(session, ret, "%s",
-				    (const char *)tmp->data);
 		}
-		WT_ERR_NOTFOUND_OK(ret);
+
+		if (v.len != 0)
+			WT_ERR_MSG(session, EINVAL,
+			    "invalid checkpoint target \"%s\": URIs may "
+			    "require quoting",
+			    (const char *)tmp->data);
+
+		WT_ERR(__wt_buf_fmt(session, tmp, "%.*s", (int)k.len, k.str));
+		if ((ret = __wt_schema_worker(
+		    session, tmp->data, __wt_checkpoint, cfg, 0)) != 0)
+			WT_ERR_MSG(session, ret, "%s", (const char *)tmp->data);
 	}
+	WT_ERR_NOTFOUND_OK(ret);
 
 	if (!target_list) {
 		/*
@@ -227,11 +222,13 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_CKPT *ckpt, *ckptbase, *deleted;
 	WT_CONFIG dropconf;
 	WT_CONFIG_ITEM cval, k, v;
+	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	const char *name;
 	char *name_alloc;
 	int force;
 
+	conn = S2C(session);
 	btree = session->btree;
 	force = 0;
 	ckpt = ckptbase = NULL;
@@ -267,11 +264,14 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	}
 
 	/*
-	 * We may be dropping checkpoints, check the configuration.  If we're
-	 * dropping checkpoints, set force, we have to create the checkpoint
-	 * even if the tree is clean.
+	 * We may be dropping specific checkpoints, check the configuration.
+	 * If we're dropping checkpoints, set force, we have to create the
+	 * checkpoint even if the tree is clean.
+	 *
+	 * Note: even if the application wants to drop checkpoints, we can't
+	 * do it if there's a hot backup running.
 	 */
-	if (cfg != NULL) {
+	if (conn->ckpt_backup == 0 && cfg != NULL) {
 		cval.len = 0;
 		WT_ERR(__wt_config_gets(session, cfg, "drop", &cval));
 		if (cval.len != 0) {
@@ -299,7 +299,8 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	}
 
 	/* Discard checkpoints with the same name as the new checkpoint. */
-	__drop(ckptbase, name, strlen(name));
+	if (conn->ckpt_backup == 0)
+		__drop(ckptbase, name, strlen(name));
 
 	/* Add a new checkpoint entry at the end of the list. */
 	WT_CKPT_FOREACH(ckptbase, ckpt)

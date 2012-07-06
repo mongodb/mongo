@@ -555,6 +555,10 @@ extern void __wt_connection_destroy(WT_CONNECTION_IMPL *conn);
 extern int __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[]);
 extern int __wt_connection_close(WT_CONNECTION_IMPL *conn);
 extern void __wt_conn_stat_init(WT_SESSION_IMPL *session);
+extern int __wt_curbackup_open(WT_SESSION_IMPL *session,
+    const char *uri,
+    const char *cfg[],
+    WT_CURSOR **cursorp);
 extern int __wt_curbulk_init(WT_CURSOR_BULK *cbulk);
 extern int __wt_curconfig_open(WT_SESSION_IMPL *session,
     const char *uri,
@@ -644,6 +648,7 @@ extern int __wt_meta_ckptlist_set( WT_SESSION_IMPL *session,
 extern void __wt_meta_ckptlist_free(WT_SESSION_IMPL *session,
     WT_CKPT *ckptbase);
 extern int __wt_metadata_open(WT_SESSION_IMPL *session);
+extern int __wt_metadata_load_backup(WT_SESSION_IMPL *session);
 extern int __wt_metadata_cursor( WT_SESSION_IMPL *session,
     const char *config,
     WT_CURSOR **cursorp);

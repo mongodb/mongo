@@ -1,13 +1,13 @@
 /*! @page security Security
 
-@section directory Database directory permissions
+@section directory_permissions Database directory permissions
 
 All WiredTiger files are stored in the database home directory, and the
 WiredTiger database directory should have its permissions set to ensure
 database objects are not accessible to users without appropriate
 permissions.  See @ref home for more information.
 
-@section file File permissions
+@section file_permissions File permissions
 
 WiredTiger creates file system objects readable and writable by the
 process owner, group and user, as modified by the process' umask value.

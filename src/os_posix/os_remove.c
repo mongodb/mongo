@@ -41,7 +41,7 @@ __wt_remove(WT_SESSION_IMPL *session, const char *name)
 
 	__wt_free(session, path);
 
-	if (ret == 0)
+	if (ret == 0 || ret == ENOENT)
 		return (0);
 
 	WT_RET_MSG(session, ret, "%s: remove", name);
