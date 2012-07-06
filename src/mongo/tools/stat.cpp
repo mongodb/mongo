@@ -77,7 +77,7 @@ namespace mongo {
             out << "   vsize    \t- virtual size of process in megabytes\n";
             out << "   res      \t- resident size of process in megabytes\n";
             out << "   faults   \t- # of pages faults per sec\n";
-            out << "   locked   \t- locked db and lock time for db with most lock use\n";
+            out << "   locked   \t- name of and percent time for most locked database\n";
             out << "   idx miss \t- percent of btree page misses (sampled)\n";
             out << "   qr|qw    \t- queue lengths for clients waiting (read|write)\n";
             out << "   ar|aw    \t- active clients (read|write)\n";
