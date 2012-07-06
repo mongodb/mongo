@@ -1581,59 +1581,15 @@ namespace mongo {
             pShardPipeline->getInitialQuery(&shardQueryBuilder);
             BSONObj shardQuery(shardQueryBuilder.done());
 
-            ChunkManagerPtr cm(conf->getChunkManager(fullns));
-            set<Shard> shards;
-            cm->getShardsForQuery(shards, shardQuery);
+            // Run the command on the shards
+            map<Shard, BSONObj> shardResults;
+            SHARDED->commandOp(dbName, shardedCommand, options, fullns, shardQuery, shardResults);
 
-            /*
-              From MRCmd::Run: "we need to use our connections to the shard
-              so filtering is done correctly for un-owned docs so we allocate
-              them in our thread and hand off"
-            */
-            vector<boost::shared_ptr<ShardConnection> > shardConns;
-            list<boost::shared_ptr<Future::CommandResult> > futures;
-            for (set<Shard>::iterator i=shards.begin(), end=shards.end();
-                 i != end; i++) {
-                boost::shared_ptr<ShardConnection> temp(
-                    new ShardConnection(i->getConnString(), fullns));
-                verify(temp->get());
-                futures.push_back(
-                    Future::spawnCommand(i->getConnString(), dbName,
-                                         shardedCommand , 0, temp->get()));
-                shardConns.push_back(temp);
-            }
-                    
-            /* wrap the list of futures with a source */
-            intrusive_ptr<DocumentSourceCommandFutures> pSource(
-                DocumentSourceCommandFutures::create(
-                    errmsg, &futures, pExpCtx));
+            // Combine the shards' output and finish the pipeline
+            pPipeline->run(result, errmsg,
+                    DocumentSourceCommandShards::create(shardResults, pExpCtx));
 
-            /* run the pipeline */
-            bool failed = pPipeline->run(result, errmsg, pSource);
-
-/*
-            BSONObjBuilder shardresults;
-            for (list<boost::shared_ptr<Future::CommandResult> >::iterator i(
-                     futures.begin()); i!=futures.end(); ++i) {
-                boost::shared_ptr<Future::CommandResult> res(*i);
-                if (!res->join()) {
-                    error() << "sharded pipeline failed on shard: " <<
-                        res->getServer() << " error: " << res->result() << endl;
-                    result.append( "cause" , res->result() );
-                    errmsg = "mongod pipeline failed: ";
-                    errmsg += res->result().toString();
-                    failed = true;
-                    continue;
-                }
-
-                shardresults.append( res->getServer() , res->result() );
-            }
-*/
-
-            for(unsigned i = 0; i < shardConns.size(); ++i)
-                shardConns[i]->done();
-
-            if (failed && (errmsg.length() > 0))
+            if (errmsg.length() > 0)
                 return false;
 
             return true;

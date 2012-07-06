@@ -16,14 +16,15 @@
 
 #include "pch.h"
 
-#include "db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source.h"
+#include "mongo/s/shard.h"
 
 namespace mongo {
 
-    DocumentSourceCommandFutures::~DocumentSourceCommandFutures() {
+    DocumentSourceCommandShards::~DocumentSourceCommandShards() {
     }
 
-    bool DocumentSourceCommandFutures::eof() {
+    bool DocumentSourceCommandShards::eof() {
         /* if we haven't even started yet, do so */
         if (!pCurrent.get())
             getNextDocument();
@@ -31,7 +32,7 @@ namespace mongo {
         return (pCurrent.get() == NULL);
     }
 
-    bool DocumentSourceCommandFutures::advance() {
+    bool DocumentSourceCommandShards::advance() {
         DocumentSource::advance(); // check for interrupts
 
         if (eof())
@@ -43,44 +44,43 @@ namespace mongo {
         return (pCurrent.get() != NULL);
     }
 
-    intrusive_ptr<Document> DocumentSourceCommandFutures::getCurrent() {
+    intrusive_ptr<Document> DocumentSourceCommandShards::getCurrent() {
         verify(!eof());
         return pCurrent;
     }
 
-    void DocumentSourceCommandFutures::setSource(DocumentSource *pSource) {
+    void DocumentSourceCommandShards::setSource(DocumentSource *pSource) {
         /* this doesn't take a source */
         verify(false);
     }
 
-    void DocumentSourceCommandFutures::sourceToBson(
+    void DocumentSourceCommandShards::sourceToBson(
         BSONObjBuilder *pBuilder, bool explain) const {
         /* this has no BSON equivalent */
         verify(false);
     }
 
-    DocumentSourceCommandFutures::DocumentSourceCommandFutures(
-        string &theErrmsg, FuturesList *pList,
+    DocumentSourceCommandShards::DocumentSourceCommandShards(
+        const ShardOutput& shardOutput,
         const intrusive_ptr<ExpressionContext> &pExpCtx):
         DocumentSource(pExpCtx),
         newSource(false),
         pBsonSource(),
         pCurrent(),
-        iterator(pList->begin()),
-        listEnd(pList->end()),
-        errmsg(theErrmsg) {
-    }
+        iterator(shardOutput.begin()),
+        listEnd(shardOutput.end())
+    {}
 
-    intrusive_ptr<DocumentSourceCommandFutures>
-    DocumentSourceCommandFutures::create(
-        string &errmsg, FuturesList *pList,
+    intrusive_ptr<DocumentSourceCommandShards>
+    DocumentSourceCommandShards::create(
+        const ShardOutput& shardOutput,
         const intrusive_ptr<ExpressionContext> &pExpCtx) {
-        intrusive_ptr<DocumentSourceCommandFutures> pSource(
-            new DocumentSourceCommandFutures(errmsg, pList, pExpCtx));
+        intrusive_ptr<DocumentSourceCommandShards> pSource(
+            new DocumentSourceCommandShards(shardOutput, pExpCtx));
         return pSource;
     }
 
-    void DocumentSourceCommandFutures::getNextDocument() {
+    void DocumentSourceCommandShards::getNextDocument() {
         while(true) {
             if (!pBsonSource.get()) {
                 /* if there aren't any more futures, we're done */
@@ -90,36 +90,30 @@ namespace mongo {
                 }
 
                 /* grab the next command result */
-                shared_ptr<Future::CommandResult> pResult(*iterator);
+                BSONObj resultObj = iterator->second;
+
+                uassert(16387, str::stream() << "sharded pipeline failed on shard " <<
+                                            iterator->first.getName() << ": " <<
+                                            resultObj.toString(),
+                        resultObj["ok"].trueValue());
+
+                /* grab the result array out of the shard server's response */
+                BSONElement resultArray = resultObj["result"];
+                massert(16388, str::stream() << "no result array? shard:" <<
+                                            iterator->first.getName() << ": " <<
+                                            resultObj.toString(),
+                        resultArray.type() == Array);
+
+                // done with error checking, don't need the shard name anymore
                 ++iterator;
 
-                /* try to wait for it */
-                if (!pResult->join()) {
-                    error() << "sharded pipeline failed on shard: " <<
-                        pResult->getServer() << " error: " <<
-                        pResult->result() << endl;
-                    errmsg += "-- mongod pipeline failed: ";
-                    errmsg += pResult->result().toString();
-
-                    /* move on to the next command future */
+                if (resultArray.embeddedObject().isEmpty()){
+                    // this shard had no results, on to the next one
                     continue;
                 }
 
-                /* grab the result array out of the shard server's response */
-                BSONObj shardResult(pResult->result());
-                BSONObjIterator objIterator(shardResult);
-                while(objIterator.more()) {
-                    BSONElement element(objIterator.next());
-                    const char *pFieldName = element.fieldName();
-
-                    /* find the result array and quit this loop */
-                    if (strcmp(pFieldName, "result") == 0) {
-                        pBsonSource = DocumentSourceBsonArray::create(
-                            &element, pExpCtx);
-                        newSource = true;
-                        break;
-                    }
-                }
+                pBsonSource = DocumentSourceBsonArray::create(&resultArray, pExpCtx);
+                newSource = true;
             }
 
             /* if we're done with this shard's results, try the next */

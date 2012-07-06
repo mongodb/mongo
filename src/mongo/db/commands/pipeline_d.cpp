@@ -20,6 +20,7 @@
 
 #include "db/cursor.h"
 #include "db/pipeline/document_source.h"
+#include "mongo/client/dbclientinterface.h"
 
 
 namespace mongo {
