@@ -579,7 +579,7 @@ def add_exe(e):
         e += ".exe"
     return e
 
-def set_globals(options):
+def set_globals(options, tests):
     global mongod_executable, mongod_port, shell_executable, continue_on_failure, small_oplog, small_oplog_rs, no_journal, no_preallocj, auth, keyFile, smoke_db_prefix, test_path
     #Careful, this can be called multiple times
     test_path = options.test_path
@@ -601,8 +601,15 @@ def set_globals(options):
         small_oplog_rs = options.small_oplog_rs
     no_journal = options.no_journal
     no_preallocj = options.no_preallocj
-    auth = options.auth
-    keyFile = options.keyFile
+    if options.mode == 'suite' and tests == ['client']:
+        # The client suite doesn't work with authentication
+        if options.auth:
+            print "Not running client suite with auth even though --auth was provided"
+        auth = False;
+        keyFile = False;
+    else:
+        auth = options.auth
+        keyFile = options.keyFile
 
     if auth and not keyFile:
         # if only --auth was given to smoke.py, load the
@@ -740,7 +747,7 @@ def main():
     global tests
     (options, tests) = parser.parse_args()
 
-    set_globals(options)
+    set_globals(options, tests)
 
     buildlogger_opts = (options.buildlogger_builder, options.buildlogger_buildnum, options.buildlogger_credentials)
     if all(buildlogger_opts):
