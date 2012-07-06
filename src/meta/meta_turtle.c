@@ -60,45 +60,43 @@ __wt_meta_turtle_read(
     WT_SESSION_IMPL *session, const char *key, const char **valuep)
 {
 	FILE *fp;
+	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
-	size_t buflen, len;
 	int match;
 	const char *path;
-	char *buf;
 
 	fp = NULL;
 	path = NULL;
-	buf = NULL;
 
 	/* Open the turtle file. */
 	WT_RET(__wt_filename(session, WT_METADATA_TURTLE, &path));
 	WT_ERR_TEST((fp = fopen(path, "r")) == NULL, WT_NOTFOUND);
 
 	/* Search for the key. */
-	for (buflen = 0, match = 0;;) {
-		WT_ERR(__wt_getline(session, &buf, &buflen, &len, fp));
-		if (len == 0)
+	WT_ERR(__wt_scr_alloc(session, 512, &buf));
+	for (match = 0;;) {
+		WT_ERR(__wt_getline(session, buf, fp));
+		if (buf->size == 0)
 			WT_ERR(WT_NOTFOUND);
-		if (strcmp(key, buf) == 0)
+		if (strcmp(key, buf->data) == 0)
 			match = 1;
 
 		/* Key matched: read the subsequent line for the value. */
-		WT_ERR(__wt_getline(session, &buf, &buflen, &len, fp));
-		if (len == 0)
+		WT_ERR(__wt_getline(session, buf, fp));
+		if (buf->size == 0)
 			WT_ERR(__wt_illegal_value(session, WT_METADATA_TURTLE));
 		if (match)
 			break;
 	}
 
 	/* Copy the value for the caller. */
-	WT_ERR(__wt_strdup(session, buf, valuep));
+	WT_ERR(__wt_strdup(session, buf->data, valuep));
 
 err:	if (fp != NULL)
 		WT_TRET(fclose(fp));
 	if (path != NULL)
 		__wt_free(session, path);
-	if (buf != NULL)
-		__wt_free(session, buf);
+	__wt_scr_free(&buf);
 	return (ret);
 }
 

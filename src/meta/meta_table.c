@@ -57,13 +57,12 @@ int
 __wt_metadata_load_backup(WT_SESSION_IMPL *session)
 {
 	FILE *fp;
+	WT_DECL_ITEM(key);
+	WT_DECL_ITEM(value);
 	WT_DECL_RET;
-	size_t keylen, keybuflen, valuelen, valuebuflen;
-	char *key, *value;
 	const char *path;
 
 	fp = NULL;
-	key = value = NULL;
 	path = NULL;
 
 	/* Look for a hot backup file: if we find it, load it. */
@@ -74,17 +73,17 @@ __wt_metadata_load_backup(WT_SESSION_IMPL *session)
 	}
 
 	/* Read line pairs and load them into the metadata file. */
-	key = value = NULL;
-	keybuflen = valuebuflen = 0;
+	WT_ERR(__wt_scr_alloc(session, 512, &key));
+	WT_ERR(__wt_scr_alloc(session, 512, &value));
 	for (;;) {
-		WT_ERR(__wt_getline(session, &key, &keybuflen, &keylen, fp));
-		if (keylen == 0)
+		WT_ERR(__wt_getline(session, key, fp));
+		if (key->size == 0)
 			break;
-		WT_ERR(
-		    __wt_getline(session, &value, &valuebuflen, &valuelen, fp));
-		if (valuelen == 0)
+		WT_ERR(__wt_getline(session, value, fp));
+		if (value->size == 0)
 			WT_ERR(__wt_illegal_value(session, WT_METADATA_BACKUP));
-		WT_ERR(__wt_metadata_update(session, key, value));
+		WT_ERR(__wt_metadata_update(
+		    session, (char *)key->data, (char *)value->data));
 	}
 
 	/* Remove the hot backup file, it's only read (successfully) once. */
@@ -92,12 +91,10 @@ __wt_metadata_load_backup(WT_SESSION_IMPL *session)
 
 err:	if (fp != NULL)
 		WT_TRET(fclose(fp));
-	if (key != NULL)
-		__wt_free(session, key);
-	if (value != NULL)
-		__wt_free(session, value);
 	if (path != NULL)
 		__wt_free(session, path);
+	__wt_scr_free(&key);
+	__wt_scr_free(&value);
 	return (ret);
 }
 

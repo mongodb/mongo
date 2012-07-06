@@ -19,33 +19,31 @@
  * (so the caller's EOF marker is a returned line length of 0).
  */
 int
-__wt_getline(WT_SESSION_IMPL *session,
-    char **bufp, size_t *buflenp, size_t *lenp, FILE *fp)
+__wt_getline(WT_SESSION_IMPL *session, WT_ITEM *buf, FILE *fp)
 {
-	size_t len;
 	int c;
 
-	if (*buflenp == 0)	/* A length of 0 implies buffer allocation */
-		*bufp = NULL;
+	/*
+	 * We always NUL-terminate the returned string (even if it's empty),
+	 * make sure there's buffer space for a trailing NUL in all cases.
+	 */
+	WT_RET(__wt_buf_init(session, buf, 10));
 
-	for (len = 0; (c = fgetc(fp)) != EOF;) {
+	while ((c = fgetc(fp)) != EOF) {
 		/* Leave space for a trailing NUL. */
-		if (len + 1 >= *buflenp)
-			WT_RET(__wt_realloc(
-			    session, buflenp, len + 1024, bufp));
+		if (buf->size + 1 >= buf->memsize)
+			WT_RET(__wt_buf_grow(session, buf, buf->size + 1024));
 		if (c == '\n') {
-			if (len == 0)
+			if (buf->size == 0)
 				continue;
 			break;
 		}
-		(*bufp)[len++] = (char)c;
+		((char *)buf->data)[buf->size++] = (char)c;
 	}
 	if (c == EOF && ferror(fp))
-		return (__wt_errno());
+		WT_RET_MSG(session, __wt_errno(), "file read");
 
-	if (len > 0)
-		(*bufp)[len] = '\0';
-	*lenp = len;
+	((char *)buf->data)[buf->size] = '\0';
 
 	return (0);
 }
