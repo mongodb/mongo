@@ -29,6 +29,9 @@ def discover_modules(mongo_root):
     found_modules = {}
 
     module_root = abspath(join(mongo_root, 'db', 'modules'))
+    if not isdir(module_root):
+        return found_modules
+
     for name in listdir(module_root):
         root = join(module_root, name)
         if '.' in name or not isdir(root):
