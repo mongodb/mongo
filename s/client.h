@@ -17,6 +17,7 @@
  */
 
 #include "../pch.h"
+#include "chunk.h"
 #include "writeback_listener.h"
 #include "../db/security.h"
 
@@ -78,7 +79,7 @@ namespace mongo {
         bool getLastError( const BSONObj& options , BSONObjBuilder& result , bool fromWriteBackListener = false );
 
         /** @return if its ok to auto split from this client */
-        bool autoSplitOk() const { return _autoSplitOk; }
+        bool autoSplitOk() const { return _autoSplitOk && Chunk::ShouldAutoSplit; }
         
         void noAutoSplit() { _autoSplitOk = false; }
 

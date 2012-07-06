@@ -49,6 +49,8 @@ namespace mongo {
     int Chunk::MaxChunkSize = 1024 * 1024 * 64;
     int Chunk::MaxObjectPerChunk = 250000;
     
+    // Can be overridden from command line
+    bool Chunk::ShouldAutoSplit = true;
 
     Chunk::Chunk(const ChunkManager * manager, BSONObj from)
         : _manager(manager), _lastmod(0), _dataWritten(mkDataWritten())
