@@ -81,7 +81,10 @@ namespace mongo {
         enum { UNKNOWN, NOTOPERATOR, OPERATOR } kind = UNKNOWN;
 
         BSONObj obj(pBsonElement->Obj());
+        if (obj.isEmpty())
+            return ExpressionObject::create();
         BSONObjIterator iter(obj);
+
         for(size_t fieldCount = 0; iter.more(); ++fieldCount) {
             BSONElement fieldElement(iter.next());
             const char *pFieldName = fieldElement.fieldName();
