@@ -88,7 +88,8 @@ DB.prototype.addUser = function( username , pass, readOnly, replicatedTo ){
         // printjson( le )
     }
     catch (e) {
-        if ( tojson(e).indexOf( "login" ) >= 0 ) {
+        errjson = tojson(e);
+        if ( errjson.indexOf( "login" ) >= 0 || errjson.indexOf( "unauthorized" ) >= 0 ) {
             // TODO: this check is a hack
             print( "addUser succeeded, but cannot wait for replication since we no longer have auth" );
             return "";
