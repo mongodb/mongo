@@ -32,6 +32,9 @@ adminDB.addUser( roUser, password, true, st.rs0.numNodes );
 testDB.addUser( rwUser, password, false, st.rs0.numNodes );
 testDB.addUser( roUser, password, true, st.rs0.numNodes );
 
+authenticatedConn = new Mongo( mongos.host );
+authenticatedConn.getDB( 'admin' ).auth( rwUser, password );
+
 // Add user to shards to prevent localhost connections from having automatic full access
 st.rs0.getPrimary().getDB( 'admin' ).addUser( 'user', 'password', false, 3 );
 st.rs1.getPrimary().getDB( 'admin' ).addUser( 'user', 'password', false, 3 );
@@ -111,7 +114,7 @@ var checkReadOps = function( hasReadAuth ) {
     } else {
         print( "Checking read operations, should fail" );
         assert.throws( function() { testDB.foo.find().itcount(); } );
-        assert.eq(0, testDB.runCommand({getlasterror : 1}).err.indexOf('unauthorized') );
+        assert.eq(0, testDB.runCommand({getlasterror : 1}).ok);
         checkCommandFailed( testDB, {dbstats : 1} );
         checkCommandFailed( testDB, {collstats : 'foo'} );
         checkCommandFailed( testDB, {mapreduce : 'foo', map : map, reduce : reduce,
@@ -159,7 +162,7 @@ var checkWriteOps = function( hasWriteAuth ) {
     } else {
         print( "Checking write operations, should fail" );
         testDB.foo.insert({a : 1, i : 1, j : 1});
-        assert.eq(0, testDB.runCommand({getlasterror:1}).err.indexOf('unauthorized') );
+        assert.eq(0, authenticatedConn.getDB('test').foo.count({a : 1, i : 1, j : 1}));
         checkCommandFailed( testDB, { findAndModify: "foo", query: {a:1, i:1, j:1},
                                       update: {$set: {b:1}}} );
         checkCommandFailed( testDB, {reIndex:'foo'} );
