@@ -137,6 +137,8 @@ __wt_curbackup_open(WT_SESSION_IMPL *session,
 		__curbackup_close,
 		(int (*)		/* reconfigure */
 		    (WT_CURSOR *, const char *))__wt_cursor_notsup,
+		(int (*) (WT_CURSOR *,	/* duplicate */
+		    const char *, WT_CURSOR **))__wt_cursor_notsup,
 		{ NULL, NULL },		/* TAILQ_ENTRY q */
 		0,			/* recno key */
 		{ 0 },                  /* recno raw buffer */

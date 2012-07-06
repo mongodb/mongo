@@ -35,6 +35,10 @@ __wt_cursor_set_notsup(WT_CURSOR *cursor)
 	cursor->insert = __wt_cursor_notsup;
 	cursor->update = __wt_cursor_notsup;
 	cursor->remove = __wt_cursor_notsup;
+	cursor->reconfigure =
+	    (int (*)(WT_CURSOR *, const char *))__wt_cursor_notsup;
+	cursor->duplicate = (int (*)
+	    (WT_CURSOR *, const char *, WT_CURSOR **))__wt_cursor_notsup;
 }
 
 /*
@@ -374,24 +378,20 @@ err:	API_END(session);
 }
 
 /*
- * __wt_cursor_dup --
+ * __cursor_duplicate --
  *	Duplicate a cursor.
  */
-int
-__wt_cursor_dup(WT_SESSION_IMPL *session,
-    WT_CURSOR *to_dup, const char *config, WT_CURSOR **cursorp)
+static int
+__cursor_duplicate(WT_CURSOR *to_dup, const char *config, WT_CURSOR **cursorp)
 {
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	WT_ITEM key;
-	WT_SESSION *wt_session;
 	uint32_t saved_flags;
 
-	wt_session = &session->iface;
-
 	/* First open a new cursor with the same URI. */
-	WT_ERR(wt_session->open_cursor(
-	    wt_session, to_dup->uri, NULL, config, &cursor));
+	WT_ERR(to_dup->session->open_cursor(
+	    to_dup->session, to_dup->uri, NULL, config, &cursor));
 
 	/*
 	 * If the original cursor is positioned, copy the key and position the
@@ -485,6 +485,8 @@ __wt_cursor_init(WT_CURSOR *cursor,
 		WT_RET_MSG(session, EINVAL, "cursor lacks a close method");
 	if (cursor->reconfigure == NULL)
 		cursor->reconfigure = __cursor_reconfigure;
+	if (cursor->duplicate == NULL)
+		cursor->duplicate = __cursor_duplicate;
 
 	if (cursor->uri == NULL)
 		WT_RET(__wt_strdup(session, uri, &cursor->uri));

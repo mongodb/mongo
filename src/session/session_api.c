@@ -128,12 +128,13 @@ __session_open_cursor(WT_SESSION *wt_session,
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_API_CALL(session, open_cursor, config, cfg);
 
-	if (uri != NULL && to_dup != NULL)
+	if ((to_dup == NULL && uri == NULL) || (to_dup != NULL && uri != NULL))
 		WT_ERR_MSG(session, EINVAL,
-		    "should be passed either a URI or a cursor, but not both");
+		    "should be passed either a URI or a cursor to duplicate, "
+		    "but not both");
 
 	if (to_dup != NULL)
-		ret = __wt_cursor_dup(session, to_dup, config, cursorp);
+		ret = to_dup->duplicate(to_dup, config, cursorp);
 	else if (WT_PREFIX_MATCH(uri, "backup:"))
 		ret = __wt_curbackup_open(session, uri, cfg, cursorp);
 	else if (WT_PREFIX_MATCH(uri, "colgroup:"))
