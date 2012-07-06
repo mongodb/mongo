@@ -111,15 +111,17 @@ class test_backup(wttest.WiredTigerTestCase, suite_subprocess):
             self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
                 lambda: self.session.open_cursor('backup:', None, config), msg)
 
-    # Test simple backup cursor open/close; it's OK to have more than one
-    # backup cursor open at a time.
+    # Test simple backup cursor open/close.
     def test_cursor_simple(self):
-        c1 = self.session.open_cursor('backup:', None, None)
-        c2 = self.session.open_cursor('backup:', None, None)
-        c3 = self.session.open_cursor('backup:', None, None)
-        c2.close()
-        c3.close()
-        c1.close()
+        cursor = self.session.open_cursor('backup:', None, None)
+        cursor.close()
+
+    # You can't have more than one backup cursor open at a time.
+        cursor = self.session.open_cursor('backup:', None, None)
+        msg = '/there is already a backup cursor open/'
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.session.open_cursor('backup:', None, None), msg)
+	cursor.close()
 
     # Test that cursor reset runs through the list again.
     def test_cursor_reset(self):

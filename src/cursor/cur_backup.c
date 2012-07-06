@@ -199,14 +199,10 @@ __backup_start(
 	 * Checkpoints cannot be deleted until the backup finishes; no barrier
 	 * is necessary, we're holding the checkpoint lock, so this write must
 	 * complete before that lock is released.
-	 *
-	 * We increment the hot backup counter, there's no reason you couldn't
-	 * have multiple hot backups proceeding in parallel, even thought it's
-	 * an unlikely choice to make.  Bound it out of paranoia.
 	 */
-	if (conn->ckpt_backup >= 10)
+	if (conn->ckpt_backup)
 		WT_ERR_MSG(session, EINVAL,
-		    "there are already %d backups running", conn->ckpt_backup);
+		    "there is already a backup cursor open");
 
 	/* Create the hot backup file. */
 	WT_ERR(__backup_file_create(session, &bfp));
@@ -225,7 +221,7 @@ __backup_start(
 	bfp = NULL;
 	WT_ERR_TEST(ret == EOF, __wt_errno());
 
-	++conn->ckpt_backup;
+	conn->ckpt_backup = 1;
 
 err:	if (bfp != NULL)
 		(void)fclose(bfp);
@@ -249,11 +245,7 @@ __backup_stop(WT_SESSION_IMPL *session)
 	conn = S2C(session);
 
 	/* Checkpoint deletion can proceed. */
-	if (conn->ckpt_backup == 0) {
-		ret = EINVAL;
-		__wt_errx(session, "backup counter went negative");
-	} else
-		--conn->ckpt_backup;
+	conn->ckpt_backup = 0;
 
 	/* Remove any backup metadata file. */
 	WT_TRET(__backup_file_remove(session));
