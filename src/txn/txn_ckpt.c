@@ -267,17 +267,19 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * We may be dropping specific checkpoints, check the configuration.
 	 * If we're dropping checkpoints, set force, we have to create the
 	 * checkpoint even if the tree is clean.
-	 *
-	 * Note: even if the application wants to drop checkpoints, we can't
-	 * do it if there's a hot backup running.
 	 */
-	if (conn->ckpt_backup == 0 && cfg != NULL) {
+	if (cfg != NULL) {
 		cval.len = 0;
 		WT_ERR(__wt_config_gets(session, cfg, "drop", &cval));
 		if (cval.len != 0) {
 			WT_ERR(__wt_config_subinit(session, &dropconf, &cval));
 			while ((ret =
 			    __wt_config_next(&dropconf, &k, &v)) == 0) {
+				/* We can't drop checkpoints if in a backup. */
+				if (conn->ckpt_backup)
+					WT_ERR_MSG(session, EINVAL,
+					    "checkpoints cannot be dropped "
+					    "while backup cursors are open");
 				force = 1;
 
 				if (v.len == 0)
@@ -298,8 +300,13 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 		}
 	}
 
-	/* Discard checkpoints with the same name as the new checkpoint. */
-	if (conn->ckpt_backup == 0)
+	/*
+	 * Discard checkpoints with the same name as the new checkpoint.  We
+	 * can't discard checkpoints if a backup cursor is open, but we don't
+	 * fail in this case, dropping this checkpoint wasn't a request made
+	 * by the application.
+	 */
+	if (conn->ckpt_backup)
 		__drop(ckptbase, name, strlen(name));
 
 	/* Add a new checkpoint entry at the end of the list. */
