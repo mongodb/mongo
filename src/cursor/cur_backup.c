@@ -82,6 +82,7 @@ __curbackup_close(WT_CURSOR *cursor)
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	char **p;
+	int tret;
 
 	cb = (WT_CURSOR_BACKUP *)cursor;
 	CURSOR_API_CALL_NOCONF(cursor, session, close, NULL);
@@ -95,7 +96,9 @@ __curbackup_close(WT_CURSOR *cursor)
 
 	ret = __wt_cursor_close(cursor);
 
-	WT_TRET(__backup_stop(session));		/* Stop the backup. */
+	WT_WITH_SCHEMA_LOCK(session,
+	    tret = __backup_stop(session));		/* Stop the backup. */
+	WT_TRET(tret);
 
 	API_END(session);
 	return (ret);
@@ -155,8 +158,12 @@ __wt_curbackup_open(WT_SESSION_IMPL *session,
 
 	cursor->key_format = "S";	/* Return the file names as the key. */
 
-	/* Start the backup and fill in the cursor's list. */
-	WT_ERR(__backup_start(session, cb, cfg));
+	/*
+	 * Start the backup and fill in the cursor's list.  Acquire the API
+	 * lock, we need a quiescent view.
+	 */
+	WT_WITH_SCHEMA_LOCK(session, ret = __backup_start(session, cb, cfg));
+	WT_ERR(ret);
 
 	/* __wt_cursor_init is last so we don't have to clean up on error. */
 	STATIC_ASSERT(offsetof(WT_CURSOR_BACKUP, iface) == 0);
@@ -187,9 +194,6 @@ __backup_start(
 	bfp = NULL;
 	cb->next = 0;
 	cb->list = NULL;
-
-	/* Acquire the API lock, we need a quiescent view. */
-	__wt_spin_lock(session, &conn->schema_lock);
 
 	/*
 	 * Checkpoints cannot be deleted until the backup finishes; no barrier
@@ -229,7 +233,6 @@ err:	if (bfp != NULL)
 	if (ret != 0)
 		(void)__backup_file_remove(session);
 
-	__wt_spin_unlock(session, &conn->schema_lock);
 	return (ret);
 }
 
@@ -245,8 +248,6 @@ __backup_stop(WT_SESSION_IMPL *session)
 
 	conn = S2C(session);
 
-	__wt_spin_lock(session, &conn->schema_lock);
-
 	/* Checkpoint deletion can proceed. */
 	if (conn->ckpt_backup == 0) {
 		ret = EINVAL;
@@ -256,8 +257,6 @@ __backup_stop(WT_SESSION_IMPL *session)
 
 	/* Remove any backup metadata file. */
 	WT_TRET(__backup_file_remove(session));
-
-	__wt_spin_unlock(session, &conn->schema_lock);
 
 	return (ret);
 }
