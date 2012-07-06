@@ -306,7 +306,7 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * fail in this case, dropping this checkpoint wasn't a request made
 	 * by the application.
 	 */
-	if (conn->ckpt_backup)
+	if (!conn->ckpt_backup)
 		__drop(ckptbase, name, strlen(name));
 
 	/* Add a new checkpoint entry at the end of the list. */
