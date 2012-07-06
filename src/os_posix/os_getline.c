@@ -29,7 +29,8 @@ __wt_getline(WT_SESSION_IMPL *session,
 		*bufp = NULL;
 
 	for (len = 0; (c = fgetc(fp)) != EOF;) {
-		if (len >= *buflenp)
+		/* Leave space for a trailing NUL. */
+		if (len + 1 >= *buflenp)
 			WT_RET(__wt_realloc(
 			    session, buflenp, len + 1024, bufp));
 		if (c == '\n') {
@@ -42,7 +43,8 @@ __wt_getline(WT_SESSION_IMPL *session,
 	if (c == EOF && ferror(fp))
 		return (__wt_errno());
 
-	(*bufp)[len] = '\0';
+	if (len > 0)
+		(*bufp)[len] = '\0';
 	*lenp = len;
 
 	return (0);
