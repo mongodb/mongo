@@ -49,7 +49,6 @@ var s6121 = db.runCommand(
         }}
 ]});
 // Assert we get the error we want
-assert.eq(s6121.result, [ ], 's6121 failed confirming that date and timestamp cant be compared');
 assert.eq(s6121.ok, 0, 's6121 failed confirming that date and timestamp cant be compared');
 assert.eq(s6121.code, 15994, 's6121 failed confirming that date and timestamp cant be compared');
 

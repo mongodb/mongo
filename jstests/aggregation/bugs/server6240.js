@@ -13,7 +13,6 @@
 
 // Function for checking
 function check_answer(agg_result, errno) {
-    assert.eq(agg_result.result, [ ], 's6240 failed');
     assert.eq(agg_result.ok, 0, 's6240 failed');
     assert.eq(agg_result.code, errno, 's6240 failed');
 }

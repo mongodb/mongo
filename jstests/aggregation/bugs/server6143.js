@@ -27,7 +27,6 @@ var s6143 = db.runCommand(
 
 // Result should be the following error document
 s6143result = {
-    "result" : [],
     "errmsg" : "exception: can't convert from BSON type NULL to Date",
     "code" : 16006,
     "ok" : 0

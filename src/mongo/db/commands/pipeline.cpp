@@ -403,50 +403,37 @@ namespace mongo {
           We do this even if we're doing an explain, in order to capture
           the document counts and other stats.  However, we don't capture
           the result documents for explain.
-
-          We wrap all the BSONObjBuilder calls with a try/catch in case the
-          objects get too large and cause an exception.
         */
-        try {
-            if (explain) {
-                if (!pCtx->getInRouter())
-                    writeExplainShard(result, pInputSource);
-                else {
-                    writeExplainMongos(result, pInputSource);
-                }
+        if (explain) {
+            if (!pCtx->getInRouter())
+                writeExplainShard(result, pInputSource);
+            else {
+                writeExplainMongos(result, pInputSource);
             }
-            else
-            {
-                // the array in which the aggregation results reside
-                BSONArrayBuilder resultArray (result.subarrayStart("result"));
-                for(bool hasDoc = !pSource->eof(); hasDoc; hasDoc = pSource->advance()) {
-                    intrusive_ptr<Document> pDocument(pSource->getCurrent());
+        }
+        else {
+            // the array in which the aggregation results reside
+            // cant use subArrayStart() due to error handling
+            BSONArrayBuilder resultArray;
+            for(bool hasDoc = !pSource->eof(); hasDoc; hasDoc = pSource->advance()) {
+                intrusive_ptr<Document> pDocument(pSource->getCurrent());
 
-                    /* add the document to the result set */
-                    BSONObjBuilder documentBuilder (resultArray.subobjStart());
-                    pDocument->toBson(&documentBuilder);
-                    documentBuilder.doneFast();
-                }
-
-                resultArray.doneFast();
+                /* add the document to the result set */
+                BSONObjBuilder documentBuilder (resultArray.subobjStart());
+                pDocument->toBson(&documentBuilder);
+                documentBuilder.doneFast();
+                // object will be too large, assert. the extra 1KB is for headers
+                uassert(16387,
+                        str::stream() << "aggregation result exceeds maximum document size ("
+                                      << BSONObjMaxUserSize / (1024 * 1024) << "MB)",
+                        resultArray.len() < BSONObjMaxUserSize - 1024);
             }
-         } catch(AssertionException &ae) {
-            /* 
-               If its not the "object too large" error, rethrow.
-               At time of writing, that error code comes from
-               mongo/src/mongo/bson/util/builder.h
-            */
-            if (ae.getCode() != 13548)
-                throw;
 
-            /* throw the nicer human-readable error */
-            uassert(16029, str::stream() <<
-                    "aggregation result exceeds maximum document size limit ("
-                    << (BSONObjMaxUserSize / (1024 * 1024)) << "MB)",
-                    false);
-         }
+            resultArray.done();
+            result.appendArray("result", resultArray.arr());
+        }
 
-        return true;
+    return true;
     }
 
     void Pipeline::writeExplainOps(BSONArrayBuilder *pArrayBuilder) const {
