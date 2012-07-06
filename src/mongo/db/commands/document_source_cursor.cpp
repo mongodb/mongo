@@ -71,14 +71,25 @@ namespace mongo {
 
     void DocumentSourceCursor::advanceAndYield() {
         cursor()->advance();
-        /*
-          TODO ask for index key pattern in order to determine which index
-          was used for this particular document; that will allow us to
-          sometimes use ClientCursor::MaybeCovered.
-          See https://jira.mongodb.org/browse/SERVER-5224 .
-        */
-        bool cursorOk = cursor()->yieldSometimes( ClientCursor::WillNeed );
-        uassert( 16028, "collection or database disappeared when cursor yielded", cursorOk );
+
+        try { // SERVER-5752 may make this try unnecessary
+            /*
+              TODO ask for index key pattern in order to determine which index
+              was used for this particular document; that will allow us to
+              sometimes use ClientCursor::MaybeCovered.
+              See https://jira.mongodb.org/browse/SERVER-5224 .
+            */
+            bool cursorOk = cursor()->yieldSometimes( ClientCursor::WillNeed );
+            uassert( 16028, "collection or database disappeared when cursor yielded", cursorOk );
+        }
+        catch(SendStaleConfigException& e){
+            // We want to ignore this because the migrated documents will be filtered out of the
+            // cursor anyway and, we don't want to restart the aggregation after every migration.
+
+            log() << "Config changed during aggregation - command will resume" << endl;
+            // useful for debugging but off by default to avoid looking like a scary error.
+            LOG(1) << "aggregation stale config exception: " << e.what() << endl;
+        }
     }
 
     void DocumentSourceCursor::findNext() {

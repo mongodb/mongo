@@ -92,6 +92,7 @@ namespace mongo {
 
         // Create the necessary context to use a Cursor, including taking a namespace read lock,
         // see SERVER-6123.
+        // Note: this may throw if the sharding version for this connection is out of date.
         shared_ptr<DocumentSourceCursor::CursorWithContext> cursorWithContext
                 ( new DocumentSourceCursor::CursorWithContext( fullName ) );
 
