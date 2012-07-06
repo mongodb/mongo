@@ -35,6 +35,8 @@ namespace mongo {
         initializeEvaluator();
     }
 
+    BsonTemplateEvaluator::~BsonTemplateEvaluator() { }
+
     void BsonTemplateEvaluator::addOperator(const std::string& name, const OperatorFn& op) {
         _operatorFunctions[name] = op;
     }
