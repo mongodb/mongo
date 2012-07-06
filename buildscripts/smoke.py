@@ -651,7 +651,7 @@ def run_old_fails():
 
             filename = os.path.basename(path)
             if filename in ('test', 'test.exe') or filename.endswith('.js'):
-                set_globals(options)
+                set_globals(options, [filename])
                 oldWinners = len(winners)
                 run_tests([test])
                 if len(winners) != oldWinners: # can't use return value due to continue_on_failure
