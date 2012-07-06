@@ -8,8 +8,8 @@ files.forEach(
             return;
         }
 
-        /* load the test documents */
-        load('jstests/aggregation/data/articles.js');
+        // clean out the test documents
+        db.article.drop();
 
         print(" *******************************************");
         print("         Test : " + x.name + " ...");
