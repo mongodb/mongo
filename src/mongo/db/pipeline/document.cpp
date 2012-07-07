@@ -38,6 +38,9 @@ namespace mongo {
                        const DependencyTracker *pDependencies):
         vFieldName(),
         vpValue() {
+        const int fields = pBsonObj->nFields();
+        vFieldName.reserve(fields);
+        vpValue.reserve(fields);
         BSONObjIterator bsonIterator(pBsonObj->begin());
         while(bsonIterator.more()) {
             BSONElement bsonElement(bsonIterator.next());
