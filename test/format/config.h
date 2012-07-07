@@ -6,7 +6,7 @@
  */
 
 /*
- * Configuration for the wts program is an array of string-based paramters.
+ * Configuration for the wts program is an array of string-based parameters.
  * This is the structure used to declare them.
  */
 typedef struct {
