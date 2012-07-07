@@ -94,7 +94,7 @@ namespace mongo {
 
     DocumentSourceGroup::DocumentSourceGroup(
         const intrusive_ptr<ExpressionContext> &pExpCtx):
-        DocumentSource(pExpCtx),
+        SplittableDocumentSource(pExpCtx),
         populated(false),
         pIdExpression(),
         groups(),
@@ -370,7 +370,11 @@ namespace mongo {
         return pResult;
     }
 
-    intrusive_ptr<DocumentSource> DocumentSourceGroup::createMerger() {
+    intrusive_ptr<DocumentSource> DocumentSourceGroup::getShardSource() {
+        return this; // No modifications necessary when on shard
+    }
+
+    intrusive_ptr<DocumentSource> DocumentSourceGroup::getRouterSource() {
         intrusive_ptr<DocumentSourceGroup> pMerger(
             DocumentSourceGroup::create(pExpCtx));
 

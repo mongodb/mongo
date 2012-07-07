@@ -300,19 +300,20 @@ namespace mongo {
             intrusive_ptr<DocumentSource> pSource = sourceVector.back();
             sourceVector.pop_back();
 
-            /* hang on to this in advance, in case it is a group */
-            DocumentSourceGroup *pGroup =
-                dynamic_cast<DocumentSourceGroup *>(pSource.get());
+            // Check if this source is splittable
+            SplittableDocumentSource* splittable=
+                dynamic_cast<SplittableDocumentSource *>(pSource.get());
 
-            /* move the source from the sourceVector to the shard sourceVector */
-            pShardPipeline->sourceVector.push_back(pSource);
-
-            /*
-              If we found a group, that's a split point.
-             */
-            if (pGroup) {
-                /* start this pipeline with the group merger */
-                sourceVector.push_back(pGroup->createMerger());
+            if (!splittable){
+                // move the source from the router sourceVector to the shard sourceVector
+                pShardPipeline->sourceVector.push_back(pSource);
+            }
+            else {
+                // split into Router and Shard sources
+                intrusive_ptr<DocumentSource> shardSource  = splittable->getShardSource();
+                intrusive_ptr<DocumentSource> routerSource = splittable->getRouterSource();
+                if (shardSource) pShardPipeline->sourceVector.push_back(shardSource);
+                if (routerSource)          this->sourceVector.push_back(routerSource);
 
                 // put the sourceVector back in the correct order and exit the loop
                 reverse(sourceVector.begin(), sourceVector.end());

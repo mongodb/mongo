@@ -223,6 +223,24 @@ namespace mongo {
         long long nRowsOut;
     };
 
+    /** This class marks DocumentSources that should be split between the router and the shards
+     *  See Pipeline::splitForSharded() for details
+     */
+    class SplittableDocumentSource : public DocumentSource {
+    public:
+        /** returns a source to be run on the shards.
+         *  if NULL, don't run on shards
+         */
+        virtual intrusive_ptr<DocumentSource> getShardSource() = 0;
+
+        /** returns a source that combines results from shards.
+         *  if NULL, don't run on router
+         */
+        virtual intrusive_ptr<DocumentSource> getRouterSource() = 0;
+    protected:
+        SplittableDocumentSource(intrusive_ptr<ExpressionContext> ctx) :DocumentSource(ctx) {}
+    };
+
 
     class DocumentSourceBsonArray :
         public DocumentSource {
@@ -558,7 +576,7 @@ namespace mongo {
 
 
     class DocumentSourceGroup :
-        public DocumentSource {
+        public SplittableDocumentSource {
     public:
         // virtuals from DocumentSource
         virtual ~DocumentSourceGroup();
@@ -619,14 +637,9 @@ namespace mongo {
             BSONElement *pBsonElement,
             const intrusive_ptr<ExpressionContext> &pExpCtx);
 
-
-        /**
-          Create a unifying group that can be used to combine group results
-          from shards.
-
-          @returns the grouping DocumentSource
-        */
-        intrusive_ptr<DocumentSource> createMerger();
+        // Virtuals for SplittableDocumentSource
+        virtual intrusive_ptr<DocumentSource> getShardSource();
+        virtual intrusive_ptr<DocumentSource> getRouterSource();
 
         static const char groupName[];
 
@@ -900,7 +913,7 @@ namespace mongo {
 
 
     class DocumentSourceSort :
-        public DocumentSource {
+        public SplittableDocumentSource {
     public:
         // virtuals from DocumentSource
         virtual ~DocumentSourceSort();
@@ -924,6 +937,13 @@ namespace mongo {
          */
         static intrusive_ptr<DocumentSourceSort> create(
             const intrusive_ptr<ExpressionContext> &pExpCtx);
+
+        // Virtuals for SplittableDocumentSource
+        // All work for sort is done in router currently
+        // TODO: do partial sorts on the shards then merge in the router
+        //       Not currently possible due to DocumentSource's cursor-like interface
+        virtual intrusive_ptr<DocumentSource> getShardSource() { return NULL; }
+        virtual intrusive_ptr<DocumentSource> getRouterSource() { return this; }
 
         /**
           Add sort key field.
