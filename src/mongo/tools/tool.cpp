@@ -59,7 +59,7 @@ namespace mongo {
             ("port",po::value<string>(), "server port. Can also use --host hostname:port" )
             ("ipv6", "enable IPv6 support (disabled by default)")
 #ifdef MONGO_SSL
-            ("ssl", "use all for connections")
+            ("ssl", "use SSL for all connections")
 #endif
 
             ("username,u",po::value<string>(), "username" )
@@ -398,7 +398,7 @@ namespace mongo {
         throw UserException( 9998 , "you need to specify fields" );
     }
 
-    /** 
+    /**
      * Validate authentication on the server for the given dbname.  populates
      * level (if supplied) with the user's credentials.
      */
