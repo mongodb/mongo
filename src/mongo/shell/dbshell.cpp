@@ -615,7 +615,7 @@ int _main( int argc, char* argv[] ) {
     ( "verbose", "increase verbosity" )
     ( "ipv6", "enable IPv6 support (disabled by default)" )
 #ifdef MONGO_SSL
-    ( "ssl", "use all for connections" )
+    ( "ssl", "use SSL for all connections" )
 #endif
     ;
 
@@ -809,12 +809,12 @@ int _main( int argc, char* argv[] ) {
                 }
             }
         }
-        
+
         if ( !hasMongoRC && isatty(0) ) {
-           cout << "Welcome to the MongoDB shell.\n" 
-                   "For interactive help, type \"help\".\n" 
+           cout << "Welcome to the MongoDB shell.\n"
+                   "For interactive help, type \"help\".\n"
                    "For more comprehensive documentation, see\n\thttp://docs.mongodb.org/\n"
-                   "Questions? Try the support group\n\thttp://groups.google.com/group/mongodb-user" << endl; 
+                   "Questions? Try the support group\n\thttp://groups.google.com/group/mongodb-user" << endl;
            fstream f;
            f.open(rcLocation.c_str(), ios_base::out );
            f.close();
@@ -823,7 +823,7 @@ int _main( int argc, char* argv[] ) {
         shellHistoryInit();
 
         string prompt;
-        int promptType; 
+        int promptType;
 
         //v8::Handle<v8::Object> shellHelper = baseContext_->Global()->Get( v8::String::New( "shellHelper" ) )->ToObject();
 
