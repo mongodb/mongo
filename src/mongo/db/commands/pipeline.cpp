@@ -287,24 +287,25 @@ namespace mongo {
         pShardPipeline->collectionName = collectionName;
         pShardPipeline->explain = explain;
 
-        /* put the source list aside */
-        SourceVector tempVector(sourceVector);
-        sourceVector.clear();
+        // We will be removing from the front so reverse for now. undone later
+        // TODO: maybe sourceVector should be a deque
+        reverse(sourceVector.begin(), sourceVector.end());
 
         /*
           Run through the pipeline, looking for points to split it into
           shard pipelines, and the rest.
          */
-        while(!tempVector.empty()) {
-            intrusive_ptr<DocumentSource> &pSource = tempVector.front();
+        while(!sourceVector.empty()) {
+            // pop the first source
+            intrusive_ptr<DocumentSource> pSource = sourceVector.back();
+            sourceVector.pop_back();
 
             /* hang on to this in advance, in case it is a group */
             DocumentSourceGroup *pGroup =
                 dynamic_cast<DocumentSourceGroup *>(pSource.get());
 
-            /* move the source from the tempVector to the shard sourceVector */
+            /* move the source from the sourceVector to the shard sourceVector */
             pShardPipeline->sourceVector.push_back(pSource);
-            tempVector.erase(tempVector.begin());
 
             /*
               If we found a group, that's a split point.
@@ -313,10 +314,8 @@ namespace mongo {
                 /* start this pipeline with the group merger */
                 sourceVector.push_back(pGroup->createMerger());
 
-                /* and then add everything that remains and quit */
-                for(size_t tempn = tempVector.size(), tempi = 0;
-                    tempi < tempn; ++tempi)
-                    sourceVector.push_back(tempVector[tempi]);
+                // put the sourceVector back in the correct order and exit the loop
+                reverse(sourceVector.begin(), sourceVector.end());
                 break;
             }
         }
