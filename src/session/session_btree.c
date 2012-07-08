@@ -135,6 +135,7 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	const char *ckpt;
 	size_t ckptlen;
+	int needlock;
 
 	btree = NULL;
 
@@ -187,7 +188,24 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 		ret = 0;
 	}
 
-	WT_RET(__wt_conn_btree_get(session, uri, ckpt, cfg, flags));
+	/*
+	 * If we don't already hold the schema lock, get it now so that we
+	 * can find and/or open the handle.
+	 */
+	needlock = !F_ISSET(session, WT_SESSION_SCHEMA_LOCKED);
+	if (needlock) {
+		__wt_spin_lock(session, &S2C(session)->schema_lock);
+		F_SET(session, WT_SESSION_SCHEMA_LOCKED);
+	}
+
+	ret = __wt_conn_btree_get(session, uri, ckpt, cfg, flags);
+
+	if (needlock) {
+		F_CLR(session, WT_SESSION_SCHEMA_LOCKED);
+		__wt_spin_unlock(session, &S2C(session)->schema_lock);
+	}
+
+	WT_RET(ret);
 
 	if (btree_session == NULL)
 		WT_RET(__wt_session_add_btree(session, NULL));

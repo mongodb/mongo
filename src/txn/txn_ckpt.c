@@ -14,19 +14,24 @@
 int
 __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 {
+	WT_CONNECTION_IMPL *conn;
+	WT_BTREE *btree, *saved_btree;
 	WT_CONFIG targetconf;
 	WT_CONFIG_ITEM cval, k, v;
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
 	WT_TXN_GLOBAL *txn_global;
+	void *saved_meta_next;
 	int target_list, tracking;
 	const char *txn_cfg[] = { "isolation=snapshot", NULL };
 
+	conn = S2C(session);
 	target_list = tracking = 0;
-	txn_global = &S2C(session)->txn_global;
+	txn_global = &conn->txn_global;
 
 	/* Only one checkpoint can be active at a time. */
-	__wt_writelock(session, S2C(session)->ckpt_rwlock);
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
+
 	WT_ERR(__wt_txn_begin(session, txn_cfg));
 
 	/* Prevent eviction from evicting anything newer than this. */
@@ -36,34 +41,26 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	tracking = 1;
 
 	/* Step through the list of targets and checkpoint each one. */
-	cval.len = 0;
 	WT_ERR(__wt_config_gets(session, cfg, "target", &cval));
-	if (cval.len != 0) {
-		WT_ERR(__wt_scr_alloc(session, 512, &tmp));
-		WT_ERR(__wt_config_subinit(session, &targetconf, &cval));
-		while ((ret = __wt_config_next(&targetconf, &k, &v)) == 0) {
+	WT_ERR(__wt_config_subinit(session, &targetconf, &cval));
+	while ((ret = __wt_config_next(&targetconf, &k, &v)) == 0) {
+		if (!target_list) {
+			WT_ERR(__wt_scr_alloc(session, 512, &tmp));
 			target_list = 1;
-			WT_ERR(__wt_buf_fmt(session, tmp, "%.*s",
-			    (int)k.len, k.str));
-
-			if (v.len != 0)
-				WT_ERR_MSG(session, EINVAL,
-				    "invalid checkpoint target \"%s\": "
-				    "URIs may require quoting",
-				    (const char *)tmp->data);
-
-			__wt_spin_lock(session, &S2C(session)->schema_lock);
-			ret = __wt_schema_worker(
-			    session, tmp->data, __wt_checkpoint, cfg, 0);
-			__wt_spin_unlock(session, &S2C(session)->schema_lock);
-
-			if (ret != 0)
-				WT_ERR_MSG(session, ret, "%s",
-				    (const char *)tmp->data);
 		}
-		if (ret == WT_NOTFOUND)
-			ret = 0;
+
+		if (v.len != 0)
+			WT_ERR_MSG(session, EINVAL,
+			    "invalid checkpoint target \"%s\": URIs may "
+			    "require quoting",
+			    (const char *)tmp->data);
+
+		WT_ERR(__wt_buf_fmt(session, tmp, "%.*s", (int)k.len, k.str));
+		if ((ret = __wt_schema_worker(
+		    session, tmp->data, __wt_checkpoint, cfg, 0)) != 0)
+			WT_ERR_MSG(session, ret, "%s", (const char *)tmp->data);
 	}
+	WT_ERR_NOTFOUND_OK(ret);
 
 	if (!target_list) {
 		/*
@@ -84,8 +81,33 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 		    __wt_meta_btree_apply(session, __wt_checkpoint, cfg, 0));
 	}
 
+	/* Checkpoint the metadata file. */
+	TAILQ_FOREACH(btree, &conn->btqh, q)
+		if (strcmp(btree->name, WT_METADATA_URI) == 0)
+			break;
+	if (btree == NULL)
+		WT_ERR_MSG(session, EINVAL,
+		    "checkpoint unable to find open meta-data handle");
+
+	/*
+	 * Disable metadata tracking during the metadata checkpoint.
+	 *
+	 * We don't lock old checkpoints in the metadata file: there is no way
+	 * to open one.  We are holding other handle locks, it is not safe to
+	 * lock conn->spinlock.
+	 */
+	saved_meta_next = session->meta_track_next;
+	session->meta_track_next = NULL;
+	saved_btree = session->btree;
+	session->btree = btree;
+	ret = __wt_checkpoint(session, cfg);
+	session->btree = saved_btree;
+	session->meta_track_next = saved_meta_next;
+	WT_ERR(ret);
+
 err:	/*
-	 * XXX Rolling back the changes here is problematic.
+	 * XXX
+	 * Rolling back the changes here is problematic.
 	 *
 	 * If we unroll here, we need a way to roll back changes to the avail
 	 * list for each tree that was successfully synced before the error
@@ -102,7 +124,6 @@ err:	/*
 	txn_global->ckpt_txnid = WT_TXN_NONE;
 	if (F_ISSET(&session->txn, TXN_RUNNING))
 		WT_TRET(__wt_txn_release(session));
-	__wt_rwunlock(session, S2C(session)->ckpt_rwlock);
 	__wt_scr_free(&tmp);
 	return (ret);
 }
@@ -201,18 +222,17 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_CKPT *ckpt, *ckptbase, *deleted;
 	WT_CONFIG dropconf;
 	WT_CONFIG_ITEM cval, k, v;
+	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	const char *name;
 	char *name_alloc;
-	int force, tracked;
+	int force;
 
+	conn = S2C(session);
 	btree = session->btree;
-	force = tracked = 0;
+	force = 0;
 	ckpt = ckptbase = NULL;
 	name_alloc = NULL;
-
-	/* Checkpoints are single-threaded. */
-	__wt_writelock(session, btree->ckptlock);
 
 	/*
 	 * Get the list of checkpoints for this file.  If there's no reference,
@@ -244,9 +264,9 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	}
 
 	/*
-	 * We may be dropping checkpoints, check the configuration.  If we're
-	 * dropping checkpoints, set force, we have to create the checkpoint
-	 * even if the tree is clean.
+	 * We may be dropping specific checkpoints, check the configuration.
+	 * If we're dropping checkpoints, set force, we have to create the
+	 * checkpoint even if the tree is clean.
 	 */
 	if (cfg != NULL) {
 		cval.len = 0;
@@ -255,6 +275,11 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 			WT_ERR(__wt_config_subinit(session, &dropconf, &cval));
 			while ((ret =
 			    __wt_config_next(&dropconf, &k, &v)) == 0) {
+				/* We can't drop checkpoints if in a backup. */
+				if (conn->ckpt_backup)
+					WT_ERR_MSG(session, EINVAL,
+					    "checkpoints cannot be dropped "
+					    "while backup cursors are open");
 				force = 1;
 
 				if (v.len == 0)
@@ -275,8 +300,14 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 		}
 	}
 
-	/* Discard checkpoints with the same name as the new checkpoint. */
-	__drop(ckptbase, name, strlen(name));
+	/*
+	 * Discard checkpoints with the same name as the new checkpoint.  We
+	 * can't discard checkpoints if a backup cursor is open, but we don't
+	 * fail in this case, dropping this checkpoint wasn't a request made
+	 * by the application.
+	 */
+	if (!conn->ckpt_backup)
+		__drop(ckptbase, name, strlen(name));
 
 	/* Add a new checkpoint entry at the end of the list. */
 	WT_CKPT_FOREACH(ckptbase, ckpt)
@@ -316,16 +347,13 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 		 * is being discarded: in that case, it will be gone by the
 		 * time we try to apply or unroll the meta tracking event.
 		 */
-		if (WT_META_TRACKING(session) && cfg != NULL) {
+		if (WT_META_TRACKING(session) && cfg != NULL)
 			WT_ERR(__wt_meta_track_checkpoint(session));
-			tracked = 1;
-		} else
+		else
 			WT_ERR(__wt_bm_checkpoint_resolve(session));
 	}
 
 err:	__wt_meta_ckptlist_free(session, ckptbase);
-	if (!tracked)
-		__wt_rwunlock(session, btree->ckptlock);
 
 	__wt_free(session, name_alloc);
 

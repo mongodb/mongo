@@ -14,6 +14,7 @@ WiredTiger applications:
 
 - @subpage transactions
 - @subpage checkpoints
+- @subpage hot_backup
 
 - @subpage compression
 

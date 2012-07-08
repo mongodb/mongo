@@ -287,6 +287,7 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 		cursor->next = __curfile_next_random;
 	}
 
+	/* __wt_cursor_init is last so we don't have to clean up on error. */
 	STATIC_ASSERT(offsetof(WT_CURSOR_BTREE, iface) == 0);
 	WT_ERR(__wt_cursor_init(cursor, cursor->uri, owner, cfg, cursorp));
 

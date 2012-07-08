@@ -35,17 +35,7 @@ import wiredtiger, wttest
 
 class test_util12(wttest.WiredTigerTestCase, suite_subprocess):
     tablename = 'test_util12.a'
-    nentries = 1000
     session_params = 'key_format=S,value_format=S'
-
-    def populate(self, tablename):
-        """
-        Insert some simple entries into the table
-        """
-        cursor = self.session.open_cursor('table:' + tablename, None, None)
-        cursor.set_key('SOMEKEY')
-        cursor.set_value('SOMEVALUE')
-        cursor.close()
 
     def test_write(self):
         self.session.create('table:' + self.tablename, self.session_params)

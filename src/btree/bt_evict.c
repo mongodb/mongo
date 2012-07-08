@@ -713,17 +713,6 @@ __evict_walk(WT_SESSION_IMPL *session)
 	cache = S2C(session)->cache;
 
 	/*
-	 * We hold a spinlock for the entire walk -- it's slow, but (1) how
-	 * often do new files get added or removed to/from the system, and (2)
-	 * it's all in-memory stuff, so it's not that slow.
-	 *
-	 * If the connection spinlock is not available, don't block: another
-	 * thread may be holding it and waiting on eviction (e.g., checkpoint).
-	 */
-	if (__wt_spin_trylock(session, &conn->spinlock) != 0)
-		return (0);
-
-	/*
 	 * Resize the array in which we're tracking pages, as necessary, then
 	 * get some pages from each underlying file.  In practice, a realloc
 	 * is rarely needed, so it is worth avoiding the LRU lock.
@@ -741,6 +730,11 @@ __evict_walk(WT_SESSION_IMPL *session)
 		__wt_spin_unlock(session, &cache->evict_lock);
 	}
 
+	/*
+	 * NOTE: we don't hold the schema lock: files can't be removed without
+	 * the eviction server being involved, and when we're here, we aren't
+	 * servicing eviction requests.
+	 */
 	i = WT_EVICT_WALK_BASE;
 	TAILQ_FOREACH(btree, &conn->btqh, q) {
 		if (F_ISSET(btree, WT_BTREE_NO_EVICTION))
@@ -748,9 +742,7 @@ __evict_walk(WT_SESSION_IMPL *session)
 
 		/* Reference the correct WT_BTREE handle. */
 		WT_SET_BTREE_IN_SESSION(session, btree);
-
 		ret = __evict_walk_file(session, &i);
-
 		WT_CLEAR_BTREE_IN_SESSION(session);
 
 		if (ret != 0)
@@ -760,7 +752,6 @@ __evict_walk(WT_SESSION_IMPL *session)
 	if (0) {
 err:		__wt_spin_unlock(session, &cache->evict_lock);
 	}
-	__wt_spin_unlock(session, &conn->spinlock);
 	return (ret);
 }
 
@@ -782,6 +773,8 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 	cache = S2C(session)->cache;
 	start = cache->evict + *slotp;
 	end = start + WT_EVICT_WALK_PER_TABLE;
+	if (end > cache->evict + cache->evict_entries)
+		end = cache->evict + cache->evict_entries;
 
 	/*
 	 * Get the next WT_EVICT_WALK_PER_TABLE entries.

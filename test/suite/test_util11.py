@@ -44,6 +44,7 @@ class test_util11(wttest.WiredTigerTestCase, suite_subprocess):
         cursor = self.session.open_cursor('table:' + tablename, None, None)
         cursor.set_key('SOMEKEY')
         cursor.set_value('SOMEVALUE')
+        cursor.insert()
         cursor.close()
 
     def test_list_none(self):

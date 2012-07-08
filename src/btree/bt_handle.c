@@ -130,10 +130,6 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 	/* Close the Huffman tree. */
 	__wt_btree_huffman_close(session);
 
-	/* Checkpoint lock. */
-	if (btree->ckptlock != NULL)
-		__wt_rwlock_destroy(session, &btree->ckptlock);
-
 	/* Free allocated memory. */
 	__wt_free(session, btree->key_format);
 	__wt_free(session, btree->key_plan);
@@ -209,10 +205,6 @@ __btree_conf(WT_SESSION_IMPL *session)
 			btree->type = BTREE_COL_FIX;
 		}
 	}
-
-	/* Checkpoint lock. */
-	WT_RET(
-	    __wt_rwlock_alloc(session, "btree checkpoint", &btree->ckptlock));
 
 	/* Page sizes */
 	WT_RET(__btree_page_sizes(session, config));
