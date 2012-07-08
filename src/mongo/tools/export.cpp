@@ -91,7 +91,7 @@ public:
             return object.toString(false);
         case String:
         case Symbol:
-            return csvEscape(object.toString(false), true);
+            return csvEscape(object.toString(false, true), true);
         case Object:
             return csvEscape(object.jsonString(Strict, false));
         case Array:
