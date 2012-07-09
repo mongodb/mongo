@@ -230,6 +230,10 @@ if __name__ == '__main__':
                     usage()
                     sys.exit(False)
                 verbose = int(args.pop(0))
+		if verbose > 3:
+			verbose = 3
+		if verbose < 0:
+			verbose = 0
                 continue
             if option == '-config' or option == 'c':
                 if configfile != None or len(args) == 0:
