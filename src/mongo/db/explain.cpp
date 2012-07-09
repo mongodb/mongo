@@ -83,6 +83,8 @@ namespace mongo {
         bob.appendNumber( "n", clauseInfo.n() );
         bob.appendNumber( "nscannedObjects", clauseInfo.nscannedObjects() );
         bob.appendNumber( "nscanned", clauseInfo.nscanned() );
+        bob.appendNumber( "nscannedObjectsAllPlans", clauseInfo.nscannedObjectsAllPlans() );
+        bob.appendNumber( "nscannedAllPlans", clauseInfo.nscannedAllPlans() );
         bob.append( "scanAndOrder", _scanAndOrder );
         bob.append( "indexOnly", _indexOnly );
         bob.appendNumber( "nYields", clauseInfo.nYields() );
@@ -143,7 +145,21 @@ namespace mongo {
         _timer.stop();
     }
 
+    long long ExplainClauseInfo::nscannedObjects() const {
+        if ( _plans.empty() ) {
+            return 0;
+        }
+        return virtualPickedPlan().nscannedObjects();
+    }
+
     long long ExplainClauseInfo::nscanned() const {
+        if ( _plans.empty() ) {
+            return 0;
+        }
+        return virtualPickedPlan().nscanned();
+    }
+
+    long long ExplainClauseInfo::nscannedAllPlans() const {
         long long ret = 0;
         for( list<shared_ptr<const ExplainPlanInfo> >::const_iterator i = _plans.begin();
             i != _plans.end(); ++i ) {
@@ -210,6 +226,8 @@ namespace mongo {
             long long n = 0;
             long long nscannedObjects = 0;
             long long nscanned = 0;
+            long long nscannedObjectsAllPlans = 0;
+            long long nscannedAllPlans = 0;
             BSONArrayBuilder clauseArray( bob.subarrayStart( "clauses" ) );
             for( list<shared_ptr<ExplainClauseInfo> >::const_iterator i = _clauses.begin();
                 i != _clauses.end(); ++i ) {
@@ -217,11 +235,15 @@ namespace mongo {
                 n += (*i)->n();
                 nscannedObjects += (*i)->nscannedObjects();
                 nscanned += (*i)->nscanned();
+                nscannedObjectsAllPlans += (*i)->nscannedObjectsAllPlans();
+                nscannedAllPlans += (*i)->nscannedAllPlans();
             }
             clauseArray.done();
             bob.appendNumber( "n", n );
             bob.appendNumber( "nscannedObjects", nscannedObjects );
             bob.appendNumber( "nscanned", nscanned );
+            bob.appendNumber( "nscannedObjectsAllPlans", nscannedObjectsAllPlans );
+            bob.appendNumber( "nscannedAllPlans", nscannedAllPlans );
             bob.appendNumber( "millis", _timer.duration() );
         }
         

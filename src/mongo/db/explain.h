@@ -64,6 +64,7 @@ namespace mongo {
         bool picked() const { return _picked; }
         bool done() const { return _done; }
         long long n() const { return _n; }
+        long long nscannedObjects() const { return _nscannedObjects; }
         long long nscanned() const { return _nscanned; }
 
     private:
@@ -100,13 +101,20 @@ namespace mongo {
         BSONObj bson() const;
 
         long long n() const { return _n; }
-        long long nscannedObjects() const { return _nscannedObjects; }
+        long long nscannedObjects() const;
         long long nscanned() const;
+        long long nscannedObjectsAllPlans() const { return _nscannedObjects; }
+        long long nscannedAllPlans() const;
         long long nChunkSkips() const { return _nChunkSkips; }
         int nYields() const { return _nYields; }
         int millis() const { return _timer.duration(); }
 
     private:
+        /**
+         * @return Plan explain information to be displayed at the top of the explain output.  A
+         * picked() plan will be returned if one is available, otherwise a successful non picked()
+         * plan will be returned.
+         */
         const ExplainPlanInfo &virtualPickedPlan() const;
         list<shared_ptr<const ExplainPlanInfo> > _plans;
         long long _n;
