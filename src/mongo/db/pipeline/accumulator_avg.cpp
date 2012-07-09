@@ -28,7 +28,7 @@ namespace mongo {
 
     intrusive_ptr<const Value> AccumulatorAvg::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
-        if (!pCtx->getInRouter()) {
+        if (!pCtx->getDoingMerge()) {
             Super::evaluate(pDocument);
             ++count;
         }

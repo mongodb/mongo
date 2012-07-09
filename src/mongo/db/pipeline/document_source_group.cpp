@@ -390,8 +390,9 @@ namespace mongo {
     }
 
     intrusive_ptr<DocumentSource> DocumentSourceGroup::getRouterSource() {
-        intrusive_ptr<DocumentSourceGroup> pMerger(
-            DocumentSourceGroup::create(pExpCtx));
+        intrusive_ptr<ExpressionContext> pMergerExpCtx = pExpCtx->clone();
+        pMergerExpCtx->setDoingMerge(true);
+        intrusive_ptr<DocumentSourceGroup> pMerger(DocumentSourceGroup::create(pMergerExpCtx));
 
         /* the merger will use the same grouping key */
         pMerger->setIdExpression(ExpressionFieldPath::create(

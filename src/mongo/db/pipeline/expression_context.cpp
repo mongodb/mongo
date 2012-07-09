@@ -25,6 +25,7 @@ namespace mongo {
     }
 
     inline ExpressionContext::ExpressionContext(InterruptStatus *pS):
+        doingMerge(false),
         inShard(false),
         inRouter(false),
         intCheckCounter(1),
@@ -39,6 +40,14 @@ namespace mongo {
         if ((++intCheckCounter % 128) == 0) {
             pStatus->checkForInterrupt();
         }
+    }
+
+    ExpressionContext* ExpressionContext::clone() {
+        ExpressionContext* newContext = create(pStatus);
+        newContext->setDoingMerge(getDoingMerge());
+        newContext->setInShard(getInShard());
+        newContext->setInRouter(getInRouter());
+        return newContext;
     }
 
     ExpressionContext *ExpressionContext::create(InterruptStatus *pStatus) {
