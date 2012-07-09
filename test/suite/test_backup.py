@@ -121,7 +121,7 @@ class test_backup(wttest.WiredTigerTestCase, suite_subprocess):
         msg = '/there is already a backup cursor open/'
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.open_cursor('backup:', None, None), msg)
-	cursor.close()
+        cursor.close()
 
     # Test that cursor reset runs through the list again.
     def test_cursor_reset(self):
@@ -157,11 +157,11 @@ class test_backup(wttest.WiredTigerTestCase, suite_subprocess):
             'table:' + self.namepfx + '1', None, "checkpoint=one"), msg)
 
         # Confirm opening a backup cursor causes checkpoint to fail if dropping
-	# a named checkpoint, but does not stop a default checkpoint.
+        # a named checkpoint, but does not stop a default checkpoint.
         backup = self.session.open_cursor('backup:', None, None)
         msg = '/checkpoints cannot be dropped/'
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-	    lambda: self.session.checkpoint("name=three,drop=(two)"), msg)
+            lambda: self.session.checkpoint("name=three,drop=(two)"), msg)
         self.session.checkpoint()
         self.session.checkpoint()
         self.session.checkpoint()

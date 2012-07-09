@@ -35,6 +35,8 @@ __wt_cursor_set_notsup(WT_CURSOR *cursor)
 	cursor->insert = __wt_cursor_notsup;
 	cursor->update = __wt_cursor_notsup;
 	cursor->remove = __wt_cursor_notsup;
+	cursor->reconfigure =
+	    (int (*)(WT_CURSOR *, const char *))__wt_cursor_notsup;
 }
 
 /*
@@ -511,9 +513,9 @@ __wt_cursor_init(WT_CURSOR *cursor,
 	 */
 	WT_RET(__wt_config_gets(session, cfg, "checkpoint", &cval));
 	if (cval.len != 0) {
-		cursor->insert = (int (*)(WT_CURSOR *))__wt_cursor_notsup;
-		cursor->update = (int (*)(WT_CURSOR *))__wt_cursor_notsup;
-		cursor->remove = (int (*)(WT_CURSOR *))__wt_cursor_notsup;
+		cursor->insert = __wt_cursor_notsup;
+		cursor->update = __wt_cursor_notsup;
+		cursor->remove = __wt_cursor_notsup;
 	}
 
 	/* dump */
