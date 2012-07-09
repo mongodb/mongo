@@ -85,13 +85,6 @@ class CheckpointTest(wttest.WiredTigerTestCase):
         cursor.close()
         return snaps.sort()
     def cursor_lock(self):
-        #self.session.checkpoint()
-        #cursor = self.session.open_cursor(self.URI, None, "checkpoint=checkpoint-1")
-
-        #self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-        #        lambda: self.session.checkpoint(),
-        #        "session.checkpoint: file:__snap: Resource or device busy")
-        #cursor.close()
         self.session.checkpoint("name=another_checkpoint")
         self.session.checkpoint("drop=(from=another_checkpoint)")
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
@@ -100,9 +93,9 @@ class CheckpointTest(wttest.WiredTigerTestCase):
                             ' in file:__checkpoint:.*/')
         cursor = self.session.open_cursor(self.URI, None, "checkpoint=checkpoint-1")
         #self.session.checkpoint("drop=(from=all)")
-        #self.assertRaisesWithMessage(wiredtiger.WiredTigerError, 
-                #lambda: self.session.checkpoint("drop=(from=all)"),
-                #"/Device or resource busy/")
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError, 
+                lambda: self.session.checkpoint("drop=(from=checkpoint-1)"),
+                "/Device or resource busy/")
         cursor.close() 
     def cursor_lock_deprecated(self):
         buf = 'snapshot=snapshot-1'
