@@ -91,11 +91,16 @@ class CheckpointTest(wttest.WiredTigerTestCase):
                 lambda: self.session.open_cursor(self.URI, None, "checkpoint=another_checkpoint"),
                 r'/(.*)no "another_checkpoint" checkpoint found'+\
                             ' in file:__checkpoint:.*/')
-        cursor = self.session.open_cursor(self.URI, None, "checkpoint=checkpoint-1")
-        #self.session.checkpoint("drop=(from=all)")
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError, 
-                lambda: self.session.checkpoint("drop=(from=checkpoint-1)"),
-                "/Device or resource busy/")
+        
+        cursor = self.session.open_cursor(self.URI, None, 'checkpoint=checkpoint-1')
+        self.session.checkpoint()
+        cursor.close()
+        #cursor = self.session.open_cursor(self.URI, None, "checkpoint=checkpoint-1")
+
+        #self.session.checkpoint("drop=(from=checkpoint-1)")
+        #self.assertRaisesWithMessage(wiredtiger.WiredTigerError, 
+                #lambda: self.session.checkpoint("drop=(from=checkpoint-1)"),
+                #"/Device or resource busy/")
         cursor.close() 
     def cursor_lock_deprecated(self):
         buf = 'snapshot=snapshot-1'
