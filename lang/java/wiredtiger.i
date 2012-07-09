@@ -73,7 +73,9 @@ static void throwDbException(JNIEnv *jenv, const char *msg) {
 %}
 
 %typemap(out) WT_ITEM * %{
-        if (($result = (*jenv)->NewByteArray(jenv, $1->size)) != NULL) {
+        if ($1 == NULL)
+                $result = NULL;
+        else if (($result = (*jenv)->NewByteArray(jenv, $1->size)) != NULL) {
                 (*jenv)->SetByteArrayRegion(jenv,
                     $result, 0, $1->size, $1->data);
         }
@@ -83,21 +85,21 @@ static void throwDbException(JNIEnv *jenv, const char *msg) {
 %typemap(default) const char *config %{ $1 = NULL; %}
 
 %typemap(out) int %{
-	if ($1 != 0 && $1 != WT_NOTFOUND) {
+        if ($1 != 0 && $1 != WT_NOTFOUND) {
                 throwDbException(jenv, wiredtiger_strerror($1));
-		return $null;
-	}
-	$result = $1;
+                return $null;
+        }
+        $result = $1;
 %}
 
 /*
  * Extra 'self' elimination.
  * The methods we're wrapping look like this:
  * struct __wt_xxx {
- *	int method(WT_XXX *, ...otherargs...);
+ *      int method(WT_XXX *, ...otherargs...);
  * };
  * To SWIG, that is equivalent to:
- *	int method(struct __wt_xxx *self, WT_XXX *, ...otherargs...);
+ *      int method(struct __wt_xxx *self, WT_XXX *, ...otherargs...);
  * and we use consecutive argument matching of typemaps to convert two args to
  * one.
  */
@@ -136,53 +138,61 @@ enum SearchStatus { FOUND, NOTFOUND, SMALLER, LARGER };
 
 %extend __wt_cursor {
         %javamethodmodifiers get_key_wrap "protected";
-        WT_ITEM *get_key_wrap() {
+        WT_ITEM *get_key_wrap(JNIEnv *jenv) {
                 WT_ITEM k;
-                (void)$self->get_key($self, &k);
+                int ret;
+                if ((ret = $self->get_key($self, &k)) != 0) {
+                        throwDbException(jenv, wiredtiger_strerror(ret));
+                        return NULL;
+                }
                 return &$self->key;
         }
 
         %javamethodmodifiers get_value_wrap "protected";
-        WT_ITEM *get_value_wrap() {
+        WT_ITEM *get_value_wrap(JNIEnv *jenv) {
                 WT_ITEM v;
-                (void)$self->get_value($self, &v);
+                int ret;
+                if ((ret = $self->get_value($self, &v)) != 0) {
+                        throwDbException(jenv, wiredtiger_strerror(ret));
+                        return NULL;
+                }
                 return &$self->value;
         }
 
         %javamethodmodifiers insert_wrap "protected";
-	int insert_wrap(WT_ITEM *k, WT_ITEM *v) {
+        int insert_wrap(WT_ITEM *k, WT_ITEM *v) {
                 $self->set_key($self, k);
                 $self->set_value($self, v);
                 return $self->insert($self);
         }
 
         %javamethodmodifiers remove_wrap "protected";
-	int remove_wrap(WT_ITEM *k) {
+        int remove_wrap(WT_ITEM *k) {
                 $self->set_key($self, k);
                 return $self->remove($self);
         }
 
         %javamethodmodifiers search_wrap "protected";
-	int search_wrap(WT_ITEM *k) {
+        int search_wrap(WT_ITEM *k) {
                 $self->set_key($self, k);
                 return $self->search($self);
         }
 
         %javamethodmodifiers search_near_wrap "protected";
-	enum SearchStatus search_near_wrap(JNIEnv *jenv, WT_ITEM *k) {
+        enum SearchStatus search_near_wrap(JNIEnv *jenv, WT_ITEM *k) {
                 int cmp, ret;
 
                 $self->set_key($self, k);
                 ret = $self->search_near(self, &cmp);
                 if (ret != 0 && ret != WT_NOTFOUND)
-			throwDbException(jenv, wiredtiger_strerror(ret));
+                        throwDbException(jenv, wiredtiger_strerror(ret));
                 if (ret == 0)
                         return (cmp == 0 ? FOUND : cmp < 0 ? SMALLER : LARGER);
                 return (NOTFOUND);
         }
 
         %javamethodmodifiers update_wrap "protected";
-	int update_wrap(WT_ITEM *k, WT_ITEM *v) {
+        int update_wrap(WT_ITEM *k, WT_ITEM *v) {
                 $self->set_key($self, k);
                 $self->set_value($self, v);
                 return $self->insert($self);
