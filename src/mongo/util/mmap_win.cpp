@@ -356,10 +356,9 @@ namespace mongo {
             bool success = false;
             bool timeout = false;
             int dosError = ERROR_SUCCESS;
-            const int maximumLoopCount = 1000 * 1000;
-            const int maximumTimeInSeconds = 60;
+            const int maximumTimeInSeconds = 60 * 15;
             Timer t;
-            while ( !success && !timeout && loopCount < maximumLoopCount ) {
+            while ( !success && !timeout ) {
                 ++loopCount;
                 success = FALSE != FlushViewOfFile( _view, 0 );
                 if ( !success ) {
@@ -382,12 +381,15 @@ namespace mongo {
                         << " after " << loopCount
                         << " attempts taking " << t.millis()
                         << " ms" << endl;
+                // Abort here to avoid data corruption
+                fassert(16387, false);
             }
 
             success = FALSE != FlushFileBuffers(_fd);
             if (!success) {
                 int err = GetLastError();
                 out() << "FlushFileBuffers failed " << err << " file: " << _filename << endl;
+                fassert(16388, false);
             }
         }
 
