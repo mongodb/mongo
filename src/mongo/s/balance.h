@@ -84,7 +84,7 @@ namespace mongo {
          * @param candidateChunks possible chunks to move
          * @return number of chunks effectively moved
          */
-        int _moveChunks( const vector<CandidateChunkPtr>* candidateChunks );
+        int _moveChunks( const vector<CandidateChunkPtr>* candidateChunks , bool secondaryThrottle );
 
         /**
          * Marks this balancer as being live on the config server(s).

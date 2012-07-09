@@ -28,6 +28,7 @@
 #include "queryoptimizercursor.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/pagefault.h"
+#include "mongo/db/repl_block.h"
 
 #include <fstream>
 
@@ -264,12 +265,17 @@ namespace mongo {
                                     const BSONObj& max ,
                                     const BSONObj& keyPattern ,
                                     bool maxInclusive ,
+                                    bool secondaryThrottle ,
                                     RemoveCallback * callback,
                                     bool fromMigrate ) {
+        
+        Client& c = cc();
 
         long long numDeleted = 0;
         PageFaultRetryableSection pgrs;
         
+        long long millisWaitingForReplication = 0;
+
         while ( 1 ) {
             try {
 
@@ -316,14 +322,29 @@ namespace mongo {
                 continue;
             }
 
+            Timer secondaryThrottleTime;
+
+            if ( secondaryThrottle ) {
+                if ( ! waitForReplication( c.getLastOp(), 2, 60 /* seconds to wait */ ) ) {
+                    warning() << "replication to secondaries for removeRange at least 60 seconds behind" << endl;
+                }
+                millisWaitingForReplication += secondaryThrottleTime.millis();
+            }
+            
             if ( ! Lock::isLocked() ) {
-                int micros = 2 * Client::recommendedYieldMicros();
-                LOG(1) << "Helpers::removeRangeUnlocked going to sleep for " << micros << " micros" << endl;
-                sleepmicros( micros );
+                int micros = ( 2 * Client::recommendedYieldMicros() ) - secondaryThrottleTime.micros();
+                if ( micros > 0 ) {
+                    LOG(1) << "Helpers::removeRangeUnlocked going to sleep for " << micros << " micros" << endl;
+                    sleepmicros( micros );
+                }
             }
                 
         }
-
+        
+        if ( secondaryThrottle )
+            log() << "Helpers::removeRangeUnlocked time spent waiting for replication: "  
+                  << millisWaitingForReplication << "ms" << endl;
+        
         return numDeleted;
     }
 

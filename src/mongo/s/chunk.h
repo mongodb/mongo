@@ -145,10 +145,11 @@ namespace mongo {
          *
          * @param to shard to move this chunk to
          * @param chunSize maximum number of bytes beyond which the migrate should no go trhough
+         * @param secondaryThrottle whether during migrate all writes should block for repl
          * @param res the object containing details about the migrate execution
          * @return true if move was successful
          */
-        bool moveAndCommit( const Shard& to , long long chunkSize , BSONObj& res ) const;
+        bool moveAndCommit( const Shard& to , long long chunkSize , bool secondaryThrottle, BSONObj& res ) const;
 
         /**
          * @return size of shard in bytes

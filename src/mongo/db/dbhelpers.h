@@ -164,6 +164,7 @@ namespace mongo {
                                       const BSONObj& max , 
                                       const BSONObj& keyPattern ,
                                       bool maxInclusive = false , 
+                                      bool secondaryThrottle = false , 
                                       RemoveCallback * callback = 0, 
                                       bool fromMigrate = false );
 
