@@ -1284,7 +1284,8 @@ var g1 = db.runCommand(
         _id : "$tags",
         docsByTag : { $sum : 1 },
         viewsByTag : { $sum : "$pageViews" }
-    }}
+    }},
+    {$sort: {'_id': 1}}
 ]});
 
 var g1result = [
@@ -1292,6 +1293,11 @@ var g1result = [
         "_id" : "filthy",
         "docsByTag" : 1,
         "viewsByTag" : 6
+    },
+    {
+        "_id" : "fun",
+        "docsByTag" : 3,
+        "viewsByTag" : 17
     },
     {
         "_id" : "good",
@@ -1303,11 +1309,6 @@ var g1result = [
         "docsByTag" : 2,
         "viewsByTag" : 13
     },
-    {
-        "_id" : "fun",
-        "docsByTag" : 3,
-        "viewsByTag" : 17
-    }
 ];
 
 assert.eq(g1.result, g1result, 'g1 failed');
@@ -1335,10 +1336,18 @@ var g2 = db.runCommand(
         docsByTag : 1,
         viewsByTag : 1,
         avgByTag : { $divide:["$viewsByTag", "$docsByTag"] }
-    }}
+    }},
+    {$sort: {'docsByTag': 1, 'viewsByTag': 1}}
 ]});
 
 var g2result = [
+    {
+        "docsByTag" : 1,
+        "viewsByTag" : 5,
+        "mostViewsByTag" : 5,
+        "tag" : "good",
+        "avgByTag" : 5
+    },
     {
         "docsByTag" : 1,
         "viewsByTag" : 6,
@@ -1352,13 +1361,6 @@ var g2result = [
         "mostViewsByTag" : 7,
         "tag" : "nasty",
         "avgByTag" : 6.5
-    },
-    {
-        "docsByTag" : 1,
-        "viewsByTag" : 5,
-        "mostViewsByTag" : 5,
-        "tag" : "good",
-        "avgByTag" : 5
     },
     {
         "docsByTag" : 3,
@@ -1383,7 +1385,8 @@ var g3 = db.runCommand(
     { $group : {
         _id : { tags : 1 },
         authors : { $push : "$author" }
-    }}
+    }},
+    {$sort: {'_id': 1}}
 ]});
 
 var g3result = [
@@ -1397,11 +1400,12 @@ var g3result = [
     },
     {
         "_id" : {
-            "tags" : "nasty"
+            "tags" : "fun"
         },
         "authors" : [
-            "dave",
-            "jane"
+            "bob",
+            "bob",
+            "dave"
         ]
     },
     {
@@ -1414,12 +1418,11 @@ var g3result = [
     },
     {
         "_id" : {
-            "tags" : "fun"
+            "tags" : "nasty"
         },
         "authors" : [
-            "bob",
-            "bob",
-            "dave"
+            "dave",
+            "jane"
         ]
     }
 ];
@@ -1441,7 +1444,8 @@ var g4 = db.runCommand(
         docsByTag : { $sum : 1 },
         viewsByTag : { $sum : "$pageViews" },
         avgByTag : { $avg : "$pageViews" },
-    }}
+    }},
+    {$sort: {'_id': 1}}
 ]});
 
 var g4result = [
@@ -1455,11 +1459,11 @@ var g4result = [
     },
     {
         "_id" : {
-            "tags" : "nasty"
+            "tags" : "fun"
         },
-        "docsByTag" : 2,
-        "viewsByTag" : 13,
-        "avgByTag" : 6.5
+        "docsByTag" : 3,
+        "viewsByTag" : 17,
+        "avgByTag" : 5.666666666666667
     },
     {
         "_id" : {
@@ -1471,11 +1475,11 @@ var g4result = [
     },
     {
         "_id" : {
-            "tags" : "fun"
+            "tags" : "nasty"
         },
-        "docsByTag" : 3,
-        "viewsByTag" : 17,
-        "avgByTag" : 5.666666666666667
+        "docsByTag" : 2,
+        "viewsByTag" : 13,
+        "avgByTag" : 6.5
     }
 ];
 
@@ -1493,7 +1497,8 @@ var g5 = db.runCommand(
     { $group : {
         _id : { tags : 1 },
         authors : { $addToSet : "$author" }
-    }}
+    }},
+    {$sort: {'_id': 1}}
 ]});
 
 var g5result = [
@@ -1507,11 +1512,11 @@ var g5result = [
     },
     {
         "_id" : {
-            "tags" : "nasty"
+            "tags" : "fun"
         },
         "authors" : [
-            "jane",
-            "dave"
+            "dave",
+            "bob"
         ]
     },
     {
@@ -1524,11 +1529,11 @@ var g5result = [
     },
     {
         "_id" : {
-            "tags" : "fun"
+            "tags" : "nasty"
         },
         "authors" : [
-            "dave",
-            "bob"
+            "jane",
+            "dave"
         ]
     }
 ];
