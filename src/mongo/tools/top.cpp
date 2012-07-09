@@ -86,8 +86,7 @@ namespace mongo {
                 return stats;
             }
 
-            out = out.getOwned();
-            out = out["totals"].Obj();
+            out = out["totals"].Obj().getOwned();
 
             BSONObjIterator i( out );
             while ( i.more() ) {
