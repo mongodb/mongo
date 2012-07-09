@@ -1328,6 +1328,22 @@ namespace mongo {
         if( ! m->auth(dbname, username, pwd, errmsg, digestPassword, level ) )
             return false;
 
+        /* Also authenticate the cached secondary connection. Note that this is only
+         * needed when we actually have something cached and is last known to be
+         * working.
+         */
+        if (_lastSlaveOkConn.get() != NULL && !_lastSlaveOkConn->isFailed()) {
+            try {
+                _lastSlaveOkConn->auth(dbname, username, pwd, errmsg, digestPassword, level);
+            }
+            catch (const DBException& ex) {
+                /* Swallow exception. _lastSlaveOkConn is now in failed state.
+                 * The next time we create a new secondary connection it will
+                 * be authenticated with the credentials from _auths.
+                 */
+            }
+        }
+
         // now that it does, we should save so that for a new node we can auth
         _auths.push_back( AuthInfo( dbname , username , pwd , digestPassword ) );
         return true;
@@ -1472,7 +1488,6 @@ namespace mongo {
     DBClientConnection* DBClientReplicaSet::selectNodeUsingTags(ReadPreference preference,
                                                                 TagSet* tags) {
         if (checkLastHost(preference, tags)) {
-            // TODO: SERVER-5082, slave auth credentials may have changed
             return _lastSlaveOkConn.get();
         }
 
