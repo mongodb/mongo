@@ -38,19 +38,19 @@ namespace mongo {
          * string is not known. 'c' must be a pointer to a null-terminated string.
          */
         StringData( const char* c )
-            : _data(c), _size((unsigned) strlen(c)) {}
+            : _data(c), _size(string::npos){}
 
         /** Construct a StringData explicitly, for the case where the length of the string
          * is already known. 'c' must be a pointer to a null-terminated string, and strlenOfc
          * must be the length that strlen(c) would return, a.k.a the index of the
          * terminator in c.
          */
-        StringData( const char* c, unsigned len )
+        StringData( const char* c, size_t len )
             : _data(c), _size(len) {}
 
         /** Construct a StringData, for the case of a string. */
         StringData( const std::string& s )
-            : _data(s.c_str()), _size((unsigned) s.size()) {}
+            : _data(s.c_str()), _size(s.size()) {}
 
         // Construct a StringData explicitly, for the case of a literal whose size is
         // known at compile time.
@@ -61,11 +61,15 @@ namespace mongo {
 
         // accessors
         const char* data() const { return _data; }
-        unsigned size() const { return _size; }
+        size_t size() const { 
+            if ( _size == string::npos )
+                _size = strlen( _data );
+            return _size; 
+        }
 
     private:
         const char* const _data;  // is always null terminated
-        const unsigned    _size;  // 'size' does not include the null terminator
+        mutable size_t _size;  // 'size' does not include the null terminator
     };
 
 } // namespace mongo
