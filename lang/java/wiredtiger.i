@@ -16,7 +16,7 @@
 %pragma(java) jniclasscode=%{
   static {
     try {
-        System.loadLibrary("wiredtiger_java");
+	System.loadLibrary("wiredtiger_java");
     } catch (UnsatisfiedLinkError e) {
       System.err.println("Native code library failed to load. \n" + e);
       System.exit(1);
@@ -26,9 +26,9 @@
 
 %{
 static void throwDbException(JNIEnv *jenv, const char *msg) {
-        jclass excep = (*jenv)->FindClass(jenv, "com/wiredtiger/db/DbException");
-        if (excep)
-                (*jenv)->ThrowNew(jenv, excep, msg);
+	jclass excep = (*jenv)->FindClass(jenv, "com/wiredtiger/db/DbException");
+	if (excep)
+		(*jenv)->ThrowNew(jenv, excep, msg);
 }
 %}
 
@@ -49,7 +49,7 @@ static void throwDbException(JNIEnv *jenv, const char *msg) {
 
 %typemap(javain) uint64_t "$javainput"
 %typemap(javaout) uint64_t {
-        return $jnicall;
+	return $jnicall;
 }
 
 /* Return byte[] from cursor.get_value */
@@ -59,47 +59,47 @@ static void throwDbException(JNIEnv *jenv, const char *msg) {
 
 %typemap(javain) WT_ITEM * "$javainput"
 %typemap(javaout) WT_ITEM * {
-        return $jnicall;
+	return $jnicall;
 }
 
 %typemap(in) WT_ITEM * (WT_ITEM item) %{
-        $1 = &item;
-        $1->data = (*jenv)->GetByteArrayElements(jenv, $input, 0);
-        $1->size = (*jenv)->GetArrayLength(jenv, $input);
+	$1 = &item;
+	$1->data = (*jenv)->GetByteArrayElements(jenv, $input, 0);
+	$1->size = (*jenv)->GetArrayLength(jenv, $input);
 %}
 
 %typemap(argout) WT_ITEM * %{
-        (*jenv)->ReleaseByteArrayElements(jenv, $input, $1->data, 0);
+	(*jenv)->ReleaseByteArrayElements(jenv, $input, $1->data, 0);
 %}
 
 %typemap(out) WT_ITEM * %{
-        if ($1 == NULL)
-                $result = NULL;
-        else if (($result = (*jenv)->NewByteArray(jenv, $1->size)) != NULL) {
-                (*jenv)->SetByteArrayRegion(jenv,
-                    $result, 0, $1->size, $1->data);
-        }
+	if ($1 == NULL)
+		$result = NULL;
+	else if (($result = (*jenv)->NewByteArray(jenv, $1->size)) != NULL) {
+		(*jenv)->SetByteArrayRegion(jenv,
+		    $result, 0, $1->size, $1->data);
+	}
 %}
 
 /* Don't require empty config strings. */
 %typemap(default) const char *config %{ $1 = NULL; %}
 
 %typemap(out) int %{
-        if ($1 != 0 && $1 != WT_NOTFOUND) {
-                throwDbException(jenv, wiredtiger_strerror($1));
-                return $null;
-        }
-        $result = $1;
+	if ($1 != 0 && $1 != WT_NOTFOUND) {
+		throwDbException(jenv, wiredtiger_strerror($1));
+		return $null;
+	}
+	$result = $1;
 %}
 
 /*
  * Extra 'self' elimination.
  * The methods we're wrapping look like this:
  * struct __wt_xxx {
- *      int method(WT_XXX *, ...otherargs...);
+ *	int method(WT_XXX *, ...otherargs...);
  * };
  * To SWIG, that is equivalent to:
- *      int method(struct __wt_xxx *self, WT_XXX *, ...otherargs...);
+ *	int method(struct __wt_xxx *self, WT_XXX *, ...otherargs...);
  * and we use consecutive argument matching of typemaps to convert two args to
  * one.
  */
@@ -137,126 +137,126 @@ enum SearchStatus { FOUND, NOTFOUND, SMALLER, LARGER };
 %}
 
 %extend __wt_cursor {
-        %javamethodmodifiers get_key_wrap "protected";
-        WT_ITEM *get_key_wrap(JNIEnv *jenv) {
-                WT_ITEM k;
-                int ret;
-                if ((ret = $self->get_key($self, &k)) != 0) {
-                        throwDbException(jenv, wiredtiger_strerror(ret));
-                        return NULL;
-                }
-                return &$self->key;
-        }
+	%javamethodmodifiers get_key_wrap "protected";
+	WT_ITEM *get_key_wrap(JNIEnv *jenv) {
+		WT_ITEM k;
+		int ret;
+		if ((ret = $self->get_key($self, &k)) != 0) {
+			throwDbException(jenv, wiredtiger_strerror(ret));
+			return NULL;
+		}
+		return &$self->key;
+	}
 
-        %javamethodmodifiers get_value_wrap "protected";
-        WT_ITEM *get_value_wrap(JNIEnv *jenv) {
-                WT_ITEM v;
-                int ret;
-                if ((ret = $self->get_value($self, &v)) != 0) {
-                        throwDbException(jenv, wiredtiger_strerror(ret));
-                        return NULL;
-                }
-                return &$self->value;
-        }
+	%javamethodmodifiers get_value_wrap "protected";
+	WT_ITEM *get_value_wrap(JNIEnv *jenv) {
+		WT_ITEM v;
+		int ret;
+		if ((ret = $self->get_value($self, &v)) != 0) {
+			throwDbException(jenv, wiredtiger_strerror(ret));
+			return NULL;
+		}
+		return &$self->value;
+	}
 
-        %javamethodmodifiers insert_wrap "protected";
-        int insert_wrap(WT_ITEM *k, WT_ITEM *v) {
-                $self->set_key($self, k);
-                $self->set_value($self, v);
-                return $self->insert($self);
-        }
+	%javamethodmodifiers insert_wrap "protected";
+	int insert_wrap(WT_ITEM *k, WT_ITEM *v) {
+		$self->set_key($self, k);
+		$self->set_value($self, v);
+		return $self->insert($self);
+	}
 
-        %javamethodmodifiers remove_wrap "protected";
-        int remove_wrap(WT_ITEM *k) {
-                $self->set_key($self, k);
-                return $self->remove($self);
-        }
+	%javamethodmodifiers remove_wrap "protected";
+	int remove_wrap(WT_ITEM *k) {
+		$self->set_key($self, k);
+		return $self->remove($self);
+	}
 
-        %javamethodmodifiers search_wrap "protected";
-        int search_wrap(WT_ITEM *k) {
-                $self->set_key($self, k);
-                return $self->search($self);
-        }
+	%javamethodmodifiers search_wrap "protected";
+	int search_wrap(WT_ITEM *k) {
+		$self->set_key($self, k);
+		return $self->search($self);
+	}
 
-        %javamethodmodifiers search_near_wrap "protected";
-        enum SearchStatus search_near_wrap(JNIEnv *jenv, WT_ITEM *k) {
-                int cmp, ret;
+	%javamethodmodifiers search_near_wrap "protected";
+	enum SearchStatus search_near_wrap(JNIEnv *jenv, WT_ITEM *k) {
+		int cmp, ret;
 
-                $self->set_key($self, k);
-                ret = $self->search_near(self, &cmp);
-                if (ret != 0 && ret != WT_NOTFOUND)
-                        throwDbException(jenv, wiredtiger_strerror(ret));
-                if (ret == 0)
-                        return (cmp == 0 ? FOUND : cmp < 0 ? SMALLER : LARGER);
-                return (NOTFOUND);
-        }
+		$self->set_key($self, k);
+		ret = $self->search_near(self, &cmp);
+		if (ret != 0 && ret != WT_NOTFOUND)
+			throwDbException(jenv, wiredtiger_strerror(ret));
+		if (ret == 0)
+			return (cmp == 0 ? FOUND : cmp < 0 ? SMALLER : LARGER);
+		return (NOTFOUND);
+	}
 
-        %javamethodmodifiers update_wrap "protected";
-        int update_wrap(WT_ITEM *k, WT_ITEM *v) {
-                $self->set_key($self, k);
-                $self->set_value($self, v);
-                return $self->insert($self);
-        }
+	%javamethodmodifiers update_wrap "protected";
+	int update_wrap(WT_ITEM *k, WT_ITEM *v) {
+		$self->set_key($self, k);
+		$self->set_value($self, v);
+		return $self->insert($self);
+	}
 }
 
 %typemap(javacode) struct __wt_cursor %{
-        protected byte[] key;
-        protected byte[] value;
+	protected byte[] key;
+	protected byte[] value;
 
-        public void set_key(String key) {
-                this.key = key.getBytes();
-        }
+	public void set_key(String key) {
+		this.key = key.getBytes();
+	}
 
-        public String get_key() {
-                return new String(key);
-        }
+	public String get_key() {
+		return new String(key);
+	}
 
-        public void set_value(byte[] value) {
-                this.value = value;
-        }
+	public void set_value(byte[] value) {
+		this.value = value;
+	}
 
-        public byte[] get_value() {
-                return this.value;
-        }
+	public byte[] get_value() {
+		return this.value;
+	}
 
-        public int insert() {
-                return insert_wrap(key, value);
-        }
+	public int insert() {
+		return insert_wrap(key, value);
+	}
 
-        public int update() {
-                return update_wrap(key, value);
-        }
+	public int update() {
+		return update_wrap(key, value);
+	}
 
-        public int remove() {
-                return remove_wrap(key);
-        }
+	public int remove() {
+		return remove_wrap(key);
+	}
 
-        public int next() {
-                int ret = next_wrap();
-                key = (ret == 0) ? get_key_wrap() : null;
-                value = (ret == 0) ? get_value_wrap() : null;
-                return ret;
-        }
+	public int next() {
+		int ret = next_wrap();
+		key = (ret == 0) ? get_key_wrap() : null;
+		value = (ret == 0) ? get_value_wrap() : null;
+		return ret;
+	}
 
-        public int prev() {
-                int ret = prev_wrap();
-                key = (ret == 0) ? get_key_wrap() : null;
-                value = (ret == 0) ? get_value_wrap() : null;
-                return ret;
-        }
-        public int search() {
-                int ret = search_wrap(key);
-                key = (ret == 0) ? get_key_wrap() : null;
-                value = (ret == 0) ? get_value_wrap() : null;
-                return ret;
-        }
+	public int prev() {
+		int ret = prev_wrap();
+		key = (ret == 0) ? get_key_wrap() : null;
+		value = (ret == 0) ? get_value_wrap() : null;
+		return ret;
+	}
+	public int search() {
+		int ret = search_wrap(key);
+		key = (ret == 0) ? get_key_wrap() : null;
+		value = (ret == 0) ? get_value_wrap() : null;
+		return ret;
+	}
 
-        public SearchStatus search_near() {
-                SearchStatus ret = search_near_wrap(key);
-                key = (ret != SearchStatus.NOTFOUND) ? get_key_wrap() : null;
-                value = (ret != SearchStatus.NOTFOUND) ? get_value_wrap() : null;
-                return ret;
-        }
+	public SearchStatus search_near() {
+		SearchStatus ret = search_near_wrap(key);
+		key = (ret != SearchStatus.NOTFOUND) ? get_key_wrap() : null;
+		value = (ret != SearchStatus.NOTFOUND) ? get_value_wrap() : null;
+		return ret;
+	}
 %}
 
 /* Remove / rename parts of the C API that we don't want in Java. */
@@ -305,32 +305,32 @@ enum SearchStatus { FOUND, NOTFOUND, SMALLER, LARGER };
 /* Return new connections, sessions and cursors. */
 %inline {
 WT_CONNECTION *wiredtiger_open_wrap(JNIEnv *jenv, const char *home, const char *config) {
-        WT_CONNECTION *conn = NULL;
-        int ret;
-        if ((ret = wiredtiger_open(home, NULL, config, &conn)) != 0)
-                throwDbException(jenv, wiredtiger_strerror(ret));
-        return conn;
+	WT_CONNECTION *conn = NULL;
+	int ret;
+	if ((ret = wiredtiger_open(home, NULL, config, &conn)) != 0)
+		throwDbException(jenv, wiredtiger_strerror(ret));
+	return conn;
 }
 }
 
 %extend __wt_connection {
-        WT_SESSION *open_session_wrap(JNIEnv *jenv, const char *config) {
-                WT_SESSION *session = NULL;
-                int ret;
-                if ((ret = $self->open_session($self, NULL, config, &session)) != 0)
-                        throwDbException(jenv, wiredtiger_strerror(ret));
-                return session;
-        }
+	WT_SESSION *open_session_wrap(JNIEnv *jenv, const char *config) {
+		WT_SESSION *session = NULL;
+		int ret;
+		if ((ret = $self->open_session($self, NULL, config, &session)) != 0)
+			throwDbException(jenv, wiredtiger_strerror(ret));
+		return session;
+	}
 }
 
 %extend __wt_session {
-        WT_CURSOR *open_cursor_wrap(JNIEnv *jenv, const char *uri, WT_CURSOR *to_dup, const char *config) {
-                WT_CURSOR *cursor = NULL;
-                int ret;
-                if ((ret = $self->open_cursor($self, uri, to_dup, config, &cursor)) != 0)
-                        throwDbException(jenv, wiredtiger_strerror(ret));
-                else
-                        cursor->flags |= WT_CURSTD_RAW;
-                return cursor;
-        }
+	WT_CURSOR *open_cursor_wrap(JNIEnv *jenv, const char *uri, WT_CURSOR *to_dup, const char *config) {
+		WT_CURSOR *cursor = NULL;
+		int ret;
+		if ((ret = $self->open_cursor($self, uri, to_dup, config, &cursor)) != 0)
+			throwDbException(jenv, wiredtiger_strerror(ret));
+		else
+			cursor->flags |= WT_CURSTD_RAW;
+		return cursor;
+	}
 }
