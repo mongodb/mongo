@@ -216,14 +216,14 @@ namespace mongo {
     }
 
     LockStat* LockState::getRelevantLockStat() {
+        if ( _whichNestable )
+            return Lock::nestableLockStat( _whichNestable );
+
         if ( _otherLock )
             return &_otherLock->stats;
         
         if ( isRW() ) 
             return Lock::globalLockStat();
-        
-        if ( _whichNestable )
-            return Lock::nestableLockStat( _whichNestable );
 
         return 0;
     }

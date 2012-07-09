@@ -202,7 +202,7 @@ namespace mongo {
     void reportLockStats(BSONObjBuilder& result) {
         BSONObjBuilder b;
         b.append(".", qlk.stats.report());
-        b.append("admin", nestableLocks[Lock::local]->stats.report());
+        b.append("admin", nestableLocks[Lock::admin]->stats.report());
         b.append("local", nestableLocks[Lock::local]->stats.report());
         {
             mapsf<string,WrapperForRWLock*>::ref r(dblocks);
