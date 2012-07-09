@@ -134,6 +134,7 @@ __session_open_cursor(WT_SESSION *wt_session,
 		    "but not both");
 
 	if (to_dup != NULL) {
+		uri = to_dup->uri;
 		if (WT_PREFIX_MATCH(uri, "colgroup:") ||
 		    WT_PREFIX_MATCH(uri, "index:") ||
 		    WT_PREFIX_MATCH(uri, "file:") ||

@@ -464,8 +464,10 @@ struct __wt_session {
 	 * will be closed implicitly and must not be accessed again.
 	 *
 	 * An existing cursor can be duplicated by passing it as the \c to_dup
-	 * parameter and setting the \c uri parameter to \c NULL, otherwise the
-	 * \c to_dup parameter should be \c NULL.
+	 * parameter and setting the \c uri parameter to \c NULL, otherwise
+	 * the \c to_dup parameter should be \c NULL.  Successfully duplicated
+	 * cursors are positioned at the same place in the data source as the
+	 * existing cursor.
 	 *
 	 * @snippet ex_all.c Open a cursor
 	 *
