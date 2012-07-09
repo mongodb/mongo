@@ -64,7 +64,7 @@ namespace mongo {
         typedef map<string,CollectionData> UsageMap;
 
     public:
-        void record( const string& ns , int op , int lockType , long long micros , bool command );
+        void record( const StringData& ns , int op , int lockType , long long micros , bool command );
         void append( BSONObjBuilder& b );
         void cloneMap(UsageMap& out) const;
         CollectionData getGlobalData() const { return _global; }
@@ -78,7 +78,7 @@ namespace mongo {
         void _appendStatsEntry( BSONObjBuilder& b , const char * statsName , const UsageData& map ) const;
         void _record( CollectionData& c , int op , int lockType , long long micros , bool command );
 
-        mutable mongo::mutex _lock;
+        mutable SimpleMutex _lock;
         CollectionData _global;
         UsageMap _usage;
         string _lastDropped;

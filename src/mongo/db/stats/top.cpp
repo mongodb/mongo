@@ -42,19 +42,19 @@ namespace mongo {
 
     }
 
-    void Top::record( const string& ns , int op , int lockType , long long micros , bool command ) {
-        if ( ns[0] == '?' )
+    void Top::record( const StringData& ns , int op , int lockType , long long micros , bool command ) {
+        if ( ns.data()[0] == '?' )
             return;
 
         //cout << "record: " << ns << "\t" << op << "\t" << command << endl;
-        scoped_lock lk(_lock);
+        SimpleMutex::scoped_lock lk(_lock);
 
-        if ( ( command || op == dbQuery ) && ns == _lastDropped ) {
+        if ( ( command || op == dbQuery ) && str::equals( ns.data(), _lastDropped.c_str() ) ) {
             _lastDropped = "";
             return;
         }
 
-        CollectionData& coll = _usage[ns];
+        CollectionData& coll = _usage[ns.data()];
         _record( coll , op , lockType , micros , command );
         _record( _global , op , lockType , micros , command );
     }
@@ -103,18 +103,18 @@ namespace mongo {
 
     void Top::collectionDropped( const string& ns ) {
         //cout << "collectionDropped: " << ns << endl;
-        scoped_lock lk(_lock);
+        SimpleMutex::scoped_lock lk(_lock);
         _usage.erase(ns);
         _lastDropped = ns;
     }
 
     void Top::cloneMap(Top::UsageMap& out) const {
-        scoped_lock lk(_lock);
+        SimpleMutex::scoped_lock lk(_lock);
         out = _usage;
     }
 
     void Top::append( BSONObjBuilder& b ) {
-        scoped_lock lk( _lock );
+        SimpleMutex::scoped_lock lk( _lock );
         _appendToUsageMap( b , _usage );
     }
 
