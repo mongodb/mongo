@@ -592,6 +592,7 @@ extern int __wt_cursor_get_value(WT_CURSOR *cursor, ...);
 extern void __wt_cursor_set_key(WT_CURSOR *cursor, ...);
 extern void __wt_cursor_set_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap);
 extern void __wt_cursor_set_value(WT_CURSOR *cursor, ...);
+extern int __wt_cursor_kv_not_set(WT_CURSOR *cursor, int key);
 extern int __wt_cursor_close(WT_CURSOR *cursor);
 extern int __wt_cursor_dup(WT_SESSION_IMPL *session,
     WT_CURSOR *to_dup,
@@ -602,7 +603,6 @@ extern int __wt_cursor_init(WT_CURSOR *cursor,
     WT_CURSOR *owner,
     const char *cfg[],
     WT_CURSOR **cursorp);
-extern int __wt_cursor_kv_not_set(WT_CURSOR *cursor, int key);
 extern int __wt_curtable_get_key(WT_CURSOR *cursor, ...);
 extern int __wt_curtable_get_value(WT_CURSOR *cursor, ...);
 extern void __wt_curtable_set_key(WT_CURSOR *cursor, ...);

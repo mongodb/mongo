@@ -260,6 +260,22 @@ err:	API_END(session);
 }
 
 /*
+ * __wt_cursor_kv_not_set --
+ *	Standard error message for key/values not set.
+ */
+int
+__wt_cursor_kv_not_set(WT_CURSOR *cursor, int key)
+{
+	WT_SESSION_IMPL *session;
+
+	session = (WT_SESSION_IMPL *)cursor->session;
+
+	WT_RET_MSG(session,
+	    cursor->saved_err == 0 ? EINVAL : cursor->saved_err,
+	    "requires %s be set", key ? "key" : "value");
+}
+
+/*
  * __cursor_search --
  *	WT_CURSOR->search default implementation.
  */
@@ -548,20 +564,4 @@ __wt_cursor_init(WT_CURSOR *cursor,
 
 	*cursorp = (cdump != NULL) ? cdump : cursor;
 	return (0);
-}
-
-/*
- * __wt_cursor_kv_not_set --
- *	Standard error message for key/values not set.
- */
-int
-__wt_cursor_kv_not_set(WT_CURSOR *cursor, int key)
-{
-	WT_SESSION_IMPL *session;
-
-	session = (WT_SESSION_IMPL *)cursor->session;
-
-	WT_RET_MSG(session,
-	    cursor->saved_err == 0 ? EINVAL : cursor->saved_err,
-	    "requires %s be set", key ? "key" : "value");
 }
