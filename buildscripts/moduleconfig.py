@@ -83,7 +83,7 @@ def configure_modules(modules, conf, env):
             # else we glob the files in the module's src/
             # subdirectory, and its configure() takes 2 args
             module.configure(conf, env)
-            module_sources.extend(Glob(join(root, "src/*.cpp")))
+            module_sources.extend(env.Glob(join(root, "src/*.cpp")))
 
         if not module_sources:
             print "WARNING: no source files for module %s, module will not be built." % name
