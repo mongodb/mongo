@@ -315,12 +315,17 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
 
     printjson( this._configDB = this._configNames.join( "," ) )
     this._configConnection = new Mongo( this._configDB )
-    if ( ! otherParams.noChunkSize ) {
-        this._configConnection.getDB( "config" ).settings.insert( { _id : "chunksize" , value : otherParams.chunksize || otherParams.chunkSize || 50 } )
+    print( "ShardingTest " + this._testName + " :\n" + tojson( { config : this._configDB, shards : this._connections } ) );
+
+    if ( numMongos == 0 && !otherParams.noChunkSize ) {
+        if ( keyFile ) {
+            throw "Cannot set chunk size without any mongos when using auth";
+        } else {
+            this._configConnection.getDB( "config" ).settings.insert(
+                { _id : "chunksize" , value : otherParams.chunksize || otherParams.chunkSize || 50 } );
+        }
     }
 
-    print( "ShardingTest " + this._testName + " :\n" + tojson( { config : this._configDB, shards : this._connections } ) );
-    
     this._mongos = []
     this._mongoses = this._mongos
     for ( var i = 0; i < ( ( numMongos == 0 ? -1 : numMongos ) || 1 ); i++ ){
@@ -332,6 +337,9 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
                         verbose : verboseLevel || 0,
                         keyFile : keyFile
                       }
+        if ( ! otherParams.noChunkSize ) {
+            options.chunkSize = otherParams.chunksize || otherParams.chunkSize || 50;
+        }
 
         options = Object.merge( options, otherParams.mongosOptions )
         options = Object.merge( options, otherParams.extraOptions )
@@ -369,8 +377,10 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
     }
 
     if (jsTestOptions().keyFile && !keyFile) {
-        jsTest.addAuth(this._mongos[0]);
-        jsTest.authenticateNodes(this._mongos);
+        jsTest.addAuth( this._configConnection );
+        jsTest.authenticate( this._configConnection );
+        jsTest.authenticateNodes( this._configServers );
+        jsTest.authenticateNodes( this._mongos );
     }
 }
 

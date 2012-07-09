@@ -1123,8 +1123,18 @@ jsTest.randomize = function( seed ) {
 * with authentication enabled.
 */
 jsTest.addAuth = function(conn) {
-    print ("Adding admin user on connection: " + conn);
-    return conn.getDB('admin').addUser(jsTestOptions().adminUser, jsTestOptions().adminPassword);
+    // Get a connection over localhost so that the first user can be added.
+    var localconn = conn;
+    if ( localconn.host.indexOf('localhost') != 0 ) {
+        print( 'Getting locahost connection instead of ' + conn + ' to add first admin user' );
+        var hosts = conn.host.split(',');
+        for ( var i = 0; i < hosts.length; i++ ) {
+            hosts[i] = 'localhost:' + hosts[i].split(':')[1];
+        }
+        localconn = new Mongo(hosts.join(','));
+    }
+    print ("Adding admin user on connection: " + localconn);
+    return localconn.getDB('admin').addUser(jsTestOptions().adminUser, jsTestOptions().adminPassword);
 }
 
 jsTest.authenticate = function(conn) {

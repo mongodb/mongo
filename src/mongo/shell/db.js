@@ -70,7 +70,19 @@ DB.prototype.addUser = function( username , pass, readOnly, replicatedTo ){
     u.readOnly = readOnly;
     u.pwd = hex_md5( username + ":mongo:" + pass );
 
-    c.save( u );
+    try {
+        c.save( u );
+    } catch (e) {
+        // SyncClusterConnections call GLE automatically after every write and will throw an
+        // exception if the insert failed.
+        if ( tojson(e).indexOf( "login" ) >= 0 ){
+            // TODO: this check is a hack
+            print( "Creating user seems to have succeeded but threw an exception because we no " +
+                   "longer have auth." );
+        } else {
+            throw "Could not insert into system.users: " + tojson(e);
+        }
+    }
     print( tojson( u ) );
 
     //
