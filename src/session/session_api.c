@@ -133,9 +133,15 @@ __session_open_cursor(WT_SESSION *wt_session,
 		    "should be passed either a URI or a cursor to duplicate, "
 		    "but not both");
 
-	if (to_dup != NULL)
-		ret = to_dup->duplicate(to_dup, config, cursorp);
-	else if (WT_PREFIX_MATCH(uri, "backup:"))
+	if (to_dup != NULL) {
+		if (WT_PREFIX_MATCH(uri, "colgroup:") ||
+		    WT_PREFIX_MATCH(uri, "index:") ||
+		    WT_PREFIX_MATCH(uri, "file:") ||
+		    WT_PREFIX_MATCH(uri, "table:"))
+			ret = __wt_cursor_dup(session, to_dup, config, cursorp);
+		else
+			ret = ENOTSUP;
+	} else if (WT_PREFIX_MATCH(uri, "backup:"))
 		ret = __wt_curbackup_open(session, uri, cfg, cursorp);
 	else if (WT_PREFIX_MATCH(uri, "colgroup:"))
 		ret = __wt_curfile_open(session, uri, NULL, cfg, cursorp);

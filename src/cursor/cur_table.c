@@ -571,7 +571,6 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 		__curtable_remove,
 		__curtable_close,
 		NULL,
-		NULL,
 		{ NULL, NULL },		/* TAILQ_ENTRY q */
 		0,			/* recno key */
 		{ 0 },                  /* raw recno buffer */

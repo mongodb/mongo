@@ -390,9 +390,6 @@ struct __wt_cursor {
 	 */
 
 #if !defined(SWIG) && !defined(DOXYGEN)
-	int __F(duplicate)(
-	    WT_CURSOR *cursor, const char *config, WT_CURSOR **cursorp);
-
 	/*
 	 * !!!
 	 * Explicit representations of structures from queue.h.
