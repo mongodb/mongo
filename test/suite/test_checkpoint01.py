@@ -10,24 +10,20 @@ import traceback
 import unittest
 import wiredtiger
 import wttest
-from collections import OrderedDict
 
-class SnapShotTest(wttest.WiredTigerTestCase):
-
-    snapshots = {
-        "snapshot-1": (100, 120),
-        "snapshot-2": (200, 220),
-        "snapshot-3": (300, 320),
-        "snapshot-4": (400, 420),
-        "snapshot-5": (500, 520),
-        "snapshot-6": (100, 620),
-        "snapshot-7": (200, 720),
-        "snapshot-8": (300, 820),
-        "snapshot-9": (400, 920)
-    }
-    snapshots = OrderedDict(sorted(snapshots.items(), key=lambda t: t[0]))
-    URI = "file:__snap"
-    
+class CheckpointTest(wttest.WiredTigerTestCase):
+    checkpoints = {
+            "checkpoint-1": (100, 200),
+            "checkpoint-2": (200, 220),
+            "checkpoint-3": (300, 320),
+            "checkpoint-4": (400, 420),
+            "checkpoint-5": (500, 520),
+            "checkpoint-6": (100, 620),
+            "checkpoint-7": (200, 720),
+            "checkpoint-8": (300, 820),
+            "checkpoint-9": (400, 920)
+            }
+    URI = "file:__checkpoint"
     def setUpConnectionOpen(self, dir):
         conn = wiredtiger.wiredtiger_open(dir, "create, cache_size=100MB")
         self.pr('conn')
@@ -36,21 +32,18 @@ class SnapShotTest(wttest.WiredTigerTestCase):
         config = "key_format=S, value_format=S, internal_page_max=512, leaf_page_max=512"
         self.session.create(self.URI, config)
 
-    def test_snapshot(self):
+    def test_checkpoint(self):
         self.create_session()
-        self.build_file_with_snapshots() # build set of snapshots
-        for snapshot_names, sizes in self.snapshots.iteritems():
-            self.check(snapshot_names)
+        self.build_file_with_checkpoints()
+        for checkpoint_name, size in self.checkpoints.iteritems():
+            self.check(checkpoint_name)
         self.cursor_lock()
         self.drop()
-
-    def build_file_with_snapshots(self):
-        for snapshot_name, sizes in self.snapshots.iteritems():
+    def build_file_with_checkpoints(self):
+        for checkpoint_name, sizes in self.checkpoints.iteritems():
             start, stop = sizes
             self.add_records(start, stop)
-            buf = "snapshot=%s" % snapshot_name
-            self.assertEqual(0, self.session.sync(self.URI, buf))
-            self.assertEqual(0, self.session.verify(self.URI, None))
+            self.session.checkpoint("name=%s" % checkpoint_name)
     
     def add_records(self, start, stop):
         cursor = self.session.open_cursor(self.URI, None, "overwrite")
@@ -65,25 +58,25 @@ class SnapShotTest(wttest.WiredTigerTestCase):
         cursor.close()
 
             
-    def dump_records(self, snapshot_name, filename):
+    def dump_records(self, checkpoint_name, filename):
         records = []
-        for snapshot, sizes in self.snapshots.iteritems():
-            sizes = self.snapshots[snapshot]
+        for checkpoint, sizes in self.checkpoints.iteritems():
+            sizes = self.checkpoints[checkpoint]
             start, stop = sizes
             for i in range(start, stop+1):
                     records.append("%010d KEY------\n%010d VALUE----\n" % (i, i))
-            if snapshot == snapshot_name:
+            if checkpoint == checkpoint_name:
                 break;
         return records.sort()
 
-    def check(self, snapshot_name):
-        records = self.dump_records(snapshot_name, "__dump.1")
-        snaps = self.dump_snap(snapshot_name, "__dump.2")
+    def check(self, checkpoint_name):
+        records = self.dump_records(checkpoint_name, "__dump.1")
+        snaps = self.dump_snap(checkpoint_name, "__dump.2")
         self.assertEqual(records, snaps)
 
-    def dump_snap(self, snapshot_name, filename):
+    def dump_snap(self, checkpoint_name, filename):
         snaps = []
-        buf = "snapshot=%s" % snapshot_name
+        buf = "checkpoint=%s" % checkpoint_name
         cursor = self.session.open_cursor(self.URI, None, buf)
         while cursor.next() == 0:
             key =  cursor.get_key()
@@ -91,8 +84,27 @@ class SnapShotTest(wttest.WiredTigerTestCase):
             snaps.append( "%s\n%s\n" % (key, value))
         cursor.close()
         return snaps.sort()
-
     def cursor_lock(self):
+        #self.session.checkpoint()
+        #cursor = self.session.open_cursor(self.URI, None, "checkpoint=checkpoint-1")
+
+        #self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+        #        lambda: self.session.checkpoint(),
+        #        "session.checkpoint: file:__snap: Resource or device busy")
+        #cursor.close()
+        self.session.checkpoint("name=another_checkpoint")
+        self.session.checkpoint("drop=(from=another_checkpoint)")
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+                lambda: self.session.open_cursor(self.URI, None, "checkpoint=another_checkpoint"),
+                r'/(.*)no "another_checkpoint" checkpoint found'+\
+                            ' in file:__checkpoint:.*/')
+        cursor = self.session.open_cursor(self.URI, None, "checkpoint=checkpoint-1")
+        #self.session.checkpoint("drop=(from=all)")
+        #self.assertRaisesWithMessage(wiredtiger.WiredTigerError, 
+                #lambda: self.session.checkpoint("drop=(from=all)"),
+                #"/Device or resource busy/")
+        cursor.close() 
+    def cursor_lock_deprecated(self):
         buf = 'snapshot=snapshot-1'
         cursor = self.session.open_cursor(self.URI, None, buf)
         with self.assertRaises(wiredtiger.WiredTigerError) as cm:
@@ -108,8 +120,5 @@ class SnapShotTest(wttest.WiredTigerTestCase):
         self.assertEqual(0, cursor3.close())
 
     def drop(self):
-        for snapshot_name, sizes in self.snapshots.iteritems():
-            start, stop = sizes
-            buf = 'snapshot=%s' % snapshot_name
-            self.assertEqual(0, self.session.drop(self.URI, buf))
-            self.assertEqual(0, self.session.verify(self.URI, None))
+        self.assertEqual(0, self.session.checkpoint("drop=(from=all)"))
+            #self.assertEqual(0, self.session.verify(self.URI, None))
