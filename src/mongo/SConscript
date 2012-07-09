@@ -31,9 +31,7 @@ env.StaticLibrary('foundation',
                     'util/time_support.cpp',
                     ],
                   LIBDEPS=['stacktrace',
-                           '$BUILD_DIR/third_party/boost/boost_system',
-                           '$BUILD_DIR/third_party/boost/boost_filesystem',
-                           '$BUILD_DIR/third_party/boost/boost_thread'])
+                           '$BUILD_DIR/third_party/mongo_boost'])
 
 commonFiles = [ "pch.cpp",
                 "buildinfo.cpp",
