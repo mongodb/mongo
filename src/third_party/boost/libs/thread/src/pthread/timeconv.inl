@@ -20,8 +20,8 @@ const int NANOSECONDS_PER_MICROSECOND = 1000;
 inline void to_time(int milliseconds, boost::xtime& xt)
 {
     int res = 0;
-    res = boost::xtime_get(&xt, boost::TIME_UTC);
-    BOOST_ASSERT(res == boost::TIME_UTC); (void)res;
+    res = boost::xtime_get(&xt, boost::TIME_UTC_);
+    BOOST_ASSERT(res == boost::TIME_UTC_); (void)res;
 
     xt.sec += (milliseconds / MILLISECONDS_PER_SECOND);
     xt.nsec += ((milliseconds % MILLISECONDS_PER_SECOND) *
@@ -56,8 +56,8 @@ inline void to_timespec_duration(const boost::xtime& xt, timespec& ts)
 {
     boost::xtime cur;
     int res = 0;
-    res = boost::xtime_get(&cur, boost::TIME_UTC);
-    BOOST_ASSERT(res == boost::TIME_UTC); (void)res;
+    res = boost::xtime_get(&cur, boost::TIME_UTC_);
+    BOOST_ASSERT(res == boost::TIME_UTC_); (void)res;
 
     if (boost::xtime_cmp(xt, cur) <= 0)
     {
@@ -87,8 +87,8 @@ inline void to_duration(boost::xtime xt, int& milliseconds)
 {
     boost::xtime cur;
     int res = 0;
-    res = boost::xtime_get(&cur, boost::TIME_UTC);
-    BOOST_ASSERT(res == boost::TIME_UTC); (void)res;
+    res = boost::xtime_get(&cur, boost::TIME_UTC_);
+    BOOST_ASSERT(res == boost::TIME_UTC_); (void)res;
 
     if (boost::xtime_cmp(xt, cur) <= 0)
         milliseconds = 0;
@@ -109,8 +109,8 @@ inline void to_microduration(boost::xtime xt, int& microseconds)
 {
     boost::xtime cur;
     int res = 0;
-    res = boost::xtime_get(&cur, boost::TIME_UTC);
-    BOOST_ASSERT(res == boost::TIME_UTC); (void)res;
+    res = boost::xtime_get(&cur, boost::TIME_UTC_);
+    BOOST_ASSERT(res == boost::TIME_UTC_); (void)res;
 
     if (boost::xtime_cmp(xt, cur) <= 0)
         microseconds = 0;

@@ -20,7 +20,8 @@ namespace boost {
 
 enum xtime_clock_types
 {
-    TIME_UTC=1
+    //TIME_UTC=1
+    TIME_UTC_=1 // 10gen: switched to TIME_UTC_ as in boost 1.50 to avoid C11 / glibc-2.16 conflict
 //    TIME_TAI,
 //    TIME_MONOTONIC,
 //    TIME_PROCESS,
@@ -68,7 +69,7 @@ inline xtime get_xtime(boost::system_time const& abs_time)
 
 inline int xtime_get(struct xtime* xtp, int clock_type)
 {
-    if (clock_type == TIME_UTC)
+    if (clock_type == TIME_UTC_)
     {
         *xtp=get_xtime(get_system_time());
         return clock_type;

@@ -92,7 +92,7 @@ namespace mongo {
             if ( msTimeOut ) {
                 // add msTimeOut millisecond to current time
                 boost::xtime xt;
-                boost::xtime_get( &xt, boost::TIME_UTC );
+                boost::xtime_get( &xt, boost::TIME_UTC_ );
 
                 unsigned long long ns = msTimeOut * 1000000ULL; // milli to nano
                 if ( xt.nsec + ns < 1000000000 ) {

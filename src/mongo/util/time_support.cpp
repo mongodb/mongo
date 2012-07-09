@@ -106,7 +106,7 @@ namespace mongo {
         if ( s <= 0 )
             return;
         boost::xtime xt;
-        boost::xtime_get(&xt, boost::TIME_UTC);
+        boost::xtime_get(&xt, boost::TIME_UTC_);
         xt.sec += (int)( s / 1000000 );
         xt.nsec += (int)(( s % 1000000 ) * 1000);
         if ( xt.nsec >= 1000000000 ) {
@@ -118,13 +118,13 @@ namespace mongo {
 #elif defined(__sunos__)
     void sleepsecs(int s) {
         boost::xtime xt;
-        boost::xtime_get(&xt, boost::TIME_UTC);
+        boost::xtime_get(&xt, boost::TIME_UTC_);
         xt.sec += s;
         boost::thread::sleep(xt);
     }
     void sleepmillis(long long s) {
         boost::xtime xt;
-        boost::xtime_get(&xt, boost::TIME_UTC);
+        boost::xtime_get(&xt, boost::TIME_UTC_);
         xt.sec += (int)( s / 1000 );
         xt.nsec += (int)(( s % 1000 ) * 1000000);
         if ( xt.nsec >= 1000000000 ) {
@@ -137,7 +137,7 @@ namespace mongo {
         if ( s <= 0 )
             return;
         boost::xtime xt;
-        boost::xtime_get(&xt, boost::TIME_UTC);
+        boost::xtime_get(&xt, boost::TIME_UTC_);
         xt.sec += (int)( s / 1000000 );
         xt.nsec += (int)(( s % 1000000 ) * 1000);
         if ( xt.nsec >= 1000000000 ) {
@@ -202,24 +202,24 @@ namespace mongo {
 #ifdef _WIN32 // no gettimeofday on windows
     unsigned long long curTimeMillis64() {
         boost::xtime xt;
-        boost::xtime_get(&xt, boost::TIME_UTC);
+        boost::xtime_get(&xt, boost::TIME_UTC_);
         return ((unsigned long long)xt.sec) * 1000 + xt.nsec / 1000000;
     }
     Date_t jsTime() {
         boost::xtime xt;
-        boost::xtime_get(&xt, boost::TIME_UTC);
+        boost::xtime_get(&xt, boost::TIME_UTC_);
         unsigned long long t = xt.nsec / 1000000;
         return ((unsigned long long) xt.sec * 1000) + t + getJSTimeVirtualSkew() + getJSTimeVirtualThreadSkew();
     }
     unsigned long long curTimeMicros64() {
         boost::xtime xt;
-        boost::xtime_get(&xt, boost::TIME_UTC);
+        boost::xtime_get(&xt, boost::TIME_UTC_);
         unsigned long long t = xt.nsec / 1000;
         return (((unsigned long long) xt.sec) * 1000000) + t;
     }    
     unsigned curTimeMicros() {
         boost::xtime xt;
-        boost::xtime_get(&xt, boost::TIME_UTC);
+        boost::xtime_get(&xt, boost::TIME_UTC_);
         unsigned t = xt.nsec / 1000;
         unsigned secs = xt.sec % 1024;
         return secs*1000000 + t;

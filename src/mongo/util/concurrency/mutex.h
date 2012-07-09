@@ -37,7 +37,7 @@ namespace mongo {
 
     inline boost::xtime incxtimemillis( long long s ) {
         boost::xtime xt;
-        boost::xtime_get(&xt, boost::TIME_UTC);
+        boost::xtime_get(&xt, boost::TIME_UTC_);
         xt.sec += (int)( s / 1000 );
         xt.nsec += (int)(( s % 1000 ) * 1000000);
         if ( xt.nsec >= 1000000000 ) {
