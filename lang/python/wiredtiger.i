@@ -131,7 +131,19 @@ class IterableCursor:
 %}
 
 %typemap(out) int {
-	if ($1 != 0 && $1 != WT_NOTFOUND) {
+	/*
+	 * cursor.equals returns a boolean (equal or not-equal).
+	 * cursor key-based position functions can return not-found.
+	 */
+	if ($1 != 0 &&
+	    strcmp("$symname", "Cursor_equals") != 0 &&
+	    ($1 != WT_NOTFOUND || (
+	    strcmp("$symname", "Cursor_next") != 0 &&
+	    strcmp("$symname", "Cursor_prev") != 0 &&
+	    strcmp("$symname", "Cursor_remove") != 0 &&
+	    strcmp("$symname", "Cursor_search") != 0 &&
+	    strcmp("$symname", "Cursor_search_near") != 0 &&
+	    strcmp("$symname", "Cursor_update") != 0))) {
 		/* We could use PyErr_SetObject for more complex reporting. */
 		SWIG_Python_SetErrorMsg(wtError, wiredtiger_strerror($1));
 		SWIG_fail;
