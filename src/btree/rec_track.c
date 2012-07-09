@@ -100,8 +100,6 @@ __wt_rec_track(WT_SESSION_IMPL *session, WT_PAGE *page,
 	uint8_t *p;
 	uint32_t i;
 
-	WT_ASSERT(session, addr != NULL);
-
 	mod = page->modify;
 
 	/* Find an empty slot. */
