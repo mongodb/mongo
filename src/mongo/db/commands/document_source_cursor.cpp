@@ -21,13 +21,16 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/pipeline/document.h"
+#include "mongo/s/d_logic.h"
 
 namespace mongo {
 
-    DocumentSourceCursor::CursorWithContext::CursorWithContext( const string& ns ) :
-        // Take a read lock.
-        _readContext( ns ) {
-    }
+    DocumentSourceCursor::CursorWithContext::CursorWithContext( const string& ns )
+        : _readContext( ns ) // Take a read lock.
+        , _chunkMgr(shardingState.needShardChunkManager( ns )
+                    ? shardingState.getShardChunkManager( ns )
+                    : ShardChunkManagerPtr())
+    {}
 
     DocumentSourceCursor::~DocumentSourceCursor() {
     }
@@ -101,9 +104,14 @@ namespace mongo {
 
         while( cursor()->ok() ) {
             if ( cursor()->currentMatches() && !cursor()->currentIsDup() ) {
-
                 /* grab the matching document */
                 BSONObj documentObj( cursor()->current() );
+
+                // check to see if this is a new object we don't own yet
+                // because of a chunk migration
+                if ( chunkMgr() && ! chunkMgr()->belongsToMe( documentObj ) )
+                    continue;
+
                 pCurrent = Document::createFromBsonObj(
                     &documentObj, NULL /* LATER pDependencies.get()*/);
                 advanceAndYield();

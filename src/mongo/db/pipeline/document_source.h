@@ -39,6 +39,7 @@ namespace mongo {
     class ExpressionObject;
     class Matcher;
     class Shard;
+    class ShardChunkManager;
 
     class DocumentSource :
         public IntrusiveCounterUnsigned,
@@ -352,6 +353,7 @@ namespace mongo {
             // Must be the first struct member for proper construction and destruction, as other
             // members may depend on the read lock it acquires.
             Client::ReadContext _readContext;
+            shared_ptr<ShardChunkManager> _chunkMgr;
             ClientCursor::Holder _cursor;
         };
 
@@ -443,6 +445,7 @@ namespace mongo {
         shared_ptr<CursorWithContext> _cursorWithContext;
 
         ClientCursor::Holder& cursor();
+        const ShardChunkManager* chunkMgr() { return _cursorWithContext->_chunkMgr.get(); }
 
         /*
           Advance the cursor, and yield sometimes.
