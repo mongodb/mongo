@@ -1730,7 +1730,7 @@ namespace {
             tags.next();
 
             ASSERT( tags.isExhausted() );
-#ifndef _DEBUG
+#if !(defined(_DEBUG) || defined(_DURABLEDEFAULTON) || defined(_DURABLEDEFAULTOFF))
             // TODO: remove this guard once SERVER-6317 is fixed
             ASSERT_THROWS( tags.getCurrentTag(), AssertionException );
 #endif
@@ -1762,7 +1762,7 @@ namespace {
             tags.next();
 
             ASSERT( tags.isExhausted() );
-#ifndef _DEBUG
+#if !(defined(_DEBUG) || defined(_DURABLEDEFAULTON) || defined(_DURABLEDEFAULTOFF))
             // TODO: remove this guard once SERVER-6317 is fixed
             ASSERT_THROWS( tags.getCurrentTag(), AssertionException );
 #endif
@@ -1776,7 +1776,7 @@ namespace {
             TagSet tags( emptyArray );
 
             ASSERT( tags.isExhausted() );
-#ifndef _DEBUG
+#if !(defined(_DEBUG) || defined(_DURABLEDEFAULTON) || defined(_DURABLEDEFAULTOFF))
             // TODO: remove this guard once SERVER-6317 is fixed
             ASSERT_THROWS( tags.getCurrentTag(), AssertionException );
 #endif
