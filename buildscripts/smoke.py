@@ -191,7 +191,8 @@ class mongod(object):
             argv += ['--auth']
             self.auth = True
         print "running " + " ".join(argv)
-        self.proc = Popen(buildlogger(argv, is_global=True))
+        self.proc = self._start(buildlogger(argv, is_global=True))
+
         if not self.did_mongod_start(self.port):
             raise Exception("Failed to start mongod")
 
@@ -206,6 +207,36 @@ class mongod(object):
                 for source in local.sources.find(fields=["syncedTo"]):
                     synced = synced and "syncedTo" in source and source["syncedTo"]
 
+    def _start(self, argv):
+        """In most cases, just call subprocess.Popen(). On windows,
+        add the started process to a new Job Object, so that any
+        child processes of this process can be killed with a single
+        call to TerminateJobObject (see self.stop()).
+        """
+        proc = Popen(argv)
+
+        if os.sys.platform == "win32":
+            # Create a job object with the "kill on job close"
+            # flag; this is inherited by child processes (ie
+            # the mongod started on our behalf by buildlogger)
+            # and lets us terminate the whole tree of processes
+            # rather than orphaning the mongod.
+            import win32job
+
+            self.job_object = win32job.CreateJobObject(None, '')
+
+            job_info = win32job.QueryInformationJobObject(
+                self.job_object, win32job.JobObjectExtendedLimitInformation)
+            job_info['BasicLimitInformation']['LimitFlags'] |= win32job.JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+            win32job.SetInformationJobObject(
+                self.job_object,
+                win32job.JobObjectExtendedLimitInformation,
+                job_info)
+
+            win32job.AssignProcessToJobObject(self.job_object, proc._handle)
+
+        return proc
+
     def stop(self):
         if not self.proc:
             print >> sys.stderr, "probable bug: self.proc unset in stop()"
@@ -215,8 +246,8 @@ class mongod(object):
             self.proc.terminate()
         except AttributeError:
             if os.sys.platform == "win32":
-                import win32process
-                win32process.TerminateProcess(self.proc._handle, -1)
+                import win32job
+                win32job.TerminateJobObject(self.job_object, -1)
             else:
                 from os import kill
                 kill(self.proc.pid, 15)
