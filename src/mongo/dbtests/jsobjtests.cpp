@@ -2212,15 +2212,16 @@ namespace JsobjTests {
     public:
         void run() {
             ASSERT( string::npos != 0 );
+            std::string s1("aaa");
+            
+            StringData a(s1);
+            ASSERT_EQUALS(3u, a.size());
 
-            StringData a( string( "aaa" ) );
-            ASSERT_EQUALS( (size_t)3 , a.size() );
+            StringData b(s1.c_str());
+            ASSERT_EQUALS(3u, b.size());
 
-            StringData b( string( "bbb" ).c_str() );
-            ASSERT_EQUALS( (size_t)3 , b.size() );
-
-            StringData c( "ccc", StringData::LiteralTag() );
-            ASSERT_EQUALS( (size_t)3 , c.size() );
+            StringData c("ccc", StringData::LiteralTag());
+            ASSERT_EQUALS(3u , c.size());
 
             // TODO update test when second parm takes StringData too
             BSONObjBuilder builder;
