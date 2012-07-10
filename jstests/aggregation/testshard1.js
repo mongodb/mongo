@@ -78,9 +78,9 @@ var a1 = db.runCommand({ aggregate:"ts1", pipeline:[
 
 var a1result = a1.result;
 for(i = 0 ; i < 10; ++i) {
-    assert(a1result[i].avgCounter == a1result[i]._id,
+    assert.eq(a1result[i].avgCounter, a1result[i]._id,
            'agg sharded test avgCounter failed');
-    assert(a1result[i].numberSet.length == 2,
+    assert.eq(a1result[i].numberSet.length, 2,
            'agg sharded test numberSet length failed');
 }
 
@@ -93,7 +93,7 @@ var a2 = db.runCommand({ aggregate:"ts1", pipeline:[
 ]});
 
 // sum of an arithmetic progression S(n) = (n/2)(a(1) + a(n));
-assert(a2.result[0].total == (nItems/2)*(1 + nItems),
+assert.eq(a2.result[0].total, (nItems/2)*(1 + nItems),
        'agg sharded test counter sum failed');
 
 // an initial group starts the group in the shards, and combines them in mongos
@@ -107,7 +107,7 @@ var a3 = db.runCommand({ aggregate:"ts1", pipeline:[
 
 var a3result = a3.result;
 for(i = 0 ; i < strings.length; ++i) {
-    assert(a3result[i].total == nItems/strings.length,
+    assert.eq(a3result[i].total, nItems/strings.length,
            'agg sharded test sum numbers failed');
 }
 
@@ -122,6 +122,7 @@ var a4 = db.runCommand({ aggregate:"ts1", pipeline:[
 var a4result = a4.result;
 for(i = 0; i < 6; ++i) {
     c = a4result[i].counter;
+    printjson({c:c})
     assert((c == 55) || (c == 1111) || (c == 2222) ||
            (c == 33333) || (c = 99999) || (c == 55555),
            'agg sharded test simple match failed');
