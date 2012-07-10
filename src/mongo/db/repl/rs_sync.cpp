@@ -126,9 +126,18 @@ namespace replset {
              ++it) {
             try {
                 if (!st->syncApply(*it)) {
-                    if (st->shouldRetry(*it)) {
+                    bool status;
+                    {
+                        Lock::GlobalWrite lk;
+                        status = st->shouldRetry(*it);
+                    }
+                    if (status) {
+                        // retry
                         fassert(15915, st->syncApply(*it));
                     }
+                    // If shouldRetry() returns false, fall through.
+                    // This can happen if the document that was moved and missed by Cloner
+                    // subsequently got deleted and no longer exists on the Sync Target at all
                 }
             }
             catch (DBException& e) {
@@ -339,7 +348,7 @@ namespace replset {
             // This will cause this node to go into RECOVERING state
             // if we should crash and restart before updating the oplog
             { 
-                Client::WriteContext cx( "local" );   
+                Client::WriteContext cx( "local" );
                 Helpers::putSingleton("local.replset.minvalid", lastOp);
             }
             multiApply(ops, multiSyncApply);

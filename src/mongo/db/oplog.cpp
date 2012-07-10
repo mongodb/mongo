@@ -801,8 +801,7 @@ namespace mongo {
                     if( updateCriteria.nFields() == 1 ) {
                         // was a simple { _id : ... } update criteria
                         failedUpdate = true;
-                        LOG(1) << "replication failed to apply update: " << op.toString() << endl;
-                        // todo: probably should assert in these failedUpdate cases if not in initialSync
+                        log() << "replication failed to apply update: " << op.toString() << endl;
                     }
                     // need to check to see if it isn't present so we can set failedUpdate correctly.
                     // note that adds some overhead for this extra check in some cases, such as an updateCriteria
@@ -815,7 +814,7 @@ namespace mongo {
                             // capped collections won't have an _id index
                             (nsd->findIdIndex() < 0 && Helpers::findOne(ns, updateCriteria, false).isNull())) {
                             failedUpdate = true;
-                            LOG(1) << "replication couldn't find doc: " << op.toString() << endl;
+                            log() << "replication couldn't find doc: " << op.toString() << endl;
                         }
 
                         // Otherwise, it's present; zero objects were updated because of additional specifiers
@@ -828,7 +827,7 @@ namespace mongo {
                     // if an regular non-mod update fails the item is (presumably) missing.
                     if( !upsert ) {
                         failedUpdate = true;
-                        LOG(1) << "replication update of non-mod failed: " << op.toString() << endl;
+                        log() << "replication update of non-mod failed: " << op.toString() << endl;
                     }
                 }
             }
