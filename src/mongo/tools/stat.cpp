@@ -399,7 +399,7 @@ namespace mongo {
                 if ( orig == "" )
                     orig = "localhost";
 
-                if ( orig.find( ":" ) != string::npos )
+                if ( orig.find( ":" ) != string::npos || hasParam( "port" ) )
                     showPorts = true;
 
                 StringSplitter ss( orig.c_str() , "," );
