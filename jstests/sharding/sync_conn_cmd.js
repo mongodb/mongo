@@ -1,3 +1,4 @@
+// This test fails when run with authentication due to SERVER-6327
 /**
  * Test SyncClusterConnection commands using call instead of findOne
  */

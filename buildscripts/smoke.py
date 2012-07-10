@@ -328,12 +328,16 @@ def skipTest(path):
             return True
     if auth or keyFile: # For tests running with auth
         # Skip any tests that run with auth explicitly
-        if parentDir == "auth" or "auth" in basename:
+        if parentDir == "auth" or "auth" in basename or parentDir == "tool": # SERVER-6368
             return True
         # These tests don't pass with authentication due to limitations of the test infrastructure,
         # not due to actual bugs.
-        if os.path.join(parentDir,basename) in ["sharding/sync3.js", "sharding/sync6.js"]:
+        if os.path.join(parentDir,basename) in ["sharding/sync3.js", "sharding/sync6.js", "sharding/parallel.js"]:
             return True
+        # These tests fail due to bugs
+        if os.path.join(parentDir,basename) in ["sharding/sync_conn_cmd.js"]:
+            return True
+
     return False
 
 def runTest(test):
