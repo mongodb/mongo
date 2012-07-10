@@ -236,14 +236,14 @@ namespace mongo {
                         << " attempts taking " << t.millis()
                         << " ms" << endl;
                 // Abort here to avoid data corruption
-                fassert(16387, false);
+                abort();
             }
 
             success = FALSE != FlushFileBuffers(_fd);
             if (!success) {
                 int err = GetLastError();
                 out() << "FlushFileBuffers failed " << err << " file: " << _filename << endl;
-                fassert(16388, false);
+                abort();
             }
         }
 
