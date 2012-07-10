@@ -96,7 +96,7 @@ if shellEnv is not None:
     addSmoketest( "smokeJsSlowWeekly", [add_exe("mongo"), add_exe("mongod"), add_exe("mongos") ])
     addSmoketest( "smokeQuota", [ add_exe("mongo"), add_exe("mongod") ] )
     addSmoketest( "smokeTool", [ add_exe( "mongo" ), add_exe("mongod"), add_exe("mongos"), "tools" ] )
-    addSmoketest( "smokeAggregation", [ add_exe( "mongo" ), add_exe( "mongod" ) ] )
+    addSmoketest( "smokeAggregation", [ add_exe( "mongo" ), add_exe( "mongod" ), add_exe( "mongos" ) ] )
 
     addSmoketest( "smokeFailingTests", [ add_exe( "mongo" ), add_exe( "mongod" ) ], ['--only-old-fails', '--continue-on-failure'] )
     addSmoketest( "smokeResetFails", [ add_exe( "mongo" ), add_exe( "mongod" ) ], ['--reset-old-fails'] )
