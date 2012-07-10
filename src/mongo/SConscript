@@ -31,7 +31,7 @@ env.StaticLibrary('foundation',
                     'util/time_support.cpp',
                     ],
                   LIBDEPS=['stacktrace',
-                           '$BUILD_DIR/third_party/mongo_boost'])
+                           '$BUILD_DIR/third_party/shim_boost'])
 
 commonFiles = [ "pch.cpp",
                 "buildinfo.cpp",
@@ -88,7 +88,7 @@ env.StaticLibrary('mongocommon', commonFiles,
                            'stacktrace',
                            '$BUILD_DIR/third_party/pcrecpp',
                            '$BUILD_DIR/third_party/murmurhash3/murmurhash3',
-                           '$BUILD_DIR/third_party/mongo_boost'],)
+                           '$BUILD_DIR/third_party/shim_boost'],)
 
 env.StaticLibrary("coredb", [ "db/commands.cpp" ])
 
@@ -350,7 +350,7 @@ env.StaticLibrary("serveronly", serverOnlyFiles,
                   LIBDEPS=["coreshard",
                            "dbcmdline",
                            "defaultversion",
-                           '$BUILD_DIR/third_party/mongo_snappy'])
+                           '$BUILD_DIR/third_party/shim_snappy'])
 
 # These files go into mongos and mongod only, not into the shell or any tools.
 mongodAndMongosFiles = [
