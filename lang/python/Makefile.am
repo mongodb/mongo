@@ -7,7 +7,7 @@ endif
 all-local: _wiredtiger.so
 $(PYSRC)/wiredtiger_wrap.c: $(top_srcdir)/src/include/wiredtiger.in $(PYSRC)/wiredtiger.i
 	@(cd $(PYSRC) && \
-	    $(SWIG) -python -threads -I$(abs_top_builddir) wiredtiger.i)
+	    $(SWIG) -python -nodefaultctor -nodefaultdtor -threads -I$(abs_top_builddir) wiredtiger.i)
 
 _wiredtiger.so: $(top_builddir)/libwiredtiger.la $(PYSRC)/wiredtiger_wrap.c
 	$(PYTHON) $(PYSRC)/setup.py build_ext -b . -t . -f $(PY_SETUP_DEBUG)
