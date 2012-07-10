@@ -40,6 +40,7 @@ import os
 import parser
 import re
 import shutil
+import shlex
 import socket
 from subprocess import (Popen,
                         PIPE,
@@ -60,12 +61,12 @@ except ImportError:
 # TODO clean this up so we don't need globals...
 mongo_repo = os.getcwd() #'./'
 failfile = os.path.join(mongo_repo, 'failfile.smoke')
-cpp_unittest_list = os.path.join(mongo_repo, 'build', 'unittests.txt')
 test_path = None
 mongod_executable = None
 mongod_port = None
 shell_executable = None
 continue_on_failure = None
+file_of_commands_mode = False
 
 tests = []
 winners = []
@@ -362,6 +363,14 @@ def runTest(test):
         else:
             argv = [test_path and os.path.abspath(os.path.join(test_path, path)) or path,
                     "--port", mongod_port]
+    elif file_of_commands_mode:
+        # smoke.py was invoked like "--mode files --from-file foo",
+        # so don't try to interpret the test path too much
+        argv = shlex.split(path)
+        path = argv[0]
+        # if the command is a python script, use the script name
+        if os.path.basename(path) in ('python', 'python.exe'):
+            path = argv[1]
     else:
         raise Bug("fell off in extenstion case: %s" % path)
 
@@ -555,9 +564,6 @@ def expand_suites(suites,expandUseDB=True):
             else:
                 program = 'test'
             (globstr, usedb) = (program, False)
-        elif suite == "cppUnittests":
-            if os.path.exists(cpp_unittest_list):
-                tests += [(line.strip(), False) for line in file(cpp_unittest_list)]
         elif suite == 'perf':
             if os.sys.platform == "win32":
                 program = 'perftest.exe'
@@ -612,6 +618,7 @@ def add_exe(e):
 
 def set_globals(options, tests):
     global mongod_executable, mongod_port, shell_executable, continue_on_failure, small_oplog, small_oplog_rs, no_journal, no_preallocj, auth, keyFile, smoke_db_prefix, test_path
+    global file_of_commands_mode
     #Careful, this can be called multiple times
     test_path = options.test_path
 
@@ -646,6 +653,10 @@ def set_globals(options, tests):
         # if only --auth was given to smoke.py, load the
         # default keyFile from jstests/libs/authTestsKey
         keyFile = os.path.join(mongo_repo, 'jstests', 'libs', 'authTestsKey')
+
+    # if smoke.py is running a list of commands read from a
+    # file (or stdin) rather than running a suite of js tests
+    file_of_commands_mode = options.File and options.mode == 'files'
 
 def clear_failfile():
     if os.path.exists(failfile):

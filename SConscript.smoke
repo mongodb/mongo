@@ -53,6 +53,17 @@ def addSmoketest( name, deps, extraSmokeArgs=[] ):
     smokeArgs = smokeFlags + [target] + extraSmokeArgs
     addTest(name, deps, utils.run_smoke_command(*smokeArgs))
 
+def addSmokeSuite( name, suitefile ):
+    # Add a smoketest target which invokes smoke.py with
+    # --from-file, and passes the named suitefile as the
+    # command line argument.
+
+    # resolve an initial # in the suitefile
+    suitefile = str(env.File(suitefile))
+
+    addTest(name, [suitefile],
+            utils.run_smoke_command('--mode', 'files', '--from-file', suitefile))
+
 addSmoketest( "smoke", [ add_exe( "test" ), add_exe( "mongod" ), add_exe( "mongo" ) ] )
 addSmoketest( "smokePerf", [ add_exe("perftest") ]  )
 addSmoketest( "smokeClient", [
@@ -66,7 +77,8 @@ addSmoketest( "smokeClient", [
         add_exe('clientTest'),
         ] )
 addSmoketest( "mongosTest", [ add_exe( 'mongos' ) ])
-addSmoketest( "smokeCppUnittests", "$UNITTEST_LIST" )
+addSmokeSuite( "smokeCppUnittests", "$UNITTEST_LIST" )
+addSmokeSuite( "smokeModuleTests", "$MODULETEST_LIST" )
 
 # These tests require the mongo shell
 if shellEnv is not None:

@@ -14,10 +14,10 @@ have a "configure" function, and optionally a "test" function
 if the module exposes per-module tests.
 """
 
-__all__ = ('discover_modules', 'configure_modules')
+__all__ = ('discover_modules', 'configure_modules', 'register_module_test')
 
 import imp
-from os import listdir
+from os import listdir, makedirs
 from os.path import abspath, dirname, join, isdir, isfile
 
 def discover_modules(mongo_root):
@@ -90,4 +90,39 @@ def configure_modules(modules, conf, env):
         else:
             source_map[name] = module_sources
 
+    _setup_module_tests_file(str(env.File(env['MODULETEST_LIST'])))
+
     return source_map
+
+module_tests = []
+def register_module_test(*command):
+    """Modules can register tests as part of their configure(), which
+    are commands whose exit status indicates the success or failure of
+    the test.
+
+    Use this function from configure() like:
+
+        register_module_test('/usr/bin/python', '/path/to/module/tests/foo.py')
+        register_module_test('/bin/bash', '/path/to/module/tests/bar.sh')
+
+    The registered test commands can be run with "scons smokeModuleTests"
+    """
+    command = ' '.join(command)
+    module_tests.append(command)
+
+def _setup_module_tests_file(test_file):
+    """Modules' configure() functions may have called register_module_test,
+    in which case, we need to record the registered tests' commands into
+    a text file which smoke.py and SCons know how to work with.
+    """
+    folder = dirname(test_file)
+    if not isdir(folder):
+        makedirs(folder)
+
+    fp = file(test_file, 'w')
+    for test in module_tests:
+        fp.write(test)
+        fp.write('\n')
+    fp.close()
+    print "Generated %s" % test_file
+
