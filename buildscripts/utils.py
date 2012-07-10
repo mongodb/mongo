@@ -193,7 +193,10 @@ def smoke_command(*args):
     # invocation of smoke.py
     here = os.path.dirname(__file__)
     smoke_py = os.path.abspath(os.path.join(here, 'smoke.py'))
-    return [find_python(), smoke_py] + list(args)
+    # the --with-cleanbb argument causes smoke.py to run
+    # buildscripts/cleanbb.py before each test phase; this
+    # prevents us from running out of disk space on slaves
+    return [find_python(), smoke_py, '--with-cleanbb'] + list(args)
 
 def run_smoke_command(*args):
     # to run a command line script from a scons Alias (or any

@@ -775,6 +775,9 @@ def main():
     parser.add_option('--reset-old-fails', dest='reset_old_fails', default=False,
                       action="store_true",
                       help='Clear the failfile. Do this if all tests pass')
+    parser.add_option('--with-cleanbb', dest='with_cleanbb', default=False,
+                      action="store_true",
+                      help='Clear database files from previous smoke.py runs')
 
     # Buildlogger invocation from command line
     parser.add_option('--buildlogger-builder', dest='buildlogger_builder', default=None,
@@ -830,6 +833,10 @@ def main():
 
     if not tests:
         raise Exception( "no tests specified" )
+
+    if options.with_cleanbb:
+        dbroot = os.path.join(options.smoke_db_prefix, 'data', 'db')
+        call([utils.find_python(), "buildscripts/cleanbb.py", "--nokill", dbroot])
 
     try:
         run_tests(tests)
