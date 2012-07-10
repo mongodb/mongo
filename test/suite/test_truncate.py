@@ -31,6 +31,7 @@
 
 import os, time
 import wiredtiger, wttest
+from helper import confirmDoesNotExist, confirmEmpty
 
 # Test session.truncate.
 class test_truncate(wttest.WiredTigerTestCase):
@@ -105,19 +106,11 @@ class test_truncate(wttest.WiredTigerTestCase):
         self.assertEqual(want, self.nentries)
         cursor.close()
 
-    def checkEmpty(self, t):
-        cursor = self.session.open_cursor(self.uri + t, None, None)
-        got = 0
-        for key,val in cursor:
-            got += 1
-        self.assertEqual(got, 0)
-        cursor.close()
-
     def test_truncate(self):
         self.populate(self.name)
 
         self.session.truncate(self.uri + self.name, None, None, None)
-        self.checkEmpty(self.name)
+        confirmEmpty(self, self.uri + self.name)
         self.session.drop(self.uri + self.name, None)
 
     def test_truncate_cursor(self):

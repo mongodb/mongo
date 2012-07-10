@@ -31,6 +31,7 @@
 
 import os, time
 import wiredtiger, wttest
+from helper import confirmDoesNotExist, confirmEmpty
 
 # Test session.drop and session.rename operations.
 class test_base06(wttest.WiredTigerTestCase):
@@ -43,19 +44,19 @@ class test_base06(wttest.WiredTigerTestCase):
         ('table', dict(uri='table:'))
         ]
 
-    def populate(self, tablename):
+    def populate(self, name):
         create_args = 'key_format=i,value_format=S'
-        self.session.create(self.uri + tablename, create_args)
-        cursor = self.session.open_cursor(self.uri + tablename, None, None)
+        self.session.create(self.uri + name, create_args)
+        cursor = self.session.open_cursor(self.uri + name, None, None)
         for i in range(0, self.nentries):
             cursor.set_key(i)
             cursor.set_value(str(i))
             cursor.insert()
-        self.pr('populate: ' + tablename + ': added ' + str(self.nentries))
+        self.pr('populate: ' + name + ': added ' + str(self.nentries))
         cursor.close()
 
-    def checkContents(self, tablename):
-        cursor = self.session.open_cursor(self.uri + tablename, None, None)
+    def checkContents(self, name):
+        cursor = self.session.open_cursor(self.uri + name, None, None)
         want = 0
         for key,val in cursor:
             self.assertEqual(key, want)
@@ -64,29 +65,16 @@ class test_base06(wttest.WiredTigerTestCase):
         self.assertEqual(want, self.nentries)
         cursor.close()
 
-    def checkDoesNotExist(self, t):
-        self.assertFalse(os.path.exists(t + ".wt"))
-        self.assertRaises(wiredtiger.WiredTigerError,
-            lambda: self.session.open_cursor(self.uri + t, None, None))
-
-    def checkEmpty(self, t):
-        cursor = self.session.open_cursor(self.uri + t, None, None)
-        got = 0
-        for key,val in cursor:
-            got += 1
-        self.assertEqual(got, 0)
-        cursor.close()
-
     def test_nop(self):
         """ Make sure our test functions work """
         self.populate(self.name1)
         self.checkContents(self.name1)
-        self.checkDoesNotExist(self.name2)
+        confirmDoesNotExist(self, self.uri + self.name2)
 
     def test_drop(self):
         self.populate(self.name1)
         self.session.drop(self.uri + self.name1, None)
-        self.checkDoesNotExist(self.name1)
+        confirmDoesNotExist(self, self.uri + self.name1)
         self.session.drop(self.uri + self.name1, 'force')
         self.assertRaises(wiredtiger.WiredTigerError,
             lambda: self.session.drop(self.uri + self.name1, None))
@@ -96,11 +84,11 @@ class test_base06(wttest.WiredTigerTestCase):
         self.session.rename(
             self.uri + self.name1, self.uri + self.name2, None)
         self.checkContents(self.name2)
-        self.checkDoesNotExist(self.name1)
+        confirmDoesNotExist(self, self.uri + self.name1)
         self.session.rename(
             self.uri + self.name2, self.uri + self.name1, None)
         self.checkContents(self.name1)
-        self.checkDoesNotExist(self.name2)
+        confirmDoesNotExist(self, self.uri + self.name2)
         self.assertRaises(wiredtiger.WiredTigerError,
             lambda: self.session.rename(
             self.uri + self.name2, self.uri + self.name1, None))

@@ -27,6 +27,7 @@
 #
 
 import os
+import wiredtiger
 
 # python has a filecmp.cmp function, but different versions of python approach
 # file comparison differently.  To make sure we get byte for byte comparison,
@@ -47,3 +48,17 @@ def compareFiles(filename1, filename2):
                 # files are identical size
                 if not b1:
                     return True
+
+# confirm a URI doesn't exist.
+def confirmDoesNotExist(self, uri):
+    self.assertFalse(os.path.exists(uri))
+    self.assertFalse(os.path.exists(uri + ".wt"))
+    self.assertRaises(wiredtiger.WiredTigerError,
+        lambda: self.session.open_cursor(uri, None, None))
+
+# confirm a URI exists and is empty.
+def confirmEmpty(self, uri):
+    cursor = self.session.open_cursor(uri, None, None)
+    self.assertEqual(cursor.next(), wiredtiger.WT_NOTFOUND)
+    cursor.close()
+
