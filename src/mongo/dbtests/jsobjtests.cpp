@@ -2211,14 +2211,16 @@ namespace JsobjTests {
     class StringDataTest {
     public:
         void run() {
+            ASSERT( string::npos != 0 );
+
             StringData a( string( "aaa" ) );
-            ASSERT_EQUALS( 3u , a.size() );
+            ASSERT_EQUALS( (size_t)3 , a.size() );
 
             StringData b( string( "bbb" ).c_str() );
-            ASSERT_EQUALS( 3u , b.size() );
+            ASSERT_EQUALS( (size_t)3 , b.size() );
 
             StringData c( "ccc", StringData::LiteralTag() );
-            ASSERT_EQUALS( 3u , c.size() );
+            ASSERT_EQUALS( (size_t)3 , c.size() );
 
             // TODO update test when second parm takes StringData too
             BSONObjBuilder builder;
