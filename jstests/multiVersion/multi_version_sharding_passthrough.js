@@ -143,13 +143,24 @@ var runMultiVersionTest = function( opts ){
 // Run multi-version tests of 2.0/2.2 mongos/mongod tests
 //
 
+/*
+jsTest.log( "Running single version 2.2 mongod/mongos passthrough tests..." )
+
+runMultiVersionTest({
+        shardOptions : { binVersion : "latest" },
+        rsOptions : { binVersion : "latest" },
+        mongosOptions : { binVersion : "latest" },
+        configOptions : { binVersion : "latest" } })
+*/
+
 jsTest.log( "Running multi-version 2.0/2.2 mongod/mongos passthrough tests..." )
 
 runMultiVersionTest({
         shardOptions : { binVersion : "2.0.6" },
         rsOptions : { binVersion : "2.0.6" },
         mongosOptions : { binVersion : "latest" },
-        configOptions : { binVersion : "2.0.6" } })
+        configOptions : { binVersion : "2.0.6" },
+        exceptPatterns : [ ] })
 
 //
 // Run multi-version passthrough for 2.2/2.0 mongod/mongos
