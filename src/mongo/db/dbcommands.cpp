@@ -1359,7 +1359,12 @@ namespace mongo {
         virtual bool slaveOk() const { return true; }
         virtual LockType locktype() const { return WRITE; }
         virtual bool logTheOp() { return true; }
-        
+        virtual void help( stringstream &help ) const {
+            help << 
+                "Sets collection options.\n"
+                "Example: { collMod: 'foo', usePowerOf2Sizes:true }";
+        }
+
         bool run(const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             string ns = dbname + "." + jsobj.firstElement().valuestr();
             Client::Context ctx( ns );
