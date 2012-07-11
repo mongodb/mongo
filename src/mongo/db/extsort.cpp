@@ -17,6 +17,11 @@
 */
 
 #include "pch.h"
+
+#if defined(_WIN32)
+#   include <io.h>
+#endif
+
 #include "extsort.h"
 #include "namespace-inl.h"
 #include "../util/file.h"
@@ -27,9 +32,6 @@
 #include <boost/filesystem/convenience.hpp>
 #include <boost/filesystem/operations.hpp>
 
-#if defined(_WIN32)
-#   include <io.h>
-#endif
 
 
 namespace mongo {
@@ -260,7 +262,7 @@ namespace mongo {
 
     BSONObjExternalSorter::FileIterator::FileIterator( string file ) {
 #ifdef _WIN32
-        _file = _open( file.c_str(), _O_RDWR | _O_CREAT , _S_IREAD | _S_IWRITE );
+        _file = ::_open( file.c_str(), _O_RDWR | _O_CREAT , _S_IREAD | _S_IWRITE );
 #else
         _file = ::open( file.c_str(), O_CREAT | O_RDWR | O_NOATIME , S_IRUSR | S_IWUSR );
 #endif
