@@ -58,6 +58,7 @@ namespace mongo {
         scope->injectV8Function("remove", mongoRemove, proto);
         scope->injectV8Function("update", mongoUpdate, proto);
         scope->injectV8Function("auth", mongoAuth, proto);
+        scope->injectV8Function("logout", mongoLogout, proto);
 
         v8::Handle<FunctionTemplate> ic = scope->createV8Function(internalCursorCons);
         ic->InstanceTemplate()->SetInternalFieldCount( 1 );
@@ -470,6 +471,22 @@ namespace mongo {
         } catch ( ... ) {
         }
         return v8::ThrowException( v8::String::New( errmsg.c_str() ) );
+    }
+
+    v8::Handle<v8::Value> mongoLogout(V8Scope* scope, const v8::Arguments& args) {
+        jsassert(args.Length() == 1, "update needs 1 arg");
+        DBClientBase* conn = getConnection(args);
+        const string db = toSTLString(args[0]);
+
+        BSONObj ret;
+        try {
+            conn->logout(db, ret);
+        }
+        catch (const std::exception& ex) {
+            return v8::ThrowException(v8::String::New(ex.what()));
+        }
+
+        return scope->mongoToLZV8(ret, false, false);
     }
 
 //    +    JSBool mongo_auth(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {

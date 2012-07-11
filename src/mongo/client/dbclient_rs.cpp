@@ -1280,8 +1280,8 @@ namespace mongo {
     }
 
     void DBClientReplicaSet::_auth( DBClientConnection * conn ) {
-        for ( list<AuthInfo>::iterator i=_auths.begin(); i!=_auths.end(); ++i ) {
-            const AuthInfo& a = *i;
+        for (map<string, AuthInfo>::const_iterator i = _auths.begin(); i != _auths.end(); ++i) {
+            const AuthInfo& a = i->second;
             string errmsg;
             if ( ! conn->auth( a.dbname , a.username , a.pwd , errmsg, a.digestPassword ) )
                 warning() << "cached auth failed for set: " << _setName << " db: " << a.dbname << " user: " << a.username << endl;
@@ -1345,8 +1345,30 @@ namespace mongo {
         }
 
         // now that it does, we should save so that for a new node we can auth
-        _auths.push_back( AuthInfo( dbname , username , pwd , digestPassword ) );
+        _auths[dbname] = AuthInfo(dbname, username, pwd, digestPassword);
         return true;
+    }
+
+    void DBClientReplicaSet::logout(const string &dbname, BSONObj& info) {
+        DBClientConnection* priConn = checkMaster();
+
+        priConn->logout(dbname, info);
+        _auths.erase(dbname);
+
+        /* Also logout the cached secondary connection. Note that this is only
+         * needed when we actually have something cached and is last known to be
+         * working.
+         */
+        if (_lastSlaveOkConn.get() != NULL && !_lastSlaveOkConn->isFailed()) {
+            try {
+                BSONObj dummy;
+                _lastSlaveOkConn->logout(dbname, dummy);
+            }
+            catch (const DBException& ex) {
+                // Make sure we can't use this connection again.
+                verify(_lastSlaveOkConn->isFailed());
+            }
+        }
     }
 
     // ------------- simple functions -----------------

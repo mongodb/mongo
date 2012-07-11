@@ -499,6 +499,10 @@ namespace mongo {
         return false;
     }
 
+    void DBClientWithCommands::logout(const string &dbname, BSONObj& info) {
+        runCommand(dbname, BSON("logout" << 1), info);
+    }
+
     BSONObj ismastercmdobj = fromjson("{\"ismaster\":1}");
 
     bool DBClientWithCommands::isMaster(bool& isMaster, BSONObj *info) {

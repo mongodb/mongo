@@ -586,6 +586,15 @@ namespace mongo {
         */
         virtual bool auth(const string &dbname, const string &username, const string &pwd, string& errmsg, bool digestPassword = true, Auth::Level * level = NULL);
 
+        /**
+         * Logs out the connection for the given database.
+         *
+         * @param dbname the database to logout from.
+         * @param info the result object for the logout command (provided for backwards
+         *     compatibility with mongo shell)
+         */
+        virtual void logout(const string& dbname, BSONObj& info);
+
         /** count number of objects in collection ns that match the query criteria specified
             throws UserAssertion if database returns an error
         */

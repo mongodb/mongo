@@ -126,8 +126,8 @@ DB.prototype.addUser = function( username , pass, readOnly, replicatedTo ){
 }
 
 DB.prototype.logout = function(){
-    return this.runCommand({logout : 1});
-}
+    return this.getMongo().logout(this.getName());
+};
 
 DB.prototype.removeUser = function( username ){
     this.getCollection( "system.users" ).remove( { user : username } );

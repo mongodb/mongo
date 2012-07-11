@@ -404,6 +404,15 @@ namespace mongo {
         */
         virtual bool auth(const string &dbname, const string &username, const string &pwd, string& errmsg, bool digestPassword = true, Auth::Level * level = NULL);
 
+        /**
+         * Logs out the connection for the given database.
+         *
+         * @param dbname the database to logout from.
+         * @param info the result object for the logout command (provided for backwards
+         *     compatibility with mongo shell)
+         */
+        virtual void logout(const string& dbname, BSONObj& info);
+
         // ----------- simple functions --------------
 
         /** throws userassertion "no master found" */
@@ -527,6 +536,8 @@ namespace mongo {
          * fields are exactly for DBClientConnection::auth
          */
         struct AuthInfo {
+            // Default constructor provided only to make it compatible with std::map::operator[]
+            AuthInfo(): digestPassword(false) { }
             AuthInfo( string d , string u , string p , bool di )
                 : dbname( d ) , username( u ) , pwd( p ) , digestPassword( di ) {}
             string dbname;
@@ -539,7 +550,7 @@ namespace mongo {
         // we can re-auth
         // this could be a security issue, as the password is stored in memory
         // not sure if/how we should handle
-        list<AuthInfo> _auths;
+        std::map<string, AuthInfo> _auths; // dbName -> AuthInfo
 
     protected:
 

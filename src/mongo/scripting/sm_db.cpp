@@ -351,6 +351,42 @@ namespace mongo {
         return JS_TRUE;
     }
 
+    JSBool mongo_logout(JSContext *context, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {
+        try {
+            smuassert(context, "mongo_logout needs 1 arg" , argc == 1);
+            shared_ptr<DBClientWithCommands>* connHolder =
+                    reinterpret_cast<shared_ptr<DBClientWithCommands>*>(
+                            JS_GetPrivate(context , obj));
+            smuassert(context,  "no connection!", connHolder && connHolder->get());
+            DBClientWithCommands *conn = connHolder->get();
+
+            Convertor convertor(context);
+            string db = convertor.toString(argv[0]);
+
+            BSONObj ret;
+            conn->logout(db, ret);
+            *rval = convertor.toval(&ret);
+        }
+        catch (const AssertionException& e) {
+            if (!JS_IsExceptionPending(context)) {
+                JS_ReportError(context, e.what());
+            }
+            return JS_FALSE;
+        }
+        catch (const SocketException& e) {
+            if (!JS_IsExceptionPending(context)) {
+                JS_ReportError(context, e.toString().c_str());
+            }
+            return JS_FALSE;
+        }
+        catch (const std::exception& e) {
+            log() << "unhandled exception: " << e.what() << ", throwing Fatal Assertion" << endl;
+            fassertFailed(16396);
+        }
+
+        return JS_TRUE;
+    }
+
     JSBool mongo_find(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {
         try {
             smuassert( cx , "mongo_find needs 7 args" , argc == 7 );
@@ -546,6 +582,7 @@ namespace mongo {
 
     JSFunctionSpec mongo_functions[] = {
         { "auth" , mongo_auth , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
+        { "logout", mongo_logout, 0, JSPROP_READONLY | JSPROP_PERMANENT, 0 },
         { "find" , mongo_find , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
         { "update" , mongo_update , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
         { "insert" , mongo_insert , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
