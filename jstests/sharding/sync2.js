@@ -9,6 +9,8 @@ s2 = s._mongos[1];
 s.adminCommand( { enablesharding : "test" } );
 s.adminCommand( { shardcollection : "test.foo" , key : { num : 1 } } );
 
+s.config.settings.update( { _id: "balancer" }, { $set : { stopped: true } } , true );
+
 s.getDB( "test" ).foo.insert( { num : 1 } );
 s.getDB( "test" ).foo.insert( { num : 2 } );
 s.getDB( "test" ).foo.insert( { num : 3 } );
