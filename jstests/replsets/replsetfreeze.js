@@ -66,7 +66,7 @@ master.getDB("admin").runCommand({replSetFreeze : 30});
 
 print("4: check no one is master for 30 seconds");
 var start = (new Date()).getTime();
-while ((new Date()).getTime() - start < 30000) {
+while ((new Date()).getTime() - start < (28 * 1000) ) { // we need less 30 since it takes some time to return... hacky
   var result = master.getDB("admin").runCommand({isMaster:1});
   assert.eq(result.ismaster, false);
   assert.eq(result.primary, undefined);
