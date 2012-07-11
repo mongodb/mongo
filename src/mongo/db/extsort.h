@@ -25,7 +25,6 @@
 #include "mongo/db/namespace-inl.h"
 #include "mongo/db/curop-inl.h"
 #include "mongo/util/array.h"
-#include "mongo/util/mmap.h"
 
 namespace mongo {
 
@@ -66,9 +65,11 @@ namespace mongo {
             bool more();
             Data next();
         private:
-            MemoryMappedFile _file;
-            char * _buf;
-            char * _end;
+            bool _read( char* buf, ssize_t count );
+
+            int _file;
+            unsigned long long _length;
+            unsigned long long _readSoFar;
         };
 
     public:
