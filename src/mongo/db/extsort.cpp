@@ -287,7 +287,7 @@ namespace mongo {
 
     
 #if defined(_WIN32)
-    static inline int win_read(int fd, const void *data, int count) { return _read(fd, data, count); }
+    static inline int win_read(int fd, void *data, int count) { return _read(fd, data, count); }
 #endif
 
 
