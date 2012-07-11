@@ -27,6 +27,11 @@
 #include <boost/filesystem/convenience.hpp>
 #include <boost/filesystem/operations.hpp>
 
+#if defined(_WIN32)
+#   include <io.h>
+#endif
+
+
 namespace mongo {
 
     HLMutex BSONObjExternalSorter::_extSortMutex("s");
