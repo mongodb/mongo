@@ -2,6 +2,8 @@
 
 s = new ShardingTest( "sync2" , 3 , 50 , 2 , { sync : true } );
 
+s.stopBalancer()
+
 s2 = s._mongos[1];
 
 s.adminCommand( { enablesharding : "test" } );
