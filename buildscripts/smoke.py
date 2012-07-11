@@ -836,7 +836,8 @@ def main():
         tests = filter( lambda x : ignore_patt.search( x[0] ) == None, tests )
 
     if not tests:
-        raise Exception( "no tests specified" )
+        print "warning: no tests specified"
+        return
 
     if options.with_cleanbb:
         dbroot = os.path.join(options.smoke_db_prefix, 'data', 'db')
