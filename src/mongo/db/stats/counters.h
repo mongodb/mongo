@@ -45,6 +45,15 @@ namespace mongo {
         void gotOp( int op , bool isCommand );
 
         BSONObj getObj();
+        
+        // thse are used by snmp, and other things, do not remove
+        const AtomicUInt * getInsert() const { return &_insert; }
+        const AtomicUInt * getQuery() const { return &_query; }
+        const AtomicUInt * getUpdate() const { return &_update; }
+        const AtomicUInt * getDelete() const { return &_delete; }
+        const AtomicUInt * getGetMore() const { return &_getmore; }
+        const AtomicUInt * getCommand() const { return &_command; }
+
 
     private:
 
