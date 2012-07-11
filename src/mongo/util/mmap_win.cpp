@@ -389,7 +389,6 @@ namespace mongo {
             if (!success) {
                 int err = GetLastError();
                 out() << "FlushFileBuffers failed " << err << " file: " << _filename << endl;
-                fassert(16388, false);
             }
         }
 
