@@ -61,6 +61,9 @@ for(i = 1; i <= nItems; ++i) {
          filler: "0123456789012345678901234567890123456789"});
 }
 
+// wait for all writebacks to be applied
+assert.eq(db.getLastError(), null);
+
 // a project and group in shards, result combined in mongos
 var a1 = db.runCommand({ aggregate:"ts1", pipeline:[
     { $project: {

@@ -102,23 +102,23 @@ namespace mongo {
             return;
         }
 
-        while( cursor()->ok() ) {
-            if ( cursor()->currentMatches() && !cursor()->currentIsDup() ) {
-                /* grab the matching document */
-                BSONObj documentObj( cursor()->current() );
+        for( ; cursor()->ok(); advanceAndYield() ) {
+            if ( !cursor()->currentMatches() || cursor()->currentIsDup() )
+                continue;
 
-                // check to see if this is a new object we don't own yet
-                // because of a chunk migration
-                if ( chunkMgr() && ! chunkMgr()->belongsToMe( documentObj ) )
-                    continue;
+            /* grab the matching document */
+            BSONObj documentObj( cursor()->current() );
 
-                pCurrent = Document::createFromBsonObj(
-                    &documentObj, NULL /* LATER pDependencies.get()*/);
-                advanceAndYield();
-                return;
-            }
+            // check to see if this is a new object we don't own yet
+            // because of a chunk migration
+            if ( chunkMgr() && ! chunkMgr()->belongsToMe( documentObj ) )
+                continue;
+
+            pCurrent = Document::createFromBsonObj(
+                &documentObj, NULL /* LATER pDependencies.get()*/);
 
             advanceAndYield();
+            return;
         }
 
         // If we got here, there aren't any more documents.
