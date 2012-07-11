@@ -277,10 +277,10 @@ namespace mongo {
     }
 
     
-    bool BSONObjExternalSorter::FileIterator::_read( char* buf, ssize_t count ) {
-        ssize_t total = 0;
+    bool BSONObjExternalSorter::FileIterator::_read( char* buf, long long count ) {
+        long long total = 0;
         while ( total < count ) {
-            ssize_t now = ::read( _file, buf, count );
+            long long now = ::read( _file, buf, count );
             if ( now < 0 ) {
                 log() << "read failed for BSONObjExternalSorter " << errnoWithDescription() << endl;
                 return false;

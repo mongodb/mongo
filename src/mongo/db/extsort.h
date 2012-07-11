@@ -65,7 +65,7 @@ namespace mongo {
             bool more();
             Data next();
         private:
-            bool _read( char* buf, ssize_t count );
+            bool _read( char* buf, long long count );
 
             int _file;
             unsigned long long _length;
