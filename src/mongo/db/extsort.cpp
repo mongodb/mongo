@@ -286,11 +286,16 @@ namespace mongo {
     }
 
     
+#if defined(_WIN32)
+    static inline int win_read(int fd, const void *data, int count) { return _read(fd, data, count); }
+#endif
+
+
     bool BSONObjExternalSorter::FileIterator::_read( char* buf, long long count ) {
         long long total = 0;
         while ( total < count ) {
 #ifdef _WIN32
-            long long now = ::_read( _file, buf, count );
+            long long now = win_read( _file, buf, count );
 #else
             long long now = ::read( _file, buf, count );
 #endif
