@@ -254,7 +254,11 @@ namespace mongo {
     // -----------------------------------
 
     BSONObjExternalSorter::FileIterator::FileIterator( string file ) {
+#ifdef _WIN32
+        _file = _open( file.c_str(), _O_RDWR | _O_CREAT | O_NOATIME, _S_IREAD | _S_IWRITE );
+#else
         _file = ::open( file.c_str(), O_CREAT | O_RDWR | O_NOATIME , S_IRUSR | S_IWUSR );
+#endif
         massert( 16392, 
                  str::stream() << "FileIterator can't open file: " 
                  << file << errnoWithDescription(), 
@@ -268,8 +272,13 @@ namespace mongo {
         _readSoFar = 0;
     }
     BSONObjExternalSorter::FileIterator::~FileIterator() {
-        if ( _file >= 0 )
-            close( _file );
+        if ( _file >= 0 ) {
+#ifdef _WIN32
+            fileClose( _file );
+#else
+            ::close( _file );
+#endif
+        }
     }
 
     bool BSONObjExternalSorter::FileIterator::more() {
@@ -280,7 +289,11 @@ namespace mongo {
     bool BSONObjExternalSorter::FileIterator::_read( char* buf, long long count ) {
         long long total = 0;
         while ( total < count ) {
+#ifdef _WIN32
+            long long now = _read( _file, buf, count );
+#else
             long long now = ::read( _file, buf, count );
+#endif
             if ( now < 0 ) {
                 log() << "read failed for BSONObjExternalSorter " << errnoWithDescription() << endl;
                 return false;
