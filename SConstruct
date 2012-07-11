@@ -745,8 +745,7 @@ if "uname" in dir(os):
 if has_option( "ssl" ):
     env.Append( CPPDEFINES=["MONGO_SSL"] )
     env.Append( LIBS=["ssl"] )
-    if darwin:
-        env.Append( LIBS=["crypto"] )
+    env.Append( LIBS=["crypto"] )
 
 try:
     umask = os.umask(022)
