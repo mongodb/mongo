@@ -255,7 +255,7 @@ namespace mongo {
 
     BSONObjExternalSorter::FileIterator::FileIterator( string file ) {
 #ifdef _WIN32
-        _file = _open( file.c_str(), _O_RDWR | _O_CREAT | O_NOATIME, _S_IREAD | _S_IWRITE );
+        _file = _open( file.c_str(), _O_RDWR | _O_CREAT , _S_IREAD | _S_IWRITE );
 #else
         _file = ::open( file.c_str(), O_CREAT | O_RDWR | O_NOATIME , S_IRUSR | S_IWUSR );
 #endif
@@ -274,7 +274,7 @@ namespace mongo {
     BSONObjExternalSorter::FileIterator::~FileIterator() {
         if ( _file >= 0 ) {
 #ifdef _WIN32
-            fileClose( _file );
+            _close( _file );
 #else
             ::close( _file );
 #endif
