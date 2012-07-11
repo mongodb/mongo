@@ -25,6 +25,7 @@
 #include "db/pipeline/dependency_tracker.h"
 #include "db/pipeline/document.h"
 #include "db/pipeline/expression.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "db/pipeline/value.h"
 #include "util/string_writer.h"
 
