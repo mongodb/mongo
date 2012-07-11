@@ -115,6 +115,9 @@ def _setup_module_tests_file(test_file):
     in which case, we need to record the registered tests' commands into
     a text file which smoke.py and SCons know how to work with.
     """
+    if not module_tests:
+        return
+
     folder = dirname(test_file)
     if not isdir(folder):
         makedirs(folder)
