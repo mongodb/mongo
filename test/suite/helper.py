@@ -73,12 +73,12 @@ def simplePopulate(self, uri, config, rows):
     self.pr('simplePopulate: ' + uri + ' with ' + str(rows) + ' rows')
     self.session.create(uri, config)
     cursor = self.session.open_cursor(uri, None, None)
-    if string.find(config, "key_format=i") != -1:
+    if string.find(cursor.key_format, "i") != -1:
         for i in range(0, rows):
             cursor.set_key(i)
             cursor.set_value(str(i) + ': abcdefghijklmnopqrstuvwxyz')
             cursor.insert()
-    elif string.find(config, "key_format=S") != -1:
+    elif string.find(cursor.key_format, "S") != -1:
         for i in range(0, rows):
             cursor.set_key(str(i))
             cursor.set_value(str(i) + ': abcdefghijklmnopqrstuvwxyz')
@@ -86,4 +86,24 @@ def simplePopulate(self, uri, config, rows):
     else:
         raise AssertionError(
             'simplePopulate: configuration has unknown key type')
+    cursor.close()
+
+def simplePopulateCheck(self, uri):
+    self.pr('simplePopulateCheck: ' + uri)
+    cursor = self.session.open_cursor(uri, None, None)
+    if string.find(cursor.key_format, "i") != -1:
+	next = 0
+        for key,val in cursor:
+	    self.assertEqual(key, next)
+	    self.assertEqual(val, str(next) + ': abcdefghijklmnopqrstuvwxyz')
+	    next += 1
+    elif string.find(cursor.key_format, "S") != -1:
+	next = 0
+        for key,val in cursor:
+	    self.assertEqual(key, str(next))
+	    self.assertEqual(val, str(next) + ': abcdefghijklmnopqrstuvwxyz')
+	    next += 1
+    else:
+        raise AssertionError(
+            'simplePopulateCheck: configuration has unknown key type')
     cursor.close()

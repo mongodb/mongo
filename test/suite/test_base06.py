@@ -31,67 +31,52 @@
 
 import os, time
 import wiredtiger, wttest
-from helper import confirmDoesNotExist, confirmEmpty
+from helper import confirmDoesNotExist, simplePopulate, simplePopulateCheck
 
 # Test session.drop and session.rename operations.
 class test_base06(wttest.WiredTigerTestCase):
     name1 = 'test_base06a'
     name2 = 'test_base06b'
-    nentries = 30
 
     scenarios = [
         ('file', dict(uri='file:')),
         ('table', dict(uri='table:'))
         ]
 
-    def populate(self, name):
-        create_args = 'key_format=i,value_format=S'
-        self.session.create(self.uri + name, create_args)
-        cursor = self.session.open_cursor(self.uri + name, None, None)
-        for i in range(0, self.nentries):
-            cursor.set_key(i)
-            cursor.set_value(str(i))
-            cursor.insert()
-        self.pr('populate: ' + name + ': added ' + str(self.nentries))
-        cursor.close()
-
-    def checkContents(self, name):
-        cursor = self.session.open_cursor(self.uri + name, None, None)
-        want = 0
-        for key,val in cursor:
-            self.assertEqual(key, want)
-            self.assertEqual(val, str(want))
-            want += 1
-        self.assertEqual(want, self.nentries)
-        cursor.close()
-
-    def test_nop(self):
-        """ Make sure our test functions work """
-        self.populate(self.name1)
-        self.checkContents(self.name1)
-        confirmDoesNotExist(self, self.uri + self.name2)
-
+    # Test drop of an object.
     def test_drop(self):
-        self.populate(self.name1)
-        self.session.drop(self.uri + self.name1, None)
-        confirmDoesNotExist(self, self.uri + self.name1)
-        self.session.drop(self.uri + self.name1, 'force')
-        self.assertRaises(wiredtiger.WiredTigerError,
-            lambda: self.session.drop(self.uri + self.name1, None))
+	name = self.uri + self.name1
+        simplePopulate(self, name, 'key_format=S,value_format=S', 10)
+        self.session.drop(name, None)
+        confirmDoesNotExist(self, name)
 
+    # Test drop of a non-existent object.
+    def test_drop_dne(self):
+	name = self.uri + self.name1
+        confirmDoesNotExist(self, name)
+        self.session.drop(name, 'force')
+        self.assertRaises(
+	    wiredtiger.WiredTigerError, lambda: self.session.drop(name, None))
+
+    # Test rename of an object.
     def test_rename(self):
-        self.populate(self.name1)
-        self.session.rename(
-            self.uri + self.name1, self.uri + self.name2, None)
-        self.checkContents(self.name2)
-        confirmDoesNotExist(self, self.uri + self.name1)
-        self.session.rename(
-            self.uri + self.name2, self.uri + self.name1, None)
-        self.checkContents(self.name1)
-        confirmDoesNotExist(self, self.uri + self.name2)
+	name1 = self.uri + self.name1
+	name2 = self.uri + self.name2
+        simplePopulate(self, name1, 'key_format=S,value_format=S', 10)
+        self.session.rename(name1, name2, None)
+        confirmDoesNotExist(self, name1)
+        simplePopulateCheck(self, name2)
+
+        self.session.rename(name2, name1, None)
+        confirmDoesNotExist(self, name2)
+        simplePopulateCheck(self, name1)
+
+    def test_rename_dne(self):
+	name1 = self.uri + self.name1
+	name2 = self.uri + self.name2
+        confirmDoesNotExist(self, name1)
         self.assertRaises(wiredtiger.WiredTigerError,
-            lambda: self.session.rename(
-            self.uri + self.name2, self.uri + self.name1, None))
+	    lambda: self.session.rename(name1, name2, None))
 
 if __name__ == '__main__':
     wttest.run()
