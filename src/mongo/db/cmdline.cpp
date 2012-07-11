@@ -49,7 +49,8 @@ namespace mongo {
     static BSONObj parsedOpts;
 
     void CmdLine::addGlobalOptions( boost::program_options::options_description& general ,
-                                    boost::program_options::options_description& hidden ) {
+                                    boost::program_options::options_description& hidden ,
+                                    boost::program_options::options_description& ssl_options ) {
         /* support for -vv -vvvv etc. */
         for (string s = "vv"; s.length() <= 12; s.append("v")) {
             hidden.add_options()(s.c_str(), "verbose");
@@ -83,13 +84,17 @@ namespace mongo {
 #endif
         ;
         
-        hidden.add_options()
-        ("cloud", po::value<string>(), "custom dynamic host naming")
+
 #ifdef MONGO_SSL
+        ssl_options.add_options()
         ("sslOnNormalPorts" , "use ssl on configured ports" )
         ("sslPEMKeyFile" , po::value<string>(&cmdLine.sslPEMKeyFile), "PEM file for ssl" )
         ("sslPEMKeyPassword" , new PasswordValue(&cmdLine.sslPEMKeyPassword) , "PEM file password" )
 #endif
+        ;
+        
+        hidden.add_options()
+        ("cloud", po::value<string>(), "custom dynamic host naming")
         ;
 
     }
@@ -433,7 +438,9 @@ namespace mongo {
             }
             
             cmdLine.sslServerManager = new SSLManager( false );
-            cmdLine.sslServerManager->setupPEM( cmdLine.sslPEMKeyFile , cmdLine.sslPEMKeyPassword );
+            if ( ! cmdLine.sslServerManager->setupPEM( cmdLine.sslPEMKeyFile , cmdLine.sslPEMKeyPassword ) ) {
+                ::_exit(EXIT_BADOPTIONS);
+            }
         }
         else if ( cmdLine.sslPEMKeyFile.size() || cmdLine.sslPEMKeyPassword.size() ) {
             log() << "need to enable sslOnNormalPorts" << endl;

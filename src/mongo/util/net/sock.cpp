@@ -479,15 +479,23 @@ namespace mongo {
         return(pass.size());
     }
 
-    void SSLManager::setupPEM( const string& keyFile , const string& password ) {
+    bool SSLManager::setupPEM( const string& keyFile , const string& password ) {
         _password = password;
         
-        massert( 15867 , "Can't read certificate file" , SSL_CTX_use_certificate_chain_file( _context , keyFile.c_str() ) );
+        if ( SSL_CTX_use_certificate_chain_file( _context , keyFile.c_str() ) != 1 ) {
+            log() << "Can't read certificate file: " << keyFile << endl;
+            return false;
+        }
         
         SSL_CTX_set_default_passwd_cb_userdata( _context , this );
         SSL_CTX_set_default_passwd_cb( _context, &SSLManager::password_cb );
         
-        massert( 15868 , "Can't read key file" , SSL_CTX_use_PrivateKey_file( _context , keyFile.c_str() , SSL_FILETYPE_PEM ) );
+        if ( SSL_CTX_use_PrivateKey_file( _context , keyFile.c_str() , SSL_FILETYPE_PEM ) != 1 ) {
+            log() << "Can't read key file: " << keyFile << endl;
+            return false;
+        }
+        
+        return true;
     }
         
     SSL * SSLManager::secure( int fd ) {

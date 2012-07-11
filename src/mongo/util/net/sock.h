@@ -149,7 +149,8 @@ namespace mongo {
     public:
         SSLManager( bool client );
         
-        void setupPEM( const string& keyFile , const string& password );
+        /** @return true if was successful, otherwise false */
+        bool setupPEM( const string& keyFile , const string& password );
         void setupPubPriv( const string& privateKeyFile , const string& publicKeyFile );
 
         /**

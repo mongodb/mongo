@@ -616,19 +616,17 @@ static int mongoDbMain(int argc, char* argv[]) {
 #if defined(_WIN32)
     po::options_description windows_scm_options("Windows Service Control Manager options");
 #endif
-#if defined(MONGO_SSL)
-         po::options_description ssl_options("SSL options");
-#endif
     po::options_description replication_options("Replication options");
     po::options_description ms_options("Master/slave options");
     po::options_description rs_options("Replica set options");
     po::options_description sharding_options("Sharding options");
     po::options_description visible_options("Allowed options");
     po::options_description hidden_options("Hidden options");
+    po::options_description ssl_options("SSL options");
 
     po::positional_options_description positional_options;
 
-    CmdLine::addGlobalOptions( general_options , hidden_options );
+    CmdLine::addGlobalOptions( general_options , hidden_options , ssl_options );
 
     StringBuilder dbpathBuilder;
     dbpathBuilder << "directory for datafiles - defaults to " << dbpath;
@@ -666,14 +664,6 @@ static int mongoDbMain(int argc, char* argv[]) {
     ("sysinfo", "print some diagnostic system information")
     ("upgrade", "upgrade db if needed")
     ;
-
-#if defined(MONGO_SSL)
-    ssl_options.add_options()
-    ("sslOnNormalPorts", "Enable SSL on the defined/default ports")
-    ("sslPEMKeyFile", "Specify the path to the PEM formatted SSL certificate/key file")
-    ("sslPEMKeyPassword", "Enable SSL on the defined/default ports")
-    ;
-#endif
 
 #if defined(_WIN32)
     CmdLine::addWindowsOptions( windows_scm_options, hidden_options );

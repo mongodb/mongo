@@ -133,7 +133,8 @@ namespace mongo {
         static void launchOk();
 
         static void addGlobalOptions( boost::program_options::options_description& general ,
-                                      boost::program_options::options_description& hidden );
+                                      boost::program_options::options_description& hidden ,
+                                      boost::program_options::options_description& ssl_options );
 
         static void addWindowsOptions( boost::program_options::options_description& windows ,
                                        boost::program_options::options_description& hidden );
