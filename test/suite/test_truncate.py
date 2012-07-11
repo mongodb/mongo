@@ -31,105 +31,100 @@
 
 import os, time
 import wiredtiger, wttest
-from helper import confirmDoesNotExist, confirmEmpty
+from helper import confirmDoesNotExist, confirmEmpty, simplePopulate
 
 # Test session.truncate.
 class test_truncate(wttest.WiredTigerTestCase):
     name = 'test_truncate'
-    #nentries = 1000
-    nentries = 30
+    nentries = 10000
+
+    # Use a small page size because we want to create a number of pages.
+    config = 'allocation_size=512,key_format=i,value_format=S'
 
     scenarios = [
         ('file', dict(uri='file:')),
         ('table', dict(uri='table:'))
         ]
 
-    def populate(self, name):
-        create_args = 'key_format=i,value_format=S'
-        self.session.create(self.uri + name, create_args)
-        cursor = self.session.open_cursor(self.uri + name, None, None)
-        for i in range(0, self.nentries):
-            cursor.set_key(i)
-            cursor.set_value(str(i))
-            cursor.insert()
-        self.pr('populate: ' + name + ': added ' + str(self.nentries))
-        cursor.close()
-
-    def setupCursor(self, name, value):
-        if value == None:
+    def initCursor(self, name, key):
+        if key == None:
             return None
-        cursor = self.session.open_cursor(self.uri + name, None, None)
-        if value >= 0 and value < self.nentries:
-            cursor.set_key(value)
-            self.assertEqual(cursor.search(), 0)
+        cursor = self.session.open_cursor(name, None, None)
+        cursor.set_key(key)
+        self.assertEqual(cursor.search(), 0)
+        self.assertEqual(cursor.get_key(), key)
         return cursor
 
+    # Truncate a range using cursors, and check the results.
     def truncateRangeAndCheck(self, name, begin, end):
         self.pr('truncateRangeAndCheck: ' + str(begin) + ',' + str(end))
-        self.populate(name)
-        cur1 = self.setupCursor(name, begin)
-        cur2 = self.setupCursor(name, end)
-        beginerror = (begin != None and begin < 0)
-        if not cur1 and not cur2:
-            self.session.truncate(self.uri + name, None, None, None)
-        elif beginerror:
-            self.assertRaises(wiredtiger.WiredTigerError, lambda:
-                self.session.truncate(None, cur1, cur2, None))
-        else:
-            self.session.truncate(None, cur1, cur2, None)
-        if cur1:
-            cur1.close()
-        if cur2:
-            cur2.close()
-        if begin is None:
+        simplePopulate(self, name, self.config, self.nentries)
+        cur1 = self.initCursor(name, begin)
+        cur2 = self.initCursor(name, end)
+        self.session.truncate(None, cur1, cur2, None)
+        if not cur1:
             begin = 0
-        if end is None:
+        else:
+            cur1.close()
+        if not cur2:
             end = self.nentries - 1
+        else:
+            cur2.close()
 
-        cursor = self.session.open_cursor(self.uri + name, None, None)
-        self.pr('truncate(' + str(begin) + ' through ' + str(end) + ') => ' + \
-            str([i for i in cursor]))
+        # If the object is empty, confirm that, otherwise test the first and
+        # last keys are the ones before/after the truncated range.
+        cursor = self.session.open_cursor(name, None, None)
+        if begin == 0 and end == self.nentries - 1:
+            confirmEmpty(self, name)
+        else:
+            self.assertEqual(cursor.next(), 0)
+            key = cursor.get_key()
+            if begin == 0:
+                self.assertEqual(key, end + 1)
+            else:
+                self.assertEqual(key, 0)
+
+            self.assertEqual(cursor.reset(), 0)
+            self.assertEqual(cursor.prev(), 0)
+            key = cursor.get_key()
+            if end == self.nentries - 1:
+                self.assertEqual(key, begin - 1)
+            else:
+                self.assertEqual(key, self.nentries - 1)
+
         cursor.close()
+        self.session.drop(name, None)
 
-        cursor = self.session.open_cursor(self.uri + name, None, None)
-        want = 0
-        # skip over numbers truncated
-        if (not beginerror) and want >= begin and want <= end:
-            want = end + 1
-        for key,val in cursor:
-            self.assertEqual(key, want)
-            self.assertEqual(val, str(want))
-            want += 1
-            # skip over numbers truncated
-            if want >= begin and want <= end:
-                want = end + 1
-        self.assertEqual(want, self.nentries)
-        cursor.close()
-
+    # Test truncate of an object.
     def test_truncate(self):
-        self.populate(self.name)
+        name = self.uri + self.name
+        simplePopulate(self, name, self.config, self.nentries)
+        self.session.truncate(name, None, None, None)
+        confirmEmpty(self, name)
 
-        self.session.truncate(self.uri + self.name, None, None, None)
-        confirmEmpty(self, self.uri + self.name)
-        self.session.drop(self.uri + self.name, None)
-
+    # Test using cursors for the begin and end of truncate, with 8 cases:
+    #    beginning to end (begin and end set to None)
+    #    beginning to end (first and last records)
+    #    beginning to mid-point (begin cursor None)
+    #    beginning to mid-point (begin cursor on first record)
+    #    mid-point to end (end cursor None)
+    #    mid-point to end (end cursor on last record)
+    #    mid-point to mid-point
+    #
+    # For begin and end: None means pass None for the cursor arg to truncate.
+    # An integer N, with 0 <= N < self.nentries, passes a cursor positioned
+    # at that element, 0 positions a cursor before the first element, and
+    # self.nentries positions a cursor after the last element.
     def test_truncate_cursor(self):
-        # Test using cursors for the begin and end of truncate
-        # For begin and end, the following applies:
-        #   None means pass None for the cursor arg to truncate
-        #   An integer N, with 0 <= N < self.nentries, passes
-        #   a cursor positioned at that element.  0 positions
-        #   a cursor before the first element, and self.nentries
-        #   positions a cursor after the last element.
-        #
-        # We assume that the begin cursor must be positioned over
-        # a value.  If not, we assume it raises an error.
-        for begin in [None, 0, 10]:
-            for end in [None, self.nentries - 1, self.nentries - 10]:
-                self.truncateRangeAndCheck(self.name, begin, end)
-                self.session.drop(self.uri + self.name, None)
-        self.truncateRangeAndCheck(self.name, 10, 10)
-        self.session.drop(self.uri + self.name, None)
+        name = self.uri + self.name
+        self.truncateRangeAndCheck(name, 0, self.nentries - 1)
+        self.truncateRangeAndCheck(name, None, self.nentries - 1)
+        self.truncateRangeAndCheck(name, 0, None)
+        self.truncateRangeAndCheck(name, None, self.nentries - 737)
+        self.truncateRangeAndCheck(name, 0, self.nentries - 737)
+        self.truncateRangeAndCheck(name, 737, None)
+        self.truncateRangeAndCheck(name, 737, self.nentries - 1)
+        self.truncateRangeAndCheck(name, 737, self.nentries - 737)
 
 if __name__ == '__main__':
     wttest.run()

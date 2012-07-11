@@ -59,7 +59,7 @@ class test_backup(wttest.WiredTigerTestCase, suite_subprocess):
     def compare(self, name):
         self.runWt(['dump', name], outfilename='orig')
         self.runWt(['-h', self.dir, 'dump', name], outfilename='backup')
-        compareFiles('orig', 'backup')
+        compareFiles(self, 'orig', 'backup')
 
     # Test backup of a database in a 'wt' process.
     def test_backup_database(self):

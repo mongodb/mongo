@@ -26,13 +26,14 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 
-import os
+import os, string
 import wiredtiger
 
 # python has a filecmp.cmp function, but different versions of python approach
 # file comparison differently.  To make sure we get byte for byte comparison,
 # we define it here.
-def compareFiles(filename1, filename2):
+def compareFiles(self, filename1, filename2):
+    self.pr('compareFiles: ' + filename1 + ', ' + filename2)
     bufsize = 4096
     if os.path.getsize(filename1) != os.path.getsize(filename2):
         print filename1 + ' size = ' + str(os.path.getsize(filename1))
@@ -51,6 +52,7 @@ def compareFiles(filename1, filename2):
 
 # confirm a URI doesn't exist.
 def confirmDoesNotExist(self, uri):
+    self.pr('confirmDoesNotExist: ' + uri)
     self.assertFalse(os.path.exists(uri))
     self.assertFalse(os.path.exists(uri + ".wt"))
     self.assertRaises(wiredtiger.WiredTigerError,
@@ -58,7 +60,31 @@ def confirmDoesNotExist(self, uri):
 
 # confirm a URI exists and is empty.
 def confirmEmpty(self, uri):
+    self.pr('confirmEmpty: ' + uri)
     cursor = self.session.open_cursor(uri, None, None)
     self.assertEqual(cursor.next(), wiredtiger.WT_NOTFOUND)
     cursor.close()
 
+# population of a simple object.
+#    uri:       object
+#    config:    session.create configuration string
+#    rows:      entries to insert
+def simplePopulate(self, uri, config, rows):
+    self.pr('simplePopulate: ' + uri + ' with ' + str(rows) + ' rows')
+    create_args = 'allocation_size=512,key_format=i,value_format=S'
+    self.session.create(uri, config)
+    cursor = self.session.open_cursor(uri, None, None)
+    if string.find(config, "key_format=i"):
+        for i in range(0, rows):
+            cursor.set_key(i)
+            cursor.set_value(str(i) + ': abcdefghijklmnopqrstuvwxyz')
+            cursor.insert()
+    elif string.find(config, "key_format=S"):
+        for i in range(0, rows):
+            cursor.set_key(str(i))
+            cursor.set_value(str(i) + ': abcdefghijklmnopqrstuvwxyz')
+            cursor.insert()
+    else:
+        raise AssertionError(
+            'simplePopulate: configuration has unknown key type')
+    cursor.close()
