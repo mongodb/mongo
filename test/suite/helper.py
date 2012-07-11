@@ -73,12 +73,12 @@ def simplePopulate(self, uri, config, rows):
     self.pr('simplePopulate: ' + uri + ' with ' + str(rows) + ' rows')
     self.session.create(uri, config)
     cursor = self.session.open_cursor(uri, None, None)
-    if string.find(config, "key_format=i"):
+    if string.find(config, "key_format=i") != -1:
         for i in range(0, rows):
             cursor.set_key(i)
             cursor.set_value(str(i) + ': abcdefghijklmnopqrstuvwxyz')
             cursor.insert()
-    elif string.find(config, "key_format=S"):
+    elif string.find(config, "key_format=S") != -1:
         for i in range(0, rows):
             cursor.set_key(str(i))
             cursor.set_value(str(i) + ': abcdefghijklmnopqrstuvwxyz')
