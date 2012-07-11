@@ -29,21 +29,23 @@
 # 	Configuration
 #
 
-#### This test has workarounds to allow it to complete, marked with '####' comments
-
-import wiredtiger, wttest
 import json
+import wiredtiger, wttest
 
+# Test configuration strings.
 class test_base02(wttest.WiredTigerTestCase):
-    """
-    Test configuration strings
-    """
-    table_name1 = 'test_base02a'
+    name = 'test_base02a'
 
-    def create_and_drop_table(self, tablename, confstr):
-        self.pr('create_table with config:\n      ' + confstr)
-        self.session.create('table:' + tablename, confstr)
-        self.session.drop('table:' + tablename, None)
+    scenarios = [
+	    ('file', dict(uri='file:')),
+	    ('table', dict(uri='table:'))
+	    ]
+
+    def create_and_drop(self, confstr):
+	name = self.uri + self.name
+        self.pr('create_and_drop: ' + name + ": " + confstr)
+        self.session.create(name, confstr)
+        self.session.drop(name, None)
 
     def test_config_combinations(self):
         """
@@ -71,7 +73,7 @@ class test_base02(wttest.WiredTigerTestCase):
                 for enc in conf_encoding:
                     conflist = [size, col, enc]
                     confstr = ",".join([c for c in conflist if c != None])
-                    self.create_and_drop_table(self.table_name1, confstr)
+                    self.create_and_drop(confstr)
 
     def test_config_json(self):
         """
@@ -86,7 +88,7 @@ class test_base02(wttest.WiredTigerTestCase):
                     "colgroups" : ("cyear", "population"),
 			})]
         for confstr in conf_jsonstr:
-            self.create_and_drop_table(self.table_name1, confstr)
+            self.create_and_drop(confstr)
 
 if __name__ == '__main__':
     wttest.run()
