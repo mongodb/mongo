@@ -25,38 +25,23 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_base06.py
-#	session level operations on tables
+# test_rename.py
+#	session level rename operation
 #
 
 import os, time
 import wiredtiger, wttest
 from helper import confirmDoesNotExist, simplePopulate, simplePopulateCheck
 
-# Test session.drop and session.rename operations.
-class test_base06(wttest.WiredTigerTestCase):
-    name1 = 'test_base06a'
-    name2 = 'test_base06b'
+# Test session.rename operations.
+class test_rename(wttest.WiredTigerTestCase):
+    name1 = 'test_rename1'
+    name2 = 'test_rename2'
 
     scenarios = [
         ('file', dict(uri='file:')),
         ('table', dict(uri='table:'))
         ]
-
-    # Test drop of an object.
-    def test_drop(self):
-	name = self.uri + self.name1
-        simplePopulate(self, name, 'key_format=S,value_format=S', 10)
-        self.session.drop(name, None)
-        confirmDoesNotExist(self, name)
-
-    # Test drop of a non-existent object.
-    def test_drop_dne(self):
-	name = self.uri + self.name1
-        confirmDoesNotExist(self, name)
-        self.session.drop(name, 'force')
-        self.assertRaises(
-	    wiredtiger.WiredTigerError, lambda: self.session.drop(name, None))
 
     # Test rename of an object.
     def test_rename(self):
