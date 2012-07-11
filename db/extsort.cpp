@@ -25,6 +25,11 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
+#if defined(_WIN32)
+#   include <io.h>
+#endif
+
+
 namespace mongo {
 
     IndexInterface *BSONObjExternalSorter::extSortIdxInterface;
