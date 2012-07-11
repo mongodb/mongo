@@ -71,7 +71,6 @@ def confirmEmpty(self, uri):
 #    rows:      entries to insert
 def simplePopulate(self, uri, config, rows):
     self.pr('simplePopulate: ' + uri + ' with ' + str(rows) + ' rows')
-    create_args = 'allocation_size=512,key_format=i,value_format=S'
     self.session.create(uri, config)
     cursor = self.session.open_cursor(uri, None, None)
     if string.find(config, "key_format=i"):
