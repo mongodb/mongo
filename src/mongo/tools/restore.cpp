@@ -96,7 +96,7 @@ public:
 
         _drop = hasParam( "drop" );
         _keepIndexVersion = hasParam("keepIndexVersion");
-        _restoreOptions = !hasParam("noOptionRestore");
+        _restoreOptions = !hasParam("noOptionsRestore");
         _restoreIndexes = !hasParam("noIndexRestore");
         _w = getParam( "w" , 1 );
 
