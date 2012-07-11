@@ -92,10 +92,12 @@ namespace replset {
         }
     }
 
+    static AtomicUInt32 replWriterWorkerId;
     void initializeWriterThread() {
         // Only do this once per thread
         if (!ClientBasic::getCurrent()) {
-            Client::initThread("repl writer worker");
+            string threadName = str::stream() << "repl writer worker " << replWriterWorkerId.addAndFetch(1);
+            Client::initThread( threadName.c_str() );
             // allow us to get through the magic barrier
             Lock::ParallelBatchWriterMode::iAmABatchParticipant();
             replLocalAuth();
