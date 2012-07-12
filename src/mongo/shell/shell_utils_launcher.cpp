@@ -163,8 +163,18 @@ namespace mongo {
             verify( !program.empty() );
             boost::filesystem::path programPath = findProgram(program);
 
+            string prefix( "mongod-" );
+            bool isMongodProgram =
+                    string("mongod") == program ||
+                    program.compare( 0, prefix.size(), prefix ) == 0;
+
+            prefix = "mongos-";
+            bool isMongosProgram =
+                    string("mongos") == program ||
+                    program.compare( 0, prefix.size(), prefix ) == 0;
+
 #if 0
-            if (program == "mongos") {
+            if (isMongosProgram == "mongos") {
                 _argv.push_back("valgrind");
                 _argv.push_back("--log-file=/tmp/mongos-%p.valgrind");
                 _argv.push_back("--leak-check=yes");
@@ -199,17 +209,11 @@ namespace mongo {
                 _argv.push_back(str);
             }
 
-            string prefix( "mongod" );
-            bool isMongodProgram = program.compare( 0, prefix.size(), prefix ) == 0;
-
-            prefix = "mongos";
-            bool isMongosProgram = program.compare( 0, prefix.size(), prefix ) == 0;
-
             if ( ! isMongodProgram && ! isMongosProgram && program != "mongobridge" )
                 _port = 0;
             else {
                 if ( _port <= 0 )
-                    log() << "error: a port number is expected when running mongod (etc.) from the shell" << endl;
+                    log() << "error: a port number is expected when running " << program << " from the shell" << endl;
                 verify( _port > 0 );
             }
             if ( _port > 0 ) {
