@@ -262,7 +262,7 @@ namespace mongo {
 
     BSONObjExternalSorter::FileIterator::FileIterator( string file ) {
 #ifdef _WIN32
-        _file = ::_open( file.c_str(), _O_RDWR | _O_CREAT , _S_IREAD | _S_IWRITE );
+        _file = ::_open( file.c_str(), _O_BINARY | _O_RDWR | _O_CREAT , _S_IREAD | _S_IWRITE );
 #else
         _file = ::open( file.c_str(), O_CREAT | O_RDWR | O_NOATIME , S_IRUSR | S_IWUSR );
 #endif
@@ -292,17 +292,12 @@ namespace mongo {
         return _readSoFar < _length;
     }
 
-    
-#if defined(_WIN32)
-    static inline int win_read(int fd, void *data, int count) { return _read(fd, data, count); }
-#endif
-
 
     bool BSONObjExternalSorter::FileIterator::_read( char* buf, long long count ) {
         long long total = 0;
         while ( total < count ) {
 #ifdef _WIN32
-            long long now = win_read( _file, buf, count );
+            long long now = ::_read( _file, buf, count );
 #else
             long long now = ::read( _file, buf, count );
 #endif
@@ -331,14 +326,14 @@ namespace mongo {
         memcpy( buf+sizeof(unsigned), reinterpret_cast<char*>(&size), sizeof(int) ); // size of doc
         if ( ! _read( buf + sizeof(unsigned) + sizeof(int), size-sizeof(int) ) ) { // doc content
             free( buf );
-            msgasserted( 16394, "reading doc for external sort failed" );
+            msgasserted( 16394, std::string("reading doc for external sort failed:") + errnoWithDescription() );
         }
         
         // read DiskLoc
         DiskLoc l;
         if ( ! _read( reinterpret_cast<char*>(&l), 8 ) ) {
             free( buf );
-            msgasserted( 16393, "reading DiskLoc for external sort failed" );            
+            msgasserted( 16393, std::string("reading DiskLoc for external sort failed") + errnoWithDescription() );            
         }
         _readSoFar += 8 + size;
         
