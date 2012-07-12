@@ -330,6 +330,7 @@ namespace mongo {
         }
 
         string sourceHostname = source->h().toString();
+        init.setHostname(sourceHostname);
         OplogReader r;
         if( !r.connect(sourceHostname) ) {
             sethbmsg( str::stream() << "initial sync couldn't connect to " << source->h().toString() , 0);

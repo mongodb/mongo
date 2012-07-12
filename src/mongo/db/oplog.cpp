@@ -661,6 +661,10 @@ namespace mongo {
         }
     }
 
+    void Sync::setHostname(const string& hostname) {
+        hn = hostname;
+    }
+
     BSONObj Sync::getMissingDoc(const BSONObj& o) {
         OplogReader missingObjReader;
         const char *ns = o.getStringField("ns");

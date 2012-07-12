@@ -144,6 +144,7 @@ namespace mongo {
          * If applyOperation_inlock should be called again after an update fails.
          */
         virtual bool shouldRetry(const BSONObj& o);
+        void setHostname(const string& hostname);
     };
 
     void pretouchOperation(const BSONObj& op);
