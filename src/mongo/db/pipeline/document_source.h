@@ -449,13 +449,14 @@ namespace mongo {
         const ShardChunkManager* chunkMgr() { return _cursorWithContext->_chunkMgr.get(); }
 
         /*
-          Advance the cursor, and yield sometimes.
+          Yield the cursor sometimes.
 
           If the state of the world changed during the yield such that we
           are unable to continue execution of the query, this will release the
-          client cursor, and throw an error.
+          client cursor, and throw an error.  NOTE This differs from the
+          behavior of most other operations, see SERVER-2454.
          */
-        void advanceAndYield();
+        void yieldSometimes();
 
         /*
           This document source hangs on to the dependency tracker when it

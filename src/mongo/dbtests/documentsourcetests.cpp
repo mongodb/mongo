@@ -19,6 +19,8 @@
 #include "pch.h"
 #include "mongo/db/pipeline/document_source.h"
 
+#include <boost/thread/thread.hpp>
+
 #include "mongo/db/interrupt_status_mongod.h"
 #include "mongo/db/pipeline/expression_context.h"
 
@@ -149,6 +151,82 @@ namespace DocumentSourceTests {
             }
         };
 
+        /** Set a value or await an expected value. */
+        class PendingValue {
+        public:
+            PendingValue( int initialValue ) :
+            _value( initialValue ),
+            _mutex( "DocumentSourceTests::PendingValue::_mutex" ) {
+            }
+            void set( int newValue ) {
+                scoped_lock lk( _mutex );
+                _value = newValue;
+                _condition.notify_all();
+            }
+            void await( int expectedValue ) const {
+                scoped_lock lk( _mutex );
+                while( _value != expectedValue ) {
+                    _condition.wait( lk.boost() );
+                }
+            }
+        private:
+            int _value;
+            mutable mongo::mutex _mutex;
+            mutable boost::condition _condition;
+        };
+
+        /** A writer client will be registered for the lifetime of an object of this class. */
+        class WriterClientScope {
+        public:
+            WriterClientScope() :
+            _state( Initial ),
+            _dummyWriter( boost::bind( &WriterClientScope::runDummyWriter, this ) ) {
+                _state.await( Ready );
+            }
+            ~WriterClientScope() {
+                // Terminate the writer thread even on exception.
+                _state.set( Finished );
+                DESTRUCTOR_GUARD( _dummyWriter.join() );
+            }
+        private:
+            enum State {
+                Initial,
+                Ready,
+                Finished
+            };
+            void runDummyWriter() {
+                Client::initThread( "dummy writer" );
+                scoped_ptr<Acquiring> a( new Acquiring( 0 , cc().lockState() ) );
+                _state.set( Ready );
+                _state.await( Finished );
+                a.reset(0);
+                cc().shutdown();
+            }
+            PendingValue _state;
+            boost::thread _dummyWriter;
+        };
+
+        /** DocumentSourceCursor yields deterministically when enough documents are scanned. */
+        class Yield : public Base {
+        public:
+            void run() {
+                // Insert enough documents that counting them will exceed the iteration threshold
+                // to trigger a yield.
+                for( int i = 0; i < 1000; ++i ) {
+                    client.insert( ns, BSON( "a" << 1 ) );
+                }
+                createSource();
+                ASSERT_EQUALS( 0, cc().curop()->numYields() );
+                // Iterate through all results.
+                while( source()->advance() );
+                // The lock was yielded during iteration.
+                ASSERT( 0 < cc().curop()->numYields() );
+            }
+        private:
+            // An active writer is required to trigger yielding.
+            WriterClientScope _writerScope;
+        };
+
     } // namespace DocumentSourceCursor
 
     namespace DocumentSourceLimit {
@@ -229,6 +307,7 @@ namespace DocumentSourceTests {
             add<DocumentSourceCursor::Iterate>();
             add<DocumentSourceCursor::Dispose>();
             add<DocumentSourceCursor::IterateDispose>();
+            add<DocumentSourceCursor::Yield>();
             add<DocumentSourceLimit::DisposeSource>();
             add<DocumentSourceLimit::DisposeSourceCascade>();
         }

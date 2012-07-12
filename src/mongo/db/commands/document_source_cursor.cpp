@@ -72,9 +72,7 @@ namespace mongo {
         return _cursorWithContext->_cursor;
     }
 
-    void DocumentSourceCursor::advanceAndYield() {
-        cursor()->advance();
-
+    void DocumentSourceCursor::yieldSometimes() {
         try { // SERVER-5752 may make this try unnecessary
             /*
               TODO ask for index key pattern in order to determine which index
@@ -102,7 +100,14 @@ namespace mongo {
             return;
         }
 
-        for( ; cursor()->ok(); advanceAndYield() ) {
+        for( ; cursor()->ok(); cursor()->advance() ) {
+
+            yieldSometimes();
+            if ( !cursor()->ok() ) {
+                // The cursor was exhausted during the yield.
+                break;
+            }
+
             if ( !cursor()->currentMatches() || cursor()->currentIsDup() )
                 continue;
 
@@ -117,7 +122,7 @@ namespace mongo {
             pCurrent = Document::createFromBsonObj(
                 &documentObj, NULL /* LATER pDependencies.get()*/);
 
-            advanceAndYield();
+            cursor()->advance();
             return;
         }
 
