@@ -18,16 +18,16 @@
 
 #include "pch.h"
 
+#if defined(_WIN32)
+#   include <io.h>
+#endif
+
 #include "extsort.h"
 #include "namespace-inl.h"
 #include "../util/file.h"
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-
-#if defined(_WIN32)
-#   include <io.h>
-#endif
 
 
 namespace mongo {
