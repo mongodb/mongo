@@ -34,7 +34,8 @@ namespace mongo {
         DocumentSource(pExpCtx),
         excludeId(false),
         pEO(ExpressionObject::create()),
-        _isSimple(true) // set to false in addField
+        _isSimple(true), // set to false in addField
+        _wouldBeRemoved(false)
     { }
 
     const char *DocumentSourceProject::getSourceName() const {
@@ -79,6 +80,25 @@ namespace mongo {
           it is found, because we took care of it above.
         */
         pEO->addToDocument(pResultDocument, pInDocument, true);
+
+        if (debug && _wouldBeRemoved) {
+            // In this case the $project would have been removed in a
+            // non-debug build. Make sure that won't change the output.
+            if (Document::compare(pResultDocument, pSource->getCurrent()) != 0) {
+                log() << "$project removed incorrectly: " << getRaw();
+                {
+                    BSONObjBuilder printable;
+                    pSource->getCurrent()->toBson(&printable);
+                    log() << "in:  " << printable.done();
+                }
+                {
+                    BSONObjBuilder printable;
+                    pResultDocument->toBson(&printable);
+                    log() << "out: " << printable.done();
+                }
+                verify(false);
+            }
+        }
 
         return pResultDocument;
     }

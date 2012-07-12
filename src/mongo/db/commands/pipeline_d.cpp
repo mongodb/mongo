@@ -67,14 +67,22 @@ namespace mongo {
         BSONObj projection;
         if (pSources->size()) {
             const intrusive_ptr<DocumentSource> &source = pSources->front();
-            const DocumentSourceProject *projectSource =
+            DocumentSourceProject* projectSource =
                 dynamic_cast<DocumentSourceProject*>(source.get());
 
             if (projectSource && projectSource->isSimple()) {
                 projection = projectSource->getRaw();
 
                 // remove the projection from the pipeline
-                pSources->erase(pSources->begin());
+                if (debug) {
+                    // leaving this in for DEBUG build to allow testing that
+                    // $project behaves the same regardless of if it is
+                    // implemented with Projection or DocumentSourceProject
+                    projectSource->setWouldBeRemoved();
+                }
+                else {
+                    pSources->erase(pSources->begin());
+                }
             }
         }
 

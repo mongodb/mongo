@@ -847,6 +847,8 @@ namespace mongo {
         /** true if just include/exclude, no renames */
         bool isSimple() const { return _isSimple; }
 
+        /** called by DocumentSourceCursor in debug builds if it would remove this Projection */
+        void setWouldBeRemoved() { _wouldBeRemoved = true; }
 
     protected:
         // virtuals from DocumentSource
@@ -860,6 +862,7 @@ namespace mongo {
         intrusive_ptr<ExpressionObject> pEO;
         BSONObj _raw;
         bool _isSimple;
+        bool _wouldBeRemoved; // only used by debug builds
 
         /*
           Utility object used by manageDependencies().
