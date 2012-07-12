@@ -145,7 +145,8 @@ namespace mongo {
                     stringstream ss;
                     ss.setf( ios::fixed );
                     ss << diffs[idx].ns << ":" << setprecision(1) << ( 100.0 * ( globalTime + diffs[idx].write ) / uptimeMillis ) << "%";
-                    _append( result , "locked db" , 10 , ss.str() );
+                    // set the width to be the greater of the field header size or the actual field length, e.g., 'mylongdb:89.1%' 
+                    _append( result , "locked db" , ( ss.str().size() > 10 ? ss.str().size() : 10 ) , ss.str() );
                 }
             }
             else {
