@@ -53,13 +53,15 @@ function shouldRunTest( testFile, exceptPatterns ){
         return false
     }
     
-    var testName = testFile.name.replace( /\.js$/, "" ).replace( /[\/\\]/, "" )
+    var testName = testFile.name.replace( /\.js$/, "" )
+    var testSuffixAt = Math.max( testName.lastIndexOf( "/" ), testName.lastIndexOf( "\\" ) )
+    if( testSuffixAt >= 0 ) testName = testName.substring( testSuffixAt + 1 )
     
     for( var i = 0; i < testsToIgnore.length; i++ ){
         if( ! testsToIgnore[ i ].test( testName ) ) continue
         
         print( " >>>>>>>>> skipping test that would correctly fail under sharding " 
-               + x.name )
+               + testName )
         
         return false
     }
@@ -69,7 +71,7 @@ function shouldRunTest( testFile, exceptPatterns ){
         if( ! testsThatAreBuggy[ i ].test( testName ) ) continue
         
         print( " !!!!!!!!!! skipping test that has failed under sharding but might not anymore " 
-               + x.name)
+               + testName )
         
         return false
     }
@@ -83,7 +85,7 @@ function shouldRunTest( testFile, exceptPatterns ){
             if( ! exceptPatterns[ i ].test( testName ) ) continue
             
             print( " >>>>>>> skipping test that will fail due to a custom multi-version setup " 
-                   + x.name)
+                   + testName )
             
             return false
         }
@@ -97,7 +99,7 @@ var runMultiVersionTest = function( opts ){
     var oldOpts = {}
     
     oldOpts.mongosOptions = ShardingTest.mongosOptions
-    oldOpts.rsOptions = ShardingTest.rsOptions 
+    oldOpts.rsOptions = ShardingTest.rsOptions
     oldOpts.shardOptions = ShardingTest.shardOptions
     oldOpts.configOptions = ShardingTest.configOptions
     
@@ -109,28 +111,47 @@ var runMultiVersionTest = function( opts ){
                                 verbose : 0, 
                                 mongos : 1 })
     
+    // Needed for some legacy tests
+    var oldMyShardingTest = typeof( myShardingTest ) == 'undefined' ? undefined : myShardingTest
+    myShardingTest = st
+    // End legacy
+    
     st.s.getDB( "admin" ).runCommand({ enableSharding : "test" })
     
     // Setup db variable context
     db = st.s.getDB( "test" )
+    db.shardedPassthrough = true    
     
     var files = listFiles( "jstests" )
-    
+        
     files.forEach( function( testFile ){
         
         if( ! shouldRunTest( testFile, opts.exceptPatterns ) ) return
         
         print( " *******************************************" )
         print( "         Test : " + testFile.name + " ..." )
-        print( "                " + Date.timeFunc(
-          function() {
-              load( testFile.name );
-          }, 1) + "ms" ) // end print
+        
+        try {
+            
+            print( "                " + Date.timeFunc(
+              function() {
+                  load( testFile.name );
+              }, 1) + "ms" ) // end print     
+        }
+        catch( e ){
+            
+            if( ! opts.continueOnError ) throw e
+            
+            print( "Caught error : " )
+            printjson( e )
+        }
+        
     })
-    
+        
     st.stop()
     
     // Reset version context
+    myShardingTest = oldMyShardingTest
     
     Object.extend( ShardingTest, oldOpts )
 }
@@ -153,6 +174,157 @@ runMultiVersionTest({
         configOptions : { binVersion : "latest" } })
 */
 
+// List of tests not working in 2.0.6
+
+// git diff <rev1>..<rev2> --summary jstests/ |\
+//   sed 's/.*jstests\/\(.*\)\.js/\/\^\1\$\/,/' |\
+//   egrep -v "\/.*\/.*\/" | egrep "^\/"
+
+// Tests added to v2.2
+var v22Only = [ /^all3$/,
+                /^all4$/,
+                /^all5$/,
+                /^arrayfind6$/,
+                /^arrayfind7$/,
+                /^arrayfind8$/,
+                /^arrayfind9$/,
+                /^arrayfinda$/,
+                /^basicc$/,
+                /^bench_test3$/,
+                /^bulk_insert$/,
+                /^capped_empty$/,
+                /^capped_server2639$/,
+                /^compact_speed_test$/,
+                /^count6$/,
+                /^count7$/,
+                /^count8$/,
+                /^count9$/,
+                /^counta$/,
+                /^countb$/,
+                /^coveredIndex3$/,
+                /^coveredIndex4$/,
+                /^coveredIndex5$/,
+                /^currentop$/,
+                /^db$/,
+                /^elemMatchProjection$/,
+                /^existsa$/,
+                /^explain4$/,
+                /^explain5$/,
+                /^explain6$/,
+                /^explain7$/,
+                /^explain8$/,
+                /^explain9$/,
+                /^explaina$/,
+                /^find9$/,
+                /^find_and_modify_server6226$/,
+                /^find_and_modify_server6254$/,
+                /^find_and_modify_where$/,
+                /^finda$/,
+                /^geo_max$/,
+                /^geo_multikey0$/,
+                /^geo_multikey1$/,
+                /^geo_uniqueDocs2$/,
+                /^geo_update3$/,
+                /^geo_update_btree$/,
+                /^geo_update_btree2$/,
+                /^geog$/,
+                /^gle_shell_server5441$/,
+                /^hashindex1$/,
+                /^hashtest1$/,
+                /^hostinfo$/,
+                /^inb$/,
+                /^index12$/,
+                /^indexx$/,
+                /^indexy$/,
+                /^indexz$/,
+                /^jni1$/,
+                /^jni2$/,
+                /^jni3$/,
+                /^jni4$/,
+                /^jni5$/,
+                /^jni7$/,
+                /^jni8$/,
+                /^jni9$/,
+                /^js1$/,
+                /^js2$/,
+                /^js3$/,
+                /^js4$/,
+                /^js5$/,
+                /^js7$/,
+                /^js8$/,
+                /^js9$/,
+                /^loglong$/,
+                /^logpath$/,
+                /^median$/,
+                /^memory$/,
+                /^mr_noscripting$/,
+                /^nin2$/,
+                /^numberlong4$/,
+                /^oro$/,
+                /^orp$/,
+                /^orq$/,
+                /^padding$/,
+                /^profile4$/,
+                /^queryoptimizer10$/,
+                /^queryoptimizer4$/,
+                /^queryoptimizer5$/,
+                /^queryoptimizer8$/,
+                /^queryoptimizer9$/,
+                /^queryoptimizerb$/,
+                /^regex_util$/,
+                /^regexb$/,
+                /^remove10$/,
+                /^removea$/,
+                /^removeb$/,
+                /^removec$/,
+                /^rename5$/,
+                /^rename_stayTemp$/,
+                /^server1470$/,
+                /^server5346$/,
+                /^shelltypes$/,
+                /^showdiskloc$/,
+                /^sortb$/,
+                /^sortc$/,
+                /^sortd$/,
+                /^sorte$/,
+                /^sortf$/,
+                /^sortg$/,
+                /^sorth$/,
+                /^sorti$/,
+                /^sortj$/,
+                /^sortk$/,
+                /^sortl$/,
+                /^sortm$/,
+                /^update_arraymatch7$/,
+                /^updateh$/,
+                /^updatei$/,
+                /^updatej$/,
+                /^updatek$/,
+                /^useindexonobjgtlt$/,
+                /^where4$/,
+              ]
+
+// Edited in v22
+v22Only.push( /^array4$/ )
+v22Only.push( /^queryoptimizer7$/ )
+v22Only.push( /^update_blank1$/ )
+v22Only.push( /^mr2$/ )
+v22Only.push( /^query1$/ )
+v22Only.push( /^updatee$/ )
+v22Only.push( /^orf$/ )
+v22Only.push( /^pull$/ )
+v22Only.push( /^pullall$/ )
+v22Only.push( /^update_addToSet$/ )
+v22Only.push( /^not2$/ )
+v22Only.push( /^index_diag$/ )
+v22Only.push( /^find_and_modify4$/ )
+v22Only.push( /^update6$/ )
+v22Only.push( /^indexp$/ )
+v22Only.push( /^index_elemmatch1$/ )
+
+// TODO
+// mr_merge2 - causes segfault?
+
 jsTest.log( "Running multi-version 2.0/2.2 mongod/mongos passthrough tests..." )
 
 runMultiVersionTest({
@@ -160,12 +332,16 @@ runMultiVersionTest({
         rsOptions : { binVersion : "2.0.6" },
         mongosOptions : { binVersion : "latest" },
         configOptions : { binVersion : "2.0.6" },
-        exceptPatterns : [ ] })
+        exceptPatterns : v22Only,
+        continueOnError : false })
 
 //
 // Run multi-version passthrough for 2.2/2.0 mongod/mongos
 //
-        
+
+v22Only.push( /.*auth.*/ ) // Can't run auth tests
+v22Only.push( /^splitvector$/ ) // Splitvector has been removed from mongod
+
 jsTest.log( "Running multi-version 2.2/2.0 mongod/mongos passthrough tests..." )
         
 runMultiVersionTest({
@@ -173,8 +349,18 @@ runMultiVersionTest({
         rsOptions : { binVersion : "latest" },
         mongosOptions : { binVersion : "2.0.6" },
         configOptions : { binVersion : "latest" },
-        exceptPatterns : /.*auth.*/ }) // Can't run auth tests this way
-        
+        exceptPatterns : v22Only,
+        continueOnError : false })
+
+/*
+runMultiVersionTest({
+        shardOptions : { binVersion : [ "2.0.6", "latest" ] },
+        rsOptions : { binVersion : [ "2.0.6", "latest" ] },
+        mongosOptions : { binVersion : [ "2.0.6", "latest" ] },
+        configOptions : { binVersion : [ "2.0.6", "latest" ] },
+        exceptPatterns : v22Only,
+        continueOnError : false })
+*/        
         
 jsTest.log( "Finished all multi-version tests..." )
 
