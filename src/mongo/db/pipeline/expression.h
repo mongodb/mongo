@@ -735,23 +735,6 @@ namespace mongo {
     };
 
 
-    class ExpressionLiteral :
-        public ExpressionNary {
-    public:
-        // virtuals from ExpressionNary
-        virtual ~ExpressionLiteral();
-        virtual intrusive_ptr<const Value> evaluate(
-            const intrusive_ptr<Document> &pDocument) const;
-        virtual const char *getOpName() const;
-        virtual void addOperand(const intrusive_ptr<Expression> &pExpression);
-
-        static intrusive_ptr<ExpressionNary> create();
-
-    private:
-        ExpressionLiteral();
-    };
-
-
     class ExpressionMinute :
         public ExpressionNary {
     public:

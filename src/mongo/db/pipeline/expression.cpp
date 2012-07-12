@@ -204,7 +204,6 @@ namespace mongo {
         {"$gte", ExpressionCompare::createGte, OpDesc::FIXED_COUNT, 2},
         {"$hour", ExpressionHour::create, OpDesc::FIXED_COUNT, 1},
         {"$ifNull", ExpressionIfNull::create, OpDesc::FIXED_COUNT, 2},
-        {"$literal", ExpressionLiteral::create, OpDesc::FIXED_COUNT, 1},
         {"$lt", ExpressionCompare::createLt, OpDesc::FIXED_COUNT, 2},
         {"$lte", ExpressionCompare::createLte, OpDesc::FIXED_COUNT, 2},
         {"$minute", ExpressionMinute::create, OpDesc::FIXED_COUNT, 1},
@@ -1694,40 +1693,6 @@ namespace mongo {
         }
 
         return true;
-    }
-
-    /* ------------------------- ExpressionLiteral -------------------------- */
-
-    ExpressionLiteral::~ExpressionLiteral() {
-    }
-
-    intrusive_ptr<ExpressionNary> ExpressionLiteral::create() {
-        intrusive_ptr<ExpressionLiteral> pExpression(new ExpressionLiteral());
-        return pExpression;
-    }
-
-    ExpressionLiteral::ExpressionLiteral():
-        ExpressionNary() {
-    }
-
-    void ExpressionLiteral::addOperand(
-        const intrusive_ptr<Expression> &pExpression) {
-        checkArgLimit(1);
-        ExpressionNary::addOperand(pExpression);
-    }
-
-    intrusive_ptr<const Value> ExpressionLiteral::evaluate(
-        const intrusive_ptr<Document> &pDocument) const {
-        checkArgCount(1);
-        BSONObjBuilder extractor;
-        vpOperand[0]->addToBsonObj( &extractor, string("literal"), false );
-        BSONObj extractedObject = extractor.obj();
-        string str(extractedObject.getStringField("literal"));
-        return Value::createString(str);
-    }
-
-    const char *ExpressionLiteral::getOpName() const {
-        return "$literal";
     }
 
     /* ------------------------- ExpressionMinute -------------------------- */
