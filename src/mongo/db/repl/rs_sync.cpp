@@ -267,19 +267,20 @@ namespace replset {
         OpTime ts;
         time_t start = time(0);
         unsigned long long n = 0, lastN = 0;
+        
         while( ts < minValid ) {
-            deque<BSONObj> ops;
+            OpQueue ops;
 
-            while (ops.size() < replBatchSize) {
+            while (ops.getSize() < replBatchSizeBytes) {
                 if (tryPopAndWaitForMore(&ops)) {
                     break;
                 }
             }
 
             
-            multiApply(ops, multiInitialSyncApply);
+            multiApply(ops.getDeque(), multiInitialSyncApply);
 
-            n += ops.size();
+            n += ops.getDeque().size();
 
             if ( n > lastN + 1000 ) {
                 time_t now = time(0);
@@ -293,9 +294,9 @@ namespace replset {
             }
 
             // we want to keep a record of the last op applied, to compare with minvalid
-            const BSONObj& lastOp = ops[ops.size()-1];
+            const BSONObj& lastOp = ops.getDeque().back();
             OpTime tempTs = lastOp["ts"]._opTime();
-            applyOpsToOplog(&ops);
+            applyOpsToOplog(&ops.getDeque());
 
             ts = tempTs;
         }
@@ -304,7 +305,7 @@ namespace replset {
     /* tail an oplog.  ok to return, will be re-called. */
     void SyncTail::oplogApplication() {
         while( 1 ) {
-            deque<BSONObj> ops;
+            OpQueue ops;
             time_t lastTimeChecked = time(0);
 
             verify( !Lock::isLocked() );
@@ -313,7 +314,7 @@ namespace replset {
             
             // tryPopAndWaitForMore returns true when we need to end a batch early
             while (!tryPopAndWaitForMore(&ops) && 
-                   (ops.size() < replBatchSize)) {
+                   (ops.getSize() < replBatchSizeBytes)) {
 
                 if (theReplSet->isPrimary()) {
                     return;
@@ -343,7 +344,7 @@ namespace replset {
                     }
                 }
             }
-            const BSONObj& lastOp = ops.back();
+            const BSONObj& lastOp = ops.getDeque().back();
             handleSlaveDelay(lastOp);
 
             // Set minValid to the last op to be applied in this next batch.
@@ -353,9 +354,9 @@ namespace replset {
                 Client::WriteContext cx( "local" );
                 Helpers::putSingleton("local.replset.minvalid", lastOp);
             }
-            multiApply(ops, multiSyncApply);
+            multiApply(ops.getDeque(), multiSyncApply);
 
-            applyOpsToOplog(&ops);
+            applyOpsToOplog(&ops.getDeque());
         }
     }
 
@@ -366,7 +367,7 @@ namespace replset {
     // This function also blocks 1 second waiting for new ops to appear in the bgsync
     // queue.  We can't block forever because there are maintenance things we need
     // to periodically check in the loop.
-    bool SyncTail::tryPopAndWaitForMore(std::deque<BSONObj>* ops) {
+    bool SyncTail::tryPopAndWaitForMore(SyncTail::OpQueue* ops) {
         BSONObj op;
         // Check to see if there are ops waiting in the bgsync queue
         bool peek_success = peek(&op);
