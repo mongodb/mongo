@@ -847,7 +847,7 @@ namespace mongo {
         /** true if just include/exclude, no renames */
         bool isSimple() const { return _isSimple; }
 
-        /** called by DocumentSourceCursor in debug builds if it would remove this Projection */
+        /** called by PipelineD::prepareCursorSource in debug builds if it would remove this Projection */
         void setWouldBeRemoved() { _wouldBeRemoved = true; }
 
     protected:
