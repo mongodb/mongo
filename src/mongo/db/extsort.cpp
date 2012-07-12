@@ -272,7 +272,9 @@ namespace mongo {
                  _file >= 0 );
 
 #ifdef POSIX_FADV_DONTNEED
-        posix_fadvise(_file, 0, 0, POSIX_FADV_SEQUENTIAL | POSIX_FADV_DONTNEED);
+        int err = posix_fadvise(_file, 0, 0, POSIX_FADV_SEQUENTIAL );
+        if ( err )
+            log() << "posix_fadvise failed: " << err << endl;
 #endif
 
         _length = (unsigned long long)boost::filesystem::file_size( file );
