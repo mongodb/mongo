@@ -72,8 +72,8 @@ __wt_config_subinit(
 		conf->top = conf->depth;				\
 	if (conf->depth == conf->top) {					\
 		if (out->len > 0)					\
-			return __config_err(conf,			\
-			    "New value starts without a separator", 0);	\
+			return (__config_err(conf,			\
+			    "New value starts without a separator", 0));\
 		out->type = (t);					\
 		out->str = (conf->cur + (i));				\
 	}								\
@@ -433,7 +433,7 @@ __wt_config_next(WT_CONFIG *conf, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 			break;
 
 		case A_BAD:
-			return __config_err(conf, "Unexpected character", 0);
+			return (__config_err(conf, "Unexpected character", 0));
 
 		case A_DOWN:
 			--conf->depth;
@@ -454,8 +454,8 @@ __wt_config_next(WT_CONFIG *conf, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 				 * values.
 				 */
 				if (out == value && *conf->cur != ':')
-					return __config_err(conf,
-					    "Value already complete", 0);
+					return (__config_err(conf,
+					    "Value already complete", 0));
 				out = value;
 			}
 			break;
@@ -542,8 +542,8 @@ val:		return (__process_value(conf, value));
 	if (conf->depth == 0)
 		return (WT_NOTFOUND);
 
-	return __config_err(conf,
-	    "Closing brackets missing from config string", 0);
+	return (__config_err(conf,
+	    "Closing brackets missing from config string", 0));
 }
 
 /*
