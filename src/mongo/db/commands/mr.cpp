@@ -503,7 +503,7 @@ namespace mongo {
                 // reduce: apply reduce op on new result and existing one
                 BSONList values;
 
-                op->setMessage( "m/r: reduce post processing" , _db.count( _config.tempLong, BSONObj() ) );
+					 op->setMessage( "m/r: reduce post processing" , _safeCount( _db, _config.tempLong, BSONObj() ) );
                 auto_ptr<DBClientCursor> cursor = _db.query( _config.tempLong , BSONObj() , 0, 0, 0, QueryOption_NoCursorTimeout );
                 while ( cursor->more() ) {
                     BSONObj temp = cursor->next();
