@@ -243,15 +243,15 @@ class mongod(object):
             print >> sys.stderr, "probable bug: self.proc unset in stop()"
             return
         try:
-            # This function not available in Python 2.5
-            self.proc.terminate()
-        except AttributeError:
             if os.sys.platform == "win32":
                 import win32job
                 win32job.TerminateJobObject(self.job_object, -1)
             else:
-                from os import kill
-                kill(self.proc.pid, 15)
+                # This function not available in Python 2.5
+                self.proc.terminate()
+        except AttributeError:
+            from os import kill
+            kill(self.proc.pid, 15)
         self.proc.wait()
         sys.stderr.flush()
         sys.stdout.flush()
