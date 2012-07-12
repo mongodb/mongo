@@ -96,10 +96,11 @@ for path in clientHeaderDirectories:
     clientHeaders.extend(Glob('mongo/%s/*.hpp' % path))
 
 mongoclient_lib = env.Library('mongoclient', clientSource),
-env.Install('#/', [
+mongoclient_install = env.Install('#/', [
         mongoclient_lib,
         #env.SharedLibrary('mongoclient', clientSource),
         ])
+env.Alias('mongoclient', mongoclient_install)
 
 clientTests = clientEnv.Install('#/', [
         clientEnv.Program(target,
