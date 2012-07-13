@@ -30,10 +30,11 @@ namespace mongo {
         };
 
         enum Constants {
-            SliceSize = 65536 , 
+            SliceSize = 1024 , 
             MaxChain = 20 , // intentionally very low
             NumSlices = 10 ,
-            RotateTimeSecs = 90 
+            RotateTimeSecs = 90 ,
+            BigHashSize = 128
         };
         
         int hash( size_t region ) {
@@ -192,8 +193,13 @@ namespace mongo {
             Slice _slices[NumSlices];
 
             SimpleMutex _lock;
-        } rolling;
+        };
+
+        Rolling* rolling = new Rolling[BigHashSize];
         
+        int bigHash( size_t region ) {
+            return hash( region ) % BigHashSize;
+        }
     }
 
     bool Record::MemoryTrackingEnabled = true;
@@ -261,8 +267,8 @@ namespace mongo {
         const size_t page = (size_t)data >> 12;
         const size_t region = page >> 6;
         const size_t offset = page & 0x3f;
-        
-        if ( ps::rolling.access( region , offset , false ) ) {
+
+        if ( ps::rolling[ps::bigHash(region)].access( region , offset , false ) ) {
 #ifdef _DEBUG
             if ( blockSupported && ! ProcessInfo::blockInMemory( const_cast<char*>(data) ) ) {
                 warning() << "we think data is in ram but system says no"  << endl;
@@ -286,7 +292,7 @@ namespace mongo {
         const size_t page = (size_t)_data >> 12;
         const size_t region = page >> 6;
         const size_t offset = page & 0x3f;        
-        ps::rolling.access( region , offset , true );
+        ps::rolling[ps::bigHash(region)].access( region , offset , true );
         return this;
     }
     
