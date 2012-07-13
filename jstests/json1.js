@@ -18,3 +18,7 @@ assert.eq(tojson(x), '{\n\t"x" : [\n\t\t{\n\t\t\t"x" : [\n\t\t\t\t1,\n\t\t\t\t2,
 // special types
 x = {"x" : ObjectId("4ad35a73d2e34eb4fc43579a"),  'z' : /xd?/ig};
 assert.eq(tojson(x,"",false), '{\n\t"x" : ObjectId("4ad35a73d2e34eb4fc43579a"),\n\t"z" : /xd?/gi\n}' , "F" );
+
+// Timestamp type
+x = {"x" : Timestamp()};
+assert.eq(tojson(x,"",false), '{\n\t"x" : Timestamp(0, 0)\n}' , "G")
