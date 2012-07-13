@@ -71,7 +71,7 @@ namespace mongo {
           Add this document to the BSONObj under construction with the
           given BSONObjBuilder.
         */
-        void toBson(BSONObjBuilder *pBsonObjBuilder);
+        void toBson(BSONObjBuilder *pBsonObjBuilder) const;
 
         /*
           Create a new FieldIterator that can be used to examine the
@@ -185,6 +185,9 @@ namespace mongo {
           @param seed value to augment with this' hash
         */
         void hash_combine(size_t &seed) const;
+
+        // For debugging purposes only!
+        string toString() const;
 
     private:
         friend class FieldIterator;

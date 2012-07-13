@@ -56,7 +56,7 @@ namespace mongo {
         }
     }
 
-    void Document::toBson(BSONObjBuilder *pBuilder) {
+    void Document::toBson(BSONObjBuilder *pBuilder) const {
         const size_t n = vFieldName.size();
         for(size_t i = 0; i < n; ++i)
             vpValue[i]->addToBsonObj(pBuilder, vFieldName[i]);
@@ -200,6 +200,13 @@ namespace mongo {
         /* NOTREACHED */
         verify(false);
         return 0;
+    }
+
+    string Document::toString() const {
+        // this is a temporary hack and it should only be used for debugging
+        BSONObjBuilder bb;
+        toBson(&bb);
+        return bb.done().toString();
     }
 
     /* ----------------------- FieldIterator ------------------------------- */
