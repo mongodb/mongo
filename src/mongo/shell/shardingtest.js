@@ -957,3 +957,26 @@ ShardingTest.prototype.startBalancer = function( timeout, interval ) {
     sh.waitForBalancer( true, timeout, interval )
     db = oldDB
 }
+
+/**
+ * Kills the mongos with index n.
+ */
+ShardingTest.prototype.stopMongos = function(n) {
+    MongoRunner.stopMongos(this['s' + n].port);
+};
+
+/**
+ * Restarts a previously stopped mongos using the same parameter as before.
+ *
+ * Warning: Overwrites the old s (if n = 0) and sn member variables
+ */
+ShardingTest.prototype.restartMongos = function(n) {
+    this.stopMongos(n);
+    var newConn = MongoRunner.runMongos(this['s' + n].commandLine);
+
+    this['s' + n] = newConn;
+    if (n == 0) {
+        this.s = newConn;
+    }
+};
+

@@ -236,32 +236,7 @@ namespace mongo {
         }
 
         log() << "starting new replica set monitor for replica set " << _name << " with seed of " << seedString( servers ) << endl;
-
-        string errmsg;
-        for ( unsigned i = 0; i < servers.size(); i++ ) {
-
-            // Don't check servers we have already
-            if( _find_inlock( servers[i] ) >= 0 ) continue;
-
-            auto_ptr<DBClientConnection> conn( new DBClientConnection( true , 0, 5.0 ) );
-            try{
-                if( ! conn->connect( servers[i] , errmsg ) ){
-                    throw DBException( errmsg, 15928 );
-                }
-                log() << "successfully connected to seed " << servers[i] << " for replica set " << this->_name << endl;
-            }
-            catch( DBException& e ){
-                log() << "error connecting to seed " << servers[i] << causedBy( e ) << endl;
-                // skip seeds that don't work
-                continue;
-            }
-
-            string maybePrimary;
-            _checkConnection( conn.get(), maybePrimary, false, -1 );
-        }
-
-        // Check everything to get the first data
-        _check( true );
+        _populateHosts_inSetsLock(servers);
 
         _setServers.insert( pair<string, vector<HostAndPort> >(name, servers) );
 
@@ -912,6 +887,23 @@ namespace mongo {
     }
 
     void ReplicaSetMonitor::check( bool checkAllSecondaries ) {
+        bool isNodeEmpty = false;
+
+        {
+            scoped_lock lk( _lock );
+            isNodeEmpty = _nodes.empty();
+        }
+
+        if (isNodeEmpty) {
+            scoped_lock lk(_setsLock);
+            _populateHosts_inSetsLock(_setServers[_name]);
+            /* _populateHosts_inlock already refreshes _nodes so no more work
+             * needs to be done. If it was unsuccessful, the succeeding lines
+             * will also fail, so no point in trying.
+             */
+            return;
+        }
+
         shared_ptr<DBClientConnection> masterConn;
 
         {
@@ -1123,6 +1115,39 @@ namespace mongo {
 
         // host is not part of the set anymore!
         return false;
+    }
+
+    void ReplicaSetMonitor::_populateHosts_inSetsLock(const vector<HostAndPort>& seedList){
+        verify(_nodes.empty());
+
+        for (vector<HostAndPort>::const_iterator iter = seedList.begin();
+                iter != seedList.end(); ++iter) {
+            // Don't check servers we have already
+            if (_find(*iter) >= 0) continue;
+
+            scoped_ptr<DBClientConnection> conn(new DBClientConnection(true, 0, 5.0));
+
+            try{
+                string errmsg;
+                if (!conn->connect(*iter, errmsg)) {
+                    throw DBException(errmsg, 15928);
+                }
+
+                log() << "successfully connected to seed " << *iter
+                        << " for replica set " << _name << endl;
+            }
+            catch(const DBException& e){
+                log() << "error connecting to seed " << *iter << causedBy(e) << endl;
+                // skip seeds that don't work
+                continue;
+            }
+
+            string maybePrimary;
+            _checkConnection(conn.get(), maybePrimary, false, -1);
+        }
+
+        // Check everything to get the first data
+        _check(true);
     }
 
     bool ReplicaSetMonitor::Node::matchesTag(const BSONObj& tag) const {
