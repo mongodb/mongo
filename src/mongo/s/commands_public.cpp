@@ -121,6 +121,8 @@ namespace mongo {
                 set<Shard> shards;
                 getShards(dbName, cmdObj, shards);
 
+                // TODO: Future is deprecated, replace with commandOp()
+
                 list< shared_ptr<Future::CommandResult> > futures;
                 for ( set<Shard>::const_iterator i=shards.begin(), end=shards.end() ; i != end ; i++ ) {
                     futures.push_back( Future::spawnCommand( i->getConnString() , dbName , cmdObj, 0 ) );
@@ -132,10 +134,18 @@ namespace mongo {
                 for ( list< shared_ptr<Future::CommandResult> >::iterator i=futures.begin(); i!=futures.end(); i++ ) {
                     shared_ptr<Future::CommandResult> res = *i;
                     if ( ! res->join() ) {
-                        if ( res->result()["errmsg"].type() )
+
+                        BSONObj result = res->result();
+
+                        if( ! result["errmsg"].eoo() ){
                             errors.appendAs(res->result()["errmsg"], res->getServer());
-                        else
-                            errors.append(res->getServer(), "join failed");
+                        }
+                        else {
+
+                            // Can happen if message is empty, for some reason
+                            errors.append( res->getServer(), str::stream()
+                                << "result without error message returned : " << result );
+                        }
                     }
                     results.push_back( res->result() );
                     subobj.append( res->getServer() , res->result() );
