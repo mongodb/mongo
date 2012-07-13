@@ -13,6 +13,7 @@ static inline int
 __wt_txn_modify(WT_SESSION_IMPL *session, wt_txnid_t *id)
 {
 	WT_TXN *txn;
+	WT_TXN_GLOBAL *txn_global;
 
 	txn = &session->txn;
 	if (F_ISSET(txn, TXN_RUNNING)) {
@@ -22,8 +23,21 @@ __wt_txn_modify(WT_SESSION_IMPL *session, wt_txnid_t *id)
 			    WT_MAX(10, 2 * txn->mod_count) *
 			    sizeof(wt_txnid_t *), &txn->mod));
 		txn->mod[txn->mod_count++] = id;
-	} else
+	} else {
+		/* Auto-commit: allocate a single-shot transaction ID. */
+		txn_global = &S2C(session)->txn_global;
+		if (txn->id == WT_TXN_NONE ||
+		    txn->id == WT_TXN_ABORTED ||
+		    txn->id + 1 != txn_global->current)
+			do {
+				txn->id = txn_global->current;
+			} while (!WT_ATOMIC_CAS(
+			    txn_global->current, txn->id, txn->id + 1) ||
+			    txn->id == WT_TXN_NONE ||
+			    txn->id == WT_TXN_ABORTED);
+		//*id = txn->id;
 		*id = WT_TXN_NONE;
+	}
 
 	return (0);
 }
