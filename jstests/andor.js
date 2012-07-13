@@ -101,5 +101,5 @@ test();
 t.drop();
 t.ensureIndex( {a:1} );
 var e = t.find( {$and:[{a:1}]} ).explain();
-// nested $or clauses currently ignored for indexing
-assert.eq( e.indexBounds, t.find( {$and:[{a:1,$or:[{a:2}]}]} ).explain().indexBounds );
+// nested non singleton $or clauses currently ignored for indexing
+assert.eq( e.indexBounds, t.find( {$and:[{a:1,$or:[{a:2},{a:3}]}]} ).explain().indexBounds );

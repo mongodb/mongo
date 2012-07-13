@@ -263,6 +263,72 @@ namespace QueryUtilTests {
             virtual BSONElement upper() { return _o2.firstElement(); }
             BSONObj _o1, _o2;
         };
+
+        /**
+         * Field bounds of a query clause within a singleton $or expression are intersected with
+         * those of the overall query.  SERVER-6416
+         */
+        class SingletonOr : public Base {
+        public:
+            SingletonOr() :
+                _obj( BSON( "" << 5 ) ) {
+            }
+            void run() {
+                Base::run();
+                const FieldRangeSet s( "ns", query(), true, true );
+                // There should not be an index constraint recorded for the $or field.
+                ASSERT( s.range( "$or" ).universal() );
+            }
+        private:
+            virtual BSONObj query() {
+                // There is a single $or clause.
+                return fromjson( "{$or:[{a:5}]}" );
+            }
+            virtual bool mustBeExactMatchRepresentation() {
+                // The 'a' FieldRange is an exact match representation (it is an equality), though
+                // not the overall FieldRangeSet.
+                return true;
+            }
+            virtual bool isPointIntervalSet() { return true; }
+            virtual BSONElement lower() { return _obj.firstElement(); }
+            virtual BSONElement upper() { return _obj.firstElement(); }
+            BSONObj _obj;
+        };
+
+        /**
+         * Field bounds of a query clause within a nested singleton $or expression are intersected
+         * with those of the overall query.  SERVER-6416
+         */
+        class NestedSingletonOr : public SingletonOr {
+            virtual BSONObj query() {
+                // There is a single $or clause.
+                return fromjson( "{$or:[{$or:[{a:5}]}]}" );
+            }
+        };
+
+        /**
+         * Field bounds of a query clause within a non singleton $or expression are not intersected
+         * with those of the overall query.
+         */
+        class NonSingletonOr : public Base {
+        public:
+            void run() {
+                Base::run();
+                const FieldRangeSet s( "ns", query(), true, true );
+                // There should not be an index constraint recorded for the $or field.
+                ASSERT( s.range( "$or" ).universal() );
+            }
+        private:
+            virtual BSONObj query() {
+                // There is more than one $or clause.
+                return fromjson( "{$or:[{a:5},{a:6}]}" );
+            }
+            virtual bool mustBeExactMatchRepresentation() {
+                // The 'a' FieldRange is an exact match representation (the default universal range
+                // matches anything), though not the overall FieldRangeSet.
+                return true;
+            }
+        };
         
         class Empty {
         public:
@@ -1379,6 +1445,10 @@ namespace QueryUtilTests {
                 And() : ExactMatchRepresentation( fromjson( "{$and:[{a:{$in:[0,1]}}]}" ) ) {}
             };
 
+            struct Or : public NotExactMatchRepresentation {
+                Or() : NotExactMatchRepresentation( fromjson( "{$or:[{a:{$in:[0,1]}}]}" ) ) {}
+            };
+
             struct All : public NotExactMatchRepresentation {
                 All() : NotExactMatchRepresentation( fromjson( "{a:{$all:[0]}}" ) ) {}
             };
@@ -2414,6 +2484,9 @@ namespace QueryUtilTests {
             add<FieldRangeTests::UnhelpfulRegex>();
             add<FieldRangeTests::In>();
             add<FieldRangeTests::And>();
+            add<FieldRangeTests::SingletonOr>();
+            add<FieldRangeTests::NestedSingletonOr>();
+            add<FieldRangeTests::NonSingletonOr>();
             add<FieldRangeTests::Empty>();
             add<FieldRangeTests::Equality>();
             add<FieldRangeTests::SimplifiedQuery>();
@@ -2537,6 +2610,7 @@ namespace QueryUtilTests {
             add<FieldRangeSetTests::ExactMatchRepresentation::Regex>();
             add<FieldRangeSetTests::ExactMatchRepresentation::UntypedRegex>();
             add<FieldRangeSetTests::ExactMatchRepresentation::And>();
+            add<FieldRangeSetTests::ExactMatchRepresentation::Or>();
             add<FieldRangeSetTests::ExactMatchRepresentation::All>();
             add<FieldRangeSetTests::ExactMatchRepresentation::ElemMatch>();
             add<FieldRangeSetTests::ExactMatchRepresentation::AllElemMatch>();

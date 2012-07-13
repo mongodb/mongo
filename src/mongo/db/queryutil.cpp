@@ -950,6 +950,19 @@ namespace mongo {
         }
     }
 
+    void FieldRangeSet::handleConjunctionClauses( const BSONObj& clauses, bool optimize ) {
+        BSONObjIterator clausesIterator( clauses );
+        while( clausesIterator.more() ) {
+            BSONElement clause = clausesIterator.next();
+            uassert( 14817, "$and/$or elements must be objects", clause.type() == Object );
+            BSONObjIterator clauseIterator( clause.embeddedObject() );
+            while( clauseIterator.more() ) {
+                BSONElement matchElement = clauseIterator.next();
+                handleMatchField( matchElement, optimize );
+            }
+        }
+    }
+
     void FieldRangeSet::handleMatchField( const BSONElement& matchElement, bool optimize ) {
         const char* matchFieldName = matchElement.fieldName();
         if ( matchFieldName[ 0 ] == '$' ) {
@@ -957,30 +970,29 @@ namespace mongo {
                 uassert( 14816, "$and expression must be a nonempty array",
                          matchElement.type() == Array &&
                          matchElement.embeddedObject().nFields() > 0 );
-                BSONObjIterator andExpressionIterator( matchElement.embeddedObject() );
-                while( andExpressionIterator.more() ) {
-                    BSONElement andClause = andExpressionIterator.next();
-                    uassert( 14817, "$and elements must be objects", andClause.type() == Object );
-                    BSONObjIterator andClauseIterator( andClause.embeddedObject() );
-                    while( andClauseIterator.more() ) {
-                        BSONElement andMatchElement = andClauseIterator.next();
-                        handleMatchField( andMatchElement, optimize );
-                    }
-                }
+                handleConjunctionClauses( matchElement.embeddedObject(), optimize );
                 return;
             }
         
             adjustMatchField();
 
-            if ( str::equals( matchFieldName, "$where" ) ) {
-                return;
-            }
-        
             if ( str::equals( matchFieldName, "$or" ) ) {
+                // Check for a singleton $or expression.
+                if ( matchElement.type() == Array &&
+                     matchElement.embeddedObject().nFields() == 1 ) {
+                    // Compute field bounds for a singleton $or expression as if it is a $and
+                    // expression.  With only one clause, the matching semantics are the same.
+                    // SERVER-6416
+                    handleConjunctionClauses( matchElement.embeddedObject(), optimize );
+                }
                 return;
             }
         
             if ( str::equals( matchFieldName, "$nor" ) ) {
+                return;
+            }
+
+            if ( str::equals( matchFieldName, "$where" ) ) {
                 return;
             }
         }

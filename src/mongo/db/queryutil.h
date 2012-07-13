@@ -518,6 +518,7 @@ namespace mongo {
          * TODO integrate these with an external query parser shared by the matcher.  SERVER-1009
          */
         void handleMatchField( const BSONElement& matchElement, bool optimize );
+        void handleConjunctionClauses( const BSONObj& clauses, bool optimize );
         void handleOp( const char* matchFieldName, const BSONElement& op, bool isNot,
                        bool optimize );
         void handleNotOp( const char* matchFieldName, const BSONElement& notOp, bool optimize );
