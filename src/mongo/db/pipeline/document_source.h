@@ -1177,23 +1177,6 @@ namespace mongo {
             const intrusive_ptr<DependencyTracker> &pTracker);
 
         /**
-          Create a new DocumentSource that can implement unwind.
-
-          @param pExpCtx the expression context for the pipeline
-          @returns the projection DocumentSource
-        */
-        static intrusive_ptr<DocumentSourceUnwind> create(
-            const intrusive_ptr<ExpressionContext> &pExpCtx);
-
-        /**
-          Specify the field to unwind.  There must be exactly one before
-          the pipeline begins execution.
-
-          @param rFieldPath - path to the field to unwind
-        */
-        void unwindField(const FieldPath &rFieldPath);
-
-        /**
           Create a new projection DocumentSource from BSON.
 
           This is a convenience for directly handling BSON, and relies on the
@@ -1216,40 +1199,27 @@ namespace mongo {
     private:
         DocumentSourceUnwind(const intrusive_ptr<ExpressionContext> &pExpCtx);
 
-        // configuration state
-        FieldPath unwindPath;
-
-        vector<int> fieldIndex; /* for the current document, the indices
-                                   leading down to the field being unwound */
-
-        // iteration state
-        intrusive_ptr<Document> pNoUnwindDocument;
-                                              // document to return, pre-unwind
-        intrusive_ptr<const Value> pUnwindArray; // field being unwound
-        intrusive_ptr<ValueIterator> pUnwinder; // iterator used for unwinding
-        intrusive_ptr<const Value> pUnwindValue; // current value
-
-        /*
-          Clear all the state related to unwinding an array.
+        /**
+         * Lazily construct the _unwinder and initialize the iterator state of this DocumentSource.
+         * To be called by all members that depend on the iterator state.
          */
-        void resetArray();
+        void lazyInit();
 
-        /*
-          Clone the current document being unwound.
-
-          This is a partial deep clone.  Because we're going to replace the
-          value at the end, we have to replace everything along the path
-          leading to that in order to not share that change with any other
-          clones (or the original) that we've made.
-
-          This expects pUnwindValue to have been set by a prior call to
-          advance().  However, pUnwindValue may also be NULL, in which case
-          the field will be removed -- this is the action for an empty
-          array.
-
-          @returns a partial deep clone of pNoUnwindDocument
+        /**
+         * If the _unwinder is exhausted and the source may be advanced, advance the pSource and
+         * reset the _unwinder's source document.
          */
-        intrusive_ptr<Document> clonePath() const;
+        void mayAdvanceSource();
+
+        /** Specify the field to unwind. */
+        void unwindPath(const FieldPath &fieldPath);
+
+        // Configuration state.
+        FieldPath _unwindPath;
+
+        // Iteration state.
+        class Unwinder;
+        scoped_ptr<Unwinder> _unwinder;
     };
 
 }
@@ -1282,13 +1252,6 @@ namespace mongo {
         const DocumentSourceProject *pT):
         pTracker(pTrack),
         pThis(pT) {
-    }
-
-    inline void DocumentSourceUnwind::resetArray() {
-        pNoUnwindDocument.reset();
-        pUnwindArray.reset();
-        pUnwinder.reset();
-        pUnwindValue.reset();
     }
 
 }

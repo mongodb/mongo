@@ -24,6 +24,175 @@
 
 namespace mongo {
 
+    /** Helper class to unwind arrays within a series of documents. */
+    class DocumentSourceUnwind::Unwinder {
+    public:
+        /** @param unwindPath is the field path to the array to unwind. */
+        Unwinder(const FieldPath& unwindPath);
+        /** Reset the unwinder to unwind a new document. */
+        void resetDocument(const intrusive_ptr<Document>& document);
+        /** @return true if done unwinding the last document passed to resetDocument(). */
+        bool eof() const;
+        /**
+         * Try to advance to the next document unwound from the document passed to resetDocument().
+         * @return true if advanced to a new unwound document, but false if done advancing.
+         */
+        void advance();
+        /**
+         * @return the current document unwound from the document provided to resetDocuemnt(), using
+         * the current value in the array located at the provided unwindPath.  But @return
+         * intrusive_ptr<Document>() if resetDocument() has not been called or the results to unwind
+         * have been exhausted.
+         */
+        intrusive_ptr<Document> getCurrent() const;
+    private:
+        /**
+         * @return the value at the unwind path, otherwise an empty pointer if no such value
+         * exists.  The _unwindPathFieldIndexes attribute will be set as the field path is traversed
+         * to find the value to unwind.
+         */
+        intrusive_ptr<const Value> extractUnwindValue();
+        // Path to the array to unwind.
+        FieldPath _unwindPath;
+        // The souce document to unwind.
+        intrusive_ptr<Document> _document;
+        // Document indexes of the field path components.
+        vector<int> _unwindPathFieldIndexes;
+        // Iterator over the array within _document to unwind.
+        intrusive_ptr<ValueIterator> _unwindArrayIterator;
+        // The last value returned from _unwindArrayIterator.
+        intrusive_ptr<const Value> _unwindArrayIteratorCurrent;
+    };
+
+    DocumentSourceUnwind::Unwinder::Unwinder(const FieldPath& unwindPath):
+        _unwindPath(unwindPath) {
+    }
+
+    void DocumentSourceUnwind::Unwinder::resetDocument(const intrusive_ptr<Document>& document) {
+        verify( document );
+
+        // Reset document specific attributes.
+        _document = document;
+        _unwindPathFieldIndexes.clear();
+        _unwindArrayIterator.reset();
+        _unwindArrayIteratorCurrent.reset();
+
+        intrusive_ptr<const Value> pathValue = extractUnwindValue(); // sets _unwindPathFieldIndexes
+        if (!pathValue) {
+            // The path does not exist.
+            return;
+        }
+
+        bool nothingToEmit =
+            (pathValue->getType() == jstNULL) ||
+            (pathValue->getType() == Undefined) ||
+            ((pathValue->getType() == Array) && (pathValue->getArrayLength() == 0));
+
+        if (nothingToEmit) {
+            // The target field exists, but there are no values to unwind.
+            return;
+        }
+
+        // The target field must be an array to unwind.
+        uassert(15978, str::stream() << DocumentSourceUnwind::unwindName
+                << ":  value at end of field path must be an array",
+                pathValue->getType() == Array);
+
+        // Start the iterator used to unwind the array.
+        _unwindArrayIterator = pathValue->getArray();
+        verify(_unwindArrayIterator->more()); // Checked above that the array is nonempty.
+        // Pull the first value out of the iterator.
+        _unwindArrayIteratorCurrent = _unwindArrayIterator->next();
+    }
+
+    bool DocumentSourceUnwind::Unwinder::eof() const {
+        return !_unwindArrayIteratorCurrent;
+    }
+
+    void DocumentSourceUnwind::Unwinder::advance() {
+        if (!_unwindArrayIterator) {
+            // resetDocument() has not been called or the supplied document had no results to
+            // unwind.
+            _unwindArrayIteratorCurrent = NULL;
+        }
+        else if (!_unwindArrayIterator->more()) {
+            // There are no more results to unwind.
+            _unwindArrayIteratorCurrent = NULL;
+        }
+        else {
+            _unwindArrayIteratorCurrent = _unwindArrayIterator->next();
+        }
+    }
+
+    intrusive_ptr<Document> DocumentSourceUnwind::Unwinder::getCurrent() const {
+        if (!_unwindArrayIteratorCurrent) {
+            return NULL;
+        }
+
+        // Clone all the documents along the field path so that the end values are not shared across
+        // documents that have come out of this pipeline operator.  This is a partial deep clone.
+        // Because the value at the end will be replaced, everything along the path leading to that
+        // will be replaced in order not to share that change with any other clones (or the
+        // original).
+
+        intrusive_ptr<Document> clone(_document->clone());
+        intrusive_ptr<Document> current(clone);
+        const size_t n = _unwindPathFieldIndexes.size();
+        verify(n);
+        for(size_t i = 0; i < n; ++i) {
+            const size_t fi = _unwindPathFieldIndexes[i];
+            Document::FieldPair fp(current->getField(fi));
+            if (i + 1 < n) {
+                // For every object in the path but the last, clone it and continue on down.
+                intrusive_ptr<Document> next = fp.second->getDocument()->clone();
+                current->setField(fi, fp.first, Value::createDocument(next));
+                current = next;
+            }
+            else {
+                // In the last nested document, subsitute the current unwound value.
+                current->setField(fi, fp.first, _unwindArrayIteratorCurrent);
+            }
+        }
+
+        return clone;
+    }
+
+    intrusive_ptr<const Value> DocumentSourceUnwind::Unwinder::extractUnwindValue() {
+
+        intrusive_ptr<Document> current = _document;
+        intrusive_ptr<const Value> pathValue;
+        const size_t pathLength = _unwindPath.getPathLength();
+        verify(pathLength>0);
+        for(size_t i = 0; i < pathLength; ++i) {
+
+            size_t idx = current->getFieldIndex(_unwindPath.getFieldName(i));
+
+            if (idx == current->getFieldCount()) {
+                // The target field is missing.
+                return NULL;
+            }
+
+            // Record the indexes of the fields down the field path in order to quickly replace them
+            // as the documents along the field path are cloned.
+            _unwindPathFieldIndexes.push_back(idx);
+
+            pathValue = current->getField(idx).second;
+
+            if (i < pathLength - 1) {
+
+                if (pathValue->getType() != Object) {
+                    // The next field in the path cannot exist (inside a non object).
+                    return NULL;
+                }
+
+                // Move down the object tree.
+                current = pathValue->getDocument();
+            }
+        }
+
+        return pathValue;
+    }
+
     const char DocumentSourceUnwind::unwindName[] = "$unwind";
 
     DocumentSourceUnwind::~DocumentSourceUnwind() {
@@ -32,11 +201,36 @@ namespace mongo {
     DocumentSourceUnwind::DocumentSourceUnwind(
         const intrusive_ptr<ExpressionContext> &pExpCtx):
         DocumentSource(pExpCtx),
-        unwindPath(),
-        pNoUnwindDocument(),
-        pUnwindArray(),
-        pUnwinder(),
-        pUnwindValue() {
+        _unwindPath() {
+    }
+
+    void DocumentSourceUnwind::lazyInit() {
+        if (!_unwinder) {
+            verify(_unwindPath.getPathLength());
+            _unwinder.reset(new Unwinder(_unwindPath));
+            if (!pSource->eof()) {
+                // Set up the first source document for unwinding.
+                _unwinder->resetDocument(pSource->getCurrent());
+            }
+            mayAdvanceSource();
+        }
+    }
+
+    void DocumentSourceUnwind::mayAdvanceSource() {
+        while(_unwinder->eof()) {
+            // The _unwinder is exhausted.
+
+            if (pSource->eof()) {
+                // The source is exhausted.
+                return;
+            }
+            if (!pSource->advance()) {
+                // The source is exhausted.
+                return;
+            }
+            // Reset the _unwinder with pSource's next document.
+            _unwinder->resetDocument(pSource->getCurrent());
+        }
     }
 
     const char *DocumentSourceUnwind::getSourceName() const {
@@ -44,182 +238,37 @@ namespace mongo {
     }
 
     bool DocumentSourceUnwind::eof() {
-        /*
-          If we're unwinding an array, and there are more elements, then we
-          can return more documents.
-        */
-        if (pUnwinder.get() && pUnwinder->more())
-            return false;
-
-        return pSource->eof();
+        lazyInit();
+        return _unwinder->eof();
     }
 
     bool DocumentSourceUnwind::advance() {
         DocumentSource::advance(); // check for interrupts
-
-        if (pUnwinder.get() && pUnwinder->more()) {
-            pUnwindValue = pUnwinder->next();
-            return true;
-        }
-
-        /* release the last document and advance */
-        resetArray();
-        return pSource->advance();
+        lazyInit();
+        _unwinder->advance();
+        mayAdvanceSource();
+        return !_unwinder->eof();
     }
 
     intrusive_ptr<Document> DocumentSourceUnwind::getCurrent() {
-        if (!pNoUnwindDocument.get()) {
-            intrusive_ptr<Document> pInDocument(pSource->getCurrent());
-
-            /* create the result document */
-            pNoUnwindDocument = pInDocument;
-            fieldIndex.clear();
-
-            /*
-              First we'll look to see if the path is there.  If it isn't,
-              we'll pass this document through.  If it is, we record the
-              indexes of the fields down the field path so that we can
-              quickly replace them as we clone the documents along the
-              field path.
-
-              We have to clone all the documents along the field path so
-              that we don't share the end value across documents that have
-              come out of this pipeline operator.
-             */
-            intrusive_ptr<Document> pCurrent(pInDocument);
-            const size_t pathLength = unwindPath.getPathLength();
-            for(size_t i = 0; i < pathLength; ++i) {
-                size_t idx = pCurrent->getFieldIndex(
-                    unwindPath.getFieldName(i));
-                if (idx == pCurrent->getFieldCount() ) {
-                    /* this document doesn't contain the target field */
-                    resetArray();
-                    return pInDocument;
-                    break;
-                }
-
-                fieldIndex.push_back(idx);
-                Document::FieldPair fp(pCurrent->getField(idx));
-                intrusive_ptr<const Value> pPathValue(fp.second);
-                if (i < pathLength - 1) {
-                    if (pPathValue->getType() != Object) {
-                        /* can't walk down the field path */
-                        resetArray();
-                        uassert(15977, str::stream() << unwindName <<
-                                ":  cannot traverse field path past scalar value for \"" <<
-                                fp.first << "\"", false);
-                        break;
-                    }
-
-                    /* move down the object tree */
-                    pCurrent = pPathValue->getDocument();
-                }
-                else /* (i == pathLength - 1) */ {
-                    if (pPathValue->getType() != Array) {
-                        /* last item on path must be an array to unwind */
-                        resetArray();
-                        uassert(15978, str::stream() << unwindName <<
-                                ":  value at end of field path must be an array",
-                                false);
-                        break;
-                    }
-
-                    /* keep track of the array we're unwinding */
-                    pUnwindArray = pPathValue;
-                    if (pUnwindArray->getArrayLength() == 0) {
-                        /*
-                          The $unwind of an empty array is a NULL value.  If we
-                          encounter this, use the non-unwind path, but replace
-                          pOutField with a null.
-
-                          Make sure unwind value is clear so the array is
-                          removed.
-                        */
-                        pUnwindValue.reset();
-                        intrusive_ptr<Document> pClone(clonePath());
-                        resetArray();
-                        return pClone;
-                    }
-
-                    /* get the iterator we'll use to unwind the array */
-                    pUnwinder = pUnwindArray->getArray();
-                    verify(pUnwinder->more()); // we just checked above...
-                    pUnwindValue = pUnwinder->next();
-                }
-            }
-        }
-
-        /*
-          If we're unwinding a field, create an alternate document.  In the
-          alternate (clone), replace the unwound array field with the element
-          at the appropriate index.
-         */
-        if (pUnwindArray.get()) {
-            /* clone the document with an array we're unwinding */
-            intrusive_ptr<Document> pUnwindDocument(clonePath());
-
-            return pUnwindDocument;
-        }
-
-        return pNoUnwindDocument;
-    }
-
-    intrusive_ptr<Document> DocumentSourceUnwind::clonePath() const {
-        /*
-          For this to be valid, we must already have pNoUnwindDocument set,
-          and have set up the vector of indices for that document in fieldIndex.
-         */
-        verify(pNoUnwindDocument.get());
-
-        intrusive_ptr<Document> pClone(pNoUnwindDocument->clone());
-        intrusive_ptr<Document> pCurrent(pClone);
-        const size_t n = fieldIndex.size();
-        verify(n);
-        for(size_t i = 0; i < n; ++i) {
-            const size_t fi = fieldIndex[i];
-            Document::FieldPair fp(pCurrent->getField(fi));
-            if (i + 1 < n) {
-                /*
-                  For every object in the path but the last, clone it and
-                  continue on down.
-                */
-                intrusive_ptr<Document> pNext(
-                    fp.second->getDocument()->clone());
-                pCurrent->setField(fi, fp.first, Value::createDocument(pNext));
-                pCurrent = pNext;
-            }
-            else {
-                /* for the last, subsitute the next unwound value */
-                pCurrent->setField(fi, fp.first, pUnwindValue);
-            }
-        }
-
-        return pClone;
+        lazyInit();
+        return _unwinder->getCurrent();
     }
 
     void DocumentSourceUnwind::sourceToBson(
         BSONObjBuilder *pBuilder, bool explain) const {
-        pBuilder->append(unwindName, unwindPath.getPath(true));
+        pBuilder->append(unwindName, _unwindPath.getPath(true));
     }
 
-    intrusive_ptr<DocumentSourceUnwind> DocumentSourceUnwind::create(
-        const intrusive_ptr<ExpressionContext> &pExpCtx) {
-        intrusive_ptr<DocumentSourceUnwind> pSource(
-            new DocumentSourceUnwind(pExpCtx));
-        return pSource;
-    }
-
-    void DocumentSourceUnwind::unwindField(const FieldPath &rFieldPath) {
-        /* can't set more than one unwind field */
+    void DocumentSourceUnwind::unwindPath(const FieldPath &fieldPath) {
+        // Can't set more than one unwind path.
         uassert(15979, str::stream() << unwindName <<
                 "can't unwind more than one path at once",
-                !unwindPath.getPathLength());
-
+                !_unwindPath.getPathLength());
         uassert(15980, "the path of the field to unwind cannot be empty",
-                false);
-
-        /* record the field path */
-        unwindPath = rFieldPath;
+                fieldPath.getPathLength());
+        // Record the unwind path.
+        _unwindPath = fieldPath;
     }
 
     intrusive_ptr<DocumentSource> DocumentSourceUnwind::createFromBson(
@@ -234,16 +283,15 @@ namespace mongo {
 
         string prefixedPathString(pBsonElement->String());
         string pathString(Expression::removeFieldPrefix(prefixedPathString));
-        intrusive_ptr<DocumentSourceUnwind> pUnwind(
-            DocumentSourceUnwind::create(pExpCtx));
-        pUnwind->unwindPath = FieldPath(pathString);
+        intrusive_ptr<DocumentSourceUnwind> pUnwind(new DocumentSourceUnwind(pExpCtx));
+        pUnwind->unwindPath(FieldPath(pathString));
 
         return pUnwind;
     }
 
     void DocumentSourceUnwind::manageDependencies(
         const intrusive_ptr<DependencyTracker> &pTracker) {
-        pTracker->addDependency(unwindPath.getPath(false), this);
+        pTracker->addDependency(_unwindPath.getPath(false), this);
     }
     
 }
