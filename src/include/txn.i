@@ -35,8 +35,7 @@ __wt_txn_modify(WT_SESSION_IMPL *session, wt_txnid_t *id)
 			    txn_global->current, txn->id, txn->id + 1) ||
 			    txn->id == WT_TXN_NONE ||
 			    txn->id == WT_TXN_ABORTED);
-		//*id = txn->id;
-		*id = WT_TXN_NONE;
+		*id = txn->id;
 	}
 
 	return (0);
