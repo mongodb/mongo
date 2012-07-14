@@ -28,6 +28,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/heapcheck.h"
 #include "mongo/util/concurrency/threadlocal.h"
+#include "mongo/util/time_support.h"
 
 #if defined(_DEBUG)
 #include "mongo/util/concurrency/mutexdebugger.h"
@@ -37,7 +38,7 @@ namespace mongo {
 
     inline boost::xtime incxtimemillis( long long s ) {
         boost::xtime xt;
-        boost::xtime_get(&xt, boost::TIME_UTC_);
+        boost::xtime_get(&xt, MONGO_BOOST_TIME_UTC);
         xt.sec += (int)( s / 1000 );
         xt.nsec += (int)(( s % 1000 ) * 1000000);
         if ( xt.nsec >= 1000000000 ) {

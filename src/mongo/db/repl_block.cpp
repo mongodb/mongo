@@ -183,7 +183,7 @@ namespace mongo {
             w--; // now this is the # of slaves i need
 
             boost::xtime xt;
-            boost::xtime_get(&xt, boost::TIME_UTC_);
+            boost::xtime_get(&xt, MONGO_BOOST_TIME_UTC);
             xt.sec += maxSecondsToWait;
             
             scoped_lock mylk(_mutex);

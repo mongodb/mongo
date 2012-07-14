@@ -16,6 +16,8 @@
 
 #include <boost/config/abi_prefix.hpp>
 
+#define MONGO_BOOST_TIME_UTC_HACK 1
+
 namespace boost {
 
 enum xtime_clock_types
