@@ -353,7 +353,10 @@ def runTest(test):
     if file_of_commands_mode:
         # smoke.py was invoked like "--mode files --from-file foo",
         # so don't try to interpret the test path too much
-        argv = shlex.split(path)
+        if os.sys.platform == "win32":
+            argv = path
+        else:
+            argv = shlex.split(path)
         path = argv[0]
         # if the command is a python script, use the script name
         if os.path.basename(path) in ('python', 'python.exe'):
