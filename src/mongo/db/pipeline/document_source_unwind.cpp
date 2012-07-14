@@ -94,7 +94,7 @@ namespace mongo {
         }
 
         // The target field must be an array to unwind.
-        uassert(15978, str::stream() << DocumentSourceUnwind::unwindName
+        uassert(15978, str::stream() << (string)DocumentSourceUnwind::unwindName
                 << ":  value at end of field path must be an array",
                 pathValue->getType() == Array);
 
