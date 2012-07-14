@@ -518,7 +518,7 @@ __wt_cursor_init(WT_CURSOR *cursor,
 	 * The append flag is only relevant to column stores.
 	 */
 	if (WT_CURSOR_RECNO(cursor)) {
-		WT_RET(__wt_config_gets(session, cfg, "append", &cval));
+		WT_RET(__wt_config_gets_defno(session, cfg, "append", &cval));
 		if (cval.val != 0)
 			F_SET(cursor, WT_CURSTD_APPEND);
 	}
@@ -527,7 +527,7 @@ __wt_cursor_init(WT_CURSOR *cursor,
 	 * checkpoint
 	 * Checkpoint cursors are read-only.
 	 */
-	WT_RET(__wt_config_gets(session, cfg, "checkpoint", &cval));
+	WT_RET(__wt_config_gets_defno(session, cfg, "checkpoint", &cval));
 	if (cval.len != 0) {
 		cursor->insert = __wt_cursor_notsup;
 		cursor->update = __wt_cursor_notsup;
@@ -535,7 +535,7 @@ __wt_cursor_init(WT_CURSOR *cursor,
 	}
 
 	/* dump */
-	WT_RET(__wt_config_gets(session, cfg, "dump", &cval));
+	WT_RET(__wt_config_gets_defno(session, cfg, "dump", &cval));
 	if (cval.len != 0) {
 		F_SET(cursor, (__wt_config_strcmp(&cval, "print") == 0) ?
 		    WT_CURSTD_DUMP_PRINT : WT_CURSTD_DUMP_HEX);
@@ -544,8 +544,13 @@ __wt_cursor_init(WT_CURSOR *cursor,
 	} else
 		cdump = NULL;
 
+	/* overwrite */
+	WT_RET(__wt_config_gets_defno(session, cfg, "overwrite", &cval));
+	if (cval.val != 0)
+		F_SET(cursor, WT_CURSTD_OVERWRITE);
+
 	/* raw */
-	WT_RET(__wt_config_gets(session, cfg, "raw", &cval));
+	WT_RET(__wt_config_gets_defno(session, cfg, "raw", &cval));
 	if (cval.val != 0)
 		F_SET(cursor, WT_CURSTD_RAW);
 

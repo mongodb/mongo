@@ -347,7 +347,7 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 	clear_func = NULL;
 	cst = NULL;
 
-	WT_RET(__wt_config_gets(session, cfg, "statistics_clear", &cval));
+	WT_RET(__wt_config_gets_defno(session, cfg, "statistics_clear", &cval));
 	statistics_clear = (cval.val != 0);
 
 	if (!WT_PREFIX_SKIP(uri, "statistics:"))

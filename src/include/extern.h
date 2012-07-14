@@ -445,6 +445,10 @@ extern int __wt_config_gets(WT_SESSION_IMPL *session,
     const char **cfg,
     const char *key,
     WT_CONFIG_ITEM *value);
+extern int __wt_config_gets_defno(WT_SESSION_IMPL *session,
+    const char **cfg,
+    const char *key,
+    WT_CONFIG_ITEM *value);
 extern  int __wt_config_getone(WT_SESSION_IMPL *session,
     const char *cfg,
     WT_CONFIG_ITEM *key,
