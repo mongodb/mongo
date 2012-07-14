@@ -26,6 +26,7 @@ for ( var opt in options ) {
   assert.eq(options[opt], cappedOptions[opt], 'invalid option')
 }
 db.capped.insert({ x: 1 });
+db.getLastError()
 
 // Full dump/restore
 
@@ -52,6 +53,7 @@ for ( var opt in options ) {
   assert.eq(options[opt], cappedOptions[opt], 'invalid option')
 }
 db.capped.insert({ x: 1 });
+db.getLastError()
 
 dumppath = t.ext + "noOptionsSingleDump/";
 mkdir(dumppath);
@@ -80,6 +82,7 @@ for ( var opt in options ) {
   assert.eq(options[opt], cappedOptions[opt], 'invalid option')
 }
 db.capped.insert({ x: 1 });
+db.getLastError()
 
 dumppath = t.ext + "noOptionsSingleColDump/";
 mkdir(dumppath);
