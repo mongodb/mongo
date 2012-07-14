@@ -354,7 +354,7 @@ def runTest(test):
         # smoke.py was invoked like "--mode files --from-file foo",
         # so don't try to interpret the test path too much
         if os.sys.platform == "win32":
-            argv = path
+            argv = [path]
         else:
             argv = shlex.split(path)
         path = argv[0]
