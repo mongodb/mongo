@@ -141,12 +141,14 @@ namespace mongo {
             ObjectCtx(int options);
             static const int UNWIND_OK = 0x0001;
             static const int DOCUMENT_OK = 0x0002;
+            static const int TOP_LEVEL = 0x0004;
 
             bool unwindOk() const;
             bool unwindUsed() const;
             void unwind(string fieldName);
 
             bool documentOk() const;
+            bool topLevel() const;
 
         private:
             int options;
@@ -926,25 +928,16 @@ namespace mongo {
           instead of creating a new one.
 
           @param pResult the Document to add the evaluated expressions to
-          @param pDocument the input Document
-          @param excludeId for exclusions, exclude the _id, if present
+          @param pDocument the input Document for this level
+          @param rootDoc the root of the whole input document
          */
-        void addToDocument(const intrusive_ptr<Document> &pResult,
-                           const intrusive_ptr<Document> &pDocument,
-            bool excludeId = false) const;
+        void addToDocument(const intrusive_ptr<Document>& pResult,
+                           const intrusive_ptr<Document>& pDocument,
+                           const intrusive_ptr<Document>& rootDoc
+                          ) const;
 
-        /*
-          Estimate the number of fields that will result from evaluating
-          this over pDocument.  Does not include _id.  This is an estimate
-          (really an upper bound) because we can't account for undefined
-          fields without actually doing the evaluation.  But this is still
-          useful as an argument to Document::create(), if you plan to use
-          addToDocument().
-
-          @param pDocument the input document
-          @returns estimated number of fields that will result
-         */
-        size_t getSizeHint(const intrusive_ptr<Document> &pDocument) const;
+        // estimated number of fields that will be output
+        size_t getSizeHint() const;
 
         /*
           Create an empty expression.  Until fields are added, this
@@ -960,7 +953,7 @@ namespace mongo {
           @param pExpression the expression to evaluate obtain this field's
                  Value in the result Document
         */
-        void addField(const string &fieldPath,
+        void addField(const FieldPath &fieldPath,
                       const intrusive_ptr<Expression> &pExpression);
 
         /*
@@ -974,38 +967,11 @@ namespace mongo {
         void includePath(const string &fieldPath);
 
         /*
-          Add a field path to the set of those to be excluded.
-
-          Note that excluding a nested field implies including everything on
-          the path leading down to it (because you're stating you want to see
-          all the other fields that aren't being excluded).
-
-          @param fieldName the name of the field to be excluded
-         */
-        void excludePath(const string &fieldPath);
-
-        /*
-          Return the expression for a field.
-
-          @param fieldName the field name for the expression to return
-          @returns the expression used to compute the field, if it is present,
-            otherwise NULL.
-        */
-        intrusive_ptr<Expression> getField(const string &fieldName) const;
-
-        /*
           Get a count of the added fields.
 
           @returns how many fields have been added
          */
         size_t getFieldCount() const;
-
-        /*
-          Get a count of the exclusions.
-
-          @returns how many fields have been excluded.
-        */
-        size_t getExclusionCount() const;
 
         /*
           Specialized BSON conversion that allows for writing out a
@@ -1036,42 +1002,20 @@ namespace mongo {
             virtual void path(const string &path, bool include) = 0;
         };
 
-        /**
-          Emit the field paths that have been included or excluded.  "Included"
-          includes paths that are referenced in expressions for computed
-          fields.
-
-          @param pSink where to write the paths to
-          @param pvPath pointer to a vector of strings describing the path on
-            descent; the top-level call should pass an empty vector
-         */
-        void emitPaths(PathSink *pPathSink) const;
+        void excludeId(bool b) { _excludeId = b; }
 
     private:
         ExpressionObject();
 
-        void includePath(
-            const FieldPath *pPath, size_t pathi, size_t pathn,
-            bool excludeLast);
+        // mapping from fieldname to Expression to generate the value
+        // NULL expression means include from source document
+        typedef map<string, intrusive_ptr<Expression> > ExpressionMap;
+        ExpressionMap _expressions;
 
-        bool excludePaths;
-        set<string> path;
+        // this is used to maintain order for generated fields not in the source document
+        vector<string> _order;
 
-        /* these two vectors are maintained in parallel */
-        vector<string> vFieldName;
-        vector<intrusive_ptr<Expression> > vpExpression;
-
-
-        /*
-          Utility function used by documentToBson().  Emits inclusion
-          and exclusion paths by recursively walking down the nested
-          ExpressionObject trees these have created.
-
-          @param pSink where to write the paths to
-          @param pvPath pointer to a vector of strings describing the path on
-            descent; the top-level call should pass an empty vector
-         */
-        void emitPaths(PathSink *pPathSink, vector<string> *pvPath) const;
+        bool _excludeId;
 
         /*
           Utility object for collecting emitPaths() results in a BSON
@@ -1313,7 +1257,7 @@ namespace mongo {
     }
 
     inline size_t ExpressionObject::getFieldCount() const {
-        return vFieldName.size();
+        return _expressions.size();
     }
 
     inline ExpressionObject::BuilderPathSink::BuilderPathSink(

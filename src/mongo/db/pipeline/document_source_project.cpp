@@ -32,7 +32,6 @@ namespace mongo {
     DocumentSourceProject::DocumentSourceProject(
         const intrusive_ptr<ExpressionContext> &pExpCtx):
         DocumentSource(pExpCtx),
-        excludeId(false),
         pEO(ExpressionObject::create()),
         _isSimple(true), // set to false in addField
         _wouldBeRemoved(false)
@@ -56,22 +55,8 @@ namespace mongo {
         intrusive_ptr<Document> pInDocument(pSource->getCurrent());
 
         /* create the result document */
-        const size_t sizeHint =
-            pEO->getSizeHint(pInDocument) + (excludeId ? 0 : 1);
+        const size_t sizeHint = pEO->getSizeHint();
         intrusive_ptr<Document> pResultDocument(Document::create(sizeHint));
-
-        if (!excludeId) {
-            intrusive_ptr<const Value> pId(
-                pInDocument->getField(Document::idName));
-
-            /*
-              Previous projections could have removed _id, (or declined to
-              generate it) so it might already not exist.  Only attempt to add
-              if we found it.
-            */
-            if (pId.get())
-                pResultDocument->addField(Document::idName, pId);
-        }
 
         /*
           Use the ExpressionObject to create the base result.
@@ -79,7 +64,7 @@ namespace mongo {
           If we're excluding fields at the top level, leave out the _id if
           it is found, because we took care of it above.
         */
-        pEO->addToDocument(pResultDocument, pInDocument, true);
+        pEO->addToDocument(pResultDocument, pInDocument, /*root=*/pInDocument);
 
         if (debug && _wouldBeRemoved) {
             // In this case the $project would have been removed in a
@@ -111,41 +96,8 @@ namespace mongo {
     void DocumentSourceProject::sourceToBson(
         BSONObjBuilder *pBuilder, bool explain) const {
         BSONObjBuilder insides;
-        if (excludeId)
-            insides.append(Document::idName, false);
         pEO->documentToBson(&insides, true);
         pBuilder->append(projectName, insides.done());
-    }
-
-    void DocumentSourceProject::addField(
-        const string &fieldName, const intrusive_ptr<Expression> &pExpression) {
-        uassert(15960,
-                "projection fields must be defined by non-empty expressions",
-                pExpression);
-
-        _isSimple = false; // this projection is no longer just inclusion/exclusion
-        pEO->addField(fieldName, pExpression);
-    }
-
-    void DocumentSourceProject::includePath(const string &fieldPath) {
-        if (Document::idName.compare(fieldPath) == 0) {
-            uassert(15961, str::stream() << projectName <<
-                    ":  _id cannot be included once it has been excluded",
-                    !excludeId);
-
-            return;
-        }
-
-        pEO->includePath(fieldPath);
-    }
-
-    void DocumentSourceProject::excludePath(const string &fieldPath) {
-        if (Document::idName.compare(fieldPath) == 0) {
-            excludeId = true;
-            return;
-        }
-
-        pEO->excludePath(fieldPath);
     }
 
     intrusive_ptr<DocumentSource> DocumentSourceProject::createFromBson(
@@ -156,64 +108,24 @@ namespace mongo {
                 " specification must be an object",
                 pBsonElement->type() == Object);
 
-        /* chain the projection onto the original source */
         intrusive_ptr<DocumentSourceProject> pProject(new DocumentSourceProject(pExpCtx));
 
-        /*
-          Pull out the $project object.  This should just be a list of
-          field inclusion or exclusion specifications.  Note you can't do
-          both, except for the case of _id.
-         */
         BSONObj projectObj(pBsonElement->Obj());
         pProject->_raw = projectObj.getOwned(); // probably not necessary, but better to be safe
-        BSONObjIterator fieldIterator(projectObj);
+
         Expression::ObjectCtx objectCtx(
-            Expression::ObjectCtx::DOCUMENT_OK);
-        while(fieldIterator.more()) {
-            BSONElement outFieldElement(fieldIterator.next());
-            string outFieldPath(outFieldElement.fieldName());
-            string inFieldName(outFieldPath);
-            BSONType specType = outFieldElement.type();
+              Expression::ObjectCtx::DOCUMENT_OK
+            | Expression::ObjectCtx::TOP_LEVEL
+            );
 
-            switch(specType) {
-            case Bool:
-            case NumberDouble:
-            case NumberLong:
-            case NumberInt:
-                /* simple include/exclude specification */
-                if (outFieldElement.trueValue())
-                    pProject->includePath(outFieldPath);
-                else
-                    pProject->excludePath(outFieldPath);
-                break;
+        intrusive_ptr<Expression> parsed = Expression::parseObject(pBsonElement, &objectCtx);
+        ExpressionObject* exprObj = dynamic_cast<ExpressionObject*>(parsed.get());
+        massert(16402, "parseObject() returned wrong type of Expression", exprObj);
+        uassert(16403, "$projection requires at least one output field", exprObj->getFieldCount());
+        pProject->pEO = exprObj;
 
-            case String:
-                /* include a field, with rename */
-                inFieldName = outFieldElement.String();
-                pProject->addField(
-                    outFieldPath,
-                    ExpressionFieldPath::create(
-                        Expression::removeFieldPrefix(inFieldName)));
-                break;
-
-            case Object: {
-                intrusive_ptr<Expression> pDocument(
-                    Expression::parseObject(&outFieldElement, &objectCtx));
-
-                /* add The document expression to the projection */
-                pProject->addField(outFieldPath, pDocument);
-                break;
-            }
-
-            default:
-                uassert(15971, str::stream() <<
-                        "invalid BSON type (" << specType <<
-                        ") for " << projectName <<
-                        " field " << outFieldPath, false);
-            }
-
-        }
-
+        // TODO simpleness
+        pProject->_isSimple = false;
         return pProject;
     }
 
@@ -246,6 +158,11 @@ namespace mongo {
 
     void DocumentSourceProject::manageDependencies(
         const intrusive_ptr<DependencyTracker> &pTracker) {
+        
+        // the manageDependecies system is currently unused
+        return;
+
+#if 0 
         /*
           Look at all the products (inclusions and computed fields) of this
           projection.  For each one that is a dependency, remove it from the
@@ -274,6 +191,7 @@ namespace mongo {
           add their dependencies to the list of dependencies.
          */
         pEO->addDependencies(pTracker, this);
+#endif
     }
 
 }

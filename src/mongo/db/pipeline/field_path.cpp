@@ -73,10 +73,9 @@ namespace mongo {
             outStream << prefix;
 
         outStream << vFieldName[0];
-
         const size_t n = vFieldName.size();
         for(size_t i = 1; i < n; ++i)
-            outStream << "." << vFieldName[i];
+            outStream << '.' << vFieldName[i];
     }
 
     FieldPath &FieldPath::operator=(const FieldPath &rRHS) {
@@ -85,6 +84,15 @@ namespace mongo {
         }
 
         return *this;
+    }
+
+    FieldPath FieldPath::tail() const {
+        verify(!vFieldName.empty());
+
+        FieldPath out;
+        vector<string> allButFirst(vFieldName.begin()+1, vFieldName.end());
+        out.vFieldName.swap(allButFirst);
+        return out;
     }
 
 }

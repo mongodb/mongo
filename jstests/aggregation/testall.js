@@ -931,18 +931,18 @@ var p15 = db.runCommand(
 var p15result = [
     {
         "_id" : 1,
-        "pageViews" : 5,
-        "author" : "BOB"
+        "author" : "BOB",
+        "pageViews" : 5
     },
     {
         "_id" : 2,
-        "pageViews" : 7,
-        "author" : "DAVE"
+        "author" : "DAVE",
+        "pageViews" : 7
     },
     {
         "_id" : 3,
-        "pageViews" : 6,
-        "author" : "JANE"
+        "author" : "JANE",
+        "pageViews" : 6
     }
 ];
 
@@ -965,18 +965,18 @@ var p16 = db.runCommand(
 var p16result = [
     {
         "_id" : 1,
+        "author" : "bob",
         "pageViews" : 5,
-        "author" : "bob"
     },
     {
         "_id" : 2,
+        "author" : "dave",
         "pageViews" : 7,
-        "author" : "dave"
     },
     {
         "_id" : 3,
+        "author" : "jane",
         "pageViews" : 6,
-        "author" : "jane"
     }
 ];
 
@@ -1324,7 +1324,7 @@ var g2 = db.runCommand(
     }},
     { $unwind : "$tags" },
     { $group : {
-        _id: { tags : 1 },
+        _id: { tags : "$tags" },
         docsByTag : { $sum : 1 },
         viewsByTag : { $sum : "$pageViews" },
         mostViewsByTag : { $max : "$pageViews" },
@@ -1383,7 +1383,7 @@ var g3 = db.runCommand(
     }},
     { $unwind : "$tags" },
     { $group : {
-        _id : { tags : 1 },
+        _id : { tags : "$tags" },
         authors : { $push : "$author" }
     }},
     {$sort: {'_id': 1}}
@@ -1440,7 +1440,7 @@ var g4 = db.runCommand(
     }},
     { $unwind : "$tags" },
     { $group : {
-        _id: { tags : 1 },
+        _id: { tags : "$tags" },
         docsByTag : { $sum : 1 },
         viewsByTag : { $sum : "$pageViews" },
         avgByTag : { $avg : "$pageViews" },
@@ -1495,7 +1495,7 @@ var g5 = db.runCommand(
     }},
     { $unwind : "$tags" },
     { $group : {
-        _id : { tags : 1 },
+        _id : { tags : "$tags" },
         authors : { $addToSet : "$author" }
     }},
     {$sort: {'_id': 1}}

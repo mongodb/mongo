@@ -218,9 +218,6 @@ namespace mongo {
         */
         Document::FieldPair next();
 
-    private:
-        friend class Document;
-
         /*
           Constructor.
 
@@ -228,6 +225,9 @@ namespace mongo {
               iterated
         */
         FieldIterator(const intrusive_ptr<Document> &pDocument);
+
+    private:
+        friend class Document;
 
         /*
           We'll hang on to the original document to ensure we keep the

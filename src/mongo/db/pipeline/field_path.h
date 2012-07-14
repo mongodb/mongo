@@ -83,6 +83,9 @@ namespace mongo {
 
         static const char prefix[];
 
+        /** a FieldPath like this but missing the first element (useful for recursion) */
+        FieldPath tail() const;
+
     private:
         vector<string> vFieldName;
     };

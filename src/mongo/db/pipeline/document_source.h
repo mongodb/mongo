@@ -800,32 +800,6 @@ namespace mongo {
             const intrusive_ptr<DependencyTracker> &pTracker);
 
         /**
-          Include a field path in a projection.
-
-          @param fieldPath the path of the field to include
-        */
-        void includePath(const string &fieldPath);
-
-        /**
-          Exclude a field path from the projection.
-
-          @param fieldPath the path of the field to exclude
-         */
-        void excludePath(const string &fieldPath);
-
-        /**
-          Add an output Expression in the projection.
-
-          BSON document fields are ordered, so the new field will be
-          appended to the existing set.
-
-          @param fieldName the name of the field as it will appear
-          @param pExpression the expression used to compute the field
-        */
-        void addField(const string &fieldName,
-                      const intrusive_ptr<Expression> &pExpression);
-
-        /**
           Create a new projection DocumentSource from BSON.
 
           This is a convenience for directly handling BSON, and relies on the
@@ -847,7 +821,9 @@ namespace mongo {
         /** true if just include/exclude, no renames */
         bool isSimple() const { return _isSimple; }
 
-        /** called by PipelineD::prepareCursorSource in debug builds if it would remove this Projection */
+        /** called by PipelineD::prepareCursorSource in debug builds if it
+         *  would remove this Projection
+         */
         void setWouldBeRemoved() { _wouldBeRemoved = true; }
 
     protected:
@@ -858,7 +834,6 @@ namespace mongo {
         DocumentSourceProject(const intrusive_ptr<ExpressionContext> &pExpCtx);
 
         // configuration state
-        bool excludeId;
         intrusive_ptr<ExpressionObject> pEO;
         BSONObj _raw;
         bool _isSimple;
