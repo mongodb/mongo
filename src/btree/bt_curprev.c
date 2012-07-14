@@ -31,7 +31,7 @@
  * __cursor_skip_prev --
  *	Move back one position in a skip list stack (aka "finger").
  */
-static inline void
+static inline int
 __cursor_skip_prev(WT_CURSOR_BTREE *cbt)
 {
 	WT_INSERT *current, *ins;
@@ -50,8 +50,8 @@ restart:
 		if (cbt->btree->type == BTREE_ROW) {
 			key.data = WT_INSERT_KEY(current);
 			key.size = WT_INSERT_KEY_SIZE(current);
-			cbt->ins = __wt_search_insert(session,
-			    cbt, cbt->ins_head, &key);
+			WT_RET(__wt_search_insert(
+			    session, cbt, cbt->ins_head, &key));
 		} else
 			cbt->ins = __col_insert_search(cbt->ins_head,
 			    cbt->ins_stack, WT_INSERT_RECNO(current));
@@ -111,6 +111,7 @@ restart:
 		goto restart;
 
 	cbt->ins = PREV_INS(cbt, 0);
+	return (0);
 }
 
 /*
@@ -133,7 +134,7 @@ __cursor_fix_append_prev(WT_CURSOR_BTREE *cbt, int newpage)
 		cbt->recno = WT_INSERT_RECNO(cbt->ins);
 	} else {
 		if (cbt->recno == WT_INSERT_RECNO(cbt->ins)) {
-			__cursor_skip_prev(cbt);
+			WT_RET(__cursor_skip_prev(cbt));
 			if (cbt->ins == NULL)
 				return (WT_NOTFOUND);
 		}
@@ -232,7 +233,7 @@ __cursor_var_append_prev(WT_CURSOR_BTREE *cbt, int newpage)
 	}
 
 	for (;;) {
-		__cursor_skip_prev(cbt);
+		WT_RET(__cursor_skip_prev(cbt));
 new_page:	if (cbt->ins == NULL)
 			return (WT_NOTFOUND);
 
@@ -387,7 +388,7 @@ __cursor_row_prev(WT_CURSOR_BTREE *cbt, int newpage)
 		 * next movement.
 		 */
 		if (cbt->ins != NULL)
-			__cursor_skip_prev(cbt);
+			WT_RET(__cursor_skip_prev(cbt));
 
 new_insert:	if ((ins = cbt->ins) != NULL) {
 			if ((upd = __wt_txn_read(session, ins->upd)) == NULL ||
