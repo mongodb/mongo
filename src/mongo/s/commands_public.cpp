@@ -132,7 +132,10 @@ namespace mongo {
                 for ( list< shared_ptr<Future::CommandResult> >::iterator i=futures.begin(); i!=futures.end(); i++ ) {
                     shared_ptr<Future::CommandResult> res = *i;
                     if ( ! res->join() ) {
-                        errors.appendAs(res->result()["errmsg"], res->getServer());
+                        if ( res->result()["errmsg"].type() )
+                            errors.appendAs(res->result()["errmsg"], res->getServer());
+                        else
+                            errors.append(res->getServer(), "join failed");
                     }
                     results.push_back( res->result() );
                     subobj.append( res->getServer() , res->result() );
