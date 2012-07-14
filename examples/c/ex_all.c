@@ -76,7 +76,7 @@ cursor_ops(WT_SESSION *session)
 	    session, "table:mytable", NULL, NULL, &cursor);
 	cursor->set_key(cursor, key);
 	ret = cursor->search(cursor);
-	ret = session->open_cursor(session, NULL, &duplicate, NULL, &cursor);
+	ret = session->open_cursor(session, NULL, cursor, NULL, &duplicate);
 	/*! [Duplicate a cursor] */
 	}
 
