@@ -101,7 +101,8 @@ namespace DirectClientTests {
     class BadNSQuery : ClientBase {
     public:
         virtual void run(){
-            BSONObj result = client().query( "", Query(), 1 )->next();
+            auto_ptr<DBClientCursor> cursor = client().query( "", Query(), 1 );
+            BSONObj result = cursor->next().getOwned();
             ASSERT( result.hasField( "$err" ));
         }
     };
