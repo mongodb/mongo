@@ -60,15 +60,25 @@ const char *progname;
 int
 cursor_ops(WT_SESSION *session)
 {
-	WT_CURSOR *cursor, *other;
+	WT_CURSOR *cursor;
 	int ret;
-
-	other = NULL;
 
 	/*! [Open a cursor] */
 	ret = session->open_cursor(
 	    session, "table:mytable", NULL, NULL, &cursor);
 	/*! [Open a cursor] */
+
+	{
+	WT_CURSOR *duplicate;
+	const char *key = "some key";
+	/*! [Duplicate a cursor] */
+	ret = session->open_cursor(
+	    session, "table:mytable", NULL, NULL, &cursor);
+	cursor->set_key(cursor, key);
+	ret = cursor->search(cursor);
+	ret = session->open_cursor(session, NULL, &duplicate, NULL, &cursor);
+	/*! [Duplicate a cursor] */
+	}
 
 	{
 	/*! [Get the cursor's string key] */
@@ -141,11 +151,15 @@ cursor_ops(WT_SESSION *session)
 	ret = cursor->reset(cursor);
 	/*! [Reset the cursor] */
 
+	{
+	WT_CURSOR *other;
+	other = NULL;
 	/*! [Test cursor equality] */
 	if (cursor->equals(cursor, other)) {
 		/* Take some action. */
 	}
 	/*! [Test cursor equality] */
+	}
 
 	{
 	/*! [Search for an exact match] */
