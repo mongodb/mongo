@@ -316,10 +316,6 @@ __session_truncate(WT_SESSION *wt_session,
 	if (start != NULL && stop != NULL && strcmp(start->uri, stop->uri) != 0)
 		WT_ERR_MSG(session, EINVAL,
 		    "truncate method cursors must reference the same object");
-	if ((start != NULL && !F_ISSET(start, WT_CURSTD_KEY_SET)) ||
-	    (stop != NULL && !F_ISSET(stop, WT_CURSTD_KEY_SET)))
-		WT_ERR_MSG(session, EINVAL,
-		    "the truncate method cursors must have their keys set");
 
 	if (uri == NULL) {
 		/*
