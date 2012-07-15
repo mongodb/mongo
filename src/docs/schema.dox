@@ -164,7 +164,7 @@ of names for the column groups in the \c colgroups configuration key to
 WT_SESSION::create.  Then make a call to WT_SESSION::create for each column
 group, using the URI <code>colgroup:\<table\>:\<colgroup name\></code> and a
 \c columns key in the configuration.  Columns can be stored in multiple
-column groups, but all value columns must appear in at least on column group.
+column groups, but all value columns must appear in at least one column group.
 
 Column groups have the same key as the table.  This is particularly useful
 for column stores, because record numbers are not stored explicitly on disk,
