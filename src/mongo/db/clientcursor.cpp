@@ -511,7 +511,9 @@ namespace mongo {
                 if ( yielded ) {
                     *yielded = true;   
                 }
-                return yield( suggestYieldMicros() , rec );
+                bool res = yield( suggestYieldMicros() , rec );
+                _yieldSometimesTracker.resetLastTime();
+                return res;
             }
             return true;
         }
@@ -521,12 +523,16 @@ namespace mongo {
             if ( yielded ) {
                 *yielded = true;   
             }
-            return yield( micros , _recordForYield( need ) );
+            bool res = yield( micros , _recordForYield( need ) );
+            _yieldSometimesTracker.resetLastTime();
+            return res;
         }
         return true;
     }
 
     void ClientCursor::staticYield( int micros , const StringData& ns , Record * rec ) {
+        bool haveReadLock = Lock::isReadLocked();
+
         killCurrentOp.checkForInterrupt( false );
         {
             auto_ptr<LockMongoFilesShared> lk;
@@ -537,10 +543,16 @@ namespace mongo {
             
             dbtempreleasecond unlock;
             if ( unlock.unlocked() ) {
-                if ( micros == -1 )
-                    micros = Client::recommendedYieldMicros();
-                if ( micros > 0 )
-                    sleepmicros( micros );
+                if ( haveReadLock ) {
+                    // don't sleep with a read lock
+                }
+                else {
+                    if ( micros == -1 )
+                        micros = Client::recommendedYieldMicros();
+                    if ( micros > 0 )
+                        sleepmicros( micros );
+                }
+                
             }
             else if ( Listener::getTimeTracker() == 0 ) {
                 // we aren't running a server, so likely a repair, so don't complain
