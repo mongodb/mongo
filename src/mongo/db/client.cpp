@@ -546,8 +546,8 @@ namespace mongo {
         if ( readers )
             *readers = r;
 
-        int time = r * 100;
-        time += w * 500;
+        int time = r * 10; // we have to be nice to readers since they don't have priority
+        time += w; // writers are greedy, so we can be mean tot hem
 
         time = min( time , 1000000 );
 
