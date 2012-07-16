@@ -275,7 +275,14 @@ namespace mongo {
             }
             BSONObj errObj = err.done();
 
-            log() << errObj << endl;
+            if( scex ){
+                log() << "stale version detected during query over "
+                      << q.ns << " : " << errObj << endl;
+            }
+            else{
+                log() << "problem detected during query over "
+                      << q.ns << " : " << errObj << endl;
+            }
 
             BufBuilder b;
             b.skip(sizeof(QueryResult));
