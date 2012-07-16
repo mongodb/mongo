@@ -25,8 +25,11 @@
 #include "mongo/db/lasterror.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/goodies.h"
+#include "mongo/util/startup_test.h"
 
 namespace mongo {
+    StartupTest::StartupTest() {}
+    StartupTest::~StartupTest() {}
     bool inShutdown() { return false; }
     std::string getThreadName() { return "UNKNOWN"; }
     void setLastError(int code, const char* msg) {}

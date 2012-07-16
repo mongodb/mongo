@@ -20,12 +20,6 @@
 
 namespace mongo {
 
-    string dynHostMyName() { return ""; }
-
-    void dynHostResolve(string& name, int& port) {
-        verify(false);
-    }
-
     StartupTest::StartupTest() {}
     StartupTest::~StartupTest() {}
 

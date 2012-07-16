@@ -33,18 +33,28 @@ env.StaticLibrary('foundation',
                   LIBDEPS=['stacktrace',
                            '$BUILD_DIR/third_party/shim_boost'])
 
+env.StaticLibrary('stringutils', ['util/stringutils.cpp', 'util/base64.cpp',])
+
+env.StaticLibrary('md5', [
+        'util/md5.cpp',
+        'util/md5main.cpp',
+        ])
+
+env.StaticLibrary('bson', [
+        'bson/oid.cpp',
+        'db/nonce.cpp',
+        'db/jsobj.cpp',
+        'db/json.cpp',
+        ], LIBDEPS=[
+        'md5',
+        'stringutils',
+        ])
+
 commonFiles = [ "pch.cpp",
                 "buildinfo.cpp",
-                "db/jsobj.cpp",
-                "bson/oid.cpp",
-                "db/json.cpp",
                 "db/hasher.cpp",
                 "db/lasterror.cpp",
                 "db/namespace.cpp",
-                "db/nonce.cpp",
-                "db/queryutil.cpp",
-                "db/querypattern.cpp",
-                "db/projection.cpp",
                 "shell/mongo.cpp",
                 "util/background.cpp",
                 "util/intrusive_counter.cpp",
@@ -54,8 +64,6 @@ commonFiles = [ "pch.cpp",
                 "util/trace.cpp",
                 "util/ramlog.cpp",
                 "util/progress_meter.cpp",
-                "util/md5main.cpp",
-                "util/base64.cpp",
                 "util/concurrency/task.cpp",
                 "util/concurrency/thread_pool.cpp",
                 "util/password.cpp",
@@ -63,7 +71,6 @@ commonFiles = [ "pch.cpp",
                 "util/histogram.cpp",
                 "util/concurrency/spin_lock.cpp",
                 "util/text_startuptest.cpp",
-                "util/stringutils.cpp",
                 "util/stack_introspect.cpp",
                 "util/concurrency/synchronization.cpp",
                 "util/net/sock.cpp",
@@ -71,7 +78,6 @@ commonFiles = [ "pch.cpp",
                 "util/net/message.cpp",
                 "util/net/message_port.cpp",
                 "util/net/listen.cpp",
-                "util/md5.cpp",
                 "util/startup_test.cpp",
                 "client/authentication_table.cpp",
                 "client/connpool.cpp",
@@ -81,67 +87,74 @@ commonFiles = [ "pch.cpp",
                 "client/model.cpp",
                 "client/syncclusterconnection.cpp",
                 "client/distlock.cpp",
-                "s/shardconnection.cpp"]
+                ]
 
 env.StaticLibrary('mongocommon', commonFiles,
-                  LIBDEPS=['foundation',
+                  LIBDEPS=['bson',
+                           'foundation',
+                           'md5',
                            'stacktrace',
+                           'stringutils',
                            '$BUILD_DIR/third_party/pcrecpp',
                            '$BUILD_DIR/third_party/murmurhash3/murmurhash3',
                            '$BUILD_DIR/third_party/shim_boost'],)
 
-env.StaticLibrary("coredb", [ "db/commands.cpp" ])
+env.StaticLibrary("coredb", [
+        "client/parallel.cpp",
+        "db/commands.cpp",
+        "db/commands/cloud.cpp",
+        "db/commands/hashcmd.cpp",
+        "db/commands/isself.cpp",
+        "db/commands/pipeline.cpp",
+        "db/dbcommands_generic.cpp",
+        "db/dbwebserver.cpp",
+        "db/matcher.cpp",
+        "db/pipeline/accumulator.cpp",
+        "db/pipeline/accumulator_add_to_set.cpp",
+        "db/pipeline/accumulator_avg.cpp",
+        "db/pipeline/accumulator_first.cpp",
+        "db/pipeline/accumulator_last.cpp",
+        "db/pipeline/accumulator_min_max.cpp",
+        "db/pipeline/accumulator_push.cpp",
+        "db/pipeline/accumulator_single_value.cpp",
+        "db/pipeline/accumulator_sum.cpp",
+        "db/pipeline/builder.cpp",
+        "db/pipeline/dependency_tracker.cpp",
+        "db/pipeline/doc_mem_monitor.cpp",
+        "db/pipeline/document.cpp",
+        "db/pipeline/document_source.cpp",
+        "db/pipeline/document_source_bson_array.cpp",
+        "db/pipeline/document_source_command_futures.cpp",
+        "db/pipeline/document_source_filter.cpp",
+        "db/pipeline/document_source_filter_base.cpp",
+        "db/pipeline/document_source_group.cpp",
+        "db/pipeline/document_source_limit.cpp",
+        "db/pipeline/document_source_match.cpp",
+        "db/pipeline/document_source_out.cpp",
+        "db/pipeline/document_source_project.cpp",
+        "db/pipeline/document_source_skip.cpp",
+        "db/pipeline/document_source_sort.cpp",
+        "db/pipeline/document_source_unwind.cpp",
+        "db/pipeline/expression.cpp",
+        "db/pipeline/expression_context.cpp",
+        "db/pipeline/field_path.cpp",
+        "db/pipeline/value.cpp",
+        "db/projection.cpp",
+        "db/querypattern.cpp",
+        "db/queryutil.cpp",
+        "db/security_commands.cpp",
+        "db/security_common.cpp",
+        "db/stats/top.cpp",
+        "s/shardconnection.cpp",
+        ])
 
 coreServerFiles = [ "util/version.cpp",
-                    "util/net/message_server_port.cpp",
-                    "client/parallel.cpp",
                     "db/common.cpp",
                     "util/net/miniwebserver.cpp",
-                    "db/dbwebserver.cpp",
-                    "db/matcher.cpp",
-                    "db/dbcommands_generic.cpp",
-                    "db/commands/cloud.cpp",
                     "db/dbmessage.cpp",
-                    "db/commands/hashcmd.cpp",
-                    "db/commands/pipeline.cpp",
                     "db/indexkey.cpp",
-                    "db/pipeline/accumulator.cpp",
-                    "db/pipeline/accumulator_add_to_set.cpp",
-                    "db/pipeline/accumulator_avg.cpp",
-                    "db/pipeline/accumulator_first.cpp",
-                    "db/pipeline/accumulator_last.cpp",
-                    "db/pipeline/accumulator_min_max.cpp",
-                    "db/pipeline/accumulator_push.cpp",
-                    "db/pipeline/accumulator_single_value.cpp",
-                    "db/pipeline/accumulator_sum.cpp",
-                    "db/pipeline/builder.cpp",
-                    "db/pipeline/dependency_tracker.cpp",
-                    "db/pipeline/doc_mem_monitor.cpp",
-                    "db/pipeline/document.cpp",
-                    "db/pipeline/document_source.cpp",
-                    "db/pipeline/document_source_bson_array.cpp",
-                    "db/pipeline/document_source_command_futures.cpp",
-                    "db/pipeline/document_source_filter.cpp",
-                    "db/pipeline/document_source_filter_base.cpp",
-                    "db/pipeline/document_source_group.cpp",
-                    "db/pipeline/document_source_limit.cpp",
-                    "db/pipeline/document_source_match.cpp",
-                    "db/pipeline/document_source_out.cpp",
-                    "db/pipeline/document_source_project.cpp",
-                    "db/pipeline/document_source_skip.cpp",
-                    "db/pipeline/document_source_sort.cpp",
-                    "db/pipeline/document_source_unwind.cpp",
-                    "db/pipeline/expression.cpp",
-                    "db/pipeline/expression_context.cpp",
-                    "db/pipeline/field_path.cpp",
-                    "db/pipeline/value.cpp",
-
                     "db/stats/counters.cpp",
                     "db/stats/service_stats.cpp",
-                    "db/stats/top.cpp",
-                    "db/commands/isself.cpp",
-                    "db/security_common.cpp",
-                    "db/security_commands.cpp",
                     ]
 
 env.StaticLibrary('ntservice', ['util/ntservice.cpp'])
@@ -151,9 +164,10 @@ scripting_common_files = [ "scripting/engine.cpp",
                            "scripting/bench.cpp",
                            ]
 
-env.StaticLibrary('bson_template_evaluator', ["scripting/bson_template_evaluator.cpp"])
+env.StaticLibrary('bson_template_evaluator', ["scripting/bson_template_evaluator.cpp"],
+                  LIBDEPS=['bson'])
 env.CppUnitTest('bson_template_evaluator_test', ['scripting/bson_template_evaluator_test.cpp'],
-                LIBDEPS=['bson_template_evaluator','#/mongoclient'])
+                LIBDEPS=['bson_template_evaluator'])
 
 if usesm:
     env.StaticLibrary('scripting', scripting_common_files + ['scripting/engine_spidermonkey.cpp'],
@@ -329,7 +343,6 @@ mongosLibraryFiles = [
 
 env.Library( "mongoscore" , mongosLibraryFiles )
 
-
 env.CppUnitTest( "balancer_policy_test" , [ "s/balancer_policy_tests.cpp" ] ,
                  LIBDEPS=["mongoscore", "coreshard","mongocommon","coreserver","coredb","dbcmdline","mongodandmongos"] ,
                  NO_CRUTCH=True)
@@ -355,6 +368,7 @@ env.StaticLibrary("serveronly", serverOnlyFiles,
 # These files go into mongos and mongod only, not into the shell or any tools.
 mongodAndMongosFiles = [
     "db/connection_factory.cpp",
+    "util/net/message_server_port.cpp",
     ]
 env.StaticLibrary("mongodandmongos", mongodAndMongosFiles)
 
@@ -424,7 +438,7 @@ mongos = env.Program(
     _LIBDEPS='$_LIBDEPS_OBJS')
 env.Install( '#/', mongos )
 
-env.Library("clientandshell", ["client/clientAndShell.cpp"], LIBDEPS=["mongocommon", "coredb", "defaultversion", "gridfs", "notmongodormongos"])
+env.Library("clientandshell", ["client/clientAndShell.cpp"], LIBDEPS=["mongocommon", "defaultversion", "gridfs", "notmongodormongos"])
 env.Library("allclient", "client/clientOnly.cpp", LIBDEPS=["clientandshell"])
 
 if has_option( "sharedclient" ):
