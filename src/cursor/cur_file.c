@@ -260,7 +260,7 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 	btree = session->btree;
 	WT_ASSERT(session, btree != NULL);
 
-	WT_RET(__wt_config_gets(session, cfg, "bulk", &cval));
+	WT_RET(__wt_config_gets_defno(session, cfg, "bulk", &cval));
 	bulk = (cval.val != 0);
 
 	csize = bulk ? sizeof(WT_CURSOR_BULK) : sizeof(WT_CURSOR_BTREE);
@@ -281,12 +281,13 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 	 * random_retrieval
 	 * Random retrieval cursors only support next and close.
 	 */
-	WT_ERR(__wt_config_gets(session, cfg, "next_random", &cval));
+	WT_ERR(__wt_config_gets_defno(session, cfg, "next_random", &cval));
 	if (cval.val != 0) {
 		__wt_cursor_set_notsup(cursor);
 		cursor->next = __curfile_next_random;
 	}
 
+	/* __wt_cursor_init is last so we don't have to clean up on error. */
 	STATIC_ASSERT(offsetof(WT_CURSOR_BTREE, iface) == 0);
 	WT_ERR(__wt_cursor_init(cursor, cursor->uri, owner, cfg, cursorp));
 
@@ -308,7 +309,7 @@ __wt_curfile_open(WT_SESSION_IMPL *session, const char *uri,
 	WT_CONFIG_ITEM cval;
 	int bulk;
 
-	WT_RET(__wt_config_gets(session, cfg, "bulk", &cval));
+	WT_RET(__wt_config_gets_defno(session, cfg, "bulk", &cval));
 	bulk = (cval.val != 0);
 
 	/* TODO: handle projections. */

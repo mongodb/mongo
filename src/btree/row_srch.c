@@ -11,7 +11,7 @@
  * __wt_search_insert --
  *	Search a row-store insert list, creating a skiplist stack as we go.
  */
-WT_INSERT *
+int
 __wt_search_insert(WT_SESSION_IMPL *session,
     WT_CURSOR_BTREE *cbt, WT_INSERT_HEAD *inshead, WT_ITEM *srch_key)
 {
@@ -21,8 +21,10 @@ __wt_search_insert(WT_SESSION_IMPL *session,
 	int cmp, i;
 
 	/* If there's no insert chain to search, we're done. */
-	if ((ret_ins = WT_SKIP_LAST(inshead)) == NULL)
-		return (NULL);
+	if ((ret_ins = WT_SKIP_LAST(inshead)) == NULL) {
+		cbt->ins = NULL;
+		return (0);
+	}
 
 	btree = session->btree;
 
@@ -36,7 +38,8 @@ __wt_search_insert(WT_SESSION_IMPL *session,
 			    &inshead->tail[i]->next[i] :
 			    &inshead->head[i];
 		cbt->compare = -cmp;
-		return (ret_ins);
+		cbt->ins = ret_ins;
+		return (0);
 	}
 
 	/*
@@ -44,7 +47,7 @@ __wt_search_insert(WT_SESSION_IMPL *session,
 	 * go as far as possible at each level before stepping down to the next.
 	 */
 	ret_ins = NULL;
-	for (i = WT_SKIP_MAXDEPTH - 1, insp = &inshead->head[i]; i >= 0; ) {
+	for (i = WT_SKIP_MAXDEPTH - 1, insp = &inshead->head[i]; i >= 0;) {
 		if (*insp == NULL) {
 			cbt->ins_stack[i--] = insp--;
 			continue;
@@ -58,8 +61,8 @@ __wt_search_insert(WT_SESSION_IMPL *session,
 			ret_ins = *insp;
 			insert_key.data = WT_INSERT_KEY(ret_ins);
 			insert_key.size = WT_INSERT_KEY_SIZE(ret_ins);
-			(void)WT_BTREE_CMP(session, btree,
-			    srch_key, &insert_key, cmp);
+			WT_RET(WT_BTREE_CMP(
+			    session, btree, srch_key, &insert_key, cmp));
 		}
 
 		if (cmp > 0)		/* Keep going at this level */
@@ -76,7 +79,8 @@ __wt_search_insert(WT_SESSION_IMPL *session,
 	 * choice; update the compare field to its new value.
 	 */
 	cbt->compare = -cmp;
-	return (ret_ins);
+	cbt->ins = ret_ins;
+	return (0);
 }
 
 /*
@@ -87,7 +91,6 @@ int
 __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 {
 	WT_BTREE *btree;
-	WT_CELL_UNPACK *unpack, _unpack;
 	WT_DECL_RET;
 	WT_IKEY *ikey;
 	WT_ITEM *item, _item, *srch_key;
@@ -102,7 +105,6 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 	srch_key = &cbt->iface.key;
 
 	btree = session->btree;
-	unpack = &_unpack;
 	rip = NULL;
 
 	cmp = -1;				/* Assume we don't match. */
@@ -174,41 +176,7 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 		indx = base + (limit >> 1);
 		rip = page->u.row.d + indx;
 
-retry:		ikey = WT_ROW_KEY_COPY(rip);
-		/*
-		 * Key copied.
-		 *
-		 * If another thread instantiated the key, we don't have any
-		 * work to do.  Figure this out using the key's value:
-		 *
-		 * If the key points off-page, the key has been instantiated,
-		 * just use it.
-		 *
-		 * If the key points on-page, we have a copy of a WT_CELL value
-		 * that can be processed, regardless of what any other thread is
-		 * doing.
-		 */
-		if (__wt_off_page(page, ikey)) {
-			_item.data = WT_IKEY_DATA(ikey);
-			_item.size = ikey->size;
-			item = &_item;
-		} else {
-			if (btree->huffman_key != NULL) {
-				WT_ERR(__wt_row_key(session, page, rip, NULL));
-				goto retry;
-			}
-			__wt_cell_unpack((WT_CELL *)ikey, unpack);
-			if (unpack->type == WT_CELL_KEY &&
-			    unpack->prefix == 0) {
-				_item.data = unpack->data;
-				_item.size = unpack->size;
-				item = &_item;
-			} else {
-				WT_ERR(__wt_row_key(session, page, rip, NULL));
-				goto retry;
-			}
-		}
-
+		WT_ERR(__wt_row_key(session, page, rip, item, 1));
 		WT_ERR(WT_BTREE_CMP(session, btree, srch_key, item, cmp));
 		if (cmp == 0)
 			break;
@@ -272,7 +240,7 @@ retry:		ikey = WT_ROW_KEY_COPY(rip);
 	 * return insert information appropriately.
 	 */
 	cbt->page = page;
-	cbt->ins = __wt_search_insert(session, cbt, cbt->ins_head, srch_key);
+	WT_ERR(__wt_search_insert(session, cbt, cbt->ins_head, srch_key));
 	return (0);
 
 err:	__wt_page_release(session, page);

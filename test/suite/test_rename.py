@@ -25,31 +25,43 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_util04.py
-# 	Utilities: wt drop
+# test_rename.py
+#	session level rename operation
 #
 
-import os
-from suite_subprocess import suite_subprocess
+import os, time
 import wiredtiger, wttest
+from helper import confirmDoesNotExist, simplePopulate, simplePopulateCheck
 
-class test_util04(wttest.WiredTigerTestCase, suite_subprocess):
-    tablename = 'test_util04.a'
-    nentries = 1000
+# Test session.rename operations.
+class test_rename(wttest.WiredTigerTestCase):
+    name1 = 'test_rename1'
+    name2 = 'test_rename2'
 
-    def test_drop_process(self):
-        """
-        Test drop in a 'wt' process
-        """
-        params = 'key_format=S,value_format=S'
-        self.session.create('table:' + self.tablename, params)
+    scenarios = [
+        ('file', dict(uri='file:')),
+        ('table', dict(uri='table:'))
+        ]
 
-        self.assertTrue(os.path.exists(self.tablename + ".wt"))
-        self.runWt(["drop", "table:" + self.tablename])
+    # Test rename of an object.
+    def test_rename(self):
+	name1 = self.uri + self.name1
+	name2 = self.uri + self.name2
+        simplePopulate(self, name1, 'key_format=S,value_format=S', 10)
+        self.session.rename(name1, name2, None)
+        confirmDoesNotExist(self, name1)
+        simplePopulateCheck(self, name2)
 
-        self.assertFalse(os.path.exists(self.tablename + ".wt"))
-        self.assertRaises(wiredtiger.WiredTigerError, lambda:
-            self.session.open_cursor('table:' + self.tablename, None, None))
+        self.session.rename(name2, name1, None)
+        confirmDoesNotExist(self, name2)
+        simplePopulateCheck(self, name1)
+
+    def test_rename_dne(self):
+	name1 = self.uri + self.name1
+	name2 = self.uri + self.name2
+        confirmDoesNotExist(self, name1)
+        self.assertRaises(wiredtiger.WiredTigerError,
+	    lambda: self.session.rename(name1, name2, None))
 
 if __name__ == '__main__':
     wttest.run()

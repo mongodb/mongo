@@ -25,31 +25,36 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_util04.py
-# 	Utilities: wt drop
-#
+# test_drop.py
+#	session level drop operation
 
-import os
-from suite_subprocess import suite_subprocess
+import os, time
 import wiredtiger, wttest
+from helper import confirmDoesNotExist, simplePopulate, simplePopulateCheck
 
-class test_util04(wttest.WiredTigerTestCase, suite_subprocess):
-    tablename = 'test_util04.a'
-    nentries = 1000
+# Test session.drop operations.
+class test_drop(wttest.WiredTigerTestCase):
+    name = 'test_drop'
 
-    def test_drop_process(self):
-        """
-        Test drop in a 'wt' process
-        """
-        params = 'key_format=S,value_format=S'
-        self.session.create('table:' + self.tablename, params)
+    scenarios = [
+        ('file', dict(uri='file:')),
+        ('table', dict(uri='table:'))
+        ]
 
-        self.assertTrue(os.path.exists(self.tablename + ".wt"))
-        self.runWt(["drop", "table:" + self.tablename])
+    # Test drop of an object.
+    def test_drop(self):
+	name = self.uri + self.name
+        simplePopulate(self, name, 'key_format=S,value_format=S', 10)
+        self.session.drop(name, None)
+        confirmDoesNotExist(self, name)
 
-        self.assertFalse(os.path.exists(self.tablename + ".wt"))
-        self.assertRaises(wiredtiger.WiredTigerError, lambda:
-            self.session.open_cursor('table:' + self.tablename, None, None))
+    # Test drop of a non-existent object.
+    def test_drop_dne(self):
+	name = self.uri + self.name
+        confirmDoesNotExist(self, name)
+        self.session.drop(name, 'force')
+        self.assertRaises(
+	    wiredtiger.WiredTigerError, lambda: self.session.drop(name, None))
 
 if __name__ == '__main__':
     wttest.run()

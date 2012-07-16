@@ -130,15 +130,6 @@ class IterableCursor:
 ## @endcond
 %}
 
-%typemap(out) int {
-	if ($1 != 0 && $1 != WT_NOTFOUND) {
-		/* We could use PyErr_SetObject for more complex reporting. */
-		SWIG_Python_SetErrorMsg(wtError, wiredtiger_strerror($1));
-		SWIG_fail;
-	}
-	$result = SWIG_From_int((int)($1));
-}
-
 /*
  * Extra 'self' elimination.
  * The methods we're wrapping look like this:
@@ -332,6 +323,46 @@ SELFHELPER(struct __wt_cursor)
 %ignore wiredtiger_struct_unpackv;
 
 %ignore wiredtiger_extension_init;
+
+/*
+ * Error handling.  This comes last so it doesn't interfere with the extension
+ * code above.
+ * 
+ * Default case: a non-zero return is an error.
+ */
+%exception {
+        $action
+	if (result != 0) {
+		/* We could use PyErr_SetObject for more complex reporting. */
+		SWIG_Python_SetErrorMsg(wtError, wiredtiger_strerror(result));
+		SWIG_fail;
+	}
+}
+
+/* Cursor positioning methods can also return WT_NOTFOUND. */
+%define NOTFOUND_OK(m)
+%exception m {
+        $action
+	if (result != 0 && result != WT_NOTFOUND) {
+		/* We could use PyErr_SetObject for more complex reporting. */
+		SWIG_Python_SetErrorMsg(wtError, wiredtiger_strerror(result));
+		SWIG_fail;
+	}
+}
+%enddef
+
+NOTFOUND_OK(__wt_cursor::next)
+NOTFOUND_OK(__wt_cursor::prev)
+NOTFOUND_OK(__wt_cursor::remove)
+NOTFOUND_OK(__wt_cursor::search)
+NOTFOUND_OK(__wt_cursor::search_near)
+NOTFOUND_OK(__wt_cursor::update)
+
+/* Lastly, some methods need no error checking. */
+%exception __wt_cursor::equals;
+%exception __wt_connection::get_home;
+%exception wiredtiger_strerror;
+%exception wiredtiger_version;
 
 %rename(Cursor) __wt_cursor;
 %rename(Session) __wt_session;

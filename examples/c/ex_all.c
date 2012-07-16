@@ -36,8 +36,10 @@
 #include <errno.h>
 #include <inttypes.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/stat.h>
 
 #include <wiredtiger.h>
 
@@ -49,21 +51,34 @@ int checkpoint_ops(WT_SESSION *session);
 int connection_ops(WT_CONNECTION *conn);
 int cursor_ops(WT_SESSION *session);
 int cursor_search_near(WT_CURSOR *cursor);
+int hot_backup(WT_SESSION *session);
 int pack_ops(WT_SESSION *session);
 int session_ops(WT_SESSION *session);
+
+const char *progname;
 
 int
 cursor_ops(WT_SESSION *session)
 {
-	WT_CURSOR *cursor, *other;
+	WT_CURSOR *cursor;
 	int ret;
-
-	other = NULL;
 
 	/*! [Open a cursor] */
 	ret = session->open_cursor(
 	    session, "table:mytable", NULL, NULL, &cursor);
 	/*! [Open a cursor] */
+
+	{
+	WT_CURSOR *duplicate;
+	const char *key = "some key";
+	/*! [Duplicate a cursor] */
+	ret = session->open_cursor(
+	    session, "table:mytable", NULL, NULL, &cursor);
+	cursor->set_key(cursor, key);
+	ret = cursor->search(cursor);
+	ret = session->open_cursor(session, NULL, cursor, NULL, &duplicate);
+	/*! [Duplicate a cursor] */
+	}
 
 	{
 	/*! [Get the cursor's string key] */
@@ -136,11 +151,15 @@ cursor_ops(WT_SESSION *session)
 	ret = cursor->reset(cursor);
 	/*! [Reset the cursor] */
 
+	{
+	WT_CURSOR *other;
+	other = NULL;
 	/*! [Test cursor equality] */
 	if (cursor->equals(cursor, other)) {
 		/* Take some action. */
 	}
 	/*! [Test cursor equality] */
+	}
 
 	{
 	/*! [Search for an exact match] */
@@ -767,7 +786,49 @@ pack_ops(WT_SESSION *session)
 	return (ret);
 }
 
-int main(void)
+int
+hot_backup(WT_SESSION *session)
+{
+	char buf[1024];
+
+	/*! [Hot backup]*/
+	WT_CURSOR *cursor;
+	const char *filename;
+	int ret;
+
+	/* Create the backup directory. */
+	ret = mkdir("/path/database.backup", 077);
+
+	/* Open the hot backup data source. */
+	ret = session->open_cursor(session, "backup:", NULL, NULL, &cursor);
+
+	/* Copy the list of files. */
+	while (
+	    (ret = cursor->next(cursor)) == 0 &&
+	    (ret = cursor->get_key(cursor, &filename)) == 0) {
+		(void)snprintf(buf, sizeof(buf),
+		    "cp /path/database/%s /path/database.backup/%s",
+		    filename, filename);
+		ret = system(buf);
+	}
+	if (ret == WT_NOTFOUND)
+		ret = 0;
+	if (ret != 0)
+		fprintf(stderr, "%s: cursor next(backup:) failed: %s\n",
+		    progname, wiredtiger_strerror(ret));
+
+	ret = cursor->close(cursor);
+	/*! [Hot backup]*/
+
+	/*! [Hot backup of a checkpoint]*/
+	ret = session->checkpoint(session, "drop=(from=June01),name=June01");
+	/*! [Hot backup of a checkpoint]*/
+
+	return (0);
+}
+
+int
+main(void)
 {
 	int ret;
 

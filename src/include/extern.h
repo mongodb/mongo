@@ -317,9 +317,7 @@ extern int __wt_page_inmem(WT_SESSION_IMPL *session,
 extern int __wt_cache_read(WT_SESSION_IMPL *session,
     WT_PAGE *parent,
     WT_REF *ref);
-extern int __wt_kv_return(WT_SESSION_IMPL *session,
-    WT_CURSOR_BTREE *cbt,
-    int key_ret);
+extern int __wt_kv_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt);
 extern int __wt_bt_salvage( WT_SESSION_IMPL *session,
     WT_CKPT *ckptbase,
     const char *cfg[]);
@@ -387,7 +385,7 @@ extern int __wt_rec_row_bulk_insert(WT_CURSOR_BULK *cbulk);
 extern int __wt_rec_col_fix_bulk_insert(WT_CURSOR_BULK *cbulk);
 extern int __wt_rec_col_var_bulk_insert(WT_CURSOR_BULK *cbulk);
 extern int __wt_row_leaf_keys(WT_SESSION_IMPL *session, WT_PAGE *page);
-extern int __wt_row_key( WT_SESSION_IMPL *session,
+extern int __wt_row_key_copy( WT_SESSION_IMPL *session,
     WT_PAGE *page,
     WT_ROW *rip_arg,
     WT_ITEM *retb);
@@ -418,7 +416,7 @@ extern void __wt_update_obsolete(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     WT_INSERT *ins);
 extern void __wt_update_serial_func(WT_SESSION_IMPL *session);
-extern WT_INSERT *__wt_search_insert(WT_SESSION_IMPL *session,
+extern int __wt_search_insert(WT_SESSION_IMPL *session,
     WT_CURSOR_BTREE *cbt,
     WT_INSERT_HEAD *inshead,
     WT_ITEM *srch_key);
@@ -447,6 +445,10 @@ extern int __wt_config_get(WT_SESSION_IMPL *session,
     WT_CONFIG_ITEM *key,
     WT_CONFIG_ITEM *value);
 extern int __wt_config_gets(WT_SESSION_IMPL *session,
+    const char **cfg,
+    const char *key,
+    WT_CONFIG_ITEM *value);
+extern int __wt_config_gets_defno(WT_SESSION_IMPL *session,
     const char **cfg,
     const char *key,
     WT_CONFIG_ITEM *value);
@@ -560,6 +562,10 @@ extern void __wt_connection_destroy(WT_CONNECTION_IMPL *conn);
 extern int __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[]);
 extern int __wt_connection_close(WT_CONNECTION_IMPL *conn);
 extern void __wt_conn_stat_init(WT_SESSION_IMPL *session);
+extern int __wt_curbackup_open(WT_SESSION_IMPL *session,
+    const char *uri,
+    const char *cfg[],
+    WT_CURSOR **cursorp);
 extern int __wt_curbulk_init(WT_CURSOR_BULK *cbulk);
 extern int __wt_curconfig_open(WT_SESSION_IMPL *session,
     const char *uri,
@@ -593,6 +599,7 @@ extern int __wt_cursor_get_value(WT_CURSOR *cursor, ...);
 extern void __wt_cursor_set_key(WT_CURSOR *cursor, ...);
 extern void __wt_cursor_set_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap);
 extern void __wt_cursor_set_value(WT_CURSOR *cursor, ...);
+extern int __wt_cursor_kv_not_set(WT_CURSOR *cursor, int key);
 extern int __wt_cursor_close(WT_CURSOR *cursor);
 extern int __wt_cursor_dup(WT_SESSION_IMPL *session,
     WT_CURSOR *to_dup,
@@ -603,7 +610,6 @@ extern int __wt_cursor_init(WT_CURSOR *cursor,
     WT_CURSOR *owner,
     const char *cfg[],
     WT_CURSOR **cursorp);
-extern int __wt_cursor_kv_not_set(WT_CURSOR *cursor, int key);
 extern int __wt_curtable_get_key(WT_CURSOR *cursor, ...);
 extern int __wt_curtable_get_value(WT_CURSOR *cursor, ...);
 extern void __wt_curtable_set_key(WT_CURSOR *cursor, ...);
@@ -649,6 +655,7 @@ extern int __wt_meta_ckptlist_set( WT_SESSION_IMPL *session,
 extern void __wt_meta_ckptlist_free(WT_SESSION_IMPL *session,
     WT_CKPT *ckptbase);
 extern int __wt_metadata_open(WT_SESSION_IMPL *session);
+extern int __wt_metadata_load_backup(WT_SESSION_IMPL *session);
 extern int __wt_metadata_cursor( WT_SESSION_IMPL *session,
     const char *config,
     WT_CURSOR **cursorp);
@@ -716,6 +723,7 @@ extern int __wt_filesize(WT_SESSION_IMPL *session, WT_FH *fh, off_t *sizep);
 extern int __wt_bytelock(WT_FH *fhp, off_t byte, int lock);
 extern int __wt_fsync(WT_SESSION_IMPL *session, WT_FH *fh);
 extern int __wt_ftruncate(WT_SESSION_IMPL *session, WT_FH *fh, off_t len);
+extern int __wt_getline(WT_SESSION_IMPL *session, WT_ITEM *buf, FILE *fp);
 extern int __wt_cond_alloc(WT_SESSION_IMPL *session,
     const char *name,
     int is_locked,

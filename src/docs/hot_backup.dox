@@ -1,0 +1,58 @@
+/*! @page hot_backup Hot backup
+
+WiredTiger cursors provide access to data from a variety of sources.
+One of these sources is the list of files required to perform a hot
+backup of the database.  The list may be the files required by all of
+the objects in the database, or a subset of the objects in the database.
+
+To perform a hot backup:
+
+1. Open a cursor on the backup data source, which begins the process of
+a hot backup.
+
+2. Copy each file returned by the WT_CURSOR::next method into a
+different directory.
+
+3. Close the cursor; the cursor must not be closed until all of the
+files have been copied.
+
+The directory to which the files are copied may subsequently be
+specified as an directory to the ::wiredtiger_open function and accessed
+as a WiredTiger database home.
+
+The following is a programmatic example of creating a hot backup:
+
+@snippet ex_all.c Hot backup
+
+In cases where the backup is desired for a checkpoint other than the
+most recent, applications can discard all checkpoints subsequent to the
+checkpoint they want using the WT_SESSION::checkpoint method.  For
+example:
+
+@snippet ex_all.c Hot backup of a checkpoint
+
+The @ref utility_backup command may also be used to create hot backups:
+
+@code
+rm -rf /path/database.backup &&
+    mkdir /path/database.backup &&
+    wt -h /path/database.source backup /path/database.backup
+@endcode
+
+Notes:
+
+- Copying the database files for a hot backup does not require any
+special alignment or block size (specifically, Linux or Windows
+filesystems that do not support read/write isolation can be safely read
+for hot backups).
+
+- The cursor must not be closed until all of the files have been copied,
+however, there is no requirement that the files be copied in any order
+or in any relationship to the WT_CURSOR::next calls, only that all files
+have been copied before the cursor is closed.
+
+- During the period the hot backup cursor is open, database checkpoints
+can be created, but no checkpoints can be deleted.  This may result in
+significant file growth.
+
+*/

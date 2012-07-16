@@ -54,6 +54,7 @@ src/conn/conn_btree.c
 src/conn/conn_handle.c
 src/conn/conn_open.c
 src/conn/conn_stat.c
+src/cursor/cur_backup.c
 src/cursor/cur_bulk.c
 src/cursor/cur_config.c
 src/cursor/cur_dump.c
@@ -79,6 +80,7 @@ src/os_posix/os_filesize.c
 src/os_posix/os_flock.c
 src/os_posix/os_fsync.c
 src/os_posix/os_ftruncate.c
+src/os_posix/os_getline.c
 src/os_posix/os_mtx.c
 src/os_posix/os_open.c
 src/os_posix/os_priv.c

@@ -226,9 +226,15 @@ static int
 __curstat_reset(WT_CURSOR *cursor)
 {
 	WT_CURSOR_STAT *cst;
+	WT_SESSION_IMPL *session;
 
 	cst = (WT_CURSOR_STAT *)cursor;
+	CURSOR_API_CALL_NOCONF(cursor, session, reset, cst->btree);
+
 	cst->notpositioned = 1;
+	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+
+	API_END(session);
 	return (0);
 }
 
@@ -274,7 +280,7 @@ __curstat_close(WT_CURSOR *cursor)
 	cst = (WT_CURSOR_STAT *)cursor;
 	CURSOR_API_CALL_NOCONF(cursor, session, close, cst->btree);
 
-	if (ret == 0 && cst->clear_func)
+	if (cst->clear_func)
 		cst->clear_func(cst->stats_first);
 
 	__wt_buf_free(session, &cst->pv);
@@ -341,7 +347,7 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 	clear_func = NULL;
 	cst = NULL;
 
-	WT_RET(__wt_config_gets(session, cfg, "statistics_clear", &cval));
+	WT_RET(__wt_config_gets_defno(session, cfg, "statistics_clear", &cval));
 	statistics_clear = (cval.val != 0);
 
 	if (!WT_PREFIX_SKIP(uri, "statistics:"))
@@ -380,6 +386,7 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 	cst->notpositioned = 1;
 	cst->clear_func = clear_func;
 
+	/* __wt_cursor_init is last so we don't have to clean up on error. */
 	STATIC_ASSERT(offsetof(WT_CURSOR_STAT, iface) == 0);
 	WT_ERR(__wt_cursor_init(cursor, uri, NULL, cfg, cursorp));
 

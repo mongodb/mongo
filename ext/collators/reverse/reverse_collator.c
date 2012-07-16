@@ -25,7 +25,6 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <errno.h>
 #include <string.h>
 
 #include <wiredtiger_ext.h>

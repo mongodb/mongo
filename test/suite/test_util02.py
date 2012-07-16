@@ -50,27 +50,6 @@ class test_util02(wttest.WiredTigerTestCase, suite_subprocess):
         ('ii', dict(key_format='i',value_format='i')),
         ]
 
-    # python has a filecmp.cmp function, but different versions
-    # of python approach file comparison differently.  To make
-    # sure we really get byte for byte comparison, we define it here.
-
-    def compare_files(self, filename1, filename2):
-        bufsize = 4096
-        if os.path.getsize(filename1) != os.path.getsize(filename2):
-            print filename1 + ' size = ' + str(os.path.getsize(filename1))
-            print filename2 + ' size = ' + str(os.path.getsize(filename2))
-            return False
-        with open(filename1, "rb") as fp1:
-            with open(filename2, "rb") as fp2:
-                while True:
-                    b1 = fp1.read(bufsize)
-                    b2 = fp2.read(bufsize)
-                    if b1 != b2:
-                        return False
-                    # files are identical size
-                    if not b1:
-                        return True
-
     def get_string(self, i, len):
         """
         Return a pseudo-random, but predictable string that uses

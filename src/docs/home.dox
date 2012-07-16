@@ -1,4 +1,4 @@
-/*! @page home WiredTiger Home Directory
+/*! @page home Database Home Directory
 
 WiredTiger file naming is based on the \c home argument specified to the
 ::wiredtiger_open function and the \c WIREDTIGER_HOME environment

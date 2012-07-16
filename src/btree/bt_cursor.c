@@ -155,7 +155,7 @@ __wt_btcur_search(WT_CURSOR_BTREE *cbt)
 		} else
 			ret = WT_NOTFOUND;
 	} else
-		ret = __wt_kv_return(session, cbt, 0);
+		ret = __wt_kv_return(session, cbt);
 
 err:	__cursor_func_resolve(cbt, ret);
 
@@ -211,7 +211,7 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exact)
 		*exact = 0;
 	} else if (!__cursor_invalid(cbt)) {
 		*exact = cbt->compare;
-		ret = __wt_kv_return(session, cbt, cbt->compare == 0 ? 0 : 1);
+		ret = __wt_kv_return(session, cbt);
 	} else if ((ret = __wt_btcur_next(cbt)) != WT_NOTFOUND)
 		*exact = 1;
 	else {
@@ -220,8 +220,7 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exact)
 		    __wt_col_search(session, cbt, 0));
 		if (!__cursor_invalid(cbt)) {
 			*exact = cbt->compare;
-			ret = __wt_kv_return(
-			    session, cbt, cbt->compare == 0 ? 0 : 1);
+			ret = __wt_kv_return(session, cbt);
 		} else if ((ret = __wt_btcur_prev(cbt)) != WT_NOTFOUND)
 			*exact = -1;
 	}

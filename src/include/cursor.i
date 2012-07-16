@@ -123,11 +123,12 @@ __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip)
 		kb->size = ikey->size;
 	} else {
 		/*
-		 * If the key is simple and on-page, just reference it.
-		 * Else, if the key is simple, prefix-compressed and on-page,
-		 * and we have the previous expanded key in the cursor buffer,
-		 * build the key quickly.
-		 * Else, instantiate the key and do it all  the hard way.
+		 * Get a reference to the key, ideally without doing a copy.  If
+		 * the key is simple and on-page, just reference it; if the key
+		 * is simple, on-page and prefix-compressed, and we have the
+		 * previous expanded key in the cursor buffer, build the key
+		 * here.  Else, call the underlying routines to do it the hard
+		 * way.
 		 */
 		if (btree->huffman_key != NULL)
 			goto slow;
@@ -163,7 +164,7 @@ __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip)
 			kb->size = cbt->tmp.size;
 			cbt->rip_saved = rip;
 		} else
-slow:			WT_RET(__wt_row_key(session, cbt->page, rip, kb));
+slow:			WT_RET(__wt_row_key_copy(session, cbt->page, rip, kb));
 	}
 
 	/*

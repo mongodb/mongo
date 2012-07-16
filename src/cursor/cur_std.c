@@ -35,6 +35,8 @@ __wt_cursor_set_notsup(WT_CURSOR *cursor)
 	cursor->insert = __wt_cursor_notsup;
 	cursor->update = __wt_cursor_notsup;
 	cursor->remove = __wt_cursor_notsup;
+	cursor->reconfigure =
+	    (int (*)(WT_CURSOR *, const char *))__wt_cursor_notsup;
 }
 
 /*
@@ -255,6 +257,22 @@ __wt_cursor_set_value(WT_CURSOR *cursor, ...)
 	va_end(ap);
 
 err:	API_END(session);
+}
+
+/*
+ * __wt_cursor_kv_not_set --
+ *	Standard error message for key/values not set.
+ */
+int
+__wt_cursor_kv_not_set(WT_CURSOR *cursor, int key)
+{
+	WT_SESSION_IMPL *session;
+
+	session = (WT_SESSION_IMPL *)cursor->session;
+
+	WT_RET_MSG(session,
+	    cursor->saved_err == 0 ? EINVAL : cursor->saved_err,
+	    "requires %s be set", key ? "key" : "value");
 }
 
 /*
@@ -500,7 +518,7 @@ __wt_cursor_init(WT_CURSOR *cursor,
 	 * The append flag is only relevant to column stores.
 	 */
 	if (WT_CURSOR_RECNO(cursor)) {
-		WT_RET(__wt_config_gets(session, cfg, "append", &cval));
+		WT_RET(__wt_config_gets_defno(session, cfg, "append", &cval));
 		if (cval.val != 0)
 			F_SET(cursor, WT_CURSTD_APPEND);
 	}
@@ -509,16 +527,22 @@ __wt_cursor_init(WT_CURSOR *cursor,
 	 * checkpoint
 	 * Checkpoint cursors are read-only.
 	 */
-	WT_RET(__wt_config_gets(session, cfg, "checkpoint", &cval));
+	WT_RET(__wt_config_gets_defno(session, cfg, "checkpoint", &cval));
 	if (cval.len != 0) {
-		cursor->insert = (int (*)(WT_CURSOR *))__wt_cursor_notsup;
-		cursor->update = (int (*)(WT_CURSOR *))__wt_cursor_notsup;
-		cursor->remove = (int (*)(WT_CURSOR *))__wt_cursor_notsup;
+		cursor->insert = __wt_cursor_notsup;
+		cursor->update = __wt_cursor_notsup;
+		cursor->remove = __wt_cursor_notsup;
 	}
 
 	/* dump */
-	WT_RET(__wt_config_gets(session, cfg, "dump", &cval));
+	WT_RET(__wt_config_gets_defno(session, cfg, "dump", &cval));
 	if (cval.len != 0) {
+		/*
+		 * Dump cursors should not have owners: only the top-level
+		 * cursor should be wrapped in a dump cursor.
+		 */
+		WT_ASSERT(session, owner == NULL);
+
 		F_SET(cursor, (__wt_config_strcmp(&cval, "print") == 0) ?
 		    WT_CURSTD_DUMP_PRINT : WT_CURSTD_DUMP_HEX);
 		WT_RET(__wt_curdump_create(cursor, owner, &cdump));
@@ -526,8 +550,13 @@ __wt_cursor_init(WT_CURSOR *cursor,
 	} else
 		cdump = NULL;
 
+	/* overwrite */
+	WT_RET(__wt_config_gets_defno(session, cfg, "overwrite", &cval));
+	if (cval.val != 0)
+		F_SET(cursor, WT_CURSTD_OVERWRITE);
+
 	/* raw */
-	WT_RET(__wt_config_gets(session, cfg, "raw", &cval));
+	WT_RET(__wt_config_gets_defno(session, cfg, "raw", &cval));
 	if (cval.val != 0)
 		F_SET(cursor, WT_CURSTD_RAW);
 
@@ -546,20 +575,4 @@ __wt_cursor_init(WT_CURSOR *cursor,
 
 	*cursorp = (cdump != NULL) ? cdump : cursor;
 	return (0);
-}
-
-/*
- * __wt_cursor_kv_not_set --
- *	Standard error message for key/values not set.
- */
-int
-__wt_cursor_kv_not_set(WT_CURSOR *cursor, int key)
-{
-	WT_SESSION_IMPL *session;
-
-	session = (WT_SESSION_IMPL *)cursor->session;
-
-	WT_RET_MSG(session,
-	    cursor->saved_err == 0 ? EINVAL : cursor->saved_err,
-	    "requires %s be set", key ? "key" : "value");
 }

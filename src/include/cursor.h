@@ -5,6 +5,16 @@
  * See the file LICENSE for redistribution information.
  */
 
+struct __wt_cursor_backup {
+	WT_CURSOR iface;
+
+	size_t next;			/* Cursor position */
+
+	size_t list_allocated;		/* List of files */
+	size_t list_next;
+	char **list;
+};
+
 struct __wt_cursor_btree {
 	WT_CURSOR iface;
 
@@ -161,12 +171,12 @@ struct __wt_cursor_table {
 
 #define	WT_CURSOR_RECNO(cursor)	(strcmp((cursor)->key_format, "r") == 0)
 
-#define	WT_CURSOR_NEEDKEY(cursor)	do {				\
+#define	WT_CURSOR_NEEDKEY(cursor) do {					\
 	if (!F_ISSET(cursor, WT_CURSTD_KEY_SET))			\
 		WT_ERR(__wt_cursor_kv_not_set(cursor, 1));		\
 } while (0)
 
-#define	WT_CURSOR_NEEDVALUE(cursor)	do {				\
+#define	WT_CURSOR_NEEDVALUE(cursor) do {				\
 	if (!F_ISSET(cursor, WT_CURSTD_VALUE_SET))			\
 		WT_ERR(__wt_cursor_kv_not_set(cursor, 0));		\
 } while (0)

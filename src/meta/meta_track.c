@@ -107,8 +107,6 @@ __meta_track_apply(WT_SESSION_IMPL *session, WT_META_TRACK *trk, int unroll)
 		session->btree = trk->btree;
 		if (!unroll)
 			WT_TRET(__wt_bm_checkpoint_resolve(session));
-		/* Release the checkpoint lock */
-		__wt_rwunlock(session, session->btree->ckptlock);
 		session->btree = saved_btree;
 		break;
 	case WT_ST_LOCK:	/* Handle lock, see above */

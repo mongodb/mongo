@@ -26,7 +26,6 @@
  */
 
 #include <bzlib.h>
-#include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -128,7 +127,7 @@ bzip2_error(WT_SESSION *session, const char *call, int bzret)
 static void *
 bzalloc(void *cookie, int number, int size)
 {
-	return (wiredtiger_scr_alloc(cookie, (size_t)number * size));
+	return (wiredtiger_scr_alloc(cookie, (size_t)(number * size)));
 }
 
 static void
@@ -200,7 +199,7 @@ bzip2_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 		*result_lenp = dst_len - bz.avail_out;
 		ret = 0;
 	} else
-		bzip2_error(session, "BZ2_bzDecompress", ret);
+		(void)bzip2_error(session, "BZ2_bzDecompress", ret);
 
 	if ((tret = BZ2_bzDecompressEnd(&bz)) != BZ_OK)
 		return (bzip2_error(session, "BZ2_bzDecompressEnd", tret));

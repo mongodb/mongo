@@ -72,8 +72,8 @@ __wt_config_subinit(
 		conf->top = conf->depth;				\
 	if (conf->depth == conf->top) {					\
 		if (out->len > 0)					\
-			return __config_err(conf,			\
-			    "New value starts without a separator", 0);	\
+			return (__config_err(conf,			\
+			    "New value starts without a separator", 0));\
 		out->type = (t);					\
 		out->str = (conf->cur + (i));				\
 	}								\
@@ -433,7 +433,7 @@ __wt_config_next(WT_CONFIG *conf, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 			break;
 
 		case A_BAD:
-			return __config_err(conf, "Unexpected character", 0);
+			return (__config_err(conf, "Unexpected character", 0));
 
 		case A_DOWN:
 			--conf->depth;
@@ -454,8 +454,8 @@ __wt_config_next(WT_CONFIG *conf, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 				 * values.
 				 */
 				if (out == value && *conf->cur != ':')
-					return __config_err(conf,
-					    "Value already complete", 0);
+					return (__config_err(conf,
+					    "Value already complete", 0));
 				out = value;
 			}
 			break;
@@ -542,8 +542,8 @@ val:		return (__process_value(conf, value));
 	if (conf->depth == 0)
 		return (WT_NOTFOUND);
 
-	return __config_err(conf,
-	    "Closing brackets missing from config string", 0);
+	return (__config_err(conf,
+	    "Closing brackets missing from config string", 0));
 }
 
 /*
@@ -605,6 +605,39 @@ __wt_config_gets(WT_SESSION_IMPL *session,
     const char **cfg, const char *key, WT_CONFIG_ITEM *value)
 {
 	WT_CONFIG_ITEM key_item;
+
+	key_item.type = ITEM_STRING;
+	key_item.str = key;
+	key_item.len = strlen(key);
+
+	return (__wt_config_get(session, cfg, &key_item, value));
+}
+
+/*
+ * __wt_config_gets_defno --
+ *	Given a NULL-terminated list of configuration strings, and if the
+ * application supplied any configuration strings, find the final value for
+ * a given string key
+ */
+int
+__wt_config_gets_defno(WT_SESSION_IMPL *session,
+    const char **cfg, const char *key, WT_CONFIG_ITEM *value)
+{
+	WT_CONFIG_ITEM key_item;
+
+	/*
+	 * This is a performance hack: it's expensive to parse configuration
+	 * strings, so don't do it unless it's necessary in performance paths
+	 * like cursor creation.  Assume the second configuration string is
+	 * the application's configuration string, and if it's not set (which
+	 * is true most of the time), then assume the default answer is "no",
+	 * and return that.  This makes it much faster to open cursors when
+	 * checking for obscure open configuration strings like "next_random".
+	 */
+	value->len = 0;
+	value->val = 0;
+	if (cfg[1] == NULL)
+		return (0);
 
 	key_item.type = ITEM_STRING;
 	key_item.str = key;

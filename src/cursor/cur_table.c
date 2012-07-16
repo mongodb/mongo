@@ -475,26 +475,22 @@ __curtable_close(WT_CURSOR *cursor)
 }
 
 static int
-__curtable_open_colgroups(WT_CURSOR_TABLE *ctable, const char *cfg[])
+__curtable_open_colgroups(WT_CURSOR_TABLE *ctable, const char *cfg_arg[])
 {
 	WT_SESSION_IMPL *session;
 	WT_TABLE *table;
 	WT_CURSOR **cp;
-	const char *cfg_override[5];
+	/*
+	 * Underlying column groups are always opened without dump or
+	 * overwrite, and only the primary is opened with next_random.
+	 */
+	const char *cfg[] = {
+		cfg_arg[0], cfg_arg[1], "dump=\"\",overwrite=false", NULL, NULL
+	};
 	int i;
 
 	session = (WT_SESSION_IMPL *)ctable->iface.session;
 	table = ctable->table;
-
-	/*
-	 * Underlying column groups are always opened without overwrite, and
-	 * only the primary is opened with next_random.
-	 */
-	cfg_override[0] = cfg[0];
-	cfg_override[1] = cfg[1];
-	cfg_override[2] = "overwrite=false";
-	cfg_override[3] = NULL;
-	cfg_override[4] = NULL;
 
 	if (!table->cg_complete)
 		WT_RET_MSG(session, EINVAL,
@@ -508,8 +504,8 @@ __curtable_open_colgroups(WT_CURSOR_TABLE *ctable, const char *cfg[])
 	    i < WT_COLGROUPS(table);
 	    i++, cp++) {
 		WT_RET(__wt_curfile_open(session, table->cg_name[i],
-		    &ctable->iface, cfg_override, cp));
-		cfg_override[3] = "next_random=false";
+		    &ctable->iface, cfg, cp));
+		cfg[3] = "next_random=false";
 	}
 	return (0);
 }
@@ -600,13 +596,7 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 		size = strlen(tablename);
 	else
 		size = WT_PTRDIFF(columns, tablename);
-	if ((ret =
-	    __wt_schema_get_table(session, tablename, size, &table)) != 0) {
-		if (ret == WT_NOTFOUND)
-			WT_RET_MSG(session, EINVAL,
-			    "Cannot open cursor '%s' on unknown table", uri);
-		return (ret);
-	}
+	WT_RET(__wt_schema_get_table(session, tablename, size, &table));
 
 	if (!table->cg_complete)
 		WT_RET_MSG(session, EINVAL,
@@ -646,7 +636,7 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 	 * random_retrieval
 	 * Random retrieval cursors only support next and close.
 	 */
-	WT_ERR(__wt_config_gets(session, cfg, "next_random", &cval));
+	WT_ERR(__wt_config_gets_defno(session, cfg, "next_random", &cval));
 	if (cval.val != 0) {
 		__wt_cursor_set_notsup(cursor);
 		cursor->next = __curtable_next_random;

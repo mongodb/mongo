@@ -238,10 +238,10 @@ err:		cursor->saved_err = ret;
 static int								\
 __curdump_##op(WT_CURSOR *cursor)					\
 {									\
-	WT_CURSOR_DUMP *cdump;						\
+	WT_CURSOR *child;						\
 									\
-	cdump = (WT_CURSOR_DUMP *)cursor;				\
-	return (cdump->child->op(cdump->child));			\
+	child = ((WT_CURSOR_DUMP *)cursor)->child;			\
+	return (child->op(child));					\
 }
 
 WT_CURDUMP_PASS(next)
@@ -339,7 +339,9 @@ __wt_curdump_create(WT_CURSOR *child, WT_CURSOR *owner, WT_CURSOR **cursorp)
 	F_SET(cursor,
 	    F_ISSET(child, WT_CURSTD_DUMP_PRINT | WT_CURSTD_DUMP_HEX));
 
+	/* __wt_cursor_init is last so we don't have to clean up on error. */
 	STATIC_ASSERT(offsetof(WT_CURSOR_DUMP, iface) == 0);
 	WT_RET(__wt_cursor_init(cursor, NULL, owner, cfg, cursorp));
+
 	return (0);
 }

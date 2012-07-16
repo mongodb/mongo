@@ -112,6 +112,7 @@ fileformats
 fileid
 filename
 filesystem
+filesystems
 fillfactor
 firstname
 fput
@@ -171,6 +172,7 @@ memfree
 memp
 metadata
 minkey
+mkdir
 mmap
 mpool
 mpoolfile
@@ -236,6 +238,7 @@ reconf
 recs
 rerequests
 ret
+rf
 ro
 rpc
 rwlock

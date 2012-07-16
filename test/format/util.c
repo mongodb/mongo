@@ -72,7 +72,7 @@ val_gen_setup(uint8_t **valp)
 	size_t i, len;
 
 	/*
-	 * Set initial buffer contents to reconizable text.
+	 * Set initial buffer contents to recognizable text.
 	 *
 	 * Add a few extra bytes in order to guarantee we can always offset
 	 * into the buffer by a few extra bytes, used to generate different

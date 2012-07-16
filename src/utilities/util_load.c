@@ -305,7 +305,7 @@ config_update(WT_SESSION *session, char **list)
 			 * configuration strings with brackets.  Unfortunately,
 			 * that implies we can't simply append new configuration
 			 * strings to existing ones.  We call an unpublished
-			 * WiredTiger API to do the concatentation: if anyone
+			 * WiredTiger API to do the concatenation: if anyone
 			 * else ever needs it we can make it public, but I think
 			 * that's unlikely.  We're also playing fast and loose
 			 * with types, but it should work.
