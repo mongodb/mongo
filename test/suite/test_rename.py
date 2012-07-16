@@ -31,7 +31,8 @@
 
 import os, time
 import wiredtiger, wttest
-from helper import confirmDoesNotExist, simplePopulate, simplePopulateCheck
+from helper import confirmDoesNotExist,\
+    complexPopulate, complexPopulateCheck, simplePopulate, simplePopulateCheck
 
 # Test session.rename operations.
 class test_rename(wttest.WiredTigerTestCase):
@@ -43,25 +44,38 @@ class test_rename(wttest.WiredTigerTestCase):
         ('table', dict(uri='table:'))
         ]
 
+    # Populate and object, and rename it a couple of times, confirming the
+    # old name doesn't exist and the new name has the right contents.
+    def rename(self, populate, check):
+        uri1 = self.uri + self.name1
+        uri2 = self.uri + self.name2
+        populate(self, uri1, 'key_format=S', 10)
+
+        self.session.rename(uri1, uri2, None)
+        confirmDoesNotExist(self, uri1)
+        check(self, uri2)
+
+        self.session.rename(uri2, uri1, None)
+        confirmDoesNotExist(self, uri2)
+        check(self, uri1)
+
+        self.session.drop(uri1)
+
     # Test rename of an object.
     def test_rename(self):
-	name1 = self.uri + self.name1
-	name2 = self.uri + self.name2
-        simplePopulate(self, name1, 'key_format=S', 10)
-        self.session.rename(name1, name2, None)
-        confirmDoesNotExist(self, name1)
-        simplePopulateCheck(self, name2)
+        # Simple, one-file file or table object.
+        self.rename(simplePopulate, simplePopulateCheck)
 
-        self.session.rename(name2, name1, None)
-        confirmDoesNotExist(self, name2)
-        simplePopulateCheck(self, name1)
+        # A complex, multi-file table object.
+        if self.uri == "table:":
+            self.rename(complexPopulate, complexPopulateCheck)
 
     def test_rename_dne(self):
-	name1 = self.uri + self.name1
-	name2 = self.uri + self.name2
-        confirmDoesNotExist(self, name1)
+        uri1 = self.uri + self.name1
+        uri2 = self.uri + self.name2
+        confirmDoesNotExist(self, uri1)
         self.assertRaises(wiredtiger.WiredTigerError,
-	    lambda: self.session.rename(name1, name2, None))
+            lambda: self.session.rename(uri1, uri2, None))
 
 if __name__ == '__main__':
     wttest.run()

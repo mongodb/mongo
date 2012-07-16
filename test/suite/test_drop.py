@@ -41,19 +41,21 @@ class test_drop(wttest.WiredTigerTestCase):
         ('table', dict(uri='table:'))
         ]
 
-    # Test drop of an object.
-    def test_drop(self):
-        # Simple file or table object.
+    # Populate and object, remove it and confirm it no longer exists.
+    def drop(self, populate):
         uri = self.uri + self.name
-        simplePopulate(self, uri, 'key_format=S', 10)
+        populate(self, uri, 'key_format=S', 10)
         self.session.drop(uri, None)
         confirmDoesNotExist(self, uri)
 
+    # Test drop of an object.
+    def test_drop(self):
+        # Simple file or table object.
+        self.drop(simplePopulate)
+
         # A complex, multi-file table object.
         if self.uri == "table:":
-            complexPopulate(self, uri, 'key_format=S', 10)
-            self.session.drop(uri, None)
-            confirmDoesNotExist(self, uri)
+            self.drop(complexPopulate)
 
     # Test drop of a non-existent object.
     def test_drop_dne(self):
