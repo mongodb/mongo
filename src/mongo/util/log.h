@@ -134,10 +134,11 @@ namespace mongo {
 
     class Nullstream {
     public:
+        Nullstream();
+        virtual ~Nullstream();
         virtual Nullstream& operator<< (Tee* tee) {
             return *this;
         }
-        virtual ~Nullstream() {}
         virtual Nullstream& operator<<(const char *) {
             return *this;
         }

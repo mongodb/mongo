@@ -62,6 +62,9 @@ namespace mongo {
         return Logstream::get().prolog();
     }
 
+    Nullstream::Nullstream() {}
+    Nullstream::~Nullstream() {}
+
     class LoggingManager {
     public:
         LoggingManager()
@@ -399,7 +402,6 @@ namespace mongo {
     }
         
     Logstream& Logstream::get() {
-        fassert( 16397, doneSetup );
         if ( StaticObserver::_destroyingStatics ) {
             cout << "Logstream::get called in uninitialized state" << endl;
         }
