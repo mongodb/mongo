@@ -399,6 +399,7 @@ namespace mongo {
     }
         
     Logstream& Logstream::get() {
+        fassert( 16397, doneSetup );
         if ( StaticObserver::_destroyingStatics ) {
             cout << "Logstream::get called in uninitialized state" << endl;
         }
