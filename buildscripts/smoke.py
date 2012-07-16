@@ -246,6 +246,9 @@ class mongod(object):
             if os.sys.platform == "win32":
                 import win32job
                 win32job.TerminateJobObject(self.job_object, -1)
+                import time
+                # Windows doesn't seem to kill the process immediately, so give it some time to die
+                time.sleep(5) 
             else:
                 # This function not available in Python 2.5
                 self.proc.terminate()
