@@ -38,16 +38,23 @@ class test_truncate(wttest.WiredTigerTestCase):
     name = 'test_truncate'
     nentries = 10000
 
-    # Use a small page size because we want to create a number of pages.
-    config = 'allocation_size=512,key_format=i,value_format=S'
+    # Use a small page size because we want to create lots of pages in the file.
+    config = 'leaf_page_max=1024,key_format=i,value_format=S'
 
     scenarios = [
         ('file', dict(uri='file:')),
         ('table', dict(uri='table:'))
         ]
 
+    # Test simple truncate of an object using its URI.
+    def test_truncate(self):
+        name = self.uri + self.name
+        simplePopulate(self, name, self.config, self.nentries)
+        self.session.truncate(name, None, None, None)
+        confirmEmpty(self, name)
+
     def initCursor(self, name, key):
-        if key == None:
+        if key == -1:
             return None
         cursor = self.session.open_cursor(name, None, None)
         cursor.set_key(key)
@@ -58,7 +65,6 @@ class test_truncate(wttest.WiredTigerTestCase):
     # Truncate a range using cursors, and check the results.
     def truncateRangeAndCheck(self, name, begin, end):
         self.pr('truncateRangeAndCheck: ' + str(begin) + ',' + str(end))
-        simplePopulate(self, name, self.config, self.nentries)
         cur1 = self.initCursor(name, begin)
         cur2 = self.initCursor(name, end)
         self.session.truncate(None, cur1, cur2, None)
@@ -93,38 +99,69 @@ class test_truncate(wttest.WiredTigerTestCase):
                 self.assertEqual(key, self.nentries - 1)
 
         cursor.close()
-        self.session.drop(name, None)
 
-    # Test truncate of an object.
-    def test_truncate(self):
+    # Build a complex table with multiple files.
+    def complexPopulate(self):
         name = self.uri + self.name
-        simplePopulate(self, name, self.config, self.nentries)
-        self.session.truncate(name, None, None, None)
-        confirmEmpty(self, name)
+        self.session.create(name,
+            'leaf_page_max=1024,key_format=i,value_format=SiSS,' +
+            'columns=(record,column2,column3,column4,column5),' +
+            'colgroups=(cgroup1,cgroup2,cgroup3,cgroup4,cgroup5,cgroup6)')
+        cgname = 'colgroup:' + self.name
+        self.session.create(cgname + ':cgroup1', 'columns=(column2)')
+        self.session.create(cgname + ':cgroup2', 'columns=(column3)')
+        self.session.create(cgname + ':cgroup3', 'columns=(column4)')
+        self.session.create(cgname + ':cgroup4', 'columns=(column2,column3)')
+        self.session.create(cgname + ':cgroup5', 'columns=(column3,column4)')
+        self.session.create(cgname + ':cgroup6', 'columns=(column4,column5)')
+        cursor = self.session.open_cursor(name, None, None)
+        for i in range(0, self.nentries):
+                cursor.set_key(i)
+                cursor.set_value(
+                    str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%26],
+                    i,
+                    str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%23],
+                    str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%18])
+                cursor.insert()
+        cursor.close()
 
-    # Test using cursors for the begin and end of truncate, with 8 cases:
+    # Test truncation using cursors, with 8 cases:
     #    beginning to end (begin and end set to None)
-    #    beginning to end (first and last records)
-    #    beginning to mid-point (begin cursor None)
-    #    beginning to mid-point (begin cursor on first record)
-    #    mid-point to end (end cursor None)
-    #    mid-point to end (end cursor on last record)
+    #    beginning to end (begin/end set to first/last records)
+    #    beginning to mid-point (begin cursor set to None)
+    #    beginning to mid-point (begin cursor set to first record)
+    #    mid-point to end (end cursor set to None)
+    #    mid-point to end (end cursor set to last record)
     #    mid-point to mid-point
     #
-    # For begin and end: None means pass None for the cursor arg to truncate.
+    # For begin and end: -1 means pass None for the cursor arg to truncate.
     # An integer N, with 0 <= N < self.nentries, passes a cursor positioned
-    # at that element, 0 positions a cursor before the first element, and
-    # self.nentries positions a cursor after the last element.
+    # at that element.
     def test_truncate_cursor(self):
         name = self.uri + self.name
-        self.truncateRangeAndCheck(name, 0, self.nentries - 1)
-        self.truncateRangeAndCheck(name, None, self.nentries - 1)
-        self.truncateRangeAndCheck(name, 0, None)
-        self.truncateRangeAndCheck(name, None, self.nentries - 737)
-        self.truncateRangeAndCheck(name, 0, self.nentries - 737)
-        self.truncateRangeAndCheck(name, 737, None)
-        self.truncateRangeAndCheck(name, 737, self.nentries - 1)
-        self.truncateRangeAndCheck(name, 737, self.nentries - 737)
+        list = [
+            (0, self.nentries - 1),
+            (-1, self.nentries - 1),
+            (0, -1),
+            (-1, self.nentries - 737),
+            (0, self.nentries - 737),
+            (737, -1),
+            (737, self.nentries - 1),
+            (737, self.nentries - 737)
+            ]
+
+        # A simple, one-file file or table object.
+        for begin,end in list:
+            simplePopulate(self, name, self.config, self.nentries)
+            self.truncateRangeAndCheck(name, begin, end)
+            self.session.drop(name, None)
+
+        # A complex, multi-file table object.
+        if self.uri == "table:":
+            for begin,end in list:
+                self.complexPopulate()
+                self.truncateRangeAndCheck(name, begin, end)
+                self.session.drop(name, None)
 
 if __name__ == '__main__':
     wttest.run()
