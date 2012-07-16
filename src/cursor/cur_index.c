@@ -304,10 +304,12 @@ __curindex_close(WT_CURSOR *cursor)
 
 static int
 __curindex_open_colgroups(
-    WT_SESSION_IMPL *session, WT_CURSOR_INDEX *cindex, const char *cfg[])
+    WT_SESSION_IMPL *session, WT_CURSOR_INDEX *cindex, const char *cfg_arg[])
 {
 	WT_TABLE *table;
 	WT_CURSOR **cp;
+	/* Child cursors are opened without dump disabled. */
+	const char *cfg[] = { cfg_arg[0], cfg_arg[1], "dump=\"\"", NULL };
 	char *proj;
 	uint32_t arg;
 

@@ -238,10 +238,10 @@ err:		cursor->saved_err = ret;
 static int								\
 __curdump_##op(WT_CURSOR *cursor)					\
 {									\
-	WT_CURSOR_DUMP *cdump;						\
+	WT_CURSOR *child;						\
 									\
-	cdump = (WT_CURSOR_DUMP *)cursor;				\
-	return (cdump->child->op(cdump->child));			\
+	child = ((WT_CURSOR_DUMP *)cursor)->child;			\
+	return (child->op(child));					\
 }
 
 WT_CURDUMP_PASS(next)

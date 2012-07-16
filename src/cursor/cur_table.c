@@ -475,26 +475,22 @@ __curtable_close(WT_CURSOR *cursor)
 }
 
 static int
-__curtable_open_colgroups(WT_CURSOR_TABLE *ctable, const char *cfg[])
+__curtable_open_colgroups(WT_CURSOR_TABLE *ctable, const char *cfg_arg[])
 {
 	WT_SESSION_IMPL *session;
 	WT_TABLE *table;
 	WT_CURSOR **cp;
-	const char *cfg_override[5];
+	/*
+	 * Underlying column groups are always opened without dump or
+	 * overwrite, and only the primary is opened with next_random.
+	 */
+	const char *cfg[] = {
+		cfg_arg[0], cfg_arg[1], "dump=\"\",overwrite=false", NULL, NULL
+	};
 	int i;
 
 	session = (WT_SESSION_IMPL *)ctable->iface.session;
 	table = ctable->table;
-
-	/*
-	 * Underlying column groups are always opened without overwrite, and
-	 * only the primary is opened with next_random.
-	 */
-	cfg_override[0] = cfg[0];
-	cfg_override[1] = cfg[1];
-	cfg_override[2] = "overwrite=false";
-	cfg_override[3] = NULL;
-	cfg_override[4] = NULL;
 
 	if (!table->cg_complete)
 		WT_RET_MSG(session, EINVAL,
@@ -508,8 +504,8 @@ __curtable_open_colgroups(WT_CURSOR_TABLE *ctable, const char *cfg[])
 	    i < WT_COLGROUPS(table);
 	    i++, cp++) {
 		WT_RET(__wt_curfile_open(session, table->cg_name[i],
-		    &ctable->iface, cfg_override, cp));
-		cfg_override[3] = "next_random=false";
+		    &ctable->iface, cfg, cp));
+		cfg[3] = "next_random=false";
 	}
 	return (0);
 }
