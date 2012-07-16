@@ -457,7 +457,9 @@ namespace mongo {
                 if ( yielded ) {
                     *yielded = true;   
                 }
-                return yield( yieldSuggest() , rec );
+                bool res = yield( yieldSuggest() , rec );
+                _yieldSometimesTracker.resetLastTime();
+                return res;
             }
             return true;
         }
@@ -467,12 +469,16 @@ namespace mongo {
             if ( yielded ) {
                 *yielded = true;   
             }
-            return yield( micros , _recordForYield( need ) );
+            bool res = yield( micros , _recordForYield( need ) );
+            _yieldSometimesTracker.resetLastTime();
+            return res;
         }
         return true;
     }
 
     void ClientCursor::staticYield( int micros , const StringData& ns , Record * rec ) {
+        bool haveReadLock = dbMutex.atLeastReadLocked() && ! dbMutex.isWriteLocked();
+
         killCurrentOp.checkForInterrupt( false );
         {
             auto_ptr<RWLockRecursive::Shared> lk;
@@ -481,10 +487,16 @@ namespace mongo {
             
             dbtempreleasecond unlock;
             if ( unlock.unlocked() ) {
-                if ( micros == -1 )
-                    micros = Client::recommendedYieldMicros();
-                if ( micros > 0 )
-                    sleepmicros( micros );
+                if ( haveReadLock ) {
+                    // don't sleep with a read lock
+                }
+                else {
+                    if ( micros == -1 )
+                        micros = Client::recommendedYieldMicros();
+                    if ( micros > 0 )
+                        sleepmicros( micros );
+                }
+                
             }
             else {
                 CurOp * c = cc().curop();
