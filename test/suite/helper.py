@@ -65,45 +65,86 @@ def confirmEmpty(self, uri):
     self.assertEqual(cursor.next(), wiredtiger.WT_NOTFOUND)
     cursor.close()
 
-# population of a simple object.
+# population of a simple object, where the keys are the record number.
 #    uri:       object
-#    config:    session.create configuration string
+#    config:    prefix of the session.create configuration string
 #    rows:      entries to insert
 def simplePopulate(self, uri, config, rows):
     self.pr('simplePopulate: ' + uri + ' with ' + str(rows) + ' rows')
-    self.session.create(uri, config)
+    self.session.create(uri, config + ',value_format=S')
     cursor = self.session.open_cursor(uri, None, None)
-    if string.find(cursor.key_format, "i") != -1:
+    if cursor.key_format == 'i' or cursor.key_format == 'u':
         for i in range(0, rows):
             cursor.set_key(i)
             cursor.set_value(str(i) + ': abcdefghijklmnopqrstuvwxyz')
             cursor.insert()
-    elif string.find(cursor.key_format, "S") != -1:
+    elif cursor.key_format == 'S':
         for i in range(0, rows):
             cursor.set_key(str(i))
             cursor.set_value(str(i) + ': abcdefghijklmnopqrstuvwxyz')
             cursor.insert()
     else:
         raise AssertionError(
-            'simplePopulate: configuration has unknown key type')
+            'simplePopulate: cursor has unexpected key format: ' +
+            cursor.key_format)
     cursor.close()
 
 def simplePopulateCheck(self, uri):
     self.pr('simplePopulateCheck: ' + uri)
     cursor = self.session.open_cursor(uri, None, None)
-    if string.find(cursor.key_format, "i") != -1:
-	next = 0
+    next = -1
+    if cursor.key_format == 'i' or cursor.key_format == 'u':
         for key,val in cursor:
+	    next += 1
 	    self.assertEqual(key, next)
 	    self.assertEqual(val, str(next) + ': abcdefghijklmnopqrstuvwxyz')
-	    next += 1
-    elif string.find(cursor.key_format, "S") != -1:
-	next = 0
+    elif cursor.key_format == 'S':
         for key,val in cursor:
+	    next += 1
 	    self.assertEqual(key, str(next))
 	    self.assertEqual(val, str(next) + ': abcdefghijklmnopqrstuvwxyz')
-	    next += 1
     else:
         raise AssertionError(
-            'simplePopulateCheck: configuration has unknown key type')
+            'simplePopulate: cursor has unexpected key format: ' +
+            cursor.key_format)
+    cursor.close()
+
+# population of a complex object, where the keys are the record number.
+#    uri:       object
+#    config:    prefix of the session.create configuration string
+#    rows:      entries to insert
+def complexPopulate(self, uri, config, rows):
+    self.session.create(uri,
+	config + ',value_format=SiSS,' +
+	'columns=(record,column2,column3,column4,column5),' +
+	'colgroups=(cgroup1,cgroup2,cgroup3,cgroup4,cgroup5,cgroup6)')
+    cgname = 'colgroup:' + uri.split(":")[1]
+    self.session.create(cgname + ':cgroup1', 'columns=(column2)')
+    self.session.create(cgname + ':cgroup2', 'columns=(column3)')
+    self.session.create(cgname + ':cgroup3', 'columns=(column4)')
+    self.session.create(cgname + ':cgroup4', 'columns=(column2,column3)')
+    self.session.create(cgname + ':cgroup5', 'columns=(column3,column4)')
+    self.session.create(cgname + ':cgroup6', 'columns=(column4,column5)')
+    cursor = self.session.open_cursor(uri, None, None)
+    if cursor.key_format == 'i' or cursor.key_format == 'u':
+	for i in range(0, rows):
+	    cursor.set_key(i)
+	    cursor.set_value(
+		str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%26],
+		i,
+		str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%23],
+		str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%18])
+	    cursor.insert()
+    elif cursor.key_format == 'S':
+	    cursor.set_key(str(i))
+	    cursor.set_value(
+		str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%26],
+		i,
+		str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%23],
+		str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%18])
+	    cursor.insert()
+    else:
+        raise AssertionError(
+            'complexPopulate: cursor has unexpected key format: ' +
+            cursor.key_format)
     cursor.close()

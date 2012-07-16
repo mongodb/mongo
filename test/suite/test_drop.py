@@ -44,7 +44,7 @@ class test_drop(wttest.WiredTigerTestCase):
     # Test drop of an object.
     def test_drop(self):
 	name = self.uri + self.name
-        simplePopulate(self, name, 'key_format=S,value_format=S', 10)
+        simplePopulate(self, name, 'key_format=S', 10)
         self.session.drop(name, None)
         confirmDoesNotExist(self, name)
 

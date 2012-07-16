@@ -47,7 +47,7 @@ class test_rename(wttest.WiredTigerTestCase):
     def test_rename(self):
 	name1 = self.uri + self.name1
 	name2 = self.uri + self.name2
-        simplePopulate(self, name1, 'key_format=S,value_format=S', 10)
+        simplePopulate(self, name1, 'key_format=S', 10)
         self.session.rename(name1, name2, None)
         confirmDoesNotExist(self, name1)
         simplePopulateCheck(self, name2)

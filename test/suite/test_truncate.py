@@ -31,7 +31,8 @@
 
 import os, time
 import wiredtiger, wttest
-from helper import confirmDoesNotExist, confirmEmpty, simplePopulate
+from helper import\
+    confirmDoesNotExist, confirmEmpty, complexPopulate, simplePopulate
 
 # Test session.truncate.
 class test_truncate(wttest.WiredTigerTestCase):
@@ -39,7 +40,7 @@ class test_truncate(wttest.WiredTigerTestCase):
     nentries = 10000
 
     # Use a small page size because we want to create lots of pages in the file.
-    config = 'leaf_page_max=1024,key_format=i,value_format=S'
+    config = 'leaf_page_max=1024,key_format=i'
 
     scenarios = [
         ('file', dict(uri='file:')),
@@ -48,25 +49,25 @@ class test_truncate(wttest.WiredTigerTestCase):
 
     # Test simple truncate of an object using its URI.
     def test_truncate(self):
-        name = self.uri + self.name
-        simplePopulate(self, name, self.config, self.nentries)
-        self.session.truncate(name, None, None, None)
-        confirmEmpty(self, name)
+        uri = self.uri + self.name
+        simplePopulate(self, uri, self.config, self.nentries)
+        self.session.truncate(uri, None, None, None)
+        confirmEmpty(self, uri)
 
-    def initCursor(self, name, key):
+    def initCursor(self, uri, key):
         if key == -1:
             return None
-        cursor = self.session.open_cursor(name, None, None)
+        cursor = self.session.open_cursor(uri, None, None)
         cursor.set_key(key)
         self.assertEqual(cursor.search(), 0)
         self.assertEqual(cursor.get_key(), key)
         return cursor
 
     # Truncate a range using cursors, and check the results.
-    def truncateRangeAndCheck(self, name, begin, end):
+    def truncateRangeAndCheck(self, uri, begin, end):
         self.pr('truncateRangeAndCheck: ' + str(begin) + ',' + str(end))
-        cur1 = self.initCursor(name, begin)
-        cur2 = self.initCursor(name, end)
+        cur1 = self.initCursor(uri, begin)
+        cur2 = self.initCursor(uri, end)
         self.session.truncate(None, cur1, cur2, None)
         if not cur1:
             begin = 0
@@ -79,9 +80,9 @@ class test_truncate(wttest.WiredTigerTestCase):
 
         # If the object is empty, confirm that, otherwise test the first and
         # last keys are the ones before/after the truncated range.
-        cursor = self.session.open_cursor(name, None, None)
+        cursor = self.session.open_cursor(uri, None, None)
         if begin == 0 and end == self.nentries - 1:
-            confirmEmpty(self, name)
+            confirmEmpty(self, uri)
         else:
             self.assertEqual(cursor.next(), 0)
             key = cursor.get_key()
@@ -100,31 +101,6 @@ class test_truncate(wttest.WiredTigerTestCase):
 
         cursor.close()
 
-    # Build a complex table with multiple files.
-    def complexPopulate(self):
-        name = self.uri + self.name
-        self.session.create(name,
-            'leaf_page_max=1024,key_format=i,value_format=SiSS,' +
-            'columns=(record,column2,column3,column4,column5),' +
-            'colgroups=(cgroup1,cgroup2,cgroup3,cgroup4,cgroup5,cgroup6)')
-        cgname = 'colgroup:' + self.name
-        self.session.create(cgname + ':cgroup1', 'columns=(column2)')
-        self.session.create(cgname + ':cgroup2', 'columns=(column3)')
-        self.session.create(cgname + ':cgroup3', 'columns=(column4)')
-        self.session.create(cgname + ':cgroup4', 'columns=(column2,column3)')
-        self.session.create(cgname + ':cgroup5', 'columns=(column3,column4)')
-        self.session.create(cgname + ':cgroup6', 'columns=(column4,column5)')
-        cursor = self.session.open_cursor(name, None, None)
-        for i in range(0, self.nentries):
-                cursor.set_key(i)
-                cursor.set_value(
-                    str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%26],
-                    i,
-                    str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%23],
-                    str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%18])
-                cursor.insert()
-        cursor.close()
-
     # Test truncation using cursors, with 8 cases:
     #    beginning to end (begin and end set to None)
     #    beginning to end (begin/end set to first/last records)
@@ -138,7 +114,7 @@ class test_truncate(wttest.WiredTigerTestCase):
     # An integer N, with 0 <= N < self.nentries, passes a cursor positioned
     # at that element.
     def test_truncate_cursor(self):
-        name = self.uri + self.name
+        uri = self.uri + self.name
         list = [
             (0, self.nentries - 1),
             (-1, self.nentries - 1),
@@ -152,16 +128,16 @@ class test_truncate(wttest.WiredTigerTestCase):
 
         # A simple, one-file file or table object.
         for begin,end in list:
-            simplePopulate(self, name, self.config, self.nentries)
-            self.truncateRangeAndCheck(name, begin, end)
-            self.session.drop(name, None)
+            simplePopulate(self, uri, self.config, self.nentries)
+            self.truncateRangeAndCheck(uri, begin, end)
+            self.session.drop(uri, None)
 
         # A complex, multi-file table object.
         if self.uri == "table:":
             for begin,end in list:
-                self.complexPopulate()
-                self.truncateRangeAndCheck(name, begin, end)
-                self.session.drop(name, None)
+                complexPopulate(self, uri, self.config, self.nentries)
+                self.truncateRangeAndCheck(uri, begin, end)
+                self.session.drop(uri, None)
 
 if __name__ == '__main__':
     wttest.run()
