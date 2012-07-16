@@ -13,8 +13,7 @@ t = db.arrNestTest;
 t.drop();
 t.ensureIndex({a:1});
 
-nestedArr = makeNestArr(300);
-print(nestedArr);
+nestedArr = makeNestArr(150);
 
 t.save( { tst : "test1", a : nestedArr } );
 t.save( { tst : "test2", a : nestedArr } );
@@ -25,3 +24,4 @@ assert.eq(1, t.find({tst : "test2"}).count(), "find test");
 
 //make sure index insertion failed (nesting must be large enough)
 assert.eq(0, t.find().hint({a:1}).explain().n, "index not empty");
+print("Test succeeded!")
