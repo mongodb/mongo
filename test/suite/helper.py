@@ -96,14 +96,14 @@ def simplePopulateCheck(self, uri):
     next = -1
     if cursor.key_format == 'i' or cursor.key_format == 'u':
         for key,val in cursor:
-	    next += 1
-	    self.assertEqual(key, next)
-	    self.assertEqual(val, str(next) + ': abcdefghijklmnopqrstuvwxyz')
+            next += 1
+            self.assertEqual(key, next)
+            self.assertEqual(val, str(next) + ': abcdefghijklmnopqrstuvwxyz')
     elif cursor.key_format == 'S':
         for key,val in cursor:
-	    next += 1
-	    self.assertEqual(key, str(next))
-	    self.assertEqual(val, str(next) + ': abcdefghijklmnopqrstuvwxyz')
+            next += 1
+            self.assertEqual(key, str(next))
+            self.assertEqual(val, str(next) + ': abcdefghijklmnopqrstuvwxyz')
     else:
         raise AssertionError(
             'simplePopulate: cursor has unexpected key format: ' +
@@ -116,9 +116,9 @@ def simplePopulateCheck(self, uri):
 #    rows:      entries to insert
 def complexPopulate(self, uri, config, rows):
     self.session.create(uri,
-	config + ',value_format=SiSS,' +
-	'columns=(record,column2,column3,column4,column5),' +
-	'colgroups=(cgroup1,cgroup2,cgroup3,cgroup4,cgroup5,cgroup6)')
+        config + ',value_format=SiSS,' +
+        'columns=(record,column2,column3,column4,column5),' +
+        'colgroups=(cgroup1,cgroup2,cgroup3,cgroup4,cgroup5,cgroup6)')
     cgname = 'colgroup:' + uri.split(":")[1]
     self.session.create(cgname + ':cgroup1', 'columns=(column2)')
     self.session.create(cgname + ':cgroup2', 'columns=(column3)')
@@ -128,23 +128,23 @@ def complexPopulate(self, uri, config, rows):
     self.session.create(cgname + ':cgroup6', 'columns=(column4,column5)')
     cursor = self.session.open_cursor(uri, None, None)
     if cursor.key_format == 'i' or cursor.key_format == 'u':
-	for i in range(0, rows):
-	    cursor.set_key(i)
-	    cursor.set_value(
-		str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%26],
-		i,
-		str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%23],
-		str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%18])
-	    cursor.insert()
+        for i in range(0, rows):
+            cursor.set_key(i)
+            cursor.set_value(
+                str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%26],
+                i,
+                str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%23],
+                str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%18])
+            cursor.insert()
     elif cursor.key_format == 'S':
-	for i in range(0, rows):
-	    cursor.set_key(str(i))
-	    cursor.set_value(
-		str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%26],
-		i,
-		str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%23],
-		str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%18])
-	    cursor.insert()
+        for i in range(0, rows):
+            cursor.set_key(str(i))
+            cursor.set_value(
+                str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%26],
+                i,
+                str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%23],
+                str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%18])
+            cursor.insert()
     else:
         raise AssertionError(
             'complexPopulate: cursor has unexpected key format: ' +
