@@ -127,6 +127,10 @@ namespace mongo {
             return false;
         }
 
+        void resetLastTime() {
+            _last = Listener::getElapsedTimeMillis();
+        }
+        
     private:
         const int _h;
         const int _ms;
