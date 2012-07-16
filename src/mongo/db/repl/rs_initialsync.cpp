@@ -374,6 +374,16 @@ namespace mongo {
             }
 
             lastOp = minValid;
+            // its currently important that lastOp is equal to the last op we actually pulled
+            // this is because the background thread only pulls each op once now
+            // so if its now, we'll be waiting forever
+            {
+                // this takes whatever the last op the we got is
+                // and stores it locally before we wipe it out below
+                Lock::DBRead lk(rsoplog);
+                Helpers::getLast(rsoplog, lastOp);
+                lastOp = lastOp.getOwned();
+            }
 
             // reset state, as that "didn't count"
             emptyOplog(); 
