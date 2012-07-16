@@ -6,16 +6,20 @@
 
 /**
  * Checks if a query to the given collection will be routed to the secondary.
- * 
+ *
  * @param {DBCollection} coll
  * @param {Object} query
- * 
+ *
  * @return {boolean} true if query was routed to a secondary node.
  */
 function doesRouteToSec( coll, query ) {
     var explain = coll.find( query ).explain();
     var conn = new Mongo( explain.server );
-    return conn.getDB( 'admin' ).runCommand({ isMaster: 1 }).secondary;
+    var cmdRes = conn.getDB( 'admin' ).runCommand({ isMaster: 1 });
+
+    jsTest.log('isMaster: ' + tojson(cmdRes));
+
+    return cmdRes.secondary;
 }
 
 var rsOpts = { oplogSize: 10 };
@@ -73,15 +77,6 @@ for ( var n = 0; n < nodeCount; n++ ) {
 replTest.awaitSecondaryNodes();
 
 coll.setSlaveOk( true );
-
-try {
-    assert( doesRouteToSec( coll, { v: vToFind++ }));
-} catch (x) {
-    /* This is expected since the socket for the old connection we have has
-     * already been closed on the other side
-     */
-    print( 'Exception occured (expected): ' + x );
-}
 
 /* replSetMonitor does not refresh the nodes information when getting secondaries.
  * A node that is previously labeled as secondary can now be a primary, so we
