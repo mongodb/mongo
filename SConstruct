@@ -302,6 +302,8 @@ env = Environment( BUILD_DIR=variantDir,
                    CONFIGURELOG = scons_data_dir + '/config.log'
                    )
 
+env['_LIBDEPS'] = '$_LIBDEPS_OBJS'
+
 if has_option('mute'):
     env.Append( CCCOMSTR = "Compiling $TARGET" )
     env.Append( CXXCOMSTR = env["CCCOMSTR"] )

@@ -403,8 +403,7 @@ env.StaticLibrary("coreserver", coreServerFiles, LIBDEPS=["mongocommon", "script
 mongod = env.Install(
     '#/', env.Program( "mongod", mongodOnlyFiles,
                        LIBDEPS=["coreserver", "serveronly", "coredb", "ntservice",
-                                "mongodandmongos"] + modules,
-                       _LIBDEPS='$_LIBDEPS_OBJS' ) )
+                                "mongodandmongos"] + modules ) )
 Default( mongod )
 
 # tools
@@ -434,15 +433,14 @@ env.Install( '#/', [
 mongos = env.Program(
     "mongos", [ "s/server.cpp"] ,
     LIBDEPS=["mongoscore", "coreserver", "coredb", "mongocommon", "coreshard", "dbcmdline", "ntservice",
-             "mongodandmongos"],
-    _LIBDEPS='$_LIBDEPS_OBJS')
+             "mongodandmongos"])
 env.Install( '#/', mongos )
 
 env.Library("clientandshell", ["client/clientAndShell.cpp"], LIBDEPS=["mongocommon", "defaultversion", "gridfs", "notmongodormongos"])
 env.Library("allclient", "client/clientOnly.cpp", LIBDEPS=["clientandshell"])
 
 if has_option( "sharedclient" ):
-    sharedClientLibName = str( env.SharedLibrary( "mongoclient", [], LIBDEPS=["allclient"], _LIBDEPS='$_LIBDEPS_OBJS' )[0] )
+    sharedClientLibName = str( env.SharedLibrary( "mongoclient", [], LIBDEPS=["allclient"] )[0] )
 
 # dbtests test binary
 env.StaticLibrary('testframework', ['dbtests/framework.cpp'], LIBDEPS=['unittest/unittest'])
@@ -450,8 +448,7 @@ env.StaticLibrary('testframework', ['dbtests/framework.cpp'], LIBDEPS=['unittest
 test = testEnv.Install(
     '#/',
     testEnv.Program( "test", [ f for f in Glob( "dbtests/*.cpp" ) if not str( f ).endswith( 'framework.cpp' ) ],
-                     LIBDEPS=["mongocommon", "serveronly", "coreserver", "coredb", "testframework", "gridfs", "notmongodormongos" ],
-                     _LIBDEPS='$_LIBDEPS_OBJS' ) )
+                     LIBDEPS=["mongocommon", "serveronly", "coreserver", "coredb", "testframework", "gridfs", "notmongodormongos" ] ) )
 
 if len(testEnv.subst('$PROGSUFFIX')):
     testEnv.Alias( "test", "#/${PROGPREFIX}test${PROGSUFFIX}" )
