@@ -5,6 +5,9 @@ s = new ShardingTest( "aggregation_sort1", 2, 0, 2 );
 s.adminCommand( { enablesharding:"test" } );
 s.adminCommand( { shardcollection:"test.data", key:{ _id:1 } } );
 
+// Test does it's own balancing.
+s.stopBalancer();
+
 d = s.getDB( "test" );
 
 // Insert _id values 0 - 99.
