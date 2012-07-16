@@ -45,19 +45,15 @@ namespace {
     }
 
     TEST(UnitTestSelfTest, TestStringComparisons) {
-        ASSERT_EQUALS("hello", "hello");
         ASSERT_EQUALS(std::string("hello"), "hello");
         ASSERT_EQUALS("hello", std::string("hello"));
 
-        ASSERT_NOT_EQUALS("hello", "good bye!");
         ASSERT_NOT_EQUALS(std::string("hello"), "good bye!");
         ASSERT_NOT_EQUALS("hello", std::string("good bye!"));
 
-        ASSERT_TEST_FAILS(ASSERT_NOT_EQUALS("hello", "hello"));
         ASSERT_TEST_FAILS(ASSERT_NOT_EQUALS(std::string("hello"), "hello"));
         ASSERT_TEST_FAILS(ASSERT_NOT_EQUALS("hello", std::string("hello")));
 
-        ASSERT_TEST_FAILS(ASSERT_EQUALS("hello", "good bye!"));
         ASSERT_TEST_FAILS(ASSERT_EQUALS(std::string("hello"), "good bye!"));
         ASSERT_TEST_FAILS(ASSERT_EQUALS("hello", std::string("good bye!")));
     }
