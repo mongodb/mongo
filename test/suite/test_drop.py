@@ -30,7 +30,7 @@
 
 import os, time
 import wiredtiger, wttest
-from helper import confirmDoesNotExist, simplePopulate, simplePopulateCheck
+from helper import confirmDoesNotExist, complexPopulate, simplePopulate
 
 # Test session.drop operations.
 class test_drop(wttest.WiredTigerTestCase):
@@ -43,18 +43,25 @@ class test_drop(wttest.WiredTigerTestCase):
 
     # Test drop of an object.
     def test_drop(self):
-	name = self.uri + self.name
-        simplePopulate(self, name, 'key_format=S', 10)
-        self.session.drop(name, None)
-        confirmDoesNotExist(self, name)
+	# Simple file or table object.
+	uri = self.uri + self.name
+        simplePopulate(self, uri, 'key_format=S', 10)
+        self.session.drop(uri, None)
+        confirmDoesNotExist(self, uri)
+
+        # A complex, multi-file table object.
+        if self.uri == "table:":
+	    complexPopulate(self, uri, 'key_format=S', 10)
+	    self.session.drop(uri, None)
+	    confirmDoesNotExist(self, uri)
 
     # Test drop of a non-existent object.
     def test_drop_dne(self):
-	name = self.uri + self.name
-        confirmDoesNotExist(self, name)
-        self.session.drop(name, 'force')
+	uri = self.uri + self.name
+        confirmDoesNotExist(self, uri)
+        self.session.drop(uri, 'force')
         self.assertRaises(
-	    wiredtiger.WiredTigerError, lambda: self.session.drop(name, None))
+	    wiredtiger.WiredTigerError, lambda: self.session.drop(uri, None))
 
 if __name__ == '__main__':
     wttest.run()

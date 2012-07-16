@@ -53,10 +53,11 @@ def compareFiles(self, filename1, filename2):
 # confirm a URI doesn't exist.
 def confirmDoesNotExist(self, uri):
     self.pr('confirmDoesNotExist: ' + uri)
-    self.assertFalse(os.path.exists(uri))
-    self.assertFalse(os.path.exists(uri + ".wt"))
     self.assertRaises(wiredtiger.WiredTigerError,
         lambda: self.session.open_cursor(uri, None, None))
+    import glob
+    self.assertEqual(glob.glob('*' + uri.split(":")[1] + '*'), [],
+        'URI exists, file name matching \"' + uri.split(":")[1] + '\" found')
 
 # confirm a URI exists and is empty.
 def confirmEmpty(self, uri):
@@ -136,6 +137,7 @@ def complexPopulate(self, uri, config, rows):
 		str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%18])
 	    cursor.insert()
     elif cursor.key_format == 'S':
+	for i in range(0, rows):
 	    cursor.set_key(str(i))
 	    cursor.set_value(
 		str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%26],
