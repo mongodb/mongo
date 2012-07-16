@@ -56,7 +56,6 @@ CONF=/etc/mongodb.conf
 DATA=/var/lib/mongodb
 LOGDIR=/var/log/mongodb
 PIDFILE=$DATA/$NAME.pid
-LOCKFILE=$DATA/mongod.lock
 LOGFILE=$LOGDIR/$NAME.log  # Server logfile
 ENABLE_MONGODB=yes
 
