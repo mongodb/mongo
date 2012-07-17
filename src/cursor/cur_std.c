@@ -40,6 +40,22 @@ __wt_cursor_set_notsup(WT_CURSOR *cursor)
 }
 
 /*
+ * __wt_cursor_kv_not_set --
+ *	Standard error message for key/values not set.
+ */
+int
+__wt_cursor_kv_not_set(WT_CURSOR *cursor, int key)
+{
+	WT_SESSION_IMPL *session;
+
+	session = (WT_SESSION_IMPL *)cursor->session;
+
+	WT_RET_MSG(session,
+	    cursor->saved_err == 0 ? EINVAL : cursor->saved_err,
+	    "requires %s be set", key ? "key" : "value");
+}
+
+/*
  * __wt_cursor_get_key --
  *	WT_CURSOR->get_key default implementation.
  */
@@ -53,6 +69,20 @@ __wt_cursor_get_key(WT_CURSOR *cursor, ...)
 	ret = __wt_cursor_get_keyv(cursor, cursor->flags, ap);
 	va_end(ap);
 	return (ret);
+}
+
+/*
+ * __wt_cursor_set_key --
+ *	WT_CURSOR->set_key default implementation.
+ */
+void
+__wt_cursor_set_key(WT_CURSOR *cursor, ...)
+{
+	va_list ap;
+
+	va_start(ap, cursor);
+	__wt_cursor_set_keyv(cursor, cursor->flags, ap);
+	va_end(ap);
 }
 
 /*
@@ -73,6 +103,24 @@ __wt_cursor_get_raw_key(WT_CURSOR *cursor, WT_ITEM *key)
 	if (!raw_set)
 		F_CLR(cursor, WT_CURSTD_RAW);
 	return (ret);
+}
+
+/*
+ * __wt_cursor_set_raw_key --
+ *	Temporarily force raw mode in a cursor to set a canonical copy of
+ * the key.
+ */
+static void
+__wt_cursor_set_raw_key(WT_CURSOR *cursor, WT_ITEM *key)
+{
+	int raw_set;
+
+	raw_set = F_ISSET(cursor, WT_CURSTD_RAW) ? 1 : 0;
+	if (!raw_set)
+		F_SET(cursor, WT_CURSTD_RAW);
+	cursor->set_key(cursor, key);
+	if (!raw_set)
+		F_CLR(cursor, WT_CURSTD_RAW);
 }
 
 /*
@@ -113,65 +161,6 @@ __wt_cursor_get_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 
 err:	API_END(session);
 	return (ret);
-}
-
-/*
- * __wt_cursor_get_value --
- *	WT_CURSOR->get_value default implementation.
- */
-int
-__wt_cursor_get_value(WT_CURSOR *cursor, ...)
-{
-	WT_DECL_RET;
-	WT_SESSION_IMPL *session;
-	const char *fmt;
-	va_list ap;
-
-	CURSOR_API_CALL_NOCONF(cursor, session, get_value, NULL);
-	WT_CURSOR_NEEDVALUE(cursor);
-
-	va_start(ap, cursor);
-	fmt = F_ISSET(cursor,
-	    WT_CURSTD_DUMP_HEX | WT_CURSTD_DUMP_PRINT | WT_CURSTD_RAW) ?
-	    "u" : cursor->value_format;
-	ret = __wt_struct_unpackv(session,
-	    cursor->value.data, cursor->value.size, fmt, ap);
-	va_end(ap);
-
-err:	API_END(session);
-	return (ret);
-}
-
-/*
- * __wt_cursor_set_keyv --
- *	WT_CURSOR->set_key default implementation.
- */
-void
-__wt_cursor_set_key(WT_CURSOR *cursor, ...)
-{
-	va_list ap;
-
-	va_start(ap, cursor);
-	__wt_cursor_set_keyv(cursor, cursor->flags, ap);
-	va_end(ap);
-}
-
-/*
- * __wt_cursor_set_raw_key --
- *	Temporarily force raw mode in a cursor to set a canonical copy of
- * the key.
- */
-static void
-__wt_cursor_set_raw_key(WT_CURSOR *cursor, WT_ITEM *key)
-{
-	int raw_set;
-
-	raw_set = F_ISSET(cursor, WT_CURSTD_RAW) ? 1 : 0;
-	if (!raw_set)
-		F_SET(cursor, WT_CURSTD_RAW);
-	cursor->set_key(cursor, key);
-	if (!raw_set)
-		F_CLR(cursor, WT_CURSTD_RAW);
 }
 
 /*
@@ -247,6 +236,33 @@ err:		cursor->saved_err = ret;
 }
 
 /*
+ * __wt_cursor_get_value --
+ *	WT_CURSOR->get_value default implementation.
+ */
+int
+__wt_cursor_get_value(WT_CURSOR *cursor, ...)
+{
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+	const char *fmt;
+	va_list ap;
+
+	CURSOR_API_CALL_NOCONF(cursor, session, get_value, NULL);
+	WT_CURSOR_NEEDVALUE(cursor);
+
+	va_start(ap, cursor);
+	fmt = F_ISSET(cursor,
+	    WT_CURSTD_DUMP_HEX | WT_CURSTD_DUMP_PRINT | WT_CURSTD_RAW) ?
+	    "u" : cursor->value_format;
+	ret = __wt_struct_unpackv(session,
+	    cursor->value.data, cursor->value.size, fmt, ap);
+	va_end(ap);
+
+err:	API_END(session);
+	return (ret);
+}
+
+/*
  * __wt_cursor_set_value --
  *	WT_CURSOR->set_value default implementation.
  */
@@ -295,22 +311,6 @@ __wt_cursor_set_value(WT_CURSOR *cursor, ...)
 	va_end(ap);
 
 err:	API_END(session);
-}
-
-/*
- * __wt_cursor_kv_not_set --
- *	Standard error message for key/values not set.
- */
-int
-__wt_cursor_kv_not_set(WT_CURSOR *cursor, int key)
-{
-	WT_SESSION_IMPL *session;
-
-	session = (WT_SESSION_IMPL *)cursor->session;
-
-	WT_RET_MSG(session,
-	    cursor->saved_err == 0 ? EINVAL : cursor->saved_err,
-	    "requires %s be set", key ? "key" : "value");
 }
 
 /*
