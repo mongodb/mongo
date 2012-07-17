@@ -101,8 +101,6 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 	txn->isolation = (__wt_config_strcmp(&cval, "snapshot") == 0) ?
 	    TXN_ISO_SNAPSHOT : TXN_ISO_READ_UNCOMMITTED;
 
-	WT_ASSERT(session, txn_global->ids[session->id] == WT_TXN_NONE);
-
 	do {
 		/* Take a copy of the current session ID. */
 		txn->id = txn_global->current;

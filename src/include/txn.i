@@ -240,8 +240,6 @@ __wt_txn_read_last(WT_SESSION_IMPL *session)
 	 * If there is no transaction running, release the ID we put in the
 	 * global table.
 	 */
-	if (!F_ISSET(txn, TXN_RUNNING)) {
-		WT_ASSERT(session, txn_global->ids[session->id] != WT_TXN_NONE);
+	if (!F_ISSET(txn, TXN_RUNNING))
 		txn_global->ids[session->id] = WT_TXN_NONE;
-	}
 }
