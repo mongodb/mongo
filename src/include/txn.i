@@ -19,15 +19,15 @@ __wt_txn_getid(WT_SESSION_IMPL *session)
 	txn = &session->txn;
 
 	if (F_ISSET(txn, TXN_RUNNING))
-                return;
+		return;
 
-        /* If we already have the latest ID, keep using it. */
+	/* If we already have the latest ID, keep using it. */
 	id = txn->id;
-        txn_global = &S2C(session)->txn_global;
-        if (id + 1 == txn_global->current &&
+	txn_global = &S2C(session)->txn_global;
+	if (id + 1 == txn_global->current &&
 	    id != WT_TXN_NONE && id != WT_TXN_ABORTED)
-                return;
-                
+		return;
+
 	do {
 		id = txn_global->current;
 	} while (!WT_ATOMIC_CAS(txn_global->current, id, id + 1) ||
@@ -53,7 +53,7 @@ __wt_txn_modify(WT_SESSION_IMPL *session, wt_txnid_t *id)
 			    sizeof(wt_txnid_t *), &txn->mod));
 		txn->mod[txn->mod_count++] = id;
 	} else
-                __wt_txn_getid(session);
+		__wt_txn_getid(session);
 
 	*id = txn->id;
 	return (0);
