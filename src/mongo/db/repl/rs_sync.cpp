@@ -170,6 +170,10 @@ namespace replset {
             catch (const DBException& e) {
                 LOG(2) << "ignoring exception in prefetchOp(): " << e.what() << endl;
             }
+            catch (const std::exception& e) {
+                log() << "Unhandled std::exception in prefetchOp(): " << e.what() << endl;
+                fassertFailed(16397);
+            }
         }
     }
 
