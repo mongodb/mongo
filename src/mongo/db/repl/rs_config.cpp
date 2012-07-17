@@ -78,7 +78,7 @@ namespace mongo {
     bo ReplSetConfig::MemberCfg::asBson() const {
         bob b;
         b << "_id" << _id;
-        b.append("host", h.dynString());
+        b.append("host", h.toString());
         if( votes != 1 ) b << "votes" << votes;
         if( priority != 1.0 ) b << "priority" << priority;
         if( arbiterOnly ) b << "arbiterOnly" << true;
@@ -541,7 +541,7 @@ namespace mongo {
                 log() << "replSet " << o.toString() << rsLog;
                 uassert(13108, "bad replset config -- duplicate hosts in the config object?", false);
             }
-            hosts.insert(m.h.dynString());
+            hosts.insert(m.h.toString());
             ords.insert(m._id);
             this->members.push_back(m);
         }
@@ -585,7 +585,7 @@ namespace mongo {
     ReplSetConfig::ReplSetConfig(const HostAndPort& h) :
       _ok(false),_majority(-1)
     {
-        LOG(2) << "ReplSetConfig load " << h.toStringLong() << rsLog;
+        LOG(2) << "ReplSetConfig load " << h.toString() << rsLog;
 
         _constructed = false;
         clear();

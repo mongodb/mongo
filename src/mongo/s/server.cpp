@@ -211,8 +211,6 @@ namespace mongo {
         }
     }
 
-    void cloudCmdLineParamIs(string cmd);
-
 } // namespace mongo
 
 using namespace mongo;
@@ -405,11 +403,6 @@ int _main(int argc, char* argv[]) {
     if ( ! params.count( "configdb" ) ) {
         out() << "error: no args for --configdb" << endl;
         return 4;
-    }
-
-    if( params.count("cloud") ) {
-        string s = params["cloud"].as<string>();
-        cloudCmdLineParamIs(s);
     }
 
     splitStringDelim( params["configdb"].as<string>() , &configdbs , ',' );

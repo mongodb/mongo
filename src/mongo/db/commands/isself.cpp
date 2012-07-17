@@ -158,11 +158,6 @@ namespace mongo {
 
     bool HostAndPort::isSelf() const {
 
-        if( dyn() ) { 
-            LOG(2) << "isSelf " << _dynName << ' ' << dynHostMyName() << endl;
-            return dynHostMyName() == _dynName;
-        }
-
         int _p = port();
         int p = _p == -1 ? CmdLine::DefaultDBPort : _p;
 

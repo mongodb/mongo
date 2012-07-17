@@ -124,7 +124,7 @@ namespace mongo {
                     }
 
                     if( !allowFailure ) {
-                        string msg = string("need all members up to initiate, not ok : ") + i->h.toStringLong();
+                        string msg = string("need all members up to initiate, not ok : ") + i->h.toString();
                         if( !initial )
                             msg = string("need most members up to reconfigure, not ok : ") + i->h.toString();
                         uasserted(13144, msg);
@@ -210,7 +210,7 @@ namespace mongo {
                 bob b;
                 b.append("_id", name);
                 bob members;
-                members.append("0", BSON( "_id" << 0 << "host" << HostAndPort::me().dynString() ));
+                members.append("0", BSON( "_id" << 0 << "host" << HostAndPort::me().toString() ));
                 result.append("me", HostAndPort::me().toString());
                 for( unsigned i = 0; i < seeds.size(); i++ )
                     members.append(bob::numStr(i+1), BSON( "_id" << i+1 << "host" << seeds[i].toString()));
