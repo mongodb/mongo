@@ -57,7 +57,8 @@ def confirmDoesNotExist(self, uri):
         lambda: self.session.open_cursor(uri, None, None))
     import glob
     self.assertEqual(glob.glob('*' + uri.split(":")[1] + '*'), [],
-        'URI exists, file name matching \"' + uri.split(":")[1] + '\" found')
+        'confirmDoesNotExist: URI exists, file name matching \"' +
+        uri.split(":")[1] + '\" found')
 
 # confirm a URI exists and is empty.
 def confirmEmpty(self, uri):
