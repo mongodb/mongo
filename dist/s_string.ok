@@ -363,6 +363,7 @@ func
 funcs
 gcc
 gdb
+getid
 getline
 getone
 getoneraw
