@@ -512,7 +512,8 @@ namespace mongo {
                     *yielded = true;   
                 }
                 bool res = yield( suggestYieldMicros() , rec );
-                _yieldSometimesTracker.resetLastTime();
+                if ( res )
+                    _yieldSometimesTracker.resetLastTime();
                 return res;
             }
             return true;
@@ -524,7 +525,8 @@ namespace mongo {
                 *yielded = true;   
             }
             bool res = yield( micros , _recordForYield( need ) );
-            _yieldSometimesTracker.resetLastTime();
+            if ( res ) 
+                _yieldSometimesTracker.resetLastTime();
             return res;
         }
         return true;
