@@ -374,7 +374,9 @@ __wt_update_obsolete(WT_SESSION_IMPL *session, WT_PAGE *page, WT_INSERT *ins)
 	 * discard them all.
 	 */
 	for (size = 0; upd != NULL; upd = next) {
-		size += sizeof(WT_UPDATE) + upd->size;
+		/* Deleted items have a dummy size: don't include that. */
+		size += sizeof(WT_UPDATE) +
+		    (WT_UPDATE_DELETED_ISSET(upd) ? 0 : upd->size);
 		next = upd->next;
 		__wt_free(session, upd);
 	}
