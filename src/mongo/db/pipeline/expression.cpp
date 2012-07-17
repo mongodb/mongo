@@ -20,7 +20,6 @@
 #include <cstdio>
 #include "db/jsobj.h"
 #include "db/pipeline/builder.h"
-#include "db/pipeline/dependency_tracker.h"
 #include "db/pipeline/document.h"
 #include "db/pipeline/expression_context.h"
 #include "db/pipeline/value.h"

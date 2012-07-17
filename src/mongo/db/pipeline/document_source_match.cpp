@@ -96,11 +96,4 @@ namespace mongo {
         DocumentSourceFilterBase(pExpCtx),
         matcher(query) {
     }
-
-    void DocumentSourceMatch::manageDependencies(
-        const intrusive_ptr<DependencyTracker> &pTracker) {
-#ifdef MONGO_LATER_SERVER_4644
-        verify(false); // $$$ implement dependencies on Matcher
-#endif /* MONGO_LATER_SERVER_4644 */
-    }
 }

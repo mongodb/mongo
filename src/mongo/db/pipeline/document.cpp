@@ -17,7 +17,6 @@
 #include "pch.h"
 #include <boost/functional/hash.hpp>
 #include "db/jsobj.h"
-#include "db/pipeline/dependency_tracker.h"
 #include "db/pipeline/document.h"
 #include "db/pipeline/value.h"
 #include "util/mongoutils/str.h"
@@ -27,17 +26,11 @@ namespace mongo {
 
     string Document::idName("_id");
 
-    intrusive_ptr<Document> Document::createFromBsonObj(
-        BSONObj *pBsonObj, const DependencyTracker *pDependencies) {
-        intrusive_ptr<Document> pDocument(
-            new Document(pBsonObj, pDependencies));
-        return pDocument;
+    intrusive_ptr<Document> Document::createFromBsonObj(BSONObj* pBsonObj) {
+        return new Document(pBsonObj);
     }
 
-    Document::Document(BSONObj *pBsonObj,
-                       const DependencyTracker *pDependencies):
-        vFieldName(),
-        vpValue() {
+    Document::Document(BSONObj* pBsonObj) {
         const int fields = pBsonObj->nFields();
         vFieldName.reserve(fields);
         vpValue.reserve(fields);
@@ -46,7 +39,6 @@ namespace mongo {
             BSONElement bsonElement(bsonIterator.next());
             string fieldName(bsonElement.fieldName());
 
-            // LATER check pDependencies
             // LATER grovel through structures???
             intrusive_ptr<const Value> pValue(
                 Value::createFromBsonElement(&bsonElement));
@@ -56,7 +48,7 @@ namespace mongo {
         }
     }
 
-    void Document::toBson(BSONObjBuilder *pBuilder) const {
+    void Document::toBson(BSONObjBuilder* pBuilder) const {
         const size_t n = vFieldName.size();
         for(size_t i = 0; i < n; ++i)
             vpValue[i]->addToBsonObj(pBuilder, vFieldName[i]);

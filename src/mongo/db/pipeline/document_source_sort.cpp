@@ -19,7 +19,6 @@
 #include "db/pipeline/document_source.h"
 
 #include "db/jsobj.h"
-#include "db/pipeline/dependency_tracker.h"
 #include "db/pipeline/doc_mem_monitor.h"
 #include "db/pipeline/document.h"
 #include "db/pipeline/expression.h"
@@ -221,14 +220,4 @@ namespace mongo {
         */
         return 0;
     }
-
-    void DocumentSourceSort::manageDependencies(
-        const intrusive_ptr<DependencyTracker> &pTracker) {
-        /* get the dependencies out of the matcher */
-        for(SortPaths::iterator i(vSortKey.begin()); i != vSortKey.end(); ++i) {
-            string fieldPath((*i)->getFieldPath(false));
-            pTracker->addDependency(fieldPath, this);
-        }
-    }
-
 }

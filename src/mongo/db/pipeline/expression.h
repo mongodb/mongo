@@ -27,7 +27,6 @@ namespace mongo {
     class BSONElement;
     class BSONObjBuilder;
     class Builder;
-    class DependencyTracker;
     class Document;
     class DocumentSource;
     class ExpressionContext;

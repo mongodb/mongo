@@ -507,9 +507,6 @@
     <ClCompile Include="..\db\pipeline\builder.cpp">
       <Filter>db\pipeline\Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\db\pipeline\dependency_tracker.cpp">
-      <Filter>db\pipeline\Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\db\pipeline\doc_mem_monitor.cpp">
       <Filter>db\pipeline\Source Files</Filter>
     </ClCompile>
@@ -847,9 +844,6 @@
       <Filter>db\pipeline\Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\db\pipeline\builder.h">
-      <Filter>db\pipeline\Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\db\pipeline\dependency_tracker.h">
       <Filter>db\pipeline\Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\db\pipeline\doc_mem_monitor.h">

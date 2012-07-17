@@ -293,10 +293,4 @@ namespace mongo {
 
         return pUnwind;
     }
-
-    void DocumentSourceUnwind::manageDependencies(
-        const intrusive_ptr<DependencyTracker> &pTracker) {
-        pTracker->addDependency(_unwindPath.getPath(false), this);
-    }
-    
 }

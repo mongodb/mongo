@@ -134,8 +134,7 @@ namespace mongo {
                 }
             }
 
-            pCurrent = Document::createFromBsonObj(
-                &documentObj, NULL /* LATER pDependencies.get()*/);
+            pCurrent = Document::createFromBsonObj(&documentObj);
 
             cursor()->advance();
             return;
@@ -195,9 +194,8 @@ namespace mongo {
         const intrusive_ptr<ExpressionContext> &pCtx):
         DocumentSource(pCtx),
         pCurrent(),
-        _cursorWithContext( cursorWithContext ),
-        pDependencies() {
-    }
+        _cursorWithContext( cursorWithContext )
+    {}
 
     intrusive_ptr<DocumentSourceCursor> DocumentSourceCursor::create(
         const shared_ptr<CursorWithContext>& cursorWithContext,
@@ -227,11 +225,4 @@ namespace mongo {
         _projection->init(projection);
         cursor()->fields = _projection;
     }
-
-    void DocumentSourceCursor::manageDependencies(
-        const intrusive_ptr<DependencyTracker> &pTracker) {
-        /* hang on to the tracker */
-        pDependencies = pTracker;
-    }
-
 }
