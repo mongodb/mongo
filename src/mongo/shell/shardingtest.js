@@ -819,6 +819,19 @@ ShardingTest.prototype.chunkDiff = function( collName , dbName ){
     return max - min;
 }
 
+// Waits up to one minute for the difference in chunks between the most loaded shard and least
+// loaded shard to be 0 or 1, indicating that the collection is well balanced.
+// This should only be called after creating a big enough chunk difference to trigger balancing.
+ShardingTest.prototype.awaitBalance = function( collName , dbName ) {
+    var shardingTest = this;
+    assert.soon( function() {
+        var x = shardingTest.chunkDiff( collName , dbName );
+        print( "chunk diff: " + x );
+        return x < 2;
+    } , "no balance happened", 60000 );
+
+}
+
 ShardingTest.prototype.getShard = function( coll, query, includeEmpty ){
     var shards = this.getShards( coll, query, includeEmpty )
     assert.eq( shards.length, 1 )

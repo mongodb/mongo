@@ -3,7 +3,7 @@
 s = new ShardingTest( "shard_index", 2, 0, 1 )
 
 // Regenerate fully because of SERVER-2782
-for ( var i = 0; i < 13; i++ ) {
+for ( var i = 0; i < 15; i++ ) {
 		
 	var coll = s.admin._mongo.getDB( "test" ).getCollection( "foo" + i )
 	coll.drop()
@@ -242,6 +242,38 @@ for ( var i = 0; i < 13; i++ ) {
             print(e);
         }
         assert( !passed , "Should not be able to shard collection with mulikey index");
+    }
+    if ( i == 13 ){
+
+        coll.save({ num : [100, 200], x : 10});
+        coll.ensureIndex( { num : 1, x : 1} );
+
+        passed = false;
+        try{
+            s.adminCommand( { shardcollection : "" + coll, key : { num : 1 } } );
+            passed = true;
+        }
+        catch( e ){
+            print(e);
+        }
+        assert( !passed , "Should not be able to shard collection with mulikey index");
+
+    }
+    if ( i == 14 ){
+
+        coll.save({ num : 100, x : 10, y : [1,2]});
+        coll.ensureIndex( { num : 1, x : 1, y : 1} );
+
+        passed = false;
+        try{
+            s.adminCommand( { shardcollection : "" + coll, key : { num : 1 } } );
+            passed = true;
+        }
+        catch( e ){
+            print(e);
+        }
+        assert( !passed , "Should not be able to shard collection with mulikey index");
+
     }
 }
 
