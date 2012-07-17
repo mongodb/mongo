@@ -36,8 +36,16 @@ catch(e) {
     print(e);
 }
 
-var config = master.getDB("local").system.replset.findOne();
-assert.eq(oldVersion+1, config.version);
+assert.soon(function() {
+    try {
+        var config = master.getDB("local").system.replset.findOne();
+        return oldVersion+1 == config.version;
+    }
+    catch (e) {
+        print("Query failed: "+e);
+        return false;
+    }
+});
 
 
 print("0 & 3 up; 1, 2, 4 down");
