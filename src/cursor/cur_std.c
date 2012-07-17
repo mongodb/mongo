@@ -56,6 +56,26 @@ __wt_cursor_get_key(WT_CURSOR *cursor, ...)
 }
 
 /*
+ * __wt_cursor_get_raw_key --
+ *	Temporarily force raw mode in a cursor to get a canonical copy of
+ * the key.
+ */
+static int
+__wt_cursor_get_raw_key(WT_CURSOR *cursor, WT_ITEM *key)
+{
+	WT_DECL_RET;
+	int raw_set;
+
+	raw_set = F_ISSET(cursor, WT_CURSTD_RAW) ? 1 : 0;
+	if (!raw_set)
+		F_SET(cursor, WT_CURSTD_RAW);
+	ret = cursor->get_key(cursor, key);
+	if (!raw_set)
+		F_CLR(cursor, WT_CURSTD_RAW);
+	return (ret);
+}
+
+/*
  * __wt_cursor_get_keyv --
  *	WT_CURSOR->get_key worker function.
  */
@@ -134,6 +154,24 @@ __wt_cursor_set_key(WT_CURSOR *cursor, ...)
 	va_start(ap, cursor);
 	__wt_cursor_set_keyv(cursor, cursor->flags, ap);
 	va_end(ap);
+}
+
+/*
+ * __wt_cursor_set_raw_key --
+ *	Temporarily force raw mode in a cursor to set a canonical copy of
+ * the key.
+ */
+static void
+__wt_cursor_set_raw_key(WT_CURSOR *cursor, WT_ITEM *key)
+{
+	int raw_set;
+
+	raw_set = F_ISSET(cursor, WT_CURSTD_RAW) ? 1 : 0;
+	if (!raw_set)
+		F_SET(cursor, WT_CURSTD_RAW);
+	cursor->set_key(cursor, key);
+	if (!raw_set)
+		F_CLR(cursor, WT_CURSTD_RAW);
 }
 
 /*
@@ -295,26 +333,29 @@ __cursor_search(WT_CURSOR *cursor)
 static int
 __cursor_equals(WT_CURSOR *cursor, WT_CURSOR *other)
 {
+	WT_ITEM aitem, bitem;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
 	CURSOR_API_CALL_NOCONF(cursor, session, equals, NULL);
 
-	/* Both cursors must refer to the same source. */
-	if (other == NULL || strcmp(cursor->uri, other->uri) != 0)
-		goto done;
-
-	/* Check that both have keys set and the keys match. */
-	if (F_ISSET(cursor, WT_CURSTD_KEY_SET) &&
-	    F_ISSET(other, WT_CURSTD_KEY_SET)) {
-		if (WT_CURSOR_RECNO(cursor))
-			ret = (cursor->recno == other->recno);
-		else if (cursor->key.size == other->key.size)
-			ret = (memcmp(cursor->key.data, other->key.data,
-			    cursor->key.size) == 0);
+	/*
+	 * Confirm both cursors refer to the same source, then retrieve their
+	 * raw keys and compare them.
+	 */
+	if (other != NULL && strcmp(cursor->uri, other->uri) == 0) {
+		/*
+		 * Don't clear (or allocate memory for) the WT_ITEM structures
+		 * because all that happens underneath is their data and size
+		 * fields are reset to reference the cursor's key.
+		 */
+		WT_ERR(__wt_cursor_get_raw_key(cursor, &aitem));
+		WT_ERR(__wt_cursor_get_raw_key(other, &bitem));
+		ret = (aitem.size == bitem.size &&
+		    memcmp(aitem.data, bitem.data, aitem.size) == 0) ? 1 : 0;
 	}
 
-done:	API_END(session);
+err:	API_END(session);
 	return (ret);
 }
 
@@ -403,38 +444,24 @@ __wt_cursor_dup(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_ITEM key;
 	WT_SESSION *wt_session;
-	uint32_t saved_flags;
 
 	wt_session = &session->iface;
 
-	/* First open a new cursor with the same URI. */
+	/* Open a new cursor with the same URI. */
 	WT_ERR(wt_session->open_cursor(
 	    wt_session, to_dup->uri, NULL, config, &cursor));
 
 	/*
-	 * If the original cursor is positioned, copy the key and position the
-	 * new cursor.  Temporarily force raw mode in both cursors to get a
-	 * canonical copy of the key.
+	 * Get a copy of the cursor's raw key, and set it in the new cursor,
+	 * then search for that key to position the cursor.
+	 *
+	 * Don't clear (or allocate memory for) the WT_ITEM structure because
+	 * all that happens underneath is the data and size fields are reset
+	 * to reference the cursor's key.
 	 */
-	if (F_ISSET(to_dup, WT_CURSTD_KEY_SET)) {
-		/* Get the (raw) key from the original cursor. */
-		saved_flags = F_ISSET(to_dup, WT_CURSTD_RAW);
-		if (saved_flags == 0)
-			F_SET(to_dup, WT_CURSTD_RAW);
-		ret = to_dup->get_key(to_dup, &key);
-		if (saved_flags == 0)
-			F_CLR(to_dup, WT_CURSTD_RAW);
-		WT_ERR(ret);
-
-		/* Set the (raw) key in the new cursor. */
-		saved_flags = F_ISSET(cursor, WT_CURSTD_RAW);
-		if (saved_flags == 0)
-			F_SET(cursor, WT_CURSTD_RAW);
-		cursor->set_key(cursor, &key);
-		if (saved_flags == 0)
-			F_CLR(cursor, WT_CURSTD_RAW);
-		WT_ERR(cursor->search(cursor));
-	}
+	WT_ERR(__wt_cursor_get_raw_key(to_dup, &key));
+	__wt_cursor_set_raw_key(cursor, &key);
+	WT_ERR(cursor->search(cursor));
 
 	if (0) {
 err:		if (cursor != NULL)
