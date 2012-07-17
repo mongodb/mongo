@@ -129,6 +129,12 @@ namespace mongo {
         return pProject;
     }
 
+    DocumentSource::GetDepsReturn DocumentSourceProject::getDependencies(set<string>& deps) const {
+        vector<string> path; // empty == top-level
+        pEO->addDependencies(deps, &path);
+        return EXAUSTIVE;
+    }
+
     void DocumentSourceProject::DependencyRemover::path(
         const string &path, bool include) {
         if (include)

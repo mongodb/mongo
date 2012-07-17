@@ -31,6 +31,10 @@ namespace mongo {
         vFieldName() {
     }
 
+    FieldPath::FieldPath(const vector<string>& fieldPath):
+        vFieldName(fieldPath) {
+    }
+
     FieldPath::FieldPath(const string &fieldPath):
         vFieldName() {
         /*

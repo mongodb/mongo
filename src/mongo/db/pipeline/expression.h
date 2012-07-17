@@ -55,15 +55,19 @@ namespace mongo {
         virtual intrusive_ptr<Expression> optimize() = 0;
 
         /**
-           Add this expression's field dependencies to the dependency tracker.
+           Add this expression's field dependencies to the set
 
            Expressions are trees, so this is often recursive.
 
-           @params pTracker the tracker to add the dependencies to
+           @param deps output parameter
+           @param path path to self if all ancestors are ExpressionObjects.
+                       Top-level ExpressionObject gets pointer to empty vector.
+                       If any other Expression is an ancestor {a:1} object
+                       aren't allowed, so they get NULL
+
+
          */
-        virtual void addDependencies(
-            const intrusive_ptr<DependencyTracker> &pTracker,
-            const DocumentSource *pSource) const = 0;
+        virtual void addDependencies(set<string>& deps, vector<string>* path=NULL) const = 0;
 
         /*
           Evaluate the Expression using the given document as input.
@@ -233,9 +237,7 @@ namespace mongo {
             BSONObjBuilder *pBuilder, string fieldName,
             bool requireExpression) const;
         virtual void addToBsonArray(BSONArrayBuilder *pBuilder) const;
-        virtual void addDependencies(
-            const intrusive_ptr<DependencyTracker> &pTracker,
-            const DocumentSource *pSource) const;
+        virtual void addDependencies(set<string>& deps, vector<string>* path=NULL) const;
 
         /*
           Add an operand to the n-ary expression.
@@ -392,9 +394,7 @@ namespace mongo {
         // virtuals from ExpressionNary
         virtual ~ExpressionCoerceToBool();
         virtual intrusive_ptr<Expression> optimize();
-        virtual void addDependencies(
-            const intrusive_ptr<DependencyTracker> &pTracker,
-            const DocumentSource *pSource) const;
+        virtual void addDependencies(set<string>& deps, vector<string>* path=NULL) const;
         virtual intrusive_ptr<const Value> evaluate(
             const intrusive_ptr<Document> &pDocument) const;
         virtual void addToBsonObj(
@@ -470,9 +470,7 @@ namespace mongo {
         // virtuals from Expression
         virtual ~ExpressionConstant();
         virtual intrusive_ptr<Expression> optimize();
-        virtual void addDependencies(
-            const intrusive_ptr<DependencyTracker> &pTracker,
-            const DocumentSource *pSource) const;
+        virtual void addDependencies(set<string>& deps, vector<string>* path=NULL) const;
         virtual intrusive_ptr<const Value> evaluate(
             const intrusive_ptr<Document> &pDocument) const;
         virtual const char *getOpName() const;
@@ -575,9 +573,7 @@ namespace mongo {
         // virtuals from Expression
         virtual ~ExpressionFieldPath();
         virtual intrusive_ptr<Expression> optimize();
-        virtual void addDependencies(
-            const intrusive_ptr<DependencyTracker> &pTracker,
-            const DocumentSource *pSource) const;
+        virtual void addDependencies(set<string>& deps, vector<string>* path=NULL) const;
         virtual intrusive_ptr<const Value> evaluate(
             const intrusive_ptr<Document> &pDocument) const;
         virtual void addToBsonObj(
@@ -647,9 +643,7 @@ namespace mongo {
         // virtuals from expression
         virtual ~ExpressionFieldRange();
         virtual intrusive_ptr<Expression> optimize();
-        virtual void addDependencies(
-            const intrusive_ptr<DependencyTracker> &pTracker,
-            const DocumentSource *pSource) const;
+        virtual void addDependencies(set<string>& deps, vector<string>* path=NULL) const;
         virtual intrusive_ptr<const Value> evaluate(
             const intrusive_ptr<Document> &pDocument) const;
         virtual void addToBsonObj(
@@ -903,9 +897,7 @@ namespace mongo {
         // virtuals from Expression
         virtual ~ExpressionObject();
         virtual intrusive_ptr<Expression> optimize();
-        virtual void addDependencies(
-            const intrusive_ptr<DependencyTracker> &pTracker,
-            const DocumentSource *pSource) const;
+        virtual void addDependencies(set<string>& deps, vector<string>* path=NULL) const;
         virtual intrusive_ptr<const Value> evaluate(
             const intrusive_ptr<Document> &pDocument) const;
         virtual void addToBsonObj(

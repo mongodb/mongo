@@ -58,31 +58,34 @@ namespace mongo {
 
         /* Look for an initial simple project; we'll avoid constructing Values
          * for fields that won't make it through the projection.
-         *
-         * Currently this only supports the basic projections that mongod
-         * already supports natively.
-         * TODO: support any $project
          */
 
         BSONObj projection;
-        if (pSources->size()) {
-            const intrusive_ptr<DocumentSource> &source = pSources->front();
-            DocumentSourceProject* projectSource =
-                dynamic_cast<DocumentSourceProject*>(source.get());
+        {
+            set<string> deps;
+            DocumentSource::GetDepsReturn status = DocumentSource::SEE_NEXT;
+            for (size_t i=0; i < pSources->size() && status == DocumentSource::SEE_NEXT; i++) {
+                status = (*pSources)[i]->getDependencies(deps);
+            }
 
-            if (projectSource && projectSource->isSimple()) {
-                projection = projectSource->getRaw();
+            if (status == DocumentSource::EXAUSTIVE) {
+                BSONObjBuilder bb;
+                if (deps.count("_id") == 0)
+                    bb.append("_id", 0);
 
-                // remove the projection from the pipeline
-                if (debug) {
-                    // leaving this in for DEBUG build to allow testing that
-                    // $project behaves the same regardless of if it is
-                    // implemented with Projection or DocumentSourceProject
-                    projectSource->setWouldBeRemoved();
+                string last;
+                for (set<string>::const_iterator it(deps.begin()), end(deps.end()); it!=end; ++it) {
+                    if (!last.empty() && str::startsWith(*it, last)) {
+                        // we are including a parent of *it so we don't need to
+                        // include this field explicitly. In fact, due to
+                        // SERVER-6527 if we included this field, the parent
+                        // wouldn't be fully included.
+                        continue;
+                    }
+                    last = *it + '.';
+                    bb.append(*it, 1);
                 }
-                else {
-                    pSources->erase(pSources->begin());
-                }
+                projection = bb.obj();
             }
         }
 

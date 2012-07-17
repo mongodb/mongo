@@ -27,9 +27,10 @@ namespace mongo {
         /**
            Constructor.
 
-           @param fieldPath the dotted field path string
+           @param fieldPath the dotted field path string or pre-split vector
          */
-        FieldPath(const string &fieldPath);
+        FieldPath(const string& fieldPath);
+        FieldPath(const vector<string>& fieldPath);
 
         /**
            Constructor.

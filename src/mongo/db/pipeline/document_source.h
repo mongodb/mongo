@@ -164,9 +164,28 @@ namespace mongo {
 
            $$$ MONGO_LATER_SERVER_4644
            @param pTracker the dependency tracker
+
+           Note, this function doesn't affect anything but is currently called by stub code
          */
         virtual void manageDependencies(
             const intrusive_ptr<DependencyTracker> &pTracker);
+
+        enum GetDepsReturn {
+            NOT_SUPPORTED, // This means the set should be ignored
+            EXAUSTIVE, // This means that everything needed should be in the set
+            SEE_NEXT, // Add the next Source's deps to the set
+        };
+
+        /** Get the fields this operation needs to do it's job.
+         *  Deps should be in "a.b.c" notation
+         *
+         *  @param deps results are added here. NOT CLEARED
+         *
+         *  Note: this is a simplified form of manageDependencies()
+         */
+        virtual GetDepsReturn getDependencies(set<string>& deps) const {
+            return NOT_SUPPORTED;
+        }
 
         /**
           Add the DocumentSource to the array builder.
@@ -798,6 +817,8 @@ namespace mongo {
         virtual void optimize();
         virtual void manageDependencies(
             const intrusive_ptr<DependencyTracker> &pTracker);
+
+        virtual GetDepsReturn getDependencies(set<string>& deps) const;
 
         /**
           Create a new projection DocumentSource from BSON.

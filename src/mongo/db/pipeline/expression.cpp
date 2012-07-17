@@ -610,10 +610,8 @@ namespace mongo {
         return intrusive_ptr<Expression>(this);
     }
 
-    void ExpressionCoerceToBool::addDependencies(
-        const intrusive_ptr<DependencyTracker> &pTracker,
-        const DocumentSource *pSource) const {
-        /* nothing to do */
+    void ExpressionCoerceToBool::addDependencies(set<string>& deps, vector<string>* path) const {
+        pExpression->addDependencies(deps);
     }
 
     intrusive_ptr<const Value> ExpressionCoerceToBool::evaluate(
@@ -921,9 +919,7 @@ namespace mongo {
         return intrusive_ptr<Expression>(this);
     }
 
-    void ExpressionConstant::addDependencies(
-        const intrusive_ptr<DependencyTracker> &pTracker,
-        const DocumentSource *pSource) const {
+    void ExpressionConstant::addDependencies(set<string>& deps, vector<string>* path) const {
         /* nothing to do */
     }
 
@@ -1148,12 +1144,34 @@ namespace mongo {
         return intrusive_ptr<Expression>(this);
     }
 
-    void ExpressionObject::addDependencies(
-        const intrusive_ptr<DependencyTracker> &pTracker,
-        const DocumentSource *pSource) const {
+    void ExpressionObject::addDependencies(set<string>& deps, vector<string>* path) const {
+        string pathStr;
+        if (path) {
+            if (path->empty()) {
+                // we are in the top-level so _id is implicit
+                if (!_excludeId)
+                    deps.insert("_id");
+            }
+            else {
+                FieldPath f (*path);
+                pathStr = f.getPath(false);
+                pathStr += '.';
+            }
+        }
+
         for (ExpressionMap::const_iterator it(_expressions.begin()); it!=_expressions.end(); ++it) {
-            if (it->second)
-                it->second->addDependencies(pTracker, pSource);
+            if (it->second) {
+                if (path) path->push_back(it->first);
+                it->second->addDependencies(deps, path);
+                if (path) path->pop_back();
+            }
+            else { // inclusion
+                // TODO move this assert into parsing stage
+                uassert(16407, "inclusion not supported in objects nested in $expressions",
+                        path);
+
+                deps.insert(pathStr + it->first);
+            }
         }
     }
 
@@ -1434,10 +1452,8 @@ namespace mongo {
         return intrusive_ptr<Expression>(this);
     }
 
-    void ExpressionFieldPath::addDependencies(
-        const intrusive_ptr<DependencyTracker> &pTracker,
-        const DocumentSource *pSource) const {
-        pTracker->addDependency(fieldPath.getPath(false), pSource);
+    void ExpressionFieldPath::addDependencies(set<string>& deps, vector<string>* path) const {
+        deps.insert(fieldPath.getPath(false));
     }
 
     intrusive_ptr<const Value> ExpressionFieldPath::evaluatePath(
@@ -1542,10 +1558,8 @@ namespace mongo {
         return intrusive_ptr<Expression>(this);
     }
 
-    void ExpressionFieldRange::addDependencies(
-        const intrusive_ptr<DependencyTracker> &pTracker,
-        const DocumentSource *pSource) const {
-        pFieldPath->addDependencies(pTracker, pSource);
+    void ExpressionFieldRange::addDependencies(set<string>& deps, vector<string>* path) const {
+        pFieldPath->addDependencies(deps);
     }
 
     intrusive_ptr<const Value> ExpressionFieldRange::evaluate(
@@ -2261,12 +2275,10 @@ namespace mongo {
         return pNew;
     }
 
-    void ExpressionNary::addDependencies(
-        const intrusive_ptr<DependencyTracker> &pTracker,
-        const DocumentSource *pSource) const {
+    void ExpressionNary::addDependencies(set<string>& deps, vector<string>* path) const {
         for(ExpressionVector::const_iterator i(vpOperand.begin());
             i != vpOperand.end(); ++i) {
-            (*i)->addDependencies(pTracker, pSource);
+            (*i)->addDependencies(deps);
         }
     }
 

@@ -3,7 +3,7 @@
 t = db.jstests_aggregation_server6120;
 t.drop();
 
-t.save( {} );
+t.save( {object: {a:1}} );
 
 function coerceToBool( value ) {
     return t.aggregate( { $project:{ boolValue:{ $and:[ value ] } } } ).result[ 0 ].boolValue;
@@ -31,7 +31,7 @@ assertBoolValue( false, null );
 // Always true types.
 assertBoolValue( true, '' );
 assertBoolValue( true, 'a' );
-assertBoolValue( true, { a:1 } );
+assertBoolValue( true, "$object" );
 assertBoolValue( true, [] );
 assertBoolValue( true, [ 1 ] );
 assertBoolValue( true, new ObjectId() );
