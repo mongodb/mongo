@@ -130,6 +130,7 @@ struct __wt_session_impl {
 	 * easily call a function to clear memory up to, but not including, the
 	 * hazard reference.
 	 */
+	u_int nhazard;
 #define	WT_SESSION_CLEAR(s)	memset(s, 0, WT_PTRDIFF(&(s)->hazard, s))
 	WT_HAZARD *hazard;		/* Hazard reference array */
 };

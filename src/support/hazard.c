@@ -63,6 +63,14 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, int *busyp
 		    ref->state == WT_REF_EVICT_WALK) {
 			WT_VERBOSE_RET(session, hazard,
 			    "session %p hazard %p: set", session, ref->page);
+
+			/*
+			 * If this is the first hazard reference in the session,
+			 * we may need to update our transactional context.
+			 */
+			if (session->nhazard++ == 0)
+				WT_RET(__wt_txn_read_first(session));
+
 			return (0);
 		}
 
@@ -139,6 +147,14 @@ __wt_hazard_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
 				__wt_evict_server_wake(session);
 			} else
 				hp->page = NULL;
+
+			/*
+			 * If this was the last hazard reference in the session,
+			 * we may need to update our transactional context.
+			 */
+			if (--session->nhazard == 0)
+				__wt_txn_read_last(session);
+
 			return;
 		}
 	__wt_errx(session,
