@@ -62,9 +62,6 @@ namespace mongo {
         return Logstream::get().prolog();
     }
 
-    Nullstream::Nullstream() {}
-    Nullstream::~Nullstream() {}
-
     class LoggingManager {
     public:
         LoggingManager()
