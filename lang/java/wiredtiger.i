@@ -195,7 +195,7 @@ enum SearchStatus { FOUND, NOTFOUND, SMALLER, LARGER };
 	int update_wrap(WT_ITEM *k, WT_ITEM *v) {
 		$self->set_key($self, k);
 		$self->set_value($self, v);
-		return $self->insert($self);
+		return $self->update($self);
 	}
 }
 
