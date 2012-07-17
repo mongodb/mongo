@@ -1143,6 +1143,13 @@ namespace mongo {
 
         return intrusive_ptr<Expression>(this);
     }
+    bool ExpressionObject::isSimple() {
+        for (ExpressionMap::iterator it(_expressions.begin()); it!=_expressions.end(); ++it) {
+            if (it->second && !it->second->isSimple())
+                return false;
+        }
+        return true;
+    }
 
     void ExpressionObject::addDependencies(set<string>& deps, vector<string>* path) const {
         string pathStr;

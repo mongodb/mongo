@@ -29,12 +29,9 @@ namespace mongo {
     DocumentSourceProject::~DocumentSourceProject() {
     }
 
-    DocumentSourceProject::DocumentSourceProject(
-        const intrusive_ptr<ExpressionContext> &pExpCtx):
-        DocumentSource(pExpCtx),
-        pEO(ExpressionObject::create()),
-        _isSimple(true), // set to false in addField
-        _wouldBeRemoved(false)
+    DocumentSourceProject::DocumentSourceProject(const intrusive_ptr<ExpressionContext> &pExpCtx)
+        : DocumentSource(pExpCtx)
+        , pEO(ExpressionObject::create())
     { }
 
     const char *DocumentSourceProject::getSourceName() const {
@@ -66,24 +63,29 @@ namespace mongo {
         */
         pEO->addToDocument(pResultDocument, pInDocument, /*root=*/pInDocument);
 
-        if (debug && _wouldBeRemoved) {
-            // In this case the $project would have been removed in a
-            // non-debug build. Make sure that won't change the output.
-            if (Document::compare(pResultDocument, pSource->getCurrent()) != 0) {
-                log() << "$project removed incorrectly: " << getRaw();
-                {
-                    BSONObjBuilder printable;
-                    pSource->getCurrent()->toBson(&printable);
-                    log() << "in:  " << printable.done();
-                }
-                {
-                    BSONObjBuilder printable;
-                    pResultDocument->toBson(&printable);
-                    log() << "out: " << printable.done();
-                }
-                verify(false);
+#if defined(_DEBUG)
+        if (!_simpleProjection.getSpec().isEmpty()) {
+            // Make sure we return the same results as Projection class
+
+            BSONObjBuilder inputBuilder;
+            pSource->getCurrent()->toBson(&inputBuilder);
+            BSONObj input = inputBuilder.done();
+
+            BSONObjBuilder outputBuilder;
+            pResultDocument->toBson(&outputBuilder);
+            BSONObj output = outputBuilder.done();
+
+            BSONObj projected = _simpleProjection.transform(input);
+
+            if (projected != output) {
+                log() << "$project applied incorrectly: " << getRaw() << endl;
+                log() << "input:  " << input << endl;
+                log() << "out: " << output << endl;
+                log() << "projected: " << projected << endl;
+                verify(false); // exits in _DEBUG builds
             }
         }
+#endif
 
         return pResultDocument;
     }
@@ -122,10 +124,18 @@ namespace mongo {
         ExpressionObject* exprObj = dynamic_cast<ExpressionObject*>(parsed.get());
         massert(16402, "parseObject() returned wrong type of Expression", exprObj);
         uassert(16403, "$projection requires at least one output field", exprObj->getFieldCount());
+
         pProject->pEO = exprObj;
 
-        // TODO simpleness
-        pProject->_isSimple = false;
+#if defined(_DEBUG)
+        if (exprObj->isSimple()) {
+            set<string> deps;
+            vector<string> path;
+            exprObj->addDependencies(deps, &path);
+            pProject->_simpleProjection.init(depsToProjection(deps));
+        }
+#endif
+
         return pProject;
     }
 

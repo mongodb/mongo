@@ -69,6 +69,9 @@ namespace mongo {
          */
         virtual void addDependencies(set<string>& deps, vector<string>* path=NULL) const = 0;
 
+        /** simple expressions are just inclusion exclusion as supported by ExpressionObject */
+        virtual bool isSimple() { return false; }
+
         /*
           Evaluate the Expression using the given document as input.
 
@@ -897,6 +900,7 @@ namespace mongo {
         // virtuals from Expression
         virtual ~ExpressionObject();
         virtual intrusive_ptr<Expression> optimize();
+        virtual bool isSimple();
         virtual void addDependencies(set<string>& deps, vector<string>* path=NULL) const;
         virtual intrusive_ptr<const Value> evaluate(
             const intrusive_ptr<Document> &pDocument) const;

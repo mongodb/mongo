@@ -187,6 +187,11 @@ namespace mongo {
             return NOT_SUPPORTED;
         }
 
+        /** This takes dependencies from getDependencies and
+         *  returns a projection that includes all of them
+         */
+        static BSONObj depsToProjection(const set<string>& deps);
+
         /**
           Add the DocumentSource to the array builder.
 
@@ -839,14 +844,6 @@ namespace mongo {
         /** projection as specified by the user */
         BSONObj getRaw() const { return _raw; }
 
-        /** true if just include/exclude, no renames */
-        bool isSimple() const { return _isSimple; }
-
-        /** called by PipelineD::prepareCursorSource in debug builds if it
-         *  would remove this Projection
-         */
-        void setWouldBeRemoved() { _wouldBeRemoved = true; }
-
     protected:
         // virtuals from DocumentSource
         virtual void sourceToBson(BSONObjBuilder *pBuilder, bool explain) const;
@@ -857,8 +854,11 @@ namespace mongo {
         // configuration state
         intrusive_ptr<ExpressionObject> pEO;
         BSONObj _raw;
-        bool _isSimple;
-        bool _wouldBeRemoved; // only used by debug builds
+
+#if defined(_DEBUG)
+        // this is used in DEBUG builds to ensure we are compatible
+        Projection _simpleProjection;
+#endif
 
         /*
           Utility object used by manageDependencies().

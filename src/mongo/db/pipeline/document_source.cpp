@@ -91,4 +91,24 @@ namespace mongo {
         ss << ba.toString(/* isArray */true); 
             // our toString should use standard string types.....
     }
+
+    BSONObj DocumentSource::depsToProjection(const set<string>& deps) {
+        BSONObjBuilder bb;
+        if (deps.count("_id") == 0)
+            bb.append("_id", 0);
+
+        string last;
+        for (set<string>::const_iterator it(deps.begin()), end(deps.end()); it!=end; ++it) {
+            if (!last.empty() && str::startsWith(*it, last)) {
+                // we are including a parent of *it so we don't need to
+                // include this field explicitly. In fact, due to
+                // SERVER-6527 if we included this field, the parent
+                // wouldn't be fully included.
+                continue;
+            }
+            last = *it + '.';
+            bb.append(*it, 1);
+        }
+        return bb.obj();
+    }
 }
