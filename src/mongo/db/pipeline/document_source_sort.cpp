@@ -110,6 +110,14 @@ namespace mongo {
             pBuilder->append(ss.str(), (vAscending[i] ? 1 : -1));
         }
     }
+    DocumentSource::GetDepsReturn DocumentSourceSort::getDependencies(set<string>& deps) const {
+        for(size_t i = 0; i < vSortKey.size(); ++i) {
+            vSortKey[i]->addDependencies(deps);
+        }
+
+        return SEE_NEXT;
+    }
+
 
     intrusive_ptr<DocumentSource> DocumentSourceSort::createFromBson(
         BSONElement *pBsonElement,

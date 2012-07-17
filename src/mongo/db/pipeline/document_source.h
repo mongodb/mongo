@@ -618,6 +618,7 @@ namespace mongo {
         virtual bool advance();
         virtual const char *getSourceName() const;
         virtual intrusive_ptr<Document> getCurrent();
+        virtual GetDepsReturn getDependencies(set<string>& deps) const;
 
         /**
           Create a new grouping DocumentSource.
@@ -932,6 +933,9 @@ namespace mongo {
         virtual intrusive_ptr<Document> getCurrent();
         virtual void manageDependencies(
             const intrusive_ptr<DependencyTracker> &pTracker);
+
+        virtual GetDepsReturn getDependencies(set<string>& deps) const;
+
         /*
           TODO
           Adjacent sorts should reduce to the last sort.
@@ -1064,6 +1068,10 @@ namespace mongo {
         virtual const char *getSourceName() const;
         virtual bool coalesce(const intrusive_ptr<DocumentSource> &pNextSource);
 
+        virtual GetDepsReturn getDependencies(set<string>& deps) const {
+            return SEE_NEXT; // This doesn't affect needed fields
+        }
+
         /**
           Create a new limiting DocumentSource.
 
@@ -1087,7 +1095,6 @@ namespace mongo {
         static intrusive_ptr<DocumentSource> createFromBson(
             BSONElement *pBsonElement,
             const intrusive_ptr<ExpressionContext> &pExpCtx);
-
 
         static const char limitName[];
 
@@ -1115,6 +1122,10 @@ namespace mongo {
         virtual const char *getSourceName() const;
         virtual bool coalesce(const intrusive_ptr<DocumentSource> &pNextSource);
 
+        virtual GetDepsReturn getDependencies(set<string>& deps) const {
+            return SEE_NEXT; // This doesn't affect needed fields
+        }
+
         /**
           Create a new skipping DocumentSource.
 
@@ -1138,7 +1149,6 @@ namespace mongo {
         static intrusive_ptr<DocumentSource> createFromBson(
             BSONElement *pBsonElement,
             const intrusive_ptr<ExpressionContext> &pExpCtx);
-
 
         static const char skipName[];
 
@@ -1171,6 +1181,8 @@ namespace mongo {
         virtual intrusive_ptr<Document> getCurrent();
         virtual void manageDependencies(
             const intrusive_ptr<DependencyTracker> &pTracker);
+
+        virtual GetDepsReturn getDependencies(set<string>& deps) const;
 
         /**
           Create a new projection DocumentSource from BSON.

@@ -1562,4 +1562,13 @@ var g6result = [
     }
 ];
 
-assert.eq(g6.result, g6result, 'g6 failed');
+// Test unwind on an unused field
+var g7 = db.runCommand(
+{ aggregate : "article", pipeline : [
+    { $unwind : '$tags' },
+    { $group : {
+        _id : "tag_count", /* constant string, *not* a field reference */
+        count : { $sum : 1 }
+    }}
+]});
+assert.eq(g7.result[0].count, 7);

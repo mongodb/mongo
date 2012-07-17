@@ -260,6 +260,11 @@ namespace mongo {
         pBuilder->append(unwindName, _unwindPath.getPath(true));
     }
 
+    DocumentSource::GetDepsReturn DocumentSourceUnwind::getDependencies(set<string>& deps) const {
+        deps.insert(_unwindPath.getPath(false));
+        return SEE_NEXT;
+    }
+
     void DocumentSourceUnwind::unwindPath(const FieldPath &fieldPath) {
         // Can't set more than one unwind path.
         uassert(15979, str::stream() << unwindName <<
