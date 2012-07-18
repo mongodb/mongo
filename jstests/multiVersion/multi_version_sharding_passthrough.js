@@ -49,7 +49,7 @@ function shouldRunTest( testFile, exceptPatterns ){
     if( /[\/\\]_/.test( testFile.name ) || // underscore tests
         ! /\.js$/.test( testFile.name ) )  // isn't a .js file
     { 
-        print( " >>>>>>>> skipping " + x.name )
+        print( " >>>>>>>> skipping " + testFile.name )
         return false
     }
     
@@ -123,7 +123,8 @@ var runMultiVersionTest = function( opts ){
     db.shardedPassthrough = true    
     
     var files = listFiles( "jstests" )
-        
+    var errors = []   
+    
     files.forEach( function( testFile ){
         
         if( ! shouldRunTest( testFile, opts.exceptPatterns ) ) return
@@ -144,6 +145,8 @@ var runMultiVersionTest = function( opts ){
             
             print( "Caught error : " )
             printjson( e )
+            
+            errors.push( e )            
         }
         
     })
@@ -154,6 +157,8 @@ var runMultiVersionTest = function( opts ){
     myShardingTest = oldMyShardingTest
     
     Object.extend( ShardingTest, oldOpts )
+    
+    return errors
 }
 
 //
@@ -215,6 +220,7 @@ var v22Only = [ /^all3$/,
                 /^explain8$/,
                 /^explain9$/,
                 /^explaina$/,
+                /^explainb$/,
                 /^find9$/,
                 /^find_and_modify_server6226$/,
                 /^find_and_modify_server6254$/,
@@ -263,6 +269,7 @@ var v22Only = [ /^all3$/,
                 /^oro$/,
                 /^orp$/,
                 /^orq$/,
+                /^orr$/,
                 /^padding$/,
                 /^profile4$/,
                 /^queryoptimizer10$/,
@@ -300,6 +307,7 @@ var v22Only = [ /^all3$/,
                 /^updatei$/,
                 /^updatej$/,
                 /^updatek$/,
+                /^use_power_of_2$/,
                 /^useindexonobjgtlt$/,
                 /^where4$/,
               ]
@@ -327,13 +335,18 @@ v22Only.push( /^index_elemmatch1$/ )
 
 jsTest.log( "Running multi-version 2.0/2.2 mongod/mongos passthrough tests..." )
 
-runMultiVersionTest({
+var errors = []
+
+errors = errors.concat( 
+
+    runMultiVersionTest({
         shardOptions : { binVersion : "2.0.6" },
         rsOptions : { binVersion : "2.0.6" },
         mongosOptions : { binVersion : "latest" },
         configOptions : { binVersion : "2.0.6" },
         exceptPatterns : v22Only,
-        continueOnError : false })
+        continueOnError : true })
+)
 
 //
 // Run multi-version passthrough for 2.2/2.0 mongod/mongos
@@ -343,14 +356,17 @@ v22Only.push( /.*auth.*/ ) // Can't run auth tests
 v22Only.push( /^splitvector$/ ) // Splitvector has been removed from mongod
 
 jsTest.log( "Running multi-version 2.2/2.0 mongod/mongos passthrough tests..." )
-        
-runMultiVersionTest({
+
+errors = errors.concat(    
+
+    runMultiVersionTest({
         shardOptions : { binVersion : "latest" },
         rsOptions : { binVersion : "latest" },
         mongosOptions : { binVersion : "2.0.6" },
         configOptions : { binVersion : "latest" },
         exceptPatterns : v22Only,
-        continueOnError : false })
+        continueOnError : true })
+)
 
 /*
 runMultiVersionTest({
@@ -364,3 +380,8 @@ runMultiVersionTest({
         
 jsTest.log( "Finished all multi-version tests..." )
 
+if( errors.length > 0 ){
+    
+    printjson( errors )
+    throw errors
+}
