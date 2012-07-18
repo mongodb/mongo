@@ -19,7 +19,6 @@ __session_close_cursors(WT_SESSION_IMPL *session)
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 
-	ret = 0;
 	while ((cursor = TAILQ_FIRST(&session->cursors)) != NULL)
 		WT_TRET(cursor->close(cursor));
 	return (ret);

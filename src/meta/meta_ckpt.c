@@ -58,18 +58,14 @@ __wt_meta_checkpoint_get(WT_SESSION_IMPL *session,
 int
 __wt_meta_checkpoint_clear(WT_SESSION_IMPL *session, const char *name)
 {
-	WT_DECL_RET;
-
-	ret = __ckpt_set(session, name, NULL);
-
 	/*
 	 * If we are unrolling a failed create, we may have already removed the
 	 * metadata entry.  If no entry is found to update and we're trying to
 	 * clear the checkpoint, just ignore it.
 	 */
-	if (ret == WT_NOTFOUND)
-		ret = 0;
-	return (ret);
+	WT_RET_NOTFOUND_OK(__ckpt_set(session, name, NULL));
+
+	return (0);
 }
 
 /*
