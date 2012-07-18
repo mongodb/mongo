@@ -54,6 +54,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 		    "Checkpoint not permitted in a transaction");
 
 	WT_RET(__wt_txn_get_snapshot(session, WT_TXN_NONE));
+	txn->isolation = TXN_ISO_SNAPSHOT;
 
 	/* Prevent eviction from evicting anything newer than this. */
 	txn_global->ckpt_txnid = txn->snap_min;
@@ -143,6 +144,7 @@ err:	/*
 		WT_TRET(__wt_meta_track_off(session, ret != 0));
 
 	txn_global->ckpt_txnid = WT_TXN_NONE;
+	txn->isolation = TXN_ISO_READ_UNCOMMITTED;
 	__wt_scr_free(&tmp);
 	return (ret);
 }

@@ -95,8 +95,9 @@ __wt_txn_visible(WT_SESSION_IMPL *session, wt_txnid_t id)
 	 * non-snapshot transactions see all other changes.
 	 */
 	txn = &session->txn;
-	if (id == WT_TXN_NONE || id == txn->id ||
-	    txn->isolation != TXN_ISO_SNAPSHOT)
+	if (id == WT_TXN_NONE ||
+	    txn->isolation != TXN_ISO_SNAPSHOT ||
+	    (F_ISSET(txn, TXN_RUNNING) && id == txn->id))
 		return (1);
 
 	/*
