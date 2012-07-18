@@ -116,9 +116,14 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 			cgname = table->cg_name[i] =
 			    __wt_buf_steal(session, &namebuf, NULL);
 		}
-		/* It is okay if the table is not yet complete. */
-		WT_ERR_NOTFOUND_OK(__wt_schema_get_btree(
-		    session, cgname, strlen(cgname), NULL, 0));
+		ret = __wt_schema_get_btree(
+		    session, cgname, strlen(cgname), NULL, 0);
+		if (ret != 0) {
+			/* It is okay if the table is not yet complete. */
+			if (ret == WT_NOTFOUND)
+				ret = 0;
+			goto err;
+		}
 		WT_ERR(__wt_session_release_btree(session));
 	}
 
