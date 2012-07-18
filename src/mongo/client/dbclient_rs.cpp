@@ -238,7 +238,7 @@ namespace mongo {
         log() << "starting new replica set monitor for replica set " << _name << " with seed of " << seedString( servers ) << endl;
         _populateHosts_inSetsLock(servers);
 
-        _setServers.insert( pair<string, vector<HostAndPort> >(name, servers) );
+        _seedServers.insert( pair<string, vector<HostAndPort> >(name, servers) );
 
         log() << "replica set monitor for replica set " << _name << " started, address is " << getServerAddress() << endl;
 
@@ -257,7 +257,7 @@ namespace mongo {
 
     void ReplicaSetMonitor::_cacheServerAddresses_inlock() {
         // Save list of current set members so that the monitor can be rebuilt if needed.
-        vector<HostAndPort>& servers = _setServers[_name];
+        vector<HostAndPort>& servers = _seedServers[_name];
         servers.clear();
         for ( vector<Node>::iterator it = _nodes.begin(); it < _nodes.end(); ++it ) {
             servers.push_back( it->addr );
@@ -280,8 +280,8 @@ namespace mongo {
             return i->second;
         }
         if ( createFromSeed ) {
-            map<string,vector<HostAndPort> >::const_iterator j = _setServers.find( name );
-            if ( j != _setServers.end() ) {
+            map<string,vector<HostAndPort> >::const_iterator j = _seedServers.find( name );
+            if ( j != _seedServers.end() ) {
                 log(4) << "Creating ReplicaSetMonitor from cached address" << endl;
                 ReplicaSetMonitorPtr& m = _sets[name];
                 verify( !m );
@@ -337,7 +337,7 @@ namespace mongo {
         log(2) << "Removing ReplicaSetMonitor for " << name << " from replica set table" << endl;
         _sets.erase( name );
         if ( clearSeedCache ) {
-            _setServers.erase( name );
+            _seedServers.erase( name );
         }
     }
 
@@ -896,7 +896,7 @@ namespace mongo {
 
         if (isNodeEmpty) {
             scoped_lock lk(_setsLock);
-            _populateHosts_inSetsLock(_setServers[_name]);
+            _populateHosts_inSetsLock(_seedServers[_name]);
             /* _populateHosts_inlock already refreshes _nodes so no more work
              * needs to be done. If it was unsuccessful, the succeeding lines
              * will also fail, so no point in trying.
@@ -1228,7 +1228,7 @@ namespace mongo {
 
     mongo::mutex ReplicaSetMonitor::_setsLock( "ReplicaSetMonitor" );
     map<string,ReplicaSetMonitorPtr> ReplicaSetMonitor::_sets;
-    map<string,vector<HostAndPort> > ReplicaSetMonitor::_setServers;
+    map<string,vector<HostAndPort> > ReplicaSetMonitor::_seedServers;
     ReplicaSetMonitor::ConfigChangeHook ReplicaSetMonitor::_hook;
     int ReplicaSetMonitor::_maxFailedChecks = 30; // At 1 check every 10 seconds, 30 checks takes 5 minutes
 

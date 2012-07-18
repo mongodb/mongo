@@ -377,7 +377,7 @@ namespace mongo {
 
         static mongo::mutex _setsLock; // protects _sets and _setServers
         static map<string,ReplicaSetMonitorPtr> _sets; // set name to Monitor
-        static map<string,vector<HostAndPort> > _setServers; // set name to seed list. Used to rebuild the monitor if it is cleaned up but then the set is accessed again.
+        static map<string,vector<HostAndPort> > _seedServers; // set name to seed list. Used to rebuild the monitor if it is cleaned up but then the set is accessed again.
 
         static ConfigChangeHook _hook;
         int _localThresholdMillis; // local ping latency threshold (protected by _lock)
