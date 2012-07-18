@@ -20,22 +20,43 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_CONFIG_ITEM cval, k, v;
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
+	WT_TXN *txn;
 	WT_TXN_GLOBAL *txn_global;
 	void *saved_meta_next;
 	int target_list, tracking;
-	const char *txn_cfg[] = { "isolation=snapshot", NULL };
 
 	conn = S2C(session);
 	target_list = tracking = 0;
+	txn = &session->txn;
 	txn_global = &conn->txn_global;
 
 	/* Only one checkpoint can be active at a time. */
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
 
-	WT_ERR(__wt_txn_begin(session, txn_cfg));
+	/*
+	 * Checkpoints require a snapshot to write a transactionally consistent
+	 * snapshot of the data.
+	 *
+	 * We can't use an application's transaction: if it has uncommitted
+	 * changes, they will be written in the checkpoint and may appear after
+	 * a crash.
+	 *
+	 * Don't start a real transaction with its own ID: although there
+	 * should be no conflicts when updating the metadata, we don't want to
+	 * take the risk of aborting after doing all of the I/O.  In addition,
+	 * the tracking of non-transactional readers is complicated by having a
+	 * full transaction: there may be non-transactional cursors open in
+	 * this session that hold hazard references, so we may already have an
+	 * ID in the global state table.
+	 */
+	if (F_ISSET(txn, TXN_RUNNING))
+		WT_RET_MSG(session, EINVAL,
+		    "Checkpoint not permitted in a transaction");
+
+	WT_RET(__wt_txn_get_snapshot(session, WT_TXN_NONE));
 
 	/* Prevent eviction from evicting anything newer than this. */
-	txn_global->ckpt_txnid = session->txn.snap_min;
+	txn_global->ckpt_txnid = txn->snap_min;
 
 	WT_ERR(__wt_meta_track_on(session));
 	tracking = 1;
@@ -122,8 +143,6 @@ err:	/*
 		WT_TRET(__wt_meta_track_off(session, ret != 0));
 
 	txn_global->ckpt_txnid = WT_TXN_NONE;
-	if (F_ISSET(&session->txn, TXN_RUNNING))
-		WT_TRET(__wt_txn_release(session));
 	__wt_scr_free(&tmp);
 	return (ret);
 }

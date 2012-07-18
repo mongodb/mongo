@@ -156,6 +156,8 @@ struct __wt_txn;
     typedef struct __wt_txn WT_TXN;
 struct __wt_txn_global;
     typedef struct __wt_txn_global WT_TXN_GLOBAL;
+struct __wt_txn_state;
+    typedef struct __wt_txn_state WT_TXN_STATE;
 struct __wt_update;
     typedef struct __wt_update WT_UPDATE;
 /*

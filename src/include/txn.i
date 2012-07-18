@@ -205,19 +205,20 @@ __wt_txn_read_first(WT_SESSION_IMPL *session)
 {
 	WT_TXN *txn;
 	WT_TXN_GLOBAL *txn_global;
+	WT_TXN_STATE *txn_state;
 
 	txn = &session->txn;
 	txn_global = &S2C(session)->txn_global;
+	txn_state = &txn_global->states[session->id];
 
 	/*
-	 * If there is no transaction running, put an ID in the global table
-	 * so we show up in snapshots.  This prevents any update the we are
-	 * reading from being trimmed to save memory.
+	 * If there is no transaction running, put an ID in the global table so
+	 * the oldest reader in the system can be tracked.  This prevents any
+	 * update the we are reading from being trimmed to save memory.
 	 */
 	if (!F_ISSET(txn, TXN_RUNNING)) {
-		WT_ASSERT(session, txn_global->ids[session->id] == WT_TXN_NONE);
-		__wt_txn_getid(session);
-		txn_global->ids[session->id] = txn->id;
+		WT_ASSERT(session, txn_state->id == WT_TXN_NONE);
+		txn_state->id = txn_global->current;
 	}
 
 	return (0);
@@ -231,15 +232,17 @@ static inline void
 __wt_txn_read_last(WT_SESSION_IMPL *session)
 {
 	WT_TXN *txn;
-	WT_TXN_GLOBAL *txn_global;
+	WT_TXN_STATE *txn_state;
 
 	txn = &session->txn;
-	txn_global = &S2C(session)->txn_global;
+	txn_state = &S2C(session)->txn_global.states[session->id];
 
 	/*
 	 * If there is no transaction running, release the ID we put in the
 	 * global table.
 	 */
-	if (!F_ISSET(txn, TXN_RUNNING))
-		txn_global->ids[session->id] = WT_TXN_NONE;
+	if (!F_ISSET(txn, TXN_RUNNING)) {
+		WT_ASSERT(session, txn_state->id != WT_TXN_NONE);
+		txn_state->id = WT_TXN_NONE;
+	}
 }
