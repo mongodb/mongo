@@ -415,19 +415,9 @@ namespace mongo {
             opMAX_DISTANCE=0x15
         };
 
-        /** add all elements of the object to the specified vector */
-        void elems(std::vector<BSONElement> &) const;
-        /** add all elements of the object to the specified list */
-        void elems(std::list<BSONElement> &) const;
-
-        /** add all values of the object to the specified vector.  If type mismatches, exception.
-            this is most useful when the BSONObj is an array, but can be used with non-arrays too in theory.
-
-            example:
-              bo sub = y["subobj"].Obj();
-              std::vector<int> myints;
-              sub.Vals(myints);
-        */
+        /** add all elements of the object to the specified container */
+        template<class CONTAINER>
+        void elems(CONTAINER& c) const;
 
         friend class BSONObjIterator;
         typedef BSONObjIterator iterator;
