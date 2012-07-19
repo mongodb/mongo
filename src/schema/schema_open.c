@@ -275,7 +275,7 @@ __wt_schema_open_index(
 	/*
 	 * XXX
 	 * Do a full scan through the metadata to find all matching indices.
-	 * This scan be optimized with search + next.
+	 * This scan should be optimized with search + next.
 	 */
 	WT_RET(__wt_metadata_cursor(session, NULL, &cursor));
 
