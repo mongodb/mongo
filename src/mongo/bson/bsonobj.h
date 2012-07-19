@@ -428,18 +428,6 @@ namespace mongo {
               std::vector<int> myints;
               sub.Vals(myints);
         */
-        template <class T>
-        void Vals(std::vector<T> &) const;
-        /** add all values of the object to the specified list.  If type mismatches, exception. */
-        template <class T>
-        void Vals(std::list<T> &) const;
-
-        /** add all values of the object to the specified vector.  If type mismatches, skip. */
-        template <class T>
-        void vals(std::vector<T> &) const;
-        /** add all values of the object to the specified list.  If type mismatches, skip. */
-        template <class T>
-        void vals(std::list<T> &) const;
 
         friend class BSONObjIterator;
         typedef BSONObjIterator iterator;
