@@ -1418,12 +1418,6 @@ namespace mongo {
         includePath(&fieldPath, 0, fieldPath.getPathLength(), true);
     }
 
-    Iterator<string> *ExpressionObject::getFieldIterator() const {
-        intrusive_ptr<const ExpressionObject> pThis(this);
-        return new IteratorVectorIntrusive<string, ExpressionObject>(
-            vFieldName, pThis);
-    }
-
     intrusive_ptr<Expression> ExpressionObject::getField(
         const string &fieldName) const {
         const size_t n = vFieldName.size();

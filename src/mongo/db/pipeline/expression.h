@@ -20,8 +20,6 @@
 
 #include "db/pipeline/field_path.h"
 #include "util/intrusive_counter.h"
-#include "util/iterator.h"
-
 
 namespace mongo {
 
@@ -985,14 +983,6 @@ namespace mongo {
           @param fieldName the name of the field to be excluded
          */
         void excludePath(const string &fieldPath);
-
-        /**
-           Get an iterator that can be used to iterate over all the result
-           field names in this ExpressionObject.
-
-           @returns the (intrusive_ptr'ed) iterator
-         */
-        Iterator<string> *getFieldIterator() const;
 
         /*
           Return the expression for a field.
