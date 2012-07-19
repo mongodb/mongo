@@ -512,7 +512,10 @@ namespace mongo {
          * @param tags pointer to the list of tags.
          *
          * @return a pointer to the new connection object if it can find a good connection.
-         *      Otherwise it returns NULL.
+         *     Otherwise it returns NULL.
+         *
+         * @throws DBException when an error occurred either when trying to connect to
+         *     a node that was thought to be ok or when an assertion happened.
          */
         DBClientConnection* selectNodeUsingTags(ReadPreference preference,
                                                 TagSet* tags);
@@ -522,6 +525,11 @@ namespace mongo {
          * set and can be used for the given read preference.
          */
         bool checkLastHost( ReadPreference preference, const TagSet* tags );
+
+        /**
+         * Destroys all cached information about the last slaveOk operation.
+         */
+        void invalidateLastSlaveOkCache();
 
         void _auth( DBClientConnection * conn );
 

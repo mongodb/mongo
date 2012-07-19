@@ -1320,9 +1320,7 @@ namespace mongo {
         ReplicaSetMonitorPtr monitor = _getMonitor();
 
         if (_lastSlaveOkConn && _lastSlaveOkConn->isFailed()) {
-            monitor->notifySlaveFailure(_lastSlaveOkHost);
-            _lastSlaveOkHost = HostAndPort();
-            _lastSlaveOkConn.reset();
+            invalidateLastSlaveOkCache();
             return false;
         }
 
@@ -1391,6 +1389,7 @@ namespace mongo {
                  * The next time we create a new secondary connection it will
                  * be authenticated with the credentials from _auths.
                  */
+                verify(_lastSlaveOkConn->isFailed());
             }
         }
 
@@ -1452,13 +1451,13 @@ namespace mongo {
             scoped_ptr<TagSet> tags(_extractReadPref(query.obj, &pref));
 
             for (size_t retry = 0; retry < MAX_RETRY; retry++) {
-                DBClientConnection* conn = selectNodeUsingTags(pref, tags.get());
-
-                if (conn == NULL) {
-                    break;
-                }
-
                 try {
+                    DBClientConnection* conn = selectNodeUsingTags(pref, tags.get());
+
+                    if (conn == NULL) {
+                        break;
+                    }
+
                     auto_ptr<DBClientCursor> cursor = conn->query(ns, query,
                             nToReturn, nToSkip, fieldsToReturn, queryOptions,
                             batchSize);
@@ -1468,6 +1467,7 @@ namespace mongo {
                 catch (const DBException &dbExcep) {
                     LOG(1) << "can't query replica set slave " << _lastSlaveOkHost
                            << ": " << causedBy(dbExcep) << endl;
+                    invalidateLastSlaveOkCache();
                 }
             }
 
@@ -1489,18 +1489,19 @@ namespace mongo {
             scoped_ptr<TagSet> tags(_extractReadPref(query.obj, &pref));
 
             for (size_t retry = 0; retry < MAX_RETRY; retry++) {
-                DBClientConnection* conn = selectNodeUsingTags(pref, tags.get());
-
-                if (conn == NULL) {
-                    break;
-                }
-
                 try {
+                    DBClientConnection* conn = selectNodeUsingTags(pref, tags.get());
+
+                    if (conn == NULL) {
+                        break;
+                    }
+
                     return conn->findOne(ns,query,fieldsToReturn,queryOptions);
                 }
                 catch (const DBException &dbExcep) {
                     LOG(1) << "can't findone replica set slave " << _lastSlaveOkHost
                            << ": " << causedBy(dbExcep) << endl;
+                    invalidateLastSlaveOkCache();
                 }
             }
 
@@ -1571,14 +1572,7 @@ namespace mongo {
         }
 
         _lastSlaveOkConn.reset(new DBClientConnection(true , this , _so_timeout));
-
-        try {
-            _lastSlaveOkConn->connect(_lastSlaveOkHost);
-        }
-        catch (const ConnectException&) {
-            // Note: a failed connect will also mark the connection as failed.
-            return NULL;
-        }
+        _lastSlaveOkConn->connect(_lastSlaveOkHost);
 
         _auth(_lastSlaveOkConn.get());
         return _lastSlaveOkConn.get();
@@ -1603,28 +1597,29 @@ namespace mongo {
 
                 for (size_t retry = 0; retry < MAX_RETRY; retry++) {
                     _lazyState._retries = retry;
-                    DBClientConnection* conn = selectNodeUsingTags(pref, tags.get());
-
-                    if (conn == NULL) {
-                        break;
-                    }
-
-                    if (actualServer != NULL) {
-                        *actualServer = conn->getServerAddress();
-                    }
-
                     try {
+                        DBClientConnection* conn = selectNodeUsingTags(pref, tags.get());
+
+                        if (conn == NULL) {
+                            break;
+                        }
+
+                        if (actualServer != NULL) {
+                            *actualServer = conn->getServerAddress();
+                        }
+
                         conn->say(toSend);
+
+                        _lazyState._lastOp = lastOp;
+                        _lazyState._slaveOk = slaveOk;
+                        _lazyState._lastClient = conn;
                     }
                     catch (const DBException& DBExcep) {
                         LOG(1) << "can't callLazy replica set slave " << _lastSlaveOkHost
                                 << ": " << causedBy(DBExcep) << endl;
+                        invalidateLastSlaveOkCache();
                         continue;
                     }
-
-                    _lazyState._lastOp = lastOp;
-                    _lazyState._slaveOk = slaveOk;
-                    _lazyState._lastClient = conn;
 
                     return;
                 }
@@ -1745,17 +1740,17 @@ namespace mongo {
                 scoped_ptr<TagSet> tags(_extractReadPref(qm.query, &pref));
 
                 for (size_t retry = 0; retry < MAX_RETRY; retry++) {
-                    DBClientConnection* conn = selectNodeUsingTags(pref, tags.get());
-
-                    if (conn == NULL) {
-                        return false;
-                    }
-
-                    if (actualServer != NULL) {
-                        *actualServer = conn->getServerAddress();
-                    }
-
                     try {
+                        DBClientConnection* conn = selectNodeUsingTags(pref, tags.get());
+
+                        if (conn == NULL) {
+                            return false;
+                        }
+
+                        if (actualServer != NULL) {
+                            *actualServer = conn->getServerAddress();
+                        }
+
                         return conn->call(toSend, response, assertOk);
                     }
                     catch (const DBException& dbExcep) {
@@ -1764,6 +1759,8 @@ namespace mongo {
 
                         if (actualServer)
                             *actualServer = "";
+
+                        invalidateLastSlaveOkCache();
                     }
                 }
 
@@ -1795,6 +1792,16 @@ namespace mongo {
         }
 
         return true;
+    }
+
+    void DBClientReplicaSet::invalidateLastSlaveOkCache() {
+        /* This is not wrapped in with if (_lastSlaveOkConn && _lastSlaveOkConn->isFailed())
+         * because there are certain exceptions that will not make the connection be labeled
+         * as failed. For example, asserts 13079, 13080, 16386
+         */
+        _getMonitor()->notifySlaveFailure(_lastSlaveOkHost);
+        _lastSlaveOkHost = HostAndPort();
+        _lastSlaveOkConn.reset();
     }
 
     TagSet::TagSet() : _isExhausted(true), _tagIterator(_tags) {
