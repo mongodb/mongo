@@ -258,7 +258,7 @@ __cursor_row_next(WT_CURSOR_BTREE *cbt, int newpage)
 	if (newpage) {
 		cbt->ins_head = WT_ROW_INSERT_SMALLEST(cbt->page);
 		cbt->ins = WT_SKIP_FIRST(cbt->ins_head);
-		cbt->slot = 1;
+		cbt->row_iteration_slot = 1;
 		goto new_insert;
 	}
 
@@ -284,24 +284,24 @@ new_insert:	if ((ins = cbt->ins) != NULL) {
 		}
 
 		/* Check for the end of the page. */
-		if (cbt->slot >= cbt->page->entries * 2 + 1)
+		if (cbt->row_iteration_slot >= cbt->page->entries * 2 + 1)
 			return (WT_NOTFOUND);
-		++cbt->slot;
+		++cbt->row_iteration_slot;
 
 		/*
 		 * Odd-numbered slots configure as WT_INSERT_HEAD entries,
 		 * even-numbered slots configure as WT_ROW entries.
 		 */
-		if (cbt->slot & 0x01) {
-			cbt->ins_head =
-			    WT_ROW_INSERT_SLOT(cbt->page, cbt->slot / 2 - 1);
+		if (cbt->row_iteration_slot & 0x01) {
+			cbt->ins_head = WT_ROW_INSERT_SLOT(
+			    cbt->page, cbt->row_iteration_slot / 2 - 1);
 			cbt->ins = WT_SKIP_FIRST(cbt->ins_head);
 			goto new_insert;
 		}
 		cbt->ins_head = NULL;
 		cbt->ins = NULL;
 
-		rip = &cbt->page->u.row.d[cbt->slot / 2 - 1];
+		rip = &cbt->page->u.row.d[cbt->row_iteration_slot / 2 - 1];
 		upd = __wt_txn_read(session, WT_ROW_UPDATE(cbt->page, rip));
 		if (upd != NULL && WT_UPDATE_DELETED_ISSET(upd))
 			continue;
@@ -346,21 +346,13 @@ __wt_btcur_iterate_setup(WT_CURSOR_BTREE *cbt, int next)
 		 * slot 2 is WT_ROW[0], slot 3 is WT_INSERT_HEAD[0], and so on.
 		 * This means WT_INSERT lists are odd-numbered slots, and WT_ROW
 		 * array slots are even-numbered slots.
-		 *
-		 * !!!
-		 * I'm re-using WT_CURSOR_BTREE->slot for this purpose, which
-		 * means that WT_CURSOR_BTREE->slot is now useless outside of
-		 * cursor next/prev.  If that turns out to be a bad idea because
-		 * we need the original value of WT_CURSOR_BTREE->slot after a
-		 * next/prev call, switch to another field to hold the iteration
-		 * slot.
 		 */
-		cbt->slot = (cbt->slot + 1) * 2;
+		cbt->row_iteration_slot = (cbt->slot + 1) * 2;
 		if (cbt->ins_head != NULL) {
 			if (cbt->ins_head == WT_ROW_INSERT_SMALLEST(page))
-				cbt->slot = 1;
+				cbt->row_iteration_slot = 1;
 			else
-				cbt->slot += 1;
+				cbt->row_iteration_slot += 1;
 		}
 	} else {
 		/*

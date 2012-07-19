@@ -375,7 +375,7 @@ __cursor_row_prev(WT_CURSOR_BTREE *cbt, int newpage)
 		else
 			cbt->ins_head = WT_ROW_INSERT_SLOT(
 			    cbt->page, cbt->page->entries - 1);
-		cbt->slot = cbt->page->entries * 2 + 1;
+		cbt->row_iteration_slot = cbt->page->entries * 2 + 1;
 		cbt->ins = WT_SKIP_LAST(cbt->ins_head);
 		goto new_insert;
 	}
@@ -402,25 +402,26 @@ new_insert:	if ((ins = cbt->ins) != NULL) {
 		}
 
 		/* Check for the beginning of the page. */
-		if (cbt->slot == 1)
+		if (cbt->row_iteration_slot == 1)
 			return (WT_NOTFOUND);
-		--cbt->slot;
+		--cbt->row_iteration_slot;
 
 		/*
 		 * Odd-numbered slots configure as WT_INSERT_HEAD entries,
 		 * even-numbered slots configure as WT_ROW entries.
 		 */
-		if (cbt->slot & 0x01) {
-			cbt->ins_head = cbt->slot == 1 ?
+		if (cbt->row_iteration_slot & 0x01) {
+			cbt->ins_head = cbt->row_iteration_slot == 1 ?
 			    WT_ROW_INSERT_SMALLEST(cbt->page) :
-			    WT_ROW_INSERT_SLOT(cbt->page, cbt->slot / 2 - 1);
+			    WT_ROW_INSERT_SLOT(
+			    cbt->page, cbt->row_iteration_slot / 2 - 1);
 			cbt->ins = WT_SKIP_LAST(cbt->ins_head);
 			goto new_insert;
 		}
 		cbt->ins_head = NULL;
 		cbt->ins = NULL;
 
-		rip = &cbt->page->u.row.d[cbt->slot / 2 - 1];
+		rip = &cbt->page->u.row.d[cbt->row_iteration_slot / 2 - 1];
 		upd = __wt_txn_read(session, WT_ROW_UPDATE(cbt->page, rip));
 		if (upd != NULL && WT_UPDATE_DELETED_ISSET(upd))
 			continue;
