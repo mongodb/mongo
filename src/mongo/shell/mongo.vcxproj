@@ -934,7 +934,6 @@ cscript //Nologo createCPPfromJavaScriptFiles.js "$(ProjectDir).."</Command>
     <ClCompile Include="..\client\dbclient_rs.cpp" />
     <ClCompile Include="..\client\syncclusterconnection.cpp" />
     <ClCompile Include="..\db\commands.cpp" />
-    <ClCompile Include="..\db\commands\cloud.cpp" />
     <ClCompile Include="..\db\lasterror.cpp" />
     <ClCompile Include="..\db\nonce.cpp" />
     <ClCompile Include="..\..\third_party\pcre-8.30\pcrecpp.cc" />

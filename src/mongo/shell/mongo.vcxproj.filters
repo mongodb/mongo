@@ -53,9 +53,6 @@
     <Filter Include="JavaScript source files">
       <UniqueIdentifier>{473e7192-9f2a-47c5-ad95-e5b75d4f48f9}</UniqueIdentifier>
     </Filter>
-    <Filter Include="db\commands">
-      <UniqueIdentifier>{afb47ac9-02b9-4073-b154-b89918d3bb33}</UniqueIdentifier>
-    </Filter>
     <Filter Include="third_party\pcre\Header Files">
       <UniqueIdentifier>{d615e21d-d5a5-44bf-8633-bc0eae7a762a}</UniqueIdentifier>
     </Filter>
@@ -298,9 +295,6 @@
     </ClCompile>
     <ClCompile Include="..\util\startup_test.cpp">
       <Filter>util\Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\db\commands\cloud.cpp">
-      <Filter>db\commands</Filter>
     </ClCompile>
     <ClCompile Include="..\util\stacktrace.cpp">
       <Filter>util\Source Files</Filter>
