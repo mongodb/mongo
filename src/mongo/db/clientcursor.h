@@ -140,7 +140,7 @@ namespace mongo {
             ~Holder() {
                 DESTRUCTOR_GUARD ( reset(); );
             }
-            operator bool() { return _c; }
+            operator bool() const { return _c; }
             ClientCursor * operator-> () { return _c; }
             const ClientCursor * operator-> () const { return _c; }
             /** Release ownership of the ClientCursor. */
@@ -173,7 +173,7 @@ namespace mongo {
             CCById::const_iterator _i;
         };
         
-        ClientCursor(int queryOptions, const shared_ptr<Cursor>& c, const string& ns, BSONObj query = BSONObj() );
+        ClientCursor(int queryOptions, const shared_ptr<Cursor>& c, const string& ns, const BSONObj& query = BSONObj() );
 
         ~ClientCursor();
 
