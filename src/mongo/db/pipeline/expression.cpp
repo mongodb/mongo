@@ -34,17 +34,9 @@ namespace mongo {
         verify(false && "Expression::toMatcherBson()");
     }
 
-    Expression::ObjectCtx::ObjectCtx(int theOptions):
-        options(theOptions),
-        unwindField() {
-    }
-
-    void Expression::ObjectCtx::unwind(string fieldName) {
-        verify(unwindOk());
-        verify(!unwindUsed());
-        verify(fieldName.size());
-        unwindField = fieldName;
-    }
+    Expression::ObjectCtx::ObjectCtx(int theOptions)
+        : options(theOptions)
+    {}
 
     bool Expression::ObjectCtx::documentOk() const {
         return ((options & DOCUMENT_OK) != 0);
@@ -53,8 +45,6 @@ namespace mongo {
     bool Expression::ObjectCtx::topLevel() const {
         return ((options & TOP_LEVEL) != 0);
     }
-
-    const char Expression::unwindName[] = "$unwind";
 
     string Expression::removeFieldPrefix(const string &prefixedField) {
         const char *pPrefixedField = prefixedField.c_str();
@@ -72,11 +62,6 @@ namespace mongo {
 
           f0: {f1: ..., f2: ..., f3: ...}
           f0: {$operator:[operand1, operand2, ...]}
-          f0: {$unwind:"fieldpath"}
-
-          We handle $unwind as a special case, because this is done by the
-          projection source.  For any other expression, we hand over control to
-          code that parses the expression and returns an expression.
         */
 
         intrusive_ptr<Expression> pExpression; // the result

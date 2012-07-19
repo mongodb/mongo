@@ -133,32 +133,20 @@ namespace mongo {
         /*
           Utility class for parseObject() below.
 
-          Only one array can be unwound in a processing pipeline.  If the
-          UNWIND_OK option is used, unwindOk() will return true, and a field
-          can be declared as unwound using unwind(), after which unwindUsed()
-          will return true.  Only specify UNWIND_OK if it is OK to unwind an
-          array in the current context.
-
           DOCUMENT_OK indicates that it is OK to use a Document in the current
           context.
          */
         class ObjectCtx {
         public:
             ObjectCtx(int options);
-            static const int UNWIND_OK = 0x0001;
-            static const int DOCUMENT_OK = 0x0002;
-            static const int TOP_LEVEL = 0x0004;
-
-            bool unwindOk() const;
-            bool unwindUsed() const;
-            void unwind(string fieldName);
+            static const int DOCUMENT_OK = 0x0001;
+            static const int TOP_LEVEL = 0x0002;
 
             bool documentOk() const;
             bool topLevel() const;
 
         private:
             int options;
-            string unwindField;
         };
 
         /*
@@ -171,8 +159,6 @@ namespace mongo {
          */
         static intrusive_ptr<Expression> parseObject(
             BSONElement *pBsonElement, ObjectCtx *pCtx);
-
-        static const char unwindName[];
 
         /*
           Parse a BSONElement Object which has already been determined to be
@@ -1221,14 +1207,6 @@ namespace mongo {
 /* ======================= INLINED IMPLEMENTATIONS ========================== */
 
 namespace mongo {
-
-    inline bool Expression::ObjectCtx::unwindOk() const {
-        return ((options & UNWIND_OK) != 0);
-    }
-
-    inline bool Expression::ObjectCtx::unwindUsed() const {
-        return (unwindField.size() != 0);
-    }
 
     inline int Expression::signum(int i) {
         if (i < 0)
