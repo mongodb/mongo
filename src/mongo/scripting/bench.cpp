@@ -473,7 +473,7 @@ namespace mongo {
                         int count = cursor->itcount();
 
                         if ( expected >= 0 &&  count != expected ) {
-                            cout << "bench query on: " << ns << " expected: " << expected << " got: " << cout << endl;
+                            cout << "bench query on: " << ns << " expected: " << expected << " got: " << count << endl;
                             verify(false);
                         }
 
