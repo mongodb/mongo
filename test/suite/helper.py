@@ -67,6 +67,16 @@ def confirmEmpty(self, uri):
     self.assertEqual(cursor.next(), wiredtiger.WT_NOTFOUND)
     cursor.close()
 
+# create a simplePopulate or complexPopulate key
+def keyPopulate(key_format, i):
+    if key_format == 'i' or key_format == 'u':
+        return i
+    elif key_format == 'S':
+        return str('%015d' % i)
+    else:
+        raise AssertionError(
+            'keyPopulate: object has unexpected key format: ' + key_format)
+
 # population of a simple object, where the keys are the record number.
 #    uri:       object
 #    config:    prefix of the session.create configuration string
@@ -75,40 +85,20 @@ def simplePopulate(self, uri, config, rows):
     self.pr('simplePopulate: ' + uri + ' with ' + str(rows) + ' rows')
     self.session.create(uri, config + ',value_format=S')
     cursor = self.session.open_cursor(uri, None, None)
-    if cursor.key_format == 'i' or cursor.key_format == 'u':
-        for i in range(0, rows):
-            cursor.set_key(i)
-            cursor.set_value(str(i) + ': abcdefghijklmnopqrstuvwxyz')
-            cursor.insert()
-    elif cursor.key_format == 'S':
-        for i in range(0, rows):
-            cursor.set_key(str(i))
-            cursor.set_value(str(i) + ': abcdefghijklmnopqrstuvwxyz')
-            cursor.insert()
-    else:
-        raise AssertionError(
-            'simplePopulate: cursor has unexpected key format: ' +
-            cursor.key_format)
+    for i in range(0, rows):
+        cursor.set_key(keyPopulate(cursor.key_format, i))
+        cursor.set_value(str(i) + ': abcdefghijklmnopqrstuvwxyz')
+        cursor.insert()
     cursor.close()
 
 def simplePopulateCheck(self, uri):
     self.pr('simplePopulateCheck: ' + uri)
     cursor = self.session.open_cursor(uri, None, None)
-    next = -1
-    if cursor.key_format == 'i' or cursor.key_format == 'u':
-        for key,val in cursor:
-            next += 1
-            self.assertEqual(key, next)
-            self.assertEqual(val, str(next) + ': abcdefghijklmnopqrstuvwxyz')
-    elif cursor.key_format == 'S':
-        for key,val in cursor:
-            next += 1
-            self.assertEqual(key, str(next))
-            self.assertEqual(val, str(next) + ': abcdefghijklmnopqrstuvwxyz')
-    else:
-        raise AssertionError(
-            'simplePopulateCheck: cursor has unexpected key format: ' +
-            cursor.key_format)
+    i = -1
+    for key,val in cursor:
+        i += 1
+        self.assertEqual(key, keyPopulate(cursor.key_format, i))
+        self.assertEqual(val, str(i) + ': abcdefghijklmnopqrstuvwxyz')
     cursor.close()
 
 # population of a complex object, where the keys are the record number.
@@ -128,59 +118,29 @@ def complexPopulate(self, uri, config, rows):
     self.session.create(cgname + ':cgroup5', 'columns=(column3,column4)')
     self.session.create(cgname + ':cgroup6', 'columns=(column4,column5)')
     cursor = self.session.open_cursor(uri, None, None)
-    if cursor.key_format == 'i' or cursor.key_format == 'u':
-        for i in range(0, rows):
-            cursor.set_key(i)
-            cursor.set_value(
-                str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%26],
-                i,
-                str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%23],
-                str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%18])
-            cursor.insert()
-    elif cursor.key_format == 'S':
-        for i in range(0, rows):
-            cursor.set_key(str(i))
-            cursor.set_value(
-                str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%26],
-                i,
-                str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%23],
-                str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%18])
-            cursor.insert()
-    else:
-        raise AssertionError(
-            'complexPopulate: cursor has unexpected key format: ' +
-            cursor.key_format)
+    for i in range(0, rows):
+        cursor.set_key(keyPopulate(cursor.key_format, i))
+        cursor.set_value(
+            str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%26],
+            i,
+            str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%23],
+            str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%18])
+        cursor.insert()
     cursor.close()
 
 def complexPopulateCheck(self, uri):
     self.pr('complexPopulateCheck: ' + uri)
     cursor = self.session.open_cursor(uri, None, None)
     i = -1
-    if cursor.key_format == 'i' or cursor.key_format == 'u':
-        for key, s1, i2, s3, s4 in cursor:
-            i += 1
-            self.assertEqual(key, i)
-            self.assertEqual(s1,
-                str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%26])
-            self.assertEqual(i2, i)
-            self.assertEqual(s3,
-                str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%23])
-            self.assertEqual(s4,
-                str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%18])
-            self.assertEqual(i2, i)
-    elif cursor.key_format == 'S':
-        for key, s1, i2, s3, s4 in cursor:
-            i += 1
-            self.assertEqual(key, str(i))
-            self.assertEqual(s1,
-                str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%26])
-            self.assertEqual(i2, i)
-            self.assertEqual(s3,
-                str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%23])
-            self.assertEqual(s4,
-                str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%18])
-    else:
-        raise AssertionError(
-            'complexPopulateCheck: cursor has unexpected key format: ' +
-            cursor.key_format)
+    for key, s1, i2, s3, s4 in cursor:
+        i += 1
+        self.assertEqual(key, keyPopulate(cursor.key_format, i))
+        self.assertEqual(s1,
+            str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%26])
+        self.assertEqual(i2, i)
+        self.assertEqual(s3,
+            str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%23])
+        self.assertEqual(s4,
+            str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%18])
+        self.assertEqual(i2, i)
     cursor.close()
