@@ -311,7 +311,7 @@ namespace mongo {
                 hasNext = pSource->advance()) {
             intrusive_ptr<Document> pDocument(pSource->getCurrent());
 
-            /* get the _id document */
+            /* get the _id value */
             intrusive_ptr<const Value> pId(pIdExpression->evaluate(pDocument));
 
             /* treat Undefined the same as NULL SERVER-4674 */

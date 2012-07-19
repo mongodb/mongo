@@ -298,6 +298,481 @@ namespace DocumentSourceTests {
 
     } // namespace DocumentSourceLimit
 
+    namespace DocumentSourceGroup {
+
+        using mongo::DocumentSourceGroup;
+
+        class Base : public DocumentSourceCursor::Base {
+        protected:
+            void createGroup( const BSONObj &spec ) {
+                BSONObj namedSpec = BSON( "$group" << spec );
+                BSONElement specElement = namedSpec.firstElement();
+                _group = DocumentSourceGroup::createFromBson( &specElement, ctx() );
+                BSONArrayBuilder bab;
+                _group->addToBsonArray( &bab );
+                // The $group spec round trips.
+                ASSERT_EQUALS( namedSpec, bab.arr()[ 0 ].Obj().getOwned() );
+                _group->setSource( source() );
+            }
+            DocumentSource* group() { return _group.get(); }
+            /** Assert that iterator state accessors consistently report the source is exhausted. */
+            void assertExhausted( const intrusive_ptr<DocumentSource> &source ) const {
+                // eof() is true.
+                ASSERT( source->eof() );
+                // advance() can't be called (a verify assertion will be triggered) in this context.
+                // ASSERT( !_group->advance() );
+                // getCurrent() does not assert, and returns an empty pointer.
+                ASSERT( !source->getCurrent() );
+            }
+        private:
+            intrusive_ptr<DocumentSource> _group;
+        };
+
+        class ParseErrorBase : public Base {
+        public:
+            virtual ~ParseErrorBase() {
+            }
+            void run() {
+                ASSERT_THROWS( createGroup( spec() ), UserException );
+            }
+        protected:
+            virtual BSONObj spec() = 0;
+        };
+
+        class ExpressionBase : public Base {
+        public:
+            virtual ~ExpressionBase() {
+            }
+            void run() {
+                // Insert a single document for $group to iterate over.
+                client.insert( ns, doc() );
+                createSource();
+                createGroup( spec() );
+                // A group result is available.
+                ASSERT( !group()->eof() );
+                BSONObjBuilder bob;
+                group()->getCurrent()->toBson( &bob );
+                // The constant _id value from the $group spec is passed through.
+                ASSERT_EQUALS( expected(), bob.obj() );
+            }
+        protected:
+            virtual BSONObj doc() = 0;
+            virtual BSONObj spec() = 0;
+            virtual BSONObj expected() = 0;
+        };
+
+        class IdConstantBase : public ExpressionBase {
+            virtual BSONObj doc() { return BSONObj(); }
+            virtual BSONObj expected() {
+                // Since spec() specifies a constant _id, its value will be passed through.
+                return spec();
+            }
+        };
+
+        /** $group spec is not an object. */
+        class NonObject : public Base {
+        public:
+            void run() {
+                BSONObj spec = BSON( "$group" << "foo" );
+                BSONElement specElement = spec.firstElement();
+                ASSERT_THROWS( DocumentSourceGroup::createFromBson( &specElement, ctx() ),
+                               UserException );
+            }
+        };
+
+        /** $group spec is an empty object. */
+        class EmptySpec : public ParseErrorBase {
+            BSONObj spec() { return BSONObj(); }
+        };
+
+        /** $group _id is an empty object. */
+        class IdEmptyObject : public IdConstantBase {
+            BSONObj spec() { return BSON( "_id" << BSONObj() ); }
+        };
+
+        /** $group _id is computed from an object expression. */
+        class IdObjectExpression : public ExpressionBase {
+            BSONObj doc() { return BSON( "a" << 6 ); }
+            BSONObj spec() { return BSON( "_id" << BSON( "z" << "$a" ) ); }
+            BSONObj expected() { return BSON( "_id" << BSON( "z" << 6 ) ); }
+        };
+
+        /** $group _id is specified as an invalid object expression. */
+        class IdInvalidObjectExpression : public ParseErrorBase {
+            BSONObj spec() { return BSON( "_id" << BSON( "$add" << 1 << "$and" << 1 ) ); }
+        };
+        
+        /** $group with two _id specs. */
+        class TwoIdSpecs : public ParseErrorBase {
+            BSONObj spec() { return BSON( "_id" << 1 << "_id" << 2 ); }            
+        };
+
+        /** $group _id is the empty string. */
+        class IdEmptyString : public IdConstantBase {
+            BSONObj spec() { return BSON( "_id" << "" ); }
+        };
+
+        /** $group _id is a string constant. */
+        class IdStringConstant : public IdConstantBase {
+            BSONObj spec() { return BSON( "_id" << "abc" ); }
+        };
+
+        /** $group _id is a field path expression. */
+        class IdFieldPath : public ExpressionBase {
+            BSONObj doc() { return BSON( "a" << 5 ); }
+            BSONObj spec() { return BSON( "_id" << "$a" ); }
+            BSONObj expected() { return BSON( "_id" << 5 ); }
+        };
+
+        /** $group with _id set to an invalid field path. */
+        class IdInvalidFieldPath : public ParseErrorBase {
+            BSONObj spec() { return BSON( "_id" << "$a.." ); }
+        };
+        
+        /** $group _id is a numeric constant. */
+        class IdNumericConstant : public IdConstantBase {
+            BSONObj spec() { return BSON( "_id" << 2 ); }
+        };
+
+        /** $group _id is an array constant. */
+        class IdArrayConstant : public IdConstantBase {
+            BSONObj spec() { return BSON( "_id" << BSON_ARRAY( 1 << 2 ) ); }
+        };
+
+        /** $group _id is a regular expression (not supported). */
+        class IdRegularExpression : public ParseErrorBase {
+            BSONObj spec() { return fromjson( "{_id:/a/}" ); }
+        };
+
+        /** The name of an aggregate field is specified with a $ prefix. */
+        class DollarAggregateFieldName : public ParseErrorBase {
+            BSONObj spec() { return BSON( "_id" << 1 << "$foo" << BSON( "$sum" << 1 ) ); }
+        };
+
+        /** An aggregate field spec that is not an object. */
+        class NonObjectAggregateSpec : public ParseErrorBase {
+            BSONObj spec() { return BSON( "_id" << 1 << "a" << 1 ); }
+        };
+        
+        /** An aggregate field spec that is not an object. */
+        class EmptyObjectAggregateSpec : public ParseErrorBase {
+            BSONObj spec() { return BSON( "_id" << 1 << "a" << BSONObj() ); }
+        };
+        
+        /** An aggregate field spec with an invalid accumulator operator. */
+        class BadAccumulator : public ParseErrorBase {
+            BSONObj spec() { return BSON( "_id" << 1 << "a" << BSON( "$bad" << 1 ) ); }
+        };
+        
+        /** An aggregate field spec with an array argument. */
+        class SumArray : public ParseErrorBase {
+            BSONObj spec() { return BSON( "_id" << 1 << "a" << BSON( "$sum" << BSONArray() ) ); }
+        };
+        
+        /** Multiple accumulator operators for a field. */
+        class MultipleAccumulatorsForAField : public ParseErrorBase {
+            BSONObj spec() {
+                return BSON( "_id" << 1 << "a" << BSON( "$sum" << 1 << "$push" << 1 ) );
+            }
+        };
+
+        /** Aggregation using duplicate field names is allowed currently. */
+        class DuplicateAggregateFieldNames : public ExpressionBase {
+            BSONObj doc() { return BSONObj(); }
+            BSONObj spec() {
+                return BSON( "_id" << 0 << "z" << BSON( "$sum" << 1 )
+                             << "z" << BSON( "$push" << 1 ) );
+            }
+            BSONObj expected() { return BSON( "_id" << 0 << "z" << 1 << "z" << BSON_ARRAY( 1 ) ); }
+        };
+
+        /** Aggregate the value of an object expression. */
+        class AggregateObjectExpression : public ExpressionBase {
+            BSONObj doc() { return BSON( "a" << 6 ); }
+            BSONObj spec() {
+                return BSON( "_id" << 0 << "z" << BSON( "$first" << BSON( "x" << "$a" ) ) );
+            }
+            BSONObj expected() { return BSON( "_id" << 0 << "z" << BSON( "x" << 6 ) ); }
+        };
+
+        /** Aggregate the value of an operator expression. */
+        class AggregateOperatorExpression : public ExpressionBase {
+            BSONObj doc() { return BSON( "a" << 6 ); }
+            BSONObj spec() {
+                return BSON( "_id" << 0 << "z" << BSON( "$first" << "$a" ) );
+            }
+            BSONObj expected() { return BSON( "_id" << 0 << "z" << 6 ); }
+        };
+
+        struct ValueCmp {
+            bool operator()( const intrusive_ptr<const Value> &a,
+                            const intrusive_ptr<const Value> &b ) {
+                return Value::compare( a, b ) < 0;
+            }
+        };
+        typedef map<intrusive_ptr<const Value>,intrusive_ptr<Document>,ValueCmp> IdMap;
+
+        class CheckResultsBase : public Base {
+        public:
+            virtual ~CheckResultsBase() {
+            }
+            void run() {
+                runSharded( false );
+                client.dropCollection( ns );
+                runSharded( true );
+            }
+            void runSharded( bool sharded ) {
+                populateData();
+                createSource();
+                createGroup( groupSpec() );
+
+                intrusive_ptr<DocumentSource> sink = group();
+                if ( sharded ) {
+                    sink = createMerger();
+                    sink->setSource( group() );
+                }
+
+                checkResultSet( sink );
+            }
+        protected:
+            virtual void populateData() {}
+            virtual BSONObj groupSpec() { return BSON( "_id" << 0 ); }
+            /** Expected results.  Must be sorted by _id to ensure consistent ordering. */
+            virtual BSONObj expectedResultSet() {
+                BSONObj wrappedResult =
+                        // fromjson cannot parse an array, so place the array within an object.
+                        fromjson( string( "{'':" ) + expectedResultSetString() + "}" );
+                return wrappedResult[ "" ].embeddedObject().getOwned();
+            }
+            /** Expected results.  Must be sorted by _id to ensure consistent ordering. */
+            virtual string expectedResultSetString() { return "[]"; }
+            intrusive_ptr<DocumentSource> createMerger() {
+                // Set up a group merger to simulate merging results in the router.  In this
+                // case only one shard is in use.
+                SplittableDocumentSource *splittable =
+                        dynamic_cast<SplittableDocumentSource*>( group() );
+                intrusive_ptr<DocumentSource> routerSource = splittable->getRouterSource();
+                ASSERT_NOT_EQUALS( group(), routerSource.get() );
+                BSONArrayBuilder bab;
+                routerSource->addToBsonArray( &bab );
+                BSONObj routerSourceSpec = bab.arr()[ 0 ].Obj().getOwned();
+                BSONElement routerSourceSpecElement = routerSourceSpec.firstElement();
+                intrusive_ptr<ExpressionContext> routerContext =
+                        ExpressionContext::create( &InterruptStatusMongod::status );
+                routerContext->setDoingMerge(true);
+                routerContext->setInShard(false);
+                return DocumentSourceGroup::createFromBson( &routerSourceSpecElement,
+                                                            routerContext );
+            }
+            void checkResultSet( const intrusive_ptr<DocumentSource> &sink ) {
+                // Load the results from the DocumentSourceGroup and sort them by _id.
+                IdMap resultSet;
+                while( !sink->eof() ) {
+                    
+                    intrusive_ptr<Document> current = sink->getCurrent();
+                    
+                    // If not eof, current is non null.
+                    ASSERT( current );
+                    
+                    // Save the current result.
+                    intrusive_ptr<const Value> id = current->getValue( "_id" );
+                    resultSet[ id ] = current;
+                    
+                    // Advance.
+                    if ( sink->advance() ) {
+                        // If advance succeeded, eof() is false.
+                        ASSERT( !sink->eof() );
+                    }
+                }
+                // Verify the DocumentSourceGroup is exhausted.
+                assertExhausted( sink );
+                
+                // Convert results to BSON once they all have been retrieved (to detect any errors
+                // resulting from incorrectly shared sub objects).
+                BSONArrayBuilder bsonResultSet;
+                for( IdMap::const_iterator i = resultSet.begin(); i != resultSet.end(); ++i ) {
+                    BSONObjBuilder bob;
+                    i->second->toBson( &bob );
+                    bsonResultSet << bob.obj();
+                }
+                // Check the result set.
+                ASSERT_EQUALS( expectedResultSet(), bsonResultSet.arr() );
+            }
+        };
+
+        /** An empty collection generates no results. */
+        class EmptyCollection : public CheckResultsBase {
+        };
+
+        /** eof() is the first iteration method called. */
+        class InitEof : public Base {
+        public:
+            void run() {
+                client.insert( ns, BSONObj() );
+                createSource();
+                createGroup( BSON( "_id" << 1 ) );
+                ASSERT( !group()->eof() );
+            }
+        };
+
+        /** advance() is the first iteration method called. */
+        class InitAdvance : public Base {
+        public:
+            void run() {
+                client.insert( ns, BSON( "_id" << 0 ) );
+                client.insert( ns, BSON( "_id" << 1 ) );
+                createSource();
+                createGroup( BSON( "_id" << "$_id" ) );
+                ASSERT( group()->advance() );
+                // Exhaust the results.
+                ASSERT( !group()->advance() );
+            }
+        };
+
+        /** getCurrent() is the first iteration method called. */
+        class InitGetCurrent : public Base {
+        public:
+            void run() {
+                client.insert( ns, BSONObj() );
+                createSource();
+                createGroup( BSON( "_id" << 1 ) );
+                ASSERT_EQUALS( 1, group()->getCurrent()->getValue( "_id" )->getInt() );
+            }
+        };
+
+        /** A $group performed on a single document. */
+        class SingleDocument : public CheckResultsBase {
+            void populateData() {
+                client.insert( ns, BSON( "a" << 1 ) );
+            }
+            virtual BSONObj groupSpec() {
+                return BSON( "_id" << 0 << "a" << BSON( "$sum" << "$a" ) );
+            }
+            virtual string expectedResultSetString() { return "[{_id:0,a:1}]"; }
+        };
+
+        /** A $group performed on two values for a single key. */
+        class TwoValuesSingleKey : public CheckResultsBase {
+            void populateData() {
+                client.insert( ns, BSON( "a" << 1 ) );
+                client.insert( ns, BSON( "a" << 2 ) );
+            }
+            virtual BSONObj groupSpec() {
+                return BSON( "_id" << 0 << "a" << BSON( "$push" << "$a" ) );
+            }
+            virtual string expectedResultSetString() { return "[{_id:0,a:[1,2]}]"; }
+        };
+        
+        /** A $group performed on two values with one key each. */
+        class TwoValuesTwoKeys : public CheckResultsBase {
+            void populateData() {
+                client.insert( ns, BSON( "_id" << 0 << "a" << 1 ) );
+                client.insert( ns, BSON( "_id" << 1 << "a" << 2 ) );
+            }
+            virtual BSONObj groupSpec() {
+                return BSON( "_id" << "$_id" << "a" << BSON( "$push" << "$a" ) );
+            }
+            virtual string expectedResultSetString() { return "[{_id:0,a:[1]},{_id:1,a:[2]}]"; }
+        };
+        
+        /** A $group performed on two values with two keys each. */
+        class FourValuesTwoKeys : public CheckResultsBase {
+            void populateData() {
+                client.insert( ns, BSON( "id" << 0 << "a" << 1 ) );
+                client.insert( ns, BSON( "id" << 1 << "a" << 2 ) );
+                client.insert( ns, BSON( "id" << 0 << "a" << 3 ) );
+                client.insert( ns, BSON( "id" << 1 << "a" << 4 ) );
+            }
+            virtual BSONObj groupSpec() {
+                return BSON( "_id" << "$id" << "a" << BSON( "$push" << "$a" ) );
+            }
+            virtual string expectedResultSetString() { return "[{_id:0,a:[1,3]},{_id:1,a:[2,4]}]"; }
+        };
+
+        /** A $group performed on two values with two keys each and two accumulator operations. */
+        class FourValuesTwoKeysTwoAccumulators : public CheckResultsBase {
+            void populateData() {
+                client.insert( ns, BSON( "id" << 0 << "a" << 1 ) );
+                client.insert( ns, BSON( "id" << 1 << "a" << 2 ) );
+                client.insert( ns, BSON( "id" << 0 << "a" << 3 ) );
+                client.insert( ns, BSON( "id" << 1 << "a" << 4 ) );
+            }
+            virtual BSONObj groupSpec() {
+                return BSON( "_id" << "$id"
+                             << "list" << BSON( "$push" << "$a" )
+                             << "sum" << BSON( "$sum"
+                                               << BSON( "$divide" << BSON_ARRAY( "$a" << 2 ) ) ) );
+            }
+            virtual string expectedResultSetString() {
+                return "[{_id:0,list:[1,3],sum:2},{_id:1,list:[2,4],sum:3}]";
+            }
+        };
+
+        /** Null and undefined _id values are grouped together. */
+        class GroupNullUndefinedIds : public CheckResultsBase {
+            void populateData() {
+                client.insert( ns, BSON( "a" << BSONNULL << "b" << 100 ) );
+                client.insert( ns, BSON( "b" << 10 ) );
+            }
+            virtual BSONObj groupSpec() {
+                return BSON( "_id" << "$a" << "sum" << BSON( "$sum" << "$b" ) );
+            }
+            virtual string expectedResultSetString() { return "[{_id:null,sum:110}]"; }
+        };
+
+        /** A complex _id expression. */
+        class ComplexId : public CheckResultsBase {
+            void populateData() {
+                client.insert( ns, BSON( "a" << "de" << "b" << "ad" << "c" << "beef" ) );
+                client.insert( ns, BSON( "a" << "d" << "b" << "eadbe" << "d" << "ef" ) );
+            }
+            virtual BSONObj groupSpec() {
+                return BSON( "_id" << BSON( "$add"
+                                            << BSON_ARRAY( "$a" << "$b" << "$c" << "$d" ) ) );
+            }
+            virtual string expectedResultSetString() { return "[{_id:'deadbeef'}]"; }
+        };
+
+        /** An undefined accumulator value is dropped. */
+        class UndefinedAccumulatorValue : public CheckResultsBase {
+            void populateData() {
+                client.insert( ns, BSONObj() );
+            }
+            virtual BSONObj groupSpec() {
+                return BSON( "_id" << 0 << "first" << BSON( "$first" << "$missing" ) );
+            }
+            virtual string expectedResultSetString() { return "[{_id:0}]"; }            
+        };
+
+        /** Simulate merging sharded results in the router. */ 
+        class RouterMerger : public CheckResultsBase {
+        public:
+            void run() {
+                BSONObj sourceData =
+                        fromjson( "{'':[{_id:0,list:[1,2]},{_id:1,list:[3,4]}" // from shard 1
+                                  ",{_id:0,list:[10,20]},{_id:1,list:[30,40]}]}" // from shard 2
+                                  );
+                BSONElement sourceDataElement = sourceData.firstElement();
+                // Create a source with synthetic data.
+                intrusive_ptr<DocumentSourceBsonArray> source =
+                        DocumentSourceBsonArray::create( &sourceDataElement, ctx() );
+                // Create a group source.
+                createGroup( BSON( "_id" << "$x" << "list" << BSON( "$push" << "$y" ) ) );
+                // Create a merger version of the source.
+                intrusive_ptr<DocumentSource> group = createMerger();
+                // Attach the merger to the synthetic shard results.
+                group->setSource( source.get() );
+                // Check the merger's output.
+                checkResultSet( group );
+            }
+        private:
+            string expectedResultSetString() {
+                return "[{_id:0,list:[1,2,10,20]},{_id:1,list:[3,4,30,40]}]";
+            }
+        };
+
+    } // namespace DocumentSourceGroup
+
     namespace DocumentSourceUnwind {
 
         using mongo::DocumentSourceUnwind;
@@ -609,6 +1084,41 @@ namespace DocumentSourceTests {
             add<DocumentSourceCursor::Yield>();
             add<DocumentSourceLimit::DisposeSource>();
             add<DocumentSourceLimit::DisposeSourceCascade>();
+            add<DocumentSourceGroup::NonObject>();
+            add<DocumentSourceGroup::EmptySpec>();
+            add<DocumentSourceGroup::IdEmptyObject>();
+            add<DocumentSourceGroup::IdObjectExpression>();
+            add<DocumentSourceGroup::IdInvalidObjectExpression>();
+            add<DocumentSourceGroup::TwoIdSpecs>();
+            add<DocumentSourceGroup::IdEmptyString>();
+            add<DocumentSourceGroup::IdStringConstant>();
+            add<DocumentSourceGroup::IdFieldPath>();
+            add<DocumentSourceGroup::IdInvalidFieldPath>();
+            add<DocumentSourceGroup::IdNumericConstant>();
+            add<DocumentSourceGroup::IdArrayConstant>();
+            add<DocumentSourceGroup::IdRegularExpression>();
+            add<DocumentSourceGroup::DollarAggregateFieldName>();
+            add<DocumentSourceGroup::NonObjectAggregateSpec>();
+            add<DocumentSourceGroup::EmptyObjectAggregateSpec>();
+            add<DocumentSourceGroup::BadAccumulator>();
+            add<DocumentSourceGroup::SumArray>();
+            add<DocumentSourceGroup::MultipleAccumulatorsForAField>();
+            add<DocumentSourceGroup::DuplicateAggregateFieldNames>();
+            add<DocumentSourceGroup::AggregateObjectExpression>();
+            add<DocumentSourceGroup::AggregateOperatorExpression>();
+            add<DocumentSourceGroup::EmptyCollection>();
+            add<DocumentSourceGroup::InitEof>();
+            add<DocumentSourceGroup::InitAdvance>();
+            add<DocumentSourceGroup::InitGetCurrent>();
+            add<DocumentSourceGroup::SingleDocument>();
+            add<DocumentSourceGroup::TwoValuesSingleKey>();
+            add<DocumentSourceGroup::TwoValuesTwoKeys>();
+            add<DocumentSourceGroup::FourValuesTwoKeys>();
+            add<DocumentSourceGroup::FourValuesTwoKeysTwoAccumulators>();
+            add<DocumentSourceGroup::GroupNullUndefinedIds>();
+            add<DocumentSourceGroup::ComplexId>();
+            add<DocumentSourceGroup::UndefinedAccumulatorValue>();
+            add<DocumentSourceGroup::RouterMerger>();
             add<DocumentSourceUnwind::EofInit>();
             add<DocumentSourceUnwind::AdvanceInit>();
             add<DocumentSourceUnwind::GetCurrentInit>();
