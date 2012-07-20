@@ -439,13 +439,11 @@ int
 __wt_curtable_truncate(
     WT_SESSION_IMPL *session, WT_CURSOR *start, WT_CURSOR *stop)
 {
-	WT_CURSOR *copy_start, *copy_stop, **list_start, **list_stop;
+	WT_CURSOR **list_start, **list_stop;
 	WT_CURSOR_TABLE *ctable, *ctable_start, *ctable_stop;
 	WT_DECL_RET;
 	WT_ITEM key;
-	int equals, i;
-
-	copy_start = copy_stop = NULL;
+	int i;
 
 	/*
 	 * Step through the cursor range, removing any indices.
@@ -460,53 +458,53 @@ __wt_curtable_truncate(
 	 */
 	if (start == NULL) {
 		ctable = (WT_CURSOR_TABLE *)stop;
-		WT_ERR(__curtable_open_indices(ctable));
+		WT_RET(__curtable_open_indices(ctable));
 		if (ctable->table->nindices > 0) {
-			WT_ERR(__wt_cursor_get_raw_key(stop, &key));
-			for (;;) {
-				APPLY_IDX(ctable, remove);
-				if ((ret = stop->prev(stop)) != 0)
-					break;
+			WT_RET(__wt_cursor_get_raw_key(stop, &key));
 
+			do {
 				APPLY_CG(ctable, search);
-				WT_ERR(ret);
-			}
-			WT_ERR_NOTFOUND_OK(ret);
+				WT_RET(ret);
+				APPLY_IDX(ctable, remove);
+			} while ((ret = stop->prev(stop)) == 0);
+			WT_RET_NOTFOUND_OK(ret);
+			ret = 0;
+
 			__wt_cursor_set_raw_key(stop, &key);
 			APPLY_CG(ctable, search);
 		}
 	} else if (stop == NULL) {
 		ctable = (WT_CURSOR_TABLE *)start;
-		WT_ERR(__curtable_open_indices(ctable));
+		WT_RET(__curtable_open_indices(ctable));
 		if (ctable->table->nindices > 0) {
-			WT_ERR(__wt_cursor_get_raw_key(start, &key));
-			for (;;) {
-				APPLY_IDX(ctable, remove);
-				if ((ret = start->next(start)) != 0)
-					break;
+			WT_RET(__wt_cursor_get_raw_key(start, &key));
 
+			do {
 				APPLY_CG(ctable, search);
-				WT_ERR(ret);
-			}
-			WT_ERR_NOTFOUND_OK(ret);
+				WT_RET(ret);
+				APPLY_IDX(ctable, remove);
+			} while ((ret = start->next(start)) == 0);
+			WT_RET_NOTFOUND_OK(ret);
+			ret = 0;
+
 			__wt_cursor_set_raw_key(start, &key);
 			APPLY_CG(ctable, search);
 		}
 	} else {
 		ctable = (WT_CURSOR_TABLE *)start;
-		WT_ERR(__curtable_open_indices(ctable));
+		WT_RET(__curtable_open_indices(ctable));
 		if (ctable->table->nindices > 0) {
-			WT_ERR(__wt_cursor_get_raw_key(start, &key));
-			for (;;) {
-				equals = start->equals(start, stop);
-				APPLY_IDX(ctable, remove);
-				if (equals || (ret = start->next(start)) != 0)
-					break;
+			WT_RET(__wt_cursor_get_raw_key(start, &key));
 
+			do {
 				APPLY_CG(ctable, search);
-				WT_ERR(ret);
-			}
-			WT_ERR_NOTFOUND_OK(ret);
+				WT_RET(ret);
+				APPLY_IDX(ctable, remove);
+			} while (!start->equals(start, stop) &&
+			    (ret = start->next(start)) == 0);
+			WT_RET_NOTFOUND_OK(ret);
+			ret = 0;
+
 			__wt_cursor_set_raw_key(start, &key);
 			APPLY_CG(ctable, search);
 		}
@@ -524,7 +522,7 @@ __wt_curtable_truncate(
 		    list_stop = ctable_stop->cg_cursors;
 		    i < WT_COLGROUPS(ctable_stop->table);
 		    i++, ++list_stop)
-			WT_ERR(
+			WT_RET(
 			    __wt_curfile_truncate(session, NULL, *list_stop));
 	else if (stop == NULL)
 		for (i = 0,
@@ -532,7 +530,7 @@ __wt_curtable_truncate(
 		    list_start = ctable_start->cg_cursors;
 		    i < WT_COLGROUPS(ctable_start->table);
 		    i++, ++list_start)
-			WT_ERR(
+			WT_RET(
 			    __wt_curfile_truncate(session, *list_start, NULL));
 	else {
 		for (i = 0,
@@ -542,15 +540,10 @@ __wt_curtable_truncate(
 		    list_stop = ctable_stop->cg_cursors;
 		    i < WT_COLGROUPS(ctable_start->table);
 		    i++, ++list_start, ++list_stop)
-			WT_ERR(__wt_curfile_truncate(
+			WT_RET(__wt_curfile_truncate(
 			    session, *list_start, *list_stop));
 	}
-
-err:	if (copy_start != NULL)
-		WT_TRET(copy_start->close(copy_start));
-	if (copy_stop != NULL)
-		WT_TRET(copy_stop->close(copy_stop));
-	return (ret);
+err:	return (ret);
 }
 
 /*
