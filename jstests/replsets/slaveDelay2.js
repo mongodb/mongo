@@ -1,30 +1,11 @@
+load("jstests/replsets/rslib.js");
 
 var name = "slaveDelay2";
 var host = getHostName();
 
-var waitForAllMembers = function(master) {
-  var ready = false;
-
-  outer:
-  while (true) {
-    var state = master.getSisterDB("admin").runCommand({replSetGetStatus:1});
-
-    for (var m in state.members) {
-      if (state.members[m].state != 2 && state.members[m].state != 1) {
-        sleep(10000);
-        continue outer;
-      }
-    }
-
-    printjson(state);
-    print("okay, everyone is primary or secondary");
-    return;
-  }
-};
-
 
 var initialize = function() {
-  var replTest = new ReplSetTest( {name: name, nodes: 1} );
+  var replTest = new ReplSetTest( {name: name, nodes: 1, oplogSize : 1024} );
 
   var nodes = replTest.startSet();
   
@@ -57,7 +38,7 @@ doTest = function( signal ) {
    * initializing. Make sure it syncs all of these writes before going into
    * syncDelay.
    */
-  var conn = MongoRunner.runMongod({port : 31008, dbpath : name + "-sd", useHostname: true, replSet: name });
+  var conn = MongoRunner.runMongod({port : 31008, dbpath : name + "-sd", useHostname: true, replSet: name, oplogSize : 1024 });
   conn.setSlaveOk();
   
   config = master.getSisterDB("local").system.replset.findOne();
@@ -67,7 +48,7 @@ doTest = function( signal ) {
   assert.eq(ok.ok,1);
 
   // do inserts during initial sync
-  count = 0;
+  var count = 0;
   while (count < 10) {
     for (var i = 100*count; i<100*(count+1); i++) {
       master.foo.insert({x:i});
@@ -91,7 +72,7 @@ doTest = function( signal ) {
   }
 
   // wait a bit for the syncs to be applied
-  waitForAllMembers(master);    
+  waitForAllMembers(master, 120000);
 
   for (var i=0; i<(100*count); i++) {
     var obj = conn.getDB(name).foo.findOne({x : i});
