@@ -123,8 +123,8 @@ __drop_colgroup(
 	}
 
 	/* If we can get the table, detach the colgroup from it. */
-	if ((ret =
-	    __wt_schema_get_table(session, tablename, tlen, &table)) == 0)
+	if ((ret = __wt_schema_get_table(
+	    session, tablename, tlen, 1, &table)) == 0)
 		table->cg_complete = 0;
 	else if (ret == WT_NOTFOUND)
 		ret = 0;
@@ -167,7 +167,7 @@ __drop_index(
 
 	/* If we can get the table, detach the index from it. */
 	if ((ret = __wt_schema_get_table(
-	    session, tablename, tlen, &table)) == 0)
+	    session, tablename, tlen, 1, &table)) == 0)
 		table->idx_complete = 0;
 	else if (ret == WT_NOTFOUND)
 		ret = 0;
@@ -193,7 +193,7 @@ __drop_table(
 	name = uri;
 	(void)WT_PREFIX_SKIP(name, "table:");
 
-	WT_ERR(__wt_schema_get_table(session, name, strlen(name), &table));
+	WT_ERR(__wt_schema_get_table(session, name, strlen(name), 1, &table));
 
 	/* Drop the column groups. */
 	for (i = 0; i < WT_COLGROUPS(table); i++) {

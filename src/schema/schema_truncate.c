@@ -43,7 +43,7 @@ __truncate_table(WT_SESSION_IMPL *session, const char *name)
 	WT_TABLE *table;
 	int i, tret;
 
-	WT_RET(__wt_schema_get_table(session, name, strlen(name), &table));
+	WT_RET(__wt_schema_get_table(session, name, strlen(name), 0, &table));
 	WT_RET(__wt_scr_alloc(session, 0, &namebuf));
 
 	/* Truncate the column groups. */

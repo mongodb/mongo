@@ -116,7 +116,7 @@ __create_colgroup(WT_SESSION_IMPL *session,
 		tlen = strlen(tablename);
 
 	if ((ret =
-	    __wt_schema_get_table(session, tablename, tlen, &table)) != 0)
+	    __wt_schema_get_table(session, tablename, tlen, 1, &table)) != 0)
 		WT_RET_MSG(session, (ret == WT_NOTFOUND) ? ENOENT : ret,
 		    "Can't create '%s' for non-existent table '%.*s'",
 		    name, (int)tlen, tablename);
@@ -223,7 +223,7 @@ __create_index(WT_SESSION_IMPL *session,
 
 	tlen = (size_t)(idxname++ - tablename);
 	if ((ret =
-	    __wt_schema_get_table(session, tablename, tlen, &table)) != 0)
+	    __wt_schema_get_table(session, tablename, tlen, 1, &table)) != 0)
 		WT_RET_MSG(session, ret,
 		    "Can't create an index for a non-existent table: %.*s",
 		    (int)tlen, tablename);
@@ -330,7 +330,7 @@ __create_table(WT_SESSION_IMPL *session,
 		return (EINVAL);
 
 	if ((ret = __wt_schema_get_table(session,
-	    tablename, strlen(tablename), &table)) == 0) {
+	    tablename, strlen(tablename), 0, &table)) == 0) {
 		if (exclusive)
 			ret = EEXIST;
 		return (0);
@@ -360,7 +360,7 @@ __create_table(WT_SESSION_IMPL *session,
 
 	/* Attempt to open the table now to catch any errors. */
 	WT_ERR(__wt_schema_get_table(
-	    session, tablename, strlen(tablename), &table));
+	    session, tablename, strlen(tablename), 1, &table));
 
 	if (ncolgroups == 0) {
 		cgsize = strlen("colgroup:") + strlen(tablename) + 1;

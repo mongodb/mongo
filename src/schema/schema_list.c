@@ -50,15 +50,25 @@ __wt_schema_find_table(WT_SESSION_IMPL *session,
  */
 int
 __wt_schema_get_table(WT_SESSION_IMPL *session,
-    const char *name, size_t namelen, WT_TABLE **tablep)
+    const char *name, size_t namelen, int ok_incomplete, WT_TABLE **tablep)
 {
 	WT_DECL_RET;
+	WT_TABLE *table;
 
-	ret = __wt_schema_find_table(session, name, namelen, tablep);
+	ret = __wt_schema_find_table(session, name, namelen, &table);
 
 	if (ret == WT_NOTFOUND) {
-		WT_RET(__wt_schema_open_table(session, name, namelen, tablep));
-		ret = __wt_schema_add_table(session, *tablep);
+		WT_RET(__wt_schema_open_table(session, name, namelen, &table));
+		ret = __wt_schema_add_table(session, table);
+	}
+
+	if (ret == 0) {
+		if (!ok_incomplete && !table->cg_complete)
+			WT_RET_MSG(session, EINVAL, "'%s' cannot be used "
+			    "until all column groups are created",
+			    table->name);
+
+		*tablep = table;
 	}
 
 	return (ret);

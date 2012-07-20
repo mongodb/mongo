@@ -157,8 +157,8 @@ __rename_table(
 
 	buf = NULL;
 
-	WT_RET(
-	    __wt_schema_get_table(session, oldname, strlen(oldname), &table));
+	WT_RET(__wt_schema_get_table(
+	    session, oldname, strlen(oldname), 0, &table));
 
 	/* Rename the column groups. */
 	for (i = 0; i < WT_COLGROUPS(table); i++)

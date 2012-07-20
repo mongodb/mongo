@@ -596,11 +596,8 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 		size = strlen(tablename);
 	else
 		size = WT_PTRDIFF(columns, tablename);
-	WT_RET(__wt_schema_get_table(session, tablename, size, &table));
+	WT_RET(__wt_schema_get_table(session, tablename, size, 0, &table));
 
-	if (!table->cg_complete)
-		WT_RET_MSG(session, EINVAL,
-		    "Cannot open cursor '%s' on incomplete table", uri);
 	if (table->is_simple)
 		/*
 		 * The returned cursor should be public: it is not part of a

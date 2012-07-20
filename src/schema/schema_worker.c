@@ -38,7 +38,7 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 		WT_TRET(__wt_session_release_btree(session));
 	} else if (WT_PREFIX_SKIP(tablename, "table:")) {
 		WT_RET(__wt_schema_get_table(session,
-		    tablename, strlen(tablename), &table));
+		    tablename, strlen(tablename), 0, &table));
 		WT_ASSERT(session, session->btree == NULL);
 
 		for (i = 0; i < WT_COLGROUPS(table); i++) {
