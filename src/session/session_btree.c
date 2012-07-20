@@ -79,8 +79,10 @@ __wt_session_lock_btree(WT_SESSION_IMPL *session, uint32_t flags)
 	 * The handle needs to be opened.  If we locked the handle above,
 	 * unlock it before returning.
 	 */
-	if (!LF_ISSET(WT_BTREE_EXCLUSIVE) || special_flags == 0)
+	if (!LF_ISSET(WT_BTREE_EXCLUSIVE) || special_flags == 0) {
+		F_CLR(btree, WT_BTREE_EXCLUSIVE);
 		__wt_rwunlock(session, btree->rwlock);
+	}
 
 	/* Treat an unopened handle just like a non-existent handle. */
 	return (WT_NOTFOUND);
