@@ -117,6 +117,8 @@ def complexPopulate(self, uri, config, rows):
     self.session.create(cgname + ':cgroup4', 'columns=(column2,column3)')
     self.session.create(cgname + ':cgroup5', 'columns=(column3,column4)')
     self.session.create(cgname + ':cgroup6', 'columns=(column4,column5)')
+    #indxname = 'index:' + uri.split(":")[1]
+    #self.session.create(indxname + ':indx1', 'columns=(column2)')
     cursor = self.session.open_cursor(uri, None, None)
     for i in range(0, rows):
         cursor.set_key(keyPopulate(cursor.key_format, i))

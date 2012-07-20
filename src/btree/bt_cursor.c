@@ -434,6 +434,68 @@ err:	__cursor_func_resolve(cbt, ret);
 }
 
 /*
+ * __wt_btcur_equals --
+ *	Return if two cursors reference the same row.
+ */
+static int
+__wt_btcur_equals(WT_CURSOR_BTREE *a, WT_CURSOR_BTREE *b)
+{
+	WT_DECL_RET;
+
+	if (a->btree != b->btree)
+		return (0);
+
+	ret = 0;
+	switch (a->btree->type) {
+	case BTREE_COL_FIX:
+	case BTREE_COL_VAR:
+		if (a->recno == b->recno)
+			ret = 1;
+		break;
+	case BTREE_ROW:
+		ret = 0;
+		if (a->page != b->page)
+			break;
+		if (a->slot != b->slot)
+			break;
+		if (a->ins_head != b->ins_head)
+			break;
+		if (a->ins != b->ins)
+			break;
+		ret = 1;
+		break;
+	}
+	return (ret);
+}
+
+/*
+ * __wt_btcur_truncate --
+ *	Discard a cursor range from the tree.
+ */
+int
+__wt_btcur_truncate(WT_CURSOR_BTREE *start, WT_CURSOR_BTREE *stop)
+{
+	WT_DECL_RET;
+
+	if (start == NULL)
+		do {
+			WT_RET(__wt_btcur_remove(stop));
+		} while ((ret = __wt_btcur_prev(stop)) == 0);
+	else if (stop == NULL)
+		do {
+			WT_RET(__wt_btcur_remove(start));
+		} while ((ret = __wt_btcur_next(start)) == 0);
+	else
+		do {
+			WT_RET(__wt_btcur_remove(start));
+		} while (!__wt_btcur_equals(start, stop) &&
+		    (ret = __wt_btcur_next(start)) == 0);
+
+	WT_RET_NOTFOUND_OK(ret);
+	return (0);
+}
+
+/*
  * __wt_btcur_close --
  *	Close a btree cursor.
  */

@@ -188,6 +188,41 @@ err:	API_END_TXN_ERROR(session, ret);
 }
 
 /*
+ * __wt_curfile_truncate --
+ *	WT_SESSION.truncate support when file cursors are specified.
+ */
+int
+__wt_curfile_truncate(
+    WT_SESSION_IMPL *session, WT_CURSOR *start, WT_CURSOR *stop)
+{
+	WT_BTREE *saved_btree;
+	WT_CURSOR_BTREE *cursor;
+	WT_DECL_RET;
+
+	if (start == NULL) {
+		WT_CURSOR_NEEDKEY(stop);
+		cursor = (WT_CURSOR_BTREE *)stop;
+	} else {
+		WT_CURSOR_NEEDKEY(start);
+		cursor = (WT_CURSOR_BTREE *)start;
+	}
+
+	/*
+	 * !!!
+	 * We're doing a cursor operation but in the service of the session API;
+	 * set the session handle to reference the appropriate Btree, but don't
+	 * do any of the other "standard" cursor API setup.
+	 */
+	saved_btree = session->btree;
+	session->btree = cursor->btree;
+	ret = __wt_btcur_truncate(
+	    (WT_CURSOR_BTREE *)start, (WT_CURSOR_BTREE *)stop);
+	session->btree = saved_btree;
+
+err:	return (ret);
+}
+
+/*
  * __curfile_close --
  *	WT_CURSOR->close method for the btree cursor type.
  */
@@ -322,7 +357,7 @@ __wt_curfile_open(WT_SESSION_IMPL *session, const char *uri,
 		WT_RET(__wt_session_get_btree(session,
 		     uri, cfg, bulk ? WT_BTREE_EXCLUSIVE : 0));
 	else
-		WT_RET_MSG(session, EINVAL, "Unexpected object type");
+		WT_RET(__wt_bad_object_type(session, uri));
 
 	return (__wt_curfile_create(session, owner, cfg, cursorp));
 }

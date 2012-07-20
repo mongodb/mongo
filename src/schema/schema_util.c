@@ -24,7 +24,7 @@ __wt_schema_get_source(
 		return (0);
 	}
 
-	return (__wt_unknown_object_type(session, name));
+	return (__wt_bad_object_type(session, name));
 }
 
 /*
@@ -49,7 +49,7 @@ __wt_schema_name_check(WT_SESSION_IMPL *session, const char *uri)
 			name = sep + 1;
 	} else if (!WT_PREFIX_SKIP(name, "table:") &&
 	    !WT_PREFIX_SKIP(name, "file:"))
-		return (__wt_unknown_object_type(session, uri));
+		return (__wt_bad_object_type(session, uri));
 
 	if (WT_PREFIX_MATCH(name, "WiredTiger"))
 		WT_RET_MSG(session, EINVAL,

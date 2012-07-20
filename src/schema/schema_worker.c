@@ -50,7 +50,7 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 			WT_RET(ret);
 		}
 	} else
-		return (__wt_unknown_object_type(session, uri));
+		return (__wt_bad_object_type(session, uri));
 
 	return (ret);
 }

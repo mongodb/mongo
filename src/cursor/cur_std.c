@@ -90,7 +90,7 @@ __wt_cursor_set_key(WT_CURSOR *cursor, ...)
  *	Temporarily force raw mode in a cursor to get a canonical copy of
  * the key.
  */
-static int
+int
 __wt_cursor_get_raw_key(WT_CURSOR *cursor, WT_ITEM *key)
 {
 	WT_DECL_RET;
@@ -110,7 +110,7 @@ __wt_cursor_get_raw_key(WT_CURSOR *cursor, WT_ITEM *key)
  *	Temporarily force raw mode in a cursor to set a canonical copy of
  * the key.
  */
-static void
+void
 __wt_cursor_set_raw_key(WT_CURSOR *cursor, WT_ITEM *key)
 {
 	int raw_set;
