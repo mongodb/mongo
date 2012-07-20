@@ -259,38 +259,38 @@ __wt_schema_open_index(
     WT_SESSION_IMPL *session, WT_TABLE *table, const char *idxname, size_t len)
 {
 	WT_CURSOR *cursor;
+	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
+	int cmp, i, copy;
 	const char *idxconf, *name, *tablename, *uri;
-	int i, match, skipped;
 
-	cursor = NULL;
-	skipped = 0;
-	idxconf = NULL;
-	tablename = table->name;
-	(void)WT_PREFIX_SKIP(tablename, "table:");
-
+	/* Check if we've already done the work. */
 	if (len == 0 && table->idx_complete)
 		return (0);
 
-	/*
-	 * XXX
-	 * Do a full scan through the metadata to find all matching indices.
-	 * This scan should be optimized with search + next.
-	 */
-	WT_RET(__wt_metadata_cursor(session, NULL, &cursor));
+	cursor = NULL;
+	idxconf = NULL;
 
-	/* Open each index. */
-	for (i = 0; (ret = cursor->next(cursor)) == 0;) {
+	/* Build a search key. */
+	tablename = table->name;
+	(void)WT_PREFIX_SKIP(tablename, "table:");
+	WT_ERR(__wt_scr_alloc(session, 512, &tmp));
+	WT_ERR(__wt_buf_fmt(session, tmp, "index:%s:", tablename));
+
+	/* Find matching indices. */
+	WT_ERR(__wt_metadata_cursor(session, NULL, &cursor));
+	cursor->set_key(cursor, tmp->data);
+	if ((ret = cursor->search_near(cursor, &cmp)) == 0 && cmp < 0)
+		ret = cursor->next(cursor);
+	for (i = 0; ret == 0; ret = cursor->next(cursor)) {
 		WT_ERR(cursor->get_key(cursor, &uri));
 		name = uri;
-		if (!WT_PREFIX_SKIP(name, "index:") ||
-		    !WT_PREFIX_SKIP(name, tablename) ||
-		    !WT_PREFIX_SKIP(name, ":"))
-			continue;
+		if (!WT_PREFIX_SKIP(name, tmp->data))
+			break;
 
 		/* Is this the index we are looking for? */
-		match = (len > 0 &&
-		   strncmp(name, idxname, len) == 0 && name[len] == '\0');
+		copy = len == 0 ||
+		    (strncmp(name, idxname, len) == 0 && name[len] == '\0');
 
 		if ((size_t)i * sizeof(const char *) >= table->idx_name_alloc)
 			WT_ERR(__wt_realloc(session, &table->idx_name_alloc,
@@ -300,30 +300,25 @@ __wt_schema_open_index(
 		if (table->idx_name[i] == NULL)
 			WT_ERR(__wt_strdup(session, uri, &table->idx_name[i]));
 
-		if (len == 0 || match) {
+		if (copy) {
 			WT_ERR(cursor->get_value(cursor, &idxconf));
 			WT_ERR(__open_index(session, table, uri, idxconf));
-		} else
-			skipped = 1;
 
-		if (match) {
-			ret = cursor->close(cursor);
-			cursor = NULL;
-			break;
+			if (len != 0)
+				break;
 		}
 		i++;
 	}
+	WT_ERR_NOTFOUND_OK(ret);
 
-	/* Did we make it all the way through? */
-	if (ret == WT_NOTFOUND) {
-		ret = 0;
-		if (!skipped) {
-			table->nindices = i;
-			table->idx_complete = 1;
-		}
+	/* If we did a full pass, we won't need to do it again. */
+	if (len == 0) {
+		table->nindices = i;
+		table->idx_complete = 1;
 	}
 
-err:	if (cursor != NULL)
+err:	__wt_scr_free(&tmp);
+	if (cursor != NULL)
 		WT_TRET(cursor->close(cursor));
 	return (ret);
 }
