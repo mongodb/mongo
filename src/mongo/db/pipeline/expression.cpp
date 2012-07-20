@@ -1382,6 +1382,9 @@ namespace mongo {
     }
 
     void ExpressionObject::documentToBson(BSONObjBuilder *pBuilder, bool requireExpression) const {
+        if (_excludeId)
+            pBuilder->appendBool("_id", false);
+
         for (vector<string>::const_iterator it(_order.begin()); it!=_order.end(); ++it) {
             string fieldName = *it;
             verify(_expressions.find(fieldName) != _expressions.end());
@@ -2280,21 +2283,14 @@ namespace mongo {
         return NULL;
     }
 
-    void ExpressionNary::toBson(
-        BSONObjBuilder *pBuilder, const char *pOpName) const {
+    void ExpressionNary::toBson(BSONObjBuilder *pBuilder, const char *pOpName) const {
         const size_t nOperand = vpOperand.size();
-        verify(nOperand > 0);
-        if (nOperand == 1) {
-            vpOperand[0]->addToBsonObj(pBuilder, pOpName, false);
-            return;
-        }
 
         /* build up the array */
-        BSONArrayBuilder arrBuilder;
+        BSONArrayBuilder arrBuilder (pBuilder->subarrayStart(pOpName));
         for(size_t i = 0; i < nOperand; ++i)
             vpOperand[i]->addToBsonArray(&arrBuilder);
-
-        pBuilder->append(pOpName, arrBuilder.arr());
+        arrBuilder.doneFast();
     }
 
     void ExpressionNary::addToBsonObj(

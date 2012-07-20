@@ -102,8 +102,8 @@ namespace mongo {
         bool runExecute(
             BSONObjBuilder &result, string &errmsg,
             const string &ns, const string &db,
-            intrusive_ptr<Pipeline> &pPipeline,
-            intrusive_ptr<ExpressionContext> &pCtx);
+            intrusive_ptr<Pipeline> pPipeline,
+            intrusive_ptr<ExpressionContext> pCtx);
     };
 
     // self-registering singleton static instance
@@ -155,8 +155,26 @@ namespace mongo {
     bool PipelineCommand::runExecute(
         BSONObjBuilder &result, string &errmsg,
         const string &ns, const string &db,
-        intrusive_ptr<Pipeline> &pPipeline,
-        intrusive_ptr<ExpressionContext> &pCtx) {
+        intrusive_ptr<Pipeline> pPipeline,
+        intrusive_ptr<ExpressionContext> pCtx) {
+
+#if _DEBUG
+        // This is outside of the if block to keep the object alive until the pipeline is finished.
+        BSONObj parsed;
+        if (!pCtx->getInShard()) {
+            // Make sure all operations round-trip through Pipeline::toBson()
+            // correctly by reparsing every command on DEBUG builds. This is
+            // important because sharded aggregations rely on this ability.
+            // Skipping when inShard because this has already been through the
+            // transformation (and this unsets pCtx->inShard).
+            BSONObjBuilder bb;
+            pPipeline->toBson(&bb);
+            parsed = bb.obj();
+            // PRINT(parsed); // when debugging failures uncomment this and the matching one in run
+            pPipeline = Pipeline::parseCommand(errmsg, parsed, pCtx);
+            verify(pPipeline);
+        }
+#endif
 
         // The DocumentSourceCursor manages a read lock internally, see SERVER-6123.
         intrusive_ptr<DocumentSourceCursor> pSource(
@@ -252,6 +270,7 @@ namespace mongo {
     bool PipelineCommand::run(const string &db, BSONObj &cmdObj,
                               int options, string &errmsg,
                               BSONObjBuilder &result, bool fromRepl) {
+        // PRINT(cmdObj); // uncomment when debugging
 
         intrusive_ptr<ExpressionContext> pCtx(
             ExpressionContext::create(&InterruptStatusMongod::status));
