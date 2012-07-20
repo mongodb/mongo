@@ -78,6 +78,13 @@ class test_backup(wttest.WiredTigerTestCase, suite_subprocess):
         self.populate()
         os.mkdir(self.dir)
         self.runWt(['backup', self.dir])
+
+	# Make sure all the files were copied.
+	self.runWt(['list'], outfilename='outfile.orig')
+	self.runWt(['-h', self.dir, 'list'], outfilename='outfile.backup')
+        compareFiles(self, 'outfile.orig', 'outfile.backup')
+
+	# And that the contents are the same.
         for i in self.objs:
             self.compare(i[0])
 
