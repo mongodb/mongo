@@ -644,10 +644,10 @@ __curtable_open_indices(WT_CURSOR_TABLE *ctable)
 	session = (WT_SESSION_IMPL *)ctable->iface.session;
 	table = ctable->table;
 
-	if (!ctable->table->idx_complete)
-		WT_RET(__wt_schema_open_index(session, table, NULL, 0));
+	WT_RET(__wt_schema_open_index(session, table, NULL, 0));
 	if (table->nindices == 0 || ctable->idx_cursors != NULL)
 		return (0);
+
 	/* Check for bulk cursors. */
 	primary = *ctable->cg_cursors;
 	if (F_ISSET(((WT_CURSOR_BTREE *)primary)->btree, WT_BTREE_BULK))
