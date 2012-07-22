@@ -172,7 +172,7 @@ namespace mongo {
         void display( stringstream& ss , double elapsed , const string& ns , const Top::CollectionData& data ) {
             if ( ns != "TOTAL" && data.total.count == 0 )
                 return;
-            ss << "<tr><th>" << ns << "</th>";
+            ss << "<tr><th>" << html::escape( ns ) << "</th>";
 
             display( ss , elapsed , data.total );
 

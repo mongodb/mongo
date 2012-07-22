@@ -502,11 +502,9 @@ namespace mongo {
                     else
                         tablecell( ss , "" );
                     tablecell( ss , co.getOp() );
-                    tablecell( ss , co.getNS() );
-                    if ( co.haveQuery() ) {
-                        string escapedQuery = html::escape( co.query().toString() );
-                        tablecell( ss , escapedQuery ) ;
-                    }
+                    tablecell( ss , html::escape( co.getNS() ) );
+                    if ( co.haveQuery() )
+                        tablecell( ss , html::escape( co.query().toString() ) );
                     else
                         tablecell( ss , "" );
                     tablecell( ss , co.getRemoteString() );
