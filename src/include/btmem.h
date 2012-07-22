@@ -325,16 +325,14 @@ struct __wt_ref {
 	/*
 	 * Page state.
 	 *
-	 * WT_REF_DISK has a value of 0, the default state after allocating
-	 * cleared memory.
-	 *
-	 * Synchronization is based on the WT_REF->state field, which has 5
-	 * possible states:
+	 * Synchronization is based on the WT_REF->state field, which has a
+	 * number of possible states:
 	 *
 	 * WT_REF_DISK:
 	 *	The initial setting before a page is brought into memory, and
 	 *	set as a result of page eviction; the page is on disk, and must
-	 *	be read into into memory before use.
+	 *	be read into into memory before use.  WT_REF_DISK has a value
+	 *	of 0, the default state after allocating cleared memory.
 	 *
 	 * WT_REF_EVICT_FORCE:
 	 *	Set by eviction when a page is awaiting forced eviction;

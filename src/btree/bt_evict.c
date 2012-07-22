@@ -791,9 +791,9 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 		}
 
 		/*
-		 * Root pages can't be evicted, nor can skip pages that must be
-		 * merged into their parents.  Use the EVICT_LRU flag to avoid
-		 * putting pages onto the list multiple times.
+		 * Root pages can't be evicted, nor can internal pages expected
+		 * to be merged into their parents.  Use the EVICT_LRU flag to
+		 * avoid putting pages onto the list multiple times.
 		 *
 		 * Don't skip pages marked WT_PM_REC_EMPTY or SPLIT: updates
 		 * after their last reconciliation may have changed their state
