@@ -504,7 +504,8 @@ namespace mongo {
                     tablecell( ss , co.getOp() );
                     tablecell( ss , co.getNS() );
                     if ( co.haveQuery() ) {
-                        tablecell( ss , co.query() );
+                        string escapedQuery = html::escape( co.query().toString() );
+                        tablecell( ss , escapedQuery ) ;
                     }
                     else
                         tablecell( ss , "" );

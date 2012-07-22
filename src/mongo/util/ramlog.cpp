@@ -135,7 +135,7 @@ namespace mongo {
             verify( strlen(v[i]) > 20 );
             int r = repeats(v, i);
             if( r < 0 ) {
-                s << color( linkify( clean(v,i).c_str() ) ) << '\n';
+                s << color( linkify( html::escape( clean(v, i) ).c_str() ) ) << '\n';
             }
             else {
                 stringstream x;
@@ -147,7 +147,7 @@ namespace mongo {
                     stringstream r;
                     if( nr == 1 ) r << "repeat last line";
                     else r << "repeats last " << nr << " lines; ends " << string(v[last]+4,0,15);
-                    s << html::a("", r.str(), clean(v,i,x.str()));
+                    s << html::a("", r.str(), html::escape( clean(v, i,x.str() ) ) );
                 }
                 else s << x.str();
                 s << '\n';
