@@ -85,6 +85,21 @@ namespace mongo {
         pBuilder->append(groupName, insides.done());
     }
 
+    DocumentSource::GetDepsReturn DocumentSourceGroup::getDependencies(set<string>& deps) const {
+        // add the _id
+        pIdExpression->addDependencies(deps);
+
+        // add the rest
+        const size_t n = vFieldName.size();
+        for(size_t i = 0; i < n; ++i) {
+            intrusive_ptr<Accumulator> pA((*vpAccumulatorFactory[i])(pExpCtx));
+            pA->addOperand(vpExpression[i]);
+            pA->addDependencies(deps);
+        }
+
+        return EXAUSTIVE;
+    }
+
     intrusive_ptr<DocumentSourceGroup> DocumentSourceGroup::create(
         const intrusive_ptr<ExpressionContext> &pExpCtx) {
         intrusive_ptr<DocumentSourceGroup> pSource(
@@ -375,8 +390,9 @@ namespace mongo {
     }
 
     intrusive_ptr<DocumentSource> DocumentSourceGroup::getRouterSource() {
-        intrusive_ptr<DocumentSourceGroup> pMerger(
-            DocumentSourceGroup::create(pExpCtx));
+        intrusive_ptr<ExpressionContext> pMergerExpCtx = pExpCtx->clone();
+        pMergerExpCtx->setDoingMerge(true);
+        intrusive_ptr<DocumentSourceGroup> pMerger(DocumentSourceGroup::create(pMergerExpCtx));
 
         /* the merger will use the same grouping key */
         pMerger->setIdExpression(ExpressionFieldPath::create(

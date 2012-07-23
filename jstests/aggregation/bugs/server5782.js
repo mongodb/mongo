@@ -42,7 +42,7 @@ var l1 = db.runCommand(
 { aggregate: "article", pipeline : [
     { $project : {
         author : 1,
-        $authorWroteIt : { $eq:["$author", name] }
+        authorWroteIt : { $eq:["$author", name] }
     }}
 ]});
 
@@ -51,22 +51,22 @@ var l1result = [
     {
         "_id" : 1,
         "author" : "bob",
-        "$authorWroteIt" : true
+        "authorWroteIt" : true
     },
     {
         "_id" : 2,
         "author" : "dave",
-        "$authorWroteIt" : true
+        "authorWroteIt" : true
     },
     {
         "_id" : 3,
         "author" : "jane",
-        "$authorWroteIt" : true
+        "authorWroteIt" : true
     },
     {
         "_id" : 4,
         "author" : "$author",
-        "$authorWroteIt" : true
+        "authorWroteIt" : true
     }
 ];
 
@@ -75,7 +75,7 @@ var l2 = db.runCommand(
 { aggregate: "article", pipeline : [
     { $project : {
         author : 1,
-        $authorWroteIt : { $eq:["$author", { $literal: name } ] }
+        authorWroteIt : { $eq:["$author", { $literal: name } ] }
     }}
 ]});
 
@@ -84,22 +84,22 @@ var l2result = [
     {
         "_id" : 1,
         "author" : "bob",
-        "$authorWroteIt" : false
+        "authorWroteIt" : false
     },
     {
         "_id" : 2,
         "author" : "dave",
-        "$authorWroteIt" : false
+        "authorWroteIt" : false
     },
     {
         "_id" : 3,
         "author" : "jane",
-        "$authorWroteIt" : false
+        "authorWroteIt" : false
     },
     {
         "_id" : 4,
         "author" : "$author",
-        "$authorWroteIt" : true
+        "authorWroteIt" : true
     }
 ];
 

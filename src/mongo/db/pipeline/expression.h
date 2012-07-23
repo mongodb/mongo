@@ -20,8 +20,6 @@
 
 #include "db/pipeline/field_path.h"
 #include "util/intrusive_counter.h"
-#include "util/iterator.h"
-
 
 namespace mongo {
 
@@ -29,7 +27,6 @@ namespace mongo {
     class BSONElement;
     class BSONObjBuilder;
     class Builder;
-    class DependencyTracker;
     class Document;
     class DocumentSource;
     class ExpressionContext;
@@ -57,15 +54,22 @@ namespace mongo {
         virtual intrusive_ptr<Expression> optimize() = 0;
 
         /**
-           Add this expression's field dependencies to the dependency tracker.
+           Add this expression's field dependencies to the set
 
            Expressions are trees, so this is often recursive.
 
-           @params pTracker the tracker to add the dependencies to
+           @param deps output parameter
+           @param path path to self if all ancestors are ExpressionObjects.
+                       Top-level ExpressionObject gets pointer to empty vector.
+                       If any other Expression is an ancestor {a:1} object
+                       aren't allowed, so they get NULL
+
+
          */
-        virtual void addDependencies(
-            const intrusive_ptr<DependencyTracker> &pTracker,
-            const DocumentSource *pSource) const = 0;
+        virtual void addDependencies(set<string>& deps, vector<string>* path=NULL) const = 0;
+
+        /** simple expressions are just inclusion exclusion as supported by ExpressionObject */
+        virtual bool isSimple() { return false; }
 
         /*
           Evaluate the Expression using the given document as input.
@@ -129,30 +133,20 @@ namespace mongo {
         /*
           Utility class for parseObject() below.
 
-          Only one array can be unwound in a processing pipeline.  If the
-          UNWIND_OK option is used, unwindOk() will return true, and a field
-          can be declared as unwound using unwind(), after which unwindUsed()
-          will return true.  Only specify UNWIND_OK if it is OK to unwind an
-          array in the current context.
-
           DOCUMENT_OK indicates that it is OK to use a Document in the current
           context.
          */
         class ObjectCtx {
         public:
             ObjectCtx(int options);
-            static const int UNWIND_OK = 0x0001;
-            static const int DOCUMENT_OK = 0x0002;
-
-            bool unwindOk() const;
-            bool unwindUsed() const;
-            void unwind(string fieldName);
+            static const int DOCUMENT_OK = 0x0001;
+            static const int TOP_LEVEL = 0x0002;
 
             bool documentOk() const;
+            bool topLevel() const;
 
         private:
             int options;
-            string unwindField;
         };
 
         /*
@@ -165,8 +159,6 @@ namespace mongo {
          */
         static intrusive_ptr<Expression> parseObject(
             BSONElement *pBsonElement, ObjectCtx *pCtx);
-
-        static const char unwindName[];
 
         /*
           Parse a BSONElement Object which has already been determined to be
@@ -233,9 +225,7 @@ namespace mongo {
             BSONObjBuilder *pBuilder, string fieldName,
             bool requireExpression) const;
         virtual void addToBsonArray(BSONArrayBuilder *pBuilder) const;
-        virtual void addDependencies(
-            const intrusive_ptr<DependencyTracker> &pTracker,
-            const DocumentSource *pSource) const;
+        virtual void addDependencies(set<string>& deps, vector<string>* path=NULL) const;
 
         /*
           Add an operand to the n-ary expression.
@@ -392,9 +382,7 @@ namespace mongo {
         // virtuals from ExpressionNary
         virtual ~ExpressionCoerceToBool();
         virtual intrusive_ptr<Expression> optimize();
-        virtual void addDependencies(
-            const intrusive_ptr<DependencyTracker> &pTracker,
-            const DocumentSource *pSource) const;
+        virtual void addDependencies(set<string>& deps, vector<string>* path=NULL) const;
         virtual intrusive_ptr<const Value> evaluate(
             const intrusive_ptr<Document> &pDocument) const;
         virtual void addToBsonObj(
@@ -470,9 +458,7 @@ namespace mongo {
         // virtuals from Expression
         virtual ~ExpressionConstant();
         virtual intrusive_ptr<Expression> optimize();
-        virtual void addDependencies(
-            const intrusive_ptr<DependencyTracker> &pTracker,
-            const DocumentSource *pSource) const;
+        virtual void addDependencies(set<string>& deps, vector<string>* path=NULL) const;
         virtual intrusive_ptr<const Value> evaluate(
             const intrusive_ptr<Document> &pDocument) const;
         virtual const char *getOpName() const;
@@ -575,9 +561,7 @@ namespace mongo {
         // virtuals from Expression
         virtual ~ExpressionFieldPath();
         virtual intrusive_ptr<Expression> optimize();
-        virtual void addDependencies(
-            const intrusive_ptr<DependencyTracker> &pTracker,
-            const DocumentSource *pSource) const;
+        virtual void addDependencies(set<string>& deps, vector<string>* path=NULL) const;
         virtual intrusive_ptr<const Value> evaluate(
             const intrusive_ptr<Document> &pDocument) const;
         virtual void addToBsonObj(
@@ -647,9 +631,7 @@ namespace mongo {
         // virtuals from expression
         virtual ~ExpressionFieldRange();
         virtual intrusive_ptr<Expression> optimize();
-        virtual void addDependencies(
-            const intrusive_ptr<DependencyTracker> &pTracker,
-            const DocumentSource *pSource) const;
+        virtual void addDependencies(set<string>& deps, vector<string>* path=NULL) const;
         virtual intrusive_ptr<const Value> evaluate(
             const intrusive_ptr<Document> &pDocument) const;
         virtual void addToBsonObj(
@@ -903,9 +885,8 @@ namespace mongo {
         // virtuals from Expression
         virtual ~ExpressionObject();
         virtual intrusive_ptr<Expression> optimize();
-        virtual void addDependencies(
-            const intrusive_ptr<DependencyTracker> &pTracker,
-            const DocumentSource *pSource) const;
+        virtual bool isSimple();
+        virtual void addDependencies(set<string>& deps, vector<string>* path=NULL) const;
         virtual intrusive_ptr<const Value> evaluate(
             const intrusive_ptr<Document> &pDocument) const;
         virtual void addToBsonObj(
@@ -928,25 +909,16 @@ namespace mongo {
           instead of creating a new one.
 
           @param pResult the Document to add the evaluated expressions to
-          @param pDocument the input Document
-          @param excludeId for exclusions, exclude the _id, if present
+          @param pDocument the input Document for this level
+          @param rootDoc the root of the whole input document
          */
-        void addToDocument(const intrusive_ptr<Document> &pResult,
-                           const intrusive_ptr<Document> &pDocument,
-            bool excludeId = false) const;
+        void addToDocument(const intrusive_ptr<Document>& pResult,
+                           const intrusive_ptr<Document>& pDocument,
+                           const intrusive_ptr<Document>& rootDoc
+                          ) const;
 
-        /*
-          Estimate the number of fields that will result from evaluating
-          this over pDocument.  Does not include _id.  This is an estimate
-          (really an upper bound) because we can't account for undefined
-          fields without actually doing the evaluation.  But this is still
-          useful as an argument to Document::create(), if you plan to use
-          addToDocument().
-
-          @param pDocument the input document
-          @returns estimated number of fields that will result
-         */
-        size_t getSizeHint(const intrusive_ptr<Document> &pDocument) const;
+        // estimated number of fields that will be output
+        size_t getSizeHint() const;
 
         /*
           Create an empty expression.  Until fields are added, this
@@ -962,7 +934,7 @@ namespace mongo {
           @param pExpression the expression to evaluate obtain this field's
                  Value in the result Document
         */
-        void addField(const string &fieldPath,
+        void addField(const FieldPath &fieldPath,
                       const intrusive_ptr<Expression> &pExpression);
 
         /*
@@ -976,46 +948,11 @@ namespace mongo {
         void includePath(const string &fieldPath);
 
         /*
-          Add a field path to the set of those to be excluded.
-
-          Note that excluding a nested field implies including everything on
-          the path leading down to it (because you're stating you want to see
-          all the other fields that aren't being excluded).
-
-          @param fieldName the name of the field to be excluded
-         */
-        void excludePath(const string &fieldPath);
-
-        /**
-           Get an iterator that can be used to iterate over all the result
-           field names in this ExpressionObject.
-
-           @returns the (intrusive_ptr'ed) iterator
-         */
-        Iterator<string> *getFieldIterator() const;
-
-        /*
-          Return the expression for a field.
-
-          @param fieldName the field name for the expression to return
-          @returns the expression used to compute the field, if it is present,
-            otherwise NULL.
-        */
-        intrusive_ptr<Expression> getField(const string &fieldName) const;
-
-        /*
           Get a count of the added fields.
 
           @returns how many fields have been added
          */
         size_t getFieldCount() const;
-
-        /*
-          Get a count of the exclusions.
-
-          @returns how many fields have been excluded.
-        */
-        size_t getExclusionCount() const;
 
         /*
           Specialized BSON conversion that allows for writing out a
@@ -1046,42 +983,20 @@ namespace mongo {
             virtual void path(const string &path, bool include) = 0;
         };
 
-        /**
-          Emit the field paths that have been included or excluded.  "Included"
-          includes paths that are referenced in expressions for computed
-          fields.
-
-          @param pSink where to write the paths to
-          @param pvPath pointer to a vector of strings describing the path on
-            descent; the top-level call should pass an empty vector
-         */
-        void emitPaths(PathSink *pPathSink) const;
+        void excludeId(bool b) { _excludeId = b; }
 
     private:
         ExpressionObject();
 
-        void includePath(
-            const FieldPath *pPath, size_t pathi, size_t pathn,
-            bool excludeLast);
+        // mapping from fieldname to Expression to generate the value
+        // NULL expression means include from source document
+        typedef map<string, intrusive_ptr<Expression> > ExpressionMap;
+        ExpressionMap _expressions;
 
-        bool excludePaths;
-        set<string> path;
+        // this is used to maintain order for generated fields not in the source document
+        vector<string> _order;
 
-        /* these two vectors are maintained in parallel */
-        vector<string> vFieldName;
-        vector<intrusive_ptr<Expression> > vpExpression;
-
-
-        /*
-          Utility function used by documentToBson().  Emits inclusion
-          and exclusion paths by recursively walking down the nested
-          ExpressionObject trees these have created.
-
-          @param pSink where to write the paths to
-          @param pvPath pointer to a vector of strings describing the path on
-            descent; the top-level call should pass an empty vector
-         */
-        void emitPaths(PathSink *pPathSink, vector<string> *pvPath) const;
+        bool _excludeId;
 
         /*
           Utility object for collecting emitPaths() results in a BSON
@@ -1293,14 +1208,6 @@ namespace mongo {
 
 namespace mongo {
 
-    inline bool Expression::ObjectCtx::unwindOk() const {
-        return ((options & UNWIND_OK) != 0);
-    }
-
-    inline bool Expression::ObjectCtx::unwindUsed() const {
-        return (unwindField.size() != 0);
-    }
-
     inline int Expression::signum(int i) {
         if (i < 0)
             return -1;
@@ -1323,7 +1230,7 @@ namespace mongo {
     }
 
     inline size_t ExpressionObject::getFieldCount() const {
-        return vFieldName.size();
+        return _expressions.size();
     }
 
     inline ExpressionObject::BuilderPathSink::BuilderPathSink(

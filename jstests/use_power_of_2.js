@@ -70,6 +70,9 @@ db.createCollection(coll);
 var res = db.runCommand( { "collMod" : coll ,  "usePowerOf2Sizes" : true } );
 assert.eq( res.ok , 1 , "collMod failed" );
 
+res = db.runCommand( { "collMod" : coll , "usePowerOf2Sizess" : true } )
+assert.eq( res.ok , 0 , "collMod should have failed: " + tojson( res ) )
+
 testStorageSize(t);
 
 /**************** Test 2 *****************************/

@@ -87,12 +87,4 @@ namespace mongo {
     ClientBasic* ClientBasic::getCurrent() {
         return 0;
     }
-
-    string dynHostMyName() { return ""; }
-
-    void dynHostResolve(string& name, int& port) {
-        fassertFailed(16398);
-    }
-
-
 }

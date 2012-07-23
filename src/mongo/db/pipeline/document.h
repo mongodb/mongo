@@ -22,7 +22,6 @@
 
 namespace mongo {
     class BSONObj;
-    class DependencyTracker;
     class FieldIterator;
     class Value;
 
@@ -37,14 +36,9 @@ namespace mongo {
           Document field values may be pointed to in the BSONObj, so it
           must live at least as long as the resulting Document.
 
-          LATER - use an abstract class for the dependencies; something like
-          a "lookup(const string &fieldName)" so there can be other
-          implementations.
-
           @returns shared pointer to the newly created Document
         */
-        static intrusive_ptr<Document> createFromBsonObj(
-            BSONObj *pBsonObj, const DependencyTracker *pDependencies = NULL);
+        static intrusive_ptr<Document> createFromBsonObj(BSONObj* pBsonObj);
 
         /*
           Create a new empty Document.
@@ -71,7 +65,7 @@ namespace mongo {
           Add this document to the BSONObj under construction with the
           given BSONObjBuilder.
         */
-        void toBson(BSONObjBuilder *pBsonObjBuilder);
+        void toBson(BSONObjBuilder *pBsonObjBuilder) const;
 
         /*
           Create a new FieldIterator that can be used to examine the
@@ -186,11 +180,14 @@ namespace mongo {
         */
         void hash_combine(size_t &seed) const;
 
+        // For debugging purposes only!
+        string toString() const;
+
     private:
         friend class FieldIterator;
 
         Document(size_t sizeHint);
-        Document(BSONObj *pBsonObj, const DependencyTracker *pDependencies);
+        Document(BSONObj* pBsonObj);
 
         /* these two vectors parallel each other */
         vector<string> vFieldName;
@@ -215,9 +212,6 @@ namespace mongo {
         */
         Document::FieldPair next();
 
-    private:
-        friend class Document;
-
         /*
           Constructor.
 
@@ -225,6 +219,9 @@ namespace mongo {
               iterated
         */
         FieldIterator(const intrusive_ptr<Document> &pDocument);
+
+    private:
+        friend class Document;
 
         /*
           We'll hang on to the original document to ensure we keep the

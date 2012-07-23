@@ -58,31 +58,18 @@ namespace mongo {
 
         /* Look for an initial simple project; we'll avoid constructing Values
          * for fields that won't make it through the projection.
-         *
-         * Currently this only supports the basic projections that mongod
-         * already supports natively.
-         * TODO: support any $project
          */
 
         BSONObj projection;
-        if (pSources->size()) {
-            const intrusive_ptr<DocumentSource> &source = pSources->front();
-            DocumentSourceProject* projectSource =
-                dynamic_cast<DocumentSourceProject*>(source.get());
+        {
+            set<string> deps;
+            DocumentSource::GetDepsReturn status = DocumentSource::SEE_NEXT;
+            for (size_t i=0; i < pSources->size() && status == DocumentSource::SEE_NEXT; i++) {
+                status = (*pSources)[i]->getDependencies(deps);
+            }
 
-            if (projectSource && projectSource->isSimple()) {
-                projection = projectSource->getRaw();
-
-                // remove the projection from the pipeline
-                if (debug) {
-                    // leaving this in for DEBUG build to allow testing that
-                    // $project behaves the same regardless of if it is
-                    // implemented with Projection or DocumentSourceProject
-                    projectSource->setWouldBeRemoved();
-                }
-                else {
-                    pSources->erase(pSources->begin());
-                }
+            if (status == DocumentSource::EXAUSTIVE) {
+                projection = DocumentSource::depsToProjection(deps);
             }
         }
 

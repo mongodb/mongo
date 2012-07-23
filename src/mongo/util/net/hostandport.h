@@ -25,15 +25,12 @@ namespace mongo {
 
     using namespace mongoutils;
 
-    void dynHostResolve(string& name, int& port);
-    string dynHostMyName();
-
     /** helper for manipulating host:port connection endpoints.
       */
     struct HostAndPort {
         HostAndPort() : _port(-1) { }
 
-        /** From a string hostname[:portnumber] or a #dynname
+        /** From a string hostname[:portnumber]
             Throws user assertion if bad config string or bad port #.
         */
         HostAndPort(string s);
@@ -73,69 +70,33 @@ namespace mongo {
          */
         string toString( bool includePort=true ) const;
 
-        // get the logical name if using a #dynhostname instead of resolving to current actual name
-        string dynString() const;
-        string toStringLong() const;
-
         operator string() const { return toString(); }
 
-        bool empty() const { 
-            return _dynName.empty() && _host.empty() && _port < 0;
+        bool empty() const {
+            return _host.empty() && _port < 0;
         }
-        string host() const { 
-            if( !dyn() )
-                return _host; 
-            string h = _dynName;
-            int p;
-            dynHostResolve(h, p);
-            return h;
+        string host() const {
+            return _host;
         }
-        int port() const { 
-            int p = -2;
-            if( dyn() ) {
-                string h = _dynName;
-                dynHostResolve(h,p);
-            }
-            else {
-                p = _port;
-            }
-            return p >= 0 ? p : CmdLine::DefaultDBPort; 
+        int port() const {
+            if (hasPort())
+                return _port;
+            return CmdLine::DefaultDBPort;
         }
-        bool hasPort() const { 
-            int p = -2;
-            if( dyn() ) {
-                string h = _dynName;
-                dynHostResolve(h,p);
-            }
-            else {
-                p = _port;
-            }
-            return p >= 0;
+        bool hasPort() const {
+            return _port >= 0;
         }
-        void setPort( int port ) { 
-            if( dyn() ) {
-                log() << "INFO skipping setPort() HostAndPort dyn()=true" << endl;
-                return;
-            }
-            _port = port; 
+        void setPort( int port ) {
+            _port = port;
         }
 
     private:
-        bool dyn() const { return !_dynName.empty(); }
         void init(const char *);
-        // invariant (except full obj assignment):
-        string _dynName; // when this is set, _host and _port aren't used, rather, we look up the dyn info every time.
         string _host;
         int _port; // -1 indicates unspecified
     };
 
     inline HostAndPort HostAndPort::me() {
-        {
-            string s = dynHostMyName();
-            if( !s.empty() ) 
-                return HostAndPort(s);
-        }
-
         const char* ips = cmdLine.bind_ip.c_str();
         while(*ips) {
             string ip;
@@ -158,14 +119,6 @@ namespace mongo {
         verify( !h.empty() );
         verify( h != "localhost" );
         return HostAndPort(h, cmdLine.port);
-    }
-
-    inline string HostAndPort::dynString() const {
-        return dyn() ? _dynName : toString();
-    }
-
-    inline string HostAndPort::toStringLong() const {
-        return _dynName + ':' + toString();
     }
 
     inline string HostAndPort::toString( bool includePort ) const {
@@ -205,8 +158,6 @@ namespace mongo {
 
     inline void HostAndPort::init(const char *p) {
         massert(13110, "HostAndPort: host is empty", *p);
-        verify( *p != '#' );
-        verify( _dynName.empty() );
         const char *colon = strrchr(p, ':');
         if( colon ) {
             int port = atoi(colon+1);
@@ -222,15 +173,7 @@ namespace mongo {
     }
 
     inline HostAndPort::HostAndPort(string s) {
-        const char *p = s.c_str();
-        if( *p == '#' ) {
-            _dynName = s;
-            _port = -2;
-            _host = "invalid_hostname_dyn_in_use";
-        }
-        else {
-            init(p);
-        }
+        init(s.c_str());
     }
 
 }

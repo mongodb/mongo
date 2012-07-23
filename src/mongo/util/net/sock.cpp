@@ -46,9 +46,6 @@ using namespace mongoutils;
 
 namespace mongo {
 
-    void dynHostResolve(string& name, int& port);
-    string dynHostMyName();
-
     static bool ipv6 = false;
     void enableIPv6(bool state) { ipv6 = state; }
     bool IPv6Enabled() { return ipv6; }
@@ -150,12 +147,8 @@ namespace mongo {
 
     SockAddr::SockAddr(const char * _iporhost , int port) {
         string target = _iporhost;
-        bool cloudName = *_iporhost == '#';
         if( target == "localhost" ) {
             target = "127.0.0.1";
-        }
-        else if( cloudName ) {
-            dynHostResolve(target, port);
         }
 
         if( str::contains(target, '/') ) {
@@ -186,7 +179,7 @@ namespace mongo {
 #else
             int nodata = false;
 #endif
-            if ( (ret == EAI_NONAME || nodata) && !cloudName ) {
+            if ( (ret == EAI_NONAME || nodata) ) {
                 // iporhost isn't an IP address, allow DNS lookup
                 hints.ai_flags &= ~AI_NUMERICHOST;
                 ret = getaddrinfo(target.c_str(), ss.str().c_str(), &hints, &addrs);
@@ -310,13 +303,6 @@ namespace mongo {
     // If an ip address is passed in, just return that.  If a hostname is passed
     // in, look up its ip and return that.  Returns "" on failure.
     string hostbyname(const char *hostname) {
-        if( *hostname == '#' ) {
-            string s = hostname;
-            int port;
-            dynHostResolve(s, port);
-            return s;
-        }
-
         string addr =  SockAddr(hostname, 0).getAddr();
         if (addr == "0.0.0.0")
             return "";
@@ -329,12 +315,6 @@ namespace mongo {
     DiagStr& _hostNameCached = *(new DiagStr); // this is also written to from commands/cloud.cpp
 
     string getHostName() {
-        {
-            string s = dynHostMyName();
-            if( !s.empty() ) 
-                return s;
-        }
-
         char buf[256];
         int ec = gethostname(buf, 127);
         if ( ec || *buf == 0 ) {
@@ -345,7 +325,6 @@ namespace mongo {
     }
 
     /** we store our host name once */
-    // ok w dynhosts map?
     string getHostNameCached() {
         string temp = _hostNameCached.get();
         if (_hostNameCached.empty()) {

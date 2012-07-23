@@ -102,6 +102,8 @@ valInc = 0;
 for (j=0; j<100; j++){ 
     print( "Inserted document: " + (j * 100) );
     for (i=0; i<512; i++){ db.foo.save({ i : idInc++, val: valInc++, y:str}) }
+    // wait for replication to catch up
+    db.runCommand({getLastError:1, w:2, wtimeout:10000});
 }
 
 jsTest.log( "Waiting for errors..." )

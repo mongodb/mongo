@@ -1154,14 +1154,6 @@ namespace mongo {
 
 namespace mongo {
 
-    void pipeSigHandler( int signal ) {
-#ifdef psignal
-        psignal( signal, "Signal Received : ");
-#else
-        cout << "got pipe signal:" << signal << endl;
-#endif
-    }
-
     void abruptQuit(int x) {
         ostringstream ossSig;
         ossSig << "Got signal: " << x << " (" << strsignal( x ) << ")." << endl;
@@ -1239,7 +1231,7 @@ namespace mongo {
 
         verify( signal(SIGABRT, abruptQuit) != SIG_ERR );
         verify( signal(SIGQUIT, abruptQuit) != SIG_ERR );
-        verify( signal(SIGPIPE, pipeSigHandler) != SIG_ERR );
+        verify( signal(SIGPIPE, SIG_IGN) != SIG_ERR );
 
         setupSIGTRAPforGDB();
 

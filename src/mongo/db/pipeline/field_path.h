@@ -27,9 +27,10 @@ namespace mongo {
         /**
            Constructor.
 
-           @param fieldPath the dotted field path string
+           @param fieldPath the dotted field path string or pre-split vector
          */
-        FieldPath(const string &fieldPath);
+        FieldPath(const string& fieldPath);
+        FieldPath(const vector<string>& fieldPath);
 
         /**
            Constructor.
@@ -82,6 +83,9 @@ namespace mongo {
         static const char *getPrefix();
 
         static const char prefix[];
+
+        /** a FieldPath like this but missing the first element (useful for recursion) */
+        FieldPath tail() const;
 
     private:
         vector<string> vFieldName;

@@ -1361,7 +1361,7 @@ namespace mongo {
             try {
                 _lastSlaveOkConn->auth(dbname, username, pwd, errmsg, digestPassword, level);
             }
-            catch (const DBException& ex) {
+            catch (const DBException&) {
                 /* Swallow exception. _lastSlaveOkConn is now in failed state.
                  * The next time we create a new secondary connection it will
                  * be authenticated with the credentials from _auths.
@@ -1389,7 +1389,7 @@ namespace mongo {
                 BSONObj dummy;
                 _lastSlaveOkConn->logout(dbname, dummy);
             }
-            catch (const DBException& ex) {
+            catch (const DBException&) {
                 // Make sure we can't use this connection again.
                 verify(_lastSlaveOkConn->isFailed());
             }
@@ -1550,7 +1550,7 @@ namespace mongo {
         try {
             _lastSlaveOkConn->connect(_lastSlaveOkHost);
         }
-        catch (const ConnectException& connEx) {
+        catch (const ConnectException&) {
             // Note: a failed connect will also mark the connection as failed.
             return NULL;
         }

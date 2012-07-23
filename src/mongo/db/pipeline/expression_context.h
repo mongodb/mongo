@@ -29,9 +29,11 @@ namespace mongo {
     public:
         virtual ~ExpressionContext();
 
+        void setDoingMerge(bool b);
         void setInShard(bool b);
         void setInRouter(bool b);
 
+        bool getDoingMerge() const;
         bool getInShard() const;
         bool getInRouter() const;
 
@@ -42,11 +44,14 @@ namespace mongo {
          */
         void checkForInterrupt();
 
+        ExpressionContext* clone();
+
         static ExpressionContext *create(InterruptStatus *pStatus);
 
     private:
         ExpressionContext(InterruptStatus *pStatus);
         
+        bool doingMerge;
         bool inShard;
         bool inRouter;
         unsigned intCheckCounter; // interrupt check counter
@@ -59,12 +64,20 @@ namespace mongo {
 
 namespace mongo {
 
+    inline void ExpressionContext::setDoingMerge(bool b) {
+        doingMerge = b;
+    }
+
     inline void ExpressionContext::setInShard(bool b) {
         inShard = b;
     }
     
     inline void ExpressionContext::setInRouter(bool b) {
         inRouter = b;
+    }
+
+    inline bool ExpressionContext::getDoingMerge() const {
+        return doingMerge;
     }
 
     inline bool ExpressionContext::getInShard() const {

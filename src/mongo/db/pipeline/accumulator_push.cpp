@@ -28,7 +28,7 @@ namespace mongo {
 
         if (prhs->getType() == Undefined)
             ; /* nothing to add to the array */
-        else if (!pCtx->getInRouter())
+        else if (!pCtx->getDoingMerge())
             vpValue.push_back(prhs);
         else {
             /*

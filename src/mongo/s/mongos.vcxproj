@@ -992,7 +992,6 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="..\db\pipeline\accumulator_single_value.cpp" />
     <ClCompile Include="..\db\pipeline\accumulator_sum.cpp" />
     <ClCompile Include="..\db\pipeline\builder.cpp" />
-    <ClCompile Include="..\db\pipeline\dependency_tracker.cpp" />
     <ClCompile Include="..\db\pipeline\document.cpp" />
     <ClCompile Include="..\db\pipeline\document_source.cpp" />
     <ClCompile Include="..\db\pipeline\document_source_bson_array.cpp" />
@@ -1193,7 +1192,6 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\db\interrupt_status.h" />
     <ClInclude Include="..\db\pipeline\accumulator.h" />
     <ClInclude Include="..\db\pipeline\builder.h" />
-    <ClInclude Include="..\db\pipeline\dependency_tracker.h" />
     <ClInclude Include="..\db\pipeline\document.h" />
     <ClInclude Include="..\db\pipeline\document_source.h" />
     <ClInclude Include="..\db\pipeline\doc_mem_monitor.h" />

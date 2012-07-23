@@ -93,10 +93,6 @@ namespace mongo {
 #endif
         ;
         
-        hidden.add_options()
-        ("cloud", po::value<string>(), "custom dynamic host naming")
-        ;
-
     }
 
 #if defined(_WIN32)

@@ -22,7 +22,6 @@
 #include "util/intrusive_counter.h"
 #include "db/clientcursor.h"
 #include "db/jsobj.h"
-#include "db/pipeline/dependency_tracker.h"
 #include "db/pipeline/document.h"
 #include "db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -33,7 +32,6 @@
 namespace mongo {
     class Accumulator;
     class Cursor;
-    class DependencyTracker;
     class Document;
     class Expression;
     class ExpressionContext;
@@ -159,14 +157,25 @@ namespace mongo {
          */
         virtual void optimize();
 
-        /**
-           Adjust dependencies according to the needs of this source.
+        enum GetDepsReturn {
+            NOT_SUPPORTED, // This means the set should be ignored
+            EXAUSTIVE, // This means that everything needed should be in the set
+            SEE_NEXT, // Add the next Source's deps to the set
+        };
 
-           $$$ MONGO_LATER_SERVER_4644
-           @param pTracker the dependency tracker
+        /** Get the fields this operation needs to do it's job.
+         *  Deps should be in "a.b.c" notation
+         *
+         *  @param deps results are added here. NOT CLEARED
          */
-        virtual void manageDependencies(
-            const intrusive_ptr<DependencyTracker> &pTracker);
+        virtual GetDepsReturn getDependencies(set<string>& deps) const {
+            return NOT_SUPPORTED;
+        }
+
+        /** This takes dependencies from getDependencies and
+         *  returns a projection that includes all of them
+         */
+        static BSONObj depsToProjection(const set<string>& deps);
 
         /**
           Add the DocumentSource to the array builder.
@@ -365,8 +374,6 @@ namespace mongo {
         virtual bool advance();
         virtual intrusive_ptr<Document> getCurrent();
         virtual void setSource(DocumentSource *pSource);
-        virtual void manageDependencies(
-            const intrusive_ptr<DependencyTracker> &pTracker);
 
         /**
          * Release the Cursor and the read lock it requires, but without changing the other data.
@@ -462,14 +469,6 @@ namespace mongo {
           behavior of most other operations, see SERVER-2454.
          */
         void yieldSometimes();
-
-        /*
-          This document source hangs on to the dependency tracker when it
-          gets it so that it can be used for selective reification of
-          fields in order to avoid fields that are not required through the
-          pipeline.
-         */
-        intrusive_ptr<DependencyTracker> pDependencies;
     };
 
 
@@ -594,6 +593,7 @@ namespace mongo {
         virtual bool advance();
         virtual const char *getSourceName() const;
         virtual intrusive_ptr<Document> getCurrent();
+        virtual GetDepsReturn getDependencies(set<string>& deps) const;
 
         /**
           Create a new grouping DocumentSource.
@@ -707,8 +707,6 @@ namespace mongo {
         // virtuals from DocumentSource
         virtual ~DocumentSourceMatch();
         virtual const char *getSourceName() const;
-        virtual void manageDependencies(
-            const intrusive_ptr<DependencyTracker> &pTracker);
 
         /**
           Create a filter.
@@ -796,34 +794,8 @@ namespace mongo {
         virtual const char *getSourceName() const;
         virtual intrusive_ptr<Document> getCurrent();
         virtual void optimize();
-        virtual void manageDependencies(
-            const intrusive_ptr<DependencyTracker> &pTracker);
 
-        /**
-          Include a field path in a projection.
-
-          @param fieldPath the path of the field to include
-        */
-        void includePath(const string &fieldPath);
-
-        /**
-          Exclude a field path from the projection.
-
-          @param fieldPath the path of the field to exclude
-         */
-        void excludePath(const string &fieldPath);
-
-        /**
-          Add an output Expression in the projection.
-
-          BSON document fields are ordered, so the new field will be
-          appended to the existing set.
-
-          @param fieldName the name of the field as it will appear
-          @param pExpression the expression used to compute the field
-        */
-        void addField(const string &fieldName,
-                      const intrusive_ptr<Expression> &pExpression);
+        virtual GetDepsReturn getDependencies(set<string>& deps) const;
 
         /**
           Create a new projection DocumentSource from BSON.
@@ -844,12 +816,6 @@ namespace mongo {
         /** projection as specified by the user */
         BSONObj getRaw() const { return _raw; }
 
-        /** true if just include/exclude, no renames */
-        bool isSimple() const { return _isSimple; }
-
-        /** called by PipelineD::prepareCursorSource in debug builds if it would remove this Projection */
-        void setWouldBeRemoved() { _wouldBeRemoved = true; }
-
     protected:
         // virtuals from DocumentSource
         virtual void sourceToBson(BSONObjBuilder *pBuilder, bool explain) const;
@@ -858,70 +824,13 @@ namespace mongo {
         DocumentSourceProject(const intrusive_ptr<ExpressionContext> &pExpCtx);
 
         // configuration state
-        bool excludeId;
         intrusive_ptr<ExpressionObject> pEO;
         BSONObj _raw;
-        bool _isSimple;
-        bool _wouldBeRemoved; // only used by debug builds
 
-        /*
-          Utility object used by manageDependencies().
-
-          Removes dependencies from a DependencyTracker.
-         */
-        class DependencyRemover :
-            public ExpressionObject::PathSink {
-        public:
-            // virtuals from PathSink
-            virtual void path(const string &path, bool include);
-
-            /*
-              Constructor.
-
-              Captures a reference to the smart pointer to the DependencyTracker
-              that this will remove dependencies from via
-              ExpressionObject::emitPaths().
-
-              @param pTracker reference to the smart pointer to the
-                DependencyTracker
-             */
-            DependencyRemover(const intrusive_ptr<DependencyTracker> &pTracker);
-
-        private:
-            const intrusive_ptr<DependencyTracker> &pTracker;
-        };
-
-        /*
-          Utility object used by manageDependencies().
-
-          Checks dependencies to see if they are present.  If not, then
-          throws a user error.
-         */
-        class DependencyChecker :
-            public ExpressionObject::PathSink {
-        public:
-            // virtuals from PathSink
-            virtual void path(const string &path, bool include);
-
-            /*
-              Constructor.
-
-              Captures a reference to the smart pointer to the DependencyTracker
-              that this will check dependencies from from
-              ExpressionObject::emitPaths() to see if they are required.
-
-              @param pTracker reference to the smart pointer to the
-                DependencyTracker
-              @param pThis the projection that is making this request
-             */
-            DependencyChecker(
-                const intrusive_ptr<DependencyTracker> &pTracker,
-                const DocumentSourceProject *pThis);
-
-        private:
-            const intrusive_ptr<DependencyTracker> &pTracker;
-            const DocumentSourceProject *pThis;
-        };
+#if defined(_DEBUG)
+        // this is used in DEBUG builds to ensure we are compatible
+        Projection _simpleProjection;
+#endif
     };
 
 
@@ -934,8 +843,9 @@ namespace mongo {
         virtual bool advance();
         virtual const char *getSourceName() const;
         virtual intrusive_ptr<Document> getCurrent();
-        virtual void manageDependencies(
-            const intrusive_ptr<DependencyTracker> &pTracker);
+
+        virtual GetDepsReturn getDependencies(set<string>& deps) const;
+
         /*
           TODO
           Adjacent sorts should reduce to the last sort.
@@ -1068,6 +978,10 @@ namespace mongo {
         virtual const char *getSourceName() const;
         virtual bool coalesce(const intrusive_ptr<DocumentSource> &pNextSource);
 
+        virtual GetDepsReturn getDependencies(set<string>& deps) const {
+            return SEE_NEXT; // This doesn't affect needed fields
+        }
+
         /**
           Create a new limiting DocumentSource.
 
@@ -1091,7 +1005,6 @@ namespace mongo {
         static intrusive_ptr<DocumentSource> createFromBson(
             BSONElement *pBsonElement,
             const intrusive_ptr<ExpressionContext> &pExpCtx);
-
 
         static const char limitName[];
 
@@ -1119,6 +1032,10 @@ namespace mongo {
         virtual const char *getSourceName() const;
         virtual bool coalesce(const intrusive_ptr<DocumentSource> &pNextSource);
 
+        virtual GetDepsReturn getDependencies(set<string>& deps) const {
+            return SEE_NEXT; // This doesn't affect needed fields
+        }
+
         /**
           Create a new skipping DocumentSource.
 
@@ -1142,7 +1059,6 @@ namespace mongo {
         static intrusive_ptr<DocumentSource> createFromBson(
             BSONElement *pBsonElement,
             const intrusive_ptr<ExpressionContext> &pExpCtx);
-
 
         static const char skipName[];
 
@@ -1173,8 +1089,8 @@ namespace mongo {
         virtual bool advance();
         virtual const char *getSourceName() const;
         virtual intrusive_ptr<Document> getCurrent();
-        virtual void manageDependencies(
-            const intrusive_ptr<DependencyTracker> &pTracker);
+
+        virtual GetDepsReturn getDependencies(set<string>& deps) const;
 
         /**
           Create a new projection DocumentSource from BSON.
@@ -1241,17 +1157,4 @@ namespace mongo {
         const intrusive_ptr<Expression> &pExpression) {
         pIdExpression = pExpression;
     }
-
-    inline DocumentSourceProject::DependencyRemover::DependencyRemover(
-        const intrusive_ptr<DependencyTracker> &pT):
-        pTracker(pT) {
-    }
-
-    inline DocumentSourceProject::DependencyChecker::DependencyChecker(
-        const intrusive_ptr<DependencyTracker> &pTrack,
-        const DocumentSourceProject *pT):
-        pTracker(pTrack),
-        pThis(pT) {
-    }
-
 }

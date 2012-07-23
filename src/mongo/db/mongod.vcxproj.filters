@@ -304,9 +304,6 @@
     <ClCompile Include="ops\delete.cpp">
       <Filter>db\ops</Filter>
     </ClCompile>
-    <ClCompile Include="pipeline\dependency_tracker.cpp">
-      <Filter>db\pipeline\Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\scripting\engine.cpp">
       <Filter>scripting</Filter>
     </ClCompile>
@@ -945,9 +942,6 @@
       <Filter>third_party\pcre</Filter>
     </ClInclude>
     <ClInclude Include="pipeline\accumulator.h">
-      <Filter>db\pipeline\Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="pipeline\dependency_tracker.h">
       <Filter>db\pipeline\Header Files</Filter>
     </ClInclude>
     <ClInclude Include="pipeline\doc_mem_monitor.h">
