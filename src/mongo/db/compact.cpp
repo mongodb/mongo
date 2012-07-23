@@ -200,21 +200,34 @@ namespace mongo {
         scoped_array<SortPhaseOne> phase1( new SortPhaseOne[nidx] );
         {
             NamespaceDetails::IndexIterator ii = d->ii(); 
-            int x = 0;
-            while( ii.more() ) { 
+            // For each existing index...
+            for( int idxNo = 0; ii.more(); ++idxNo ) {
+                // Build a new index spec based on the old index spec.
                 BSONObjBuilder b;
                 IndexDetails& idx = ii.next();
                 BSONObj::iterator i(idx.info.obj());
                 while( i.more() ) { 
                     BSONElement e = i.next();
-                    if( !str::equals(e.fieldName(), "v") && !str::equals(e.fieldName(), "background") ) {
-                        b.append(e);
+                    if ( str::equals( e.fieldName(), "v" ) ) {
+                        // Drop any preexisting index version spec.  The default index version will
+                        // be used instead for the new index.
+                        continue;
                     }
+                    if ( str::equals( e.fieldName(), "background" ) ) {
+                        // Create the new index in the foreground.
+                        continue;
+                    }
+                    // Pass the element through to the new index spec.
+                    b.append(e);
                 }
+                // Add the new index spec to 'indexSpecs'.
                 BSONObj o = b.obj().getOwned();
-                phase1[x].sorter.reset( new BSONObjExternalSorter( idx.idxInterface(), o.getObjectField("key") ) );
-                phase1[x].sorter->hintNumObjects( d->stats.nrecords );
-                indexSpecs[x++].reset(o);
+                indexSpecs[idxNo].reset(o);
+                // Create an external sorter.
+                phase1[idxNo].sorter.reset
+                        ( new BSONObjExternalSorter( idx.idxInterface(),
+                                                     o.getObjectField("key") ) );
+                phase1[idxNo].sorter->hintNumObjects( d->stats.nrecords );
             }
         }
 
