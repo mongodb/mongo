@@ -225,8 +225,10 @@ public:
             return;
         }
 
+        boost::filesystem::file_status fileStatus = boost::filesystem::status(root);
         if ( ! ( endsWith( root.string().c_str() , ".bson" ) ||
-                 endsWith( root.string().c_str() , ".bin" ) ) ) {
+                 endsWith( root.string().c_str() , ".bin" ) ) &&
+             ! ( fileStatus.type() == boost::filesystem::fifo_file ) ) {
             error() << "don't know what to do with file [" << root.string() << "]" << endl;
             return;
         }
@@ -281,8 +283,10 @@ public:
             }
         }
 
+        // process metadata files
+        // but only for regular files
         BSONObj metadataObject;
-        if (_restoreOptions || _restoreIndexes) {
+        if ( fileStatus.type() != boost::filesystem::fifo_file && ( _restoreOptions || _restoreIndexes ) ) {
             boost::filesystem::path metadataFile = (root.branch_path() / (oldCollName + ".metadata.json"));
             if (!boost::filesystem::exists(metadataFile.string())) {
                 // This is fine because dumps from before 2.1 won't have a metadata file, just print a warning.
@@ -317,6 +321,7 @@ public:
         }
 
         processFile( root );
+
         if (_drop && root.leaf() == "system.users.bson") {
             // Delete any users that used to exist but weren't in the dump file
             for (set<string>::iterator it = _users.begin(); it != _users.end(); ++it) {

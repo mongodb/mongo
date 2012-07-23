@@ -146,6 +146,7 @@ namespace mongo {
         auto_ptr<Matcher> _matcher;
 
     public:
+
         BSONTool( const char * name , DBAccess access=ALL, bool objcheck = false );
 
         virtual int doRun() = 0;
@@ -154,7 +155,6 @@ namespace mongo {
         virtual int run();
 
         long long processFile( const boost::filesystem::path& file );
-
     };
 
 }
