@@ -243,14 +243,19 @@ namespace mongo {
                   Treat as a projection field with the additional ability to
                   add aggregation operators.
                 */
+                uassert(16414, str::stream() <<
+                        "the group aggregate field name '" << pFieldName <<
+                        "' cannot be used because $group's field names cannot contain '.'",
+                        !str::contains(pFieldName, '.') );
+
                 uassert(15950, str::stream() <<
-                        "the group aggregate field name \"" <<
+                        "the group aggregate field name '" <<
                         pFieldName << "\" cannot be an operator name",
-                        *pFieldName != '$');
+                        pFieldName[0] != '$');
 
                 uassert(15951, str::stream() <<
-                        "the group aggregate field \"" << pFieldName <<
-                        "\" must be defined as an expression inside an object",
+                        "the group aggregate field '" << pFieldName <<
+                        "' must be defined as an expression inside an object",
                         groupField.type() == Object);
 
                 BSONObj subField(groupField.Obj());
