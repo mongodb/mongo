@@ -1,8 +1,4 @@
-JAVA_HOME = `/usr/libexec/java_home`
-
-INCLUDES = -I$(abs_top_builddir) \
-	   -I$(JAVA_HOME)/include \
-	   -I$(JAVA_HOME)/include/`uname | tr A-Z a-z`
+INCLUDES = -I$(abs_top_builddir)
 
 JAVASRC = $(top_srcdir)/lang/java
 BUILT_SOURCES = $(JAVASRC)/wiredtiger_wrap.c
@@ -23,6 +19,7 @@ dist_java_JAVA = \
 		wiredtigerJNI.java
 java_LTLIBRARIES = libwiredtiger_java.la
 
+CPPFLAGS += $(JNI_CPPFLAGS)
 # Some warnings when compiling the generated code are unavoidable
 CFLAGS += -w
 libwiredtiger_java_la_SOURCES = $(BUILT_SOURCES) $(SWIG_SOURCES)
