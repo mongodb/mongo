@@ -271,7 +271,7 @@ namespace mongo {
                  << file << errnoWithDescription(), 
                  _file >= 0 );
 
-#ifdef POSIX_FADV_DONTNEED
+#ifdef POSIX_FADV_SEQUENTIAL
         int err = posix_fadvise(_file, 0, 0, POSIX_FADV_SEQUENTIAL );
         if ( err )
             log() << "posix_fadvise failed: " << err << endl;
