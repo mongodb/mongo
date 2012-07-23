@@ -758,60 +758,7 @@ namespace mongo {
         intrusive_ptr<const Value> pLeft(vpOperand[0]->evaluate(pDocument));
         intrusive_ptr<const Value> pRight(vpOperand[1]->evaluate(pDocument));
 
-        /* TODO look into collapsing by using Value::compare() */
-
-        BSONType leftType = pLeft->getType();
-        BSONType rightType = pRight->getType();
-        uassert(15994, str::stream() << getOpName() <<
-                ":  no automatic conversion for types " <<
-                typeName(leftType) << " and " << typeName(rightType),
-                leftType == rightType);
-        // CW TODO at least for now.  later, handle automatic conversions
-
-        int cmp = 0;
-        switch(leftType) {
-        case NumberDouble: {
-            double left = pLeft->getDouble();
-            double right = pRight->getDouble();
-
-            if (left < right)
-                cmp = -1;
-            else if (left > right)
-                cmp = 1;
-            break;
-        }
-
-        case NumberInt: {
-            int left = pLeft->getInt();
-            int right = pRight->getInt();
-
-            if (left < right)
-                cmp = -1;
-            else if (left > right)
-                cmp = 1;
-            break;
-        }
-
-        case String: {
-            string left(pLeft->getString());
-            string right(pRight->getString());
-            cmp = signum(left.compare(right));
-            break;
-        }
-
-        case Date:
-            cmp = signum(Value::compare(pLeft, pRight));
-            break;
-
-        case Timestamp:
-            cmp = signum(Value::compare(pLeft, pRight));
-            break;
-
-        default:
-            uassert(15995, str::stream() <<
-                    "can't compare values of type " << typeName(leftType), false);
-            break;
-        }
+        int cmp = signum(Value::compare(pLeft, pRight));
 
         if (cmpOp == CMP) {
             switch(cmp) {
