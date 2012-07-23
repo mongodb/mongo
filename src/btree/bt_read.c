@@ -20,7 +20,6 @@ __wt_cache_read(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *ref)
 	uint32_t size;
 	const uint8_t *addr;
 
-
 	/*
 	 * Attempt to set the state to WT_REF_READING; if successful, we've
 	 * won the race, read the page.
