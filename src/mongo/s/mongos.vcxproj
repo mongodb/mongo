@@ -976,7 +976,6 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="..\client\dbclientcursor.cpp" />
     <ClCompile Include="..\client\dbclient_rs.cpp" />
     <ClCompile Include="..\client\distlock.cpp" />
-    <ClCompile Include="..\db\commands\cloud.cpp" />
     <ClCompile Include="..\db\commands\pipeline.cpp" />
     <ClCompile Include="..\db\common.cpp" />
     <ClCompile Include="..\db\dbmessage.cpp" />

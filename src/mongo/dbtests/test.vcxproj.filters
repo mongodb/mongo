@@ -1273,9 +1273,6 @@
     <ClCompile Include="..\s\d_chunk_manager.cpp">
       <Filter>s</Filter>
     </ClCompile>
-    <ClCompile Include="..\db\commands\cloud.cpp">
-      <Filter>db\commands</Filter>
-    </ClCompile>
     <ClCompile Include="..\s\d_split.cpp">
       <Filter>s</Filter>
     </ClCompile>

@@ -1286,7 +1286,6 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="..\db\memconcept.cpp" />
     <ClCompile Include="..\db\clientcursor.cpp" />
     <ClCompile Include="..\db\cloner.cpp" />
-    <ClCompile Include="..\db\commands\cloud.cpp" />
     <ClCompile Include="..\db\commands.cpp" />
     <ClCompile Include="..\db\common.cpp" />
     <ClCompile Include="..\db\cursor.cpp" />

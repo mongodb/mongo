@@ -157,9 +157,6 @@
     <ClCompile Include="commands\fsync.cpp">
       <Filter>db\commands</Filter>
     </ClCompile>
-    <ClCompile Include="commands\cloud.cpp">
-      <Filter>db\commands</Filter>
-    </ClCompile>
     <ClCompile Include="..\util\debug_util.cpp">
       <Filter>util\Source Files</Filter>
     </ClCompile>

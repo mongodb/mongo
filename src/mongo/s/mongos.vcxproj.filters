@@ -281,9 +281,6 @@
     <ClCompile Include="..\scripting\engine_spidermonkey.cpp">
       <Filter>scripting</Filter>
     </ClCompile>
-    <ClCompile Include="..\db\commands\cloud.cpp">
-      <Filter>db\commands</Filter>
-    </ClCompile>
     <ClCompile Include="..\db\stats\counters.cpp">
       <Filter>db\stats</Filter>
     </ClCompile>

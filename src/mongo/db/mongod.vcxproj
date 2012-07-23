@@ -1100,7 +1100,6 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="..\util\version.cpp" />
     <ClCompile Include="btreebuilder.cpp" />
     <ClCompile Include="cap.cpp" />
-    <ClCompile Include="commands\cloud.cpp" />
     <ClCompile Include="commands\distinct.cpp" />
     <ClCompile Include="commands\document_source_cursor.cpp" />
     <ClCompile Include="commands\find_and_modify.cpp" />
