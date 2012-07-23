@@ -396,6 +396,7 @@ namespace mongo {
     HostAndPort ReplicaSetMonitor::getMaster() {
         {
             scoped_lock lk( _lock );
+            verify(_master < static_cast<int>(_nodes.size()));
             if ( _master >= 0 && _nodes[_master].ok )
                 return _nodes[_master].addr;
         }
@@ -404,6 +405,7 @@ namespace mongo {
 
         scoped_lock lk( _lock );
         uassert( 10009 , str::stream() << "ReplicaSetMonitor no master found for set: " << _name , _master >= 0 );
+        verify(_master < static_cast<int>(_nodes.size()));
         return _nodes[_master].addr;
     }
     
@@ -666,6 +668,10 @@ namespace mongo {
 
             _nodes.push_back( Node( h , newConn ) );
         }
+
+        // Invalidate the cached _master index since the _nodes structure has
+        // already been modified.
+        _master = -1;
     }
     
 
@@ -754,7 +760,11 @@ namespace mongo {
 
         if ( errorOccured && nodesOffset >= 0 ) {
             scoped_lock lk( _lock );
-            _nodes[nodesOffset].ok = false;
+
+            if (_checkConnMatch_inlock(conn, nodesOffset)) {
+                // Make sure _checkHosts didn't modify the _nodes structure
+                _nodes[nodesOffset].ok = false;
+            }
         }
 
         if ( changed && _hook )
@@ -774,6 +784,7 @@ namespace mongo {
 
             if ( !checkAllSecondaries ) {
                 scoped_lock lk( _lock );
+                verify(_master < static_cast<int>(_nodes.size()));
                 if ( _master >= 0 && _nodes[_master].ok ) {
                   /* Nothing else to do since another thread already
                    * found a usable _master
@@ -911,6 +922,7 @@ namespace mongo {
 
             // first see if the current master is fine
             if ( _master >= 0 ) {
+                verify(_master < static_cast<int>(_nodes.size()));
                 masterConn = _nodes[_master].conn;
             }
         }
