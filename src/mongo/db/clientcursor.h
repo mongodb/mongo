@@ -181,7 +181,7 @@ namespace mongo {
 
         CursorId cursorid() const { return _cursorid; }
         string ns() const { return _ns; }
-        Database * db() const { return _db; }
+        const Database * db() const { return _db; }
         const BSONObj& query() const { return _query; }
         int queryOptions() const { return _queryOptions; }
 
