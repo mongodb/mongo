@@ -921,7 +921,6 @@ namespace mongo {
          */
         void populate();
         bool populated;
-        long long count;
 
         /* these two parallel each other */
         typedef vector<intrusive_ptr<ExpressionFieldPath> > SortPaths;

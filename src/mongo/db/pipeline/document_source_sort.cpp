@@ -54,7 +54,6 @@ namespace mongo {
         ++docIterator;
         if (docIterator == documents.end()) {
             pCurrent.reset();
-            count = 0;
             return false;
         }
         pCurrent = *docIterator;
