@@ -148,7 +148,7 @@ namespace mongo {
     void appendReplicationInfo( BSONObjBuilder& result , bool authed , int level ) {
 
         if ( replSet ) {
-            if( theReplSet == 0 ) {
+            if( theReplSet == 0 || theReplSet->state().shunned() ) {
                 result.append("ismaster", false);
                 result.append("secondary", false);
                 result.append("info", ReplSet::startupStatusMsg.get());
