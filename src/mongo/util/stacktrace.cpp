@@ -201,7 +201,6 @@ namespace mongo {
         TraceItem traceItem;
         size_t moduleWidth = 0;
         size_t sourceWidth = 0;
-        size_t frameCount = 0;
         for ( size_t i = 0; i < maxBackTraceFrames; ++i ) {
             ret = StackWalk64( imageType,
                                process,
@@ -213,7 +212,6 @@ namespace mongo {
                                NULL,
                                NULL );
             if ( ret == FALSE || frame64.AddrReturn.Offset == 0 ) {
-                frameCount = i;
                 break;
             }
             DWORD64 address = frame64.AddrPC.Offset;
@@ -235,6 +233,7 @@ namespace mongo {
         // print list
         ++moduleWidth;
         ++sourceWidth;
+        size_t frameCount = traceList.size();
         for ( size_t i = 0; i < frameCount; ++i ) {
             os << traceList[i].moduleName << " ";
             size_t width = traceList[i].moduleName.length();
