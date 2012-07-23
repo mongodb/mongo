@@ -199,7 +199,7 @@ namespace {
 
             ASSERT( node.isCompatible( ReadPreference_PrimaryOnly, &tags ));
             ASSERT( node.isCompatible( ReadPreference_PrimaryPreferred, &tags ));
-            ASSERT( node.isCompatible( ReadPreference_SecondaryPreferred, &tags ));
+            ASSERT( !node.isCompatible( ReadPreference_SecondaryPreferred, &tags ));
             ASSERT( !node.isCompatible( ReadPreference_SecondaryOnly, &tags ));
             ASSERT( node.isCompatible( ReadPreference_Nearest, &tags ));
         }
@@ -292,7 +292,7 @@ namespace {
 
             ASSERT( node.isCompatible( ReadPreference_PrimaryOnly, &tags ));
             ASSERT( node.isCompatible( ReadPreference_PrimaryPreferred, &tags ));
-            ASSERT( node.isCompatible( ReadPreference_SecondaryPreferred, &tags ));
+            ASSERT( !node.isCompatible( ReadPreference_SecondaryPreferred, &tags ));
             ASSERT( !node.isCompatible( ReadPreference_SecondaryOnly, &tags ));
             ASSERT( node.isCompatible( ReadPreference_Nearest, &tags ));
         }

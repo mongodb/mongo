@@ -1192,7 +1192,12 @@ namespace mongo {
             return false;
         }
 
-        if (readPreference == ReadPreference_SecondaryOnly &&
+        if ((readPreference == ReadPreference_SecondaryOnly ||
+                /* This is the original behavior for slaveOk. This can result to reading
+                 * data back in time, but the main idea here is to avoid overloading the
+                 * primary when secondary is available.
+                 */
+                readPreference == ReadPreference_SecondaryPreferred) &&
                 !okForSecondaryQueries()) {
             return false;
         }

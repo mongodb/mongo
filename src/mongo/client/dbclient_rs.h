@@ -99,6 +99,11 @@ namespace mongo {
             }
 
             /**
+             * Checks whether this nodes is compatible with the given readPreference and
+             * tag. Compatibility check is strict in the sense that secondary preferred
+             * is treated like secondary only and primary preferred is treated like
+             * primary only.
+             *
              * @return true if this node is compatible with the read preference and tags.
              */
             bool isCompatible(ReadPreference readPreference, const TagSet* tag) const;
