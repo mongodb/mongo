@@ -30,6 +30,11 @@
 #include "compact.h"
 #include "../util/concurrency/task.h"
 
+// these are needed for the chunk ownership testing
+#include "../s/d_chunk_manager.h"
+#include "../client/connpool.h"
+#include "../db/repl/rs.h"
+
 namespace mongo {
 
     char faux;
@@ -41,7 +46,7 @@ namespace mongo {
     /** @return number of skipped (invalid) documents */
     unsigned compactExtent(const char *ns, NamespaceDetails *d, const DiskLoc ext, int n,
                 const scoped_array<IndexSpec> &indexSpecs,
-                scoped_array<SortPhaseOne>& phase1, int nidx, bool validate)
+                scoped_array<SortPhaseOne>& phase1, int nidx, bool validate, const ShardChunkManager* chunkMgr)
     {
         log() << "compact extent #" << n << endl;
 
@@ -77,7 +82,11 @@ namespace mongo {
                 nrecs++;
                 BSONObj objOld(recOld);
 
-                if( !validate || objOld.valid() ) {
+                bool isValid =  !validate || objOld.valid();
+                bool belongsToMe = !isValid || // don't check invalid docs
+                                   !chunkMgr || chunkMgr->belongsToMe(objOld);
+
+                if(isValid && belongsToMe) {
                     unsigned sz = objOld.objsize();
                     unsigned lenWHdr = sz + Record::HeaderSize;
                     totalSize += lenWHdr;
@@ -136,7 +145,7 @@ namespace mongo {
 
     extern SortPhaseOne *precalced;
 
-    bool _compact(const char *ns, NamespaceDetails *d, string& errmsg, bool validate, BSONObjBuilder& result) { 
+    bool _compact(const char *ns, NamespaceDetails *d, string& errmsg, bool validate, BSONObjBuilder& result, const ShardChunkManager* chunkMgr) { 
         //int les = d->lastExtentSize;
 
         // this is a big job, so might as well make things tidy before we start just to be nice.
@@ -202,7 +211,7 @@ namespace mongo {
         long long skipped = 0;
         int n = 0;
         for( list<DiskLoc>::iterator i = extents.begin(); i != extents.end(); i++ ) { 
-            skipped += compactExtent(ns, d, *i, n++, indexSpecs, phase1, nidx, validate);
+            skipped += compactExtent(ns, d, *i, n++, indexSpecs, phase1, nidx, validate, chunkMgr);
             pm.hit();
         }
 
@@ -236,7 +245,7 @@ namespace mongo {
         return true;
     }
 
-    bool compact(const string& ns, string &errmsg, bool validate, BSONObjBuilder& result) {
+    bool compact(const string& ns, string &errmsg, bool validate, BSONObjBuilder& result, const ShardChunkManager* chunkMgr) {
         massert( 14028, "bad ns", NamespaceString::normal(ns.c_str()) );
         massert( 14027, "can't compact a system namespace", !str::contains(ns, ".system.") ); // items in system.indexes cannot be moved there are pointers to those disklocs in NamespaceDetails
 
@@ -250,7 +259,7 @@ namespace mongo {
             massert( 13661, "cannot compact capped collection", !d->capped );
             log() << "compact " << ns << " begin" << endl;
             try { 
-                ok = _compact(ns.c_str(), d, errmsg, validate, result);
+                ok = _compact(ns.c_str(), d, errmsg, validate, result, chunkMgr);
             }
             catch(...) { 
                 log() << "compact " << ns << " end (with error)" << endl;
@@ -293,8 +302,42 @@ namespace mongo {
             }
 
             string ns = db + '.' + coll;
+
+            scoped_ptr<ShardChunkManager> chunkMgr;
+            if (cmdObj.hasField("configSvr")) {
+                assert(cmdObj.hasField("shardName"));
+                string configSvr = cmdObj["configSvr"].String();
+                string shardName = cmdObj["shardName"].String();
+
+                {
+                    // Error checking block
+                    ScopedDbConnection config (configSvr);
+
+                    BSONObj balancer = config->findOne("config.settings",
+                                                       QUERY("_id" << "balancer"));
+                    uassert(16395, "balancer must be disabled", balancer["stopped"].trueValue());
+
+                    BSONObj shard = config->findOne("config.shards", QUERY( "_id" << shardName ));
+                    uassert(16396, "no such shard: " + shardName, !shard.isEmpty());
+
+                    if (theReplSet) {
+                        ConnectionString cs (shard["host"].String());
+                        string shardSetName = cs.getSetName();
+                        uassert(16397,
+                                str::stream() << "shard " << shardName
+                                   << " has replica set name " << shardSetName
+                                   << " that differs from this host's " << theReplSet->name(),
+                                shardSetName == theReplSet->name());
+                    }
+                    config.done();
+                }
+
+                chunkMgr.reset(new ShardChunkManager(configSvr, db + '.' + coll, shardName));
+            }
+
+
             bool validate = !cmdObj.hasElement("validate") || cmdObj["validate"].trueValue(); // default is true at the moment
-            bool ok = compact(ns, errmsg, validate, result);
+            bool ok = compact(ns, errmsg, validate, result, chunkMgr.get());
             return ok;
         }
     };
