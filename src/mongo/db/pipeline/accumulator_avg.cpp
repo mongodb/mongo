@@ -30,7 +30,6 @@ namespace mongo {
         const intrusive_ptr<Document> &pDocument) const {
         if (!pCtx->getDoingMerge()) {
             Super::evaluate(pDocument);
-            ++count;
         }
         else {
             /*
@@ -38,36 +37,16 @@ namespace mongo {
               both a subtotal and a count.  This is what getValue() produced
               below.
              */
-            intrusive_ptr<const Value> prhs(
-                vpOperand[0]->evaluate(pDocument));
+            intrusive_ptr<const Value> prhs(vpOperand[0]->evaluate(pDocument));
             verify(prhs->getType() == Object);
             intrusive_ptr<Document> pShardDoc(prhs->getDocument());
 
-            intrusive_ptr<const Value> pSubTotal(
-                pShardDoc->getValue(subTotalName));
+            intrusive_ptr<const Value> pSubTotal(pShardDoc->getValue(subTotalName));
             verify(pSubTotal.get());
-            BSONType subTotalType = pSubTotal->getType();
-            if ((totalType == NumberLong) || (subTotalType == NumberLong))
-                totalType = NumberLong;
-            if ((totalType == NumberDouble) || (subTotalType == NumberDouble))
-                totalType = NumberDouble;
-
-            if (subTotalType == NumberInt) {
-                int v = pSubTotal->getInt();
-                longTotal += v;
-                doubleTotal += v;
-            }
-            else if (subTotalType == NumberLong) {
-                long long v = pSubTotal->getLong();
-                longTotal += v;
-                doubleTotal += v;
-            }
-            else {
-                double v = pSubTotal->getDouble();
-                doubleTotal += v;
-            }
+            doubleTotal += pSubTotal->getDouble();
                 
             intrusive_ptr<const Value> pCount(pShardDoc->getValue(countName));
+            verify(pCount.get());
             count += pCount->getLong();
         }
 
@@ -83,29 +62,15 @@ namespace mongo {
     intrusive_ptr<const Value> AccumulatorAvg::getValue() const {
         if (!pCtx->getInShard()) {
             double avg = 0;
-            if (count) {
-                if (totalType != NumberDouble)
-                    avg = static_cast<double>(longTotal / count);
-                else
-                    avg = doubleTotal / count;
-            }
+            if (count)
+                avg = doubleTotal / static_cast<double>(count);
 
             return Value::createDouble(avg);
         }
 
         intrusive_ptr<Document> pDocument(Document::create());
-
-        intrusive_ptr<const Value> pSubTotal;
-        if (totalType == NumberInt)
-            pSubTotal = Value::createInt((int)longTotal);
-        else if (totalType == NumberLong)
-            pSubTotal = Value::createLong(longTotal);
-        else
-            pSubTotal = Value::createDouble(doubleTotal);
-        pDocument->addField(subTotalName, pSubTotal);
-
-        intrusive_ptr<const Value> pCount(Value::createLong(count));
-        pDocument->addField(countName, pCount);
+        pDocument->addField(subTotalName, Value::createDouble(doubleTotal));
+        pDocument->addField(countName, Value::createLong(count));
 
         return Value::createDocument(pDocument);
     }
@@ -113,7 +78,6 @@ namespace mongo {
     AccumulatorAvg::AccumulatorAvg(
         const intrusive_ptr<ExpressionContext> &pTheCtx):
         AccumulatorSum(),
-        count(0),
         pCtx(pTheCtx) {
     }
 

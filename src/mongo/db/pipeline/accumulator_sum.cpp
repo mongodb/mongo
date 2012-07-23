@@ -26,23 +26,30 @@ namespace mongo {
         verify(vpOperand.size() == 1);
         intrusive_ptr<const Value> prhs(vpOperand[0]->evaluate(pDocument));
 
-        /* upgrade to the widest type required to hold the result */
-        totalType = Value::getWidestNumeric(totalType, prhs->getType());
+        BSONType rhsType = prhs->getType();
 
-        if (totalType == NumberInt) {
-            int v = prhs->coerceToInt();
-            longTotal += v;
-            doubleTotal += v;
-        }
-        else if (totalType == NumberLong) {
+        // do nothing with non numeric types
+        if (!(rhsType == NumberInt || rhsType == NumberLong || rhsType == NumberDouble))
+            return Value::getZero();
+
+        // upgrade to the widest type required to hold the result
+        totalType = Value::getWidestNumeric(totalType, rhsType);
+
+        if (totalType == NumberInt || totalType == NumberLong) {
             long long v = prhs->coerceToLong();
             longTotal += v;
             doubleTotal += v;
         }
-        else { /* (totalType == NumberDouble) */
+        else if (totalType == NumberDouble) {
             double v = prhs->coerceToDouble();
             doubleTotal += v;
         }
+        else {
+            // non numerics should have returned above so we should never get here
+            verify(false);
+        }
+
+        count++;
 
         return Value::getZero();
     }
@@ -54,18 +61,26 @@ namespace mongo {
     }
 
     intrusive_ptr<const Value> AccumulatorSum::getValue() const {
-        if (totalType == NumberInt)
-            return Value::createInt((int)longTotal);
-        if (totalType == NumberLong)
+        if (totalType == NumberLong) {
             return Value::createLong(longTotal);
-        return Value::createDouble(doubleTotal);
+        }
+        else if (totalType == NumberDouble) {
+            return Value::createDouble(doubleTotal);
+        }
+        else if (totalType == NumberInt) {
+            return Value::createIntOrLong(longTotal);
+        }
+        else {
+            massert(16000, "$sum resulted in a non-numeric type", false);
+        }
     }
 
     AccumulatorSum::AccumulatorSum():
         Accumulator(),
         totalType(NumberInt),
         longTotal(0),
-        doubleTotal(0) {
+        doubleTotal(0),
+        count(0) {
     }
 
     const char *AccumulatorSum::getOpName() const {

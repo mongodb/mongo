@@ -138,7 +138,7 @@ namespace AccumulatorTests {
                 createAccumulator();
                 accumulator()->evaluate( frombson( BSON( "d" << 10 ) ) );
                 accumulator()->evaluate( frombson( BSON( "d" << 11 ) ) );
-                ASSERT_EQUALS( 10, accumulator()->getValue()->getDouble() );
+                ASSERT_EQUALS( 10.5, accumulator()->getValue()->getDouble() );
             }
         };        
         
@@ -173,8 +173,8 @@ namespace AccumulatorTests {
                         ( frombson( BSON( "d" << numeric_limits<long long>::max() ) ) );
                 accumulator()->evaluate
                         ( frombson( BSON( "d" << numeric_limits<long long>::max() ) ) );
-                ASSERT_EQUALS( ( numeric_limits<long long>::max() +
-                                 numeric_limits<long long>::max() ) / 2,
+                ASSERT_EQUALS( ( (double)numeric_limits<long long>::max() +
+                                 numeric_limits<long long>::max() ) / 2.0,
                                accumulator()->getValue()->getDouble() );
             }
         };
@@ -241,7 +241,7 @@ namespace AccumulatorTests {
                 BSONObj operand1() { return BSON( "d" << numeric_limits<int>::max() ); }
                 BSONObj operand2() { return BSON( "d" << 3 ); }
                 BSONObj expectedResult() {
-                    return BSON( "subTotal" << numeric_limits<int>::max() + 3 << "count" << 2 );
+                    return BSON( "subTotal" << numeric_limits<int>::max() + 3.0 << "count" << 2 );
                 }
             };
 
@@ -302,7 +302,7 @@ namespace AccumulatorTests {
             /* Router result for one integer. */
             class Int : public SingleOperandBase {
                 BSONObj operand() { return BSON( "d" << BSON( "subTotal" << 3 << "count" << 2 ) ); }
-                BSONObj expectedResult() { return BSON( "" << 1.0 ); }
+                BSONObj expectedResult() { return BSON( "" << 1.5 ); }
             };
             
             /* Router result for one long. */
@@ -310,7 +310,7 @@ namespace AccumulatorTests {
                 BSONObj operand() {
                     return BSON( "d" << BSON( "subTotal" << 6LL << "count" << 5 ) );
                 }
-                BSONObj expectedResult() { return BSON( "" << 1.0 ); }
+                BSONObj expectedResult() { return BSON( "" << 1.2 ); }
             };
             
             /* Router result for one double. */
@@ -348,7 +348,7 @@ namespace AccumulatorTests {
                 BSONObj operand2() {
                     return BSON( "d" << BSON( "subTotal" << 4 << "count" << 2 ) );
                 }
-                BSONObj expectedResult() { return BSON( "" << 2.0 ); }
+                BSONObj expectedResult() { return BSON( "" << (7.0/3) ); }
             };
             
             /* Router result for two ints, without overflow. */
@@ -362,7 +362,7 @@ namespace AccumulatorTests {
                 }
                 BSONObj expectedResult() {
                     return BSON( ""
-                                 << double( ( (long long)numeric_limits<int>::max() + 4 ) / 8 ) ); }
+                                 <<  ( (long long)numeric_limits<int>::max() + 4 ) / 8.0 ); }
             };
             
             /* Router result for an int and a double. */
@@ -788,18 +788,18 @@ namespace AccumulatorTests {
         /** Two ints overflow. */
         class IntIntOverflow : public TypeConversionBase {
             BSONObj summand1() { return BSON( "d" << numeric_limits<int>::max() ); }
-            BSONObj summand2() { return BSON( "d" << numeric_limits<int>::max() ); }
+            BSONObj summand2() { return BSON( "d" << 10 ); }
             BSONObj expectedSum() {
-                return BSON( "" << numeric_limits<int>::max() + numeric_limits<int>::max() );
+                return BSON( "" << numeric_limits<int>::max() + 10LL );
             }
         };
 
         /** Two ints nagative overflow. */
         class IntIntNegativeOverflow : public TypeConversionBase {
             BSONObj summand1() { return BSON( "d" << -numeric_limits<int>::max() ); }
-            BSONObj summand2() { return BSON( "d" << -numeric_limits<int>::max() ); }
+            BSONObj summand2() { return BSON( "d" << -10 ); }
             BSONObj expectedSum() {
-                return BSON( "" << -numeric_limits<int>::max() + -numeric_limits<int>::max() );
+                return BSON( "" << -numeric_limits<int>::max() + -10LL );
             }
         };
         
@@ -941,33 +941,6 @@ namespace AccumulatorTests {
             BSONObj expectedSum() { return BSON( "" << 9 ); }
         };
 
-        class InvalidSummandBase : public Base {
-        public:
-            virtual ~InvalidSummandBase() {
-            }
-            void run() {
-                createAccumulator();
-                ASSERT_THROWS( accumulator()->evaluate( frombson( summand() ) ), UserException );
-            }
-        protected:
-            virtual BSONObj summand() = 0;
-        };
-
-        /** Date values can't be summed. */
-        class Date : public InvalidSummandBase {
-            BSONObj summand() { return mongo::fromjson( "{d:new Date(0)}" ); }
-        };
-        
-        /** String values can't be summed. */
-        class String : public InvalidSummandBase {
-            BSONObj summand() { return BSON( "d" << "string" ); }
-        };
-
-        /** Bool values can't be summed. */
-        class Bool : public InvalidSummandBase {
-            BSONObj summand() { return BSON( "d" << true ); }
-        };
-
         /** Two large integers do not overflow if a double is added later. */
         class NoOverflowBeforeDouble : public TypeConversionBase {
         public:
@@ -1071,8 +1044,6 @@ namespace AccumulatorTests {
             add<Sum::LongIntNegative>();
             add<Sum::IntNull>();
             add<Sum::IntUndefined>();
-            add<Sum::Date>();
-            add<Sum::String>();
             add<Sum::NoOverflowBeforeDouble>();
         }
     } myall;
