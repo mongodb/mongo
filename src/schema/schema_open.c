@@ -261,11 +261,11 @@ __wt_schema_open_index(
 	WT_CURSOR *cursor;
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
-	int cmp, i, copy;
+	int cmp, i, match;
 	const char *idxconf, *name, *tablename, *uri;
 
 	/* Check if we've already done the work. */
-	if (len == 0 && table->idx_complete)
+	if (idxname == NULL && table->idx_complete)
 		return (0);
 
 	cursor = NULL;
@@ -282,37 +282,61 @@ __wt_schema_open_index(
 	cursor->set_key(cursor, tmp->data);
 	if ((ret = cursor->search_near(cursor, &cmp)) == 0 && cmp < 0)
 		ret = cursor->next(cursor);
-	for (i = 0; ret == 0; ret = cursor->next(cursor)) {
+	for (i = 0; ret == 0; i++, ret = cursor->next(cursor)) {
 		WT_ERR(cursor->get_key(cursor, &uri));
 		name = uri;
 		if (!WT_PREFIX_SKIP(name, tmp->data))
 			break;
 
 		/* Is this the index we are looking for? */
-		copy = len == 0 ||
-		    (strncmp(name, idxname, len) == 0 && name[len] == '\0');
+		match = (idxname == NULL ||
+		    (strncmp(name, idxname, len) == 0 && name[len] == '\0'));
 
-		if ((size_t)i * sizeof(const char *) >= table->idx_name_alloc)
+		/*
+		 * Ensure there is space, including if we have to make room for
+		 * a new entry in the middle of the list.
+		 */
+		if (table->idx_name_alloc <=
+		    ((size_t)WT_MAX(i, table->nindices) + 1) *
+		    sizeof(const char *))
 			WT_ERR(__wt_realloc(session, &table->idx_name_alloc,
 			    WT_MAX(10 * sizeof(const char *),
 			    2 * table->idx_name_alloc), &table->idx_name));
 
+		/* Keep the in-memory list in sync with the metadata. */
+		cmp = 0;
+		while (table->idx_name[i] != NULL &&
+		    (cmp = strcmp(uri, table->idx_name[i])) > 0) {
+			/* Index no longer exists, remove it. */
+			__wt_free(session, table->idx_name[i]);
+			memmove(&table->idx_name[i], &table->idx_name[i + 1],
+			    (table->nindices - i) * sizeof(const char *));
+			table->idx_name[--table->nindices] = NULL;
+		}
+		if (cmp < 0) {
+			/* Make room for a new index. */
+			memmove(&table->idx_name[i + 1], &table->idx_name[i],
+			    (table->nindices - i) * sizeof(const char *));
+			table->idx_name[i] = NULL;
+			++table->nindices;
+		}
+
 		if (table->idx_name[i] == NULL)
 			WT_ERR(__wt_strdup(session, uri, &table->idx_name[i]));
 
-		if (copy) {
+		if (match) {
 			WT_ERR(cursor->get_value(cursor, &idxconf));
 			WT_ERR(__open_index(session, table, uri, idxconf));
 
-			if (len != 0)
+			/* If we were looking for a single index, we're done. */
+			if (idxname != NULL)
 				break;
 		}
-		i++;
 	}
 	WT_ERR_NOTFOUND_OK(ret);
 
 	/* If we did a full pass, we won't need to do it again. */
-	if (len == 0) {
+	if (idxname == NULL) {
 		table->nindices = i;
 		table->idx_complete = 1;
 	}
