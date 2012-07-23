@@ -97,7 +97,7 @@ namespace mongo {
           Set the given field to be at the specified position in the
           Document.  This will replace any field that is currently in that
           position.  The index must be within the current range of field
-          indices.
+          indices, otherwise behavior is undefined.
 
           pValue.get() may be NULL, in which case the field will be
           removed.  fieldName is ignored in this case.

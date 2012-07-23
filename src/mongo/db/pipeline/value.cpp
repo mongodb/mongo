@@ -1024,7 +1024,7 @@ namespace mongo {
             }
         }
 
-        /* NOTREACHED */
+        // Reachable, but callers must subsequently err out in this case.
         return Undefined;
     }
 
