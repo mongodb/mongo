@@ -55,7 +55,7 @@ NAME=mongodb
 CONF=/etc/mongodb.conf
 DATA=/var/lib/mongodb
 LOGDIR=/var/log/mongodb
-PIDFILE=/var/run/$NAME.pid
+PIDFILE=$DATA/$NAME.pid
 LOGFILE=$LOGDIR/$NAME.log  # Server logfile
 ENABLE_MONGODB=yes
 
@@ -69,8 +69,9 @@ fi
 NUMACTL_ARGS="--interleave=all"
 if which numactl >/dev/null 2>/dev/null && numactl $NUMACTL_ARGS ls / >/dev/null 2>/dev/null
 then
-    NUMACTL="numactl $NUMACTL_ARGS"
+    NUMACTL="`which numactl` -- $NUMACTL_ARGS -- "
 else
+    DAEMON_OPTS="-- $DAEMON_OPTS"
     NUMACTL=""
 fi
 
@@ -97,7 +98,7 @@ DIETIME=10                   # Time to wait for the server to die, in seconds
 
 DAEMONUSER=${DAEMONUSER:-mongodb}
 DAEMON_OPTS=${DAEMON_OPTS:-"--dbpath $DATA --logpath $LOGFILE run"}
-DAEMON_OPTS="$DAEMON_OPTS --config $CONF"
+DAEMON_OPTS="$DAEMON_OPTS --config $CONF --pidfilepath $PIDFILE"
 
 set -e
 
@@ -128,8 +129,8 @@ running() {
 start_server() {
 # Start the process using the wrapper
             start-stop-daemon --background --start --quiet --pidfile $PIDFILE \
-                        --make-pidfile --chuid $DAEMONUSER \
-                        --exec $NUMACTL $DAEMON -- $DAEMON_OPTS
+                        --chuid $DAEMONUSER \
+                        --exec $NUMACTL $DAEMON $DAEMON_OPTS
             errcode=$?
 	return $errcode
 }
