@@ -36,6 +36,8 @@ namespace mongo {
         BSONObjExternalSorter( IndexInterface &i, const BSONObj & order = BSONObj() , long maxFileSize = 1024 * 1024 * 100 );
         ~BSONObjExternalSorter();
         typedef pair<BSONObj,DiskLoc> Data;
+        /** @return the IndexInterface used to perform key comparisons. */
+        const IndexInterface& getIndexInterface() const { return _idxi; }
  
     private:
         static HLMutex _extSortMutex;

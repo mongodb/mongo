@@ -46,6 +46,10 @@ namespace mongo {
         }
     }
 
+    IndexInterface& IndexInterface::defaultVersion() {
+        return *IndexDetails::iis[ DefaultIndexVersionNumber ];
+    }
+
 
     template< class V >
     class IndexInterfaceImpl : public IndexInterface { 

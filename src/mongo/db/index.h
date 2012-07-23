@@ -70,6 +70,13 @@ namespace mongo {
         virtual DiskLoc locate(const IndexDetails &idx , const DiskLoc& thisLoc, const BSONObj& key, const Ordering &order,
                                int& pos, bool& found, const DiskLoc &recordLoc, int direction=1) = 0;
         virtual DiskLoc advance(const DiskLoc& thisLoc, int& keyOfs, int direction, const char *caller) = 0;
+
+        /**
+         * @return a static IndexInterface consistent with index version DefaultIndexVersionNumber.
+         * An IndexInterface should generally not be retrieved via this function, but from the
+         * IndexDetails for an existing index.
+         */
+        static IndexInterface& defaultVersion();
     };
 
     /* Details about a particular index. There is one of these effectively for each object in

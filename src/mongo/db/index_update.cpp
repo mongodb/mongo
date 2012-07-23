@@ -301,6 +301,8 @@ namespace mongo {
         pm.finished();
 
         BSONObjExternalSorter& sorter = *(phase1->sorter);
+        // Ensure the index and external sorter have a consistent index interface (and sort order).
+        fassert( 16408, &idx.idxInterface() == &sorter.getIndexInterface() );
 
         if( phase1->multi )
             d->setIndexIsMultikey(ns, idxNo);

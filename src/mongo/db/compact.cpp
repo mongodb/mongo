@@ -204,8 +204,7 @@ namespace mongo {
             for( int idxNo = 0; ii.more(); ++idxNo ) {
                 // Build a new index spec based on the old index spec.
                 BSONObjBuilder b;
-                IndexDetails& idx = ii.next();
-                BSONObj::iterator i(idx.info.obj());
+                BSONObj::iterator i(ii.next().info.obj());
                 while( i.more() ) { 
                     BSONElement e = i.next();
                     if ( str::equals( e.fieldName(), "v" ) ) {
@@ -225,8 +224,11 @@ namespace mongo {
                 indexSpecs[idxNo].reset(o);
                 // Create an external sorter.
                 phase1[idxNo].sorter.reset
-                        ( new BSONObjExternalSorter( idx.idxInterface(),
-                                                     o.getObjectField("key") ) );
+                        ( new BSONObjExternalSorter
+                           // Use the default index interface, since the new index will be created
+                           // with the default index version.
+                         ( IndexInterface::defaultVersion(),
+                           o.getObjectField("key") ) );
                 phase1[idxNo].sorter->hintNumObjects( d->stats.nrecords );
             }
         }
