@@ -31,7 +31,9 @@ printjson( replTest.liveNodes );
 var dbname = "dbname";
 var masterdb = master.getDB( dbname );
 var slave1db = slave1.getDB( dbname );
+slave1db.setSlaveOk();
 var slave2db = slave2.getDB( dbname );
+slave2db.setSlaveOk();
 
 var numtests = 2;
 for( testnum=0; testnum < numtests; testnum++ ){
