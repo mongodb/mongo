@@ -69,7 +69,7 @@ def confirmEmpty(self, uri):
 
 # create a simplePopulate or complexPopulate key
 def keyPopulate(key_format, i):
-    if key_format == 'i' or key_format == 'u':
+    if key_format == 'i' or key_format == 'r' or key_format == 'u':
         return i
     elif key_format == 'S':
         return str('%015d' % i)
@@ -85,7 +85,7 @@ def simplePopulate(self, uri, config, rows):
     self.pr('simplePopulate: ' + uri + ' with ' + str(rows) + ' rows')
     self.session.create(uri, config + ',value_format=S')
     cursor = self.session.open_cursor(uri, None, None)
-    for i in range(0, rows):
+    for i in range(1, rows):
         cursor.set_key(keyPopulate(cursor.key_format, i))
         cursor.set_value(str(i) + ': abcdefghijklmnopqrstuvwxyz')
         cursor.insert()
@@ -94,7 +94,7 @@ def simplePopulate(self, uri, config, rows):
 def simplePopulateCheck(self, uri):
     self.pr('simplePopulateCheck: ' + uri)
     cursor = self.session.open_cursor(uri, None, None)
-    i = -1
+    i = 0
     for key,val in cursor:
         i += 1
         self.assertEqual(key, keyPopulate(cursor.key_format, i))
@@ -127,7 +127,7 @@ def complexPopulate(self, uri, config, rows):
     self.session.create(
 	indxname + ':indx6', 'columns=(column3,column5,column4)')
     cursor = self.session.open_cursor(uri, None, None)
-    for i in range(0, rows):
+    for i in range(1, rows):
         cursor.set_key(keyPopulate(cursor.key_format, i))
         cursor.set_value(
             str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%26],
@@ -140,7 +140,7 @@ def complexPopulate(self, uri, config, rows):
 def complexPopulateCheck(self, uri):
     self.pr('complexPopulateCheck: ' + uri)
     cursor = self.session.open_cursor(uri, None, None)
-    i = -1
+    i = 0
     for key, s1, i2, s3, s4 in cursor:
         i += 1
         self.assertEqual(key, keyPopulate(cursor.key_format, i))

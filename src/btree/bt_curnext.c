@@ -43,7 +43,7 @@ __cursor_fix_append_next(WT_CURSOR_BTREE *cbt, int newpage)
 	 * insert is aborted, we simply return zero (empty), regardless of
 	 * whether we are at the end of the data.
 	 */
-	cbt->iface.recno = ++cbt->recno;
+	__cursor_set_recno(cbt, cbt->recno + 1);
 	if (cbt->recno < WT_INSERT_RECNO(cbt->ins) ||
 	    (upd = __wt_txn_read(session, cbt->ins->upd)) == NULL) {
 		cbt->v = 0;
@@ -66,12 +66,9 @@ __cursor_fix_next(WT_CURSOR_BTREE *cbt, int newpage)
 	WT_ITEM *val;
 	WT_SESSION_IMPL *session;
 	WT_UPDATE *upd;
-	uint64_t *recnop;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	btree = session->btree;
-
-	recnop = &cbt->iface.recno;
 	val = &cbt->iface.value;
 
 	/* Initialize for each new page. */
@@ -79,7 +76,7 @@ __cursor_fix_next(WT_CURSOR_BTREE *cbt, int newpage)
 		cbt->last_standard_recno = __col_last_recno(cbt->page);
 		if (cbt->last_standard_recno == 0)
 			return (WT_NOTFOUND);
-		cbt->recno = cbt->page->u.col_fix.recno;
+		__cursor_set_recno(cbt, cbt->page->u.col_fix.recno);
 		goto new_page;
 	}
 
@@ -87,10 +84,9 @@ __cursor_fix_next(WT_CURSOR_BTREE *cbt, int newpage)
 	for (;;) {
 		if (cbt->recno >= cbt->last_standard_recno)
 			return (WT_NOTFOUND);
-		++cbt->recno;
-new_page:	*recnop = cbt->recno;
+		__cursor_set_recno(cbt, cbt->recno + 1);
 
-		/* Check any insert list for a matching record. */
+new_page:	/* Check any insert list for a matching record. */
 		if ((ins = __col_insert_search_match(
 		    WT_COL_UPDATE_SINGLE(cbt->page), cbt->recno)) != NULL &&
 		    (upd = __wt_txn_read(session, ins->upd)) != NULL) {
@@ -131,7 +127,7 @@ __cursor_var_append_next(WT_CURSOR_BTREE *cbt, int newpage)
 		if ((cbt->ins = WT_SKIP_NEXT(cbt->ins)) == NULL)
 			return (WT_NOTFOUND);
 
-new_page:	cbt->iface.recno = WT_INSERT_RECNO(cbt->ins);
+new_page:	__cursor_set_recno(cbt, WT_INSERT_RECNO(cbt->ins));
 		if ((upd = __wt_txn_read(session, cbt->ins->upd)) == NULL ||
 		    WT_UPDATE_DELETED_ISSET(upd))
 			continue;
@@ -156,10 +152,8 @@ __cursor_var_next(WT_CURSOR_BTREE *cbt, int newpage)
 	WT_ITEM *val;
 	WT_SESSION_IMPL *session;
 	WT_UPDATE *upd;
-	uint64_t *recnop;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
-	recnop = &cbt->iface.recno;
 	val = &cbt->iface.value;
 
 	/* Initialize for each new page. */
@@ -167,7 +161,7 @@ __cursor_var_next(WT_CURSOR_BTREE *cbt, int newpage)
 		cbt->last_standard_recno = __col_last_recno(cbt->page);
 		if (cbt->last_standard_recno == 0)
 			return (WT_NOTFOUND);
-		cbt->recno = cbt->page->u.col_var.recno;
+		__cursor_set_recno(cbt, cbt->page->u.col_var.recno);
 		goto new_page;
 	}
 
@@ -175,10 +169,9 @@ __cursor_var_next(WT_CURSOR_BTREE *cbt, int newpage)
 	for (;;) {
 		if (cbt->recno >= cbt->last_standard_recno)
 			return (WT_NOTFOUND);
-		++cbt->recno;
-new_page:	*recnop = cbt->recno;
+		__cursor_set_recno(cbt, cbt->recno + 1);
 
-		/* Find the matching WT_COL slot. */
+new_page:	/* Find the matching WT_COL slot. */
 		if ((cip = __col_var_search(cbt->page, cbt->recno)) == NULL)
 			return (WT_NOTFOUND);
 
@@ -301,7 +294,8 @@ new_insert:	if ((ins = cbt->ins) != NULL) {
 		cbt->ins_head = NULL;
 		cbt->ins = NULL;
 
-		rip = &cbt->page->u.row.d[cbt->row_iteration_slot / 2 - 1];
+		cbt->slot = cbt->row_iteration_slot / 2 - 1;
+		rip = &cbt->page->u.row.d[cbt->slot];
 		upd = __wt_txn_read(session, WT_ROW_UPDATE(cbt->page, rip));
 		if (upd != NULL && WT_UPDATE_DELETED_ISSET(upd))
 			continue;
@@ -373,9 +367,10 @@ __wt_btcur_iterate_setup(WT_CURSOR_BTREE *cbt, int next)
  *	Move to the next record in the tree.
  */
 int
-__wt_btcur_next(WT_CURSOR_BTREE *cbt)
+__wt_btcur_next(WT_CURSOR_BTREE *cbt, int is_modify)
 {
 	WT_DECL_RET;
+	WT_PAGE *page;
 	WT_SESSION_IMPL *session;
 	int newpage;
 
@@ -392,28 +387,38 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt)
 		__wt_btcur_iterate_setup(cbt, 1);
 
 	/*
+	 * If this is a modification, we're about to read information from the
+	 * page, save the write generation.
+	 */
+	page = cbt->page;
+	if (is_modify && page != NULL) {
+		WT_ERR(__wt_page_modify_init(session, page));
+		WT_ORDERED_READ(cbt->write_gen, page->modify->write_gen);
+	}
+
+	/*
 	 * Walk any page we're holding until the underlying call returns not-
 	 * found.  Then, move to the next page, until we reach the end of the
 	 * file.
 	 */
 	for (newpage = 0;; newpage = 1) {
 		if (F_ISSET(cbt, WT_CBT_ITERATE_APPEND)) {
-			switch (cbt->page->type) {
+			switch (page->type) {
 			case WT_PAGE_COL_FIX:
 				ret = __cursor_fix_append_next(cbt, newpage);
 				break;
 			case WT_PAGE_COL_VAR:
 				ret = __cursor_var_append_next(cbt, newpage);
 				break;
-			WT_ILLEGAL_VALUE(session);
+			WT_ILLEGAL_VALUE_ERR(session);
 			}
 			if (ret == 0)
 				break;
 			F_CLR(cbt, WT_CBT_ITERATE_APPEND);
 			if (ret != WT_NOTFOUND)
 				break;
-		} else if (cbt->page != NULL) {
-			switch (cbt->page->type) {
+		} else if (page != NULL) {
+			switch (page->type) {
 			case WT_PAGE_COL_FIX:
 				ret = __cursor_fix_next(cbt, newpage);
 				break;
@@ -423,7 +428,7 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt)
 			case WT_PAGE_ROW_LEAF:
 				ret = __cursor_row_next(cbt, newpage);
 				break;
-			WT_ILLEGAL_VALUE(session);
+			WT_ILLEGAL_VALUE_ERR(session);
 			}
 			if (ret != WT_NOTFOUND)
 				break;
@@ -433,20 +438,28 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt)
 			 * We handle it separately from the usual cursor code:
 			 * it's only that one page and it's in a simple format.
 			 */
-			if (cbt->page->type != WT_PAGE_ROW_LEAF &&
-			    (cbt->ins_head =
-			    WT_COL_APPEND(cbt->page)) != NULL) {
+			if (page->type != WT_PAGE_ROW_LEAF &&
+			    (cbt->ins_head = WT_COL_APPEND(page)) != NULL) {
 				F_SET(cbt, WT_CBT_ITERATE_APPEND);
 				continue;
 			}
 		}
 
+		cbt->page = NULL;
 		do {
-			WT_ERR(__wt_tree_np(session, &cbt->page, 0, 1));
-			WT_ERR_TEST(cbt->page == NULL, WT_NOTFOUND);
+			WT_ERR(__wt_tree_np(session, &page, 0, 1));
+			WT_ERR_TEST(page == NULL, WT_NOTFOUND);
 		} while (
-		    cbt->page->type == WT_PAGE_COL_INT ||
-		    cbt->page->type == WT_PAGE_ROW_INT);
+		    page->type == WT_PAGE_COL_INT ||
+		    page->type == WT_PAGE_ROW_INT);
+		cbt->page = page;
+
+		/* Initialize the page's modification information */
+		if (is_modify) {
+			WT_ERR(__wt_page_modify_init(session, page));
+			WT_ORDERED_READ(
+			    cbt->write_gen, page->modify->write_gen);
+		}
 	}
 
 err:	__cursor_func_resolve(cbt, ret);

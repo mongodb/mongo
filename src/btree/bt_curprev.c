@@ -131,14 +131,14 @@ __cursor_fix_append_prev(WT_CURSOR_BTREE *cbt, int newpage)
 	if (newpage) {
 		if ((cbt->ins = WT_SKIP_LAST(cbt->ins_head)) == NULL)
 			return (WT_NOTFOUND);
-		cbt->recno = WT_INSERT_RECNO(cbt->ins);
+		__cursor_set_recno(cbt, WT_INSERT_RECNO(cbt->ins));
 	} else {
 		if (cbt->recno == WT_INSERT_RECNO(cbt->ins)) {
 			WT_RET(__cursor_skip_prev(cbt));
 			if (cbt->ins == NULL)
 				return (WT_NOTFOUND);
 		}
-		--cbt->recno;
+		__cursor_set_recno(cbt, cbt->recno - 1);
 	}
 
 	/*
@@ -149,7 +149,6 @@ __cursor_fix_append_prev(WT_CURSOR_BTREE *cbt, int newpage)
 	 * of the blurring between deleted and empty values, but ideally we
 	 * would skip all uncommitted changes at the end of the data.
 	 */
-	cbt->iface.recno = cbt->recno;
 	if (cbt->recno > WT_INSERT_RECNO(cbt->ins) ||
 	    (upd = __wt_txn_read(session, cbt->ins->upd)) == NULL) {
 		cbt->v = 0;
@@ -172,12 +171,9 @@ __cursor_fix_prev(WT_CURSOR_BTREE *cbt, int newpage)
 	WT_ITEM *val;
 	WT_SESSION_IMPL *session;
 	WT_UPDATE *upd;
-	uint64_t *recnop;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	btree = session->btree;
-
-	recnop = &cbt->iface.recno;
 	val = &cbt->iface.value;
 
 	/* Initialize for each new page. */
@@ -185,7 +181,7 @@ __cursor_fix_prev(WT_CURSOR_BTREE *cbt, int newpage)
 		cbt->last_standard_recno = __col_last_recno(cbt->page);
 		if (cbt->last_standard_recno == 0)
 			return (WT_NOTFOUND);
-		cbt->recno = cbt->last_standard_recno;
+		__cursor_set_recno(cbt, cbt->last_standard_recno);
 		goto new_page;
 	}
 
@@ -193,10 +189,9 @@ __cursor_fix_prev(WT_CURSOR_BTREE *cbt, int newpage)
 	for (;;) {
 		if (cbt->recno == cbt->page->u.col_fix.recno)
 			return (WT_NOTFOUND);
-		--cbt->recno;
-new_page:	*recnop = cbt->recno;
+		__cursor_set_recno(cbt, cbt->recno - 1);
 
-		/* Check any insert list for a matching record. */
+new_page:	/* Check any insert list for a matching record. */
 		if ((ins = cbt->ins = __col_insert_search_match(
 		    WT_COL_UPDATE_SINGLE(cbt->page), cbt->recno)) != NULL &&
 		    (upd = __wt_txn_read(session, ins->upd)) != NULL) {
@@ -237,7 +232,7 @@ __cursor_var_append_prev(WT_CURSOR_BTREE *cbt, int newpage)
 new_page:	if (cbt->ins == NULL)
 			return (WT_NOTFOUND);
 
-		cbt->iface.recno = WT_INSERT_RECNO(cbt->ins);
+		__cursor_set_recno(cbt, WT_INSERT_RECNO(cbt->ins));
 		if ((upd = __wt_txn_read(session, cbt->ins->upd)) == NULL ||
 		    WT_UPDATE_DELETED_ISSET(upd))
 			continue;
@@ -262,10 +257,8 @@ __cursor_var_prev(WT_CURSOR_BTREE *cbt, int newpage)
 	WT_ITEM *val;
 	WT_SESSION_IMPL *session;
 	WT_UPDATE *upd;
-	uint64_t *recnop;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
-	recnop = &cbt->iface.recno;
 	val = &cbt->iface.value;
 
 	/* Initialize for each new page. */
@@ -273,15 +266,15 @@ __cursor_var_prev(WT_CURSOR_BTREE *cbt, int newpage)
 		cbt->last_standard_recno = __col_last_recno(cbt->page);
 		if (cbt->last_standard_recno == 0)
 			return (WT_NOTFOUND);
-		cbt->recno = cbt->last_standard_recno;
+		__cursor_set_recno(cbt, cbt->last_standard_recno);
 		goto new_page;
 	}
 
 	/* Move to the previous entry and return the item. */
 	for (;;) {
-		--cbt->recno;
-new_page:	*recnop = cbt->recno;
-		if (cbt->recno < cbt->page->u.col_var.recno)
+		__cursor_set_recno(cbt, cbt->recno - 1);
+
+new_page:	if (cbt->recno < cbt->page->u.col_var.recno)
 			return (WT_NOTFOUND);
 
 		/* Find the matching WT_COL slot. */
@@ -375,8 +368,8 @@ __cursor_row_prev(WT_CURSOR_BTREE *cbt, int newpage)
 		else
 			cbt->ins_head = WT_ROW_INSERT_SLOT(
 			    cbt->page, cbt->page->entries - 1);
-		cbt->row_iteration_slot = cbt->page->entries * 2 + 1;
 		cbt->ins = WT_SKIP_LAST(cbt->ins_head);
+		cbt->row_iteration_slot = cbt->page->entries * 2 + 1;
 		goto new_insert;
 	}
 
@@ -421,7 +414,8 @@ new_insert:	if ((ins = cbt->ins) != NULL) {
 		cbt->ins_head = NULL;
 		cbt->ins = NULL;
 
-		rip = &cbt->page->u.row.d[cbt->row_iteration_slot / 2 - 1];
+		cbt->slot = cbt->row_iteration_slot / 2 - 1;
+		rip = &cbt->page->u.row.d[cbt->slot];
 		upd = __wt_txn_read(session, WT_ROW_UPDATE(cbt->page, rip));
 		if (upd != NULL && WT_UPDATE_DELETED_ISSET(upd))
 			continue;
@@ -436,9 +430,10 @@ new_insert:	if ((ins = cbt->ins) != NULL) {
  *	Move to the previous record in the tree.
  */
 int
-__wt_btcur_prev(WT_CURSOR_BTREE *cbt)
+__wt_btcur_prev(WT_CURSOR_BTREE *cbt, int is_modify)
 {
 	WT_DECL_RET;
+	WT_PAGE *page;
 	WT_SESSION_IMPL *session;
 	int newpage;
 
@@ -455,13 +450,23 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt)
 		__wt_btcur_iterate_setup(cbt, 0);
 
 	/*
+	 * If this is a modification, we're about to read information from the
+	 * page, save the write generation.
+	 */
+	page = cbt->page;
+	if (is_modify && page != NULL) {
+		WT_ERR(__wt_page_modify_init(session, page));
+		WT_ORDERED_READ(cbt->write_gen, page->modify->write_gen);
+	}
+
+	/*
 	 * Walk any page we're holding until the underlying call returns not-
 	 * found.  Then, move to the previous page, until we reach the start
 	 * of the file.
 	 */
 	for (newpage = 0;; newpage = 1) {
 		if (F_ISSET(cbt, WT_CBT_ITERATE_APPEND)) {
-			switch (cbt->page->type) {
+			switch (page->type) {
 			case WT_PAGE_COL_FIX:
 				ret = __cursor_fix_append_prev(cbt, newpage);
 				break;
@@ -477,8 +482,8 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt)
 				break;
 			newpage = 1;
 		}
-		if (cbt->page != NULL) {
-			switch (cbt->page->type) {
+		if (page != NULL) {
+			switch (page->type) {
 			case WT_PAGE_COL_FIX:
 				ret = __cursor_fix_prev(cbt, newpage);
 				break;
@@ -494,20 +499,29 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt)
 				break;
 		}
 
+		cbt->page = NULL;
 		do {
-			WT_ERR(__wt_tree_np(session, &cbt->page, 0, 0));
-			WT_ERR_TEST(cbt->page == NULL, WT_NOTFOUND);
+			WT_ERR(__wt_tree_np(session, &page, 0, 0));
+			WT_ERR_TEST(page == NULL, WT_NOTFOUND);
 		} while (
-		    cbt->page->type == WT_PAGE_COL_INT ||
-		    cbt->page->type == WT_PAGE_ROW_INT);
+		    page->type == WT_PAGE_COL_INT ||
+		    page->type == WT_PAGE_ROW_INT);
+		cbt->page = page;
+
+		/* Initialize the page's modification information */
+		if (is_modify) {
+			WT_ERR(__wt_page_modify_init(session, page));
+			WT_ORDERED_READ(
+			    cbt->write_gen, page->modify->write_gen);
+		}
 
 		/*
 		 * The last page in a column-store has appended entries.
 		 * We handle it separately from the usual cursor code:
 		 * it's only that one page and it's in a simple format.
 		 */
-		if (cbt->page->type != WT_PAGE_ROW_LEAF &&
-		    (cbt->ins_head = WT_COL_APPEND(cbt->page)) != NULL)
+		if (page->type != WT_PAGE_ROW_LEAF &&
+		    (cbt->ins_head = WT_COL_APPEND(page)) != NULL)
 			F_SET(cbt, WT_CBT_ITERATE_APPEND);
 	}
 

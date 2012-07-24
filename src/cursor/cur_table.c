@@ -455,6 +455,11 @@ __wt_curtable_truncate(
 	 * allocate memory for) the WT_ITEM structure because all that happens
 	 * underneath is the data and size fields are reset to reference the
 	 * cursor's key.
+	 *
+	 * This loop calls open-indices and then does one search more than is
+	 * required, the session layer called search on any open cursor, in
+	 * case all the application did was set the keys.  It's cleaner this
+	 * way, and it's not worth optimizing out.
 	 */
 	if (start == NULL) {
 		ctable = (WT_CURSOR_TABLE *)stop;
