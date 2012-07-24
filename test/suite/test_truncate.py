@@ -34,7 +34,20 @@ import wiredtiger, wttest
 from helper import confirmDoesNotExist, \
     confirmEmpty, complexPopulate, keyPopulate, simplePopulate
 
+# Test session.truncate
+#       Simple, one-off tests.
+class test_truncate_standalone(wttest.WiredTigerTestCase):
+
+    # Test truncation of an object without URI or either cursor specified,
+    # expect an error.
+    def test_truncate_no_args(self):
+	simplePopulate(self, 'file:xxx', 'key_format=S', 10)
+	msg = '/either a URI or start/stop cursors/'
+	self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+	    lambda: self.session.truncate(None, None, None, None), msg)
+
 # Test session.truncate.
+#       Scenarios.
 class test_truncate(wttest.WiredTigerTestCase):
     name = 'test_truncate'
 
@@ -51,14 +64,6 @@ class test_truncate(wttest.WiredTigerTestCase):
 	('table-col-big', dict(type='table:',fmt='i',nentries=10000,skip=737)),
 	('table-row-big', dict(type='table:',fmt='S',nentries=10000,skip=737))
 	]
-
-    # Test truncation of an object without URI or either cursor.
-    def test_truncate_not_set(self):
-	uri = self.type + self.name
-	simplePopulate(self, uri, self.config + self.fmt, 10)
-	msg = '/either a URI or start/stop cursors/'
-	self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-	    lambda: self.session.truncate(None, None, None, None), msg)
 
     # Test truncation of an object using its URI.
     def test_truncate(self):
