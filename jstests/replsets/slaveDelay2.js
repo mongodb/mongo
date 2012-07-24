@@ -5,7 +5,7 @@ var host = getHostName();
 
 
 var initialize = function() {
-  var replTest = new ReplSetTest( {name: name, nodes: 1, oplogSize : 1024} );
+  var replTest = new ReplSetTest( {name: name, nodes: 1} );
 
   var nodes = replTest.startSet();
   
@@ -38,7 +38,7 @@ doTest = function( signal ) {
    * initializing. Make sure it syncs all of these writes before going into
    * syncDelay.
    */
-  var conn = MongoRunner.runMongod({port : 31008, dbpath : name + "-sd", useHostname: true, replSet: name, oplogSize : 1024 });
+  var conn = MongoRunner.runMongod({port : 31008, dbpath : name + "-sd", useHostname: true, replSet: name });
   conn.setSlaveOk();
   
   config = master.getSisterDB("local").system.replset.findOne();
