@@ -44,8 +44,12 @@ function assertNoNewWarnings() {
 }
 
 function assertNewWarning() {
-    ++oldNumWarnings;
-    assert.eq( oldNumWarnings, numWarnings() );
+    newNumWarnings = numWarnings();
+    // Ensure that newNumWarnings > oldNumWarnings.  It's not safe to test that oldNumWarnings + 1
+    // == newNumWarnings, because a (simulated) page fault exception may cause multiple messages to
+    // be logged instead of only one.
+    assert.lt( oldNumWarnings, newNumWarnings );
+    oldNumWarnings = newNumWarnings;
 }
 
 // Simple _id query without an _id index.
