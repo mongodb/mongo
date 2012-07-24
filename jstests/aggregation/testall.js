@@ -1123,13 +1123,13 @@ var p20 = db.runCommand(
 { aggregate : "vartype", pipeline : [
     { $project : {
         all_numbers : { $add:[1, "$x", 2, "$x"] },
-        string_fields : { $add:[3, "$y", 4, "$y"] },
-        number_fields : { $add:["a", "$x", "b", "$x"] },
-        all_strings : { $add:["c", "$y", "d", "$y"] },
-        potpourri_1 : { $add:[5, "$y", "e", "$x"] },
-        potpourri_2 : { $add:[6, "$x", "f", "$y"] },
-        potpourri_3 : { $add:["g", "$y", 7, "$x"] },
-        potpourri_4 : { $add:["h", "$x", 8, "$y"] },
+        string_fields : { $concat:[3, "$y", 4, "$y"] },
+        number_fields : { $concat:["a", "$x", "b", "$x"] },
+        all_strings : { $concat:["c", "$y", "d", "$y"] },
+        potpourri_1 : { $concat:[5, "$y", "e", "$x"] },
+        potpourri_2 : { $concat:[6, "$x", "f", "$y"] },
+        potpourri_3 : { $concat:["g", "$y", 7, "$x"] },
+        potpourri_4 : { $concat:["h", "$x", 8, "$y"] },
         _id: 0
     }}
 ]});
@@ -1147,9 +1147,7 @@ var p20result = [
     }
 ];
 
-/* rework to use $concat after SERVER-6195
 assert.eq(p20.result, p20result, 'p20 failed');
-*/
 
 // ternary conditional operator
 var p21 = db.runCommand(

@@ -194,6 +194,7 @@ namespace mongo {
         {"$add", ExpressionAdd::create, 0},
         {"$and", ExpressionAnd::create, 0},
         {"$cmp", ExpressionCompare::createCmp, OpDesc::FIXED_COUNT, 2},
+        {"$concat", ExpressionConcat::create, 0},
         {"$cond", ExpressionCond::create, OpDesc::FIXED_COUNT, 3},
         // $const handled specially in parseExpression
         {"$dayOfMonth", ExpressionDayOfMonth::create, OpDesc::FIXED_COUNT, 1},
@@ -725,6 +726,31 @@ namespace mongo {
 
     const char *ExpressionCompare::getOpName() const {
         return cmpLookup[cmpOp].name;
+    }
+
+    /* ------------------------- ExpressionConcat ----------------------------- */
+
+    ExpressionConcat::~ExpressionConcat() {
+    }
+
+    intrusive_ptr<ExpressionNary> ExpressionConcat::create() {
+        return new ExpressionConcat();
+    }
+
+    Value ExpressionConcat::evaluate(const Document& input) const {
+        const size_t n = vpOperand.size();
+
+        StringBuilder result;
+        for (size_t i = 0; i < n; ++i) {
+            Value val = vpOperand[i]->evaluate(input);
+            result << val.coerceToString();
+        }
+
+        return Value::createString(result.str());
+    }
+
+    const char *ExpressionConcat::getOpName() const {
+        return "$concat";
     }
 
     /* ----------------------- ExpressionCond ------------------------------ */
