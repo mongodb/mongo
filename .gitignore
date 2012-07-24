@@ -134,6 +134,11 @@ debian/mongodb
 *.includes
 *.orig
 
+#eclipse
+.cproject
+.project
+
+
 
 # old things that should be removed
 # maybe remove this mid 2012
