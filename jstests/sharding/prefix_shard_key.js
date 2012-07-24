@@ -69,7 +69,9 @@ printjson( result4 );
 assert.eq( 0, result4.ok , "moveChunk succeeded without a usable index");
 
 coll.remove({ num : 100 });
+db.getLastError();
 coll.reIndex();
+db.getLastError();
 var result4 = admin.runCommand( { movechunk : coll.getFullName() , find : { num : 70 } , to : s.getOther( s.getServer( "test" ) ).name } );
 printjson( result4 );
 assert.eq( 1, result4.ok , "moveChunk failed after rebuilding index");
