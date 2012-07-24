@@ -172,7 +172,7 @@ namespace DocumentTests {
                 assertComparison( 0, BSON( "a" << 2 ), BSON( "a" << 2 ) );
                 assertComparison( -1, BSON( "a" << 1 ), BSON( "a" << 2 ) );
                 assertComparison( -1, BSON( "a" << 1 << "b" << 1 ), BSON( "a" << 1 << "b" << 2 ) );
-                ASSERT_THROWS( assertComparison( NULL, BSON( "a" << 1 ), BSON( "a" << "foo" ) ),
+                ASSERT_THROWS( assertComparison( 0, BSON( "a" << 1 ), BSON( "a" << "foo" ) ),
                                UserException );
             }
         public:
@@ -1057,8 +1057,8 @@ namespace DocumentTests {
                 }
 
                 // Otherwise comparing different types is not supported.
-                ASSERT_THROWS( assertComparison( NULL, 90, "abc" ), UserException );
-                ASSERT_THROWS( assertComparison( NULL, 90, BSON( "a" << "b" ) ), UserException );
+                ASSERT_THROWS( assertComparison( 0, 90, "abc" ), UserException );
+                ASSERT_THROWS( assertComparison( 0, 90, BSON( "a" << "b" ) ), UserException );
 
                 // String comparison.
                 assertComparison( -1, "", "a" );
@@ -1085,7 +1085,7 @@ namespace DocumentTests {
                 assertComparison( -1, fromjson( "{'':[0,0]}" ), fromjson( "{'':[1]}" ) );
                 assertComparison( -1, fromjson( "{'':[0]}" ), fromjson( "{'':[0,0]}" ) );
                 // Assertion on nested type mismatch.
-                ASSERT_THROWS( assertComparison( NULL, fromjson( "{'':[0]}" ),
+                ASSERT_THROWS( assertComparison( 0, fromjson( "{'':[0]}" ),
                                                  fromjson( "{'':['']}" ) ),
                                UserException );
 
