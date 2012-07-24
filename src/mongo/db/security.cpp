@@ -34,6 +34,7 @@ namespace mongo {
     void AuthenticationInfo::setTemporaryAuthorization( BSONObj& obj ) {
         fassert( 16232, !_usingTempAuth );
         scoped_spinlock lk( _lock );
+        LOG(5) << "Setting temporary authorization to: " << obj << endl;
         _tempAuthTable.setFromBSON( obj );
         _usingTempAuth = true;
     }
