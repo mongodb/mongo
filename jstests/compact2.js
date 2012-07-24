@@ -9,7 +9,7 @@ t.drop();
  * version, and that the unique and background fields are set correctly.
  */
 function assertIndex( expectedVersion, unique, background ) {
-    indexSpec = db.system.indexes.findOne( { ns:t, key:{ date:1 } } );
+    indexSpec = db.system.indexes.findOne( { ns:t.toString(), key:{ date:1 } } );
     // The index version is as expected.
     assert.eq( expectedVersion, indexSpec.v );
     // The index uniqueness is as expected (treat missing and false unique specs as equivalent).
