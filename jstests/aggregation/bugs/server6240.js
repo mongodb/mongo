@@ -31,7 +31,7 @@ var s6240add = db.runCommand(
             add: { $add: ["$date", 2] }
     }}
 ]});
-check_answer(s6240add, 16377);
+check_answer(s6240add, 16415);
 
 
 // Divide

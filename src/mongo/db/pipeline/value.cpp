@@ -207,6 +207,16 @@ namespace mongo {
         return pValue;
     }
 
+    intrusive_ptr<const Value> Value::createIntOrLong(long long value) {
+        if (value > numeric_limits<int>::max() || value < numeric_limits<int>::min()) {
+            // it is too large to be an int and should remain a long
+            return new Value(value);
+        }
+
+        // should be an int since all arguments were int and it fits
+        return createInt(value);
+    }
+
     Value::Value(long long longValue):
         type(NumberLong),
         pDocumentValue(),

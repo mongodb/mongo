@@ -339,83 +339,13 @@ namespace mongo {
     ExpressionAdd::~ExpressionAdd() {
     }
 
-    intrusive_ptr<Expression> ExpressionAdd::optimize() {
-        intrusive_ptr<Expression> pE(ExpressionNary::optimize());
-        ExpressionAdd *pA = dynamic_cast<ExpressionAdd *>(pE.get());
-        if (pA) {
-            /* don't create a circular reference */
-            if (pA != this)
-                pA->pAdd = this;
-        }
-
-        return pE;
-    }
-
     intrusive_ptr<ExpressionNary> ExpressionAdd::create() {
         intrusive_ptr<ExpressionAdd> pExpression(new ExpressionAdd());
         return pExpression;
     }
 
-    ExpressionAdd::ExpressionAdd():
-        ExpressionNary(),
-        useOriginal(false) {
-    }
-
     intrusive_ptr<const Value> ExpressionAdd::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
-        unsigned stringCount = 0;
-        unsigned nonConstStringCount = 0;
-        unsigned dateCount = 0;
-        const size_t n = vpOperand.size();
-        vector<intrusive_ptr<const Value> > vpValue; /* evaluated operands */
-
-        /* use the original, if we've been told to do so */
-        if (useOriginal) {
-            return pAdd->evaluate(pDocument);
-        }
-
-        for (size_t i = 0; i < n; ++i) {
-            intrusive_ptr<const Value> pValue(
-                vpOperand[i]->evaluate(pDocument));
-            vpValue.push_back(pValue);
-
-            BSONType valueType = pValue->getType();
-            if (valueType == String) {
-                ++stringCount;
-                if (!dynamic_cast<ExpressionConstant *>(vpOperand[i].get()))
-                    ++nonConstStringCount;
-            }
-            else if (valueType == Date)
-                ++dateCount;
-        }
-
-        uassert(16377, "$add does not support dates", !dateCount);
-
-        /*
-          If there are non-constant strings, and we've got a copy of the
-          original, then use that from this point forward.  This is necessary
-          to keep the order of strings the same for string concatenation;
-          constant-folding would violate the order preservation.
-
-          This is a one-way conversion we do if we see one of these.  It is
-          possible that these could vary from document to document, but any
-          sane schema probably isn't going to do that, so once we see a string,
-          we can probably assume they're going to be strings all the way down.
-         */
-        if (nonConstStringCount && pAdd.get()) {
-            useOriginal = true;
-            return pAdd->evaluate(pDocument);
-        }
-
-        if (stringCount) {
-            stringstream stringTotal;
-            for (size_t i = 0; i < n; ++i) {
-                intrusive_ptr<const Value> pValue(vpValue[i]);
-                stringTotal << pValue->coerceToString();
-            }
-
-            return Value::createString(stringTotal.str());
-        }
 
         /*
           We'll try to return the narrowest possible result value.  To do that
@@ -426,19 +356,34 @@ namespace mongo {
         double doubleTotal = 0;
         long long longTotal = 0;
         BSONType totalType = NumberInt;
-        for(size_t i = 0; i < n; ++i) {
-            intrusive_ptr<const Value> pValue(vpValue[i]);
+
+        const size_t n = vpOperand.size();
+        for (size_t i = 0; i < n; ++i) {
+            intrusive_ptr<const Value> pValue(vpOperand[i]->evaluate(pDocument));
+
+            BSONType valueType = pValue->getType();
+            uassert(16415, "$add does not support dates",
+                    valueType != Date);
+            uassert(16416, "$add does not support strings",
+                    valueType != String);
 
             totalType = Value::getWidestNumeric(totalType, pValue->getType());
             doubleTotal += pValue->coerceToDouble();
             longTotal += pValue->coerceToLong();
         }
 
-        if (totalType == NumberDouble)
-            return Value::createDouble(doubleTotal);
-        if (totalType == NumberLong)
+        if (totalType == NumberLong) {
             return Value::createLong(longTotal);
-        return Value::createInt((int)longTotal);
+        }
+        else if (totalType == NumberDouble) {
+            return Value::createDouble(doubleTotal);
+        }
+        else if (totalType == NumberInt) {
+            return Value::createIntOrLong(longTotal);
+        }
+        else {
+            massert(16417, "$add resulted in a non-numeric type", false);
+        }
     }
 
     const char *ExpressionAdd::getOpName() const {
@@ -448,16 +393,6 @@ namespace mongo {
     intrusive_ptr<ExpressionNary> (*ExpressionAdd::getFactory() const)() {
         return ExpressionAdd::create;
     }
-
-    void ExpressionAdd::toBson(
-        BSONObjBuilder *pBuilder, const char *pOpName) const {
-
-        if (pAdd)
-            pAdd->toBson(pBuilder, pOpName);
-        else
-            ExpressionNary::toBson(pBuilder, pOpName);
-    }
-
 
     /* ------------------------- ExpressionAnd ----------------------------- */
 

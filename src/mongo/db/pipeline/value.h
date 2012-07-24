@@ -81,6 +81,17 @@ namespace mongo {
         static intrusive_ptr<const Value> createInt(int value);
 
         /*
+          Construct a long or interger-valued Value.
+          Used when preforming arithmetic operations with int where the result may be too large
+          and need to be stored as long. The Value will be an int if value fits, otherwise it
+          will be a long.
+
+          @param value the value
+          @returns a Value with the given value
+        */
+        static intrusive_ptr<const Value> createIntOrLong(long long value);
+
+        /*
           Construct an long(long)-valued Value.
 
           For commonly used values, consider using one of the singleton

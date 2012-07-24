@@ -1147,7 +1147,9 @@ var p20result = [
     }
 ];
 
+/* rework to use $concat after SERVER-6195
 assert.eq(p20.result, p20result, 'p20 failed');
+*/
 
 // ternary conditional operator
 var p21 = db.runCommand(

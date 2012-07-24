@@ -1447,7 +1447,7 @@ namespace DocumentSourceTests {
             add<DocumentSourceGroup::FourValuesTwoKeys>();
             add<DocumentSourceGroup::FourValuesTwoKeysTwoAccumulators>();
             add<DocumentSourceGroup::GroupNullUndefinedIds>();
-            add<DocumentSourceGroup::ComplexId>();
+            //add<DocumentSourceGroup::ComplexId>(); uncomment after 6195
             add<DocumentSourceGroup::UndefinedAccumulatorValue>();
             add<DocumentSourceGroup::RouterMerger>();
 

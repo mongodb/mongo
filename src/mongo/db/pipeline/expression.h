@@ -311,9 +311,7 @@ namespace mongo {
     public:
         // virtuals from Expression
         virtual ~ExpressionAdd();
-        virtual intrusive_ptr<Expression> optimize();
-        virtual intrusive_ptr<const Value> evaluate(
-            const intrusive_ptr<Document> &pDocument) const;
+        virtual intrusive_ptr<const Value> evaluate(const intrusive_ptr<Document> &pDocument) const;
         virtual const char *getOpName() const;
 
         // virtuals from ExpressionNary
@@ -325,24 +323,6 @@ namespace mongo {
           @returns addition expression
          */
         static intrusive_ptr<ExpressionNary> create();
-
-    protected:
-        // virtuals from ExpressionNary
-        virtual void toBson(BSONObjBuilder *pBuilder,
-                            const char *pOpName) const;
-
-    private:
-        ExpressionAdd();
-
-        /*
-          If the operator can be optimized, we save the original here.
-
-          This is necessary because addition must follow its original operand
-          ordering strictly if a string is detected, otherwise string
-          concatenation may appear to have re-ordered the operands.
-         */
-        intrusive_ptr<ExpressionAdd> pAdd;
-        mutable bool useOriginal;
     };
 
 
