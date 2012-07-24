@@ -1,3 +1,23 @@
+/* load the test utilities */
+load('jstests/aggregation/extras/utils.js');
+// should fail due to explain being disables
+/* sample aggregate explain command queries */
+// make sure we're using the right db; this is the same as "use mydb;" in shell
+db = db.getSisterDB("aggdb");
+
+var eg2 = db.runCommand({ aggregate : "article", explain: true,
+                          splitMongodPipeline: true, pipeline : [
+    { $project : {
+        author : 1,
+        tags : 1,
+        pageViews : 1
+    }}
+]});
+
+eg2result = { "errmsg" : "unrecognized field \"explain", "ok" : 0 };
+assert(documentEq(eg2, eg2result), 'explain should be disabled');
+
+// Disable explain tests
 if ( 0 ) {
 
 /* load the test documents */
@@ -17,6 +37,7 @@ function removeVariants(ed) {
 /* sample aggregate explain command queries */
 // make sure we're using the right db; this is the same as "use mydb;" in shell
 db = db.getSisterDB("aggdb");
+
 
 // $max, and averaging in a final projection; _id is structured
 var eg2 = db.runCommand({ aggregate : "article", explain: true,
@@ -400,7 +421,7 @@ var edi2result = {
     "serverPipeline" : [
         {
             "query" : {
-                
+
             },
             "sort" : {
                 "d" : 1
