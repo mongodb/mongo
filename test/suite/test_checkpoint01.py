@@ -49,23 +49,32 @@ class CheckpointTest(wttest.WiredTigerTestCase):
 	}
     URI = "file:__checkpoint"
 
-    def create_session(self):
-	config = "key_format=S,value_format=S,leaf_page_max=512"
-	self.session.create(self.URI, config)
-
-    def test_checkpoint(self):
-	self.create_session()
-	self.build_file_with_checkpoints()
-	for checkpoint_name, size in self.checkpoints.iteritems():
-	    self.check(checkpoint_name)
-	self.cursor_lock()
-	self.drop()
-
+    # For each checkpoint entry, add/overwrite the specified records, then
+    # checkpoint the object, and verify it (which verifies the underlying
+    # checkpoints individually.
     def build_file_with_checkpoints(self):
 	for checkpoint_name, sizes in self.checkpoints.iteritems():
 	    start, stop = sizes
 	    self.add_records(start, stop)
 	    self.session.checkpoint("name=%s" % checkpoint_name)
+	    self.assertEqual(0, self.session.verify(self.URI, None))
+
+    # For each checkpoint entry, verify it contains the records it should.
+    def check(self):
+	for checkpoint_name, sizes in self.checkpoints.iteritems():
+	    start, stop = sizes
+
+	    records = self.dump_records(checkpoint_name)
+	    snaps = self.dump_snap(checkpoint_name)
+	    self.assertEqual(records, snaps)
+
+    def test_checkpoint(self):
+	config = "key_format=S,value_format=S,leaf_page_max=512"
+	self.session.create(self.URI, config)
+	self.build_file_with_checkpoints()
+	self.check()
+	self.cursor_lock()
+	self.drop()
     
     def add_records(self, start, stop):
 	cursor = self.session.open_cursor(self.URI, None, "overwrite")
@@ -79,7 +88,7 @@ class CheckpointTest(wttest.WiredTigerTestCase):
 		self.fail("cursor.insert(): %s" % result)
 	cursor.close()
 	    
-    def dump_records(self, checkpoint_name, filename):
+    def dump_records(self, checkpoint_name):
 	records = []
 	for checkpoint, sizes in self.checkpoints.iteritems():
 	    sizes = self.checkpoints[checkpoint]
@@ -90,12 +99,7 @@ class CheckpointTest(wttest.WiredTigerTestCase):
 		break;
 	return records.sort()
 
-    def check(self, checkpoint_name):
-	records = self.dump_records(checkpoint_name, "__dump.1")
-	snaps = self.dump_snap(checkpoint_name, "__dump.2")
-	self.assertEqual(records, snaps)
-
-    def dump_snap(self, checkpoint_name, filename):
+    def dump_snap(self, checkpoint_name):
 	snaps = []
 	buf = "checkpoint=%s" % checkpoint_name
 	cursor = self.session.open_cursor(self.URI, None, buf)
