@@ -114,16 +114,19 @@ doTest = function( signal ) {
   config.version++;
   config.members[3].slaveDelay = 15;
 
-  master = reconfig(replTest, config);
-  master = master.getSisterDB(name);
+  reconfig(replTest, config);
+  master = replTest.getMaster().getDB(name);
   assert.soon(function() {
           return conn.getDB("local").system.replset.findOne().version == config.version;
       });
 
   assert.soon(function() {
-      return conn.getDB("admin").isMaster().secondary;
+      var result = conn.getDB("admin").isMaster();
+      printjson(result);
+      return result.secondary;
   });
 
+  print("testing insert");
   master.foo.insert({_id : 124, "x" : "foo"});
   assert(master.foo.findOne({_id:124}) != null);
 
