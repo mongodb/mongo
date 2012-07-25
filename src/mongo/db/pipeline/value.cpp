@@ -124,7 +124,7 @@ namespace mongo {
             break;
 
         case String:
-            stringValue = pBsonElement->String();
+            stringValue = pBsonElement->str();
             break;
 
         case Object: {

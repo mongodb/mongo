@@ -193,7 +193,7 @@ namespace mongo {
                     idSet = true;
                 }
                 else if (groupType == String) {
-                    string groupString(groupField.String());
+                    string groupString(groupField.str());
                     const char *pGroupString = groupString.c_str();
                     if ((groupString.length() == 0) ||
                         (pGroupString[0] != '$'))

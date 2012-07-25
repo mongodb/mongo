@@ -47,6 +47,9 @@ namespace mongo {
     }
 
     string Expression::removeFieldPrefix(const string &prefixedField) {
+        uassert(16419, str::stream()<<"field path must not contain embedded null characters" << prefixedField.find("\0") << "," ,
+                prefixedField.find('\0') == string::npos);
+
         const char *pPrefixedField = prefixedField.c_str();
         uassert(15982, str::stream() <<
                 "field path references must be prefixed with a '$' (\"" <<
@@ -128,7 +131,7 @@ namespace mongo {
                         // CW TODO could also be a constant
                         intrusive_ptr<Expression> pPath(
                             ExpressionFieldPath::create(
-                                removeFieldPrefix(fieldElement.String())));
+                                removeFieldPrefix(fieldElement.str())));
                         pExpressionObject->addField(fieldName, pPath);
                         break;
                     }
@@ -300,7 +303,7 @@ namespace mongo {
               again in the constant code path.
             */
             BSONElement opCopy(*pBsonElement);
-            string value(opCopy.String());
+            string value(opCopy.str());
 
             /* check for a field path */
             if (value[0] != '$')

@@ -283,7 +283,7 @@ namespace mongo {
                 " field path must be specified as a string",
                 pBsonElement->type() == String);
 
-        string prefixedPathString(pBsonElement->String());
+        string prefixedPathString(pBsonElement->str());
         string pathString(Expression::removeFieldPrefix(prefixedPathString));
         intrusive_ptr<DocumentSourceUnwind> pUnwind(new DocumentSourceUnwind(pExpCtx));
         pUnwind->unwindPath(FieldPath(pathString));
