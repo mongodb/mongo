@@ -26,7 +26,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 # test_base02.py
-# 	Configuration
+#    Configuration
 #
 
 import json
@@ -37,12 +37,12 @@ class test_base02(wttest.WiredTigerTestCase):
     name = 'test_base02a'
 
     scenarios = [
-	    ('file', dict(uri='file:')),
-	    ('table', dict(uri='table:'))
-	    ]
+        ('file', dict(uri='file:')),
+        ('table', dict(uri='table:'))
+        ]
 
     def create_and_drop(self, confstr):
-	name = self.uri + self.name
+        name = self.uri + self.name
         self.pr('create_and_drop: ' + name + ": " + confstr)
         self.session.create(name, confstr)
         self.session.drop(name, None)
@@ -82,11 +82,11 @@ class test_base02(wttest.WiredTigerTestCase):
         conf_jsonstr = [
             json.dumps({'columns' : ('key', 'value')}),
             json.dumps({
-                    "key_format" : "r",
-                    "value_format" : "5sHQ",
-                    "columns" : ("id", "country", "year", "population"),
-                    "colgroups" : ("cyear", "population"),
-			})]
+                "key_format" : "r",
+                "value_format" : "5sHQ",
+                "columns" : ("id", "country", "year", "population"),
+                "colgroups" : ("cyear", "population"),
+                    })]
         for confstr in conf_jsonstr:
             self.create_and_drop(confstr)
 
