@@ -93,20 +93,6 @@ int main() {
 
     bo sub = y["subobj"].Obj();
 
-    /* grab all the int's that were in subobj.  if it had elements that were not ints, we throw an exception
-       (capital V on Vals() means exception if wrong type found
-    */
-    vector<int> myints;
-    sub.Vals(myints);
-    cout << "my ints: " << myints[0] << ' ' << myints[1] << endl;
-
-    /* grab all the string values from x.  if the field isn't of string type, just skip it --
-       lowercase v on vals() indicates skip don't throw.
-    */
-    vector<string> strs;
-    x.vals(strs);
-    cout << strs.size() << " strings, first one: " << strs[0] << endl;
-
     iter(y);
     return 0;
 }

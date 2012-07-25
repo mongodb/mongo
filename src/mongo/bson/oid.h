@@ -32,7 +32,7 @@ namespace mongo {
         When _id field is missing from a BSON object, on an insert the database may insert one
         automatically in certain circumstances.
 
-        Warning: You must call OID::newState() after a fork().
+        Warning: You must call OID::justForked() after a fork().
 
         Typical contents of the BSON ObjectID is a 12-byte value consisting of a 4-byte timestamp (seconds since epoch),
         a 3-byte machine id, a 2-byte process id, and a 3-byte counter. Note that the timestamp and counter fields must
