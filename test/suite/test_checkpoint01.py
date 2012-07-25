@@ -127,21 +127,6 @@ class CheckpointTest(wttest.WiredTigerTestCase):
 	    lambda: self.session.checkpoint("drop=(from=checkpoint-1)"), r"")
 	cursor.close() 
 
-    def cursor_lock_deprecated(self):
-	buf = 'snapshot=snapshot-1'
-	cursor = self.session.open_cursor(self.URI, None, buf)
-	with self.assertRaises(wiredtiger.WiredTigerError) as cm:
-	    self.session.drop(self.URI, buf)
-	self.assertEqual(0, cursor.close())
-	cursor1 = self.session.open_cursor(self.URI, None, buf)
-	assert cursor1 != None
-	buf = 'snapshot=snapshot-2' 
-	cursor2 = self.session.open_cursor(self.URI, None, buf)
-	cursor3 = self.session.open_cursor(self.URI, None, None)
-	self.assertEqual(0, cursor1.close())
-	self.assertEqual(0, cursor2.close())
-	self.assertEqual(0, cursor3.close())
-
     def drop(self):
 	self.assertEqual(0, self.session.checkpoint("drop=(from=all)"))
 	self.assertEqual(0, self.session.verify(self.URI, None))
