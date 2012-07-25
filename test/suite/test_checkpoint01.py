@@ -46,11 +46,15 @@ class test_checkpoint(wttest.WiredTigerTestCase):
 	"checkpoint-8": (300, 820),
 	"checkpoint-9": (400, 920)
 	}
-    URI = "file:__checkpoint"
-    
+
+    scenarios = [
+	('file', dict(uri='file:checkpoint',fmt='S')),
+	('table', dict(uri='table:checkpoint',fmt='S'))
+	]
+
     # Add a set of records for a checkpoint.
     def add_records(self, name, start, stop):
-	cursor = self.session.open_cursor(self.URI, None, "overwrite")
+	cursor = self.session.open_cursor(self.uri, None, "overwrite")
 	for i in range(start, stop+1):
 	    cursor.set_key("%010d KEY------" % i)
 	    cursor.set_value("%010d VALUE "% i + name)
@@ -65,7 +69,7 @@ class test_checkpoint(wttest.WiredTigerTestCase):
 	    start, stop = sizes
 	    self.add_records(checkpoint_name, start, stop)
 	    self.session.checkpoint("name=" + checkpoint_name)
-	    self.session.verify(self.URI, None)
+	    self.session.verify(self.uri, None)
 	    
     # Create a dictionary of sorted records a checkpoint should include.
     def list_expected(self, name):
@@ -82,7 +86,7 @@ class test_checkpoint(wttest.WiredTigerTestCase):
     # Create a dictionary of sorted records a checkpoint does include.
     def list_checkpoint(self, name):
 	records = {}
-	cursor = self.session.open_cursor(self.URI, None, 'checkpoint=' + name)
+	cursor = self.session.open_cursor(self.uri, None, 'checkpoint=' + name)
 	while cursor.next() == 0:
 	    records[cursor.get_key()] = cursor.get_value()
 	cursor.close()
@@ -96,22 +100,22 @@ class test_checkpoint(wttest.WiredTigerTestCase):
 	    self.assertEqual(list_expected, list_checkpoint)
 
     def test_checkpoint(self):
-	config = "key_format=S,value_format=S,leaf_page_max=512"
-	self.session.create(self.URI, config)
+	self.session.create(self.uri,
+	    "key_format=" + self.fmt + ",value_format=S,leaf_page_max=512")
 	self.build_file_with_checkpoints()
 	self.check()
 	self.drop()
 
     def drop(self):
 	self.session.checkpoint("drop=(from=all)")
-	self.session.verify(self.URI, None)
+	self.session.verify(self.uri, None)
 
 # Check some specific cursor checkpoint combinations.
 class test_checkpoint_cursor(wttest.WiredTigerTestCase):
 
     scenarios = [
-	('file', dict(uri='file:truncate',fmt='S')),
-	('table', dict(uri='table:truncate',fmt='S'))
+	('file', dict(uri='file:checkpoint',fmt='S')),
+	('table', dict(uri='table:checkpoint',fmt='S'))
 	]
 
     # Check that you cannot open a checkpoint that doesn't exist.
