@@ -58,15 +58,34 @@ class CheckpointTest(wttest.WiredTigerTestCase):
 	    self.add_records(start, stop)
 	    self.session.checkpoint("name=%s" % checkpoint_name)
 	    self.session.verify(self.URI, None)
+	    
+    # Create a list of sorted records that a checkpoint should include.
+    def list_expected(self, checkpoint_name):
+	records = []
+	for checkpoint, sizes in self.checkpoints.iteritems():
+	    start, stop = sizes
+	    for i in range(start, stop+1):
+		records.append("%010d KEY------" % i)
+	    if checkpoint == checkpoint_name:
+		break;
+	return records.sort()
+
+    # Create a list of sorted records that a checkpoint does contain.
+    def list_checkpoint(self, checkpoint_name):
+	records = []
+	cursor = self.session.open_cursor(
+	    self.URI, None, 'checkpoint=' + checkpoint_name)
+	while cursor.next() == 0:
+	    records.append(cursor.get_key())
+	cursor.close()
+	return records.sort()
 
     # For each checkpoint entry, verify it contains the records it should.
     def check(self):
 	for checkpoint_name, sizes in self.checkpoints.iteritems():
-	    start, stop = sizes
-
-	    records = self.dump_records(checkpoint_name)
-	    snaps = self.dump_snap(checkpoint_name)
-	    self.assertEqual(records, snaps)
+	    expected = self.list_expected(checkpoint_name)
+	    checkpoint = self.list_checkpoint(checkpoint_name)
+	    self.assertEqual(expected, checkpoint)
 
     def test_checkpoint(self):
 	config = "key_format=S,value_format=S,leaf_page_max=512"
@@ -87,28 +106,6 @@ class CheckpointTest(wttest.WiredTigerTestCase):
 	    if result != 0:
 		self.fail("cursor.insert(): %s" % result)
 	cursor.close()
-	    
-    def dump_records(self, checkpoint_name):
-	records = []
-	for checkpoint, sizes in self.checkpoints.iteritems():
-	    sizes = self.checkpoints[checkpoint]
-	    start, stop = sizes
-	    for i in range(start, stop+1):
-		records.append("%010d KEY------\n%010d VALUE----\n" % (i, i))
-	    if checkpoint == checkpoint_name:
-		break;
-	return records.sort()
-
-    def dump_snap(self, checkpoint_name):
-	snaps = []
-	buf = "checkpoint=%s" % checkpoint_name
-	cursor = self.session.open_cursor(self.URI, None, buf)
-	while cursor.next() == 0:
-	    key =  cursor.get_key()
-	    value = cursor.get_value()
-	    snaps.append( "%s\n%s\n" % (key, value))
-	cursor.close()
-	return snaps.sort()
 
     def cursor_lock(self):
 	self.session.checkpoint("name=another_checkpoint")
