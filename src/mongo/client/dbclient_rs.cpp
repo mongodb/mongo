@@ -717,16 +717,21 @@ namespace mongo {
 
             if ( nodesOffset >= 0 ) {
                 scoped_lock lk( _lock );
+                Node& node = _nodes[nodesOffset];
 
-                // update ping time with smoothed moving averaged (1/4th the delta)
-                _nodes[nodesOffset].pingTimeMillis +=
-                        (commandTime - _nodes[nodesOffset].pingTimeMillis) / 4;
+                if (node.pingTimeMillis == 0) {
+                    node.pingTimeMillis = commandTime;
+                }
+                else {
+                    // update ping time with smoothed moving averaged (1/4th the delta)
+                    node.pingTimeMillis += (commandTime - node.pingTimeMillis) / 4;
+                }
 
-                _nodes[nodesOffset].hidden = o["hidden"].trueValue();
-                _nodes[nodesOffset].secondary = o["secondary"].trueValue();
-                _nodes[nodesOffset].ismaster = o["ismaster"].trueValue();
+                node.hidden = o["hidden"].trueValue();
+                node.secondary = o["secondary"].trueValue();
+                node.ismaster = o["ismaster"].trueValue();
 
-                _nodes[nodesOffset].lastIsMaster = o.copy();
+                node.lastIsMaster = o.copy();
             }
 
             log( ! verbose ) << "ReplicaSetMonitor::_checkConnection: " << conn->toString()
