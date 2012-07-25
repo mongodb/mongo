@@ -33,12 +33,7 @@
 # verify snapshots data inside check(). Then we test cursor locks and finally
 # we drop the snapshots.
 
-import os
-import sys
-import traceback
-import unittest
-import wiredtiger
-import wttest
+import wiredtiger, wttest
 
 class CheckpointTest(wttest.WiredTigerTestCase):
     checkpoints = {
