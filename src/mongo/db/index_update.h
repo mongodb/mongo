@@ -43,7 +43,8 @@ namespace mongo {
                              NamespaceDetails *d,
                              int idxNo,
                              const BSONObj& obj,
-                             DiskLoc recordLoc);
+                             DiskLoc recordLoc,
+                             const bool allowDups = false);
 
     bool dropIndexes( NamespaceDetails *d, const char *ns, const char *name, string &errmsg, BSONObjBuilder &anObjBuilder, bool maydeleteIdIndex );
 

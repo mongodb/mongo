@@ -72,7 +72,7 @@ namespace mongo {
         for ( int indexNo = 0; indexNo < indexCount; indexNo++ ) {
             // This will page in all index pages for the given object.
             try {
-                fetchIndexInserters(/*out*/unusedKeys, inserter, nsd, indexNo, obj, unusedDl);
+                fetchIndexInserters(/*out*/unusedKeys, inserter, nsd, indexNo, obj, unusedDl, /*allowDups*/true);
             }
             catch (const DBException& e) {
                 LOG(2) << "ignoring exception in prefetchIndexPages(): " << e.what() << endl;

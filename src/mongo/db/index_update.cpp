@@ -84,12 +84,13 @@ namespace mongo {
                              NamespaceDetails *d,
                              int idxNo,
                              const BSONObj& obj,
-                             DiskLoc recordLoc) {
+                             DiskLoc recordLoc,
+                             const bool allowDups) {
         IndexDetails &idx = d->idx(idxNo);
         idx.getKeysFromObject(obj, keys);
         if( keys.empty() )
             return;
-        bool dupsAllowed = !idx.unique();
+        bool dupsAllowed = !idx.unique() || allowDups;
         Ordering ordering = Ordering::make(idx.keyPattern());
         
         try {
