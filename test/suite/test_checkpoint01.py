@@ -144,4 +144,4 @@ class CheckpointTest(wttest.WiredTigerTestCase):
 
     def drop(self):
 	self.assertEqual(0, self.session.checkpoint("drop=(from=all)"))
-	#self.assertEqual(0, self.session.verify(self.URI, None))
+	self.assertEqual(0, self.session.verify(self.URI, None))
