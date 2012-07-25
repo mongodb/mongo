@@ -48,12 +48,9 @@ class CheckpointTest(wttest.WiredTigerTestCase):
             "checkpoint-9": (400, 920)
             }
     URI = "file:__checkpoint"
-    def setUpConnectionOpen(self, dir):
-        conn = wiredtiger.wiredtiger_open(dir, "create, cache_size=100MB")
-        self.pr('conn')
-        return conn
+
     def create_session(self):
-        config = "key_format=S, value_format=S, internal_page_max=512, leaf_page_max=512"
+        config = "key_format=S,value_format=S,leaf_page_max=512"
         self.session.create(self.URI, config)
 
     def test_checkpoint(self):
