@@ -46,6 +46,8 @@ class test_checkpoint(wttest.WiredTigerTestCase):
 	"checkpoint-8": (300, 820),
 	"checkpoint-9": (400, 920)
 	}
+    checkpoints_deleted = {
+	}
 
     scenarios = [
 	('file', dict(uri='file:checkpoint',fmt='S')),
@@ -69,7 +71,6 @@ class test_checkpoint(wttest.WiredTigerTestCase):
 	    start, stop = sizes
 	    self.add_records(checkpoint_name, start, stop)
 	    self.session.checkpoint("name=" + checkpoint_name)
-	    self.session.verify(self.uri, None)
 	    
     # Create a dictionary of sorted records a checkpoint should include.
     def list_expected(self, name):
@@ -92,23 +93,55 @@ class test_checkpoint(wttest.WiredTigerTestCase):
 	cursor.close()
 	return records
 
-    # For each checkpoint entry, verify it contains the records it should.
+    # For each existing checkpoint entry, verify it contains the records it
+    # should, and no other checkpoints exist.
     def check(self):
-	for checkpoint_name, sizes in self.checkpoints.iteritems():
-	    list_expected = self.list_expected(checkpoint_name)
-	    list_checkpoint = self.list_checkpoint(checkpoint_name)
-	    self.assertEqual(list_expected, list_checkpoint)
+	# Physically verify the file, including the individual checkpoints.
+	self.session.verify(self.uri, None)
 
+	for checkpoint_name, sizes in self.checkpoints.iteritems():
+		list_expected = self.list_expected(checkpoint_name)
+		list_checkpoint = self.list_checkpoint(checkpoint_name)
+		self.assertEqual(list_expected, list_checkpoint)
+
+	msg = '/no.*checkpoint found/'
+	for checkpoint_name, sizes in self.checkpoints_deleted.iteritems():
+	    self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+	    lambda: self.session.open_cursor(
+	    self.uri, None, "checkpoint=" + checkpoint_name), msg)
+
+    # Main checkpoint test driver.
     def test_checkpoint(self):
+	# Build a file with a set of checkpoints, and confirm they all have
+	# the correct key/value pairs.
 	self.session.create(self.uri,
 	    "key_format=" + self.fmt + ",value_format=S,leaf_page_max=512")
 	self.build_file_with_checkpoints()
 	self.check()
-	self.drop()
 
-    def drop(self):
-	self.session.checkpoint("drop=(from=all)")
-	self.session.verify(self.uri, None)
+	'''
+	XXX
+	Waiting on issue #269
+	# Drop a set of checkpoints, and confirm the contents of remaining
+	# checkpoints, and that dropped checkpoints don't appear.
+	for i in [1,3,7,9]:
+	    checkpoint_name = 'checkpoint-' + str(i)
+	    self.session.checkpoint('drop=(' + checkpoint_name + ')')
+	    self.checkpoints_deleted[checkpoint_name] =\
+		self.checkpoints[checkpoint_name]
+	    del self.checkpoints[checkpoint_name]
+	    self.check()
+
+	# Drop remaining checkpoints; we have to name the checkpoint, else
+	# closed files won't be checkpointed.  That should have removed all
+	# of the checkpoints, and subsequent opens should fail.
+	self.session.checkpoint("name=final,drop=(from=all)")
+	for checkpoint_name, sizes in self.checkpoints.iteritems():
+	    self.checkpoints_deleted[checkpoint_name] =\
+		self.checkpoints[checkpoint_name]
+	    del self.checkpoints[checkpoint_name]
+	self.check()
+	'''
 
 # Check some specific cursor checkpoint combinations.
 class test_checkpoint_cursor(wttest.WiredTigerTestCase):
@@ -196,8 +229,7 @@ class test_checkpoint_target(wttest.WiredTigerTestCase):
 	cursor.close()
 
     def test_checkpoint_target(self):
-	# Create 3 objects, change one record to an easily recognizable string
-	# and checkpoint them.
+	# Create 3 objects, change one record to an easily recognizable string.
 	uri = self.uri + '1'
 	simplePopulate(self, uri, 'key_format=' + self.fmt, 100)
 	self.update(uri, 'ORIGINAL')
@@ -208,9 +240,11 @@ class test_checkpoint_target(wttest.WiredTigerTestCase):
 	simplePopulate(self, uri, 'key_format=' + self.fmt, 100)
 	self.update(uri, 'ORIGINAL')
 
+	# Checkpoint all three objects.
 	self.session.checkpoint("name=checkpoint-1")
 
-	# Update all 3 objects, then checkpoint two of the objects.
+	# Update all 3 objects, then checkpoint two of the objects with the
+	# same checkpoint name.
 	self.update(self.uri + '1', 'UPDATE')
 	self.update(self.uri + '2', 'UPDATE')
 	self.update(self.uri + '3', 'UPDATE')
