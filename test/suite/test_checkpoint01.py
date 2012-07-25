@@ -29,7 +29,7 @@
 # 	Checkpoint tests
 
 import wiredtiger, wttest
-from helper import simplePopulate
+from helper import keyPopulate, simplePopulate
 
 # General checkpoint test: create an object containing sets of data associated
 # with a set of checkpoints, then confirm the checkpoint's values are correct,
@@ -112,7 +112,6 @@ class test_checkpoint(wttest.WiredTigerTestCase):
 
 # Check some specific cursor checkpoint combinations.
 class test_checkpoint_cursor(wttest.WiredTigerTestCase):
-
     scenarios = [
 	('file', dict(uri='file:checkpoint',fmt='S')),
 	('table', dict(uri='table:checkpoint',fmt='S'))
@@ -174,3 +173,52 @@ class test_checkpoint_cursor(wttest.WiredTigerTestCase):
 	cursor.close()
 	self.session.checkpoint("drop=(checkpoint-2)")
 	self.session.checkpoint("drop=(from=all)")
+
+# Check that you can checkpoint targets.
+class test_checkpoint_target(wttest.WiredTigerTestCase):
+    scenarios = [
+	('file', dict(uri='file:checkpoint',fmt='S')),
+	('table', dict(uri='table:checkpoint',fmt='S'))
+	]
+
+    def update(self, uri, value):
+	cursor = self.session.open_cursor(uri, None, "overwrite")
+	cursor.set_key(keyPopulate(self.fmt, 10))
+	cursor.set_value(value)
+	cursor.insert()
+	cursor.close()
+
+    def check(self, uri, value):
+	cursor = self.session.open_cursor(uri, None, "checkpoint=checkpoint-1")
+	cursor.set_key(keyPopulate(self.fmt, 10))
+	cursor.search()
+	self.assertEquals(cursor.get_value(), value)
+	cursor.close()
+
+    def test_checkpoint_target(self):
+	# Create 3 objects, change one record to an easily recognizable string
+	# and checkpoint them.
+	uri = self.uri + '1'
+	simplePopulate(self, uri, 'key_format=' + self.fmt, 100)
+	self.update(uri, 'ORIGINAL')
+	uri = self.uri + '2'
+	simplePopulate(self, uri, 'key_format=' + self.fmt, 100)
+	self.update(uri, 'ORIGINAL')
+	uri = self.uri + '3'
+	simplePopulate(self, uri, 'key_format=' + self.fmt, 100)
+	self.update(uri, 'ORIGINAL')
+
+	self.session.checkpoint("name=checkpoint-1")
+
+	# Update all 3 objects, then checkpoint two of the objects.
+	self.update(self.uri + '1', 'UPDATE')
+	self.update(self.uri + '2', 'UPDATE')
+	self.update(self.uri + '3', 'UPDATE')
+	target = 'target=("' + self.uri + '1"' + ',"' + self.uri + '2")'
+	self.session.checkpoint("name=checkpoint-1," + target)
+
+	# Confirm the checkpoint has the old value in objects that weren't
+	# checkpointed, and the new value in objects that were checkpointed.
+	self.check(self.uri + '1', 'UPDATE')
+	self.check(self.uri + '2', 'UPDATE')
+	self.check(self.uri + '3', 'ORIGINAL')
