@@ -21,14 +21,6 @@
 
 namespace BSONObjTests {
 
-	inline void iter(mongo::BSONObj o) {
-		/* iterator example */
-		cout << "\niter()\n";
-		for( mongo::BSONObj::iterator i(o); i.more(); ) {
-			cout << ' ' << i.next().toString() << '\n';
-		}
-	}
-
 	class Base {
     public:
         Base( const std::string& name )
@@ -38,7 +30,7 @@ namespace BSONObjTests {
         virtual ~Base() {
         }
 
-        const char * ns() { return _ns.c_str(); }
+        const char * ns() const { return _ns.c_str(); }
     private:
         const std::string _ns;
     };
@@ -86,41 +78,51 @@ namespace BSONObjTests {
 			*/
 			mongo::BSONObj y = BSON( "x" << "asdf" << "y" << true << "subobj" << BSON( "z" << 3 << "q" << 4 ) );
 
-			/* print it */
-			cout << "y: " << y << endl;
-
-			/* reach in and get subobj.z */
-			cout << "subobj.z: " << y.getFieldDotted("subobj.z").Number() << endl;
-
-			/* alternate syntax: */
-			cout << "subobj.z: " << y["subobj"]["z"].Number() << endl;
+			myStream.str("");
+			myStream << y;
+			ASSERT_EQUALS("{ x: \"asdf\", y: true, subobj: { z: 3, q: 4 } }", myStream.str());
+			ASSERT_EQUALS(3, y.getFieldDotted("subobj.z").Number());
+			ASSERT_EQUALS(3, y["subobj"]["z"].Number());
 
 			/* fetch all *top level* elements from object y into a vector */
-			vector<mongo::BSONElement> v;
-			y.elems(v);
-			cout << v[0] << endl;
+			std::vector<mongo::BSONElement> myVector;
+			y.elems(myVector);
+
+			ASSERT_EQUALS(3u, myVector.size());
+
+			myStream.str("");
+			myStream << myVector[0];
+			ASSERT_EQUALS("x: \"asdf\"", myStream.str());
+			ASSERT_EQUALS("asdf", myVector[0].String());
+			ASSERT_TRUE(myVector[1].Bool());
+			ASSERT_EQUALS("subobj: { z: 3, q: 4 }", myVector[2].toString());
 
 			/* into an array */
-			list<mongo::BSONElement> L;
-			y.elems(L);
+			typedef std::list<mongo::BSONElement> BSONElementList;
+			BSONElementList myList;
+			y.elems(myList);
+
+			ASSERT_EQUALS(3u, myList.size());
+			BSONElementList::const_iterator myIt = myList.begin();
+			myStream.str("");
+			myStream << *myIt;
+			ASSERT_EQUALS("x: \"asdf\"", myStream.str());
+			++myIt;
+			ASSERT_TRUE((*myIt).Bool());
+			++myIt;
+			ASSERT_EQUALS("subobj: { z: 3, q: 4 }", (*myIt).toString());
 
 			mongo::BSONObj sub = y["subobj"].Obj();
+			ASSERT_EQUALS("{ z: 3, q: 4 }", sub.toString());
 
-			/* grab all the int's that were in subobj.  if it had elements that were not ints, we throw an exception
-			   (capital V on Vals() means exception if wrong type found
-			*/
-		//    vector<int> myints;
-		//    sub.Vals(myints);
-		//    cout << "my ints: " << myints[0] << ' ' << myints[1] << endl;
-
-			/* grab all the string values from x.  if the field isn't of string type, just skip it --
-			   lowercase v on vals() indicates skip don't throw.
-			*/
-		//    vector<string> strs;
-		//    x.vals(strs);
-		//    cout << strs.size() << " strings, first one: " << strs[0] << endl;
-
-			iter(y);
+			mongo::BSONObj::iterator myBSONIterator(y);
+			ASSERT_TRUE(myBSONIterator.more());
+			ASSERT_EQUALS("x: \"asdf\"", myBSONIterator.next().toString());
+			ASSERT_TRUE(myBSONIterator.more());
+			ASSERT_EQUALS("y: true", myBSONIterator.next().toString());
+			ASSERT_TRUE(myBSONIterator.more());
+			ASSERT_EQUALS("subobj: { z: 3, q: 4 }", myBSONIterator.next().toString());
+			ASSERT_FALSE(myBSONIterator.more());
 		}
 	};
 
