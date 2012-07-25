@@ -523,7 +523,7 @@ namespace mongo {
 
     } clientListPlugin;
 
-    int Client::recommendedYieldMicros( int * writers , int * readers ) {
+    int Client::recommendedYieldMicros( int * writers , int * readers, bool needExact ) {
         int num = 0;
         int w = 0;
         int r = 0;
@@ -538,6 +538,8 @@ namespace mongo {
                     else
                         r++;
                 }
+                if (num > 100 && !needExact)
+                    break;
             }
         }
 

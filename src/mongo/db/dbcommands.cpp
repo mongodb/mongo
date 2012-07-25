@@ -474,7 +474,7 @@ namespace mongo {
                 {
                     BSONObjBuilder ttt( t.subobjStart( "currentQueue" ) );
                     int w=0, r=0;
-                    Client::recommendedYieldMicros( &w , &r );
+                    Client::recommendedYieldMicros( &w , &r, true );
                     ttt.append( "total" , w + r );
                     ttt.append( "readers" , r );
                     ttt.append( "writers" , w );
