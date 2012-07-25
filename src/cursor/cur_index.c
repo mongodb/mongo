@@ -116,7 +116,7 @@ __curindex_next(WT_CURSOR *cursor)
 
 	cindex = (WT_CURSOR_INDEX *)cursor;
 	CURSOR_API_CALL_NOCONF(cursor, session, next, cindex->cbt.btree);
-	if ((ret = __wt_btcur_next(&cindex->cbt)) == 0)
+	if ((ret = __wt_btcur_next(&cindex->cbt, 0)) == 0)
 		ret = __curindex_move(cindex);
 	API_END(session);
 
@@ -136,7 +136,7 @@ __curindex_prev(WT_CURSOR *cursor)
 
 	cindex = (WT_CURSOR_INDEX *)cursor;
 	CURSOR_API_CALL_NOCONF(cursor, session, prev, cindex->cbt.btree);
-	if ((ret = __wt_btcur_prev(&cindex->cbt)) == 0)
+	if ((ret = __wt_btcur_prev(&cindex->cbt, 0)) == 0)
 		ret = __curindex_move(cindex);
 	API_END(session);
 

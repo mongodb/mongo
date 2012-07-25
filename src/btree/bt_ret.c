@@ -30,6 +30,11 @@ __wt_kv_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
+		/*
+		 * The interface cursor's record has usually been set, but that
+		 * isn't universally true, specifically, cursor.search_near may
+		 * call here without first setting the interface cursor.
+		 */
 		cursor->recno = cbt->recno;
 
 		/*
@@ -45,6 +50,11 @@ __wt_kv_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 		v = __bit_getv_recno(page, cbt->iface.recno, btree->bitcnt);
 		return (__wt_buf_set(session, &cursor->value, &v, 1));
 	case WT_PAGE_COL_VAR:
+		/*
+		 * The interface cursor's record has usually been set, but that
+		 * isn't universally true, specifically, cursor.search_near may
+		 * call here without first setting the interface cursor.
+		 */
 		cursor->recno = cbt->recno;
 
 		/*

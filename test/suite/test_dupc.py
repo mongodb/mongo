@@ -31,53 +31,55 @@
 
 import os, time
 import wiredtiger, wttest
-from helper import complexPopulate, simplePopulate
+from helper import complexPopulate, keyPopulate, simplePopulate
 
 # Test session.open_cursor with cursor duplication.
 class test_duplicate_cursor(wttest.WiredTigerTestCase):
     name = 'test_dupc'
     nentries = 1000
 
-    config = 'key_format=i'
+    config = 'key_format='
 
     scenarios = [
-        ('file', dict(uri='file:')),
-        ('table', dict(uri='table:'))
-        ]
+	('file', dict(uri='file:', fmt='r')),
+	('file', dict(uri='file:', fmt='S')),
+	('table', dict(uri='table:', fmt='r')),
+	('table', dict(uri='table:', fmt='S'))
+	]
 
     # Iterate through an object, duplicate the cursor and checking that it
     # matches the original and is set to the same record.
     def iterate(self, uri):
-        cursor = self.session.open_cursor(uri, None, None)
-        next = -1
-        while True:
-            next += 1
-            nextret = cursor.next()
-            if nextret != 0:
-                break
-            self.assertEqual(cursor.get_key(), next);
-            dupc = self.session.open_cursor(None, cursor, None)
-            self.assertEqual(cursor.equals(dupc), 1)
-            self.assertEqual(dupc.get_key(), next);
-            cursor.close()
-            cursor = dupc
-        self.assertEqual(next, self.nentries);
-        self.assertEqual(nextret, wiredtiger.WT_NOTFOUND)
-        cursor.close()
+	cursor = self.session.open_cursor(uri, None, None)
+	next = 0
+	while True:
+	    next += 1
+	    nextret = cursor.next()
+	    if nextret != 0:
+		break
+	    self.assertEqual(cursor.get_key(), keyPopulate(self.fmt, next))
+	    dupc = self.session.open_cursor(None, cursor, None)
+	    self.assertEqual(cursor.equals(dupc), 1)
+	    self.assertEqual(dupc.get_key(), keyPopulate(self.fmt, next))
+	    cursor.close()
+	    cursor = dupc
+	self.assertEqual(next, self.nentries)
+	self.assertEqual(nextret, wiredtiger.WT_NOTFOUND)
+	cursor.close()
 
     def test_duplicate_cursor(self):
-        uri = self.uri + self.name
+	uri = self.uri + self.name
 
-        # A simple, one-file file or table object.
-        simplePopulate(self, uri, self.config, self.nentries)
-        self.iterate(uri)
-        self.session.drop(uri, None)
+	# A simple, one-file file or table object.
+	simplePopulate(self, uri, self.config + self.fmt, self.nentries)
+	self.iterate(uri)
+	self.session.drop(uri, None)
 
-        # A complex, multi-file table object.
-        if self.uri == "table:":
-            complexPopulate(self, uri, self.config, self.nentries)
-            self.iterate(uri)
-            self.session.drop(uri, None)
+	# A complex, multi-file table object.
+	if self.uri == "table:":
+	    complexPopulate(self, uri, self.config + self.fmt, self.nentries)
+	    self.iterate(uri)
+	    self.session.drop(uri, None)
 
 if __name__ == '__main__':
     wttest.run()

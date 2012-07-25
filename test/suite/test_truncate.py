@@ -34,119 +34,139 @@ import wiredtiger, wttest
 from helper import confirmDoesNotExist, \
     confirmEmpty, complexPopulate, keyPopulate, simplePopulate
 
+# Test session.truncate
+#       Simple, one-off tests.
+class test_truncate_standalone(wttest.WiredTigerTestCase):
+
+    # Test truncation of an object without URI or either cursor specified,
+    # expect an error.
+    def test_truncate_no_args(self):
+	simplePopulate(self, 'file:xxx', 'key_format=S', 10)
+	msg = '/either a URI or start/stop cursors/'
+	self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+	    lambda: self.session.truncate(None, None, None, None), msg)
+
 # Test session.truncate.
+#       Scenarios.
 class test_truncate(wttest.WiredTigerTestCase):
     name = 'test_truncate'
-    nentries = 10000
 
     # Use a small page size because we want to create lots of pages in the file.
     config = 'leaf_page_max=1024,key_format='
 
     scenarios = [
-        ( 'file-row',  dict(type='file:',fmt='S')),
-        ( 'file-col',  dict(type='file:',fmt='i')),
-        ('table-row', dict(type='table:',fmt='S')),
-        ('table-col', dict(type='table:',fmt='i'))
-        ]
+	('file-col-small', dict(type='file:',fmt='r',nentries=100,skip=5)),
+	('file-row-small', dict(type='file:',fmt='S',nentries=100,skip=5)),
+	('table-col-small', dict(type='table:',fmt='i',nentries=100,skip=5)),
+	('table-row-small', dict(type='table:',fmt='S',nentries=100,skip=5)),
+	('file-col-big', dict(type='file:',fmt='i',nentries=10000,skip=737)),
+	('file-row-big', dict(type='file:',fmt='S',nentries=10000,skip=737)),
+	('table-col-big', dict(type='table:',fmt='i',nentries=10000,skip=737)),
+	('table-row-big', dict(type='table:',fmt='S',nentries=10000,skip=737))
+	]
 
     # Test truncation of an object using its URI.
     def test_truncate(self):
-        uri = self.type + self.name
-        simplePopulate(self, uri, self.config + self.fmt, self.nentries)
-        self.session.truncate(uri, None, None, None)
-        confirmEmpty(self, uri)
-        self.session.drop(uri, None)
+	uri = self.type + self.name
+	simplePopulate(self, uri, self.config + self.fmt, self.nentries)
+	self.session.truncate(uri, None, None, None)
+	confirmEmpty(self, uri)
+	self.session.drop(uri, None)
 
-        if self.type == "table:":
-            complexPopulate(self, uri, self.config + self.fmt, self.nentries)
-            self.session.truncate(uri, None, None, None)
-            confirmEmpty(self, uri)
-            self.session.drop(uri, None)
+	if self.type == "table:":
+	    complexPopulate(self, uri, self.config + self.fmt, self.nentries)
+	    self.session.truncate(uri, None, None, None)
+	    confirmEmpty(self, uri)
+	    self.session.drop(uri, None)
 
     def initCursor(self, uri, key):
-        if key == -1:
-            return None
-        cursor = self.session.open_cursor(uri, None, None)
-        cursor.set_key(keyPopulate(self.fmt, key))
-        self.assertEqual(cursor.search(), 0)
-        self.assertEqual(cursor.get_key(), keyPopulate(self.fmt, key))
-        return cursor
+	if key == -1:
+	    return None
+	cursor = self.session.open_cursor(uri, None, None)
+	cursor.set_key(keyPopulate(self.fmt, key))
+
+	# Test scenarios where we fully instantiate a cursor as well as where we
+	# only set the key.  If it's a small run, do a search which builds out
+	# the cursor, otherwise, do nothing.
+	if self.skip == 5:
+	    self.assertEqual(cursor.search(), 0)
+	    self.assertEqual(cursor.get_key(), keyPopulate(self.fmt, key))
+
+	return cursor
 
     # Truncate a range using cursors, and check the results.
     def truncateRangeAndCheck(self, uri, begin, end):
-        self.pr('truncateRangeAndCheck: ' + str(begin) + ',' + str(end))
-        cur1 = self.initCursor(uri, begin)
-        cur2 = self.initCursor(uri, end)
-        self.session.truncate(None, cur1, cur2, None)
-        if not cur1:
-            begin = 0
-        else:
-            cur1.close()
-        if not cur2:
-            end = self.nentries - 1
-        else:
-            cur2.close()
+	self.pr('truncateRangeAndCheck: ' + str(begin) + ',' + str(end))
+	cur1 = self.initCursor(uri, begin)
+	cur2 = self.initCursor(uri, end)
+	self.session.truncate(None, cur1, cur2, None)
+	if not cur1:
+	    begin = 1
+	else:
+	    cur1.close()
+	if not cur2:
+	    end = self.nentries - 1
+	else:
+	    cur2.close()
 
-        # If the object is empty, confirm that, otherwise test the first and
-        # last keys are the ones before/after the truncated range.
-        cursor = self.session.open_cursor(uri, None, None)
-        if begin == 0 and end == self.nentries - 1:
-            confirmEmpty(self, uri)
-        else:
-            self.assertEqual(cursor.next(), 0)
-            key = cursor.get_key()
-            if begin == 0:
-                self.assertEqual(key, keyPopulate(self.fmt, end + 1))
-            else:
-                self.assertEqual(key, keyPopulate(self.fmt, 0))
-            self.assertEqual(cursor.reset(), 0)
-            self.assertEqual(cursor.prev(), 0)
-            key = cursor.get_key()
-            if end == self.nentries - 1:
-                self.assertEqual(key, keyPopulate(self.fmt, begin - 1))
-            else:
-                self.assertEqual(key, keyPopulate(self.fmt, self.nentries - 1))
+	# If the object is empty, confirm that, otherwise test the first and
+	# last keys are the ones before/after the truncated range.
+	cursor = self.session.open_cursor(uri, None, None)
+	if begin == 1 and end == self.nentries - 1:
+	    confirmEmpty(self, uri)
+	else:
+	    self.assertEqual(cursor.next(), 0)
+	    key = cursor.get_key()
+	    if begin == 1:
+		self.assertEqual(key, keyPopulate(self.fmt, end + 1))
+	    else:
+		self.assertEqual(key, keyPopulate(self.fmt, 1))
+	    self.assertEqual(cursor.reset(), 0)
+	    self.assertEqual(cursor.prev(), 0)
+	    key = cursor.get_key()
+	    if end == self.nentries - 1:
+		self.assertEqual(key, keyPopulate(self.fmt, begin - 1))
+	    else:
+		self.assertEqual(key, keyPopulate(self.fmt, self.nentries - 1))
 
-        cursor.close()
+	cursor.close()
 
-    # Test truncation using cursors, with 8 cases:
-    #    beginning to end (begin and end set to None)
-    #    beginning to end (begin/end set to first/last records)
-    #    beginning to mid-point (begin cursor set to None)
-    #    beginning to mid-point (begin cursor set to first record)
-    #    mid-point to end (end cursor set to None)
-    #    mid-point to end (end cursor set to last record)
-    #    mid-point to mid-point
+    # Test truncation using cursors.
     #
     # For begin and end: -1 means pass None for the cursor arg to truncate.
-    # An integer N, with 0 <= N < self.nentries, passes a cursor positioned
+    # An integer N, with 1 <= N < self.nentries, passes a cursor positioned
     # at that element.
     def test_truncate_cursor(self):
-        uri = self.type + self.name
-        list = [
-            (0, self.nentries - 1),
-            (-1, self.nentries - 1),
-            (0, -1),
-            (-1, self.nentries - 737),
-            (0, self.nentries - 737),
-            (737, -1),
-            (737, self.nentries - 1),
-            (737, self.nentries - 737)
-            ]
+	uri = self.type + self.name
+	list = [
+	    (-1, self.nentries - 1),            # begin to end, begin = None
+	    (1, -1),                            # begin to end, end = None
+	    (1, self.nentries - 1),             # begin to end
+	    (-1, self.nentries - self.skip),    # begin to middle, begin = None
+	    (1, self.nentries - self.skip),     # begin to middle
+	    (self.skip, -1),                    # middle to end, end = None
+	    (self.skip, self.nentries - 1),     # middle to end
+	    (self.skip,                         # middle to different middle
+		self.nentries - self.skip),
+	    (1, 1),                             # begin to begin
+	    (self.nentries - 1,                 # end to end
+		self.nentries -1),
+	    (self.skip, self.skip)              # middle to same middle
+	    ]
 
-        # A simple, one-file file or table object.
-        for begin,end in list:
-            simplePopulate(self, uri, self.config + self.fmt, self.nentries)
-            self.truncateRangeAndCheck(uri, begin, end)
-            self.session.drop(uri, None)
+	# A simple, one-file file or table object.
+	for begin,end in list:
+	    simplePopulate(self, uri, self.config + self.fmt, self.nentries)
+	    self.truncateRangeAndCheck(uri, begin, end)
+	    self.session.drop(uri, None)
 
-        # A complex, multi-file table object.
-        if self.type == "table:":
-            for begin,end in list:
-                complexPopulate(
-                    self, uri, self.config + self.fmt, self.nentries)
-                self.truncateRangeAndCheck(uri, begin, end)
-                self.session.drop(uri, None)
+	# A complex, multi-file table object.
+	if self.type == "table:":
+	    for begin,end in list:
+		complexPopulate(
+		    self, uri, self.config + self.fmt, self.nentries)
+		self.truncateRangeAndCheck(uri, begin, end)
+		self.session.drop(uri, None)
 
 if __name__ == '__main__':
     wttest.run()

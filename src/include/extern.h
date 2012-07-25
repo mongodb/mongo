@@ -237,9 +237,9 @@ extern int __wt_cell_unpack_copy( WT_SESSION_IMPL *session,
     WT_CELL_UNPACK *unpack,
     WT_ITEM *retb);
 extern void __wt_btcur_iterate_setup(WT_CURSOR_BTREE *cbt, int next);
-extern int __wt_btcur_next(WT_CURSOR_BTREE *cbt);
+extern int __wt_btcur_next(WT_CURSOR_BTREE *cbt, int is_modify);
 extern int __wt_btcur_next_random(WT_CURSOR_BTREE *cbt);
-extern int __wt_btcur_prev(WT_CURSOR_BTREE *cbt);
+extern int __wt_btcur_prev(WT_CURSOR_BTREE *cbt, int is_modify);
 extern int __wt_btcur_reset(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_search(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exact);

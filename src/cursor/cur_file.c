@@ -20,7 +20,7 @@ __curfile_next(WT_CURSOR *cursor)
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL_NOCONF(cursor, session, next, cbt->btree);
-	ret = __wt_btcur_next((WT_CURSOR_BTREE *)cursor);
+	ret = __wt_btcur_next((WT_CURSOR_BTREE *)cursor, 0);
 	API_END(session);
 
 	return (ret);
@@ -59,7 +59,7 @@ __curfile_prev(WT_CURSOR *cursor)
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL_NOCONF(cursor, session, prev, cbt->btree);
-	ret = __wt_btcur_prev((WT_CURSOR_BTREE *)cursor);
+	ret = __wt_btcur_prev((WT_CURSOR_BTREE *)cursor, 0);
 	API_END(session);
 
 	return (ret);
@@ -199,27 +199,25 @@ __wt_curfile_truncate(
 	WT_CURSOR_BTREE *cursor;
 	WT_DECL_RET;
 
-	if (start == NULL) {
-		WT_CURSOR_NEEDKEY(stop);
-		cursor = (WT_CURSOR_BTREE *)stop;
-	} else {
-		WT_CURSOR_NEEDKEY(start);
-		cursor = (WT_CURSOR_BTREE *)start;
-	}
-
 	/*
+	 * Our caller is either the session layer or the table-cursor truncate
+	 * code, both of which guarantee any open cursor is fully instantiated.
+	 * To minimize overhead when called from the table-cursor code, don't
+	 * do any further checking.
+	 *
 	 * !!!
 	 * We're doing a cursor operation but in the service of the session API;
 	 * set the session handle to reference the appropriate Btree, but don't
 	 * do any of the other "standard" cursor API setup.
 	 */
+	cursor = (WT_CURSOR_BTREE *)(start == NULL ? stop : start);
 	saved_btree = session->btree;
 	session->btree = cursor->btree;
 	ret = __wt_btcur_truncate(
 	    (WT_CURSOR_BTREE *)start, (WT_CURSOR_BTREE *)stop);
 	session->btree = saved_btree;
 
-err:	return (ret);
+	return (ret);
 }
 
 /*
