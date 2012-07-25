@@ -23,7 +23,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_TXN *txn;
 	WT_TXN_GLOBAL *txn_global;
 	void *saved_meta_next;
-	int target_list, tracking;
+	int ckpt_closed, target_list, tracking;
 
 	conn = S2C(session);
 	target_list = tracking = 0;
@@ -86,9 +86,9 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 
 	if (!target_list) {
 		/*
-		 * Possible checkpoint name.  If checkpoints are named, we must
-		 * checkpoint both open and closed files; if checkpoints are not
-		 * named, we only checkpoint open files.
+		 * Possible checkpoint name.  If checkpoints are named or we're
+		 * dropping checkpoints, checkpoint both open and closed files;
+		 * else, we only checkpoint open files.
 		 *
 		 * XXX
 		 * We don't optimize unnamed checkpoints of a list of targets,
@@ -97,10 +97,16 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 		 * unlikely to checkpoint a list of closed targets.
 		 */
 		cval.len = 0;
+		ckpt_closed = 0;
 		WT_ERR(__wt_config_gets(session, cfg, "name", &cval));
-		WT_ERR(cval.len == 0 ?
-		    __wt_conn_btree_apply(session, __wt_checkpoint, cfg) :
-		    __wt_meta_btree_apply(session, __wt_checkpoint, cfg, 0));
+		if (cval.len != 0)
+			ckpt_closed = 1;
+		WT_ERR(__wt_config_gets(session, cfg, "drop", &cval));
+		if (cval.len != 0)
+			ckpt_closed = 1;
+		WT_ERR(ckpt_closed ?
+		    __wt_meta_btree_apply(session, __wt_checkpoint, cfg, 0) :
+		    __wt_conn_btree_apply(session, __wt_checkpoint, cfg));
 	}
 
 	/* Checkpoint the metadata file. */
