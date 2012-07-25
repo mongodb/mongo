@@ -159,7 +159,7 @@ namespace mongo {
         noTableScan(false), prealloc(true), preallocj(true), smallfiles(sizeof(int*) == 4),
         configsvr(false), quota(false), quotaFiles(8), cpu(false),
         durOptions(0), objcheck(false), oplogSize(0), defaultProfile(0),
-        slowMS(100), defaultLocalThresholdMillis(10), pretouch(0), moveParanoia( true ),
+        slowMS(100), defaultLocalThresholdMillis(15), pretouch(0), moveParanoia( true ),
         syncdelay(60), noUnixSocket(false), doFork(0), socket("/tmp") 
     {
         started = time(0);
