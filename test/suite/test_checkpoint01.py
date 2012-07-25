@@ -35,7 +35,7 @@
 
 import wiredtiger, wttest
 
-class CheckpointTest(wttest.WiredTigerTestCase):
+class test_checkpoint(wttest.WiredTigerTestCase):
     checkpoints = {
 	"checkpoint-1": (100, 200),
 	"checkpoint-2": (200, 220),
@@ -43,49 +43,58 @@ class CheckpointTest(wttest.WiredTigerTestCase):
 	"checkpoint-4": (400, 420),
 	"checkpoint-5": (500, 520),
 	"checkpoint-6": (100, 620),
-	"checkpoint-7": (200, 720),
+	"checkpoint-7": (200, 250),
 	"checkpoint-8": (300, 820),
 	"checkpoint-9": (400, 920)
 	}
     URI = "file:__checkpoint"
+    
+    # Add a set of records for a checkpoint.
+    def add_records(self, name, start, stop):
+	cursor = self.session.open_cursor(self.URI, None, "overwrite")
+	for i in range(start, stop+1):
+	    cursor.set_key("%010d KEY------" % i)
+	    cursor.set_value("%010d VALUE "% i + name)
+	    self.assertEqual(cursor.insert(), 0)
+	cursor.close()
 
     # For each checkpoint entry, add/overwrite the specified records, then
-    # checkpoint the object, and verify it (which verifies the underlying
-    # checkpoints individually.
+    # checkpoint the object, and verify it (which verifies all underlying
+    # checkpoints individually).
     def build_file_with_checkpoints(self):
 	for checkpoint_name, sizes in self.checkpoints.iteritems():
 	    start, stop = sizes
-	    self.add_records(start, stop)
-	    self.session.checkpoint("name=%s" % checkpoint_name)
+	    self.add_records(checkpoint_name, start, stop)
+	    self.session.checkpoint("name=" + checkpoint_name)
 	    self.session.verify(self.URI, None)
 	    
-    # Create a list of sorted records that a checkpoint should include.
-    def list_expected(self, checkpoint_name):
-	records = []
-	for checkpoint, sizes in self.checkpoints.iteritems():
+    # Create a dictionary of sorted records a checkpoint should include.
+    def list_expected(self, name):
+	records = {}
+	for checkpoint_name, sizes in self.checkpoints.iteritems():
 	    start, stop = sizes
 	    for i in range(start, stop+1):
-		records.append("%010d KEY------" % i)
-	    if checkpoint == checkpoint_name:
+		records['%010d KEY------' % i] =\
+		    '%010d VALUE ' % i + checkpoint_name
+	    if name == checkpoint_name:
 		break;
-	return records.sort()
+	return records
 
-    # Create a list of sorted records that a checkpoint does contain.
-    def list_checkpoint(self, checkpoint_name):
-	records = []
-	cursor = self.session.open_cursor(
-	    self.URI, None, 'checkpoint=' + checkpoint_name)
+    # Create a dictionary of sorted records a checkpoint does include.
+    def list_checkpoint(self, name):
+	records = {}
+	cursor = self.session.open_cursor(self.URI, None, 'checkpoint=' + name)
 	while cursor.next() == 0:
-	    records.append(cursor.get_key())
+	    records[cursor.get_key()] = cursor.get_value()
 	cursor.close()
-	return records.sort()
+	return records
 
     # For each checkpoint entry, verify it contains the records it should.
     def check(self):
 	for checkpoint_name, sizes in self.checkpoints.iteritems():
-	    expected = self.list_expected(checkpoint_name)
-	    checkpoint = self.list_checkpoint(checkpoint_name)
-	    self.assertEqual(expected, checkpoint)
+	    list_expected = self.list_expected(checkpoint_name)
+	    list_checkpoint = self.list_checkpoint(checkpoint_name)
+	    self.assertEqual(list_expected, list_checkpoint)
 
     def test_checkpoint(self):
 	config = "key_format=S,value_format=S,leaf_page_max=512"
@@ -94,18 +103,6 @@ class CheckpointTest(wttest.WiredTigerTestCase):
 	self.check()
 	self.cursor_lock()
 	self.drop()
-    
-    def add_records(self, start, stop):
-	cursor = self.session.open_cursor(self.URI, None, "overwrite")
-	for i in range(start, stop+1):
-	    kbuf = "%010d KEY------" % i
-	    cursor.set_key(kbuf)
-	    vbuf = "%010d VALUE----" % i
-	    cursor.set_value(vbuf)
-	    result = cursor.insert()
-	    if result != 0:
-		self.fail("cursor.insert(): %s" % result)
-	cursor.close()
 
     def cursor_lock(self):
 	self.session.checkpoint("name=another_checkpoint")
