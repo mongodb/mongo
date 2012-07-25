@@ -38,7 +38,8 @@ doTest = function( signal ) {
    * initializing. Make sure it syncs all of these writes before going into
    * syncDelay.
    */
-  var conn = MongoRunner.runMongod({port : 31008, dbpath : name + "-sd", useHostname: true, replSet: name });
+  var conn = MongoRunner.runMongod({port : 31008, dbpath : name + "-sd", useHostname: true,
+                                    replSet: name, oplogSize : 128});
   conn.setSlaveOk();
   
   config = master.getSisterDB("local").system.replset.findOne();
@@ -72,7 +73,7 @@ doTest = function( signal ) {
   }
 
   // wait a bit for the syncs to be applied
-  waitForAllMembers(master, 120000);
+  waitForAllMembers(master);
 
   for (var i=0; i<(100*count); i++) {
     var obj = conn.getDB(name).foo.findOne({x : i});
