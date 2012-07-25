@@ -832,60 +832,11 @@ dodouble:
         return o[field];
     }
 
-    inline void BSONObj::elems(std::vector<BSONElement> &v) const {
-        BSONObjIterator i(*this);
-        while( i.more() )
-            v.push_back(i.next());
-    }
-
-    inline void BSONObj::elems(std::list<BSONElement> &v) const {
-        BSONObjIterator i(*this);
-        while( i.more() )
-            v.push_back(i.next());
-    }
-
-    template <class T>
-    void BSONObj::Vals(std::vector<T>& v) const {
-        BSONObjIterator i(*this);
-        while( i.more() ) {
-            T t;
-            i.next().Val(t);
-            v.push_back(t);
-        }
-    }
-    template <class T>
-    void BSONObj::Vals(std::list<T>& v) const {
-        BSONObjIterator i(*this);
-        while( i.more() ) {
-            T t;
-            i.next().Val(t);
-            v.push_back(t);
-        }
-    }
-
-    template <class T>
-    void BSONObj::vals(std::vector<T>& v) const {
-        BSONObjIterator i(*this);
-        while( i.more() ) {
-            try {
-                T t;
-                i.next().Val(t);
-                v.push_back(t);
-            }
-            catch(...) { }
-        }
-    }
-    template <class T>
-    void BSONObj::vals(std::list<T>& v) const {
-        BSONObjIterator i(*this);
-        while( i.more() ) {
-            try {
-                T t;
-                i.next().Val(t);
-                v.push_back(t);
-            }
-            catch(...) { }
-        }
+    template<class CONTAINER>
+    inline void BSONObj::elems(CONTAINER& c) const {
+    	BSONObjIterator i(*this);
+		while( i.more() )
+			c.push_back(i.next());
     }
 
     inline std::ostream& operator<<( std::ostream &s, const BSONObj &o ) {

@@ -164,10 +164,9 @@ namespace mongo {
                     }
                 }
             }
-            for ( CCById::iterator i = clientCursorsById.begin(); i != clientCursorsById.end();  ) {
-                CCById::iterator j = i;
-                i++;
-                if( j->second->shouldTimeout( millis ) ) {
+            const CCById::const_iterator clientEnd = clientCursorsById.end();
+            for ( CCById::const_iterator i = clientCursorsById.begin(); i != clientEnd; ++i ) {
+                if( i->second->shouldTimeout( millis ) ) {
                     foundSomeToTimeout = true;
                 }
             }
@@ -299,7 +298,7 @@ namespace mongo {
         _i = clientCursorsById.upper_bound( id );
     }
     
-    ClientCursor::ClientCursor(int queryOptions, const shared_ptr<Cursor>& c, const string& ns, BSONObj query ) :
+    ClientCursor::ClientCursor(int queryOptions, const shared_ptr<Cursor>& c, const string& ns, const BSONObj& query ) :
         _ns(ns), _db( cc().database() ),
         _c(c), _pos(0),
         _query(query),  _queryOptions(queryOptions),
