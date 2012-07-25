@@ -57,7 +57,7 @@ class CheckpointTest(wttest.WiredTigerTestCase):
 	    start, stop = sizes
 	    self.add_records(start, stop)
 	    self.session.checkpoint("name=%s" % checkpoint_name)
-	    self.assertEqual(0, self.session.verify(self.URI, None))
+	    self.session.verify(self.URI, None)
 
     # For each checkpoint entry, verify it contains the records it should.
     def check(self):
@@ -132,5 +132,5 @@ class CheckpointTest(wttest.WiredTigerTestCase):
 	cursor.close() 
 
     def drop(self):
-	self.assertEqual(0, self.session.checkpoint("drop=(from=all)"))
-	self.assertEqual(0, self.session.verify(self.URI, None))
+	self.session.checkpoint("drop=(from=all)")
+	self.session.verify(self.URI, None)
