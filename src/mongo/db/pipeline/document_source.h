@@ -1130,7 +1130,7 @@ namespace mongo {
         void unwindPath(const FieldPath &fieldPath);
 
         // Configuration state.
-        FieldPath _unwindPath;
+        scoped_ptr<FieldPath> _unwindPath;
 
         // Iteration state.
         class Unwinder;

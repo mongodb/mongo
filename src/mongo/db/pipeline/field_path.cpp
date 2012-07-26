@@ -24,19 +24,16 @@ namespace mongo {
 
     const char FieldPath::prefix[] = "$";
 
-    FieldPath::~FieldPath() {
+    FieldPath::FieldPath(const vector<string>& fieldPath) {
+        massert(16409, "FieldPath cannot be constructed from an empty vector.", !fieldPath.empty());
+        vFieldName.reserve(fieldPath.size());
+        for(vector<string>::const_iterator i = fieldPath.begin(); i != fieldPath.end(); ++i) {
+            pushFieldName(*i);
+        }
+        verify(getPathLength() > 0);
     }
 
-    FieldPath::FieldPath():
-        vFieldName() {
-    }
-
-    FieldPath::FieldPath(const vector<string>& fieldPath):
-        vFieldName(fieldPath) {
-    }
-
-    FieldPath::FieldPath(const string &fieldPath):
-        vFieldName() {
+    FieldPath::FieldPath(const string& fieldPath) {
         /*
           The field path could be using dot notation.
           Break the field path up by peeling off successive pieces.
@@ -48,22 +45,20 @@ namespace mongo {
 
             /* if there are no more dots, use the remainder of the string */
             if (dotpos == fieldPath.npos) {
-                vFieldName.push_back(fieldPath.substr(startpos, dotpos));
+                string lastFieldName = fieldPath.substr(startpos, dotpos);
+                pushFieldName(lastFieldName);
                 break;
             }
 
             /* use the string up to the dot */
             const size_t length = dotpos - startpos;
-            uassert(15998, str::stream() <<
-                    "field names cannot be zero length (in path \"" <<
-                    fieldPath << "\")",
-                    length > 0);
-
-            vFieldName.push_back(fieldPath.substr(startpos, length));
+            string nextFieldName = fieldPath.substr(startpos, length);
+            pushFieldName(nextFieldName);
 
             /* next time, search starting one spot after that */
             startpos = dotpos + 1;
         }
+        verify(getPathLength() > 0);
     }
 
     string FieldPath::getPath(bool fieldPrefix) const {
@@ -76,27 +71,31 @@ namespace mongo {
         if (fieldPrefix)
             outStream << prefix;
 
-        outStream << vFieldName[0];
         const size_t n = vFieldName.size();
+
+        verify(n > 0);
+        outStream << vFieldName[0];
         for(size_t i = 1; i < n; ++i)
             outStream << '.' << vFieldName[i];
     }
 
-    FieldPath &FieldPath::operator=(const FieldPath &rRHS) {
-        if (this != &rRHS) {
-            vFieldName = rRHS.vFieldName;
-        }
-
-        return *this;
+    FieldPath FieldPath::tail() const {
+        vector<string> allButFirst(vFieldName.begin()+1, vFieldName.end());
+        return FieldPath(allButFirst);
     }
 
-    FieldPath FieldPath::tail() const {
-        verify(!vFieldName.empty());
+    void FieldPath::uassertValidFieldName(const string& fieldName) {
+        uassert(15998, "FieldPath field names may not be empty strings.", fieldName.length() > 0);
+        uassert(16410, "FieldPath field names may not start with '$'.", fieldName[0] != '$');
+        uassert(16411, "FieldPath field names may not contain '\0'.",
+                fieldName.find('\0') == string::npos);
+        uassert(16412, "FieldPath field names may not contain '.'.",
+                !str::contains(fieldName, '.'));
+    }
 
-        FieldPath out;
-        vector<string> allButFirst(vFieldName.begin()+1, vFieldName.end());
-        out.vFieldName.swap(allButFirst);
-        return out;
+    void FieldPath::pushFieldName(const string& fieldName) {
+        uassertValidFieldName(fieldName);
+        vFieldName.push_back(fieldName);
     }
 
 }

@@ -162,7 +162,6 @@ namespace mongo {
         intrusive_ptr<Document> current = _document;
         intrusive_ptr<const Value> pathValue;
         const size_t pathLength = _unwindPath.getPathLength();
-        verify(pathLength>0);
         for(size_t i = 0; i < pathLength; ++i) {
 
             size_t idx = current->getFieldIndex(_unwindPath.getFieldName(i));
@@ -200,14 +199,13 @@ namespace mongo {
 
     DocumentSourceUnwind::DocumentSourceUnwind(
         const intrusive_ptr<ExpressionContext> &pExpCtx):
-        DocumentSource(pExpCtx),
-        _unwindPath() {
+        DocumentSource(pExpCtx) {
     }
 
     void DocumentSourceUnwind::lazyInit() {
         if (!_unwinder) {
-            verify(_unwindPath.getPathLength());
-            _unwinder.reset(new Unwinder(_unwindPath));
+            verify(_unwindPath);
+            _unwinder.reset(new Unwinder(*_unwindPath));
             if (!pSource->eof()) {
                 // Set up the first source document for unwinding.
                 _unwinder->resetDocument(pSource->getCurrent());
@@ -257,23 +255,22 @@ namespace mongo {
 
     void DocumentSourceUnwind::sourceToBson(
         BSONObjBuilder *pBuilder, bool explain) const {
-        pBuilder->append(unwindName, _unwindPath.getPath(true));
+        verify(_unwindPath);
+        pBuilder->append(unwindName, _unwindPath->getPath(true));
     }
 
     DocumentSource::GetDepsReturn DocumentSourceUnwind::getDependencies(set<string>& deps) const {
-        deps.insert(_unwindPath.getPath(false));
+        verify(_unwindPath);
+        deps.insert(_unwindPath->getPath(false));
         return SEE_NEXT;
     }
 
     void DocumentSourceUnwind::unwindPath(const FieldPath &fieldPath) {
         // Can't set more than one unwind path.
-        uassert(15979, str::stream() << unwindName <<
-                "can't unwind more than one path at once",
-                !_unwindPath.getPathLength());
-        uassert(15980, "the path of the field to unwind cannot be empty",
-                fieldPath.getPathLength());
+        uassert(15979, str::stream() << unwindName << "can't unwind more than one path",
+                !_unwindPath);
         // Record the unwind path.
-        _unwindPath = fieldPath;
+        _unwindPath.reset(new FieldPath(fieldPath));
     }
 
     intrusive_ptr<DocumentSource> DocumentSourceUnwind::createFromBson(

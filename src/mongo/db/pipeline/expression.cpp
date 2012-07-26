@@ -1326,8 +1326,6 @@ namespace mongo {
 
     void ExpressionObject::addField(const FieldPath &fieldPath,
                                     const intrusive_ptr<Expression> &pExpression) {
-        verify(fieldPath.getPathLength() > 0); // sanity check
-
         const string fieldPart = fieldPath.getFieldName(0);
         const bool haveExpr = _expressions.count(fieldPart);
 

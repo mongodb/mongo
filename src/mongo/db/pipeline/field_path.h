@@ -22,20 +22,16 @@ namespace mongo {
 
     class FieldPath {
     public:
-        virtual ~FieldPath();
 
         /**
-           Constructor.
-
-           @param fieldPath the dotted field path string or pre-split vector
+         * Constructor.
+         *
+         * @param fieldPath the dotted field path string or non empty pre-split vector.
+         * The constructed object will have getPathLength() > 0.
+         * Uassert if any component field names do not pass validation.
          */
         FieldPath(const string& fieldPath);
         FieldPath(const vector<string>& fieldPath);
-
-        /**
-           Constructor.
-        */
-        FieldPath();
 
         /**
           Get the number of path elements in the field path.
@@ -47,7 +43,7 @@ namespace mongo {
         /**
           Get a particular path element from the path.
 
-          @param i the index of the path element
+          @param i the zero based index of the path element.
           @returns the path element
          */
         string getFieldName(size_t i) const;
@@ -69,13 +65,6 @@ namespace mongo {
         void writePath(ostream &outStream, bool fieldPrefix) const;
 
         /**
-           Assignment operator.
-
-           @param rRHS right hand side of the assignment
-        */
-        FieldPath &operator=(const FieldPath &rRHS);
-
-        /**
            Get the prefix string.
 
            @returns the prefix string
@@ -84,10 +73,22 @@ namespace mongo {
 
         static const char prefix[];
 
-        /** a FieldPath like this but missing the first element (useful for recursion) */
+        /**
+         * A FieldPath like this but missing the first element (useful for recursion).
+         * Precondition getPathLength() > 1.
+         */
         FieldPath tail() const;
 
     private:
+        /** Uassert if a field name does not pass validation. */
+        static void uassertValidFieldName(const string& fieldName);
+
+        /**
+         * Push a new field name to the back of the vector of names comprising the field path.
+         * Uassert if 'fieldName' does not pass validation.
+         */
+        void pushFieldName(const string& fieldName);
+
         vector<string> vFieldName;
     };
 }
@@ -102,6 +103,7 @@ namespace mongo {
     }
 
     inline string FieldPath::getFieldName(size_t i) const {
+        verify(i < getPathLength());
         return vFieldName[i];
     }
 
