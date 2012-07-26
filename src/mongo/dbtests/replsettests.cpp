@@ -355,7 +355,7 @@ namespace ReplSetTests {
 
         void insert() {
             Client::Context ctx( cappedNs() );
-            BSONObj o = BSON("x" << 456);
+            BSONObj o = BSON(GENOID << "x" << 456);
             DiskLoc loc = theDataFileMgr.insert( cappedNs().c_str(), o.objdata(), o.objsize(), false );
             verify(!loc.isNull());
         }
@@ -372,10 +372,10 @@ namespace ReplSetTests {
             int count = (int) client.count(cappedNs(), BSONObj());
             verify(count > 1);
 
-            // Just to be sure, no _id index, right?
+            // check _id index created
             Client::Context ctx(cappedNs());
             NamespaceDetails *nsd = nsdetails(cappedNs().c_str());
-            verify(nsd->findIdIndex() == -1);
+            verify(nsd->findIdIndex() > -1);
         }
     };
 
