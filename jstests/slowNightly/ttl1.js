@@ -20,3 +20,59 @@ assert.soon(
 
 assert.eq( 0 , t.find( { x : { $lt : new Date( now - 20000000 ) } } ).count() );
 assert.eq( 6 , t.count() );
+
+var runner;
+var conn;
+
+var primeSystemReplset = function() {
+    var port = allocatePorts(1)[0];
+    runner = new MongodRunner(port, "/data/db/jstests_slowNightly-ttl");
+    conn = runner.start();
+    var localDB = conn.getDB("local");
+    localDB.system.replset.insert({x:1});
+
+    print("create a TTL collection");
+    var testDB = conn.getDB("test");
+    testDB.foo.ensureIndex({x:1}, {expireAfterSeconds : 2});
+    testDB.getLastError();
+};
+
+var restartWithConfig = function() {
+    stopMongod(runner.port(), 15);
+    conn = runner.start(true /* reuse data */);
+    testDB = conn.getDB("test");
+    var n = 100;
+    for (var i=0; i<n; i++) {
+        testDB.foo.insert({x : new Date()});
+    }
+
+    print("sleeping 60 seconds");
+    sleep(60000);
+
+    assert.eq(testDB.foo.count(), n);
+};
+
+var restartWithoutConfig = function() {
+    var localDB = conn.getDB("local");
+    localDB.system.replset.remove();
+    localDB.getLastError();
+
+    stopMongod(runner.port(), 15);
+
+    conn = runner.start(true /* reuse data */);
+
+    assert.soon(function() {
+        return conn.getDB("test").foo.count() < 100;
+    }, "never deleted", 60000);
+
+    stopMongod(runner.port(), 15);
+};
+
+print("Part 2: test that ttl monitor isn't started when rs config is present");
+primeSystemReplset();
+
+print("make sure TTL doesn't work when member is started with system.replset doc")
+restartWithConfig();
+
+print("remove system.replset entry & restart");
+restartWithoutConfig();
