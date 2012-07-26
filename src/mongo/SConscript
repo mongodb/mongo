@@ -299,9 +299,6 @@ serverOnlyFiles = [ "db/curop.cpp",
                     "db/commands/document_source_cursor.cpp",
                     "db/driverHelpers.cpp" ]
 
-if os.sys.platform == 'win32':
-    serverOnlyFiles += [ "util/hook_win32.cpp", "util/hook_windows_memory.cpp" ]
-
 env.Library( "dbcmdline", "db/cmdline.cpp" )
 
 env.Library('stacktrace', 'util/stacktrace.cpp')

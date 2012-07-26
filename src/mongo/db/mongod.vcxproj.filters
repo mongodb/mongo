@@ -884,12 +884,6 @@
     <ClCompile Include="..\util\touch_pages.cpp">
       <Filter>util\Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\util\hook_win32.cpp">
-      <Filter>util\Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\util\hook_windows_memory.cpp">
-      <Filter>util\Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\client\authentication_table.cpp">
       <Filter>client\Source Files</Filter>
     </ClCompile>
@@ -1175,9 +1169,6 @@
     </ClInclude>
     <ClInclude Include="..\util\queue.h">
       <Filter>util\Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\util\concurrency\remap_lock.h">
-      <Filter>util\concurrency</Filter>
     </ClInclude>
     <ClInclude Include="..\client\connpool.h">
       <Filter>client\Header Files</Filter>
@@ -1615,12 +1606,6 @@
       <Filter>util\Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\util\touch_pages.h">
-      <Filter>util\Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\util\hook_win32.h">
-      <Filter>util\Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\util\hook_windows_memory.h">
       <Filter>util\Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\client\authentication_table.h">

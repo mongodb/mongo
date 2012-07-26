@@ -29,7 +29,6 @@
 #include "../../db/cmdline.h"
 #include "../../db/lasterror.h"
 #include "../../db/stats/counters.h"
-#include "mongo/util/concurrency/remap_lock.h"
 #include "mongo/util/concurrency/ticketholder.h"
 
 #ifdef __linux__  // TODO: consider making this ifndef _WIN32
@@ -138,13 +137,6 @@ namespace mongo {
             try {
 #ifndef __linux__  // TODO: consider making this ifdef _WIN32
                 {
-#ifdef _WIN32
-                    // This Windows-only lock is to protect MemoryMappedFile::remapPrivateView ...
-                    //  it unmaps and remaps the private map and needs to get the previous address,
-                    //  and if we let a new thread get created between those calls, its thread
-                    //  stack could be created within that block, leading to an fassert ...
-                    RemapLock lk;
-#endif
                     boost::thread thr( boost::bind( &pms::threadRun , p ) );
                 }
 #else

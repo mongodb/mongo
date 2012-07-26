@@ -14,7 +14,6 @@
  */
 
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/concurrency/remap_lock.h"
 #include "mongo/s/config.h"
 #include "mongo/s/balancer_policy.h"
 
@@ -32,9 +31,6 @@ namespace mongo {
     bool haveLocalShardingInfo( const string& ns ) {
         return false;
     }
-
-    RemapLock::RemapLock() {}
-    RemapLock::~RemapLock() {}
 
     namespace {
         

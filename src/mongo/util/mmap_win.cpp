@@ -22,7 +22,6 @@
 #include "../db/d_concurrency.h"
 #include "../db/memconcept.h"
 #include "mongo/util/timer.h"
-#include "mongo/util/concurrency/remap_lock.h"
 #include "mongo/util/file_allocator.h"
 
 namespace mongo {
@@ -42,17 +41,6 @@ namespace mongo {
 
     MAdvise::MAdvise(void *,unsigned, Advice) { }
     MAdvise::~MAdvise() { }
-
-    // SERVER-2942 -- We do it this way because RemapLock is used in both mongod and mongos but
-    // we need different effects.  When called in mongod it needs to be a mutex and in mongos it
-    // needs to be a no-op.  This is the mongod version, the no-op mongos version is in server.cpp.
-    SimpleMutex _remapLock( "remapLock" );
-    RemapLock::RemapLock() {
-        _remapLock.lock();
-    }
-    RemapLock::~RemapLock() {
-        _remapLock.unlock();
-    }
 
     static unsigned long long _nextMemoryMappedFileLocation = 256LL * 1024LL * 1024LL * 1024LL;
     static SimpleMutex _nextMemoryMappedFileLocationMutex( "nextMemoryMappedFileLocationMutex" );
@@ -309,8 +297,6 @@ namespace mongo {
         verify( Lock::isW() );
 
         LockMongoFilesExclusive lockMongoFiles;
-
-        RemapLock remapLock;
 
         clearWritableBits(oldPrivateAddr);
         if( !UnmapViewOfFile(oldPrivateAddr) ) {

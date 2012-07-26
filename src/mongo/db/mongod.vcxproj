@@ -1076,8 +1076,6 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="..\util\file_allocator.cpp" />
     <ClCompile Include="..\util\histogram.cpp" />
     <ClCompile Include="..\util\intrusive_counter.cpp" />
-    <ClCompile Include="..\util\hook_win32.cpp" />
-    <ClCompile Include="..\util\hook_windows_memory.cpp" />
     <ClCompile Include="..\util\log.cpp" />
     <ClCompile Include="..\util\logfile.cpp" />
     <ClCompile Include="..\util\net\listen.cpp" />
@@ -1241,10 +1239,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\util\concurrency\mutexdebugger.h" />
     <ClInclude Include="..\util\concurrency\simplerwlock.h" />
     <ClInclude Include="..\util\histogram.h" />
-    <ClInclude Include="..\util\hook_win32.h" />
-    <ClInclude Include="..\util\hook_windows_memory.h" />
     <ClInclude Include="..\util\progress_meter.h" />
-    <ClInclude Include="..\util\concurrency\remap_lock.h" />
     <ClInclude Include="..\util\signal_handlers.h" />
     <ClInclude Include="..\util\stacktrace.h" />
     <ClInclude Include="..\util\stack_introspect.h" />
