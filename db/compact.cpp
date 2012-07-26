@@ -72,14 +72,13 @@ namespace mongo {
 
         {
             log() << "compact copying records" << endl;
-            unsigned totalSize = 0;
-            int nrecs = 0;
+            long long totalSize = 0;
+            long long nrecs = 0;
             DiskLoc L = e->firstRecord;
             if( !L.isNull() )
             while( 1 ) {
                 Record *recOld = L.rec();
                 L = recOld->nextInExtent(L);
-                nrecs++;
                 BSONObj objOld(recOld);
 
                 bool isValid =  !validate || objOld.valid();
@@ -90,6 +89,7 @@ namespace mongo {
                     unsigned sz = objOld.objsize();
                     unsigned lenWHdr = sz + Record::HeaderSize;
                     totalSize += lenWHdr;
+                    nrecs++;
                     DiskLoc extentLoc;
                     DiskLoc loc = allocateSpaceForANewRecord(ns, d, lenWHdr, false);
                     uassert(14024, "compact error out of space during compaction", !loc.isNull());
@@ -135,6 +135,14 @@ namespace mongo {
             newFirst.ext()->xprev.writing().Null();
             getDur().writing(e)->markEmpty();
             freeExtents(ext,ext);
+
+            // update datasize/record count for this namespace's extent
+            {
+                NamespaceDetails::Stats* s = getDur().writing(&d->stats);
+                s->datasize += totalSize;
+                s->nrecords += nrecs;
+            }
+
             getDur().commitIfNeeded();
 
             log() << "compact " << nrecs << " documents " << totalSize/1000000.0 << "MB" << endl;
@@ -210,6 +218,15 @@ namespace mongo {
 
         long long skipped = 0;
         int n = 0;
+
+        // reset data size and record counts to 0 for this namespace
+        // as we're about to tally them up again for each new extent
+        {
+            NamespaceDetails::Stats *s = getDur().writing(&d->stats);
+            s->datasize = 0;
+            s->nrecords = 0;
+        }
+
         for( list<DiskLoc>::iterator i = extents.begin(); i != extents.end(); i++ ) { 
             skipped += compactExtent(ns, d, *i, n++, indexSpecs, phase1, nidx, validate, chunkMgr);
             pm.hit();
