@@ -443,6 +443,7 @@ namespace mongo {
     };
 
     extern Tee* const warnings; // Things put here go in serverStatus
+    extern Tee* startupWarningsLog;
 
     string errnoWithDescription(int errorcode = -1);
     void rawOut( const string &s );

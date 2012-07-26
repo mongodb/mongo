@@ -122,7 +122,7 @@ namespace mongo {
     }
 
 
-    static Tee * startupWarningsLog = new RamLog("startupWarnings"); //intentionally leaked
+    Tee * startupWarningsLog = new RamLog("startupWarnings"); //intentionally leaked
 
     //
     // system warnings
