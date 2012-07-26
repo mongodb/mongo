@@ -42,8 +42,8 @@ namespace mongo {
 
             static BSONObj userPattern = BSON("user" << 1);
 
-            scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::
-                                                 getScopedDbConnection( s.getConnString(), 30.0 ) );
+            scoped_ptr<ScopedDbConnection> conn(
+                    ScopedDbConnection::getInternalScopedDbConnection( s.getConnString(), 30.0 ) );
             OCCASIONALLY conn->get()->ensureIndex(systemUsers, userPattern, false, "user_1");
             {
                 BSONObjBuilder b;
