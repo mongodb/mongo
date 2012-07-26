@@ -10,6 +10,8 @@ var x;
 
 // clear out any data from old tests
 testdb.system.js.remove();
+delete myfunc;
+delete myfunc2;
 
 x = testdb.system.js.findOne();
 assert.isnull(x, "Test for empty collection");
@@ -34,7 +36,8 @@ assert.eq(x, "myfunc", "Checking that myfunc() returns the correct value");
 // Insert value into collection from another process
 var coproc = startParallelShell(
         'db.getSisterDB("loadserverscripts").system.js.insert' +
-        '    ( {_id: "myfunc2", "value": function(){ return "myfunc2"; } } ); '
+        '    ( {_id: "myfunc2", "value": function(){ return "myfunc2"; } } );' +
+        'db.getLastError();'
                 );
 // wait for results
 coproc();
