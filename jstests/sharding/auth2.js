@@ -1,5 +1,6 @@
 var st = new ShardingTest({ keyFile : 'jstests/libs/key1', shards : 2, chunksize : 1, config : 3, verbose : 2,
-                            other : { nopreallocj : 1, verbose : 2, useHostname : true }});
+                            other : { nopreallocj : 1, verbose : 2, useHostname : true,
+                                      configOptions : { verbose : 2 }}});
 
 st.printShardingStatus();
 
