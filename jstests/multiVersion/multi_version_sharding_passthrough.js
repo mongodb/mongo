@@ -329,6 +329,7 @@ v22Only.push( /^find_and_modify4$/ )
 v22Only.push( /^update6$/ )
 v22Only.push( /^indexp$/ )
 v22Only.push( /^index_elemmatch1$/ )
+v22Only.push( /^splitvector$/ )
 
 // TODO
 // mr_merge2 - causes segfault?
@@ -353,7 +354,6 @@ errors = errors.concat(
 //
 
 v22Only.push( /.*auth.*/ ) // Can't run auth tests
-v22Only.push( /^splitvector$/ ) // Splitvector has been removed from mongod
 
 jsTest.log( "Running multi-version 2.2/2.0 mongod/mongos passthrough tests..." )
 
