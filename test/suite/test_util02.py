@@ -24,15 +24,13 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-#
-# test_util02.py
-# 	Utilities: wt load
-#
 
 import string, os
 from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
 
+# test_util02.py
+#    Utilities: wt load
 class test_util02(wttest.WiredTigerTestCase, suite_subprocess):
     """
     Test wt load

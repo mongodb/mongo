@@ -24,15 +24,13 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-#
-# test_drop.py
-#	session level drop operation
 
 import os, time
 import wiredtiger, wttest
 from helper import confirmDoesNotExist, complexPopulate, simplePopulate
 
-# Test session.drop operations.
+# test_drop.py
+#    session level drop operation
 class test_drop(wttest.WiredTigerTestCase):
     name = 'test_drop'
 

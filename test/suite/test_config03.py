@@ -24,15 +24,12 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-#
-# test_config03.py
-# 	More configuration strings for wiredtiger_open,
-#       combined probabilistically.
-#
 
 import wiredtiger, wtscenario, wttest
 import test_base03
 
+# test_config03.py
+#    More configuration strings for wiredtiger_open, combined probabilistically.
 class test_config03(test_base03.test_base03):
     K = 1024
     M = 1024 * K

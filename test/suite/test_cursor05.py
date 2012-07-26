@@ -24,15 +24,12 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-#
-# test_cursor05.py
-# 	Test cursors at the point where a cursor is first
-#	initialized, and when it hits an endpoint.
-#	Mix that in with column groups.
-#
 
 import wiredtiger, wttest
 
+# test_cursor05.py
+#    Test cursors at the point where a cursor is first initialized, and when it
+# hits an endpoint.  Mix that in with column groups.
 class test_cursor05(wttest.WiredTigerTestCase):
     """
     Test basic operations

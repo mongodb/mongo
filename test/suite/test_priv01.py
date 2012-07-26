@@ -24,17 +24,14 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-#
-# test_priv01.py
-# 	Test privileged operations.
-#	This is a variant of test_config02.py.
-#	This test should be run as both normal and privileged
-#	(e.g. root) user, and should pass in both cases.
-#
 
 import os
 import wiredtiger, wttest
 
+# test_priv01.py
+#    Test privileged operations.
+#    This is a variant of test_config02.py.  This test should be run as both
+# normal and privileged (e.g. root) user, and should pass in both cases.
 class test_priv01(wttest.WiredTigerTestCase):
     """
     This tests privileged operations.

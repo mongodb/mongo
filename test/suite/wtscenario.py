@@ -24,14 +24,12 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-#
-# wtscenarios.py
-# 	Support scenarios based testing
-#
 
 import testscenarios
 import suite_random
 
+# wtscenarios.py
+#    Support scenarios based testing
 def powerrange(start, stop, mult):
     """
     Like xrange, generates a range from start to stop.

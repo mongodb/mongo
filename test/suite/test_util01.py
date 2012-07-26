@@ -24,15 +24,13 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-#
-# test_util01.py
-# 	Utilities: wt dump, as well as the dump cursor
-#
 
 import string, os
 from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
 
+# test_util01.py
+#    Utilities: wt dump, as well as the dump cursor
 class test_util01(wttest.WiredTigerTestCase, suite_subprocess):
     """
     Test wt dump.  We check for specific output.

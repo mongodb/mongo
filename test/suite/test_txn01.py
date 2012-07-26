@@ -24,14 +24,12 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-#
-# test_txn01.py
-#	Transactions: basic functionality
-#
 
 import os, struct
 import wiredtiger, wttest
 
+# test_txn01.py
+#    Transactions: basic functionality
 class test_txn01(wttest.WiredTigerTestCase):
     tablename = 'test_txn01'
     uri = 'table:' + tablename

@@ -24,15 +24,13 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-#
-# test_util11.py
-#	Utilities: wt list
-#
 
 import os, struct
 from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
 
+# test_util11.py
+#    Utilities: wt list
 class test_util11(wttest.WiredTigerTestCase, suite_subprocess):
     tablenamepfx = 'test_util11.'
     session_params = 'key_format=S,value_format=S'

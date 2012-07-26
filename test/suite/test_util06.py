@@ -24,15 +24,13 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-#
-# test_util06.py
-# 	Utilities: wt salvage
-#
 
 import os, struct
 from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
 
+# test_util06.py
+#    Utilities: wt salvage
 class test_util06(wttest.WiredTigerTestCase, suite_subprocess):
     tablename = 'test_util06.a'
     nentries = 1000

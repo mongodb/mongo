@@ -24,15 +24,13 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-#
-# test_util10.py
-#	Utilities: wt dumpfile
-#
 
 import os, struct
 from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
 
+# test_util10.py
+#    Utilities: wt dumpfile
 class test_util10(wttest.WiredTigerTestCase, suite_subprocess):
     tablename = 'test_util10.a'
     nentries = 1000

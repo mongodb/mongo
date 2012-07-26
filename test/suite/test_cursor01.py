@@ -24,13 +24,11 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-#
-# test_cursor01.py
-# 	Cursor operations
-#
 
 import wiredtiger, wttest
 
+# test_cursor01.py
+#    Cursor operations
 # Basic smoke-test of file and table cursors: tests get/set key, insert
 # and forward/backward iteration, and mostly because we don't test them
 # anywhere else, cursor duplication and equality.

@@ -24,14 +24,12 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-#
-# test_config01.py
-# 	Configuration strings for wiredtiger_open
-#
 
 import wiredtiger, wtscenario, wttest
 import test_base03
 
+# test_config01.py
+#    Configuration strings for wiredtiger_open
 class test_config01(test_base03.test_base03):
     scenarios = wtscenario.wtscenario.session_create_scenario()
 

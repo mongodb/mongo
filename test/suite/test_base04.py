@@ -24,13 +24,11 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-#
-# test_base04.py
-#	Test that tables are reconciled correctly when they are empty.
-#
 
 import wiredtiger, wttest
 
+# test_base04.py
+#    Test that tables are reconciled correctly when they are empty.
 class test_base04(wttest.WiredTigerTestCase):
     '''Test various tree types becoming empty'''
 

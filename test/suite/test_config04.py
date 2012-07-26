@@ -24,14 +24,12 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-#
-# test_config04.py
-# 	Individually test config options
-#
 
 import os
 import wiredtiger, wttest
 
+# test_config04.py
+#    Individually test config options
 class test_config04(wttest.WiredTigerTestCase):
     table_name1 = 'test_config04'
     nentries = 100

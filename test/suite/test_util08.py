@@ -24,14 +24,12 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-#
-# test_util08.py
-# 	Utilities: wt copyright
-#
 
 from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
 
+# test_util08.py
+#    Utilities: wt copyright
 class test_util08(wttest.WiredTigerTestCase, suite_subprocess):
     def test_copyright(self):
         """

@@ -24,13 +24,12 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-#
-# test_checkpoint01.py
-# 	Checkpoint tests
 
 import wiredtiger, wttest
 from helper import keyPopulate, simplePopulate
 
+# test_checkpoint01.py
+#    Checkpoint tests
 # General checkpoint test: create an object containing sets of data associated
 # with a set of checkpoints, then confirm the checkpoint's values are correct,
 # including after other checkpoints are dropped.

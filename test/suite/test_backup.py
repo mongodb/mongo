@@ -24,10 +24,6 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-#
-# test_backup.py
-# 	Utilities: wt backup
-#
 
 import shutil, string, os
 from suite_subprocess import suite_subprocess
@@ -35,6 +31,8 @@ import wiredtiger, wttest
 from helper import compareFiles, confirmDoesNotExist, \
     complexPopulate, complexPopulateCheck, simplePopulate, simplePopulateCheck
 
+# test_backup.py
+#    Utilities: wt backup
 # Test backup (both backup cursors and the wt backup command).
 class test_backup(wttest.WiredTigerTestCase, suite_subprocess):
     dir='backup.dir'            # Backup directory name

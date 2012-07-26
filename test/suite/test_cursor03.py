@@ -24,16 +24,14 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-#
-# test_cursor02.py
-# 	Cursor operations on tables of various sizes,
-#       with key/values of various sizes.
-#
 
 import wiredtiger
 from test_cursor_tracker import TestCursorTracker
 from wtscenario import multiply_scenarios
 
+# test_cursor03.py
+#    Cursor operations on tables of various sizes, with key/values of various
+# sizes.
 class test_cursor03(TestCursorTracker):
     """
     Cursor operations on small tables of each access method.

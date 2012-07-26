@@ -24,14 +24,12 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-#
-# test_config01.py
-# 	The home directory for wiredtiger_open
-#
 
 import os
 import wiredtiger, wttest
 
+# test_config01.py
+#    The home directory for wiredtiger_open
 class test_config02(wttest.WiredTigerTestCase):
     table_name1 = 'test_config02'
     nentries = 100
@@ -82,7 +80,7 @@ class test_config02(wttest.WiredTigerTestCase):
             configarg += ',' + configextra
         if homeenv == None:
             os.unsetenv('WIREDTIGER_HOME')
-	else:
+        else:
             os.putenv('WIREDTIGER_HOME', homeenv)
         self.conn = wiredtiger.wiredtiger_open(homearg, configarg)
         self.session = self.conn.open_session(None)

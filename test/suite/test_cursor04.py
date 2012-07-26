@@ -24,13 +24,11 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-#
-# test_base03.py
-# 	Cursor operations
-#
 
 import wiredtiger, wttest
 
+# test_base04.py
+#     Cursor operations
 class test_cursor04(wttest.WiredTigerTestCase):
     """
     Test cursor search and search_near

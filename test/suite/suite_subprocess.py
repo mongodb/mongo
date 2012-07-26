@@ -24,14 +24,12 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-#
-# suite_subprocess.py
-# 	Run a subprocess within the test suite
-#
 
-from run import wt_builddir
 import os, subprocess
+from run import wt_builddir
 
+# suite_subprocess.py
+#    Run a subprocess within the test suite
 # Used as a 'mixin' class along with a WiredTigerTestCase class
 class suite_subprocess:
     subproc = None
