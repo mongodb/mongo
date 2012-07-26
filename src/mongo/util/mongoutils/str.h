@@ -106,11 +106,14 @@ namespace mongoutils {
             return (p != 0) ? string(p+x.size()) : "";
         }
 
-        /** @return true if s contains x */
+        /** @return true if s contains x
+         *  These should not be used with strings containing NUL bytes
+         */
         inline bool contains(string s, string x) {
             return strstr(s.c_str(), x.c_str()) != 0;
         }
         inline bool contains(string s, char x) {
+            verify(x != '\0'); // this expects c-strings so don't use when looking for NUL bytes
             return strchr(s.c_str(), x) != 0;
         }
 
