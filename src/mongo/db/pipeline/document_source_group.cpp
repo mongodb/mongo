@@ -250,7 +250,7 @@ namespace mongo {
 
                 uassert(15950, str::stream() <<
                         "the group aggregate field name '" <<
-                        pFieldName << "\" cannot be an operator name",
+                        pFieldName << "' cannot be an operator name",
                         pFieldName[0] != '$');
 
                 uassert(15951, str::stream() <<
@@ -273,8 +273,8 @@ namespace mongo {
                                       GroupOpDescCmp);
 
                     uassert(15952, str::stream() <<
-                            "unknown group operator \"" <<
-                            key.pName << "\"",
+                            "unknown group operator '" <<
+                            key.pName << "'",
                             pOp);
 
                     intrusive_ptr<Expression> pGroupExpr;
@@ -300,8 +300,8 @@ namespace mongo {
                 }
 
                 uassert(15954, str::stream() <<
-                        "the computed aggregate \"" <<
-                        pFieldName << "\" must specify exactly one operator",
+                        "the computed aggregate '" <<
+                        pFieldName << "' must specify exactly one operator",
                         subCount == 1);
             }
         }

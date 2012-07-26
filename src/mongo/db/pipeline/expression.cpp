@@ -52,8 +52,8 @@ namespace mongo {
 
         const char *pPrefixedField = prefixedField.c_str();
         uassert(15982, str::stream() <<
-                "field path references must be prefixed with a '$' (\"" <<
-                prefixedField << "\"", pPrefixedField[0] == '$');
+                "field path references must be prefixed with a '$' ('" <<
+                prefixedField << "'", pPrefixedField[0] == '$');
 
         return string(pPrefixedField + 1);
     }
@@ -82,8 +82,8 @@ namespace mongo {
 
             if (pFieldName[0] == '$') {
                 uassert(15983, str::stream() <<
-                        "the operator must be the only field in a pipeline object (at \""
-                        << pFieldName << "\"",
+                        "the operator must be the only field in a pipeline object (at '"
+                        << pFieldName << "'",
                         fieldCount == 0);
 
                 uassert(16404, "$expressions are not allowed at the top-level of $project",
@@ -95,8 +95,8 @@ namespace mongo {
                 pExpression = parseExpression(pFieldName, &fieldElement);
             }
             else {
-                uassert(15990, str::stream() << "this object is already an operator expression, and can't be used as a document expression (at \"" <<
-                        pFieldName << "\")",
+                uassert(15990, str::stream() << "this object is already an operator expression, and can't be used as a document expression (at '" <<
+                        pFieldName << "')",
                         kind != OPERATOR);
 
                 uassert(16405, "dotted field names are only allowed at the top level",
@@ -154,8 +154,8 @@ namespace mongo {
                     default:
                         uassert(15992, str::stream() <<
                                 "disallowed field type " << typeName(fieldType) <<
-                                " in object expression (at \"" <<
-                                fieldName << "\")", false);
+                                " in object expression (at '" <<
+                                fieldName << "')", false);
                 }
             }
         }
@@ -228,8 +228,8 @@ namespace mongo {
         const OpDesc *pOp = (const OpDesc *)bsearch(
                                 &key, OpTable, NOp, sizeof(OpDesc), OpDescCmp);
 
-        uassert(15999, str::stream() << "invalid operator \"" <<
-                pOpName << "\"", pOp);
+        uassert(15999, str::stream() << "invalid operator '" <<
+                pOpName << "'", pOp);
 
         /* make the expression node */
         intrusive_ptr<ExpressionNary> pExpression((*pOp->pFactory)());
@@ -1377,10 +1377,10 @@ namespace mongo {
                 }
 
                 uassert(16014, str::stream() << 
-                        "the element \"" << fieldPath.getFieldName(index) <<
-                        "\" along the dotted path \"" <<
+                        "the element '" << fieldPath.getFieldName(index) <<
+                        "' along the dotted path '" <<
                         fieldPath.getPath(false) <<
-                        "\" is not an object, and cannot be navigated",
+                        "' is not an object, and cannot be navigated",
                         iType == Object);
                 intrusive_ptr<const Value> itemResult(
                     evaluatePath(index, pathLength, pItem->getDocument()));
