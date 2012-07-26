@@ -18,6 +18,8 @@ replTest.initiate();
 // Call getMaster to return a reference to the node that's been
 // elected master
 var master = replTest.getMaster();
+// wait for secondaries to be up, since we'll be reading from them
+replTest.awaitSecondaryNodes();
 // And get the slaves from the liveNodes
 var slave1 = replTest.liveNodes.slaves[0];
 var slave2 = replTest.liveNodes.slaves[1];
