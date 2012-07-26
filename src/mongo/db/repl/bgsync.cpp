@@ -461,7 +461,7 @@ namespace replset {
                     return true;
                 }
                 OpTime theirTS = theirLastOp["ts"]._opTime();
-                if (theirTS < theReplSet->lastOpTimeWritten) {
+                if (theirTS < _lastOpTimeFetched) {
                     log() << "replSet we are ahead of the primary, will try to roll back" << rsLog;
                     theReplSet->syncRollback(r);
                     return true;
@@ -480,8 +480,8 @@ namespace replset {
         BSONObj o = r.nextSafe();
         OpTime ts = o["ts"]._opTime();
         long long h = o["h"].numberLong();
-        if( ts != theReplSet->lastOpTimeWritten || h != theReplSet->lastH ) {
-            log() << "replSet our last op time written: " << theReplSet->lastOpTimeWritten.toStringPretty() << rsLog;
+        if( ts != _lastOpTimeFetched || h != _lastH ) {
+            log() << "replSet our last op time fetched: " << _lastOpTimeFetched.toStringPretty() << rsLog;
             log() << "replset source's GTE: " << ts.toStringPretty() << rsLog;
             theReplSet->syncRollback(r);
             return true;
