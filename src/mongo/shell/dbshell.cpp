@@ -385,10 +385,11 @@ string finishCode( string code ) {
         if ( ! line )
             return "";
 
-        while ( startsWith( line, "... " ) )
-            line += 4;
+        char * linePtr = line;
+        while ( startsWith( linePtr, "... " ) )
+            linePtr += 4;
 
-        code += line;
+        code += linePtr;
         free( line );
     }
     return code;
