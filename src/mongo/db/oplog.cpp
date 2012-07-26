@@ -787,13 +787,8 @@ namespace mongo {
         }
         else if ( *opType == 'u' ) {
             opCounters->gotUpdate();
-            // dm do we create this for a capped collection?
-            //  - if not, updates would be slow
-            //    - but if were by id would be slow on primary too so maybe ok
-            //    - if on primary was by another key and there are other indexes, this could be very bad w/out an index
-            //  - if do create, odd to have on secondary but not primary.  also can cause secondary to block for
-            //    quite a while on creation.
-            RARELY if (nsd && !nsd->isCapped()) { ensureHaveIdIndex(ns); } // otherwise updates will be super slow
+            // ensure all collections, including capped, have an _id index.
+            RARELY if ( nsd ) { ensureHaveIdIndex(ns); } // otherwise updates will be super slow
             OpDebug debug;
             BSONObj updateCriteria = op.getObjectField("o2");
             bool upsert = fields[3].booleanSafe();

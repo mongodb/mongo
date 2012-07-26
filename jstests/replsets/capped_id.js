@@ -2,7 +2,8 @@
 
 // Test #
 // 0) create capped collection on replset, check _id index appears on secondary
-// 1) create normal collection, then convertToCapped, repeat check from #1
+// 1) create normal collection, then convertToCapped, check _id index on secondaries
+// 2) create capped collection, do updates instead of inserts, check _id index on secondaries
 
 // Create a new replica set test with name 'testSet' and 3 members
 var replTest = new ReplSetTest( {name: 'testSet', nodes: 3} );
@@ -18,6 +19,7 @@ replTest.initiate();
 // Call getMaster to return a reference to the node that's been
 // elected master
 var master = replTest.getMaster();
+
 // wait for secondaries to be up, since we'll be reading from them
 replTest.awaitSecondaryNodes();
 // And get the slaves from the liveNodes
@@ -33,11 +35,9 @@ printjson( replTest.liveNodes );
 var dbname = "dbname";
 var masterdb = master.getDB( dbname );
 var slave1db = slave1.getDB( dbname );
-slave1db.setSlaveOk();
 var slave2db = slave2.getDB( dbname );
-slave2db.setSlaveOk();
 
-var numtests = 2;
+var numtests = 3;
 for( testnum=0; testnum < numtests; testnum++ ){
 
     //define collection name
@@ -75,6 +75,16 @@ for( testnum=0; testnum < numtests; testnum++ ){
 
         // then convert it to capped
         masterdb.runCommand({convertToCapped: coll , size: 1024 } );
+        replTest.awaitReplication();
+    }
+    else if ( testnum == 2 ){
+        // similar to first test, but check that a bunch of updates instead
+        // of inserts triggers the _id index creation on secondaries.
+        masterdb.runCommand( {create : coll , capped : true , size : 1024} );
+        masterdb.getCollection( coll ).insert( {a : 0} );
+        for(i=0; i < 500 ; i++){
+            masterdb.getCollection( coll ).update( {} , {$inc : {a : 1} } );
+        }
         replTest.awaitReplication();
     }
 
