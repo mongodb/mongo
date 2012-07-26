@@ -1932,9 +1932,12 @@ namespace mongo {
 
         if (productType == NumberDouble)
             return Value::createDouble(doubleProduct);
-        if (productType == NumberLong)
+        else if (productType == NumberLong)
             return Value::createLong(longProduct);
-        return Value::createInt((int)longProduct);
+        else if (productType == NumberInt)
+            return Value::createIntOrLong(longProduct);
+        else
+            massert(16418, "$multiply resulted in a non-numeric type", false);
     }
 
     const char *ExpressionMultiply::getOpName() const {
@@ -2528,8 +2531,7 @@ namespace mongo {
         intrusive_ptr<const Value> pLeft(vpOperand[0]->evaluate(pDocument));
         intrusive_ptr<const Value> pRight(vpOperand[1]->evaluate(pDocument));
             
-        productType = Value::getWidestNumeric(
-            pRight->getType(), pLeft->getType());
+        productType = Value::getWidestNumeric(pRight->getType(), pLeft->getType());
         
         uassert(16376,
                 "$subtract does not support dates",
@@ -2545,7 +2547,11 @@ namespace mongo {
         long long left = pLeft->coerceToLong();
         if (productType == NumberLong)
             return Value::createLong(left - right);
-        return Value::createInt((int)(left - right));
+        else if (productType == NumberInt)
+            return Value::createIntOrLong(left - right);
+        else
+            massert(16413, "$subtract resulted in a non-numeric type", false);
+        
     }
 
     const char *ExpressionSubtract::getOpName() const {
