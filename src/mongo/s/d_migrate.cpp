@@ -1415,6 +1415,22 @@ namespace mongo {
             ScopedDbConnection& conn = *connPtr;
             conn->getLastError(); // just test connection
 
+            {
+                // 0. copy system.namespaces entry if collection doesn't already exist
+                Client::WriteContext ctx( ns );
+                // Only copy if ns doesn't already exist
+                if ( ! nsdetails( ns.c_str() ) ) {
+                    string system_namespaces = NamespaceString( ns ).db + ".system.namespaces";
+                    BSONObj entry = conn->findOne( system_namespaces, BSON( "name" << ns ) );
+                    if ( entry["options"].isABSONObj() ) {
+                        string errmsg;
+                        if ( ! userCreateNS( ns.c_str(), entry["options"].Obj(), errmsg, true, 0 ) )
+                            warning() << "failed to create collection with options: " << errmsg
+                                      << endl;
+                    }
+                }
+            }
+
             {                
                 // 1. copy indexes
                 
