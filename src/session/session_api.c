@@ -213,12 +213,10 @@ __session_rename(WT_SESSION *wt_session,
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_API_CALL(session, rename, config, cfg);
 
-	WT_ERR(__wt_meta_track_on(session));
 	WT_WITH_SCHEMA_LOCK(session,
 	    ret = __wt_schema_rename(session, uri, newname, cfg));
 
-err:	WT_TRET(__wt_meta_track_off(session, ret != 0));
-	API_END_NOTFOUND_MAP(session, ret);
+err:	API_END_NOTFOUND_MAP(session, ret);
 }
 
 /*
@@ -234,12 +232,10 @@ __session_drop(WT_SESSION *wt_session, const char *uri, const char *config)
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_API_CALL(session, drop, config, cfg);
 
-	WT_ERR(__wt_meta_track_on(session));
 	WT_WITH_SCHEMA_LOCK(session,
 	    ret = __wt_schema_drop(session, uri, cfg));
 
 err:	/* Note: drop operations cannot be unrolled (yet?). */
-	WT_TRET(__wt_meta_track_off(session, 0));
 	API_END_NOTFOUND_MAP(session, ret);
 }
 

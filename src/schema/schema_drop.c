@@ -238,6 +238,8 @@ __wt_schema_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 	/* Disallow drops from the WiredTiger name space. */
 	WT_RET(__wt_schema_name_check(session, uri));
 
+	WT_RET(__wt_meta_track_on(session));
+
 	if (WT_PREFIX_MATCH(uri, "colgroup:"))
 		ret = __drop_colgroup(session, uri, force, cfg);
 	else if (WT_PREFIX_MATCH(uri, "file:"))
@@ -257,5 +259,8 @@ __wt_schema_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 	 */
 	if (ret == WT_NOTFOUND)
 		ret = force ? 0 : ENOENT;
+
+	WT_TRET(__wt_meta_track_off(session, ret != 0));
+
 	return (ret);
 }
