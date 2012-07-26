@@ -929,9 +929,8 @@ extern int __wt_session_get_btree(WT_SESSION_IMPL *session,
     const char *uri,
     const char *cfg[],
     uint32_t flags);
-extern int __wt_session_lock_checkpoint( WT_SESSION_IMPL *session,
-    const char *checkpoint,
-    uint32_t flags);
+extern int __wt_session_lock_checkpoint(WT_SESSION_IMPL *session,
+    const char *checkpoint);
 extern int __wt_session_discard_btree( WT_SESSION_IMPL *session,
     WT_BTREE_SESSION *btree_session);
 extern int __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[]);

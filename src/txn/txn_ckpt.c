@@ -262,13 +262,14 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	name_alloc = NULL;
 
 	/*
-	 * Get the list of checkpoints for this file.  If there's no reference,
-	 * this file is dead.  Discard it from the cache without bothering to
+	 * Get the list of checkpoints for this file.  If this is a read-only
+	 * handle for a checkpoint or there's no reference in the metadata (the
+	 * file is dead), then discard it from the cache without bothering to
 	 * write any dirty pages.
 	 */
-	if ((ret =
-	    __wt_meta_ckptlist_get(session, btree->name, &ckptbase)) != 0) {
-		if (ret == WT_NOTFOUND)
+	if (btree->checkpoint != NULL || (ret = __wt_meta_ckptlist_get(
+	    session, btree->name, &ckptbase)) != 0) {
+		if (ret == 0 || ret == WT_NOTFOUND)
 			ret = __wt_bt_cache_flush(
 			    session, NULL, WT_SYNC_DISCARD_NOWRITE, 0);
 		goto err;
@@ -354,8 +355,8 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	if (WT_META_TRACKING(session))
 		WT_CKPT_FOREACH(ckptbase, deleted)
 			if (F_ISSET(deleted, WT_CKPT_DELETE))
-				WT_ERR(__wt_session_lock_checkpoint(session,
-				    deleted->name, WT_BTREE_EXCLUSIVE));
+				WT_ERR(__wt_session_lock_checkpoint(
+				    session, deleted->name));
 
 	/* Flush the file from the cache, creating the checkpoint. */
 	WT_ERR(__wt_bt_cache_flush(

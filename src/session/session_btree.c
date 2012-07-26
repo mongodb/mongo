@@ -108,7 +108,7 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 	 * If we had special flags set, close the handle so that future access
 	 * can get a handle without special flags.
 	 */
-	if (F_ISSET(btree, WT_BTREE_SPECIAL_FLAGS)) {
+	if (F_ISSET(btree, WT_BTREE_DISCARD | WT_BTREE_SPECIAL_FLAGS)) {
 		WT_ASSERT(session, F_ISSET(btree, WT_BTREE_EXCLUSIVE));
 
 		ret = __wt_conn_btree_sync_and_close(session);
@@ -225,8 +225,7 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
  *	Lock the btree handle for the given checkpoint name.
  */
 int
-__wt_session_lock_checkpoint(
-    WT_SESSION_IMPL *session, const char *checkpoint, uint32_t flags)
+__wt_session_lock_checkpoint(WT_SESSION_IMPL *session, const char *checkpoint)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
@@ -240,8 +239,14 @@ __wt_session_lock_checkpoint(
 	WT_ERR(__wt_buf_fmt(session, buf, "checkpoint=\"%s\"", checkpoint));
 	cfg[0] = buf->data;
 
-	LF_SET(WT_BTREE_LOCK_ONLY);
-	WT_ERR(__wt_session_get_btree(session, btree->name, cfg, flags));
+	WT_ERR(__wt_session_get_btree(session, btree->name, cfg,
+	    WT_BTREE_EXCLUSIVE | WT_BTREE_LOCK_ONLY));
+
+	/*
+	 * We lock checkpoint handles that we are overwriting, so the handle
+	 * must be closed when we release it.
+	 */
+	F_SET(session->btree, WT_BTREE_DISCARD);
 
 	WT_ASSERT(session, WT_META_TRACKING(session));
 	WT_ERR(__wt_meta_track_handle_lock(session));
