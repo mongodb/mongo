@@ -255,16 +255,16 @@ __wt_rec_write(
 			ret = __rec_col_fix(session, page);
 		break;
 	case WT_PAGE_COL_INT:
-		ret =__rec_col_int(session, page);
+		ret = __rec_col_int(session, page);
 		break;
 	case WT_PAGE_COL_VAR:
-		ret =__rec_col_var(session, page, salvage);
+		ret = __rec_col_var(session, page, salvage);
 		break;
 	case WT_PAGE_ROW_INT:
-		ret =__rec_row_int(session, page);
+		ret = __rec_row_int(session, page);
 		break;
 	case WT_PAGE_ROW_LEAF:
-		ret =__rec_row_leaf(session, page, salvage);
+		ret = __rec_row_leaf(session, page, salvage);
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}
