@@ -35,48 +35,48 @@ from helper import keyPopulate, simplePopulate
 # with a set of checkpoints, then confirm the checkpoint's values are correct,
 # including after other checkpoints are dropped.
 class test_checkpoint(wttest.WiredTigerTestCase):
-    checkpoints = {
-        "checkpoint-1": (100, 200),
-        "checkpoint-2": (200, 220),
-        "checkpoint-3": (300, 320),
-        "checkpoint-4": (400, 420),
-        "checkpoint-5": (500, 520),
-        "checkpoint-6": (100, 620),
-        "checkpoint-7": (200, 250),
-        "checkpoint-8": (300, 820),
-        "checkpoint-9": (400, 920)
-        }
-    checkpoints_deleted = {
-        }
-
     scenarios = [
         ('file', dict(uri='file:checkpoint',fmt='S')),
         ('table', dict(uri='table:checkpoint',fmt='S'))
         ]
 
+    # Each checkpoint has a key range and a "is dropped" flag.
+    checkpoints = {
+        "checkpoint-1": ((100, 200), 0),
+        "checkpoint-2": ((200, 220), 0),
+        "checkpoint-3": ((300, 320), 0),
+        "checkpoint-4": ((400, 420), 0),
+        "checkpoint-5": ((500, 520), 0),
+        "checkpoint-6": ((100, 620), 0),
+        "checkpoint-7": ((200, 250), 0),
+        "checkpoint-8": ((300, 820), 0),
+        "checkpoint-9": ((400, 920), 0)
+        }
+
     # Add a set of records for a checkpoint.
-    def add_records(self, name, start, stop):
+    def add_records(self, name):
         cursor = self.session.open_cursor(self.uri, None, "overwrite")
+        start, stop = self.checkpoints[name][0]
         for i in range(start, stop+1):
             cursor.set_key("%010d KEY------" % i)
             cursor.set_value("%010d VALUE "% i + name)
             self.assertEqual(cursor.insert(), 0)
         cursor.close()
+        self.checkpoints[name] = (self.checkpoints[name][0], 1)
 
     # For each checkpoint entry, add/overwrite the specified records, then
     # checkpoint the object, and verify it (which verifies all underlying
     # checkpoints individually).
     def build_file_with_checkpoints(self):
-        for checkpoint_name, sizes in self.checkpoints.iteritems():
-            start, stop = sizes
-            self.add_records(checkpoint_name, start, stop)
+        for checkpoint_name, entry in self.checkpoints.iteritems():
+            self.add_records(checkpoint_name)
             self.session.checkpoint("name=" + checkpoint_name)
             
     # Create a dictionary of sorted records a checkpoint should include.
     def list_expected(self, name):
         records = {}
-        for checkpoint_name, sizes in self.checkpoints.iteritems():
-            start, stop = sizes
+        for checkpoint_name, entry in self.checkpoints.iteritems():
+            start, stop = entry[0]
             for i in range(start, stop+1):
                 records['%010d KEY------' % i] =\
                     '%010d VALUE ' % i + checkpoint_name
@@ -99,16 +99,16 @@ class test_checkpoint(wttest.WiredTigerTestCase):
         # Physically verify the file, including the individual checkpoints.
         self.session.verify(self.uri, None)
 
-        for checkpoint_name, sizes in self.checkpoints.iteritems():
+        msg = '/no.*checkpoint found/'
+        for checkpoint_name, entry in self.checkpoints.iteritems():
+            if entry[1] == 0:
+                self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+                    lambda: self.session.open_cursor(
+                    self.uri, None, "checkpoint=" + checkpoint_name), msg)
+            else:
                 list_expected = self.list_expected(checkpoint_name)
                 list_checkpoint = self.list_checkpoint(checkpoint_name)
                 self.assertEqual(list_expected, list_checkpoint)
-
-        msg = '/no.*checkpoint found/'
-        for checkpoint_name, sizes in self.checkpoints_deleted.iteritems():
-            self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.session.open_cursor(
-            self.uri, None, "checkpoint=" + checkpoint_name), msg)
 
     # Main checkpoint test driver.
     def test_checkpoint(self):
@@ -119,32 +119,24 @@ class test_checkpoint(wttest.WiredTigerTestCase):
         self.build_file_with_checkpoints()
         self.check()
 
-        '''
-        XXX
-        Waiting on issue #269
-        # Drop a set of checkpoints, and confirm the contents of remaining
-        # checkpoints, and that dropped checkpoints don't appear.
+        # Drop a set of checkpoints sequentially, and each time confirm the
+        # contents of remaining checkpoints, and that dropped checkpoints
+        # don't appear.
         for i in [1,3,7,9]:
             checkpoint_name = 'checkpoint-' + str(i)
             self.session.checkpoint('drop=(' + checkpoint_name + ')')
-            self.checkpoints_deleted[checkpoint_name] =\
-                self.checkpoints[checkpoint_name]
-            del self.checkpoints[checkpoint_name]
+            self.checkpoints[checkpoint_name] =\
+                (self.checkpoints[checkpoint_name][0], 0)
             self.check()
-        '''
 
-        # Drop remaining checkpoints; that should have removed all of the
-        # checkpoints, and subsequent opens should fail.
+        # Drop remaining checkpoints, all subsequent checkpoint opens should
+        # fail.
         self.session.checkpoint("drop=(from=all)")
-        '''
-        XXX
-        Waiting on issue #269
-        for checkpoint_name, sizes in self.checkpoints.iteritems():
-            self.checkpoints_deleted[checkpoint_name] =\
-                self.checkpoints[checkpoint_name]
-            del self.checkpoints[checkpoint_name]
+        for checkpoint_name, entry in self.checkpoints.iteritems():
+            self.checkpoints[checkpoint_name] =\
+                (self.checkpoints[checkpoint_name][0], 0)
         self.check()
-        '''
+
 
 # Check some specific cursor checkpoint combinations.
 class test_checkpoint_cursor(wttest.WiredTigerTestCase):
@@ -209,6 +201,7 @@ class test_checkpoint_cursor(wttest.WiredTigerTestCase):
         cursor.close()
         self.session.checkpoint("drop=(checkpoint-2)")
         self.session.checkpoint("drop=(from=all)")
+
 
 # Check that you can checkpoint targets.
 class test_checkpoint_target(wttest.WiredTigerTestCase):
