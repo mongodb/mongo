@@ -51,28 +51,47 @@ class test_empty(wttest.WiredTigerTestCase):
             name = name + '.wt'
         self.assertEquals(os.stat(name).st_size, 512)
 
-    # Creating an object, inserting a record and then removing it (that is,
-    # building an empty, dirty tree), shouldn't write any blocks.  This is
-    # not true for column-store objects, though, even deleting an object
-    # modifies the name space, which requires a write.
+    # Open a new sesssion, add a few rows to an object and then remove them,
+    # then close the object.  We open/close the object so it's flushed from
+    # the underlying cache each time.
+    def empty(self):
+        uri = self.type + self.name
+        self.session = self.conn.open_session()
+        self.session.create(uri, 'key_format=' + self.fmt)
+
+        # Add a few records to the object and remove them.
+        cursor = self.session.open_cursor(uri, None, None)
+        for i in range(1,5):
+            cursor.set_key(keyPopulate(self.fmt, i));
+            cursor.set_value("XXX");
+            cursor.insert();
+            cursor.remove();
+
+        # Do a checkpoint, we shouldn't write any checkpoint records, either.
+        self.session.checkpoint("name=ckpt");
+
+        # Open and close a checkopint cursor.
+        cursor = self.session.open_cursor(uri, None, "checkpoint=ckpt")
+        cursor.close()
+
+        self.session.close();
+
+        # The file should not have grown.
+        name = self.name
+        if self.type == "table:":
+            name = name + '.wt'
+        self.assertEquals(os.stat(name).st_size, 512)
+
+    # Creating an object, inserting and removing records (that is, building an
+    # empty, dirty tree), shouldn't write any blocks.  This doesn't work for
+    # column-store objects, though, because deleting an object modifies the name
+    # space, which requires a write.
     def test_empty(self):
-        if self.fmt == 'S':
-            uri = self.type + self.name
-            self.session.create(uri, 'key_format=' + self.fmt)
+        if self.fmt == 'r':
+            return
 
-            # Add a few records and remove them.
-            cursor = self.session.open_cursor(uri, None, None)
-            for i in range(1,5):
-                cursor.set_key(keyPopulate(self.fmt, i));
-                cursor.set_value("XXX");
-                cursor.insert();
-                cursor.remove();
-            self.session.close();
-
-            name = self.name
-            if self.type == "table:":
-                name = name + '.wt'
-            self.assertEquals(os.stat(name).st_size, 512)
+        for i in range(1,5):
+            self.empty()
 
 if __name__ == '__main__':
     wttest.run()
