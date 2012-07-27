@@ -97,7 +97,7 @@ namespace mongo {
             pA->addDependencies(deps);
         }
 
-        return EXAUSTIVE;
+        return EXHAUSTIVE;
     }
 
     intrusive_ptr<DocumentSourceGroup> DocumentSourceGroup::create(

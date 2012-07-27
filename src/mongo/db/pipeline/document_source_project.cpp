@@ -143,6 +143,6 @@ namespace mongo {
     DocumentSource::GetDepsReturn DocumentSourceProject::getDependencies(set<string>& deps) const {
         vector<string> path; // empty == top-level
         pEO->addDependencies(deps, &path);
-        return EXAUSTIVE;
+        return EXHAUSTIVE;
     }
 }

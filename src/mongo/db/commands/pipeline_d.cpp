@@ -68,7 +68,7 @@ namespace mongo {
                 status = (*pSources)[i]->getDependencies(deps);
             }
 
-            if (status == DocumentSource::EXAUSTIVE) {
+            if (status == DocumentSource::EXHAUSTIVE) {
                 projection = DocumentSource::depsToProjection(deps);
             }
         }

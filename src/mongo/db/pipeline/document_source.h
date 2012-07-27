@@ -87,12 +87,10 @@ namespace mongo {
         */
         virtual bool advance();
 
-        /**
-          Advance the source, and return the next Expression.
-
-          @returns the current Document
-          TODO throws an exception if there are no more expressions to return.
-        */
+        /** @returns the current Document without advancing.
+         *
+         *  some implementations do the equivalent of verify(!eof()) so check eof() first
+         */
         virtual intrusive_ptr<Document> getCurrent() = 0;
 
         /**
@@ -159,11 +157,11 @@ namespace mongo {
 
         enum GetDepsReturn {
             NOT_SUPPORTED, // This means the set should be ignored
-            EXAUSTIVE, // This means that everything needed should be in the set
+            EXHAUSTIVE, // This means that everything needed should be in the set
             SEE_NEXT, // Add the next Source's deps to the set
         };
 
-        /** Get the fields this operation needs to do it's job.
+        /** Get the fields this operation needs to do its job.
          *  Deps should be in "a.b.c" notation
          *
          *  @param deps results are added here. NOT CLEARED
