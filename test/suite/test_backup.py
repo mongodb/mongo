@@ -25,11 +25,15 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import shutil, string, os
+import glob
+import os
+import shutil
+import string
 from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
-from helper import compareFiles, confirmDoesNotExist, \
-    complexPopulate, complexPopulateCheck, simplePopulate, simplePopulateCheck
+from helper import compare_files, confirm_does_not_exist,\
+    complex_populate, complex_populate_check,\
+    simple_populate, simple_populate_check
 
 # test_backup.py
 #    Utilities: wt backup
@@ -39,12 +43,12 @@ class test_backup(wttest.WiredTigerTestCase, suite_subprocess):
 
     pfx = 'test_backup'
     objs = [
-        ( 'file:' + pfx + '.1', simplePopulate),
-        ( 'file:' + pfx + '.2', simplePopulate),
-        ('table:' + pfx + '.3', simplePopulate),
-        ('table:' + pfx + '.4', simplePopulate),
-        ('table:' + pfx + '.5', complexPopulate),
-        ('table:' + pfx + '.6', complexPopulate),
+        ( 'file:' + pfx + '.1', simple_populate),
+        ( 'file:' + pfx + '.2', simple_populate),
+        ('table:' + pfx + '.3', simple_populate),
+        ('table:' + pfx + '.4', simple_populate),
+        ('table:' + pfx + '.5', complex_populate),
+        ('table:' + pfx + '.6', complex_populate),
     ]
 
     # Populate a set of objects.
@@ -56,7 +60,7 @@ class test_backup(wttest.WiredTigerTestCase, suite_subprocess):
     def compare(self, uri):
         self.runWt(['dump', uri], outfilename='orig')
         self.runWt(['-h', self.dir, 'dump', uri], outfilename='backup')
-        compareFiles(self, 'orig', 'backup')
+        compare_files(self, 'orig', 'backup')
 
     # Test simple backup cursor open/close.
     def test_cursor_simple(self):
@@ -80,7 +84,7 @@ class test_backup(wttest.WiredTigerTestCase, suite_subprocess):
         # Make sure all the files were copied.
         self.runWt(['list'], outfilename='outfile.orig')
         self.runWt(['-h', self.dir, 'list'], outfilename='outfile.backup')
-        compareFiles(self, 'outfile.orig', 'outfile.backup')
+        compare_files(self, 'outfile.orig', 'outfile.backup')
 
         # And that the contents are the same.
         for i in self.objs:
@@ -94,7 +98,6 @@ class test_backup(wttest.WiredTigerTestCase, suite_subprocess):
             lambda: session.open_cursor(uri, None, None))
         conn.close()
 
-        import glob
         self.assertEqual(
             glob.glob(self.dir + '*' + uri.split(":")[1] + '*'), [],
             'confirmPathDoesNotExist: URI exists, file name matching \"' +

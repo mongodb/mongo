@@ -31,8 +31,8 @@
 
 import os, time
 import wiredtiger, wttest
-from helper import confirmDoesNotExist, \
-    confirmEmpty, complexPopulate, keyPopulate, simplePopulate
+from helper import confirm_empty,\
+    complex_populate, key_populate, simple_populate
 
 # Test session.truncate
 #       Simple, one-off tests.
@@ -41,7 +41,7 @@ class test_truncate_standalone(wttest.WiredTigerTestCase):
     # Test truncation of an object without URI or either cursor specified,
     # expect an error.
     def test_truncate_no_args(self):
-        simplePopulate(self, 'file:xxx', 'key_format=S', 10)
+        simple_populate(self, 'file:xxx', 'key_format=S', 10)
         msg = '/either a URI or start/stop cursors/'
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.truncate(None, None, None, None), msg)
@@ -68,29 +68,29 @@ class test_truncate(wttest.WiredTigerTestCase):
     # Test truncation of an object using its URI.
     def test_truncate(self):
         uri = self.type + self.name
-        simplePopulate(self, uri, self.config + self.fmt, self.nentries)
+        simple_populate(self, uri, self.config + self.fmt, self.nentries)
         self.session.truncate(uri, None, None, None)
-        confirmEmpty(self, uri)
+        confirm_empty(self, uri)
         self.session.drop(uri, None)
 
         if self.type == "table:":
-            complexPopulate(self, uri, self.config + self.fmt, self.nentries)
+            complex_populate(self, uri, self.config + self.fmt, self.nentries)
             self.session.truncate(uri, None, None, None)
-            confirmEmpty(self, uri)
+            confirm_empty(self, uri)
             self.session.drop(uri, None)
 
     def initCursor(self, uri, key):
         if key == -1:
             return None
         cursor = self.session.open_cursor(uri, None, None)
-        cursor.set_key(keyPopulate(self.fmt, key))
+        cursor.set_key(key_populate(self.fmt, key))
 
         # Test scenarios where we fully instantiate a cursor as well as where we
         # only set the key.  If it's a small run, do a search which builds out
         # the cursor, otherwise, do nothing.
         if self.skip == 5:
             self.assertEqual(cursor.search(), 0)
-            self.assertEqual(cursor.get_key(), keyPopulate(self.fmt, key))
+            self.assertEqual(cursor.get_key(), key_populate(self.fmt, key))
 
         return cursor
 
@@ -113,21 +113,21 @@ class test_truncate(wttest.WiredTigerTestCase):
         # last keys are the ones before/after the truncated range.
         cursor = self.session.open_cursor(uri, None, None)
         if begin == 1 and end == self.nentries - 1:
-            confirmEmpty(self, uri)
+            confirm_empty(self, uri)
         else:
             self.assertEqual(cursor.next(), 0)
             key = cursor.get_key()
             if begin == 1:
-                self.assertEqual(key, keyPopulate(self.fmt, end + 1))
+                self.assertEqual(key, key_populate(self.fmt, end + 1))
             else:
-                self.assertEqual(key, keyPopulate(self.fmt, 1))
+                self.assertEqual(key, key_populate(self.fmt, 1))
             self.assertEqual(cursor.reset(), 0)
             self.assertEqual(cursor.prev(), 0)
             key = cursor.get_key()
             if end == self.nentries - 1:
-                self.assertEqual(key, keyPopulate(self.fmt, begin - 1))
+                self.assertEqual(key, key_populate(self.fmt, begin - 1))
             else:
-                self.assertEqual(key, keyPopulate(self.fmt, self.nentries - 1))
+                self.assertEqual(key, key_populate(self.fmt, self.nentries - 1))
 
         cursor.close()
 
@@ -156,14 +156,14 @@ class test_truncate(wttest.WiredTigerTestCase):
 
         # A simple, one-file file or table object.
         for begin,end in list:
-            simplePopulate(self, uri, self.config + self.fmt, self.nentries)
+            simple_populate(self, uri, self.config + self.fmt, self.nentries)
             self.truncateRangeAndCheck(uri, begin, end)
             self.session.drop(uri, None)
 
         # A complex, multi-file table object.
         if self.type == "table:":
             for begin,end in list:
-                complexPopulate(
+                complex_populate(
                     self, uri, self.config + self.fmt, self.nentries)
                 self.truncateRangeAndCheck(uri, begin, end)
                 self.session.drop(uri, None)

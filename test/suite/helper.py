@@ -26,14 +26,16 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 
-import os, string
+import glob
+import os
+import string
 import wiredtiger
 
 # python has a filecmp.cmp function, but different versions of python approach
 # file comparison differently.  To make sure we get byte for byte comparison,
 # we define it here.
-def compareFiles(self, filename1, filename2):
-    self.pr('compareFiles: ' + filename1 + ', ' + filename2)
+def compare_files(self, filename1, filename2):
+    self.pr('compare_files: ' + filename1 + ', ' + filename2)
     bufsize = 4096
     if os.path.getsize(filename1) != os.path.getsize(filename2):
         print filename1 + ' size = ' + str(os.path.getsize(filename1))
@@ -51,53 +53,52 @@ def compareFiles(self, filename1, filename2):
                     return True
 
 # confirm a URI doesn't exist.
-def confirmDoesNotExist(self, uri):
-    self.pr('confirmDoesNotExist: ' + uri)
+def confirm_does_not_exist(self, uri):
+    self.pr('confirm_does_not_exist: ' + uri)
     self.assertRaises(wiredtiger.WiredTigerError,
         lambda: self.session.open_cursor(uri, None, None))
-    import glob
     self.assertEqual(glob.glob('*' + uri.split(":")[1] + '*'), [],
-        'confirmDoesNotExist: URI exists, file name matching \"' +
+        'confirm_does_not_exist: URI exists, file name matching \"' +
         uri.split(":")[1] + '\" found')
 
 # confirm a URI exists and is empty.
-def confirmEmpty(self, uri):
-    self.pr('confirmEmpty: ' + uri)
+def confirm_empty(self, uri):
+    self.pr('confirm_empty: ' + uri)
     cursor = self.session.open_cursor(uri, None, None)
     self.assertEqual(cursor.next(), wiredtiger.WT_NOTFOUND)
     cursor.close()
 
-# create a simplePopulate or complexPopulate key
-def keyPopulate(key_format, i):
+# create a simple_populate or complex_populate key
+def key_populate(key_format, i):
     if key_format == 'i' or key_format == 'r' or key_format == 'u':
         return i
     elif key_format == 'S':
         return str('%015d' % i)
     else:
         raise AssertionError(
-            'keyPopulate: object has unexpected key format: ' + key_format)
+            'key_populate: object has unexpected key format: ' + key_format)
 
 # population of a simple object, where the keys are the record number.
 #    uri:       object
 #    config:    prefix of the session.create configuration string
 #    rows:      entries to insert
-def simplePopulate(self, uri, config, rows):
-    self.pr('simplePopulate: ' + uri + ' with ' + str(rows) + ' rows')
+def simple_populate(self, uri, config, rows):
+    self.pr('simple_populate: ' + uri + ' with ' + str(rows) + ' rows')
     self.session.create(uri, config + ',value_format=S')
     cursor = self.session.open_cursor(uri, None, None)
     for i in range(1, rows):
-        cursor.set_key(keyPopulate(cursor.key_format, i))
+        cursor.set_key(key_populate(cursor.key_format, i))
         cursor.set_value(str(i) + ': abcdefghijklmnopqrstuvwxyz')
         cursor.insert()
     cursor.close()
 
-def simplePopulateCheck(self, uri):
-    self.pr('simplePopulateCheck: ' + uri)
+def simple_populate_check(self, uri):
+    self.pr('simple_populate_check: ' + uri)
     cursor = self.session.open_cursor(uri, None, None)
     i = 0
     for key,val in cursor:
         i += 1
-        self.assertEqual(key, keyPopulate(cursor.key_format, i))
+        self.assertEqual(key, key_populate(cursor.key_format, i))
         self.assertEqual(val, str(i) + ': abcdefghijklmnopqrstuvwxyz')
     cursor.close()
 
@@ -105,7 +106,7 @@ def simplePopulateCheck(self, uri):
 #    uri:       object
 #    config:    prefix of the session.create configuration string
 #    rows:      entries to insert
-def complexPopulate(self, uri, config, rows):
+def complex_populate(self, uri, config, rows):
     self.session.create(uri,
         config + ',value_format=SiSS,' +
         'columns=(record,column2,column3,column4,column5),' +
@@ -128,7 +129,7 @@ def complexPopulate(self, uri, config, rows):
         indxname + ':indx6', 'columns=(column3,column5,column4)')
     cursor = self.session.open_cursor(uri, None, None)
     for i in range(1, rows):
-        cursor.set_key(keyPopulate(cursor.key_format, i))
+        cursor.set_key(key_populate(cursor.key_format, i))
         cursor.set_value(
             str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%26],
             i,
@@ -137,13 +138,13 @@ def complexPopulate(self, uri, config, rows):
         cursor.insert()
     cursor.close()
 
-def complexPopulateCheck(self, uri):
-    self.pr('complexPopulateCheck: ' + uri)
+def complex_populate_check(self, uri):
+    self.pr('complex_populate_check: ' + uri)
     cursor = self.session.open_cursor(uri, None, None)
     i = 0
     for key, s1, i2, s3, s4 in cursor:
         i += 1
-        self.assertEqual(key, keyPopulate(cursor.key_format, i))
+        self.assertEqual(key, key_populate(cursor.key_format, i))
         self.assertEqual(s1,
             str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%26])
         self.assertEqual(i2, i)

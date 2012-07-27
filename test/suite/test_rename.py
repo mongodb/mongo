@@ -27,8 +27,9 @@
 
 import os, time
 import wiredtiger, wttest
-from helper import confirmDoesNotExist,\
-    complexPopulate, complexPopulateCheck, simplePopulate, simplePopulateCheck
+from helper import confirm_does_not_exist,\
+    complex_populate, complex_populate_check,\
+    simple_populate, simple_populate_check
 
 #
 # test_rename.py
@@ -50,11 +51,11 @@ class test_rename(wttest.WiredTigerTestCase):
         populate(self, uri1, 'key_format=S', 10)
 
         self.session.rename(uri1, uri2, None)
-        confirmDoesNotExist(self, uri1)
+        confirm_does_not_exist(self, uri1)
         check(self, uri2)
 
         self.session.rename(uri2, uri1, None)
-        confirmDoesNotExist(self, uri2)
+        confirm_does_not_exist(self, uri2)
         check(self, uri1)
 
         self.session.drop(uri1)
@@ -62,16 +63,16 @@ class test_rename(wttest.WiredTigerTestCase):
     # Test rename of an object.
     def test_rename(self):
         # Simple, one-file file or table object.
-        self.rename(simplePopulate, simplePopulateCheck)
+        self.rename(simple_populate, simple_populate_check)
 
         # A complex, multi-file table object.
         if self.uri == "table:":
-            self.rename(complexPopulate, complexPopulateCheck)
+            self.rename(complex_populate, complex_populate_check)
 
     def test_rename_dne(self):
         uri1 = self.uri + self.name1
         uri2 = self.uri + self.name2
-        confirmDoesNotExist(self, uri1)
+        confirm_does_not_exist(self, uri1)
         self.assertRaises(wiredtiger.WiredTigerError,
             lambda: self.session.rename(uri1, uri2, None))
 

@@ -26,7 +26,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wiredtiger, wttest
-from helper import keyPopulate, simplePopulate
+from helper import key_populate, simple_populate
 
 # test_checkpoint01.py
 #    Checkpoint tests
@@ -146,7 +146,7 @@ class test_checkpoint_cursor(wttest.WiredTigerTestCase):
 
     # Check that you cannot open a checkpoint that doesn't exist.
     def test_checkpoint_dne(self):
-        simplePopulate(self, self.uri, 'key_format=' + self.fmt, 100)
+        simple_populate(self, self.uri, 'key_format=' + self.fmt, 100)
         msg = '/no.*checkpoint found/'
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.open_cursor(
@@ -154,7 +154,7 @@ class test_checkpoint_cursor(wttest.WiredTigerTestCase):
 
     # Check that you can open checkpoints more than once.
     def test_checkpoint_multiple_open(self):
-        simplePopulate(self, self.uri, 'key_format=' + self.fmt, 100)
+        simple_populate(self, self.uri, 'key_format=' + self.fmt, 100)
         self.session.checkpoint("name=checkpoint-1")
         c1 = self.session.open_cursor(self.uri, None, "checkpoint=checkpoint-1")
         c2 = self.session.open_cursor(self.uri, None, "checkpoint=checkpoint-1")
@@ -171,7 +171,7 @@ class test_checkpoint_cursor(wttest.WiredTigerTestCase):
 
     # Check that you cannot drop a checkpoint if it's in use.
     def test_checkpoint_inuse(self):
-        simplePopulate(self, self.uri, 'key_format=' + self.fmt, 100)
+        simple_populate(self, self.uri, 'key_format=' + self.fmt, 100)
         self.session.checkpoint("name=checkpoint-1")
         self.session.checkpoint("name=checkpoint-2")
         self.session.checkpoint("name=checkpoint-3")
@@ -211,14 +211,14 @@ class test_checkpoint_target(wttest.WiredTigerTestCase):
 
     def update(self, uri, value):
         cursor = self.session.open_cursor(uri, None, "overwrite")
-        cursor.set_key(keyPopulate(self.fmt, 10))
+        cursor.set_key(key_populate(self.fmt, 10))
         cursor.set_value(value)
         cursor.insert()
         cursor.close()
 
     def check(self, uri, value):
         cursor = self.session.open_cursor(uri, None, "checkpoint=checkpoint-1")
-        cursor.set_key(keyPopulate(self.fmt, 10))
+        cursor.set_key(key_populate(self.fmt, 10))
         cursor.search()
         self.assertEquals(cursor.get_value(), value)
         cursor.close()
@@ -226,13 +226,13 @@ class test_checkpoint_target(wttest.WiredTigerTestCase):
     def test_checkpoint_target(self):
         # Create 3 objects, change one record to an easily recognizable string.
         uri = self.uri + '1'
-        simplePopulate(self, uri, 'key_format=' + self.fmt, 100)
+        simple_populate(self, uri, 'key_format=' + self.fmt, 100)
         self.update(uri, 'ORIGINAL')
         uri = self.uri + '2'
-        simplePopulate(self, uri, 'key_format=' + self.fmt, 100)
+        simple_populate(self, uri, 'key_format=' + self.fmt, 100)
         self.update(uri, 'ORIGINAL')
         uri = self.uri + '3'
-        simplePopulate(self, uri, 'key_format=' + self.fmt, 100)
+        simple_populate(self, uri, 'key_format=' + self.fmt, 100)
         self.update(uri, 'ORIGINAL')
 
         # Checkpoint all three objects.
@@ -262,10 +262,10 @@ class test_checkpoint_cursor_update(wttest.WiredTigerTestCase):
         ]
 
     def test_checkpoint_cursor_update(self):
-        simplePopulate(self, self.uri, 'key_format=' + self.fmt, 100)
+        simple_populate(self, self.uri, 'key_format=' + self.fmt, 100)
         self.session.checkpoint("name=ckpt")
         cursor = self.session.open_cursor(self.uri, None, "checkpoint=ckpt")
-        cursor.set_key(keyPopulate(self.fmt, 10))
+        cursor.set_key(key_populate(self.fmt, 10))
         cursor.set_value("XXX")
         self.assertRaises(wiredtiger.WiredTigerError, lambda: cursor.insert())
         self.assertRaises(wiredtiger.WiredTigerError, lambda: cursor.remove())

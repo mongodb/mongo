@@ -31,7 +31,7 @@
 
 import os, time
 import wiredtiger, wttest
-from helper import complexPopulate, keyPopulate, simplePopulate
+from helper import complex_populate, key_populate, simple_populate
 
 # Test session.open_cursor with cursor duplication.
 class test_duplicate_cursor(wttest.WiredTigerTestCase):
@@ -57,10 +57,10 @@ class test_duplicate_cursor(wttest.WiredTigerTestCase):
             nextret = cursor.next()
             if nextret != 0:
                 break
-            self.assertEqual(cursor.get_key(), keyPopulate(self.fmt, next))
+            self.assertEqual(cursor.get_key(), key_populate(self.fmt, next))
             dupc = self.session.open_cursor(None, cursor, None)
             self.assertEqual(cursor.equals(dupc), 1)
-            self.assertEqual(dupc.get_key(), keyPopulate(self.fmt, next))
+            self.assertEqual(dupc.get_key(), key_populate(self.fmt, next))
             cursor.close()
             cursor = dupc
         self.assertEqual(next, self.nentries)
@@ -71,13 +71,13 @@ class test_duplicate_cursor(wttest.WiredTigerTestCase):
         uri = self.uri + self.name
 
         # A simple, one-file file or table object.
-        simplePopulate(self, uri, self.config + self.fmt, self.nentries)
+        simple_populate(self, uri, self.config + self.fmt, self.nentries)
         self.iterate(uri)
         self.session.drop(uri, None)
 
         # A complex, multi-file table object.
         if self.uri == "table:":
-            complexPopulate(self, uri, self.config + self.fmt, self.nentries)
+            complex_populate(self, uri, self.config + self.fmt, self.nentries)
             self.iterate(uri)
             self.session.drop(uri, None)
 
