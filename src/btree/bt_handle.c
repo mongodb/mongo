@@ -252,6 +252,10 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session)
 	root = leaf = NULL;
 
 	/*
+	 * A note about empty trees: the initial tree is a root page and a leaf
+	 * page, the leaf of which is marked dirty.   If evicted without being
+	 * modified, that's OK, nothing will ever be written.
+	 *
 	 * Create a leaf page -- this can be reconciled while the root stays
 	 * pinned.
 	 */
@@ -272,10 +276,6 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session)
 	leaf->entries = 0;
 
 	/*
-	 * A note about empty trees: the initial tree is a root page and a leaf
-	 * page, neither of which are marked dirty.   If evicted without being
-	 * modified, that's OK, nothing will ever be written.
-	 *
 	 * Create the empty root page.
 	 *
 	 * !!!
@@ -317,12 +317,11 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session)
 	btree->root_page = root;
 
 	/*
-	 * Mark the child page empty so that if it is evicted, the tree ends up
-	 * sane.  The page should not be dirty, else we would write empty trees
-	 * on close, including empty checkpoints.
+	 * Mark the leaf page dirty; if it's evicted, it will be reconciled,
+	 * but if it's still empty, nothing will be written.
 	 */
 	WT_ERR(__wt_page_modify_init(session, leaf));
-	F_SET(leaf->modify, WT_PM_REC_EMPTY);
+	__wt_page_modify_set(leaf);
 
 	return (0);
 
