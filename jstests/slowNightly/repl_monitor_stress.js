@@ -54,7 +54,7 @@ for (var node = NODE_COUNT - 1; node >= 0; node--) {
         var replView = connPoolStats.replicaSets[replTest.name];
         print('Current replView: ' + tojson(replView));
         return replView.master == node;
-    });
+    }, 'timed out waiting for node " + node + " to become master', 60000);
 
     // Remove first node from set
     confDoc.members.shift();
@@ -94,7 +94,7 @@ for (var node = NODE_COUNT - 1; node >= 0; node--) {
         mongos.getDB('test').user.find().explain();
 
         return waitNodeCount(NODE_COUNT - 1);
-    });
+    }, 'timed out waiting for node to be removed', 60000);
 
     jsTest.log(tojson(mongos.getDB('admin').runCommand('connPoolStats')));
 
@@ -110,7 +110,8 @@ for (var node = NODE_COUNT - 1; node >= 0; node--) {
     replTest.awaitSecondaryNodes();
 
     // Make sure mongos view of replica set is in steady state before proceeding
-    assert.soon(function() { return waitNodeCount(NODE_COUNT); });
+    assert.soon(function() { return waitNodeCount(NODE_COUNT); },
+        'timed out waiting for node to get back to set', 60000);
 }
 
 // Make sure that mongos did not crash
