@@ -13,15 +13,20 @@ var db = mongos.getDB('test')
 var addUser = function( db, username, password ) {
     var conn = db.getMongo();
     // Get a connection over localhost so that the first user can be added.
-    if ( conn.host.indexOf('localhost') != 0 ) {
+    if ( conn.host.indexOf('localhost') != 0 && conn.host.split(',').length > 1 ) {
         print( 'Getting locahost connection instead of ' + conn + ' to add user' );
         var hosts = conn.host.split(',');
         for ( var i = 0; i < hosts.length; i++ ) {
-            hosts[i] = 'localhost:' + hosts[i].split(':')[1];
+            conn = new Mongo( 'localhost:' + hosts[i].split(':')[1] );
+            print( "Adding user on connection: " + conn );
+            if ( !conn.getDB('admin').addUser( username, password ) ) {
+                return false;
+            }
         }
-        conn = new Mongo(hosts.join(','));
+        return true;
+    } else {
+        return conn.getDB('admin').addUser( username, password );
     }
-    return conn.getDB('admin').addUser( username, password );
 }
 
 
