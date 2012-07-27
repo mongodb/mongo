@@ -1176,9 +1176,7 @@ namespace DocumentTests {
             add<Value::Long>();
             add<Value::Double>();
             add<Value::String>();
-            if ( 0 ) { // SERVER-6556
             add<Value::StringWithNull>();
-            }
             add<Value::Date>();
             add<Value::Timestamp>();
             add<Value::EmptyDocument>();
