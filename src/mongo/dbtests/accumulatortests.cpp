@@ -59,11 +59,16 @@ namespace AccumulatorTests {
             value->addToBsonObj( &bob, "" );
             return bob.obj();
         }
+        /** Check binary equality, ensuring use of the same numeric types. */
+        void assertBinaryEqual( const BSONObj& expected, const BSONObj& actual ) const {
+            ASSERT_EQUALS( expected, actual );
+            ASSERT( expected.binaryEqual( actual ) );
+        }
         void assertBsonRepresentation( const BSONObj& expected,
                                        const intrusive_ptr<Accumulator>& accumulator ) const {
             BSONObjBuilder bob;
             accumulator->addToBsonObj( &bob, "", true );
-            ASSERT_EQUALS( expected, bob.obj().firstElement().Obj().getOwned() );
+            assertBinaryEqual( expected, bob.obj().firstElement().Obj().getOwned() );
         }
         intrusive_ptr<ExpressionContext> standalone() const { return _standalone; }
         intrusive_ptr<ExpressionContext> shard() const { return _shard; }
@@ -190,30 +195,30 @@ namespace AccumulatorTests {
                 void run() {
                     createAccumulator();
                     accumulator()->evaluate( frombson( operand() ) );
-                    ASSERT_EQUALS( expectedResult(),
-                                   fromDocument( accumulator()->getValue()->getDocument() ) );
+                    assertBinaryEqual( expectedResult(),
+                                       fromDocument( accumulator()->getValue()->getDocument() ) );
                 }
             protected:
                 virtual BSONObj operand() = 0;
                 virtual BSONObj expectedResult() = 0;
             };
 
-            /* Shard result for one integer. */
+            /** Shard result for one integer. */
             class Int : public SingleOperandBase {
                 BSONObj operand() { return BSON( "d" << 3 ); }
-                BSONObj expectedResult() { return BSON( "subTotal" << 3 << "count" << 1 ); }
+                BSONObj expectedResult() { return BSON( "subTotal" << 3.0 << "count" << 1LL ); }
             };
             
-            /* Shard result for one long. */
+            /** Shard result for one long. */
             class Long : public SingleOperandBase {
                 BSONObj operand() { return BSON( "d" << 5LL ); }
-                BSONObj expectedResult() { return BSON( "subTotal" << 5LL << "count" << 1 ); }
+                BSONObj expectedResult() { return BSON( "subTotal" << 5.0 << "count" << 1LL ); }
             };
             
-            /* Shard result for one double. */
+            /** Shard result for one double. */
             class Double : public SingleOperandBase {
                 BSONObj operand() { return BSON( "d" << 116.0 ); }
-                BSONObj expectedResult() { return BSON( "subTotal" << 116.0 << "count" << 1 ); }
+                BSONObj expectedResult() { return BSON( "subTotal" << 116.0 << "count" << 1LL ); }
             };
 
             class TwoOperandBase : public Base {
@@ -231,8 +236,8 @@ namespace AccumulatorTests {
                     createAccumulator();
                     accumulator()->evaluate( frombson( a ) );
                     accumulator()->evaluate( frombson( b ) );
-                    ASSERT_EQUALS( expectedResult(),
-                                   fromDocument( accumulator()->getValue()->getDocument() ) );                    
+                    assertBinaryEqual( expectedResult(),
+                                       fromDocument( accumulator()->getValue()->getDocument() ) );
                 }
             };
 
@@ -241,7 +246,7 @@ namespace AccumulatorTests {
                 BSONObj operand1() { return BSON( "d" << numeric_limits<int>::max() ); }
                 BSONObj operand2() { return BSON( "d" << 3 ); }
                 BSONObj expectedResult() {
-                    return BSON( "subTotal" << numeric_limits<int>::max() + 3.0 << "count" << 2 );
+                    return BSON( "subTotal" << numeric_limits<int>::max() + 3.0 << "count" << 2LL );
                 }
             };
 
@@ -249,21 +254,21 @@ namespace AccumulatorTests {
             class IntLong : public TwoOperandBase {
                 BSONObj operand1() { return BSON( "d" << 5 ); }
                 BSONObj operand2() { return BSON( "d" << 3LL ); }
-                BSONObj expectedResult() { return BSON( "subTotal" << 8LL << "count" << 2 ); }
+                BSONObj expectedResult() { return BSON( "subTotal" << 8.0 << "count" << 2LL ); }
             };
             
             /** Shard avg an int and a double. */
             class IntDouble : public TwoOperandBase {
                 BSONObj operand1() { return BSON( "d" << 5 ); }
                 BSONObj operand2() { return BSON( "d" << 6.2 ); }
-                BSONObj expectedResult() { return BSON( "subTotal" << 11.2 << "count" << 2 ); }
+                BSONObj expectedResult() { return BSON( "subTotal" << 11.2 << "count" << 2LL ); }
             };
             
             /** Shard avg a long and a double. */
             class LongDouble : public TwoOperandBase {
                 BSONObj operand1() { return BSON( "d" << 5LL ); }
                 BSONObj operand2() { return BSON( "d" << 1.0 ); }
-                BSONObj expectedResult() { return BSON( "subTotal" << 6.0 << "count" << 2 ); }
+                BSONObj expectedResult() { return BSON( "subTotal" << 6.0 << "count" << 2LL ); }
             };
 
             /** Shard avg an int, long, and double. */
@@ -274,8 +279,8 @@ namespace AccumulatorTests {
                     accumulator()->evaluate( frombson( BSON( "d" << 1 ) ) );
                     accumulator()->evaluate( frombson( BSON( "d" << 2LL ) ) );
                     accumulator()->evaluate( frombson( BSON( "d" << 4.0 ) ) );
-                    ASSERT_EQUALS( BSON( "subTotal" << 7.0 << "count" << 3 ),
-                                   fromDocument( accumulator()->getValue()->getDocument() ) );
+                    assertBinaryEqual( BSON( "subTotal" << 7.0 << "count" << 3LL ),
+                                       fromDocument( accumulator()->getValue()->getDocument() ) );
                 }
             };
 
@@ -287,106 +292,35 @@ namespace AccumulatorTests {
                 virtual intrusive_ptr<ExpressionContext> context() { return router(); }
             };
 
-            class SingleOperandBase : public Base {
+            /** Router result from one shard. */
+            class OneShard : public Base {
             public:
                 void run() {
                     createAccumulator();
-                    accumulator()->evaluate( frombson( operand() ) );
-                    ASSERT_EQUALS( expectedResult(), fromValue( accumulator()->getValue() ) );
+                    accumulator()->evaluate
+                            ( frombson
+                             ( BSON( "d" << BSON( "subTotal" << 3.0 << "count" << 2LL ) ) ) );
+                    assertBinaryEqual( BSON( "" << 3.0 / 2 ),
+                                       fromValue( accumulator()->getValue() ) );
                 }
-            protected:
-                virtual BSONObj operand() = 0;
-                virtual BSONObj expectedResult() = 0;
             };
             
-            /* Router result for one integer. */
-            class Int : public SingleOperandBase {
-                BSONObj operand() { return BSON( "d" << BSON( "subTotal" << 3 << "count" << 2 ) ); }
-                BSONObj expectedResult() { return BSON( "" << 1.5 ); }
-            };
-            
-            /* Router result for one long. */
-            class Long : public SingleOperandBase {
-                BSONObj operand() {
-                    return BSON( "d" << BSON( "subTotal" << 6LL << "count" << 5 ) );
-                }
-                BSONObj expectedResult() { return BSON( "" << 1.2 ); }
-            };
-            
-            /* Router result for one double. */
-            class Double : public SingleOperandBase {
-                BSONObj operand() {
-                    return BSON( "d" << BSON( "subTotal" << 6.6 << "count" << 1 ) );
-                }
-                BSONObj expectedResult() { return BSON( "" << 6.6 ); }
-            };
-
-            class TwoOperandBase : public Base {
+            /** Router result from two shards. */
+            class TwoShards : public Base {
             public:
                 void run() {
-                    checkAvg( operand1(), operand2() );
-                    checkAvg( operand2(), operand1() );
-                }
-            protected:
-                virtual BSONObj operand1() = 0;
-                virtual BSONObj operand2() = 0;
-                virtual BSONObj expectedResult() = 0;
-            private:
-                void checkAvg( const BSONObj& a, const BSONObj& b ) {
                     createAccumulator();
-                    accumulator()->evaluate( frombson( a ) );
-                    accumulator()->evaluate( frombson( b ) );
-                    ASSERT_EQUALS( expectedResult(), fromValue( accumulator()->getValue() ) );
+                    accumulator()->evaluate
+                            ( frombson
+                             ( BSON( "d" << BSON( "subTotal" << 6.0 << "count" << 1LL ) ) ) );
+                    accumulator()->evaluate
+                            ( frombson
+                             ( BSON( "d" << BSON( "subTotal" << 5.0 << "count" << 2LL ) ) ) );
+                    assertBinaryEqual( BSON( "" << 11.0 / 3 ),
+                                       fromValue( accumulator()->getValue() ) );
                 }
             };
 
-            /* Router result for two ints. */
-            class IntInt : public TwoOperandBase {
-                BSONObj operand1() {
-                    return BSON( "d" << BSON( "subTotal" << 3 << "count" << 1 ) );
-                }
-                BSONObj operand2() {
-                    return BSON( "d" << BSON( "subTotal" << 4 << "count" << 2 ) );
-                }
-                BSONObj expectedResult() { return BSON( "" << (7.0/3) ); }
-            };
-            
-            /* Router result for two ints, without overflow. */
-            class IntIntNoOverflow : public TwoOperandBase {
-                BSONObj operand1() {
-                    return BSON( "d" <<
-                                 BSON( "subTotal" << numeric_limits<int>::max() << "count" << 4 ) );
-                }
-                BSONObj operand2() {
-                    return BSON( "d" << BSON( "subTotal" << 4 << "count" << 4 ) );
-                }
-                BSONObj expectedResult() {
-                    return BSON( ""
-                                 <<  ( (long long)numeric_limits<int>::max() + 4 ) / 8.0 ); }
-            };
-            
-            /* Router result for an int and a double. */
-            class IntDouble : public TwoOperandBase {
-                BSONObj operand1() {
-                    return BSON( "d" << BSON( "subTotal" << 5 << "count" << 1 ) );
-                }
-                BSONObj operand2() {
-                    return BSON( "d" << BSON( "subTotal" << 5.0 << "count" << 2 ) );
-                }
-                BSONObj expectedResult() { return BSON( "" << 10.0/3 ); }
-            };
-
-            /* Router result for a long and a double. */
-            class LongDouble : public TwoOperandBase {
-                BSONObj operand1() {
-                    return BSON( "d" << BSON( "subTotal" << 6LL << "count" << 1 ) );
-                }
-                BSONObj operand2() {
-                    return BSON( "d" << BSON( "subTotal" << 5.0 << "count" << 2 ) );
-                }
-                BSONObj expectedResult() { return BSON( "" << 11.0/3 ); }
-            };
-            
         } // namespace Router
         
     } // namespace Avg
@@ -983,15 +917,8 @@ namespace AccumulatorTests {
             add<Avg::Shard::IntDouble>();
             add<Avg::Shard::LongDouble>();
             add<Avg::Shard::IntLongDouble>();
-            add<Avg::Router::Int>();
-            add<Avg::Router::Long>();
-            add<Avg::Router::Double>();
-            add<Avg::Router::IntInt>();
-            add<Avg::Router::IntIntNoOverflow>();
-            add<Avg::Router::IntDouble>();
-            if ( 0 ) { // SERVER-6551
-            add<Avg::Router::LongDouble>();
-            }
+            add<Avg::Router::OneShard>();
+            add<Avg::Router::TwoShards>();
 
             add<First::None>();
             add<First::One>();
