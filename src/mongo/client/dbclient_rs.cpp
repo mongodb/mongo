@@ -737,13 +737,6 @@ namespace mongo {
             log( ! verbose ) << "ReplicaSetMonitor::_checkConnection: " << conn->toString()
                              << ' ' << o << endl;
             
-            if (!o["secondary"].trueValue() && !o["ismaster"].trueValue()) {
-                /* This node is not in steady state so don't trust the host list.
-                 * In the worst case, this node can even be a non member of the set.
-                 */
-                return false;
-            }
-
             // add other nodes
             BSONArrayBuilder b;
             if ( o["hosts"].type() == Array ) {
