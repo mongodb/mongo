@@ -295,53 +295,21 @@ namespace mongo {
         return pExpression;
     }
 
-    intrusive_ptr<Expression> Expression::parseOperand(
-        BSONElement *pBsonElement) {
+    intrusive_ptr<Expression> Expression::parseOperand(BSONElement *pBsonElement) {
         BSONType type = pBsonElement->type();
 
-        switch(type) {
-        case String: {
-            /*
-              This could be a field path, or it could be a constant
-              string.
-
-              We make a copy of the BSONElement reader so we can read its
-              value without advancing its state, in case we need to read it
-              again in the constant code path.
-            */
-            BSONElement opCopy(*pBsonElement);
-            string value(opCopy.str());
-
-            /* check for a field path */
-            if (value[0] != '$')
-                goto ExpectConstant;  // assume plain string constant
-
+        if (type == String && pBsonElement->valuestr()[0] == '$') {
             /* if we got here, this is a field path expression */
-            string fieldPath(removeFieldPrefix(value));
-            intrusive_ptr<Expression> pFieldExpr(
-                ExpressionFieldPath::create(fieldPath));
-            return pFieldExpr;
+            string fieldPath = removeFieldPrefix(pBsonElement->str());
+            return ExpressionFieldPath::create(fieldPath);
         }
-
-        case Object: {
+        else if (type == Object) {
             ObjectCtx oCtx(ObjectCtx::DOCUMENT_OK);
-            intrusive_ptr<Expression> pSubExpression(
-                Expression::parseObject(pBsonElement, &oCtx));
-            return pSubExpression;
+            return Expression::parseObject(pBsonElement, &oCtx);
         }
-
-        default:
-        ExpectConstant: {
-                intrusive_ptr<Expression> pOperand(
-                    ExpressionConstant::createFromBsonElement(pBsonElement));
-                return pOperand;
-            }
-
-        } // switch(type)
-
-        /* NOTREACHED */
-        verify(false);
-        return intrusive_ptr<Expression>();
+        else {
+            return ExpressionConstant::createFromBsonElement(pBsonElement);
+        }
     }
 
     /* ------------------------- ExpressionAdd ----------------------------- */
