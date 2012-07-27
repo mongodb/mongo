@@ -253,11 +253,12 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session)
 
 	/*
 	 * A note about empty trees: the initial tree is a root page and a leaf
-	 * page, the leaf of which is marked dirty.   If evicted without being
-	 * modified, that's OK, nothing will ever be written.
+	 * page.  We need a pair of pages instead of just a single page because
+	 * we can reconcile the leaf page while the root stays pinned in memory.
+	 * If the pair is evicted without being modified, that's OK, nothing is
+	 * ever written.
 	 *
-	 * Create a leaf page -- this can be reconciled while the root stays
-	 * pinned.
+	 * Create the leaf page.
 	 */
 	WT_ERR(__wt_calloc_def(session, 1, &leaf));
 	switch (btree->type) {
@@ -276,7 +277,7 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session)
 	leaf->entries = 0;
 
 	/*
-	 * Create the empty root page.
+	 * Create the root page.
 	 *
 	 * !!!
 	 * Be cautious about changing the order of updates in this code: to call
@@ -317,8 +318,25 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session)
 	btree->root_page = root;
 
 	/*
-	 * Mark the leaf page dirty; if it's evicted, it will be reconciled,
-	 * but if it's still empty, nothing will be written.
+	 * Mark the leaf page dirty: we didn't create an entirely valid root
+	 * page (specifically, the root page's disk address isn't set, and it's
+	 * the act of reconciling the leaf page that makes it work, we don't
+	 * try and use the original disk address of modified pages).  We could
+	 * get around that by leaving the leaf page clean and building a better
+	 * root page, but then we get into trouble because a checkpoint marks
+	 * the root page dirty to force a write, and without reconciling the
+	 * leaf page we won't realize there's no records to write, we'll write
+	 * a root page, which isn't correct for an empty tree.
+	 *    Earlier versions of this code kept the leaf page clean, but with
+	 * the "empty" flag set in the leaf page's modification structure; in
+	 * that case, checkpoints works (forced reconciliation of a root with
+	 * a single "empty" page wouldn't write any blocks). That version had
+	 * memory leaks because the eviction code didn't correctly handle pages
+	 * that were "clean" (and so never reconciled), yet "modified" with an
+	 * "empty" flag.  The goal of this code is to mimic a real tree that
+	 * simply has no records, for whatever reason, and trust reconciliation
+	 * to figure out it's empty and not write any blocks.
+	 *    There's some discussion in issue #272.
 	 */
 	WT_ERR(__wt_page_modify_init(session, leaf));
 	__wt_page_modify_set(leaf);
