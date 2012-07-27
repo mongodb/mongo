@@ -46,6 +46,10 @@ namespace mongo {
         return ((options & TOP_LEVEL) != 0);
     }
 
+    bool Expression::ObjectCtx::inclusionOk() const {
+        return ((options & INCLUSION_OK) != 0);
+    }
+
     string Expression::removeFieldPrefix(const string &prefixedField) {
         uassert(16419, str::stream()<<"field path must not contain embedded null characters" << prefixedField.find("\0") << "," ,
                 prefixedField.find('\0') == string::npos);
@@ -120,7 +124,8 @@ namespace mongo {
                     case Object: {
                         /* it's a nested document */
                         ObjectCtx oCtx(
-                            (pCtx->documentOk() ? ObjectCtx::DOCUMENT_OK : 0));
+                            (pCtx->documentOk() ? ObjectCtx::DOCUMENT_OK : 0)
+                             | (pCtx->inclusionOk() ? ObjectCtx::INCLUSION_OK : 0));
                         intrusive_ptr<Expression> pNested(
                             parseObject(&fieldElement, &oCtx));
                         pExpressionObject->addField(fieldName, pNested);
@@ -141,6 +146,8 @@ namespace mongo {
                     case NumberInt: {
                         /* it's an inclusion specification */
                         if (fieldElement.trueValue()) {
+                            uassert(16420, "field inclusion is not allowed inside of $expressions",
+                                    pCtx->inclusionOk());
                             pExpressionObject->includePath(fieldName);
                         }
                         else {
@@ -1042,7 +1049,6 @@ namespace mongo {
                 if (path) path->pop_back();
             }
             else { // inclusion
-                // TODO move this assert into parsing stage
                 uassert(16407, "inclusion not supported in objects nested in $expressions",
                         path);
 

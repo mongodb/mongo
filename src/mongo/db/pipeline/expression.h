@@ -141,9 +141,11 @@ namespace mongo {
             ObjectCtx(int options);
             static const int DOCUMENT_OK = 0x0001;
             static const int TOP_LEVEL = 0x0002;
+            static const int INCLUSION_OK = 0x0004;
 
             bool documentOk() const;
             bool topLevel() const;
+            bool inclusionOk() const;
 
         private:
             int options;

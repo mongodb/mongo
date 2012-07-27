@@ -118,6 +118,7 @@ namespace mongo {
         Expression::ObjectCtx objectCtx(
               Expression::ObjectCtx::DOCUMENT_OK
             | Expression::ObjectCtx::TOP_LEVEL
+            | Expression::ObjectCtx::INCLUSION_OK
             );
 
         intrusive_ptr<Expression> parsed = Expression::parseObject(pBsonElement, &objectCtx);

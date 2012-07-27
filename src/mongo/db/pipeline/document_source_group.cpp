@@ -184,8 +184,7 @@ namespace mongo {
                       Use the projection-like set of field paths to create the
                       group-by key.
                     */
-                    Expression::ObjectCtx oCtx(
-                        Expression::ObjectCtx::DOCUMENT_OK);
+                    Expression::ObjectCtx oCtx(Expression::ObjectCtx::DOCUMENT_OK);
                     intrusive_ptr<Expression> pId(
                         Expression::parseObject(&groupField, &oCtx));
 

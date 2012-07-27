@@ -1,20 +1,15 @@
-db = db.getSiblingDB('foo');
+// test to make sure we accept all numeric types for inclusion
+c = db.blah;
+c.drop();
+c.save({key: 4, v: 3, x: 2});
 
-// test to make sure we accept all numeric types for inclusion/exclusion
 var r = db.runCommand({ "aggregate" : "blah", "pipeline" : [
     { "$project" : {
+        "_id" : 0,
         "key" : NumberLong(1),
         "v" : 1, /* javascript:  really a double */
         "x" : NumberInt(1)
     }},
-    { "$group" : {
-        "_id" : {
-            "key" : NumberInt(1),
-            "v" : 1, /* javascript:  really a double */
-            "x" :NumberLong(1)
-        },
-        "min_v" : { "$min" : "$v" }
-    }}
 ]});
 
-assert(r.ok, 'support204 failed');
+assert.eq(r.result, [{key: 4, v: 3, x: 2}], "support204 failed");
