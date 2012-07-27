@@ -668,7 +668,14 @@ startMongoProgram = function(){
 // program name, and subsequent arguments to this function are passed as
 // command line arguments to the program.  Returns pid of the spawned program.
 startMongoProgramNoConnect = function() {
-    return _startMongoProgram.apply( null, arguments );
+    var args = argumentsToArray( arguments );
+    if ( jsTestOptions().auth ) {
+        var progName = args[0];
+        args = args.slice(1);
+        args.unshift( progName, '-u', jsTestOptions().adminUser,
+                      '-p', jsTestOptions().adminPassword );
+    }
+    return _startMongoProgram.apply( null, args );
 }
 
 myPort = function() {
