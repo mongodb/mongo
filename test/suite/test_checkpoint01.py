@@ -251,3 +251,23 @@ class test_checkpoint_target(wttest.WiredTigerTestCase):
         self.check(self.uri + '1', 'UPDATE')
         self.check(self.uri + '2', 'UPDATE')
         self.check(self.uri + '3', 'ORIGINAL')
+
+# Check that you can't write checkpoint cursors.
+class test_checkpoint_cursor_update(wttest.WiredTigerTestCase):
+    scenarios = [
+        ('file', dict(uri='file:checkpoint',fmt='r')),
+        ('file', dict(uri='file:checkpoint',fmt='S')),
+        ('table', dict(uri='table:checkpoint',fmt='r')),
+        ('table', dict(uri='table:checkpoint',fmt='S'))
+        ]
+
+    def test_checkpoint_cursor_update(self):
+        simplePopulate(self, self.uri, 'key_format=' + self.fmt, 100)
+        self.session.checkpoint("name=ckpt")
+        cursor = self.session.open_cursor(self.uri, None, "checkpoint=ckpt")
+        cursor.set_key(keyPopulate(self.fmt, 10))
+        cursor.set_value("XXX")
+	self.assertRaises(wiredtiger.WiredTigerError, lambda: cursor.insert())
+	self.assertRaises(wiredtiger.WiredTigerError, lambda: cursor.remove())
+	self.assertRaises(wiredtiger.WiredTigerError, lambda: cursor.update())
+        cursor.close()
