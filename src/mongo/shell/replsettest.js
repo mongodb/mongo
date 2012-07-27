@@ -893,6 +893,7 @@ ReplSetTest.State = {}
 ReplSetTest.State.PRIMARY = 1
 ReplSetTest.State.SECONDARY = 2
 ReplSetTest.State.RECOVERING = 3
+ReplSetTest.State.ARBITER = 7
 
 /** 
  * Overflows a replica set secondary or secondaries, specified by id or conn.

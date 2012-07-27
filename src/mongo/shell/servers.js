@@ -297,7 +297,13 @@ MongoRunner.mongoOptions = function( opts ){
     if( ! opts.restart ) opts.restart = false
     
     // RunId can come from a number of places
-    if( isObject( opts.restart ) ){
+    // If restart is passed as an old connection
+    if( opts.restart && opts.restart.getDB ){
+        opts.runId = opts.restart.runId
+        opts.restart = true
+    }
+    // If it's the runId itself
+    else if( isObject( opts.restart ) ){
         opts.runId = opts.restart
         opts.restart = true
     }
