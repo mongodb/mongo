@@ -296,6 +296,17 @@ namespace DocumentSourceTests {
             }
         };
 
+        /** A limit does not introduce any dependencies. */
+        class Dependencies : public Base {
+        public:
+            void run() {
+                createLimit( 1 );
+                set<string> dependencies;
+                ASSERT_EQUALS( DocumentSource::SEE_NEXT, limit()->getDependencies( dependencies ) );
+                ASSERT_EQUALS( 0U, dependencies.size() );
+            }
+        };
+
     } // namespace DocumentSourceLimit
 
     namespace DocumentSourceGroup {
@@ -768,6 +779,24 @@ namespace DocumentSourceTests {
         private:
             string expectedResultSetString() {
                 return "[{_id:0,list:[1,2,10,20]},{_id:1,list:[3,4,30,40]}]";
+            }
+        };
+
+        /** Dependant field paths. */
+        class Dependencies : public Base {
+        public:
+            void run() {
+                createGroup( fromjson( "{_id:'$x',a:{$sum:'$y.z'},b:{$avg:{$add:['$u','$v']}}}" ) );
+                set<string> dependencies;
+                ASSERT_EQUALS( DocumentSource::EXHAUSTIVE,
+                               group()->getDependencies( dependencies ) );
+                ASSERT_EQUALS( 4U, dependencies.size() );
+                // Dependency from _id expression.
+                ASSERT_EQUALS( 1U, dependencies.count( "x" ) );
+                // Dependencies from accumulator expressions.
+                ASSERT_EQUALS( 1U, dependencies.count( "y.z" ) );
+                ASSERT_EQUALS( 1U, dependencies.count( "u" ) );
+                ASSERT_EQUALS( 1U, dependencies.count( "v" ) );
             }
         };
 
@@ -1286,6 +1315,19 @@ namespace DocumentSourceTests {
             }
             BSONObj sortSpec() { return BSON( "a.b" << 1 ); }
         };
+
+        /** Dependant field paths. */
+        class Dependencies : public Base {
+        public:
+            void run() {
+                createSort( BSON( "a" << 1 << "b.c" << -1 ) );
+                set<string> dependencies;
+                ASSERT_EQUALS( DocumentSource::SEE_NEXT, sort()->getDependencies( dependencies ) );
+                ASSERT_EQUALS( 2U, dependencies.size() );
+                ASSERT_EQUALS( 1U, dependencies.count( "a" ) );
+                ASSERT_EQUALS( 1U, dependencies.count( "b.c" ) );
+            }
+        };
         
     } // namespace DocumentSourceSort
 
@@ -1586,6 +1628,19 @@ namespace DocumentSourceTests {
             }
         };
 
+        /** Dependant field paths. */
+        class Dependencies : public Base {
+        public:
+            void run() {
+                createUnwind( "$x.y.z" );
+                set<string> dependencies;
+                ASSERT_EQUALS( DocumentSource::SEE_NEXT,
+                               unwind()->getDependencies( dependencies ) );
+                ASSERT_EQUALS( 1U, dependencies.size() );
+                ASSERT_EQUALS( 1U, dependencies.count( "x.y.z" ) );
+            }
+        };
+
     } // namespace DocumentSourceUnwind
 
     class All : public Suite {
@@ -1601,6 +1656,7 @@ namespace DocumentSourceTests {
 
             add<DocumentSourceLimit::DisposeSource>();
             add<DocumentSourceLimit::DisposeSourceCascade>();
+            add<DocumentSourceLimit::Dependencies>();
 
             add<DocumentSourceGroup::NonObject>();
             add<DocumentSourceGroup::EmptySpec>();
@@ -1637,6 +1693,7 @@ namespace DocumentSourceTests {
             //add<DocumentSourceGroup::ComplexId>(); uncomment after 6195
             add<DocumentSourceGroup::UndefinedAccumulatorValue>();
             add<DocumentSourceGroup::RouterMerger>();
+            add<DocumentSourceGroup::Dependencies>();
 
             add<DocumentSourceProject::EofInit>();
             add<DocumentSourceProject::AdvanceInit>();
@@ -1671,6 +1728,7 @@ namespace DocumentSourceTests {
             add<DocumentSourceSort::NullValue>();
             add<DocumentSourceSort::MissingObjectWithinArray>();
             add<DocumentSourceSort::ExtractArrayValues>();
+            add<DocumentSourceSort::Dependencies>();
 
             add<DocumentSourceUnwind::EofInit>();
             add<DocumentSourceUnwind::AdvanceInit>();
@@ -1692,6 +1750,7 @@ namespace DocumentSourceTests {
             add<DocumentSourceUnwind::DoubleNestedArray>();
             add<DocumentSourceUnwind::SeveralDocuments>();
             add<DocumentSourceUnwind::SeveralMoreDocuments>();
+            add<DocumentSourceUnwind::Dependencies>();
         }
     } myall;
 
