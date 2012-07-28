@@ -96,8 +96,10 @@ public:
         int queryOptions = QueryOption_SlaveOk | QueryOption_NoCursorTimeout;
         if (startsWith(coll.c_str(), "local.oplog."))
             queryOptions |= QueryOption_OplogReplay;
-        else if ( _query.isEmpty() && !hasParam("dbpath") && !hasParam("forceTableScan") )
+        else if ( _query.isEmpty() && !hasParam("dbpath") && !hasParam("forceTableScan") ) {
             q.snapshot();
+            log() << "doing snapshot query" << endl;
+        }
         
         DBClientBase& connBase = conn(true);
         Writer writer(out, m);
@@ -243,7 +245,7 @@ public:
         }
         
         if ( ! hasParam( "db" ) ){
-            log() << "repair mode only works on 1 db right at a time right now" << endl;
+            log() << "repair mode only works on 1 db at a time right now" << endl;
             return -1;
         }
 
@@ -279,7 +281,7 @@ public:
         while ( ! loc.isNull() ){
             
             if ( ! seen.insert( loc ).second ) {
-                error() << "infinite loop in extend, seen: " << loc << " before" << endl;
+                error() << "infinite loop in extent, seen: " << loc << " before" << endl;
                 break;
             }
 
@@ -306,13 +308,21 @@ public:
                         log() << ss.str();
                     }
                     catch ( std::exception& ) {
+                        log() << "unable to log invalid document @ " << loc << endl;
                     }
                 }
             }
             loc = forward ? rec->getNext( loc ) : rec->getPrev( loc );
+
+            // break when new loc is outside current extent boundary
+            if ( forward && loc.compare( e->lastRecord ) > 0 || 
+                 ! forward && loc.compare( e->firstRecord ) < 0 ) 
+            {
+                break;
+            }
         }
+        log() << "wrote " << seen.size() << " documents" << endl;
         return forward ? e->xnext : e->xprev;
-        
     }
 
     void _repair( Database* db , string ns , boost::filesystem::path outfile ){
@@ -337,6 +347,7 @@ public:
         
         FilePtr f (fopen(outfile.string().c_str(), "wb"));
 
+        // init with double the docs count because we make two passes 
         ProgressMeter m( nsd->stats.nrecords * 2 );
         m.setUnits("objects");
         
