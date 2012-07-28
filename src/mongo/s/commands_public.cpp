@@ -215,6 +215,11 @@ namespace mongo {
             ReIndexCmd() :  AllShardsCollectionCommand("reIndex") {}
         } reIndexCmd;
 
+        class CollectionModCmd : public AllShardsCollectionCommand {
+        public:
+            CollectionModCmd() :  AllShardsCollectionCommand("collMod") {}
+        } collectionModCmd;
+
         class ProfileCmd : public PublicGridCommand {
         public:
             ProfileCmd() :  PublicGridCommand("profile") {}
