@@ -230,17 +230,23 @@ __wt_session_lock_checkpoint(WT_SESSION_IMPL *session, const char *checkpoint)
 	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_ITEM *buf;
-	const char *cfg[] = { NULL, NULL };
 
 	buf = NULL;
 	btree = session->btree;
 
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));
 	WT_ERR(__wt_buf_fmt(session, buf, "checkpoint=\"%s\"", checkpoint));
-	cfg[0] = buf->data;
 
-	WT_ERR(__wt_session_get_btree(session, btree->name, cfg,
-	    WT_BTREE_EXCLUSIVE | WT_BTREE_LOCK_ONLY));
+	/*
+	 * Set config in raw_cfg[1], not raw_cfg[0]; the underlying function
+	 * calls __wt_config_gets_defno to speed up cursor creation and a NULL
+	 * cfg[1] in that function implies no user-specified configuration.
+	 */
+	{
+	const char *raw_cfg[] = { "", buf->data, NULL };
+	WT_ERR(__wt_session_get_btree(session,
+	    btree->name, raw_cfg, WT_BTREE_EXCLUSIVE | WT_BTREE_LOCK_ONLY));
+	}
 
 	/*
 	 * We lock checkpoint handles that we are overwriting, so the handle

@@ -430,8 +430,8 @@ __cursor_reconfigure(WT_CURSOR *cursor, const char *config)
 	 * the config string from the application, not with defaults.
 	 *
 	 * Set config in raw_cfg[1], not raw_cfg[0]; the underlying function
-	 * calls __wt_config_gets_defno to speed up cursor creation and that
-	 * function a NULL cfg[1] implies no user-specified configuration.
+	 * calls __wt_config_gets_defno to speed up cursor creation and a NULL
+	 * cfg[1] in that function implies no user-specified configuration.
 	 */
 	{
 	const char *raw_cfg[] = { "", config, NULL };
