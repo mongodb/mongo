@@ -4,8 +4,7 @@
 
 The checkpoint functionality supported by WT_SESSION::checkpoint and the
 snapshot functionality supported by WT_SESSION::sync have been merged
-into a single piece of functionality, and applications no longer have
-access to object-level snapshots.
+into a single piece of functionality.
 
 @par WT_SESSION.checkpoint
 The WT_SESSION::checkpoint method's \c snapshot configuration string has
@@ -40,6 +39,12 @@ Other changes:
 In releases before 1.3, the WT_SESSION::open_cursor method could
 duplicate cursors that were not positioned in an object; in 1.3, a
 cursor must be positioned in order to be duplicated.
+
+@par WT_CURSOR.equals
+In releases before 1.3, the WT_CURSOR::equals method returned
+zero/non-zero to indicate cursor equality; in 1.3, WT_CURSOR::equals
+returns a standard error status, and cursor equality is returned in an
+additional parameter specified to the method.
 
 @section version13file Version 1.3 file format changes
 

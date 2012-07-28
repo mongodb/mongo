@@ -235,10 +235,12 @@ struct __wt_cursor {
 	 *
 	 * @param cursor the cursor handle
 	 * @param other another cursor handle
-	 * @returns true (non-zero) if both cursors reference the same item,
-	 * false (zero) otherwise
+	 * @param equalp the status of the comparison: non-zero if the cursors
+	 * refer to the same item, or zero if the cursors do not refer to the
+	 * same item.
+	 * @errors
 	 */
-	int __F(equals)(WT_CURSOR *cursor, WT_CURSOR *other);
+	int __F(equals)(WT_CURSOR *cursor, WT_CURSOR *other, int *equalp);
 
 	/*! Return the next record.
 	 *

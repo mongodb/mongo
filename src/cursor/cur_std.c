@@ -26,7 +26,8 @@ __wt_cursor_notsup(WT_CURSOR *cursor)
 void
 __wt_cursor_set_notsup(WT_CURSOR *cursor)
 {
-	cursor->equals = (int (*)(WT_CURSOR *, WT_CURSOR *))__wt_cursor_notsup;
+	cursor->equals =
+	    (int (*)(WT_CURSOR *, WT_CURSOR *, int *))__wt_cursor_notsup;
 	cursor->next = __wt_cursor_notsup;
 	cursor->prev = __wt_cursor_notsup;
 	cursor->reset = __wt_cursor_notsup;
@@ -331,13 +332,15 @@ __cursor_search(WT_CURSOR *cursor)
  *	WT_CURSOR->equals default implementation.
  */
 static int
-__cursor_equals(WT_CURSOR *cursor, WT_CURSOR *other)
+__cursor_equals(WT_CURSOR *cursor, WT_CURSOR *other, int *equalp)
 {
 	WT_ITEM aitem, bitem;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
 	CURSOR_API_CALL_NOCONF(cursor, session, equals, NULL);
+
+	*equalp = 0;
 
 	/*
 	 * Confirm both cursors refer to the same source, then retrieve their
@@ -351,7 +354,7 @@ __cursor_equals(WT_CURSOR *cursor, WT_CURSOR *other)
 		 */
 		WT_ERR(__wt_cursor_get_raw_key(cursor, &aitem));
 		WT_ERR(__wt_cursor_get_raw_key(other, &bitem));
-		ret = (aitem.size == bitem.size &&
+		*equalp = (aitem.size == bitem.size &&
 		    memcmp(aitem.data, bitem.data, aitem.size) == 0) ? 1 : 0;
 	}
 

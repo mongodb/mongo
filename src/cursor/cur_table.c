@@ -443,7 +443,7 @@ __wt_curtable_truncate(
 	WT_CURSOR_TABLE *ctable, *ctable_start, *ctable_stop;
 	WT_DECL_RET;
 	WT_ITEM key;
-	int i;
+	int equal, i;
 
 	/*
 	 * Step through the cursor range, removing any indices.
@@ -505,8 +505,8 @@ __wt_curtable_truncate(
 				APPLY_CG(ctable, search);
 				WT_RET(ret);
 				APPLY_IDX(ctable, remove);
-			} while (!start->equals(start, stop) &&
-			    (ret = start->next(start)) == 0);
+				WT_RET(start->equals(start, stop, &equal));
+			} while (!equal && (ret = start->next(start)) == 0);
 			WT_RET_NOTFOUND_OK(ret);
 			ret = 0;
 

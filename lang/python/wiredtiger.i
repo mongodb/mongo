@@ -35,7 +35,10 @@ from packing import pack, unpack
 	$1 = &temp;
 }
 
-/* Convert 'int *' to an output arg in search_near, wiredtiger_version */
+/*
+ * Convert 'int *' to an output arg in cursor.equals, cursor.search_near,
+ * wiredtiger_version
+ */
 %apply int *OUTPUT { int * };
 
 /* Event handlers are not supported in Python. */
@@ -359,8 +362,8 @@ NOTFOUND_OK(__wt_cursor::search_near)
 NOTFOUND_OK(__wt_cursor::update)
 
 /* Lastly, some methods need no error checking. */
-%exception __wt_cursor::equals;
 %exception __wt_connection::get_home;
+%exception __wt_connection::is_new;
 %exception wiredtiger_strerror;
 %exception wiredtiger_version;
 
