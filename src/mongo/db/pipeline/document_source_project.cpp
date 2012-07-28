@@ -50,6 +50,7 @@ namespace mongo {
 
     intrusive_ptr<Document> DocumentSourceProject::getCurrent() {
         intrusive_ptr<Document> pInDocument(pSource->getCurrent());
+        verify(pInDocument);
 
         /* create the result document */
         const size_t sizeHint = pEO->getSizeHint();
