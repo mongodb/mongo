@@ -149,7 +149,7 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 	 * set.
 	 */
 	if (cfg != NULL &&
-	    __wt_config_gets(session, cfg, "checkpoint", &cval) == 0 &&
+	    __wt_config_gets_defno(session, cfg, "checkpoint", &cval) == 0 &&
 	    cval.len != 0) {
 		ckpt = cval.str;
 		ckptlen = cval.len;

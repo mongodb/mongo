@@ -400,7 +400,8 @@ __cursor_runtime_config(WT_CURSOR *cursor, const char *cfg[])
 
 	session = (WT_SESSION_IMPL *)cursor->session;
 
-	if ((ret = __wt_config_gets(session, cfg, "overwrite", &cval)) == 0) {
+	if ((ret =
+	    __wt_config_gets_defno(session, cfg, "overwrite", &cval)) == 0) {
 		if (cval.val)
 			F_SET(cursor, WT_CURSTD_OVERWRITE);
 		else
@@ -420,16 +421,22 @@ __cursor_reconfigure(WT_CURSOR *cursor, const char *config)
 {
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	const char *raw_cfg[] = { config, NULL };
 
 	CURSOR_API_CALL(cursor, session, reconfigure, NULL, config, cfg);
+	WT_UNUSED(cfg);
 
 	/*
 	 * We need to take care here: only override with values that appear in
 	 * the config string from the application, not with defaults.
+	 *
+	 * Set config in raw_cfg[1], not raw_cfg[0]; the underlying function
+	 * calls __wt_config_gets_defno to speed up cursor creation and that
+	 * function a NULL cfg[1] implies no user-specified configuration.
 	 */
-	WT_UNUSED(cfg);
+	{
+	const char *raw_cfg[] = { "", config, NULL };
 	ret = __cursor_runtime_config(cursor, raw_cfg);
+	}
 
 err:	API_END(session);
 	return (ret);
