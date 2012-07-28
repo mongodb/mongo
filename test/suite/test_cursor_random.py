@@ -39,67 +39,67 @@ class test_cursor_random(wttest.WiredTigerTestCase):
     # Check that opening a random cursor on a row-store returns not-supported
     # for every method except for next, and next returns not-found.
     def test_cursor_random_column(self):
-	uri = self.type + 'random'
-	self.session.create(uri, 'key_format=' + self.fmt + ',value_format=S')
-	cursor = self.session.open_cursor(uri, None, "next_random=true")
-	self.assertRaises(
-	    wiredtiger.WiredTigerError, lambda: cursor.equals(cursor))
-	self.assertRaises(wiredtiger.WiredTigerError, lambda: cursor.prev())
-	self.assertRaises(wiredtiger.WiredTigerError, lambda: cursor.reset())
-	self.assertRaises(wiredtiger.WiredTigerError, lambda: cursor.search())
-	self.assertRaises(
-	    wiredtiger.WiredTigerError, lambda: cursor.search_near())
-	self.assertRaises(wiredtiger.WiredTigerError, lambda: cursor.insert())
-	self.assertRaises(wiredtiger.WiredTigerError, lambda: cursor.update())
-	self.assertRaises(wiredtiger.WiredTigerError, lambda: cursor.remove())
-	self.assertRaises(
-	    wiredtiger.WiredTigerError, lambda: cursor.reconfigure())
+        uri = self.type + 'random'
+        self.session.create(uri, 'key_format=' + self.fmt + ',value_format=S')
+        cursor = self.session.open_cursor(uri, None, "next_random=true")
+        self.assertRaises(
+            wiredtiger.WiredTigerError, lambda: cursor.equals(cursor))
+        self.assertRaises(wiredtiger.WiredTigerError, lambda: cursor.prev())
+        self.assertRaises(wiredtiger.WiredTigerError, lambda: cursor.reset())
+        self.assertRaises(wiredtiger.WiredTigerError, lambda: cursor.search())
+        self.assertRaises(
+            wiredtiger.WiredTigerError, lambda: cursor.search_near())
+        self.assertRaises(wiredtiger.WiredTigerError, lambda: cursor.insert())
+        self.assertRaises(wiredtiger.WiredTigerError, lambda: cursor.update())
+        self.assertRaises(wiredtiger.WiredTigerError, lambda: cursor.remove())
+        self.assertRaises(
+            wiredtiger.WiredTigerError, lambda: cursor.reconfigure())
 
-	self.assertTrue(cursor.next(), wiredtiger.WT_NOTFOUND)
-	cursor.close()
+        self.assertTrue(cursor.next(), wiredtiger.WT_NOTFOUND)
+        cursor.close()
 
     # Check that next_random works with a single value, repeatedly.
     def test_cursor_random_single_record(self):
-	uri = self.type + 'random'
-	self.session.create(uri, 'key_format=' + self.fmt + ',value_format=S')
-	cursor = self.session.open_cursor(uri, None)
-	cursor.set_key('AAA')
-	cursor.set_value('BBB')
-	cursor.insert()
-	cursor.close
-	cursor = self.session.open_cursor(uri, None, "next_random=true")
-	for i in range(1,5):
-	    cursor.next()
-	    self.assertEquals(cursor.get_key(), 'AAA')
-	cursor.close
+        uri = self.type + 'random'
+        self.session.create(uri, 'key_format=' + self.fmt + ',value_format=S')
+        cursor = self.session.open_cursor(uri, None)
+        cursor.set_key('AAA')
+        cursor.set_value('BBB')
+        cursor.insert()
+        cursor.close
+        cursor = self.session.open_cursor(uri, None, "next_random=true")
+        for i in range(1,5):
+            cursor.next()
+            self.assertEquals(cursor.get_key(), 'AAA')
+        cursor.close
 
     # Check that next_random works in the presence of a larger set of values.
     def test_cursor_random_single_record(self):
-	uri = self.type + 'random'
-	if self.type == 'file:':
-	    simple_populate(
-		self, uri, 'leaf_page_max=512,key_format=' + self.fmt, 10000)
-	else:
-	    complex_populate(
-		self, uri, 'leaf_page_max=512,key_format=' + self.fmt, 10000)
+        uri = self.type + 'random'
+        if self.type == 'file:':
+            simple_populate(
+                self, uri, 'leaf_page_max=512,key_format=' + self.fmt, 10000)
+        else:
+            complex_populate(
+                self, uri, 'leaf_page_max=512,key_format=' + self.fmt, 10000)
 
-	# Close the connection so everything is forced to disk (otherwise the
-	# values are on an insert list and the underlying engine doesn't make
-	# random selections, it selects the middle of the list.
-	self.conn.close()
-	self.conn = self.setUpConnectionOpen(".")
-	self.session = self.conn.open_session()
-	cursor = self.session.open_cursor(uri, None, "next_random=true")
-	last = ''
-	match = 0
-	for i in range(1,10):
-	    cursor.next()
-	    current = cursor.get_key()
-	    if current == last:
-		match += 1
-	    last = current
-	self.assertLess(match, 5,
-	    'next_random did not return random records, too many matches found')
+        # Close the connection so everything is forced to disk (otherwise the
+        # values are on an insert list and the underlying engine doesn't make
+        # random selections, it selects the middle of the list.
+        self.conn.close()
+        self.conn = self.setUpConnectionOpen(".")
+        self.session = self.conn.open_session()
+        cursor = self.session.open_cursor(uri, None, "next_random=true")
+        last = ''
+        match = 0
+        for i in range(1,10):
+            cursor.next()
+            current = cursor.get_key()
+            if current == last:
+                match += 1
+            last = current
+        self.assertLess(match, 5,
+            'next_random did not return random records, too many matches found')
 
 
 # Check that opening a random cursor on column-store returns not-supported.
@@ -110,11 +110,11 @@ class test_cursor_random_column(wttest.WiredTigerTestCase):
         ]
 
     def test_cursor_random_column(self):
-	self.session.create(
-	    self.uri, 'key_format=' + self.fmt + ',value_format=S')
-	cursor = self.session.open_cursor(self.uri, None, "next_random=true")
-	self.assertRaises(wiredtiger.WiredTigerError, lambda: cursor.next())
-	cursor.close()
+        self.session.create(
+            self.uri, 'key_format=' + self.fmt + ',value_format=S')
+        cursor = self.session.open_cursor(self.uri, None, "next_random=true")
+        self.assertRaises(wiredtiger.WiredTigerError, lambda: cursor.next())
+        cursor.close()
 
 
 if __name__ == '__main__':
