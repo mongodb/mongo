@@ -368,8 +368,10 @@ namespace mongo {
                     NamespaceDetails::IndexIterator i = d->ii();
                     while( i.more() ) {
                         IndexDetails& id = i.next();
+                        log() << "validating index " << idxn << ": " << id.indexNamespace() << endl;
                         long long keys = id.idxInterface().fullValidate(id.head, id.keyPattern());
                         indexes.appendNumber(id.indexNamespace(), keys);
+                        idxn++;
                     }
                     result.append("keysPerIndex", indexes.done());
                 }
