@@ -315,8 +315,8 @@ public:
             loc = forward ? rec->getNext( loc ) : rec->getPrev( loc );
 
             // break when new loc is outside current extent boundary
-            if ( forward && loc.compare( e->lastRecord ) > 0 || 
-                 ! forward && loc.compare( e->firstRecord ) < 0 ) 
+            if ( ( forward && loc.compare( e->lastRecord ) > 0 ) || 
+                 ( ! forward && loc.compare( e->firstRecord ) < 0 ) ) 
             {
                 break;
             }
