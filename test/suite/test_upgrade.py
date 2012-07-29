@@ -27,51 +27,33 @@
 
 import os, time
 import wiredtiger, wttest
-from helper import confirm_does_not_exist, complex_populate, simple_populate
+from helper import complex_populate, simple_populate
 
-# test_drop.py
-#    session level drop operation
-class test_drop(wttest.WiredTigerTestCase):
-    name = 'test_drop'
+# test_upgrade.py
+#    session level upgrade operation
+class test_upgrade(wttest.WiredTigerTestCase):
+    name = 'test_upgrade'
 
     scenarios = [
         ('file', dict(uri='file:')),
         ('table', dict(uri='table:'))
         ]
 
-    # Populate an object, remove it and confirm it no longer exists.
-    def drop(self, populate, with_cursor):
+    # Populate an object, then upgrade it.
+    def upgrade(self, populate):
         uri = self.uri + self.name
         populate(self, uri, 'key_format=S', 10)
+        self.session.upgrade(uri, None)
+        self.session.drop(uri)
 
-        # Open cursors should cause failure.
-        if with_cursor:
-            cursor = self.session.open_cursor(uri, None, None)
-            self.assertRaises(wiredtiger.WiredTigerError,
-                lambda: self.session.drop(uri, None))
-            cursor.close()
-
-        self.session.drop(uri, None)
-        confirm_does_not_exist(self, uri)
-
-    # Test drop of an object.
-    def test_drop(self):
+    # Test upgrade of an object.
+    def test_upgrade(self):
         # Simple file or table object.
-        self.drop(simple_populate, False)
-        self.drop(simple_populate, True)
+        self.upgrade(simple_populate)
 
         # A complex, multi-file table object.
         if self.uri == "table:":
-            self.drop(complex_populate, False)
-            self.drop(complex_populate, True)
-
-    # Test drop of a non-existent object: force succeeds, without force fails.
-    def test_drop_dne(self):
-        uri = self.uri + self.name
-        confirm_does_not_exist(self, uri)
-        self.session.drop(uri, 'force')
-        self.assertRaises(
-            wiredtiger.WiredTigerError, lambda: self.session.drop(uri, None))
+            self.upgrade(complex_populate)
 
 
 if __name__ == '__main__':
