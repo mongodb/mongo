@@ -33,10 +33,13 @@ function restore(path, toolTest, coll) {
 restore(normalDumpPath, t, c);
 restore(repairDumpPath, t, c);
 
-// get the dumped files
-normalFiles = listFiles(normalDumpPath + '/'  + t.baseName )
+// get the dumped bson files
+normalFiles = listFiles( normalDumpPath + '/'  + t.baseName )
+
+// filter out the metadata.json file
+normalFiles = normalFiles.filter( function(x) { if ( x.name.match( /bson$/ ) ) return x; } )
 assert.eq( normalFiles[0].name, normalDumpPath + "/" + t.baseName + "/foo.bson", "unexpected file name")
-repairFiles = listFiles(repairDumpPath + '/'  + t.baseName )
+repairFiles = listFiles( repairDumpPath + '/'  + t.baseName )
 assert.eq( repairFiles[0].name, repairDumpPath + "/" + t.baseName + "/foo.bson", "unexpected file name")
 
 // the --repair bson file should be exactly twice the size of the normal dump file
