@@ -33,13 +33,13 @@ class test_isnew(wttest.WiredTigerTestCase):
 
     # Test is-new of a connection.
     def test_isnew(self):
-        # We just created a connection, is_new should return true.
-        self.assertEquals(self.conn.is_new(), 1)
+        # We just created a connection, is_new should return True.
+        self.assertEquals(self.conn.is_new(), True)
 
-        # Close and re-open the connection.
+        # Close and re-open the connection, is_new should return False.
         self.conn.close()
         self.conn = self.setUpConnectionOpen(".")
-        self.assertEquals(self.conn.is_new(), 0)
+        self.assertEquals(self.conn.is_new(), False)
 
 
 if __name__ == '__main__':
