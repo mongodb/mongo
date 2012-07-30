@@ -105,7 +105,6 @@ namespace mongo {
 
         OID writebackID;
         writebackID.initSequential();
-        lastError.getSafe()->writeback( writebackID );
 
         const OID& clientID = ShardedConnectionInfo::get(false)->getID();
         massert( 10422 ,  "write with bad shard config and no server id!" , clientID.isSet() );
@@ -123,6 +122,11 @@ namespace mongo {
 
         b.appendBinData( "msg" , m.header()->len , bdtCustom , (char*)(m.singleData()) );
         LOG(2) << "writing back msg with len: " << m.header()->len << " op: " << m.operation() << endl;
+
+        // Don't register the writeback until immediately before we queue it -
+        // after this line, mongos will wait for an hour if we don't queue correctly
+        lastError.getSafe()->writeback( writebackID );
+
         writeBackManager.queueWriteBack( clientID.str() , b.obj() );
 
         return true;
