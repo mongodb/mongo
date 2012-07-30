@@ -1011,7 +1011,6 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     </ClCompile>
     <ClCompile Include="..\bson\oid.cpp" />
     <ClCompile Include="..\client\authentication_table.cpp" />
-    <ClCompile Include="..\client\connection_factory.cpp" />
     <ClCompile Include="..\client\dbclientcursor.cpp" />
     <ClCompile Include="..\client\dbclient_rs.cpp" />
     <ClCompile Include="..\client\distlock.cpp" />
@@ -1113,6 +1112,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="commands\pipeline_d.cpp" />
     <ClCompile Include="commands\touch.cpp" />
     <ClCompile Include="compact.cpp" />
+    <ClCompile Include="connection_factory.cpp" />
     <ClCompile Include="curop.cpp" />
     <ClCompile Include="dbcommands_generic.cpp" />
     <ClCompile Include="dbmessage.cpp" />
@@ -1448,7 +1448,6 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="projection.h" />
     <ClInclude Include="queryutil.h" />
     <ClInclude Include="repl.h" />
-    <ClInclude Include="replpair.h" />
     <ClInclude Include="repl\connections.h" />
     <ClInclude Include="repl\multicmd.h" />
     <ClInclude Include="repl\rsmember.h" />
@@ -1468,13 +1467,11 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="clientcursor.h" />
     <ClInclude Include="cmdline.h" />
     <ClInclude Include="commands.h" />
-    <ClInclude Include="concurrency.h" />
     <ClInclude Include="curop.h" />
     <ClInclude Include="cursor.h" />
     <ClInclude Include="database.h" />
     <ClInclude Include="db.h" />
     <ClInclude Include="dbhelpers.h" />
-    <ClInclude Include="dbinfo.h" />
     <ClInclude Include="dbmessage.h" />
     <ClInclude Include="diskloc.h" />
     <ClInclude Include="index.h" />
@@ -1485,7 +1482,6 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="namespace.h" />
     <ClInclude Include="..\pch.h" />
     <ClInclude Include="pdfile.h" />
-    <ClInclude Include="query.h" />
     <ClInclude Include="queryoptimizer.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="scanandorder.h" />
@@ -1529,7 +1525,6 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="repl\rs.h" />
     <ClInclude Include="repl\rs_config.h" />
     <ClInclude Include="..\bson\bsonelement.h" />
-    <ClInclude Include="..\bson\bsoninlines.h" />
     <ClInclude Include="..\bson\bsonmisc.h" />
     <ClInclude Include="..\bson\bsonobj.h" />
     <ClInclude Include="..\bson\bsonobjbuilder.h" />

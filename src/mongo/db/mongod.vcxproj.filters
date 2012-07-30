@@ -262,9 +262,6 @@
     <ClCompile Include="..\s\chunk.cpp">
       <Filter>s</Filter>
     </ClCompile>
-    <ClCompile Include="commands\cloud.cpp">
-      <Filter>db\commands</Filter>
-    </ClCompile>
     <ClCompile Include="..\s\config.cpp">
       <Filter>s</Filter>
     </ClCompile>
@@ -905,9 +902,6 @@
     <ClCompile Include="commands\hashcmd.cpp">
       <Filter>db\commands</Filter>
     </ClCompile>
-    <ClCompile Include="..\client\connection_factory.cpp">
-      <Filter>client\Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\scripting\sm_db.cpp">
       <Filter>scripting</Filter>
     </ClCompile>
@@ -922,6 +916,9 @@
     </ClCompile>
     <ClCompile Include="..\..\third_party\murmurhash3\MurmurHash3.cpp">
       <Filter>third_party\MurmurHash3</Filter>
+    </ClCompile>
+    <ClCompile Include="connection_factory.cpp">
+      <Filter>db\Source Files\a to d</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -984,9 +981,6 @@
       <Filter>bson</Filter>
     </ClInclude>
     <ClInclude Include="..\bson\bsonelement.h">
-      <Filter>bson</Filter>
-    </ClInclude>
-    <ClInclude Include="..\bson\bsoninlines.h">
       <Filter>bson</Filter>
     </ClInclude>
     <ClInclude Include="..\bson\bsonmisc.h">
@@ -1314,9 +1308,6 @@
     <ClInclude Include="commands.h">
       <Filter>db\Header Files\a to d</Filter>
     </ClInclude>
-    <ClInclude Include="concurrency.h">
-      <Filter>db\Header Files\a to d</Filter>
-    </ClInclude>
     <ClInclude Include="curop.h">
       <Filter>db\Header Files\a to d</Filter>
     </ClInclude>
@@ -1339,9 +1330,6 @@
       <Filter>db\Header Files\a to d</Filter>
     </ClInclude>
     <ClInclude Include="dbhelpers.h">
-      <Filter>db\Header Files\a to d</Filter>
-    </ClInclude>
-    <ClInclude Include="dbinfo.h">
       <Filter>db\Header Files\a to d</Filter>
     </ClInclude>
     <ClInclude Include="dbmessage.h">
@@ -1443,9 +1431,6 @@
     <ClInclude Include="projection.h">
       <Filter>db\Header Files\o to z</Filter>
     </ClInclude>
-    <ClInclude Include="query.h">
-      <Filter>db\Header Files\o to z</Filter>
-    </ClInclude>
     <ClInclude Include="queryoptimizer.h">
       <Filter>db\Header Files\o to z</Filter>
     </ClInclude>
@@ -1456,9 +1441,6 @@
       <Filter>db\Header Files\o to z</Filter>
     </ClInclude>
     <ClInclude Include="repl.h">
-      <Filter>db\Header Files\o to z</Filter>
-    </ClInclude>
-    <ClInclude Include="replpair.h">
       <Filter>db\Header Files\o to z</Filter>
     </ClInclude>
     <ClInclude Include="resource.h">
