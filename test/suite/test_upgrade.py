@@ -49,7 +49,7 @@ class test_upgrade(wttest.WiredTigerTestCase):
             cursor = self.session.open_cursor(uri, None, None)
             self.assertRaises(wiredtiger.WiredTigerError,
                 lambda: self.session.drop(uri, None))
-        cursor.close()
+            cursor.close()
 
         self.session.upgrade(uri, None)
         self.session.drop(uri)
