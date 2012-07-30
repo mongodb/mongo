@@ -43,6 +43,14 @@ class test_upgrade(wttest.WiredTigerTestCase):
     def upgrade(self, populate):
         uri = self.uri + self.name
         populate(self, uri, 'key_format=S', 10)
+
+        # Open cursors should cause failure.
+        if with_cursor:
+            cursor = self.session.open_cursor(uri, None, None)
+            self.assertRaises(wiredtiger.WiredTigerError,
+                lambda: self.session.drop(uri, None))
+        cursor.close()
+
         self.session.upgrade(uri, None)
         self.session.drop(uri)
 
