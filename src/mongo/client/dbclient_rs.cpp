@@ -477,11 +477,11 @@ namespace mongo {
             return fallbackNode;
         }
 
-        massert( 15899, str::stream() << "No suitable secondary found for slaveOk query in replica set: "
-                                      << _name, _master >= 0 && _nodes[_master].ok );
+        massert(15899, str::stream() << "No suitable secondary found for slaveOk query"
+                "in replica set: " << _name, _master >= 0 &&
+                _master < static_cast<int>(_nodes.size()) && _nodes[_master].ok);
 
         // Fall back to primary
-        verify( static_cast<unsigned>(_master) < _nodes.size() );
         log(1) << "dbclient_rs getSlave no member in secondary state found, "
                   "returning primary " << _nodes[ _master ] << endl;
         return _nodes[_master].addr;
@@ -836,7 +836,10 @@ namespace mongo {
                     {
                         scoped_lock lk( _lock );
                         probablePrimaryIdx = _find_inlock( maybePrimary );
-                        probablePrimaryConn = _nodes[probablePrimaryIdx].conn;
+
+                        if (probablePrimaryIdx >= 0) {
+                            probablePrimaryConn = _nodes[probablePrimaryIdx].conn;
+                        }
                     }
 
                     if ( probablePrimaryIdx >= 0 ) {
