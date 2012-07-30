@@ -806,10 +806,10 @@ namespace mongo {
          buf.append( "errCount", (long long) stats.errCount );
          buf.append( "trapped", "error: not implemented" );
          appendAverageMicrosIfAvailable(buf, "findOneLatencyAverageMicros", stats.findOneCounter);
-         appendAverageMicrosIfAvailable(buf, "findOneLatencyAverageMicros", stats.insertCounter);
-         appendAverageMicrosIfAvailable(buf, "findOneLatencyAverageMicros", stats.deleteCounter);
-         appendAverageMicrosIfAvailable(buf, "findOneLatencyAverageMicros", stats.updateCounter);
-         appendAverageMicrosIfAvailable(buf, "findOneLatencyAverageMicros", stats.queryCounter);
+         appendAverageMicrosIfAvailable(buf, "insertLatencyAverageMicros", stats.insertCounter);
+         appendAverageMicrosIfAvailable(buf, "deleteLatencyAverageMicros", stats.deleteCounter);
+         appendAverageMicrosIfAvailable(buf, "updateLatencyAverageMicros", stats.updateCounter);
+         appendAverageMicrosIfAvailable(buf, "queryLatencyAverageMicros", stats.queryCounter);
 
          {
              BSONObjIterator i( after );
