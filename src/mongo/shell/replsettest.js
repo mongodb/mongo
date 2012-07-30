@@ -376,9 +376,10 @@ ReplSetTest.prototype.awaitSecondaryNodes = function( timeout ) {
   jsTest.attempt({context: this, timeout: 60000, desc: "Awaiting secondaries"}, function() {
      var ready = true;
      for(var i=0; i<len; i++) {
-       ready = ready && slaves[i].getDB("admin").runCommand({ismaster: 1})['secondary'];
+       var isMaster = slaves[i].getDB("admin").runCommand({ismaster: 1});
+       var arbiter = isMaster['arbiterOnly'] == undefined ? false : isMaster['arbiterOnly'];
+       ready = ready && ( isMaster['secondary'] || arbiter );
      }
-
      return ready;
   });
 }
