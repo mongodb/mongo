@@ -356,6 +356,13 @@ namespace mongo {
         }
     }
 
+    /**
+     * Checks if this server was started without --replset but has a config in local.system.replset
+     * (meaning that this is probably a replica set member started in stand-alone mode).
+     *
+     * @returns the number of documents in local.system.replset or 0 if this was started with
+     *          --replset.
+     */
     unsigned long long checkIfReplMissingFromCommandLine() {
         Lock::GlobalWrite lk; // _openAllFiles is false at this point, so this is helpful for the query below to work as you can't open files when readlocked
         if( !cmdLine.usingReplSets() ) {
@@ -503,8 +510,10 @@ namespace mongo {
         unsigned long long missingRepl = checkIfReplMissingFromCommandLine();
         if (missingRepl) {
             log() << startupWarningsLog;
-            log() << "** warning: mongod started without --replSet yet " << missingRepl << " documents are present in local.system.replset" << startupWarningsLog;
-            log() << "**          restart with --replSet unless you are doing maintenance and no other clients are connected" << startupWarningsLog;
+            log() << "** warning: mongod started without --replSet yet " << missingRepl
+                  << " documents are present in local.system.replset" << startupWarningsLog;
+            log() << "**          restart with --replSet unless you are doing maintenance and no"
+                  << " other clients are connected" << startupWarningsLog;
             log() << startupWarningsLog;
         }
 
@@ -534,8 +543,10 @@ namespace mongo {
         PeriodicTask::theRunner->go();
         if (missingRepl) {
             log() << "** warning: not starting TTL monitor" << startupWarningsLog;
-            log() << "**          if this member is not part of a replica set and you want to use " << startupWarningsLog;
-            log() << "**          TTL collections, remove local.system.replset and restart" << startupWarningsLog;
+            log() << "**          if this member is not part of a replica set and you want to use "
+                  << startupWarningsLog;
+            log() << "**          TTL collections, remove local.system.replset and restart"
+                  << startupWarningsLog;
         }
         else {
             startTTLBackgroundJob();

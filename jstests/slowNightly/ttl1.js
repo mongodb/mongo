@@ -1,3 +1,11 @@
+/**
+ * Part 1: TODO
+ * Part 2: this tests ensures that when a stand-alone server is started with something in
+ *         local.system.replset, it doesn't start the TTL monitor (SERVER-6609). The test creates a
+ *         dummy replset config & TTL collection, then restarts the member and ensures that it
+ *         doesn't time out the docs in the TTL collection. Then it removes the "config" and
+ *         restarts, ensuring that the TTL monitor deletes the docs.
+ */
 
 t = db.ttl1;
 t.drop();
