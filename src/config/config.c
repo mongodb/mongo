@@ -14,7 +14,7 @@
 static int
 __config_err(WT_CONFIG *conf, const char *msg, int err)
 {
-	WT_RET_MSG(conf->session, err == 0 ? EINVAL : err,
+	WT_RET_MSG(conf->session, err,
 	    "Error parsing '%.*s' at byte %u: %s",
 	    (int)(conf->end - conf->orig), conf->orig,
 	    (u_int)(conf->cur - conf->orig), msg);
@@ -73,7 +73,8 @@ __wt_config_subinit(
 	if (conf->depth == conf->top) {					\
 		if (out->len > 0)					\
 			return (__config_err(conf,			\
-			    "New value starts without a separator", 0));\
+			    "New value starts without a separator",	\
+			    EINVAL));					\
 		out->type = (t);					\
 		out->str = (conf->cur + (i));				\
 	}								\
@@ -333,11 +334,150 @@ static int8_t goesc[256] = {
 };
 
 /*
- * __process_value
+ * __config_next --
+ *	Get the next config item in the string without processing the value.
+ */
+static int
+__config_next(WT_CONFIG *conf, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
+{
+	WT_CONFIG_ITEM *out = key;
+	int utf8_remain = 0;
+	static WT_CONFIG_ITEM default_value = {
+		"", 0, 1, ITEM_NUM
+	};
+
+	key->len = 0;
+	*value = default_value;
+
+	if (conf->go == NULL)
+		conf->go = gostruct;
+
+	while (conf->cur < conf->end) {
+		switch (conf->go[(int)*conf->cur]) {
+		case A_LOOP:
+			break;
+
+		case A_BAD:
+			return (__config_err(
+			    conf, "Unexpected character", EINVAL));
+
+		case A_DOWN:
+			--conf->depth;
+			CAP(0);
+			break;
+
+		case A_UP:
+			if (conf->top == -1)
+				conf->top = 1;
+			PUSH(0, ITEM_STRUCT);
+			++conf->depth;
+			break;
+
+		case A_VALUE:
+			if (conf->depth == conf->top) {
+				/*
+				 * Special case: ':' is permitted in unquoted
+				 * values.
+				 */
+				if (out == value && *conf->cur != ':')
+					return (__config_err(conf,
+					    "Value already complete", EINVAL));
+				out = value;
+			}
+			break;
+
+		case A_NEXT:
+			/*
+			 * If we're at the top level and we have a complete
+			 * key (and optional value), we're done.
+			 */
+			if (conf->depth == conf->top && key->len > 0) {
+				++conf->cur;
+				return (0);
+			} else
+				break;
+
+		case A_QDOWN:
+			CAP(-1);
+			conf->go = gostruct;
+			break;
+
+		case A_QUP:
+			PUSH(1, ITEM_STRING);
+			conf->go = gostring;
+			break;
+
+		case A_ESC:
+			conf->go = goesc;
+			break;
+
+		case A_UNESC:
+			conf->go = gostring;
+			break;
+
+		case A_BARE:
+			PUSH(0, ITEM_ID);
+			conf->go = gobare;
+			break;
+
+		case A_NUMBARE:
+			PUSH(0, ITEM_NUM);
+			conf->go = gobare;
+			break;
+
+		case A_UNBARE:
+			CAP(-1);
+			conf->go = gostruct;
+			continue;
+
+		case A_UTF8_2:
+			conf->go = goutf8_continue;
+			utf8_remain = 1;
+			break;
+
+		case A_UTF8_3:
+			conf->go = goutf8_continue;
+			utf8_remain = 2;
+			break;
+
+		case A_UTF8_4:
+			conf->go = goutf8_continue;
+			utf8_remain = 3;
+			break;
+
+		case A_UTF_CONTINUE:
+			if (!--utf8_remain)
+				conf->go = gostring;
+			break;
+		}
+
+		conf->cur++;
+	}
+
+	/* Might have a trailing key/value without a closing brace */
+	if (conf->go == gobare) {
+		CAP(-1);
+		conf->go = gostruct;
+	}
+
+	/* Did we find something? */
+	if (conf->depth <= conf->top && key->len > 0)
+		return (0);
+
+	/* We're either at the end of the string or we failed to parse. */
+	if (conf->depth == 0)
+		return (WT_NOTFOUND);
+
+	return (__config_err(conf,
+	    "Closing brackets missing from config string", EINVAL));
+}
+
+/*
+ * __config_process_value
  *	Deal with special config values like true / false.
  */
 static int
-__process_value(WT_CONFIG *conf, WT_CONFIG_ITEM *value)
+__config_process_value(WT_CONFIG *conf, WT_CONFIG_ITEM *value)
 {
 	char *endptr;
 
@@ -410,140 +550,13 @@ __process_value(WT_CONFIG *conf, WT_CONFIG_ITEM *value)
 
 /*
  * __wt_config_next --
- *	Get the next config item in the string.
+ *	Get the next config item in the string and process the value.
  */
 int
 __wt_config_next(WT_CONFIG *conf, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 {
-	WT_CONFIG_ITEM *out = key;
-	int utf8_remain = 0;
-	static WT_CONFIG_ITEM default_value = {
-		"", 0, 1, ITEM_NUM
-	};
-
-	key->len = 0;
-	*value = default_value;
-
-	if (conf->go == NULL)
-		conf->go = gostruct;
-
-	while (conf->cur < conf->end) {
-		switch (conf->go[(int)*conf->cur]) {
-		case A_LOOP:
-			break;
-
-		case A_BAD:
-			return (__config_err(conf, "Unexpected character", 0));
-
-		case A_DOWN:
-			--conf->depth;
-			CAP(0);
-			break;
-
-		case A_UP:
-			if (conf->top == -1)
-				conf->top = 1;
-			PUSH(0, ITEM_STRUCT);
-			++conf->depth;
-			break;
-
-		case A_VALUE:
-			if (conf->depth == conf->top) {
-				/*
-				 * Special case: ':' is permitted in unquoted
-				 * values.
-				 */
-				if (out == value && *conf->cur != ':')
-					return (__config_err(conf,
-					    "Value already complete", 0));
-				out = value;
-			}
-			break;
-
-		case A_NEXT:
-			/*
-			 * If we're at the top level and we have a complete
-			 * key (and optional value), we're done.
-			 */
-			if (conf->depth == conf->top && key->len > 0) {
-				++conf->cur;
-				goto val;
-			} else
-				break;
-
-		case A_QDOWN:
-			CAP(-1);
-			conf->go = gostruct;
-			break;
-
-		case A_QUP:
-			PUSH(1, ITEM_STRING);
-			conf->go = gostring;
-			break;
-
-		case A_ESC:
-			conf->go = goesc;
-			break;
-
-		case A_UNESC:
-			conf->go = gostring;
-			break;
-
-		case A_BARE:
-			PUSH(0, ITEM_ID);
-			conf->go = gobare;
-			break;
-
-		case A_NUMBARE:
-			PUSH(0, ITEM_NUM);
-			conf->go = gobare;
-			break;
-
-		case A_UNBARE:
-			CAP(-1);
-			conf->go = gostruct;
-			continue;
-
-		case A_UTF8_2:
-			conf->go = goutf8_continue;
-			utf8_remain = 1;
-			break;
-
-		case A_UTF8_3:
-			conf->go = goutf8_continue;
-			utf8_remain = 2;
-			break;
-
-		case A_UTF8_4:
-			conf->go = goutf8_continue;
-			utf8_remain = 3;
-			break;
-
-		case A_UTF_CONTINUE:
-			if (!--utf8_remain)
-				conf->go = gostring;
-			break;
-		}
-
-		conf->cur++;
-	}
-
-	/* Might have a trailing key/value without a closing brace */
-	if (conf->go == gobare) {
-		CAP(-1);
-		conf->go = gostruct;
-	}
-
-	/* Did we find something? */
-	if (conf->depth <= conf->top && key->len > 0)
-val:		return (__process_value(conf, value));
-
-	/* We're either at the end of the string or we failed to parse. */
-	if (conf->depth == 0)
-		return (WT_NOTFOUND);
-
-	return (__config_err(conf,
-	    "Closing brackets missing from config string", 0));
+	WT_RET(__config_next(conf, key, value));
+	return (__config_process_value(conf, value));
 }
 
 /*
@@ -559,7 +572,7 @@ __wt_config_getraw(
 	int found;
 
 	found = 0;
-	while ((ret = __wt_config_next(cparser, &k, &v)) == 0) {
+	while ((ret = __config_next(cparser, &k, &v)) == 0) {
 		if ((k.type == ITEM_STRING || k.type == ITEM_ID) &&
 		    key->len == k.len &&
 		    strncasecmp(key->str, k.str, k.len) == 0) {
@@ -568,7 +581,8 @@ __wt_config_getraw(
 		}
 	}
 
-	return (found && ret == WT_NOTFOUND ? 0 : ret);
+	return ((found && ret == WT_NOTFOUND) ?
+	    __config_process_value(cparser, value) : ret);
 }
 
 /*
