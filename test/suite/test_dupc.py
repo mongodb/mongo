@@ -59,7 +59,7 @@ class test_duplicate_cursor(wttest.WiredTigerTestCase):
                 break
             self.assertEqual(cursor.get_key(), key_populate(self.fmt, next))
             dupc = self.session.open_cursor(None, cursor, None)
-            self.assertFalse(cursor.equals(dupc))
+            self.assertTrue(cursor.equals(dupc))
             self.assertEqual(dupc.get_key(), key_populate(self.fmt, next))
             cursor.close()
             cursor = dupc
