@@ -124,14 +124,14 @@ sleep( 10 * 1000 )
 joinFindInsert()
 joinShardedFindInsert()
 
-var totalInserts = st.s.getCollection( insertNS ).find().sort({ _id : -1 }).next()._id
+var totalInserts = st.s.getCollection( insertNS ).find().sort({ _id : -1 }).next()._id + 1
 var dataFound = st.s.getCollection( insertNS ).count()
 
 jsTest.log( "Found " + dataFound + " docs out of " + totalInserts + " inserted." )
 
 assert.gt( dataFound / totalInserts, 0.5 )
 
-var totalInserts = st.s.getCollection( shardedInsertNS ).find().sort({ _id : -1 }).next()._id
+var totalInserts = st.s.getCollection( shardedInsertNS ).find().sort({ _id : -1 }).next()._id + 1
 var dataFound = st.s.getCollection( shardedInsertNS ).find().itcount()
 
 jsTest.log( "Found " + dataFound + " sharded docs out of " + tojson( totalInserts ) + " inserted." )
