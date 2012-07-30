@@ -151,6 +151,20 @@ namespace mongo {
      * @param os    ostream& to receive printed stack backtrace
      */
     void printStackTrace( std::ostream& os ) {
+        CONTEXT context;
+        memset( &context, 0, sizeof(context) );
+        context.ContextFlags = CONTEXT_CONTROL;
+        RtlCaptureContext( &context );
+        printWindowsStackTrace( context, os );
+    }
+
+    /**
+     * Print stack trace (using a specified stack context) to "os"
+     * 
+     * @param context   CONTEXT record for stack trace
+     * @param os        ostream& to receive printed stack backtrace
+     */
+    void printWindowsStackTrace( CONTEXT& context, std::ostream& os ) {
         HANDLE process = GetCurrentProcess();
         BOOL ret = SymInitialize( process, NULL, TRUE );
         if ( ret == FALSE ) {
@@ -162,11 +176,6 @@ namespace mongo {
         DWORD options = SymGetOptions();
         options |= SYMOPT_LOAD_LINES | SYMOPT_FAIL_CRITICAL_ERRORS;
         SymSetOptions( options );
-
-        CONTEXT context;
-        memset( &context, 0, sizeof(context) );
-        context.ContextFlags = CONTEXT_CONTROL;
-        RtlCaptureContext( &context );
 
         STACKFRAME64 frame64;
         memset( &frame64, 0, sizeof(frame64) );

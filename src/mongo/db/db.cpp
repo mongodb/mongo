@@ -1386,6 +1386,8 @@ namespace mongo {
             log() << "*** access violation was a " << acTypeString << addressString << endl;
         }
 
+        log() << "*** stack trace for unhandled exception:" << endl;
+        printWindowsStackTrace( *excPointers->ContextRecord );
         doMinidump(excPointers);
 
         // In release builds, let dbexit() try to shut down cleanly
