@@ -324,13 +324,13 @@ namespace mongo {
 
         BSONType type;
 
-        /* store value in one of these */
+        // store values that don't need a ctor/dtor in one of these
         union {
             double doubleValue;
             bool boolValue;
             int intValue;
             long long longValue;
-        } simple; // values that don't need a ctor/dtor
+        };
         OID oidValue;
         Date_t dateValue;
         string stringValue; // String, Regex, Symbol

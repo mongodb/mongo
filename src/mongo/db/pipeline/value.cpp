@@ -62,15 +62,15 @@ namespace mongo {
             break;
 
         case NumberDouble:
-            simple.doubleValue = 0;
+            doubleValue = 0;
             break;
 
         case Bool:
-            simple.boolValue = false;
+            boolValue = false;
             break;
 
         case NumberInt:
-            simple.intValue = 0;
+            intValue = 0;
             break;
 
         case Timestamp:
@@ -78,7 +78,7 @@ namespace mongo {
             break;
 
         case NumberLong:
-            simple.longValue = 0;
+            longValue = 0;
             break;
 
         default:
@@ -89,12 +89,10 @@ namespace mongo {
         }
     }
 
-    Value::Value(bool boolValue):
-        type(Bool),
-        pDocumentValue(),
-        vpValue() {
-        simple.boolValue = boolValue;
-    }
+    Value::Value(bool value)
+        : type(Bool)
+        , boolValue(value)
+    {}
 
     intrusive_ptr<const Value> Value::createFromBsonElement(
         BSONElement *pBsonElement) {
@@ -120,7 +118,7 @@ namespace mongo {
         vpValue() {
         switch(type) {
         case NumberDouble:
-            simple.doubleValue = pBsonElement->Double();
+            doubleValue = pBsonElement->Double();
             break;
 
         case String:
@@ -151,7 +149,7 @@ namespace mongo {
             break;
 
         case Bool:
-            simple.boolValue = pBsonElement->Bool();
+            boolValue = pBsonElement->Bool();
             break;
 
         case Date:
@@ -164,7 +162,7 @@ namespace mongo {
             break;
 
         case NumberInt:
-            simple.intValue = pBsonElement->numberInt();
+            intValue = pBsonElement->numberInt();
             break;
 
         case Timestamp:
@@ -172,7 +170,7 @@ namespace mongo {
             break;
 
         case NumberLong:
-            simple.longValue = pBsonElement->numberLong();
+            longValue = pBsonElement->numberLong();
             break;
 
         case Undefined:
@@ -195,12 +193,10 @@ namespace mongo {
         }
     }
 
-    Value::Value(int intValue):
-        type(NumberInt),
-        pDocumentValue(),
-        vpValue() {
-        simple.intValue = intValue;
-    }
+    Value::Value(int value)
+        : type(NumberInt)
+        , intValue(value)
+    {}
 
     intrusive_ptr<const Value> Value::createInt(int value) {
         intrusive_ptr<const Value> pValue(new Value(value));
@@ -217,24 +213,20 @@ namespace mongo {
         return createInt(value);
     }
 
-    Value::Value(long long longValue):
-        type(NumberLong),
-        pDocumentValue(),
-        vpValue() {
-        simple.longValue = longValue;
-    }
+    Value::Value(long long value)
+        : type(NumberLong)
+        , longValue(value)
+    {}
 
     intrusive_ptr<const Value> Value::createLong(long long value) {
         intrusive_ptr<const Value> pValue(new Value(value));
         return pValue;
     }
 
-    Value::Value(double value):
-        type(NumberDouble),
-        pDocumentValue(),
-        vpValue() {
-        simple.doubleValue = value;
-    }
+    Value::Value(double value)
+        : type(NumberDouble)
+        , doubleValue(value)
+    {}
 
     intrusive_ptr<const Value> Value::createDouble(double value) {
         intrusive_ptr<const Value> pValue(new Value(value));
@@ -304,12 +296,12 @@ namespace mongo {
     double Value::getDouble() const {
         BSONType type = getType();
         if (type == NumberInt)
-            return simple.intValue;
+            return intValue;
         if (type == NumberLong)
-            return static_cast< double >( simple.longValue );
+            return static_cast< double >( longValue );
 
         verify(type == NumberDouble);
-        return simple.doubleValue;
+        return doubleValue;
     }
 
     string Value::getString() const {
@@ -358,7 +350,7 @@ namespace mongo {
 
     bool Value::getBool() const {
         verify(getType() == Bool);
-        return simple.boolValue;
+        return boolValue;
     }
 
     Date_t Value::getDate() const {
@@ -383,16 +375,16 @@ namespace mongo {
 
     int Value::getInt() const {
         verify(getType() == NumberInt);
-        return simple.intValue;
+        return intValue;
     }
 
     long long Value::getLong() const {
         BSONType type = getType();
         if (type == NumberInt)
-            return simple.intValue;
+            return intValue;
 
         verify(type == NumberLong);
-        return simple.longValue;
+        return longValue;
     }
 
     void Value::addToBson(Builder *pBuilder) const {
@@ -500,7 +492,7 @@ namespace mongo {
         BSONType type = getType();
         switch(type) {
         case NumberDouble:
-            if (simple.doubleValue != 0)
+            if (doubleValue != 0)
                 return true;
             break;
 
@@ -516,7 +508,7 @@ namespace mongo {
             return true;
 
         case Bool:
-            if (simple.boolValue)
+            if (boolValue)
                 return true;
             break;
 
@@ -525,12 +517,12 @@ namespace mongo {
             break;
 
         case NumberInt:
-            if (simple.intValue != 0)
+            if (intValue != 0)
                 return true;
             break;
 
         case NumberLong:
-            if (simple.longValue != 0)
+            if (longValue != 0)
                 return true;
             break;
 
@@ -555,13 +547,13 @@ namespace mongo {
     int Value::coerceToInt() const {
         switch(type) {
         case NumberDouble:
-            return (int)simple.doubleValue;
+            return (int)doubleValue;
 
         case NumberInt:
-            return simple.intValue;
+            return intValue;
 
         case NumberLong:
-            return (int)simple.longValue;
+            return (int)longValue;
 
         case jstNULL:
         case Undefined:
@@ -581,13 +573,13 @@ namespace mongo {
     long long Value::coerceToLong() const {
         switch(type) {
         case NumberDouble:
-            return (long long)simple.doubleValue;
+            return (long long)doubleValue;
 
         case NumberInt:
-            return simple.intValue;
+            return intValue;
 
         case NumberLong:
-            return simple.longValue;
+            return longValue;
 
         case jstNULL:
         case Undefined:
@@ -607,13 +599,13 @@ namespace mongo {
     double Value::coerceToDouble() const {
         switch(type) {
         case NumberDouble:
-            return simple.doubleValue;
+            return doubleValue;
 
         case NumberInt:
-            return (double)simple.intValue;
+            return (double)intValue;
 
         case NumberLong:
-            return (double)simple.longValue;
+            return (double)longValue;
 
         case jstNULL:
         case Undefined:
@@ -650,15 +642,15 @@ namespace mongo {
         stringstream ss;
         switch(type) {
         case NumberDouble:
-            ss << simple.doubleValue;
+            ss << doubleValue;
             return ss.str();
 
         case NumberInt:
-            ss << simple.intValue;
+            ss << intValue;
             return ss.str();
 
         case NumberLong:
-            ss << simple.longValue;
+            ss << longValue;
             return ss.str();
 
         case String:
@@ -843,9 +835,9 @@ namespace mongo {
             return 1;
 
         case Bool:
-            if (rL->simple.boolValue == rR->simple.boolValue)
+            if (rL->boolValue == rR->boolValue)
                 return 0;
-            if (rL->simple.boolValue)
+            if (rL->boolValue)
                 return 1;
             return -1;
 
@@ -942,7 +934,7 @@ namespace mongo {
             break;
 
         case Bool:
-            boost::hash_combine(seed, simple.boolValue);
+            boost::hash_combine(seed, boolValue);
             break;
 
         case Date:
