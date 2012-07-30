@@ -46,6 +46,9 @@ jsTestLog('Creating initial data');
 st.adminCommand( { enablesharding : "test" } );
 st.adminCommand( { shardcollection : "test.foo" , key : { i : 1, j : 1 } } );
 
+// Stop the balancer, so no moveChunks will interfere with the splits we're testing
+st.stopBalancer()
+
 var str = 'a';
 while ( str.length < 8000 ) {
     str += str;
@@ -57,6 +60,14 @@ for ( var i = 0; i < 100; i++ ) {
     }
 }
 testDB.getLastError( 'majority' );
+
+// Wait for the balancer to start back up
+st.startBalancer()
+
+// Make sure we've done at least some splitting, so the balancer will work
+assert.gt( configDB.chunks.find({ ns : 'test.foo' }).count(), 2 )
+
+// Make sure we eventually balance all the chunks we've created
 assert.soon( function() {
     var x = st.chunkDiff( "foo", "test" );
     print( "chunk diff: " + x );
