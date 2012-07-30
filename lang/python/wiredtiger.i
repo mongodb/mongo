@@ -35,12 +35,6 @@ from packing import pack, unpack
 	$1 = &temp;
 }
 
-/*
- * Convert 'int *' to an output arg in cursor.equals, cursor.search_near,
- * wiredtiger_version
- */
-%apply int *OUTPUT { int * };
-
 /* Event handlers are not supported in Python. */
 %typemap(in, numinputs=0) WT_EVENT_HANDLER * { $1 = NULL; }
 
@@ -144,8 +138,8 @@ class IterableCursor:
  * and we use consecutive argument matching of typemaps to convert two args to
  * one.
  */
-%define SELFHELPER(type)
-%typemap(in) (type *self, type *) (void *argp = 0, int res = 0) %{
+%define SELFHELPER(type, name)
+%typemap(in) (type *self, type *name) (void *argp = 0, int res = 0) %{
 	res = SWIG_ConvertPtr($input, &argp, $descriptor, $disown | 0);
 	if (!SWIG_IsOK(res)) { 
 		SWIG_exception_fail(SWIG_ArgError(res), "in method '$symname', "
@@ -155,16 +149,20 @@ class IterableCursor:
 %}
 %enddef
 
-SELFHELPER(struct __wt_connection)
-SELFHELPER(struct __wt_session)
-SELFHELPER(struct __wt_cursor)
+SELFHELPER(struct __wt_connection, connection)
+SELFHELPER(struct __wt_session, session)
+SELFHELPER(struct __wt_cursor, cursor)
 
 /* WT_CURSOR customization. */
 /* First, replace the varargs get / set methods with Python equivalents. */
 %ignore __wt_cursor::get_key;
-%ignore __wt_cursor::set_key;
 %ignore __wt_cursor::get_value;
+%ignore __wt_cursor::set_key;
 %ignore __wt_cursor::set_value;
+
+/* Next, override methods that return integers via arguments. */
+%ignore __wt_cursor::equals(WT_CURSOR *, WT_CURSOR *, int *);
+%ignore __wt_cursor::search_near(WT_CURSOR *, int *);
 
 /* SWIG magic to turn Python byte strings into data / size. */
 %apply (char *STRING, int LENGTH) { (char *data, int size) };
@@ -240,6 +238,34 @@ SELFHELPER(struct __wt_cursor)
 		}
 		return SWIG_FromCharPtrAndSize(v.data, v.size);
 	}
+
+        /* equals and search_near need special handling. */
+        PyObject *equals(WT_CURSOR *other) {
+                int is_equal = 0;
+                int ret = $self->equals($self, other, &is_equal);
+		if (ret != 0) {
+			SWIG_Python_SetErrorMsg(wtError,
+			    wiredtiger_strerror(ret));
+                        return (NULL);
+                }
+		return (SWIG_From_int(is_equal));
+        }
+
+        PyObject *search_near() {
+                int cmp = 0;
+                int ret = $self->search_near($self, &cmp);
+		if (ret != 0 && ret != WT_NOTFOUND) {
+			SWIG_Python_SetErrorMsg(wtError,
+			    wiredtiger_strerror(ret));
+                        return (NULL);
+                }
+                /*
+                 * Map less-than-zero to -1 and greater-than-zero to 1 to avoid
+                 * colliding with WT_NOTFOUND.
+                 */
+		return (SWIG_From_int((ret != 0) ? ret :
+                    (cmp < 0) ? -1 : (cmp == 0) ? 0 : 1));
+        }
 
 %pythoncode %{
 	def get_key(self):
@@ -358,14 +384,18 @@ NOTFOUND_OK(__wt_cursor::next)
 NOTFOUND_OK(__wt_cursor::prev)
 NOTFOUND_OK(__wt_cursor::remove)
 NOTFOUND_OK(__wt_cursor::search)
-NOTFOUND_OK(__wt_cursor::search_near)
 NOTFOUND_OK(__wt_cursor::update)
 
-/* Lastly, some methods need no error checking. */
+/* Lastly, some methods need no (additional) error checking. */
+%exception __wt_connection::equals;
+%exception __wt_connection::search_near;
 %exception __wt_connection::get_home;
 %exception __wt_connection::is_new;
 %exception wiredtiger_strerror;
 %exception wiredtiger_version;
+
+/* Convert 'int *' to output args for wiredtiger_version */
+%apply int *OUTPUT { int * };
 
 %rename(Cursor) __wt_cursor;
 %rename(Session) __wt_session;

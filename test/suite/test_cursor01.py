@@ -141,7 +141,7 @@ class test_cursor01(wttest.WiredTigerTestCase):
             self.assertEqual(value, self.genvalue(i))
             i += 1
             dupc = self.session.open_cursor(None, cursor, None)
-            self.assertEqual(cursor.equals(dupc)[1], 1)
+            self.assertTrue(cursor.equals(dupc))
             cursor.close()
             cursor = dupc
 
@@ -195,7 +195,7 @@ class test_cursor01(wttest.WiredTigerTestCase):
             self.assertEqual(value, self.genvalue(i))
             i -= 1
             dupc = self.session.open_cursor(None, cursor, None)
-            self.assertEqual(cursor.equals(dupc)[1], 1)
+            self.assertTrue(cursor.equals(dupc))
             cursor.close()
             cursor = dupc
 

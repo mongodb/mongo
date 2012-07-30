@@ -134,7 +134,7 @@ class test_util06(wttest.WiredTigerTestCase, suite_subprocess):
                 matchpos = 0
             c = fp.read(1)
         # Make sure we found the embedded string
-        self.assertEqual(found, 1)
+        self.assertTrue(found)
         fp.close()
 
     def test_salvage_process_empty(self):
