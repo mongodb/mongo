@@ -40,7 +40,7 @@ class test_upgrade(wttest.WiredTigerTestCase):
         ]
 
     # Populate an object, then upgrade it.
-    def upgrade(self, populate):
+    def upgrade(self, populate, with_cursor):
         uri = self.uri + self.name
         populate(self, uri, 'key_format=S', 10)
 
@@ -57,11 +57,13 @@ class test_upgrade(wttest.WiredTigerTestCase):
     # Test upgrade of an object.
     def test_upgrade(self):
         # Simple file or table object.
-        self.upgrade(simple_populate)
+        self.upgrade(simple_populate, False)
+        self.upgrade(simple_populate, True)
 
         # A complex, multi-file table object.
         if self.uri == "table:":
-            self.upgrade(complex_populate)
+            self.upgrade(complex_populate, False)
+            self.upgrade(complex_populate, True)
 
 
 if __name__ == '__main__':
