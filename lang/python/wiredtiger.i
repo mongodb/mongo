@@ -239,33 +239,33 @@ SELFHELPER(struct __wt_cursor, cursor)
 		return SWIG_FromCharPtrAndSize(v.data, v.size);
 	}
 
-        /* equals and search_near need special handling. */
-        PyObject *equals(WT_CURSOR *other) {
-                int is_equal = 0;
-                int ret = $self->equals($self, other, &is_equal);
+	/* equals and search_near need special handling. */
+	PyObject *equals(WT_CURSOR *other) {
+		int is_equal = 0;
+		int ret = $self->equals($self, other, &is_equal);
 		if (ret != 0) {
 			SWIG_Python_SetErrorMsg(wtError,
 			    wiredtiger_strerror(ret));
-                        return (NULL);
-                }
+			return (NULL);
+		}
 		return (SWIG_From_int(is_equal));
-        }
+	}
 
-        PyObject *search_near() {
-                int cmp = 0;
-                int ret = $self->search_near($self, &cmp);
+	PyObject *search_near() {
+		int cmp = 0;
+		int ret = $self->search_near($self, &cmp);
 		if (ret != 0 && ret != WT_NOTFOUND) {
 			SWIG_Python_SetErrorMsg(wtError,
 			    wiredtiger_strerror(ret));
-                        return (NULL);
-                }
-                /*
-                 * Map less-than-zero to -1 and greater-than-zero to 1 to avoid
-                 * colliding with WT_NOTFOUND.
-                 */
+			return (NULL);
+		}
+		/*
+		 * Map less-than-zero to -1 and greater-than-zero to 1 to avoid
+		 * colliding with WT_NOTFOUND.
+		 */
 		return (SWIG_From_int((ret != 0) ? ret :
-                    (cmp < 0) ? -1 : (cmp == 0) ? 0 : 1));
-        }
+		    (cmp < 0) ? -1 : (cmp == 0) ? 0 : 1));
+	}
 
 %pythoncode %{
 	def get_key(self):
@@ -360,7 +360,7 @@ SELFHELPER(struct __wt_cursor, cursor)
  * Default case: a non-zero return is an error.
  */
 %exception {
-        $action
+	$action
 	if (result != 0) {
 		/* We could use PyErr_SetObject for more complex reporting. */
 		SWIG_Python_SetErrorMsg(wtError, wiredtiger_strerror(result));
@@ -371,7 +371,7 @@ SELFHELPER(struct __wt_cursor, cursor)
 /* Cursor positioning methods can also return WT_NOTFOUND. */
 %define NOTFOUND_OK(m)
 %exception m {
-        $action
+	$action
 	if (result != 0 && result != WT_NOTFOUND) {
 		/* We could use PyErr_SetObject for more complex reporting. */
 		SWIG_Python_SetErrorMsg(wtError, wiredtiger_strerror(result));
