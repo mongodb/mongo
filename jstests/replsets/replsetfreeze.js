@@ -49,7 +49,9 @@ var config = {"_id" : "unicomplex", "members" : [
     {"_id" : 2, "host" : nodes[2], "arbiterOnly" : true}]};
 var r = replTest.initiate(config);
 var master = replTest.getMaster();
+var secondary = replTest.getSecondary();
 
+replTest.awaitSecondaryNodes();
 
 print("2: step down m1");
 try {
@@ -59,8 +61,10 @@ catch(e) {
   print(e);
 }
 reconnect(master);
+printjson( master.getDB("admin").runCommand({replSetGetStatus: 1}) );
 
 print("3: freeze set for 30 seconds");
+secondary.getDB("admin").runCommand({replSetFreeze : 30});
 master.getDB("admin").runCommand({replSetFreeze : 30});
 
 
