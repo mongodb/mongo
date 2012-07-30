@@ -8,12 +8,13 @@
 #include "wt_internal.h"
 
 /*
- * __wt_conn_btree_open_lock --
+ * __conn_btree_open_lock --
  *	Spin on the current btree handle until either (a) it is open, read
- *	locked; or (b) it is closed, write locked.
+ *	locked; or (b) it is closed, write locked.  If exclusive access is
+ *	requested and cannot be granted immediately, fail with EBUSY.
  */
-void
-__wt_conn_btree_open_lock(WT_SESSION_IMPL *session, uint32_t flags)
+static int
+__conn_btree_open_lock(WT_SESSION_IMPL *session, uint32_t flags)
 {
 	WT_BTREE *btree;
 
@@ -34,7 +35,7 @@ __wt_conn_btree_open_lock(WT_SESSION_IMPL *session, uint32_t flags)
 		    !LF_ISSET(WT_BTREE_EXCLUSIVE)) {
 			__wt_readlock(session, btree->rwlock);
 			if (F_ISSET(btree, WT_BTREE_OPEN))
-				break;
+				return (0);
 			__wt_rwunlock(session, btree->rwlock);
 		}
 
@@ -57,8 +58,9 @@ __wt_conn_btree_open_lock(WT_SESSION_IMPL *session, uint32_t flags)
 
 			/* We have an exclusive lock, we're done. */
 			F_SET(btree, WT_BTREE_EXCLUSIVE);
-			break;
-		}
+			return (0);
+		} else if (LF_ISSET(WT_BTREE_EXCLUSIVE))
+			return (EBUSY);
 
 		/* Give other threads a chance to make progress. */
 		__wt_yield();
@@ -100,10 +102,8 @@ __conn_btree_get(WT_SESSION_IMPL *session,
 			break;
 		}
 	}
-	if (matched) {
-		__wt_conn_btree_open_lock(session, flags);
-		return (0);
-	}
+	if (matched)
+		return (__conn_btree_open_lock(session, flags));
 
 	/*
 	 * Allocate the WT_BTREE structure, its lock, and set the name so we
@@ -219,7 +219,7 @@ __wt_conn_btree_open(WT_SESSION_IMPL *session,
 		if (!LF_ISSET(WT_BTREE_EXCLUSIVE)) {
 			F_CLR(btree, WT_BTREE_EXCLUSIVE);
 			__wt_rwunlock(session, btree->rwlock);
-			__wt_conn_btree_open_lock(session, flags);
+			WT_ERR(__conn_btree_open_lock(session, flags));
 		}
 	} while (!F_ISSET(btree, WT_BTREE_OPEN));
 
@@ -252,7 +252,7 @@ __wt_conn_btree_get(WT_SESSION_IMPL *session,
 	locked = 1;
 	if ((btree = session->btree) != NULL) {
 		if (!F_ISSET(btree, WT_BTREE_EXCLUSIVE))
-			__wt_conn_btree_open_lock(session, flags);
+			WT_RET(__conn_btree_open_lock(session, flags));
 		else
 			locked = 0;
 	} else {
