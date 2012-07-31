@@ -331,15 +331,15 @@ namespace mongo {
             bool boolValue;
             int intValue;
             long long longValue;
-            // The members below are redundant, but useful for clarity and searchability.
+            ReplTime timestampValue;
+            unsigned char oidValue[12];
+            // The member below is redundant, but useful for clarity and searchability.
             long long dateValue;
         };
-        OID oidValue;
+
         string stringValue; // String, Regex, Symbol
-        OpTime timestampValue;
         intrusive_ptr<Document> pDocumentValue;
         vector<intrusive_ptr<const Value> > vpValue; // for arrays
-
 
         /*
         These are often used as the result of boolean or comparison

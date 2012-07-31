@@ -69,7 +69,7 @@ namespace mongo {
             break;
 
         case Timestamp:
-            timestampValue = OpTime();
+            timestampValue = 0;
             break;
 
         default:
@@ -136,7 +136,8 @@ namespace mongo {
         }
 
         case jstOID:
-            oidValue = pBsonElement->OID();
+            BOOST_STATIC_ASSERT(sizeof(oidValue) == sizeof(OID));
+            memcpy(oidValue, pBsonElement->OID().getData(), sizeof(oidValue));
             break;
 
         case Bool:
@@ -158,7 +159,8 @@ namespace mongo {
             break;
 
         case Timestamp:
-            timestampValue = pBsonElement->_opTime();
+            // asDate is a poorly named function that returns a ReplTime
+            timestampValue = pBsonElement->_opTime().asDate();
             break;
 
         case NumberLong:
@@ -232,12 +234,10 @@ namespace mongo {
         return pValue;
     }
 
-    Value::Value(const OpTime& value):
-        type(Timestamp),
-        pDocumentValue(),
-        vpValue() {
-        timestampValue = value;
-    }
+    Value::Value(const OpTime& value)
+        : type(Timestamp)
+        , timestampValue(value.asDate())
+    {}
 
     intrusive_ptr<const Value> Value::createTimestamp(const OpTime& value) {
         intrusive_ptr<const Value> pValue(new Value(value));
@@ -332,7 +332,7 @@ namespace mongo {
 
     OID Value::getOid() const {
         verify(getType() == jstOID);
-        return oidValue;
+        return OID(oidValue);
     }
 
     bool Value::getBool() const {
@@ -616,7 +616,7 @@ namespace mongo {
             return dateValue; 
 
         case Timestamp:
-            return timestampValue.getSecs() * 1000LL;
+            return getTimestamp().getSecs() * 1000LL;
 
         default:
             uassert(16006, str::stream() <<
@@ -687,7 +687,7 @@ namespace mongo {
             return stringValue;
 
         case Timestamp:
-            ss << timestampValue.toStringPretty();
+            ss << getTimestamp().toStringPretty();
             return ss.str();
 
         case Date:
@@ -858,9 +858,9 @@ namespace mongo {
             break;
 
         case jstOID:
-            if (rL->oidValue < rR->oidValue)
+            if (rL->getOid() < rR->getOid())
                 return -1;
-            if (rL->oidValue == rR->oidValue)
+            if (rL->getOid() == rR->getOid())
                 return 0;
             return 1;
 
@@ -958,7 +958,7 @@ namespace mongo {
             break;
 
         case jstOID:
-            oidValue.hash_combine(seed);
+            getOid().hash_combine(seed);
             break;
 
         case Bool:
@@ -974,7 +974,7 @@ namespace mongo {
             break;
 
         case Timestamp:
-            boost::hash_combine(seed, timestampValue.asLL());
+            boost::hash_combine(seed, timestampValue);
             break;
 
         case Undefined:

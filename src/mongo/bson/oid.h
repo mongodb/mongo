@@ -46,6 +46,11 @@ namespace mongo {
         /** init from a 24 char hex string */
         explicit OID(const std::string &s) { init(s); }
 
+        /** init from a reference to a 12-byte array */
+        explicit OID(const unsigned char (&arr)[12]) {
+            memcpy(data, arr, 12);
+        }
+
         /** initialize to 'null' */
         void clear() { a = 0; b = 0; }
 
