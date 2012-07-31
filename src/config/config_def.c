@@ -118,11 +118,12 @@ __wt_confchk_file_meta =
 
 const char *
 __wt_confdfl_index_meta =
-    "columns=(),filename=""";
+    "columns=(),columns=(),filename="",key_format=u,value_format=u";
 
 const char *
 __wt_confchk_index_meta =
-    "columns=(type=list),filename=()";
+    "columns=(type=list),columns=(type=list),filename=(),"
+    "key_format=(type=format),value_format=(type=format)";
 
 const char *
 __wt_confdfl_session_begin_transaction =

@@ -20,16 +20,16 @@ static int __curtable_update(WT_CURSOR *cursor);
 } while (0)
 
 #define	APPLY_IDX(ctable, f) do {					\
-	WT_BTREE *btree;						\
+	WT_INDEX *idx;							\
 	WT_CURSOR **__cp;						\
 	int __i;							\
 	WT_ERR(__curtable_open_indices(ctable));			\
 	__cp = (ctable)->idx_cursors;					\
 	for (__i = 0; __i < ctable->table->nindices; __i++, __cp++) {	\
-		btree = ((WT_CURSOR_BTREE *)*__cp)->btree;		\
+		idx = ctable->table->indices[__i];			\
 		WT_ERR(__wt_schema_project_merge(session,		\
 		    ctable->cg_cursors,					\
-		    btree->key_plan, btree->key_format, &(*__cp)->key));\
+		    idx->key_plan, idx->key_format, &(*__cp)->key));	\
 		F_SET(*__cp, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);	\
 		WT_ERR((*__cp)->f(*__cp));				\
 	}								\
@@ -623,7 +623,7 @@ __curtable_open_colgroups(WT_CURSOR_TABLE *ctable, const char *cfg_arg[])
 	for (i = 0, cp = ctable->cg_cursors;
 	    i < WT_COLGROUPS(table);
 	    i++, cp++) {
-		WT_RET(__wt_curfile_open(session, table->cg_name[i],
+		WT_RET(__wt_curfile_open(session, table->cgroups[i]->source,
 		    &ctable->iface, cfg, cp));
 		cfg[3] = "next_random=false";
 	}
@@ -642,7 +642,7 @@ __curtable_open_indices(WT_CURSOR_TABLE *ctable)
 	session = (WT_SESSION_IMPL *)ctable->iface.session;
 	table = ctable->table;
 
-	WT_RET(__wt_schema_open_index(session, table, NULL, 0));
+	WT_RET(__wt_schema_open_indices(session, table));
 	if (table->nindices == 0 || ctable->idx_cursors != NULL)
 		return (0);
 
@@ -654,7 +654,7 @@ __curtable_open_indices(WT_CURSOR_TABLE *ctable)
 	WT_RET(__wt_calloc_def(session, table->nindices, &ctable->idx_cursors));
 
 	for (i = 0, cp = ctable->idx_cursors; i < table->nindices; i++, cp++)
-		WT_RET(__wt_curfile_open(session, table->idx_name[i],
+		WT_RET(__wt_curfile_open(session, table->indices[i]->source,
 		    &ctable->iface, cfg, cp));
 	return (0);
 }
@@ -724,7 +724,7 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 		 * table cursor.
 		 */
 		return (__wt_curfile_open(
-		    session, table->cg_name[0], NULL, cfg, cursorp));
+		    session, table->cgroups[0]->source, NULL, cfg, cursorp));
 
 	WT_RET(__wt_calloc_def(session, 1, &ctable));
 

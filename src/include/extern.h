@@ -823,6 +823,9 @@ extern int __wt_schema_get_table(WT_SESSION_IMPL *session,
     size_t namelen,
     int ok_incomplete,
     WT_TABLE **tablep);
+extern void __wt_schema_destroy_colgroup(WT_SESSION_IMPL *session,
+    WT_COLGROUP *colgroup);
+extern void __wt_schema_destroy_index(WT_SESSION_IMPL *session, WT_INDEX *idx);
 extern void __wt_schema_destroy_table(WT_SESSION_IMPL *session,
     WT_TABLE *table);
 extern int __wt_schema_remove_table( WT_SESSION_IMPL *session, WT_TABLE *table);
@@ -831,7 +834,7 @@ extern int __wt_schema_colgroup_name(WT_SESSION_IMPL *session,
     WT_TABLE *table,
     const char *cgname,
     size_t len,
-    WT_ITEM *namebuf);
+    WT_ITEM *buf);
 extern int __wt_schema_get_btree(WT_SESSION_IMPL *session,
     const char *objname,
     size_t len,
@@ -839,10 +842,12 @@ extern int __wt_schema_get_btree(WT_SESSION_IMPL *session,
     uint32_t flags);
 extern int __wt_schema_open_colgroups(WT_SESSION_IMPL *session,
     WT_TABLE *table);
-extern int __wt_schema_open_index( WT_SESSION_IMPL *session,
+extern int __wt_schema_open_index(WT_SESSION_IMPL *session,
     WT_TABLE *table,
     const char *idxname,
-    size_t len);
+    size_t len,
+    WT_INDEX **indexp);
+extern int __wt_schema_open_indices(WT_SESSION_IMPL *session, WT_TABLE *table);
 extern int __wt_schema_open_table(WT_SESSION_IMPL *session,
     const char *name,
     size_t namelen,

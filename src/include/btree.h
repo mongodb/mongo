@@ -72,7 +72,11 @@ struct __wt_btree {
 	const char *checkpoint;		/* Checkpoint name (or NULL) */
 	const char *config;		/* Configuration string */
 
-	/* XXX Should move into the session-level handle information. */
+	/*
+	 * XXX Everything above here should move into the session-level
+	 * handle structure.
+	 */
+
 	WT_CKPT	  *ckpt;		/* Checkpoint information */
 
 	enum {	BTREE_COL_FIX=1,	/* Fixed-length column store */
@@ -81,10 +85,7 @@ struct __wt_btree {
 	} type;				/* Type */
 
 	const char *key_format;		/* Key format */
-	const char *key_plan;		/* Key projection plan */
-	const char *idxkey_format;	/* Index key format (hides primary) */
 	const char *value_format;	/* Value format */
-	const char *value_plan;		/* Value projection plan */
 	uint8_t bitcnt;			/* Fixed-length field size in bits */
 
 					/* Row-store comparison function */

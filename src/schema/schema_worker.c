@@ -18,9 +18,10 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
    int (*func)(WT_SESSION_IMPL *, const char *[]),
    const char *cfg[], uint32_t open_flags)
 {
+	WT_COLGROUP *colgroup;
 	WT_DECL_RET;
 	WT_TABLE *table;
-	const char *cgname, *tablename;
+	const char *tablename;
 	int i;
 
 	tablename = uri;
@@ -42,9 +43,9 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 		WT_ASSERT(session, session->btree == NULL);
 
 		for (i = 0; i < WT_COLGROUPS(table); i++) {
-			cgname = table->cg_name[i];
-			WT_RET(__wt_schema_get_btree(session,
-			    cgname, strlen(cgname), cfg, open_flags));
+			colgroup = table->cgroups[i];
+			WT_RET(__wt_session_get_btree(session,
+			    colgroup->source, cfg, open_flags));
 			ret = func(session, cfg);
 			WT_TRET(__wt_session_release_btree(session));
 			WT_RET(ret);

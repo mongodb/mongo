@@ -132,10 +132,7 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 
 	/* Free allocated memory. */
 	__wt_free(session, btree->key_format);
-	__wt_free(session, btree->key_plan);
-	__wt_free(session, btree->idxkey_format);
 	__wt_free(session, btree->value_format);
-	__wt_free(session, btree->value_plan);
 	__wt_free(session, btree->stats);
 
 	return (ret);

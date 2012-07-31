@@ -60,6 +60,7 @@ __create_file(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_buf_fmt(session, val, "version=(major=%d,minor=%d)",
 		    WT_BTREE_MAJOR_VERSION, WT_BTREE_MINOR_VERSION));
 		filecfg[2] = val->data;
+		filecfg[3] = NULL;
 		WT_ERR(__wt_config_collapse(session, filecfg, &treeconf));
 		if ((ret = __wt_metadata_insert(session, uri, treeconf)) != 0) {
 			if (ret == WT_DUPLICATE_KEY)
@@ -93,10 +94,10 @@ __create_colgroup(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_ITEM fmt, namebuf, uribuf;
 	WT_TABLE *table;
-	const char *cfg[] = { __wt_confdfl_colgroup_meta, config, NULL, NULL };
+	const char *cfg[4] = API_CONF_DEFAULTS(colgroup, meta, config);
 	const char *filecfg[] = { config, NULL, NULL };
 	const char **cfgp;
-	const char *cgconf, *cgname, *fileconf, *filename, *fileuri;
+	const char *cgconf, *cgname, *fileconf, *filename;
 	const char *oldconf, *tablename;
 	size_t tlen;
 
@@ -149,8 +150,6 @@ __create_colgroup(WT_SESSION_IMPL *session,
 		(void)WT_PREFIX_SKIP(filename, "filename=");
 	}
 
-	WT_ERR(__wt_config_collapse(session, cfg, &cgconf));
-
 	/* Calculate the key/value formats -- these go into the file config. */
 	WT_ERR(__wt_buf_fmt(session, &fmt, "key_format=%s", table->key_format));
 	if (cgname == NULL)
@@ -168,9 +167,9 @@ __create_colgroup(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_config_concat(session, filecfg, &fileconf));
 
 	WT_ERR(__wt_buf_fmt(session, &uribuf, "file:%s", filename));
-	fileuri = uribuf.data;
+	WT_ERR(__create_file(session, uribuf.data, exclusive, fileconf));
 
-	WT_ERR(__create_file(session, fileuri, exclusive, fileconf));
+	WT_ERR(__wt_config_collapse(session, cfg, &cgconf));
 	if ((ret = __wt_metadata_insert(session, name, cgconf)) != 0) {
 		/*
 		 * If the entry already exists in the metadata, we're done.
@@ -198,16 +197,17 @@ __create_index(WT_SESSION_IMPL *session,
 	WT_CONFIG pkcols;
 	WT_CONFIG_ITEM ckey, cval, icols;
 	WT_DECL_RET;
-	WT_ITEM extra_cols, fmt, namebuf, uribuf;
+	WT_ITEM confbuf, extra_cols, fmt, namebuf, uribuf;
 	WT_TABLE *table;
-	const char *cfg[] = { __wt_confdfl_index_meta, config, NULL, NULL };
+	const char *cfg[4] = API_CONF_DEFAULTS(index, meta, NULL);
 	const char *filecfg[] = { config, NULL, NULL };
-	const char *fileconf, *filename, *fileuri, *idxconf, *idxname;
+	const char *fileconf, *filename, *idxconf, *idxname;
 	const char *tablename;
 	size_t tlen;
 	int i;
 
 	idxconf = fileconf = NULL;
+	WT_CLEAR(confbuf);
 	WT_CLEAR(fmt);
 	WT_CLEAR(extra_cols);
 	WT_CLEAR(namebuf);
@@ -228,20 +228,23 @@ __create_index(WT_SESSION_IMPL *session,
 		    "Can't create an index for a non-existent table: %.*s",
 		    (int)tlen, tablename);
 
-	/* Add the filename to the index config before collapsing. */
 	if (__wt_config_getones(session, config, "filename", &cval) == 0) {
-		WT_ERR(__wt_buf_fmt(session,
-		    &namebuf, "%.*s", (int)cval.len, cval.str));
+		WT_ERR(__wt_buf_fmt(session, &namebuf,
+		    "%.*s", (int)cval.len, cval.str));
 		filename = namebuf.data;
 	} else {
 		WT_ERR(__wt_buf_fmt(session, &namebuf,
-		    "filename=%.*s_%s.wti", (int)tlen, tablename, idxname));
-		cfg[2] = filename = namebuf.data;
-		(void)WT_PREFIX_SKIP(filename, "filename=");
-	}
-	WT_ERR(__wt_config_collapse(session, cfg, &idxconf));
+		    "%.*s_%s.wti", (int)tlen, tablename, idxname));
+		filename = namebuf.data;
 
-	/* Calculate the key/value formats -- these go into the file config. */
+		/* Add the filename to the index config before collapsing. */
+		WT_ERR(__wt_buf_catfmt(session, &confbuf,
+		    ",filename=%s", filename));
+	}
+
+	(void)WT_PREFIX_SKIP(filename, "filename=");
+
+	/* Calculate the key/value formats. */
 	if (__wt_config_getones(session, config, "columns", &icols) != 0)
 		WT_ERR_MSG(session, EINVAL,
 		    "No 'columns' configuration for '%s'", name);
@@ -285,9 +288,11 @@ __create_index(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_config_concat(session, filecfg, &fileconf));
 
 	WT_ERR(__wt_buf_fmt(session, &uribuf, "file:%s", filename));
-	fileuri = uribuf.data;
+	WT_ERR(__create_file(session, uribuf.data, exclusive, fileconf));
 
-	WT_ERR(__create_file(session, fileuri, exclusive, fileconf));
+	cfg[1] = fileconf;
+	cfg[2] = confbuf.data;
+	WT_ERR(__wt_config_collapse(session, cfg, &idxconf));
 	if ((ret = __wt_metadata_insert(session, name, idxconf)) != 0) {
 		/*
 		 * If the entry already exists in the metadata, we're done.
@@ -300,8 +305,9 @@ __create_index(WT_SESSION_IMPL *session,
 
 err:	__wt_free(session, fileconf);
 	__wt_free(session, idxconf);
-	__wt_buf_free(session, &fmt);
+	__wt_buf_free(session, &confbuf);
 	__wt_buf_free(session, &extra_cols);
+	__wt_buf_free(session, &fmt);
 	__wt_buf_free(session, &namebuf);
 	__wt_buf_free(session, &uribuf);
 	return (ret);

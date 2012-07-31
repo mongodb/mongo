@@ -197,18 +197,19 @@ __drop_table(
 
 	/* Drop the column groups. */
 	for (i = 0; i < WT_COLGROUPS(table); i++) {
-		if (table->cg_name[i] == NULL)
+		if (table->cgroups[i] == NULL)
 			continue;
 		WT_ERR(__drop_colgroup(
-		    session, table->cg_name[i], force, cfg));
+		    session, table->cgroups[i]->name, force, cfg));
 	}
 
 	/* Drop the indices. */
-	WT_ERR(__wt_schema_open_index(session, table, NULL, 0));
+	WT_ERR(__wt_schema_open_indices(session, table));
 	for (i = 0; i < table->nindices; i++) {
-		if (table->idx_name[i] == NULL)
+		if (table->indices[i] == NULL)
 			continue;
-		WT_TRET(__drop_index(session, table->idx_name[i], force, cfg));
+		WT_TRET(__drop_index(
+		    session, table->indices[i]->name, force, cfg));
 	}
 
 	WT_ERR(__wt_schema_remove_table(session, table));

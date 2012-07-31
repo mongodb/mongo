@@ -75,12 +75,43 @@ __wt_schema_get_table(WT_SESSION_IMPL *session,
 }
 
 /*
+ * __wt_schema_destroy_colgroup --
+ *	Free a column group handle.
+ */
+void
+__wt_schema_destroy_colgroup(WT_SESSION_IMPL *session, WT_COLGROUP *colgroup)
+{
+	__wt_free(session, colgroup->name);
+	__wt_free(session, colgroup->source);
+	__wt_free(session, colgroup->config);
+	__wt_free(session, colgroup);
+}
+
+/*
+ * __wt_schema_destroy_index --
+ *	Free an index handle.
+ */
+void
+__wt_schema_destroy_index(WT_SESSION_IMPL *session, WT_INDEX *idx)
+{
+	__wt_free(session, idx->name);
+	__wt_free(session, idx->source);
+	__wt_free(session, idx->config);
+	__wt_free(session, idx->key_plan);
+	__wt_free(session, idx->value_plan);
+	__wt_free(session, idx->idxkey_format);
+	__wt_free(session, idx);
+}
+
+/*
  * __wt_schema_destroy_table --
  *	Free a table handle.
  */
 void
 __wt_schema_destroy_table(WT_SESSION_IMPL *session, WT_TABLE *table)
 {
+	WT_COLGROUP *colgroup;
+	WT_INDEX *idx;
 	int i;
 
 	__wt_free(session, table->name);
@@ -88,15 +119,21 @@ __wt_schema_destroy_table(WT_SESSION_IMPL *session, WT_TABLE *table)
 	__wt_free(session, table->plan);
 	__wt_free(session, table->key_format);
 	__wt_free(session, table->value_format);
-	if (table->cg_name != NULL) {
-		for (i = 0; i < WT_COLGROUPS(table); i++)
-			__wt_free(session, table->cg_name[i]);
-		__wt_free(session, table->cg_name);
+	if (table->cgroups != NULL) {
+		for (i = 0; i < WT_COLGROUPS(table); i++) {
+			if ((colgroup = table->cgroups[i]) == NULL)
+				continue;
+			__wt_schema_destroy_colgroup(session, colgroup);
+		}
+		__wt_free(session, table->cgroups);
 	}
-	if (table->idx_name != NULL) {
-		for (i = 0; i < table->nindices; i++)
-			__wt_free(session, table->idx_name[i]);
-		__wt_free(session, table->idx_name);
+	if (table->indices != NULL) {
+		for (i = 0; i < table->nindices; i++) {
+			if ((idx = table->indices[i]) == NULL)
+				continue;
+			__wt_schema_destroy_index(session, idx);
+		}
+		__wt_free(session, table->indices);
 	}
 	__wt_free(session, table);
 }

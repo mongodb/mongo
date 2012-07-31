@@ -162,12 +162,14 @@ __rename_table(
 
 	/* Rename the column groups. */
 	for (i = 0; i < WT_COLGROUPS(table); i++)
-		WT_RET(__rename_tree(session, table->cg_name[i], newname));
+		WT_RET(__rename_tree(
+		    session, table->cgroups[i]->name, newname));
 
 	/* Rename the indices. */
-	WT_RET(__wt_schema_open_index(session, table, NULL, 0));
+	WT_RET(__wt_schema_open_indices(session, table));
 	for (i = 0; i < table->nindices; i++)
-		WT_RET(__rename_tree(session, table->idx_name[i], newname));
+		WT_RET(__rename_tree(session,
+		    table->indices[i]->name, newname));
 
 	WT_RET(__wt_schema_remove_table(session, table));
 

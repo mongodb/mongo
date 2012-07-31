@@ -177,7 +177,7 @@ table_only_meta = [
 
 colgroup_meta = column_meta + filename_meta
 
-index_meta = column_meta + filename_meta
+index_meta = column_meta + format_meta + filename_meta
 
 table_meta = format_meta + table_only_meta
 
