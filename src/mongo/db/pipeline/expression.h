@@ -19,6 +19,7 @@
 #include "pch.h"
 
 #include "db/pipeline/field_path.h"
+#include "db/pipeline/value.h"
 #include "util/intrusive_counter.h"
 
 namespace mongo {
