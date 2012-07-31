@@ -1,0 +1,61 @@
+// $ifNull returns the result of the first expression if not null or undefined, otherwise of the
+// second expression.
+
+t = db.jstests_aggregation_ifnull;
+t.drop();
+
+t.save( {} );
+
+function assertError( expectedErrorCode, ifNullSpec ) {
+    assert.eq( expectedErrorCode,
+               t.aggregate( { $project:{ a:{ $ifNull:ifNullSpec } } } ).code );    
+}
+
+function assertResult( expectedResult, arg0, arg1 ) {
+    assert.eq( expectedResult,
+               t.aggregate( { $project:{ a:{ $ifNull:[ arg0, arg1 ] } } } ).result[ 0 ].a );
+}
+
+// Wrong number of args.
+assertError( 16020, [] );
+assertError( 16020, [1] );
+assertError( 16020, [null] );
+assertError( 16020, [1,1,1] );
+assertError( 16020, [1,1,null] );
+assertError( 16020, [1,1,undefined] );
+
+// First arg non null.
+assertResult( 1, 1, 2 );
+assertResult( 2, 2, 1 );
+assertResult( false, false, 1 );
+assertResult( '', '', 1 );
+assertResult( [], [], 1 );
+assertResult( {}, {}, 1 );
+assertResult( 1, 1, null );
+assertResult( 2, 2, undefined );
+
+// First arg null.
+assertResult( 2, null, 2 );
+assertResult( 1, null, 1 );
+assertResult( null, null, null );
+assertResult( undefined, null, undefined );
+
+// First arg undefined.
+assertResult( 2, undefined, 2 );
+assertResult( 1, undefined, 1 );
+assertResult( null, undefined, null );
+assertResult( undefined, undefined, undefined );
+
+// Computed expression.
+assertResult( 3, { $add:[ 1, 2 ] }, 5 );
+assertResult( 20, '$missingField', { $multiply:[ 4, 5 ] } );
+
+// Divide by 0.
+assertResult( 'div0', { $divide:[ 1, 0 ] }, 'div0' );
+
+// Nested.
+t.drop();
+t.save( { d:'foo' } );
+assertResult( 'foo', '$a', { $ifNull:[ '$b', { $ifNull:[ '$c', '$d' ] } ] } );
+t.update( {}, { $set:{ b:'bar' } } );
+assertResult( 'bar', '$a', { $ifNull:[ '$b', { $ifNull:[ '$c', '$d' ] } ] } );
