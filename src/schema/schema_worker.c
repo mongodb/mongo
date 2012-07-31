@@ -28,7 +28,8 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 
 	/* Get the btree handle(s) and call the underlying function. */
 	if (WT_PREFIX_MATCH(uri, "file:")) {
-		WT_RET(__wt_session_get_btree(session, uri, cfg, open_flags));
+		WT_RET(__wt_session_get_btree_ckpt(
+		    session, uri, cfg, open_flags));
 		ret = func(session, cfg);
 		WT_TRET(__wt_session_release_btree(session));
 	} else if (WT_PREFIX_MATCH(uri, "colgroup:") ||
@@ -44,7 +45,7 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 
 		for (i = 0; i < WT_COLGROUPS(table); i++) {
 			colgroup = table->cgroups[i];
-			WT_RET(__wt_session_get_btree(session,
+			WT_RET(__wt_session_get_btree_ckpt(session,
 			    colgroup->source, cfg, open_flags));
 			ret = func(session, cfg);
 			WT_TRET(__wt_session_release_btree(session));

@@ -159,6 +159,10 @@
 	((strncmp((str), (pre), strlen(pre)) == 0) ?			\
 	    ((str) += strlen(pre), 1) : 0)
 
+/* Check if a string matches a byte string of len bytes. */
+#define	WT_STRING_MATCH(str, bytes, len)				\
+	(strncmp(str, bytes, len) == 0 && (str)[(len)] == '\0')
+
 /* Function return value and scratch buffer declaration and initialization. */
 #define	WT_DECL_ITEM(i)	WT_ITEM *i = NULL
 #define	WT_DECL_RET	int ret = 0

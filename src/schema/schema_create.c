@@ -29,7 +29,7 @@ __create_file(WT_SESSION_IMPL *session,
 
 	/* Get an exclusive handle lock to protect the name. */
 	WT_RET(__wt_session_get_btree(
-	    session, uri, cfg, WT_BTREE_EXCLUSIVE | WT_BTREE_LOCK_ONLY));
+	    session, uri, NULL, cfg, WT_BTREE_EXCLUSIVE | WT_BTREE_LOCK_ONLY));
 
 	if (WT_META_TRACKING(session)) {
 		WT_RET(__wt_meta_track_handle_lock(session));

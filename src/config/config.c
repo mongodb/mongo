@@ -650,7 +650,7 @@ __wt_config_gets_defno(WT_SESSION_IMPL *session,
 	 */
 	value->len = 0;
 	value->val = 0;
-	if (cfg[1] == NULL)
+	if (cfg == NULL || cfg[1] == NULL)
 		return (0);
 
 	key_item.type = ITEM_STRING;

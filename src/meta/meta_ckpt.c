@@ -7,74 +7,20 @@
 
 #include "wt_internal.h"
 
-static int __ckpt_get(
-	WT_SESSION_IMPL *, const char *, const char *,  WT_ITEM *);
-static int __ckpt_get_last(WT_SESSION_IMPL *, const char *, WT_ITEM *);
-static int __ckpt_get_name(
+static int __ckpt_last_addr(WT_SESSION_IMPL *, const char *, WT_ITEM *);
+static int __ckpt_last_name(WT_SESSION_IMPL *, const char *, const char **);
+static int __ckpt_named_addr(
 	WT_SESSION_IMPL *, const char *, const char *, WT_ITEM *);
 static int __ckpt_set(WT_SESSION_IMPL *, const char *, const char *);
 static int __ckpt_version_chk(WT_SESSION_IMPL *, const char *, const char *);
 
 /*
- * __wt_meta_checkpoint_get --
+ * __wt_meta_checkpoint_addr --
  *	Return a file's checkpoint address.
  */
 int
-__wt_meta_checkpoint_get(WT_SESSION_IMPL *session,
-    const char *name, const char *checkpoint, WT_ITEM *addr)
-{
-	WT_DECL_RET;
-
-	/* Get the checkpoint address. */
-	ret = __ckpt_get(session, name, checkpoint, addr);
-
-	/*
-	 * If we find a checkpoint, check the version and return the address.
-	 * If we don't find a named checkpoint, we're done, they're read-only.
-	 * If we don't find a default checkpoint, it's creation, return "no
-	 * data" and let our caller handle it.
-	 */
-	if (ret == WT_NOTFOUND) {
-		/*
-		 * If the caller didn't give us a specific checkpoint name, we
-		 * assume it's a creation and there isn't a checkpoint to find.
-		 * Let the caller deal with the failure.
-		 */
-		if (checkpoint != NULL)
-			WT_RET_MSG(session, WT_NOTFOUND,
-			    "no \"%s\" checkpoint found in %s",
-			    checkpoint, name);
-
-		addr->data = NULL;
-		addr->size = 0;
-	}
-	return (0);
-}
-
-/*
- * __wt_meta_checkpoint_clear --
- *	Clear a file's checkpoint.
- */
-int
-__wt_meta_checkpoint_clear(WT_SESSION_IMPL *session, const char *name)
-{
-	/*
-	 * If we are unrolling a failed create, we may have already removed the
-	 * metadata entry.  If no entry is found to update and we're trying to
-	 * clear the checkpoint, just ignore it.
-	 */
-	WT_RET_NOTFOUND_OK(__ckpt_set(session, name, NULL));
-
-	return (0);
-}
-
-/*
- * __ckpt_get --
- *	Get a file's checkpoint.
- */
-static int
-__ckpt_get(WT_SESSION_IMPL *session,
-    const char *name, const char *checkpoint, WT_ITEM *addr)
+__wt_meta_checkpoint_addr(WT_SESSION_IMPL *session,
+    const char *fname, const char *checkpoint, WT_ITEM *addr)
 {
 	WT_DECL_RET;
 	const char *config;
@@ -82,19 +28,73 @@ __ckpt_get(WT_SESSION_IMPL *session,
 	config = NULL;
 
 	/* Retrieve the metadata entry for the file. */
-	WT_ERR(__wt_metadata_read(session, name, &config));
+	WT_ERR(__wt_metadata_read(session, fname, &config));
 
 	/* Check the major/minor version numbers. */
-	WT_ERR(__ckpt_version_chk(session, name, config));
+	WT_ERR(__ckpt_version_chk(session, fname, config));
 
-	/* Retrieve the named checkpoint or the last checkpoint. */
-	if (checkpoint == NULL)
-		WT_ERR(__ckpt_get_last(session, config, addr));
-	else
-		WT_ERR(__ckpt_get_name(session, checkpoint, config, addr));
+	/*
+	 * Retrieve the named checkpoint or the last checkpoint.
+	 *
+	 * If we don't find a named checkpoint, we're done, they're read-only.
+	 * If we don't find a default checkpoint, it's creation, return "no
+	 * data" and let our caller handle it.
+	 */
+	if (checkpoint == NULL) {
+		if ((ret =
+		    __ckpt_last_addr(session, config, addr)) == WT_NOTFOUND) {
+			ret = 0;
+			addr->data = NULL;
+			addr->size = 0;
+		}
+	} else
+		WT_ERR(__ckpt_named_addr(session, checkpoint, config, addr));
 
 err:	__wt_free(session, config);
 	return (ret);
+}
+
+/*
+ * __wt_meta_checkpoint_last_name --
+ *	Return the last unnamed checkpoint's name.
+ */
+int
+__wt_meta_checkpoint_last_name(
+    WT_SESSION_IMPL *session, const char *fname, const char **namep)
+{
+	WT_DECL_RET;
+	const char *config;
+
+	config = NULL;
+
+	/* Retrieve the metadata entry for the file. */
+	WT_ERR(__wt_metadata_read(session, fname, &config));
+
+	/* Check the major/minor version numbers. */
+	WT_ERR(__ckpt_version_chk(session, fname, config));
+
+	/* Retrieve the name of the last unnamed checkpoint. */
+	WT_ERR(__ckpt_last_name(session, config, namep));
+
+err:	__wt_free(session, config);
+	return (ret);
+}
+
+/*
+ * __wt_meta_checkpoint_clear --
+ *	Clear a file's checkpoint.
+ */
+int
+__wt_meta_checkpoint_clear(WT_SESSION_IMPL *session, const char *fname)
+{
+	/*
+	 * If we are unrolling a failed create, we may have already removed the
+	 * metadata entry.  If no entry is found to update and we're trying to
+	 * clear the checkpoint, just ignore it.
+	 */
+	WT_RET_NOTFOUND_OK(__ckpt_set(session, fname, NULL));
+
+	return (0);
 }
 
 /*
@@ -102,7 +102,7 @@ err:	__wt_free(session, config);
  *	Set a file's checkpoint.
  */
 static int
-__ckpt_set(WT_SESSION_IMPL *session, const char *name, const char *v)
+__ckpt_set(WT_SESSION_IMPL *session, const char *fname, const char *v)
 {
 	WT_DECL_RET;
 	const char *config, *cfg[3], *newcfg;
@@ -110,14 +110,14 @@ __ckpt_set(WT_SESSION_IMPL *session, const char *name, const char *v)
 	config = newcfg = NULL;
 
 	/* Retrieve the metadata for this file. */
-	WT_ERR(__wt_metadata_read(session, name, &config));
+	WT_ERR(__wt_metadata_read(session, fname, &config));
 
 	/* Replace the checkpoint entry. */
 	cfg[0] = config;
 	cfg[1] = v == NULL ? "checkpoint=()" : v;
 	cfg[2] = NULL;
 	WT_ERR(__wt_config_collapse(session, cfg, &newcfg));
-	WT_ERR(__wt_metadata_update(session, name, newcfg));
+	WT_ERR(__wt_metadata_update(session, fname, newcfg));
 
 err:	__wt_free(session, config);
 	__wt_free(session, newcfg);
@@ -125,20 +125,26 @@ err:	__wt_free(session, config);
 }
 
 /*
- * __ckpt_get_name --
+ * __ckpt_named_addr --
  *	Return the cookie associated with a file's named checkpoint.
  */
 static int
-__ckpt_get_name(WT_SESSION_IMPL *session,
-    const char *name, const char *config, WT_ITEM *addr)
+__ckpt_named_addr(WT_SESSION_IMPL *session,
+    const char *checkpoint, const char *config, WT_ITEM *addr)
 {
 	WT_CONFIG ckptconf;
 	WT_CONFIG_ITEM a, k, v;
 
 	WT_RET(__wt_config_getones(session, config, "checkpoint", &v));
 	WT_RET(__wt_config_subinit(session, &ckptconf, &v));
+
+	/*
+	 * Take the first match: there should never be more than a single
+	 * checkpoint of any name.
+	 */
 	while (__wt_config_next(&ckptconf, &k, &v) == 0)
-		if (strlen(name) == k.len && strncmp(name, k.str, k.len) == 0) {
+		if (strlen(checkpoint) == k.len &&
+		    strncmp(checkpoint, k.str, k.len) == 0) {
 			WT_RET(__wt_config_subgets(session, &v, "addr", &a));
 			WT_RET(__wt_nhex_to_raw(session, a.str, a.len, addr));
 			return (0);
@@ -147,11 +153,11 @@ __ckpt_get_name(WT_SESSION_IMPL *session,
 }
 
 /*
- * __ckpt_get_last --
+ * __ckpt_last_addr --
  *	Return the cookie associated with the file's last checkpoint.
  */
 static int
-__ckpt_get_last(
+__ckpt_last_addr(
     WT_SESSION_IMPL *session, const char *config, WT_ITEM *addr)
 {
 	WT_CONFIG ckptconf;
@@ -161,23 +167,69 @@ __ckpt_get_last(
 	WT_RET(__wt_config_getones(session, config, "checkpoint", &v));
 	WT_RET(__wt_config_subinit(session, &ckptconf, &v));
 	for (found = 0; __wt_config_next(&ckptconf, &k, &v) == 0;) {
-		if (found) {
-			WT_RET(__wt_config_subgets(session, &v, "order", &a));
-			if (a.val < found)
-				continue;
-		}
+		/* Ignore checkpoints before the ones we've already seen. */
+		WT_RET(__wt_config_subgets(session, &v, "order", &a));
+		if (found && a.val < found)
+			continue;
+		found = a.val;
 
+		/*
+		 * Copy out the address; our caller wants the raw cookie, not
+		 * the hex.
+		 */
 		WT_RET(__wt_config_subgets(session, &v, "addr", &a));
 		if (a.len == 0)
 			WT_RET(EINVAL);
-
-		/* Our caller wants the raw cookie, not the hex. */
 		WT_RET(__wt_nhex_to_raw(session, a.str, a.len, addr));
-		WT_RET(__wt_config_subgets(session, &v, "order", &a));
-		found = a.val;
 	}
 
 	return (found ? 0 : WT_NOTFOUND);
+}
+
+/*
+ * __ckpt_last_name --
+ *	Return the name associated with the file's last unnamed checkpoint.
+ */
+static int
+__ckpt_last_name(
+    WT_SESSION_IMPL *session, const char *config, const char **namep)
+{
+	WT_CONFIG ckptconf;
+	WT_CONFIG_ITEM a, k, v;
+	WT_DECL_RET;
+	int64_t found;
+
+	*namep = NULL;
+
+	WT_ERR(__wt_config_getones(session, config, "checkpoint", &v));
+	WT_ERR(__wt_config_subinit(session, &ckptconf, &v));
+	for (found = 0; __wt_config_next(&ckptconf, &k, &v) == 0;) {
+		/*
+		 * We only care about unnamed checkpoints; applications may not
+		 * use any matching prefix as a checkpoint name, the comparison
+		 * is pretty simple.
+		 */
+		if (k.len < strlen(WT_CHECKPOINT) ||
+		    strncmp(k.str, WT_CHECKPOINT, strlen(WT_CHECKPOINT)) != 0)
+			continue;
+
+		/* Ignore checkpoints before the ones we've already seen. */
+		WT_ERR(__wt_config_subgets(session, &v, "order", &a));
+		if (found && a.val < found)
+			continue;
+
+		if (*namep != NULL)
+			__wt_free(session, *namep);
+		WT_ERR(__wt_strndup(session, k.str, k.len, namep));
+		found = a.val;
+	}
+	if (!found)
+		ret = WT_NOTFOUND;
+
+	if (0) {
+err:		__wt_free(session, namep);
+	}
+	return (ret);
 }
 
 /*
@@ -201,7 +253,7 @@ __ckpt_compare_order(const void *a, const void *b)
  */
 int
 __wt_meta_ckptlist_get(
-    WT_SESSION_IMPL *session, const char *name, WT_CKPT **ckptbasep)
+    WT_SESSION_IMPL *session, const char *fname, WT_CKPT **ckptbasep)
 {
 	WT_CKPT *ckpt, *ckptbase;
 	WT_CONFIG ckptconf;
@@ -220,7 +272,7 @@ __wt_meta_ckptlist_get(
 	config = NULL;
 
 	/* Retrieve the metadata information for the file. */
-	WT_RET(__wt_metadata_read(session, name, &config));
+	WT_RET(__wt_metadata_read(session, fname, &config));
 
 	/* Load any existing checkpoints into the array. */
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));
@@ -302,18 +354,18 @@ err:		__wt_meta_ckptlist_free(session, ckptbase);
  */
 int
 __wt_meta_ckptlist_set(
-    WT_SESSION_IMPL *session, const char *name, WT_CKPT *ckptbase)
+    WT_SESSION_IMPL *session, const char *fname, WT_CKPT *ckptbase)
 {
 	WT_CKPT *ckpt;
 	WT_DECL_RET;
 	WT_ITEM *buf;
-	int64_t order;
+	int64_t maxorder;
 	const char *sep;
 
 	buf = NULL;
 
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));
-	order = 0;
+	maxorder = 0;
 	sep = "";
 	WT_ERR(__wt_buf_fmt(session, buf, "checkpoint=("));
 	WT_CKPT_FOREACH(ckptbase, ckpt) {
@@ -322,18 +374,20 @@ __wt_meta_ckptlist_set(
 			continue;
 
 		/*
-		 * Track the largest active checkpoint counter: it's not really
-		 * a generational number or an ID because we reset it to 1 if
-		 * the checkpoint we're writing is the only checkpoint the file
-		 * has.  The problem we're solving is when two checkpoints are
-		 * taken quickly, the timer may not be unique and/or we can even
-		 * see time travel on the second checkpoint if we read the time
-		 * in-between nanoseconds rolling over.  All we need to know
-		 * is the real checkpoint order so we don't accidentally take
-		 * the wrong "last" checkpoint.
+		 * Each internal checkpoint name is appended with a generation
+		 * to make it a unique name.  We're solving two problems: when
+		 * two checkpoints are taken quickly, the timer may not be
+		 * unique and/or we can even see time travel on the second
+		 * checkpoint if we snapshot the time in-between nanoseconds
+		 * rolling over.  Second, if we reset the generational counter
+		 * when new checkpoints arrive, we could logically re-create
+		 * specific checkpoints, racing with cursors open on those
+		 * checkpoints.  I can't think of any way to return incorrect
+		 * results by racing with those cursors, but it's simpler not
+		 * to worry about it.
 		 */
-		if (ckpt->order > order)
-			order = ckpt->order;
+		if (ckpt->order > maxorder)
+			maxorder = ckpt->order;
 
 		if (F_ISSET(ckpt, WT_CKPT_ADD | WT_CKPT_UPDATE)) {
 			/* Convert the raw cookie to a hex string. */
@@ -341,18 +395,26 @@ __wt_meta_ckptlist_set(
 			    ckpt->raw.data, ckpt->raw.size, &ckpt->addr));
 
 			if (F_ISSET(ckpt, WT_CKPT_ADD))
-				ckpt->order = order + 1;
+				ckpt->order = ++maxorder;
 		}
-		WT_ERR(__wt_buf_catfmt(session, buf,
-		    "%s%s=(addr=\"%.*s\",order=%" PRIu64
-		    ",time=%" PRIuMAX ",size=%" PRIu64 ")",
-		    sep, ckpt->name,
-		    (int)ckpt->addr.size, (char *)ckpt->addr.data,
-		    ckpt->order, ckpt->sec, ckpt->ckpt_size));
+		if (strcmp(ckpt->name, WT_CHECKPOINT) == 0)
+			WT_ERR(__wt_buf_catfmt(session, buf,
+			    "%s%s.%" PRId64 "=(addr=\"%.*s\",order=%" PRIu64
+			    ",time=%" PRIuMAX ",size=%" PRIu64 ")",
+			    sep, ckpt->name, ckpt->order,
+			    (int)ckpt->addr.size, (char *)ckpt->addr.data,
+			    ckpt->order, ckpt->sec, ckpt->ckpt_size));
+		else
+			WT_ERR(__wt_buf_catfmt(session, buf,
+			    "%s%s=(addr=\"%.*s\",order=%" PRIu64
+			    ",time=%" PRIuMAX ",size=%" PRIu64 ")",
+			    sep, ckpt->name,
+			    (int)ckpt->addr.size, (char *)ckpt->addr.data,
+			    ckpt->order, ckpt->sec, ckpt->ckpt_size));
 		sep = ",";
 	}
 	WT_ERR(__wt_buf_catfmt(session, buf, ")"));
-	WT_ERR(__ckpt_set(session, name, buf->mem));
+	WT_ERR(__ckpt_set(session, fname, buf->mem));
 
 err:	__wt_scr_free(&buf);
 
@@ -386,7 +448,7 @@ __wt_meta_ckptlist_free(WT_SESSION_IMPL *session, WT_CKPT *ckptbase)
  */
 static int
 __ckpt_version_chk(
-    WT_SESSION_IMPL *session, const char *name, const char *config)
+    WT_SESSION_IMPL *session, const char *fname, const char *config)
 {
 	WT_CONFIG_ITEM a, v;
 	int majorv, minorv;
@@ -402,6 +464,6 @@ __ckpt_version_chk(
 	    minorv > WT_BTREE_MINOR_VERSION))
 		WT_RET_MSG(session, EACCES,
 		    "%s is an unsupported version of a WiredTiger file",
-		    name);
+		    fname);
 	return (0);
 }

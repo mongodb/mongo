@@ -210,7 +210,7 @@ __conn_btree_open(WT_SESSION_IMPL *session,
 		F_SET(btree, WT_BTREE_NO_EVICTION);
 
 	do {
-		WT_ERR(__wt_meta_checkpoint_get(
+		WT_ERR(__wt_meta_checkpoint_addr(
 		    session, btree->name, btree->checkpoint, addr));
 		WT_ERR(__wt_btree_open(session, addr->data, addr->size, cfg,
 		    btree->checkpoint == NULL ? 0 : 1));

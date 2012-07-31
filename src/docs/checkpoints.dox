@@ -35,10 +35,12 @@ Named checkpoints persist until explicitly dropped.  Checkpoints share
 pages, and deleting a checkpoint may or may not make pages available for
 re-use, depending on whether the dropped checkpoint contained the last
 reference to a block of data.  Creating a named checkpoint automatically
-discards any other checkpoint with the same name (unless they are
-currently open in a cursor).
+discards any previous checkpoints with the same name.
 
-Unnamed checkpoints managed by WiredTiger are given the name
-"WiredTigerInternalCheckpoint".
+Named checkpoints may not be discarded if in use or when hot backups are
+in progress.
+
+Unnamed checkpoints managed by WiredTiger are given the reserved name
+"WiredTigerCheckpoint".
 
  */

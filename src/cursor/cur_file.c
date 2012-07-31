@@ -352,7 +352,7 @@ __wt_curfile_open(WT_SESSION_IMPL *session, const char *uri,
 		WT_RET(__wt_schema_get_btree(session,
 		    uri, strlen(uri), cfg, bulk ? WT_BTREE_EXCLUSIVE : 0));
 	else if (WT_PREFIX_MATCH(uri, "file:"))
-		WT_RET(__wt_session_get_btree(session,
+		WT_RET(__wt_session_get_btree_ckpt(session,
 		     uri, cfg, bulk ? WT_BTREE_EXCLUSIVE : 0));
 	else
 		WT_RET(__wt_bad_object_type(session, uri));

@@ -53,7 +53,7 @@ __truncate_table(WT_SESSION_IMPL *session, const char *name)
 		 * __wt_conn_btree_close_all.
 		 */
 		WT_ERR(tret = __wt_session_get_btree(session,
-		    table->cgroups[i]->source, NULL, WT_BTREE_EXCLUSIVE));
+		    table->cgroups[i]->source, NULL, NULL, WT_BTREE_EXCLUSIVE));
 		btree = session->btree;
 		WT_ERR(__wt_buf_set(
 		    session, namebuf, btree->name, strlen(btree->name) + 1));
@@ -68,7 +68,7 @@ __truncate_table(WT_SESSION_IMPL *session, const char *name)
 		 * __wt_conn_btree_close_all.
 		 */
 		WT_ERR(tret = __wt_session_get_btree(session,
-		    table->indices[i]->source, NULL, WT_BTREE_EXCLUSIVE));
+		    table->indices[i]->source, NULL, NULL, WT_BTREE_EXCLUSIVE));
 		btree = session->btree;
 		WT_ERR(__wt_buf_set(
 		    session, namebuf, btree->name, strlen(btree->name) + 1));

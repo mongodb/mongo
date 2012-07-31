@@ -519,8 +519,10 @@ struct __wt_session {
 	 * bulk-loaded.  Cursors configured for bulk load only support the
 	 * WT_CURSOR::insert and WT_CURSOR::close methods.,a boolean flag;
 	 * default \c false.}
-	 * @config{checkpoint, the name of a checkpoint to open.,a string;
-	 * default empty.}
+	 * @config{checkpoint, the name of a checkpoint to open; the reserved
+	 * checkpoint name "WiredTigerCheckpoint" opens a cursor on the most
+	 * recent unnamed checkpoint taken for the object.,a string; default
+	 * empty.}
 	 * @config{dump, configure the cursor for dump format inputs and
 	 * outputs: "hex" selects a simple hexadecimal format\, "print" selects
 	 * a format where only non-printing characters are hexadecimal encoded.
@@ -845,8 +847,9 @@ struct __wt_session {
 	 * additionally contain one of the following keys: \c "from=all" to drop
 	 * all checkpoints\, \c "from=<checkpoint>" to drop all checkpoints
 	 * after and including the named checkpoint\, or \c "to=<checkpoint>" to
-	 * drop all checkpoints before and including the named checkpoint.,a
-	 * list of strings; default empty.}
+	 * drop all checkpoints before and including the named checkpoint.
+	 * Checkpoints cannot be dropped while a hot backup is in progress or if
+	 * open in a cursor.,a list of strings; default empty.}
 	 * @config{name, if non-empty\, specify a name for the checkpoint.,a
 	 * string; default empty.}
 	 * @config{target, if non-empty\, checkpoint the list of objects.,a list

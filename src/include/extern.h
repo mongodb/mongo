@@ -644,17 +644,20 @@ extern int __wt_meta_btree_apply(WT_SESSION_IMPL *session,
     const char *[]),
     const char *cfg[],
     uint32_t flags);
-extern int __wt_meta_checkpoint_get(WT_SESSION_IMPL *session,
-    const char *name,
+extern int __wt_meta_checkpoint_addr(WT_SESSION_IMPL *session,
+    const char *fname,
     const char *checkpoint,
     WT_ITEM *addr);
+extern int __wt_meta_checkpoint_last_name( WT_SESSION_IMPL *session,
+    const char *fname,
+    const char **namep);
 extern int __wt_meta_checkpoint_clear(WT_SESSION_IMPL *session,
-    const char *name);
+    const char *fname);
 extern int __wt_meta_ckptlist_get( WT_SESSION_IMPL *session,
-    const char *name,
+    const char *fname,
     WT_CKPT **ckptbasep);
 extern int __wt_meta_ckptlist_set( WT_SESSION_IMPL *session,
-    const char *name,
+    const char *fname,
     WT_CKPT *ckptbase);
 extern void __wt_meta_ckptlist_free(WT_SESSION_IMPL *session,
     WT_CKPT *ckptbase);
@@ -925,8 +928,13 @@ extern int __wt_session_add_btree( WT_SESSION_IMPL *session,
     WT_BTREE_SESSION **btree_sessionp);
 extern int __wt_session_lock_btree(WT_SESSION_IMPL *session, uint32_t flags);
 extern int __wt_session_release_btree(WT_SESSION_IMPL *session);
+extern int __wt_session_get_btree_ckpt(WT_SESSION_IMPL *session,
+    const char *uri,
+    const char *cfg[],
+    uint32_t flags);
 extern int __wt_session_get_btree(WT_SESSION_IMPL *session,
     const char *uri,
+    const char *checkpoint,
     const char *cfg[],
     uint32_t flags);
 extern int __wt_session_lock_checkpoint(WT_SESSION_IMPL *session,

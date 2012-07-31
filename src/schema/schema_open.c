@@ -68,7 +68,7 @@ __wt_schema_get_btree(WT_SESSION_IMPL *session,
 	if (ret != 0)
 		goto err;
 
-	ret = __wt_session_get_btree(session, fileuri, cfg, flags);
+	ret = __wt_session_get_btree_ckpt(session, fileuri, cfg, flags);
 	if (ret == ENOENT)
 		__wt_errx(session,
 		    "%s created but '%s' is missing", objname, fileuri);

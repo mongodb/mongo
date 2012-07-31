@@ -172,10 +172,9 @@ class test_backup(wttest.WiredTigerTestCase, suite_subprocess):
         # Confirm checkpoints are being deleted.
         self.session.checkpoint("name=one")
         self.session.checkpoint("name=two,drop=(one)")
-        msg = '/no "one" checkpoint found/'
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+        self.assertRaises(wiredtiger.WiredTigerError,
             lambda: self.session.open_cursor(
-            self.objs[0][0], None, "checkpoint=one"), msg)
+            self.objs[0][0], None, "checkpoint=one"))
 
         # Confirm opening a backup cursor causes checkpoint to fail if dropping
         # a named checkpoint, but does not stop a default checkpoint.
@@ -185,6 +184,8 @@ class test_backup(wttest.WiredTigerTestCase, suite_subprocess):
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.checkpoint("name=three,drop=(two)"), msg)
         self.session.checkpoint()
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.session.checkpoint("name=three,drop=(two)"), msg)
         self.session.checkpoint()
         cursor.close()
 

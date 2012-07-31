@@ -182,7 +182,7 @@ WildTiger
 WinNT
 WiredTiger
 WiredTiger's
-WiredTigerInternalCheckpoint
+WiredTigerCheckpoint
 Wuninitialized
 XP
 __wt_epoch
@@ -484,6 +484,7 @@ nul
 numSymbols
 numbare
 offpage
+ok
 oldname
 onint
 onpage

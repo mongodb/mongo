@@ -39,8 +39,7 @@ __wt_metadata_open(WT_SESSION_IMPL *session)
 	if (session->metafile != NULL)
 		return (0);
 
-	WT_RET(__wt_session_get_btree(
-	    session, WT_METADATA_URI, NULL, 0));
+	WT_RET(__wt_session_get_btree(session, WT_METADATA_URI, NULL, NULL, 0));
 
 	session->metafile = session->btree;
 	WT_ASSERT(session, session->metafile != NULL);
