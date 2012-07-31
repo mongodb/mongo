@@ -914,8 +914,16 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	 * later).
 	 */
 	WT_ERR(__wt_meta_turtle_init(session, &exist));
-	if (!exist)
-		WT_ERR(__wt_schema_create(session, WT_METADATA_URI, NULL));
+	if (!exist) {
+		/*
+		 * We're single-threaded, but acquire the schema lock
+		 * regardless: the lower level code checks that it is
+		 * appropriately synchronized.
+		 */
+		WT_WITH_SCHEMA_LOCK(session,
+		    ret = __wt_schema_create(session, WT_METADATA_URI, NULL));
+		WT_ERR(ret);
+	}
 	WT_ERR(__wt_metadata_open(session));
 
 	/* If there's a hot-backup file, load it. */

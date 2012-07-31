@@ -540,10 +540,6 @@ extern const char *__wt_confchk_table_meta;
 extern const char *__wt_confdfl_wiredtiger_open;
 extern const char *__wt_confchk_wiredtiger_open;
 extern int __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session);
-extern int __wt_conn_btree_open(WT_SESSION_IMPL *session,
-    const char *config,
-    const char *cfg[],
-    uint32_t flags);
 extern int __wt_conn_btree_get(WT_SESSION_IMPL *session,
     const char *name,
     const char *ckpt,

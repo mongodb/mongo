@@ -169,11 +169,11 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_conn_btree_open --
+ * __conn_btree_open --
  *	Open the current btree handle.
  */
-int
-__wt_conn_btree_open(WT_SESSION_IMPL *session,
+static int
+__conn_btree_open(WT_SESSION_IMPL *session,
     const char *config, const char *cfg[], uint32_t flags)
 {
 	WT_BTREE *btree;
@@ -182,7 +182,8 @@ __wt_conn_btree_open(WT_SESSION_IMPL *session,
 
 	btree = session->btree;
 
-	WT_ASSERT(session, F_ISSET(btree, WT_BTREE_EXCLUSIVE) &&
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED) &&
+	    F_ISSET(btree, WT_BTREE_EXCLUSIVE) &&
 	    !LF_ISSET(WT_BTREE_LOCK_ONLY));
 
 	/* Open the underlying file, free any old config. */
@@ -268,7 +269,7 @@ __wt_conn_btree_get(WT_SESSION_IMPL *session,
 				ret = ENOENT;
 			goto err;
 		}
-		ret = __wt_conn_btree_open(session, treeconf, cfg, flags);
+		ret = __conn_btree_open(session, treeconf, cfg, flags);
 	}
 
 err:	if (ret != 0 && locked) {
