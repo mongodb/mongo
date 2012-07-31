@@ -7,7 +7,8 @@ t.drop();
 t.save( {} );
 
 function week( date ) {
-    return t.aggregate( { $project:{ a:{ $week:date } } } ).result[ 0 ].a;
+    return t.aggregate( { $project:{ a:{ $week:date } } },
+                        { $match:{ a:{ $type:16 /* Int type expected */ } } } ).result[ 0 ].a;
 }
 
 function assertWeek( expectedWeek, date ) {
@@ -124,3 +125,26 @@ assertWeek( 8, new Date( 2020, 1, 28 ) );
 assertWeek( 8, new Date( 2020, 1, 29 ) );
 // Sun Mar 1 2020
 assertWeek( 9, new Date( 2020, 2, 1 ) );
+
+// Timestamp argument.
+assertWeek( 1, new Timestamp( new Date( 1984, 0, 1 ).getTime() / 1000, 0 ) );
+assertWeek( 1, new Timestamp( new Date( 1984, 0, 1 ).getTime() / 1000, 1000000000 ) );
+
+// Numeric argument not allowed.
+assert.eq( 16006, t.aggregate( { $project:{ a:{ $week:5 } } } ).code );
+
+// String argument not allowed.
+assert.eq( 16006, t.aggregate( { $project:{ a:{ $week:'foo' } } } ).code );
+
+// Array argument format.
+assertWeek( 8, [ new Date( 2016, 1, 27 ) ] );
+
+// Wrong number of arguments.
+assert.eq( 16020, t.aggregate( { $project:{ a:{ $week:[] } } } ).code );
+assert.eq( 16020, t.aggregate( { $project:{ a:{ $week:[ new Date( 2020, 1, 28 ),
+                                                        new Date( 2020, 1, 29 ) ] } } } ).code );
+
+// From a field path expression.
+t.remove();
+t.save( { a:new Date( 2020, 2, 1 ) } );
+assertWeek( 9, '$a' );
