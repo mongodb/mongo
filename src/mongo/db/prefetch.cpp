@@ -48,8 +48,11 @@ namespace mongo {
         const char *ns = op.getStringField("ns");
         NamespaceDetails *nsd = nsdetails(ns);
         if (!nsd) return; // maybe not opened yet
+        
+        LOG(4) << "index prefetch for op " << *opType << endl;
 
-        log(4) << "index prefetch for op " << *opType << endl;
+        DEV Lock::assertAtLeastReadLocked(ns);
+
         prefetchIndexPages(nsd, obj);
 
         // do not prefetch the data for inserts; it doesn't exist yet
