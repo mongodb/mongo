@@ -38,22 +38,9 @@ namespace mongo {
     Value::~Value() {
     }
 
-    Value::Value():
-        type(jstNULL),
-        oidValue(),
-        dateValue(),
-        stringValue(),
-        pDocumentValue(),
-        vpValue() {
-    }
+    Value::Value(): type(jstNULL) {}
 
-    Value::Value(BSONType theType):
-        type(theType),
-        oidValue(),
-        dateValue(),
-        stringValue(),
-        pDocumentValue(),
-        vpValue() {
+    Value::Value(BSONType theType): type(theType) {
         switch(type) {
         case Undefined:
         case jstNULL:
@@ -61,24 +48,28 @@ namespace mongo {
         case Array: // empty
             break;
 
-        case NumberDouble:
-            doubleValue = 0;
-            break;
-
         case Bool:
             boolValue = false;
+            break;
+
+        case NumberDouble:
+            doubleValue = 0;
             break;
 
         case NumberInt:
             intValue = 0;
             break;
 
-        case Timestamp:
-            timestampValue = OpTime();
-            break;
-
         case NumberLong:
             longValue = 0;
+            break;
+
+        case Date:
+            dateValue = 0;
+            break;
+
+        case Timestamp:
+            timestampValue = OpTime();
             break;
 
         default:
@@ -153,7 +144,8 @@ namespace mongo {
             break;
 
         case Date:
-            dateValue = pBsonElement->Date();
+            // this is really signed but typed as unsigned for historical reasons
+            dateValue = static_cast<long long>(pBsonElement->Date().millis);
             break;
 
         case RegEx:
@@ -233,15 +225,10 @@ namespace mongo {
         return pValue;
     }
 
-    Value::Value(const Date_t &value):
-        type(Date),
-        pDocumentValue(),
-        vpValue() {
-        dateValue = value;
-    }
-
-    intrusive_ptr<const Value> Value::createDate(const Date_t &value) {
-        intrusive_ptr<const Value> pValue(new Value(value));
+    intrusive_ptr<const Value> Value::createDate(const long long &value) {
+        // Can't directly construct because constructor would clash with createLong
+        intrusive_ptr<Value> pValue(new Value(Date));
+        pValue->dateValue = value;
         return pValue;
     }
 
@@ -353,7 +340,7 @@ namespace mongo {
         return boolValue;
     }
 
-    Date_t Value::getDate() const {
+    long long Value::getDate() const {
         verify(getType() == Date);
         return dateValue;
     }
@@ -431,7 +418,7 @@ namespace mongo {
             break;
 
         case Date:
-            pBuilder->append(getDate());
+            pBuilder->append(Date_t(getDate()));
             break;
 
         case RegEx:
@@ -622,20 +609,63 @@ namespace mongo {
         return (double)0;
     }
 
-    Date_t Value::coerceToDate() const {
+    long long Value::coerceToDate() const {
         switch(type) {
 
         case Date:
             return dateValue; 
 
         case Timestamp:
-            return Date_t(timestampValue.getSecs() * 1000ULL);
+            return timestampValue.getSecs() * 1000LL;
 
         default:
             uassert(16006, str::stream() <<
                     "can't convert from BSON type " << typeName(type) << " to Date",
                     false);
         } // switch(type)
+    }
+
+    time_t Value::coerceToTimeT() const {
+        long long millis = coerceToDate();
+        if (millis < 0) {
+            // We want the division below to truncate toward -inf rather than 0
+            // eg Dec 31, 1969 23:59:58.001 should be -2 seconds rather than -1
+            // This is needed to get the correct values from coerceToTM
+            if ( -1999 / 1000 != -2) { // this is implementation defined
+                millis -= 1000-1;
+            }
+        }
+        const long long seconds = millis / 1000;
+
+        uassert(16421, "Can't handle date values outside of time_t range",
+               seconds >= std::numeric_limits<time_t>::min() &&
+               seconds <= std::numeric_limits<time_t>::max());
+
+        return static_cast<time_t>(seconds);
+    }
+    tm Value::coerceToTm() const {
+        // See implementation in Date_t.
+        // Can't reuse that here because it doesn't support times before 1970
+        time_t dtime = coerceToTimeT();
+        tm out;
+
+#if defined(_WIN32) // Both the argument order and the return values differ
+        bool itWorked = gmtime_s(&out, &dtime) == 0;
+#else
+        bool itWorked = gmtime_r(&dtime, &out) != NULL;
+#endif
+
+        if (!itWorked) {
+            if (dtime < 0) {
+                // Windows docs say it doesn't support these, but empirically it seems to work
+                uasserted(16422, "gmtime failed - your system doesn't support dates before 1970");
+            }
+            else {
+                uasserted(16423, str::stream() << "gmtime failed to convert time_t of " << dtime);
+            }
+        }
+
+        return out;
     }
 
     string Value::coerceToString() const {
@@ -661,7 +691,7 @@ namespace mongo {
             return ss.str();
 
         case Date:
-            return dateValue.toString();
+            return time_t_to_String(coerceToTimeT());
 
         case jstNULL:
         case Undefined:
@@ -842,10 +872,8 @@ namespace mongo {
             return -1;
 
         case Date: {
-            // need to convert to long long to handle dates before 1970
-            // see BSONElement::compareElementValues
-            long long l = static_cast<long long>(rL->dateValue.millis);
-            long long r = static_cast<long long>(rR->dateValue.millis);
+            long long l = rL->dateValue;
+            long long r = rR->dateValue;
             if (l < r)
                 return -1;
             if (l > r)
@@ -938,7 +966,7 @@ namespace mongo {
             break;
 
         case Date:
-            boost::hash_combine(seed, (unsigned long long)dateValue);
+            boost::hash_combine(seed, dateValue);
             break;
 
         case RegEx:

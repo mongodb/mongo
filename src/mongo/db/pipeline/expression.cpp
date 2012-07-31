@@ -850,8 +850,7 @@ namespace mongo {
         const intrusive_ptr<Document> &pDocument) const {
         checkArgCount(1);
         intrusive_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
-        tm date;
-        (pDate->coerceToDate()).toTm(&date);
+        tm date = pDate->coerceToTm();
         return Value::createInt(date.tm_mday); 
     }
 
@@ -882,8 +881,7 @@ namespace mongo {
         const intrusive_ptr<Document> &pDocument) const {
         checkArgCount(1);
         intrusive_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
-        tm date;
-        (pDate->coerceToDate()).toTm(&date);
+        tm date = pDate->coerceToTm();
         return Value::createInt(date.tm_wday+1); // MySQL uses 1-7 tm uses 0-6
     }
 
@@ -914,8 +912,7 @@ namespace mongo {
         const intrusive_ptr<Document> &pDocument) const {
         checkArgCount(1);
         intrusive_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
-        tm date;
-        (pDate->coerceToDate()).toTm(&date);
+        tm date = pDate->coerceToTm();
         return Value::createInt(date.tm_yday+1); // MySQL uses 1-366 tm uses 0-365
     }
 
@@ -1757,8 +1754,7 @@ namespace mongo {
         const intrusive_ptr<Document> &pDocument) const {
         checkArgCount(1);
         intrusive_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
-        tm date;
-        (pDate->coerceToDate()).toTm(&date);
+        tm date = pDate->coerceToTm();
         return Value::createInt(date.tm_min);
     }
 
@@ -1858,8 +1854,7 @@ namespace mongo {
         const intrusive_ptr<Document> &pDocument) const {
         checkArgCount(1);
         intrusive_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
-        tm date;
-        (pDate->coerceToDate()).toTm(&date);
+        tm date = pDate->coerceToTm();
         return Value::createInt(date.tm_mon + 1); // MySQL uses 1-12 tm uses 0-11
     }
 
@@ -1945,8 +1940,7 @@ namespace mongo {
         const intrusive_ptr<Document> &pDocument) const {
         checkArgCount(1);
         intrusive_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
-        tm date;
-        (pDate->coerceToDate()).toTm(&date);
+        tm date = pDate->coerceToTm();
         return Value::createInt(date.tm_hour);
     }
 
@@ -2373,8 +2367,7 @@ namespace mongo {
         const intrusive_ptr<Document> &pDocument) const {
         checkArgCount(1);
         intrusive_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
-        tm date;
-        (pDate->coerceToDate()).toTm(&date);
+        tm date = pDate->coerceToTm();
         return Value::createInt(date.tm_sec);
     }
 
@@ -2620,8 +2613,7 @@ namespace mongo {
         const intrusive_ptr<Document> &pDocument) const {
         checkArgCount(1);
         intrusive_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
-        tm date;
-        (pDate->coerceToDate()).toTm(&date);
+        tm date = pDate->coerceToTm();
         int dayOfWeek = date.tm_wday;
         int dayOfYear = date.tm_yday;
         int prevSundayDayOfYear = dayOfYear - dayOfWeek; // may be negative
@@ -2669,8 +2661,7 @@ namespace mongo {
         const intrusive_ptr<Document> &pDocument) const {
         checkArgCount(1);
         intrusive_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
-        tm date;
-        (pDate->coerceToDate()).toTm(&date);
+        tm date = pDate->coerceToTm();
         return Value::createInt(date.tm_year + 1900); // tm_year is years since 1900
     }
 
