@@ -80,6 +80,7 @@ namespace mongo {
             int readLength = fread(&buf, 1, 1, file);
             if (readLength < 1) {
                 log() << "error reading file " << filename << endl;
+                fclose( file );
                 return false;
             }
             read++;
@@ -92,11 +93,14 @@ namespace mongo {
             // check valid base64
             if ((buf < 'A' || buf > 'Z') && (buf < 'a' || buf > 'z') && (buf < '0' || buf > '9') && buf != '+' && buf != '/') {
                 log() << "invalid char in key file " << filename << ": " << buf << endl;
+                fclose( file );
                 return false;
             }
 
             str += buf;
         }
+
+        fclose( file );
 
         if (str.size() < 6) {
             log() << "security key must be at least 6 characters" << endl;
