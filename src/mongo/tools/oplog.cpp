@@ -88,11 +88,6 @@ public:
             if ( o["op"].String() == "n" )
                 continue;
 
-            if ( o["op"].String() == "c" ) {
-                cout << "skipping: " << o << endl;
-                continue;
-            }
-
             BSONObjBuilder b( o.objsize() + 32 );
             BSONArrayBuilder updates( b.subarrayStart( "applyOps" ) );
             updates.append( o );
