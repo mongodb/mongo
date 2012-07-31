@@ -995,6 +995,54 @@ namespace QueryUtilTests {
                 ASSERT_EQUALS( "x", frs.range( "a" ).min().String() );
             }
         };
+
+        /**
+         * The elemMatchContext is preserved when two FieldRanges are intersected, singleKey ==
+         * false, and the resulting FieldRange is an unmodified copy of one of the original two
+         * FieldRanges.  For example, if FieldRange a == [[1, 10]] is intersected with FieldRange b
+         * == [[5, 5]], a will be replaced with b.  In this case, because a becomes an exact copy of
+         * b, b's elemMatchContext will be copied to a.
+         */
+        class PreserveNonUniversalElemMatchContext {
+        public:
+            void run() {
+                BSONObj query = fromjson( "{a:{$elemMatch:{b:1}},c:{$lt:5},d:1}" );
+                _expectedElemMatchContext = query.firstElement().Obj().firstElement();
+
+                // The elemMatchContext is set properly for the 'a.b' field.
+                FieldRangeSet frs( "", query, true, true );
+                assertElemMatchContext( frs.range( "a.b" ) );
+
+                // The elemMatchContext is preserved after intersecting with a superset range.
+                frs.range( "a.b" ).intersect( frs.range( "c" ), false );
+                assertElemMatchContext( frs.range( "a.b" ) );
+
+                // The elemMatchContext is forwarded after intersecting with a subset range.
+                frs.range( "c" ).intersect( frs.range( "a.b" ), false );
+                assertElemMatchContext( frs.range( "c" ) );
+
+                // The elemMatchContext is cleared after a _single key_ intersection.
+                frs.range( "a.b" ).intersect( frs.range( "d" ), true /* singleKey */ );
+                ASSERT( frs.range( "a.b" ).elemMatchContext().eoo() );
+            }
+        private:
+            void assertElemMatchContext( const FieldRange& range ) {
+                ASSERT_EQUALS( _expectedElemMatchContext.rawdata(),
+                               range.elemMatchContext().rawdata() );
+            }
+            BSONElement _expectedElemMatchContext;
+        };
+
+        /** Intersect two universal ranges, one special. */
+        class IntersectSpecial {
+        public:
+            void run() {
+                FieldRangeSet frs( "", fromjson( "{loc:{$near:[0,0],$maxDistance:5}}" ), true,
+                                   true );
+                // The intersection is special.
+                ASSERT( !frs.range( "loc" ).getSpecial().empty() );
+            }
+        };
         
         namespace ExactMatchRepresentation {
 
@@ -2583,6 +2631,8 @@ namespace QueryUtilTests {
             add<FieldRangeTests::DiffMulti2>();
             add<FieldRangeTests::Universal>();
             add<FieldRangeTests::ElemMatchRegex>();
+            add<FieldRangeTests::PreserveNonUniversalElemMatchContext>();
+            add<FieldRangeTests::IntersectSpecial>();
             add<FieldRangeTests::ExactMatchRepresentation::EqualArray>();
             add<FieldRangeTests::ExactMatchRepresentation::EqualEmptyArray>();
             add<FieldRangeTests::ExactMatchRepresentation::InArray>();

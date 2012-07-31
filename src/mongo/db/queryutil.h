@@ -297,6 +297,10 @@ namespace mongo {
          */
         FieldRange( const BSONElement &e , bool isNot, bool optimize );
 
+        void setElemMatchContext( const BSONElement& elemMatchContext ) {
+            _elemMatchContext = elemMatchContext;
+        }
+
         /**
          * @return Range intersection with 'other'.
          * @param singleKey - Indicate whether intersection will be performed in a single value or
@@ -345,6 +349,7 @@ namespace mongo {
          *  FieldRange( {} ), isPointIntervalSet() -> false
          */
         bool isPointIntervalSet() const;
+        const BSONElement& elemMatchContext() const { return _elemMatchContext; }
         
         /** Empty the range so it includes no BSONElements. */
         void makeEmpty() { _intervals.clear(); }
@@ -367,8 +372,14 @@ namespace mongo {
         vector<FieldInterval> _intervals;
         // Owns memory for our BSONElements.
         vector<BSONObj> _objData;
-        string _special;
+        string _special; // Index type name of a non standard (eg '2d') index required by a parsed
+                         // query operator (eg '$near').
         bool _exactMatchRepresentation;
+        BSONElement _elemMatchContext; // Parent $elemMatch object of the field constraint that
+                                       // generated this FieldRange.  For example if the query is
+                                       // { a:{ $elemMatch:{ b:1, c:1 } } }, then the
+                                       // _elemMatchContext for the FieldRange on 'a.b' is the query
+                                       // element having field name '$elemMatch'.
     };
     
     /**
@@ -400,7 +411,7 @@ namespace mongo {
          *     TODO It is unclear why 'optimize' is optional, see SERVER-5165.
          */
         FieldRangeSet( const char *ns, const BSONObj &query , bool singleKey , bool optimize );
-        
+
         /** @return range for the given field. */
         const FieldRange &range( const char *fieldName ) const;
         /** @return range for the given field.  Public for testing. */
