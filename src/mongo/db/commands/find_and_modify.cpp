@@ -171,9 +171,13 @@ namespace mongo {
                         _appendHelper( result , doc , found , fields );
                     }
                     
-                    updateObjects( ns.c_str() , update , queryModified , upsert , false , true , cc().curop()->debug() );
+                    UpdateResult res = updateObjects( ns.c_str() , update , queryModified , upsert , false , true , cc().curop()->debug() );
                     
                     if ( returnNew ) {
+                        if ( ! res.existing && res.upserted.isSet() ) {
+                            queryModified = BSON( "_id" << res.upserted );
+                        }
+                        log() << "queryModified: " << queryModified << endl;
                         verify( Helpers::findOne( ns.c_str() , queryModified , doc ) );
                         _appendHelper( result , doc , true , fields );
                     }
