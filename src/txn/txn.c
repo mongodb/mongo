@@ -115,7 +115,8 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_ASSERT(session, txn_state->id == WT_TXN_NONE);
 
 	WT_RET(__wt_config_gets_defno(session, cfg, "isolation", &cval));
-	txn->isolation = (__wt_config_strcmp(&cval, "snapshot") == 0) ?
+	txn->isolation =
+	    WT_STRING_MATCH("snapshot", cval.str, cval.len) ?
 	    TXN_ISO_SNAPSHOT : TXN_ISO_READ_UNCOMMITTED;
 
 	F_SET(txn, TXN_RUNNING);

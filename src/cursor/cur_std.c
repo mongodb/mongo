@@ -580,7 +580,8 @@ __wt_cursor_init(WT_CURSOR *cursor,
 		 */
 		WT_ASSERT(session, owner == NULL);
 
-		F_SET(cursor, (__wt_config_strcmp(&cval, "print") == 0) ?
+		F_SET(cursor,
+		    WT_STRING_MATCH("print", cval.str, cval.len) ?
 		    WT_CURSTD_DUMP_PRINT : WT_CURSTD_DUMP_HEX);
 		WT_RET(__wt_curdump_create(cursor, owner, &cdump));
 		owner = cdump;

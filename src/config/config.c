@@ -715,28 +715,3 @@ __wt_config_subgets(WT_SESSION_IMPL *session,
 
 	return (__wt_config_subgetraw(session, cfg, &key_item, value));
 }
-
-/*
- * __wt_config_strcmp --
- *	Compare a string value with a given string.
- */
-int
-__wt_config_strcmp(WT_CONFIG_ITEM *cfg, const char *str)
-{
-	const char *cstr;
-	size_t i;
-
-	for (i = 0, cstr = cfg->str; i < cfg->len; i++, cstr++, str++) {
-		/* This covers hitting a NULL at the end of the string. */
-		if (*cstr > *str)
-			return (1);
-		if (*cstr < *str)
-			return (-1);
-	}
-
-	/*
-	 * All the characters are equal: if we are at the end of the string,
-	 * we're done.
-	 */
-	return ((*str == '\0') ? 0 : -1);
-}
