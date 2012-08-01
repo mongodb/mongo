@@ -414,12 +414,12 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 			    __wt_session_lock_checkpoint(session, ckpt->name);
 			if (ret == 0)
 				continue;
-			if (strncmp(ckpt->name,
+			if (ret == EBUSY && strncmp(ckpt->name,
 			    WT_CHECKPOINT, strlen(WT_CHECKPOINT)) == 0) {
 				F_CLR(ckpt, WT_CKPT_DELETE);
 				continue;
 			}
-			WT_ERR_MSG(session, EBUSY,
+			WT_ERR_MSG(session, ret,
 			    "checkpoints cannot be dropped when in-use");
 		}
 
