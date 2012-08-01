@@ -96,26 +96,26 @@ namespace BackgroundJobTests {
     class GoStateCase {
     public:
         void run() {
-	    for ( unsigned int i = 0; i < 100; i++ ) { // race
-		IncTester tester( 0 /* inc without wait */ );
-		tester.go();
-		ASSERT_NOT_EQUALS( tester.getState(), BackgroundJob::NotStarted ); // Running or Done
-		tester.wait(); // cleanup
-	    }
+            for ( unsigned int i = 0; i < 100; i++ ) { // race
+                IncTester tester( 0 /* inc without wait */ );
+                tester.go();
+                ASSERT_NOT_EQUALS( tester.getState(), BackgroundJob::NotStarted ); // Running or Done
+                tester.wait(); // cleanup
+            }
         }
     };
 
     class RunTwiceCase {
     public:
         void run() {
-	    for ( unsigned int i = 0; i < 100; i++ ) { // race
-		IncTester tester( 0 /* inc without wait */ );
-		tester.go();
-		tester.wait();
-		tester.go();
-		tester.wait();
-		ASSERT_EQUALS( tester.getVal() , 2 );
-	    }
+            for ( unsigned int i = 0; i < 100; i++ ) { // race
+                IncTester tester( 0 /* inc without wait */ );
+                tester.go();
+                tester.wait();
+                tester.go();
+                tester.wait();
+                ASSERT_EQUALS( tester.getVal() , 2 );
+            }
         }
     };
 
