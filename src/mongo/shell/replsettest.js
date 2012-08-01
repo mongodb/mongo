@@ -601,6 +601,8 @@ ReplSetTest.prototype.start = function( n , options , restart , wait ){
                  replSet : this.useSeedList ? this.getURL() : this.name,
                  dbpath : "$set-$node" }
     
+    defaults = Object.merge( defaults, ReplSetTest.nodeOptions || {} )
+        
     // TODO : should we do something special if we don't currently know about this node?
     n = this.getNodeId( n )
     
