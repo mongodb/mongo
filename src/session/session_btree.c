@@ -298,7 +298,7 @@ __wt_session_discard_btree(
     WT_SESSION_IMPL *session, WT_BTREE_SESSION *btree_session)
 {
 	WT_BTREE *btree;
-	int ret;
+	WT_DECL_RET;
 
 	TAILQ_REMOVE(&session->btrees, btree_session, q);
 
