@@ -237,7 +237,8 @@ namespace mongo {
                 const IndexDetails *idx = d->findIndexByPrefix( keyPattern ,
                                                                 true ); /* require single key */
                 if ( idx == NULL ) {
-                    errmsg = "couldn't find index over splitting key";
+                    errmsg = (string)"couldn't find index over splitting key " +
+                             keyPattern.clientReadable().toString();
                     return false;
                 }
                 min = Helpers::modifiedRangeBound( min , idx->keyPattern() , -1 );
