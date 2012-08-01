@@ -235,12 +235,11 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table, WT_INDEX *idx)
 		goto err;
 
 	WT_ERR(__wt_scr_alloc(session, 0, &plan));
-	WT_ERR(__wt_struct_plan(session,
-	    table, buf->data, buf->size, 0, plan));
+	WT_ERR(__wt_struct_plan(session, table, buf->data, buf->size, 0, plan));
 	idx->key_plan = __wt_buf_steal(session, plan, NULL);
 
 	/* Set up the cursor key format (the visible columns). */
-	__wt_buf_init(session, buf, 0);
+	WT_ERR(__wt_buf_init(session, buf, 0));
 	WT_ERR(__wt_struct_truncate(session,
 	    idx->key_format, cursor_key_cols, buf));
 	idx->idxkey_format = __wt_buf_steal(session, buf, NULL);
