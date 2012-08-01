@@ -402,7 +402,7 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 		namesize = (size_t)(columns - idxname);
 
 	WT_RET(__wt_schema_open_index(session, table, idxname, namesize, &idx));
-	WT_RET(__wt_session_get_btree(session, idx->source, NULL, 0));
+	WT_RET(__wt_session_get_btree(session, idx->source, NULL, NULL, 0));
 	WT_RET(__wt_calloc_def(session, 1, &cindex));
 
 	cbt = &cindex->cbt;

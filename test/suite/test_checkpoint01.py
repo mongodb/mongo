@@ -98,12 +98,11 @@ class test_checkpoint(wttest.WiredTigerTestCase):
         # Physically verify the file, including the individual checkpoints.
         self.session.verify(self.uri, None)
 
-        msg = '/no.*checkpoint found/'
         for checkpoint_name, entry in self.checkpoints.iteritems():
             if entry[1] == 0:
-                self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+                self.assertRaises(wiredtiger.WiredTigerError,
                     lambda: self.session.open_cursor(
-                    self.uri, None, "checkpoint=" + checkpoint_name), msg)
+                    self.uri, None, "checkpoint=" + checkpoint_name))
             else:
                 list_expected = self.list_expected(checkpoint_name)
                 list_checkpoint = self.list_checkpoint(checkpoint_name)
@@ -147,10 +146,12 @@ class test_checkpoint_cursor(wttest.WiredTigerTestCase):
     # Check that you cannot open a checkpoint that doesn't exist.
     def test_checkpoint_dne(self):
         simple_populate(self, self.uri, 'key_format=' + self.fmt, 100)
-        msg = '/no.*checkpoint found/'
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+        self.assertRaises(wiredtiger.WiredTigerError,
             lambda: self.session.open_cursor(
-            self.uri, None, "checkpoint=checkpoint-1"), msg)
+            self.uri, None, "checkpoint=checkpoint-1"))
+        self.assertRaises(wiredtiger.WiredTigerError,
+            lambda: self.session.open_cursor(
+            self.uri, None, "checkpoint=WiredTigerCheckpoint"))
 
     # Check that you can open checkpoints more than once.
     def test_checkpoint_multiple_open(self):
@@ -178,18 +179,16 @@ class test_checkpoint_cursor(wttest.WiredTigerTestCase):
         cursor = self.session.open_cursor(
             self.uri, None, "checkpoint=checkpoint-2")
 
+        # Check creating an identically named checkpoint fails. */
         # Check dropping the specific checkpoint fails.
-        self.assertRaises(wiredtiger.WiredTigerError,
-            lambda: self.session.checkpoint("drop=(checkpoint-2)"))
-
         # Check dropping all checkpoints fails.
-        self.assertRaises(wiredtiger.WiredTigerError,
-            lambda: self.session.checkpoint("drop=(from=all)"))
-
-        # Check creating an identically named checkpoint fails (because it will
-        # attempt to drop the open checkpoint).
-        self.assertRaises(wiredtiger.WiredTigerError,
-            lambda: self.session.checkpoint("name=checkpoint-2"))
+        msg = '/checkpoints cannot be dropped/'
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.session.checkpoint("name=checkpoint-2"), msg)
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.session.checkpoint("drop=(checkpoint-2)"), msg)
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.session.checkpoint("drop=(from=all)"), msg)
 
         # Check dropping other checkpoints succeeds (which also tests that you
         # can create new checkpoints while other checkpoints are in-use).
@@ -198,6 +197,7 @@ class test_checkpoint_cursor(wttest.WiredTigerTestCase):
         # Close the cursor and repeat the failing commands, they should now
         # succeed.
         cursor.close()
+        self.session.checkpoint("name=checkpoint-2")
         self.session.checkpoint("drop=(checkpoint-2)")
         self.session.checkpoint("drop=(from=all)")
 
@@ -252,6 +252,7 @@ class test_checkpoint_target(wttest.WiredTigerTestCase):
         self.check(self.uri + '2', 'UPDATE')
         self.check(self.uri + '3', 'ORIGINAL')
 
+
 # Check that you can't write checkpoint cursors.
 class test_checkpoint_cursor_update(wttest.WiredTigerTestCase):
     scenarios = [
@@ -271,3 +272,62 @@ class test_checkpoint_cursor_update(wttest.WiredTigerTestCase):
         self.assertRaises(wiredtiger.WiredTigerError, lambda: cursor.remove())
         self.assertRaises(wiredtiger.WiredTigerError, lambda: cursor.update())
         cursor.close()
+
+
+# Check that WiredTigerCheckpoint works as a checkpoint specifier.
+class test_checkpoint_last(wttest.WiredTigerTestCase):
+    scenarios = [
+        ('file', dict(uri='file:checkpoint',fmt='S')),
+        #('table', dict(uri='table:checkpoint',fmt='S'))
+        ]
+
+    def test_checkpoint_last(self):
+        # Create an object, change one record to an easily recognizable string,
+        # then checkpoint it and open a cursor, confirming we see the correct
+        # value.   Repeat this action, we want to be sure the engine gets the
+        # latest checkpoint information each time.
+        uri = self.uri
+        simple_populate(self, uri, 'key_format=' + self.fmt, 100)
+
+        for value in ('FIRST', 'SECOND', 'THIRD', 'FOURTH', 'FIFTH'):
+            # Update the object.
+            cursor = self.session.open_cursor(uri, None, "overwrite")
+            cursor.set_key(key_populate(self.fmt, 10))
+            cursor.set_value(value)
+            cursor.insert()
+            cursor.close()
+
+            # Checkpoint the object.
+            self.session.checkpoint()
+
+            # Verify the "last" checkpoint sees the correct value.
+            cursor = self.session.open_cursor(
+                uri, None, "checkpoint=WiredTigerCheckpoint")
+            cursor.set_key(key_populate(self.fmt, 10))
+            cursor.search()
+            self.assertEquals(cursor.get_value(), value)
+            # Don't close the checkpoint cursor, we want it to remain open until
+            # the test completes.
+
+
+# Check we can't use the reserved name as an application checkpoint name.
+class test_checkpoint_last_name(wttest.WiredTigerTestCase):
+    def test_checkpoint_last_name(self):
+        simple_populate(self, "file:checkpoint", 'key_format=S', 100)
+        msg = '/the checkpoint name.*is reserved/'
+        for conf in (
+            'name=WiredTigerCheckpoint',
+            'name=WiredTigerCheckpoint.',
+            'name=WiredTigerCheckpointX',
+            'drop=(from=WiredTigerCheckpoint)',
+            'drop=(from=WiredTigerCheckpoint.)',
+            'drop=(from=WiredTigerCheckpointX)',
+            'drop=(to=WiredTigerCheckpoint)',
+            'drop=(to=WiredTigerCheckpoint.)',
+            'drop=(to=WiredTigerCheckpointX)'):
+                self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+                    lambda: self.session.checkpoint(conf), msg)
+
+
+if __name__ == '__main__':
+    wttest.run()

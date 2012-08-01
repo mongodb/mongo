@@ -267,7 +267,9 @@ methods = {
 		support the WT_CURSOR::insert and WT_CURSOR::close methods''',
 		type='boolean'),
 	Config('checkpoint', '', r'''
-		the name of a checkpoint to open'''),
+		the name of a checkpoint to open; the reserved checkpoint name
+		"WiredTigerCheckpoint" opens a cursor on the most recent unnamed
+		checkpoint taken for the object'''),
 	Config('dump', '', r'''
 		configure the cursor for dump format inputs and outputs:
 		"hex" selects a simple hexadecimal format, "print"
@@ -339,7 +341,9 @@ methods = {
 		\c "from=<checkpoint>" to drop all checkpoints after and
 		including the named checkpoint, or
 		\c "to=<checkpoint>" to drop all checkpoints before and
-		including the named checkpoint''', type='list'),
+		including the named checkpoint.  Checkpoints cannot be
+		dropped while a hot backup is in progress or if open in
+		a cursor''', type='list'),
 	Config('name', '', r'''
 		if non-empty, specify a name for the checkpoint'''),
 	Config('target', '', r'''

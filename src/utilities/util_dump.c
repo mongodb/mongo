@@ -144,7 +144,7 @@ dump_config(WT_SESSION *session, const char *uri)
 	int tret;
 
 	/* Dump the config. */
-	if (strncmp(uri, "table:", strlen("table:")) == 0) {
+	if (WT_PREFIX_MATCH(uri, "table:")) {
 		/* Open a metadata cursor. */
 		if ((ret = session->open_cursor(
 		    session, WT_METADATA_URI, NULL, NULL, &cursor)) != 0) {

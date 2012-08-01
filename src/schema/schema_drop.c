@@ -24,7 +24,7 @@ __drop_file(
 		return (EINVAL);
 
 	if (session->btree == NULL &&
-	    (ret = __wt_session_get_btree(session, uri, cfg,
+	    (ret = __wt_session_get_btree(session, uri, NULL, cfg,
 	    WT_BTREE_EXCLUSIVE | WT_BTREE_LOCK_ONLY)) != 0) {
 		if (ret == WT_NOTFOUND || ret == ENOENT)
 			ret = 0;

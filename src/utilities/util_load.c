@@ -88,7 +88,7 @@ load_dump(WT_SESSION *session)
 	 * otherwise, it's a single file dump.
 	 */
 	for (entry = list; *entry != NULL; ++entry)
-		if (strncmp(*entry, "table:", strlen("table:")) == 0)
+		if (WT_PREFIX_MATCH(*entry, "table:"))
 			break;
 	if (*entry == NULL) {
 		/*
@@ -96,7 +96,7 @@ load_dump(WT_SESSION *session)
 		 * the configuration information.
 		 */
 		if (list[0] == NULL || list[1] == NULL || list[2] != NULL ||
-		    strncmp(list[0], "file:", strlen("file:")) != 0)
+		    !WT_PREFIX_MATCH(list[0], "file:"))
 			return (format());
 
 		entry = list;
@@ -234,19 +234,16 @@ config_update(WT_SESSION *session, char **list)
 	const char *cfg[] = { NULL, NULL, NULL };
 	char **configp, **listp, *p, *t;
 
-#define	MATCH(s, tag)                                           	\
-	(strncmp(s, tag, strlen(tag)) == 0)
-
 	/*
 	 * If the object has been renamed, replace all of the column group,
 	 * index, file and table names with the new name.
 	 */
 	if (cmdname != NULL) {
 		for (listp = list; *listp != NULL; listp += 2)
-			if (MATCH(*listp, "colgroup:") ||
-			    MATCH(*listp, "file:") ||
-			    MATCH(*listp, "index:") ||
-			    MATCH(*listp, "table:"))
+			if (WT_PREFIX_MATCH(*listp, "colgroup:") ||
+			    WT_PREFIX_MATCH(*listp, "file:") ||
+			    WT_PREFIX_MATCH(*listp, "index:") ||
+			    WT_PREFIX_MATCH(*listp, "table:"))
 				if (config_rename(listp, cmdname))
 					return (1);
 

@@ -68,7 +68,7 @@ __wt_schema_get_btree(WT_SESSION_IMPL *session,
 	if (ret != 0)
 		goto err;
 
-	ret = __wt_session_get_btree(session, fileuri, cfg, flags);
+	ret = __wt_session_get_btree_ckpt(session, fileuri, cfg, flags);
 	if (ret == ENOENT)
 		__wt_errx(session,
 		    "%s created but '%s' is missing", objname, fileuri);
@@ -235,12 +235,11 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table, WT_INDEX *idx)
 		goto err;
 
 	WT_ERR(__wt_scr_alloc(session, 0, &plan));
-	WT_ERR(__wt_struct_plan(session,
-	    table, buf->data, buf->size, 0, plan));
+	WT_ERR(__wt_struct_plan(session, table, buf->data, buf->size, 0, plan));
 	idx->key_plan = __wt_buf_steal(session, plan, NULL);
 
 	/* Set up the cursor key format (the visible columns). */
-	__wt_buf_init(session, buf, 0);
+	WT_ERR(__wt_buf_init(session, buf, 0));
 	WT_ERR(__wt_struct_truncate(session,
 	    idx->key_format, cursor_key_cols, buf));
 	idx->idxkey_format = __wt_buf_steal(session, buf, NULL);
@@ -297,8 +296,7 @@ __wt_schema_open_index(WT_SESSION_IMPL *session,
 			break;
 
 		/* Is this the index we are looking for? */
-		match = (idxname == NULL ||
-		    (strncmp(name, idxname, len) == 0 && name[len] == '\0'));
+		match = idxname == NULL || WT_STRING_MATCH(name, idxname, len);
 
 		/*
 		 * Ensure there is space, including if we have to make room for

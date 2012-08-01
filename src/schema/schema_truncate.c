@@ -41,7 +41,7 @@ __truncate_table(WT_SESSION_IMPL *session, const char *name)
 	WT_DECL_ITEM(namebuf);
 	WT_DECL_RET;
 	WT_TABLE *table;
-	int i, tret;
+	int i;
 
 	WT_RET(__wt_schema_get_table(session, name, strlen(name), 0, &table));
 	WT_RET(__wt_scr_alloc(session, 0, &namebuf));
@@ -52,8 +52,8 @@ __truncate_table(WT_SESSION_IMPL *session, const char *name)
 		 * Get an exclusive lock on the handle: it will be released by
 		 * __wt_conn_btree_close_all.
 		 */
-		WT_ERR(tret = __wt_session_get_btree(session,
-		    table->cgroups[i]->source, NULL, WT_BTREE_EXCLUSIVE));
+		WT_ERR(__wt_session_get_btree(session,
+		    table->cgroups[i]->source, NULL, NULL, WT_BTREE_EXCLUSIVE));
 		btree = session->btree;
 		WT_ERR(__wt_buf_set(
 		    session, namebuf, btree->name, strlen(btree->name) + 1));
@@ -67,8 +67,8 @@ __truncate_table(WT_SESSION_IMPL *session, const char *name)
 		 * Get an exclusive lock on the handle: it will be released by
 		 * __wt_conn_btree_close_all.
 		 */
-		WT_ERR(tret = __wt_session_get_btree(session,
-		    table->indices[i]->source, NULL, WT_BTREE_EXCLUSIVE));
+		WT_ERR(__wt_session_get_btree(session,
+		    table->indices[i]->source, NULL, NULL, WT_BTREE_EXCLUSIVE));
 		btree = session->btree;
 		WT_ERR(__wt_buf_set(
 		    session, namebuf, btree->name, strlen(btree->name) + 1));

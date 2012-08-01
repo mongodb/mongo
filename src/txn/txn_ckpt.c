@@ -156,6 +156,27 @@ err:	/*
 }
 
 /*
+ * __ckpt_name_ok --
+ *	Complain if our reserved checkpoint name is used.
+ */
+static int
+__ckpt_name_ok(WT_SESSION_IMPL *session, const char *name, size_t len)
+{
+	/*
+	 * The internal checkpoint name is special, applications aren't allowed
+	 * to use it.  Be aggressive and disallow any matching prefix, it makes
+	 * things easier when checking in other places.
+	 */
+	if (len < strlen(WT_CHECKPOINT))
+		return (0);
+	if (strncmp(name, WT_CHECKPOINT, strlen(WT_CHECKPOINT)) != 0)
+		return (0);
+
+	WT_RET_MSG(session, EINVAL,
+	    "the checkpoint name \"%s\" is reserved", WT_CHECKPOINT);
+}
+
+/*
  * __drop --
  *	Drop all checkpoints with a specific name.
  */
@@ -164,10 +185,22 @@ __drop(WT_CKPT *ckptbase, const char *name, size_t len)
 {
 	WT_CKPT *ckpt;
 
-	WT_CKPT_FOREACH(ckptbase, ckpt)
-		if (strlen(ckpt->name) == len &&
-		    strncmp(ckpt->name, name, len) == 0)
-			F_SET(ckpt, WT_CKPT_DELETE);
+	/*
+	 * If we're dropping internal checkpoints, match to the '.' separating
+	 * the checkpoint name from the generational number, and take all that
+	 * we can find.  Applications aren't allowed to use any variant of this
+	 * name, so the test is still pretty simple, if the leading bytes match,
+	 * it's one we want to drop.
+	 */
+	if (strncmp(WT_CHECKPOINT, name, len) == 0) {
+		WT_CKPT_FOREACH(ckptbase, ckpt)
+			if (strncmp(ckpt->name,
+			    WT_CHECKPOINT, strlen(WT_CHECKPOINT)) == 0)
+				F_SET(ckpt, WT_CKPT_DELETE);
+	} else
+		WT_CKPT_FOREACH(ckptbase, ckpt)
+			if (WT_STRING_MATCH(ckpt->name, name, len))
+				F_SET(ckpt, WT_CKPT_DELETE);
 }
 
 /*
@@ -184,7 +217,7 @@ __drop_from(WT_CKPT *ckptbase, const char *name, size_t len)
 	 * There's a special case -- if the name is "all", then we delete all
 	 * of the checkpoints.
 	 */
-	if (len == strlen("all") && strncmp(name, "all", len) == 0) {
+	if (WT_STRING_MATCH("all", name, len)) {
 		WT_CKPT_FOREACH(ckptbase, ckpt)
 			F_SET(ckpt, WT_CKPT_DELETE);
 		return;
@@ -197,9 +230,7 @@ __drop_from(WT_CKPT *ckptbase, const char *name, size_t len)
 	 */
 	matched = 0;
 	WT_CKPT_FOREACH(ckptbase, ckpt) {
-		if (!matched &&
-		    (strlen(ckpt->name) != len ||
-		    strncmp(ckpt->name, name, len) != 0))
+		if (!matched && !WT_STRING_MATCH(ckpt->name, name, len))
 			continue;
 
 		matched = 1;
@@ -223,8 +254,7 @@ __drop_to(WT_CKPT *ckptbase, const char *name, size_t len)
 	 */
 	mark = NULL;
 	WT_CKPT_FOREACH(ckptbase, ckpt)
-		if (strlen(ckpt->name) == len &&
-		    strncmp(ckpt->name, name, len) == 0)
+		if (WT_STRING_MATCH(ckpt->name, name, len))
 			mark = ckpt;
 
 	if (mark == NULL)
@@ -246,7 +276,7 @@ int
 __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_BTREE *btree;
-	WT_CKPT *ckpt, *ckptbase, *deleted;
+	WT_CKPT *ckpt, *ckptbase, *new;
 	WT_CONFIG dropconf;
 	WT_CONFIG_ITEM cval, k, v;
 	WT_CONNECTION_IMPL *conn;
@@ -275,21 +305,26 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 		goto err;
 	}
 
-	/*
-	 * This may be a named checkpoint, check the configuration.  If it's a
-	 * named checkpoint, set force, we have to create the checkpoint even if
-	 * the tree is clean.
-	 */
+	/* This may be a named checkpoint, check the configuration. */
 	cval.len = 0;
 	if (cfg != NULL)
 		WT_ERR(__wt_config_gets(session, cfg, "name", &cval));
 	if (cval.len == 0)
-		name = WT_INTERNAL_CHKPT;
+		name = WT_CHECKPOINT;
 	else {
+		WT_ERR(__ckpt_name_ok(session, cval.str, cval.len));
+
+		/*
+		 * Dropping and naming checkpoints require a checkpoint even
+		 * if the tree is clean.
+		 */
 		force = 1;
 		WT_ERR(__wt_strndup(session, cval.str, cval.len, &name_alloc));
 		name = name_alloc;
 	}
+
+	/* Drop checkpoints with the same name as the one we're taking. */
+	__drop(ckptbase, name, strlen(name));
 
 	/*
 	 * We may be dropping specific checkpoints, check the configuration.
@@ -303,45 +338,39 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 			WT_ERR(__wt_config_subinit(session, &dropconf, &cval));
 			while ((ret =
 			    __wt_config_next(&dropconf, &k, &v)) == 0) {
-				/* We can't drop checkpoints if in a backup. */
-				if (conn->ckpt_backup)
-					WT_ERR_MSG(session, EINVAL,
-					    "checkpoints cannot be dropped "
-					    "while backup cursors are open");
-				force = 1;
+				/* Disallow the reserved checkpoint name. */
+				if (v.len == 0)
+					WT_ERR(__ckpt_name_ok(
+					    session, k.str, k.len));
+				else
+					WT_ERR(__ckpt_name_ok(
+					    session, v.str, v.len));
 
 				if (v.len == 0)
 					__drop(ckptbase, k.str, k.len);
-				else if (k.len == strlen("from") &&
-				    strncmp(k.str, "from", k.len) == 0)
+				else if (WT_STRING_MATCH("from", k.str, k.len))
 					__drop_from(ckptbase, v.str, v.len);
-				else if (k.len == strlen("to") &&
-				    strncmp(k.str, "to", k.len) == 0)
+				else if (WT_STRING_MATCH("to", k.str, k.len))
 					__drop_to(ckptbase, v.str, v.len);
 				else
 					WT_ERR_MSG(session, EINVAL,
 					    "unexpected value for checkpoint "
 					    "key: %.*s",
 					    (int)k.len, k.str);
+
+				/* Dropping requires a checkpoint. */
+				force = 1;
 			}
 			WT_ERR_NOTFOUND_OK(ret);
 		}
 	}
-
-	/*
-	 * Discard checkpoints with the same name as the new checkpoint.  We
-	 * can't discard checkpoints if a backup cursor is open, but we don't
-	 * fail in this case, dropping this checkpoint wasn't a request made
-	 * by the application.
-	 */
-	if (!conn->ckpt_backup)
-		__drop(ckptbase, name, strlen(name));
 
 	/* Add a new checkpoint entry at the end of the list. */
 	WT_CKPT_FOREACH(ckptbase, ckpt)
 		;
 	WT_ERR(__wt_strdup(session, name, &ckpt->name));
 	F_SET(ckpt, WT_CKPT_ADD);
+	new = ckpt;
 
 	/*
 	 * Lock the checkpoints that will be deleted.
@@ -353,17 +382,53 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * open.
 	 */
 	if (WT_META_TRACKING(session))
-		WT_CKPT_FOREACH(ckptbase, deleted)
-			if (F_ISSET(deleted, WT_CKPT_DELETE))
-				WT_ERR(__wt_session_lock_checkpoint(
-				    session, deleted->name));
+		WT_CKPT_FOREACH(ckptbase, ckpt) {
+			if (!F_ISSET(ckpt, WT_CKPT_DELETE))
+				continue;
+
+			/*
+			 * We can't drop/update checkpoints if a backup cursor
+			 * is open.  WiredTiger checkpoints are uniquely named
+			 * and it's OK to have multiple in the system: clear the
+			 * delete flag, and otherwise fail.
+			 */
+			if (conn->ckpt_backup) {
+				if (strncmp(ckpt->name,
+				    WT_CHECKPOINT,
+				    strlen(WT_CHECKPOINT)) == 0) {
+					F_CLR(ckpt, WT_CKPT_DELETE);
+					continue;
+				}
+				WT_ERR_MSG(session, EBUSY,
+				    "checkpoints cannot be dropped when "
+				    "backup cursors are open");
+			}
+
+			/*
+			 * We can't drop/update checkpoints if referenced by a
+			 * cursor.  WiredTiger checkpoints are uniquely named
+			 * and it's OK to have multiple in the system: clear the
+			 * delete flag, and otherwise fail.
+			 */
+			ret =
+			    __wt_session_lock_checkpoint(session, ckpt->name);
+			if (ret == 0)
+				continue;
+			if (ret == EBUSY && strncmp(ckpt->name,
+			    WT_CHECKPOINT, strlen(WT_CHECKPOINT)) == 0) {
+				F_CLR(ckpt, WT_CKPT_DELETE);
+				continue;
+			}
+			WT_ERR_MSG(session, ret,
+			    "checkpoints cannot be dropped when in-use");
+		}
 
 	/* Flush the file from the cache, creating the checkpoint. */
 	WT_ERR(__wt_bt_cache_flush(
 	    session, ckptbase, cfg == NULL ? WT_SYNC_DISCARD : WT_SYNC, force));
 
 	/* If there was a checkpoint, update the metadata and resolve it. */
-	if (ckpt->raw.data == NULL) {
+	if (new->raw.data == NULL) {
 		if (force)
 			WT_ERR_MSG(session, EINVAL,
 			    "cache flush failed to create a checkpoint");
