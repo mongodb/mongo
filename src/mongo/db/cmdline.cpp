@@ -93,6 +93,9 @@ namespace mongo {
 #endif
         ;
         
+        // Extra hidden options
+        hidden.add_options()
+        ("traceExceptions", "log stack traces for every exception");
     }
 
 #if defined(_WIN32)
@@ -245,6 +248,10 @@ namespace mongo {
 
         if (params.count("quiet")) {
             cmdLine.quiet = true;
+        }
+
+        if (params.count("traceExceptions")) {
+            DBException::traceExceptions = true;
         }
 
         if ( params.count( "maxConns" ) ) {
