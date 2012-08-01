@@ -383,7 +383,7 @@ DBCollection.prototype.findAndModify = function(args){
         if (ret.errmsg == "No matching object found"){
             return null;
         }
-        throw "findAndModifyFailed failed: " + tojson( ret.errmsg );
+        throw "findAndModifyFailed failed: " + tojson( ret );
     }
     return ret.value;
 }
