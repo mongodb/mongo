@@ -1,0 +1,281 @@
+WinPerfCounters README
+
+  Windows Performance Counters Module
+
+
+OVERVIEW
+
+  Windows Performance Counters for mongod.exe, implemented as a mongo Module,
+  using the Windows API Performance Counters Library V2.0 (aka perflib 2.0,
+  introduced in Windows Vista / Windows Server 2008).
+
+  Shows as "MongoDB" counterset.
+
+  Have zero CPU cost when there are no client applications monitoring the
+  counters. Have negligible CPU cost when there are clients. Memory cost is
+  negligible, always.
+
+  Compatible with 32 and 64 bit versions of mongod.exe, and, unlike perflib 1,
+  doesn't care if the Windows performance counter clients are 32 or 64 bits.
+
+  Runs with standalone mongod.exe, service mongod.exe, and multiple and
+  mixed instances of both. Each will appear as a separate and independent
+  counterset instance.
+
+  Adds a single command line option to mongod.exe, to enable: --winPerfCounters
+
+  As with any perflib2 application, there is an install/uninstall/upgrade
+  step required. See below.
+
+  Unlike perflib 1, no performance DLL is built. The only artifact that needs
+  to be distributed with mongod.exe is the XML manifest file "mongod.man".
+
+
+BUILDING
+
+  The module builds with mongod.exe, no special action required.
+
+  scons mongod.man : copies mongod.man to the project root dir.
+
+  scons winperfcountersprobe.exe : builds and copy probe needed for testing.
+
+  scons all : builds all above.
+
+  MUST be built with Windows SDK 7.0 (SDK for Windows 7) or more recent, to get
+  the right version of the ctrpp.exe tool.
+
+
+INSTALLING
+
+  If you don't want to use performance counters, you don't need to do anything.
+
+  If not installed, there will be no runtime error, i.e., mongod.exe will
+  not complain, even if given the command line option to activate this
+  module. But no client application will be able to see the counters.
+
+  To install, you MUST follow the official MS way:
+
+    .from a prompt with admin privileges
+    .on the same directory containing BOTH mongod.exe and mongod.man
+    .run "lodctr /m:mongod.man"
+
+    See if lodctr explicitly tells you it succeeded, because in Vista SP2
+    it sometimes does NOT tell you if it failed.
+
+  Then, undocumented and painfully discovered (in Vista SP2):
+
+    .edit mongod.exe ACL: grant read access to Administrators and "Performance
+     Monitor Users"
+
+  The lodctr.exe tool is distributed with Windows. This will register with
+  Windows all the required metadata and the location of mongod.exe, where
+  perflib2 will get the counter's strings.
+
+  IMPORTANT: if you want to change mongod.exe's name or directory, you MUST
+  reinstall.
+
+
+UNINSTALLING
+
+  To uninstall, you MUST follow the official MS way:
+
+    .from a prompt with admin privileges
+    .on the same directory containing both THE INSTALLED mongod.exe and
+     mongod.man
+    .run "unlodctr /m:mongod.man"
+
+  The unlodctr.exe tool is distributed with Windows.
+
+
+UPGRADING
+
+  Before installing a new version of mongod.exe, you SHOULD uninstall the older
+  one.
+
+  That's the official MS way, the safe way, and always works.
+
+  If the new mongod.exe has the EXACT same mongod.man as the old one, and will
+  be put in the same directory, overwriting the old one, you can do without
+  reinstalling. That's how I usually do while developing on Vista SP2.
+
+
+USING
+
+  Start mongod.exe with --winPerfCounters to enable.
+
+  -vv(...) levels available, see source code.
+
+  No special permission required for mongod.exe.
+
+
+QUIRKS
+
+  mongod.exe file locked, cannot delete/upgrade
+
+    .close all perf counter client applications
+    .stop the SNMP service
+    .rename away mongod.exe
+
+  "unlodctr.exe /m:mongod.man" fails
+
+    .run as an administrator
+    .mongod.man MUST be the same as the installed
+
+  Counters not showing/showing wrong
+
+    .run app as a member of "Performance Monitor Users" or Administrators
+    .check mongod.exe ACL
+    .try with perfmon.exe (PDH API)
+    .reinstall
+    .only WMI not showing? "winmgmt.exe /resyncperf" or restart WMI or
+     just wait a few minutes
+
+
+DEVELOPING NEW COUNTERS
+
+  Roadmap:
+
+    1.mongod.man: create new "<counter>" element
+
+    2.winperfcounters.cpp: implement counter update logic in
+      WinPerfCounters::updateCounters()
+
+    3.winperfcountersprobe.cpp: add counter metadata to
+      to CounterNameInfoMap::CounterNameInfoMap()
+
+    4.winperfcounterstest.wsf: add counter metadata to global variable
+      gMongoCounters
+
+  Guidelines:
+
+    Keep these design goals: zero CPU cost when no clients, negligible CPU cost
+    with clients. Negligible memory cost in either case.
+
+    Stick to this instructions, unless you have a very firm grasp of perflib2.
+
+    WMI (and so the test script) can be particularly weird with changing
+    counter definitions (registry or .exe strings). During the dev cycle it's
+    very common to have the test script fail when it shouldn't - it's just
+    WMI acting up. See quirks.
+
+  mongod.man:
+
+    WARNING: screw this manifest, and you can screw the user's registry.
+
+    There is a GUI editor in Windows SDK, called "Manifest Generator"
+    (ecmangen.exe), which can be used.
+
+    Note that this file is UTF-16 encoded, with BOM. Keep it that way.
+
+    To define a new counter just add a new <counter> element. Read the GUI
+    editor's help (F1) for a very brief guide on the parameters. More info can
+    be found on the SDK's chapter "Performance Counters Schema". There are no
+    naming style guide to counters.
+
+    Once a counter has made it to a stable, official MongoDb release,
+    never change its name. It will brake someone's monitoring app/script.
+
+    USE ONLY THE FOLLOWING TYPES:
+
+      perf_counter_rawcount
+
+        ULONG counter (32 bit), "shows the last observed value".
+        Examples: MBytes Received, Current Connections, Requests in Queue
+
+      perf_counter_large_rawcount
+
+        ULONGLONG (64 bit) version of previous.
+        Examples: Bytes Received
+
+      perf_counter_counter
+
+        ULONG, "shows the average number of operations completed during each
+        second of the sample interval". NOTE: we only have to set the absolute
+        value at each update, it's the clients job to do all the calculation /
+        time tracking.
+        Examples: Read Operations/sec
+
+      perf_counter_bulk_count
+
+        ULONGLONG version of previous.
+        Examples: Bytes/sec
+
+    UNLESS you want to DIG DEEP:
+
+    There are dozens of other types, most of them never seen in the wild. Start
+    by reading WinPef.h from the SDK, then the official documentation on types,
+    which is NOT on the SDK, but in the technet library, on "Windows Server
+    2003 Deployment Guide" -> ... -> "Counter Types". (At
+    http://go.microsoft.com/fwlink?linkid=44341 or
+    http://technet.microsoft.com/en-us/library/cc785636(WS.10).aspx )
+    Then back to the SDK.
+
+
+TESTING
+
+  See winperfcounterstest.wsf.
+
+  Build winperfcountersprobe.exe with scons.
+
+  WARNING: DON'T automate testing without considering that mongod.exe must be
+  installed, and that implies administrative privileges AND the potential to
+  mess badly with the registry.
+
+
+USEFUL TOOLS
+
+  perfmon.exe, typeperf.exe, wbemtest.exe, wmic.exe
+
+
+DEVELOPERS BE WARNED
+
+  Microsoft screwed this one up.
+
+  This version 2.0 of perflib looks very nice, BUT it was unbelievably
+  painful and time consuming to deal with a documentation that is lacking,
+  obtuse and simply wrong at times; painful to do so many tests and debugging
+  to discover the many blatant bugs in perflib2; and painful to deal with
+  idiosyncratic things like lodctr/unlodctr.
+
+  For such a core service, it's just not up to MS own standards.
+
+
+HOTFIXES
+
+  On Vista SP2 x86/x64 with NO hotfixes, winperfcounterstest.wsf passes, and
+  all manual scenarios tried run fine (perfmon, wmic, wbemtest, etc).
+
+  Here are SOME hotfixes that I found that may be relevant to users and
+  developers. I've tested some of them, and found that some of the bugs I've
+  found are fixed, even if the KB doesn't seem to be related.
+
+  KB970520 - The Wmiprvse.exe process creates a memory leak on a computer that
+  is running Windows Server 2008 if you remotely monitor this process by using
+  the WMI interface on a computer that is running Windows Server 2003 or
+  Windows XP
+
+  KB970838 - The handle count and the memory usage of an application keep
+  increasing if the application calls PDH APIs to add and delete V2 performance
+  counters on a computer that is running Windows Server 2008 or Windows Vista
+
+  KB2414106 - You cannot remotely query version 2.0 performance counters on a
+  computer that is running Windows Server 2008 or Windows Vista
+
+  KB2581359 - The PdhEnumObjects function used together with the bRefresh
+  parameter does not function correctly in Windows 7 or in Windows Server
+  2008 R2
+
+  KB2268318 - Duplicated data may be in the Performance log when you use the
+  Performance Logs and Alerts service to collect performance data in Windows
+  Server 2008, in Windows Vista, in Windows 7, or in Windows Server 2008 R2
+
+  KB2613988 - Changes to performance counters are not updated for at least 15
+  minutes when you use WMI to query performance counter values in Windows 7
+  or in Windows Server 2008 R2
+
+
+AUTHOR
+
+  Erich Siedler
+  erich.siedler@gmail.com
+

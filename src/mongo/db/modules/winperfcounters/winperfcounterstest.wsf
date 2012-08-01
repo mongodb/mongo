@@ -1,0 +1,413 @@
+<!--
+    Copyright (C) 2012 Erich Siedler <erich.siedler@gmail.com>
+
+    This program is free software: you can redistribute it and/or  modify
+    it under the terms of the GNU Affero General Public License, version 3,
+    as published by the Free Software Foundation.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Affero General Public License for more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+<job>
+    <runtime>
+        <description>
+
+Indirectly tests windows performance counters implemented in mongod.exe by
+using a probe as the provider, and the WMI infrastructure to read the data.
+
+This exercises the C++ implementation, the XML manifest definitions, and the
+installation of mongod.exe counters.
+
+The actual real data gathering ( WinPerfCounters::updateCounters() ) is not
+tested here.
+
+All 4 combinations of 32/64-bits probe and 32/64-bits cscript.exe ( i.e.
+\Windows\System32\cscript.exe and \Windows\SysWOW64\cscript.exe ) should be
+run. The installed mongod.exe should match the probe version.
+
+It can happen, especially after upgrading mongod.exe/probe.exe ( i.e. while
+developing new counters ), that WMI doesn't see the new counters. In that
+case running "winmgmt.exe /resyncperf" and restarting the WMI service
+usually does the trick. See README (also about hotfixes for Windows).
+
+How to run:
+
+  .use cscript.exe
+  .be a member of the "Performance Monitor Users" group
+   or have administrative rights
+  .install mongod.exe, see README
+
+How to add new counters:
+
+  .add their names to the gMongoCounters variable
+
+        </description>
+        <unnamed
+            name = "probe.exe"
+            helpstring = "Filename of the probe executable"
+            many = "false"
+            required = "true"
+        />
+        <example>
+Example: cscript winperfcounterstest.wsf ..\..\winperfcountersprobe.exe
+        </example>
+    </runtime>
+
+    <reference object="WbemScripting.SWbemLocator" />
+    <object id="gShell" progid="WScript.Shell" />
+    <object id="gFs" progid="Scripting.FileSystemObject" />
+
+    <script language="JScript">
+
+        // list of counters to test: type is the same as in the XML manifest,
+        // name must be mangled to WMI form ("Some Counter/sec" -> "SomeCounterPersec")
+        var gMongoCounters = {
+
+		'perf_counter_rawcount' : [
+		     'Connections'
+		    ,'ConnectionsAvailable'
+		    ,'globalLockCurrentQueue'
+		    ,'globalLockCurrentQueueReaders'
+		    ,'globalLockCurrentQueueWriters'
+		    ,'globalLockActiveClients'
+		    ,'globalLockActiveClientsReaders'
+		    ,'globalLockActiveClientsWriters'
+		    ,'AssertsRollovers'
+		    ,'AssertsRegular'
+		    ,'AssertsWarning'
+		    ,'AssertsMessage'
+		    ,'AssertsUser'
+		],
+
+		'perf_counter_large_rawcount' : [
+		     'NetworkBytesIn'
+		    ,'NetworkBytesOut'
+		    ,'NetworkRequests'
+		    ,'Asserts'
+		],
+
+		'perf_counter_counter' : [
+		     'OpCountersInsertsPersec'
+		    ,'OpCountersQueriesPersec'
+		    ,'OpCountersUpdatesPersec'
+		    ,'OpCountersDeletesPersec'
+		    ,'OpCountersGetMorePersec'
+		    ,'OpCountersCommandsPersec'
+		],
+
+		'perf_counter_bulk_count' : [
+		     'NetworkBytesInPersec'
+		    ,'NetworkBytesOutPersec'
+		    ,'NetworksRequestsPersec'
+		    ,'AssertsPersec'
+		    ,'OpCountersPersec'
+		]
+
+        };
+
+
+
+        //
+        // globals
+        //
+        var gProbeExe = 'NOT_INITIALIZED';
+
+        // from the SDK WMI page "CounterType Qualifier"
+        var gCounterTypesNumToString = {
+                0 : 'perf_counter_rawcount_hex',
+                256 : 'perf_counter_large_rawcount_hex',
+                2816 : 'perf_counter_text',
+                65536 : 'perf_counter_rawcount',
+                65792 : 'perf_counter_large_rawcount',
+                73728 : 'perf_double_raw',
+                4195328 : 'perf_counter_delta',
+                4195584 : 'perf_counter_large_delta',
+                4260864 : 'perf_sample_counter',
+                4523008 : 'perf_counter_queuelen_type',
+                4523264 : 'perf_counter_large_queuelen_type',
+                5571840 : 'perf_counter_100ns_queuelen_type',
+                6620416 : 'perf_counter_obj_time_queuelen_type',
+                272696320 : 'perf_counter_counter',
+                272696576 : 'perf_counter_bulk_count',
+                537003008 : 'perf_raw_fraction',
+                541132032 : 'perf_counter_timer',
+                541525248 : 'perf_precision_system_timer',
+                542180608 : 'perf_100nsec_timer',
+                542573824 : 'perf_precision_100ns_timer',
+                543229184 : 'perf_obj_time_timer',
+                543622400 : 'perf_precision_object_timer',
+                549585920 : 'perf_sample_fraction',
+                557909248 : 'perf_counter_timer_inv',
+                558957824 : 'perf_100nsec_timer_inv',
+                574686464 : 'perf_counter_multi_timer',
+                575735040 : 'perf_100nsec_multi_timer',
+                591463680 : 'perf_counter_multi_timer_inv',
+                592512256 : 'perf_100nsec_multi_timer_inv',
+                805438464 : 'perf_average_timer',
+                807666944 : 'perf_elapsed_time',
+                1073742336 : 'perf_counter_nodata',
+                1073874176 : 'perf_average_bulk',
+                1073939457 : 'perf_sample_base',
+                1073939458 : 'perf_average_base',
+                1073939459 : 'perf_raw_base',
+                1073939712 : 'perf_precision_timestamp',
+                1073939715 : 'perf_large_raw_base',
+                1107494144 : 'perf_counter_multi_base',
+                2147483648 : 'perf_counter_histogram_type'
+        };
+
+
+
+        //
+        // utils
+        //
+        function parseCommandLine() {
+            var arg = WScript.Arguments;
+            if ( 1 != arg.length ) {
+                arg.ShowUsage();
+                WScript.Quit( 1 );
+            }
+            gProbeExe = arg( 0 );
+            if ( !gFs.FileExists( gProbeExe ) ) {
+                WScript.Echo( "Error: '" + gProbeExe + "' not found! " );
+                WScript.Quit( 1 );
+            }
+        }
+
+        function KillProcess( process_id ) {
+            gShell.Exec( 'taskkill /f /pid ' + process_id );
+        }
+
+        function Probe() {
+            this.name = "Probe_" + ( Math.round( Math.random() * 1000000 + 1 ) );
+            this.probe = gShell.Exec( gProbeExe + ' ' + this.name );
+            this.waitReady();
+            this.init();
+        }
+
+        Probe.prototype.init = function() {
+            this.probe.StdIn.WriteLine( "INIT" );
+            this.waitReady();
+        }
+
+        Probe.prototype.shutdown = function() {
+            this.probe.StdIn.WriteLine( "SHUTDOWN" );
+            this.waitReady();
+        }
+
+        Probe.prototype.kill = function() {
+            if ( 0 === this.probe.Status ) {
+                KillProcess( this.probe.ProcessID );
+            }
+        }
+
+        Probe.prototype.waitReady = function() {
+            while ( this.probe.StdOut.ReadLine() != "READY" ) {}
+        }
+
+        Probe.prototype.setCounters = function( name_value_hash ) {
+            var name_vals = [];
+            for ( var name in name_value_hash ) {
+                name_vals.push( name + "=" + name_value_hash[ name ] );
+            }
+            var str = "SET:" + name_vals.join( ";" );
+            this.probe.StdIn.WriteLine( str );
+            this.waitReady();
+        }
+
+        function getAllCounterNames( mongo_counters ) {
+            var r = [];
+            for ( var counter_type in mongo_counters ) {
+                r = r.concat( mongo_counters[ counter_type ] );
+            }
+            return r;
+        }
+
+        function toCounterTypeString( counter_type_num ) {
+            if ( counter_type_num in gCounterTypesNumToString ) {
+                return gCounterTypesNumToString[ counter_type_num ];
+            } else {
+                return counter_type_num;
+            }
+        }
+
+
+
+        //
+        // testing framework
+        //
+        function assert( test, msg ) {
+            if ( !test ) {
+                throw msg;
+            }
+        }
+
+        function perfQueryInstanceCount( instance_name ) {
+            return GetObject( "winmgmts:root/cimv2" )
+                   .ExecQuery( "SELECT * FROM Win32_PerfRawData_MongoDB_MongoDB WHERE NAME='" + instance_name + "'",
+                               "WQL", wbemFlagReturnWhenComplete ).Count;
+        }
+
+        function perfQueryRawCounter( instance_name, counter_name ) {
+            var o = GetObject( "winmgmts:root/cimv2" )
+                   .ExecQuery( "SELECT " + counter_name + " FROM Win32_PerfRawData_MongoDB_MongoDB WHERE NAME='" + instance_name + "'",
+                               "WQL", wbemFlagReturnWhenComplete );
+            return ( new Enumerator( o ) ).item()[ counter_name ];
+        }
+
+    </script>
+    <!-- MUCH easier in VBScript -->
+    <script language="VBScript">
+
+        Function perfGetCounterType( instance_name, counter_name )
+            Dim o, r
+            set o = GetObject( "winmgmts:root/cimv2" )_
+                    .Get( "Win32_PerfFormattedData_MongoDB_MongoDB.Name='" + instance_name + "'" )
+            r = o.Properties_( counter_name ).Qualifiers_( "CounterType" )
+            perfGetCounterType = r
+        End Function
+
+    </script>
+    <script language="JScript">
+
+        function assertPerfInstanceExists( instance_name ) {
+            assert( 1 === perfQueryInstanceCount( instance_name ),
+                    "assertPerfInstanceExists( " + instance_name + " )" );
+        }
+
+        function assertPerfInstanceExistsNot( instance_name ) {
+            assert( 0 === perfQueryInstanceCount( instance_name ),
+                    "assertPerfInstanceExistsNot( " + instance_name + " )" );
+        }
+
+        function assertPerfRawCounterEquals( instance_name, counter_name, value ) {
+            var actual = perfQueryRawCounter( instance_name, counter_name );
+            // WMI uint64/CIM_UINT64 comes as decimal strings in automation/scripting
+            if ( "string" === typeof( actual ) ) {
+                actual = Number( actual );
+            }
+            assert( value ===  actual,
+                    "assertPerfRawCounterEquals( " + instance_name + ", " + counter_name + ", " + value + " ) got " + actual );
+        }
+
+        function assertPerfCounterType( instance_name, counter_name, counter_type ) {
+            var actual = toCounterTypeString( perfGetCounterType( instance_name, counter_name ) );
+            assert( counter_type === actual,
+                    "assertPerfCounterType( " + instance_name + ", " + counter_name + ", " + counter_type + " ) got " + actual );
+        }
+
+        function runTests( test_suite ) {
+            for ( var test in test_suite ) {
+                WScript.Echo( 'Testing ' + test + '...' );
+                var p = [];
+                var t = {
+                     NewProbe : function() { p.unshift( new Probe() ); return p[ 0 ]; }
+                };
+                try {
+                    test_suite[ test ]( t );
+                } catch( e ) {
+                    WScript.Echo( 'FAILED: ' + e );
+                    // uncomment this to facilitate debugging
+                    //throw e;
+                } finally {
+                    for ( ; p.length > 0 ; p.pop().kill() ) {}
+                }
+            }
+        }
+
+
+
+        //
+        // The tests
+        //
+        parseCommandLine();
+
+        runTests( {
+
+            testInitSingleInstance : function( T ) {
+                var p1 = T.NewProbe();
+                assertPerfInstanceExists( p1.name );
+            },
+
+            testInitMultipleInstances : function( T ) {
+                var p1 = T.NewProbe();
+                var p2 = T.NewProbe();
+                assertPerfInstanceExists( p1.name );
+                assertPerfInstanceExists( p2.name );
+            },
+
+            testShutdownSingleInstance : function( T ) {
+                var p1 = T.NewProbe();
+                p1.shutdown();
+                assertPerfInstanceExistsNot( p1.name );
+            },
+
+            testShutdownMultipleInstances : function( T ) {
+                var p1 = T.NewProbe();
+                var p2 = T.NewProbe();
+                p1.shutdown();
+                p2.shutdown();
+                assertPerfInstanceExistsNot( p1.name );
+                assertPerfInstanceExistsNot( p2.name );
+            },
+
+            testRestartSingleInstance : function( T ) {
+                var p1 = T.NewProbe();
+                p1.shutdown();
+                p1.init();
+                assertPerfInstanceExists( p1.name );
+            },
+
+            testRestartMultipleInstances : function( T ) {
+                var p1 = T.NewProbe();
+                var p2 = T.NewProbe();
+                p1.shutdown();
+                p2.shutdown();
+                p1.init();
+                p2.init();
+                assertPerfInstanceExists( p1.name );
+                assertPerfInstanceExists( p2.name );
+            },
+
+            // check if WMI sees all counters and their types
+            testCounterTypes : function( T ) {
+                var p = T.NewProbe();
+                for ( var counter_type in gMongoCounters ) {
+                    for ( var counter in gMongoCounters[ counter_type ] ) {
+                        assertPerfCounterType( p.name, gMongoCounters[ counter_type ][ counter ], counter_type );
+                    }
+                }
+            },
+
+            // make 2 probes set random values to all counters, then check them via WMI
+            testSetRawCounters : function( T ) {
+                var probes  = [ T.NewProbe(), T.NewProbe() ];
+                var targets = [];
+                var ctrs = getAllCounterNames( gMongoCounters );
+                for ( var i = 0; i <= 1; ++i ) {
+                    targets[ i ] = {};
+                    for ( var c in ctrs ) {
+                        targets[ i ][ ctrs[ c ] ] = Math.round( Math.random() * 1000000 + 1 );
+                    }
+
+                    probes[ i ].setCounters( targets[ i ] );
+                }
+
+                for ( var i = 0; i <= 1; ++i ) {
+                    for ( var c in ctrs ) {
+                        assertPerfRawCounterEquals( probes[ i ].name, ctrs[ c ], targets[ i ][ ctrs[ c ] ] );
+                    }
+                }
+            }
+
+
+        } );
+
+    </script>
+
+</job>

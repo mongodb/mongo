@@ -40,6 +40,7 @@
 #endif
 #include "stats/counters.h"
 #include "background.h"
+#include "module.h"
 #include "dur_journal.h"
 #include "dur_recover.h"
 #include "d_concurrency.h"
@@ -953,6 +954,9 @@ namespace mongo {
 
         log() << "shutdown: going to close listening sockets..." << endl;
         ListeningSockets::get()->closeAll();
+
+        log() << "shutdown: going to shutdown modules..." << endl;
+        Module::shutdownAll();
 
         log() << "shutdown: going to flush diaglog..." << endl;
         _diaglog.flush();

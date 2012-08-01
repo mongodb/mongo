@@ -50,7 +50,7 @@ namespace mongo {
         virtual void init() = 0;
 
         /**
-         * called when the database is about to shutdown
+         * called when the database is about to shutdown, can be called without init()
          */
         virtual void shutdown() = 0;
 
@@ -61,6 +61,7 @@ namespace mongo {
         static void addOptions( boost::program_options::options_description& options );
         static void configAll( boost::program_options::variables_map& params );
         static void initAll();
+        static void shutdownAll();
 
     private:
         static std::list<Module*> * _all;

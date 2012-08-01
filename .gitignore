@@ -69,6 +69,7 @@ scratch
 # binaries
 /mongo
 /mongod
+/mongod.man
 /mongogrid
 /mongos
 

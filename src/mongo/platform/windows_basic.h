@@ -15,4 +15,6 @@
 # include <ws2tcpip.h>
 # include <wspiapi.h>
 # include <windows.h>
+# include <perflib.h>
+# include <pdh.h>
 #endif

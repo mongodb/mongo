@@ -654,6 +654,20 @@ elif "win32" == os.sys.platform:
     env.Append( EXTRACPPPATH=["#/../winpcap/Include"] )
     env.Append( EXTRALIBPATH=["#/../winpcap/Lib"] )
 
+    if force64:
+        env.Append( CTRPP= winSDKHome + "/Bin/x64/ctrpp.exe" )
+    else:
+        env.Append( CTRPP= winSDKHome + "/Bin/ctrpp.exe" )
+    if os.path.exists( env['CTRPP'] ):
+        print( "found ctrpp at " + env['CTRPP'] )
+
+    ctrpp_resource_builder = Builder( action = '"$CTRPP" -prefix Ctrpp_ -rc $TARGET $SOURCE', src_suffix='.man', suffix='.rc' )
+    ctrpp_header_builder = Builder( action = '"$CTRPP" -prefix Ctrpp_ -o $TARGET $SOURCE', src_suffix='.man', suffix='.h' )
+    env['BUILDERS']['PerfCounters_Resource'] = ctrpp_resource_builder
+    env['BUILDERS']['PerfCounters_Header'] = ctrpp_header_builder
+
+
+
 else:
     print( "No special config for [" + os.sys.platform + "] which probably means it won't work" )
 

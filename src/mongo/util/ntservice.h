@@ -61,6 +61,8 @@ namespace mongo {
         static void WINAPI initService( DWORD argc, LPTSTR *argv );
         static void WINAPI serviceCtrl( DWORD ctrlCode );
 
+        static std::wstring getServiceName();
+
     protected:
         static std::wstring _serviceName;
         static SERVICE_STATUS_HANDLE _statusHandle;

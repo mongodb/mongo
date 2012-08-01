@@ -65,4 +65,16 @@ namespace mongo {
 
     }
 
+
+    void Module::shutdownAll() {
+        if ( ! _all ) {
+            return;
+        }
+        for ( list<Module*>::iterator i=_all->begin(); i!=_all->end(); i++ ) {
+            Module* m = *i;
+            m->shutdown();
+        }
+
+    }
+
 }

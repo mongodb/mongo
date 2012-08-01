@@ -138,6 +138,11 @@ namespace mongo {
     class NetworkCounter {
     public:
         NetworkCounter() : _bytesIn(0), _bytesOut(0), _requests(0), _overflows(0) {}
+
+        long long getBytesIn() const { return _bytesIn; }
+        long long getBytesOut() const { return _bytesOut; }
+        long long getRequests() const { return _requests; }
+
         void hit( long long bytesIn , long long bytesOut );
         void append( BSONObjBuilder& b );
     private:

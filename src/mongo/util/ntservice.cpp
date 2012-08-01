@@ -416,6 +416,7 @@ namespace mongo {
         _serviceName = serviceName;
         _serviceCallback = startService;
 
+        // lpServiceName is ignored when SERVICE_WIN32_OWN_PROCESS, but cannot be NULL
         SERVICE_TABLE_ENTRY dispTable[] = {
             { (LPTSTR)serviceName.c_str(), (LPSERVICE_MAIN_FUNCTION)ServiceController::initService },
             { NULL, NULL }
@@ -457,6 +458,15 @@ namespace mongo {
     }
 
     void WINAPI ServiceController::initService( DWORD argc, LPTSTR *argv ) {
+        // the SDK says argc can be 0, but in many code examples from MS it's assumed that the service name
+        // is always present at argv[0]; testing on Vista SP2 corroborates that
+        if ( 1 <= argc ) {
+            verify( argv && argv[0] );
+            _serviceName = argv[0];
+            verify( ! _serviceName.empty() );
+        }
+
+        // lpServiceName is not verified when SERVICE_WIN32_OWN_PROCESS
         _statusHandle = RegisterServiceCtrlHandler( _serviceName.c_str(), serviceCtrl );
         if ( !_statusHandle )
             return;
@@ -490,6 +500,10 @@ namespace mongo {
             serviceShutdown( "SERVICE_CONTROL_SHUTDOWN" );
             break;
         }
+    }
+
+    std::wstring ServiceController::getServiceName() {
+        return _serviceName;
     }
 
 } // namespace mongo
