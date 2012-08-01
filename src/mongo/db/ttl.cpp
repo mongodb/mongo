@@ -39,15 +39,17 @@ namespace mongo {
         
         void doTTLForDB( const string& dbName ) {
             
-            if ( ! isMasterNs( dbName.c_str() ) )
-                return;
-            
             Client::GodScope god;
 
             vector<BSONObj> indexes;
             {
-                auto_ptr<DBClientCursor> cursor = db.query( dbName + ".system.indexes" , 
-                                                            BSON( secondsExpireField << BSON( "$exists" << true ) ) );
+                auto_ptr<DBClientCursor> cursor =
+                                db.query( dbName + ".system.indexes" ,
+                                          BSON( secondsExpireField << BSON( "$exists" << true ) ) ,
+                                          0 , /* default nToReturn */
+                                          0 , /* default nToSkip */
+                                          0 , /* default fieldsToReturn */
+                                          QueryOption_SlaveOk ); /* perform on secondaries too */
                 if ( cursor.get() ) {
                     while ( cursor->more() ) {
                         indexes.push_back( cursor->next().getOwned() );
@@ -86,6 +88,11 @@ namespace mongo {
                     if ( nsd->setUserFlag( NamespaceDetails::Flag_UsePowerOf2Sizes ) ) {
                         nsd->syncUserFlags( ns );
                     }
+                    // only do deletes if on master
+                    if ( ! isMasterNs( dbName.c_str() ) ) {
+                        continue;
+                    }
+
                     n = deleteObjects( ns.c_str() , query , false , true );
                 }
 
