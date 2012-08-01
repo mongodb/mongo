@@ -156,6 +156,9 @@ namespace mongo {
                 _appendHelper( result , doc , found , fields );
                 if ( found ) {
                     deleteObjects( ns.c_str() , queryModified , true , true );
+                    BSONObjBuilder le( result.subobjStart( "lastErrorObject" ) );
+                    le.appendNumber( "n" , 1 );
+                    le.done();
                 }
             }
             else {
@@ -181,6 +184,13 @@ namespace mongo {
                         verify( Helpers::findOne( ns.c_str() , queryModified , doc ) );
                         _appendHelper( result , doc , true , fields );
                     }
+                    
+                    BSONObjBuilder le( result.subobjStart( "lastErrorObject" ) );
+                    le.appendBool( "updatedExisting" , res.existing );
+                    le.appendNumber( "n" , res.num );
+                    if ( res.upserted.isSet() )
+                        le.append( "upserted" , res.upserted );
+                    le.done();
                     
                 }
             }
