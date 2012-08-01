@@ -143,8 +143,7 @@ __ckpt_named_addr(WT_SESSION_IMPL *session,
 	 * checkpoint of any name.
 	 */
 	while (__wt_config_next(&ckptconf, &k, &v) == 0)
-		if (strlen(checkpoint) == k.len &&
-		    strncmp(checkpoint, k.str, k.len) == 0) {
+		if (WT_STRING_MATCH(checkpoint, k.str, k.len)) {
 			WT_RET(__wt_config_subgets(session, &v, "addr", &a));
 			WT_RET(__wt_nhex_to_raw(session, a.str, a.len, addr));
 			return (0);

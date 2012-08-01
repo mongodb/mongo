@@ -296,8 +296,7 @@ __wt_schema_open_index(WT_SESSION_IMPL *session,
 			break;
 
 		/* Is this the index we are looking for? */
-		match = (idxname == NULL ||
-		    (strncmp(name, idxname, len) == 0 && name[len] == '\0'));
+		match = idxname == NULL || WT_STRING_MATCH(name, idxname, len);
 
 		/*
 		 * Ensure there is space, including if we have to make room for
