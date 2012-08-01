@@ -387,10 +387,10 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 				continue;
 
 			/*
-			 * We can't drop checkpoints if a backup cursor is open.
-			 * WiredTiger checkpoints are uniquely named and it's
-			 * OK to have multiple in the system: clear the delete
-			 * flag, and otherwise fail.
+			 * We can't drop/update checkpoints if a backup cursor
+			 * is open.  WiredTiger checkpoints are uniquely named
+			 * and it's OK to have multiple in the system: clear the
+			 * delete flag, and otherwise fail.
 			 */
 			if (conn->ckpt_backup) {
 				if (strncmp(ckpt->name,
@@ -405,10 +405,10 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 			}
 
 			/*
-			 * We can't drop checkpoints if referenced by a cursor.
-			 * WiredTiger checkpoints are uniquely named and it's
-			 * OK to have multiple in the system: clear the delete
-			 * flag, and otherwise fail.
+			 * We can't drop/update checkpoints if referenced by a
+			 * cursor.  WiredTiger checkpoints are uniquely named
+			 * and it's OK to have multiple in the system: clear the
+			 * delete flag, and otherwise fail.
 			 */
 			ret =
 			    __wt_session_lock_checkpoint(session, ckpt->name);
