@@ -23,6 +23,7 @@
 #include "../dbhelpers.h"
 #include "../ops/delete.h"
 #include "../ops/update.h"
+#include "../queryutil.h"
 
 namespace mongo {
 
@@ -118,8 +119,38 @@ namespace mongo {
             bool found = Helpers::findOne( ns.c_str() , queryOriginal , doc );
 
             BSONObj queryModified = queryOriginal;
-            if ( found && doc["_id"].type() )
-                queryModified = doc["_id"].wrap();
+            if ( found && doc["_id"].type() && ! isSimpleIdQuery( queryOriginal ) ) {
+                // we're going to re-write the query to be more efficient
+                // we have to be a little careful because of positional operators
+                // maybe we can pass this all through eventually, but right now isn't an easy way
+                BSONObjBuilder b( queryOriginal.objsize() + 10 );
+                b.append( doc["_id"] );
+                
+                bool addedAtomic = false;
+
+                BSONObjIterator i( queryOriginal );
+                while ( i.more() ) {
+                    const BSONElement& elem = i.next();
+
+                    if ( str::equals( "_id" , elem.fieldName() ) ) {
+                        // we already do _id
+                        continue;
+                    }
+                    
+                    if ( ! str::contains( elem.fieldName() , '.' ) ) {
+                        // if there is a dotted field, accept we may need more query parts
+                        continue;
+                    }
+                    
+                    if ( ! addedAtomic ) {
+                        b.appendBool( "$atomic" , true );
+                        addedAtomic = true;
+                    }
+
+                    b.append( elem );
+                }
+                queryModified = b.obj();
+            }
 
             if ( remove ) {
                 _appendHelper( result , doc , found , fields );
