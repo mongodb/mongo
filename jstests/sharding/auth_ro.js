@@ -17,12 +17,14 @@ var createShardedCollection = function() {
 
     // make sure there are chunks on both shards
     printjson(configDB.chunks.find().toArray());
+    st.awaitBalance( coll.getName(), coll.getDB().getName() , 60 * 5 * 1000 /* 5 minutes */ );
 };
 
 var populateCollection = function(collection) {
     for (i=0; i<100000; i++) {
         collection.insert({x:i, y: i, foo:"bar", date: new Date(), r:Math.random()});
     }
+    collection.getDB().getLastError();
 };
 
 var getROUser = function(x) {
