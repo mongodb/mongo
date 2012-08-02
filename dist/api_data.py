@@ -266,6 +266,9 @@ methods = {
 		be bulk-loaded.  Cursors configured for bulk load only
 		support the WT_CURSOR::insert and WT_CURSOR::close methods''',
 		type='boolean'),
+	Config('cache_resident', 'false', r'''
+		do not ever evict the object's pages''',
+		type='boolean'),
 	Config('checkpoint', '', r'''
 		the name of a checkpoint to open; the reserved checkpoint
 		name "WiredTigerCheckpoint" opens a cursor on the most recent

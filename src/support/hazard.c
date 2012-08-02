@@ -22,11 +22,17 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, int *busyp
 #endif
     )
 {
+	WT_BTREE *btree;
 	WT_CONNECTION_IMPL *conn;
 	WT_HAZARD *hp;
 
+	btree = session->btree;
 	conn = S2C(session);
 	*busyp = 0;
+
+	/* If a file cannot be evicted, hazard references aren't required. */
+	if (btree->cache_resident)
+		return (0);
 
 	/*
 	 * Do the dance:
@@ -108,10 +114,16 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, int *busyp
 void
 __wt_hazard_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
+	WT_BTREE *btree;
 	WT_CONNECTION_IMPL *conn;
 	WT_HAZARD *hp;
 
+	btree = session->btree;
 	conn = S2C(session);
+
+	/* If a file cannot be evicted, hazard references aren't required. */
+	if (btree->cache_resident)
+		return;
 
 	/*
 	 * The default value for a WT_HAZARD slot is NULL, but clearing a

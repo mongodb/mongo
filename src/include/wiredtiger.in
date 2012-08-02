@@ -519,6 +519,8 @@ struct __wt_session {
 	 * bulk-loaded.  Cursors configured for bulk load only support the
 	 * WT_CURSOR::insert and WT_CURSOR::close methods.,a boolean flag;
 	 * default \c false.}
+	 * @config{cache_resident, do not ever evict the object's pages.,a
+	 * boolean flag; default \c false.}
 	 * @config{checkpoint, the name of a checkpoint to open; the reserved
 	 * checkpoint name "WiredTigerCheckpoint" opens a cursor on the most
 	 * recent internal checkpoint taken for the object.,a string; default

@@ -310,6 +310,11 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 	if (bulk)
 		WT_ERR(__wt_curbulk_init((WT_CURSOR_BULK *)cbt));
 
+	/* cache_resident */
+	if ((ret = __wt_config_gets_defno(
+	    session, cfg, "cache_resident", &cval)) == 0)
+		btree->cache_resident = cval.val ? 1 : 0;
+
 	/*
 	 * random_retrieval
 	 * Random retrieval cursors only support next and close.

@@ -1,6 +1,6 @@
 /*! @page tuning Performance Tuning
 
-@section cache Cache size
+@section cache_size Cache size
 
 The cache size for the database is configurable by setting the \c
 cache_size configuration string when calling the ::wiredtiger_open
@@ -12,6 +12,24 @@ eviction statistics for the database.
 An example of setting a cache size to 500MB:
 
 @snippet ex_config.c configure cache size
+
+@section cache_resident Cache resident objects
+
+Cache resident objects (objects never considered for the purposes of
+cache eviction), can be configured with the WT_SESSION::open_cursor
+"cache_resident" configuration string.
+
+Configuring a cache resident object has two effects: first, once the
+object's page have been instantiated in memory, no further I/O cost is
+ever paid for object access, minimizing potential latency.  Second,
+in-memory objects can be accessed faster than objects tracked for
+potential eviction, and applications able to guarantee sufficient memory
+that an object need never be evicted can significantly increase their
+performance.
+
+An example of configuring a cache-resident object:
+
+@snippet ex_all.c Open a cache-resident cursor
 
 @section page Page and overflow sizes
 

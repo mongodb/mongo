@@ -68,6 +68,11 @@ cursor_ops(WT_SESSION *session)
 	    session, "table:mytable", NULL, NULL, &cursor);
 	/*! [Open a cursor] */
 
+	/*! [Open a cache-resident cursor] */
+	ret = session->open_cursor(
+	    session, "table:mytable", NULL, "cache_resident=true", &cursor);
+	/*! [Open a cache-resident cursor] */
+
 	{
 	WT_CURSOR *duplicate;
 	const char *key = "some key";

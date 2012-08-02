@@ -162,8 +162,7 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session)
 
 	WT_TRET(__wt_btree_close(session));
 
-	F_CLR(btree,
-	    WT_BTREE_OPEN | WT_BTREE_NO_EVICTION | WT_BTREE_SPECIAL_FLAGS);
+	F_CLR(btree, WT_BTREE_OPEN | WT_BTREE_SPECIAL_FLAGS);
 
 	return (ret);
 }
@@ -207,7 +206,7 @@ __conn_btree_open(WT_SESSION_IMPL *session,
 
 	/* The metadata file is never evicted. */
 	if (strcmp(btree->name, WT_METADATA_URI) == 0)
-		F_SET(btree, WT_BTREE_NO_EVICTION);
+		btree->cache_resident = 1;
 
 	do {
 		WT_ERR(__wt_meta_checkpoint_addr(
