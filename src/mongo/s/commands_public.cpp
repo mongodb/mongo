@@ -22,7 +22,7 @@
 #include "../client/connpool.h"
 #include "../client/parallel.h"
 #include "../db/commands.h"
-#include "../db/commands/pipeline.h"
+#include "../db/pipeline/pipeline.h"
 #include "../db/pipeline/document_source.h"
 #include "../db/pipeline/expression_context.h"
 #include "../db/queryutil.h"

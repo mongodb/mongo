@@ -15,8 +15,8 @@
  */
 
 #include "pch.h"
-#include "db/commands/pipeline.h"
-#include "db/commands/pipeline_d.h"
+#include "db/pipeline/pipeline.h"
+#include "db/pipeline/pipeline_d.h"
 
 #include "db/cursor.h"
 #include "db/queryutil.h"

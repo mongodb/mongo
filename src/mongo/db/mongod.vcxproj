@@ -1098,7 +1098,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="btreebuilder.cpp" />
     <ClCompile Include="cap.cpp" />
     <ClCompile Include="commands\distinct.cpp" />
-    <ClCompile Include="commands\document_source_cursor.cpp" />
+    <ClCompile Include="pipeline\document_source_cursor.cpp" />
     <ClCompile Include="commands\find_and_modify.cpp" />
     <ClCompile Include="commands\fsync.cpp" />
     <ClCompile Include="commands\group.cpp" />
@@ -1106,8 +1106,8 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="commands\isself.cpp" />
     <ClCompile Include="commands\mr.cpp" />
     <ClCompile Include="commands\pipeline_command.cpp" />
-    <ClCompile Include="commands\pipeline.cpp" />
-    <ClCompile Include="commands\pipeline_d.cpp" />
+    <ClCompile Include="pipeline\pipeline.cpp" />
+    <ClCompile Include="pipeline\pipeline_d.cpp" />
     <ClCompile Include="commands\touch.cpp" />
     <ClCompile Include="compact.cpp" />
     <ClCompile Include="connection_factory.cpp" />
@@ -1156,7 +1156,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="pipeline\document.cpp" />
     <ClCompile Include="pipeline\document_source.cpp" />
     <ClCompile Include="pipeline\document_source_bson_array.cpp" />
-    <ClCompile Include="pipeline\document_source_command_futures.cpp" />
+    <ClCompile Include="pipeline\document_source_command_shards.cpp" />
     <ClCompile Include="pipeline\document_source_filter.cpp" />
     <ClCompile Include="pipeline\document_source_filter_base.cpp" />
     <ClCompile Include="pipeline\document_source_group.cpp" />
@@ -1405,8 +1405,8 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\util\text.h" />
     <ClInclude Include="..\util\time_support.h" />
     <ClInclude Include="..\util\trace.h" />
-    <ClInclude Include="commands\pipeline.h" />
-    <ClInclude Include="commands\pipeline_d.h" />
+    <ClInclude Include="pipeline\pipeline.h" />
+    <ClInclude Include="pipeline\pipeline_d.h" />
     <ClInclude Include="databaseholder.h" />
     <ClInclude Include="durop.h" />
     <ClInclude Include="dur_commitjob.h" />

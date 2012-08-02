@@ -976,7 +976,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="..\client\dbclientcursor.cpp" />
     <ClCompile Include="..\client\dbclient_rs.cpp" />
     <ClCompile Include="..\client\distlock.cpp" />
-    <ClCompile Include="..\db\commands\pipeline.cpp" />
+    <ClCompile Include="..\db\pipeline\pipeline.cpp" />
     <ClCompile Include="..\db\common.cpp" />
     <ClCompile Include="..\db\dbmessage.cpp" />
     <ClCompile Include="..\db\dbcommands_generic.cpp" />
@@ -994,7 +994,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="..\db\pipeline\document.cpp" />
     <ClCompile Include="..\db\pipeline\document_source.cpp" />
     <ClCompile Include="..\db\pipeline\document_source_bson_array.cpp" />
-    <ClCompile Include="..\db\pipeline\document_source_command_futures.cpp" />
+    <ClCompile Include="..\db\pipeline\document_source_command_shards.cpp" />
     <ClCompile Include="..\db\pipeline\document_source_filter.cpp" />
     <ClCompile Include="..\db\pipeline\document_source_filter_base.cpp" />
     <ClCompile Include="..\db\pipeline\document_source_group.cpp" />
@@ -1187,7 +1187,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\..\third_party\js-1.7\resource.h" />
     <ClInclude Include="..\client\authentication_table.h" />
     <ClInclude Include="..\client\authlevel.h" />
-    <ClInclude Include="..\db\commands\pipeline.h" />
+    <ClInclude Include="..\db\pipeline\pipeline.h" />
     <ClInclude Include="..\db\interrupt_status.h" />
     <ClInclude Include="..\db\pipeline\accumulator.h" />
     <ClInclude Include="..\db\pipeline\builder.h" />

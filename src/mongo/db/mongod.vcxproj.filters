@@ -163,8 +163,8 @@
     <ClCompile Include="commands\distinct.cpp">
       <Filter>db\commands</Filter>
     </ClCompile>
-    <ClCompile Include="commands\document_source_cursor.cpp">
-      <Filter>db\commands</Filter>
+    <ClCompile Include="pipeline\document_source_cursor.cpp">
+      <Filter>db\pipeline</Filter>
     </ClCompile>
     <ClCompile Include="geo\2d.cpp">
       <Filter>db\geo</Filter>
@@ -211,7 +211,7 @@
     <ClCompile Include="pipeline\document_source_bson_array.cpp">
       <Filter>db\pipeline\Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="pipeline\document_source_command_futures.cpp">
+    <ClCompile Include="pipeline\document_source_command_shards.cpp">
       <Filter>db\pipeline\Source Files</Filter>
     </ClCompile>
     <ClCompile Include="pipeline\document_source_filter.cpp">
@@ -395,14 +395,14 @@
       <Filter>util\Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\pch.cpp" />
-    <ClCompile Include="commands\pipeline.cpp">
-      <Filter>db\commands</Filter>
+    <ClCompile Include="pipeline\pipeline.cpp">
+      <Filter>db\pipeline</Filter>
     </ClCompile>
     <ClCompile Include="commands\pipeline_command.cpp">
       <Filter>db\commands</Filter>
     </ClCompile>
-    <ClCompile Include="commands\pipeline_d.cpp">
-      <Filter>db\commands</Filter>
+    <ClCompile Include="pipeline\pipeline_d.cpp">
+      <Filter>db\pipeline</Filter>
     </ClCompile>
     <ClCompile Include="..\util\processinfo.cpp">
       <Filter>util\Source Files</Filter>
@@ -1146,11 +1146,11 @@
     <ClInclude Include="..\util\optime.h">
       <Filter>util\Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="commands\pipeline.h">
-      <Filter>db\commands</Filter>
+    <ClInclude Include="pipeline\pipeline.h">
+      <Filter>db\pipeline</Filter>
     </ClInclude>
-    <ClInclude Include="commands\pipeline_d.h">
-      <Filter>db\commands</Filter>
+    <ClInclude Include="pipeline\pipeline_d.h">
+      <Filter>db\pipeline</Filter>
     </ClInclude>
     <ClInclude Include="..\util\processinfo.h">
       <Filter>util\Header Files</Filter>
