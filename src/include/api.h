@@ -264,6 +264,9 @@ struct __wt_connection_impl {
 	uint32_t direct_io;
 	uint32_t verbose;
 
+	/* XXX LSM stuff.  Will move. */
+	TAILQ_HEAD(__wt_lsm_qh, __wt_lsm_tree) lsmqh;
+
 	uint32_t flags;
 };
 

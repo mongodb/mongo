@@ -7,13 +7,12 @@
 
 #include "wt_internal.h"
 
-/* XXX cheat. */
-static WT_LSM_TREE __lsm_tree;
-
 static void
 __lsm_tree_discard(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
 	int i;
+
+	TAILQ_REMOVE(&S2C(session)->lsmqh, lsm_tree, q);
 
 	__wt_free(session, lsm_tree->name);
 	for (i = 0; i < lsm_tree->nchunks; i++)
@@ -35,7 +34,8 @@ __wt_lsm_tree_create(
 	WT_LSM_TREE *lsm_tree;
 	const char *cfg[] = API_CONF_DEFAULTS(session, create, config);
 
-	lsm_tree = &__lsm_tree;
+	WT_RET(__wt_calloc_def(session, 1, &lsm_tree));
+	TAILQ_INSERT_HEAD(&S2C(session)->lsmqh, lsm_tree, q);
 
 	WT_RET(__wt_strdup(session, uri, &lsm_tree->name));
 	lsm_tree->filename = uri + strlen("lsm:");
@@ -55,8 +55,11 @@ __wt_lsm_tree_create(
 	    lsm_tree->filename, 1));
 	lsm_tree->chunk[0] = __wt_buf_steal(session, buf, NULL);
 
-	/* XXX value_format=u, including a byte of status */
-	WT_ERR(__wt_schema_create(session, lsm_tree->chunk[0], config));
+	/* value_format=u, including a byte of status */
+	WT_ERR(__wt_buf_fmt(session, buf,
+	    "%s,key_format=u,value_format=u", config));
+
+	WT_ERR(__wt_schema_create(session, lsm_tree->chunk[0], buf->data));
 
 	if (0) {
 err:		__lsm_tree_discard(session, lsm_tree);
@@ -72,9 +75,13 @@ int
 __wt_lsm_tree_get(
     WT_SESSION_IMPL *session, const char *uri, WT_LSM_TREE **treep)
 {
-	WT_UNUSED(session);
-	WT_UNUSED(uri);
+	WT_LSM_TREE *lsm_tree;
 
-	*treep = &__lsm_tree;
-	return (0);
+	TAILQ_FOREACH(lsm_tree, &S2C(session)->lsmqh, q)
+		if (strcmp(uri, lsm_tree->name) == 0) {
+			*treep = lsm_tree;
+			return (0);
+		}
+
+	return (ENOENT);
 }

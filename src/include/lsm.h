@@ -9,12 +9,21 @@ struct __wt_cursor_lsm {
 	WT_CURSOR iface;
 
 	WT_LSM_TREE *lsmtree;
+	WT_CURSOR *current;     /* The current cursor for iteration. */
 	WT_CURSOR **cursors;
+
+#define	WT_CLSM_MULTIPLE        0x01    /* Multiple cursors have values for the
+					   current key. */
+#define	WT_CLSM_ITERATE_NEXT    0x02    /* Forward iteration. */
+#define	WT_CLSM_ITERATE_PREV    0x04    /* Backward iteration. */
+	uint32_t flags;
 };
 
 struct __wt_lsm_tree {
 	const char *name, *filename;
 	const char *key_format, *value_format;
+
+	WT_COLLATOR *collator;
 
 	WT_RWLOCK *rwlock;
 	uint64_t dsk_gen;

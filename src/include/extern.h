@@ -1072,7 +1072,7 @@ extern int __wt_buf_catfmt(WT_SESSION_IMPL *session,
     4)));
 extern int
 __wt_scr_alloc_func(WT_SESSION_IMPL *session,
- uint32_t size, WT_ITEM **scratchp
+ size_t size, WT_ITEM **scratchp
 #ifdef HAVE_DIAGNOSTIC
  , const char *file, int line
 #endif

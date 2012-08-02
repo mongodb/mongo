@@ -138,6 +138,7 @@ __session_open_cursor(WT_SESSION *wt_session,
 		if (WT_PREFIX_MATCH(uri, "colgroup:") ||
 		    WT_PREFIX_MATCH(uri, "index:") ||
 		    WT_PREFIX_MATCH(uri, "file:") ||
+		    WT_PREFIX_MATCH(uri, "lsm:") ||
 		    WT_PREFIX_MATCH(uri, "table:"))
 			ret = __wt_cursor_dup(session, to_dup, config, cursorp);
 		else
