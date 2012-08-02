@@ -36,6 +36,10 @@ namespace mongo {
 
     class ShardStrategy : public Strategy {
 
+        bool _isSystemIndexes( const char* ns ) {
+            return strstr( ns , ".system.indexes" ) == strchr( ns , '.' ) && strchr( ns , '.' );
+        }
+
         virtual void queryOp( Request& r ) {
 
             // TODO: These probably should just be handled here.
@@ -55,6 +59,25 @@ namespace mongo {
 
             QuerySpec qSpec( (string)q.ns, q.query, q.fields, q.ntoskip, q.ntoreturn, q.queryOptions );
 
+            if ( _isSystemIndexes( q.ns ) && q.query["ns"].type() == String && r.getConfig()->isSharded( q.query["ns"].String() ) ) {
+                // if you are querying on system.indexes, we need to make sure we go to a shard that actually has chunks
+                // this is not a perfect solution (what if you just look at all indexes)
+                // but better than doing nothing
+                
+                ShardPtr myShard;
+                ChunkManagerPtr cm;
+                r.getConfig()->getChunkManagerOrPrimary( q.query["ns"].String(), cm, myShard );
+                if ( cm ) {
+                    set<Shard> shards;
+                    cm->getAllShards( shards );
+                    verify( shards.size() > 0 );
+                    myShard.reset( new Shard( *shards.begin() ) );
+                }
+                
+                doQuery( r, *myShard );
+                return;
+            }
+            
             ParallelSortClusteredCursor * cursor = new ParallelSortClusteredCursor( qSpec, CommandInfo() );
             verify( cursor );
 
@@ -104,6 +127,7 @@ namespace mongo {
             else{
                 // TODO:  Better merge this logic.  We potentially can now use the same cursor logic for everything.
                 ShardPtr primary = cursor->getPrimary();
+                verify( primary.get() );
                 DBClientCursorPtr shardCursor = cursor->getShardCursor( *primary );
                 r.reply( *(shardCursor->getMessage()) , shardCursor->originalHost() );
             }
@@ -951,8 +975,7 @@ namespace mongo {
             const char *ns = r.getns();
 
             // TODO: Index write logic needs to be audited
-            bool isIndexWrite =
-                    strstr( ns , ".system.indexes" ) == strchr( ns , '.' ) && strchr( ns , '.' );
+            bool isIndexWrite = _isSystemIndexes( ns );
 
             // TODO: This block goes away, system.indexes needs to handle better
             if( isIndexWrite ){
