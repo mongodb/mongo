@@ -143,7 +143,7 @@ namespace ExpressionTests {
                 // The constant is copied out as is.
                 assertBinaryEqual( BSON( "field" << 5 ), toBsonObj( expression, false ) );
                 // The constant is replaced with a $ expression.
-                assertBinaryEqual( BSON( "field" << BSON( "$noOp" << 5 ) ),
+                assertBinaryEqual( BSON( "field" << BSON( "$const" << 5 ) ),
                                    toBsonObj( expression, true ) );
             }
         private:

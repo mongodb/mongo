@@ -195,6 +195,7 @@ namespace mongo {
         {"$and", ExpressionAnd::create, 0},
         {"$cmp", ExpressionCompare::createCmp, OpDesc::FIXED_COUNT, 2},
         {"$cond", ExpressionCond::create, OpDesc::FIXED_COUNT, 3},
+        // $const handled specially in parseExpression
         {"$dayOfMonth", ExpressionDayOfMonth::create, OpDesc::FIXED_COUNT, 1},
         {"$dayOfWeek", ExpressionDayOfWeek::create, OpDesc::FIXED_COUNT, 1},
         {"$dayOfYear", ExpressionDayOfYear::create, OpDesc::FIXED_COUNT, 1},
@@ -211,7 +212,6 @@ namespace mongo {
         {"$month", ExpressionMonth::create, OpDesc::FIXED_COUNT, 1},
         {"$multiply", ExpressionMultiply::create, 0},
         {"$ne", ExpressionCompare::createNe, OpDesc::FIXED_COUNT, 2},
-        {"$noOp", ExpressionNoOp::create, OpDesc::FIXED_COUNT, 1},
         {"$not", ExpressionNot::create, OpDesc::FIXED_COUNT, 1},
         {"$or", ExpressionOr::create, 0},
         {"$second", ExpressionSecond::create, OpDesc::FIXED_COUNT, 1},
@@ -229,6 +229,11 @@ namespace mongo {
     intrusive_ptr<Expression> Expression::parseExpression(
         const char *pOpName, BSONElement *pBsonElement) {
         /* look for the specified operator */
+
+        if (str::equals(pOpName, "$const")) {
+            return ExpressionConstant::createFromBsonElement(pBsonElement);
+        }
+
         OpDesc key;
         key.pName = pOpName;
         const OpDesc *pOp = (const OpDesc *)bsearch(
@@ -783,7 +788,7 @@ namespace mongo {
           inclusion (or exclusion):
           { $project : {
               x : true, // include
-              y : { $noOp: true }
+              y : { $const: true }
           }}
 
           This can happen as a result of optimizations.  For example, the
@@ -803,17 +808,10 @@ namespace mongo {
             return;
         }
 
-        /*
-          We require an expression, so build one here, and use that.
-
-          Note we emit a $noOp expression.  This is because the table-driven
-          expression parser requires an ExpressionNary factory, and
-          ExpressionConstant isn't an ExpressionNary.  However, the generated
-          NoOp will go away in its ::optimize() phase.
-        */
-        BSONObjBuilder constBuilder;
-        pValue->addToBsonObj(&constBuilder, "$noOp");
-        pBuilder->append(fieldName, constBuilder.done());
+        // We require an expression, so build one here, and use that.
+        BSONObjBuilder constBuilder (pBuilder->subobjStart(fieldName));
+        pValue->addToBsonObj(&constBuilder, getOpName());
+        constBuilder.done();
     }
 
     void ExpressionConstant::addToBsonArray(
@@ -2141,43 +2139,6 @@ namespace mongo {
                 ":  insufficient operands; " << reqArgs <<
                 " required, only got " << vpOperand.size(),
                 vpOperand.size() == reqArgs);
-    }
-
-    /* ----------------------- ExpressionNoOp ------------------------------ */
-
-    ExpressionNoOp::~ExpressionNoOp() {
-    }
-
-    intrusive_ptr<ExpressionNary> ExpressionNoOp::create() {
-        intrusive_ptr<ExpressionNoOp> pExpression(new ExpressionNoOp());
-        return pExpression;
-    }
-
-    intrusive_ptr<Expression> ExpressionNoOp::optimize() {
-        checkArgCount(1);
-        intrusive_ptr<Expression> pR(vpOperand[0]->optimize());
-        return pR;
-    }
-
-    ExpressionNoOp::ExpressionNoOp():
-        ExpressionNary() {
-    }
-
-    void ExpressionNoOp::addOperand(
-        const intrusive_ptr<Expression> &pExpression) {
-        checkArgLimit(1);
-        ExpressionNary::addOperand(pExpression);
-    }
-
-    intrusive_ptr<const Value> ExpressionNoOp::evaluate(
-        const intrusive_ptr<Document> &pDocument) const {
-        checkArgCount(1);
-        intrusive_ptr<const Value> pValue(vpOperand[0]->evaluate(pDocument));
-        return pValue;
-    }
-
-    const char *ExpressionNoOp::getOpName() const {
-        return "$noOp";
     }
 
     /* ------------------------- ExpressionNot ----------------------------- */

@@ -810,24 +810,6 @@ namespace mongo {
     };
 
 
-    class ExpressionNoOp :
-        public ExpressionNary {
-    public:
-        // virtuals from ExpressionNary
-        virtual ~ExpressionNoOp();
-        virtual intrusive_ptr<Expression> optimize();
-        virtual intrusive_ptr<const Value> evaluate(
-            const intrusive_ptr<Document> &pDocument) const;
-        virtual const char *getOpName() const;
-        virtual void addOperand(const intrusive_ptr<Expression> &pExpression);
-
-        static intrusive_ptr<ExpressionNary> create();
-
-    private:
-        ExpressionNoOp();
-    };
-
-
     class ExpressionNot :
         public ExpressionNary {
     public:

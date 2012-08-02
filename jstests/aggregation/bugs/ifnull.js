@@ -30,7 +30,7 @@ assertResult( 1, 1, 2 );
 assertResult( 2, 2, 1 );
 assertResult( false, false, 1 );
 assertResult( '', '', 1 );
-//assertResult( [], [], 1 ); // SERVER-6688
+assertResult( [], [], 1 );
 assertResult( {}, {}, 1 );
 assertResult( 1, 1, null );
 assertResult( 2, 2, undefined );

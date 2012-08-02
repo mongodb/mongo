@@ -906,7 +906,7 @@ namespace DocumentSourceTests {
                 project()->optimize();
                 // Optimizing the DocumentSourceProject optimizes the Expressions that comprise it,
                 // in this case replacing an expression depending on constants with a constant.
-                checkBsonRepresentation( fromjson( "{$project:{a:{$noOp:true}}}" ) );
+                checkBsonRepresentation( fromjson( "{$project:{a:{$const:true}}}" ) );
             }
         };
 
