@@ -618,13 +618,38 @@ int
 __wt_config_gets(WT_SESSION_IMPL *session,
     const char **cfg, const char *key, WT_CONFIG_ITEM *value)
 {
-	WT_CONFIG_ITEM key_item;
-
-	key_item.type = ITEM_STRING;
-	key_item.str = key;
-	key_item.len = strlen(key);
+	WT_CONFIG_ITEM key_item = { key, strlen(key), 0, ITEM_STRING };
 
 	return (__wt_config_get(session, cfg, &key_item, value));
+}
+
+/*
+ * __wt_config_getone --
+ *	Get the value for a given key from a single config string.
+ */
+ int
+__wt_config_getone(WT_SESSION_IMPL *session,
+    const char *config, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
+{
+	WT_CONFIG cparser;
+
+	WT_RET(__wt_config_init(session, &cparser, config));
+	return (__wt_config_getraw(&cparser, key, value));
+}
+
+/*
+ * __wt_config_getones --
+ *	Get the value for a given string key from a single config string.
+ */
+ int
+__wt_config_getones(WT_SESSION_IMPL *session,
+    const char *config, const char *key, WT_CONFIG_ITEM *value)
+{
+	WT_CONFIG cparser;
+	WT_CONFIG_ITEM key_item = { key, strlen(key), 0, ITEM_STRING };
+
+	WT_RET(__wt_config_init(session, &cparser, config));
+	return (__wt_config_getraw(&cparser, &key_item, value));
 }
 
 /*
@@ -637,8 +662,6 @@ int
 __wt_config_gets_defno(WT_SESSION_IMPL *session,
     const char **cfg, const char *key, WT_CONFIG_ITEM *value)
 {
-	WT_CONFIG_ITEM key_item;
-
 	/*
 	 * This is a performance hack: it's expensive to parse configuration
 	 * strings, so don't do it unless it's necessary in performance paths
@@ -652,36 +675,13 @@ __wt_config_gets_defno(WT_SESSION_IMPL *session,
 	value->val = 0;
 	if (cfg == NULL || cfg[1] == NULL)
 		return (0);
-
-	key_item.type = ITEM_STRING;
-	key_item.str = key;
-	key_item.len = strlen(key);
-
-	return (__wt_config_get(session, cfg, &key_item, value));
-}
-
-/*
- * __wt_config_getone --
- *	Get the value for a given key from a single config string.
- */
- int
-__wt_config_getone(WT_SESSION_IMPL *session,
-    const char *cfg, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
-{
-	const char *cfgs[] = { cfg, NULL };
-	return (__wt_config_get(session, cfgs, key, value));
-}
-
-/*
- * __wt_config_getones --
- *	Get the value for a given string key from a single config string.
- */
- int
-__wt_config_getones(WT_SESSION_IMPL *session,
-    const char *cfg, const char *key, WT_CONFIG_ITEM *value)
-{
-	const char *cfgs[] = { cfg, NULL };
-	return (__wt_config_gets(session, cfgs, key, value));
+	else if (cfg[2] == NULL) {
+		int ret = __wt_config_getones(session, cfg[1], key, value);
+		if (ret == WT_NOTFOUND)
+			ret = 0;
+		return (ret);
+	}
+	return (__wt_config_gets(session, cfg, key, value));
 }
 
 /*
