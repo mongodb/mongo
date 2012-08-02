@@ -3751,14 +3751,14 @@ namespace QueryOptimizerCursorTests {
             void check( const shared_ptr<Cursor> &c ) {}            
         };
         
-        class SnapshotWithoutIdIndex : public Base {
+        class SnapshotCappedColl : public Base {
         public:
-            SnapshotWithoutIdIndex() {
+            SnapshotCappedColl() {
                 _cli.dropCollection( ns() );
                 _cli.createCollection( ns(), 1000, true );
                 _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
             }
-            string expectedType() const { return "BtreeCursor a_1"; }
+            string expectedType() const { return "BtreeCursor _id_"; }
             BSONObj query() const {
                 return BSON( "$query" << BSON( "a" << 1 ) << "$snapshot" << true );
             }
@@ -4837,7 +4837,7 @@ namespace QueryOptimizerCursorTests {
             add<GetCursor::MultiIndex>();
             add<GetCursor::Hint>();
             add<GetCursor::Snapshot>();
-            add<GetCursor::SnapshotWithoutIdIndex>();
+            add<GetCursor::SnapshotCappedColl>();
             add<GetCursor::Min>();
             add<GetCursor::Max>();
             add<GetCursor::RequireIndex::NoConstraints>();
@@ -4854,9 +4854,10 @@ namespace QueryOptimizerCursorTests {
             add<GetCursor::IdElseNatural::HintedIdForQuery>( BSON( "a" << 1 ) );
             add<GetCursor::IdElseNatural::HintedIdForQuery>( BSON( "_id" << 1 << "a" << 1 ) );
             add<GetCursor::IdElseNatural::HintedNaturalForQuery>( BSONObj() );
-            add<GetCursor::IdElseNatural::HintedNaturalForQuery>( BSON( "_id" << 1 ) );
-            add<GetCursor::IdElseNatural::HintedNaturalForQuery>( BSON( "a" << 1 ) );
-            add<GetCursor::IdElseNatural::HintedNaturalForQuery>( BSON( "_id" << 1 << "a" << 1 ) );
+            // now capped collections have _id index by default, so skip these
+            //add<GetCursor::IdElseNatural::HintedNaturalForQuery>( BSON( "_id" << 1 ) );
+            //add<GetCursor::IdElseNatural::HintedNaturalForQuery>( BSON( "a" << 1 ) );
+            //add<GetCursor::IdElseNatural::HintedNaturalForQuery>( BSON( "_id" << 1 << "a" << 1 ) );
             add<GetCursor::MatcherValidation>();
             add<Explain::ClearRecordedIndex>();
             add<Explain::Initial>();

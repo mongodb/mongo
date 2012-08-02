@@ -336,8 +336,6 @@ namespace ReplSetTests {
         }
     };
 
-    // check that applying ops doesn't cause _id index to be created
-
     class CappedUpdate : public CappedInitialSync {
         void updateSucceed() {
             BSONObjBuilder b;

@@ -313,16 +313,11 @@ namespace mongo {
         NamespaceDetails *d = nsdetails(ns);
         verify(d);
         
-        bool ensure = false;
-        if ( options.getField( "autoIndexId" ).type() ) {
-            if ( options["autoIndexId"].trueValue() ) {
-                ensure = true;
-            }
-        }
-        else {
-            if ( !newCapped ) {
-                ensure=true;
-            }
+        // make an _id index for all colls, except capped ones in local w/o autoIndexID
+        // (reason for the exception is for the oplog and non-replicated capped colls)
+        bool ensure = true;
+        if( newCapped && str::equals( nsToDatabase( ns ).c_str() ,  "local" ) ) {
+            ensure = options.getField( "autoIndexId" ).trueValue();
         }
         if( ensure ) {
             if( deferIdIndex )
@@ -1435,8 +1430,9 @@ namespace mongo {
             BSONObj io((const char *) obuf);
             BSONElement idField = io.getField( "_id" );
             uassert( 10099 ,  "_id cannot be an array", idField.type() != Array );
-            // we don't add _id for capped collections as they don't have an _id index
-            if( idField.eoo() && !wouldAddIndex && strstr(ns, ".local.") == 0 && d->haveIdIndex() ) {
+            // we don't add _id for capped collections in local as they don't have an _id index
+            if( idField.eoo() && !wouldAddIndex &&
+                !str::equals( nsToDatabase( ns ).c_str() , "local" ) && d->haveIdIndex() ) {
                 if( addedID )
                     *addedID = true;
                 addID = len;
