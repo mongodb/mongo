@@ -50,12 +50,12 @@ assertError( 16395, { $where:'true' } );
 assertError( 16424, { $match:{ a:{ $near:[ 0, 0 ] } } } );
 
 // Update modifier not allowed.
-if ( 0 ) { // No validation for this in find.
+if ( 0 ) { // SERVER-6650
 assertError( 0, { a:1, $inc:{ b:1 } } );
 }
 
 // Aggregation expression not allowed.
-if ( 0 ) { // No validation for this in find.
+if ( 0 ) { // SERVER-6650
 assertError( 0, { a:1, b:{ $gt:{ $add:[ 1, 1 ] } } } );
 }
 
