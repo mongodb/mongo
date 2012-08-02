@@ -318,7 +318,7 @@ namespace mongo {
         // respect autoIndexId if set. otherwise, create an _id index for all colls, except for
         // capped ones in local w/o autoIndexID (reason for the exception is for the oplog and
         //  non-replicated capped colls)
-        if( !options.getField( "autoIndexId" ).eoo() ||
+        if( options.hasField( "autoIndexId" ) ||
             (newCapped && str::equals( nsToDatabase( ns ).c_str() ,  "local" )) ) {
             ensure = options.getField( "autoIndexId" ).trueValue();
         }
