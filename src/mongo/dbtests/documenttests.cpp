@@ -917,8 +917,8 @@ namespace DocumentTests {
             
             /** Coerce date to string. */
             class DateToString : public ToStringBase {
-                intrusive_ptr<const Value> value() { return Value::createDate(12345); }
-                string expected() { return Date_t( 12345 ).toString(); }
+                intrusive_ptr<const Value> value() { return Value::createDate(1234567890LL*1000); }
+                string expected() { return "2009-02-13T23:31:30"; } // from js
             };
 
             /** Coerce null to string. */
