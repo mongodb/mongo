@@ -181,7 +181,9 @@ namespace mongo {
                         return true;
                 }
             }
-            catch(...) { }
+            catch(const std::exception& e) {
+                log() << "Unable to check for journal files due to: " << e.what() << endl;
+            }
             return false;
         }
 
@@ -207,6 +209,7 @@ namespace mongo {
                     boost::filesystem::remove(lsnPath());
                 }
                 catch(...) {
+                    // std::exception details logged in catch below
                     log() << "couldn't remove " << lsnPath().string() << endl;
                     throw;
                 }
@@ -245,7 +248,14 @@ namespace mongo {
         bool _preallocateIsFaster() {
             bool faster = false;
             boost::filesystem::path p = getJournalDir() / "tempLatencyTest";
-            try { remove(p); } catch(...) { }
+            if (boost::filesystem::exists(p)) {
+                try {
+                    remove(p);
+                }
+                catch(const std::exception& e) {
+                    log() << "Unable to remove temporary file due to: " << e.what() << endl;
+                }
+            }
             try {
                 AlignedBuilder b(8192);
                 int millis[2];
@@ -266,10 +276,18 @@ namespace mongo {
                     log() << "preallocateIsFaster=true " << diff / (1.0*N) << endl;
                 }
             }
-            catch(...) {
-                log() << "info preallocateIsFaster couldn't run; returning false" << endl;
+            catch (const std::exception& e) {
+                log() << "info preallocateIsFaster couldn't run due to: " << e.what()
+                      << "; returning false" << endl;
             }
-            try { remove(p); } catch(...) { }
+            if (boost::filesystem::exists(p)) {
+                try {
+                    remove(p);
+                }
+                catch(const std::exception& e) {
+                    log() << "Unable to remove temporary file due to: " << e.what() << endl;
+                }
+            }
             return faster;
         }
         bool preallocateIsFaster() {
@@ -369,8 +387,9 @@ namespace mongo {
                     try {
                         _preallocateFiles();
                     }
-                    catch(...) {
-                        log() << "warning caught exception in preallocateFiles, continuing" << endl;
+                    catch (const std::exception& e) {
+                        log() << "warning caught exception (" << e.what()
+                              << ") in preallocateFiles, continuing" << endl;
                     }
             }
             j.open();
@@ -399,8 +418,9 @@ namespace mongo {
                             return;
                         }
                     }
-                } catch(...) { 
-                    log() << "warning exception in dur::removeOldJournalFile " << p.string() << endl;
+                } catch (const std::exception& e) {
+                    log() << "warning exception in dur::removeOldJournalFile " << p.string()
+                          << ": " <<  e.what() << endl;
                     // fall through and try to delete the file
                 }
             }
@@ -409,8 +429,8 @@ namespace mongo {
             try {
                 boost::filesystem::remove(p);
             }
-            catch(...) { 
-                log() << "warning exception removing " << p.string() << endl;
+            catch (const std::exception& e) {
+                log() << "warning exception removing " << p.string() << ": " << e.what() << endl;
             }
         }
 
@@ -422,8 +442,8 @@ namespace mongo {
                     if( boost::filesystem::exists(filepath) )
                         return filepath;
                 }
-            } catch(...) { 
-                log() << "warning exception in dur::findPrealloced()" << endl;
+            } catch (const std::exception& e) {
+                log() << "warning exception in dur::findPrealloced(): " << e.what() << endl;
             }
             return boost::filesystem::path();
         }
@@ -466,8 +486,9 @@ namespace mongo {
                         }
                         boost::filesystem::rename(p, fname);
                     }
-                    catch(...) { 
-                        log() << "warning couldn't write to / rename file " << p.string() << endl;
+                    catch (const std::exception& e) {
+                        log() << "warning couldn't write to / rename file " << p.string()
+                              << ": " << e.what() << endl;
                     }
                 }
             }
