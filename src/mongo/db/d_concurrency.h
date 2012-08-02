@@ -91,6 +91,11 @@ namespace mongo {
             /** @return micros since we started acquiring */
             long long acquireFinished( LockStat* stat );
 
+            // Accrue elapsed lock time since last we called reset
+            void recordTime();
+            // Start recording a new period, starting now()
+            void resetTime();
+
         protected:
             explicit ScopedLock( char type ); 
 
@@ -106,7 +111,6 @@ namespace mongo {
         private:
             ParallelBatchWriterSupport _pbws_lk;
 
-        private:
             void _recordTime( long long micros );
             Timer _timer;
             char _type;      // 'r','w','R','W'

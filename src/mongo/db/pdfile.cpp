@@ -313,12 +313,16 @@ namespace mongo {
         NamespaceDetails *d = nsdetails(ns);
         verify(d);
         
-        // make an _id index for all colls, except capped ones in local w/o autoIndexID
-        // (reason for the exception is for the oplog and non-replicated capped colls)
         bool ensure = true;
-        if( newCapped && str::equals( nsToDatabase( ns ).c_str() ,  "local" ) ) {
+
+        // respect autoIndexId if set. otherwise, create an _id index for all colls, except for
+        // capped ones in local w/o autoIndexID (reason for the exception is for the oplog and
+        //  non-replicated capped colls)
+        if( !options.getField( "autoIndexId" ).eoo() ||
+            (newCapped && str::equals( nsToDatabase( ns ).c_str() ,  "local" )) ) {
             ensure = options.getField( "autoIndexId" ).trueValue();
         }
+
         if( ensure ) {
             if( deferIdIndex )
                 *deferIdIndex = true;
