@@ -13,7 +13,7 @@ struct __wt_cursor_lsm {
 };
 
 struct __wt_lsm_tree {
-	const char *name;
+	const char *name, *filename;
 	const char *key_format, *value_format;
 
 	WT_RWLOCK *rwlock;
@@ -21,7 +21,7 @@ struct __wt_lsm_tree {
 
 	TAILQ_ENTRY(__wt_lsm_tree) q;
 
-	int chunks;		/* Number of active chunks. */
+	int nchunks;		/* Number of active chunks. */
 	const char **chunk;	/* Array of chunk URIs. */
 };
 

@@ -636,6 +636,12 @@ extern int __wt_clsm_open(WT_SESSION_IMPL *session,
     const char *cfg[],
     WT_CURSOR **cursorp);
 extern int __wt_lsm_init(WT_CONNECTION *wt_conn, const char *config);
+extern int __wt_lsm_tree_create( WT_SESSION_IMPL *session,
+    const char *uri,
+    const char *config);
+extern int __wt_lsm_tree_get( WT_SESSION_IMPL *session,
+    const char *uri,
+    WT_LSM_TREE **treep);
 extern int __wt_metadata_get(WT_SESSION *session,
     const char *uri,
     const char **valuep);

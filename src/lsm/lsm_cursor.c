@@ -8,7 +8,8 @@
 #include "wt_internal.h"
 
 #define	FORALL_CURSORS(clsm, c, i)					\
-	for (i = 0; i < clsm->nchunks && (c = clsm->cursors[i]) != NULL; i++)
+	for (i = 0; i < clsm->lsmtree->nchunks; i++)			\
+		if ((c = clsm->cursors[i]) != NULL)
 
 /*
  * __clsm_next --
@@ -173,11 +174,15 @@ static int
 __clsm_close(WT_CURSOR *cursor)
 {
 	WT_CURSOR_LSM *clsm;
+	WT_CURSOR *c;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
+	int i;
 
 	clsm = (WT_CURSOR_LSM *)cursor;
 	CURSOR_API_CALL_NOCONF(cursor, session, close, NULL);
+	FORALL_CURSORS(clsm, c, i)
+		WT_TRET(c->close(c));
 	__wt_free(session, clsm->cursors);
 	/* The WT_LSM_TREE owns the URI. */
 	cursor->uri = NULL;
@@ -191,15 +196,12 @@ static int
 __clsm_open_cursors(WT_CURSOR_LSM *clsm, const char *cfg[])
 {
 	WT_CURSOR **cp;
-	WT_DECL_RET;
 	WT_LSM_TREE *lsmtree;
 	WT_SESSION_IMPL *session;
-	WT_SESSION *wt_session;
-	const char *cfg_no_overwrite[4], *config;
+	const char *cfg_no_overwrite[4];
 	int i;
 
 	session = (WT_SESSION_IMPL *)clsm->iface.session;
-	wt_session = &session->iface;
 	lsmtree = clsm->lsmtree;
 
 	/* Underlying column groups are always opened without overwrite */
@@ -208,17 +210,15 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm, const char *cfg[])
 	cfg_no_overwrite[2] = "overwrite=false";
 	cfg_no_overwrite[3] = NULL;
 
-	WT_RET(__wt_config_collapse(session, cfg, &config));
-	WT_ERR(__wt_calloc_def(session, lsmtree->chunks, &clsm->cursors));
+	WT_RET(__wt_calloc_def(session, lsmtree->nchunks, &clsm->cursors));
 
 	for (i = 0, cp = clsm->cursors;
-	    i < lsmtree->chunks;
+	    i < lsmtree->nchunks;
 	    i++, cp++)
-		WT_ERR(wt_session->open_cursor(
-		    wt_session, lsmtree->chunk[i], NULL, config, cp));
+		WT_RET(__wt_curfile_open(session,
+		    lsmtree->chunk[i], &clsm->iface, cfg_no_overwrite, cp));
 
-err:	__wt_free(session, config);
-	return (ret);
+	return (0);
 }
 
 /*
@@ -261,15 +261,14 @@ __wt_clsm_open(WT_SESSION_IMPL *session,
 	WT_CURSOR_LSM *clsm;
 	WT_DECL_RET;
 	WT_LSM_TREE *lsmtree;
-	size_t size;
-	const char *treename;
 
 	clsm = NULL;
 
-	treename = uri;
-	if (!WT_PREFIX_SKIP(treename, "lsm:"))
+	if (!WT_PREFIX_SKIP(uri, "lsm:"))
 		return (EINVAL);
-	size = strlen(treename);
+
+	/* Get the LSM tree. */
+	WT_RET(__wt_lsm_tree_get(session, uri, &lsmtree));
 
 	WT_RET(__wt_calloc_def(session, 1, &clsm));
 

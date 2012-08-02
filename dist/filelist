@@ -67,6 +67,7 @@ src/log/log.c
 src/log/log_desc.c
 src/lsm/lsm_cursor.c
 src/lsm/lsm_dsrc.c
+src/lsm/lsm_tree.c
 src/meta/meta_api.c
 src/meta/meta_apply.c
 src/meta/meta_ckpt.c
