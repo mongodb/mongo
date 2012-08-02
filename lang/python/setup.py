@@ -23,9 +23,9 @@ if sys.platform == 'darwin':
 
 dir = os.path.dirname(__file__)
 
-# Read the version information from dist/RELEASE
-dist = os.path.join(os.path.dirname(os.path.dirname(dir)), 'dist')
-for l in open(os.path.join(dist, 'RELEASE')):
+# Read the version information from the RELEASE file
+top = os.path.dirname(os.path.dirname(dir))
+for l in open(os.path.join(top, 'RELEASE')):
     if re.match(r'WIREDTIGER_VERSION_(?:MAJOR|MINOR|PATCH)=', l):
         exec(l)
 
