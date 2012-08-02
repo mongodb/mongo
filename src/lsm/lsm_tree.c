@@ -10,9 +10,10 @@
 static void
 __lsm_tree_discard(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
-	int i;
+	u_int i;
 
 	TAILQ_REMOVE(&S2C(session)->lsmqh, lsm_tree, q);
+	__wt_spin_destroy(session, &lsm_tree->lock);
 
 	__wt_free(session, lsm_tree->name);
 	for (i = 0; i < lsm_tree->nchunks; i++)
@@ -35,12 +36,11 @@ __wt_lsm_tree_create(
 	const char *cfg[] = API_CONF_DEFAULTS(session, create, config);
 
 	WT_RET(__wt_calloc_def(session, 1, &lsm_tree));
+	__wt_spin_init(session, &lsm_tree->lock);
 	TAILQ_INSERT_HEAD(&S2C(session)->lsmqh, lsm_tree, q);
 
 	WT_RET(__wt_strdup(session, uri, &lsm_tree->name));
 	lsm_tree->filename = uri + strlen("lsm:");
-
-	WT_ERR(__wt_scr_alloc(session, 0, &buf));
 
 	WT_ERR(__wt_config_gets(session, cfg, "key_format", &cval));
 	WT_ERR(__wt_strndup(session, cval.str, cval.len,
@@ -49,8 +49,14 @@ __wt_lsm_tree_create(
 	WT_ERR(__wt_strndup(session, cval.str, cval.len,
 	    &lsm_tree->value_format));
 
+	lsm_tree->dsk_gen = 1;
 	lsm_tree->nchunks = 1;
+
+	lsm_tree->threshhold = 2 * WT_MEGABYTE;
+
 	WT_ERR(__wt_calloc_def(session, lsm_tree->nchunks, &lsm_tree->chunk));
+	lsm_tree->chunk_allocated = lsm_tree->nchunks * sizeof(const char *);
+	WT_ERR(__wt_scr_alloc(session, 0, &buf));
 	WT_ERR(__wt_buf_fmt(session, buf, "file:%s-%06d.lsm",
 	    lsm_tree->filename, 1));
 	lsm_tree->chunk[0] = __wt_buf_steal(session, buf, NULL);
@@ -84,4 +90,19 @@ __wt_lsm_tree_get(
 		}
 
 	return (ENOENT);
+}
+
+int
+__wt_lsm_tree_switch(WT_SESSION_IMPL *session, WT_LSM_TREE *lsmtree)
+{
+	__wt_spin_lock(session, &lsmtree->lock);
+
+	lsmtree->old_cursors += lsmtree->ncursor;
+	++lsmtree->dsk_gen;
+	++lsmtree->nchunks;
+
+	/* TODO: complete */
+
+	__wt_spin_unlock(session, &lsmtree->lock);
+	return (0);
 }

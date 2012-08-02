@@ -372,6 +372,27 @@ __wt_btree_root_empty(WT_SESSION_IMPL *session, WT_PAGE **leafp)
 }
 
 /*
+ * __wt_btree_get_memsize --
+ *      Access the size of an in-memory tree with a single leaf page.
+ */
+int
+__wt_btree_get_memsize(WT_SESSION_IMPL *session, uint32_t **memsizep)
+{
+	WT_BTREE *btree;
+	WT_PAGE *root, *child;
+
+	btree = session->btree;
+	root = btree->root_page;
+
+	if (root->entries != 1)
+		return (WT_ERROR);
+
+	child = root->u.intl.t->page;
+	*memsizep = &child->memory_footprint;
+	return (0);
+}
+
+/*
  * __btree_get_last_recno --
  *      Set the last record number for a column-store.
  */

@@ -325,7 +325,7 @@ struct __wt_connection_impl {
 
 #define	CURSOR_API_CALL_NOCONF(cur, s, n, bt)				\
 	(s) = (WT_SESSION_IMPL *)(cur)->session;			\
-	API_CALL_NOCONF(s, cursor, n, cur, bt);				\
+	API_CALL_NOCONF(s, cursor, n, cur, bt)
 
 /*******************************************
  * Global variables.

@@ -9,13 +9,16 @@ struct __wt_cursor_lsm {
 	WT_CURSOR iface;
 
 	WT_LSM_TREE *lsmtree;
-	WT_CURSOR *current;     /* The current cursor for iteration. */
+	uint64_t dsk_gen;
+
+	u_int nchunks;
 	WT_CURSOR **cursors;
+	WT_CURSOR *current;     /* The current cursor for iteration */
 
 #define	WT_CLSM_MULTIPLE        0x01    /* Multiple cursors have values for the
-					   current key. */
-#define	WT_CLSM_ITERATE_NEXT    0x02    /* Forward iteration. */
-#define	WT_CLSM_ITERATE_PREV    0x04    /* Backward iteration. */
+					   current key */
+#define	WT_CLSM_ITERATE_NEXT    0x02    /* Forward iteration */
+#define	WT_CLSM_ITERATE_PREV    0x04    /* Backward iteration */
 	uint32_t flags;
 };
 
@@ -23,15 +26,20 @@ struct __wt_lsm_tree {
 	const char *name, *filename;
 	const char *key_format, *value_format;
 
-	WT_COLLATOR *collator;
-
 	WT_RWLOCK *rwlock;
-	uint64_t dsk_gen;
-
 	TAILQ_ENTRY(__wt_lsm_tree) q;
 
-	int nchunks;		/* Number of active chunks. */
-	const char **chunk;	/* Array of chunk URIs. */
+	WT_SPINLOCK lock;
+	uint64_t dsk_gen, ncursor, old_cursors;
+	uint32_t *memsizep;
+
+	uint32_t threshhold;
+
+	WT_COLLATOR *collator;
+
+	u_int nchunks;		/* Number of active chunks */
+	const char **chunk;	/* Array of chunk URIs */
+	size_t chunk_allocated;	/* Space allocated for chunks */
 };
 
 struct __wt_lsm_data_source {
