@@ -521,7 +521,7 @@ struct __wt_session {
 	 * default \c false.}
 	 * @config{checkpoint, the name of a checkpoint to open; the reserved
 	 * checkpoint name "WiredTigerCheckpoint" opens a cursor on the most
-	 * recent unnamed checkpoint taken for the object.,a string; default
+	 * recent internal checkpoint taken for the object.,a string; default
 	 * empty.}
 	 * @config{dump, configure the cursor for dump format inputs and
 	 * outputs: "hex" selects a simple hexadecimal format\, "print" selects
