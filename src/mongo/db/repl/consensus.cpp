@@ -21,12 +21,21 @@
 
 namespace mongo {
 
+    /** the first cmd called by a node seeking election and it's a basic sanity 
+        test: do any of the nodes it can reach know that it can't be the primary?
+        */
     class CmdReplSetFresh : public ReplSetCommand {
     public:
         CmdReplSetFresh() : ReplSetCommand("replSetFresh") { }
     private:
 
         bool shouldVeto(const BSONObj& cmdObj, string& errmsg) {
+            // don't veto older versions
+            if (cmdObj["id"].eoo()) {
+                // they won't be looking for the veto field
+                return false;
+            }
+
             unsigned id = cmdObj["id"].Int();
             const Member* primary = theReplSet->box.getPrimary();
             const Member* hopeful = theReplSet->findById(id);
@@ -51,12 +60,6 @@ namespace mongo {
             else if( highestPriority && highestPriority->config().priority > hopeful->config().priority) {
                 errmsg = str::stream() << hopeful->fullName() << " has lower priority than " << highestPriority->fullName();
                 return true;
-            }
-
-            // don't veto older versions
-            if (cmdObj["id"].eoo()) {
-                // they won't be looking for the veto field
-                return false;
             }
 
             if ( !theReplSet->isElectable(id) ||
