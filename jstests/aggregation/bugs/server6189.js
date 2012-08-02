@@ -2,6 +2,8 @@
 
 c = db.c;
 function test(date, testSynthetics) {
+    print("testing " + date);
+
     c.drop();
     c.save( {date: date} );
 
@@ -18,7 +20,7 @@ function test(date, testSynthetics) {
                                 , string: {$substr: ['$date', 0,1000]}
                                 }} );
 
-    if (date.getUTCFullYear() < 1970 && _isWindows() && result.code == 16422) {
+    if (date.valueOf() < 0 && _isWindows() && result.code == 16422) {
         // some versions of windows (but not all) fail with dates before 1970
         print("skipping test of " + date.tojson() + " because system doesn't support old dates");
         return;
