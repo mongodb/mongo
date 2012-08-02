@@ -158,7 +158,7 @@ __session_open_cursor(WT_SESSION *wt_session,
 		ret = __wt_curtable_open(session, uri, cfg, cursorp);
 	else if ((ret = __wt_schema_get_source(session, uri, &dsrc)) == 0)
 		ret = dsrc->open_cursor(dsrc, &session->iface,
-		    uri, config, cursorp);
+		    uri, cfg, cursorp);
 
 err:	API_END_NOTFOUND_MAP(session, ret);
 }

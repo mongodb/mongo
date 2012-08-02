@@ -21,62 +21,61 @@ __lsm_create(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 
 static int
 __lsm_drop(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-    const char *name, const char *config)
+    const char *name, const char *cfg[])
 {
 	WT_UNUSED(dsrc);
 	WT_UNUSED(session);
 	WT_UNUSED(name);
-	WT_UNUSED(config);
+	WT_UNUSED(cfg);
 
 	return (ENOTSUP);
 }
 
 static int
-__lsm_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-    const char *obj, const char *config, WT_CURSOR **new_cursor)
+__lsm_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *wt_session,
+    const char *obj, const char *cfg[], WT_CURSOR **new_cursor)
 {
-	WT_UNUSED(dsrc);
-	WT_UNUSED(session);
-	WT_UNUSED(obj);
-	WT_UNUSED(config);
-	WT_UNUSED(new_cursor);
+	WT_SESSION_IMPL *session;
 
-	return (ENOTSUP);
+	session = (WT_SESSION_IMPL *)wt_session;
+	WT_UNUSED(dsrc);
+
+	return (__wt_clsm_open(session, obj, cfg, new_cursor));
 }
 
 static int
 __lsm_rename(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-    const char *oldname, const char *newname, const char *config)
+    const char *oldname, const char *newname, const char *cfg[])
 {
 	WT_UNUSED(dsrc);
 	WT_UNUSED(session);
 	WT_UNUSED(oldname);
 	WT_UNUSED(newname);
-	WT_UNUSED(config);
+	WT_UNUSED(cfg);
 
 	return (ENOTSUP);
 }
 
 static int
 __lsm_sync(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-    const char *name, const char *config)
+    const char *name, const char *cfg[])
 {
 	WT_UNUSED(dsrc);
 	WT_UNUSED(session);
 	WT_UNUSED(name);
-	WT_UNUSED(config);
+	WT_UNUSED(cfg);
 
 	return (ENOTSUP);
 }
 
 static int
 __lsm_truncate(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-    const char *name, const char *config)
+    const char *name, const char *cfg[])
 {
 	WT_UNUSED(dsrc);
 	WT_UNUSED(session);
 	WT_UNUSED(name);
-	WT_UNUSED(config);
+	WT_UNUSED(cfg);
 
 	return (ENOTSUP);
 }
