@@ -588,11 +588,6 @@ __wt_cursor_init(WT_CURSOR *cursor,
 	} else
 		cdump = NULL;
 
-	/* overwrite */
-	WT_RET(__wt_config_gets_defno(session, cfg, "overwrite", &cval));
-	if (cval.val != 0)
-		F_SET(cursor, WT_CURSTD_OVERWRITE);
-
 	/* raw */
 	WT_RET(__wt_config_gets_defno(session, cfg, "raw", &cval));
 	if (cval.val != 0)
