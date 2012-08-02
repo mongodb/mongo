@@ -45,10 +45,12 @@ progress), the checkpoint will fail.
 
 Internal checkpoints (that is, checkpoints not named by the application)
 use the reserved name "WiredTigerCheckpoint".  Applications can open the
-most recent of these checkpoints by specifying "WiredTigerCheckpoint" as
-the checkpoint name to WT_SESSION::open_cursor.   Creating a new
-internal checkpoint drops any previous internal checkpoints, if
+most recent of these checkpoints by specifying "WiredTigerCheckpoint"
+as the checkpoint name to WT_SESSION::open_cursor.   Creating a new
+internal checkpoint drops all previous internal checkpoints, if
 possible; if a previous internal checkpoint cannot be dropped for any
 reason, the checkpoint will ignore the previous checkpoint and continue.
+Subsequent checkpoints will drop those ignored checkpoints as soon as
+they can be dropped.
 
  */
