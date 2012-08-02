@@ -668,6 +668,14 @@ namespace mongo {
         return out;
     }
 
+    static string tmToISODateString(const tm& time) {
+        char buf[128];
+        size_t len = strftime(buf, 128, "%Y-%m-%dT%H:%M:%S", &time);
+        verify(len > 0);
+        verify(len < 128);
+        return buf;
+    }
+
     string Value::coerceToString() const {
         stringstream ss;
         switch(type) {
@@ -691,7 +699,7 @@ namespace mongo {
             return ss.str();
 
         case Date:
-            return time_t_to_String(coerceToTimeT());
+            return tmToISODateString(coerceToTm());
 
         case jstNULL:
         case Undefined:

@@ -15,7 +15,7 @@ function test(date, testSynthetics) {
                                 //, millisecond:{ $millisecond: '$date' } // server-6666
 
                                 // $substr will call coerceToString
-                                //, string: {$substr: ['$date', 0,1000]} // server-6679
+                                , string: {$substr: ['$date', 0,1000]}
                                 }} );
 
     if (date.getUTCFullYear() < 1970 && _isWindows() && result.code == 16422) {
@@ -38,7 +38,7 @@ function test(date, testSynthetics) {
                              , minute: date.getUTCMinutes()
                              , second: date.getUTCSeconds()
                              //, millisecond: date.getUTCMilliseconds() // server-6666
-                             //, string: date.tojson().split('"')[1] // server-6679
+                             , string: date.tojson().slice(9,28)
                              } );
 
     if (testSynthetics) {
