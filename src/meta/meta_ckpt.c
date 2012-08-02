@@ -368,10 +368,6 @@ __wt_meta_ckptlist_set(
 	sep = "";
 	WT_ERR(__wt_buf_fmt(session, buf, "checkpoint=("));
 	WT_CKPT_FOREACH(ckptbase, ckpt) {
-		/* Skip deleted checkpoints. */
-		if (F_ISSET(ckpt, WT_CKPT_DELETE))
-			continue;
-
 		/*
 		 * Each internal checkpoint name is appended with a generation
 		 * to make it a unique name.  We're solving two problems: when
@@ -387,6 +383,10 @@ __wt_meta_ckptlist_set(
 		 */
 		if (ckpt->order > maxorder)
 			maxorder = ckpt->order;
+
+		/* Skip deleted checkpoints. */
+		if (F_ISSET(ckpt, WT_CKPT_DELETE))
+			continue;
 
 		if (F_ISSET(ckpt, WT_CKPT_ADD | WT_CKPT_UPDATE)) {
 			/* Convert the raw cookie to a hex string. */
