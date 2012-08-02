@@ -9,7 +9,9 @@ assert.eq( 1, db.system.indexes.count( {ns: "test.jstests_index9"} ), "There sho
 
 t.drop();
 db.createCollection( "jstests_index9", {autoIndexId:false} );
-assert.eq( 1, db.system.indexes.count( {ns: "test.jstests_index9"} ), "There should be 1 index even if autoIndexId: false" );
+assert.eq( 0, db.system.indexes.count( {ns: "test.jstests_index9"} ), "There should be 0 index if autoIndexId: false" );
+t.createIndex( { _id:1 } );
+assert.eq( 1, db.system.indexes.count( {ns: "test.jstests_index9"} ) );
 t.createIndex( { _id:1 } );
 assert.eq( 1, db.system.indexes.count( {ns: "test.jstests_index9"} ) );
 
