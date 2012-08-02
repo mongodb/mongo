@@ -62,7 +62,7 @@ namespace mongo {
 
         class FileIterator : boost::noncopyable {
         public:
-            FileIterator( string file );
+            FileIterator( const std::string& file );
             ~FileIterator();
             bool more();
             Data next();
@@ -124,7 +124,7 @@ namespace mongo {
 
         void _sortInMem();
 
-        void sort( string file );
+        void sort( const std::string& file );
         void finishMap();
 
         BSONObj _order;

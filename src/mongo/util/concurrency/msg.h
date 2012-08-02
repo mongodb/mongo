@@ -35,7 +35,7 @@ namespace mongo {
             /** send a message to the port */
             void send(lam);
 
-            Server(string name) : m("server"), _name(name), rq(false) { }
+            Server(const std::string& name) : m("server"), _name(name), rq(false) { }
             virtual ~Server() { }
 
             /** send message but block until function completes */

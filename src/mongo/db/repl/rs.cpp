@@ -54,7 +54,7 @@ namespace mongo {
         }
     }
 
-    void ReplSetImpl::sethbmsg(string s, int logLevel) {
+    void ReplSetImpl::sethbmsg(const std::string& s, int logLevel) {
         static time_t lastLogged;
         _hbmsgTime = time(0);
 
@@ -318,7 +318,10 @@ namespace mongo {
 
     /** @param cfgString <setname>/<seedhost1>,<seedhost2> */
 
-    void parseReplsetCmdLine(string cfgString, string& setname, vector<HostAndPort>& seeds, set<HostAndPort>& seedSet ) {
+    void parseReplsetCmdLine(const std::string& cfgString,
+                             string& setname,
+                             vector<HostAndPort>& seeds,
+                             set<HostAndPort>& seedSet ) {
         const char *p = cfgString.c_str();
         const char *slash = strchr(p, '/');
         if( slash )

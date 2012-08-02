@@ -48,7 +48,7 @@ namespace mongo {
                 if( --n != 0 ) fail();
             }
         public:
-            Block(string f, unsigned l) : n(0), ncalls(0), file(f), line(l) { }
+            Block(const std::string& f, unsigned l) : n(0), ncalls(0), file(f), line(l) { }
             ~Block() { 
                 if( ncalls > 1000000 ) { 
                     // just so we know if we are slowing things down

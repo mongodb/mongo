@@ -39,7 +39,7 @@ namespace mongo {
 
         bool empty() const { return _p.empty(); }
 
-        static RelativePath fromRelativePath(string f) {
+        static RelativePath fromRelativePath(const std::string& f) {
             RelativePath rp;
             rp._p = f;
             return rp;

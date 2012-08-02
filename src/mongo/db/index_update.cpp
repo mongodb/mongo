@@ -479,7 +479,7 @@ namespace mongo {
     };
 
     // throws DBException
-    void buildAnIndex(string ns, NamespaceDetails *d, IndexDetails& idx, int idxNo, bool background) {
+    void buildAnIndex(const std::string& ns, NamespaceDetails *d, IndexDetails& idx, int idxNo, bool background) {
         tlog() << "build index " << ns << ' ' << idx.keyPattern() << ( background ? " background" : "" ) << endl;
         Timer t;
         unsigned long long n;

@@ -152,7 +152,7 @@ namespace mongo {
             scoped_lock lk( _mutex );
             _sockets->insert( sock );
         }
-        void addPath( string path ) {
+        void addPath( const std::string& path ) {
             scoped_lock lk( _mutex );
             _socketPaths->insert( path );
         }

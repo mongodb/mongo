@@ -185,7 +185,7 @@ namespace mongo {
         /*
           Add this value to the BSON object under construction.
         */
-        void addToBsonObj(BSONObjBuilder *pBuilder, string fieldName) const;
+        void addToBsonObj(BSONObjBuilder *pBuilder, const std::string& fieldName) const;
 
         /*
           Add this field to the BSON array under construction.

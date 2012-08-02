@@ -464,7 +464,7 @@ namespace mongo {
         }
     }
 
-    void Value::addToBsonObj(BSONObjBuilder *pBuilder, string fieldName) const {
+    void Value::addToBsonObj(BSONObjBuilder *pBuilder, const std::string& fieldName) const {
         BuilderObj objBuilder(pBuilder, fieldName);
         addToBson(&objBuilder);
     }

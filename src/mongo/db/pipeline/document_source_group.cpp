@@ -119,7 +119,7 @@ namespace mongo {
     }
 
     void DocumentSourceGroup::addAccumulator(
-        string fieldName,
+        const std::string& fieldName,
         intrusive_ptr<Accumulator> (*pAccumulatorFactory)(
             const intrusive_ptr<ExpressionContext> &),
         const intrusive_ptr<Expression> &pExpression) {

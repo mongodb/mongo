@@ -373,7 +373,7 @@ namespace mongo {
     public:
         FavIconHandler() : DbWebHandler( "favicon.ico" , 0 , false ) {}
 
-        virtual void handle( const char *rq, string url, BSONObj params,
+        virtual void handle( const char *rq, const std::string& url, BSONObj params,
                              string& responseMsg, int& responseCode,
                              vector<string>& headers,  const SockAddr &from ) {
             responseCode = 404;
@@ -387,7 +387,7 @@ namespace mongo {
     public:
         StatusHandler() : DbWebHandler( "_status" , 1 , false ) {}
 
-        virtual void handle( const char *rq, string url, BSONObj params,
+        virtual void handle( const char *rq, const std::string& url, BSONObj params,
                              string& responseMsg, int& responseCode,
                              vector<string>& headers,  const SockAddr &from ) {
             headers.push_back( "Content-Type: application/json;charset=utf-8" );
@@ -439,7 +439,7 @@ namespace mongo {
     public:
         CommandListHandler() : DbWebHandler( "_commands" , 1 , true ) {}
 
-        virtual void handle( const char *rq, string url, BSONObj params,
+        virtual void handle( const char *rq, const std::string& url, BSONObj params,
                              string& responseMsg, int& responseCode,
                              vector<string>& headers,  const SockAddr &from ) {
             headers.push_back( "Content-Type: text/html;charset=utf-8" );
@@ -491,7 +491,7 @@ namespace mongo {
             return _cmd(cmd) != 0;
         }
 
-        virtual void handle( const char *rq, string url, BSONObj params,
+        virtual void handle( const char *rq, const std::string& url, BSONObj params,
                              string& responseMsg, int& responseCode,
                              vector<string>& headers,  const SockAddr &from ) {
             string cmd;

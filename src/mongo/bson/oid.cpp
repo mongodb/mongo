@@ -157,7 +157,7 @@ namespace mongo {
         }
     }
 
-    void OID::init( string s ) {
+    void OID::init( const std::string& s ) {
         verify( s.size() == 24 );
         const char *p = s.c_str();
         for( int i = 0; i < 12; i++ ) {

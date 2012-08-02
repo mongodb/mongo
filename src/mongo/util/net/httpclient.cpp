@@ -29,11 +29,11 @@ namespace mongo {
 #define HD(x)
 
 
-    int HttpClient::get( string url , Result * result ) {
+    int HttpClient::get( const std::string& url , Result * result ) {
         return _go( "GET" , url , 0 , result );
     }
 
-    int HttpClient::post( string url , string data , Result * result ) {
+    int HttpClient::post( const std::string& url , const std::string& data , Result * result ) {
         return _go( "POST" , url , data.c_str() , result );
     }
 

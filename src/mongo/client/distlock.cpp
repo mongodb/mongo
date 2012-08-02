@@ -79,7 +79,9 @@ namespace mongo {
             : _mutex( "DistributedLockPinger" ) {
         }
 
-        void _distLockPingThread( ConnectionString addr, string process, unsigned long long sleepTime ) {
+        void _distLockPingThread( ConnectionString addr,
+                                  const std::string& process,
+                                  unsigned long long sleepTime ) {
 
             setThreadName( "LockPinger" );
 
@@ -216,7 +218,10 @@ namespace mongo {
 
         }
 
-        void distLockPingThread( ConnectionString addr, long long clockSkew, string processId, unsigned long long sleepTime ) {
+        void distLockPingThread( ConnectionString addr,
+                                 long long clockSkew,
+                                 const std::string& processId,
+                                 unsigned long long sleepTime ) {
             try {
                 jsTimeVirtualThreadSkew( clockSkew );
                 _distLockPingThread( addr, processId, sleepTime );

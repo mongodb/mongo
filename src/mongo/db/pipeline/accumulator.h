@@ -32,7 +32,7 @@ namespace mongo {
         // virtuals from ExpressionNary
         virtual void addOperand(const intrusive_ptr<Expression> &pExpression);
         virtual void addToBsonObj(
-            BSONObjBuilder *pBuilder, string fieldName,
+            BSONObjBuilder *pBuilder, const std::string& fieldName,
             bool requireExpression) const;
         virtual void addToBsonArray(BSONArrayBuilder *pBuilder) const;
 
@@ -56,7 +56,7 @@ namespace mongo {
           @param opName the operator name
          */
         void opToBson(
-            BSONObjBuilder *pBuilder, string fieldName, string opName,
+            BSONObjBuilder *pBuilder, const std::string& fieldName, const std::string& opName,
             bool requireExpression) const;
     };
 

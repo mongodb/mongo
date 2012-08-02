@@ -217,7 +217,7 @@ namespace mongo {
             is created first, and the journal will just replay the creation if the create didn't
             happen because of crashing.
         */
-        void DurableImpl::createdFile(string filename, unsigned long long len) {
+        void DurableImpl::createdFile(const std::string& filename, unsigned long long len) {
             shared_ptr<DurOp> op( new FileCreatedOp(filename, len) );
             commitJob.noteOp(op);
         }

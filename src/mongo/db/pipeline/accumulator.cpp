@@ -36,18 +36,19 @@ namespace mongo {
         ExpressionNary() {
     }
 
-    void Accumulator::opToBson(
-        BSONObjBuilder *pBuilder, string opName,
-        string fieldName, bool requireExpression) const {
+    void Accumulator::opToBson(BSONObjBuilder *pBuilder,
+                               const std::string& opName,
+                               const std::string& fieldName,
+                               bool requireExpression) const {
         verify(vpOperand.size() == 1);
         BSONObjBuilder builder;
         vpOperand[0]->addToBsonObj(&builder, opName, requireExpression);
         pBuilder->append(fieldName, builder.done());
     }
 
-    void Accumulator::addToBsonObj(
-        BSONObjBuilder *pBuilder, string fieldName,
-        bool requireExpression) const {
+    void Accumulator::addToBsonObj(BSONObjBuilder *pBuilder,
+                                   const std::string& fieldName,
+                                   bool requireExpression) const {
         opToBson(pBuilder, getOpName(), fieldName, requireExpression);
     }
 

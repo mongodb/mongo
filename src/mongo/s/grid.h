@@ -45,7 +45,7 @@ namespace mongo {
          * removes db entry.
          * on next getDBConfig call will fetch from db
          */
-        void removeDB( string db );
+        void removeDB( const std::string& db );
 
         /**
          * removes db entry - only this DBConfig object will be removed,
@@ -106,7 +106,7 @@ namespace mongo {
          * @param name identifies a particular type of configuration data.
          * @return a BSON object containing the requested data.
          */
-        BSONObj getConfigSetting( string name ) const;
+        BSONObj getConfigSetting( const std::string& name ) const;
 
         unsigned long long getNextOpTime() const;
         

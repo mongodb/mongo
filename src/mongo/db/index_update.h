@@ -30,7 +30,11 @@ namespace mongo {
     // Build an index in the foreground
     // If background is false, uses fast index builder
     // If background is true, uses background index builder; blocks until done.
-    void buildAnIndex(string ns, NamespaceDetails *d, IndexDetails& idx, int idxNo, bool background);
+    void buildAnIndex(const std::string& ns,
+                      NamespaceDetails *d,
+                      IndexDetails& idx,
+                      int idxNo,
+                      bool background);
 
     // add index keys for a newly inserted record 
     // done in two steps/phases to allow potential deferal of write lock portion in the future

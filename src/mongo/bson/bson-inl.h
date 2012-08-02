@@ -916,9 +916,9 @@ dodouble:
     }
 
     // used by jsonString()
-    inline std::string escape( std::string s , bool escape_slash=false) {
+    inline std::string escape( const std::string& s , bool escape_slash=false) {
         StringBuilder ret;
-        for ( std::string::iterator i = s.begin(); i != s.end(); ++i ) {
+        for ( std::string::const_iterator i = s.begin(); i != s.end(); ++i ) {
             switch ( *i ) {
             case '"':
                 ret << "\\\"";

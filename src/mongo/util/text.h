@@ -70,7 +70,7 @@ namespace mongo {
      * guarantee that the codepoints are valid.
      */
     bool isValidUTF8(const char *s);
-    bool isValidUTF8(std::string s);
+    bool isValidUTF8(const std::string& s);
 
     // expect that n contains a base ten number and nothing else after it
     // NOTE win version hasn't been tested directly

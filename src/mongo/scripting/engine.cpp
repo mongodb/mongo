@@ -342,7 +342,7 @@ namespace mongo {
 
     class PooledScope : public Scope {
     public:
-        PooledScope( const string pool , Scope * real ) : _pool( pool ) , _real( real ) {
+        PooledScope( const std::string& pool , Scope * real ) : _pool( pool ) , _real( real ) {
             _real->loadStored( true );
         };
         virtual ~PooledScope() {

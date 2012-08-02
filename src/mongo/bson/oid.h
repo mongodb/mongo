@@ -79,7 +79,7 @@ namespace mongo {
         void initSequential();
 
         /** init from a 24 char hex string */
-        void init( std::string s );
+        void init( const std::string& s );
 
         /** Set to the min/max OID that could be generated at given timestamp. */
         void init( Date_t date, bool max=false );

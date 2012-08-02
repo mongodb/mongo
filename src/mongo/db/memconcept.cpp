@@ -86,7 +86,7 @@ namespace mongo {
 
 #if 0 && defined(_DEBUG)
         bool d = false;
-        void is(void *p, concept c, string description, unsigned len) {
+        void is(void *p, concept c, const std::string& description, unsigned len) {
             DDD( log() << "is  " << p << ' ' << c.toString() << ' ' << description << ' ' << len << endl; )
             C &node = map.find(p);
             node.p = p;

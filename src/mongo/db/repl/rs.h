@@ -294,14 +294,17 @@ namespace mongo {
         SP sp;
     };
 
-    void parseReplsetCmdLine(string cfgString, string& setname, vector<HostAndPort>& seeds, set<HostAndPort>& seedSet );
+    void parseReplsetCmdLine(const std::string& cfgString,
+                             string& setname,
+                             vector<HostAndPort>& seeds,
+                             set<HostAndPort>& seedSet);
 
     /** Parameter given to the --replSet command line option (parsed).
         Syntax is "<setname>/<seedhost1>,<seedhost2>"
         where setname is a name and seedhost is "<host>[:<port>]" */
     class ReplSetCmdline {
     public:
-        ReplSetCmdline(string cfgString) { parseReplsetCmdLine(cfgString, setname, seeds, seedSet); }
+        ReplSetCmdline(const std::string& cfgString) { parseReplsetCmdLine(cfgString, setname, seeds, seedSet); }
         string setname;
         vector<HostAndPort> seeds;
         set<HostAndPort> seedSet;
@@ -367,7 +370,7 @@ namespace mongo {
         char _hbmsg[256]; // we change this unlocked, thus not an stl::string
         time_t _hbmsgTime; // when it was logged
     public:
-        void sethbmsg(string s, int logLevel = 0);
+        void sethbmsg(const std::string& s, int logLevel = 0);
 
         /**
          * Election with Priorities

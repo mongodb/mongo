@@ -67,7 +67,7 @@ namespace mongo {
     }
 
     /* todo : progress metering to sethbmsg. */
-    static bool clone(const char *master, string db, bool dataPass ) {
+    static bool clone(const char *master, const std::string& db, bool dataPass ) {
         CloneOptions options;
 
         options.fromDB = db;

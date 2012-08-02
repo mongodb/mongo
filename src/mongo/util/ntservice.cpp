@@ -40,7 +40,7 @@ namespace mongo {
     // returns true if the service is started.
     bool serviceParamsCheck(
             boost::program_options::variables_map& params,
-            const std::string dbpath,
+            const std::string& dbpath,
             const ntServiceDefaultStrings& defaultStrings,
             const vector<string>& disallowedOptions,
             int argc,
@@ -177,7 +177,7 @@ namespace mongo {
             const wstring& serviceDesc,
             const wstring& serviceUser,
             const wstring& servicePassword,
-            const std::string dbpath,
+            const std::string& dbpath,
             int argc,
             char* argv[]
     ) {

@@ -341,7 +341,7 @@ namespace mongo {
             return n;
         }
 
-        GeoHash operator+( string s ) const {
+        GeoHash operator+( const std::string& s ) const {
            return operator+( s.c_str() );
         }
 

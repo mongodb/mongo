@@ -99,7 +99,7 @@ namespace mongo {
 
     }
 
-    bool isValidUTF8(string s) { 
+    bool isValidUTF8(const std::string& s) { 
         return isValidUTF8(s.c_str()); 
     }
 

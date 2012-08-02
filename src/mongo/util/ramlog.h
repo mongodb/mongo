@@ -23,7 +23,7 @@ namespace mongo {
 
     class RamLog : public Tee {
     public:
-        RamLog( string name );
+        RamLog( const std::string& name );
 
         virtual void write(LogLevel ll, const string& str);
 
@@ -31,7 +31,7 @@ namespace mongo {
 
         void toHTML(stringstream& s);
 
-        static RamLog* get( string name );
+        static RamLog* get( const std::string& name );
         static void getNames( vector<string>& names );
 
         time_t lastWrite() { return _lastWrite; } // 0 if no writes
@@ -39,7 +39,7 @@ namespace mongo {
     protected:
         static int repeats(const vector<const char *>& v, int i);
         static string clean(const vector<const char *>& v, int i, string line="");
-        static string color(string line);
+        static string color(const std::string& line);
 
         /* turn http:... into an anchor */
         static string linkify(const char *s);

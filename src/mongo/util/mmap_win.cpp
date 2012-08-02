@@ -328,7 +328,10 @@ namespace mongo {
 
     class WindowsFlushable : public MemoryMappedFile::Flushable {
     public:
-        WindowsFlushable( void * view , HANDLE fd , string filename , boost::shared_ptr<mutex> flushMutex )
+        WindowsFlushable( void * view,
+                          HANDLE fd,
+                          const std::string& filename,
+                          boost::shared_ptr<mutex> flushMutex )
             : _view(view) , _fd(fd) , _filename(filename) , _flushMutex(flushMutex)
         {}
 

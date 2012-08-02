@@ -256,7 +256,7 @@ namespace mongo {
             _memoryUsed = 0;
         }
 
-        void start( string ns ,
+        void start( const std::string& ns ,
                     const BSONObj& min ,
                     const BSONObj& max ,
                     const BSONObj& shardKeyPattern ) {
@@ -650,7 +650,7 @@ namespace mongo {
     } migrateFromStatus;
 
     struct MigrateStatusHolder {
-        MigrateStatusHolder( string ns ,
+        MigrateStatusHolder( const std::string& ns ,
                              const BSONObj& min ,
                              const BSONObj& max ,
                              const BSONObj& shardKeyPattern ) {

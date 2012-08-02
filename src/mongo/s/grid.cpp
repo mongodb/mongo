@@ -134,7 +134,7 @@ namespace mongo {
         return dbConfig;
     }
 
-    void Grid::removeDB( string database ) {
+    void Grid::removeDB( const std::string& database ) {
         uassert( 10186 ,  "removeDB expects db name" , database.find( '.' ) == string::npos );
         scoped_lock l( _lock );
         _databases.erase( database );
@@ -554,7 +554,7 @@ namespace mongo {
         _databases.clear();
     }
 
-    BSONObj Grid::getConfigSetting( string name ) const {
+    BSONObj Grid::getConfigSetting( const std::string& name ) const {
         scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::getInternalScopedDbConnection(
                 configServer.getPrimary().getConnString() ) );
         BSONObj result = conn->get()->findOne( ShardNS::settings, BSON( "_id" << name ) );

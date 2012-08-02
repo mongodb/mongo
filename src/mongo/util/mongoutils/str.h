@@ -37,8 +37,6 @@ namespace mongoutils {
 
     namespace str {
 
-        typedef std::string string;
-
         /** the idea here is to make one liners easy.  e.g.:
 
                return str::stream() << 1 << ' ' << 2;
@@ -67,13 +65,15 @@ namespace mongoutils {
             }
             return true;
         }
-        inline bool startsWith(string s, string p) { return startsWith(s.c_str(), p.c_str()); }
+        inline bool startsWith(const std::string& s, const std::string& p) {
+            return startsWith(s.c_str(), p.c_str());
+        }
 
         // while these are trivial today use in case we do different wide char things later
         inline bool startsWith(const char *p, char ch) { return *p == ch; }
-        inline bool startsWith(string s, char ch) { return startsWith(s.c_str(), ch); }
+        inline bool startsWith(const std::string& s, char ch) { return startsWith(s.c_str(), ch); }
 
-        inline bool endsWith(string s, string p) {
+        inline bool endsWith(const std::string& s, const std::string& p) {
             int l = p.size();
             int x = s.size();
             if( x < l ) return false;
@@ -91,9 +91,9 @@ namespace mongoutils {
             const char *p = strchr(s, x);
             return (p != 0) ? p+1 : "";
         }
-        inline string after(const string& s, char x) {
+        inline std::string after(const std::string& s, char x) {
             const char *p = strchr(s.c_str(), x);
-            return (p != 0) ? string(p+1) : "";
+            return (p != 0) ? std::string(p+1) : "";
         }
 
         /** find string x, and return rest of string thereafter, or "" if not found */
@@ -101,30 +101,30 @@ namespace mongoutils {
             const char *p = strstr(s, x);
             return (p != 0) ? p+strlen(x) : "";
         }
-        inline string after(string s, string x) {
+        inline std::string after(const std::string& s, const std::string& x) {
             const char *p = strstr(s.c_str(), x.c_str());
-            return (p != 0) ? string(p+x.size()) : "";
+            return (p != 0) ? std::string(p+x.size()) : "";
         }
 
         /** @return true if s contains x
          *  These should not be used with strings containing NUL bytes
          */
-        inline bool contains(string s, string x) {
+        inline bool contains(const std::string& s, const std::string& x) {
             return strstr(s.c_str(), x.c_str()) != 0;
         }
-        inline bool contains(string s, char x) {
+        inline bool contains(const std::string& s, char x) {
             verify(x != '\0'); // this expects c-strings so don't use when looking for NUL bytes
             return strchr(s.c_str(), x) != 0;
         }
 
         /** @return everything before the character x, else entire string */
-        inline string before(const string& s, char x) {
+        inline std::string before(const std::string& s, char x) {
             const char *p = strchr(s.c_str(), x);
             return (p != 0) ? s.substr(0, p-s.c_str()) : s;
         }
 
         /** @return everything before the string x, else entire string */
-        inline string before(const string& s, const string& x) {
+        inline std::string before(const std::string& s, const std::string& x) {
             const char *p = strstr(s.c_str(), x.c_str());
             return (p != 0) ? s.substr(0, p-s.c_str()) : s;
         }
@@ -142,11 +142,11 @@ namespace mongoutils {
             }
             return ofs;
         }
-        inline int shareCommonPrefix(const string &a, const string &b)
+        inline int shareCommonPrefix(const std::string &a, const std::string &b)
         { return shareCommonPrefix(a.c_str(), b.c_str()); }
 
         /** string to unsigned. zero if not a number. can end with non-num chars */
-        inline unsigned toUnsigned(const string& a) {
+        inline unsigned toUnsigned(const std::string& a) {
             unsigned x = 0;
             const char *p = a.c_str();
             while( 1 ) {
@@ -163,32 +163,32 @@ namespace mongoutils {
             and R is empty.
             @return true if char found
         */
-        inline bool splitOn(const string &s, char c, string& L, string& R) {
+        inline bool splitOn(const std::string &s, char c, std::string& L, std::string& R) {
             const char *start = s.c_str();
             const char *p = strchr(start, c);
             if( p == 0 ) {
                 L = s; R.clear();
                 return false;
             }
-            L = string(start, p-start);
-            R = string(p+1);
+            L = std::string(start, p-start);
+            R = std::string(p+1);
             return true;
         }
         /** split scanning reverse direction. Splits ONCE ONLY. */
-        inline bool rSplitOn(const string &s, char c, string& L, string& R) {
+        inline bool rSplitOn(const std::string &s, char c, std::string& L, std::string& R) {
             const char *start = s.c_str();
             const char *p = strrchr(start, c);
             if( p == 0 ) {
                 L = s; R.clear();
                 return false;
             }
-            L = string(start, p-start);
-            R = string(p+1);
+            L = std::string(start, p-start);
+            R = std::string(p+1);
             return true;
         }
 
         /** @return number of occurrences of c in s */
-        inline unsigned count( const string& s , char c ) {
+        inline unsigned count( const std::string& s , char c ) {
             unsigned n=0;
             for ( unsigned i=0; i<s.size(); i++ )
                 if ( s[i] == c )
@@ -197,15 +197,15 @@ namespace mongoutils {
         }
 
         /** trim leading spaces. spaces only, not tabs etc. */
-        inline string ltrim(const string& s) {
+        inline std::string ltrim(const std::string& s) {
             const char *p = s.c_str();
             while( *p == ' ' ) p++;
             return p;
         }
 
         /** remove trailing chars in place */
-        inline void stripTrailing(string& s, const char *chars) {
-            string::iterator i = s.end();
+        inline void stripTrailing(std::string& s, const char *chars) {
+            std::string::iterator i = s.end();
             while( s.begin() != i ) {
                 i--;
                 if( contains(chars, *i) ) {

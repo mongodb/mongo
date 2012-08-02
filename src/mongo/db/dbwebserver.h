@@ -39,7 +39,7 @@ namespace mongo {
         virtual bool requiresREST( const string& url ) const { return _requiresREST; }
 
         virtual void handle( const char *rq, // the full request
-                             string url,
+                             const std::string& url,
                              BSONObj params,
                              // set these and return them:
                              string& responseMsg,
