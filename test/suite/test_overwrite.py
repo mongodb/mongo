@@ -32,13 +32,20 @@ from helper import key_populate, simple_populate
 #    cursor overwrite configuration method
 class test_overwrite(wttest.WiredTigerTestCase):
     scenarios = [
+        ('file', dict(uri='file:overwrite',fmt='r')),
         ('file', dict(uri='file:overwrite',fmt='S')),
+        ('table', dict(uri='table:overwrite',fmt='r')),
         ('table', dict(uri='table:overwrite',fmt='S'))
         ]
 
     # Test configuration of a cursor for overwrite.
     def test_overwrite(self):
         simple_populate(self, self.uri, 'key_format=' + self.fmt, 100)
+        cursor = self.session.open_cursor(self.uri, None, None)
+        cursor.set_key(key_populate(self.fmt, 10))
+        cursor.set_value('XXXXXXXXXX')
+        self.assertRaises(wiredtiger.WiredTigerError, lambda: cursor.insert())
+
         cursor = self.session.open_cursor(self.uri, None, "overwrite")
         cursor.set_key(key_populate(self.fmt, 10))
         cursor.set_value('XXXXXXXXXX')
@@ -51,6 +58,7 @@ class test_overwrite(wttest.WiredTigerTestCase):
         cursor.set_key(key_populate(self.fmt, 10))
         cursor.set_value('XXXXXXXXXX')
         self.assertRaises(wiredtiger.WiredTigerError, lambda: cursor.insert())
+
         cursor.reconfigure("overwrite");
         cursor.set_key(key_populate(self.fmt, 10))
         cursor.set_value('XXXXXXXXXX')
