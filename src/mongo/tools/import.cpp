@@ -118,6 +118,12 @@ class Import : public Tool {
         }
         else {
             in->getline( buf , BUF_SIZE );
+            if ((in->rdstate() & ios_base::eofbit) && (in->rdstate() & ios_base::failbit)) {
+                // this is the last line, and it's empty (not even a newline)
+                buf[0] = '\0';
+                return 0;
+            }
+
             uassert(16329, str::stream() << "read error, or input line too long (max length: "
                     << BUF_SIZE << ")", !(in->rdstate() & ios_base::failbit));
             log(1) << "got line:" << buf << endl;
