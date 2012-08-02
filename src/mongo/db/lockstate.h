@@ -82,6 +82,9 @@ namespace mongo {
         bool _batchWriter;
 
         LockStat* getRelevantLockStat();
+        void recordLockTime() { _scopedLk->recordTime(); }
+        void resetLockTime() { _scopedLk->resetTime(); }
+        
     private:
         unsigned _recursive;           // we allow recursively asking for a lock; we track that here
 

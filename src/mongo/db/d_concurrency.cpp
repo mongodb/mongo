@@ -23,6 +23,7 @@
 #include "../util/concurrency/rwlock.h"
 #include "../util/concurrency/mapsf.h"
 #include "../util/assert_util.h"
+#include "../util/stacktrace.h"
 #include "client.h"
 #include "curop.h"
 #include "namespacestring.h"
@@ -292,8 +293,6 @@ namespace mongo {
         int prevCount = ls.recursiveCount();
         Lock::ScopedLock* what = ls.leaveScopedLock();
         fassert( 16171 , prevCount != 1 || what == this );
-
-        _recordTime( _timer.micros() );
     }
     
     long long Lock::ScopedLock::acquireFinished( LockStat* stat ) {
@@ -315,10 +314,18 @@ namespace mongo {
             _stat->recordLockTimeMicros( _type , micros );
         cc().curop()->lockStat().recordLockTimeMicros( _type , micros );
     }
+
+    void Lock::ScopedLock::recordTime() {
+        _recordTime(_timer.micros());
+    }
+
+    void Lock::ScopedLock::resetTime() {
+        _timer.reset();
+    }
     
     void Lock::ScopedLock::relock() {
-        _timer.reset();
         _relock();
+        resetTime();
     }
 
 
@@ -417,6 +424,7 @@ namespace mongo {
         if( noop ) { 
             return;
         }
+        recordTime();  // for lock stats
         if( threadState() == 'R' ) { // we downgraded
             qlk.unlock_R();
         }
@@ -461,6 +469,7 @@ namespace mongo {
     }
     Lock::GlobalRead::~GlobalRead() {
         if( !noop ) {
+            recordTime();  // for lock stats
             qlk.unlock_R();
         }
     }
@@ -618,6 +627,8 @@ namespace mongo {
 
     void Lock::DBWrite::unlockDB() {
         if( _weLocked ) {
+            recordTime();  // for lock stats
+        
             if ( _nested )
                 lockState().unlockedNestable();
             else
@@ -625,6 +636,7 @@ namespace mongo {
     
             _weLocked->unlock();
         }
+
         if( _locked_w ) {
             if (DB_LEVEL_LOCKING_ENABLED) {
                 qlk.unlock_w();
@@ -640,6 +652,8 @@ namespace mongo {
     }
     void Lock::DBRead::unlockDB() {
         if( _weLocked ) {
+            recordTime();  // for lock stats
+        
             if( _nested )
                 lockState().unlockedNestable();
             else
@@ -717,20 +731,30 @@ namespace mongo {
 
     Lock::DBWrite::UpgradeToExclusive::UpgradeToExclusive() {
         fassert( 16187, lockState().threadState() == 'w' );
+
+        // We're about to temporarily drop w, so stop the lock time stopwatch
+        lockState().recordLockTime();
+
         _gotUpgrade = qlk.w_to_X();
-        if ( _gotUpgrade )
+        if ( _gotUpgrade ) {
             lockState().changeLockState('W');
+            lockState().resetLockTime();
+        }
     }
 
     Lock::DBWrite::UpgradeToExclusive::~UpgradeToExclusive() {
         if ( _gotUpgrade ) {
             fassert( 16188, lockState().threadState() == 'W' );
+            lockState().recordLockTime();
             qlk.X_to_w();
             lockState().changeLockState('w');
         }
         else {
             fassert( 16189, lockState().threadState() == 'w' );
         }
+
+        // Start recording lock time again
+        lockState().resetLockTime();
     }
 
     writelocktry::writelocktry( int tryms ) : 
