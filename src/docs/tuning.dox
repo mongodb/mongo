@@ -1,6 +1,6 @@
 /*! @page tuning Performance Tuning
 
-@section cache Cache size
+@section tuning_cache_size Cache size
 
 The cache size for the database is configurable by setting the \c
 cache_size configuration string when calling the ::wiredtiger_open
@@ -13,7 +13,7 @@ An example of setting a cache size to 500MB:
 
 @snippet ex_config.c configure cache size
 
-@section page Page and overflow sizes
+@section tuning_page_size  Page and overflow sizes
 
 There are four page and item size configuration values: \c internal_page_max,
 \c internal_item_max, \c leaf_page_max and \c leaf_item_max.  All four should
@@ -90,7 +90,7 @@ An example of configuring page sizes:
 
 @snippet ex_file.c file create
 
-@section memory Memory allocation
+@section tuning_memory_allocation Memory allocation
 
 I/O intensive threaded applications, where the working set does not fit
 into the available cache, can be dominated by memory allocation because
@@ -101,7 +101,7 @@ better threaded performance (for example, Google's
 or <a href="http://www.canonware.com/jemalloc">jemalloc</a>),
 can dramatically improve throughput.
 
-@section checksums Checksums
+@section tuning_checksums Checksums
 
 WiredTiger configures checksums on file reads and writes, by default.
 In read-only applications, or when file compression provides any
@@ -109,7 +109,7 @@ necessary checksum functionality, or when using backing storage systems
 where blocks require no validation, performance can be increased by
 turning off checksum support when calling the WT_SESSION::create method.
 
-@section statistics Performance monitoring with statistics
+@section tuning_statistics Performance monitoring with statistics
 
 WiredTiger maintains a variety of statistics that can be read with a
 cursor.  The statistics are at two levels: per-database statistics and
