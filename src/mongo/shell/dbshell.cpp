@@ -298,7 +298,8 @@ bool isUseCmd( string code ) {
 bool isBalanced( string code ) {
     if (isUseCmd( code ))
         return true;  // don't balance "use <dbname>" in case dbname contains special chars
-    int brackets = 0;
+    int curlyBrackets = 0;
+    int squareBrackets = 0;
     int parens = 0;
     bool danglingOp = false;
 
@@ -310,10 +311,30 @@ bool isBalanced( string code ) {
                     i++;
             }
             continue;
-        case '{': brackets++; break;
-        case '}': if ( brackets <= 0 ) return true; brackets--; break;
-        case '(': parens++; break;
-        case ')': if ( parens <= 0 ) return true; parens--; break;
+        case '{':
+            curlyBrackets++;
+            break;
+        case '}':
+            if ( curlyBrackets <= 0 )
+                return true;
+            curlyBrackets--;
+            break;
+        case '[':
+            squareBrackets++;
+            break;
+        case ']':
+            if ( squareBrackets <= 0 )
+                return true;
+            squareBrackets--;
+            break;
+        case '(':
+            parens++;
+            break;
+        case ')':
+            if ( parens <= 0 )
+                return true;
+            parens--;
+            break;
         case '"':
             i++;
             while ( i < code.size() && code[i] != '"' ) i++;
@@ -341,7 +362,7 @@ bool isBalanced( string code ) {
         else if ( !std::isspace( static_cast<unsigned char>( code[i] ) ) ) danglingOp = false;
     }
 
-    return brackets == 0 && parens == 0 && !danglingOp;
+    return curlyBrackets == 0 && squareBrackets == 0 && parens == 0 && !danglingOp;
 }
 
 struct BalancedTest : public mongo::StartupTest {
