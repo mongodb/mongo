@@ -94,7 +94,7 @@ file_config = format_meta + [
 		See @ref compression for more information'''),
 	Config('cache_resident', 'false', r'''
 		do not ever evict the object's pages; see @ref
-		cache_resident for more information''',
+		tuning_cache_resident for more information''',
 		type='boolean'),
 	Config('checksum', 'true', r'''
 		configure file block checksums; if false, the block
