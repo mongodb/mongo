@@ -204,10 +204,6 @@ __conn_btree_open(WT_SESSION_IMPL *session,
 	/* Set any special flags on the handle. */
 	F_SET(btree, LF_ISSET(WT_BTREE_SPECIAL_FLAGS));
 
-	/* The metadata file is never evicted. */
-	if (strcmp(btree->name, WT_METADATA_URI) == 0)
-		btree->cache_resident = 1;
-
 	do {
 		WT_ERR(__wt_meta_checkpoint_addr(
 		    session, btree->name, btree->checkpoint, addr));

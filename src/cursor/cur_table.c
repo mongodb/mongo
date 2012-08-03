@@ -696,14 +696,13 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 		0			/* uint32_t flags */
 	};
 	WT_CONFIG_ITEM cval;
-	WT_CURSOR *cursor, **cp;
+	WT_CURSOR *cursor;
 	WT_CURSOR_TABLE *ctable;
 	WT_DECL_RET;
 	WT_ITEM fmt, plan;
 	WT_TABLE *table;
 	size_t size;
 	const char *tablename, *columns;
-	int i;
 
 	WT_CLEAR(fmt);
 	WT_CLEAR(plan);
@@ -772,29 +771,6 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 	 * cursor(s).
 	 */
 	WT_ERR(__curtable_open_colgroups(ctable, cfg));
-
-	/*
-	 * cache_resident
-	 * Check after we've opened the column-groups; we need them open in
-	 * order to configure their underlying handles.
-	 */
-	if ((ret = __wt_config_gets_defno(
-	    session, cfg, "cache_resident", &cval)) == 0) {
-		for (i = 0, cp = (ctable)->cg_cursors;
-		    i < WT_COLGROUPS(ctable->table); i++, cp++)
-			if (*cp != NULL)
-				((WT_CURSOR_BTREE *)*cp)->btree->
-				    cache_resident = cval.val ? 1 : 0;
-
-		/* Open the indices so we configure those cursors as well. */
-		WT_ERR(__curtable_open_indices(ctable));
-		if (ctable->idx_cursors != NULL)
-			for (i = 0, cp = (ctable)->idx_cursors;
-			    i < ctable->table->nindices; i++, cp++)
-				if (*cp != NULL)
-					((WT_CURSOR_BTREE *)*cp)->btree->
-					    cache_resident = cval.val ? 1 : 0;
-	}
 
 	if (0) {
 err:		(void)__curtable_close(cursor);

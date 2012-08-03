@@ -16,7 +16,7 @@ An example of setting a cache size to 500MB:
 @section cache_resident Cache resident objects
 
 Cache resident objects (objects never considered for the purposes of
-cache eviction), can be configured with the WT_SESSION::open_cursor
+cache eviction), can be configured with the WT_SESSION::create
 "cache_resident" configuration string.
 
 Configuring a cache resident object has two effects: first, once the
@@ -29,7 +29,7 @@ performance.
 
 An example of configuring a cache-resident object:
 
-@snippet ex_all.c Open a cache-resident cursor
+@snippet ex_all.c Create a cache-resident object
 
 @section page Page and overflow sizes
 

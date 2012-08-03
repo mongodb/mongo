@@ -68,11 +68,6 @@ cursor_ops(WT_SESSION *session)
 	    session, "table:mytable", NULL, NULL, &cursor);
 	/*! [Open a cursor] */
 
-	/*! [Open a cache-resident cursor] */
-	ret = session->open_cursor(
-	    session, "table:mytable", NULL, "cache_resident=true", &cursor);
-	/*! [Open a cache-resident cursor] */
-
 	{
 	WT_CURSOR *duplicate;
 	const char *key = "some key";
@@ -376,9 +371,14 @@ session_ops(WT_SESSION *session)
 	cursor_ops(session);
 
 	/*! [Create a table] */
-	ret = session->create(session, "table:mytable",
-	    "key_format=S,value_format=S");
+	ret = session->create(session,
+	    "table:mytable", "key_format=S,value_format=S");
 	/*! [Create a table] */
+
+	/*! [Create a cache-resident object] */
+	ret = session->create(session,
+	    "table:mytable", "key_format=r,value_format=S,cache_resident=true");
+	/*! [Create a cache-resident object] */
 
 	checkpoint_ops(session);
 

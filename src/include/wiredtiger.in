@@ -519,8 +519,6 @@ struct __wt_session {
 	 * bulk-loaded.  Cursors configured for bulk load only support the
 	 * WT_CURSOR::insert and WT_CURSOR::close methods.,a boolean flag;
 	 * default \c false.}
-	 * @config{cache_resident, do not ever evict the object's pages.,a
-	 * boolean flag; default \c false.}
 	 * @config{checkpoint, the name of a checkpoint to open; the reserved
 	 * checkpoint name "WiredTigerCheckpoint" opens a cursor on the most
 	 * recent internal checkpoint taken for the object.,a string; default
@@ -581,6 +579,9 @@ struct __wt_session {
 	 * custom compression engine \c "name" created with
 	 * WT_CONNECTION::add_compressor. See @ref compression for more
 	 * information.,a string; default empty.}
+	 * @config{cache_resident, do not ever evict the object's pages; see
+	 * @ref cache_resident for more information.,a boolean flag; default \c
+	 * false.}
 	 * @config{checksum, configure file block checksums; if false\, the
 	 * block manager is free to not write or check block checksums. This can
 	 * increase performance in applications where compression provides
