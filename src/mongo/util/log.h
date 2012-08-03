@@ -71,7 +71,7 @@ namespace mongo {
         case LL_ERROR:
             return LOG_ERR;
         case LL_SEVERE:
-            return LOG_CRIT;
+            return LOG_EMERG;
         default:
             return LL_INFO;
         }
@@ -248,7 +248,7 @@ namespace mongo {
 
             char * newName = (char *) malloc( strlen(name) + 1 );
             strcpy( newName , name);
-            openlog( newName , LOG_ODELAY , LOG_USER );
+            openlog( newName , LOG_PID | LOG_CONS | LOG_ODELAY , LOG_USER );
             isSyslog = true;
         }
 #endif
