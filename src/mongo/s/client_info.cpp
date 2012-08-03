@@ -247,11 +247,12 @@ namespace mongo {
             }
             catch( std::exception &e ){
 
-              // Safe to return here, since we haven't started any extra processing yet, just collecting
-              // responses.
+                // Safe to return here, since we haven't started any extra processing yet, just collecting
+                // responses.
 
-              warning() << "could not get last error from a shard " << theShard << causedBy( e ) << endl;
-                conn->done();
+                warning() << "could not get last error from a shard " << theShard << causedBy( e ) << endl;
+                if (conn)
+                    conn->done();
 
                 return false;
             }
