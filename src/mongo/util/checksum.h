@@ -1,5 +1,5 @@
 #pragma once
-#include "../pch.h"
+#include "mongo/pch.h"
 namespace mongo {
     /** a simple, rather dumb, but very fast checksum.  see perftests.cpp for unit tests. */
     struct Checksum { 

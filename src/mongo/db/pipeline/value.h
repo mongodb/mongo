@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include "pch.h"
+#include "mongo/pch.h"
 #include "bson/bsontypes.h"
 #include "bson/oid.h"
 #include "util/intrusive_counter.h"

@@ -17,7 +17,7 @@
 
 #pragma once
 
-#include "../pch.h"
+#include "mongo/pch.h"
 #include "connpool.h"
 #include "syncclusterconnection.h"
 

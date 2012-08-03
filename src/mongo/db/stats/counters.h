@@ -17,7 +17,7 @@
 
 #pragma once
 
-#include "../../pch.h"
+#include "mongo/pch.h"
 #include "../jsobj.h"
 #include "../../util/net/message.h"
 #include "../../util/processinfo.h"

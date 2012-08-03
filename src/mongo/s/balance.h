@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "../pch.h"
+#include "mongo/pch.h"
 #include "../util/background.h"
 #include "balancer_policy.h"
 

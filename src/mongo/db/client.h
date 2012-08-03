@@ -24,7 +24,7 @@
 
 #pragma once
 
-#include "../pch.h"
+#include "mongo/pch.h"
 #include "security.h"
 #include "namespace-inl.h"
 #include "lasterror.h"

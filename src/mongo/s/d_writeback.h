@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "../pch.h"
+#include "mongo/pch.h"
 
 #include "../util/queue.h"
 #include "../util/background.h"

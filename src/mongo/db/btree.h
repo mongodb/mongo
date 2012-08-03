@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "pch.h"
+#include "mongo/pch.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/pdfile.h"

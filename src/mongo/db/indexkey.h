@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "../pch.h"
+#include "mongo/pch.h"
 #include "diskloc.h"
 #include "jsobj.h"
 #include <map>

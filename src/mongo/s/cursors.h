@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "../pch.h"
+#include "mongo/pch.h"
 
 #include "../db/jsobj.h"
 #include "../db/dbmessage.h"

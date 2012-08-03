@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "../pch.h"
+#include "mongo/pch.h"
 
 #include "../client/connpool.h"
 #include "../util/background.h"

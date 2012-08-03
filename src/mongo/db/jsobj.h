@@ -28,7 +28,7 @@
 
 #pragma once
 
-#include "../pch.h"
+#include "mongo/pch.h"
 #include "../bson/util/builder.h"
 #include "../util/optime.h"
 #include "../bson/bsontypes.h"

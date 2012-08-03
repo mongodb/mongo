@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include "pch.h"
+#include "mongo/pch.h"
 
 namespace mongo {
     class DocumentSourceCursor;

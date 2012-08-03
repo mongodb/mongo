@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include "pch.h"
+#include "mongo/pch.h"
 
 #include "db/pipeline/field_path.h"
 #include "db/pipeline/value.h"

@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include "pch.h"
+#include "mongo/pch.h"
 
 #include <boost/unordered_set.hpp>
 #include "db/pipeline/value.h"

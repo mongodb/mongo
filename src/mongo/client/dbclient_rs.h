@@ -17,7 +17,7 @@
 
 #pragma once
 
-#include "pch.h"
+#include "mongo/pch.h"
 
 #include <boost/function.hpp>
 #include <boost/shared_ptr.hpp>

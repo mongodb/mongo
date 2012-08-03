@@ -15,7 +15,7 @@
  *    limitations under the License.
  */
 
-#include "pch.h"
+#include "mongo/pch.h"
 
 #include <list>
 #include <boost/filesystem/path.hpp>

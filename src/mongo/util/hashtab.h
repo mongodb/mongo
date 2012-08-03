@@ -22,7 +22,7 @@
 
 #pragma once
 
-#include "../pch.h"
+#include "mongo/pch.h"
 #include <map>
 #include "../db/dur.h"
 

@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include "../pch.h"
+#include "mongo/pch.h"
 #include "jsobj.h"
 
 namespace boost {

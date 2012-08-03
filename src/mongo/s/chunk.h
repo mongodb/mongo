@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "../pch.h"
+#include "mongo/pch.h"
 
 #include "../bson/util/atomic_int.h"
 #include "../client/distlock.h"

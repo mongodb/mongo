@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include "pch.h"
+#include "mongo/pch.h"
 
 #include <boost/unordered_map.hpp>
 #include "util/intrusive_counter.h"

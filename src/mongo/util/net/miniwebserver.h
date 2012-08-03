@@ -17,7 +17,7 @@
 
 #pragma once
 
-#include "../../pch.h"
+#include "mongo/pch.h"
 #include "message.h"
 #include "message_port.h"
 #include "listen.h"

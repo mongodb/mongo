@@ -22,7 +22,7 @@
 
 #pragma once
 
-#include "pch.h"
+#include "mongo/pch.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/util/md5.hpp"
 

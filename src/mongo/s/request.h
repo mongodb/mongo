@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "../pch.h"
+#include "mongo/pch.h"
 #include "../util/net/message.h"
 #include "../db/dbmessage.h"
 #include "config.h"

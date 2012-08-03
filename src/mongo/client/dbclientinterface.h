@@ -20,7 +20,7 @@
 
 #pragma once
 
-#include "pch.h"
+#include "mongo/pch.h"
 
 #include "mongo/client/authlevel.h"
 #include "mongo/client/authentication_table.h"
