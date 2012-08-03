@@ -4,6 +4,7 @@
 
 var testsToIgnore = [ /dbadmin/,
                       /error1/,
+                      /features1/,
                       /fsync/,
                       /fsync2/,
                       /geo.*/,
