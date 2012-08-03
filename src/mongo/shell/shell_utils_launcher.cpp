@@ -738,7 +738,7 @@ namespace mongo {
             scope.injectNative( "_startMongoProgram", StartMongoProgram );
             scope.injectNative( "runProgram", RunProgram );
             scope.injectNative( "run", RunProgram );
-            scope.injectNative( "runMongoProgram", RunMongoProgram );
+            scope.injectNative( "_runMongoProgram", RunMongoProgram );
             scope.injectNative( "stopMongod", StopMongoProgram );
             scope.injectNative( "stopMongoProgram", StopMongoProgram );
             scope.injectNative( "stopMongoProgramByPid", StopMongoProgramByPid );
