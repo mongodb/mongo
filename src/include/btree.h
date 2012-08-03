@@ -105,6 +105,7 @@ struct __wt_btree {
 	uint64_t last_recno;		/* Column-store last record number */
 
 	WT_PAGE *root_page;		/* Root page */
+	int modified;			/* If the tree ever modified */
 
 	void *block;			/* Block manager */
 	u_int block_header;		/* Block manager header length */

@@ -283,7 +283,7 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_DECL_RET;
 	const char *name;
 	char *name_alloc;
-	int force;
+	int force, is_checkpoint;
 
 	conn = S2C(session);
 	btree = session->btree;
@@ -292,18 +292,41 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	name_alloc = NULL;
 
 	/*
-	 * Get the list of checkpoints for this file.  If this is a read-only
-	 * handle for a checkpoint or there's no reference in the metadata (the
-	 * file is dead), then discard it from the cache without bothering to
-	 * write any dirty pages.
+	 * We're called in two ways: either because a handle is closing or
+	 * session.checkpoint was called, figure it out.
 	 */
-	if (btree->checkpoint != NULL || (ret = __wt_meta_ckptlist_get(
-	    session, btree->name, &ckptbase)) != 0) {
-		if (ret == 0 || ret == WT_NOTFOUND)
-			ret = __wt_bt_cache_flush(
-			    session, NULL, WT_SYNC_DISCARD_NOWRITE, 0);
-		goto err;
-	}
+	is_checkpoint = cfg == NULL ? 0 : 1;
+
+	/*
+	 * Checkpoint handles are read-only by definition and don't participate
+	 * in checkpoints.   Closing one discards its blocks, otherwise there's
+	 * no work to do.
+	 */
+	if (btree->checkpoint != NULL)
+		return (is_checkpoint ? 0 :
+		    __wt_bt_cache_flush(
+		    session, NULL, WT_SYNC_DISCARD_NOWRITE));
+
+	/*
+	 * If closing a file that's never been modified, discard its blocks.
+	 * If checkpoint of a file that's never been modified, we may still
+	 * have to checkpoint it, we'll test again once we understand the
+	 * nature of the checkpoint.
+	 */
+	if (btree->modified == 0 && !is_checkpoint)
+		return (__wt_bt_cache_flush(
+		    session, NULL, WT_SYNC_DISCARD_NOWRITE));
+
+	/*
+	 * Get the list of checkpoints for this file.  If there's no reference
+	 * to the file in the metadata (the file is dead), then discard it from
+	 * the cache without bothering to write any dirty pages.
+	 */
+	if ((ret = __wt_meta_ckptlist_get(
+	    session, btree->name, &ckptbase)) == WT_NOTFOUND)
+		return (__wt_bt_cache_flush(
+		    session, NULL, WT_SYNC_DISCARD_NOWRITE));
+	WT_ERR(ret);
 
 	/* This may be a named checkpoint, check the configuration. */
 	cval.len = 0;
@@ -322,9 +345,6 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 		WT_ERR(__wt_strndup(session, cval.str, cval.len, &name_alloc));
 		name = name_alloc;
 	}
-
-	/* Drop checkpoints with the same name as the one we're taking. */
-	__drop(ckptbase, name, strlen(name));
 
 	/*
 	 * We may be dropping specific checkpoints, check the configuration.
@@ -364,6 +384,19 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 			WT_ERR_NOTFOUND_OK(ret);
 		}
 	}
+
+	/*
+	 * Ignore read-only objects if we don't have to take a checkpoint.  If
+	 * force is set because the checkpoint is named or there's an explicit
+	 * command to drop a checkpoint, we'll modify the file's root page and
+	 * ensure a checkpoint happens, but otherwise, the object isn't dirty
+	 * and the existing checkpoints are sufficient.
+	 */
+	if (!force && btree->modified == 0)
+		goto skip;
+
+	/* Drop checkpoints with the same name as the one we're taking. */
+	__drop(ckptbase, name, strlen(name));
 
 	/* Add a new checkpoint entry at the end of the list. */
 	WT_CKPT_FOREACH(ckptbase, ckpt)
@@ -423,9 +456,16 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 			    "checkpoints cannot be dropped when in-use");
 		}
 
+	/*
+	 * If we're forcing a checkpoint, notify the cache in case the file
+	 * has no dirty pages.
+	 */
+	if (force)
+		WT_ERR(__wt_bt_cache_force_write(session));
+
 	/* Flush the file from the cache, creating the checkpoint. */
-	WT_ERR(__wt_bt_cache_flush(
-	    session, ckptbase, cfg == NULL ? WT_SYNC_DISCARD : WT_SYNC, force));
+	WT_ERR(__wt_bt_cache_flush(session,
+	    ckptbase, is_checkpoint ? WT_SYNC : WT_SYNC_DISCARD));
 
 	/* If there was a checkpoint, update the metadata and resolve it. */
 	if (new->raw.data == NULL) {
@@ -440,14 +480,14 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 		 * is being discarded: in that case, it will be gone by the
 		 * time we try to apply or unroll the meta tracking event.
 		 */
-		if (WT_META_TRACKING(session) && cfg != NULL)
+		if (WT_META_TRACKING(session) && is_checkpoint)
 			WT_ERR(__wt_meta_track_checkpoint(session));
 		else
 			WT_ERR(__wt_bm_checkpoint_resolve(session));
 	}
 
-err:	__wt_meta_ckptlist_free(session, ckptbase);
-
+err:
+skip:	__wt_meta_ckptlist_free(session, ckptbase);
 	__wt_free(session, name_alloc);
 
 	return (ret);
