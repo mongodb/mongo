@@ -27,7 +27,7 @@
 namespace {
     using std::vector;
     using boost::scoped_ptr;
-    
+
     using mongo::BSONObj;
     using mongo::ReplicaSetMonitor;
     using mongo::HostAndPort;
@@ -436,15 +436,12 @@ namespace {
             vector<ReplicaSetMonitor::Node> nodes =
                     NodeSetFixtures::getThreeMemberWithTags();
             TagSet tags( TagSetFixtures::getDefaultSet() );
-            bool shouldRefresh = false;
             HostAndPort lastHost = nodes[0].addr;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_PrimaryOnly, &tags, 3,
-                &lastHost, &shouldRefresh );
+                ReadPreference_PrimaryOnly, &tags, 3, &lastHost );
 
             ASSERT_EQUALS( "b", host.host() );
-            ASSERT( !shouldRefresh );
         }
     };
 
@@ -454,17 +451,14 @@ namespace {
             vector<ReplicaSetMonitor::Node> nodes =
                     NodeSetFixtures::getThreeMemberWithTags();
             TagSet tags( TagSetFixtures::getDefaultSet() );
-            bool shouldRefresh = false;
             HostAndPort lastHost = nodes[0].addr;
 
             nodes[1].ok = false;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_PrimaryOnly, &tags, 3,
-                &lastHost, &shouldRefresh );
+                ReadPreference_PrimaryOnly, &tags, 3,  &lastHost );
 
             ASSERT( host.empty() );
-            ASSERT( shouldRefresh );
         }
     };
 
@@ -474,17 +468,14 @@ namespace {
             vector<ReplicaSetMonitor::Node> nodes =
                     NodeSetFixtures::getThreeMemberWithTags();
             TagSet tags( TagSetFixtures::getDefaultSet() );
-            bool shouldRefresh = false;
             HostAndPort lastHost = nodes[0].addr;
 
             nodes[1].ismaster = false;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_PrimaryOnly, &tags, 3,
-                &lastHost, &shouldRefresh );
+                ReadPreference_PrimaryOnly, &tags, 3, &lastHost );
 
             ASSERT( host.empty() );
-            ASSERT( shouldRefresh );
         }
     };
 
@@ -495,15 +486,12 @@ namespace {
                     NodeSetFixtures::getThreeMemberWithTags();
 
             TagSet tags( TagSetFixtures::getDefaultSet() );
-            bool shouldRefresh = false;
             HostAndPort lastHost = nodes[0].addr;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_PrimaryPreferred, &tags, 1,
-                &lastHost, &shouldRefresh );
+                ReadPreference_PrimaryPreferred, &tags, 1, &lastHost );
 
             ASSERT_EQUALS( "b", host.host() );
-            ASSERT( !shouldRefresh );
         }
     };
 
@@ -513,18 +501,15 @@ namespace {
             vector<ReplicaSetMonitor::Node> nodes =
                     NodeSetFixtures::getThreeMemberWithTags();
             TagSet tags( TagSetFixtures::getDefaultSet() );
-            bool shouldRefresh = false;
             HostAndPort lastHost = nodes[1].addr;
 
             nodes[1].ok = false;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_PrimaryPreferred, &tags, 1,
-                &lastHost, &shouldRefresh );
+                ReadPreference_PrimaryPreferred, &tags, 1, &lastHost );
 
             ASSERT_EQUALS( "c", host.host() );
             ASSERT_EQUALS("c", lastHost.host());
-            ASSERT( shouldRefresh );
         }
     };
 
@@ -534,18 +519,15 @@ namespace {
             vector<ReplicaSetMonitor::Node> nodes =
                     NodeSetFixtures::getThreeMemberWithTags();
             TagSet tags( TagSetFixtures::getDefaultSet() );
-            bool shouldRefresh = false;
             HostAndPort lastHost = nodes[1].addr;
 
             nodes[2].ok = false;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_SecondaryOnly, &tags, 1,
-                &lastHost, &shouldRefresh );
+                ReadPreference_SecondaryOnly, &tags, 1, &lastHost );
 
             ASSERT_EQUALS( "a", host.host() );
             ASSERT_EQUALS("a", lastHost.host());
-            ASSERT( !shouldRefresh );
         }
     };
 
@@ -555,18 +537,15 @@ namespace {
             vector<ReplicaSetMonitor::Node> nodes =
                     NodeSetFixtures::getThreeMemberWithTags();
             TagSet tags( TagSetFixtures::getDefaultSet() );
-            bool shouldRefresh = false;
             HostAndPort lastHost = nodes[1].addr;
 
             nodes[0].ok = false;
             nodes[2].ok = false;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_SecondaryOnly, &tags, 1,
-                &lastHost, &shouldRefresh );
+                ReadPreference_SecondaryOnly, &tags, 1, &lastHost );
 
             ASSERT( host.empty() );
-            ASSERT( !shouldRefresh );
         }
     };
 
@@ -576,18 +555,15 @@ namespace {
             vector<ReplicaSetMonitor::Node> nodes =
                     NodeSetFixtures::getThreeMemberWithTags();
             TagSet tags( TagSetFixtures::getDefaultSet() );
-            bool shouldRefresh = false;
             HostAndPort lastHost = nodes[1].addr;
 
             nodes[2].ok = false;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_SecondaryPreferred, &tags, 1,
-                &lastHost, &shouldRefresh );
+                ReadPreference_SecondaryPreferred, &tags, 1, &lastHost );
 
             ASSERT_EQUALS( "a", host.host() );
             ASSERT_EQUALS("a", lastHost.host());
-            ASSERT( !shouldRefresh );
         }
     };
 
@@ -597,19 +573,16 @@ namespace {
             vector<ReplicaSetMonitor::Node> nodes =
                     NodeSetFixtures::getThreeMemberWithTags();
             TagSet tags( TagSetFixtures::getDefaultSet() );
-            bool shouldRefresh = false;
             HostAndPort lastHost = nodes[1].addr;
 
             nodes[0].ok = false;
             nodes[2].ok = false;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_SecondaryPreferred, &tags, 1,
-                &lastHost, &shouldRefresh );
+                ReadPreference_SecondaryPreferred, &tags, 1, &lastHost );
 
             ASSERT_EQUALS( "b", host.host() );
             ASSERT_EQUALS("b", lastHost.host());
-            ASSERT( !shouldRefresh );
         }
     };
 
@@ -619,7 +592,6 @@ namespace {
             vector<ReplicaSetMonitor::Node> nodes =
                     NodeSetFixtures::getThreeMemberWithTags();
             TagSet tags( TagSetFixtures::getDefaultSet() );
-            bool shouldRefresh = false;
             HostAndPort lastHost = nodes[1].addr;
 
             nodes[0].ok = false;
@@ -627,11 +599,9 @@ namespace {
             nodes[2].ok = false;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_SecondaryPreferred, &tags, 1,
-                &lastHost, &shouldRefresh );
+                ReadPreference_SecondaryPreferred, &tags, 1, &lastHost );
 
             ASSERT( host.empty() );
-            ASSERT( shouldRefresh );
         }
     };
 
@@ -641,7 +611,6 @@ namespace {
             vector<ReplicaSetMonitor::Node> nodes =
                     NodeSetFixtures::getThreeMemberWithTags();
             TagSet tags( TagSetFixtures::getDefaultSet() );
-            bool shouldRefresh = false;
             HostAndPort lastHost = nodes[0].addr;
 
             nodes[0].pingTimeMillis = 1;
@@ -649,12 +618,10 @@ namespace {
             nodes[2].pingTimeMillis = 3;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_Nearest, &tags, 3,
-                &lastHost, &shouldRefresh );
+                ReadPreference_Nearest, &tags, 3, &lastHost );
 
             ASSERT_EQUALS( "b", host.host() );
             ASSERT_EQUALS("b", lastHost.host());
-            ASSERT( !shouldRefresh );
         }
     };
 
@@ -664,7 +631,6 @@ namespace {
             vector<ReplicaSetMonitor::Node> nodes =
                     NodeSetFixtures::getThreeMemberWithTags();
             TagSet tags( TagSetFixtures::getDefaultSet() );
-            bool shouldRefresh = false;
             HostAndPort lastHost = nodes[0].addr;
 
             nodes[0].pingTimeMillis = 10;
@@ -672,11 +638,9 @@ namespace {
             nodes[2].pingTimeMillis = 30;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_Nearest, &tags, 3,
-                &lastHost, &shouldRefresh );
+                ReadPreference_Nearest, &tags, 3, &lastHost );
 
             ASSERT( !host.empty() );
-            ASSERT( !shouldRefresh );
         }
     };
 
@@ -686,16 +650,13 @@ namespace {
             vector<ReplicaSetMonitor::Node> nodes =
                     NodeSetFixtures::getThreeMemberWithTags();
             TagSet tags( TagSetFixtures::getP2Tag() );
-            bool shouldRefresh = false;
             HostAndPort lastHost = nodes[2].addr;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_PrimaryOnly, &tags, 3,
-                &lastHost, &shouldRefresh );
+                ReadPreference_PrimaryOnly, &tags, 3, &lastHost );
 
             // Note: PrimaryOnly ignores tag
             ASSERT_EQUALS( "b", host.host() );
-            ASSERT( !shouldRefresh );
         }
     };
 
@@ -705,18 +666,15 @@ namespace {
             vector<ReplicaSetMonitor::Node> nodes =
                     NodeSetFixtures::getThreeMemberWithTags();
             TagSet tags( TagSetFixtures::getP2Tag() );
-            bool shouldRefresh = false;
             HostAndPort lastHost = nodes[2].addr;
 
             nodes[1].ok = false;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_PrimaryPreferred, &tags, 3,
-                &lastHost, &shouldRefresh );
+                ReadPreference_PrimaryPreferred, &tags, 3, &lastHost );
 
             ASSERT_EQUALS( "c", host.host() );
             ASSERT_EQUALS("c", lastHost.host());
-            ASSERT( shouldRefresh );
         }
     };
 
@@ -726,15 +684,12 @@ namespace {
             vector<ReplicaSetMonitor::Node> nodes =
                     NodeSetFixtures::getThreeMemberWithTags();
             TagSet tags( TagSetFixtures::getSingleNoMatchTag() );
-            bool shouldRefresh = false;
             HostAndPort lastHost = nodes[2].addr;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_PrimaryPreferred, &tags, 3,
-                &lastHost, &shouldRefresh );
+                ReadPreference_PrimaryPreferred, &tags, 3, &lastHost );
 
             ASSERT_EQUALS( "b", host.host() );
-            ASSERT( !shouldRefresh );
         }
     };
 
@@ -744,36 +699,30 @@ namespace {
             vector<ReplicaSetMonitor::Node> nodes =
                     NodeSetFixtures::getThreeMemberWithTags();
             TagSet tags( TagSetFixtures::getSingleNoMatchTag() );
-            bool shouldRefresh = false;
             HostAndPort lastHost = nodes[2].addr;
 
             nodes[1].ok = false;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_PrimaryPreferred, &tags, 3,
-                &lastHost, &shouldRefresh );
+                ReadPreference_PrimaryPreferred, &tags, 3, &lastHost );
 
             ASSERT( host.empty() );
-            ASSERT( shouldRefresh );
         }
     };
-    
+
     class SecOnlyWithTagsTest {
     public:
         void run() {
             vector<ReplicaSetMonitor::Node> nodes =
                     NodeSetFixtures::getThreeMemberWithTags();
             TagSet tags( TagSetFixtures::getP2Tag() );
-            bool shouldRefresh = false;
             HostAndPort lastHost = nodes[2].addr;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_SecondaryOnly, &tags, 3,
-                &lastHost, &shouldRefresh );
+                ReadPreference_SecondaryOnly, &tags, 3, &lastHost );
 
             ASSERT_EQUALS( "c", host.host() );
             ASSERT_EQUALS("c", lastHost.host());
-            ASSERT( !shouldRefresh );
         }
     };
 
@@ -782,7 +731,6 @@ namespace {
         void run() {
             vector<ReplicaSetMonitor::Node> nodes =
                     NodeSetFixtures::getThreeMemberWithTags();
-            bool shouldRefresh = false;
             HostAndPort lastHost = nodes[2].addr;
 
             BSONArrayBuilder arrayBuilder;
@@ -790,11 +738,9 @@ namespace {
             TagSet tags( arrayBuilder.arr() );
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                 ReadPreference_SecondaryOnly, &tags, 3,
-                 &lastHost, &shouldRefresh );
+                 ReadPreference_SecondaryOnly, &tags, 3, &lastHost );
 
             ASSERT( host.empty() );
-            ASSERT( !shouldRefresh );
         }
     };
 
@@ -804,16 +750,13 @@ namespace {
             vector<ReplicaSetMonitor::Node> nodes =
                     NodeSetFixtures::getThreeMemberWithTags();
             TagSet tags( TagSetFixtures::getP2Tag() );
-            bool shouldRefresh = false;
             HostAndPort lastHost = nodes[2].addr;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_SecondaryPreferred, &tags, 3,
-                &lastHost, &shouldRefresh );
+                ReadPreference_SecondaryPreferred, &tags, 3, &lastHost );
 
             ASSERT_EQUALS( "c", host.host() );
             ASSERT_EQUALS("c", lastHost.host());
-            ASSERT( !shouldRefresh );
         }
     };
 
@@ -822,7 +765,6 @@ namespace {
         void run() {
             vector<ReplicaSetMonitor::Node> nodes =
                     NodeSetFixtures::getThreeMemberWithTags();
-            bool shouldRefresh = false;
             HostAndPort lastHost = nodes[1].addr;
 
             BSONArrayBuilder arrayBuilder;
@@ -832,12 +774,10 @@ namespace {
             nodes[2].ok = false;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_SecondaryPreferred, &tags, 3,
-                &lastHost, &shouldRefresh );
+                ReadPreference_SecondaryPreferred, &tags, 3, &lastHost );
 
             ASSERT_EQUALS( "a", host.host() );
             ASSERT_EQUALS("a", lastHost.host());
-            ASSERT( !shouldRefresh );
         }
     };
 
@@ -847,15 +787,12 @@ namespace {
             vector<ReplicaSetMonitor::Node> nodes =
                     NodeSetFixtures::getThreeMemberWithTags();
             TagSet tags( TagSetFixtures::getSingleNoMatchTag() );
-            bool shouldRefresh = false;
             HostAndPort lastHost = nodes[2].addr;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_SecondaryPreferred, &tags, 3,
-                &lastHost, &shouldRefresh );
+                ReadPreference_SecondaryPreferred, &tags, 3, &lastHost );
 
             ASSERT_EQUALS( "b", host.host() );
-            ASSERT( !shouldRefresh );
         }
     };
 
@@ -865,17 +802,14 @@ namespace {
             vector<ReplicaSetMonitor::Node> nodes =
                     NodeSetFixtures::getThreeMemberWithTags();
             TagSet tags( TagSetFixtures::getSingleNoMatchTag() );
-            bool shouldRefresh = false;
             HostAndPort lastHost = nodes[2].addr;
 
             nodes[1].ok = false;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_SecondaryPreferred, &tags, 3,
-                &lastHost, &shouldRefresh );
+                ReadPreference_SecondaryPreferred, &tags, 3, &lastHost );
 
             ASSERT( host.empty() );
-            ASSERT( shouldRefresh );
         }
     };
 
@@ -885,15 +819,12 @@ namespace {
             vector<ReplicaSetMonitor::Node> nodes =
                     NodeSetFixtures::getThreeMemberWithTags();
             TagSet tags( TagSetFixtures::getSingleNoMatchTag() );
-            bool shouldRefresh = false;
             HostAndPort lastHost = nodes[2].addr;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_SecondaryPreferred, &tags, 3,
-                &lastHost, &shouldRefresh );
+                ReadPreference_SecondaryPreferred, &tags, 3, &lastHost );
 
             ASSERT_EQUALS( "b", host.host() );
-            ASSERT( !shouldRefresh );
         }
     };
 
@@ -902,7 +833,6 @@ namespace {
         void run() {
             vector<ReplicaSetMonitor::Node> nodes =
                     NodeSetFixtures::getThreeMemberWithTags();
-            bool shouldRefresh = false;
             HostAndPort lastHost = nodes[1].addr;
 
             BSONArrayBuilder arrayBuilder;
@@ -910,12 +840,10 @@ namespace {
             TagSet tags( arrayBuilder.arr() );
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_Nearest, &tags, 3,
-                &lastHost, &shouldRefresh );
+                ReadPreference_Nearest, &tags, 3, &lastHost );
 
             ASSERT_EQUALS( "a", host.host() );
             ASSERT_EQUALS("a", lastHost.host());
-            ASSERT( !shouldRefresh );
         }
     };
 
@@ -925,15 +853,12 @@ namespace {
             vector<ReplicaSetMonitor::Node> nodes =
                     NodeSetFixtures::getThreeMemberWithTags();
             TagSet tags( TagSetFixtures::getSingleNoMatchTag() );
-            bool shouldRefresh = false;
             HostAndPort lastHost = nodes[1].addr;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_Nearest, &tags, 3,
-                &lastHost, &shouldRefresh );
+                ReadPreference_Nearest, &tags, 3, &lastHost );
 
             ASSERT( host.empty() );
-            ASSERT( !shouldRefresh );
         }
     };
 
@@ -943,16 +868,13 @@ namespace {
             vector<ReplicaSetMonitor::Node> nodes =
                     NodeSetFixtures::getThreeMemberWithTags();
             TagSet tags( TagSetFixtures::getMultiNoMatchTag() );
-            bool shouldRefresh = false;
             HostAndPort lastHost = nodes[1].addr;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_PrimaryOnly, &tags, 3,
-                &lastHost, &shouldRefresh );
+                ReadPreference_PrimaryOnly, &tags, 3, &lastHost );
 
             ASSERT_EQUALS( "b", host.host() );
             ASSERT_EQUALS("b", lastHost.host());
-            ASSERT( !shouldRefresh );
         }
     };
 
@@ -962,17 +884,14 @@ namespace {
             vector<ReplicaSetMonitor::Node> nodes =
                     NodeSetFixtures::getThreeMemberWithTags();
             TagSet tags( TagSetFixtures::getMultiNoMatchTag() );
-            bool shouldRefresh = false;
             HostAndPort lastHost = nodes[1].addr;
 
             nodes[1].ok = false;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_PrimaryOnly, &tags, 3,
-                &lastHost, &shouldRefresh );
+                ReadPreference_PrimaryOnly, &tags, 3, &lastHost );
 
             ASSERT( host.empty() );
-            ASSERT( shouldRefresh );
         }
     };
 
@@ -987,15 +906,12 @@ namespace {
             arrayBuilder.append( BSON( "p" << "2" ));
 
             TagSet tags( arrayBuilder.arr() );
-            bool shouldRefresh = false;
             HostAndPort lastHost = nodes[2].addr;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_PrimaryPreferred, &tags, 3,
-                &lastHost, &shouldRefresh );
+                ReadPreference_PrimaryPreferred, &tags, 3, &lastHost );
 
             ASSERT_EQUALS( "b", host.host() );
-            ASSERT( !shouldRefresh );
         }
     };
 
@@ -1102,18 +1018,15 @@ namespace {
     public:
         void run() {
             vector<ReplicaSetMonitor::Node> nodes = getNodes();
-            bool shouldRefresh = false;
             HostAndPort lastHost = nodes[2].addr;
 
             nodes[1].ok = false;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_PrimaryPreferred, getTagSet(), 3,
-                &lastHost, &shouldRefresh );
+                ReadPreference_PrimaryPreferred, getTagSet(), 3, &lastHost );
 
             ASSERT_EQUALS( "a", host.host() );
             ASSERT_EQUALS("a", lastHost.host());
-            ASSERT( shouldRefresh );
         }
     };
 
@@ -1121,19 +1034,16 @@ namespace {
     public:
         void run() {
             vector<ReplicaSetMonitor::Node> nodes = getNodes();
-            bool shouldRefresh = false;
             HostAndPort lastHost = nodes[2].addr;
 
             nodes[0].ok = false;
             nodes[1].ok = false;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_PrimaryPreferred, getTagSet(), 3,
-                &lastHost, &shouldRefresh );
+                ReadPreference_PrimaryPreferred, getTagSet(), 3, &lastHost );
 
             ASSERT_EQUALS( "c", host.host() );
             ASSERT_EQUALS("c", lastHost.host());
-            ASSERT( shouldRefresh );
         }
     };
 
@@ -1141,18 +1051,15 @@ namespace {
     public:
         void run() {
             vector<ReplicaSetMonitor::Node> nodes = getNodes();
-            bool shouldRefresh = false;
             HostAndPort lastHost = nodes[2].addr;
 
             nodes[1].ok = false;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_PrimaryPreferred, getTagSet(), 3,
-                &lastHost, &shouldRefresh );
+                ReadPreference_PrimaryPreferred, getTagSet(), 3, &lastHost );
 
             ASSERT_EQUALS( "c", host.host() );
             ASSERT_EQUALS("c", lastHost.host());
-            ASSERT( shouldRefresh );
         }
     };
 
@@ -1160,19 +1067,16 @@ namespace {
     public:
         void run() {
             vector<ReplicaSetMonitor::Node> nodes = getNodes();
-            bool shouldRefresh = false;
             HostAndPort lastHost = nodes[2].addr;
 
             nodes[1].ok = false;
             nodes[2].ok = false;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_PrimaryPreferred, getTagSet(), 3,
-                &lastHost, &shouldRefresh );
+                ReadPreference_PrimaryPreferred, getTagSet(), 3, &lastHost );
 
             ASSERT_EQUALS( "a", host.host() );
             ASSERT_EQUALS("a", lastHost.host());
-            ASSERT( shouldRefresh );
         }
     };
 
@@ -1180,18 +1084,15 @@ namespace {
     public:
         void run() {
             vector<ReplicaSetMonitor::Node> nodes = getNodes();
-            bool shouldRefresh = false;
             HostAndPort lastHost = nodes[2].addr;
 
             nodes[1].ok = false;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_PrimaryPreferred, getTagSet(), 3,
-                &lastHost, &shouldRefresh );
+                ReadPreference_PrimaryPreferred, getTagSet(), 3, &lastHost );
 
             ASSERT_EQUALS( "a", host.host() );
             ASSERT_EQUALS("a", lastHost.host());
-            ASSERT( shouldRefresh );
         }
     };
 
@@ -1199,18 +1100,15 @@ namespace {
     public:
         void run() {
             vector<ReplicaSetMonitor::Node> nodes = getNodes();
-            bool shouldRefresh = false;
             HostAndPort lastHost = nodes[2].addr;
 
             nodes[0].ok = false;
             nodes[1].ok = false;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_PrimaryPreferred, getTagSet(), 3,
-                &lastHost, &shouldRefresh );
+                ReadPreference_PrimaryPreferred, getTagSet(), 3, &lastHost );
 
             ASSERT( host.empty() );
-            ASSERT( shouldRefresh );
         }
     };
 
@@ -1221,15 +1119,12 @@ namespace {
                     NodeSetFixtures::getThreeMemberWithTags();
 
             TagSet tags( TagSetFixtures::getMultiNoMatchTag() );
-            bool shouldRefresh = false;
             HostAndPort lastHost = nodes[2].addr;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_PrimaryPreferred, &tags, 3,
-                &lastHost, &shouldRefresh );
+                ReadPreference_PrimaryPreferred, &tags, 3, &lastHost );
 
             ASSERT_EQUALS( "b", host.host() );
-            ASSERT( !shouldRefresh );
         }
     };
 
@@ -1239,17 +1134,14 @@ namespace {
             vector<ReplicaSetMonitor::Node> nodes =
                     NodeSetFixtures::getThreeMemberWithTags();
             TagSet tags( TagSetFixtures::getMultiNoMatchTag() );
-            bool shouldRefresh = false;
             HostAndPort lastHost = nodes[2].addr;
 
             nodes[1].ok = false;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_PrimaryPreferred, &tags, 3,
-                &lastHost, &shouldRefresh );
+                ReadPreference_PrimaryPreferred, &tags, 3, &lastHost );
 
             ASSERT( host.empty() );
-            ASSERT( shouldRefresh );
         }
     };
 
@@ -1257,16 +1149,13 @@ namespace {
     public:
         void run() {
             vector<ReplicaSetMonitor::Node> nodes = getNodes();
-            bool shouldRefresh = false;
             HostAndPort lastHost = nodes[2].addr;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_SecondaryOnly, getTagSet(), 3,
-                &lastHost, &shouldRefresh );
+                ReadPreference_SecondaryOnly, getTagSet(), 3, &lastHost );
 
             ASSERT_EQUALS( "a", host.host() );
             ASSERT_EQUALS("a", lastHost.host());
-            ASSERT( !shouldRefresh );
         }
     };
 
@@ -1274,18 +1163,15 @@ namespace {
     public:
         void run() {
             vector<ReplicaSetMonitor::Node> nodes = getNodes();
-            bool shouldRefresh = false;
             HostAndPort lastHost = nodes[2].addr;
 
             nodes[0].ok = false;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_SecondaryOnly, getTagSet(), 3,
-                &lastHost, &shouldRefresh );
+                ReadPreference_SecondaryOnly, getTagSet(), 3, &lastHost );
 
             ASSERT_EQUALS( "c", host.host() );
             ASSERT_EQUALS("c", lastHost.host());
-            ASSERT( !shouldRefresh );
         }
     };
 
@@ -1293,16 +1179,13 @@ namespace {
     public:
         void run() {
             vector<ReplicaSetMonitor::Node> nodes = getNodes();
-            bool shouldRefresh = false;
             HostAndPort lastHost = nodes[2].addr;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_SecondaryOnly, getTagSet(), 3,
-                &lastHost, &shouldRefresh );
+                ReadPreference_SecondaryOnly, getTagSet(), 3, &lastHost );
 
             ASSERT_EQUALS( "c", host.host() );
             ASSERT_EQUALS("c", lastHost.host());
-            ASSERT( !shouldRefresh );
         }
     };
 
@@ -1310,18 +1193,15 @@ namespace {
     public:
         void run() {
             vector<ReplicaSetMonitor::Node> nodes = getNodes();
-            bool shouldRefresh = false;
             HostAndPort lastHost = nodes[2].addr;
 
             nodes[2].ok = false;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_SecondaryOnly, getTagSet(), 3,
-                &lastHost, &shouldRefresh );
+                ReadPreference_SecondaryOnly, getTagSet(), 3, &lastHost );
 
             ASSERT_EQUALS( "a", host.host() );
             ASSERT_EQUALS("a", lastHost.host());
-            ASSERT( !shouldRefresh );
         }
     };
 
@@ -1329,16 +1209,13 @@ namespace {
     public:
         void run() {
             vector<ReplicaSetMonitor::Node> nodes = getNodes();
-            bool shouldRefresh = false;
             HostAndPort lastHost = nodes[2].addr;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_SecondaryOnly, getTagSet(), 3,
-                &lastHost, &shouldRefresh );
+                ReadPreference_SecondaryOnly, getTagSet(), 3, &lastHost );
 
             ASSERT_EQUALS( "a", host.host() );
             ASSERT_EQUALS("a", lastHost.host());
-            ASSERT( !shouldRefresh );
         }
     };
 
@@ -1346,17 +1223,14 @@ namespace {
     public:
         void run() {
             vector<ReplicaSetMonitor::Node> nodes = getNodes();
-            bool shouldRefresh = false;
             HostAndPort lastHost = nodes[2].addr;
 
             nodes[0].ok = false;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_SecondaryOnly, getTagSet(), 3,
-                &lastHost, &shouldRefresh );
+                ReadPreference_SecondaryOnly, getTagSet(), 3, &lastHost );
 
             ASSERT( host.empty() );
-            ASSERT( !shouldRefresh );
         }
     };
 
@@ -1365,16 +1239,13 @@ namespace {
         void run() {
             vector<ReplicaSetMonitor::Node> nodes =
                     NodeSetFixtures::getThreeMemberWithTags();
-            bool shouldRefresh = false;
             HostAndPort lastHost = nodes[2].addr;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                 ReadPreference_SecondaryOnly, getTagSet(), 3,
-                 &lastHost, &shouldRefresh );
+                 ReadPreference_SecondaryOnly, getTagSet(), 3, &lastHost );
 
             ASSERT_EQUALS( "a", host.host() );
             ASSERT_EQUALS("a", lastHost.host());
-            ASSERT( !shouldRefresh );
         }
     };
 
@@ -1384,15 +1255,12 @@ namespace {
             vector<ReplicaSetMonitor::Node> nodes =
                     NodeSetFixtures::getThreeMemberWithTags();
             TagSet tags( TagSetFixtures::getMultiNoMatchTag() );
-            bool shouldRefresh = false;
             HostAndPort lastHost = nodes[2].addr;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                 ReadPreference_SecondaryOnly, &tags, 3,
-                 &lastHost, &shouldRefresh );
+                 ReadPreference_SecondaryOnly, &tags, 3, &lastHost );
 
             ASSERT( host.empty() );
-            ASSERT( !shouldRefresh );
         }
     };
 
@@ -1400,16 +1268,13 @@ namespace {
     public:
         void run() {
             vector<ReplicaSetMonitor::Node> nodes = getNodes();
-            bool shouldRefresh = false;
             HostAndPort lastHost = nodes[2].addr;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_SecondaryPreferred, getTagSet(), 3,
-                &lastHost, &shouldRefresh );
+                ReadPreference_SecondaryPreferred, getTagSet(), 3, &lastHost );
 
             ASSERT_EQUALS( "a", host.host() );
             ASSERT_EQUALS("a", lastHost.host());
-            ASSERT( !shouldRefresh );
         }
     };
 
@@ -1417,18 +1282,15 @@ namespace {
     public:
         void run() {
             vector<ReplicaSetMonitor::Node> nodes = getNodes();
-            bool shouldRefresh = false;
             HostAndPort lastHost = nodes[2].addr;
 
             nodes[0].ok = false;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_SecondaryPreferred, getTagSet(), 3,
-                &lastHost, &shouldRefresh );
+                ReadPreference_SecondaryPreferred, getTagSet(), 3, &lastHost );
 
             ASSERT_EQUALS( "c", host.host() );
             ASSERT_EQUALS("c", lastHost.host());
-            ASSERT( !shouldRefresh );
         }
     };
 
@@ -1436,16 +1298,13 @@ namespace {
     public:
         void run() {
             vector<ReplicaSetMonitor::Node> nodes = getNodes();
-            bool shouldRefresh = false;
             HostAndPort lastHost = nodes[2].addr;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_SecondaryPreferred, getTagSet(), 3,
-                &lastHost, &shouldRefresh );
+                ReadPreference_SecondaryPreferred, getTagSet(), 3, &lastHost );
 
             ASSERT_EQUALS( "c", host.host() );
             ASSERT_EQUALS("c", lastHost.host());
-            ASSERT( !shouldRefresh );
         }
     };
 
@@ -1453,18 +1312,15 @@ namespace {
     public:
         void run() {
             vector<ReplicaSetMonitor::Node> nodes = getNodes();
-            bool shouldRefresh = false;
             HostAndPort lastHost = nodes[2].addr;
 
             nodes[2].ok = false;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_SecondaryPreferred, getTagSet(), 3,
-                &lastHost, &shouldRefresh );
+                ReadPreference_SecondaryPreferred, getTagSet(), 3, &lastHost );
 
             ASSERT_EQUALS( "a", host.host() );
             ASSERT_EQUALS("a", lastHost.host());
-            ASSERT( !shouldRefresh );
         }
     };
 
@@ -1472,16 +1328,13 @@ namespace {
     public:
         void run() {
             vector<ReplicaSetMonitor::Node> nodes = getNodes();
-            bool shouldRefresh = false;
             HostAndPort lastHost = nodes[2].addr;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_SecondaryPreferred, getTagSet(), 3,
-                &lastHost, &shouldRefresh );
+                ReadPreference_SecondaryPreferred, getTagSet(), 3, &lastHost );
 
             ASSERT_EQUALS( "a", host.host() );
             ASSERT_EQUALS("a", lastHost.host());
-            ASSERT( !shouldRefresh );
         }
     };
 
@@ -1489,17 +1342,14 @@ namespace {
     public:
         void run() {
             vector<ReplicaSetMonitor::Node> nodes = getNodes();
-            bool shouldRefresh = false;
             HostAndPort lastHost = nodes[2].addr;
 
             nodes[0].ok = false;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_SecondaryPreferred, getTagSet(), 3,
-                &lastHost, &shouldRefresh );
+                ReadPreference_SecondaryPreferred, getTagSet(), 3, &lastHost );
 
             ASSERT_EQUALS( "b", host.host() );
-            ASSERT( !shouldRefresh );
         }
     };
 
@@ -1508,16 +1358,13 @@ namespace {
         void run() {
             vector<ReplicaSetMonitor::Node> nodes =
                     NodeSetFixtures::getThreeMemberWithTags();
-            bool shouldRefresh = false;
             HostAndPort lastHost = nodes[2].addr;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                 ReadPreference_SecondaryPreferred, getTagSet(), 3,
-                 &lastHost, &shouldRefresh );
+                 ReadPreference_SecondaryPreferred, getTagSet(), 3, &lastHost );
 
             ASSERT_EQUALS( "a", host.host() );
             ASSERT_EQUALS("a", lastHost.host());
-            ASSERT( !shouldRefresh );
         }
     };
 
@@ -1527,15 +1374,12 @@ namespace {
             vector<ReplicaSetMonitor::Node> nodes =
                     NodeSetFixtures::getThreeMemberWithTags();
             TagSet tags( TagSetFixtures::getMultiNoMatchTag() );
-            bool shouldRefresh = false;
             HostAndPort lastHost = nodes[2].addr;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                 ReadPreference_SecondaryPreferred, &tags, 3,
-                 &lastHost, &shouldRefresh );
+                 ReadPreference_SecondaryPreferred, &tags, 3, &lastHost );
 
             ASSERT_EQUALS( "b", host.host() );
-            ASSERT( !shouldRefresh );
         }
     };
 
@@ -1545,17 +1389,14 @@ namespace {
             vector<ReplicaSetMonitor::Node> nodes =
                     NodeSetFixtures::getThreeMemberWithTags();
             TagSet tags( TagSetFixtures::getMultiNoMatchTag() );
-            bool shouldRefresh = false;
             HostAndPort lastHost = nodes[2].addr;
 
             nodes[1].ok = false;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                 ReadPreference_SecondaryPreferred, &tags, 3,
-                 &lastHost, &shouldRefresh );
+                 ReadPreference_SecondaryPreferred, &tags, 3, &lastHost );
 
             ASSERT( host.empty() );
-            ASSERT( shouldRefresh );
         }
     };
 
@@ -1563,16 +1404,13 @@ namespace {
     public:
         void run() {
             vector<ReplicaSetMonitor::Node> nodes = getNodes();
-            bool shouldRefresh = false;
             HostAndPort lastHost = nodes[2].addr;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_Nearest, getTagSet(), 3,
-                &lastHost, &shouldRefresh );
+                ReadPreference_Nearest, getTagSet(), 3, &lastHost );
 
             ASSERT_EQUALS( "a", host.host() );
             ASSERT_EQUALS("a", lastHost.host());
-            ASSERT( !shouldRefresh );
         }
     };
 
@@ -1586,18 +1424,15 @@ namespace {
             arrayBuilder.append( BSON( "dc" << "sf" ));
 
             TagSet tags( arrayBuilder.arr() );
-            bool shouldRefresh = false;
             HostAndPort lastHost = nodes[2].addr;
 
             nodes[0].ok = false;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_Nearest, &tags, 3,
-                &lastHost, &shouldRefresh );
+                ReadPreference_Nearest, &tags, 3, &lastHost );
 
             ASSERT_EQUALS( "b", host.host() );
             ASSERT_EQUALS("b", lastHost.host());
-            ASSERT( !shouldRefresh );
         }
     };
 
@@ -1605,16 +1440,13 @@ namespace {
     public:
         void run() {
             vector<ReplicaSetMonitor::Node> nodes = getNodes();
-            bool shouldRefresh = false;
             HostAndPort lastHost = nodes[2].addr;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_Nearest, getTagSet(), 3,
-                &lastHost, &shouldRefresh );
+                ReadPreference_Nearest, getTagSet(), 3, &lastHost );
 
             ASSERT_EQUALS( "c", host.host() );
             ASSERT_EQUALS("c", lastHost.host());
-            ASSERT( !shouldRefresh );
         }
     };
 
@@ -1622,7 +1454,6 @@ namespace {
     public:
         void run() {
             vector<ReplicaSetMonitor::Node> nodes = NodeSetFixtures::getThreeMemberWithTags();
-            bool shouldRefresh = false;
             HostAndPort lastHost = nodes[2].addr;
 
             BSONArrayBuilder arrayBuilder;
@@ -1635,12 +1466,10 @@ namespace {
             nodes[2].ok = false;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_Nearest, &tags, 3,
-                &lastHost, &shouldRefresh );
+                ReadPreference_Nearest, &tags, 3, &lastHost );
 
             ASSERT_EQUALS( "b", host.host() );
             ASSERT_EQUALS("b", lastHost.host());
-            ASSERT( !shouldRefresh );
         }
     };
 
@@ -1648,16 +1477,13 @@ namespace {
     public:
         void run() {
             vector<ReplicaSetMonitor::Node> nodes = getNodes();
-            bool shouldRefresh = false;
             HostAndPort lastHost = nodes[2].addr;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_Nearest, getTagSet(), 3,
-                &lastHost, &shouldRefresh );
+                ReadPreference_Nearest, getTagSet(), 3, &lastHost );
 
             ASSERT_EQUALS( "a", host.host() );
             ASSERT_EQUALS("a", lastHost.host());
-            ASSERT( !shouldRefresh );
         }
     };
 
@@ -1665,17 +1491,14 @@ namespace {
     public:
         void run() {
             vector<ReplicaSetMonitor::Node> nodes = getNodes();
-            bool shouldRefresh = false;
             HostAndPort lastHost = nodes[2].addr;
 
             nodes[0].ok = false;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                ReadPreference_Nearest, getTagSet(), 3,
-                &lastHost, &shouldRefresh );
+                ReadPreference_Nearest, getTagSet(), 3, &lastHost );
 
             ASSERT( host.empty() );
-            ASSERT( !shouldRefresh );
         }
     };
 
@@ -1684,16 +1507,13 @@ namespace {
         void run() {
             vector<ReplicaSetMonitor::Node> nodes =
                     NodeSetFixtures::getThreeMemberWithTags();
-            bool shouldRefresh = false;
             HostAndPort lastHost = nodes[2].addr;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                 ReadPreference_Nearest, getTagSet(), 3,
-                 &lastHost, &shouldRefresh );
+                 ReadPreference_Nearest, getTagSet(), 3, &lastHost );
 
             ASSERT_EQUALS( "b", host.host() );
             ASSERT_EQUALS("b", lastHost.host());
-            ASSERT( !shouldRefresh );
         }
     };
 
@@ -1703,15 +1523,12 @@ namespace {
             vector<ReplicaSetMonitor::Node> nodes =
                     NodeSetFixtures::getThreeMemberWithTags();
             TagSet tags( TagSetFixtures::getMultiNoMatchTag() );
-            bool shouldRefresh = false;
             HostAndPort lastHost = nodes[2].addr;
 
             HostAndPort host = ReplicaSetMonitor::selectNode( nodes,
-                 ReadPreference_Nearest, &tags, 3,
-                 &lastHost, &shouldRefresh );
+                 ReadPreference_Nearest, &tags, 3, &lastHost );
 
             ASSERT( host.empty() );
-            ASSERT( !shouldRefresh );
         }
     };
 
