@@ -39,7 +39,6 @@ __create_file(WT_SESSION_IMPL *session,
 	/* Check if the file already exists. */
 	if (!is_metadata && (ret =
 	    __wt_metadata_read(session, uri, &treeconf)) != WT_NOTFOUND) {
-		__wt_free(session, treeconf);
 		if (exclusive)
 			WT_TRET(EEXIST);
 		goto err;
@@ -336,13 +335,9 @@ __create_table(WT_SESSION_IMPL *session,
 		return (EINVAL);
 
 	if ((ret = __wt_schema_get_table(session,
-	    tablename, strlen(tablename), 0, &table)) == 0) {
-		if (exclusive)
-			ret = EEXIST;
-		return (0);
-	}
-	if (ret != WT_NOTFOUND)
-		return (ret);
+	    tablename, strlen(tablename), 0, &table)) == 0)
+		return (exclusive ? EEXIST : 0);
+	WT_RET_NOTFOUND_OK(ret);
 
 	WT_RET(__wt_config_gets(session, cfg, "colgroups", &cval));
 	WT_RET(__wt_config_subinit(session, &conf, &cval));
@@ -350,8 +345,7 @@ __create_table(WT_SESSION_IMPL *session,
 	    (ret = __wt_config_next(&conf, &cgkey, &cgval)) == 0;
 	    ncolgroups++)
 		;
-	if (ret != WT_NOTFOUND)
-		return (ret);
+	WT_RET_NOTFOUND_OK(ret);
 
 	WT_RET(__wt_config_collapse(session, cfg, &tableconf));
 	if ((ret = __wt_metadata_insert(session, name, tableconf)) != 0) {
