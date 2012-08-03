@@ -163,9 +163,6 @@
     <ClCompile Include="commands\distinct.cpp">
       <Filter>db\commands</Filter>
     </ClCompile>
-    <ClCompile Include="pipeline\document_source_cursor.cpp">
-      <Filter>db\pipeline</Filter>
-    </ClCompile>
     <ClCompile Include="geo\2d.cpp">
       <Filter>db\geo</Filter>
     </ClCompile>
@@ -395,14 +392,8 @@
       <Filter>util\Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\pch.cpp" />
-    <ClCompile Include="pipeline\pipeline.cpp">
-      <Filter>db\pipeline</Filter>
-    </ClCompile>
     <ClCompile Include="commands\pipeline_command.cpp">
       <Filter>db\commands</Filter>
-    </ClCompile>
-    <ClCompile Include="pipeline\pipeline_d.cpp">
-      <Filter>db\pipeline</Filter>
     </ClCompile>
     <ClCompile Include="..\util\processinfo.cpp">
       <Filter>util\Source Files</Filter>
@@ -914,6 +905,15 @@
     <ClCompile Include="connection_factory.cpp">
       <Filter>db\Source Files\a to d</Filter>
     </ClCompile>
+    <ClCompile Include="pipeline\document_source_cursor.cpp">
+      <Filter>db\pipeline\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="pipeline\pipeline.cpp">
+      <Filter>db\pipeline\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="pipeline\pipeline_d.cpp">
+      <Filter>db\pipeline\Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\targetver.h" />
@@ -1145,12 +1145,6 @@
     </ClInclude>
     <ClInclude Include="..\util\optime.h">
       <Filter>util\Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="pipeline\pipeline.h">
-      <Filter>db\pipeline</Filter>
-    </ClInclude>
-    <ClInclude Include="pipeline\pipeline_d.h">
-      <Filter>db\pipeline</Filter>
     </ClInclude>
     <ClInclude Include="..\util\processinfo.h">
       <Filter>util\Header Files</Filter>
@@ -1664,6 +1658,12 @@
     </ClInclude>
     <ClInclude Include="..\..\third_party\murmurhash3\MurmurHash3.h">
       <Filter>third_party\MurmurHash3</Filter>
+    </ClInclude>
+    <ClInclude Include="pipeline\pipeline.h">
+      <Filter>db\pipeline\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="pipeline\pipeline_d.h">
+      <Filter>db\pipeline\Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

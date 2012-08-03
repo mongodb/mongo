@@ -293,9 +293,6 @@
     <ClCompile Include="..\client\syncclusterconnection.cpp">
       <Filter>client</Filter>
     </ClCompile>
-    <ClCompile Include="..\db\pipeline\pipeline.cpp">
-      <Filter>db\pipeline</Filter>
-    </ClCompile>
     <ClCompile Include="..\db\stats\top.cpp">
       <Filter>db\stats</Filter>
     </ClCompile>
@@ -731,6 +728,9 @@
     </ClCompile>
     <ClCompile Include="..\util\concurrency\mutexdebugger.cpp">
       <Filter>util\concurrency</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\pipeline.cpp">
+      <Filter>db\pipeline\Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
