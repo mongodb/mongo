@@ -52,8 +52,6 @@ class test_cursor_random(wttest.WiredTigerTestCase):
         self.assertRaises(wiredtiger.WiredTigerError, lambda: cursor.insert())
         self.assertRaises(wiredtiger.WiredTigerError, lambda: cursor.update())
         self.assertRaises(wiredtiger.WiredTigerError, lambda: cursor.remove())
-        self.assertRaises(
-            wiredtiger.WiredTigerError, lambda: cursor.reconfigure())
 
         self.assertTrue(cursor.next(), wiredtiger.WT_NOTFOUND)
         cursor.close()

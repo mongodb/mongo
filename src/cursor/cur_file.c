@@ -271,7 +271,6 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 		__curfile_update,
 		__curfile_remove,
 		__curfile_close,
-		NULL,
 		{ NULL, NULL },		/* TAILQ_ENTRY q */
 		0,			/* recno key */
 		{ 0 },                  /* recno raw buffer */

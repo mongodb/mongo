@@ -373,24 +373,9 @@ struct __wt_cursor {
 	 */
 	int __F(close)(WT_CURSOR *cursor);
 
-	/*! Reconfigure a cursor at run-time.
-	 *
-	 * @snippet ex_all.c Reconfigure the cursor
-	 *
-	 * @param cursor the cursor handle
-	 * @configstart{cursor.reconfigure, see dist/api_data.py}
-	 * @config{overwrite, change the behavior of the cursor's insert method
-	 * to overwrite previously existing values.,a boolean flag; default \c
-	 * false.}
-	 * @configend
-	 * @errors
-	 */
-	int __F(reconfigure)(WT_CURSOR *cursor, const char *config);
-
 	/*
 	 * Protected fields, only to be used by cursor implementations.
 	 */
-
 #if !defined(SWIG) && !defined(DOXYGEN)
 	/*
 	 * !!!
@@ -449,26 +434,30 @@ struct __wt_session {
 	 * @{
 	 */
 
-	/*! Open a cursor.
-	 *
-	 * Open a new cursor on the specified data source.  Cursor handles
-	 * should be discarded by calling WT_CURSOR::close.
-	 *
-	 * Cursors are opened in the context of the current transaction.  The
-	 * cursor must be closed before the transaction can end.  If
-	 * WT_SESSION::commit_transaction or WT_SESSION::rollback_transaction
-	 * are called with cursors open in the transaction, the cursor handles
-	 * will be closed implicitly and must not be accessed again.
+	/*! Open a new cursor on a data source or duplicate an existing cursor.
 	 *
 	 * @snippet ex_all.c Open a cursor
 	 *
 	 * An existing cursor can be duplicated by passing it as the \c to_dup
-	 * parameter and setting the \c uri parameter to \c NULL, otherwise
-	 * the \c to_dup parameter should be \c NULL.  Successfully duplicated
-	 * cursors are positioned at the same place in the data source as the
-	 * existing cursor.
+	 * parameter and setting the \c uri parameter to \c NULL:
 	 *
 	 * @snippet ex_all.c Duplicate a cursor
+	 *
+	 * Cursors being duplicated must have a key set, and successfully
+	 * duplicated cursors are positioned at the same place in the data
+	 * source as the original.
+	 *
+	 * To reconfigure a cursor, duplicate it with a new configuration value:
+	 *
+	 * @snippet ex_all.c Reconfigure a cursor
+	 *
+	 * Cursors are opened in the context of the current transaction, and
+	 * ending a transaction implicitly closes all open cursors (if
+	 * WT_SESSION::commit_transaction or WT_SESSION::rollback_transaction
+	 * are called with open cursors, the cursor handles will be closed
+	 * and must not be accessed again).
+	 *
+	 * Cursor handles should be discarded by calling WT_CURSOR::close.
 	 *
 	 * Cursors are relatively light-weight objects but may hold references
 	 * to heavier-weight objects; applications should re-use cursors when
@@ -476,13 +465,12 @@ struct __wt_session {
 	 * applications need to cache cursors at all cost.
 	 *
 	 * @param session the session handle
-	 * @param uri the data source on which the cursor operates;
-	 *  cursors are usually opened on tables, however, cursors can be
-	 *  opened on any data source, regardless of whether it is ultimately
-	 *  stored in a table.  Some cursor types may have limited
-	 *  functionality (for example, be read-only or not support
-	 *  transactional updates).  See @ref data_sources for more
-	 *  information.
+	 * @param uri the data source on which the cursor operates; cursors
+	 *  are usually opened on tables, however, cursors can be opened on
+	 *  any data source, regardless of whether it is ultimately stored
+	 *  in a table.  Some cursor types may have limited functionality
+	 *  (for example, they may be read-only or not support transactional
+	 *  updates).  See @ref data_sources for more information.
 	 *  <br>
 	 *  The following are the builtin cursor types:
 	 *  <table>

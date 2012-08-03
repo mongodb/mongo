@@ -498,8 +498,6 @@ extern const char *__wt_confdfl_connection_reconfigure;
 extern const char *__wt_confchk_connection_reconfigure;
 extern const char *__wt_confdfl_cursor_close;
 extern const char *__wt_confchk_cursor_close;
-extern const char *__wt_confdfl_cursor_reconfigure;
-extern const char *__wt_confchk_cursor_reconfigure;
 extern const char *__wt_confdfl_file_meta;
 extern const char *__wt_confchk_file_meta;
 extern const char *__wt_confdfl_index_meta;

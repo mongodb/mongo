@@ -88,14 +88,6 @@ __wt_confchk_cursor_close =
     "";
 
 const char *
-__wt_confdfl_cursor_reconfigure =
-    "overwrite=false";
-
-const char *
-__wt_confchk_cursor_reconfigure =
-    "overwrite=(type=boolean)";
-
-const char *
 __wt_confdfl_file_meta =
     "allocation_size=512B,block_compressor="",checkpoint="",checksum=true,"
     "collator="",columns=(),huffman_key="",huffman_value="","

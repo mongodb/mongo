@@ -51,7 +51,7 @@ class test_overwrite(wttest.WiredTigerTestCase):
         cursor.set_value('XXXXXXXXXX')
         cursor.insert()
 
-    # Test reconfiguration of a cursor for overwrite.
+    # Test duplicating a cursor with overwrite.
     def test_overwrite_reconfig(self):
         simple_populate(self, self.uri, 'key_format=' + self.fmt, 100)
         cursor = self.session.open_cursor(self.uri, None)
@@ -59,10 +59,10 @@ class test_overwrite(wttest.WiredTigerTestCase):
         cursor.set_value('XXXXXXXXXX')
         self.assertRaises(wiredtiger.WiredTigerError, lambda: cursor.insert())
 
-        cursor.reconfigure("overwrite");
         cursor.set_key(key_populate(self.fmt, 10))
-        cursor.set_value('XXXXXXXXXX')
-        cursor.insert()
+        dupc = self.session.open_cursor(None, cursor, "overwrite");
+        dupc.set_value('XXXXXXXXXX')
+        dupc.insert()
 
 
 if __name__ == '__main__':

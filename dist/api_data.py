@@ -181,14 +181,6 @@ index_meta = column_meta + format_meta + filename_meta
 
 table_meta = format_meta + table_only_meta
 
-# Cursor runtime config, shared by cursor.reconfigure and session.open_cursor
-cursor_runtime_config = [
-	Config('overwrite', 'false', r'''
-		change the behavior of the cursor's insert method to
-		overwrite previously existing values''',
-		type='boolean'),
-]
-
 # Connection runtime config, shared by conn.reconfigure and wiredtiger_open
 connection_runtime_config = [
 	Config('cache_size', '100MB', r'''
@@ -234,8 +226,6 @@ methods = {
 
 'cursor.close' : Method([]),
 
-'cursor.reconfigure' : Method(cursor_runtime_config),
-
 'session.close' : Method([]),
 
 'session.create' : Method(table_meta + file_config + filename_meta + [
@@ -255,7 +245,7 @@ methods = {
 'session.dumpfile' : Method([]),
 'session.log_printf' : Method([]),
 
-'session.open_cursor' : Method(cursor_runtime_config + [
+'session.open_cursor' : Method([
 	Config('append', 'false', r'''
 		append the value as a new record, creating a new record
 		number key; valid only for cursors with record number keys''',
@@ -286,6 +276,10 @@ methods = {
 		the object; valid only for row-store cursors.  Cursors
 		configured with next_random only support the WT_CURSOR::next
 		and WT_CURSOR::close methods''',
+		type='boolean'),
+	Config('overwrite', 'false', r'''
+		change the behavior of the cursor's insert method to overwrite
+		previously existing values''',
 		type='boolean'),
 	Config('raw', 'false', r'''
 		ignore the encodings for the key and value, manage data as if
