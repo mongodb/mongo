@@ -589,8 +589,9 @@ static void edit( const string& whatToEdit ) {
     if ( editingVariable ) {
         // Try to execute assignment to copy edited value back into the variable
         const string code = whatToEdit + string( " = " ) + sb.str();
-        if ( !shellMainScope->exec( code, "tojs", false, false, false ) )
-            return; // Error already printed
+        if ( !shellMainScope->exec( code, "tojs", false, true, false ) ) {
+            cout << "error executing assignment: " << code << endl;
+        }
     }
     else {
         linenoisePreloadBuffer( sb.str().c_str() );
