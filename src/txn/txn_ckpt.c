@@ -283,7 +283,7 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_DECL_RET;
 	const char *name;
 	char *name_alloc;
-	int force, is_checkpoint;
+	int deleted, force, is_checkpoint;
 
 	conn = S2C(session);
 	btree = session->btree;
@@ -392,11 +392,30 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * ensure a checkpoint happens, but otherwise, the object isn't dirty
 	 * and the existing checkpoints are sufficient.
 	 */
-	if (!force && btree->modified == 0)
+	if (btree->modified == 0 && !force)
 		goto skip;
 
 	/* Drop checkpoints with the same name as the one we're taking. */
 	__drop(ckptbase, name, strlen(name));
+
+	/*
+	 * Another check for read-only objects not requiring a checkpoint.  If
+	 * the application repeatedly checkpoints the same name (imagine taking
+	 * an hourly checkpoint using the same name), there's no reason to
+	 * repeat the checkpoint for read-only objects.  If the only checkpoint
+	 * we're deleting is the last one in the list, and it has the same name
+	 * as the checkpoint we're about to take, skip the work.
+	 */
+	if (btree->modified == 0) {
+		deleted = 0;
+		WT_CKPT_FOREACH(ckptbase, ckpt)
+			if (F_ISSET(ckpt, WT_CKPT_DELETE))
+				++deleted;
+		if (deleted == 1 &&
+		    F_ISSET(ckpt - 1, WT_CKPT_DELETE) &&
+		    strcmp(name, (ckpt - 1)->name) == 0)
+			goto skip;
+	}
 
 	/* Add a new checkpoint entry at the end of the list. */
 	WT_CKPT_FOREACH(ckptbase, ckpt)
@@ -469,6 +488,12 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/* If there was a checkpoint, update the metadata and resolve it. */
 	if (new->raw.data == NULL) {
+		/*
+		 * Our knowledge of whether or not the file has dirty pages
+		 * isn't perfect, we only know if the file was ever modified.
+		 * If we didn't really need a checkpoint, it's not a problem
+		 * if one wasn't created.
+		 */
 		if (force)
 			WT_ERR_MSG(session, EINVAL,
 			    "cache flush failed to create a checkpoint");
