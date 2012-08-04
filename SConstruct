@@ -595,9 +595,10 @@ elif "win32" == os.sys.platform:
     # /Z7 debug info goes into each individual .obj file -- no .pdb created 
     env.Append( CCFLAGS= ["/Z7", "/errorReport:none"] )
     if release:
-        # /MT: Causes your application to use the multithread, static version of the run-time library (LIBCMT.lib)
-        # /O2: optimize for speed (as opposed to size)
-        env.Append( CCFLAGS= ["/O2", "/MT"] )
+        # /O2:  optimize for speed (as opposed to size)
+        # /Oy-: disable frame pointer optimization (overrides /O2, only affects 32-bit)
+        # /MT:  use the multithreaded, static version of the run-time library (LIBCMT.lib)
+        env.Append( CCFLAGS= ["/O2", "/Oy-", "/MT"] )
 
         # TODO: this has caused some linking problems :
         # /GL whole program optimization
