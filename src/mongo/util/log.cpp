@@ -315,9 +315,8 @@ namespace mongo {
                 bufSize += 128;
 
             BufBuilder b(bufSize);
-            if ( !isSyslog ) {
-                time_t_to_String( time(0) , b.grow(20) );
-            }
+            time_t_to_String( time(0) , b.grow(20) );
+
             if (!threadName.empty()) {
                 b.appendChar( '[' );
                 b.appendStr( threadName , false );
