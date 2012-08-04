@@ -164,40 +164,57 @@ __wt_hazard_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
- * __wt_hazard_empty --
+ * __wt_hazard_close --
  *	Verify that no hazard references are set.
  */
 void
-__wt_hazard_empty(WT_SESSION_IMPL *session)
+__wt_hazard_close(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_HAZARD *hp;
-	int first;
+	int found;
 
 	conn = S2C(session);
 
+	/* Check for a set hazard reference and complain if we find one. */
+	for (found = 0, hp = session->hazard;
+	    hp < session->hazard + conn->hazard_size; ++hp)
+		if (hp->page != NULL) {
+			found = 1;
+			__wt_errx(session,
+			    "session %p: hazard reference table not empty",
+			    session);
+#ifdef HAVE_DIAGNOSTIC
+			__hazard_dump(session);
+#endif
+		}
+	if (!found)
+		return;
+
 	/*
-	 * Check for a set hazard reference and complain if we find one.  Clear
-	 * any we find because it's not a correctness problem (any hazard ref
-	 * we find can't be real because the session is being closed when we're
-	 * called).   We do this work because it's not expensive, and we don't
+	 * Clear any hazard references because it's not a correctness problem
+	 * (any hazard reference we find can't be real because the session is
+	 * being closed when we're called).   We do this work because session
+	 * close isn't that common that it's an expensive check, and we don't
 	 * want to let a hazard reference lie around, keeping a page from being
 	 * evicted.
 	 */
-	for (first = 1, hp = session->hazard;
+	for (hp = session->hazard;
 	    hp < session->hazard + conn->hazard_size; ++hp)
-		if (hp->page != NULL) {
-			if (first) {
-				first = 0;
-				__wt_errx(session,
-				    "session %p: hazard reference table not "
-				    "empty", session);
-#ifdef HAVE_DIAGNOSTIC
-				__hazard_dump(session);
-#endif
-			}
-			hp->page = NULL;
-		}
+		if (hp->page != NULL)
+			__wt_hazard_clear(session, hp->page);
+
+	if (session->nhazard == 0)
+		return;
+
+	/*
+	 * Clean up the transactional state, we've released all our hazard
+	 * references.
+	 */
+	__wt_errx(session,
+	    "session %p: hazard reference count didn't match table entries",
+	    session);
+	__wt_txn_read_last(session);
 }
 
 #ifdef HAVE_DIAGNOSTIC
