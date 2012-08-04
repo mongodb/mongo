@@ -180,13 +180,15 @@ __wt_hazard_close(WT_SESSION_IMPL *session)
 	for (found = 0, hp = session->hazard;
 	    hp < session->hazard + conn->hazard_size; ++hp)
 		if (hp->page != NULL) {
-			found = 1;
 			__wt_errx(session,
-			    "session %p: hazard reference table not empty",
-			    session);
+			    "session %p: hazard reference table not empty: "
+			    "page %p",
+			    session, hp->page);
 #ifdef HAVE_DIAGNOSTIC
 			__hazard_dump(session);
 #endif
+			found = 1;
+			break;
 		}
 	if (!found)
 		return;
