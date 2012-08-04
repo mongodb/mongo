@@ -92,8 +92,7 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, int *busyp
 	}
 
 	__wt_errx(session,
-	    "there are no more hazard reference slots in the session");
-
+	    "session %p: hazard reference table full", session);
 #ifdef HAVE_DIAGNOSTIC
 	__hazard_dump(session);
 #endif
@@ -158,8 +157,10 @@ __wt_hazard_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
 			return;
 		}
 	__wt_errx(session,
-	    "clear hazard reference: session: %p reference %p: not found",
-	    session, page);
+	    "session %p: clear hazard reference %p: not found", session, page);
+#ifdef HAVE_DIAGNOSTIC
+	__hazard_dump(session);
+#endif
 }
 
 /*
@@ -171,6 +172,7 @@ __wt_hazard_empty(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_HAZARD *hp;
+	int first;
 
 	conn = S2C(session);
 
@@ -182,17 +184,19 @@ __wt_hazard_empty(WT_SESSION_IMPL *session)
 	 * want to let a hazard reference lie around, keeping a page from being
 	 * evicted.
 	 */
-#ifdef HAVE_DIAGNOSTIC
-	__hazard_dump(session);
-#endif
-
-	for (hp = session->hazard;
+	for (first = 1, hp = session->hazard;
 	    hp < session->hazard + conn->hazard_size; ++hp)
 		if (hp->page != NULL) {
+			if (first) {
+				first = 0;
+				__wt_errx(session,
+				    "session %p: hazard reference table not "
+				    "empty", session);
+#ifdef HAVE_DIAGNOSTIC
+				__hazard_dump(session);
+#endif
+			}
 			hp->page = NULL;
-
-			__wt_errx(session,
-			    "unexpected hazard reference at session.close");
 		}
 }
 
@@ -206,21 +210,14 @@ __hazard_dump(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_HAZARD *hp;
-	int fail;
 
 	conn = S2C(session);
 
-	fail = 0;
 	for (hp = session->hazard;
 	    hp < session->hazard + conn->hazard_size; ++hp)
-		if (hp->page != NULL) {
+		if (hp->page != NULL)
 			__wt_errx(session,
-			    "hazard reference: (%p: %s, line %d)",
-			    hp->page, hp->file, hp->line);
-			fail = 1;
-		}
-
-	if (fail)
-		__wt_errx(session, "unexpected hazard reference");
+			    "session %p: hazard reference %p: %s, line %d",
+			    session, hp->page, hp->file, hp->line);
 }
 #endif
