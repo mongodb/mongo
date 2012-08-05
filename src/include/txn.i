@@ -194,7 +194,11 @@ __wt_txn_ancient(WT_SESSION_IMPL *session, wt_txnid_t id)
 #define	TXN_WRAP_BUFFER	1000000
 #define	TXN_WINDOW	((UINT32_MAX / 2) - TXN_WRAP_BUFFER)
 
-	return (id != WT_TXN_NONE && TXNID_LT(id, current - TXN_WINDOW));
+	if (id != WT_TXN_NONE && TXNID_LT(id, current - TXN_WINDOW)) {
+		WT_CSTAT_INCR(session, txn_ancient);
+		return (1);
+	}
+	return (0);
 }
 
 /*

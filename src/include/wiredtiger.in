@@ -1579,51 +1579,53 @@ extern int wiredtiger_extension_init(WT_SESSION *session,
  * following keys.
  * @{
  */
+/*! ancient transactions */
+#define	WT_STAT_txn_ancient				0
 /*! blocks read from a file */
-#define	WT_STAT_block_read				0
+#define	WT_STAT_block_read				1
 /*! blocks written to a file */
-#define	WT_STAT_block_write				1
+#define	WT_STAT_block_write				2
 /*! cache: bytes currently held in the cache */
-#define	WT_STAT_cache_bytes_inuse			2
+#define	WT_STAT_cache_bytes_inuse			3
 /*! cache: eviction server unable to reach eviction goal */
-#define	WT_STAT_cache_evict_slow			3
+#define	WT_STAT_cache_evict_slow			4
 /*! cache: internal pages evicted */
-#define	WT_STAT_cache_evict_internal			4
+#define	WT_STAT_cache_evict_internal			5
 /*! cache: maximum bytes configured */
-#define	WT_STAT_cache_bytes_max				5
+#define	WT_STAT_cache_bytes_max				6
 /*! cache: modified pages evicted */
-#define	WT_STAT_cache_evict_modified			6
+#define	WT_STAT_cache_evict_modified			7
 /*! cache: pages currently held in the cache */
-#define	WT_STAT_cache_pages_inuse			7
+#define	WT_STAT_cache_pages_inuse			8
 /*! cache: pages selected for eviction not evicted because of a hazard
  * reference */
-#define	WT_STAT_cache_evict_hazard			8
+#define	WT_STAT_cache_evict_hazard			9
 /*! cache: unmodified pages evicted */
-#define	WT_STAT_cache_evict_unmodified			9
+#define	WT_STAT_cache_evict_unmodified			10
 /*! checkpoints */
-#define	WT_STAT_checkpoint				10
+#define	WT_STAT_checkpoint				11
 /*! condition wait calls */
-#define	WT_STAT_cond_wait				11
+#define	WT_STAT_cond_wait				12
 /*! files currently open */
-#define	WT_STAT_file_open				12
+#define	WT_STAT_file_open				13
 /*! rwlock readlock calls */
-#define	WT_STAT_rwlock_rdlock				13
+#define	WT_STAT_rwlock_rdlock				14
 /*! rwlock writelock calls */
-#define	WT_STAT_rwlock_wrlock				14
+#define	WT_STAT_rwlock_wrlock				15
 /*! total memory allocations */
-#define	WT_STAT_memalloc				15
+#define	WT_STAT_memalloc				16
 /*! total memory frees */
-#define	WT_STAT_memfree					16
+#define	WT_STAT_memfree					17
 /*! total read I/Os */
-#define	WT_STAT_total_read_io				17
+#define	WT_STAT_total_read_io				18
 /*! total write I/Os */
-#define	WT_STAT_total_write_io				18
+#define	WT_STAT_total_write_io				19
 /*! transactions */
-#define	WT_STAT_txn_begin				19
+#define	WT_STAT_txn_begin				20
 /*! transactions committed */
-#define	WT_STAT_txn_commit				20
+#define	WT_STAT_txn_commit				21
 /*! transactions rolled-back */
-#define	WT_STAT_txn_rollback				21
+#define	WT_STAT_txn_rollback				22
 
 /*!
  * @}

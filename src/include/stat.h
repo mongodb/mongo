@@ -98,6 +98,7 @@ struct __wt_btree_stats {
  * Statistics entries for CONNECTION handle.
  */
 struct __wt_connection_stats {
+	WT_STATS txn_ancient;
 	WT_STATS block_read;
 	WT_STATS block_write;
 	WT_STATS cache_bytes_inuse;

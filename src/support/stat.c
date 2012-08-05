@@ -141,6 +141,7 @@ __wt_stat_alloc_connection_stats(WT_SESSION_IMPL *session, WT_CONNECTION_STATS *
 	stats->rwlock_wrlock.desc = "rwlock writelock calls";
 	stats->total_read_io.desc = "total read I/Os";
 	stats->total_write_io.desc = "total write I/Os";
+	stats->txn_ancient.desc = "ancient transactions";
 	stats->txn_begin.desc = "transactions";
 	stats->txn_commit.desc = "transactions committed";
 	stats->txn_rollback.desc = "transactions rolled-back";
@@ -171,6 +172,7 @@ __wt_stat_clear_connection_stats(WT_STATS *stats_arg)
 	stats->rwlock_wrlock.v = 0;
 	stats->total_read_io.v = 0;
 	stats->total_write_io.v = 0;
+	stats->txn_ancient.v = 0;
 	stats->txn_begin.v = 0;
 	stats->txn_commit.v = 0;
 	stats->txn_rollback.v = 0;
