@@ -69,7 +69,7 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, int *busyp
 			 * we may need to update our transactional context.
 			 */
 			if (session->nhazard++ == 0)
-				WT_RET(__wt_txn_read_first(session));
+				__wt_txn_read_first(session);
 
 			return (0);
 		}

@@ -201,7 +201,7 @@ __wt_txn_ancient(WT_SESSION_IMPL *session, wt_txnid_t id)
  * __wt_txn_read_first --
  *      Called for the first page read for a session.
  */
-static inline int
+static inline void
 __wt_txn_read_first(WT_SESSION_IMPL *session)
 {
 	WT_TXN *txn;
@@ -221,8 +221,6 @@ __wt_txn_read_first(WT_SESSION_IMPL *session)
 		WT_ASSERT(session, txn_state->id == WT_TXN_NONE);
 		txn_state->id = txn_global->current;
 	}
-
-	return (0);
 }
 
 /*
