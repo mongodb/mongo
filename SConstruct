@@ -626,6 +626,9 @@ elif "win32" == os.sys.platform:
             #env.Append( CPPDEFINES=[ "_DEBUG" ] )
             # This means --dd is always on unless you say --release
 
+    # This gives 32-bit programs 4 GB of user address space in WOW64, ignored in 64-bit builds
+    env.Append( LINKFLAGS=" /LARGEADDRESSAWARE " )
+
     if force64:
         env.Append( EXTRALIBPATH=[ winSDKHome + "/Lib/x64" ] )
     else:

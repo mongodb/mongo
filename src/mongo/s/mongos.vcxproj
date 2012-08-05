@@ -185,6 +185,7 @@
       <SubSystem>Console</SubSystem>
       <TargetMachine>MachineX86</TargetMachine>
       <IgnoreSpecificDefaultLibraries>msvcrtd</IgnoreSpecificDefaultLibraries>
+      <LargeAddressAware>true</LargeAddressAware>
     </Link>
     <PreBuildEvent>
       <Command>"$(ProjectDir)..\..\third_party\js-1.7\jskwgen.exe" "$(ProjectDir)..\..\third_party\js-1.7\jsautokw.h"
@@ -213,6 +214,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Console</SubSystem>
       <TargetMachine>MachineX86</TargetMachine>
+      <LargeAddressAware>true</LargeAddressAware>
     </Link>
     <PreBuildEvent>
       <Command>"$(ProjectDir)..\..\third_party\js-1.7\jskwgen.exe" "$(ProjectDir)..\..\third_party\js-1.7\jsautokw.h"
@@ -298,6 +300,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <TargetMachine>MachineX86</TargetMachine>
+      <LargeAddressAware>true</LargeAddressAware>
     </Link>
     <PreBuildEvent>
       <Command>"$(ProjectDir)..\..\third_party\js-1.7\jskwgen.exe" "$(ProjectDir)..\..\third_party\js-1.7\jsautokw.h"
@@ -329,6 +332,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <TargetMachine>MachineX86</TargetMachine>
+      <LargeAddressAware>true</LargeAddressAware>
     </Link>
     <PreBuildEvent>
       <Command>"$(ProjectDir)..\..\third_party\js-1.7\jskwgen.exe" "$(ProjectDir)..\..\third_party\js-1.7\jsautokw.h"
