@@ -206,6 +206,12 @@ __btree_conf(WT_SESSION_IMPL *session)
 	/* Page sizes */
 	WT_RET(__btree_page_sizes(session, config));
 
+	/* Eviction; the metadata file is never evicted. */
+	if (strcmp(btree->name, WT_METADATA_URI) == 0)
+		btree->cache_resident = 1;
+	WT_RET(__wt_config_getones(session, config, "cache_resident", &cval));
+	btree->cache_resident = cval.val ? 1 : 0;
+
 	/* Huffman encoding */
 	WT_RET(__wt_btree_huffman_open(session, config));
 

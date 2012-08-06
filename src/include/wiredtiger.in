@@ -567,6 +567,9 @@ struct __wt_session {
 	 * custom compression engine \c "name" created with
 	 * WT_CONNECTION::add_compressor. See @ref compression for more
 	 * information.,a string; default empty.}
+	 * @config{cache_resident, do not ever evict the object's pages; see
+	 * @ref tuning_cache_resident for more information.,a boolean flag;
+	 * default \c false.}
 	 * @config{checksum, configure file block checksums; if false\, the
 	 * block manager is free to not write or check block checksums. This can
 	 * increase performance in applications where compression provides

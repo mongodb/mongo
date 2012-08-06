@@ -111,7 +111,8 @@ struct __wt_btree {
 	u_int block_header;		/* Block manager header length */
 
 	WT_PAGE *evict_page;		/* Eviction thread's location */
-	volatile uint32_t lru_count;	/* Count of threads in LRU eviction. */
+	volatile uint32_t lru_count;	/* Count of threads in LRU eviction */
+	int cache_resident;		/* If no eviction on this object */
 
 	WT_BTREE_STATS *stats;		/* Btree statistics */
 
@@ -119,7 +120,6 @@ struct __wt_btree {
 #define	WT_BTREE_DISCARD	0x0002	/* Discard on release */
 #define	WT_BTREE_EXCLUSIVE	0x0004	/* Need exclusive access to handle */
 #define	WT_BTREE_LOCK_ONLY	0x0008	/* Handle is only needed for locking */
-#define	WT_BTREE_NO_EVICTION	0x0010	/* The file isn't evicted */
 #define	WT_BTREE_OPEN		0x0020	/* Handle is open */
 #define	WT_BTREE_SALVAGE	0x0040	/* Handle is for salvage */
 #define	WT_BTREE_UPGRADE	0x0080	/* Handle is for upgrade */

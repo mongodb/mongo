@@ -92,6 +92,10 @@ file_config = format_meta + [
 		empty (off) or \c "bzip2", \c "snappy" or custom compression
 		engine \c "name" created with WT_CONNECTION::add_compressor.
 		See @ref compression for more information'''),
+	Config('cache_resident', 'false', r'''
+		do not ever evict the object's pages; see @ref
+		tuning_cache_resident for more information''',
+		type='boolean'),
 	Config('checksum', 'true', r'''
 		configure file block checksums; if false, the block
 		manager is free to not write or check block checksums.
