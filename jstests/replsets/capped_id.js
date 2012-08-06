@@ -4,6 +4,8 @@
 // 0) create capped collection on replset, check _id index appears on secondary
 // 1) create normal collection, then convertToCapped, check _id index on secondaries
 // 2) create capped collection, do updates instead of inserts, check _id index on secondaries
+// 3) create capped collection with autoIndexId=false. make sure no _id index. then create one
+//    and check it got created on secondaries.
 
 // Create a new replica set test with name 'testSet' and 3 members
 var replTest = new ReplSetTest( {name: 'testSet', nodes: 3} );
@@ -37,7 +39,7 @@ var masterdb = master.getDB( dbname );
 var slave1db = slave1.getDB( dbname );
 var slave2db = slave2.getDB( dbname );
 
-var numtests = 3;
+var numtests = 4;
 for( testnum=0; testnum < numtests; testnum++ ){
 
     //define collection name
@@ -85,6 +87,28 @@ for( testnum=0; testnum < numtests; testnum++ ){
         for(i=0; i < 500 ; i++){
             masterdb.getCollection( coll ).update( {} , {$inc : {a : 1} } );
         }
+        replTest.awaitReplication();
+    }
+    else if  ( testnum == 3 ){
+        // explicitly set autoIndexId : false
+        masterdb.runCommand( {create : coll , capped : true , size : 1024 , autoIndexId : false } )
+        for(i=0; i < 500 ; i++){
+            masterdb.getCollection( coll ).insert( {a: 1000} );
+        }
+        replTest.awaitReplication();
+
+        assert.eq( 0 ,
+                masterdb.system.indexes.find( { key:{"_id" : 1}, ns: dbname + "." + coll } ).count() ,
+                "master has an _id index on capped collection when autoIndexId is false");
+        assert.eq( 0 ,
+                slave1db.system.indexes.find( { key:{"_id" : 1}, ns: dbname + "." + coll } ).count() ,
+                "slave1 has an _id index on capped collection when autoIndexId is false");
+        assert.eq( 0 ,
+                slave2db.system.indexes.find( { key:{"_id" : 1}, ns: dbname + "." + coll } ).count() ,
+                "slave2 has an _id index on capped collection when autoIndexId is false");
+
+        // now create the index and make sure it works
+        masterdb.getCollection( coll ).ensureIndex( { "_id" : 1 } );
         replTest.awaitReplication();
     }
 
