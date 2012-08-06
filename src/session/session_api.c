@@ -69,7 +69,7 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	__wt_txn_destroy(session);
 
 	/* Confirm we're not holding any hazard references. */
-	__wt_hazard_empty(session);
+	__wt_hazard_close(session);
 
 	/* Free the reconciliation information. */
 	__wt_rec_destroy(session);

@@ -194,14 +194,18 @@ __wt_txn_ancient(WT_SESSION_IMPL *session, wt_txnid_t id)
 #define	TXN_WRAP_BUFFER	1000000
 #define	TXN_WINDOW	((UINT32_MAX / 2) - TXN_WRAP_BUFFER)
 
-	return (id != WT_TXN_NONE && TXNID_LT(id, current - TXN_WINDOW));
+	if (id != WT_TXN_NONE && TXNID_LT(id, current - TXN_WINDOW)) {
+		WT_CSTAT_INCR(session, txn_ancient);
+		return (1);
+	}
+	return (0);
 }
 
 /*
  * __wt_txn_read_first --
  *      Called for the first page read for a session.
  */
-static inline int
+static inline void
 __wt_txn_read_first(WT_SESSION_IMPL *session)
 {
 	WT_TXN *txn;
@@ -221,8 +225,6 @@ __wt_txn_read_first(WT_SESSION_IMPL *session)
 		WT_ASSERT(session, txn_state->id == WT_TXN_NONE);
 		txn_state->id = txn_global->current;
 	}
-
-	return (0);
 }
 
 /*

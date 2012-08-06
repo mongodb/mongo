@@ -325,10 +325,10 @@ extern int __wt_bt_salvage( WT_SESSION_IMPL *session,
     WT_CKPT *ckptbase,
     const char *cfg[]);
 extern int __wt_btree_stat_init(WT_SESSION_IMPL *session);
-extern int __wt_bt_cache_flush( WT_SESSION_IMPL *session,
+extern int __wt_bt_cache_force_write(WT_SESSION_IMPL *session);
+extern int __wt_bt_cache_flush(WT_SESSION_IMPL *session,
     WT_CKPT *ckptbase,
-    int op,
-    int force);
+    int op);
 extern int __wt_upgrade(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_verify(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_dumpfile(WT_SESSION_IMPL *session, const char *cfg[]);
@@ -451,16 +451,16 @@ extern int __wt_config_gets(WT_SESSION_IMPL *session,
     const char **cfg,
     const char *key,
     WT_CONFIG_ITEM *value);
-extern int __wt_config_gets_defno(WT_SESSION_IMPL *session,
-    const char **cfg,
-    const char *key,
-    WT_CONFIG_ITEM *value);
 extern  int __wt_config_getone(WT_SESSION_IMPL *session,
-    const char *cfg,
+    const char *config,
     WT_CONFIG_ITEM *key,
     WT_CONFIG_ITEM *value);
 extern  int __wt_config_getones(WT_SESSION_IMPL *session,
-    const char *cfg,
+    const char *config,
+    const char *key,
+    WT_CONFIG_ITEM *value);
+extern int __wt_config_gets_defno(WT_SESSION_IMPL *session,
+    const char **cfg,
     const char *key,
     WT_CONFIG_ITEM *value);
 extern  int __wt_config_subgetraw(WT_SESSION_IMPL *session,
@@ -500,8 +500,6 @@ extern const char *__wt_confdfl_connection_reconfigure;
 extern const char *__wt_confchk_connection_reconfigure;
 extern const char *__wt_confdfl_cursor_close;
 extern const char *__wt_confchk_cursor_close;
-extern const char *__wt_confdfl_cursor_reconfigure;
-extern const char *__wt_confchk_cursor_reconfigure;
 extern const char *__wt_confdfl_file_meta;
 extern const char *__wt_confchk_file_meta;
 extern const char *__wt_confdfl_index_meta;
@@ -1004,7 +1002,7 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, int *busyp
 #endif
  );
 extern void __wt_hazard_clear(WT_SESSION_IMPL *session, WT_PAGE *page);
-extern void __wt_hazard_empty(WT_SESSION_IMPL *session);
+extern void __wt_hazard_close(WT_SESSION_IMPL *session);
 extern int __wt_raw_to_hex( WT_SESSION_IMPL *session,
     const uint8_t *from,
     uint32_t size,

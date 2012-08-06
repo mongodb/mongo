@@ -1,7 +1,7 @@
 /*! @page checkpoints Checkpoints
 
-WiredTiger supports checkpoints, a read-only, static view of one or
-more data sources.
+WiredTiger supports checkpoints, a read-only, static view of one or more
+data sources.
 
 Checkpoints offer basic operation durability without transactional
 logging, across application or system failure.  (Transactional logging
@@ -11,8 +11,8 @@ checkpoints offer durability without recovery or impacting performance,
 but the creation of a checkpoint is a relatively heavy-weight operation.
 WiredTiger does not yet support transactional logging.)
 
-Checkpoints are automatically created whenever a modified data source is
-closed.
+A checkpoint is automatically created whenever a modified data source
+is closed.
 
 When WiredTiger data sources are first opened, they are opened in the
 state of the most recent checkpoint taken on the file, in other words,
@@ -20,27 +20,37 @@ updates after the most recent checkpoint will not appear in the data
 source.  If no checkpoint is found when the data source is opened, the
 data source will appear empty.
 
-Checkpoints may optionally be named.  Named checkpoints are created and
-discarded using the WT_SESSION::checkpoint method and read using the
-WT_SESSION::open_cursor method.  Additionally, the \c -c option to the
-\c wt command line utility \c list command will list a data source's
-checkpoints in a human-readable format.
+Checkpoints are created and discarded using the WT_SESSION::checkpoint
+method and read using the WT_SESSION::open_cursor method.  Additionally,
+the \c -c option to the \c wt command line utility \c list command will
+list a data source's checkpoints, with time stamp, in a human-readable
+format.
 
 Cursors are opened in the most recent version of a data source unless a
-checkpoint name is provided to WT_SESSION::open_cursor.  Cursors opened
-in the most recent version of a data source support write operations,
-cursors opened in a checkpoint are read-only.
+checkpoint configuration string is provided to WT_SESSION::open_cursor.
+Cursors opened in the most recent version of a data source support write
+operations, cursors opened in a checkpoint are read-only.
 
-Named checkpoints persist until explicitly dropped.  Checkpoints share
-pages, and deleting a checkpoint may or may not make pages available for
-re-use, depending on whether the dropped checkpoint contained the last
-reference to a block of data.  Creating a named checkpoint automatically
-discards any previous checkpoints with the same name.
+Checkpoints share file blocks, and dropping a checkpoint may or may not
+make file blocks available for re-use, depending on whether the dropped
+checkpoint contained the last reference to a file block.
 
-Named checkpoints may not be discarded if in use or when hot backups are
-in progress.
+Checkpoints may optionally be given names by the application.
+Checkpoints named by the application persist until explicitly dropped
+or the application creates a new checkpoint with the same name.
+Creating a new named checkpoint drops any previous checkpoint with the
+same name; if a previous checkpoint cannot be dropped (either because a
+cursor is reading from the previous checkpoint, or hot backups are in
+progress), the checkpoint will fail.
 
-Unnamed checkpoints managed by WiredTiger are given the reserved name
-"WiredTigerCheckpoint".
+Internal checkpoints (that is, checkpoints not named by the application)
+use the reserved name "WiredTigerCheckpoint".  Applications can open the
+most recent of these checkpoints by specifying "WiredTigerCheckpoint"
+as the checkpoint name to WT_SESSION::open_cursor.   Creating a new
+internal checkpoint drops all previous internal checkpoints, if
+possible; if a previous internal checkpoint cannot be dropped for any
+reason, the checkpoint will ignore the previous checkpoint and continue.
+Subsequent checkpoints will drop those ignored checkpoints as soon as
+they can be dropped.
 
  */

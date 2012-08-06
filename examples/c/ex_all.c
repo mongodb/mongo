@@ -76,8 +76,28 @@ cursor_ops(WT_SESSION *session)
 	    session, "table:mytable", NULL, NULL, &cursor);
 	cursor->set_key(cursor, key);
 	ret = cursor->search(cursor);
+
+	/* Duplicate the cursor. */
 	ret = session->open_cursor(session, NULL, cursor, NULL, &duplicate);
 	/*! [Duplicate a cursor] */
+	}
+
+	{
+	WT_CURSOR *overwrite_cursor;
+	const char *key = "some key", *value = "some value";
+	/*! [Reconfigure a cursor] */
+	ret = session->open_cursor(
+	    session, "table:mytable", NULL, NULL, &cursor);
+	cursor->set_key(cursor, key);
+
+	/* Reconfigure the cursor to overwrite the record. */
+	ret = session->open_cursor(
+	    session, NULL, cursor, "overwrite=true", &overwrite_cursor);
+	ret = cursor->close(cursor);
+
+	overwrite_cursor->set_value(overwrite_cursor, value);
+	ret = overwrite_cursor->insert(cursor);
+	/*! [Reconfigure a cursor] */
 	}
 
 	{
@@ -175,8 +195,7 @@ cursor_ops(WT_SESSION *session)
 	{
 	/*! [Insert a new record] */
 	/* Insert a new record. */
-	const char *key = "some key";
-	const char *value = "some value";
+	const char *key = "some key", *value = "some value";
 	cursor->set_key(cursor, key);
 	cursor->set_value(cursor, value);
 	ret = cursor->insert(cursor);
@@ -184,10 +203,9 @@ cursor_ops(WT_SESSION *session)
 	}
 
 	{
+	const char *key = "some key", *value = "some value";
 	/*! [Insert a new record or overwrite an existing record] */
 	/* Insert a new record or overwrite an existing record. */
-	const char *key = "some key";
-	const char *value = "some value";
 	ret = session->open_cursor(
 	    session, "table:mytable", NULL, "overwrite", &cursor);
 	cursor->set_key(cursor, key);
@@ -212,8 +230,7 @@ cursor_ops(WT_SESSION *session)
 
 	{
 	/*! [Update an existing record] */
-	const char *key = "some key";
-	const char *value = "some value";
+	const char *key = "some key", *value = "some value";
 	cursor->set_key(cursor, key);
 	cursor->set_value(cursor, value);
 	ret = cursor->update(cursor);
@@ -239,10 +256,6 @@ cursor_ops(WT_SESSION *session)
 	}
 	/*! [Display an error] */
 	}
-
-	/*! [Reconfigure the cursor] */
-	ret = cursor->reconfigure(cursor, "append=true");
-	/*! [Reconfigure the cursor] */
 
 	/*! [Close the cursor] */
 	ret = cursor->close(cursor);
@@ -371,9 +384,14 @@ session_ops(WT_SESSION *session)
 	cursor_ops(session);
 
 	/*! [Create a table] */
-	ret = session->create(session, "table:mytable",
-	    "key_format=S,value_format=S");
+	ret = session->create(session,
+	    "table:mytable", "key_format=S,value_format=S");
 	/*! [Create a table] */
+
+	/*! [Create a cache-resident object] */
+	ret = session->create(session,
+	    "table:mytable", "key_format=r,value_format=S,cache_resident=true");
+	/*! [Create a cache-resident object] */
 
 	checkpoint_ops(session);
 

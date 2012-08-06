@@ -36,8 +36,6 @@ __wt_cursor_set_notsup(WT_CURSOR *cursor)
 	cursor->insert = __wt_cursor_notsup;
 	cursor->update = __wt_cursor_notsup;
 	cursor->remove = __wt_cursor_notsup;
-	cursor->reconfigure =
-	    (int (*)(WT_CURSOR *, const char *))__wt_cursor_notsup;
 }
 
 /*
@@ -413,36 +411,6 @@ __cursor_runtime_config(WT_CURSOR *cursor, const char *cfg[])
 }
 
 /*
- * __cursor_reconfigure --
- *	WT_CURSOR->reconfigure default implementation.
- */
-static int
-__cursor_reconfigure(WT_CURSOR *cursor, const char *config)
-{
-	WT_DECL_RET;
-	WT_SESSION_IMPL *session;
-
-	CURSOR_API_CALL(cursor, session, reconfigure, NULL, config, cfg);
-	WT_UNUSED(cfg);
-
-	/*
-	 * We need to take care here: only override with values that appear in
-	 * the config string from the application, not with defaults.
-	 *
-	 * Set config in raw_cfg[1], not raw_cfg[0]; the underlying function
-	 * calls __wt_config_gets_defno to speed up cursor creation and a NULL
-	 * cfg[1] in that function implies no user-specified configuration.
-	 */
-	{
-	const char *raw_cfg[] = { "", config, NULL };
-	ret = __cursor_runtime_config(cursor, raw_cfg);
-	}
-
-err:	API_END(session);
-	return (ret);
-}
-
-/*
  * __wt_cursor_dup --
  *	Duplicate a cursor.
  */
@@ -538,8 +506,6 @@ __wt_cursor_init(WT_CURSOR *cursor,
 		cursor->remove = __wt_cursor_notsup;
 	if (cursor->close == NULL)
 		WT_RET_MSG(session, EINVAL, "cursor lacks a close method");
-	if (cursor->reconfigure == NULL)
-		cursor->reconfigure = __cursor_reconfigure;
 
 	if (cursor->uri == NULL)
 		WT_RET(__wt_strdup(session, uri, &cursor->uri));
@@ -587,11 +553,6 @@ __wt_cursor_init(WT_CURSOR *cursor,
 		owner = cdump;
 	} else
 		cdump = NULL;
-
-	/* overwrite */
-	WT_RET(__wt_config_gets_defno(session, cfg, "overwrite", &cval));
-	if (cval.val != 0)
-		F_SET(cursor, WT_CURSTD_OVERWRITE);
 
 	/* raw */
 	WT_RET(__wt_config_gets_defno(session, cfg, "raw", &cval));

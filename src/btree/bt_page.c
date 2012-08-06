@@ -84,8 +84,6 @@ __wt_page_in_func(
 			 */
 			if (page->modify != NULL &&
 			    __wt_txn_ancient(session, page->modify->first_id)) {
-				WT_VERBOSE_RET(session, read,
-				    "ancient updates, forcing eviction");
 				__wt_evict_page_request(session, page);
 				__wt_hazard_clear(session, page);
 				__wt_evict_server_wake(session);

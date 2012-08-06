@@ -22,11 +22,17 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, int *busyp
 #endif
     )
 {
+	WT_BTREE *btree;
 	WT_CONNECTION_IMPL *conn;
 	WT_HAZARD *hp;
 
+	btree = session->btree;
 	conn = S2C(session);
 	*busyp = 0;
+
+	/* If a file cannot be evicted, hazard references aren't required. */
+	if (btree->cache_resident)
+		return (0);
 
 	/*
 	 * Do the dance:
@@ -69,7 +75,7 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, int *busyp
 			 * we may need to update our transactional context.
 			 */
 			if (session->nhazard++ == 0)
-				WT_RET(__wt_txn_read_first(session));
+				__wt_txn_read_first(session);
 
 			return (0);
 		}
@@ -92,8 +98,7 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, int *busyp
 	}
 
 	__wt_errx(session,
-	    "there are no more hazard reference slots in the session");
-
+	    "session %p: hazard reference table full", session);
 #ifdef HAVE_DIAGNOSTIC
 	__hazard_dump(session);
 #endif
@@ -108,10 +113,16 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, int *busyp
 void
 __wt_hazard_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
+	WT_BTREE *btree;
 	WT_CONNECTION_IMPL *conn;
 	WT_HAZARD *hp;
 
+	btree = session->btree;
 	conn = S2C(session);
+
+	/* If a file cannot be evicted, hazard references aren't required. */
+	if (btree->cache_resident)
+		return;
 
 	/*
 	 * The default value for a WT_HAZARD slot is NULL, but clearing a
@@ -158,42 +169,66 @@ __wt_hazard_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
 			return;
 		}
 	__wt_errx(session,
-	    "clear hazard reference: session: %p reference %p: not found",
-	    session, page);
-}
-
-/*
- * __wt_hazard_empty --
- *	Verify that no hazard references are set.
- */
-void
-__wt_hazard_empty(WT_SESSION_IMPL *session)
-{
-	WT_CONNECTION_IMPL *conn;
-	WT_HAZARD *hp;
-
-	conn = S2C(session);
-
-	/*
-	 * Check for a set hazard reference and complain if we find one.  Clear
-	 * any we find because it's not a correctness problem (any hazard ref
-	 * we find can't be real because the session is being closed when we're
-	 * called).   We do this work because it's not expensive, and we don't
-	 * want to let a hazard reference lie around, keeping a page from being
-	 * evicted.
-	 */
+	    "session %p: clear hazard reference %p: not found", session, page);
 #ifdef HAVE_DIAGNOSTIC
 	__hazard_dump(session);
 #endif
+}
 
-	for (hp = session->hazard;
+/*
+ * __wt_hazard_close --
+ *	Verify that no hazard references are set.
+ */
+void
+__wt_hazard_close(WT_SESSION_IMPL *session)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_HAZARD *hp;
+	int found;
+
+	conn = S2C(session);
+
+	/* Check for a set hazard reference and complain if we find one. */
+	for (found = 0, hp = session->hazard;
 	    hp < session->hazard + conn->hazard_size; ++hp)
 		if (hp->page != NULL) {
-			hp->page = NULL;
-
 			__wt_errx(session,
-			    "unexpected hazard reference at session.close");
+			    "session %p: hazard reference table not empty: "
+			    "page %p",
+			    session, hp->page);
+#ifdef HAVE_DIAGNOSTIC
+			__hazard_dump(session);
+#endif
+			found = 1;
+			break;
 		}
+	if (!found)
+		return;
+
+	/*
+	 * Clear any hazard references because it's not a correctness problem
+	 * (any hazard reference we find can't be real because the session is
+	 * being closed when we're called).   We do this work because session
+	 * close isn't that common that it's an expensive check, and we don't
+	 * want to let a hazard reference lie around, keeping a page from being
+	 * evicted.
+	 */
+	for (hp = session->hazard;
+	    hp < session->hazard + conn->hazard_size; ++hp)
+		if (hp->page != NULL)
+			__wt_hazard_clear(session, hp->page);
+
+	if (session->nhazard == 0)
+		return;
+
+	/*
+	 * Clean up the transactional state, we've released all our hazard
+	 * references.
+	 */
+	__wt_errx(session,
+	    "session %p: hazard reference count didn't match table entries",
+	    session);
+	__wt_txn_read_last(session);
 }
 
 #ifdef HAVE_DIAGNOSTIC
@@ -206,21 +241,14 @@ __hazard_dump(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_HAZARD *hp;
-	int fail;
 
 	conn = S2C(session);
 
-	fail = 0;
 	for (hp = session->hazard;
 	    hp < session->hazard + conn->hazard_size; ++hp)
-		if (hp->page != NULL) {
+		if (hp->page != NULL)
 			__wt_errx(session,
-			    "hazard reference: (%p: %s, line %d)",
-			    hp->page, hp->file, hp->line);
-			fail = 1;
-		}
-
-	if (fail)
-		__wt_errx(session, "unexpected hazard reference");
+			    "session %p: hazard reference %p: %s, line %d",
+			    session, hp->page, hp->file, hp->line);
 }
 #endif

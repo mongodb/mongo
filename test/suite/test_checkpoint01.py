@@ -278,7 +278,7 @@ class test_checkpoint_cursor_update(wttest.WiredTigerTestCase):
 class test_checkpoint_last(wttest.WiredTigerTestCase):
     scenarios = [
         ('file', dict(uri='file:checkpoint',fmt='S')),
-        #('table', dict(uri='table:checkpoint',fmt='S'))
+        ('table', dict(uri='table:checkpoint',fmt='S'))
         ]
 
     def test_checkpoint_last(self):
