@@ -120,8 +120,14 @@ namespace mongo {
             return;
         }
 
+        int msgId = (int)(_m.header()->id);
 
-        LOG(3) << "Request::process ns: " << getns() << " msg id:" << (int)(_m.header()->id) << " attempt: " << attempt << endl;
+        Timer t;
+        LOG(3) << "Request::process begin ns: " << getns()
+               << " msg id: " << msgId
+               << " op: " << op
+               << " attempt: " << attempt
+               << endl;
 
         Strategy * s = SHARDED;
         _counter = &opsNonSharded;
@@ -141,6 +147,13 @@ namespace mongo {
             checkAuth( Auth::WRITE );
             s->writeOp( op, *this );
         }
+
+        LOG(3) << "Request::process end ns: " << getns()
+               << " msg id: " << msgId
+               << " op: " << op
+               << " attempt: " << attempt
+               << " " << t.millis() << "ms"
+               << endl;
 
         globalOpCounters.gotOp( op , iscmd );
         _counter->gotOp( op , iscmd );
