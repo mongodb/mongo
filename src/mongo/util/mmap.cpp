@@ -166,18 +166,16 @@ namespace mongo {
         set<MongoFile*> seen;
         while ( true ) {
             auto_ptr<Flushable> f;
-            {
-                LockMongoFilesShared lk;
-                for ( set<MongoFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ ) {
-                    MongoFile * mmf = *i;
-                    if ( ! mmf )
-                        continue;
-                    if ( seen.count( mmf ) )
-                        continue;
-                    f.reset( mmf->prepareFlush() );
-                    seen.insert( mmf );
-                    break;
-                }
+            LockMongoFilesShared lk;
+            for ( set<MongoFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ ) {
+                MongoFile * mmf = *i;
+                if ( ! mmf )
+                    continue;
+                if ( seen.count( mmf ) )
+                    continue;
+                f.reset( mmf->prepareFlush() );
+                seen.insert( mmf );
+                break;
             }
             if ( ! f.get() )
                 break;
