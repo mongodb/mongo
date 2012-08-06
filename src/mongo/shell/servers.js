@@ -290,6 +290,11 @@ MongoRunner.arrToOpts = function( arr ){
 MongoRunner.savedOptions = {}
 
 MongoRunner.mongoOptions = function( opts ){
+   
+    // If we're a mongo object
+    if( opts.getDB ){
+        opts = { restart : opts.runId }
+    }
     
     // Initialize and create a copy of the opts
     opts = Object.merge( opts || {}, {} )
