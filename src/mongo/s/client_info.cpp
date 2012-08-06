@@ -192,7 +192,7 @@ namespace mongo {
 
             _addWriteBack( writebacks , res );
 
-            LOG(3) << "gathering writebacks from " << sinceLastGetError().size() << " hosts for"
+            LOG(4) << "gathering writebacks from " << sinceLastGetError().size() << " hosts for"
                    << " gle (" << theShard << ")" << endl;
 
             // hit other machines just to block
@@ -216,7 +216,7 @@ namespace mongo {
             }
             clearSinceLastGetError();
 
-            LOG(3) << "checking " << writebacks.size() << " writebacks for"
+            LOG(4) << "checking " << writebacks.size() << " writebacks for"
                    << " gle (" << theShard << ")" << endl;
 
             if ( writebacks.size() ){
@@ -314,7 +314,7 @@ namespace mongo {
         if ( updatedExistingStat )
             result.appendBool( "updatedExisting" , updatedExistingStat > 0 );
 
-        LOG(3) << "gathering writebacks from " << sinceLastGetError().size() << " hosts for"
+        LOG(4) << "gathering writebacks from " << sinceLastGetError().size() << " hosts for"
                << " gle (" << shards->size() << " shards)" << endl;
 
         // hit other machines just to block
@@ -336,7 +336,7 @@ namespace mongo {
         }
         clearSinceLastGetError();
 
-        LOG(3) << "checking " << writebacks.size() << " writebacks for"
+        LOG(4) << "checking " << writebacks.size() << " writebacks for"
                 << " gle (" << shards->size() << " shards)" << endl;
 
         if ( errors.size() == 0 ) {

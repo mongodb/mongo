@@ -303,10 +303,36 @@ namespace mongo {
                                                      true ) )
                             {
                                 b.appendBool( "commandFailed" , true );
-                                if( ! b.hasField( "errmsg" ) ) b.append( "errmsg", errmsg );
+                                if( ! b.hasField( "errmsg" ) ){
+
+                                    b.append( "errmsg", errmsg );
+                                    gle = b.obj();
+                                }
+                                else if( errmsg.size() > 0 ){
+
+                                    // Rebuild GLE object with errmsg
+                                    // TODO: Make this less clumsy by improving GLE interface
+                                    gle = b.obj();
+
+                                    if( gle["errmsg"].type() == String ){
+
+                                        BSONObj gleNoErrmsg =
+                                                gle.filterFieldsUndotted( BSON( "errmsg" << 1 ),
+                                                                          false );
+                                        BSONObjBuilder bb;
+                                        bb.appendElements( gleNoErrmsg );
+                                        bb.append( "errmsg", gle["errmsg"].String() +
+                                                             " ::and:: " +
+                                                             errmsg );
+                                        gle = bb.obj().getOwned();
+                                    }
+                                }
+                            }
+                            else{
+                                gle = b.obj();
                             }
 
-                            gle = b.obj();
+                            log() << "GLE is " << gle << endl;
 
                             if ( gle["code"].numberInt() == 9517 ) {
 
