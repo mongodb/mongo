@@ -276,10 +276,17 @@ namespace mongo {
                             ci->newRequest(); // this so we flip prev and cur shards
 
                             BSONObjBuilder b;
-                            if ( ! ci->getLastError( "admin", BSON( "getLastError" << 1 ) , b ,
-                                                     true ) ) {
+                            string errmsg;
+                            if ( ! ci->getLastError( "admin",
+                                                     BSON( "getLastError" << 1 ),
+                                                     b,
+                                                     errmsg,
+                                                     true ) )
+                            {
                                 b.appendBool( "commandFailed" , true );
+                                if( ! b.hasField( "errmsg" ) ) b.append( "errmsg", errmsg );
                             }
+
                             gle = b.obj();
 
                             if ( gle["code"].numberInt() == 9517 ) {

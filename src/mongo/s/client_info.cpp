@@ -136,8 +136,13 @@ namespace mongo {
         _prev = temp;
     }
 
-    bool ClientInfo::getLastError( const string& dbName, const BSONObj& options ,
-                                   BSONObjBuilder& result , bool fromWriteBackListener ) {
+    bool ClientInfo::getLastError( const string& dbName,
+                                   const BSONObj& options,
+                                   BSONObjBuilder& result,
+                                   string& errmsg,
+                                   bool fromWriteBackListener)
+    {
+
         set<string> * shards = getPrev();
 
         if ( shards->size() == 0 ) {
@@ -151,8 +156,6 @@ namespace mongo {
         if ( shards->size() == 1 ) {
             string theShard = *(shards->begin() );
 
-
-
             BSONObj res;
             bool ok = false;
             {
@@ -162,7 +165,12 @@ namespace mongo {
                 }
                 catch( std::exception &e ) {
 
-                    warning() << "could not get last error from shard " << theShard << causedBy( e ) << endl;
+                    string message =
+                            str::stream() << "could not get last error from shard " << theShard
+                                          << causedBy( e );
+
+                    warning() << message << endl;
+                    errmsg = message;
 
                     // Catch everything that happens here, since we need to ensure we return our connection when we're
                     // finished.
@@ -250,7 +258,13 @@ namespace mongo {
                 // Safe to return here, since we haven't started any extra processing yet, just collecting
                 // responses.
 
-                warning() << "could not get last error from a shard " << theShard << causedBy( e ) << endl;
+                string message =
+                        str::stream() << "could not get last error from a shard " << theShard
+                                      << causedBy( e );
+
+                warning() << message << endl;
+                errmsg = message;
+
                 if (conn)
                     conn->done();
 

@@ -91,6 +91,7 @@ namespace mongo {
         bool getLastError( const string& dbName,
                            const BSONObj& options ,
                            BSONObjBuilder& result ,
+                           string& errmsg,
                            bool fromWriteBackListener = false );
 
         /** @return if its ok to auto split from this client */

@@ -1187,7 +1187,7 @@ namespace mongo {
                     }
                 }
                 ClientInfo * client = ClientInfo::get();
-                bool res = client->getLastError( dbName, cmdObj , result );
+                bool res = client->getLastError( dbName, cmdObj , result, errmsg );
                 client->disableForCommand();
                 return res;
             }
