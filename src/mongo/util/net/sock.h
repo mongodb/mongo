@@ -146,10 +146,18 @@ namespace mongo {
 
     private:
 
-        // Don't want to pull in any other headers here, so this is necessary for now
         // TODO: Allow exceptions better control over their messages
         static string _getStringType( Type t ){
-            std::stringstream ss; ss << t; return ss.str();
+            switch (t) {
+                case CLOSED:        return "CLOSED";
+                case RECV_ERROR:    return "RECV_ERROR";
+                case SEND_ERROR:    return "SEND_ERROR";
+                case RECV_TIMEOUT:  return "RECV_TIMEOUT";
+                case SEND_TIMEOUT:  return "SEND_TIMEOUT";
+                case FAILED_STATE:  return "FAILED_STATE";
+                case CONNECT_ERROR: return "CONNECT_ERROR";
+                default:            return "UNKNOWN"; // should never happen
+            }
         }
 
         string _server;
