@@ -1,86 +1,51 @@
 /**
- * Part 1: TODO
- * Part 2: this tests ensures that when a stand-alone server is started with something in
- *         local.system.replset, it doesn't start the TTL monitor (SERVER-6609). The test creates a
- *         dummy replset config & TTL collection, then restarts the member and ensures that it
- *         doesn't time out the docs in the TTL collection. Then it removes the "config" and
- *         restarts, ensuring that the TTL monitor deletes the docs.
+ * Part 1: Simple test of TTL.  Create a new collection with 24 docs, with timestamps at one hour
+ *         intervals, from now-minus-23 hours ago until now.  Also add some docs with non-date
+ *         values.  Then create a TTL index that expires all docs older than ~5.5 hours (20000
+ *         seconds).  Wait 70 seconds (TTL monitor runs every 60) and check that 18 docs deleted.
+ * Part 2: Add a second TTL index on an identical field. The second index expires docs older than
+ *         ~2.8 hours (10000 seconds). Wait 70 seconds and check that 3 more docs deleted.
  */
 
-t = db.ttl1;
+// Part 1
+var t = db.ttl1;
 t.drop();
 
-now = (new Date()).getTime();
+var now = (new Date()).getTime();
 
-for ( i=0; i<24; i++ )
-    t.insert( { x : new Date( now - ( 3600 * 1000 * i ) ) } );
+for ( i=0; i<24; i++ ){
+    var past = new Date( now - ( 3600 * 1000 * i ) );
+    t.insert( { x : past , y : past } );
+}
+t.insert( { a : 1 } )     //no x value
+t.insert( { x: null } )   //non-date value
+t.insert( { x : true } )  //non-date value
+t.insert( { x : "yo" } )  //non-date value
+t.insert( { x : 3 } )     //non-date value
+t.insert( { x : /foo/ } ) //non-date value
 db.getLastError();
 
-assert.eq( 24 , t.count() );
+assert.eq( 30 , t.count() );
 
 t.ensureIndex( { x : 1 } , { expireAfterSeconds : 20000 } );
 
 assert.soon( 
     function() {
-        return t.count() < 24;
-    }, "never deleted" , 120 * 1000
+        return t.count() < 30;
+    }, "TTL index on x didn't delete" , 70 * 1000
 );
 
 assert.eq( 0 , t.find( { x : { $lt : new Date( now - 20000000 ) } } ).count() );
-assert.eq( 6 , t.count() );
+assert.eq( 12 , t.count() );
 
-var runner;
-var conn;
+// Part 2
+t.ensureIndex( { y : 1 } , { expireAfterSeconds : 10000 } );
 
-var primeSystemReplset = function() {
-    var port = allocatePorts(1)[0];
-    runner = new MongodRunner(port, "/data/db/jstests_slowNightly-ttl");
-    conn = runner.start();
-    var localDB = conn.getDB("local");
-    localDB.system.replset.insert({x:1});
+assert.soon(
+    function() {
+        return t.count() < 12;
+    }, "TTL index on y didn't delete" , 70 * 1000
+);
 
-    print("create a TTL collection");
-    var testDB = conn.getDB("test");
-    testDB.foo.ensureIndex({x:1}, {expireAfterSeconds : 2});
-    testDB.getLastError();
-};
-
-var restartWithConfig = function() {
-    stopMongod(runner.port(), 15);
-    conn = runner.start(true /* reuse data */);
-    testDB = conn.getDB("test");
-    var n = 100;
-    for (var i=0; i<n; i++) {
-        testDB.foo.insert({x : new Date()});
-    }
-
-    print("sleeping 60 seconds");
-    sleep(60000);
-
-    assert.eq(testDB.foo.count(), n);
-};
-
-var restartWithoutConfig = function() {
-    var localDB = conn.getDB("local");
-    localDB.system.replset.remove();
-    localDB.getLastError();
-
-    stopMongod(runner.port(), 15);
-
-    conn = runner.start(true /* reuse data */);
-
-    assert.soon(function() {
-        return conn.getDB("test").foo.count() < 100;
-    }, "never deleted", 60000);
-
-    stopMongod(runner.port(), 15);
-};
-
-print("Part 2: test that ttl monitor isn't started when rs config is present");
-primeSystemReplset();
-
-print("make sure TTL doesn't work when member is started with system.replset doc")
-restartWithConfig();
-
-print("remove system.replset entry & restart");
-restartWithoutConfig();
+assert.eq( 0 , t.find( { y : { $lt : new Date( now - 10000000 ) } } ).count() );
+assert.eq( 9 , t.count() );
