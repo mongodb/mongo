@@ -1009,25 +1009,20 @@ namespace mongo {
                                                       TagSet* tags) {
 
         HostAndPort candidate;
-        bool tryRefreshing = false;
 
         {
             scoped_lock lk(_lock);
             candidate = ReplicaSetMonitor::selectNode(_nodes, preference, tags,
-                    _localThresholdMillis, &_lastReadPrefHost, &tryRefreshing);
+                    _localThresholdMillis, &_lastReadPrefHost);
         }
 
-        if (tryRefreshing) {
+        if (candidate.empty()) {
             // mimic checkMaster behavior, which refreshes the local view of the replica set
-            // and try to find a good primary again.
             _check(false);
 
             scoped_lock lk(_lock);
-            uassert(16386, str::stream() << "Cannot contact primary of set " << _name,
-                    _master >= 0);
-
             return ReplicaSetMonitor::selectNode(_nodes, preference, tags, _localThresholdMillis,
-                    &_lastReadPrefHost, &tryRefreshing);
+                    &_lastReadPrefHost);
         }
 
         return candidate;
@@ -1038,8 +1033,7 @@ namespace mongo {
                                               ReadPreference preference,
                                               TagSet* tags,
                                               int localThresholdMillis,
-                                              HostAndPort* lastHost,
-                                              bool* tryRefreshing) {
+                                              HostAndPort* lastHost) {
         switch (preference) {
         case ReadPreference_PrimaryOnly:
             for (vector<Node>::const_iterator iter = nodes.begin(); iter != nodes.end(); ++iter) {
@@ -1048,20 +1042,19 @@ namespace mongo {
                 }
             }
 
-            *tryRefreshing = true;
             return HostAndPort();
 
         case ReadPreference_PrimaryPreferred:
         {
             HostAndPort candidatePri = selectNode(nodes, ReadPreference_PrimaryOnly, tags,
-                    localThresholdMillis, lastHost, tryRefreshing);
+                                                  localThresholdMillis, lastHost);
 
             if (!candidatePri.empty()) {
                 return candidatePri;
             }
 
-            return selectNode(nodes, ReadPreference_SecondaryOnly, tags, localThresholdMillis,
-                    lastHost, tryRefreshing);
+            return selectNode(nodes, ReadPreference_SecondaryOnly, tags,
+                              localThresholdMillis, lastHost);
         }
 
         case ReadPreference_SecondaryOnly:
@@ -1086,14 +1079,14 @@ namespace mongo {
         case ReadPreference_SecondaryPreferred:
         {
             HostAndPort candidateSec = selectNode(nodes, ReadPreference_SecondaryOnly, tags,
-                    localThresholdMillis, lastHost, tryRefreshing);
+                                                  localThresholdMillis, lastHost);
 
             if (!candidateSec.empty()) {
                 return candidateSec;
             }
 
-            return selectNode(nodes, ReadPreference_PrimaryOnly, tags, localThresholdMillis,
-                    lastHost, tryRefreshing);
+            return selectNode(nodes, ReadPreference_PrimaryOnly, tags,
+                              localThresholdMillis, lastHost);
         }
 
         case ReadPreference_Nearest:

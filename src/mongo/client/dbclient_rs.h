@@ -147,8 +147,6 @@ namespace mongo {
          *     robin, starting from the node next to this lastHost. This will be overwritten
          *     with the newly chosen host if not empty, not primary and when preference
          *     is not Nearest.
-         * @param tryRefreshing an out parameter for notifying the caller that it needs
-         *     to refresh the view of the nodes.
          *
          * @return the host object of the node selected. If none of the nodes are
          *     eligible, returns an empty host.
@@ -157,8 +155,7 @@ namespace mongo {
                                       ReadPreference preference,
                                       TagSet* tags,
                                       int localThresholdMillis,
-                                      HostAndPort* lastHost,
-                                      bool* tryRefreshing);
+                                      HostAndPort* lastHost);
 
         /**
          * Selects the right node given the nodes to pick from and the preference. This
