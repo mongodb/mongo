@@ -133,13 +133,25 @@ namespace mongo {
         const enum Type { CLOSED , RECV_ERROR , SEND_ERROR, RECV_TIMEOUT, SEND_TIMEOUT, FAILED_STATE, CONNECT_ERROR } _type;
         
         SocketException( Type t , string server , int code = 9001 , string extra="" ) 
-            : DBException( "socket exception" , code ) , _type(t) , _server(server), _extra(extra){ }
+            : DBException( (string)"socket exception ["  + _getStringType( t ) + "] for " + server, code ),
+              _type(t),
+              _server(server),
+              _extra(extra)
+        {}
+
         virtual ~SocketException() throw() {}
 
         bool shouldPrint() const { return _type != CLOSED; }
         virtual string toString() const;
 
     private:
+
+        // Don't want to pull in any other headers here, so this is necessary for now
+        // TODO: Allow exceptions better control over their messages
+        static string _getStringType( Type t ){
+            std::stringstream ss; ss << t; return ss.str();
+        }
+
         string _server;
         string _extra;
     };
