@@ -285,8 +285,8 @@ err:	if (ret != 0 && locked) {
 
 /*
  * __wt_conn_btree_apply --
- *	Apply a function to all open, non-checkpoint btree handles apart from
- * the metadata file.
+ *	Apply a function to all open btree handles apart from the metadata
+ * file.
  */
 int
 __wt_conn_btree_apply(WT_SESSION_IMPL *session,
@@ -303,7 +303,6 @@ __wt_conn_btree_apply(WT_SESSION_IMPL *session,
 
 	TAILQ_FOREACH(btree, &conn->btqh, q)
 		if (F_ISSET(btree, WT_BTREE_OPEN) &&
-		    btree->checkpoint == NULL &&
 		    strcmp(btree->name, WT_METADATA_URI) != 0) {
 			/*
 			 * We have the connection spinlock, which prevents
