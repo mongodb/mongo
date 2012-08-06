@@ -20,19 +20,9 @@ __wt_bt_cache_force_write(WT_SESSION_IMPL *session)
 	btree = session->btree;
 	page = btree->root_page;
 
-	/*
-	 * If we're forcing a checkpoint, mark the root page dirty to ensure a
-	 * write.
-	 */
+	/* If forcing a checkpoint, dirty the root page to ensure a write. */
 	WT_RET(__wt_page_modify_init(session, page));
-
-	/*
-	 * Dirty a page, but do not set the tree's modified flag, as that flag
-	 * can never be cleared and we don't want to repeatedly write read-only
-	 * cache objects because there was a named checkpoint at some time in
-	 * the past.
-	 */
-	++page->modify->write_gen;
+	__wt_page_modify_set(session, page);
 
 	return (0);
 }

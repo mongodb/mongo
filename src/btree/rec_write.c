@@ -3062,10 +3062,16 @@ err:			__wt_scr_free(&tkey);
 	}
 
 	/*
-	 * If reconciliation succeeded and no updates were skipped, set the disk
-	 * generation to the write generation as of when reconciliation started.
+	 * Success: if modifications were skipped, the tree cannot be clean.  As
+	 * the checkpoint initiation code might have cleared the tree's modified
+	 * flag, explicitly dirty the page, which includes setting the tree's
+	 * modified flag.  If modifications were not skipped, the page might be
+	 * clean, update the disk generation to the write generation as of when
+	 * reconciliation started.
 	 */
-	if (!r->upd_skipped)
+	if (r->upd_skipped)
+		__wt_page_modify_set(session, page);
+	else
 		mod->disk_gen = r->orig_write_gen;
 
 	return (0);
