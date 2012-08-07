@@ -158,7 +158,9 @@ namespace mongo {
 #if defined(SIGBUS)
         signal( SIGBUS , printStackAndExit );
 #endif
+#if defined(SIGPIPE)
         signal( SIGPIPE , SIG_IGN );
+#endif
 
         set_new_handler( my_new_handler );
     }
