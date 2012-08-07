@@ -121,12 +121,8 @@ tfile.write('''/* DO NOT EDIT: automatically built by dist/config.py. */
 ''')
 
 # Make a TextWrapper that can wrap at commas.
-w = textwrap.TextWrapper(width=72, break_on_hyphens=False)
+w = textwrap.TextWrapper(width=68, break_on_hyphens=False)
 w.wordsep_re = w.wordsep_simple_re = re.compile(r'(,)')
-# Make a TextWrapper that can wrap at string elements.
-w2 = textwrap.TextWrapper(width=72, break_on_hyphens=False)
-w2.wordsep_re = w2.wordsep_simple_re = re.compile(r'(}, )')
-w2.break_long_words = False
 
 def checkstr(c):
 	'''Generate the JSON string used by __wt_config_check to validate the
@@ -150,12 +146,12 @@ def checkstr(c):
 
 def get_default(c):
 	t = gettype(c)
-	if c.default or t == 'int':
+	if c.default == 'false':
+		return '0'
+	elif (c.default or t == 'int') and c.default != 'true':
 		return str(c.default)
-	elif t == 'string':
-		return '""'
 	else:
-		return '()'
+		return ''
 
 for name in sorted(api_data.methods.keys()):
 	ctype = api_data.methods[name].config
@@ -166,24 +162,30 @@ __wt_confdfl_%(name)s =
 %(config)s;
 ''' % {
 	'name' : name,
-	'config' : '\n'.join('    "%s"' % line
+	'config' : '\n'.join('\t"%s"' % line
 		for line in w.wrap(','.join('%s=%s' % (c.name, get_default(c))
 			for c in sorted(ctype))) or [""]),
 })
 # Construct an array of allowable configuration options. Always append an empty
-# entry as a terminator to support iteration
-	tfile.write('''
+# string as a terminator for iteration
+	if not ctype:
+		tfile.write('''
 WT_CONFIG_CHECK
 __wt_confchk_%(name)s[] = {
-%(check)s
-	{ NULL, NULL, NULL }
+\t{ NULL, NULL, NULL }
+};
+''' % { 'name' : name })
+	else:
+		tfile.write('''
+WT_CONFIG_CHECK
+__wt_confchk_%(name)s[] = {
+\t%(check)s
+\t{ NULL, NULL, NULL }
 };
 ''' % {
 	'name' : name,
-	'check' : '\n'.join('    %s' % line
-		for line in w2.wrap(' '.join('{ "%s", "%s", %s },' %
-		    (c.name, gettype(c), checkstr(c))
-			for c in sorted(ctype)))),
+	'check' : '\n\t'.join('"\n\t    "'.join(w.wrap('{ "%s", "%s", %s },' %
+		(c.name, gettype(c), checkstr(c)))) for c in sorted(ctype)),
 })
 
 tfile.close()

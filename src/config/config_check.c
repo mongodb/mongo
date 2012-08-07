@@ -20,9 +20,9 @@ __wt_config_check(WT_SESSION_IMPL *session,
     WT_CONFIG_CHECK checks[], const char *config)
 {
 	WT_CONFIG parser, cparser, sparser;
-	WT_CONFIG_ITEM k, v, chk, ck, cv, dummy;
+	WT_CONFIG_ITEM k, v, ck, cv, dummy;
 	WT_DECL_RET;
-	int found, i;
+	int badtype, found, i;
 
 	/* It is always okay to pass NULL. */
 	if (config == NULL)
@@ -50,20 +50,20 @@ __wt_config_check(WT_SESSION_IMPL *session,
 			return (WT_NOTFOUND);
 		}
 
-		if (strcmp(checks[i].type, "int") == 0) {
-			if (v.type != ITEM_NUM)
-badtype:			WT_RET_MSG(session, EINVAL,
-				    "Invalid value type "
-				    "for key '%.*s': expected a %.*s",
-				    (int)k.len, k.str,
-				    (int)cv.len, cv.str);
-		} else if (strcmp(checks[i].type, "boolean") == 0) {
-			if (v.type != ITEM_NUM || (v.val != 0 && v.val != 1))
-				goto badtype;
-		} else if (strcmp(checks[i].type, "list") == 0) {
-			if (v.len > 0 && v.type != ITEM_STRUCT)
-				goto badtype;
-		}
+		if (strcmp(checks[i].type, "int") == 0)
+			badtype = (v.type != ITEM_NUM);
+		else if (strcmp(checks[i].type, "boolean") == 0)
+			badtype = (v.type != ITEM_NUM ||
+			    (v.val != 0 && v.val != 1));
+		else if (strcmp(checks[i].type, "list") == 0)
+			badtype = (v.len > 0 && v.type != ITEM_STRUCT);
+		else
+			badtype = 0;
+
+		if (badtype)
+			WT_RET_MSG(session, EINVAL,
+			    "Invalid value type for key '%.*s': expected a %s",
+			    (int)k.len, k.str, checks[i].type);
 
 		if (checks[i].checks == NULL)
 			continue;
