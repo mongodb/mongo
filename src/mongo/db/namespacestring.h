@@ -113,8 +113,8 @@ namespace mongo {
          * @return if db.coll is an allowed collection name
          */
         static bool validCollectionName(const char* dbcoll){
-          const char *c = strchr( dbcoll, '.' ) + 1;
-          return normal(dbcoll) && c && *c;
+            const char *c = strchr( dbcoll, '.' );
+            return (c != NULL) && (c[1] != '\0') && normal(dbcoll);
         }
 
     private:
