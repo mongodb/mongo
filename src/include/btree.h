@@ -89,7 +89,7 @@ struct __wt_btree {
 	uint8_t bitcnt;			/* Fixed-length field size in bits */
 
 					/* Row-store comparison function */
-	WT_COLLATOR *collator;          /* Comparison function */
+	WT_COLLATOR *collator;		/* Comparison function */
 
 	uint32_t key_gap;		/* Row-store prefix key gap */
 

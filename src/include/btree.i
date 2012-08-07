@@ -338,7 +338,7 @@ __wt_page_hazard_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 /*
  * __wt_skip_choose_depth --
- *      Randomly choose a depth for a skiplist insert.
+ *	Randomly choose a depth for a skiplist insert.
  */
 static inline u_int
 __wt_skip_choose_depth(void)
@@ -386,5 +386,5 @@ __wt_btree_lex_compare(const WT_ITEM *user_item, const WT_ITEM *tree_item)
 #define	WT_BTREE_CMP(s, bt, k1, k2, cmp)				\
 	(((bt)->collator == NULL) ?					\
 	(((cmp) = __wt_btree_lex_compare((k1), (k2))), 0) :		\
-	(bt)->collator->compare((bt)->collator, &(s)->iface,            \
+	(bt)->collator->compare((bt)->collator, &(s)->iface,		\
 	    (k1), (k2), &(cmp)))

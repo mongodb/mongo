@@ -218,7 +218,7 @@ __create_index(WT_SESSION_IMPL *session,
 	idxname = strchr(tablename, ':');
 	if (idxname == NULL)
 		WT_RET_MSG(session, EINVAL, "Invalid index name, "
-		     "should be <table name>:<index name>: %s", name);
+		    "should be <table name>:<index name>: %s", name);
 
 	tlen = (size_t)(idxname++ - tablename);
 	if ((ret =
@@ -274,7 +274,7 @@ __create_index(WT_SESSION_IMPL *session,
 	/* Index values are empty: all columns are packed into the index key. */
 	WT_ERR(__wt_buf_fmt(session, &fmt, "value_format=,key_format="));
 	WT_ERR(__wt_struct_reformat(session, table,
-	     icols.str, icols.len, (const char *)extra_cols.data, 0, &fmt));
+	    icols.str, icols.len, (const char *)extra_cols.data, 0, &fmt));
 
 	/* Check for a record number index key, which makes no sense. */
 	WT_ERR(__wt_config_getones(session, fmt.data, "key_format", &cval));

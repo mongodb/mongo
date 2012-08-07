@@ -152,7 +152,7 @@ extern int __wt_bm_salvage_next(WT_SESSION_IMPL *session,
 extern int __wt_bm_salvage_end(WT_SESSION_IMPL *session);
 extern int __wt_bm_verify_start(WT_SESSION_IMPL *session, WT_CKPT *ckptbase);
 extern int __wt_bm_verify_end(WT_SESSION_IMPL *session);
-extern int __wt_bm_verify_addr(WT_SESSION_IMPL *session,
+extern int __wt_bm_verify_addr( WT_SESSION_IMPL *session,
     const uint8_t *addr,
     uint32_t addr_size);
 extern int __wt_block_truncate(WT_SESSION_IMPL *session, const char *filename);

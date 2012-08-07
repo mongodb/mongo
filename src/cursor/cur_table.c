@@ -14,8 +14,8 @@ static int __curtable_update(WT_CURSOR *cursor);
 	WT_CURSOR **__cp;						\
 	int __i;							\
 	for (__i = 0, __cp = ctable->cg_cursors;			\
-	     __i < WT_COLGROUPS(ctable->table);				\
-	     __i++, __cp++)						\
+	    __i < WT_COLGROUPS(ctable->table);				\
+	    __i++, __cp++)						\
 		WT_TRET((*__cp)->f(*__cp));				\
 } while (0)
 
@@ -161,8 +161,7 @@ __wt_curtable_set_value(WT_CURSOR *cursor, ...)
 	va_end(ap);
 
 	for (i = 0, cp = ctable->cg_cursors;
-	     i < WT_COLGROUPS(ctable->table);
-	     i++, cp++)
+	    i < WT_COLGROUPS(ctable->table); i++, cp++)
 		if (ret == 0)
 			F_SET(*cp, WT_CURSTD_VALUE_SET);
 		else {
@@ -688,7 +687,7 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 		__curtable_close,
 		{ NULL, NULL },		/* TAILQ_ENTRY q */
 		0,			/* recno key */
-		{ 0 },                  /* raw recno buffer */
+		{ 0 },			/* raw recno buffer */
 		{ NULL, 0, 0, NULL, 0 },/* WT_ITEM key */
 		{ NULL, 0, 0, NULL, 0 },/* WT_ITEM value */
 		0,			/* int saved_err */

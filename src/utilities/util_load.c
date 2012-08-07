@@ -76,8 +76,8 @@ load_dump(WT_SESSION *session)
 	int hex, tret;
 	char **entry, **list, *p, *uri, config[64];
 
-	list = NULL;            /* -Wuninitialized */
-	hex = 0;                /* -Wuninitialized */
+	list = NULL;		/* -Wuninitialized */
+	hex = 0;		/* -Wuninitialized */
 
 	/* Read the metadata file. */
 	if ((ret = config_read(&list, &hex)) != 0)

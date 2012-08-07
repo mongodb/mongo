@@ -487,10 +487,10 @@ __wt_huffman_open(WT_SESSION_IMPL *session,
 		symbol = indexed_freqs[i].symbol;
 		weighted_length +=
 		    indexed_freqs[i].frequency * huffman->codes[symbol].length;
-		 printf(
-		     "\t%" PRIu16 "->%" PRIu16 ". %" PRIu32 " * %" PRIu8 "\n",
-		     i, symbol,
-		     indexed_freqs[i].frequency, huffman->codes[symbol].length);
+		printf(
+		    "\t%" PRIu16 "->%" PRIu16 ". %" PRIu32 " * %" PRIu8 "\n",
+		    i, symbol,
+		    indexed_freqs[i].frequency, huffman->codes[symbol].length);
 	}
 	printf("weighted length of all codes (the smaller the better): "
 	    "%" PRIu32 "\n", weighted_length);

@@ -711,7 +711,7 @@ err:	if (conn->lock_fh != NULL) {
 
 /*
  * __conn_verbose_config --
- *      Set verbose configuration.
+ *	Set verbose configuration.
  */
 static int
 __conn_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])

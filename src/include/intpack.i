@@ -17,8 +17,8 @@
  * the marginal benefit is small, and we want this code to be relatively
  * easy to implement in client code or scripting APIs.
  *
- * First byte | Next |                        |
- * byte       | bytes| Min Value              | Max Value
+ * First byte  | Next |                        |
+ * byte        | bytes| Min Value              | Max Value
  * ------------+------+------------------------+--------------------------------
  * [00 00xxxx] | free | N/A                    | N/A
  * [00 01llll] | llll | -2^64                  | -2^13 - 2^6
@@ -50,14 +50,14 @@
 
 /* Count the leading zero bytes. */
 #ifdef __GNUC__
-#define	WT_LEADING_ZEROS(x, i)                                          \
+#define	WT_LEADING_ZEROS(x, i)						\
 	(i = (x == 0) ? (int)sizeof (x) : __builtin_clzll(x) >> 3)
 #else
-#define	WT_LEADING_ZEROS(x, i) do {                                     \
-	uint64_t __x = (x);                                             \
-	uint64_t __m = 0xff << 56;                                      \
-	for (i = 0; !(__x & __m) && i != 8; i++)                        \
-		__m >>= 8;                                              \
+#define	WT_LEADING_ZEROS(x, i) do {					\
+	uint64_t __x = (x);						\
+	uint64_t __m = 0xff << 56;					\
+	for (i = 0; !(__x & __m) && i != 8; i++)			\
+		__m >>= 8;						\
 } while (0)
 #endif
 

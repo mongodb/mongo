@@ -447,9 +447,8 @@ err:	if (was_running) {
 
 /*
  * __evict_file_request_walk --
- *      Walk the session list looking for sync/close requests.  If we find a
- *      request, perform it, clear the request, and wake up the requesting
- *      thread.
+ *	Walk the session list looking for sync/close requests.  If we find a
+ * request, perform it, clear the request, and wake up the requesting thread.
  */
 static int
 __evict_file_request_walk(WT_SESSION_IMPL *session)

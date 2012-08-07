@@ -13,16 +13,16 @@
 #define	WT_PROJ_VALUE	'v' /* Go to the value in cursor <arg>. */
 
 struct __wt_colgroup {
-	const char *name;               /* Logical name */
-	const char *source;             /* Underlying data source */
+	const char *name;		/* Logical name */
+	const char *source;		/* Underlying data source */
 	const char *config;		/* Configuration string */
 
 	WT_CONFIG_ITEM colconf;		/* List of columns from config */
 };
 
 struct __wt_index {
-	const char *name;               /* Logical name */
-	const char *source;             /* Underlying data source */
+	const char *name;		/* Logical name */
+	const char *source;		/* Underlying data source */
 	const char *config;		/* Configuration string */
 
 	WT_CONFIG_ITEM colconf;		/* List of columns from config */

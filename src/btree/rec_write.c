@@ -140,10 +140,10 @@ typedef struct {
 	WT_ITEM *cur, _cur;		/* Key/Value being built */
 	WT_ITEM *last, _last;		/* Last key/value built */
 
-	int	key_pfx_compress;	/* If can prefix-compress next key */
-	int     key_pfx_compress_conf;	/* If prefix compression configured */
-	int	key_sfx_compress;	/* If can suffix-compress next key */
-	int     key_sfx_compress_conf;	/* If suffix compression configured */
+	int key_pfx_compress;		/* If can prefix-compress next key */
+	int key_pfx_compress_conf;	/* If prefix compression configured */
+	int key_sfx_compress;		/* If can suffix-compress next key */
+	int key_sfx_compress_conf;	/* If suffix compression configured */
 } WT_RECONCILE;
 
 static void __rec_cell_build_addr(
@@ -1983,8 +1983,8 @@ compare:		/*
 		 * discard the underlying blocks, they're no longer useful.
 		 */
 		if (ovfl_state == OVFL_UNUSED)
-			 WT_ERR(__wt_rec_track_onpage_add(
-			     session, page, unpack->data, unpack->size));
+			WT_ERR(__wt_rec_track_onpage_add(
+			    session, page, unpack->data, unpack->size));
 	}
 
 	/* Walk any append list. */

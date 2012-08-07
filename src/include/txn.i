@@ -7,7 +7,7 @@
 
 /*
  * __wt_txn_getid --
- *      Get a transaction ID for a non-transactional operation.
+ *	Get a transaction ID for a non-transactional operation.
  */
 static inline void
 __wt_txn_getid(WT_SESSION_IMPL *session)
@@ -38,7 +38,7 @@ __wt_txn_getid(WT_SESSION_IMPL *session)
 
 /*
  * __wt_txn_modify --
- *      Mark an object modified by the current transaction.
+ *	Mark an object modified by the current transaction.
  */
 static inline int
 __wt_txn_modify(WT_SESSION_IMPL *session, wt_txnid_t *id)
@@ -203,7 +203,7 @@ __wt_txn_ancient(WT_SESSION_IMPL *session, wt_txnid_t id)
 
 /*
  * __wt_txn_read_first --
- *      Called for the first page read for a session.
+ *	Called for the first page read for a session.
  */
 static inline void
 __wt_txn_read_first(WT_SESSION_IMPL *session)
@@ -229,7 +229,7 @@ __wt_txn_read_first(WT_SESSION_IMPL *session)
 
 /*
  * __wt_txn_read_last --
- *      Called when the last page for a session is released.
+ *	Called when the last page for a session is released.
  */
 static inline void
 __wt_txn_read_last(WT_SESSION_IMPL *session)

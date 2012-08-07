@@ -342,7 +342,7 @@ __rec_review(WT_SESSION_IMPL *session,
 
 /*
  * __rec_excl_clear --
- *     Discard exclusive access and return a page's subtree to availability.
+ *	Discard exclusive access and return a page's subtree to availability.
  */
 static void
 __rec_excl_clear(WT_SESSION_IMPL *session)
