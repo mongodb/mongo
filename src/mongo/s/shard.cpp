@@ -390,8 +390,16 @@ namespace mongo {
         if( !noauth ) {
             string err;
             LOG(2) << "calling onCreate auth for " << conn->toString() << endl;
-            uassert( 15847, "can't authenticate to shard server",
-                    conn->auth("local", internalSecurity.user, internalSecurity.pwd, err, false));
+
+            bool result = conn->auth( "local",
+                                      internalSecurity.user,
+                                      internalSecurity.pwd,
+                                      err,
+                                      false );
+
+            uassert( 15847, str::stream() << "can't authenticate to server "
+                                          << conn->getServerAddress() << causedBy( err ), result );
+
             if ( conn->type() == ConnectionString::SYNC ) {
                 // Connections to the config servers should always have full access.
                 conn->setAuthenticationTable(

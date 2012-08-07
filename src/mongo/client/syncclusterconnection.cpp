@@ -200,16 +200,71 @@ namespace mongo {
         return DBClientBase::findOne( ns , query , fieldsToReturn , queryOptions );
     }
 
-    bool SyncClusterConnection::auth(const string &dbname, const string &username, const string &password_text, string& errmsg, bool digestPassword, Auth::Level* level) {
-        for (vector<DBClientConnection*>::iterator it = _conns.begin(); it < _conns.end(); it++) {
-            massert( 15848, "sync cluster of sync clusters?", (*it)->type() != ConnectionString::SYNC);
+    bool SyncClusterConnection::auth(const string &dbname,
+                                     const string &username,
+                                     const string &password_text,
+                                     string& errmsg,
+                                     bool digestPassword,
+                                     Auth::Level* level)
+    {
+        // A SCC is authorized if any connection has been authorized
+        // Credentials are stored in the auto-reconnect connections.
 
-            if (!(*it)->auth(dbname, username, password_text, errmsg, digestPassword, level)) {
-                return false;
+        bool authedOnce = false;
+        vector<string> errors;
+
+        for( vector<DBClientConnection*>::iterator it = _conns.begin(); it < _conns.end(); ++it ){
+
+            massert( 15848, "sync cluster of sync clusters?",
+                            (*it)->type() != ConnectionString::SYNC );
+
+            // Authorize or collect the error message
+            string lastErrmsg;
+            bool authed = false;
+            try{
+                // Auth errors can manifest either as exceptions or as false results
+                // TODO: Make this better
+                authed = (*it)->auth( dbname,
+                                      username,
+                                      password_text,
+                                      lastErrmsg,
+                                      digestPassword,
+                                      level );
             }
+            catch( const DBException& e ){
+                // auth will be retried on reconnect
+                lastErrmsg = e.what();
+            }
+
+            if( ! authed ){
+
+                // Since we're using auto-reconnect connections, we're sure the auth info has been
+                // stored if needed for later
+
+                lastErrmsg = str::stream() << "auth error on " << (*it)->getServerAddress()
+                                                               << causedBy( lastErrmsg );
+
+                LOG(1) << lastErrmsg << endl;
+                errors.push_back( lastErrmsg );
+            }
+
+            authedOnce = authedOnce || authed;
         }
-        return true;
+
+        if( authedOnce ) return true;
+
+        // Assemble the error message
+        str::stream errStream;
+        for( vector<string>::iterator it = errors.begin(); it != errors.end(); ++it ){
+            if( it != errors.begin() ) errStream << " ::and:: ";
+            errStream << *it;
+        }
+
+        errmsg = errStream;
+        return false;
     }
+
+    // TODO: logout is required for use of this class outside of a cluster environment
 
     void SyncClusterConnection::setAuthenticationTable( const AuthenticationTable& auth ) {
         for( size_t i = 0; i < _conns.size(); ++i ) {
