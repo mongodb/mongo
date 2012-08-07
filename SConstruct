@@ -854,6 +854,8 @@ def doConfigure(myenv):
 
 env = doConfigure( env )
 
+env['PDB'] = '${TARGET.base}.pdb'
+
 testEnv = env.Clone()
 testEnv.Append( CPPPATH=["../"] )
 

@@ -507,6 +507,9 @@ def checkGlibc(target,source,env):
 
 distBinaries = []
 
+if windows:
+    distBinaries.extend(['mongod.pdb', 'mongos.pdb'])
+
 def installBinary( e, name ):
     global distBinaries
 
