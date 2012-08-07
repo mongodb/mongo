@@ -8,14 +8,14 @@ soonCount = function( count ) {
                 } );
 }
 
-doTest = function( signal ) {
+doTest = function(signal, extraOpts) {
     print("signal: "+signal);
 
     var rt = new ReplTest( "repl2tests" );
 
     // implicit small oplog makes slave get out of sync
     m = rt.start( true, { oplogSize : "1" } );
-    s = rt.start( false );
+    s = rt.start(false, extraOpts);
 
     am = m.getDB("foo").a
 
@@ -28,7 +28,7 @@ doTest = function( signal ) {
     for( i = 0; i < 1000; ++i )
         am.save( { _id: new ObjectId(), i: i, b: big } );
 
-    s = rt.start( false , null , true );
+    s = rt.start(false, extraOpts, true);
 
     print("earliest op in master: "+tojson(m.getDB("local").oplog.$main.find().sort({$natural:1}).limit(1).next()));
     print("latest op on slave: "+tojson(s.getDB("local").sources.findOne()));
@@ -53,4 +53,4 @@ doTest = function( signal ) {
 }
 
 doTest( 15 ); // SIGTERM
-doTest( 9 );  // SIGKILL
+doTest(9, { journal: null });  // SIGKILL

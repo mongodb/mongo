@@ -12,7 +12,7 @@ auth = function( n ) {
     return n.getDB( baseName ).auth( "test", "test" );
 }
 
-doTest = function( signal ) {
+doTest = function(signal, extraOpts) {
 
     rt = new ReplTest( baseName );
     
@@ -27,7 +27,11 @@ doTest = function( signal ) {
     
     m = rt.start( true, { auth:null }, true );
     auth( m );
-    s = rt.start( false, { auth:null }, true );
+
+    var slaveOpt = { auth: null };
+    slaveOpt = Object.extend(slaveOpt, extraOpts);
+
+    s = rt.start( false, slaveOpt, true );
     assert.soon( function() { return auth( s ); } );
     
     ma = m.getDB( baseName ).a;    
@@ -42,7 +46,7 @@ doTest = function( signal ) {
     rt.stop( false, signal );
     
     ma.save( {} );
-    s = rt.start( false, { auth:null }, true );
+    s = rt.start(false, slaveOpt, true);
     assert.soon( function() { return auth( s ); } );
     sa = s.getDB( baseName ).a;
     assert.soon( function() { return 2 == sa.count(); } );
@@ -60,4 +64,4 @@ doTest = function( signal ) {
 }
 
 doTest( 15 ); // SIGTERM
-doTest( 9 );  // SIGKILL
+doTest(9, { journal: null });  // SIGKILL
