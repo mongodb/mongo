@@ -108,13 +108,26 @@ catch (e) {
     print(e);
 }
 
-print("\nsleeping");
 
-sleep(2000);
+master = replTest.getMaster();
+assert.soon(function() {
+    var result = master.getDB("admin").runCommand({replSetGetStatus:1});
+    for (var i in result.members) {
+        if (result.members[i].self) {
+            continue;
+        }
+
+        return result.members[i].health == 0;
+    }
+
+}, 'make sure master knows that slave is down before proceeding');
+
 
 print("\nrunning shutdown without force on master: "+master);
 
-result = replTest.getMaster().getDB("admin").runCommand({shutdown : 1, timeoutSecs : 3});
+// this should fail because the master can't reach an up-to-date secondary (because the only 
+// secondary is down)
+result = master.getDB("admin").runCommand({shutdown : 1, timeoutSecs : 3});
 assert.eq(result.ok, 0);
 
 print("\nsend shutdown command");
