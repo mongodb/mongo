@@ -26,7 +26,12 @@ print( "GLE start" )
 var gle_state = 0;
 try{
     var myjson = coll.getDB().getLastErrorObj();
-    if ( myjson.err != "socket exception" ) {
+    // for example -- err : "socket exception [SEND_ERROR] for 127.0.0.1:30001"
+    //  or            err : "socket exception [CONNECT_ERROR] for localhost:30001"
+    var errorStringParts = myjson.err.split(" ");
+    if ( errorStringParts.length < 2 ||
+         errorStringParts[0] != "socket" ||
+         errorStringParts[1] != "exception" ) {
         gle_state = 1;
         print( "Unit test failure -- received response from getLastError:" );
         printjson( myjson );
