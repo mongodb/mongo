@@ -98,7 +98,13 @@ namespace mongo {
         static bool validDBName( const string& db ) {
             if ( db.size() == 0 || db.size() > 64 )
                 return false;
+#ifdef _WIN32
+            // We prohibit all FAT32-disallowed characters on Windows
             size_t good = strcspn( db.c_str() , "/\\. \"*<>:|?" );
+#else
+            // For non-Windows platforms we are much more lenient
+            size_t good = strcspn( db.c_str() , "/\\. \"" );
+#endif
             return good == db.size();
         }
 
