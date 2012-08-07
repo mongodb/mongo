@@ -123,18 +123,19 @@ tfile.write('''/* DO NOT EDIT: automatically built by dist/config.py. */
 # Make a TextWrapper that can wrap at commas.
 w = textwrap.TextWrapper(width=72, break_on_hyphens=False)
 w.wordsep_re = w.wordsep_simple_re = re.compile(r'(,)')
+# Make a TextWrapper that can wrap at string elements.
+w2 = textwrap.TextWrapper(width=72, break_on_hyphens=False)
+w2.wordsep_re = w2.wordsep_simple_re = re.compile(r'(}, )')
+w2.break_long_words = False
 
 def checkstr(c):
 	'''Generate the JSON string used by __wt_config_check to validate the
 	config string'''
 	checks = c.flags
-	ctype = gettype(c)
 	cmin = str(checks.get('min', ''))
 	cmax = str(checks.get('max', ''))
 	choices = checks.get('choices', [])
 	result = []
-	if ctype != 'string':
-		result.append('type=' + ctype)
 	if cmin:
 		result.append('min=' + cmin)
 	if cmax:
@@ -142,7 +143,10 @@ def checkstr(c):
 	if choices:
 		result.append('choices=' + '[' +
 		    ','.join('\\"' + s + '\\"' for s in choices) + ']')
-	return ','.join(result)
+	if result:
+		return '"' + ','.join(result) + '"'
+	else:
+		return 'NULL'
 
 def get_default(c):
 	t = gettype(c)
@@ -166,15 +170,20 @@ __wt_confdfl_%(name)s =
 		for line in w.wrap(','.join('%s=%s' % (c.name, get_default(c))
 			for c in sorted(ctype))) or [""]),
 })
+# Construct an array of allowable configuration options. Always append an empty
+# entry as a terminator to support iteration
 	tfile.write('''
-const char *
-__wt_confchk_%(name)s =
-%(check)s;
+WT_CONFIG_CHECK
+__wt_confchk_%(name)s[] = {
+%(check)s
+	{ NULL, NULL, NULL }
+};
 ''' % {
 	'name' : name,
-	'check' : '\n'.join('    "%s"' % line
-		for line in w.wrap(','.join('%s=(%s)' % (c.name, checkstr(c))
-			for c in sorted(ctype))) or [""]),
+	'check' : '\n'.join('    %s' % line
+		for line in w2.wrap(' '.join('{ "%s", "%s", %s },' %
+		    (c.name, gettype(c), checkstr(c))
+			for c in sorted(ctype)))),
 })
 
 tfile.close()

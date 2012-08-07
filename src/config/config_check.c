@@ -17,12 +17,12 @@
  */
 int
 __wt_config_check(WT_SESSION_IMPL *session,
-    const char *checks, const char *config)
+    WT_CONFIG_CHECK checks[], const char *config)
 {
 	WT_CONFIG parser, cparser, sparser;
 	WT_CONFIG_ITEM k, v, chk, ck, cv, dummy;
 	WT_DECL_RET;
-	int found;
+	int found, i;
 
 	/* It is always okay to pass NULL. */
 	if (config == NULL)
@@ -35,31 +35,43 @@ __wt_config_check(WT_SESSION_IMPL *session,
 			    "Invalid configuration key found: '%.*s'",
 			    (int)k.len, k.str);
 
-		if ((ret = __wt_config_getone(session,
-		    checks, &k, &chk)) != 0) {
-			if (ret == WT_NOTFOUND)
-				WT_RET_MSG(session, EINVAL,
-				    "Unknown configuration key found: '%.*s'",
-				    (int)k.len, k.str);
-			return (ret);
+		/* The config check array is sorted, so exit on first found */
+		for (i = 0, found = 0; checks[i].name != NULL; i++)
+			if (WT_STRING_CASE_MATCH(
+			    checks[i].name, k.str, k.len)) {
+				found = 1;
+				break;
+			}
+
+		if (!found) {
+			WT_RET_MSG(session, EINVAL,
+			    "Unknown configuration key found: '%.*s'",
+			    (int)k.len, k.str);
+			return (WT_NOTFOUND);
 		}
 
-		WT_RET(__wt_config_subinit(session, &cparser, &chk));
+		if (strcmp(checks[i].type, "int") == 0) {
+			if (v.type != ITEM_NUM)
+badtype:			WT_RET_MSG(session, EINVAL,
+				    "Invalid value type "
+				    "for key '%.*s': expected a %.*s",
+				    (int)k.len, k.str,
+				    (int)cv.len, cv.str);
+		} else if (strcmp(checks[i].type, "boolean") == 0) {
+			if (v.type != ITEM_NUM || (v.val != 0 && v.val != 1))
+				goto badtype;
+		} else if (strcmp(checks[i].type, "list") == 0) {
+			if (v.len > 0 && v.type != ITEM_STRUCT)
+				goto badtype;
+		}
+
+		if (checks[i].checks == NULL)
+			continue;
+
+		/* Setup an iterator for the check string. */
+		WT_RET(__wt_config_init(session, &cparser, checks[i].checks));
 		while ((ret = __wt_config_next(&cparser, &ck, &cv)) == 0) {
-			if (strncmp(ck.str, "type", ck.len) == 0) {
-				if ((strncmp(cv.str, "int", cv.len) == 0 &&
-				    v.type != ITEM_NUM) ||
-				    (strncmp(cv.str, "boolean", cv.len) == 0 &&
-				    (v.type != ITEM_NUM ||
-				    (v.val != 0 && v.val != 1))) ||
-				    (strncmp(cv.str, "list", cv.len) == 0 &&
-				    v.len > 0 && v.type != ITEM_STRUCT))
-					WT_RET_MSG(session, EINVAL,
-					    "Invalid value type "
-					    "for key '%.*s': expected a %.*s",
-					    (int)k.len, k.str,
-					    (int)cv.len, cv.str);
-			} else if (strncmp(ck.str, "min", ck.len) == 0) {
+			if (strncmp(ck.str, "min", ck.len) == 0) {
 				if (v.val < cv.val)
 					WT_RET_MSG(session, EINVAL,
 					    "Value too small for key '%.*s' "
