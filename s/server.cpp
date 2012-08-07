@@ -142,7 +142,9 @@ namespace mongo {
 #if defined(SIGBUS)
         signal( SIGBUS , printStackAndExit );
 #endif
+#if defined(SIGPIPE)
         signal( SIGPIPE , SIG_IGN );
+#endif
     }
 
     void init() {
