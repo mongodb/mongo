@@ -41,7 +41,7 @@ class test_truncate_standalone(wttest.WiredTigerTestCase):
     # Test truncation without URI or cursors specified, or with a URI and
     # either cursor specified, expect errors.
     def test_truncate_bad_args(self):
-	uri = 'file:xxx'
+        uri = 'file:xxx'
         simple_populate(self, uri, 'key_format=S', 10)
         msg = '/either a URI or start/stop cursors/'
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
