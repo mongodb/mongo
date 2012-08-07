@@ -132,7 +132,7 @@ namespace mongo {
     }
 
     bool PoolForHost::StoredConnection::ok( time_t now ) {
-        return ( now - when ) < PoolForHost::_connPoolTimeout;
+        return ( now - when ) < static_cast<signed>(PoolForHost::_connPoolTimeout);
     }
 
     void PoolForHost::createdOne( DBClientBase * base) {
