@@ -40,7 +40,4 @@ Shows how to access database and table statistics.
 @example ex_thread.c
 Shows how to access a database with multiple threads.
 
-@example ex_transaction.c
-Shows how to use transactions.
-
  */

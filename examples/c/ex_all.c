@@ -469,6 +469,74 @@ session_ops(WT_SESSION *session)
 	return (ret);
 }
 
+static int
+txn_examples(WT_CONNECTION *conn, WT_SESSION *session)
+{
+	WT_CURSOR *cursor;
+	int ret;
+
+	/*! [simple transaction] */
+	ret = session->begin_transaction(session, NULL);
+
+	ret =
+	    session->open_cursor(session, "table:mytable", NULL, NULL, &cursor);
+	cursor->set_key(cursor, "some-key");
+	cursor->set_value(cursor, "some-value");
+	ret = cursor->update(cursor);
+
+	/* Resolving the transaction closes the open cursors. */
+	ret = session->commit_transaction(session, NULL);
+	/*! [simple transaction] */
+
+	/*! [simple rollback transaction] */
+	ret = session->begin_transaction(session, NULL);
+
+	ret =
+	    session->open_cursor(session, "table:mytable", NULL, NULL, &cursor);
+	cursor->set_key(cursor, "some-key");
+	cursor->set_value(cursor, "some-value");
+	ret = cursor->update(cursor);
+
+	/* Resolving the transaction closes the open cursors. */
+	switch (ret) {
+	case 0:
+		ret = session->commit_transaction(session, NULL);
+		break;
+	case WT_DEADLOCK:			/* Conflict */
+	default:				/* Other error */
+		ret = session->rollback_transaction(session, NULL);
+		break;
+	}
+	/*! [simple rollback transaction] */
+
+	/*! [simple transaction isolation] */
+	/* A single transaction configured for snapshot isolation. */
+	ret = session->begin_transaction(session, "isolation=snapshot");
+
+	ret =
+	    session->open_cursor(session, "table:mytable", NULL, NULL, &cursor);
+	cursor->set_key(cursor, "some-key");
+	cursor->set_value(cursor, "some-value");
+	ret = cursor->update(cursor);
+
+	/* Resolving the transaction closes the open cursors. */
+	ret = session->commit_transaction(session, NULL);
+	/*! [simple transaction isolation] */
+
+	/*! [session isolation configuration] */
+	/* Open a session configured for read-uncommitted isolation. */
+	ret = conn->open_session(
+	    conn, NULL, "isolation=read_uncommitted", &session);
+	/*! [session isolation configuration] */
+
+	/*! [session isolation re-configuration] */
+	/* Re-configure a session for snapshot isolation. */
+	ret = session->reconfigure(session, "isolation=snapshot");
+	/*! [session isolation re-configuration] */
+
+	return (ret);
+}
+
 /*! [WT_DATA_SOURCE create] */
 static int
 my_create(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
