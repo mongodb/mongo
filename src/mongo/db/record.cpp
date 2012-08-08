@@ -203,23 +203,20 @@ namespace mongo {
 
         namespace PointerTable {
 
-            enum {
-                /* A "superpage" is a group of 16 contiguous pages that differ
-                 * only in the low-order 16 bits. This means that there is
-                 * enough room in the low-order bits to store a bitmap for each
-                 * page in the superpage.
-                 */
-                superpageMask = ~0xffffLL,
-                superpageShift = 16,
-                pageSelectorMask = 0xf000LL, // selects a page in a superpage
-                pageSelectorShift = 12,
+            /* A "superpage" is a group of 16 contiguous pages that differ
+             * only in the low-order 16 bits. This means that there is
+             * enough room in the low-order bits to store a bitmap for each
+             * page in the superpage.
+             */
+            static const size_t superpageMask = ~0xffffLL;
+            static const size_t superpageShift = 16;
+            static const size_t pageSelectorMask = 0xf000LL; // selects a page in a superpage
+            static const size_t pageSelectorShift = 12;
                 
-                // Tunables
-                capacity = 128, // in superpages
-                bucketSize = 4, // half cache line
-                buckets = capacity/bucketSize,
-            };
-            
+            // Tunables
+            static const int capacity = 128; // in superpages
+            static const int bucketSize = 4; // half cache line
+            static const int buckets = capacity/bucketSize;
             
             struct Data {
                 /** organized similar to a CPU cache
