@@ -13,13 +13,7 @@ sh._checkFullName = function( fullName ) {
 
 sh._adminCommand = function( cmd , skipCheck ) {
     if ( ! skipCheck ) sh._checkMongos();
-    var res = db.getSisterDB( "admin" ).runCommand( cmd );
-
-    if ( res == null || ! res.ok ) {
-        print( "command failed: " + tojson( res ) )
-    }
-
-    return res;
+    return db.getSisterDB( "admin" ).runCommand( cmd );
 }
 
 sh._dataFormat = function( bytes ){
@@ -62,12 +56,12 @@ sh.status = function( verbose , configDB ) {
 }
 
 sh.addShard = function( url ){
-    sh._adminCommand( { addShard : url } , true )
+    return sh._adminCommand( { addShard : url } , true );
 }
 
 sh.enableSharding = function( dbname ) { 
     assert( dbname , "need a valid dbname" )
-    sh._adminCommand( { enableSharding : dbname } )
+    return sh._adminCommand( { enableSharding : dbname } );
 }
 
 sh.shardCollection = function( fullName , key , unique ) {
@@ -79,17 +73,17 @@ sh.shardCollection = function( fullName , key , unique ) {
     if ( unique ) 
         cmd.unique = true;
 
-    sh._adminCommand( cmd )
+    return sh._adminCommand( cmd );
 }
 
 sh.splitFind = function( fullName , find ) {
     sh._checkFullName( fullName )
-    sh._adminCommand( { split : fullName , find : find } )
+    return sh._adminCommand( { split : fullName , find : find } );
 }
 
 sh.splitAt = function( fullName , middle ) {
     sh._checkFullName( fullName )
-    sh._adminCommand( { split : fullName , middle : middle } )
+    return sh._adminCommand( { split : fullName , middle : middle } );
 }
 
 sh.moveChunk = function( fullName , find , to ) {
