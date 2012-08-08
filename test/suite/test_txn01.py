@@ -25,16 +25,20 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import os, struct
 import wiredtiger, wttest
 
 # test_txn01.py
 #    Transactions: basic functionality
 class test_txn01(wttest.WiredTigerTestCase):
-    tablename = 'test_txn01'
-    uri = 'table:' + tablename
-    nentries = 10000
-    create_params = 'key_format=r,value_format=S'
+    nentries = 1000
+    scenarios = [
+        ('col', dict(uri='file:text_txn01',key_format='r',value_format='S')),
+        ('col', dict(uri='table:text_txn01',key_format='r',value_format='S')),
+        ('fix', dict(uri='file:text_txn01',key_format='r',value_format='8t')),
+        ('fix', dict(uri='table:text_txn01',key_format='r',value_format='8t')),
+        ('row', dict(uri='file:text_txn01',key_format='S',value_format='S')),
+        ('row', dict(uri='table:text_txn01',key_format='S',value_format='S')),
+    ]
 
     # Overrides WiredTigerTestCase
     def setUpConnectionOpen(self, dir):
@@ -44,54 +48,72 @@ class test_txn01(wttest.WiredTigerTestCase):
         self.pr(`conn`)
         return conn
 
+    # Return the number of records visible to the cursor.
+    def cursor_count(self, cursor):
+        count = 0
+        # Column-store appends result in phantoms, ignore records unless they
+        # have our flag value.
+        for r in cursor:
+            if self.value_format == 'S' or cursor.get_value() == 0xab:
+                count += 1
+        return count
+
+    # Checkpoint the database and assert the number of records visible to the
+    # checkpoint matches the expected value.
     def check_checkpoint(self, expected):
         s = self.conn.open_session()
         s.checkpoint("name=test")
-        try:
-            cursor = s.open_cursor(self.uri, None, "checkpoint=test")
-            count = 0
-            for r in cursor:
-                count += 1
-        finally:
-            s.close()
-        self.assertEqual(count, expected)
+        cursor = s.open_cursor(self.uri, None, "checkpoint=test")
+        self.assertEqual(self.cursor_count(cursor), expected)
+        s.close()
 
-    def check_transaction(self, expected):
+    # Open a cursor with snapshot isolation, and assert the number of records
+    # visible to the cursor matches the expected value.
+    def check_transaction(self, level, expected):
         s = self.conn.open_session()
-        s.begin_transaction('isolation=snapshot')
-        try:
-            cursor = s.open_cursor(self.uri, None)
-            count = 0
-            for r in cursor:
-                count += 1
-        finally:
-            s.close()
-        self.assertEqual(count, expected)
+        s.begin_transaction(level)
+        cursor = s.open_cursor(self.uri, None)
+        self.assertEqual(self.cursor_count(cursor), expected)
+        s.close()
 
-    def check_count(self, expected):
-        self.check_transaction(expected)
-        self.check_checkpoint(expected)
+    def check(self, committed, total):
+        self.check_transaction('isolation=snapshot', committed)
+        #self.check_transaction('isolation=read-committed', committed)
+        self.check_transaction('isolation=read-uncommitted', total)
+        self.check_checkpoint(committed)
 
+    # Loop through a set of inserts, periodically committing; before each
+    # commit, verify the number of visible records matches the expected value.
     def test_visibilty(self):
-        self.session.create(self.uri, self.create_params)
-        committed_inserts = 0
-        self.check_count(committed_inserts)
+        self.session.create(self.uri,
+            'key_format=' + self.key_format +
+            ',value_format=' + self.value_format)
+        self.check(0, 0)
+
+        committed = 0
         self.session.begin_transaction()
-        cursor = self.session.open_cursor(self.uri, None, "append")
+        cursor = self.session.open_cursor(self.uri, None)
         for i in xrange(self.nentries):
-            if i > 0 and (i * 10) % self.nentries == 0:
-                self.check_count(committed_inserts)
+            if i > 0 and i % (self.nentries / 37) == 0:
+                self.check(committed, i)
                 self.session.commit_transaction()
-                committed_inserts = i
+                committed = i
                 self.session.begin_transaction()
-                cursor = self.session.open_cursor(self.uri, None, "append")
-            cursor.set_value(("value%06d" % i) * 100)
+                cursor = self.session.open_cursor(self.uri, None)
+
+            if self.key_format == 'S':
+                cursor.set_key("key: %06d" % i)
+            else:
+                cursor.set_key(i + 1)
+            if self.value_format == 'S':
+                cursor.set_value("value: %06d" % i)
+            else:
+                cursor.set_value(0xab)
             cursor.insert()
-        cursor.close()
-        self.check_count(committed_inserts)
+
+        self.check(committed, self.nentries)
         self.session.commit_transaction()
-        committed_inserts = self.nentries
-        self.check_count(committed_inserts)
+        self.check(self.nentries, self.nentries)
 
 if __name__ == '__main__':
     wttest.run()
