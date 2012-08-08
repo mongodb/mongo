@@ -131,6 +131,7 @@ print("sync from self: error");
 var result = replTest.nodes[3].getDB("admin").runCommand({replSetSyncFrom: replTest.host+":"+replTest.ports[3]});
 printjson(result);
 assert.eq(result.ok, 0);
+assert.eq(result.errmsg, "I cannot sync from myself");
 
 print("sync from arbiter: error");
 result = replTest.nodes[3].getDB("admin").runCommand({replSetSyncFrom: replTest.host+":"+replTest.ports[1]});
@@ -170,5 +171,15 @@ assert.eq(result.ok, 1);
 assert.soon(function() {
     return checkSyncingFrom(nodes[3], replTest.host+":"+replTest.ports[2])
 });
+
+/**
+ * Test forcing a primary to sync from another member
+ */
+
+print("sync a primary from another member: error");
+result = replTest.nodes[0].getDB("admin").runCommand({replSetSyncFrom: replTest.host+":"+replTest.ports[2]});
+printjson(result);
+assert.eq(result.ok, 0);
+assert.eq(result.errmsg, "primaries don't sync");
 
 replTest.stopSet();
