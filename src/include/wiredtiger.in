@@ -436,10 +436,10 @@ struct __wt_session {
 	 *
 	 * @param session the session handle
 	 * @configstart{session.reconfigure, see dist/api_data.py}
-	 * @config{isolation, the isolation level for operations in this
-	 * session\, unless overridden by WT_SESSION::begin_transaction.,a
-	 * string\, chosen from the following options: \c "read-uncommitted"\,
-	 * \c "read-committed"\, \c "snapshot"; default \c read-committed.}
+	 * @config{isolation, the default isolation level for operations in this
+	 * session.,a string\, chosen from the following options: \c
+	 * "read-uncommitted"\, \c "read-committed"\, \c "snapshot"; default \c
+	 * read-committed.}
 	 * @configend
 	 * @errors
 	 */
@@ -792,10 +792,10 @@ struct __wt_session {
 	 *
 	 * @param session the session handle
 	 * @configstart{session.begin_transaction, see dist/api_data.py}
-	 * @config{isolation, if non-empty\, the isolation level for this
-	 * transaction; otherwise inherits the session's isolation level.,a
-	 * string\, chosen from the following options: \c "read-uncommitted"\,
-	 * \c "read-committed"\, \c "snapshot"; default empty.}
+	 * @config{isolation, the isolation level for this transaction; defaults
+	 * to the session's isolation level.,a string\, chosen from the
+	 * following options: \c "read-uncommitted"\, \c "read-committed"\, \c
+	 * "snapshot"; default empty.}
 	 * @config{name, name of the transaction for tracing and debugging.,a
 	 * string; default empty.}
 	 * @config{priority, priority of the transaction for resolving
@@ -1035,7 +1035,12 @@ struct __wt_connection {
 	 * @param connection the connection handle
 	 * @param errhandler An error handler.  If <code>NULL</code>, the
 	 * connection's error handler is used
-	 * @configempty{connection.open_session, see dist/api_data.py}
+	 * @configstart{connection.open_session, see dist/api_data.py}
+	 * @config{isolation, the default isolation level for operations in this
+	 * session.,a string\, chosen from the following options: \c
+	 * "read-uncommitted"\, \c "read-committed"\, \c "snapshot"; default \c
+	 * read-committed.}
+	 * @configend
 	 * @param sessionp the new session handle
 	 * @errors
 	 */

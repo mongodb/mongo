@@ -555,8 +555,6 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
 	WT_SESSION_IMPL *session, *session_ret;
 	uint32_t i;
 
-	WT_UNUSED(config);
-
 	session = conn->default_session;
 	session_ret = NULL;
 
@@ -612,6 +610,13 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
 	 */
 	if (internal)
 		F_SET(session_ret, WT_SESSION_INTERNAL);
+
+	/*
+	 * Configuration: currently, the configuration for open_session is the
+	 * same as session.reconfigure, so use that function.
+	 */
+	if (config != NULL)
+		WT_ERR(__session_reconfigure(session_ret, config));
 
 	/*
 	 * Publish: make the entry visible to server threads.  There must be a

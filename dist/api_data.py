@@ -219,6 +219,12 @@ connection_runtime_config = [
 		    'write']),
 ]
 
+session_config = [
+	Config('isolation', 'read-committed', r'''
+		the default isolation level for operations in this session''',
+		choices=['read-uncommitted', 'read-committed', 'snapshot']),
+]
+
 methods = {
 'file.meta' : Method(file_meta),
 
@@ -311,18 +317,18 @@ methods = {
 
 'session.begin_transaction' : Method([
 	Config('isolation', '', r'''
-		if non-empty, the isolation level for this transaction; otherwise
-		inherits the session's isolation level''',
+		the isolation level for this transaction; defaults to the
+		session's isolation level''',
 		choices=['read-uncommitted', 'read-committed', 'snapshot']),
 	Config('name', '', r'''
 		name of the transaction for tracing and debugging'''),
-	Config('sync', 'full', r'''
-		how to sync log records when the transaction commits''',
-		choices=['full', 'flush', 'write', 'none']),
 	Config('priority', 0, r'''
 		priority of the transaction for resolving conflicts.
 		Transactions with higher values are less likely to abort''',
 		min='-100', max='100'),
+	Config('sync', 'full', r'''
+		how to sync log records when the transaction commits''',
+		choices=['full', 'flush', 'write', 'none']),
 ]),
 
 'session.commit_transaction' : Method([]),
@@ -360,14 +366,9 @@ methods = {
 		make namespaces distinct or during upgrades'''),
 ]),
 
-'connection.open_session' : Method([]),
+'connection.open_session' : Method(session_config),
 
-'session.reconfigure' : Method([
-	Config('isolation', 'read-committed', r'''
-		the isolation level for operations in this session, unless overridden
-		by WT_SESSION::begin_transaction''',
-		choices=['read-uncommitted', 'read-committed', 'snapshot']),
-]),
+'session.reconfigure' : Method(session_config),
 
 'wiredtiger_open' : Method(connection_runtime_config + [
 	Config('buffer_alignment', '-1', r'''

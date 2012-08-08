@@ -71,10 +71,12 @@ __wt_confchk_connection_load_extension[] = {
 
 const char *
 __wt_confdfl_connection_open_session =
-	"";
+	"isolation=read-committed";
 
 WT_CONFIG_CHECK
 __wt_confchk_connection_open_session[] = {
+	{ "isolation", "string", "choices=[\"read-uncommitted\","
+	    "\"read-committed\",\"snapshot\"]" },
 	{ NULL, NULL, NULL }
 };
 
