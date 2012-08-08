@@ -128,12 +128,21 @@ __session_reconfigure(WT_SESSION *wt_session, const char *config)
 	SESSION_API_CALL(session, reconfigure, config, cfg);
 
 	WT_ERR(__wt_config_gets_defno(session, cfg, "isolation", &cval));
-	if (cval.len != 0)
+	if (cval.len != 0) {
+		if (!F_ISSET(S2C(session), WT_CONN_TRANSACTIONAL))
+			WT_ERR_MSG(session, EINVAL,
+			    "Database not configured for transactions");
+
+		if (TAILQ_FIRST(&session->cursors) != NULL)
+			WT_ERR_MSG(
+			    session, EINVAL, "Not permitted with open cursors");
+
 		session->isolation =
 		    WT_STRING_MATCH("snapshot", cval.str, cval.len) ?
 		    TXN_ISO_SNAPSHOT :
 		    WT_STRING_MATCH("read-uncommitted", cval.str, cval.len) ?
 		    TXN_ISO_READ_UNCOMMITTED : TXN_ISO_READ_COMMITTED;
+	}
 
 err:	API_END_NOTFOUND_MAP(session, ret);
 }
