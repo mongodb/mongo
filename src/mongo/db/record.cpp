@@ -202,67 +202,6 @@ namespace mongo {
         }
     }
 
-    /**
-     * this acts a sort of lru bloom filter for records
-     * if something is in it, the odds of it being in memory is exceedingly high (though not 100%)
-     * if something is not in it, we have to do the more costly thread safe variant
-     * this is also pseudo thread safe, meaning threads may stomp on each other
-     * though the impact of that should be negligible, and the only risk falling back to the slow cachw
-     * or in a bad case, not detecting a page fault
-     */
-    class SimpleCache {
-    public:
-        /*
-        SimpleCache() {
-            _pos = 0;
-        }
-        */
-        bool inCache( size_t page ) const {
-            for ( int i=0; i<SIZE; i++ ) 
-                if ( _entries[i] == page )
-                    return true;
-            return false;
-        }
-        
-        void add( size_t page ) {
-            _entries[_pos++%SIZE] = page;
-        }
-    
-        static SimpleCache* get();
-
-        /*
-        static SimpleCache* get() {
-#if 0
-            unsigned long long id = 0;
-#ifdef _WIN32
-            id = reinterpret_cast<unsigned long long>( GetCurrentThreadId() );
-#else
-            id = static_cast<unsigned long long>(pthread_self());
-#endif
-            return &_threaded[ id % NUM_THREADS ];
-        }
-        */    
-    private:
-        enum { SIZE = 25 };
-        size_t _entries[SIZE];
-        int _pos;
-
-        enum { NUM_THREADS = 128 };
-        //static SimpleCache _threaded[NUM_THREADS];
-    };
-
-    //SimpleCache SimpleCache::_threaded[NUM_THREADS];
-
-#ifdef _WIN32
-    __declspec( thread ) SimpleCache mySimpleCache;
-#else
-    __thread SimpleCache mySimpleCache;
-#endif
-
-    SimpleCache* SimpleCache::get() { 
-        return &mySimpleCache;
-    }
-
     bool Record::MemoryTrackingEnabled = true;
     
     volatile int __record_touch_dummy = 1; // this is used to make sure the compiler doesn't get too smart on us
@@ -321,17 +260,13 @@ namespace mongo {
             if ( rand() % mod == 0 ) 
                 return false;
         } // end DEV test code
-        
+
         if ( ! MemoryTrackingEnabled )
             return true;
 
         const size_t page = (size_t)data >> 12;
         const size_t region = page >> 6;
         const size_t offset = page & 0x3f;
-
-        SimpleCache* sc = SimpleCache::get();
-        if ( sc->inCache( page ) )
-            return true;
 
         if ( ps::rolling[ps::bigHash(region)].access( region , offset , false ) ) {
 #ifdef _DEBUG
@@ -354,19 +289,10 @@ namespace mongo {
 
 
     Record* Record::accessed() {
-        if ( ! MemoryTrackingEnabled )
-            return this;
-
         const size_t page = (size_t)_data >> 12;
         const size_t region = page >> 6;
         const size_t offset = page & 0x3f;        
-
-        SimpleCache* sc = SimpleCache::get();
-        if ( ! sc->inCache( page ) ) {
-            ps::rolling[ps::bigHash(region)].access( region , offset , true );
-            sc->add( page );
-        }
-
+        ps::rolling[ps::bigHash(region)].access( region , offset , true );
         return this;
     }
     
