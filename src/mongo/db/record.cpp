@@ -211,7 +211,7 @@ namespace mongo {
             static const size_t superpageMask = ~0xffffLL;
             static const size_t superpageShift = 16;
             static const size_t pageSelectorMask = 0xf000LL; // selects a page in a superpage
-            static const size_t pageSelectorShift = 12;
+            static const int pageSelectorShift = 12;
                 
             // Tunables
             static const int capacity = 128; // in superpages
@@ -301,7 +301,7 @@ namespace mongo {
         return &_pointerTableData; 
     }
 #elif defined(_WIN32)
-    __declspec( thread ) ps::PointerTable::Data _pointerTable;
+    __declspec( thread ) ps::PointerTable::Data _pointerTableData;
     ps::PointerTable::Data* ps::PointerTable::getData() { 
         return &_pointerTableData; 
     }
