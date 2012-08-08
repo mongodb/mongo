@@ -65,13 +65,15 @@ namespace mongo{
 	{
 		if(!started_)
 			return;
-
+		BSONElement idElement = id["_id"];
+		if(idElement.eoo())
+		        return;
 		zmq::socket_t producer(context_, ZMQ_PUSH);
 		producer.connect("inproc://worker");
 
 		BSONObjBuilder b;
 		b.append("ns",ns);
-		b.append(id["_id"]);		
+		b.append(idElement);		
 		b.append("op",(int)operation);
 		b.append("change",update);
 		std::string msg = b.obj().jsonString(Strict,0);
