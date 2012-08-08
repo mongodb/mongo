@@ -201,7 +201,6 @@ struct __wt_connection_impl {
 	WT_FH *lock_fh;			/* Lock file handle */
 
 	pthread_t cache_evict_tid;	/* Cache eviction server thread ID */
-	pthread_t cache_read_tid;	/* Cache read server thread ID */
 
 					/* Locked: btree list */
 	TAILQ_HEAD(__wt_btree_qh, __wt_btree) btqh;

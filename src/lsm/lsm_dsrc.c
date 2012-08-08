@@ -7,6 +7,10 @@
 
 #include "wt_internal.h"
 
+/*
+ * __lsm_create --
+ *	Implementation of the create operation for LSM trees.
+ */
 static int
 __lsm_create(WT_DATA_SOURCE *dsrc, WT_SESSION *wt_session,
     const char *uri, const char *config)
@@ -19,6 +23,10 @@ __lsm_create(WT_DATA_SOURCE *dsrc, WT_SESSION *wt_session,
 	return (__wt_lsm_tree_create(session, uri, config));
 }
 
+/*
+ * __lsm_drop --
+ *	Implementation of the drop operation for LSM trees.
+ */
 static int
 __lsm_drop(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
     const char *name, const char *cfg[])
@@ -31,6 +39,10 @@ __lsm_drop(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	return (ENOTSUP);
 }
 
+/*
+ * __lsm_open_cursor --
+ *	Implementation of the open_cursor operation for LSM trees.
+ */
 static int
 __lsm_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *wt_session,
     const char *obj, const char *cfg[], WT_CURSOR **new_cursor)
@@ -43,6 +55,10 @@ __lsm_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *wt_session,
 	return (__wt_clsm_open(session, obj, cfg, new_cursor));
 }
 
+/*
+ * __lsm_rename --
+ *	Implementation of the rename operation for LSM trees.
+ */
 static int
 __lsm_rename(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
     const char *oldname, const char *newname, const char *cfg[])
@@ -56,6 +72,10 @@ __lsm_rename(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	return (ENOTSUP);
 }
 
+/*
+ * __lsm_sync --
+ *	Implementation of the sync operation for LSM trees.
+ */
 static int
 __lsm_sync(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
     const char *name, const char *cfg[])
@@ -68,6 +88,10 @@ __lsm_sync(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	return (ENOTSUP);
 }
 
+/*
+ * __lsm_truncate --
+ *	Implementation of the truncate operation for LSM trees.
+ */
 static int
 __lsm_truncate(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
     const char *name, const char *cfg[])
@@ -80,6 +104,10 @@ __lsm_truncate(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	return (ENOTSUP);
 }
 
+/*
+ * __wt_lsm_init --
+ *	Initialize LSM structures during wiredtiger_open.
+ */
 int
 __wt_lsm_init(WT_CONNECTION *wt_conn, const char *config)
 {
@@ -107,4 +135,20 @@ __wt_lsm_init(WT_CONNECTION *wt_conn, const char *config)
 
 	return (wt_conn->add_data_source(wt_conn,
 	    "lsm:", &lsm_dsrc->iface, config));
+}
+
+/*
+ * __wt_lsm_cleanup --
+ *	Clean up LSM structures during connection close.
+ */
+int
+__wt_lsm_cleanup(WT_CONNECTION *wt_conn)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_SESSION_IMPL *session;
+
+	conn = (WT_CONNECTION_IMPL *)wt_conn;
+	session = conn->default_session;
+
+	return (__wt_lsm_tree_close_all(session));
 }

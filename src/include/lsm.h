@@ -13,7 +13,7 @@ struct __wt_cursor_lsm {
 
 	u_int nchunks;
 	WT_CURSOR **cursors;
-	WT_CURSOR *current;     /* The current cursor for iteration */
+	WT_CURSOR *current;     	/* The current cursor for iteration */
 
 #define	WT_CLSM_MULTIPLE        0x01    /* Multiple cursors have values for the
 					   current key */
@@ -24,7 +24,9 @@ struct __wt_cursor_lsm {
 
 struct __wt_lsm_tree {
 	const char *name, *filename;
-	const char *key_format, *value_format;
+	const char *key_format, *value_format, *file_config;
+
+	WT_COLLATOR *collator;
 
 	WT_RWLOCK *rwlock;
 	TAILQ_ENTRY(__wt_lsm_tree) q;
@@ -35,11 +37,15 @@ struct __wt_lsm_tree {
 
 	uint32_t threshhold;
 
-	WT_COLLATOR *collator;
+	WT_CONNECTION_IMPL *conn;	/* Passed to thread_create */
+	pthread_t worker_tid;		/* LSM worker thread */
 
-	u_int nchunks;		/* Number of active chunks */
-	const char **chunk;	/* Array of chunk URIs */
-	size_t chunk_allocated;	/* Space allocated for chunks */
+	u_int nchunks;			/* Number of active chunks */
+	const char **chunk;		/* Array of chunk URIs */
+	size_t chunk_allocated;		/* Space allocated for chunks */
+
+#define	WT_LSM_TREE_OPEN	0x01
+	uint32_t flags;
 };
 
 struct __wt_lsm_data_source {

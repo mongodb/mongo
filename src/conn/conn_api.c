@@ -319,6 +319,12 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 		if (!F_ISSET(s, WT_SESSION_INTERNAL))
 			__wt_free(session, s->hazard);
 
+	/*
+	 * XXX LSM cleanup.
+	 * This is structured so that it could be moved to an extension.
+	 */
+	WT_ERR(__wt_lsm_cleanup(&conn->iface));
+
 	/* Close open btree handles. */
 	WT_TRET(__wt_conn_btree_discard(conn));
 

@@ -447,9 +447,6 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm)
 	WT_DECL_RET;
 	WT_LSM_TREE *lsmtree;
 	WT_SESSION_IMPL *session;
-	/* Child cursors always use overwrite and raw mode. */
-	const char *cfg[] =
-	    API_CONF_DEFAULTS(session, open_cursor, "overwrite,raw");
 	u_int i;
 
 	session = (WT_SESSION_IMPL *)clsm->iface.session;
@@ -479,7 +476,12 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm)
 
 	for (i = 0, cp = clsm->cursors; i < clsm->nchunks; i++, cp++) {
 		WT_ERR(__wt_curfile_open(session,
-		    lsmtree->chunk[i], &clsm->iface, cfg, cp));
+		    lsmtree->chunk[i], &clsm->iface, NULL, cp));
+
+		/* Child cursors always use overwrite and raw mode. */
+		F_SET(*cp, WT_CURSTD_OVERWRITE | WT_CURSTD_RAW);
+
+		/* Peek into the btree layer to track the in-memory size. */
 		if (i == 0 && lsmtree->memsizep == NULL)
 			WT_ERR(__wt_btree_get_memsize(
 			    session, &lsmtree->memsizep));
@@ -562,14 +564,9 @@ __wt_clsm_open(WT_SESSION_IMPL *session,
 	 * LSM cursors default to overwrite: if no setting was supplied, turn
 	 * it on.
 	 */
-	if (cfg[1] == NULL)
+	if (cfg[1] != NULL || __wt_config_getones(
+	    session, cfg[1], "overwrite", &cval) == WT_NOTFOUND)
 		F_SET(cursor, WT_CURSTD_OVERWRITE);
-	else {
-		ret = __wt_config_getones(session, cfg[1], "overwrite", &cval);
-		if (ret == WT_NOTFOUND)
-			F_SET(cursor, WT_CURSTD_OVERWRITE);
-		WT_ERR_NOTFOUND_OK(ret);
-	}
 
 	if (0) {
 err:		(void)__clsm_close(cursor);
