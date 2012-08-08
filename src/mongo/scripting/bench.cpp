@@ -120,6 +120,7 @@ namespace mongo {
         hideResults = true;
         handleErrors = false;
         hideErrors = false;
+        loopCommands = true;
 
         trapPattern.reset();
         noTrapPattern.reset();
@@ -164,8 +165,8 @@ namespace mongo {
             this->throwGLE = args["throwGLE"].trueValue();
         if ( ! args["breakOnTrap"].eoo() )
             this->breakOnTrap = args["breakOnTrap"].trueValue();
-
-        uassert(16164, "loopCommands config not supported", args["loopCommands"].eoo());
+        if ( ! args["loopCommands"].eoo() )
+            this->loopCommands = args["loopCommands"].trueValue();
 
         if ( ! args["trapPattern"].eoo() ){
             const char* regex = args["trapPattern"].regex();
@@ -651,6 +652,8 @@ namespace mongo {
 
                 sleepmillis( delay );
             }
+            if ( ! _config->loopCommands )
+                break;
         }
 
         conn->getLastError();

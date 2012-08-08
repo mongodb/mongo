@@ -88,6 +88,7 @@ namespace mongo {
         bool hideResults;
         bool handleErrors;
         bool hideErrors;
+        bool loopCommands;
 
         boost::shared_ptr< pcrecpp::RE > trapPattern;
         boost::shared_ptr< pcrecpp::RE > noTrapPattern;
