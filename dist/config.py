@@ -146,12 +146,12 @@ def checkstr(c):
 
 def get_default(c):
 	t = gettype(c)
-	if c.default or t == 'int':
+	if c.default == 'false':
+		return '0'
+	elif (c.default or t == 'int') and c.default != 'true':
 		return str(c.default)
-	elif t == 'string':
-		return ''
 	else:
-		return '()'
+		return ''
 
 for name in sorted(api_data.methods.keys()):
 	ctype = api_data.methods[name].config
