@@ -53,14 +53,16 @@ struct __wt_txn_global {
 	wt_txnid_t ckpt_txnid;		/* ID of checkpoint, or WT_TXN_NONE */
 };
 
+enum __wt_txn_isolation {
+	TXN_ISO_READ_UNCOMMITTED,
+	TXN_ISO_READ_COMMITTED,
+	TXN_ISO_SNAPSHOT
+};
+
 struct __wt_txn {
 	wt_txnid_t id;
 
-	enum {
-		TXN_ISO_READ_UNCOMMITTED,
-		TXN_ISO_READ_COMMITTED,
-		TXN_ISO_SNAPSHOT
-	} isolation;
+	WT_TXN_ISOLATION isolation;
 
 	/*
 	 * Snapshot data:

@@ -430,6 +430,21 @@ struct __wt_session {
 	 */
 	int __F(close)(WT_SESSION *session, const char *config);
 
+	/*! Reconfigure a session handle.
+	 *
+	 * @snippet ex_all.c Reconfigure a session
+	 *
+	 * @param session the session handle
+	 * @configstart{session.reconfigure, see dist/api_data.py}
+	 * @config{isolation, the isolation level for operations in this
+	 * session\, unless overridden by WT_SESSION::begin_transaction.,a
+	 * string\, chosen from the following options: \c "read-uncommitted"\,
+	 * \c "read-committed"\, \c "snapshot"; default \c read-committed.}
+	 * @configend
+	 * @errors
+	 */
+	int __F(reconfigure)(WT_SESSION *session, const char *config);
+
 	/*! @name Cursor handles
 	 * @{
 	 */
@@ -517,10 +532,6 @@ struct __wt_session {
 	 * The cursor dump format is compatible with the @ref utility_dump and
 	 * @ref utility_load commands.,a string\, chosen from the following
 	 * options: \c "hex"\, \c "print"; default empty.}
-	 * @config{isolation, the isolation level for this cursor\, ignored for
-	 * transactional cursors.,a string\, chosen from the following options:
-	 * \c "snapshot"\, \c "read-committed"\, \c "read-uncommitted"; default
-	 * \c read-committed.}
 	 * @config{next_random, configure the cursor to return a pseudo-random
 	 * record from the object; valid only for row-store cursors.  Cursors
 	 * configured with next_random only support the WT_CURSOR::next and
@@ -781,9 +792,10 @@ struct __wt_session {
 	 *
 	 * @param session the session handle
 	 * @configstart{session.begin_transaction, see dist/api_data.py}
-	 * @config{isolation, the isolation level for this transaction.,a
+	 * @config{isolation, if non-empty\, the isolation level for this
+	 * transaction; otherwise inherits the session's isolation level.,a
 	 * string\, chosen from the following options: \c "read-uncommitted"\,
-	 * \c "snapshot"; default \c snapshot.}
+	 * \c "read-committed"\, \c "snapshot"; default empty.}
 	 * @config{name, name of the transaction for tracing and debugging.,a
 	 * string; default empty.}
 	 * @config{priority, priority of the transaction for resolving
@@ -1031,7 +1043,7 @@ struct __wt_connection {
 	    WT_EVENT_HANDLER *errhandler, const char *config,
 	    WT_SESSION **sessionp);
 
-	/*! Reconfigure a connection at run-time.
+	/*! Reconfigure a connection handle.
 	 *
 	 * @snippet ex_all.c Reconfigure a connection
 	 *

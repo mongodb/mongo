@@ -381,6 +381,10 @@ session_ops(WT_SESSION *session)
 {
 	int ret;
 
+	/*! [Reconfigure a session] */
+	ret = session->reconfigure(session, "isolation=snapshot");
+	/*! [Reconfigure a session] */
+
 	cursor_ops(session);
 
 	/*! [Create a table] */

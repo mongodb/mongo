@@ -271,10 +271,6 @@ methods = {
 		hexadecimal encoded.  The cursor dump format is compatible
 		with the @ref utility_dump and @ref utility_load commands''',
 		choices=['hex', 'print']),
-	Config('isolation', 'read-committed', r'''
-		the isolation level for this cursor, ignored for transactional
-		cursors''',
-		choices=['snapshot', 'read-committed', 'read-uncommitted']),
 	Config('next_random', 'false', r'''
 		configure the cursor to return a pseudo-random record from
 		the object; valid only for row-store cursors.  Cursors
@@ -314,9 +310,10 @@ methods = {
 'session.verify' : Method([]),
 
 'session.begin_transaction' : Method([
-	Config('isolation', 'snapshot', r'''
-		the isolation level for this transaction''',
-		choices=['read-uncommitted', 'snapshot']),
+	Config('isolation', '', r'''
+		if non-empty, the isolation level for this transaction; otherwise
+		inherits the session's isolation level''',
+		choices=['read-uncommitted', 'read-committed', 'snapshot']),
 	Config('name', '', r'''
 		name of the transaction for tracing and debugging'''),
 	Config('sync', 'full', r'''
@@ -364,6 +361,13 @@ methods = {
 ]),
 
 'connection.open_session' : Method([]),
+
+'session.reconfigure' : Method([
+	Config('isolation', 'read-committed', r'''
+		the isolation level for operations in this session, unless overridden
+		by WT_SESSION::begin_transaction''',
+		choices=['read-uncommitted', 'read-committed', 'snapshot']),
+]),
 
 'wiredtiger_open' : Method(connection_runtime_config + [
 	Config('buffer_alignment', '-1', r'''

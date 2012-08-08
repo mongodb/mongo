@@ -115,9 +115,14 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_ASSERT(session, txn_state->id == WT_TXN_NONE);
 
 	WT_RET(__wt_config_gets_defno(session, cfg, "isolation", &cval));
-	txn->isolation =
-	    WT_STRING_MATCH("snapshot", cval.str, cval.len) ?
-	    TXN_ISO_SNAPSHOT : TXN_ISO_READ_UNCOMMITTED;
+	if (cval.len == 0)
+		txn->isolation = session->isolation;
+	else
+		txn->isolation =
+		    WT_STRING_MATCH("snapshot", cval.str, cval.len) ?
+		    TXN_ISO_SNAPSHOT :
+		    WT_STRING_MATCH("read-uncommitted", cval.str, cval.len) ?
+		    TXN_ISO_READ_UNCOMMITTED : TXN_ISO_READ_COMMITTED;
 
 	F_SET(txn, TXN_RUNNING);
 	F_SET(txn_state, TXN_STATE_RUNNING);
@@ -176,7 +181,7 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 
 	/* Reset the transaction state to not running. */
 	txn->id = WT_TXN_NONE;
-	txn->isolation = TXN_ISO_READ_UNCOMMITTED;
+	txn->isolation = session->isolation;
 	F_CLR(txn, TXN_ERROR | TXN_RUNNING);
 
 	return (0);
@@ -222,6 +227,9 @@ int
 __wt_txn_init(WT_SESSION_IMPL *session)
 {
 	WT_TXN *txn;
+
+	/* The default isolation level is read-committed. */
+	session->isolation = TXN_ISO_READ_COMMITTED;
 
 	txn = &session->txn;
 	txn->id = WT_TXN_NONE;

@@ -114,6 +114,31 @@ err:	API_END_NOTFOUND_MAP(session, ret);
 }
 
 /*
+ * __session_reconfigure --
+ *	WT_SESSION->reconfigure method.
+ */
+static int
+__session_reconfigure(WT_SESSION *wt_session, const char *config)
+{
+	WT_CONFIG_ITEM cval;
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+
+	session = (WT_SESSION_IMPL *)wt_session;
+	SESSION_API_CALL(session, reconfigure, config, cfg);
+
+	WT_ERR(__wt_config_gets_defno(session, cfg, "isolation", &cval));
+	if (cval.len != 0)
+		session->isolation =
+		    WT_STRING_MATCH("snapshot", cval.str, cval.len) ?
+		    TXN_ISO_SNAPSHOT :
+		    WT_STRING_MATCH("read-uncommitted", cval.str, cval.len) ?
+		    TXN_ISO_READ_UNCOMMITTED : TXN_ISO_READ_COMMITTED;
+
+err:	API_END_NOTFOUND_MAP(session, ret);
+}
+
+/*
  * __session_open_cursor --
  *	WT_SESSION->open_cursor method.
  */
@@ -510,6 +535,7 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
 	static WT_SESSION stds = {
 		NULL,
 		__session_close,
+		__session_reconfigure,
 		__session_open_cursor,
 		__session_create,
 		__session_drop,

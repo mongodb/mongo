@@ -157,7 +157,8 @@ __wt_txn_update_check(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 	WT_TXN *txn;
 
 	txn = &session->txn;
-	if (txn->isolation == TXN_ISO_SNAPSHOT)
+	if (txn->isolation == TXN_ISO_READ_COMMITTED ||
+	    txn->isolation == TXN_ISO_SNAPSHOT)
 		while (upd != NULL && !__wt_txn_visible(session, upd->txnid)) {
 			if (upd->txnid != WT_TXN_ABORTED) {
 				WT_BSTAT_INCR(session, update_conflict);
@@ -205,7 +206,7 @@ __wt_txn_ancient(WT_SESSION_IMPL *session, wt_txnid_t id)
  * __wt_txn_read_first --
  *	Called for the first page read for a session.
  */
-static inline void
+static inline int
 __wt_txn_read_first(WT_SESSION_IMPL *session)
 {
 	WT_TXN *txn;
@@ -224,7 +225,13 @@ __wt_txn_read_first(WT_SESSION_IMPL *session)
 	if (!F_ISSET(txn, TXN_RUNNING)) {
 		WT_ASSERT(session, txn_state->id == WT_TXN_NONE);
 		txn_state->id = txn_global->current;
+
+		if (session->isolation == TXN_ISO_READ_COMMITTED ||
+		    session->isolation == TXN_ISO_SNAPSHOT)
+			WT_RET(__wt_txn_get_snapshot(session, WT_TXN_NONE));
 	}
+
+	return (0);
 }
 
 /*

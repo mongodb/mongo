@@ -520,6 +520,8 @@ extern const char *__wt_confdfl_session_log_printf;
 extern const char *__wt_confchk_session_log_printf;
 extern const char *__wt_confdfl_session_open_cursor;
 extern const char *__wt_confchk_session_open_cursor;
+extern const char *__wt_confdfl_session_reconfigure;
+extern const char *__wt_confchk_session_reconfigure;
 extern const char *__wt_confdfl_session_rename;
 extern const char *__wt_confchk_session_rename;
 extern const char *__wt_confdfl_session_rollback_transaction;

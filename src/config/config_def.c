@@ -119,13 +119,13 @@ __wt_confchk_index_meta =
 
 const char *
 __wt_confdfl_session_begin_transaction =
-    "isolation=snapshot,name="",priority=0,sync=full";
+    "isolation="",name="",priority=0,sync=full";
 
 const char *
 __wt_confchk_session_begin_transaction =
-    "isolation=(choices=[\"read-uncommitted\",\"snapshot\"]),name=(),"
-    "priority=(type=int,min=-100,max=100),sync=(choices=[\"full\",\"flush\","
-    "\"write\",\"none\"])";
+    "isolation=(choices=[\"read-uncommitted\",\"read-committed\","
+    "\"snapshot\"]),name=(),priority=(type=int,min=-100,max=100),"
+    "sync=(choices=[\"full\",\"flush\",\"write\",\"none\"])";
 
 const char *
 __wt_confdfl_session_checkpoint =
@@ -202,17 +202,25 @@ __wt_confchk_session_log_printf =
 
 const char *
 __wt_confdfl_session_open_cursor =
-    "append=false,bulk=false,checkpoint="",dump="",isolation=read-committed,"
-    "next_random=false,overwrite=false,raw=false,statistics=false,"
-    "statistics_clear=false,target=()";
+    "append=false,bulk=false,checkpoint="",dump="",next_random=false,"
+    "overwrite=false,raw=false,statistics=false,statistics_clear=false,"
+    "target=()";
 
 const char *
 __wt_confchk_session_open_cursor =
     "append=(type=boolean),bulk=(type=boolean),checkpoint=(),"
-    "dump=(choices=[\"hex\",\"print\"]),isolation=(choices=[\"snapshot\","
-    "\"read-committed\",\"read-uncommitted\"]),next_random=(type=boolean),"
+    "dump=(choices=[\"hex\",\"print\"]),next_random=(type=boolean),"
     "overwrite=(type=boolean),raw=(type=boolean),statistics=(type=boolean),"
     "statistics_clear=(type=boolean),target=(type=list)";
+
+const char *
+__wt_confdfl_session_reconfigure =
+    "isolation=read-committed";
+
+const char *
+__wt_confchk_session_reconfigure =
+    "isolation=(choices=[\"read-uncommitted\",\"read-committed\","
+    "\"snapshot\"])";
 
 const char *
 __wt_confdfl_session_rename =
