@@ -24,6 +24,7 @@
 #include "mongo/db/index_update.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_details.h"
+#include "mongo/db/repl/rs.h"
 
 namespace mongo {
 
@@ -67,22 +68,57 @@ namespace mongo {
     void prefetchIndexPages(NamespaceDetails *nsd, const BSONObj& obj) {
         DiskLoc unusedDl; // unused
         IndexInterface::IndexInserter inserter;
-
-        // includes all indexes, including ones
-        // in the process of being built
-        int indexCount = nsd->nIndexesBeingBuilt(); 
         BSONObjSet unusedKeys;
-        for ( int indexNo = 0; indexNo < indexCount; indexNo++ ) {
-            // This will page in all index pages for the given object.
+        ReplSetImpl::IndexPrefetchConfig prefetchConfig = theReplSet->getIndexPrefetchConfig();
+        switch (prefetchConfig) {
+        case ReplSetImpl::PREFETCH_NONE:
+            return;
+        case ReplSetImpl::PREFETCH_ID_ONLY:
+        {
+            int indexNo = nsd->findIdIndex();
+            if (indexNo == -1) return;
             try {
-                fetchIndexInserters(/*out*/unusedKeys, inserter, nsd, indexNo, obj, unusedDl, /*allowDups*/true);
+                fetchIndexInserters(/*out*/unusedKeys, 
+                                    inserter, 
+                                    nsd, 
+                                    indexNo, 
+                                    obj, 
+                                    unusedDl, 
+                                    /*allowDups*/true);
             }
             catch (const DBException& e) {
                 LOG(2) << "ignoring exception in prefetchIndexPages(): " << e.what() << endl;
             }
-            unusedKeys.clear();
+            break;
+        }
+        case ReplSetImpl::PREFETCH_ALL:
+        {
+            // indexCount includes all indexes, including ones
+            // in the process of being built
+            int indexCount = nsd->nIndexesBeingBuilt(); 
+            for ( int indexNo = 0; indexNo < indexCount; indexNo++ ) {
+                // This will page in all index pages for the given object.
+                try {
+                    fetchIndexInserters(/*out*/unusedKeys, 
+                                        inserter, 
+                                        nsd, 
+                                        indexNo, 
+                                        obj, 
+                                        unusedDl, 
+                                        /*allowDups*/true);
+                }
+                catch (const DBException& e) {
+                    LOG(2) << "ignoring exception in prefetchIndexPages(): " << e.what() << endl;
+                }
+                unusedKeys.clear();
+            }
+            break;
+        }
+        default:
+            fassertFailed(16427);
         }
     }
+
 
     void prefetchRecordPages(const char* ns, const BSONObj& obj) {
         BSONElement _id;

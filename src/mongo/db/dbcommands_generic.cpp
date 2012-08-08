@@ -124,6 +124,8 @@ namespace mongo {
         */
     unsigned replApplyBatchSize = 1;
 
+    const char* fetchReplIndexPrefetchParam();
+
     class CmdGet : public Command {
     public:
         CmdGet() : Command( "getParameter" ) { }
@@ -160,7 +162,9 @@ namespace mongo {
             if( all || cmdObj.hasElement("replApplyBatchSize") ) {
                 result.append("replApplyBatchSize", replApplyBatchSize);
             }
-
+            if (all || cmdObj.hasElement("replIndexPrefetch")) {
+                result.append("replIndexPrefetch", fetchReplIndexPrefetchParam());
+            }
             if ( before == result.len() ) {
                 errmsg = "no option found to get";
                 return false;

@@ -45,6 +45,10 @@ namespace mongo {
         return true;
     }
 
+    const char* fetchReplIndexPrefetchParam() { 
+        return "unsupported"; 
+    }
+
     namespace dbgrid_pub_cmds {
 
         class PublicGridCommand : public Command {

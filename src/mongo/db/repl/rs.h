@@ -515,16 +515,32 @@ namespace mongo {
         threadpool::ThreadPool _prefetcherPool;
 
     public:
+        // Allow index prefetching to be turned on/off
+        enum IndexPrefetchConfig {
+            PREFETCH_NONE=0, PREFETCH_ID_ONLY=1, PREFETCH_ALL=2
+        };
+
+        void setIndexPrefetchConfig(const IndexPrefetchConfig cfg) {
+            _indexPrefetchConfig = cfg;
+        }
+        IndexPrefetchConfig getIndexPrefetchConfig() {
+            return _indexPrefetchConfig;
+        }
+            
         static const int replWriterThreadCount;
         static const int replPrefetcherThreadCount;
         threadpool::ThreadPool& getPrefetchPool() { return _prefetcherPool; }
         threadpool::ThreadPool& getWriterPool() { return _writerPool; }
+
 
         const ReplSetConfig::MemberCfg& myConfig() const { return _config; }
         bool tryToGoLiveAsASecondary(OpTime&); // readlocks
         void syncRollback(OplogReader& r);
         void syncThread();
         const OpTime lastOtherOpTime() const;
+
+    private:
+        IndexPrefetchConfig _indexPrefetchConfig;
     };
 
     class ReplSet : public ReplSetImpl {

@@ -397,6 +397,21 @@ namespace mongo {
                 log() << "replSet warning command line seed " << i->toString() << " is not present in the current repl set config" << rsLog;
             }
         }
+
+        // Figure out indexPrefetch setting
+        std::string& prefetch = cmdLine.rsIndexPrefetch;
+        if (!prefetch.empty()) {
+            IndexPrefetchConfig prefetchConfig = PREFETCH_ALL;
+            if (prefetch == "none")
+                prefetchConfig = PREFETCH_NONE;
+            else if (prefetch == "_id_only")
+                prefetchConfig = PREFETCH_ID_ONLY;
+            else if (prefetch == "all")
+                prefetchConfig = PREFETCH_ALL;
+            else
+                warning() << "unrecognized indexPrefetch setting: " << prefetch << endl;
+            setIndexPrefetchConfig(prefetchConfig);
+        }
     }
 
     ReplSetImpl::ReplSetImpl() :
