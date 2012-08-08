@@ -200,7 +200,122 @@ namespace mongo {
         int bigHash( size_t region ) {
             return hash( region ) % BigHashSize;
         }
+
+        /** This class is a thread-local cache of the pages we have seen */
+        class PointerTable {
+        public:
+            /** call this to check a page has been seen yet. */
+            bool seen(size_t ptr) {
+                resetIfNeeded();
+
+                // A bucket contains 4 superpages each containing 16 contiguous pages
+                // See below for a more detailed explanation of superpages
+                size_t* bucket = _table[bucketFor(ptr)];
+
+                for (int i = 0; i < bucketSize; i++) {
+                    if (superpageOf(ptr) == superpageOf(bucket[i])) {
+                        if (haveSeenPage(bucket[i], ptr))
+                            return true;
+
+                        markPageSeen(bucket[i], ptr);
+                        return false;
+                    }
+                }
+
+                // superpage isn't in thread-local cache
+                // slide bucket forward and add new superpage at front
+                for (int i = bucketSize-1; i > 0; i--)
+                    bucket[i] = bucket[i-1];
+
+                bucket[0] = superpageOf(ptr);
+                markPageSeen(bucket[0], ptr);
+
+                return false;
+            }
+
+            static PointerTable* get();
+
+        private:
+            void resetIfNeeded() {
+                const long long now = Listener::getElapsedTimeMillis();
+                if (MONGO_unlikely(now - _lastReset > RotateTimeSecs*1000))
+                    reset();
+            }
+
+            void reset() {
+                memset(_table, 0, sizeof(_table));
+                _lastReset = Listener::getElapsedTimeMillis();
+            }
+
+            static size_t superpageOf(size_t ptr) {
+                return ptr & superpageMask;
+            }
+
+            static size_t bucketFor(size_t ptr) {
+                return (ptr >> superpageShift) % buckets;
+            }
+
+            static bool haveSeenPage(size_t superpage, size_t ptr) {
+                return superpage & pageBitOf(ptr);
+            }
+
+            static void markPageSeen(size_t& superpage, size_t ptr) {
+                superpage |= pageBitOf(ptr);
+            }
+
+            static size_t pageBitOf(size_t ptr) {
+                return 1 << ((ptr & pageSelectorMask) >> pageSelectorShift);
+            }
+
+            enum {
+                /* A "superpage" is a group of 16 contiguous pages that differ
+                 * only in the low-order 16 bits. This means that there is
+                 * enough room in the low-order bits to store a bitmap for each
+                 * page in the superpage.
+                 */
+                superpageMask = ~0xffffLL,
+                superpageShift = 16,
+                pageSelectorMask = 0xf000LL, // selects a page in a superpage
+                pageSelectorShift = 12,
+
+                // Tunables
+                capacity = 128, // in superpages
+                bucketSize = 4, // half cache line
+                buckets = capacity/bucketSize,
+            };
+
+            /** organized similar to a CPU cache
+             *  bucketSize-way set associative
+             *  least-recently-inserted replacement policy
+             */
+            size_t _table[buckets][bucketSize];
+            long long _lastReset; // time in millis
+        };
     }
+
+    
+    // These need to be outside the ps namespace due to the way they are defined
+#if defined(__linux__) && defined(__GNUC__)
+    __thread ps::PointerTable _pointerTable;
+    ps::PointerTable* ps::PointerTable::get() { 
+        return &_pointerTable; 
+    }
+#elif defined(_WIN32)
+    __declspec( thread ) ps::PointerTable _pointerTable;
+    ps::PointerTable* ps::PointerTable::get() { 
+        return &_pointerTable; 
+    }
+#else
+    boost::thread_specific_ptr<ps::PointerTable> _pointerTable;
+    ps::PointerTable* ps::PointerTable::get() { 
+        PointerTable* pt = _pointerTable.get();
+        if ( ! pt ) {
+            pt = new ps::PointerTable();
+            _pointerTable.reset( pt );
+        }
+        return pt;
+    }
+#endif
 
     bool Record::MemoryTrackingEnabled = true;
     
@@ -268,7 +383,9 @@ namespace mongo {
         const size_t region = page >> 6;
         const size_t offset = page & 0x3f;
 
-        if ( ps::rolling[ps::bigHash(region)].access( region , offset , false ) ) {
+        const bool seen = ps::PointerTable::get()->seen(reinterpret_cast<size_t>(data));
+        if (seen || ps::rolling[ps::bigHash(region)].access( region , offset , false ) ) {
+        
 #ifdef _DEBUG
             if ( blockSupported && ! ProcessInfo::blockInMemory( const_cast<char*>(data) ) ) {
                 warning() << "we think data is in ram but system says no"  << endl;
@@ -289,10 +406,14 @@ namespace mongo {
 
 
     Record* Record::accessed() {
-        const size_t page = (size_t)_data >> 12;
-        const size_t region = page >> 6;
-        const size_t offset = page & 0x3f;        
-        ps::rolling[ps::bigHash(region)].access( region , offset , true );
+        const bool seen = ps::PointerTable::get()->seen(reinterpret_cast<size_t>(_data));
+        if (!seen){
+            const size_t page = (size_t)_data >> 12;
+            const size_t region = page >> 6;
+            const size_t offset = page & 0x3f;        
+            ps::rolling[ps::bigHash(region)].access( region , offset , true );
+        }
+
         return this;
     }
     
