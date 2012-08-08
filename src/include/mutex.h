@@ -79,11 +79,11 @@
 #define	WT_WRITE_BARRIER()
 #define	HAVE_ATOMICS 1
 #elif defined(__GNUC__)
-#define	WT_ATOMIC_ADD(v, val)                                           \
+#define	WT_ATOMIC_ADD(v, val)						\
 	__sync_add_and_fetch(&(v), val)
-#define	WT_ATOMIC_CAS(v, oldv, newv)                                    \
+#define	WT_ATOMIC_CAS(v, oldv, newv)					\
 	__sync_bool_compare_and_swap(&(v), oldv, newv)
-#define	WT_ATOMIC_SUB(v, val)                                           \
+#define	WT_ATOMIC_SUB(v, val)						\
 	__sync_sub_and_fetch(&(v), val)
 
 #if defined(x86_64) || defined(__x86_64__)

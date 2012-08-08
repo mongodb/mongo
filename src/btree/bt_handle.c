@@ -222,7 +222,7 @@ __btree_conf(WT_SESSION_IMPL *session)
 
 /*
  * __wt_btree_tree_open --
- *      Read in a tree from disk.
+ *	Read in a tree from disk.
  */
 int
 __wt_btree_tree_open(WT_SESSION_IMPL *session, WT_ITEM *dsk)
@@ -241,7 +241,7 @@ __wt_btree_tree_open(WT_SESSION_IMPL *session, WT_ITEM *dsk)
 
 /*
  * __btree_tree_open_empty --
- *      Create an empty in-memory tree.
+ *	Create an empty in-memory tree.
  */
 static int
 __btree_tree_open_empty(WT_SESSION_IMPL *session)
@@ -405,7 +405,7 @@ __wt_btree_get_memsize(WT_SESSION_IMPL *session, uint32_t **memsizep)
 
 /*
  * __btree_get_last_recno --
- *      Set the last record number for a column-store.
+ *	Set the last record number for a column-store.
  */
 static int
 __btree_get_last_recno(WT_SESSION_IMPL *session)

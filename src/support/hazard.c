@@ -42,11 +42,11 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, int *busyp
 	 * page eviction server.
 	 *
 	 * Add the WT_REF reference to the session's hazard list and flush the
-	 * write, then see if the state field is still WT_REF_MEM.  If it's
-	 * still WT_REF_MEM, we can use the page because the page eviction
-	 * server will see our hazard reference before it discards the buffer
-	 * (the eviction server sets the state to WT_REF_LOCKED, then flushes
-	 * memory and checks the hazard references).
+	 * write, then see if the page's state is still valid.  If so, we can
+	 * use the page because the page eviction server will see our hazard
+	 * reference before it discards the page (the eviction server sets the
+	 * state to WT_REF_LOCKED, then flushes memory and checks the hazard
+	 * references).
 	 */
 	for (hp = session->hazard;
 	    hp < session->hazard + conn->hazard_size; ++hp) {
@@ -62,11 +62,19 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, int *busyp
 		WT_FULL_BARRIER();
 
 		/*
-		 * Check to see if the page state is still valid (where valid
-		 * means a state of WT_REF_MEM or WT_REF_EVICT_WALK).
+		 * Check if the page state is still valid, where valid means a
+		 * state of WT_REF_MEM or WT_REF_EVICT_WALK and the pointer is
+		 * unchanged.  (The pointer can change, it means the page was
+		 * evicted between the time we set our hazard reference and the
+		 * publication.  It would theoretically be possible for the
+		 * page to be evicted and a different page read into the same
+		 * memory, so the pointer hasn't changed but the contents have.
+		 * That's OK, we found this page in tree's key space, whatever
+		 * page we find here is the page page for us to use.)
 		 */
-		if (ref->state == WT_REF_MEM ||
-		    ref->state == WT_REF_EVICT_WALK) {
+		if (ref->page == hp->page &&
+		    (ref->state == WT_REF_MEM ||
+		    ref->state == WT_REF_EVICT_WALK)) {
 			WT_VERBOSE_RET(session, hazard,
 			    "session %p hazard %p: set", session, ref->page);
 
@@ -88,9 +96,7 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, int *busyp
 		 * go ahead and complete the eviction.
 		 *
 		 * We don't bother publishing this update: the worst case is we
-		 * prevent the page from being evicted, but that's not going to
-		 * happen repeatedly, the eviction thread gives up and won't try
-		 * again until it loops around through the tree.
+		 * prevent some random page from being evicted.
 		 */
 		hp->page = NULL;
 		*busyp = 1;

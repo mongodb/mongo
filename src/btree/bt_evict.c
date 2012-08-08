@@ -12,7 +12,6 @@ static int  __evict_file_request(WT_SESSION_IMPL *, int);
 static int  __evict_file_request_walk(WT_SESSION_IMPL *);
 static int  __evict_lru(WT_SESSION_IMPL *);
 static int  __evict_lru_cmp(const void *, const void *);
-static void __evict_lru_sort(WT_SESSION_IMPL *);
 static int  __evict_page_request_walk(WT_SESSION_IMPL *);
 static int  __evict_walk(WT_SESSION_IMPL *);
 static int  __evict_walk_file(WT_SESSION_IMPL *, u_int *);
@@ -448,9 +447,8 @@ err:	if (was_running) {
 
 /*
  * __evict_file_request_walk --
- *      Walk the session list looking for sync/close requests.  If we find a
- *      request, perform it, clear the request, and wake up the requesting
- *      thread.
+ *	Walk the session list looking for sync/close requests.  If we find a
+ * request, perform it, clear the request, and wake up the requesting thread.
  */
 static int
 __evict_file_request_walk(WT_SESSION_IMPL *session)
@@ -683,7 +681,8 @@ __evict_lru(WT_SESSION_IMPL *session)
 
 	/* Sort the list into LRU order and restart. */
 	__wt_spin_lock(session, &cache->evict_lock);
-	__evict_lru_sort(session);
+	qsort(cache->evict,
+	    cache->evict_entries, sizeof(WT_EVICT_ENTRY), __evict_lru_cmp);
 	__evict_list_clr_all(session, WT_EVICT_WALK_BASE);
 
 	cache->evict_current = cache->evict;
@@ -824,34 +823,6 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 }
 
 /*
- * __evict_lru_sort --
- *	Sort the list of pages queued for eviction into LRU order.
- */
-static void
-__evict_lru_sort(WT_SESSION_IMPL *session)
-{
-	WT_CACHE *cache;
-
-	/*
-	 * We have an array of page eviction references that may contain NULLs,
-	 * as well as duplicate entries.
-	 *
-	 * First, sort the array by WT_REF address, then delete any duplicates.
-	 * The reason is because we might evict the page but leave a duplicate
-	 * entry in the "saved" area of the array, and that would be a NULL
-	 * dereference on the next run.  (If someone ever tries to remove this
-	 * duplicate cleanup for better performance, you can't fix it just by
-	 * checking the WT_REF state -- that only works if you are discarding
-	 * a page from a single level of the tree; if you are discarding a
-	 * page and its parent, the duplicate of the page's WT_REF might have
-	 * been free'd before a subsequent review of the eviction array.)
-	 */
-	cache = S2C(session)->cache;
-	qsort(cache->evict,
-	    cache->evict_entries, sizeof(WT_EVICT_ENTRY), __evict_lru_cmp);
-}
-
-/*
  * __evict_get_page --
  *	Get a page for eviction.
  */
@@ -977,8 +948,7 @@ __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app)
 
 /*
  * __evict_lru_cmp --
- *	Qsort function: sort LRU eviction array based on the page's read
- *	generation.
+ *	Qsort function: sort the eviction array.
  */
 static int
 __evict_lru_cmp(const void *a, const void *b)
@@ -997,11 +967,9 @@ __evict_lru_cmp(const void *a, const void *b)
 	if (b_page == NULL)
 		return (-1);
 
-	/* Sort the LRU in ascending order. */
-	a_lru = a_page->read_gen;
-	b_lru = b_page->read_gen;
-
 	/*
+	 * Sort by the LRU in ascending order.
+	 *
 	 * Bias in favor of leaf pages.  Otherwise, we can waste time
 	 * considering parent pages for eviction while their child pages are
 	 * still in memory.
@@ -1010,6 +978,8 @@ __evict_lru_cmp(const void *a, const void *b)
 	 * if we have enough good leaf page candidates, we should evict them
 	 * first, but not completely ignore an old internal page.
 	 */
+	a_lru = a_page->read_gen;
+	b_lru = b_page->read_gen;
 	if (a_page->type == WT_PAGE_ROW_INT || a_page->type == WT_PAGE_COL_INT)
 		a_lru += WT_EVICT_GROUP;
 	if (b_page->type == WT_PAGE_ROW_INT || b_page->type == WT_PAGE_COL_INT)

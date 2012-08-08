@@ -482,6 +482,18 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	if (force)
 		WT_ERR(__wt_bt_cache_force_write(session));
 
+	/*
+	 * Clear the tree's modified value and ensure that write happens before
+	 * we reconcile/write any pages.   Any changes before we clear the flag
+	 * are guaranteed to be part of this checkpoint (unless reconciliation
+	 * skips updates for transactional reasons), and changes subsequent to
+	 * the checkpoint start, which might not be included, will re-set the
+	 * modified flag.  The "unless reconciliation skips updates" problem is
+	 * handled in the reconciliation code: if reconciliation skips updates,
+	 * it sets the modified flag itself.
+	 */
+	WT_PUBLISH(btree->modified, 0);
+
 	/* Flush the file from the cache, creating the checkpoint. */
 	WT_ERR(__wt_bt_cache_flush(session,
 	    ckptbase, is_checkpoint ? WT_SYNC : WT_SYNC_DISCARD));

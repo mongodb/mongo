@@ -75,7 +75,7 @@ __wt_session_serialize_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page, int ret)
 	 * they will have to retry their update for reading an old version of
 	 * the page.
 	 */
-       WT_PUBLISH(session->wq_ret, ret);
+	WT_PUBLISH(session->wq_ret, ret);
 
 	/* If the calling thread is sleeping, wake it up. */
 	if (session->wq_sleeping)

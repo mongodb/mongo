@@ -273,7 +273,7 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 		__curfile_close,
 		{ NULL, NULL },		/* TAILQ_ENTRY q */
 		0,			/* recno key */
-		{ 0 },                  /* recno raw buffer */
+		{ 0 },			/* recno raw buffer */
 		{ NULL, 0, 0, NULL, 0 },/* WT_ITEM key */
 		{ NULL, 0, 0, NULL, 0 },/* WT_ITEM value */
 		0,			/* int saved_err */
@@ -352,7 +352,7 @@ __wt_curfile_open(WT_SESSION_IMPL *session, const char *uri,
 		    uri, strlen(uri), cfg, bulk ? WT_BTREE_EXCLUSIVE : 0));
 	else if (WT_PREFIX_MATCH(uri, "file:"))
 		WT_RET(__wt_session_get_btree_ckpt(session,
-		     uri, cfg, bulk ? WT_BTREE_EXCLUSIVE : 0));
+		    uri, cfg, bulk ? WT_BTREE_EXCLUSIVE : 0));
 	else
 		WT_RET(__wt_bad_object_type(session, uri));
 

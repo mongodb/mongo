@@ -140,10 +140,10 @@ typedef struct {
 	WT_ITEM *cur, _cur;		/* Key/Value being built */
 	WT_ITEM *last, _last;		/* Last key/value built */
 
-	int	key_pfx_compress;	/* If can prefix-compress next key */
-	int     key_pfx_compress_conf;	/* If prefix compression configured */
-	int	key_sfx_compress;	/* If can suffix-compress next key */
-	int     key_sfx_compress_conf;	/* If suffix compression configured */
+	int key_pfx_compress;		/* If can prefix-compress next key */
+	int key_pfx_compress_conf;	/* If prefix compression configured */
+	int key_sfx_compress;		/* If can suffix-compress next key */
+	int key_sfx_compress_conf;	/* If suffix compression configured */
 } WT_RECONCILE;
 
 static void __rec_cell_build_addr(
@@ -1983,8 +1983,8 @@ compare:		/*
 		 * discard the underlying blocks, they're no longer useful.
 		 */
 		if (ovfl_state == OVFL_UNUSED)
-			 WT_ERR(__wt_rec_track_onpage_add(
-			     session, page, unpack->data, unpack->size));
+			WT_ERR(__wt_rec_track_onpage_add(
+			    session, page, unpack->data, unpack->size));
 	}
 
 	/* Walk any append list. */
@@ -3062,10 +3062,16 @@ err:			__wt_scr_free(&tkey);
 	}
 
 	/*
-	 * If reconciliation succeeded and no updates were skipped, set the disk
-	 * generation to the write generation as of when reconciliation started.
+	 * Success: if modifications were skipped, the tree cannot be clean.  As
+	 * the checkpoint initiation code might have cleared the tree's modified
+	 * flag, explicitly dirty the page, which includes setting the tree's
+	 * modified flag.  If modifications were not skipped, the page might be
+	 * clean, update the disk generation to the write generation as of when
+	 * reconciliation started.
 	 */
-	if (!r->upd_skipped)
+	if (r->upd_skipped)
+		__wt_page_modify_set(session, page);
+	else
 		mod->disk_gen = r->orig_write_gen;
 
 	return (0);

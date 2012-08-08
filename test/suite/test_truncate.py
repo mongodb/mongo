@@ -38,13 +38,20 @@ from helper import confirm_empty,\
 #       Simple, one-off tests.
 class test_truncate_standalone(wttest.WiredTigerTestCase):
 
-    # Test truncation of an object without URI or either cursor specified,
-    # expect an error.
-    def test_truncate_no_args(self):
-        simple_populate(self, 'file:xxx', 'key_format=S', 10)
+    # Test truncation without URI or cursors specified, or with a URI and
+    # either cursor specified, expect errors.
+    def test_truncate_bad_args(self):
+        uri = 'file:xxx'
+        simple_populate(self, uri, 'key_format=S', 10)
         msg = '/either a URI or start/stop cursors/'
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.truncate(None, None, None, None), msg)
+        cursor = self.session.open_cursor(uri, None, None)
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.session.truncate(uri, cursor, None, None), msg)
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.session.truncate(uri, None, cursor, None), msg)
+
 
 # Test session.truncate.
 #       Scenarios.

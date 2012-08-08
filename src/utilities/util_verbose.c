@@ -37,8 +37,8 @@ __handle_message_verbose(WT_EVENT_HANDLER *handler, const char *message)
  *	Default WT_EVENT_HANDLER->handle_progress implementation: ignore.
  */
 static int
-__handle_progress_verbose(WT_EVENT_HANDLER *handler,
-     const char *operation, uint64_t progress)
+__handle_progress_verbose(
+    WT_EVENT_HANDLER *handler, const char *operation, uint64_t progress)
 {
 	WT_UNUSED(handler);
 

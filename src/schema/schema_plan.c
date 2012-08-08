@@ -173,7 +173,7 @@ __wt_struct_plan(WT_SESSION_IMPL *session, WT_TABLE *table,
 	char coltype, current_coltype;
 
 	saved_btree = session->btree;
-	start_cg = start_col = -1;      /* -Wuninitialized */
+	start_cg = start_col = -1;		/* -Wuninitialized */
 
 	/* Work through the value columns by skipping over the key columns. */
 	WT_ERR(__wt_config_initn(session, &conf, columns, len));

@@ -463,7 +463,7 @@ __cursor_equals(WT_CURSOR_BTREE *a, WT_CURSOR_BTREE *b)
 
 /*
  * __cursor_remove --
- *     Remove an item referenced by the cursor.
+ *	Remove an item referenced by the cursor.
  */
 static inline int
 __cursor_remove(WT_CURSOR_BTREE *cbt)

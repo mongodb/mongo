@@ -21,8 +21,8 @@ struct __wt_process {
  *******************************************/
 /*
  * WT_BTREE_SESSION --
- *      Per-session cache of btree handles to avoid synchronization when
- *      opening cursors.
+ *	Per-session cache of btree handles to avoid synchronization when
+ * opening cursors.
  */
 struct __wt_btree_session {
 	WT_BTREE *btree;
@@ -144,7 +144,7 @@ struct __wt_session_impl {
  */
 struct __wt_named_collator {
 	const char *name;		/* Name of collator */
-	WT_COLLATOR *collator;	        /* User supplied object */
+	WT_COLLATOR *collator;		/* User supplied object */
 	TAILQ_ENTRY(__wt_named_collator) q;	/* Linked list of collators */
 };
 

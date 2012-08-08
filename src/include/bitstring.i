@@ -172,7 +172,7 @@ __bit_ffc(uint8_t *bitf, uint32_t nbits, uint32_t *retp)
 	uint8_t lb;
 	uint32_t byte, stopbyte, value;
 
-	value = 0;              /* -Wuninitialized */
+	value = 0;		/* -Wuninitialized */
 
 	if (nbits == 0)
 		return (-1);

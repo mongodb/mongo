@@ -21,3 +21,9 @@ struct __wt_config_item {
 	int64_t val;
 	enum { ITEM_STRING, ITEM_ID, ITEM_NUM, ITEM_STRUCT } type;
 };
+
+struct __wt_config_check {
+	const char *name;
+	const char *type;
+	const char *checks;
+};

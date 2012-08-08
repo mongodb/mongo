@@ -1104,13 +1104,13 @@ __wt_cksum(const void *chunk, size_t len)
 	crc = 0xffffffff;
 
 	/* Checksum one byte at a time to the first 4B boundary. */
-	 for (p = chunk;
-	     ((uintptr_t)p & (sizeof(uint32_t) - 1)) != 0 &&
-	     len > 0; ++p, --len)
+	for (p = chunk;
+	    ((uintptr_t)p & (sizeof(uint32_t) - 1)) != 0 &&
+	    len > 0; ++p, --len)
 #ifdef WORDS_BIGENDIAN
-	     crc = g_crc_slicing[0][((crc >> 24) ^ *p) & 0xFF] ^ (crc << 8);
+		crc = g_crc_slicing[0][((crc >> 24) ^ *p) & 0xFF] ^ (crc << 8);
 #else
-	     crc = g_crc_slicing[0][(crc ^ *p) & 0xFF] ^ (crc >> 8);
+		crc = g_crc_slicing[0][(crc ^ *p) & 0xFF] ^ (crc >> 8);
 #endif
 
 	/* Checksum in 8B chunks. */

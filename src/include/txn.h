@@ -64,9 +64,9 @@ struct __wt_txn {
 
 	/*
 	 * Snapshot data:
-	 *     everything < snapshot[0] is visible,
-	 *     everything > id is invisible
-	 *     everything in between is visible unless it is in snap_overlap.
+	 *	everything < snapshot[0] is visible,
+	 *	everything > id is invisible
+	 *	everything in between is visible unless it is in snap_overlap.
 	 */
 	wt_txnid_t snap_min, snap_max;
 	wt_txnid_t *snapshot;
