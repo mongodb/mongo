@@ -79,6 +79,8 @@ struct __wt_condvar;
     typedef struct __wt_condvar WT_CONDVAR;
 struct __wt_config;
     typedef struct __wt_config WT_CONFIG;
+struct __wt_config_check;
+    typedef struct __wt_config_check WT_CONFIG_CHECK;
 struct __wt_config_item;
     typedef struct __wt_config_item WT_CONFIG_ITEM;
 struct __wt_connection_impl;
