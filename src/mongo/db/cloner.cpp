@@ -567,10 +567,9 @@ namespace mongo {
         virtual LockType locktype() const { return NONE; }
         CmdCloneCollection() : Command("cloneCollection") { }
         virtual void help( stringstream &help ) const {
-            help << "{ cloneCollection: <namespace>, from: <host> [,query: <query_filter>] [,copyIndexes:<bool>] }"
+            help << "{ cloneCollection: <collection>, from: <host> [,query: <query_filter>] [,copyIndexes:<bool>] }"
                  "\nCopies a collection from one server to another. Do not use on a single server as the destination "
                  "is placed at the same db.collection (namespace) as the source.\n"
-                 "Warning: the local copy of 'ns' is emptied before the copying begins. Any existing data will be lost there."
                  ;
         }
         virtual bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
