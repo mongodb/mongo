@@ -90,18 +90,23 @@ __wt_txn_visible(WT_SESSION_IMPL *session, wt_txnid_t id)
 	if (id == WT_TXN_ABORTED)
 		return (0);
 
-	/*
-	 * Changes with no associated transaction are always visible, and
-	 * non-snapshot transactions see all other changes.
-	 */
+	/* Changes with no associated transaction are always visible. */
+	if (id == WT_TXN_NONE)
+		return (1);
+
+	/* Transactions see their own changes. */
 	txn = &session->txn;
-	if (id == WT_TXN_NONE ||
-	    txn->isolation != TXN_ISO_SNAPSHOT ||
-	    (F_ISSET(txn, TXN_RUNNING) && id == txn->id))
+	if (F_ISSET(txn, TXN_RUNNING) && id == txn->id)
+		return (1);
+
+	/* Read-uncommitted transactions see all other changes. */
+	if (txn->isolation == TXN_ISO_READ_UNCOMMITTED)
 		return (1);
 
 	/*
-	 * The snapshot test.
+	 * TXN_ISO_SNAPSHOT, TXN_ISO_READ_COMMITTED:
+	 * Otherwise, the ID is visible if it is not the result of a concurrent
+	 * transaction, that is, if it is not in the snapshot list.
 	 */
 	if (TXNID_LT(id, txn->snap_min))
 		return (1);
@@ -109,9 +114,8 @@ __wt_txn_visible(WT_SESSION_IMPL *session, wt_txnid_t id)
 		return (0);
 
 	/*
-	 * Otherwise, the ID is visible if it is not the result of a concurrent
-	 * transaction.  That is, if it is not in the snapshot list.  Fast path
-	 * the single-threaded case where there are no concurrent transactions.
+	 * Fast path the single-threaded case where there are no concurrent
+	 * transactions.
 	 */
 	return (txn->snapshot_count == 0 || bsearch(&id, txn->snapshot,
 	    txn->snapshot_count, sizeof(wt_txnid_t), __wt_txnid_cmp) == NULL);
