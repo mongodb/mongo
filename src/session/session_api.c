@@ -625,7 +625,8 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
 	 * same as session.reconfigure, so use that function.
 	 */
 	if (config != NULL)
-		WT_ERR(__session_reconfigure(session_ret, config));
+		WT_ERR(
+		    __session_reconfigure((WT_SESSION *)session_ret, config));
 
 	/*
 	 * Publish: make the entry visible to server threads.  There must be a
