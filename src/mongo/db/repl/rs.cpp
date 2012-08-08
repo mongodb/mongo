@@ -369,7 +369,8 @@ namespace mongo {
         mgr( new Manager(this) ),
         ghost( new GhostSync(this) ),
         _writerPool(replWriterThreadCount),
-        _prefetcherPool(replPrefetcherThreadCount) {
+        _prefetcherPool(replPrefetcherThreadCount),
+        _indexPrefetchConfig(PREFETCH_ALL) {
 
         _cfg = 0;
         memset(_hbmsg, 0, sizeof(_hbmsg));
@@ -424,7 +425,8 @@ namespace mongo {
         mgr(0),
         ghost(0),
         _writerPool(replWriterThreadCount),
-        _prefetcherPool(replPrefetcherThreadCount) {
+        _prefetcherPool(replPrefetcherThreadCount),
+        _indexPrefetchConfig(PREFETCH_ALL) {
     }
 
     ReplSet::ReplSet(ReplSetCmdline& replSetCmdline) : ReplSetImpl(replSetCmdline) {}
