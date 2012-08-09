@@ -1,30 +1,48 @@
 /*! @page file_formats File formats
 
-@section formats File formats
+@section file_formats_formats File formats
 
 WiredTiger supports two underlying file formats: row-store and
-column-store.  WiredTiger row- and column-stores are both key/value
-stores.
+column-store, both are key/value stores.
 
-In a row-store, both keys and data are variable-length byte strings.  In
-a column-store, the key is a 64-bit record number, and the data item is
-either a variable- or fixed-length byte string.
+In a row-store, both keys and data are variable-length byte strings.
+In a column-store, keys are 64-bit record numbers (format type 'r'),
+and data items are either variable- or fixed-length byte strings.
 
-Generally, row-stores are faster for queries where a set of columns are
-required by every lookup (because there's only a single set of meta-data
-pages to go through, or read into the cache).  Column-stores are faster
-for queries where only a few of the columns are required for any lookup
-(because only the columns being returned are present in the cache).
+Generally, row-stores are faster for queries where all of the columns
+are required by every lookup (because there's only a single set of
+meta-data pages to read into the cache and search).  Column-stores are
+faster when most queries require only a subset of the columns (because
+columns can be separated into multiple files and only the columns being
+returned need be present in the cache).
+
+Row-store keys and values, and variable-length column-store values, can
+be up to (4GB - 512B) in length.  Keys and values too large to fit on a
+normal page are stored as overflow items in the file, and are likely to
+require additional file I/O to access.
+
+Fixed-length column-store values (format type 't'), are limited to
+8-bits, and only values between 0 and 255 may be stored.  Additionally,
+there is no out-of-band fixed-length "deleted" value, and deleting a
+value is the same as storing a value of 0.  For the same reason, storing
+a value of 0 will cause cursor scans to skip the record.
+
+WiredTiger does not support duplicate data items: there can be only a
+single value for any given key, and applications are responsible for
+creating unique key/value pairs.
+
+WiredTiger allocates space from the underlying files in block units.
+The minimum file allocation unit WiredTiger supports is 512B and the
+maximum file allocation unit is 512MB.  File block offsets are 64-bit
+(meaning the maximum file size is very, very large).
+
+@section file_formats_compression File formats and compression
 
 Row-stores support three types of compression: prefix compression (where
 any identical portion of each key byte string is only stored once),
 Huffman encoding of individual key/value items, (see @subpage huffman
 for details), and stream compression of the blocks in the file (see @ref
 compression for details).
-
-Unlike some row-stores, WiredTiger does not support duplicate data
-items, that is, for any single key, there can be only a single value,
-and applications are responsible for creating unique key/value pairs.
 
 Column-stores with variable-length byte string values support three
 types of compression: run-length encoding (where duplicate values are
@@ -35,21 +53,5 @@ the file (see @ref compression for details).
 Column-stores with fixed-length byte values support a single type of
 compression: stream compression of the blocks in the file (see @ref
 compression for details).
-
-In row-stores, keys and values too large to fit on a normal page are
-stored as overflow items in the file.  In variable-length column-stores,
-values too large to fit on a normal page are stored as overflow items
-in the file.
-
-WiredTiger allocates space from the underlying files in block units.
-The minimum file allocation unit WiredTiger supports is 512B and the
-maximum file allocation unit is 512MB.  File block offsets are 64-bit
-(meaning the maximum file size is very, very large).
-
-Variable-length column-store values, and row-store keys and values, can
-be up to (4GB - 512B) in length.
-
-Fixed-length values are limited to 8-bits (that is, only values between
-0 and 255 may be stored in fixed-length column-store files).
 
 */
