@@ -54,30 +54,31 @@ attempts to rollback and update the same value.
 
 @section transaction_isolation Isolation levels
 
-WiredTiger supports <code>snapshot</code>, <code>read-committed</code>
-and <code>read-uncommitted</code> isolation levels; the default
-isolation level is is <code>read-committed</code>.
-
-- <code>read-committed</code>:
-Transactions cannot see changes made by other transactions before those
-transactions are committed.  Dirty reads are not possible; non-repeatable
-reads and phantoms are possible.  Read-committed isolation is the
-default.
+WiredTiger supports <code>read-uncommitted</code>,
+<code>read-committed</code> and  <code>snapshot</code> isolation levels;
+the default isolation level is is <code>read-committed</code>.
 
 - <code>read-uncommitted</code>:
 Transactions can see changes made by other transactions before those
 transactions are committed.  Dirty reads, non-repeatable reads and
 phantoms are possible.
 
+- <code>read-committed</code>:
+Transactions cannot see changes made by other transactions before those
+transactions are committed.  Dirty reads are not possible;
+non-repeatable reads and phantoms are possible.
+
 - <code>snapshot</code>:
 Transactions read the versions of records committed before the transaction
 started.  Dirty reads and non-repeatable reads are not possible; phantoms
-are possible.  Snapshot isolation is a strong guarantee, but not equivalent
-to a single-threaded execution of the transactions, known as serializable
+are possible.<br><br>
+Snapshot isolation is a strong guarantee, but not equivalent to a
+single-threaded execution of the transactions, known as serializable
 isolation.  Concurrent transactions T1 and T2 running under snapshot
-isolation may both commit and produce a state that neither (T1 followed by
-T2) or (T2 followed by T1) could have produced, if there is overlap between
-T1's reads and T2's writes, and between T1's writes and T2's reads.
+isolation may both commit and produce a state that neither (T1 followed
+by T2) or (T2 followed by T1) could have produced, if there is overlap
+between T1's reads and T2's writes, and between T1's writes and T2's
+reads.
 
 The transaction isolation level can be configured on a per-transaction
 basis:
