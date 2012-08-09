@@ -11,7 +11,7 @@ struct __wt_cursor_lsm {
 	WT_LSM_TREE *lsmtree;
 	uint64_t dsk_gen;
 
-	u_int nchunks;
+	int nchunks;
 	WT_CURSOR **cursors;
 	WT_CURSOR *current;     	/* The current cursor for iteration */
 
@@ -40,7 +40,7 @@ struct __wt_lsm_tree {
 	WT_CONNECTION_IMPL *conn;	/* Passed to thread_create */
 	pthread_t worker_tid;		/* LSM worker thread */
 
-	u_int nchunks;			/* Number of active chunks */
+	int nchunks;			/* Number of active chunks */
 	const char **chunk;		/* Array of chunk URIs */
 	size_t chunk_allocated;		/* Space allocated for chunks */
 

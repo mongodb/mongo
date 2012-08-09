@@ -8,7 +8,7 @@
 #include "wt_internal.h"
 
 #define	FORALL_CURSORS(clsm, c, i)					\
-	for (i = 0; i < clsm->nchunks; i++)			\
+	for (i = clsm->nchunks - 1; i >= 0; i--)			\
 		if ((c = clsm->cursors[i]) != NULL)
 
 #define	WT_LSM_CMP(s, lsmtree, k1, k2, cmp)				\
@@ -79,7 +79,7 @@ static int
 __clsm_get_current(WT_SESSION_IMPL *session, WT_CURSOR_LSM *clsm, int smallest)
 {
 	WT_CURSOR *c, *current;
-	u_int i;
+	int i;
 	int cmp, multiple;
 
 	current = NULL;
@@ -127,7 +127,7 @@ __clsm_next(WT_CURSOR *cursor)
 	WT_CURSOR *c;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	u_int i;
+	int i;
 	int check, cmp;
 
 	WT_LSM_ENTER(clsm, cursor, session, next);
@@ -184,7 +184,7 @@ __clsm_prev(WT_CURSOR *cursor)
 	WT_CURSOR *c;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	u_int i;
+	int i;
 	int check, cmp;
 
 	WT_LSM_ENTER(clsm, cursor, session, next);
@@ -264,7 +264,7 @@ __clsm_search(WT_CURSOR *cursor)
 	WT_CURSOR_LSM *clsm;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	u_int i;
+	int i;
 
 	WT_LSM_ENTER(clsm, cursor, session, search);
 	WT_CURSOR_NEEDKEY(cursor);
@@ -326,7 +326,7 @@ __clsm_put(
 
 	lsmtree = clsm->lsmtree;
 
-	primary = clsm->cursors[0];
+	primary = clsm->cursors[clsm->nchunks - 1];
 	primary->set_key(primary, key);
 	primary->set_value(primary, value);
 	WT_RET(primary->insert(primary));
@@ -426,7 +426,7 @@ __clsm_close(WT_CURSOR *cursor)
 	WT_CURSOR *c;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	u_int i;
+	int i;
 
 	WT_LSM_ENTER(clsm, cursor, session, close);
 	FORALL_CURSORS(clsm, c, i)
@@ -447,7 +447,7 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm)
 	WT_DECL_RET;
 	WT_LSM_TREE *lsmtree;
 	WT_SESSION_IMPL *session;
-	u_int i;
+	int i;
 
 	session = (WT_SESSION_IMPL *)clsm->iface.session;
 	lsmtree = clsm->lsmtree;
@@ -474,7 +474,7 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm)
 		    &clsm->cursors));
 	clsm->nchunks = lsmtree->nchunks;
 
-	for (i = 0, cp = clsm->cursors; i < clsm->nchunks; i++, cp++) {
+	for (i = 0, cp = clsm->cursors; i != clsm->nchunks; i++, cp++) {
 		WT_ERR(__wt_curfile_open(session,
 		    lsmtree->chunk[i], &clsm->iface, NULL, cp));
 
