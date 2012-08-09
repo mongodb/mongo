@@ -77,21 +77,17 @@ for (var node = NODE_COUNT - 1; node >= 0; node--) {
     };
 
     assert.soon(function() {
-        var connPoolStats = mongos.getDB('admin').runCommand({ connPoolStats: 1 });
-
         /* TODO: SERVER-5175
          * 1. Trigger/Add sleep right before _master gets updated to the current value
          * 2. Trigger/Add sleep right before acquiring the lock inside getMaster. Sleep
          *    should be long enough to time with ReplicaSetMonitorWatcher refresh and
          *    not too long to let sleep at #1 expire.
          */
-
         try {
             mongos.getDB('test').user.find().explain();
         } catch (x) {
             print('query error, try again: ' + x);
         }
-        mongos.getDB('test').user.find().explain();
 
         return waitNodeCount(NODE_COUNT - 1);
     }, 'timed out waiting for node to be removed', 60000);
