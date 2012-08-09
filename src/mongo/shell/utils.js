@@ -827,6 +827,7 @@ if ( typeof _threadInject != "undefined" ){
                                    "jstests/dropdb_race.js",
                                    "jstests/fsync2.js", // May be placed in serialTestsArr once SERVER-4243 is fixed.
                                    "jstests/bench_test1.js",
+                                   "jstests/bench_test4.js",
                                    "jstests/padding.js",
                                    "jstests/queryoptimizera.js",
                                    "jstests/loglong.js" // log might overflow before 
