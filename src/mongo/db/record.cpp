@@ -239,7 +239,7 @@ namespace mongo {
             }
 
             inline size_t pageBitOf(size_t ptr) {
-                return 1 << ((ptr & pageSelectorMask) >> pageSelectorShift);
+                return 1LL << ((ptr & pageSelectorMask) >> pageSelectorShift);
             }
             
             inline size_t superpageOf(size_t ptr) {
