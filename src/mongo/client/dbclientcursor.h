@@ -168,6 +168,8 @@ namespace mongo {
 
         string originalHost() const { return _originalHost; }
 
+        string getns() const { return ns; }
+
         Message* getMessage(){ return batch.m.get(); }
 
         /**

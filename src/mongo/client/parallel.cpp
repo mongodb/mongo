@@ -97,15 +97,16 @@ namespace mongo {
             throw UserException( o["code"].numberInt() , o["$err"].String() );
         }
 
-        BSONObj res = cursor->peekFirst();
-        // For backwards compatibility with v2.0 mongods because in 2.0 commands that care about
-        // versioning (like the count command) will return with the stale config error code, but
-        // don't set the ShardConfigStale result flag on the cursor.
-        // NOTE: This could potentially cause problems if the user's document has a "code" field.
-        // TODO: This should probably be removed for 2.3, as we'll no longer need to support running
-        // with a 2.0 mongod.
-        if ( res.hasField( "code" ) && res["code"].Number() == SendStaleConfigCode ) {
-            throw RecvStaleConfigException( "ClusteredCursor::_checkCursor", res );
+        if ( NamespaceString( cursor->getns() ).isCommand() ) {
+            // For backwards compatibility with v2.0 mongods because in 2.0 commands that care about
+            // versioning (like the count command) will return with the stale config error code, but
+            // don't set the ShardConfigStale result flag on the cursor.
+            // TODO: This should probably be removed for 2.3, as we'll no longer need to support
+            // running with a 2.0 mongod.
+            BSONObj res = cursor->peekFirst();
+            if ( res.hasField( "code" ) && res["code"].Number() == SendStaleConfigCode ) {
+                throw RecvStaleConfigException( "ClusteredCursor::_checkCursor", res );
+            }
         }
     }
 
