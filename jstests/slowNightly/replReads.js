@@ -52,9 +52,13 @@ function testReadLoadBalancing(numReplicas) {
         conn.getDB('test').foo.findOne()
     }
 
+    var profileCriteria = { op: 'query', ns: 'test.foo' };
+
     for (var i = 0; i < secondaries.length; i++) {
         var profileCollection = secondaries[i].getDB('test').system.profile;
-        assert.eq(10, profileCollection.find().count(), "Wrong number of read queries sent to secondary " + i + " " + tojson( profileCollection.find().toArray() ))
+        assert.eq(10, profileCollection.find(profileCriteria).count(),
+            "Wrong number of read queries sent to secondary " + i +
+            " " + tojson( profileCollection.find().toArray() ));
     }
     
     db = primary.getDB( "test" );
@@ -101,7 +105,7 @@ function testReadLoadBalancing(numReplicas) {
     var counts = []
     for (var i = 0; i < secondaries.length; i++) {
         var profileCollection = secondaries[i].getDB('test').system.profile;
-        counts.push( profileCollection.find().count() );
+        counts.push( profileCollection.find(profileCriteria).count() );
     }
 
     counts = counts.sort();
