@@ -306,14 +306,9 @@ namespace mongo {
         return &_pointerTableData; 
     }
 #else
-    boost::thread_specific_ptr<ps::PointerTable::Data> _pointerTable;
+    TSP_DEFINE(ps::PointerTable::Data, _pointerTableData);
     ps::PointerTable::Data* ps::PointerTable::getData() { 
-        PointerTable::Data* pt = _pointerTable.get();
-        if ( ! pt ) {
-            pt = new ps::PointerTable::Data();
-            _pointerTable.reset( pt );
-        }
-        return pt;
+        return _pointerTableData.getMake();
     }
 #endif
 

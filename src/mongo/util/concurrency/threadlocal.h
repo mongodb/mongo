@@ -18,6 +18,7 @@
 
 #include "mongo/client/undef_macros.h"
 #include <boost/thread/tss.hpp>
+#include <boost/bind.hpp>
 #include "mongo/client/redef_macros.h"
 
 
@@ -115,6 +116,48 @@ namespace mongo {
     } \
     TSP<T> p;
 # endif
+
+#elif defined(__APPLE__)
+    template< class T>
+    struct TSP {
+        pthread_key_t _key;
+    public:
+        TSP() {
+            verify( pthread_key_create( &_key, TSP::dodelete ) == 0 );
+        }
+
+        ~TSP() {
+            pthread_key_delete( _key );
+        }
+
+        static void dodelete( void* x ) {
+            T* t = reinterpret_cast<T*>(x);
+            delete t;
+        }
+        
+        T* get() const { 
+            return reinterpret_cast<T*>( pthread_getspecific( _key ) ); 
+        }
+        
+        void reset(T* v) { 
+            T* old = get();
+            delete old;
+            verify( pthread_setspecific( _key, v ) == 0 ); 
+        }
+
+        T* getMake() { 
+            T *t = get();
+            if( t == 0 ) {
+                t = new T();
+                reset( t );
+            }
+            return t;
+        }
+    };
+
+#  define TSP_DECLARE(T,p) extern TSP<T> p;
+
+#  define TSP_DEFINE(T,p) TSP<T> p; 
 
 #else
 
