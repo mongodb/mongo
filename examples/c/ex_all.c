@@ -54,6 +54,7 @@ int cursor_search_near(WT_CURSOR *cursor);
 int hot_backup(WT_SESSION *session);
 int pack_ops(WT_SESSION *session);
 int session_ops(WT_SESSION *session);
+int transaction_ops(WT_CONNECTION *conn, WT_SESSION *session);
 
 const char *progname;
 
@@ -385,8 +386,6 @@ session_ops(WT_SESSION *session)
 	ret = session->reconfigure(session, "isolation=snapshot");
 	/*! [Reconfigure a session] */
 
-	cursor_ops(session);
-
 	/*! [Create a table] */
 	ret = session->create(session,
 	    "table:mytable", "key_format=S,value_format=S");
@@ -396,8 +395,6 @@ session_ops(WT_SESSION *session)
 	ret = session->create(session,
 	    "table:mytable", "key_format=r,value_format=S,cache_resident=true");
 	/*! [Create a cache-resident object] */
-
-	checkpoint_ops(session);
 
 	/*! [Drop a table] */
 	ret = session->drop(session, "table:mytable", NULL);
@@ -469,8 +466,8 @@ session_ops(WT_SESSION *session)
 	return (ret);
 }
 
-static int
-txn_examples(WT_CONNECTION *conn, WT_SESSION *session)
+int
+transaction_ops(WT_CONNECTION *conn, WT_SESSION *session)
 {
 	WT_CURSOR *cursor;
 	int ret;
