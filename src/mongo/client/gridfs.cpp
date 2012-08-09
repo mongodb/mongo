@@ -139,6 +139,12 @@ namespace mongo {
     }
 
     BSONObj GridFS::insertFile(const string& name, const OID& id, gridfs_offset length, const string& contentType) {
+        // Wait for any pending writebacks to finish
+        string err = _client.getLastError();
+        uassert( 16428,
+                 str::stream() << "Error storing GridFS chunk for file: " << name
+                               << ", error: " << err,
+                 err == "" );
 
         BSONObj res;
         if ( ! _client.runCommand( _dbName.c_str() , BSON( "filemd5" << id << "root" << _prefix ) , res ) )
