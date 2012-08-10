@@ -101,13 +101,13 @@ div.navtab {
 /* @group Link Styling */
 
 a {
-	color: #6E5739;
+	color: #3D578C;
 	font-weight: normal;
 	text-decoration: none;
 }
 
 .contents a:visited {
-	color: #836844;
+	color: #4665A2;
 }
 
 a:hover {
@@ -983,7 +983,7 @@ dl.section dd {
 #projectlogo
 {
 	text-align: center;
-	vertical-align: bottom;
+	vertical-align: center;
 	border-collapse: separate;
 }
  
