@@ -183,18 +183,24 @@ namespace mongo {
         };
 
         static string fileName(const char* dbName, int fileNo) {
-            stringstream ss;
+            boost::filesystem::path full(dbpath);
+
+            StackStringBuilder ss;
+            ss << full.string();
+#ifdef _WIN32
+            ss << '\\';
+#else
+            ss << '/';
+#endif
             ss << dbName << '.';
             verify( fileNo >= 0 );
+
             if( fileNo == JEntry::DotNsSuffix )
                 ss << "ns";
             else
                 ss << fileNo;
 
-            // relative name -> full path name
-            boost::filesystem::path full(dbpath);
-            full /= ss.str();
-            return full.string();
+            return ss.str();
         }
 
         RecoveryJob::~RecoveryJob() {
