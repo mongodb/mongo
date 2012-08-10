@@ -77,19 +77,19 @@ class test_txn01(wttest.WiredTigerTestCase):
         s.close()
 
     def check(self, cursor, committed, total):
-	# The cursor itself should see all of the records.
-	if cursor != None:
-	    cursor.reset()
-	    self.assertEqual(self.cursor_count(cursor), total)
+        # The cursor itself should see all of the records.
+        if cursor != None:
+            cursor.reset()
+            self.assertEqual(self.cursor_count(cursor), total)
 
-	# Read-uncommitted should see all of the records.
+        # Read-uncommitted should see all of the records.
         self.check_transaction('isolation=read-uncommitted', total)
 
-	# Snapshot and read-committed should see only committed records.
+        # Snapshot and read-committed should see only committed records.
         self.check_transaction('isolation=snapshot', committed)
         self.check_transaction('isolation=read-committed', committed)
 
-	# Checkpoints should only write committed items.
+        # Checkpoints should only write committed items.
         self.check_checkpoint(committed)
 
     # Loop through a set of inserts, periodically committing; before each
