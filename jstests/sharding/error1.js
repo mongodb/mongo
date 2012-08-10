@@ -1,5 +1,5 @@
-
 s = new ShardingTest( "error1" , 2 , 1 , 1 );
+s.stopBalancer()
 s.adminCommand( { enablesharding : "test" } );
 
 a = s._connections[0].getDB( "test" );
