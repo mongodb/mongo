@@ -116,8 +116,7 @@ namespace mongo {
         massert(13650, str::stream() << "Couldn't open directory '" << dir.string() << "' for flushing: " << errnoWithDescription(), fd >= 0);
         if (fsync(fd) != 0){
             int e = errno;
-            close(fd);
-            massert(13651, str::stream() << "Couldn't fsync directory '" << dir.string() << "': " << errnoWithDescription(e), false);
+            log() << "WARNING can't fsync() parent dir for file: " << dir.string() << " (" << errnoWithDescription(e) << ") this might be ok" << endl;
         }
         close(fd);
 #endif
