@@ -30,12 +30,14 @@ __cursor_fix_append_next(WT_CURSOR_BTREE *cbt, int newpage)
 			return (WT_NOTFOUND);
 
 	/*
-	 * Column store appends are inherently non-transactional.
-	 *
+	 * Fixed-width column store appends are inherently non-transactional.
 	 * Even a non-visible update by a concurrent or aborted transaction
 	 * changes the effective end of the data.  The effect is subtle because
 	 * of the blurring between deleted and empty values, but ideally we
-	 * would skip all uncommitted changes at the end of the data.
+	 * would skip all uncommitted changes at the end of the data.  This
+	 * doesn't apply to variable-width column stores because the implicitly
+	 * created records written by reconciliation are deleted and so can be
+	 * never seen by a read.
 	 *
 	 * The problem is that we don't know at this point whether there may be
 	 * multiple uncommitted changes at the end of the data, and it would be

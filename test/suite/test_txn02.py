@@ -29,7 +29,6 @@
 #   Transactions: commits and rollbacks
 #
 
-import os, struct
 import wiredtiger, wttest
 from wtscenario import multiply_scenarios, number_scenarios
 
@@ -82,6 +81,8 @@ class test_txn02(wttest.WiredTigerTestCase):
         self.session2 = conn.open_session()
         return conn
 
+    # Check that a cursor (optionally started in a new transaction), sees the
+    # expected values.
     def check(self, session, txn_config, expected):
         if txn_config:
             session.begin_transaction(txn_config)
@@ -97,6 +98,17 @@ class test_txn02(wttest.WiredTigerTestCase):
             session.commit_transaction()
         self.assertEqual(actual, expected)
 
+    # Check the state of the system with respect to the current cursor and
+    # different isolation levels.
+    def check_all(self, current, committed):
+        # Transactions see their own changes.
+        # Read-uncommitted transactions see all changes.
+        # Snapshot and read-committed transactions should not see changes.
+        self.check(self.session, None, current);
+        self.check(self.session2, "isolation=snapshot", committed)
+        self.check(self.session2, "isolation=read-committed", committed)
+        self.check(self.session2, "isolation=read-uncommitted", current)
+
     def test_ops(self):
         self.session.create(self.uri, self.create_params)
         # Set up the table with entries for 1 and 10
@@ -107,7 +119,8 @@ class test_txn02(wttest.WiredTigerTestCase):
         c.set_key(10)
         c.insert()
         c.close()
-        expected = {1:1, 10:1}
+        current = {1:1, 10:1}
+        committed = current.copy()
 
         ops = (self.op1, self.op2, self.op3, self.op4)
         txns = (self.txn1, self.txn2, self.txn3, self.txn4)
@@ -124,36 +137,25 @@ class test_txn02(wttest.WiredTigerTestCase):
                 c.set_key(k)
                 c.set_value(i + 2)
                 c.insert()
-                # A snapshot transaction should not see the changes
-                self.check(self.session2, "isolation=snapshot", expected)
-                if txn == 'commit':
-                    expected[k] = i + 2
+                current[k] = i + 2;
             elif op == 'remove':
                 c.set_key(k)
                 c.remove()
-                # A snapshot transaction should not see the changes
-                self.check(self.session2, "isolation=snapshot", expected)
-                if txn == 'commit' and k in expected:
-                    del expected[k]
-            else:
-                print "UNKNOWN op", op
+                if k in current:
+                    del current[k]
+
+            # Check the state after each operation.
+            self.check_all(current, committed)
+
             if txn == 'commit':
-                # The transaction should see its own changes
-                self.check(self.session, None, expected)
-                # A read-uncommitted transaction should see the changes already
-                self.check(self.session2,
-                    "isolation=read-uncommitted", expected)
+                committed = current.copy()
                 self.session.commit_transaction()
             elif txn == 'rollback':
+                current = committed.copy()
                 self.session.rollback_transaction()
-            else:
-                print "UNKNOWN op", op
 
-            # The change should be (in)visible in the same session
-            self.check(self.session, None, expected)
-            # The change should be (in)visible to snapshot transactions
-            self.check(self.session2, "isolation=snapshot", expected)
-        self.session.drop(self.uri)
+            # Check the state after each commit/rollback.
+            self.check_all(current, committed)
 
 if __name__ == '__main__':
     wttest.run()

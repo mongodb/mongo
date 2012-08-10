@@ -219,6 +219,12 @@ connection_runtime_config = [
 		    'write']),
 ]
 
+session_config = [
+	Config('isolation', 'read-committed', r'''
+		the default isolation level for operations in this session''',
+		choices=['read-uncommitted', 'read-committed', 'snapshot']),
+]
+
 methods = {
 'file.meta' : Method(file_meta),
 
@@ -271,10 +277,6 @@ methods = {
 		hexadecimal encoded.  The cursor dump format is compatible
 		with the @ref utility_dump and @ref utility_load commands''',
 		choices=['hex', 'print']),
-	Config('isolation', 'read-committed', r'''
-		the isolation level for this cursor, ignored for transactional
-		cursors''',
-		choices=['snapshot', 'read-committed', 'read-uncommitted']),
 	Config('next_random', 'false', r'''
 		configure the cursor to return a pseudo-random record from
 		the object; valid only for row-store cursors.  Cursors
@@ -314,18 +316,19 @@ methods = {
 'session.verify' : Method([]),
 
 'session.begin_transaction' : Method([
-	Config('isolation', 'snapshot', r'''
-		the isolation level for this transaction''',
-		choices=['read-uncommitted', 'snapshot']),
+	Config('isolation', '', r'''
+		the isolation level for this transaction; defaults to the
+		session's isolation level''',
+		choices=['read-uncommitted', 'read-committed', 'snapshot']),
 	Config('name', '', r'''
 		name of the transaction for tracing and debugging'''),
-	Config('sync', 'full', r'''
-		how to sync log records when the transaction commits''',
-		choices=['full', 'flush', 'write', 'none']),
 	Config('priority', 0, r'''
 		priority of the transaction for resolving conflicts.
 		Transactions with higher values are less likely to abort''',
 		min='-100', max='100'),
+	Config('sync', 'full', r'''
+		how to sync log records when the transaction commits''',
+		choices=['full', 'flush', 'write', 'none']),
 ]),
 
 'session.commit_transaction' : Method([]),
@@ -363,7 +366,9 @@ methods = {
 		make namespaces distinct or during upgrades'''),
 ]),
 
-'connection.open_session' : Method([]),
+'connection.open_session' : Method(session_config),
+
+'session.reconfigure' : Method(session_config),
 
 'wiredtiger_open' : Method(connection_runtime_config + [
 	Config('buffer_alignment', '-1', r'''

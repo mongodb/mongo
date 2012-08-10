@@ -43,12 +43,10 @@ __wt_config_check(WT_SESSION_IMPL *session,
 				break;
 			}
 
-		if (!found) {
+		if (!found)
 			WT_RET_MSG(session, EINVAL,
 			    "Unknown configuration key found: '%.*s'",
 			    (int)k.len, k.str);
-			return (WT_NOTFOUND);
-		}
 
 		if (strcmp(checks[i].type, "int") == 0)
 			badtype = (v.type != ITEM_NUM);

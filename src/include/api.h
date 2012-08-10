@@ -106,6 +106,7 @@ struct __wt_session_impl {
 	int	wq_sleeping;		/* Thread is blocked */
 	int	wq_ret;			/* Return value */
 
+	WT_TXN_ISOLATION isolation;
 	WT_TXN	txn;			/* Transaction state */
 
 	void	*reconcile;		/* Reconciliation information */

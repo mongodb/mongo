@@ -39,13 +39,12 @@ extern "C" {
  *******************************************/
 #include "queue.h"
 
-/*******************************************
- * Forward structure declarations for internal structures.
- *******************************************/
 /*
  * DO NOT EDIT: automatically built by dist/s_typedef.
- * Forward structure declarations for internal structures: BEGIN
+ * Forward type declarations for internal types: BEGIN
  */
+enum __wt_txn_isolation;
+    typedef enum __wt_txn_isolation WT_TXN_ISOLATION;
 struct __wt_addr;
     typedef struct __wt_addr WT_ADDR;
 struct __wt_block;
@@ -167,7 +166,7 @@ struct __wt_txn_state;
 struct __wt_update;
     typedef struct __wt_update WT_UPDATE;
 /*
- * Forward structure declarations for internal structures: END
+ * Forward type declarations for internal types: END
  * DO NOT EDIT: automatically built by dist/s_typedef.
  */
 

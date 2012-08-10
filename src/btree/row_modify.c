@@ -344,7 +344,8 @@ __wt_update_obsolete(WT_SESSION_IMPL *session, WT_PAGE *page, WT_INSERT *ins)
 
 	txn = &session->txn;
 
-	if (txn->isolation != TXN_ISO_SNAPSHOT)
+	if (txn->isolation != TXN_ISO_SNAPSHOT &&
+	    txn->isolation != TXN_ISO_READ_COMMITTED)
 		return;
 
 	/*

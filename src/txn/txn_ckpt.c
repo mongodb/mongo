@@ -150,7 +150,8 @@ err:	/*
 		WT_TRET(__wt_meta_track_off(session, ret != 0));
 
 	txn_global->ckpt_txnid = WT_TXN_NONE;
-	txn->isolation = TXN_ISO_READ_UNCOMMITTED;
+	__wt_txn_release_snapshot(session);
+	txn->isolation = session->isolation;
 	__wt_scr_free(&tmp);
 	return (ret);
 }

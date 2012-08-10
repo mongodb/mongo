@@ -71,10 +71,12 @@ __wt_confchk_connection_load_extension[] = {
 
 const char *
 __wt_confdfl_connection_open_session =
-	"";
+	"isolation=read-committed";
 
 WT_CONFIG_CHECK
 __wt_confchk_connection_open_session[] = {
+	{ "isolation", "string", "choices=[\"read-uncommitted\","
+	    "\"read-committed\",\"snapshot\"]" },
 	{ NULL, NULL, NULL }
 };
 
@@ -155,12 +157,12 @@ __wt_confchk_index_meta[] = {
 
 const char *
 __wt_confdfl_session_begin_transaction =
-	"isolation=snapshot,name=,priority=0,sync=full";
+	"isolation=,name=,priority=0,sync=full";
 
 WT_CONFIG_CHECK
 __wt_confchk_session_begin_transaction[] = {
 	{ "isolation", "string", "choices=[\"read-uncommitted\","
-	    "\"snapshot\"]" },
+	    "\"read-committed\",\"snapshot\"]" },
 	{ "name", "string", NULL },
 	{ "priority", "int", "min=-100,max=100" },
 	{ "sync", "string", "choices=[\"full\",\"flush\",\"write\","
@@ -268,9 +270,8 @@ __wt_confchk_session_log_printf[] = {
 
 const char *
 __wt_confdfl_session_open_cursor =
-	"append=0,bulk=0,checkpoint=,dump=,isolation=read-committed,"
-	"next_random=0,overwrite=0,raw=0,statistics=0,statistics_clear=0,"
-	"target=";
+	"append=0,bulk=0,checkpoint=,dump=,next_random=0,overwrite=0,raw=0,"
+	"statistics=0,statistics_clear=0,target=";
 
 WT_CONFIG_CHECK
 __wt_confchk_session_open_cursor[] = {
@@ -278,14 +279,23 @@ __wt_confchk_session_open_cursor[] = {
 	{ "bulk", "boolean", NULL },
 	{ "checkpoint", "string", NULL },
 	{ "dump", "string", "choices=[\"hex\",\"print\"]" },
-	{ "isolation", "string", "choices=[\"snapshot\",\"read-committed\","
-	    "\"read-uncommitted\"]" },
 	{ "next_random", "boolean", NULL },
 	{ "overwrite", "boolean", NULL },
 	{ "raw", "boolean", NULL },
 	{ "statistics", "boolean", NULL },
 	{ "statistics_clear", "boolean", NULL },
 	{ "target", "list", NULL },
+	{ NULL, NULL, NULL }
+};
+
+const char *
+__wt_confdfl_session_reconfigure =
+	"isolation=read-committed";
+
+WT_CONFIG_CHECK
+__wt_confchk_session_reconfigure[] = {
+	{ "isolation", "string", "choices=[\"read-uncommitted\","
+	    "\"read-committed\",\"snapshot\"]" },
 	{ NULL, NULL, NULL }
 };
 
