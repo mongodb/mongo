@@ -88,6 +88,8 @@ class test_txn01(wttest.WiredTigerTestCase):
 	# Snapshot and read-committed should see only committed records.
         self.check_transaction('isolation=snapshot', committed)
         self.check_transaction('isolation=read-committed', committed)
+
+	# Checkpoints should only write committed items.
         self.check_checkpoint(committed)
 
     # Loop through a set of inserts, periodically committing; before each
