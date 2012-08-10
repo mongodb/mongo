@@ -51,7 +51,7 @@ to develop mongo client software.
 %setup
 
 %build
-scons -%{?_smp_mflags} -prefix=$RPM_BUILD_ROOT/usr all
+scons -%{?_smp_mflags} --prefix=$RPM_BUILD_ROOT/usr all
 # XXX really should have shared library here
 
 %install
