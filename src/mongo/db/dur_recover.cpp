@@ -187,11 +187,16 @@ namespace mongo {
 
             StackStringBuilder ss;
             ss << full.string();
+
 #ifdef _WIN32
-            ss << '\\';
+            static const char pathSep = '\\';
 #else
-            ss << '/';
+            static const char pathSep = '/';
 #endif
+
+            if (!dbpath.empty() && dbpath[dbpath.size()-1] != pathSep)
+                ss << pathSep;
+
             ss << dbName << '.';
             verify( fileNo >= 0 );
 
