@@ -1,7 +1,7 @@
 Name: mongo-10gen
 Conflicts: mongo, mongo-10gen-unstable
 Obsoletes: mongo-stable
-Version: 2.1.2
+Version: 2.2.0
 Release: mongodb_1%{?dist}
 Summary: mongodb client shell and tools
 License: AGPL 3.0
@@ -25,7 +25,7 @@ client utilities.
 %package server
 Summary: mongodb server, sharding server, and support scripts
 Group: Applications/Databases
-Requires: mongo
+Requires: mongo-10gen
 Requires(pre): /usr/sbin/useradd
 Requires(pre): /usr/sbin/groupadd
 Requires(post): chkconfig
@@ -51,13 +51,12 @@ to develop mongo client software.
 %setup
 
 %build
-scons -%{?_smp_mflags} -prefix=$RPM_BUILD_ROOT/usr all
+scons -%{?_smp_mflags} --prefix=$RPM_BUILD_ROOT/usr all
 # XXX really should have shared library here
 
 %install
 scons --prefix=$RPM_BUILD_ROOT/usr install
 mkdir -p $RPM_BUILD_ROOT/usr
-cp -rv BINARIES/usr/bin $RPM_BUILD_ROOT/usr
 mkdir -p $RPM_BUILD_ROOT/usr/share/man/man1
 cp debian/*.1 $RPM_BUILD_ROOT/usr/share/man/man1/
 # FIXME: remove this rm when mongosniff is back in the package
@@ -71,6 +70,7 @@ mkdir -p $RPM_BUILD_ROOT/etc/sysconfig
 cp -v rpm/mongod.sysconfig $RPM_BUILD_ROOT/etc/sysconfig/mongod
 mkdir -p $RPM_BUILD_ROOT/var/lib/mongo
 mkdir -p $RPM_BUILD_ROOT/var/log/mongo
+mkdir -p $RPM_BUILD_ROOT/var/run/mongo
 touch $RPM_BUILD_ROOT/var/log/mongo/mongod.log
 
 %clean
@@ -108,44 +108,53 @@ fi
 %defattr(-,root,root,-)
 %doc README GNU-AGPL-3.0.txt
 
+%{_bindir}/bsondump
 %{_bindir}/mongo
 %{_bindir}/mongodump
 %{_bindir}/mongoexport
 %{_bindir}/mongofiles
 %{_bindir}/mongoimport
+%{_bindir}/mongooplog
+%{_bindir}/mongoperf
 %{_bindir}/mongorestore
-%{_bindir}/mongosniff
 %{_bindir}/mongostat
-%{_bindir}/bsondump
 %{_bindir}/mongotop
+%{_bindir}/perftest
 
+%{_mandir}/man1/bsondump.1*
 %{_mandir}/man1/mongo.1*
-%{_mandir}/man1/mongod.1*
 %{_mandir}/man1/mongodump.1*
 %{_mandir}/man1/mongoexport.1*
 %{_mandir}/man1/mongofiles.1*
 %{_mandir}/man1/mongoimport.1*
-%{_mandir}/man1/mongosniff.1*
-%{_mandir}/man1/mongostat.1*
 %{_mandir}/man1/mongorestore.1*
-%{_mandir}/man1/bsondump.1*
+#%{_mandir}/man1/mongosniff.1*
+%{_mandir}/man1/mongostat.1*
+
+%files devel
+%{_includedir}/mongo/*
+#%{_libdir}/libmongoclient.a - Currently build does not use libdir
+/usr/lib/libmongoclient.a
 
 %files server
 %defattr(-,root,root,-)
 %config(noreplace) /etc/mongod.conf
 %{_bindir}/mongod
 %{_bindir}/mongos
-#%{_mandir}/man1/mongod.1*
+%{_mandir}/man1/mongod.1*
 %{_mandir}/man1/mongos.1*
 /etc/rc.d/init.d/mongod
 %config(noreplace) /etc/sysconfig/mongod
-#/etc/rc.d/init.d/mongos
 %attr(0755,mongod,mongod) %dir /var/lib/mongo
 %attr(0755,mongod,mongod) %dir /var/log/mongo
 %attr(0755,mongod,mongod) %dir /var/run/mongo
 %attr(0640,mongod,mongod) %config(noreplace) %verify(not md5 size mtime) /var/log/mongo/mongod.log
 
 %changelog
+* Fri Aug 10 2012 Joey Kwasniewski <kwasniewski@gmail.com>
+- Update for Mongo 2.2.0
+- Fixed prefix issue
+
 * Fri Feb 17 2012 Michael A. Fiedler <michael@10gen.com>
 - Added proper pid file usage
 
