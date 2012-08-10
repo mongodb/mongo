@@ -28,12 +28,13 @@ namespace mongo {
 
             static RecoveryJob & get() { return _instance; }
         private:
-            void write(const ParsedJournalEntry& entry); // actually writes to the file
-            void applyEntry(const ParsedJournalEntry& entry, bool apply, bool dump);
+            void write(const ParsedJournalEntry& entry, MongoMMF* mmf); // actually writes to the file
+            void applyEntry(const ParsedJournalEntry& entry, bool apply, bool dump, MongoMMF* mmf);
             void applyEntries(const vector<ParsedJournalEntry> &entries);
             bool processFileBuffer(const void *, unsigned len);
             bool processFile(boost::filesystem::path journalfile);
             void _close(); // doesn't lock
+            MongoMMF* getMongoMMF(const ParsedJournalEntry& entry);
 
             list<boost::shared_ptr<MongoMMF> > _mmfs;
 

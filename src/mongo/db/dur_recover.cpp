@@ -214,9 +214,55 @@ namespace mongo {
             _mmfs.clear();
         }
 
-        void RecoveryJob::write(const ParsedJournalEntry& entry) {
+        void RecoveryJob::write(const ParsedJournalEntry& entry, MongoMMF* mmf) {
             //TODO(mathias): look into making some of these dasserts
             verify(entry.e);
+
+            if ((entry.e->ofs + entry.e->len) <= mmf->length()) {
+                verify(mmf->view_write());
+                verify(entry.e->srcData());
+
+                void* dest = (char*)mmf->view_write() + entry.e->ofs;
+                memcpy(dest, entry.e->srcData(), entry.e->len);
+                stats.curr->_writeToDataFilesBytes += entry.e->len;
+            }
+            else {
+                massert(13622, "Trying to write past end of file in WRITETODATAFILES", _recovering);
+            }
+        }
+
+        void RecoveryJob::applyEntry(const ParsedJournalEntry& entry, bool apply, bool dump, MongoMMF* mmf) {
+            if( entry.e ) {
+                if( dump ) {
+                    stringstream ss;
+                    ss << "  BASICWRITE " << setw(20) << entry.dbName << '.';
+                    if( entry.e->isNsSuffix() )
+                        ss << "ns";
+                    else
+                        ss << setw(2) << entry.e->getFileNo();
+                    ss << ' ' << setw(6) << entry.e->len << ' ' << /*hex << setw(8) << (size_t) fqe.srcData << dec <<*/
+                       "  " << hexdump(entry.e->srcData(), entry.e->len);
+                    log() << ss.str() << endl;
+                }
+                if( apply ) {
+                    write(entry, mmf);
+                }
+            }
+            else if(entry.op) {
+                // a DurOp subclass operation
+                if( dump ) {
+                    log() << "  OP " << entry.op->toString() << endl;
+                }
+                if( apply ) {
+                    if( entry.op->needFilesClosed() ) {
+                        _close(); // locked in processSection
+                    }
+                    entry.op->replay();
+                }
+            }
+        }
+
+        MongoMMF* RecoveryJob::getMongoMMF(const ParsedJournalEntry& entry) {
             verify(entry.dbName);
             verify(strnlen(entry.dbName, MaxDatabaseNameLen) < MaxDatabaseNameLen);
 
@@ -243,48 +289,7 @@ namespace mongo {
                 mmf = sp.get();
             }
 
-            if ((entry.e->ofs + entry.e->len) <= mmf->length()) {
-                verify(mmf->view_write());
-                verify(entry.e->srcData());
-
-                void* dest = (char*)mmf->view_write() + entry.e->ofs;
-                memcpy(dest, entry.e->srcData(), entry.e->len);
-                stats.curr->_writeToDataFilesBytes += entry.e->len;
-            }
-            else {
-                massert(13622, "Trying to write past end of file in WRITETODATAFILES", _recovering);
-            }
-        }
-
-        void RecoveryJob::applyEntry(const ParsedJournalEntry& entry, bool apply, bool dump) {
-            if( entry.e ) {
-                if( dump ) {
-                    stringstream ss;
-                    ss << "  BASICWRITE " << setw(20) << entry.dbName << '.';
-                    if( entry.e->isNsSuffix() )
-                        ss << "ns";
-                    else
-                        ss << setw(2) << entry.e->getFileNo();
-                    ss << ' ' << setw(6) << entry.e->len << ' ' << /*hex << setw(8) << (size_t) fqe.srcData << dec <<*/
-                       "  " << hexdump(entry.e->srcData(), entry.e->len);
-                    log() << ss.str() << endl;
-                }
-                if( apply ) {
-                    write(entry);
-                }
-            }
-            else if(entry.op) {
-                // a DurOp subclass operation
-                if( dump ) {
-                    log() << "  OP " << entry.op->toString() << endl;
-                }
-                if( apply ) {
-                    if( entry.op->needFilesClosed() ) {
-                        _close(); // locked in processSection
-                    }
-                    entry.op->replay();
-                }
-            }
+            return mmf;
         }
 
         void RecoveryJob::applyEntries(const vector<ParsedJournalEntry> &entries) {
@@ -293,8 +298,18 @@ namespace mongo {
             if( dump )
                 log() << "BEGIN section" << endl;
 
+            const char* lastDbName = NULL;
+            int lastFileNo = 0;
+            MongoMMF* mmf = NULL;
             for( vector<ParsedJournalEntry>::const_iterator i = entries.begin(); i != entries.end(); ++i ) {
-                applyEntry(*i, apply, dump);
+                if (i->e && (i->dbName != lastDbName || i->e->getFileNo() != lastFileNo)) {
+                    mmf = getMongoMMF(*i);
+                    lastDbName = i->dbName;
+                    lastFileNo = i->e->getFileNo();
+                }
+                fassert(16429, !i->e || mmf);
+
+                applyEntry(*i, apply, dump, mmf);
             }
 
             if( dump )
