@@ -146,7 +146,7 @@ namespace mongo {
         BSONObjBuilder b;
 
         if( ! cc().isAdmin() ) {
-            b.append("err", "unauthorized");
+            b.append("err", "Unauthorized. This command must be run against the admin db");
         }
         else {
             DbMessage d(m);
