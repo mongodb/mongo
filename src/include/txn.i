@@ -108,7 +108,7 @@ __wt_txn_visible(WT_SESSION_IMPL *session, wt_txnid_t id)
 	 * Otherwise, the ID is visible if it is not the result of a concurrent
 	 * transaction, that is, if it is not in the snapshot list.
 	 */
-	if (TXNID_LT(id, txn->snap_min))
+	if (txn->snapshot_count == 0 || TXNID_LT(id, txn->snap_min))
 		return (1);
 	if (TXNID_LT(txn->snap_max, id))
 		return (0);
@@ -117,8 +117,8 @@ __wt_txn_visible(WT_SESSION_IMPL *session, wt_txnid_t id)
 	 * Fast path the single-threaded case where there are no concurrent
 	 * transactions.
 	 */
-	return (txn->snapshot_count == 0 || bsearch(&id, txn->snapshot,
-	    txn->snapshot_count, sizeof(wt_txnid_t), __wt_txnid_cmp) == NULL);
+	return (bsearch(&id, txn->snapshot, txn->snapshot_count,
+	    sizeof(wt_txnid_t), __wt_txnid_cmp) == NULL);
 }
 
 /*
@@ -161,8 +161,7 @@ __wt_txn_update_check(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 	WT_TXN *txn;
 
 	txn = &session->txn;
-	if (txn->isolation == TXN_ISO_READ_COMMITTED ||
-	    txn->isolation == TXN_ISO_SNAPSHOT)
+	if (txn->isolation == TXN_ISO_SNAPSHOT)
 		while (upd != NULL && !__wt_txn_visible(session, upd->txnid)) {
 			if (upd->txnid != WT_TXN_ABORTED) {
 				WT_BSTAT_INCR(session, update_conflict);
@@ -227,13 +226,15 @@ __wt_txn_read_first(WT_SESSION_IMPL *session)
 	 * update the we are reading from being trimmed to save memory.
 	 */
 	if (!F_ISSET(txn, TXN_RUNNING)) {
-		WT_ASSERT(session, txn_state->id == WT_TXN_NONE);
+		WT_ASSERT(session, txn_state->id == WT_TXN_NONE &&
+		    !F_ISSET(txn_state, TXN_STATE_RUNNING));
 		txn_state->id = txn_global->current;
-
-		if (session->isolation == TXN_ISO_READ_COMMITTED ||
-		    session->isolation == TXN_ISO_SNAPSHOT)
-			WT_RET(__wt_txn_get_snapshot(session, WT_TXN_NONE));
 	}
+
+	if (txn->isolation == TXN_ISO_READ_COMMITTED ||
+	    (!F_ISSET(txn, TXN_RUNNING) &&
+	    txn->isolation == TXN_ISO_SNAPSHOT))
+		WT_RET(__wt_txn_get_snapshot(session, WT_TXN_NONE));
 
 	return (0);
 }
@@ -256,7 +257,13 @@ __wt_txn_read_last(WT_SESSION_IMPL *session)
 	 * global table.
 	 */
 	if (!F_ISSET(txn, TXN_RUNNING)) {
-		WT_ASSERT(session, txn_state->id != WT_TXN_NONE);
+		WT_ASSERT(session, txn_state->id != WT_TXN_NONE &&
+		    !F_ISSET(txn_state, TXN_STATE_RUNNING));
 		txn_state->id = WT_TXN_NONE;
 	}
+
+	if (txn->isolation == TXN_ISO_READ_COMMITTED ||
+	    (!F_ISSET(txn, TXN_RUNNING) &&
+	    txn->isolation == TXN_ISO_SNAPSHOT))
+		__wt_txn_release_snapshot(session);
 }

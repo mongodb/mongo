@@ -78,7 +78,7 @@ class test_txn01(wttest.WiredTigerTestCase):
 
     def check(self, committed, total):
         self.check_transaction('isolation=snapshot', committed)
-        #self.check_transaction('isolation=read-committed', committed)
+        self.check_transaction('isolation=read-committed', committed)
         self.check_transaction('isolation=read-uncommitted', total)
         self.check_checkpoint(committed)
 
