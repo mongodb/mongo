@@ -137,30 +137,20 @@ def get_libdeps(source, target, env, for_signature):
     Expands to the library dependencies for a target.
     """
 
-    if for_signature:
-        return []
     target = env.Flatten([target])
     return list(__get_libdeps(target[0], 'LIBDEPS'))
 
 def get_libdeps_objs(source, target, env, for_signature):
-    if for_signature:
-        return []
-
     objs = set()
     for lib in get_libdeps(source, target, env, for_signature):
         objs.update(lib.sources_set)
     return list(objs)
 
 def get_libdeps_special_sun(source, target, env, for_signature):
-    if for_signature:
-        return []
-
     x = get_libdeps(source, target, env, for_signature )
     return x + x + x
 
 def get_syslibdeps(source, target, env, for_signature):
-    if for_signature:
-        return[]
     deps = list(__get_libdeps(target[0], 'SYSLIBDEPS'))
     return deps
 
