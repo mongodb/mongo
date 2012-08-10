@@ -76,10 +76,18 @@ class test_txn01(wttest.WiredTigerTestCase):
         self.assertEqual(self.cursor_count(cursor), expected)
         s.close()
 
-    def check(self, committed, total):
+    def check(self, cursor, committed, total):
+	# The cursor itself should see all of the records.
+	if cursor != None:
+	    cursor.reset()
+	    self.assertEqual(self.cursor_count(cursor), total)
+
+	# Read-uncommitted should see all of the records.
+        self.check_transaction('isolation=read-uncommitted', total)
+
+	# Snapshot and read-committed should see only committed records.
         self.check_transaction('isolation=snapshot', committed)
         self.check_transaction('isolation=read-committed', committed)
-        self.check_transaction('isolation=read-uncommitted', total)
         self.check_checkpoint(committed)
 
     # Loop through a set of inserts, periodically committing; before each
@@ -88,14 +96,14 @@ class test_txn01(wttest.WiredTigerTestCase):
         self.session.create(self.uri,
             'key_format=' + self.key_format +
             ',value_format=' + self.value_format)
-        self.check(0, 0)
 
         committed = 0
         self.session.begin_transaction()
         cursor = self.session.open_cursor(self.uri, None)
+        self.check(cursor, 0, 0)
         for i in xrange(self.nentries):
             if i > 0 and i % (self.nentries / 37) == 0:
-                self.check(committed, i)
+                self.check(cursor, committed, i)
                 self.session.commit_transaction()
                 committed = i
                 self.session.begin_transaction()
@@ -111,9 +119,9 @@ class test_txn01(wttest.WiredTigerTestCase):
                 cursor.set_value(0xab)
             cursor.insert()
 
-        self.check(committed, self.nentries)
+        self.check(cursor, committed, self.nentries)
         self.session.commit_transaction()
-        self.check(self.nentries, self.nentries)
+        self.check(cursor, self.nentries, self.nentries)
 
 if __name__ == '__main__':
     wttest.run()
