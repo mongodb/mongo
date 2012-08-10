@@ -125,5 +125,43 @@ class test_txn01(wttest.WiredTigerTestCase):
         self.session.commit_transaction()
         self.check(cursor, self.nentries, self.nentries)
 
+
+# Test that read-committed is the default isolation level.
+class test_read_committed_default(wttest.WiredTigerTestCase):
+    uri = 'table:test_txn'
+
+    # Return the number of records visible to the cursor.
+    def cursor_count(self, cursor):
+        count = 0
+        for r in cursor:
+            count += 1
+        return count
+
+    def test_read_committed_default(self):
+        self.session.create(self.uri, 'key_format=S,value_format=S')
+        self.session.begin_transaction()
+        cursor = self.session.open_cursor(self.uri, None)
+        cursor.set_key('key: aaa')
+        cursor.set_value('value: aaa')
+        cursor.insert()
+        self.session.commit_transaction()
+        self.session.begin_transaction()
+        cursor = self.session.open_cursor(self.uri, None)
+        cursor.set_key('key: bbb')
+        cursor.set_value('value: bbb')
+        cursor.insert()
+
+        s = self.conn.open_session()
+        s.begin_transaction("isolation=read-committed")
+        cursor = s.open_cursor(self.uri, None)
+        self.assertEqual(self.cursor_count(cursor), 1)
+        s.commit_transaction()
+        s.begin_transaction(None)
+        cursor = s.open_cursor(self.uri, None)
+        self.assertEqual(self.cursor_count(cursor), 1)
+        s.commit_transaction()
+        s.close()
+
+
 if __name__ == '__main__':
     wttest.run()
