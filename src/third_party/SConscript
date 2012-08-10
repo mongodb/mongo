@@ -42,3 +42,10 @@ else:
     env.Append(CPPPATH='$BUILD_DIR/third_party/js-1.7')
     env.SConscript('js-1.7/SConscript')
     env.StaticLibrary('shim_spidermonkey', ['shim_spidermonkey.cpp'], LIBDEPS=['js-1.7/js'])
+
+if (GetOption("allocator") != "tcmalloc") or use_system_version_of_library("tcmalloc"):
+    env.StaticLibrary("shim_allocator", "shim_allocator.cpp")
+else:
+    env.SConscript('gperftools-2.0/SConscript')
+    env.StaticLibrary('shim_allocator', 'shim_allocator.cpp',
+                      LIBDEPS=['gperftools-2.0/tcmalloc_minimal'])

@@ -31,6 +31,7 @@ env.StaticLibrary('foundation',
                     'util/time_support.cpp',
                     ],
                   LIBDEPS=['stacktrace',
+                           '$BUILD_DIR/third_party/shim_allocator',
                            '$BUILD_DIR/third_party/shim_boost'])
 
 env.StaticLibrary('stringutils', ['util/stringutils.cpp', 'util/base64.cpp',])

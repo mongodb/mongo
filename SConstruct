@@ -79,9 +79,10 @@ def add_option( name, help, nargs, contributesToVariantDir,
                help=help )
 
     options[name] = { "help" : help ,
-                      "nargs" : nargs , 
+                      "nargs" : nargs ,
                       "contributesToVariantDir" : contributesToVariantDir ,
-                      "dest" : dest } 
+                      "dest" : dest,
+                      "default": default }
 
 def get_option( name ):
     return GetOption( name )
@@ -120,6 +121,8 @@ def get_variant_dir():
         if not has_option( o["dest"] ):
             continue
         if not o["contributesToVariantDir"]:
+            continue
+        if get_option(o["dest"]) == o["default"]:
             continue
         
         if o["nargs"] == 0:
@@ -199,13 +202,16 @@ add_option( "clang" , "use clang++ rather than g++ (experimental)" , 0 , True )
 
 # debugging/profiling help
 
-add_option( "tcmalloc" , "link against tcmalloc" , 0 , False )
+add_option( "allocator" , "allocator to use (tcmalloc or system)" , 1 , True,
+            default=(sys.platform.startswith('linux') and 'tcmalloc' or 'system') )
 add_option( "gdbserver" , "build in gdb server support" , 0 , True )
 add_option( "heapcheck", "link to heap-checking malloc-lib and look for memory leaks during tests" , 0 , False )
 add_option( "gcov" , "compile with flags for gcov" , 0 , True )
 
 add_option("smokedbprefix", "prefix to dbpath et al. for smoke tests", 1 , False )
 add_option("smokeauth", "run smoke tests with --auth", 0 , False )
+
+add_option( "use-system-tcmalloc", "use system version of tcmalloc library", 0, True )
 
 add_option( "use-system-pcre", "use system version of pcre library", 0, True )
 
@@ -298,8 +304,8 @@ env = Environment( BUILD_DIR=variantDir,
                    PYSYSPLATFORM=os.sys.platform,
 
                    PCRE_VERSION='8.30',
-                   CONFIGUREDIR = scons_data_dir + '/sconf_temp',
-                   CONFIGURELOG = scons_data_dir + '/config.log'
+                   CONFIGUREDIR = '#' + scons_data_dir + '/sconf_temp',
+                   CONFIGURELOG = '#' + scons_data_dir + '/config.log'
                    )
 
 env['_LIBDEPS'] = '$_LIBDEPS_OBJS'
@@ -826,9 +832,19 @@ def doConfigure(myenv):
 
     # 'tcmalloc' needs to be the last library linked. Please, add new libraries before this 
     # point.
-    if has_option("tcmalloc") or has_option("heapcheck"):
-        if not conf.CheckLib("tcmalloc"):
+    if get_option('allocator') == 'tcmalloc':
+        if use_system_version_of_library('tcmalloc'):
+            if not conf.CheckLib("tcmalloc"):
+                Exit(1)
+        elif has_option("heapcheck"):
+            print ("--heapcheck does not work with the tcmalloc embedded in the mongodb source "
+                   "tree.  Use --use-system-tcmalloc.")
             Exit(1)
+    elif get_option('allocator') == 'system':
+        pass
+    else:
+        print "Invalid --allocator parameter: \"%s\"" % get_option('allocator')
+        Exit(1)
 
     if has_option("heapcheck"):
         if ( not debugBuild ) and ( not debugLogging ):
