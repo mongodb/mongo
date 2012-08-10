@@ -264,9 +264,9 @@ struct __wt_cursor {
 	 * are released, and the cursor position is no longer valid.  Subsequent
 	 * iteration with WT_CURSOR::next will move to the first record, or
 	 * with WT_CURSOR::prev will move to the last record.
-	 * 
+	 *
 	 * @snippet ex_all.c Reset the cursor
-	 * 
+	 *
 	 * @param cursor the cursor handle
 	 * @errors
 	 */
@@ -277,7 +277,7 @@ struct __wt_cursor {
 	 * @snippet ex_all.c Search for an exact match
 	 *
 	 * @param cursor the cursor handle
-	 * \errors
+	 * @errors
 	 */
 	int __F(search)(WT_CURSOR *cursor);
 
@@ -539,7 +539,7 @@ struct __wt_session {
 	 * @config{target, if non-empty\, backup the list of objects; valid only
 	 * for a backup data source.,a list of strings; default empty.}
 	 * @configend
-	 * @param[out] cursorp a pointer to the newly opened cursor
+	 * @param cursorp a pointer to the newly opened cursor
 	 * @errors
 	 */
 	int __F(open_cursor)(WT_SESSION *session,
@@ -1024,7 +1024,7 @@ struct __wt_connection {
 	 * @param errhandler An error handler.  If <code>NULL</code>, the
 	 * connection's error handler is used
 	 * @configempty{connection.open_session, see dist/api_data.py}
-	 * @param[out] sessionp the new session handle
+	 * @param sessionp the new session handle
 	 * @errors
 	 */
 	int __F(open_session)(WT_CONNECTION *connection,
@@ -1121,7 +1121,7 @@ struct __wt_connection {
  * for details).  Configuration values specified in the \c config argument to
  * the ::wiredtiger_open function override configuration values specified in
  * the \c WiredTiger.config file.
- * @param[out] connectionp A pointer to the newly opened connection handle
+ * @param connectionp A pointer to the newly opened connection handle
  * @errors
  */
 int wiredtiger_open(const char *home,
