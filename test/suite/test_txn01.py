@@ -123,7 +123,7 @@ class test_txn01(wttest.WiredTigerTestCase):
 
         self.check(cursor, committed, self.nentries)
         self.session.commit_transaction()
-        self.check(cursor, self.nentries, self.nentries)
+        self.check(None, self.nentries, self.nentries)
 
 
 # Test that read-committed is the default isolation level.
