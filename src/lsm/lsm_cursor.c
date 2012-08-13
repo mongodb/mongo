@@ -105,8 +105,10 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm)
 {
 	WT_CURSOR **cp;
 	WT_DECL_RET;
+	WT_LSM_CHUNK *chunk;
 	WT_LSM_TREE *lsmtree;
 	WT_SESSION_IMPL *session;
+	const char *ckpt_cfg[] = { "checkpoint=WiredTigerCheckpoint", NULL };
 	int i;
 
 	session = (WT_SESSION_IMPL *)clsm->iface.session;
@@ -130,8 +132,14 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm)
 	clsm->nchunks = lsmtree->nchunks;
 
 	for (i = 0, cp = clsm->cursors; i != clsm->nchunks; i++, cp++) {
+		/*
+		 * Read from the checkpoint if the file has been written.
+		 * Once all cursors switch, the in-memory tree can be evicted.
+		 */
+		chunk = &lsmtree->chunk[i];
 		WT_ERR(__wt_curfile_open(session,
-		    lsmtree->chunk[i], &clsm->iface, NULL, cp));
+		    chunk->uri, &clsm->iface,
+		    F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) ? ckpt_cfg : NULL, cp));
 
 		/* Child cursors always use overwrite and raw mode. */
 		F_SET(*cp, WT_CURSTD_OVERWRITE | WT_CURSTD_RAW);
@@ -422,7 +430,6 @@ __clsm_put(
 		WT_RET(__clsm_close_cursors(clsm));
 		WT_RET(__wt_btree_release_memsize(session, btree));
 
-		printf("Switching because %d > %d\n", (int)*memsizep, (int)lsmtree->threshhold);
 		WT_WITH_SCHEMA_LOCK(session,
 		    ret = __wt_lsm_tree_switch(session, clsm->lsmtree));
 	}

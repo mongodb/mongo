@@ -125,6 +125,8 @@ struct __wt_insert;
     typedef struct __wt_insert WT_INSERT;
 struct __wt_insert_head;
     typedef struct __wt_insert_head WT_INSERT_HEAD;
+struct __wt_lsm_chunk;
+    typedef struct __wt_lsm_chunk WT_LSM_CHUNK;
 struct __wt_lsm_data_source;
     typedef struct __wt_lsm_data_source WT_LSM_DATA_SOURCE;
 struct __wt_lsm_tree;

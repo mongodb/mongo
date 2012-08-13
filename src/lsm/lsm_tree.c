@@ -23,6 +23,8 @@ __lsm_tree_discard(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	for (i = 0; i < lsm_tree->nchunks; i++)
 		__wt_free(session, lsm_tree->chunk[i]);
 	__wt_free(session, lsm_tree->chunk);
+
+	__wt_free(session, lsm_tree);
 }
 
 /*
@@ -168,9 +170,6 @@ __wt_lsm_tree_switch(
 
 	__wt_spin_lock(session, &lsm_tree->lock);
 
-	/* Unset the cache_resident flag for the old chunk. */
-	lsm_tree->memsizep = NULL;
-
 	lsm_tree->old_cursors += lsm_tree->ncursor;
 	++lsm_tree->dsk_gen;
 
@@ -180,9 +179,15 @@ __wt_lsm_tree_switch(
 		    &lsm_tree->chunk_allocated,
 		    (lsm_tree->nchunks + 1) * sizeof(*lsm_tree->chunk),
 		    &lsm_tree->chunk));
+
 	WT_ERR(__wt_lsm_tree_create_chunk(session,
-	    lsm_tree, lsm_tree->last++, &lsm_tree->chunk[lsm_tree->nchunks]));
+	    lsm_tree, lsm_tree->last++,
+	    &lsm_tree->chunk[lsm_tree->nchunks].uri));
 	++lsm_tree->nchunks;
+
+	if (lsm_tree->memsizep != NULL)
+		printf("Switched to %d because %d > %d\n", lsm_tree->last, (int)*lsm_tree->memsizep, (int)lsm_tree->threshhold);
+	lsm_tree->memsizep = NULL;
 
 	/* TODO: update metadata. */
 

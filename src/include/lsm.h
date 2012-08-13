@@ -23,6 +23,13 @@ struct __wt_cursor_lsm {
 	uint32_t flags;
 };
 
+struct __wt_lsm_chunk {
+	const char *uri;
+
+#define	WT_LSM_CHUNK_ONDISK	0x01
+	uint32_t flags;
+};
+
 struct __wt_lsm_tree {
 	const char *name, *filename;
 	const char *key_format, *value_format, *file_config;
@@ -43,7 +50,7 @@ struct __wt_lsm_tree {
 
 	int nchunks;			/* Number of active chunks */
 	int last;			/* Last allocated ID. */
-	const char **chunk;		/* Array of chunk URIs */
+	WT_LSM_CHUNK *chunk;		/* Array of active LSM chunks */
 	size_t chunk_allocated;		/* Space allocated for chunks */
 
 #define	WT_LSM_TREE_OPEN	0x01
