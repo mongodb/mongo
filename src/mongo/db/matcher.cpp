@@ -353,8 +353,11 @@ namespace mongo {
                 regex = fe.regex();
                 flags = fe.regexFlags();
             }
-            else {
+            else if ( fe.type() == String ) {
                 regex = fe.valuestrsafe();
+            }
+            else {
+                uasserted( 16330, "$regex patterns must have BSON regex or string type" );
             }
             break;
         }
