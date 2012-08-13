@@ -18,17 +18,24 @@ __wt_lsm_worker(void *arg)
 	WT_CONNECTION *wt_conn;
 	WT_CONNECTION_IMPL *conn;
 	WT_LSM_TREE *lsm_tree;
-	WT_SESSION *session;
+	WT_SESSION *wt_session;
+	WT_SESSION_IMPL *session;
 
 	lsm_tree = arg;
 	conn = lsm_tree->conn;
 	wt_conn = &conn->iface;
 
-	if (wt_conn->open_session(wt_conn, NULL, NULL, &session) != 0)
+	if (wt_conn->open_session(wt_conn, NULL, NULL, &wt_session) != 0)
 		return (NULL);
 
-	while (F_ISSET(lsm_tree, WT_LSM_TREE_OPEN))
-		__wt_yield();
+	session = (WT_SESSION_IMPL *)wt_session;
+
+	while (F_ISSET(lsm_tree, WT_LSM_TREE_OPEN)) {
+		__wt_sleep(1, 0);
+		(void)__wt_lsm_major_merge(session, lsm_tree);
+	}
+
+	(void)wt_session->close(wt_session, NULL);
 
 	return (NULL);
 }

@@ -37,7 +37,8 @@ static int __clsm_open_cursors(WT_CURSOR_LSM *);
 static inline int
 __clsm_enter(WT_CURSOR_LSM *clsm)
 {
-	if (clsm->dsk_gen != clsm->lsmtree->dsk_gen)
+	if (!F_ISSET(clsm, WT_CLSM_MERGE) &&
+	    clsm->dsk_gen != clsm->lsmtree->dsk_gen)
 		return (__clsm_open_cursors(clsm));
 
 	/* TODO: indicate somehow that we are in the tree. */
@@ -65,10 +66,84 @@ static WT_ITEM __lsm_tombstone = { "", 0, 0, NULL, 0 };
 		WT_ERR(__wt_cursor_kv_not_set(cursor, 0));		\
 } while (0)
 
+/*
+ * __clsm_islive --
+ *	Check whether the current value is something other than a tombstone.
+ */
 static inline int
 __clsm_islive(WT_ITEM *item)
 {
 	return (item->size != 0);
+}
+
+/*
+ * __clsm_close_cursors --
+ *	Close all of the btree cursors currently open.
+ */
+static int
+__clsm_close_cursors(WT_CURSOR_LSM *clsm)
+{
+	WT_CURSOR *c;
+	int i;
+
+	if (clsm->cursors != NULL) {
+		FORALL_CURSORS(clsm, c, i) {
+			clsm->cursors[i] = NULL;
+			WT_RET(c->close(c));
+		}
+	}
+
+	return (0);
+}
+
+/*
+ * __clsm_open_cursors --
+ *	Open cursors for the current set of files.
+ */
+static int
+__clsm_open_cursors(WT_CURSOR_LSM *clsm)
+{
+	WT_CURSOR **cp;
+	WT_DECL_RET;
+	WT_LSM_TREE *lsmtree;
+	WT_SESSION_IMPL *session;
+	int i;
+
+	session = (WT_SESSION_IMPL *)clsm->iface.session;
+	lsmtree = clsm->lsmtree;
+
+	WT_RET(__clsm_close_cursors(clsm));
+
+	__wt_spin_lock(session, &lsmtree->lock);
+	clsm->dsk_gen = lsmtree->dsk_gen;
+
+	if (clsm->cursors != NULL) {
+		WT_ASSERT(session, lsmtree->old_cursors > 0);
+		--lsmtree->old_cursors;
+	}
+	++lsmtree->ncursor;
+
+	if (lsmtree->nchunks > clsm->nchunks)
+		WT_RET(__wt_realloc(session, NULL,
+		    lsmtree->nchunks * sizeof(WT_CURSOR *),
+		    &clsm->cursors));
+	clsm->nchunks = lsmtree->nchunks;
+
+	for (i = 0, cp = clsm->cursors; i != clsm->nchunks; i++, cp++) {
+		WT_ERR(__wt_curfile_open(session,
+		    lsmtree->chunk[i], &clsm->iface, NULL, cp));
+
+		/* Child cursors always use overwrite and raw mode. */
+		F_SET(*cp, WT_CURSTD_OVERWRITE | WT_CURSTD_RAW);
+
+		/* Peek into the btree layer to track the in-memory size. */
+		if (i == clsm->nchunks - 1 && lsmtree->memsizep == NULL)
+			WT_ERR(__wt_btree_get_memsize(
+			    session, &lsmtree->memsizep));
+	}
+
+err:	__wt_spin_unlock(session, &lsmtree->lock);
+	return (ret);
 }
 
 /*
@@ -320,7 +395,9 @@ static inline int
 __clsm_put(
     WT_SESSION_IMPL *session, WT_CURSOR_LSM *clsm, WT_ITEM *key, WT_ITEM *value)
 {
+	WT_BTREE *btree;
 	WT_CURSOR *primary;
+	WT_DECL_RET;
 	WT_LSM_TREE *lsmtree;
 	uint32_t *memsizep;
 
@@ -332,10 +409,25 @@ __clsm_put(
 	WT_RET(primary->insert(primary));
 
 	if ((memsizep = lsmtree->memsizep) != NULL &&
-	    *memsizep > lsmtree->threshhold)
-		WT_RET(__wt_lsm_tree_switch(session, clsm->lsmtree));
+	    *memsizep > lsmtree->threshhold) {
+		/*
+		 * Close our cursors: if we are the only open cursor, this
+		 * means the btree handle is unlocked.
+		 *
+		 * XXX this is insufficient if multiple cursors are open, need
+		 * to move some operations (such as clearing the
+		 * "cache_resident" flag) into the worker thread.
+		 */
+		btree = ((WT_CURSOR_BTREE *)primary)->btree;
+		WT_RET(__clsm_close_cursors(clsm));
+		WT_RET(__wt_btree_release_memsize(session, btree));
 
-	return (0);
+		printf("Switching because %d > %d\n", (int)*memsizep, (int)lsmtree->threshhold);
+		WT_WITH_SCHEMA_LOCK(session,
+		    ret = __wt_lsm_tree_switch(session, clsm->lsmtree));
+	}
+
+	return (ret);
 }
 
 /*
@@ -437,57 +529,6 @@ __clsm_close(WT_CURSOR *cursor)
 	WT_TRET(__wt_cursor_close(cursor));
 	WT_LSM_END(clsm, session);
 
-	return (ret);
-}
-
-static int
-__clsm_open_cursors(WT_CURSOR_LSM *clsm)
-{
-	WT_CURSOR *c, **cp;
-	WT_DECL_RET;
-	WT_LSM_TREE *lsmtree;
-	WT_SESSION_IMPL *session;
-	int i;
-
-	session = (WT_SESSION_IMPL *)clsm->iface.session;
-	lsmtree = clsm->lsmtree;
-
-	if (clsm->cursors != NULL) {
-		FORALL_CURSORS(clsm, c, i) {
-			clsm->cursors[i] = NULL;
-			WT_RET(c->close(c));
-		}
-	}
-
-	__wt_spin_lock(session, &lsmtree->lock);
-	clsm->dsk_gen = lsmtree->dsk_gen;
-
-	if (clsm->cursors != NULL) {
-		WT_ASSERT(session, lsmtree->old_cursors > 0);
-		--lsmtree->old_cursors;
-	}
-	++lsmtree->ncursor;
-
-	if (lsmtree->nchunks > clsm->nchunks)
-		WT_RET(__wt_realloc(session, NULL,
-		    lsmtree->nchunks * sizeof(WT_CURSOR *),
-		    &clsm->cursors));
-	clsm->nchunks = lsmtree->nchunks;
-
-	for (i = 0, cp = clsm->cursors; i != clsm->nchunks; i++, cp++) {
-		WT_ERR(__wt_curfile_open(session,
-		    lsmtree->chunk[i], &clsm->iface, NULL, cp));
-
-		/* Child cursors always use overwrite and raw mode. */
-		F_SET(*cp, WT_CURSTD_OVERWRITE | WT_CURSTD_RAW);
-
-		/* Peek into the btree layer to track the in-memory size. */
-		if (i == 0 && lsmtree->memsizep == NULL)
-			WT_ERR(__wt_btree_get_memsize(
-			    session, &lsmtree->memsizep));
-	}
-
-err:	__wt_spin_unlock(session, &lsmtree->lock);
 	return (ret);
 }
 

@@ -48,8 +48,13 @@ __wt_eviction_page_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 	conn = S2C(session);
 	mod = page->modify;
 
-	/* Root pages and clean pages are never forcibly evicted. */
-	if (WT_PAGE_IS_ROOT(page) || !__wt_page_is_modified(page))
+	/*
+	 * Root pages and clean pages are never forcibly evicted.
+	 * Nor are pages from files that are purely cache resident.
+	 */
+	if (WT_PAGE_IS_ROOT(page) ||
+	    !__wt_page_is_modified(page) ||
+	    session->btree->cache_resident)
 		return (0);
 
 	/* Check the page's memory footprint. */

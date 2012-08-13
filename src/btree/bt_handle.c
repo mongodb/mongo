@@ -400,6 +400,20 @@ __wt_btree_get_memsize(WT_SESSION_IMPL *session, uint32_t **memsizep)
 
 	child = root->u.intl.t->page;
 	*memsizep = &child->memory_footprint;
+
+	btree->cache_resident = 1;
+	return (0);
+}
+
+/*
+ * __wt_btree_release_memsize --
+ *      Release a cache-resident tree.
+ */
+int
+__wt_btree_release_memsize(WT_SESSION_IMPL *session, WT_BTREE *btree)
+{
+	WT_UNUSED(session);
+	btree->cache_resident = 0;
 	return (0);
 }
 

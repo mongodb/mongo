@@ -15,10 +15,11 @@ struct __wt_cursor_lsm {
 	WT_CURSOR **cursors;
 	WT_CURSOR *current;     	/* The current cursor for iteration */
 
-#define	WT_CLSM_MULTIPLE        0x01    /* Multiple cursors have values for the
+#define	WT_CLSM_ITERATE_NEXT    0x01    /* Forward iteration */
+#define	WT_CLSM_ITERATE_PREV    0x02    /* Backward iteration */
+#define	WT_CLSM_MERGE		0x04    /* Merge cursor, don't update. */
+#define	WT_CLSM_MULTIPLE        0x08    /* Multiple cursors have values for the
 					   current key */
-#define	WT_CLSM_ITERATE_NEXT    0x02    /* Forward iteration */
-#define	WT_CLSM_ITERATE_PREV    0x04    /* Backward iteration */
 	uint32_t flags;
 };
 
@@ -41,6 +42,7 @@ struct __wt_lsm_tree {
 	pthread_t worker_tid;		/* LSM worker thread */
 
 	int nchunks;			/* Number of active chunks */
+	int last;			/* Last allocated ID. */
 	const char **chunk;		/* Array of chunk URIs */
 	size_t chunk_allocated;		/* Space allocated for chunks */
 
