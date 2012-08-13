@@ -10,7 +10,7 @@
 static void
 __lsm_tree_discard(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
-	u_int i;
+	int i;
 
 	TAILQ_REMOVE(&S2C(session)->lsmqh, lsm_tree, q);
 	__wt_spin_destroy(session, &lsm_tree->lock);
