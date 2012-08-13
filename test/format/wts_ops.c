@@ -134,7 +134,7 @@ ops(void *arg)
 	/* Pick a period for re-opening the session and cursors. */
 	session = NULL;
 	cursor = cursor_insert = NULL;
-	session_period = MMRAND(1, 23);
+	session_period = 100 * MMRAND(1, 50);
 
 	/* Pick an operation where we'll do a checkpoint. */
 	ckpt_op = MMRAND(1, thread_ops);

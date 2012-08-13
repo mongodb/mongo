@@ -22,8 +22,8 @@ into a set of columns.  Tables may also have associated indices, each
 of which is ordered by one or more columns.
 
 WiredTiger distributions are tested on Linux, FreeBSD and Mac OS X.
-WiredTiger should be portable to any system that supports the ANSI C99,
-POSIX 1003.1 and POSIX 1003.1c (threads extension) standards.
+WiredTiger should be portable to any 64-bit system which supports the
+ANSI C99, POSIX 1003.1 and POSIX 1003.1c (threads extension) standards.
 
 For more information about using WiredTiger, see:
 

@@ -34,13 +34,27 @@ __txn_sort_snapshot(WT_SESSION_IMPL *session,
 
 	txn = &session->txn;
 
-	qsort(txn->snapshot, n, sizeof(wt_txnid_t), __wt_txnid_cmp);
+	if (n > 1)
+		qsort(txn->snapshot, n, sizeof(wt_txnid_t), __wt_txnid_cmp);
 	txn->snapshot_count = n;
 	txn->snap_min = (n == 0) ? id : txn->snapshot[0];
-	txn->snap_max = (n == 0) ? id : txn->snapshot[n - 1];
+	txn->snap_max = id;
 	WT_ASSERT(session, txn->snap_min != WT_TXN_NONE);
 	txn->oldest_reader = TXNID_LT(oldest_reader, txn->snap_min) ?
 	    oldest_reader : txn->snap_min;
+}
+
+/*
+ * __wt_txn_release_snapshot --
+ *	Release the snapshot in the current transaction.
+ */
+void
+__wt_txn_release_snapshot(WT_SESSION_IMPL *session)
+{
+	WT_TXN *txn;
+
+	txn = &session->txn;
+	txn->snapshot_count = 0;
 }
 
 /*
@@ -115,9 +129,16 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_ASSERT(session, txn_state->id == WT_TXN_NONE);
 
 	WT_RET(__wt_config_gets_defno(session, cfg, "isolation", &cval));
-	txn->isolation =
-	    WT_STRING_MATCH("snapshot", cval.str, cval.len) ?
-	    TXN_ISO_SNAPSHOT : TXN_ISO_READ_UNCOMMITTED;
+	if (cval.len == 0)
+		txn->isolation = session->isolation;
+	else
+		txn->isolation =
+		    WT_STRING_MATCH("snapshot", cval.str, cval.len) ?
+		    TXN_ISO_SNAPSHOT :
+		    WT_STRING_MATCH("read-uncommitted", cval.str, cval.len) ?
+		    TXN_ISO_READ_UNCOMMITTED : TXN_ISO_READ_COMMITTED;
+
+	WT_ASSERT(session, session->nhazard == 0);
 
 	F_SET(txn, TXN_RUNNING);
 	F_SET(txn_state, TXN_STATE_RUNNING);
@@ -176,7 +197,8 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 
 	/* Reset the transaction state to not running. */
 	txn->id = WT_TXN_NONE;
-	txn->isolation = TXN_ISO_READ_UNCOMMITTED;
+	__wt_txn_release_snapshot(session);
+	txn->isolation = session->isolation;
 	F_CLR(txn, TXN_ERROR | TXN_RUNNING);
 
 	return (0);
@@ -228,6 +250,9 @@ __wt_txn_init(WT_SESSION_IMPL *session)
 
 	WT_RET(__wt_calloc_def(session,
 	    S2C(session)->session_size, &txn->snapshot));
+
+	/* The default isolation level is read-committed. */
+	txn->isolation = session->isolation = TXN_ISO_READ_COMMITTED;
 
 	return (0);
 }

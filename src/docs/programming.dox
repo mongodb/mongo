@@ -9,8 +9,8 @@ WiredTiger applications:
 - @subpage cursors
 - @subpage threads
 
-- @subpage file_formats
 - @subpage schema
+- @subpage file_formats
 
 - @subpage transactions
 - @subpage checkpoints

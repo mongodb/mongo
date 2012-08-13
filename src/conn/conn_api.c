@@ -773,16 +773,16 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
     const char *config, WT_CONNECTION **wt_connp)
 {
 	static WT_CONNECTION stdc = {
+		__conn_close,
+		__conn_reconfigure,
+		__conn_get_home,
+		__conn_is_new,
+		__conn_open_session,
 		__conn_load_extension,
 		__conn_add_data_source,
 		__conn_add_collator,
 		__conn_add_compressor,
-		__conn_add_extractor,
-		__conn_close,
-		__conn_get_home,
-		__conn_is_new,
-		__conn_open_session,
-		__conn_reconfigure
+		__conn_add_extractor
 	};
 	static struct {
 		const char *name;

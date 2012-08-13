@@ -13,8 +13,7 @@ noinst_PROGRAMS = \
 	ex_process \
 	ex_schema \
 	ex_stat \
-	ex_thread \
-	ex_transaction
+	ex_thread
 
 # The examples can be run with no arguments as simple smoke tests
 TESTS = $(noinst_PROGRAMS)
