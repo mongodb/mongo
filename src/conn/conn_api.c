@@ -303,12 +303,6 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 	WT_UNUSED(cfg);
 
 	/*
-	 * XXX LSM cleanup.
-	 * This is structured so that it could be moved to an extension.
-	 */
-	WT_ERR(__wt_lsm_cleanup(&conn->iface));
-
-	/*
 	 * Close open, external sessions.
 	 * Additionally, the session's hazard reference memory isn't discarded
 	 * during normal session close because access to it isn't serialized.
@@ -324,6 +318,12 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 	for (s = conn->sessions, i = 0; i < conn->session_size; ++s, ++i)
 		if (!F_ISSET(s, WT_SESSION_INTERNAL))
 			__wt_free(session, s->hazard);
+
+	/*
+	 * XXX LSM cleanup.
+	 * This is structured so that it could be moved to an extension.
+	 */
+	WT_ERR(__wt_lsm_cleanup(&conn->iface));
 
 	/* Close open btree handles. */
 	WT_TRET(__wt_conn_btree_discard(conn));

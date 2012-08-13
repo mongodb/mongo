@@ -39,14 +39,14 @@ __wt_lsm_major_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	 */
 	if (nchunks <= 1)
 		return (WT_NOTFOUND);
-	if (!F_ISSET(&lsm_tree->chunk[nchunks], WT_LSM_CHUNK_ONDISK))
-		return (0);
 
 	/*
 	 * We have a limited number of hazard references, and we want to bound
 	 * the amount of work in the merge.
 	 */
 	nchunks = WT_MIN((int)S2C(session)->hazard_size / 2, nchunks);
+	if (!F_ISSET(&lsm_tree->chunk[nchunks - 1], WT_LSM_CHUNK_ONDISK))
+		return (0);
 
 	printf("Merging first %d chunks into %d\n", nchunks, dest_id);
 

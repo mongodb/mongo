@@ -26,7 +26,7 @@
 #define	WT_LSM_ENTER(clsm, cursor, session, n)				\
 	clsm = (WT_CURSOR_LSM *)cursor;					\
 	CURSOR_API_CALL_NOCONF(cursor, session, next, NULL);		\
-	WT_TRET(__clsm_enter(clsm))
+	WT_ERR(__clsm_enter(clsm))
 
 #define	WT_LSM_END(clsm, session)					\
 	WT_TRET(__clsm_leave(clsm));					\
@@ -109,7 +109,7 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm)
 	WT_LSM_TREE *lsmtree;
 	WT_SESSION_IMPL *session;
 	const char *ckpt_cfg[] = { "checkpoint=WiredTigerCheckpoint", NULL };
-	int i;
+	int i, nchunks;
 
 	session = (WT_SESSION_IMPL *)clsm->iface.session;
 	lsmtree = clsm->lsmtree;
@@ -125,11 +125,11 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm)
 	}
 	++lsmtree->ncursor;
 
-	if (lsmtree->nchunks > clsm->nchunks)
+	if ((nchunks = lsmtree->nchunks) > clsm->nchunks)
 		WT_RET(__wt_realloc(session, NULL,
-		    lsmtree->nchunks * sizeof(WT_CURSOR *),
+		    nchunks * sizeof(WT_CURSOR *),
 		    &clsm->cursors));
-	clsm->nchunks = lsmtree->nchunks;
+	clsm->nchunks = nchunks;
 
 	for (i = 0, cp = clsm->cursors; i != clsm->nchunks; i++, cp++) {
 		/*
@@ -331,7 +331,7 @@ __clsm_reset(WT_CURSOR *cursor)
 		clsm->current = NULL;
 	}
 	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
-	WT_LSM_END(clsm, session);
+err:	WT_LSM_END(clsm, session);
 
 	return (ret);
 }
@@ -534,7 +534,7 @@ __clsm_close(WT_CURSOR *cursor)
 	/* The WT_LSM_TREE owns the URI. */
 	cursor->uri = NULL;
 	WT_TRET(__wt_cursor_close(cursor));
-	WT_LSM_END(clsm, session);
+err:	WT_LSM_END(clsm, session);
 
 	return (ret);
 }
