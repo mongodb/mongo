@@ -164,6 +164,8 @@ namespace replset {
         const char *ns = op.getStringField("ns");
         if (ns && (ns[0] != '\0')) {
             try {
+                // one possible tweak here would be to stay in the read lock for this database 
+                // for multiple prefetches if they are for the same database.
                 Client::ReadContext ctx(ns);
                 prefetchPagesForReplicatedOp(op);
             }

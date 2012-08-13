@@ -54,9 +54,29 @@ namespace mongo {
 
         DEV Lock::assertAtLeastReadLocked(ns);
 
+        // should we prefetch index pages on updates? if the update is in-place and doesn't change 
+        // indexed values, it is actually slower - a lot slower if there are a dozen indexes or 
+        // lots of multikeys.  possible variations (not all mutually exclusive):
+        //  1) current behavior: full prefetch
+        //  2) don't do it for updates
+        //  3) don't do multikey indexes for updates
+        //  4) don't prefetchIndexPages on some heuristic; e.g., if it's an $inc.
+        //  5) if not prefetching index pages (#2), we should do it if we are upsertings and it 
+        //     will be an insert. to do that we could do the prefetchRecordPage first and if DNE
+        //     then we do #1.
+        // 
+        // note that on deletes 'obj' does not have all the keys we would want to prefetch on.
+        // a way to achieve that would be to prefetch the record first, and then afterwards do 
+        // this part.
+        //
         prefetchIndexPages(nsd, obj);
 
         // do not prefetch the data for inserts; it doesn't exist yet
+        // 
+        // we should consider doing the record prefetch for the delete op case as we hit the record
+        // when we delete.  note if done we only want to touch the first page.
+        // 
+        // update: do record prefetch. 
         if ((*opType == 'u') &&
             // do not prefetch the data for capped collections because
             // they typically do not have an _id index for findById() to use.
@@ -70,11 +90,17 @@ namespace mongo {
         IndexInterface::IndexInserter inserter;
         BSONObjSet unusedKeys;
         ReplSetImpl::IndexPrefetchConfig prefetchConfig = theReplSet->getIndexPrefetchConfig();
+
+        // do we want prefetchConfig to be (1) as-is, (2) for update ops only, or (3) configured per op type?  
+        // One might want PREFETCH_NONE for updates, but it's more rare that it is a bad idea for inserts.  
+        // #3 (per op), a big issue would be "too many knobs".
         switch (prefetchConfig) {
         case ReplSetImpl::PREFETCH_NONE:
             return;
         case ReplSetImpl::PREFETCH_ID_ONLY:
         {
+            // on the update op case, the call to prefetchRecordPages will touch the _id index.
+            // thus perhaps this option isn't very useful?
             int indexNo = nsd->findIdIndex();
             if (indexNo == -1) return;
             try {
@@ -127,8 +153,11 @@ namespace mongo {
             builder.append(_id);
             BSONObj result;
             try {
+                // we can probably use Client::Context here instead of ReadContext as we
+                // have locked higher up the call stack already
                 Client::ReadContext ctx( ns );
                 if( Helpers::findById(cc(), ns, builder.done(), result) ) {
+                    // do we want to use Record::touch() here?  it's pretty similar.
                     volatile char _dummy_char = '\0';
                     // Touch the first word on every page in order to fault it into memory
                     for (int i = 0; i < result.objsize(); i += g_minOSPageSizeBytes) {                        
