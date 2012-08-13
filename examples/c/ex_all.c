@@ -473,28 +473,22 @@ transaction_ops(WT_CONNECTION *conn, WT_SESSION *session)
 	int ret;
 
 	/*! [simple transaction] */
-	ret = session->begin_transaction(session, NULL);
-
 	ret =
 	    session->open_cursor(session, "table:mytable", NULL, NULL, &cursor);
+	ret = session->begin_transaction(session, NULL);
 	cursor->set_key(cursor, "some-key");
 	cursor->set_value(cursor, "some-value");
 	ret = cursor->update(cursor);
-
-	/* Resolving the transaction closes the open cursors. */
 	ret = session->commit_transaction(session, NULL);
 	/*! [simple transaction] */
 
 	/*! [simple rollback transaction] */
-	ret = session->begin_transaction(session, NULL);
-
 	ret =
 	    session->open_cursor(session, "table:mytable", NULL, NULL, &cursor);
+	ret = session->begin_transaction(session, NULL);
 	cursor->set_key(cursor, "some-key");
 	cursor->set_value(cursor, "some-value");
 	ret = cursor->update(cursor);
-
-	/* Resolving the transaction closes the open cursors. */
 	switch (ret) {
 	case 0:
 		ret = session->commit_transaction(session, NULL);
@@ -508,15 +502,12 @@ transaction_ops(WT_CONNECTION *conn, WT_SESSION *session)
 
 	/*! [simple transaction isolation] */
 	/* A single transaction configured for snapshot isolation. */
-	ret = session->begin_transaction(session, "isolation=snapshot");
-
 	ret =
 	    session->open_cursor(session, "table:mytable", NULL, NULL, &cursor);
+	ret = session->begin_transaction(session, "isolation=snapshot");
 	cursor->set_key(cursor, "some-key");
 	cursor->set_value(cursor, "some-value");
 	ret = cursor->update(cursor);
-
-	/* Resolving the transaction closes the open cursors. */
 	ret = session->commit_transaction(session, NULL);
 	/*! [simple transaction isolation] */
 

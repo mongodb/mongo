@@ -26,11 +26,17 @@ properties:
 
 In WiredTiger, the transactional context is managed by the WT_SESSION
 class.  Applications call WT_SESSION::begin_transaction to start a new
-transaction, which is only permitted when no cursors are open.  Operations
-performed with that WT_SESSION handle are then part of the transaction, and
-their effects can be committed by calling WT_SESSION::commit_transaction or
-WT_SESSION::rollback_transaction, both of which implicitly close any open
-cursors.
+transaction.  Operations performed with that WT_SESSION handle
+(including cursors already open in that WT_SESSION handle and cursors
+subsequently opened before the transaction ends), are then part of the
+transaction and their effects committed or discarded by calling
+WT_SESSION::commit_transaction and WT_SESSION::rollback_transaction.
+
+Both WT_SESSION::commit_transaction and WT_SESSION::rollback_transaction
+implicitly reset all open cursors.
+
+If WT_SESSION::commit_transaction returns an error for any reason, the
+transaction was rolled-back, not committed.
 
 @snippet ex_all.c simple transaction
 
