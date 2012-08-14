@@ -39,7 +39,7 @@ for( var test = 0; test < 3; test++ ){
     
     // Kind a heuristic test, we want to make sure that the error wait after sleeping is much less
     // than the error wait after a lot of errors
-    assert.gt( lastWait, firstWait * 2 * 2 * 2 * 2 )
+    assert.gt( lastWait, firstWait * 2 * 2 )
     
     // Sleeping for long enough to reset our exponential counter
     sleep( 3000 )
