@@ -473,13 +473,19 @@ transaction_ops(WT_CONNECTION *conn, WT_SESSION *session)
 	int ret;
 
 	/*! [simple transaction] */
+	ret = session->begin_transaction(session, NULL);
 	ret =
 	    session->open_cursor(session, "table:mytable", NULL, NULL, &cursor);
-	ret = session->begin_transaction(session, NULL);
 	cursor->set_key(cursor, "some-key");
 	cursor->set_value(cursor, "some-value");
 	ret = cursor->update(cursor);
 	ret = session->commit_transaction(session, NULL);
+
+	/*
+	 * The cursor position has been reset by the transaction commit, it
+	 * can be used again until the handle is explicitly closed.
+	 */
+	ret = cursor->close(cursor);
 	/*! [simple transaction] */
 
 	/*! [simple rollback transaction] */

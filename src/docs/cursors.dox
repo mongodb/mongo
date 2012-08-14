@@ -61,7 +61,7 @@ cursor's \c key_format or \c value_format, respectively.
 @section cursors_transactions Transactions
 
 A transactional cursor (any cursor that supports transactional operations),
-operates in the context of they active transaction, if any.  When a transaction
+operates in the context of the active transaction, if any.  When a transaction
 is started with the WT_SESSION:begin_transaction method, all already open
 transactional cursors begin operating in the context of the new transaction.
 Any transactional cursors opened after the transaction is started will also
