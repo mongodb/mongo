@@ -31,6 +31,12 @@ namespace DocumentSourceTests {
     static const char* const ns = "unittests.documentsourcetests";
     static DBDirectClient client;
 
+    BSONObj toBson( const intrusive_ptr<DocumentSource>& source ) {
+        BSONArrayBuilder bab;
+        source->addToBsonArray( &bab );
+        return bab.arr()[ 0 ].Obj().getOwned();
+    }
+
     class CollectionBase {
     public:
         ~CollectionBase() {
@@ -315,14 +321,16 @@ namespace DocumentSourceTests {
 
         class Base : public DocumentSourceCursor::Base {
         protected:
-            void createGroup( const BSONObj &spec ) {
+            void createGroup( const BSONObj &spec, bool inShard = false ) {
                 BSONObj namedSpec = BSON( "$group" << spec );
                 BSONElement specElement = namedSpec.firstElement();
-                _group = DocumentSourceGroup::createFromBson( &specElement, ctx() );
-                BSONArrayBuilder bab;
-                _group->addToBsonArray( &bab );
-                // The $group spec round trips.
-                ASSERT_EQUALS( namedSpec, bab.arr()[ 0 ].Obj().getOwned() );
+                intrusive_ptr<ExpressionContext> expressionContext =
+                        ExpressionContext::create( &InterruptStatusMongod::status );
+                if ( inShard ) {
+                    expressionContext->setInShard( true );
+                }
+                _group = DocumentSourceGroup::createFromBson( &specElement, expressionContext );
+                assertRoundTrips( _group );
                 _group->setSource( source() );
             }
             DocumentSource* group() { return _group.get(); }
@@ -336,6 +344,16 @@ namespace DocumentSourceTests {
                 ASSERT( !source->getCurrent() );
             }
         private:
+            /** Check that the group's spec round trips. */
+            void assertRoundTrips( const intrusive_ptr<DocumentSource>& group ) {
+                // We don't check against the spec that generated 'group' originally, because
+                // $const operators may be introduced in the first serialization.
+                BSONObj spec = toBson( group );
+                BSONElement specElement = spec.firstElement();
+                intrusive_ptr<DocumentSource> generated =
+                        DocumentSourceGroup::createFromBson( &specElement, ctx() );
+                ASSERT_EQUALS( spec, toBson( generated ) );
+            }
             intrusive_ptr<DocumentSource> _group;
         };
 
@@ -540,6 +558,8 @@ namespace DocumentSourceTests {
                 intrusive_ptr<DocumentSource> sink = group();
                 if ( sharded ) {
                     sink = createMerger();
+                    // Serialize and re-parse the shard stage.
+                    createGroup( toBson( group() )[ "$group" ].Obj(), true );
                     sink->setSource( group() );
                 }
 
@@ -562,18 +582,10 @@ namespace DocumentSourceTests {
                 // case only one shard is in use.
                 SplittableDocumentSource *splittable =
                         dynamic_cast<SplittableDocumentSource*>( group() );
+                ASSERT( splittable );
                 intrusive_ptr<DocumentSource> routerSource = splittable->getRouterSource();
                 ASSERT_NOT_EQUALS( group(), routerSource.get() );
-                BSONArrayBuilder bab;
-                routerSource->addToBsonArray( &bab );
-                BSONObj routerSourceSpec = bab.arr()[ 0 ].Obj().getOwned();
-                BSONElement routerSourceSpecElement = routerSourceSpec.firstElement();
-                intrusive_ptr<ExpressionContext> routerContext =
-                        ExpressionContext::create( &InterruptStatusMongod::status );
-                routerContext->setDoingMerge(true);
-                routerContext->setInShard(false);
-                return DocumentSourceGroup::createFromBson( &routerSourceSpecElement,
-                                                            routerContext );
+                return routerSource;
             }
             void checkResultSet( const intrusive_ptr<DocumentSource> &sink ) {
                 // Load the results from the DocumentSourceGroup and sort them by _id.
@@ -798,6 +810,36 @@ namespace DocumentSourceTests {
                 ASSERT_EQUALS( 1U, dependencies.count( "u" ) );
                 ASSERT_EQUALS( 1U, dependencies.count( "v" ) );
             }
+        };
+
+        /**
+         * A string constant (not a field path) as an _id expression and passed to an accumulator.
+         * SERVER-6766
+         */
+        class StringConstantIdAndAccumulatorExpressions : public CheckResultsBase {
+            void populateData() { client.insert( ns, BSONObj() ); }
+            BSONObj groupSpec() {
+                return fromjson( "{_id:{$const:'$_id...'},a:{$push:{$const:'$a...'}}}" );
+            }
+            string expectedResultSetString() { return "[{_id:'$_id...',a:['$a...']}]"; }
+        };
+
+        /** An array constant passed to an accumulator. */
+        class ArrayConstantAccumulatorExpression : public CheckResultsBase {
+        public:
+            void run() {
+                // A parse exception is thrown when a raw array is provided to an accumulator.
+                ASSERT_THROWS( createGroup( fromjson( "{_id:1,a:{$push:[4,5,6]}}" ) ),
+                               UserException );
+                // Run standard base tests.
+                CheckResultsBase::run();
+            }
+            void populateData() { client.insert( ns, BSONObj() ); }
+            BSONObj groupSpec() {
+                // An array can be specified using $const.
+                return fromjson( "{_id:[1,2,3],a:{$push:{$const:[4,5,6]}}}" );
+            }
+            string expectedResultSetString() { return "[{_id:[1,2,3],a:[[4,5,6]]}]"; }
         };
 
     } // namespace DocumentSourceGroup
@@ -1694,6 +1736,8 @@ namespace DocumentSourceTests {
             add<DocumentSourceGroup::UndefinedAccumulatorValue>();
             add<DocumentSourceGroup::RouterMerger>();
             add<DocumentSourceGroup::Dependencies>();
+            add<DocumentSourceGroup::StringConstantIdAndAccumulatorExpressions>();
+            add<DocumentSourceGroup::ArrayConstantAccumulatorExpression>();
 
             add<DocumentSourceProject::EofInit>();
             add<DocumentSourceProject::AdvanceInit>();
