@@ -389,22 +389,103 @@ err:	WT_LSM_END(clsm, session);
  *	WT_CURSOR->search_near method for the LSM cursor type.
  */
 static int
-__clsm_search_near(WT_CURSOR *cursor, int *exact)
+__clsm_search_near(WT_CURSOR *cursor, int *exactp)
 {
+	WT_CURSOR *c, *larger, *smaller;
 	WT_CURSOR_LSM *clsm;
 	WT_DECL_RET;
+	WT_ITEM v;
 	WT_SESSION_IMPL *session;
+	int cmp, deleted, i;
 
 	WT_LSM_ENTER(clsm, cursor, session, search_near);
 	WT_CURSOR_NEEDKEY(cursor);
 
 	/*
-	 * TODO: implement -- we need the closest key we find, which is going
-	 * to require some care during the lookup.
+	 * search_near is somewhat fiddly: we can't just return a nearby key
+	 * from the in-memory chunk because there could be a closer key on
+	 * disk.
+	 *
+	 * As we search down the chunks, we stop as soon as we find an exact
+	 * match.  Otherwise, we maintain the smallest cursor larger than the
+	 * search key and the largest cursor smaller than the search key.  At
+	 * the bottom, if one of those is set, we use it, otherwise we return
+	 * WT_NOTFOUND.
 	 */
-	WT_UNUSED(exact);
-	ret = ENOTSUP;
+	larger = smaller = NULL;
+	FORALL_CURSORS(clsm, c, i) {
+		c->set_key(c, &cursor->key);
+		if ((ret = c->search_near(c, &cmp)) == WT_NOTFOUND)
+			continue;
+		else if (ret != 0)
+			goto err;
+
+		WT_ERR(c->get_value(c, &v));
+		deleted = !__clsm_islive(&v);
+
+		if (cmp == 0 && !deleted) {
+			clsm->current = c;
+			*exactp = 0;
+			goto done;
+		}
+
+		/*
+		 * If we land on a deleted item, try going forwards or
+		 * backwards to find one that isn't deleted.
+		 */
+		while (deleted && (ret = c->next(c)) == 0) {
+			cmp = 1;
+			WT_ERR(c->get_value(c, &v));
+			deleted = !__clsm_islive(&v);
+		}
+		WT_ERR_NOTFOUND_OK(ret);
+		while (deleted && (ret = c->prev(c)) == 0) {
+			cmp = -1;
+			WT_ERR(c->get_value(c, &v));
+			deleted = !__clsm_islive(&v);
+		}
+		WT_ERR_NOTFOUND_OK(ret);
+		if (deleted)
+			continue;
+		if (cmp > 0) {
+			if (larger == NULL)
+				larger = c;
+			else {
+				WT_RET(WT_LSM_CURCMP(session,
+				    clsm->lsmtree, c, larger, cmp));
+				if (cmp < 0)
+					larger = c;
+			}
+		} else {
+			if (smaller == NULL)
+				smaller = c;
+			else {
+				WT_RET(WT_LSM_CURCMP(session,
+				    clsm->lsmtree, c, smaller, cmp));
+				if (cmp > 0)
+					smaller = c;
+			}
+		}
+	}
+
+	if (smaller != NULL) {
+		clsm->current = smaller;
+		*exactp = -1;
+	} else if (larger != NULL) {
+		clsm->current = larger;
+		*exactp = 1;
+	} else
+		ret = WT_NOTFOUND;
+
+done:
 err:	WT_LSM_END(clsm, session);
+	if (ret == 0) {
+		c = clsm->current;
+		WT_RET(c->get_key(c, &cursor->key));
+		WT_RET(c->get_value(c, &cursor->value));
+		F_SET(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+	} else
+		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
 	return (ret);
 }
