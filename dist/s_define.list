@@ -82,3 +82,9 @@ TAILQ_PREV
 TRACEBUF
 TRASHIT
 _DB_QUEUE_H_
+
+# List of hash #defines that are "unused", they are only used in headers or
+# test code.
+FNV_VERSION
+__WT_HASH_H
+

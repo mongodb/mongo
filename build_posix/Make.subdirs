@@ -14,5 +14,6 @@ ext/compressors/snappy_compress SNAPPY
 lang/python PYTHON
 test/fops
 test/format HAVE_BDB
+test/hash
 test/salvage
 test/thread

@@ -9,6 +9,7 @@ ADDR
 AJZ
 API
 APIs
+Alakuijala
 Alloc
 Athlon
 BBBBB
@@ -19,6 +20,7 @@ BBBBBBBBBBBBBBBB
 BBBBBBBBBBBBBBBBBB
 BDB
 BDB's
+BIGENDIAN
 BSR
 BTREE
 BUF
@@ -26,6 +28,7 @@ BUFs
 BZ
 BZIP
 Bitfield
+Bitwise
 Bsearch
 Btree
 Bzip
@@ -42,6 +45,7 @@ CURSORs
 CURSTD
 CallsCustDate
 Checksum
+CityHash
 Comparator
 Config
 CustomersPhone
@@ -53,6 +57,7 @@ EB
 EBUSY
 EINTR
 EINVAL
+EMail
 ENOENT
 ENOMEM
 ENOTSUP
@@ -66,14 +71,18 @@ Eron
 FALLTHROUGH
 FH
 FLD
+FNV
 FOREACH
 FREELIST
 Fasttrack
+Fnv
 FreeBSD
 FreeBSD's
 Freelist
 GCC
 GIDs
+Geoff
+IEEE
 IKEY
 IMPL
 IMPL's
@@ -85,6 +94,7 @@ INUSE
 ISSET
 JPEG
 JSON
+Jyrki
 KEYFIRST
 KV
 Kanowski's
@@ -111,6 +121,7 @@ Mewhort
 Multi
 Mutex
 Mutexes
+NOLL
 NONINFRINGEMENT
 NOTFOUND
 NOTREACHED
@@ -120,7 +131,9 @@ NUL
 NULLs
 NetBSD
 NoAddr
+Noll
 Nul
+Nusov
 ONPAGE
 OUTBUFF
 OVFL
@@ -131,9 +144,11 @@ POSIX
 PSIZE
 PTR
 Pagesize
+Phong
 PlatformSDK
 Pre
 Qsort
+RCS
 READONLY
 REF's
 REQ
@@ -145,6 +160,7 @@ Recurse
 Redistributions
 Resize
 SCHED
+SIMD
 SLIST
 SLVG
 SQL
@@ -161,6 +177,7 @@ Subtrees
 TAILQ
 TODO
 TOOSMALL
+TORTIOUS
 TRK
 TXN
 TXNID
@@ -175,14 +192,17 @@ UnixLib
 VARCHAR
 Vc
 Vixie
+Vo
 Vv
 VxWorks
 WIREDTIGER
+WeakHashLen
 WildTiger
 WinNT
 WiredTiger
 WiredTiger's
 WiredTigerCheckpoint
+WithSeeds
 Wuninitialized
 XP
 __wt_epoch
@@ -203,6 +223,7 @@ ap
 api
 arg
 argc
+args
 argv
 async
 bdb
@@ -237,16 +258,20 @@ bzip
 calloc
 catfmt
 cfg
+cfv
 checkfrag
 checksum
 checksums
 chk
+chongo
 cip
+cityhash
 ckpt
 ckptfrag
 ckptlist
 cksum
 clr
+cmd
 cmp
 cnt
 colcheck
@@ -349,6 +374,7 @@ filesystem
 fixup
 flcs
 fmt
+fnv
 fopen
 fp
 fprintf
@@ -380,11 +406,13 @@ goesc
 gostring
 gostruct
 goutf
+hashval
 havesize
 hdr
 hrow
 html
 huffman
+hval
 iS
 iSh
 ikey
@@ -419,6 +447,7 @@ lexicographically
 lf
 lfence
 lld
+llx
 llll
 llu
 loadtext
@@ -469,6 +498,7 @@ newname
 nextprev
 nhex
 nl
+nline
 nlpo
 nocase
 nop
@@ -488,6 +518,7 @@ ok
 oldname
 onint
 onpage
+oo
 os
 ovfl
 packv
@@ -502,6 +533,7 @@ presize
 printf
 printlog
 priv
+pseudorandom
 pthread
 putK
 putV
@@ -583,6 +615,7 @@ su
 subgetraw
 subgets
 subinit
+sublicense
 subtree
 subtrees
 sunique
@@ -608,6 +641,7 @@ tid
 tinsert
 tlist
 tload
+tmp
 toffpage
 toverflow
 tparent
@@ -656,6 +690,7 @@ unsized
 untyped
 upd
 uri
+usr
 utf
 util
 uu
@@ -679,6 +714,7 @@ wrlock
 wti
 wts
 xff
+xffff
 xxxx
 xxxxx
 xxxxxx
