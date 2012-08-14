@@ -159,7 +159,8 @@ err:	__wt_spin_unlock(session, &lsmtree->lock);
  *	Find the smallest / largest of the cursors and copy its key/value.
  */
 static int
-__clsm_get_current(WT_SESSION_IMPL *session, WT_CURSOR_LSM *clsm, int smallest)
+__clsm_get_current(
+    WT_SESSION_IMPL *session, WT_CURSOR_LSM *clsm, int smallest, int *deletedp)
 {
 	WT_CURSOR *c, *current;
 	int i;
@@ -194,7 +195,11 @@ __clsm_get_current(WT_SESSION_IMPL *session, WT_CURSOR_LSM *clsm, int smallest)
 
 	WT_RET(current->get_key(current, &c->key));
 	WT_RET(current->get_value(current, &c->value));
-	F_SET(c, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+
+	if ((*deletedp = !__clsm_islive(&c->value)) == 0)
+		F_SET(c, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+	else
+		F_CLR(c, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
 	return (0);
 }
@@ -211,7 +216,7 @@ __clsm_next(WT_CURSOR *cursor)
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	int i;
-	int check, cmp;
+	int check, cmp, deleted;
 
 	WT_LSM_ENTER(clsm, cursor, session, next);
 
@@ -222,7 +227,7 @@ __clsm_next(WT_CURSOR *cursor)
 			WT_ERR_NOTFOUND_OK(c->next(c));
 		}
 	} else {
-		/*
+retry:		/*
 		 * If there are multiple cursors on that key, move them
 		 * forward.
 		 */
@@ -250,7 +255,9 @@ __clsm_next(WT_CURSOR *cursor)
 	}
 
 	/* Find the cursor(s) with the smallest key. */
-	ret = __clsm_get_current(session, clsm, 1);
+	if ((ret = __clsm_get_current(session, clsm, 1, &deleted)) == 0 &&
+	    deleted)
+		goto retry;
 err:	WT_LSM_END(clsm, session);
 
 	return (ret);
@@ -268,7 +275,7 @@ __clsm_prev(WT_CURSOR *cursor)
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	int i;
-	int check, cmp;
+	int check, cmp, deleted;
 
 	WT_LSM_ENTER(clsm, cursor, session, next);
 
@@ -279,7 +286,7 @@ __clsm_prev(WT_CURSOR *cursor)
 			WT_ERR_NOTFOUND_OK(c->prev(c));
 		}
 	} else {
-		/*
+retry:		/*
 		 * If there are multiple cursors on that key, move them
 		 * backwards.
 		 */
@@ -307,7 +314,9 @@ __clsm_prev(WT_CURSOR *cursor)
 	}
 
 	/* Find the cursor(s) with the smallest key. */
-	ret = __clsm_get_current(session, clsm, 0);
+	if ((ret = __clsm_get_current(session, clsm, 0, &deleted)) == 0 &&
+	    deleted)
+		goto retry;
 err:	WT_LSM_END(clsm, session);
 
 	return (ret);
@@ -351,20 +360,26 @@ __clsm_search(WT_CURSOR *cursor)
 
 	WT_LSM_ENTER(clsm, cursor, session, search);
 	WT_CURSOR_NEEDKEY(cursor);
-	ret = WT_NOTFOUND;
 	FORALL_CURSORS(clsm, c, i) {
 		c->set_key(c, &cursor->key);
-		WT_ERR_NOTFOUND_OK(c->search(c));
-		if (ret == 0) {
+		if ((ret = c->search(c)) == 0) {
 			WT_ERR(c->get_key(c, &cursor->key));
 			WT_ERR(c->get_value(c, &cursor->value));
 			clsm->current = c;
-			F_SET(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
-			break;
-		}
+			if (!__clsm_islive(&cursor->value))
+				ret = WT_NOTFOUND;
+			goto done;
+		} else if (ret != WT_NOTFOUND)
+			goto err;
 	}
+	ret = WT_NOTFOUND;
 
+done:
 err:	WT_LSM_END(clsm, session);
+	if (ret == 0)
+		F_SET(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+	else
+		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
 	return (ret);
 }
@@ -415,6 +430,7 @@ __clsm_put(
 	primary->set_key(primary, key);
 	primary->set_value(primary, value);
 	WT_RET(primary->insert(primary));
+	clsm->current = primary;
 
 	if ((memsizep = lsmtree->memsizep) != NULL &&
 	    *memsizep > lsmtree->threshhold) {
@@ -460,7 +476,6 @@ __clsm_insert(WT_CURSOR *cursor)
 	}
 
 	ret = __clsm_put(session, clsm, &cursor->key, &cursor->value);
-	clsm->current = NULL;
 
 err:	WT_LSM_END(clsm, session);
 
