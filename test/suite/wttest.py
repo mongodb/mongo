@@ -274,24 +274,29 @@ class WiredTigerTestCase(unittest.TestCase):
             raise
 
     def tearDown(self):
+        excinfo = sys.exc_info()
+        passed = (excinfo == (None, None, None))
+
         try:
             self.fdTearDown()
             self.pr('finishing')
             self.close_conn()
-            self.captureout.check(self)
-            self.captureerr.check(self)
+            # Only check for unexpected output if the test passed
+            if passed:
+                self.captureout.check(self)
+                self.captureerr.check(self)
         finally:
             # always get back to original directory
             os.chdir(self.origcwd)
 
         # Clean up unless there's a failure
-        excinfo = sys.exc_info()
-        if excinfo == (None, None, None):
-            if not WiredTigerTestCase._preserveFiles:
-                removeAll(self.testdir)
-            else:
-                self.pr('preserving directory ' + self.testdir)
+        if passed and not WiredTigerTestCase._preserveFiles:
+            removeAll(self.testdir)
         else:
+            self.pr('preserving directory ' + self.testdir)
+
+        if not passed:
+            print "ERROR"
             self.pr('FAIL')
             self.prexception(excinfo)
             self.pr('preserving directory ' + self.testdir)
