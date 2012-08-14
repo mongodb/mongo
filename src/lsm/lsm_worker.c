@@ -49,7 +49,7 @@ __wt_lsm_worker(void *arg)
 			    &chunk_array);
 		if (ret == 0)
 			memcpy(chunk_array, lsm_tree->chunk,
-			    nchunks * sizeof (*lsm_tree->chunk));
+			    nchunks * sizeof(*lsm_tree->chunk));
 		__wt_spin_unlock(session, &lsm_tree->lock);
 		WT_ERR(ret);
 

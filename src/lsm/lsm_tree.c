@@ -174,7 +174,8 @@ __wt_lsm_tree_switch(
 	++lsm_tree->dsk_gen;
 
 	/* TODO more sensible realloc */
-	if ((lsm_tree->nchunks + 1) * sizeof(*lsm_tree->chunk) > lsm_tree->chunk_allocated)
+	if ((lsm_tree->nchunks + 1) * sizeof(*lsm_tree->chunk) >
+	    lsm_tree->chunk_allocated)
 		WT_ERR(__wt_realloc(session,
 		    &lsm_tree->chunk_allocated,
 		    (lsm_tree->nchunks + 1) * sizeof(*lsm_tree->chunk),
@@ -186,7 +187,8 @@ __wt_lsm_tree_switch(
 	++lsm_tree->nchunks;
 
 	if (lsm_tree->memsizep != NULL)
-		printf("Switched to %d because %d > %d\n", lsm_tree->last, (int)*lsm_tree->memsizep, (int)lsm_tree->threshhold);
+		printf("Switched to %d because %d > %d\n", lsm_tree->last,
+		    (int)*lsm_tree->memsizep, (int)lsm_tree->threshhold);
 	lsm_tree->memsizep = NULL;
 
 	/* TODO: update metadata. */

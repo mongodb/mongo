@@ -62,18 +62,18 @@ static WT_ITEM __lsm_tombstone = { "", 0, 0, NULL, 0 };
 
 #define	WT_LSM_NEEDVALUE(c) do {					\
 	WT_CURSOR_NEEDVALUE(c);						\
-	if (!__clsm_islive(&(c)->value))				\
+	if (__clsm_deleted(&(c)->value))				\
 		WT_ERR(__wt_cursor_kv_not_set(cursor, 0));		\
 } while (0)
 
 /*
- * __clsm_islive --
- *	Check whether the current value is something other than a tombstone.
+ * __clsm_deleted --
+ *	Check whether the current value is a tombstone.
  */
 static inline int
-__clsm_islive(WT_ITEM *item)
+__clsm_deleted(WT_ITEM *item)
 {
-	return (item->size != 0);
+	return (item->size == 0);
 }
 
 /*
@@ -196,7 +196,7 @@ __clsm_get_current(
 	WT_RET(current->get_key(current, &c->key));
 	WT_RET(current->get_value(current, &c->value));
 
-	if ((*deletedp = !__clsm_islive(&c->value)) == 0)
+	if ((*deletedp = __clsm_deleted(&c->value)) == 0)
 		F_SET(c, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 	else
 		F_CLR(c, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
@@ -366,7 +366,7 @@ __clsm_search(WT_CURSOR *cursor)
 			WT_ERR(c->get_key(c, &cursor->key));
 			WT_ERR(c->get_value(c, &cursor->value));
 			clsm->current = c;
-			if (!__clsm_islive(&cursor->value))
+			if (__clsm_deleted(&cursor->value))
 				ret = WT_NOTFOUND;
 			goto done;
 		} else if (ret != WT_NOTFOUND)
@@ -421,7 +421,7 @@ __clsm_search_near(WT_CURSOR *cursor, int *exactp)
 			goto err;
 
 		WT_ERR(c->get_value(c, &v));
-		deleted = !__clsm_islive(&v);
+		deleted = __clsm_deleted(&v);
 
 		if (cmp == 0 && !deleted) {
 			clsm->current = c;
@@ -436,13 +436,13 @@ __clsm_search_near(WT_CURSOR *cursor, int *exactp)
 		while (deleted && (ret = c->next(c)) == 0) {
 			cmp = 1;
 			WT_ERR(c->get_value(c, &v));
-			deleted = !__clsm_islive(&v);
+			deleted = __clsm_deleted(&v);
 		}
 		WT_ERR_NOTFOUND_OK(ret);
 		while (deleted && (ret = c->prev(c)) == 0) {
 			cmp = -1;
 			WT_ERR(c->get_value(c, &v));
-			deleted = !__clsm_islive(&v);
+			deleted = __clsm_deleted(&v);
 		}
 		WT_ERR_NOTFOUND_OK(ret);
 		if (deleted)
@@ -451,7 +451,7 @@ __clsm_search_near(WT_CURSOR *cursor, int *exactp)
 			if (larger == NULL)
 				larger = c;
 			else {
-				WT_RET(WT_LSM_CURCMP(session,
+				WT_ERR(WT_LSM_CURCMP(session,
 				    clsm->lsmtree, c, larger, cmp));
 				if (cmp < 0)
 					larger = c;
@@ -460,7 +460,7 @@ __clsm_search_near(WT_CURSOR *cursor, int *exactp)
 			if (smaller == NULL)
 				smaller = c;
 			else {
-				WT_RET(WT_LSM_CURCMP(session,
+				WT_ERR(WT_LSM_CURCMP(session,
 				    clsm->lsmtree, c, smaller, cmp));
 				if (cmp > 0)
 					smaller = c;
@@ -480,9 +480,11 @@ __clsm_search_near(WT_CURSOR *cursor, int *exactp)
 done:
 err:	WT_LSM_END(clsm, session);
 	if (ret == 0) {
+		WT_TRET(c->get_key(c, &cursor->key));
+		WT_TRET(c->get_value(c, &cursor->value));
+	}
+	if (ret == 0) {
 		c = clsm->current;
-		WT_RET(c->get_key(c, &cursor->key));
-		WT_RET(c->get_value(c, &cursor->value));
 		F_SET(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 	} else
 		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
