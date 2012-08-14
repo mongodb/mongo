@@ -796,7 +796,7 @@ struct __wt_session {
 	 * WT_SESSION::transaction_begin will fail if a transaction is already
 	 * in progress in the session.
 	 *
-	 * @snippet ex_all.c Begin a transaction
+	 * @snippet ex_all.c transaction commit/rollback
 	 *
 	 * @param session the session handle
 	 * @configstart{session.begin_transaction, see dist/api_data.py}
@@ -826,7 +826,7 @@ struct __wt_session {
 	 * If WT_SESSION::commit_transaction returns an error, the transaction
 	 * was rolled-back, not committed.
 	 *
-	 * @snippet ex_all.c Commit a transaction
+	 * @snippet ex_all.c transaction commit/rollback
 	 *
 	 * @param session the session handle
 	 * @configempty{session.commit_transaction, see dist/api_data.py}
@@ -840,7 +840,7 @@ struct __wt_session {
 	 *
 	 * All open cursors are reset.
 	 *
-	 * @snippet ex_all.c Rollback a transaction
+	 * @snippet ex_all.c transaction commit/rollback
 	 *
 	 * @param session the session handle
 	 * @configempty{session.rollback_transaction, see dist/api_data.py}
