@@ -325,20 +325,26 @@ def ternary( b , l="true", r="false" ):
 # Blech.
 def skipTest(path):
     basename = os.path.basename(path)
-    parentDir = os.path.basename(os.path.dirname(path))
+    parentPath = os.path.dirname(path)
+    parentDir = os.path.basename(parentPath)
     if small_oplog: # For tests running in parallel
         if basename in ["cursor8.js", "indexh.js", "dropdb.js"]:
             return True
     if auth or keyFile: # For tests running with auth
         # Skip any tests that run with auth explicitly
-        if parentDir == "auth" or "auth" in basename or parentDir == "tool": # SERVER-6368
+        if parentDir == "auth" or "auth" in basename:
             return True
         # These tests don't pass with authentication due to limitations of the test infrastructure,
         # not due to actual bugs.
+        if parentDir == "tool": # SERVER-6368
+            return True
+        if parentPath == mongo_repo: # Skip client tests
+            return True
+        # SERVER-6388
         if os.path.join(parentDir,basename) in ["sharding/sync3.js", "sharding/sync6.js", "sharding/parallel.js", "jstests/bench_test1.js", "jstests/bench_test2.js", "jstests/bench_test3.js"]:
             return True
         # These tests fail due to bugs
-        if os.path.join(parentDir,basename) in ["sharding/sync_conn_cmd.js"]:
+        if os.path.join(parentDir,basename) in ["sharding/sync_conn_cmd.js"]: # SERVER-6327
             return True
 
     return False
