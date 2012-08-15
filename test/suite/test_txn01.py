@@ -71,8 +71,8 @@ class test_txn01(wttest.WiredTigerTestCase):
     # visible to the cursor matches the expected value.
     def check_transaction(self, level, expected):
         s = self.conn.open_session()
-        s.begin_transaction(level)
         cursor = s.open_cursor(self.uri, None)
+        s.begin_transaction(level)
         self.assertEqual(self.cursor_count(cursor), expected)
         s.close()
 
@@ -100,16 +100,15 @@ class test_txn01(wttest.WiredTigerTestCase):
             ',value_format=' + self.value_format)
 
         committed = 0
-        self.session.begin_transaction()
         cursor = self.session.open_cursor(self.uri, None)
         self.check(cursor, 0, 0)
+        self.session.begin_transaction()
         for i in xrange(self.nentries):
             if i > 0 and i % (self.nentries / 37) == 0:
                 self.check(cursor, committed, i)
                 self.session.commit_transaction()
                 committed = i
                 self.session.begin_transaction()
-                cursor = self.session.open_cursor(self.uri, None)
 
             if self.key_format == 'S':
                 cursor.set_key("key: %06d" % i)
@@ -123,7 +122,7 @@ class test_txn01(wttest.WiredTigerTestCase):
 
         self.check(cursor, committed, self.nentries)
         self.session.commit_transaction()
-        self.check(None, self.nentries, self.nentries)
+        self.check(cursor, self.nentries, self.nentries)
 
 
 # Test that read-committed is the default isolation level.
@@ -139,25 +138,23 @@ class test_read_committed_default(wttest.WiredTigerTestCase):
 
     def test_read_committed_default(self):
         self.session.create(self.uri, 'key_format=S,value_format=S')
-        self.session.begin_transaction()
         cursor = self.session.open_cursor(self.uri, None)
+        self.session.begin_transaction()
         cursor.set_key('key: aaa')
         cursor.set_value('value: aaa')
         cursor.insert()
         self.session.commit_transaction()
         self.session.begin_transaction()
-        cursor = self.session.open_cursor(self.uri, None)
         cursor.set_key('key: bbb')
         cursor.set_value('value: bbb')
         cursor.insert()
 
         s = self.conn.open_session()
-        s.begin_transaction("isolation=read-committed")
         cursor = s.open_cursor(self.uri, None)
+        s.begin_transaction("isolation=read-committed")
         self.assertEqual(self.cursor_count(cursor), 1)
         s.commit_transaction()
         s.begin_transaction(None)
-        cursor = s.open_cursor(self.uri, None)
         self.assertEqual(self.cursor_count(cursor), 1)
         s.commit_transaction()
         s.close()

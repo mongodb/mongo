@@ -112,13 +112,13 @@ class test_txn02(wttest.WiredTigerTestCase):
     def test_ops(self):
         self.session.create(self.uri, self.create_params)
         # Set up the table with entries for 1 and 10
-        c = self.session.open_cursor(self.uri, None)
+        # We use the overwrite config so insert can update as needed.
+        c = self.session.open_cursor(self.uri, None, 'overwrite')
         c.set_value(1)
         c.set_key(1)
         c.insert()
         c.set_key(10)
         c.insert()
-        c.close()
         current = {1:1, 10:1}
         committed = current.copy()
 
@@ -128,11 +128,9 @@ class test_txn02(wttest.WiredTigerTestCase):
         #                 for ok, txn in zip(ops, txns))
         for i, ot in enumerate(zip(ops, txns)):
             self.session.begin_transaction()
-            c = self.session.open_cursor(self.uri, None, 'overwrite')
             ok, txn = ot
             op, k = ok
             # print '%s(%d)[%s]' % (ok[0], ok[1], txn)
-            # We use the overwrite config so insert can update as needed.
             if op == 'insert' or op == 'update':
                 c.set_key(k)
                 c.set_value(i + 2)
