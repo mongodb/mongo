@@ -4,17 +4,21 @@ The WiredTiger software is Open Source software: you may redistribute
 it and modify it under the terms of version 3 of the
 <a href="http://www.gnu.org/licenses/gpl-3.0-standalone.html">
 <b>GNU General Public License</b></a>
-as published by the Free Software Foundation.  The WiredTiger library
-binary also includes software copyrighted under the terms of the
-<a href="http://www.opensource.org/licenses/BSD-3-Clause">
-<b>University of California, Berkeley (BSD) 3-Clause License</b></a>.
-Any redistribution should comply with both copyrights.
-
-This program is distributed in the hope that it will be useful, but
-WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+as published by the Free Software Foundation. This program is
+distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or
+FITNESS FOR A PARTICULAR PURPOSE.  See the
 <a href="http://www.gnu.org/licenses/gpl-3.0-standalone.html">
 <b>GNU General Public License</b></a> for details.
+
+The WiredTiger library binary includes software copyrighted under the
+terms of the
+<a href="http://www.opensource.org/licenses/BSD-3-Clause">
+<b>University of California, Berkeley (BSD) 3-Clause License</b></a>
+and the
+<a href="http://www.opensource.org/licenses/MIT">
+<b>MIT License</b></a>.  Any redistribution should comply with these
+copyrights.
 
 For a license to use the WiredTiger software under conditions other than
 those described above, or for technical support for this software, please
@@ -31,6 +35,7 @@ distributed under the following licenses:
 @row{src/include/bitstring.i, University of California\, Berkeley (BSD) 3-Clause License}
 @row{src/include/queue.h, University of California\, Berkeley (BSD) 3-Clause License}
 @row{src/support/hash_city.c, The MIT License}
+@row{src/support/hash_fnv.c, Public Domain Software}
 @row{src/utilities/util_getopt.c, University of California\, Berkeley (BSD) 3-Clause License}
 </table>
 
