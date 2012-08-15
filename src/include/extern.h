@@ -520,6 +520,8 @@ extern const char *__wt_confdfl_session_log_printf;
 extern WT_CONFIG_CHECK __wt_confchk_session_log_printf[];
 extern const char *__wt_confdfl_session_open_cursor;
 extern WT_CONFIG_CHECK __wt_confchk_session_open_cursor[];
+extern const char *__wt_confdfl_session_reconfigure;
+extern WT_CONFIG_CHECK __wt_confchk_session_reconfigure[];
 extern const char *__wt_confdfl_session_rename;
 extern WT_CONFIG_CHECK __wt_confchk_session_rename[];
 extern const char *__wt_confdfl_session_rollback_transaction;
@@ -981,6 +983,8 @@ extern int __wt_filename(WT_SESSION_IMPL *session,
 extern int __wt_library_init(void);
 extern int __wt_breakpoint(void);
 extern void __wt_attach(WT_SESSION_IMPL *session);
+extern uint64_t __wt_hash_city64(const void *string, uint32_t len);
+extern uint64_t __wt_hash_fnv64(const void *string, uint32_t len);
 extern int
 __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, int *busyp
 #ifdef HAVE_DIAGNOSTIC
@@ -1077,6 +1081,7 @@ extern int __wt_stat_alloc_connection_stats(WT_SESSION_IMPL *session,
     WT_CONNECTION_STATS **statsp);
 extern void __wt_stat_clear_connection_stats(WT_STATS *stats_arg);
 extern int __wt_txnid_cmp(const void *v1, const void *v2);
+extern void __wt_txn_release_snapshot(WT_SESSION_IMPL *session);
 extern int __wt_txn_get_snapshot(WT_SESSION_IMPL *session, wt_txnid_t max_id);
 extern int __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_txn_release(WT_SESSION_IMPL *session);

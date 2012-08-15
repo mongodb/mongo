@@ -89,10 +89,12 @@ del
 desc
 destructor
 destructors
+dl
 dlp
 dontlock
 dp
 dsync
+dt
 dumpfile
 dup
 dups
@@ -115,6 +117,7 @@ filesystem
 filesystems
 fillfactor
 firstname
+fnv
 fput
 freelist
 gcc

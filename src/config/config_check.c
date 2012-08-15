@@ -43,12 +43,10 @@ __wt_config_check(WT_SESSION_IMPL *session,
 				break;
 			}
 
-		if (!found) {
+		if (!found)
 			WT_RET_MSG(session, EINVAL,
 			    "Unknown configuration key found: '%.*s'",
 			    (int)k.len, k.str);
-			return (WT_NOTFOUND);
-		}
 
 		if (strcmp(checks[i].type, "int") == 0)
 			badtype = (v.type != ITEM_NUM);
@@ -71,21 +69,21 @@ __wt_config_check(WT_SESSION_IMPL *session,
 		/* Setup an iterator for the check string. */
 		WT_RET(__wt_config_init(session, &cparser, checks[i].checks));
 		while ((ret = __wt_config_next(&cparser, &ck, &cv)) == 0) {
-			if (strncmp(ck.str, "min", ck.len) == 0) {
+			if (WT_STRING_MATCH("min", ck.str, ck.len)) {
 				if (v.val < cv.val)
 					WT_RET_MSG(session, EINVAL,
 					    "Value too small for key '%.*s' "
 					    "the minimum is %.*s",
 					    (int)k.len, k.str,
 					    (int)cv.len, cv.str);
-			} else if (strncmp(ck.str, "max", ck.len) == 0) {
+			} else if (WT_STRING_MATCH("max", ck.str, ck.len)) {
 				if (v.val > cv.val)
 					WT_RET_MSG(session, EINVAL,
 					    "Value too large for key '%.*s' "
 					    "the maximum is %.*s",
 					    (int)k.len, k.str,
 					    (int)cv.len, cv.str);
-			} else if (strncmp(ck.str, "choices", ck.len) == 0) {
+			} else if (WT_STRING_MATCH("choices", ck.str, ck.len)) {
 				if (v.len == 0)
 					WT_RET_MSG(session, EINVAL,
 					    "Key '%.*s' requires a value",

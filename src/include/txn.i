@@ -90,31 +90,35 @@ __wt_txn_visible(WT_SESSION_IMPL *session, wt_txnid_t id)
 	if (id == WT_TXN_ABORTED)
 		return (0);
 
-	/*
-	 * Changes with no associated transaction are always visible, and
-	 * non-snapshot transactions see all other changes.
-	 */
+	/* Changes with no associated transaction are always visible. */
+	if (id == WT_TXN_NONE)
+		return (1);
+
+	/* Transactions see their own changes. */
 	txn = &session->txn;
-	if (id == WT_TXN_NONE ||
-	    txn->isolation != TXN_ISO_SNAPSHOT ||
-	    (F_ISSET(txn, TXN_RUNNING) && id == txn->id))
+	if (F_ISSET(txn, TXN_RUNNING) && id == txn->id)
+		return (1);
+
+	/* Read-uncommitted transactions see all other changes. */
+	if (txn->isolation == TXN_ISO_READ_UNCOMMITTED)
 		return (1);
 
 	/*
-	 * The snapshot test.
+	 * TXN_ISO_SNAPSHOT, TXN_ISO_READ_COMMITTED:
+	 * Otherwise, the ID is visible if it is not the result of a concurrent
+	 * transaction, that is, if it is not in the snapshot list.
 	 */
-	if (TXNID_LT(id, txn->snap_min))
+	if (txn->snapshot_count == 0 || TXNID_LT(id, txn->snap_min))
 		return (1);
 	if (TXNID_LT(txn->snap_max, id))
 		return (0);
 
 	/*
-	 * Otherwise, the ID is visible if it is not the result of a concurrent
-	 * transaction.  That is, if it is not in the snapshot list.  Fast path
-	 * the single-threaded case where there are no concurrent transactions.
+	 * Fast path the single-threaded case where there are no concurrent
+	 * transactions.
 	 */
-	return (txn->snapshot_count == 0 || bsearch(&id, txn->snapshot,
-	    txn->snapshot_count, sizeof(wt_txnid_t), __wt_txnid_cmp) == NULL);
+	return (bsearch(&id, txn->snapshot, txn->snapshot_count,
+	    sizeof(wt_txnid_t), __wt_txnid_cmp) == NULL);
 }
 
 /*
@@ -205,7 +209,7 @@ __wt_txn_ancient(WT_SESSION_IMPL *session, wt_txnid_t id)
  * __wt_txn_read_first --
  *	Called for the first page read for a session.
  */
-static inline void
+static inline int
 __wt_txn_read_first(WT_SESSION_IMPL *session)
 {
 	WT_TXN *txn;
@@ -222,9 +226,17 @@ __wt_txn_read_first(WT_SESSION_IMPL *session)
 	 * update the we are reading from being trimmed to save memory.
 	 */
 	if (!F_ISSET(txn, TXN_RUNNING)) {
-		WT_ASSERT(session, txn_state->id == WT_TXN_NONE);
+		WT_ASSERT(session, txn_state->id == WT_TXN_NONE &&
+		    !F_ISSET(txn_state, TXN_STATE_RUNNING));
 		txn_state->id = txn_global->current;
 	}
+
+	if (txn->isolation == TXN_ISO_READ_COMMITTED ||
+	    (!F_ISSET(txn, TXN_RUNNING) &&
+	    txn->isolation == TXN_ISO_SNAPSHOT))
+		WT_RET(__wt_txn_get_snapshot(session, WT_TXN_NONE));
+
+	return (0);
 }
 
 /*
@@ -245,7 +257,13 @@ __wt_txn_read_last(WT_SESSION_IMPL *session)
 	 * global table.
 	 */
 	if (!F_ISSET(txn, TXN_RUNNING)) {
-		WT_ASSERT(session, txn_state->id != WT_TXN_NONE);
+		WT_ASSERT(session, txn_state->id != WT_TXN_NONE &&
+		    !F_ISSET(txn_state, TXN_STATE_RUNNING));
 		txn_state->id = WT_TXN_NONE;
 	}
+
+	if (txn->isolation == TXN_ISO_READ_COMMITTED ||
+	    (!F_ISSET(txn, TXN_RUNNING) &&
+	    txn->isolation == TXN_ISO_SNAPSHOT))
+		__wt_txn_release_snapshot(session);
 }
