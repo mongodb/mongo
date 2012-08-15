@@ -447,18 +447,6 @@ session_ops(WT_SESSION *session)
 	ret = session->verify(session, "table:mytable", NULL);
 	/*! [Verify a table] */
 
-	/*! [Begin a transaction] */
-	ret = session->begin_transaction(session, NULL);
-	/*! [Begin a transaction] */
-
-	/*! [Commit a transaction] */
-	ret = session->commit_transaction(session, NULL);
-	/*! [Commit a transaction] */
-
-	/*! [Rollback a transaction] */
-	ret = session->rollback_transaction(session, NULL);
-	/*! [Rollback a transaction] */
-
 	/*! [Close a session] */
 	ret = session->close(session, NULL);
 	/*! [Close a session] */
@@ -472,53 +460,47 @@ transaction_ops(WT_CONNECTION *conn, WT_SESSION *session)
 	WT_CURSOR *cursor;
 	int ret;
 
-	/*! [simple transaction] */
-	ret = session->begin_transaction(session, NULL);
-
+	/*! [transaction commit/rollback] */
 	ret =
 	    session->open_cursor(session, "table:mytable", NULL, NULL, &cursor);
-	cursor->set_key(cursor, "some-key");
-	cursor->set_value(cursor, "some-value");
-	ret = cursor->update(cursor);
-
-	/* Resolving the transaction closes the open cursors. */
-	ret = session->commit_transaction(session, NULL);
-	/*! [simple transaction] */
-
-	/*! [simple rollback transaction] */
 	ret = session->begin_transaction(session, NULL);
+	/*
+	 * Cursors may be opened before or after the transaction begins, and in
+	 * either case, subsequent operations are included in the transaction.
+	 * The begin_transaction call resets all open cursors.
+	 */
 
-	ret =
-	    session->open_cursor(session, "table:mytable", NULL, NULL, &cursor);
-	cursor->set_key(cursor, "some-key");
-	cursor->set_value(cursor, "some-value");
-	ret = cursor->update(cursor);
-
-	/* Resolving the transaction closes the open cursors. */
-	switch (ret) {
-	case 0:
+	cursor->set_key(cursor, "key");
+	cursor->set_value(cursor, "value");
+	switch (ret = cursor->update(cursor)) {
+	case 0:					/* Update success */
 		ret = session->commit_transaction(session, NULL);
+		/*
+		 * The commit_transaction call resets all open cursors.
+		 * If commit_transaction fails, the transaction was rolled-back.
+		 */
 		break;
-	case WT_DEADLOCK:			/* Conflict */
+	case WT_DEADLOCK:			/* Update conflict */
 	default:				/* Other error */
 		ret = session->rollback_transaction(session, NULL);
+		/* The rollback_transaction call resets all open cursors. */
 		break;
 	}
-	/*! [simple rollback transaction] */
 
-	/*! [simple transaction isolation] */
+	/* Cursors remain open and may be used for multiple transactions. */
+	/*! [transaction commit/rollback] */
+	ret = cursor->close(cursor);
+
+	/*! [transaction isolation] */
 	/* A single transaction configured for snapshot isolation. */
-	ret = session->begin_transaction(session, "isolation=snapshot");
-
 	ret =
 	    session->open_cursor(session, "table:mytable", NULL, NULL, &cursor);
+	ret = session->begin_transaction(session, "isolation=snapshot");
 	cursor->set_key(cursor, "some-key");
 	cursor->set_value(cursor, "some-value");
 	ret = cursor->update(cursor);
-
-	/* Resolving the transaction closes the open cursors. */
 	ret = session->commit_transaction(session, NULL);
-	/*! [simple transaction isolation] */
+	/*! [transaction isolation] */
 
 	/*! [session isolation configuration] */
 	/* Open a session configured for read-uncommitted isolation. */

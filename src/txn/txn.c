@@ -123,9 +123,6 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 	txn_state = &txn_global->states[session->id];
 	oldest_reader = WT_TXN_ABORTED;
 
-	if (F_ISSET(txn, TXN_RUNNING))
-		WT_RET_MSG(session, EINVAL, "Transaction already running");
-
 	WT_ASSERT(session, txn_state->id == WT_TXN_NONE);
 
 	WT_RET(__wt_config_gets_defno(session, cfg, "isolation", &cval));
