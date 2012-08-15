@@ -275,7 +275,7 @@ methods = {
 		"hex" selects a simple hexadecimal format, "print"
 		selects a format where only non-printing characters are
 		hexadecimal encoded.  The cursor dump format is compatible
-		with the @ref utility_dump and @ref utility_load commands''',
+		with the @ref util_dump and @ref util_load commands''',
 		choices=['hex', 'print']),
 	Config('next_random', 'false', r'''
 		configure the cursor to return a pseudo-random record from

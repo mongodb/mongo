@@ -127,20 +127,20 @@ struct __wt_item {
 /*!
  * A WT_CURSOR handle is the interface to a cursor.
  *
- * Cursors allow data to be searched, stepped through and updated: the
- * so-called CRUD operations (create, read, update and delete).
+ * Cursors allow data to be searched, iterated and modified, implementing the
+ * CRUD (create, read, update and delete) operations.  Cursors are opened in
+ * the context of a session.  If a transaction is started, cursors operate in
+ * the context of the transaction until the transaction is resolved.
  *
  * Raw data is represented by key/value pairs of WT_ITEM structures, but
  * cursors can also provide access to fields within the key and value if the
  * formats are described in the WT_SESSION::create method.
  *
- * A cursor can be positioned in a collection of data.  Cursors are opened in
- * the context of a session (which may have an associated transaction), and can
- * query and update records.  In the common case, a cursor is used to access
- * records in a table.  However, cursors can be used on subsets of tables (such
- * as a single column or a projection of multiple columns), as an interface to
- * statistics, configuration data or application-specific data sources.  See
- * WT_SESSION::open_cursor for more information.
+ * In the common case, a cursor is used to access records in a table.  However,
+ * cursors can be used on subsets of tables (such as a single column or a
+ * projection of multiple columns), as an interface to statistics, configuration
+ * data or application-specific data sources.  See WT_SESSION::open_cursor for
+ * more information.
  *
  * <b>Thread safety:</b> A WT_CURSOR handle is not usually shared between
  * threads, see @ref threads for more information.
@@ -261,9 +261,9 @@ struct __wt_cursor {
 	int __F(prev)(WT_CURSOR *cursor);
 
 	/*! Reset the position of the cursor.  Any resources held by the cursor
-	 * are released, and the cursor position is no longer valid.  Subsequent
-	 * iteration with WT_CURSOR::next will move to the first record, or
-	 * with WT_CURSOR::prev will move to the last record.
+	 * are released, and the cursor's key and position are no longer valid.
+	 * A subsequent iteration with WT_CURSOR::next will move to the first
+	 * record, or with WT_CURSOR::prev will move to the last record.
 	 *
 	 * @snippet ex_all.c Reset the cursor
 	 *
@@ -436,6 +436,10 @@ struct __wt_session {
 	 *
 	 * @snippet ex_all.c Reconfigure a session
 	 *
+	 * WT_SESSION::reconfigure will fail if a transaction is in progress
+	 * in the session.
+	 * All open cursors are reset.
+	 *
 	 * @param session the session handle
 	 * @configstart{session.reconfigure, see dist/api_data.py}
 	 * @config{isolation, the default isolation level for operations in this
@@ -468,13 +472,11 @@ struct __wt_session {
 	 *
 	 * @snippet ex_all.c Reconfigure a cursor
 	 *
-	 * Cursors are opened in the context of the current transaction, and
-	 * ending a transaction implicitly closes all open cursors (if
-	 * WT_SESSION::commit_transaction or WT_SESSION::rollback_transaction
-	 * are called with open cursors, the cursor handles will be closed
-	 * and must not be accessed again).
-	 *
 	 * Cursor handles should be discarded by calling WT_CURSOR::close.
+	 *
+	 * Cursors capable of supporting transactional operations operate in the
+	 * context of the current transaction, if any.  Ending a transaction
+	 * implicitly resets all open cursors.
 	 *
 	 * Cursors are relatively light-weight objects but may hold references
 	 * to heavier-weight objects; applications should re-use cursors when
@@ -531,9 +533,9 @@ struct __wt_session {
 	 * @config{dump, configure the cursor for dump format inputs and
 	 * outputs: "hex" selects a simple hexadecimal format\, "print" selects
 	 * a format where only non-printing characters are hexadecimal encoded.
-	 * The cursor dump format is compatible with the @ref utility_dump and
-	 * @ref utility_load commands.,a string\, chosen from the following
-	 * options: \c "hex"\, \c "print"; default empty.}
+	 * The cursor dump format is compatible with the @ref util_dump and @ref
+	 * util_load commands.,a string\, chosen from the following options: \c
+	 * "hex"\, \c "print"; default empty.}
 	 * @config{next_random, configure the cursor to return a pseudo-random
 	 * record from the object; valid only for row-store cursors.  Cursors
 	 * configured with next_random only support the WT_CURSOR::next and
@@ -782,15 +784,19 @@ struct __wt_session {
 	 */
 	/*! Start a transaction in this session.
 	 *
-	 * All cursors opened in this session that support transactional
-	 * semantics will operate in the context of the transaction.  The
-	 * transaction remains active until ended with
+	 * The transaction remains active until ended by
 	 * WT_SESSION::commit_transaction or WT_SESSION::rollback_transaction.
+	 * Operations performed on cursors capable of supporting transactional
+	 * operations that are already open in this session, or which are opened
+	 * before the transaction ends, will operate in the context of the
+	 * transaction.
 	 *
-	 * Not permitted if a transaction is in progress or cursors are open in
-	 * the session.
+	 * All open cursors are reset.
 	 *
-	 * @snippet ex_all.c Begin a transaction
+	 * WT_SESSION::transaction_begin will fail if a transaction is already
+	 * in progress in the session.
+	 *
+	 * @snippet ex_all.c transaction commit/rollback
 	 *
 	 * @param session the session handle
 	 * @configstart{session.begin_transaction, see dist/api_data.py}
@@ -813,11 +819,14 @@ struct __wt_session {
 
 	/*! Commit the current transaction.
 	 *
-	 * A transaction must be in progress when this method is called.  Any
-	 * cursors opened during the transaction will be closed before the
-	 * commit is processed.
+	 * A transaction must be in progress when this method is called.
 	 *
-	 * @snippet ex_all.c Commit a transaction
+	 * All open cursors are reset.
+	 *
+	 * If WT_SESSION::commit_transaction returns an error, the transaction
+	 * was rolled-back, not committed.
+	 *
+	 * @snippet ex_all.c transaction commit/rollback
 	 *
 	 * @param session the session handle
 	 * @configempty{session.commit_transaction, see dist/api_data.py}
@@ -827,11 +836,11 @@ struct __wt_session {
 
 	/*! Roll back the current transaction.
 	 *
-	 * A transaction must be in progress when this method is called.  Any
-	 * cursors opened during the transaction will be closed before the
-	 * rollback is processed.
+	 * A transaction must be in progress when this method is called.
 	 *
-	 * @snippet ex_all.c Rollback a transaction
+	 * All open cursors are reset.
+	 *
+	 * @snippet ex_all.c transaction commit/rollback
 	 *
 	 * @param session the session handle
 	 * @configempty{session.rollback_transaction, see dist/api_data.py}

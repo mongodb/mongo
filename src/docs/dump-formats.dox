@@ -1,8 +1,8 @@
 /*! @page dump_formats Dump Formats
 
-The @ref utility_dump command produces a text representation of a table
-that can be loaded by @ref utility_load.  This page describes the output
-format of the @ref utility_dump command.
+The @ref util_dump command produces a text representation of a table
+that can be loaded by @ref util_load.  This page describes the output
+format of the @ref util_dump command.
 
 Dump files have three parts, a prefix, a header and a body.
 
