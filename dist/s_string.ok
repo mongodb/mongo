@@ -75,7 +75,6 @@ FNV
 FOREACH
 FREELIST
 Fasttrack
-Fnv
 FreeBSD
 FreeBSD's
 Freelist
@@ -133,7 +132,6 @@ NetBSD
 NoAddr
 Noll
 Nul
-Nusov
 ONPAGE
 OUTBUFF
 OVFL
@@ -258,7 +256,6 @@ bzip
 calloc
 catfmt
 cfg
-cfv
 checkfrag
 checksum
 checksums
@@ -447,7 +444,6 @@ lexicographically
 lf
 lfence
 lld
-llx
 llll
 llu
 loadtext
@@ -498,7 +494,6 @@ newname
 nextprev
 nhex
 nl
-nline
 nlpo
 nocase
 nop
@@ -533,7 +528,6 @@ presize
 printf
 printlog
 priv
-pseudorandom
 pthread
 putK
 putV
@@ -641,7 +635,6 @@ tid
 tinsert
 tlist
 tload
-tmp
 toffpage
 toverflow
 tparent
@@ -714,7 +707,6 @@ wrlock
 wti
 wts
 xff
-xffff
 xxxx
 xxxxx
 xxxxxx

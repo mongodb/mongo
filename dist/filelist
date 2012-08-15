@@ -109,7 +109,8 @@ src/session/session_salvage.c
 src/support/err.c
 src/support/filename.c
 src/support/global.c
-src/support/hash.c
+src/support/hash_city.c
+src/support/hash_fnv.c
 src/support/hazard.c
 src/support/hex.c
 src/support/huffman.c

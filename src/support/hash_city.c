@@ -1,47 +1,10 @@
 /*-
- * Copyright (c) 2008-$year WiredTiger, Inc.
+ * Copyright (c) 2008-2012 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
- */
-
-#include <stdlib.h>
-
-#include "wt_internal.h"
-#include "hash.h"
-
-/*
- * This file contains 64 bit hash implementations used by Wired Tiger.
- * The implementations are from third parties - licenses are included above the
- * relevant implementations.
- * The code has been updated to remove unnecessary content and better comply
- * with Wired Tiger coding standards.
- * The original source code can be found at:
- * Google City Hash C port: http://code.google.com/p/cityhash-c/
- * FNV 1a 64 bit: http://www.isthe.com/chongo/src/fnv/hash_64a.c
- */
-
-static inline uint64_t CityHash64(const char *, size_t);
-static inline Fnv64_t fnv_64a_buf(void *, size_t , Fnv64_t);
-
-/* Wired Tiger wrappers around third party hash implementations. */
-uint64_t
-__wt_hash_city(const void *string, uint32_t len)
-{
-	return (CityHash64((const char *)string, len));
-}
-
-uint64_t
-__wt_hash_fnv(const void *string, uint32_t len)
-{
-	return (fnv_64a_buf((void *)string, len, FNV1A_64_INIT));
-}
-
-/*
- * city.c - cityhash-c
- * CityHash on C
- * Copyright (c) 2011-2012, Alexander Nusov
  *
- * - original copyright notice -
+ * -- Original copyright is below --
+ *
  * Copyright (c) 2011 Google, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -73,6 +36,29 @@ __wt_hash_fnv(const void *string, uint32_t len)
  */
 
 #include <string.h>
+#include "wt_internal.h"
+
+static inline uint64_t CityHash64(const char *, size_t);
+/* Wired Tiger wrapper around third party hash implementations. */
+uint64_t
+__wt_hash_city64(const void *string, uint32_t len)
+{
+	return (CityHash64((const char *)string, len));
+}
+
+/*
+ * Google City Hash implementation. Based on source code from:
+ * http://code.google.com/p/cityhash/
+ */
+
+typedef struct _uint128 uint128;
+struct _uint128 {
+  uint64_t first;
+  uint64_t second;
+};
+
+#define	Uint128Low64(x) 	(x).first
+#define	Uint128High64(x)	(x).second
 
 static uint64_t UNALIGNED_LOAD64(const char *p) {
 	uint64_t result;
@@ -315,118 +301,3 @@ static inline uint64_t CityHash64(const char *s, size_t len) {
 	return HashLen16(HashLen16(v.first, w.first) + ShiftMix(y) * k1 + z,
 	    HashLen16(v.second, w.second) + x);
 }
-
-/*
- * END city.c - cityhash-c
- */
-
-/*
- * hash_64 - 64 bit Fowler/Noll/Vo-0 FNV-1a hash code
- *
- * @(#) $Revision: 5.1 $
- * @(#) $Id: hash_64a.c,v 5.1 2009/06/30 09:01:38 chongo Exp $
- * @(#) $Source: /usr/local/src/cmd/fnv/RCS/hash_64a.c,v $
- *
- ***
- *
- * Fowler/Noll/Vo hash
- *
- * The basis of this hash algorithm was taken from an idea sent
- * as reviewer comments to the IEEE POSIX P1003.2 committee by:
- *
- *      Phong Vo (http://www.research.att.com/info/kpv/)
- *      Glenn Fowler (http://www.research.att.com/~gsf/)
- *
- * In a subsequent ballot round:
- *
- *      Landon Curt Noll (http://www.isthe.com/chongo/)
- *
- * improved on their algorithm.  Some people tried this hash
- * and found that it worked rather well.  In an EMail message
- * to Landon, they named it the ``Fowler/Noll/Vo'' or FNV hash.
- *
- * FNV hashes are designed to be fast while maintaining a low
- * collision rate. The FNV speed allows one to quickly hash lots
- * of data while maintaining a reasonable collision rate.  See:
- *
- *      http://www.isthe.com/chongo/tech/comp/fnv/index.html
- *
- * for more details as well as other forms of the FNV hash.
- *
- ***
- *
- * To use the recommended 64 bit FNV-1a hash, pass FNV1A_64_INIT as the
- * Fnv64_t hashval argument to fnv_64a_buf() or fnv_64a_str().
- *
- ***
- *
- * Please do not copyright this code.  This code is in the public domain.
- *
- * LANDON CURT NOLL DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,
- * INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO
- * EVENT SHALL LANDON CURT NOLL BE LIABLE FOR ANY SPECIAL, INDIRECT OR
- * CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF
- * USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
- * OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
- *
- * By:
- *	chongo <Landon Curt Noll> /\oo/\
- *      http://www.isthe.com/chongo/
- *
- * Share and Enjoy!	:-)
- */
-
-/*
- * FNV-1a defines the initial basis to be non-zero
- */
-
-/*
- * 64 bit magic FNV-1a prime
- */
-#define	FNV_64_PRIME ((Fnv64_t)0x100000001b3ULL)
-
-/*
- * fnv_64a_buf - perform a 64 bit Fowler/Noll/Vo FNV-1a hash on a buffer
- *
- * input:
- *	buf	- start of buffer to hash
- *	len	- length of buffer in octets
- *	hval	- previous hash value or 0 if first call
- *
- * returns:
- *	64 bit hash as a static hash type
- *
- * NOTE: To use the recommended 64 bit FNV-1a hash, use FNV1A_64_INIT as the
- * 	 hval arg on the first call to either fnv_64a_buf() or fnv_64a_str().
- */
-static inline Fnv64_t
-fnv_64a_buf(void *buf, size_t len, Fnv64_t hval)
-{
-	unsigned char *bp = (unsigned char *)buf;	/* start of buffer */
-	unsigned char *be = bp + len;		/* beyond end of buffer */
-
-	/*
-	 * FNV-1a hash each octet of the buffer
-	 */
-	while (bp < be) {
-
-		/* xor the bottom with the current octet */
-		hval ^= (Fnv64_t)*bp++;
-
-		/* multiply by the 64 bit FNV magic prime mod 2^64 */
-#if defined(NO_FNV_GCC_OPTIMIZATION)
-		hval *= FNV_64_PRIME;
-#else /* NO_FNV_GCC_OPTIMIZATION */
-		hval += (hval << 1) + (hval << 4) + (hval << 5) +
-			(hval << 7) + (hval << 8) + (hval << 40);
-#endif /* NO_FNV_GCC_OPTIMIZATION */
-	}
-
-	/* return our new hash value */
-	return (hval);
-}
-
-/*
- * END: hash_64 - 64 bit Fowler/Noll/Vo-0 FNV-1a hash code
- */
