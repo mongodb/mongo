@@ -53,7 +53,10 @@ public:
     string _curcoll;
     set<string> _users; // For restoring users with --drop
     auto_ptr<Matcher> _opmatcher; // For oplog replay
+    std::set<std::string> _fieldsSet;
+
     Restore() : BSONTool( "restore" ) , _drop(false) {
+        addFieldOptions();
         add_options()
         ("drop" , "drop each collection before import" )
         ("oplogReplay", "replay oplog for point-in-time restore")
@@ -76,6 +79,14 @@ public:
     }
 
     virtual int doRun() {
+        try {
+            needFields();
+            std::copy( _fields.begin(), _fields.end(), std::inserter( _fieldsSet, _fieldsSet.end() ) );
+        } catch ( UserException &e ) {
+            if ( e.getCode() != 9998 ) {
+                throw e;
+            }
+        }
 
         // authenticate
         enum Auth::Level authLevel = Auth::NONE;
@@ -366,7 +377,16 @@ public:
             conn().update(_curns, Query(userMatch), obj);
             _users.erase(obj["user"].String());
         } else {
-            conn().insert( _curns , obj );
+            // restore only selected fields
+            if ( _fields.size() ) {
+                // fill new obj
+                BSONObj newObj;
+                newObj.addFields(*(const_cast<BSONObj*>(&obj)), _fieldsSet);
+
+                conn().insert( _curns , newObj );
+            } else {
+                conn().insert( _curns , obj );
+            }
 
             // wait for insert to propagate to "w" nodes (doesn't warn if w used without replset)
             if ( _w > 1 ) {
