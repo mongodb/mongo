@@ -30,6 +30,7 @@ distributed under the following licenses:
 @hrow{Distribution File, License}
 @row{src/include/bitstring.i, University of California\, Berkeley (BSD) 3-Clause License}
 @row{src/include/queue.h, University of California\, Berkeley (BSD) 3-Clause License}
+@row{src/support/hash_city.c, The MIT License}
 @row{src/utilities/util_getopt.c, University of California\, Berkeley (BSD) 3-Clause License}
 </table>
 
