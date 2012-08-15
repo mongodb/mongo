@@ -457,7 +457,7 @@ session_ops(WT_SESSION *session)
 int
 transaction_ops(WT_CONNECTION *conn, WT_SESSION *session)
 {
-	WT_CURSOR *cursor, *cursor1, *cursor2;
+	WT_CURSOR *cursor;
 	int ret;
 
 	/*! [transaction commit/rollback] */
