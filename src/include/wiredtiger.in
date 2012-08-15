@@ -533,9 +533,9 @@ struct __wt_session {
 	 * @config{dump, configure the cursor for dump format inputs and
 	 * outputs: "hex" selects a simple hexadecimal format\, "print" selects
 	 * a format where only non-printing characters are hexadecimal encoded.
-	 * The cursor dump format is compatible with the @ref utility_dump and
-	 * @ref utility_load commands.,a string\, chosen from the following
-	 * options: \c "hex"\, \c "print"; default empty.}
+	 * The cursor dump format is compatible with the @ref util_dump and @ref
+	 * util_load commands.,a string\, chosen from the following options: \c
+	 * "hex"\, \c "print"; default empty.}
 	 * @config{next_random, configure the cursor to return a pseudo-random
 	 * record from the object; valid only for row-store cursors.  Cursors
 	 * configured with next_random only support the WT_CURSOR::next and
