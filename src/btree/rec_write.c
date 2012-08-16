@@ -1168,6 +1168,7 @@ __wt_rec_bulk_wrapup(WT_CURSOR_BULK *cbulk)
 	/* Mark the page's parent dirty. */
 	WT_RET(__wt_page_modify_init(session, page->parent));
 	__wt_page_modify_set(page->parent);
+	__wt_tree_modify_set(btree);
 
 	return (0);
 }
