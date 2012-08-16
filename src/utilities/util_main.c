@@ -38,7 +38,7 @@ main(int argc, char *argv[])
 	/* Check the version against the library build. */
 	(void)wiredtiger_version(&major_v, & minor_v, NULL);
 	if (major_v != WIREDTIGER_VERSION_MAJOR ||
-	     minor_v != WIREDTIGER_VERSION_MINOR) {
+	    minor_v != WIREDTIGER_VERSION_MINOR) {
 		fprintf(stderr,
 		    "%s: program build version %d.%d does not match "
 		    "library build version %d.%d\n",

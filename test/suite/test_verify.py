@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Copyright (c) 2008-2012 WiredTiger, Inc.
+# Public Domain 2008-2012 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
 #
@@ -24,15 +24,13 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-#
-# test_util05.py
-# 	Utilities: wt verify
-#
 
 import os, struct
 from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
 
+# test_util05.py
+#    Utilities: wt verify
 class test_util05(wttest.WiredTigerTestCase, suite_subprocess):
     tablename = 'test_util05.a'
     nentries = 1000

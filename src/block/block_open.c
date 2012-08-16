@@ -97,12 +97,11 @@ __wt_block_open(WT_SESSION_IMPL *session, const char *filename,
 		WT_NAMED_COMPRESSOR *ncomp;
 
 		conn = S2C(session);
-		TAILQ_FOREACH(ncomp, &conn->compqh, q) {
-			if (strncmp(ncomp->name, cval.str, cval.len) == 0) {
+		TAILQ_FOREACH(ncomp, &conn->compqh, q)
+			if (WT_STRING_MATCH(ncomp->name, cval.str, cval.len)) {
 				block->compressor = ncomp->compressor;
 				break;
 			}
-		}
 		if (block->compressor == NULL)
 			WT_ERR_MSG(session, EINVAL,
 			    "unknown block_compressor '%.*s'",

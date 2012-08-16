@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Copyright (c) 2008-2012 WiredTiger, Inc.
+# Public Domain 2008-2012 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
 #
@@ -24,15 +24,13 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-#
-# test_util01.py
-# 	Utilities: wt dump, as well as the dump cursor
-#
 
 import string, os
 from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
 
+# test_util01.py
+#    Utilities: wt dump, as well as the dump cursor
 class test_util01(wttest.WiredTigerTestCase, suite_subprocess):
     """
     Test wt dump.  We check for specific output.
@@ -138,7 +136,7 @@ class test_util01(wttest.WiredTigerTestCase, suite_subprocess):
                     expectout.write('Format=print\n')
                 expectout.write('Header\n')
                 expectout.write('table:' + self.tablename + '\n')
-                expectout.write('colgroups=(),columns=(),' + params + '\n')
+                expectout.write('colgroups=,columns=,' + params + '\n')
                 expectout.write('Data\n')
             for i in range(0, self.nentries):
                 key = self.get_key(i)

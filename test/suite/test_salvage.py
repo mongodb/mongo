@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Copyright (c) 2008-2012 WiredTiger, Inc.
+# Public Domain 2008-2012 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
 #
@@ -24,15 +24,13 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-#
-# test_util06.py
-# 	Utilities: wt salvage
-#
 
 import os, struct
 from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
 
+# test_util06.py
+#    Utilities: wt salvage
 class test_util06(wttest.WiredTigerTestCase, suite_subprocess):
     tablename = 'test_util06.a'
     nentries = 1000
@@ -136,7 +134,7 @@ class test_util06(wttest.WiredTigerTestCase, suite_subprocess):
                 matchpos = 0
             c = fp.read(1)
         # Make sure we found the embedded string
-        self.assertEqual(found, 1)
+        self.assertTrue(found)
         fp.close()
 
     def test_salvage_process_empty(self):

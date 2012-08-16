@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Copyright (c) 2008-2012 WiredTiger, Inc.
+# Public Domain 2008-2012 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
 #
@@ -26,12 +26,16 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 
+import glob
 import os
+import string
+import wiredtiger
 
 # python has a filecmp.cmp function, but different versions of python approach
 # file comparison differently.  To make sure we get byte for byte comparison,
 # we define it here.
-def compareFiles(filename1, filename2):
+def compare_files(self, filename1, filename2):
+    self.pr('compare_files: ' + filename1 + ', ' + filename2)
     bufsize = 4096
     if os.path.getsize(filename1) != os.path.getsize(filename2):
         print filename1 + ' size = ' + str(os.path.getsize(filename1))
@@ -47,3 +51,106 @@ def compareFiles(filename1, filename2):
                 # files are identical size
                 if not b1:
                     return True
+
+# confirm a URI doesn't exist.
+def confirm_does_not_exist(self, uri):
+    self.pr('confirm_does_not_exist: ' + uri)
+    self.assertRaises(wiredtiger.WiredTigerError,
+        lambda: self.session.open_cursor(uri, None, None))
+    self.assertEqual(glob.glob('*' + uri.split(":")[1] + '*'), [],
+        'confirm_does_not_exist: URI exists, file name matching \"' +
+        uri.split(":")[1] + '\" found')
+
+# confirm a URI exists and is empty.
+def confirm_empty(self, uri):
+    self.pr('confirm_empty: ' + uri)
+    cursor = self.session.open_cursor(uri, None, None)
+    self.assertEqual(cursor.next(), wiredtiger.WT_NOTFOUND)
+    cursor.close()
+
+# create a simple_populate or complex_populate key
+def key_populate(key_format, i):
+    if key_format == 'i' or key_format == 'r' or key_format == 'u':
+        return i
+    elif key_format == 'S':
+        return str('%015d' % i)
+    else:
+        raise AssertionError(
+            'key_populate: object has unexpected key format: ' + key_format)
+
+# population of a simple object, where the keys are the record number.
+#    uri:       object
+#    config:    prefix of the session.create configuration string
+#    rows:      entries to insert
+def simple_populate(self, uri, config, rows):
+    self.pr('simple_populate: ' + uri + ' with ' + str(rows) + ' rows')
+    self.session.create(uri, config + ',value_format=S')
+    cursor = self.session.open_cursor(uri, None, None)
+    for i in range(1, rows):
+        cursor.set_key(key_populate(cursor.key_format, i))
+        cursor.set_value(str(i) + ': abcdefghijklmnopqrstuvwxyz')
+        cursor.insert()
+    cursor.close()
+
+def simple_populate_check(self, uri):
+    self.pr('simple_populate_check: ' + uri)
+    cursor = self.session.open_cursor(uri, None, None)
+    i = 0
+    for key,val in cursor:
+        i += 1
+        self.assertEqual(key, key_populate(cursor.key_format, i))
+        self.assertEqual(val, str(i) + ': abcdefghijklmnopqrstuvwxyz')
+    cursor.close()
+
+# population of a complex object, where the keys are the record number.
+#    uri:       object
+#    config:    prefix of the session.create configuration string
+#    rows:      entries to insert
+def complex_populate(self, uri, config, rows):
+    self.session.create(uri,
+        config + ',value_format=SiSS,' +
+        'columns=(record,column2,column3,column4,column5),' +
+        'colgroups=(cgroup1,cgroup2,cgroup3,cgroup4,cgroup5,cgroup6)')
+    cgname = 'colgroup:' + uri.split(":")[1]
+    self.session.create(cgname + ':cgroup1', 'columns=(column2)')
+    self.session.create(cgname + ':cgroup2', 'columns=(column3)')
+    self.session.create(cgname + ':cgroup3', 'columns=(column4)')
+    self.session.create(cgname + ':cgroup4', 'columns=(column2,column3)')
+    self.session.create(cgname + ':cgroup5', 'columns=(column3,column4)')
+    self.session.create(
+        cgname + ':cgroup6', 'columns=(column2,column4,column5)')
+    indxname = 'index:' + uri.split(":")[1]
+    self.session.create(indxname + ':indx1', 'columns=(column2)')
+    self.session.create(indxname + ':indx2', 'columns=(column3)')
+    self.session.create(indxname + ':indx3', 'columns=(column4)')
+    self.session.create(indxname + ':indx4', 'columns=(column2,column4)')
+    self.session.create(indxname + ':indx5', 'columns=(column3,column5)')
+    self.session.create(
+        indxname + ':indx6', 'columns=(column3,column5,column4)')
+    cursor = self.session.open_cursor(uri, None, None)
+    for i in range(1, rows):
+        cursor.set_key(key_populate(cursor.key_format, i))
+        cursor.set_value(
+            str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%26],
+            i,
+            str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%23],
+            str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%18])
+        cursor.insert()
+    cursor.close()
+
+def complex_populate_check(self, uri):
+    self.pr('complex_populate_check: ' + uri)
+    cursor = self.session.open_cursor(uri, None, None)
+    i = 0
+    for key, s1, i2, s3, s4 in cursor:
+        i += 1
+        self.assertEqual(key, key_populate(cursor.key_format, i))
+        self.assertEqual(s1,
+            str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%26])
+        self.assertEqual(i2, i)
+        self.assertEqual(s3,
+            str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%23])
+        self.assertEqual(s4,
+            str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%18])
+        self.assertEqual(i2, i)
+    cursor.close()

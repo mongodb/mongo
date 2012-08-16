@@ -11,20 +11,16 @@ static int
 __find_next_col(WT_SESSION_IMPL *session, WT_TABLE *table,
     WT_CONFIG_ITEM *colname, int *cgnump, int *colnump, char *coltype)
 {
-	WT_BTREE *cgtree;
+	WT_COLGROUP *colgroup;
 	WT_CONFIG conf;
 	WT_CONFIG_ITEM cval, k, v;
-	WT_DECL_RET;
 	int cg, col, foundcg, foundcol, getnext;
 
 	foundcg = foundcol = -1;
 
 	getnext = 1;
-	for (cgtree = NULL, cg = 0; cg < WT_COLGROUPS(table); cg++) {
-		WT_RET(__wt_schema_get_btree(session,
-		    table->cg_name[cg], strlen(table->cg_name[cg]),
-		    NULL, 0));
-		cgtree = session->btree;
+	for (colgroup = NULL, cg = 0; cg < WT_COLGROUPS(table); cg++) {
+		colgroup = table->cgroups[cg];
 
 		/*
 		 * If there is only one column group, we just scan through all
@@ -36,11 +32,10 @@ __find_next_col(WT_SESSION_IMPL *session, WT_TABLE *table,
 			cval = table->colconf;
 			col = 0;
 		} else {
-cgcols:			WT_ERR(__wt_config_getones(session,
-			    cgtree->config, "columns", &cval));
+cgcols:			cval = colgroup->colconf;
 			col = table->nkey_columns;
 		}
-		WT_ERR(__wt_config_subinit(session, &conf, &cval));
+		WT_RET(__wt_config_subinit(session, &conf, &cval));
 		for (; __wt_config_next(&conf, &k, &v) == 0; col++) {
 			if (cg == *cgnump && col == *colnump)
 				getnext = 1;
@@ -55,13 +50,8 @@ cgcols:			WT_ERR(__wt_config_getones(session,
 				goto cgcols;
 		}
 
-		cgtree = NULL;
-		WT_ERR(__wt_session_release_btree(session));
+		colgroup = NULL;
 	}
-
-err:	if (cgtree != NULL)
-		WT_TRET(__wt_session_release_btree(session));
-	WT_RET(ret);
 
 	if (foundcg == -1)
 		return (WT_NOTFOUND);
@@ -183,7 +173,7 @@ __wt_struct_plan(WT_SESSION_IMPL *session, WT_TABLE *table,
 	char coltype, current_coltype;
 
 	saved_btree = session->btree;
-	start_cg = start_col = -1;      /* -Wuninitialized */
+	start_cg = start_col = -1;		/* -Wuninitialized */
 
 	/* Work through the value columns by skipping over the key columns. */
 	WT_ERR(__wt_config_initn(session, &conf, columns, len));

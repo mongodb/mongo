@@ -6,8 +6,39 @@
  */
 
 /*
+ * __wt_txn_getid --
+ *	Get a transaction ID for a non-transactional operation.
+ */
+static inline void
+__wt_txn_getid(WT_SESSION_IMPL *session)
+{
+	WT_TXN *txn;
+	WT_TXN_GLOBAL *txn_global;
+	wt_txnid_t id;
+
+	txn = &session->txn;
+
+	if (F_ISSET(txn, TXN_RUNNING))
+		return;
+
+	/* If we already have the latest ID, keep using it. */
+	id = txn->id;
+	txn_global = &S2C(session)->txn_global;
+	if (id + 1 == txn_global->current &&
+	    id != WT_TXN_NONE && id != WT_TXN_ABORTED)
+		return;
+
+	do {
+		id = txn_global->current;
+	} while (!WT_ATOMIC_CAS(txn_global->current, id, id + 1) ||
+	    id == WT_TXN_NONE || id == WT_TXN_ABORTED);
+
+	txn->id = id;
+}
+
+/*
  * __wt_txn_modify --
- *      Mark an object modified by the current transaction.
+ *	Mark an object modified by the current transaction.
  */
 static inline int
 __wt_txn_modify(WT_SESSION_IMPL *session, wt_txnid_t *id)
@@ -16,15 +47,15 @@ __wt_txn_modify(WT_SESSION_IMPL *session, wt_txnid_t *id)
 
 	txn = &session->txn;
 	if (F_ISSET(txn, TXN_RUNNING)) {
-		*id = txn->id;
 		if (txn->mod_count * sizeof(wt_txnid_t *) == txn->mod_alloc)
 			WT_RET(__wt_realloc(session, &txn->mod_alloc,
 			    WT_MAX(10, 2 * txn->mod_count) *
 			    sizeof(wt_txnid_t *), &txn->mod));
 		txn->mod[txn->mod_count++] = id;
 	} else
-		*id = WT_TXN_NONE;
+		__wt_txn_getid(session);
 
+	*id = txn->id;
 	return (0);
 }
 
@@ -59,30 +90,35 @@ __wt_txn_visible(WT_SESSION_IMPL *session, wt_txnid_t id)
 	if (id == WT_TXN_ABORTED)
 		return (0);
 
-	/*
-	 * Changes with no associated transaction are always visible, and
-	 * non-snapshot transactions see all other changes.
-	 */
+	/* Changes with no associated transaction are always visible. */
+	if (id == WT_TXN_NONE)
+		return (1);
+
+	/* Transactions see their own changes. */
 	txn = &session->txn;
-	if (id == WT_TXN_NONE || id == txn->id ||
-	    txn->isolation != TXN_ISO_SNAPSHOT)
+	if (F_ISSET(txn, TXN_RUNNING) && id == txn->id)
+		return (1);
+
+	/* Read-uncommitted transactions see all other changes. */
+	if (txn->isolation == TXN_ISO_READ_UNCOMMITTED)
 		return (1);
 
 	/*
-	 * The snapshot test.
+	 * TXN_ISO_SNAPSHOT, TXN_ISO_READ_COMMITTED:
+	 * Otherwise, the ID is visible if it is not the result of a concurrent
+	 * transaction, that is, if it is not in the snapshot list.
 	 */
-	if (TXNID_LT(id, txn->snap_min))
+	if (txn->snapshot_count == 0 || TXNID_LT(id, txn->snap_min))
 		return (1);
 	if (TXNID_LT(txn->snap_max, id))
 		return (0);
 
 	/*
-	 * Otherwise, the ID is visible if it is not the result of a concurrent
-	 * transaction.  That is, if it is not in the snapshot list.  Fast path
-	 * the single-threaded case where there are no concurrent transactions.
+	 * Fast path the single-threaded case where there are no concurrent
+	 * transactions.
 	 */
-	return (txn->snapshot_count == 0 || bsearch(&id, txn->snapshot,
-	    txn->snapshot_count, sizeof(wt_txnid_t), __wt_txnid_cmp) == NULL);
+	return (bsearch(&id, txn->snapshot, txn->snapshot_count,
+	    sizeof(wt_txnid_t), __wt_txnid_cmp) == NULL);
 }
 
 /*
@@ -162,5 +198,72 @@ __wt_txn_ancient(WT_SESSION_IMPL *session, wt_txnid_t id)
 #define	TXN_WRAP_BUFFER	1000000
 #define	TXN_WINDOW	((UINT32_MAX / 2) - TXN_WRAP_BUFFER)
 
-	return (id != WT_TXN_NONE && TXNID_LT(id, current - TXN_WINDOW));
+	if (id != WT_TXN_NONE && TXNID_LT(id, current - TXN_WINDOW)) {
+		WT_CSTAT_INCR(session, txn_ancient);
+		return (1);
+	}
+	return (0);
+}
+
+/*
+ * __wt_txn_read_first --
+ *	Called for the first page read for a session.
+ */
+static inline int
+__wt_txn_read_first(WT_SESSION_IMPL *session)
+{
+	WT_TXN *txn;
+	WT_TXN_GLOBAL *txn_global;
+	WT_TXN_STATE *txn_state;
+
+	txn = &session->txn;
+	txn_global = &S2C(session)->txn_global;
+	txn_state = &txn_global->states[session->id];
+
+	/*
+	 * If there is no transaction running, put an ID in the global table so
+	 * the oldest reader in the system can be tracked.  This prevents any
+	 * update the we are reading from being trimmed to save memory.
+	 */
+	if (!F_ISSET(txn, TXN_RUNNING)) {
+		WT_ASSERT(session, txn_state->id == WT_TXN_NONE &&
+		    !F_ISSET(txn_state, TXN_STATE_RUNNING));
+		txn_state->id = txn_global->current;
+	}
+
+	if (txn->isolation == TXN_ISO_READ_COMMITTED ||
+	    (!F_ISSET(txn, TXN_RUNNING) &&
+	    txn->isolation == TXN_ISO_SNAPSHOT))
+		WT_RET(__wt_txn_get_snapshot(session, WT_TXN_NONE));
+
+	return (0);
+}
+
+/*
+ * __wt_txn_read_last --
+ *	Called when the last page for a session is released.
+ */
+static inline void
+__wt_txn_read_last(WT_SESSION_IMPL *session)
+{
+	WT_TXN *txn;
+	WT_TXN_STATE *txn_state;
+
+	txn = &session->txn;
+	txn_state = &S2C(session)->txn_global.states[session->id];
+
+	/*
+	 * If there is no transaction running, release the ID we put in the
+	 * global table.
+	 */
+	if (!F_ISSET(txn, TXN_RUNNING)) {
+		WT_ASSERT(session, txn_state->id != WT_TXN_NONE &&
+		    !F_ISSET(txn_state, TXN_STATE_RUNNING));
+		txn_state->id = WT_TXN_NONE;
+	}
+
+	if (txn->isolation == TXN_ISO_READ_COMMITTED ||
+	    (!F_ISSET(txn, TXN_RUNNING) &&
+	    txn->isolation == TXN_ISO_SNAPSHOT))
+		__wt_txn_release_snapshot(session);
 }

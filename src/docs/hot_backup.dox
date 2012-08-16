@@ -31,7 +31,7 @@ example:
 
 @snippet ex_all.c Hot backup of a checkpoint
 
-The @ref utility_backup command may also be used to create hot backups:
+The @ref util_backup command may also be used to create hot backups:
 
 @code
 rm -rf /path/database.backup &&

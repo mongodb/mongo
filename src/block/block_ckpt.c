@@ -515,11 +515,8 @@ err:	if (locked)
 
 	/* Discard any checkpoint information we loaded. */
 	WT_CKPT_FOREACH(ckptbase, ckpt)
-		if ((ci = ckpt->bpriv) != NULL) {
-			__wt_block_extlist_free(session, &ci->alloc);
-			__wt_block_extlist_free(session, &ci->avail);
-			__wt_block_extlist_free(session, &ci->discard);
-		}
+		if ((ci = ckpt->bpriv) != NULL)
+			__wt_block_ckpt_destroy(session, ci);
 
 	__wt_scr_free(&tmp);
 	return (ret);
@@ -703,6 +700,8 @@ __ckpt_string(WT_SESSION_IMPL *session,
 	    ", write generation=%" PRIu64,
 	    (uintmax_t)ci->file_size,
 	    ci->write_gen));
+
+	__wt_block_ckpt_destroy(session, ci);
 
 	return (0);
 }

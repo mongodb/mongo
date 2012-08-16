@@ -37,6 +37,7 @@ connection_stats = [
 	Stat('rwlock_wrlock', 'rwlock writelock calls'),
 	Stat('total_read_io', 'total read I/Os'),
 	Stat('total_write_io', 'total write I/Os'),
+	Stat('txn_ancient', 'ancient transactions'),
 	Stat('txn_begin', 'transactions'),
 	Stat('txn_commit', 'transactions committed'),
 	Stat('txn_rollback', 'transactions rolled-back'),

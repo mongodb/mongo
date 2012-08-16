@@ -17,9 +17,9 @@ __rename_file(
 {
 	WT_DECL_RET;
 	int exist;
-	const char *filename, *newfile, *value;
+	const char *filename, *newfile, *newvalue, *oldvalue;
 
-	value = NULL;
+	newvalue = oldvalue = NULL;
 
 	filename = uri;
 	newfile = newuri;
@@ -28,13 +28,21 @@ __rename_file(
 		return (EINVAL);
 
 	/* Close any btree handles in the file. */
-	WT_RET(__wt_conn_btree_close_all(session, uri));
+	WT_ERR(__wt_conn_btree_close_all(session, uri));
 
 	/*
-	 * Check to see if the proposed name is already in use, in either
-	 * the metadata or the filesystem.
+	 * First, check if the file being renamed exists in the system.  Doing
+	 * this check first matches the table rename behavior because we return
+	 * WT_NOTFOUND when the renamed file doesn't exist (subsequently mapped
+	 * to ENOENT by the session layer).
 	 */
-	switch (ret = __wt_metadata_read(session, newuri, &value)) {
+	WT_ERR(__wt_metadata_read(session, uri, &oldvalue));
+
+	/*
+	 * Check to see if the proposed name is already in use, in either the
+	 * metadata or the filesystem.
+	 */
+	switch (ret = __wt_metadata_read(session, newuri, &newvalue)) {
 	case 0:
 		WT_ERR_MSG(session, EEXIST, "%s", newuri);
 	case WT_NOTFOUND:
@@ -48,16 +56,16 @@ __rename_file(
 		WT_ERR_MSG(session, EEXIST, "%s", newfile);
 
 	/* Replace the old file entries with new file entries. */
-	WT_ERR(__wt_metadata_read(session, uri, &value));
 	WT_ERR(__wt_metadata_remove(session, uri));
-	WT_ERR(__wt_metadata_insert(session, newuri, value));
+	WT_ERR(__wt_metadata_insert(session, newuri, oldvalue));
 
 	/* Rename the underlying file. */
 	WT_ERR(__wt_rename(session, filename, newfile));
 	if (WT_META_TRACKING(session))
 		WT_ERR(__wt_meta_track_fileop(session, uri, newuri));
 
-err:	__wt_free(session, value);
+err:	__wt_free(session, newvalue);
+	__wt_free(session, oldvalue);
 
 	return (ret);
 }
@@ -113,8 +121,7 @@ __rename_tree(WT_SESSION_IMPL *session, const char *name, const char *newname)
 	/* Overwrite it with the new filename. */
 	WT_ERR(__wt_scr_alloc(session, 0, &nv));
 	WT_ERR(__wt_buf_fmt(session, nv, "%.*s%s%s",
-	    (int)WT_PTRDIFF(p, value), value,
-	    newfile, t == NULL ? "" : t));
+	    (int)WT_PTRDIFF(p, value), value, newfile, t == NULL ? "" : t));
 
 	/*
 	 * Remove the old metadata entry.
@@ -150,17 +157,19 @@ __rename_table(
 
 	buf = NULL;
 
-	WT_RET(
-	    __wt_schema_get_table(session, oldname, strlen(oldname), &table));
+	WT_RET(__wt_schema_get_table(
+	    session, oldname, strlen(oldname), 0, &table));
 
 	/* Rename the column groups. */
 	for (i = 0; i < WT_COLGROUPS(table); i++)
-		WT_RET(__rename_tree(session, table->cg_name[i], newname));
+		WT_RET(__rename_tree(
+		    session, table->cgroups[i]->name, newname));
 
 	/* Rename the indices. */
-	WT_RET(__wt_schema_open_index(session, table, NULL, 0));
+	WT_RET(__wt_schema_open_indices(session, table));
 	for (i = 0; i < table->nindices; i++)
-		WT_RET(__rename_tree(session, table->idx_name[i], newname));
+		WT_RET(__rename_tree(session,
+		    table->indices[i]->name, newname));
 
 	WT_RET(__wt_schema_remove_table(session, table));
 

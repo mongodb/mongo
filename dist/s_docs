@@ -12,9 +12,28 @@ type doxygen > /dev/null 2>&1 || {
 	exit 0
 }
 
-. ./RELEASE
+. ../RELEASE
 
 e=0
+
+sectionchk()
+{
+	# sections are a global name space for doxygen, and must be uniquely
+	# named or you can get the wrong results.  For example, if you have
+	# "@section foo ABC" and "@section foo DEF", they will both appear as
+	# "ABC" or "DEF".
+	(cd ../src/docs &&
+	egrep -h '@section' *.dox |
+	sort -u | awk '{ print $2 }' | sort | uniq -d) > $t
+	test -s $t && {
+		echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+		echo '@section references that are not uniquely named'
+		sed -e 's/^/	/' < $t
+		echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+		e=1
+	}
+}
+
 spellchk()
 {
 	# If aspell has been installed, run a spell check.
@@ -101,8 +120,9 @@ while :
 	esac
 done
 
-# Spell check the documentation.
+# Spell and section-name check the documentation.
 spellchk
+sectionchk
 
 # Build the documentation.
 build $clean

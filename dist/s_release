@@ -3,7 +3,7 @@
 
 set -e
 
-. ./RELEASE || exit 1
+. ../RELEASE || exit 1
 
 RELEASE_DIR=`pwd`/../releases
 mkdir -p $RELEASE_DIR

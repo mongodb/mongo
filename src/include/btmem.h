@@ -38,7 +38,7 @@ struct __wt_page_header {
  * WT_PAGE_HEADER_SIZE is the number of bytes we allocate for the structure: if
  * the compiler inserts padding it will break the world.
  */
-#define	WT_PAGE_HEADER_SIZE            20
+#define	WT_PAGE_HEADER_SIZE		20
 
 /*
  * The block-manager specific information immediately follows the WT_PAGE_DISK
@@ -325,16 +325,14 @@ struct __wt_ref {
 	/*
 	 * Page state.
 	 *
-	 * WT_REF_DISK has a value of 0, the default state after allocating
-	 * cleared memory.
-	 *
-	 * Synchronization is based on the WT_REF->state field, which has 5
-	 * possible states:
+	 * Synchronization is based on the WT_REF->state field, which has a
+	 * number of possible states:
 	 *
 	 * WT_REF_DISK:
 	 *	The initial setting before a page is brought into memory, and
 	 *	set as a result of page eviction; the page is on disk, and must
-	 *	be read into into memory before use.
+	 *	be read into into memory before use.  WT_REF_DISK has a value
+	 *	of 0, the default state after allocating cleared memory.
 	 *
 	 * WT_REF_EVICT_FORCE:
 	 *	Set by eviction when a page is awaiting forced eviction;
@@ -483,7 +481,7 @@ struct __wt_col_rle {
 
 /*
  * WT_COL_PTR --
- *     Return a pointer corresponding to the data offset -- if the item doesn't
+ *	Return a pointer corresponding to the data offset -- if the item doesn't
  * exist on the page, return a NULL.
  */
 #define	WT_COL_PTR(page, cip)						\
@@ -596,7 +594,7 @@ struct __wt_insert {
 		uint64_t recno;			/* column-store record number */
 		struct {
 			uint32_t offset;	/* row-store key data start */
-			uint32_t size;          /* row-store key data size */
+			uint32_t size;		/* row-store key data size */
 		} key;
 	} u;
 

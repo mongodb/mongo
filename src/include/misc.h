@@ -49,8 +49,8 @@
 #define	WT_ELEMENTS(a)	(sizeof(a) / sizeof(a[0]))
 
 /* 10 level skip lists, 1/2 have a link to the next element. */
-#define	WT_SKIP_MAXDEPTH        10
-#define	WT_SKIP_PROBABILITY     (UINT32_MAX >> 2)
+#define	WT_SKIP_MAXDEPTH	10
+#define	WT_SKIP_PROBABILITY	(UINT32_MAX >> 2)
 
 /*
  * Quiet compiler warnings about unused parameters.
@@ -158,6 +158,13 @@
 #define	WT_PREFIX_SKIP(str, pre)					\
 	((strncmp((str), (pre), strlen(pre)) == 0) ?			\
 	    ((str) += strlen(pre), 1) : 0)
+
+/* Check if a string matches a byte string of len bytes. */
+#define	WT_STRING_MATCH(str, bytes, len)				\
+	(strncmp(str, bytes, len) == 0 && (str)[(len)] == '\0')
+
+#define	WT_STRING_CASE_MATCH(str, bytes, len)				\
+	(strncasecmp(str, bytes, len) == 0 && (str)[(len)] == '\0')
 
 /* Function return value and scratch buffer declaration and initialization. */
 #define	WT_DECL_ITEM(i)	WT_ITEM *i = NULL

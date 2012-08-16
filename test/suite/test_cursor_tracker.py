@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Copyright (c) 2008-2012 WiredTiger, Inc.
+# Public Domain 2008-2012 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
 #
@@ -26,51 +26,51 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 # test_cursor_tracker.py
-#	Tracker for testing cursor operations.  Keys and values
-#	are generated automatically based somewhat on position,
-#	and are stored simultaneously in the WT table and
-#	in a compact representation in python data structures
-#	(self.bitlist, self.vers).  A set of convenience functions
-#	allows us to insert/remove/update keys on a cursor,
-#	navigate forward, back, etc. and verify K/V pairs in
-#	the table.  Comprehensive tests can then be built up.
+#       Tracker for testing cursor operations.  Keys and values
+#       are generated automatically based somewhat on position,
+#       and are stored simultaneously in the WT table and
+#       in a compact representation in python data structures
+#       (self.bitlist, self.vers).  A set of convenience functions
+#       allows us to insert/remove/update keys on a cursor,
+#       navigate forward, back, etc. and verify K/V pairs in
+#       the table.  Comprehensive tests can then be built up.
 #
-#	All keys and values are generated, based on a triple:
-#	[major, minor, version].  The key generator is a pure function
-#	K that returns a string and takes inputs (major, minor).
-#	K is implemented as encode_key() below, its inverse is decode_key().
-#	The value generator is a pure function V that returns a string
-#	based on inputs (major, minor, version).  It is implemented
-#	as encode_value(), its inverse being decode_value().
+#       All keys and values are generated, based on a triple:
+#       [major, minor, version].  The key generator is a pure function
+#       K that returns a string and takes inputs (major, minor).
+#       K is implemented as encode_key() below, its inverse is decode_key().
+#       The value generator is a pure function V that returns a string
+#       based on inputs (major, minor, version).  It is implemented
+#       as encode_value(), its inverse being decode_value().
 #
-#	When a test starts, calling cur_initial_conditions, a set
-#	of N K/V populates the table.  These correspond to major
-#	numbers.  For example, with N==3, major/minor numbers of
-#	[0,0], [0,1], [0,2] are inserted into the table.
-#	The table is then closed (and session closed) to guarantee
-#	that the associated data is written to disk before continuing.
-#	The theory is that since changes in WT are stored in skip lists,
-#	we want the test to be aware of preexisting values (those having
-#	minor number == 0) so we can try all combinations of adding
-#	new skip list entries, and removing/updating both skip list
-#	and original values.
+#       When a test starts, calling cur_initial_conditions, a set
+#       of N K/V populates the table.  These correspond to major
+#       numbers.  For example, with N==3, major/minor numbers of
+#       [0,0], [0,1], [0,2] are inserted into the table.
+#       The table is then closed (and session closed) to guarantee
+#       that the associated data is written to disk before continuing.
+#       The theory is that since changes in WT are stored in skip lists,
+#       we want the test to be aware of preexisting values (those having
+#       minor number == 0) so we can try all combinations of adding
+#       new skip list entries, and removing/updating both skip list
+#       and original values.
 #
-#	After initial conditions are set up, the test calls functions
-#	such as cur_insert to insert values.  Since minor numbers
-#	sort secondarily to major, they will take logical positions
-#	in specific places relative to major (preexisting) K/V pairs.
+#       After initial conditions are set up, the test calls functions
+#       such as cur_insert to insert values.  Since minor numbers
+#       sort secondarily to major, they will take logical positions
+#       in specific places relative to major (preexisting) K/V pairs.
 #
-#	Updating an existing value is detected in the python data
-#	structures, and result in incrementing the version number.
-#	Thus, the key remains unchanged, but the associated value
-#	changes (the size of the value may be altered as well).
+#       Updating an existing value is detected in the python data
+#       structures, and result in incrementing the version number.
+#       Thus, the key remains unchanged, but the associated value
+#       changes (the size of the value may be altered as well).
 #
-#	TODO: we need to separate the cursor tracking information
-#	(the current position where we believe we are) from
-#	the database information (what we think is in the data storage).
-#	Once that's done, we can have multiple cursor tests
-#	(though simulating transactions would probably be beyond what
-#	we want to do here).
+#       TODO: we need to separate the cursor tracking information
+#       (the current position where we believe we are) from
+#       the database information (what we think is in the data storage).
+#       Once that's done, we can have multiple cursor tests
+#       (though simulating transactions would probably be beyond what
+#       we want to do here).
 
 import hashlib
 import wiredtiger, wttest
@@ -488,7 +488,6 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
             else:
                 kind = 'value'
             self.fail('mismatched ' + kind + ', want: ' + wantstr + ', got: ' + gotstr)
-
 
 if __name__ == '__main__':
     wttest.run()

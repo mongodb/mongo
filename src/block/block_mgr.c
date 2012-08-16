@@ -363,8 +363,8 @@ __wt_bm_verify_end(WT_SESSION_IMPL *session)
  *	Verify an address.
  */
 int
-__wt_bm_verify_addr(WT_SESSION_IMPL *session,
-     const uint8_t *addr, uint32_t addr_size)
+__wt_bm_verify_addr(
+    WT_SESSION_IMPL *session, const uint8_t *addr, uint32_t addr_size)
 {
 	WT_BLOCK *block;
 

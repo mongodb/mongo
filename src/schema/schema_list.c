@@ -34,8 +34,7 @@ __wt_schema_find_table(WT_SESSION_IMPL *session,
 	TAILQ_FOREACH(table, &session->tables, q) {
 		tablename = table->name;
 		(void)WT_PREFIX_SKIP(tablename, "table:");
-		if (strncmp(tablename, name, namelen) == 0 &&
-		    tablename[namelen] == '\0') {
+		if (WT_STRING_MATCH(tablename, name, namelen)) {
 			*tablep = table;
 			return (0);
 		}
@@ -50,18 +49,57 @@ __wt_schema_find_table(WT_SESSION_IMPL *session,
  */
 int
 __wt_schema_get_table(WT_SESSION_IMPL *session,
-    const char *name, size_t namelen, WT_TABLE **tablep)
+    const char *name, size_t namelen, int ok_incomplete, WT_TABLE **tablep)
 {
 	WT_DECL_RET;
+	WT_TABLE *table;
 
-	ret = __wt_schema_find_table(session, name, namelen, tablep);
+	ret = __wt_schema_find_table(session, name, namelen, &table);
 
 	if (ret == WT_NOTFOUND) {
-		WT_RET(__wt_schema_open_table(session, name, namelen, tablep));
-		ret = __wt_schema_add_table(session, *tablep);
+		WT_RET(__wt_schema_open_table(session, name, namelen, &table));
+		ret = __wt_schema_add_table(session, table);
+	}
+
+	if (ret == 0) {
+		if (!ok_incomplete && !table->cg_complete)
+			WT_RET_MSG(session, EINVAL, "'%s' cannot be used "
+			    "until all column groups are created",
+			    table->name);
+
+		*tablep = table;
 	}
 
 	return (ret);
+}
+
+/*
+ * __wt_schema_destroy_colgroup --
+ *	Free a column group handle.
+ */
+void
+__wt_schema_destroy_colgroup(WT_SESSION_IMPL *session, WT_COLGROUP *colgroup)
+{
+	__wt_free(session, colgroup->name);
+	__wt_free(session, colgroup->source);
+	__wt_free(session, colgroup->config);
+	__wt_free(session, colgroup);
+}
+
+/*
+ * __wt_schema_destroy_index --
+ *	Free an index handle.
+ */
+void
+__wt_schema_destroy_index(WT_SESSION_IMPL *session, WT_INDEX *idx)
+{
+	__wt_free(session, idx->name);
+	__wt_free(session, idx->source);
+	__wt_free(session, idx->config);
+	__wt_free(session, idx->key_plan);
+	__wt_free(session, idx->value_plan);
+	__wt_free(session, idx->idxkey_format);
+	__wt_free(session, idx);
 }
 
 /*
@@ -71,6 +109,8 @@ __wt_schema_get_table(WT_SESSION_IMPL *session,
 void
 __wt_schema_destroy_table(WT_SESSION_IMPL *session, WT_TABLE *table)
 {
+	WT_COLGROUP *colgroup;
+	WT_INDEX *idx;
 	int i;
 
 	__wt_free(session, table->name);
@@ -78,15 +118,21 @@ __wt_schema_destroy_table(WT_SESSION_IMPL *session, WT_TABLE *table)
 	__wt_free(session, table->plan);
 	__wt_free(session, table->key_format);
 	__wt_free(session, table->value_format);
-	if (table->cg_name != NULL) {
-		for (i = 0; i < WT_COLGROUPS(table); i++)
-			__wt_free(session, table->cg_name[i]);
-		__wt_free(session, table->cg_name);
+	if (table->cgroups != NULL) {
+		for (i = 0; i < WT_COLGROUPS(table); i++) {
+			if ((colgroup = table->cgroups[i]) == NULL)
+				continue;
+			__wt_schema_destroy_colgroup(session, colgroup);
+		}
+		__wt_free(session, table->cgroups);
 	}
-	if (table->idx_name != NULL) {
-		for (i = 0; i < table->nindices; i++)
-			__wt_free(session, table->idx_name[i]);
-		__wt_free(session, table->idx_name);
+	if (table->indices != NULL) {
+		for (i = 0; i < table->nindices; i++) {
+			if ((idx = table->indices[i]) == NULL)
+				continue;
+			__wt_schema_destroy_index(session, idx);
+		}
+		__wt_free(session, table->indices);
 	}
 	__wt_free(session, table);
 }

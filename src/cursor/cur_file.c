@@ -20,7 +20,7 @@ __curfile_next(WT_CURSOR *cursor)
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL_NOCONF(cursor, session, next, cbt->btree);
-	ret = __wt_btcur_next((WT_CURSOR_BTREE *)cursor);
+	ret = __wt_btcur_next((WT_CURSOR_BTREE *)cursor, 0);
 	API_END(session);
 
 	return (ret);
@@ -59,7 +59,7 @@ __curfile_prev(WT_CURSOR *cursor)
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL_NOCONF(cursor, session, prev, cbt->btree);
-	ret = __wt_btcur_prev((WT_CURSOR_BTREE *)cursor);
+	ret = __wt_btcur_prev((WT_CURSOR_BTREE *)cursor, 0);
 	API_END(session);
 
 	return (ret);
@@ -188,6 +188,39 @@ err:	API_END_TXN_ERROR(session, ret);
 }
 
 /*
+ * __wt_curfile_truncate --
+ *	WT_SESSION.truncate support when file cursors are specified.
+ */
+int
+__wt_curfile_truncate(
+    WT_SESSION_IMPL *session, WT_CURSOR *start, WT_CURSOR *stop)
+{
+	WT_BTREE *saved_btree;
+	WT_CURSOR_BTREE *cursor;
+	WT_DECL_RET;
+
+	/*
+	 * Our caller is either the session layer or the table-cursor truncate
+	 * code, both of which guarantee any open cursor is fully instantiated.
+	 * To minimize overhead when called from the table-cursor code, don't
+	 * do any further checking.
+	 *
+	 * !!!
+	 * We're doing a cursor operation but in the service of the session API;
+	 * set the session handle to reference the appropriate Btree, but don't
+	 * do any of the other "standard" cursor API setup.
+	 */
+	cursor = (WT_CURSOR_BTREE *)(start == NULL ? stop : start);
+	saved_btree = session->btree;
+	session->btree = cursor->btree;
+	ret = __wt_btcur_truncate(
+	    (WT_CURSOR_BTREE *)start, (WT_CURSOR_BTREE *)stop);
+	session->btree = saved_btree;
+
+	return (ret);
+}
+
+/*
  * __curfile_close --
  *	WT_CURSOR->close method for the btree cursor type.
  */
@@ -238,10 +271,9 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 		__curfile_update,
 		__curfile_remove,
 		__curfile_close,
-		NULL,
 		{ NULL, NULL },		/* TAILQ_ENTRY q */
 		0,			/* recno key */
-		{ 0 },                  /* recno raw buffer */
+		{ 0 },			/* recno raw buffer */
 		{ NULL, 0, 0, NULL, 0 },/* WT_ITEM key */
 		{ NULL, 0, 0, NULL, 0 },/* WT_ITEM value */
 		0,			/* int saved_err */
@@ -260,7 +292,7 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 	btree = session->btree;
 	WT_ASSERT(session, btree != NULL);
 
-	WT_RET(__wt_config_gets(session, cfg, "bulk", &cval));
+	WT_RET(__wt_config_gets_defno(session, cfg, "bulk", &cval));
 	bulk = (cval.val != 0);
 
 	csize = bulk ? sizeof(WT_CURSOR_BULK) : sizeof(WT_CURSOR_BTREE);
@@ -281,7 +313,7 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 	 * random_retrieval
 	 * Random retrieval cursors only support next and close.
 	 */
-	WT_ERR(__wt_config_gets(session, cfg, "next_random", &cval));
+	WT_ERR(__wt_config_gets_defno(session, cfg, "next_random", &cval));
 	if (cval.val != 0) {
 		__wt_cursor_set_notsup(cursor);
 		cursor->next = __curfile_next_random;
@@ -309,7 +341,7 @@ __wt_curfile_open(WT_SESSION_IMPL *session, const char *uri,
 	WT_CONFIG_ITEM cval;
 	int bulk;
 
-	WT_RET(__wt_config_gets(session, cfg, "bulk", &cval));
+	WT_RET(__wt_config_gets_defno(session, cfg, "bulk", &cval));
 	bulk = (cval.val != 0);
 
 	/* TODO: handle projections. */
@@ -319,10 +351,10 @@ __wt_curfile_open(WT_SESSION_IMPL *session, const char *uri,
 		WT_RET(__wt_schema_get_btree(session,
 		    uri, strlen(uri), cfg, bulk ? WT_BTREE_EXCLUSIVE : 0));
 	else if (WT_PREFIX_MATCH(uri, "file:"))
-		WT_RET(__wt_session_get_btree(session,
-		     uri, cfg, bulk ? WT_BTREE_EXCLUSIVE : 0));
+		WT_RET(__wt_session_get_btree_ckpt(session,
+		    uri, cfg, bulk ? WT_BTREE_EXCLUSIVE : 0));
 	else
-		WT_RET_MSG(session, EINVAL, "Unexpected object type");
+		WT_RET(__wt_bad_object_type(session, uri));
 
 	return (__wt_curfile_create(session, owner, cfg, cursorp));
 }

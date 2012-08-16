@@ -370,12 +370,22 @@ __wt_illegal_value(WT_SESSION_IMPL *session, const char *name)
 }
 
 /*
- * __wt_unknown_object_type --
- *	Print a standard error message when given an unknown object type.
+ * __wt_bad_object_type --
+ *	Print a standard error message when given an unknown or unsupported
+ * object type.
  */
 int
-__wt_unknown_object_type(WT_SESSION_IMPL *session, const char *uri)
+__wt_bad_object_type(WT_SESSION_IMPL *session, const char *uri)
 {
-	WT_RET_MSG(session, EINVAL,
-	    "unknown or unsupported object type: %s", uri);
+	if (WT_PREFIX_MATCH(uri, "backup:") ||
+	    WT_PREFIX_MATCH(uri, "colgroup:") ||
+	    WT_PREFIX_MATCH(uri, "config:") ||
+	    WT_PREFIX_MATCH(uri, "file:") ||
+	    WT_PREFIX_MATCH(uri, "index:") ||
+	    WT_PREFIX_MATCH(uri, "statistics:") ||
+	    WT_PREFIX_MATCH(uri, "table:"))
+		WT_RET_MSG(session, ENOTSUP,
+		    "unsupported object type: %s", uri);
+
+	WT_RET_MSG(session, ENOTSUP, "unknown object type: %s", uri);
 }

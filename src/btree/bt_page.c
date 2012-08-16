@@ -39,15 +39,10 @@ __wt_page_in_func(
 	for (;;) {
 		switch (ref->state) {
 		case WT_REF_DISK:
-			/*
-			 * The page isn't in memory, attempt to set the state
-			 * to WT_REF_READING.  If successful, read it.
-			 */
+			/* The page isn't in memory, attempt to read it. */
 			__wt_eviction_check(session, &read_lockout, wake);
 			wake = 0;
-
-			if (read_lockout || !WT_ATOMIC_CAS(ref->state,
-			    WT_REF_DISK, WT_REF_READING))
+			if (read_lockout)
 				break;
 
 			WT_RET(__wt_cache_read(session, parent, ref));
@@ -89,8 +84,6 @@ __wt_page_in_func(
 			 */
 			if (page->modify != NULL &&
 			    __wt_txn_ancient(session, page->modify->first_id)) {
-				WT_VERBOSE_RET(session, read,
-				    "ancient updates, forcing eviction");
 				__wt_evict_page_request(session, page);
 				__wt_hazard_clear(session, page);
 				__wt_evict_server_wake(session);

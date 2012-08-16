@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Copyright (c) 2008-2012 WiredTiger, Inc.
+# Public Domain 2008-2012 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
 #
@@ -24,86 +24,118 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-#
-# test_backup.py
-# 	Utilities: wt backup
-#
 
-import string, os
+import glob
+import os
+import shutil
+import string
 from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
-from helper import compareFiles
+from helper import compare_files, confirm_does_not_exist,\
+    complex_populate, complex_populate_check,\
+    simple_populate, simple_populate_check
 
+# test_backup.py
+#    Utilities: wt backup
 # Test backup (both backup cursors and the wt backup command).
 class test_backup(wttest.WiredTigerTestCase, suite_subprocess):
-    namepfx = 'test_backup.'
-
-    objs=4                      # Number of objects
     dir='backup.dir'            # Backup directory name
+
+    pfx = 'test_backup'
+    objs = [
+        ( 'file:' + pfx + '.1', simple_populate),
+        ( 'file:' + pfx + '.2', simple_populate),
+        ('table:' + pfx + '.3', simple_populate),
+        ('table:' + pfx + '.4', simple_populate),
+        ('table:' + pfx + '.5', complex_populate),
+        ('table:' + pfx + '.6', complex_populate),
+    ]
 
     # Populate a set of objects.
     def populate(self):
-        params = 'key_format=S,value_format=S'
-        for type in [ 'table:', 'file:' ]:
-            for obj in range(1, self.objs):
-                name = type + self.namepfx + str(obj)
-                self.session.create(name, params)
-                cursor = self.session.open_cursor(name, None, None)
-                for i in range(1, 100):
-                    cursor.set_key('KEY' + str(i))
-                    cursor.set_value('VALUE' + str(i))
-                    cursor.insert()
-                cursor.close()
+        for i in self.objs:
+            i[1](self, i[0], 'key_format=S', 100)
 
-    # Dump and compare the original and backed-up file
-    def compare(self, name):
-        self.runWt(['dump', name], outfilename='orig')
-        self.runWt(['-h', self.dir, 'dump', name], outfilename='backup')
-        compareFiles('orig', 'backup')
+    # Compare the original and backed-up files using the wt dump command.
+    def compare(self, uri):
+        self.runWt(['dump', uri], outfilename='orig')
+        self.runWt(['-h', self.dir, 'dump', uri], outfilename='backup')
+        compare_files(self, 'orig', 'backup')
 
-    # Test backup of a database in a 'wt' process.
+    # Test simple backup cursor open/close.
+    def test_cursor_simple(self):
+        cursor = self.session.open_cursor('backup:', None, None)
+        cursor.close()
+
+    # Test you can't have more than one backup cursor open at a time.
+    def test_cursor_single(self):
+        cursor = self.session.open_cursor('backup:', None, None)
+        msg = '/there is already a backup cursor open/'
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.session.open_cursor('backup:', None, None), msg)
+        cursor.close()
+
+    # Test backup of a database using the wt backup command.
     def test_backup_database(self):
         self.populate()
         os.mkdir(self.dir)
         self.runWt(['backup', self.dir])
-        for n in range(1, self.objs):
-            self.compare('table:' + self.namepfx + str(n))
 
-    # Test backup of a table in a 'wt' process.
+        # Make sure all the files were copied.
+        self.runWt(['list'], outfilename='outfile.orig')
+        self.runWt(['-h', self.dir, 'list'], outfilename='outfile.backup')
+        compare_files(self, 'outfile.orig', 'outfile.backup')
+
+        # And that the contents are the same.
+        for i in self.objs:
+            self.compare(i[0])
+
+    # Check that a URI doesn't exist, both the meta-data and the file names.
+    def confirmPathDoesNotExist(self, uri):
+        conn = wiredtiger.wiredtiger_open(self.dir)
+        session = conn.open_session()
+        self.assertRaises(wiredtiger.WiredTigerError,
+            lambda: session.open_cursor(uri, None, None))
+        conn.close()
+
+        self.assertEqual(
+            glob.glob(self.dir + '*' + uri.split(":")[1] + '*'), [],
+            'confirmPathDoesNotExist: URI exists, file name matching \"' +
+            uri.split(":")[1] + '\" found')
+
+    # Backup a set of chosen tables/files using the wt backup command.
+    def backup_table(self, l):
+        # Remove any previous backup directories.
+        shutil.rmtree(self.dir, True)
+        os.mkdir(self.dir)
+
+        # Build a command line of objects to back up and run wt.
+        o = 'backup'
+        for i in range(0, len(self.objs)):
+            if i in l:
+                o += ' -t ' + self.objs[i][0]
+        o += ' ' + self.dir
+        self.runWt(o.split())
+
+        # Confirm the objects we backed up exist, with correct contents.
+        for i in range(0, len(self.objs)):
+            if i in l:
+                self.compare(self.objs[i][0])
+
+        # Confirm the other objects don't exist.
+        for i in range(0, len(self.objs)):
+            if i not in l:
+                self.confirmPathDoesNotExist(self.objs[i][0])
+
+    # Test backup of database subsets.
     def test_backup_table(self):
         self.populate()
-        os.mkdir(self.dir)
-        for i in range(1, 2):
-            self.runWt(
-                ['backup', '-t', 'table:' + self.namepfx + '1', self.dir])
-        for n in range(1, 2):
-            self.compare('table:' + self.namepfx + str(n))
+        self.backup_table([0,2,4])
+        self.backup_table([1,3,5])
+        self.backup_table([0,1,2])
+        self.backup_table([3,4,5])
 
-        # The files shouldn't be there.
-        conn = wiredtiger.wiredtiger_open(self.dir)
-        session = conn.open_session()
-        self.assertRaises(wiredtiger.WiredTigerError, lambda:
-            session.open_cursor('file:' + self.namepfx + '1', None, None))
-        conn.close()
-
-    # Test backup of a file in a 'wt' process.
-    def test_backup_file(self):
-        self.populate()
-        os.mkdir(self.dir)
-        for i in range(1, 2):
-            self.runWt(
-                ['backup', '-t', 'file:' + self.namepfx + '1', self.dir])
-        for n in range(1, 2):
-            self.compare('file:' + self.namepfx + str(n))
-
-        # The tables shouldn't be there.
-        conn = wiredtiger.wiredtiger_open(self.dir)
-        session = conn.open_session()
-        self.assertRaises(wiredtiger.WiredTigerError, lambda:
-            session.open_cursor('table:' + self.namepfx + '1', None, None))
-        conn.close()
-
-    # Test backup of random object types.
+    # Test backup of random object types fails.
     def test_illegal_objects(self):
         for target in ('colgroup:xxx', 'index:xxx'):
             msg = '/invalid backup target object/'
@@ -111,19 +143,7 @@ class test_backup(wttest.WiredTigerTestCase, suite_subprocess):
             self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
                 lambda: self.session.open_cursor('backup:', None, config), msg)
 
-    # Test simple backup cursor open/close.
-    def test_cursor_simple(self):
-        cursor = self.session.open_cursor('backup:', None, None)
-        cursor.close()
-
-    # You can't have more than one backup cursor open at a time.
-        cursor = self.session.open_cursor('backup:', None, None)
-        msg = '/there is already a backup cursor open/'
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.session.open_cursor('backup:', None, None), msg)
-	cursor.close()
-
-    # Test that cursor reset runs through the list again.
+    # Test cursor reset runs through the list twice.
     def test_cursor_reset(self):
         self.populate()
         cursor = self.session.open_cursor('backup:', None, None)
@@ -134,7 +154,7 @@ class test_backup(wttest.WiredTigerTestCase, suite_subprocess):
                 break;
             i += 1
         self.assertEqual(ret, wiredtiger.WT_NOTFOUND)
-        self.assertEqual(i, self.objs *  2)
+        total = i * 2
         cursor.reset()
         while True:
             ret = cursor.next()
@@ -142,30 +162,32 @@ class test_backup(wttest.WiredTigerTestCase, suite_subprocess):
                 break;
             i += 1
         self.assertEqual(ret, wiredtiger.WT_NOTFOUND)
-        self.assertEqual(i, self.objs * 4)
+        self.assertEqual(i, total)
 
-    # Named checkpoints can't be deleted while backup cursors are open.
+    # Test that named checkpoints can't be deleted while backup cursors are
+    # open, but that normal checkpoints continue to work.
     def test_checkpoint_delete(self):
         self.populate()
 
         # Confirm checkpoints are being deleted.
         self.session.checkpoint("name=one")
         self.session.checkpoint("name=two,drop=(one)")
-        msg = '/no "one" checkpoint found/'
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+        self.assertRaises(wiredtiger.WiredTigerError,
             lambda: self.session.open_cursor(
-            'table:' + self.namepfx + '1', None, "checkpoint=one"), msg)
+            self.objs[0][0], None, "checkpoint=one"))
 
         # Confirm opening a backup cursor causes checkpoint to fail if dropping
-	# a named checkpoint, but does not stop a default checkpoint.
-        backup = self.session.open_cursor('backup:', None, None)
+        # a named checkpoint, but does not stop a default checkpoint.
+        cursor = self.session.open_cursor('backup:', None, None)
+        self.session.checkpoint()
         msg = '/checkpoints cannot be dropped/'
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-	    lambda: self.session.checkpoint("name=three,drop=(two)"), msg)
+            lambda: self.session.checkpoint("name=three,drop=(two)"), msg)
         self.session.checkpoint()
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.session.checkpoint("name=three,drop=(two)"), msg)
         self.session.checkpoint()
-        self.session.checkpoint()
-        backup.close()
+        cursor.close()
 
 if __name__ == '__main__':
     wttest.run()

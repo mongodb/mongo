@@ -6,6 +6,17 @@
  */
 
 /*
+ * __cursor_set_recno --
+ *	The cursor value in the interface has to track the value in the
+ * underlying cursor, update them in parallel.
+ */
+static inline void
+__cursor_set_recno(WT_CURSOR_BTREE *cbt, uint64_t v)
+{
+	cbt->iface.recno = cbt->recno = v;
+}
+
+/*
  * __cursor_search_clear --
  *	Reset the cursor's state for a search.
  */

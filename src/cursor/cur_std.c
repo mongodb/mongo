@@ -26,7 +26,8 @@ __wt_cursor_notsup(WT_CURSOR *cursor)
 void
 __wt_cursor_set_notsup(WT_CURSOR *cursor)
 {
-	cursor->equals = (int (*)(WT_CURSOR *, WT_CURSOR *))__wt_cursor_notsup;
+	cursor->equals =
+	    (int (*)(WT_CURSOR *, WT_CURSOR *, int *))__wt_cursor_notsup;
 	cursor->next = __wt_cursor_notsup;
 	cursor->prev = __wt_cursor_notsup;
 	cursor->reset = __wt_cursor_notsup;
@@ -35,6 +36,22 @@ __wt_cursor_set_notsup(WT_CURSOR *cursor)
 	cursor->insert = __wt_cursor_notsup;
 	cursor->update = __wt_cursor_notsup;
 	cursor->remove = __wt_cursor_notsup;
+}
+
+/*
+ * __wt_cursor_kv_not_set --
+ *	Standard error message for key/values not set.
+ */
+int
+__wt_cursor_kv_not_set(WT_CURSOR *cursor, int key)
+{
+	WT_SESSION_IMPL *session;
+
+	session = (WT_SESSION_IMPL *)cursor->session;
+
+	WT_RET_MSG(session,
+	    cursor->saved_err == 0 ? EINVAL : cursor->saved_err,
+	    "requires %s be set", key ? "key" : "value");
 }
 
 /*
@@ -51,6 +68,58 @@ __wt_cursor_get_key(WT_CURSOR *cursor, ...)
 	ret = __wt_cursor_get_keyv(cursor, cursor->flags, ap);
 	va_end(ap);
 	return (ret);
+}
+
+/*
+ * __wt_cursor_set_key --
+ *	WT_CURSOR->set_key default implementation.
+ */
+void
+__wt_cursor_set_key(WT_CURSOR *cursor, ...)
+{
+	va_list ap;
+
+	va_start(ap, cursor);
+	__wt_cursor_set_keyv(cursor, cursor->flags, ap);
+	va_end(ap);
+}
+
+/*
+ * __wt_cursor_get_raw_key --
+ *	Temporarily force raw mode in a cursor to get a canonical copy of
+ * the key.
+ */
+int
+__wt_cursor_get_raw_key(WT_CURSOR *cursor, WT_ITEM *key)
+{
+	WT_DECL_RET;
+	int raw_set;
+
+	raw_set = F_ISSET(cursor, WT_CURSTD_RAW) ? 1 : 0;
+	if (!raw_set)
+		F_SET(cursor, WT_CURSTD_RAW);
+	ret = cursor->get_key(cursor, key);
+	if (!raw_set)
+		F_CLR(cursor, WT_CURSTD_RAW);
+	return (ret);
+}
+
+/*
+ * __wt_cursor_set_raw_key --
+ *	Temporarily force raw mode in a cursor to set a canonical copy of
+ * the key.
+ */
+void
+__wt_cursor_set_raw_key(WT_CURSOR *cursor, WT_ITEM *key)
+{
+	int raw_set;
+
+	raw_set = F_ISSET(cursor, WT_CURSTD_RAW) ? 1 : 0;
+	if (!raw_set)
+		F_SET(cursor, WT_CURSTD_RAW);
+	cursor->set_key(cursor, key);
+	if (!raw_set)
+		F_CLR(cursor, WT_CURSTD_RAW);
 }
 
 /*
@@ -91,47 +160,6 @@ __wt_cursor_get_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 
 err:	API_END(session);
 	return (ret);
-}
-
-/*
- * __wt_cursor_get_value --
- *	WT_CURSOR->get_value default implementation.
- */
-int
-__wt_cursor_get_value(WT_CURSOR *cursor, ...)
-{
-	WT_DECL_RET;
-	WT_SESSION_IMPL *session;
-	const char *fmt;
-	va_list ap;
-
-	CURSOR_API_CALL_NOCONF(cursor, session, get_value, NULL);
-	WT_CURSOR_NEEDVALUE(cursor);
-
-	va_start(ap, cursor);
-	fmt = F_ISSET(cursor,
-	    WT_CURSTD_DUMP_HEX | WT_CURSTD_DUMP_PRINT | WT_CURSTD_RAW) ?
-	    "u" : cursor->value_format;
-	ret = __wt_struct_unpackv(session,
-	    cursor->value.data, cursor->value.size, fmt, ap);
-	va_end(ap);
-
-err:	API_END(session);
-	return (ret);
-}
-
-/*
- * __wt_cursor_set_keyv --
- *	WT_CURSOR->set_key default implementation.
- */
-void
-__wt_cursor_set_key(WT_CURSOR *cursor, ...)
-{
-	va_list ap;
-
-	va_start(ap, cursor);
-	__wt_cursor_set_keyv(cursor, cursor->flags, ap);
-	va_end(ap);
 }
 
 /*
@@ -207,6 +235,33 @@ err:		cursor->saved_err = ret;
 }
 
 /*
+ * __wt_cursor_get_value --
+ *	WT_CURSOR->get_value default implementation.
+ */
+int
+__wt_cursor_get_value(WT_CURSOR *cursor, ...)
+{
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+	const char *fmt;
+	va_list ap;
+
+	CURSOR_API_CALL_NOCONF(cursor, session, get_value, NULL);
+	WT_CURSOR_NEEDVALUE(cursor);
+
+	va_start(ap, cursor);
+	fmt = F_ISSET(cursor,
+	    WT_CURSTD_DUMP_HEX | WT_CURSTD_DUMP_PRINT | WT_CURSTD_RAW) ?
+	    "u" : cursor->value_format;
+	ret = __wt_struct_unpackv(session,
+	    cursor->value.data, cursor->value.size, fmt, ap);
+	va_end(ap);
+
+err:	API_END(session);
+	return (ret);
+}
+
+/*
  * __wt_cursor_set_value --
  *	WT_CURSOR->set_value default implementation.
  */
@@ -275,28 +330,33 @@ __cursor_search(WT_CURSOR *cursor)
  *	WT_CURSOR->equals default implementation.
  */
 static int
-__cursor_equals(WT_CURSOR *cursor, WT_CURSOR *other)
+__cursor_equals(WT_CURSOR *cursor, WT_CURSOR *other, int *equalp)
 {
+	WT_ITEM aitem, bitem;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
 	CURSOR_API_CALL_NOCONF(cursor, session, equals, NULL);
 
-	/* Both cursors must refer to the same source. */
-	if (other == NULL || strcmp(cursor->uri, other->uri) != 0)
-		goto done;
+	*equalp = 0;
 
-	/* Check that both have keys set and the keys match. */
-	if (F_ISSET(cursor, WT_CURSTD_KEY_SET) &&
-	    F_ISSET(other, WT_CURSTD_KEY_SET)) {
-		if (WT_CURSOR_RECNO(cursor))
-			ret = (cursor->recno == other->recno);
-		else if (cursor->key.size == other->key.size)
-			ret = (memcmp(cursor->key.data, other->key.data,
-			    cursor->key.size) == 0);
+	/*
+	 * Confirm both cursors refer to the same source, then retrieve their
+	 * raw keys and compare them.
+	 */
+	if (other != NULL && strcmp(cursor->uri, other->uri) == 0) {
+		/*
+		 * Don't clear (or allocate memory for) the WT_ITEM structures
+		 * because all that happens underneath is their data and size
+		 * fields are reset to reference the cursor's key.
+		 */
+		WT_ERR(__wt_cursor_get_raw_key(cursor, &aitem));
+		WT_ERR(__wt_cursor_get_raw_key(other, &bitem));
+		*equalp = (aitem.size == bitem.size &&
+		    memcmp(aitem.data, bitem.data, aitem.size) == 0) ? 1 : 0;
 	}
 
-done:	API_END(session);
+err:	API_END(session);
 	return (ret);
 }
 
@@ -338,7 +398,8 @@ __cursor_runtime_config(WT_CURSOR *cursor, const char *cfg[])
 
 	session = (WT_SESSION_IMPL *)cursor->session;
 
-	if ((ret = __wt_config_gets(session, cfg, "overwrite", &cval)) == 0) {
+	if ((ret =
+	    __wt_config_gets_defno(session, cfg, "overwrite", &cval)) == 0) {
 		if (cval.val)
 			F_SET(cursor, WT_CURSTD_OVERWRITE);
 		else
@@ -347,30 +408,6 @@ __cursor_runtime_config(WT_CURSOR *cursor, const char *cfg[])
 	WT_RET_NOTFOUND_OK(ret);
 
 	return (0);
-}
-
-/*
- * __cursor_reconfigure --
- *	WT_CURSOR->reconfigure default implementation.
- */
-static int
-__cursor_reconfigure(WT_CURSOR *cursor, const char *config)
-{
-	WT_DECL_RET;
-	WT_SESSION_IMPL *session;
-	const char *raw_cfg[] = { config, NULL };
-
-	CURSOR_API_CALL(cursor, session, reconfigure, NULL, config, cfg);
-
-	/*
-	 * We need to take care here: only override with values that appear in
-	 * the config string from the application, not with defaults.
-	 */
-	WT_UNUSED(cfg);
-	ret = __cursor_runtime_config(cursor, raw_cfg);
-
-err:	API_END(session);
-	return (ret);
 }
 
 /*
@@ -385,38 +422,24 @@ __wt_cursor_dup(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_ITEM key;
 	WT_SESSION *wt_session;
-	uint32_t saved_flags;
 
 	wt_session = &session->iface;
 
-	/* First open a new cursor with the same URI. */
+	/* Open a new cursor with the same URI. */
 	WT_ERR(wt_session->open_cursor(
 	    wt_session, to_dup->uri, NULL, config, &cursor));
 
 	/*
-	 * If the original cursor is positioned, copy the key and position the
-	 * new cursor.  Temporarily force raw mode in both cursors to get a
-	 * canonical copy of the key.
+	 * Get a copy of the cursor's raw key, and set it in the new cursor,
+	 * then search for that key to position the cursor.
+	 *
+	 * Don't clear (or allocate memory for) the WT_ITEM structure because
+	 * all that happens underneath is the data and size fields are reset
+	 * to reference the cursor's key.
 	 */
-	if (F_ISSET(to_dup, WT_CURSTD_KEY_SET)) {
-		/* Get the (raw) key from the original cursor. */
-		saved_flags = F_ISSET(to_dup, WT_CURSTD_RAW);
-		if (saved_flags == 0)
-			F_SET(to_dup, WT_CURSTD_RAW);
-		ret = to_dup->get_key(to_dup, &key);
-		if (saved_flags == 0)
-			F_CLR(to_dup, WT_CURSTD_RAW);
-		WT_ERR(ret);
-
-		/* Set the (raw) key in the new cursor. */
-		saved_flags = F_ISSET(cursor, WT_CURSTD_RAW);
-		if (saved_flags == 0)
-			F_SET(cursor, WT_CURSTD_RAW);
-		cursor->set_key(cursor, &key);
-		if (saved_flags == 0)
-			F_CLR(cursor, WT_CURSTD_RAW);
-		WT_ERR(cursor->search(cursor));
-	}
+	WT_ERR(__wt_cursor_get_raw_key(to_dup, &key));
+	__wt_cursor_set_raw_key(cursor, &key);
+	WT_ERR(cursor->search(cursor));
 
 	if (0) {
 err:		if (cursor != NULL)
@@ -483,8 +506,6 @@ __wt_cursor_init(WT_CURSOR *cursor,
 		cursor->remove = __wt_cursor_notsup;
 	if (cursor->close == NULL)
 		WT_RET_MSG(session, EINVAL, "cursor lacks a close method");
-	if (cursor->reconfigure == NULL)
-		cursor->reconfigure = __cursor_reconfigure;
 
 	if (cursor->uri == NULL)
 		WT_RET(__wt_strdup(session, uri, &cursor->uri));
@@ -500,7 +521,7 @@ __wt_cursor_init(WT_CURSOR *cursor,
 	 * The append flag is only relevant to column stores.
 	 */
 	if (WT_CURSOR_RECNO(cursor)) {
-		WT_RET(__wt_config_gets(session, cfg, "append", &cval));
+		WT_RET(__wt_config_gets_defno(session, cfg, "append", &cval));
 		if (cval.val != 0)
 			F_SET(cursor, WT_CURSTD_APPEND);
 	}
@@ -509,17 +530,24 @@ __wt_cursor_init(WT_CURSOR *cursor,
 	 * checkpoint
 	 * Checkpoint cursors are read-only.
 	 */
-	WT_RET(__wt_config_gets(session, cfg, "checkpoint", &cval));
+	WT_RET(__wt_config_gets_defno(session, cfg, "checkpoint", &cval));
 	if (cval.len != 0) {
-		cursor->insert = (int (*)(WT_CURSOR *))__wt_cursor_notsup;
-		cursor->update = (int (*)(WT_CURSOR *))__wt_cursor_notsup;
-		cursor->remove = (int (*)(WT_CURSOR *))__wt_cursor_notsup;
+		cursor->insert = __wt_cursor_notsup;
+		cursor->update = __wt_cursor_notsup;
+		cursor->remove = __wt_cursor_notsup;
 	}
 
 	/* dump */
-	WT_RET(__wt_config_gets(session, cfg, "dump", &cval));
+	WT_RET(__wt_config_gets_defno(session, cfg, "dump", &cval));
 	if (cval.len != 0) {
-		F_SET(cursor, (__wt_config_strcmp(&cval, "print") == 0) ?
+		/*
+		 * Dump cursors should not have owners: only the top-level
+		 * cursor should be wrapped in a dump cursor.
+		 */
+		WT_ASSERT(session, owner == NULL);
+
+		F_SET(cursor,
+		    WT_STRING_MATCH("print", cval.str, cval.len) ?
 		    WT_CURSTD_DUMP_PRINT : WT_CURSTD_DUMP_HEX);
 		WT_RET(__wt_curdump_create(cursor, owner, &cdump));
 		owner = cdump;
@@ -527,7 +555,7 @@ __wt_cursor_init(WT_CURSOR *cursor,
 		cdump = NULL;
 
 	/* raw */
-	WT_RET(__wt_config_gets(session, cfg, "raw", &cval));
+	WT_RET(__wt_config_gets_defno(session, cfg, "raw", &cval));
 	if (cval.val != 0)
 		F_SET(cursor, WT_CURSTD_RAW);
 
@@ -546,20 +574,4 @@ __wt_cursor_init(WT_CURSOR *cursor,
 
 	*cursorp = (cdump != NULL) ? cdump : cursor;
 	return (0);
-}
-
-/*
- * __wt_cursor_kv_not_set --
- *	Standard error message for key/values not set.
- */
-int
-__wt_cursor_kv_not_set(WT_CURSOR *cursor, int key)
-{
-	WT_SESSION_IMPL *session;
-
-	session = (WT_SESSION_IMPL *)cursor->session;
-
-	WT_RET_MSG(session,
-	    cursor->saved_err == 0 ? EINVAL : cursor->saved_err,
-	    "requires %s be set", key ? "key" : "value");
 }

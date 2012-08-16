@@ -36,7 +36,7 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 	 * and the contents of the file would be discarded.
 	 */
 	WT_RET(__wt_calloc_def(session, 2, &ckptbase));
-	WT_ERR(__wt_strdup(session, WT_INTERNAL_CHKPT, &ckptbase[0].name));
+	WT_ERR(__wt_strdup(session, WT_CHECKPOINT, &ckptbase[0].name));
 	F_SET(&ckptbase[0], WT_CKPT_ADD);
 
 	WT_ERR(__wt_bt_salvage(session, ckptbase, cfg));

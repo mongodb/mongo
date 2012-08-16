@@ -13,12 +13,20 @@ static inline void
 __wt_cache_page_inmem_incr(
     WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 {
-	WT_CACHE *cache;
-
-	cache = S2C(session)->cache;
-
-	WT_ATOMIC_ADD(cache->bytes_inmem, size);
+	WT_ATOMIC_ADD(S2C(session)->cache->bytes_inmem, size);
 	WT_ATOMIC_ADD(page->memory_footprint, WT_STORE_SIZE(size));
+}
+
+/*
+ * __wt_cache_page_inmem_decr --
+ *	Decrement a page's memory footprint in the cache.
+ */
+static inline void
+__wt_cache_page_inmem_decr(
+    WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
+{
+	WT_ATOMIC_SUB(S2C(session)->cache->bytes_inmem, size);
+	WT_ATOMIC_SUB(page->memory_footprint, WT_STORE_SIZE(size));
 }
 
 /*
@@ -132,8 +140,11 @@ __wt_page_modify_init(WT_SESSION_IMPL *session, WT_PAGE *page)
  *	Mark the page dirty.
  */
 static inline void
-__wt_page_modify_set(WT_PAGE *page)
+__wt_page_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
+	/* Set the tree modified flag. */
+	session->btree->modified = 1;
+
 	/*
 	 * Publish: there must be a barrier to ensure all changes to the page
 	 * are flushed before we update the page's write generation, otherwise
@@ -327,7 +338,7 @@ __wt_page_hazard_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 /*
  * __wt_skip_choose_depth --
- *      Randomly choose a depth for a skiplist insert.
+ *	Randomly choose a depth for a skiplist insert.
  */
 static inline u_int
 __wt_skip_choose_depth(void)
@@ -375,5 +386,5 @@ __wt_btree_lex_compare(const WT_ITEM *user_item, const WT_ITEM *tree_item)
 #define	WT_BTREE_CMP(s, bt, k1, k2, cmp)				\
 	(((bt)->collator == NULL) ?					\
 	(((cmp) = __wt_btree_lex_compare((k1), (k2))), 0) :		\
-	(bt)->collator->compare((bt)->collator, &(s)->iface,            \
+	(bt)->collator->compare((bt)->collator, &(s)->iface,		\
 	    (k1), (k2), &(cmp)))

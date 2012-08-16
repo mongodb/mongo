@@ -64,7 +64,7 @@ __wt_session_serialize_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page, int ret)
 {
 	/* If passed a page and the return value is OK, we modified the page. */
 	if (page != NULL && ret == 0)
-		__wt_page_modify_set(page);
+		__wt_page_modify_set(session, page);
 
 	/*
 	 * Publish: there must be a barrier to ensure the return value is set
@@ -75,7 +75,7 @@ __wt_session_serialize_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page, int ret)
 	 * they will have to retry their update for reading an old version of
 	 * the page.
 	 */
-       WT_PUBLISH(session->wq_ret, ret);
+	WT_PUBLISH(session->wq_ret, ret);
 
 	/* If the calling thread is sleeping, wake it up. */
 	if (session->wq_sleeping)

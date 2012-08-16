@@ -72,7 +72,11 @@ struct __wt_btree {
 	const char *checkpoint;		/* Checkpoint name (or NULL) */
 	const char *config;		/* Configuration string */
 
-	/* XXX Should move into the session-level handle information. */
+	/*
+	 * XXX Everything above here should move into the session-level
+	 * handle structure.
+	 */
+
 	WT_CKPT	  *ckpt;		/* Checkpoint information */
 
 	enum {	BTREE_COL_FIX=1,	/* Fixed-length column store */
@@ -81,14 +85,11 @@ struct __wt_btree {
 	} type;				/* Type */
 
 	const char *key_format;		/* Key format */
-	const char *key_plan;		/* Key projection plan */
-	const char *idxkey_format;	/* Index key format (hides primary) */
 	const char *value_format;	/* Value format */
-	const char *value_plan;		/* Value projection plan */
 	uint8_t bitcnt;			/* Fixed-length field size in bits */
 
 					/* Row-store comparison function */
-	WT_COLLATOR *collator;          /* Comparison function */
+	WT_COLLATOR *collator;		/* Comparison function */
 
 	uint32_t key_gap;		/* Row-store prefix key gap */
 
@@ -104,23 +105,25 @@ struct __wt_btree {
 	uint64_t last_recno;		/* Column-store last record number */
 
 	WT_PAGE *root_page;		/* Root page */
+	int modified;			/* If the tree ever modified */
 
 	void *block;			/* Block manager */
 	u_int block_header;		/* Block manager header length */
 
 	WT_PAGE *evict_page;		/* Eviction thread's location */
-	volatile uint32_t lru_count;	/* Count of threads in LRU eviction. */
+	volatile uint32_t lru_count;	/* Count of threads in LRU eviction */
+	int cache_resident;		/* If no eviction on this object */
 
 	WT_BTREE_STATS *stats;		/* Btree statistics */
 
 #define	WT_BTREE_BULK		0x0001	/* Bulk-load handle */
-#define	WT_BTREE_EXCLUSIVE	0x0002	/* Need exclusive access to handle */
-#define	WT_BTREE_LOCK_ONLY	0x0004	/* Handle is only needed for locking */
-#define	WT_BTREE_NO_EVICTION	0x0008	/* The file isn't evicted */
-#define	WT_BTREE_OPEN		0x0010	/* Handle is open */
-#define	WT_BTREE_SALVAGE	0x0020	/* Handle is for salvage */
-#define	WT_BTREE_UPGRADE	0x0040	/* Handle is for upgrade */
-#define	WT_BTREE_VERIFY		0x0080	/* Handle is for verify */
+#define	WT_BTREE_DISCARD	0x0002	/* Discard on release */
+#define	WT_BTREE_EXCLUSIVE	0x0004	/* Need exclusive access to handle */
+#define	WT_BTREE_LOCK_ONLY	0x0008	/* Handle is only needed for locking */
+#define	WT_BTREE_OPEN		0x0020	/* Handle is open */
+#define	WT_BTREE_SALVAGE	0x0040	/* Handle is for salvage */
+#define	WT_BTREE_UPGRADE	0x0080	/* Handle is for upgrade */
+#define	WT_BTREE_VERIFY		0x0100	/* Handle is for verify */
 	uint32_t flags;
 };
 

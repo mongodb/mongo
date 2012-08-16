@@ -238,10 +238,10 @@ err:		cursor->saved_err = ret;
 static int								\
 __curdump_##op(WT_CURSOR *cursor)					\
 {									\
-	WT_CURSOR_DUMP *cdump;						\
+	WT_CURSOR *child;						\
 									\
-	cdump = (WT_CURSOR_DUMP *)cursor;				\
-	return (cdump->child->op(cdump->child));			\
+	child = ((WT_CURSOR_DUMP *)cursor)->child;			\
+	return (child->op(child));					\
 }
 
 WT_CURDUMP_PASS(next)
@@ -310,11 +310,9 @@ __wt_curdump_create(WT_CURSOR *child, WT_CURSOR *owner, WT_CURSOR **cursorp)
 		__curdump_update,
 		__curdump_remove,
 		__curdump_close,
-		(int (*)		/* reconfigure */
-		    (WT_CURSOR *, const char *))__wt_cursor_notsup,
 		{ NULL, NULL },		/* TAILQ_ENTRY q */
 		0,			/* recno key */
-		{ 0 },                  /* recno raw buffer */
+		{ 0 },			/* recno raw buffer */
 		{ NULL, 0, 0, NULL, 0 },/* WT_ITEM key */
 		{ NULL, 0, 0, NULL, 0 },/* WT_ITEM value */
 		0,			/* int saved_err */

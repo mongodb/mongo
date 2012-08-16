@@ -111,7 +111,7 @@ ops(void *arg)
 	WT_CURSOR *cursor, *cursor_insert;
 	WT_SESSION *session;
 	WT_ITEM key, value;
-	uint64_t cnt, keyno, ckpt_op, thread_ops;
+	uint64_t cnt, keyno, ckpt_op, session_period, thread_ops;
 	uint32_t op;
 	uint8_t *keybuf, *valbuf;
 	u_int np;
@@ -128,36 +128,53 @@ ops(void *arg)
 	memset(&value, 0, sizeof(value));
 	val_gen_setup(&valbuf);
 
-	/* Open a session. */
-	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		die(ret, "connection.open_session");
-
-	/*
-	 * Open two cursors: one configured for overwriting and one configured
-	 * for append if we're dealing with a column-store.
-	 *
-	 * The reason is when testing with existing records, we don't track if
-	 * a record was deleted or not, which means we must use cursor->insert
-	 * with overwriting configured.  But, in column-store files where we're
-	 * testing with new, appended records, we don't want to have to specify
-	 * the record number, which requires an append configuration.
-	 */
-	cursor = cursor_insert = NULL;
-	if ((ret = session->open_cursor(session,
-	    WT_TABLENAME, NULL, "overwrite", &cursor)) != 0)
-		die(ret, "session.open_cursor");
-	if ((g.c_file_type == FIX || g.c_file_type == VAR) &&
-	    (ret = session->open_cursor(session,
-	    WT_TABLENAME, NULL, "append", &cursor_insert)) != 0)
-		die(ret, "session.open_cursor");
-
 	/* Each thread does its share of the total operations. */
 	thread_ops = g.c_ops / g.c_threads;
+
+	/* Pick a period for re-opening the session and cursors. */
+	session = NULL;
+	cursor = cursor_insert = NULL;
+	session_period = 100 * MMRAND(1, 50);
 
 	/* Pick an operation where we'll do a checkpoint. */
 	ckpt_op = MMRAND(1, thread_ops);
 
 	for (cnt = 0; cnt < thread_ops; ++cnt) {
+		/*
+		 * cnt starts at 0 and (0 % anything == 0), so we always open
+		 * a session and cursors the first time through the loop.
+		 */
+		if (cnt % session_period == 0) {
+			if (session != NULL &&
+			    (ret = session->close(session, NULL)) != 0)
+				die(ret, "session.close");
+
+			if ((ret = conn->open_session(
+			    conn, NULL, NULL, &session)) != 0)
+				die(ret, "connection.open_session");
+
+			/*
+			 * Open two cursors: one configured for overwriting and
+			 * one configured for append if we're dealing with a
+			 * column-store.
+			 *
+			 * The reason is when testing with existing records, we
+			 * don't track if a record was deleted or not, which
+			 * means we must use cursor->insert with overwriting
+			 * configured.  But, in column-store files where we're
+			 * testing with new, appended records, we don't want to
+			 * have to specify the record number, which requires an
+			 * append configuration.
+			 */
+			if ((ret = session->open_cursor(session,
+			    WT_TABLENAME, NULL, "overwrite", &cursor)) != 0)
+				die(ret, "session.open_cursor");
+			if ((g.c_file_type == FIX || g.c_file_type == VAR) &&
+			    (ret = session->open_cursor(session,
+			    WT_TABLENAME, NULL, "append", &cursor_insert)) != 0)
+				die(ret, "session.open_cursor");
+		}
+
 		if (SINGLETHREADED && cnt % 100 == 0)
 			track("read/write ops", 0ULL, tinfo);
 
@@ -193,8 +210,8 @@ ops(void *arg)
 		 * Perform some number of operations: the percentage of deletes,
 		 * inserts and writes are specified, reads are the rest.  The
 		 * percentages don't have to add up to 100, a high percentage
-		 * of deletes will mean fewer inserts and writes.  A read
-		 * operation always follows a modification to confirm it worked.
+		 * of deletes will mean fewer inserts and writes.  Modifications
+		 * are always followed by a read to confirm it worked.
 		 */
 		op = (uint32_t)(wts_rand() % 100);
 		if (op < g.c_delete_pct) {

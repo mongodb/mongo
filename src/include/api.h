@@ -21,8 +21,8 @@ struct __wt_process {
  *******************************************/
 /*
  * WT_BTREE_SESSION --
- *      Per-session cache of btree handles to avoid synchronization when
- *      opening cursors.
+ *	Per-session cache of btree handles to avoid synchronization when
+ * opening cursors.
  */
 struct __wt_btree_session {
 	WT_BTREE *btree;
@@ -106,6 +106,7 @@ struct __wt_session_impl {
 	int	wq_sleeping;		/* Thread is blocked */
 	int	wq_ret;			/* Return value */
 
+	WT_TXN_ISOLATION isolation;
 	WT_TXN	txn;			/* Transaction state */
 
 	void	*reconcile;		/* Reconciliation information */
@@ -130,6 +131,7 @@ struct __wt_session_impl {
 	 * easily call a function to clear memory up to, but not including, the
 	 * hazard reference.
 	 */
+	u_int nhazard;
 #define	WT_SESSION_CLEAR(s)	memset(s, 0, WT_PTRDIFF(&(s)->hazard, s))
 	WT_HAZARD *hazard;		/* Hazard reference array */
 };
@@ -143,7 +145,7 @@ struct __wt_session_impl {
  */
 struct __wt_named_collator {
 	const char *name;		/* Name of collator */
-	WT_COLLATOR *collator;	        /* User supplied object */
+	WT_COLLATOR *collator;		/* User supplied object */
 	TAILQ_ENTRY(__wt_named_collator) q;	/* Linked list of collators */
 };
 
@@ -314,10 +316,6 @@ struct __wt_connection_impl {
 
 #define	SESSION_API_CALL(s, n, cfg, cfgvar)				\
 	API_CALL(s, session, n, NULL, NULL, cfg, cfgvar);
-
-#define	CURSOR_API_CALL(cur, s, n, bt, cfg, cfgvar)			\
-	(s) = (WT_SESSION_IMPL *)(cur)->session;			\
-	API_CALL(s, cursor, n, cur, bt, cfg, cfgvar)
 
 #define	CURSOR_API_CALL_NOCONF(cur, s, n, bt)				\
 	(s) = (WT_SESSION_IMPL *)(cur)->session;			\

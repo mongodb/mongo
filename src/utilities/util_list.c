@@ -102,9 +102,6 @@ list_print(WT_SESSION *session, const char *name, int cflag, int vflag)
 		return (1);
 	}
 
-#define	MATCH(s, tag)							\
-	(strncmp(s, tag, strlen(tag)) == 0)
-
 	found = name == NULL;
 	while ((ret = cursor->next(cursor)) == 0) {
 		/* Get the key. */
@@ -116,10 +113,11 @@ list_print(WT_SESSION *session, const char *name, int cflag, int vflag)
 		 * tables).
 		 */
 		if (name == NULL) {
-			if (!MATCH(key, "file:") && !MATCH(key, "table:"))
+			if (!WT_PREFIX_MATCH(key, "file:") &&
+			    !WT_PREFIX_MATCH(key, "table:"))
 				continue;
 		} else {
-			if (!MATCH(key, name))
+			if (!WT_PREFIX_MATCH(key, name))
 				continue;
 			found = 1;
 		}

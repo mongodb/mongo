@@ -40,35 +40,50 @@ typedef uint32_t wt_txnid_t;
 	 ((t1) == WT_TXN_NONE || (t2) == WT_TXN_ABORTED) ? 1 :	\
 	 (t2) - (t1) < (UINT32_MAX / 2))
 
+struct __wt_txn_state {
+	wt_txnid_t id;
+
+#define	TXN_STATE_RUNNING	0x01
+	uint32_t flags;
+};
+
 struct __wt_txn_global {
 	volatile wt_txnid_t current;	/* Current transaction ID. */
-	wt_txnid_t *ids;		/* Per-session transaction IDs */
+	WT_TXN_STATE *states;		/* Per-session transaction states */
 	wt_txnid_t ckpt_txnid;		/* ID of checkpoint, or WT_TXN_NONE */
+};
+
+enum __wt_txn_isolation {
+	TXN_ISO_READ_UNCOMMITTED,
+	TXN_ISO_READ_COMMITTED,
+	TXN_ISO_SNAPSHOT
 };
 
 struct __wt_txn {
 	wt_txnid_t id;
 
+	WT_TXN_ISOLATION isolation;
+
 	/*
 	 * Snapshot data:
-	 *     everything < snapshot[0] is visible,
-	 *     everything > id is invisible
-	 *     everything in between is visible unless it is in snap_overlap.
+	 *	everything < snapshot[0] is visible,
+	 *	everything > id is invisible
+	 *	everything in between is visible unless it is in snap_overlap.
 	 */
 	wt_txnid_t snap_min, snap_max;
 	wt_txnid_t *snapshot;
 	uint32_t snapshot_count;
 
+	/*
+	 * The oldest reader when this transaction started, used to trim
+	 * obsolete WT_UPDATE structures.
+	 */
+	wt_txnid_t oldest_reader;
+
 	/* Array of txn IDs in items created or modified by this txn. */
 	wt_txnid_t **mod;
 	size_t mod_alloc;
 	u_int mod_count;
-
-	enum {
-		TXN_ISO_READ_UNCOMMITTED,
-		TXN_ISO_READ_COMMITTED,
-		TXN_ISO_SNAPSHOT
-	} isolation;
 
 #define	TXN_ERROR	0x01
 #define	TXN_RUNNING	0x02

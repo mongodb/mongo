@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Copyright (c) 2008-2012 WiredTiger, Inc.
+# Public Domain 2008-2012 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
 #
@@ -24,13 +24,11 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-#
-# test_base03.py
-# 	Cursor operations
-#
 
 import wiredtiger, wttest
 
+# test_base04.py
+#     Cursor operations
 class test_cursor04(wttest.WiredTigerTestCase):
     """
     Test cursor search and search_near
@@ -91,9 +89,8 @@ class test_cursor04(wttest.WiredTigerTestCase):
 
     def expect_either(self, cursor, lt, gt):
         origkey = cursor.get_key()
-        near_ret = cursor.search_near()
-        self.assertEqual(near_ret[0], 0)
-        direction = near_ret[1]
+        direction = cursor.search_near()
+        self.assertNotEqual(direction, wiredtiger.WT_NOTFOUND)
 
         # Deletions for 'fix' clear the value, they
         # do not remove the key, so we expect '0' direction
@@ -149,17 +146,15 @@ class test_cursor04(wttest.WiredTigerTestCase):
 
         # 2. Calling search_near for a value beyond the end
         cursor.set_key(self.genkey(self.nentries))
-        near_ret = cursor.search_near()
-        self.assertEqual(near_ret[0], 0)
-        self.assertEqual(near_ret[1], -1)
+        cmp = cursor.search_near()
+        self.assertEqual(cmp, -1)
         self.assertEqual(cursor.get_key(), self.genkey(self.nentries-1))
         self.assertEqual(cursor.get_value(), self.genvalue(self.nentries-1))
 
         # 2.a calling search_near for an existing value
         cursor.set_key(self.genkey(7))
-        near_ret = cursor.search_near()
-        self.assertEqual(near_ret[0], 0)
-        self.assertEqual(near_ret[1], 0)
+        cmp = cursor.search_near()
+        self.assertEqual(cmp, 0)
         self.assertEqual(cursor.get_key(), self.genkey(7))
         self.assertEqual(cursor.get_value(), self.genvalue(7))
 
@@ -181,14 +176,13 @@ class test_cursor04(wttest.WiredTigerTestCase):
         #    print('value: ' + str(value))
 
         cursor.set_key(self.genkey(0))
-        near_ret = cursor.search_near()
-        self.assertEqual(near_ret[0], 0)
+        cmp = cursor.search_near()
         if self.tablekind != 'fix':
-            self.assertEqual(near_ret[1], 1)
+            self.assertEqual(cmp, 1)
             self.assertEqual(cursor.get_key(), self.genkey(1))
             self.assertEqual(cursor.get_value(), self.genvalue(1))
         else:
-            self.assertEqual(near_ret[1], 0)
+            self.assertEqual(cmp, 0)
             self.assertEqual(cursor.get_key(), self.genkey(0))
             self.assertEqual(cursor.get_value(), 0)
             

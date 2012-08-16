@@ -7,7 +7,7 @@ m4_include([build_posix/aclocal/version-set.m4])
 
 AC_CONFIG_AUX_DIR([build_posix/gnu-support])
 AC_CONFIG_MACRO_DIR([build_posix/aclocal])
-AC_CONFIG_SRCDIR([dist/RELEASE])
+AC_CONFIG_SRCDIR([RELEASE])
 
 AM_INIT_AUTOMAKE([1.10 foreign])
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([no])])
@@ -52,12 +52,13 @@ AM_CONDITIONAL([DEBUG], [test "$wt_cv_enable_debug" = "yes"])
 
 # Java and Python APIs
 if test "$wt_cv_enable_java" = "yes" -o "$wt_cv_enable_python" = "yes"; then
-        AC_PATH_PROG([SWIG], [swig], [swig])
+	AX_PKG_SWIG(2.0.4, [],
+	    [ AC_MSG_ERROR([SWIG is required to build Java or Python APIs.]) ])
 fi
 
 if test "$wt_cv_enable_java" = "yes"; then
 	JAVAC=${JAVAC-javac}
-        AX_PROG_JAVAC
+	AX_PROG_JAVAC
 	AX_JNI_INCLUDE_DIR
 	for JNI_INCLUDE_DIR in $JNI_INCLUDE_DIRS ; do
 		JNI_CPPFLAGS="$JNI_CPPFLAGS -I$JNI_INCLUDE_DIR"
@@ -78,6 +79,21 @@ AC_CHECK_LIB(dl, dlopen)
 AC_CHECK_LIB(rt, sched_yield)
 AC_CHECK_FUNCS([clock_gettime gettimeofday fcntl posix_memalign])
 AC_SYS_LARGEFILE
+
+# Check for __builtin_expect used by City hash implementation
+AC_MSG_CHECKING([if the compiler supports __builtin_expect])
+AC_TRY_COMPILE(, [
+    return __builtin_expect(1, 1) ? 1 : 0
+], [
+    wt_have_builtin_expect=yes
+    AC_MSG_RESULT([yes])
+], [
+    wt_have_builtin_expect=no
+    AC_MSG_RESULT([no])
+])
+if test x$wt_have_builtin_expect = xyes ; then
+    AC_DEFINE([HAVE_BUILTIN_EXPECT], [1], [Define to 1 if the compiler supports __builtin_expect.])
+fi
 
 AC_C_BIGENDIAN
 

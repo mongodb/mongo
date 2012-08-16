@@ -107,10 +107,10 @@ and will not have a out-of-band value to indicate the record does not
 exist.  In this case, a 0 byte value is used to indicate the record does
 not exist.  This means removing a record with WT_CURSOR::remove is
 equivalent to storing a value of 0 in the record with WT_CURSOR::update
-(and storing a value of 0 in the record will cause cursor scans to
-skip the record).  Additionally, creating a record past the end of the
-table or file implies the creation of any missing intermediate records,
-with byte values of 0.
+(and storing a value of 0 in the record will cause cursor scans to skip
+the record).  Additionally, creating a record past the end of an object
+implies the creation of any missing intermediate records, with byte
+values of 0.
 
 The <code>'u'</code> type is for raw byte arrays: if it appears at the end
 of a format string (including in the default <code>"u"</code> format for
@@ -164,7 +164,7 @@ of names for the column groups in the \c colgroups configuration key to
 WT_SESSION::create.  Then make a call to WT_SESSION::create for each column
 group, using the URI <code>colgroup:\<table\>:\<colgroup name\></code> and a
 \c columns key in the configuration.  Columns can be stored in multiple
-column groups, but all value columns must appear in at least on column group.
+column groups, but all value columns must appear in at least one column group.
 
 Column groups have the same key as the table.  This is particularly useful
 for column stores, because record numbers are not stored explicitly on disk,

@@ -24,6 +24,12 @@ statistics:
 
 See @ref cursors for more information on available cursor types.
 
+@section cursor_closing Closing a cursor
+
+Cursors remain open until either WT_CURSOR::close is called or the cursor's
+session is closed, which may either be in WT_SESSION::close or
+WT_CONNECTION::close.
+
 @section cursor_position Positioning a cursor
 
 Cursors may be positioned at the beginning of the data source, the end of
@@ -54,6 +60,11 @@ To position a cursor at or near a location in the data source, use the
 WT_CURSOR::search_near method:
 
 @snippet ex_cursor.c cursor search near
+
+Cursor positions do not survive transactions: cursors that are open during
+WT_SESSION::begin_transaction, WT_SESSION::commit_transaction or
+WT_SESSION::rollback_transaction will lose their position as if
+WT_CURSOR::reset was called.
 
 @section cursor_writes Inserting and updating
 
@@ -92,6 +103,6 @@ To remove existing data using a cursor, use the WT_CURSOR::remove method:
 After any cursor handle method failure, the cursor's position is
 undetermined.  Applications that cannot re-position the cursor after
 failure must duplicate the cursor before calling a cursor method that will
-attempt to re-position the cursor.  @notyet{cursor duplication}
+attempt to re-position the cursor.
 
  */

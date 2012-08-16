@@ -79,12 +79,16 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 	 * the WT_INSERT structure.
 	 */
 	if (cbt->compare == 0 && cbt->ins != NULL) {
-		WT_ERR(__wt_update_check(session, page, cbt->ins->upd));
-		WT_ERR(__wt_update_alloc(session, value, &upd, &upd_size));
+		/* Discard obsolete WT_UPDATE structures. */
+		__wt_update_obsolete(session, page, cbt->ins);
 
-		/* Insert the WT_UPDATE structure. */
-		ret = __wt_update_serial(session, page,
-		    cbt->write_gen, &cbt->ins->upd, NULL, 0, &upd, upd_size);
+		/* Make sure the update can proceed. */
+		WT_ERR(__wt_update_check(session, page, cbt->ins->upd));
+
+		/* Allocate and insert a WT_UPDATE structure. */
+		WT_ERR(__wt_update_alloc(session, value, &upd, &upd_size));
+		WT_ERR(__wt_update_serial(session, page,
+		    cbt->write_gen, &cbt->ins->upd, NULL, 0, &upd, upd_size));
 	} else {
 		/* There may be no insert list, allocate as necessary. */
 		new_inshead_size = new_inslist_size = 0;
@@ -167,7 +171,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 			    &ins, ins_size, skipdepth));
 	}
 
-	if (ret != 0) {
+	if (0) {
 err:		if (ins != NULL)
 			__wt_free(session, ins);
 		if (upd != NULL) {

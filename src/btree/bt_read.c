@@ -21,12 +21,17 @@ __wt_cache_read(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *ref)
 	const uint8_t *addr;
 
 	/*
+	 * Attempt to set the state to WT_REF_READING; if successful, we've
+	 * won the race, read the page.
+	 */
+	if (!WT_ATOMIC_CAS(ref->state, WT_REF_DISK, WT_REF_READING))
+		return (0);
+
+	/*
 	 * We don't pass in an allocated buffer, force allocation of new memory
 	 * of the appropriate size.
 	 */
 	WT_CLEAR(tmp);
-
-	WT_ASSERT(session, ref->state == WT_REF_READING);
 
 	/* Get the address. */
 	__wt_get_addr(parent, ref, &addr, &size);

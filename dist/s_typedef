@@ -6,14 +6,14 @@ trap 'rm -f $t; exit 0' 0 1 2 3 13 15
 build() {
 	# Build the standard typedefs.
 	f=../src/include/wt_internal.h
-	(sed -e '/Forward structure declarations .*: BEGIN/{' \
+	(sed -e '/Forward type declarations .*: BEGIN/{' \
 	    -e 'n' \
 	    -e 'q' \
 	    -e '}' < $f
 
-	l=`echo ../src/include/*.[hi] ../src/include/*.in |
-	    sed -e 's/wiredtiger.*\.in//' -e 's/queue.h//'`
-	egrep -h '^[ 	]*(struct|union)[	 ]*__.*[	 ]*{$' $l | \
+	l=`ls ../src/include/*.[hi] ../src/include/*.in |
+	    sed -e '/wiredtiger.*/d' -e '/queue.h/d'`
+	egrep -h '^[ 	]*(enum|struct|union)[	 ]*__.*[	 ]*{$' $l | \
 	    sed -e 's/^[	 ]*//' -e 's/[	 ]*{$//' | sort | \
 	while read t n; do
 		upper=`echo $n | sed -e 's/^__//' | tr a-z A-Z`
@@ -22,7 +22,7 @@ build() {
 	done
 
 	echo '/*'
-	sed -e '/Forward structure declarations .*: END/,${' \
+	sed -e '/Forward type declarations .*: END/,${' \
 	    -e 'p' \
 	    -e '}' \
 	    -e 'd' < $f) > $t

@@ -39,13 +39,12 @@ extern "C" {
  *******************************************/
 #include "queue.h"
 
-/*******************************************
- * Forward structure declarations for internal structures.
- *******************************************/
 /*
  * DO NOT EDIT: automatically built by dist/s_typedef.
- * Forward structure declarations for internal structures: BEGIN
+ * Forward type declarations for internal types: BEGIN
  */
+enum __wt_txn_isolation;
+    typedef enum __wt_txn_isolation WT_TXN_ISOLATION;
 struct __wt_addr;
     typedef struct __wt_addr WT_ADDR;
 struct __wt_block;
@@ -74,10 +73,14 @@ struct __wt_col;
     typedef struct __wt_col WT_COL;
 struct __wt_col_rle;
     typedef struct __wt_col_rle WT_COL_RLE;
+struct __wt_colgroup;
+    typedef struct __wt_colgroup WT_COLGROUP;
 struct __wt_condvar;
     typedef struct __wt_condvar WT_CONDVAR;
 struct __wt_config;
     typedef struct __wt_config WT_CONFIG;
+struct __wt_config_check;
+    typedef struct __wt_config_check WT_CONFIG_CHECK;
 struct __wt_config_item;
     typedef struct __wt_config_item WT_CONFIG_ITEM;
 struct __wt_connection_impl;
@@ -114,6 +117,8 @@ struct __wt_hazard;
     typedef struct __wt_hazard WT_HAZARD;
 struct __wt_ikey;
     typedef struct __wt_ikey WT_IKEY;
+struct __wt_index;
+    typedef struct __wt_index WT_INDEX;
 struct __wt_insert;
     typedef struct __wt_insert WT_INSERT;
 struct __wt_insert_head;
@@ -156,10 +161,12 @@ struct __wt_txn;
     typedef struct __wt_txn WT_TXN;
 struct __wt_txn_global;
     typedef struct __wt_txn_global WT_TXN_GLOBAL;
+struct __wt_txn_state;
+    typedef struct __wt_txn_state WT_TXN_STATE;
 struct __wt_update;
     typedef struct __wt_update WT_UPDATE;
 /*
- * Forward structure declarations for internal structures: END
+ * Forward type declarations for internal types: END
  * DO NOT EDIT: automatically built by dist/s_typedef.
  */
 

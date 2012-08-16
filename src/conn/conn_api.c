@@ -711,7 +711,7 @@ err:	if (conn->lock_fh != NULL) {
 
 /*
  * __conn_verbose_config --
- *      Set verbose configuration.
+ *	Set verbose configuration.
  */
 static int
 __conn_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
@@ -767,16 +767,16 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
     const char *config, WT_CONNECTION **wt_connp)
 {
 	static WT_CONNECTION stdc = {
+		__conn_close,
+		__conn_reconfigure,
+		__conn_get_home,
+		__conn_is_new,
+		__conn_open_session,
 		__conn_load_extension,
 		__conn_add_data_source,
 		__conn_add_collator,
 		__conn_add_compressor,
-		__conn_add_extractor,
-		__conn_close,
-		__conn_get_home,
-		__conn_is_new,
-		__conn_open_session,
-		__conn_reconfigure
+		__conn_add_extractor
 	};
 	static struct {
 		const char *name;
@@ -914,8 +914,16 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	 * later).
 	 */
 	WT_ERR(__wt_meta_turtle_init(session, &exist));
-	if (!exist)
-		WT_ERR(__wt_schema_create(session, WT_METADATA_URI, NULL));
+	if (!exist) {
+		/*
+		 * We're single-threaded, but acquire the schema lock
+		 * regardless: the lower level code checks that it is
+		 * appropriately synchronized.
+		 */
+		WT_WITH_SCHEMA_LOCK(session,
+		    ret = __wt_schema_create(session, WT_METADATA_URI, NULL));
+		WT_ERR(ret);
+	}
 	WT_ERR(__wt_metadata_open(session));
 
 	/* If there's a hot-backup file, load it. */

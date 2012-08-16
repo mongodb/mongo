@@ -212,7 +212,7 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exact)
 	} else if (!__cursor_invalid(cbt)) {
 		*exact = cbt->compare;
 		ret = __wt_kv_return(session, cbt);
-	} else if ((ret = __wt_btcur_next(cbt)) != WT_NOTFOUND)
+	} else if ((ret = __wt_btcur_next(cbt, 0)) != WT_NOTFOUND)
 		*exact = 1;
 	else {
 		WT_ERR(btree->type == BTREE_ROW ?
@@ -221,7 +221,7 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exact)
 		if (!__cursor_invalid(cbt)) {
 			*exact = cbt->compare;
 			ret = __wt_kv_return(session, cbt);
-		} else if ((ret = __wt_btcur_prev(cbt)) != WT_NOTFOUND)
+		} else if ((ret = __wt_btcur_prev(cbt, 0)) != WT_NOTFOUND)
 			*exact = -1;
 	}
 
@@ -431,6 +431,116 @@ retry:	__cursor_func_init(cbt, 1);
 err:	__cursor_func_resolve(cbt, ret);
 
 	return (ret);
+}
+
+/*
+ * __cursor_equals --
+ *	Return if two cursors reference the same row.
+ */
+static int
+__cursor_equals(WT_CURSOR_BTREE *a, WT_CURSOR_BTREE *b)
+{
+	switch (a->btree->type) {
+	case BTREE_COL_FIX:
+	case BTREE_COL_VAR:
+		if (a->recno == b->recno)
+			return (1);
+		break;
+	case BTREE_ROW:
+		if (a->btree != b->btree || a->page != b->page)
+			return (0);
+		if (a->ins != NULL || b->ins != NULL) {
+			if (a->ins == b->ins)
+				return (1);
+			break;
+		}
+		if (a->slot == b->slot)
+			return (1);
+		break;
+	}
+	return (0);
+}
+
+/*
+ * __cursor_remove --
+ *	Remove an item referenced by the cursor.
+ */
+static inline int
+__cursor_remove(WT_CURSOR_BTREE *cbt)
+{
+	WT_BTREE *btree;
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+
+	session = (WT_SESSION_IMPL *)cbt->iface.session;
+	btree = cbt->btree;
+
+	switch (btree->type) {
+	case BTREE_COL_FIX:
+	case BTREE_COL_VAR:
+		ret = __wt_col_modify(session, cbt, 2);
+		break;
+	case BTREE_ROW:
+		ret = __wt_row_modify(session, cbt, 1);
+		break;
+	}
+	return (ret);
+}
+
+/*
+ * __wt_btcur_truncate --
+ *	Discard a cursor range from the tree.
+ */
+int
+__wt_btcur_truncate(WT_CURSOR_BTREE *start, WT_CURSOR_BTREE *stop)
+{
+	WT_DECL_RET;
+
+	/*
+	 * First, call the standard cursor remove method to do a full search
+	 * and re-position the cursor because we don't have a saved copy of
+	 * the page's write generation information, which we need to remove
+	 * a record.  Once that's done, we can delete records without a full
+	 * search, unless we encounter a restart error because the page was
+	 * modified by some other thread of control; in that case, repeat the
+	 * full search to refresh the page's modification information.
+	 */
+	if (start == NULL) {
+		do {
+			WT_RET(__wt_btcur_remove(stop));
+			for (;;) {
+				if ((ret = __wt_btcur_prev(stop, 1)) != 0)
+					break;
+				if ((ret = __cursor_remove(stop)) != 0)
+					break;
+			}
+		} while (ret == WT_RESTART);
+	} else if (stop == NULL) {
+		do {
+			WT_RET(__wt_btcur_remove(start));
+			for (;;) {
+				if ((ret = __wt_btcur_next(start, 1)) != 0)
+					break;
+				if ((ret = __cursor_remove(start)) != 0)
+					break;
+			}
+		} while (ret == WT_RESTART);
+	} else {
+		do {
+			WT_RET(__wt_btcur_remove(start));
+			for (;;) {
+				if (__cursor_equals(start, stop))
+					break;
+				if ((ret = __wt_btcur_next(start, 1)) != 0)
+					break;
+				if ((ret = __cursor_remove(start)) != 0)
+					break;
+			}
+		} while (ret == WT_RESTART);
+	}
+
+	WT_RET_NOTFOUND_OK(ret);
+	return (0);
 }
 
 /*

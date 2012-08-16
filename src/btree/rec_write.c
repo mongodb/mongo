@@ -140,10 +140,10 @@ typedef struct {
 	WT_ITEM *cur, _cur;		/* Key/Value being built */
 	WT_ITEM *last, _last;		/* Last key/value built */
 
-	int	key_pfx_compress;	/* If can prefix-compress next key */
-	int     key_pfx_compress_conf;	/* If prefix compression configured */
-	int	key_sfx_compress;	/* If can suffix-compress next key */
-	int     key_sfx_compress_conf;	/* If suffix compression configured */
+	int key_pfx_compress;		/* If can prefix-compress next key */
+	int key_pfx_compress_conf;	/* If prefix compression configured */
+	int key_sfx_compress;		/* If can suffix-compress next key */
+	int key_sfx_compress_conf;	/* If suffix compression configured */
 } WT_RECONCILE;
 
 static void __rec_cell_build_addr(
@@ -255,16 +255,16 @@ __wt_rec_write(
 			ret = __rec_col_fix(session, page);
 		break;
 	case WT_PAGE_COL_INT:
-		ret =__rec_col_int(session, page);
+		ret = __rec_col_int(session, page);
 		break;
 	case WT_PAGE_COL_VAR:
-		ret =__rec_col_var(session, page, salvage);
+		ret = __rec_col_var(session, page, salvage);
 		break;
 	case WT_PAGE_ROW_INT:
-		ret =__rec_row_int(session, page);
+		ret = __rec_row_int(session, page);
 		break;
 	case WT_PAGE_ROW_LEAF:
-		ret =__rec_row_leaf(session, page, salvage);
+		ret = __rec_row_leaf(session, page, salvage);
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}
@@ -296,7 +296,7 @@ __wt_rec_write(
 				break;
 		}
 		WT_RET(__wt_page_modify_init(session, page));
-		__wt_page_modify_set(page);
+		__wt_page_modify_set(session, page);
 
 		return (0);
 	}
@@ -344,7 +344,7 @@ __wt_rec_write(
 	WT_VERBOSE_RET(session, reconcile,
 	    "root page split %p -> %p", page, page->modify->u.split);
 	page = page->modify->u.split;
-	__wt_page_modify_set(page);
+	__wt_page_modify_set(session, page);
 	F_CLR(page->modify, WT_PM_REC_SPLIT_MERGE);
 
 	WT_RET(__wt_rec_write(session, page, NULL));
@@ -1167,7 +1167,7 @@ __wt_rec_bulk_wrapup(WT_CURSOR_BULK *cbulk)
 
 	/* Mark the page's parent dirty. */
 	WT_RET(__wt_page_modify_init(session, page->parent));
-	__wt_page_modify_set(page->parent);
+	__wt_page_modify_set(session, page->parent);
 
 	return (0);
 }
@@ -1983,8 +1983,8 @@ compare:		/*
 		 * discard the underlying blocks, they're no longer useful.
 		 */
 		if (ovfl_state == OVFL_UNUSED)
-			 WT_ERR(__wt_rec_track_onpage_add(
-			     session, page, unpack->data, unpack->size));
+			WT_ERR(__wt_rec_track_onpage_add(
+			    session, page, unpack->data, unpack->size));
 	}
 
 	/* Walk any append list. */
@@ -3062,10 +3062,16 @@ err:			__wt_scr_free(&tkey);
 	}
 
 	/*
-	 * If reconciliation succeeded and no updates were skipped, set the disk
-	 * generation to the write generation as of when reconciliation started.
+	 * Success: if modifications were skipped, the tree cannot be clean.  As
+	 * the checkpoint initiation code might have cleared the tree's modified
+	 * flag, explicitly dirty the page, which includes setting the tree's
+	 * modified flag.  If modifications were not skipped, the page might be
+	 * clean, update the disk generation to the write generation as of when
+	 * reconciliation started.
 	 */
-	if (!r->upd_skipped)
+	if (r->upd_skipped)
+		__wt_page_modify_set(session, page);
+	else
 		mod->disk_gen = r->orig_write_gen;
 
 	return (0);

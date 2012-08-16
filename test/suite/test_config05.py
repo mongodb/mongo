@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Copyright (c) 2008-2012 WiredTiger, Inc.
+# Public Domain 2008-2012 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
 #
@@ -24,13 +24,11 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-#
-# test_config05.py
-# 	Test multiple connection opens
-#
 
 import wiredtiger, wttest
 
+# test_config05.py
+#    Test multiple connection opens
 class test_config05(wttest.WiredTigerTestCase):
     table_name1 = 'test_config05'
     nentries = 100

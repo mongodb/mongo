@@ -56,6 +56,17 @@ struct __wt_cursor_btree {
 	uint64_t last_standard_recno;
 
 	/*
+	 * For row-store pages, we need a single item that tells us the part of
+	 * the page we're walking (otherwise switching from next to prev and
+	 * vice-versa is just too complicated), so we map the WT_ROW and
+	 * WT_INSERT_HEAD insert array slots into a single name space: slot 1
+	 * is the "smallest key insert list", slot 2 is WT_ROW[0], slot 3 is
+	 * WT_INSERT_HEAD[0], and so on.  This means WT_INSERT lists are
+	 * odd-numbered slots, and WT_ROW array slots are even-numbered slots.
+	 */
+	uint32_t row_iteration_slot;	/* Row-store iteration slot */
+
+	/*
 	 * Variable-length column-store values are run-length encoded and may
 	 * be overflow values or Huffman encoded.   To avoid repeatedly reading
 	 * overflow values or decompressing encoded values, process it once and
@@ -140,6 +151,7 @@ struct __wt_cursor_index {
 	WT_CURSOR_BTREE cbt;
 
 	WT_TABLE *table;
+	WT_INDEX *index;
 	const char *key_plan, *value_plan;
 	WT_CURSOR **cg_cursors;
 };
@@ -171,12 +183,12 @@ struct __wt_cursor_table {
 
 #define	WT_CURSOR_RECNO(cursor)	(strcmp((cursor)->key_format, "r") == 0)
 
-#define	WT_CURSOR_NEEDKEY(cursor)	do {				\
+#define	WT_CURSOR_NEEDKEY(cursor) do {					\
 	if (!F_ISSET(cursor, WT_CURSTD_KEY_SET))			\
 		WT_ERR(__wt_cursor_kv_not_set(cursor, 1));		\
 } while (0)
 
-#define	WT_CURSOR_NEEDVALUE(cursor)	do {				\
+#define	WT_CURSOR_NEEDVALUE(cursor) do {				\
 	if (!F_ISSET(cursor, WT_CURSTD_VALUE_SET))			\
 		WT_ERR(__wt_cursor_kv_not_set(cursor, 0));		\
 } while (0)

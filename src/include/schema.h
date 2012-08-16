@@ -12,6 +12,27 @@
 #define	WT_PROJ_SKIP	's' /* Skip a column in the cursor (<arg> repeats). */
 #define	WT_PROJ_VALUE	'v' /* Go to the value in cursor <arg>. */
 
+struct __wt_colgroup {
+	const char *name;		/* Logical name */
+	const char *source;		/* Underlying data source */
+	const char *config;		/* Configuration string */
+
+	WT_CONFIG_ITEM colconf;		/* List of columns from config */
+};
+
+struct __wt_index {
+	const char *name;		/* Logical name */
+	const char *source;		/* Underlying data source */
+	const char *config;		/* Configuration string */
+
+	WT_CONFIG_ITEM colconf;		/* List of columns from config */
+
+	const char *idxkey_format;	/* Index key format (hides primary) */
+	const char *key_format;		/* Key format */
+	const char *key_plan;		/* Key projection plan */
+	const char *value_plan;		/* Value projection plan */
+};
+
 /*
  * WT_TABLE --
  *	Handle for a logical table.  A table consists of one or more column
@@ -25,8 +46,9 @@ struct __wt_table {
 
 	WT_CONFIG_ITEM cgconf, colconf;
 
-	const char **cg_name, **idx_name;
-	size_t idx_name_alloc;
+	WT_COLGROUP **cgroups;
+	WT_INDEX **indices;
+	size_t idx_alloc;
 
 	TAILQ_ENTRY(__wt_table) q;
 

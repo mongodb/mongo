@@ -24,7 +24,7 @@ __drop_file(
 		return (EINVAL);
 
 	if (session->btree == NULL &&
-	    (ret = __wt_session_get_btree(session, uri, cfg,
+	    (ret = __wt_session_get_btree(session, uri, NULL, cfg,
 	    WT_BTREE_EXCLUSIVE | WT_BTREE_LOCK_ONLY)) != 0) {
 		if (ret == WT_NOTFOUND || ret == ENOENT)
 			ret = 0;
@@ -123,8 +123,8 @@ __drop_colgroup(
 	}
 
 	/* If we can get the table, detach the colgroup from it. */
-	if ((ret =
-	    __wt_schema_get_table(session, tablename, tlen, &table)) == 0)
+	if ((ret = __wt_schema_get_table(
+	    session, tablename, tlen, 1, &table)) == 0)
 		table->cg_complete = 0;
 	else if (ret == WT_NOTFOUND)
 		ret = 0;
@@ -167,7 +167,7 @@ __drop_index(
 
 	/* If we can get the table, detach the index from it. */
 	if ((ret = __wt_schema_get_table(
-	    session, tablename, tlen, &table)) == 0)
+	    session, tablename, tlen, 1, &table)) == 0)
 		table->idx_complete = 0;
 	else if (ret == WT_NOTFOUND)
 		ret = 0;
@@ -193,22 +193,23 @@ __drop_table(
 	name = uri;
 	(void)WT_PREFIX_SKIP(name, "table:");
 
-	WT_ERR(__wt_schema_get_table(session, name, strlen(name), &table));
+	WT_ERR(__wt_schema_get_table(session, name, strlen(name), 1, &table));
 
 	/* Drop the column groups. */
 	for (i = 0; i < WT_COLGROUPS(table); i++) {
-		if (table->cg_name[i] == NULL)
+		if (table->cgroups[i] == NULL)
 			continue;
 		WT_ERR(__drop_colgroup(
-		    session, table->cg_name[i], force, cfg));
+		    session, table->cgroups[i]->name, force, cfg));
 	}
 
 	/* Drop the indices. */
-	WT_ERR(__wt_schema_open_index(session, table, NULL, 0));
+	WT_ERR(__wt_schema_open_indices(session, table));
 	for (i = 0; i < table->nindices; i++) {
-		if (table->idx_name[i] == NULL)
+		if (table->indices[i] == NULL)
 			continue;
-		WT_TRET(__drop_index(session, table->idx_name[i], force, cfg));
+		WT_TRET(__drop_index(
+		    session, table->indices[i]->name, force, cfg));
 	}
 
 	WT_ERR(__wt_schema_remove_table(session, table));
@@ -238,6 +239,8 @@ __wt_schema_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 	/* Disallow drops from the WiredTiger name space. */
 	WT_RET(__wt_schema_name_check(session, uri));
 
+	WT_RET(__wt_meta_track_on(session));
+
 	if (WT_PREFIX_MATCH(uri, "colgroup:"))
 		ret = __drop_colgroup(session, uri, force, cfg);
 	else if (WT_PREFIX_MATCH(uri, "file:"))
@@ -257,5 +260,8 @@ __wt_schema_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 	 */
 	if (ret == WT_NOTFOUND)
 		ret = force ? 0 : ENOENT;
+
+	WT_TRET(__wt_meta_track_off(session, ret != 0));
+
 	return (ret);
 }

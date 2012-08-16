@@ -135,11 +135,9 @@ __wt_curbackup_open(WT_SESSION_IMPL *session,
 		__wt_cursor_notsup,	/* update */
 		__wt_cursor_notsup,	/* remove */
 		__curbackup_close,
-		(int (*)		/* reconfigure */
-		    (WT_CURSOR *, const char *))__wt_cursor_notsup,
 		{ NULL, NULL },		/* TAILQ_ENTRY q */
 		0,			/* recno key */
-		{ 0 },                  /* recno raw buffer */
+		{ 0 },			/* recno raw buffer */
 		{ NULL, 0, 0, NULL, 0 },/* WT_ITEM key */
 		{ NULL, 0, 0, NULL, 0 },/* WT_ITEM value */
 		0,			/* int saved_err */
@@ -465,7 +463,7 @@ __backup_table_element(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb,
 		if (!WT_PREFIX_MATCH(key, elem) ||
 		    !WT_PREFIX_MATCH(key + strlen(elem), table) ||
 		    (key[strlen(elem) + strlen(table)] != ':' &&
-		     key[strlen(elem) + strlen(table)] != '\0'))
+		    key[strlen(elem) + strlen(table)] != '\0'))
 			break;
 
 		/* Dump the metadata entry. */

@@ -324,11 +324,9 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 		__wt_cursor_notsup,	/* update */
 		__wt_cursor_notsup,	/* remove */
 		__curstat_close,
-		(int (*)		/* reconfigure */
-		    (WT_CURSOR *, const char *))__wt_cursor_notsup,
 		{ NULL, NULL },		/* TAILQ_ENTRY q */
 		0,			/* recno key */
-		{ 0 },                  /* recno raw buffer */
+		{ 0 },			/* recno raw buffer */
 		{ NULL, 0, 0, NULL, 0 },/* WT_ITEM key */
 		{ NULL, 0, 0, NULL, 0 },/* WT_ITEM value */
 		0,			/* int saved_err */
@@ -347,13 +345,13 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 	clear_func = NULL;
 	cst = NULL;
 
-	WT_RET(__wt_config_gets(session, cfg, "statistics_clear", &cval));
+	WT_RET(__wt_config_gets_defno(session, cfg, "statistics_clear", &cval));
 	statistics_clear = (cval.val != 0);
 
 	if (!WT_PREFIX_SKIP(uri, "statistics:"))
 		return (EINVAL);
 	if (WT_PREFIX_MATCH(uri, "file:")) {
-		WT_ERR(__wt_session_get_btree(session, uri, NULL, 0));
+		WT_ERR(__wt_session_get_btree(session, uri, NULL, NULL, 0));
 		btree = session->btree;
 		WT_ERR(__wt_btree_stat_init(session));
 		stats_first = (WT_STATS *)session->btree->stats;

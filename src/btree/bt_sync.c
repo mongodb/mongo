@@ -8,26 +8,36 @@
 #include "wt_internal.h"
 
 /*
+ * __wt_bt_cache_force_write --
+ *	Dirty the root page of the tree so it gets written.
+ */
+int
+__wt_bt_cache_force_write(WT_SESSION_IMPL *session)
+{
+	WT_BTREE *btree;
+	WT_PAGE *page;
+
+	btree = session->btree;
+	page = btree->root_page;
+
+	/* If forcing a checkpoint, dirty the root page to ensure a write. */
+	WT_RET(__wt_page_modify_init(session, page));
+	__wt_page_modify_set(session, page);
+
+	return (0);
+}
+
+/*
  * __wt_bt_cache_flush --
  *	Write dirty pages from the cache, optionally discarding the file.
  */
 int
-__wt_bt_cache_flush(
-    WT_SESSION_IMPL *session, WT_CKPT *ckptbase, int op, int force)
+__wt_bt_cache_flush(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, int op)
 {
 	WT_DECL_RET;
 	WT_BTREE *btree;
 
 	btree = session->btree;
-
-	/*
-	 * If we need a new checkpoint, mark the root page dirty to ensure a
-	 * write.
-	 */
-	if (force) {
-		WT_RET(__wt_page_modify_init(session, btree->root_page));
-		__wt_page_modify_set(btree->root_page);
-	}
 
 	/*
 	 * Ask the eviction thread to flush any dirty pages, and optionally

@@ -14,22 +14,22 @@ static int __curtable_update(WT_CURSOR *cursor);
 	WT_CURSOR **__cp;						\
 	int __i;							\
 	for (__i = 0, __cp = ctable->cg_cursors;			\
-	     __i < WT_COLGROUPS(ctable->table);				\
-	     __i++, __cp++)						\
+	    __i < WT_COLGROUPS(ctable->table);				\
+	    __i++, __cp++)						\
 		WT_TRET((*__cp)->f(*__cp));				\
 } while (0)
 
 #define	APPLY_IDX(ctable, f) do {					\
-	WT_BTREE *btree;						\
+	WT_INDEX *idx;							\
 	WT_CURSOR **__cp;						\
 	int __i;							\
 	WT_ERR(__curtable_open_indices(ctable));			\
 	__cp = (ctable)->idx_cursors;					\
 	for (__i = 0; __i < ctable->table->nindices; __i++, __cp++) {	\
-		btree = ((WT_CURSOR_BTREE *)*__cp)->btree;		\
+		idx = ctable->table->indices[__i];			\
 		WT_ERR(__wt_schema_project_merge(session,		\
 		    ctable->cg_cursors,					\
-		    btree->key_plan, btree->key_format, &(*__cp)->key));\
+		    idx->key_plan, idx->key_format, &(*__cp)->key));	\
 		F_SET(*__cp, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);	\
 		WT_ERR((*__cp)->f(*__cp));				\
 	}								\
@@ -161,8 +161,7 @@ __wt_curtable_set_value(WT_CURSOR *cursor, ...)
 	va_end(ap);
 
 	for (i = 0, cp = ctable->cg_cursors;
-	     i < WT_COLGROUPS(ctable->table);
-	     i++, cp++)
+	    i < WT_COLGROUPS(ctable->table); i++, cp++)
 		if (ret == 0)
 			F_SET(*cp, WT_CURSTD_VALUE_SET);
 		else {
@@ -432,6 +431,126 @@ err:	API_END(session);
 }
 
 /*
+ * __wt_curtable_truncate --
+ *	WT_SESSION.truncate support when table cursors are specified.
+ */
+int
+__wt_curtable_truncate(
+    WT_SESSION_IMPL *session, WT_CURSOR *start, WT_CURSOR *stop)
+{
+	WT_CURSOR **list_start, **list_stop;
+	WT_CURSOR_TABLE *ctable, *ctable_start, *ctable_stop;
+	WT_DECL_RET;
+	WT_ITEM key;
+	int equal, i;
+
+	/*
+	 * Step through the cursor range, removing any indices.
+	 *
+	 * If there are indices, copy the key we're using to step through the
+	 * cursor range (so we can reset the cursor to its original position),
+	 * then remove all of the index records in the truncated range.  Get a
+	 * raw copy of the key because it's simplest to do; don't clear (or
+	 * allocate memory for) the WT_ITEM structure because all that happens
+	 * underneath is the data and size fields are reset to reference the
+	 * cursor's key.
+	 *
+	 * This loop calls open-indices and then does one search more than is
+	 * required, the session layer called search on any open cursor, in
+	 * case all the application did was set the keys.  It's cleaner this
+	 * way, and it's not worth optimizing out.
+	 */
+	if (start == NULL) {
+		ctable = (WT_CURSOR_TABLE *)stop;
+		WT_RET(__curtable_open_indices(ctable));
+		if (ctable->table->nindices > 0) {
+			WT_RET(__wt_cursor_get_raw_key(stop, &key));
+
+			do {
+				APPLY_CG(ctable, search);
+				WT_RET(ret);
+				APPLY_IDX(ctable, remove);
+			} while ((ret = stop->prev(stop)) == 0);
+			WT_RET_NOTFOUND_OK(ret);
+			ret = 0;
+
+			__wt_cursor_set_raw_key(stop, &key);
+			APPLY_CG(ctable, search);
+		}
+	} else if (stop == NULL) {
+		ctable = (WT_CURSOR_TABLE *)start;
+		WT_RET(__curtable_open_indices(ctable));
+		if (ctable->table->nindices > 0) {
+			WT_RET(__wt_cursor_get_raw_key(start, &key));
+
+			do {
+				APPLY_CG(ctable, search);
+				WT_RET(ret);
+				APPLY_IDX(ctable, remove);
+			} while ((ret = start->next(start)) == 0);
+			WT_RET_NOTFOUND_OK(ret);
+			ret = 0;
+
+			__wt_cursor_set_raw_key(start, &key);
+			APPLY_CG(ctable, search);
+		}
+	} else {
+		ctable = (WT_CURSOR_TABLE *)start;
+		WT_RET(__curtable_open_indices(ctable));
+		if (ctable->table->nindices > 0) {
+			WT_RET(__wt_cursor_get_raw_key(start, &key));
+
+			do {
+				APPLY_CG(ctable, search);
+				WT_RET(ret);
+				APPLY_IDX(ctable, remove);
+				WT_RET(start->equals(start, stop, &equal));
+			} while (!equal && (ret = start->next(start)) == 0);
+			WT_RET_NOTFOUND_OK(ret);
+			ret = 0;
+
+			__wt_cursor_set_raw_key(start, &key);
+			APPLY_CG(ctable, search);
+		}
+	}
+
+	/*
+	 * Truncate the column groups.
+	 *
+	 * Assumes the table's cursors have the same set of underlying objects,
+	 * in the same order.
+	 */
+	if (start == NULL)
+		for (i = 0,
+		    ctable_stop = (WT_CURSOR_TABLE *)stop,
+		    list_stop = ctable_stop->cg_cursors;
+		    i < WT_COLGROUPS(ctable_stop->table);
+		    i++, ++list_stop)
+			WT_RET(
+			    __wt_curfile_truncate(session, NULL, *list_stop));
+	else if (stop == NULL)
+		for (i = 0,
+		    ctable_start = (WT_CURSOR_TABLE *)start,
+		    list_start = ctable_start->cg_cursors;
+		    i < WT_COLGROUPS(ctable_start->table);
+		    i++, ++list_start)
+			WT_RET(
+			    __wt_curfile_truncate(session, *list_start, NULL));
+	else {
+		for (i = 0,
+		    ctable_start = (WT_CURSOR_TABLE *)start,
+		    list_start = ctable_start->cg_cursors,
+		    ctable_stop = (WT_CURSOR_TABLE *)stop,
+		    list_stop = ctable_stop->cg_cursors;
+		    i < WT_COLGROUPS(ctable_start->table);
+		    i++, ++list_start, ++list_stop)
+			WT_RET(__wt_curfile_truncate(
+			    session, *list_start, *list_stop));
+	}
+err:	return (ret);
+}
+
+/*
  * __curtable_close --
  *	WT_CURSOR->close method for the table cursor type.
  */
@@ -475,26 +594,22 @@ __curtable_close(WT_CURSOR *cursor)
 }
 
 static int
-__curtable_open_colgroups(WT_CURSOR_TABLE *ctable, const char *cfg[])
+__curtable_open_colgroups(WT_CURSOR_TABLE *ctable, const char *cfg_arg[])
 {
 	WT_SESSION_IMPL *session;
 	WT_TABLE *table;
 	WT_CURSOR **cp;
-	const char *cfg_override[5];
+	/*
+	 * Underlying column groups are always opened without dump or
+	 * overwrite, and only the primary is opened with next_random.
+	 */
+	const char *cfg[] = {
+		cfg_arg[0], cfg_arg[1], "dump=\"\",overwrite=false", NULL, NULL
+	};
 	int i;
 
 	session = (WT_SESSION_IMPL *)ctable->iface.session;
 	table = ctable->table;
-
-	/*
-	 * Underlying column groups are always opened without overwrite, and
-	 * only the primary is opened with next_random.
-	 */
-	cfg_override[0] = cfg[0];
-	cfg_override[1] = cfg[1];
-	cfg_override[2] = "overwrite=false";
-	cfg_override[3] = NULL;
-	cfg_override[4] = NULL;
 
 	if (!table->cg_complete)
 		WT_RET_MSG(session, EINVAL,
@@ -507,9 +622,9 @@ __curtable_open_colgroups(WT_CURSOR_TABLE *ctable, const char *cfg[])
 	for (i = 0, cp = ctable->cg_cursors;
 	    i < WT_COLGROUPS(table);
 	    i++, cp++) {
-		WT_RET(__wt_curfile_open(session, table->cg_name[i],
-		    &ctable->iface, cfg_override, cp));
-		cfg_override[3] = "next_random=false";
+		WT_RET(__wt_curfile_open(session, table->cgroups[i]->source,
+		    &ctable->iface, cfg, cp));
+		cfg[3] = "next_random=false";
 	}
 	return (0);
 }
@@ -526,10 +641,10 @@ __curtable_open_indices(WT_CURSOR_TABLE *ctable)
 	session = (WT_SESSION_IMPL *)ctable->iface.session;
 	table = ctable->table;
 
-	if (!ctable->table->idx_complete)
-		WT_RET(__wt_schema_open_index(session, table, NULL, 0));
+	WT_RET(__wt_schema_open_indices(session, table));
 	if (table->nindices == 0 || ctable->idx_cursors != NULL)
 		return (0);
+
 	/* Check for bulk cursors. */
 	primary = *ctable->cg_cursors;
 	if (F_ISSET(((WT_CURSOR_BTREE *)primary)->btree, WT_BTREE_BULK))
@@ -538,7 +653,7 @@ __curtable_open_indices(WT_CURSOR_TABLE *ctable)
 	WT_RET(__wt_calloc_def(session, table->nindices, &ctable->idx_cursors));
 
 	for (i = 0, cp = ctable->idx_cursors; i < table->nindices; i++, cp++)
-		WT_RET(__wt_curfile_open(session, table->idx_name[i],
+		WT_RET(__wt_curfile_open(session, table->indices[i]->source,
 		    &ctable->iface, cfg, cp));
 	return (0);
 }
@@ -570,10 +685,9 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 		__curtable_update,
 		__curtable_remove,
 		__curtable_close,
-		NULL,
 		{ NULL, NULL },		/* TAILQ_ENTRY q */
 		0,			/* recno key */
-		{ 0 },                  /* raw recno buffer */
+		{ 0 },			/* raw recno buffer */
 		{ NULL, 0, 0, NULL, 0 },/* WT_ITEM key */
 		{ NULL, 0, 0, NULL, 0 },/* WT_ITEM value */
 		0,			/* int saved_err */
@@ -600,18 +714,15 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 		size = strlen(tablename);
 	else
 		size = WT_PTRDIFF(columns, tablename);
-	WT_RET(__wt_schema_get_table(session, tablename, size, &table));
+	WT_RET(__wt_schema_get_table(session, tablename, size, 0, &table));
 
-	if (!table->cg_complete)
-		WT_RET_MSG(session, EINVAL,
-		    "Cannot open cursor '%s' on incomplete table", uri);
 	if (table->is_simple)
 		/*
 		 * The returned cursor should be public: it is not part of a
 		 * table cursor.
 		 */
 		return (__wt_curfile_open(
-		    session, table->cg_name[0], NULL, cfg, cursorp));
+		    session, table->cgroups[0]->source, NULL, cfg, cursorp));
 
 	WT_RET(__wt_calloc_def(session, 1, &ctable));
 
@@ -640,7 +751,7 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 	 * random_retrieval
 	 * Random retrieval cursors only support next and close.
 	 */
-	WT_ERR(__wt_config_gets(session, cfg, "next_random", &cval));
+	WT_ERR(__wt_config_gets_defno(session, cfg, "next_random", &cval));
 	if (cval.val != 0) {
 		__wt_cursor_set_notsup(cursor);
 		cursor->next = __curtable_next_random;

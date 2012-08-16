@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Copyright (c) 2008-2012 WiredTiger, Inc.
+# Public Domain 2008-2012 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
 #
@@ -24,13 +24,14 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-#
-# test_cursor01.py
-# 	Cursor operations
-#
 
 import wiredtiger, wttest
 
+# test_cursor01.py
+#    Cursor operations
+# Basic smoke-test of file and table cursors: tests get/set key, insert
+# and forward/backward iteration, and mostly because we don't test them
+# anywhere else, cursor duplication and equality.
 class test_cursor01(wttest.WiredTigerTestCase):
     """
     Test basic operations
@@ -39,43 +40,13 @@ class test_cursor01(wttest.WiredTigerTestCase):
     nentries = 10
 
     scenarios = [
-        ('row', dict(tablekind='row')),
-        ('col', dict(tablekind='col')),
-        ('fix', dict(tablekind='fix'))
+        ('file-col', dict(tablekind='col',uri='file')),
+        ('file-fix', dict(tablekind='fix',uri='file')),
+        ('file-row', dict(tablekind='row',uri='file')),
+        ('table-col', dict(tablekind='col',uri='table')),
+        ('table-fix', dict(tablekind='fix',uri='table')),
+        ('table-row', dict(tablekind='row',uri='table'))
         ]
-
-    def config_string(self):
-        """
-        Return any additional configuration.
-        This method may be overridden.
-        """
-        return ''
-
-    def session_create(self, name, args):
-        """
-        session.create, but report errors more completely
-        """
-        try:
-            self.session.create(name, args)
-        except:
-            print('**** ERROR in session.create("' + name + '","' + args + '") ***** ')
-            raise
-
-    def create_session_and_cursor(self):
-        tablearg = "table:" + self.table_name1
-        if self.tablekind == 'row':
-            keyformat = 'key_format=S'
-        else:
-            keyformat = 'key_format=r'  # record format
-        if self.tablekind == 'fix':
-            valformat = 'value_format=8t'
-        else:
-            valformat = 'value_format=S'
-        create_args = keyformat + ',' + valformat + self.config_string()
-        self.pr('creating session: ' + create_args)
-        self.session_create(tablearg, create_args)
-        self.pr('creating cursor')
-        return self.session.open_cursor(tablearg, None, None)
 
     def genkey(self, i):
         if self.tablekind == 'row':
@@ -92,16 +63,38 @@ class test_cursor01(wttest.WiredTigerTestCase):
     def assertCursorHasNoKeyValue(self, cursor):
         keymsg = 'cursor.get_key: requires key be set: Invalid argument\n'
         valuemsg = 'cursor.get_value: requires value be set: Invalid argument\n'
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            cursor.get_key, keymsg)
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            cursor.get_value, valuemsg)
-        
-    def test_forward_iter(self):
+        self.assertRaisesWithMessage(
+            wiredtiger.WiredTigerError, cursor.get_key, keymsg)
+        self.assertRaisesWithMessage(
+            wiredtiger.WiredTigerError, cursor.get_value, valuemsg)
+
+    def session_create(self, name, args):
         """
-        Create entries, and read back in a cursor: key=string, value=string
+        session.create, but report errors more completely
         """
-        cursor = self.create_session_and_cursor()
+        try:
+            self.session.create(name, args)
+        except:
+            print('**** ERROR in session.create("' + name + '","' + args + '") ***** ')
+            raise
+
+    # Create and populate the object, returning an open cursor.
+    def create_session_and_cursor(self):
+        tablearg = self.uri + ':' + self.table_name1
+        if self.tablekind == 'row':
+            keyformat = 'key_format=S'
+        else:
+            keyformat = 'key_format=r'  # record format
+        if self.tablekind == 'fix':
+            valformat = 'value_format=8t'
+        else:
+            valformat = 'value_format=S'
+        create_args = keyformat + ',' + valformat
+
+        self.pr('creating session: ' + create_args)
+        self.session_create(tablearg, create_args)
+        self.pr('creating cursor')
+        cursor = self.session.open_cursor(tablearg, None, None)
         self.assertCursorHasNoKeyValue(cursor)
 
         for i in range(0, self.nentries):
@@ -109,11 +102,13 @@ class test_cursor01(wttest.WiredTigerTestCase):
             cursor.set_value(self.genvalue(i))
             cursor.insert()
 
-        # Don't use the builtin 'for ... in cursor',
-        # iterate using the basic API.
+        return cursor
 
-        # 1. Start with the first k/v pair.
+    # Forward iteration.
+    def forward_iter(self, cursor):
         cursor.reset()
+        self.assertCursorHasNoKeyValue(cursor)
+
         i = 0
         while True:
             nextret = cursor.next()
@@ -121,52 +116,53 @@ class test_cursor01(wttest.WiredTigerTestCase):
                 break
             key = cursor.get_key()
             value = cursor.get_value()
-            #print('want: ' + str(self.genkey(i)) + ' got: ' + str(key))
             self.assertEqual(key, self.genkey(i))
             self.assertEqual(value, self.genvalue(i))
             i += 1
 
-        self.assertEqual(nextret, wiredtiger.WT_NOTFOUND)
         self.assertEqual(i, self.nentries)
-
-        # After an error, we can no longer access the key or value
+        self.assertEqual(nextret, wiredtiger.WT_NOTFOUND)
         self.assertCursorHasNoKeyValue(cursor)
+        return cursor
 
-        # 2. Setting reset() should place us just before first pair.
+    # Forward iteration with cursor duplication.
+    def forward_iter_with_dup(self, cursor):
         cursor.reset()
         self.assertCursorHasNoKeyValue(cursor)
-            
-        nextret = cursor.next()
+
         i = 0
-        while nextret == 0:
+        while True:
+            nextret = cursor.next()
+            if nextret != 0:
+                break
             key = cursor.get_key()
             value = cursor.get_value()
             self.assertEqual(key, self.genkey(i))
             self.assertEqual(value, self.genvalue(i))
             i += 1
-            nextret = cursor.next()
+            dupc = self.session.open_cursor(None, cursor, None)
+            self.assertTrue(cursor.equals(dupc))
+            cursor.close()
+            cursor = dupc
 
-        self.assertEqual(nextret, wiredtiger.WT_NOTFOUND)
         self.assertEqual(i, self.nentries)
+        self.assertEqual(nextret, wiredtiger.WT_NOTFOUND)
+        self.assertCursorHasNoKeyValue(cursor)
+        return cursor
+
+    # Forward iteration through the object.
+    # Don't use the builtin 'for ... in cursor', iterate using the basic API.
+    def test_forward_iter(self):
+        cursor = self.create_session_and_cursor()
+        cursor = self.forward_iter(cursor)
+        cursor = self.forward_iter_with_dup(cursor)
         cursor.close()
 
-    def test_backward_iter(self):
-        """
-        Create entries, and read back in a cursor: key=string, value=string
-        """
-        cursor = self.create_session_and_cursor()
-        self.assertCursorHasNoKeyValue(cursor)
-
-        for i in range(0, self.nentries):
-            cursor.set_key(self.genkey(i))
-            cursor.set_value(self.genvalue(i))
-            cursor.insert()
-
-        # Don't use the builtin 'for ... in cursor',
-        # iterate using the basic API.
-
-        # 1. Start with the last k/v pair.
+    # Backward iteration.
+    def backward_iter(self, cursor):
         cursor.reset()
+        self.assertCursorHasNoKeyValue(cursor)
+        
         i = self.nentries - 1
         while True:
             prevret = cursor.prev()
@@ -178,28 +174,42 @@ class test_cursor01(wttest.WiredTigerTestCase):
             self.assertEqual(value, self.genvalue(i))
             i -= 1
 
-        self.assertEqual(prevret, wiredtiger.WT_NOTFOUND)
         self.assertEqual(i, -1)
-
-        # After an error, we can no longer access the key or value
+        self.assertEqual(prevret, wiredtiger.WT_NOTFOUND)
         self.assertCursorHasNoKeyValue(cursor)
+        return cursor
 
-        # 2. Setting reset() should place us just after last pair.
+    # Backward iteration with cursor duplication.
+    def backward_iter_with_dup(self, cursor):
         cursor.reset()
         self.assertCursorHasNoKeyValue(cursor)
-            
-        prevret = cursor.prev()
+        
         i = self.nentries - 1
-        while prevret == 0:
+        while True:
+            prevret = cursor.prev()
+            if prevret != 0:
+                break
             key = cursor.get_key()
             value = cursor.get_value()
             self.assertEqual(key, self.genkey(i))
             self.assertEqual(value, self.genvalue(i))
             i -= 1
-            prevret = cursor.prev()
+            dupc = self.session.open_cursor(None, cursor, None)
+            self.assertTrue(cursor.equals(dupc))
+            cursor.close()
+            cursor = dupc
 
-        self.assertEqual(prevret, wiredtiger.WT_NOTFOUND)
         self.assertEqual(i, -1)
+        self.assertEqual(prevret, wiredtiger.WT_NOTFOUND)
+        self.assertCursorHasNoKeyValue(cursor)
+        return cursor
+
+    # Backward iteration through the object.
+    # Don't use the builtin 'for ... in cursor', iterate using the basic API.
+    def test_backward_iter(self):
+        cursor = self.create_session_and_cursor()
+        cursor = self.backward_iter(cursor)
+        cursor = self.backward_iter_with_dup(cursor)
         cursor.close()
 
 if __name__ == '__main__':
