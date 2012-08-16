@@ -497,6 +497,11 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	btree->modified = 0;
 	WT_FULL_BARRIER();
 
+
+	/* If closing a handle, include everything in the checkpoint. */
+	if (!is_checkpoint)
+		session->txn.isolation = TXN_ISO_READ_UNCOMMITTED;
+
 	/* Flush the file from the cache, creating the checkpoint. */
 	WT_ERR(__wt_bt_cache_flush(session,
 	    ckptbase, is_checkpoint ? WT_SYNC : WT_SYNC_DISCARD));
@@ -518,6 +523,9 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 err:
 skip:	__wt_meta_ckptlist_free(session, ckptbase);
 	__wt_free(session, name_alloc);
+
+	if (!is_checkpoint)
+		session->txn.isolation = session->isolation;
 
 	return (ret);
 }
