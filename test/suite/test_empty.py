@@ -70,7 +70,7 @@ class test_empty(wttest.WiredTigerTestCase):
         # Do a checkpoint, we shouldn't write any checkpoint records, either.
         self.session.checkpoint("name=ckpt");
 
-        # Open and close a checkopint cursor.
+        # Open and close a checkpoint cursor.
         cursor = self.session.open_cursor(uri, None, "checkpoint=ckpt")
         cursor.close()
 
