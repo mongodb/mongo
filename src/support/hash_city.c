@@ -116,7 +116,7 @@ static uint32_t UNALIGNED_LOAD32(const char *p) {
 #endif  /* WORDS_BIGENDIAN */
 
 #if !defined(LIKELY)
-#if HAVE_BUILTIN_EXPECT
+#ifdef HAVE_BUILTIN_EXPECT
 #define	LIKELY(x) (__builtin_expect(!!(x), 1))
 #else
 #define	LIKELY(x) (x)
@@ -144,10 +144,11 @@ static const uint64_t k3 = 0xc949d7c7509e6557ULL;
 static inline uint64_t Hash128to64(const uint128 x) {
 	/* Murmur-inspired hashing. */
 	const uint64_t kMul = 0x9ddfea08eb382d69ULL;
+	uint64_t a, b;
 
-	uint64_t a = (Uint128Low64(x) ^ Uint128High64(x)) * kMul;
+	a = (Uint128Low64(x) ^ Uint128High64(x)) * kMul;
 	a ^= (a >> 47);
-	uint64_t b = (Uint128High64(x) ^ a) * kMul;
+	b = (Uint128High64(x) ^ a) * kMul;
 	b ^= (b >> 47);
 	b *= kMul;
 	return (b);
@@ -184,21 +185,25 @@ static uint64_t HashLen16(uint64_t u, uint64_t v) {
 }
 
 static uint64_t HashLen0to16(const char *s, size_t len) {
+	uint64_t a64, b64;
+	uint32_t y, z;
+	uint8_t a8, b8, c8;
 	if (len > 8) {
-		uint64_t a = Fetch64(s);
-		uint64_t b = Fetch64(s + len - 8);
-		return HashLen16(a, RotateByAtLeast1(b + len, len)) ^ b;
+		a64 = Fetch64(s);
+		b64 = Fetch64(s + len - 8);
+		return HashLen16(
+		    a64, RotateByAtLeast1(b64 + len, (int)len)) ^ b64;
 	}
 	if (len >= 4) {
-		uint64_t a = Fetch32(s);
-		return HashLen16(len + (a << 3), Fetch32(s + len - 4));
+		a64 = Fetch32(s);
+		return HashLen16(len + (a64 << 3), Fetch32(s + len - 4));
 	}
 	if (len > 0) {
-		uint8_t a = s[0];
-		uint8_t b = s[len >> 1];
-		uint8_t c = s[len - 1];
-		uint32_t y = (uint32_t)(a) + ((uint32_t)(b) << 8);
-		uint32_t z = len + ((uint32_t)(c) << 2);
+		a8 = s[0];
+		b8 = s[len >> 1];
+		c8 = s[len - 1];
+		y = (uint32_t)(a8) + ((uint32_t)(b8) << 8);
+		z = (uint32_t)len + ((uint32_t)(c8) << 2);
 		return ShiftMix(y * k2 ^ z * k3) * k2;
 	}
 	return (k2);
@@ -222,46 +227,48 @@ static uint64_t HashLen17to32(const char *s, size_t len) {
  * Callers do best to use "random-looking" values for a and b.
  * static pair<uint64, uint64> WeakHashLen32WithSeeds(
  */
-static uint128 WeakHashLen32WithSeeds6(
-    uint64_t w, uint64_t x, uint64_t y, uint64_t z, uint64_t a, uint64_t b) {
+static void WeakHashLen32WithSeeds6(uint64_t w, uint64_t x,
+    uint64_t y, uint64_t z, uint64_t a, uint64_t b, uint128 *ret) {
+	uint64_t c;
+
 	a += w;
 	b = Rotate(b + a + z, 21);
-	uint64_t c = a;
+	c = a;
 	a += x;
 	a += y;
 	b += Rotate(a, 44);
 
-	uint128 result;
-	result.first = (uint64_t) (a + z);
-	result.second = (uint64_t) (b + c);
-	return (result);
+	ret->first = (uint64_t) (a + z);
+	ret->second = (uint64_t) (b + c);
 }
 
 /*
  * Return a 16-byte hash for s[0] ... s[31], a, and b.  Quick and dirty.
  * static pair<uint64, uint64> WeakHashLen32WithSeeds(
  */
-static uint128 WeakHashLen32WithSeeds(
-		const char* s, uint64_t a, uint64_t b) {
+static void WeakHashLen32WithSeeds(
+		const char* s, uint64_t a, uint64_t b, uint128 *ret) {
 	return WeakHashLen32WithSeeds6(Fetch64(s),
 			Fetch64(s + 8),
 			Fetch64(s + 16),
 			Fetch64(s + 24),
 			a,
-			b);
+			b,
+			ret);
 }
 
 /* Return an 8-byte hash for 33 to 64 bytes. */
 static uint64_t HashLen33to64(const char *s, size_t len) {
-	uint64_t z = Fetch64(s + 24);
-	uint64_t a = Fetch64(s) + (len + Fetch64(s + len - 16)) * k0;
-	uint64_t b = Rotate(a + z, 52);
-	uint64_t c = Rotate(a, 37);
+	uint64_t a, b, c, r, vf, vs, wf, ws, z;
+	z = Fetch64(s + 24);
+	a = Fetch64(s) + (len + Fetch64(s + len - 16)) * k0;
+	b = Rotate(a + z, 52);
+	c = Rotate(a, 37);
 	a += Fetch64(s + 8);
 	c += Rotate(a, 7);
 	a += Fetch64(s + 16);
-	uint64_t vf = a + z;
-	uint64_t vs = b + Rotate(a, 31) + c;
+	vf = a + z;
+	vs = b + Rotate(a, 31) + c;
 	a = Fetch64(s + 16) + Fetch64(s + len - 32);
 	z = Fetch64(s + len - 8);
 	b = Rotate(a + z, 52);
@@ -269,13 +276,16 @@ static uint64_t HashLen33to64(const char *s, size_t len) {
 	a += Fetch64(s + len - 24);
 	c += Rotate(a, 7);
 	a += Fetch64(s + len - 16);
-	uint64_t wf = a + z;
-	uint64_t ws = b + Rotate(a, 31) + c;
-	uint64_t r = ShiftMix((vf + ws) * k2 + (wf + vs) * k0);
+	wf = a + z;
+	ws = b + Rotate(a, 31) + c;
+	r = ShiftMix((vf + ws) * k2 + (wf + vs) * k0);
 	return ShiftMix(r * k0 + vs) * k2;
 }
 
 static inline uint64_t CityHash64(const char *s, size_t len) {
+	uint64_t temp, x, y, z;
+	uint128 v, w;
+
 	if (len <= 32) {
 		if (len <= 16) {
 			return HashLen0to16(s, len);
@@ -290,35 +300,30 @@ static inline uint64_t CityHash64(const char *s, size_t len) {
 	 * For strings over 64 bytes we hash the end first, and then as we
 	 * loop we keep 56 bytes of state: v, w, x, y, and z.
 	 */
-	uint64_t x = Fetch64(s + len - 40);
-	uint64_t y = Fetch64(s + len - 16) + Fetch64(s + len - 56);
-	uint64_t z =
-	    HashLen16(Fetch64(s + len - 48) + len, Fetch64(s + len - 24));
-	uint64_t temp;
-	uint128 v = WeakHashLen32WithSeeds(s + len - 64, len, z);
-	uint128 w = WeakHashLen32WithSeeds(s + len - 32, y + k1, x);
+	x = Fetch64(s + len - 40);
+	y = Fetch64(s + len - 16) + Fetch64(s + len - 56);
+	z = HashLen16(Fetch64(s + len - 48) + len, Fetch64(s + len - 24));
+	WeakHashLen32WithSeeds(s + len - 64, len, z, &v);
+	WeakHashLen32WithSeeds(s + len - 32, y + k1, x, &w);
 	x = x * k1 + Fetch64(s);
 
 	/*
-	 * Decrease len to the nearest multiple of 64, and operate on 64-byte
-	 * chunks.
+	 * Use len to count multiples of 64, and operate on 64-byte chunks.
 	 */
-	len = (len - 1) & ~(size_t)(63);
-	do {
+	for (len = (len - 1) >> 6; len != 0; len--) {
 		x = Rotate(x + y + v.first + Fetch64(s + 8), 37) * k1;
 		y = Rotate(y + v.second + Fetch64(s + 48), 42) * k1;
 		x ^= w.second;
 		y += v.first + Fetch64(s + 40);
 		z = Rotate(z + w.first, 33) * k1;
-		v = WeakHashLen32WithSeeds(s, v.second * k1, x + w.first);
-		w = WeakHashLen32WithSeeds(
-		    s + 32, z + w.second, y + Fetch64(s + 16));
+		WeakHashLen32WithSeeds(s, v.second * k1, x + w.first, &v);
+		WeakHashLen32WithSeeds(
+		    s + 32, z + w.second, y + Fetch64(s + 16), &w);
 		temp = z;
 		z = x;
 		x = temp;
 		s += 64;
-		len -= 64;
-	} while (len != 0);
+	}
 	return HashLen16(HashLen16(v.first, w.first) + ShiftMix(y) * k1 + z,
 	    HashLen16(v.second, w.second) + x);
 }
