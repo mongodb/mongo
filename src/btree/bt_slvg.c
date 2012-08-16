@@ -1036,14 +1036,15 @@ __slvg_col_range_missing(WT_SESSION_IMPL *session, WT_STUFF *ss)
 static int
 __slvg_modify_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	WT_RET(__wt_page_modify_init(session, page));
+	WT_BTREE *btree;
 
-	/*
-	 * The page is dirty -- don't set the tree modification flag, though,
-	 * we're not going through the normal checkpoint process that clears
-	 * that flag, and so on the next checkpoint we'd potentially have the
-	 * modified flag set without any dirty pages.
-	 */
+	btree = session->btree;
+
+	/* The tree is dirty. */
+	btree->modified = 1;
+
+	/* The page is dirty. */
+	WT_RET(__wt_page_modify_init(session, page));
 	__wt_page_modify_set(page);
 
 	return (0);

@@ -217,6 +217,9 @@ __btree_conf(WT_SESSION_IMPL *session)
 
 	WT_RET(__wt_stat_alloc_btree_stats(session, &btree->stats));
 
+	/* The tree has not been modified. */
+	btree->modified = 0;
+
 	return (0);
 }
 
