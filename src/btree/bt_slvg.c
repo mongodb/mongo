@@ -1036,10 +1036,6 @@ __slvg_col_range_missing(WT_SESSION_IMPL *session, WT_STUFF *ss)
 static int
 __slvg_modify_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	WT_BTREE *btree;
-
-	btree = session->btree;
-
 	WT_RET(__wt_page_modify_init(session, page));
 
 	/*
