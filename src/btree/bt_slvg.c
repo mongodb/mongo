@@ -1030,6 +1030,30 @@ __slvg_col_range_missing(WT_SESSION_IMPL *session, WT_STUFF *ss)
 }
 
 /*
+ * __slvg_modify_init --
+ *	Initialize a salvage page's modification information.
+ */
+static int
+__slvg_modify_init(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	WT_BTREE *btree;
+
+	btree = session->btree;
+
+	WT_RET(__wt_page_modify_init(session, page));
+
+	/*
+	 * The page and tree are both dirty -- setting the tree's modification
+	 * flag is probably not necessary (it won't be part of any checkpoints,
+	 * at least in this incarnation), but it's the right thing to do.
+	 */
+	__wt_tree_modify_set(btree);
+	__wt_page_modify_set(page);
+
+	return (0);
+}
+
+/*
  * __slvg_col_build_internal --
  *	Build a column-store in-memory page that references all of the leaf
  *	pages we've found.
@@ -1056,8 +1080,7 @@ __slvg_col_build_internal(
 	page->u.intl.recno = 1;
 	page->entries = leaf_cnt;
 	page->type = WT_PAGE_COL_INT;
-	WT_ERR(__wt_page_modify_init(session, page));
-	__wt_page_modify_set(session, page);
+	WT_ERR(__slvg_modify_init(session, page));
 
 	for (ref = page->u.intl.t, i = 0; i < ss->pages_next; ++i) {
 		if ((trk = ss->pages[i]) == NULL)
@@ -1174,8 +1197,7 @@ __slvg_col_build_leaf(
 	ref->addr = NULL;
 
 	/* Write the new version of the leaf page to disk. */
-	WT_ERR(__wt_page_modify_init(session, page));
-	__wt_page_modify_set(session, page);
+	WT_ERR(__slvg_modify_init(session, page));
 	WT_ERR(__wt_rec_write(session, page, cookie));
 
 	/* Reset the page. */
@@ -1630,8 +1652,7 @@ __slvg_row_build_internal(
 	page->read_gen = 0;
 	page->entries = leaf_cnt;
 	page->type = WT_PAGE_ROW_INT;
-	WT_ERR(__wt_page_modify_init(session, page));
-	__wt_page_modify_set(session, page);
+	WT_ERR(__slvg_modify_init(session, page));
 
 	for (ref = page->u.intl.t, i = 0; i < ss->pages_next; ++i) {
 		if ((trk = ss->pages[i]) == NULL)
@@ -1827,8 +1848,7 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 		ref->addr = NULL;
 
 		/* Write the new version of the leaf page to disk. */
-		WT_ERR(__wt_page_modify_init(session, page));
-		__wt_page_modify_set(session, page);
+		WT_ERR(__slvg_modify_init(session, page));
 		WT_ERR(__wt_rec_write(session, page, cookie));
 
 		/* Reset the page. */

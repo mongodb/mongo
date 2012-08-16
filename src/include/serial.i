@@ -62,9 +62,18 @@ __wt_session_serialize_func(WT_SESSION_IMPL *session,
 static inline void
 __wt_session_serialize_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page, int ret)
 {
-	/* If passed a page and the return value is OK, we modified the page. */
-	if (page != NULL && ret == 0)
-		__wt_page_modify_set(session, page);
+	WT_BTREE *btree;
+
+	btree = session->btree;
+
+	/*
+	 * If passed a page and the return value is OK, we modified the tree
+	 * and the page.
+	 */
+	if (page != NULL && ret == 0) {
+		__wt_tree_modify_set(btree);
+		__wt_page_modify_set(page);
+	}
 
 	/*
 	 * Publish: there must be a barrier to ensure the return value is set

@@ -393,8 +393,12 @@ __wt_meta_ckptlist_set(
 			WT_ERR(__wt_raw_to_hex(session,
 			    ckpt->raw.data, ckpt->raw.size, &ckpt->addr));
 
-			if (F_ISSET(ckpt, WT_CKPT_ADD))
+			if (F_ISSET(ckpt, WT_CKPT_ADD)) {
 				ckpt->order = ++maxorder;
+
+				/* Assert we have a checkpoint. */
+				WT_ASSERT(session, ckpt->raw.data != NULL);
+			}
 		}
 		if (strcmp(ckpt->name, WT_CHECKPOINT) == 0)
 			WT_ERR(__wt_buf_catfmt(session, buf,

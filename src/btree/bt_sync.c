@@ -20,9 +20,9 @@ __wt_bt_cache_force_write(WT_SESSION_IMPL *session)
 	btree = session->btree;
 	page = btree->root_page;
 
-	/* If forcing a checkpoint, dirty the root page to ensure a write. */
+	/* Dirty the root page to ensure a write. */
 	WT_RET(__wt_page_modify_init(session, page));
-	__wt_page_modify_set(session, page);
+	__wt_page_modify_set(page);
 
 	return (0);
 }

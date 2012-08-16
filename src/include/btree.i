@@ -136,15 +136,32 @@ __wt_page_modify_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
+ * __wt_tree_modify_clr, set, test --
+ *	Mark the tree dirty, clean and test.
+ */
+static inline void
+__wt_tree_modify_clr(WT_BTREE *btree)
+{
+	btree->modified = 0;
+}
+static inline void
+__wt_tree_modify_set(WT_BTREE *btree)
+{
+	btree->modified = 1;
+}
+static inline int
+__wt_tree_modify_isset(WT_BTREE *btree)
+{
+	return (btree->modified);
+}
+
+/*
  * __wt_page_modify_set --
  *	Mark the page dirty.
  */
 static inline void
-__wt_page_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
+__wt_page_modify_set(WT_PAGE *page)
 {
-	/* Set the tree modified flag. */
-	session->btree->modified = 1;
-
 	/*
 	 * Publish: there must be a barrier to ensure all changes to the page
 	 * are flushed before we update the page's write generation, otherwise
