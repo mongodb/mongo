@@ -469,6 +469,9 @@ __wt_conn_btree_discard(WT_CONNECTION_IMPL *conn)
 	/* Close is single-threaded, no need to get the lock for real. */
 	F_SET(session, WT_SESSION_SCHEMA_LOCKED);
 
+	/* We don't need a snapshot: just read everything when writing. */
+	session->isolation = session->txn.isolation = TXN_ISO_READ_UNCOMMITTED;
+
 	/*
 	 * Close open btree handles: first, everything but the metadata file
 	 * (as closing a normal file may open and write the metadata file),

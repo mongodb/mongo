@@ -104,19 +104,19 @@ __wt_txn_visible(WT_SESSION_IMPL *session, wt_txnid_t id)
 		return (1);
 
 	/*
-	 * TXN_ISO_SNAPSHOT, TXN_ISO_READ_COMMITTED:
-	 * Otherwise, the ID is visible if it is not the result of a concurrent
-	 * transaction, that is, if it is not in the snapshot list.
+	 * TXN_ISO_SNAPSHOT, TXN_ISO_READ_COMMITTED: the ID is visible if it is
+	 * not the result of a concurrent transaction, that is, if was
+	 * committed before the snapshot was taken.
+	 *
+	 * The order here is important: anything newer than the maximum ID we
+	 * saw when taking the snapshot should be invisible, even if the
+	 * snapshot is empty.
 	 */
-	if (txn->snapshot_count == 0 || TXNID_LT(id, txn->snap_min))
-		return (1);
 	if (TXNID_LT(txn->snap_max, id))
 		return (0);
+	if (txn->snapshot_count == 0 || TXNID_LT(id, txn->snap_min))
+		return (1);
 
-	/*
-	 * Fast path the single-threaded case where there are no concurrent
-	 * transactions.
-	 */
 	return (bsearch(&id, txn->snapshot, txn->snapshot_count,
 	    sizeof(wt_txnid_t), __wt_txnid_cmp) == NULL);
 }
