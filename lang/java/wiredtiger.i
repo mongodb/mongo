@@ -25,6 +25,8 @@
 %}
 
 %{
+typedef int bool;
+
 static void throwDbException(JNIEnv *jenv, const char *msg) {
 	jclass excep = (*jenv)->FindClass(jenv, "com/wiredtiger/db/DbException");
 	if (excep)
@@ -127,6 +129,9 @@ SELFHELPER(struct __wt_cursor, cursor)
 %javamethodmodifiers __wt_cursor::prev "protected";
 %rename (prev_wrap) __wt_cursor::prev;
 
+%ignore __wt_cursor::equals(WT_CURSOR *, WT_CURSOR *, int *);
+%rename (equals_wrap) __wt_cursor::equals;
+
 /* SWIG magic to turn Java byte strings into data / size. */
 %apply (char *STRING, int LENGTH) { (char *data, int size) };
 
@@ -196,6 +201,13 @@ enum SearchStatus { FOUND, NOTFOUND, SMALLER, LARGER };
 		$self->set_key($self, k);
 		$self->set_value($self, v);
 		return $self->update($self);
+	}
+
+	bool equals_wrap(JNIEnv *jenv, WT_CURSOR *other) {
+                int cmp, ret = $self->equals($self, other, &cmp);
+		if (ret != 0)
+			throwDbException(jenv, wiredtiger_strerror(ret));
+		return (bool)cmp;
 	}
 }
 
