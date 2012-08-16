@@ -55,9 +55,6 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	__wt_spin_lock(session, &S2C(session)->schema_lock);
 	F_SET(session, WT_SESSION_SCHEMA_LOCKED);
 
-	/* We don't need a snapshot: include everything in checkpoints. */
-	session->isolation = session->txn.isolation = TXN_ISO_READ_UNCOMMITTED;
-
 	while ((btree_session = TAILQ_FIRST(&session->btrees)) != NULL)
 		WT_TRET(__wt_session_discard_btree(session, btree_session));
 
