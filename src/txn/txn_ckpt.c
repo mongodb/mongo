@@ -313,7 +313,7 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * have to checkpoint it, we'll test again once we understand the
 	 * nature of the checkpoint.
 	 */
-	if (!__wt_tree_modify_isset(btree) && !is_checkpoint)
+	if (!btree->modified && !is_checkpoint)
 		return (__wt_bt_cache_flush(
 		    session, NULL, WT_SYNC_DISCARD_NOWRITE));
 
@@ -399,7 +399,7 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * to open the checkpoint in a cursor after taking any checkpoint, which
 	 * means it must exist.
 	 */
-	if (!__wt_tree_modify_isset(btree)) {
+	if (!btree->modified) {
 		if (!is_checkpoint)
 			goto skip;
 
@@ -491,9 +491,11 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * the checkpoint start, which might not be included, will re-set the
 	 * modified flag.  The "unless reconciliation skips updates" problem is
 	 * handled in the reconciliation code: if reconciliation skips updates,
-	 * it sets the modified flag itself.
+	 * it sets the modified flag itself.  Use a full barrier so we get the
+	 * store done quickly, this isn't a performance path.
 	 */
-	__wt_tree_modify_clr(btree);
+	btree->modified = 0;
+	WT_FULL_BARRIER();
 
 	/* Flush the file from the cache, creating the checkpoint. */
 	WT_ERR(__wt_bt_cache_flush(session,

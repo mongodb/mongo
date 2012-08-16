@@ -71,7 +71,13 @@ __wt_session_serialize_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page, int ret)
 	 * and the page.
 	 */
 	if (page != NULL && ret == 0) {
-		__wt_tree_modify_set(btree);
+		/*
+		 * A memory barrier is required for setting the tree's modified
+		 * value, we depend on the barrier called in setting the page's
+		 * modified value.
+		 */
+		btree->modified = 1;
+
 		__wt_page_modify_set(page);
 	}
 

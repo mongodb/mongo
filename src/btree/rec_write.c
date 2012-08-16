@@ -1165,10 +1165,12 @@ __wt_rec_bulk_wrapup(WT_CURSOR_BULK *cbulk)
 	WT_RET(__rec_split_finish(session));
 	WT_RET(__rec_write_wrapup(session, page));
 
+	/* Mark the tree dirty so close performs a checkpoint. */
+	btree->modified = 1;
+
 	/* Mark the page's parent dirty. */
 	WT_RET(__wt_page_modify_init(session, page->parent));
 	__wt_page_modify_set(page->parent);
-	__wt_tree_modify_set(btree);
 
 	return (0);
 }
@@ -3064,17 +3066,24 @@ err:			__wt_scr_free(&tkey);
 
 	/*
 	 * Success.
+	 *
 	 * If modifications were skipped, the tree isn't clean.  The checkpoint
 	 * call cleared the tree's modified value before it called the eviction
-	 * thread, so we must explicitly reset the tree's modified flag.
-	 *
+	 * thread, so we must explicitly reset the tree's modified flag.  We
+	 * publish the change for clarity (the requirement is the value be set
+	 * before a subsequent checkpoint reads it, and because the current
+	 * checkpoint is waiting on this reconciliation to complete, there's no
+	 * risk of that happening).
+	 */
+	if (r->upd_skipped)
+		WT_PUBLISH(btree->modified, 1);
+
+	/*
 	 * If modifications were not skipped, the page might be clean; update
 	 * the disk generation to the write generation as of when reconciliation
 	 * started.
 	 */
-	if (r->upd_skipped)
-		__wt_tree_modify_set(btree);
-	else
+	if (!r->upd_skipped)
 		mod->disk_gen = r->orig_write_gen;
 
 	return (0);
