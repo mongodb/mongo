@@ -308,11 +308,9 @@ static inline uint64_t CityHash64(const char *s, size_t len) {
 	x = x * k1 + Fetch64(s);
 
 	/*
-	 * Decrease len to the nearest multiple of 64, and operate on 64-byte
-	 * chunks.
+	 * Use len to count multiples of 64, and operate on 64-byte chunks.
 	 */
-	len = (len - 1) & ~(size_t)(63);
-	do {
+	for (len = (len - 1) >> 6; len != 0; len--) {
 		x = Rotate(x + y + v.first + Fetch64(s + 8), 37) * k1;
 		y = Rotate(y + v.second + Fetch64(s + 48), 42) * k1;
 		x ^= w.second;
@@ -325,8 +323,7 @@ static inline uint64_t CityHash64(const char *s, size_t len) {
 		z = x;
 		x = temp;
 		s += 64;
-		len -= 64;
-	} while (len != 0);
+	}
 	return HashLen16(HashLen16(v.first, w.first) + ShiftMix(y) * k1 + z,
 	    HashLen16(v.second, w.second) + x);
 }
