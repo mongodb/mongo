@@ -471,11 +471,18 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 		}
 
 	/*
-	 * If the object is unmodified, notify the cache in case the file has
-	 * no dirty pages.
+	 * Mark the root page dirty to ensure something gets written.
+	 *
+	 * Don't test the tree modify flag first: if the tree is modified,
+	 * we must write the root page anyway, we're not adding additional
+	 * writes to the process.   If the tree is not modified, we have to
+	 * dirty the root page to ensure something gets written.  This is
+	 * really about paranoia: if the tree modification value gets out of
+	 * sync with the set of dirty pages (modify is set, but there are no
+	 * dirty pages), we do a checkpoint without any writes, no checkpoint
+	 * is created, and then things get bad.
 	 */
-	if (!__wt_tree_modify_isset(btree))
-		WT_ERR(__wt_bt_cache_force_write(session));
+	WT_ERR(__wt_bt_cache_force_write(session));
 
 	/*
 	 * Clear the tree's modified flag; any changes before we clear the flag

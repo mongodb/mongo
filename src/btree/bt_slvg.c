@@ -1043,11 +1043,11 @@ __slvg_modify_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_RET(__wt_page_modify_init(session, page));
 
 	/*
-	 * The page and tree are both dirty -- setting the tree's modification
-	 * flag is probably not necessary (it won't be part of any checkpoints,
-	 * at least in this incarnation), but it's the right thing to do.
+	 * The page is dirty -- don't set the tree modification flag, though,
+	 * we're not going through the normal checkpoint process that clears
+	 * that flag, and so on the next checkpoint we'd potentially have the
+	 * modified flag set without any dirty pages.
 	 */
-	__wt_tree_modify_set(btree);
 	__wt_page_modify_set(page);
 
 	return (0);
