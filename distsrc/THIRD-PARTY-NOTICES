@@ -228,7 +228,9 @@ ghost@aladdin.com
  using BMDiff and then compressing the output of BMDiff with
  Snappy.
 
-6) License for Google Perftools (TCMalloc utility)
+6) License notice for Google Perftools (TCMalloc utility)
+---------------------------------
+New BSD License
 
 Copyright (c) 1998-2006, Google Inc.
 All rights reserved.
