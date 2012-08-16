@@ -13,7 +13,8 @@ into a single piece of functionality.
 <ul>
 <li>WT_SESSION.checkpoint<br>
 The WT_SESSION::checkpoint method's \c snapshot configuration string has
-been renamed to \c name.
+been renamed to \c name.  The name assigned to checkpoints without a
+specified \c name configuration is now \c "WiredTigerCheckpoint".
 
 <li>WT_SESSION.drop<br>
 In releases before 1.3, the WT_SESSION::drop method was used to delete
@@ -60,8 +61,13 @@ cursors.
 
 <dt>Default transactional isolation level</dt>
 <dd>
-In releases before 1.3, the default isolation level was <code>snapshot</code>;
-in 1.3, the default isolation level is <code>read-committed</code>.
+In releases before 1.3, the default isolation level for transaction was
+\c snapshot, and the default isolation level for non-transaction operations
+was \c read-uncommitted; in 1.3, the default isolation level for all
+operations is \c read-committed.
+
+The default can be overridden for a session using the \c isolation setting
+in WT_CONNECTION::open_cursor.
 </dd>
 
 <dt>WT_CURSOR.equals</dt>
