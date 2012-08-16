@@ -497,7 +497,6 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	btree->modified = 0;
 	WT_FULL_BARRIER();
 
-
 	/* If closing a handle, include everything in the checkpoint. */
 	if (!is_checkpoint)
 		session->txn.isolation = TXN_ISO_READ_UNCOMMITTED;
