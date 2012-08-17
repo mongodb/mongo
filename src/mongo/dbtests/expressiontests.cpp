@@ -81,6 +81,44 @@ namespace ExpressionTests {
             }
         };
 
+        /** Output to BSONObj. */
+        class AddToBsonObj {
+        public:
+            void run() {
+                intrusive_ptr<Expression> expression = ExpressionCoerceToBool::create(
+                        ExpressionFieldPath::create("foo"));
+
+                // serialized as $and because CoerceToBool isn't an ExpressionNary
+                assertBinaryEqual(fromjson("{field:{$and:['$foo']}}"), toBsonObj(expression));
+            }
+        private:
+            static BSONObj toBsonObj(const intrusive_ptr<Expression>& expression) {
+
+                BSONObjBuilder bob;
+                expression->addToBsonObj(&bob, "field", false);
+                return bob.obj();
+            }
+        };
+
+        /** Output to BSONArray. */
+        class AddToBsonArray {
+        public:
+            void run() {
+                intrusive_ptr<Expression> expression = ExpressionCoerceToBool::create(
+                        ExpressionFieldPath::create("foo"));
+
+                // serialized as $and because CoerceToBool isn't an ExpressionNary
+                assertBinaryEqual(BSON_ARRAY(fromjson("{$and:['$foo']}")), toBsonArray(expression));
+            }
+        private:
+            static BSONArray toBsonArray(const intrusive_ptr<Expression>& expression) {
+                BSONArrayBuilder bab;
+                expression->addToBsonArray(&bab);
+                return bab.arr();
+            }
+        };
+
+
         // TODO Test optimize(), difficult because a CoerceToBool cannot be output as BSON.
         
     } // namespace CoerceToBool
@@ -399,6 +437,8 @@ namespace ExpressionTests {
             add<CoerceToBool::EvaluateTrue>();
             add<CoerceToBool::EvaluateFalse>();
             add<CoerceToBool::Dependencies>();
+            add<CoerceToBool::AddToBsonObj>();
+            add<CoerceToBool::AddToBsonArray>();
 
             add<Constant::Create>();
             add<Constant::CreateFromBsonElement>();
