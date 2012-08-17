@@ -526,14 +526,24 @@ namespace mongo {
     }
 
     void ExpressionCoerceToBool::addToBsonObj(
-        BSONObjBuilder *pBuilder, string fieldName,
-        bool requireExpression) const {
-        verify(false && "not possible"); // no equivalent of this
+            BSONObjBuilder *pBuilder, string fieldName,
+            bool requireExpression) const {
+        // Serializing as an $and expression which will become a CoerceToBool
+        BSONObjBuilder sub (pBuilder->subobjStart(fieldName));
+        BSONArrayBuilder arr (sub.subarrayStart("$and"));
+        pExpression->addToBsonArray(&arr);
+        arr.doneFast();
+        sub.doneFast();
     }
 
     void ExpressionCoerceToBool::addToBsonArray(
-        BSONArrayBuilder *pBuilder) const {
-        verify(false && "not possible"); // no equivalent of this
+            BSONArrayBuilder *pBuilder) const {
+        // Serializing as an $and expression which will become a CoerceToBool
+        BSONObjBuilder sub (pBuilder->subobjStart());
+        BSONArrayBuilder arr (sub.subarrayStart("$and"));
+        pExpression->addToBsonArray(&arr);
+        arr.doneFast();
+        sub.doneFast();
     }
 
     /* ----------------------- ExpressionCompare --------------------------- */
