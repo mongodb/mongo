@@ -9,10 +9,13 @@
 #include <vector>
 
 #ifdef _WIN32
+#include <sstream>
 #include <stdio.h>
 #include <boost/smart_ptr/scoped_array.hpp>
 #include "mongo/platform/windows_basic.h"
 #include <DbgHelp.h>
+#include "mongo/util/assert_util.h"
+#include "mongo/util/log.h"
 #endif
 
 #ifdef MONGO_HAVE_EXECINFO_BACKTRACE
@@ -169,7 +172,7 @@ namespace mongo {
         BOOL ret = SymInitialize( process, NULL, TRUE );
         if ( ret == FALSE ) {
             DWORD dosError = GetLastError();
-            os << "Stack trace failed, SymInitialize failed with error " <<
+            log() << "Stack trace failed, SymInitialize failed with error " <<
                     std::dec << dosError << std::endl;
             return;
         }
@@ -244,20 +247,21 @@ namespace mongo {
         ++sourceWidth;
         size_t frameCount = traceList.size();
         for ( size_t i = 0; i < frameCount; ++i ) {
-            os << traceList[i].moduleName << " ";
+            std::stringstream ss;
+            ss << traceList[i].moduleName << " ";
             size_t width = traceList[i].moduleName.length();
             while ( width < moduleWidth ) {
-                os << " ";
+                ss << " ";
                 ++width;
             }
-            os << traceList[i].sourceAndLine << " ";
+            ss << traceList[i].sourceAndLine << " ";
             width = traceList[i].sourceAndLine.length();
             while ( width < sourceWidth ) {
-                os << " ";
+                ss << " ";
                 ++width;
             }
-            os << traceList[i].symbolAndOffset;
-            os << std::endl;
+            ss << traceList[i].symbolAndOffset;
+            log() << ss.str() << std::endl;
         }
     }
 }
