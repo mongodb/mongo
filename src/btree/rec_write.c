@@ -3144,7 +3144,7 @@ __rec_split_row(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_PAGE **splitp)
 	page->type = WT_PAGE_ROW_INT;
 
 	/*
-	 * we don't re-write parent pages when child pages split, which means
+	 * We don't re-write parent pages when child pages split, which means
 	 * we have only one slot to work with in the parent.  When a leaf page
 	 * splits, we create a new internal page referencing the split pages,
 	 * and when the leaf page is evicted, we update the leaf's slot in the
@@ -3175,7 +3175,7 @@ __rec_split_row(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_PAGE **splitp)
 		((WT_ADDR *)ref->addr)->size = bnd->addr.size;
 		bnd->addr.addr = NULL;
 
-		WT_PUBLISH(ref->state, WT_REF_DISK);
+		ref->state = WT_REF_DISK;
 		ref->page = NULL;
 	}
 
@@ -3229,7 +3229,7 @@ __rec_split_col(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_PAGE **splitp)
 		((WT_ADDR *)ref->addr)->size = bnd->addr.size;
 		bnd->addr.addr = NULL;
 
-		WT_PUBLISH(ref->state, WT_REF_DISK);
+		ref->state = WT_REF_DISK;
 		ref->page = NULL;
 	}
 
