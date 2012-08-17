@@ -436,9 +436,13 @@ int _main(int argc, char* argv[]) {
 #if defined(_WIN32)
     vector<string> disallowedOptions;
     disallowedOptions.push_back( "upgrade" );
-    serviceParamsCheck( params, "", defaultServiceStrings, disallowedOptions, argc, argv );
-
-    // if we reach here, then we are not running as a service
+    if ( serviceParamsCheck( params, "", defaultServiceStrings, disallowedOptions, argc, argv ) ) {
+        return 0;   // this means that we are running as a service, and we won't
+                    // reach this statement until initService() has run and returned,
+                    // but it usually exits directly so we never actually get here
+    }
+    // if we reach here, then we are not running as a service.  service installation
+    // exits directly and so never reaches here either.
 #endif
 
     runMongosServer( params.count( "upgrade" ) > 0 );
@@ -448,10 +452,11 @@ int _main(int argc, char* argv[]) {
 #if defined(_WIN32)
 namespace mongo {
 
-    void initService( void ) {
+    bool initService() {
         ServiceController::reportStatus( SERVICE_RUNNING );
         log() << "Service running" << endl;
         runMongosServer( false );
+        return true;
     }
 
 } // namespace mongo

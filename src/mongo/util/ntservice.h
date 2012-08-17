@@ -29,7 +29,8 @@ namespace mongo {
         const wchar_t* serviceDescription;
     };
 
-    void serviceParamsCheck(
+    typedef bool ( *ServiceCallback )( void );
+    bool serviceParamsCheck(
             boost::program_options::variables_map& params,
             const std::string dbpath,
             const ntServiceDefaultStrings& defaultStrings,
@@ -54,7 +55,7 @@ namespace mongo {
                 char* argv[]
         );
         static bool removeService( const std::wstring& serviceName );
-        static bool startService( const std::wstring& serviceName );
+        static bool startService( const std::wstring& serviceName, ServiceCallback startService );
         static bool reportStatus( DWORD reportState, DWORD waitHint = 0 );
 
         static void WINAPI initService( DWORD argc, LPTSTR *argv );
@@ -63,6 +64,7 @@ namespace mongo {
     protected:
         static std::wstring _serviceName;
         static SERVICE_STATUS_HANDLE _statusHandle;
+        static ServiceCallback _serviceCallback;
     };
 
 } // namespace mongo

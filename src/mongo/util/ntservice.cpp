@@ -30,16 +30,15 @@ namespace mongo {
 
     SERVICE_STATUS_HANDLE ServiceController::_statusHandle = NULL;
     wstring ServiceController::_serviceName;
+    ServiceCallback ServiceController::_serviceCallback = NULL;
 
     ServiceController::ServiceController() {}
 
     // defined in db/db.cpp for mongod.exe and in s/server.cpp for mongos.exe
-    extern void initService(void);
+    extern bool initService();
 
-    // handle the logic around running as a service.  only returns if we should run normally;
-    // exits directly when installing or removing a service and after running as a service when
-    // we are started with --service.
-    void serviceParamsCheck(
+    // returns true if the service is started.
+    bool serviceParamsCheck(
             boost::program_options::variables_map& params,
             const std::string dbpath,
             const ntServiceDefaultStrings& defaultStrings,
@@ -164,11 +163,12 @@ namespace mongo {
             ::_exit( EXIT_CLEAN );
         }
         else if ( startService ) {
-            if ( !ServiceController::startService( windowsServiceName ) ) {
+            if ( !ServiceController::startService( windowsServiceName , mongo::initService ) ) {
                 ::_exit( EXIT_NTSERVICE_ERROR );
             }
-            dbexit( EXIT_CLEAN );
+            return true;
         }
+        return false;
     }
 
     bool ServiceController::installService(
@@ -412,11 +412,12 @@ namespace mongo {
         return serviceRemoved;
     }
 
-    bool ServiceController::startService( const wstring& serviceName ) {
+    bool ServiceController::startService( const wstring& serviceName, ServiceCallback startService ) {
         _serviceName = serviceName;
+        _serviceCallback = startService;
 
         SERVICE_TABLE_ENTRY dispTable[] = {
-            { (LPTSTR)serviceName.c_str(), ServiceController::initService },
+            { (LPTSTR)serviceName.c_str(), (LPSERVICE_MAIN_FUNCTION)ServiceController::initService },
             { NULL, NULL }
         };
 
@@ -461,14 +462,17 @@ namespace mongo {
             return;
 
         reportStatus( SERVICE_START_PENDING, 1000 );
-        mongo::initService();
+
+        _serviceCallback();
+        reportStatus( SERVICE_STOPPED );
+        ::_exit( EXIT_CLEAN );
     }
 
     static void serviceShutdown( const char* controlCodeName ) {
         Client::initThread( "serviceShutdown" );
         log() << "got " << controlCodeName << " request from Windows Service Control Manager, " <<
             ( inShutdown() ? "already in shutdown" : "will terminate after current cmd ends" ) << endl;
-        ServiceController::reportStatus( SERVICE_STOP_PENDING, 5000 );
+        ServiceController::reportStatus( SERVICE_STOP_PENDING );
         if ( ! inShutdown() ) {
             // TODO: SERVER-5703, separate the "cleanup for shutdown" functionality from
             // the "terminate process" functionality in exitCleanly.
