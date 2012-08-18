@@ -223,10 +223,12 @@ namespace mongo {
             log() << "random seed: " << seed << endl;
 
             if( time(0) % 3 == 0 && !nodur ) {
-                cmdLine.dur = true;
-                log() << "****************" << endl;
-                log() << "running with journaling enabled to test that. dbtests will do this occasionally even if --dur is not specified." << endl;
-                log() << "****************" << endl;
+                if( !cmdLine.dur ) {
+                    cmdLine.dur = true;
+                    log() << "****************" << endl;
+                    log() << "running with journaling enabled to test that. dbtests will do this occasionally even if --dur is not specified." << endl;
+                    log() << "****************" << endl;
+                }
             }
 
             FileAllocator::get()->start();
