@@ -616,10 +616,10 @@ namespace mongo {
         /*             -1      0      1      reverse          name   */
         /* EQ  */ { { false, true,  false }, Expression::EQ,  "$eq"  },
         /* NE  */ { { true,  false, true },  Expression::NE,  "$ne"  },
-        /* GT  */ { { false, false, true },  Expression::LTE, "$gt"  },
-        /* GTE */ { { false, true,  true },  Expression::LT,  "$gte" },
-        /* LT  */ { { true,  false, false }, Expression::GTE, "$lt"  },
-        /* LTE */ { { true,  true,  false }, Expression::GT,  "$lte" },
+        /* GT  */ { { false, false, true },  Expression::LT,  "$gt"  },
+        /* GTE */ { { false, true,  true },  Expression::LTE, "$gte" },
+        /* LT  */ { { true,  false, false }, Expression::GT,  "$lt"  },
+        /* LTE */ { { true,  true,  false }, Expression::GTE, "$lte" },
         /* CMP */ { { false, false, false }, Expression::CMP, "$cmp" },
     };
 
