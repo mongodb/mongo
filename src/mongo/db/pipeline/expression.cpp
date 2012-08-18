@@ -1458,6 +1458,9 @@ namespace mongo {
             return;
         }
 
+        // FIXME Append constant values using the $const operator.  SERVER-6769
+
+        // FIXME This checks pointer equality not value equality.
         if (pRange->pTop.get() == pRange->pBottom.get()) {
             BSONArrayBuilder operands;
             pFieldPath->addToBsonArray(&operands);
@@ -1588,9 +1591,7 @@ namespace mongo {
         pBottom(),
         pTop() {
         switch(cmpOp) {
-        case NE:
-            bottomOpen = topOpen = true;
-            /* FALLTHROUGH */
+
         case EQ:
             pBottom = pTop = pValue;
             break;
@@ -1611,6 +1612,7 @@ namespace mongo {
             pTop = pValue;
             break;
 
+        case NE:
         case CMP:
             verify(false); // not allowed
             break;
@@ -1632,7 +1634,7 @@ namespace mongo {
         pBottom(pTheBottom),
         pTop(pTheTop) {
     }
-        
+
     ExpressionFieldRange::Range *ExpressionFieldRange::Range::intersect(
         const Range *pRange) const {
         /*
