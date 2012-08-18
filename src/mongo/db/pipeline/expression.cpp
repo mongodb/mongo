@@ -991,6 +991,7 @@ namespace mongo {
 
         return intrusive_ptr<Expression>(this);
     }
+
     bool ExpressionObject::isSimple() {
         for (ExpressionMap::iterator it(_expressions.begin()); it!=_expressions.end(); ++it) {
             if (it->second && !it->second->isSimple())
@@ -1003,7 +1004,7 @@ namespace mongo {
         string pathStr;
         if (path) {
             if (path->empty()) {
-                // we are in the top-level so _id is implicit
+                // we are in the top level of a projection so _id is implicit
                 if (!_excludeId)
                     deps.insert("_id");
             }
@@ -1013,6 +1014,10 @@ namespace mongo {
                 pathStr += '.';
             }
         }
+        else {
+            verify(!_excludeId);
+        }
+        
 
         for (ExpressionMap::const_iterator it(_expressions.begin()); it!=_expressions.end(); ++it) {
             if (it->second) {
@@ -1050,7 +1055,7 @@ namespace mongo {
 
             // This field is not supposed to be in the output (unless it is _id)
             if (exprIter == end) {
-                if (!_excludeId && atRoot && field.first == "_id") {
+                if (!_excludeId && atRoot && field.first == Document::idName) {
                     // _id from the root doc is always included (until exclusion is supported)
                     // not updating doneFields since "_id" isn't in _expressions
                     pResult->addField(field.first, field.second);
@@ -1130,6 +1135,9 @@ namespace mongo {
                 pResult->addField(field.first,
                                     Value::createArray(result));
             }
+            else {
+                verify( false );
+            }
         }
 
         if (doneFields.size() == _expressions.size())
@@ -1178,7 +1186,10 @@ namespace mongo {
         /* create and populate the result */
         intrusive_ptr<Document> pResult(
             Document::create(getSizeHint()));
-        addToDocument(pResult, Document::create(), pDocument);
+        
+        addToDocument(pResult,
+                      Document::create(), // No inclusion field matching.
+                      pDocument);
         return pResult;
     }
 
@@ -1230,6 +1241,7 @@ namespace mongo {
         }
 
         if (fieldPath.getPathLength() == 1) {
+            verify(!haveExpr); // haveExpr case handled above.
             expr = pExpression;
             return;
         }

@@ -62,10 +62,9 @@ namespace mongo {
            @param deps output parameter
            @param path path to self if all ancestors are ExpressionObjects.
                        Top-level ExpressionObject gets pointer to empty vector.
-                       If any other Expression is an ancestor {a:1} object
-                       aren't allowed, so they get NULL
-
-
+                       If any other Expression is an ancestor, or in other cases
+                       where {a:1} inclusion objects aren't allowed, they get
+                       NULL.
          */
         virtual void addDependencies(set<string>& deps, vector<string>* path=NULL) const = 0;
 
@@ -835,6 +834,7 @@ namespace mongo {
         virtual intrusive_ptr<Expression> optimize();
         virtual bool isSimple();
         virtual void addDependencies(set<string>& deps, vector<string>* path=NULL) const;
+        /** Only evaluates non inclusion expressions.  For inclusions, use addToDocument(). */
         virtual intrusive_ptr<const Value> evaluate(
             const intrusive_ptr<Document> &pDocument) const;
         virtual void addToBsonObj(
