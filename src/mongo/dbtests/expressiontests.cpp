@@ -39,6 +39,13 @@ namespace ExpressionTests {
         return bob.obj();
     }
 
+    /** Convert Expression to BSON. */
+    static BSONObj expressionToBson( const intrusive_ptr<Expression>& expression ) {
+        BSONObjBuilder bob;
+        expression->addToBsonObj( &bob, "", true );
+        return bob.obj().firstElement().embeddedObject().getOwned();
+    }
+
     /** Create a Document from a BSONObj. */
     intrusive_ptr<Document> fromBson( BSONObj obj ) {
         return Document::createFromBsonObj( &obj );
@@ -123,6 +130,322 @@ namespace ExpressionTests {
         
     } // namespace CoerceToBool
 
+    namespace Compare {
+
+        class OptimizeBase {
+        public:
+            virtual ~OptimizeBase() {
+            }
+            void run() {
+                BSONObj specObject = BSON( "" << spec() );
+                BSONElement specElement = specObject.firstElement();
+                intrusive_ptr<Expression> expression = Expression::parseOperand( &specElement );
+                intrusive_ptr<Expression> optimized = expression->optimize();
+                ASSERT_EQUALS( expectedFieldRange(),
+                               (bool)dynamic_pointer_cast<ExpressionFieldRange>( optimized ) );
+                ASSERT_EQUALS( expectedOptimized(), expressionToBson( optimized ) );
+            }
+        protected:
+            virtual BSONObj spec() = 0;
+            virtual BSONObj expectedOptimized() = 0;
+            virtual bool expectedFieldRange() = 0;
+        };
+        
+        class FieldRangeOptimize : public OptimizeBase {
+            BSONObj expectedOptimized() { return spec(); }
+            bool expectedFieldRange() { return true; }
+        };
+        
+        class NoOptimize : public OptimizeBase {
+            BSONObj expectedOptimized() { return spec(); }
+            bool expectedFieldRange() { return false; }
+        };
+
+        /** Check expected result for expressions depending on constants. */
+        class ExpectedResultBase : public OptimizeBase {
+        public:
+            void run() {
+                OptimizeBase::run();
+                BSONObj specObject = BSON( "" << spec() );
+                BSONElement specElement = specObject.firstElement();
+                intrusive_ptr<Expression> expression = Expression::parseOperand( &specElement );
+                // Check expression spec round trip.
+                ASSERT_EQUALS( spec(), expressionToBson( expression ) );
+                // Check evaluation result.
+                ASSERT_EQUALS( expectedResult(),
+                               toBson( expression->evaluate( Document::create() ) ) );
+                // Check that the result is the same after optimizing.
+                intrusive_ptr<Expression> optimized = expression->optimize();
+                ASSERT_EQUALS( expectedResult(),
+                               toBson( optimized->evaluate( Document::create() ) ) );
+            }
+        protected:
+            virtual BSONObj spec() = 0;
+            virtual BSONObj expectedResult() = 0;
+        private:
+            virtual BSONObj expectedOptimized() {
+                return BSON( "$const" << expectedResult().firstElement() );
+            }
+            virtual bool expectedFieldRange() { return false; }
+        };
+
+        class ExpectedTrue : public ExpectedResultBase {
+            BSONObj expectedResult() { return BSON( "" << true ); }            
+        };
+        
+        class ExpectedFalse : public ExpectedResultBase {
+            BSONObj expectedResult() { return BSON( "" << false ); }            
+        };
+        
+        class ParseError {
+        public:
+            virtual ~ParseError() {
+            }
+            void run() {
+                BSONObj specObject = BSON( "" << spec() );
+                BSONElement specElement = specObject.firstElement();
+                ASSERT_THROWS( Expression::parseOperand( &specElement ), UserException );
+            }
+        protected:
+            virtual BSONObj spec() = 0;
+        };
+
+        /** $eq with first < second. */
+        class EqLt : public ExpectedFalse {
+            BSONObj spec() { return BSON( "$eq" << BSON_ARRAY( 1 << 2 ) ); }
+        };
+
+        /** $eq with first == second. */
+        class EqEq : public ExpectedTrue {
+            BSONObj spec() { return BSON( "$eq" << BSON_ARRAY( 1 << 1 ) ); }
+        };
+        
+        /** $eq with first > second. */
+        class EqGt : public ExpectedFalse {
+            BSONObj spec() { return BSON( "$eq" << BSON_ARRAY( 1 << 0 ) ); }
+        };
+        
+        /** $ne with first < second. */
+        class NeLt : public ExpectedTrue {
+            BSONObj spec() { return BSON( "$ne" << BSON_ARRAY( 1 << 2 ) ); }
+        };
+        
+        /** $ne with first == second. */
+        class NeEq : public ExpectedFalse {
+            BSONObj spec() { return BSON( "$ne" << BSON_ARRAY( 1 << 1 ) ); }
+        };
+        
+        /** $ne with first > second. */
+        class NeGt : public ExpectedTrue {
+            BSONObj spec() { return BSON( "$ne" << BSON_ARRAY( 1 << 0 ) ); }
+        };
+        
+        /** $gt with first < second. */
+        class GtLt : public ExpectedFalse {
+            BSONObj spec() { return BSON( "$gt" << BSON_ARRAY( 1 << 2 ) ); }
+        };
+        
+        /** $gt with first == second. */
+        class GtEq : public ExpectedFalse {
+            BSONObj spec() { return BSON( "$gt" << BSON_ARRAY( 1 << 1 ) ); }
+        };
+        
+        /** $gt with first > second. */
+        class GtGt : public ExpectedTrue {
+            BSONObj spec() { return BSON( "$gt" << BSON_ARRAY( 1 << 0 ) ); }
+        };
+        
+        /** $gte with first < second. */
+        class GteLt : public ExpectedFalse {
+            BSONObj spec() { return BSON( "$gte" << BSON_ARRAY( 1 << 2 ) ); }
+        };
+        
+        /** $gte with first == second. */
+        class GteEq : public ExpectedTrue {
+            BSONObj spec() { return BSON( "$gte" << BSON_ARRAY( 1 << 1 ) ); }
+        };
+        
+        /** $gte with first > second. */
+        class GteGt : public ExpectedTrue {
+            BSONObj spec() { return BSON( "$gte" << BSON_ARRAY( 1 << 0 ) ); }
+        };
+        
+        /** $lt with first < second. */
+        class LtLt : public ExpectedTrue {
+            BSONObj spec() { return BSON( "$lt" << BSON_ARRAY( 1 << 2 ) ); }
+        };
+        
+        /** $lt with first == second. */
+        class LtEq : public ExpectedFalse {
+            BSONObj spec() { return BSON( "$lt" << BSON_ARRAY( 1 << 1 ) ); }
+        };
+        
+        /** $lt with first > second. */
+        class LtGt : public ExpectedFalse {
+            BSONObj spec() { return BSON( "$lt" << BSON_ARRAY( 1 << 0 ) ); }
+        };
+        
+        /** $lte with first < second. */
+        class LteLt : public ExpectedTrue {
+            BSONObj spec() { return BSON( "$lte" << BSON_ARRAY( 1 << 2 ) ); }
+        };
+        
+        /** $lte with first == second. */
+        class LteEq : public ExpectedTrue {
+            BSONObj spec() { return BSON( "$lte" << BSON_ARRAY( 1 << 1 ) ); }
+        };
+        
+        /** $lte with first > second. */
+        class LteGt : public ExpectedFalse {
+            BSONObj spec() { return BSON( "$lte" << BSON_ARRAY( 1 << 0 ) ); }
+        };
+        
+        /** $cmp with first < second. */
+        class CmpLt : public ExpectedResultBase {
+            BSONObj spec() { return BSON( "$cmp" << BSON_ARRAY( 1 << 2 ) ); }
+            BSONObj expectedResult() { return BSON( "" << -1 ); }
+        };
+        
+        /** $cmp with first == second. */
+        class CmpEq : public ExpectedResultBase {
+            BSONObj spec() { return BSON( "$cmp" << BSON_ARRAY( 1 << 1 ) ); }
+            BSONObj expectedResult() { return BSON( "" << 0 ); }
+        };
+        
+        /** $cmp with first > second. */
+        class CmpGt : public ExpectedResultBase {
+            BSONObj spec() { return BSON( "$cmp" << BSON_ARRAY( 1 << 0 ) ); }
+            BSONObj expectedResult() { return BSON( "" << 1 ); }
+        };
+
+        /** $cmp results are bracketed to an absolute value of 1. */
+        class CmpBracketed : public ExpectedResultBase {
+            BSONObj spec() { return BSON( "$cmp" << BSON_ARRAY( "z" << "a" ) ); }
+            BSONObj expectedResult() { return BSON( "" << 1 ); }
+        };
+
+        /** Zero operands provided. */
+        class ZeroOperands : public ParseError {
+            BSONObj spec() { return BSON( "$ne" << BSONArray() ); }
+        };
+
+        /** One operand provided. */
+        class OneOperand : public ParseError {
+            BSONObj spec() { return BSON( "$eq" << BSON_ARRAY( 1 ) ); }
+        };
+        
+        /** Three operands provided. */
+        class ThreeOperands : public ParseError {
+            BSONObj spec() { return BSON( "$gt" << BSON_ARRAY( 2 << 3 << 4 ) ); }
+        };
+        
+        /** Incompatible types cannot be compared. */
+        class IncompatibleTypes {
+        public:
+            void run() {
+                BSONObj specObject = BSON( "" << BSON( "$ne" << BSON_ARRAY( "a" << 1 ) ) );
+                BSONElement specElement = specObject.firstElement();
+                intrusive_ptr<Expression> expression = Expression::parseOperand( &specElement );
+                ASSERT_THROWS( expression->evaluate( Document::create() ), UserException );
+            }
+        };
+
+        /**
+         * An expression depending on constants is optimized to a constant via
+         * ExpressionNary::optimize().
+         */
+        class OptimizeConstants : public OptimizeBase {
+            BSONObj spec() { return BSON( "$eq" << BSON_ARRAY( 1 << 1 ) ); }
+            BSONObj expectedOptimized() { return BSON( "$const" << true ); }
+            bool expectedFieldRange() { return false; }
+        };
+
+        /** $cmp is not optimized. */
+        class NoOptimizeCmp : public NoOptimize {
+            BSONObj spec() { return BSON( "$cmp" << BSON_ARRAY( 1 << "$a" ) ); }
+        };
+        
+        /** $ne is not optimized. */
+        class NoOptimizeNe : public NoOptimize {
+            BSONObj spec() { return BSON( "$ne" << BSON_ARRAY( 1 << "$a" ) ); }
+        };
+        
+        /** No optimization is performend without a constant. */
+        class NoOptimizeNoConstant : public NoOptimize {
+            BSONObj spec() { return BSON( "$ne" << BSON_ARRAY( "$a" << "$b" ) ); }
+        };
+        
+        /** No optimization is performend without an immediate field path. */
+        class NoOptimizeWithoutFieldPath : public NoOptimize {
+            BSONObj spec() {
+                return BSON( "$eq" << BSON_ARRAY( BSON( "$and" << BSON_ARRAY( "$a" ) ) << 1 ) );
+            }
+        };
+        
+        /** No optimization is performend without an immediate field path. */
+        class NoOptimizeWithoutFieldPathReverse : public NoOptimize {
+            BSONObj spec() {
+                return BSON( "$eq" << BSON_ARRAY( 1 << BSON( "$and" << BSON_ARRAY( "$a" ) ) ) );
+            }
+        };
+        
+        /** An equality expression is optimized. */
+        class OptimizeEq : public FieldRangeOptimize {
+            BSONObj spec() { return BSON( "$eq" << BSON_ARRAY( "$a" << 1 ) ); }
+        };
+        
+        /** A reverse sense equality expression is optimized. */
+        class OptimizeEqReverse : public FieldRangeOptimize {
+            BSONObj spec() { return BSON( "$eq" << BSON_ARRAY( 1 << "$a" ) ); }
+            BSONObj expectedOptimized() { return BSON( "$eq" << BSON_ARRAY( "$a" << 1 ) ); }
+        };
+        
+        /** A $lt expression is optimized. */
+        class OptimizeLt : public FieldRangeOptimize {
+            BSONObj spec() { return BSON( "$lt" << BSON_ARRAY( "$a" << 1 ) ); }
+        };
+        
+        /** A reverse sense $lt expression is optimized. */
+        class OptimizeLtReverse : public FieldRangeOptimize {
+            BSONObj spec() { return BSON( "$lt" << BSON_ARRAY( 1 << "$a" ) ); }
+            BSONObj expectedOptimized() { return BSON( "$gt" << BSON_ARRAY( "$a" << 1 ) ); }
+        };
+        
+        /** A $lte expression is optimized. */
+        class OptimizeLte : public FieldRangeOptimize {
+            BSONObj spec() { return BSON( "$lte" << BSON_ARRAY( "$b" << 2 ) ); }
+        };
+        
+        /** A reverse sense $lte expression is optimized. */
+        class OptimizeLteReverse : public FieldRangeOptimize {
+            BSONObj spec() { return BSON( "$lte" << BSON_ARRAY( 2 << "$b" ) ); }
+            BSONObj expectedOptimized() { return BSON( "$gte" << BSON_ARRAY( "$b" << 2 ) ); }
+        };
+        
+        /** A $gt expression is optimized. */
+        class OptimizeGt : public FieldRangeOptimize {
+            BSONObj spec() { return BSON( "$gt" << BSON_ARRAY( "$b" << 2 ) ); }
+        };
+        
+        /** A reverse sense $gt expression is optimized. */
+        class OptimizeGtReverse : public FieldRangeOptimize {
+            BSONObj spec() { return BSON( "$gt" << BSON_ARRAY( 2 << "$b" ) ); }
+            BSONObj expectedOptimized() { return BSON( "$lt" << BSON_ARRAY( "$b" << 2 ) ); }
+        };
+        
+        /** A $gte expression is optimized. */
+        class OptimizeGte : public FieldRangeOptimize {
+            BSONObj spec() { return BSON( "$gte" << BSON_ARRAY( "$b" << 2 ) ); }
+        };
+        
+        /** A reverse sense $gte expression is optimized. */
+        class OptimizeGteReverse : public FieldRangeOptimize {
+            BSONObj spec() { return BSON( "$gte" << BSON_ARRAY( 2 << "$b" ) ); }
+            BSONObj expectedOptimized() { return BSON( "$lte" << BSON_ARRAY( "$b" << 2 ) ); }
+        };
+        
+    } // namespace Compare
+    
     namespace Constant {
 
         /** Create an ExpressionConstant from a Value. */
@@ -439,6 +762,49 @@ namespace ExpressionTests {
             add<CoerceToBool::Dependencies>();
             add<CoerceToBool::AddToBsonObj>();
             add<CoerceToBool::AddToBsonArray>();
+
+            add<Compare::EqLt>();
+            add<Compare::EqEq>();
+            add<Compare::EqGt>();
+            add<Compare::NeLt>();
+            add<Compare::NeEq>();
+            add<Compare::NeGt>();
+            add<Compare::GtLt>();
+            add<Compare::GtEq>();
+            add<Compare::GtGt>();
+            add<Compare::GteLt>();
+            add<Compare::GteEq>();
+            add<Compare::GteGt>();
+            add<Compare::LtLt>();
+            add<Compare::LtEq>();
+            add<Compare::LtGt>();
+            add<Compare::LteLt>();
+            add<Compare::LteEq>();
+            add<Compare::LteGt>();
+            add<Compare::CmpLt>();
+            add<Compare::CmpEq>();
+            add<Compare::CmpGt>();
+            add<Compare::CmpBracketed>();
+            add<Compare::ZeroOperands>();
+            add<Compare::OneOperand>();
+            add<Compare::ThreeOperands>();
+            add<Compare::IncompatibleTypes>();
+            add<Compare::OptimizeConstants>();
+            add<Compare::NoOptimizeCmp>();
+            add<Compare::NoOptimizeNe>();
+            add<Compare::NoOptimizeNoConstant>();
+            add<Compare::NoOptimizeWithoutFieldPath>();
+            add<Compare::NoOptimizeWithoutFieldPathReverse>();
+            add<Compare::OptimizeEq>();
+            add<Compare::OptimizeEqReverse>();
+            add<Compare::OptimizeLt>();
+            add<Compare::OptimizeLtReverse>();
+            add<Compare::OptimizeLte>();
+            add<Compare::OptimizeLteReverse>();
+            add<Compare::OptimizeGt>();
+            add<Compare::OptimizeGtReverse>();
+            add<Compare::OptimizeGte>();
+            add<Compare::OptimizeGteReverse>();
 
             add<Constant::Create>();
             add<Constant::CreateFromBsonElement>();
