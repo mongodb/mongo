@@ -99,6 +99,7 @@ KV
 Kanowski's
 Kounavis
 LF
+LNO
 LRU
 LSB
 LSN
@@ -446,6 +447,7 @@ lfence
 lld
 llll
 llu
+lno
 loadtext
 logput
 lookup

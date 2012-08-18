@@ -59,11 +59,12 @@ struct __wt_page_header {
 
 /*
  * WT_ADDR --
- *	A block location.
+ *	An in-memory structure to hold a block's location.
  */
 struct __wt_addr {
-	uint8_t *addr;			/* Cookie */
-	uint32_t size;			/* Cookie length */
+	uint8_t *addr;			/* Block-manager's cookie */
+	uint32_t size;			/* Block-manager's cookie length */
+	uint8_t  leaf_no_overflow;	/* 1/0: a leaf page w/o overflow */
 };
 
 /*

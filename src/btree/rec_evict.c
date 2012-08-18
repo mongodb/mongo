@@ -120,6 +120,7 @@ __rec_page_clean_update(WT_SESSION_IMPL *session, WT_PAGE *page)
 static int
 __rec_page_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
+	WT_ADDR *addr;
 	WT_PAGE_MODIFY *mod;
 	WT_REF *parent_ref;
 
@@ -140,11 +141,11 @@ __rec_page_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * Publish: a barrier to ensure the structure fields are set
 		 * before the state change makes the page available to readers.
 		 */
-		WT_RET(__wt_calloc(
-		    session, 1, sizeof(WT_ADDR), &parent_ref->addr));
-		((WT_ADDR *)parent_ref->addr)->addr = mod->u.replace.addr;
-		((WT_ADDR *)parent_ref->addr)->size = mod->u.replace.size;
+		WT_RET(__wt_calloc(session, 1, sizeof(WT_ADDR), &addr));
+		*addr = mod->u.replace;
+
 		parent_ref->page = NULL;
+		parent_ref->addr = addr;
 		WT_PUBLISH(parent_ref->state, WT_REF_DISK);
 		break;
 	case WT_PM_REC_SPLIT:				/* Page split */

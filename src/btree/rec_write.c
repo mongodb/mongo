@@ -23,9 +23,31 @@ typedef struct {
 
 	WT_ITEM	 dsk;			/* Temporary disk-image buffer */
 
-	/* Track whether all changes to the page are written. */
-	uint32_t orig_write_gen;
-	int upd_skipped;
+	/*
+	 * If we successfully write all of the changes to a page, we update the
+	 * page's disk generation to the write generation as of the start of
+	 * page reconciliation (marking the page clean, if the write generation
+	 * matches the disk generation).   However, if we have to skip a change
+	 * to the page for transactional reasons, we don't do this update, the
+	 * page can't be clean.
+	 */
+	uint32_t orig_write_gen;	/* Page's original write generation */
+	int	 upd_skipped;		/* If updates were skipped */
+
+	/*
+	 * Track if reconciliation has seen any overflow items.  Leaf pages with
+	 * no overflow items are special because we can delete them without
+	 * reading them.  If a leaf page is reconciled and no overflow items are
+	 * included, we set the parent page's address cell to a special type,
+	 * leaf-no-overflow.  The code works on a per-page reconciliation basis,
+	 * that is, once we see an overflow item, all subsequent leaf pages will
+	 * not get the special cell type.  It would be possible to do better by
+	 * tracking overflow items on split boundaries, but this is simply a
+	 * a performance optimization for range deletes, I don't see an argument
+	 * for optimizing for pages that split and contain chunks both with and
+	 * without overflow items.
+	 */
+	int	ovfl_items;
 
 	/*
 	 * Reconciliation gets tricky if we have to split a page, that is, if
@@ -147,7 +169,7 @@ typedef struct {
 } WT_RECONCILE;
 
 static void __rec_cell_build_addr(
-		WT_SESSION_IMPL *, const void *, uint32_t, uint64_t);
+		WT_SESSION_IMPL *, const void *, uint32_t, u_int, uint64_t);
 static int  __rec_cell_build_key(
 		WT_SESSION_IMPL *, const void *, uint32_t, int, int *);
 static int  __rec_cell_build_ovfl(
@@ -411,12 +433,11 @@ __rec_write_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 	/* Read the disk generation before we read anything from the page. */
 	WT_ORDERED_READ(r->orig_write_gen, page->modify->write_gen);
 
-	/*
-	 * Pages cannot be evicted if they are only partially written, that is,
-	 * if we skipped an update for transactional reasons, the page cannot
-	 * be evicted.
-	 */
+	/* Per-page reconciliation: track skipped updates. */
 	r->upd_skipped = 0;
+
+	/* Per-page reconciliation: track overflow items. */
+	r->ovfl_items = 0;
 
 	return (0);
 }
@@ -962,9 +983,11 @@ __rec_split_write(
 {
 	WT_CELL *cell;
 	WT_PAGE_HEADER *dsk;
+	WT_RECONCILE *r;
 	uint32_t size;
 	uint8_t addr[WT_BTREE_MAX_ADDR_COOKIE];
 
+	r = session->reconcile;
 	dsk = buf->mem;
 
 	/*
@@ -1007,6 +1030,11 @@ __rec_split_write(
 		WT_RET(
 		    __wt_strndup(session, (char *)addr, size, &bnd->addr.addr));
 		bnd->addr.size = size;
+		bnd->addr.leaf_no_overflow =
+		    (dsk->type == WT_PAGE_COL_FIX ||
+		    dsk->type == WT_PAGE_COL_VAR ||
+		    dsk->type == WT_PAGE_ROW_LEAF)
+		    && r->ovfl_items == 0 ? 1 : 0;
 	}
 
 	return (0);
@@ -1337,6 +1365,7 @@ __rec_col_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 static int
 __rec_col_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
+	WT_ADDR *addr;
 	WT_KV *val;
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_PAGE *rp;
@@ -1372,9 +1401,10 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 				 */
 				continue;
 			case WT_PM_REC_REPLACE:
+				addr = &rp->modify->u.replace;
 				__rec_cell_build_addr(session,
-				    rp->modify->u.replace.addr,
-				    rp->modify->u.replace.size,
+				    addr->addr, addr->size,
+				    addr->leaf_no_overflow,
 				    ref->u.recno);
 				val_set = 1;
 				break;
@@ -1398,12 +1428,13 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * cell.
 		 */
 		if (!val_set) {
-			if (__wt_off_page(page, ref->addr))
+			if (__wt_off_page(page, ref->addr)) {
+				addr = ref->addr;
 				__rec_cell_build_addr(session,
-				    ((WT_ADDR *)ref->addr)->addr,
-				    ((WT_ADDR *)ref->addr)->size,
+				    addr->addr, addr->size,
+				    addr->leaf_no_overflow,
 				    ref->u.recno);
-			else {
+			} else {
 				__wt_cell_unpack(ref->addr, unpack);
 				val->buf.data = ref->addr;
 				val->buf.size = unpack->len;
@@ -1905,6 +1936,9 @@ record_loop:	/*
 					    session, salvage,
 					    last, 0, 1, repeat_count));
 
+					/* Track the page has overflow items. */
+					r->ovfl_items = 1;
+
 					ovfl_state = OVFL_USED;
 					continue;
 				case OVFL_USED:
@@ -2062,6 +2096,7 @@ err:	__wt_scr_free(&orig);
 static int
 __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
+	WT_ADDR *addr;
 	WT_BTREE *btree;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
@@ -2178,9 +2213,10 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 					    session, page, unpack, tmpkey));
 				continue;
 			case WT_PM_REC_REPLACE:
+				addr = &rp->modify->u.replace;
 				__rec_cell_build_addr(session,
-				    rp->modify->u.replace.addr,
-				    rp->modify->u.replace.size, 0);
+				    addr->addr, addr->size,
+				    addr->leaf_no_overflow, 0);
 				val_set = 1;
 				break;
 			case WT_PM_REC_SPLIT:
@@ -2280,11 +2316,12 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * on-page cell we copy it from the page, else build a new cell.
 		 */
 		if (!val_set) {
-			if (__wt_off_page(page, ref->addr))
+			if (__wt_off_page(page, ref->addr)) {
+				addr = ref->addr;
 				__rec_cell_build_addr(session,
-				    ((WT_ADDR *)ref->addr)->addr,
-				    ((WT_ADDR *)ref->addr)->size, 0);
-			else {
+				    addr->addr, addr->size,
+				    addr->leaf_no_overflow, 0);
+			} else {
 				__wt_cell_unpack(ref->addr, unpack);
 				val->buf.data = ref->addr;
 				val->buf.size = unpack->len;
@@ -2338,6 +2375,7 @@ err:	__wt_scr_free(&tmpkey);
 static int
 __rec_row_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
+	WT_ADDR *addr;
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_IKEY *ikey;
 	WT_KV *key, *val;
@@ -2366,9 +2404,10 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 			case WT_PM_REC_EMPTY:
 				continue;
 			case WT_PM_REC_REPLACE:
+				addr = &rp->modify->u.replace;
 				__rec_cell_build_addr(session,
-				    rp->modify->u.replace.addr,
-				    rp->modify->u.replace.size, 0);
+				    addr->addr, addr->size,
+				    addr->leaf_no_overflow, 0);
 				val_set = 1;
 				break;
 			case WT_PM_REC_SPLIT:
@@ -2411,11 +2450,12 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * on-page cell we copy it from the page, else build a new cell.
 		 */
 		if (!val_set) {
-			if (__wt_off_page(page, ref->addr))
+			if (__wt_off_page(page, ref->addr)) {
+				addr = ref->addr;
 				__rec_cell_build_addr(session,
-				    ((WT_ADDR *)ref->addr)->addr,
-				    ((WT_ADDR *)ref->addr)->size, 0);
-			else {
+				    addr->addr, addr->size,
+				    addr->leaf_no_overflow, 0);
+			} else {
 				__wt_cell_unpack(ref->addr, unpack);
 				val->buf.data = ref->addr;
 				val->buf.size = unpack->len;
@@ -2539,6 +2579,10 @@ __rec_row_leaf(
 			} else {
 				val->buf.data = val_cell;
 				val->buf.size = unpack->len;
+
+				/* Track the page has overflow items. */
+				if (unpack->ovfl)
+					r->ovfl_items = 1;
 			}
 			val->cell_len = 0;
 			val->len = val->buf.size;
@@ -2648,6 +2692,9 @@ __rec_row_leaf(
 				 * prefix information for a subsequent key.
 				 */
 				tmpkey->size = 0;
+
+				/* Track the page has overflow items. */
+				r->ovfl_items = 1;
 			}
 		} else {
 			/*
@@ -3123,6 +3170,7 @@ __rec_write_wrapup_err(WT_SESSION_IMPL *session, WT_PAGE *page)
 static int
 __rec_split_row(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_PAGE **splitp)
 {
+	WT_ADDR *addr;
 	WT_BOUNDARY *bnd;
 	WT_DECL_RET;
 	WT_PAGE *page;
@@ -3168,15 +3216,15 @@ __rec_split_row(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_PAGE **splitp)
 	/* Enter each split page into the new, internal page. */
 	for (ref = page->u.intl.t,
 	    bnd = r->bnd, i = 0; i < r->bnd_next; ++ref, ++bnd, ++i) {
-		WT_ERR(__wt_row_ikey_alloc(session, 0,
-		    bnd->key.data, bnd->key.size, &ref->u.key));
-		WT_ERR(__wt_calloc(session, 1, sizeof(WT_ADDR), &ref->addr));
-		((WT_ADDR *)ref->addr)->addr = bnd->addr.addr;
-		((WT_ADDR *)ref->addr)->size = bnd->addr.size;
+		WT_ERR(__wt_calloc(session, 1, sizeof(WT_ADDR), &addr));
+		*addr = bnd->addr;
 		bnd->addr.addr = NULL;
 
-		ref->state = WT_REF_DISK;
 		ref->page = NULL;
+		WT_ERR(__wt_row_ikey_alloc(session, 0,
+		    bnd->key.data, bnd->key.size, &ref->u.key));
+		ref->addr = addr;
+		ref->state = WT_REF_DISK;
 	}
 
 	*splitp = page;
@@ -3193,6 +3241,7 @@ err:	__wt_page_out(session, &page, 0);
 static int
 __rec_split_col(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_PAGE **splitp)
 {
+	WT_ADDR *addr;
 	WT_BOUNDARY *bnd;
 	WT_DECL_RET;
 	WT_PAGE *page;
@@ -3223,14 +3272,14 @@ __rec_split_col(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_PAGE **splitp)
 	/* Enter each split page into the new, internal page. */
 	for (ref = page->u.intl.t,
 	    bnd = r->bnd, i = 0; i < r->bnd_next; ++ref, ++bnd, ++i) {
-		ref->u.recno = bnd->recno;
-		WT_ERR(__wt_calloc(session, 1, sizeof(WT_ADDR), &ref->addr));
-		((WT_ADDR *)ref->addr)->addr = bnd->addr.addr;
-		((WT_ADDR *)ref->addr)->size = bnd->addr.size;
+		WT_ERR(__wt_calloc(session, 1, sizeof(WT_ADDR), &addr));
+		*addr= bnd->addr;
 		bnd->addr.addr = NULL;
 
-		ref->state = WT_REF_DISK;
 		ref->page = NULL;
+		ref->u.recno = bnd->recno;
+		ref->addr = addr;
+		ref->state = WT_REF_DISK;
 	}
 
 	*splitp = page;
@@ -3332,12 +3381,12 @@ __rec_cell_build_key(WT_SESSION_IMPL *session,
 
 /*
  * __rec_cell_build_addr --
- *	Process an address reference and return a WT_CELL structure to be stored
+ *	Process an address reference and return a cell structure to be stored
  * on the page.
  */
 static void
-__rec_cell_build_addr(
-    WT_SESSION_IMPL *session, const void *addr, uint32_t size, uint64_t recno)
+__rec_cell_build_addr(WT_SESSION_IMPL *session,
+    const void *addr, uint32_t size, u_int leaf_no_overflow, uint64_t recno)
 {
 	WT_KV *val;
 	WT_RECONCILE *r;
@@ -3360,7 +3409,8 @@ __rec_cell_build_addr(
 	 */
 	val->buf.data = addr;
 	val->buf.size = size;
-	val->cell_len = __wt_cell_pack_addr(&val->cell, recno, val->buf.size);
+	val->cell_len = __wt_cell_pack_addr(
+	    &val->cell, leaf_no_overflow, recno, val->buf.size);
 	val->len = val->cell_len + val->buf.size;
 }
 
@@ -3431,6 +3481,9 @@ __rec_cell_build_ovfl(
 	r = session->reconcile;
 	btree = session->btree;
 	page = r->page;
+
+	/* Track the page has overflow items. */
+	r->ovfl_items = 1;
 
 	/*
 	 * See if this overflow record has already been written and reuse it if

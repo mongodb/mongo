@@ -24,7 +24,7 @@
  *
  * WT_PAGE_ROW_INT (row-store internal page):
  *	Keys and offpage-reference pairs (a WT_CELL_KEY or WT_CELL_KEY_OVFL
- * cell followed by a WT_CELL_ADDR cell).
+ * cell followed by a WT_CELL_{ADDR,ADDR_LNO} cell).
  *
  * WT_PAGE_ROW_LEAF (row-store leaf page):
  *	Keys with optional data cells (a WT_CELL_KEY or WT_CELL_KEY_OVFL cell,
@@ -34,7 +34,7 @@
  * a single byte immediately following the cell.
  *
  * WT_PAGE_COL_INT (Column-store internal page):
- *	Off-page references (a WT_CELL_ADDR cell).
+ *	Off-page references (a WT_CELL_{ADDR,ADDR_LNO} cell).
  *
  * WT_PAGE_COL_VAR (Column-store leaf page storing variable-length cells):
  *	Data cells (a WT_CELL_VALUE or WT_CELL_VALUE_OVFL cell), and deleted
@@ -60,15 +60,21 @@
 #define	WT_CELL_UNUSED_BIT5	0x010		/* Unused */
 
 /*
- * Bits 6-8 are for other cell types (there are currently 6 cell types).
+ * Bits 6-8 are for other cell types (there are currently 7 cell types).
+ *
+ * WT_CELL_ADDR is a block location, WT_CELL_ADDR_LNO is a block location with
+ * the additional information that the address is for a leaf page without any
+ * overflow items.  The goal is to speed up data truncation since we don't have
+ * to read leaf pages without overflow items in order to delete them.
  */
-#define	WT_CELL_ADDR		(0 << 5)	/* Location reference */
-#define	WT_CELL_DEL		(1 << 5)	/* Deleted */
-#define	WT_CELL_KEY		(2 << 5)	/* Key */
-#define	WT_CELL_KEY_OVFL	(3 << 5)	/* Key overflow */
-#define	WT_CELL_VALUE		(4 << 5)	/* Value */
-#define	WT_CELL_VALUE_OVFL	(5 << 5)	/* Value overflow */
-#define	WT_CELL_UNUSED_TYPE6	(6 << 5)	/* Unused */
+#define	WT_CELL_ADDR		(0 << 5)	/* Block location */
+#define	WT_CELL_ADDR_LNO	(1 << 5)	/* Block location (lno) */
+#define	WT_CELL_DEL		(2 << 5)	/* Deleted */
+#define	WT_CELL_KEY		(3 << 5)	/* Key */
+#define	WT_CELL_KEY_OVFL	(4 << 5)	/* Key overflow */
+#define	WT_CELL_VALUE		(5 << 5)	/* Value */
+#define	WT_CELL_VALUE_OVFL	(6 << 5)	/* Value overflow */
+#define	WT_CELL_UNUSED_TYPE	(7 << 5)	/* Unused */
 #define	WT_CELL_TYPE_MASK	(7 << 5)
 
 /*
@@ -101,10 +107,12 @@ struct __wt_cell_unpack {
 
 	uint32_t len;			/* Cell + data total length */
 
+	uint8_t  prefix;		/* Cell prefix length */
+
 	uint8_t  raw;			/* Raw cell type (include "shorts") */
 	uint8_t  type;			/* Cell type */
-	uint8_t  prefix;		/* Cell prefix */
-	uint8_t	 ovfl;			/* Cell is an overflow */
+	uint8_t  lno;			/* 1/0: leaf page addr, no overflow */
+	uint8_t	 ovfl;			/* 1/0: cell is an overflow */
 };
 
 /*
@@ -122,15 +130,19 @@ struct __wt_cell_unpack {
  *	Pack an address cell.
  */
 static inline uint32_t
-__wt_cell_pack_addr(WT_CELL *cell, uint64_t recno, uint32_t size)
+__wt_cell_pack_addr(
+    WT_CELL *cell, u_int leaf_no_overflow, uint64_t recno, uint32_t size)
 {
-	uint8_t *p;
+	uint8_t *p, type;
 
 	p = cell->__chunk + 1;
-	if (recno == 0)				/* Type + recno */
-		cell->__chunk[0] = WT_CELL_ADDR;
+
+						/* Address type */
+	type = leaf_no_overflow ? WT_CELL_ADDR_LNO : WT_CELL_ADDR;
+	if (recno == 0)				/* Record number */
+		cell->__chunk[0] = type;
 	else {
-		cell->__chunk[0] = WT_CELL_ADDR | WT_CELL_64V;
+		cell->__chunk[0] = type | WT_CELL_64V;
 		(void)__wt_vpack_uint(&p, 0, recno);
 	}
 						/* Length */
@@ -279,11 +291,13 @@ __wt_cell_rle(WT_CELL_UNPACK *unpack)
 
 /*
  * __wt_cell_type --
- *	Return the cell's type (collapsing "short" types).
+ *	Return the cell's type (collapsing special types).
  */
 static inline u_int
 __wt_cell_type(WT_CELL *cell)
 {
+	u_int type;
+
 	/*
 	 * NOTE: WT_CELL_VALUE_SHORT MUST BE CHECKED BEFORE WT_CELL_KEY_SHORT.
 	 */
@@ -291,7 +305,10 @@ __wt_cell_type(WT_CELL *cell)
 		return (WT_CELL_VALUE);
 	if (cell->__chunk[0] & WT_CELL_KEY_SHORT)
 		return (WT_CELL_KEY);
-	return (cell->__chunk[0] & WT_CELL_TYPE_MASK);
+
+	type = cell->__chunk[0] & WT_CELL_TYPE_MASK;
+
+	return (type == WT_CELL_ADDR_LNO ? WT_CELL_ADDR : type);
 }
 
 /*
@@ -331,9 +348,13 @@ __wt_cell_unpack_safe(WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
 	} else if (cell->__chunk[0] & WT_CELL_KEY_SHORT) {
 		unpack->type = WT_CELL_KEY;
 		unpack->raw = WT_CELL_KEY_SHORT;
-	} else
-		unpack->type =
-		    unpack->raw = cell->__chunk[0] & WT_CELL_TYPE_MASK;
+	} else {
+		unpack->raw = cell->__chunk[0] & WT_CELL_TYPE_MASK;
+		if (unpack->raw == WT_CELL_ADDR_LNO)
+			unpack->type = WT_CELL_ADDR;
+		else
+			unpack->type = unpack->raw;
+	}
 
 	/*
 	 * Handle cells with neither an RLE count or data length: short key/data
@@ -383,26 +404,36 @@ __wt_cell_unpack_safe(WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
 		WT_RET(__wt_vunpack_uint(
 		    &p, end == NULL ? 0 : (size_t)(end - p), &unpack->v));
 
-	/*
-	 * Deleted cells have known sizes, and no length bytes.
-	 * Key/data and overflow cells have data length bytes.
-	 */
+	/* Set addr and overflow flags. */
 	switch (unpack->raw) {
-	case WT_CELL_DEL:
-		unpack->len = WT_PTRDIFF32(p, cell);
+	case WT_CELL_ADDR_LNO:
+		unpack->lno = 1;
 		break;
 	case WT_CELL_KEY_OVFL:
 	case WT_CELL_VALUE_OVFL:
 		unpack->ovfl = 1;
-		/* FALLTHROUGH */
+		break;
+	}
+
+	/*
+	 * Deleted cells have known sizes, and no length bytes.
+	 * Address, key/data and overflow cells have data length bytes.
+	 */
+	switch (unpack->raw) {
 	case WT_CELL_ADDR:
+	case WT_CELL_ADDR_LNO:
 	case WT_CELL_KEY:
+	case WT_CELL_KEY_OVFL:
 	case WT_CELL_VALUE:
+	case WT_CELL_VALUE_OVFL:
 		WT_RET(__wt_vunpack_uint(
 		    &p, end == NULL ? 0 : (size_t)(end - p), &v));
 		unpack->data = p;
 		unpack->size = WT_STORE_SIZE(v);
 		unpack->len = WT_PTRDIFF32(p + unpack->size, cell);
+		break;
+	case WT_CELL_DEL:
+		unpack->len = WT_PTRDIFF32(p, cell);
 		break;
 	default:
 		return (WT_ERROR);			/* Unknown cell type. */
@@ -411,7 +442,7 @@ __wt_cell_unpack_safe(WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
 	/*
 	 * Check the original cell against the full cell length (this is a
 	 * diagnostic as well, we may be copying the cell from the page and
-	 * we need the right length.
+	 * we need the right length).
 	 */
 done:	CHK(cell, unpack->len);
 	return (0);
