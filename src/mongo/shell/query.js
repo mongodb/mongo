@@ -358,7 +358,7 @@ DBQuery.prototype.shellPrint = function(){
 }
 
 DBQuery.prototype.toString = function(){
-    return "DBQuery: " + this._ns + " -> " + tojson( this.query );
+    return "DBQuery: " + this._ns + " -> " + tojson( this._query );
 }
 
 DBQuery.shellBatchSize = 20;
