@@ -380,7 +380,7 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, int discard)
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	WT_BSTAT_INCR(session, cursor_read_next);
 
-	flags = WT_TREE_NEXT;			/* Tree walk flags. */
+	flags = 0;					/* Tree walk flags. */
 	if (discard)
 		LF_SET(WT_TREE_DISCARD);
 

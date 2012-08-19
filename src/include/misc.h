@@ -173,7 +173,7 @@
 /* Flags for the tree-walk function. */
 #define	WT_TREE_DISCARD	0x01			/* Discarding */
 #define	WT_TREE_EVICT	0x02			/* Eviction */
-#define	WT_TREE_NEXT	0x04			/* Forward walk */
+#define	WT_TREE_PREV	0x04			/* Backward walk */
 
 /*
  * In diagnostic mode we track the locations from which hazard references and

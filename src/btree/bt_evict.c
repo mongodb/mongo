@@ -541,13 +541,11 @@ __evict_file_request(WT_SESSION_IMPL *session, int syncop)
 	 * the tree.  So, always stay one page ahead of the page being returned.
 	 */
 	next_page = NULL;
-	WT_RET(
-	    __wt_tree_walk(session, &next_page, WT_TREE_EVICT | WT_TREE_NEXT));
+	WT_RET(__wt_tree_walk(session, &next_page, WT_TREE_EVICT));
 	for (;;) {
 		if ((page = next_page) == NULL)
 			break;
-		WT_ERR(__wt_tree_walk(
-		    session, &next_page, WT_TREE_EVICT | WT_TREE_NEXT));
+		WT_ERR(__wt_tree_walk(session, &next_page, WT_TREE_EVICT));
 
 		/* Write dirty pages for sync, and sync with discard. */
 		switch (syncop) {
@@ -785,8 +783,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 	 */
 	for (evict = start, restarts = 0;
 	    evict < end && restarts <= 1 && ret == 0;
-	    ret = __wt_tree_walk(
-		session, &btree->evict_page, WT_TREE_EVICT | WT_TREE_NEXT)) {
+	    ret = __wt_tree_walk(session, &btree->evict_page, WT_TREE_EVICT)) {
 		if ((page = btree->evict_page) == NULL) {
 			++restarts;
 			continue;

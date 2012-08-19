@@ -443,7 +443,7 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, int discard)
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	WT_BSTAT_INCR(session, cursor_read_prev);
 
-	flags = 0;				/* Tree walk flags. */
+	flags = WT_TREE_PREV;				/* Tree walk flags. */
 	if (discard)
 		LF_SET(WT_TREE_DISCARD);
 

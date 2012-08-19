@@ -58,14 +58,14 @@ __wt_tree_walk(WT_SESSION_IMPL *session, WT_PAGE **pagep, uint32_t flags)
 	WT_PAGE *page, *t;
 	WT_REF *ref;
 	uint32_t slot;
-	int discard, eviction, fast, next;
+	int discard, eviction, fast, prev;
 
 	btree = session->btree;
 
 	/* We can currently only do fast-discard on row-store trees. */
 	discard = LF_ISSET(WT_TREE_DISCARD) && btree->type == BTREE_ROW ? 1 : 0;
 	eviction = LF_ISSET(WT_TREE_EVICT) ? 1 : 0;
-	next = LF_ISSET(WT_TREE_NEXT) ? 1 : 0;
+	prev = LF_ISSET(WT_TREE_PREV) ? 1 : 0;
 
 	/*
 	 * Take a copy of any returned page; we have a hazard reference on the
@@ -78,7 +78,7 @@ __wt_tree_walk(WT_SESSION_IMPL *session, WT_PAGE **pagep, uint32_t flags)
 	if (page == NULL) {
 		if ((page = btree->root_page) == NULL)
 			return (0);
-		slot = next ? 0 : page->entries - 1;
+		slot = prev ? page->entries - 1 : 0;
 		goto descend;
 	}
 
@@ -122,15 +122,15 @@ __wt_tree_walk(WT_SESSION_IMPL *session, WT_PAGE **pagep, uint32_t flags)
 	 * and left/right-most element in its subtree.
 	 */
 	for (;;) {
-		if ((!next && slot == 0) ||
-		    (next && slot == page->entries - 1)) {
+		if ((prev && slot == 0) ||
+		    (!prev && slot == page->entries - 1)) {
 			*pagep = page;
 			return (0);
 		}
-		if (next)
-			++slot;
-		else
+		if (prev)
 			--slot;
+		else
+			++slot;
 
 descend:	for (;;) {
 			if (page->type == WT_PAGE_ROW_INT ||
@@ -192,7 +192,7 @@ descend:	for (;;) {
 
 			page = ref->page;
 			WT_ASSERT(session, page != NULL);
-			slot = next ? 0 : page->entries - 1;
+			slot = prev ? page->entries - 1 : 0;
 		}
 	}
 	/* NOTREACHED */
