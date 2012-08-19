@@ -8,19 +8,64 @@
 #include "wt_internal.h"
 
 /*
- * __wt_tree_np --
+ * __tree_walk_fast --
+ *	Fast delete for leaf pages that don't reference overflow items.
+ */
+static inline int
+__tree_walk_fast(
+    WT_SESSION_IMPL *session, WT_PAGE *page, WT_REF *ref, int *fast)
+{
+	WT_CELL_UNPACK unpack;
+
+	*fast = 0;
+
+	/*
+	 * If we're discarding pages and the page is not in-memory (so no other
+	 * thread is using it), and the page doesn't reference overflow items,
+	 * (so there's no cleanup to do), try and simply delete the page.
+	 */
+	if (ref->state != WT_REF_DISK)
+		return (0);
+
+	__wt_cell_unpack(ref->addr, &unpack);
+	if (unpack.raw != WT_CELL_ADDR_LNO)
+		return (0);
+
+	if (!WT_ATOMIC_CAS(ref->state, WT_REF_DISK, WT_REF_DELETED))
+		return (0);
+
+	/*
+	 * This action dirtied the page: mark it dirty now, because there's no
+	 * future reconciliation of a leaf page that will dirty it as we write
+	 * the tree.
+	 */
+	WT_RET(__wt_page_modify_init(session, page));
+	__wt_page_modify_set(page);
+
+	*fast = 1;
+	return (0);
+}
+
+/*
+ * __wt_tree_walk --
  *	Move to the next/previous page in the tree.
  */
 int
-__wt_tree_np(WT_SESSION_IMPL *session, WT_PAGE **pagep, int eviction, int next)
+__wt_tree_walk(WT_SESSION_IMPL *session, WT_PAGE **pagep, uint32_t flags)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_PAGE *page, *t;
 	WT_REF *ref;
 	uint32_t slot;
+	int discard, eviction, fast, next;
 
 	btree = session->btree;
+
+	/* We can currently only do fast-discard on row-store trees. */
+	discard = LF_ISSET(WT_TREE_DISCARD) && btree->type == BTREE_ROW ? 1 : 0;
+	eviction = LF_ISSET(WT_TREE_EVICT) ? 1 : 0;
+	next = LF_ISSET(WT_TREE_NEXT) ? 1 : 0;
 
 	/*
 	 * Take a copy of any returned page; we have a hazard reference on the
@@ -124,6 +169,17 @@ descend:	for (;;) {
 				    ref->state != WT_REF_EVICT_FORCE)
 					break;
 			} else {
+				/* Skip already deleted pages. */
+				if (ref->state == WT_REF_DELETED)
+					break;
+
+				if (discard) {
+					WT_RET(__tree_walk_fast(
+					    session, page, ref, &fast));
+					if (fast)
+						break;
+				}
+
 				/*
 				 * Swap hazard references at each level (but
 				 * don't leave a hazard reference dangling on

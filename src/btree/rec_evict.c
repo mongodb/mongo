@@ -187,7 +187,8 @@ __rec_discard_tree(WT_SESSION_IMPL *session, WT_PAGE *page, int single)
 	case WT_PAGE_ROW_INT:
 		/* For each entry in the page... */
 		WT_REF_FOREACH(page, ref, i) {
-			if (ref->state == WT_REF_DISK)
+			if (ref->state == WT_REF_DISK ||
+			    ref->state == WT_REF_DELETED)
 				continue;
 			WT_ASSERT(session,
 			    single || ref->state == WT_REF_LOCKED);
@@ -252,6 +253,7 @@ __rec_review(WT_SESSION_IMPL *session,
 		WT_REF_FOREACH(page, ref, i)
 			switch (ref->state) {
 			case WT_REF_DISK:		/* On-disk */
+			case WT_REF_DELETED:		/* On-disk, deleted */
 				break;
 			case WT_REF_MEM:		/* In-memory */
 				WT_RET(__rec_review(

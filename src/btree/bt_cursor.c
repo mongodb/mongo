@@ -497,13 +497,20 @@ __wt_btcur_truncate(WT_CURSOR_BTREE *start, WT_CURSOR_BTREE *stop)
 	WT_DECL_RET;
 
 	/*
-	 * First, call the standard cursor remove method to do a full search
-	 * and re-position the cursor because we don't have a saved copy of
-	 * the page's write generation information, which we need to remove
-	 * a record.  Once that's done, we can delete records without a full
-	 * search, unless we encounter a restart error because the page was
-	 * modified by some other thread of control; in that case, repeat the
-	 * full search to refresh the page's modification information.
+	 * First, call the standard cursor remove method to do a full search and
+	 * re-position the cursor because we don't have a saved copy of the
+	 * page's write generation information, which we need to remove records.
+	 * Once that's done, we can delete records without a full search, unless
+	 * we encounter a restart error because the page was modified by some
+	 * other thread of control; in that case, repeat the full search to
+	 * refresh the page's modification information.
+	 *
+	 * If this is a row-store, we delete leaf pages having no overflow items
+	 * without reading them; for that to work, we have to ensure we read the
+	 * page referenced by the ending cursor, since we may be deleting only a
+	 * partial page at the end of the truncation.  Our caller already fully
+	 * instantiated the end cursor, so we know that page is pinned in memory
+	 * and we can proceed without concern.
 	 */
 	if (start == NULL) {
 		do {

@@ -39,6 +39,7 @@ __wt_page_in_func(
 	for (;;) {
 		switch (ref->state) {
 		case WT_REF_DISK:
+		case WT_REF_DELETED:
 			/* The page isn't in memory, attempt to read it. */
 			__wt_eviction_check(session, &read_lockout, wake);
 			wake = 0;

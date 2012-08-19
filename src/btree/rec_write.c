@@ -202,7 +202,7 @@ static int  __rec_write_wrapup(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_write_wrapup_err(WT_SESSION_IMPL *, WT_PAGE *);
 
 /*
- * Helper macro to determine whether the given WT_REF has a page with
+ * Helper function to determine whether the given WT_REF has a page with
  * modifications.
  *
  * The reconciliation code is used in the following situations:
@@ -234,10 +234,27 @@ static int  __rec_write_wrapup_err(WT_SESSION_IMPL *, WT_PAGE *);
  * page is assigned to the second parameter.  The macro evaluates true if the
  * page has been modified.
  */
-#define	PAGE_MODIFIED(ref, rp)						\
-	(((ref)->state != WT_REF_DISK &&				\
-	  (ref)->state != WT_REF_READING) &&				\
-	    (rp = (ref)->page)->modify != NULL)
+static inline int
+__page_modified(WT_REF *ref, WT_PAGE **rpp)
+{
+	*rpp = ref->page;
+
+	switch (ref->state) {
+	case WT_REF_DISK:
+	case WT_REF_READING:
+		return (0);
+	case WT_REF_DELETED:
+		return (1);
+	case WT_REF_EVICT_FORCE:
+	case WT_REF_EVICT_WALK:
+	case WT_REF_LOCKED:
+	case WT_REF_MEM:
+	default:
+		break;
+	}
+
+	return (ref->page->modify == NULL ? 0 : 1);
+}
 
 /*
  * __wt_rec_write --
@@ -1390,7 +1407,7 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * Deleted/split pages are merged into the parent and discarded.
 		 */
 		val_set = 0;
-		if (PAGE_MODIFIED(ref, rp)) {
+		if (__page_modified(ref, &rp)) {
 			switch (F_ISSET(rp->modify, WT_PM_REC_MASK)) {
 			case WT_PM_REC_EMPTY:
 				/*
@@ -2020,7 +2037,7 @@ compare:		/*
 		 * discard the underlying blocks, they're no longer useful.
 		 */
 		if (ovfl_state == OVFL_UNUSED)
-			WT_ERR(__wt_rec_track_onpage_add(
+			WT_ERR(__wt_rec_track_onpage_addr(
 			    session, page, unpack->data, unpack->size));
 	}
 
@@ -2198,7 +2215,21 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * is on the split-created internal page.
 		 */
 		val_set = 0;
-		if (PAGE_MODIFIED(ref, rp)) {
+		if (__page_modified(ref, &rp)) {
+			/*
+			 * If there's no page, then it must be a "fast-delete"
+			 * page, a page marked deleted without reading, rather
+			 * than incrementally updated until it it was empty.
+			 * Empty pages are added to the tracking list when they
+			 * are found to be empty, fast-delete pages were never
+			 * reconciled, and so are added in the reconciliation
+			 * of their parent.
+			 */
+			if (rp == NULL) {
+				WT_RET(__wt_rec_track_onpage_ref(
+				    session, page, page, ref));
+				goto page_deleted;
+			}
 			switch (F_ISSET(rp->modify, WT_PM_REC_MASK)) {
 			case WT_PM_REC_EMPTY:
 				/*
@@ -2208,7 +2239,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 				 * necessary for a subsequent reconciliation,
 				 * enter them into the tracking system.
 				 */
-				if (onpage_ovfl)
+page_deleted:			if (onpage_ovfl)
 					WT_ERR(__rec_onpage_ovfl(
 					    session, page, unpack, tmpkey));
 				continue;
@@ -2399,7 +2430,21 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * Deleted/split pages are merged into the parent and discarded.
 		 */
 		val_set = 0;
-		if (PAGE_MODIFIED(ref, rp)) {
+		if (__page_modified(ref, &rp)) {
+			/*
+			 * If there's no page, then it must be a "fast-delete"
+			 * page, a page marked deleted without reading, rather
+			 * than incrementally updated until it it was empty.
+			 * Empty pages are added to the tracking list when they
+			 * are found to be empty, fast-delete pages were never
+			 * reconciled, and so are added in the reconciliation
+			 * of their parent.
+			 */
+			if (rp == NULL) {
+				WT_RET(__wt_rec_track_onpage_ref(
+				    session, page, page, ref));
+				continue;
+			}
 			switch (F_ISSET(rp->modify, WT_PM_REC_MASK)) {
 			case WT_PM_REC_EMPTY:
 				continue;
@@ -2595,7 +2640,7 @@ __rec_row_leaf(
 			 * I/O for little reason.
 			 */
 			if (val_cell != NULL && unpack->ovfl)
-				WT_ERR(__wt_rec_track_onpage_add(
+				WT_ERR(__wt_rec_track_onpage_addr(
 				    session, page, unpack->data, unpack->size));
 
 			/* If this key/value pair was deleted, we're done. */
@@ -2933,8 +2978,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_DECL_RET;
 	WT_PAGE_MODIFY *mod;
 	WT_RECONCILE *r;
-	uint32_t i, size;
-	const uint8_t *addr;
+	uint32_t i;
 
 	r = session->reconcile;
 	btree = session->btree;
@@ -2954,11 +2998,9 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * The exception is root pages are never tracked or free'd, they
 		 * are checkpoints, and must be explicitly dropped.
 		 */
-		if (!WT_PAGE_IS_ROOT(page) && page->ref->addr != NULL) {
-			__wt_get_addr(page->parent, page->ref, &addr, &size);
-			WT_RET(__wt_rec_track_onpage_add(
-			    session, page, addr, size));
-		}
+		if (!WT_PAGE_IS_ROOT(page) && page->ref->addr != NULL)
+			WT_RET(__wt_rec_track_onpage_ref(
+			    session, page, page->parent, page->ref));
 		break;
 	case WT_PM_REC_EMPTY:				/* Page deleted */
 		break;

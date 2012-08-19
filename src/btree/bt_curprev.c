@@ -432,15 +432,20 @@ new_insert:	if ((ins = cbt->ins) != NULL) {
  *	Move to the previous record in the tree.
  */
 int
-__wt_btcur_prev(WT_CURSOR_BTREE *cbt, int is_modify)
+__wt_btcur_prev(WT_CURSOR_BTREE *cbt, int discard)
 {
 	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_SESSION_IMPL *session;
+	uint32_t flags;
 	int newpage;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	WT_BSTAT_INCR(session, cursor_read_prev);
+
+	flags = 0;				/* Tree walk flags. */
+	if (discard)
+		LF_SET(WT_TREE_DISCARD);
 
 	__cursor_func_init(cbt, 0);
 
@@ -456,7 +461,7 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, int is_modify)
 	 * page, save the write generation.
 	 */
 	page = cbt->page;
-	if (is_modify && page != NULL) {
+	if (discard && page != NULL) {
 		WT_ERR(__wt_page_modify_init(session, page));
 		WT_ORDERED_READ(cbt->write_gen, page->modify->write_gen);
 	}
@@ -503,7 +508,7 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, int is_modify)
 
 		cbt->page = NULL;
 		do {
-			WT_ERR(__wt_tree_np(session, &page, 0, 0));
+			WT_ERR(__wt_tree_walk(session, &page, flags));
 			WT_ERR_TEST(page == NULL, WT_NOTFOUND);
 		} while (
 		    page->type == WT_PAGE_COL_INT ||
@@ -511,7 +516,7 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, int is_modify)
 		cbt->page = page;
 
 		/* Initialize the page's modification information */
-		if (is_modify) {
+		if (discard) {
 			WT_ERR(__wt_page_modify_init(session, page));
 			WT_ORDERED_READ(
 			    cbt->write_gen, page->modify->write_gen);

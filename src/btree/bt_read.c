@@ -17,6 +17,7 @@ __wt_cache_read(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *ref)
 	WT_DECL_RET;
 	WT_ITEM tmp;
 	WT_PAGE *page;
+	WT_PAGE_STATE state;
 	uint32_t size;
 	const uint8_t *addr;
 
@@ -24,7 +25,11 @@ __wt_cache_read(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *ref)
 	 * Attempt to set the state to WT_REF_READING; if successful, we've
 	 * won the race, read the page.
 	 */
-	if (!WT_ATOMIC_CAS(ref->state, WT_REF_DISK, WT_REF_READING))
+	if (WT_ATOMIC_CAS(ref->state, WT_REF_DISK, WT_REF_READING))
+		state = WT_REF_DISK;
+	else if (WT_ATOMIC_CAS(ref->state, WT_REF_DELETED, WT_REF_READING))
+		state = WT_REF_DELETED;
+	else
 		return (0);
 
 	/*
@@ -40,6 +45,9 @@ __wt_cache_read(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *ref)
 	WT_ERR(__wt_bm_read(session, &tmp, addr, size));
 
 	/* Build the in-memory version of the page. */
+	/*
+	 * XXX: if state == WT_REF_DELETED, clean up the page.
+	 */
 	WT_ERR(__wt_page_inmem(session, parent, ref, tmp.mem, &page));
 
 	WT_VERBOSE_ERR(session, read,
@@ -49,7 +57,7 @@ __wt_cache_read(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *ref)
 	WT_PUBLISH(ref->state, WT_REF_MEM);
 	return (0);
 
-err:	ref->state = WT_REF_DISK;
+err:	WT_PUBLISH(ref->state, state);
 	__wt_buf_free(session, &tmp);
 	return (ret);
 }
