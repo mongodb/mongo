@@ -52,16 +52,24 @@
  * Bit 3 marks variable-length column store data with an associated run-length
  * counter or a record number: there is a uint64_t value immediately after the
  * cell description byte.
+ *
+ * Bits 4 and 5 are unused.
+ *
+ * Bits 6-8 are for cell "types" (there are currently 7 cell types, we have a
+ * single free type).
+ *
+ * We can use bits 4 or 5 as single bits easily; we can use bits 4 and 5 as type
+ * bits in a backward compatible way by adding bit 5 to the type mask and adding
+ * new types that incorporate bit 5.
  */
 #define	WT_CELL_VALUE_SHORT	0x001		/* Short data */
 #define	WT_CELL_KEY_SHORT	0x002		/* Short key */
 #define	WT_CELL_64V		0x004		/* RLE or recno */
+
 #define	WT_CELL_UNUSED_BIT4	0x008		/* Unused */
 #define	WT_CELL_UNUSED_BIT5	0x010		/* Unused */
 
 /*
- * Bits 6-8 are for other cell types (there are currently 7 cell types).
- *
  * WT_CELL_ADDR is a block location, WT_CELL_ADDR_LNO is a block location with
  * the additional information that the address is for a leaf page without any
  * overflow items.  The goal is to speed up data truncation since we don't have
@@ -74,8 +82,8 @@
 #define	WT_CELL_KEY_OVFL	(4 << 5)	/* Key overflow */
 #define	WT_CELL_VALUE		(5 << 5)	/* Value */
 #define	WT_CELL_VALUE_OVFL	(6 << 5)	/* Value overflow */
-#define	WT_CELL_UNUSED_TYPE	(7 << 5)	/* Unused */
-#define	WT_CELL_TYPE_MASK	(7 << 5)
+#define	WT_CELL_UNUSED_TYPE7	(7 << 5)	/* Unused */
+#define	WT_CELL_TYPE(v)		((v) & 7 << 5)	/* Bits 6-8 */
 
 /*
  * WT_CELL --
@@ -306,7 +314,7 @@ __wt_cell_type(WT_CELL *cell)
 	if (cell->__chunk[0] & WT_CELL_KEY_SHORT)
 		return (WT_CELL_KEY);
 
-	type = cell->__chunk[0] & WT_CELL_TYPE_MASK;
+	type = WT_CELL_TYPE(cell->__chunk[0]);
 
 	return (type == WT_CELL_ADDR_LNO ? WT_CELL_ADDR : type);
 }
@@ -349,7 +357,7 @@ __wt_cell_unpack_safe(WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
 		unpack->type = WT_CELL_KEY;
 		unpack->raw = WT_CELL_KEY_SHORT;
 	} else {
-		unpack->raw = cell->__chunk[0] & WT_CELL_TYPE_MASK;
+		unpack->raw = WT_CELL_TYPE(cell->__chunk[0]);
 		if (unpack->raw == WT_CELL_ADDR_LNO)
 			unpack->type = WT_CELL_ADDR;
 		else
