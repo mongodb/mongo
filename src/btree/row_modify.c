@@ -163,8 +163,7 @@ err:		if (ins != NULL)
 
 /*
  * __wt_row_insert_alloc --
- *	Row-store insert: allocate a WT_INSERT structure from the session's
- *	buffer and fill it in.
+ *	Row-store insert: allocate a WT_INSERT structure and fill it in.
  */
 int
 __wt_row_insert_alloc(WT_SESSION_IMPL *session,
@@ -291,8 +290,7 @@ __wt_update_check(WT_SESSION_IMPL *session, WT_PAGE *page, WT_UPDATE *next)
 
 /*
  * __wt_update_alloc --
- *	Allocate a WT_UPDATE structure and associated value from the session's
- *	buffer and fill it in.
+ *	Allocate a WT_UPDATE structure and associated value and fill it in.
  */
 int
 __wt_update_alloc(WT_SESSION_IMPL *session,
