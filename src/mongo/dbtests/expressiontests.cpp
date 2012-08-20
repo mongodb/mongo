@@ -258,6 +258,197 @@ namespace ExpressionTests {
         
     } // namespace Add
 
+    namespace And {
+
+        class ExpectedResultBase {
+        public:
+            virtual ~ExpectedResultBase() {
+            }
+            void run() {
+                BSONObj specObject = BSON( "" << spec() );
+                BSONElement specElement = specObject.firstElement();
+                intrusive_ptr<Expression> expression = Expression::parseOperand( &specElement );
+                ASSERT_EQUALS( spec(), expressionToBson( expression ) );
+                ASSERT_EQUALS( BSON( "" << expectedResult() ),
+                               toBson( expression->evaluate( fromBson( BSON( "a" << 1 ) ) ) ) );
+                intrusive_ptr<Expression> optimized = expression->optimize();
+                ASSERT_EQUALS( BSON( "" << expectedResult() ),
+                               toBson( optimized->evaluate( fromBson( BSON( "a" << 1 ) ) ) ) );
+            }
+        protected:
+            virtual BSONObj spec() = 0;
+            virtual bool expectedResult() = 0;
+        };
+
+        class OptimizeBase {
+        public:
+            virtual ~OptimizeBase() {
+            }
+            void run() {
+                BSONObj specObject = BSON( "" << spec() );
+                BSONElement specElement = specObject.firstElement();
+                intrusive_ptr<Expression> expression = Expression::parseOperand( &specElement );
+                ASSERT_EQUALS( spec(), expressionToBson( expression ) );
+                intrusive_ptr<Expression> optimized = expression->optimize();
+                ASSERT_EQUALS( expectedOptimized(), expressionToBson( optimized ) );
+            }
+        protected:
+            virtual BSONObj spec() = 0;
+            virtual BSONObj expectedOptimized() = 0;
+        };
+
+        class NoOptimizeBase : public OptimizeBase {
+            BSONObj expectedOptimized() { return spec(); }
+        };
+
+        /** $and without operands. */
+        class NoOperands : public ExpectedResultBase {
+            BSONObj spec() { return BSON( "$and" << BSONArray() ); }
+            bool expectedResult() { return true; }
+        };
+
+        /** $and passed 'true'. */
+        class True : public ExpectedResultBase {
+            BSONObj spec() { return BSON( "$and" << BSON_ARRAY( true ) ); }
+            bool expectedResult() { return true; }
+        };
+        
+        /** $and passed 'false'. */
+        class False : public ExpectedResultBase {
+            BSONObj spec() { return BSON( "$and" << BSON_ARRAY( false ) ); }
+            bool expectedResult() { return false; }
+        };
+        
+        /** $and passed 'true', 'true'. */
+        class TrueTrue : public ExpectedResultBase {
+            BSONObj spec() { return BSON( "$and" << BSON_ARRAY( true << true ) ); }
+            bool expectedResult() { return true; }
+        };
+        
+        /** $and passed 'true', 'false'. */
+        class TrueFalse : public ExpectedResultBase {
+            BSONObj spec() { return BSON( "$and" << BSON_ARRAY( true << false ) ); }
+            bool expectedResult() { return false; }
+        };
+        
+        /** $and passed 'false', 'true'. */
+        class FalseTrue : public ExpectedResultBase {
+            BSONObj spec() { return BSON( "$and" << BSON_ARRAY( false << true ) ); }
+            bool expectedResult() { return false; }
+        };
+        
+        /** $and passed 'false', 'false'. */
+        class FalseFalse : public ExpectedResultBase {
+            BSONObj spec() { return BSON( "$and" << BSON_ARRAY( false << false ) ); }
+            bool expectedResult() { return false; }
+        };
+        
+        /** $and passed 'true', 'true', 'true'. */
+        class TrueTrueTrue : public ExpectedResultBase {
+            BSONObj spec() { return BSON( "$and" << BSON_ARRAY( true << true << true ) ); }
+            bool expectedResult() { return true; }
+        };
+
+        /** $and passed 'true', 'true', 'false'. */
+        class TrueTrueFalse : public ExpectedResultBase {
+            BSONObj spec() { return BSON( "$and" << BSON_ARRAY( true << true << false ) ); }
+            bool expectedResult() { return false; }
+        };
+
+        /** $and passed '0', '1'. */
+        class ZeroOne : public ExpectedResultBase {
+            BSONObj spec() { return BSON( "$and" << BSON_ARRAY( 0 << 1 ) ); }
+            bool expectedResult() { return false; }
+        };
+        
+        /** $and passed '1', '2'. */
+        class OneTwo : public ExpectedResultBase {
+            BSONObj spec() { return BSON( "$and" << BSON_ARRAY( 1 << 2 ) ); }
+            bool expectedResult() { return true; }
+        };
+        
+        /** $and passed a field path. */
+        class FieldPath : public ExpectedResultBase {
+            BSONObj spec() { return BSON( "$and" << BSON_ARRAY( "$a" ) ); }
+            bool expectedResult() { return true; }
+        };
+
+        /** A constant expression is optimized to a constant. */
+        class OptimizeConstantExpression : public OptimizeBase {
+            BSONObj spec() { return BSON( "$and" << BSON_ARRAY( 1 ) ); }
+            BSONObj expectedOptimized() { return BSON( "$const" << true ); }
+        };
+
+        /** A non constant expression is not optimized. */
+        class NonConstant : public NoOptimizeBase {
+            BSONObj spec() { return BSON( "$and" << BSON_ARRAY( "$a" ) ); }            
+        };
+
+        /** An expression beginning with a single constant is not optimized.  SERVER-6192 */
+        class ConstantNonConstant : public NoOptimizeBase {
+            BSONObj spec() { return BSON( "$and" << BSON_ARRAY( 1 << "$a" ) ); }
+        };
+
+        /** An expression with a field path and '1'. */
+        class NonConstantOne : public OptimizeBase {
+            BSONObj spec() { return BSON( "$and" << BSON_ARRAY( "$a" << 1 ) ); }
+            BSONObj expectedOptimized() { return BSON( "$and" << BSON_ARRAY( "$a" ) ); }
+        };
+        
+        /** An expression with a field path and '0'. */
+        class NonConstantZero : public OptimizeBase {
+            BSONObj spec() { return BSON( "$and" << BSON_ARRAY( "$a" << 0 ) ); }
+            BSONObj expectedOptimized() { return BSON( "$const" << false ); }
+        };
+        
+        /** An expression with two field paths and '1'. */
+        class NonConstantNonConstantOne : public OptimizeBase {
+            BSONObj spec() { return BSON( "$and" << BSON_ARRAY( "$a" << "$b" << 1 ) ); }
+            BSONObj expectedOptimized() { return BSON( "$and" << BSON_ARRAY( "$a" << "$b" ) ); }
+        };
+        
+        /** An expression with two field paths and '0'. */
+        class NonConstantNonConstantZero : public OptimizeBase {
+            BSONObj spec() { return BSON( "$and" << BSON_ARRAY( "$a" << "$b" << 0 ) ); }
+            BSONObj expectedOptimized() { return BSON( "$const" << false ); }
+        };
+
+        /** An expression with '0', '1', and a field path. */
+        class ZeroOneNonConstant : public OptimizeBase {
+            BSONObj spec() { return BSON( "$and" << BSON_ARRAY( 0 << 1 << "$a" ) ); }
+            BSONObj expectedOptimized() { return BSON( "$const" << false ); }
+        };
+        
+        /** An expression with '1', '1', and a field path. */
+        class OneOneNonConstant : public OptimizeBase {
+            BSONObj spec() { return BSON( "$and" << BSON_ARRAY( 1 << 1 << "$a" ) ); }
+            BSONObj expectedOptimized() { return BSON( "$and" << BSON_ARRAY( "$a" ) ); }            
+        };
+
+        /** Nested $and expressions. */
+        class Nested : public OptimizeBase {
+            BSONObj spec() {
+                return BSON( "$and" <<
+                             BSON_ARRAY( 1 << BSON( "$and" << BSON_ARRAY( 1 ) ) << "$a" << "$b" ) );
+            }
+            BSONObj expectedOptimized() { return BSON( "$and" << BSON_ARRAY( "$a" << "$b" ) ); }            
+        };
+
+        /** Nested $and expressions containing a nested value evaluating to false. */
+        class NestedZero : public OptimizeBase {
+            BSONObj spec() {
+                return BSON( "$and" <<
+                            BSON_ARRAY( 1 <<
+                                        BSON( "$and" <<
+                                              BSON_ARRAY( BSON( "$and" <<
+                                                                BSON_ARRAY( 0 ) ) ) ) <<
+                                        "$a" << "$b" ) );
+            }
+            BSONObj expectedOptimized() { return BSON( "$const" << false ); }
+        };
+        
+    } // namespace And
+
     namespace CoerceToBool {
 
         /** Nested expression coerced to true. */
@@ -2189,6 +2380,197 @@ namespace ExpressionTests {
 
     } // namespace Object
 
+    namespace Or {
+        
+        class ExpectedResultBase {
+        public:
+            virtual ~ExpectedResultBase() {
+            }
+            void run() {
+                BSONObj specObject = BSON( "" << spec() );
+                BSONElement specElement = specObject.firstElement();
+                intrusive_ptr<Expression> expression = Expression::parseOperand( &specElement );
+                ASSERT_EQUALS( spec(), expressionToBson( expression ) );
+                ASSERT_EQUALS( BSON( "" << expectedResult() ),
+                               toBson( expression->evaluate( fromBson( BSON( "a" << 1 ) ) ) ) );
+                intrusive_ptr<Expression> optimized = expression->optimize();
+                ASSERT_EQUALS( BSON( "" << expectedResult() ),
+                               toBson( optimized->evaluate( fromBson( BSON( "a" << 1 ) ) ) ) );
+            }
+        protected:
+            virtual BSONObj spec() = 0;
+            virtual bool expectedResult() = 0;
+        };
+        
+        class OptimizeBase {
+        public:
+            virtual ~OptimizeBase() {
+            }
+            void run() {
+                BSONObj specObject = BSON( "" << spec() );
+                BSONElement specElement = specObject.firstElement();
+                intrusive_ptr<Expression> expression = Expression::parseOperand( &specElement );
+                ASSERT_EQUALS( spec(), expressionToBson( expression ) );
+                intrusive_ptr<Expression> optimized = expression->optimize();
+                ASSERT_EQUALS( expectedOptimized(), expressionToBson( optimized ) );
+            }
+        protected:
+            virtual BSONObj spec() = 0;
+            virtual BSONObj expectedOptimized() = 0;
+        };
+        
+        class NoOptimizeBase : public OptimizeBase {
+            BSONObj expectedOptimized() { return spec(); }
+        };
+        
+        /** $or without operands. */
+        class NoOperands : public ExpectedResultBase {
+            BSONObj spec() { return BSON( "$or" << BSONArray() ); }
+            bool expectedResult() { return false; }
+        };
+        
+        /** $or passed 'true'. */
+        class True : public ExpectedResultBase {
+            BSONObj spec() { return BSON( "$or" << BSON_ARRAY( true ) ); }
+            bool expectedResult() { return true; }
+        };
+        
+        /** $or passed 'false'. */
+        class False : public ExpectedResultBase {
+            BSONObj spec() { return BSON( "$or" << BSON_ARRAY( false ) ); }
+            bool expectedResult() { return false; }
+        };
+        
+        /** $or passed 'true', 'true'. */
+        class TrueTrue : public ExpectedResultBase {
+            BSONObj spec() { return BSON( "$or" << BSON_ARRAY( true << true ) ); }
+            bool expectedResult() { return true; }
+        };
+        
+        /** $or passed 'true', 'false'. */
+        class TrueFalse : public ExpectedResultBase {
+            BSONObj spec() { return BSON( "$or" << BSON_ARRAY( true << false ) ); }
+            bool expectedResult() { return true; }
+        };
+        
+        /** $or passed 'false', 'true'. */
+        class FalseTrue : public ExpectedResultBase {
+            BSONObj spec() { return BSON( "$or" << BSON_ARRAY( false << true ) ); }
+            bool expectedResult() { return true; }
+        };
+        
+        /** $or passed 'false', 'false'. */
+        class FalseFalse : public ExpectedResultBase {
+            BSONObj spec() { return BSON( "$or" << BSON_ARRAY( false << false ) ); }
+            bool expectedResult() { return false; }
+        };
+        
+        /** $or passed 'false', 'false', 'false'. */
+        class FalseFalseFalse : public ExpectedResultBase {
+            BSONObj spec() { return BSON( "$or" << BSON_ARRAY( false << false << false ) ); }
+            bool expectedResult() { return false; }
+        };
+        
+        /** $or passed 'false', 'false', 'true'. */
+        class FalseFalseTrue : public ExpectedResultBase {
+            BSONObj spec() { return BSON( "$or" << BSON_ARRAY( false << false << true ) ); }
+            bool expectedResult() { return true; }
+        };
+        
+        /** $or passed '0', '1'. */
+        class ZeroOne : public ExpectedResultBase {
+            BSONObj spec() { return BSON( "$or" << BSON_ARRAY( 0 << 1 ) ); }
+            bool expectedResult() { return true; }
+        };
+        
+        /** $or passed '0', 'false'. */
+        class ZeroFalse : public ExpectedResultBase {
+            BSONObj spec() { return BSON( "$or" << BSON_ARRAY( 0 << false ) ); }
+            bool expectedResult() { return false; }
+        };
+        
+        /** $or passed a field path. */
+        class FieldPath : public ExpectedResultBase {
+            BSONObj spec() { return BSON( "$or" << BSON_ARRAY( "$a" ) ); }
+            bool expectedResult() { return true; }
+        };
+        
+        /** A constant expression is optimized to a constant. */
+        class OptimizeConstantExpression : public OptimizeBase {
+            BSONObj spec() { return BSON( "$or" << BSON_ARRAY( 1 ) ); }
+            BSONObj expectedOptimized() { return BSON( "$const" << true ); }
+        };
+        
+        /** A non constant expression is not optimized. */
+        class NonConstant : public NoOptimizeBase {
+            BSONObj spec() { return BSON( "$or" << BSON_ARRAY( "$a" ) ); }            
+        };
+        
+        /** An expression beginning with a single constant is not optimized.  SERVER-6192 */
+        class ConstantNonConstant : public NoOptimizeBase {
+            BSONObj spec() { return BSON( "$or" << BSON_ARRAY( 1 << "$a" ) ); }
+        };
+        
+        /** An expression with a field path and '1'. */
+        class NonConstantOne : public OptimizeBase {
+            BSONObj spec() { return BSON( "$or" << BSON_ARRAY( "$a" << 1 ) ); }
+            BSONObj expectedOptimized() { return BSON( "$const" << true ); }
+        };
+        
+        /** An expression with a field path and '0'. */
+        class NonConstantZero : public OptimizeBase {
+            BSONObj spec() { return BSON( "$or" << BSON_ARRAY( "$a" << 0 ) ); }
+            BSONObj expectedOptimized() { return BSON( "$and" << BSON_ARRAY( "$a" ) ); }
+        };
+        
+        /** An expression with two field paths and '1'. */
+        class NonConstantNonConstantOne : public OptimizeBase {
+            BSONObj spec() { return BSON( "$or" << BSON_ARRAY( "$a" << "$b" << 1 ) ); }
+            BSONObj expectedOptimized() { return BSON( "$const" << true ); }
+        };
+        
+        /** An expression with two field paths and '0'. */
+        class NonConstantNonConstantZero : public OptimizeBase {
+            BSONObj spec() { return BSON( "$or" << BSON_ARRAY( "$a" << "$b" << 0 ) ); }
+            BSONObj expectedOptimized() { return BSON( "$or" << BSON_ARRAY( "$a" << "$b" ) ); }
+        };
+        
+        /** An expression with '0', '1', and a field path. */
+        class ZeroOneNonConstant : public OptimizeBase {
+            BSONObj spec() { return BSON( "$or" << BSON_ARRAY( 0 << 1 << "$a" ) ); }
+            BSONObj expectedOptimized() { return BSON( "$const" << true ); }
+        };
+        
+        /** An expression with '0', '0', and a field path. */
+        class ZeroZeroNonConstant : public OptimizeBase {
+            BSONObj spec() { return BSON( "$or" << BSON_ARRAY( 0 << 0 << "$a" ) ); }
+            BSONObj expectedOptimized() { return BSON( "$and" << BSON_ARRAY( "$a" ) ); }            
+        };
+        
+        /** Nested $or expressions. */
+        class Nested : public OptimizeBase {
+            BSONObj spec() {
+                return BSON( "$or" <<
+                             BSON_ARRAY( 0 << BSON( "$or" << BSON_ARRAY( 0 ) ) << "$a" << "$b" ) );
+            }
+            BSONObj expectedOptimized() { return BSON( "$or" << BSON_ARRAY( "$a" << "$b" ) ); }            
+        };
+        
+        /** Nested $or expressions containing a nested value evaluating to false. */
+        class NestedOne : public OptimizeBase {
+            BSONObj spec() {
+                return BSON( "$or" <<
+                             BSON_ARRAY( 0 <<
+                                         BSON( "$or" <<
+                                               BSON_ARRAY( BSON( "$or" <<
+                                                                 BSON_ARRAY( 1 ) ) ) ) <<
+                                         "$a" << "$b" ) );
+            }
+            BSONObj expectedOptimized() { return BSON( "$const" << true ); }
+        };
+        
+    } // namespace Or
+
     namespace Parse {
 
         namespace Object {
@@ -2588,6 +2970,31 @@ namespace ExpressionTests {
             add<Add::IntNull>();
             add<Add::LongUndefined>();
 
+            add<And::NoOperands>();
+            add<And::True>();
+            add<And::False>();
+            add<And::TrueTrue>();
+            add<And::TrueFalse>();
+            add<And::FalseTrue>();
+            add<And::FalseFalse>();
+            add<And::TrueTrueTrue>();
+            add<And::TrueTrueFalse>();
+            add<And::TrueTrueFalse>();
+            add<And::ZeroOne>();
+            add<And::OneTwo>();
+            add<And::FieldPath>();
+            add<And::OptimizeConstantExpression>();
+            add<And::NonConstant>();
+            add<And::ConstantNonConstant>();
+            add<And::NonConstantOne>();
+            add<And::NonConstantZero>();
+            add<And::NonConstantNonConstantOne>();
+            add<And::NonConstantNonConstantZero>();
+            add<And::ZeroOneNonConstant>();
+            add<And::OneOneNonConstant>();
+            add<And::Nested>();
+            add<And::NestedZero>();
+
             add<CoerceToBool::EvaluateTrue>();
             add<CoerceToBool::EvaluateFalse>();
             add<CoerceToBool::Dependencies>();
@@ -2744,6 +3151,30 @@ namespace ExpressionTests {
             add<Object::AddToBsonObjRequireExpression>();
             add<Object::AddToBsonArray>();
             add<Object::Evaluate>();
+
+            add<Or::NoOperands>();
+            add<Or::True>();
+            add<Or::False>();
+            add<Or::TrueTrue>();
+            add<Or::TrueFalse>();
+            add<Or::FalseTrue>();
+            add<Or::FalseFalse>();
+            add<Or::FalseFalseFalse>();
+            add<Or::FalseFalseTrue>();
+            add<Or::ZeroOne>();
+            add<Or::ZeroFalse>();
+            add<Or::FieldPath>();
+            add<Or::OptimizeConstantExpression>();
+            add<Or::NonConstant>();
+            add<Or::ConstantNonConstant>();
+            add<Or::NonConstantOne>();
+            add<Or::NonConstantZero>();
+            add<Or::NonConstantNonConstantOne>();
+            add<Or::NonConstantNonConstantZero>();
+            add<Or::ZeroOneNonConstant>();
+            add<Or::ZeroZeroNonConstant>();
+            add<Or::Nested>();
+            add<Or::NestedOne>();
 
             add<Parse::Object::NonObject>();
             add<Parse::Object::Empty>();
