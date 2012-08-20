@@ -67,21 +67,6 @@ AC_CHECK_LIB(rt, sched_yield)
 AC_CHECK_FUNCS([clock_gettime gettimeofday fcntl posix_memalign])
 AC_SYS_LARGEFILE
 
-# Check for __builtin_expect used by City hash implementation
-AC_MSG_CHECKING([if the compiler supports __builtin_expect])
-AC_TRY_COMPILE(, [
-    return __builtin_expect(1, 1) ? 1 : 0
-], [
-    wt_have_builtin_expect=yes
-    AC_MSG_RESULT([yes])
-], [
-    wt_have_builtin_expect=no
-    AC_MSG_RESULT([no])
-])
-if test x$wt_have_builtin_expect = xyes ; then
-    AC_DEFINE([HAVE_BUILTIN_EXPECT], [1], [Define to 1 if the compiler supports __builtin_expect.])
-fi
-
 AC_C_BIGENDIAN
 
 # Linux requires _GNU_SOURCE to be defined and buffers aligned to 512 byte

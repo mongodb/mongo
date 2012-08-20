@@ -119,11 +119,6 @@ __wt_hash_fnv64(const void *string, uint32_t len)
 }
 
 /*
- * 64 bit magic FNV-1a prime
- */
-#define	FNV_64_PRIME ((uint64_t)0x100000001b3ULL)
-
-/*
  * fnv_64a_buf - perform a 64 bit Fowler/Noll/Vo FNV-1a hash on a buffer
  *
  * input:
@@ -151,13 +146,13 @@ fnv_64a_buf(void *buf, size_t len, uint64_t hval)
 		/* xor the bottom with the current octet */
 		hval ^= (uint64_t)*bp++;
 
-		/* multiply by the 64 bit FNV magic prime mod 2^64 */
-#if defined(NO_FNV_GCC_OPTIMIZATION)
-		hval *= FNV_64_PRIME;
-#else /* NO_FNV_GCC_OPTIMIZATION */
+		/*
+		 * Multiply by the 64 bit FNV magic prime mod 2^64. The
+		 * following shift operation is generally faster than
+		 * a multiply operation.
+		 */
 		hval += (hval << 1) + (hval << 4) + (hval << 5) +
 			(hval << 7) + (hval << 8) + (hval << 40);
-#endif /* NO_FNV_GCC_OPTIMIZATION */
 	}
 
 	/* return our new hash value */
