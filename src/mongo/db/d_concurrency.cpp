@@ -278,10 +278,23 @@ namespace mongo {
     void Lock::ParallelBatchWriterMode::iAmABatchParticipant() {
         lockState()._batchWriter = true;
     }
-    Lock::ParallelBatchWriterSupport::ParallelBatchWriterSupport() :
-        _lk( lockState()._batchWriter ? 0 : new RWLockRecursive::Shared(ParallelBatchWriterMode::_batchLock) )
-    {
+
+    Lock::ParallelBatchWriterSupport::ParallelBatchWriterSupport() {
+        relock();
     }
+
+    void Lock::ParallelBatchWriterSupport::tempRelease() {
+        _lk.reset( 0 );
+    }
+
+    void Lock::ParallelBatchWriterSupport::relock() {
+        LockState& ls = lockState();
+        if ( ! ls._batchWriter ) {
+            AcquiringParallelWriter a(ls);
+            _lk.reset( new RWLockRecursive::Shared(ParallelBatchWriterMode::_batchLock) );
+        }
+    }
+
 
     Lock::ScopedLock::ScopedLock( char type ) 
         : _type(type), _stat(0) {
@@ -306,6 +319,7 @@ namespace mongo {
     void Lock::ScopedLock::tempRelease() {
         long long micros = _timer.micros();
         _tempRelease();
+        _pbws_lk.tempRelease();
         _recordTime( micros ); // might as well do after we unlock
     }
 
@@ -324,6 +338,7 @@ namespace mongo {
     }
     
     void Lock::ScopedLock::relock() {
+        _pbws_lk.relock();
         _relock();
         resetTime();
     }

@@ -35,7 +35,8 @@ namespace mongo {
           _otherCount(0), 
           _otherLock(NULL),
           _scopedLk(NULL),
-          _lockPending(false)
+          _lockPending(false),
+          _lockPendingParallelWriter(false)
     {
     }
 
@@ -241,4 +242,13 @@ namespace mongo {
             stat->recordAcquireTimeMicros( _ls.threadState(), _lock->acquireFinished( stat ) );
     }
     
+    AcquiringParallelWriter::AcquiringParallelWriter( LockState& ls )
+        : _ls( ls ) {
+        _ls._lockPendingParallelWriter = true;
+    }
+    
+    AcquiringParallelWriter::~AcquiringParallelWriter() {
+        _ls._lockPendingParallelWriter = false;
+    }
+
 }
