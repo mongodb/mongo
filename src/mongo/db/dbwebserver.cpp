@@ -91,7 +91,7 @@ namespace mongo {
                 pcrecpp::StringPiece input( auth );
 
                 string name, val;
-                pcrecpp::RE re("(\\w+)=\"?(.*?)\"?, ");
+                pcrecpp::RE re("(\\w+)=\"?(.*?)\"?,\\s*");
                 while ( re.Consume( &input, &name, &val) ) {
                     parms[name] = val;
                 }
