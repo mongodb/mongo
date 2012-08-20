@@ -120,7 +120,7 @@ __wt_page_inmem(WT_SESSION_IMPL *session,
 
 	WT_ASSERT_RET(session, dsk->u.entries > 0);
 
-	*pagep = page = NULL;
+	*pagep = NULL;
 
 	/*
 	 * Allocate and initialize the WT_PAGE.
