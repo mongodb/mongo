@@ -2945,6 +2945,218 @@ namespace ExpressionTests {
 
     } // namespace Parse
 
+    namespace Strcasecmp {
+
+        class ExpectedResultBase {
+        public:
+            virtual ~ExpectedResultBase() {
+            }
+            void run() {
+                assertResult( expectedResult(), spec() );
+                assertResult( -expectedResult(), reverseSpec() );
+            }
+        protected:
+            virtual string a() = 0;
+            virtual string b() = 0;
+            virtual int expectedResult() = 0;
+        private:
+            BSONObj spec() { return BSON( "$strcasecmp" << BSON_ARRAY( a() << b() ) ); }
+            BSONObj reverseSpec() { return BSON( "$strcasecmp" << BSON_ARRAY( b() << a() ) ); }
+            void assertResult( int expectedResult, const BSONObj& spec ) {
+                BSONObj specObj = BSON( "" << spec );
+                BSONElement specElement = specObj.firstElement();
+                intrusive_ptr<Expression> expression = Expression::parseOperand( &specElement );
+                ASSERT_EQUALS( spec, expressionToBson( expression ) );
+                ASSERT_EQUALS( BSON( "" << expectedResult ),
+                               toBson( expression->evaluate( Document::create() ) ) );                
+            }
+        };
+
+        class NullBegin : public ExpectedResultBase {
+            string a() { return string( "\0ab", 3 ); }
+            string b() { return string( "\0AB", 3 ); }
+            int expectedResult() { return 0; }            
+        };
+
+        class NullEnd : public ExpectedResultBase {
+            string a() { return string( "ab\0", 3 ); }
+            string b() { return string( "aB\0", 3 ); }
+            int expectedResult() { return 0; }            
+        };
+        
+        class NullMiddleLt : public ExpectedResultBase {
+            string a() { return string( "a\0a", 3 ); }
+            string b() { return string( "a\0B", 3 ); }
+            int expectedResult() { return -1; }            
+        };
+        
+        class NullMiddleEq : public ExpectedResultBase {
+            string a() { return string( "a\0b", 3 ); }
+            string b() { return string( "a\0B", 3 ); }
+            int expectedResult() { return 0; }            
+        };
+        
+        class NullMiddleGt : public ExpectedResultBase {
+            string a() { return string( "a\0c", 3 ); }
+            string b() { return string( "a\0B", 3 ); }
+            int expectedResult() { return 1; }            
+        };
+        
+    } // namespace Strcasecmp
+
+    namespace Substr {
+
+        class ExpectedResultBase {
+        public:
+            virtual ~ExpectedResultBase() {
+            }
+            void run() {
+                BSONObj specObj = BSON( "" << spec() );
+                BSONElement specElement = specObj.firstElement();
+                intrusive_ptr<Expression> expression = Expression::parseOperand( &specElement );
+                ASSERT_EQUALS( spec(), expressionToBson( expression ) );
+                ASSERT_EQUALS( BSON( "" << expectedResult() ),
+                               toBson( expression->evaluate( Document::create() ) ) );
+            }
+        protected:
+            virtual string str() = 0;
+            virtual int offset() = 0;
+            virtual int length() = 0;
+            virtual string expectedResult() = 0;
+        private:
+            BSONObj spec() {
+                return BSON( "$substr" << BSON_ARRAY( str() << offset() << length() ) );
+            }
+        };
+
+        /** Retrieve a full string containing a null character. */
+        class FullNull : public ExpectedResultBase {
+            string str() { return string( "a\0b", 3 ); }
+            int offset() { return 0; }
+            int length() { return 3; }
+            string expectedResult() { return str(); }
+        };
+
+        /** Retrieve a substring beginning with a null character. */
+        class BeginAtNull : public ExpectedResultBase {
+            string str() { return string( "a\0b", 3 ); }
+            int offset() { return 1; }
+            int length() { return 2; }
+            string expectedResult() { return string( "\0b", 2 ); }
+        };
+
+        /** Retrieve a substring ending with a null character. */
+        class EndAtNull : public ExpectedResultBase {
+            string str() { return string( "a\0b", 3 ); }
+            int offset() { return 0; }
+            int length() { return 2; }
+            string expectedResult() { return string( "a\0", 2 ); }
+        };
+
+        /** Drop a beginning null character. */
+        class DropBeginningNull : public ExpectedResultBase {
+            string str() { return string( "\0b", 2 ); }
+            int offset() { return 1; }
+            int length() { return 1; }
+            string expectedResult() { return "b"; }
+        };
+        
+        /** Drop an ending null character. */
+        class DropEndingNull : public ExpectedResultBase {
+            string str() { return string( "a\0", 2 ); }
+            int offset() { return 0; }
+            int length() { return 1; }
+            string expectedResult() { return "a"; }
+        };
+        
+    } // namespace Substr
+
+    namespace ToLower {
+
+        class ExpectedResultBase {
+        public:
+            virtual ~ExpectedResultBase() {
+            }
+            void run() {
+                BSONObj specObj = BSON( "" << spec() );
+                BSONElement specElement = specObj.firstElement();
+                intrusive_ptr<Expression> expression = Expression::parseOperand( &specElement );
+                ASSERT_EQUALS( spec(), expressionToBson( expression ) );
+                ASSERT_EQUALS( BSON( "" << expectedResult() ),
+                               toBson( expression->evaluate( Document::create() ) ) );
+            }
+        protected:
+            virtual string str() = 0;
+            virtual string expectedResult() = 0;
+        private:
+            BSONObj spec() {
+                return BSON( "$toLower" << BSON_ARRAY( str() ) );
+            }
+        };
+
+        /** String beginning with a null character. */
+        class NullBegin : public ExpectedResultBase {
+            string str() { return string( "\0aB", 3 ); }
+            string expectedResult() { return string( "\0ab", 3 ); }
+        };
+
+        /** String containing a null character. */
+        class NullMiddle : public ExpectedResultBase {
+            string str() { return string( "a\0B", 3 ); }
+            string expectedResult() { return string( "a\0b", 3 ); }
+        };
+        
+        /** String ending with a null character. */
+        class NullEnd : public ExpectedResultBase {
+            string str() { return string( "aB\0", 3 ); }
+            string expectedResult() { return string( "ab\0", 3 ); }
+        };
+        
+    } // namespace ToLower
+
+    namespace ToUpper {
+
+        class ExpectedResultBase {
+        public:
+            virtual ~ExpectedResultBase() {
+            }
+            void run() {
+                BSONObj specObj = BSON( "" << spec() );
+                BSONElement specElement = specObj.firstElement();
+                intrusive_ptr<Expression> expression = Expression::parseOperand( &specElement );
+                ASSERT_EQUALS( spec(), expressionToBson( expression ) );
+                ASSERT_EQUALS( BSON( "" << expectedResult() ),
+                               toBson( expression->evaluate( Document::create() ) ) );
+            }
+        protected:
+            virtual string str() = 0;
+            virtual string expectedResult() = 0;
+        private:
+            BSONObj spec() {
+                return BSON( "$toUpper" << BSON_ARRAY( str() ) );
+            }
+        };
+
+        /** String beginning with a null character. */
+        class NullBegin : public ExpectedResultBase {
+            string str() { return string( "\0aB", 3 ); }
+            string expectedResult() { return string( "\0AB", 3 ); }
+        };
+
+        /** String containing a null character. */
+        class NullMiddle : public ExpectedResultBase {
+            string str() { return string( "a\0B", 3 ); }
+            string expectedResult() { return string( "A\0B", 3 ); }
+        };
+        
+        /** String ending with a null character. */
+        class NullEnd : public ExpectedResultBase {
+            string str() { return string( "aB\0", 3 ); }
+            string expectedResult() { return string( "AB\0", 3 ); }
+        };
+        
+    } // namespace ToUpper
+
     class All : public Suite {
     public:
         All() : Suite( "expression" ) {
@@ -3218,6 +3430,26 @@ namespace ExpressionTests {
             add<Parse::Operand::Object>();
             add<Parse::Operand::InclusionObject>();
             add<Parse::Operand::Constant>();
+
+            add<Strcasecmp::NullBegin>();
+            add<Strcasecmp::NullEnd>();
+            add<Strcasecmp::NullMiddleLt>();
+            add<Strcasecmp::NullMiddleEq>();
+            add<Strcasecmp::NullMiddleGt>();
+
+            add<Substr::FullNull>();
+            add<Substr::BeginAtNull>();
+            add<Substr::EndAtNull>();
+            add<Substr::DropBeginningNull>();
+            add<Substr::DropEndingNull>();
+
+            add<ToLower::NullBegin>();
+            add<ToLower::NullMiddle>();
+            add<ToLower::NullEnd>();
+
+            add<ToUpper::NullBegin>();
+            add<ToUpper::NullMiddle>();
+            add<ToUpper::NullEnd>();
         }
     } myall;
 
