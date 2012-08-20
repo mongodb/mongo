@@ -50,7 +50,7 @@ namespace mongo {
         bool isLocked( const StringData& ns ); // rwRW
 
         /** pending means we are currently trying to get a lock */
-        bool hasLockPending() const { return _lockPending; }
+        bool hasLockPending() const { return _lockPending || _lockPendingParallelWriter; }
 
         // ----
 
@@ -105,8 +105,10 @@ namespace mongo {
         Lock::ScopedLock* _scopedLk;   
         
         bool _lockPending;
+        bool _lockPendingParallelWriter;
 
         friend class Acquiring;
+        friend class AcquiringParallelWriter;
     };
 
     class WrapperForRWLock : boost::noncopyable { 
@@ -132,7 +134,14 @@ namespace mongo {
         LockState& _ls;
     };
         
+    class AcquiringParallelWriter {
+    public:
+        AcquiringParallelWriter( LockState& ls );
+        ~AcquiringParallelWriter();
 
+    private:
+        LockState& _ls;
+    };
 
 
 }

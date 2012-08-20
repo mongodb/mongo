@@ -78,9 +78,15 @@ namespace mongo {
 
     private:
         class ParallelBatchWriterSupport : boost::noncopyable {
-            scoped_ptr<RWLockRecursive::Shared> _lk;
         public:
             ParallelBatchWriterSupport();
+
+        private:
+            void tempRelease();
+            void relock();
+
+            scoped_ptr<RWLockRecursive::Shared> _lk;
+            friend class ScopedLock;
         };
 
     public:
