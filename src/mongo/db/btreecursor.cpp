@@ -221,20 +221,20 @@ namespace mongo {
         NamespaceDetails *d, int idxNo, const IndexDetails& id, 
         const BSONObj &startKey, const BSONObj &endKey, bool endKeyInclusive, int direction) 
     { 
-        BtreeCursor *c = make( d , idxNo , id );
+        auto_ptr<BtreeCursor> c( make( d , idxNo , id ) );
         c->init(startKey,endKey,endKeyInclusive,direction);
         c->initWithoutIndependentFieldRanges();
         dassert( c->_dups.size() == 0 );
-        return c;
+        return c.release();
     }
 
     BtreeCursor* BtreeCursor::make(
         NamespaceDetails *d, int idxNo, const IndexDetails& id, 
         const shared_ptr< FieldRangeVector > &bounds, int singleIntervalLimit, int direction )
     {
-        BtreeCursor *c = make( d , idxNo , id );
+        auto_ptr<BtreeCursor> c( make( d , idxNo , id ) );
         c->init(bounds,singleIntervalLimit,direction);
-        return c;
+        return c.release();
     }
 
     BtreeCursor::BtreeCursor( NamespaceDetails* nsd , int theIndexNo, const IndexDetails& id ) 
