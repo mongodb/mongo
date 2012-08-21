@@ -258,7 +258,15 @@ f.ensureIndex( { x: 1, y: 1 } );
 case4();
 
 f.drop();
+f.ensureIndex( { x: 1, y: -1 , z : 1 } );
+case4();
+
+f.drop();
 f.ensureIndex( { x: 1, y: 1 } );
+case5();
+
+f.drop();
+f.ensureIndex( { x: 1, y: -1 , z : 1 } );
 case5();
 
 f.drop();
@@ -266,7 +274,15 @@ f.ensureIndex( { x: 1, y: 1 } );
 case6();
 
 f.drop();
+f.ensureIndex( { x: 1, y: -1 , z : 1 } );
+case6();
+
+f.drop();
 f.ensureIndex( { x: 1, y: 1 } );
+case7();
+
+f.drop();
+f.ensureIndex( { x: 1, y: -1 , z : 1 } );
 case7();
 
 f.drop();
@@ -274,7 +290,15 @@ f.ensureIndex( { x: 1, y: 1 } );
 case8();
 
 f.drop();
+f.ensureIndex( { x: 1, y: -1 , z : 1 } );
+case8();
+
+f.drop();
 f.ensureIndex( { x: 1, y: 1 } );
+case9();
+
+f.drop();
+f.ensureIndex( { x: 1, y: -1 , z : 1 } );
 case9();
 
 print("PASSED");
