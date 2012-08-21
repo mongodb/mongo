@@ -1133,6 +1133,7 @@ namespace mongo {
 
                                 if ( ! yield.stillOk() ) {
                                     cursor.release();
+                                    holdCursor.release();
                                     break;
                                 }
 
