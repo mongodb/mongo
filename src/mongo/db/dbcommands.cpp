@@ -1249,8 +1249,9 @@ namespace mongo {
                     errmsg = "couldn't find valid index containing key pattern";
                     return false;
                 }
+                // If both min and max non-empty, append MinKey's to make them fit chosen index
                 min = Helpers::modifiedRangeBound( min , idx->keyPattern() , -1 );
-                max = Helpers::modifiedRangeBound( max , idx->keyPattern() , 1 );
+                max = Helpers::modifiedRangeBound( max , idx->keyPattern() , -1 );
 
                 c.reset( BtreeCursor::make( d, d->idxNo(*idx), *idx, min, max, false, 1 ) );
             }
