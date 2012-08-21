@@ -97,9 +97,15 @@ namespace mongo {
                 errmsg = "couldn't find valid index for shard key";
                 return false;
             }
-            //has the effect of extending empty min/max to match selected index
+            // extend min to get (min, MinKey, MinKey, ....)
             min = Helpers::modifiedRangeBound( min , idx->keyPattern() , -1 );
-            max = Helpers::modifiedRangeBound( max , idx->keyPattern() , 1 );
+            if  ( max.isEmpty() ) {
+                // if max not specified, make it (MaxKey, Maxkey, MaxKey...)
+                max = Helpers::modifiedRangeBound( max , idx->keyPattern() , 1 );
+            } else {
+                // otherwise make it (max,MinKey,MinKey...) so that bound is non-inclusive
+                max = Helpers::modifiedRangeBound( max , idx->keyPattern() , -1 );
+            }
 
             BtreeCursor * bc = BtreeCursor::make( d , d->idxNo(*idx) , *idx , min , max , false , 1 );
             shared_ptr<Cursor> c( bc );
@@ -196,17 +202,7 @@ namespace mongo {
             // If min and max are not provided use the "minKey" and "maxKey" for the sharding key pattern.
             BSONObj min = jsobj.getObjectField( "min" );
             BSONObj max = jsobj.getObjectField( "max" );
-            if ( min.isEmpty() && max.isEmpty() ) {
-                BSONObjBuilder minBuilder;
-                BSONObjBuilder maxBuilder;
-                BSONForEach(key, keyPattern) {
-                    minBuilder.appendMinKey( key.fieldName() );
-                    maxBuilder.appendMaxKey( key.fieldName() );
-                }
-                min = minBuilder.obj();
-                max = maxBuilder.obj();
-            }
-            else if ( min.isEmpty() || max.isEmpty() ) {
+            if ( min.isEmpty() != max.isEmpty() ){
                 errmsg = "either provide both min and max or leave both empty";
                 return false;
             }
@@ -241,8 +237,15 @@ namespace mongo {
                              keyPattern.clientReadable().toString();
                     return false;
                 }
+                // extend min to get (min, MinKey, MinKey, ....)
                 min = Helpers::modifiedRangeBound( min , idx->keyPattern() , -1 );
-                max = Helpers::modifiedRangeBound( max , idx->keyPattern() , 1 );
+                if  ( max.isEmpty() ) {
+                    // if max not specified, make it (MaxKey, Maxkey, MaxKey...)
+                    max = Helpers::modifiedRangeBound( max , idx->keyPattern() , 1 );
+                } else {
+                    // otherwise make it (max,MinKey,MinKey...) so that bound is non-inclusive
+                    max = Helpers::modifiedRangeBound( max , idx->keyPattern() , -1 );
+                }
                 
                 const long long recCount = d->stats.nrecords;
                 const long long dataSize = d->stats.datasize;
@@ -324,15 +327,13 @@ namespace mongo {
                 // at the end. If a key appears more times than entries allowed on a chunk, we issue a warning and
                 // split on the following key.
                 set<BSONObj> tooFrequentKeys;
-                splitKeys.push_back( c->currKey().getOwned() );
+                splitKeys.push_back( bc->prettyKey( c->currKey().getOwned() ).extractFields( keyPattern ) );
                 while ( 1 ) {
                     while ( cc->ok() ) {
                         currCount++;
-                        BSONObj currKey = c->currKey();
-                        
-                        DEV verify( currKey.woCompare( max ) <= 0 );
                         
                         if ( currCount > keyCount ) {
+                            BSONObj currKey = bc->prettyKey( c->currKey() ).extractFields(keyPattern);
                             // Do not use this split key if it is the same used in the previous split point.
                             if ( currKey.woCompare( splitKeys.back() ) == 0 ) {
                                 tooFrequentKeys.insert( currKey.getOwned() );
@@ -343,7 +344,7 @@ namespace mongo {
                                 currCount = 0;
                                 numChunks++;
                                 
-                                LOG(4) << "picked a split key: " << bc->prettyKey( currKey ) << endl;
+                                LOG(4) << "picked a split key: " << currKey << endl;
                             }
                             
                         }
@@ -393,12 +394,9 @@ namespace mongo {
                               << " bytes because of key " << bc->prettyKey( *it ) << endl;
                 }
                 
-                // Remove the sentinel at the beginning before returning and add fieldnames.
+                // Remove the sentinel at the beginning before returning
                 splitKeys.erase( splitKeys.begin() );
                 verify( c.get() );
-                for ( vector<BSONObj>::iterator it = splitKeys.begin(); it != splitKeys.end() ; ++it ) {
-                    *it = bc->prettyKey( *it );
-                }
                 
                 if ( timer.millis() > cmdLine.slowMS ) {
                     warning() << "Finding the split vector for " <<  ns << " over "<< keyPattern

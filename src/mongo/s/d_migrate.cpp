@@ -437,9 +437,9 @@ namespace mongo {
                 errmsg = (string)"can't find index in storeCurrentLocs" + causedBy( errmsg );
                 return false;
             }
-
+            // Assume both min and max non-empty, append MinKey's to make them fit chosen index
             BSONObj min = Helpers::modifiedRangeBound( _min , idx->keyPattern() , -1 );
-            BSONObj max = Helpers::modifiedRangeBound( _max , idx->keyPattern() , 1 );
+            BSONObj max = Helpers::modifiedRangeBound( _max , idx->keyPattern() , -1 );
 
             BtreeCursor* btreeCursor = BtreeCursor::make( d , *idx , min , max , false , 1 );
             auto_ptr<ClientCursor> cc(

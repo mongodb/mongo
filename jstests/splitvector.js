@@ -28,6 +28,22 @@ assertChunkSizes = function ( splitVec , numDocs , maxChunkSize , msg ){
     }
 }
 
+// Takes two documents and asserts that both contain exactly the same set of field names.
+// This is useful for checking that splitPoints have the same format as the original key pattern,
+// even when sharding on a prefix key.
+// Not very efficient, so only call when # of field names is small
+var assertFieldNamesMatch = function( splitPoint , keyPattern ){
+    for ( var p in splitPoint ) {
+        if( splitPoint.hasOwnProperty( p ) ) {
+            assert( keyPattern.hasOwnProperty( p ) , "property " + p + " not in keyPattern" );
+        }
+    }
+    for ( var p in keyPattern ) {
+        if( keyPattern.hasOwnProperty( p ) ){
+            assert( splitPoint.hasOwnProperty( p ) , "property " + p + " not in splitPoint" );
+        }
+    }
+}
 
 // -------------------------
 //  TESTS START HERE
@@ -84,6 +100,9 @@ var case4 = function() {
     assert.eq( true , res.ok , "4b" );
     assert.close( numDocs*docSize / ((1<<20) * factor), res.splitKeys.length , "num split keys" , -1 );
     assertChunkSizes( res.splitKeys , numDocs, (1<<20) * factor , "4d" );
+    for( i=0; i < res.splitKeys.length; i++ ){
+        assertFieldNamesMatch( res.splitKeys[i] , {x : 1} );
+    }
 }
 case4();
 
@@ -104,6 +123,9 @@ var case5 = function() {
 
     assert.eq( true , res.ok , "5a" );
     assert.eq( 1 , res.splitKeys.length , "5b" );
+    for( i=0; i < res.splitKeys.length; i++ ){
+        assertFieldNamesMatch( res.splitKeys[i] , {x : 1} );
+    }
 }
 case5();
 
@@ -124,6 +146,9 @@ var case6 = function() {
 
     assert.eq( true , res.ok , "6a" );
     assert.eq( 19 , res.splitKeys.length , "6b" );
+    for( i=0; i < res.splitKeys.length; i++ ){
+        assertFieldNamesMatch( res.splitKeys[i] , {x : 1} );
+    }
 }
 case6();
 
@@ -149,6 +174,9 @@ var case7 = function() {
 
     assert.eq( true , res.ok , "7a" );
     assert.eq( 2 , res.splitKeys[0].x, "7b");
+    for( i=0; i < res.splitKeys.length; i++ ){
+        assertFieldNamesMatch( res.splitKeys[i] , {x : 1} );
+    }
 }
 case7();
 
@@ -180,6 +208,9 @@ var case8 = function() {
     assert.eq( 2 , res.splitKeys.length , "8b" );
     assert.eq( 2 , res.splitKeys[0].x , "8c" );
     assert.eq( 3 , res.splitKeys[1].x , "8d" );
+    for( i=0; i < res.splitKeys.length; i++ ){
+        assertFieldNamesMatch( res.splitKeys[i] , {x : 1} );
+    }
 }
 case8();
 
@@ -211,6 +242,9 @@ var case9 = function() {
         assert.eq( true , res.ok , "9a: " + tojson(res) );
         assert.eq( 1 , res.splitKeys.length , "9b: " + tojson(res) );
         assert.eq( 2 , res.splitKeys[0].x , "9c: " + tojson(res) );
+        for( i=0; i < res.splitKeys.length; i++ ){
+            assertFieldNamesMatch( res.splitKeys[i] , {x : 1} );
+        }
     }
 }
 case9();
