@@ -1024,7 +1024,7 @@ namespace mongo {
 
                 uassert( 16149 , "cannot run map reduce without the js engine", globalScriptEngine );
 
-                auto_ptr<ClientCursor> holdCursor;
+                ClientCursor::Holder holdCursor;
                 ShardChunkManagerPtr chunkManager;
 
                 {
@@ -1040,8 +1040,8 @@ namespace mongo {
                     // Get a very basic cursor, prevents deletion of migrated data while we m/r
                     shared_ptr<Cursor> temp = NamespaceDetailsTransient::getCursor( config.ns.c_str(), BSONObj(), BSONObj() );
                     uassert( 15876, str::stream() << "could not create cursor over " << config.ns << " to hold data while prepping m/r", temp.get() );
-                    holdCursor = auto_ptr<ClientCursor>( new ClientCursor( QueryOption_NoCursorTimeout , temp , config.ns.c_str() ) );
-                    uassert( 15877, str::stream() << "could not create m/r holding client cursor over " << config.ns, holdCursor.get() );
+                    holdCursor.reset( new ClientCursor( QueryOption_NoCursorTimeout , temp , config.ns.c_str() ) );
+                    uassert( 15877, str::stream() << "could not create m/r holding client cursor over " << config.ns, holdCursor );
 
                 }
 
@@ -1133,7 +1133,6 @@ namespace mongo {
 
                                 if ( ! yield.stillOk() ) {
                                     cursor.release();
-                                    holdCursor.release();
                                     break;
                                 }
 
