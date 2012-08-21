@@ -99,6 +99,27 @@ namespace tcmalloc {
 // only result in a single call to PickNextSamplingPoint.
 //-------------------------------------------------------------------
 
+#ifdef NO_TCMALLOC_SAMPLES // 10gen
+
+// Dummy class with same public interface as below
+class PERFTOOLS_DLL_DECL Sampler {
+ public:
+  void Init(uint32_t seed) {}
+  bool SampleAllocation(size_t k) { return false; }
+  static void InitStatics() {}
+  int GetSamplePeriod() { return 0; }
+
+# if 0
+  // "public" functions only used in the Sampler and tests of the Sampler
+  void Cleanup();
+  size_t PickNextSamplingPoint();
+  static uint64_t NextRandom(uint64_t rnd_);
+  static double FastLog2(const double & d);
+  static void PopulateFastLog2Table();
+# endif
+};
+
+#else
 class PERFTOOLS_DLL_DECL Sampler {
  public:
   // Initialize this sampler.
@@ -173,6 +194,7 @@ inline double Sampler::FastLog2(const double & d) {
   const int32_t exponent = ((x_high >> 20) & 0x7FF) - 1023;
   return exponent + log_table_[y];
 }
+#endif // NO_TCMALLOC_SAMPLES // 10gen
 
 }  // namespace tcmalloc
 

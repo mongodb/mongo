@@ -56,6 +56,8 @@ DEFINE_int64(tcmalloc_sample_parameter,
 
 namespace tcmalloc {
 
+#if !defined(NO_TCMALLOC_SAMPLES) // 10gen
+
 // Statics for Sampler
 double Sampler::log_table_[1<<kFastlogNumBits];
 
@@ -126,5 +128,6 @@ size_t Sampler::PickNextSamplingPoint() {
   return static_cast<size_t>(min(0.0, (FastLog2(q) - 26)) * (-log(2.0)
                              * FLAGS_tcmalloc_sample_parameter) + 1);
 }
+#endif // !defined(NO_TCMALLOC_SAMPLES) // 10gen
 
 }  // namespace tcmalloc
