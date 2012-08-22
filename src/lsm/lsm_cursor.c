@@ -215,17 +215,33 @@ __clsm_next(WT_CURSOR *cursor)
 	WT_CURSOR *c;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int i;
-	int check, cmp, deleted;
+	int check, cmp, deleted, i;
 
 	WT_LSM_ENTER(clsm, cursor, session, next);
 
-	/* If we aren't positioned, get started. */
-	if (clsm->current == NULL) {
+	/* If we aren't positioned for a forward scan, get started. */
+	if (clsm->current == NULL || !F_ISSET(clsm, WT_CLSM_ITERATE_NEXT)) {
+		F_CLR(clsm, WT_CLSM_MULTIPLE);
 		FORALL_CURSORS(clsm, c, i) {
-			WT_ERR(c->reset(c));
-			WT_ERR_NOTFOUND_OK(c->next(c));
+			if (clsm->current == NULL) {
+				WT_ERR(c->reset(c));
+				ret = c->next(c);
+			} else {
+				c->set_key(c, &cursor->key);
+				if ((ret = c->search_near(c, &cmp)) == 0) {
+					if (cmp < 0)
+						ret = c->next(c);
+					else if (cmp == 0)
+						F_SET(clsm, WT_CLSM_MULTIPLE);
+				}
+			}
+			WT_ERR_NOTFOUND_OK(ret);
 		}
+		F_SET(clsm, WT_CLSM_ITERATE_NEXT);
+		F_CLR(clsm, WT_CLSM_ITERATE_PREV);
+		/* XXX: we just positioned *at* the key, now move */
+		if (clsm->current != NULL)
+			goto retry;
 	} else {
 retry:		/*
 		 * If there are multiple cursors on that key, move them
@@ -274,17 +290,33 @@ __clsm_prev(WT_CURSOR *cursor)
 	WT_CURSOR *c;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int i;
-	int check, cmp, deleted;
+	int check, cmp, deleted, i;
 
 	WT_LSM_ENTER(clsm, cursor, session, next);
 
-	/* If we aren't positioned, get started. */
-	if (clsm->current == NULL) {
+	/* If we aren't positioned for a reverse scan, get started. */
+	if (clsm->current == NULL || !F_ISSET(clsm, WT_CLSM_ITERATE_PREV)) {
+		F_CLR(clsm, WT_CLSM_MULTIPLE);
 		FORALL_CURSORS(clsm, c, i) {
-			WT_ERR(c->reset(c));
-			WT_ERR_NOTFOUND_OK(c->prev(c));
+			if (clsm->current == NULL) {
+				WT_ERR(c->reset(c));
+				ret = c->prev(c);
+			} else if (c != clsm->current) {
+				c->set_key(c, &cursor->key);
+				if ((ret = c->search_near(c, &cmp)) == 0) {
+					if (cmp > 0)
+						ret = c->prev(c);
+					else if (cmp == 0)
+						F_SET(clsm, WT_CLSM_MULTIPLE);
+				}
+			}
+			WT_ERR_NOTFOUND_OK(ret);
 		}
+		F_SET(clsm, WT_CLSM_ITERATE_PREV);
+		F_CLR(clsm, WT_CLSM_ITERATE_NEXT);
+		/* XXX: we just positioned *at* the key, now move */
+		if (clsm->current != NULL)
+			goto retry;
 	} else {
 retry:		/*
 		 * If there are multiple cursors on that key, move them
@@ -313,7 +345,7 @@ retry:		/*
 		WT_ERR_NOTFOUND_OK(c->prev(c));
 	}
 
-	/* Find the cursor(s) with the smallest key. */
+	/* Find the cursor(s) with the largest key. */
 	if ((ret = __clsm_get_current(session, clsm, 0, &deleted)) == 0 &&
 	    deleted)
 		goto retry;
@@ -340,6 +372,7 @@ __clsm_reset(WT_CURSOR *cursor)
 		clsm->current = NULL;
 	}
 	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+	F_CLR(clsm, WT_CLSM_ITERATE_NEXT | WT_CLSM_ITERATE_PREV);
 err:	WT_LSM_END(clsm, session);
 
 	return (ret);
@@ -513,6 +546,13 @@ __clsm_put(
 	primary->set_key(primary, key);
 	primary->set_value(primary, value);
 	WT_RET(primary->insert(primary));
+
+	/*
+	 * Set the position for future scans.  If we were already positioned in
+	 * a non-primary chunk, we may now have multiple cursors matching the
+	 * key.
+	 */
+	F_CLR(clsm, WT_CLSM_ITERATE_PREV | WT_CLSM_ITERATE_NEXT);
 	clsm->current = primary;
 
 	if ((memsizep = lsm_tree->memsizep) != NULL &&
