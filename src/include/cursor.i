@@ -95,7 +95,7 @@ __cursor_func_resolve(WT_CURSOR_BTREE *cbt, int ret)
  *	Return a WT_ROW slot's K/V pair.
  */
 static inline int
-__cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip)
+__cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip, WT_UPDATE *upd)
 {
 	WT_BTREE *btree;
 	WT_ITEM *kb, *vb;
@@ -103,7 +103,6 @@ __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip)
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_IKEY *ikey;
 	WT_SESSION_IMPL *session;
-	WT_UPDATE *upd;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	btree = session->btree;
@@ -179,11 +178,13 @@ slow:			WT_RET(__wt_row_key_copy(session, cbt->page, rip, kb));
 	}
 
 	/*
-	 * If the item was ever modified, use the WT_UPDATE data.
+	 * If the item was ever modified, use the WT_UPDATE data.  Note that
+	 * the caller passes us the update: it has already resolved which one
+	 * (if any) is visible.
 	 * Else, check for empty data.
 	 * Else, use the value from the original disk image.
 	 */
-	if ((upd = WT_ROW_UPDATE(cbt->page, rip)) != NULL) {
+	if (upd != NULL) {
 		vb->data = WT_UPDATE_DATA(upd);
 		vb->size = upd->size;
 	} else if ((cell = __wt_row_value(cbt->page, rip)) == NULL) {

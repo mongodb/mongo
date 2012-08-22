@@ -328,6 +328,48 @@ class test_checkpoint_last_name(wttest.WiredTigerTestCase):
                 self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
                     lambda: self.session.checkpoint(conf), msg)
 
+class test_checkpoint_empty(wttest.WiredTigerTestCase):
+    scenarios = [
+        ('file', dict(uri='file:checkpoint')),
+        ('table', dict(uri='table:checkpoint')),
+    ]
+
+    # Create an empty file, do one of 4 cases of checkpoint, then verify the
+    # checkpoints exist.   The reason for the 4 cases is we must create all
+    # checkpoints an application can explicitly reference using a cursor, and
+    # I want to test when other types of checkpoints are created before the
+    # checkpoint we really need.
+    # Case 1: a named checkpoint
+    def test_checkpoint_empty_one(self):
+        self.session.create(self.uri, "key_format=S,value_format=S")
+        self.session.checkpoint('name=ckpt')
+        cursor = self.session.open_cursor(self.uri, None, "checkpoint=ckpt")
+
+    # Case 2: an internal checkpoint
+    def test_checkpoint_empty_two(self):
+        self.session.create(self.uri, "key_format=S,value_format=S")
+        self.session.checkpoint()
+        cursor = self.session.open_cursor(
+            self.uri, None, "checkpoint=WiredTigerCheckpoint")
+
+    # Case 3: a named checkpoint, then an internal checkpoint
+    def test_checkpoint_empty_three(self):
+        self.session.create(self.uri, "key_format=S,value_format=S")
+        self.session.checkpoint('name=ckpt')
+        self.session.checkpoint()
+        cursor = self.session.open_cursor(self.uri, None, "checkpoint=ckpt")
+        cursor = self.session.open_cursor(
+            self.uri, None, "checkpoint=WiredTigerCheckpoint")
+
+    # Case 4: an internal checkpoint, then a named checkpoint
+    def test_checkpoint_empty_four(self):
+        self.session.create(self.uri, "key_format=S,value_format=S")
+        self.session.checkpoint()
+        self.session.checkpoint('name=ckpt')
+        cursor = self.session.open_cursor(self.uri, None, "checkpoint=ckpt")
+        cursor = self.session.open_cursor(
+            self.uri, None, "checkpoint=WiredTigerCheckpoint")
+
 
 if __name__ == '__main__':
     wttest.run()

@@ -302,7 +302,7 @@ new_insert:	if ((ins = cbt->ins) != NULL) {
 		if (upd != NULL && WT_UPDATE_DELETED_ISSET(upd))
 			continue;
 
-		return (__cursor_row_slot_return(cbt, rip));
+		return (__cursor_row_slot_return(cbt, rip, upd));
 	}
 	/* NOTREACHED */
 }

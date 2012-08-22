@@ -217,6 +217,9 @@ __btree_conf(WT_SESSION_IMPL *session)
 
 	WT_RET(__wt_stat_alloc_btree_stats(session, &btree->stats));
 
+	/* The tree has not been modified. */
+	btree->modified = 0;
+
 	return (0);
 }
 
@@ -340,14 +343,13 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session)
 	 * simply has no records, for whatever reason, and trust reconciliation
 	 * to figure out it's empty and not write any blocks.
 	 *    We do not set the tree's modified flag because the checkpoint code
-	 * skips unmodified files in default checkpoints (checkpoints that don't
-	 * require a write unless the file is actually dirty).  There's no
-	 * reason to reconcile this file unless the application requires it as
-	 * part of a forced checkpoint or if the application actually modifies
-	 * it.
+	 * skips unmodified files in closing checkpoints (checkpoints that don't
+	 * require a write unless the file is actually dirty).  There's no need
+	 * to reconcile this file unless the application does a real checkpoint
+	 * or it's actually modified.
 	 */
 	WT_ERR(__wt_page_modify_init(session, leaf));
-	++leaf->modify->write_gen;
+	__wt_page_modify_set(leaf);
 
 	return (0);
 

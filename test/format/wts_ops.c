@@ -167,11 +167,12 @@ ops(void *arg)
 			 * append configuration.
 			 */
 			if ((ret = session->open_cursor(session,
-			    WT_TABLENAME, NULL, "overwrite", &cursor)) != 0)
+			    g.c_data_source, NULL, "overwrite", &cursor)) != 0)
 				die(ret, "session.open_cursor");
 			if ((g.c_file_type == FIX || g.c_file_type == VAR) &&
-			    (ret = session->open_cursor(session,
-			    WT_TABLENAME, NULL, "append", &cursor_insert)) != 0)
+			    (ret = session->open_cursor(
+			    session, g.c_data_source,
+			    NULL, "append", &cursor_insert)) != 0)
 				die(ret, "session.open_cursor");
 		}
 
@@ -319,7 +320,7 @@ wts_read_scan(void)
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die(ret, "connection.open_session");
 	if ((ret = session->open_cursor(
-	    session, WT_TABLENAME, NULL, NULL, &cursor)) != 0)
+	    session, g.c_data_source, NULL, NULL, &cursor)) != 0)
 		die(ret, "session.open_cursor");
 
 	/* Check a random subset of the records using the key. */

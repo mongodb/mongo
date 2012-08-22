@@ -140,11 +140,8 @@ __wt_page_modify_init(WT_SESSION_IMPL *session, WT_PAGE *page)
  *	Mark the page dirty.
  */
 static inline void
-__wt_page_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
+__wt_page_modify_set(WT_PAGE *page)
 {
-	/* Set the tree modified flag. */
-	session->btree->modified = 1;
-
 	/*
 	 * Publish: there must be a barrier to ensure all changes to the page
 	 * are flushed before we update the page's write generation, otherwise
