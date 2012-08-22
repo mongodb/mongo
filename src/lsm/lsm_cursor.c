@@ -11,14 +11,14 @@
 	for (i = clsm->nchunks - 1; i >= 0; i--)			\
 		if ((c = clsm->cursors[i]) != NULL)
 
-#define	WT_LSM_CMP(s, lsmtree, k1, k2, cmp)				\
-	(((lsmtree)->collator == NULL) ?				\
+#define	WT_LSM_CMP(s, lsm_tree, k1, k2, cmp)				\
+	(((lsm_tree)->collator == NULL) ?				\
 	(((cmp) = __wt_btree_lex_compare((k1), (k2))), 0) :		\
-	(lsmtree)->collator->compare((lsmtree)->collator, &(s)->iface,	\
-	    (k1), (k2), &(cmp)))
+	(lsm_tree)->collator->compare((lsm_tree)->collator,		\
+	    &(s)->iface, (k1), (k2), &(cmp)))
 
-#define	WT_LSM_CURCMP(s, lsmtree, c1, c2, cmp)				\
-	WT_LSM_CMP(s, lsmtree, &(c1)->key, &(c2)->key, cmp)
+#define	WT_LSM_CURCMP(s, lsm_tree, c1, c2, cmp)				\
+	WT_LSM_CMP(s, lsm_tree, &(c1)->key, &(c2)->key, cmp)
 
 /*
  * LSM API enter/leave: check that the cursor is in sync with the tree.
@@ -38,7 +38,7 @@ static inline int
 __clsm_enter(WT_CURSOR_LSM *clsm)
 {
 	if (!F_ISSET(clsm, WT_CLSM_MERGE) &&
-	    clsm->dsk_gen != clsm->lsmtree->dsk_gen)
+	    clsm->dsk_gen != clsm->lsm_tree->dsk_gen)
 		return (__clsm_open_cursors(clsm));
 
 	/* TODO: indicate somehow that we are in the tree. */
@@ -106,26 +106,26 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm)
 	WT_CURSOR **cp;
 	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk;
-	WT_LSM_TREE *lsmtree;
+	WT_LSM_TREE *lsm_tree;
 	WT_SESSION_IMPL *session;
 	const char *ckpt_cfg[] = { "checkpoint=WiredTigerCheckpoint", NULL };
 	int i, nchunks;
 
 	session = (WT_SESSION_IMPL *)clsm->iface.session;
-	lsmtree = clsm->lsmtree;
+	lsm_tree = clsm->lsm_tree;
 
 	WT_RET(__clsm_close_cursors(clsm));
 
-	__wt_spin_lock(session, &lsmtree->lock);
-	clsm->dsk_gen = lsmtree->dsk_gen;
+	__wt_spin_lock(session, &lsm_tree->lock);
+	clsm->dsk_gen = lsm_tree->dsk_gen;
 
 	if (clsm->cursors != NULL) {
-		WT_ASSERT(session, lsmtree->old_cursors > 0);
-		--lsmtree->old_cursors;
+		WT_ASSERT(session, lsm_tree->old_cursors > 0);
+		--lsm_tree->old_cursors;
 	}
-	++lsmtree->ncursor;
+	++lsm_tree->ncursor;
 
-	if ((nchunks = lsmtree->nchunks) > clsm->nchunks)
+	if ((nchunks = lsm_tree->nchunks) > clsm->nchunks)
 		WT_RET(__wt_realloc(session, NULL,
 		    nchunks * sizeof(WT_CURSOR *),
 		    &clsm->cursors));
@@ -136,7 +136,7 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm)
 		 * Read from the checkpoint if the file has been written.
 		 * Once all cursors switch, the in-memory tree can be evicted.
 		 */
-		chunk = &lsmtree->chunk[i];
+		chunk = &lsm_tree->chunk[i];
 		WT_ERR(__wt_curfile_open(session,
 		    chunk->uri, &clsm->iface,
 		    F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) ? ckpt_cfg : NULL, cp));
@@ -145,12 +145,12 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm)
 		F_SET(*cp, WT_CURSTD_OVERWRITE | WT_CURSTD_RAW);
 
 		/* Peek into the btree layer to track the in-memory size. */
-		if (i == clsm->nchunks - 1 && lsmtree->memsizep == NULL)
+		if (i == clsm->nchunks - 1 && lsm_tree->memsizep == NULL)
 			WT_ERR(__wt_btree_get_memsize(
-			    session, &lsmtree->memsizep));
+			    session, &lsm_tree->memsizep));
 	}
 
-err:	__wt_spin_unlock(session, &lsmtree->lock);
+err:	__wt_spin_unlock(session, &lsm_tree->lock);
 	return (ret);
 }
 
@@ -174,7 +174,7 @@ __clsm_get_current(
 			cmp = (smallest ? -1 : 1);
 		} else
 			WT_RET(WT_LSM_CURCMP(session,
-			    clsm->lsmtree, c, current, cmp));
+			    clsm->lsm_tree, c, current, cmp));
 		if (smallest ? cmp < 0 : cmp > 0) {
 			current = c;
 			multiple = 0;
@@ -239,7 +239,7 @@ retry:		/*
 					continue;
 				if (check) {
 					WT_ERR(WT_LSM_CURCMP(session,
-					    clsm->lsmtree, c, clsm->current,
+					    clsm->lsm_tree, c, clsm->current,
 					    cmp));
 					if (cmp == 0)
 						WT_ERR_NOTFOUND_OK(c->next(c));
@@ -298,7 +298,7 @@ retry:		/*
 					continue;
 				if (check) {
 					WT_ERR(WT_LSM_CURCMP(session,
-					    clsm->lsmtree, c, clsm->current,
+					    clsm->lsm_tree, c, clsm->current,
 					    cmp));
 					if (cmp == 0)
 						WT_ERR_NOTFOUND_OK(c->prev(c));
@@ -452,7 +452,7 @@ __clsm_search_near(WT_CURSOR *cursor, int *exactp)
 				larger = c;
 			else {
 				WT_ERR(WT_LSM_CURCMP(session,
-				    clsm->lsmtree, c, larger, cmp));
+				    clsm->lsm_tree, c, larger, cmp));
 				if (cmp < 0)
 					larger = c;
 			}
@@ -461,7 +461,7 @@ __clsm_search_near(WT_CURSOR *cursor, int *exactp)
 				smaller = c;
 			else {
 				WT_ERR(WT_LSM_CURCMP(session,
-				    clsm->lsmtree, c, smaller, cmp));
+				    clsm->lsm_tree, c, smaller, cmp));
 				if (cmp > 0)
 					smaller = c;
 			}
@@ -504,10 +504,10 @@ __clsm_put(
 	WT_BTREE *btree;
 	WT_CURSOR *primary;
 	WT_DECL_RET;
-	WT_LSM_TREE *lsmtree;
+	WT_LSM_TREE *lsm_tree;
 	uint32_t *memsizep;
 
-	lsmtree = clsm->lsmtree;
+	lsm_tree = clsm->lsm_tree;
 
 	primary = clsm->cursors[clsm->nchunks - 1];
 	primary->set_key(primary, key);
@@ -515,8 +515,8 @@ __clsm_put(
 	WT_RET(primary->insert(primary));
 	clsm->current = primary;
 
-	if ((memsizep = lsmtree->memsizep) != NULL &&
-	    *memsizep > lsmtree->threshhold) {
+	if ((memsizep = lsm_tree->memsizep) != NULL &&
+	    *memsizep > lsm_tree->threshhold) {
 		/*
 		 * Close our cursors: if we are the only open cursor, this
 		 * means the btree handle is unlocked.
@@ -530,7 +530,7 @@ __clsm_put(
 		WT_RET(__wt_btree_release_memsize(session, btree));
 
 		WT_WITH_SCHEMA_LOCK(session,
-		    ret = __wt_lsm_tree_switch(session, clsm->lsmtree));
+		    ret = __wt_lsm_tree_switch(session, clsm->lsm_tree));
 	}
 
 	return (ret);
@@ -676,7 +676,7 @@ __wt_clsm_open(WT_SESSION_IMPL *session,
 	WT_CURSOR *cursor;
 	WT_CURSOR_LSM *clsm;
 	WT_DECL_RET;
-	WT_LSM_TREE *lsmtree;
+	WT_LSM_TREE *lsm_tree;
 
 	clsm = NULL;
 
@@ -684,18 +684,18 @@ __wt_clsm_open(WT_SESSION_IMPL *session,
 		return (EINVAL);
 
 	/* Get the LSM tree. */
-	WT_RET(__wt_lsm_tree_get(session, uri, &lsmtree));
+	WT_RET(__wt_lsm_tree_get(session, uri, &lsm_tree));
 
 	WT_RET(__wt_calloc_def(session, 1, &clsm));
 
 	cursor = &clsm->iface;
 	*cursor = iface;
 	cursor->session = &session->iface;
-	cursor->uri = lsmtree->name;
-	cursor->key_format = lsmtree->key_format;
-	cursor->value_format = lsmtree->value_format;
+	cursor->uri = lsm_tree->name;
+	cursor->key_format = lsm_tree->key_format;
+	cursor->value_format = lsm_tree->value_format;
 
-	clsm->lsmtree = lsmtree;
+	clsm->lsm_tree = lsm_tree;
 
 	/*
 	 * The tree's dsk_gen starts at one, so starting the cursor on zero

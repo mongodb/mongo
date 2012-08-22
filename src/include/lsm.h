@@ -8,7 +8,7 @@
 struct __wt_cursor_lsm {
 	WT_CURSOR iface;
 
-	WT_LSM_TREE *lsmtree;
+	WT_LSM_TREE *lsm_tree;
 	uint64_t dsk_gen;
 
 	int nchunks;
