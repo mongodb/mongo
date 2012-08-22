@@ -211,7 +211,7 @@ static uint64_t HashLen17to32(const char *s, size_t len) {
 	uint64_t c = Fetch64(s + len - 8) * k2;
 	uint64_t d = Fetch64(s + len - 16) * k0;
 	return HashLen16(Rotate(a - b, 43) + Rotate(c, 30) + d,
-			a + Rotate(b ^ k3, 20) - c + len);
+			a + Rotate(b ^ k3, 20) + len - c);
 }
 
 /*

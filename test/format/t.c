@@ -148,6 +148,8 @@ main(int argc, char *argv[])
 		(void)fclose(g.logfp);
 	if (g.rand_log != NULL)
 		(void)fclose(g.rand_log);
+	if (g.c_data_source != NULL)
+		(void)free(g.c_data_source);
 
 	config_print(0);
 	return (EXIT_SUCCESS);

@@ -7,6 +7,9 @@
 #cache
 #	size of the cache in MB
 
+#data_source
+#	type of data source to create (file | table | lsm)
+
 #delete_pct
 #	percent operations that are deletes
 
