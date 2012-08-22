@@ -178,7 +178,7 @@ namespace ReplSetTests {
         bool retry;
 
         // instead of actually applying operations, we return success or failure
-        virtual bool syncApply(const BSONObj& o) {
+        virtual bool syncApply(const BSONObj& o, bool convertUpdateToUpsert) {
             step++;
 
             if ((failOnStep == FAIL_FIRST_APPLY && step == 1) ||
