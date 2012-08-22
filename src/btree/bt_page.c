@@ -164,7 +164,11 @@ __wt_page_inmem(WT_SESSION_IMPL *session,
 	*pagep = page;
 	return (0);
 
-err:	__wt_free(session, page);
+err:	/*
+	 * Our caller (specifically salvage) may have special concerns about the
+	 * underlying disk image, the caller owns that problem.
+	 */
+	__wt_page_out(session, &page, WT_PAGE_FREE_IGNORE_DISK);
 	return (ret);
 }
 
