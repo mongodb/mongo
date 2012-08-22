@@ -88,8 +88,8 @@ namespace mongo {
 
         {
             bool reject = false;
-            nonce64 *ln = lastNonce.release();
-            if ( ln == 0 ) {
+            scoped_ptr<nonce64> ln(lastNonce.release());
+            if ( !ln ) {
                 reject = true;
                 log(1) << "auth: no lastNonce" << endl;
             }
