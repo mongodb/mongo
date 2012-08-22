@@ -29,8 +29,6 @@ skip	src/include/serial_funcs.i
 skip	src/log/log_desc.c
 skip	src/support/stat.c
 skip	test/config.i
-skip	test/config_test.c
-skip	test/config_test.py
 skip	test/packing/intpack-test2.c
 skip	test/packing/intpack-test.c
 skip	test/packing/packing-test.c

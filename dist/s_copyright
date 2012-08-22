@@ -19,7 +19,7 @@ ENDOFTEXT
 
 # Copyright for files WiredTiger does not own.
 cat > $c2 <<ENDOFTEXT
- * Copyright (c) 2008-$year WiredTiger, Inc.
+ * Public Domain 2008-$year WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
 ENDOFTEXT
@@ -32,7 +32,7 @@ cat > $c3 <<ENDOFTEXT
 ENDOFTEXT
 
 cat > $c4 <<ENDOFTEXT
-# Copyright (c) 2008-$year WiredTiger, Inc.
+# Public Domain 2008-$year WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
 ENDOFTEXT

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Copyright (c) 2008-2012 WiredTiger, Inc.
+# Public Domain 2008-2012 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
 #
@@ -29,10 +29,10 @@ import os, struct
 from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
 
-# test_util06.py
+# test_salvage.py
 #    Utilities: wt salvage
-class test_util06(wttest.WiredTigerTestCase, suite_subprocess):
-    tablename = 'test_util06.a'
+class test_salvage(wttest.WiredTigerTestCase, suite_subprocess):
+    tablename = 'test_salvage.a'
     nentries = 1000
     session_params = 'key_format=S,value_format=S'
     unique = 'SomeUniqueString'

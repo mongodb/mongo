@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Copyright (c) 2008-2012 WiredTiger, Inc.
+# Public Domain 2008-2012 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
 #
@@ -69,10 +69,19 @@ class test_txn01(wttest.WiredTigerTestCase):
 
     # Open a cursor with snapshot isolation, and assert the number of records
     # visible to the cursor matches the expected value.
-    def check_transaction(self, level, expected):
+    def check_txn_cursor(self, level, expected):
         s = self.conn.open_session()
         cursor = s.open_cursor(self.uri, None)
         s.begin_transaction(level)
+        self.assertEqual(self.cursor_count(cursor), expected)
+        s.close()
+
+    # Open a session with snapshot isolation, and assert the number of records
+    # visible to the cursor matches the expected value.
+    def check_txn_session(self, level, expected):
+        s = self.conn.open_session(level)
+        cursor = s.open_cursor(self.uri, None)
+        s.begin_transaction()
         self.assertEqual(self.cursor_count(cursor), expected)
         s.close()
 
@@ -83,11 +92,15 @@ class test_txn01(wttest.WiredTigerTestCase):
             self.assertEqual(self.cursor_count(cursor), total)
 
         # Read-uncommitted should see all of the records.
-        self.check_transaction('isolation=read-uncommitted', total)
-
         # Snapshot and read-committed should see only committed records.
-        self.check_transaction('isolation=snapshot', committed)
-        self.check_transaction('isolation=read-committed', committed)
+        self.check_txn_cursor('isolation=read-uncommitted', total)
+        self.check_txn_session('isolation=read-uncommitted', total)
+
+        self.check_txn_cursor('isolation=snapshot', committed)
+        self.check_txn_session('isolation=snapshot', committed)
+
+        self.check_txn_cursor('isolation=read-committed', committed)
+        self.check_txn_session('isolation=read-committed', committed)
 
         # Checkpoints should only write committed items.
         self.check_checkpoint(committed)

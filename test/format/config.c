@@ -40,6 +40,26 @@ config_setup(void)
 		}
 	}
 
+	/* Pick a data source type. */
+	cp = config_find("data_source", strlen("data_source"));
+	if (!(cp->flags & C_PERM)) {
+		switch (MMRAND(0, 1)) {
+		case 0:
+			fprintf(stderr, "Chose file data source\n");
+			config_single("data_source=file", 0);
+			break;
+		case 1:
+			fprintf(stderr, "Chose table data source\n");
+			config_single("data_source=table", 0);
+			break;
+		/* LSM isn't implemented yet.
+		case 2:
+			config_single("data_source=lsm", 0);
+			break;
+		*/
+		}
+	}
+
 	/* Reset the key count. */
 	g.key_cnt = 0;
 
@@ -144,6 +164,8 @@ config_print(int error_display)
 		    (g.c_file_type == VAR && !(cp->type_mask & C_VAR))))
 			fprintf(fp,
 			    "# %s not applicable to this run\n", cp->name);
+		else if (cp->flags & C_STRING)
+			fprintf(fp, "%s=%s\n", cp->name, *cp->vstr);
 		else if (strcmp(cp->name, "file_type"))
 			fprintf(fp, "%s=%" PRIu32 "\n", cp->name, *cp->v);
 		else
@@ -186,7 +208,7 @@ config_clear(void)
 {
 	CONFIG *cp;
 
-	/* Display configuration names. */
+	/* Clear configuration data. */
 	for (cp = c; cp->name != NULL; ++cp)
 		cp->flags &= ~(uint32_t)C_TEMP;
 }
@@ -209,8 +231,28 @@ config_single(const char *s, int perm)
 
 	cp = config_find(s, (size_t)(ep - s));
 	cp->flags |= perm ? C_PERM : C_TEMP;
+	++ep;
 
-	*cp->v = config_translate(ep + 1);
+	if (cp->flags & C_STRING) {
+		/* At the moment there is only one string config. */
+		if (strncmp(s, "data_source", strlen("data_source")) != 0) {
+			fprintf(stderr, "Invalid string configuration\n");
+			exit(EXIT_FAILURE);
+		}
+		if (strncmp("file", ep, strlen("file")) != 0 &&
+		    strncmp("table", ep, strlen("table")) != 0 &&
+		    strncmp("lsm", ep, strlen("lsm")) != 0) {
+		    fprintf(stderr, "Invalid file type option: %s\n", ep);
+		    exit(EXIT_FAILURE);
+		}
+		if ((*cp->vstr =
+		    malloc(strlen(ep) + strlen(WT_NAME) + 2)) == NULL)
+			exit(EXIT_FAILURE);
+		sprintf(*cp->vstr, "%s:%s", ep, WT_NAME);
+		return;
+	}
+
+	*cp->v = config_translate(ep);
 	if (cp->flags & C_BOOL) {
 		if (*cp->v != 0 && *cp->v != 1) {
 			fprintf(stderr, "%s: %s: value of boolean not 0 or 1\n",

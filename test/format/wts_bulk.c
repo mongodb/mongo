@@ -26,7 +26,7 @@ wts_load(void)
 	 * Avoid bulk load with a custom collator, because the order of
 	 * insertion will not match the collation order.
 	 */
-	if ((ret = session->open_cursor(session, WT_TABLENAME, NULL,
+	if ((ret = session->open_cursor(session, g.c_data_source, NULL,
 	    (g.c_file_type == ROW && g.c_reverse) ? NULL : "bulk",
 	    &cursor)) != 0)
 		die(ret, "session.open_cursor");
