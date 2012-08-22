@@ -156,5 +156,5 @@ namespace mongo {
      * @param fromRepl really from replication or for testing/internal/command/etc...
      * Returns if the op was an update that could not be applied (true on failure)
      */
-    bool applyOperation_inlock(const BSONObj& op , bool fromRepl = true );
+    bool applyOperation_inlock(const BSONObj& op, bool fromRepl = true, bool convertUpdateToUpsert = false);
 }

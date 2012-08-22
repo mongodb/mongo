@@ -50,7 +50,7 @@ namespace replset {
     /* apply the log op that is in param o
        @return bool success (true) or failure (false)
     */
-    bool SyncTail::syncApply(const BSONObj &op) {
+    bool SyncTail::syncApply(const BSONObj &op, bool convertUpdateToUpsert) {
         const char *ns = op.getStringField("ns");
         verify(ns);
 
@@ -79,7 +79,9 @@ namespace replset {
 
         Client::Context ctx(ns, dbpath, false);
         ctx.getClient()->curop()->reset();
-        bool ok = !applyOperation_inlock(op);
+        // For non-initial-sync, we convert updates to upserts
+        // to suppress errors when replaying oplog entries.
+        bool ok = !applyOperation_inlock(op, true, convertUpdateToUpsert);
         getDur().commitIfNeeded();
 
         return ok;
@@ -111,7 +113,7 @@ namespace replset {
              it != ops.end();
              ++it) {
             try {
-                fassert(16359, st->syncApply(*it));
+                fassert(16359, st->syncApply(*it, true));
             } catch (DBException& e) {
                 error() << "writer worker caught exception: " << e.what() 
                         << " on: " << it->toString() << endl;
