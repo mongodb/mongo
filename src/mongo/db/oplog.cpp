@@ -720,7 +720,7 @@ namespace mongo {
     /** @param fromRepl false if from ApplyOpsCmd
         @return true if was and update should have happened and the document DNE.  see replset initial sync code.
      */
-    bool applyOperation_inlock(const BSONObj& op , bool fromRepl ) {
+    bool applyOperation_inlock(const BSONObj& op, bool fromRepl, bool convertUpdateToUpsert) {
         LOG(6) << "applying op: " << op << endl;
         bool failedUpdate = false;
 
@@ -789,7 +789,7 @@ namespace mongo {
 
             OpDebug debug;
             BSONObj updateCriteria = op.getObjectField("o2");
-            bool upsert = fields[3].booleanSafe();
+            bool upsert = fields[3].booleanSafe() || convertUpdateToUpsert;
             UpdateResult ur = updateObjects(ns, o, updateCriteria, upsert, /*multi*/ false,
                                             /*logop*/ false , debug, /*fromMigrate*/ false,
                                             QueryPlanSelectionPolicy::idElseNatural() );
