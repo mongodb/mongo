@@ -101,6 +101,7 @@ Kounavis
 LF
 LRU
 LSB
+LSM
 LSN
 LSN's
 LSNs
@@ -451,6 +452,7 @@ logput
 lookup
 lookups
 lru
+lsm
 lsn
 lu
 majorp
