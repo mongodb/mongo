@@ -22,14 +22,14 @@ __wt_lsm_worker(void *arg)
 	WT_LSM_TREE *lsm_tree;
 	WT_SESSION *wt_session;
 	WT_SESSION_IMPL *session;
-	size_t chunk_allocated;
+	size_t chunk_alloc;
 	int i, nchunks, progress;
 
 	lsm_tree = arg;
 	conn = lsm_tree->conn;
 	wt_conn = &conn->iface;
 	chunk_array = NULL;
-	chunk_allocated = 0;
+	chunk_alloc = 0;
 
 	if (wt_conn->open_session(wt_conn, NULL, NULL, &wt_session) != 0)
 		return (NULL);
@@ -43,9 +43,9 @@ __wt_lsm_worker(void *arg)
 		/* Take a copy of the current state of the LSM tree. */
 		__wt_spin_lock(session, &lsm_tree->lock);
 		nchunks = lsm_tree->nchunks - 1;
-		if (chunk_allocated < lsm_tree->chunk_allocated)
+		if (chunk_alloc < lsm_tree->chunk_alloc)
 			ret = __wt_realloc(session,
-			    &chunk_allocated, lsm_tree->chunk_allocated,
+			    &chunk_alloc, lsm_tree->chunk_alloc,
 			    &chunk_array);
 		if (ret == 0)
 			memcpy(chunk_array, lsm_tree->chunk,

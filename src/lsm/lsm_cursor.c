@@ -516,7 +516,7 @@ __clsm_put(
 	clsm->current = primary;
 
 	if ((memsizep = lsm_tree->memsizep) != NULL &&
-	    *memsizep > lsm_tree->threshhold) {
+	    *memsizep > lsm_tree->threshold) {
 		/*
 		 * Close our cursors: if we are the only open cursor, this
 		 * means the btree handle is unlocked.

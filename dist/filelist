@@ -68,6 +68,7 @@ src/log/log_desc.c
 src/lsm/lsm_cursor.c
 src/lsm/lsm_dsrc.c
 src/lsm/lsm_merge.c
+src/lsm/lsm_meta.c
 src/lsm/lsm_tree.c
 src/lsm/lsm_worker.c
 src/meta/meta_api.c

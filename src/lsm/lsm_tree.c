@@ -84,8 +84,8 @@ err:	__wt_scr_free(&buf);
 }
 
 /*
- * __wt_lsm_tree_get --
- *	Get an LSM tree structure for the given name.
+ * __wt_lsm_tree_create --
+ *	Create an LSM tree structure for the given name.
  */
 int
 __wt_lsm_tree_create(
@@ -116,7 +116,7 @@ __wt_lsm_tree_create(
 	    &lsm_tree->value_format));
 
 	/* TODO: make this configurable. */
-	lsm_tree->threshhold = 2 * WT_MEGABYTE;
+	lsm_tree->threshold = 2 * WT_MEGABYTE;
 
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));
 	WT_ERR(__wt_buf_fmt(session, buf,
@@ -140,6 +140,40 @@ err:		__lsm_tree_discard(session, lsm_tree);
 }
 
 /*
+ * __wt_lsm_tree_open --
+ *	Open an LSM tree structure.
+ */
+static int
+__lsm_tree_open(
+    WT_SESSION_IMPL *session, const char *uri, WT_LSM_TREE **treep)
+{
+	WT_DECL_RET;
+	WT_LSM_TREE *lsm_tree;
+
+	/* Try to open the tree. */
+	WT_RET(__wt_calloc_def(session, 1, &lsm_tree));
+	__wt_spin_init(session, &lsm_tree->lock);
+	WT_ERR(__wt_strdup(session, uri, &lsm_tree->name));
+	TAILQ_INSERT_HEAD(&S2C(session)->lsmqh, lsm_tree, q);
+
+	WT_ERR(__wt_lsm_meta_read(session, lsm_tree));
+
+	/* Create an in-memory chunk. */
+	WT_ERR(__wt_lsm_tree_switch(session, lsm_tree));
+
+	lsm_tree->conn = S2C(session);
+	WT_ERR(__wt_thread_create(
+	    &lsm_tree->worker_tid, __wt_lsm_worker, lsm_tree));
+	F_SET(lsm_tree, WT_LSM_TREE_OPEN);
+	*treep = lsm_tree;
+
+	if (0) {
+err:		__lsm_tree_discard(session, lsm_tree);
+	}
+	return (ret);
+}
+
+/*
  * __wt_lsm_tree_get --
  *	get an LSM tree structure for the given name.
  */
@@ -147,6 +181,7 @@ int
 __wt_lsm_tree_get(
     WT_SESSION_IMPL *session, const char *uri, WT_LSM_TREE **treep)
 {
+	WT_DECL_RET;
 	WT_LSM_TREE *lsm_tree;
 
 	TAILQ_FOREACH(lsm_tree, &S2C(session)->lsmqh, q)
@@ -155,7 +190,9 @@ __wt_lsm_tree_get(
 			return (0);
 		}
 
-	return (ENOENT);
+	WT_WITH_SCHEMA_LOCK(session,
+	    ret = __lsm_tree_open(session, uri, treep));
+	return (ret);
 }
 
 /*
@@ -170,15 +207,21 @@ __wt_lsm_tree_switch(
 
 	__wt_spin_lock(session, &lsm_tree->lock);
 
+	if (lsm_tree->memsizep != NULL)
+		printf("Switched to %d because %d > %d\n", lsm_tree->last,
+		    (int)*lsm_tree->memsizep, (int)lsm_tree->threshold);
+	lsm_tree->memsizep = NULL;
+
 	lsm_tree->old_cursors += lsm_tree->ncursor;
 	++lsm_tree->dsk_gen;
 
 	/* TODO more sensible realloc */
 	if ((lsm_tree->nchunks + 1) * sizeof(*lsm_tree->chunk) >
-	    lsm_tree->chunk_allocated)
+	    lsm_tree->chunk_alloc)
 		WT_ERR(__wt_realloc(session,
-		    &lsm_tree->chunk_allocated,
-		    (lsm_tree->nchunks + 1) * sizeof(*lsm_tree->chunk),
+		    &lsm_tree->chunk_alloc,
+		    WT_MAX(10 * sizeof(*lsm_tree->chunk),
+		    2 * lsm_tree->chunk_alloc),
 		    &lsm_tree->chunk));
 
 	WT_ERR(__wt_lsm_tree_create_chunk(session,
@@ -186,12 +229,7 @@ __wt_lsm_tree_switch(
 	    &lsm_tree->chunk[lsm_tree->nchunks].uri));
 	++lsm_tree->nchunks;
 
-	if (lsm_tree->memsizep != NULL)
-		printf("Switched to %d because %d > %d\n", lsm_tree->last,
-		    (int)*lsm_tree->memsizep, (int)lsm_tree->threshhold);
-	lsm_tree->memsizep = NULL;
-
-	/* TODO: update metadata. */
+	WT_ERR(__wt_lsm_meta_write(session, lsm_tree));
 
 err:	__wt_spin_unlock(session, &lsm_tree->lock);
 	/* TODO: mark lsm_tree bad on error(?) */

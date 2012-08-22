@@ -31,7 +31,7 @@ struct __wt_lsm_chunk {
 };
 
 struct __wt_lsm_tree {
-	const char *name, *filename;
+	const char *name, *config, *filename;
 	const char *key_format, *value_format, *file_config;
 
 	WT_COLLATOR *collator;
@@ -43,7 +43,7 @@ struct __wt_lsm_tree {
 	uint64_t dsk_gen, ncursor, old_cursors;
 	uint32_t *memsizep;
 
-	uint32_t threshhold;
+	uint32_t threshold;
 
 	WT_CONNECTION_IMPL *conn;	/* Passed to thread_create */
 	pthread_t worker_tid;		/* LSM worker thread */
@@ -51,7 +51,7 @@ struct __wt_lsm_tree {
 	int nchunks;			/* Number of active chunks */
 	int last;			/* Last allocated ID. */
 	WT_LSM_CHUNK *chunk;		/* Array of active LSM chunks */
-	size_t chunk_allocated;		/* Space allocated for chunks */
+	size_t chunk_alloc;		/* Space allocated for chunks */
 
 #define	WT_LSM_TREE_OPEN	0x01
 	uint32_t flags;
