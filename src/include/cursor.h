@@ -103,11 +103,12 @@ struct __wt_cursor_btree {
 	 */
 	uint8_t v;			/* Fixed-length return value */
 
-#define	WT_CBT_ITERATE_APPEND	0x01	/* Col-store: iterating append list */
-#define	WT_CBT_ITERATE_NEXT	0x02	/* Next iteration configuration */
-#define	WT_CBT_ITERATE_PREV	0x04	/* Prev iteration configuration */
-#define	WT_CBT_MAX_RECORD	0x08	/* Col-store: past end-of-table */
-#define	WT_CBT_SEARCH_SMALLEST	0x10	/* Row-store: small-key insert list */
+#define	WT_CBT_ACTIVE		0x01	/* Col-store: iterating append list */
+#define	WT_CBT_ITERATE_APPEND	0x02	/* Col-store: iterating append list */
+#define	WT_CBT_ITERATE_NEXT	0x04	/* Next iteration configuration */
+#define	WT_CBT_ITERATE_PREV	0x08	/* Prev iteration configuration */
+#define	WT_CBT_MAX_RECORD	0x10	/* Col-store: past end-of-table */
+#define	WT_CBT_SEARCH_SMALLEST	0x20	/* Row-store: small-key insert list */
 	uint8_t flags;
 };
 
