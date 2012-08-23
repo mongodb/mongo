@@ -78,7 +78,7 @@ def key_populate(key_format, i):
         raise AssertionError(
             'key_populate: object has unexpected key format: ' + key_format)
 
-# population of a simple object, where the keys are the record number.
+# population of a simple object
 #    uri:       object
 #    config:    prefix of the session.create configuration string
 #    rows:      entries to insert
@@ -102,7 +102,7 @@ def simple_populate_check(self, uri):
         self.assertEqual(val, str(i) + ': abcdefghijklmnopqrstuvwxyz')
     cursor.close()
 
-# population of a complex object, where the keys are the record number.
+# population of a complex object
 #    uri:       object
 #    config:    prefix of the session.create configuration string
 #    rows:      entries to insert
