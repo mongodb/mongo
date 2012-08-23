@@ -445,7 +445,6 @@ __wt_curtable_truncate(
 	WT_ITEM raw;
 	int equal, i;
 
-
 	WT_RET(__wt_scr_alloc(session, 128, &key));
 
 	/*
