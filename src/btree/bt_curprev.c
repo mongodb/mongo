@@ -169,7 +169,6 @@ static inline int
 __cursor_fix_prev(WT_CURSOR_BTREE *cbt, int newpage)
 {
 	WT_BTREE *btree;
-	WT_INSERT *ins;
 	WT_ITEM *val;
 	WT_SESSION_IMPL *session;
 	WT_UPDATE *upd;
@@ -194,9 +193,15 @@ __cursor_fix_prev(WT_CURSOR_BTREE *cbt, int newpage)
 		__cursor_set_recno(cbt, cbt->recno - 1);
 
 new_page:	/* Check any insert list for a matching record. */
-		if ((ins = cbt->ins = __col_insert_search_match(
-		    WT_COL_UPDATE_SINGLE(cbt->page), cbt->recno)) != NULL &&
-		    (upd = __wt_txn_read(session, ins->upd)) != NULL) {
+		cbt->ins_head = WT_COL_UPDATE_SINGLE(cbt->page);
+		cbt->ins = __col_insert_search(
+		    cbt->ins_head, cbt->ins_stack, cbt->recno);
+		if (cbt->ins != NULL &&
+		    cbt->recno != WT_INSERT_RECNO(cbt->ins))
+			cbt->ins = NULL;
+		upd = cbt->ins == NULL ?
+		    NULL : __wt_txn_read(session, cbt->ins->upd);
+		if (upd != NULL) {
 			val->data = WT_UPDATE_DATA(upd);
 			val->size = 1;
 			return (0);
