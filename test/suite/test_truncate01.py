@@ -78,25 +78,31 @@ class test_truncate_uri(wttest.WiredTigerTestCase):
             self.session.drop(uri, None)
 
 
+# XXX
+#	currently tests with an on-disk image (close & re-open after create)
+#       -- test with initial appends (big insert list)
+#       -- test with re-open and subsequent appends (half-and-half)
 # Test session.truncate.
 class test_truncate(wttest.WiredTigerTestCase):
     name = 'test_truncate'
 
     # Use a small page size because we want to create lots of pages.
-    config = 'leaf_page_max=512,key_format='
-
+    # The underlying table routines don't easily support 8t value types, limit
+    # those tests to file objects.
     types = [
-        ('file', dict(type='file:')),
-        ('table', dict(type='table:')),
+        ('file', dict(config='leaf_page_max=512,key_format=',type='file:')),
+        ('file', dict(config=\
+            'leaf_page_max=512,value_format=8t,key_format=',type='file:')),
+        ('table', dict(config='leaf_page_max=512,key_format=',type='table:')),
     ]
-    fmt = [
-        ('integer', dict(fmt='i')),
-        ('recno', dict(fmt='r')),
-        ('string', dict(fmt='S')),
+    keyfmt = [
+        ('integer', dict(keyfmt='i')),
+        ('recno', dict(keyfmt='r')),
+        ('string', dict(keyfmt='S')),
     ]
     size = [
         ('small', dict(nentries=100,skip=7)),
-        ('big', dict(nentries=5000,skip=37)),
+        ('big', dict(nentries=1000,skip=37)),
     ]
     search = [
         ('searchtrue', dict(search=True)),
@@ -104,21 +110,38 @@ class test_truncate(wttest.WiredTigerTestCase):
     ]
 
     scenarios = number_scenarios(
-        multiply_scenarios('.', types, fmt, size, search))
+        multiply_scenarios('.', types, keyfmt, size, search))
 
+    # Set a cursor and optionally search for the item.
     def initCursor(self, uri, key):
         if key == -1:
             return None
         cursor = self.session.open_cursor(uri, None, None)
-        cursor.set_key(key_populate(self.fmt, key))
+        cursor.set_key(key_populate(self.keyfmt, key))
 
         # Test scenarios where we fully instantiate a cursor as well as where we
         # only set the key.
         if self.search:
             self.assertEqual(cursor.search(), 0)
-            self.assertEqual(cursor.get_key(), key_populate(self.fmt, key))
+            self.assertEqual(cursor.get_key(), key_populate(self.keyfmt, key))
 
         return cursor
+
+    # Return the first/last valid item in the object (valid means skipping
+    # over deleted fixed-length rows).
+    def getKey(self, cursor, nextprev):
+        if cursor.value_format == '8t':
+            while (True):
+                self.assertEqual(nextprev(), 0)
+                if cursor.get_value() != 0:
+                        break;
+        else:
+            self.assertEqual(nextprev(), 0)
+        return cursor.get_key()
+    def getFirstKey(self, cursor):
+        return self.getKey(cursor, cursor.next)
+    def getLastKey(self, cursor):
+        return self.getKey(cursor, cursor.prev)
 
     # Truncate a range using cursors, and check the results.
     def truncateRangeAndCheck(self, uri, begin, end):
@@ -141,19 +164,20 @@ class test_truncate(wttest.WiredTigerTestCase):
         if begin == 1 and end == self.nentries - 1:
             confirm_empty(self, uri)
         else:
-            self.assertEqual(cursor.next(), 0)
-            key = cursor.get_key()
+            key = self.getFirstKey(cursor)
             if begin == 1:
-                self.assertEqual(key, key_populate(self.fmt, end + 1))
+                self.assertEqual(key, key_populate(self.keyfmt, end + 1))
             else:
-                self.assertEqual(key, key_populate(self.fmt, 1))
+                self.assertEqual(key, key_populate(self.keyfmt, 1))
+
             self.assertEqual(cursor.reset(), 0)
-            self.assertEqual(cursor.prev(), 0)
-            key = cursor.get_key()
+
+            key = self.getLastKey(cursor)
             if end == self.nentries - 1:
-                self.assertEqual(key, key_populate(self.fmt, begin - 1))
+                self.assertEqual(key, key_populate(self.keyfmt, begin - 1))
             else:
-                self.assertEqual(key, key_populate(self.fmt, self.nentries - 1))
+                self.assertEqual(
+                    key, key_populate(self.keyfmt, self.nentries - 1))
         cursor.close()
 
     # Test truncation using cursors.
@@ -181,7 +205,8 @@ class test_truncate(wttest.WiredTigerTestCase):
 
         # A simple, one-file file or table object.
         for begin,end in list:
-            simple_populate(self, uri, self.config + self.fmt, self.nentries)
+            simple_populate(self, uri, self.config + self.keyfmt, self.nentries)
+            self.reopen_conn()
             self.truncateRangeAndCheck(uri, begin, end)
             self.session.drop(uri, None)
 
@@ -189,7 +214,8 @@ class test_truncate(wttest.WiredTigerTestCase):
         if self.type == "table:":
             for begin,end in list:
                 complex_populate(
-                    self, uri, self.config + self.fmt, self.nentries)
+                    self, uri, self.config + self.keyfmt, self.nentries)
+                self.reopen_conn()
                 self.truncateRangeAndCheck(uri, begin, end)
                 self.session.drop(uri, None)
 
