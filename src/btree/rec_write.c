@@ -202,7 +202,7 @@ static int  __rec_write_wrapup(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_write_wrapup_err(WT_SESSION_IMPL *, WT_PAGE *);
 
 /*
- * Helper function to determine whether the given WT_REF has a page with
+ * Helper function to determine whether the given WT_REF references any
  * modifications.
  *
  * The reconciliation code is used in the following situations:
@@ -235,25 +235,45 @@ static int  __rec_write_wrapup_err(WT_SESSION_IMPL *, WT_PAGE *);
  * page has been modified.
  */
 static inline int
-__page_modified(WT_REF *ref, WT_PAGE **rpp)
+__page_modified(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE **rpp)
 {
+	WT_RECONCILE *r;
+	int skip;
+
+	r = session->reconcile;
 	*rpp = ref->page;
 
-	switch (ref->state) {
-	case WT_REF_DISK:
-	case WT_REF_READING:
-		return (0);
-	case WT_REF_DELETED:
-		return (1);
-	case WT_REF_EVICT_FORCE:
-	case WT_REF_EVICT_WALK:
-	case WT_REF_LOCKED:
-	case WT_REF_MEM:
-	default:
-		break;
-	}
-
-	return (ref->page->modify == NULL ? 0 : 1);
+	for (;; __wt_yield())
+		switch (ref->state) {
+		case WT_REF_DISK:
+		case WT_REF_READING:
+			/* On disk or being read, not modified by definition. */
+			return (0);
+		case WT_REF_DELETED:
+			/*
+			 * Lock down the WT_REF and decide if any deleted page
+			 * is visible to this reconciliation.
+			 */
+			if (!WT_ATOMIC_CAS(
+			    ref->state, WT_REF_DELETED, WT_REF_READING))
+				break;
+			skip = !__wt_txn_visible(session, ref->txnid);
+			WT_PUBLISH(ref->state, WT_REF_DELETED);
+			if (skip) {
+				r->upd_skipped = 1;
+				return (0);
+			}
+			return (1);
+		case WT_REF_EVICT_FORCE:
+		case WT_REF_EVICT_WALK:
+		case WT_REF_MEM:
+			/* In-memory states, check page's modify structure. */
+			return (ref->page->modify == NULL ? 0 : 1);
+		case WT_REF_LOCKED:
+			/* In transition, wait for page's state to settle. */
+		default:
+			break;
+		}
 }
 
 /*
@@ -1407,7 +1427,7 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * Deleted/split pages are merged into the parent and discarded.
 		 */
 		val_set = 0;
-		if (__page_modified(ref, &rp)) {
+		if (__page_modified(session, ref, &rp)) {
 			switch (F_ISSET(rp->modify, WT_PM_REC_MASK)) {
 			case WT_PM_REC_EMPTY:
 				/*
@@ -2215,7 +2235,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * is on the split-created internal page.
 		 */
 		val_set = 0;
-		if (__page_modified(ref, &rp)) {
+		if (__page_modified(session, ref, &rp)) {
 			/*
 			 * If there's no page, then it must be a "fast-delete"
 			 * page, a page marked deleted without reading, rather
@@ -2430,7 +2450,7 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * Deleted/split pages are merged into the parent and discarded.
 		 */
 		val_set = 0;
-		if (__page_modified(ref, &rp)) {
+		if (__page_modified(session, ref, &rp)) {
 			/*
 			 * If there's no page, then it must be a "fast-delete"
 			 * page, a page marked deleted without reading, rather

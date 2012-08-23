@@ -387,6 +387,7 @@ struct __wt_ref {
 		uint64_t recno;		/* Column-store: starting recno */
 		void	*key;		/* Row-store: on-page cell or WT_IKEY */
 	} u;
+	wt_txnid_t txnid;		/* Transaction ID */
 
 	volatile WT_PAGE_STATE state;	/* Page state */
 };

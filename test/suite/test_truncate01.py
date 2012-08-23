@@ -25,11 +25,10 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_truncate.py
+# test_truncate01.py
 #       session level operations on tables
 #
 
-import os, time
 import wiredtiger, wttest
 from helper import confirm_empty,\
     complex_populate, key_populate, simple_populate

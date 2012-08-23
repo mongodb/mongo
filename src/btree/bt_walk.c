@@ -8,41 +8,133 @@
 #include "wt_internal.h"
 
 /*
- * __tree_walk_fast --
- *	Fast delete for leaf pages that don't reference overflow items.
+ * __tree_walk_delete_rollback --
+ *	Abort pages that were deleted without instantiation.
  */
-static inline int
-__tree_walk_fast(
-    WT_SESSION_IMPL *session, WT_PAGE *page, WT_REF *ref, int *fast)
+void
+__wt_tree_walk_delete_rollback(WT_REF *ref)
 {
-	WT_CELL_UNPACK unpack;
-
-	*fast = 0;
+	WT_PAGE *page;
+	WT_ROW *rip;
+	WT_UPDATE *upd;
+	uint32_t i;
 
 	/*
-	 * If we're discarding pages and the page is not in-memory (so no other
-	 * thread is using it), and the page doesn't reference overflow items,
-	 * (so there's no cleanup to do), try and simply delete the page.
+	 * If the page is still marked deleted, it's as we left it, reset the
+	 * state to on-disk and we're done.
+	 */
+	if (WT_ATOMIC_CAS(ref->state, WT_REF_DELETED, WT_REF_READING)) {
+		WT_PUBLISH(ref->state, WT_REF_DISK);
+		return;
+	}
+
+	/*
+	 * The page is either instantiated or being instantiated -- wait for
+	 * the page to settle down, as needed, and then clean up the update
+	 * structures.
+	 */
+	while (ref->state != WT_REF_MEM)
+		__wt_yield();
+	page = ref->page;
+	WT_ROW_FOREACH(page, rip, i)
+		for (upd =
+		    WT_ROW_UPDATE(page, rip); upd != NULL; upd = upd->next)
+			if (upd->txnid == ref->txnid)
+				upd->txnid = WT_TXN_ABORTED;
+}
+
+/*
+ * __tree_walk_delete --
+ *	If deleting a range, try to delete the page without instantiating it.
+ */
+static inline int
+__tree_walk_delete(
+    WT_SESSION_IMPL *session, WT_PAGE *page, WT_REF *ref, int *skipp)
+{
+	WT_CELL_UNPACK unpack;
+	WT_DECL_RET;
+
+	*skipp = 0;
+
+	/*
+	 * If the page is already instantiated in-memory, other threads may be
+	 * using it: no fast delete.
 	 */
 	if (ref->state != WT_REF_DISK)
 		return (0);
 
+	/*
+	 * If the page references overflow items, we have to clean it up during
+	 * reconciliation, no fast delete.
+	 */
 	__wt_cell_unpack(ref->addr, &unpack);
 	if (unpack.raw != WT_CELL_ADDR_LNO)
 		return (0);
 
-	if (!WT_ATOMIC_CAS(ref->state, WT_REF_DISK, WT_REF_DELETED))
+	/*
+	 * Atomically switch the page's state to delete it.  If the page state
+	 * changed underneath us, no fast delete.
+	 *
+	 * Possible optimization: if the page is already deleted and the delete
+	 * is visible to us (the delete has been committed), we could skip the
+	 * page instead of instantiating it and figuring out there are no rows
+	 * in the page.  While that's a huge amount of work to no purpose, it's
+	 * unclear optimizing for overlapping range deletes is worth the effort.
+	 */
+	if (!WT_ATOMIC_CAS(ref->state, WT_REF_DISK, WT_REF_READING))
 		return (0);
 
 	/*
-	 * This action dirtied the page: mark it dirty now, because there's no
-	 * future reconciliation of a leaf page that will dirty it as we write
-	 * the tree.
+	 * We have the reference "locked":
+	 * Record the change in the transaction structure and set the change's
+	 * transaction ID.
 	 */
-	WT_RET(__wt_page_modify_init(session, page));
+	WT_ERR(__wt_txn_modify_ref(session, ref));
+
+	/*
+	 * This action dirties the page: mark it dirty now, because there's no
+	 * future reconciliation of the child leaf page that will dirty it as
+	 * we flush the tree.
+	 */
+	WT_ERR(__wt_page_modify_init(session, page));
 	__wt_page_modify_set(page);
 
-	*fast = 1;
+	*skipp = 1;
+
+	/* Release the page. */
+err:	WT_PUBLISH(ref->state, WT_REF_DELETED);
+
+	return (ret);
+}
+
+/*
+ * __tree_walk_read --
+ *	If iterating a cursor, skip deleted pages that are visible to us.
+ */
+static inline int
+__tree_walk_read(WT_SESSION_IMPL *session, WT_REF *ref, int *skipp)
+{
+	*skipp = 0;
+
+	/*
+	 * Do a simple test first, avoid the atomic operation unless it's
+	 * demonstrably necessary.
+	 */
+	if (ref->state != WT_REF_DELETED)
+		return (0);
+
+	/*
+	 * It's possible the state is changing underneath us, we could race
+	 * between checking for a deleted state and looking at the stored
+	 * transaction ID to see if the delete is visible to us.  Lock down
+	 * the structure.
+	 */
+	if (!WT_ATOMIC_CAS(ref->state, WT_REF_DELETED, WT_REF_READING))
+		return (0);
+
+	*skipp = __wt_txn_visible(session, ref->txnid) ? 1 : 0;
+
+	WT_PUBLISH(ref->state, WT_REF_DELETED);
 	return (0);
 }
 
@@ -58,7 +150,7 @@ __wt_tree_walk(WT_SESSION_IMPL *session, WT_PAGE **pagep, uint32_t flags)
 	WT_PAGE *page, *t;
 	WT_REF *ref;
 	uint32_t slot;
-	int discard, eviction, fast, prev;
+	int discard, eviction, prev, skip;
 
 	btree = session->btree;
 
@@ -169,14 +261,23 @@ descend:	for (;;) {
 				    ref->state != WT_REF_EVICT_FORCE)
 					break;
 			} else {
-				/* Skip already deleted pages. */
-				if (ref->state == WT_REF_DELETED)
-					break;
-
 				if (discard) {
-					WT_RET(__tree_walk_fast(
-					    session, page, ref, &fast));
-					if (fast)
+					/*
+					 * If deleting a range, try to delete
+					 * the page without instantiating it.
+					 */
+					WT_RET(__tree_walk_delete(
+					    session, page, ref, &skip));
+					if (skip)
+						break;
+				} else {
+					/*
+					 * If iterating a cursor, skip deleted
+					 * pages that are visible to us.
+					 */
+					WT_RET(__tree_walk_read(
+					    session, ref, &skip));
+					if (skip)
 						break;
 				}
 

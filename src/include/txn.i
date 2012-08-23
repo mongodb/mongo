@@ -38,7 +38,7 @@ __wt_txn_getid(WT_SESSION_IMPL *session)
 
 /*
  * __wt_txn_modify --
- *	Mark an object modified by the current transaction.
+ *	Mark a WT_UPDATE object modified by the current transaction.
  */
 static inline int
 __wt_txn_modify(WT_SESSION_IMPL *session, wt_txnid_t *id)
@@ -56,6 +56,30 @@ __wt_txn_modify(WT_SESSION_IMPL *session, wt_txnid_t *id)
 		__wt_txn_getid(session);
 
 	*id = txn->id;
+	return (0);
+}
+
+/*
+ * __wt_txn_modify_ref --
+ *	Mark a WT_REF object modified by the current transaction.
+ */
+static inline int
+__wt_txn_modify_ref(WT_SESSION_IMPL *session, WT_REF *ref)
+{
+	WT_TXN *txn;
+
+	txn = &session->txn;
+	if (F_ISSET(txn, TXN_RUNNING)) {
+		if (txn->modref_count *
+		    sizeof(WT_REF *) == txn->modref_alloc)
+			WT_RET(__wt_realloc(session, &txn->modref_alloc,
+			    WT_MAX(10, 2 * txn->modref_count) *
+			    sizeof(WT_REF *), &txn->modref));
+		txn->modref[txn->modref_count++] = ref;
+	} else
+		__wt_txn_getid(session);
+
+	ref->txnid = txn->id;
 	return (0);
 }
 
