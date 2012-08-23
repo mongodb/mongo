@@ -255,7 +255,6 @@ __cursor_var_prev(WT_CURSOR_BTREE *cbt, int newpage)
 	WT_CELL *cell;
 	WT_CELL_UNPACK unpack;
 	WT_COL *cip;
-	WT_INSERT *ins;
 	WT_ITEM *val;
 	WT_SESSION_IMPL *session;
 	WT_UPDATE *upd;
@@ -282,14 +281,17 @@ new_page:	if (cbt->recno < cbt->page->u.col_var.recno)
 		/* Find the matching WT_COL slot. */
 		if ((cip = __col_var_search(cbt->page, cbt->recno)) == NULL)
 			return (WT_NOTFOUND);
+		cbt->slot = WT_COL_SLOT(cbt->page, cip);
 
 		/* Check any insert list for a matching record. */
-		if ((ins = __col_insert_search_match(
-		    WT_COL_UPDATE(cbt->page, cip), cbt->recno)) != NULL &&
-		    (upd = __wt_txn_read(session, ins->upd)) != NULL) {
+		cbt->ins_head = WT_COL_UPDATE_SLOT(cbt->page, cbt->slot);
+		cbt->ins = __col_insert_search_match(cbt->ins_head, cbt->recno);
+		upd = cbt->ins == NULL ?
+		    NULL : __wt_txn_read(session, cbt->ins->upd);
+		if (upd != NULL) {
 			if (WT_UPDATE_DELETED_ISSET(upd))
 				continue;
-			cbt->ins = ins;
+
 			val->data = WT_UPDATE_DATA(upd);
 			val->size = upd->size;
 			return (0);
