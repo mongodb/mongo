@@ -89,7 +89,7 @@ def value_populate(value_format, i):
     elif value_format == 'S':
         return str(i) + ': abcdefghijklmnopqrstuvwxyz'
     elif value_format == '8t':
-	return 0xab
+        return 0xab
     else:
         raise AssertionError(
             'value_populate: object has unexpected format: ' + value_format)
