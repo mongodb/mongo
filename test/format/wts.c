@@ -147,13 +147,15 @@ wts_dump(const char *tag, int dump_bdb)
 	track("dump files and compare", 0ULL, NULL);
 	offset = snprintf(cmd, sizeof(cmd), "sh ./s_dumpcmp");
 	if (dump_bdb)
-		offset += snprintf(cmd + offset, sizeof(cmd) - offset, " -b");
+		offset += snprintf(cmd + offset,
+		    sizeof(cmd) - (size_t)offset, " -b");
 	if (g.c_file_type == FIX || g.c_file_type == VAR)
-		offset += snprintf(cmd + offset, sizeof(cmd) - offset, " -c");
+		offset += snprintf(cmd + offset,
+		    sizeof(cmd) - (size_t)offset, " -c");
 
 	if (g.c_data_source != NULL)
-		offset += snprintf(cmd + offset, sizeof(cmd) - offset,
-		    " -n %s", g.c_data_source);
+		offset += snprintf(cmd + offset,
+		    sizeof(cmd) - (size_t)offset, " -n %s", g.c_data_source);
 	if ((ret = system(cmd)) != 0)
 		die(ret, "%s: dump comparison failed", tag);
 }
