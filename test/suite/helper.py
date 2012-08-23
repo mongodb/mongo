@@ -65,7 +65,11 @@ def confirm_does_not_exist(self, uri):
 def confirm_empty(self, uri):
     self.pr('confirm_empty: ' + uri)
     cursor = self.session.open_cursor(uri, None, None)
-    self.assertEqual(cursor.next(), wiredtiger.WT_NOTFOUND)
+    if cursor.value_format == '8t':
+        for key,val in cursor:
+            self.assertEqual(val, 0)
+    else:
+        self.assertEqual(cursor.next(), wiredtiger.WT_NOTFOUND)
     cursor.close()
 
 # create a simple_populate or complex_populate key
@@ -76,19 +80,34 @@ def key_populate(key_format, i):
         return str('%015d' % i)
     else:
         raise AssertionError(
-            'key_populate: object has unexpected key format: ' + key_format)
+            'key_populate: object has unexpected format: ' + key_format)
+
+# create a simple_populate value
+def value_populate(value_format, i):
+    if value_format == 'i' or value_format == 'r' or value_format == 'u':
+        return i
+    elif value_format == 'S':
+        return str(i) + ': abcdefghijklmnopqrstuvwxyz'
+    elif value_format == '8t':
+	return 0xab
+    else:
+        raise AssertionError(
+            'value_populate: object has unexpected format: ' + value_format)
+
+        cursor.set_value(str(i) + ': abcdefghijklmnopqrstuvwxyz')
 
 # population of a simple object
 #    uri:       object
-#    config:    prefix of the session.create configuration string
+#    config:    prefix of the session.create configuration string (defaults
+#               to string value formats)
 #    rows:      entries to insert
 def simple_populate(self, uri, config, rows):
     self.pr('simple_populate: ' + uri + ' with ' + str(rows) + ' rows')
-    self.session.create(uri, config + ',value_format=S')
+    self.session.create(uri, 'value_format=S,' + config)
     cursor = self.session.open_cursor(uri, None, None)
     for i in range(1, rows):
         cursor.set_key(key_populate(cursor.key_format, i))
-        cursor.set_value(str(i) + ': abcdefghijklmnopqrstuvwxyz')
+        cursor.set_value(value_populate(cursor.value_format, i))
         cursor.insert()
     cursor.close()
 
@@ -99,7 +118,7 @@ def simple_populate_check(self, uri):
     for key,val in cursor:
         i += 1
         self.assertEqual(key, key_populate(cursor.key_format, i))
-        self.assertEqual(val, str(i) + ': abcdefghijklmnopqrstuvwxyz')
+        self.assertEqual(val, value_populate(cursor.value_format, i))
     cursor.close()
 
 # population of a complex object
