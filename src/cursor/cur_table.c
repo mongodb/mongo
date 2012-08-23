@@ -440,9 +440,13 @@ __wt_curtable_truncate(
 {
 	WT_CURSOR **list_start, **list_stop;
 	WT_CURSOR_TABLE *ctable, *ctable_start, *ctable_stop;
+	WT_DECL_ITEM(key);
 	WT_DECL_RET;
-	WT_ITEM key;
+	WT_ITEM raw;
 	int equal, i;
+
+
+	WT_RET(__wt_scr_alloc(session, 128, &key));
 
 	/*
 	 * Step through the cursor range, removing any indices.
@@ -450,10 +454,11 @@ __wt_curtable_truncate(
 	 * If there are indices, copy the key we're using to step through the
 	 * cursor range (so we can reset the cursor to its original position),
 	 * then remove all of the index records in the truncated range.  Get a
-	 * raw copy of the key because it's simplest to do; don't clear (or
-	 * allocate memory for) the WT_ITEM structure because all that happens
-	 * underneath is the data and size fields are reset to reference the
-	 * cursor's key.
+	 * raw copy of the key because it's simplest to do, but copy the key:
+	 * all that happens underneath is the data and size fields are reset to
+	 * reference the cursor's key, and in the case of record numbers, it's
+	 * the cursor's recno buffer, which will be updated as we cursor through
+	 * the object.
 	 *
 	 * This loop calls open-indices and then does one search more than is
 	 * required, the session layer called search on any open cursor, in
@@ -462,54 +467,57 @@ __wt_curtable_truncate(
 	 */
 	if (start == NULL) {
 		ctable = (WT_CURSOR_TABLE *)stop;
-		WT_RET(__curtable_open_indices(ctable));
+		WT_ERR(__curtable_open_indices(ctable));
 		if (ctable->table->nindices > 0) {
-			WT_RET(__wt_cursor_get_raw_key(stop, &key));
+			WT_ERR(__wt_cursor_get_raw_key(stop, &raw));
+			WT_ERR(__wt_buf_set(session, key, raw.data, raw.size));
 
 			do {
 				APPLY_CG(ctable, search);
-				WT_RET(ret);
+				WT_ERR(ret);
 				APPLY_IDX(ctable, remove);
 			} while ((ret = stop->prev(stop)) == 0);
-			WT_RET_NOTFOUND_OK(ret);
+			WT_ERR_NOTFOUND_OK(ret);
 			ret = 0;
 
-			__wt_cursor_set_raw_key(stop, &key);
+			__wt_cursor_set_raw_key(stop, &raw);
 			APPLY_CG(ctable, search);
 		}
 	} else if (stop == NULL) {
 		ctable = (WT_CURSOR_TABLE *)start;
-		WT_RET(__curtable_open_indices(ctable));
+		WT_ERR(__curtable_open_indices(ctable));
 		if (ctable->table->nindices > 0) {
-			WT_RET(__wt_cursor_get_raw_key(start, &key));
+			WT_ERR(__wt_cursor_get_raw_key(start, &raw));
+			WT_ERR(__wt_buf_set(session, key, raw.data, raw.size));
 
 			do {
 				APPLY_CG(ctable, search);
-				WT_RET(ret);
+				WT_ERR(ret);
 				APPLY_IDX(ctable, remove);
 			} while ((ret = start->next(start)) == 0);
-			WT_RET_NOTFOUND_OK(ret);
+			WT_ERR_NOTFOUND_OK(ret);
 			ret = 0;
 
-			__wt_cursor_set_raw_key(start, &key);
+			__wt_cursor_set_raw_key(start, key);
 			APPLY_CG(ctable, search);
 		}
 	} else {
 		ctable = (WT_CURSOR_TABLE *)start;
-		WT_RET(__curtable_open_indices(ctable));
+		WT_ERR(__curtable_open_indices(ctable));
 		if (ctable->table->nindices > 0) {
-			WT_RET(__wt_cursor_get_raw_key(start, &key));
+			WT_ERR(__wt_cursor_get_raw_key(start, &raw));
+			WT_ERR(__wt_buf_set(session, key, raw.data, raw.size));
 
 			do {
 				APPLY_CG(ctable, search);
-				WT_RET(ret);
+				WT_ERR(ret);
 				APPLY_IDX(ctable, remove);
-				WT_RET(start->equals(start, stop, &equal));
+				WT_ERR(start->equals(start, stop, &equal));
 			} while (!equal && (ret = start->next(start)) == 0);
-			WT_RET_NOTFOUND_OK(ret);
+			WT_ERR_NOTFOUND_OK(ret);
 			ret = 0;
 
-			__wt_cursor_set_raw_key(start, &key);
+			__wt_cursor_set_raw_key(start, key);
 			APPLY_CG(ctable, search);
 		}
 	}
@@ -526,7 +534,7 @@ __wt_curtable_truncate(
 		    list_stop = ctable_stop->cg_cursors;
 		    i < WT_COLGROUPS(ctable_stop->table);
 		    i++, ++list_stop)
-			WT_RET(
+			WT_ERR(
 			    __wt_curfile_truncate(session, NULL, *list_stop));
 	else if (stop == NULL)
 		for (i = 0,
@@ -534,7 +542,7 @@ __wt_curtable_truncate(
 		    list_start = ctable_start->cg_cursors;
 		    i < WT_COLGROUPS(ctable_start->table);
 		    i++, ++list_start)
-			WT_RET(
+			WT_ERR(
 			    __wt_curfile_truncate(session, *list_start, NULL));
 	else {
 		for (i = 0,
@@ -544,10 +552,12 @@ __wt_curtable_truncate(
 		    list_stop = ctable_stop->cg_cursors;
 		    i < WT_COLGROUPS(ctable_start->table);
 		    i++, ++list_start, ++list_stop)
-			WT_RET(__wt_curfile_truncate(
+			WT_ERR(__wt_curfile_truncate(
 			    session, *list_start, *list_stop));
 	}
-err:	return (ret);
+
+err:	__wt_scr_free(&key);
+	return (ret);
 }
 
 /*
