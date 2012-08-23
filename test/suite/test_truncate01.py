@@ -32,6 +32,7 @@
 import wiredtiger, wttest
 from helper import confirm_empty,\
     complex_populate, key_populate, simple_populate
+from wtscenario import multiply_scenarios, number_scenarios
 
 # Test session.truncate
 #       Simple, one-off tests.
@@ -52,38 +53,58 @@ class test_truncate_standalone(wttest.WiredTigerTestCase):
             lambda: self.session.truncate(uri, None, cursor, None), msg)
 
 
-# Test session.truncate.
-#       Scenarios.
-class test_truncate(wttest.WiredTigerTestCase):
+# Test truncation of an object using its URI.
+class test_truncate_uri(wttest.WiredTigerTestCase):
     name = 'test_truncate'
-
-    # Use a small page size because we want to create lots of pages in the file.
-    config = 'leaf_page_max=1024,key_format='
-
     scenarios = [
-        ('file-col-small', dict(type='file:',fmt='r',nentries=100,skip=5)),
-        ('file-row-small', dict(type='file:',fmt='S',nentries=100,skip=5)),
-        ('table-col-small', dict(type='table:',fmt='i',nentries=100,skip=5)),
-        ('table-row-small', dict(type='table:',fmt='S',nentries=100,skip=5)),
-        ('file-col-big', dict(type='file:',fmt='i',nentries=10000,skip=737)),
-        ('file-row-big', dict(type='file:',fmt='S',nentries=10000,skip=737)),
-        ('table-col-big', dict(type='table:',fmt='i',nentries=10000,skip=737)),
-        ('table-row-big', dict(type='table:',fmt='S',nentries=10000,skip=737))
-        ]
+        ('file', dict(type='file:')),
+        ('table', dict(type='table:'))
+    ]
 
-    # Test truncation of an object using its URI.
-    def test_truncate(self):
+    # Populate an object, truncate it by URI, and confirm it's empty.
+    def test_truncate_uri(self):
         uri = self.type + self.name
-        simple_populate(self, uri, self.config + self.fmt, self.nentries)
+
+        # A simple, one-file file or table object.
+        simple_populate(self, uri, 'key_format=S', 100)
         self.session.truncate(uri, None, None, None)
         confirm_empty(self, uri)
         self.session.drop(uri, None)
 
         if self.type == "table:":
-            complex_populate(self, uri, self.config + self.fmt, self.nentries)
+            complex_populate(self, uri, 'key_format=S', 100)
             self.session.truncate(uri, None, None, None)
             confirm_empty(self, uri)
             self.session.drop(uri, None)
+
+
+# Test session.truncate.
+class test_truncate(wttest.WiredTigerTestCase):
+    name = 'test_truncate'
+
+    # Use a small page size because we want to create lots of pages.
+    config = 'leaf_page_max=512,key_format='
+
+    types = [
+        ('file', dict(type='file:')),
+        ('table', dict(type='table:')),
+    ]
+    fmt = [
+        ('integer', dict(fmt='i')),
+        ('recno', dict(fmt='r')),
+        ('string', dict(fmt='S')),
+    ]
+    size = [
+        ('small', dict(nentries=100,skip=7)),
+        ('big', dict(nentries=5000,skip=37)),
+    ]
+    search = [
+        ('searchtrue', dict(search=True)),
+        ('searchfalse', dict(search=False)),
+    ]
+
+    scenarios = number_scenarios(
+        multiply_scenarios('.', types, fmt, size, search))
 
     def initCursor(self, uri, key):
         if key == -1:
@@ -92,9 +113,8 @@ class test_truncate(wttest.WiredTigerTestCase):
         cursor.set_key(key_populate(self.fmt, key))
 
         # Test scenarios where we fully instantiate a cursor as well as where we
-        # only set the key.  If it's a small run, do a search which builds out
-        # the cursor, otherwise, do nothing.
-        if self.skip == 5:
+        # only set the key.
+        if self.search:
             self.assertEqual(cursor.search(), 0)
             self.assertEqual(cursor.get_key(), key_populate(self.fmt, key))
 
@@ -134,7 +154,6 @@ class test_truncate(wttest.WiredTigerTestCase):
                 self.assertEqual(key, key_populate(self.fmt, begin - 1))
             else:
                 self.assertEqual(key, key_populate(self.fmt, self.nentries - 1))
-
         cursor.close()
 
     # Test truncation using cursors.
@@ -173,6 +192,7 @@ class test_truncate(wttest.WiredTigerTestCase):
                     self, uri, self.config + self.fmt, self.nentries)
                 self.truncateRangeAndCheck(uri, begin, end)
                 self.session.drop(uri, None)
+
 
 if __name__ == '__main__':
     wttest.run()
