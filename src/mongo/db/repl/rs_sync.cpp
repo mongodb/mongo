@@ -325,7 +325,9 @@ namespace replset {
                 if (theReplSet->isPrimary()) {
                     return;
                 }
+
                 time_t now = time(0);
+
                 // occasionally check some things
                 if (ops.empty() || now > lastTimeChecked) {
                     lastTimeChecked = now;
@@ -349,7 +351,22 @@ namespace replset {
                         return;
                     }
                 }
+
+                const int slaveDelaySecs = theReplSet->myConfig().slaveDelay;
+                if (!ops.empty() && slaveDelaySecs > 0) {
+                    const BSONObj& lastOp = ops.getDeque().back();
+                    const unsigned int opTimestampSecs = lastOp["ts"]._opTime().getSecs();
+
+                    // Stop the batch as the lastOp is too new to be applied. If we continue
+                    // on, we can get ops that are way ahead of the delay and this will
+                    // make this thread sleep longer when handleSlaveDelay is called
+                    // and apply ops much sooner than we like.
+                    if (opTimestampSecs > (now - slaveDelaySecs)) {
+                        break;
+                    }
+                }
             }
+
             const BSONObj& lastOp = ops.getDeque().back();
             handleSlaveDelay(lastOp);
 
