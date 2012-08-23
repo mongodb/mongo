@@ -9,7 +9,7 @@
 
 /*
  * __tree_walk_delete_rollback --
- *	Abort pages that were deleted without instantiation.
+ *	Abort pages that were deleted without being instantiated.
  */
 void
 __wt_tree_walk_delete_rollback(WT_REF *ref)
