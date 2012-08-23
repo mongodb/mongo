@@ -77,7 +77,7 @@ __cursor_leave(WT_CURSOR_BTREE *cbt)
  * __cursor_enter --
  *	Setup the cursor's state for a new call.
  */
-static inline int
+static inline void
 __cursor_enter(WT_CURSOR_BTREE *cbt)
 {
 	WT_SESSION_IMPL *session;
@@ -87,23 +87,19 @@ __cursor_enter(WT_CURSOR_BTREE *cbt)
 	if (session->ncursors++ == 0)
 		__wt_txn_read_first(session);
 	F_SET(cbt, WT_CBT_ACTIVE);
-
-	return (0);
 }
 
 /*
  * __cursor_func_init --
  *	Cursor call setup.
  */
-static inline int
+static inline void
 __cursor_func_init(WT_CURSOR_BTREE *cbt, int reenter)
 {
 	if (reenter)
 		__cursor_leave(cbt);
 	if (!F_ISSET(cbt, WT_CBT_ACTIVE))
-		WT_RET(__cursor_enter(cbt));
-
-	return (0);
+		__cursor_enter(cbt);
 }
 
 /*
