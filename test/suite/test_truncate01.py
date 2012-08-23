@@ -79,7 +79,7 @@ class test_truncate_uri(wttest.WiredTigerTestCase):
 
 
 # XXX
-#	currently tests with an on-disk image (close & re-open after create)
+#       currently tests with an on-disk image (close & re-open after create)
 #       -- test with initial appends (big insert list)
 #       -- test with re-open and subsequent appends (half-and-half)
 # Test session.truncate.
