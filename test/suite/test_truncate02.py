@@ -33,6 +33,9 @@ import wiredtiger, wttest
 from helper import key_populate, simple_populate
 from wtscenario import multiply_scenarios, number_scenarios
 
+# XXX
+# Test more value types '8t'
+
 # test_truncate_fast_delete
 #       When deleting leaf pages that aren't in memory, we set transactional
 # information in the page's WT_REF structure, which results in interesting
@@ -47,9 +50,10 @@ class test_truncate_fast_delete(wttest.WiredTigerTestCase):
 
     # This is all about testing the btree layer, not the schema layer, test
     # files and ignore tables.
-    types = [
-        #('col', dict(fmt='r')),
-        ('row', dict(fmt='S')),
+    keyfmt = [
+        ('integer', dict(keyfmt='i')),
+        ('recno', dict(keyfmt='r')),
+        ('string', dict(keyfmt='S')),
         ]
 
     # Overflow records force pages to be instantiated, blocking fast delete.
@@ -81,7 +85,7 @@ class test_truncate_fast_delete(wttest.WiredTigerTestCase):
         ]
 
     scenarios = number_scenarios(
-        multiply_scenarios('.', types, overflow, reads, writes, txn))
+        multiply_scenarios('.', keyfmt, overflow, reads, writes, txn))
 
     # Return the number of records visible to the cursor; test both forward
     # and backward iteration, they are different code paths in this case.
@@ -107,14 +111,15 @@ class test_truncate_fast_delete(wttest.WiredTigerTestCase):
     # Trigger fast delete and test cursor counts.
     def test_truncate_fast_delete(self):
         # Create the object.
-        simple_populate(self, self.uri, self.config + self.fmt, self.nentries)
+        simple_populate(
+            self, self.uri, self.config + self.keyfmt, self.nentries)
 
         # Optionally add a few overflow records so we block fast delete on
         # those pages.
         if self.overflow:
             cursor = self.session.open_cursor(self.uri, None)
             for i in range(1, self.nentries, 3123):
-                cursor.set_key(key_populate(self.fmt, i))
+                cursor.set_key(key_populate(self.keyfmt, i))
                 cursor.set_value("abcd" * 512)
                 cursor.update()
             cursor.close()
@@ -127,11 +132,11 @@ class test_truncate_fast_delete(wttest.WiredTigerTestCase):
             cursor = self.session.open_cursor(self.uri, None)
             if self.readbefore:
                     for i in range(1, self.nentries, 737):
-                        cursor.set_key(key_populate(self.fmt, i))
+                        cursor.set_key(key_populate(self.keyfmt, i))
                         cursor.search()
             if self.writebefore:
                     for i in range(1, self.nentries, 988):
-                        cursor.set_key(key_populate(self.fmt, i))
+                        cursor.set_key(key_populate(self.keyfmt, i))
                         cursor.set_value("NEW VALUE")
                         cursor.update()
             cursor.close()
@@ -139,9 +144,9 @@ class test_truncate_fast_delete(wttest.WiredTigerTestCase):
         # Begin a transaction, and truncate a big range of rows.
         self.session.begin_transaction(None)
         start = self.session.open_cursor(self.uri, None)
-        start.set_key(key_populate(self.fmt, 10))
+        start.set_key(key_populate(self.keyfmt, 10))
         end = self.session.open_cursor(self.uri, None)
-        end.set_key(key_populate(self.fmt, self.nentries - 10))
+        end.set_key(key_populate(self.keyfmt, self.nentries - 10))
         self.session.truncate(None, start, end, None)
         start.close()
         end.close()
@@ -151,11 +156,11 @@ class test_truncate_fast_delete(wttest.WiredTigerTestCase):
             cursor = self.session.open_cursor(self.uri, None)
             if self.readafter:
                     for i in range(1, self.nentries, 1123):
-                        cursor.set_key(key_populate(self.fmt, i))
+                        cursor.set_key(key_populate(self.keyfmt, i))
                         cursor.search()
             if self.writeafter:
                     for i in range(1, self.nentries, 621):
-                        cursor.set_key(key_populate(self.fmt, i))
+                        cursor.set_key(key_populate(self.keyfmt, i))
                         cursor.set_value("NEW VALUE")
                         cursor.update()
             cursor.close()
