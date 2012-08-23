@@ -51,6 +51,8 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	while ((cursor = TAILQ_FIRST(&session->cursors)) != NULL)
 		WT_TRET(cursor->close(cursor));
 
+	WT_ASSERT(session, session->ncursors == 0);
+
 	/* Acquire the schema lock: we may be closing btree handles. */
 	__wt_spin_lock(session, &S2C(session)->schema_lock);
 	F_SET(session, WT_SESSION_SCHEMA_LOCKED);

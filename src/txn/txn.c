@@ -61,7 +61,7 @@ __wt_txn_release_snapshot(WT_SESSION_IMPL *session)
  * __wt_txn_get_snapshot --
  *	Set up a snapshot in the current transaction, without allocating an ID.
  */
-int
+void
 __wt_txn_get_snapshot(WT_SESSION_IMPL *session, wt_txnid_t max_id)
 {
 	WT_CONNECTION_IMPL *conn;
@@ -98,7 +98,6 @@ __wt_txn_get_snapshot(WT_SESSION_IMPL *session, wt_txnid_t max_id)
 	__txn_sort_snapshot(session, n,
 	    (max_id != WT_TXN_NONE) ? max_id : current_id,
 	    oldest_reader);
-	return (0);
 }
 
 /*
@@ -135,7 +134,7 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 		    WT_STRING_MATCH("read-uncommitted", cval.str, cval.len) ?
 		    TXN_ISO_READ_UNCOMMITTED : TXN_ISO_READ_COMMITTED;
 
-	WT_ASSERT(session, session->nhazard == 0);
+	WT_ASSERT(session, session->ncursors == 0);
 
 	F_SET(txn, TXN_RUNNING);
 	F_SET(txn_state, TXN_STATE_RUNNING);

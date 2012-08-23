@@ -110,7 +110,7 @@ __wt_btcur_reset(WT_CURSOR_BTREE *cbt)
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	WT_BSTAT_INCR(session, cursor_resets);
 
-	__cursor_func_init(cbt, 1);
+	__cursor_leave(cbt);
 	__cursor_search_clear(cbt);
 
 	return (0);
@@ -561,7 +561,7 @@ __wt_btcur_close(WT_CURSOR_BTREE *cbt)
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 
-	__cursor_func_init(cbt, 1);
+	__cursor_leave(cbt);
 	__wt_buf_free(session, &cbt->tmp);
 
 	return (0);

@@ -430,18 +430,17 @@ __evict_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 	if (was_running)
 		WT_RET(__wt_txn_init(session));
 
-	WT_ERR(__wt_txn_get_snapshot(session, txn_global->ckpt_txnid));
-
+	__wt_txn_get_snapshot(session, txn_global->ckpt_txnid);
+	txn->isolation = TXN_ISO_READ_COMMITTED;
 	ret = __wt_rec_evict(session, page, 0);
 
-err:	if (was_running) {
+	if (was_running) {
 		WT_ASSERT(session, txn->snapshot == NULL ||
 		    txn->snapshot != saved_txn.snapshot);
 		__wt_txn_destroy(session);
 	}
 
 	session->txn = saved_txn;
-
 	return (ret);
 }
 
