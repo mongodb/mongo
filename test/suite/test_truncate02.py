@@ -81,18 +81,18 @@ class test_truncate_fast_delete(wttest.WiredTigerTestCase):
         ]
 
     scenarios = number_scenarios(
-	multiply_scenarios('.', types, overflow, reads, writes, txn))
+        multiply_scenarios('.', types, overflow, reads, writes, txn))
 
     # Return the number of records visible to the cursor; test both forward
     # and backward iteration, they are different code paths in this case.
     def cursor_count(self, cursor, expected):
         count = 0
-	while cursor.next() == 0:
+        while cursor.next() == 0:
             count += 1
         self.assertEqual(count, expected)
-	cursor.reset()
+        cursor.reset()
         count = 0
-	while cursor.prev() == 0:
+        while cursor.prev() == 0:
             count += 1
         self.assertEqual(count, expected)
 
@@ -125,15 +125,15 @@ class test_truncate_fast_delete(wttest.WiredTigerTestCase):
         # Optionally read/write a few rows before truncation.
         if self.readbefore or self.writebefore:
             cursor = self.session.open_cursor(self.uri, None)
-	    if self.readbefore:
-		    for i in range(1, self.nentries, 737):
-			cursor.set_key(key_populate(self.fmt, i))
-			cursor.search()
-	    if self.writebefore:
-		    for i in range(1, self.nentries, 988):
-			cursor.set_key(key_populate(self.fmt, i))
-			cursor.set_value("NEW VALUE")
-			cursor.update()
+            if self.readbefore:
+                    for i in range(1, self.nentries, 737):
+                        cursor.set_key(key_populate(self.fmt, i))
+                        cursor.search()
+            if self.writebefore:
+                    for i in range(1, self.nentries, 988):
+                        cursor.set_key(key_populate(self.fmt, i))
+                        cursor.set_value("NEW VALUE")
+                        cursor.update()
             cursor.close()
 
         # Begin a transaction, and truncate a big range of rows.
@@ -149,15 +149,15 @@ class test_truncate_fast_delete(wttest.WiredTigerTestCase):
         # Optionally read/write a few rows after truncation.
         if self.readafter or self.writeafter:
             cursor = self.session.open_cursor(self.uri, None)
-	    if self.readafter:
-		    for i in range(1, self.nentries, 1123):
-			cursor.set_key(key_populate(self.fmt, i))
-			cursor.search()
-	    if self.writeafter:
-		    for i in range(1, self.nentries, 621):
-			cursor.set_key(key_populate(self.fmt, i))
-			cursor.set_value("NEW VALUE")
-			cursor.update()
+            if self.readafter:
+                    for i in range(1, self.nentries, 1123):
+                        cursor.set_key(key_populate(self.fmt, i))
+                        cursor.search()
+            if self.writeafter:
+                    for i in range(1, self.nentries, 621):
+                        cursor.set_key(key_populate(self.fmt, i))
+                        cursor.set_value("NEW VALUE")
+                        cursor.update()
             cursor.close()
 
         # A cursor involved in the transaction should see the deleted records.
@@ -171,19 +171,19 @@ class test_truncate_fast_delete(wttest.WiredTigerTestCase):
         # A separate, read_uncommitted cursor should see the deleted records.
         self.outside_count("isolation=read-uncommitted", 18)
 
-	# Commit/rollback the transaction.
-	if self.commit:
-		self.session.commit_transaction()
-	else:
-		self.session.rollback_transaction()
+        # Commit/rollback the transaction.
+        if self.commit:
+                self.session.commit_transaction()
+        else:
+                self.session.rollback_transaction()
 
-	# Check a read_committed cursor sees the right records.
-	cursor = self.session.open_cursor(self.uri, None)
-	if self.commit:
-		self.cursor_count(cursor, 18)
-	else:
-		self.cursor_count(cursor, self.nentries -1)
-	cursor.close()
+        # Check a read_committed cursor sees the right records.
+        cursor = self.session.open_cursor(self.uri, None)
+        if self.commit:
+                self.cursor_count(cursor, 18)
+        else:
+                self.cursor_count(cursor, self.nentries -1)
+        cursor.close()
 
 
 if __name__ == '__main__':
