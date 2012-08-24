@@ -31,7 +31,7 @@
 
 import wiredtiger, wttest
 from helper import confirm_empty,\
-    complex_populate, key_populate, simple_populate
+    complex_populate, key_populate, simple_populate, value_populate
 from wtscenario import multiply_scenarios, number_scenarios
 
 # Test session.truncate
@@ -46,7 +46,7 @@ class test_truncate_standalone(wttest.WiredTigerTestCase):
         msg = '/either a URI or start/stop cursors/'
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.truncate(None, None, None, None), msg)
-        cursor = self.session.open_cursor(uri, None, None)
+        cursor = self.session.open_cursor(uri, None)
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.truncate(uri, cursor, None, None), msg)
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
@@ -79,8 +79,7 @@ class test_truncate_uri(wttest.WiredTigerTestCase):
 
 
 # XXX
-#       currently tests with an on-disk image (close & re-open after create)
-#       -- test with initial appends (big insert list)
+#	-- test with appends
 #       -- test with re-open and subsequent appends (half-and-half)
 # Test session.truncate.
 class test_truncate(wttest.WiredTigerTestCase):
@@ -100,6 +99,10 @@ class test_truncate(wttest.WiredTigerTestCase):
         ('recno', dict(keyfmt='r')),
         ('string', dict(keyfmt='S')),
     ]
+    image = [
+        ('in-memory', dict(reopen=False)),
+        ('on-disk', dict(reopen=True)),
+    ]
     size = [
         ('small', dict(nentries=100,skip=7)),
         ('big', dict(nentries=1000,skip=37)),
@@ -110,20 +113,20 @@ class test_truncate(wttest.WiredTigerTestCase):
     ]
 
     scenarios = number_scenarios(
-        multiply_scenarios('.', types, keyfmt, size, search))
+        multiply_scenarios('.', types, keyfmt, image, size, search))
 
     # Set a cursor and optionally search for the item.
     def initCursor(self, uri, key):
         if key == -1:
             return None
-        cursor = self.session.open_cursor(uri, None, None)
-        cursor.set_key(key_populate(self.keyfmt, key))
+        cursor = self.session.open_cursor(uri, None)
+        cursor.set_key(key_populate(cursor, key))
 
         # Test scenarios where we fully instantiate a cursor as well as where we
         # only set the key.
         if self.search:
             self.assertEqual(cursor.search(), 0)
-            self.assertEqual(cursor.get_key(), key_populate(self.keyfmt, key))
+            self.assertEqual(cursor.get_key(), key_populate(cursor, key))
 
         return cursor
 
@@ -160,24 +163,23 @@ class test_truncate(wttest.WiredTigerTestCase):
 
         # If the object is empty, confirm that, otherwise test the first and
         # last keys are the ones before/after the truncated range.
-        cursor = self.session.open_cursor(uri, None, None)
+        cursor = self.session.open_cursor(uri, None)
         if begin == 1 and end == self.nentries - 1:
             confirm_empty(self, uri)
         else:
             key = self.getFirstKey(cursor)
             if begin == 1:
-                self.assertEqual(key, key_populate(self.keyfmt, end + 1))
+                self.assertEqual(key, key_populate(cursor, end + 1))
             else:
-                self.assertEqual(key, key_populate(self.keyfmt, 1))
+                self.assertEqual(key, key_populate(cursor, 1))
 
             self.assertEqual(cursor.reset(), 0)
 
             key = self.getLastKey(cursor)
             if end == self.nentries - 1:
-                self.assertEqual(key, key_populate(self.keyfmt, begin - 1))
+                self.assertEqual(key, key_populate(cursor, begin - 1))
             else:
-                self.assertEqual(
-                    key, key_populate(self.keyfmt, self.nentries - 1))
+                self.assertEqual(key, key_populate(cursor, self.nentries - 1))
         cursor.close()
 
     # Test truncation using cursors.
@@ -205,8 +207,13 @@ class test_truncate(wttest.WiredTigerTestCase):
 
         # A simple, one-file file or table object.
         for begin,end in list:
+            # Populate the object.
             simple_populate(self, uri, self.config + self.keyfmt, self.nentries)
-            self.reopen_conn()
+
+            # Optionally close and re-open the object to get a disk image.
+            if self.reopen:
+                self.reopen_conn()
+
             self.truncateRangeAndCheck(uri, begin, end)
             self.session.drop(uri, None)
 
@@ -215,7 +222,8 @@ class test_truncate(wttest.WiredTigerTestCase):
             for begin,end in list:
                 complex_populate(
                     self, uri, self.config + self.keyfmt, self.nentries)
-                self.reopen_conn()
+                if self.reopen:
+                    self.reopen_conn()
                 self.truncateRangeAndCheck(uri, begin, end)
                 self.session.drop(uri, None)
 

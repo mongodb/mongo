@@ -119,7 +119,7 @@ class test_truncate_fast_delete(wttest.WiredTigerTestCase):
         if self.overflow:
             cursor = self.session.open_cursor(self.uri, None)
             for i in range(1, self.nentries, 3123):
-                cursor.set_key(key_populate(self.keyfmt, i))
+                cursor.set_key(key_populate(cursor, i))
                 cursor.set_value("abcd" * 512)
                 cursor.update()
             cursor.close()
@@ -132,11 +132,11 @@ class test_truncate_fast_delete(wttest.WiredTigerTestCase):
             cursor = self.session.open_cursor(self.uri, None)
             if self.readbefore:
                     for i in range(1, self.nentries, 737):
-                        cursor.set_key(key_populate(self.keyfmt, i))
+                        cursor.set_key(key_populate(cursor, i))
                         cursor.search()
             if self.writebefore:
                     for i in range(1, self.nentries, 988):
-                        cursor.set_key(key_populate(self.keyfmt, i))
+                        cursor.set_key(key_populate(cursor, i))
                         cursor.set_value("NEW VALUE")
                         cursor.update()
             cursor.close()
@@ -144,9 +144,9 @@ class test_truncate_fast_delete(wttest.WiredTigerTestCase):
         # Begin a transaction, and truncate a big range of rows.
         self.session.begin_transaction(None)
         start = self.session.open_cursor(self.uri, None)
-        start.set_key(key_populate(self.keyfmt, 10))
+        start.set_key(key_populate(start, 10))
         end = self.session.open_cursor(self.uri, None)
-        end.set_key(key_populate(self.keyfmt, self.nentries - 10))
+        end.set_key(key_populate(end, self.nentries - 10))
         self.session.truncate(None, start, end, None)
         start.close()
         end.close()
@@ -156,11 +156,11 @@ class test_truncate_fast_delete(wttest.WiredTigerTestCase):
             cursor = self.session.open_cursor(self.uri, None)
             if self.readafter:
                     for i in range(1, self.nentries, 1123):
-                        cursor.set_key(key_populate(self.keyfmt, i))
+                        cursor.set_key(key_populate(cursor, i))
                         cursor.search()
             if self.writeafter:
                     for i in range(1, self.nentries, 621):
-                        cursor.set_key(key_populate(self.keyfmt, i))
+                        cursor.set_key(key_populate(cursor, i))
                         cursor.set_value("NEW VALUE")
                         cursor.update()
             cursor.close()

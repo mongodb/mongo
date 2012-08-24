@@ -62,7 +62,7 @@ class test_empty(wttest.WiredTigerTestCase):
         # Add a few records to the object and remove them.
         cursor = self.session.open_cursor(uri, None, None)
         for i in range(1,5):
-            cursor.set_key(key_populate(self.fmt, i));
+            cursor.set_key(key_populate(cursor, i));
             cursor.set_value("XXX");
             cursor.insert();
             cursor.remove();
