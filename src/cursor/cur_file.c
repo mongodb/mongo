@@ -198,13 +198,50 @@ __wt_curfile_truncate(
 	WT_BTREE *saved_btree;
 	WT_CURSOR_BTREE *cursor;
 	WT_DECL_RET;
+	int exact;
+	uint64_t start_recno, stop_recno;
 
 	/*
-	 * Our caller is either the session layer or the table-cursor truncate
-	 * code, both of which guarantee any open cursor is fully instantiated.
-	 * To minimize overhead when called from the table-cursor code, don't
-	 * do any further checking.
+	 * We're called by either the session layer or the table-cursor truncate
+	 * code: in both cases, the key must have been set but the cursor itself
+	 * may not be positioned.
 	 *
+	 * Column-store cursors might not reference a valid record, applications
+	 * can specify records larger than the current maximum record and create
+	 * deleted records (variable-length column-store), or records with a
+	 * value of 0 (fixed-length column-store).  Row-store does a search,
+	 * column-store does a search-near for this reason.  Column-store also
+	 * corrects on return so any start/stop cursor is positioned on the next
+	 * record greater-than/less-than or equal to the original key.  There's
+	 * some possibility they might cross, of course, and in that case we're
+	 * done quickly.
+	 */
+	if (start != NULL) {
+		if (strcmp(start->key_format, "r") == 0) {
+			WT_RET(start->search_near(start, &exact));
+			if (exact < 0)
+				WT_RET(start->next(start));
+
+			start_recno = start->recno;
+		} else
+			WT_RET(start->search(start));
+	}
+	if (stop != NULL) {
+		if (strcmp(stop->key_format, "r") == 0) {
+			WT_RET(stop->search_near(stop, &exact));
+			if (exact > 0)
+				WT_RET(stop->prev(stop));
+
+			stop_recno = stop->recno;
+
+			/* Check for crossing key/record numbers. */
+			if (start != NULL && start_recno > stop_recno)
+				return (0);
+		} else
+			WT_RET(stop->search(stop));
+	}
+
+	/*
 	 * !!!
 	 * We're doing a cursor operation but in the service of the session API;
 	 * set the session handle to reference the appropriate Btree, but don't

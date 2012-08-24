@@ -78,6 +78,9 @@ class test_truncate_uri(wttest.WiredTigerTestCase):
             self.session.drop(uri, None)
 
 
+# XXX
+#       Test where the start of the delete is within the append area
+#       we're already testing where it's inside the implicit area.
 # Test session.truncate.
 class test_truncate(wttest.WiredTigerTestCase):
     name = 'test_truncate'
@@ -97,9 +100,11 @@ class test_truncate(wttest.WiredTigerTestCase):
         ('string', dict(keyfmt='S')),
     ]
     image = [
-        ('in-memory', dict(reopen=False,append=False)),
-        ('on-disk', dict(reopen=True,append=False)),
-        ('on-disk-append', dict(reopen=True,append=True)),
+        ('in-memory', dict(reopen=False,append=False,implicit=False)),
+        ('on-disk', dict(reopen=True,append=False,implicit=False)),
+        ('on-disk-append', dict(reopen=True,append=True,implicit=False)),
+        ('on-disk-append-implicit',
+            dict(reopen=True,append=True,implicit=True)),
     ]
     size = [
         ('small', dict(nentries=100,skip=7,search=False)),
@@ -118,8 +123,9 @@ class test_truncate(wttest.WiredTigerTestCase):
         cursor.set_key(key_populate(cursor, key))
 
         # Test scenarios where we fully instantiate a cursor as well as where we
-        # only set the key.
-        if self.search:
+        # only set the key.  The key may not exist in a column-store so ignore
+        # the flag if implicit is set.
+        if self.search and not self.implicit:
             self.assertEqual(cursor.search(), 0)
             self.assertEqual(cursor.get_key(), key_populate(cursor, key))
 
@@ -157,14 +163,20 @@ class test_truncate(wttest.WiredTigerTestCase):
             cur2.close()
 
         # If the object is empty, confirm that, otherwise test the first and
-        # last keys are the ones before/after the truncated range.
+        # last keys are the ones before/after the truncated range.  Note that
+        # column-store tests implicit keys, and so the test is slightly looser
+        # in that case.
         cursor = self.session.open_cursor(uri, None)
         if begin == 1 and end == self.nentries - 1:
             confirm_empty(self, uri)
         else:
             key = self.getFirstKey(cursor)
             if begin == 1:
-                self.assertEqual(key, key_populate(cursor, end + 1))
+                if self.implicit:
+                        self.assertGreaterEqual(
+                            key, key_populate(cursor, end + 1))
+                else:
+                        self.assertEqual(key, key_populate(cursor, end + 1))
             else:
                 self.assertEqual(key, key_populate(cursor, 1))
 
@@ -172,7 +184,11 @@ class test_truncate(wttest.WiredTigerTestCase):
 
             key = self.getLastKey(cursor)
             if end == self.nentries - 1:
-                self.assertEqual(key, key_populate(cursor, begin - 1))
+                if self.implicit:
+                        self.assertLessEqual(
+                            key, key_populate(cursor, begin - 1))
+                else:
+                        self.assertEqual(key, key_populate(cursor, begin - 1))
             else:
                 self.assertEqual(key, key_populate(cursor, self.nentries - 1))
         cursor.close()
@@ -196,9 +212,13 @@ class test_truncate(wttest.WiredTigerTestCase):
                 self.nentries - self.skip),
             (1, 1),                             # begin to begin
             (self.nentries - 1,                 # end to end
-                self.nentries -1),
+                self.nentries - 1),
             (self.skip, self.skip)              # middle to same middle
             ]
+
+        # Implicit records only apply to column-store.
+        if self.implicit and not self.keyfmt == 'r':
+            return
 
         # A simple, one-file file or table object.
         for begin,end in list:
@@ -218,6 +238,12 @@ class test_truncate(wttest.WiredTigerTestCase):
 
             # Optionally append rows to the object.
             if self.append:
+                # Column-store: create implicit records, making sure they span
+                # the end of the delete range, in other words, "12" is larger
+                # than the "10" we used to set append_count.
+                if self.implicit:
+                    pop_count += 12
+
                 cursor = self.session.open_cursor(uri, None)
                 while pop_count < self.nentries:
                     cursor.set_key(key_populate(cursor, pop_count))

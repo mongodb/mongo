@@ -330,8 +330,6 @@ __session_truncate(WT_SESSION *wt_session,
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	WT_CURSOR *cursor;
-	int cmp_recno, exact;
-	uint64_t start_recno, stop_recno;
 
 	session = (WT_SESSION_IMPL *)wt_session;
 
@@ -358,53 +356,7 @@ __session_truncate(WT_SESSION *wt_session,
 			    "truncate method cursors must reference the same "
 			    "object");
 
-		/*
-		 * For table truncation, we need the complete table cursor setup
-		 * (including indices), and for file truncation, we need a fully
-		 * initialized btree cursor.  There's no reason to believe any
-		 * of that is done, yet, the application may have only set the
-		 * keys and done nothing further.  Because the table cursor code
-		 * sits on top of the file cursor code, the easy solution is to
-		 * do a search now, that fully instantiates everything we need,
-		 * and then we don't have to deal with it further.
-		 *
-		 * A column-store cursor might not reference a valid record, as
-		 * applications can specify a record larger than the current
-		 * maximum record and create deleted records (variable-length
-		 * column-store), or records with a value of 0 (fixed-length
-		 * column-store).  Row-store does a search, column-store does a
-		 * search-near for this reason.  Column-store also corrects on
-		 * return so any start/stop cursor is positioned on the next
-		 * record greater-than/less-than or equal to the original key.
-		 * There's some possibility they might cross, of course, and in
-		 * that case we're done.
-		 */
-		cmp_recno = 0;
-		if (start != NULL) {
-			cursor = start;
-			if (strcmp(start->key_format, "r") == 0) {
-				cmp_recno = 1;
-				WT_ERR(start->search_near(start, &exact));
-				if (exact < 0)
-					WT_ERR(start->next(start));
-				WT_ERR(start->get_key(cursor, &start_recno));
-			} else
-				WT_ERR(start->search(start));
-		}
-		if (stop != NULL) {
-			cursor = stop;
-			if (strcmp(stop->key_format, "r") == 0) {
-				cmp_recno = 1;
-				WT_ERR(stop->search_near(stop, &exact));
-				if (exact > 0)
-					WT_ERR(stop->prev(stop));
-				WT_ERR(stop->get_key(cursor, &stop_recno));
-			} else
-				WT_ERR(stop->search(stop));
-		}
-		if (start != NULL && stop != NULL &&
-		    cmp_recno && start_recno >= stop_recno)
-			return (0);
+		cursor = start == NULL ? stop : start;
 		if (WT_PREFIX_MATCH(cursor->uri, "file:"))
 			ret = __wt_curfile_truncate(session, start, stop);
 		else if (WT_PREFIX_MATCH(cursor->uri, "table:"))

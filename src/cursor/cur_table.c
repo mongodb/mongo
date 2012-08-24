@@ -438,12 +438,58 @@ int
 __wt_curtable_truncate(
     WT_SESSION_IMPL *session, WT_CURSOR *start, WT_CURSOR *stop)
 {
-	WT_CURSOR **list_start, **list_stop;
+	WT_CURSOR **list_start, **list_stop, *primary;
 	WT_CURSOR_TABLE *ctable, *ctable_start, *ctable_stop;
 	WT_DECL_ITEM(key);
 	WT_DECL_RET;
 	WT_ITEM raw;
-	int equal, i;
+	uint64_t start_recno, stop_recno;
+	int equal, i, exact;
+
+	/*
+	 * Table truncation requires the complete table cursor setup (including
+	 * indices).  There's no reason to believe any of that is done yet, the
+	 * application may have only set the keys and done nothing further.  Do
+	 * it now so we don't have to worry about it later.
+	 *
+	 * Column-store cursors might not reference a valid record, applications
+	 * can specify records larger than the current maximum record and create
+	 * deleted records (variable-length column-store), or records with a
+	 * value of 0 (fixed-length column-store).  Row-store does a search,
+	 * column-store does a search-near for this reason.  Column-store also
+	 * corrects on return so any start/stop cursor is positioned on the next
+	 * record greater-than/less-than or equal to the original key.  There's
+	 * some possibility they might cross, of course, and in that case we're
+	 * done quickly.
+	 */
+	if (start != NULL) {
+		if (strcmp(start->key_format, "r") == 0) {
+			WT_RET(start->search_near(start, &exact));
+			if (exact < 0)
+				WT_RET(start->next(start));
+
+			ctable = (WT_CURSOR_TABLE *)start;
+			primary = *ctable->cg_cursors;
+			start_recno = primary->recno;
+		} else
+			WT_RET(start->search(start));
+	}
+	if (stop != NULL) {
+		if (strcmp(stop->key_format, "r") == 0) {
+			WT_RET(stop->search_near(stop, &exact));
+			if (exact > 0)
+				WT_RET(stop->prev(stop));
+
+			ctable = (WT_CURSOR_TABLE *)stop;
+			primary = *ctable->cg_cursors;
+			stop_recno = primary->recno;
+
+			/* Check for crossing key/record numbers. */
+			if (start != NULL && start_recno > stop_recno)
+				return (0);
+		} else
+			WT_RET(stop->search(stop));
+	}
 
 	WT_RET(__wt_scr_alloc(session, 128, &key));
 
@@ -458,11 +504,6 @@ __wt_curtable_truncate(
 	 * reference the cursor's key, and in the case of record numbers, it's
 	 * the cursor's recno buffer, which will be updated as we cursor through
 	 * the object.
-	 *
-	 * This loop calls open-indices and then does one search more than is
-	 * required, the session layer called search on any open cursor, in
-	 * case all the application did was set the keys.  It's cleaner this
-	 * way, and it's not worth optimizing out.
 	 */
 	if (start == NULL) {
 		ctable = (WT_CURSOR_TABLE *)stop;
@@ -479,7 +520,7 @@ __wt_curtable_truncate(
 			WT_ERR_NOTFOUND_OK(ret);
 			ret = 0;
 
-			__wt_cursor_set_raw_key(stop, &raw);
+			__wt_cursor_set_raw_key(stop, key);
 			APPLY_CG(ctable, search);
 		}
 	} else if (stop == NULL) {
