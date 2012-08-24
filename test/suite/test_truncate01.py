@@ -78,9 +78,6 @@ class test_truncate_uri(wttest.WiredTigerTestCase):
             self.session.drop(uri, None)
 
 
-# XXX
-#	-- test with appends
-#       -- test with re-open and subsequent appends (half-and-half)
 # Test session.truncate.
 class test_truncate(wttest.WiredTigerTestCase):
     name = 'test_truncate'
@@ -100,8 +97,9 @@ class test_truncate(wttest.WiredTigerTestCase):
         ('string', dict(keyfmt='S')),
     ]
     image = [
-        ('in-memory', dict(reopen=False)),
-        ('on-disk', dict(reopen=True)),
+        ('in-memory', dict(reopen=False,append=False)),
+        ('on-disk', dict(reopen=True,append=False)),
+        ('on-disk', dict(reopen=True,append=True)),
     ]
     size = [
         ('small', dict(nentries=100,skip=7,search=False)),
@@ -204,12 +202,29 @@ class test_truncate(wttest.WiredTigerTestCase):
 
         # A simple, one-file file or table object.
         for begin,end in list:
-            # Populate the object.
-            simple_populate(self, uri, self.config + self.keyfmt, self.nentries)
+            # Populate the object.  We want to test cursor transition to the
+            # append list: if self.append is set, append the last rows after
+            # we've written the object and re-read it, so we have a mix of an
+            # on-disk format and an append list.
+            append_count = 0
+            if self.append:
+                append_count = self.skip + 10
+            pop_count = self.nentries - append_count
+            simple_populate(self, uri, self.config + self.keyfmt, pop_count)
 
             # Optionally close and re-open the object to get a disk image.
             if self.reopen:
                 self.reopen_conn()
+
+            # Optionally append rows to the object.
+            if self.append:
+                cursor = self.session.open_cursor(uri, None)
+                while pop_count < self.nentries:
+                    cursor.set_key(key_populate(cursor, pop_count))
+                    cursor.set_value(value_populate(cursor, pop_count))
+                    cursor.insert()
+                    pop_count += 1
+                cursor.close()
 
             self.truncateRangeAndCheck(uri, begin, end)
             self.session.drop(uri, None)
