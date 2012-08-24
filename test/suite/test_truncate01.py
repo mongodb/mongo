@@ -31,7 +31,7 @@
 
 import wiredtiger, wttest
 from helper import confirm_empty,\
-    complex_populate, key_populate, simple_populate, value_populate
+    key_populate, value_populate, complex_populate, simple_populate
 from wtscenario import multiply_scenarios, number_scenarios
 
 # Test session.truncate
@@ -173,10 +173,9 @@ class test_truncate(wttest.WiredTigerTestCase):
             key = self.getFirstKey(cursor)
             if begin == 1:
                 if self.implicit:
-                        self.assertGreaterEqual(
-                            key, key_populate(cursor, end + 1))
+                    self.assertGreaterEqual(key, key_populate(cursor, end + 1))
                 else:
-                        self.assertEqual(key, key_populate(cursor, end + 1))
+                    self.assertEqual(key, key_populate(cursor, end + 1))
             else:
                 self.assertEqual(key, key_populate(cursor, 1))
 
@@ -185,10 +184,9 @@ class test_truncate(wttest.WiredTigerTestCase):
             key = self.getLastKey(cursor)
             if end == self.nentries - 1:
                 if self.implicit:
-                        self.assertLessEqual(
-                            key, key_populate(cursor, begin - 1))
+                    self.assertLessEqual(key, key_populate(cursor, begin - 1))
                 else:
-                        self.assertEqual(key, key_populate(cursor, begin - 1))
+                    self.assertEqual(key, key_populate(cursor, begin - 1))
             else:
                 self.assertEqual(key, key_populate(cursor, self.nentries - 1))
         cursor.close()
