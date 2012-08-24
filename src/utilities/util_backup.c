@@ -34,7 +34,7 @@ append_target(const char *target, char **bufp)
 	}
 	if (first) {
 		first = 0;
-		strcat(buf, "target=(");
+		strcpy(buf, "target=(");
 	} else
 		buf[strlen(buf) - 1] = ',';	/* overwrite previous ")" */
 	strcat(buf, "\"");
