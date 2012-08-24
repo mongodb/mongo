@@ -91,7 +91,11 @@ def value_populate(cursor, i):
     elif value_format == 'S':
         return str(i) + ': abcdefghijklmnopqrstuvwxyz'
     elif value_format == '8t':
-        return 0xab
+	value = (
+	    0xa1, 0xa2, 0xa3, 0xa4, 0xa5, 0xa6, 0xa7, 0xa8, 0xaa, 0xab,
+	    0xac, 0xad, 0xae, 0xaf, 0xb1, 0xb2, 0xb3, 0xb4, 0xb5, 0xb6,
+	    0xb7, 0xb8, 0xba, 0xbb, 0xbc, 0xbd, 0xbe, 0xbf)
+        return value[i % len(value)]
     else:
         raise AssertionError(
             'value_populate: object has unexpected format: ' + value_format)
@@ -118,7 +122,9 @@ def simple_populate_check(self, uri):
     for key,val in cursor:
         i += 1
         self.assertEqual(key, key_populate(cursor, i))
-        self.assertEqual(val, value_populate(cursor, i))
+	if cursor.value_format == '8t' and val == 0:	# deleted
+	    continue;
+	self.assertEqual(val, value_populate(cursor, i))
     cursor.close()
 
 # population of a complex object
