@@ -447,7 +447,7 @@ __cursor_equals(WT_CURSOR_BTREE *a, WT_CURSOR_BTREE *b)
 			return (1);
 		break;
 	case BTREE_ROW:
-		if (a->btree != b->btree || a->page != b->page)
+		if (a->page != b->page)
 			return (0);
 		if (a->ins != NULL || b->ins != NULL) {
 			if (a->ins == b->ins)
@@ -462,37 +462,14 @@ __cursor_equals(WT_CURSOR_BTREE *a, WT_CURSOR_BTREE *b)
 }
 
 /*
- * __cursor_remove --
- *	Remove an item referenced by the cursor.
+ * __cursor_truncate --
+ *	Discard a cursor range from row-store or variable-width column-store
+ * tree.
  */
-static inline int
-__cursor_remove(WT_CURSOR_BTREE *cbt)
-{
-	WT_BTREE *btree;
-	WT_DECL_RET;
-	WT_SESSION_IMPL *session;
-
-	session = (WT_SESSION_IMPL *)cbt->iface.session;
-	btree = cbt->btree;
-
-	switch (btree->type) {
-	case BTREE_COL_FIX:
-	case BTREE_COL_VAR:
-		ret = __wt_col_modify(session, cbt, 2);
-		break;
-	case BTREE_ROW:
-		ret = __wt_row_modify(session, cbt, 1);
-		break;
-	}
-	return (ret);
-}
-
-/*
- * __wt_btcur_truncate --
- *	Discard a cursor range from the tree.
- */
-int
-__wt_btcur_truncate(WT_CURSOR_BTREE *start, WT_CURSOR_BTREE *stop)
+static int
+__cursor_truncate(WT_SESSION_IMPL *session,
+    WT_CURSOR_BTREE *start, WT_CURSOR_BTREE *stop,
+    int (*rmfunc)(WT_SESSION_IMPL *, WT_CURSOR_BTREE *, int))
 {
 	WT_DECL_RET;
 
@@ -518,7 +495,7 @@ __wt_btcur_truncate(WT_CURSOR_BTREE *start, WT_CURSOR_BTREE *stop)
 			for (;;) {
 				if ((ret = __wt_btcur_prev(stop, 1)) != 0)
 					break;
-				if ((ret = __cursor_remove(stop)) != 0)
+				if ((ret = rmfunc(session, stop, 2)) != 0)
 					break;
 			}
 		} while (ret == WT_RESTART);
@@ -528,7 +505,7 @@ __wt_btcur_truncate(WT_CURSOR_BTREE *start, WT_CURSOR_BTREE *stop)
 			for (;;) {
 				if ((ret = __wt_btcur_next(start, 1)) != 0)
 					break;
-				if ((ret = __cursor_remove(start)) != 0)
+				if ((ret = rmfunc(session, start, 2)) != 0)
 					break;
 			}
 		} while (ret == WT_RESTART);
@@ -540,7 +517,7 @@ __wt_btcur_truncate(WT_CURSOR_BTREE *start, WT_CURSOR_BTREE *stop)
 					break;
 				if ((ret = __wt_btcur_next(start, 1)) != 0)
 					break;
-				if ((ret = __cursor_remove(start)) != 0)
+				if ((ret = rmfunc(session, start, 2)) != 0)
 					break;
 			}
 		} while (ret == WT_RESTART);
@@ -548,6 +525,114 @@ __wt_btcur_truncate(WT_CURSOR_BTREE *start, WT_CURSOR_BTREE *stop)
 
 	WT_RET_NOTFOUND_OK(ret);
 	return (0);
+}
+
+/*
+ * __cursor_truncate_fix --
+ *	Discard a cursor range from fixed-width column-store tree.
+ */
+static int
+__cursor_truncate_fix(WT_SESSION_IMPL *session,
+    WT_CURSOR_BTREE *start, WT_CURSOR_BTREE *stop,
+    int (*rmfunc)(WT_SESSION_IMPL *, WT_CURSOR_BTREE *, int))
+{
+	WT_DECL_RET;
+	uint8_t *value;
+
+	/*
+	 * Handle fixed-length column-store objects separately: for row-store
+	 * and variable-length column-store objects we have "deleted" values
+	 * and so returned objects actually exist: fixed-length column-store
+	 * objects are filled-in if they don't exist, that is, if you create
+	 * record 37, records 1-36 magically appear.  Those records can't be
+	 * deleted, which means we have to ignore already "deleted" records.
+	 *
+	 * First, call the standard cursor remove method to do a full search and
+	 * re-position the cursor because we don't have a saved copy of the
+	 * page's write generation information, which we need to remove records.
+	 * Once that's done, we can delete records without a full search, unless
+	 * we encounter a restart error because the page was modified by some
+	 * other thread of control; in that case, repeat the full search to
+	 * refresh the page's modification information.
+	 */
+	if (start == NULL) {
+		do {
+			WT_RET(__wt_btcur_remove(stop));
+			for (;;) {
+				if ((ret = __wt_btcur_prev(stop, 1)) != 0)
+					break;
+				value = (uint8_t *)stop->iface.value.data;
+				if (*value != 0 &&
+				    (ret = rmfunc(session, stop, 2)) != 0)
+					break;
+			}
+		} while (ret == WT_RESTART);
+	} else if (stop == NULL) {
+		value = (uint8_t *)&start->iface.value;
+		do {
+			WT_RET(__wt_btcur_remove(start));
+			for (;;) {
+				if ((ret = __wt_btcur_next(start, 1)) != 0)
+					break;
+				value = (uint8_t *)start->iface.value.data;
+				if (*value != 0 &&
+				    (ret = rmfunc(session, start, 2)) != 0)
+					break;
+			}
+		} while (ret == WT_RESTART);
+	} else {
+		value = (uint8_t *)&start->iface.value;
+		do {
+			WT_RET(__wt_btcur_remove(start));
+			for (;;) {
+				if (__cursor_equals(start, stop))
+					break;
+				if ((ret = __wt_btcur_next(start, 1)) != 0)
+					break;
+				value = (uint8_t *)start->iface.value.data;
+				if (*value != 0 &&
+				    (ret = rmfunc(session, start, 2)) != 0)
+					break;
+			}
+		} while (ret == WT_RESTART);
+	}
+
+	WT_RET_NOTFOUND_OK(ret);
+	return (0);
+}
+
+/*
+ * __wt_btcur_truncate --
+ *	Discard a cursor range from the tree.
+ */
+int
+__wt_btcur_truncate(WT_CURSOR_BTREE *start, WT_CURSOR_BTREE *stop)
+{
+	WT_BTREE *btree;
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+
+	if (start == NULL) {
+		session = (WT_SESSION_IMPL *)stop->iface.session;
+		btree = stop->btree;
+	} else {
+		session = (WT_SESSION_IMPL *)start->iface.session;
+		btree = start->btree;
+	}
+
+	switch (btree->type) {
+	case BTREE_COL_FIX:
+		ret = __cursor_truncate_fix(
+		    session, start, stop, __wt_col_modify);
+		break;
+	case BTREE_COL_VAR:
+		ret = __cursor_truncate(session, start, stop, __wt_col_modify);
+		break;
+	case BTREE_ROW:
+		ret = __cursor_truncate(session, start, stop, __wt_row_modify);
+		break;
+	}
+	return (ret);
 }
 
 /*
