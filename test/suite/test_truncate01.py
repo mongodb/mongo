@@ -104,16 +104,13 @@ class test_truncate(wttest.WiredTigerTestCase):
         ('on-disk', dict(reopen=True)),
     ]
     size = [
-        ('small', dict(nentries=100,skip=7)),
-        ('big', dict(nentries=1000,skip=37)),
-    ]
-    search = [
-        ('searchtrue', dict(search=True)),
-        ('searchfalse', dict(search=False)),
+        ('small', dict(nentries=100,skip=7,search=False)),
+        ('small', dict(nentries=100,skip=7,search=True)),
+        ('big', dict(nentries=1000,skip=37,search=True)),
     ]
 
     scenarios = number_scenarios(
-        multiply_scenarios('.', types, keyfmt, image, size, search))
+        multiply_scenarios('.', types, keyfmt, image, size))
 
     # Set a cursor and optionally search for the item.
     def initCursor(self, uri, key):
