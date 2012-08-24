@@ -440,11 +440,22 @@ if has_option( "sharedclient" ):
 
 # dbtests test binary
 env.StaticLibrary('testframework', ['dbtests/framework.cpp'], LIBDEPS=['unittest/unittest'])
+env.StaticLibrary('mocklib', [f for f in Glob( "dbtests/mock/*.cpp" )],
+  LIBDEPS=['unittest/unittest', 'mongocommon'])
 
 test = testEnv.Install(
     '#/',
-    testEnv.Program( "test", [ f for f in Glob( "dbtests/*.cpp" ) if not str( f ).endswith( 'framework.cpp' ) ],
-                     LIBDEPS=["mongocommon", "serveronly", "coreserver", "coredb", "testframework", "gridfs", "notmongodormongos" ] ) )
+    testEnv.Program("test",
+                    [ f for f in Glob("dbtests/*.cpp") if not str(f).endswith('framework.cpp') ],
+                    LIBDEPS = [
+                       "mongocommon",
+                       "serveronly",
+                       "coreserver",
+                       "coredb",
+                       "testframework",
+                       "gridfs",
+                       "notmongodormongos",
+                       "mocklib"]))
 
 if len(testEnv.subst('$PROGSUFFIX')):
     testEnv.Alias( "test", "#/${PROGPREFIX}test${PROGSUFFIX}" )
