@@ -42,14 +42,18 @@ __curbulk_close(WT_CURSOR *cursor)
 	WT_CURSOR_BULK *cbulk;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
+	int tret;
 
 	cbulk = (WT_CURSOR_BULK *)cursor;
 	btree = cbulk->cbt.btree;
 
 	CURSOR_API_CALL_NOCONF(cursor, session, close, btree);
 	WT_TRET(__wt_bulk_end(cbulk));
-	if (session->btree != NULL)
-		WT_TRET(__wt_session_release_btree(session));
+	if (session->btree != NULL) {
+		WT_WITH_SCHEMA_LOCK(session,
+		    tret = __wt_session_release_btree(session));
+		WT_TRET(tret);
+	}
 	/* The URI is owned by the btree handle. */
 	cursor->uri = NULL;
 	WT_TRET(__wt_cursor_close(cursor));
