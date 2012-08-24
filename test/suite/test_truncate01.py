@@ -99,7 +99,7 @@ class test_truncate(wttest.WiredTigerTestCase):
     image = [
         ('in-memory', dict(reopen=False,append=False)),
         ('on-disk', dict(reopen=True,append=False)),
-        ('on-disk', dict(reopen=True,append=True)),
+        ('on-disk-append', dict(reopen=True,append=True)),
     ]
     size = [
         ('small', dict(nentries=100,skip=7,search=False)),
