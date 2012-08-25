@@ -219,8 +219,8 @@ __wt_curfile_truncate(
 	if (start != NULL) {
 		if (strcmp(start->key_format, "r") == 0) {
 			WT_RET(start->search_near(start, &exact));
-			if (exact < 0)
-				WT_RET(start->next(start));
+			if (exact < 0 && (ret = start->next(start)) != 0)
+				return (ret == WT_NOTFOUND ? 0 : ret);
 
 			start_recno = start->recno;
 		} else
@@ -229,8 +229,8 @@ __wt_curfile_truncate(
 	if (stop != NULL) {
 		if (strcmp(stop->key_format, "r") == 0) {
 			WT_RET(stop->search_near(stop, &exact));
-			if (exact > 0)
-				WT_RET(stop->prev(stop));
+			if (exact > 0 && (ret = stop->prev(stop)) != 0)
+				return (ret == WT_NOTFOUND ? 0 : ret);
 
 			stop_recno = stop->recno;
 
