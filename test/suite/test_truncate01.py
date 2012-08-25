@@ -31,7 +31,8 @@
 
 import wiredtiger, wttest
 from helper import confirm_empty,\
-    key_populate, value_populate, complex_populate, simple_populate
+    key_populate, value_populate, simple_populate,\
+    value_populate_complex, complex_populate
 from wtscenario import multiply_scenarios, number_scenarios
 
 # Test session.truncate
@@ -79,7 +80,7 @@ class test_truncate_uri(wttest.WiredTigerTestCase):
 
 
 # XXX
-#       Test where the start of the delete is within the append area
+#       Test where the start of the delete is within an append area
 #       we're already testing where it's inside the implicit area.
 # Test session.truncate.
 class test_truncate(wttest.WiredTigerTestCase):
@@ -131,24 +132,8 @@ class test_truncate(wttest.WiredTigerTestCase):
 
         return cursor
 
-    # Return the first/last valid item in the object (valid means skipping
-    # over deleted fixed-length rows).
-    def getKey(self, cursor, nextprev):
-        if cursor.value_format == '8t':
-            while (True):
-                self.assertEqual(nextprev(), 0)
-                if cursor.get_value() != 0:
-                        break;
-        else:
-            self.assertEqual(nextprev(), 0)
-        return cursor.get_key()
-    def getFirstKey(self, cursor):
-        return self.getKey(cursor, cursor.next)
-    def getLastKey(self, cursor):
-        return self.getKey(cursor, cursor.prev)
-
     # Truncate a range using cursors, and check the results.
-    def truncateRangeAndCheck(self, uri, begin, end):
+    def truncateRangeAndCheck(self, uri, begin, end, expected):
         self.pr('truncateRangeAndCheck: ' + str(begin) + ',' + str(end))
         cur1 = self.initCursor(uri, begin)
         cur2 = self.initCursor(uri, end)
@@ -162,33 +147,26 @@ class test_truncate(wttest.WiredTigerTestCase):
         else:
             cur2.close()
 
-        # If the object is empty, confirm that, otherwise test the first and
-        # last keys are the ones before/after the truncated range.  Note that
-        # column-store tests implicit keys, and so the test is slightly looser
-        # in that case.
-        cursor = self.session.open_cursor(uri, None)
+        # If the object should be empty, confirm that.
         if begin == 1 and end == self.nentries - 1:
             confirm_empty(self, uri)
-        else:
-            key = self.getFirstKey(cursor)
-            if begin == 1:
-                if self.implicit:
-                    self.assertGreaterEqual(key, key_populate(cursor, end + 1))
-                else:
-                    self.assertEqual(key, key_populate(cursor, end + 1))
-            else:
-                self.assertEqual(key, key_populate(cursor, 1))
+            return
 
-            self.assertEqual(cursor.reset(), 0)
-
-            key = self.getLastKey(cursor)
-            if end == self.nentries - 1:
-                if self.implicit:
-                    self.assertLessEqual(key, key_populate(cursor, begin - 1))
-                else:
-                    self.assertEqual(key, key_populate(cursor, begin - 1))
+        # Check the expected values against the object.
+        cursor = self.session.open_cursor(uri, None)
+        for i in range(begin, end + 1):
+            expected[key_populate(cursor, i)] = 0
+        for k, v in expected.iteritems():
+            cursor.set_key(k)
+            if v == 0 and \
+              cursor.key_format == 'r' and cursor.value_format == '8t':
+                cursor.search()
+                self.assertEqual(cursor.get_values(), [0])
+            elif v == 0:
+                self.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND)
             else:
-                self.assertEqual(key, key_populate(cursor, self.nentries - 1))
+                cursor.search()
+                self.assertEqual(cursor.get_values(), v)
         cursor.close()
 
     # Test truncation using cursors.
@@ -220,15 +198,25 @@ class test_truncate(wttest.WiredTigerTestCase):
 
         # A simple, one-file file or table object.
         for begin,end in list:
-            # Populate the object.  We want to test cursor transition to the
-            # append list: if self.append is set, append the last rows after
-            # we've written the object and re-read it, so we have a mix of an
-            # on-disk format and an append list.
+            # We want to test cursor transition to the append list: if
+            # self.append is set, append the last rows after we've written
+            # the object and re-read it, so we have a mix of an on-disk
+            # format and an append list.
             append_count = 0
             if self.append:
                 append_count = self.skip + 10
             pop_count = self.nentries - append_count
+
+            # Populate the object.
             simple_populate(self, uri, self.config + self.keyfmt, pop_count)
+
+            # Build a dictionary of what the object should look like and
+            # compare against it when we're done.
+            expected = {}
+            cursor = self.session.open_cursor(uri, None)
+            for i in range(1, pop_count):
+                expected[key_populate(cursor, i)] = [value_populate(cursor, i)]
+            cursor.close()
 
             # Optionally close and re-open the object to get a disk image.
             if self.reopen:
@@ -240,17 +228,25 @@ class test_truncate(wttest.WiredTigerTestCase):
                 # the end of the delete range, in other words, "12" is larger
                 # than the "10" we used to set append_count.
                 if self.implicit:
-                    pop_count += 12
+                    cursor = self.session.open_cursor(uri, None)
+                    for i in range(1, 13):
+                        expected[key_populate(cursor, pop_count)] = 0
+                        pop_count += 1
+                    cursor.close()
 
                 cursor = self.session.open_cursor(uri, None)
                 while pop_count < self.nentries:
-                    cursor.set_key(key_populate(cursor, pop_count))
-                    cursor.set_value(value_populate(cursor, pop_count))
+                    key = key_populate(cursor, pop_count)
+                    cursor.set_key(key)
+                    val = value_populate(cursor, pop_count)
+                    cursor.set_value(val)
                     cursor.insert()
+
+                    expected[key] = [val]
                     pop_count += 1
                 cursor.close()
 
-            self.truncateRangeAndCheck(uri, begin, end)
+            self.truncateRangeAndCheck(uri, begin, end, expected)
             self.session.drop(uri, None)
 
         # A complex, multi-file table object.
@@ -258,9 +254,21 @@ class test_truncate(wttest.WiredTigerTestCase):
             for begin,end in list:
                 complex_populate(
                     self, uri, self.config + self.keyfmt, self.nentries)
+
+                # Build a dictionary of what the object should look like and
+                # compare against it when we're done.
+                expected = {}
+                cursor = self.session.open_cursor(uri, None)
+                for i in range(1, self.nentries):
+                    expected[key_populate(cursor, i)] = \
+                        value_populate_complex(i)
+                cursor.close()
+
                 if self.reopen:
                     self.reopen_conn()
-                self.truncateRangeAndCheck(uri, begin, end)
+
+                self.truncateRangeAndCheck(uri, begin, end, expected)
+
                 self.session.drop(uri, None)
 
 

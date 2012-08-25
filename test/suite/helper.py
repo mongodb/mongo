@@ -56,7 +56,7 @@ def compare_files(self, filename1, filename2):
 def confirm_does_not_exist(self, uri):
     self.pr('confirm_does_not_exist: ' + uri)
     self.assertRaises(wiredtiger.WiredTigerError,
-        lambda: self.session.open_cursor(uri, None, None))
+        lambda: self.session.open_cursor(uri, None))
     self.assertEqual(glob.glob('*' + uri.split(":")[1] + '*'), [],
         'confirm_does_not_exist: URI exists, file name matching \"' +
         uri.split(":")[1] + '\" found')
@@ -64,7 +64,7 @@ def confirm_does_not_exist(self, uri):
 # confirm a URI exists and is empty.
 def confirm_empty(self, uri):
     self.pr('confirm_empty: ' + uri)
-    cursor = self.session.open_cursor(uri, None, None)
+    cursor = self.session.open_cursor(uri, None)
     if cursor.value_format == '8t':
         for key,val in cursor:
             self.assertEqual(val, 0)
@@ -108,7 +108,7 @@ def value_populate(cursor, i):
 def simple_populate(self, uri, config, rows):
     self.pr('simple_populate: ' + uri + ' with ' + str(rows) + ' rows')
     self.session.create(uri, 'value_format=S,' + config)
-    cursor = self.session.open_cursor(uri, None, None)
+    cursor = self.session.open_cursor(uri, None)
     for i in range(1, rows):
         cursor.set_key(key_populate(cursor, i))
         cursor.set_value(value_populate(cursor, i))
@@ -117,7 +117,7 @@ def simple_populate(self, uri, config, rows):
 
 def simple_populate_check(self, uri):
     self.pr('simple_populate_check: ' + uri)
-    cursor = self.session.open_cursor(uri, None, None)
+    cursor = self.session.open_cursor(uri, None)
     i = 0
     for key,val in cursor:
         i += 1
@@ -126,6 +126,14 @@ def simple_populate_check(self, uri):
             continue;
         self.assertEqual(val, value_populate(cursor, i))
     cursor.close()
+
+# Return the value stored in a complex object.
+def value_populate_complex(i):
+    return [\
+        str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%26],\
+        i,\
+        str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%23],\
+        str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%18]]
 
 # population of a complex object
 #    uri:       object
@@ -152,30 +160,24 @@ def complex_populate(self, uri, config, rows):
     self.session.create(indxname + ':indx5', 'columns=(column3,column5)')
     self.session.create(
         indxname + ':indx6', 'columns=(column3,column5,column4)')
-    cursor = self.session.open_cursor(uri, None, None)
+    cursor = self.session.open_cursor(uri, None)
     for i in range(1, rows):
         cursor.set_key(key_populate(cursor, i))
-        cursor.set_value(
-            str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%26],
-            i,
-            str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%23],
-            str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%18])
+        v = value_populate_complex(i)
+        cursor.set_value(v[0], v[1], v[2], v[3])
         cursor.insert()
     cursor.close()
 
 def complex_populate_check(self, uri):
     self.pr('complex_populate_check: ' + uri)
-    cursor = self.session.open_cursor(uri, None, None)
+    cursor = self.session.open_cursor(uri, None)
     i = 0
     for key, s1, i2, s3, s4 in cursor:
         i += 1
         self.assertEqual(key, key_populate(cursor, i))
-        self.assertEqual(s1,
-            str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%26])
-        self.assertEqual(i2, i)
-        self.assertEqual(s3,
-            str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%23])
-        self.assertEqual(s4,
-            str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%18])
-        self.assertEqual(i2, i)
+        v = value_populate_complex(i)
+        self.assertEqual(s1, v[0])
+        self.assertEqual(i2, v[1])
+        self.assertEqual(s3, v[2])
+        self.assertEqual(s4, v[3])
     cursor.close()
