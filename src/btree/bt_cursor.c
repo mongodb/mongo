@@ -204,8 +204,9 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exact)
 	 * an earlier record.  If that fails, quit, there's no record to return.
 	 */
 	if (cbt->compare != 0 && __cursor_fix_implicit(btree, cbt)) {
+		cbt->recno = cursor->recno;
 		cbt->v = 0;
-		val = &cbt->iface.value;
+		val = cursor->value;
 		val->data = &cbt->v;
 		val->size = 1;
 		*exact = 0;
