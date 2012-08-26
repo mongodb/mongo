@@ -25,7 +25,7 @@ __cursor_fix_append_next(WT_CURSOR_BTREE *cbt, int newpage)
 		if ((cbt->ins = WT_SKIP_FIRST(cbt->ins_head)) == NULL)
 			return (WT_NOTFOUND);
 	} else
-		if (cbt->recno == WT_INSERT_RECNO(cbt->ins) &&
+		if (cbt->recno <= WT_INSERT_RECNO(cbt->ins) &&
 		    (cbt->ins = WT_SKIP_NEXT(cbt->ins)) == NULL)
 			return (WT_NOTFOUND);
 

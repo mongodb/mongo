@@ -133,7 +133,7 @@ __cursor_fix_append_prev(WT_CURSOR_BTREE *cbt, int newpage)
 			return (WT_NOTFOUND);
 		__cursor_set_recno(cbt, WT_INSERT_RECNO(cbt->ins));
 	} else {
-		if (cbt->recno == WT_INSERT_RECNO(cbt->ins)) {
+		if (cbt->recno <= WT_INSERT_RECNO(cbt->ins)) {
 			WT_RET(__cursor_skip_prev(cbt));
 			if (cbt->ins == NULL)
 				return (WT_NOTFOUND);
