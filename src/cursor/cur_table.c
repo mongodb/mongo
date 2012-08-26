@@ -452,14 +452,17 @@ __wt_curtable_truncate(
 	 * application may have only set the keys and done nothing further.  Do
 	 * it now so we don't have to worry about it later.
 	 *
-	 * Column-store cursors might not reference a valid record, applications
+	 * Column-store cursors might not reference a valid record: applications
 	 * can specify records larger than the current maximum record and create
 	 * deleted records (variable-length column-store), or records with a
-	 * value of 0 (fixed-length column-store).  Row-store does a search,
-	 * column-store does a search-near for this reason.  Column-store also
-	 * corrects on return so any start/stop cursor is positioned on the next
+	 * value of 0 (fixed-length column-store).  Column-store calls search-
+	 * near for this reason.  That's currently only necessary for variable-
+	 * length column-store because fixed-length column-store returns the
+	 * implicitly created records, but it's simpler to test for column-store
+	 * than to test for the value type.  Additionally, column-store corrects
+	 * after search-near so the start/stop cursor is positioned on the next
 	 * record greater-than/less-than or equal to the original key.  There's
-	 * some possibility they might cross, of course, and in that case we're
+	 * the possibility they might cross, of course, and in that case we're
 	 * done quickly.
 	 */
 	if (start != NULL) {
