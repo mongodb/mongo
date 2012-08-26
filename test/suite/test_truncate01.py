@@ -272,7 +272,7 @@ class test_truncate(wttest.WiredTigerTestCase):
                     self.reopen_conn()
 
                 # Optionally insert initial implicit records.
-                cursor = self.session.open_cursor(uri, None)
+                cursor = self.session.open_cursor(uri, None, "overwrite")
                 start = 0;
                 for i in range(0, begin_implicit):
                     start += 1
