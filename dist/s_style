@@ -94,5 +94,5 @@ done
 
 if egrep '	' test/suite/*.py > $t; then
 	echo '[tab] characters appear in test suite scripts:'
-	cat $t
+	cat $t | sed 's/:.*//' | sort -u | sed 's/^/	/'
 fi
