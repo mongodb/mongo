@@ -147,7 +147,6 @@ __wt_btcur_search(WT_CURSOR_BTREE *cbt)
 		 * column-store implicitly fills the gap with empty records.
 		 */
 		if (__cursor_fix_implicit(btree, cbt)) {
-			cbt->recno = cursor->recno;
 			cbt->v = 0;
 			cursor->value.data = &cbt->v;
 			cursor->value.size = 1;
@@ -202,7 +201,6 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exact)
 	 * an earlier record.  If that fails, quit, there's no record to return.
 	 */
 	if (cbt->compare != 0 && __cursor_fix_implicit(btree, cbt)) {
-		cbt->recno = cursor->recno;
 		cbt->v = 0;
 		cursor->value.data = &cbt->v;
 		cursor->value.size = 1;
@@ -441,7 +439,12 @@ __cursor_equals(WT_CURSOR_BTREE *a, WT_CURSOR_BTREE *b)
 	switch (a->btree->type) {
 	case BTREE_COL_FIX:
 	case BTREE_COL_VAR:
-		if (a->recno == b->recno)
+		/*
+		 * Compare the interface's cursor record, not the underlying
+		 * cursor reference: the underlying cursor reference is the
+		 * one being returned to the application.
+		 */
+		if (((WT_CURSOR *)a)->recno == ((WT_CURSOR *)b)->recno)
 			return (1);
 		break;
 	case BTREE_ROW:
