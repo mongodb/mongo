@@ -126,7 +126,6 @@ __wt_btcur_search(WT_CURSOR_BTREE *cbt)
 	WT_BTREE *btree;
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
-	WT_ITEM *val;
 	WT_SESSION_IMPL *session;
 
 	btree = cbt->btree;
@@ -148,10 +147,10 @@ __wt_btcur_search(WT_CURSOR_BTREE *cbt)
 		 * column-store implicitly fills the gap with empty records.
 		 */
 		if (__cursor_fix_implicit(btree, cbt)) {
+			cbt->recno = cursor->recno;
 			cbt->v = 0;
-			val = &cbt->iface.value;
-			val->data = &cbt->v;
-			val->size = 1;
+			cursor->value.data = &cbt->v;
+			cursor->value.size = 1;
 		} else
 			ret = WT_NOTFOUND;
 	} else
@@ -172,7 +171,6 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exact)
 	WT_BTREE *btree;
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
-	WT_ITEM *val;
 	WT_SESSION_IMPL *session;
 
 	btree = cbt->btree;
@@ -206,9 +204,8 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exact)
 	if (cbt->compare != 0 && __cursor_fix_implicit(btree, cbt)) {
 		cbt->recno = cursor->recno;
 		cbt->v = 0;
-		val = cursor->value;
-		val->data = &cbt->v;
-		val->size = 1;
+		cursor->value.data = &cbt->v;
+		cursor->value.size = 1;
 		*exact = 0;
 	} else if (!__cursor_invalid(cbt)) {
 		*exact = cbt->compare;
