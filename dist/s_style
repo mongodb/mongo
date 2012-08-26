@@ -92,7 +92,12 @@ for f in `find examples ext src test -name '*.[chisy]' -o -name '*.in' |
 	cmp $t $f > /dev/null 2>&1 || (echo "modifying $f" && cp $t $f)
 done
 
-if egrep '	' test/suite/*.py > $t; then
+# The test suite follows Python coding standards: check for tab characters.
+egrep '	' test/suite/*.py |
+    sed 's/:.*//' |
+    sort -u |
+    sed 's/^/	/' > $t; then
+test -s $t && {
 	echo '[tab] characters appear in test suite scripts:'
-	cat $t | sed 's/:.*//' | sort -u | sed 's/^/	/'
-fi
+	cat $t
+}
