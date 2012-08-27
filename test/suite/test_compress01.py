@@ -149,6 +149,6 @@ class test_compress01_3_sn(test_compress01_base, compress01_tests):
 
 
 if __name__ == '__main__':
-    wttest.run(test_compress01_base)
     wttest.run(test_compress01_1_nop)
     wttest.run(test_compress01_2_bz)
+    wttest.run(test_compress01_3_sn)
