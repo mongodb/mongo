@@ -12,7 +12,7 @@ static int __err_cell_type(
 	WT_SESSION_IMPL *, uint32_t, const char *, uint8_t, uint8_t);
 static int __err_eof(WT_SESSION_IMPL *, uint32_t, const char *);
 static int __verify_dsk_chunk(
-	WT_SESSION_IMPL *, const char *, WT_PAGE_HEADER *, uint32_t);
+	WT_SESSION_IMPL *, const char *, WT_PAGE_HEADER *, uint64_t);
 static int __verify_dsk_col_fix(
 	WT_SESSION_IMPL *, const char *, WT_PAGE_HEADER *);
 static int __verify_dsk_col_int(
@@ -407,7 +407,7 @@ __verify_dsk_col_fix(
     WT_SESSION_IMPL *session, const char *addr, WT_PAGE_HEADER *dsk)
 {
 	WT_BTREE *btree;
-	uint32_t datalen;
+	uint64_t datalen;
 
 	btree = session->btree;
 
@@ -506,7 +506,7 @@ match_err:			WT_RET_VRFY(session,
  */
 static int
 __verify_dsk_chunk(WT_SESSION_IMPL *session,
-    const char *addr, WT_PAGE_HEADER *dsk, uint32_t datalen)
+    const char *addr, WT_PAGE_HEADER *dsk, uint64_t datalen)
 {
 	WT_BTREE *btree;
 	uint8_t *p, *end;
