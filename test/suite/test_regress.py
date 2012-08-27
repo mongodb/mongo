@@ -75,5 +75,39 @@ class test_regression(wttest.WiredTigerTestCase):
                 cursor.prev()
 
 
+    # Test a bug where cursor remove inside implicit records looped infinitely.
+    def test_regression_0002(self):
+        uri='file:xxx'
+        config='leaf_page_max=512,value_format=8t,key_format=r'
+        self.session.create(uri, config)
+
+        # Insert 50 records, and 20 implicit records.
+        cursor = self.session.open_cursor(uri, None)
+        for i in range(1, 50):
+            cursor.set_key(i)
+            cursor.set_value(0xab)
+            cursor.insert()
+
+        cursor.set_key(70)
+        cursor.set_value(0xbb)
+        cursor.insert()
+
+        cursor.set_key(68)
+        cursor.search()
+        for i in range(1, 5):
+            cursor.prev()
+            self.assertEqual(cursor.get_key(), 68 - i)
+            self.assertEqual(cursor.get_value(), 0x00)
+            cursor.remove()
+
+        cursor.set_key(62)
+        cursor.search()
+        for i in range(1, 5):
+            cursor.next()
+            self.assertEqual(cursor.get_key(), 62 + i)
+            self.assertEqual(cursor.get_value(), 0x00)
+            cursor.remove()
+
+
 if __name__ == '__main__':
     wttest.run()
