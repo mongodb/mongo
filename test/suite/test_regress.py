@@ -34,79 +34,130 @@ import wiredtiger, wttest
 # Regression tests.
 class test_regression(wttest.WiredTigerTestCase):
 
-    # Test a bug where cursor movement inside implicit records failed.
-    def test_regression_0001(self):
-        uri='file:xxx'
-        config='leaf_page_max=512,value_format=8t,key_format=r'
-        self.session.create(uri, config)
-
-        # Insert 50 records, and 20 implicit records.
+    def create_implicit(self, uri, initial, middle, trailing):
+        self.session.create(uri, 'key_format=r,value_format=8t')
         cursor = self.session.open_cursor(uri, None)
-        for i in range(1, 50):
-            cursor.set_key(i)
+
+        # Create a set of initial implicit records, followed by a set of real
+        # records, followed by a set of trailing implicit records.
+        r = initial
+        for i in range(0, middle):
+            r += 1
+            cursor.set_key(r)
             cursor.set_value(0xab)
             cursor.insert()
-
-        cursor.set_key(70)
+        r += trailing;
+        cursor.set_key(r + 1)
         cursor.set_value(0xbb)
         cursor.insert()
+        return (cursor)
 
-        # Check search inside the implicit keys.
+    # Test a bug where cursor movement inside implicit records failed.
+    def test_regression_0001(self):
+        uri = 'file:xxx'
+        cursor = self.create_implicit(uri, 0, 50, 20)
+
+        # Check search inside trailing implicit keys.
         for i in range(0, 5):
-                cursor.set_key(60 + i)
-                cursor.search()
-                self.assertEqual(cursor.get_key(), 60 + i)
-                self.assertEqual(cursor.get_value(), 0x00)
+            cursor.set_key(60 + i)
+            self.assertEqual(cursor.search(), 0)
+            self.assertEqual(cursor.get_key(), 60 + i)
+            self.assertEqual(cursor.get_value(), 0x00)
 
-        # Check cursor next inside the implicit keys.
+        # Check cursor next inside trailing implicit keys.
         cursor.set_key(60)
-        cursor.search()
+        self.assertEquals(cursor.search(), 0)
         for i in range(0, 5):
-                self.assertEqual(cursor.get_key(), 60 + i)
-                self.assertEqual(cursor.get_value(), 0x00)
-                cursor.next()
+            self.assertEqual(cursor.get_key(), 60 + i)
+            self.assertEqual(cursor.get_value(), 0x00)
+            self.assertEqual(cursor.next(), 0)
 
-        # Check cursor prev inside the implicit keys.
+        # Check cursor prev inside trailing implicit keys.
         cursor.set_key(60)
-        cursor.search()
+        self.assertEquals(cursor.search(), 0)
         for i in range(0, 5):
-                self.assertEqual(cursor.get_key(), 60 - i)
-                self.assertEqual(cursor.get_value(), 0x00)
-                cursor.prev()
+            self.assertEqual(cursor.get_key(), 60 - i)
+            self.assertEqual(cursor.get_value(), 0x00)
+            self.assertEqual(cursor.prev(), 0)
+
+        self.assertEquals(cursor.close(), 0)
+        self.session.drop(uri)
+        cursor = self.create_implicit(uri, 20, 50, 0)
+
+        # Check search inside leading implicit keys.
+        for i in range(0, 5):
+            cursor.set_key(10 + i)
+            self.assertEqual(cursor.search(), 0)
+            self.assertEqual(cursor.get_key(), 10 + i)
+            self.assertEqual(cursor.get_value(), 0x00)
+
+        # Check cursor next inside leading implicit keys.
+        cursor.set_key(10)
+        self.assertEquals(cursor.search(), 0)
+        for i in range(0, 5):
+            self.assertEqual(cursor.get_key(), 10 + i)
+            self.assertEqual(cursor.get_value(), 0x00)
+            self.assertEqual(cursor.next(), 0)
+
+        # Check cursor prev inside leading implicit keys.
+        cursor.set_key(10)
+        self.assertEquals(cursor.search(), 0)
+        for i in range(0, 5):
+            self.assertEqual(cursor.get_key(), 10 - i)
+            self.assertEqual(cursor.get_value(), 0x00)
+            self.assertEqual(cursor.prev(), 0)
+
+        self.assertEquals(cursor.close(), 0)
+        self.session.drop(uri)
 
 
     # Test a bug where cursor remove inside implicit records looped infinitely.
     def test_regression_0002(self):
         uri='file:xxx'
-        config='leaf_page_max=512,value_format=8t,key_format=r'
-        self.session.create(uri, config)
+        cursor = self.create_implicit(uri, 0, 50, 20)
 
-        # Insert 50 records, and 20 implicit records.
-        cursor = self.session.open_cursor(uri, None)
-        for i in range(1, 50):
-            cursor.set_key(i)
-            cursor.set_value(0xab)
-            cursor.insert()
-
-        cursor.set_key(70)
-        cursor.set_value(0xbb)
-        cursor.insert()
-
-        cursor.set_key(68)
-        cursor.search()
-        for i in range(1, 5):
-            cursor.prev()
-            self.assertEqual(cursor.get_key(), 68 - i)
-            self.assertEqual(cursor.get_value(), 0x00)
-            cursor.remove()
-
+        # Check cursor next/remove inside trailing implicit keys.
         cursor.set_key(62)
-        cursor.search()
+        self.assertEquals(cursor.search(), 0)
         for i in range(1, 5):
-            cursor.next()
+            self.assertEquals(cursor.next(), 0)
             self.assertEqual(cursor.get_key(), 62 + i)
             self.assertEqual(cursor.get_value(), 0x00)
-            cursor.remove()
+            self.assertEquals(cursor.remove(), 0)
+
+        # Check cursor prev/remove inside trailing implicit keys.
+        cursor.set_key(68)
+        self.assertEquals(cursor.search(), 0)
+        for i in range(1, 5):
+            self.assertEquals(cursor.prev(), 0)
+            self.assertEqual(cursor.get_key(), 68 - i)
+            self.assertEqual(cursor.get_value(), 0x00)
+            self.assertEquals(cursor.remove(), 0)
+
+        self.assertEquals(cursor.close(), 0)
+        self.session.drop(uri)
+        cursor = self.create_implicit(uri, 20, 50, 0)
+
+        # Check cursor next/remove inside leading implicit keys.
+        cursor.set_key(2)
+        self.assertEquals(cursor.search(), 0)
+        for i in range(1, 5):
+            self.assertEquals(cursor.next(), 0)
+            self.assertEqual(cursor.get_key(), 2 + i)
+            self.assertEqual(cursor.get_value(), 0x00)
+            self.assertEquals(cursor.remove(), 0)
+
+        # Check cursor prev/remove inside leading implicit keys.
+        cursor.set_key(18)
+        self.assertEquals(cursor.search(), 0)
+        for i in range(1, 5):
+            self.assertEquals(cursor.prev(), 0)
+            self.assertEqual(cursor.get_key(), 18 - i)
+            self.assertEqual(cursor.get_value(), 0x00)
+            self.assertEquals(cursor.remove(), 0)
+
+        self.assertEquals(cursor.close(), 0)
+        self.session.drop(uri)
 
 
 if __name__ == '__main__':
