@@ -30,8 +30,8 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, int *busyp
 	conn = S2C(session);
 	*busyp = 0;
 
-	/* If a file cannot be evicted, hazard references aren't required. */
-	if (btree->cache_resident)
+	/* If a file can never be evicted, hazard references aren't required. */
+	if (F_ISSET(btree, WT_BTREE_NO_HAZARD))
 		return (0);
 
 	/*
@@ -120,8 +120,8 @@ __wt_hazard_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
 	btree = session->btree;
 	conn = S2C(session);
 
-	/* If a file cannot be evicted, hazard references aren't required. */
-	if (btree->cache_resident)
+	/* If a file can never be evicted, hazard references aren't required. */
+	if (F_ISSET(btree, WT_BTREE_NO_HAZARD))
 		return;
 
 	/*

@@ -112,7 +112,6 @@ struct __wt_btree {
 
 	WT_PAGE *evict_page;		/* Eviction thread's location */
 	volatile uint32_t lru_count;	/* Count of threads in LRU eviction */
-	int cache_resident;		/* If no eviction on this object */
 
 	WT_BTREE_STATS *stats;		/* Btree statistics */
 
@@ -120,10 +119,12 @@ struct __wt_btree {
 #define	WT_BTREE_DISCARD	0x0002	/* Discard on release */
 #define	WT_BTREE_EXCLUSIVE	0x0004	/* Need exclusive access to handle */
 #define	WT_BTREE_LOCK_ONLY	0x0008	/* Handle is only needed for locking */
-#define	WT_BTREE_OPEN		0x0020	/* Handle is open */
-#define	WT_BTREE_SALVAGE	0x0040	/* Handle is for salvage */
-#define	WT_BTREE_UPGRADE	0x0080	/* Handle is for upgrade */
-#define	WT_BTREE_VERIFY		0x0100	/* Handle is for verify */
+#define	WT_BTREE_NO_EVICTION	0x0010	/* Disable eviction */
+#define	WT_BTREE_NO_HAZARD	0x0020	/* Disable hazard references */
+#define	WT_BTREE_OPEN		0x0040	/* Handle is open */
+#define	WT_BTREE_SALVAGE	0x0080	/* Handle is for salvage */
+#define	WT_BTREE_UPGRADE	0x0100	/* Handle is for upgrade */
+#define	WT_BTREE_VERIFY		0x0200	/* Handle is for verify */
 	uint32_t flags;
 };
 

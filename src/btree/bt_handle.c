@@ -208,11 +208,12 @@ __btree_conf(WT_SESSION_IMPL *session)
 
 	/* Eviction; the metadata file is never evicted. */
 	if (strcmp(btree->name, WT_METADATA_URI) == 0)
-		btree->cache_resident = 1;
+		F_SET(btree, WT_BTREE_NO_EVICTION | WT_BTREE_NO_HAZARD);
 	else {
 		WT_RET(__wt_config_getones(
 		    session, config, "cache_resident", &cval));
-		btree->cache_resident = cval.val ? 1 : 0;
+		if (cval.val)
+			F_SET(btree, WT_BTREE_NO_EVICTION | WT_BTREE_NO_HAZARD);
 	}
 
 	/* Huffman encoding */
@@ -406,7 +407,7 @@ __wt_btree_get_memsize(WT_SESSION_IMPL *session, uint32_t **memsizep)
 	child = root->u.intl.t->page;
 	*memsizep = &child->memory_footprint;
 
-	btree->cache_resident = 1;
+	F_SET(btree, WT_BTREE_NO_EVICTION);
 	return (0);
 }
 
@@ -418,7 +419,7 @@ int
 __wt_btree_release_memsize(WT_SESSION_IMPL *session, WT_BTREE *btree)
 {
 	WT_UNUSED(session);
-	btree->cache_resident = 0;
+	F_CLR(btree, WT_BTREE_NO_EVICTION);
 	return (0);
 }
 

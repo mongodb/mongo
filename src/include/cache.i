@@ -54,7 +54,7 @@ __wt_eviction_page_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 */
 	if (WT_PAGE_IS_ROOT(page) ||
 	    !__wt_page_is_modified(page) ||
-	    session->btree->cache_resident)
+	    F_ISSET(session->btree, WT_BTREE_NO_EVICTION))
 		return (0);
 
 	/* Check the page's memory footprint. */
