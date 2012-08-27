@@ -131,12 +131,37 @@ __cursor_fix_append_prev(WT_CURSOR_BTREE *cbt, int newpage)
 	if (newpage) {
 		if ((cbt->ins = WT_SKIP_LAST(cbt->ins_head)) == NULL)
 			return (WT_NOTFOUND);
-	} else
-		if (cbt->recno <= WT_INSERT_RECNO(cbt->ins)) {
+	} else {
+		/*
+		 * Handle the special case of leading implicit records, that is,
+		 * there aren't any records in the tree not on the append list,
+		 * and the first record on the append list isn't record 1.
+		 *
+		 * The "right" place to handle this is probably in our caller.
+		 * The high-level cursor-previous routine would:
+		 *    -- call this routine to walk the append list
+		 *    -- call the routine to walk the standard page items
+		 *    -- call the tree walk routine looking for a previous page
+		 * Each of them returns WT_NOTFOUND, at which point our caller
+		 * checks the cursor record number, and if it's larger than 1,
+		 * returns the implicit records.  Instead, I'm trying to detect
+		 * the case here, mostly because I don't want to put that code
+		 * into our caller.  Anyway, if this code breaks for any reason,
+		 * that's the way I'd go.
+		 *
+		 * If we're not pointing to a WT_INSERT entry, or we can't find
+		 * a WT_INSERT record that precedes our record name-space, check
+		 * if there are any records on the page.  If there aren't, then
+		 * we're in the magic zone, keep going until we get to a record
+		 * number of 1.
+		 */
+		if (cbt->ins != NULL &&
+		    cbt->recno <= WT_INSERT_RECNO(cbt->ins))
 			WT_RET(__cursor_skip_prev(cbt));
-			if (cbt->ins == NULL)
-				return (WT_NOTFOUND);
-		}
+		if (cbt->ins == NULL &&
+		    (cbt->recno == 1 || __col_last_recno(cbt->page) != 0))
+			return (WT_NOTFOUND);
+	}
 
 	/*
 	 * This code looks different from the cursor-next code.  The append
@@ -161,7 +186,8 @@ __cursor_fix_append_prev(WT_CURSOR_BTREE *cbt, int newpage)
 	 * created records written by reconciliation are deleted and so can be
 	 * never seen by a read.
 	 */
-	if (cbt->recno > WT_INSERT_RECNO(cbt->ins) ||
+	if (cbt->ins == NULL ||
+	    cbt->recno > WT_INSERT_RECNO(cbt->ins) ||
 	    (upd = __wt_txn_read(session, cbt->ins->upd)) == NULL) {
 		cbt->v = 0;
 		val->data = &cbt->v;
