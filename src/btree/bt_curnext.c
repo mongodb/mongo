@@ -25,9 +25,20 @@ __cursor_fix_append_next(WT_CURSOR_BTREE *cbt, int newpage)
 		if ((cbt->ins = WT_SKIP_FIRST(cbt->ins_head)) == NULL)
 			return (WT_NOTFOUND);
 	} else
-		if (cbt->recno == WT_INSERT_RECNO(cbt->ins) &&
+		if (cbt->recno >= WT_INSERT_RECNO(cbt->ins) &&
 		    (cbt->ins = WT_SKIP_NEXT(cbt->ins)) == NULL)
 			return (WT_NOTFOUND);
+
+	/*
+	 * This code looks different from the cursor-previous code.  The append
+	 * list appears on the last page of the tree, but it may be preceded by
+	 * other rows, which means the cursor's recno will be set to a value and
+	 * we simply want to increment it.  If the cursor's recno is NOT set,
+	 * we're starting our iteration in a tree that has only appended items.
+	 * In that case, recno will be 0 and happily enough the increment will
+	 * set it to 1, which is correct.
+	 */
+	__cursor_set_recno(cbt, cbt->recno + 1);
 
 	/*
 	 * Fixed-width column store appends are inherently non-transactional.
@@ -45,7 +56,6 @@ __cursor_fix_append_next(WT_CURSOR_BTREE *cbt, int newpage)
 	 * insert is aborted, we simply return zero (empty), regardless of
 	 * whether we are at the end of the data.
 	 */
-	__cursor_set_recno(cbt, cbt->recno + 1);
 	if (cbt->recno < WT_INSERT_RECNO(cbt->ins) ||
 	    (upd = __wt_txn_read(session, cbt->ins->upd)) == NULL) {
 		cbt->v = 0;

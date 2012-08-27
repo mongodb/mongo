@@ -147,6 +147,7 @@ __wt_btcur_search(WT_CURSOR_BTREE *cbt)
 		 * column-store implicitly fills the gap with empty records.
 		 */
 		if (__cursor_fix_implicit(btree, cbt)) {
+			cbt->recno = cursor->recno;
 			cbt->v = 0;
 			cursor->value.data = &cbt->v;
 			cursor->value.size = 1;
@@ -201,6 +202,7 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exact)
 	 * an earlier record.  If that fails, quit, there's no record to return.
 	 */
 	if (cbt->compare != 0 && __cursor_fix_implicit(btree, cbt)) {
+		cbt->recno = cursor->recno;
 		cbt->v = 0;
 		cursor->value.data = &cbt->v;
 		cursor->value.size = 1;
@@ -339,16 +341,24 @@ retry:	__cursor_func_init(cbt, 1);
 	case BTREE_COL_VAR:
 		WT_ERR(__wt_col_search(session, cbt, 1));
 
-		/*
-		 * Remove the record if it exists.  Creating a record past the
-		 * end of the tree in a fixed-length column-store implicitly
-		 * fills the gap with empty records.  Return success in that
-		 * case, the record was deleted successfully.
-		 */
-		if (cbt->compare != 0 || __cursor_invalid(cbt))
-			ret =
-			    __cursor_fix_implicit(btree, cbt) ? 0 : WT_NOTFOUND;
-		else if ((ret = __wt_col_modify(session, cbt, 2)) == WT_RESTART)
+		/* Remove the record if it exists. */
+		if (cbt->compare != 0 || __cursor_invalid(cbt)) {
+			if (!__cursor_fix_implicit(btree, cbt))
+				WT_ERR(WT_NOTFOUND);
+			/*
+			 * Creating a record past the end of the tree in a
+			 * fixed-length column-store implicitly fills the
+			 * gap with empty records.  Return success in that
+			 * case, the record was deleted successfully.
+			 *
+			 * Correct the btree cursor's location: the search
+			 * will have pointed us at the previous/next item,
+			 * and that's not correct.
+			 */
+			cbt->recno = cursor->recno;
+		} else
+			if ((ret =
+			    __wt_col_modify(session, cbt, 2)) == WT_RESTART)
 			goto retry;
 		break;
 	case BTREE_ROW:

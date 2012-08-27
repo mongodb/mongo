@@ -131,15 +131,25 @@ __cursor_fix_append_prev(WT_CURSOR_BTREE *cbt, int newpage)
 	if (newpage) {
 		if ((cbt->ins = WT_SKIP_LAST(cbt->ins_head)) == NULL)
 			return (WT_NOTFOUND);
-		__cursor_set_recno(cbt, WT_INSERT_RECNO(cbt->ins));
-	} else {
-		if (cbt->recno == WT_INSERT_RECNO(cbt->ins)) {
+	} else
+		if (cbt->recno <= WT_INSERT_RECNO(cbt->ins)) {
 			WT_RET(__cursor_skip_prev(cbt));
 			if (cbt->ins == NULL)
 				return (WT_NOTFOUND);
 		}
+
+	/*
+	 * This code looks different from the cursor-next code.  The append
+	 * list appears on the last page of the tree and contains the last
+	 * records in the tree.  If we're iterating through the tree, starting
+	 * at the last record in the tree, by definition we're starting a new
+	 * iteration and we set the record number to the last record found in
+	 * the tree.  Otherwise, decrement the record.
+	 */
+	if (newpage)
+		__cursor_set_recno(cbt, WT_INSERT_RECNO(cbt->ins));
+	else
 		__cursor_set_recno(cbt, cbt->recno - 1);
-	}
 
 	/*
 	 * Fixed-width column store appends are inherently non-transactional.
