@@ -136,7 +136,7 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
             self.encode_value = self.encode_value_fix
             self.decode_value = self.decode_value_fix
 
-    def cur_initial_conditions(self, tablename, npairs, tablekind, keysizes, valuesizes):
+    def cur_initial_conditions(self, tablename, npairs, tablekind, keysizes, valuesizes, uri="table"):
         if npairs >= 0xffffffff:
             raise Exception('cur_initial_conditions: npairs too big')
         self.tablekind = tablekind
@@ -151,7 +151,7 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
         self.keysizes = keysizes
         self.valuesizes = valuesizes
         if tablekind != None:
-            cursor = self.session.open_cursor('table:' + tablename, None, 'append')
+            cursor = self.session.open_cursor(uri + ':' + tablename, None, 'append')
             for i in range(npairs):
                 wtkey = self.encode_key(i << 32)
                 wtval = self.encode_value(i << 32)
