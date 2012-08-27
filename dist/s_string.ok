@@ -453,6 +453,7 @@ lookup
 lookups
 lru
 lsm
+lsn
 lu
 majorp
 malloc

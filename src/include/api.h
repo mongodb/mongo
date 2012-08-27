@@ -108,6 +108,7 @@ struct __wt_session_impl {
 
 	WT_TXN_ISOLATION isolation;
 	WT_TXN	txn;			/* Transaction state */
+	u_int	ncursors;		/* Count of active file cursors. */
 
 	void	*reconcile;		/* Reconciliation information */
 

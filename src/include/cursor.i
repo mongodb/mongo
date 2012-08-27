@@ -40,15 +40,15 @@ __cursor_search_clear(WT_CURSOR_BTREE *cbt)
 	cbt->cip_saved = NULL;
 	cbt->rip_saved = NULL;
 
-	cbt->flags = 0;
+	F_CLR(cbt, ~WT_CBT_ACTIVE);
 }
 
 /*
- * __cursor_func_init --
- *	Reset the cursor's state for a new call.
+ * __cursor_leave --
+ *	Clear a cursor's position.
  */
 static inline void
-__cursor_func_init(WT_CURSOR_BTREE *cbt, int page_release)
+__cursor_leave(WT_CURSOR_BTREE *cbt)
 {
 	WT_CURSOR *cursor;
 	WT_SESSION_IMPL *session;
@@ -57,13 +57,49 @@ __cursor_func_init(WT_CURSOR_BTREE *cbt, int page_release)
 	session = (WT_SESSION_IMPL *)cursor->session;
 
 	/* Optionally release any page references we're holding. */
-	if (page_release && cbt->page != NULL) {
+	if (cbt->page != NULL) {
 		__wt_page_release(session, cbt->page);
 		cbt->page = NULL;
 	}
 
 	/* Reset the returned key/value state. */
 	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+
+	if (F_ISSET(cbt, WT_CBT_ACTIVE)) {
+		WT_ASSERT(session, session->ncursors > 0);
+		if (--session->ncursors == 0)
+			__wt_txn_read_last(session);
+		F_CLR(cbt, WT_CBT_ACTIVE);
+	}
+}
+
+/*
+ * __cursor_enter --
+ *	Setup the cursor's state for a new call.
+ */
+static inline void
+__cursor_enter(WT_CURSOR_BTREE *cbt)
+{
+	WT_SESSION_IMPL *session;
+
+	session = (WT_SESSION_IMPL *)cbt->iface.session;
+
+	if (session->ncursors++ == 0)
+		__wt_txn_read_first(session);
+	F_SET(cbt, WT_CBT_ACTIVE);
+}
+
+/*
+ * __cursor_func_init --
+ *	Cursor call setup.
+ */
+static inline void
+__cursor_func_init(WT_CURSOR_BTREE *cbt, int reenter)
+{
+	if (reenter)
+		__cursor_leave(cbt);
+	if (!F_ISSET(cbt, WT_CBT_ACTIVE))
+		__cursor_enter(cbt);
 }
 
 /*
@@ -85,7 +121,7 @@ __cursor_func_resolve(WT_CURSOR_BTREE *cbt, int ret)
 	if (ret == 0)
 		F_SET(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 	else {
-		__cursor_func_init(cbt, 1);
+		__cursor_leave(cbt);
 		__cursor_search_clear(cbt);
 	}
 }
