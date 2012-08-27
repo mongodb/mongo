@@ -45,11 +45,9 @@ config_setup(void)
 	if (!(cp->flags & C_PERM)) {
 		switch (MMRAND(0, 1)) {
 		case 0:
-			fprintf(stderr, "Chose file data source\n");
 			config_single("data_source=file", 0);
 			break;
 		case 1:
-			fprintf(stderr, "Chose table data source\n");
 			config_single("data_source=table", 0);
 			break;
 		/* LSM isn't implemented yet.

@@ -78,13 +78,7 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, int *busyp
 			WT_VERBOSE_RET(session, hazard,
 			    "session %p hazard %p: set", session, ref->page);
 
-			/*
-			 * If this is the first hazard reference in the session,
-			 * we may need to update our transactional context.
-			 */
-			if (session->nhazard++ == 0)
-				WT_RET(__wt_txn_read_first(session));
-
+			++session->nhazard;
 			return (0);
 		}
 
@@ -169,9 +163,7 @@ __wt_hazard_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
 			 * If this was the last hazard reference in the session,
 			 * we may need to update our transactional context.
 			 */
-			if (--session->nhazard == 0)
-				__wt_txn_read_last(session);
-
+			--session->nhazard;
 			return;
 		}
 	__wt_errx(session,
@@ -224,17 +216,10 @@ __wt_hazard_close(WT_SESSION_IMPL *session)
 		if (hp->page != NULL)
 			__wt_hazard_clear(session, hp->page);
 
-	if (session->nhazard == 0)
-		return;
-
-	/*
-	 * Clean up the transactional state, we've released all our hazard
-	 * references.
-	 */
-	__wt_errx(session,
-	    "session %p: hazard reference count didn't match table entries",
-	    session);
-	__wt_txn_read_last(session);
+	if (session->nhazard != 0)
+		__wt_errx(session, "session %p: "
+		    "hazard reference count didn't match table entries",
+		    session);
 }
 
 #ifdef HAVE_DIAGNOSTIC

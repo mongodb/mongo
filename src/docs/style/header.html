@@ -6,22 +6,23 @@
 <!--BEGIN PROJECT_NAME--><title>$projectname: $title</title><!--END PROJECT_NAME-->
 <!--BEGIN !PROJECT_NAME--><title>$title</title><!--END !PROJECT_NAME-->
 <link href="$relpath$tabs.css" rel="stylesheet" type="text/css"/>
-<link href="$relpath$wiredtiger.css" rel="stylesheet" type="text/css" />
+<script type="text/javascript" src="$relpath$jquery.js"></script>
+<script type="text/javascript" src="$relpath$dynsections.js"></script>
 $treeview
 $search
 $mathjax
+<link href="$relpath$wiredtiger.css" rel="stylesheet" type="text/css" />
 </head>
 <body>
-<div id="top"><!-- do not remove this div! -->
+<div id="top"><!-- do not remove this div, it is closed by doxygen! -->
+
 <!--BEGIN TITLEAREA-->
 <div id="titlearea">
 <table cellspacing="0" cellpadding="0">
  <tbody>
  <tr style="height: 56px;">
   <!--BEGIN PROJECT_LOGO-->
-  <td id="projectlogo">
-    <div class="logo"><a href="http://wiredtiger.com/"><img src="$relpath$LogoFinal-header.png" alt="WiredTiger" /></a></div>
-  </td>
+  <td id="projectlogo"><a href="http://wiredtiger.com/"><img alt="Logo" src="$relpath$$projectlogo" alt="WiredTiger" /></a></td>
   <!--END PROJECT_LOGO-->
   <!--BEGIN PROJECT_NAME-->
   <td style="padding-left: 0.5em;">
@@ -52,3 +53,4 @@ $mathjax
   <a class="last" href="http://groups.google.com/group/wiredtiger-users">Join my user group</a>
 </div>
 <!--END TITLEAREA-->
+<!-- end header part -->

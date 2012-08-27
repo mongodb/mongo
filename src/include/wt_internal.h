@@ -201,6 +201,9 @@ struct __wt_update;
 #include "intpack.i"
 #include "cell.i"
 
+/* Required by cursor.i */
+#include "txn.i"
+
 #include "bitstring.i"
 #include "btree.i"
 #include "cache.i"
@@ -211,7 +214,6 @@ struct __wt_update;
 #include "packing.i"
 #include "serial.i"
 #include "serial_funcs.i"
-#include "txn.i"
 
 #if defined(__cplusplus)
 }
