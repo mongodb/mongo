@@ -65,7 +65,7 @@
 				/* mask for the bit within its byte */
 #define	__bit_mask(bit)	(1 << ((bit) & 0x7))
 
-                                /* Bytes in a bitstring of nbits */
+				/* Bytes in a bitstring of nbits */
 #define	__bitstr_size(nbits) (((nbits) + 7) >> 3)
 
 /*
