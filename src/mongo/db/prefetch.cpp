@@ -135,7 +135,7 @@ namespace mongo {
                         _dummy_char += *(result.objdata() + i); 
                     }
                     // hit the last page, in case we missed it above
-                    _dummy_char += *(result.objdata() + result.objsize());
+                    _dummy_char += *(result.objdata() + result.objsize() - 1);
                 }
             }
             catch(const DBException& e) {
