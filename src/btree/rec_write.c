@@ -458,7 +458,7 @@ __wt_rec_destroy(WT_SESSION_IMPL *session)
  *	Update the memory tracking structure for a set of new entries.
  */
 static inline void
-__rec_incr(WT_SESSION_IMPL *session, WT_RECONCILE *r, uint32_t v, uint64_t size)
+__rec_incr(WT_SESSION_IMPL *session, WT_RECONCILE *r, uint32_t v, uint32_t size)
 {
 	/*
 	 * The buffer code is fragile and prone to off-by-one errors -- check
@@ -469,7 +469,7 @@ __rec_incr(WT_SESSION_IMPL *session, WT_RECONCILE *r, uint32_t v, uint64_t size)
 	    WT_BLOCK_FITS(r->first_free, size, r->dsk.mem, r->page_size));
 
 	r->entries += v;
-	r->space_avail -= (uint32_t)size;
+	r->space_avail -= size;
 	r->first_free += size;
 }
 
