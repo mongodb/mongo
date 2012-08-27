@@ -494,6 +494,19 @@ namespace mongo {
                     BSONObjBuilder& result,
                     bool ){
 
+                long long skip = 0;
+                if( cmdObj["skip"].isNumber() ){
+                    skip = cmdObj["skip"].numberLong();
+                    if( skip < 0 ){
+                        errmsg = "skip value is negative in count query";
+                        return false;
+                    }
+                }
+                else if( cmdObj["skip"].ok() ){
+                    errmsg = "skip value is not a valid number";
+                    return false;
+                }
+
                 const string collection = cmdObj.firstElement().valuestrsafe();
                 const string fullns = dbName + "." + collection;
 
@@ -514,8 +527,6 @@ namespace mongo {
                      * apply it only once we have collected all counts.
                      */
                     if( limit != 0 && cmdObj["skip"].isNumber() ){
-                        long long skip = cmdObj["skip"].numberLong();
-                        uassert( 16260 , "skip has to be positive" , skip >= 0 );
                         if ( limit > 0 )
                             limit += skip;
                         else

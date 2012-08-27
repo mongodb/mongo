@@ -21,3 +21,8 @@ assert.eq( 50 , t.find( { m : 5 } ).skip( 10 ).limit(20).count() , "J" )
 assert.eq( 20 , t.find( { m : 5 } ).skip( 10 ).limit(20).countReturn() , "K" )
 
 assert.eq( 5 , t.find( { m : 5 } ).skip( 45 ).limit(20).countReturn() , "L" )
+
+// Negative skip values should return error
+var negSkipResult = db.runCommand({ count: 't', skip : -2 });
+assert( ! negSkipResult.ok , "negative skip value shouldn't work, n = " + negSkipResult.n );
+assert( negSkipResult.errmsg.length > 0 , "no error msg for negative skip" );

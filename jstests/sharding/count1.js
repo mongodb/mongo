@@ -163,12 +163,10 @@ var badCmdResult = db.runCommand({ count: 'foo', query: { $c: { $abc: 3 }}});
 assert( ! badCmdResult.ok , "invalid query syntax didn't return error" );
 assert( badCmdResult.errmsg.length > 0 , "no error msg for invalid query" );
 
-/* uncomment when SERVER-6634 is fixed:
 // Negative skip values should return error
 var negSkipResult = db.runCommand({ count: 'foo', skip : -2 });
 assert( ! negSkipResult.ok , "negative skip value shouldn't work" );
 assert( negSkipResult.errmsg.length > 0 , "no error msg for negative skip" );
-*/
 
 // Negative skip values with positive limit should return error
 var negSkipLimitResult = db.runCommand({ count: 'foo', skip : -2, limit : 1 });
