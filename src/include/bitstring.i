@@ -65,15 +65,8 @@
 				/* mask for the bit within its byte */
 #define	__bit_mask(bit)	(1 << ((bit) & 0x7))
 
-/*
- * __bitstr_size --
- *	Return the bytes in a bitstring of nbits.
- */
-static inline uint64_t
-__bitstr_size(uint64_t nbits)
-{
-	return (((nbits) + 7) >> 3);
-}
+				/* Bytes in a bitstring of nbits */
+#define	__bitstr_size(nbits) (((nbits) + 7) >> 3)
 
 /*
  * __bit_alloc --
