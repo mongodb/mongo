@@ -108,6 +108,7 @@ namespace mongo {
             int queryOptions = cc->queryOptions();
             
             curop.debug().query = cc->query();
+            curop.setQuery( cc->query() );
 
             start = cc->pos();
             Cursor *c = cc->c();
