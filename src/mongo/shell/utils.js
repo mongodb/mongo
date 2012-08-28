@@ -1876,7 +1876,7 @@ help = shellHelper.help = function (x) {
         print();
         print("\to = new ObjectId()                  create a new ObjectId");
         print("\to.getTimestamp()                    return timestamp derived from first 32 bits of the OID");
-        print("\to.isObjectId()");
+        print("\to.isObjectId");
         print("\to.toString()");
         print("\to.equals(otherid)");
         print();
