@@ -344,7 +344,7 @@ __cursor_equals(WT_CURSOR *cursor, WT_CURSOR *other, int *equalp)
 	 * Confirm both cursors refer to the same source, then retrieve their
 	 * raw keys and compare them.
 	 */
-	if (other != NULL && strcmp(cursor->uri, other->uri) == 0) {
+	if (strcmp(cursor->uri, other->uri) == 0) {
 		/*
 		 * Don't clear (or allocate memory for) the WT_ITEM structures
 		 * because all that happens underneath is their data and size
