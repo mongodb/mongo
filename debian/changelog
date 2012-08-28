@@ -1,3 +1,9 @@
+mongodb (2.2.0) unstable; urgency=low
+
+  * see http://docs.mongodb.org/manual/release-notes/2.2/
+
+ -- Richard Kreuter <richard@10gen.com>  Wed, 29 Aug 2012 16:56:28 -0500
+
 mongodb (2.1.2) unstable; urgency=low
 
   * see http://jira.mongodb.org/browse/SERVER/fixforversion/10894
