@@ -229,7 +229,7 @@ namespace mongo {
 
         /* on the shard servers, create the local pipeline */
         intrusive_ptr<ExpressionContext> pShardCtx(
-            ExpressionContext::create(&InterruptStatusMongod::status));
+            ExpressionContext::create((BSONObj*)NULL, &InterruptStatusMongod::status));
         intrusive_ptr<Pipeline> pShardPipeline(
             Pipeline::parseCommand(errmsg, shardBson, pShardCtx));
         if (!pShardPipeline.get()) {
@@ -272,16 +272,16 @@ namespace mongo {
                               BSONObjBuilder &result, bool fromRepl) {
         // PRINT(cmdObj); // uncomment when debugging
 
+        string ns(parseNs(db, cmdObj));
+
         intrusive_ptr<ExpressionContext> pCtx(
-            ExpressionContext::create(&InterruptStatusMongod::status));
+            ExpressionContext::create((BSONObj*)NULL, &InterruptStatusMongod::status));
 
         /* try to parse the command; if this fails, then we didn't run */
         intrusive_ptr<Pipeline> pPipeline(
             Pipeline::parseCommand(errmsg, cmdObj, pCtx));
         if (!pPipeline.get())
             return false;
-
-        string ns(parseNs(db, cmdObj));
 
         if (pPipeline->isExplain())
             return runExplain(result, errmsg, ns, db, pPipeline, pCtx);

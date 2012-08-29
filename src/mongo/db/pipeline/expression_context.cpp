@@ -24,11 +24,12 @@ namespace mongo {
     ExpressionContext::~ExpressionContext() {
     }
 
-    inline ExpressionContext::ExpressionContext(InterruptStatus *pS):
+    inline ExpressionContext::ExpressionContext(BSONObj* shardKeyObj, InterruptStatus *pS):
         doingMerge(false),
         inShard(false),
         inRouter(false),
         intCheckCounter(1),
+        shardKey(shardKeyObj),
         pStatus(pS) {
     }
 
@@ -43,15 +44,15 @@ namespace mongo {
     }
 
     ExpressionContext* ExpressionContext::clone() {
-        ExpressionContext* newContext = create(pStatus);
+        ExpressionContext* newContext = create(getShardKey(), pStatus);
         newContext->setDoingMerge(getDoingMerge());
         newContext->setInShard(getInShard());
         newContext->setInRouter(getInRouter());
         return newContext;
     }
 
-    ExpressionContext *ExpressionContext::create(InterruptStatus *pStatus) {
-        return new ExpressionContext(pStatus);
+    ExpressionContext *ExpressionContext::create(BSONObj* shardKey, InterruptStatus *pStatus) {
+        return new ExpressionContext(shardKey, pStatus);
     }
 
 }
