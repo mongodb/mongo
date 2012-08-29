@@ -13,6 +13,7 @@ src/block/block_read.c
 src/block/block_slvg.c
 src/block/block_vrfy.c
 src/block/block_write.c
+src/bloom/bloom.c
 src/btree/bt_bulk.c
 src/btree/bt_cache.c
 src/btree/bt_cell.c

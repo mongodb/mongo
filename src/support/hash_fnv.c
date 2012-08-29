@@ -111,7 +111,10 @@ static inline uint64_t fnv_64a_buf(void *, size_t , uint64_t);
  */
 #define	FNV1A_64_INIT ((uint64_t)0xcbf29ce484222325ULL)
 
-/* Wired Tiger wrapper around third party hash implementation. */
+/*
+ * __wt_hash_fnv64 --
+ * Wired Tiger wrapper around third party hash implementation.
+ */
 uint64_t
 __wt_hash_fnv64(const void *string, uint32_t len)
 {
