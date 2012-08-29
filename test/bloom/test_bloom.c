@@ -5,6 +5,7 @@
  * See the file LICENSE for redistribution information.
  */
 
+#include <signal.h>
 #include "wt_internal.h"
 
 typedef struct {
