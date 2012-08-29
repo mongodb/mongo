@@ -16,8 +16,15 @@ for( i = 0; i < 1000; ++i ) {
 }
 db.getLastError();
 
-// The idea here is to try and remove the last match for the {a:1} index scan while distinct is yielding.
-p = startParallelShell( 'for( i = 0; i < 2500; ++i ) { db.jstests_distinct3.remove({a:49}); for( j = 0; j < 20; ++j ) { db.jstests_distinct3.save({a:49,c:49,d:j}) } }' );
+// Attempt to remove the last match for the {a:1} index scan while distinct is yielding.
+p = startParallelShell( 'for( i = 0; i < 2500; ++i ) {                             ' +
+                        '    db.jstests_distinct3.remove( { a:49 } );              ' +
+                        '    for( j = 0; j < 20; ++j ) {                           ' +
+                        '        db.jstests_distinct3.save( { a:49, c:49, d:j } ); ' +
+                        '    }                                                     ' +
+                        '}                                                         ' +
+                        '// Wait for the above writes to complete.                 ' +
+                        'db.getLastError();                                        ' );
 
 for( i = 0; i < 100; ++i ) {
     count = t.distinct( 'c', {$or:[{a:{$gte:0},d:0},{b:{$gte:0}}]} ).length;
