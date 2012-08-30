@@ -569,8 +569,14 @@ __clsm_put(
 		WT_RET(__clsm_close_cursors(clsm));
 		WT_RET(__wt_btree_release_memsize(session, btree));
 
+		/*
+		 * Take the LSM lock first: we can't acquire it while
+		 * holding the schema lock, or we will deadlock.
+		 */
+		__wt_spin_lock(session, &clsm->lsm_tree->lock);
 		WT_WITH_SCHEMA_LOCK(session,
 		    ret = __wt_lsm_tree_switch(session, clsm->lsm_tree));
+		__wt_spin_unlock(session, &clsm->lsm_tree->lock);
 	}
 
 	return (ret);

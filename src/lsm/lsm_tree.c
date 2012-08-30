@@ -153,6 +153,7 @@ __lsm_tree_open(
 	/* Try to open the tree. */
 	WT_RET(__wt_calloc_def(session, 1, &lsm_tree));
 	__wt_spin_init(session, &lsm_tree->lock);
+	/* TODO: acquire the lock before the tree is visible? */
 	WT_ERR(__wt_strdup(session, uri, &lsm_tree->name));
 	TAILQ_INSERT_HEAD(&S2C(session)->lsmqh, lsm_tree, q);
 
@@ -205,8 +206,6 @@ __wt_lsm_tree_switch(
 {
 	WT_DECL_RET;
 
-	__wt_spin_lock(session, &lsm_tree->lock);
-
 	if (lsm_tree->memsizep != NULL)
 		printf("Switched to %d because %d > %d\n", lsm_tree->last,
 		    (int)*lsm_tree->memsizep, (int)lsm_tree->threshold);
@@ -231,7 +230,6 @@ __wt_lsm_tree_switch(
 
 	WT_ERR(__wt_lsm_meta_write(session, lsm_tree));
 
-err:	__wt_spin_unlock(session, &lsm_tree->lock);
-	/* TODO: mark lsm_tree bad on error(?) */
+err:	/* TODO: mark lsm_tree bad on error(?) */
 	return (ret);
 }

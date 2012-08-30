@@ -24,6 +24,11 @@ __wt_lsm_major_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 
 	src = dest = NULL;
 
+	/*
+	 * TODO: describe the dace with lsm_tree->lock here to avoid holding
+	 * the tree locked while a merge is in progress.
+	 */
+
 	/* Figure out how many chunks to merge, allocate an ID for the merge. */
 	__wt_spin_lock(session, &lsm_tree->lock);
 	nchunks = lsm_tree->nchunks - 1;
@@ -89,6 +94,7 @@ __wt_lsm_major_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	/*
 	 * TODO: save the old chunk names so they can be removed later, when
 	 * we can be sure no cursors are looking at them.
+	 * TODO: free the old chunk names before overwriting them.
 	 */
 	memmove(lsm_tree->chunk + 1, lsm_tree->chunk + nchunks,
 	    (lsm_tree->nchunks - nchunks) * sizeof(*lsm_tree->chunk));
