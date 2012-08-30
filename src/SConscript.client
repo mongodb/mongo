@@ -3,7 +3,7 @@
 # This SConscript describes build and install rules for the Mongo C++ driver and associated exmaple
 # programs.
 
-Import('env clientEnv')
+Import('env clientEnv static shared')
 
 clientSource = [
     'mongo/bson/oid.cpp',
@@ -95,16 +95,25 @@ for path in clientHeaderDirectories:
     clientHeaders.extend(Glob('mongo/%s/*.h' % path))
     clientHeaders.extend(Glob('mongo/%s/*.hpp' % path))
 
-mongoclient_lib = env.Library('mongoclient', clientSource),
-mongoclient_install = env.Install('#/', [
-        mongoclient_lib,
-        #env.SharedLibrary('mongoclient', clientSource),
-        ])
+mongoclient_install = []
+if static:
+    mongoclient_lib = env.Library('mongoclient', clientSource)
+    mongoclient_install.append(env.Install('#/', mongoclient_lib))
+
+if shared:
+    mongoclient_shlib = env.SharedLibrary('mongoclient', clientSource)
+    mongoclient_install.append(env.Install('#/', mongoclient_shlib))
+
 env.Alias('mongoclient', mongoclient_install)
+
+if shared:
+    mongoclient_test_lib = mongoclient_shlib
+if static:
+    mongoclient_test_lib = mongoclient_lib
 
 clientTests = clientEnv.Install('#/', [
         clientEnv.Program(target,
-                          [source, mongoclient_lib]) for (target, source) in exampleSourceMap])
+                          [source, mongoclient_test_lib]) for (target, source) in exampleSourceMap])
 
 clientTests.append(
     clientEnv.Install('#/', clientEnv.Program('bsondemo', 'mongo/bson/bsondemo/bsondemo.cpp')))
@@ -134,7 +143,10 @@ env.Install(
 # install
 prefix = GetOption("prefix")
 
-env.Install(prefix + "/lib", '${LIBPREFIX}mongoclient${LIBSUFFIX}')
+if static:
+    env.Install(prefix + "/lib", '${LIBPREFIX}mongoclient${LIBSUFFIX}')
+if shared:
+    env.Install(prefix + "/lib", '${SHLIBPREFIX}mongoclient${SHLIBSUFFIX}')
 
 for x in clientHeaderDirectories:
     env.Install(prefix + "/include/mongo/" + x,

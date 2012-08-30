@@ -21,6 +21,25 @@ AddOption("--prefix",
           default="/usr/local",
           help="installation root")
 
+AddOption("--flags",
+          dest="flags",
+          type="string",
+          nargs=1,
+          action="store",
+          help="additional flags")
+
+AddOption("--static",
+          dest="static",
+          action="store_true",
+          default=False,
+          help="create static library")
+
+AddOption("--shared",
+          dest="shared",
+          action="store_true",
+          default=False,
+          help="create shared library")
+
 
 env = Environment(BUILD_DIR='#build',
                   CLIENT_ARCHIVE='${CLIENT_DIST_BASENAME}${DIST_ARCHIVE_SUFFIX}',
@@ -66,6 +85,9 @@ if nix:
 if linux:
     env.Append(LINKFLAGS=["-Wl,--as-needed", "-Wl,-zdefs", "-pthread"])
 
+if GetOption( "flags") is not None:
+    env.MergeFlags(GetOption( "flags"))
+
 boostLibs = ["thread", "filesystem", "system"]
 conf = Configure(env)
 for lib in boostLibs:
@@ -78,10 +100,21 @@ conf.Finish()
 clientEnv = env.Clone()
 clientEnv['CPPDEFINES'].remove('MONGO_EXPOSE_MACROS')
 
-Export("env clientEnv")
+static = GetOption("static")
+shared = GetOption("shared")
+if static == False and shared == False:
+    static = True
+
+Export("env clientEnv static shared")
 env.SConscript('src/SConscript.client', variant_dir='$BUILD_DIR', duplicate=False)
 
-mongoclient = env.Alias('mongoclient', ['${LIBPREFIX}mongoclient${LIBSUFFIX}'])
+libs = []
+if static:
+    libs.append('${LIBPREFIX}mongoclient${LIBSUFFIX}')
+if shared:
+    libs.append('${SHLIBPREFIX}mongoclient${SHLIBSUFFIX}')
+
+mongoclient = env.Alias('mongoclient', libs)
 env.Default(mongoclient)
 
 
