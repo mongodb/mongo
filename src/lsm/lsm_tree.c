@@ -21,7 +21,7 @@ __lsm_tree_discard(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 
 	__wt_free(session, lsm_tree->name);
 	for (i = 0; i < lsm_tree->nchunks; i++)
-		__wt_free(session, lsm_tree->chunk[i]);
+		__wt_free(session, lsm_tree->chunk[i].uri);
 	__wt_free(session, lsm_tree->chunk);
 
 	__wt_free(session, lsm_tree);

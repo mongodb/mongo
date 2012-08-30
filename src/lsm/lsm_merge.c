@@ -90,10 +90,10 @@ __wt_lsm_major_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	 * TODO: save the old chunk names so they can be removed later, when
 	 * we can be sure no cursors are looking at them.
 	 */
-	memmove(lsm_tree->chunk, lsm_tree->chunk + nchunks,
-	    nchunks * sizeof(*lsm_tree->chunk));
-	lsm_tree->nchunks -= nchunks;
-	chunk = &lsm_tree->chunk[lsm_tree->nchunks++];
+	memmove(lsm_tree->chunk + 1, lsm_tree->chunk + nchunks,
+	    (lsm_tree->nchunks - nchunks) * sizeof(*lsm_tree->chunk));
+	lsm_tree->nchunks -= nchunks - 1;
+	chunk = &lsm_tree->chunk[0];
 	chunk->uri = dest_uri;
 	F_SET(chunk, WT_LSM_CHUNK_ONDISK);
 	dest_uri = NULL;
