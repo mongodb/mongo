@@ -45,7 +45,7 @@ class test_truncate_fast_delete(wttest.WiredTigerTestCase):
     # of individual pages in the file.
     types = [
         ('file', dict(type='file:',\
-	    config='leaf_page_max=512,value_format=S,key_format=')),
+            config='leaf_page_max=512,value_format=S,key_format=')),
     ]
 
     # This is all about testing the btree layer, not the schema layer, test
@@ -112,14 +112,14 @@ class test_truncate_fast_delete(wttest.WiredTigerTestCase):
     def test_truncate_fast_delete(self):
         uri = self.type + self.name
 
-	'''
-	print '===== run:'
-	print 'config:', self.config + self.keyfmt, \
-	    'overflow=', self.overflow, \
-	    'readafter=', self.readafter, 'readbefore=', self.readbefore, \
-	    'writeafter=', self.writeafter, 'writebefore=', self.writebefore, \
-	    'commit=', self.commit
-	'''
+        '''
+        print '===== run:'
+        print 'config:', self.config + self.keyfmt, \
+            'overflow=', self.overflow, \
+            'readafter=', self.readafter, 'readbefore=', self.readbefore, \
+            'writeafter=', self.writeafter, 'writebefore=', self.writebefore, \
+            'commit=', self.commit
+        '''
 
         # Create the object.
         simple_populate(self, uri, self.config + self.keyfmt, self.nentries)
@@ -176,8 +176,8 @@ class test_truncate_fast_delete(wttest.WiredTigerTestCase):
             cursor.close()
 
         # A cursor involved in the transaction should see the deleted records.
-	# The number 18 comes from deleting row 10 (inclusive), to row N - 10,
-	# inclusive, or 9 + 9 == 18.
+        # The number 18 comes from deleting row 10 (inclusive), to row N - 10,
+        # inclusive, or 9 + 9 == 18.
         cursor = self.session.open_cursor(uri, None)
         self.cursor_count(cursor, 18)
         cursor.close()
