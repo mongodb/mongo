@@ -60,7 +60,10 @@
 #include "wt_internal.h"
 
 static inline uint64_t CityHash64(const char *, size_t);
-/* Wired Tiger wrapper around third party hash implementations. */
+/*
+ * __wt_hash_city64 --
+ * Wired Tiger wrapper around third party hash implementation.
+ */
 uint64_t
 __wt_hash_city64(const void *string, uint32_t len)
 {
