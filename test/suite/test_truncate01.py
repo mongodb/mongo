@@ -80,7 +80,7 @@ class test_truncate_uri(wttest.WiredTigerTestCase):
 
 
 # Test session.truncate.
-class test_truncate(wttest.WiredTigerTestCase):
+class test_truncate_cursor(wttest.WiredTigerTestCase):
     name = 'test_truncate'
 
     # Use a small page size because we want to create lots of pages.
@@ -89,7 +89,7 @@ class test_truncate(wttest.WiredTigerTestCase):
     types = [
         ('file', dict(type='file:',config='leaf_page_max=512,key_format=')),
         ('file8t', dict(type='file:',\
-	    config='leaf_page_max=512,value_format=8t,key_format=')),
+            config='leaf_page_max=512,value_format=8t,key_format=')),
         ('table', dict(type='table:',config='leaf_page_max=512,key_format=')),
     ]
     keyfmt = [
@@ -119,7 +119,7 @@ class test_truncate(wttest.WiredTigerTestCase):
 
         # Test scenarios where we fully instantiate a cursor as well as where we
         # only set the key.  The key may not exist in a column-store so ignore
-        # the flag if implicit is set.
+        # the flag in that case.
         if self.search and not cursor.key_format == 'r':
             self.assertEqual(cursor.search(), 0)
             self.assertEqual(cursor.get_key(), key_populate(cursor, key))
@@ -163,8 +163,8 @@ class test_truncate(wttest.WiredTigerTestCase):
                 self.assertEqual(cursor.get_values(), v)
         cursor.close()
 
-    # Test truncation using cursors.
-    def test_truncate_cursor(self):
+    # Test truncation of files and simple tables using cursors.
+    def test_truncate_simple(self):
         uri = self.type + self.name
 
         # layout:
@@ -309,6 +309,63 @@ class test_truncate(wttest.WiredTigerTestCase):
                 self.truncateRangeAndCheck(uri, begin, end, expected)
                 self.session.drop(uri, None)
 
+    # Test truncation of complex tables using cursors.  We can't do the kind of
+    # layout and detailed testing as we can with files, but this will at least
+    # smoke-test the handling of indexes and column-groups.
+    def test_truncate_complex(self):
+
+        # We only care about tables.
+        if self.type == 'file:':
+                return
+
+        uri = self.type + self.name
+
+        # list: truncation patterns
+        #
+        # begin and end: -1 means pass None for the cursor arg to truncate.  An
+        # integer N, with 1 <= N < self.nentries, truncates from/to a cursor
+        # positioned at that row.
+        list = [
+            (-1, self.nentries),                # begin to end, begin = None
+            (1, -1),                            # begin to end, end = None
+            (1, self.nentries),                 # begin to end
+            (-1, self.nentries - self.skip),    # begin to middle, begin = None
+            (1, self.nentries - self.skip),     # begin to middle
+            (self.skip, -1),                    # middle to end, end = None
+            (self.skip, self.nentries),         # middle to end
+            (self.skip,                         # middle to different middle
+                self.nentries - self.skip),
+            (1, 1),                             # begin to begin
+            (self.nentries, self.nentries),     # end to end
+            (self.skip, self.skip)              # middle to same middle
+            ]
+
+        # Build the layout we're going to test
+        for begin,end in list:
+            '''
+            print '===== run:', uri
+            print 'key:', self.keyfmt, 'begin:', begin, 'end:', end
+            '''
+
+            # Create the object.
+            complex_populate(
+                self, uri, self.config + self.keyfmt, self.nentries + 1)
+
+            # Build a dictionary of what the object should look like for
+            # later comparison
+            cursor = self.session.open_cursor(uri, None)
+            expected = {}
+            for i in range(1, self.nentries + 1):
+                expected[key_populate(cursor, i)] = value_populate_complex(i)
+            cursor.close()
+
+            # Optionally close and re-open the object to get a disk image
+            # instead of a big insert list.
+            if self.reopen:
+                self.reopen_conn()
+
+            self.truncateRangeAndCheck(uri, begin, end, expected)
+            self.session.drop(uri, None)
 
 if __name__ == '__main__':
     wttest.run()
