@@ -439,7 +439,7 @@ static int
 __verify_filefrag_chk(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
 	WT_DECL_RET;
-	uint32_t first, last;
+	uint64_t first, last;
 
 	/*
 	 * Check for file fragments we haven't verified -- every time we find
@@ -518,7 +518,7 @@ static int
 __verify_ckptfrag_chk(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
 	WT_DECL_RET;
-	uint32_t first, last;
+	uint64_t first, last;
 
 	/*
 	 * Check for checkpoint fragments we haven't verified -- every time we

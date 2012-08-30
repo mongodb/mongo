@@ -99,13 +99,6 @@ class test_compress01_base(wttest.WiredTigerTestCase):
         self.conn = self.setUpConnectionOpen(".")
         self.session = self.setUpSessionOpen(self.conn)
 
-    def test_insert_and_verify(self):
-        self.do_insert()
-        # We want a fresh cache so that compressed pages
-        # are really read from disk. 
-        self.do_fresh_cache()
-        self.do_verify()
-
     def extensionArg(self, name):
         if name != None:
             testdir = os.path.dirname(__file__)
@@ -128,21 +121,34 @@ class test_compress01_base(wttest.WiredTigerTestCase):
         return conn
 
 
-class test_compress01_1_nop(test_compress01_base):
+# Put the tests in a class that doesn't inherit from unittest.TestCase so
+# they will only be called by the concrete subclasses with real implementations.
+#
+# It doesn't make sense to call test_compress01_base.test_insert_and_verify --
+# this is how to avoid that.
+class compress01_tests(object):
+    def test_insert_and_verify(self):
+        self.do_insert()
+        # We want a fresh cache so that compressed pages
+        # are really read from disk. 
+        self.do_fresh_cache()
+        self.do_verify()
+
+
+class test_compress01_1_nop(test_compress01_base, compress01_tests):
     def __init__(self, testname):
         test_compress01_base.__init__(self, testname, 'nop_compress', 'nop')
 
-
-class test_compress01_2_bz(test_compress01_base):
+class test_compress01_2_bz(test_compress01_base, compress01_tests):
     def __init__(self, testname):
         test_compress01_base.__init__(self, testname, 'bzip2_compress', 'bz')
 
-class test_compress01_3_sn(test_compress01_base):
+class test_compress01_3_sn(test_compress01_base, compress01_tests):
     def __init__(self, testname):
         test_compress01_base.__init__(self, testname, 'snappy_compress', 'sn')
 
 
 if __name__ == '__main__':
-    wttest.run(test_compress01_base)
     wttest.run(test_compress01_1_nop)
     wttest.run(test_compress01_2_bz)
+    wttest.run(test_compress01_3_sn)

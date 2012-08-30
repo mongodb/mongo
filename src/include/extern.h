@@ -223,6 +223,23 @@ extern int __wt_block_write_off(WT_SESSION_IMPL *session,
     uint32_t *sizep,
     uint32_t *cksump,
     int force_extend);
+extern int __wt_bloom_create( WT_SESSION_IMPL *session,
+    const char *uri,
+    const char *config,
+    uint64_t count,
+    uint32_t factor,
+    uint32_t k,
+    WT_BLOOM **bloomp);
+extern int __wt_bloom_open(WT_SESSION_IMPL *session,
+    const char *uri,
+    uint32_t factor,
+    uint32_t k,
+    WT_BLOOM **bloomp);
+extern int __wt_bloom_insert(WT_BLOOM *bloom, WT_ITEM *key);
+extern int __wt_bloom_finalize(WT_BLOOM *bloom);
+extern int __wt_bloom_get(WT_BLOOM *bloom, WT_ITEM *key);
+extern int __wt_bloom_close(WT_BLOOM *bloom);
+extern int __wt_bloom_drop(WT_BLOOM *bloom, const char *config);
 extern int __wt_bulk_init(WT_CURSOR_BULK *cbulk);
 extern int __wt_bulk_insert(WT_CURSOR_BULK *cbulk);
 extern int __wt_bulk_end(WT_CURSOR_BULK *cbulk);
