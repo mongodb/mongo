@@ -693,17 +693,54 @@ namespace mongo {
 
 #define OPDEBUG_APPEND_NUMBER(x) if( x != -1 ) b.appendNumber( #x , (x) )
 #define OPDEBUG_APPEND_BOOL(x) if( x ) b.appendBool( #x , (x) )
-    void OpDebug::append( const CurOp& curop, BSONObjBuilder& b ) const {
+    bool OpDebug::append(const CurOp& curop, BSONObjBuilder& b, size_t maxSize) const {
         b.append( "op" , iscommand ? "command" : opToString( op ) );
         b.append( "ns" , ns.toString() );
-        if ( ! query.isEmpty() )
-            b.append( iscommand ? "command" : "query" , query );
-        else if ( ! iscommand && curop.haveQuery() )
-            curop.appendQuery( b , "query" );
-
-        if ( ! updateobj.isEmpty() )
-            b.append( "updateobj" , updateobj );
         
+        int queryUpdateObjSize = 0;
+        if (!query.isEmpty()) {
+            queryUpdateObjSize += query.objsize();
+        }
+        else if (!iscommand && curop.haveQuery()) {
+            queryUpdateObjSize += curop.query()["query"].size();
+        }
+
+        if (!updateobj.isEmpty()) {
+            queryUpdateObjSize += updateobj.objsize();
+        }
+
+        if (static_cast<size_t>(queryUpdateObjSize) > maxSize) {
+            if (!query.isEmpty()) {
+                // Use 60 since BSONObj::toString can truncate strings into 150 chars
+                // and we want to have enough room for both query and updateobj when
+                // the entire document is going to be serialized into a string
+                const string abbreviated(query.toString(false, false), 0, 60);
+                b.append(iscommand ? "command" : "query", abbreviated + "...");
+            }
+            else if (!iscommand && curop.haveQuery()) {
+                const string abbreviated(curop.query()["query"].toString(false, false), 0, 60);
+                b.append("query", abbreviated + "...");
+            }
+
+            if (!updateobj.isEmpty()) {
+                const string abbreviated(updateobj.toString(false, false), 0, 60);
+                b.append("updateobj", abbreviated + "...");
+            }
+
+            return false;
+        }
+
+        if (!query.isEmpty()) {
+            b.append(iscommand ? "command" : "query", query);
+        }
+        else if (!iscommand && curop.haveQuery()) {
+            curop.appendQuery(b, "query");
+        }
+
+        if (!updateobj.isEmpty()) {
+            b.append("updateobj", updateobj);
+        }
+
         const bool moved = (nmoved >= 1);
 
         OPDEBUG_APPEND_NUMBER( cursorid );
@@ -724,14 +761,15 @@ namespace mongo {
 
         b.appendNumber( "numYield" , curop.numYields() );
         b.append( "lockStats" , curop.lockStat().report() );
-        
-        if ( ! exceptionInfo.empty() ) 
+
+        if ( ! exceptionInfo.empty() )
             exceptionInfo.append( b , "exception" , "exceptionCode" );
-        
+
         OPDEBUG_APPEND_NUMBER( nreturned );
         OPDEBUG_APPEND_NUMBER( responseLength );
         b.append( "millis" , executionTime );
-        
+
+        return true;
     }
 
 }
