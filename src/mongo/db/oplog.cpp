@@ -367,13 +367,13 @@ namespace mongo {
             sz = (double)cmdLine.oplogSize;
         else {
             /* not specified. pick a default size */
-            sz = 50.0 * 1000 * 1000;
+            sz = 50.0 * 1024 * 1024;
             if ( sizeof(int *) >= 8 ) {
 #if defined(__APPLE__)
                 // typically these are desktops (dev machines), so keep it smallish
-                sz = (256-64) * 1000 * 1000;
+                sz = (256-64) * 1024 * 1024;
 #else
-                sz = 990.0 * 1000 * 1000;
+                sz = 990.0 * 1024 * 1024;
                 boost::intmax_t free = File::freeSpace(dbpath); //-1 if call not supported.
                 double fivePct = free * 0.05;
                 if ( fivePct > sz )
