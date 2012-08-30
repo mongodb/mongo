@@ -363,7 +363,7 @@ namespace replset {
                     // on, we can get ops that are way ahead of the delay and this will
                     // make this thread sleep longer when handleSlaveDelay is called
                     // and apply ops much sooner than we like.
-                    if (opTimestampSecs > (now - slaveDelaySecs)) {
+                    if (opTimestampSecs > static_cast<unsigned int>(now - slaveDelaySecs)) {
                         break;
                     }
                 }
