@@ -310,8 +310,13 @@ __rec_review(WT_SESSION_IMPL *session,
 
 	/* If the page is dirty, write it so we know the final state. */
 	if (__wt_page_is_modified(page) &&
-	    !F_ISSET(mod, WT_PM_REC_SPLIT_MERGE))
+	    !F_ISSET(mod, WT_PM_REC_SPLIT_MERGE)) {
 		WT_RET(__wt_rec_write(session, page, NULL));
+
+		/* If there are unwritten changes on the page, give up. */
+		if (__wt_page_is_modified(page))
+			return (EBUSY);
+	}
 
 	/*
 	 * Repeat the eviction tests.

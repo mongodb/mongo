@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Copyright (c) 2008-2012 WiredTiger, Inc.
+# Public Domain 2008-2012 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
 #
@@ -62,37 +62,37 @@ class test_txn03(wttest.WiredTigerTestCase):
         c.set_value(self.data_str1)
         c.set_key(self.key_str)
         c.insert()
-	c.close()
+        c.close()
         c = self.session.open_cursor(self.uri2, None, 'overwrite')
         c.set_value(self.data_str1)
         c.set_key(self.key_str)
         c.insert()
-	c.close()
+        c.close()
 
-	# Update the first table - this update should be visible in the
-	# new session.
-	self.session.begin_transaction()
+        # Update the first table - this update should be visible in the
+        # new session.
+        self.session.begin_transaction()
         c = self.session.open_cursor(self.uri1, None, 'overwrite')
         c.set_value(self.data_str2)
         c.set_key(self.key_str)
         c.insert()
         self.session.commit_transaction()
-	c.close()
+        c.close()
 
-	# Open another session and some transactional cursors.
+        # Open another session and some transactional cursors.
         self.session2 = self.conn.open_session()
-	self.session2.begin_transaction("isolation=snapshot")
+        self.session2.begin_transaction("isolation=snapshot")
         t1c = self.session2.open_cursor(self.uri1, None, 'overwrite')
         t2c = self.session2.open_cursor(self.uri2, None, 'overwrite')
 
-	# Make an update in the first session.
-	self.session.begin_transaction()
-	c = self.session.open_cursor(self.uri2, None, 'overwrite')
-	c.set_value(self.data_str2)
-	c.set_key(self.key_str)
-	c.insert()
-	self.session.commit_transaction()
-	c.close()
+        # Make an update in the first session.
+        self.session.begin_transaction()
+        c = self.session.open_cursor(self.uri2, None, 'overwrite')
+        c.set_value(self.data_str2)
+        c.set_key(self.key_str)
+        c.insert()
+        self.session.commit_transaction()
+        c.close()
 
         t1c.set_key(self.key_str)
         t1c.search()
@@ -101,10 +101,10 @@ class test_txn03(wttest.WiredTigerTestCase):
         self.assertEqual(t1c.get_value(), self.data_str2)
         self.assertEqual(t2c.get_value(), self.data_str1)
 
-	# Clean up
-	t1c.close()
-	t2c.close()
-	self.session2.rollback_transaction()
+        # Clean up
+        t1c.close()
+        t2c.close()
+        self.session2.rollback_transaction()
 
 if __name__ == '__main__':
     wttest.run()

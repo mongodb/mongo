@@ -55,6 +55,8 @@ struct __wt_block_desc;
     typedef struct __wt_block_desc WT_BLOCK_DESC;
 struct __wt_block_header;
     typedef struct __wt_block_header WT_BLOCK_HEADER;
+struct __wt_bloom;
+    typedef struct __wt_bloom WT_BLOOM;
 struct __wt_btree;
     typedef struct __wt_btree WT_BTREE;
 struct __wt_btree_session;
@@ -201,6 +203,9 @@ struct __wt_update;
 #include "intpack.i"
 #include "cell.i"
 
+/* Required by cursor.i */
+#include "txn.i"
+
 #include "bitstring.i"
 #include "btree.i"
 #include "cache.i"
@@ -211,7 +216,6 @@ struct __wt_update;
 #include "packing.i"
 #include "serial.i"
 #include "serial_funcs.i"
-#include "txn.i"
 
 #if defined(__cplusplus)
 }

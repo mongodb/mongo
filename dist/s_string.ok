@@ -101,6 +101,7 @@ Kounavis
 LF
 LRU
 LSB
+LSM
 LSN
 LSN's
 LSNs
@@ -256,6 +257,7 @@ bzip
 calloc
 catfmt
 cfg
+cfkos
 checkfrag
 checksum
 checksums
@@ -451,6 +453,7 @@ logput
 lookup
 lookups
 lru
+lsm
 lsn
 lu
 majorp

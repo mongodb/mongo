@@ -104,19 +104,19 @@ __wt_txn_visible(WT_SESSION_IMPL *session, wt_txnid_t id)
 		return (1);
 
 	/*
-	 * TXN_ISO_SNAPSHOT, TXN_ISO_READ_COMMITTED:
-	 * Otherwise, the ID is visible if it is not the result of a concurrent
-	 * transaction, that is, if it is not in the snapshot list.
+	 * TXN_ISO_SNAPSHOT, TXN_ISO_READ_COMMITTED: the ID is visible if it is
+	 * not the result of a concurrent transaction, that is, if was
+	 * committed before the snapshot was taken.
+	 *
+	 * The order here is important: anything newer than the maximum ID we
+	 * saw when taking the snapshot should be invisible, even if the
+	 * snapshot is empty.
 	 */
-	if (txn->snapshot_count == 0 || TXNID_LT(id, txn->snap_min))
-		return (1);
 	if (TXNID_LT(txn->snap_max, id))
 		return (0);
+	if (txn->snapshot_count == 0 || TXNID_LT(id, txn->snap_min))
+		return (1);
 
-	/*
-	 * Fast path the single-threaded case where there are no concurrent
-	 * transactions.
-	 */
 	return (bsearch(&id, txn->snapshot, txn->snapshot_count,
 	    sizeof(wt_txnid_t), __wt_txnid_cmp) == NULL);
 }
@@ -209,7 +209,7 @@ __wt_txn_ancient(WT_SESSION_IMPL *session, wt_txnid_t id)
  * __wt_txn_read_first --
  *	Called for the first page read for a session.
  */
-static inline int
+static inline void
 __wt_txn_read_first(WT_SESSION_IMPL *session)
 {
 	WT_TXN *txn;
@@ -234,9 +234,7 @@ __wt_txn_read_first(WT_SESSION_IMPL *session)
 	if (txn->isolation == TXN_ISO_READ_COMMITTED ||
 	    (!F_ISSET(txn, TXN_RUNNING) &&
 	    txn->isolation == TXN_ISO_SNAPSHOT))
-		WT_RET(__wt_txn_get_snapshot(session, WT_TXN_NONE));
-
-	return (0);
+		__wt_txn_get_snapshot(session, WT_TXN_NONE);
 }
 
 /*

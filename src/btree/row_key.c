@@ -47,7 +47,8 @@ __wt_row_leaf_keys(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * Allocate a bit array and figure out the set of "interesting" keys,
 	 * marking up the array.
 	 */
-	WT_RET(__wt_scr_alloc(session, __bitstr_size(page->entries), &tmp));
+	WT_RET(__wt_scr_alloc(
+	    session, (uint32_t)__bitstr_size(page->entries), &tmp));
 
 	__inmem_row_leaf_slots(tmp->mem, 0, page->entries, btree->key_gap);
 

@@ -296,7 +296,7 @@ __wt_rec_write(
 				break;
 		}
 		WT_RET(__wt_page_modify_init(session, page));
-		__wt_page_modify_set(session, page);
+		__wt_page_modify_set(page);
 
 		return (0);
 	}
@@ -344,7 +344,7 @@ __wt_rec_write(
 	WT_VERBOSE_RET(session, reconcile,
 	    "root page split %p -> %p", page, page->modify->u.split);
 	page = page->modify->u.split;
-	__wt_page_modify_set(session, page);
+	__wt_page_modify_set(page);
 	F_CLR(page->modify, WT_PM_REC_SPLIT_MERGE);
 
 	WT_RET(__wt_rec_write(session, page, NULL));
@@ -1165,9 +1165,12 @@ __wt_rec_bulk_wrapup(WT_CURSOR_BULK *cbulk)
 	WT_RET(__rec_split_finish(session));
 	WT_RET(__rec_write_wrapup(session, page));
 
+	/* Mark the tree dirty so close performs a checkpoint. */
+	btree->modified = 1;
+
 	/* Mark the page's parent dirty. */
 	WT_RET(__wt_page_modify_init(session, page->parent));
-	__wt_page_modify_set(session, page->parent);
+	__wt_page_modify_set(page->parent);
 
 	return (0);
 }
@@ -3062,16 +3065,25 @@ err:			__wt_scr_free(&tkey);
 	}
 
 	/*
-	 * Success: if modifications were skipped, the tree cannot be clean.  As
-	 * the checkpoint initiation code might have cleared the tree's modified
-	 * flag, explicitly dirty the page, which includes setting the tree's
-	 * modified flag.  If modifications were not skipped, the page might be
-	 * clean, update the disk generation to the write generation as of when
-	 * reconciliation started.
+	 * Success.
+	 *
+	 * If modifications were skipped, the tree isn't clean.  The checkpoint
+	 * call cleared the tree's modified value before it called the eviction
+	 * thread, so we must explicitly reset the tree's modified flag.  We
+	 * publish the change for clarity (the requirement is the value be set
+	 * before a subsequent checkpoint reads it, and because the current
+	 * checkpoint is waiting on this reconciliation to complete, there's no
+	 * risk of that happening).
 	 */
 	if (r->upd_skipped)
-		__wt_page_modify_set(session, page);
-	else
+		WT_PUBLISH(btree->modified, 1);
+
+	/*
+	 * If modifications were not skipped, the page might be clean; update
+	 * the disk generation to the write generation as of when reconciliation
+	 * started.
+	 */
+	if (!r->upd_skipped)
 		mod->disk_gen = r->orig_write_gen;
 
 	return (0);
@@ -3132,7 +3144,7 @@ __rec_split_row(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_PAGE **splitp)
 	page->type = WT_PAGE_ROW_INT;
 
 	/*
-	 * we don't re-write parent pages when child pages split, which means
+	 * We don't re-write parent pages when child pages split, which means
 	 * we have only one slot to work with in the parent.  When a leaf page
 	 * splits, we create a new internal page referencing the split pages,
 	 * and when the leaf page is evicted, we update the leaf's slot in the
@@ -3163,7 +3175,7 @@ __rec_split_row(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_PAGE **splitp)
 		((WT_ADDR *)ref->addr)->size = bnd->addr.size;
 		bnd->addr.addr = NULL;
 
-		WT_PUBLISH(ref->state, WT_REF_DISK);
+		ref->state = WT_REF_DISK;
 		ref->page = NULL;
 	}
 
@@ -3217,7 +3229,7 @@ __rec_split_col(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_PAGE **splitp)
 		((WT_ADDR *)ref->addr)->size = bnd->addr.size;
 		bnd->addr.addr = NULL;
 
-		WT_PUBLISH(ref->state, WT_REF_DISK);
+		ref->state = WT_REF_DISK;
 		ref->page = NULL;
 	}
 
