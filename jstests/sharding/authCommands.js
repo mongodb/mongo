@@ -16,9 +16,12 @@ assert.eq(0, db.runCommand({dbStats : 1}).ok);
 
 assert( db.getSiblingDB('local').auth('__system', 'foopdedoop'), "Failed to authenticate as system user" );
 
-assert.eq(0, db.runCommand({dbStats : 1}).ok);
+// Because of SERVER-6897, commands sent without an $auth table are assumed to have full access
+// to preserve compatibility with 2.0
+// assert.eq(0, db.runCommand({dbStats : 1}).ok); // SERVER-6897
 assert.eq(1, db.runCommand({dbStats : 1, $auth : { test : { userName : NumberInt(1) } } } ).ok );
-assert.eq(0, db.runCommand({dbStats : 1}).ok); // Make sure the credentials are temporary.
+ // SERVER-6897
+// assert.eq(0, db.runCommand({dbStats : 1}).ok); // Make sure the credentials are temporary.
 assert.eq(0, db.runCommand({dropDatabase : 1, $auth : { test : { userName : NumberInt(1) } } } ).ok );
 assert.eq(1, db.runCommand({dropDatabase : 1, $auth : { test : { userName : NumberInt(2) } } } ).ok );
 

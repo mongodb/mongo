@@ -1909,12 +1909,11 @@ namespace mongo {
                 BSONObj authObj = cmdObj[AuthenticationTable::fieldName].Obj();
                 ai->setTemporaryAuthorization( authObj );
             } else {
-                result.append( "errmsg" ,
-                               "unauthorized: no auth credentials provided for command and "
-                               "authenticated using internal user.  This is most likely because "
-                               "you are using an old version of mongos" );
-                log() << "command denied: " << cmdObj.toString() << endl;
-                return false;
+                SOMETIMES ( noAuthTableCounter, 1000 ) {
+                    warning() << "Received command without $auth table.  This is probably because "
+                        "you are running with 1 or more mongod or mongos nodes that are running a "
+                        "version prior to 2.2.  Command object: " << cmdObj.toString() << endl;
+                }
             }
         }
 
