@@ -96,7 +96,7 @@ __wt_txn_visible(WT_SESSION_IMPL *session, wt_txnid_t id)
 
 	/* Transactions see their own changes. */
 	txn = &session->txn;
-	if (F_ISSET(txn, TXN_RUNNING) && id == txn->id)
+	if (id == txn->id)
 		return (1);
 
 	/* Read-uncommitted transactions see all other changes. */

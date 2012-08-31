@@ -17,8 +17,8 @@ struct __wt_bloom {
 	WT_SESSION_IMPL *session;
 	WT_CURSOR *c;
 
-	uint8_t k;		/* The number of hash functions used. */
-	uint8_t factor;		/* The number of bits per item inserted. */
+	uint32_t k;		/* The number of hash functions used. */
+	uint32_t factor;	/* The number of bits per item inserted. */
 	uint64_t m;		/* The number of slots in the bit string. */
 	uint64_t n;		/* The number of items to be inserted. */
 };

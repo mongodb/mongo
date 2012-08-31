@@ -162,12 +162,16 @@ config_print(int error_display)
 		    (g.c_file_type == VAR && !(cp->type_mask & C_VAR))))
 			fprintf(fp,
 			    "# %s not applicable to this run\n", cp->name);
+		else if (strcmp(cp->name, "data_source") == 0)
+			fprintf(fp, "%s=%.*s\n", cp->name,
+			    (int)(strchr(*cp->vstr, ':') - *cp->vstr),
+			    *cp->vstr);
 		else if (cp->flags & C_STRING)
 			fprintf(fp, "%s=%s\n", cp->name, *cp->vstr);
-		else if (strcmp(cp->name, "file_type"))
-			fprintf(fp, "%s=%" PRIu32 "\n", cp->name, *cp->v);
-		else
+		else if (strcmp(cp->name, "file_type") == 0)
 			fprintf(fp, "%s=%s\n", cp->name, config_dtype());
+		else
+			fprintf(fp, "%s=%" PRIu32 "\n", cp->name, *cp->v);
 
 	fprintf(fp, "############################################\n");
 	if (fp != stdout)

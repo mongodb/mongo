@@ -494,8 +494,7 @@ __evict_file_request_walk(WT_SESSION_IMPL *session)
 
 	WT_VERBOSE_RET(session, evictserver,
 	    "file request: %s",
-	    (request_session->syncop == WT_SYNC ? "sync" :
-	    (request_session->syncop == WT_SYNC_DISCARD ?
+	    (syncop == WT_SYNC ? "sync" : (syncop == WT_SYNC_DISCARD ?
 	    "sync-discard" : "sync-discard-nowrite")));
 
 	/*

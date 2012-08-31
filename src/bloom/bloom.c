@@ -120,7 +120,7 @@ __wt_bloom_open(WT_SESSION_IMPL *session,
 	/* Find the largest key, to get the size of the filter. */
 	WT_RET(wt_session->open_cursor(wt_session, bloom->uri, NULL, NULL, &c));
 	WT_RET(c->prev(c));
-	c->get_key(c, &size);
+	WT_RET(c->get_key(c, &size));
 	WT_RET(c->close(c));
 
 	WT_RET(__bloom_setup(bloom, 0, size, factor, k));
@@ -137,7 +137,7 @@ int
 __wt_bloom_insert(WT_BLOOM *bloom, WT_ITEM *key)
 {
 	uint64_t h1, h2;
-	int i;
+	uint32_t i;
 
 	h1 = __wt_hash_fnv64(key->data, key->size);
 	h2 = __wt_hash_city64(key->data, key->size);
@@ -167,7 +167,8 @@ __wt_bloom_finalize(WT_BLOOM *bloom)
 	 */
 	WT_RET(wt_session->create(wt_session, bloom->uri, bloom->config));
 
-	wt_session->open_cursor(wt_session, bloom->uri, NULL, "bulk", &c);
+	WT_RET(wt_session->open_cursor(
+	    wt_session, bloom->uri, NULL, "bulk", &c));
 	/* Add the entries from the array into the table. */
 	for (i = 0; i < bloom->m; i++) {
 		c->set_value(c, __bit_test(bloom->bitstring, i));
@@ -191,7 +192,7 @@ __wt_bloom_get(WT_BLOOM *bloom, WT_ITEM *key)
 	WT_CURSOR *c;
 	WT_DECL_RET;
 	WT_SESSION *wt_session;
-	int i;
+	uint32_t i;
 	uint64_t h1, h2;
 	uint8_t bit;
 
@@ -247,18 +248,19 @@ err:	/* Don't return WT_NOTFOUND from a failed search. */
 int
 __wt_bloom_close(WT_BLOOM *bloom)
 {
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
 	session = bloom->session;
 
 	if (bloom->c != NULL)
-		bloom->c->close(bloom->c);
+		ret = bloom->c->close(bloom->c);
 	__wt_free(session, bloom->uri);
 	__wt_free(session, bloom->config);
 	__wt_free(session, bloom->bitstring);
 	__wt_free(session, bloom);
 
-	return (0);
+	return (ret);
 }
 
 /*
@@ -273,10 +275,10 @@ __wt_bloom_drop(WT_BLOOM *bloom, const char *config)
 
 	wt_session = (WT_SESSION *)bloom->session;
 	if (bloom->c != NULL) {
-		bloom->c->close(bloom->c);
+		ret = bloom->c->close(bloom->c);
 		bloom->c = NULL;
 	}
-	WT_RET(wt_session->drop(wt_session, bloom->uri, config));
+	WT_TRET(wt_session->drop(wt_session, bloom->uri, config));
 	WT_TRET(__wt_bloom_close(bloom));
 
 	return (ret);
