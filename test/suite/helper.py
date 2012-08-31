@@ -52,6 +52,26 @@ def compare_files(self, filename1, filename2):
                 if not b1:
                     return True
 
+# Iterate over a set of tables, ensuring that they have identical contents
+def compare_tables(self, session, uris):
+    cursors = list()
+    for next_uri in uris:
+        cursors.append(session.open_cursor(next_uri, None, None))
+
+    done = False
+    while not done:
+        keys = list()
+        for next_cursor in cursors:
+            if (next_cursor.next() == wiredtiger.WT_NOTFOUND):
+                done = True
+                break;
+            keys.append(next_cursor.get_value())
+        match = all(x == keys[0] for x in keys)
+        if not match:
+            return False
+
+    return True
+
 # confirm a URI doesn't exist.
 def confirm_does_not_exist(self, uri):
     self.pr('confirm_does_not_exist: ' + uri)
