@@ -26,7 +26,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import Queue
-import threading ,time, wiredtiger, wttest
+import threading, time, wiredtiger, wttest
 from wtthread import checkpoint_thread, op_thread
 from helper import key_populate, simple_populate
 
@@ -54,14 +54,13 @@ class test_checkpoint02(wttest.WiredTigerTestCase):
         for i in xrange(self.nops):
             if i % 191 == 0 and i != 0:
                 queue.put_nowait(('b', i, my_data))
-#            # The following table create/drop code isn't working any more.
-#            if i % 257 == 0 and i != 0:
-#                queue.put_nowait(('t', i, my_data))
-#            # Wait another 200 operations, then delete the above table. This
-#            # not guarantee that the initial operations on the table will have
-#            # been finished.
-#            if (i - 100) % 257 == 0 and (i - 100) != 0:
-#                queue.put_nowait(('d', i - 100, my_data))
+            if i % 257 == 0 and i != 0:
+                queue.put_nowait(('t', i, my_data))
+            # Wait another 200 operations, then delete the above table. This
+            # not guarantee that the initial operations on the table will have
+            # been finished.
+            if (i - 100) % 257 == 0 and (i - 100) != 0:
+                queue.put_nowait(('d', i - 100, my_data))
             queue.put_nowait(('i', i, my_data))
 
         for i in xrange(self.nthreads):

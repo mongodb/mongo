@@ -26,7 +26,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import Queue
-import os, shutil, threading ,time, wiredtiger, wttest
+import os, shutil, sys, threading, time, wiredtiger, wttest
 from helper import compare_tables
 
 class checkpoint_thread(threading.Thread):
@@ -78,12 +78,19 @@ class backup_thread(threading.Thread):
                     continue;
                 uri = "file:" + next_file
                 uris.append(uri)
+
             # TODO: We want a self.assertTrue here - but need to be a wttest to
             # do that..
-            if not compare_tables(self, bkp_session, uris):
-                print "Error: tables differ."
+            if not compare_tables(
+                        self, sess, uris, "checkpoint=WiredTigerCheckpoint"):
+                print "Error: checkpoint tables differ."
             else:
-                print "Tables match"
+                print "Checkpoint tables match"
+
+            if not compare_tables(self, bkp_session, uris):
+                print "Error: backup tables differ."
+            else:
+                print "Backup tables match"
             bkp_conn.close()
 
         sess.close()

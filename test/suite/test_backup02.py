@@ -26,7 +26,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import Queue
-import threading ,time, wiredtiger, wttest
+import threading, time, wiredtiger, wttest
 from wtthread import backup_thread, checkpoint_thread, op_thread
 from helper import key_populate, simple_populate
 
@@ -37,7 +37,6 @@ class test_backup02(wttest.WiredTigerTestCase):
     scenarios = [
         ('table', dict(uri='table:test',fmt='L',dsize=100,nops=200,nthreads=1,time=30)),
         ]
-
 
     def test_backup02(self):
         done = threading.Event()
@@ -60,8 +59,10 @@ class test_backup02(wttest.WiredTigerTestCase):
         for i in xrange(self.nops):
             queue.put_nowait(('gi', i, my_data))
 
+        opthreads = []
         for i in xrange(self.nthreads):
             t = op_thread(self.conn, uris, self.fmt, queue, done)
+            opthreads.append(t)
             t.start()
 
         # Add 200 update entries into the queue every .1 seconds.
@@ -76,10 +77,10 @@ class test_backup02(wttest.WiredTigerTestCase):
         queue.join()
         done.set()
 #        # Wait for checkpoint thread to notice status change.
-#        while ckpt.is_alive():
-#            time.sleep(0.01)
-        while bkp.is_alive():
-            time.sleep(0.01)
+#        ckpt.join()
+        for t in opthreads:
+            t.join()
+        bkp.join()
 
 if __name__ == '__main__':
     wttest.run()

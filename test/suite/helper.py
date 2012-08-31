@@ -26,9 +26,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 
-import glob
-import os
-import string
+import glob, os, string
 import wiredtiger
 
 # python has a filecmp.cmp function, but different versions of python approach
@@ -53,24 +51,28 @@ def compare_files(self, filename1, filename2):
                     return True
 
 # Iterate over a set of tables, ensuring that they have identical contents
-def compare_tables(self, session, uris):
+def compare_tables(self, session, uris, config=None):
     cursors = list()
     for next_uri in uris:
-        cursors.append(session.open_cursor(next_uri, None, None))
+        cursors.append(session.open_cursor(next_uri, None, config))
 
-    done = False
-    while not done:
-        keys = list()
-        for next_cursor in cursors:
-            if (next_cursor.next() == wiredtiger.WT_NOTFOUND):
-                done = True
-                break;
-            keys.append(next_cursor.get_value())
-        match = all(x == keys[0] for x in keys)
-        if not match:
-            return False
+    try:
+        done = False
+        while not done:
+            keys = list()
+            for next_cursor in cursors:
+                if (next_cursor.next() == wiredtiger.WT_NOTFOUND):
+                    done = True
+                    break;
+                keys.append(next_cursor.get_value())
+            match = all(x == keys[0] for x in keys)
+            if not match:
+                return False
 
-    return True
+        return True
+    finally:
+        for c in cursors:
+            c.close()
 
 # confirm a URI doesn't exist.
 def confirm_does_not_exist(self, uri):
