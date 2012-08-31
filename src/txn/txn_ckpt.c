@@ -20,6 +20,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_CONFIG_ITEM cval, k, v;
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
+	WT_SESSION *wt_session;
 	WT_TXN *txn;
 	WT_TXN_GLOBAL *txn_global;
 	void *saved_meta_next;
@@ -41,22 +42,15 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * changes, they will be written in the checkpoint and may appear after
 	 * a crash.
 	 *
-	 * Don't start a real transaction with its own ID: although there
-	 * should be no conflicts when updating the metadata, we don't want to
-	 * take the risk of aborting after doing all of the I/O.  Use read
-	 * committed isolation for the same reason.
-	 *
-	 * In addition, the tracking of non-transactional readers is
-	 * complicated by having a full transaction: there may be
-	 * non-transactional cursors open in this session that hold hazard
-	 * references, so we may already have an ID in the global state table.
+	 * Use a real snapshot transaction: we don't want any chance of the
+	 * snapshot being updated during the checkpoint.
 	 */
 	if (F_ISSET(txn, TXN_RUNNING))
 		WT_RET_MSG(session, EINVAL,
 		    "Checkpoint not permitted in a transaction");
 
-	__wt_txn_get_snapshot(session, WT_TXN_NONE);
-	txn->isolation = TXN_ISO_READ_COMMITTED;
+	wt_session = &session->iface;
+	WT_RET(wt_session->begin_transaction(wt_session, "isolation=snapshot"));
 
 	/* Prevent eviction from evicting anything newer than this. */
 	txn_global->ckpt_txnid = txn->snap_min;
@@ -152,8 +146,7 @@ err:	/*
 		WT_TRET(__wt_meta_track_off(session, ret != 0));
 
 	txn_global->ckpt_txnid = WT_TXN_NONE;
-	__wt_txn_release_snapshot(session);
-	txn->isolation = session->isolation;
+	__wt_txn_release(session);
 	__wt_scr_free(&tmp);
 	return (ret);
 }
