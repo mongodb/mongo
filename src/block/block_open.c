@@ -238,7 +238,7 @@ __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block)
 		    block->name);
 
 err:	__wt_scr_free(&buf);
-	return (0);
+	return (ret);
 }
 
 /*
