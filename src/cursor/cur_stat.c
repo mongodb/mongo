@@ -47,7 +47,7 @@ __curstat_get_key(WT_CURSOR *cursor, ...)
 	CURSOR_API_CALL_NOCONF(cursor, session, get_key, cst->btree);
 	va_start(ap, cursor);
 
-	WT_CURSOR_NEEDKEY(cursor);
+	WT_ERR(WT_CURSOR_NEEDKEY(cursor));
 
 	if (F_ISSET(cursor, WT_CURSTD_RAW)) {
 		WT_ERR(__wt_struct_size(
@@ -85,7 +85,7 @@ __curstat_get_value(WT_CURSOR *cursor, ...)
 	CURSOR_API_CALL_NOCONF(cursor, session, get_value, cst->btree);
 	va_start(ap, cursor);
 
-	WT_CURSOR_NEEDVALUE(cursor);
+	WT_ERR(WT_CURSOR_NEEDVALUE(cursor));
 
 	if (F_ISSET(cursor, WT_CURSTD_RAW)) {
 		WT_ERR(__wt_struct_size(session, &size, cursor->value_format,
@@ -252,7 +252,7 @@ __curstat_search(WT_CURSOR *cursor)
 	cst = (WT_CURSOR_STAT *)cursor;
 	CURSOR_API_CALL_NOCONF(cursor, session, search, cst->btree);
 
-	WT_CURSOR_NEEDKEY(cursor);
+	WT_ERR(WT_CURSOR_NEEDKEY(cursor));
 	F_CLR(cursor, WT_CURSTD_VALUE_SET);
 
 	if (cst->key < 0 || cst->key >= cst->stats_count)
@@ -324,6 +324,7 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 		__wt_cursor_notsup,	/* update */
 		__wt_cursor_notsup,	/* remove */
 		__curstat_close,
+		NULL,			/* compare */
 		{ NULL, NULL },		/* TAILQ_ENTRY q */
 		0,			/* recno key */
 		{ 0 },			/* recno raw buffer */

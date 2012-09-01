@@ -440,6 +440,46 @@ err:	__cursor_func_resolve(cbt, ret);
 }
 
 /*
+ * __wt_btcur_compare --
+ *	Return a comparison between two cursors.
+ */
+int
+__wt_btcur_compare(WT_CURSOR_BTREE *a_arg, WT_CURSOR_BTREE *b_arg, int *cmpp)
+{
+	WT_BTREE *btree;
+	WT_CURSOR *a, *b;
+	WT_SESSION_IMPL *session;
+
+	a = (WT_CURSOR *)a_arg;
+	b = (WT_CURSOR *)b_arg;
+	btree = a_arg->btree;
+	session = (WT_SESSION_IMPL *)a->session;
+
+	switch (btree->type) {
+	case BTREE_COL_FIX:
+	case BTREE_COL_VAR:
+		/*
+		 * Compare the interface's cursor record, not the underlying
+		 * cursor reference: the interface's cursor reference is the
+		 * one being returned to the application.
+		 */
+		if (a->recno < b->recno)
+			*cmpp = -1;
+		else if (a->recno == b->recno)
+			*cmpp = 0;
+		else
+			*cmpp = 1;
+		break;
+	case BTREE_ROW:
+		WT_RET(WT_BTREE_CMP(
+		    session, btree, &a->key, &b->key, *cmpp));
+		break;
+	WT_ILLEGAL_VALUE(session);
+	}
+	return (0);
+}
+
+/*
  * __cursor_equals --
  *	Return if two cursors reference the same row.
  */
@@ -451,7 +491,7 @@ __cursor_equals(WT_CURSOR_BTREE *a, WT_CURSOR_BTREE *b)
 	case BTREE_COL_VAR:
 		/*
 		 * Compare the interface's cursor record, not the underlying
-		 * cursor reference: the underlying cursor reference is the
+		 * cursor reference: the interface's cursor reference is the
 		 * one being returned to the application.
 		 */
 		if (((WT_CURSOR *)a)->recno == ((WT_CURSOR *)b)->recno)
@@ -633,14 +673,30 @@ __wt_btcur_truncate(WT_CURSOR_BTREE *start, WT_CURSOR_BTREE *stop)
 
 	switch (btree->type) {
 	case BTREE_COL_FIX:
-		ret = __cursor_truncate_fix(
-		    session, start, stop, __wt_col_modify);
+		WT_RET(__cursor_truncate_fix(
+		    session, start, stop, __wt_col_modify));
 		break;
 	case BTREE_COL_VAR:
-		ret = __cursor_truncate(session, start, stop, __wt_col_modify);
+		WT_RET(__cursor_truncate(
+		    session, start, stop, __wt_col_modify));
 		break;
 	case BTREE_ROW:
-		ret = __cursor_truncate(session, start, stop, __wt_row_modify);
+		/*
+		 * The underlying cursor comparison routine requires cursors be
+		 * fully instantiated when truncating row-store objects because
+		 * it's comparing page and/or skiplist positions, not keys. (Key
+		 * comparison would work, it's only that a key comparison would
+		 * be relatively expensive.  Column-store objects have record
+		 * number keys, so the key comparison is cheap.)  Cursors may
+		 * have only had their keys set, so we must ensure the cursors
+		 * are positioned in the tree.
+		 */
+		if (start != NULL)
+			WT_RET(__wt_btcur_search(start));
+		if (stop != NULL)
+			WT_RET(__wt_btcur_search(stop));
+		WT_RET(__cursor_truncate(
+		    session, start, stop, __wt_row_modify));
 		break;
 	}
 	return (ret);

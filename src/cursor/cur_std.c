@@ -36,6 +36,8 @@ __wt_cursor_set_notsup(WT_CURSOR *cursor)
 	cursor->insert = __wt_cursor_notsup;
 	cursor->update = __wt_cursor_notsup;
 	cursor->remove = __wt_cursor_notsup;
+	cursor->compare =
+	    (int (*)(WT_CURSOR *, WT_CURSOR *, int *))__wt_cursor_notsup;
 }
 
 /*
@@ -136,7 +138,7 @@ __wt_cursor_get_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 	const char *fmt;
 
 	CURSOR_API_CALL_NOCONF(cursor, session, get_key, NULL);
-	WT_CURSOR_NEEDKEY(cursor);
+	WT_ERR(WT_CURSOR_NEEDKEY(cursor));
 
 	if (WT_CURSOR_RECNO(cursor)) {
 		if (LF_ISSET(WT_CURSTD_RAW)) {
@@ -247,7 +249,7 @@ __wt_cursor_get_value(WT_CURSOR *cursor, ...)
 	va_list ap;
 
 	CURSOR_API_CALL_NOCONF(cursor, session, get_value, NULL);
-	WT_CURSOR_NEEDVALUE(cursor);
+	WT_ERR(WT_CURSOR_NEEDVALUE(cursor));
 
 	va_start(ap, cursor);
 	fmt = F_ISSET(cursor,
@@ -344,17 +346,19 @@ __cursor_equals(WT_CURSOR *cursor, WT_CURSOR *other, int *equalp)
 	 * Confirm both cursors refer to the same source, then retrieve their
 	 * raw keys and compare them.
 	 */
-	if (strcmp(cursor->uri, other->uri) == 0) {
-		/*
-		 * Don't clear (or allocate memory for) the WT_ITEM structures
-		 * because all that happens underneath is their data and size
-		 * fields are reset to reference the cursor's key.
-		 */
-		WT_ERR(__wt_cursor_get_raw_key(cursor, &aitem));
-		WT_ERR(__wt_cursor_get_raw_key(other, &bitem));
-		*equalp = (aitem.size == bitem.size &&
-		    memcmp(aitem.data, bitem.data, aitem.size) == 0) ? 1 : 0;
-	}
+	if (strcmp(cursor->uri, other->uri) != 0)
+		WT_ERR_MSG(session, EINVAL,
+		    "equality method cursors must reference the same object");
+
+	/*
+	 * Don't clear (or allocate memory for) the WT_ITEM structures because
+	 * all that happens underneath is their data and size fields are reset
+	 * to reference the cursor's key.
+	 */
+	WT_ERR(__wt_cursor_get_raw_key(cursor, &aitem));
+	WT_ERR(__wt_cursor_get_raw_key(other, &bitem));
+	*equalp = (aitem.size == bitem.size &&
+	    memcmp(aitem.data, bitem.data, aitem.size) == 0) ? 1 : 0;
 
 err:	API_END(session);
 	return (ret);
@@ -506,6 +510,9 @@ __wt_cursor_init(WT_CURSOR *cursor,
 		cursor->remove = __wt_cursor_notsup;
 	if (cursor->close == NULL)
 		WT_RET_MSG(session, EINVAL, "cursor lacks a close method");
+	if (cursor->compare == NULL)
+		cursor->compare = (int (*)
+		    (WT_CURSOR *, WT_CURSOR *, int *))__wt_cursor_notsup;
 
 	if (cursor->uri == NULL)
 		WT_RET(__wt_strdup(session, uri, &cursor->uri));

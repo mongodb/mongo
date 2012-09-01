@@ -35,15 +35,20 @@ from helper import confirm_empty,\
     value_populate_complex, complex_populate
 from wtscenario import multiply_scenarios, number_scenarios
 
-# Test session.truncate
-#       Simple, one-off tests.
-class test_truncate_standalone(wttest.WiredTigerTestCase):
+# Test truncation arguments.
+class test_truncate_arguments(wttest.WiredTigerTestCase):
+    name = 'test_truncate'
+
+    scenarios = [
+        ('file', dict(type='file:')),
+        ('table', dict(type='table:'))
+    ]
 
     # Test truncation without URI or cursors specified, or with a URI and
     # either cursor specified, expect errors.
     def test_truncate_bad_args(self):
-        uri = 'file:xxx'
-        simple_populate(self, uri, 'key_format=S', 10)
+        uri = self.type + self.name
+        simple_populate(self, uri, 'key_format=S', 100)
         msg = '/either a URI or start/stop cursors/'
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.truncate(None, None, None, None), msg)
@@ -52,6 +57,28 @@ class test_truncate_standalone(wttest.WiredTigerTestCase):
             lambda: self.session.truncate(uri, cursor, None, None), msg)
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.truncate(uri, None, cursor, None), msg)
+
+    # Test truncation of cursors where no key is set, expect errors.
+    def test_truncate_cursor_notset(self):
+        uri = self.type + self.name
+        simple_populate(self, uri, 'key_format=S', 100)
+        c1 = self.session.open_cursor(uri, None)
+        c2 = self.session.open_cursor(uri, None)
+        c2.set_key(key_populate(c2, 10))
+        msg = '/requires key be set/'
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.session.truncate(None, c1, c2, None), msg)
+        c1.close()
+        c2.close()
+
+        c1 = self.session.open_cursor(uri, None)
+        c1.set_key(key_populate(c1, 10))
+        c2 = self.session.open_cursor(uri, None)
+        msg = '/requires key be set/'
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.session.truncate(None, c1, c2, None), msg)
+        c1.close()
+        c2.close()
 
 
 # Test truncation of an object using its URI.
@@ -77,6 +104,37 @@ class test_truncate_uri(wttest.WiredTigerTestCase):
             self.session.truncate(uri, None, None, None)
             confirm_empty(self, uri)
             self.session.drop(uri, None)
+
+
+# Test truncation of cursors in an illegal order.
+class test_truncate_cursor_order(wttest.WiredTigerTestCase):
+    name = 'test_truncate'
+
+    types = [
+        ('file', dict(type='file:')),
+        ('table', dict(type='table:'))
+    ]
+    keyfmt = [
+        ('integer', dict(keyfmt='i')),
+        ('recno', dict(keyfmt='r')),
+        ('string', dict(keyfmt='S')),
+    ]
+    scenarios = number_scenarios(multiply_scenarios('.', types, keyfmt))
+
+    # Test an illegal order, then confirm that equal cursors works.
+    def test_truncate_cursor_order(self):
+        uri = self.type + self.name
+        simple_populate(self, uri, 'key_format=' + self.keyfmt, 100)
+        c1 = self.session.open_cursor(uri, None)
+        c2 = self.session.open_cursor(uri, None)
+
+        c1.set_key(key_populate(c1, 20))
+        c2.set_key(key_populate(c2, 10))
+        msg = '/the start cursor position is after the stop cursor position/'
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.session.truncate(None, c1, c2, None), msg)
+        c2.set_key(key_populate(c2, 20))
+        self.session.truncate(None, c1, c2, None)
 
 
 # Test session.truncate.

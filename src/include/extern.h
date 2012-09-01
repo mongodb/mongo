@@ -263,6 +263,9 @@ extern int __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exact);
 extern int __wt_btcur_insert(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_remove(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_update(WT_CURSOR_BTREE *cbt);
+extern int __wt_btcur_compare(WT_CURSOR_BTREE *a_arg,
+    WT_CURSOR_BTREE *b_arg,
+    int *cmpp);
 extern int __wt_btcur_truncate(WT_CURSOR_BTREE *start, WT_CURSOR_BTREE *stop);
 extern int __wt_btcur_close(WT_CURSOR_BTREE *cbt);
 extern int __wt_debug_addr(WT_SESSION_IMPL *session,

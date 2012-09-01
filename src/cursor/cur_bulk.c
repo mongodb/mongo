@@ -23,8 +23,8 @@ __curbulk_insert(WT_CURSOR *cursor)
 	btree = cbulk->cbt.btree;
 	CURSOR_API_CALL_NOCONF(cursor, session, insert, btree);
 	if (btree->type == BTREE_ROW)
-		WT_CURSOR_NEEDKEY(cursor);
-	WT_CURSOR_NEEDVALUE(cursor);
+		WT_ERR(WT_CURSOR_NEEDKEY(cursor));
+	WT_ERR(WT_CURSOR_NEEDVALUE(cursor));
 	WT_ERR(__wt_bulk_insert(cbulk));
 err:	API_END(session);
 
