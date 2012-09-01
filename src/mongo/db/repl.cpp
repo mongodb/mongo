@@ -491,7 +491,8 @@ namespace mongo {
     }
 
     /* grab initial copy of a database from the master */
-    void ReplSource::resync(const std::string& db) {
+    void ReplSource::resync(const std::string& dbName) {
+        const std::string db(dbName);   // need local copy of the name, we're dropping the original
         string dummyNs = resyncDrop( db.c_str(), "internal" );
         Client::Context ctx( dummyNs );
         {
