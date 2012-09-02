@@ -555,12 +555,12 @@ elif "win32" == os.sys.platform:
         env.Append( CPPDEFINES=[ "MONGO_USE_SRW_ON_WINDOWS" ] )
 
     for pathdir in env['ENV']['PATH'].split(os.pathsep):
-	if os.path.exists(os.path.join(pathdir, 'cl.exe')):
+        if os.path.exists(os.path.join(pathdir, 'cl.exe')):
             print( "found visual studio at " + pathdir )
-	    break
+            break
     else:
-	#use current environment
-	env['ENV'] = dict(os.environ)
+        #use current environment
+        env['ENV'] = dict(os.environ)
 
     env.Append( CPPDEFINES=[ "_UNICODE" ] )
     env.Append( CPPDEFINES=[ "UNICODE" ] )
