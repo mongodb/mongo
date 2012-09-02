@@ -138,7 +138,7 @@ namespace mongo {
          * @return true if a match is found.
          * @param orderedMatch set if it is an ordered match.
          */
-        virtual bool handleMatch( bool& orderedMatch, MatchDetails& details ) = 0;
+        virtual bool handleMatch( bool* orderedMatch, const MatchDetails& details ) = 0;
 
         /**
          * Write all matches into the buffer, overwriting existing data.
@@ -171,7 +171,7 @@ namespace mongo {
     public:
         OrderedBuildStrategy( const ParsedQuery &parsedQuery, const shared_ptr<Cursor> &cursor,
                              BufBuilder &buf );
-        virtual bool handleMatch( bool& orderedMatch, MatchDetails& details );
+        virtual bool handleMatch( bool* orderedMatch, const MatchDetails& details );
         virtual int bufferedMatches() const { return _bufferedMatches; }
     private:
         int _skip;
@@ -187,7 +187,7 @@ namespace mongo {
                                            const shared_ptr<Cursor>& cursor,
                                            BufBuilder& buf,
                                            const QueryPlanSummary& queryPlan );
-        virtual bool handleMatch( bool &orderedMatch, MatchDetails& details );
+        virtual bool handleMatch( bool* orderedMatch, const MatchDetails& details );
         /** Handle a match without performing deduping. */
         void _handleMatchNoDedup();
         virtual int rewriteMatches();
@@ -228,7 +228,7 @@ namespace mongo {
                             const shared_ptr<QueryOptimizerCursor> &cursor,
                             BufBuilder &buf );
         void init();
-        virtual bool handleMatch( bool &orderedMatch, MatchDetails &details );
+        virtual bool handleMatch( bool* orderedMatch, const MatchDetails& details );
         virtual int rewriteMatches();
         virtual int bufferedMatches() const;
         virtual void finishedFirstBatch();

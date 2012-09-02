@@ -329,14 +329,14 @@ namespace mongo {
     _bufferedMatches() {
     }
     
-    bool OrderedBuildStrategy::handleMatch( bool &orderedMatch, MatchDetails& details ) {
+    bool OrderedBuildStrategy::handleMatch( bool* orderedMatch, const MatchDetails& details ) {
         DiskLoc loc = _cursor->currLoc();
         if ( _cursor->getsetdup( loc ) ) {
-            return orderedMatch = false;
+            return *orderedMatch = false;
         }
         if ( _skip > 0 ) {
             --_skip;
-            return orderedMatch = false;
+            return *orderedMatch = false;
         }
         // Explain does not obey soft limits, so matches should not be buffered.
         if ( !_parsedQuery.isExplain() ) {
@@ -345,7 +345,7 @@ namespace mongo {
                                    ( _parsedQuery.showDiskLoc() ? &loc : 0 ) );
             ++_bufferedMatches;
         }
-        return orderedMatch = true;
+        return *orderedMatch = true;
     }
 
     ReorderBuildStrategy* ReorderBuildStrategy::make( const ParsedQuery& parsedQuery,
@@ -368,8 +368,8 @@ namespace mongo {
         _scanAndOrder.reset( newScanAndOrder( queryPlan ) );
     }
 
-    bool ReorderBuildStrategy::handleMatch( bool &orderedMatch, MatchDetails& details ) {
-        orderedMatch = false;
+    bool ReorderBuildStrategy::handleMatch( bool* orderedMatch, const MatchDetails& details ) {
+        *orderedMatch = false;
         if ( _cursor->getsetdup( _cursor->currLoc() ) ) {
             return false;
         }
@@ -430,11 +430,11 @@ namespace mongo {
                                                          QueryPlanSummary() ) );
     }
 
-    bool HybridBuildStrategy::handleMatch( bool &orderedMatch, MatchDetails& details ) {
+    bool HybridBuildStrategy::handleMatch( bool* orderedMatch, const MatchDetails& details ) {
         if ( !_queryOptimizerCursor->currentPlanScanAndOrderRequired() ) {
             return _orderedBuild.handleMatch( orderedMatch, details );
         }
-        orderedMatch = false;
+        *orderedMatch = false;
         return handleReorderMatch();
     }
     
@@ -519,7 +519,7 @@ namespace mongo {
             return false;
         }
         bool orderedMatch = false;
-        bool match = _builder->handleMatch( orderedMatch, details );
+        bool match = _builder->handleMatch( &orderedMatch, details );
         _explain->noteIterate( match, orderedMatch, true, false );
         return match;
     }
