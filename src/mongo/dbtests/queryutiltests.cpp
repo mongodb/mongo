@@ -1269,6 +1269,18 @@ namespace QueryUtilTests {
             }
         };
 
+        /** No field range is generated for an $atomic field.  SERVER-5354 */
+        class Atomic {
+        public:
+            void run() {
+                FieldRangeSet ranges( "", BSON( "a" << 1 << "$atomic" << 1 ), true, true );
+                // No range is computed for the '$atomic' field.
+                ASSERT( ranges.range( "$atomic" ).universal() );
+                // A standard equality range is computed for the 'a' field.
+                ASSERT( ranges.range( "a" ).equality() );
+            }
+        };
+
         namespace ElemMatch {
             
             /** Field ranges generated for the $elemMatch operator. */
@@ -2595,6 +2607,7 @@ namespace QueryUtilTests {
             add<FieldRangeSetTests::MatchPossibleForIndex>();
             add<FieldRangeSetTests::Subset>();
             add<FieldRangeSetTests::Prefixed>();
+            add<FieldRangeSetTests::Atomic>();
             add<FieldRangeSetTests::ElemMatch::Ranges>();
             add<FieldRangeSetTests::ElemMatch::TopLevelElements>();
             add<FieldRangeSetTests::ElemMatch::TopLevelNotElement>();

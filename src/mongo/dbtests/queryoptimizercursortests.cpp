@@ -3972,31 +3972,27 @@ namespace QueryOptimizerCursorTests {
             void run() {
                 // Matcher validation with an empty collection.
                 _cli.remove( ns(), BSONObj() );
-                // The historical behavior has been to generate a MsgAssertionException for the
-                // multiple cursors case, but it should be a UserException.
-                checkInvalidQueryAssertions<MsgAssertionException>();
+                checkInvalidQueryAssertions();
                 
                 // Matcher validation with a missing collection.
                 _cli.dropCollection( ns() );
-                checkInvalidQueryAssertions<UserException>();
+                checkInvalidQueryAssertions();
             }
         private:
-            template<class MultipleCursorException>
             static void checkInvalidQueryAssertions() {
                 Client::ReadContext ctx( ns() );
                 
                 // An invalid query generaing a single query plan asserts.
                 BSONObj invalidQuery = fromjson( "{$and:[{$atomic:true}]}" );
-                assertInvalidQueryAssertion<UserException>( invalidQuery );
+                assertInvalidQueryAssertion( invalidQuery );
                 
                 // An invalid query generating multiple query plans asserts.
                 BSONObj invalidIdQuery = fromjson( "{_id:0,$and:[{$atomic:true}]}" );
-                assertInvalidQueryAssertion<MultipleCursorException>( invalidIdQuery );                
+                assertInvalidQueryAssertion( invalidIdQuery );
             }
-            template<class Exception>
             static void assertInvalidQueryAssertion( const BSONObj &query ) {
                 ASSERT_THROWS( NamespaceDetailsTransient::getCursor( ns(), query, BSONObj() ),
-                              Exception );
+                               UserException );
             }
         };
         
