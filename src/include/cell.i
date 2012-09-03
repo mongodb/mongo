@@ -411,7 +411,7 @@ __wt_cell_unpack_safe(WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
 		WT_RET(__wt_vunpack_uint(
 		    &p, end == NULL ? 0 : (size_t)(end - p), &unpack->v));
 
-	/* Set addr and overflow flags. */
+	/* Set overflow flags. */
 	switch (unpack->raw) {
 	case WT_CELL_KEY_OVFL:
 	case WT_CELL_VALUE_OVFL:
