@@ -1441,7 +1441,8 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 				addr = &rp->modify->u.replace;
 				__rec_cell_build_addr(session,
 				    addr->addr, addr->size,
-				    addr->leaf_no_overflow,
+				    addr->leaf_no_overflow ?
+				    WT_CELL_ADDR_LNO : WT_CELL_ADDR,
 				    ref->u.recno);
 				val_set = 1;
 				break;
@@ -1469,7 +1470,8 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 				addr = ref->addr;
 				__rec_cell_build_addr(session,
 				    addr->addr, addr->size,
-				    addr->leaf_no_overflow,
+				    addr->leaf_no_overflow ?
+				    WT_CELL_ADDR_LNO : WT_CELL_ADDR,
 				    ref->u.recno);
 			} else {
 				__wt_cell_unpack(ref->addr, unpack);
@@ -2267,7 +2269,8 @@ page_deleted:			if (onpage_ovfl)
 				addr = &rp->modify->u.replace;
 				__rec_cell_build_addr(session,
 				    addr->addr, addr->size,
-				    addr->leaf_no_overflow, 0);
+				    addr->leaf_no_overflow ?
+				    WT_CELL_ADDR_LNO : WT_CELL_ADDR, 0);
 				val_set = 1;
 				break;
 			case WT_PM_REC_SPLIT:
@@ -2371,7 +2374,8 @@ page_deleted:			if (onpage_ovfl)
 				addr = ref->addr;
 				__rec_cell_build_addr(session,
 				    addr->addr, addr->size,
-				    addr->leaf_no_overflow, 0);
+				    addr->leaf_no_overflow ?
+				    WT_CELL_ADDR_LNO : WT_CELL_ADDR, 0);
 			} else {
 				__wt_cell_unpack(ref->addr, unpack);
 				val->buf.data = ref->addr;
@@ -2472,7 +2476,8 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 				addr = &rp->modify->u.replace;
 				__rec_cell_build_addr(session,
 				    addr->addr, addr->size,
-				    addr->leaf_no_overflow, 0);
+				    addr->leaf_no_overflow ?
+				    WT_CELL_ADDR_LNO : WT_CELL_ADDR, 0);
 				val_set = 1;
 				break;
 			case WT_PM_REC_SPLIT:
@@ -2519,7 +2524,8 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 				addr = ref->addr;
 				__rec_cell_build_addr(session,
 				    addr->addr, addr->size,
-				    addr->leaf_no_overflow, 0);
+				    addr->leaf_no_overflow ?
+				    WT_CELL_ADDR_LNO : WT_CELL_ADDR, 0);
 			} else {
 				__wt_cell_unpack(ref->addr, unpack);
 				val->buf.data = ref->addr;
@@ -3448,7 +3454,7 @@ __rec_cell_build_key(WT_SESSION_IMPL *session,
  */
 static void
 __rec_cell_build_addr(WT_SESSION_IMPL *session,
-    const void *addr, uint32_t size, u_int leaf_no_overflow, uint64_t recno)
+    const void *addr, uint32_t size, u_int cell_type, uint64_t recno)
 {
 	WT_KV *val;
 	WT_RECONCILE *r;
@@ -3472,7 +3478,7 @@ __rec_cell_build_addr(WT_SESSION_IMPL *session,
 	val->buf.data = addr;
 	val->buf.size = size;
 	val->cell_len = __wt_cell_pack_addr(
-	    &val->cell, leaf_no_overflow, recno, val->buf.size);
+	    &val->cell, cell_type, recno, val->buf.size);
 	val->len = val->cell_len + val->buf.size;
 }
 

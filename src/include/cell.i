@@ -24,7 +24,7 @@
  *
  * WT_PAGE_ROW_INT (row-store internal page):
  *	Keys and offpage-reference pairs (a WT_CELL_KEY or WT_CELL_KEY_OVFL
- * cell followed by a WT_CELL_{ADDR,ADDR_LNO} cell).
+ * cell followed by a WT_CELL_{ADDR,ADDR_DEL,ADDR_LNO} cell).
  *
  * WT_PAGE_ROW_LEAF (row-store leaf page):
  *	Keys with optional data cells (a WT_CELL_KEY or WT_CELL_KEY_OVFL cell,
@@ -45,9 +45,7 @@
  * Bits 1 and 2 are reserved for "short" key and data cells.  If bit 1 (but not
  * bit 2) is set, it's a short data item, less than 128 bytes in length, and the
  * other 7 bits are the length.   If bit 2 is set (but not bit 1), it's a short
- * key, less than 64 bytes in length, and the other 6 bits are the length.  The
- * 0x03 bit combination (setting both 0x01 and 0x02) is unused, but will require
- * code changes.
+ * key, less than 64 bytes in length, and the other 6 bits are the length.
  *
  * Bit 3 marks variable-length column store data with an associated run-length
  * counter or a record number: there is a uint64_t value immediately after the
@@ -55,16 +53,16 @@
  *
  * Bits 4 and 5 are unused.
  *
- * Bits 6-8 are for cell "types" (there are currently 7 cell types, we have a
- * single free type).
+ * Bits 6-8 are cell "types", there are 8, we have no unused slots.
  *
- * We can use bits 4 or 5 as single bits easily; we can use bits 4 and 5 as type
- * bits in a backward compatible way by adding bit 5 to the type mask and adding
- * new types that incorporate bit 5.
+ * The 0x03 bit combination (setting both 0x01 and 0x02) is unused, but would
+ * require code changes.  We can use bits 4 or 5 as single bits easily; we can
+ * use bits 4 and 5 as type bits in a backward compatible way by adding bit 5
+ * to the type mask and adding new types that incorporate bit 5.
  */
 #define	WT_CELL_VALUE_SHORT	0x001		/* Short data */
 #define	WT_CELL_KEY_SHORT	0x002		/* Short key */
-#define	WT_CELL_64V		0x004		/* RLE or recno */
+#define	WT_CELL_64V		0x004		/* associated recno or RLE */
 
 #define	WT_CELL_UNUSED_BIT4	0x008		/* Unused */
 #define	WT_CELL_UNUSED_BIT5	0x010		/* Unused */
@@ -76,13 +74,13 @@
  * to read leaf pages without overflow items in order to delete them.
  */
 #define	WT_CELL_ADDR		(0 << 5)	/* Block location */
-#define	WT_CELL_ADDR_LNO	(1 << 5)	/* Block location (lno) */
-#define	WT_CELL_DEL		(2 << 5)	/* Deleted */
-#define	WT_CELL_KEY		(3 << 5)	/* Key */
-#define	WT_CELL_KEY_OVFL	(4 << 5)	/* Key overflow */
-#define	WT_CELL_VALUE		(5 << 5)	/* Value */
-#define	WT_CELL_VALUE_OVFL	(6 << 5)	/* Value overflow */
-#define	WT_CELL_UNUSED_TYPE7	(7 << 5)	/* Unused */
+#define	WT_CELL_ADDR_DEL	(1 << 5)	/* Block location (deleted) */
+#define	WT_CELL_ADDR_LNO	(2 << 5)	/* Block location (lno) */
+#define	WT_CELL_DEL		(3 << 5)	/* Deleted value */
+#define	WT_CELL_KEY		(4 << 5)	/* Key */
+#define	WT_CELL_KEY_OVFL	(5 << 5)	/* Key overflow */
+#define	WT_CELL_VALUE		(6 << 5)	/* Value */
+#define	WT_CELL_VALUE_OVFL	(7 << 5)	/* Value overflow */
 #define	WT_CELL_TYPE(v)		((v) & 7 << 5)	/* Bits 6-8 */
 
 /*
@@ -119,7 +117,6 @@ struct __wt_cell_unpack {
 
 	uint8_t  raw;			/* Raw cell type (include "shorts") */
 	uint8_t  type;			/* Cell type */
-	uint8_t  lno;			/* 1/0: leaf page addr, no overflow */
 	uint8_t	 ovfl;			/* 1/0: cell is an overflow */
 };
 
@@ -139,18 +136,16 @@ struct __wt_cell_unpack {
  */
 static inline uint32_t
 __wt_cell_pack_addr(
-    WT_CELL *cell, u_int leaf_no_overflow, uint64_t recno, uint32_t size)
+    WT_CELL *cell, u_int cell_type, uint64_t recno, uint32_t size)
 {
-	uint8_t *p, type;
+	uint8_t *p;
 
 	p = cell->__chunk + 1;
 
-						/* Address type */
-	type = leaf_no_overflow ? WT_CELL_ADDR_LNO : WT_CELL_ADDR;
-	if (recno == 0)				/* Record number */
-		cell->__chunk[0] = type;
-	else {
-		cell->__chunk[0] = type | WT_CELL_64V;
+	if (recno == 0)				/* Cell type */
+		cell->__chunk[0] = cell_type;
+	else {					/* Cell type + record number */
+		cell->__chunk[0] = cell_type | WT_CELL_64V;
 		(void)__wt_vpack_uint(&p, 0, recno);
 	}
 						/* Length */
@@ -202,11 +197,11 @@ __wt_cell_pack_del(WT_CELL *cell, uint64_t rle)
 	uint8_t *p;
 
 	p = cell->__chunk + 1;
-	if (rle < 2) {				/* Type + RLE */
+	if (rle < 2) {				/* Type */
 		cell->__chunk[0] = WT_CELL_DEL;
 		return (1);
 	}
-
+						/* Type + RLE */
 	cell->__chunk[0] = WT_CELL_DEL | WT_CELL_64V;
 	(void)__wt_vpack_uint(&p, 0, rle);
 
@@ -316,7 +311,10 @@ __wt_cell_type(WT_CELL *cell)
 
 	type = WT_CELL_TYPE(cell->__chunk[0]);
 
-	return (type == WT_CELL_ADDR_LNO ? WT_CELL_ADDR : type);
+	if (type == WT_CELL_ADDR_DEL || type == WT_CELL_ADDR_LNO)
+		return (WT_CELL_ADDR);
+
+	return (type);
 }
 
 /*
@@ -358,7 +356,8 @@ __wt_cell_unpack_safe(WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
 		unpack->raw = WT_CELL_KEY_SHORT;
 	} else {
 		unpack->raw = WT_CELL_TYPE(cell->__chunk[0]);
-		if (unpack->raw == WT_CELL_ADDR_LNO)
+		if (unpack->raw == WT_CELL_ADDR_DEL ||
+		    unpack->raw == WT_CELL_ADDR_LNO)
 			unpack->type = WT_CELL_ADDR;
 		else
 			unpack->type = unpack->raw;
@@ -414,9 +413,6 @@ __wt_cell_unpack_safe(WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
 
 	/* Set addr and overflow flags. */
 	switch (unpack->raw) {
-	case WT_CELL_ADDR_LNO:
-		unpack->lno = 1;
-		break;
 	case WT_CELL_KEY_OVFL:
 	case WT_CELL_VALUE_OVFL:
 		unpack->ovfl = 1;
@@ -424,11 +420,12 @@ __wt_cell_unpack_safe(WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
 	}
 
 	/*
-	 * Deleted cells have known sizes, and no length bytes.
-	 * Address, key/data and overflow cells have data length bytes.
+	 * Deleted cells have known sizes, and no length bytes; everything else
+	 * has data length bytes.
 	 */
 	switch (unpack->raw) {
 	case WT_CELL_ADDR:
+	case WT_CELL_ADDR_DEL:
 	case WT_CELL_ADDR_LNO:
 	case WT_CELL_KEY:
 	case WT_CELL_KEY_OVFL:

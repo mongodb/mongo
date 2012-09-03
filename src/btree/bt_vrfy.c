@@ -299,7 +299,7 @@ recno_chk:	if (recno != vs->record_total + 1)
 		lno = 0;
 	else {
 		__wt_cell_unpack(page->ref->addr, unpack);
-		lno = unpack->lno ? 1 : 0;
+		lno = unpack->raw == WT_CELL_ADDR_LNO ? 1 : 0;
 	}
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
