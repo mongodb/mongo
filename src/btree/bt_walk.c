@@ -23,15 +23,15 @@ __wt_tree_walk_delete_rollback(WT_REF *ref)
 	 * If the page is still marked deleted, it's as we left it, reset the
 	 * state to on-disk and we're done.
 	 */
-	if (WT_ATOMIC_CAS(ref->state, WT_REF_DELETED, WT_REF_READING)) {
-		WT_PUBLISH(ref->state, WT_REF_DISK);
+	if (WT_ATOMIC_CAS(ref->state, WT_REF_DELETED, WT_REF_DISK))
 		return;
-	}
 
 	/*
 	 * The page is either instantiated or being instantiated -- wait for
 	 * the page to settle down, as needed, and then clean up the update
-	 * structures.
+	 * structures.  We don't need a hazard reference or anything on the
+	 * page because there are unresolved transactions, the page can't go
+	 * anywhere.
 	 */
 	while (ref->state != WT_REF_MEM)
 		__wt_yield();
