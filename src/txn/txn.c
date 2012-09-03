@@ -172,7 +172,7 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
  * __wt_txn_release --
  *	Release the resources associated with the current transaction.
  */
-int
+void
 __wt_txn_release(WT_SESSION_IMPL *session)
 {
 	WT_TXN *txn;
@@ -181,9 +181,6 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 	txn = &session->txn;
 	txn->mod_count = txn->modref_count = 0;
 	txn_state = &S2C(session)->txn_global.states[session->id];
-
-	if (!F_ISSET(txn, TXN_RUNNING))
-		WT_RET_MSG(session, EINVAL, "No transaction is active");
 
 	/* Clear the transaction's ID from the global table. */
 	WT_ASSERT(session, txn_state->id != WT_TXN_NONE &&
@@ -196,8 +193,6 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 	__wt_txn_release_snapshot(session);
 	txn->isolation = session->isolation;
 	F_CLR(txn, TXN_ERROR | TXN_RUNNING);
-
-	return (0);
 }
 
 /*
@@ -207,9 +202,16 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 int
 __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 {
+	WT_TXN *txn;
+
 	WT_UNUSED(cfg);
 
-	return (__wt_txn_release(session));
+	txn = &session->txn;
+	if (!F_ISSET(txn, TXN_RUNNING))
+		WT_RET_MSG(session, EINVAL, "No transaction is active");
+
+	__wt_txn_release(session);
+	return (0);
 }
 
 /*
@@ -227,6 +229,8 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_UNUSED(cfg);
 
 	txn = &session->txn;
+	if (!F_ISSET(txn, TXN_RUNNING))
+		WT_RET_MSG(session, EINVAL, "No transaction is active");
 
 	/* Rollback updates. */
 	for (i = 0, m = txn->mod; i < txn->mod_count; i++, m++)
@@ -236,7 +240,8 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
 	for (i = 0, rp = txn->modref; i < txn->modref_count; i++, rp++)
 		__wt_tree_walk_delete_rollback(*rp);
 
-	return (__wt_txn_release(session));
+	__wt_txn_release(session);
+	return (0);
 }
 
 /*
