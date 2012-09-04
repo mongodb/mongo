@@ -792,7 +792,7 @@ namespace mongo {
         if ( ! cc().getAuthenticationInfo()->isAuthorizedReads( nsToDatabase( cursor->ns() ) ) )
             return false;
 
-        // mustn't have an active ClientCursor::Pointer
+        // Must not have an active ClientCursor::Pin.
         massert( 16089,
                 str::stream() << "Cannot kill active cursor " << id,
                 cursor->_pinValue < 100 );

@@ -100,6 +100,9 @@ namespace mongo {
                 }
             }
             void release() {
+                if ( _cursorid == INVALID_CURSOR_ID ) {
+                    return;
+                }
                 ClientCursor *cursor = c();
                 _cursorid = INVALID_CURSOR_ID;
                 if ( cursor ) {
