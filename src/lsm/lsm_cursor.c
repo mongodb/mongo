@@ -25,7 +25,7 @@
  */
 #define	WT_LSM_ENTER(clsm, cursor, session, n)				\
 	clsm = (WT_CURSOR_LSM *)cursor;					\
-	CURSOR_API_CALL_NOCONF(cursor, session, next, NULL);		\
+	CURSOR_API_CALL_NOCONF(cursor, session, n, NULL);		\
 	WT_ERR(__clsm_enter(clsm))
 
 #define	WT_LSM_END(clsm, session)					\
