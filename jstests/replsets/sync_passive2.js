@@ -182,4 +182,34 @@ printjson(result);
 assert.eq(result.ok, 0);
 assert.eq(result.errmsg, "primaries don't sync");
 
+/**
+ * Check sync target re-evaluation:
+ * - Set member 3 to be slave delayed by 40 seconds.
+ * - Force 2 to sync from 3
+ * - Do some writes
+ * - Check who 2 is syncing from, it should be someone other than three after ~30 seconds
+ */
+print("check sync target re-evaluation");
+config = replTest.getReplSetConfig();
+config.members[3].slaveDelay = 40;
+config.members[3].priority = 0;
+config.version++;
+try {
+    replTest.getMaster().getDB("admin").runCommand({replSetReconfig:config});
+} catch (x) { /* expected */ }
+
+print("force 2 to sync from 3");
+replTest.nodes[2].getDB("admin").runCommand({replSetSyncFrom: replTest.host+":"+replTest.ports[3]});
+assert.soon(function() {
+    return checkSyncingFrom(nodes[2], replTest.host+":"+replTest.ports[3]);
+});
+
+print("do a write");
+replTest.getMaster().getDB("foo").bar.insert({x:1});
+
+print("check that 2 changes sync targets");
+assert.soon(function() {
+    return !checkSyncingFrom(nodes[2], replTest.host+":"+replTest.ports[3]);
+}, 'failed to change sync target', 60000);
+
 replTest.stopSet();

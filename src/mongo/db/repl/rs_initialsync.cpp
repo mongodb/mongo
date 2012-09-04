@@ -124,6 +124,11 @@ namespace mongo {
         d->emptyCappedCollection(rsoplog);
     }
 
+    bool Member::syncable() const {
+        bool buildIndexes = theReplSet ? theReplSet->buildIndexes() : true;
+        return hbinfo().up() && (config().buildIndexes || !buildIndexes) && state().readable();
+    }
+
     Member* ReplSetImpl::getMemberToSyncTo() {
         lock lk(this);
 
@@ -180,13 +185,7 @@ namespace mongo {
         // This loop attempts to set 'closest'.
         for (int attempts = 0; attempts < 2; ++attempts) {
             for (Member *m = _members.head(); m; m = m->next()) {
-                if (!m->hbinfo().up())
-                    continue;
-                // make sure members with buildIndexes sync from other members w/indexes
-                if (buildIndexes && !m->config().buildIndexes)
-                    continue;
-
-                if (!m->state().readable())
+                if (!m->syncable())
                     continue;
 
                 if (m->state() == MemberState::RS_SECONDARY) {
