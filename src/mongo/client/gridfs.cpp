@@ -58,7 +58,7 @@ namespace mongo {
         _chunkSize = DEFAULT_CHUNK_SIZE;
 
         client.ensureIndex( _filesNS , BSON( "filename" << 1 ) );
-        client.ensureIndex( _chunksNS , BSON( "files_id" << 1 << "n" << 1 ) );
+        client.ensureIndex( _chunksNS , BSON( "files_id" << 1 << "n" << 1 ) , /*unique=*/true );
     }
 
     GridFS::~GridFS() {
