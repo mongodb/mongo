@@ -23,16 +23,10 @@ typedef struct {
 
 	WT_ITEM	 dsk;			/* Temporary disk-image buffer */
 
-	/*
-	 * If we successfully write all of the changes to a page, we update the
-	 * page's disk generation to the write generation as of the start of
-	 * page reconciliation (marking the page clean, if the write generation
-	 * matches the disk generation).   However, if we have to skip a change
-	 * to the page for transactional reasons, we don't do this update, the
-	 * page can't be clean.
-	 */
-	uint32_t orig_write_gen;	/* Page's original write generation */
-	int	 upd_skipped;		/* If updates were skipped */
+	/* Track whether all changes to the page are written. */
+	uint32_t orig_write_gen;
+	int upd_skipped;
+	int upd_skip_fail;
 
 	/*
 	 * Track if reconciliation has seen any overflow items.  Leaf pages with
@@ -197,7 +191,7 @@ static int  __rec_split_init(WT_SESSION_IMPL *, WT_PAGE *, uint64_t, uint32_t);
 static int  __rec_split_row(WT_SESSION_IMPL *, WT_PAGE *, WT_PAGE **);
 static int  __rec_split_row_promote(WT_SESSION_IMPL *, uint8_t);
 static int  __rec_split_write(WT_SESSION_IMPL *, WT_BOUNDARY *, WT_ITEM *, int);
-static int  __rec_write_init(WT_SESSION_IMPL *, WT_PAGE *);
+static int  __rec_write_init(WT_SESSION_IMPL *, WT_PAGE *, uint32_t);
 static int  __rec_write_wrapup(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_write_wrapup_err(WT_SESSION_IMPL *, WT_PAGE *);
 
@@ -278,12 +272,26 @@ __rec_page_modified(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE **rpp)
 }
 
 /*
+ * __rec_txn_read --
+ *	Helper for transactional reads: fail fast if skipping updates.
+ */
+static inline int
+__rec_txn_read(WT_SESSION_IMPL *session, WT_UPDATE *upd, WT_UPDATE **updp)
+{
+	WT_RECONCILE *r;
+
+	r = session->reconcile;
+	*updp = __wt_txn_read_skip(session, upd, &r->upd_skipped);
+	return ((r->upd_skip_fail && r->upd_skipped) ? EBUSY : 0);
+}
+
+/*
  * __wt_rec_write --
  *	Reconcile an in-memory page into its on-disk format, and write it.
  */
 int
-__wt_rec_write(
-    WT_SESSION_IMPL *session, WT_PAGE *page, WT_SALVAGE_COOKIE *salvage)
+__wt_rec_write(WT_SESSION_IMPL *session,
+    WT_PAGE *page, WT_SALVAGE_COOKIE *salvage, uint32_t flags)
 {
 	WT_DECL_RET;
 
@@ -303,7 +311,7 @@ __wt_rec_write(
 		return (0);
 
 	/* Initialize the reconciliation structures for each new run. */
-	WT_RET(__rec_write_init(session, page));
+	WT_RET(__rec_write_init(session, page, flags));
 	WT_RET(__wt_rec_track_init(session, page));
 
 	/* Reconcile the page. */
@@ -407,7 +415,7 @@ __wt_rec_write(
 	__wt_page_modify_set(page);
 	F_CLR(page->modify, WT_PM_REC_SPLIT_MERGE);
 
-	WT_RET(__wt_rec_write(session, page, NULL));
+	WT_RET(__wt_rec_write(session, page, NULL, flags));
 
 	return (0);
 }
@@ -417,7 +425,7 @@ __wt_rec_write(
  *	Initialize the reconciliation structure.
  */
 static int
-__rec_write_init(WT_SESSION_IMPL *session, WT_PAGE *page)
+__rec_write_init(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 {
 	WT_BTREE *btree;
 	WT_CONFIG_ITEM cval;
@@ -473,6 +481,7 @@ __rec_write_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	/* Per-page reconciliation: track skipped updates. */
 	r->upd_skipped = 0;
+	r->upd_skip_fail = LF_ISSET(WT_REC_SINGLE) ? 0 : 1;
 
 	/* Per-page reconciliation: track overflow items. */
 	r->ovfl_items = 0;
@@ -1176,7 +1185,7 @@ __wt_rec_bulk_init(WT_CURSOR_BULK *cbulk)
 	btree = session->btree;
 	page = cbulk->leaf;
 
-	WT_RET(__rec_write_init(session, page));
+	WT_RET(__rec_write_init(session, page, 0));
 
 	switch (btree->type) {
 	case BTREE_COL_FIX:
@@ -1513,7 +1522,7 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	/* Update any changes to the original on-page data items. */
 	WT_SKIP_FOREACH(ins, WT_COL_UPDATE_SINGLE(page)) {
-		upd = __wt_txn_read_skip(session, ins->upd, &r->upd_skipped);
+		WT_RET(__rec_txn_read(session, ins->upd, &upd));
 		if (upd == NULL)
 			continue;
 		__bit_setv_recno(
@@ -1537,7 +1546,7 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 	/* Walk any append list. */
 	append = WT_COL_APPEND(page);
 	WT_SKIP_FOREACH(ins, append) {
-		upd = __wt_txn_read_skip(session, ins->upd, &r->upd_skipped);
+		WT_RET(__rec_txn_read(session, ins->upd, &upd));
 		if (upd == NULL)
 			continue;
 		for (;;) {
@@ -1784,7 +1793,7 @@ __rec_col_var(
 	WT_INSERT_HEAD *append;
 	WT_ITEM *last;
 	WT_RECONCILE *r;
-	WT_UPDATE *upd;
+	WT_UPDATE *next_upd, *upd;
 	uint64_t n, nrepeat, repeat_count, rle, slvg_missing, src_recno;
 	uint32_t i, size;
 	int deleted, last_deleted, orig_deleted, update_no_copy;
@@ -1844,9 +1853,12 @@ __rec_col_var(
 			nrepeat = __wt_cell_rle(unpack);
 
 			ins = WT_SKIP_FIRST(WT_COL_UPDATE(page, cip));
-			while (ins != NULL && __wt_txn_read_skip(
-			    session, ins->upd, &r->upd_skipped) == NULL)
+			while (ins != NULL) {
+				WT_ERR(__rec_txn_read(session, ins->upd, &upd));
+				if (upd != NULL)
+					break;
 				ins = WT_SKIP_NEXT(ins);
+			}
 
 			/*
 			 * If the original value is "deleted", there's no value
@@ -1908,14 +1920,15 @@ record_loop:	/*
 		    n < nrepeat; n += repeat_count, src_recno += repeat_count) {
 			if (ins != NULL &&
 			    WT_INSERT_RECNO(ins) == src_recno) {
-				upd = __wt_txn_read_skip(
-				    session, ins->upd, &r->upd_skipped);
+				WT_ERR(__rec_txn_read(session, ins->upd, &upd));
 				WT_ASSERT(session, upd != NULL);
 				do {
 					ins = WT_SKIP_NEXT(ins);
-				} while (ins != NULL &&
-				    __wt_txn_read_skip(session,
-				    ins->upd, &r->upd_skipped) == NULL);
+					if (ins == NULL)
+						break;
+					WT_ERR(__rec_txn_read(
+					    session, ins->upd, &next_upd));
+				} while (next_upd == NULL);
 
 				update_no_copy = 1;	/* No data copy */
 
@@ -2066,7 +2079,7 @@ compare:		/*
 	/* Walk any append list. */
 	append = WT_COL_APPEND(page);
 	WT_SKIP_FOREACH(ins, append) {
-		upd = __wt_txn_read_skip(session, ins->upd, &r->upd_skipped);
+		WT_ERR(__rec_txn_read(session, ins->upd, &upd));
 		if (upd == NULL)
 			continue;
 		for (n = WT_INSERT_RECNO(ins); src_recno <= n; ++src_recno) {
@@ -2752,8 +2765,7 @@ __rec_row_leaf(
 		/* Build value cell. */
 		if ((val_cell = __wt_row_value(page, rip)) != NULL)
 			__wt_cell_unpack(val_cell, unpack);
-		upd = __wt_txn_read_skip(
-		    session, WT_ROW_UPDATE(page, rip), &r->upd_skipped);
+		WT_ERR(__rec_txn_read(session, WT_ROW_UPDATE(page, rip), &upd));
 		if (upd == NULL) {
 			/*
 			 * Copy the item off the page -- however, when the page
@@ -3006,7 +3018,7 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_INSERT *ins)
 
 	for (; ins != NULL; ins = WT_SKIP_NEXT(ins)) {
 		/* Build value cell. */
-		upd = __wt_txn_read_skip(session, ins->upd, &r->upd_skipped);
+		WT_RET(__rec_txn_read(session, ins->upd, &upd));
 		if (upd == NULL || WT_UPDATE_DELETED_ISSET(upd))
 			continue;
 		if (upd->size == 0)
@@ -3343,9 +3355,11 @@ __rec_write_wrapup_err(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 */
 	WT_TRET(__wt_rec_track_wrapup_err(session, page));
 	for (bnd = r->bnd, i = 0; i < r->bnd_next; ++bnd, ++i)
-		if (bnd->addr.addr != NULL)
+		if (bnd->addr.addr != NULL) {
 			WT_TRET(__wt_bm_free(
 			    session, bnd->addr.addr, bnd->addr.size));
+			bnd->addr.addr = NULL;
+		}
 	return (ret);
 }
 

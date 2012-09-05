@@ -146,6 +146,22 @@ __wt_txn_visible(WT_SESSION_IMPL *session, wt_txnid_t id)
 }
 
 /*
+ * __wt_txn_visible_all --
+ *	Check if a given transaction ID is "globally visible".  This is, if
+ *      all sessions in the system will see the transaction ID.
+ */
+static inline int
+__wt_txn_visible_all(WT_SESSION_IMPL *session, wt_txnid_t id)
+{
+	WT_TXN *txn;
+
+	txn = &session->txn;
+	if (TXNID_LT(txn->oldest_snap_min, id))
+		return (0);
+	return (1);
+}
+
+/*
  * __wt_txn_read_skip --
  *	Get the first visible update in a list (or NULL if none are visible),
  *	and report whether uncommitted changes were skipped.
@@ -249,16 +265,17 @@ __wt_txn_read_first(WT_SESSION_IMPL *session)
 	 * the oldest reader in the system can be tracked.  This prevents any
 	 * update the we are reading from being trimmed to save memory.
 	 */
-	if (!F_ISSET(txn, TXN_RUNNING)) {
-		WT_ASSERT(session, txn_state->id == WT_TXN_NONE &&
-		    !F_ISSET(txn_state, TXN_STATE_RUNNING));
-		txn_state->id = txn_global->current;
-	}
+	WT_ASSERT(session, F_ISSET(txn, TXN_RUNNING) ||
+	    (txn_state->id == WT_TXN_NONE &&
+	    txn_state->snap_min == WT_TXN_NONE));
 
 	if (txn->isolation == TXN_ISO_READ_COMMITTED ||
 	    (!F_ISSET(txn, TXN_RUNNING) &&
-	    txn->isolation == TXN_ISO_SNAPSHOT))
+	    txn->isolation == TXN_ISO_SNAPSHOT)) {
 		__wt_txn_get_snapshot(session, WT_TXN_NONE);
+		txn_state->snap_min = txn->snap_min;
+	} else if (!F_ISSET(txn, TXN_RUNNING))
+		txn_state->snap_min = txn_global->current;
 }
 
 /*
@@ -274,18 +291,10 @@ __wt_txn_read_last(WT_SESSION_IMPL *session)
 	txn = &session->txn;
 	txn_state = &S2C(session)->txn_global.states[session->id];
 
-	/*
-	 * If there is no transaction running, release the ID we put in the
-	 * global table.
-	 */
-	if (!F_ISSET(txn, TXN_RUNNING)) {
-		WT_ASSERT(session, txn_state->id != WT_TXN_NONE &&
-		    !F_ISSET(txn_state, TXN_STATE_RUNNING));
-		txn_state->id = WT_TXN_NONE;
-	}
-
+	/* Release the snap_min ID we put in the global table. */
 	if (txn->isolation == TXN_ISO_READ_COMMITTED ||
-	    (!F_ISSET(txn, TXN_RUNNING) &&
-	    txn->isolation == TXN_ISO_SNAPSHOT))
+	    !F_ISSET(txn, TXN_RUNNING)) {
 		__wt_txn_release_snapshot(session);
+		txn_state->snap_min = WT_TXN_NONE;
+	}
 }
