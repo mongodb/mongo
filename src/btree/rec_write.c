@@ -3110,9 +3110,11 @@ __rec_write_wrapup_err(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 */
 	WT_TRET(__wt_rec_track_wrapup_err(session, page));
 	for (bnd = r->bnd, i = 0; i < r->bnd_next; ++bnd, ++i)
-		if (bnd->addr.addr != NULL)
+		if (bnd->addr.addr != NULL) {
 			WT_TRET(__wt_bm_free(
 			    session, bnd->addr.addr, bnd->addr.size));
+			bnd->addr.addr = NULL;
+		}
 	return (ret);
 }
 
