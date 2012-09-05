@@ -879,6 +879,9 @@ __debug_cell(WT_DBG *ds, WT_PAGE_HEADER *dsk, WT_CELL_UNPACK *unpack)
 	case WT_CELL_ADDR:
 		type = "addr";
 		goto addr;
+	case WT_CELL_ADDR_DEL:
+		type = "addr/del";
+		goto addr;
 	case WT_CELL_ADDR_LNO:
 		type = "addr/lno";
 		goto addr;
@@ -921,6 +924,9 @@ __debug_cell_data(WT_DBG *ds, const char *tag, WT_CELL_UNPACK *unpack)
 	switch (unpack->raw) {
 	case WT_CELL_ADDR:
 		__debug_item(ds, tag, "addr", strlen("addr"));
+		break;
+	case WT_CELL_ADDR_DEL:
+		__debug_item(ds, tag, "addr/del", strlen("addr/del"));
 		break;
 	case WT_CELL_ADDR_LNO:
 		__debug_item(ds, tag, "addr/lno", strlen("addr/lno"));
