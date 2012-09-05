@@ -50,11 +50,9 @@ config_setup(void)
 		case 1:
 			config_single("data_source=table", 0);
 			break;
-		/* LSM isn't implemented yet.
 		case 2:
 			config_single("data_source=lsm", 0);
 			break;
-		*/
 		}
 	}
 
@@ -87,6 +85,20 @@ config_setup(void)
 		for (cp = c; cp->name != NULL; ++cp)
 			if (cp->flags & C_OPS)
 				*cp->v = 0;
+
+	/* LSM trees are only compatible with row store tables. */
+	if (g.c_file_type != ROW &&
+	    strncmp(g.c_data_source, "lsm", strlen("lsm")) == 0) {
+		cp = config_find("file_type", strlen("file_type"));
+		if (!(cp->flags & C_PERM))
+			config_single("file_type=row", 0);
+		else {
+			fprintf(stderr,
+	    "%s: LSM data source is only compatible with row file_type\n",
+			    g.progname);
+			exit(EXIT_FAILURE);
+		}
+	}
 
 	/* Multi-threaded runs cannot be replayed. */
 	if (g.replay && g.c_threads != 1) {

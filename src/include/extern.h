@@ -304,7 +304,8 @@ extern int __wt_btree_open(WT_SESSION_IMPL *session,
 extern int __wt_btree_close(WT_SESSION_IMPL *session);
 extern int __wt_btree_tree_open(WT_SESSION_IMPL *session, WT_ITEM *dsk);
 extern int __wt_btree_root_empty(WT_SESSION_IMPL *session, WT_PAGE **leafp);
-extern int __wt_btree_get_memsize(WT_SESSION_IMPL *session,
+extern int __wt_btree_get_memsize( WT_SESSION_IMPL *session,
+    WT_BTREE *btree,
     uint32_t **memsizep);
 extern int __wt_btree_release_memsize(WT_SESSION_IMPL *session,
     WT_BTREE *btree);

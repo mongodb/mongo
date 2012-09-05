@@ -159,8 +159,8 @@ __lsm_tree_open(
 
 	WT_ERR(__wt_lsm_meta_read(session, lsm_tree));
 
-	/* Create an in-memory chunk. */
-	WT_ERR(__wt_lsm_tree_switch(session, lsm_tree));
+	/* Set the generation number so cursors are opened on first usage. */
+	lsm_tree->dsk_gen = 1;
 
 	lsm_tree->conn = S2C(session);
 	WT_ERR(__wt_thread_create(

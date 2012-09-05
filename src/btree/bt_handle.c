@@ -393,12 +393,12 @@ __wt_btree_root_empty(WT_SESSION_IMPL *session, WT_PAGE **leafp)
  *      Access the size of an in-memory tree with a single leaf page.
  */
 int
-__wt_btree_get_memsize(WT_SESSION_IMPL *session, uint32_t **memsizep)
+__wt_btree_get_memsize(
+    WT_SESSION_IMPL *session, WT_BTREE *btree, uint32_t **memsizep)
 {
-	WT_BTREE *btree;
 	WT_PAGE *root, *child;
 
-	btree = session->btree;
+	WT_UNUSED(session);
 	root = btree->root_page;
 
 	if (root->entries != 1)

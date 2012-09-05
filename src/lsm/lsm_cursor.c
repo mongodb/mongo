@@ -143,11 +143,6 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm)
 
 		/* Child cursors always use overwrite and raw mode. */
 		F_SET(*cp, WT_CURSTD_OVERWRITE | WT_CURSTD_RAW);
-
-		/* Peek into the btree layer to track the in-memory size. */
-		if (i == clsm->nchunks - 1 && lsm_tree->memsizep == NULL)
-			WT_ERR(__wt_btree_get_memsize(
-			    session, &lsm_tree->memsizep));
 	}
 
 err:	__wt_spin_unlock(session, &lsm_tree->lock);
@@ -554,6 +549,15 @@ __clsm_put(
 	 */
 	F_CLR(clsm, WT_CLSM_ITERATE_PREV | WT_CLSM_ITERATE_NEXT);
 	clsm->current = primary;
+	btree = ((WT_CURSOR_BTREE *)primary)->btree;
+
+	/*
+	 * Peek into the btree layer to find the in-memory size. Create a 
+	 * tree if the current one is empty.
+	 */
+	if (lsm_tree->memsizep == NULL && __wt_btree_get_memsize(
+	    session, btree, &lsm_tree->memsizep) == WT_ERROR)
+		WT_RET(__wt_lsm_tree_switch(session, lsm_tree));
 
 	if ((memsizep = lsm_tree->memsizep) != NULL &&
 	    *memsizep > lsm_tree->threshold) {
@@ -565,7 +569,6 @@ __clsm_put(
 		 * to move some operations (such as clearing the
 		 * "cache_resident" flag) into the worker thread.
 		 */
-		btree = ((WT_CURSOR_BTREE *)primary)->btree;
 		WT_RET(__clsm_close_cursors(clsm));
 		WT_RET(__wt_btree_release_memsize(session, btree));
 
