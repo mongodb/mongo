@@ -419,7 +419,9 @@ namespace mongo {
                 log() << "replSet set minValid=" << minValid["ts"]._opTime().toString() << rsLog;
             }
             catch(...) { }
-            Helpers::putSingleton("local.replset.minvalid", minValid);
+
+            theReplSet->setMinValid(minValid);
+
             cx.ctx().db()->flushFiles(true);
         }
 

@@ -304,18 +304,6 @@ namespace mongo {
         bson::bo goodVersionOfObject;
     };
 
-    static void setMinValid(bo newMinValid) {
-        try {
-            log() << "replSet minvalid=" << newMinValid["ts"]._opTime().toStringLong() << rsLog;
-        }
-        catch(...) { }
-        {
-            Helpers::putSingleton("local.replset.minvalid", newMinValid);
-            Client::Context cx( "local." );
-            cx.db()->flushFiles(true);
-        }
-    }
-
     void ReplSetImpl::syncFixUp(HowToFixUp& h, OplogReader& r) {
         DBClientConnection *them = r.conn();
 
@@ -378,6 +366,7 @@ namespace mongo {
 
         /* we have items we are writing that aren't from a point-in-time.  thus best not to come online
            until we get to that point in freshness. */
+        log() << "replSet minvalid=" << newMinValid["ts"]._opTime().toStringLong() << rsLog;
         setMinValid(newMinValid);
 
         /** any full collection resyncs required? */
@@ -411,6 +400,7 @@ namespace mongo {
                         err = "can't get minvalid from primary";
                     }
                     else {
+                        log() << "replSet minvalid=" << newMinValid["ts"]._opTime().toStringLong() << rsLog;
                         setMinValid(newMinValid);
                     }
                 }

@@ -541,7 +541,7 @@ namespace mongo {
         void syncRollback(OplogReader& r);
         void syncThread();
         const OpTime lastOtherOpTime() const;
-
+        static void setMinValid(BSONObj obj);
     private:
         IndexPrefetchConfig _indexPrefetchConfig;
     };
