@@ -79,9 +79,6 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 	 * the WT_INSERT structure.
 	 */
 	if (cbt->compare == 0 && cbt->ins != NULL) {
-		/* Discard obsolete WT_UPDATE structures. */
-		__wt_update_obsolete(session, page, cbt->ins);
-
 		/* Make sure the update can proceed. */
 		WT_ERR(__wt_update_check(session, page, cbt->ins->upd));
 
@@ -309,4 +306,33 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session)
 		btree->last_recno = recno;
 
 err:	__wt_session_serialize_wrapup(session, page, ret);
+}
+
+/*
+ * __wt_col_leaf_obsolete --
+ *	Discard all obsolete updates on a column-store leaf page.
+ */
+void
+__wt_col_leaf_obsolete(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	WT_INSERT *ins;
+	WT_COL *cip;
+	uint32_t i;
+
+	switch (page->type) {
+	case WT_PAGE_COL_FIX:
+		WT_SKIP_FOREACH(ins, WT_COL_UPDATE_SINGLE(page))
+			__wt_update_obsolete(session, page, ins->upd);
+		break;
+
+	case WT_PAGE_COL_VAR:
+		WT_COL_FOREACH(page, cip, i)
+			WT_SKIP_FOREACH(ins, WT_COL_UPDATE(page, cip))
+				__wt_update_obsolete(session, page, ins->upd);
+		break;
+	}
+
+	/* Walk any append list. */
+	WT_SKIP_FOREACH(ins, WT_COL_APPEND(page))
+		__wt_update_obsolete(session, page, ins->upd);
 }

@@ -232,6 +232,7 @@ static int
 __rec_review(WT_SESSION_IMPL *session,
     WT_REF *ref, WT_PAGE *page, uint32_t flags, int top)
 {
+	WT_DECL_RET;
 	WT_PAGE_MODIFY *mod;
 	uint32_t i;
 
@@ -311,10 +312,20 @@ __rec_review(WT_SESSION_IMPL *session,
 	/* If the page is dirty, write it so we know the final state. */
 	if (__wt_page_is_modified(page) &&
 	    !F_ISSET(mod, WT_PM_REC_SPLIT_MERGE)) {
-		WT_RET(__wt_rec_write(session, page, NULL));
+		if ((ret = __wt_rec_write(session, page, NULL, flags)) == EBUSY)
+			switch (page->type) {
+			case WT_PAGE_COL_FIX:
+			case WT_PAGE_COL_VAR:
+				__wt_col_leaf_obsolete(session, page);
+				break;
+			case WT_PAGE_ROW_LEAF:
+				__wt_row_leaf_obsolete(session, page);
+				break;
+			}
+		WT_RET(ret);
 
 		/* If there are unwritten changes on the page, give up. */
-		if (__wt_page_is_modified(page)) {
+		if (!LF_ISSET(WT_REC_SINGLE) && __wt_page_is_modified(page)) {
 			WT_VERBOSE_RET(session, evict,
 			    "page %p written but not clean", page);
 			return (EBUSY);

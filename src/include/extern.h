@@ -358,6 +358,7 @@ extern int __wt_col_modify(WT_SESSION_IMPL *session,
     WT_CURSOR_BTREE *cbt,
     int op);
 extern void __wt_col_append_serial_func(WT_SESSION_IMPL *session);
+extern void __wt_col_leaf_obsolete(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_col_search(WT_SESSION_IMPL *session,
     WT_CURSOR_BTREE *cbt,
     int is_modify);
@@ -393,9 +394,10 @@ extern int __wt_rec_track_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_rec_track_wrapup_err(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern void __wt_rec_track_discard(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern char *__wt_track_string(WT_PAGE_TRACK *track, char *buf, size_t len);
-extern int __wt_rec_write( WT_SESSION_IMPL *session,
+extern int __wt_rec_write(WT_SESSION_IMPL *session,
     WT_PAGE *page,
-    WT_SALVAGE_COOKIE *salvage);
+    WT_SALVAGE_COOKIE *salvage,
+    uint32_t flags);
 extern void __wt_rec_destroy(WT_SESSION_IMPL *session);
 extern int __wt_rec_bulk_init(WT_CURSOR_BULK *cbulk);
 extern int __wt_rec_bulk_wrapup(WT_CURSOR_BULK *cbulk);
@@ -432,7 +434,8 @@ extern int __wt_update_alloc(WT_SESSION_IMPL *session,
     size_t *sizep);
 extern void __wt_update_obsolete(WT_SESSION_IMPL *session,
     WT_PAGE *page,
-    WT_INSERT *ins);
+    WT_UPDATE *upd);
+extern void __wt_row_leaf_obsolete(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern void __wt_update_serial_func(WT_SESSION_IMPL *session);
 extern int __wt_search_insert(WT_SESSION_IMPL *session,
     WT_CURSOR_BTREE *cbt,

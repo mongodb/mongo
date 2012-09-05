@@ -550,7 +550,8 @@ __evict_file_request(WT_SESSION_IMPL *session, int syncop)
 		case WT_SYNC:
 		case WT_SYNC_DISCARD:
 			if (__wt_page_is_modified(page))
-				WT_ERR(__wt_rec_write(session, page, NULL));
+				WT_ERR(__wt_rec_write(
+				    session, page, NULL, WT_REC_SINGLE));
 			break;
 		case WT_SYNC_DISCARD_NOWRITE:
 			break;
