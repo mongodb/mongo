@@ -306,6 +306,10 @@ extern int __wt_btree_open(WT_SESSION_IMPL *session,
     int readonly);
 extern int __wt_btree_close(WT_SESSION_IMPL *session);
 extern int __wt_btree_tree_open(WT_SESSION_IMPL *session, WT_ITEM *dsk);
+extern int __wt_btree_leaf_create( WT_SESSION_IMPL *session,
+    WT_PAGE *parent,
+    WT_REF *ref,
+    WT_PAGE **pagep);
 extern int __wt_btree_root_empty(WT_SESSION_IMPL *session, WT_PAGE **leafp);
 extern int __wt_btree_huffman_open(WT_SESSION_IMPL *session,
     const char *config);
