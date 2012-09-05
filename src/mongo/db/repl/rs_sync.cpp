@@ -356,10 +356,8 @@ namespace replset {
             // Set minValid to the last op to be applied in this next batch.
             // This will cause this node to go into RECOVERING state
             // if we should crash and restart before updating the oplog
-            { 
-                Client::WriteContext cx( "local" );
-                Helpers::putSingleton("local.replset.minvalid", lastOp);
-            }
+            theReplSet->setMinValid(lastOp);
+
             multiApply(ops.getDeque(), multiSyncApply);
 
             applyOpsToOplog(&ops.getDeque());
