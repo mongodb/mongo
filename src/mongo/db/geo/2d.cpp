@@ -328,33 +328,53 @@ namespace mongo {
         }
 
         GeoHash _hash( const BSONObj& o, const BSONObj* src ) const {
+
             BSONObjIterator i(o);
             uassert( 13067 , 
-                    str::stream() << "geo field is empty\n" 
-                    << ( src ? (*src).toString() : "" ) , 
+                    str::stream() << "geo field is empty"
+                                  << ( src ? causedBy((*src).toString()) : "" ),
+
                     i.more() );
+
             BSONElement x = i.next();
             uassert( 13068 , 
-                    str::stream() << "geo field only has 1 element\n" 
-                    << ( src ? (*src).toString() : "" ) , 
+                    str::stream() << "geo field only has 1 element"
+                                  << causedBy( src ? (*src).toString() : x.toString() ),
+
                     i.more() );
+
             BSONElement y = i.next();
             uassert( 13026 , 
-                    str::stream() << "geo values have to be numbers\n" 
-                    << ( src ? (*src).toString() : "" ) , 
+                    str::stream() << "geo values have to be numbers"
+                                  << causedBy( src ? (*src).toString() :
+                                               BSON_ARRAY( x << y ).toString() ),
+
                     x.isNumber() && y.isNumber() );
+
             uassert( 13027 , 
-                    str::stream() << "point not in interval of [ " << _min << ", " << _max << " ]\n" 
-                    << ( src ? (*src).toString() : "" ), 
-                    x.number() <= _max && x.number() >= _min && y.number() <= _max && y.number() >= _min ); 
-            return hash( x.number(), y.number() );
+                    str::stream() << "point not in interval of [ " << _min << ", " << _max << " ]"
+                                  << causedBy( src ? (*src).toString() :
+                                               BSON_ARRAY( x.number() << y.number() ).toString() ),
+
+                    x.number() <= _max && x.number() >= _min &&
+                    y.number() <= _max && y.number() >= _min );
+
+            return GeoHash( _convert(x.number()), _convert(y.number()) , _bits );
         }
 
         GeoHash hash( const Point& p ) const {
             return hash( p._x, p._y );
         }
 
-        GeoHash hash( double x , double y ) const {
+        GeoHash hash( double x, double y ) const {
+
+            uassert( 16433,
+                    str::stream() << "point not in interval of [ " << _min << ", " << _max << " ]"
+                                  << causedBy( BSON_ARRAY( x << y ).toString() ),
+
+                    x <= _max && x >= _min &&
+                    y <= _max && y >= _min );
+
             return GeoHash( _convert(x), _convert(y) , _bits );
         }
 
@@ -368,6 +388,7 @@ namespace mongo {
         }
 
         unsigned _convert( double in ) const {
+
             verify( in <= _max && in >= _min );
 
             if (in == _max) {
