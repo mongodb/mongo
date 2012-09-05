@@ -108,14 +108,12 @@ void
 __wt_txn_get_evict_snapshot(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
-	WT_TXN *txn;
 	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_STATE *s;
 	wt_txnid_t current_id, id, oldest_snap_min;
 	uint32_t i, session_cnt;
 
 	conn = S2C(session);
-	txn = &session->txn;
 	txn_global = &conn->txn_global;
 	oldest_snap_min = WT_TXN_ABORTED;
 
