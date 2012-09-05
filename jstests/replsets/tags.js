@@ -26,6 +26,8 @@ replTest.initiate({_id : name, members :
         }});
 
 var master = replTest.getMaster();
+// make everyone catch up before reconfig
+replTest.awaitReplication();
 
 var config = master.getDB("local").system.replset.findOne();
 
