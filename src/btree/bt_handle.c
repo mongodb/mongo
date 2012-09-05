@@ -393,12 +393,12 @@ __wt_btree_root_empty(WT_SESSION_IMPL *session, WT_PAGE **leafp)
  *      Access the size of an in-memory tree with a single leaf page.
  */
 int
-__wt_btree_get_memsize(WT_SESSION_IMPL *session, uint32_t **memsizep)
+__wt_btree_get_memsize(
+    WT_SESSION_IMPL *session, WT_BTREE *btree, uint32_t **memsizep)
 {
-	WT_BTREE *btree;
 	WT_PAGE *root, *child;
 
-	btree = session->btree;
+	WT_UNUSED(session);
 	root = btree->root_page;
 
 	if (root->entries != 1)
@@ -416,11 +416,9 @@ __wt_btree_get_memsize(WT_SESSION_IMPL *session, uint32_t **memsizep)
  *      Release a cache-resident tree.
  */
 int
-__wt_btree_release_memsize(WT_SESSION_IMPL *session)
+__wt_btree_release_memsize(WT_SESSION_IMPL *session, WT_BTREE *btree)
 {
-	WT_BTREE *btree;
-
-	btree = session->btree;
+	WT_UNUSED(session);
 	F_CLR(btree, WT_BTREE_NO_EVICTION);
 	return (0);
 }

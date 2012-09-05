@@ -529,7 +529,7 @@ static inline int
 __clsm_put(
     WT_SESSION_IMPL *session, WT_CURSOR_LSM *clsm, WT_ITEM *key, WT_ITEM *value)
 {
-	WT_BTREE *old_btree;
+	WT_BTREE *btree;
 	WT_CURSOR *primary;
 	WT_DECL_RET;
 	WT_LSM_TREE *lsm_tree;
@@ -549,16 +549,15 @@ __clsm_put(
 	 */
 	F_CLR(clsm, WT_CLSM_ITERATE_PREV | WT_CLSM_ITERATE_NEXT);
 	clsm->current = primary;
-	old_btree = session->btree;
-	session->btree = ((WT_CURSOR_BTREE *)primary)->btree;
+	btree = ((WT_CURSOR_BTREE *)primary)->btree;
 
 	/*
 	 * Peek into the btree layer to find the in-memory size. Create a 
 	 * tree if the current one is empty.
 	 */
 	if (lsm_tree->memsizep == NULL && __wt_btree_get_memsize(
-	    session, &lsm_tree->memsizep) == WT_ERROR)
-		WT_ERR(__wt_lsm_tree_switch(session, lsm_tree));
+	    session, btree, &lsm_tree->memsizep) == WT_ERROR)
+		WT_RET(__wt_lsm_tree_switch(session, lsm_tree));
 
 	if ((memsizep = lsm_tree->memsizep) != NULL &&
 	    *memsizep > lsm_tree->threshold) {
@@ -570,8 +569,8 @@ __clsm_put(
 		 * to move some operations (such as clearing the
 		 * "cache_resident" flag) into the worker thread.
 		 */
-		WT_ERR(__clsm_close_cursors(clsm));
-		WT_ERR(__wt_btree_release_memsize(session));
+		WT_RET(__clsm_close_cursors(clsm));
+		WT_RET(__wt_btree_release_memsize(session, btree));
 
 		/*
 		 * Take the LSM lock first: we can't acquire it while
@@ -583,7 +582,6 @@ __clsm_put(
 		__wt_spin_unlock(session, &clsm->lsm_tree->lock);
 	}
 
-err:	session->btree = old_btree;
 	return (ret);
 }
 
