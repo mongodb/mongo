@@ -21,6 +21,17 @@ AddOption("--prefix",
           default="/usr/local",
           help="installation root")
 
+AddOption("--static",
+          dest="static",
+          action="store_true",
+          default=False,
+          help="create static library (default)")
+
+AddOption("--shared",
+          dest="shared",
+          action="store_true",
+          default=False,
+          help="create shared library")
 
 env = Environment(BUILD_DIR='#build',
                   CLIENT_ARCHIVE='${CLIENT_DIST_BASENAME}${DIST_ARCHIVE_SUFFIX}',
@@ -78,10 +89,21 @@ conf.Finish()
 clientEnv = env.Clone()
 clientEnv['CPPDEFINES'].remove('MONGO_EXPOSE_MACROS')
 
-Export("env clientEnv")
+staticLib = GetOption("static")
+sharedLib = GetOption("shared")
+if staticLib == False and sharedLib == False:
+    staticLib = True
+
+Export("env clientEnv staticLib sharedLib")
 env.SConscript('src/SConscript.client', variant_dir='$BUILD_DIR', duplicate=False)
 
-mongoclient = env.Alias('mongoclient', ['${LIBPREFIX}mongoclient${LIBSUFFIX}'])
+libs = []
+if staticLib:
+    libs.append('${LIBPREFIX}mongoclient${LIBSUFFIX}')
+if sharedLib:
+    libs.append('${SHLIBPREFIX}mongoclient${SHLIBSUFFIX}')
+
+mongoclient = env.Alias('mongoclient', libs)
 env.Default(mongoclient)
 
 
