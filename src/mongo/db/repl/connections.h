@@ -62,7 +62,7 @@ namespace mongo {
                         BSONObj &info,
                         int options=0,
                         const AuthenticationTable* auth=NULL) {
-            return conn()->runCommand(dbname, cmd, info, options, auth);
+            return conn()->runCommand(dbname, cmd, info, options, noauth ? NULL : auth);
         }
         unsigned long long count(const string &ns) {
             return conn()->count(ns);
