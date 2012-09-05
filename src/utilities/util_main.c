@@ -255,6 +255,14 @@ util_name(const char *s, const char *type, u_int flags)
 			return (NULL);
 		}
 		copy = 1;
+	} else if (WT_PREFIX_MATCH(s, "lsm:")) {
+		if (!(flags & UTIL_LSM_OK)) {
+			fprintf(stderr,
+			    "%s: %s: \"lsm\" type not supported\n",
+			    progname, command);
+			return (NULL);
+		}
+		copy = 1;
 	} else if (WT_PREFIX_MATCH(s, "table:")) {
 		if (!(flags & UTIL_TABLE_OK)) {
 			fprintf(stderr,

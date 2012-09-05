@@ -416,9 +416,11 @@ __wt_btree_get_memsize(WT_SESSION_IMPL *session, uint32_t **memsizep)
  *      Release a cache-resident tree.
  */
 int
-__wt_btree_release_memsize(WT_SESSION_IMPL *session, WT_BTREE *btree)
+__wt_btree_release_memsize(WT_SESSION_IMPL *session)
 {
-	WT_UNUSED(session);
+	WT_BTREE *btree;
+
+	btree = session->btree;
 	F_CLR(btree, WT_BTREE_NO_EVICTION);
 	return (0);
 }
