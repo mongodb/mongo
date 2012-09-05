@@ -732,6 +732,9 @@
     <ClCompile Include="..\db\pipeline\pipeline.cpp">
       <Filter>db\pipeline\Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\scripting\bson_template_evaluator.cpp">
+      <Filter>scripting</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\pch.h" />
@@ -1064,6 +1067,9 @@
     </ClInclude>
     <ClInclude Include="..\platform\float_utils.h">
       <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\scripting\bson_template_evaluator.h">
+      <Filter>scripting</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

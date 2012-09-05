@@ -1020,6 +1020,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="..\db\security_common.cpp" />
     <ClCompile Include="..\db\stats\top.cpp" />
     <ClCompile Include="..\scripting\bench.cpp" />
+    <ClCompile Include="..\scripting\bson_template_evaluator.cpp" />
     <ClCompile Include="..\scripting\sm_db.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
@@ -1211,6 +1212,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\platform\compiler_msvc.h" />
     <ClInclude Include="..\platform\float_utils.h" />
     <ClInclude Include="..\platform\windows_basic.h" />
+    <ClInclude Include="..\scripting\bson_template_evaluator.h" />
     <ClInclude Include="..\util\assert_util.h" />
     <ClInclude Include="..\util\concurrency\mutexdebugger.h" />
     <ClInclude Include="..\util\concurrency\rwlockimpl.h" />

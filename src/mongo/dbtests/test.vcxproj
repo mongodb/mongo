@@ -521,6 +521,10 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\platform\compiler_msvc.h" />
     <ClInclude Include="..\platform\float_utils.h" />
     <ClInclude Include="..\platform\windows_basic.h" />
+    <ClInclude Include="..\scripting\bench.h" />
+    <ClInclude Include="..\scripting\bson_template_evaluator.h" />
+    <ClInclude Include="..\scripting\engine.h" />
+    <ClInclude Include="..\scripting\engine_spidermonkey.h" />
     <ClInclude Include="..\server.h" />
     <ClInclude Include="..\s\chunk.h" />
     <ClInclude Include="..\s\config.h" />
@@ -1245,6 +1249,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="..\db\restapi.cpp" />
     <ClCompile Include="..\db\scanandorder.cpp" />
     <ClCompile Include="..\db\security_common.cpp" />
+    <ClCompile Include="..\scripting\bson_template_evaluator.cpp" />
     <ClCompile Include="..\scripting\sm_db.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
