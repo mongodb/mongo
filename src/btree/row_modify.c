@@ -354,7 +354,7 @@ __wt_update_obsolete(WT_SESSION_IMPL *session, WT_PAGE *page, WT_INSERT *ins)
 	 * that appear after it.
 	 */
 	for (upd = ins->upd; upd != NULL; upd = upd->next)
-		if (TXNID_LT(upd->txnid, txn->oldest_reader)) {
+		if (__wt_txn_visible_all(session, upd->txnid)) {
 			/*
 			 * We cannot discard this WT_UPDATE structure, we can
 			 * only discard WT_UPDATE structures subsequent to it,

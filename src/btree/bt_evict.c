@@ -430,7 +430,7 @@ __evict_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 	if (was_running)
 		WT_RET(__wt_txn_init(session));
 
-	__wt_txn_get_snapshot(session, txn_global->ckpt_txnid);
+	__wt_txn_get_evict_snapshot(session);
 	txn->isolation = TXN_ISO_READ_COMMITTED;
 	ret = __wt_rec_evict(session, page, 0);
 

@@ -314,8 +314,11 @@ __rec_review(WT_SESSION_IMPL *session,
 		WT_RET(__wt_rec_write(session, page, NULL));
 
 		/* If there are unwritten changes on the page, give up. */
-		if (__wt_page_is_modified(page))
+		if (__wt_page_is_modified(page)) {
+			WT_VERBOSE_RET(session, evict,
+			    "page %p written but not clean", page);
 			return (EBUSY);
+		}
 	}
 
 	/*
