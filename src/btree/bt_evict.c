@@ -407,7 +407,6 @@ static int
 __evict_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_DECL_RET;
-	WT_TXN_GLOBAL *txn_global;
 	WT_TXN saved_txn, *txn;
 	int was_running;
 
@@ -426,7 +425,6 @@ __evict_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 	saved_txn = *txn;
 	was_running = (F_ISSET(txn, TXN_RUNNING) != 0);
 
-	txn_global = &S2C(session)->txn_global;
 	if (was_running)
 		WT_RET(__wt_txn_init(session));
 
