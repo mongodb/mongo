@@ -22,14 +22,12 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_DECL_RET;
 	WT_SESSION *wt_session;
 	WT_TXN *txn;
-	WT_TXN_GLOBAL *txn_global;
 	void *saved_meta_next;
 	int ckpt_closed, target_list, tracking;
 
 	conn = S2C(session);
 	target_list = tracking = 0;
 	txn = &session->txn;
-	txn_global = &conn->txn_global;
 
 	/* Only one checkpoint can be active at a time. */
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
