@@ -1843,9 +1843,26 @@ namespace mongo {
             migrateStatus.from = cmdObj["from"].String();
             migrateStatus.min = cmdObj["min"].Obj().getOwned();
             migrateStatus.max = cmdObj["max"].Obj().getOwned();
-            migrateStatus.shardKeyPattern = cmdObj["shardKeyPattern"].Obj().getOwned();
             migrateStatus.secondaryThrottle = cmdObj["secondaryThrottle"].trueValue();
-            
+            if (cmdObj.hasField("shardKeyPattern")) {
+                migrateStatus.shardKeyPattern = cmdObj["shardKeyPattern"].Obj().getOwned();
+            } else {
+                // shardKeyPattern may not be provided if another shard is from pre 2.2
+                // In that case, assume the shard key pattern is the same as the range
+                // specifiers provided.
+                BSONObj keya , keyb;
+                Helpers::toKeyFormat( migrateStatus.min , keya );
+                Helpers::toKeyFormat( migrateStatus.max , keyb );
+                verify( keya == keyb );
+
+                warning() << "No shard key pattern provided by source shard for migration."
+                    " This is likely because the source shard is running a version prior to 2.2."
+                    " Falling back to assuming the shard key matches the pattern of the min and max"
+                    " chunk range specifiers.  Inferred shard key: " << keya << endl;
+
+                migrateStatus.shardKeyPattern = keya.getOwned();
+            }
+
             if ( migrateStatus.secondaryThrottle && ! anyReplEnabled() ) {
                 warning() << "secondaryThrottle asked for, but not replication" << endl;
                 migrateStatus.secondaryThrottle = false;
