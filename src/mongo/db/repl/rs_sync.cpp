@@ -766,6 +766,11 @@ namespace replset {
                     return;
                 }
                 slave->reader.ghostQueryGTE(rsoplog, last);
+                // if we lose the connection between connecting and querying, the cursor may not
+                // exist so we have to check again before using it.
+                if (!slave->reader.haveCursor()) {
+                    return;
+                }
             }
 
             LOG(1) << "replSet last: " << slave->last.toString() << " to " << last.toString() << rsLog;
