@@ -184,7 +184,7 @@ namespace mongo {
             }
 #endif
 
-            _argv.push_back( programPath.native_file_string() );
+            _argv.push_back( programPath.string() );
 
             _port = -1;
 
