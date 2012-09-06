@@ -128,8 +128,6 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm)
 	WT_RET(__clsm_close_cursors(clsm));
 
 	__wt_spin_lock(session, &lsm_tree->lock);
-	clsm->dsk_gen = lsm_tree->dsk_gen;
-
 	if (clsm->cursors != NULL) {
 		WT_ASSERT(session, lsm_tree->old_cursors > 0);
 		--lsm_tree->old_cursors;
@@ -157,10 +155,11 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm)
 	}
 	 	
 	/* Peek into the btree layer to track the in-memory size. */
-	if (i == clsm->nchunks - 1 && lsm_tree->memsizep == NULL)
+	if (lsm_tree->memsizep == NULL)
 		(void)__wt_btree_get_memsize(
 		    session, session->btree, &lsm_tree->memsizep);
 
+	clsm->dsk_gen = lsm_tree->dsk_gen;
 err:	__wt_spin_unlock(session, &lsm_tree->lock);
 	return (ret);
 }
@@ -469,9 +468,10 @@ __clsm_search_near(WT_CURSOR *cursor, int *exactp)
 	larger = smaller = NULL;
 	FORALL_CURSORS(clsm, c, i) {
 		c->set_key(c, &cursor->key);
-		if ((ret = c->search_near(c, &cmp)) == WT_NOTFOUND)
+		if ((ret = c->search_near(c, &cmp)) == WT_NOTFOUND) {
+			ret = 0;
 			continue;
-		else if (ret != 0)
+		} else if (ret != 0)
 			goto err;
 
 		WT_ERR(c->get_value(c, &v));
@@ -534,13 +534,13 @@ __clsm_search_near(WT_CURSOR *cursor, int *exactp)
 done:
 err:	WT_LSM_END(clsm, session);
 	if (ret == 0) {
+		c = clsm->current;
 		WT_TRET(c->get_key(c, &cursor->key));
 		WT_TRET(c->get_value(c, &cursor->value));
 	}
-	if (ret == 0) {
-		c = clsm->current;
+	if (ret == 0)
 		F_SET(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
-	} else
+	else
 		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
 	return (ret);

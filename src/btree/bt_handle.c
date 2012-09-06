@@ -400,13 +400,14 @@ __wt_btree_get_memsize(
 
 	WT_UNUSED(session);
 	root = btree->root_page;
-
-	if (root->entries != 1)
-		return (WT_ERROR);
-
 	child = root->u.intl.t->page;
-	*memsizep = &child->memory_footprint;
 
+	if (root->entries != 1 || child == NULL) {
+		*memsizep = NULL;
+		return (WT_ERROR);
+	}
+
+	*memsizep = &child->memory_footprint;
 	F_SET(btree, WT_BTREE_NO_EVICTION);
 	return (0);
 }
