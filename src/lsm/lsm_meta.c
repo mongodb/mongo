@@ -29,10 +29,6 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 			/* Don't include the brackets. */
 			WT_ERR(__wt_strndup(session,
 			    cv.str + 1, cv.len - 2, &lsm_tree->file_config));
-		} else if (WT_STRING_MATCH("filename", ck.str, ck.len)) {
-			__wt_free(session, lsm_tree->filename);
-			WT_ERR(__wt_strndup(session,
-			    cv.str, cv.len, &lsm_tree->filename));
 		} else if (WT_STRING_MATCH("key_format", ck.str, ck.len)) {
 			__wt_free(session, lsm_tree->key_format);
 			WT_ERR(__wt_strndup(session,
@@ -88,8 +84,8 @@ __wt_lsm_meta_write(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 
 	WT_RET(__wt_scr_alloc(session, 0, &buf));
 	WT_ERR(__wt_buf_fmt(session, buf,
-	    "file_config=(%s),filename=\"%s\",key_format=%s,value_format=%s",
-	    lsm_tree->file_config, lsm_tree->filename,
+	    "file_config=(%s),key_format=%s,value_format=%s",
+	    lsm_tree->file_config,
 	    lsm_tree->key_format, lsm_tree->value_format));
 	WT_ERR(__wt_buf_catfmt(session, buf,
 	    ",last=%" PRIu32 ",threshold=%" PRIu64,

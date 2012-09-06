@@ -119,7 +119,7 @@ __wt_lsm_tree_create(
 	TAILQ_INSERT_HEAD(&S2C(session)->lsmqh, lsm_tree, q);
 
 	WT_RET(__wt_strdup(session, uri, &lsm_tree->name));
-	lsm_tree->filename = uri + strlen("lsm:");
+	lsm_tree->filename = lsm_tree->name + strlen("lsm:");
 
 	WT_ERR(__wt_config_gets(session, cfg, "key_format", &cval));
 	WT_ERR(__wt_strndup(session, cval.str, cval.len,
@@ -168,6 +168,7 @@ __lsm_tree_open(
 	__wt_spin_init(session, &lsm_tree->lock);
 	/* TODO: acquire the lock before the tree is visible? */
 	WT_ERR(__wt_strdup(session, uri, &lsm_tree->name));
+	lsm_tree->filename = lsm_tree->name + strlen("lsm:");
 	TAILQ_INSERT_HEAD(&S2C(session)->lsmqh, lsm_tree, q);
 
 	WT_ERR(__wt_lsm_meta_read(session, lsm_tree));
