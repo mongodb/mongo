@@ -47,6 +47,8 @@ __wt_cell_type_string(uint8_t type)
 	switch (type) {
 	case WT_CELL_ADDR:
 		return ("address");
+	case WT_CELL_ADDR_DEL:
+		return ("address/del");
 	case WT_CELL_ADDR_LNO:
 		return ("address/lno");
 	case WT_CELL_DEL:
