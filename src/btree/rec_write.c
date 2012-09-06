@@ -2149,8 +2149,6 @@ err:	__wt_scr_free(&orig);
 static int
 __rec_internal_deleted(WT_SESSION_IMPL *session, WT_PAGE *page, WT_REF *ref)
 {
-	int older;
-
 	/*
 	 * Internal pages with child leaf pages in the WT_REF_DELETED state are
 	 * a special case during reconciliation.  First, if the deletion isn't
@@ -2174,7 +2172,13 @@ __rec_internal_deleted(WT_SESSION_IMPL *session, WT_PAGE *page, WT_REF *ref)
 	 * to do this once, of course, and we use the WT_REF.addr field to flag
 	 * if the leaf page has been deleted.  Additionally, our caller knows a
 	 * NULL value for WT_REF.addr means to skip the cell entirely.
-	 *
+	 */
+
+	 /* First, a fast check for an already discarded page. */
+	if (ref->addr == NULL)
+		return (0);
+
+	/*
 	 * One final note: if the WT_REF transaction ID is set to WT_TXN_NONE,
 	 * it means this WT_REF is the re-creation of a deleted node (we wrote
 	 * out the deleted node after the deletion became visible, but before
@@ -2184,18 +2188,8 @@ __rec_internal_deleted(WT_SESSION_IMPL *session, WT_PAGE *page, WT_REF *ref)
 	 * there are no older transactions needing to see previous versions of
 	 * the page.
 	 */
-#if 0
-	older = ref->txnid == WT_TXN_NONE ?
-	    0 : __wt_txn_visible_all(session, ref->txnid);
-#else
-	older = 1;
-#endif
-	/*
-	 * No barrier needed to read or write the addr field: the addr field is
-	 * never reset once cleared, and reconciliation itself is followed by a
-	 * barrier.
-	 */
-	if (!older && ref->addr != NULL) {
+	if (ref->txnid == WT_TXN_NONE ||
+	    __wt_txn_visible_all(session, ref->txnid)) {
 		/*
 		 * Free the page when reconciliation completes, ensure we only
 		 * free the page once.
