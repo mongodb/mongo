@@ -178,6 +178,8 @@ static int  __rec_col_merge(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_col_var(WT_SESSION_IMPL *, WT_PAGE *, WT_SALVAGE_COOKIE *);
 static int  __rec_col_var_helper(WT_SESSION_IMPL *,
 		WT_SALVAGE_COOKIE *, WT_ITEM *, int, int, uint64_t);
+static int  __rec_page_deleted(WT_SESSION_IMPL *, WT_PAGE *, WT_REF *, int *);
+static int  __rec_page_modified(WT_SESSION_IMPL *, WT_PAGE *, WT_REF *, int *);
 static int  __rec_row_int(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_row_leaf(WT_SESSION_IMPL *, WT_PAGE *, WT_SALVAGE_COOKIE *);
 static int  __rec_row_leaf_insert(WT_SESSION_IMPL *, WT_INSERT *);
@@ -196,8 +198,8 @@ static int  __rec_write_wrapup(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_write_wrapup_err(WT_SESSION_IMPL *, WT_PAGE *);
 
 /*
- * Helper function to determine whether the given WT_REF references any
- * modifications.
+ * __rec_page_modified --
+ *	Return if the given WT_REF references any modifications.
  *
  * The reconciliation code is used in the following situations:
  *
@@ -220,47 +222,52 @@ static int  __rec_write_wrapup_err(WT_SESSION_IMPL *, WT_PAGE *);
  * To make this tractable, the eviction server guarantees that no thread is
  * doing LRU eviction in the tree when cases (1) and (2) occur.  That is, the
  * only state change that can occur during a sync or forced eviction is for a
- * reference to a page on disk to cause a page to be read (WT_REF_READING).  We
- * can safely ignore those pages because they are unmodified by definition --
- * they are being read from disk.
- *
- * If there is a valid page associated with the reference, a pointer to the
- * page is assigned to the second parameter.  The macro evaluates true if the
- * page has been modified.
+ * reference to a page on disk to cause a page to be read (WT_REF_READING).
+ * In the case of a read, we could safely ignore those pages because they are
+ * unmodified by definition -- they are being read from disk, however, in the
+ * current system, that state also includes fast-delete pages that are being
+ * instantiated.  Those pages cannot be ignored, as they have been modified.
+ * For this reason, we have to wait for the WT_REF_READING state to be resolved
+ * to another state before we proceed.
  */
 static int
-__rec_page_modified(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE **rpp)
+__rec_page_modified(
+    WT_SESSION_IMPL *session, WT_PAGE *page, WT_REF *ref, int *modifyp)
 {
-	WT_RECONCILE *r;
+	WT_DECL_RET;
 
-	r = session->reconcile;
-	*rpp = ref->page;
-
+	*modifyp = 0;
 	for (;; __wt_yield())
 		switch (ref->state) {
 		case WT_REF_DISK:
 			/* On disk, not modified by definition. */
-			WT_ASSERT(session, *rpp == NULL);
 			return (0);
 		case WT_REF_DELETED:
 			/*
-			 * Decide if any deleted page is visible: we don't need
-			 * to lock the WT_REF structure because the state won't
-			 * be WT_REF_DELETED until the transaction ID has been
-			 * set, and the transaction ID is never cleared, even if
-			 * the page is instantiated.
+			 * The WT_REF entry is in a deleted state.
+			 *
+			 * It's possible the state is changing underneath us and
+			 * we can race between checking for a deleted state and
+			 * looking at the stored transaction ID to see if the
+			 * delete is visible to us.  Lock down the structure.
 			 */
-			WT_ASSERT(session, *rpp == NULL);
-			if (__wt_txn_visible(session, ref->txnid))
-				return (1);
-			r->upd_skipped = 1;
-			return (0);
+			if (!WT_ATOMIC_CAS(
+			    ref->state, WT_REF_DELETED, WT_REF_READING))
+				break;
+			ret = __rec_page_deleted(session, page, ref, modifyp);
+			WT_PUBLISH(ref->state, WT_REF_DELETED);
+			return (ret);
 		case WT_REF_EVICT_FORCE:
 		case WT_REF_EVICT_WALK:
 		case WT_REF_LOCKED:
 		case WT_REF_MEM:
-			/* In-memory states, check page's modify structure. */
-			return (ref->page->modify == NULL ? 0 : 1);
+			/*
+			 * In-memory states: set modify based on the existence
+			 * of the page's modify structure.
+			 */
+			if (ref->page->modify != NULL)
+				*modifyp = 1;
+			return (0);
 		case WT_REF_READING:
 			/*
 			 * Being read or in fast-delete, wait for the page's
@@ -269,6 +276,81 @@ __rec_page_modified(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE **rpp)
 			 break;
 		WT_ILLEGAL_VALUE(session);
 		}
+	/* NOTREACHED */
+}
+
+/*
+ * __rec_page_deleted --
+ *	Handle pages with leaf pages in the WT_REF_DELETED state.
+ */
+static int
+__rec_page_deleted(
+    WT_SESSION_IMPL *session, WT_PAGE *page, WT_REF *ref, int *modifyp)
+{
+	WT_RECONCILE *r;
+
+	r = session->reconcile;
+	*modifyp = 0;
+
+	/*
+	 * Internal pages with child leaf pages in the WT_REF_DELETED state are
+	 * a special case during reconciliation.  First, if the deletion isn't
+	 * visible, we proceed as with any change that's not visible: set the
+	 * skipped flag and ignore the change for the purposes of writing the
+	 * internal page.
+	 */
+	if (!__wt_txn_visible(session, ref->txnid)) {
+		r->upd_skipped = 1;
+		return (0);
+	}
+
+	/* The deletion is visible, set the modified return. */
+	*modifyp = 1;
+
+	/*
+	 * If the deletion is visible, check for any transactions in the system
+	 * that might want to see the page's state before the deletion.
+	 *
+	 * If any such transactions exist, we cannot discard the underlying leaf
+	 * page to the block manager because the transaction may eventually read
+	 * it.  However, this write might be part of a checkpoint, and should we
+	 * recover to that checkpoint, we'll need to delete the leaf page, else
+	 * we'd leak it.  The solution is to write a proxy cell on the internal
+	 * page ensuring the leaf page is eventually discarded.
+	 *
+	 * If no such transactions exist, we can discard the leaf page to the
+	 * block manager, and no cell needs to be written at all.  We set the
+	 * WT_REF.addr field to NULL for a few reasons: (1) we can avoid doing
+	 * the free on the next reconciliation (that's only performance, as the
+	 * underlying tracking routines won't free the same block twice), (2)
+	 * our caller knows a WT_REF.addr of NULL means we skip the cell when
+	 * writing the page, and (3) the cache read routine knows a WT_REF.addr
+	 * of NULL means the underlying page is gone and it has to instantiate
+	 * a new page.  Note #2 and #3 are safe: the WT_REF.addr field is never
+	 * reset once cleared, so it's safe to test it outside of the WT_REF
+	 * structure lock.
+	 *
+	 * One final note: if the WT_REF transaction ID is set to WT_TXN_NONE,
+	 * it means this WT_REF is the re-creation of a deleted node (we wrote
+	 * out the deleted node after the deletion became visible, but before
+	 * we could delete the leaf page, and subsequently crashed, then read
+	 * the page and re-created the WT_REF_DELETED state).   In other words,
+	 * the delete is visible to all (it became visible), and by definition
+	 * there are no older transactions needing to see previous versions of
+	 * the page.
+	 */
+	if (ref->addr != NULL &&
+	    (ref->txnid == WT_TXN_NONE ||
+	    __wt_txn_visible_all(session, ref->txnid))) {
+		/*
+		 * Free the page when reconciliation completes and ensure we
+		 * only free the page once.
+		 */
+		WT_RET(__wt_rec_track_onpage_ref(session, page, page, ref));
+		ref->addr = NULL;
+	}
+
+	return (0);
 }
 
 /*
@@ -1418,7 +1500,7 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_RECONCILE *r;
 	WT_REF *ref;
 	uint32_t i;
-	int val_set;
+	int modified;
 
 	WT_BSTAT_INCR(session, rec_page_merge);
 
@@ -1435,8 +1517,10 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * The page may be emptied or internally created during a split.
 		 * Deleted/split pages are merged into the parent and discarded.
 		 */
-		val_set = 0;
-		if (__rec_page_modified(session, ref, &rp)) {
+		addr = NULL;
+		WT_RET(__rec_page_modified(session, page, ref, &modified));
+		if (modified) {
+			rp = ref->page;
 			switch (F_ISSET(rp->modify, WT_PM_REC_MASK)) {
 			case WT_PM_REC_EMPTY:
 				/*
@@ -1448,12 +1532,6 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 				continue;
 			case WT_PM_REC_REPLACE:
 				addr = &rp->modify->u.replace;
-				__rec_cell_build_addr(session,
-				    addr->addr, addr->size,
-				    addr->leaf_no_overflow ?
-				    WT_CELL_ADDR_LNO : WT_CELL_ADDR,
-				    ref->u.recno);
-				val_set = 1;
 				break;
 			case WT_PM_REC_SPLIT:
 				WT_RET(__rec_col_merge(
@@ -1474,22 +1552,20 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * on-page cell and we copy it from the page, else build a new
 		 * cell.
 		 */
-		if (!val_set) {
-			if (__wt_off_page(page, ref->addr)) {
-				addr = ref->addr;
-				__rec_cell_build_addr(session,
-				    addr->addr, addr->size,
-				    addr->leaf_no_overflow ?
-				    WT_CELL_ADDR_LNO : WT_CELL_ADDR,
-				    ref->u.recno);
-			} else {
-				__wt_cell_unpack(ref->addr, unpack);
-				val->buf.data = ref->addr;
-				val->buf.size = unpack->len;
-				val->cell_len = 0;
-				val->len = unpack->len;
-			}
-		}
+		if (addr == NULL && __wt_off_page(page, ref->addr))
+			addr = ref->addr;
+		if (addr == NULL) {
+			__wt_cell_unpack(ref->addr, unpack);
+			val->buf.data = ref->addr;
+			val->buf.size = unpack->len;
+			val->cell_len = 0;
+			val->len = unpack->len;
+		} else
+			__rec_cell_build_addr(session,
+			    addr->addr, addr->size,
+			    addr->leaf_no_overflow ?
+			    WT_CELL_ADDR_LNO : WT_CELL_ADDR,
+			    ref->u.recno);
 
 		/* Boundary: split or write the page. */
 		while (val->len > r->space_avail)
@@ -2142,65 +2218,6 @@ err:	__wt_scr_free(&orig);
 }
 
 /*
- * __rec_internal_deleted --
- *	Handle internal pages with leaf pages in the WT_REF_DELETED state,
- * where the deletion is visible.
- */
-static int
-__rec_internal_deleted(WT_SESSION_IMPL *session, WT_PAGE *page, WT_REF *ref)
-{
-	/*
-	 * Internal pages with child leaf pages in the WT_REF_DELETED state are
-	 * a special case during reconciliation.  First, if the deletion isn't
-	 * visible, we proceed as with any change that's not visible: set the
-	 * skipped flag and ignore the change for the purposes of writing the
-	 * internal page.   That's all handled by the __rec_page_modified call,
-	 * we only arrive here after we've determined the deletion is visible.
-	 *
-	 * If the deletion is visible, check for any transactions in the system
-	 * that might want to see the page's state before the deletion.
-	 *
-	 * If any such transactions exist, we cannot discard the underlying leaf
-	 * page to the block manager because the transaction may eventually read
-	 * it.  However, this write might be part of a checkpoint, and should we
-	 * recover to that checkpoint, we'll need to delete the leaf page, else
-	 * we'd leak it.  The solution is to write a proxy cell on the internal
-	 * page ensuring the leaf page is eventually discarded.
-	 *
-	 * If no such transactions exist, we can discard the leaf page to the
-	 * block manager, and no cell needs to be written at all.  We only want
-	 * to do this once, of course, and we use the WT_REF.addr field to flag
-	 * if the leaf page has been deleted.  Additionally, our caller knows a
-	 * NULL value for WT_REF.addr means to skip the cell entirely.
-	 */
-
-	 /* First, a fast check for an already discarded page. */
-	if (ref->addr == NULL)
-		return (0);
-
-	/*
-	 * One final note: if the WT_REF transaction ID is set to WT_TXN_NONE,
-	 * it means this WT_REF is the re-creation of a deleted node (we wrote
-	 * out the deleted node after the deletion became visible, but before
-	 * we could delete the leaf page, and subsequently crashed, then read
-	 * the page and re-created the WT_REF_DELETED state).   In other words,
-	 * the delete is visible to all (it became visible), and by definition
-	 * there are no older transactions needing to see previous versions of
-	 * the page.
-	 */
-	if (ref->txnid == WT_TXN_NONE ||
-	    __wt_txn_visible_all(session, ref->txnid)) {
-		/*
-		 * Free the page when reconciliation completes, ensure we only
-		 * free the page once.
-		 */
-		WT_RET(__wt_rec_track_onpage_ref(session, page, page, ref));
-		ref->addr = NULL;
-	}
-	return (0);
-}
-
-/*
  * __rec_row_int --
  *	Reconcile a row-store internal page.
  */
@@ -2276,9 +2293,10 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 */
 		onpage_ovfl = cell != NULL && kpack->ovfl == 1 ? 1 : 0;
 
-		modified = __rec_page_modified(session, ref, &rp);
 		vtype = 0;
 		addr = NULL;
+		rp = ref->page;
+		WT_ERR(__rec_page_modified(session, page, ref, &modified));
 
 		/*
 		 * A modified WT_REF with no child page must be a page marked
@@ -2297,13 +2315,10 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 				    session, page, kpack, tmpkey));
 
 			/*
-			 * Resolve the underlying leaf page; as part of that
-			 * call, the WT_REF addr field is possibly cleared.
-			 * That's our signal that not only is the leaf page
-			 * deleted, but there are no older readers in the
-			 * system, and there's no need to write this cell.
+			 * If the WT_REF addr field is cleared, not only is the
+			 * leaf page deleted, but there are no older readers in
+			 * the system, and there's no need to write this cell.
 			 */
-			WT_ERR(__rec_internal_deleted(session, page, ref));
 			if (ref->addr == NULL)
 				continue;
 
@@ -2554,9 +2569,10 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	/* For each entry in the in-memory page... */
 	WT_REF_FOREACH(page, ref, i) {
-		modified = __rec_page_modified(session, ref, &rp);
 		vtype = 0;
 		addr = NULL;
+		rp = ref->page;
+		WT_RET(__rec_page_modified(session, page, ref, &modified));
 
 		/*
 		 * A modified WT_REF with no child page must be a page marked
@@ -2564,13 +2580,10 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 */
 		if (modified && rp == NULL) {
 			/*
-			 * Resolve the underlying leaf page; as part of that
-			 * call, the WT_REF addr field is possibly cleared.
-			 * That's our signal that not only is the leaf page
-			 * deleted, but there are no older readers in the
-			 * system, and there's no need to write this cell.
+			 * If the WT_REF addr field is cleared, not only is the
+			 * leaf page deleted, but there are no older readers in
+			 * the system, and there's no need to write this cell.
 			 */
-			WT_RET(__rec_internal_deleted(session, page, ref));
 			if (ref->addr == NULL)
 				continue;
 
