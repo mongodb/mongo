@@ -687,8 +687,11 @@ row_remove(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int *notfoundp)
 		return;
 
 	bdb_remove(keyno, &notfound);
+
 	/* LSM trees don't check for existence if "overwrite" is set. */
-	if (strncmp(cursor->uri, "lsm:", 4) != 0)
+	if (strncmp(cursor->uri, "lsm:", 4) == 0)
+		*notfoundp = notfound;
+	else
 		(void)notfound_chk("row_remove", ret, notfound, keyno);
 }
 
