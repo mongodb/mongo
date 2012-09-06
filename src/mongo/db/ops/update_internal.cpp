@@ -29,8 +29,9 @@
 
 namespace mongo {
 
-    const char* Mod::modNames[] = { "$inc", "$set", "$push", "$pushAll", "$pull", "$pullAll" , "$pop", "$unset" ,
-                                    "$bitand" , "$bitor" , "$bit" , "$addToSet", "$rename", "$rename"
+    const char* Mod::modNames[] = { "$inc", "$set", "$setIfAbsent", "$push", "$pushAll", "$pull", "$pullAll" ,
+    								"$pop", "$unset", "$bitand" , "$bitor" , "$bit" , "$addToSet", "$rename",
+    								"$rename"
                                   };
     unsigned Mod::modNamesNum = sizeof(Mod::modNames)/sizeof(char*);
 
@@ -101,6 +102,7 @@ namespace mongo {
             break;
         }
 
+        case SET_IF_ABSENT:
         case SET: {
             _checkForAppending( elt );
             builder.appendAs( elt , shortFieldName );
@@ -413,6 +415,13 @@ namespace mongo {
                     }
                 }
                 break;
+
+            case Mod::SET_IF_ABSENT:
+            	// Can only stay in place if the previous value was null (i.e. no-op)
+            	mss->amIInPlacePossible( !e.isNull() );
+            	if (!e.isNull())
+            		ms.dontApply=true;
+            	break;
 
             case Mod::SET:
                 mss->amIInPlacePossible( m.elt.type() == e.type() &&
