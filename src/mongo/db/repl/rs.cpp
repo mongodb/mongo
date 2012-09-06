@@ -837,8 +837,8 @@ namespace mongo {
     
     void ReplSetImpl::setMinValid(BSONObj obj) {
         BSONObjBuilder builder;
+        builder.appendTimestamp("ts", obj["ts"].date());
         builder.append("h", obj["h"]);
-        builder.append("ts", obj["ts"]);
         Lock::DBWrite cx( "local" );
         Helpers::putSingleton("local.replset.minvalid", builder.obj());
     }
