@@ -522,7 +522,7 @@ __verify_ckptfrag_chk(WT_SESSION_IMPL *session, WT_BLOCK *block)
 
 	/*
 	 * The checkpoint fragment memory is only allocated as a checkpoint
-	 * is succesfully loaded; don't check if there's nothing there.
+	 * is successfully loaded; don't check if there's nothing there.
 	 */
 	if (block->fragckpt == NULL)
 		return (0);
