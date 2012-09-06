@@ -20,6 +20,7 @@
 #include <vector>
 
 #include "mongo/db/client.h"
+#include "mongo/db/dur.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/oplog.h"
 #include "mongo/util/concurrency/thread_pool.h"
@@ -69,7 +70,9 @@ namespace replset {
         void applyOpsToOplog(std::deque<BSONObj>* ops);
 
     protected:
-        static const unsigned int replBatchSizeBytes = 1024 * 1024 * 256 ;
+        // Cap the batches using the limit on journal commits.
+        // This works out to be 100 MB (64 bit) or 50 MB (32 bit)
+        static const unsigned int replBatchSizeBytes = dur::UncommittedBytesLimit;
 
         // Prefetch and write a deque of operations, using the supplied function.
         // Initial Sync and Sync Tail each use a different function.
