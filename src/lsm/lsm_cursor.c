@@ -33,6 +33,7 @@
 	API_END(session)
 
 static int __clsm_open_cursors(WT_CURSOR_LSM *);
+static int __clsm_search(WT_CURSOR *);
 
 static inline int
 __clsm_enter(WT_CURSOR_LSM *clsm)
@@ -103,7 +104,7 @@ __clsm_close_cursors(WT_CURSOR_LSM *clsm)
 static int
 __clsm_open_cursors(WT_CURSOR_LSM *clsm)
 {
-	WT_CURSOR **cp;
+	WT_CURSOR *c, **cp;
 	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk;
 	WT_LSM_TREE *lsm_tree;
@@ -113,6 +114,13 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm)
 
 	session = (WT_SESSION_IMPL *)clsm->iface.session;
 	lsm_tree = clsm->lsm_tree;
+	c = &clsm->iface;
+
+	/* Copy the key, so we don't lose the cursor position. */
+	if (clsm->current != NULL) {
+		WT_RET(__wt_buf_set(session, &c->key, c->key.data, c->key.size));
+		F_CLR(clsm, WT_CLSM_ITERATE_NEXT | WT_CLSM_ITERATE_PREV);
+	}
 
 	WT_RET(__clsm_close_cursors(clsm));
 
@@ -143,6 +151,22 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm)
 
 		/* Child cursors always use overwrite and raw mode. */
 		F_SET(*cp, WT_CURSTD_OVERWRITE | WT_CURSTD_RAW);
+	}
+
+	/*
+	 * This is wrong for a number of reasons:
+	 *  * We don't want to have the cost of doing a search if the cursor
+	 *    isn't being used for iterating.
+	 *  * The search can result in an unexpected unpositioned cursor if a
+	 *    delete has removed the key being searched for.
+	 */
+	if (clsm->current != NULL) {
+		if (__clsm_search(c) == WT_NOTFOUND)
+			/*
+			 * Don't mark the key invalid, this could be happening
+			 * during an insert.
+			 */
+			F_SET(c, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 	}
 
 err:	__wt_spin_unlock(session, &lsm_tree->lock);
@@ -538,6 +562,16 @@ __clsm_put(
 	lsm_tree = clsm->lsm_tree;
 
 	primary = clsm->cursors[clsm->nchunks - 1];
+
+	/* Create a new in-memory chunk if this is the first insert operation. */
+	if (lsm_tree->memsizep == NULL &&
+	    F_ISSET(primary, WT_LSM_CHUNK_ONDISK)) {
+		__wt_spin_lock(session, &lsm_tree->lock);
+		WT_WITH_SCHEMA_LOCK(session,
+		    ret = __wt_lsm_tree_switch(session, lsm_tree));
+		__wt_spin_unlock(session, &lsm_tree->lock);
+	}
+
 	primary->set_key(primary, key);
 	primary->set_value(primary, value);
 	WT_RET(primary->insert(primary));
@@ -549,15 +583,6 @@ __clsm_put(
 	 */
 	F_CLR(clsm, WT_CLSM_ITERATE_PREV | WT_CLSM_ITERATE_NEXT);
 	clsm->current = primary;
-	btree = ((WT_CURSOR_BTREE *)primary)->btree;
-
-	/*
-	 * Peek into the btree layer to find the in-memory size. Create a 
-	 * tree if the current one is empty.
-	 */
-	if (lsm_tree->memsizep == NULL && __wt_btree_get_memsize(
-	    session, btree, &lsm_tree->memsizep) == WT_ERROR)
-		WT_RET(__wt_lsm_tree_switch(session, lsm_tree));
 
 	if ((memsizep = lsm_tree->memsizep) != NULL &&
 	    *memsizep > lsm_tree->threshold) {
@@ -569,6 +594,7 @@ __clsm_put(
 		 * to move some operations (such as clearing the
 		 * "cache_resident" flag) into the worker thread.
 		 */
+		btree = ((WT_CURSOR_BTREE *)primary)->btree;
 		WT_RET(__clsm_close_cursors(clsm));
 		WT_RET(__wt_btree_release_memsize(session, btree));
 
@@ -576,10 +602,10 @@ __clsm_put(
 		 * Take the LSM lock first: we can't acquire it while
 		 * holding the schema lock, or we will deadlock.
 		 */
-		__wt_spin_lock(session, &clsm->lsm_tree->lock);
+		__wt_spin_lock(session, &lsm_tree->lock);
 		WT_WITH_SCHEMA_LOCK(session,
-		    ret = __wt_lsm_tree_switch(session, clsm->lsm_tree));
-		__wt_spin_unlock(session, &clsm->lsm_tree->lock);
+		    ret = __wt_lsm_tree_switch(session, lsm_tree));
+		__wt_spin_unlock(session, &lsm_tree->lock);
 	}
 
 	return (ret);

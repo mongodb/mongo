@@ -103,7 +103,7 @@ __wt_lsm_major_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	chunk->uri = dest_uri;
 	F_SET(chunk, WT_LSM_CHUNK_ONDISK);
 	dest_uri = NULL;
-	++lsm_tree->dsk_gen;
+	WT_ERR(__wt_lsm_tree_bump_gen(session, lsm_tree));
 	ret = __wt_lsm_meta_write(session, lsm_tree);
 	__wt_spin_unlock(session, &lsm_tree->lock);
 

@@ -28,6 +28,19 @@ __lsm_tree_discard(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 }
 
 /*
+ * __wt_lsm_tree_bump_gen --
+ *	Update the generation number of a LSM tree.
+ */
+int
+__wt_lsm_tree_bump_gen(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
+{
+	WT_UNUSED(session);
+	lsm_tree->old_cursors += lsm_tree->ncursor;
+	++lsm_tree->dsk_gen;
+	return (0);
+}
+
+/*
  * __wt_lsm_tree_close --
  *	Close an LSM tree structure.
  */
@@ -211,8 +224,7 @@ __wt_lsm_tree_switch(
 		    (int)*lsm_tree->memsizep, (int)lsm_tree->threshold);
 	lsm_tree->memsizep = NULL;
 
-	lsm_tree->old_cursors += lsm_tree->ncursor;
-	++lsm_tree->dsk_gen;
+	WT_ERR(__wt_lsm_tree_bump_gen(session, lsm_tree));
 
 	/* TODO more sensible realloc */
 	if ((lsm_tree->nchunks + 1) * sizeof(*lsm_tree->chunk) >
@@ -232,4 +244,28 @@ __wt_lsm_tree_switch(
 
 err:	/* TODO: mark lsm_tree bad on error(?) */
 	return (ret);
+}
+
+/*
+ * __wt_lsm_tree_worker --
+ *	Run a schema worker operation on each level of a LSM tree.
+ */
+int
+__wt_lsm_tree_worker(WT_SESSION_IMPL *session,
+   const char *uri,
+   int (*func)(WT_SESSION_IMPL *, const char *[]),
+   const char *cfg[], uint32_t open_flags)
+{
+	WT_CURSOR *cursor;
+	WT_LSM_TREE *lsm_tree;
+	int i;
+
+	WT_UNUSED(func);
+	WT_UNUSED(open_flags);
+	WT_RET(__wt_clsm_open(session, uri, cfg, &cursor));
+	lsm_tree = ((WT_CURSOR_LSM *)cursor)->lsm_tree;
+	for (i = 0; i < lsm_tree->nchunks; i++) {
+		WT_RET(__wt_schema_worker(session, lsm_tree->chunk[i].uri, func, cfg, open_flags));
+	}
+	return (0);
 }
