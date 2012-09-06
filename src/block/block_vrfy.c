@@ -521,6 +521,13 @@ __verify_ckptfrag_chk(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	uint64_t first, last;
 
 	/*
+	 * The checkpoint fragment memory is only allocated as a checkpoint
+	 * is succesfully loaded; don't check if there's nothing there.
+	 */
+	if (block->fragckpt == NULL)
+		return (0);
+
+	/*
 	 * Check for checkpoint fragments we haven't verified -- every time we
 	 * find a bit that's set, complain.  We re-start the search each time
 	 * after clearing the set bit(s) we found: it's simpler and this isn't
