@@ -22,6 +22,7 @@ __wt_lsm_worker(void *arg)
 	WT_LSM_TREE *lsm_tree;
 	WT_SESSION *wt_session;
 	WT_SESSION_IMPL *session;
+	const char *cfg[] = { "name=,drop=", NULL };
 	size_t chunk_alloc;
 	int i, nchunks, progress;
 
@@ -62,12 +63,17 @@ __wt_lsm_worker(void *arg)
 				continue;
 
 			/* XXX durability: need to checkpoint the metadata? */
+			/*
+			 * NOTE: we pass a non-NULL config, because otherwise
+			 * __wt_checkpoint thinks we're closing the file.
+			 */
 			WT_WITH_SCHEMA_LOCK(session, ret =
 			    __wt_schema_worker(session, chunk->uri,
-			    __wt_checkpoint, NULL, 0));
+			    __wt_checkpoint, cfg, 0));
 			if (ret == 0) {
 				__wt_spin_lock(session, &lsm_tree->lock);
 				F_SET(&lsm_tree->chunk[i], WT_LSM_CHUNK_ONDISK);
+				lsm_tree->dsk_gen++;
 				__wt_spin_unlock(session, &lsm_tree->lock);
 				progress = 1;
 			}
