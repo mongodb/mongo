@@ -94,6 +94,7 @@ __clsm_close_cursors(WT_CURSOR_LSM *clsm)
 		}
 	}
 
+	clsm->current = NULL;
 	return (0);
 }
 
@@ -117,8 +118,10 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm)
 	c = &clsm->iface;
 
 	/* Copy the key, so we don't lose the cursor position. */
-	if (clsm->current != NULL) {
-		WT_RET(__wt_buf_set(session, &c->key, c->key.data, c->key.size));
+	if (F_ISSET(c, WT_CURSTD_KEY_SET)) {
+		if (c->key.data != c->key.mem)
+			WT_RET(__wt_buf_set(
+			    session, &c->key, c->key.data, c->key.size));
 		F_CLR(clsm, WT_CLSM_ITERATE_NEXT | WT_CLSM_ITERATE_PREV);
 	}
 
@@ -151,22 +154,6 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm)
 
 		/* Child cursors always use overwrite and raw mode. */
 		F_SET(*cp, WT_CURSTD_OVERWRITE | WT_CURSTD_RAW);
-	}
-
-	/*
-	 * This is wrong for a number of reasons:
-	 *  * We don't want to have the cost of doing a search if the cursor
-	 *    isn't being used for iterating.
-	 *  * The search can result in an unexpected unpositioned cursor if a
-	 *    delete has removed the key being searched for.
-	 */
-	if (clsm->current != NULL) {
-		if (__clsm_search(c) == WT_NOTFOUND)
-			/*
-			 * Don't mark the key invalid, this could be happening
-			 * during an insert.
-			 */
-			F_SET(c, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 	}
 
 err:	__wt_spin_unlock(session, &lsm_tree->lock);
@@ -242,16 +229,21 @@ __clsm_next(WT_CURSOR *cursor)
 	if (clsm->current == NULL || !F_ISSET(clsm, WT_CLSM_ITERATE_NEXT)) {
 		F_CLR(clsm, WT_CLSM_MULTIPLE);
 		FORALL_CURSORS(clsm, c, i) {
-			if (clsm->current == NULL) {
+			if (!F_ISSET(cursor, WT_CURSTD_KEY_SET)) {
 				WT_ERR(c->reset(c));
 				ret = c->next(c);
-			} else {
+			} else if (c != clsm->current) {
 				c->set_key(c, &cursor->key);
 				if ((ret = c->search_near(c, &cmp)) == 0) {
 					if (cmp < 0)
 						ret = c->next(c);
-					else if (cmp == 0)
-						F_SET(clsm, WT_CLSM_MULTIPLE);
+					else if (cmp == 0) {
+						if (clsm->current == NULL)
+							clsm->current = c;
+						else
+							F_SET(clsm,
+							    WT_CLSM_MULTIPLE);
+					}
 				}
 			}
 			WT_ERR_NOTFOUND_OK(ret);
@@ -317,7 +309,7 @@ __clsm_prev(WT_CURSOR *cursor)
 	if (clsm->current == NULL || !F_ISSET(clsm, WT_CLSM_ITERATE_PREV)) {
 		F_CLR(clsm, WT_CLSM_MULTIPLE);
 		FORALL_CURSORS(clsm, c, i) {
-			if (clsm->current == NULL) {
+			if (!F_ISSET(cursor, WT_CURSTD_KEY_SET)) {
 				WT_ERR(c->reset(c));
 				ret = c->prev(c);
 			} else if (c != clsm->current) {
@@ -325,8 +317,13 @@ __clsm_prev(WT_CURSOR *cursor)
 				if ((ret = c->search_near(c, &cmp)) == 0) {
 					if (cmp > 0)
 						ret = c->prev(c);
-					else if (cmp == 0)
-						F_SET(clsm, WT_CLSM_MULTIPLE);
+					else if (cmp == 0) {
+						if (clsm->current == NULL)
+							clsm->current = c;
+						else
+							F_SET(clsm,
+							    WT_CLSM_MULTIPLE);
+					}
 				}
 			}
 			WT_ERR_NOTFOUND_OK(ret);
@@ -561,17 +558,25 @@ __clsm_put(
 
 	lsm_tree = clsm->lsm_tree;
 
-	primary = clsm->cursors[clsm->nchunks - 1];
-
-	/* Create a new in-memory chunk if this is the first insert operation. */
-	if (lsm_tree->memsizep == NULL &&
-	    F_ISSET(primary, WT_LSM_CHUNK_ONDISK)) {
+	/*
+	 * If this is the first update in this cursor, check if a new in-memory
+	 * chunk is needed.
+	 */
+	if (!F_ISSET(clsm, WT_CLSM_UPDATED)) {
 		__wt_spin_lock(session, &lsm_tree->lock);
-		WT_WITH_SCHEMA_LOCK(session,
-		    ret = __wt_lsm_tree_switch(session, lsm_tree));
+		if (clsm->dsk_gen == lsm_tree->dsk_gen)
+			WT_WITH_SCHEMA_LOCK(session,
+			    ret = __wt_lsm_tree_switch(session, lsm_tree));
 		__wt_spin_unlock(session, &lsm_tree->lock);
+		WT_RET(ret);
+		F_SET(clsm, WT_CLSM_UPDATED);
+
+		/* We changed the structure, or someone else did: update. */
+		WT_RET(__clsm_leave(clsm));
+		WT_RET(__clsm_enter(clsm));
 	}
 
+	primary = clsm->cursors[clsm->nchunks - 1];
 	primary->set_key(primary, key);
 	primary->set_value(primary, value);
 	WT_RET(primary->insert(primary));

@@ -256,16 +256,18 @@ __wt_lsm_tree_worker(WT_SESSION_IMPL *session,
    int (*func)(WT_SESSION_IMPL *, const char *[]),
    const char *cfg[], uint32_t open_flags)
 {
-	WT_CURSOR *cursor;
+	WT_LSM_CHUNK *chunk;
 	WT_LSM_TREE *lsm_tree;
 	int i;
 
-	WT_UNUSED(func);
-	WT_UNUSED(open_flags);
-	WT_RET(__wt_clsm_open(session, uri, cfg, &cursor));
-	lsm_tree = ((WT_CURSOR_LSM *)cursor)->lsm_tree;
+	WT_RET(__wt_lsm_tree_get(session, uri, &lsm_tree));
 	for (i = 0; i < lsm_tree->nchunks; i++) {
-		WT_RET(__wt_schema_worker(session, lsm_tree->chunk[i].uri, func, cfg, open_flags));
+		chunk = &lsm_tree->chunk[i];
+		if (func == __wt_checkpoint &&
+		    F_ISSET(chunk, WT_LSM_CHUNK_ONDISK))
+			continue;
+		WT_RET(__wt_schema_worker(
+		    session, chunk->uri, func, cfg, open_flags));
 	}
 	return (0);
 }

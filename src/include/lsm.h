@@ -20,6 +20,7 @@ struct __wt_cursor_lsm {
 #define	WT_CLSM_MERGE		0x04    /* Merge cursor, don't update. */
 #define	WT_CLSM_MULTIPLE        0x08    /* Multiple cursors have values for the
 					   current key */
+#define	WT_CLSM_UPDATED		0x10    /* Cursor has done updates */
 	uint32_t flags;
 };
 
