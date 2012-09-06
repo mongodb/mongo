@@ -323,10 +323,10 @@ __rec_review(WT_SESSION_IMPL *session,
 			    "page %p written but not clean", page);
 
 			/*
-			 * If we don't have any hazard references, try to bump
-			 * our snapshot.
+			 * If there is only a single cursor open, there are no
+			 * consistency issues: try to bump our snapshot.
 			 */
-			if (session->nhazard == 0) {
+			if (session->ncursors <= 1) {
 				__wt_txn_read_last(session);
 				__wt_txn_read_first(session);
 			}
