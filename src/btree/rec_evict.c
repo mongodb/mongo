@@ -315,7 +315,25 @@ __rec_review(WT_SESSION_IMPL *session,
 	/* If the page is dirty, write it so we know the final state. */
 	if (__wt_page_is_modified(page) &&
 	    !F_ISSET(mod, WT_PM_REC_SPLIT_MERGE)) {
-		if ((ret = __wt_rec_write(session, page, NULL, flags)) == EBUSY)
+		ret = __wt_rec_write(session, page, NULL, flags);
+
+		/* If there are unwritten changes on the page, give up. */
+		if (ret == 0 &&
+		    !LF_ISSET(WT_REC_SINGLE) && __wt_page_is_modified(page))
+			ret = EBUSY;
+		if (ret == EBUSY) {
+			WT_VERBOSE_RET(session, evict,
+			    "page %p written but not clean", page);
+
+			/*
+			 * If there is only a single cursor open, there are no
+			 * consistency issues: try to bump our snapshot.
+			 */
+			if (session->ncursors <= 1) {
+				__wt_txn_read_last(session);
+				__wt_txn_read_first(session);
+			}
+
 			switch (page->type) {
 			case WT_PAGE_COL_FIX:
 			case WT_PAGE_COL_VAR:
@@ -325,14 +343,8 @@ __rec_review(WT_SESSION_IMPL *session,
 				__wt_row_leaf_obsolete(session, page);
 				break;
 			}
-		WT_RET(ret);
-
-		/* If there are unwritten changes on the page, give up. */
-		if (!LF_ISSET(WT_REC_SINGLE) && __wt_page_is_modified(page)) {
-			WT_VERBOSE_RET(session, evict,
-			    "page %p written but not clean", page);
-			return (EBUSY);
 		}
+		WT_RET(ret);
 	}
 
 	/*
