@@ -73,6 +73,7 @@ namespace replset {
         // Cap the batches using the limit on journal commits.
         // This works out to be 100 MB (64 bit) or 50 MB (32 bit)
         static const unsigned int replBatchSizeBytes = dur::UncommittedBytesLimit;
+        static const int replBatchLimitSeconds = 5;
 
         // Prefetch and write a deque of operations, using the supplied function.
         // Initial Sync and Sync Tail each use a different function.
