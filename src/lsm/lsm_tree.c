@@ -197,6 +197,7 @@ __wt_lsm_tree_get(
 {
 	WT_DECL_RET;
 	WT_LSM_TREE *lsm_tree;
+	int needlock;
 
 	TAILQ_FOREACH(lsm_tree, &S2C(session)->lsmqh, q)
 		if (strcmp(uri, lsm_tree->name) == 0) {
@@ -204,8 +205,21 @@ __wt_lsm_tree_get(
 			return (0);
 		}
 
-	WT_WITH_SCHEMA_LOCK(session,
-	    ret = __lsm_tree_open(session, uri, treep));
+	/*
+	 * If we don't already hold the schema lock, get it now so that we
+	 * can find and/or open the handle.
+	 */
+	needlock = !F_ISSET(session, WT_SESSION_SCHEMA_LOCKED);
+	if (needlock) {
+		__wt_spin_lock(session, &S2C(session)->schema_lock);
+		F_SET(session, WT_SESSION_SCHEMA_LOCKED);
+	}
+	ret = __lsm_tree_open(session, uri, treep);
+	if (needlock) {
+		F_CLR(session, WT_SESSION_SCHEMA_LOCKED);
+		__wt_spin_unlock(session, &S2C(session)->schema_lock);
+	}
+	WT_RET(ret);
 	return (ret);
 }
 
