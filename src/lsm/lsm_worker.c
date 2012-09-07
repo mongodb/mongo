@@ -43,12 +43,15 @@ __wt_lsm_worker(void *arg)
 
 		/* Take a copy of the current state of the LSM tree. */
 		__wt_spin_lock(session, &lsm_tree->lock);
-		nchunks = lsm_tree->nchunks - 1;
+		for (nchunks = lsm_tree->nchunks - 1;
+		    nchunks > 0 && lsm_tree->chunk[nchunks].ncursor > 0;
+		    --nchunks)
+			;
 		if (chunk_alloc < lsm_tree->chunk_alloc)
 			ret = __wt_realloc(session,
 			    &chunk_alloc, lsm_tree->chunk_alloc,
 			    &chunk_array);
-		if (ret == 0)
+		if (ret == 0 && nchunks > 0)
 			memcpy(chunk_array, lsm_tree->chunk,
 			    nchunks * sizeof(*lsm_tree->chunk));
 		__wt_spin_unlock(session, &lsm_tree->lock);
@@ -79,7 +82,7 @@ __wt_lsm_worker(void *arg)
 			}
 		}
 
-		if (__wt_lsm_major_merge(session, lsm_tree) == 0)
+		if (nchunks > 0 && __wt_lsm_major_merge(session, lsm_tree) == 0)
 			progress = 1;
 
 		if (!progress)

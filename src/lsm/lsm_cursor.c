@@ -111,6 +111,7 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm)
 	WT_LSM_TREE *lsm_tree;
 	WT_SESSION_IMPL *session;
 	const char *ckpt_cfg[] = { "checkpoint=WiredTigerCheckpoint", NULL };
+	const char *primary_uri;
 	int i, nchunks;
 
 	session = (WT_SESSION_IMPL *)clsm->iface.session;
@@ -125,14 +126,30 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm)
 		F_CLR(clsm, WT_CLSM_ITERATE_NEXT | WT_CLSM_ITERATE_PREV);
 	}
 
+	/*
+	 * Take a copy of the primary cursor URI.  We're about to close the
+	 * cursor, but this pointer will stay valid because it is owned by the
+	 * underlying btree handle.
+	 */
+	if (clsm->cursors != NULL)
+		primary_uri = clsm->cursors[clsm->nchunks - 1]->uri;
+	else
+		primary_uri = NULL;
 	WT_RET(__clsm_close_cursors(clsm));
 
 	__wt_spin_lock(session, &lsm_tree->lock);
-	if (clsm->cursors != NULL) {
-		WT_ASSERT(session, lsm_tree->old_cursors > 0);
-		--lsm_tree->old_cursors;
+	/* Detach from our old primary. */
+	if (primary_uri != NULL) {
+		for (i = clsm->nchunks - 1; i >= 0; i--) {
+			chunk = &lsm_tree->chunk[i];
+			if (strcmp(primary_uri, chunk->uri) == 0) {
+				--chunk->ncursor;
+				break;
+			}
+		}
+		/* We must find the primary: it can't have gone anywhere yet. */
+		WT_ASSERT(session, i != -1);
 	}
-	++lsm_tree->ncursor;
 
 	if ((nchunks = lsm_tree->nchunks) > clsm->nchunks)
 		WT_RET(__wt_realloc(session, NULL,
@@ -153,6 +170,9 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm)
 		/* Child cursors always use overwrite and raw mode. */
 		F_SET(*cp, WT_CURSTD_OVERWRITE | WT_CURSTD_RAW);
 	}
+	
+	/* The last chunk is our new primary. */
+	++chunk->ncursor;
 
 	/* Peek into the btree layer to track the in-memory size. */
 	if (lsm_tree->memsizep == NULL)
@@ -605,7 +625,6 @@ __clsm_put(
 		 * "cache_resident" flag) into the worker thread.
 		 */
 		btree = ((WT_CURSOR_BTREE *)primary)->btree;
-		WT_RET(__clsm_close_cursors(clsm));
 		WT_RET(__wt_btree_release_memsize(session, btree));
 
 		/*
@@ -613,8 +632,10 @@ __clsm_put(
 		 * holding the schema lock, or we will deadlock.
 		 */
 		__wt_spin_lock(session, &lsm_tree->lock);
-		WT_WITH_SCHEMA_LOCK(session,
-		    ret = __wt_lsm_tree_switch(session, lsm_tree));
+		/* Make sure we don't race. */
+		if (clsm->dsk_gen == lsm_tree->dsk_gen)
+			WT_WITH_SCHEMA_LOCK(session,
+			    ret = __wt_lsm_tree_switch(session, lsm_tree));
 		__wt_spin_unlock(session, &lsm_tree->lock);
 	}
 

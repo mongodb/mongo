@@ -35,7 +35,6 @@ int
 __wt_lsm_tree_bump_gen(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
 	WT_UNUSED(session);
-	lsm_tree->old_cursors += lsm_tree->ncursor;
 	++lsm_tree->dsk_gen;
 	return (0);
 }

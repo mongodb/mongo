@@ -27,6 +27,7 @@ struct __wt_cursor_lsm {
 struct __wt_lsm_chunk {
 	const char *uri;
 
+	uint32_t ncursor;		/* Cursors with the chunk as primary. */
 #define	WT_LSM_CHUNK_ONDISK	0x01
 	uint32_t flags;
 };
@@ -41,7 +42,7 @@ struct __wt_lsm_tree {
 	TAILQ_ENTRY(__wt_lsm_tree) q;
 
 	WT_SPINLOCK lock;
-	uint64_t dsk_gen, ncursor, old_cursors;
+	uint64_t dsk_gen;
 	uint32_t *memsizep;
 
 	uint32_t threshold;
