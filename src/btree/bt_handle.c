@@ -267,26 +267,7 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session)
 	 * If the pair is evicted without being modified, that's OK, nothing is
 	 * ever written.
 	 *
-	 * Create the leaf page.
-	 */
-	WT_ERR(__wt_calloc_def(session, 1, &leaf));
-	switch (btree->type) {
-	case BTREE_COL_FIX:
-		leaf->u.col_fix.recno = 1;
-		leaf->type = WT_PAGE_COL_FIX;
-		break;
-	case BTREE_COL_VAR:
-		leaf->u.col_var.recno = 1;
-		leaf->type = WT_PAGE_COL_VAR;
-		break;
-	case BTREE_ROW:
-		leaf->type = WT_PAGE_ROW_LEAF;
-		break;
-	}
-	leaf->entries = 0;
-
-	/*
-	 * Create the root page.
+	 * Create the root and leaf pages.
 	 *
 	 * !!!
 	 * Be cautious about changing the order of updates in this code: to call
@@ -301,6 +282,7 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session)
 		root->u.intl.recno = 1;
 		WT_ERR(__wt_calloc_def(session, 1, &root->u.intl.t));
 		ref = root->u.intl.t;
+		WT_ERR(__wt_btree_leaf_create(session, root, ref, &leaf));
 		ref->page = leaf;
 		ref->addr = NULL;
 		ref->state = WT_REF_MEM;
@@ -310,6 +292,7 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session)
 		root->type = WT_PAGE_ROW_INT;
 		WT_ERR(__wt_calloc_def(session, 1, &root->u.intl.t));
 		ref = root->u.intl.t;
+		WT_ERR(__wt_btree_leaf_create(session, root, ref, &leaf));
 		ref->page = leaf;
 		ref->addr = NULL;
 		ref->state = WT_REF_MEM;
@@ -320,11 +303,6 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session)
 	root->entries = 1;
 	root->parent = NULL;
 	root->ref = NULL;
-
-	leaf->ref = ref;
-	leaf->parent = root;
-
-	btree->root_page = root;
 
 	/*
 	 * Mark the leaf page dirty: we didn't create an entirely valid root
@@ -354,6 +332,8 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session)
 	WT_ERR(__wt_page_modify_init(session, leaf));
 	__wt_page_modify_set(leaf);
 
+	btree->root_page = root;
+
 	return (0);
 
 err:	if (leaf != NULL)
@@ -361,6 +341,41 @@ err:	if (leaf != NULL)
 	if (root != NULL)
 		__wt_page_out(session, &root, 0);
 	return (ret);
+}
+
+/*
+ * __wt_btree_leaf_create --
+ *	Create an empty leaf page.
+ */
+int
+__wt_btree_leaf_create(
+    WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *ref, WT_PAGE **pagep)
+{
+	WT_BTREE *btree;
+	WT_PAGE *leaf;
+
+	btree = session->btree;
+
+	WT_RET(__wt_calloc_def(session, 1, &leaf));
+	switch (btree->type) {
+	case BTREE_COL_FIX:
+		leaf->u.col_fix.recno = 1;
+		leaf->type = WT_PAGE_COL_FIX;
+		break;
+	case BTREE_COL_VAR:
+		leaf->u.col_var.recno = 1;
+		leaf->type = WT_PAGE_COL_VAR;
+		break;
+	case BTREE_ROW:
+		leaf->type = WT_PAGE_ROW_LEAF;
+		break;
+	}
+	leaf->entries = 0;
+	leaf->ref = ref;
+	leaf->parent = parent;
+
+	*pagep = leaf;
+	return (0);
 }
 
 /*
@@ -400,7 +415,7 @@ __btree_get_last_recno(WT_SESSION_IMPL *session)
 	btree = session->btree;
 
 	page = NULL;
-	WT_RET(__wt_tree_np(session, &page, 0, 0));
+	WT_RET(__wt_tree_walk(session, &page, WT_TREE_PREV));
 	if (page == NULL)
 		return (WT_NOTFOUND);
 

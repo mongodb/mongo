@@ -1087,6 +1087,8 @@ __slvg_col_build_internal(
 		WT_ERR(__wt_strndup(session,
 		    (char *)trk->addr.addr, trk->addr.size, &addr->addr));
 		addr->size = trk->addr.size;
+		addr->leaf_no_overflow = trk->ovfl_cnt == 0 ? 1 : 0;
+
 		ref->page = NULL;
 		ref->addr = addr;
 		ref->u.recno = trk->col_start;
@@ -1659,9 +1661,11 @@ __slvg_row_build_internal(
 		WT_ERR(__wt_strndup(session,
 		    (char *)trk->addr.addr, trk->addr.size, &addr->addr));
 		addr->size = trk->addr.size;
+		addr->leaf_no_overflow = trk->ovfl_cnt == 0 ? 1 : 0;
 
 		ref->page = NULL;
 		ref->addr = addr;
+		ref->u.key = NULL;
 		ref->state = WT_REF_DISK;
 
 		/*

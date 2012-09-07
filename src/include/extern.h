@@ -254,15 +254,18 @@ extern int __wt_cell_unpack_copy( WT_SESSION_IMPL *session,
     WT_CELL_UNPACK *unpack,
     WT_ITEM *retb);
 extern void __wt_btcur_iterate_setup(WT_CURSOR_BTREE *cbt, int next);
-extern int __wt_btcur_next(WT_CURSOR_BTREE *cbt, int is_modify);
+extern int __wt_btcur_next(WT_CURSOR_BTREE *cbt, int discard);
 extern int __wt_btcur_next_random(WT_CURSOR_BTREE *cbt);
-extern int __wt_btcur_prev(WT_CURSOR_BTREE *cbt, int is_modify);
+extern int __wt_btcur_prev(WT_CURSOR_BTREE *cbt, int discard);
 extern int __wt_btcur_reset(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_search(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exact);
 extern int __wt_btcur_insert(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_remove(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_update(WT_CURSOR_BTREE *cbt);
+extern int __wt_btcur_compare(WT_CURSOR_BTREE *a_arg,
+    WT_CURSOR_BTREE *b_arg,
+    int *cmpp);
 extern int __wt_btcur_truncate(WT_CURSOR_BTREE *start, WT_CURSOR_BTREE *stop);
 extern int __wt_btcur_close(WT_CURSOR_BTREE *cbt);
 extern int __wt_debug_addr(WT_SESSION_IMPL *session,
@@ -303,6 +306,10 @@ extern int __wt_btree_open(WT_SESSION_IMPL *session,
     int readonly);
 extern int __wt_btree_close(WT_SESSION_IMPL *session);
 extern int __wt_btree_tree_open(WT_SESSION_IMPL *session, WT_ITEM *dsk);
+extern int __wt_btree_leaf_create( WT_SESSION_IMPL *session,
+    WT_PAGE *parent,
+    WT_REF *ref,
+    WT_PAGE **pagep);
 extern int __wt_btree_root_empty(WT_SESSION_IMPL *session, WT_PAGE **leafp);
 extern int __wt_btree_huffman_open(WT_SESSION_IMPL *session,
     const char *config);
@@ -350,10 +357,10 @@ extern int __wt_dumpfile(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_verify_dsk(WT_SESSION_IMPL *session,
     const char *addr,
     WT_ITEM *buf);
-extern int __wt_tree_np(WT_SESSION_IMPL *session,
+extern void __wt_tree_walk_delete_rollback(WT_REF *ref);
+extern int __wt_tree_walk(WT_SESSION_IMPL *session,
     WT_PAGE **pagep,
-    int eviction,
-    int next);
+    uint32_t flags);
 extern int __wt_col_modify(WT_SESSION_IMPL *session,
     WT_CURSOR_BTREE *cbt,
     int op);
@@ -378,10 +385,14 @@ extern int __wt_rec_track_onpage_srch(WT_SESSION_IMPL *session,
     uint32_t addr_size,
     int *foundp,
     WT_ITEM *copy);
-extern int __wt_rec_track_onpage_add(WT_SESSION_IMPL *session,
+extern int __wt_rec_track_onpage_addr(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     const uint8_t *addr,
     uint32_t addr_size);
+extern int __wt_rec_track_onpage_ref( WT_SESSION_IMPL *session,
+    WT_PAGE *page,
+    WT_PAGE *refpage,
+    WT_REF *ref);
 extern int __wt_rec_track_ovfl_reuse( WT_SESSION_IMPL *session,
     WT_PAGE *page,
     const void *data,

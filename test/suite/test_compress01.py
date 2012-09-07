@@ -92,13 +92,6 @@ class test_compress01_base(wttest.WiredTigerTestCase):
             self.assertEquals(getcursor.get_value(), val)
             getcursor.close()
 
-    def do_fresh_cache(self):
-        # Since we are running WT in-process, we just need
-        # to shut down the connection and start again.
-        self.conn.close()
-        self.conn = self.setUpConnectionOpen(".")
-        self.session = self.setUpSessionOpen(self.conn)
-
     def extensionArg(self, name):
         if name != None:
             testdir = os.path.dirname(__file__)
@@ -116,7 +109,8 @@ class test_compress01_base(wttest.WiredTigerTestCase):
         return self.setUpConnectionWithExtension(dir, self.compressor_name)
         
     def setUpConnectionWithExtension(self, dir, name):
-        conn = wiredtiger.wiredtiger_open(dir, 'create,' + self.extensionArg(name))
+        conn = wiredtiger.wiredtiger_open(
+            dir, 'create,' + self.extensionArg(name))
         self.pr(`conn`)
         return conn
 
@@ -129,9 +123,8 @@ class test_compress01_base(wttest.WiredTigerTestCase):
 class compress01_tests(object):
     def test_insert_and_verify(self):
         self.do_insert()
-        # We want a fresh cache so that compressed pages
-        # are really read from disk. 
-        self.do_fresh_cache()
+        # We want a fresh cache so compressed pages are read from disk. 
+        self.reopen_conn()
         self.do_verify()
 
 

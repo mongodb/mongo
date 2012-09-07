@@ -29,12 +29,13 @@ static void __verify_checkpoint_reset(WT_VSTUFF *);
 static int  __verify_int(WT_SESSION_IMPL *, int);
 static int  __verify_overflow(
 	WT_SESSION_IMPL *, const uint8_t *, uint32_t, WT_VSTUFF *);
-static int  __verify_overflow_cell(WT_SESSION_IMPL *, WT_PAGE *, WT_VSTUFF *);
+static int  __verify_overflow_cell(
+	WT_SESSION_IMPL *, WT_PAGE *, int *, WT_VSTUFF *);
 static int  __verify_row_int_key_order(
 	WT_SESSION_IMPL *, WT_PAGE *, WT_REF *, uint32_t, WT_VSTUFF *);
 static int  __verify_row_leaf_key_order(
 	WT_SESSION_IMPL *, WT_PAGE *, WT_VSTUFF *);
-static int  __verify_tree(WT_SESSION_IMPL *, WT_PAGE *, uint64_t, WT_VSTUFF *);
+static int  __verify_tree(WT_SESSION_IMPL *, WT_PAGE *, WT_VSTUFF *);
 
 /*
  * __wt_verify --
@@ -126,7 +127,7 @@ __verify_int(WT_SESSION_IMPL *session, int dumpfile)
 			/* Verify then discard the checkpoint from the cache. */
 			if ((ret = __wt_btree_tree_open(session, &dsk)) == 0) {
 				ret = __verify_tree(
-				    session, btree->root_page, (uint64_t)1, vs);
+				    session, btree->root_page, vs);
 				WT_TRET(__wt_bt_cache_flush(
 				    session, NULL, WT_SYNC_DISCARD));
 			}
@@ -182,8 +183,7 @@ __verify_checkpoint_reset(WT_VSTUFF *vs)
  * in the page and in the tree.
  */
 static int
-__verify_tree(WT_SESSION_IMPL *session,
-    WT_PAGE *page, uint64_t parent_recno, WT_VSTUFF *vs)
+__verify_tree(WT_SESSION_IMPL *session, WT_PAGE *page, WT_VSTUFF *vs)
 {
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
@@ -191,8 +191,8 @@ __verify_tree(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_REF *ref;
 	uint64_t recno;
-	uint32_t entry, i, size;
-	const uint8_t *addr;
+	uint32_t entry, i;
+	int found, lno;
 
 	unpack = &_unpack;
 
@@ -236,7 +236,7 @@ __verify_tree(WT_SESSION_IMPL *session,
 #endif
 
 	/*
-	 * Column-store key order checks: check the starting record number,
+	 * Column-store key order checks: check the page's record number and
 	 * then update the total record count.
 	 */
 	switch (page->type) {
@@ -248,12 +248,12 @@ __verify_tree(WT_SESSION_IMPL *session,
 		goto recno_chk;
 	case WT_PAGE_COL_VAR:
 		recno = page->u.col_var.recno;
-recno_chk:	if (parent_recno != recno)
+recno_chk:	if (recno != vs->record_total + 1)
 			WT_RET_MSG(session, WT_ERROR,
 			    "page at %s has a starting record of %" PRIu64
 			    " when the expected starting record is %" PRIu64,
 			    __wt_page_addr_string(session, vs->tmp1, page),
-			    recno, parent_recno);
+			    recno, vs->record_total + 1);
 		break;
 	}
 	switch (page->type) {
@@ -288,12 +288,41 @@ recno_chk:	if (parent_recno != recno)
 	 * Check overflow pages.  We check overflow cells separately from other
 	 * tests that walk the page as it's simpler, and I don't care much how
 	 * fast table verify runs.
+	 *
+	 * Object if a leaf-no-overflow address cell references a page that has
+	 * overflow keys, but don't object if a standard address cell references
+	 * a page without overflow keys.  The leaf-no-overflow address cell is
+	 * an optimization for trees without few, if any, overflow items, and
+	 * may not be set by reconciliation in all possible cases.
 	 */
+	if (WT_PAGE_IS_ROOT(page))
+		lno = 0;
+	else {
+		__wt_cell_unpack(page->ref->addr, unpack);
+		lno = unpack->raw == WT_CELL_ADDR_LNO ? 1 : 0;
+	}
 	switch (page->type) {
+	case WT_PAGE_COL_FIX:
+		break;
 	case WT_PAGE_COL_VAR:
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
-		WT_RET(__verify_overflow_cell(session, page, vs));
+		WT_RET(__verify_overflow_cell(session, page, &found, vs));
+		if (found && lno)
+			WT_RET_MSG(session, WT_ERROR,
+			    "page at %s referenced in its parent by a cell of "
+			    "type %s illegally contains overflow items",
+			    __wt_page_addr_string(session, vs->tmp1, page),
+			    __wt_cell_type_string(WT_CELL_ADDR_LNO));
+		break;
+	default:
+		if (lno)
+			WT_RET_MSG(session, WT_ERROR,
+			    "page at %s is of type %s and is illegally "
+			    "referenced in its parent by a cell of type %s",
+			    __wt_page_addr_string(session, vs->tmp1, page),
+			    __wt_page_type_string(page->type),
+			    __wt_cell_type_string(WT_CELL_ADDR_LNO));
 		break;
 	}
 
@@ -301,36 +330,37 @@ recno_chk:	if (parent_recno != recno)
 	switch (page->type) {
 	case WT_PAGE_COL_INT:
 		/* For each entry in an internal page, verify the subtree. */
+		entry = 0;
 		WT_REF_FOREACH(page, ref, i) {
 			/*
 			 * It's a depth-first traversal: this entry's starting
 			 * record number should be 1 more than the total records
 			 * reviewed to this point.
 			 */
+			++entry;
 			if (ref->u.recno != vs->record_total + 1) {
-				WT_DECL_ITEM(tmp);
-				WT_RET(__wt_scr_alloc(session, 0, &tmp));
 				__wt_cell_unpack(ref->addr, unpack);
-				ret = __wt_bm_addr_string(
-				    session, tmp, unpack->data, unpack->size);
-				__wt_errx(session, "page at %s has a starting "
-				    "record of %" PRIu64 " when the expected "
-				    "starting record was %" PRIu64,
-				    ret == 0 ?
-				    (char *)tmp->data : "[Unknown address]",
-				    ref->u.recno, vs->record_total + 1);
-				__wt_scr_free(&tmp);
-				return (WT_ERROR);
+				WT_RET_MSG(session, WT_ERROR,
+				    "the starting record number in entry %"
+				    PRIu32 " of the column internal page at "
+				    "%s is %" PRIu64 " and the expected "
+				    "starting record number is %" PRIu64,
+				    entry,
+				    __wt_page_addr_string(
+				    session, vs->tmp1, page),
+				    ref->u.recno,
+				    vs->record_total + 1);
 			}
 
-			/* ref references the subtree containing the record */
-			__wt_get_addr(page, ref, &addr, &size);
+			/* Verify the subtree. */
 			WT_RET(__wt_page_in(session, page, ref));
-			ret =
-			    __verify_tree(session, ref->page, ref->u.recno, vs);
+			ret = __verify_tree(session, ref->page, vs);
 			__wt_page_release(session, ref->page);
 			WT_RET(ret);
-			WT_RET(__wt_bm_verify_addr(session, addr, size));
+
+			__wt_cell_unpack(ref->addr, unpack);
+			WT_RET(__wt_bm_verify_addr(
+			    session, unpack->data, unpack->size));
 		}
 		break;
 	case WT_PAGE_ROW_INT:
@@ -345,19 +375,20 @@ recno_chk:	if (parent_recno != recno)
 			 * The 0th key of any internal page is magic, and we
 			 * can't test against it.
 			 */
-			if (entry != 0)
+			++entry;
+			if (entry != 1)
 				WT_RET(__verify_row_int_key_order(
 				    session, page, ref, entry, vs));
-			++entry;
 
-			/* ref references the subtree containing the record */
-			__wt_get_addr(page, ref, &addr, &size);
+			/* Verify the subtree. */
 			WT_RET(__wt_page_in(session, page, ref));
-			ret =
-			    __verify_tree(session, ref->page, (uint64_t)0, vs);
+			ret = __verify_tree(session, ref->page, vs);
 			__wt_page_release(session, ref->page);
 			WT_RET(ret);
-			WT_RET(__wt_bm_verify_addr(session, addr, size));
+
+			__wt_cell_unpack(ref->addr, unpack);
+			WT_RET(__wt_bm_verify_addr(
+			    session, unpack->data, unpack->size));
 		}
 		break;
 	}
@@ -470,7 +501,8 @@ __verify_row_leaf_key_order(
  *	Verify any overflow cells on the page.
  */
 static int
-__verify_overflow_cell(WT_SESSION_IMPL *session, WT_PAGE *page, WT_VSTUFF *vs)
+__verify_overflow_cell(
+    WT_SESSION_IMPL *session, WT_PAGE *page, int *found, WT_VSTUFF *vs)
 {
 	WT_BTREE *btree;
 	WT_CELL *cell;
@@ -481,6 +513,7 @@ __verify_overflow_cell(WT_SESSION_IMPL *session, WT_PAGE *page, WT_VSTUFF *vs)
 
 	btree = session->btree;
 	unpack = &_unpack;
+	*found = 0;
 
 	/*
 	 * If a tree is empty (just created), it won't have a disk image;
@@ -497,11 +530,13 @@ __verify_overflow_cell(WT_SESSION_IMPL *session, WT_PAGE *page, WT_VSTUFF *vs)
 		switch (unpack->type) {
 		case WT_CELL_KEY_OVFL:
 		case WT_CELL_VALUE_OVFL:
+			*found = 1;
 			WT_ERR(__verify_overflow(
 			    session, unpack->data, unpack->size, vs));
 			break;
 		}
 	}
+
 	return (0);
 
 err:	WT_RET_MSG(session, ret,

@@ -356,20 +356,6 @@ __session_truncate(WT_SESSION *wt_session,
 			    "truncate method cursors must reference the same "
 			    "object");
 
-		/*
-		 * For table truncation, we need the complete table cursor setup
-		 * (including indices), and for file truncation, we need a fully
-		 * initialized btree cursor.  There's no reason to believe any
-		 * of that is done, yet, the application may have only set the
-		 * keys and done nothing further.  Because the table cursor code
-		 * sits on top of the file cursor code, the easy solution is to
-		 * do a search now, that fully instantiates everything we need,
-		 * and then we don't have to deal with it further.
-		 */
-		if (start != NULL)
-			WT_ERR(start->search(start));
-		if (stop != NULL)
-			WT_ERR(stop->search(stop));
 		cursor = start == NULL ? stop : start;
 		if (WT_PREFIX_MATCH(cursor->uri, "file:"))
 			ret = __wt_curfile_truncate(session, start, stop);

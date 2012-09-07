@@ -22,7 +22,7 @@ __curindex_get_value(WT_CURSOR *cursor, ...)
 
 	cindex = (WT_CURSOR_INDEX *)cursor;
 	CURSOR_API_CALL_NOCONF(cursor, session, get_value, NULL);
-	WT_CURSOR_NEEDVALUE(cursor);
+	WT_ERR(WT_CURSOR_NEEDVALUE(cursor));
 
 	va_start(ap, cursor);
 	if (F_ISSET(cursor, WT_CURSTD_RAW)) {
@@ -195,7 +195,7 @@ __curindex_search(WT_CURSOR *cursor)
 	 * using only the primary's recno as the index key.  Disallow that for
 	 * now.
 	 */
-	WT_ASSERT(session, strcmp(cursor->key_format, "r") != 0);
+	WT_ASSERT(session, !WT_CURSOR_RECNO(cursor));
 
 	/*
 	 * We expect partial matches, but we want the smallest item that
@@ -360,6 +360,7 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 		__wt_cursor_notsup,	/* update */
 		__wt_cursor_notsup,	/* remove */
 		__curindex_close,
+		NULL,			/* compare */
 		{ NULL, NULL },		/* TAILQ_ENTRY q */
 		0,			/* recno key */
 		{ 0 },			/* recno raw buffer */

@@ -77,10 +77,17 @@ struct __wt_txn {
 	 */
 	wt_txnid_t oldest_snap_min;
 
-	/* Array of txn IDs in items created or modified by this txn. */
-	wt_txnid_t **mod;
-	size_t mod_alloc;
-	u_int mod_count;
+	/*
+	 * Arrays of txn IDs in WT_UPDATE or WT_REF structures created or
+	 * modified by this transaction.
+	 */
+	wt_txnid_t    **mod;
+	size_t		mod_alloc;
+	u_int		mod_count;
+
+	WT_REF	      **modref;
+	size_t		modref_alloc;
+	u_int		modref_count;
 
 #define	TXN_ERROR	0x01
 #define	TXN_RUNNING	0x02

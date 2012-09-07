@@ -131,15 +131,50 @@ __cursor_fix_append_prev(WT_CURSOR_BTREE *cbt, int newpage)
 	if (newpage) {
 		if ((cbt->ins = WT_SKIP_LAST(cbt->ins_head)) == NULL)
 			return (WT_NOTFOUND);
-		__cursor_set_recno(cbt, WT_INSERT_RECNO(cbt->ins));
 	} else {
-		if (cbt->recno == WT_INSERT_RECNO(cbt->ins)) {
+		/*
+		 * Handle the special case of leading implicit records, that is,
+		 * there aren't any records in the tree not on the append list,
+		 * and the first record on the append list isn't record 1.
+		 *
+		 * The "right" place to handle this is probably in our caller.
+		 * The high-level cursor-previous routine would:
+		 *    -- call this routine to walk the append list
+		 *    -- call the routine to walk the standard page items
+		 *    -- call the tree walk routine looking for a previous page
+		 * Each of them returns WT_NOTFOUND, at which point our caller
+		 * checks the cursor record number, and if it's larger than 1,
+		 * returns the implicit records.  Instead, I'm trying to detect
+		 * the case here, mostly because I don't want to put that code
+		 * into our caller.  Anyway, if this code breaks for any reason,
+		 * that's the way I'd go.
+		 *
+		 * If we're not pointing to a WT_INSERT entry, or we can't find
+		 * a WT_INSERT record that precedes our record name-space, check
+		 * if there are any records on the page.  If there aren't, then
+		 * we're in the magic zone, keep going until we get to a record
+		 * number of 1.
+		 */
+		if (cbt->ins != NULL &&
+		    cbt->recno <= WT_INSERT_RECNO(cbt->ins))
 			WT_RET(__cursor_skip_prev(cbt));
-			if (cbt->ins == NULL)
-				return (WT_NOTFOUND);
-		}
-		__cursor_set_recno(cbt, cbt->recno - 1);
+		if (cbt->ins == NULL &&
+		    (cbt->recno == 1 || __col_last_recno(cbt->page) != 0))
+			return (WT_NOTFOUND);
 	}
+
+	/*
+	 * This code looks different from the cursor-next code.  The append
+	 * list appears on the last page of the tree and contains the last
+	 * records in the tree.  If we're iterating through the tree, starting
+	 * at the last record in the tree, by definition we're starting a new
+	 * iteration and we set the record number to the last record found in
+	 * the tree.  Otherwise, decrement the record.
+	 */
+	if (newpage)
+		__cursor_set_recno(cbt, WT_INSERT_RECNO(cbt->ins));
+	else
+		__cursor_set_recno(cbt, cbt->recno - 1);
 
 	/*
 	 * Fixed-width column store appends are inherently non-transactional.
@@ -151,7 +186,8 @@ __cursor_fix_append_prev(WT_CURSOR_BTREE *cbt, int newpage)
 	 * created records written by reconciliation are deleted and so can be
 	 * never seen by a read.
 	 */
-	if (cbt->recno > WT_INSERT_RECNO(cbt->ins) ||
+	if (cbt->ins == NULL ||
+	    cbt->recno > WT_INSERT_RECNO(cbt->ins) ||
 	    (upd = __wt_txn_read(session, cbt->ins->upd)) == NULL) {
 		cbt->v = 0;
 		val->data = &cbt->v;
@@ -169,7 +205,6 @@ static inline int
 __cursor_fix_prev(WT_CURSOR_BTREE *cbt, int newpage)
 {
 	WT_BTREE *btree;
-	WT_INSERT *ins;
 	WT_ITEM *val;
 	WT_SESSION_IMPL *session;
 	WT_UPDATE *upd;
@@ -194,9 +229,15 @@ __cursor_fix_prev(WT_CURSOR_BTREE *cbt, int newpage)
 		__cursor_set_recno(cbt, cbt->recno - 1);
 
 new_page:	/* Check any insert list for a matching record. */
-		if ((ins = cbt->ins = __col_insert_search_match(
-		    WT_COL_UPDATE_SINGLE(cbt->page), cbt->recno)) != NULL &&
-		    (upd = __wt_txn_read(session, ins->upd)) != NULL) {
+		cbt->ins_head = WT_COL_UPDATE_SINGLE(cbt->page);
+		cbt->ins = __col_insert_search(
+		    cbt->ins_head, cbt->ins_stack, cbt->recno);
+		if (cbt->ins != NULL &&
+		    cbt->recno != WT_INSERT_RECNO(cbt->ins))
+			cbt->ins = NULL;
+		upd = cbt->ins == NULL ?
+		    NULL : __wt_txn_read(session, cbt->ins->upd);
+		if (upd != NULL) {
 			val->data = WT_UPDATE_DATA(upd);
 			val->size = 1;
 			return (0);
@@ -255,7 +296,6 @@ __cursor_var_prev(WT_CURSOR_BTREE *cbt, int newpage)
 	WT_CELL *cell;
 	WT_CELL_UNPACK unpack;
 	WT_COL *cip;
-	WT_INSERT *ins;
 	WT_ITEM *val;
 	WT_SESSION_IMPL *session;
 	WT_UPDATE *upd;
@@ -282,14 +322,17 @@ new_page:	if (cbt->recno < cbt->page->u.col_var.recno)
 		/* Find the matching WT_COL slot. */
 		if ((cip = __col_var_search(cbt->page, cbt->recno)) == NULL)
 			return (WT_NOTFOUND);
+		cbt->slot = WT_COL_SLOT(cbt->page, cip);
 
 		/* Check any insert list for a matching record. */
-		if ((ins = __col_insert_search_match(
-		    WT_COL_UPDATE(cbt->page, cip), cbt->recno)) != NULL &&
-		    (upd = __wt_txn_read(session, ins->upd)) != NULL) {
+		cbt->ins_head = WT_COL_UPDATE_SLOT(cbt->page, cbt->slot);
+		cbt->ins = __col_insert_search_match(cbt->ins_head, cbt->recno);
+		upd = cbt->ins == NULL ?
+		    NULL : __wt_txn_read(session, cbt->ins->upd);
+		if (upd != NULL) {
 			if (WT_UPDATE_DELETED_ISSET(upd))
 				continue;
-			cbt->ins = ins;
+
 			val->data = WT_UPDATE_DATA(upd);
 			val->size = upd->size;
 			return (0);
@@ -432,15 +475,20 @@ new_insert:	if ((ins = cbt->ins) != NULL) {
  *	Move to the previous record in the tree.
  */
 int
-__wt_btcur_prev(WT_CURSOR_BTREE *cbt, int is_modify)
+__wt_btcur_prev(WT_CURSOR_BTREE *cbt, int discard)
 {
 	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_SESSION_IMPL *session;
+	uint32_t flags;
 	int newpage;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	WT_BSTAT_INCR(session, cursor_read_prev);
+
+	flags = WT_TREE_PREV;				/* Tree walk flags. */
+	if (discard)
+		LF_SET(WT_TREE_DISCARD);
 
 	__cursor_func_init(cbt, 0);
 
@@ -456,7 +504,7 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, int is_modify)
 	 * page, save the write generation.
 	 */
 	page = cbt->page;
-	if (is_modify && page != NULL) {
+	if (discard && page != NULL) {
 		WT_ERR(__wt_page_modify_init(session, page));
 		WT_ORDERED_READ(cbt->write_gen, page->modify->write_gen);
 	}
@@ -503,7 +551,7 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, int is_modify)
 
 		cbt->page = NULL;
 		do {
-			WT_ERR(__wt_tree_np(session, &page, 0, 0));
+			WT_ERR(__wt_tree_walk(session, &page, flags));
 			WT_ERR_TEST(page == NULL, WT_NOTFOUND);
 		} while (
 		    page->type == WT_PAGE_COL_INT ||
@@ -511,7 +559,7 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, int is_modify)
 		cbt->page = page;
 
 		/* Initialize the page's modification information */
-		if (is_modify) {
+		if (discard) {
 			WT_ERR(__wt_page_modify_init(session, page));
 			WT_ORDERED_READ(
 			    cbt->write_gen, page->modify->write_gen);
