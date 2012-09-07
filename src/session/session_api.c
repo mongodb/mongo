@@ -26,17 +26,34 @@ __session_reset_cursors(WT_SESSION_IMPL *session)
 
 /*
  * __session_close --
+ *	Close any cached handles in a session.  Called holding the schema lock.
+ */
+static int
+__session_close_cache(WT_SESSION_IMPL *session)
+{
+	WT_BTREE_SESSION *btree_session;
+	WT_DECL_RET;
+
+	while ((btree_session = TAILQ_FIRST(&session->btrees)) != NULL)
+		WT_TRET(__wt_session_discard_btree(session, btree_session));
+
+	WT_TRET(__wt_schema_close_tables(session));
+
+	return (ret);
+}
+
+/*
+ * __session_close --
  *	WT_SESSION->close method.
  */
 static int
 __session_close(WT_SESSION *wt_session, const char *config)
 {
-	WT_BTREE_SESSION *btree_session;
 	WT_CONNECTION_IMPL *conn;
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int needlock;
+	int tret;
 
 	conn = (WT_CONNECTION_IMPL *)wt_session->connection;
 	session = (WT_SESSION_IMPL *)wt_session;
@@ -54,17 +71,15 @@ __session_close(WT_SESSION *wt_session, const char *config)
 
 	WT_ASSERT(session, session->ncursors == 0);
 
-	/* Acquire the schema lock: we may be closing btree handles. */
-	__wt_spin_lock(session, &S2C(session)->schema_lock);
-	F_SET(session, WT_SESSION_SCHEMA_LOCKED);
-
-	while ((btree_session = TAILQ_FIRST(&session->btrees)) != NULL)
-		WT_TRET(__wt_session_discard_btree(session, btree_session));
-
-	WT_TRET(__wt_schema_close_tables(session));
-
-	F_CLR(session, WT_SESSION_SCHEMA_LOCKED);
-	__wt_spin_unlock(session, &S2C(session)->schema_lock);
+	/*
+	 * Acquire the schema lock: we may be closing btree handles.
+	 *
+	 * Note that in some special cases, the schema may already be locked
+	 * (e.g., if this session is an LSM tree worker and the tree is being
+	 * dropped).
+	 */
+	WT_WITH_SCHEMA_LOCK_OPT(session, tret = __session_close_cache(session));
+	WT_TRET(tret);
 
 	/* Discard metadata tracking. */
 	__wt_meta_track_discard(session);

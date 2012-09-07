@@ -170,7 +170,7 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm)
 		/* Child cursors always use overwrite and raw mode. */
 		F_SET(*cp, WT_CURSTD_OVERWRITE | WT_CURSTD_RAW);
 	}
-	
+
 	/* The last chunk is our new primary. */
 	++chunk->ncursor;
 
