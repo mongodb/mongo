@@ -262,42 +262,51 @@ namespace mongo {
         }
 
         bool NOINLINE_DECL DurableImpl::_aCommitIsNeeded() {
-            if( !Lock::isLocked() ) {
-                DEV log() << "commitIfNeeded but we are unlocked that is ok but why do we get here" << endl;
-                Lock::GlobalRead r;
-                if( commitJob.bytes() < UncommittedBytesLimit ) {
-                    // someone else beat us to it
-                    return false;
+            switch (Lock::isLocked()) {
+                case '\0': {
+                    DEV log() << "commitIfNeeded but we are unlocked that is ok but why do we get here" << endl;
+                    Lock::GlobalRead r;
+                    if( commitJob.bytes() < UncommittedBytesLimit ) {
+                        // someone else beat us to it
+                        return false;
+                    }
+                    commitNow();
+                    return true;
                 }
-                commitNow();
-            }
-            else if( Lock::isLocked() == 'w' ) {
-                if( Lock::atLeastReadLocked("local") ) { 
-                    error() << "can't commitNow from commitIfNeeded, as we are in local db lock" << endl;
-                    printStackTrace();
-                    dassert(false); // this will make _DEBUG builds terminate. so we will notice in buildbot.
-                    return false;
-                }
-                else if( Lock::atLeastReadLocked("admin") ) { 
-                    error() << "can't commitNow from commitIfNeeded, as we are in admin db lock" << endl;
-                    printStackTrace();
-                    dassert(false);
-                    return false;
-                }
-                else {
+                case 'w': {
+                    if( Lock::atLeastReadLocked("local") ) {
+                        error() << "can't commitNow from commitIfNeeded, as we are in local db lock" << endl;
+                        printStackTrace();
+                        dassert(false); // this will make _DEBUG builds terminate. so we will notice in buildbot.
+                        return false;
+                    }
+                    if( Lock::atLeastReadLocked("admin") ) {
+                        error() << "can't commitNow from commitIfNeeded, as we are in admin db lock" << endl;
+                        printStackTrace();
+                        dassert(false);
+                        return false;
+                    }
+
                     log(1) << "commitIfNeeded upgrading from shared write to exclusive write state"
                            << endl;
                     Lock::DBWrite::UpgradeToExclusive ex;
                     if (ex.gotUpgrade()) {
                         commitNow();
                     }
+                    return true;
                 }
+
+                case 'W':
+                case 'R':
+                    commitNow();
+                    return true;
+
+                case 'r':
+                    return false;
+
+                default:
+                    fassertFailed(16434); // unknown lock type
             }
-            else { 
-                // 'W'
-                commitNow();
-            }
-            return true;
         }
 
         /** we may need to commit earlier than normal if data are being written at 
