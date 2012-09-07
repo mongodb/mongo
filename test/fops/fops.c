@@ -11,6 +11,7 @@ static void *fop(void *);
 static void  print_stats(u_int);
 
 typedef struct {
+	int bulk;				/* bulk load */
 	int create;				/* session.create */
 	int drop;				/* session.drop */
 	int ckpt;				/* session.checkpoint */
@@ -107,7 +108,7 @@ fop(void *arg)
 	s = &run_stats[id];
 
 	for (i = 0; i < nops; ++i, sched_yield())
-		switch (r() % 5) {
+		switch (r() % 6) {
 		case 0:
 			++s->create;
 			obj_create();
@@ -128,6 +129,9 @@ fop(void *arg)
 			++s->verify;
 			obj_verify();
 			break;
+		case 5:
+			++s->bulk;
+			obj_bulk();
 		default:
 			break;
 		}
