@@ -312,12 +312,13 @@ namespace replset {
     void SyncTail::oplogApplication() {
         while( 1 ) {
             OpQueue ops;
-            time_t lastTimeChecked = time(0);
 
             verify( !Lock::isLocked() );
 
+            Timer batchTimer;
+            int lastTimeChecked = 0;
+
             // always fetch a few ops first
-            
             // tryPopAndWaitForMore returns true when we need to end a batch early
             while (!tryPopAndWaitForMore(&ops) && 
                    (ops.getSize() < replBatchSizeBytes)) {
@@ -326,7 +327,11 @@ namespace replset {
                     return;
                 }
 
-                time_t now = time(0);
+                int now = batchTimer.seconds();
+
+                // don't wait more than five seconds building up a batch
+                if (!ops.empty() && now > replBatchLimitSeconds)
+                    break;
 
                 // occasionally check some things
                 if (ops.empty() || now > lastTimeChecked) {
@@ -361,7 +366,7 @@ namespace replset {
                     // on, we can get ops that are way ahead of the delay and this will
                     // make this thread sleep longer when handleSlaveDelay is called
                     // and apply ops much sooner than we like.
-                    if (opTimestampSecs > (now - slaveDelaySecs)) {
+                    if (opTimestampSecs > static_cast<unsigned int>(time(0) - slaveDelaySecs)) {
                         break;
                     }
                 }
