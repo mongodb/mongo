@@ -53,6 +53,10 @@ namespace mongo {
             connect();
         }
 
+        void setTimeout(time_t timeout) {
+            connInfo->setTimeout(timeout);
+        }
+
         /* If we were to run a query and not exhaust the cursor, future use of the connection would be problematic.
            So here what we do is wrapper known safe methods and not allow cursor-style queries at all.  This makes
            ScopedConn limited in functionality but very safe.  More non-cursor wrappers can be added here if needed.
@@ -80,9 +84,18 @@ namespace mongo {
             bool connected;
             ConnectionInfo() : lock("ConnectionInfo"),
                                cc(new DBClientConnection(/*reconnect*/ true, 0, /*timeout*/ 10.0)),
-                               connected(false) {
+                               connected(false),
+                               _timeout(10) {
                 cc->_logLevel = 2;
             }
+
+            void setTimeout(time_t timeout) {
+                _timeout = timeout;
+                cc->setSoTimeout(_timeout);
+            }
+
+        private:
+            time_t _timeout;
         } *connInfo;
         typedef map<string,ScopedConn::ConnectionInfo*> M;
         static M& _map;
