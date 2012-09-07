@@ -61,22 +61,17 @@ class test_truncate_arguments(wttest.WiredTigerTestCase):
     # Test truncation of cursors where no key is set, expect errors.
     def test_truncate_cursor_notset(self):
         uri = self.type + self.name
+        msg = '/requires key be set/'
+
         simple_populate(self, uri, 'key_format=S', 100)
+
         c1 = self.session.open_cursor(uri, None)
         c2 = self.session.open_cursor(uri, None)
         c2.set_key(key_populate(c2, 10))
-        msg = '/requires key be set/'
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.truncate(None, c1, c2, None), msg)
-        c1.close()
-        c2.close()
-
-        c1 = self.session.open_cursor(uri, None)
-        c1.set_key(key_populate(c1, 10))
-        c2 = self.session.open_cursor(uri, None)
-        msg = '/requires key be set/'
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.session.truncate(None, c1, c2, None), msg)
+            lambda: self.session.truncate(None, c2, c1, None), msg)
         c1.close()
         c2.close()
 
@@ -137,6 +132,48 @@ class test_truncate_cursor_order(wttest.WiredTigerTestCase):
         self.session.truncate(None, c1, c2, None)
 
 
+# Test truncation of cursors past the end of the object.
+class test_truncate_cursor_end(wttest.WiredTigerTestCase):
+    name = 'test_truncate'
+
+    types = [
+        ('file', dict(type='file:')),
+        ('table', dict(type='table:'))
+    ]
+    keyfmt = [
+        ('integer', dict(keyfmt='i')),
+        ('recno', dict(keyfmt='r')),
+        ('string', dict(keyfmt='S')),
+    ]
+    scenarios = number_scenarios(multiply_scenarios('.', types, keyfmt))
+
+    # Test truncation of cursors past the end of the object.
+    def test_truncate_cursor_order(self):
+        uri = self.type + self.name
+
+        # A simple, one-file file or table object.
+        simple_populate(self, uri, 'key_format=' + self.keyfmt, 100)
+        c1 = self.session.open_cursor(uri, None)
+        c1.set_key(key_populate(c1, 1000))
+        c2 = self.session.open_cursor(uri, None)
+        c2.set_key(key_populate(c2, 2000))
+        self.session.truncate(None, c1, c2, None)
+        self.assertEquals(c1.close(), 0)
+        self.assertEquals(c2.close(), 0)
+        self.session.drop(uri)
+
+        if self.type == "table:":
+            complex_populate(self, uri, 'key_format=' + self.keyfmt, 100)
+            c1 = self.session.open_cursor(uri, None)
+            c1.set_key(key_populate(c1, 1000))
+            c2 = self.session.open_cursor(uri, None)
+            c2.set_key(key_populate(c2, 2000))
+            self.session.truncate(None, c1, c2, None)
+            self.assertEquals(c1.close(), 0)
+            self.assertEquals(c2.close(), 0)
+            self.session.drop(uri)
+
+
 # Test session.truncate.
 class test_truncate_cursor(wttest.WiredTigerTestCase):
     name = 'test_truncate'
@@ -160,35 +197,26 @@ class test_truncate_cursor(wttest.WiredTigerTestCase):
         ('on-disk', dict(reopen=True)),
     ]
     size = [
-        ('small', dict(nentries=100,skip=7,search=False)),
-        ('small-with-search', dict(nentries=100,skip=7,search=True)),
-        ('big', dict(nentries=1000,skip=37,search=False)),
+        ('small', dict(nentries=100,skip=7)),
+        ('big', dict(nentries=1000,skip=37)),
     ]
 
     scenarios = number_scenarios(
         multiply_scenarios('.', types, keyfmt, size, reopen))
 
-    # Set a cursor and optionally search for the item.
-    def initCursor(self, uri, key):
+    # Set a cursor key.
+    def cursorKey(self, uri, key):
         if key == -1:
             return None
         cursor = self.session.open_cursor(uri, None)
         cursor.set_key(key_populate(cursor, key))
-
-        # Test scenarios where we fully instantiate a cursor as well as where we
-        # only set the key.  The key may not exist in a column-store so ignore
-        # the flag in that case.
-        if self.search and not cursor.key_format == 'r':
-            self.assertEqual(cursor.search(), 0)
-            self.assertEqual(cursor.get_key(), key_populate(cursor, key))
-
         return cursor
 
     # Truncate a range using cursors, and check the results.
     def truncateRangeAndCheck(self, uri, begin, end, expected):
         self.pr('truncateRangeAndCheck: ' + str(begin) + ',' + str(end))
-        cur1 = self.initCursor(uri, begin)
-        cur2 = self.initCursor(uri, end)
+        cur1 = self.cursorKey(uri, begin)
+        cur2 = self.cursorKey(uri, end)
         self.session.truncate(None, cur1, cur2, None)
         if not cur1:
             begin = 1
@@ -226,9 +254,9 @@ class test_truncate_cursor(wttest.WiredTigerTestCase):
         uri = self.type + self.name
 
         # layout:
-        #    the number of initial implicit records
+        #    the number of initial skipped records
         #    the number of initial inserted records
-        #    the number of trailing implicit records
+        #    the number of trailing skipped records
         #    the number of trailing inserted records
         layout = [
             # simple set of rows
@@ -240,10 +268,10 @@ class test_truncate_cursor(wttest.WiredTigerTestCase):
             # trailing append list, delete point overlap
             (0, 0, 0, self.skip + 3),
 
-            # trailing implicit list, no delete point overlap
+            # trailing skipped list, no delete point overlap
             (0, 0, self.skip - 3, 1),
 
-            # trailing implicit list, delete point overlap
+            # trailing skipped list, delete point overlap
             (0, 0, self.skip + 3, 1),
 
             # leading insert list, no delete point overlap
@@ -252,10 +280,10 @@ class test_truncate_cursor(wttest.WiredTigerTestCase):
             # leading insert list, delete point overlap
             (0, self.skip + 3, 0, 0),
 
-            # leading implicit list, no delete point overlap
+            # leading skipped list, no delete point overlap
             (self.skip - 3, 1, 0, 0),
 
-            # leading implicit list, delete point overlap
+            # leading skipped list, delete point overlap
             (self.skip + 3, 1, 0, 0),
         ]
 
@@ -281,25 +309,21 @@ class test_truncate_cursor(wttest.WiredTigerTestCase):
 
         # Build the layout we're going to test
         total = self.nentries
-        for begin_implicit,begin_insert,end_implicit,end_insert in layout:
+        for begin_skipped,begin_insert,end_skipped,end_insert in layout:
 
-            # implicit layouts are only interesting for column-stores
-            if self.keyfmt != 'r' and (begin_implicit or end_implicit):
-                continue;
-
-            # implicit records require insert/append records
-            if begin_implicit and not begin_insert or \
-                end_implicit and not end_insert:
-                raise AssertionError('test error: implicit set without insert')
+            # skipped records require insert/append records
+            if begin_skipped and not begin_insert or \
+                end_skipped and not end_insert:
+                raise AssertionError('test error: skipped set without insert')
 
             for begin,end in list:
                 '''
                 print '===== run:'
                 print 'key:', self.keyfmt, 'begin:', begin, 'end:', end
                 print 'total: ', total, \
-                    'begin_implicit:', begin_implicit, \
+                    'begin_skipped:', begin_skipped, \
                     'begin_insert:', begin_insert, \
-                    'end_implicit:', end_implicit, \
+                    'end_skipped:', end_skipped, \
                     'end_insert:', end_insert
                 '''
 
@@ -311,9 +335,9 @@ class test_truncate_cursor(wttest.WiredTigerTestCase):
                 self.session.create(
                     uri, 'value_format=S,' + self.config + self.keyfmt)
 
-                # Insert the records that aren't implicit or inserted.
-                start = begin_implicit + begin_insert
-                stop = self.nentries - (end_implicit + end_insert)
+                # Insert the records that aren't skipped or inserted.
+                start = begin_skipped + begin_insert
+                stop = self.nentries - (end_skipped + end_insert)
                 cursor = self.session.open_cursor(uri, None)
                 for i in range(start + 1, stop + 1):
                     k = key_populate(cursor, i)
@@ -329,10 +353,10 @@ class test_truncate_cursor(wttest.WiredTigerTestCase):
                 if self.reopen:
                     self.reopen_conn()
 
-                # Optionally insert initial implicit records.
+                # Optionally insert initial skipped records.
                 cursor = self.session.open_cursor(uri, None, "overwrite")
                 start = 0;
-                for i in range(0, begin_implicit):
+                for i in range(0, begin_skipped):
                     start += 1
                     k = key_populate(cursor, start)
                     expected[k] = [0]
@@ -347,8 +371,8 @@ class test_truncate_cursor(wttest.WiredTigerTestCase):
                     cursor.insert()
                     expected[k] = [v]
 
-                # Optionally insert trailing implicit records.
-                for i in range(0, end_implicit):
+                # Optionally insert trailing skipped records.
+                for i in range(0, end_skipped):
                     stop += 1
                     k = key_populate(cursor, stop)
                     expected[k] = [0]
@@ -424,6 +448,7 @@ class test_truncate_cursor(wttest.WiredTigerTestCase):
 
             self.truncateRangeAndCheck(uri, begin, end, expected)
             self.session.drop(uri, None)
+
 
 if __name__ == '__main__':
     wttest.run()

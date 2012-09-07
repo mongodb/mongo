@@ -70,6 +70,16 @@ The default can be overridden for a session using the \c isolation setting
 in WT_CONNECTION::open_cursor.
 </dd>
 
+<dt>WT_SESSION.truncate</dt>
+<dd>
+In releases before 1.3, the WT_SESSION::truncate method required cursors used
+for truncation of a cursor range to reference existing keys in the object;
+in 1.3, the WT_SESSION::truncate method has been changed to allow cursors to
+reference any valid key in the object's name space so applications may discard
+portions of the object name space without knowing exactly what records the
+object contains.
+</dd>
+
 <dt>WT_CURSOR.equals</dt>
 <dd>
 In releases before 1.3, the WT_CURSOR::equals method returned zero/non-zero

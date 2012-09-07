@@ -728,20 +728,26 @@ struct __wt_session {
 	int __F(salvage)(WT_SESSION *session,
 	    const char *name, const char *config);
 
-	/*! Truncate a file, table or a cursor range.
+	/*! Truncate a file, table or cursor range.
 	 *
+	 * Truncate a file or table.
 	 * @snippet ex_all.c Truncate a table
 	 *
+	 * Truncate a cursor range.  When truncating based on a cursor position,
+	 * it is not required the cursor reference a record in the object, only
+	 * that the key be set.  This allows applications to discard portions of
+	 * the object name space without knowing exactly what records the object
+	 * contains.
 	 * @snippet ex_all.c Truncate a range
 	 *
 	 * @param session the session handle
 	 * @param name the URI of the file or table to truncate
 	 * @param start optional cursor marking the first record discarded;
 	 * if <code>NULL</code>, the truncate starts from the beginning of
-	 * the table
+	 * the object
 	 * @param stop optional cursor marking the last record discarded;
 	 * if <code>NULL</code>, the truncate continues to the end of the
-	 * table
+	 * object
 	 * @configempty{session.truncate, see dist/api_data.py}
 	 * @errors
 	 */

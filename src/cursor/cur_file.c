@@ -230,67 +230,6 @@ __wt_curfile_truncate(
 	WT_BTREE *saved_btree;
 	WT_CURSOR_BTREE *cursor;
 	WT_DECL_RET;
-	int cmp, is_column;
-
-	/*
-	 * We're called by either the session layer or the table-cursor truncate
-	 * code: in both cases, the key must have been set but the cursor itself
-	 * may not be positioned.
-	 */
-	if (start != NULL)
-		WT_RET(WT_CURSOR_NEEDKEY(start));
-	if (stop != NULL)
-		WT_RET(WT_CURSOR_NEEDKEY(stop));
-
-	/*
-	 * If both cursors set, check they're correctly ordered with respect to
-	 * each other.  We have to test this before any column-store search, the
-	 * search can change the initial cursor position.
-	 */
-	if (start != NULL && stop != NULL) {
-		WT_RET(__curfile_compare(start, stop, &cmp));
-		if (cmp > 0)
-			WT_RET_MSG(session, EINVAL,
-			    "the start cursor position is after the stop "
-			    "cursor position");
-	}
-
-	/*
-	 * Column-store cursors might not reference a valid record: applications
-	 * can specify records larger than the current maximum record and create
-	 * implicit records (variable-length column-store deleted records, or
-	 * fixed-length column-store records with a value of 0).  Column-store
-	 * calls search-near for this reason.  That's currently only necessary
-	 * for variable-length column-store because fixed-length column-store
-	 * returns the implicitly created records, but it's simpler to test for
-	 * column-store than to test for the value type.
-	 *
-	 * Additionally, column-store corrects after search-near positioning the
-	 * start/stop cursors on the next record greater-than/less-than or equal
-	 * to the original key.  If the start/stop cursors hit the beginning/end
-	 * of the object, or the start/stop record numbers cross, we're done as
-	 * the range is empty.
-	 */
-	if (start == NULL)
-		is_column = WT_CURSOR_RECNO(stop);
-	else
-		is_column = WT_CURSOR_RECNO(start);
-	if (is_column) {
-		if (start != NULL) {
-			WT_RET(start->search_near(start, &cmp));
-			if (cmp < 0 && (ret = start->next(start)) != 0)
-				return (ret == WT_NOTFOUND ? 0 : ret);
-		}
-		if (stop != NULL) {
-			WT_RET(stop->search_near(stop, &cmp));
-			if (cmp > 0 && (ret = stop->prev(stop)) != 0)
-				return (ret == WT_NOTFOUND ? 0 : ret);
-
-			/* Check for crossing key/record numbers. */
-			if (start != NULL && start->recno > stop->recno)
-				return (0);
-		}
-	}
 
 	/*
 	 * !!!
