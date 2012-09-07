@@ -2,6 +2,7 @@
  * Testing read preference on DBClientReplicaSets, specifically on the auto-retry
  * and automatic failover selection
  */
+// NOTE: this test is skipped when running smoke.py with --auth because of SERVER-6972
 
 function basicTest() {
     var replTest = new ReplSetTest({ name: 'basic', nodes: 2, useHostName: true });

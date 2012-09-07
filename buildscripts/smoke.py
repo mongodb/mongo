@@ -343,6 +343,9 @@ def skipTest(path):
         # SERVER-6388
         if os.path.join(parentDir,basename) in ["sharding/sync3.js", "sharding/sync6.js", "sharding/parallel.js", "jstests/bench_test1.js", "jstests/bench_test2.js", "jstests/bench_test3.js"]:
             return True
+        # SERVER-6972
+        if os.path.join(parentDir,basename) == "sharding/read_pref_rs_client.js":
+            return True
         # These tests fail due to bugs
         if os.path.join(parentDir,basename) in ["sharding/sync_conn_cmd.js"]: # SERVER-6327
             return True
