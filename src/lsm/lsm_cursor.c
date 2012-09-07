@@ -749,6 +749,7 @@ __wt_clsm_open(WT_SESSION_IMPL *session,
 		__clsm_update,
 		__clsm_remove,
 		__clsm_close,
+		NULL,
 		{ NULL, NULL },		/* TAILQ_ENTRY q */
 		0,			/* recno key */
 		{ 0 },                  /* raw recno buffer */
