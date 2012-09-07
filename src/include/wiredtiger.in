@@ -227,20 +227,21 @@ struct __wt_cursor {
 	/*! @name Cursor positioning
 	 * @{
 	 */
-	/*! Test whether two cursors refer to the same item.  To be equal,
-	 * both cursors must have the same data source, have valid keys, and
-	 * the keys must be equal.
+	/*! Return the ordering relationship between two cursors: both cursors
+	 * must have the same data source and have valid keys.
 	 *
-	 * @snippet ex_all.c Test cursor equality
+	 * @snippet ex_all.c Cursor comparison
 	 *
 	 * @param cursor the cursor handle
 	 * @param other another cursor handle
-	 * @param equalp the status of the comparison: non-zero if the cursors
-	 * refer to the same item, or zero if the cursors do not refer to the
-	 * same item.
+	 * @param comparep the status of the comparison: < 0 if
+	 * <code>cursor</code> refers to a key that appears before
+	 * <code>other</code>, 0 if the cursors refer to the same key,
+	 * and > 0 if <code>cursor</code> refers to a key that appears after
+	 * <code>other</code>.
 	 * @errors
 	 */
-	int __F(equals)(WT_CURSOR *cursor, WT_CURSOR *other, int *equalp);
+	int __F(compare)(WT_CURSOR *cursor, WT_CURSOR *other, int *comparep);
 
 	/*! Return the next record.
 	 *
@@ -379,9 +380,6 @@ struct __wt_cursor {
 	 * Protected fields, only to be used by cursor implementations.
 	 */
 #if !defined(SWIG) && !defined(DOXYGEN)
-	/* Private cursor comparison function. */
-	int __F(compare)(WT_CURSOR *, WT_CURSOR *, int *);
-
 	/*
 	 * !!!
 	 * Explicit representations of structures from queue.h.

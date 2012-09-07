@@ -174,13 +174,17 @@ cursor_ops(WT_SESSION *session)
 
 	{
 	WT_CURSOR *other = NULL;
-	/*! [Test cursor equality] */
-	int equal;
-	ret = cursor->equals(cursor, other, &equal);
-	if (equal) {
-		/* Take some action. */
+	/*! [Cursor comparison] */
+	int compare;
+	ret = cursor->compare(cursor, other, &compare);
+	if (compare == 0) {
+		/* Cursors reference the same key */
+	} else if (compare < 0) {
+		/* Cursor key less than other key */
+	} else if (compare > 0) {
+		/* Cursor key greater than other key */
 	}
-	/*! [Test cursor equality] */
+	/*! [Cursor comparison] */
 	}
 
 	{

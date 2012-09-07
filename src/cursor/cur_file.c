@@ -22,12 +22,15 @@ __curfile_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 	CURSOR_API_CALL_NOCONF(a, session, compare, cbt->btree);
 
 	/*
-	 * Confirm both cursors refer to the same source, then call the
-	 * underlying object to compare them.
+	 * Confirm both cursors refer to the same source and have keys, then
+	 * call the underlying object to compare them.
 	 */
 	if (strcmp(a->uri, b->uri) != 0)
 		WT_ERR_MSG(session, EINVAL,
 		    "comparison method cursors must reference the same object");
+
+	WT_ERR(WT_CURSOR_NEEDKEY(a));
+	WT_ERR(WT_CURSOR_NEEDKEY(b));
 
 	ret = __wt_btcur_compare(
 	    (WT_CURSOR_BTREE *)a, (WT_CURSOR_BTREE *)b, cmpp);
@@ -346,7 +349,7 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 		NULL,
 		NULL,
 		NULL,
-		NULL,
+		__curfile_compare,
 		__curfile_next,
 		__curfile_prev,
 		__curfile_reset,
@@ -356,7 +359,6 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 		__curfile_update,
 		__curfile_remove,
 		__curfile_close,
-		__curfile_compare,
 		{ NULL, NULL },		/* TAILQ_ENTRY q */
 		0,			/* recno key */
 		{ 0 },			/* recno raw buffer */

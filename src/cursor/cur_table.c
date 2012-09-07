@@ -185,12 +185,14 @@ __curtable_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 	CURSOR_API_CALL_NOCONF(a, session, compare, NULL);
 
 	/*
-	 * Confirm both cursors refer to the same source, then call the
-	 * underlying object's comparison routine.
+	 * Confirm both cursors refer to the same source and have keys, then
+	 * call the underlying object's comparison routine.
 	 */
 	if (strcmp(a->uri, b->uri) != 0)
 		WT_ERR_MSG(session, EINVAL,
 		    "comparison method cursors must reference the same object");
+	WT_ERR(WT_CURSOR_NEEDKEY(WT_CURSOR_PRIMARY(a)));
+	WT_ERR(WT_CURSOR_NEEDKEY(WT_CURSOR_PRIMARY(b)));
 
 	ret = WT_CURSOR_PRIMARY(a)->compare(
 	    WT_CURSOR_PRIMARY(a), WT_CURSOR_PRIMARY(b), cmpp);
@@ -471,7 +473,7 @@ __wt_curtable_truncate(
 	WT_DECL_ITEM(key);
 	WT_DECL_RET;
 	WT_ITEM raw;
-	int cmp, equal, i, is_column;
+	int cmp, i, is_column;
 
 	/*
 	 * We're called by the session layer: the key must have been set but
@@ -606,8 +608,8 @@ __wt_curtable_truncate(
 				APPLY_CG(ctable, search);
 				WT_ERR(ret);
 				APPLY_IDX(ctable, remove);
-				WT_ERR(start->equals(start, stop, &equal));
-			} while (!equal && (ret = start->next(start)) == 0);
+				WT_ERR(start->compare(start, stop, &cmp));
+			} while (cmp < 0 && (ret = start->next(start)) == 0);
 			WT_ERR_NOTFOUND_OK(ret);
 			ret = 0;
 
@@ -779,7 +781,7 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 		__wt_curtable_get_value,
 		__wt_curtable_set_key,
 		__wt_curtable_set_value,
-		NULL,
+		__curtable_compare,
 		__curtable_next,
 		__curtable_prev,
 		__curtable_reset,
@@ -789,7 +791,6 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 		__curtable_update,
 		__curtable_remove,
 		__curtable_close,
-		__curtable_compare,	/* compare */
 		{ NULL, NULL },		/* TAILQ_ENTRY q */
 		0,			/* recno key */
 		{ 0 },			/* raw recno buffer */
