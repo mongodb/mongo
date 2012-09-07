@@ -12,6 +12,7 @@ struct __wt_cursor_lsm {
 	uint64_t dsk_gen;
 
 	int nchunks;
+	WT_BLOOM **blooms;
 	WT_CURSOR **cursors;
 	WT_CURSOR *current;     	/* The current cursor for iteration */
 
@@ -25,7 +26,9 @@ struct __wt_cursor_lsm {
 };
 
 struct __wt_lsm_chunk {
-	const char *uri;
+	const char *uri;		/* Data source for this chunk. */
+	const char *bloom_uri;		/* URI of Bloom filter, if any. */
+	uint64_t count;			/* Approximate count of records. */
 
 	uint32_t ncursor;		/* Cursors with the chunk as primary. */
 #define	WT_LSM_CHUNK_ONDISK	0x01
@@ -45,7 +48,10 @@ struct __wt_lsm_tree {
 	uint64_t dsk_gen;
 	uint32_t *memsizep;
 
+	/* Configuration parameters */
 	uint32_t threshold;
+	uint32_t bloom_factor;
+	uint32_t bloom_k;
 
 	WT_SESSION_IMPL *worker_session;/* Passed to thread_create */
 	pthread_t worker_tid;		/* LSM worker thread */

@@ -14,6 +14,10 @@ static int __bloom_init(
     WT_SESSION_IMPL *, const char *, const char *, WT_BLOOM **);
 static int __bloom_setup(WT_BLOOM *, uint64_t, uint64_t, uint32_t, uint32_t);
 
+/*
+ * __bloom_init --
+ *	Allocate a WT_BLOOM handle.
+ */
 static int
 __bloom_init(WT_SESSION_IMPL *session,
     const char *uri, const char *config, WT_BLOOM **bloomp)
@@ -51,10 +55,12 @@ err:	if (bloom->uri != NULL)
 }
 
 /*
- * Populate the bloom structure.
- * Setup is passed in either the count of items expected (n), or the length
- * of the bitstring (m). Depends on whether the function is called via create
- * or open.
+ * __bloom_setup --
+ *	Populate the bloom structure.
+ *
+ * Setup is passed in either the count of items expected (n), or the length of
+ * the bitstring (m). Depends on whether the function is called via create or
+ * open.
  */
 static int
 __bloom_setup(
@@ -77,8 +83,8 @@ __bloom_setup(
 /*
  * __wt_bloom_create --
  *
- * Creates and configures a WT_BLOOM handle, allocates a bitstring in memory
- * to use while populating the bloom filter.
+ * Creates and configures a WT_BLOOM handle, allocates a bitstring in memory to
+ * use while populating the bloom filter.
  *
  * count  - is the expected number of inserted items
  * factor - is the number of bits to use per inserted item
@@ -101,8 +107,8 @@ __wt_bloom_create(
 
 /*
  * __wt_bloom_open --
- * Open a Bloom filter object for use by a single session. The filter must have
- * been created and finalized.
+ *	Open a Bloom filter object for use by a single session. The filter must
+ *	have been created and finalized.
  */
 int
 __wt_bloom_open(WT_SESSION_IMPL *session,
@@ -131,7 +137,7 @@ __wt_bloom_open(WT_SESSION_IMPL *session,
 
 /*
  * __wt_bloom_insert --
- * Adds the given key to the Bloom filter.
+ *	Adds the given key to the Bloom filter.
  */
 int
 __wt_bloom_insert(WT_BLOOM *bloom, WT_ITEM *key)
@@ -149,8 +155,8 @@ __wt_bloom_insert(WT_BLOOM *bloom, WT_ITEM *key)
 
 /*
  * __wt_bloom_finalize --
- * Writes the Bloom filter to stable storage. After calling finalize, only
- * read operations can be performed on the bloom filter.
+ *	Writes the Bloom filter to stable storage. After calling finalize, only
+ *	read operations can be performed on the bloom filter.
  */
 int
 __wt_bloom_finalize(WT_BLOOM *bloom)
@@ -183,8 +189,8 @@ __wt_bloom_finalize(WT_BLOOM *bloom)
 
 /*
  * __wt_bloom_get --
- * Tests whether the given key is in the Bloom filter.
- * Returns zero if found, WT_NOTFOUND if not.
+ *	Tests whether the given key is in the Bloom filter.
+ *	Returns zero if found, WT_NOTFOUND if not.
  */
 int
 __wt_bloom_get(WT_BLOOM *bloom, WT_ITEM *key)
@@ -243,7 +249,7 @@ err:	/* Don't return WT_NOTFOUND from a failed search. */
 
 /*
  * __wt_bloom_close --
- * Close the Bloom filter, release any resources.
+ *	Close the Bloom filter, release any resources.
  */
 int
 __wt_bloom_close(WT_BLOOM *bloom)
@@ -265,7 +271,7 @@ __wt_bloom_close(WT_BLOOM *bloom)
 
 /*
  * __wt_bloom_drop --
- * Drop a Bloom filter, release any resources.
+ *	Drop a Bloom filter, release any resources.
  */
 int
 __wt_bloom_drop(WT_BLOOM *bloom, const char *config)

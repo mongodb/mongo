@@ -681,6 +681,10 @@ extern int __wt_lsm_tree_bump_gen(WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree);
 extern int __wt_lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree);
 extern int __wt_lsm_tree_close_all(WT_SESSION_IMPL *session);
+extern int __wt_lsm_tree_bloom_name( WT_SESSION_IMPL *session,
+    WT_LSM_TREE *lsm_tree,
+    int i,
+    WT_ITEM *buf);
 extern int __wt_lsm_tree_create_chunk( WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree,
     int i,

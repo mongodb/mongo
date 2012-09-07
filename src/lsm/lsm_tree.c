@@ -20,8 +20,10 @@ __lsm_tree_discard(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	__wt_spin_destroy(session, &lsm_tree->lock);
 
 	__wt_free(session, lsm_tree->name);
-	for (i = 0; i < lsm_tree->nchunks; i++)
+	for (i = 0; i < lsm_tree->nchunks; i++) {
+		__wt_free(session, lsm_tree->chunk[i].bloom_uri);
 		__wt_free(session, lsm_tree->chunk[i].uri);
+	}
 	__wt_free(session, lsm_tree->chunk);
 
 	__wt_free(session, lsm_tree);
@@ -95,6 +97,19 @@ __wt_lsm_tree_close_all(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __wt_lsm_tree_bloom_name --
+ *	Get the URI of the Bloom filter for a given chunk.
+ */
+int
+__wt_lsm_tree_bloom_name(
+    WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, int i, WT_ITEM *buf)
+{
+	WT_RET(__wt_buf_fmt(session, buf, "file:%s-%06d.bf",
+	    lsm_tree->filename, i + 1));
+	return (0);
+}
+
+/*
  * __wt_lsm_tree_create_chunk --
  *	Create a chunk of an LSM tree.
  */
@@ -162,8 +177,10 @@ __wt_lsm_tree_create(
 	WT_ERR(__wt_strndup(session, cval.str, cval.len,
 	    &lsm_tree->value_format));
 
-	/* TODO: make this configurable. */
+	/* TODO: make these configurable. */
 	lsm_tree->threshold = 2 * WT_MEGABYTE;
+	lsm_tree->bloom_factor = 8;
+	lsm_tree->bloom_k = 4;
 
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));
 	WT_ERR(__wt_buf_fmt(session, buf,
@@ -316,6 +333,9 @@ __wt_lsm_tree_drop(
 	for (i = 0; i < lsm_tree->nchunks; i++) {
 		chunk = &lsm_tree->chunk[i];
 		WT_ERR(__wt_schema_drop(session, chunk->uri, cfg));
+		if (chunk->bloom_uri != NULL)
+			WT_ERR(
+			    __wt_schema_drop(session, chunk->bloom_uri, cfg));
 	}
 
 	WT_ERR(__wt_metadata_remove(session, lsm_tree->name));

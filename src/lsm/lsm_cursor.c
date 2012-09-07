@@ -84,6 +84,7 @@ __clsm_deleted(WT_ITEM *item)
 static int
 __clsm_close_cursors(WT_CURSOR_LSM *clsm)
 {
+	WT_BLOOM *bloom;
 	WT_CURSOR *c;
 	int i;
 
@@ -91,6 +92,10 @@ __clsm_close_cursors(WT_CURSOR_LSM *clsm)
 		FORALL_CURSORS(clsm, c, i) {
 			clsm->cursors[i] = NULL;
 			WT_RET(c->close(c));
+			if ((bloom = clsm->blooms[i]) != NULL) {
+				clsm->blooms[i] = NULL;
+				WT_RET(__wt_bloom_close(bloom));
+			}
 		}
 	}
 
@@ -151,10 +156,12 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm)
 		WT_ASSERT(session, i != -1);
 	}
 
-	if ((nchunks = lsm_tree->nchunks) > clsm->nchunks)
+	if ((nchunks = lsm_tree->nchunks) > clsm->nchunks) {
 		WT_RET(__wt_realloc(session, NULL,
-		    nchunks * sizeof(WT_CURSOR *),
-		    &clsm->cursors));
+		    nchunks * sizeof(WT_BLOOM *), &clsm->blooms));
+		WT_RET(__wt_realloc(session, NULL,
+		    nchunks * sizeof(WT_CURSOR *), &clsm->cursors));
+	}
 	clsm->nchunks = nchunks;
 
 	for (i = 0, cp = clsm->cursors; i != clsm->nchunks; i++, cp++) {
@@ -166,6 +173,10 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm)
 		WT_ERR(__wt_curfile_open(session,
 		    chunk->uri, &clsm->iface,
 		    F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) ? ckpt_cfg : NULL, cp));
+		if (chunk->bloom_uri != NULL)
+			WT_ERR(__wt_bloom_open(session, chunk->bloom_uri,
+			    lsm_tree->bloom_factor, lsm_tree->bloom_k,
+			    &clsm->blooms[i]));
 
 		/* Child cursors always use overwrite and raw mode. */
 		F_SET(*cp, WT_CURSTD_OVERWRITE | WT_CURSTD_RAW);
@@ -425,6 +436,7 @@ err:	WT_LSM_END(clsm, session);
 static int
 __clsm_search(WT_CURSOR *cursor)
 {
+	WT_BLOOM *bloom;
 	WT_CURSOR *c;
 	WT_CURSOR_LSM *clsm;
 	WT_DECL_RET;
@@ -434,6 +446,13 @@ __clsm_search(WT_CURSOR *cursor)
 	WT_LSM_ENTER(clsm, cursor, session, search);
 	WT_CURSOR_NEEDKEY(cursor);
 	FORALL_CURSORS(clsm, c, i) {
+		/* If there is a Bloom filter, see if we can skip the read. */
+		if ((bloom = clsm->blooms[i]) != NULL) {
+			ret = __wt_bloom_get(bloom, &cursor->key);
+			if (ret == WT_NOTFOUND)
+				continue;
+			WT_RET(ret);
+		}
 		c->set_key(c, &cursor->key);
 		if ((ret = c->search(c)) == 0) {
 			WT_ERR(c->get_key(c, &cursor->key));
@@ -734,6 +753,7 @@ __clsm_close(WT_CURSOR *cursor)
 	WT_LSM_ENTER(clsm, cursor, session, close);
 	FORALL_CURSORS(clsm, c, i)
 		WT_TRET(c->close(c));
+	__wt_free(session, clsm->blooms);
 	__wt_free(session, clsm->cursors);
 	/* The WT_LSM_TREE owns the URI. */
 	cursor->uri = NULL;
