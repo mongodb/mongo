@@ -153,7 +153,7 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm)
 		/* Child cursors always use overwrite and raw mode. */
 		F_SET(*cp, WT_CURSTD_OVERWRITE | WT_CURSTD_RAW);
 	}
-	 	
+
 	/* Peek into the btree layer to track the in-memory size. */
 	if (lsm_tree->memsizep == NULL)
 		(void)__wt_btree_get_memsize(
