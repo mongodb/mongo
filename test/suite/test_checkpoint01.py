@@ -211,14 +211,14 @@ class test_checkpoint_target(wttest.WiredTigerTestCase):
 
     def update(self, uri, value):
         cursor = self.session.open_cursor(uri, None, "overwrite")
-        cursor.set_key(key_populate(self.fmt, 10))
+        cursor.set_key(key_populate(cursor, 10))
         cursor.set_value(value)
         cursor.insert()
         cursor.close()
 
     def check(self, uri, value):
         cursor = self.session.open_cursor(uri, None, "checkpoint=checkpoint-1")
-        cursor.set_key(key_populate(self.fmt, 10))
+        cursor.set_key(key_populate(cursor, 10))
         cursor.search()
         self.assertEquals(cursor.get_value(), value)
         cursor.close()
@@ -266,7 +266,7 @@ class test_checkpoint_cursor_update(wttest.WiredTigerTestCase):
         simple_populate(self, self.uri, 'key_format=' + self.fmt, 100)
         self.session.checkpoint("name=ckpt")
         cursor = self.session.open_cursor(self.uri, None, "checkpoint=ckpt")
-        cursor.set_key(key_populate(self.fmt, 10))
+        cursor.set_key(key_populate(cursor, 10))
         cursor.set_value("XXX")
         self.assertRaises(wiredtiger.WiredTigerError, lambda: cursor.insert())
         self.assertRaises(wiredtiger.WiredTigerError, lambda: cursor.remove())
@@ -292,7 +292,7 @@ class test_checkpoint_last(wttest.WiredTigerTestCase):
         for value in ('FIRST', 'SECOND', 'THIRD', 'FOURTH', 'FIFTH'):
             # Update the object.
             cursor = self.session.open_cursor(uri, None, "overwrite")
-            cursor.set_key(key_populate(self.fmt, 10))
+            cursor.set_key(key_populate(cursor, 10))
             cursor.set_value(value)
             cursor.insert()
             cursor.close()
@@ -303,7 +303,7 @@ class test_checkpoint_last(wttest.WiredTigerTestCase):
             # Verify the "last" checkpoint sees the correct value.
             cursor = self.session.open_cursor(
                 uri, None, "checkpoint=WiredTigerCheckpoint")
-            cursor.set_key(key_populate(self.fmt, 10))
+            cursor.set_key(key_populate(cursor, 10))
             cursor.search()
             self.assertEquals(cursor.get_value(), value)
             # Don't close the checkpoint cursor, we want it to remain open until

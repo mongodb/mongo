@@ -379,6 +379,9 @@ struct __wt_cursor {
 	 * Protected fields, only to be used by cursor implementations.
 	 */
 #if !defined(SWIG) && !defined(DOXYGEN)
+	/* Private cursor comparison function. */
+	int __F(compare)(WT_CURSOR *, WT_CURSOR *, int *);
+
 	/*
 	 * !!!
 	 * Explicit representations of structures from queue.h.

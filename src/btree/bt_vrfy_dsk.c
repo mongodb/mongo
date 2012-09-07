@@ -563,6 +563,8 @@ __err_cell_type(WT_SESSION_IMPL *session,
 {
 	switch (cell_type) {
 	case WT_CELL_ADDR:
+	case WT_CELL_ADDR_DEL:
+	case WT_CELL_ADDR_LNO:
 		if (dsk_type == WT_PAGE_COL_INT ||
 		    dsk_type == WT_PAGE_ROW_INT)
 			return (0);

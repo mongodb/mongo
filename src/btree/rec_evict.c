@@ -120,6 +120,7 @@ __rec_page_clean_update(WT_SESSION_IMPL *session, WT_PAGE *page)
 static int
 __rec_page_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
+	WT_ADDR *addr;
 	WT_PAGE_MODIFY *mod;
 	WT_REF *parent_ref;
 
@@ -140,11 +141,11 @@ __rec_page_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * Publish: a barrier to ensure the structure fields are set
 		 * before the state change makes the page available to readers.
 		 */
-		WT_RET(__wt_calloc(
-		    session, 1, sizeof(WT_ADDR), &parent_ref->addr));
-		((WT_ADDR *)parent_ref->addr)->addr = mod->u.replace.addr;
-		((WT_ADDR *)parent_ref->addr)->size = mod->u.replace.size;
+		WT_RET(__wt_calloc(session, 1, sizeof(WT_ADDR), &addr));
+		*addr = mod->u.replace;
+
 		parent_ref->page = NULL;
+		parent_ref->addr = addr;
 		WT_PUBLISH(parent_ref->state, WT_REF_DISK);
 		break;
 	case WT_PM_REC_SPLIT:				/* Page split */
@@ -186,7 +187,8 @@ __rec_discard_tree(WT_SESSION_IMPL *session, WT_PAGE *page, int single)
 	case WT_PAGE_ROW_INT:
 		/* For each entry in the page... */
 		WT_REF_FOREACH(page, ref, i) {
-			if (ref->state == WT_REF_DISK)
+			if (ref->state == WT_REF_DISK ||
+			    ref->state == WT_REF_DELETED)
 				continue;
 			WT_ASSERT(session,
 			    single || ref->state == WT_REF_LOCKED);
@@ -232,6 +234,7 @@ static int
 __rec_review(WT_SESSION_IMPL *session,
     WT_REF *ref, WT_PAGE *page, uint32_t flags, int top)
 {
+	WT_DECL_RET;
 	WT_PAGE_MODIFY *mod;
 	uint32_t i;
 
@@ -251,6 +254,7 @@ __rec_review(WT_SESSION_IMPL *session,
 		WT_REF_FOREACH(page, ref, i)
 			switch (ref->state) {
 			case WT_REF_DISK:		/* On-disk */
+			case WT_REF_DELETED:		/* On-disk, deleted */
 				break;
 			case WT_REF_MEM:		/* In-memory */
 				WT_RET(__rec_review(
@@ -311,11 +315,36 @@ __rec_review(WT_SESSION_IMPL *session,
 	/* If the page is dirty, write it so we know the final state. */
 	if (__wt_page_is_modified(page) &&
 	    !F_ISSET(mod, WT_PM_REC_SPLIT_MERGE)) {
-		WT_RET(__wt_rec_write(session, page, NULL));
+		ret = __wt_rec_write(session, page, NULL, flags);
 
 		/* If there are unwritten changes on the page, give up. */
-		if (__wt_page_is_modified(page))
-			return (EBUSY);
+		if (ret == 0 &&
+		    !LF_ISSET(WT_REC_SINGLE) && __wt_page_is_modified(page))
+			ret = EBUSY;
+		if (ret == EBUSY) {
+			WT_VERBOSE_RET(session, evict,
+			    "page %p written but not clean", page);
+
+			/*
+			 * If there is only a single cursor open, there are no
+			 * consistency issues: try to bump our snapshot.
+			 */
+			if (session->ncursors <= 1) {
+				__wt_txn_read_last(session);
+				__wt_txn_read_first(session);
+			}
+
+			switch (page->type) {
+			case WT_PAGE_COL_FIX:
+			case WT_PAGE_COL_VAR:
+				__wt_col_leaf_obsolete(session, page);
+				break;
+			case WT_PAGE_ROW_LEAF:
+				__wt_row_leaf_obsolete(session, page);
+				break;
+			}
+		}
+		WT_RET(ret);
 	}
 
 	/*
