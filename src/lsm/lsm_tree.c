@@ -47,10 +47,31 @@ int
 __wt_lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
 	WT_DECL_RET;
+	WT_SESSION *wt_session;
 
 	if (F_ISSET(lsm_tree, WT_LSM_TREE_OPEN)) {
 		F_CLR(lsm_tree, WT_LSM_TREE_OPEN);
 		WT_TRET(__wt_thread_join(lsm_tree->worker_tid));
+	}
+
+	/*
+	 * Close the session and free its hazard array (necessary because
+	 * we set WT_SESSION_INTERNAL to simplify shutdown ordering.
+	 *
+	 * Do this in the main thread to avoid deadlocks.
+	 */
+	if (lsm_tree->worker_session != NULL) {
+		F_SET(lsm_tree->worker_session,
+		    F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
+
+		wt_session = &lsm_tree->worker_session->iface;
+		WT_TRET(wt_session->close(wt_session, NULL));
+		
+		/*
+		 * This is safe after the close because session handles are
+		 * not freed, but are managed by the connection.
+		 */
+		__wt_free(NULL, lsm_tree->worker_session->hazard);
 	}
 
 	__lsm_tree_discard(session, lsm_tree);
@@ -104,10 +125,24 @@ __wt_lsm_tree_create(
     WT_SESSION_IMPL *session, const char *uri, const char *config)
 {
 	WT_CONFIG_ITEM cval;
+	WT_CONNECTION *wt_conn;
 	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
 	WT_LSM_TREE *lsm_tree;
+	WT_SESSION *wt_session;
 	const char *cfg[] = API_CONF_DEFAULTS(session, create, config);
+
+	/* If the tree is open, it already exists. */
+	if ((ret = __wt_lsm_tree_get(session, uri, &lsm_tree)) == 0)
+		return (EEXIST);
+	WT_RET_NOTFOUND_OK(ret);
+
+	/* If the tree has metadata, it already exists. */
+	if (__wt_metadata_read(session, uri, &config) == 0) {
+		__wt_free(session, config);
+		return (EEXIST);
+	}
+	WT_RET_NOTFOUND_OK(ret);
 
 	/*
 	 * XXX this call should just insert the metadata: most of this should
@@ -139,7 +174,11 @@ __wt_lsm_tree_create(
 	WT_ERR(__wt_lsm_tree_switch(session, lsm_tree));
 
 	/* XXX This should definitely only happen when opening the tree. */
-	lsm_tree->conn = S2C(session);
+	wt_conn = &S2C(session)->iface;
+	WT_ERR(wt_conn->open_session(wt_conn, NULL, NULL, &wt_session));
+	lsm_tree->worker_session = (WT_SESSION_IMPL *)wt_session;
+	F_SET(lsm_tree->worker_session, WT_SESSION_INTERNAL);
+
 	WT_ERR(__wt_thread_create(
 	    &lsm_tree->worker_tid, __wt_lsm_worker, lsm_tree));
 	F_SET(lsm_tree, WT_LSM_TREE_OPEN);
@@ -159,8 +198,10 @@ static int
 __lsm_tree_open(
     WT_SESSION_IMPL *session, const char *uri, WT_LSM_TREE **treep)
 {
+	WT_CONNECTION *wt_conn;
 	WT_DECL_RET;
 	WT_LSM_TREE *lsm_tree;
+	WT_SESSION *wt_session;
 
 	/* Try to open the tree. */
 	WT_RET(__wt_calloc_def(session, 1, &lsm_tree));
@@ -175,7 +216,11 @@ __lsm_tree_open(
 	/* Set the generation number so cursors are opened on first usage. */
 	lsm_tree->dsk_gen = 1;
 
-	lsm_tree->conn = S2C(session);
+	wt_conn = &S2C(session)->iface;
+	WT_ERR(wt_conn->open_session(wt_conn, NULL, NULL, &wt_session));
+	lsm_tree->worker_session = (WT_SESSION_IMPL *)wt_session;
+	F_SET(lsm_tree->worker_session, WT_SESSION_INTERNAL);
+
 	WT_ERR(__wt_thread_create(
 	    &lsm_tree->worker_tid, __wt_lsm_worker, lsm_tree));
 	F_SET(lsm_tree, WT_LSM_TREE_OPEN);
@@ -257,6 +302,39 @@ __wt_lsm_tree_switch(
 	WT_ERR(__wt_lsm_meta_write(session, lsm_tree));
 
 err:	/* TODO: mark lsm_tree bad on error(?) */
+	return (ret);
+}
+
+/*
+ * __wt_lsm_tree_drop --
+ *	Drop an LSM tree.
+ */
+int
+__wt_lsm_tree_drop(
+    WT_SESSION_IMPL *session, const char *name, const char *cfg[])
+{
+	WT_DECL_RET;
+	WT_LSM_CHUNK *chunk;
+	WT_LSM_TREE *lsm_tree;
+	int i;
+
+	/* Get the LSM tree. */
+	WT_RET(__wt_lsm_tree_get(session, name, &lsm_tree));
+	__wt_spin_lock(session, &lsm_tree->lock);
+
+	/* Drop the chunks. */
+	for (i = 0; i < lsm_tree->nchunks; i++) {
+		chunk = &lsm_tree->chunk[i];
+		WT_ERR(__wt_schema_drop(session, chunk->uri, cfg));
+	}
+
+	WT_ERR(__wt_metadata_remove(session, lsm_tree->name));
+	__wt_spin_unlock(session, &lsm_tree->lock);
+	ret = __wt_lsm_tree_close(session, lsm_tree);
+
+	if (0) {
+err:		__wt_spin_unlock(session, &lsm_tree->lock);
+	}
 	return (ret);
 }
 

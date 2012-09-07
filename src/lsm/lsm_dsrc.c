@@ -28,15 +28,15 @@ __lsm_create(WT_DATA_SOURCE *dsrc, WT_SESSION *wt_session,
  *	Implementation of the drop operation for LSM trees.
  */
 static int
-__lsm_drop(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-    const char *name, const char *cfg[])
+__lsm_drop(WT_DATA_SOURCE *dsrc, WT_SESSION *wt_session,
+    const char *uri, const char *cfg[])
 {
-	WT_UNUSED(dsrc);
-	WT_UNUSED(session);
-	WT_UNUSED(name);
-	WT_UNUSED(cfg);
+	WT_SESSION_IMPL *session;
 
-	return (ENOTSUP);
+	WT_UNUSED(dsrc);
+	session = (WT_SESSION_IMPL *)wt_session;
+
+	return (__wt_lsm_tree_drop(session, uri, cfg));
 }
 
 /*
@@ -73,22 +73,6 @@ __lsm_rename(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 }
 
 /*
- * __lsm_sync --
- *	Implementation of the sync operation for LSM trees.
- */
-static int
-__lsm_sync(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-    const char *name, const char *cfg[])
-{
-	WT_UNUSED(dsrc);
-	WT_UNUSED(session);
-	WT_UNUSED(name);
-	WT_UNUSED(cfg);
-
-	return (ENOTSUP);
-}
-
-/*
  * __lsm_truncate --
  *	Implementation of the truncate operation for LSM trees.
  */
@@ -119,7 +103,6 @@ __wt_lsm_init(WT_CONNECTION *wt_conn, const char *config)
 		__lsm_drop,
 		__lsm_open_cursor,
 		__lsm_rename,
-		__lsm_sync,
 		__lsm_truncate
 	};
 

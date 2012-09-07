@@ -15,34 +15,29 @@
 void *
 __wt_lsm_worker(void *arg)
 {
-	WT_CONNECTION *wt_conn;
-	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk, *chunk_array;
 	WT_LSM_TREE *lsm_tree;
-	WT_SESSION *wt_session;
 	WT_SESSION_IMPL *session;
 	const char *cfg[] = { "name=,drop=", NULL };
 	size_t chunk_alloc;
 	int i, nchunks, progress;
 
 	lsm_tree = arg;
-	conn = lsm_tree->conn;
-	wt_conn = &conn->iface;
+	session = lsm_tree->worker_session;
+
 	chunk_array = NULL;
 	chunk_alloc = 0;
-
-	if (wt_conn->open_session(wt_conn, NULL, NULL, &wt_session) != 0)
-		return (NULL);
-
-	session = (WT_SESSION_IMPL *)wt_session;
-	F_SET(session, WT_SESSION_INTERNAL);
 
 	while (F_ISSET(lsm_tree, WT_LSM_TREE_OPEN)) {
 		progress = 0;
 
-		/* Take a copy of the current state of the LSM tree. */
 		__wt_spin_lock(session, &lsm_tree->lock);
+		if (!F_ISSET(lsm_tree, WT_LSM_TREE_OPEN)) {
+			__wt_spin_unlock(session, &lsm_tree->lock);
+			break;
+		}
+		/* Take a copy of the current state of the LSM tree. */
 		for (nchunks = lsm_tree->nchunks - 1;
 		    nchunks > 0 && lsm_tree->chunk[nchunks].ncursor > 0;
 		    --nchunks)
@@ -86,16 +81,10 @@ __wt_lsm_worker(void *arg)
 			progress = 1;
 
 		if (!progress)
-			__wt_sleep(1, 0);
+			__wt_sleep(0, 10);
 	}
 
-	/*
-	 * Close the session and free its hazard array (necessary because
-	 * we set WT_SESSION_INTERNAL to simplify shutdown ordering.
-	 */
 err:	__wt_free(session, chunk_array);
-	(void)wt_session->close(wt_session, NULL);
-	__wt_free(NULL, session->hazard);
 
 	return (NULL);
 }

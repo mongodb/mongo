@@ -97,15 +97,7 @@ __wt_lsm_meta_write(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		    (i < lsm_tree->nchunks - 1) ? "," : ""));
 	WT_ERR(__wt_buf_catfmt(session, buf, "]"));
 	WT_ERR(__wt_metadata_update(session, lsm_tree->name, buf->data));
-#ifdef HAVE_DIAGNOSTIC
-	{
-	WT_LSM_TREE *test;
-	WT_ERR(__wt_calloc_def(session, 1, &test));
-	test->name = lsm_tree->name;
-	WT_ERR(__wt_lsm_meta_read(session, test));
-	__wt_free(session, test);
-	}
-#endif
+
 err:	__wt_scr_free(&buf);
 	return (ret);
 }

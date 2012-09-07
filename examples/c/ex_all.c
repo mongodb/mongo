@@ -579,21 +579,6 @@ my_rename(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 }
 /*! [WT_DATA_SOURCE rename] */
 
-/*! [WT_DATA_SOURCE sync] */
-static int
-my_sync(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-    const char *name, const char *cfg[])
-{
-	/* Unused parameters */
-	(void)dsrc;
-	(void)session;
-	(void)name;
-	(void)cfg;
-
-	return (0);
-}
-/*! [WT_DATA_SOURCE sync] */
-
 /*! [WT_DATA_SOURCE truncate] */
 static int
 my_truncate(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
@@ -620,7 +605,6 @@ add_data_source(WT_CONNECTION *conn)
 		my_drop,
 		my_open_cursor,
 		my_rename,
-		my_sync,
 		my_truncate
 	};
 	ret = conn->add_data_source(conn, "dsrc:", &my_dsrc, NULL);

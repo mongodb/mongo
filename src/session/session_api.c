@@ -36,6 +36,7 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
+	int needlock;
 
 	conn = (WT_CONNECTION_IMPL *)wt_session->connection;
 	session = (WT_SESSION_IMPL *)wt_session;

@@ -693,6 +693,9 @@ extern int __wt_lsm_tree_get( WT_SESSION_IMPL *session,
     WT_LSM_TREE **treep);
 extern int __wt_lsm_tree_switch( WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree);
+extern int __wt_lsm_tree_drop( WT_SESSION_IMPL *session,
+    const char *name,
+    const char *cfg[]);
 extern int __wt_lsm_tree_worker(WT_SESSION_IMPL *session,
     const char *uri,
     int (*func)(WT_SESSION_IMPL *,

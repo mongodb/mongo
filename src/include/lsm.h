@@ -47,7 +47,7 @@ struct __wt_lsm_tree {
 
 	uint32_t threshold;
 
-	WT_CONNECTION_IMPL *conn;	/* Passed to thread_create */
+	WT_SESSION_IMPL *worker_session;/* Passed to thread_create */
 	pthread_t worker_tid;		/* LSM worker thread */
 
 	int nchunks;			/* Number of active chunks */

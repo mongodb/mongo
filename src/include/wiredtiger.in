@@ -1547,17 +1547,10 @@ struct __wt_data_source {
 
 	/*! Callback to rename an object.
 	 *
-	 * @snippet ex_all.c WT_DATA_SOURCE sync
+	 * @snippet ex_all.c WT_DATA_SOURCE rename
 	 */
 	int (*rename)(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	    const char *oldname, const char *newname, const char *cfg[]);
-
-	/*! Callback to sync an object.
-	 *
-	 * @snippet ex_all.c WT_DATA_SOURCE sync
-	 */
-	int (*sync)(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-	    const char *name, const char *cfg[]);
 
 	/*! Callback to truncate an object.
 	 *
