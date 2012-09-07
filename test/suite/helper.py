@@ -78,7 +78,7 @@ def compare_tables(self, session, uris, config=None):
 def confirm_does_not_exist(self, uri):
     self.pr('confirm_does_not_exist: ' + uri)
     self.assertRaises(wiredtiger.WiredTigerError,
-        lambda: self.session.open_cursor(uri, None, None))
+        lambda: self.session.open_cursor(uri, None))
     self.assertEqual(glob.glob('*' + uri.split(":")[1] + '*'), [],
         'confirm_does_not_exist: URI exists, file name matching \"' +
         uri.split(":")[1] + '\" found')
@@ -86,45 +86,78 @@ def confirm_does_not_exist(self, uri):
 # confirm a URI exists and is empty.
 def confirm_empty(self, uri):
     self.pr('confirm_empty: ' + uri)
-    cursor = self.session.open_cursor(uri, None, None)
-    self.assertEqual(cursor.next(), wiredtiger.WT_NOTFOUND)
+    cursor = self.session.open_cursor(uri, None)
+    if cursor.value_format == '8t':
+        for key,val in cursor:
+            self.assertEqual(val, 0)
+    else:
+        self.assertEqual(cursor.next(), wiredtiger.WT_NOTFOUND)
     cursor.close()
 
 # create a simple_populate or complex_populate key
-def key_populate(key_format, i):
+def key_populate(cursor, i):
+    key_format = cursor.key_format
     if key_format == 'i' or key_format == 'r' or key_format == 'u':
         return i
     elif key_format == 'S':
         return str('%015d' % i)
     else:
         raise AssertionError(
-            'key_populate: object has unexpected key format: ' + key_format)
+            'key_populate: object has unexpected format: ' + key_format)
 
-# population of a simple object, where the keys are the record number.
+# create a simple_populate value
+def value_populate(cursor, i):
+    value_format = cursor.value_format
+    if value_format == 'i' or value_format == 'r' or value_format == 'u':
+        return i
+    elif value_format == 'S':
+        return str(i) + ': abcdefghijklmnopqrstuvwxyz'
+    elif value_format == '8t':
+        value = (
+            0xa1, 0xa2, 0xa3, 0xa4, 0xa5, 0xa6, 0xa7, 0xa8, 0xaa, 0xab,
+            0xac, 0xad, 0xae, 0xaf, 0xb1, 0xb2, 0xb3, 0xb4, 0xb5, 0xb6,
+            0xb7, 0xb8, 0xba, 0xbb, 0xbc, 0xbd, 0xbe, 0xbf)
+        return value[i % len(value)]
+    else:
+        raise AssertionError(
+            'value_populate: object has unexpected format: ' + value_format)
+
+# population of a simple object
 #    uri:       object
-#    config:    prefix of the session.create configuration string
+#    config:    prefix of the session.create configuration string (defaults
+#               to string value formats)
 #    rows:      entries to insert
 def simple_populate(self, uri, config, rows):
     self.pr('simple_populate: ' + uri + ' with ' + str(rows) + ' rows')
-    self.session.create(uri, config + ',value_format=S')
-    cursor = self.session.open_cursor(uri, None, None)
+    self.session.create(uri, 'value_format=S,' + config)
+    cursor = self.session.open_cursor(uri, None)
     for i in range(1, rows):
-        cursor.set_key(key_populate(cursor.key_format, i))
-        cursor.set_value(str(i) + ': abcdefghijklmnopqrstuvwxyz')
+        cursor.set_key(key_populate(cursor, i))
+        cursor.set_value(value_populate(cursor, i))
         cursor.insert()
     cursor.close()
 
 def simple_populate_check(self, uri):
     self.pr('simple_populate_check: ' + uri)
-    cursor = self.session.open_cursor(uri, None, None)
+    cursor = self.session.open_cursor(uri, None)
     i = 0
     for key,val in cursor:
         i += 1
-        self.assertEqual(key, key_populate(cursor.key_format, i))
-        self.assertEqual(val, str(i) + ': abcdefghijklmnopqrstuvwxyz')
+        self.assertEqual(key, key_populate(cursor, i))
+        if cursor.value_format == '8t' and val == 0:    # deleted
+            continue;
+        self.assertEqual(val, value_populate(cursor, i))
     cursor.close()
 
-# population of a complex object, where the keys are the record number.
+# Return the value stored in a complex object.
+def value_populate_complex(i):
+    return [\
+        str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%26],\
+        i,\
+        str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%23],\
+        str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%18]]
+
+# population of a complex object
 #    uri:       object
 #    config:    prefix of the session.create configuration string
 #    rows:      entries to insert
@@ -149,30 +182,24 @@ def complex_populate(self, uri, config, rows):
     self.session.create(indxname + ':indx5', 'columns=(column3,column5)')
     self.session.create(
         indxname + ':indx6', 'columns=(column3,column5,column4)')
-    cursor = self.session.open_cursor(uri, None, None)
+    cursor = self.session.open_cursor(uri, None)
     for i in range(1, rows):
-        cursor.set_key(key_populate(cursor.key_format, i))
-        cursor.set_value(
-            str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%26],
-            i,
-            str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%23],
-            str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%18])
+        cursor.set_key(key_populate(cursor, i))
+        v = value_populate_complex(i)
+        cursor.set_value(v[0], v[1], v[2], v[3])
         cursor.insert()
     cursor.close()
 
 def complex_populate_check(self, uri):
     self.pr('complex_populate_check: ' + uri)
-    cursor = self.session.open_cursor(uri, None, None)
+    cursor = self.session.open_cursor(uri, None)
     i = 0
     for key, s1, i2, s3, s4 in cursor:
         i += 1
-        self.assertEqual(key, key_populate(cursor.key_format, i))
-        self.assertEqual(s1,
-            str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%26])
-        self.assertEqual(i2, i)
-        self.assertEqual(s3,
-            str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%23])
-        self.assertEqual(s4,
-            str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%18])
-        self.assertEqual(i2, i)
+        self.assertEqual(key, key_populate(cursor, i))
+        v = value_populate_complex(i)
+        self.assertEqual(s1, v[0])
+        self.assertEqual(i2, v[1])
+        self.assertEqual(s3, v[2])
+        self.assertEqual(s4, v[3])
     cursor.close()

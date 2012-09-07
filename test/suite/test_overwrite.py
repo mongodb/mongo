@@ -42,12 +42,12 @@ class test_overwrite(wttest.WiredTigerTestCase):
     def test_overwrite(self):
         simple_populate(self, self.uri, 'key_format=' + self.fmt, 100)
         cursor = self.session.open_cursor(self.uri, None, None)
-        cursor.set_key(key_populate(self.fmt, 10))
+        cursor.set_key(key_populate(cursor, 10))
         cursor.set_value('XXXXXXXXXX')
         self.assertRaises(wiredtiger.WiredTigerError, lambda: cursor.insert())
 
         cursor = self.session.open_cursor(self.uri, None, "overwrite")
-        cursor.set_key(key_populate(self.fmt, 10))
+        cursor.set_key(key_populate(cursor, 10))
         cursor.set_value('XXXXXXXXXX')
         cursor.insert()
 
@@ -55,11 +55,11 @@ class test_overwrite(wttest.WiredTigerTestCase):
     def test_overwrite_reconfig(self):
         simple_populate(self, self.uri, 'key_format=' + self.fmt, 100)
         cursor = self.session.open_cursor(self.uri, None)
-        cursor.set_key(key_populate(self.fmt, 10))
+        cursor.set_key(key_populate(cursor, 10))
         cursor.set_value('XXXXXXXXXX')
         self.assertRaises(wiredtiger.WiredTigerError, lambda: cursor.insert())
 
-        cursor.set_key(key_populate(self.fmt, 10))
+        cursor.set_key(key_populate(cursor, 10))
         dupc = self.session.open_cursor(None, cursor, "overwrite");
         dupc.set_value('XXXXXXXXXX')
         dupc.insert()

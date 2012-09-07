@@ -407,7 +407,6 @@ static int
 __evict_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_DECL_RET;
-	WT_TXN_GLOBAL *txn_global;
 	WT_TXN saved_txn, *txn;
 	int was_running;
 
@@ -426,11 +425,10 @@ __evict_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 	saved_txn = *txn;
 	was_running = (F_ISSET(txn, TXN_RUNNING) != 0);
 
-	txn_global = &S2C(session)->txn_global;
 	if (was_running)
 		WT_RET(__wt_txn_init(session));
 
-	__wt_txn_get_snapshot(session, txn_global->ckpt_txnid);
+	__wt_txn_get_evict_snapshot(session);
 	txn->isolation = TXN_ISO_READ_COMMITTED;
 	ret = __wt_rec_evict(session, page, 0);
 
@@ -539,18 +537,19 @@ __evict_file_request(WT_SESSION_IMPL *session, int syncop)
 	 * the tree.  So, always stay one page ahead of the page being returned.
 	 */
 	next_page = NULL;
-	WT_RET(__wt_tree_np(session, &next_page, 1, 1));
+	WT_RET(__wt_tree_walk(session, &next_page, WT_TREE_EVICT));
 	for (;;) {
 		if ((page = next_page) == NULL)
 			break;
-		WT_ERR(__wt_tree_np(session, &next_page, 1, 1));
+		WT_ERR(__wt_tree_walk(session, &next_page, WT_TREE_EVICT));
 
 		/* Write dirty pages for sync, and sync with discard. */
 		switch (syncop) {
 		case WT_SYNC:
 		case WT_SYNC_DISCARD:
 			if (__wt_page_is_modified(page))
-				WT_ERR(__wt_rec_write(session, page, NULL));
+				WT_ERR(__wt_rec_write(
+				    session, page, NULL, WT_REC_SINGLE));
 			break;
 		case WT_SYNC_DISCARD_NOWRITE:
 			break;
@@ -781,7 +780,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 	 */
 	for (evict = start, restarts = 0;
 	    evict < end && restarts <= 1 && ret == 0;
-	    ret = __wt_tree_np(session, &btree->evict_page, 1, 1)) {
+	    ret = __wt_tree_walk(session, &btree->evict_page, WT_TREE_EVICT)) {
 		if ((page = btree->evict_page) == NULL) {
 			++restarts;
 			continue;
