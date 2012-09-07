@@ -138,13 +138,13 @@ def get_libdeps(source, target, env, for_signature):
     """
 
     target = env.Flatten([target])
-    return list(__get_libdeps(target[0], 'LIBDEPS'))
+    return sorted_by_str(__get_libdeps(target[0], 'LIBDEPS'))
 
 def get_libdeps_objs(source, target, env, for_signature):
     objs = set()
     for lib in get_libdeps(source, target, env, for_signature):
         objs.update(lib.sources_set)
-    return list(objs)
+    return sorted_by_str(objs)
 
 def get_libdeps_special_sun(source, target, env, for_signature):
     x = get_libdeps(source, target, env, for_signature )
