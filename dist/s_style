@@ -96,7 +96,7 @@ done
 egrep '	' test/suite/*.py |
     sed 's/:.*//' |
     sort -u |
-    sed 's/^/	/' > $t; then
+    sed 's/^/	/' > $t
 test -s $t && {
 	echo '[tab] characters appear in test suite scripts:'
 	cat $t
