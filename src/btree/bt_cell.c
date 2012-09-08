@@ -8,21 +8,6 @@
 #include "wt_internal.h"
 
 /*
- * __wt_cell_copy --
- *	Copy an on-page cell into a return buffer, processing as needed.
- */
-int
-__wt_cell_copy(WT_SESSION_IMPL *session, WT_CELL *cell, WT_ITEM *retb)
-{
-	WT_CELL_UNPACK *unpack, _unpack;
-
-	unpack = &_unpack;
-
-	__wt_cell_unpack(cell, unpack);
-	return (__wt_cell_unpack_copy(session, unpack, retb));
-}
-
-/*
  * __wt_cell_unpack_copy --
  *	Copy an unpacked cell into a return buffer, processing as needed.
  */

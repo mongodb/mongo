@@ -103,7 +103,7 @@ __wt_kv_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 	}
 
 	/* The value is an on-page cell, unpack and expand it as necessary. */
-	__wt_cell_unpack(cell, &unpack);
+	__wt_cell_unpack(page, cell, &unpack);
 	if (btree->huffman_value == NULL && unpack.type == WT_CELL_VALUE) {
 		cursor->value.data = unpack.data;
 		cursor->value.size = unpack.size;

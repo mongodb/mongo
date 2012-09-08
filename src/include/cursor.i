@@ -138,6 +138,7 @@ __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip, WT_UPDATE *upd)
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_IKEY *ikey;
+	WT_PAGE *page;
 	WT_SESSION_IMPL *session;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
@@ -146,6 +147,7 @@ __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip, WT_UPDATE *upd)
 
 	kb = &cbt->iface.key;
 	vb = &cbt->iface.value;
+	page = cbt->page;
 
 	/*
 	 * Return the WT_ROW slot's K/V pair.
@@ -164,7 +166,7 @@ __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip, WT_UPDATE *upd)
 	 * If the key points on-page, we have a copy of a WT_CELL value that can
 	 * be processed, regardless of what any other thread is doing.
 	 */
-	if (__wt_off_page(cbt->page, ikey)) {
+	if (__wt_off_page(page, ikey)) {
 		kb->data = WT_IKEY_DATA(ikey);
 		kb->size = ikey->size;
 	} else {
@@ -178,7 +180,7 @@ __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip, WT_UPDATE *upd)
 		 */
 		if (btree->huffman_key != NULL)
 			goto slow;
-		__wt_cell_unpack((WT_CELL *)ikey, unpack);
+		__wt_cell_unpack(page, (WT_CELL *)ikey, unpack);
 		if (unpack->type == WT_CELL_KEY && unpack->prefix == 0) {
 			kb->data = cbt->tmp.data = unpack->data;
 			kb->size = cbt->tmp.size = unpack->size;
@@ -210,7 +212,7 @@ __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip, WT_UPDATE *upd)
 			kb->size = cbt->tmp.size;
 			cbt->rip_saved = rip;
 		} else
-slow:			WT_RET(__wt_row_key_copy(session, cbt->page, rip, kb));
+slow:			WT_RET(__wt_row_key_copy(session, page, rip, kb));
 	}
 
 	/*
@@ -223,11 +225,11 @@ slow:			WT_RET(__wt_row_key_copy(session, cbt->page, rip, kb));
 	if (upd != NULL) {
 		vb->data = WT_UPDATE_DATA(upd);
 		vb->size = upd->size;
-	} else if ((cell = __wt_row_value(cbt->page, rip)) == NULL) {
+	} else if ((cell = __wt_row_value(page, rip)) == NULL) {
 		vb->data = "";
 		vb->size = 0;
 	} else {
-		__wt_cell_unpack(cell, unpack);
+		__wt_cell_unpack(page, cell, unpack);
 		if (unpack->type == WT_CELL_VALUE &&
 		    btree->huffman_value == NULL) {
 			vb->data = unpack->data;

@@ -1204,10 +1204,12 @@ __rec_split_row_promote(WT_SESSION_IMPL *session, uint8_t type)
 		 * The cell had better have a zero-length prefix: it's the first
 		 * key on the page.  (If it doesn't have a zero-length prefix,
 		 * __wt_cell_unpack() won't be sufficient anyway, we'd only copy
-		 * the non-prefix-compressed portion of the key.)
+		 * the non-prefix-compressed portion of the key.)  It had better
+		 * not be a cell copy, either, but there's no way we can check
+		 * that.
 		 */
 		cell = WT_PAGE_HEADER_BYTE(btree, r->dsk.mem);
-		__wt_cell_unpack(cell, unpack);
+		__wt_cell_unpack(r->dsk.mem, cell, unpack);
 		WT_ASSERT_RET(session, unpack->prefix == 0);
 		WT_RET(__wt_cell_unpack_copy(session, unpack, &r->bnd[0].key));
 	}
@@ -1555,7 +1557,7 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 		if (addr == NULL && __wt_off_page(page, ref->addr))
 			addr = ref->addr;
 		if (addr == NULL) {
-			__wt_cell_unpack(ref->addr, unpack);
+			__wt_cell_unpack(page, ref->addr, unpack);
 			val->buf.data = ref->addr;
 			val->buf.size = unpack->len;
 			val->cell_len = 0;
@@ -1925,7 +1927,7 @@ __rec_col_var(
 			nrepeat = 1;
 			orig_deleted = 1;
 		} else {
-			__wt_cell_unpack(cell, unpack);
+			__wt_cell_unpack(page, cell, unpack);
 			nrepeat = __wt_cell_rle(unpack);
 
 			ins = WT_SKIP_FIRST(WT_COL_UPDATE(page, cip));
@@ -2283,7 +2285,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 			cell = NULL;
 		else {
 			cell = WT_PAGE_REF_OFFSET(page, ikey->cell_offset);
-			__wt_cell_unpack(cell, kpack);
+			__wt_cell_unpack(page, cell, kpack);
 		}
 
 		/*
@@ -2425,7 +2427,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 		if (addr == NULL && __wt_off_page(page, ref->addr))
 			addr = ref->addr;
 		if (addr == NULL) {
-			__wt_cell_unpack(ref->addr, vpack);
+			__wt_cell_unpack(page, ref->addr, vpack);
 			p = vpack->data;
 			size = vpack->size;
 			if (vtype == 0)
@@ -2517,7 +2519,8 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 			 * about to promote it.
 			 */
 			if (onpage_ovfl)
-				WT_ERR(__wt_cell_copy(session, cell, r->cur));
+				WT_ERR(__wt_cell_unpack_copy(
+				    session, kpack, r->cur));
 			WT_ERR(__rec_split(session));
 
 			r->key_pfx_compress = 0;
@@ -2644,7 +2647,7 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 		if (addr == NULL && __wt_off_page(page, ref->addr))
 			addr = ref->addr;
 		if (addr == NULL) {
-			__wt_cell_unpack(ref->addr, vpack);
+			__wt_cell_unpack(page, ref->addr, vpack);
 			p = vpack->data;
 			size = vpack->size;
 			if (vtype == 0)
@@ -2771,7 +2774,7 @@ __rec_row_leaf(
 
 		/* Build value cell. */
 		if ((val_cell = __wt_row_value(page, rip)) != NULL)
-			__wt_cell_unpack(val_cell, unpack);
+			__wt_cell_unpack(page, val_cell, unpack);
 		WT_ERR(__rec_txn_read(session, WT_ROW_UPDATE(page, rip), &upd));
 		if (upd == NULL) {
 			/*
@@ -2814,7 +2817,7 @@ __rec_row_leaf(
 				 * again for a subsequent reconciliation.  Add
 				 * the key to the tracking system.
 				 */
-				__wt_cell_unpack(cell, unpack);
+				__wt_cell_unpack(page, cell, unpack);
 				if (unpack->ovfl)
 					WT_ERR(__rec_onpage_ovfl(
 					    session, page, unpack, tmpkey));
@@ -2854,7 +2857,7 @@ __rec_row_leaf(
 		 * the tracking system, assume prefix compression won't make
 		 * things better, and simply copy the key from the disk image.
 		 */
-		__wt_cell_unpack(cell, unpack);
+		__wt_cell_unpack(page, cell, unpack);
 		onpage_ovfl = unpack->ovfl;
 		if (onpage_ovfl) {
 			WT_ERR(__wt_rec_track_onpage_srch(session,

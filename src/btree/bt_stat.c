@@ -109,7 +109,7 @@ __stat_page_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 			WT_BSTAT_INCR(session, file_col_deleted);
 		} else {
 			orig_deleted = 0;
-			__wt_cell_unpack(cell, unpack);
+			__wt_cell_unpack(page, cell, unpack);
 			WT_BSTAT_INCRV(
 			    session, file_entries, __wt_cell_rle(unpack));
 		}
