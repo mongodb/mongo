@@ -1246,8 +1246,8 @@ __rec_split_write(
 		bnd->addr.leaf_no_overflow =
 		    (dsk->type == WT_PAGE_COL_FIX ||
 		    dsk->type == WT_PAGE_COL_VAR ||
-		    dsk->type == WT_PAGE_ROW_LEAF)
-		    && r->ovfl_items == 0 ? 1 : 0;
+		    dsk->type == WT_PAGE_ROW_LEAF) &&
+		    r->ovfl_items == 0 ? 1 : 0;
 	}
 
 	return (0);
