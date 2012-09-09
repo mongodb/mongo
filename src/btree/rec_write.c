@@ -578,9 +578,12 @@ __rec_write_init(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 		/* Dictionary compression only writes repeated values once. */
 		WT_RET(__wt_config_getones(session,
 		    btree->config, "dictionary", &cval));
-		if ((r->dictionary_slots = cval.val) != 0)
+		if ((r->dictionary_slots = cval.val) != 0) {
+			if (r->dictionary_slots < 100)
+				r->dictionary_slots = 100;
 			WT_RET(__wt_calloc_def(
 			    session, r->dictionary_slots, &r->dictionary));
+		}
 	}
 
 	r->page = page;
