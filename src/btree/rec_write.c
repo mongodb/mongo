@@ -1286,14 +1286,14 @@ __rec_split_row_promote(WT_SESSION_IMPL *session, uint8_t type)
 	if (r->bnd_next == 1) {
 		/*
 		 * The cell had better have a zero-length prefix: it's the first
-		 * key on the page.  (If it doesn't have a zero-length prefix,
-		 * __wt_cell_unpack() won't be sufficient anyway, we'd only copy
-		 * the non-prefix-compressed portion of the key.)  It had better
-		 * not be a cell copy, either, but there's no way to check that.
+		 * key on the page.  We also assert it's not a copy cell, even
+		 * if we could copy the value, which we could, the first cell on
+		 * a page had better not refer an earlier cell on the page.
 		 */
 		cell = WT_PAGE_HEADER_BYTE(btree, r->dsk.mem);
 		__wt_cell_unpack(cell, unpack);
-		WT_ASSERT_RET(session, unpack->prefix == 0);
+		WT_ASSERT_RET(session,
+		    unpack->copy == 0 && unpack->prefix == 0);
 		WT_RET(__wt_cell_unpack_copy(session, unpack, &r->bnd[0].key));
 	}
 
