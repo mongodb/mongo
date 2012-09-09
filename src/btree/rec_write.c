@@ -2610,7 +2610,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 				WT_ERR(__wt_cell_unpack_copy(
 				    session, kpack, r->cur));
 			WT_ERR(__rec_split(session));
-	
+
 			/*
 			 * Turn off prefix compression until a full key written
 			 * to the new page, and (unless we're already working
@@ -2773,7 +2773,7 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 */
 		while (key->len + val->len > r->space_avail) {
 			WT_RET(__rec_split(session));
-	
+
 			/*
 			 * Turn off prefix compression until a full key written
 			 * to the new page, and (unless we're already working
@@ -3108,7 +3108,7 @@ __rec_row_leaf(
 				WT_ERR(__wt_cell_unpack_copy(
 				    session, unpack, r->cur));
 			WT_ERR(__rec_split(session));
-	
+
 			/*
 			 * Turn off prefix compression until a full key written
 			 * to the new page, and (unless we're already working
@@ -3185,7 +3185,7 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_INSERT *ins)
 		while (key->len +
 		    val->len + WT_TRAILING_KEY_CELL > r->space_avail) {
 			WT_RET(__rec_split(session));
-	
+
 			/*
 			 * Turn off prefix compression until a full key written
 			 * to the new page, and (unless we're already working
