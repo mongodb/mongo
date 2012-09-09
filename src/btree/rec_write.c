@@ -1293,7 +1293,7 @@ __rec_split_row_promote(WT_SESSION_IMPL *session, uint8_t type)
 		cell = WT_PAGE_HEADER_BYTE(btree, r->dsk.mem);
 		__wt_cell_unpack(cell, unpack);
 		WT_ASSERT_RET(session,
-		    unpack->copy == 0 && unpack->prefix == 0);
+		    unpack->raw != WT_CELL_VALUE_COPY && unpack->prefix == 0);
 		WT_RET(__wt_cell_unpack_copy(session, unpack, &r->bnd[0].key));
 	}
 
@@ -2895,7 +2895,7 @@ __rec_row_leaf(
 				val->buf.size = 0;
 				val->cell_len = 0;
 				val->len = val->buf.size;
-			} else if (unpack->copy) {
+			} else if (unpack->raw == WT_CELL_VALUE_COPY) {
 				/* If the item is Huffman encoded, decode it. */
 				if (btree->huffman_value == NULL) {
 					p = unpack->data;

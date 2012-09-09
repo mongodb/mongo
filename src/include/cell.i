@@ -124,7 +124,6 @@ struct __wt_cell_unpack {
 	uint8_t type;			/* Cell type */
 
 	uint8_t ovfl;			/* 1/0: cell is an overflow */
-	uint8_t copy;			/* 1/0: cell is a copy */
 };
 
 /*
@@ -458,17 +457,9 @@ __wt_cell_unpack_safe(WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
 		    &p, end == NULL ? 0 : (size_t)(end - p), &unpack->v));
 
 	/*
-	 * One switch to handle a set of actions for different cell types.
-	 *
-	 * Copied cells: copied cells are entirely hidden from our caller, our
-	 * caller can't detect we redirected to a different cell on the page.
-	 * We've wasted a little work by here, but most of the work above was
-	 * skipped.
-	 *
-	 * Set overflow flags.
-	 *
-	 * Set the data length: deleted cells have known sizes, and no length
-	 * bytes; everything else has data length bytes.
+	 * One switch to handle special actions for a few different cell types,
+	 * and set the data length: deleted cells are fixed-size without length
+	 * bytes; almost everything else has data length bytes.
 	 */
 	switch (unpack->raw) {
 	case WT_CELL_VALUE_COPY:
@@ -480,12 +471,15 @@ __wt_cell_unpack_safe(WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
 		saved_len = WT_PTRDIFF32(p, cell);
 		cell = (WT_CELL *)((uint8_t *)cell - unpack->v);
 		ret = __wt_cell_unpack_safe(cell, unpack, end);
-		unpack->copy = 1;
+		unpack->raw = WT_CELL_VALUE_COPY;
 		unpack->__len = saved_len;
 		return (ret);
 
 	case WT_CELL_KEY_OVFL:
 	case WT_CELL_VALUE_OVFL:
+		/*
+		 * Set overflow flags.
+		 */
 		unpack->ovfl = 1;
 		/* FALLTHROUGH */
 
