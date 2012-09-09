@@ -38,11 +38,13 @@ maximum file allocation unit is 512MB.  File block offsets are 64-bit
 
 @section file_formats_compression File formats and compression
 
-Row-stores support three types of compression: prefix compression (where
+Row-stores support four types of compression: prefix compression (where
 any identical portion of each key byte string is only stored once),
-Huffman encoding of individual key/value items, (see @subpage huffman
-for details), and stream compression of the blocks in the file (see @ref
-compression for details).
+dictionary compression (where a dictionary of values are checked for
+repeated values, in which case only one copy of the value is stored on
+the page), Huffman encoding of individual key/value items, (see
+@subpage huffman for details), and stream compression of the blocks in
+the file (see @ref compression for details).
 
 Column-stores with variable-length byte string values support three
 types of compression: run-length encoding (where duplicate values are

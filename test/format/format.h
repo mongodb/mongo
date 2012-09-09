@@ -67,6 +67,7 @@ typedef struct {
 	uint32_t c_cache;
 	char *c_data_source;
 	uint32_t c_delete_pct;
+	uint32_t c_dictionary;
 	uint32_t c_file_type;
 	uint32_t c_huffman_key;
 	uint32_t c_huffman_value;

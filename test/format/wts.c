@@ -103,6 +103,9 @@ wts_open(void)
 		    ",value_format=%dt", g.c_bitcnt);
 		break;
 	case ROW:
+		if (g.c_dictionary)
+			p += snprintf(p, (size_t)(end - p),
+			    ",dictionary=123");
 		if (g.c_huffman_key)
 			p += snprintf(p, (size_t)(end - p),
 			    ",huffman_key=english");
@@ -234,6 +237,7 @@ wts_stats(void)
 		die(errno, "fopen: __stats");
 
 	/* Connection statistics. */
+	fprintf(fp, "====== Connection statistics:\n");
 	if ((ret = session->open_cursor(session,
 	    "statistics:", NULL, NULL, &cursor)) != 0)
 		die(ret, "session.open_cursor");
@@ -249,6 +253,7 @@ wts_stats(void)
 		die(ret, "cursor.close");
 
 	/* File statistics. */
+	fprintf(fp, "\n\n====== File statistics:\n");
 	if ((stat_name =
 	    malloc(strlen("statistics:") + strlen(g.c_data_source))) == NULL)
 		die(ret, "malloc");

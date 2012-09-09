@@ -116,13 +116,15 @@ struct __wt_cell_unpack {
 	const void *data;		/* Data */
 	uint32_t    size;		/* Data size */
 
-	uint32_t len;			/* Cell + data total length */
+	uint32_t __len;			/* Cell + data length (usually) */
 
-	uint8_t  prefix;		/* Cell prefix length */
+	uint8_t prefix;			/* Cell prefix length */
 
-	uint8_t  raw;			/* Raw cell type (include "shorts") */
-	uint8_t  type;			/* Cell type */
-	uint8_t	 ovfl;			/* 1/0: cell is an overflow */
+	uint8_t raw;			/* Raw cell type (include "shorts") */
+	uint8_t type;			/* Cell type */
+
+	uint8_t ovfl;			/* 1/0: cell is an overflow */
+	uint8_t copy;			/* 1/0: cell is a copy */
 };
 
 /*
@@ -133,7 +135,7 @@ struct __wt_cell_unpack {
 	for ((cell) =							\
 	    WT_PAGE_HEADER_BYTE(btree, dsk), (i) = (dsk)->u.entries;	\
 	    (i) > 0;							\
-	    (cell) = (WT_CELL *)((uint8_t *)(cell) + (unpack)->len), --(i))
+	    (cell) = (WT_CELL *)((uint8_t *)(cell) + (unpack)->__len), --(i))
 
 /*
  * __wt_cell_pack_addr --
@@ -315,6 +317,26 @@ __wt_cell_rle(WT_CELL_UNPACK *unpack)
 }
 
 /*
+ * __wt_cell_total_len --
+ *	Return the cell's total length, including data.
+ */
+static inline uint32_t
+__wt_cell_total_len(WT_CELL_UNPACK *unpack)
+{
+	/*
+	 * The length field is specially named because it's dangerous to use it:
+	 * it represents the length of the current cell (normally used for the
+	 * loop that walks through cells on the page), but occasionally we want
+	 * to copy a cell directly from the page, and what we need is the cell's
+	 * total length.   The problem is dictionary-copy cells, because in that
+	 * case, the __len field is the length of the current cell, not the cell
+	 * for which we're returning data.  To use the __len field, you must be
+	 * sure you're not looking at a copy cell.
+	 */
+	return (unpack->__len);
+}
+
+/*
  * __wt_cell_type --
  *	Return the cell's type (collapsing special types).
  */
@@ -344,11 +366,12 @@ __wt_cell_type(WT_CELL *cell)
  *	Unpack a WT_CELL into a structure during verification.
  */
 static inline int
-__wt_cell_unpack_safe(
-    void *base, WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
+__wt_cell_unpack_safe(WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
 {
+	WT_DECL_RET;
 	uint64_t v;
 	const uint8_t *p;
+	uint32_t saved_len;
 
 	/*
 	 * The verification code specifies an end argument, a pointer to 1 past
@@ -402,7 +425,7 @@ __wt_cell_unpack_safe(
 
 		unpack->data = cell->__chunk + 2;
 		unpack->size = cell->__chunk[0] >> 2;
-		unpack->len = 2 + unpack->size;
+		unpack->__len = 2 + unpack->size;
 		goto done;
 	case WT_CELL_VALUE_SHORT:
 		/*
@@ -411,7 +434,7 @@ __wt_cell_unpack_safe(
 		 */
 		unpack->data = cell->__chunk + 1;
 		unpack->size = cell->__chunk[0] >> 1;
-		unpack->len = 1 + unpack->size;
+		unpack->__len = 1 + unpack->size;
 		goto done;
 	}
 
@@ -449,8 +472,17 @@ __wt_cell_unpack_safe(
 	 */
 	switch (unpack->raw) {
 	case WT_CELL_VALUE_COPY:
-		return (__wt_cell_unpack_safe(base,
-		    (WT_CELL *)((uint8_t *)base + unpack->v), unpack, end));
+		/*
+		 * The cell's value is an offset to a cell written earlier in
+		 * the page.  Save and restore the length of this cell, we need
+		 * it to step through the set of cells on the page.
+		 */
+		saved_len = WT_PTRDIFF32(p, cell);
+		cell = (WT_CELL *)((uint8_t *)cell - unpack->v);
+		ret = __wt_cell_unpack_safe(cell, unpack, end);
+		unpack->copy = 1;
+		unpack->__len = saved_len;
+		return (ret);
 
 	case WT_CELL_KEY_OVFL:
 	case WT_CELL_VALUE_OVFL:
@@ -466,11 +498,11 @@ __wt_cell_unpack_safe(
 		    &p, end == NULL ? 0 : (size_t)(end - p), &v));
 		unpack->data = p;
 		unpack->size = WT_STORE_SIZE(v);
-		unpack->len = WT_PTRDIFF32(p + unpack->size, cell);
+		unpack->__len = WT_PTRDIFF32(p + unpack->size, cell);
 		break;
 
 	case WT_CELL_DEL:
-		unpack->len = WT_PTRDIFF32(p, cell);
+		unpack->__len = WT_PTRDIFF32(p, cell);
 		break;
 	default:
 		return (WT_ERROR);			/* Unknown cell type. */
@@ -481,18 +513,8 @@ __wt_cell_unpack_safe(
 	 * diagnostic as well, we may be copying the cell from the page and
 	 * we need the right length).
 	 */
-done:	CHK(cell, unpack->len);
+done:	CHK(cell, unpack->__len);
 	return (0);
-}
-
-/*
- * __wt_cell_unpack_dsk --
- *	Unpack a WT_CELL into a structure.
- */
-static inline void
-__wt_cell_unpack_dsk(void *base, WT_CELL *cell, WT_CELL_UNPACK *unpack)
-{
-	(void)__wt_cell_unpack_safe(base, cell, unpack, NULL);
 }
 
 /*
@@ -500,7 +522,20 @@ __wt_cell_unpack_dsk(void *base, WT_CELL *cell, WT_CELL_UNPACK *unpack)
  *	Unpack a WT_CELL into a structure.
  */
 static inline void
-__wt_cell_unpack(WT_PAGE *page, WT_CELL *cell, WT_CELL_UNPACK *unpack)
+__wt_cell_unpack(WT_CELL *cell, WT_CELL_UNPACK *unpack)
 {
-	(void)__wt_cell_unpack_safe(page->dsk, cell, unpack, NULL);
+	(void)__wt_cell_unpack_safe(cell, unpack, NULL);
+}
+
+/*
+ * __wt_cell_next --
+ *	Return the next WT_CELL on the page.
+ */
+static inline WT_CELL *
+__wt_cell_next(WT_CELL *cell)
+{
+	WT_CELL_UNPACK unpack;
+
+	__wt_cell_unpack(cell, &unpack);
+	return ((WT_CELL *)((uint8_t *)cell + unpack.__len));
 }
