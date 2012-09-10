@@ -45,7 +45,7 @@ __wt_spin_trylock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
 	WT_UNUSED(session);
 
-	return (__sync_lock_test_and_set(t, 1);
+	return (__sync_lock_test_and_set(t, 1));
 }
 
 static inline void
