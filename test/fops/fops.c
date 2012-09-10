@@ -48,7 +48,7 @@ r(void)
 int
 fop_start(u_int nthreads)
 {
-	clock_t start, stop;
+	struct timeval start, stop;
 	double seconds;
 	pthread_t *tids;
 	u_int i;
@@ -61,7 +61,7 @@ fop_start(u_int nthreads)
 	    (tids = calloc((size_t)(nthreads), sizeof(*tids))) == NULL)
 		die("calloc", errno);
 
-	start = clock();
+	(void)gettimeofday(&start, NULL);
 
 	/* Create threads. */
 	for (i = 0; i < nthreads; ++i)
@@ -73,8 +73,9 @@ fop_start(u_int nthreads)
 	for (i = 0; i < nthreads; ++i)
 		(void)pthread_join(tids[i], &thread_ret);
 
-	stop = clock();
-	seconds = (stop - start) / (double)CLOCKS_PER_SEC;
+	(void)gettimeofday(&stop, NULL);
+	seconds = (stop.tv_sec - start.tv_sec) +
+	    (stop.tv_usec - start.tv_usec) * 1e-6;
 	fprintf(stderr, "timer: %.2lf seconds (%d ops/second)\n",
 	    seconds, (int)((nthreads * nops) / seconds));
 
