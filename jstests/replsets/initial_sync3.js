@@ -40,6 +40,8 @@ assert(!result.secondary, tojson(result));
 
 print("bring 0 back up");
 replTest.restart(0);
+print("0 should become primary");
+master = replTest.getMaster();
 
 print("now 1 should be able to initial sync");
 assert.soon(function() {
