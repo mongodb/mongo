@@ -128,8 +128,6 @@ namespace mongo {
     const Member* ReplSetImpl::getMemberToSyncTo() {
         lock lk(this);
 
-        bool buildIndexes = true;
-
         // if we have a target we've requested to sync from, use it
 
         if (_forceSyncTarget) {
@@ -149,8 +147,6 @@ namespace mongo {
                 OCCASIONALLY log() << "waiting for " << needMorePings << " pings from other members before syncing" << endl;
                 return NULL;
             }
-
-            buildIndexes = myConfig().buildIndexes;
 
             // If we are only allowed to sync from the primary, return that
             if (!_cfg->chainingAllowed()) {
