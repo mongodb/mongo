@@ -335,20 +335,21 @@ def skipTest(path):
         # Skip any tests that run with auth explicitly
         if parentDir == "auth" or "auth" in basename:
             return True
-        # These tests don't pass with authentication due to limitations of the test infrastructure,
-        # not due to actual bugs.
-        if parentDir == "tool": # SERVER-6368
-            return True
         if parentPath == mongo_repo: # Skip client tests
             return True
-        # SERVER-6388
-        if os.path.join(parentDir,basename) in ["sharding/sync3.js", "sharding/sync6.js", "sharding/parallel.js", "jstests/bench_test1.js", "jstests/bench_test2.js", "jstests/bench_test3.js"]:
+        if parentDir == "tool": # SERVER-6368
             return True
-        # SERVER-6972
-        if os.path.join(parentDir,basename) == "sharding/read_pref_rs_client.js":
-            return True
-        # These tests fail due to bugs
-        if os.path.join(parentDir,basename) in ["sharding/sync_conn_cmd.js"]: # SERVER-6327
+
+        authTestsToSkip = [("sharding", "read_pref_rs_client.js"), # SERVER-6972
+                           ("sharding", "sync_conn_cmd.js"), #SERVER-6327
+                           ("sharding", "sync3.js"), # SERVER-6388 for this and those below
+                           ("sharding", "sync6.js"),
+                           ("sharding", "parallel.js"),
+                           ("jstests", "bench_test1.js"),
+                           ("jstests", "bench_test2.js"),
+                           ("jstests", "bench_test3.js")]
+
+        if os.path.join(parentDir,basename) in [ os.path.join(*test) for test in authTestsToSkip ]:
             return True
 
     return False
