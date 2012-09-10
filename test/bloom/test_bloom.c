@@ -194,7 +194,7 @@ int run(void)
 	}
 	free((void *)item.data);
 	printf("Out of %d ops, got %d false positives, %.4f%%\n",
-	    g.c_ops, fp, (float)fp/g.c_ops);
+	    g.c_ops, fp, 100.0 * fp/g.c_ops);
 	if ((ret = __wt_bloom_drop(bloomp, NULL)) != 0)
 		die(ret, "__wt_bloom_drop");
 
