@@ -190,7 +190,8 @@ assert.eq(result.errmsg, "primaries don't sync");
  * - Check who 2 is syncing from, it should be someone other than three after ~30 seconds
  */
 print("check sync target re-evaluation");
-config = replTest.getReplSetConfig();
+master = replTest.getMaster();
+config = master.getDB("local").system.replset.findOne();
 config.members[3].slaveDelay = 40;
 config.members[3].priority = 0;
 config.version++;
