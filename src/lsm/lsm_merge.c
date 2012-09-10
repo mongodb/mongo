@@ -24,6 +24,7 @@ __wt_lsm_major_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	const char *dest_uri;
 	uint64_t record_count;
 	int dest_id, nchunks;
+	size_t chunk_sz, i, j, saved_alloc;
 
 	src = dest = NULL;
 
@@ -105,11 +106,31 @@ __wt_lsm_major_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	WT_ERR(ret);
 
 	__wt_spin_lock(session, &lsm_tree->lock);
-	/*
-	 * TODO: save the old chunk names so they can be removed later, when
-	 * we can be sure no cursors are looking at them.
-	 * TODO: free the old chunk names before overwriting them.
-	 */
+	chunk_sz = sizeof(*lsm_tree->old_chunks);
+	if (nchunks * chunk_sz > lsm_tree->old_avail * chunk_sz) {
+		saved_alloc = lsm_tree->old_alloc;
+		WT_ERR(__wt_realloc(session,
+		    &lsm_tree->old_alloc,
+		    WT_MAX(10 * chunk_sz,
+		    lsm_tree->old_alloc + (2 * nchunks * chunk_sz)),
+		    &lsm_tree->old_chunks));
+		lsm_tree->nold_chunks = (int)(lsm_tree->old_alloc / chunk_sz);
+		lsm_tree->old_avail +=
+		    (lsm_tree->old_alloc - saved_alloc) / chunk_sz;
+	}
+	/* Copy entries one at a time, so we can reuse gaps in the list. */
+	for (j = 0, i = 0;
+	    j < (size_t)nchunks && i < lsm_tree->nold_chunks; i++) {
+		if (lsm_tree->old_chunks[i].uri == NULL) {
+			memcpy(&lsm_tree->old_chunks[i],
+			    &lsm_tree->chunk[j++], chunk_sz);
+			--lsm_tree->old_avail;
+		}
+	}
+
+	WT_ASSERT(session, (int)j == nchunks);
+
+	/* Update the current chunk list. */
 	memmove(lsm_tree->chunk + 1, lsm_tree->chunk + nchunks,
 	    (lsm_tree->nchunks - nchunks) * sizeof(*lsm_tree->chunk));
 	lsm_tree->nchunks -= nchunks - 1;

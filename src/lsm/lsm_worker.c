@@ -7,6 +7,9 @@
 
 #include "wt_internal.h"
 
+static int
+__lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree);
+
 /*
  * __wt_lsm_worker --
  *	The worker thread for an LSM tree, responsible for writing in-memory
@@ -77,7 +80,17 @@ __wt_lsm_worker(void *arg)
 			}
 		}
 
+		/* Clear any state from previous worker thread iterations. */
+		session->btree = NULL;
+
 		if (nchunks > 0 && __wt_lsm_major_merge(session, lsm_tree) == 0)
+			progress = 1;
+
+		/* Clear any state from previous worker thread iterations. */
+		session->btree = NULL;
+
+		if (lsm_tree->nold_chunks != lsm_tree->old_avail &&
+		    __lsm_free_chunks(session, lsm_tree) == 0)
 			progress = 1;
 
 		if (!progress)
@@ -87,4 +100,46 @@ __wt_lsm_worker(void *arg)
 err:	__wt_free(session, chunk_array);
 
 	return (NULL);
+}
+
+static int
+__lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
+{
+	WT_DECL_RET;
+	char *uri;
+	const char *drop_cfg[] = { NULL };
+	size_t found, i;
+
+	found = 0;
+	for (i = 0; i < lsm_tree->nold_chunks; i++) {
+		uri = (char *)lsm_tree->old_chunks[i].uri;
+		if (uri == NULL)
+			continue;
+		if (!found) {
+			found = 1;
+			/* TODO: Do we need the lsm_tree lock for all drops? */
+			__wt_spin_lock(session, &lsm_tree->lock);
+		}
+		WT_WITH_SCHEMA_LOCK(session,
+		    ret = __wt_schema_drop(session, uri, drop_cfg));
+		if (ret == EBUSY)
+			/*
+			 * TODO: Chunks resulting from a merge fail this for
+			 * ever, and are thus never freed. Understand why
+			 * they are held open.
+			 */
+			continue;
+		if (ret != 0)
+			goto err;
+		__wt_free(session, uri);
+		memset(
+		    &lsm_tree->old_chunks[i], 0, sizeof(*lsm_tree->old_chunks));
+		++lsm_tree->old_avail;
+	}
+	if (found) {
+err:		ret = __wt_lsm_meta_write(session, lsm_tree);
+		__wt_spin_unlock(session, &lsm_tree->lock);
+	}
+	/* Returning non-zero means there is no work to do. */
+	return (found ? 0 : WT_NOTFOUND);
 }
