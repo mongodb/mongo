@@ -51,7 +51,6 @@ typedef struct {
 	 * smaller-than-maximum page size when a split is required so we don't
 	 * repeatedly split a packed page.
 	 */
-	uint32_t btree_split_pct;	/* Split page percent */
 	uint32_t page_size;		/* Maximum page size */
 	uint32_t split_size;		/* Split page size */
 
@@ -525,7 +524,6 @@ static int
 __rec_write_init(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 {
 	WT_BTREE *btree;
-	WT_CONFIG_ITEM cval;
 	WT_RECONCILE *r;
 
 	btree = session->btree;
@@ -542,54 +540,53 @@ __rec_write_init(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 		/* Disk buffers may need to be aligned. */
 		F_SET(&r->dsk, WT_ITEM_ALIGNED);
 
-		/*
-		 * Configuration.
-		 *
-		 * Split percentage, determines split boundaries.
-		 */
-		WT_RET(__wt_config_getones(session,
-		    btree->config, "split_pct", &cval));
-		r->btree_split_pct = (uint32_t)cval.val;
-
-		/*
-		 * Suffix compression is a hack to shorten internal page keys
-		 * by discarding trailing bytes that aren't necessary for tree
-		 * navigation.  We don't do suffix compression if there is a
-		 * custom collator because we don't know what bytes a custom
-		 * collator might use.  Some custom collators (for example, a
-		 * collator implementing reverse ordering of strings), won't
-		 * have any problem with suffix compression: if there's ever a
-		 * reason to implement suffix compression for custom collators,
-		 * we can add a setting to the collator, configured when the
-		 * collator is added, that turns on suffix compression.
-		 */
-		r->key_sfx_compress_conf = 0;
-		if (btree->collator == NULL) {
-			WT_RET(__wt_config_getones(session,
-			    btree->config, "internal_key_truncate", &cval));
-			r->key_sfx_compress_conf = (cval.val != 0);
-		}
-
-		/* Prefix compression discards key's repeated prefix bytes. */
-		WT_RET(__wt_config_getones(session,
-		    btree->config, "prefix_compression", &cval));
-		r->key_pfx_compress_conf = (cval.val != 0);
-
-		/* Dictionary compression only writes repeated values once. */
-		WT_RET(__wt_config_getones(session,
-		    btree->config, "dictionary", &cval));
-		if ((r->dictionary_slots = cval.val) != 0) {
-			if (r->dictionary_slots < 100)
-				r->dictionary_slots = 100;
-			WT_RET(__wt_calloc_def(
-			    session, r->dictionary_slots, &r->dictionary));
-		}
 	}
 
-	r->page = page;
+	/*
+	 * Suffix compression is a hack to shorten internal page keys
+	 * by discarding trailing bytes that aren't necessary for tree
+	 * navigation.  We don't do suffix compression if there is a
+	 * custom collator because we don't know what bytes a custom
+	 * collator might use.  Some custom collators (for example, a
+	 * collator implementing reverse ordering of strings), won't
+	 * have any problem with suffix compression: if there's ever a
+	 * reason to implement suffix compression for custom collators,
+	 * we can add a setting to the collator, configured when the
+	 * collator is added, that turns on suffix compression.
+	 */
+	r->key_sfx_compress_conf = 0;
+	if (btree->collator == NULL && btree->internal_key_truncate)
+		r->key_sfx_compress_conf = 1;
 
-	/* Read the disk generation before we read anything from the page. */
-	WT_ORDERED_READ(r->orig_write_gen, page->modify->write_gen);
+	/* Prefix compression discards key's repeated prefix bytes. */
+	r->key_pfx_compress_conf = 0;
+	if (btree->prefix_compression)
+		r->key_pfx_compress_conf = 1;
+
+	/*
+	 * Dictionary compression only writes repeated values once.  We grow
+	 * the dictionary as necessary, always using the largest size we've
+	 * seen.
+	 */
+	if (btree->dictionary != 0 && btree->dictionary > r->dictionary_slots) {
+		/*
+		 * Sanity check the size: 100 slots is the smallest dictionary
+		 * we use.
+		 */
+		if (btree->dictionary < 100)
+			btree->dictionary = 100;
+		if (r->dictionary != NULL) {
+			r->dictionary_slots = 0;
+			__wt_free(session, r->dictionary);
+		}
+		WT_RET(__wt_calloc_def(
+		    session, btree->dictionary, &r->dictionary));
+		r->dictionary_slots = btree->dictionary;
+	}
+
+	/* Per-page reconciliation: reset the dictionary. */
+	if (btree->dictionary)
+		__rec_dictionary_reset(r);
 
 	/* Per-page reconciliation: track skipped updates. */
 	r->upd_skipped = 0;
@@ -598,9 +595,9 @@ __rec_write_init(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	/* Per-page reconciliation: track overflow items. */
 	r->ovfl_items = 0;
 
-	/* Per-page reconciliation: reset the dictionary. */
-	if (r->dictionary != NULL)
-		__rec_dictionary_reset(r);
+	/* Read the disk generation before we read anything from the page. */
+	r->page = page;
+	WT_ORDERED_READ(r->orig_write_gen, page->modify->write_gen);
 
 	return (0);
 }
@@ -865,7 +862,7 @@ __rec_split_init(
 	r->page_size = max;
 	r->split_size = page->type == WT_PAGE_COL_FIX ?
 	    max :
-	    WT_SPLIT_PAGE_SIZE(max, btree->allocsize, r->btree_split_pct);
+	    WT_SPLIT_PAGE_SIZE(max, btree->allocsize, btree->split_pct);
 
 	/*
 	 * If the maximum page size is the same as the split page size, there
@@ -925,7 +922,7 @@ __rec_split(WT_SESSION_IMPL *session)
 	dsk = r->dsk.mem;
 
 	/* Hitting a page boundary resets the dictionary, in all cases. */
-	if (r->dictionary)
+	if (btree->dictionary)
 		__rec_dictionary_reset(r);
 
 	/*
@@ -1426,6 +1423,7 @@ __wt_rec_bulk_wrapup(WT_CURSOR_BULK *cbulk)
 int
 __wt_rec_row_bulk_insert(WT_CURSOR_BULK *cbulk)
 {
+	WT_BTREE *btree;
 	WT_CURSOR *cursor;
 	WT_KV *key, *val;
 	WT_RECONCILE *r;
@@ -1434,6 +1432,7 @@ __wt_rec_row_bulk_insert(WT_CURSOR_BULK *cbulk)
 
 	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
 	r = session->reconcile;
+	btree = session->btree;
 
 	cursor = &cbulk->cbt.iface;
 	key = &r->k;
@@ -1468,7 +1467,7 @@ __wt_rec_row_bulk_insert(WT_CURSOR_BULK *cbulk)
 	/* Copy the key/value pair onto the page. */
 	__rec_copy_incr(session, r, key);
 	if (val->len != 0) {
-		if (r->dictionary)
+		if (btree->dictionary)
 			__rec_dict_copy_incr(session, r, val);
 		else
 			__rec_copy_incr(session, r, val);
@@ -3156,12 +3155,14 @@ err:	__wt_scr_free(&tmpkey);
 static int
 __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_INSERT *ins)
 {
+	WT_BTREE *btree;
 	WT_KV *key, *val;
 	WT_RECONCILE *r;
 	WT_UPDATE *upd;
 	int ovfl_key;
 
 	r = session->reconcile;
+	btree = session->btree;
 	key = &r->k;
 	val = &r->v;
 
@@ -3204,7 +3205,7 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_INSERT *ins)
 		/* Copy the key/value pair onto the page. */
 		__rec_copy_incr(session, r, key);
 		if (val->len != 0) {
-			if (r->dictionary)
+			if (btree->dictionary)
 				__rec_dict_copy_incr(session, r, val);
 			else
 				__rec_copy_incr(session, r, val);
@@ -3908,8 +3909,8 @@ __rec_dictionary_reset(WT_RECONCILE *r)
 	 * the current boundary's start address instead, but that's a little
 	 * trickier if we actually split and the boundary moves around.
 	 */
-	memset(
-	    r->dictionary, 0, r->dictionary_slots * sizeof(r->dictionary[0]));
+	memset(r->dictionary,
+	    0, (size_t)r->dictionary_slots * sizeof(r->dictionary[0]));
 }
 
 /*
