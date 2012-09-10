@@ -425,6 +425,7 @@ __wt_curfile_open(WT_SESSION_IMPL *session, const char *uri,
     WT_CURSOR *owner, const char *cfg[], WT_CURSOR **cursorp)
 {
 	WT_CONFIG_ITEM cval;
+	WT_DECL_RET;
 	int bulk;
 
 	WT_RET(__wt_config_gets_defno(session, cfg, "bulk", &cval));
@@ -442,5 +443,9 @@ __wt_curfile_open(WT_SESSION_IMPL *session, const char *uri,
 	else
 		WT_RET(__wt_bad_object_type(session, uri));
 
-	return (__wt_curfile_create(session, owner, cfg, cursorp));
+	WT_ERR(__wt_curfile_create(session, owner, cfg, cursorp));
+	return (0);
+
+err:	WT_WITH_SCHEMA_LOCK(session, (void)__wt_session_release_btree(session));
+	return (ret);
 }

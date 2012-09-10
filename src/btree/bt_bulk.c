@@ -16,18 +16,18 @@ static int __bulk_row_keycmp_err(WT_CURSOR_BULK *);
 int
 __wt_bulk_init(WT_CURSOR_BULK *cbulk)
 {
-	WT_DECL_RET;
+	WT_BTREE *btree;
 	WT_SESSION_IMPL *session;
 
 	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
+	btree = session->btree;
 
-	/*
-	 * You can't bulk-load into existing trees.  Check, and retrieve the
-	 * leaf page we're going to use.
-	 */
-	if ((ret = __wt_btree_root_empty(session, &cbulk->leaf)) != 0)
-		WT_RET_MSG(
-		    session, ret, "bulk-load is only possible for empty trees");
+	if (!btree->bulk_load_ok)
+		WT_RET_MSG(session,
+		    EINVAL, "bulk-load is only possible for empty trees");
+
+	/* Set a reference to the empty leaf page. */
+	cbulk->leaf = btree->root_page->u.intl.t->page;
 
 	WT_RET(__wt_rec_bulk_init(cbulk));
 
