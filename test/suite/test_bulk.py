@@ -53,7 +53,7 @@ class test_bulk_load_not_empty(wttest.WiredTigerTestCase):
         cursor.close()
         msg = '/bulk-load is only possible for empty trees/'
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-	    lambda: self.session.open_cursor(uri, None, "bulk"), msg)
+            lambda: self.session.open_cursor(uri, None, "bulk"), msg)
 
     def test_bulk_load_busy(self):
         uri = self.type + self.name
@@ -64,7 +64,7 @@ class test_bulk_load_not_empty(wttest.WiredTigerTestCase):
         cursor.insert()
         # Don't close the insert cursor, we want EBUSY.
         self.assertRaises(wiredtiger.WiredTigerError,
-	    lambda: self.session.open_cursor(uri, None, "bulk"))
+            lambda: self.session.open_cursor(uri, None, "bulk"))
 
 
 # Smoke test bulk-load.
@@ -91,12 +91,12 @@ class test_bulk_load(wttest.WiredTigerTestCase):
     def test_bulk_load(self):
         uri = self.type + self.name
         self.session.create(uri,
-	    'key_format=' + self.keyfmt + ',value_format=' + self.valfmt)
+            'key_format=' + self.keyfmt + ',value_format=' + self.valfmt)
         cursor = self.session.open_cursor(uri, None, "bulk")
         for i in range(1, 100):
-	    cursor.set_key(key_populate(cursor, i))
-	    cursor.set_value(value_populate(cursor, i))
-	    cursor.insert()
+            cursor.set_key(key_populate(cursor, i))
+            cursor.set_value(value_populate(cursor, i))
+            cursor.insert()
         cursor.close()
 
 
