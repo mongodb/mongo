@@ -1,7 +1,8 @@
 /*! @page huffman Huffman Encoding
 
 Keys in row-stores and variable-length values in either row- or
-column-stores can be compressed with Huffman encoding.
+column-stores can be compressed with Huffman encoding.  The additional
+CPU cost of Huffman coding can be high, and should be considered.
 
 Huffman compression is maintained in memory as well as on disk, and can
 increase the amount of usable data the cache can hold as well as
