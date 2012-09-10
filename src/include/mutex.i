@@ -15,6 +15,11 @@
 
 #if SPINLOCK_TYPE == SPINLOCK_GCC
 
+/* Default to spinning 1000 times before yielding. */
+#ifndef WT_SPIN_COUNT
+#define	WT_SPIN_COUNT 1000
+#endif
+
 static inline void
 __wt_spin_init(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
@@ -33,11 +38,16 @@ __wt_spin_destroy(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 static inline void
 __wt_spin_lock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
+	int i;
+
 	WT_UNUSED(session);
 
-	while (__sync_lock_test_and_set(t, 1))
-		while (*t)
+	while (__sync_lock_test_and_set(t, 1)) {
+		for (i = 0; *t && i < WT_SPIN_COUNT; i++)
 			WT_PAUSE();
+		if (*t)
+			__wt_yield();
+	}
 }
 
 static inline int
