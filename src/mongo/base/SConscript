@@ -2,9 +2,13 @@
 
 Import("env")
 
-env.StaticLibrary("base", ['status.cpp'])
+env.StaticLibrary('base', ['initializer_dependency_graph.cpp',
+                           'make_string_vector.cpp',
+                           'status.cpp'])
+
+env.CppUnitTest('initializer_dependency_graph_test',
+                ['initializer_dependency_graph_test.cpp'],
+                LIBDEPS=['base'])
 
 env.CppUnitTest('status_test', 'status_test.cpp',
                 LIBDEPS=['base'])
-
-

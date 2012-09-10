@@ -114,6 +114,14 @@ namespace mongo {
         static void unref(ErrorInfo* error);
     };
 
+    static inline bool operator==(const ErrorCodes::Error lhs, const Status& rhs) {
+        return rhs == lhs;
+    }
+
+    static inline bool operator!=(const ErrorCodes::Error lhs, const Status& rhs) {
+        return rhs != lhs;
+    }
+
     //
     // Convenience method for unittest code. Please use accessors otherwise.
     //
