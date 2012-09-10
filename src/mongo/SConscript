@@ -453,7 +453,7 @@ mongosLibraryFiles = [
 env.Library( "mongoscore" , mongosLibraryFiles, LIBDEPS=['db/auth/authmongos'] )
 
 env.CppUnitTest( "balancer_policy_test" , [ "s/balancer_policy_tests.cpp" ] ,
-                 LIBDEPS=["mongoscore", "coreshard","mongocommon","coreserver","coredb","dbcmdline","mongodandmongos"] ,
+                 LIBDEPS=["mongoscore", "coreshard", "mongocommon","coreserver","coredb","dbcmdline","mongodandmongos"] ,
                  NO_CRUTCH=True)
 
 env.CppUnitTest("scoped_db_conn_test", [ "client/scoped_db_conn_test.cpp" ],
@@ -603,14 +603,15 @@ if has_option( "sharedclient" ):
 
 # dbtests test binary
 env.StaticLibrary('testframework', ['dbtests/framework.cpp'], LIBDEPS=['unittest/unittest'])
+
 env.StaticLibrary('mocklib', [
+        'dbtests/mock/mock_conn_registry.cpp',
         'dbtests/mock/mock_dbclient_connection.cpp',
+        'dbtests/mock/mock_dbclient_cursor.cpp',
         'dbtests/mock/mock_remote_db_server.cpp',
         'dbtests/mock/mock_replica_set.cpp'
     ],
-    LIBDEPS=['unittest/unittest', 'mongocommon'])
-
-
+    LIBDEPS=['mongocommon'])
 
 test = testEnv.Install(
     '#/',
@@ -644,7 +645,7 @@ if darwin or env["_HAVEPCAP"]:
         sniffEnv.Append( LIBS=[ "wpcap" ] )
 
     sniffEnv.Install( '#/', sniffEnv.Program( "mongosniff", "tools/sniffer.cpp",
-                                              LIBDEPS=["gridfs", "serveronly", "coreserver", "coredb", "notmongodormongos"] ) )
+                                              LIBDEPS=["gridfs", "serveronly", "coreserver", "coredb", "notmongodormongos"]))
 
 # --- shell ---
 

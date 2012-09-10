@@ -30,6 +30,8 @@
 
 using mongo::BSONObj;
 using mongo::ConnectionString;
+using mongo::MockDBClientConnection;
+using mongo::MockRemoteDBServer;
 
 using std::string;
 using std::vector;

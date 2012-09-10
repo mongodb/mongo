@@ -22,7 +22,7 @@
 #include <map>
 #include <vector>
 
-namespace mongo_test {
+namespace mongo {
     /**
      * This is a helper class for managing a replica set consisting of
      * MockRemoteDBServer instances.
@@ -49,7 +49,6 @@ namespace mongo_test {
         std::string getSetName() const;
         std::string getConnectionString() const;
         std::vector<mongo::HostAndPort> getHosts() const;
-        mongo::ConnectionString::ConnectionHook* getConnectionHook();
         const std::vector<mongo::ReplSetConfig::MemberCfg>& getReplConfig() const;
         std::string getPrimary() const;
         const std::vector<std::string>& getSecondaries() const;
@@ -89,27 +88,6 @@ namespace mongo_test {
         void restore(const std::string& hostName);
 
     private:
-        class ReplSetConnHook: public mongo::ConnectionString::ConnectionHook {
-        public:
-            /**
-             * Creates a new connection hook for the ConnectionString class that
-             * can create mock connections to mock replica set members using their
-             * pseudo host names.
-             *
-             * @param replSet the mock replica set. Caller is responsible for managing
-             *     replSet and making sure that it lives longer than this object.
-             */
-            ReplSetConnHook(MockReplicaSet* replSet);
-            ~ReplSetConnHook();
-
-            mongo::DBClientBase* connect(
-                    const mongo::ConnectionString& connString,
-                    std::string& errmsg, double socketTimeout);
-
-        private:
-            MockReplicaSet* _replSet;
-        };
-
         /**
          * Mocks the ismaster command based on the information on the current
          * replica set configuration.
@@ -129,7 +107,6 @@ namespace mongo_test {
 
         const std::string _setName;
         std::map<std::string, MockRemoteDBServer*> _nodeMap;
-        ReplSetConnHook _connStringHook;
         std::vector<mongo::ReplSetConfig::MemberCfg> _replConfig;
 
         std::string _primaryHost;

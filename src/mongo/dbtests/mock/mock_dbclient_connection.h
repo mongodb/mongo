@@ -23,7 +23,7 @@
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/dbtests/mock/mock_remote_db_server.h"
 
-namespace mongo_test {
+namespace mongo {
     /**
      * A simple class for mocking mongo::DBClientConnection.
      *
@@ -47,6 +47,12 @@ namespace mongo_test {
         //
         // DBClientBase methods
         //
+
+        bool connect(const char* hostName, std::string& errmsg);
+
+        inline bool connect(const HostAndPort& host, std::string& errmsg) {
+            return connect(host.toString().c_str(), errmsg);
+        }
 
         bool runCommand(const std::string& dbname, const mongo::BSONObj& cmdObj,
                 mongo::BSONObj &info, int options = 0,

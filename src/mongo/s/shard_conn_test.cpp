@@ -15,6 +15,7 @@
 
 #include "mongo/base/init.h"
 #include "mongo/client/connpool.h"
+#include "mongo/dbtests/mock/mock_conn_registry.h"
 #include "mongo/dbtests/mock/mock_dbclient_connection.h"
 #include "mongo/platform/cstdint.h"
 #include "mongo/s/shard.h"
@@ -32,6 +33,7 @@
 
 using boost::scoped_ptr;
 using mongo::DBClientBase;
+using mongo::MockRemoteDBServer;
 using mongo::ShardConnection;
 using std::string;
 using std::vector;
@@ -68,12 +70,16 @@ namespace mongo_test {
         void setUp() {
             _maxPoolSizePerHost = mongo::PoolForHost::getMaxPerHost();
 
+            mongo::ConnectionString::setConnectionHook(
+                    mongo::MockConnRegistry::get()->getConnStrHook());
             _dummyServer = new MockRemoteDBServer(TARGET_HOST);
-            mongo::ConnectionString::setConnectionHook(_dummyServer->getConnectionHook());
+            mongo::MockConnRegistry::get()->addServer(_dummyServer);
         }
 
         void tearDown() {
             ShardConnection::clearPool();
+
+            mongo::MockConnRegistry::get()->removeServer(_dummyServer->getServerAddress());
             delete _dummyServer;
 
             mongo::PoolForHost::setMaxPerHost(_maxPoolSizePerHost);

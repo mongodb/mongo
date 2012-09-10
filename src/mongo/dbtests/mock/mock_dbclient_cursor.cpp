@@ -17,7 +17,7 @@
 
 #include "mongo/dbtests/mock/mock_dbclient_cursor.h"
 
-namespace mongo_test {
+namespace mongo {
     MockDBClientCursor::MockDBClientCursor(mongo::DBClientBase* client,
             const mongo::BSONArray& resultSet):
         mongo::DBClientCursor(client, "", 0, 0, 0) {

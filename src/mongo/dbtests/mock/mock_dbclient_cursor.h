@@ -20,7 +20,7 @@
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/client/dbclientmockcursor.h"
 
-namespace mongo_test {
+namespace mongo {
 
     /**
      * Simple adapter class for mongo::DBClientMockCursor to mongo::DBClientCursor.

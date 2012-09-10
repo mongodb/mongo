@@ -27,7 +27,7 @@ using mongo::str::stream;
 using std::string;
 using std::vector;
 
-namespace mongo_test {
+namespace mongo {
     MockRemoteDBServer::CircularBSONIterator::CircularBSONIterator(
             const vector<BSONObj>& replyVector) {
         for (std::vector<mongo::BSONObj>::const_iterator iter = replyVector.begin();
@@ -57,14 +57,10 @@ namespace mongo_test {
             _delayMilliSec(0),
             _cmdCount(0),
             _queryCount(0),
-            _connStrHook(this) {
+            _instanceID(0) {
     }
 
     MockRemoteDBServer::~MockRemoteDBServer() {
-    }
-
-    mongo::ConnectionString::ConnectionHook* MockRemoteDBServer::getConnectionHook() {
-        return &_connStrHook;
     }
 
     void MockRemoteDBServer::setDelay(long long milliSec) {
@@ -207,27 +203,6 @@ namespace mongo_test {
 
         if (!_isRunning || id < _instanceID) {
             throw mongo::SocketException(mongo::SocketException::CLOSED, _hostName);
-        }
-    }
-
-    MockRemoteDBServer::MockDBClientConnStrHook::MockDBClientConnStrHook(
-            MockRemoteDBServer* mockServer): _mockServer(mockServer) {
-    }
-
-    MockRemoteDBServer::MockDBClientConnStrHook::~MockDBClientConnStrHook() {
-    }
-
-    mongo::DBClientBase* MockRemoteDBServer::MockDBClientConnStrHook::connect(
-            const mongo::ConnectionString& connString,
-            std::string& errmsg,
-            double socketTimeout) {
-        if (_mockServer->isRunning()) {
-            return new MockDBClientConnection(_mockServer);
-        }
-        else {
-            // mimic ConnectionString::connect for MASTER type connection to return NULL
-            // if the destination is unreachable.
-            return NULL;
         }
     }
 }

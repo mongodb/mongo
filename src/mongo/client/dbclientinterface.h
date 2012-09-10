@@ -172,6 +172,7 @@ namespace mongo {
     bool hasReadPreference(const BSONObj& queryObj);
 
     class DBClientBase;
+    class DBClientConnection;
 
     /**
      * ConnectionString handles parsing different ways to connect to mongo and determining method
@@ -287,6 +288,11 @@ namespace mongo {
         static void setConnectionHook( ConnectionHook* hook ){
             scoped_lock lk( _connectHookMutex );
             _connectHook = hook;
+        }
+
+        static ConnectionHook* getConnectionHook() {
+            scoped_lock lk( _connectHookMutex );
+            return _connectHook;
         }
 
     private:
@@ -1178,6 +1184,18 @@ namespace mongo {
         static int getNumConnections() {
             return _numConnections;
         }
+
+        /**
+         * Primarily used for notifying the replica set client that the server
+         * it is talking to is not primary anymore.
+         *
+         * @param rsClient caller is responsible for managing the life of rsClient
+         * and making sure that it lives longer than this object.
+         *
+         * Warning: This is only for internal use and will eventually be removed in
+         * the future.
+         */
+        void setReplSetClientCallback(DBClientReplicaSet* rsClient);
 
         static void setLazyKillCursor( bool lazy ) { _lazyKillCursor = lazy; }
         static bool getLazyKillCursor() { return _lazyKillCursor; }

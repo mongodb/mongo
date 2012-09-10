@@ -24,7 +24,7 @@ using mongo::BSONObj;
 using std::string;
 using std::vector;
 
-namespace mongo_test {
+namespace mongo {
     MockDBClientConnection::MockDBClientConnection(MockRemoteDBServer* remoteServer,
             bool autoReconnect):
             _remoteServerInstanceID(remoteServer->getInstanceID()),
@@ -35,6 +35,16 @@ namespace mongo_test {
     }
 
     MockDBClientConnection::~MockDBClientConnection() {
+    }
+
+    bool MockDBClientConnection::connect(const char* hostName, std::string& errmsg) {
+        if (_remoteServer->isRunning()) {
+            _remoteServerInstanceID = _remoteServer->getInstanceID();
+            return true;
+        }
+
+        errmsg.assign("cannot connect to " + _remoteServer->getServerAddress());
+        return false;
     }
 
     bool MockDBClientConnection::runCommand(const string& dbname, const BSONObj& cmdObj,

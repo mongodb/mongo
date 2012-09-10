@@ -24,6 +24,8 @@ using mongo::BSONElement;
 using mongo::BSONObj;
 using mongo::BSONObjIterator;
 using mongo::ConnectionString;
+using mongo::MockRemoteDBServer;
+using mongo::MockReplicaSet;
 
 using std::set;
 using std::string;
