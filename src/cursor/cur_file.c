@@ -446,6 +446,7 @@ __wt_curfile_open(WT_SESSION_IMPL *session, const char *uri,
 	WT_ERR(__wt_curfile_create(session, owner, cfg, cursorp));
 	return (0);
 
-err:	WT_WITH_SCHEMA_LOCK(session, (void)__wt_session_release_btree(session));
+err:	/* If the cursor could not be opened, release the handle. */
+	(void)__wt_session_release_btree(session);
 	return (ret);
 }
