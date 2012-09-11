@@ -350,7 +350,7 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 		__curindex_get_value,
 		NULL,
 		__curindex_set_value,
-		NULL,
+		NULL,			/* compare */
 		__curindex_next,
 		__curindex_prev,
 		__curindex_reset,
@@ -360,7 +360,6 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 		__wt_cursor_notsup,	/* update */
 		__wt_cursor_notsup,	/* remove */
 		__curindex_close,
-		NULL,			/* compare */
 		{ NULL, NULL },		/* TAILQ_ENTRY q */
 		0,			/* recno key */
 		{ 0 },			/* recno raw buffer */

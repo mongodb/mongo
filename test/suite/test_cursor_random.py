@@ -43,7 +43,7 @@ class test_cursor_random(wttest.WiredTigerTestCase):
         self.session.create(uri, 'key_format=' + self.fmt + ',value_format=S')
         cursor = self.session.open_cursor(uri, None, "next_random=true")
         self.assertRaises(
-            wiredtiger.WiredTigerError, lambda: cursor.equals(cursor))
+            wiredtiger.WiredTigerError, lambda: cursor.compare(cursor))
         self.assertRaises(wiredtiger.WiredTigerError, lambda: cursor.prev())
         self.assertRaises(wiredtiger.WiredTigerError, lambda: cursor.reset())
         self.assertRaises(wiredtiger.WiredTigerError, lambda: cursor.search())

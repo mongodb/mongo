@@ -135,6 +135,8 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 	__wt_free(session, btree->value_format);
 	__wt_free(session, btree->stats);
 
+	btree->bulk_load_ok = 0;
+
 	return (ret);
 }
 
@@ -261,6 +263,12 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session)
 	root = leaf = NULL;
 
 	/*
+	 * Empty objects can be used for cursor inserts or for bulk loads; set
+	 * a flag that's cleared when a row is inserted into the tree.
+	 */
+	btree->bulk_load_ok = 1;
+
+	/*
 	 * A note about empty trees: the initial tree is a root page and a leaf
 	 * page.  We need a pair of pages instead of just a single page because
 	 * we can reconcile the leaf page while the root stays pinned in memory.
@@ -375,30 +383,6 @@ __wt_btree_leaf_create(
 	leaf->parent = parent;
 
 	*pagep = leaf;
-	return (0);
-}
-
-/*
- * __wt_btree_root_empty --
- *	Bulk loads only work on empty trees: check before doing a bulk load.
- */
-int
-__wt_btree_root_empty(WT_SESSION_IMPL *session, WT_PAGE **leafp)
-{
-	WT_BTREE *btree;
-	WT_PAGE *root, *child;
-
-	btree = session->btree;
-	root = btree->root_page;
-
-	if (root->entries != 1)
-		return (WT_ERROR);
-
-	child = root->u.intl.t->page;
-	if (child->entries != 0)
-		return (WT_ERROR);
-
-	*leafp = child;
 	return (0);
 }
 

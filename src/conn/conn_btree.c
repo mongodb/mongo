@@ -151,8 +151,6 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session)
 
 	btree = session->btree;
 
-	WT_ASSERT(session, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
-
 	if (!F_ISSET(btree, WT_BTREE_OPEN))
 		return (0);
 
@@ -161,7 +159,6 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session)
 		ret = __wt_checkpoint(session, NULL);
 
 	WT_TRET(__wt_btree_close(session));
-
 	F_CLR(btree, WT_BTREE_OPEN | WT_BTREE_SPECIAL_FLAGS);
 
 	return (ret);

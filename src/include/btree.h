@@ -106,6 +106,7 @@ struct __wt_btree {
 
 	WT_PAGE *root_page;		/* Root page */
 	int modified;			/* If the tree ever modified */
+	int bulk_load_ok;		/* Bulk-load is a possibility */
 
 	void *block;			/* Block manager */
 	u_int block_header;		/* Block manager header length */
