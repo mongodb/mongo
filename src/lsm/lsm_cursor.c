@@ -272,9 +272,9 @@ __clsm_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 	WT_ERR(WT_CURSOR_NEEDKEY(a));
 	WT_ERR(WT_CURSOR_NEEDKEY(b));
 
-	/* TODO: How to order cursors on different levels? */
+	/* TODO: How to order cursors with different dsk_gen values? */
 	if (alsm->nchunks != blsm->nchunks)
-		return 1;
+		return (1);
 
 	cmp = 0;
 	FORALL_CURSORS(alsm, c, i) {

@@ -49,9 +49,8 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		else if (WT_STRING_MATCH("chunks", ck.str, ck.len)) {
 			WT_ERR(__wt_config_subinit(session, &lparser, &cv));
 			chunk_sz = sizeof(*lsm_tree->chunk);
-			for (nchunks = 0;
-			    (ret = __wt_config_next( &lparser, &lk, &lv)) == 0;
-			    nchunks++) {
+			for (nchunks = 0; (ret =
+			    __wt_config_next( &lparser, &lk, &lv)) == 0; ) {
 				if (WT_STRING_MATCH("bloom", lk.str, lk.len)) {
 					WT_ERR(__wt_strndup(session,
 					    lv.str, lv.len, &chunk->bloom_uri));
@@ -72,6 +71,7 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 				WT_ERR(__wt_strndup(session,
 				    lk.str, lk.len, &chunk->uri));
 				chunk->flags = WT_LSM_CHUNK_ONDISK;
+				nchunks++;
 			}
 			WT_ERR_NOTFOUND_OK(ret);
 			lsm_tree->nchunks = nchunks;
