@@ -26,7 +26,7 @@ __wt_cursor_notsup(WT_CURSOR *cursor)
 void
 __wt_cursor_set_notsup(WT_CURSOR *cursor)
 {
-	cursor->equals =
+	cursor->compare =
 	    (int (*)(WT_CURSOR *, WT_CURSOR *, int *))__wt_cursor_notsup;
 	cursor->next = __wt_cursor_notsup;
 	cursor->prev = __wt_cursor_notsup;
@@ -36,8 +36,6 @@ __wt_cursor_set_notsup(WT_CURSOR *cursor)
 	cursor->insert = __wt_cursor_notsup;
 	cursor->update = __wt_cursor_notsup;
 	cursor->remove = __wt_cursor_notsup;
-	cursor->compare =
-	    (int (*)(WT_CURSOR *, WT_CURSOR *, int *))__wt_cursor_notsup;
 }
 
 /*
@@ -328,43 +326,6 @@ __cursor_search(WT_CURSOR *cursor)
 }
 
 /*
- * __cursor_equals --
- *	WT_CURSOR->equals default implementation.
- */
-static int
-__cursor_equals(WT_CURSOR *cursor, WT_CURSOR *other, int *equalp)
-{
-	WT_ITEM aitem, bitem;
-	WT_DECL_RET;
-	WT_SESSION_IMPL *session;
-
-	CURSOR_API_CALL_NOCONF(cursor, session, equals, NULL);
-
-	*equalp = 0;
-
-	/*
-	 * Confirm both cursors refer to the same source, then retrieve their
-	 * raw keys and compare them.
-	 */
-	if (strcmp(cursor->uri, other->uri) != 0)
-		WT_ERR_MSG(session, EINVAL,
-		    "equality method cursors must reference the same object");
-
-	/*
-	 * Don't clear (or allocate memory for) the WT_ITEM structures because
-	 * all that happens underneath is their data and size fields are reset
-	 * to reference the cursor's key.
-	 */
-	WT_ERR(__wt_cursor_get_raw_key(cursor, &aitem));
-	WT_ERR(__wt_cursor_get_raw_key(other, &bitem));
-	*equalp = (aitem.size == bitem.size &&
-	    memcmp(aitem.data, bitem.data, aitem.size) == 0) ? 1 : 0;
-
-err:	API_END(session);
-	return (ret);
-}
-
-/*
  * __wt_cursor_close --
  *	WT_CURSOR->close default implementation.
  */
@@ -489,8 +450,9 @@ __wt_cursor_init(WT_CURSOR *cursor,
 		cursor->set_key = __wt_cursor_set_key;
 	if (cursor->set_value == NULL)
 		cursor->set_value = __wt_cursor_set_value;
-	if (cursor->equals == NULL)
-		cursor->equals = __cursor_equals;
+	if (cursor->compare == NULL)
+		cursor->compare = (int (*)
+		    (WT_CURSOR *, WT_CURSOR *, int *))__wt_cursor_notsup;
 	if (cursor->next == NULL)
 		cursor->next = __wt_cursor_notsup;
 	if (cursor->prev == NULL)

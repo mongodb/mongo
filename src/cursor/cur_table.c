@@ -185,12 +185,14 @@ __curtable_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 	CURSOR_API_CALL_NOCONF(a, session, compare, NULL);
 
 	/*
-	 * Confirm both cursors refer to the same source, then call the
-	 * underlying object's comparison routine.
+	 * Confirm both cursors refer to the same source and have keys, then
+	 * call the underlying object's comparison routine.
 	 */
 	if (strcmp(a->uri, b->uri) != 0)
 		WT_ERR_MSG(session, EINVAL,
 		    "comparison method cursors must reference the same object");
+	WT_ERR(WT_CURSOR_NEEDKEY(WT_CURSOR_PRIMARY(a)));
+	WT_ERR(WT_CURSOR_NEEDKEY(WT_CURSOR_PRIMARY(b)));
 
 	ret = WT_CURSOR_PRIMARY(a)->compare(
 	    WT_CURSOR_PRIMARY(a), WT_CURSOR_PRIMARY(b), cmpp);
@@ -471,79 +473,7 @@ __wt_curtable_truncate(
 	WT_DECL_ITEM(key);
 	WT_DECL_RET;
 	WT_ITEM raw;
-	int cmp, equal, i, is_column;
-
-	/*
-	 * We're called by the session layer: the key must have been set but
-	 * the cursor itself may not be positioned.
-	 */
-	if (start != NULL)
-		WT_RET(WT_CURSOR_NEEDKEY(WT_CURSOR_PRIMARY(start)));
-	if (stop != NULL)
-		WT_RET(WT_CURSOR_NEEDKEY(WT_CURSOR_PRIMARY(stop)));
-
-	/*
-	 * If both cursors set, check they're correctly ordered with respect to
-	 * each other.  We have to test this before any column-store search, the
-	 * search can change the initial cursor position.
-	 */
-	if (start != NULL && stop != NULL) {
-		WT_RET(__curtable_compare(start, stop, &cmp));
-		if (cmp > 0)
-			WT_RET_MSG(session, EINVAL,
-			    "the start cursor position is after the stop "
-			    "cursor position");
-	}
-
-	/*
-	 * Table truncation requires the complete table cursor setup (including
-	 * indices and column groups because we handle them before truncating
-	 * the underlying objects).  There's no reason to believe any of that is
-	 * done yet, the application may have only set the keys and done nothing
-	 * further.  Do it now so we don't have to worry about it later.
-	 *
-	 * Column-store cursors might not reference a valid record: applications
-	 * can specify records larger than the current maximum record and create
-	 * implicit records (variable-length column-store deleted records, or
-	 * fixed-length column-store records with a value of 0).  Column-store
-	 * calls search-near for this reason.  That's currently only necessary
-	 * for variable-length column-store because fixed-length column-store
-	 * returns the implicitly created records, but it's simpler to test for
-	 * column-store than to test for the value type.
-	 *
-	 * Additionally, column-store corrects after search-near positioning the
-	 * start/stop cursors on the next record greater-than/less-than or equal
-	 * to the original key.  If the start/stop cursors hit the beginning/end
-	 * of the object, or the start/stop record numbers cross, we're done as
-	 * the range is empty.
-	 */
-	if (start == NULL)
-		is_column = WT_CURSOR_RECNO(WT_CURSOR_PRIMARY(stop));
-	else
-		is_column = WT_CURSOR_RECNO(WT_CURSOR_PRIMARY(start));
-	if (is_column) {
-		if (start != NULL) {
-			WT_RET(start->search_near(start, &cmp));
-			if (cmp < 0 && (ret = start->next(start)) != 0)
-				return (ret == WT_NOTFOUND ? 0 : ret);
-		}
-		if (stop != NULL) {
-			WT_RET(stop->search_near(stop, &cmp));
-			if (cmp > 0 && (ret = stop->prev(stop)) != 0)
-				return (ret == WT_NOTFOUND ? 0 : ret);
-
-			/* Check for crossing key/record numbers. */
-			if (start != NULL &&
-			    WT_CURSOR_PRIMARY(start)->recno >
-			    WT_CURSOR_PRIMARY(stop)->recno)
-				return (0);
-		}
-	} else {
-		if (start != NULL)
-			WT_RET(start->search(start));
-		if (stop != NULL)
-			WT_RET(stop->search(stop));
-	}
+	int cmp, i;
 
 	WT_RET(__wt_scr_alloc(session, 128, &key));
 
@@ -606,8 +536,8 @@ __wt_curtable_truncate(
 				APPLY_CG(ctable, search);
 				WT_ERR(ret);
 				APPLY_IDX(ctable, remove);
-				WT_ERR(start->equals(start, stop, &equal));
-			} while (!equal && (ret = start->next(start)) == 0);
+				WT_ERR(start->compare(start, stop, &cmp));
+			} while (cmp < 0 && (ret = start->next(start)) == 0);
 			WT_ERR_NOTFOUND_OK(ret);
 			ret = 0;
 
@@ -779,7 +709,7 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 		__wt_curtable_get_value,
 		__wt_curtable_set_key,
 		__wt_curtable_set_value,
-		NULL,
+		__curtable_compare,
 		__curtable_next,
 		__curtable_prev,
 		__curtable_reset,
@@ -789,7 +719,6 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 		__curtable_update,
 		__curtable_remove,
 		__curtable_close,
-		__curtable_compare,	/* compare */
 		{ NULL, NULL },		/* TAILQ_ENTRY q */
 		0,			/* recno key */
 		{ 0 },			/* raw recno buffer */

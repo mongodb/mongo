@@ -278,6 +278,7 @@ colcheck
 colgroup
 colgroups
 comparator
+comparep
 concat
 cond
 conf
@@ -344,7 +345,6 @@ enum's
 env
 eof
 eop
-equalp
 errhandler
 errno
 errv
