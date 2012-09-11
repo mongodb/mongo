@@ -81,7 +81,7 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 			for (nchunks = 0;
 			    (ret = __wt_config_next( &lparser, &lk, &lv)) == 0;
 			    nchunks++) {
-				if (nchunks * chunk_sz >
+				if ((nchunks + 1) * chunk_sz >
 				    lsm_tree->old_avail * chunk_sz) {
 					alloc = lsm_tree->old_alloc;
 					WT_ERR(__wt_realloc(session,
