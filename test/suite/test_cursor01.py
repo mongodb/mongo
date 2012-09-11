@@ -142,7 +142,6 @@ class test_cursor01(wttest.WiredTigerTestCase):
             self.assertEqual(value, self.genvalue(i))
             dupc = self.session.open_cursor(None, cursor, None)
             self.assertEquals(cursor.compare(dupc), 0)
-            self.assertTrue(cursor.equals(dupc))
             key = dupc.get_key()
             value = dupc.get_value()
             self.assertEqual(key, self.genkey(i))

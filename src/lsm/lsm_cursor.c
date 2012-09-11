@@ -246,6 +246,51 @@ __clsm_get_current(
 }
 
 /*
+ * __clsm_compare --
+ *	WT_CURSOR->compare implementation for the LSM cursor type.
+ */
+static int
+__clsm_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
+{
+	WT_CURSOR_LSM *alsm, *blsm;
+	WT_CURSOR *c;
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+	int cmp, i;
+
+	WT_LSM_ENTER(alsm, a, session, compare);
+	blsm = (WT_CURSOR_LSM *)b;
+
+	/*
+	 * Confirm both cursors refer to the same source and have keys, then
+	 * call the underlying object to compare them.
+	 */
+	if (strcmp(a->uri, b->uri) != 0)
+		WT_ERR_MSG(session, EINVAL,
+		    "comparison method cursors must reference the same object");
+
+	WT_ERR(WT_CURSOR_NEEDKEY(a));
+	WT_ERR(WT_CURSOR_NEEDKEY(b));
+
+	/* TODO: How to order cursors on different levels? */
+	if (alsm->nchunks != blsm->nchunks)
+		return 1;
+
+	cmp = 0;
+	FORALL_CURSORS(alsm, c, i) {
+		WT_RET(WT_LSM_CURCMP(session,
+		    alsm->lsm_tree, c, blsm->cursors[i], cmp));
+		if (!cmp)
+			break;
+	}
+err:	WT_LSM_END(alsm, session);
+	if (ret != 0)
+		*cmpp = cmp;
+
+	return (ret);
+}
+
+/*
  * __clsm_next --
  *	WT_CURSOR->next method for the LSM cursor type.
  */
@@ -780,7 +825,7 @@ __wt_clsm_open(WT_SESSION_IMPL *session,
 		NULL,
 		NULL,
 		NULL,
-		NULL,
+		__clsm_compare,
 		__clsm_next,
 		__clsm_prev,
 		__clsm_reset,
