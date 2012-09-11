@@ -36,7 +36,8 @@ namespace mongo {
     // from d_migrate.cpp
     void logOpForSharding( const char * opstr , const char * ns , const BSONObj& obj , BSONObj * patt );
 
-    int __findingStartInitialTimeout = 5; // configurable for testing
+    // Configurable for testing.
+    int FindingStartCursor::_initialTimeout = 5;
 
     // cached copies of these...so don't rename them, drop them, etc.!!!
     static NamespaceDetails *localOplogMainDetails = 0;
@@ -432,7 +433,7 @@ namespace mongo {
                 }
                 _findingStartCursor->advance();
                 RARELY {
-                    if ( _findingStartTimer.seconds() >= __findingStartInitialTimeout ) {
+                    if ( _findingStartTimer.seconds() >= _initialTimeout ) {
                         // If we've scanned enough, switch to find extent mode.
                         createClientCursor( extentFirstLoc( _findingStartCursor->currLoc() ) );
                         _findingStartMode = FindExtent;

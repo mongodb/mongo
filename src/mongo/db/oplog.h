@@ -60,8 +60,6 @@ namespace mongo {
 
     void oplogCheckCloseDatabase( Database * db );
 
-    extern int __findingStartInitialTimeout; // configurable for testing
-
     class QueryPlan;
     
     /** Implements an optimized procedure for finding the first op in the oplog. */
@@ -117,6 +115,11 @@ namespace mongo {
          */
         DiskLoc prevExtentFirstLoc( const DiskLoc& rec ) const;
 
+        /** For testing only. */
+
+        static int getInitialTimeout() { return _initialTimeout; }
+        static void setInitialTimeout( int timeout ) { _initialTimeout = timeout; }
+
     private:
         FindingStartCursor( const QueryPlan &qp );
         void init();
@@ -130,6 +133,7 @@ namespace mongo {
         ClientCursor::Holder _findingStartCursor;
         shared_ptr<Cursor> _c;
         ClientCursor::YieldData _yieldData;
+        static int _initialTimeout;
 
         /** @return the first record of the extent containing @param rec. */
         DiskLoc extentFirstLoc( const DiskLoc &rec );
