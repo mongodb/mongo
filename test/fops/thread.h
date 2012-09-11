@@ -33,6 +33,7 @@ void die(const char *, int) __attribute__((noreturn));
 void die(const char *, int);
 #endif
 int  fop_start(u_int);
+void obj_bulk(void);
 void obj_checkpoint(void);
 void obj_create(void);
 void obj_drop(void);

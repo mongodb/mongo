@@ -297,6 +297,46 @@ __curstat_close(WT_CURSOR *cursor)
 }
 
 /*
+ * __curstat_conn_init --
+ *	Initialize the statistics for a connection.
+ */
+static void
+__curstat_conn_init(
+    WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst, int statistics_clear)
+{
+	__wt_conn_stat_init(session);
+
+	cst->btree = NULL;
+	cst->notpositioned = 1;
+	cst->stats_first = (WT_STATS *)S2C(session)->stats;
+	cst->stats_count = sizeof(WT_CONNECTION_STATS) / sizeof(WT_STATS);
+	cst->clear_func =
+	    statistics_clear ? __wt_stat_clear_connection_stats : NULL;
+}
+
+/*
+ * __curstat_file_init --
+ *	Initialize the statistics for a file.
+ */
+static int
+__curstat_file_init(WT_SESSION_IMPL *session,
+    const char *uri, WT_CURSOR_STAT *cst, int statistics_clear)
+{
+	WT_BTREE *btree;
+
+	WT_RET(__wt_session_get_btree(session, uri, NULL, NULL, 0));
+	btree = session->btree;
+	WT_RET(__wt_btree_stat_init(session));
+
+	cst->btree = btree;
+	cst->notpositioned = 1;
+	cst->stats_first = (WT_STATS *)session->btree->stats;
+	cst->stats_count = sizeof(WT_BTREE_STATS) / sizeof(WT_STATS);
+	cst->clear_func = statistics_clear ? __wt_stat_clear_btree_stats : NULL;
+	return (0);
+}
+
+/*
  * __wt_curstat_open --
  *	WT_SESSION->open_cursor method for the statistics cursor type.
  */
@@ -332,44 +372,22 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 		0,			/* int saved_err */
 		0			/* uint32_t flags */
 	};
-	WT_BTREE *btree;
 	WT_CONFIG_ITEM cval;
 	WT_CURSOR *cursor;
 	WT_CURSOR_STAT *cst;
 	WT_DECL_RET;
-	WT_STATS *stats_first;
-	void (*clear_func)(WT_STATS *);
-	int statistics_clear, stats_count;
+	int statistics_clear;
 
-	btree = NULL;
-	clear_func = NULL;
 	cst = NULL;
 
 	WT_RET(__wt_config_gets_defno(session, cfg, "statistics_clear", &cval));
 	statistics_clear = (cval.val != 0);
 
-	if (!WT_PREFIX_SKIP(uri, "statistics:"))
-		return (EINVAL);
-	if (WT_PREFIX_MATCH(uri, "file:")) {
-		WT_ERR(__wt_session_get_btree(session, uri, NULL, NULL, 0));
-		btree = session->btree;
-		WT_ERR(__wt_btree_stat_init(session));
-		stats_first = (WT_STATS *)session->btree->stats;
-		stats_count = sizeof(WT_BTREE_STATS) / sizeof(WT_STATS);
-		if (statistics_clear)
-			clear_func = __wt_stat_clear_btree_stats;
-	} else {
-		__wt_conn_stat_init(session);
-		stats_first = (WT_STATS *)S2C(session)->stats;
-		stats_count = sizeof(WT_CONNECTION_STATS) / sizeof(WT_STATS);
-		if (statistics_clear)
-			clear_func = __wt_stat_clear_connection_stats;
-	}
-
 	WT_ERR(__wt_calloc_def(session, 1, &cst));
 	cursor = &cst->iface;
 	*cursor = iface;
 	cursor->session = &session->iface;
+
 	/*
 	 * We return the statistics field's offset as the key, and a string
 	 * description, a string value,  and a uint64_t value as the value
@@ -378,11 +396,13 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 	cursor->key_format = "i";
 	cursor->value_format = "SSq";
 
-	cst->btree = btree;
-	cst->stats_first = stats_first;
-	cst->stats_count = stats_count;
-	cst->notpositioned = 1;
-	cst->clear_func = clear_func;
+	if (strcmp(uri, "statistics:") == 0)
+		__curstat_conn_init(session, cst, statistics_clear);
+	else if (WT_PREFIX_MATCH(uri, "statistics:file:"))
+		WT_ERR(__curstat_file_init(session,
+		    uri + strlen("statistics:"), cst, statistics_clear));
+	else
+		WT_ERR(__wt_bad_object_type(session, uri));
 
 	/* __wt_cursor_init is last so we don't have to clean up on error. */
 	STATIC_ASSERT(offsetof(WT_CURSOR_STAT, iface) == 0);
