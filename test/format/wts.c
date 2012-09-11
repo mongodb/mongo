@@ -248,7 +248,12 @@ wts_stats(void)
 	if ((ret = cursor->close(cursor)) != 0)
 		die(ret, "cursor.close");
 
-	/* File statistics. */
+	/*
+	 * XXX
+	 * WiredTiger only supports file object statistics.
+	 */
+	if (strncmp(g.c_data_source, "file:", strlen("file:")) != 0)
+		goto skip;
 	if ((stat_name =
 	    malloc(strlen("statistics:") + strlen(g.c_data_source))) == NULL)
 		die(ret, "malloc");
@@ -268,7 +273,7 @@ wts_stats(void)
 	if ((ret = cursor->close(cursor)) != 0)
 		die(ret, "cursor.close");
 
-	if ((ret = fclose(fp)) != 0)
+skip:	if ((ret = fclose(fp)) != 0)
 		die(ret, "fclose");
 
 	if ((ret = session->close(session, NULL)) != 0)
