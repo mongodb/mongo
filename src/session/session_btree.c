@@ -63,7 +63,9 @@ __wt_session_lock_btree(WT_SESSION_IMPL *session, uint32_t flags)
 			WT_RET(__wt_try_writelock(session, btree->rwlock));
 			F_SET(btree, WT_BTREE_EXCLUSIVE);
 		}
-	} else
+	} else if (F_ISSET(btree, WT_BTREE_SPECIAL_FLAGS))
+		return (EBUSY);
+	else
 		__wt_readlock(session, btree->rwlock);
 
 	/*
@@ -99,10 +101,6 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 	WT_DECL_RET;
 
 	btree = session->btree;
-
-	/* If the tree is being created, it is already locked and tracked. */
-	if (btree == session->created_btree)
-		return (0);
 
 	/*
 	 * If we had special flags set, close the handle so that future access
@@ -211,12 +209,6 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 		session->btree = NULL;
 	else {
 		session->btree = btree;
-		/*
-		 * If the tree is being created, it is already locked and
-		 * tracked.
-		 */
-		if (btree == session->created_btree)
-			return (0);
 
 		/*
 		 * Try and lock the file; if we succeed, our "exclusive" state

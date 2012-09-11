@@ -27,15 +27,6 @@ __create_file(WT_SESSION_IMPL *session,
 	if (!WT_PREFIX_SKIP(filename, "file:"))
 		WT_RET_MSG(session, EINVAL, "Expected a 'file:' URI: %s", uri);
 
-	/* Get an exclusive handle lock to protect the name. */
-	WT_RET(__wt_session_get_btree(
-	    session, uri, NULL, cfg, WT_BTREE_EXCLUSIVE | WT_BTREE_LOCK_ONLY));
-
-	if (WT_META_TRACKING(session)) {
-		WT_RET(__wt_meta_track_handle_lock(session));
-		session->created_btree = session->btree;
-	}
-
 	/* Check if the file already exists. */
 	if (!is_metadata && (ret =
 	    __wt_metadata_read(session, uri, &treeconf)) != WT_NOTFOUND) {
@@ -75,11 +66,9 @@ __create_file(WT_SESSION_IMPL *session,
 	 * call, otherwise we could race with a drop.
 	 */
 	ret = __wt_conn_btree_get(session, uri, NULL, cfg, WT_BTREE_EXCLUSIVE);
+	WT_TRET(__wt_session_release_btree(session));
 
-err:	if (!WT_META_TRACKING(session))
-		WT_TRET(__wt_session_release_btree(session));
-
-	__wt_scr_free(&val);
+err:	__wt_scr_free(&val);
 	__wt_free(session, treeconf);
 
 	return (ret);

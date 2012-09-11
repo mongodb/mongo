@@ -117,6 +117,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * to open one.  We are holding other handle locks, it is not safe to
 	 * lock conn->spinlock.
 	 */
+	txn->isolation = TXN_ISO_READ_UNCOMMITTED;
 	saved_meta_next = session->meta_track_next;
 	session->meta_track_next = NULL;
 	saved_btree = session->btree;
@@ -139,6 +140,7 @@ err:	/*
 	 * overwritten the checkpoint, so what ends up on disk is not
 	 * consistent.
 	 */
+	txn->isolation = TXN_ISO_READ_UNCOMMITTED;
 	if (tracking)
 		WT_TRET(__wt_meta_track_off(session, ret != 0));
 
@@ -273,6 +275,7 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_CONFIG_ITEM cval, k, v;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
+	WT_TXN *txn;
 	const char *name;
 	char *name_alloc;
 	int deleted, is_checkpoint;
@@ -497,7 +500,11 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	    ckptbase, is_checkpoint ? WT_SYNC : WT_SYNC_DISCARD));
 
 	/* Update the object's metadata. */
-	WT_ERR(__wt_meta_ckptlist_set(session, btree->name, ckptbase));
+	txn = &session->txn;
+	txn->isolation = TXN_ISO_READ_UNCOMMITTED;
+	ret = __wt_meta_ckptlist_set(session, btree->name, ckptbase);
+	txn->isolation = TXN_ISO_SNAPSHOT;
+	WT_ERR(ret);
 
 	/*
 	 * If tracking enabled, defer making pages available until transaction

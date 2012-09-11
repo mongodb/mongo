@@ -18,17 +18,17 @@ obj_bulk(void)
 		die("conn.session", ret);
 
 	if ((ret = session->create(session, uri, NULL)) != 0)
-		if (ret != EEXIST)
+		if (ret != EEXIST && ret != EBUSY)
 			die("session.create", ret);
 
-	if (ret != EEXIST) {
+	if (ret == 0) {
 		if ((ret = session->open_cursor(
-		    session, uri, NULL, "bulk", &c)) != 0)
+		    session, uri, NULL, "bulk", &c)) == 0) {
+			/* Yield so that other threads can interfere. */
+			sched_yield();
+			c->close(c);
+		} else if (ret != ENOENT && ret != EBUSY)
 			die("session.open_cursor", ret);
-
-		/* Sleep so that other threads have a chance to interfere. */
-		sleep(1);
-		c->close(c);
 	}
 	if ((ret = session->close(session, NULL)) != 0)
 		die("session.close", ret);
@@ -44,7 +44,7 @@ obj_create(void)
 		die("conn.session", ret);
 
 	if ((ret = session->create(session, uri, NULL)) != 0)
-		if (ret != EEXIST)
+		if (ret != EEXIST && ret != EBUSY)
 			die("session.create", ret);
 
 	if ((ret = session->close(session, NULL)) != 0)
@@ -99,7 +99,7 @@ obj_upgrade(void)
 		die("conn.session", ret);
 
 	if ((ret = session->upgrade(session, uri, NULL)) != 0)
-		if (ret != ENOENT)
+		if (ret != ENOENT && ret != EBUSY)
 			die("session.upgrade", ret);
 
 	if ((ret = session->close(session, NULL)) != 0)
@@ -116,7 +116,7 @@ obj_verify(void)
 		die("conn.session", ret);
 
 	if ((ret = session->verify(session, uri, NULL)) != 0)
-		if (ret != ENOENT)
+		if (ret != ENOENT && ret != EBUSY)
 			die("session.verify", ret);
 
 	if ((ret = session->close(session, NULL)) != 0)
