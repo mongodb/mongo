@@ -32,7 +32,7 @@ __create_file(WT_SESSION_IMPL *session,
 	    __wt_metadata_read(session, uri, &treeconf)) != WT_NOTFOUND) {
 		if (exclusive)
 			WT_TRET(EEXIST);
-		goto err;
+		return (ret);
 	}
 
 	/* Create the file. */
@@ -65,8 +65,12 @@ __create_file(WT_SESSION_IMPL *session,
 	 * Keep the handle exclusive until it is released at the end of the
 	 * call, otherwise we could race with a drop.
 	 */
-	ret = __wt_conn_btree_get(session, uri, NULL, cfg, WT_BTREE_EXCLUSIVE);
-	WT_TRET(__wt_session_release_btree(session));
+	WT_ERR(__wt_conn_btree_get(
+	    session, uri, NULL, cfg, WT_BTREE_EXCLUSIVE));
+	if (!WT_META_TRACKING(session))
+		WT_ERR(__wt_session_release_btree(session));
+	else
+		WT_ERR(__wt_meta_track_handle_lock(session, 1));
 
 err:	__wt_scr_free(&val);
 	__wt_free(session, treeconf);

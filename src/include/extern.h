@@ -716,7 +716,7 @@ extern int __wt_meta_track_update(WT_SESSION_IMPL *session, const char *key);
 extern int __wt_meta_track_fileop( WT_SESSION_IMPL *session,
     const char *olduri,
     const char *newuri);
-extern int __wt_meta_track_handle_lock(WT_SESSION_IMPL *session);
+extern int __wt_meta_track_handle_lock(WT_SESSION_IMPL *session, int created);
 extern int __wt_meta_turtle_init(WT_SESSION_IMPL *session, int *existp);
 extern int __wt_meta_turtle_read( WT_SESSION_IMPL *session,
     const char *key,

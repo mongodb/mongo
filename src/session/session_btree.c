@@ -273,7 +273,7 @@ __wt_session_lock_checkpoint(WT_SESSION_IMPL *session, const char *checkpoint)
 	F_SET(session->btree, WT_BTREE_DISCARD);
 
 	WT_ASSERT(session, WT_META_TRACKING(session));
-	WT_ERR(__wt_meta_track_handle_lock(session));
+	WT_ERR(__wt_meta_track_handle_lock(session, 0));
 
 	/* Restore the original btree in the session. */
 err:	session->btree = btree;

@@ -393,7 +393,7 @@ __wt_conn_btree_close_all(WT_SESSION_IMPL *session, const char *name)
 
 		session->btree = btree;
 		if (WT_META_TRACKING(session))
-			WT_ERR(__wt_meta_track_handle_lock(session));
+			WT_ERR(__wt_meta_track_handle_lock(session, 0));
 
 		/*
 		 * We have an exclusive lock, which means there are no
