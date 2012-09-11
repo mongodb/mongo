@@ -135,6 +135,8 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 	__wt_free(session, btree->value_format);
 	__wt_free(session, btree->stats);
 
+	btree->bulk_load_ok = 0;
+
 	return (ret);
 }
 
