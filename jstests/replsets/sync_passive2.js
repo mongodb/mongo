@@ -204,11 +204,9 @@ assert.soon(function() {
     return checkSyncingFrom(nodes[2], replTest.host+":"+replTest.ports[3]);
 });
 
-print("do a write");
-replTest.getMaster().getDB("foo").bar.insert({x:1});
-
-print("check that 2 changes sync targets");
+print("do writes and check that 2 changes sync targets");
 assert.soon(function() {
+    replTest.getMaster().getDB("foo").bar.insert({x:1});
     return !checkSyncingFrom(nodes[2], replTest.host+":"+replTest.ports[3]);
 }, 'failed to change sync target', 60000);
 
