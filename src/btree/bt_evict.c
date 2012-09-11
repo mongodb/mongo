@@ -733,7 +733,14 @@ __evict_walk(WT_SESSION_IMPL *session)
 	 */
 	i = WT_EVICT_WALK_BASE;
 	TAILQ_FOREACH(btree, &conn->btqh, q) {
-		if (F_ISSET(btree, WT_BTREE_NO_EVICTION))
+		/*
+		 * Skip files marked as cache-resident, and files involved (or
+		 * potentially involved), in a bulk load.  The real problem is
+		 * eviction doesn't want to be walking the file as it converts
+		 * to a bulk-loaded object, and empty trees aren't worth trying
+		 * to evict, anyway.
+		 */
+		if (F_ISSET(btree, WT_BTREE_NO_EVICTION) || btree->bulk_load_ok)
 			continue;
 
 		/* Reference the correct WT_BTREE handle. */

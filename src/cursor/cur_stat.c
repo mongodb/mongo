@@ -313,7 +313,7 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 		__curstat_get_value,
 		__curstat_set_key,
 		__curstat_set_value,
-		NULL,
+		NULL,			/* compare */
 		__curstat_next,
 		__curstat_prev,
 		__curstat_reset,
@@ -324,7 +324,6 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 		__wt_cursor_notsup,	/* update */
 		__wt_cursor_notsup,	/* remove */
 		__curstat_close,
-		NULL,			/* compare */
 		{ NULL, NULL },		/* TAILQ_ENTRY q */
 		0,			/* recno key */
 		{ 0 },			/* recno raw buffer */

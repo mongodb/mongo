@@ -349,6 +349,7 @@ __session_truncate(WT_SESSION *wt_session,
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	WT_CURSOR *cursor;
+	int cmp;
 
 	session = (WT_SESSION_IMPL *)wt_session;
 
@@ -368,24 +369,71 @@ __session_truncate(WT_SESSION *wt_session,
 		    "the truncate method should be passed either a URI or "
 		    "start/stop cursors, but not both");
 
-	if (uri == NULL) {
-		if (start != NULL && stop != NULL &&
-		    strcmp(start->uri, stop->uri) != 0)
-			WT_ERR_MSG(session, EINVAL,
-			    "truncate method cursors must reference the same "
-			    "object");
-
-		cursor = start == NULL ? stop : start;
-		if (WT_PREFIX_MATCH(cursor->uri, "file:"))
-			ret = __wt_curfile_truncate(session, start, stop);
-		else if (WT_PREFIX_MATCH(cursor->uri, "table:"))
-			ret = __wt_curtable_truncate(session, start, stop);
-		else
-			ret = __wt_bad_object_type(session, cursor->uri);
-	} else
+	if (uri != NULL) {
 		WT_WITH_SCHEMA_LOCK(session,
 		    ret = __wt_schema_truncate(session, uri, cfg));
+		goto done;
+	}
 
+	/* Truncate is only supported for file and table objects. */
+	cursor = start == NULL ? stop : start;
+	if (!WT_PREFIX_MATCH(cursor->uri, "file:") &&
+	    !WT_PREFIX_MATCH(cursor->uri, "table:"))
+		WT_ERR(__wt_bad_object_type(session, cursor->uri));
+
+	/*
+	 * If both cursors set, check they're correctly ordered with respect to
+	 * each other.  We have to test this before any search, the search can
+	 * change the initial cursor position.
+	 *
+	 * Rather happily, the compare routine will also confirm the cursors
+	 * reference the same object and the keys are set.
+	 */
+	if (start != NULL && stop != NULL) {
+		WT_ERR(start->compare(start, stop, &cmp));
+		if (cmp > 0)
+			WT_ERR_MSG(session, EINVAL,
+			    "the start cursor position is after the stop "
+			    "cursor position");
+	}
+
+	/*
+	 * Truncate does not require keys actually exist so that applications
+	 * can discard parts of the object's name space without knowing exactly
+	 * what records currently appear in the object.  For this reason, do a
+	 * search-near, rather than a search.  Additionally, we have to correct
+	 * after calling search-near, to position the start/stop cursors on the
+	 * next record greater than/less than the original key.  If the cursors
+	 * hit the beginning/end of the object, or the start/stop keys cross,
+	 * we're done, the range must be empty.
+	 */
+	if (start != NULL) {
+		WT_ERR(start->search_near(start, &cmp));
+		if (cmp < 0 && (ret = start->next(start)) != 0) {
+			WT_ERR_NOTFOUND_OK(ret);
+			goto done;
+		}
+	}
+	if (stop != NULL) {
+		WT_ERR(stop->search_near(stop, &cmp));
+		if (cmp > 0 && (ret = stop->prev(stop)) != 0) {
+			WT_ERR_NOTFOUND_OK(ret);
+			goto done;
+		}
+
+		if (start != NULL) {
+			WT_ERR(start->compare(start, stop, &cmp));
+			if (cmp > 0)
+				goto done;
+		}
+	}
+
+	if (WT_PREFIX_MATCH(cursor->uri, "file:"))
+		WT_ERR(__wt_curfile_truncate(session, start, stop));
+	else
+		WT_ERR(__wt_curtable_truncate(session, start, stop));
+
+done:
 err:	API_END_NOTFOUND_MAP(session, ret);
 }
 
