@@ -124,13 +124,10 @@ namespace mongo {
         d->emptyCappedCollection(rsoplog);
     }
 
-    bool Member::syncable() const {
-        bool buildIndexes = theReplSet ? theReplSet->buildIndexes() : true;
-        return hbinfo().up() && (config().buildIndexes || !buildIndexes) && state().readable();
-    }
-
     Member* ReplSetImpl::getMemberToSyncTo() {
         lock lk(this);
+
+        bool buildIndexes = true;
 
         // if we have a target we've requested to sync from, use it
 
@@ -149,6 +146,8 @@ namespace mongo {
                 OCCASIONALLY log() << "waiting for " << needMorePings << " pings from other members before syncing" << endl;
                 return NULL;
             }
+
+            buildIndexes = myConfig().buildIndexes;
         }
 
         // find the member with the lowest ping time that has more data than me
@@ -181,7 +180,13 @@ namespace mongo {
         // This loop attempts to set 'closest'.
         for (int attempts = 0; attempts < 2; ++attempts) {
             for (Member *m = _members.head(); m; m = m->next()) {
-                if (!m->syncable())
+                if (!m->hbinfo().up())
+                    continue;
+                // make sure members with buildIndexes sync from other members w/indexes
+                if (buildIndexes && !m->config().buildIndexes)
+                    continue;
+
+                if (!m->state().readable())
                     continue;
 
                 if (m->state() == MemberState::RS_SECONDARY) {

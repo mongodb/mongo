@@ -104,8 +104,6 @@ namespace replset {
         // Check if rollback is necessary
         bool isRollbackRequired(OplogReader& r);
         void getOplogReader(OplogReader& r);
-        // Evaluate if the current sync target is still good
-        bool shouldChangeSyncTarget();
         // check lastOpTimeWritten against the remote's earliest op, filling in remoteOldestOp.
         bool isStale(OplogReader& r, BSONObj& remoteOldestOp);
         // stop syncing when this becomes a primary
