@@ -109,6 +109,14 @@ namespace mongo {
          */
         static shared_ptr<Cursor> getCursor( const char *ns, const BSONObj &query, const BSONObj &order );
 
+        /**
+         * @return the first record of the first nonempty extent preceding the extent containing
+         *     @param rec, or DiskLoc() if there is no such record or the beginning of the
+         *     collection is reached.
+         * public for testing
+         */
+        DiskLoc prevExtentFirstLoc( const DiskLoc& rec ) const;
+
     private:
         FindingStartCursor( const QueryPlan &qp );
         void init();
@@ -122,9 +130,10 @@ namespace mongo {
         ClientCursor::Holder _findingStartCursor;
         shared_ptr<Cursor> _c;
         ClientCursor::YieldData _yieldData;
+
+        /** @return the first record of the extent containing @param rec. */
         DiskLoc extentFirstLoc( const DiskLoc &rec );
 
-        DiskLoc prevExtentFirstLoc( const DiskLoc &rec );
         void createClientCursor( const DiskLoc &startLoc = DiskLoc() );
         void destroyClientCursor() {
             _findingStartCursor.reset( 0 );

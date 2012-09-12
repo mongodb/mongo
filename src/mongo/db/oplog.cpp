@@ -486,33 +486,40 @@ namespace mongo {
         return _qp.nsd()->capFirstNewRecord;
     }
     
-    void wassertExtentNonempty( const Extent *e ) {
-        // TODO ensure this requirement is clearly enforced, or fix.
-        wassert( !e->firstRecord.isNull() );
-    }
-    
-    DiskLoc FindingStartCursor::prevExtentFirstLoc( const DiskLoc &rec ) {
+    DiskLoc FindingStartCursor::prevExtentFirstLoc( const DiskLoc& rec ) const {
         Extent *e = rec.rec()->myExtent( rec );
         if ( _qp.nsd()->capLooped() ) {
-            if ( e->xprev.isNull() ) {
-                e = _qp.nsd()->lastExtent.ext();
-            }
-            else {
-                e = e->xprev.ext();
-            }
-            if ( e->myLoc != _qp.nsd()->capExtent ) {
-                wassertExtentNonempty( e );
-                return e->firstRecord;
+            while( true ) {
+                // Advance e to preceding extent (looping to lastExtent if necessary).
+                if ( e->xprev.isNull() ) {
+                    e = _qp.nsd()->lastExtent.ext();
+                }
+                else {
+                    e = e->xprev.ext();
+                }
+                if ( e->myLoc == _qp.nsd()->capExtent ) {
+                    // Reached the extent containing the oldest data in the collection.
+                    return DiskLoc();
+                }
+                if ( !e->firstRecord.isNull() ) {
+                    // Return the first record of the first non empty extent encountered.
+                    return e->firstRecord;
+                }
             }
         }
         else {
-            if ( !e->xprev.isNull() ) {
+            while( true ) {
+                if ( e->xprev.isNull() ) {
+                    // Reached the beginning of the collection.
+                    return DiskLoc();
+                }
                 e = e->xprev.ext();
-                wassertExtentNonempty( e );
-                return e->firstRecord;
+                if ( !e->firstRecord.isNull() ) {
+                    // Return the first record of the first non empty extent encountered.
+                    return e->firstRecord;
+                }
             }
         }
-        return DiskLoc(); // reached beginning of collection
     }
     
     void FindingStartCursor::createClientCursor( const DiskLoc &startLoc ) {
