@@ -26,7 +26,8 @@ obj_bulk(void)
 		    session, uri, NULL, "bulk", &c)) == 0) {
 			/* Yield so that other threads can interfere. */
 			sched_yield();
-			c->close(c);
+			if ((ret = c->close(c)) != 0)
+				die("cursor.close", ret);
 		} else if (ret != ENOENT && ret != EBUSY)
 			die("session.open_cursor", ret);
 	}
