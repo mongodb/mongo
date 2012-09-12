@@ -307,7 +307,6 @@ extern int __wt_btree_leaf_create( WT_SESSION_IMPL *session,
     WT_PAGE *parent,
     WT_REF *ref,
     WT_PAGE **pagep);
-extern int __wt_btree_root_empty(WT_SESSION_IMPL *session, WT_PAGE **leafp);
 extern int __wt_btree_huffman_open(WT_SESSION_IMPL *session,
     const char *config);
 extern void __wt_btree_huffman_close(WT_SESSION_IMPL *session);
@@ -714,7 +713,7 @@ extern int __wt_meta_track_update(WT_SESSION_IMPL *session, const char *key);
 extern int __wt_meta_track_fileop( WT_SESSION_IMPL *session,
     const char *olduri,
     const char *newuri);
-extern int __wt_meta_track_handle_lock(WT_SESSION_IMPL *session);
+extern int __wt_meta_track_handle_lock(WT_SESSION_IMPL *session, int created);
 extern int __wt_meta_turtle_init(WT_SESSION_IMPL *session, int *existp);
 extern int __wt_meta_turtle_read( WT_SESSION_IMPL *session,
     const char *key,

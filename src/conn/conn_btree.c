@@ -31,6 +31,10 @@ __conn_btree_open_lock(WT_SESSION_IMPL *session, uint32_t flags)
 	 * and WT_BTREE_OPEN is still not set, we need to do the open.
 	 */
 	for (;;) {
+		if (!LF_ISSET(WT_BTREE_EXCLUSIVE) &&
+		    F_ISSET(btree, WT_BTREE_SPECIAL_FLAGS))
+			return (EBUSY);
+
 		if (F_ISSET(btree, WT_BTREE_OPEN) &&
 		    !LF_ISSET(WT_BTREE_EXCLUSIVE)) {
 			__wt_readlock(session, btree->rwlock);
@@ -151,8 +155,6 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session)
 
 	btree = session->btree;
 
-	WT_ASSERT(session, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
-
 	if (!F_ISSET(btree, WT_BTREE_OPEN))
 		return (0);
 
@@ -161,7 +163,6 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session)
 		ret = __wt_checkpoint(session, NULL);
 
 	WT_TRET(__wt_btree_close(session));
-
 	F_CLR(btree, WT_BTREE_OPEN | WT_BTREE_SPECIAL_FLAGS);
 
 	return (ret);
@@ -238,25 +239,20 @@ __wt_conn_btree_get(WT_SESSION_IMPL *session,
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	const char *treeconf;
-	int locked;
 
 	conn = S2C(session);
 
 	WT_STAT_INCR(conn->stats, file_open);
 
-	locked = 1;
-	if ((btree = session->btree) != NULL) {
-		if (!F_ISSET(btree, WT_BTREE_EXCLUSIVE))
-			WT_RET(__conn_btree_open_lock(session, flags));
-		else
-			locked = 0;
-	} else {
+	if (session->btree != NULL)
+		WT_RET(__conn_btree_open_lock(session, flags));
+	else
 		WT_RET(__conn_btree_get(session, name, ckpt, flags));
-		btree = session->btree;
-	}
+
+	btree = session->btree;
 
 	if (!LF_ISSET(WT_BTREE_LOCK_ONLY) &&
-	    (!F_ISSET(session->btree, WT_BTREE_OPEN) ||
+	    (!F_ISSET(btree, WT_BTREE_OPEN) ||
 	    LF_ISSET(WT_BTREE_SPECIAL_FLAGS))) {
 		if ((ret = __wt_metadata_read(session, name, &treeconf)) != 0) {
 			if (ret == WT_NOTFOUND)
@@ -266,7 +262,7 @@ __wt_conn_btree_get(WT_SESSION_IMPL *session,
 		ret = __conn_btree_open(session, treeconf, cfg, flags);
 	}
 
-err:	if (ret != 0 && locked) {
+err:	if (ret != 0) {
 		F_CLR(btree, WT_BTREE_EXCLUSIVE);
 		__wt_rwunlock(session, btree->rwlock);
 	}
@@ -297,6 +293,7 @@ __wt_conn_btree_apply(WT_SESSION_IMPL *session,
 
 	TAILQ_FOREACH(btree, &conn->btqh, q)
 		if (F_ISSET(btree, WT_BTREE_OPEN) &&
+		    !F_ISSET(btree, WT_BTREE_EXCLUSIVE) &&
 		    strcmp(btree->name, WT_METADATA_URI) != 0) {
 			/*
 			 * We have the connection spinlock, which prevents
@@ -396,7 +393,7 @@ __wt_conn_btree_close_all(WT_SESSION_IMPL *session, const char *name)
 
 		session->btree = btree;
 		if (WT_META_TRACKING(session))
-			WT_ERR(__wt_meta_track_handle_lock(session));
+			WT_ERR(__wt_meta_track_handle_lock(session, 0));
 
 		/*
 		 * We have an exclusive lock, which means there are no

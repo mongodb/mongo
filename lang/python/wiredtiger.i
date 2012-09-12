@@ -161,7 +161,7 @@ SELFHELPER(struct __wt_cursor, cursor)
 %ignore __wt_cursor::set_value;
 
 /* Next, override methods that return integers via arguments. */
-%ignore __wt_cursor::equals(WT_CURSOR *, WT_CURSOR *, int *);
+%ignore __wt_cursor::compare(WT_CURSOR *, WT_CURSOR *, int *);
 %ignore __wt_cursor::search_near(WT_CURSOR *, int *);
 
 /* SWIG magic to turn Python byte strings into data / size. */
@@ -239,16 +239,16 @@ SELFHELPER(struct __wt_cursor, cursor)
 		return SWIG_FromCharPtrAndSize(v.data, v.size);
 	}
 
-	/* equals and search_near need special handling. */
-	PyObject *equals(WT_CURSOR *other) {
-		int is_equal = 0;
-		int ret = $self->equals($self, other, &is_equal);
+	/* compare and search_near need special handling. */
+	PyObject *compare(WT_CURSOR *other) {
+		int cmp = 0;
+		int ret = $self->compare($self, other, &cmp);
 		if (ret != 0) {
 			SWIG_Python_SetErrorMsg(wtError,
 			    wiredtiger_strerror(ret));
 			return (NULL);
 		}
-		return (SWIG_From_int(is_equal));
+		return (SWIG_From_int(cmp));
 	}
 
 	PyObject *search_near() {
@@ -387,7 +387,7 @@ NOTFOUND_OK(__wt_cursor::search)
 NOTFOUND_OK(__wt_cursor::update)
 
 /* Lastly, some methods need no (additional) error checking. */
-%exception __wt_connection::equals;
+%exception __wt_connection::compare;
 %exception __wt_connection::search_near;
 %exception __wt_connection::get_home;
 %exception __wt_connection::is_new;

@@ -34,7 +34,12 @@ __wt_meta_btree_apply(WT_SESSION_IMPL *session,
 			break;
 		else if (strcmp(uri, WT_METADATA_URI) == 0)
 			continue;
-		WT_ERR(__wt_session_get_btree(session, uri, NULL, NULL, flags));
+		ret = __wt_session_get_btree(session, uri, NULL, NULL, flags);
+		if (ret == EBUSY) {
+			ret = 0;
+			continue;
+		}
+		WT_ERR(ret);
 		ret = func(session, cfg);
 		WT_TRET(__wt_session_release_btree(session));
 		WT_ERR(ret);
