@@ -33,12 +33,12 @@ __wt_lsm_major_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	 * the tree locked while a merge is in progress.
 	 */
 
-	/* Figure out how many chunks to merge, allocate an ID for the merge. */
-	__wt_spin_lock(session, &lsm_tree->lock);
+	/*
+	 * Take a copy of the latest chunk id. This value needs to be atomically
+	 * read. We need a copy, since other threads may alter the chunk count
+	 * while we are doing a merge.
+	 */
 	nchunks = lsm_tree->nchunks - 1;
-	if (nchunks > 1)
-		dest_id = lsm_tree->last++;
-	__wt_spin_unlock(session, &lsm_tree->lock);
 
 	/*
 	 * If there aren't any chunks to merge, or some of the chunks aren't
@@ -61,6 +61,9 @@ __wt_lsm_major_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 
 	if (nchunks <= 1)
 		return (0);
+
+	/* Allocate an ID for the merge. */
+	dest_id = WT_ATOMIC_ADD(lsm_tree->last, 1);
 
 	printf("Merging first %d chunks into %d\n", nchunks, dest_id + 1);
 

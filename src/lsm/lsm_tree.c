@@ -105,7 +105,7 @@ __wt_lsm_tree_bloom_name(
     WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, int i, WT_ITEM *buf)
 {
 	WT_RET(__wt_buf_fmt(session, buf, "file:%s-%06d.bf",
-	    lsm_tree->filename, i + 1));
+	    lsm_tree->filename, i));
 	return (0);
 }
 
@@ -122,7 +122,7 @@ __wt_lsm_tree_create_chunk(
 
 	WT_RET(__wt_scr_alloc(session, 0, &buf));
 	WT_ERR(__wt_buf_fmt(session, buf, "file:%s-%06d.lsm",
-	    lsm_tree->filename, i + 1));
+	    lsm_tree->filename, i));
 	WT_ERR(__wt_schema_create(session,
 	    buf->data, lsm_tree->file_config));
 	*urip = __wt_buf_steal(session, buf, NULL);
@@ -302,7 +302,7 @@ __wt_lsm_tree_switch(
 		    &lsm_tree->chunk));
 
 	WT_ERR(__wt_lsm_tree_create_chunk(session,
-	    lsm_tree, lsm_tree->last++,
+	    lsm_tree, WT_ATOMIC_ADD(lsm_tree->last, 1),
 	    &lsm_tree->chunk[lsm_tree->nchunks].uri));
 	++lsm_tree->nchunks;
 
