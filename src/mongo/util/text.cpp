@@ -60,7 +60,7 @@ namespace mongo {
         return l;
     }
 
-    string StringSplitter::join( vector<string>& l , const string& split ) {
+    string StringSplitter::join( const vector<string>& l , const string& split ) {
         stringstream ss;
         for ( unsigned i=0; i<l.size(); i++ ) {
             if ( i > 0 )
