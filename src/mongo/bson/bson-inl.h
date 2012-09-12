@@ -208,7 +208,9 @@ dodouble:
     inline NOINLINE_DECL void BSONObj::_assertInvalid() const {
         StringBuilder ss;
         int os = objsize();
-        ss << "BSONObj size: " << os << " (0x" << toHex( &os, 4 ) << ") is invalid, exceeds max of 16MB.";
+        ss << "BSONObj size: " << os << " (0x" << toHex( &os, 4 ) << ") is invalid. "
+           << "Size must be between 0 and " << BSONObjMaxInternalSize
+           << "(" << ( BSONObjMaxInternalSize/(1024*1024) ) << "MB)";
         try {
             BSONElement e = firstElement();
             ss << " First element: " << e.toString();
