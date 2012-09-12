@@ -327,7 +327,7 @@ __wt_lsm_tree_drop(
 
 	/* Get the LSM tree. */
 	WT_RET(__wt_lsm_tree_get(session, name, &lsm_tree));
-	__wt_spin_lock(session, &lsm_tree->lock);
+	WT_RET(__wt_spin_trylock(session, &lsm_tree->lock));
 
 	/* Drop the chunks. */
 	for (i = 0; i < lsm_tree->nchunks; i++) {

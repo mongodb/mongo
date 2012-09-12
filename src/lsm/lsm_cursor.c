@@ -136,7 +136,7 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm)
 	 * cursor, but this pointer will stay valid because it is owned by the
 	 * underlying btree handle.
 	 */
-	if (clsm->cursors != NULL)
+	if (clsm->cursors != NULL && clsm->cursors[clsm->nchunks - 1] != NULL)
 		primary_uri = clsm->cursors[clsm->nchunks - 1]->uri;
 	else
 		primary_uri = NULL;
@@ -278,7 +278,7 @@ __clsm_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 
 	cmp = 0;
 	FORALL_CURSORS(alsm, c, i) {
-		WT_RET(WT_LSM_CURCMP(session,
+		WT_ERR(WT_LSM_CURCMP(session,
 		    alsm->lsm_tree, c, blsm->cursors[i], cmp));
 		if (!cmp)
 			break;
@@ -795,7 +795,12 @@ __clsm_close(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 	int i;
 
-	WT_LSM_ENTER(clsm, cursor, session, close);
+	/*
+	 * Don't use the normal __clsm_enter path: that is wasted work when
+	 * closing, and the cursor may never have been used.
+	 */
+	clsm = (WT_CURSOR_LSM *)cursor;
+	CURSOR_API_CALL_NOCONF(cursor, session, close, NULL);
 	FORALL_CURSORS(clsm, c, i)
 		WT_TRET(c->close(c));
 	__wt_free(session, clsm->blooms);
@@ -803,7 +808,7 @@ __clsm_close(WT_CURSOR *cursor)
 	/* The WT_LSM_TREE owns the URI. */
 	cursor->uri = NULL;
 	WT_TRET(__wt_cursor_close(cursor));
-err:	WT_LSM_END(clsm, session);
+	API_END(session);
 
 	return (ret);
 }
