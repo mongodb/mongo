@@ -145,7 +145,7 @@ namespace mongo {
         catch (po::error &e) {
             cerr << "ERROR: " << e.what() << endl << endl;
             printHelp(cerr);
-            return EXIT_BADOPTIONS;
+            ::_exit(EXIT_BADOPTIONS);
         }
 
         // hide password from ps output
@@ -160,12 +160,12 @@ namespace mongo {
 
         if ( _params.count( "help" ) ) {
             printHelp(cout);
-            return 0;
+            ::_exit(0);
         }
 
         if ( _params.count( "version" ) ) {
             printVersion(cout);
-            return 0;
+            ::_exit(0);
         }
 
         if ( _params.count( "verbose" ) ) {
@@ -206,13 +206,13 @@ namespace mongo {
                 ConnectionString cs = ConnectionString::parse( _host , errmsg );
                 if ( ! cs.isValid() ) {
                     cerr << "invalid hostname [" << _host << "] " << errmsg << endl;
-                    return -1;
+                    ::_exit(-1);
                 }
 
                 _conn = cs.connect( errmsg );
                 if ( ! _conn ) {
                     cerr << "couldn't connect to [" << _host << "] " << errmsg << endl;
-                    return -1;
+                    ::_exit(-1);
                 }
 
                 (_usesstdout ? cout : cerr ) << "connected to: " << _host << endl;
@@ -242,7 +242,7 @@ namespace mongo {
                      "path you should connect to that instead of direct data "
                      "file access" << endl << endl;
                 dbexit( EXIT_CLEAN );
-                return -1;
+                ::_exit(-1);
             }
 
             FileAllocator::get()->start();
@@ -311,7 +311,7 @@ namespace mongo {
 
         fflush(stdout);
         fflush(stderr);
-        return ret;
+        ::_exit(ret);
     }
 
     DBClientBase& Tool::conn( bool slaveIfPaired ) {
