@@ -862,7 +862,7 @@ namespace mongo {
                         }
                     }
                 else
-                     newIndexSpecB << "ns" << to;
+                    newIndexSpecB << "ns" << to;
             }
             BSONObj newIndexSpec = newIndexSpecB.done();
             DiskLoc newIndexSpecLoc = theDataFileMgr.insert( s.c_str(), newIndexSpec.objdata(), newIndexSpec.objsize(), true, false );
