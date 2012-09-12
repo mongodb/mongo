@@ -70,19 +70,9 @@ __wt_bt_cache_flush(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, int op)
 	case WT_SYNC:
 		break;
 	case WT_SYNC_DISCARD:
+	case WT_SYNC_DISCARD_NOWRITE:
 		/* If discarding the tree, the root page should be gone. */
 		WT_ASSERT(session, btree->root_page == NULL);
-		break;
-	case WT_SYNC_DISCARD_NOWRITE:
-		/*
-		 * XXX
-		 * I'm not sure this is the right place to do this, but it's
-		 * the point in the btree engine where we know the root page
-		 * is gone.  Unlike WT_SYNC_DISCARD, which writes, evicts and
-		 * discards the root page, WT_SYNC_DISCARD_NOWRITE simply
-		 * discards the pages, which means "eviction" never happens.
-		 */
-		btree->root_page = NULL;
 		break;
 	}
 
