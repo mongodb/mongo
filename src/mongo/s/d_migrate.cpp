@@ -1678,10 +1678,16 @@ namespace mongo {
                         }
                     }
 
+                    // id object most likely has form { _id : ObjectId(...) }
+                    // infer from that correct index to use, e.g. { _id : 1 }
+                    BSONObj idIndexPattern;
+                    Helpers::toKeyFormat( id , idIndexPattern );
+
+                    // TODO: create a better interface to remove objects directly
                     Helpers::removeRange( ns ,
                                           id ,
                                           id,
-                                          findShardKeyIndexPattern_locked( ns , shardKeyPattern ), 
+                                          idIndexPattern ,
                                           true , /*maxInclusive*/
                                           false , /* secondaryThrottle */
                                           cmdLine.moveParanoia ? &rs : 0 , /*callback*/
