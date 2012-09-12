@@ -607,6 +607,10 @@ struct __wt_session {
 	 * value_format.  For colgroups and indices\, all column names must
 	 * appear in the list of columns for the table.,a list of strings;
 	 * default empty.}
+	 * @config{dictionary, the number of entries maintained in the Btree
+	 * row-store leaf page value dictionary; see @ref
+	 * file_formats_compression for more information.,an integer greater
+	 * than or equal to 0; default \c 0.}
 	 * @config{exclusive, fail if the object exists.  When false (the
 	 * default)\, if the object exists\, check that its settings match the
 	 * specified configuration.,a boolean flag; default \c false.}
@@ -1741,30 +1745,32 @@ extern int wiredtiger_extension_init(WT_SESSION *session,
 #define	WT_STAT_file_allocsize				29
 /*! reconcile: deleted or temporary pages merged */
 #define	WT_STAT_rec_page_merge				30
+/*! reconcile: dictionary match */
+#define	WT_STAT_rec_dictionary				31
 /*! reconcile: internal pages split */
-#define	WT_STAT_rec_split_intl				31
+#define	WT_STAT_rec_split_intl				32
 /*! reconcile: leaf pages split */
-#define	WT_STAT_rec_split_leaf				32
+#define	WT_STAT_rec_split_leaf				33
 /*! reconcile: overflow key */
-#define	WT_STAT_rec_ovfl_key				33
+#define	WT_STAT_rec_ovfl_key				34
 /*! reconcile: overflow value */
-#define	WT_STAT_rec_ovfl_value				34
+#define	WT_STAT_rec_ovfl_value				35
 /*! reconcile: pages deleted */
-#define	WT_STAT_rec_page_delete				35
+#define	WT_STAT_rec_page_delete				36
 /*! reconcile: pages written */
-#define	WT_STAT_rec_written				36
+#define	WT_STAT_rec_written				37
 /*! reconcile: unable to acquire hazard reference */
-#define	WT_STAT_rec_hazard				37
+#define	WT_STAT_rec_hazard				38
 /*! row-store internal pages */
-#define	WT_STAT_file_row_int_pages			38
+#define	WT_STAT_file_row_int_pages			39
 /*! row-store leaf pages */
-#define	WT_STAT_file_row_leaf_pages			39
+#define	WT_STAT_file_row_leaf_pages			40
 /*! total entries */
-#define	WT_STAT_file_entries				40
+#define	WT_STAT_file_entries				41
 /*! update conflicts */
-#define	WT_STAT_update_conflict				41
+#define	WT_STAT_update_conflict				42
 /*! write generation conflicts */
-#define	WT_STAT_file_write_conflicts			42
+#define	WT_STAT_file_write_conflicts			43
 /*! @} */
 /*
  * Statistics section: END

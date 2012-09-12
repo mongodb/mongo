@@ -81,6 +81,7 @@ btree_stats = [
 	Stat('overflow_read', 'file: overflow pages read from the file'),
 	Stat('page_read', 'file: pages read from the file'),
 	Stat('page_write', 'file: pages written to the file'),
+	Stat('rec_dictionary', 'reconcile: dictionary match'),
 	Stat('rec_hazard', 'reconcile: unable to acquire hazard reference'),
 	Stat('rec_ovfl_key', 'reconcile: overflow key'),
 	Stat('rec_ovfl_value', 'reconcile: overflow value'),

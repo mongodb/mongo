@@ -70,17 +70,21 @@ static CONFIG c[] = {
 	  "percent operations that are deletes",
 	  0, C_OPS, 0, 45, &g.c_delete_pct, NULL },
 
+	{ "dictionary",
+	  "if values are dictionary compressed",	/* 20% */
+	  C_ROW, C_BOOL, 20, 0, &g.c_dictionary, NULL },
+
 	{ "file_type",
 	  "type of file to create (fix | var | row)",
 	  0, C_IGNORE, 1, 3, &g.c_file_type, NULL },
 
 	{ "huffman_key",
-	  "if keys are huffman encoded",		/* 40% */
-	  C_ROW, C_BOOL, 40, 0, &g.c_huffman_key, NULL },
+	  "if keys are huffman encoded",		/* 20% */
+	  C_ROW, C_BOOL, 20, 0, &g.c_huffman_key, NULL },
 
 	{ "huffman_value",
-	 "if values are huffman encoded",		/* 40% */
-	 C_ROW|C_VAR, C_BOOL, 40, 0, &g.c_huffman_value, NULL },
+	 "if values are huffman encoded",		/* 20% */
+	 C_ROW|C_VAR, C_BOOL, 20, 0, &g.c_huffman_value, NULL },
 
 	{ "insert_pct",
 	  "percent operations that are inserts",
@@ -107,8 +111,8 @@ static CONFIG c[] = {
 	  0, 0, 0, M(2), &g.c_ops, NULL },
 
 	{ "repeat_data_pct",
-	  "percent duplicate values in variable-len column-store files",
-	  C_VAR, 0, 0, 90, &g.c_repeat_data_pct, NULL },
+	  "percent duplicate values in row- or variable-length column-stores",
+	  C_ROW|C_VAR, 0, 0, 90, &g.c_repeat_data_pct, NULL },
 
 	{ "reverse",
 	  "collate in reverse order",			/* 10% */

@@ -51,21 +51,25 @@
  * counter or a record number: there is a uint64_t value immediately after the
  * cell description byte.
  *
- * Bits 4 and 5 are unused.
+ * Bit 4 is unused.
  *
- * Bits 6-8 are cell "types", there are 8, we have no unused slots.
+ * Bits 5-8 are cell "types".
  *
  * The 0x03 bit combination (setting both 0x01 and 0x02) is unused, but would
- * require code changes.  We can use bits 4 or 5 as single bits easily; we can
- * use bits 4 and 5 as type bits in a backward compatible way by adding bit 5
- * to the type mask and adding new types that incorporate bit 5.
+ * require code changes.  We can use bit 4 as a single bit easily; we can use
+ * use bit 4 as a type bit in a backward compatible way by adding bit 4 to the
+ * type mask and adding new types that incorporate it.
  */
 #define	WT_CELL_VALUE_SHORT	0x001		/* Short data */
 #define	WT_CELL_KEY_SHORT	0x002		/* Short key */
-#define	WT_CELL_64V		0x004		/* associated recno or RLE */
+
+/*
+ * Cell types can have an associated, 64-bit packed value: an RLE count, a
+ * record number, or a copy-cell page offset.
+ */
+#define	WT_CELL_64V		0x004		/* Associated value */
 
 #define	WT_CELL_UNUSED_BIT4	0x008		/* Unused */
-#define	WT_CELL_UNUSED_BIT5	0x010		/* Unused */
 
 /*
  * WT_CELL_ADDR is a block location, WT_CELL_ADDR_LNO is a block location with
@@ -73,15 +77,16 @@
  * overflow items.  The goal is to speed up data truncation since we don't have
  * to read leaf pages without overflow items in order to delete them.
  */
-#define	WT_CELL_ADDR		(0 << 5)	/* Block location */
-#define	WT_CELL_ADDR_DEL	(1 << 5)	/* Block location (deleted) */
-#define	WT_CELL_ADDR_LNO	(2 << 5)	/* Block location (lno) */
-#define	WT_CELL_DEL		(3 << 5)	/* Deleted value */
-#define	WT_CELL_KEY		(4 << 5)	/* Key */
-#define	WT_CELL_KEY_OVFL	(5 << 5)	/* Key overflow */
-#define	WT_CELL_VALUE		(6 << 5)	/* Value */
-#define	WT_CELL_VALUE_OVFL	(7 << 5)	/* Value overflow */
-#define	WT_CELL_TYPE(v)		((v) & 7 << 5)	/* Bits 6-8 */
+#define	WT_CELL_ADDR		(0 << 4)	/* Block location */
+#define	WT_CELL_ADDR_DEL	(1 << 4)	/* Block location (deleted) */
+#define	WT_CELL_ADDR_LNO	(2 << 4)	/* Block location (lno) */
+#define	WT_CELL_DEL		(3 << 4)	/* Deleted value */
+#define	WT_CELL_KEY		(4 << 4)	/* Key */
+#define	WT_CELL_KEY_OVFL	(5 << 4)	/* Key overflow */
+#define	WT_CELL_VALUE		(6 << 4)	/* Value */
+#define	WT_CELL_VALUE_COPY	(7 << 4)	/* Value copy */
+#define	WT_CELL_VALUE_OVFL	(8 << 4)	/* Value overflow */
+#define	WT_CELL_TYPE(v)		((v) & 0x0f << 4)
 
 /*
  * WT_CELL --
@@ -92,7 +97,7 @@ struct __wt_cell {
 	 * Maximum of 16 bytes:
 	 * 1: type + 64V flag (recno/rle)
 	 * 1: prefix compression count
-	 * 9: optional RLE or recno	(uint64_t encoding, max 9 bytes)
+	 * 9: associated 64-bit value	(uint64_t encoding, max 9 bytes)
 	 * 5: optional data length	(uint32_t encoding, max 5 bytes)
 	 *
 	 * The prefix compression count and 64V value overlap, this calculation
@@ -111,13 +116,14 @@ struct __wt_cell_unpack {
 	const void *data;		/* Data */
 	uint32_t    size;		/* Data size */
 
-	uint32_t len;			/* Cell + data total length */
+	uint32_t __len;			/* Cell + data length (usually) */
 
-	uint8_t  prefix;		/* Cell prefix length */
+	uint8_t prefix;			/* Cell prefix length */
 
-	uint8_t  raw;			/* Raw cell type (include "shorts") */
-	uint8_t  type;			/* Cell type */
-	uint8_t	 ovfl;			/* 1/0: cell is an overflow */
+	uint8_t raw;			/* Raw cell type (include "shorts") */
+	uint8_t type;			/* Cell type */
+
+	uint8_t ovfl;			/* 1/0: cell is an overflow */
 };
 
 /*
@@ -128,7 +134,7 @@ struct __wt_cell_unpack {
 	for ((cell) =							\
 	    WT_PAGE_HEADER_BYTE(btree, dsk), (i) = (dsk)->u.entries;	\
 	    (i) > 0;							\
-	    (cell) = (WT_CELL *)((uint8_t *)(cell) + (unpack)->len), --(i))
+	    (cell) = (WT_CELL *)((uint8_t *)(cell) + (unpack)->__len), --(i))
 
 /*
  * __wt_cell_pack_addr --
@@ -183,6 +189,23 @@ __wt_cell_pack_data(WT_CELL *cell, uint64_t rle, uint32_t size)
 	}
 						/* Length */
 	(void)__wt_vpack_uint(&p, 0, (uint64_t)size);
+
+	return (WT_PTRDIFF32(p, cell));
+}
+
+/*
+ * __wt_cell_pack_copy --
+ *	Write a copy value cell.
+ */
+static inline uint32_t
+__wt_cell_pack_copy(WT_CELL *cell, uint64_t v)
+{
+	uint8_t *p;
+
+	p = cell->__chunk + 1;
+						/* Type + copy offset */
+	cell->__chunk[0] = WT_CELL_VALUE_COPY | WT_CELL_64V;
+	(void)__wt_vpack_uint(&p, 0, v);
 
 	return (WT_PTRDIFF32(p, cell));
 }
@@ -293,6 +316,26 @@ __wt_cell_rle(WT_CELL_UNPACK *unpack)
 }
 
 /*
+ * __wt_cell_total_len --
+ *	Return the cell's total length, including data.
+ */
+static inline uint32_t
+__wt_cell_total_len(WT_CELL_UNPACK *unpack)
+{
+	/*
+	 * The length field is specially named because it's dangerous to use it:
+	 * it represents the length of the current cell (normally used for the
+	 * loop that walks through cells on the page), but occasionally we want
+	 * to copy a cell directly from the page, and what we need is the cell's
+	 * total length.   The problem is dictionary-copy cells, because in that
+	 * case, the __len field is the length of the current cell, not the cell
+	 * for which we're returning data.  To use the __len field, you must be
+	 * sure you're not looking at a copy cell.
+	 */
+	return (unpack->__len);
+}
+
+/*
  * __wt_cell_type --
  *	Return the cell's type (collapsing special types).
  */
@@ -324,8 +367,10 @@ __wt_cell_type(WT_CELL *cell)
 static inline int
 __wt_cell_unpack_safe(WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
 {
+	WT_DECL_RET;
 	uint64_t v;
 	const uint8_t *p;
+	uint32_t saved_len;
 
 	/*
 	 * The verification code specifies an end argument, a pointer to 1 past
@@ -379,7 +424,7 @@ __wt_cell_unpack_safe(WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
 
 		unpack->data = cell->__chunk + 2;
 		unpack->size = cell->__chunk[0] >> 2;
-		unpack->len = 2 + unpack->size;
+		unpack->__len = 2 + unpack->size;
 		goto done;
 	case WT_CELL_VALUE_SHORT:
 		/*
@@ -388,7 +433,7 @@ __wt_cell_unpack_safe(WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
 		 */
 		unpack->data = cell->__chunk + 1;
 		unpack->size = cell->__chunk[0] >> 1;
-		unpack->len = 1 + unpack->size;
+		unpack->__len = 1 + unpack->size;
 		goto done;
 	}
 
@@ -407,38 +452,51 @@ __wt_cell_unpack_safe(WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
 		unpack->prefix = cell->__chunk[1];
 	}
 
-	if (cell->__chunk[0] & WT_CELL_64V)		/* skip RLE/recno */
+	if (cell->__chunk[0] & WT_CELL_64V)		/* skip value */
 		WT_RET(__wt_vunpack_uint(
 		    &p, end == NULL ? 0 : (size_t)(end - p), &unpack->v));
 
-	/* Set overflow flags. */
-	switch (unpack->raw) {
-	case WT_CELL_KEY_OVFL:
-	case WT_CELL_VALUE_OVFL:
-		unpack->ovfl = 1;
-		break;
-	}
-
 	/*
-	 * Deleted cells have known sizes, and no length bytes; everything else
-	 * has data length bytes.
+	 * One switch to handle special actions for a few different cell types,
+	 * and set the data length: deleted cells are fixed-size without length
+	 * bytes; almost everything else has data length bytes.
 	 */
 	switch (unpack->raw) {
+	case WT_CELL_VALUE_COPY:
+		/*
+		 * The cell's value is an offset to a cell written earlier in
+		 * the page.  Save and restore the length of this cell, we need
+		 * it to step through the set of cells on the page.
+		 */
+		saved_len = WT_PTRDIFF32(p, cell);
+		cell = (WT_CELL *)((uint8_t *)cell - unpack->v);
+		ret = __wt_cell_unpack_safe(cell, unpack, end);
+		unpack->raw = WT_CELL_VALUE_COPY;
+		unpack->__len = saved_len;
+		return (ret);
+
+	case WT_CELL_KEY_OVFL:
+	case WT_CELL_VALUE_OVFL:
+		/*
+		 * Set overflow flags.
+		 */
+		unpack->ovfl = 1;
+		/* FALLTHROUGH */
+
 	case WT_CELL_ADDR:
 	case WT_CELL_ADDR_DEL:
 	case WT_CELL_ADDR_LNO:
 	case WT_CELL_KEY:
-	case WT_CELL_KEY_OVFL:
 	case WT_CELL_VALUE:
-	case WT_CELL_VALUE_OVFL:
 		WT_RET(__wt_vunpack_uint(
 		    &p, end == NULL ? 0 : (size_t)(end - p), &v));
 		unpack->data = p;
 		unpack->size = WT_STORE_SIZE(v);
-		unpack->len = WT_PTRDIFF32(p + unpack->size, cell);
+		unpack->__len = WT_PTRDIFF32(p + unpack->size, cell);
 		break;
+
 	case WT_CELL_DEL:
-		unpack->len = WT_PTRDIFF32(p, cell);
+		unpack->__len = WT_PTRDIFF32(p, cell);
 		break;
 	default:
 		return (WT_ERROR);			/* Unknown cell type. */
@@ -449,7 +507,7 @@ __wt_cell_unpack_safe(WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
 	 * diagnostic as well, we may be copying the cell from the page and
 	 * we need the right length).
 	 */
-done:	CHK(cell, unpack->len);
+done:	CHK(cell, unpack->__len);
 	return (0);
 }
 
@@ -461,4 +519,17 @@ static inline void
 __wt_cell_unpack(WT_CELL *cell, WT_CELL_UNPACK *unpack)
 {
 	(void)__wt_cell_unpack_safe(cell, unpack, NULL);
+}
+
+/*
+ * __wt_cell_next --
+ *	Return the next WT_CELL on the page.
+ */
+static inline WT_CELL *
+__wt_cell_next(WT_CELL *cell)
+{
+	WT_CELL_UNPACK unpack;
+
+	__wt_cell_unpack(cell, &unpack);
+	return ((WT_CELL *)((uint8_t *)cell + unpack.__len));
 }

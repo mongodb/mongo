@@ -7,8 +7,9 @@
 
 #include "wt_internal.h"
 
-struct __rec_kv;		typedef struct __rec_kv WT_KV;
 struct __rec_boundary;		typedef struct __rec_boundary WT_BOUNDARY;
+struct __rec_dictionary;	typedef struct __rec_dictionary WT_DICTIONARY;
+struct __rec_kv;		typedef struct __rec_kv WT_KV;
 
 /*
  * Reconciliation is the process of taking an in-memory page, walking each entry
@@ -50,7 +51,6 @@ typedef struct {
 	 * smaller-than-maximum page size when a split is required so we don't
 	 * repeatedly split a packed page.
 	 */
-	uint32_t btree_split_pct;	/* Split page percent */
 	uint32_t page_size;		/* Maximum page size */
 	uint32_t split_size;		/* Split page size */
 
@@ -143,6 +143,18 @@ typedef struct {
 	WT_REF	*merge_ref;		/* Row-store merge correction key */
 
 	/*
+	 * WT_DICTIONARY --
+	 *	We optionally build a dictionary of row-store values for leaf
+	 * pages.  Where two value cells are identical, only write the value
+	 * once, the second and subsequent copies point to the original cell.
+	 */
+	struct __rec_dictionary {
+		uint64_t hash;				/* Hash value */
+		uint8_t *cell;				/* Matching cell */
+	} *dictionary;
+	long dictionary_slots;				/* Maximum entries */
+
+	/*
 	 * WT_KV--
 	 *	An on-page key/value item we're building.
 	 */
@@ -178,6 +190,8 @@ static int  __rec_col_merge(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_col_var(WT_SESSION_IMPL *, WT_PAGE *, WT_SALVAGE_COOKIE *);
 static int  __rec_col_var_helper(WT_SESSION_IMPL *,
 		WT_SALVAGE_COOKIE *, WT_ITEM *, int, int, uint64_t);
+static WT_DICTIONARY *__rec_dictionary_lookup(WT_SESSION_IMPL *, WT_KV *);
+static void __rec_dictionary_reset(WT_RECONCILE *);
 static int  __rec_page_deleted(WT_SESSION_IMPL *, WT_PAGE *, WT_REF *, int *);
 static int  __rec_page_modified(WT_SESSION_IMPL *, WT_PAGE *, WT_REF *, int *);
 static int  __rec_row_int(WT_SESSION_IMPL *, WT_PAGE *);
@@ -510,7 +524,6 @@ static int
 __rec_write_init(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 {
 	WT_BTREE *btree;
-	WT_CONFIG_ITEM cval;
 	WT_RECONCILE *r;
 
 	btree = session->btree;
@@ -527,39 +540,53 @@ __rec_write_init(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 		/* Disk buffers may need to be aligned. */
 		F_SET(&r->dsk, WT_ITEM_ALIGNED);
 
-		/* Configuration. */
-		WT_RET(__wt_config_getones(session,
-		    btree->config, "split_pct", &cval));
-		r->btree_split_pct = (uint32_t)cval.val;
-
-		/*
-		 * Suffix compression is a hack to shorten internal page keys
-		 * by discarding trailing bytes that aren't necessary for tree
-		 * navigation.  We don't do suffix compression if there is a
-		 * custom collator because we don't know what bytes a custom
-		 * collator might use.  Some custom collators (for example, a
-		 * collator implementing reverse ordering of strings), won't
-		 * have any problem with suffix compression: if there's ever a
-		 * reason to implement suffix compression for custom collators,
-		 * we can add a setting to the collator, configured when the
-		 * collator is added, that turns on suffix compression.
-		 */
-		r->key_sfx_compress_conf = 0;
-		if (btree->collator == NULL) {
-			WT_RET(__wt_config_getones(session,
-			    btree->config, "internal_key_truncate", &cval));
-			r->key_sfx_compress_conf = (cval.val != 0);
-		}
-
-		WT_RET(__wt_config_getones(session,
-		    btree->config, "prefix_compression", &cval));
-		r->key_pfx_compress_conf = (cval.val != 0);
 	}
 
-	r->page = page;
+	/*
+	 * Suffix compression is a hack to shorten internal page keys
+	 * by discarding trailing bytes that aren't necessary for tree
+	 * navigation.  We don't do suffix compression if there is a
+	 * custom collator because we don't know what bytes a custom
+	 * collator might use.  Some custom collators (for example, a
+	 * collator implementing reverse ordering of strings), won't
+	 * have any problem with suffix compression: if there's ever a
+	 * reason to implement suffix compression for custom collators,
+	 * we can add a setting to the collator, configured when the
+	 * collator is added, that turns on suffix compression.
+	 */
+	r->key_sfx_compress_conf = 0;
+	if (btree->collator == NULL && btree->internal_key_truncate)
+		r->key_sfx_compress_conf = 1;
 
-	/* Read the disk generation before we read anything from the page. */
-	WT_ORDERED_READ(r->orig_write_gen, page->modify->write_gen);
+	/* Prefix compression discards key's repeated prefix bytes. */
+	r->key_pfx_compress_conf = 0;
+	if (btree->prefix_compression)
+		r->key_pfx_compress_conf = 1;
+
+	/*
+	 * Dictionary compression only writes repeated values once.  We grow
+	 * the dictionary as necessary, always using the largest size we've
+	 * seen.
+	 */
+	if (btree->dictionary != 0 && btree->dictionary > r->dictionary_slots) {
+		/*
+		 * Sanity check the size: 100 slots is the smallest dictionary
+		 * we use.
+		 */
+		if (btree->dictionary < 100)
+			btree->dictionary = 100;
+		if (r->dictionary != NULL) {
+			r->dictionary_slots = 0;
+			__wt_free(session, r->dictionary);
+		}
+		WT_RET(__wt_calloc_def(
+		    session, btree->dictionary, &r->dictionary));
+		r->dictionary_slots = btree->dictionary;
+	}
+
+	/* Per-page reconciliation: reset the dictionary. */
+	if (btree->dictionary)
+		__rec_dictionary_reset(r);
 
 	/* Per-page reconciliation: track skipped updates. */
 	r->upd_skipped = 0;
@@ -567,6 +594,10 @@ __rec_write_init(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 
 	/* Per-page reconciliation: track overflow items. */
 	r->ovfl_items = 0;
+
+	/* Read the disk generation before we read anything from the page. */
+	r->page = page;
+	WT_ORDERED_READ(r->orig_write_gen, page->modify->write_gen);
 
 	return (0);
 }
@@ -599,6 +630,8 @@ __wt_rec_destroy(WT_SESSION_IMPL *session)
 	__wt_buf_free(session, &r->v.buf);
 	__wt_buf_free(session, &r->_cur);
 	__wt_buf_free(session, &r->_last);
+
+	__wt_free(session, r->dictionary);
 
 	__wt_free(session, session->reconcile);
 }
@@ -651,6 +684,53 @@ __rec_copy_incr(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_KV *kv)
 
 	WT_ASSERT(session, kv->len == kv->cell_len + kv->buf.size);
 	__rec_incr(session, r, 1, kv->len);
+}
+
+/*
+ * __rec_dict_copy_incr --
+ *	Check for a dictionary match, and then copy a key/value cell and buffer
+ * pair into the new image.
+ */
+static void
+__rec_dict_copy_incr(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_KV *kv)
+{
+	WT_DICTIONARY *dp;
+	uint64_t offset;
+
+	/*
+	 * We optionally create a dictionary of values and only write a unique
+	 * value once per page, using a special "copy" cell for all subsequent
+	 * copies of the value.  We have to do the cell build and resolution at
+	 * this low level because we need physical cell offsets for the page.
+	 *
+	 * Sanity check: short-data cells can be smaller than dictionary-copy
+	 * cells.  If the data is already small, don't bother doing the work.
+	 * This isn't just work avoidance: on-page cells can't grow as a result
+	 * of writing a dictionary-copy cell, the reconciliation functions do a
+	 * split-boundary test based on the size required by the value's cell;
+	 * if we grow the cell after that test we'll potentially write off the
+	 * end of the buffer's memory.
+	 */
+	if (kv->buf.size > WT_INTPACK32_MAXSIZE &&
+	    (dp = __rec_dictionary_lookup(session, kv)) != NULL) {
+		/*
+		 * If the dictionary cell reference is not set, we're
+		 * creating a new entry in the dictionary, update it.
+		 *
+		 * If the dictionary cell reference is set, we have a
+		 * matching value.  Create a copy cell instead.
+		 */
+		if (dp->cell == NULL)
+			dp->cell = r->first_free;
+		else {
+			offset = WT_PTRDIFF32(r->first_free, dp->cell);
+			kv->len = kv->cell_len =
+			   __wt_cell_pack_copy(&kv->cell, offset);
+			kv->buf.data = NULL;
+			kv->buf.size = 0;
+		}
+	}
+	__rec_copy_incr(session, r, kv);
 }
 
 /*
@@ -782,7 +862,7 @@ __rec_split_init(
 	r->page_size = max;
 	r->split_size = page->type == WT_PAGE_COL_FIX ?
 	    max :
-	    WT_SPLIT_PAGE_SIZE(max, btree->allocsize, r->btree_split_pct);
+	    WT_SPLIT_PAGE_SIZE(max, btree->allocsize, btree->split_pct);
 
 	/*
 	 * If the maximum page size is the same as the split page size, there
@@ -840,6 +920,10 @@ __rec_split(WT_SESSION_IMPL *session)
 	r = session->reconcile;
 	btree = session->btree;
 	dsk = r->dsk.mem;
+
+	/* Hitting a page boundary resets the dictionary, in all cases. */
+	if (btree->dictionary)
+		__rec_dictionary_reset(r);
 
 	/*
 	 * There are 3 cases we have to handle.
@@ -1162,8 +1246,8 @@ __rec_split_write(
 		bnd->addr.leaf_no_overflow =
 		    (dsk->type == WT_PAGE_COL_FIX ||
 		    dsk->type == WT_PAGE_COL_VAR ||
-		    dsk->type == WT_PAGE_ROW_LEAF)
-		    && r->ovfl_items == 0 ? 1 : 0;
+		    dsk->type == WT_PAGE_ROW_LEAF) &&
+		    r->ovfl_items == 0 ? 1 : 0;
 	}
 
 	return (0);
@@ -1202,13 +1286,14 @@ __rec_split_row_promote(WT_SESSION_IMPL *session, uint8_t type)
 	if (r->bnd_next == 1) {
 		/*
 		 * The cell had better have a zero-length prefix: it's the first
-		 * key on the page.  (If it doesn't have a zero-length prefix,
-		 * __wt_cell_unpack() won't be sufficient anyway, we'd only copy
-		 * the non-prefix-compressed portion of the key.)
+		 * key on the page.  We also assert it's not a copy cell, even
+		 * if we could copy the value, which we could, the first cell on
+		 * a page had better not refer an earlier cell on the page.
 		 */
 		cell = WT_PAGE_HEADER_BYTE(btree, r->dsk.mem);
 		__wt_cell_unpack(cell, unpack);
-		WT_ASSERT_RET(session, unpack->prefix == 0);
+		WT_ASSERT_RET(session,
+		    unpack->raw != WT_CELL_VALUE_COPY && unpack->prefix == 0);
 		WT_RET(__wt_cell_unpack_copy(session, unpack, &r->bnd[0].key));
 	}
 
@@ -1338,6 +1423,7 @@ __wt_rec_bulk_wrapup(WT_CURSOR_BULK *cbulk)
 int
 __wt_rec_row_bulk_insert(WT_CURSOR_BULK *cbulk)
 {
+	WT_BTREE *btree;
 	WT_CURSOR *cursor;
 	WT_KV *key, *val;
 	WT_RECONCILE *r;
@@ -1346,6 +1432,7 @@ __wt_rec_row_bulk_insert(WT_CURSOR_BULK *cbulk)
 
 	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
 	r = session->reconcile;
+	btree = session->btree;
 
 	cursor = &cbulk->cbt.iface;
 	key = &r->k;
@@ -1356,17 +1443,21 @@ __wt_rec_row_bulk_insert(WT_CURSOR_BULK *cbulk)
 	    cursor->value.data, cursor->value.size, (uint64_t)0));
 
 	/*
-	 * Boundary, split or write the page.  If the K/V pair doesn't
-	 * fit: split the page, switch to the non-prefix-compressed key
-	 * and turn off compression until a full key is written to the
-	 * new page.
+	 * Boundary, split or write the page.
 	 *
 	 * We write a trailing key cell on the page after the K/V pairs
 	 * (see WT_TRAILING_KEY_CELL for more information).
 	 */
 	while (key->len + val->len + WT_TRAILING_KEY_CELL > r->space_avail) {
+		/* Split the page. */
 		WT_RET(__rec_split(session));
 
+		/*
+		 * Turn off prefix compression until a full key written
+		 * to the new page, and (unless we're already working
+		 * with an overflow key), rebuild the key without prefix
+		 * compression.
+		 */
 		r->key_pfx_compress = 0;
 		if (!ovfl_key)
 			WT_RET(__rec_cell_build_key(
@@ -1375,8 +1466,12 @@ __wt_rec_row_bulk_insert(WT_CURSOR_BULK *cbulk)
 
 	/* Copy the key/value pair onto the page. */
 	__rec_copy_incr(session, r, key);
-	if (val->len != 0)
-		__rec_copy_incr(session, r, val);
+	if (val->len != 0) {
+		if (btree->dictionary)
+			__rec_dict_copy_incr(session, r, val);
+		else
+			__rec_copy_incr(session, r, val);
+	}
 
 	/* Update compression state. */
 	__rec_key_state_update(r, ovfl_key);
@@ -1557,9 +1652,9 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 		if (addr == NULL) {
 			__wt_cell_unpack(ref->addr, unpack);
 			val->buf.data = ref->addr;
-			val->buf.size = unpack->len;
+			val->buf.size = __wt_cell_total_len(unpack);
 			val->cell_len = 0;
-			val->len = unpack->len;
+			val->len = val->buf.size;
 		} else
 			__rec_cell_build_addr(session,
 			    addr->addr, addr->size,
@@ -2492,9 +2587,9 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 				onpage_ovfl = 0;
 			} else {
 				key->buf.data = cell;
-				key->buf.size = kpack->len;
+				key->buf.size = __wt_cell_total_len(kpack);
 				key->cell_len = 0;
-				key->len = kpack->len;
+				key->len = key->buf.size;
 				ovfl_key = 1;
 			}
 		} else
@@ -2504,10 +2599,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 		r->cell_zero = 0;
 
 		/*
-		 * Boundary, split or write the page.  If the K/V pair doesn't
-		 * fit: split the page, turn off compression (until a full key
-		 * is written to the page), change to a non-prefix-compressed
-		 * key.
+		 * Boundary, split or write the page.
 		 */
 		while (key->len + val->len > r->space_avail) {
 			/*
@@ -2517,9 +2609,16 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 			 * about to promote it.
 			 */
 			if (onpage_ovfl)
-				WT_ERR(__wt_cell_copy(session, cell, r->cur));
+				WT_ERR(__wt_cell_unpack_copy(
+				    session, kpack, r->cur));
 			WT_ERR(__rec_split(session));
 
+			/*
+			 * Turn off prefix compression until a full key written
+			 * to the new page, and (unless we're already working
+			 * with an overflow key), rebuild the key without prefix
+			 * compression.
+			 */
 			r->key_pfx_compress = 0;
 			if (!ovfl_key)
 				WT_ERR(__rec_cell_build_key(
@@ -2672,14 +2771,17 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 		r->cell_zero = 0;
 
 		/*
-		 * Boundary, split or write the page.  If the K/V pair doesn't
-		 * fit: split the page, turn off compression (until a full key
-		 * is written to the page), change to a non-prefix-compressed
-		 * key.
+		 * Boundary, split or write the page.
 		 */
 		while (key->len + val->len > r->space_avail) {
 			WT_RET(__rec_split(session));
 
+			/*
+			 * Turn off prefix compression until a full key written
+			 * to the new page, and (unless we're already working
+			 * with an overflow key), rebuild the key without prefix
+			 * compression.
+			 */
 			r->key_pfx_compress = 0;
 			if (!ovfl_key)
 				WT_RET(__rec_cell_build_key(
@@ -2709,6 +2811,7 @@ __rec_row_leaf(
 	WT_CELL *cell, *val_cell;
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_DECL_ITEM(tmpkey);
+	WT_DECL_ITEM(tmpval);
 	WT_DECL_RET;
 	WT_IKEY *ikey;
 	WT_INSERT *ins;
@@ -2717,8 +2820,9 @@ __rec_row_leaf(
 	WT_ROW *rip;
 	WT_UPDATE *upd;
 	uint64_t slvg_skip;
-	uint32_t i;
-	int found, onpage_ovfl, ovfl_key;
+	uint32_t i, size;
+	int dictionary, found, onpage_ovfl, ovfl_key;
+	const void *p;
 
 	r = session->reconcile;
 	btree = session->btree;
@@ -2737,8 +2841,12 @@ __rec_row_leaf(
 	if ((ins = WT_SKIP_FIRST(WT_ROW_INSERT_SMALLEST(page))) != NULL)
 		WT_RET(__rec_row_leaf_insert(session, ins));
 
-	/* Temporary buffer in which to instantiate any uninstantiated keys. */
+	/*
+	 * Temporary buffers in which to instantiate any uninstantiated keys
+	 * or value items we need.
+	 */
 	WT_RET(__wt_scr_alloc(session, 0, &tmpkey));
+	WT_RET(__wt_scr_alloc(session, 0, &tmpval));
 
 	/* For each entry in the page... */
 	WT_ROW_FOREACH(page, rip, i) {
@@ -2770,28 +2878,51 @@ __rec_row_leaf(
 		}
 
 		/* Build value cell. */
+		dictionary = 0;
 		if ((val_cell = __wt_row_value(page, rip)) != NULL)
 			__wt_cell_unpack(val_cell, unpack);
 		WT_ERR(__rec_txn_read(session, WT_ROW_UPDATE(page, rip), &upd));
 		if (upd == NULL) {
 			/*
-			 * Copy the item off the page -- however, when the page
-			 * was read into memory, there may not have been a value
-			 * item, that is, it may have been zero length.
+			 * When the page was read into memory, there may not
+			 * have been a value item.
+			 *
+			 * If there was a value item, check if it's a dictionary
+			 * cell (a copy of another item on the page).  If it's a
+			 * copy, we have to create a new value item as the old
+			 * item might have been discarded from the page.
 			 */
 			if (val_cell == NULL) {
 				val->buf.data = NULL;
 				val->buf.size = 0;
+				val->cell_len = 0;
+				val->len = val->buf.size;
+			} else if (unpack->raw == WT_CELL_VALUE_COPY) {
+				/* If the item is Huffman encoded, decode it. */
+				if (btree->huffman_value == NULL) {
+					p = unpack->data;
+					size = unpack->size;
+				} else {
+					WT_ERR(__wt_huffman_decode(session,
+					    btree->huffman_value,
+					    unpack->data, unpack->size,
+					    tmpval));
+					p = tmpval->data;
+					size = tmpval->size;
+				}
+				WT_ERR(__rec_cell_build_val(
+				    session, p, size, (uint64_t)0));
+				dictionary = 1;
 			} else {
 				val->buf.data = val_cell;
-				val->buf.size = unpack->len;
+				val->buf.size = __wt_cell_total_len(unpack);
+				val->cell_len = 0;
+				val->len = val->buf.size;
 
 				/* Track the page has overflow items. */
 				if (unpack->ovfl)
 					r->ovfl_items = 1;
 			}
-			val->cell_len = 0;
-			val->len = val->buf.size;
 		} else {
 			/*
 			 * If the original value was an overflow and we've not
@@ -2837,10 +2968,12 @@ __rec_row_leaf(
 			 */
 			if (upd->size == 0)
 				val->cell_len = val->len = val->buf.size = 0;
-			else
-				WT_ERR(__rec_cell_build_val(
-				    session, WT_UPDATE_DATA(upd),
-				    upd->size, (uint64_t)0));
+			else {
+				WT_ERR(__rec_cell_build_val(session,
+				    WT_UPDATE_DATA(upd), upd->size,
+				    (uint64_t)0));
+				dictionary = 1;
+			}
 		}
 
 		/*
@@ -2887,9 +3020,9 @@ __rec_row_leaf(
 				onpage_ovfl = 0;
 			} else {
 				key->buf.data = cell;
-				key->buf.size = unpack->len;
+				key->buf.size = __wt_cell_total_len(unpack);
 				key->cell_len = 0;
-				key->len = unpack->len;
+				key->len = key->buf.size;
 				ovfl_key = 1;
 
 				/*
@@ -2960,10 +3093,7 @@ __rec_row_leaf(
 		}
 
 		/*
-		 * Boundary, split or write the page.  If the K/V pair doesn't
-		 * fit: split the page, switch to the non-prefix-compressed key
-		 * and turn off compression until a full key is written to the
-		 * new page.
+		 * Boundary, split or write the page.
 		 *
 		 * We write a trailing key cell on the page after the K/V pairs
 		 * (see WT_TRAILING_KEY_CELL for more information).
@@ -2981,6 +3111,12 @@ __rec_row_leaf(
 				    session, unpack, r->cur));
 			WT_ERR(__rec_split(session));
 
+			/*
+			 * Turn off prefix compression until a full key written
+			 * to the new page, and (unless we're already working
+			 * with an overflow key), rebuild the key without prefix
+			 * compression.
+			 */
 			r->key_pfx_compress = 0;
 			if (!ovfl_key)
 				WT_ERR(__rec_cell_build_key(
@@ -2989,8 +3125,12 @@ __rec_row_leaf(
 
 		/* Copy the key/value pair onto the page. */
 		__rec_copy_incr(session, r, key);
-		if (val->len != 0)
-			__rec_copy_incr(session, r, val);
+		if (val->len != 0) {
+			if (dictionary)
+				__rec_dict_copy_incr(session, r, val);
+			else
+				__rec_copy_incr(session, r, val);
+		}
 
 		/* Update compression state. */
 		__rec_key_state_update(r, ovfl_key);
@@ -3004,6 +3144,7 @@ leaf_insert:	/* Write any K/V pairs inserted into the page after this key. */
 	ret = __rec_split_finish(session);
 
 err:	__wt_scr_free(&tmpkey);
+	__wt_scr_free(&tmpval);
 	return (ret);
 }
 
@@ -3014,12 +3155,14 @@ err:	__wt_scr_free(&tmpkey);
 static int
 __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_INSERT *ins)
 {
+	WT_BTREE *btree;
 	WT_KV *key, *val;
 	WT_RECONCILE *r;
 	WT_UPDATE *upd;
 	int ovfl_key;
 
 	r = session->reconcile;
+	btree = session->btree;
 	key = &r->k;
 	val = &r->v;
 
@@ -3038,10 +3181,7 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_INSERT *ins)
 		    WT_INSERT_KEY(ins), WT_INSERT_KEY_SIZE(ins), 0, &ovfl_key));
 
 		/*
-		 * Boundary, split or write the page.  If the K/V pair doesn't
-		 * fit: split the page, switch to the non-prefix-compressed key
-		 * and turn off compression until a full key is written to the
-		 * new page.
+		 * Boundary, split or write the page.
 		 *
 		 * We write a trailing key cell on the page after the K/V pairs
 		 * (see WT_TRAILING_KEY_CELL for more information).
@@ -3050,6 +3190,12 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_INSERT *ins)
 		    val->len + WT_TRAILING_KEY_CELL > r->space_avail) {
 			WT_RET(__rec_split(session));
 
+			/*
+			 * Turn off prefix compression until a full key written
+			 * to the new page, and (unless we're already working
+			 * with an overflow key), rebuild the key without prefix
+			 * compression.
+			 */
 			r->key_pfx_compress = 0;
 			if (!ovfl_key)
 				WT_RET(__rec_cell_build_key(
@@ -3058,8 +3204,12 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_INSERT *ins)
 
 		/* Copy the key/value pair onto the page. */
 		__rec_copy_incr(session, r, key);
-		if (val->len != 0)
-			__rec_copy_incr(session, r, val);
+		if (val->len != 0) {
+			if (btree->dictionary)
+				__rec_dict_copy_incr(session, r, val);
+			else
+				__rec_copy_incr(session, r, val);
+		}
 
 		/* Update compression state. */
 		__rec_key_state_update(r, ovfl_key);
@@ -3731,4 +3881,116 @@ __rec_cell_build_ovfl(
 
 err:	__wt_scr_free(&tmp);
 	return (ret);
+}
+
+/*
+ * __rec_dictionary_reset --
+ *	Clear the dictionary when reconciliation restarts and when crossing a
+ * page boundary (a potential split).
+ */
+static void
+__rec_dictionary_reset(WT_RECONCILE *r)
+{
+	/*
+	 * Reset the dictionary when starting a new reconciliation or crossing
+	 * a page split boundary.   I'm concerned about the latter: if it's a
+	 * dictionary with 10K slots and a small page size boundary, this is an
+	 * expensive operation we might be calling a lot; if it's a dictionary
+	 * with 100 slots and a large page size boundary it's a cheap operation
+	 * we won't call often.   The alternative is to clear the dictionary
+	 * when starting a new reconciliation and don't clear it when crossing
+	 * a split boundary.  If we don't clear the dictionary when crossing a
+	 * split boundary, then we have to add some way to detect references to
+	 * cells in other chunks of the page.  A simple way is to add the split
+	 * boundary's start address into the WT_DICTIONARY entry and test it
+	 * against the current boundary's start address when doing the lookup.
+	 * That grows the WT_DICTIONARY size by a pointer, of course; it might
+	 * be possible to test the referenced cell's address relationship to
+	 * the current boundary's start address instead, but that's a little
+	 * trickier if we actually split and the boundary moves around.
+	 */
+	memset(r->dictionary,
+	    0, (size_t)r->dictionary_slots * sizeof(r->dictionary[0]));
+}
+
+/*
+ * __rec_dictionary_cell_match --
+ *	Check to see if two cells (one in a WT_ITEM, and one laid out
+ * in a buffer), match.
+ */
+static inline int
+__rec_dictionary_cell_match(uint8_t *p, WT_KV *val)
+{
+	/*
+	 * We don't have to worry about crossing into garbage at the end of
+	 * the cell.  If the cell itself matches, the size of what follows
+	 * must match as well.
+	 */
+	if (memcmp(p, &val->cell, val->cell_len) != 0)
+		return (0);
+	if (memcmp(p + val->cell_len, val->buf.data, val->buf.size) != 0)
+		return (0);
+	return (1);
+}
+
+/*
+ * __rec_dictionary_lookup --
+ *	Check the dictionary for a matching value on this page.
+ */
+static WT_DICTIONARY *
+__rec_dictionary_lookup(WT_SESSION_IMPL *session, WT_KV *val)
+{
+	WT_DICTIONARY *dp, *empty;
+	WT_RECONCILE *r;
+	long i;
+	uint64_t hash;
+
+	r = session->reconcile;
+
+	hash = __wt_hash_fnv64(val->buf.data, val->buf.size);
+
+	/*
+	 * Walk the dictionary looking for a matching hash value.  We're not
+	 * sorting the dictionary or doing anything to make the lookup fast.
+	 * That's fine for the small dictionaries I expect to see, but bad if
+	 * we see big dictionaries with lots of unique page values.  It's an
+	 * obvious trade-off: this implementation only uses two pointers per
+	 * dictionary slot and building the dictionary takes almost no work,
+	 * vs. more memory and more work to build large dictionaries that we
+	 * can still search quickly.
+	 *
+	 * We're not doing value replacement in the dictionary.  We stop adding
+	 * new entries if we run out of empty dictionary slots (but continue to
+	 * use the existing entries).  I can't think of any reason a leaf page
+	 * value is more likely to be seen because it was seen more recently
+	 * than some other value: if we find working sets where that's not the
+	 * case, it shouldn't be too difficult to maintain a pointer which is
+	 * the next dictionary slot to re-use.
+	 */
+	empty = NULL;
+	for (dp = r->dictionary, i = r->dictionary_slots; i > 0; --i, ++dp) {
+		if (dp->cell == NULL) {
+			empty = dp;
+			break;
+		}
+		if (dp->hash != hash)
+			continue;
+
+		/* If we find a match, replace our cell with a copy cell. */
+		if (__rec_dictionary_cell_match(dp->cell, val)) {
+			WT_BSTAT_INCR(session, rec_dictionary);
+			return (dp);
+		}
+	}
+
+	/*
+	 * Set the hash value, we'll add this entry into the dictionary when we
+	 * write it into the page's buffer (because that's when we know where
+	 * it will be written).
+	 */
+	if (empty != NULL) {
+		empty->cell = NULL;	/* Not necessary, just cautious. */
+		empty->hash = hash;
+	}
+	return (empty);
 }

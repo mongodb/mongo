@@ -109,11 +109,11 @@ __wt_confchk_cursor_close[] = {
 const char *
 __wt_confdfl_file_meta =
 	"allocation_size=512B,block_compressor=,cache_resident=0,checkpoint=,"
-	"checksum=,collator=,columns=,huffman_key=,huffman_value=,"
-	"internal_item_max=0,internal_key_truncate=,internal_page_max=2KB,"
-	"key_format=u,key_gap=10,leaf_item_max=0,leaf_page_max=1MB,"
-	"prefix_compression=,split_pct=75,type=btree,value_format=u,"
-	"version=(major=0,minor=0)";
+	"checksum=,collator=,columns=,dictionary=0,huffman_key=,"
+	"huffman_value=,internal_item_max=0,internal_key_truncate=,"
+	"internal_page_max=2KB,key_format=u,key_gap=10,leaf_item_max=0,"
+	"leaf_page_max=1MB,prefix_compression=,split_pct=75,type=btree,"
+	"value_format=u,version=(major=0,minor=0)";
 
 WT_CONFIG_CHECK
 __wt_confchk_file_meta[] = {
@@ -124,6 +124,7 @@ __wt_confchk_file_meta[] = {
 	{ "checksum", "boolean", NULL },
 	{ "collator", "string", NULL },
 	{ "columns", "list", NULL },
+	{ "dictionary", "int", "min=0" },
 	{ "huffman_key", "string", NULL },
 	{ "huffman_value", "string", NULL },
 	{ "internal_item_max", "int", "min=0" },
@@ -203,8 +204,8 @@ __wt_confchk_session_commit_transaction[] = {
 const char *
 __wt_confdfl_session_create =
 	"allocation_size=512B,block_compressor=,cache_resident=0,checksum=,"
-	"colgroups=,collator=,columns=,columns=,exclusive=0,filename=,"
-	"huffman_key=,huffman_value=,internal_item_max=0,"
+	"colgroups=,collator=,columns=,columns=,dictionary=0,exclusive=0,"
+	"filename=,huffman_key=,huffman_value=,internal_item_max=0,"
 	"internal_key_truncate=,internal_page_max=2KB,key_format=u,"
 	"key_format=u,key_gap=10,leaf_item_max=0,leaf_page_max=1MB,"
 	"prefix_compression=,split_pct=75,type=btree,value_format=u,"
@@ -220,6 +221,7 @@ __wt_confchk_session_create[] = {
 	{ "collator", "string", NULL },
 	{ "columns", "list", NULL },
 	{ "columns", "list", NULL },
+	{ "dictionary", "int", "min=0" },
 	{ "exclusive", "boolean", NULL },
 	{ "filename", "string", NULL },
 	{ "huffman_key", "string", NULL },

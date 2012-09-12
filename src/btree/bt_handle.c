@@ -220,6 +220,22 @@ __btree_conf(WT_SESSION_IMPL *session)
 	/* Huffman encoding */
 	WT_RET(__wt_btree_huffman_open(session, config));
 
+	/* Reconciliation configuration. */
+	WT_RET(__wt_config_getones(
+	    session, btree->config, "dictionary", &cval));
+	btree->dictionary = (u_int)cval.val;
+
+	WT_RET(__wt_config_getones(
+	    session, btree->config, "internal_key_truncate", &cval));
+	btree->internal_key_truncate = cval.val == 0 ? 0 : 1;
+
+	WT_RET(__wt_config_getones(
+	    session, btree->config, "prefix_compression", &cval));
+	btree->prefix_compression = cval.val == 0 ? 0 : 1;
+
+	WT_RET(__wt_config_getones(session, btree->config, "split_pct", &cval));
+	btree->split_pct = (u_int)cval.val;
+
 	WT_RET(__wt_stat_alloc_btree_stats(session, &btree->stats));
 
 	/* The tree has not been modified. */

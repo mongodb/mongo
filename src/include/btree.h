@@ -102,6 +102,11 @@ struct __wt_btree {
 	void *huffman_key;		/* Key huffman encoding */
 	void *huffman_value;		/* Value huffman encoding */
 
+	u_int dictionary;		/* Reconcile: dictionary slots */
+	int   internal_key_truncate;	/* Reconcile: internal key truncate */
+	int   prefix_compression;	/* Reconcile: key prefix compression */
+	u_int split_pct;		/* Reconcile: split page percent */
+
 	uint64_t last_recno;		/* Column-store last record number */
 
 	WT_PAGE *root_page;		/* Root page */

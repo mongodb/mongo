@@ -44,6 +44,7 @@ __wt_stat_alloc_btree_stats(WT_SESSION_IMPL *session, WT_BTREE_STATS **statsp)
 	stats->overflow_read.desc = "file: overflow pages read from the file";
 	stats->page_read.desc = "file: pages read from the file";
 	stats->page_write.desc = "file: pages written to the file";
+	stats->rec_dictionary.desc = "reconcile: dictionary match";
 	stats->rec_hazard.desc =
 	    "reconcile: unable to acquire hazard reference";
 	stats->rec_ovfl_key.desc = "reconcile: overflow key";
@@ -100,6 +101,7 @@ __wt_stat_clear_btree_stats(WT_STATS *stats_arg)
 	stats->overflow_read.v = 0;
 	stats->page_read.v = 0;
 	stats->page_write.v = 0;
+	stats->rec_dictionary.v = 0;
 	stats->rec_hazard.v = 0;
 	stats->rec_ovfl_key.v = 0;
 	stats->rec_ovfl_value.v = 0;
