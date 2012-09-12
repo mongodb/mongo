@@ -168,8 +168,9 @@ __wt_row_key_copy(
 				break;
 			}
 
-			__wt_cell_unpack(WT_PAGE_REF_OFFSET(
-			    page, ikey->cell_offset), unpack);
+			__wt_cell_unpack(
+			    WT_PAGE_REF_OFFSET(page, ikey->cell_offset),
+			    unpack);
 
 			/*
 			 * If we wanted a different key and this key is an
@@ -341,9 +342,7 @@ WT_CELL *
 __wt_row_value(WT_PAGE *page, WT_ROW *rip)
 {
 	WT_CELL *cell;
-	WT_CELL_UNPACK *unpack, _unpack;
-
-	unpack = &_unpack;
+	u_int type;
 
 	cell = WT_ROW_KEY_COPY(rip);
 	/*
@@ -363,12 +362,9 @@ __wt_row_value(WT_PAGE *page, WT_ROW *rip)
 	 * key.  The page reconciliation code guarantees there is always a key
 	 * cell after an empty data cell, so this is safe.
 	 */
-	__wt_cell_unpack(cell, unpack);
-	cell = (WT_CELL *)((uint8_t *)cell + unpack->len);
-	if (__wt_cell_type(cell) == WT_CELL_KEY ||
-	    __wt_cell_type(cell) == WT_CELL_KEY_OVFL)
-		return (NULL);
-	return (cell);
+	cell = __wt_cell_next(cell);
+	type = __wt_cell_type(cell);
+	return (type == WT_CELL_KEY || type == WT_CELL_KEY_OVFL ? NULL : cell);
 }
 
 /*

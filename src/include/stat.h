@@ -80,6 +80,7 @@ struct __wt_btree_stats {
 	WT_STATS file_overflow;
 	WT_STATS file_allocsize;
 	WT_STATS rec_page_merge;
+	WT_STATS rec_dictionary;
 	WT_STATS rec_split_intl;
 	WT_STATS rec_split_leaf;
 	WT_STATS rec_ovfl_key;

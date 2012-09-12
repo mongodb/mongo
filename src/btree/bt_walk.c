@@ -67,9 +67,11 @@ __tree_walk_delete(
 	 * If the page references overflow items, we have to clean it up during
 	 * reconciliation, no fast delete.
 	 */
-	__wt_cell_unpack(ref->addr, &unpack);
-	if (unpack.raw != WT_CELL_ADDR_LNO)
-		return (0);
+	if (!__wt_off_page(page, ref->addr)) {
+		__wt_cell_unpack(ref->addr, &unpack);
+		if (unpack.raw != WT_CELL_ADDR_LNO)
+			return (0);
+	}
 
 	/*
 	 * Atomically switch the page's state to delete it.  If the page state

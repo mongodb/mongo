@@ -938,6 +938,7 @@ deleted:	__debug_item(ds, tag, "deleted", strlen("deleted"));
 	case WT_CELL_KEY_OVFL:
 	case WT_CELL_KEY_SHORT:
 	case WT_CELL_VALUE:
+	case WT_CELL_VALUE_COPY:
 	case WT_CELL_VALUE_OVFL:
 	case WT_CELL_VALUE_SHORT:
 		WT_RET(__wt_scr_alloc(session, 256, &buf));
