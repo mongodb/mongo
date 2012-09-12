@@ -30,18 +30,6 @@ __lsm_tree_discard(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 }
 
 /*
- * __wt_lsm_tree_bump_gen --
- *	Update the generation number of a LSM tree.
- */
-int
-__wt_lsm_tree_bump_gen(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
-{
-	WT_UNUSED(session);
-	++lsm_tree->dsk_gen;
-	return (0);
-}
-
-/*
  * __wt_lsm_tree_close --
  *	Close an LSM tree structure.
  */
@@ -284,13 +272,12 @@ __wt_lsm_tree_switch(
     WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
 	WT_DECL_RET;
+	WT_LSM_CHUNK *chunk;
 
 	if (lsm_tree->memsizep != NULL)
 		printf("Switched to %d because %d > %d\n", lsm_tree->last + 1,
 		    (int)*lsm_tree->memsizep, (int)lsm_tree->threshold);
 	lsm_tree->memsizep = NULL;
-
-	WT_ERR(__wt_lsm_tree_bump_gen(session, lsm_tree));
 
 	/* TODO more sensible realloc */
 	if ((lsm_tree->nchunks + 1) * sizeof(*lsm_tree->chunk) >
@@ -301,11 +288,13 @@ __wt_lsm_tree_switch(
 		    2 * lsm_tree->chunk_alloc),
 		    &lsm_tree->chunk));
 
+	chunk = &lsm_tree->chunk[lsm_tree->nchunks++];
+	WT_CLEAR(*chunk);
 	WT_ERR(__wt_lsm_tree_create_chunk(session,
 	    lsm_tree, WT_ATOMIC_ADD(lsm_tree->last, 1),
-	    &lsm_tree->chunk[lsm_tree->nchunks].uri));
-	++lsm_tree->nchunks;
+	    &chunk->uri));
 
+	++lsm_tree->dsk_gen;
 	WT_ERR(__wt_lsm_meta_write(session, lsm_tree));
 
 err:	/* TODO: mark lsm_tree bad on error(?) */

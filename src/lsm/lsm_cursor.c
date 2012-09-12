@@ -804,8 +804,11 @@ __clsm_close(WT_CURSOR *cursor)
 	 */
 	clsm = (WT_CURSOR_LSM *)cursor;
 	CURSOR_API_CALL_NOCONF(cursor, session, close, NULL);
-	FORALL_CURSORS(clsm, c, i)
+	FORALL_CURSORS(clsm, c, i) {
+		if (F_ISSET(clsm, WT_CLSM_MERGE))
+			printf("LSM merge: closing %s\n", c->uri);
 		WT_TRET(c->close(c));
+	}
 	__wt_free(session, clsm->blooms);
 	__wt_free(session, clsm->cursors);
 	/* The WT_LSM_TREE owns the URI. */

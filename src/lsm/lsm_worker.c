@@ -60,7 +60,8 @@ __wt_lsm_worker(void *arg)
 		 * something to merge.
 		 */
 		for (i = 0, chunk = chunk_array; i < nchunks; i++, chunk++) {
-			if (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK))
+			if (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) ||
+			    chunk->ncursor > 0)
 				continue;
 
 			/* XXX durability: need to checkpoint the metadata? */
