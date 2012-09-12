@@ -286,7 +286,7 @@ __wt_lsm_tree_switch(
 	WT_DECL_RET;
 
 	if (lsm_tree->memsizep != NULL)
-		printf("Switched to %d because %d > %d\n", lsm_tree->last,
+		printf("Switched to %d because %d > %d\n", lsm_tree->last + 1,
 		    (int)*lsm_tree->memsizep, (int)lsm_tree->threshold);
 	lsm_tree->memsizep = NULL;
 

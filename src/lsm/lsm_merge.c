@@ -23,8 +23,8 @@ __wt_lsm_major_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	WT_SESSION *wt_session;
 	const char *dest_uri;
 	uint64_t record_count;
-	int dest_id, nchunks;
-	size_t chunk_sz, i, j, saved_alloc;
+	size_t chunk_sz;
+	int dest_id, i, j, nchunks;
 
 	src = dest = NULL;
 
@@ -54,10 +54,15 @@ __wt_lsm_major_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	 * the amount of work in the merge.
 	 */
 	nchunks = WT_MIN((int)S2C(session)->hazard_size / 2, nchunks);
-	if (!F_ISSET(&lsm_tree->chunk[nchunks - 1], WT_LSM_CHUNK_ONDISK))
+	while (nchunks > 1 &&
+	    (!F_ISSET(&lsm_tree->chunk[nchunks - 1], WT_LSM_CHUNK_ONDISK) ||
+	    lsm_tree->chunk[nchunks - 1].ncursor > 0))
+		--nchunks;
+
+	if (nchunks <= 1)
 		return (0);
 
-	printf("Merging first %d chunks into %d\n", nchunks, dest_id);
+	printf("Merging first %d chunks into %d\n", nchunks, dest_id + 1);
 
 	WT_RET(__wt_scr_alloc(session, 0, &bbuf));
 	WT_RET(__wt_lsm_tree_bloom_name(session, lsm_tree, dest_id, bbuf));
@@ -106,24 +111,20 @@ __wt_lsm_major_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	WT_ERR(ret);
 
 	__wt_spin_lock(session, &lsm_tree->lock);
-	chunk_sz = sizeof(*lsm_tree->old_chunks);
-	if (nchunks * chunk_sz > lsm_tree->old_avail * chunk_sz) {
-		saved_alloc = lsm_tree->old_alloc;
+	if (nchunks > lsm_tree->old_avail) {
+		chunk_sz = sizeof(*lsm_tree->old_chunks);
 		WT_ERR(__wt_realloc(session,
 		    &lsm_tree->old_alloc,
-		    WT_MAX(10 * chunk_sz,
-		    lsm_tree->old_alloc + (2 * nchunks * chunk_sz)),
+		    chunk_sz * WT_MAX(10, lsm_tree->old_alloc + 2 * nchunks),
 		    &lsm_tree->old_chunks));
+		lsm_tree->old_avail += (int)(lsm_tree->old_alloc / chunk_sz) -
+		    lsm_tree->nold_chunks;
 		lsm_tree->nold_chunks = (int)(lsm_tree->old_alloc / chunk_sz);
-		lsm_tree->old_avail +=
-		    (lsm_tree->old_alloc - saved_alloc) / chunk_sz;
 	}
 	/* Copy entries one at a time, so we can reuse gaps in the list. */
-	for (j = 0, i = 0;
-	    j < (size_t)nchunks && i < lsm_tree->nold_chunks; i++) {
+	for (i = j = 0; j < nchunks && i < lsm_tree->nold_chunks; i++) {
 		if (lsm_tree->old_chunks[i].uri == NULL) {
-			memcpy(&lsm_tree->old_chunks[i],
-			    &lsm_tree->chunk[j++], chunk_sz);
+			lsm_tree->old_chunks[i] = lsm_tree->chunk[j++];
 			--lsm_tree->old_avail;
 		}
 	}

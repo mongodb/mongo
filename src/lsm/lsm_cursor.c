@@ -145,7 +145,7 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm)
 	__wt_spin_lock(session, &lsm_tree->lock);
 	/* Detach from our old primary. */
 	if (primary_uri != NULL) {
-		for (i = clsm->nchunks - 1; i >= 0; i--) {
+		for (i = lsm_tree->nchunks - 1; i >= 0; i--) {
 			chunk = &lsm_tree->chunk[i];
 			if (strcmp(primary_uri, chunk->uri) == 0) {
 				--chunk->ncursor;
@@ -183,6 +183,9 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm)
 	}
 
 	/* The last chunk is our new primary. */
+	WT_ASSERT(session,
+	    !F_ISSET(clsm, WT_CLSM_UPDATED) ||
+	    !F_ISSET(chunk, WT_LSM_CHUNK_ONDISK));
 	++chunk->ncursor;
 
 	/* Peek into the btree layer to track the in-memory size. */
@@ -675,7 +678,7 @@ __clsm_put(
 	 * a non-primary chunk, we may now have multiple cursors matching the
 	 * key.
 	 */
-	F_CLR(clsm, WT_CLSM_ITERATE_PREV | WT_CLSM_ITERATE_NEXT);
+	F_CLR(clsm, WT_CLSM_ITERATE_NEXT | WT_CLSM_ITERATE_PREV);
 	clsm->current = primary;
 
 	if ((memsizep = lsm_tree->memsizep) != NULL &&

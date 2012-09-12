@@ -62,8 +62,8 @@ struct __wt_lsm_tree {
 	size_t chunk_alloc;		/* Space allocated for chunks */
 	WT_LSM_CHUNK *old_chunks;	/* Array of old LSM chunks */
 	size_t old_alloc;		/* Space allocated for old chunks */
-	size_t nold_chunks;		/* Number of old chunks */
-	size_t old_avail;		/* Available old chunk slots */
+	int nold_chunks;		/* Number of old chunks */
+	int old_avail;			/* Available old chunk slots */
 
 #define	WT_LSM_TREE_OPEN	0x01
 	uint32_t flags;

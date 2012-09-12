@@ -108,7 +108,7 @@ __lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	WT_DECL_RET;
 	char *uri;
 	const char *drop_cfg[] = { NULL };
-	size_t found, i;
+	int found, i;
 
 	found = 0;
 	for (i = 0; i < lsm_tree->nold_chunks; i++) {

@@ -11,14 +11,13 @@ static int
 __create_file(WT_SESSION_IMPL *session,
     const char *uri, int exclusive, const char *config)
 {
-	WT_ITEM *val;
+	WT_DECL_ITEM(val);
 	WT_DECL_RET;
 	int is_metadata;
 	const char *cfg[] = API_CONF_DEFAULTS(session, create, config);
 	const char *filecfg[4] = API_CONF_DEFAULTS(file, meta, config);
 	const char *filename, *treeconf;
 
-	val = NULL;
 	treeconf = NULL;
 
 	is_metadata = strcmp(uri, WT_METADATA_URI) == 0;
@@ -32,7 +31,7 @@ __create_file(WT_SESSION_IMPL *session,
 	    __wt_metadata_read(session, uri, &treeconf)) != WT_NOTFOUND) {
 		if (exclusive)
 			WT_TRET(EEXIST);
-		return (ret);
+		goto err;
 	}
 
 	/* Create the file. */
@@ -67,10 +66,10 @@ __create_file(WT_SESSION_IMPL *session,
 	 */
 	WT_ERR(__wt_conn_btree_get(
 	    session, uri, NULL, cfg, WT_BTREE_EXCLUSIVE));
-	if (!WT_META_TRACKING(session))
-		WT_ERR(__wt_session_release_btree(session));
-	else
+	if (WT_META_TRACKING(session))
 		WT_ERR(__wt_meta_track_handle_lock(session, 1));
+	else
+		WT_ERR(__wt_session_release_btree(session));
 
 err:	__wt_scr_free(&val);
 	__wt_free(session, treeconf);
