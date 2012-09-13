@@ -38,13 +38,13 @@ __wt_txn_getid(WT_SESSION_IMPL *session)
 
 	txn->id = id;
 
-        /*
-         * We allocated a new transaction ID for updates without an explicit
-         * transaction.  To ensure that our previous updates are visible,
-         * update our transaction context (if required).
-         */
-        __wt_txn_read_last(session);
-        __wt_txn_read_first(session);
+	/*
+	 * We allocated a new transaction ID for updates without an explicit
+	 * transaction.  To ensure that our previous updates are visible,
+	 * update our transaction context (if required).
+	 */
+	__wt_txn_read_last(session);
+	__wt_txn_read_first(session);
 }
 
 /*
