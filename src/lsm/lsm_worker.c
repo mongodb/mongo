@@ -40,9 +40,13 @@ __wt_lsm_worker(void *arg)
 			__wt_spin_unlock(session, &lsm_tree->lock);
 			break;
 		}
-		/* Take a copy of the current state of the LSM tree. */
+		/*
+		 * Take a copy of the current state of the LSM tree. Skip
+		 * the last chunk - since it is the active one and not relevant
+		 * to merge operations.
+		 */
 		for (nchunks = lsm_tree->nchunks - 1;
-		    nchunks > 0 && lsm_tree->chunk[nchunks].ncursor > 0;
+		    nchunks > 0 && lsm_tree->chunk[nchunks - 1].ncursor > 0;
 		    --nchunks)
 			;
 		if (chunk_alloc < lsm_tree->chunk_alloc)
