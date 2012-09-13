@@ -13,14 +13,14 @@
  */
 static int
 __lsm_create(WT_DATA_SOURCE *dsrc, WT_SESSION *wt_session,
-    const char *uri, const char *config)
+    const char *uri, int exclusive, const char *config)
 {
 	WT_SESSION_IMPL *session;
 
 	WT_UNUSED(dsrc);
 
 	session = (WT_SESSION_IMPL *)wt_session;
-	return (__wt_lsm_tree_create(session, uri, config));
+	return (__wt_lsm_tree_create(session, uri, exclusive, config));
 }
 
 /*

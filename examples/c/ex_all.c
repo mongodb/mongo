@@ -523,12 +523,13 @@ transaction_ops(WT_CONNECTION *conn, WT_SESSION *session)
 /*! [WT_DATA_SOURCE create] */
 static int
 my_create(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-    const char *name, const char *config)
+    const char *name, int exclusive, const char *config)
 {
 	/* Unused parameters */
 	(void)dsrc;
 	(void)session;
 	(void)name;
+	(void)exclusive;
 	(void)config;
 
 	return (0);

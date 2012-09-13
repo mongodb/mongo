@@ -685,8 +685,9 @@ extern int __wt_lsm_tree_create_chunk( WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree,
     int i,
     const char **urip);
-extern int __wt_lsm_tree_create( WT_SESSION_IMPL *session,
+extern int __wt_lsm_tree_create(WT_SESSION_IMPL *session,
     const char *uri,
+    int exclusive,
     const char *config);
 extern int __wt_lsm_tree_get( WT_SESSION_IMPL *session,
     const char *uri,

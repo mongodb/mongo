@@ -1537,7 +1537,7 @@ struct __wt_data_source {
 	 * @snippet ex_all.c WT_DATA_SOURCE create
 	 */
 	int (*create)(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-	    const char *name, const char *config);
+	    const char *name, int exclusive, const char *config);
 
 	/*! Callback to drop an object.
 	 *

@@ -129,8 +129,8 @@ err:	__wt_scr_free(&buf);
  *	Create an LSM tree structure for the given name.
  */
 int
-__wt_lsm_tree_create(
-    WT_SESSION_IMPL *session, const char *uri, const char *config)
+__wt_lsm_tree_create(WT_SESSION_IMPL *session,
+    const char *uri, int exclusive, const char *config)
 {
 	WT_CONFIG_ITEM cval;
 	WT_CONNECTION *wt_conn;
@@ -142,13 +142,13 @@ __wt_lsm_tree_create(
 
 	/* If the tree is open, it already exists. */
 	if ((ret = __wt_lsm_tree_get(session, uri, &lsm_tree)) == 0)
-		return (EEXIST);
+		return (exclusive ? EEXIST : 0);
 	WT_RET_NOTFOUND_OK(ret);
 
 	/* If the tree has metadata, it already exists. */
 	if (__wt_metadata_read(session, uri, &config) == 0) {
 		__wt_free(session, config);
-		return (EEXIST);
+		return (exclusive ? EEXIST : 0);
 	}
 	WT_RET_NOTFOUND_OK(ret);
 
@@ -332,9 +332,9 @@ __wt_lsm_tree_drop(
 			    __wt_schema_drop(session, chunk->bloom_uri, cfg));
 	}
 
-	WT_ERR(__wt_metadata_remove(session, lsm_tree->name));
 	__wt_spin_unlock(session, &lsm_tree->lock);
 	ret = __wt_lsm_tree_close(session, lsm_tree);
+	WT_ERR(__wt_metadata_remove(session, name));
 
 	if (0) {
 err:		__wt_spin_unlock(session, &lsm_tree->lock);

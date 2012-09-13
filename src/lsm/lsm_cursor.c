@@ -40,9 +40,8 @@ __clsm_enter(WT_CURSOR_LSM *clsm)
 {
 	if (!F_ISSET(clsm, WT_CLSM_MERGE) &&
 	    clsm->dsk_gen != clsm->lsm_tree->dsk_gen)
-		return (__clsm_open_cursors(clsm));
+		WT_RET(__clsm_open_cursors(clsm));
 
-	/* TODO: indicate somehow that we are in the tree. */
 	return (0);
 }
 
