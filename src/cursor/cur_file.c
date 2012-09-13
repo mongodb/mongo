@@ -338,12 +338,13 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 
 	/*
 	 * random_retrieval
-	 * Random retrieval cursors only support next and close.
+	 * Random retrieval cursors only support next, reset and close.
 	 */
 	WT_ERR(__wt_config_gets_defno(session, cfg, "next_random", &cval));
 	if (cval.val != 0) {
 		__wt_cursor_set_notsup(cursor);
 		cursor->next = __curfile_next_random;
+		cursor->reset = __curfile_reset;
 	}
 
 	/* __wt_cursor_init is last so we don't have to clean up on error. */

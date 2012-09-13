@@ -783,12 +783,13 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 
 	/*
 	 * random_retrieval
-	 * Random retrieval cursors only support next and close.
+	 * Random retrieval cursors only support next, reset and close.
 	 */
 	WT_ERR(__wt_config_gets_defno(session, cfg, "next_random", &cval));
 	if (cval.val != 0) {
 		__wt_cursor_set_notsup(cursor);
 		cursor->next = __curtable_next_random;
+		cursor->reset = __curtable_reset;
 	}
 
 	STATIC_ASSERT(offsetof(WT_CURSOR_TABLE, iface) == 0);

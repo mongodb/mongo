@@ -286,7 +286,8 @@ methods = {
 		configure the cursor to return a pseudo-random record from
 		the object; valid only for row-store cursors.  Cursors
 		configured with next_random only support the WT_CURSOR::next
-		and WT_CURSOR::close methods''',
+		and WT_CURSOR::close methods.  See @ref cursor_random for
+		details''',
 		type='boolean'),
 	Config('overwrite', 'false', r'''
 		change the behavior of the cursor's insert method to overwrite

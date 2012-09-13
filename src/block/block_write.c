@@ -131,7 +131,7 @@ not_compressed:	/*
 		 */
 		dsk = buf->mem;
 	} else {
-		/* Skip the first 32B of the source data. */
+		/* Skip the header bytes of the source data. */
 		src = (uint8_t *)buf->mem + WT_BLOCK_COMPRESS_SKIP;
 		src_len = buf->size - WT_BLOCK_COMPRESS_SKIP;
 
@@ -151,7 +151,7 @@ not_compressed:	/*
 		WT_RET(__wt_scr_alloc(
 		    session, (uint32_t)len + WT_BLOCK_COMPRESS_SKIP, &tmp));
 
-		/* Skip the first 32B of the destination data. */
+		/* Skip the header bytes of the destination data. */
 		dst = (uint8_t *)tmp->mem + WT_BLOCK_COMPRESS_SKIP;
 		dst_len = len;
 

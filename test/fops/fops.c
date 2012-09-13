@@ -133,6 +133,7 @@ fop(void *arg)
 		case 5:
 			++s->bulk;
 			obj_bulk();
+			break;
 		default:
 			break;
 		}
