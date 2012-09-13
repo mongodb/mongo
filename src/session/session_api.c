@@ -160,7 +160,7 @@ __session_reconfigure(WT_SESSION *wt_session, const char *config)
 			WT_ERR_MSG(session, EINVAL,
 			    "Database not configured for transactions");
 
-		session->isolation =
+		session->isolation = session->txn.isolation =
 		    WT_STRING_MATCH("snapshot", cval.str, cval.len) ?
 		    TXN_ISO_SNAPSHOT :
 		    WT_STRING_MATCH("read-uncommitted", cval.str, cval.len) ?
