@@ -279,7 +279,7 @@ namespace replset {
         while( ts < minValid ) {
             OpQueue ops;
 
-            while (ops.getSize() < replBatchSizeBytes) {
+            while (ops.getSize() < replBatchLimitBytes) {
                 if (tryPopAndWaitForMore(&ops)) {
                     break;
                 }
@@ -323,7 +323,7 @@ namespace replset {
             // always fetch a few ops first
             // tryPopAndWaitForMore returns true when we need to end a batch early
             while (!tryPopAndWaitForMore(&ops) && 
-                   (ops.getSize() < replBatchSizeBytes)) {
+                   (ops.getSize() < replBatchLimitBytes)) {
 
                 if (theReplSet->isPrimary()) {
                     return;
@@ -331,10 +331,13 @@ namespace replset {
 
                 int now = batchTimer.seconds();
 
-                // don't wait more than five seconds building up a batch
-                if (!ops.empty() && now > replBatchLimitSeconds)
-                    break;
-
+                // apply replication batch limits
+                if (!ops.empty()) {
+                    if (now > replBatchLimitSeconds)
+                        break;
+                    if (ops.getDeque().size() > replBatchLimitOperations)
+                        break;
+                }
                 // occasionally check some things
                 if (ops.empty() || now > lastTimeChecked) {
                     lastTimeChecked = now;
