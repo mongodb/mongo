@@ -435,7 +435,7 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 	WT_ERR(__curindex_open_colgroups(session, cindex, cfg));
 
 	/* __wt_cursor_init is last so we don't have to clean up on error. */
-	WT_ERR(__wt_cursor_init(cursor, cursor->uri, 0, cfg, cursorp));
+	WT_ERR(__wt_cursor_init(cursor, cursor->uri, NULL, cfg, cursorp));
 
 	if (0) {
 err:		(void)__curindex_close(cursor);

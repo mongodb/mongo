@@ -234,6 +234,7 @@ extern int __wt_bloom_open(WT_SESSION_IMPL *session,
     const char *uri,
     uint32_t factor,
     uint32_t k,
+    WT_CURSOR *owner,
     WT_BLOOM **bloomp);
 extern int __wt_bloom_insert(WT_BLOOM *bloom, WT_ITEM *key);
 extern int __wt_bloom_finalize(WT_BLOOM *bloom);

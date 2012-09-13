@@ -112,23 +112,23 @@ __wt_bloom_create(
  */
 int
 __wt_bloom_open(WT_SESSION_IMPL *session,
-    const char *uri, uint32_t factor, uint32_t k, WT_BLOOM **bloomp)
+    const char *uri, uint32_t factor, uint32_t k,
+    WT_CURSOR *owner, WT_BLOOM **bloomp)
 {
 	WT_BLOOM *bloom;
 	WT_CURSOR *c;
-	WT_SESSION *wt_session;
+	const char *cfg[] = API_CONF_DEFAULTS(session, open_cursor, NULL);
 	uint64_t size;
-
-	wt_session = (WT_SESSION *)session;
 
 	WT_RET(__bloom_init(session, uri, NULL, &bloom));
 
 	/* Find the largest key, to get the size of the filter. */
-	WT_RET(wt_session->open_cursor(wt_session, bloom->uri, NULL, NULL, &c));
+	cfg[1] = bloom->config;
+	WT_RET(__wt_curfile_open(session, bloom->uri, owner, cfg, &c));
 	WT_RET(c->prev(c));
 	WT_RET(c->get_key(c, &size));
-	WT_RET(c->close(c));
 
+	bloom->c = c;
 	WT_RET(__bloom_setup(bloom, 0, size, factor, k));
 
 	*bloomp = bloom;

@@ -179,10 +179,10 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm)
 		WT_ERR(__wt_curfile_open(session,
 		    chunk->uri, &clsm->iface,
 		    F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) ? ckpt_cfg : NULL, cp));
-		if (chunk->bloom_uri != NULL)
+		if (chunk->bloom_uri != NULL && !F_ISSET(clsm, WT_CLSM_MERGE))
 			WT_ERR(__wt_bloom_open(session, chunk->bloom_uri,
 			    lsm_tree->bloom_factor, lsm_tree->bloom_k,
-			    &clsm->blooms[i]));
+			    c, &clsm->blooms[i]));
 
 		/* Child cursors always use overwrite and raw mode. */
 		F_SET(*cp, WT_CURSTD_OVERWRITE | WT_CURSTD_RAW);
@@ -814,10 +814,8 @@ static int
 __clsm_close(WT_CURSOR *cursor)
 {
 	WT_CURSOR_LSM *clsm;
-	WT_CURSOR *c;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int i;
 
 	/*
 	 * Don't use the normal __clsm_enter path: that is wasted work when
@@ -825,11 +823,7 @@ __clsm_close(WT_CURSOR *cursor)
 	 */
 	clsm = (WT_CURSOR_LSM *)cursor;
 	CURSOR_API_CALL_NOCONF(cursor, session, close, NULL);
-	FORALL_CURSORS(clsm, c, i) {
-		if (F_ISSET(clsm, WT_CLSM_MERGE))
-			printf("LSM merge: closing %s\n", c->uri);
-		WT_TRET(c->close(c));
-	}
+	WT_TRET(__clsm_close_cursors(clsm));
 	__wt_free(session, clsm->blooms);
 	__wt_free(session, clsm->cursors);
 	/* The WT_LSM_TREE owns the URI. */
@@ -907,7 +901,7 @@ __wt_clsm_open(WT_SESSION_IMPL *session,
 	clsm->dsk_gen = 0;
 
 	STATIC_ASSERT(offsetof(WT_CURSOR_LSM, iface) == 0);
-	WT_ERR(__wt_cursor_init(cursor, cursor->uri, 0, cfg, cursorp));
+	WT_ERR(__wt_cursor_init(cursor, cursor->uri, NULL, cfg, cursorp));
 
 	/*
 	 * LSM cursors default to overwrite: if no setting was supplied, turn
