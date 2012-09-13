@@ -113,7 +113,6 @@ __lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
 	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk;
-	const char *uri;
 	const char *drop_cfg[] = { NULL };
 	int found, i;
 
@@ -121,26 +120,42 @@ __lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	for (i = 0; i < lsm_tree->nold_chunks; i++) {
 		if ((chunk = lsm_tree->old_chunks[i]) == NULL)
 			continue;
-		uri = chunk->uri;
 		if (!found) {
 			found = 1;
 			/* TODO: Do we need the lsm_tree lock for all drops? */
 			__wt_spin_lock(session, &lsm_tree->lock);
 		}
-		WT_WITH_SCHEMA_LOCK(session,
-		    ret = __wt_schema_drop(session, uri, drop_cfg));
-		if (ret == EBUSY)
+		if (chunk->bloom_uri != NULL) {
+			WT_WITH_SCHEMA_LOCK(session, ret = __wt_schema_drop(
+			    session, chunk->bloom_uri, drop_cfg));
 			/*
-			 * TODO: Chunks resulting from a merge fail this for
-			 * ever, and are thus never freed. Understand why
-			 * they are held open.
+			 * An EBUSY return is acceptable - a cursor may still
+			 * be positioned on this old chunk.
 			 */
-			continue;
-		if (ret != 0)
-			goto err;
-		__wt_free(session, uri);
-		__wt_free(session, lsm_tree->old_chunks[i]);
-		++lsm_tree->old_avail;
+			if (ret == 0) {
+				__wt_free(session, chunk->bloom_uri);
+				chunk->bloom_uri = NULL;
+			} else if (ret != EBUSY)
+				goto err;
+		}
+		if (chunk->uri != NULL) {
+			WT_WITH_SCHEMA_LOCK(session, ret =
+			    __wt_schema_drop(session, chunk->uri, drop_cfg));
+			/*
+			 * An EBUSY return is acceptable - a cursor may still
+			 * be positioned on this old chunk.
+			 */
+			if (ret == 0) {
+				__wt_free(session, chunk->uri);
+				chunk->uri = NULL;
+			} else if (ret != EBUSY)
+				goto err;
+		}
+
+		if (chunk->uri == NULL && chunk->bloom_uri == NULL) {
+			__wt_free(session, lsm_tree->old_chunks[i]);
+			++lsm_tree->old_avail;
+		}
 	}
 	if (found) {
 err:		ret = __wt_lsm_meta_write(session, lsm_tree);
