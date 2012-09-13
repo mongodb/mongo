@@ -19,18 +19,37 @@ __wt_cursor_notsup(WT_CURSOR *cursor)
 	return (ENOTSUP);
 }
 
+/* 
+ * __wt_cursor_noop --
+ *	Cursor noop.
+ */
+int
+__wt_cursor_noop(WT_CURSOR *cursor)
+{
+	WT_UNUSED(cursor);
+
+	return (0);
+}
+
 /*
  * __wt_cursor_set_notsup --
- *	Set all of the cursor methods (except for close), to not-supported.
+ *	Reset the cursor methods to not-supported.
  */
 void
 __wt_cursor_set_notsup(WT_CURSOR *cursor)
 {
+	/*
+	 * Set all of the cursor methods (except for close and reset), to fail.
+	 * Close is unchanged so the cursor can be discarded, reset defaults to
+	 * a no-op because session transactional operations reset all of the
+	 * cursors in a session, and random cursors shouldn't block transactions
+	 * or checkpoints.
+	 */
 	cursor->compare =
 	    (int (*)(WT_CURSOR *, WT_CURSOR *, int *))__wt_cursor_notsup;
 	cursor->next = __wt_cursor_notsup;
 	cursor->prev = __wt_cursor_notsup;
-	cursor->reset = __wt_cursor_notsup;
+	cursor->reset = __wt_cursor_noop;
 	cursor->search = __wt_cursor_notsup;
 	cursor->search_near = (int (*)(WT_CURSOR *, int *))__wt_cursor_notsup;
 	cursor->insert = __wt_cursor_notsup;
@@ -458,7 +477,7 @@ __wt_cursor_init(WT_CURSOR *cursor,
 	if (cursor->prev == NULL)
 		cursor->prev = __wt_cursor_notsup;
 	if (cursor->reset == NULL)
-		cursor->reset = __wt_cursor_notsup;
+		cursor->reset = __wt_cursor_noop;
 	if (cursor->search == NULL)
 		cursor->search = __cursor_search;
 	if (cursor->search_near == NULL)
