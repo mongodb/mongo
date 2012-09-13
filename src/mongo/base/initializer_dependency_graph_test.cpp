@@ -43,7 +43,7 @@
 namespace mongo {
 namespace {
 
-    Status doNothing(InitializationContext*) { return Status::OK; }
+    Status doNothing(InitializerContext*) { return Status::OK; }
 
     TEST(InitializerDependencyGraphTest, InsertNullFunctionFails) {
         InitializerDependencyGraph graph;
