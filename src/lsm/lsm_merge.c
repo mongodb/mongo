@@ -111,7 +111,8 @@ __wt_lsm_major_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	/* Allocate an ID for the merge. */
 	dest_id = WT_ATOMIC_ADD(lsm_tree->last, 1);
 
-	printf("Merging first %d chunks into %d\n", nchunks, dest_id);
+	WT_VERBOSE_RET(session, lsm,
+	    "Merging first %d chunks into %d\n", nchunks, dest_id);
 
 	WT_RET(__wt_scr_alloc(session, 0, &bbuf));
 	WT_RET(__wt_lsm_tree_bloom_name(session, lsm_tree, dest_id, bbuf));
@@ -169,8 +170,6 @@ __wt_lsm_major_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	ret = __wt_lsm_meta_write(session, lsm_tree);
 	__wt_spin_unlock(session, &lsm_tree->lock);
 
-	printf("Merge done\n");
-
 err:	if (src != NULL)
 		WT_TRET(src->close(src));
 	if (dest != NULL)
@@ -180,6 +179,7 @@ err:	if (src != NULL)
 	__wt_scr_free(&bbuf);
 	__wt_free(session, dest_uri);
 	if (ret != 0)
-		printf("Merge failed with %s\n", wiredtiger_strerror(ret));
+		WT_VERBOSE_VOID(session, lsm,
+		    "Merge failed with %s\n", wiredtiger_strerror(ret));
 	return (ret);
 }

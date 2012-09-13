@@ -92,7 +92,7 @@ __wt_confchk_connection_reconfigure[] = {
 	{ "eviction_target", "int", "min=10,max=99" },
 	{ "eviction_trigger", "int", "min=10,max=99" },
 	{ "verbose", "list", "choices=[\"block\",\"ckpt\",\"evict\","
-	    "\"evictserver\",\"fileops\",\"hazard\",\"mutex\",\"read\","
+	    "\"evictserver\",\"fileops\",\"hazard\",\"lsm\",\"mutex\",\"read\","
 	    "\"readserver\",\"reconcile\",\"salvage\",\"verify\",\"write\"]" },
 	{ NULL, NULL, NULL }
 };
@@ -394,7 +394,7 @@ __wt_confchk_wiredtiger_open[] = {
 	{ "transactional", "boolean", NULL },
 	{ "use_environment_priv", "boolean", NULL },
 	{ "verbose", "list", "choices=[\"block\",\"ckpt\",\"evict\","
-	    "\"evictserver\",\"fileops\",\"hazard\",\"mutex\",\"read\","
+	    "\"evictserver\",\"fileops\",\"hazard\",\"lsm\",\"mutex\",\"read\","
 	    "\"readserver\",\"reconcile\",\"salvage\",\"verify\",\"write\"]" },
 	{ NULL, NULL, NULL }
 };

@@ -736,6 +736,7 @@ __conn_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 		{ "evictserver",WT_VERB_evictserver },
 		{ "fileops",	WT_VERB_fileops },
 		{ "hazard",	WT_VERB_hazard },
+		{ "lsm",	WT_VERB_lsm },
 		{ "mutex",	WT_VERB_mutex },
 		{ "read",	WT_VERB_read },
 		{ "readserver",	WT_VERB_readserver },

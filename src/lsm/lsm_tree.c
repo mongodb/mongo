@@ -279,9 +279,11 @@ __wt_lsm_tree_switch(
 	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk;
 
-	if (lsm_tree->memsizep != NULL)
-		printf("Switched to %d because %d > %d\n", lsm_tree->last + 1,
-		    (int)*lsm_tree->memsizep, (int)lsm_tree->threshold);
+	WT_VERBOSE_RET(session, lsm,
+	    "Tree switch to: %d because %d > %d", lsm_tree->last + 1,
+	    (lsm_tree->memsizep == NULL ? 0 : (int)*lsm_tree->memsizep),
+	    (int)lsm_tree->threshold);
+
 	lsm_tree->memsizep = NULL;
 
 	/* TODO more sensible realloc */
