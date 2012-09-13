@@ -88,14 +88,21 @@ __clsm_close_cursors(WT_CURSOR_LSM *clsm)
 	WT_CURSOR *c;
 	int i;
 
-	if (clsm->cursors != NULL) {
-		FORALL_CURSORS(clsm, c, i) {
-			clsm->cursors[i] = NULL;
-			WT_RET(c->close(c));
-			if ((bloom = clsm->blooms[i]) != NULL) {
-				clsm->blooms[i] = NULL;
-				WT_RET(__wt_bloom_close(bloom));
-			}
+	if (clsm->cursors == NULL)
+		return (0);
+
+	/* Detach from our old primary. */
+	if (clsm->primary_chunk != NULL) {
+		WT_ATOMIC_SUB(clsm->primary_chunk->ncursor, 1);
+		clsm->primary_chunk = NULL;
+	}
+
+	FORALL_CURSORS(clsm, c, i) {
+		clsm->cursors[i] = NULL;
+		WT_RET(c->close(c));
+		if ((bloom = clsm->blooms[i]) != NULL) {
+			clsm->blooms[i] = NULL;
+			WT_RET(__wt_bloom_close(bloom));
 		}
 	}
 
@@ -116,7 +123,6 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm)
 	WT_LSM_TREE *lsm_tree;
 	WT_SESSION_IMPL *session;
 	const char *ckpt_cfg[] = { "checkpoint=WiredTigerCheckpoint", NULL };
-	const char *primary_uri;
 	int i, nchunks;
 
 	session = (WT_SESSION_IMPL *)clsm->iface.session;
@@ -131,31 +137,9 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm)
 		F_CLR(clsm, WT_CLSM_ITERATE_NEXT | WT_CLSM_ITERATE_PREV);
 	}
 
-	/*
-	 * Take a copy of the primary cursor URI.  We're about to close the
-	 * cursor, but this pointer will stay valid because it is owned by the
-	 * underlying btree handle.
-	 */
-	if (clsm->cursors != NULL && clsm->cursors[clsm->nchunks - 1] != NULL)
-		primary_uri = clsm->cursors[clsm->nchunks - 1]->uri;
-	else
-		primary_uri = NULL;
 	WT_RET(__clsm_close_cursors(clsm));
 
 	__wt_spin_lock(session, &lsm_tree->lock);
-	/* Detach from our old primary. */
-	if (primary_uri != NULL) {
-		for (i = lsm_tree->nchunks - 1; i >= 0; i--) {
-			chunk = &lsm_tree->chunk[i];
-			if (strcmp(primary_uri, chunk->uri) == 0) {
-				--chunk->ncursor;
-				break;
-			}
-		}
-		/* We must find the primary: it can't have gone anywhere yet. */
-		WT_ASSERT(session, i != -1);
-	}
-
 	/* Merge cursors have already figured out how many chunks they need. */
 	if (F_ISSET(clsm, WT_CLSM_MERGE))
 		nchunks = clsm->nchunks;
@@ -175,7 +159,7 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm)
 		 * Read from the checkpoint if the file has been written.
 		 * Once all cursors switch, the in-memory tree can be evicted.
 		 */
-		chunk = &lsm_tree->chunk[i];
+		chunk = lsm_tree->chunk[i];
 		WT_ERR(__wt_curfile_open(session,
 		    chunk->uri, &clsm->iface,
 		    F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) ? ckpt_cfg : NULL, cp));
@@ -192,7 +176,9 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm)
 	WT_ASSERT(session,
 	    !F_ISSET(clsm, WT_CLSM_UPDATED) ||
 	    !F_ISSET(chunk, WT_LSM_CHUNK_ONDISK));
-	++chunk->ncursor;
+
+	clsm->primary_chunk = chunk;
+	WT_ATOMIC_ADD(clsm->primary_chunk->ncursor, 1);
 
 	/* Peek into the btree layer to track the in-memory size. */
 	if (lsm_tree->memsizep == NULL)

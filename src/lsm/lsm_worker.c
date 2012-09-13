@@ -19,7 +19,7 @@ void *
 __wt_lsm_worker(void *arg)
 {
 	WT_DECL_RET;
-	WT_LSM_CHUNK *chunk, *chunk_array;
+	WT_LSM_CHUNK *chunk, **chunk_array;
 	WT_LSM_TREE *lsm_tree;
 	WT_SESSION_IMPL *session;
 	const char *cfg[] = { "name=,drop=", NULL };
@@ -46,7 +46,7 @@ __wt_lsm_worker(void *arg)
 		 * to merge operations.
 		 */
 		for (nchunks = lsm_tree->nchunks - 1;
-		    nchunks > 0 && lsm_tree->chunk[nchunks - 1].ncursor > 0;
+		    nchunks > 0 && lsm_tree->chunk[nchunks - 1]->ncursor > 0;
 		    --nchunks)
 			;
 		if (chunk_alloc < lsm_tree->chunk_alloc)
@@ -63,7 +63,8 @@ __wt_lsm_worker(void *arg)
 		 * Write checkpoints in all completed files, then find
 		 * something to merge.
 		 */
-		for (i = 0, chunk = chunk_array; i < nchunks; i++, chunk++) {
+		for (i = 0; i < nchunks; i++) {
+			chunk = chunk_array[i];
 			if (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) ||
 			    chunk->ncursor > 0)
 				continue;
@@ -78,7 +79,7 @@ __wt_lsm_worker(void *arg)
 			    __wt_checkpoint, cfg, 0));
 			if (ret == 0) {
 				__wt_spin_lock(session, &lsm_tree->lock);
-				F_SET(&lsm_tree->chunk[i], WT_LSM_CHUNK_ONDISK);
+				F_SET(lsm_tree->chunk[i], WT_LSM_CHUNK_ONDISK);
 				lsm_tree->dsk_gen++;
 				__wt_spin_unlock(session, &lsm_tree->lock);
 				progress = 1;
@@ -111,15 +112,16 @@ static int
 __lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
 	WT_DECL_RET;
-	char *uri;
+	WT_LSM_CHUNK *chunk;
+	const char *uri;
 	const char *drop_cfg[] = { NULL };
 	int found, i;
 
 	found = 0;
 	for (i = 0; i < lsm_tree->nold_chunks; i++) {
-		uri = (char *)lsm_tree->old_chunks[i].uri;
-		if (uri == NULL)
+		if ((chunk = lsm_tree->old_chunks[i]) == NULL)
 			continue;
+		uri = chunk->uri;
 		if (!found) {
 			found = 1;
 			/* TODO: Do we need the lsm_tree lock for all drops? */
@@ -137,8 +139,7 @@ __lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		if (ret != 0)
 			goto err;
 		__wt_free(session, uri);
-		memset(
-		    &lsm_tree->old_chunks[i], 0, sizeof(*lsm_tree->old_chunks));
+		__wt_free(session, lsm_tree->old_chunks[i]);
 		++lsm_tree->old_avail;
 	}
 	if (found) {
