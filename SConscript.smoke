@@ -53,7 +53,7 @@ def addSmoketest( name, deps, extraSmokeArgs=[] ):
     smokeArgs = smokeFlags + [target] + extraSmokeArgs
     addTest(name, deps, utils.run_smoke_command(*smokeArgs))
 
-def addSmokeSuite( name, suitefile ):
+def addSmokeSuite( name, suitefile, needMongod=False ):
     # Add a smoketest target which invokes smoke.py with
     # --from-file, and passes the named suitefile as the
     # command line argument.
@@ -61,8 +61,10 @@ def addSmokeSuite( name, suitefile ):
     # resolve an initial # in the suitefile
     suitefile = str(env.File(suitefile))
 
-    addTest(name, [suitefile],
-            utils.run_smoke_command('--mode', 'files', '--from-file', suitefile))
+    smoke_args = ['--mode', 'files', '--from-file', suitefile]
+    if not needMongod:
+        smoke_args.append('--dont-start-mongod')
+    addTest(name, [suitefile], utils.run_smoke_command(*smoke_args))
 
 addSmoketest( "smoke", [ add_exe( "test" ), add_exe( "mongod" ), add_exe( "mongo" ) ] )
 addSmoketest( "smokePerf", [ add_exe("perftest") ]  )
