@@ -17,6 +17,7 @@
 
 #include <algorithm>
 #include <iterator>
+#include <sstream>
 
 namespace mongo {
 
@@ -118,7 +119,11 @@ namespace mongo {
         if (firstOccurence + 1 != inProgressNodeNames->end()) {
             sortedNames->clear();
             std::copy(firstOccurence, inProgressNodeNames->end(), std::back_inserter(*sortedNames));
-            return Status(ErrorCodes::GraphContainsCycle, "Cycle in dependency graph");
+            std::ostringstream os;
+            os << "Cycle in dependendcy graph: " << sortedNames->at(0);
+            for (size_t i = 1; i < sortedNames->size(); ++i)
+                os << " -> " << sortedNames->at(i);
+            return Status(ErrorCodes::GraphContainsCycle, os.str());
         }
 
         for (unordered_set<std::string>::const_iterator
