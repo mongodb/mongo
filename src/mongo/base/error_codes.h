@@ -49,6 +49,7 @@ namespace mongo {
             GraphContainsCycle = 5,
             HostUnreachable = 6,
             HostNotFound = 7,
+            UnknownError = 8,
             FailedToParse = 9,
             MaxError
         };
@@ -71,6 +72,8 @@ namespace mongo {
                 return "DuplicateKey";
             case GraphContainsCycle:
                 return "GraphContainsCycle";
+            case UnknownError:
+                return "UnknownError";
             case FailedToParse:
                 return "FailedToParse";
             default:

@@ -3,6 +3,8 @@
 Import("env")
 
 env.StaticLibrary('base', ['configuration_variable_manager.cpp',
+                           'initializer.cpp',
+                           'initializer_context.cpp',
                            'initializer_dependency_graph.cpp',
                            'make_string_vector.cpp',
                            'parse_number.cpp',
@@ -23,4 +25,6 @@ env.CppUnitTest('configuration_variable_manager_test',
                 LIBDEPS=['base'])
 
 env.CppUnitTest('parse_number_test', ['parse_number_test.cpp'], LIBDEPS=['base'])
+
+env.CppUnitTest('initializer_test', ['initializer_test.cpp'], LIBDEPS=['base'])
 
