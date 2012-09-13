@@ -287,7 +287,7 @@ __wt_row_random(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 		 * check for that.
 		 */
 		cbt->slot =
-		    btree-> root_page->entries < 2 ?
+		    btree->root_page->entries < 2 ?
 		    __wt_random() % page->entries : 0;
 		return (0);
 	}
