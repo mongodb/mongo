@@ -156,7 +156,13 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm)
 		WT_ASSERT(session, i != -1);
 	}
 
-	if ((nchunks = lsm_tree->nchunks) > clsm->nchunks) {
+	/* Merge cursors have already figured out how many chunks they need. */
+	if (F_ISSET(clsm, WT_CLSM_MERGE))
+		nchunks = clsm->nchunks;
+	else
+		nchunks = lsm_tree->nchunks;
+
+	if (clsm->cursors == NULL || nchunks > clsm->nchunks) {
 		WT_RET(__wt_realloc(session, NULL,
 		    nchunks * sizeof(WT_BLOOM *), &clsm->blooms));
 		WT_RET(__wt_realloc(session, NULL,
@@ -196,6 +202,21 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm)
 	clsm->dsk_gen = lsm_tree->dsk_gen;
 err:	__wt_spin_unlock(session, &lsm_tree->lock);
 	return (ret);
+}
+
+/* __wt_clsm_init_merge --
+ *	Initialize an LSM cursor for a (major) merge.
+ */
+int
+__wt_clsm_init_merge(WT_CURSOR *cursor, int nchunks)
+{
+	WT_CURSOR_LSM *clsm;
+
+	clsm = (WT_CURSOR_LSM *)cursor;
+	F_SET(clsm, WT_CLSM_MERGE);
+	clsm->nchunks = nchunks;
+
+	return (__clsm_open_cursors(clsm));
 }
 
 /*

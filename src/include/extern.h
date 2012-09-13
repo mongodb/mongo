@@ -663,6 +663,7 @@ extern int __wt_log_printf(WT_SESSION_IMPL *session,
     2,
     3)));
 extern WT_LOGREC_DESC __wt_logdesc_debug;
+extern int __wt_clsm_init_merge(WT_CURSOR *cursor, int nchunks);
 extern int __wt_clsm_open(WT_SESSION_IMPL *session,
     const char *uri,
     const char *cfg[],

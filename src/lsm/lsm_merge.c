@@ -84,9 +84,7 @@ __wt_lsm_major_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	WT_RET(wt_session->open_cursor(
 	    wt_session, lsm_tree->name, NULL, NULL, &src));
 	F_SET(src, WT_CURSTD_RAW);
-	WT_ERR(src->reset(src));
-	((WT_CURSOR_LSM *)src)->nchunks = nchunks;
-	F_SET((WT_CURSOR_LSM *)src, WT_CLSM_MERGE);
+	WT_ERR(__wt_clsm_init_merge(src, nchunks));
 
 	WT_WITH_SCHEMA_LOCK(session, ret = __wt_lsm_tree_create_chunk(
 	    session, lsm_tree, dest_id, &dest_uri));
