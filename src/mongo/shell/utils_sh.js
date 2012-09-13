@@ -46,7 +46,8 @@ sh.help = function() {
 
     print( "\tsh.addShardTag(shard,tag)                 adds the tag to the shard" );
     print( "\tsh.removeShardTag(shard,tag)              removes the tag from the shard" );
-    
+    print( "\tsh.addTagRange(fullName,min,max,tag)      tags the specified range of the given collection" );
+
     print( "\tsh.status()                               prints a general overview of the cluster" )
 }
 
