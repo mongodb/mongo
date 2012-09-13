@@ -17,6 +17,7 @@
 */
 
 #include "pch.h"
+#include "mongo/base/initializer.h"
 #include "db/json.h"
 #include "db/oplogreader.h"
 
@@ -104,7 +105,8 @@ public:
     }
 };
 
-int main( int argc , char** argv ) {
+int main( int argc , char** argv, char** envp ) {
+    mongo::runGlobalInitializersOrDie(argc, argv, envp);
     OplogTool t;
     return t.main( argc , argv );
 }

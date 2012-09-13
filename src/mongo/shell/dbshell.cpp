@@ -23,6 +23,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "mongo/base/initializer.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/cmdline.h"
 #include "mongo/db/repl/rs_member.h"
@@ -595,7 +596,8 @@ static void edit( const string& whatToEdit ) {
     }
 }
 
-int _main( int argc, char* argv[] ) {
+int _main( int argc, char* argv[], char **envp ) {
+    mongo::runGlobalInitializersOrDie(argc, argv, envp);
     mongo::isShell = true;
     setupSignals();
 
@@ -978,7 +980,7 @@ int wmain( int argc, wchar_t* argvW[] ) {
     int returnValue = -1;
     try {
         WindowsCommandLine wcl( argc, argvW );
-        returnValue = _main( argc, wcl.argv() );
+        returnValue = _main( argc, wcl.argv(), NULL );  // TODO: Convert wide env to utf8 env.
     }
     catch ( mongo::DBException& e ) {
         cerr << "exception: " << e.what() << endl;
@@ -988,11 +990,11 @@ int wmain( int argc, wchar_t* argvW[] ) {
     ::_exit(returnValue);
 }
 #else // #ifdef _WIN32
-int main( int argc, char* argv[] ) {
+int main( int argc, char* argv[], char **envp ) {
     static mongo::StaticObserver staticObserver;
     int returnCode;
     try {
-        returnCode = _main( argc , argv );
+        returnCode = _main( argc , argv, envp );
     }
     catch ( mongo::DBException& e ) {
         cerr << "exception: " << e.what() << endl;

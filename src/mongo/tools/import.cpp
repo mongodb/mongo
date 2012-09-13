@@ -21,6 +21,7 @@
 
 #include "tool.h"
 #include "../util/text.h"
+#include "mongo/base/initializer.h"
 
 #include <fstream>
 #include <iostream>
@@ -475,7 +476,8 @@ public:
     }
 };
 
-int main( int argc , char ** argv ) {
+int main( int argc , char ** argv, char** envp ) {
+    mongo::runGlobalInitializersOrDie(argc, argv, envp);
     Import import;
     return import.main( argc , argv );
 }

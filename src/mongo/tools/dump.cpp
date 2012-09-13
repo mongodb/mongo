@@ -16,10 +16,7 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "../pch.h"
-#include "../db/db.h"
-#include "mongo/client/dbclientcursor.h"
-#include "tool.h"
+#include "mongo/pch.h"
 
 #include <fcntl.h>
 #include <map>
@@ -27,6 +24,11 @@
 
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/convenience.hpp>
+
+#include "mongo/base/initializer.h"
+#include "mongo/client/dbclientcursor.h"
+#include "mongo/db/db.h"
+#include "mongo/tools/tool.h"
 
 using namespace mongo;
 
@@ -537,7 +539,8 @@ public:
     BSONObj _query;
 };
 
-int main( int argc , char ** argv ) {
+int main( int argc , char ** argv, char ** envp ) {
+    mongo::runGlobalInitializersOrDie(argc, argv, envp);
     Dump d;
     return d.main( argc , argv );
 }

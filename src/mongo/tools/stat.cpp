@@ -20,6 +20,7 @@
 
 #include <boost/thread/thread.hpp>
 
+#include "mongo/base/initializer.h"
 #include "db/json.h"
 #include "../util/net/httpclient.h"
 #include "../util/text.h"
@@ -572,7 +573,8 @@ namespace mongo {
 
 }
 
-int main( int argc , char ** argv ) {
+int main( int argc , char ** argv, char ** envp ) {
+    mongo::runGlobalInitializersOrDie(argc, argv, envp);
     mongo::Stat stat;
     return stat.main( argc , argv );
 }

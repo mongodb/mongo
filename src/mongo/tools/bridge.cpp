@@ -20,6 +20,7 @@
 
 #include <boost/thread.hpp>
 
+#include "mongo/base/initializer.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/util/net/listen.h"
 #include "mongo/util/net/message.h"
@@ -149,7 +150,9 @@ void check( bool b ) {
         helpExit();
 }
 
-int main( int argc, char **argv ) {
+int main( int argc, char **argv, char** envp ) {
+    mongo::runGlobalInitializersOrDie(argc, argv, envp);
+
     static StaticObserver staticObserver;
 
     setupSignals();

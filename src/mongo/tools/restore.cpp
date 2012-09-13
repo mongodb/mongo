@@ -25,6 +25,7 @@
 #include <fstream>
 #include <set>
 
+#include "mongo/base/initializer.h"
 #include "mongo/db/namespacestring.h"
 #include "mongo/tools/tool.h"
 #include "mongo/util/mmap.h"
@@ -495,7 +496,8 @@ private:
     }
 };
 
-int main( int argc , char ** argv ) {
+int main( int argc , char ** argv, char ** envp ) {
+    mongo::runGlobalInitializersOrDie(argc, argv, envp);
     Restore restore;
     return restore.main( argc , argv );
 }

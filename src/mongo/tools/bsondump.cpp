@@ -17,6 +17,7 @@
 */
 
 #include "../pch.h"
+#include "mongo/base/initializer.h"
 #include "mongo/client/dbclientcursor.h"
 #include "../util/mmap.h"
 #include "../util/text.h"
@@ -141,7 +142,8 @@ public:
     }
 };
 
-int main( int argc , char ** argv ) {
+int main( int argc , char ** argv, char **envp ) {
+    mongo::runGlobalInitializersOrDie(argc, argv, envp);
     BSONDump dump;
     return dump.main( argc , argv );
 }

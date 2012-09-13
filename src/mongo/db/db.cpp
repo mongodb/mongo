@@ -22,6 +22,7 @@
 #include <boost/filesystem/operations.hpp>
 #include <fstream>
 
+#include "mongo/base/initializer.h"
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/cmdline.h"
@@ -618,15 +619,18 @@ string arg_error_check(int argc, char* argv[]) {
     return "";
 }
 
-static int mongoDbMain(int argc, char* argv[]);
+static int mongoDbMain(int argc, char* argv[], char** envp);
 
-int main(int argc, char* argv[]) {
-    int exitCode = mongoDbMain(argc, argv);
+int main(int argc, char* argv[], char** envp) {
+    int exitCode = mongoDbMain(argc, argv, envp);
     ::_exit(exitCode);
 }
 
-static int mongoDbMain(int argc, char* argv[]) {
+static int mongoDbMain(int argc, char* argv[], char **envp) {
     static StaticObserver staticObserver;
+
+    mongo::runGlobalInitializersOrDie(argc, argv, envp);
+
     getcurns = ourgetns;
 
     po::options_description general_options("General options");

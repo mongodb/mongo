@@ -20,6 +20,7 @@
 
 #include <boost/thread/thread.hpp>
 
+#include "mongo/base/initializer.h"
 #include "../util/net/message.h"
 #include "../util/startup_test.h"
 #include "../client/connpool.h"
@@ -462,7 +463,8 @@ namespace mongo {
 } // namespace mongo
 #endif
 
-int main(int argc, char* argv[]) {
+int main(int argc, char* argv[], char** envp) {
+    mongo::runGlobalInitializersOrDie(argc, argv, envp);
     try {
         int exitCode = _main(argc, argv);
         ::_exit(exitCode);

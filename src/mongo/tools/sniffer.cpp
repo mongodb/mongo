@@ -34,6 +34,7 @@
 #undef max
 #endif
 
+#include "mongo/base/initializer.h"
 #include "../bson/util/builder.h"
 #include "../util/net/message.h"
 #include "../util/mmap.h"
@@ -444,7 +445,8 @@ void usage() {
          << endl;
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char **argv, char** envp) {
+    mongo::runGlobalInitializersOrDie(argc, argv, envp);
 
     stringstream nullStream;
     nullStream.clear(ios::failbit);
