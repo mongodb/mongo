@@ -487,6 +487,7 @@ namespace mongo {
         Member* head() const { return _members.head(); }
     public:
         const Member* findById(unsigned id) const;
+        Member* findByName(const std::string& hostname) const;
     private:
         void _getTargets(list<Target>&, int &configVersion);
         void getTargets(list<Target>&, int &configVersion);

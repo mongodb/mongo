@@ -79,7 +79,10 @@ namespace mongo {
         double health;
         time_t upSince;
         long long downSince;
+        // This is the last time we got a response from a heartbeat request to a given member.
         time_t lastHeartbeat;
+        // This is the last time we got a heartbeat request from a given member.
+        time_t lastHeartbeatRecv;
         DiagStr lastHeartbeatMsg;
         OpTime opTime;
         int skew;
@@ -96,6 +99,8 @@ namespace mongo {
 
         /* true if changed in a way of interest to the repl set manager. */
         bool changed(const HeartbeatInfo& old) const;
+
+        void recvHeartbeat();
     };
 
     inline HeartbeatInfo::HeartbeatInfo(unsigned id) : 

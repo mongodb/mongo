@@ -127,6 +127,19 @@ namespace mongo {
             if( v > cmdObj["v"].Int() )
                 result << "config" << theReplSet->config().asBson();
 
+            Member *from = theReplSet->findByName(cmdObj.getStringField("from"));
+            if (!from) {
+                return true;
+            }
+
+            // if we thought that this node is down, let it know
+            if (!from->hbinfo().up()) {
+                result.append("stateDisagreement", true);
+            }
+
+            // note that we got a heartbeat from this node
+            from->get_hbinfo().recvHeartbeat();
+
             return true;
         }
     } cmdReplSetHeartbeat;
@@ -334,6 +347,10 @@ namespace mongo {
                     mem.hbstate = MemberState(state.Int());
             }
 
+            if (info.hasField("stateDisagreement") && info["stateDisagreement"].trueValue()) {
+                log() << "replset info " << h.toString() << " thinks that we are down" << endl;
+            }
+
             return ok;
         }
 
@@ -347,6 +364,18 @@ namespace mongo {
         }
 
         void down(HeartbeatInfo& mem, string msg) {
+            // if we've received a heartbeat from this member within the last two seconds, don't
+            // change its state to down (if it's already down, leave it down since we don't have
+            // any info about it other than it's heartbeating us)
+            if (m.lastHeartbeatRecv+2 >= time(0)) {
+                LOG(1) << "replset info " << h.toString()
+                       << " just heartbeated us, but our heartbeat failed: " << msg
+                       << ", not changing state" << rsLog;
+                // we don't update any of the heartbeat info, though, since we didn't get any info
+                // other than "not down" from having it heartbeat us
+                return;
+            }
+
             mem.authIssue = false;
             mem.health = 0.0;
             mem.ping = 0;
@@ -409,6 +438,10 @@ namespace mongo {
         // Heartbeat timeout
         time_t _timeout;
     };
+
+    void HeartbeatInfo::recvHeartbeat() {
+        lastHeartbeatRecv = time(0);
+    }
 
     int ReplSetHealthPollTask::s_try_offset = 0;
 
