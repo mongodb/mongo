@@ -81,7 +81,8 @@ format_meta = column_meta + [
 
 lsm_config = [
 	Config('lsm_chunk_size', '2MB', r'''
-		the maximum size of an updateable LSM chunk''', min='512K',max='500MB'),
+		the maximum size of the in-memory chunk of an LSM tree''',
+		min='512K',max='500MB'),
 	Config('lsm_bloom_hash_count', '4', r'''
 		the number of hash values per item used for LSM bloom filters.''',
 		min='2',max='100'),

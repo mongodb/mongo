@@ -41,7 +41,8 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		} else if (WT_STRING_MATCH(
 		    "lsm_bloom_bit_count", ck.str, ck.len))
 			lsm_tree->bloom_bit_count = (uint32_t)cv.val;
-		else if (WT_STRING_MATCH("lsm_bloom_hash_count", ck.str, ck.len))
+		else if (WT_STRING_MATCH(
+		    "lsm_bloom_hash_count", ck.str, ck.len))
 			lsm_tree->bloom_hash_count = (uint32_t)cv.val;
 		else if (WT_STRING_MATCH("threshold", ck.str, ck.len))
 			lsm_tree->threshold = (uint32_t)cv.val;

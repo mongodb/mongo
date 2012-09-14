@@ -29,7 +29,6 @@
 	WT_ERR(__clsm_enter(clsm))
 
 #define	WT_LSM_END(clsm, session)					\
-	WT_TRET(__clsm_leave(clsm));					\
 	API_END(session)
 
 static int __clsm_open_cursors(WT_CURSOR_LSM *);
@@ -42,15 +41,6 @@ __clsm_enter(WT_CURSOR_LSM *clsm)
 	    clsm->dsk_gen != clsm->lsm_tree->dsk_gen)
 		WT_RET(__clsm_open_cursors(clsm));
 
-	return (0);
-}
-
-static inline int
-__clsm_leave(WT_CURSOR_LSM *clsm)
-{
-	WT_UNUSED(clsm);
-
-	/* TODO: indicate somehow that we are no longer in the tree. */
 	return (0);
 }
 
@@ -340,7 +330,8 @@ __clsm_next(WT_CURSOR *cursor)
 		}
 		F_SET(clsm, WT_CLSM_ITERATE_NEXT);
 		F_CLR(clsm, WT_CLSM_ITERATE_PREV);
-		/* XXX: we just positioned *at* the key, now move */
+
+		/* We just positioned *at* the key, now move. */
 		if (clsm->current != NULL)
 			goto retry;
 	} else {
@@ -420,7 +411,8 @@ __clsm_prev(WT_CURSOR *cursor)
 		}
 		F_SET(clsm, WT_CLSM_ITERATE_PREV);
 		F_CLR(clsm, WT_CLSM_ITERATE_NEXT);
-		/* XXX: we just positioned *at* the key, now move */
+
+		/* We just positioned *at* the key, now move. */
 		if (clsm->current != NULL)
 			goto retry;
 	} else {
@@ -671,7 +663,6 @@ __clsm_put(
 		F_SET(clsm, WT_CLSM_UPDATED);
 
 		/* We changed the structure, or someone else did: update. */
-		WT_RET(__clsm_leave(clsm));
 		WT_RET(__clsm_enter(clsm));
 	}
 

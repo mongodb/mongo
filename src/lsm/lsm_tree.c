@@ -243,7 +243,6 @@ __lsm_tree_open(
 	/* Try to open the tree. */
 	WT_RET(__wt_calloc_def(session, 1, &lsm_tree));
 	__wt_spin_init(session, &lsm_tree->lock);
-	/* TODO: acquire the lock before the tree is visible? */
 	WT_ERR(__wt_strdup(session, uri, &lsm_tree->name));
 	lsm_tree->filename = lsm_tree->name + strlen("lsm:");
 	TAILQ_INSERT_HEAD(&S2C(session)->lsmqh, lsm_tree, q);
@@ -306,7 +305,6 @@ __wt_lsm_tree_switch(
 
 	lsm_tree->memsizep = NULL;
 
-	/* TODO more sensible realloc */
 	if ((lsm_tree->nchunks + 1) * sizeof(*lsm_tree->chunk) >
 	    lsm_tree->chunk_alloc)
 		WT_ERR(__wt_realloc(session,
@@ -385,7 +383,7 @@ __wt_lsm_tree_rename(WT_SESSION_IMPL *session,
 	int i;
 
 	old = NULL;
-	
+
 	/* Get the LSM tree. */
 	WT_RET(__wt_lsm_tree_get(session, oldname, &lsm_tree));
 

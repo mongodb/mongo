@@ -76,11 +76,6 @@ __wt_lsm_major_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	bloom = NULL;
 
 	/*
-	 * TODO: describe the dance with lsm_tree->lock here to avoid holding
-	 * the tree locked while a merge is in progress.
-	 */
-
-	/*
 	 * Take a copy of the latest chunk id. This value needs to be atomically
 	 * read. We need a copy, since other threads may alter the chunk count
 	 * while we are doing a merge.
@@ -99,6 +94,10 @@ __wt_lsm_major_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	/*
 	 * We have a limited number of hazard references, and we want to bound
 	 * the amount of work in the merge.
+	 *
+	 * Use the lsm_tree lock to read the chunks (so no switches occur), but
+	 * avoid holding it while the merge is in progress: that may take a
+	 * long time.
 	 */
 	nchunks = WT_MIN((int)S2C(session)->hazard_size / 2, nchunks);
 	__wt_spin_lock(session, &lsm_tree->lock);
