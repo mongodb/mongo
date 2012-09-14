@@ -8,7 +8,7 @@
 #include "wt_internal.h"
 
 #define	FORALL_CURSORS(clsm, c, i)					\
-	for ((i) = (clsm)->nchunks - 1; (i) >= 0; (i)--)			\
+	for ((i) = (clsm)->nchunks - 1; (i) >= 0; (i)--)		\
 		if (((c) = (clsm)->cursors[i]) != NULL)
 
 #define	WT_LSM_CMP(s, lsm_tree, k1, k2, cmp)				\
@@ -136,9 +136,9 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm)
 		nchunks = lsm_tree->nchunks;
 
 	if (clsm->cursors == NULL || nchunks > clsm->nchunks) {
-		WT_RET(__wt_realloc(session, NULL,
+		WT_ERR(__wt_realloc(session, NULL,
 		    nchunks * sizeof(WT_BLOOM *), &clsm->blooms));
-		WT_RET(__wt_realloc(session, NULL,
+		WT_ERR(__wt_realloc(session, NULL,
 		    nchunks * sizeof(WT_CURSOR *), &clsm->cursors));
 	}
 	clsm->nchunks = nchunks;

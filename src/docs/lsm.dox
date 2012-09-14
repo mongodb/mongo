@@ -92,7 +92,7 @@ data stored in LSM trees:
 
 - read-only transactions running at snapshot isolation may read newer
   changes after a chunk is written to stable storage;
- 
+
 - named checkpoints are not fully supported on LSM trees: recent updates to
   the tree may not appear in the checkpoint;
 

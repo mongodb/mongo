@@ -216,6 +216,8 @@ __btree_conf(WT_SESSION_IMPL *session)
 		    session, config, "cache_resident", &cval));
 		if (cval.val)
 			F_SET(btree, WT_BTREE_NO_EVICTION | WT_BTREE_NO_HAZARD);
+		else
+			F_CLR(btree, WT_BTREE_NO_EVICTION);
 	}
 
 	/* Huffman encoding */

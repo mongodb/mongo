@@ -74,6 +74,7 @@ __wt_lsm_major_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	int dest_id, i, nchunks;
 
 	src = dest = NULL;
+	dest_uri = NULL;
 	bloom = NULL;
 
 	/*
