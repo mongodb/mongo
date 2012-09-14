@@ -117,6 +117,7 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm)
 	session = (WT_SESSION_IMPL *)clsm->iface.session;
 	lsm_tree = clsm->lsm_tree;
 	c = &clsm->iface;
+	chunk = NULL;
 
 	/* Copy the key, so we don't lose the cursor position. */
 	if (F_ISSET(c, WT_CURSTD_KEY_SET)) {
@@ -167,8 +168,8 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm)
 	    !F_ISSET(clsm, WT_CLSM_UPDATED) ||
 	    !F_ISSET(chunk, WT_LSM_CHUNK_ONDISK));
 
-	clsm->primary_chunk = chunk;
-	WT_ATOMIC_ADD(clsm->primary_chunk->ncursor, 1);
+	if ((clsm->primary_chunk = chunk) != NULL)
+		WT_ATOMIC_ADD(clsm->primary_chunk->ncursor, 1);
 
 	/* Peek into the btree layer to track the in-memory size. */
 	if (lsm_tree->memsizep == NULL)
