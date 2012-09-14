@@ -52,8 +52,8 @@ struct __wt_lsm_tree {
 
 	/* Configuration parameters */
 	uint32_t threshold;
-	uint32_t bloom_factor;
-	uint32_t bloom_k;
+	uint32_t bloom_bit_count;
+	uint32_t bloom_hash_count;
 
 	WT_SESSION_IMPL *worker_session;/* Passed to thread_create */
 	pthread_t worker_tid;		/* LSM worker thread */

@@ -164,7 +164,8 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm)
 		    F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) ? ckpt_cfg : NULL, cp));
 		if (chunk->bloom_uri != NULL && !F_ISSET(clsm, WT_CLSM_MERGE))
 			WT_ERR(__wt_bloom_open(session, chunk->bloom_uri,
-			    lsm_tree->bloom_factor, lsm_tree->bloom_k,
+			    lsm_tree->bloom_bit_count,
+			    lsm_tree->bloom_hash_count,
 			    c, &clsm->blooms[i]));
 
 		/* Child cursors always use overwrite and raw mode. */

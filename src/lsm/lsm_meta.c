@@ -38,10 +38,11 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 			__wt_free(session, lsm_tree->value_format);
 			WT_ERR(__wt_strndup(session,
 			    cv.str, cv.len, &lsm_tree->value_format));
-		} else if (WT_STRING_MATCH("bloom_factor", ck.str, ck.len))
-			lsm_tree->bloom_factor = (uint32_t)cv.val;
-		else if (WT_STRING_MATCH("bloom_k", ck.str, ck.len))
-			lsm_tree->bloom_k = (uint32_t)cv.val;
+		} else if (WT_STRING_MATCH(
+		    "lsm_bloom_bit_count", ck.str, ck.len))
+			lsm_tree->bloom_bit_count = (uint32_t)cv.val;
+		else if (WT_STRING_MATCH("lsm_bloom_hash_count", ck.str, ck.len))
+			lsm_tree->bloom_hash_count = (uint32_t)cv.val;
 		else if (WT_STRING_MATCH("threshold", ck.str, ck.len))
 			lsm_tree->threshold = (uint32_t)cv.val;
 		else if (WT_STRING_MATCH("last", ck.str, ck.len))
@@ -134,9 +135,9 @@ __wt_lsm_meta_write(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	    lsm_tree->key_format, lsm_tree->value_format));
 	WT_ERR(__wt_buf_catfmt(session, buf,
 	    ",last=%" PRIu32 ",threshold=%" PRIu64
-	    ",bloom_factor=%" PRIu32 ",bloom_k=%" PRIu32,
+	    ",lsm_bloom_bit_count=%" PRIu32 ",lsm_bloom_hash_count=%" PRIu32,
 	    lsm_tree->last, (uint64_t)lsm_tree->threshold,
-	    lsm_tree->bloom_factor, lsm_tree->bloom_k));
+	    lsm_tree->bloom_bit_count, lsm_tree->bloom_hash_count));
 	WT_ERR(__wt_buf_catfmt(session, buf, ",chunks=["));
 	for (i = 0; i < lsm_tree->nchunks; i++) {
 		chunk = lsm_tree->chunk[i];

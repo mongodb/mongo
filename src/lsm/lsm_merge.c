@@ -124,9 +124,9 @@ __wt_lsm_major_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		WT_ERR(__wt_lsm_tree_bloom_name(
 		    session, lsm_tree, dest_id, bbuf));
 
-		WT_ERR(__wt_bloom_create(
-		    session, bbuf->data, NULL, record_count,
-		    lsm_tree->bloom_factor, lsm_tree->bloom_k, &bloom));
+		WT_ERR(__wt_bloom_create(session, bbuf->data,
+		    NULL, record_count, lsm_tree->bloom_bit_count,
+		    lsm_tree->bloom_hash_count, &bloom));
 	}
 
 	/*

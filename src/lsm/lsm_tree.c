@@ -204,9 +204,12 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	    &lsm_tree->value_format));
 
 	/* TODO: make these configurable. */
-	lsm_tree->threshold = 2 * WT_MEGABYTE;
-	lsm_tree->bloom_factor = 8;
-	lsm_tree->bloom_k = 4;
+	WT_ERR(__wt_config_gets(session, cfg, "lsm_chunk_size", &cval));
+	lsm_tree->threshold = (uint32_t)cval.val;
+	WT_ERR(__wt_config_gets(session, cfg, "lsm_bloom_bit_count", &cval));
+	lsm_tree->bloom_bit_count = (uint32_t)cval.val;
+	WT_ERR(__wt_config_gets(session, cfg, "lsm_bloom_hash_count", &cval));
+	lsm_tree->bloom_hash_count = (uint32_t)cval.val;
 
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));
 	WT_ERR(__wt_buf_fmt(session, buf,
