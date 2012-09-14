@@ -496,7 +496,6 @@ err:		__wt_spin_unlock(session, &lsm_tree->lock);
 	return (ret);
 }
 
-
 /*
  * __wt_lsm_tree_worker --
  *	Run a schema worker operation on each level of a LSM tree.
