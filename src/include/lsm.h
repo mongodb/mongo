@@ -20,7 +20,7 @@ struct __wt_cursor_lsm {
 
 #define	WT_CLSM_ITERATE_NEXT    0x01    /* Forward iteration */
 #define	WT_CLSM_ITERATE_PREV    0x02    /* Backward iteration */
-#define	WT_CLSM_MERGE		0x04    /* Merge cursor, don't update. */
+#define	WT_CLSM_MERGE           0x04    /* Merge cursor, don't update. */
 #define	WT_CLSM_MULTIPLE        0x08    /* Multiple cursors have values for the
 					   current key */
 #define	WT_CLSM_UPDATED		0x10    /* Cursor has done updates */

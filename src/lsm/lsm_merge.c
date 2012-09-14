@@ -20,6 +20,7 @@ __lsm_merge_update_tree(WT_SESSION_IMPL *session,
 	size_t chunk_sz;
 	int i, j;
 
+	/* Setup the array of obsolete chunks. */
 	if (nchunks > lsm_tree->old_avail) {
 		chunk_sz = sizeof(*lsm_tree->old_chunks);
 		WT_RET(__wt_realloc(session,

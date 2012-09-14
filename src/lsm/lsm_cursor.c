@@ -8,8 +8,8 @@
 #include "wt_internal.h"
 
 #define	FORALL_CURSORS(clsm, c, i)					\
-	for (i = clsm->nchunks - 1; i >= 0; i--)			\
-		if ((c = clsm->cursors[i]) != NULL)
+	for ((i) = (clsm)->nchunks - 1; (i) >= 0; (i)--)			\
+		if (((c) = (clsm)->cursors[i]) != NULL)
 
 #define	WT_LSM_CMP(s, lsm_tree, k1, k2, cmp)				\
 	(((lsm_tree)->collator == NULL) ?				\
@@ -777,7 +777,7 @@ __clsm_remove(WT_CURSOR *cursor)
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
-	WT_LSM_ENTER(clsm, cursor, session, update);
+	WT_LSM_ENTER(clsm, cursor, session, remove);
 	WT_CURSOR_NEEDKEY(cursor);
 
 	if (F_ISSET(cursor, WT_CURSTD_OVERWRITE) ||

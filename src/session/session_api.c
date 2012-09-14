@@ -25,7 +25,7 @@ __session_reset_cursors(WT_SESSION_IMPL *session)
 }
 
 /*
- * __session_close --
+ * __session_close_cache --
  *	Close any cached handles in a session.  Called holding the schema lock.
  */
 static int

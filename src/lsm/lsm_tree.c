@@ -203,7 +203,6 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_strndup(session, cval.str, cval.len,
 	    &lsm_tree->value_format));
 
-	/* TODO: make these configurable. */
 	WT_ERR(__wt_config_gets(session, cfg, "lsm_chunk_size", &cval));
 	lsm_tree->threshold = (uint32_t)cval.val;
 	WT_ERR(__wt_config_gets(session, cfg, "lsm_bloom_bit_count", &cval));
