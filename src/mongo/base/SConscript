@@ -1,0 +1,10 @@
+# -*- mode: python -*-
+
+Import("env")
+
+env.StaticLibrary("base", ['status.cpp'])
+
+env.CppUnitTest('status_test', 'status_test.cpp',
+                LIBDEPS=['base'])
+
+
