@@ -672,6 +672,10 @@ extern int __wt_clsm_open(WT_SESSION_IMPL *session,
     WT_CURSOR **cursorp);
 extern int __wt_lsm_init(WT_CONNECTION *wt_conn, const char *config);
 extern int __wt_lsm_cleanup(WT_CONNECTION *wt_conn);
+extern int __wt_lsm_merge_update_tree(WT_SESSION_IMPL *session,
+    WT_LSM_TREE *lsm_tree,
+    int nchunks,
+    WT_LSM_CHUNK **chunkp);
 extern int __wt_lsm_major_merge(WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree);
 extern int __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree);
@@ -704,6 +708,9 @@ extern int __wt_lsm_tree_drop( WT_SESSION_IMPL *session,
 extern int __wt_lsm_tree_rename(WT_SESSION_IMPL *session,
     const char *oldname,
     const char *newname,
+    const char *cfg[]);
+extern int __wt_lsm_tree_truncate( WT_SESSION_IMPL *session,
+    const char *name,
     const char *cfg[]);
 extern int __wt_lsm_tree_worker(WT_SESSION_IMPL *session,
     const char *uri,

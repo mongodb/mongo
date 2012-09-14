@@ -8,12 +8,12 @@
 #include "wt_internal.h"
 
 /*
- * __wt_merge_update_tree --
+ * __wt_lsm_merge_update_tree --
  *	Merge a set of chunks and create a new one.
  *	Must be called with the LSM lock held.
  */
-static int
-__lsm_merge_update_tree(WT_SESSION_IMPL *session,
+int
+__wt_lsm_merge_update_tree(WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree, int nchunks, WT_LSM_CHUNK **chunkp)
 {
 	WT_LSM_CHUNK *chunk;
@@ -174,7 +174,7 @@ __wt_lsm_major_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	WT_ERR(ret);
 
 	__wt_spin_lock(session, &lsm_tree->lock);
-	ret = __lsm_merge_update_tree(session, lsm_tree, nchunks, &chunk);
+	ret = __wt_lsm_merge_update_tree(session, lsm_tree, nchunks, &chunk);
 
 	chunk->uri = dest_uri;
 	dest_uri = NULL;

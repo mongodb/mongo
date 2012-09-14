@@ -454,6 +454,50 @@ err:		__wt_spin_unlock(session, &lsm_tree->lock);
 }
 
 /*
+ * __wt_lsm_tree_truncate --
+ *	Truncate an LSM tree.
+ */
+int
+__wt_lsm_tree_truncate(
+    WT_SESSION_IMPL *session, const char *name, const char *cfg[])
+{
+	WT_DECL_RET;
+	WT_LSM_CHUNK *chunk;
+	WT_LSM_TREE *lsm_tree;
+
+	WT_UNUSED(cfg);
+
+	/* Get the LSM tree. */
+	WT_RET(__wt_lsm_tree_get(session, name, &lsm_tree));
+
+	/* Shut down the LSM worker. */
+	WT_RET(__lsm_tree_close(session, lsm_tree));
+
+	/* Prevent any new opens. */
+	WT_RET(__wt_spin_trylock(session, &lsm_tree->lock));
+
+	/* Mark all chunks old. */
+	WT_ERR(__wt_lsm_merge_update_tree(
+	    session, lsm_tree, lsm_tree->nchunks, &chunk));
+
+	/* Create the new chunk. */
+	WT_ERR(__wt_lsm_tree_create_chunk(
+	    session, lsm_tree, WT_ATOMIC_ADD(lsm_tree->last, 1), &chunk->uri));
+
+	WT_ERR(__wt_lsm_meta_write(session, lsm_tree));
+
+	WT_ERR(__lsm_tree_start_worker(session, lsm_tree));
+	__wt_spin_unlock(session, &lsm_tree->lock);
+
+	if (0) {
+err:		__wt_spin_unlock(session, &lsm_tree->lock);
+		__lsm_tree_discard(session, lsm_tree);
+	}
+	return (ret);
+}
+
+
+/*
  * __wt_lsm_tree_worker --
  *	Run a schema worker operation on each level of a LSM tree.
  */
