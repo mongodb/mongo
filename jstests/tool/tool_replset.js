@@ -17,40 +17,45 @@
 // Load utility methods for replica set tests
 load("jstests/replsets/rslib.js");
 
-var replTest = new ReplSetTest({ name: 'rs', nodes: 2, oplogSize: 5 });
+print("starting the replica set")
+
+var replTest = new ReplSetTest({ name: 'tool_replset', nodes: 2, oplogSize: 5 });
 var nodes = replTest.startSet();
 replTest.initiate();
 var master = replTest.getMaster();
-var docNum = 100;
-for (var i = 0; i < docNum; i++) {
+for (var i = 0; i < 100; i++) {
     master.getDB("foo").bar.insert({ a: i });
 }
 replTest.awaitReplication();
 
-var replSetConnString = "rs/127.0.0.1:" + replTest.ports[0] + ",127.0.0.1:" + replTest.ports[1];
+var replSetConnString = "tool_replset/127.0.0.1:" + replTest.ports[0] +
+                        ",127.0.0.1:" + replTest.ports[1];
 
 // Test with mongodump/mongorestore
 print("dump the db");
-var data = "/data/db/dumprestore11-dump1/";
+var data = "/data/db/tool_replset-dump1/";
 runMongoProgram("mongodump", "--host", replSetConnString, "--out", data);
 
+print("db successfully dumped, dropping now");
 master.getDB("foo").dropDatabase();
 replTest.awaitReplication();
 
 print("restore the db");
 runMongoProgram("mongorestore", "--host", replSetConnString, "--dir", data);
 
+print("db successfully restored, checking count")
 var x = master.getDB("foo").getCollection("bar").count();
-assert.eq(x, docNum, "mongorestore should have successfully restored the collection" + docNum);
+assert.eq(x, 100, "mongorestore should have successfully restored the collection");
 
 replTest.awaitReplication();
 
 // Test with mongoexport/mongoimport
 print("export the collection");
-var extFile = "/data/db/exportimport_replSet/export";
+var extFile = "/data/db/tool_replset/export";
 runMongoProgram("mongoexport", "--host", replSetConnString, "--out", extFile,
                 "-d", "foo", "-c", "bar");
 
+print("collection successfully exported, dropping now");
 master.getDB("foo").getCollection("bar").drop();
 replTest.awaitReplication();
 
@@ -59,21 +64,26 @@ runMongoProgram("mongoimport", "--host", replSetConnString, "--file", extFile,
                 "-d", "foo", "-c", "bar");
 
 var x = master.getDB("foo").getCollection("bar").count();
-assert.eq(x, docNum, "mongoimport should have successfully imported the collection" + docNum);
-
-master.getDB("foo").getCollection("bar").drop();
+assert.eq(x, 100, "mongoimport should have successfully imported the collection");
 
 // Test with mongooplog
 var doc = { _id : 5, x : 17 };
 master.getDB("local").oplog.rs.insert({ ts : new Timestamp(), "op" : "i", "ns" : "foo.bar",
                                          "o" : doc });
 
-assert.eq(0, master.getDB("foo").getCollection("bar").count(), "before");
+assert.eq(100, master.getDB("foo").getCollection("bar").count(), "count before running mongooplog " +
+		  "was not 100 as expected");
 
-var replSetConnString = "rs/127.0.0.1:" + replTest.ports[0] + ",127.0.0.1:" + replTest.ports[1];
 runMongoProgram("mongooplog" , "--from", "127.0.0.1:" + replTest.ports[0],
                                "--host", replSetConnString);
 
-assert.eq(101, master.getDB("foo").getCollection("bar").count(), "after")
+print("running mongooplog to replay the oplog")
+
+assert.eq(101, master.getDB("foo").getCollection("bar").count(), "count after running mongooplog " +
+		  "was not 101 as expected")
+
+print("all tests successful, stopping replica set")
 
 replTest.stopSet();
+
+print("replica set stopped, test complete")
