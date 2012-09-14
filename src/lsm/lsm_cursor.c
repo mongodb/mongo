@@ -680,6 +680,12 @@ __clsm_put(
 	WT_RET(primary->insert(primary));
 
 	/*
+	 * The count is in a shared structure, but it's only approximate, so
+	 * don't worry about protecting access.
+	 */
+	++clsm->primary_chunk->count;
+
+	/*
 	 * Set the position for future scans.  If we were already positioned in
 	 * a non-primary chunk, we may now have multiple cursors matching the
 	 * key.

@@ -69,13 +69,14 @@ __wt_lsm_major_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	WT_LSM_CHUNK *chunk;
 	WT_SESSION *wt_session;
 	const char *dest_uri;
-	uint64_t record_count;
-	int dest_id, nchunks;
+	uint64_t insert_count, record_count;
+	int dest_id, i, nchunks;
 
 	src = dest = NULL;
+	bloom = NULL;
 
 	/*
-	 * TODO: describe the dace with lsm_tree->lock here to avoid holding
+	 * TODO: describe the dance with lsm_tree->lock here to avoid holding
 	 * the tree locked while a merge is in progress.
 	 */
 
@@ -100,10 +101,14 @@ __wt_lsm_major_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	 * the amount of work in the merge.
 	 */
 	nchunks = WT_MIN((int)S2C(session)->hazard_size / 2, nchunks);
+	__wt_spin_lock(session, &lsm_tree->lock);
 	while (nchunks > 1 &&
 	    (!F_ISSET(lsm_tree->chunk[nchunks - 1], WT_LSM_CHUNK_ONDISK) ||
 	    lsm_tree->chunk[nchunks - 1]->ncursor > 0))
 		--nchunks;
+	for (record_count = 0, i = 0; i < nchunks; i++)
+		record_count += lsm_tree->chunk[i]->count;
+	__wt_spin_unlock(session, &lsm_tree->lock);
 
 	if (nchunks <= 1)
 		return (0);
@@ -114,12 +119,15 @@ __wt_lsm_major_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	WT_VERBOSE_RET(session, lsm,
 	    "Merging first %d chunks into %d\n", nchunks, dest_id);
 
-	WT_RET(__wt_scr_alloc(session, 0, &bbuf));
-	WT_RET(__wt_lsm_tree_bloom_name(session, lsm_tree, dest_id, bbuf));
-	/* TODO sum the record count in the chunks */
-	record_count = 100000;
-	WT_RET(__wt_bloom_create(session, bbuf->data, NULL, record_count,
-	    lsm_tree->bloom_factor, lsm_tree->bloom_k, &bloom));
+	if (record_count != 0) {
+		WT_RET(__wt_scr_alloc(session, 0, &bbuf));
+		WT_ERR(__wt_lsm_tree_bloom_name(
+		    session, lsm_tree, dest_id, bbuf));
+
+		WT_ERR(__wt_bloom_create(
+		    session, bbuf->data, NULL, record_count,
+		    lsm_tree->bloom_factor, lsm_tree->bloom_k, &bloom));
+	}
 
 	/*
 	 * Special setup for the merge cursor:
@@ -128,7 +136,7 @@ __wt_lsm_major_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	 * then set MERGE so the cursor doesn't track updates to the tree.
 	 */
 	wt_session = &session->iface;
-	WT_RET(wt_session->open_cursor(
+	WT_ERR(wt_session->open_cursor(
 	    wt_session, lsm_tree->name, NULL, NULL, &src));
 	F_SET(src, WT_CURSTD_RAW);
 	WT_ERR(__wt_clsm_init_merge(src, nchunks));
@@ -139,23 +147,29 @@ __wt_lsm_major_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	WT_ERR(wt_session->open_cursor(
 	    wt_session, dest_uri, NULL, "raw,bulk", &dest));
 
-	for (record_count = 0; (ret = src->next(src)) == 0; record_count++) {
+	for (insert_count = 0; (ret = src->next(src)) == 0; insert_count++) {
 		WT_ERR(src->get_key(src, &key));
 		dest->set_key(dest, &key);
 		WT_ERR(src->get_value(src, &value));
 		dest->set_value(dest, &value);
 		WT_ERR(dest->insert(dest));
-		WT_ERR(__wt_bloom_insert(bloom, &key));
+		if (bloom != NULL)
+			WT_ERR(__wt_bloom_insert(bloom, &key));
 	}
+	WT_VERBOSE_ERR(session, lsm,
+	    "Bloom size for %" PRIu64 " has %" PRIu64 " items inserted.",
+	    record_count, insert_count);
 	WT_ERR_NOTFOUND_OK(ret);
 
 	/* We've successfully created the new chunk.  Now install it. */
 	WT_TRET(src->close(src));
 	WT_TRET(dest->close(dest));
-	WT_TRET(__wt_bloom_finalize(bloom));
-	WT_TRET(__wt_bloom_close(bloom));
 	src = dest = NULL;
-	bloom = NULL;
+	if (bloom != NULL) {
+		WT_TRET(__wt_bloom_finalize(bloom));
+		WT_TRET(__wt_bloom_close(bloom));
+		bloom = NULL;
+	}
 	WT_ERR(ret);
 
 	__wt_spin_lock(session, &lsm_tree->lock);
@@ -163,8 +177,9 @@ __wt_lsm_major_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 
 	chunk->uri = dest_uri;
 	dest_uri = NULL;
-	chunk->bloom_uri = __wt_buf_steal(session, bbuf, 0);
-	chunk->count = record_count;
+	if (bloom != NULL)
+		chunk->bloom_uri = __wt_buf_steal(session, bbuf, 0);
+	chunk->count = insert_count;
 	F_SET(chunk, WT_LSM_CHUNK_ONDISK);
 
 	ret = __wt_lsm_meta_write(session, lsm_tree);
