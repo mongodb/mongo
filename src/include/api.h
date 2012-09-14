@@ -201,10 +201,11 @@ struct __wt_connection_impl {
 	WT_FH *lock_fh;			/* Lock file handle */
 
 	pthread_t cache_evict_tid;	/* Cache eviction server thread ID */
-	pthread_t cache_read_tid;	/* Cache read server thread ID */
 
 					/* Locked: btree list */
 	TAILQ_HEAD(__wt_btree_qh, __wt_btree) btqh;
+					/* Locked: LSM handle list. */
+	TAILQ_HEAD(__wt_lsm_qh, __wt_lsm_tree) lsmqh;
 					/* Locked: file list */
 	TAILQ_HEAD(__wt_fh_qh, __wt_fh) fhqh;
 
@@ -230,10 +231,8 @@ struct __wt_connection_impl {
 	uint32_t	 session_cnt;	/* Session count */
 
 	/*
-	 * WiredTiger allocates space for 15 hazard references in each thread of
-	 * control, by default.  There's no code path that requires more than 15
-	 * pages at a time (and if we find one, the right change is to increase
-	 * the default).
+	 * WiredTiger allocates space for a fixed number of hazard references
+	 * in each thread of control.
 	 */
 	uint32_t   hazard_size;		/* Hazard array size */
 
@@ -318,7 +317,7 @@ struct __wt_connection_impl {
 
 #define	CURSOR_API_CALL_NOCONF(cur, s, n, bt)				\
 	(s) = (WT_SESSION_IMPL *)(cur)->session;			\
-	API_CALL_NOCONF(s, cursor, n, cur, bt);				\
+	API_CALL_NOCONF(s, cursor, n, cur, bt)
 
 /*******************************************
  * Global variables.
@@ -341,12 +340,13 @@ extern WT_PROCESS __wt_process;
 #define	WT_SESSION_INTERNAL				0x00000004
 #define	WT_SESSION_SALVAGE_QUIET_ERR			0x00000002
 #define	WT_SESSION_SCHEMA_LOCKED			0x00000001
-#define	WT_VERB_block					0x00001000
-#define	WT_VERB_ckpt					0x00000800
-#define	WT_VERB_evict					0x00000400
-#define	WT_VERB_evictserver				0x00000200
-#define	WT_VERB_fileops					0x00000100
-#define	WT_VERB_hazard					0x00000080
+#define	WT_VERB_block					0x00002000
+#define	WT_VERB_ckpt					0x00001000
+#define	WT_VERB_evict					0x00000800
+#define	WT_VERB_evictserver				0x00000400
+#define	WT_VERB_fileops					0x00000200
+#define	WT_VERB_hazard					0x00000100
+#define	WT_VERB_lsm					0x00000080
 #define	WT_VERB_mutex					0x00000040
 #define	WT_VERB_read					0x00000020
 #define	WT_VERB_readserver				0x00000010

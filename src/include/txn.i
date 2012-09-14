@@ -5,6 +5,9 @@
  * See the file LICENSE for redistribution information.
  */
 
+static inline void __wt_txn_read_first(WT_SESSION_IMPL *session);
+static inline void __wt_txn_read_last(WT_SESSION_IMPL *session);
+
 /*
  * __wt_txn_getid --
  *	Get a transaction ID for a non-transactional operation.
@@ -34,6 +37,14 @@ __wt_txn_getid(WT_SESSION_IMPL *session)
 	    id == WT_TXN_NONE || id == WT_TXN_ABORTED);
 
 	txn->id = id;
+
+	/*
+	 * We allocated a new transaction ID for updates without an explicit
+	 * transaction.  To ensure that our previous updates are visible,
+	 * update our transaction context (if required).
+	 */
+	__wt_txn_read_last(session);
+	__wt_txn_read_first(session);
 }
 
 /*

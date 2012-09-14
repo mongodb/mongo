@@ -28,7 +28,8 @@ main(int argc, char *argv[])
 	u_int nthreads;
 	int ch, cnt, runs;
 	char *config_open;
-	const char **objp, *objs[] = { "file:__wt", "table:__wt", NULL };
+	const char **objp;
+	const char *objs[] = { "file:__wt", "table:__wt", "lsm:__wt", NULL };
 
 	if ((progname = strrchr(argv[0], '/')) == NULL)
 		progname = argv[0];

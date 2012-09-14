@@ -79,8 +79,20 @@ format_meta = column_meta + [
 		type='format'),
 ]
 
+lsm_config = [
+	Config('lsm_chunk_size', '2MB', r'''
+		the maximum size of the in-memory chunk of an LSM tree''',
+		min='512K',max='500MB'),
+	Config('lsm_bloom_hash_count', '4', r'''
+		the number of hash values per item used for LSM bloom filters.''',
+		min='2',max='100'),
+	Config('lsm_bloom_bit_count', '8', r'''
+		the number of bits used per item for LSM bloom filters.''',
+		min='2',max='1000'),
+]
+
 # Per-file configuration
-file_config = format_meta + [
+file_config = format_meta + lsm_config + [
 	Config('allocation_size', '512B', r'''
 		the file unit allocation size, in bytes, must a power-of-two;
 		smaller values decrease the file space required by overflow
@@ -215,6 +227,7 @@ connection_runtime_config = [
 		    'evictserver',
 		    'fileops',
 		    'hazard',
+		    'lsm',
 		    'mutex',
 		    'read',
 		    'readserver',
@@ -438,6 +451,7 @@ flags = {
 		'VERB_evict',
 		'VERB_evictserver',
 		'VERB_fileops',
+		'VERB_lsm',
 		'VERB_hazard',
 		'VERB_mutex',
 		'VERB_read',

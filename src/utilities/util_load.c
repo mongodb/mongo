@@ -95,8 +95,9 @@ load_dump(WT_SESSION *session)
 		 * Single file dumps can only have two lines, the file name and
 		 * the configuration information.
 		 */
-		if (list[0] == NULL || list[1] == NULL || list[2] != NULL ||
-		    !WT_PREFIX_MATCH(list[0], "file:"))
+		if ((list[0] == NULL || list[1] == NULL || list[2] != NULL) ||
+		    (WT_PREFIX_MATCH(list[0], "file:") &&
+		    WT_PREFIX_MATCH(list[0], "lsm:")))
 			return (format());
 
 		entry = list;

@@ -210,11 +210,14 @@ __btree_conf(WT_SESSION_IMPL *session)
 
 	/* Eviction; the metadata file is never evicted. */
 	if (strcmp(btree->name, WT_METADATA_URI) == 0)
-		btree->cache_resident = 1;
+		F_SET(btree, WT_BTREE_NO_EVICTION | WT_BTREE_NO_HAZARD);
 	else {
 		WT_RET(__wt_config_getones(
 		    session, config, "cache_resident", &cval));
-		btree->cache_resident = cval.val ? 1 : 0;
+		if (cval.val)
+			F_SET(btree, WT_BTREE_NO_EVICTION | WT_BTREE_NO_HAZARD);
+		else
+			F_CLR(btree, WT_BTREE_NO_EVICTION);
 	}
 
 	/* Huffman encoding */
@@ -399,6 +402,42 @@ __wt_btree_leaf_create(
 	leaf->parent = parent;
 
 	*pagep = leaf;
+	return (0);
+}
+
+/*
+ * __wt_btree_get_memsize --
+ *      Access the size of an in-memory tree with a single leaf page.
+ */
+int
+__wt_btree_get_memsize(
+    WT_SESSION_IMPL *session, WT_BTREE *btree, uint32_t **memsizep)
+{
+	WT_PAGE *root, *child;
+
+	WT_UNUSED(session);
+	root = btree->root_page;
+	child = root->u.intl.t->page;
+
+	if (root->entries != 1 || child == NULL) {
+		*memsizep = NULL;
+		return (WT_ERROR);
+	}
+
+	*memsizep = &child->memory_footprint;
+	F_SET(btree, WT_BTREE_NO_EVICTION);
+	return (0);
+}
+
+/*
+ * __wt_btree_release_memsize --
+ *      Release a cache-resident tree.
+ */
+int
+__wt_btree_release_memsize(WT_SESSION_IMPL *session, WT_BTREE *btree)
+{
+	WT_UNUSED(session);
+	F_CLR(btree, WT_BTREE_NO_EVICTION);
 	return (0);
 }
 

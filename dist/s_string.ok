@@ -104,7 +104,6 @@ LRU
 LSB
 LSM
 LSN
-LSN's
 LSNs
 LeafGreen
 Llqr
@@ -271,6 +270,7 @@ ckptfrag
 ckptlist
 cksum
 clr
+clsm
 cmd
 cmp
 cnt

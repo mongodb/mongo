@@ -576,6 +576,14 @@ __evict_file_request(WT_SESSION_IMPL *session, int syncop)
 				    session, page, WT_REC_SINGLE));
 			break;
 		case WT_SYNC_DISCARD_NOWRITE:
+			/*
+			 * When we discard the root page, clear the reference
+			 * from the btree handle.  It is important to do this
+			 * here, so that future eviction doesn't see root_page
+			 * pointing to freed memory.
+			 */
+			if (WT_PAGE_IS_ROOT(page))
+				session->btree->root_page = NULL;
 			__wt_page_out(session, &page, 0);
 			break;
 		}
@@ -734,13 +742,18 @@ __evict_walk(WT_SESSION_IMPL *session)
 	i = WT_EVICT_WALK_BASE;
 	TAILQ_FOREACH(btree, &conn->btqh, q) {
 		/*
-		 * Skip files marked as cache-resident, and files involved (or
-		 * potentially involved), in a bulk load.  The real problem is
+		 * Skip files that aren't open or don't have a root page.
+		 *
+		 * Also skip files marked as cache-resident, and files
+		 * potentially involved in a bulk load.  The real problem is
 		 * eviction doesn't want to be walking the file as it converts
 		 * to a bulk-loaded object, and empty trees aren't worth trying
 		 * to evict, anyway.
 		 */
-		if (btree->cache_resident || btree->bulk_load_ok)
+		if (!F_ISSET(btree, WT_BTREE_OPEN) ||
+		    btree->root_page == NULL ||
+		    F_ISSET(btree, WT_BTREE_NO_EVICTION) ||
+		    btree->bulk_load_ok)
 			continue;
 
 		/* Reference the correct WT_BTREE handle. */

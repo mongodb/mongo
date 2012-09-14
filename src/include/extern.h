@@ -234,6 +234,7 @@ extern int __wt_bloom_open(WT_SESSION_IMPL *session,
     const char *uri,
     uint32_t factor,
     uint32_t k,
+    WT_CURSOR *owner,
     WT_BLOOM **bloomp);
 extern int __wt_bloom_insert(WT_BLOOM *bloom, WT_ITEM *key);
 extern int __wt_bloom_finalize(WT_BLOOM *bloom);
@@ -307,6 +308,11 @@ extern int __wt_btree_leaf_create( WT_SESSION_IMPL *session,
     WT_PAGE *parent,
     WT_REF *ref,
     WT_PAGE **pagep);
+extern int __wt_btree_get_memsize( WT_SESSION_IMPL *session,
+    WT_BTREE *btree,
+    uint32_t **memsizep);
+extern int __wt_btree_release_memsize(WT_SESSION_IMPL *session,
+    WT_BTREE *btree);
 extern int __wt_btree_huffman_open(WT_SESSION_IMPL *session,
     const char *config);
 extern void __wt_btree_huffman_close(WT_SESSION_IMPL *session);
@@ -659,6 +665,60 @@ extern int __wt_log_printf(WT_SESSION_IMPL *session,
     2,
     3)));
 extern WT_LOGREC_DESC __wt_logdesc_debug;
+extern int __wt_clsm_init_merge(WT_CURSOR *cursor, int nchunks);
+extern int __wt_clsm_open(WT_SESSION_IMPL *session,
+    const char *uri,
+    const char *cfg[],
+    WT_CURSOR **cursorp);
+extern int __wt_lsm_init(WT_CONNECTION *wt_conn, const char *config);
+extern int __wt_lsm_cleanup(WT_CONNECTION *wt_conn);
+extern int __wt_lsm_merge_update_tree(WT_SESSION_IMPL *session,
+    WT_LSM_TREE *lsm_tree,
+    int nchunks,
+    WT_LSM_CHUNK **chunkp);
+extern int __wt_lsm_major_merge(WT_SESSION_IMPL *session,
+    WT_LSM_TREE *lsm_tree);
+extern int __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree);
+extern int __wt_lsm_meta_write(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree);
+extern int __wt_lsm_tree_close_all(WT_SESSION_IMPL *session);
+extern int __wt_lsm_tree_bloom_name( WT_SESSION_IMPL *session,
+    WT_LSM_TREE *lsm_tree,
+    int i,
+    WT_ITEM *buf);
+extern int __wt_lsm_tree_chunk_name( WT_SESSION_IMPL *session,
+    WT_LSM_TREE *lsm_tree,
+    int i,
+    WT_ITEM *buf);
+extern int __wt_lsm_tree_create_chunk( WT_SESSION_IMPL *session,
+    WT_LSM_TREE *lsm_tree,
+    int i,
+    const char **urip);
+extern int __wt_lsm_tree_create(WT_SESSION_IMPL *session,
+    const char *uri,
+    int exclusive,
+    const char *config);
+extern int __wt_lsm_tree_get( WT_SESSION_IMPL *session,
+    const char *uri,
+    WT_LSM_TREE **treep);
+extern int __wt_lsm_tree_switch( WT_SESSION_IMPL *session,
+    WT_LSM_TREE *lsm_tree);
+extern int __wt_lsm_tree_drop( WT_SESSION_IMPL *session,
+    const char *name,
+    const char *cfg[]);
+extern int __wt_lsm_tree_rename(WT_SESSION_IMPL *session,
+    const char *oldname,
+    const char *newname,
+    const char *cfg[]);
+extern int __wt_lsm_tree_truncate( WT_SESSION_IMPL *session,
+    const char *name,
+    const char *cfg[]);
+extern int __wt_lsm_tree_worker(WT_SESSION_IMPL *session,
+    const char *uri,
+    int (*func)(WT_SESSION_IMPL *,
+    const char *[]),
+    const char *cfg[],
+    uint32_t open_flags);
+extern void *__wt_lsm_worker(void *arg);
 extern int __wt_metadata_get(WT_SESSION *session,
     const char *uri,
     const char **valuep);
@@ -1091,7 +1151,7 @@ extern int __wt_buf_catfmt(WT_SESSION_IMPL *session,
     4)));
 extern int
 __wt_scr_alloc_func(WT_SESSION_IMPL *session,
- uint32_t size, WT_ITEM **scratchp
+ size_t size, WT_ITEM **scratchp
 #ifdef HAVE_DIAGNOSTIC
  , const char *file, int line
 #endif

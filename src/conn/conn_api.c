@@ -319,6 +319,9 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 		if (!F_ISSET(s, WT_SESSION_INTERNAL))
 			__wt_free(session, s->hazard);
 
+	/* Clean up open LSM handles. */
+	WT_ERR(__wt_lsm_cleanup(&conn->iface));
+
 	/* Close open btree handles. */
 	WT_TRET(__wt_conn_btree_discard(conn));
 
@@ -730,6 +733,7 @@ __conn_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 		{ "evictserver",WT_VERB_evictserver },
 		{ "fileops",	WT_VERB_fileops },
 		{ "hazard",	WT_VERB_hazard },
+		{ "lsm",	WT_VERB_lsm },
 		{ "mutex",	WT_VERB_mutex },
 		{ "read",	WT_VERB_read },
 		{ "readserver",	WT_VERB_readserver },
@@ -928,6 +932,12 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 
 	/* If there's a hot-backup file, load it. */
 	WT_ERR(__wt_metadata_load_backup(session));
+
+	/*
+	 * XXX LSM initialization.
+	 * This is structured so that it could be moved to an extension.
+	 */
+	WT_ERR(__wt_lsm_init(&conn->iface, NULL));
 
 	STATIC_ASSERT(offsetof(WT_CONNECTION_IMPL, iface) == 0);
 	*wt_connp = &conn->iface;

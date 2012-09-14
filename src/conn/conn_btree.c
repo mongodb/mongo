@@ -244,10 +244,7 @@ __wt_conn_btree_get(WT_SESSION_IMPL *session,
 
 	WT_STAT_INCR(conn->stats, file_open);
 
-	if (session->btree != NULL)
-		WT_RET(__conn_btree_open_lock(session, flags));
-	else
-		WT_RET(__conn_btree_get(session, name, ckpt, flags));
+	WT_RET(__conn_btree_get(session, name, ckpt, flags));
 
 	btree = session->btree;
 

@@ -523,12 +523,13 @@ transaction_ops(WT_CONNECTION *conn, WT_SESSION *session)
 /*! [WT_DATA_SOURCE create] */
 static int
 my_create(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-    const char *name, const char *config)
+    const char *name, int exclusive, const char *config)
 {
 	/* Unused parameters */
 	(void)dsrc;
 	(void)session;
 	(void)name;
+	(void)exclusive;
 	(void)config;
 
 	return (0);
@@ -538,13 +539,13 @@ my_create(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 /*! [WT_DATA_SOURCE drop] */
 static int
 my_drop(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-    const char *name, const char *config)
+    const char *name, const char *cfg[])
 {
 	/* Unused parameters */
 	(void)dsrc;
 	(void)session;
 	(void)name;
-	(void)config;
+	(void)cfg;
 
 	return (0);
 }
@@ -553,16 +554,14 @@ my_drop(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 /*! [WT_DATA_SOURCE open_cursor] */
 static int
 my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-    const char *obj, WT_CURSOR *old_cursor, const char *config,
-    WT_CURSOR **new_cursor)
+    const char *obj, const char *cfg[], WT_CURSOR **new_cursor)
 {
 	/* Unused parameters */
 	(void)dsrc;
 
 	(void)session;
 	(void)obj;
-	(void)old_cursor;
-	(void)config;
+	(void)cfg;
 	(void)new_cursor;
 
 	return (0);
@@ -572,44 +571,29 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 /*! [WT_DATA_SOURCE rename] */
 static int
 my_rename(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-    const char *oldname, const char *newname, const char *config)
+    const char *oldname, const char *newname, const char *cfg[])
 {
 	/* Unused parameters */
 	(void)dsrc;
 	(void)session;
 	(void)oldname;
 	(void)newname;
-	(void)config;
+	(void)cfg;
 
 	return (0);
 }
 /*! [WT_DATA_SOURCE rename] */
 
-/*! [WT_DATA_SOURCE sync] */
-static int
-my_sync(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-    const char *name, const char *config)
-{
-	/* Unused parameters */
-	(void)dsrc;
-	(void)session;
-	(void)name;
-	(void)config;
-
-	return (0);
-}
-/*! [WT_DATA_SOURCE sync] */
-
 /*! [WT_DATA_SOURCE truncate] */
 static int
 my_truncate(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-    const char *name, const char *config)
+    const char *name, const char *cfg[])
 {
 	/* Unused parameters */
 	(void)dsrc;
 	(void)session;
 	(void)name;
-	(void)config;
+	(void)cfg;
 
 	return (0);
 }
@@ -626,7 +610,6 @@ add_data_source(WT_CONNECTION *conn)
 		my_drop,
 		my_open_cursor,
 		my_rename,
-		my_sync,
 		my_truncate
 	};
 	ret = conn->add_data_source(conn, "dsrc:", &my_dsrc, NULL);

@@ -71,15 +71,13 @@ class test_util11(wttest.WiredTigerTestCase, suite_subprocess):
         self.populate(pfx + '3')
 
         # Construct what we think we'll find
-        filelist = ''
         tablelist = ''
         for i in range(1, 6):
-            filelist += 'file:' + pfx + str(i) + '.wt\n'
             tablelist += 'table:' + pfx + str(i) + '\n'
 
         outfile = "listout.txt"
-        self.runWt(["list"], outfilename=outfile)
-        self.check_file_content(outfile, filelist + tablelist)
+        self.runWt(["list", "table:"], outfilename=outfile)
+        self.check_file_content(outfile, tablelist)
 
     def test_list_drop(self):
         """
@@ -99,18 +97,11 @@ class test_util11(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.drop('table:' + pfx + '4', None)
 
         # Construct what we think we'll find
-        filelist = ''
-        tablelist = ''
-        filelist += 'file:' + pfx + '1.wt\n'
-        tablelist += 'table:' + pfx + '1\n'
-        filelist += 'file:' + pfx + '3.wt\n'
-        tablelist += 'table:' + pfx + '3\n'
-        filelist += 'file:' + pfx + '5.wt\n'
-        tablelist += 'table:' + pfx + '5\n'
+        tablelist = ''.join('table:' + pfx + str(i) + '\n' for i in (1, 3, 5))
 
         outfile = "listout.txt"
-        self.runWt(["list"], outfilename=outfile)
-        self.check_file_content(outfile, filelist + tablelist)
+        self.runWt(["list", "table:"], outfilename=outfile)
+        self.check_file_content(outfile, tablelist)
 
     def test_list_drop_all(self):
         """

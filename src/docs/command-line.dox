@@ -45,7 +45,7 @@ The following are command-specific options for the \c backup command:
 @par <code>-t uri</code>
 By default, the \c backup command does a hot backup of the entire
 database; the \c -t option changes the \c backup command to do a hot
-backup of only the listed \c file: and \c table: objects.
+backup of only the named objects.
 
 <hr>
 @section util_create wt create

@@ -61,7 +61,7 @@ additional CPU and memory use when searching the in-memory tree (if keys
 are encoded), and additional CPU and memory use when returning values
 from the in-memory tree and when writing pages to disk.  Note the
 additional CPU cost of Huffman encoding can be high, and should be
-considered.  (See @ref huffman for details)
+considered.  (See @subpage huffman for details)
 
 - Stream compression reduces the size requirement of on-disk objects by
 compressing blocks of the backing object's file.  The cost is additional

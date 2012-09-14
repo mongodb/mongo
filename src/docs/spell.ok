@@ -4,6 +4,7 @@ Atomicity
 BLOBs
 CFLAGS
 CPPFLAGS
+Cheng
 DB's
 DBTs
 DbCursor
@@ -12,6 +13,7 @@ DbMultiple
 EB
 EmpId
 FreeBSD
+Gawlick
 GCC
 GitHub
 IEC
@@ -158,6 +160,7 @@ loadtext
 logc
 lookup
 lrtf
+lsm
 lsn
 lt
 mailto

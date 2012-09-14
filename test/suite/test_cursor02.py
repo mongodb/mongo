@@ -38,13 +38,14 @@ class test_cursor02(TestCursorTracker):
     after inserts and removes.
     """
     scenarios = [
-        ('row', dict(tablekind='row')),
-        ('col', dict(tablekind='col')),
+        ('row', dict(tablekind='row', uri='table')),
+        ('lsm-row', dict(tablekind='row', uri='lsm')),
+        ('col', dict(tablekind='col', uri='table')),
         #('fix', dict(tablekind='fix'))
         ]
 
     def create_session_and_cursor(self, ninitialentries):
-        tablearg = "table:" + self.table_name1
+        tablearg = self.uri + ":" + self.table_name1
         if self.tablekind == 'row':
             keyformat = 'key_format=S'
         else:
@@ -56,7 +57,7 @@ class test_cursor02(TestCursorTracker):
         create_args = keyformat + ',' + valformat + self.config_string()
         self.session_create(tablearg, create_args)
         self.pr('creating cursor')
-        self.cur_initial_conditions(self.table_name1, ninitialentries, self.tablekind, None, None)
+        self.cur_initial_conditions(self.table_name1, ninitialentries, self.tablekind, None, None, self.uri)
         return self.session.open_cursor(tablearg, None, 'append')
 
     def test_multiple_remove(self):

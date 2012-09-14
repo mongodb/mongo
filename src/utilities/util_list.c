@@ -39,8 +39,8 @@ util_list(WT_SESSION *session, int argc, char *argv[])
 	case 0:
 		break;
 	case 1:
-		if ((name = util_name(
-		    *argv, "table", UTIL_FILE_OK | UTIL_TABLE_OK)) == NULL)
+		if ((name = util_name(*argv, "table",
+		    UTIL_FILE_OK | UTIL_LSM_OK | UTIL_TABLE_OK)) == NULL)
 			return (1);
 		break;
 	default:
@@ -109,14 +109,9 @@ list_print(WT_SESSION *session, const char *name, int cflag, int vflag)
 			return (util_cerr("metadata", "get_key", ret));
 
 		/*
-		 * If no object specified, show top-level objects (files and
-		 * tables).
+		 * If a name is specified, only show objects that match.
 		 */
-		if (name == NULL) {
-			if (!WT_PREFIX_MATCH(key, "file:") &&
-			    !WT_PREFIX_MATCH(key, "table:"))
-				continue;
-		} else {
+		if (name != NULL) {
 			if (!WT_PREFIX_MATCH(key, name))
 				continue;
 			found = 1;

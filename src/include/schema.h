@@ -69,3 +69,10 @@ struct __wt_table {
 	F_CLR(session, WT_SESSION_SCHEMA_LOCKED);			\
 	__wt_spin_unlock(session, &S2C(session)->schema_lock);		\
 } while (0)
+
+#define	WT_WITH_SCHEMA_LOCK_OPT(session, op) do {			\
+	if (F_ISSET(session, WT_SESSION_SCHEMA_LOCKED))			\
+		(op);							\
+	else								\
+		WT_WITH_SCHEMA_LOCK(session, op);			\
+} while (0)

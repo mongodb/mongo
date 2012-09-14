@@ -63,6 +63,8 @@ table cursor (key=table key\, value=table value)}
 file cursor (key=file key\, value=file value)}
   @row{<tt>index:\<tablename\>.\<indexname\></tt>,
 index cursor (key=index key\, value=table value)}
+  @row{<tt>lsm:\<name\></tt>,
+LSM cursor (key=LSM key\, value=LSM value), see @ref lsm}
   @row{<tt>statistics:[file</tt><tt>:\<filename\>]</tt>,
   database or file statistics (key=(int)\,
   value=(string)description\, (string)value\, (uint64_t)value)}
@@ -96,5 +98,10 @@ cursor's \c key_format or \c value_format, respectively.  For
 WT_CURSOR::set_key and WT_CURSOR::set_value in raw mode, the WT_ITEM
 should be equivalent to calling ::wiredtiger_struct_pack for the
 cursor's \c key_format or \c value_format, respectively.
+
+@section cursor_random Random lookup
+
+Cursors can be configured to return pseudo-random records from row-store
+objects.  See @subpage cursor_random for details.
 
 */

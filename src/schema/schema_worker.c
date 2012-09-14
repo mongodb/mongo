@@ -38,6 +38,9 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 		    session, uri, strlen(uri), cfg, open_flags));
 		ret = func(session, cfg);
 		WT_TRET(__wt_session_release_btree(session));
+	} else if (WT_PREFIX_SKIP(tablename, "lsm:")) {
+		WT_RET(__wt_lsm_tree_worker(
+		    session, uri, func, cfg, open_flags));
 	} else if (WT_PREFIX_SKIP(tablename, "table:")) {
 		WT_RET(__wt_schema_get_table(session,
 		    tablename, strlen(tablename), 0, &table));

@@ -25,17 +25,35 @@ __session_reset_cursors(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __session_close_cache --
+ *	Close any cached handles in a session.  Called holding the schema lock.
+ */
+static int
+__session_close_cache(WT_SESSION_IMPL *session)
+{
+	WT_BTREE_SESSION *btree_session;
+	WT_DECL_RET;
+
+	while ((btree_session = TAILQ_FIRST(&session->btrees)) != NULL)
+		WT_TRET(__wt_session_discard_btree(session, btree_session));
+
+	WT_TRET(__wt_schema_close_tables(session));
+
+	return (ret);
+}
+
+/*
  * __session_close --
  *	WT_SESSION->close method.
  */
 static int
 __session_close(WT_SESSION *wt_session, const char *config)
 {
-	WT_BTREE_SESSION *btree_session;
 	WT_CONNECTION_IMPL *conn;
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
+	int tret;
 
 	conn = (WT_CONNECTION_IMPL *)wt_session->connection;
 	session = (WT_SESSION_IMPL *)wt_session;
@@ -53,17 +71,15 @@ __session_close(WT_SESSION *wt_session, const char *config)
 
 	WT_ASSERT(session, session->ncursors == 0);
 
-	/* Acquire the schema lock: we may be closing btree handles. */
-	__wt_spin_lock(session, &S2C(session)->schema_lock);
-	F_SET(session, WT_SESSION_SCHEMA_LOCKED);
-
-	while ((btree_session = TAILQ_FIRST(&session->btrees)) != NULL)
-		WT_TRET(__wt_session_discard_btree(session, btree_session));
-
-	WT_TRET(__wt_schema_close_tables(session));
-
-	F_CLR(session, WT_SESSION_SCHEMA_LOCKED);
-	__wt_spin_unlock(session, &S2C(session)->schema_lock);
+	/*
+	 * Acquire the schema lock: we may be closing btree handles.
+	 *
+	 * Note that in some special cases, the schema may already be locked
+	 * (e.g., if this session is an LSM tree worker and the tree is being
+	 * dropped).
+	 */
+	WT_WITH_SCHEMA_LOCK_OPT(session, tret = __session_close_cache(session));
+	WT_TRET(tret);
 
 	/* Discard metadata tracking. */
 	__wt_meta_track_discard(session);
@@ -144,7 +160,7 @@ __session_reconfigure(WT_SESSION *wt_session, const char *config)
 			WT_ERR_MSG(session, EINVAL,
 			    "Database not configured for transactions");
 
-		session->isolation =
+		session->isolation = session->txn.isolation =
 		    WT_STRING_MATCH("snapshot", cval.str, cval.len) ?
 		    TXN_ISO_SNAPSHOT :
 		    WT_STRING_MATCH("read-uncommitted", cval.str, cval.len) ?
@@ -162,6 +178,7 @@ static int
 __session_open_cursor(WT_SESSION *wt_session,
     const char *uri, WT_CURSOR *to_dup, const char *config, WT_CURSOR **cursorp)
 {
+	WT_DATA_SOURCE *dsrc;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
@@ -178,6 +195,7 @@ __session_open_cursor(WT_SESSION *wt_session,
 		if (WT_PREFIX_MATCH(uri, "colgroup:") ||
 		    WT_PREFIX_MATCH(uri, "index:") ||
 		    WT_PREFIX_MATCH(uri, "file:") ||
+		    WT_PREFIX_MATCH(uri, "lsm:") ||
 		    WT_PREFIX_MATCH(uri, "table:"))
 			ret = __wt_cursor_dup(session, to_dup, config, cursorp);
 		else
@@ -196,8 +214,9 @@ __session_open_cursor(WT_SESSION *wt_session,
 		ret = __wt_curstat_open(session, uri, cfg, cursorp);
 	else if (WT_PREFIX_MATCH(uri, "table:"))
 		ret = __wt_curtable_open(session, uri, cfg, cursorp);
-	else
-		ret = __wt_bad_object_type(session, uri);
+	else if ((ret = __wt_schema_get_source(session, uri, &dsrc)) == 0)
+		ret = dsrc->open_cursor(dsrc, &session->iface,
+		    uri, cfg, cursorp);
 
 err:	API_END_NOTFOUND_MAP(session, ret);
 }

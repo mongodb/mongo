@@ -225,7 +225,7 @@ __wt_schema_rename(WT_SESSION_IMPL *session,
 		ret = __rename_table(session, oldname, newname);
 	} else if ((ret = __wt_schema_get_source(session, oldname, &dsrc)) == 0)
 		ret = dsrc->rename(dsrc,
-		    &session->iface, oldname, newname, cfg[1]);
+		    &session->iface, oldname, newname, cfg);
 
 	WT_TRET(__wt_meta_track_off(session, ret != 0));
 

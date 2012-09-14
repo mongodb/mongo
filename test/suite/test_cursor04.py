@@ -37,9 +37,10 @@ class test_cursor04(wttest.WiredTigerTestCase):
     nentries = 20
 
     scenarios = [
-        ('row', dict(tablekind='row')),
-        ('col', dict(tablekind='col')),
-        ('fix', dict(tablekind='fix'))
+        ('row', dict(tablekind='row', uri='table')),
+        ('lsm-row', dict(tablekind='row', uri='lsm')),
+        ('col', dict(tablekind='col', uri='table')),
+        ('fix', dict(tablekind='fix', uri='table'))
         ]
 
     def config_string(self):
@@ -60,7 +61,7 @@ class test_cursor04(wttest.WiredTigerTestCase):
             raise
 
     def create_session_and_cursor(self):
-        tablearg = "table:" + self.table_name1
+        tablearg = self.uri + ":" + self.table_name1
         if self.tablekind == 'row':
             keyformat = 'key_format=S'
         else:

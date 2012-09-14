@@ -92,7 +92,7 @@ __wt_confchk_connection_reconfigure[] = {
 	{ "eviction_target", "int", "min=10,max=99" },
 	{ "eviction_trigger", "int", "min=10,max=99" },
 	{ "verbose", "list", "choices=[\"block\",\"ckpt\",\"evict\","
-	    "\"evictserver\",\"fileops\",\"hazard\",\"mutex\",\"read\","
+	    "\"evictserver\",\"fileops\",\"hazard\",\"lsm\",\"mutex\",\"read\","
 	    "\"readserver\",\"reconcile\",\"salvage\",\"verify\",\"write\"]" },
 	{ NULL, NULL, NULL }
 };
@@ -112,7 +112,8 @@ __wt_confdfl_file_meta =
 	"checksum=,collator=,columns=,dictionary=0,huffman_key=,"
 	"huffman_value=,internal_item_max=0,internal_key_truncate=,"
 	"internal_page_max=2KB,key_format=u,key_gap=10,leaf_item_max=0,"
-	"leaf_page_max=1MB,prefix_compression=,split_pct=75,type=btree,"
+	"leaf_page_max=1MB,lsm_bloom_bit_count=8,lsm_bloom_hash_count=4,"
+	"lsm_chunk_size=2MB,prefix_compression=,split_pct=75,type=btree,"
 	"value_format=u,version=(major=0,minor=0)";
 
 WT_CONFIG_CHECK
@@ -134,6 +135,9 @@ __wt_confchk_file_meta[] = {
 	{ "key_gap", "int", "min=0" },
 	{ "leaf_item_max", "int", "min=0" },
 	{ "leaf_page_max", "int", "min=512B,max=512MB" },
+	{ "lsm_bloom_bit_count", "int", "min=2,max=1000" },
+	{ "lsm_bloom_hash_count", "int", "min=2,max=100" },
+	{ "lsm_chunk_size", "int", "min=512K,max=500MB" },
 	{ "prefix_compression", "boolean", NULL },
 	{ "split_pct", "int", "min=25,max=100" },
 	{ "type", "string", "choices=[\"btree\"]" },
@@ -208,6 +212,7 @@ __wt_confdfl_session_create =
 	"filename=,huffman_key=,huffman_value=,internal_item_max=0,"
 	"internal_key_truncate=,internal_page_max=2KB,key_format=u,"
 	"key_format=u,key_gap=10,leaf_item_max=0,leaf_page_max=1MB,"
+	"lsm_bloom_bit_count=8,lsm_bloom_hash_count=4,lsm_chunk_size=2MB,"
 	"prefix_compression=,split_pct=75,type=btree,value_format=u,"
 	"value_format=u";
 
@@ -234,6 +239,9 @@ __wt_confchk_session_create[] = {
 	{ "key_gap", "int", "min=0" },
 	{ "leaf_item_max", "int", "min=0" },
 	{ "leaf_page_max", "int", "min=512B,max=512MB" },
+	{ "lsm_bloom_bit_count", "int", "min=2,max=1000" },
+	{ "lsm_bloom_hash_count", "int", "min=2,max=100" },
+	{ "lsm_chunk_size", "int", "min=512K,max=500MB" },
 	{ "prefix_compression", "boolean", NULL },
 	{ "split_pct", "int", "min=25,max=100" },
 	{ "type", "string", "choices=[\"btree\"]" },
@@ -394,7 +402,7 @@ __wt_confchk_wiredtiger_open[] = {
 	{ "transactional", "boolean", NULL },
 	{ "use_environment_priv", "boolean", NULL },
 	{ "verbose", "list", "choices=[\"block\",\"ckpt\",\"evict\","
-	    "\"evictserver\",\"fileops\",\"hazard\",\"mutex\",\"read\","
+	    "\"evictserver\",\"fileops\",\"hazard\",\"lsm\",\"mutex\",\"read\","
 	    "\"readserver\",\"reconcile\",\"salvage\",\"verify\",\"write\"]" },
 	{ NULL, NULL, NULL }
 };

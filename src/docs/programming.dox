@@ -11,6 +11,7 @@ WiredTiger applications:
 
 - @subpage schema
 - @subpage file_formats
+- @subpage lsm
 
 - @subpage transactions
 - @subpage checkpoints

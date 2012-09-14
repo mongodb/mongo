@@ -138,7 +138,7 @@ int run(void)
 	WT_BLOOM *bloomp;
 	WT_ITEM item;
 	WT_SESSION_IMPL *sess;
-	const char *uri = "table:my_bloom";
+	const char *uri = "file:my_bloom.bf";
 	int ret;
 	uint32_t fp, i;
 
@@ -171,7 +171,8 @@ int run(void)
 		die(ret, "__wt_bloom_close");
 
 	g.wt_session->checkpoint(g.wt_session, NULL);
-	if ((ret = __wt_bloom_open(sess, uri, g.c_factor, g.c_k, &bloomp)) != 0)
+	if ((ret = __wt_bloom_open(
+	    sess, uri, g.c_factor, g.c_k, NULL, &bloomp)) != 0)
 		die(ret, "__wt_bloom_open");
 	for (i = 0; i < g.c_ops; i++) {
 		item.data = g.entries[i];
