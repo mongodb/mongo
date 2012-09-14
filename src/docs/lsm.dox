@@ -91,7 +91,6 @@ usually fits in cache.  The Bloom parameters can be configured with
 \c "lsm_bloom_bit_count" and \c "lsm_bloom_hash_count" configuration keys to
 WT_SESSION::create.
 
-
 @section lsm_caveats Caveats
 
 @subsection lsm_hazard Hazard configuration
