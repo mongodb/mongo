@@ -39,8 +39,8 @@ util_list(WT_SESSION *session, int argc, char *argv[])
 	case 0:
 		break;
 	case 1:
-		if ((name = util_name(
-		    *argv, "table", UTIL_FILE_OK | UTIL_TABLE_OK)) == NULL)
+		if ((name = util_name(*argv, "table",
+		    UTIL_FILE_OK | UTIL_LSM_OK | UTIL_TABLE_OK)) == NULL)
 			return (1);
 		break;
 	default:
