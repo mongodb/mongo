@@ -18,7 +18,23 @@ space in the cache before the read can be satisfied.
 
 @section lsm_description Description of LSM trees
 
+Log-Structured Merge Trees were described in this paper by Patrick O'Neil1 ,
+Edward Cheng, Dieter Gawlick and Elizabeth O'Neil1:
 http://www.cs.umb.edu/~poneil/lsmtree.pdf
+
+A logical tree is split into several physical pieces so that the
+most-recently-updated portion of data is in a tree that fits entirely in
+memory.  The size of the in-memory chunk can be configured with the
+\c "lsm_chunk_size" configuration key to WT_SESSION::create.
+
+Once the in-memory tree reaches a threshold size, a new in-memory tree is
+created and the old tree synced to disk. Once written to disk, trees are
+read-only, though they are merged in the background with other on-disk
+trees to reduce the cost of reads.
+
+With this structure, "blind writes" can be performed entirely on the
+in-memory tree.  Deletes are implemented by inserting a special "tombstone"
+record into the in-memory tree.
 
 @section lsm_api Interface to LSM trees
 
@@ -47,13 +63,44 @@ Unlike ordinary file cursors, LSM cursors default to \c overwrite mode, where:
 
 - WT_CURSOR::insert will update existing values without checking;
 - WT_CURSOR::update will insert values regardless of whether they exist; and
-- WT_CURSOR::remove will succeed regardless of whether the specified record exists.
+- WT_CURSOR::remove will succeed regardless of whether the specified record
+  exists.
 
 This behavior can be disabled by passing \c "overwrite=false" to
 WT_SESSION::open_cursor, but the result will be a search through the levels
 of the LSM tree before every modification.
 
+@section lsm_merge Merging
+
+A background thread is opened for each active LSM tree.  This thread is
+responsible for both writing old chunks to stable storage, and for merging
+multiple chunks together so that reads can be satisfied from a small number
+of files.  There is currently no way to configure merges: they are performed
+automatically by the background thread.
+
+@section lsm_bloom Bloom filters
+
+WiredTiger creates a Bloom filter when merging.  This is an additional file
+that contains a configurable number of bits per key (default 8).  Keys are
+hashed a configurable number of times (default 4), and the corresponding
+bits set.  The Bloom filter is used to avoid reading from a chunk if the key
+cannot be present.
+
+With the defaults, they Bloom filter only requires one byte per key, so it
+usually fits in cache.  The Bloom parameters can be configured with
+\c "lsm_bloom_bit_count" and \c "lsm_bloom_hash_count" configuration keys to
+WT_SESSION::create.
+
+
 @section lsm_caveats Caveats
+
+@subsection lsm_hazard Hazard configuration
+
+Reads from an LSM cursor may need to position a cursor in each active chunk.
+The number of chunks depends on the chunk size, and how many chunks have
+been merged.  There must be at least as many hazard references available as
+there are chunks in the tree.  The number of hazard references is configured
+with the \c "hazard_max" configuration key to ::wiredtiger_open.
 
 @subsection lsm_schema Creating tables using LSM trees
 
