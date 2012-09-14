@@ -340,8 +340,12 @@ __wt_lsm_tree_drop(
 
 	/* Get the LSM tree. */
 	WT_RET(__wt_lsm_tree_get(session, name, &lsm_tree));
+
+	/* Shut down the LSM worker. */
+	WT_RET(__lsm_tree_close(session, lsm_tree));
+
+	/* Prevent any new opens. */
 	WT_RET(__wt_spin_trylock(session, &lsm_tree->lock));
-	WT_ERR(__lsm_tree_close(session, lsm_tree));
 
 	/* Drop the chunks. */
 	for (i = 0; i < lsm_tree->nchunks; i++) {
@@ -378,11 +382,15 @@ __wt_lsm_tree_rename(WT_SESSION_IMPL *session,
 	int i;
 
 	old = NULL;
-
+	
 	/* Get the LSM tree. */
 	WT_RET(__wt_lsm_tree_get(session, oldname, &lsm_tree));
+
+	/* Shut down the LSM worker. */
+	WT_RET(__lsm_tree_close(session, lsm_tree));
+
+	/* Prevent any new opens. */
 	WT_RET(__wt_spin_trylock(session, &lsm_tree->lock));
-	WT_ERR(__lsm_tree_close(session, lsm_tree));
 
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));
 
