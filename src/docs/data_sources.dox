@@ -32,12 +32,14 @@ file cursor (key=file key\, value=file value)}
 index cursor (key=index key\, value=table value)}
   @row{<tt>join:\<cursor1\>\&\<cursor2\>[&\<cursor3\>...]</tt>,
 join cursor @notyet{join cursors}}
+  @row{<tt>lsm:\<name\></tt>,
+LSM cursor (key=LSM key\, value=LSM value), see @ref lsm}
   @row{<tt>statistics:[file</tt><tt>:\<filename\>]</tt>,
   database or file statistics (key=(int)\,
   value=(string)description\, (string)value\, (uint64_t)value)}
 </table>
 
-@subsection hot_backup_cursors Hot backup cursors
+@subsection data_backup Hot backup cursors
 
 See @ref hot_backup for more information.
 

@@ -63,6 +63,8 @@ table cursor (key=table key\, value=table value)}
 file cursor (key=file key\, value=file value)}
   @row{<tt>index:\<tablename\>.\<indexname\></tt>,
 index cursor (key=index key\, value=table value)}
+  @row{<tt>lsm:\<name\></tt>,
+LSM cursor (key=LSM key\, value=LSM value), see @ref lsm}
   @row{<tt>statistics:[file</tt><tt>:\<filename\>]</tt>,
   database or file statistics (key=(int)\,
   value=(string)description\, (string)value\, (uint64_t)value)}

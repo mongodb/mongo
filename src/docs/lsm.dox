@@ -1,0 +1,101 @@
+/*! @page lsm Log-Structured Merge Trees
+
+@section lsm_background Background
+
+A common requirement is sustained throughput under a workload that consists
+of random inserts, where either the key range is chosen so that inserts are
+very unlikely to conflict (e.g., 128-bit hashes), or where inserts are
+expected to overwrite existing values.
+
+With traditional btree variants, inserts are very fast while the data set
+remains in cache, but once the tree overflows the cache, performance drops
+significantly.  There are two factors involved:
+
+1. once the data fills the cache, new inserts have some probability of going
+to a page that is not in cache, requiring a read; and
+2. the cache is full of dirty pages, so pages have to be written to free
+space in the cache before the read can be satisfied.
+
+@section lsm_description Description of LSM trees
+
+http://www.cs.umb.edu/~poneil/lsmtree.pdf
+
+@section lsm_api Interface to LSM trees
+
+An LSM tree can be created as follows, in much the same way as a
+WiredTiger btree file:
+
+@code
+session->create(session, "lsm:bucket", "key_format=S,value_format=S");
+@endcode
+
+Once created, the LSM tree can be accessed using the same cursor interface
+as other data sources in WiredTiger:
+
+@code
+WT_CURSOR *c;
+
+session->open_cursor(session, "lsm:bucket", NULL, NULL, &c);
+for(;;) {
+    c->set_key("key");
+    c->set_value("data");
+    c->insert();
+}
+@endcode
+
+Unlike ordinary file cursors, LSM cursors default to \c overwrite mode, where:
+
+- WT_CURSOR::insert will update existing values without checking;
+- WT_CURSOR::update will insert values regardless of whether they exist; and
+- WT_CURSOR::remove will succeed regardless of whether the specified record exists.
+
+This behavior can be disabled by passing \c "overwrite=false" to
+WT_SESSION::open_cursor, but the result will be a search through the levels
+of the LSM tree before every modification.
+
+@section lsm_caveats Caveats
+
+@subsection lsm_schema Creating tables using LSM trees
+
+It is not yet possible to create tables or indices using LSM trees for
+storage.  This will be addressed in a future release of WiredTiger.
+
+Schema support will be provided for LSM as with an extension to the
+WT_SESSION::create method:
+
+@code
+session->create(session, "table:T", "type=lsm");
+@endcode
+
+The default type for all schema objects will continue to be btree.
+
+@subsection lsm_tombstones Empty values
+
+Internally, WiredTiger's LSM trees use an empty value to represent a
+record that has been removed (also known as a "tombstone").  For this
+reason, applications cannot store records in LSM trees with empty values.
+
+@subsection lsm_txn Transactional access
+
+There are currently some significant limitations in transactional access to
+data stored in LSM trees:
+
+- if an update transaction runs for long enough that the chunk it started
+  writing to has been replaced, its data may not be included in the
+  checkpoint when that chunk is swapped to "on disk" mode, and thus may not
+  become visible to readers of the tree immediately when the transaction
+  commits;
+
+- update transactions running at snapshot isolation may be permitted to
+  commit if they conflict with an update in a concurrent transaction and
+  the current chunk has been replaced;
+
+- read-only transactions running at snapshot isolation may read newer
+  changes after a chunk is written to stable storage;
+ 
+- named checkpoints are not fully supported on LSM trees: recent updates to
+  the tree may not appear in the checkpoint;
+
+We intend to address these limitations in future releases.
+
+ */
