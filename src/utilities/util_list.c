@@ -109,14 +109,9 @@ list_print(WT_SESSION *session, const char *name, int cflag, int vflag)
 			return (util_cerr("metadata", "get_key", ret));
 
 		/*
-		 * If no object specified, show top-level objects (files and
-		 * tables).
+		 * If a name is specified, only show objects that match.
 		 */
-		if (name == NULL) {
-			if (!WT_PREFIX_MATCH(key, "file:") &&
-			    !WT_PREFIX_MATCH(key, "table:"))
-				continue;
-		} else {
+		if (name != NULL) {
 			if (!WT_PREFIX_MATCH(key, name))
 				continue;
 			found = 1;
