@@ -13,7 +13,7 @@ s_dumpcmp: $(srcdir)/s_dumpcmp.sh
 	chmod +x $@
 
 backup:
-	rm -rf BACKUP && mkdir BACKUP && cp -p -r WiredTiger* __* BACKUP/
+	rm -rf BACKUP && mkdir BACKUP && cp -p -r RUNDIR BACKUP/
 
 clean-local:
-	rm -rf WiredTiger* *.core __*
+	rm -rf RUNDIR

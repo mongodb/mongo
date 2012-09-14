@@ -38,6 +38,8 @@ static WT_EVENT_HANDLER event_handler = {
 	handle_progress
 };
 
+#define	EXTPATH	"../../../ext"
+
 void
 wts_open(void)
 {
@@ -49,12 +51,12 @@ wts_open(void)
 	char config[512], *end, *p;
 
 	/* If the bzip2 compression module has been built, use it. */
-	ext1 = "../../ext/compressors/bzip2_compress/.libs/bzip2_compress.so";
+	ext1 = EXTPATH "compressors/bzip2_compress/.libs/bzip2_compress.so";
 	if (access(ext1, R_OK) != 0) {
 		ext1 = "";
 		g.c_bzip = 0;
 	}
-	ext2 = "../../ext/collators/reverse/.libs/reverse_collator.so";
+	ext2 = EXTPATH "/collators/reverse/.libs/reverse_collator.so";
 
 	/*
 	 * Open configuration -- put command line configuration options at the
@@ -148,7 +150,7 @@ wts_dump(const char *tag, int dump_bdb)
 	char cmd[256];
 
 	track("dump files and compare", 0ULL, NULL);
-	offset = snprintf(cmd, sizeof(cmd), "sh ./s_dumpcmp");
+	offset = snprintf(cmd, sizeof(cmd), "sh ../s_dumpcmp");
 	if (dump_bdb)
 		offset += snprintf(cmd + offset,
 		    sizeof(cmd) - (size_t)offset, " -b");
@@ -179,9 +181,9 @@ wts_salvage(void)
 	 * step as necessary.
 	 */
 	if ((ret = system(
-	    "rm -rf __slvg.copy && "
-	    "mkdir __slvg.copy && "
-	    "cp WiredTiger* __wt* __slvg.copy/")) != 0)
+	    "rm -rf slvg.copy && "
+	    "mkdir slvg.copy && "
+	    "cp WiredTiger* wt* slvg.copy/")) != 0)
 		die(ret, "salvage cleanup step failed");
 
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
@@ -233,8 +235,8 @@ wts_stats(void)
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die(ret, "connection.open_session");
 
-	if ((fp = fopen("__stats", "w")) == NULL)
-		die(errno, "fopen: __stats");
+	if ((fp = fopen("stats", "w")) == NULL)
+		die(errno, "fopen: stats");
 
 	/* Connection statistics. */
 	fprintf(fp, "====== Connection statistics:\n");

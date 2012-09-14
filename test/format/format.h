@@ -6,6 +6,7 @@
  */
 
 #include <sys/types.h>
+#include <sys/stat.h>
 
 #include <assert.h>
 #include <ctype.h>
@@ -28,14 +29,16 @@
 #define	M(v)		((v) * 1000000)		/* Million */
 #define	UNUSED(var)	(void)(var)		/* Quiet unused var warnings */
 
+/* Get a random value between a min/max pair. */
+#define	MMRAND(min, max)	(wts_rand() % (((max) + 1) - (min)) + (min))
+
 #define	FIX		1			/* File types */
 #define	ROW		2
 #define	VAR		3
 
-/* Get a random value between a min/max pair. */
-#define	MMRAND(min, max)	(wts_rand() % (((max) + 1) - (min)) + (min))
+#define	WT_NAME	"wt"				/* Object name */
 
-#define	WT_NAME	"__wt"
+#define	RUNDIR	"RUNDIR"			/* Run home */
 
 #define	SINGLETHREADED	(g.c_threads == 1)
 

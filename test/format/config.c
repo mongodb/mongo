@@ -43,15 +43,17 @@ config_setup(void)
 	/* Pick a data source type. */
 	cp = config_find("data_source", strlen("data_source"));
 	if (!(cp->flags & C_PERM)) {
-		switch (MMRAND(0, 1)) {
+		switch (MMRAND(0, 2)) {
 		case 0:
 			config_single("data_source=file", 0);
 			break;
 		case 1:
-			config_single("data_source=table", 0);
-			break;
-		case 2:
+#if 0
 			config_single("data_source=lsm", 0);
+			break;
+#endif
+		case 2:
+			config_single("data_source=table", 0);
 			break;
 		}
 	}
@@ -159,8 +161,8 @@ config_print(int error_display)
 	if (error_display)
 		fp = stdout;
 	else
-		if ((fp = fopen("__run", "w")) == NULL)
-			die(errno, "fopen: __run");
+		if ((fp = fopen("run", "w")) == NULL)
+			die(errno, "fopen: run");
 
 	fprintf(fp, "############################################\n");
 	fprintf(fp, "#  RUN PARAMETERS\n");

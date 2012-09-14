@@ -201,8 +201,8 @@ wts_rand(void)
 	 */
 	if (g.rand_log == NULL) {
 		if ((g.rand_log =
-		    fopen("__rand", g.replay ? "r" : "w")) == NULL)
-			die(errno, "fopen: __rand");
+		    fopen("rand", g.replay ? "r" : "w")) == NULL)
+			die(errno, "fopen: rand");
 		if (!g.replay) {
 			srand((u_int)(0xdeadbeef ^ (u_int)time(NULL)));
 			(void)setvbuf(g.rand_log, NULL, _IOLBF, 0);

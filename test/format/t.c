@@ -34,6 +34,18 @@ main(int argc, char *argv[])
 	/* Track progress unless we're re-directing output to a file. */
 	g.track = isatty(STDOUT_FILENO) ? 1 : 0;
 
+	/* Create the run directory and change to it. */
+	if (access(RUNDIR, X_OK) != 0 && mkdir(RUNDIR, 0777)) {
+		fprintf(stderr,
+		    "%s: mkdir: %s %s\n", g.progname, RUNDIR, strerror(errno));
+		return (EXIT_FAILURE);
+	}
+	if (chdir(RUNDIR)) {
+		fprintf(stderr,
+		    "%s: chdir: %s %s\n", g.progname, RUNDIR, strerror(errno));
+		return (EXIT_FAILURE);
+	}
+
 	/* Set values from the command line. */
 	while ((ch = getopt(argc, argv, "1C:c:Llqrt:")) != EOF)
 		switch (ch) {
@@ -179,13 +191,13 @@ startup(void)
 		g.rand_log = NULL;
 	}
 
-	/* Remove the run's files except for __rand. */
-	(void)system("rm -rf WiredTiger WiredTiger.* __[a-qs-z]* __run");
+	/* Remove the run's files except for rand. */
+	(void)system("rm -rf `ls | sed /rand/d`");
 
 	/* Open/truncate the logging file. */
 	if (g.logging != 0) {
-		if ((g.logfp = fopen("__log", "w")) == NULL)
-			die(errno, "fopen: __log");
+		if ((g.logfp = fopen("log", "w")) == NULL)
+			die(errno, "fopen: log");
 		(void)setvbuf(g.logfp, NULL, _IOLBF, 0);
 	}
 }
@@ -199,8 +211,8 @@ onint(int signo)
 {
 	UNUSED(signo);
 
-	/* Remove the run's files except for __rand. */
-	(void)system("rm -rf WiredTiger WiredTiger.* __[a-qs-z]* __run");
+	/* Remove the run's files except for rand. */
+	(void)system("rm -rf `ls | sed /rand/d`");
 
 	fprintf(stderr, "\n");
 	exit(EXIT_FAILURE);
