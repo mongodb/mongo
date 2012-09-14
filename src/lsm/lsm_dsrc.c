@@ -60,16 +60,20 @@ __lsm_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *wt_session,
  *	Implementation of the rename operation for LSM trees.
  */
 static int
-__lsm_rename(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
+__lsm_rename(WT_DATA_SOURCE *dsrc, WT_SESSION *wt_session,
     const char *oldname, const char *newname, const char *cfg[])
 {
-	WT_UNUSED(dsrc);
-	WT_UNUSED(session);
-	WT_UNUSED(oldname);
-	WT_UNUSED(newname);
-	WT_UNUSED(cfg);
+	WT_SESSION_IMPL *session;
 
-	return (ENOTSUP);
+	WT_UNUSED(dsrc);
+	session = (WT_SESSION_IMPL *)wt_session;
+
+	if (!WT_PREFIX_MATCH(newname, "lsm:"))
+		WT_RET_MSG(session, EINVAL,
+		    "rename target type must match URI: %s to %s",
+		    oldname, newname);
+
+	return (__wt_lsm_tree_rename(session, oldname, newname, cfg));
 }
 
 /*

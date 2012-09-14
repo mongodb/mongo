@@ -35,11 +35,11 @@ __lsm_tree_discard(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 }
 
 /*
- * __wt_lsm_tree_close --
+ * __lsm_tree_close --
  *	Close an LSM tree structure.
  */
-int
-__wt_lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
+static int
+__lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
 	WT_DECL_RET;
 	WT_SESSION *wt_session;
@@ -69,7 +69,6 @@ __wt_lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		__wt_free(NULL, lsm_tree->worker_session->hazard);
 	}
 
-	__lsm_tree_discard(session, lsm_tree);
 	return (ret);
 }
 
@@ -83,8 +82,10 @@ __wt_lsm_tree_close_all(WT_SESSION_IMPL *session)
 	WT_DECL_RET;
 	WT_LSM_TREE *lsm_tree;
 
-	while ((lsm_tree = TAILQ_FIRST(&S2C(session)->lsmqh)) != NULL)
-		WT_TRET(__wt_lsm_tree_close(session, lsm_tree));
+	while ((lsm_tree = TAILQ_FIRST(&S2C(session)->lsmqh)) != NULL) {
+		WT_TRET(__lsm_tree_close(session, lsm_tree));
+		__lsm_tree_discard(session, lsm_tree);
+	}
 
 	return (ret);
 }
@@ -103,6 +104,19 @@ __wt_lsm_tree_bloom_name(
 }
 
 /*
+ * __wt_lsm_tree_chunk_name --
+ *	Get the URI of the file for a given chunk.
+ */
+int
+__wt_lsm_tree_chunk_name(
+    WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, int i, WT_ITEM *buf)
+{
+	WT_RET(__wt_buf_fmt(session, buf, "file:%s-%06d.lsm",
+	    lsm_tree->filename, i));
+	return (0);
+}
+
+/*
  * __wt_lsm_tree_create_chunk --
  *	Create a chunk of an LSM tree.
  */
@@ -114,14 +128,35 @@ __wt_lsm_tree_create_chunk(
 	WT_DECL_RET;
 
 	WT_RET(__wt_scr_alloc(session, 0, &buf));
-	WT_ERR(__wt_buf_fmt(session, buf, "file:%s-%06d.lsm",
-	    lsm_tree->filename, i));
+	WT_ERR(__wt_lsm_tree_chunk_name(session, lsm_tree, i, buf));
 	WT_ERR(__wt_schema_create(session,
 	    buf->data, lsm_tree->file_config));
 	*urip = __wt_buf_steal(session, buf, NULL);
 
 err:	__wt_scr_free(&buf);
 	return (ret);
+}
+
+/*
+ * __wt_lsm_start_worker --
+ *	Start the worker thread for an LSM tree.
+ */
+static int
+__lsm_tree_start_worker(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
+{
+	WT_CONNECTION *wt_conn;
+	WT_SESSION *wt_session;
+
+	wt_conn = &S2C(session)->iface;
+	WT_RET(wt_conn->open_session(wt_conn, NULL, NULL, &wt_session));
+	lsm_tree->worker_session = (WT_SESSION_IMPL *)wt_session;
+	F_SET(lsm_tree->worker_session, WT_SESSION_INTERNAL);
+
+	WT_RET(__wt_thread_create(
+	    &lsm_tree->worker_tid, __wt_lsm_worker, lsm_tree));
+	F_SET(lsm_tree, WT_LSM_TREE_OPEN);
+
+	return (0);
 }
 
 /*
@@ -133,11 +168,9 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
     const char *uri, int exclusive, const char *config)
 {
 	WT_CONFIG_ITEM cval;
-	WT_CONNECTION *wt_conn;
 	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
 	WT_LSM_TREE *lsm_tree;
-	WT_SESSION *wt_session;
 	const char *cfg[] = API_CONF_DEFAULTS(session, create, config);
 
 	/* If the tree is open, it already exists. */
@@ -184,14 +217,7 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_lsm_tree_switch(session, lsm_tree));
 
 	/* XXX This should definitely only happen when opening the tree. */
-	wt_conn = &S2C(session)->iface;
-	WT_ERR(wt_conn->open_session(wt_conn, NULL, NULL, &wt_session));
-	lsm_tree->worker_session = (WT_SESSION_IMPL *)wt_session;
-	F_SET(lsm_tree->worker_session, WT_SESSION_INTERNAL);
-
-	WT_ERR(__wt_thread_create(
-	    &lsm_tree->worker_tid, __wt_lsm_worker, lsm_tree));
-	F_SET(lsm_tree, WT_LSM_TREE_OPEN);
+	WT_ERR(__lsm_tree_start_worker(session, lsm_tree));
 
 	if (0) {
 err:		__lsm_tree_discard(session, lsm_tree);
@@ -208,10 +234,8 @@ static int
 __lsm_tree_open(
     WT_SESSION_IMPL *session, const char *uri, WT_LSM_TREE **treep)
 {
-	WT_CONNECTION *wt_conn;
 	WT_DECL_RET;
 	WT_LSM_TREE *lsm_tree;
-	WT_SESSION *wt_session;
 
 	/* Try to open the tree. */
 	WT_RET(__wt_calloc_def(session, 1, &lsm_tree));
@@ -226,14 +250,7 @@ __lsm_tree_open(
 	/* Set the generation number so cursors are opened on first usage. */
 	lsm_tree->dsk_gen = 1;
 
-	wt_conn = &S2C(session)->iface;
-	WT_ERR(wt_conn->open_session(wt_conn, NULL, NULL, &wt_session));
-	lsm_tree->worker_session = (WT_SESSION_IMPL *)wt_session;
-	F_SET(lsm_tree->worker_session, WT_SESSION_INTERNAL);
-
-	WT_ERR(__wt_thread_create(
-	    &lsm_tree->worker_tid, __wt_lsm_worker, lsm_tree));
-	F_SET(lsm_tree, WT_LSM_TREE_OPEN);
+	WT_ERR(__lsm_tree_start_worker(session, lsm_tree));
 	*treep = lsm_tree;
 
 	if (0) {
@@ -324,6 +341,7 @@ __wt_lsm_tree_drop(
 	/* Get the LSM tree. */
 	WT_RET(__wt_lsm_tree_get(session, name, &lsm_tree));
 	WT_RET(__wt_spin_trylock(session, &lsm_tree->lock));
+	WT_ERR(__lsm_tree_close(session, lsm_tree));
 
 	/* Drop the chunks. */
 	for (i = 0; i < lsm_tree->nchunks; i++) {
@@ -335,12 +353,76 @@ __wt_lsm_tree_drop(
 	}
 
 	__wt_spin_unlock(session, &lsm_tree->lock);
-	ret = __wt_lsm_tree_close(session, lsm_tree);
 	WT_ERR(__wt_metadata_remove(session, name));
 
 	if (0) {
 err:		__wt_spin_unlock(session, &lsm_tree->lock);
 	}
+	__lsm_tree_discard(session, lsm_tree);
+	return (ret);
+}
+
+/*
+ * __wt_lsm_tree_rename --
+ *	Rename an LSM tree.
+ */
+int
+__wt_lsm_tree_rename(WT_SESSION_IMPL *session,
+    const char *oldname, const char *newname, const char *cfg[])
+{
+	WT_DECL_ITEM(buf);
+	WT_DECL_RET;
+	WT_LSM_CHUNK *chunk;
+	WT_LSM_TREE *lsm_tree;
+	const char *old;
+	int i;
+
+	old = NULL;
+
+	/* Get the LSM tree. */
+	WT_RET(__wt_lsm_tree_get(session, oldname, &lsm_tree));
+	WT_RET(__wt_spin_trylock(session, &lsm_tree->lock));
+	WT_ERR(__lsm_tree_close(session, lsm_tree));
+
+	WT_ERR(__wt_scr_alloc(session, 0, &buf));
+
+	/* Set the new name. */
+	__wt_free(session, lsm_tree->name);
+	WT_ERR(__wt_strdup(session, newname, &lsm_tree->name));
+
+	/* Rename the chunks. */
+	for (i = 0; i < lsm_tree->nchunks; i++) {
+		chunk = lsm_tree->chunk[i];
+		old = chunk->uri;
+		chunk->uri = NULL;
+
+		WT_ERR(__wt_lsm_tree_chunk_name(session, lsm_tree, i, buf));
+		chunk->uri = __wt_buf_steal(session, buf, NULL);
+		WT_ERR(__wt_schema_rename(session, old, chunk->uri, cfg));
+		__wt_free(session, old);
+
+		if ((old = chunk->bloom_uri) != NULL) {
+			chunk->bloom_uri = NULL;
+			WT_ERR(__wt_lsm_tree_bloom_name(
+			    session, lsm_tree, i, buf));
+			chunk->bloom_uri = __wt_buf_steal(session, buf, NULL);
+			WT_ERR(__wt_schema_rename(
+			    session, old, chunk->uri, cfg));
+			__wt_free(session, old);
+		}
+	}
+
+	__wt_spin_unlock(session, &lsm_tree->lock);
+	WT_ERR(__wt_lsm_meta_write(session, lsm_tree));
+	WT_ERR(__wt_metadata_remove(session, oldname));
+
+	if (0) {
+err:		__wt_spin_unlock(session, &lsm_tree->lock);
+	}
+	__wt_scr_free(&buf);
+	if (old != NULL)
+		__wt_free(session, old);
+	__lsm_tree_discard(session, lsm_tree);
 	return (ret);
 }
 

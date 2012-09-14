@@ -676,9 +676,12 @@ extern int __wt_lsm_major_merge(WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree);
 extern int __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree);
 extern int __wt_lsm_meta_write(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree);
-extern int __wt_lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree);
 extern int __wt_lsm_tree_close_all(WT_SESSION_IMPL *session);
 extern int __wt_lsm_tree_bloom_name( WT_SESSION_IMPL *session,
+    WT_LSM_TREE *lsm_tree,
+    int i,
+    WT_ITEM *buf);
+extern int __wt_lsm_tree_chunk_name( WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree,
     int i,
     WT_ITEM *buf);
@@ -697,6 +700,10 @@ extern int __wt_lsm_tree_switch( WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree);
 extern int __wt_lsm_tree_drop( WT_SESSION_IMPL *session,
     const char *name,
+    const char *cfg[]);
+extern int __wt_lsm_tree_rename(WT_SESSION_IMPL *session,
+    const char *oldname,
+    const char *newname,
     const char *cfg[]);
 extern int __wt_lsm_tree_worker(WT_SESSION_IMPL *session,
     const char *uri,
