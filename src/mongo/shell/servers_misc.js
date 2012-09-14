@@ -258,11 +258,12 @@ function startParallelShell( jsCode, port ){
         args.push("--port", port);
     }
 
+    if (typeof(db) == "object") {
+        jsCode = "db = db.getSiblingDB('" + db.getName() + "');" + jsCode;
+    }
+
     if (TestData) {
-        jsCode = "TestData = " + tojson(TestData) +
-            ";jsTest.authenticate(db.getMongo());" +
-            ((typeof(db) != 'undefined') ? "db = db.getSiblingDB('" + db.getName() + "');" : "") +
-            jsCode;
+        jsCode = "TestData = " + tojson(TestData) + ";" + jsCode;
     }
 
     args.push("--eval", jsCode);
