@@ -17,6 +17,7 @@ int
 main(int argc, char *argv[])
 {
 	int ch, reps;
+	char *p;
 
 	if ((g.progname = strrchr(argv[0], '/')) == NULL)
 		g.progname = argv[0];
@@ -140,7 +141,11 @@ main(int argc, char *argv[])
 
 		wts_close();			/* Close */
 
-		printf("%4d: %-40s\n", g.run_cnt, config_dtype());
+		/* Overwrite the progress line with a completion line. */
+		p = strchr(g.c_data_source, ':');
+		*p = '\0';
+		printf("%4d: %s %-40s\n",
+		    g.run_cnt, config_dtype(), g.c_data_source);
 	}
 
 	/* Flush/close any logging information. */
