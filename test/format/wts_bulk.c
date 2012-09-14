@@ -26,8 +26,8 @@ wts_load(void)
 	 * Avoid bulk load with a custom collator, because the order of
 	 * insertion will not match the collation order.
 	 */
-	if ((ret = session->open_cursor(session, g.c_data_source, NULL,
-	    (g.c_file_type == ROW && g.c_reverse) ? NULL : "bulk",
+	if ((ret = session->open_cursor(session, g.uri, NULL,
+	    (g.type == ROW && g.c_reverse) ? NULL : "bulk",
 	    &cursor)) != 0)
 		die(ret, "session.open_cursor");
 
@@ -52,7 +52,7 @@ wts_load(void)
 		value_gen(valbuf, &value.size, (uint64_t)g.key_cnt);
 		value.data = valbuf;
 
-		switch (g.c_file_type) {
+		switch (g.type) {
 		case FIX:
 			if (g.logging == LOG_OPS)
 				(void)session->msg_printf(session,

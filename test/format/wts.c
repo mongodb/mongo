@@ -92,14 +92,14 @@ wts_open(void)
 	    "key_format=%s,"
 	    "internal_page_max=%d,internal_item_max=%d,"
 	    "leaf_page_max=%d,leaf_item_max=%d",
-	    (g.c_file_type == ROW) ? "u" : "r",
+	    (g.type == ROW) ? "u" : "r",
 	    maxintlpage, maxintlitem, maxleafpage, maxleafitem);
 
 	if (g.c_bzip)
 		p += snprintf(p, (size_t)(end - p),
 		    ",block_compressor=\"bzip2_compress\"");
 
-	switch (g.c_file_type) {
+	switch (g.type) {
 	case FIX:
 		p += snprintf(p, (size_t)(end - p),
 		    ",value_format=%dt", g.c_bitcnt);
@@ -122,8 +122,8 @@ wts_open(void)
 		break;
 	}
 
-	if ((ret = session->create(session, g.c_data_source, config)) != 0)
-		die(ret, "session.create: %s", g.c_data_source);
+	if ((ret = session->create(session, g.uri, config)) != 0)
+		die(ret, "session.create: %s", g.uri);
 
 	if ((ret = session->close(session, NULL)) != 0)
 		die(ret, "session.close");
@@ -154,13 +154,13 @@ wts_dump(const char *tag, int dump_bdb)
 	if (dump_bdb)
 		offset += snprintf(cmd + offset,
 		    sizeof(cmd) - (size_t)offset, " -b");
-	if (g.c_file_type == FIX || g.c_file_type == VAR)
+	if (g.type == FIX || g.type == VAR)
 		offset += snprintf(cmd + offset,
 		    sizeof(cmd) - (size_t)offset, " -c");
 
-	if (g.c_data_source != NULL)
+	if (g.uri != NULL)
 		offset += snprintf(cmd + offset,
-		    sizeof(cmd) - (size_t)offset, " -n %s", g.c_data_source);
+		    sizeof(cmd) - (size_t)offset, " -n %s", g.uri);
 	if ((ret = system(cmd)) != 0)
 		die(ret, "%s: dump comparison failed", tag);
 }
@@ -188,8 +188,8 @@ wts_salvage(void)
 
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die(ret, "connection.open_session");
-	if ((ret = session->salvage(session, g.c_data_source, NULL)) != 0)
-		die(ret, "session.salvage: %s", g.c_data_source);
+	if ((ret = session->salvage(session, g.uri, NULL)) != 0)
+		die(ret, "session.salvage: %s", g.uri);
 	if ((ret = session->close(session, NULL)) != 0)
 		die(ret, "session.close");
 }
@@ -207,8 +207,8 @@ wts_verify(const char *tag)
 
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die(ret, "connection.open_session");
-	if ((ret = session->verify(session, g.c_data_source, NULL)) != 0)
-		die(ret, "session.verify: %s: %s", g.c_data_source, tag);
+	if ((ret = session->verify(session, g.uri, NULL)) != 0)
+		die(ret, "session.verify: %s: %s", g.uri, tag);
 	if ((ret = session->close(session, NULL)) != 0)
 		die(ret, "session.close");
 }
@@ -258,15 +258,14 @@ wts_stats(void)
 	 * XXX
 	 * WiredTiger only supports file object statistics.
 	 */
-	if (strncmp(g.c_data_source, "file:", strlen("file:")) != 0)
+	if (strcmp(g.c_data_source, "file") != 0)
 		goto skip;
 
 	/* File statistics. */
 	fprintf(fp, "\n\n====== File statistics:\n");
-	if ((stat_name =
-	    malloc(strlen("statistics:") + strlen(g.c_data_source))) == NULL)
+	if ((stat_name = malloc(strlen("statistics:") + strlen(g.uri))) == NULL)
 		die(ret, "malloc");
-	sprintf(stat_name, "statistics:%s", g.c_data_source);
+	sprintf(stat_name, "statistics:%s", g.uri);
 	if ((ret = session->open_cursor(
 	    session, stat_name, NULL, NULL, &cursor)) != 0)
 		die(ret, "session.open_cursor");

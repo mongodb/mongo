@@ -55,7 +55,7 @@ key_gen(uint8_t *key, uint32_t *sizep, uint64_t keyno, int insert)
 	 * In a column-store, the key is only used for BDB, and so it doesn't
 	 * need a random length.
 	 */
-	if (g.c_file_type == ROW) {
+	if (g.type == ROW) {
 		key[len] = '/';
 		len = g.key_rand_len[keyno %
 		    (sizeof(g.key_rand_len) / sizeof(g.key_rand_len[0]))];
@@ -96,7 +96,7 @@ value_gen(uint8_t *val, uint32_t *sizep, uint64_t keyno)
 	 * Fixed-length records: take the low N bits from the last digit of
 	 * the record number.
 	 */
-	if (g.c_file_type == FIX) {
+	if (g.type == FIX) {
 		switch (g.c_bitcnt) {
 		case 8: val[0] = MMRAND(1, 0xff); break;
 		case 7: val[0] = MMRAND(1, 0x7f); break;
@@ -116,8 +116,7 @@ value_gen(uint8_t *val, uint32_t *sizep, uint64_t keyno)
 	 * test that by inserting a zero-length data item every so often.
 	 * LSM doesn't support zero length items.
 	 */
-	if (keyno % 63 == 0 &&
-	    strncmp("lsm", g.c_data_source, strlen("lsm") != 0)) {
+	if (keyno % 63 == 0 && strcmp("lsm", g.c_data_source) != 0) {
 		val[0] = '\0';
 		*sizep = 0;
 		return;
@@ -131,7 +130,7 @@ value_gen(uint8_t *val, uint32_t *sizep, uint64_t keyno)
 	 * variable-length column-stores (that is, to test run-length encoding),
 	 * use the same data value all the time.
 	 */
-	if ((g.c_file_type == ROW || g.c_file_type == VAR) &&
+	if ((g.type == ROW || g.type == VAR) &&
 	    g.c_repeat_data_pct != 0 && MMRAND(1, 100) > g.c_repeat_data_pct) {
 		(void)strcpy((char *)val, "DUPLICATEV");
 		val[10] = '/';

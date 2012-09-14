@@ -32,10 +32,6 @@
 /* Get a random value between a min/max pair. */
 #define	MMRAND(min, max)	(wts_rand() % (((max) + 1) - (min)) + (min))
 
-#define	FIX		1			/* File types */
-#define	ROW		2
-#define	VAR		3
-
 #define	WT_NAME	"wt"				/* Object name */
 
 #define	RUNDIR	"RUNDIR"			/* Run home */
@@ -63,15 +59,21 @@ typedef struct {
 	int replay;				/* Replaying a run. */
 	int track;				/* Track progress */
 
+#define	FIX		1			/* File types */
+#define	ROW		2
+#define	VAR		3
+	int   type;				/* File type */
+	char *uri;				/* Object name */
+
 	char *config_open;			/* Command-line configuration */
 
 	uint32_t c_bitcnt;			/* Config values */
 	uint32_t c_bzip;
 	uint32_t c_cache;
-	char *c_data_source;
+	const char *c_data_source;
 	uint32_t c_delete_pct;
 	uint32_t c_dictionary;
-	uint32_t c_file_type;
+	const char *c_file_type;
 	uint32_t c_huffman_key;
 	uint32_t c_huffman_value;
 	uint32_t c_insert_pct;
@@ -119,8 +121,6 @@ void	 bdb_remove(uint64_t, int *);
 void	 bdb_update(const void *, uint32_t, const void *, uint32_t, int *);
 
 void	 config_error(void);
-const char *
-	 config_dtype(void);
 void	 config_file(const char *);
 void	 config_print(int);
 void	 config_setup(void);

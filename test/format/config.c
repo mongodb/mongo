@@ -9,6 +9,7 @@
 #include "config.h"
 
 static void	   config_clear(void);
+static const char *config_file_type(int);
 static CONFIG	  *config_find(const char *, size_t);
 static uint32_t	   config_translate(const char *);
 
@@ -39,6 +40,7 @@ config_setup(void)
 			break;
 		}
 	}
+	g.type = (int)config_translate(g.c_file_type);
 
 	/* Pick a data source type. */
 	cp = config_find("data_source", strlen("data_source"));
@@ -89,8 +91,7 @@ config_setup(void)
 				*cp->v = 0;
 
 	/* LSM trees are only compatible with row store tables. */
-	if (g.c_file_type != ROW &&
-	    strncmp(g.c_data_source, "lsm", strlen("lsm")) == 0) {
+	if (g.type != ROW && strcmp(g.c_data_source, "lsm") == 0) {
 		cp = config_find("file_type", strlen("file_type"));
 		if (!(cp->flags & C_PERM))
 			config_single("file_type=row", 0);
@@ -171,19 +172,13 @@ config_print(int error_display)
 	/* Display configuration values. */
 	for (cp = c; cp->name != NULL; ++cp)
 		if (cp->type_mask != 0 &&
-		    ((g.c_file_type == FIX && !(cp->type_mask & C_FIX)) ||
-		    (g.c_file_type == ROW && !(cp->type_mask & C_ROW)) ||
-		    (g.c_file_type == VAR && !(cp->type_mask & C_VAR))))
+		    ((g.type == FIX && !(cp->type_mask & C_FIX)) ||
+		    (g.type == ROW && !(cp->type_mask & C_ROW)) ||
+		    (g.type == VAR && !(cp->type_mask & C_VAR))))
 			fprintf(fp,
 			    "# %s not applicable to this run\n", cp->name);
-		else if (strcmp(cp->name, "data_source") == 0)
-			fprintf(fp, "%s=%.*s\n", cp->name,
-			    (int)(strchr(*cp->vstr, ':') - *cp->vstr),
-			    *cp->vstr);
 		else if (cp->flags & C_STRING)
 			fprintf(fp, "%s=%s\n", cp->name, *cp->vstr);
-		else if (strcmp(cp->name, "file_type") == 0)
-			fprintf(fp, "%s=%s\n", cp->name, config_dtype());
 		else
 			fprintf(fp, "%s=%" PRIu32 "\n", cp->name, *cp->v);
 
@@ -227,6 +222,8 @@ config_clear(void)
 	/* Clear configuration data. */
 	for (cp = c; cp->name != NULL; ++cp)
 		cp->flags &= ~(uint32_t)C_TEMP;
+	free(g.uri);
+	g.uri = NULL;
 }
 
 /*
@@ -250,22 +247,25 @@ config_single(const char *s, int perm)
 	++ep;
 
 	if (cp->flags & C_STRING) {
-		/* At the moment there is only one string config. */
-		if (strncmp(s, "data_source", strlen("data_source")) != 0) {
-			fprintf(stderr, "Invalid string configuration\n");
-			exit(EXIT_FAILURE);
+		if (strncmp(s, "data_source", strlen("data_source")) == 0) {
+			if (strncmp("file", ep, strlen("file")) != 0 &&
+			    strncmp("table", ep, strlen("table")) != 0 &&
+			    strncmp("lsm", ep, strlen("lsm")) != 0) {
+			    fprintf(stderr,
+			        "Invalid file type option: %s\n", ep);
+			    exit(EXIT_FAILURE);
+			}
+			*cp->vstr = ep;
+			if ((g.uri = malloc(
+			    strlen(ep) + strlen(WT_NAME) + 2)) == NULL)
+				exit(EXIT_FAILURE);
+			sprintf(g.uri, "%s:%s", ep, WT_NAME);
+			return;
 		}
-		if (strncmp("file", ep, strlen("file")) != 0 &&
-		    strncmp("table", ep, strlen("table")) != 0 &&
-		    strncmp("lsm", ep, strlen("lsm")) != 0) {
-		    fprintf(stderr, "Invalid file type option: %s\n", ep);
-		    exit(EXIT_FAILURE);
+		if (strncmp(s, "file_type", strlen("file_type")) == 0) {
+			*cp->vstr = config_file_type((int)config_translate(ep));
+			return;
 		}
-		if ((*cp->vstr =
-		    malloc(strlen(ep) + strlen(WT_NAME) + 2)) == NULL)
-			exit(EXIT_FAILURE);
-		sprintf(*cp->vstr, "%s:%s", ep, WT_NAME);
-		return;
 	}
 
 	*cp->v = config_translate(ep);
@@ -331,13 +331,13 @@ config_find(const char *s, size_t len)
 }
 
 /*
- * config_dtype --
+ * config_file_type --
  *	Return the file type as a string.
  */
-const char *
-config_dtype(void)
+static const char *
+config_file_type(int type)
 {
-	switch (g.c_file_type) {
+	switch (type) {
 	case FIX:
 		return ("fixed-length column-store");
 	case VAR:
@@ -347,5 +347,5 @@ config_dtype(void)
 	default:
 		break;
 	}
-	return ("error: UNKNOWN FILE TYPE");
+	return ("error: unknown file type");
 }

@@ -37,10 +37,10 @@ typedef struct {
 #define	C_STRING	0x020
 	uint32_t 	flags;
 
-	uint32_t	 min;			/* Minimum value */
-	uint32_t	 max;			/* Maximum value */
-	uint32_t	 *v;			/* Value for this run */
-	char		 **vstr;		/* Value for string options */
+	uint32_t	min;			/* Minimum value */
+	uint32_t	max;			/* Maximum value */
+	uint32_t	*v;			/* Value for this run */
+	const char	**vstr;			/* Value for string options */
 } CONFIG;
 
 /*
@@ -64,7 +64,7 @@ static CONFIG c[] = {
 
 	{ "data_source",
 	  "type of data source to create (file | table | lsm)",
-	  0, C_STRING, 0, 0, 0, &g.c_data_source },
+	  0, C_IGNORE | C_STRING, 0, 0, NULL, &g.c_data_source },
 
 	{ "delete_pct",
 	  "percent operations that are deletes",
@@ -76,7 +76,7 @@ static CONFIG c[] = {
 
 	{ "file_type",
 	  "type of file to create (fix | var | row)",
-	  0, C_IGNORE, 1, 3, &g.c_file_type, NULL },
+	  0, C_IGNORE|C_STRING, 1, 3, NULL, &g.c_file_type },
 
 	{ "huffman_key",
 	  "if keys are huffman encoded",		/* 20% */
