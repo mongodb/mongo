@@ -204,6 +204,8 @@ struct __wt_connection_impl {
 
 					/* Locked: btree list */
 	TAILQ_HEAD(__wt_btree_qh, __wt_btree) btqh;
+					/* Locked: LSM handle list. */
+	TAILQ_HEAD(__wt_lsm_qh, __wt_lsm_tree) lsmqh;
 					/* Locked: file list */
 	TAILQ_HEAD(__wt_fh_qh, __wt_fh) fhqh;
 
@@ -260,9 +262,6 @@ struct __wt_connection_impl {
 
 	uint32_t direct_io;
 	uint32_t verbose;
-
-	/* XXX LSM stuff.  Will move. */
-	TAILQ_HEAD(__wt_lsm_qh, __wt_lsm_tree) lsmqh;
 
 	uint32_t flags;
 };

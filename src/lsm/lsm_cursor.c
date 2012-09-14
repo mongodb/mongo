@@ -252,18 +252,18 @@ __clsm_get_current(
 static int
 __clsm_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 {
-	WT_CURSOR_LSM *alsm, *blsm;
-	WT_CURSOR *c;
+	WT_CURSOR_LSM *alsm;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int cmp, i;
+	int cmp;
 
-	WT_LSM_ENTER(alsm, a, session, compare);
-	blsm = (WT_CURSOR_LSM *)b;
+	/* There's no need to sync with the LSM tree, avoid WT_LSM_ENTER. */
+	alsm = (WT_CURSOR_LSM *)a;
+	CURSOR_API_CALL_NOCONF(a, session, compare, NULL);
 
 	/*
 	 * Confirm both cursors refer to the same source and have keys, then
-	 * call the underlying object to compare them.
+	 * compare the keys.
 	 */
 	if (strcmp(a->uri, b->uri) != 0)
 		WT_ERR_MSG(session, EINVAL,
@@ -272,21 +272,10 @@ __clsm_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 	WT_ERR(WT_CURSOR_NEEDKEY(a));
 	WT_ERR(WT_CURSOR_NEEDKEY(b));
 
-	/* TODO: How to order cursors with different dsk_gen values? */
-	if (alsm->nchunks != blsm->nchunks)
-		return (1);
+	WT_ERR(WT_LSM_CMP(session, alsm->lsm_tree, &a->key, &b->key, cmp));
+	*cmpp = cmp;
 
-	cmp = 0;
-	FORALL_CURSORS(alsm, c, i) {
-		WT_ERR(WT_LSM_CURCMP(session,
-		    alsm->lsm_tree, c, blsm->cursors[i], cmp));
-		if (!cmp)
-			break;
-	}
-err:	WT_LSM_END(alsm, session);
-	if (ret != 0)
-		*cmpp = cmp;
-
+err:	API_END(session);
 	return (ret);
 }
 
