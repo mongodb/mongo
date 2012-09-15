@@ -771,14 +771,15 @@ dodouble:
             if (full) {
                 int len;
                 const char* data = binDataClean(len);
-                s << '(' << binDataType() << ", " << toHex(data, len) << ')';
+                s << '(' << static_cast<long>(binDataType())
+                  << ", " << toHex(data, len) << ')';
             }
             break;
         case Timestamp:
             s << "Timestamp " << timestampTime() << "|" << timestampInc();
             break;
         default:
-            s << "?type=" << type();
+            s << "?type=" << static_cast<long>(type());
             break;
         }
     }

@@ -1078,7 +1078,7 @@ namespace mongo {
 
             md5digest d;
             md5_state_t st;
-            md5_init(&st);
+            mongo_md5_init(&st);
 
             int n = 0;
 
@@ -1140,7 +1140,7 @@ namespace mongo {
 
                 ClientCursor::YieldLock yield (cc.get());
                 try {
-                    md5_append( &st , (const md5_byte_t*)(data) , len );
+                    mongo_md5_append( &st , (const md5_byte_t*)(data) , len );
                     n++;
                 }
                 catch (...) {
@@ -1172,7 +1172,7 @@ namespace mongo {
                 result.appendBinData("md5state", sizeof(st), BinDataGeneral, &st);
 
             // This must be *after* the capture of md5state since it mutates st
-            md5_finish(&st, d);
+            mongo_md5_finish(&st, d);
 
             result.append( "numChunks" , n );
             result.append( "md5" , digestToString( d ) );
@@ -1712,7 +1712,7 @@ namespace mongo {
             result.append( "host" , prettyHostName() );
 
             md5_state_t globalState;
-            md5_init(&globalState);
+            mongo_md5_init(&globalState);
 
             BSONObjBuilder bb( result.subobjStart( "collections" ) );
             for ( list<string>::iterator i=colls.begin(); i != colls.end(); i++ ) {
@@ -1752,27 +1752,27 @@ namespace mongo {
                 }
 
                 md5_state_t st;
-                md5_init(&st);
+                mongo_md5_init(&st);
 
                 long long n = 0;
                 while ( cursor->ok() ) {
                     BSONObj c = cursor->current();
-                    md5_append( &st , (const md5_byte_t*)c.objdata() , c.objsize() );
+                    mongo_md5_append( &st , (const md5_byte_t*)c.objdata() , c.objsize() );
                     n++;
                     cursor->advance();
                 }
                 md5digest d;
-                md5_finish(&st, d);
+                mongo_md5_finish(&st, d);
                 string hash = digestToString( d );
 
                 bb.append( c.c_str() + ( dbname.size() + 1 ) , hash );
 
-                md5_append( &globalState , (const md5_byte_t*)hash.c_str() , hash.size() );
+                mongo_md5_append( &globalState , (const md5_byte_t*)hash.c_str() , hash.size() );
             }
             bb.done();
 
             md5digest d;
-            md5_finish(&globalState, d);
+            mongo_md5_finish(&globalState, d);
             string hash = digestToString( d );
 
             result.append( "md5" , hash );

@@ -83,9 +83,9 @@ do_md5_test(void) {
         char hex_output[16*2 + 1];
         int di;
 
-        md5_init(&state);
-        md5_append(&state, (const md5_byte_t *)test[i], strlen(test[i]));
-        md5_finish(&state, digest);
+        mongo_md5_init(&state);
+        mongo_md5_append(&state, (const md5_byte_t *)test[i], strlen(test[i]));
+        mongo_md5_finish(&state, digest);
         for (di = 0; di < 16; ++di)
             sprintf(hex_output + di * 2, "%02x", digest[di]);
         if (strcmp(hex_output, test[i + 1])) {

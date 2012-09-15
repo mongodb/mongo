@@ -385,9 +385,9 @@ namespace mongo {
     string BSONObj::md5() const {
         md5digest d;
         md5_state_t st;
-        md5_init(&st);
-        md5_append( &st , (const md5_byte_t*)_objdata , objsize() );
-        md5_finish(&st, d);
+        mongo_md5_init(&st);
+        mongo_md5_append( &st , (const md5_byte_t*)_objdata , objsize() );
+        mongo_md5_finish(&st, d);
         return digestToString( d );
     }
 

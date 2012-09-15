@@ -468,7 +468,8 @@ namespace mongo {
                 if( eoo() )
                     ss << "field not found, expected type " << t;
                 else
-                    ss << "wrong type for field (" << fieldName() << ") " << type() << " != " << t;
+                    ss << "wrong type for field (" << fieldName() << ") "
+                       << static_cast<long>(type()) << " != " << t;
                 msgasserted(13111, ss.str() );
             }
             return *this;
