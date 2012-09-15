@@ -200,8 +200,8 @@ wts_rand(void)
 	 */
 	if (g.rand_log == NULL) {
 		if ((g.rand_log =
-		    fopen("rand", g.replay ? "r" : "w")) == NULL)
-			die(errno, "fopen: rand");
+		    fopen("RUNDIR/rand", g.replay ? "r" : "w")) == NULL)
+			die(errno, "fopen: RUNDIR/rand");
 		if (!g.replay) {
 			srand((u_int)(0xdeadbeef ^ (u_int)time(NULL)));
 			(void)setvbuf(g.rand_log, NULL, _IOLBF, 0);

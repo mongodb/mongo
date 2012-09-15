@@ -162,8 +162,8 @@ config_print(int error_display)
 	if (error_display)
 		fp = stdout;
 	else
-		if ((fp = fopen("run", "w")) == NULL)
-			die(errno, "fopen: run");
+		if ((fp = fopen("RUNDIR/run", "w")) == NULL)
+			die(errno, "fopen: RUNDIR/run");
 
 	fprintf(fp, "############################################\n");
 	fprintf(fp, "#  RUN PARAMETERS\n");

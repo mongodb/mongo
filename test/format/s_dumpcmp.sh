@@ -2,7 +2,7 @@
 
 trap 'exit 1' 1 2
 
-top=../../..
+top=../..
 bdb=$top/db/build_unix
 
 colflag=0
@@ -39,30 +39,31 @@ if test -e $bzext ; then
 fi
 config='extensions=['$ext']'
 
-$top/wt -C "$config" dump $wt_name | sed -e '1,/^Data$/d' > wt_dump
+$top/wt -h RUNDIR -C "$config" dump $wt_name |
+    sed -e '1,/^Data$/d' > RUNDIR/wt_dump
 
 if test $dump_bdb -ne 1; then
 	exit 0
 fi
 
 if test $colflag -eq 0; then
-	$bdb/db_dump -p bdb |
+	$bdb/db_dump -p RUNDIR/bdb |
 	    sed -e '1,/HEADER=END/d' \
 		-e '/DATA=END/d' \
-		-e 's/^ //' > bdb_dump
+		-e 's/^ //' > RUNDIR/bdb_dump
 else
 	# Format stores record numbers in Berkeley DB as string keys,
 	# it's simpler that way.  Convert record numbers from strings
 	# to numbers.
-	$bdb/db_dump -p bdb |
+	$bdb/db_dump -p RUNDIR/bdb |
 	    sed -e '1,/HEADER=END/d' \
 		-e '/DATA=END/d' \
 		-e 's/^ //' |
 	    sed -e 's/^0*//' \
 		-e 's/\.00$//' \
-		-e N > bdb_dump
+		-e N > RUNDIR/bdb_dump
 fi
 
-cmp wt_dump bdb_dump > /dev/null
+cmp RUNDIR/wt_dump RUNDIR/bdb_dump > /dev/null
 
 exit $?

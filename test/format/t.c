@@ -39,11 +39,6 @@ main(int argc, char *argv[])
 		    "%s: mkdir: %s %s\n", g.progname, RUNDIR, strerror(errno));
 		return (EXIT_FAILURE);
 	}
-	if (chdir(RUNDIR)) {
-		fprintf(stderr,
-		    "%s: chdir: %s %s\n", g.progname, RUNDIR, strerror(errno));
-		return (EXIT_FAILURE);
-	}
 
 	/* Set values from the command line. */
 	while ((ch = getopt(argc, argv, "1C:c:Llqrt:")) != EOF)
@@ -191,12 +186,12 @@ startup(void)
 	}
 
 	/* Remove the run's files except for rand. */
-	(void)system("rm -rf `ls | sed /rand/d`");
+	(void)system("cd RUNDIR && rm -rf `ls | sed /rand/d`");
 
 	/* Open/truncate the logging file. */
 	if (g.logging != 0) {
-		if ((g.logfp = fopen("log", "w")) == NULL)
-			die(errno, "fopen: log");
+		if ((g.logfp = fopen("RUNDIR/log", "w")) == NULL)
+			die(errno, "fopen: RUNDIR/log");
 		(void)setvbuf(g.logfp, NULL, _IOLBF, 0);
 	}
 }
@@ -211,7 +206,7 @@ onint(int signo)
 	UNUSED(signo);
 
 	/* Remove the run's files except for rand. */
-	(void)system("rm -rf `ls | sed /rand/d`");
+	(void)system("cd RUNDIR && rm -rf `ls | sed /rand/d`");
 
 	fprintf(stderr, "\n");
 	exit(EXIT_FAILURE);
