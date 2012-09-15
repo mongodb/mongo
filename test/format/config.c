@@ -252,7 +252,7 @@ config_single(const char *s, int perm)
 			    strncmp("table", ep, strlen("table")) != 0 &&
 			    strncmp("lsm", ep, strlen("lsm")) != 0) {
 			    fprintf(stderr,
-			        "Invalid file type option: %s\n", ep);
+				"Invalid file type option: %s\n", ep);
 			    exit(EXIT_FAILURE);
 			}
 			*cp->vstr = ep;
