@@ -19,6 +19,8 @@
 
 #pragma once
 
+#include "mongo/platform/windows_basic.h"
+
 #include <boost/utility.hpp>
 
 namespace mongo {
