@@ -51,7 +51,7 @@ __wt_session_lock_btree(WT_SESSION_IMPL *session, uint32_t flags)
 	if (LF_ISSET(WT_BTREE_EXCLUSIVE)) {
 		/*
 		 * Try to get an exclusive handle lock and fail immediately if
-		 * it unavailable.  We don't expect exclusive operations on
+		 * it's unavailable.  We don't expect exclusive operations on
 		 * trees to be mixed with ordinary cursor access, but if there
 		 * is a use case in the future, we could make blocking here
 		 * configurable.
