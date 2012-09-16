@@ -298,7 +298,7 @@ __wt_row_random(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 	 */
 	F_SET(cbt, WT_CBT_SEARCH_SMALLEST);
 	if ((cbt->ins_head = WT_ROW_INSERT_SMALLEST(page)) == NULL)
-		return (WT_NOTFOUND);
+		WT_ERR(WT_NOTFOUND);
 	for (p = t = WT_SKIP_FIRST(cbt->ins_head);;) {
 		if ((p = WT_SKIP_NEXT(p)) == NULL)
 			break;
