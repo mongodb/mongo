@@ -274,9 +274,6 @@ __wt_row_random(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 		page = ref->page;
 	}
 
-	cbt->page = page;
-	cbt->compare = 0;
-
 	if (page->entries != 0) {
 		/*
 		 * The use case for this call is finding a place to split the
@@ -286,6 +283,8 @@ __wt_row_random(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 		 * or a tree with just one big page, that's not going to work,
 		 * check for that.
 		 */
+		cbt->page = page;
+		cbt->compare = 0;
 		cbt->slot =
 		    btree->root_page->entries < 2 ?
 		    __wt_random() % page->entries : 0;
@@ -306,6 +305,8 @@ __wt_row_random(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 			break;
 		t = WT_SKIP_NEXT(t);
 	}
+	cbt->page = page;
+	cbt->compare = 0;
 	cbt->ins = t;
 
 	return (0);
