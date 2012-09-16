@@ -23,6 +23,7 @@
 #include "cmdline.h"
 #include "../server.h"
 #include "pagefault.h"
+#include "mongo/client/dbclientinterface.h"
 
 //#define DEBUGQO(x) cout << x << endl;
 #define DEBUGQO(x)
@@ -503,6 +504,335 @@ doneCheckOrder:
         }
     }
 
+    CachedMatchCounter::CachedMatchCounter( long long& aggregateNscanned,
+                                            int cumulativeCount ) :
+        _aggregateNscanned( aggregateNscanned ),
+        _nscanned(),
+        _cumulativeCount( cumulativeCount ),
+        _count(),
+        _checkDups(),
+        _match( Unknown ),
+        _counted() {
+    }
+
+    void CachedMatchCounter::resetMatch() {
+        _match = Unknown;
+        _counted = false;
+    }
+
+    bool CachedMatchCounter::setMatch( bool match ) {
+        MatchState oldMatch = _match;
+        _match = match ? True : False;
+        return _match == True && oldMatch != True;
+    }
+
+    void CachedMatchCounter::incMatch( const DiskLoc& loc ) {
+        if ( !_counted && _match == True && !getsetdup( loc ) ) {
+            ++_cumulativeCount;
+            ++_count;
+            _counted = true;
+        }
+    }
+
+    bool CachedMatchCounter::wouldIncMatch( const DiskLoc& loc ) const {
+        return !_counted && _match == True && !getdup( loc );
+    }
+    
+    bool CachedMatchCounter::enoughCumulativeMatchesToChooseAPlan() const {
+        // This is equivalent to the default condition for switching from
+        // a query to a getMore, which was the historical default match count for
+        // choosing a plan.
+        return _cumulativeCount >= 101;
+    }
+
+    bool CachedMatchCounter::enoughMatchesToRecordPlan() const {
+        // Recording after 50 matches is a historical default (101 default limit / 2).
+        return _count > 50;
+    }
+
+    void CachedMatchCounter::updateNscanned( long long nscanned ) {
+        _aggregateNscanned += ( nscanned - _nscanned );
+        _nscanned = nscanned;
+    }
+
+    bool CachedMatchCounter::getsetdup( const DiskLoc& loc ) {
+        if ( !_checkDups ) {
+            return false;
+        }
+        pair<set<DiskLoc>::iterator, bool> p = _dups.insert( loc );
+        return !p.second;
+    }
+
+    bool CachedMatchCounter::getdup( const DiskLoc& loc ) const {
+        if ( !_checkDups ) {
+            return false;
+        }
+        return _dups.find( loc ) != _dups.end();
+    }
+
+    QueryPlanRunner::QueryPlanRunner( long long& aggregateNscanned,
+                                      const QueryPlanSelectionPolicy& selectionPolicy,
+                                      const bool& requireOrder,
+                                      bool alwaysCountMatches,
+                                      int cumulativeCount ) :
+        _complete(),
+        _stopRequested(),
+        _queryPlan(),
+        _error(),
+        _matchCounter( aggregateNscanned, cumulativeCount ),
+        _countingMatches(),
+        _mustAdvance(),
+        _capped(),
+        _selectionPolicy( selectionPolicy ),
+        _requireOrder( requireOrder ),
+        _alwaysCountMatches( alwaysCountMatches ) {
+    }
+
+    void QueryPlanRunner::next() {
+        checkCursorOrdering();
+        
+        mayAdvance();
+        
+        if ( countMatches() && _matchCounter.enoughCumulativeMatchesToChooseAPlan() ) {
+            setStop();
+            if ( _explainPlanInfo ) _explainPlanInfo->notePicked();
+            return;
+        }
+        if ( !_c || !_c->ok() ) {
+            if ( _explainPlanInfo && _c ) _explainPlanInfo->noteDone( *_c );
+            setComplete();
+            return;
+        }
+        
+        _mustAdvance = true;
+    }
+
+    long long QueryPlanRunner::nscanned() const {
+        return _c ? _c->nscanned() : _matchCounter.nscanned();
+    }
+
+    void QueryPlanRunner::prepareToYield() {
+        if ( _c && !_cc ) {
+            _cc.reset( new ClientCursor( QueryOption_NoCursorTimeout, _c, queryPlan().ns() ) );
+            // Set 'doing deletes' as deletes may occur; if there are no deletes this has no
+            // effect.
+            _cc->setDoingDeletes( true );
+        }
+        if ( _cc ) {
+            recordCursorLocation();
+            _cc->prepareToYield( _yieldData );
+        }
+    }
+    
+    void QueryPlanRunner::recoverFromYield() {
+        if ( _cc && !ClientCursor::recoverFromYield( _yieldData ) ) {
+            // !!! The collection may be gone, and any namespace or index specific memory may
+            // have become invalid.
+            _c.reset();
+            _cc.reset();
+            
+            if ( _capped ) {
+                msgassertedNoTrace( 13338,
+                                    str::stream() << "capped cursor overrun: "
+                                    << queryPlan().ns() );
+            }
+            msgassertedNoTrace( 15892,
+                                str::stream() <<
+                                "QueryPlanRunner::recoverFromYield() failed to recover" );
+        }
+        else {
+            checkCursorAdvanced();
+        }
+    }
+    
+    void QueryPlanRunner::prepareToTouchEarlierIterate() {
+        recordCursorLocation();
+        if ( _c ) {
+            _c->prepareToTouchEarlierIterate();
+        }
+    }
+
+    void QueryPlanRunner::recoverFromTouchingEarlierIterate() {
+        if ( _c ) {
+            _c->recoverFromTouchingEarlierIterate();
+        }
+        checkCursorAdvanced();
+    }
+    
+    bool QueryPlanRunner::currentMatches( MatchDetails* details ) {
+        if ( !_c || !_c->ok() ) {
+            _matchCounter.setMatch( false );
+            return false;
+        }
+        
+        MatchDetails myDetails;
+        if ( !details && _explainPlanInfo ) {
+            details = &myDetails;
+        }
+        
+        bool match = queryPlan().matcher()->matchesCurrent( _c.get(), details );
+        // Cache the match, so we can count it in mayAdvance().
+        bool newMatch = _matchCounter.setMatch( match );
+        
+        if ( _explainPlanInfo ) {
+            // Note iterate results as if this is the only query plan running.  But do not account
+            // for query parameters that may be appled to the whole result set (results from
+            // interleaved plans), for example the 'skip' parameter.
+            bool countableMatch = newMatch && _matchCounter.wouldIncMatch( _c->currLoc() );
+            bool matchWouldBeLoadedForReturn = countableMatch && hasDocumentLoadingQueryPlan();
+            _explainPlanInfo->noteIterate( countableMatch,
+                                           details->hasLoadedRecord() ||
+                                           matchWouldBeLoadedForReturn,
+                                           *_c );
+        }
+        
+        return match;
+    }
+
+    bool QueryPlanRunner::mayRecordPlan() const {
+        return complete() && ( !stopRequested() || _matchCounter.enoughMatchesToRecordPlan() );
+    }
+
+    QueryPlanRunner* QueryPlanRunner::createChild() const {
+        return new QueryPlanRunner( _matchCounter.aggregateNscanned(),
+                                    _selectionPolicy,
+                                    _requireOrder,
+                                    _alwaysCountMatches,
+                                    _matchCounter.cumulativeCount() );
+    }
+    
+    void QueryPlanRunner::setQueryPlan( const QueryPlan* queryPlan ) {
+        _queryPlan = queryPlan;
+        verify( _queryPlan != NULL );
+    }
+    
+    void QueryPlanRunner::init() {
+        checkCursorOrdering();
+        if ( !_selectionPolicy.permitPlan( queryPlan() ) ) {
+            throw MsgAssertionException( 9011,
+                                         str::stream()
+                                         << "Plan not permitted by query plan selection policy '"
+                                         << _selectionPolicy.name()
+                                         << "'" );
+        }
+        
+        _c = queryPlan().newCursor();
+        // The basic and btree cursors used by this implementation do not supply their own
+        // matchers, and a matcher from a query plan will be used instead.
+        verify( !_c->matcher() );
+        // Such cursors all support deduplication.
+        verify( _c->autoDedup() );
+        
+        // The query plan must have a matcher.  The matcher's constructor performs some aspects
+        // of query validation that should occur as part of this class's init() if not handled
+        // already.
+        fassert( 16249, queryPlan().matcher() );
+        
+        // All candidate cursors must support yields for QueryOptimizerCursorImpl's
+        // prepareToYield() and prepareToTouchEarlierIterate() to work.
+        verify( _c->supportYields() );
+        _capped = _c->capped();
+        
+        // TODO This violates the current Cursor interface abstraction, but for now it's simpler to keep our own set of
+        // dups rather than avoid poisoning the cursor's dup set with unreturned documents.  Deduping documents
+        // matched in this QueryOptimizerCursorOp will run against the takeover cursor.
+        _matchCounter.setCheckDups( countMatches() && _c->isMultiKey() );
+        // TODO ok if cursor becomes multikey later?
+        
+        _matchCounter.updateNscanned( _c->nscanned() );
+    }
+
+    void QueryPlanRunner::setException( const DBException &e ) {
+        _error = true;
+        _exception = e.getInfo();
+    }
+
+    shared_ptr<ExplainPlanInfo> QueryPlanRunner::generateExplainInfo() {
+        if ( !_c ) {
+            return shared_ptr<ExplainPlanInfo>( new ExplainPlanInfo() );
+        }
+        _explainPlanInfo.reset( new ExplainPlanInfo() );
+        _explainPlanInfo->notePlan( *_c, queryPlan().scanAndOrderRequired(),
+                                    queryPlan().keyFieldsOnly() );
+        return _explainPlanInfo;
+    }
+
+    void QueryPlanRunner::mayAdvance() {
+        if ( !_c ) {
+            return;
+        }
+        if ( countingMatches() ) {
+            // Check match if not yet known.
+            if ( !_matchCounter.knowMatch() ) {
+                currentMatches( 0 );
+            }
+            _matchCounter.incMatch( currLoc() );
+        }
+        if ( _mustAdvance ) {
+            _c->advance();
+            handleCursorAdvanced();
+        }
+        _matchCounter.updateNscanned( _c->nscanned() );
+    }
+
+    bool QueryPlanRunner::countingMatches() {
+        if ( _countingMatches ) {
+            return true;
+        }
+        if ( countMatches() ) {
+            // Only count matches after the first call to next(), which occurs before the first
+            // result is returned.
+            _countingMatches = true;
+        }
+        return false;
+    }
+
+    bool QueryPlanRunner::countMatches() const {
+        return _alwaysCountMatches || !queryPlan().scanAndOrderRequired();
+    }
+
+    bool QueryPlanRunner::hasDocumentLoadingQueryPlan() const {
+        if ( queryPlan().parsedQuery() && queryPlan().parsedQuery()->returnKey() ) {
+            // Index keys will be returned using $returnKey.
+            return false;
+        }
+        if ( queryPlan().scanAndOrderRequired() ) {
+            // The in memory sort implementation operates on full documents.
+            return true;
+        }
+        if ( keyFieldsOnly() ) {
+            // A covered index projection will be used.
+            return false;
+        }
+        // Documents will be loaded for a standard query.
+        return true;
+    }
+
+    void QueryPlanRunner::recordCursorLocation() {
+        _posBeforeYield = currLoc();
+    }
+
+    void QueryPlanRunner::checkCursorAdvanced() {
+        // This check will not correctly determine if we are looking at a different document in
+        // all cases, but it is adequate for updating the query plan's match count (just used to pick
+        // plans, not returned to the client) and adjust iteration via _mustAdvance.
+        if ( _posBeforeYield != currLoc() ) {
+            // If the yield advanced our position, the next next() will be a no op.
+            handleCursorAdvanced();
+        }
+    }
+
+    void QueryPlanRunner::handleCursorAdvanced() {
+        _mustAdvance = false;
+        _matchCounter.resetMatch();
+    }
+
+    void QueryPlanRunner::checkCursorOrdering() {
+        if ( _requireOrder && queryPlan().scanAndOrderRequired() ) {
+            throw MsgAssertionException( OutOfOrderDocumentsAssertionCode, "order spec cannot be satisfied with index" );
+        }
+    }
+
     QueryPlanGenerator::QueryPlanGenerator( QueryPlanSet &qps,
                                            auto_ptr<FieldRangeSetPair> originalFrsp,
                                            const shared_ptr<const ParsedQuery> &parsedQuery,
@@ -821,7 +1151,7 @@ doneCheckOrder:
     }
 
     bool QueryPlanSet::hasMultiKey() const {
-        for( PlanSet::const_iterator i = _plans.begin(); i != _plans.end(); ++i )
+        for( PlanVector::const_iterator i = _plans.begin(); i != _plans.end(); ++i )
             if ( (*i)->isMultiKey() )
                 return true;
         return false;
@@ -900,7 +1230,7 @@ doneCheckOrder:
     }
     
     bool QueryPlanSet::haveInOrderPlan() const {
-        for( PlanSet::const_iterator i = _plans.begin(); i != _plans.end(); ++i ) {
+        for( PlanVector::const_iterator i = _plans.begin(); i != _plans.end(); ++i ) {
             if ( !(*i)->scanAndOrderRequired() ) {
                 return true;
             }
@@ -916,7 +1246,7 @@ doneCheckOrder:
     }
 
     bool QueryPlanSet::possibleOutOfOrderPlan() const {
-        for( PlanSet::const_iterator i = _plans.begin(); i != _plans.end(); ++i ) {
+        for( PlanVector::const_iterator i = _plans.begin(); i != _plans.end(); ++i ) {
             if ( (*i)->scanAndOrderRequired() ) {
                 return true;
             }
@@ -942,7 +1272,7 @@ doneCheckOrder:
 
     string QueryPlanSet::toString() const {
         BSONArrayBuilder bab;
-        for( PlanSet::const_iterator i = _plans.begin(); i != _plans.end(); ++i ) {
+        for( PlanVector::const_iterator i = _plans.begin(); i != _plans.end(); ++i ) {
             bab << (*i)->toString();
         }
         return bab.arr().jsonString();
@@ -963,109 +1293,117 @@ doneCheckOrder:
         return ret.release();
     }
     
-    shared_ptr<QueryOp> MultiPlanScanner::iterateRunner( QueryOp &originalOp, bool retried ) {
+    shared_ptr<QueryPlanRunner> MultiPlanScanner::iterateRunnerQueue
+            ( QueryPlanRunner& originalRunner, bool retried ) {
 
-        if ( _runner ) {
-            return _runner->next();
+        if ( _runnerQueue ) {
+            return _runnerQueue->next();
         }
         
-        _runner.reset( new QueryPlanSet::Runner( *_currentQps, originalOp ) );
+        _runnerQueue.reset( new QueryPlanRunnerQueue( *_currentQps, originalRunner ) );
         shared_ptr<ExplainClauseInfo> explainClause;
         if ( _explainQueryInfo ) {
-            explainClause = _runner->generateExplainInfo();
+            explainClause = _runnerQueue->generateExplainInfo();
         }
         
-        shared_ptr<QueryOp> op = _runner->next();
-        if ( op->error() &&
+        shared_ptr<QueryPlanRunner> runner = _runnerQueue->next();
+        if ( runner->error() &&
             _currentQps->prepareToRetryQuery() ) {
 
             // Avoid an infinite loop here - this should never occur.
             verify( !retried );
-            _runner.reset();
-            return iterateRunner( originalOp, true );
+            _runnerQueue.reset();
+            return iterateRunnerQueue( originalRunner, true );
         }
         
         if ( _explainQueryInfo ) {
             _explainQueryInfo->addClauseInfo( explainClause );
         }
-        return op;
+        return runner;
     }
 
     void MultiPlanScanner::updateCurrentQps( QueryPlanSet *qps ) {
         _currentQps.reset( qps );
-        _runner.reset();
+        _runnerQueue.reset();
     }
 
-    QueryPlanSet::Runner::Runner( QueryPlanSet &plans, QueryOp &op ) :
-        _op( op ),
+    QueryPlanRunnerQueue::QueryPlanRunnerQueue( QueryPlanSet& plans,
+                                                const QueryPlanRunner& prototypeRunner ) :
+        _prototypeRunner( prototypeRunner ),
         _plans( plans ),
         _done() {
     }
 
-    void QueryPlanSet::Runner::prepareToYield() {
-        for( vector<shared_ptr<QueryOp> >::const_iterator i = _ops.begin(); i != _ops.end(); ++i ) {
-            prepareToYieldOp( **i );
+    void QueryPlanRunnerQueue::prepareToYield() {
+        for( vector<shared_ptr<QueryPlanRunner> >::const_iterator i = _runners.begin();
+             i != _runners.end(); ++i ) {
+            prepareToYieldRunner( **i );
         }
     }
 
-    void QueryPlanSet::Runner::recoverFromYield() {
-        for( vector<shared_ptr<QueryOp> >::const_iterator i = _ops.begin(); i != _ops.end(); ++i ) {
-            recoverFromYieldOp( **i );
+    void QueryPlanRunnerQueue::recoverFromYield() {
+        for( vector<shared_ptr<QueryPlanRunner> >::const_iterator i = _runners.begin();
+             i != _runners.end(); ++i ) {
+            recoverFromYieldRunner( **i );
         }        
     }
 
-    shared_ptr<QueryOp> QueryPlanSet::Runner::init() {
-        massert( 10369 ,  "no plans", _plans._plans.size() > 0 );
+    shared_ptr<QueryPlanRunner> QueryPlanRunnerQueue::init() {
+        massert( 10369 ,  "no plans", _plans.plans().size() > 0 );
         
-        if ( _plans._plans.size() > 1 )
+        if ( _plans.plans().size() > 1 )
             log(1) << "  running multiple plans" << endl;
-        for( PlanSet::iterator i = _plans._plans.begin(); i != _plans._plans.end(); ++i ) {
-            shared_ptr<QueryOp> op( _op.createChild() );
-            op->setQueryPlan( i->get() );
-            _ops.push_back( op );
+        for( QueryPlanSet::PlanVector::const_iterator i = _plans.plans().begin();
+             i != _plans.plans().end(); ++i ) {
+            shared_ptr<QueryPlanRunner> runner( _prototypeRunner.createChild() );
+            runner->setQueryPlan( i->get() );
+            _runners.push_back( runner );
         }
         
-        // Initialize ops.
-        for( vector<shared_ptr<QueryOp> >::iterator i = _ops.begin(); i != _ops.end(); ++i ) {
-            initOp( **i );
+        // Initialize runners.
+        for( vector<shared_ptr<QueryPlanRunner> >::iterator i = _runners.begin();
+             i != _runners.end(); ++i ) {
+            initRunner( **i );
             if ( _explainClauseInfo ) {
                 _explainClauseInfo->addPlanInfo( (*i)->generateExplainInfo() );
             }
         }
         
         // See if an op has completed.
-        for( vector<shared_ptr<QueryOp> >::iterator i = _ops.begin(); i != _ops.end(); ++i ) {
+        for( vector<shared_ptr<QueryPlanRunner> >::iterator i = _runners.begin();
+             i != _runners.end(); ++i ) {
             if ( (*i)->complete() ) {
                 return *i;
             }
         }
         
         // Put runnable ops in the priority queue.
-        for( vector<shared_ptr<QueryOp> >::iterator i = _ops.begin(); i != _ops.end(); ++i ) {
+        for( vector<shared_ptr<QueryPlanRunner> >::iterator i = _runners.begin();
+             i != _runners.end(); ++i ) {
             if ( !(*i)->error() ) {
                 _queue.push( *i );
             }
         }
         
         if ( _queue.empty() ) {
-            return _ops.front();
+            return _runners.front();
         }
         
-        return shared_ptr<QueryOp>();
+        return shared_ptr<QueryPlanRunner>();
     }
     
-    shared_ptr<QueryOp> QueryPlanSet::Runner::next() {
+    shared_ptr<QueryPlanRunner> QueryPlanRunnerQueue::next() {
         verify( !done() );
 
-        if ( _ops.empty() ) {
-            shared_ptr<QueryOp> initialRet = init();
+        if ( _runners.empty() ) {
+            shared_ptr<QueryPlanRunner> initialRet = init();
             if ( initialRet ) {
                 _done = true;
                 return initialRet;
             }
         }
 
-        shared_ptr<QueryOp> ret;
+        shared_ptr<QueryPlanRunner> ret;
         do {
             ret = _next();
         } while( ret->error() && !_queue.empty() );
@@ -1077,75 +1415,76 @@ doneCheckOrder:
         return ret;
     }
     
-    shared_ptr<QueryOp> QueryPlanSet::Runner::_next() {
+    shared_ptr<QueryPlanRunner> QueryPlanRunnerQueue::_next() {
         verify( !_queue.empty() );
-        OpHolder holder = _queue.pop();
-        QueryOp &op = *holder._op;
-        nextOp( op );
-        if ( op.complete() ) {
-            if ( _plans._mayRecordPlan && op.mayRecordPlan() ) {
-                op.queryPlan().registerSelf( op.nscanned(), _plans.characterizeCandidatePlans() );
+        RunnerHolder holder = _queue.pop();
+        QueryPlanRunner& runner = *holder._runner;
+        nextRunner( runner );
+        if ( runner.complete() ) {
+            if ( _plans.mayRecordPlan() && runner.mayRecordPlan() ) {
+                runner.queryPlan().registerSelf( runner.nscanned(),
+                                                 _plans.characterizeCandidatePlans() );
             }
             _done = true;
-            return holder._op;
+            return holder._runner;
         }
-        if ( op.error() ) {
-            return holder._op;
+        if ( runner.error() ) {
+            return holder._runner;
         }
         if ( _plans.hasPossiblyExcludedPlans() &&
-            op.nscanned() > _plans._oldNScanned * 10 ) {
+            runner.nscanned() > _plans.oldNScanned() * 10 ) {
             verify( _plans.nPlans() == 1 && _plans.firstPlan()->special().empty() );
-            holder._offset = -op.nscanned();
+            holder._offset = -runner.nscanned();
             _plans.addFallbackPlans();
-            PlanSet::iterator i = _plans._plans.begin();
+            QueryPlanSet::PlanVector::const_iterator i = _plans.plans().begin();
             ++i;
-            for( ; i != _plans._plans.end(); ++i ) {
-                shared_ptr<QueryOp> op( _op.createChild() );
-                op->setQueryPlan( i->get() );
-                _ops.push_back( op );
-                initOp( *op );
-                if ( op->complete() )
-                    return op;
-                _queue.push( op );
+            for( ; i != _plans.plans().end(); ++i ) {
+                shared_ptr<QueryPlanRunner> runner( _prototypeRunner.createChild() );
+                runner->setQueryPlan( i->get() );
+                _runners.push_back( runner );
+                initRunner( *runner );
+                if ( runner->complete() )
+                    return runner;
+                _queue.push( runner );
             }
-            _plans._usingCachedPlan = false;
+            _plans.setUsingCachedPlan( false );
         }
         _queue.push( holder );
-        return holder._op;
+        return holder._runner;
     }
     
-#define GUARD_OP_EXCEPTION( op, expression ) \
+#define GUARD_RUNNER_EXCEPTION( runner, expression ) \
     try { \
         expression; \
     } \
     catch ( DBException& e ) { \
-        op.setException( e.getInfo() ); \
+        runner.setException( e.getInfo() ); \
     } \
     catch ( const std::exception &e ) { \
-        op.setException( ExceptionInfo( e.what() , 0 ) ); \
+        runner.setException( ExceptionInfo( e.what(), 0 ) ); \
     } \
     catch ( PageFaultException& pfe ) { \
         throw pfe; \
     } \
     catch ( ... ) { \
-        op.setException( ExceptionInfo( "Caught unknown exception" , 0 ) ); \
+        runner.setException( ExceptionInfo( "Caught unknown exception", 0 ) ); \
     }
 
 
-    void QueryPlanSet::Runner::initOp( QueryOp &op ) {
-        GUARD_OP_EXCEPTION( op, op.init() );
+    void QueryPlanRunnerQueue::initRunner( QueryPlanRunner &runner ) {
+        GUARD_RUNNER_EXCEPTION( runner, runner.init() );
     }
 
-    void QueryPlanSet::Runner::nextOp( QueryOp &op ) {
-        GUARD_OP_EXCEPTION( op, if ( !op.error() ) { op.next(); } );
+    void QueryPlanRunnerQueue::nextRunner( QueryPlanRunner& runner ) {
+        GUARD_RUNNER_EXCEPTION( runner, if ( !runner.error() ) { runner.next(); } );
     }
 
-    void QueryPlanSet::Runner::prepareToYieldOp( QueryOp &op ) {
-        GUARD_OP_EXCEPTION( op, if ( !op.error() ) { op.prepareToYield(); } );
+    void QueryPlanRunnerQueue::prepareToYieldRunner( QueryPlanRunner& runner ) {
+        GUARD_RUNNER_EXCEPTION( runner, if ( !runner.error() ) { runner.prepareToYield(); } );
     }
 
-    void QueryPlanSet::Runner::recoverFromYieldOp( QueryOp &op ) {
-        GUARD_OP_EXCEPTION( op, if ( !op.error() ) { op.recoverFromYield(); } );
+    void QueryPlanRunnerQueue::recoverFromYieldRunner( QueryPlanRunner& runner ) {
+        GUARD_RUNNER_EXCEPTION( runner, if ( !runner.error() ) { runner.recoverFromYield(); } );
     }
 
     /**
@@ -1186,7 +1525,7 @@ doneCheckOrder:
         _recordedPlanPolicy( recordedPlanPolicy ),
         _hint( hint.getOwned() ),
         _tableScanned(),
-        _doneOps() {
+        _doneRunners() {
     }
     
     void MultiPlanScanner::init( const BSONObj &order, const BSONObj &min, const BSONObj &max ) {
@@ -1250,30 +1589,30 @@ doneCheckOrder:
         return false;
     }
 
-    shared_ptr<QueryOp> MultiPlanScanner::nextOp() {
-        verify( !doneOps() );
-        shared_ptr<QueryOp> ret = _or ? nextOpOr() : nextOpSimple();
+    shared_ptr<QueryPlanRunner> MultiPlanScanner::nextRunner() {
+        verify( !doneRunners() );
+        shared_ptr<QueryPlanRunner> ret = _or ? nextRunnerOr() : nextRunnerSimple();
         if ( ret->error() || ret->complete() ) {
-            _doneOps = true;
+            _doneRunners = true;
         }
         return ret;
     }
 
-    shared_ptr<QueryOp> MultiPlanScanner::nextOpSimple() {
-        return iterateRunner( *_baseOp );
+    shared_ptr<QueryPlanRunner> MultiPlanScanner::nextRunnerSimple() {
+        return iterateRunnerQueue( *_baseRunner );
     }
 
-    shared_ptr<QueryOp> MultiPlanScanner::nextOpOr() {
-        shared_ptr<QueryOp> op;
+    shared_ptr<QueryPlanRunner> MultiPlanScanner::nextRunnerOr() {
+        shared_ptr<QueryPlanRunner> runner;
         do {
-            op = nextOpSimple();
-            if ( !op->completeWithoutStop() ) {
-                return op;
+            runner = nextRunnerSimple();
+            if ( !runner->completeWithoutStop() ) {
+                return runner;
             }
-            handleEndOfClause( op->queryPlan() );
-            _baseOp = op;
+            handleEndOfClause( runner->queryPlan() );
+            _baseRunner = runner;
         } while( mayHandleBeginningOfClause() );
-        return op;
+        return runner;
     }
     
     const QueryPlan *MultiPlanScanner::nextClauseBestGuessPlan( const QueryPlan &currentPlan ) {
@@ -1289,20 +1628,20 @@ doneCheckOrder:
     }
     
     void MultiPlanScanner::prepareToYield() {
-        if ( _runner ) {
-            _runner->prepareToYield();
+        if ( _runnerQueue ) {
+            _runnerQueue->prepareToYield();
         }
     }
     
     void MultiPlanScanner::recoverFromYield() {
-        if ( _runner ) {
-            _runner->recoverFromYield();   
+        if ( _runnerQueue ) {
+            _runnerQueue->recoverFromYield();   
         }
     }
 
-    void MultiPlanScanner::clearRunner() {
-        if ( _runner ) {
-            _runner.reset();
+    void MultiPlanScanner::clearRunnerQueue() {
+        if ( _runnerQueue ) {
+            _runnerQueue.reset();
         }
     }
     
@@ -1371,14 +1710,14 @@ doneCheckOrder:
     MultiCursor::MultiCursor( auto_ptr<MultiPlanScanner> mps, const shared_ptr<Cursor> &c,
                              const shared_ptr<CoveredIndexMatcher> &matcher,
                              const shared_ptr<ExplainPlanInfo> &explainPlanInfo,
-                             const QueryOp &op, long long nscanned ) :
+                             const QueryPlanRunner& runner, long long nscanned ) :
     _mps( mps ),
     _c( c ),
     _matcher( matcher ),
-    _queryPlan( &op.queryPlan() ),
+    _queryPlan( &runner.queryPlan() ),
     _nscanned( nscanned ),
     _explainPlanInfo( explainPlanInfo ) {
-        _mps->clearRunner();
+        _mps->clearRunnerQueue();
         _mps->setRecordedPlanPolicy( QueryPlanGenerator::UseIfInOrder );
         if ( !ok() ) {
             // If the supplied cursor is exhausted, try to advance it.
