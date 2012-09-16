@@ -82,10 +82,16 @@ def cleanup( root , nokill ):
 if __name__ == "__main__":
     parser = OptionParser(usage="read the script")
     parser.add_option("--nokill", dest='nokill', default=False, action='store_true')
+    parser.add_option('--no-gcov', dest= "gcov", default= True, action='store_false')
     (options, args) = parser.parse_args()
-
+   
     root = "/data/db/"
     if len(args) > 0:
         root = args[0]
         
     cleanup( root , options.nokill )
+    mongo_repo=os.path.dirname(os.path.abspath(os.path.dirname(__file__)))
+    if options.gcov:
+        cleanup(os.path.join(mongo_repo, 'build', 'coverage'), True)
+
+
