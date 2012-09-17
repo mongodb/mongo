@@ -115,7 +115,7 @@ config_setup(void)
 				*cp->v = 0;
 
 	/* Multi-threaded runs cannot be replayed. */
-	if (g.replay && g.c_threads != 1) {
+	if (g.replay && !SINGLETHREADED) {
 		fprintf(stderr,
 		    "%s: -r is incompatible with threaded runs\n", g.progname);
 		exit(EXIT_FAILURE);
