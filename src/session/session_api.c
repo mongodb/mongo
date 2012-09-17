@@ -568,11 +568,40 @@ __session_checkpoint(WT_SESSION *wt_session, const char *config)
 {
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
+	WT_TXN *txn;
 
 	session = (WT_SESSION_IMPL *)wt_session;
-	WT_CSTAT_INCR(session, checkpoint);
+	txn = &session->txn;
 
+	WT_CSTAT_INCR(session, checkpoint);
 	SESSION_API_CALL(session, checkpoint, config, cfg);
+
+	/*
+	 * Checkpoints require a snapshot to write a transactionally consistent
+	 * snapshot of the data.
+	 *
+	 * We can't use an application's transaction: if it has uncommitted
+	 * changes, they will be written in the checkpoint and may appear after
+	 * a crash.
+	 *
+	 * Use a real snapshot transaction: we don't want any chance of the
+	 * snapshot being updated during the checkpoint.  Eviction is prevented
+	 * from evicting anything newer than this because we track the oldest
+	 * transaction ID in the system that is not visible to all readers.
+	 */
+	if (F_ISSET(txn, TXN_RUNNING))
+		WT_ERR_MSG(session, EINVAL,
+		    "Checkpoint not permitted in a transaction");
+
+	/*
+	 * Reset open cursors.
+	 *
+	 * We do this here explicitly even though it will happen implicitly in
+	 * the call to begin_transaction for the checkpoint, in case some
+	 * implementation of WT_CURSOR::reset needs the schema lock.
+	 */
+	WT_ERR(__session_reset_cursors(session));
+
 	WT_WITH_SCHEMA_LOCK(session,
 	    ret = __wt_txn_checkpoint(session, cfg));
 
