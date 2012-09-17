@@ -910,7 +910,7 @@ __evict_get_page(
 		 * Increment the LRU count in the btree handle to prevent it
 		 * from being closed under us.
 		 */
-		WT_ATOMIC_ADD(evict->btree->lru_count, 1);
+		(void)WT_ATOMIC_ADD(evict->btree->lru_count, 1);
 
 		*btreep = evict->btree;
 		*pagep = evict->page;
@@ -955,7 +955,7 @@ __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app)
 	 */
 	(void)__evict_page(session, page);
 
-	WT_ATOMIC_ADD(btree->lru_count, -1);
+	(void)WT_ATOMIC_SUB(btree->lru_count, 1);
 
 	WT_CLEAR_BTREE_IN_SESSION(session);
 	session->btree = saved_btree;
