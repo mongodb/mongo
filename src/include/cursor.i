@@ -6,6 +6,17 @@
  */
 
 /*
+ * __cursor_set_recno --
+ *	The cursor value in the interface has to track the value in the
+ * underlying cursor, update them in parallel.
+ */
+static inline void
+__cursor_set_recno(WT_CURSOR_BTREE *cbt, uint64_t v)
+{
+	cbt->iface.recno = cbt->recno = v;
+}
+
+/*
  * __cursor_search_clear --
  *	Reset the cursor's state for a search.
  */
@@ -29,15 +40,15 @@ __cursor_search_clear(WT_CURSOR_BTREE *cbt)
 	cbt->cip_saved = NULL;
 	cbt->rip_saved = NULL;
 
-	cbt->flags = 0;
+	F_CLR(cbt, ~WT_CBT_ACTIVE);
 }
 
 /*
- * __cursor_func_init --
- *	Reset the cursor's state for a new call.
+ * __cursor_leave --
+ *	Clear a cursor's position.
  */
 static inline void
-__cursor_func_init(WT_CURSOR_BTREE *cbt, int page_release)
+__cursor_leave(WT_CURSOR_BTREE *cbt)
 {
 	WT_CURSOR *cursor;
 	WT_SESSION_IMPL *session;
@@ -46,13 +57,49 @@ __cursor_func_init(WT_CURSOR_BTREE *cbt, int page_release)
 	session = (WT_SESSION_IMPL *)cursor->session;
 
 	/* Optionally release any page references we're holding. */
-	if (page_release && cbt->page != NULL) {
+	if (cbt->page != NULL) {
 		__wt_page_release(session, cbt->page);
 		cbt->page = NULL;
 	}
 
 	/* Reset the returned key/value state. */
 	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+
+	if (F_ISSET(cbt, WT_CBT_ACTIVE)) {
+		WT_ASSERT(session, session->ncursors > 0);
+		if (--session->ncursors == 0)
+			__wt_txn_read_last(session);
+		F_CLR(cbt, WT_CBT_ACTIVE);
+	}
+}
+
+/*
+ * __cursor_enter --
+ *	Setup the cursor's state for a new call.
+ */
+static inline void
+__cursor_enter(WT_CURSOR_BTREE *cbt)
+{
+	WT_SESSION_IMPL *session;
+
+	session = (WT_SESSION_IMPL *)cbt->iface.session;
+
+	if (session->ncursors++ == 0)
+		__wt_txn_read_first(session);
+	F_SET(cbt, WT_CBT_ACTIVE);
+}
+
+/*
+ * __cursor_func_init --
+ *	Cursor call setup.
+ */
+static inline void
+__cursor_func_init(WT_CURSOR_BTREE *cbt, int reenter)
+{
+	if (reenter)
+		__cursor_leave(cbt);
+	if (!F_ISSET(cbt, WT_CBT_ACTIVE))
+		__cursor_enter(cbt);
 }
 
 /*
@@ -74,7 +121,7 @@ __cursor_func_resolve(WT_CURSOR_BTREE *cbt, int ret)
 	if (ret == 0)
 		F_SET(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 	else {
-		__cursor_func_init(cbt, 1);
+		__cursor_leave(cbt);
 		__cursor_search_clear(cbt);
 	}
 }
@@ -84,7 +131,7 @@ __cursor_func_resolve(WT_CURSOR_BTREE *cbt, int ret)
  *	Return a WT_ROW slot's K/V pair.
  */
 static inline int
-__cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip)
+__cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip, WT_UPDATE *upd)
 {
 	WT_BTREE *btree;
 	WT_ITEM *kb, *vb;
@@ -92,8 +139,6 @@ __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip)
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_IKEY *ikey;
 	WT_SESSION_IMPL *session;
-	WT_UPDATE *upd;
-	void *key;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	btree = session->btree;
@@ -106,7 +151,7 @@ __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip)
 	 * Return the WT_ROW slot's K/V pair.
 	 */
 
-	key = WT_ROW_KEY_COPY(rip);
+	ikey = WT_ROW_KEY_COPY(rip);
 	/*
 	 * Key copied.
 	 *
@@ -119,21 +164,21 @@ __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip)
 	 * If the key points on-page, we have a copy of a WT_CELL value that can
 	 * be processed, regardless of what any other thread is doing.
 	 */
-	if (__wt_off_page(cbt->page, key)) {
-		ikey = key;
+	if (__wt_off_page(cbt->page, ikey)) {
 		kb->data = WT_IKEY_DATA(ikey);
 		kb->size = ikey->size;
 	} else {
 		/*
-		 * If the key is simple and on-page, just reference it.
-		 * Else, if the key is simple, prefix-compressed and on-page,
-		 * and we have the previous expanded key in the cursor buffer,
-		 * build the key quickly.
-		 * Else, instantiate the key and do it all  the hard way.
+		 * Get a reference to the key, ideally without doing a copy.  If
+		 * the key is simple and on-page, just reference it; if the key
+		 * is simple, on-page and prefix-compressed, and we have the
+		 * previous expanded key in the cursor buffer, build the key
+		 * here.  Else, call the underlying routines to do it the hard
+		 * way.
 		 */
 		if (btree->huffman_key != NULL)
 			goto slow;
-		__wt_cell_unpack(key, unpack);
+		__wt_cell_unpack((WT_CELL *)ikey, unpack);
 		if (unpack->type == WT_CELL_KEY && unpack->prefix == 0) {
 			kb->data = cbt->tmp.data = unpack->data;
 			kb->size = cbt->tmp.size = unpack->size;
@@ -165,15 +210,17 @@ __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip)
 			kb->size = cbt->tmp.size;
 			cbt->rip_saved = rip;
 		} else
-slow:			WT_RET(__wt_row_key(session, cbt->page, rip, kb));
+slow:			WT_RET(__wt_row_key_copy(session, cbt->page, rip, kb));
 	}
 
 	/*
-	 * If the item was ever modified, use the WT_UPDATE data.
+	 * If the item was ever modified, use the WT_UPDATE data.  Note that
+	 * the caller passes us the update: it has already resolved which one
+	 * (if any) is visible.
 	 * Else, check for empty data.
 	 * Else, use the value from the original disk image.
 	 */
-	if ((upd = WT_ROW_UPDATE(cbt->page, rip)) != NULL) {
+	if (upd != NULL) {
 		vb->data = WT_UPDATE_DATA(upd);
 		vb->size = upd->size;
 	} else if ((cell = __wt_row_value(cbt->page, rip)) == NULL) {

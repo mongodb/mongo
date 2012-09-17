@@ -111,12 +111,12 @@ ops(void *arg)
 	WT_CURSOR *cursor, *cursor_insert;
 	WT_SESSION *session;
 	WT_ITEM key, value;
-	uint64_t cnt, keyno, sync_op, thread_ops;
+	uint64_t cnt, keyno, ckpt_op, session_period, thread_ops;
 	uint32_t op;
 	uint8_t *keybuf, *valbuf;
 	u_int np;
-	int dir, insert, notfound, ret, sync_drop;
-	char sync_name[64];
+	int dir, insert, notfound, ret;
+	char *ckpt_config, buf[64];
 
 	conn = g.wts_conn;
 
@@ -128,61 +128,77 @@ ops(void *arg)
 	memset(&value, 0, sizeof(value));
 	val_gen_setup(&valbuf);
 
-	/* Open a session. */
-	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		die(ret, "connection.open_session");
-
-	/*
-	 * Open two cursors: one configured for overwriting and one configured
-	 * for append if we're dealing with a column-store.
-	 *
-	 * The reason is when testing with existing records, we don't track if
-	 * a record was deleted or not, which means we must use cursor->insert
-	 * with overwriting configured.  But, in column-store files where we're
-	 * testing with new, appended records, we don't want to have to specify
-	 * the record number, which requires an append configuration.
-	 */
-	cursor = cursor_insert = NULL;
-	if ((ret = session->open_cursor(session,
-	    WT_TABLENAME, NULL, "overwrite", &cursor)) != 0)
-		die(ret, "session.open_cursor");
-	if ((g.c_file_type == FIX || g.c_file_type == VAR) &&
-	    (ret = session->open_cursor(session,
-	    WT_TABLENAME, NULL, "append", &cursor_insert)) != 0)
-		die(ret, "session.open_cursor");
-
 	/* Each thread does its share of the total operations. */
 	thread_ops = g.c_ops / g.c_threads;
 
-	/* Pick an operation where we'll do a sync and create the name. */
-	sync_drop = 0;
-	sync_op = MMRAND(1, thread_ops);
-	snprintf(sync_name, sizeof(sync_name), "snapshot=thread-%d", tinfo->id);
+	/* Pick a period for re-opening the session and cursors. */
+	session = NULL;
+	cursor = cursor_insert = NULL;
+	session_period = 100 * MMRAND(1, 50);
+
+	/* Pick an operation where we'll do a checkpoint. */
+	ckpt_op = MMRAND(1, thread_ops);
 
 	for (cnt = 0; cnt < thread_ops; ++cnt) {
+		/*
+		 * cnt starts at 0 and (0 % anything == 0), so we always open
+		 * a session and cursors the first time through the loop.
+		 */
+		if (cnt % session_period == 0) {
+			if (session != NULL &&
+			    (ret = session->close(session, NULL)) != 0)
+				die(ret, "session.close");
+
+			if ((ret = conn->open_session(
+			    conn, NULL, NULL, &session)) != 0)
+				die(ret, "connection.open_session");
+
+			/*
+			 * Open two cursors: one configured for overwriting and
+			 * one configured for append if we're dealing with a
+			 * column-store.
+			 *
+			 * The reason is when testing with existing records, we
+			 * don't track if a record was deleted or not, which
+			 * means we must use cursor->insert with overwriting
+			 * configured.  But, in column-store files where we're
+			 * testing with new, appended records, we don't want to
+			 * have to specify the record number, which requires an
+			 * append configuration.
+			 */
+			if ((ret = session->open_cursor(session,
+			    g.c_data_source, NULL, "overwrite", &cursor)) != 0)
+				die(ret, "session.open_cursor");
+			if ((g.c_file_type == FIX || g.c_file_type == VAR) &&
+			    (ret = session->open_cursor(
+			    session, g.c_data_source,
+			    NULL, "append", &cursor_insert)) != 0)
+				die(ret, "session.open_cursor");
+		}
+
 		if (SINGLETHREADED && cnt % 100 == 0)
 			track("read/write ops", 0ULL, tinfo);
 
-		if (cnt == sync_op) {
-			if (sync_drop && (int)MMRAND(1, 4) == 1) {
-				if ((ret = session->drop(
-				    session, WT_TABLENAME, sync_name)) != 0)
-					die(ret, "session.drop: %s: %s",
-					    WT_TABLENAME, sync_name);
-				sync_drop = 0;
-			} else {
-				if ((ret = session->checkpoint(
-				    session, sync_name)) != 0)
-					die(ret, "session.checkpoint: %s",
-					    sync_name);
-				sync_drop = 1;
+		if (cnt == ckpt_op) {
+			/* Half the time we name the checkpoint. */
+			if (MMRAND(1, 2) == 1)
+				ckpt_config = NULL;
+			else {
+				(void)snprintf(buf, sizeof(buf),
+				    "name=thread-%d", tinfo->id);
+				ckpt_config = buf;
 			}
+			if ((ret =
+			    session->checkpoint(session, ckpt_config)) != 0)
+				die(ret, "session.checkpoint%s%s",
+				    ckpt_config == NULL ? "" : ": ",
+				    ckpt_config == NULL ? "" : ckpt_config);
 
 			/*
-			 * Pick the next sync operation, try for roughly five
-			 * snapshot operations per thread run.
+			 * Pick the next checkpoint operation, try for roughly
+			 * five checkpoint operations per thread run.
 			 */
-			sync_op += MMRAND(1, thread_ops) / 5;
+			ckpt_op += MMRAND(1, thread_ops) / 5;
 		}
 
 		insert = notfound = 0;
@@ -195,8 +211,8 @@ ops(void *arg)
 		 * Perform some number of operations: the percentage of deletes,
 		 * inserts and writes are specified, reads are the rest.  The
 		 * percentages don't have to add up to 100, a high percentage
-		 * of deletes will mean fewer inserts and writes.  A read
-		 * operation always follows a modification to confirm it worked.
+		 * of deletes will mean fewer inserts and writes.  Modifications
+		 * are always followed by a read to confirm it worked.
 		 */
 		op = (uint32_t)(wts_rand() % 100);
 		if (op < g.c_delete_pct) {
@@ -304,7 +320,7 @@ wts_read_scan(void)
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die(ret, "connection.open_session");
 	if ((ret = session->open_cursor(
-	    session, WT_TABLENAME, NULL, NULL, &cursor)) != 0)
+	    session, g.c_data_source, NULL, NULL, &cursor)) != 0)
 		die(ret, "session.open_cursor");
 
 	/* Check a random subset of the records using the key. */
@@ -671,7 +687,12 @@ row_remove(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int *notfoundp)
 		return;
 
 	bdb_remove(keyno, &notfound);
-	(void)notfound_chk("row_remove", ret, notfound, keyno);
+
+	/* LSM trees don't check for existence if "overwrite" is set. */
+	if (strncmp(cursor->uri, "lsm:", 4) == 0)
+		*notfoundp = notfound;
+	else
+		(void)notfound_chk("row_remove", ret, notfound, keyno);
 }
 
 /*

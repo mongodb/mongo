@@ -63,7 +63,9 @@ __wt_session_lock_btree(WT_SESSION_IMPL *session, uint32_t flags)
 			WT_RET(__wt_try_writelock(session, btree->rwlock));
 			F_SET(btree, WT_BTREE_EXCLUSIVE);
 		}
-	} else
+	} else if (F_ISSET(btree, WT_BTREE_SPECIAL_FLAGS))
+		return (EBUSY);
+	else
 		__wt_readlock(session, btree->rwlock);
 
 	/*
@@ -79,8 +81,10 @@ __wt_session_lock_btree(WT_SESSION_IMPL *session, uint32_t flags)
 	 * The handle needs to be opened.  If we locked the handle above,
 	 * unlock it before returning.
 	 */
-	if (!LF_ISSET(WT_BTREE_EXCLUSIVE) || special_flags == 0)
+	if (!LF_ISSET(WT_BTREE_EXCLUSIVE) || special_flags == 0) {
+		F_CLR(btree, WT_BTREE_EXCLUSIVE);
 		__wt_rwunlock(session, btree->rwlock);
+	}
 
 	/* Treat an unopened handle just like a non-existent handle. */
 	return (WT_NOTFOUND);
@@ -98,18 +102,15 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 
 	btree = session->btree;
 
-	/* If the tree is being created, it is already locked and tracked. */
-	if (btree == session->created_btree)
-		return (0);
-
 	/*
 	 * If we had special flags set, close the handle so that future access
 	 * can get a handle without special flags.
 	 */
-	if (F_ISSET(btree, WT_BTREE_SPECIAL_FLAGS)) {
+	if (F_ISSET(btree, WT_BTREE_DISCARD | WT_BTREE_SPECIAL_FLAGS)) {
 		WT_ASSERT(session, F_ISSET(btree, WT_BTREE_EXCLUSIVE));
+		F_CLR(btree, WT_BTREE_DISCARD);
 
-		ret = __wt_conn_btree_sync_and_close(session);
+		WT_RET(__wt_conn_btree_sync_and_close(session));
 	}
 
 	if (F_ISSET(btree, WT_BTREE_EXCLUSIVE))
@@ -122,41 +123,84 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __wt_session_get_btree_ckpt --
+ *	Check the configuration strings for a checkpoint name, get a btree
+ * handle for the given name, set session->btree.
+ */
+int
+__wt_session_get_btree_ckpt(WT_SESSION_IMPL *session,
+    const char *uri, const char *cfg[], uint32_t flags)
+{
+	WT_CONFIG_ITEM cval;
+	WT_DECL_RET;
+	int last_ckpt;
+	const char *checkpoint;
+
+	last_ckpt = 0;
+	checkpoint = NULL;
+
+	/*
+	 * This function exists to handle checkpoint configuration.  Callers
+	 * that never open a checkpoint call the underlying function directly.
+	 */
+	WT_RET_NOTFOUND_OK(
+	    __wt_config_gets_defno(session, cfg, "checkpoint", &cval));
+	if (cval.len != 0) {
+		/*
+		 * The internal checkpoint name is special, find the last
+		 * unnamed checkpoint of the object.
+		 */
+		if (WT_STRING_MATCH(WT_CHECKPOINT, cval.str, cval.len)) {
+			last_ckpt = 1;
+retry:			WT_RET(__wt_meta_checkpoint_last_name(
+			    session, uri, &checkpoint));
+		} else
+			WT_RET(__wt_strndup(
+			    session, cval.str, cval.len, &checkpoint));
+	}
+
+	ret = __wt_session_get_btree(session, uri, checkpoint, cfg, flags);
+
+	__wt_free(session, checkpoint);
+
+	/*
+	 * There's a potential race: we get the name of the most recent unnamed
+	 * checkpoint, but if it's discarded (or locked so it can be discarded)
+	 * by the time we try to open it, we'll fail the open.  Retry in those
+	 * cases, a new "last" checkpoint should surface, and we can't return an
+	 * error, the application will be justifiably upset if we can't open the
+	 * last checkpoint instance of an object.
+	 *
+	 * The check against WT_NOTFOUND is correct: if there was no checkpoint
+	 * for the object (that is, the object has never been in a checkpoint),
+	 * we returned immediately after the call to search for that name.
+	 */
+	if (last_ckpt && (ret == WT_NOTFOUND || ret == EBUSY))
+		goto retry;
+	return (ret);
+}
+
+/*
  * __wt_session_get_btree --
  *	Get a btree handle for the given name, set session->btree.
  */
 int
 __wt_session_get_btree(WT_SESSION_IMPL *session,
-    const char *uri, const char *cfg[], uint32_t flags)
+    const char *uri, const char *checkpoint, const char *cfg[], uint32_t flags)
 {
 	WT_BTREE *btree;
 	WT_BTREE_SESSION *btree_session;
-	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
-	const char *snapshot;
-	size_t snaplen;
 
 	btree = NULL;
-
-	/* Is this a snapshot operation? */
-	if (!LF_ISSET(WT_BTREE_SNAPSHOT_OP) && cfg != NULL &&
-	    __wt_config_gets(session, cfg, "snapshot", &cval) == 0 &&
-	    cval.len != 0) {
-		snapshot = cval.str;
-		snaplen = cval.len;
-	} else {
-		snapshot = NULL;
-		snaplen = 0;
-	}
 
 	TAILQ_FOREACH(btree_session, &session->btrees, q) {
 		btree = btree_session->btree;
 		if (strcmp(uri, btree->name) != 0)
 			continue;
-		if ((snapshot == NULL && btree->snapshot == NULL) ||
-		    (snapshot != NULL && btree->snapshot != NULL &&
-		    (strncmp(snapshot, btree->snapshot, snaplen) == 0 &&
-		    btree->snapshot[snaplen] == '\0')))
+		if ((checkpoint == NULL && btree->checkpoint == NULL) ||
+		    (checkpoint != NULL && btree->checkpoint != NULL &&
+		    strcmp(checkpoint, btree->checkpoint) == 0))
 			break;
 	}
 
@@ -164,13 +208,11 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 		session->btree = NULL;
 	else {
 		session->btree = btree;
-		/*
-		 * If the tree is being created, it is already locked and
-		 * tracked.
-		 */
-		if (btree == session->created_btree)
-			return (0);
 
+		/*
+		 * Try and lock the file; if we succeed, our "exclusive" state
+		 * must match.
+		 */
 		if ((ret =
 		    __wt_session_lock_btree(session, flags)) != WT_NOTFOUND) {
 			WT_ASSERT(session, ret != 0 ||
@@ -181,7 +223,13 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 		ret = 0;
 	}
 
-	WT_RET(__wt_conn_btree_get(session, uri, snapshot, cfg, flags));
+	/*
+	 * If we don't already hold the schema lock, get it now so that we
+	 * can find and/or open the handle.
+	 */
+	WT_WITH_SCHEMA_LOCK_OPT(session,
+	    ret = __wt_conn_btree_get(session, uri, checkpoint, cfg, flags));
+	WT_RET(ret);
 
 	if (btree_session == NULL)
 		WT_RET(__wt_session_add_btree(session, NULL));
@@ -195,34 +243,31 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 }
 
 /*
- * __wt_session_lock_snapshot --
- *	Lock the btree handle for the given snapshot name.
+ * __wt_session_lock_checkpoint --
+ *	Lock the btree handle for the given checkpoint name.
  */
 int
-__wt_session_lock_snapshot(
-    WT_SESSION_IMPL *session, const char *snapshot, uint32_t flags)
+__wt_session_lock_checkpoint(WT_SESSION_IMPL *session, const char *checkpoint)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
-	WT_ITEM *buf;
-	const char *cfg[] = { NULL, NULL };
 
-	buf = NULL;
 	btree = session->btree;
 
-	WT_ERR(__wt_scr_alloc(session, 0, &buf));
-	WT_ERR(__wt_buf_fmt(session, buf, "snapshot=\"%s\"", snapshot));
-	cfg[0] = buf->data;
+	WT_ERR(__wt_session_get_btree(session, btree->name,
+	    checkpoint, NULL, WT_BTREE_EXCLUSIVE | WT_BTREE_LOCK_ONLY));
 
-	LF_SET(WT_BTREE_LOCK_ONLY);
-	WT_ERR(__wt_session_get_btree(session, btree->name, cfg, flags));
+	/*
+	 * We lock checkpoint handles that we are overwriting, so the handle
+	 * must be closed when we release it.
+	 */
+	F_SET(session->btree, WT_BTREE_DISCARD);
 
 	WT_ASSERT(session, WT_META_TRACKING(session));
-	WT_ERR(__wt_meta_track_handle_lock(session));
+	WT_ERR(__wt_meta_track_handle_lock(session, 0));
 
 	/* Restore the original btree in the session. */
 err:	session->btree = btree;
-	__wt_scr_free(&buf);
 
 	return (ret);
 }
@@ -235,10 +280,18 @@ int
 __wt_session_discard_btree(
     WT_SESSION_IMPL *session, WT_BTREE_SESSION *btree_session)
 {
+	WT_BTREE *btree;
+	WT_DECL_RET;
+
 	TAILQ_REMOVE(&session->btrees, btree_session, q);
 
+	btree = session->btree;
 	session->btree = btree_session->btree;
-	__wt_overwrite_and_free(session, btree_session);
 
-	return (__wt_conn_btree_close(session, 0));
+	__wt_overwrite_and_free(session, btree_session);
+	ret = __wt_conn_btree_close(session, 0);
+
+	/* Restore the original btree in the session. */
+	session->btree = btree;
+	return (ret);
 }

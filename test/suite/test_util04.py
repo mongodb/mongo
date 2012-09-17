@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Copyright (c) 2008-2012 WiredTiger, Inc.
+# Public Domain 2008-2012 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
 #
@@ -24,15 +24,13 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-#
-# test_util04.py
-# 	Utilities: wt drop
-#
 
 import os
 from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
 
+# test_util04.py
+#    Utilities: wt drop
 class test_util04(wttest.WiredTigerTestCase, suite_subprocess):
     tablename = 'test_util04.a'
     nentries = 1000
@@ -48,12 +46,8 @@ class test_util04(wttest.WiredTigerTestCase, suite_subprocess):
         self.runWt(["drop", "table:" + self.tablename])
 
         self.assertFalse(os.path.exists(self.tablename + ".wt"))
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.session.open_cursor('table:' + self.tablename,
-                                             None, None),
-            "/Cannot open cursor 'table:" + self.tablename +
-            "' on unknown table/")
-
+        self.assertRaises(wiredtiger.WiredTigerError, lambda:
+            self.session.open_cursor('table:' + self.tablename, None, None))
 
 if __name__ == '__main__':
     wttest.run()

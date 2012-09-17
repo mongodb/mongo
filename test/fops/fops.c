@@ -11,9 +11,10 @@ static void *fop(void *);
 static void  print_stats(u_int);
 
 typedef struct {
+	int bulk;				/* bulk load */
 	int create;				/* session.create */
 	int drop;				/* session.drop */
-	int sync;				/* session.sync */
+	int ckpt;				/* session.checkpoint */
 	int upgrade;				/* session.upgrade */
 	int verify;				/* session.verify */
 } STATS;
@@ -48,7 +49,7 @@ r(void)
 int
 fop_start(u_int nthreads)
 {
-	clock_t start, stop;
+	struct timeval start, stop;
 	double seconds;
 	pthread_t *tids;
 	u_int i;
@@ -61,7 +62,7 @@ fop_start(u_int nthreads)
 	    (tids = calloc((size_t)(nthreads), sizeof(*tids))) == NULL)
 		die("calloc", errno);
 
-	start = clock();
+	(void)gettimeofday(&start, NULL);
 
 	/* Create threads. */
 	for (i = 0; i < nthreads; ++i)
@@ -73,8 +74,9 @@ fop_start(u_int nthreads)
 	for (i = 0; i < nthreads; ++i)
 		(void)pthread_join(tids[i], &thread_ret);
 
-	stop = clock();
-	seconds = (stop - start) / (double)CLOCKS_PER_SEC;
+	(void)gettimeofday(&stop, NULL);
+	seconds = (stop.tv_sec - start.tv_sec) +
+	    (stop.tv_usec - start.tv_usec) * 1e-6;
 	fprintf(stderr, "timer: %.2lf seconds (%d ops/second)\n",
 	    seconds, (int)((nthreads * nops) / seconds));
 
@@ -107,7 +109,7 @@ fop(void *arg)
 	s = &run_stats[id];
 
 	for (i = 0; i < nops; ++i, sched_yield())
-		switch (r() % 5) {
+		switch (r() % 6) {
 		case 0:
 			++s->create;
 			obj_create();
@@ -117,8 +119,8 @@ fop(void *arg)
 			obj_drop();
 			break;
 		case 2:
-			++s->sync;
-			obj_sync();
+			++s->ckpt;
+			obj_checkpoint();
 			break;
 		case 3:
 			++s->upgrade;
@@ -127,6 +129,10 @@ fop(void *arg)
 		case 4:
 			++s->verify;
 			obj_verify();
+			break;
+		case 5:
+			++s->bulk;
+			obj_bulk();
 			break;
 		default:
 			break;
@@ -148,7 +154,7 @@ print_stats(u_int nthreads)
 	s = run_stats;
 	for (id = 0; id < nthreads; ++id, ++s)
 		printf(
-		    "%3d: create %6d, drop %6d, sync %6d, upgrade %6d, "
+		    "%3d: create %6d, drop %6d, ckpt %6d, upgrade %6d, "
 		    "verify %6d\n",
-		    id, s->create, s->drop, s->sync, s->upgrade, s->verify);
+		    id, s->create, s->drop, s->ckpt, s->upgrade, s->verify);
 }

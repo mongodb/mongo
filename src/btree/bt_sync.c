@@ -8,26 +8,36 @@
 #include "wt_internal.h"
 
 /*
+ * __wt_bt_cache_force_write --
+ *	Dirty the root page of the tree so it gets written.
+ */
+int
+__wt_bt_cache_force_write(WT_SESSION_IMPL *session)
+{
+	WT_BTREE *btree;
+	WT_PAGE *page;
+
+	btree = session->btree;
+	page = btree->root_page;
+
+	/* Dirty the root page to ensure a write. */
+	WT_RET(__wt_page_modify_init(session, page));
+	__wt_page_modify_set(page);
+
+	return (0);
+}
+
+/*
  * __wt_bt_cache_flush --
  *	Write dirty pages from the cache, optionally discarding the file.
  */
 int
-__wt_bt_cache_flush(
-    WT_SESSION_IMPL *session, WT_SNAPSHOT *snapbase, int op, int force)
+__wt_bt_cache_flush(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, int op)
 {
 	WT_DECL_RET;
 	WT_BTREE *btree;
 
 	btree = session->btree;
-
-	/*
-	 * If we need a new snapshot, mark the root page dirty to ensure a
-	 * write.
-	 */
-	if (force) {
-		WT_RET(__wt_page_modify_init(session, btree->root_page));
-		__wt_page_modify_set(btree->root_page);
-	}
 
 	/*
 	 * Ask the eviction thread to flush any dirty pages, and optionally
@@ -51,28 +61,18 @@ __wt_bt_cache_flush(
 	 * already works that way.   None of these problems can't be fixed, but
 	 * I don't see a reason to change at this time, either.
 	 */
-	btree->snap = snapbase;
+	btree->ckpt = ckptbase;
 	ret = __wt_sync_file_serial(session, op);
-	btree->snap = NULL;
+	btree->ckpt = NULL;
 	WT_RET(ret);
 
 	switch (op) {
 	case WT_SYNC:
 		break;
 	case WT_SYNC_DISCARD:
+	case WT_SYNC_DISCARD_NOWRITE:
 		/* If discarding the tree, the root page should be gone. */
 		WT_ASSERT(session, btree->root_page == NULL);
-		break;
-	case WT_SYNC_DISCARD_NOWRITE:
-		/*
-		 * XXX
-		 * I'm not sure this is the right place to do this, but it's
-		 * the point in the btree engine where we know the root page
-		 * is gone.  Unlike WT_SYNC_DISCARD, which writes, evicts and
-		 * discards the root page, WT_SYNC_DISCARD_NOWRITE simply
-		 * discards the pages, which means "eviction" never happens.
-		 */
-		btree->root_page = NULL;
 		break;
 	}
 

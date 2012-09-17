@@ -131,7 +131,7 @@ not_compressed:	/*
 		 */
 		dsk = buf->mem;
 	} else {
-		/* Skip the first 32B of the source data. */
+		/* Skip the header bytes of the source data. */
 		src = (uint8_t *)buf->mem + WT_BLOCK_COMPRESS_SKIP;
 		src_len = buf->size - WT_BLOCK_COMPRESS_SKIP;
 
@@ -151,7 +151,7 @@ not_compressed:	/*
 		WT_RET(__wt_scr_alloc(
 		    session, (uint32_t)len + WT_BLOCK_COMPRESS_SKIP, &tmp));
 
-		/* Skip the first 32B of the destination data. */
+		/* Skip the header bytes of the destination data. */
 		dst = (uint8_t *)tmp->mem + WT_BLOCK_COMPRESS_SKIP;
 		dst_len = len;
 
@@ -225,7 +225,7 @@ not_compressed:	/*
 
 	/*
 	 * Allocate space from the underlying file and write the block.  Always
-	 * extend the file when writing snapshot extents, that's easier than
+	 * extend the file when writing checkpoint extents, that's easier than
 	 * distinguishing between extents allocated from the live avail list,
 	 * and those which can't be allocated from the live avail list such as
 	 * blocks for writing the live avail list itself.

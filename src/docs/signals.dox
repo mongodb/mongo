@@ -1,4 +1,4 @@
-/*! @page signals WiredTiger signal handling
+/*! @page signals Signal handling
 
 WiredTiger has no signal handlers and does not modify process signal handler behavior in any way.
 

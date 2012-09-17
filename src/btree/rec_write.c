@@ -7,8 +7,9 @@
 
 #include "wt_internal.h"
 
-struct __rec_kv;		typedef struct __rec_kv WT_KV;
 struct __rec_boundary;		typedef struct __rec_boundary WT_BOUNDARY;
+struct __rec_dictionary;	typedef struct __rec_dictionary WT_DICTIONARY;
+struct __rec_kv;		typedef struct __rec_kv WT_KV;
 
 /*
  * Reconciliation is the process of taking an in-memory page, walking each entry
@@ -25,8 +26,23 @@ typedef struct {
 
 	/* Track whether all changes to the page are written. */
 	uint32_t orig_write_gen;
-	uint32_t orig_disk_gen;
 	int upd_skipped;
+	int upd_skip_fail;
+
+	/*
+	 * Track if reconciliation has seen any overflow items.  Leaf pages with
+	 * no overflow items are special because we can delete them without
+	 * reading them.  If a leaf page is reconciled and no overflow items are
+	 * included, we set the parent page's address cell to a special type,
+	 * leaf-no-overflow.  The code works on a per-page reconciliation basis,
+	 * that is, once we see an overflow item, all subsequent leaf pages will
+	 * not get the special cell type.  It would be possible to do better by
+	 * tracking overflow items on split boundaries, but this is simply a
+	 * a performance optimization for range deletes, I don't see an argument
+	 * for optimizing for pages that split and contain chunks both with and
+	 * without overflow items.
+	 */
+	int	ovfl_items;
 
 	/*
 	 * Reconciliation gets tricky if we have to split a page, that is, if
@@ -35,7 +51,6 @@ typedef struct {
 	 * smaller-than-maximum page size when a split is required so we don't
 	 * repeatedly split a packed page.
 	 */
-	uint32_t btree_split_pct;	/* Split page percent */
 	uint32_t page_size;		/* Maximum page size */
 	uint32_t split_size;		/* Split page size */
 
@@ -128,6 +143,18 @@ typedef struct {
 	WT_REF	*merge_ref;		/* Row-store merge correction key */
 
 	/*
+	 * WT_DICTIONARY --
+	 *	We optionally build a dictionary of row-store values for leaf
+	 * pages.  Where two value cells are identical, only write the value
+	 * once, the second and subsequent copies point to the original cell.
+	 */
+	struct __rec_dictionary {
+		uint64_t hash;				/* Hash value */
+		uint8_t *cell;				/* Matching cell */
+	} *dictionary;
+	long dictionary_slots;				/* Maximum entries */
+
+	/*
 	 * WT_KV--
 	 *	An on-page key/value item we're building.
 	 */
@@ -141,14 +168,14 @@ typedef struct {
 	WT_ITEM *cur, _cur;		/* Key/Value being built */
 	WT_ITEM *last, _last;		/* Last key/value built */
 
-	int	key_pfx_compress;	/* If can prefix-compress next key */
-	int     key_pfx_compress_conf;	/* If prefix compression configured */
-	int	key_sfx_compress;	/* If can suffix-compress next key */
-	int     key_sfx_compress_conf;	/* If suffix compression configured */
+	int key_pfx_compress;		/* If can prefix-compress next key */
+	int key_pfx_compress_conf;	/* If prefix compression configured */
+	int key_sfx_compress;		/* If can suffix-compress next key */
+	int key_sfx_compress_conf;	/* If suffix compression configured */
 } WT_RECONCILE;
 
 static void __rec_cell_build_addr(
-		WT_SESSION_IMPL *, const void *, uint32_t, uint64_t);
+		WT_SESSION_IMPL *, const void *, uint32_t, u_int, uint64_t);
 static int  __rec_cell_build_key(
 		WT_SESSION_IMPL *, const void *, uint32_t, int, int *);
 static int  __rec_cell_build_ovfl(
@@ -163,6 +190,10 @@ static int  __rec_col_merge(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_col_var(WT_SESSION_IMPL *, WT_PAGE *, WT_SALVAGE_COOKIE *);
 static int  __rec_col_var_helper(WT_SESSION_IMPL *,
 		WT_SALVAGE_COOKIE *, WT_ITEM *, int, int, uint64_t);
+static WT_DICTIONARY *__rec_dictionary_lookup(WT_SESSION_IMPL *, WT_KV *);
+static void __rec_dictionary_reset(WT_RECONCILE *);
+static int  __rec_page_deleted(WT_SESSION_IMPL *, WT_PAGE *, WT_REF *, int *);
+static int  __rec_page_modified(WT_SESSION_IMPL *, WT_PAGE *, WT_REF *, int *);
 static int  __rec_row_int(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_row_leaf(WT_SESSION_IMPL *, WT_PAGE *, WT_SALVAGE_COOKIE *);
 static int  __rec_row_leaf_insert(WT_SESSION_IMPL *, WT_INSERT *);
@@ -176,13 +207,13 @@ static int  __rec_split_init(WT_SESSION_IMPL *, WT_PAGE *, uint64_t, uint32_t);
 static int  __rec_split_row(WT_SESSION_IMPL *, WT_PAGE *, WT_PAGE **);
 static int  __rec_split_row_promote(WT_SESSION_IMPL *, uint8_t);
 static int  __rec_split_write(WT_SESSION_IMPL *, WT_BOUNDARY *, WT_ITEM *, int);
-static int  __rec_write_init(WT_SESSION_IMPL *, WT_PAGE *);
+static int  __rec_write_init(WT_SESSION_IMPL *, WT_PAGE *, uint32_t);
 static int  __rec_write_wrapup(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_write_wrapup_err(WT_SESSION_IMPL *, WT_PAGE *);
 
 /*
- * Helper macro to determine whether the given WT_REF has a page with
- * modifications.
+ * __rec_page_modified --
+ *	Return if the given WT_REF references any modifications.
  *
  * The reconciliation code is used in the following situations:
  *
@@ -205,26 +236,158 @@ static int  __rec_write_wrapup_err(WT_SESSION_IMPL *, WT_PAGE *);
  * To make this tractable, the eviction server guarantees that no thread is
  * doing LRU eviction in the tree when cases (1) and (2) occur.  That is, the
  * only state change that can occur during a sync or forced eviction is for a
- * reference to a page on disk to cause a page to be read (WT_REF_READING).  We
- * can safely ignore those pages because they are unmodified by definition --
- * they are being read from disk.
- *
- * If there is a valid page associated with the reference, a pointer to the
- * page is assigned to the second parameter.  The macro evaluates true if the
- * page has been modified.
+ * reference to a page on disk to cause a page to be read (WT_REF_READING).
+ * In the case of a read, we could safely ignore those pages because they are
+ * unmodified by definition -- they are being read from disk, however, in the
+ * current system, that state also includes fast-delete pages that are being
+ * instantiated.  Those pages cannot be ignored, as they have been modified.
+ * For this reason, we have to wait for the WT_REF_READING state to be resolved
+ * to another state before we proceed.
  */
-#define	PAGE_MODIFIED(ref, rp)						\
-	(((ref)->state != WT_REF_DISK &&				\
-	  (ref)->state != WT_REF_READING) &&				\
-	    (rp = (ref)->page)->modify != NULL)
+static int
+__rec_page_modified(
+    WT_SESSION_IMPL *session, WT_PAGE *page, WT_REF *ref, int *modifyp)
+{
+	WT_DECL_RET;
+
+	*modifyp = 0;
+	for (;; __wt_yield())
+		switch (ref->state) {
+		case WT_REF_DISK:
+			/* On disk, not modified by definition. */
+			return (0);
+		case WT_REF_DELETED:
+			/*
+			 * The WT_REF entry is in a deleted state.
+			 *
+			 * It's possible the state is changing underneath us and
+			 * we can race between checking for a deleted state and
+			 * looking at the stored transaction ID to see if the
+			 * delete is visible to us.  Lock down the structure.
+			 */
+			if (!WT_ATOMIC_CAS(
+			    ref->state, WT_REF_DELETED, WT_REF_READING))
+				break;
+			ret = __rec_page_deleted(session, page, ref, modifyp);
+			WT_PUBLISH(ref->state, WT_REF_DELETED);
+			return (ret);
+		case WT_REF_EVICT_FORCE:
+		case WT_REF_EVICT_WALK:
+		case WT_REF_LOCKED:
+		case WT_REF_MEM:
+			/*
+			 * In-memory states: set modify based on the existence
+			 * of the page's modify structure.
+			 */
+			if (ref->page->modify != NULL)
+				*modifyp = 1;
+			return (0);
+		case WT_REF_READING:
+			/*
+			 * Being read or in fast-delete, wait for the page's
+			 * state to settle.
+			 */
+			 break;
+		WT_ILLEGAL_VALUE(session);
+		}
+	/* NOTREACHED */
+}
+
+/*
+ * __rec_page_deleted --
+ *	Handle pages with leaf pages in the WT_REF_DELETED state.
+ */
+static int
+__rec_page_deleted(
+    WT_SESSION_IMPL *session, WT_PAGE *page, WT_REF *ref, int *modifyp)
+{
+	WT_RECONCILE *r;
+
+	r = session->reconcile;
+	*modifyp = 0;
+
+	/*
+	 * Internal pages with child leaf pages in the WT_REF_DELETED state are
+	 * a special case during reconciliation.  First, if the deletion isn't
+	 * visible, we proceed as with any change that's not visible: set the
+	 * skipped flag and ignore the change for the purposes of writing the
+	 * internal page.
+	 */
+	if (!__wt_txn_visible(session, ref->txnid)) {
+		r->upd_skipped = 1;
+		return (0);
+	}
+
+	/* The deletion is visible, set the modified return. */
+	*modifyp = 1;
+
+	/*
+	 * If the deletion is visible, check for any transactions in the system
+	 * that might want to see the page's state before the deletion.
+	 *
+	 * If any such transactions exist, we cannot discard the underlying leaf
+	 * page to the block manager because the transaction may eventually read
+	 * it.  However, this write might be part of a checkpoint, and should we
+	 * recover to that checkpoint, we'll need to delete the leaf page, else
+	 * we'd leak it.  The solution is to write a proxy cell on the internal
+	 * page ensuring the leaf page is eventually discarded.
+	 *
+	 * If no such transactions exist, we can discard the leaf page to the
+	 * block manager, and no cell needs to be written at all.  We set the
+	 * WT_REF.addr field to NULL for a few reasons: (1) we can avoid doing
+	 * the free on the next reconciliation (that's only performance, as the
+	 * underlying tracking routines won't free the same block twice), (2)
+	 * our caller knows a WT_REF.addr of NULL means we skip the cell when
+	 * writing the page, and (3) the cache read routine knows a WT_REF.addr
+	 * of NULL means the underlying page is gone and it has to instantiate
+	 * a new page.  Note #2 and #3 are safe: the WT_REF.addr field is never
+	 * reset once cleared, so it's safe to test it outside of the WT_REF
+	 * structure lock.
+	 *
+	 * One final note: if the WT_REF transaction ID is set to WT_TXN_NONE,
+	 * it means this WT_REF is the re-creation of a deleted node (we wrote
+	 * out the deleted node after the deletion became visible, but before
+	 * we could delete the leaf page, and subsequently crashed, then read
+	 * the page and re-created the WT_REF_DELETED state).   In other words,
+	 * the delete is visible to all (it became visible), and by definition
+	 * there are no older transactions needing to see previous versions of
+	 * the page.
+	 */
+	if (ref->addr != NULL &&
+	    (ref->txnid == WT_TXN_NONE ||
+	    __wt_txn_visible_all(session, ref->txnid))) {
+		/*
+		 * Free the page when reconciliation completes and ensure we
+		 * only free the page once.
+		 */
+		WT_RET(__wt_rec_track_onpage_ref(session, page, page, ref));
+		ref->addr = NULL;
+	}
+
+	return (0);
+}
+
+/*
+ * __rec_txn_read --
+ *	Helper for transactional reads: fail fast if skipping updates.
+ */
+static inline int
+__rec_txn_read(WT_SESSION_IMPL *session, WT_UPDATE *upd, WT_UPDATE **updp)
+{
+	WT_RECONCILE *r;
+
+	r = session->reconcile;
+	*updp = __wt_txn_read_skip(session, upd, &r->upd_skipped);
+	return ((r->upd_skip_fail && r->upd_skipped) ? EBUSY : 0);
+}
 
 /*
  * __wt_rec_write --
  *	Reconcile an in-memory page into its on-disk format, and write it.
  */
 int
-__wt_rec_write(
-    WT_SESSION_IMPL *session, WT_PAGE *page, WT_SALVAGE_COOKIE *salvage)
+__wt_rec_write(WT_SESSION_IMPL *session,
+    WT_PAGE *page, WT_SALVAGE_COOKIE *salvage, uint32_t flags)
 {
 	WT_DECL_RET;
 
@@ -244,7 +407,7 @@ __wt_rec_write(
 		return (0);
 
 	/* Initialize the reconciliation structures for each new run. */
-	WT_RET(__rec_write_init(session, page));
+	WT_RET(__rec_write_init(session, page, flags));
 	WT_RET(__wt_rec_track_init(session, page));
 
 	/* Reconcile the page. */
@@ -256,16 +419,16 @@ __wt_rec_write(
 			ret = __rec_col_fix(session, page);
 		break;
 	case WT_PAGE_COL_INT:
-		ret =__rec_col_int(session, page);
+		ret = __rec_col_int(session, page);
 		break;
 	case WT_PAGE_COL_VAR:
-		ret =__rec_col_var(session, page, salvage);
+		ret = __rec_col_var(session, page, salvage);
 		break;
 	case WT_PAGE_ROW_INT:
-		ret =__rec_row_int(session, page);
+		ret = __rec_row_int(session, page);
 		break;
 	case WT_PAGE_ROW_LEAF:
-		ret =__rec_row_leaf(session, page, salvage);
+		ret = __rec_row_leaf(session, page, salvage);
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}
@@ -305,7 +468,7 @@ __wt_rec_write(
 	/*
 	 * Root pages are trickier.  First, if the page is empty or we performed
 	 * a 1-for-1 page swap, we're done, we've written the root (and done the
-	 * snapshot).
+	 * checkpoint).
 	 */
 	switch (F_ISSET(page->modify, WT_PM_REC_MASK)) {
 	case WT_PM_REC_EMPTY:				/* Page is empty */
@@ -337,10 +500,10 @@ __wt_rec_write(
 	 * root page, pointing to a chain of pages, each of which are flagged as
 	 * "split" pages, up to a final replacement page.  We don't use those
 	 * pages again, they are discarded in the next root page reconciliation.
-	 * We could discard them immediately (because the snapshot is complete,
-	 * any pages we discard go on the next snapshot's free list, it's safe
-	 * to do), but the code is simpler this way, and this operation should
-	 * not be common.
+	 * We could discard them immediately (as the checkpoint is complete, any
+	 * pages we discard go on the next checkpoint's free list, it's safe to
+	 * do), but the code is simpler this way, and this operation should not
+	 * be common.
 	 */
 	WT_VERBOSE_RET(session, reconcile,
 	    "root page split %p -> %p", page, page->modify->u.split);
@@ -348,7 +511,7 @@ __wt_rec_write(
 	__wt_page_modify_set(page);
 	F_CLR(page->modify, WT_PM_REC_SPLIT_MERGE);
 
-	WT_RET(__wt_rec_write(session, page, NULL));
+	WT_RET(__wt_rec_write(session, page, NULL, flags));
 
 	return (0);
 }
@@ -358,10 +521,9 @@ __wt_rec_write(
  *	Initialize the reconciliation structure.
  */
 static int
-__rec_write_init(WT_SESSION_IMPL *session, WT_PAGE *page)
+__rec_write_init(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 {
 	WT_BTREE *btree;
-	WT_CONFIG_ITEM cval;
 	WT_RECONCILE *r;
 
 	btree = session->btree;
@@ -378,47 +540,64 @@ __rec_write_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 		/* Disk buffers may need to be aligned. */
 		F_SET(&r->dsk, WT_ITEM_ALIGNED);
 
-		/* Configuration. */
-		WT_RET(__wt_config_getones(session,
-		    btree->config, "split_pct", &cval));
-		r->btree_split_pct = (uint32_t)cval.val;
-
-		/*
-		 * Suffix compression is a hack to shorten internal page keys
-		 * by discarding trailing bytes that aren't necessary for tree
-		 * navigation.  We don't do suffix compression if there is a
-		 * custom collator because we don't know what bytes a custom
-		 * collator might use.  Some custom collators (for example, a
-		 * collator implementing reverse ordering of strings), won't
-		 * have any problem with suffix compression: if there's ever a
-		 * reason to implement suffix compression for custom collators,
-		 * we can add a setting to the collator, configured when the
-		 * collator is added, that turns on suffix compression.
-		 */
-		r->key_sfx_compress_conf = 0;
-		if (btree->collator == NULL) {
-			WT_RET(__wt_config_getones(session,
-			    btree->config, "internal_key_truncate", &cval));
-			r->key_sfx_compress_conf = (cval.val != 0);
-		}
-
-		WT_RET(__wt_config_getones(session,
-		    btree->config, "prefix_compression", &cval));
-		r->key_pfx_compress_conf = (cval.val != 0);
 	}
 
-	r->page = page;
+	/*
+	 * Suffix compression is a hack to shorten internal page keys
+	 * by discarding trailing bytes that aren't necessary for tree
+	 * navigation.  We don't do suffix compression if there is a
+	 * custom collator because we don't know what bytes a custom
+	 * collator might use.  Some custom collators (for example, a
+	 * collator implementing reverse ordering of strings), won't
+	 * have any problem with suffix compression: if there's ever a
+	 * reason to implement suffix compression for custom collators,
+	 * we can add a setting to the collator, configured when the
+	 * collator is added, that turns on suffix compression.
+	 */
+	r->key_sfx_compress_conf = 0;
+	if (btree->collator == NULL && btree->internal_key_truncate)
+		r->key_sfx_compress_conf = 1;
 
-	/* Read the disk generation before we read anything from the page. */
-	r->orig_disk_gen = page->modify->disk_gen;
-	WT_ORDERED_READ(r->orig_write_gen, page->modify->write_gen);
+	/* Prefix compression discards key's repeated prefix bytes. */
+	r->key_pfx_compress_conf = 0;
+	if (btree->prefix_compression)
+		r->key_pfx_compress_conf = 1;
 
 	/*
-	 * Pages cannot be evicted if they are only partially written, that is,
-	 * if we skipped an update for transactional reasons, the page cannot
-	 * be evicted.
+	 * Dictionary compression only writes repeated values once.  We grow
+	 * the dictionary as necessary, always using the largest size we've
+	 * seen.
 	 */
+	if (btree->dictionary != 0 && btree->dictionary > r->dictionary_slots) {
+		/*
+		 * Sanity check the size: 100 slots is the smallest dictionary
+		 * we use.
+		 */
+		if (btree->dictionary < 100)
+			btree->dictionary = 100;
+		if (r->dictionary != NULL) {
+			r->dictionary_slots = 0;
+			__wt_free(session, r->dictionary);
+		}
+		WT_RET(__wt_calloc_def(
+		    session, btree->dictionary, &r->dictionary));
+		r->dictionary_slots = btree->dictionary;
+	}
+
+	/* Per-page reconciliation: reset the dictionary. */
+	if (btree->dictionary)
+		__rec_dictionary_reset(r);
+
+	/* Per-page reconciliation: track skipped updates. */
 	r->upd_skipped = 0;
+	r->upd_skip_fail = LF_ISSET(WT_REC_SINGLE) ? 0 : 1;
+
+	/* Per-page reconciliation: track overflow items. */
+	r->ovfl_items = 0;
+
+	/* Read the disk generation before we read anything from the page. */
+	r->page = page;
+	WT_ORDERED_READ(r->orig_write_gen, page->modify->write_gen);
 
 	return (0);
 }
@@ -451,6 +630,8 @@ __wt_rec_destroy(WT_SESSION_IMPL *session)
 	__wt_buf_free(session, &r->v.buf);
 	__wt_buf_free(session, &r->_cur);
 	__wt_buf_free(session, &r->_last);
+
+	__wt_free(session, r->dictionary);
 
 	__wt_free(session, session->reconcile);
 }
@@ -503,6 +684,53 @@ __rec_copy_incr(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_KV *kv)
 
 	WT_ASSERT(session, kv->len == kv->cell_len + kv->buf.size);
 	__rec_incr(session, r, 1, kv->len);
+}
+
+/*
+ * __rec_dict_copy_incr --
+ *	Check for a dictionary match, and then copy a key/value cell and buffer
+ * pair into the new image.
+ */
+static void
+__rec_dict_copy_incr(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_KV *kv)
+{
+	WT_DICTIONARY *dp;
+	uint64_t offset;
+
+	/*
+	 * We optionally create a dictionary of values and only write a unique
+	 * value once per page, using a special "copy" cell for all subsequent
+	 * copies of the value.  We have to do the cell build and resolution at
+	 * this low level because we need physical cell offsets for the page.
+	 *
+	 * Sanity check: short-data cells can be smaller than dictionary-copy
+	 * cells.  If the data is already small, don't bother doing the work.
+	 * This isn't just work avoidance: on-page cells can't grow as a result
+	 * of writing a dictionary-copy cell, the reconciliation functions do a
+	 * split-boundary test based on the size required by the value's cell;
+	 * if we grow the cell after that test we'll potentially write off the
+	 * end of the buffer's memory.
+	 */
+	if (kv->buf.size > WT_INTPACK32_MAXSIZE &&
+	    (dp = __rec_dictionary_lookup(session, kv)) != NULL) {
+		/*
+		 * If the dictionary cell reference is not set, we're
+		 * creating a new entry in the dictionary, update it.
+		 *
+		 * If the dictionary cell reference is set, we have a
+		 * matching value.  Create a copy cell instead.
+		 */
+		if (dp->cell == NULL)
+			dp->cell = r->first_free;
+		else {
+			offset = WT_PTRDIFF32(r->first_free, dp->cell);
+			kv->len = kv->cell_len =
+			   __wt_cell_pack_copy(&kv->cell, offset);
+			kv->buf.data = NULL;
+			kv->buf.size = 0;
+		}
+	}
+	__rec_copy_incr(session, r, kv);
 }
 
 /*
@@ -634,7 +862,7 @@ __rec_split_init(
 	r->page_size = max;
 	r->split_size = page->type == WT_PAGE_COL_FIX ?
 	    max :
-	    WT_SPLIT_PAGE_SIZE(max, btree->allocsize, r->btree_split_pct);
+	    WT_SPLIT_PAGE_SIZE(max, btree->allocsize, btree->split_pct);
 
 	/*
 	 * If the maximum page size is the same as the split page size, there
@@ -692,6 +920,10 @@ __rec_split(WT_SESSION_IMPL *session)
 	r = session->reconcile;
 	btree = session->btree;
 	dsk = r->dsk.mem;
+
+	/* Hitting a page boundary resets the dictionary, in all cases. */
+	if (btree->dictionary)
+		__rec_dictionary_reset(r);
 
 	/*
 	 * There are 3 cases we have to handle.
@@ -822,7 +1054,7 @@ __rec_split_finish(WT_SESSION_IMPL *session)
 	WT_BOUNDARY *bnd;
 	WT_PAGE_HEADER *dsk;
 	WT_RECONCILE *r;
-	int snapshot;
+	int checkpoint;
 
 	r = session->reconcile;
 
@@ -861,18 +1093,18 @@ __rec_split_finish(WT_SESSION_IMPL *session)
 	}
 
 	/*
-	 * Third, check to see if we're creating a snapshot: any time we write
+	 * Third, check to see if we're creating a checkpoint: any time we write
 	 * the root page of the tree, we tell the underlying block manager so it
-	 * can write and return the additional information a snapshot requires.
+	 * can write and return any additional information checkpoints require.
 	 */
-	snapshot = r->bnd_next == 1 && WT_PAGE_IS_ROOT(r->page);
+	checkpoint = r->bnd_next == 1 && WT_PAGE_IS_ROOT(r->page);
 
 	/* Finalize the header information and write the page. */
 	dsk = r->dsk.mem;
 	dsk->recno = bnd->recno;
 	dsk->u.entries = r->entries;
 	r->dsk.size = WT_PTRDIFF32(r->first_free, dsk);
-	return (__rec_split_write(session, bnd, &r->dsk, snapshot));
+	return (__rec_split_write(session, bnd, &r->dsk, checkpoint));
 }
 
 /*
@@ -960,13 +1192,15 @@ err:	__wt_scr_free(&tmp);
  */
 static int
 __rec_split_write(
-    WT_SESSION_IMPL *session, WT_BOUNDARY *bnd, WT_ITEM *buf, int snapshot)
+    WT_SESSION_IMPL *session, WT_BOUNDARY *bnd, WT_ITEM *buf, int checkpoint)
 {
 	WT_CELL *cell;
 	WT_PAGE_HEADER *dsk;
+	WT_RECONCILE *r;
 	uint32_t size;
 	uint8_t addr[WT_BTREE_MAX_ADDR_COOKIE];
 
+	r = session->reconcile;
 	dsk = buf->mem;
 
 	/*
@@ -992,16 +1226,16 @@ __rec_split_write(
 
 	/*
 	 * Write the chunk and save the location information.  There is one big
-	 * question: if this is a snapshot, then we're going to have to wrap up
+	 * question: if this is a checkpoint, we're going to have to wrap up
 	 * our tracking information (freeing blocks we no longer need) before we
-	 * can create the snapshot, because snapshots write extent lists, that
-	 * is, the whole system has to be consistent.   We have to handle empty
-	 * tree snapshots elsewhere (because we don't write anything for empty
-	 * tree snapshots, they don't come through this path).  Given that fact,
-	 * clear the boundary information as a reminder, and do the snapshot at
-	 * a later time, during wrapup.
+	 * can create the checkpoint, because checkpoints may write additional
+	 * information.   We have to handle empty tree checkpoints elsewhere
+	 * (because we don't write anything for empty tree checkpoints, they
+	 * don't come through this path).  Given that fact, clear the boundary
+	 * information as a reminder, and do the checkpoint at a later time,
+	 * during wrapup.
 	 */
-	if (snapshot) {
+	if (checkpoint) {
 		bnd->addr.addr = NULL;
 		bnd->addr.size = 0;
 	} else {
@@ -1009,6 +1243,11 @@ __rec_split_write(
 		WT_RET(
 		    __wt_strndup(session, (char *)addr, size, &bnd->addr.addr));
 		bnd->addr.size = size;
+		bnd->addr.leaf_no_overflow =
+		    (dsk->type == WT_PAGE_COL_FIX ||
+		    dsk->type == WT_PAGE_COL_VAR ||
+		    dsk->type == WT_PAGE_ROW_LEAF) &&
+		    r->ovfl_items == 0 ? 1 : 0;
 	}
 
 	return (0);
@@ -1047,15 +1286,15 @@ __rec_split_row_promote(WT_SESSION_IMPL *session, uint8_t type)
 	if (r->bnd_next == 1) {
 		/*
 		 * The cell had better have a zero-length prefix: it's the first
-		 * key on the page.  (If it doesn't have a zero-length prefix,
-		 * __wt_cell_unpack() won't be sufficient anyway, we'd only copy
-		 * the non-prefix-compressed portion of the key.)
+		 * key on the page.  We also assert it's not a copy cell, even
+		 * if we could copy the value, which we could, the first cell on
+		 * a page had better not refer an earlier cell on the page.
 		 */
 		cell = WT_PAGE_HEADER_BYTE(btree, r->dsk.mem);
 		__wt_cell_unpack(cell, unpack);
-		WT_ASSERT_RET(session, unpack->prefix == 0);
-		WT_RET(
-		    __wt_cell_unpack_copy(session, unpack, &r->bnd[0].key));
+		WT_ASSERT_RET(session,
+		    unpack->raw != WT_CELL_VALUE_COPY && unpack->prefix == 0);
+		WT_RET(__wt_cell_unpack_copy(session, unpack, &r->bnd[0].key));
 	}
 
 	/*
@@ -1113,7 +1352,7 @@ __wt_rec_bulk_init(WT_CURSOR_BULK *cbulk)
 	btree = session->btree;
 	page = cbulk->leaf;
 
-	WT_RET(__rec_write_init(session, page));
+	WT_RET(__rec_write_init(session, page, 0));
 
 	switch (btree->type) {
 	case BTREE_COL_FIX:
@@ -1167,6 +1406,9 @@ __wt_rec_bulk_wrapup(WT_CURSOR_BULK *cbulk)
 	WT_RET(__rec_split_finish(session));
 	WT_RET(__rec_write_wrapup(session, page));
 
+	/* Mark the tree dirty so close performs a checkpoint. */
+	btree->modified = 1;
+
 	/* Mark the page's parent dirty. */
 	WT_RET(__wt_page_modify_init(session, page->parent));
 	__wt_page_modify_set(page->parent);
@@ -1181,6 +1423,7 @@ __wt_rec_bulk_wrapup(WT_CURSOR_BULK *cbulk)
 int
 __wt_rec_row_bulk_insert(WT_CURSOR_BULK *cbulk)
 {
+	WT_BTREE *btree;
 	WT_CURSOR *cursor;
 	WT_KV *key, *val;
 	WT_RECONCILE *r;
@@ -1189,6 +1432,7 @@ __wt_rec_row_bulk_insert(WT_CURSOR_BULK *cbulk)
 
 	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
 	r = session->reconcile;
+	btree = session->btree;
 
 	cursor = &cbulk->cbt.iface;
 	key = &r->k;
@@ -1199,17 +1443,21 @@ __wt_rec_row_bulk_insert(WT_CURSOR_BULK *cbulk)
 	    cursor->value.data, cursor->value.size, (uint64_t)0));
 
 	/*
-	 * Boundary, split or write the page.  If the K/V pair doesn't
-	 * fit: split the page, switch to the non-prefix-compressed key
-	 * and turn off compression until a full key is written to the
-	 * new page.
+	 * Boundary, split or write the page.
 	 *
 	 * We write a trailing key cell on the page after the K/V pairs
 	 * (see WT_TRAILING_KEY_CELL for more information).
 	 */
 	while (key->len + val->len + WT_TRAILING_KEY_CELL > r->space_avail) {
+		/* Split the page. */
 		WT_RET(__rec_split(session));
 
+		/*
+		 * Turn off prefix compression until a full key written
+		 * to the new page, and (unless we're already working
+		 * with an overflow key), rebuild the key without prefix
+		 * compression.
+		 */
 		r->key_pfx_compress = 0;
 		if (!ovfl_key)
 			WT_RET(__rec_cell_build_key(
@@ -1218,8 +1466,12 @@ __wt_rec_row_bulk_insert(WT_CURSOR_BULK *cbulk)
 
 	/* Copy the key/value pair onto the page. */
 	__rec_copy_incr(session, r, key);
-	if (val->len != 0)
-		__rec_copy_incr(session, r, val);
+	if (val->len != 0) {
+		if (btree->dictionary)
+			__rec_dict_copy_incr(session, r, val);
+		else
+			__rec_copy_incr(session, r, val);
+	}
 
 	/* Update compression state. */
 	__rec_key_state_update(r, ovfl_key);
@@ -1336,19 +1588,20 @@ __rec_col_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 static int
 __rec_col_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
+	WT_ADDR *addr;
 	WT_KV *val;
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_PAGE *rp;
 	WT_RECONCILE *r;
 	WT_REF *ref;
 	uint32_t i;
-	int val_set;
+	int modified;
 
 	WT_BSTAT_INCR(session, rec_page_merge);
 
 	r = session->reconcile;
-	unpack = &_unpack;
 	val = &r->v;
+	unpack = &_unpack;
 
 	/* For each entry in the page... */
 	WT_REF_FOREACH(page, ref, i) {
@@ -1356,11 +1609,13 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 		r->recno = ref->u.recno;
 
 		/*
-		 * The page may be deleted or internally created during a split.
+		 * The page may be emptied or internally created during a split.
 		 * Deleted/split pages are merged into the parent and discarded.
 		 */
-		val_set = 0;
-		if (PAGE_MODIFIED(ref, rp)) {
+		addr = NULL;
+		WT_RET(__rec_page_modified(session, page, ref, &modified));
+		if (modified) {
+			rp = ref->page;
 			switch (F_ISSET(rp->modify, WT_PM_REC_MASK)) {
 			case WT_PM_REC_EMPTY:
 				/*
@@ -1371,11 +1626,7 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 				 */
 				continue;
 			case WT_PM_REC_REPLACE:
-				__rec_cell_build_addr(session,
-				    rp->modify->u.replace.addr,
-				    rp->modify->u.replace.size,
-				    ref->u.recno);
-				val_set = 1;
+				addr = &rp->modify->u.replace;
 				break;
 			case WT_PM_REC_SPLIT:
 				WT_RET(__rec_col_merge(
@@ -1396,20 +1647,20 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * on-page cell and we copy it from the page, else build a new
 		 * cell.
 		 */
-		if (!val_set) {
-			if (__wt_off_page(page, ref->addr))
-				__rec_cell_build_addr(session,
-				    ((WT_ADDR *)ref->addr)->addr,
-				    ((WT_ADDR *)ref->addr)->size,
-				    ref->u.recno);
-			else {
-				__wt_cell_unpack(ref->addr, unpack);
-				val->buf.data = ref->addr;
-				val->buf.size = unpack->len;
-				val->cell_len = 0;
-				val->len = unpack->len;
-			}
-		}
+		if (addr == NULL && __wt_off_page(page, ref->addr))
+			addr = ref->addr;
+		if (addr == NULL) {
+			__wt_cell_unpack(ref->addr, unpack);
+			val->buf.data = ref->addr;
+			val->buf.size = __wt_cell_total_len(unpack);
+			val->cell_len = 0;
+			val->len = val->buf.size;
+		} else
+			__rec_cell_build_addr(session,
+			    addr->addr, addr->size,
+			    addr->leaf_no_overflow ?
+			    WT_CELL_ADDR_LNO : WT_CELL_ADDR,
+			    ref->u.recno);
 
 		/* Boundary: split or write the page. */
 		while (val->len > r->space_avail)
@@ -1442,7 +1693,7 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	/* Update any changes to the original on-page data items. */
 	WT_SKIP_FOREACH(ins, WT_COL_UPDATE_SINGLE(page)) {
-		upd = __wt_txn_read_skip(session, ins->upd, &r->upd_skipped);
+		WT_RET(__rec_txn_read(session, ins->upd, &upd));
 		if (upd == NULL)
 			continue;
 		__bit_setv_recno(
@@ -1466,7 +1717,7 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 	/* Walk any append list. */
 	append = WT_COL_APPEND(page);
 	WT_SKIP_FOREACH(ins, append) {
-		upd = __wt_txn_read_skip(session, ins->upd, &r->upd_skipped);
+		WT_RET(__rec_txn_read(session, ins->upd, &upd));
 		if (upd == NULL)
 			continue;
 		for (;;) {
@@ -1713,7 +1964,7 @@ __rec_col_var(
 	WT_INSERT_HEAD *append;
 	WT_ITEM *last;
 	WT_RECONCILE *r;
-	WT_UPDATE *upd;
+	WT_UPDATE *next_upd, *upd;
 	uint64_t n, nrepeat, repeat_count, rle, slvg_missing, src_recno;
 	uint32_t i, size;
 	int deleted, last_deleted, orig_deleted, update_no_copy;
@@ -1773,9 +2024,12 @@ __rec_col_var(
 			nrepeat = __wt_cell_rle(unpack);
 
 			ins = WT_SKIP_FIRST(WT_COL_UPDATE(page, cip));
-			while (ins != NULL && __wt_txn_read_skip(
-			    session, ins->upd, &r->upd_skipped) == NULL)
+			while (ins != NULL) {
+				WT_ERR(__rec_txn_read(session, ins->upd, &upd));
+				if (upd != NULL)
+					break;
 				ins = WT_SKIP_NEXT(ins);
+			}
 
 			/*
 			 * If the original value is "deleted", there's no value
@@ -1837,14 +2091,15 @@ record_loop:	/*
 		    n < nrepeat; n += repeat_count, src_recno += repeat_count) {
 			if (ins != NULL &&
 			    WT_INSERT_RECNO(ins) == src_recno) {
-				upd = __wt_txn_read_skip(
-				    session, ins->upd, &r->upd_skipped);
+				WT_ERR(__rec_txn_read(session, ins->upd, &upd));
 				WT_ASSERT(session, upd != NULL);
 				do {
 					ins = WT_SKIP_NEXT(ins);
-				} while (ins != NULL &&
-				    __wt_txn_read_skip(session,
-				    ins->upd, &r->upd_skipped) == NULL);
+					if (ins == NULL)
+						break;
+					WT_ERR(__rec_txn_read(
+					    session, ins->upd, &next_upd));
+				} while (next_upd == NULL);
 
 				update_no_copy = 1;	/* No data copy */
 
@@ -1903,6 +2158,9 @@ record_loop:	/*
 					WT_ERR(__rec_col_var_helper(
 					    session, salvage,
 					    last, 0, 1, repeat_count));
+
+					/* Track the page has overflow items. */
+					r->ovfl_items = 1;
 
 					ovfl_state = OVFL_USED;
 					continue;
@@ -1985,14 +2243,14 @@ compare:		/*
 		 * discard the underlying blocks, they're no longer useful.
 		 */
 		if (ovfl_state == OVFL_UNUSED)
-			 WT_ERR(__wt_rec_track_onpage_add(
-			     session, page, unpack->data, unpack->size));
+			WT_ERR(__wt_rec_track_onpage_addr(
+			    session, page, unpack->data, unpack->size));
 	}
 
 	/* Walk any append list. */
 	append = WT_COL_APPEND(page);
 	WT_SKIP_FOREACH(ins, append) {
-		upd = __wt_txn_read_skip(session, ins->upd, &r->upd_skipped);
+		WT_ERR(__rec_txn_read(session, ins->upd, &upd));
 		if (upd == NULL)
 			continue;
 		for (n = WT_INSERT_RECNO(ins); src_recno <= n; ++src_recno) {
@@ -2061,9 +2319,10 @@ err:	__wt_scr_free(&orig);
 static int
 __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
+	WT_ADDR *addr;
 	WT_BTREE *btree;
 	WT_CELL *cell;
-	WT_CELL_UNPACK *unpack, _unpack;
+	WT_CELL_UNPACK *kpack, _kpack, *vpack, _vpack;
 	WT_DECL_RET;
 	WT_IKEY *ikey;
 	WT_DECL_ITEM(tmpkey);
@@ -2071,15 +2330,18 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_PAGE *rp;
 	WT_RECONCILE *r;
 	WT_REF *ref;
-	uint32_t i;
-	int found, onpage_ovfl, ovfl_key, val_set;
+	uint32_t i, size;
+	u_int vtype;
+	int found, modified, onpage_ovfl, ovfl_key;
+	const void *p;
 
 	r = session->reconcile;
 	btree = session->btree;
-	unpack = &_unpack;
 
 	key = &r->k;
+	kpack = &_kpack;
 	val = &r->v;
+	vpack = &_vpack;
 
 	WT_RET(__rec_split_init(session, page, 0ULL, btree->maxintlpage));
 
@@ -2116,7 +2378,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 			cell = NULL;
 		else {
 			cell = WT_PAGE_REF_OFFSET(page, ikey->cell_offset);
-			__wt_cell_unpack(cell, unpack);
+			__wt_cell_unpack(cell, kpack);
 		}
 
 		/*
@@ -2124,10 +2386,46 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * a few places below, initialize the unpacked cell's overflow
 		 * value so there's an easy test.
 		 */
-		onpage_ovfl = cell != NULL && unpack->ovfl == 1 ? 1 : 0;
+		onpage_ovfl = cell != NULL && kpack->ovfl == 1 ? 1 : 0;
+
+		vtype = 0;
+		addr = NULL;
+		rp = ref->page;
+		WT_ERR(__rec_page_modified(session, page, ref, &modified));
 
 		/*
-		 * The page may be deleted or internally created during a split.
+		 * A modified WT_REF with no child page must be a page marked
+		 * deleted without being read.
+		 */
+		if (modified && rp == NULL) {
+			/*
+			 * Overflow keys referencing discarded pages are
+			 * no longer useful.  We can't just discard them
+			 * though: if the page is re-filled, they may be
+			 * necessary for a subsequent reconciliation,
+			 * enter them into the tracking system.
+			 */
+			if (onpage_ovfl)
+				WT_ERR(__rec_onpage_ovfl(
+				    session, page, kpack, tmpkey));
+
+			/*
+			 * If the WT_REF addr field is cleared, not only is the
+			 * leaf page deleted, but there are no older readers in
+			 * the system, and there's no need to write this cell.
+			 */
+			if (ref->addr == NULL)
+				continue;
+
+			/*
+			 * There must be older readers in the system, write a
+			 * special "deleted address" cell.
+			 */
+			vtype = WT_CELL_ADDR_DEL;
+		}
+
+		/*
+		 * The page may be emptied or internally created during a split.
 		 * Deleted/split pages are merged into the parent and discarded.
 		 *
 		 * There's one special case we have to handle here: the internal
@@ -2141,7 +2439,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * our split-created subtree, and we don't update the internal
 		 * page, when we merge that internal page into its parent page,
 		 * the key may be incorrect (or more likely, have been coerced
-		 * to a single byte because it's an internal page's 0th key.
+		 * to a single byte because it's an internal page's 0th key).
 		 * Imagine the following tree:
 		 *
 		 *	2	5	40	internal page
@@ -2161,8 +2459,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * key inserted into the subtree, and discard whatever 0th key
 		 * is on the split-created internal page.
 		 */
-		val_set = 0;
-		if (PAGE_MODIFIED(ref, rp)) {
+		if (modified && rp != NULL)
 			switch (F_ISSET(rp->modify, WT_PM_REC_MASK)) {
 			case WT_PM_REC_EMPTY:
 				/*
@@ -2174,13 +2471,14 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 				 */
 				if (onpage_ovfl)
 					WT_ERR(__rec_onpage_ovfl(
-					    session, page, unpack, tmpkey));
+					    session, page, kpack, tmpkey));
 				continue;
 			case WT_PM_REC_REPLACE:
-				__rec_cell_build_addr(session,
-				    rp->modify->u.replace.addr,
-				    rp->modify->u.replace.size, 0);
-				val_set = 1;
+				/*
+				 * If the page is replaced, the page's modify
+				 * structure has the page's address.
+				 */
+				addr = &rp->modify->u.replace;
 				break;
 			case WT_PM_REC_SPLIT:
 			case WT_PM_REC_SPLIT_MERGE:
@@ -2195,16 +2493,46 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 				 */
 				if (onpage_ovfl)
 					WT_ERR(__rec_onpage_ovfl(
-					    session, page, unpack, tmpkey));
+					    session, page, kpack, tmpkey));
 
 				r->merge_ref = ref;
 				WT_ERR(__rec_row_merge(session,
-				    F_ISSET(rp->modify, WT_PM_REC_MASK) ==
-				    WT_PM_REC_SPLIT_MERGE ?
+				    F_ISSET(rp->modify, WT_PM_REC_SPLIT_MERGE) ?
 				    rp : rp->modify->u.split));
 				continue;
+			case 0:
+				/*
+				 * Hasn't been written since it was modified,
+				 * we want to reference the original page.
+				 */
+				break;
+			WT_ILLEGAL_VALUE_ERR(session);
 			}
+
+		/*
+		 * Build the value cell, the child's page address.  In the case
+		 * of a page replacement, addr points to the page's replacement
+		 * address, else use WT_REF.addr, which points to an on-page
+		 * cell or an off-page WT_ADDR structure.   In the case of page
+		 * deletion, the cell type has also been set, otherwise use the
+		 * information from the addr or original cell.
+		 */
+		if (addr == NULL && __wt_off_page(page, ref->addr))
+			addr = ref->addr;
+		if (addr == NULL) {
+			__wt_cell_unpack(ref->addr, vpack);
+			p = vpack->data;
+			size = vpack->size;
+			if (vtype == 0)
+				vtype = vpack->raw;
+		} else {
+			p = addr->addr;
+			size = addr->size;
+			if (vtype == 0)
+				vtype = addr->leaf_no_overflow ?
+				    WT_CELL_ADDR_LNO : WT_CELL_ADDR;
 		}
+		__rec_cell_build_addr(session, p, size, vtype, 0);
 
 		/*
 		 * Build key cell.
@@ -2228,7 +2556,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 */
 		if (onpage_ovfl) {
 			WT_ERR(__wt_rec_track_onpage_srch(session,
-			    page, unpack->data, unpack->size, &found, tmpkey));
+			    page, kpack->data, kpack->size, &found, tmpkey));
 			if (found) {
 				/*
 				 * If the key is Huffman encoded, decode it and
@@ -2259,9 +2587,9 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 				onpage_ovfl = 0;
 			} else {
 				key->buf.data = cell;
-				key->buf.size = unpack->len;
+				key->buf.size = __wt_cell_total_len(kpack);
 				key->cell_len = 0;
-				key->len = unpack->len;
+				key->len = key->buf.size;
 				ovfl_key = 1;
 			}
 		} else
@@ -2271,32 +2599,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 		r->cell_zero = 0;
 
 		/*
-		 * Build the value cell.  The child page address is in one of 3
-		 * places: if the page was replaced, the page's modify structure
-		 * references it and we built the value cell just above in the
-		 * switch statement.  Else, the WT_REF->addr reference points to
-		 * an on-page cell or an off-page WT_ADDR structure: if it's an
-		 * on-page cell we copy it from the page, else build a new cell.
-		 */
-		if (!val_set) {
-			if (__wt_off_page(page, ref->addr))
-				__rec_cell_build_addr(session,
-				    ((WT_ADDR *)ref->addr)->addr,
-				    ((WT_ADDR *)ref->addr)->size, 0);
-			else {
-				__wt_cell_unpack(ref->addr, unpack);
-				val->buf.data = ref->addr;
-				val->buf.size = unpack->len;
-				val->cell_len = 0;
-				val->len = unpack->len;
-			}
-		}
-
-		/*
-		 * Boundary, split or write the page.  If the K/V pair doesn't
-		 * fit: split the page, turn off compression (until a full key
-		 * is written to the page), change to a non-prefix-compressed
-		 * key.
+		 * Boundary, split or write the page.
 		 */
 		while (key->len + val->len > r->space_avail) {
 			/*
@@ -2306,9 +2609,16 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 			 * about to promote it.
 			 */
 			if (onpage_ovfl)
-				WT_ERR(__wt_cell_copy(session, cell, r->cur));
+				WT_ERR(__wt_cell_unpack_copy(
+				    session, kpack, r->cur));
 			WT_ERR(__rec_split(session));
 
+			/*
+			 * Turn off prefix compression until a full key written
+			 * to the new page, and (unless we're already working
+			 * with an overflow key), rebuild the key without prefix
+			 * compression.
+			 */
 			r->key_pfx_compress = 0;
 			if (!ovfl_key)
 				WT_ERR(__rec_cell_build_key(
@@ -2337,38 +2647,66 @@ err:	__wt_scr_free(&tmpkey);
 static int
 __rec_row_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	WT_CELL_UNPACK *unpack, _unpack;
+	WT_ADDR *addr;
+	WT_CELL_UNPACK *vpack, _vpack;
 	WT_IKEY *ikey;
 	WT_KV *key, *val;
 	WT_PAGE *rp;
 	WT_RECONCILE *r;
 	WT_REF *ref;
-	uint32_t i;
-	int ovfl_key, val_set;
+	uint32_t i, size;
+	u_int vtype;
+	int modified, ovfl_key;
+	const void *p;
 
 	WT_BSTAT_INCR(session, rec_page_merge);
 
 	r = session->reconcile;
-	unpack = &_unpack;
 	key = &r->k;
 	val = &r->v;
+	vpack = &_vpack;
 
 	/* For each entry in the in-memory page... */
 	WT_REF_FOREACH(page, ref, i) {
+		vtype = 0;
+		addr = NULL;
+		rp = ref->page;
+		WT_RET(__rec_page_modified(session, page, ref, &modified));
+
 		/*
-		 * The page may be deleted or internally created during a split.
+		 * A modified WT_REF with no child page must be a page marked
+		 * deleted without being read.
+		 */
+		if (modified && rp == NULL) {
+			/*
+			 * If the WT_REF addr field is cleared, not only is the
+			 * leaf page deleted, but there are no older readers in
+			 * the system, and there's no need to write this cell.
+			 */
+			if (ref->addr == NULL)
+				continue;
+
+			/*
+			 * There must be older readers in the system, write a
+			 * special "deleted address" cell.
+			 */
+			vtype = WT_CELL_ADDR_DEL;
+		}
+
+		/*
+		 * The page may be emptied or internally created during a split.
 		 * Deleted/split pages are merged into the parent and discarded.
 		 */
-		val_set = 0;
-		if (PAGE_MODIFIED(ref, rp)) {
+		if (modified && rp != NULL)
 			switch (F_ISSET(rp->modify, WT_PM_REC_MASK)) {
 			case WT_PM_REC_EMPTY:
 				continue;
 			case WT_PM_REC_REPLACE:
-				__rec_cell_build_addr(session,
-				    rp->modify->u.replace.addr,
-				    rp->modify->u.replace.size, 0);
-				val_set = 1;
+				/*
+				 * If the page is replaced, the page's modify
+				 * structure has the page's address.
+				 */
+				addr = &rp->modify->u.replace;
 				break;
 			case WT_PM_REC_SPLIT:
 			case WT_PM_REC_SPLIT_MERGE:
@@ -2381,12 +2719,43 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 				if (r->merge_ref == NULL)
 					r->merge_ref = ref;
 				WT_RET(__rec_row_merge(session,
-				    F_ISSET(rp->modify, WT_PM_REC_MASK) ==
-				    WT_PM_REC_SPLIT_MERGE ?
+				    F_ISSET(rp->modify, WT_PM_REC_SPLIT_MERGE) ?
 				    rp : rp->modify->u.split));
 				continue;
+			case 0:
+				/*
+				 * Hasn't been written since it was modified,
+				 * we want to reference the original page.
+				 */
+				modified = 0;
+				break;
+			WT_ILLEGAL_VALUE(session);
 			}
+
+		/*
+		 * Build the value cell, the child's page address.  In the case
+		 * of a page replacement, addr points to the page's replacement
+		 * address, else use WT_REF.addr, which points to an on-page
+		 * cell or an off-page WT_ADDR structure.   In the case of page
+		 * deletion, the cell type has also been set, otherwise use the
+		 * information from the addr or original cell.
+		 */
+		if (addr == NULL && __wt_off_page(page, ref->addr))
+			addr = ref->addr;
+		if (addr == NULL) {
+			__wt_cell_unpack(ref->addr, vpack);
+			p = vpack->data;
+			size = vpack->size;
+			if (vtype == 0)
+				vtype = vpack->raw;
+		} else {
+			p = addr->addr;
+			size = addr->size;
+			if (vtype == 0)
+				vtype = addr->leaf_no_overflow ?
+				    WT_CELL_ADDR_LNO : WT_CELL_ADDR;
 		}
+		__rec_cell_build_addr(session, p, size, vtype, 0);
 
 		/*
 		 * Build the key cell.  If this is the first key in a "to be
@@ -2402,36 +2771,17 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 		r->cell_zero = 0;
 
 		/*
-		 * Build the value cell.  The child page address is in one of 3
-		 * places: if the page was replaced, the page's modify structure
-		 * references it and we built the value cell just above in the
-		 * switch statement.  Else, the WT_REF->addr reference points to
-		 * an on-page cell or an off-page WT_ADDR structure: if it's an
-		 * on-page cell we copy it from the page, else build a new cell.
-		 */
-		if (!val_set) {
-			if (__wt_off_page(page, ref->addr))
-				__rec_cell_build_addr(session,
-				    ((WT_ADDR *)ref->addr)->addr,
-				    ((WT_ADDR *)ref->addr)->size, 0);
-			else {
-				__wt_cell_unpack(ref->addr, unpack);
-				val->buf.data = ref->addr;
-				val->buf.size = unpack->len;
-				val->cell_len = 0;
-				val->len = unpack->len;
-			}
-		}
-
-		/*
-		 * Boundary, split or write the page.  If the K/V pair doesn't
-		 * fit: split the page, turn off compression (until a full key
-		 * is written to the page), change to a non-prefix-compressed
-		 * key.
+		 * Boundary, split or write the page.
 		 */
 		while (key->len + val->len > r->space_avail) {
 			WT_RET(__rec_split(session));
 
+			/*
+			 * Turn off prefix compression until a full key written
+			 * to the new page, and (unless we're already working
+			 * with an overflow key), rebuild the key without prefix
+			 * compression.
+			 */
 			r->key_pfx_compress = 0;
 			if (!ovfl_key)
 				WT_RET(__rec_cell_build_key(
@@ -2461,6 +2811,7 @@ __rec_row_leaf(
 	WT_CELL *cell, *val_cell;
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_DECL_ITEM(tmpkey);
+	WT_DECL_ITEM(tmpval);
 	WT_DECL_RET;
 	WT_IKEY *ikey;
 	WT_INSERT *ins;
@@ -2469,17 +2820,17 @@ __rec_row_leaf(
 	WT_ROW *rip;
 	WT_UPDATE *upd;
 	uint64_t slvg_skip;
-	uint32_t i;
-	int found, onpage_ovfl, ovfl_key;
-	void *ripkey;
+	uint32_t i, size;
+	int dictionary, found, onpage_ovfl, ovfl_key;
+	const void *p;
 
 	r = session->reconcile;
 	btree = session->btree;
-	unpack = &_unpack;
 	slvg_skip = salvage == NULL ? 0 : salvage->skip;
 
 	key = &r->k;
 	val = &r->v;
+	unpack = &_unpack;
 
 	WT_RET(__rec_split_init(session, page, 0ULL, btree->maxleafpage));
 
@@ -2490,8 +2841,12 @@ __rec_row_leaf(
 	if ((ins = WT_SKIP_FIRST(WT_ROW_INSERT_SMALLEST(page))) != NULL)
 		WT_RET(__rec_row_leaf_insert(session, ins));
 
-	/* Temporary buffer in which to instantiate any uninstantiated keys. */
+	/*
+	 * Temporary buffers in which to instantiate any uninstantiated keys
+	 * or value items we need.
+	 */
 	WT_RET(__wt_scr_alloc(session, 0, &tmpkey));
+	WT_RET(__wt_scr_alloc(session, 0, &tmpval));
 
 	/* For each entry in the page... */
 	WT_ROW_FOREACH(page, rip, i) {
@@ -2514,35 +2869,60 @@ __rec_row_leaf(
 		 * Set the WT_IKEY reference (if the key was instantiated), and
 		 * the key cell reference.
 		 */
-		ripkey = WT_ROW_KEY_COPY(rip);
-		if (__wt_off_page(page, ripkey)) {
-			ikey = ripkey;
+		ikey = WT_ROW_KEY_COPY(rip);
+		if (__wt_off_page(page, ikey))
 			cell = WT_PAGE_REF_OFFSET(page, ikey->cell_offset);
-		} else {
+		else {
+			cell = (WT_CELL *)ikey;
 			ikey = NULL;
-			cell = ripkey;
 		}
 
 		/* Build value cell. */
+		dictionary = 0;
 		if ((val_cell = __wt_row_value(page, rip)) != NULL)
 			__wt_cell_unpack(val_cell, unpack);
-		upd = __wt_txn_read_skip(
-		    session, WT_ROW_UPDATE(page, rip), &r->upd_skipped);
+		WT_ERR(__rec_txn_read(session, WT_ROW_UPDATE(page, rip), &upd));
 		if (upd == NULL) {
 			/*
-			 * Copy the item off the page -- however, when the page
-			 * was read into memory, there may not have been a value
-			 * item, that is, it may have been zero length.
+			 * When the page was read into memory, there may not
+			 * have been a value item.
+			 *
+			 * If there was a value item, check if it's a dictionary
+			 * cell (a copy of another item on the page).  If it's a
+			 * copy, we have to create a new value item as the old
+			 * item might have been discarded from the page.
 			 */
 			if (val_cell == NULL) {
 				val->buf.data = NULL;
 				val->buf.size = 0;
+				val->cell_len = 0;
+				val->len = val->buf.size;
+			} else if (unpack->raw == WT_CELL_VALUE_COPY) {
+				/* If the item is Huffman encoded, decode it. */
+				if (btree->huffman_value == NULL) {
+					p = unpack->data;
+					size = unpack->size;
+				} else {
+					WT_ERR(__wt_huffman_decode(session,
+					    btree->huffman_value,
+					    unpack->data, unpack->size,
+					    tmpval));
+					p = tmpval->data;
+					size = tmpval->size;
+				}
+				WT_ERR(__rec_cell_build_val(
+				    session, p, size, (uint64_t)0));
+				dictionary = 1;
 			} else {
 				val->buf.data = val_cell;
-				val->buf.size = unpack->len;
+				val->buf.size = __wt_cell_total_len(unpack);
+				val->cell_len = 0;
+				val->len = val->buf.size;
+
+				/* Track the page has overflow items. */
+				if (unpack->ovfl)
+					r->ovfl_items = 1;
 			}
-			val->cell_len = 0;
-			val->len = val->buf.size;
 		} else {
 			/*
 			 * If the original value was an overflow and we've not
@@ -2552,7 +2932,7 @@ __rec_row_leaf(
 			 * I/O for little reason.
 			 */
 			if (val_cell != NULL && unpack->ovfl)
-				WT_ERR(__wt_rec_track_onpage_add(
+				WT_ERR(__wt_rec_track_onpage_addr(
 				    session, page, unpack->data, unpack->size));
 
 			/* If this key/value pair was deleted, we're done. */
@@ -2588,10 +2968,12 @@ __rec_row_leaf(
 			 */
 			if (upd->size == 0)
 				val->cell_len = val->len = val->buf.size = 0;
-			else
-				WT_ERR(__rec_cell_build_val(
-				    session, WT_UPDATE_DATA(upd),
-				    upd->size, (uint64_t)0));
+			else {
+				WT_ERR(__rec_cell_build_val(session,
+				    WT_UPDATE_DATA(upd), upd->size,
+				    (uint64_t)0));
+				dictionary = 1;
+			}
 		}
 
 		/*
@@ -2638,9 +3020,9 @@ __rec_row_leaf(
 				onpage_ovfl = 0;
 			} else {
 				key->buf.data = cell;
-				key->buf.size = unpack->len;
+				key->buf.size = __wt_cell_total_len(unpack);
 				key->cell_len = 0;
-				key->len = unpack->len;
+				key->len = key->buf.size;
 				ovfl_key = 1;
 
 				/*
@@ -2649,6 +3031,9 @@ __rec_row_leaf(
 				 * prefix information for a subsequent key.
 				 */
 				tmpkey->size = 0;
+
+				/* Track the page has overflow items. */
+				r->ovfl_items = 1;
 			}
 		} else {
 			/*
@@ -2700,18 +3085,15 @@ __rec_row_leaf(
 				    unpack->data, unpack->size);
 				tmpkey->size = unpack->prefix + unpack->size;
 			} else
-				WT_ERR(
-				    __wt_row_key(session, page, rip, tmpkey));
+				WT_ERR(__wt_row_key_copy(
+				    session, page, rip, tmpkey));
 
 			WT_ERR(__rec_cell_build_key(
 			    session, tmpkey->data, tmpkey->size, 0, &ovfl_key));
 		}
 
 		/*
-		 * Boundary, split or write the page.  If the K/V pair doesn't
-		 * fit: split the page, switch to the non-prefix-compressed key
-		 * and turn off compression until a full key is written to the
-		 * new page.
+		 * Boundary, split or write the page.
 		 *
 		 * We write a trailing key cell on the page after the K/V pairs
 		 * (see WT_TRAILING_KEY_CELL for more information).
@@ -2729,6 +3111,12 @@ __rec_row_leaf(
 				    session, unpack, r->cur));
 			WT_ERR(__rec_split(session));
 
+			/*
+			 * Turn off prefix compression until a full key written
+			 * to the new page, and (unless we're already working
+			 * with an overflow key), rebuild the key without prefix
+			 * compression.
+			 */
 			r->key_pfx_compress = 0;
 			if (!ovfl_key)
 				WT_ERR(__rec_cell_build_key(
@@ -2737,8 +3125,12 @@ __rec_row_leaf(
 
 		/* Copy the key/value pair onto the page. */
 		__rec_copy_incr(session, r, key);
-		if (val->len != 0)
-			__rec_copy_incr(session, r, val);
+		if (val->len != 0) {
+			if (dictionary)
+				__rec_dict_copy_incr(session, r, val);
+			else
+				__rec_copy_incr(session, r, val);
+		}
 
 		/* Update compression state. */
 		__rec_key_state_update(r, ovfl_key);
@@ -2752,6 +3144,7 @@ leaf_insert:	/* Write any K/V pairs inserted into the page after this key. */
 	ret = __rec_split_finish(session);
 
 err:	__wt_scr_free(&tmpkey);
+	__wt_scr_free(&tmpval);
 	return (ret);
 }
 
@@ -2762,18 +3155,20 @@ err:	__wt_scr_free(&tmpkey);
 static int
 __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_INSERT *ins)
 {
+	WT_BTREE *btree;
 	WT_KV *key, *val;
 	WT_RECONCILE *r;
 	WT_UPDATE *upd;
 	int ovfl_key;
 
 	r = session->reconcile;
+	btree = session->btree;
 	key = &r->k;
 	val = &r->v;
 
 	for (; ins != NULL; ins = WT_SKIP_NEXT(ins)) {
 		/* Build value cell. */
-		upd = __wt_txn_read_skip(session, ins->upd, &r->upd_skipped);
+		WT_RET(__rec_txn_read(session, ins->upd, &upd));
 		if (upd == NULL || WT_UPDATE_DELETED_ISSET(upd))
 			continue;
 		if (upd->size == 0)
@@ -2786,10 +3181,7 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_INSERT *ins)
 		    WT_INSERT_KEY(ins), WT_INSERT_KEY_SIZE(ins), 0, &ovfl_key));
 
 		/*
-		 * Boundary, split or write the page.  If the K/V pair doesn't
-		 * fit: split the page, switch to the non-prefix-compressed key
-		 * and turn off compression until a full key is written to the
-		 * new page.
+		 * Boundary, split or write the page.
 		 *
 		 * We write a trailing key cell on the page after the K/V pairs
 		 * (see WT_TRAILING_KEY_CELL for more information).
@@ -2798,6 +3190,12 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_INSERT *ins)
 		    val->len + WT_TRAILING_KEY_CELL > r->space_avail) {
 			WT_RET(__rec_split(session));
 
+			/*
+			 * Turn off prefix compression until a full key written
+			 * to the new page, and (unless we're already working
+			 * with an overflow key), rebuild the key without prefix
+			 * compression.
+			 */
 			r->key_pfx_compress = 0;
 			if (!ovfl_key)
 				WT_RET(__rec_cell_build_key(
@@ -2806,8 +3204,12 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_INSERT *ins)
 
 		/* Copy the key/value pair onto the page. */
 		__rec_copy_incr(session, r, key);
-		if (val->len != 0)
-			__rec_copy_incr(session, r, val);
+		if (val->len != 0) {
+			if (btree->dictionary)
+				__rec_dict_copy_incr(session, r, val);
+			else
+				__rec_copy_incr(session, r, val);
+		}
 
 		/* Update compression state. */
 		__rec_key_state_update(r, ovfl_key);
@@ -2866,7 +3268,7 @@ __rec_split_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
 			/*
 			 * Root page split: the last entry on the list.  There
 			 * won't be a page to discard because writing the page
-			 * created a snapshot, not a replacement page.
+			 * created a checkpoint, not a replacement page.
 			 */
 			WT_ASSERT(session, mod->u.replace.addr == NULL);
 			break;
@@ -2887,8 +3289,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_DECL_RET;
 	WT_PAGE_MODIFY *mod;
 	WT_RECONCILE *r;
-	uint32_t i, size;
-	const uint8_t *addr;
+	uint32_t i;
 
 	r = session->reconcile;
 	btree = session->btree;
@@ -2903,16 +3304,16 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 	switch (F_ISSET(mod, WT_PM_REC_MASK)) {
 	case 0:	/*
 		 * The page has never been reconciled before, track the original
-		 * address blocks (if any).
+		 * address blocks (if any).  The "if any" is for empty trees we
+		 * create when a new tree is opened, and for previously deleted
+		 * pages that are instantiated in memory.
 		 *
 		 * The exception is root pages are never tracked or free'd, they
-		 * are snapshots, and must be explicitly dropped.
+		 * are checkpoints, and must be explicitly dropped.
 		 */
-		if (!WT_PAGE_IS_ROOT(page) && page->ref->addr != NULL) {
-			__wt_get_addr(page->parent, page->ref, &addr, &size);
-			WT_RET(__wt_rec_track_onpage_add(
-			    session, page, addr, size));
-		}
+		if (!WT_PAGE_IS_ROOT(page) && page->ref->addr != NULL)
+			WT_RET(__wt_rec_track_onpage_ref(
+			    session, page, page->parent, page->ref));
 		break;
 	case WT_PM_REC_EMPTY:				/* Page deleted */
 		break;
@@ -2921,7 +3322,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * Discard the replacement leaf page's blocks.
 		 *
 		 * The exception is root pages are never tracked or free'd, they
-		 * are snapshots, and must be explicitly dropped.
+		 * are checkpoints, and must be explicitly dropped.
 		 */
 		if (!WT_PAGE_IS_ROOT(page))
 			WT_RET(__wt_rec_track(session, page,
@@ -2952,10 +3353,10 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	/*
 	 * Wrap up discarded block and overflow tracking.  If we are about to
-	 * create a snapshot, the system must be entirely consistent at that
+	 * create a checkpoint, the system must be entirely consistent at that
 	 * point, the underlying block manager is presumably going to do some
 	 * action to resolve the list of allocated/free/whatever blocks that
-	 * are associated with the snapshot.
+	 * are associated with the checkpoint.
 	 */
 	WT_RET(__wt_rec_track_wrapup(session, page));
 
@@ -2966,7 +3367,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 		/* If this is the root page, we need to create a sync point. */
 		if (WT_PAGE_IS_ROOT(page))
-			WT_RET(__wt_bm_snapshot(session, NULL, btree->snap));
+			WT_RET(__wt_bm_checkpoint(session, NULL, btree->ckpt));
 
 		/*
 		 * If the page was empty, we want to discard it from the tree
@@ -2989,7 +3390,8 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 */
 		bnd = &r->bnd[0];
 		if (bnd->addr.addr == NULL)
-			WT_RET(__wt_bm_snapshot(session, &r->dsk, btree->snap));
+			WT_RET(
+			    __wt_bm_checkpoint(session, &r->dsk, btree->ckpt));
 		else {
 			mod->u.replace = bnd->addr;
 			bnd->addr.addr = NULL;
@@ -3065,13 +3467,26 @@ err:			__wt_scr_free(&tkey);
 	}
 
 	/*
-	 * If the write succeeded, no updates were skipped and the disk
-	 * generation has not changed in the meantime, update it to the write
-	 * generation when reconciliation started.
+	 * Success.
+	 *
+	 * If modifications were skipped, the tree isn't clean.  The checkpoint
+	 * call cleared the tree's modified value before it called the eviction
+	 * thread, so we must explicitly reset the tree's modified flag.  We
+	 * publish the change for clarity (the requirement is the value be set
+	 * before a subsequent checkpoint reads it, and because the current
+	 * checkpoint is waiting on this reconciliation to complete, there's no
+	 * risk of that happening).
+	 */
+	if (r->upd_skipped)
+		WT_PUBLISH(btree->modified, 1);
+
+	/*
+	 * If modifications were not skipped, the page might be clean; update
+	 * the disk generation to the write generation as of when reconciliation
+	 * started.
 	 */
 	if (!r->upd_skipped)
-		(void)WT_ATOMIC_CAS(
-		    mod->disk_gen, r->orig_disk_gen, r->orig_write_gen);
+		mod->disk_gen = r->orig_write_gen;
 
 	return (0);
 }
@@ -3097,9 +3512,11 @@ __rec_write_wrapup_err(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 */
 	WT_TRET(__wt_rec_track_wrapup_err(session, page));
 	for (bnd = r->bnd, i = 0; i < r->bnd_next; ++bnd, ++i)
-		if (bnd->addr.addr != NULL)
+		if (bnd->addr.addr != NULL) {
 			WT_TRET(__wt_bm_free(
 			    session, bnd->addr.addr, bnd->addr.size));
+			bnd->addr.addr = NULL;
+		}
 	return (ret);
 }
 
@@ -3110,6 +3527,7 @@ __rec_write_wrapup_err(WT_SESSION_IMPL *session, WT_PAGE *page)
 static int
 __rec_split_row(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_PAGE **splitp)
 {
+	WT_ADDR *addr;
 	WT_BOUNDARY *bnd;
 	WT_DECL_RET;
 	WT_PAGE *page;
@@ -3131,7 +3549,7 @@ __rec_split_row(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_PAGE **splitp)
 	page->type = WT_PAGE_ROW_INT;
 
 	/*
-	 * we don't re-write parent pages when child pages split, which means
+	 * We don't re-write parent pages when child pages split, which means
 	 * we have only one slot to work with in the parent.  When a leaf page
 	 * splits, we create a new internal page referencing the split pages,
 	 * and when the leaf page is evicted, we update the leaf's slot in the
@@ -3155,15 +3573,15 @@ __rec_split_row(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_PAGE **splitp)
 	/* Enter each split page into the new, internal page. */
 	for (ref = page->u.intl.t,
 	    bnd = r->bnd, i = 0; i < r->bnd_next; ++ref, ++bnd, ++i) {
-		WT_ERR(__wt_row_ikey_alloc(session, 0,
-		    bnd->key.data, bnd->key.size, &ref->u.key));
-		WT_ERR(__wt_calloc(session, 1, sizeof(WT_ADDR), &ref->addr));
-		((WT_ADDR *)ref->addr)->addr = bnd->addr.addr;
-		((WT_ADDR *)ref->addr)->size = bnd->addr.size;
+		WT_ERR(__wt_calloc(session, 1, sizeof(WT_ADDR), &addr));
+		*addr = bnd->addr;
 		bnd->addr.addr = NULL;
 
-		WT_PUBLISH(ref->state, WT_REF_DISK);
 		ref->page = NULL;
+		WT_ERR(__wt_row_ikey_alloc(session, 0,
+		    bnd->key.data, bnd->key.size, &ref->u.key));
+		ref->addr = addr;
+		ref->state = WT_REF_DISK;
 	}
 
 	*splitp = page;
@@ -3180,6 +3598,7 @@ err:	__wt_page_out(session, &page, 0);
 static int
 __rec_split_col(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_PAGE **splitp)
 {
+	WT_ADDR *addr;
 	WT_BOUNDARY *bnd;
 	WT_DECL_RET;
 	WT_PAGE *page;
@@ -3210,14 +3629,14 @@ __rec_split_col(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_PAGE **splitp)
 	/* Enter each split page into the new, internal page. */
 	for (ref = page->u.intl.t,
 	    bnd = r->bnd, i = 0; i < r->bnd_next; ++ref, ++bnd, ++i) {
-		ref->u.recno = bnd->recno;
-		WT_ERR(__wt_calloc(session, 1, sizeof(WT_ADDR), &ref->addr));
-		((WT_ADDR *)ref->addr)->addr = bnd->addr.addr;
-		((WT_ADDR *)ref->addr)->size = bnd->addr.size;
+		WT_ERR(__wt_calloc(session, 1, sizeof(WT_ADDR), &addr));
+		*addr= bnd->addr;
 		bnd->addr.addr = NULL;
 
-		WT_PUBLISH(ref->state, WT_REF_DISK);
 		ref->page = NULL;
+		ref->u.recno = bnd->recno;
+		ref->addr = addr;
+		ref->state = WT_REF_DISK;
 	}
 
 	*splitp = page;
@@ -3319,12 +3738,12 @@ __rec_cell_build_key(WT_SESSION_IMPL *session,
 
 /*
  * __rec_cell_build_addr --
- *	Process an address reference and return a WT_CELL structure to be stored
+ *	Process an address reference and return a cell structure to be stored
  * on the page.
  */
 static void
-__rec_cell_build_addr(
-    WT_SESSION_IMPL *session, const void *addr, uint32_t size, uint64_t recno)
+__rec_cell_build_addr(WT_SESSION_IMPL *session,
+    const void *addr, uint32_t size, u_int cell_type, uint64_t recno)
 {
 	WT_KV *val;
 	WT_RECONCILE *r;
@@ -3347,7 +3766,8 @@ __rec_cell_build_addr(
 	 */
 	val->buf.data = addr;
 	val->buf.size = size;
-	val->cell_len = __wt_cell_pack_addr(&val->cell, recno, val->buf.size);
+	val->cell_len = __wt_cell_pack_addr(
+	    &val->cell, cell_type, recno, val->buf.size);
 	val->len = val->cell_len + val->buf.size;
 }
 
@@ -3419,6 +3839,9 @@ __rec_cell_build_ovfl(
 	btree = session->btree;
 	page = r->page;
 
+	/* Track the page has overflow items. */
+	r->ovfl_items = 1;
+
 	/*
 	 * See if this overflow record has already been written and reuse it if
 	 * possible.  Else, write a new overflow record.
@@ -3458,4 +3881,116 @@ __rec_cell_build_ovfl(
 
 err:	__wt_scr_free(&tmp);
 	return (ret);
+}
+
+/*
+ * __rec_dictionary_reset --
+ *	Clear the dictionary when reconciliation restarts and when crossing a
+ * page boundary (a potential split).
+ */
+static void
+__rec_dictionary_reset(WT_RECONCILE *r)
+{
+	/*
+	 * Reset the dictionary when starting a new reconciliation or crossing
+	 * a page split boundary.   I'm concerned about the latter: if it's a
+	 * dictionary with 10K slots and a small page size boundary, this is an
+	 * expensive operation we might be calling a lot; if it's a dictionary
+	 * with 100 slots and a large page size boundary it's a cheap operation
+	 * we won't call often.   The alternative is to clear the dictionary
+	 * when starting a new reconciliation and don't clear it when crossing
+	 * a split boundary.  If we don't clear the dictionary when crossing a
+	 * split boundary, then we have to add some way to detect references to
+	 * cells in other chunks of the page.  A simple way is to add the split
+	 * boundary's start address into the WT_DICTIONARY entry and test it
+	 * against the current boundary's start address when doing the lookup.
+	 * That grows the WT_DICTIONARY size by a pointer, of course; it might
+	 * be possible to test the referenced cell's address relationship to
+	 * the current boundary's start address instead, but that's a little
+	 * trickier if we actually split and the boundary moves around.
+	 */
+	memset(r->dictionary,
+	    0, (size_t)r->dictionary_slots * sizeof(r->dictionary[0]));
+}
+
+/*
+ * __rec_dictionary_cell_match --
+ *	Check to see if two cells (one in a WT_ITEM, and one laid out
+ * in a buffer), match.
+ */
+static inline int
+__rec_dictionary_cell_match(uint8_t *p, WT_KV *val)
+{
+	/*
+	 * We don't have to worry about crossing into garbage at the end of
+	 * the cell.  If the cell itself matches, the size of what follows
+	 * must match as well.
+	 */
+	if (memcmp(p, &val->cell, val->cell_len) != 0)
+		return (0);
+	if (memcmp(p + val->cell_len, val->buf.data, val->buf.size) != 0)
+		return (0);
+	return (1);
+}
+
+/*
+ * __rec_dictionary_lookup --
+ *	Check the dictionary for a matching value on this page.
+ */
+static WT_DICTIONARY *
+__rec_dictionary_lookup(WT_SESSION_IMPL *session, WT_KV *val)
+{
+	WT_DICTIONARY *dp, *empty;
+	WT_RECONCILE *r;
+	long i;
+	uint64_t hash;
+
+	r = session->reconcile;
+
+	hash = __wt_hash_fnv64(val->buf.data, val->buf.size);
+
+	/*
+	 * Walk the dictionary looking for a matching hash value.  We're not
+	 * sorting the dictionary or doing anything to make the lookup fast.
+	 * That's fine for the small dictionaries I expect to see, but bad if
+	 * we see big dictionaries with lots of unique page values.  It's an
+	 * obvious trade-off: this implementation only uses two pointers per
+	 * dictionary slot and building the dictionary takes almost no work,
+	 * vs. more memory and more work to build large dictionaries that we
+	 * can still search quickly.
+	 *
+	 * We're not doing value replacement in the dictionary.  We stop adding
+	 * new entries if we run out of empty dictionary slots (but continue to
+	 * use the existing entries).  I can't think of any reason a leaf page
+	 * value is more likely to be seen because it was seen more recently
+	 * than some other value: if we find working sets where that's not the
+	 * case, it shouldn't be too difficult to maintain a pointer which is
+	 * the next dictionary slot to re-use.
+	 */
+	empty = NULL;
+	for (dp = r->dictionary, i = r->dictionary_slots; i > 0; --i, ++dp) {
+		if (dp->cell == NULL) {
+			empty = dp;
+			break;
+		}
+		if (dp->hash != hash)
+			continue;
+
+		/* If we find a match, replace our cell with a copy cell. */
+		if (__rec_dictionary_cell_match(dp->cell, val)) {
+			WT_BSTAT_INCR(session, rec_dictionary);
+			return (dp);
+		}
+	}
+
+	/*
+	 * Set the hash value, we'll add this entry into the dictionary when we
+	 * write it into the page's buffer (because that's when we know where
+	 * it will be written).
+	 */
+	if (empty != NULL) {
+		empty->cell = NULL;	/* Not necessary, just cautious. */
+		empty->hash = hash;
+	}
+	return (empty);
 }

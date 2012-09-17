@@ -49,8 +49,8 @@
 #define	WT_ELEMENTS(a)	(sizeof(a) / sizeof(a[0]))
 
 /* 10 level skip lists, 1/2 have a link to the next element. */
-#define	WT_SKIP_MAXDEPTH        10
-#define	WT_SKIP_PROBABILITY     (UINT32_MAX >> 2)
+#define	WT_SKIP_MAXDEPTH	10
+#define	WT_SKIP_PROBABILITY	(UINT32_MAX >> 2)
 
 /*
  * Quiet compiler warnings about unused parameters.
@@ -159,9 +159,21 @@
 	((strncmp((str), (pre), strlen(pre)) == 0) ?			\
 	    ((str) += strlen(pre), 1) : 0)
 
+/* Check if a string matches a byte string of len bytes. */
+#define	WT_STRING_MATCH(str, bytes, len)				\
+	(strncmp(str, bytes, len) == 0 && (str)[(len)] == '\0')
+
+#define	WT_STRING_CASE_MATCH(str, bytes, len)				\
+	(strncasecmp(str, bytes, len) == 0 && (str)[(len)] == '\0')
+
 /* Function return value and scratch buffer declaration and initialization. */
 #define	WT_DECL_ITEM(i)	WT_ITEM *i = NULL
 #define	WT_DECL_RET	int ret = 0
+
+/* Flags for the tree-walk function. */
+#define	WT_TREE_DISCARD	0x01			/* Discarding */
+#define	WT_TREE_EVICT	0x02			/* Eviction */
+#define	WT_TREE_PREV	0x04			/* Backward walk */
 
 /*
  * In diagnostic mode we track the locations from which hazard references and

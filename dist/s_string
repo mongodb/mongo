@@ -21,9 +21,13 @@ check() {
 	}
 }
 
-l="`cd .. && echo src/include/*.[hi] src/include/*.in`"
-for i in $l `sed -e '/^[a-z]/! d' filelist`; do
-	check $i
+# List of files to spellchk.
+l=`(cd .. &&
+    find examples ext src test -name '*.[chisy]' &&
+    find src -name '*.in')`
+
+for f in $l; do
+	check $f
 done
 
 exit 0

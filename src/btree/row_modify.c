@@ -68,12 +68,10 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 		/* Make sure the update can proceed. */
 		WT_ERR(__wt_update_check(session, page, *upd_entry));
 
-		/* Allocate room for the new value from per-thread memory. */
+		/* Allocate and insert a WT_UPDATE structure. */
 		WT_ERR(__wt_update_alloc(session, value, &upd, &upd_size));
-
-		/* Insert the WT_UPDATE structure. */
-		ret = __wt_update_serial(session, page, cbt->write_gen,
-		    upd_entry, &new_upd, new_upd_size, &upd, upd_size);
+		WT_ERR(__wt_update_serial(session, page, cbt->write_gen,
+		    upd_entry, &new_upd, new_upd_size, &upd, upd_size));
 	} else {
 		/*
 		 * Allocate insert array if necessary, and set the array
@@ -131,14 +129,14 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 		cbt->ins = ins;
 
 		/* Insert the WT_INSERT structure. */
-		ret = __wt_insert_serial(session, page, cbt->write_gen,
+		WT_ERR(__wt_insert_serial(session, page, cbt->write_gen,
 		    inshead, cbt->ins_stack,
 		    &new_inslist, new_inslist_size,
 		    &new_inshead, new_inshead_size,
-		    &ins, ins_size, skipdepth);
+		    &ins, ins_size, skipdepth));
 	}
 
-	if (ret != 0) {
+	if (0) {
 err:		if (ins != NULL)
 			__wt_free(session, ins);
 		if (upd != NULL) {
@@ -161,8 +159,7 @@ err:		if (ins != NULL)
 
 /*
  * __wt_row_insert_alloc --
- *	Row-store insert: allocate a WT_INSERT structure from the session's
- *	buffer and fill it in.
+ *	Row-store insert: allocate a WT_INSERT structure and fill it in.
  */
 int
 __wt_row_insert_alloc(WT_SESSION_IMPL *session,
@@ -272,6 +269,10 @@ __wt_update_check(WT_SESSION_IMPL *session, WT_PAGE *page, WT_UPDATE *next)
 {
 	WT_TXN *txn;
 
+	/* Discard obsolete WT_UPDATE structures. */
+	if (next != NULL)
+		__wt_update_obsolete(session, page, next);
+
 	/* Before allocating anything, make sure this update is permitted. */
 	WT_RET(__wt_txn_update_check(session, next));
 
@@ -289,8 +290,7 @@ __wt_update_check(WT_SESSION_IMPL *session, WT_PAGE *page, WT_UPDATE *next)
 
 /*
  * __wt_update_alloc --
- *	Allocate a WT_UPDATE structure and associated value from the session's
- *	buffer and fill it in.
+ *	Allocate a WT_UPDATE structure and associated value and fill it in.
  */
 int
 __wt_update_alloc(WT_SESSION_IMPL *session,
@@ -327,6 +327,84 @@ __wt_update_alloc(WT_SESSION_IMPL *session,
 	if (sizep != NULL)
 		*sizep = sizeof(WT_UPDATE) + size;
 	return (0);
+}
+
+/*
+ * __wt_update_obsolete --
+ *	Discard obsolete updates.
+ */
+void
+__wt_update_obsolete(WT_SESSION_IMPL *session, WT_PAGE *page, WT_UPDATE *upd)
+{
+	WT_TXN *txn;
+	WT_UPDATE *next;
+	size_t size;
+
+	txn = &session->txn;
+
+	if (txn->isolation != TXN_ISO_SNAPSHOT &&
+	    txn->isolation != TXN_ISO_READ_COMMITTED)
+		return;
+
+	/*
+	 * Walk the list of updates, looking for obsolete updates.  If we find
+	 * an update no session will ever move past, we can discard any updates
+	 * that appear after it.
+	 */
+	for (; upd != NULL; upd = upd->next)
+		if (__wt_txn_visible_all(session, upd->txnid)) {
+			/*
+			 * We cannot discard this WT_UPDATE structure, we can
+			 * only discard WT_UPDATE structures subsequent to it,
+			 * other threads of control will terminate their walk
+			 * in this element.  Save a reference to the list we
+			 * will discard, and NULL terminate the list.
+			 */
+			if ((next = upd->next) == NULL)
+				return;
+			if (!WT_ATOMIC_CAS(upd->next, next, NULL))
+				return;
+			upd = next;
+			break;
+		}
+
+	/*
+	 * No update after upd in the list will ever be visible to any session,
+	 * discard them all.
+	 */
+	for (size = 0; upd != NULL; upd = next) {
+		/* Deleted items have a dummy size: don't include that. */
+		size += sizeof(WT_UPDATE) +
+		    (WT_UPDATE_DELETED_ISSET(upd) ? 0 : upd->size);
+		next = upd->next;
+		__wt_free(session, upd);
+	}
+	if (size != 0)
+		__wt_cache_page_inmem_decr(session, page, size);
+}
+
+/*
+ * __wt_page_obsolete --
+ *	Discard all obsolete updates on a row-store leaf page.
+ */
+void
+__wt_row_leaf_obsolete(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	WT_INSERT *ins;
+	WT_ROW *rip;
+	uint32_t i;
+
+	/* For entries before the first on-page record... */
+	WT_SKIP_FOREACH(ins, WT_ROW_INSERT_SMALLEST(page))
+		__wt_update_obsolete(session, page, ins->upd);
+
+	/* For each entry on the page... */
+	WT_ROW_FOREACH(page, rip, i) {
+		__wt_update_obsolete(session, page, WT_ROW_UPDATE(page, rip));
+
+		WT_SKIP_FOREACH(ins, WT_ROW_INSERT(page, rip))
+			__wt_update_obsolete(session, page, ins->upd);
+	}
 }
 
 /*

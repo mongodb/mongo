@@ -7,6 +7,7 @@ bdb=$build_top/db/build_unix
 
 colflag=0
 dump_bdb=0
+wt_name="file:__wt"
 while :
 	do case "$1" in
 	# -b means we need to dump the BDB database
@@ -16,6 +17,10 @@ while :
 	# -c means it was a column-store.
 	-c)
 		colflag=1
+		shift ;;
+	-n)
+		shift ;
+		wt_name=$1
 		shift ;;
 	*)
 		break ;;
@@ -34,7 +39,7 @@ if test -e $bzext ; then
 fi
 config='extensions=['$ext']'
 
-$build_top/wt -C "$config" dump file:__wt | sed -e '1,/^Data$/d' > __wt_dump
+$build_top/wt -C "$config" dump $wt_name | sed -e '1,/^Data$/d' > __wt_dump
 
 if test $dump_bdb -ne 1; then
 	exit 0

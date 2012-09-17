@@ -15,7 +15,7 @@
  */
 int
 __wt_schema_colgroup_name(WT_SESSION_IMPL *session,
-    WT_TABLE *table, const char *cgname, size_t len, WT_ITEM *namebuf)
+    WT_TABLE *table, const char *cgname, size_t len, WT_ITEM *buf)
 {
 	const char *tablename;
 
@@ -23,8 +23,8 @@ __wt_schema_colgroup_name(WT_SESSION_IMPL *session,
 	(void)WT_PREFIX_SKIP(tablename, "table:");
 
 	return ((table->ncolgroups == 0) ?
-	    __wt_buf_fmt(session, namebuf, "colgroup:%s", tablename) :
-	    __wt_buf_fmt(session, namebuf, "colgroup:%s:%.*s",
+	    __wt_buf_fmt(session, buf, "colgroup:%s", tablename) :
+	    __wt_buf_fmt(session, buf, "colgroup:%s:%.*s",
 	    tablename, (int)len, cgname));
 }
 
@@ -68,7 +68,7 @@ __wt_schema_get_btree(WT_SESSION_IMPL *session,
 	if (ret != 0)
 		goto err;
 
-	ret = __wt_session_get_btree(session, fileuri, cfg, flags);
+	ret = __wt_session_get_btree_ckpt(session, fileuri, cfg, flags);
 	if (ret == ENOENT)
 		__wt_errx(session,
 		    "%s created but '%s' is missing", objname, fileuri);
@@ -88,18 +88,19 @@ err:	__wt_scr_free(&uribuf);
 int
 __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 {
+	WT_COLGROUP *colgroup;
 	WT_CONFIG cparser;
 	WT_CONFIG_ITEM ckey, cval;
 	WT_DECL_RET;
-	WT_ITEM namebuf, plan;
-	const char *cgname, *fileconf;
+	WT_DECL_ITEM(buf);
+	const char *cgconfig;
 	int i;
 
 	if (table->cg_complete)
 		return (0);
 
-	WT_CLEAR(namebuf);
-	fileconf = NULL;
+	WT_RET(__wt_scr_alloc(session, 0, &buf));
+	colgroup = NULL;
 
 	WT_RET(__wt_config_subinit(session, &cparser, &table->cgconf));
 
@@ -110,36 +111,53 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 		else
 			WT_CLEAR(ckey);
 
-		if ((cgname = table->cg_name[i]) == NULL) {
-			WT_ERR(__wt_schema_colgroup_name(session, table,
-			    ckey.str, ckey.len, &namebuf));
-			cgname = table->cg_name[i] =
-			    __wt_buf_steal(session, &namebuf, NULL);
+		/*
+		 * Always open from scratch: we may have failed part of the way
+		 * through opening a table, or column groups may have changed.
+		 */
+		if (table->cgroups[i] != NULL) {
+			__wt_schema_destroy_colgroup(
+			    session, table->cgroups[i]);
+			table->cgroups[i] = NULL;
 		}
-		ret = __wt_schema_get_btree(session,
-		    cgname, strlen(cgname), NULL, 0);
-		if (ret != 0) {
-			/* It is okay if the table is not yet complete. */
+
+		WT_ERR(__wt_schema_colgroup_name(session, table,
+		    ckey.str, ckey.len, buf));
+		if ((ret = __wt_metadata_read(
+		    session, buf->data, &cgconfig)) != 0) {
+			/* It is okay if the table is incomplete. */
 			if (ret == WT_NOTFOUND)
 				ret = 0;
 			goto err;
 		}
-		WT_ERR(__wt_session_release_btree(session));
+
+		WT_ERR(__wt_calloc_def(session, 1, &colgroup));
+		colgroup->name = __wt_buf_steal(session, buf, NULL);
+		colgroup->config = cgconfig;
+		WT_ERR(__wt_config_getones(session,
+		    colgroup->config, "columns", &colgroup->colconf));
+		WT_ERR(__wt_config_getones(
+		    session, colgroup->config, "filename", &cval));
+		WT_ERR(__wt_buf_fmt(session, buf, "file:%.*s",
+		    (int)cval.len, cval.str));
+		colgroup->source = __wt_buf_steal(session, buf, NULL);
+		table->cgroups[i] = colgroup;
+		colgroup = NULL;
 	}
 
 	if (!table->is_simple) {
 		WT_ERR(__wt_table_check(session, table));
 
-		WT_CLEAR(plan);
 		WT_ERR(__wt_struct_plan(session,
-		    table, table->colconf.str, table->colconf.len, 1, &plan));
-		table->plan = __wt_buf_steal(session, &plan, NULL);
+		    table, table->colconf.str, table->colconf.len, 1, buf));
+		table->plan = __wt_buf_steal(session, buf, NULL);
 	}
 
 	table->cg_complete = 1;
 
-err:	__wt_buf_free(session, &namebuf);
-	__wt_free(session, fileconf);
+err:	__wt_scr_free(&buf);
+	if (colgroup != NULL)
+		__wt_schema_destroy_colgroup(session, colgroup);
 	return (ret);
 }
 
@@ -148,36 +166,28 @@ err:	__wt_buf_free(session, &namebuf);
  *	Open an index.
  */
 static int
-__open_index(WT_SESSION_IMPL *session, WT_TABLE *table,
-    const char *uri, const char *idxconf)
+__open_index(WT_SESSION_IMPL *session, WT_TABLE *table, WT_INDEX *idx)
 {
-	WT_BTREE *btree;
 	WT_CONFIG colconf;
-	WT_CONFIG_ITEM ckey, cval, icols;
+	WT_CONFIG_ITEM ckey, cval;
+	WT_DECL_ITEM(buf);
+	WT_DECL_ITEM(plan);
 	WT_DECL_RET;
-	WT_ITEM cols, fmt, plan, uribuf;
-	const char *fileuri;
 	u_int cursor_key_cols;
 	int i;
 
-	btree = NULL;
-	WT_CLEAR(uribuf);
+	WT_ERR(__wt_scr_alloc(session, 0, &buf));
 
 	/* Get the filename from the index config. */
-	WT_ERR(__wt_config_getones(session, idxconf, "filename", &cval));
+	WT_ERR(__wt_config_getones(session, idx->config, "filename", &cval));
 	WT_ERR(__wt_buf_fmt(
-	    session, &uribuf, "file:%.*s", (int)cval.len, cval.str));
-	fileuri = uribuf.data;
+	    session, buf, "file:%.*s", (int)cval.len, cval.str));
+	idx->source = __wt_buf_steal(session, buf, NULL);
 
-	ret = __wt_session_get_btree(
-	    session, fileuri, NULL, WT_BTREE_EXCLUSIVE);
-	btree = session->btree;
-	if (ret == ENOENT)
-		__wt_errx(session,
-		    "Index '%s' created but '%s' is missing", uri, fileuri);
-	/* Other errors will already have generated an error message. */
-	if (ret != 0)
-		goto err;
+	WT_ERR(__wt_config_getones(session, idx->config, "key_format", &cval));
+	WT_ERR(__wt_buf_fmt(
+	    session, buf, "%.*s", (int)cval.len, cval.str));
+	idx->key_format = __wt_buf_steal(session, buf, NULL);
 
 	/*
 	 * The key format for an index is somewhat subtle: the application
@@ -189,15 +199,15 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table,
 	 * the index cursor key format (which will usually omit some of those
 	 * keys).
 	 */
-	WT_ERR(__wt_config_getones(session, idxconf, "columns", &icols));
+	WT_ERR(__wt_config_getones(
+	    session, idx->config, "columns", &idx->colconf));
 
 	/* Start with the declared index columns. */
-	WT_ERR(__wt_config_subinit(session, &colconf, &icols));
-	WT_CLEAR(cols);
+	WT_ERR(__wt_config_subinit(session, &colconf, &idx->colconf));
 	cursor_key_cols = 0;
 	while ((ret = __wt_config_next(&colconf, &ckey, &cval)) == 0) {
 		WT_ERR(__wt_buf_catfmt(
-		    session, &cols, "%.*s,", (int)ckey.len, ckey.str));
+		    session, buf, "%.*s,", (int)ckey.len, ckey.str));
 		++cursor_key_cols;
 	}
 	if (ret != 0 && ret != WT_NOTFOUND)
@@ -215,37 +225,33 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table,
 		 * If the primary key column is already in the secondary key,
 		 * don't add it again.
 		 */
-		if (__wt_config_subgetraw(session, &icols, &ckey, &cval) == 0)
+		if (__wt_config_subgetraw(
+		    session, &idx->colconf, &ckey, &cval) == 0)
 			continue;
 		WT_ERR(__wt_buf_catfmt(
-		    session, &cols, "%.*s,", (int)ckey.len, ckey.str));
+		    session, buf, "%.*s,", (int)ckey.len, ckey.str));
 	}
 	if (ret != 0 && ret != WT_NOTFOUND)
 		goto err;
 
-	WT_CLEAR(plan);
-	WT_ERR(__wt_struct_plan(session,
-	    table, cols.data, cols.size, 0, &plan));
-	btree->key_plan = __wt_buf_steal(session, &plan, NULL);
+	WT_ERR(__wt_scr_alloc(session, 0, &plan));
+	WT_ERR(__wt_struct_plan(session, table, buf->data, buf->size, 0, plan));
+	idx->key_plan = __wt_buf_steal(session, plan, NULL);
 
 	/* Set up the cursor key format (the visible columns). */
-	WT_CLEAR(fmt);
+	WT_ERR(__wt_buf_init(session, buf, 0));
 	WT_ERR(__wt_struct_truncate(session,
-	    btree->key_format, cursor_key_cols, &fmt));
-	btree->idxkey_format = __wt_buf_steal(session, &fmt, NULL);
+	    idx->key_format, cursor_key_cols, buf));
+	idx->idxkey_format = __wt_buf_steal(session, buf, NULL);
 
 	/* By default, index cursor values are the table value columns. */
 	/* TODO Optimize to use index columns in preference to table lookups. */
 	WT_ERR(__wt_struct_plan(session,
-	    table, table->colconf.str, table->colconf.len, 1, &plan));
-	btree->value_plan = __wt_buf_steal(session, &plan, NULL);
+	    table, table->colconf.str, table->colconf.len, 1, plan));
+	idx->value_plan = __wt_buf_steal(session, plan, NULL);
 
-err:	__wt_buf_free(session, &cols);
-	__wt_buf_free(session, &uribuf);
-	if (btree != NULL) {
-		session->btree = btree;
-		WT_TRET(__wt_session_release_btree(session));
-	}
+err:	__wt_scr_free(&buf);
+	__wt_scr_free(&plan);
 
 	return (ret);
 }
@@ -255,77 +261,115 @@ err:	__wt_buf_free(session, &cols);
  *	Open the indices for a table.
  */
 int
-__wt_schema_open_index(
-    WT_SESSION_IMPL *session, WT_TABLE *table, const char *idxname, size_t len)
+__wt_schema_open_index(WT_SESSION_IMPL *session,
+    WT_TABLE *table, const char *idxname, size_t len, WT_INDEX **indexp)
 {
 	WT_CURSOR *cursor;
+	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
+	WT_INDEX *idx;
+	int cmp, i, match;
 	const char *idxconf, *name, *tablename, *uri;
-	int i, match, skipped;
 
-	cursor = NULL;
-	skipped = 0;
-	idxconf = NULL;
-	tablename = table->name;
-	(void)WT_PREFIX_SKIP(tablename, "table:");
-
-	if (len == 0 && table->idx_complete)
+	/* Check if we've already done the work. */
+	if (idxname == NULL && table->idx_complete)
 		return (0);
 
-	/*
-	 * XXX
-	 * Do a full scan through the metadata to find all matching indices.
-	 * This scan be optimized with search + next.
-	 */
-	WT_RET(__wt_metadata_cursor(session, NULL, &cursor));
+	cursor = NULL;
+	idx = NULL;
 
-	/* Open each index. */
-	for (i = 0; (ret = cursor->next(cursor)) == 0;) {
+	/* Build a search key. */
+	tablename = table->name;
+	(void)WT_PREFIX_SKIP(tablename, "table:");
+	WT_ERR(__wt_scr_alloc(session, 512, &tmp));
+	WT_ERR(__wt_buf_fmt(session, tmp, "index:%s:", tablename));
+
+	/* Find matching indices. */
+	WT_ERR(__wt_metadata_cursor(session, NULL, &cursor));
+	cursor->set_key(cursor, tmp->data);
+	if ((ret = cursor->search_near(cursor, &cmp)) == 0 && cmp < 0)
+		ret = cursor->next(cursor);
+	for (i = 0; ret == 0; i++, ret = cursor->next(cursor)) {
 		WT_ERR(cursor->get_key(cursor, &uri));
 		name = uri;
-		if (!WT_PREFIX_SKIP(name, "index:") ||
-		    !WT_PREFIX_SKIP(name, tablename) ||
-		    !WT_PREFIX_SKIP(name, ":"))
-			continue;
+		if (!WT_PREFIX_SKIP(name, tmp->data))
+			break;
 
 		/* Is this the index we are looking for? */
-		match = (len > 0 &&
-		   strncmp(name, idxname, len) == 0 && name[len] == '\0');
+		match = idxname == NULL || WT_STRING_MATCH(name, idxname, len);
 
-		if ((size_t)i * sizeof(const char *) >= table->idx_name_alloc)
-			WT_ERR(__wt_realloc(session, &table->idx_name_alloc,
-			    WT_MAX(10 * sizeof(const char *),
-			    2 * table->idx_name_alloc), &table->idx_name));
+		/*
+		 * Ensure there is space, including if we have to make room for
+		 * a new entry in the middle of the list.
+		 */
+		if (table->idx_alloc <= sizeof(WT_INDEX *) *
+		    ((size_t)WT_MAX(i, table->nindices) + 1))
+			WT_ERR(__wt_realloc(session, &table->idx_alloc,
+			    WT_MAX(10 * sizeof(WT_INDEX *),
+			    2 * table->idx_alloc), &table->indices));
 
-		if (table->idx_name[i] == NULL)
-			WT_ERR(__wt_strdup(session, uri, &table->idx_name[i]));
+		/* Keep the in-memory list in sync with the metadata. */
+		cmp = 0;
+		while (table->indices[i] != NULL &&
+		    (cmp = strcmp(uri, table->indices[i]->name)) > 0) {
+			/* Index no longer exists, remove it. */
+			__wt_free(session, table->indices[i]);
+			memmove(&table->indices[i], &table->indices[i + 1],
+			    (table->nindices - i) * sizeof(WT_INDEX *));
+			table->indices[--table->nindices] = NULL;
+		}
+		if (cmp < 0) {
+			/* Make room for a new index. */
+			memmove(&table->indices[i + 1], &table->indices[i],
+			    (table->nindices - i) * sizeof(WT_INDEX *));
+			table->indices[i] = NULL;
+			++table->nindices;
+		}
 
-		if (len == 0 || match) {
+		if (!match)
+			continue;
+
+		if (table->indices[i] == NULL) {
 			WT_ERR(cursor->get_value(cursor, &idxconf));
-			WT_ERR(__open_index(session, table, uri, idxconf));
-		} else
-			skipped = 1;
+			WT_ERR(__wt_calloc_def(session, 1, &idx));
+			WT_ERR(__wt_strdup(session, uri, &idx->name));
+			WT_ERR(__wt_strdup(session, idxconf, &idx->config));
+			WT_ERR(__open_index(session, table, idx));
 
-		if (match) {
-			ret = cursor->close(cursor);
-			cursor = NULL;
+			table->indices[i] = idx;
+			idx = NULL;
+		}
+
+		/* If we were looking for a single index, we're done. */
+		if (indexp != NULL)
+			*indexp = table->indices[i];
+		if (idxname != NULL)
 			break;
-		}
-		i++;
+	}
+	WT_ERR_NOTFOUND_OK(ret);
+
+	/* If we did a full pass, we won't need to do it again. */
+	if (idxname == NULL) {
+		table->nindices = i;
+		table->idx_complete = 1;
 	}
 
-	/* Did we make it all the way through? */
-	if (ret == WT_NOTFOUND) {
-		ret = 0;
-		if (!skipped) {
-			table->nindices = i;
-			table->idx_complete = 1;
-		}
-	}
-
-err:	if (cursor != NULL)
+err:	__wt_scr_free(&tmp);
+	if (idx != NULL)
+		__wt_schema_destroy_index(session, idx);
+	if (cursor != NULL)
 		WT_TRET(cursor->close(cursor));
 	return (ret);
+}
+
+/*
+ * __wt_schema_open_indices --
+ *	Open the indices for a table.
+ */
+int
+__wt_schema_open_indices(WT_SESSION_IMPL *session, WT_TABLE *table)
+{
+	return (__wt_schema_open_index(session, table, NULL, 0, NULL));
 }
 
 /*
@@ -401,7 +445,7 @@ __wt_schema_open_table(WT_SESSION_IMPL *session,
 	if (ret != WT_NOTFOUND)
 		goto err;
 
-	WT_ERR(__wt_calloc_def(session, WT_COLGROUPS(table), &table->cg_name));
+	WT_ERR(__wt_calloc_def(session, WT_COLGROUPS(table), &table->cgroups));
 	WT_ERR(__wt_schema_open_colgroups(session, table));
 	*tablep = table;
 

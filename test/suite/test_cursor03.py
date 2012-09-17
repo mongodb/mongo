@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Copyright (c) 2008-2012 WiredTiger, Inc.
+# Public Domain 2008-2012 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
 #
@@ -24,16 +24,14 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-#
-# test_cursor02.py
-# 	Cursor operations on tables of various sizes,
-#       with key/values of various sizes.
-#
 
 import wiredtiger
 from test_cursor_tracker import TestCursorTracker
 from wtscenario import multiply_scenarios
 
+# test_cursor03.py
+#    Cursor operations on tables of various sizes, with key/values of various
+# sizes.
 class test_cursor03(TestCursorTracker):
     """
     Cursor operations on small tables of each access method.
@@ -42,19 +40,20 @@ class test_cursor03(TestCursorTracker):
     after inserts and removes.
     """
     scenarios = multiply_scenarios('.', [
-            ('row', dict(tablekind='row', keysize=None, valsize=None)),
-            ('col', dict(tablekind='col', keysize=None, valsize=None)),
+            ('row', dict(tablekind='row', keysize=None, valsize=None, uri='table')),
+            ('row', dict(tablekind='row', keysize=None, valsize=None, uri='lsm')),
+            ('col', dict(tablekind='col', keysize=None, valsize=None, uri='table')),
             #('fix', dict(tablekind='fix', keysize=None, valsize=None))
-            ('row.val10k', dict(tablekind='row', keysize=None, valsize=[10, 10000])),
-            ('col.val10k', dict(tablekind='col', keysize=None, valsize=[10, 10000])),
-            ('row.keyval10k', dict(tablekind='row', keysize=[10,10000], valsize=[10, 10000])),
+            ('row.val10k', dict(tablekind='row', keysize=None, valsize=[10, 10000], uri='table')),
+            ('col.val10k', dict(tablekind='col', keysize=None, valsize=[10, 10000], uri='table')),
+            ('row.keyval10k', dict(tablekind='row', keysize=[10,10000], valsize=[10, 10000], uri='table')),
         ], [
             ('count1000', dict(tablecount=1000,cache_size=20*1024*1024)),
             ('count10000', dict(tablecount=10000, cache_size=64*1024*1024))
             ])
 
     def create_session_and_cursor(self):
-        tablearg = "table:" + self.table_name1
+        tablearg = self.uri + ":" + self.table_name1
         if self.tablekind == 'row':
             keyformat = 'key_format=S'
         else:
@@ -66,7 +65,7 @@ class test_cursor03(TestCursorTracker):
         create_args = keyformat + ',' + valformat + self.config_string()
         self.session_create(tablearg, create_args)
         self.pr('creating cursor')
-        self.cur_initial_conditions(self.table_name1, self.tablecount, self.tablekind, self.keysize, self.valsize)
+        self.cur_initial_conditions(self.table_name1, self.tablecount, self.tablekind, self.keysize, self.valsize, self.uri)
         return self.session.open_cursor(tablearg, None, 'append')
 
     def setUpConnectionOpen(self, dir):

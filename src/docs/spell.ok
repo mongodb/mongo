@@ -4,6 +4,7 @@ Atomicity
 BLOBs
 CFLAGS
 CPPFLAGS
+Cheng
 DB's
 DBTs
 DbCursor
@@ -12,6 +13,7 @@ DbMultiple
 EB
 EmpId
 FreeBSD
+Gawlick
 GCC
 GitHub
 IEC
@@ -30,7 +32,7 @@ URIs
 Vv
 WiredTiger
 WiredTiger's
-WiredTigerInternal
+WiredTigerCheckpoint
 aR
 ack'ed
 alloc
@@ -73,6 +75,7 @@ control's
 cpp
 crashless
 cursortype
+cv
 dN
 dNLen
 dNOff
@@ -88,10 +91,12 @@ del
 desc
 destructor
 destructors
+dl
 dlp
 dontlock
 dp
 dsync
+dt
 dumpfile
 dup
 dups
@@ -111,8 +116,10 @@ fileformats
 fileid
 filename
 filesystem
+filesystems
 fillfactor
 firstname
+fnv
 fput
 freelist
 gcc
@@ -153,6 +160,7 @@ loadtext
 logc
 lookup
 lrtf
+lsm
 lsn
 lt
 mailto
@@ -170,6 +178,7 @@ memfree
 memp
 metadata
 minkey
+mkdir
 mmap
 mpool
 mpoolfile
@@ -235,6 +244,7 @@ reconf
 recs
 rerequests
 ret
+rf
 ro
 rpc
 rwlock
@@ -257,7 +267,6 @@ structs
 subdatabases
 subpage
 superset
-sv
 tablename
 tcl
 tcmalloc

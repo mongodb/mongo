@@ -39,15 +39,11 @@ __wt_page_in_func(
 	for (;;) {
 		switch (ref->state) {
 		case WT_REF_DISK:
-			/*
-			 * The page isn't in memory, attempt to set the state
-			 * to WT_REF_READING.  If successful, read it.
-			 */
+		case WT_REF_DELETED:
+			/* The page isn't in memory, attempt to read it. */
 			__wt_eviction_check(session, &read_lockout, wake);
 			wake = 0;
-
-			if (read_lockout || !WT_ATOMIC_CAS(ref->state,
-			    WT_REF_DISK, WT_REF_READING))
+			if (read_lockout)
 				break;
 
 			WT_RET(__wt_cache_read(session, parent, ref));
@@ -89,8 +85,6 @@ __wt_page_in_func(
 			 */
 			if (page->modify != NULL &&
 			    __wt_txn_ancient(session, page->modify->first_id)) {
-				WT_VERBOSE_RET(session, read,
-				    "ancient updates, forcing eviction");
 				__wt_evict_page_request(session, page);
 				__wt_hazard_clear(session, page);
 				__wt_evict_server_wake(session);
@@ -126,7 +120,7 @@ __wt_page_inmem(WT_SESSION_IMPL *session,
 
 	WT_ASSERT_RET(session, dsk->u.entries > 0);
 
-	*pagep = page = NULL;
+	*pagep = NULL;
 
 	/*
 	 * Allocate and initialize the WT_PAGE.
@@ -170,7 +164,11 @@ __wt_page_inmem(WT_SESSION_IMPL *session,
 	*pagep = page;
 	return (0);
 
-err:	__wt_free(session, page);
+err:	/*
+	 * Our caller (specifically salvage) may have special concerns about the
+	 * underlying disk image, the caller owns that problem.
+	 */
+	__wt_page_out(session, &page, WT_PAGE_FREE_IGNORE_DISK);
 	return (ret);
 }
 
@@ -367,6 +365,39 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 			break;
 		case WT_CELL_ADDR:
 			ref->addr = cell;
+
+			/*
+			 * A cell may reference a deleted leaf page: if a leaf
+			 * page was deleted without first being read, and the
+			 * deletion committed, but older transactions in the
+			 * system required the previous version of the page to
+			 * be available, a special deleted-address type cell is
+			 * written.  If we crash and recover to a page with a
+			 * deleted-address cell, we now want to delete the leaf
+			 * page (because it was never deleted, but by definition
+			 * no earlier transaction might need it).
+			 *
+			 * Re-create the WT_REF state of a deleted node, give
+			 * the page a modify structure and set the transaction
+			 * ID for the first update to the page (WT_TXN_NONE
+			 * because the transaction is committed and visible.)
+			 *
+			 * If the tree is already dirty and so will be written,
+			 * mark the page dirty.  (We'd like to free the deleted
+			 * pages, but if the handle is read-only or if the
+			 * application never modifies the tree, we're not able
+			 * to do so.)
+			 */
+			if (unpack->raw == WT_CELL_ADDR_DEL) {
+				ref->state = WT_REF_DELETED;
+				ref->txnid = WT_TXN_NONE;
+
+				WT_ERR(__wt_page_modify_init(session, page));
+				page->modify->first_id = WT_TXN_NONE;
+				if (btree->modified)
+					__wt_page_modify_set(page);
+			}
+
 			++ref;
 			continue;
 		WT_ILLEGAL_VALUE_ERR(session);

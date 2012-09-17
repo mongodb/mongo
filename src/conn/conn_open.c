@@ -15,11 +15,11 @@ int
 __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[])
 {
 	WT_DECL_RET;
-	WT_SESSION_IMPL *session;
+	WT_SESSION_IMPL *evict_session, *session;
 
 	/* Default session. */
 	session = conn->default_session;
-	session->iface.connection = &conn->iface;
+	WT_ASSERT(session, session->iface.connection == &conn->iface);
 
 	/* WT_SESSION_IMPL array. */
 	WT_ERR(__wt_calloc(session,
@@ -39,8 +39,18 @@ __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[])
 
 	/* Start worker threads. */
 	F_SET(conn, WT_SERVER_RUN);
+
+	/*
+	 * Start the eviction thread.
+	 *
+	 * It needs a session handle because it is reading/writing pages.
+	 * Allocate a session here so the eviction thread never needs
+	 * to acquire the connection spinlock, which can lead to deadlock.
+	 */
+	WT_ERR(__wt_open_session(conn, 1, NULL, NULL, &evict_session));
+	evict_session->name = "eviction-server";
 	WT_ERR(__wt_thread_create(
-	    &conn->cache_evict_tid, __wt_cache_evict_server, conn));
+	    &conn->cache_evict_tid, __wt_cache_evict_server, evict_session));
 
 	return (0);
 

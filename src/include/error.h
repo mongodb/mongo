@@ -27,6 +27,14 @@
 	__wt_err(session, ret, __VA_ARGS__);				\
 	goto err;							\
 } while (0)
+#define	WT_ERR_NOTFOUND_OK(a) do {					\
+	if ((ret = (a)) != 0) {						\
+		if (ret == WT_NOTFOUND)					\
+			ret = 0;					\
+		else							\
+			goto err;					\
+	}								\
+} while (0)
 #define	WT_ERR_TEST(a, v) do {						\
 	if (a) {							\
 		ret = (v);						\
@@ -48,6 +56,11 @@
 	int __ret = (v);						\
 	__wt_err(session, __ret, __VA_ARGS__);				\
 	return (__ret);							\
+} while (0)
+#define	WT_RET_NOTFOUND_OK(a) do {					\
+	int __ret;							\
+	if ((__ret = (a)) != 0 && __ret != WT_NOTFOUND)			\
+		return (__ret);						\
 } while (0)
 
 /* Set "ret" if not already set. */

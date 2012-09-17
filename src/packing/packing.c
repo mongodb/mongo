@@ -154,6 +154,7 @@ __wt_struct_unpackv(WT_SESSION_IMPL *session,
 
 	p = buffer;
 	end = p + size;
+	WT_CLEAR(pv.u.item);			/* GCC 4.6 lint */
 
 	while ((ret = __pack_next(&pack, &pv)) == 0) {
 		WT_RET(__unpack_read(session, &pv, &p, (size_t)(end - p)));

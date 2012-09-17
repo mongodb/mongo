@@ -12,36 +12,37 @@
  *	Return a page referenced key/value pair to the application.
  */
 int
-__wt_kv_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int key_ret)
+__wt_kv_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 {
 	WT_BTREE *btree;
 	WT_CELL *cell;
-	WT_CELL_UNPACK *unpack, _unpack;
+	WT_CELL_UNPACK unpack;
 	WT_CURSOR *cursor;
-	WT_IKEY *ikey;
 	WT_PAGE *page;
 	WT_ROW *rip;
 	WT_UPDATE *upd;
 	uint8_t v;
-	void *ripkey;
 
 	btree = session->btree;
-	unpack = &_unpack;
 
 	page = cbt->page;
 	cursor = &cbt->iface;
 
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
-		if (key_ret)
-			cursor->recno = cbt->recno;
+		/*
+		 * The interface cursor's record has usually been set, but that
+		 * isn't universally true, specifically, cursor.search_near may
+		 * call here without first setting the interface cursor.
+		 */
+		cursor->recno = cbt->recno;
 
 		/*
 		 * If the cursor references a WT_INSERT item, take the related
 		 * WT_UPDATE item.
 		 */
-		if (cbt->ins != NULL) {
-			upd = cbt->ins->upd;
+		if (cbt->ins != NULL &&
+		    (upd = __wt_txn_read(session, cbt->ins->upd)) != NULL) {
 			cursor->value.data = WT_UPDATE_DATA(upd);
 			cursor->value.size = upd->size;
 			return (0);
@@ -49,15 +50,19 @@ __wt_kv_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int key_ret)
 		v = __bit_getv_recno(page, cbt->iface.recno, btree->bitcnt);
 		return (__wt_buf_set(session, &cursor->value, &v, 1));
 	case WT_PAGE_COL_VAR:
-		if (key_ret)
-			cursor->recno = cbt->recno;
+		/*
+		 * The interface cursor's record has usually been set, but that
+		 * isn't universally true, specifically, cursor.search_near may
+		 * call here without first setting the interface cursor.
+		 */
+		cursor->recno = cbt->recno;
 
 		/*
 		 * If the cursor references a WT_INSERT item, take the related
 		 * WT_UPDATE item.
 		 */
-		if (cbt->ins != NULL) {
-			upd = cbt->ins->upd;
+		if (cbt->ins != NULL &&
+		    (upd = __wt_txn_read(session, cbt->ins->upd)) != NULL) {
 			cursor->value.data = WT_UPDATE_DATA(upd);
 			cursor->value.size = upd->size;
 			return (0);
@@ -73,24 +78,14 @@ __wt_kv_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int key_ret)
 		 * original page, and the value from any related WT_UPDATE item,
 		 * or the page if the key was never updated.
 		 */
-		if (cbt->ins == NULL) {
-			if (key_ret) {
-				ripkey = WT_ROW_KEY_COPY(rip);
-				if (__wt_off_page(page, ripkey)) {
-					ikey = ripkey;
-					cursor->key.data = WT_IKEY_DATA(ikey);
-					cursor->key.size = ikey->size;
-				} else
-					WT_RET(__wt_row_key(
-					    session, page, rip, &cursor->key));
-			}
-			upd = WT_ROW_UPDATE(page, rip);
+		if (cbt->ins != NULL &&
+		    (upd = __wt_txn_read(session, cbt->ins->upd)) != NULL) {
+			cursor->key.data = WT_INSERT_KEY(cbt->ins);
+			cursor->key.size = WT_INSERT_KEY_SIZE(cbt->ins);
 		} else {
-			if (key_ret) {
-				cursor->key.data = WT_INSERT_KEY(cbt->ins);
-				cursor->key.size = WT_INSERT_KEY_SIZE(cbt->ins);
-			}
-			upd = cbt->ins->upd;
+			WT_RET(
+			    __wt_row_key(session, page, rip, &cursor->key, 0));
+			upd = __wt_txn_read(session, WT_ROW_UPDATE(page, rip));
 		}
 		if (upd != NULL) {
 			cursor->value.data = WT_UPDATE_DATA(upd);
@@ -107,12 +102,12 @@ __wt_kv_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int key_ret)
 	WT_ILLEGAL_VALUE(session);
 	}
 
-	/* It's a cell, unpack and expand it as necessary. */
-	__wt_cell_unpack(cell, unpack);
-	if (btree->huffman_value == NULL && unpack->type == WT_CELL_VALUE) {
-		cursor->value.data = unpack->data;
-		cursor->value.size = unpack->size;
+	/* The value is an on-page cell, unpack and expand it as necessary. */
+	__wt_cell_unpack(cell, &unpack);
+	if (btree->huffman_value == NULL && unpack.type == WT_CELL_VALUE) {
+		cursor->value.data = unpack.data;
+		cursor->value.size = unpack.size;
 		return (0);
-	} else
-		return (__wt_cell_unpack_copy(session, unpack, &cursor->value));
+	}
+	return (__wt_cell_unpack_copy(session, &unpack, &cursor->value));
 }

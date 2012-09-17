@@ -47,14 +47,15 @@ __wt_row_leaf_keys(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * Allocate a bit array and figure out the set of "interesting" keys,
 	 * marking up the array.
 	 */
-	WT_RET(__wt_scr_alloc(session, __bitstr_size(page->entries), &tmp));
+	WT_RET(__wt_scr_alloc(
+	    session, (uint32_t)__bitstr_size(page->entries), &tmp));
 
 	__inmem_row_leaf_slots(tmp->mem, 0, page->entries, btree->key_gap);
 
 	/* Instantiate the keys. */
 	for (rip = page->u.row.d, i = 0; i < page->entries; ++rip, ++i)
 		if (__bit_test(tmp->mem, i))
-			WT_ERR(__wt_row_key(session, page, rip, NULL));
+			WT_ERR(__wt_row_key_copy(session, page, rip, NULL));
 
 	F_SET_ATOMIC(page, WT_PAGE_BUILD_KEYS);
 
@@ -97,12 +98,12 @@ __inmem_row_leaf_slots(
 }
 
 /*
- * __wt_row_key --
+ * __wt_row_key_copy --
  *	Copy an on-page key into a return buffer, or, if no return buffer
  * is specified, instantiate the key into the in-memory page.
  */
 int
-__wt_row_key(
+__wt_row_key_copy(
     WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW *rip_arg, WT_ITEM *retb)
 {
 	enum { FORWARD, BACKWARD } direction;
@@ -167,8 +168,9 @@ __wt_row_key(
 				break;
 			}
 
-			__wt_cell_unpack(WT_PAGE_REF_OFFSET(
-			    page, ikey->cell_offset), unpack);
+			__wt_cell_unpack(
+			    WT_PAGE_REF_OFFSET(page, ikey->cell_offset),
+			    unpack);
 
 			/*
 			 * If we wanted a different key and this key is an
@@ -340,9 +342,7 @@ WT_CELL *
 __wt_row_value(WT_PAGE *page, WT_ROW *rip)
 {
 	WT_CELL *cell;
-	WT_CELL_UNPACK *unpack, _unpack;
-
-	unpack = &_unpack;
+	u_int type;
 
 	cell = WT_ROW_KEY_COPY(rip);
 	/*
@@ -362,12 +362,9 @@ __wt_row_value(WT_PAGE *page, WT_ROW *rip)
 	 * key.  The page reconciliation code guarantees there is always a key
 	 * cell after an empty data cell, so this is safe.
 	 */
-	__wt_cell_unpack(cell, unpack);
-	cell = (WT_CELL *)((uint8_t *)cell + unpack->len);
-	if (__wt_cell_type(cell) == WT_CELL_KEY ||
-	    __wt_cell_type(cell) == WT_CELL_KEY_OVFL)
-		return (NULL);
-	return (cell);
+	cell = __wt_cell_next(cell);
+	type = __wt_cell_type(cell);
+	return (type == WT_CELL_KEY || type == WT_CELL_KEY_OVFL ? NULL : cell);
 }
 
 /*

@@ -164,12 +164,11 @@ __verify_dsk_row(
 			goto err;
 		}
 
-		/*
-		 * Check the raw cell type, then collapse the short key/data
-		 * types.
-		 */
+		/* Check the raw and collapsed cell types. */
 		WT_ERR(__err_cell_type(
 		    session, cell_num, addr, unpack->raw, dsk->type));
+		WT_ERR(__err_cell_type(
+		    session, cell_num, addr, unpack->type, dsk->type));
 		cell_type = unpack->type;
 
 		/*
@@ -386,9 +385,11 @@ __verify_dsk_col_int(
 		if (__wt_cell_unpack_safe(cell, unpack, end) != 0)
 			return (__err_cell_corrupted(session, cell_num, addr));
 
-		/* Check the cell type. */
+		/* Check the raw and collapsed cell types. */
 		WT_RET (__err_cell_type(
 		    session, cell_num, addr, unpack->raw, dsk->type));
+		WT_RET (__err_cell_type(
+		    session, cell_num, addr, unpack->type, dsk->type));
 
 		/* Check if any referenced item is entirely in the file. */
 		if (!__wt_bm_addr_valid(session, unpack->data, unpack->size))
@@ -447,12 +448,11 @@ __verify_dsk_col_var(
 		if (__wt_cell_unpack_safe(cell, unpack, end) != 0)
 			return (__err_cell_corrupted(session, cell_num, addr));
 
-		/*
-		 * Check the raw cell type, then collapse the short key/data
-		 * types.
-		 */
+		/* Check the raw and collapsed cell types. */
 		WT_RET (__err_cell_type(
 		    session, cell_num, addr, unpack->raw, dsk->type));
+		WT_RET (__err_cell_type(
+		    session, cell_num, addr, unpack->type, dsk->type));
 		cell_type = unpack->type;
 
 		/* Check if any referenced item is entirely in the file.
@@ -563,6 +563,8 @@ __err_cell_type(WT_SESSION_IMPL *session,
 {
 	switch (cell_type) {
 	case WT_CELL_ADDR:
+	case WT_CELL_ADDR_DEL:
+	case WT_CELL_ADDR_LNO:
 		if (dsk_type == WT_PAGE_COL_INT ||
 		    dsk_type == WT_PAGE_ROW_INT)
 			return (0);
@@ -576,6 +578,10 @@ __err_cell_type(WT_SESSION_IMPL *session,
 	case WT_CELL_KEY_SHORT:
 		if (dsk_type == WT_PAGE_ROW_INT ||
 		    dsk_type == WT_PAGE_ROW_LEAF)
+			return (0);
+		break;
+	case WT_CELL_VALUE_COPY:
+		if (dsk_type == WT_PAGE_ROW_LEAF)
 			return (0);
 		break;
 	case WT_CELL_VALUE:

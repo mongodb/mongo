@@ -28,6 +28,7 @@ connection_stats = [
 	Stat('cache_evict_slow', 'cache: eviction server unable to reach eviction goal'),
 	Stat('cache_evict_unmodified', 'cache: unmodified pages evicted'),
 	Stat('cache_pages_inuse', 'cache: pages currently held in the cache', 'perm'),
+	Stat('checkpoint', 'checkpoints'),
 	Stat('cond_wait', 'condition wait calls'),
 	Stat('file_open', 'files currently open'),
 	Stat('memalloc', 'total memory allocations'),
@@ -36,6 +37,10 @@ connection_stats = [
 	Stat('rwlock_wrlock', 'rwlock writelock calls'),
 	Stat('total_read_io', 'total read I/Os'),
 	Stat('total_write_io', 'total write I/Os'),
+	Stat('txn_ancient', 'ancient transactions'),
+	Stat('txn_begin', 'transactions'),
+	Stat('txn_commit', 'transactions committed'),
+	Stat('txn_rollback', 'transactions rolled-back'),
 ]
 
 ##########################################
@@ -76,6 +81,7 @@ btree_stats = [
 	Stat('overflow_read', 'file: overflow pages read from the file'),
 	Stat('page_read', 'file: pages read from the file'),
 	Stat('page_write', 'file: pages written to the file'),
+	Stat('rec_dictionary', 'reconcile: dictionary match'),
 	Stat('rec_hazard', 'reconcile: unable to acquire hazard reference'),
 	Stat('rec_ovfl_key', 'reconcile: overflow key'),
 	Stat('rec_ovfl_value', 'reconcile: overflow value'),
@@ -84,4 +90,5 @@ btree_stats = [
 	Stat('rec_split_intl', 'reconcile: internal pages split'),
 	Stat('rec_split_leaf', 'reconcile: leaf pages split'),
 	Stat('rec_written', 'reconcile: pages written'),
+	Stat('update_conflict', 'update conflicts'),
 ]

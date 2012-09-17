@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Copyright (c) 2008-2012 WiredTiger, Inc.
+# Public Domain 2008-2012 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
 #
@@ -24,15 +24,12 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-#
-# test_cursor05.py
-# 	Test cursors at the point where a cursor is first
-#	initialized, and when it hits an endpoint.
-#	Mix that in with column groups.
-#
 
 import wiredtiger, wttest
 
+# test_cursor05.py
+#    Test cursors at the point where a cursor is first initialized, and when it
+# hits an endpoint.  Mix that in with column groups.
 class test_cursor05(wttest.WiredTigerTestCase):
     """
     Test basic operations

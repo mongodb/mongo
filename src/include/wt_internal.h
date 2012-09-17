@@ -39,23 +39,26 @@ extern "C" {
  *******************************************/
 #include "queue.h"
 
-/*******************************************
- * Forward structure declarations for internal structures.
- *******************************************/
 /*
  * DO NOT EDIT: automatically built by dist/s_typedef.
- * Forward structure declarations for internal structures: BEGIN
+ * Forward type declarations for internal types: BEGIN
  */
+enum __wt_page_state;
+    typedef enum __wt_page_state WT_PAGE_STATE;
+enum __wt_txn_isolation;
+    typedef enum __wt_txn_isolation WT_TXN_ISOLATION;
 struct __wt_addr;
     typedef struct __wt_addr WT_ADDR;
 struct __wt_block;
     typedef struct __wt_block WT_BLOCK;
+struct __wt_block_ckpt;
+    typedef struct __wt_block_ckpt WT_BLOCK_CKPT;
 struct __wt_block_desc;
     typedef struct __wt_block_desc WT_BLOCK_DESC;
 struct __wt_block_header;
     typedef struct __wt_block_header WT_BLOCK_HEADER;
-struct __wt_block_snapshot;
-    typedef struct __wt_block_snapshot WT_BLOCK_SNAPSHOT;
+struct __wt_bloom;
+    typedef struct __wt_bloom WT_BLOOM;
 struct __wt_btree;
     typedef struct __wt_btree WT_BTREE;
 struct __wt_btree_session;
@@ -68,20 +71,28 @@ struct __wt_cell;
     typedef struct __wt_cell WT_CELL;
 struct __wt_cell_unpack;
     typedef struct __wt_cell_unpack WT_CELL_UNPACK;
+struct __wt_ckpt;
+    typedef struct __wt_ckpt WT_CKPT;
 struct __wt_col;
     typedef struct __wt_col WT_COL;
 struct __wt_col_rle;
     typedef struct __wt_col_rle WT_COL_RLE;
+struct __wt_colgroup;
+    typedef struct __wt_colgroup WT_COLGROUP;
 struct __wt_condvar;
     typedef struct __wt_condvar WT_CONDVAR;
 struct __wt_config;
     typedef struct __wt_config WT_CONFIG;
+struct __wt_config_check;
+    typedef struct __wt_config_check WT_CONFIG_CHECK;
 struct __wt_config_item;
     typedef struct __wt_config_item WT_CONFIG_ITEM;
 struct __wt_connection_impl;
     typedef struct __wt_connection_impl WT_CONNECTION_IMPL;
 struct __wt_connection_stats;
     typedef struct __wt_connection_stats WT_CONNECTION_STATS;
+struct __wt_cursor_backup;
+    typedef struct __wt_cursor_backup WT_CURSOR_BACKUP;
 struct __wt_cursor_btree;
     typedef struct __wt_cursor_btree WT_CURSOR_BTREE;
 struct __wt_cursor_bulk;
@@ -92,6 +103,8 @@ struct __wt_cursor_dump;
     typedef struct __wt_cursor_dump WT_CURSOR_DUMP;
 struct __wt_cursor_index;
     typedef struct __wt_cursor_index WT_CURSOR_INDEX;
+struct __wt_cursor_lsm;
+    typedef struct __wt_cursor_lsm WT_CURSOR_LSM;
 struct __wt_cursor_stat;
     typedef struct __wt_cursor_stat WT_CURSOR_STAT;
 struct __wt_cursor_table;
@@ -110,10 +123,18 @@ struct __wt_hazard;
     typedef struct __wt_hazard WT_HAZARD;
 struct __wt_ikey;
     typedef struct __wt_ikey WT_IKEY;
+struct __wt_index;
+    typedef struct __wt_index WT_INDEX;
 struct __wt_insert;
     typedef struct __wt_insert WT_INSERT;
 struct __wt_insert_head;
     typedef struct __wt_insert_head WT_INSERT_HEAD;
+struct __wt_lsm_chunk;
+    typedef struct __wt_lsm_chunk WT_LSM_CHUNK;
+struct __wt_lsm_data_source;
+    typedef struct __wt_lsm_data_source WT_LSM_DATA_SOURCE;
+struct __wt_lsm_tree;
+    typedef struct __wt_lsm_tree WT_LSM_TREE;
 struct __wt_named_collator;
     typedef struct __wt_named_collator WT_NAMED_COLLATOR;
 struct __wt_named_compressor;
@@ -144,8 +165,6 @@ struct __wt_session_impl;
     typedef struct __wt_session_impl WT_SESSION_IMPL;
 struct __wt_size;
     typedef struct __wt_size WT_SIZE;
-struct __wt_snapshot;
-    typedef struct __wt_snapshot WT_SNAPSHOT;
 struct __wt_stats;
     typedef struct __wt_stats WT_STATS;
 struct __wt_table;
@@ -154,10 +173,12 @@ struct __wt_txn;
     typedef struct __wt_txn WT_TXN;
 struct __wt_txn_global;
     typedef struct __wt_txn_global WT_TXN_GLOBAL;
+struct __wt_txn_state;
+    typedef struct __wt_txn_state WT_TXN_STATE;
 struct __wt_update;
     typedef struct __wt_update WT_UPDATE;
 /*
- * Forward structure declarations for internal structures: END
+ * Forward type declarations for internal types: END
  * DO NOT EDIT: automatically built by dist/s_typedef.
  */
 
@@ -182,6 +203,7 @@ struct __wt_update;
 
 #include "api.h"
 #include "cursor.h"
+#include "lsm.h"
 #include "meta.h"
 #include "schema.h"
 
@@ -191,6 +213,9 @@ struct __wt_update;
 /* Required by cell.i */
 #include "intpack.i"
 #include "cell.i"
+
+/* Required by cursor.i */
+#include "txn.i"
 
 #include "bitstring.i"
 #include "btree.i"
@@ -202,7 +227,6 @@ struct __wt_update;
 #include "packing.i"
 #include "serial.i"
 #include "serial_funcs.i"
-#include "txn.i"
 
 #if defined(__cplusplus)
 }

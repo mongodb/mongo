@@ -127,20 +127,20 @@ struct __wt_item {
 /*!
  * A WT_CURSOR handle is the interface to a cursor.
  *
- * Cursors allow data to be searched, stepped through and updated: the
- * so-called CRUD operations (create, read, update and delete).
+ * Cursors allow data to be searched, iterated and modified, implementing the
+ * CRUD (create, read, update and delete) operations.  Cursors are opened in
+ * the context of a session.  If a transaction is started, cursors operate in
+ * the context of the transaction until the transaction is resolved.
  *
  * Raw data is represented by key/value pairs of WT_ITEM structures, but
  * cursors can also provide access to fields within the key and value if the
  * formats are described in the WT_SESSION::create method.
  *
- * A cursor can be positioned in a collection of data.  Cursors are opened in
- * the context of a session (which may have an associated transaction), and can
- * query and update records.  In the common case, a cursor is used to access
- * records in a table.  However, cursors can be used on subsets of tables (such
- * as a single column or a projection of multiple columns), as an interface to
- * statistics, configuration data or application-specific data sources.  See
- * WT_SESSION::open_cursor for more information.
+ * In the common case, a cursor is used to access records in a table.  However,
+ * cursors can be used on subsets of tables (such as a single column or a
+ * projection of multiple columns), as an interface to statistics, configuration
+ * data or application-specific data sources.  See WT_SESSION::open_cursor for
+ * more information.
  *
  * <b>Thread safety:</b> A WT_CURSOR handle is not usually shared between
  * threads, see @ref threads for more information.
@@ -227,18 +227,21 @@ struct __wt_cursor {
 	/*! @name Cursor positioning
 	 * @{
 	 */
-	/*! Test whether two cursors refer to the same item.  To be equal,
-	 * both cursors must have the same data source, have valid keys, and
-	 * the keys must be equal.
+	/*! Return the ordering relationship between two cursors: both cursors
+	 * must have the same data source and have valid keys.
 	 *
-	 * @snippet ex_all.c Test cursor equality
+	 * @snippet ex_all.c Cursor comparison
 	 *
 	 * @param cursor the cursor handle
 	 * @param other another cursor handle
-	 * @returns true (non-zero) if both cursors reference the same item,
-	 * false (zero) otherwise
+	 * @param comparep the status of the comparison: < 0 if
+	 * <code>cursor</code> refers to a key that appears before
+	 * <code>other</code>, 0 if the cursors refer to the same key,
+	 * and > 0 if <code>cursor</code> refers to a key that appears after
+	 * <code>other</code>.
+	 * @errors
 	 */
-	int __F(equals)(WT_CURSOR *cursor, WT_CURSOR *other);
+	int __F(compare)(WT_CURSOR *cursor, WT_CURSOR *other, int *comparep);
 
 	/*! Return the next record.
 	 *
@@ -259,9 +262,9 @@ struct __wt_cursor {
 	int __F(prev)(WT_CURSOR *cursor);
 
 	/*! Reset the position of the cursor.  Any resources held by the cursor
-	 * are released, and the cursor position is no longer valid.  Subsequent
-	 * iteration with WT_CURSOR::next will move to the first record, or
-	 * with WT_CURSOR::prev will move to the last record.
+	 * are released, and the cursor's key and position are no longer valid.
+	 * A subsequent iteration with WT_CURSOR::next will move to the first
+	 * record, or with WT_CURSOR::prev will move to the last record.
 	 *
 	 * @snippet ex_all.c Reset the cursor
 	 *
@@ -316,8 +319,9 @@ struct __wt_cursor {
 	 * number set as the cursor key value.
 	 *
 	 * Inserting a new record after the current maximum record in a
-	 * fixed-length column-store implicitly creates skipped records as
-	 * records with a value of 0.
+	 * fixed-length bit field column-store (that is, a store with an
+	 * 'r' type key and 't' type value) implicitly creates the missing
+	 * records as records with a value of 0.
 	 *
 	 * @snippet ex_all.c Insert a new record
 	 *
@@ -345,8 +349,9 @@ struct __wt_cursor {
 	/*! Remove a record.  The key must be set, and the key's record will be
 	 * removed.
 	 *
-	 * Removing a record in a fixed-length column-store is identical to
-	 * setting the record's value to 0.
+	 * Removing a record in a fixed-length bit field column-store
+	 * (that is, a store with an 'r' type key and 't' type value) is
+	 * identical to setting the record's value to 0.
 	 *
 	 * @snippet ex_all.c Remove a record
 	 *
@@ -374,7 +379,6 @@ struct __wt_cursor {
 	/*
 	 * Protected fields, only to be used by cursor implementations.
 	 */
-
 #if !defined(SWIG) && !defined(DOXYGEN)
 	/*
 	 * !!!
@@ -421,7 +425,7 @@ struct __wt_session {
 	 * including rolling back any active transactions and closing any
 	 * cursors that remain open in the session.
 	 *
-	 * @snippet ex_all.c session close
+	 * @snippet ex_all.c Close a session
 	 *
 	 * @param session the session handle
 	 * @configempty{session.close, see dist/api_data.py}
@@ -429,44 +433,71 @@ struct __wt_session {
 	 */
 	int __F(close)(WT_SESSION *session, const char *config);
 
+	/*! Reconfigure a session handle.
+	 *
+	 * @snippet ex_all.c Reconfigure a session
+	 *
+	 * WT_SESSION::reconfigure will fail if a transaction is in progress
+	 * in the session.
+	 * All open cursors are reset.
+	 *
+	 * @param session the session handle
+	 * @configstart{session.reconfigure, see dist/api_data.py}
+	 * @config{isolation, the default isolation level for operations in this
+	 * session.,a string\, chosen from the following options: \c
+	 * "read-uncommitted"\, \c "read-committed"\, \c "snapshot"; default \c
+	 * read-committed.}
+	 * @configend
+	 * @errors
+	 */
+	int __F(reconfigure)(WT_SESSION *session, const char *config);
+
 	/*! @name Cursor handles
 	 * @{
 	 */
 
-	/*! Open a cursor.
-	 *
-	 * Open a new cursor on the specified data source.  Cursor handles
-	 * should be discarded by calling WT_CURSOR::close.
-	 *
-	 * Cursors are light-weight objects but may hold references to
-	 * heavier-weight objects.  Applications should usually not cache
-	 * cursors as a performance optimization, instead, a new cursor
-	 * should be opened for new groups of operations.
-	 *
-	 * Cursors are opened in the context of the current transaction.  The
-	 * cursor must be closed before the transaction can end.  If
-	 * WT_SESSION::commit_transaction or WT_SESSION::rollback_transaction
-	 * are called with cursors open in the transaction, the cursor handles
-	 * will be closed implicitly and must not be accessed again.
-	 *
-	 * An existing cursor can be duplicated by passing it as the \c to_dup
-	 * parameter and setting the \c uri parameter to \c NULL, otherwise the
-	 * \c to_dup parameter should be \c NULL.
+	/*! Open a new cursor on a data source or duplicate an existing cursor.
 	 *
 	 * @snippet ex_all.c Open a cursor
 	 *
+	 * An existing cursor can be duplicated by passing it as the \c to_dup
+	 * parameter and setting the \c uri parameter to \c NULL:
+	 *
+	 * @snippet ex_all.c Duplicate a cursor
+	 *
+	 * Cursors being duplicated must have a key set, and successfully
+	 * duplicated cursors are positioned at the same place in the data
+	 * source as the original.
+	 *
+	 * To reconfigure a cursor, duplicate it with a new configuration value:
+	 *
+	 * @snippet ex_all.c Reconfigure a cursor
+	 *
+	 * Cursor handles should be discarded by calling WT_CURSOR::close.
+	 *
+	 * Cursors capable of supporting transactional operations operate in the
+	 * context of the current transaction, if any.  Ending a transaction
+	 * implicitly resets all open cursors.
+	 *
+	 * Cursors are relatively light-weight objects but may hold references
+	 * to heavier-weight objects; applications should re-use cursors when
+	 * possible, but instantiating new cursors is not so expensive that
+	 * applications need to cache cursors at all cost.
+	 *
 	 * @param session the session handle
-	 * @param uri the data source on which the cursor operates;
-	 *  cursors are usually opened on tables, however, cursors can be
-	 *  opened on any data source, regardless of whether it is ultimately
-	 *  stored in a table.  Some cursor types may have limited
-	 *  functionality (for example, be read-only or not support
-	 *  transactional updates).  See @ref data_sources for more
-	 *  information.
+	 * @param uri the data source on which the cursor operates; cursors
+	 *  are usually opened on tables, however, cursors can be opened on
+	 *  any data source, regardless of whether it is ultimately stored
+	 *  in a table.  Some cursor types may have limited functionality
+	 *  (for example, they may be read-only or not support transactional
+	 *  updates).  See @ref data_sources for more information.
 	 *  <br>
 	 *  The following are the builtin cursor types:
 	 *  <table>
 	 *  @hrow{URI, Type, Key/Value types}
+	 *  @row{<tt>backup:</tt>,
+	 *	hot backup cursor,
+	 *	key=<code>string</code>\, see @ref hot_backup for details}
 	 *  @row{<tt>colgroup:\<tablename\>.\<columnset\></tt>,
 	 *	column group cursor,
 	 *	table key\, column group value(s)}
@@ -488,35 +519,42 @@ struct __wt_session {
 	 * @param to_dup a cursor to duplicate
 	 * @param session the session handle
 	 * @configstart{session.open_cursor, see dist/api_data.py}
-	 * @config{append, only supported by cursors with record number keys:
-	 * append the value as a new record\, creating a new record number
-	 * key.,a boolean flag; default \c false.}
+	 * @config{append, append the value as a new record\, creating a new
+	 * record number key; valid only for cursors with record number keys.,a
+	 * boolean flag; default \c false.}
 	 * @config{bulk, configure the cursor for bulk loads; bulk-load is a
-	 * fast load path for empty objects\, only empty objects may be
-	 * bulk-loaded.,a boolean flag; default \c false.}
+	 * fast load path for empty objects and only empty objects may be
+	 * bulk-loaded.  Cursors configured for bulk load only support the
+	 * WT_CURSOR::insert and WT_CURSOR::close methods.,a boolean flag;
+	 * default \c false.}
+	 * @config{checkpoint, the name of a checkpoint to open; the reserved
+	 * checkpoint name "WiredTigerCheckpoint" opens a cursor on the most
+	 * recent internal checkpoint taken for the object.,a string; default
+	 * empty.}
 	 * @config{dump, configure the cursor for dump format inputs and
 	 * outputs: "hex" selects a simple hexadecimal format\, "print" selects
 	 * a format where only non-printing characters are hexadecimal encoded.
-	 * The cursor dump format is compatible with the @ref utility_dump and
-	 * @ref utility_load commands.,a string\, chosen from the following
-	 * options: \c "hex"\, \c "print"; default empty.}
-	 * @config{isolation, the isolation level for this cursor\, ignored for
-	 * transactional cursors.,a string\, chosen from the following options:
-	 * \c "snapshot"\, \c "read-committed"\, \c "read-uncommitted"; default
-	 * \c read-committed.}
+	 * The cursor dump format is compatible with the @ref util_dump and @ref
+	 * util_load commands.,a string\, chosen from the following options: \c
+	 * "hex"\, \c "print"; default empty.}
+	 * @config{next_random, configure the cursor to return a pseudo-random
+	 * record from the object; valid only for row-store cursors.  Cursors
+	 * configured with next_random only support the WT_CURSOR::next and
+	 * WT_CURSOR::close methods.  See @ref cursor_random for details.,a
+	 * boolean flag; default \c false.}
 	 * @config{overwrite, change the behavior of the cursor's insert method
 	 * to overwrite previously existing values.,a boolean flag; default \c
 	 * false.}
 	 * @config{raw, ignore the encodings for the key and value\, manage data
 	 * as if the formats were \c "u".  See @ref cursor_raw for details.,a
 	 * boolean flag; default \c false.}
-	 * @config{snapshot, the name of a snapshot to open.,a string; default
-	 * empty.}
 	 * @config{statistics, configure the cursor for statistics.,a boolean
 	 * flag; default \c false.}
-	 * @config{statistics_clear, statistics cursors only; reset statistics
-	 * counters when the cursor is closed.,a boolean flag; default \c
-	 * false.}
+	 * @config{statistics_clear, reset statistics counters when the cursor
+	 * is closed; valid only for statistics cursors.,a boolean flag; default
+	 * \c false.}
+	 * @config{target, if non-empty\, backup the list of objects; valid only
+	 * for a backup data source.,a list of strings; default empty.}
 	 * @configend
 	 * @param cursorp a pointer to the newly opened cursor
 	 * @errors
@@ -546,6 +584,9 @@ struct __wt_session {
 	 * custom compression engine \c "name" created with
 	 * WT_CONNECTION::add_compressor. See @ref compression for more
 	 * information.,a string; default empty.}
+	 * @config{cache_resident, do not ever evict the object's pages; see
+	 * @ref tuning_cache_resident for more information.,a boolean flag;
+	 * default \c false.}
 	 * @config{checksum, configure file block checksums; if false\, the
 	 * block manager is free to not write or check block checksums. This can
 	 * increase performance in applications where compression provides
@@ -567,6 +608,10 @@ struct __wt_session {
 	 * value_format.  For colgroups and indices\, all column names must
 	 * appear in the list of columns for the table.,a list of strings;
 	 * default empty.}
+	 * @config{dictionary, the number of entries maintained in the Btree
+	 * row-store leaf page value dictionary; see @ref
+	 * file_formats_compression for more information.,an integer greater
+	 * than or equal to 0; default \c 0.}
 	 * @config{exclusive, fail if the object exists.  When false (the
 	 * default)\, if the object exists\, check that its settings match the
 	 * specified configuration.,a boolean flag; default \c false.}
@@ -612,6 +657,12 @@ struct __wt_session {
 	 * significant for applications wanting to maximize sequential data
 	 * transfer from a storage device.,an integer between 512B and 512MB;
 	 * default \c 1MB.}
+	 * @config{lsm_bloom_bit_count, the number of bits used per item for LSM
+	 * bloom filters..,an integer between 2 and 1000; default \c 8.}
+	 * @config{lsm_bloom_hash_count, the number of hash values per item used
+	 * for LSM bloom filters..,an integer between 2 and 100; default \c 4.}
+	 * @config{lsm_chunk_size, the maximum size of the in-memory chunk of an
+	 * LSM tree.,an integer between 512K and 500MB; default \c 2MB.}
 	 * @config{prefix_compression, configure row-store format key prefix
 	 * compression.,a boolean flag; default \c true.}
 	 * @config{split_pct, the Btree page split size as a percentage of the
@@ -635,20 +686,13 @@ struct __wt_session {
 
 	/*! Drop (delete) an object.
 	 *
-	 * @snippet ex_all.c session drop
+	 * @snippet ex_all.c Drop a table
 	 *
 	 * @param session the session handle
 	 * @param name the URI of the object to drop, such as \c "table:stock"
 	 * @configstart{session.drop, see dist/api_data.py}
 	 * @config{force, return success if the object does not exist.,a boolean
 	 * flag; default \c false.}
-	 * @config{snapshot, specify one or more snapshots to drop.  The value
-	 * must be either the name of a single snapshot to drop (a string)\, or
-	 * a list containing one of the following keys: \c "all" to drop all
-	 * snapshots\, \c "from=<snapshot>" to drop all snapshots after and
-	 * including the named snapshots\, or \c "to=<snapshot>" to drop all
-	 * snapshots before and including the named snapshot.,a string; default
-	 * empty.}
 	 * @configend
 	 * @errors
 	 */
@@ -657,7 +701,7 @@ struct __wt_session {
 
 	/*! Rename an object.
 	 *
-	 * @snippet ex_all.c session rename
+	 * @snippet ex_all.c Rename a table
 	 *
 	 * @param session the session handle
 	 * @param oldname the current URI of the object, such as \c "table:old"
@@ -682,7 +726,7 @@ struct __wt_session {
 	 * Files are rebuilt in place, the salvage method overwrites the
 	 * existing files.
 	 *
-	 * @snippet ex_all.c session salvage
+	 * @snippet ex_all.c Salvage a table
 	 *
 	 * @param session the session handle
 	 * @param name the URI of the file or table to salvage
@@ -695,38 +739,26 @@ struct __wt_session {
 	int __F(salvage)(WT_SESSION *session,
 	    const char *name, const char *config);
 
-	/*! Snapshot a table or file.
+	/*! Truncate a file, table or cursor range.
 	 *
-	 * Flush dirty pages from a table or file to stable storage, creating a
-	 * snapshot (see @ref snapshots for more information).
+	 * Truncate a file or table.
+	 * @snippet ex_all.c Truncate a table
 	 *
-	 * @snippet ex_all.c session sync
-	 *
-	 * @param session the session handle
-	 * @param name the URI of the file or table to sync
-	 * @configstart{session.sync, see dist/api_data.py}
-	 * @config{snapshot, if non-empty\, create a named snapshot.,a string;
-	 * default empty.}
-	 * @configend
-	 * @errors
-	 */
-	int __F(sync)(WT_SESSION *session,
-	    const char *name, const char *config);
-
-	/*! Truncate a file, table or a cursor range.
-	 *
-	 * @snippet ex_all.c session truncate
-	 *
-	 * @snippet ex_all.c session range truncate
+	 * Truncate a cursor range.  When truncating based on a cursor position,
+	 * it is not required the cursor reference a record in the object, only
+	 * that the key be set.  This allows applications to discard portions of
+	 * the object name space without knowing exactly what records the object
+	 * contains.
+	 * @snippet ex_all.c Truncate a range
 	 *
 	 * @param session the session handle
 	 * @param name the URI of the file or table to truncate
 	 * @param start optional cursor marking the first record discarded;
 	 * if <code>NULL</code>, the truncate starts from the beginning of
-	 * the table
+	 * the object
 	 * @param stop optional cursor marking the last record discarded;
 	 * if <code>NULL</code>, the truncate continues to the end of the
-	 * table
+	 * object
 	 * @configempty{session.truncate, see dist/api_data.py}
 	 * @errors
 	 */
@@ -736,9 +768,9 @@ struct __wt_session {
 
 	/*! Upgrade a file or table.
 	 *
-	 * Upgrade upgrades a file, or the files of which a table is comprised.
+	 * Upgrade upgrades a file or table, if upgrade is required.
 	 *
-	 * @snippet ex_all.c session upgrade
+	 * @snippet ex_all.c Upgrade a table
 	 *
 	 * @param session the session handle
 	 * @param name the URI of the file or table to upgrade
@@ -754,7 +786,7 @@ struct __wt_session {
 	 * comprised, have been corrupted.  The WT_SESSION::salvage method
 	 * can be used to repair a corrupted file,
 	 *
-	 * @snippet ex_all.c session verify
+	 * @snippet ex_all.c Verify a table
 	 *
 	 * @param session the session handle
 	 * @param name the URI of the file or table to verify
@@ -770,21 +802,26 @@ struct __wt_session {
 	 */
 	/*! Start a transaction in this session.
 	 *
-	 * All cursors opened in this session that support transactional
-	 * semantics will operate in the context of the transaction.  The
-	 * transaction remains active until ended with
+	 * The transaction remains active until ended by
 	 * WT_SESSION::commit_transaction or WT_SESSION::rollback_transaction.
+	 * Operations performed on cursors capable of supporting transactional
+	 * operations that are already open in this session, or which are opened
+	 * before the transaction ends, will operate in the context of the
+	 * transaction.
 	 *
-	 * Not permitted if a transaction is in progress or cursors are open in
-	 * the session.
+	 * All open cursors are reset.
 	 *
-	 * @snippet ex_all.c session begin transaction
+	 * WT_SESSION::transaction_begin will fail if a transaction is already
+	 * in progress in the session.
+	 *
+	 * @snippet ex_all.c transaction commit/rollback
 	 *
 	 * @param session the session handle
 	 * @configstart{session.begin_transaction, see dist/api_data.py}
-	 * @config{isolation, the isolation level for this transaction.,a
-	 * string\, chosen from the following options: \c "read-uncommitted"\,
-	 * \c "snapshot"; default \c snapshot.}
+	 * @config{isolation, the isolation level for this transaction; defaults
+	 * to the session's isolation level.,a string\, chosen from the
+	 * following options: \c "read-uncommitted"\, \c "read-committed"\, \c
+	 * "snapshot"; default empty.}
 	 * @config{name, name of the transaction for tracing and debugging.,a
 	 * string; default empty.}
 	 * @config{priority, priority of the transaction for resolving
@@ -800,11 +837,14 @@ struct __wt_session {
 
 	/*! Commit the current transaction.
 	 *
-	 * A transaction must be in progress when this method is called.  Any
-	 * cursors opened during the transaction will be closed before the
-	 * commit is processed.
+	 * A transaction must be in progress when this method is called.
 	 *
-	 * @snippet ex_all.c session commit transaction
+	 * All open cursors are reset.
+	 *
+	 * If WT_SESSION::commit_transaction returns an error, the transaction
+	 * was rolled-back, not committed.
+	 *
+	 * @snippet ex_all.c transaction commit/rollback
 	 *
 	 * @param session the session handle
 	 * @configempty{session.commit_transaction, see dist/api_data.py}
@@ -814,11 +854,11 @@ struct __wt_session {
 
 	/*! Roll back the current transaction.
 	 *
-	 * A transaction must be in progress when this method is called.  Any
-	 * cursors opened during the transaction will be closed before the
-	 * rollback is processed.
+	 * A transaction must be in progress when this method is called.
 	 *
-	 * @snippet ex_all.c session rollback transaction
+	 * All open cursors are reset.
+	 *
+	 * @snippet ex_all.c transaction commit/rollback
 	 *
 	 * @param session the session handle
 	 * @configempty{session.rollback_transaction, see dist/api_data.py}
@@ -826,17 +866,26 @@ struct __wt_session {
 	 */
 	int __F(rollback_transaction)(WT_SESSION *session, const char *config);
 
-	/*! Write a transactionally consistent snapshot of a database.
+	/*! Write a transactionally consistent snapshot of a database or set of
+	 * objects.  The checkpoint includes all transactions committed before
+	 * the checkpoint starts.  Additionally, checkpoints may optionally be
+	 * discarded.
 	 *
-	 * All data files in the database are updated with snapshots that
-	 * reflect the transactions committed before the checkpoint starts.
-	 *
-	 * @snippet ex_all.c session checkpoint
+	 * @snippet ex_all.c Checkpoint examples
 	 *
 	 * @param session the session handle
 	 * @configstart{session.checkpoint, see dist/api_data.py}
-	 * @config{snapshot, if non-empty\, create named snapshots in files.,a
+	 * @config{drop, specify a list of checkpoints to drop. The list may
+	 * additionally contain one of the following keys: \c "from=all" to drop
+	 * all checkpoints\, \c "from=<checkpoint>" to drop all checkpoints
+	 * after and including the named checkpoint\, or \c "to=<checkpoint>" to
+	 * drop all checkpoints before and including the named checkpoint.
+	 * Checkpoints cannot be dropped while a hot backup is in progress or if
+	 * open in a cursor.,a list of strings; default empty.}
+	 * @config{name, if non-empty\, specify a name for the checkpoint.,a
 	 * string; default empty.}
+	 * @config{target, if non-empty\, checkpoint the list of objects.,a list
+	 * of strings; default empty.}
 	 * @configend
 	 * @errors
 	 */
@@ -852,7 +901,7 @@ struct __wt_session {
 	 * The specified file is displayed in a non-portable debugging mode to
 	 * the application's standard output.
 	 *
-	 * @snippet ex_all.c session dumpfile
+	 * @snippet ex_all.c Dump a file
 	 *
 	 * @param session the session handle
 	 * @param name the URI of the file to dump
@@ -864,7 +913,7 @@ struct __wt_session {
 
 	/*! Send a string to the message handler for debugging.
 	 *
-	 * @snippet ex_all.c session msg_printf
+	 * @snippet ex_all.c Print to the message stream
 	 *
 	 * @param session the session handle
 	 * @param fmt a printf-like format specification
@@ -889,9 +938,96 @@ struct __wt_session {
  * see @ref threads for more information.
  */
 struct __wt_connection {
+	/*! Close a connection.
+	 *
+	 * Any open sessions will be closed.
+	 *
+	 * @snippet ex_all.c Close a connection
+	 *
+	 * @param connection the connection handle
+	 * @configempty{connection.close, see dist/api_data.py}
+	 * @errors
+	 */
+	int __F(close)(WT_CONNECTION *connection, const char *config);
+
+	/*! Reconfigure a connection handle.
+	 *
+	 * @snippet ex_all.c Reconfigure a connection
+	 *
+	 * @param connection the connection handle
+	 * @configstart{connection.reconfigure, see dist/api_data.py}
+	 * @config{cache_size, maximum heap memory to allocate for the cache.,an
+	 * integer between 1MB and 10TB; default \c 100MB.}
+	 * @config{error_prefix, prefix string for error messages.,a string;
+	 * default empty.}
+	 * @config{eviction_target, continue evicting until the cache becomes
+	 * less full than this (as a percentage).  Must be less than \c
+	 * eviction_trigger.,an integer between 10 and 99; default \c 80.}
+	 * @config{eviction_trigger, trigger eviction when the cache becomes
+	 * this full (as a percentage).,an integer between 10 and 99; default \c
+	 * 95.}
+	 * @config{verbose, enable messages for various events.  Options are
+	 * given as a list\, such as
+	 * <code>"verbose=[evictserver\,read]"</code>.,a list\, with values
+	 * chosen from the following options: \c "block"\, \c "ckpt"\, \c
+	 * "evict"\, \c "evictserver"\, \c "fileops"\, \c "hazard"\, \c "lsm"\,
+	 * \c "mutex"\, \c "read"\, \c "readserver"\, \c "reconcile"\, \c
+	 * "salvage"\, \c "verify"\, \c "write"; default empty.}
+	 * @configend
+	 * @errors
+	 */
+	int __F(reconfigure)(WT_CONNECTION *connection, const char *config);
+
+	/*! The home directory of the connection.
+	 *
+	 * @snippet ex_all.c Get the database home directory
+	 *
+	 * @param connection the connection handle
+	 * @returns a pointer to a string naming the home directory
+	 */
+	const char *__F(get_home)(WT_CONNECTION *connection);
+
+	/*! Return if opening this handle created the database.
+	 *
+	 * @snippet ex_all.c Check if the database is newly created
+	 *
+	 * @param connection the connection handle
+	 * @returns false (zero) if the connection existed before the call to
+	 * ::wiredtiger_open, true (non-zero) if it was created by opening this
+	 * handle.
+	 */
+	int __F(is_new)(WT_CONNECTION *connection);
+
+	/*! @name Session handles
+	 * @{
+	 */
+	/*! Open a session.
+	 *
+	 * @snippet ex_all.c Open a session
+	 *
+	 * @param connection the connection handle
+	 * @param errhandler An error handler.  If <code>NULL</code>, the
+	 * connection's error handler is used
+	 * @configstart{connection.open_session, see dist/api_data.py}
+	 * @config{isolation, the default isolation level for operations in this
+	 * session.,a string\, chosen from the following options: \c
+	 * "read-uncommitted"\, \c "read-committed"\, \c "snapshot"; default \c
+	 * read-committed.}
+	 * @configend
+	 * @param sessionp the new session handle
+	 * @errors
+	 */
+	int __F(open_session)(WT_CONNECTION *connection,
+	    WT_EVENT_HANDLER *errhandler, const char *config,
+	    WT_SESSION **sessionp);
+	/*! @} */
+
+	/*! @name Extensions
+	 * @{
+	 */
 	/*! Load an extension.
 	 *
-	 * @snippet ex_all.c conn load extension
+	 * @snippet ex_all.c Load an extension
 	 *
 	 * @param connection the connection handle
 	 * @param path the filename of the extension module
@@ -975,53 +1111,7 @@ struct __wt_connection {
 	 */
 	int __F(add_extractor)(WT_CONNECTION *connection, const char *name,
 	    WT_EXTRACTOR *extractor, const char *config);
-
-	/*! Close a connection.
-	 *
-	 * Any open sessions will be closed.
-	 *
-	 * @snippet ex_all.c conn close
-	 *
-	 * @param connection the connection handle
-	 * @configempty{connection.close, see dist/api_data.py}
-	 * @errors
-	 */
-	int __F(close)(WT_CONNECTION *connection, const char *config);
-
-	/*! The home directory of the connection.
-	 *
-	 * @snippet ex_all.c conn get_home
-	 *
-	 * @param connection the connection handle
-	 * @returns a pointer to a string naming the home directory
-	 */
-	const char *__F(get_home)(WT_CONNECTION *connection);
-
-	/*! Return if opening this handle created the database.
-	 *
-	 * @snippet ex_all.c is_new
-	 *
-	 * @param connection the connection handle
-	 * @returns false (zero) if the connection existed before the call to
-	 * ::wiredtiger_open, true (non-zero) if it was created by opening this
-	 * handle.
-	 */
-	int __F(is_new)(WT_CONNECTION *connection);
-
-	/*! Open a session.
-	 *
-	 * @snippet ex_all.c Open a session
-	 *
-	 * @param connection the connection handle
-	 * @param errhandler An error handler.  If <code>NULL</code>, the
-	 * connection's error handler is used
-	 * @configempty{connection.open_session, see dist/api_data.py}
-	 * @param sessionp the new session handle
-	 * @errors
-	 */
-	int __F(open_session)(WT_CONNECTION *connection,
-	    WT_EVENT_HANDLER *errhandler, const char *config,
-	    WT_SESSION **sessionp);
+	/*! @} */
 };
 
 /*! Open a connection to a database.
@@ -1058,13 +1148,6 @@ struct __wt_connection {
  * strings; default empty.}
  * @config{hazard_max, number of simultaneous hazard references per session
  * handle.,an integer greater than or equal to 15; default \c 30.}
- * @config{home_environment, use the \c WIREDTIGER_HOME environment variable for
- * naming unless the process is running with special privileges. See @ref home
- * for more information.,a boolean flag; default \c false.}
- * @config{home_environment_priv, use the \c WIREDTIGER_HOME environment
- * variable for naming regardless of whether or not the process is running with
- * special privileges.  See @ref home for more information.,a boolean flag;
- * default \c false.}
  * @config{logging, enable logging.,a boolean flag; default \c false.}
  * @config{multiprocess, permit sharing between processes (will automatically
  * start an RPC server for primary processes and use RPC for secondary
@@ -1072,16 +1155,20 @@ struct __wt_connection {
  * \c false.}
  * @config{session_max, maximum expected number of sessions (including server
  * threads).,an integer greater than or equal to 1; default \c 50.}
- * @config{sync, sync files when closing or writing snapshots.,a boolean flag;
- * default \c true.}
+ * @config{sync, flush files to stable storage when closing or writing
+ * checkpoints.,a boolean flag; default \c true.}
  * @config{transactional, support transactional semantics.,a boolean flag;
  * default \c true.}
+ * @config{use_environment_priv, use the \c WIREDTIGER_CONFIG and \c
+ * WIREDTIGER_HOME environment variables regardless of whether or not the
+ * process is running with special privileges.  See @ref home for more
+ * information.,a boolean flag; default \c false.}
  * @config{verbose, enable messages for various events.  Options are given as a
  * list\, such as <code>"verbose=[evictserver\,read]"</code>.,a list\, with
- * values chosen from the following options: \c "block"\, \c "evict"\, \c
- * "evictserver"\, \c "fileops"\, \c "hazard"\, \c "mutex"\, \c "read"\, \c
- * "readserver"\, \c "reconcile"\, \c "salvage"\, \c "snapshot"\, \c "verify"\,
- * \c "write"; default empty.}
+ * values chosen from the following options: \c "block"\, \c "ckpt"\, \c
+ * "evict"\, \c "evictserver"\, \c "fileops"\, \c "hazard"\, \c "lsm"\, \c
+ * "mutex"\, \c "read"\, \c "readserver"\, \c "reconcile"\, \c "salvage"\, \c
+ * "verify"\, \c "write"; default empty.}
  * @configend
  * Additionally, if a file named \c WiredTiger.config appears in the WiredTiger
  * home directory, it is read for configuration values (see @ref config_file
@@ -1457,43 +1544,35 @@ struct __wt_data_source {
 	 * @snippet ex_all.c WT_DATA_SOURCE create
 	 */
 	int (*create)(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-	    const char *name, const char *config);
+	    const char *name, int exclusive, const char *config);
 
 	/*! Callback to drop an object.
 	 *
 	 * @snippet ex_all.c WT_DATA_SOURCE drop
 	 */
 	int (*drop)(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-	    const char *name, const char *config);
+	    const char *name, const char *cfg[]);
 
 	/*! Callback to initialize a cursor.
 	 *
 	 * @snippet ex_all.c WT_DATA_SOURCE open_cursor
 	 */
 	int (*open_cursor)(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-	    const char *obj, WT_CURSOR *old_cursor,
-	    const char *config, WT_CURSOR **new_cursor);
+	    const char *obj, const char *cfg[], WT_CURSOR **new_cursor);
 
 	/*! Callback to rename an object.
 	 *
-	 * @snippet ex_all.c WT_DATA_SOURCE sync
+	 * @snippet ex_all.c WT_DATA_SOURCE rename
 	 */
 	int (*rename)(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-	    const char *oldname, const char *newname, const char *config);
-
-	/*! Callback to sync an object.
-	 *
-	 * @snippet ex_all.c WT_DATA_SOURCE sync
-	 */
-	int (*sync)(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-	    const char *name, const char *config);
+	    const char *oldname, const char *newname, const char *cfg[]);
 
 	/*! Callback to truncate an object.
 	 *
 	 * @snippet ex_all.c WT_DATA_SOURCE truncate
 	 */
 	int (*truncate)(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-	    const char *name, const char *config);
+	    const char *name, const char *cfg[]);
 };
 
 /*!
@@ -1549,43 +1628,53 @@ extern int wiredtiger_extension_init(WT_SESSION *session,
  * following keys.
  * @{
  */
+/*! ancient transactions */
+#define	WT_STAT_txn_ancient				0
 /*! blocks read from a file */
-#define	WT_STAT_block_read				0
+#define	WT_STAT_block_read				1
 /*! blocks written to a file */
-#define	WT_STAT_block_write				1
+#define	WT_STAT_block_write				2
 /*! cache: bytes currently held in the cache */
-#define	WT_STAT_cache_bytes_inuse			2
+#define	WT_STAT_cache_bytes_inuse			3
 /*! cache: eviction server unable to reach eviction goal */
-#define	WT_STAT_cache_evict_slow			3
+#define	WT_STAT_cache_evict_slow			4
 /*! cache: internal pages evicted */
-#define	WT_STAT_cache_evict_internal			4
+#define	WT_STAT_cache_evict_internal			5
 /*! cache: maximum bytes configured */
-#define	WT_STAT_cache_bytes_max				5
+#define	WT_STAT_cache_bytes_max				6
 /*! cache: modified pages evicted */
-#define	WT_STAT_cache_evict_modified			6
+#define	WT_STAT_cache_evict_modified			7
 /*! cache: pages currently held in the cache */
-#define	WT_STAT_cache_pages_inuse			7
+#define	WT_STAT_cache_pages_inuse			8
 /*! cache: pages selected for eviction not evicted because of a hazard
  * reference */
-#define	WT_STAT_cache_evict_hazard			8
+#define	WT_STAT_cache_evict_hazard			9
 /*! cache: unmodified pages evicted */
-#define	WT_STAT_cache_evict_unmodified			9
+#define	WT_STAT_cache_evict_unmodified			10
+/*! checkpoints */
+#define	WT_STAT_checkpoint				11
 /*! condition wait calls */
-#define	WT_STAT_cond_wait				10
+#define	WT_STAT_cond_wait				12
 /*! files currently open */
-#define	WT_STAT_file_open				11
+#define	WT_STAT_file_open				13
 /*! rwlock readlock calls */
-#define	WT_STAT_rwlock_rdlock				12
+#define	WT_STAT_rwlock_rdlock				14
 /*! rwlock writelock calls */
-#define	WT_STAT_rwlock_wrlock				13
+#define	WT_STAT_rwlock_wrlock				15
 /*! total memory allocations */
-#define	WT_STAT_memalloc				14
+#define	WT_STAT_memalloc				16
 /*! total memory frees */
-#define	WT_STAT_memfree					15
+#define	WT_STAT_memfree					17
 /*! total read I/Os */
-#define	WT_STAT_total_read_io				16
+#define	WT_STAT_total_read_io				18
 /*! total write I/Os */
-#define	WT_STAT_total_write_io				17
+#define	WT_STAT_total_write_io				19
+/*! transactions */
+#define	WT_STAT_txn_begin				20
+/*! transactions committed */
+#define	WT_STAT_txn_commit				21
+/*! transactions rolled-back */
+#define	WT_STAT_txn_rollback				22
 
 /*!
  * @}
@@ -1655,28 +1744,32 @@ extern int wiredtiger_extension_init(WT_SESSION *session,
 #define	WT_STAT_file_allocsize				29
 /*! reconcile: deleted or temporary pages merged */
 #define	WT_STAT_rec_page_merge				30
+/*! reconcile: dictionary match */
+#define	WT_STAT_rec_dictionary				31
 /*! reconcile: internal pages split */
-#define	WT_STAT_rec_split_intl				31
+#define	WT_STAT_rec_split_intl				32
 /*! reconcile: leaf pages split */
-#define	WT_STAT_rec_split_leaf				32
+#define	WT_STAT_rec_split_leaf				33
 /*! reconcile: overflow key */
-#define	WT_STAT_rec_ovfl_key				33
+#define	WT_STAT_rec_ovfl_key				34
 /*! reconcile: overflow value */
-#define	WT_STAT_rec_ovfl_value				34
+#define	WT_STAT_rec_ovfl_value				35
 /*! reconcile: pages deleted */
-#define	WT_STAT_rec_page_delete				35
+#define	WT_STAT_rec_page_delete				36
 /*! reconcile: pages written */
-#define	WT_STAT_rec_written				36
+#define	WT_STAT_rec_written				37
 /*! reconcile: unable to acquire hazard reference */
-#define	WT_STAT_rec_hazard				37
+#define	WT_STAT_rec_hazard				38
 /*! row-store internal pages */
-#define	WT_STAT_file_row_int_pages			38
+#define	WT_STAT_file_row_int_pages			39
 /*! row-store leaf pages */
-#define	WT_STAT_file_row_leaf_pages			39
+#define	WT_STAT_file_row_leaf_pages			40
 /*! total entries */
-#define	WT_STAT_file_entries				40
+#define	WT_STAT_file_entries				41
+/*! update conflicts */
+#define	WT_STAT_update_conflict				42
 /*! write generation conflicts */
-#define	WT_STAT_file_write_conflicts			41
+#define	WT_STAT_file_write_conflicts			43
 /*! @} */
 /*
  * Statistics section: END

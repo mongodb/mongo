@@ -76,8 +76,8 @@ load_dump(WT_SESSION *session)
 	int hex, tret;
 	char **entry, **list, *p, *uri, config[64];
 
-	list = NULL;            /* -Wuninitialized */
-	hex = 0;                /* -Wuninitialized */
+	list = NULL;		/* -Wuninitialized */
+	hex = 0;		/* -Wuninitialized */
 
 	/* Read the metadata file. */
 	if ((ret = config_read(&list, &hex)) != 0)
@@ -88,15 +88,16 @@ load_dump(WT_SESSION *session)
 	 * otherwise, it's a single file dump.
 	 */
 	for (entry = list; *entry != NULL; ++entry)
-		if (strncmp(*entry, "table:", strlen("table:")) == 0)
+		if (WT_PREFIX_MATCH(*entry, "table:"))
 			break;
 	if (*entry == NULL) {
 		/*
 		 * Single file dumps can only have two lines, the file name and
 		 * the configuration information.
 		 */
-		if (list[0] == NULL || list[1] == NULL || list[2] != NULL ||
-		    strncmp(list[0], "file:", strlen("file:")) != 0)
+		if ((list[0] == NULL || list[1] == NULL || list[2] != NULL) ||
+		    (WT_PREFIX_MATCH(list[0], "file:") &&
+		    WT_PREFIX_MATCH(list[0], "lsm:")))
 			return (format());
 
 		entry = list;
@@ -153,8 +154,8 @@ load_dump(WT_SESSION *session)
 		if (ret == 0)
 			ret = tret;
 	}
-	if (ret == 0 && (ret = session->sync(session, uri, NULL)) != 0)
-		ret = util_err(ret, "%s: session.sync", uri);
+	if (ret == 0)
+		ret = util_flush(session, uri);
 
 	return (ret == 0 ? 0 : 1);
 }
@@ -234,19 +235,16 @@ config_update(WT_SESSION *session, char **list)
 	const char *cfg[] = { NULL, NULL, NULL };
 	char **configp, **listp, *p, *t;
 
-#define	MATCH(s, tag)                                           	\
-	(strncmp(s, tag, strlen(tag)) == 0)
-
 	/*
 	 * If the object has been renamed, replace all of the column group,
 	 * index, file and table names with the new name.
 	 */
 	if (cmdname != NULL) {
 		for (listp = list; *listp != NULL; listp += 2)
-			if (MATCH(*listp, "colgroup:") ||
-			    MATCH(*listp, "file:") ||
-			    MATCH(*listp, "index:") ||
-			    MATCH(*listp, "table:"))
+			if (WT_PREFIX_MATCH(*listp, "colgroup:") ||
+			    WT_PREFIX_MATCH(*listp, "file:") ||
+			    WT_PREFIX_MATCH(*listp, "index:") ||
+			    WT_PREFIX_MATCH(*listp, "table:"))
 				if (config_rename(listp, cmdname))
 					return (1);
 
@@ -305,7 +303,7 @@ config_update(WT_SESSION *session, char **list)
 			 * configuration strings with brackets.  Unfortunately,
 			 * that implies we can't simply append new configuration
 			 * strings to existing ones.  We call an unpublished
-			 * WiredTiger API to do the concatentation: if anyone
+			 * WiredTiger API to do the concatenation: if anyone
 			 * else ever needs it we can make it public, but I think
 			 * that's unlikely.  We're also playing fast and loose
 			 * with types, but it should work.

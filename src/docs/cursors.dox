@@ -10,6 +10,45 @@ A cursor includes:
 
 See @subpage cursor_ops for a description of how to use cursors.
 
+@section cursors_transactions Cursors and Transactions
+
+If there is a transaction active in a session, cursors operate in the
+context of that transaction.  Reads performed while a transaction is
+active inherit the isolation level of the transaction, and updates
+performed within a transaction are made durable by calling
+WT_SESSION::commit_transaction, or discarded by calling
+WT_SESSION::rollback_transaction.
+
+If no transaction is active, cursor reads are performed at the isolation
+level of the session, set with the \c isolation key to
+WT_CONNECTION::open_session and successful updates are automatically
+committed before the update operation completes.
+
+Any operation that consists of multiple related updates should be
+enclosed in an explicit transaction to ensure that the updates are
+applied atomically.
+
+At \c read-committed (the default) or \c snapshot isolation levels,
+committed changes from concurrent transactions become visible when no
+cursor is positioned.  In other words, at these isolation levels, all
+cursors in a session read from a stable snapshot while any cursor in the
+session remains positioned.
+
+Cursor positions do not survive transaction boundaries.  When a
+transaction is started with the WT_SESSION:begin_transaction or ended
+with either WT_SESSION::commit_transaction or
+WT_SESSION::rollback_transaction, all open cursors are reset, as if the
+WT_CURSOR::reset method was called.  The cursor reset discards any
+cursor position as well as the key and value.
+
+Applications that need to continue an operation across a transaction
+boundary must make a copy of the cursor's key, and re-position the cursor
+with WT_CURSOR::search to continue the operation, dealing with cases
+where the record may no longer be available due to a WT_CURSOR::remove
+or WT_SESSION::rollback_transaction.
+
+See @ref transactions for more information.
+
 @section cursor_types Cursor types
 
 The following are some of common builtin cursor types:
@@ -24,6 +63,8 @@ table cursor (key=table key\, value=table value)}
 file cursor (key=file key\, value=file value)}
   @row{<tt>index:\<tablename\>.\<indexname\></tt>,
 index cursor (key=index key\, value=table value)}
+  @row{<tt>lsm:\<name\></tt>,
+LSM cursor (key=LSM key\, value=LSM value), see @ref lsm}
   @row{<tt>statistics:[file</tt><tt>:\<filename\>]</tt>,
   database or file statistics (key=(int)\,
   value=(string)description\, (string)value\, (uint64_t)value)}
@@ -57,5 +98,10 @@ cursor's \c key_format or \c value_format, respectively.  For
 WT_CURSOR::set_key and WT_CURSOR::set_value in raw mode, the WT_ITEM
 should be equivalent to calling ::wiredtiger_struct_pack for the
 cursor's \c key_format or \c value_format, respectively.
+
+@section cursor_random Random lookup
+
+Cursors can be configured to return pseudo-random records from row-store
+objects.  See @subpage cursor_random for details.
 
 */

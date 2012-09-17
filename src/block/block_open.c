@@ -97,12 +97,11 @@ __wt_block_open(WT_SESSION_IMPL *session, const char *filename,
 		WT_NAMED_COMPRESSOR *ncomp;
 
 		conn = S2C(session);
-		TAILQ_FOREACH(ncomp, &conn->compqh, q) {
-			if (strncmp(ncomp->name, cval.str, cval.len) == 0) {
+		TAILQ_FOREACH(ncomp, &conn->compqh, q)
+			if (WT_STRING_MATCH(ncomp->name, cval.str, cval.len)) {
 				block->compressor = ncomp->compressor;
 				break;
 			}
-		}
 		if (block->compressor == NULL)
 			WT_ERR_MSG(session, EINVAL,
 			    "unknown block_compressor '%.*s'",
@@ -112,7 +111,7 @@ __wt_block_open(WT_SESSION_IMPL *session, const char *filename,
 	/* Open the underlying file handle. */
 	WT_ERR(__wt_open(session, filename, 0, 0, 1, &block->fh));
 
-	/* Initialize the live snapshot lock. */
+	/* Initialize the live checkpoint's lock. */
 	__wt_spin_init(session, &block->live_lock);
 
 	/*
@@ -142,7 +141,7 @@ __wt_block_close(WT_SESSION_IMPL *session, WT_BLOCK *block)
 
 	WT_VERBOSE_RETVAL(session, block, ret, "close");
 
-	ret = __wt_block_snapshot_unload(session, block);
+	ret = __wt_block_checkpoint_unload(session, block);
 
 	if (block->name != NULL)
 		__wt_free(session, block->name);
@@ -165,8 +164,8 @@ int
 __wt_desc_init(WT_SESSION_IMPL *session, WT_FH *fh)
 {
 	WT_BLOCK_DESC *desc;
+	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
-	WT_ITEM *buf;
 
 	/* Use a scratch buffer to get correct alignment for direct I/O. */
 	WT_RET(__wt_scr_alloc(session, WT_BLOCK_DESC_SECTOR, &buf));
@@ -195,8 +194,8 @@ static int
 __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
 	WT_BLOCK_DESC *desc;
+	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
-	WT_ITEM *buf;
 	uint32_t cksum;
 
 	/* Use a scratch buffer to get correct alignment for direct I/O. */
@@ -239,7 +238,7 @@ __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block)
 		    block->name);
 
 err:	__wt_scr_free(&buf);
-	return (0);
+	return (ret);
 }
 
 /*

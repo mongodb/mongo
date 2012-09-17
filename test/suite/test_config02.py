@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Copyright (c) 2008-2012 WiredTiger, Inc.
+# Public Domain 2008-2012 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
 #
@@ -24,14 +24,12 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-#
-# test_config01.py
-# 	The home directory for wiredtiger_open
-#
 
 import os
 import wiredtiger, wttest
 
+# test_config01.py
+#    The home directory for wiredtiger_open
 class test_config02(wttest.WiredTigerTestCase):
     table_name1 = 'test_config02'
     nentries = 100
@@ -82,7 +80,7 @@ class test_config02(wttest.WiredTigerTestCase):
             configarg += ',' + configextra
         if homeenv == None:
             os.unsetenv('WIREDTIGER_HOME')
-	else:
+        else:
             os.putenv('WIREDTIGER_HOME', homeenv)
         self.conn = wiredtiger.wiredtiger_open(homearg, configarg)
         self.session = self.conn.open_session(None)
@@ -119,7 +117,7 @@ class test_config02(wttest.WiredTigerTestCase):
         edir = 'envdir'
         os.mkdir(hdir)
         os.mkdir(edir)
-        self.common_test(hdir, edir, 'home_environment=true')
+        self.common_test(hdir, edir, None)
         self.checkfiles(hdir)
         self.checknofiles(edir)
 
@@ -127,28 +125,19 @@ class test_config02(wttest.WiredTigerTestCase):
         # If homedir is set, it is used no matter what
         hdir = 'homedir'
         os.mkdir(hdir)
-        self.common_test(hdir, None, 'home_environment=true')
+        self.common_test(hdir, None, None)
         self.checkfiles(hdir)
 
     def test_env_conf(self):
         edir = 'envdir'
         os.mkdir(edir)
-        self.common_test(None, edir, 'home_environment=true')
+        self.common_test(None, edir, None)
         self.checkfiles(edir)
 
     def test_env_conf_without_env_var(self):
         # no env var set, so should use current directory
-        self.common_test(None, None, 'home_environment=true')
+        self.common_test(None, None, None)
         self.checkfiles(".")
-
-    def test_env_no_conf(self):
-	# env var, but no open configuration string, should fail
-        edir = 'envdir'
-        os.mkdir(edir)
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.common_test(None, edir, None),
-            '/WIREDTIGER_HOME environment variable set but'
-            ' WiredTiger not configured to use that environment variable/')
 
     def test_home_does_not_exist(self):
         dir = 'nondir'

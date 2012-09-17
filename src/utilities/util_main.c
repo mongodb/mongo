@@ -7,6 +7,7 @@
 
 #include "util.h"
 
+const char *home = ".";				/* Home directory */
 const char *progname;				/* Program name */
 						/* Global arguments */
 const char *usage_prefix = "[-Vv] [-C config] [-h home]";
@@ -37,7 +38,7 @@ main(int argc, char *argv[])
 	/* Check the version against the library build. */
 	(void)wiredtiger_version(&major_v, & minor_v, NULL);
 	if (major_v != WIREDTIGER_VERSION_MAJOR ||
-	     minor_v != WIREDTIGER_VERSION_MINOR) {
+	    minor_v != WIREDTIGER_VERSION_MINOR) {
 		fprintf(stderr,
 		    "%s: program build version %d.%d does not match "
 		    "library build version %d.%d\n",
@@ -55,16 +56,12 @@ main(int argc, char *argv[])
 			config = util_optarg;
 			break;
 		case 'h':			/* home directory */
-			if (chdir(util_optarg) != 0) {
-				fprintf(stderr, "%s: chdir %s: %s\n",
-				    progname, util_optarg, strerror(errno));
-				return (EXIT_FAILURE);
-			}
+			home = util_optarg;
 			break;
 		case 'V':			/* version */
 			printf("%s\n", wiredtiger_version(NULL, NULL, NULL));
 			return (EXIT_SUCCESS);
-		case 'v':			/* version */
+		case 'v':			/* verbose */
 			verbose = 1;
 			break;
 		case '?':
@@ -98,13 +95,19 @@ main(int argc, char *argv[])
 	    (strcmp(command, "create") == 0 || strcmp(command, "load") == 0))
 		config = "create";
 
-	if ((ret = wiredtiger_open(".",
+	if ((ret = wiredtiger_open(home,
 	    verbose ? verbose_handler : NULL, config, &conn)) != 0)
 		goto err;
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		goto err;
 
 	switch (command[0]) {
+	case 'b':
+		if (strcmp(command, "backup") == 0)
+			ret = util_backup(session, argc, argv);
+		else
+			ret = usage();
+		break;
 	case 'c':
 		if (strcmp(command, "create") == 0)
 			ret = util_create(session, argc, argv);
@@ -196,6 +199,7 @@ usage(void)
 	    "\t-v\tverbose\n");
 	fprintf(stderr,
 	    "commands:\n"
+	    "\tbackup database backup\n"
 	    "\tcopyright copyright information\n"
 	    "\tcreate\t  create an object\n"
 	    "\tdrop\t  drop an object\n"
@@ -247,6 +251,14 @@ util_name(const char *s, const char *type, u_int flags)
 		if (!(flags & UTIL_INDEX_OK)) {
 			fprintf(stderr,
 			    "%s: %s: \"index\" type not supported\n",
+			    progname, command);
+			return (NULL);
+		}
+		copy = 1;
+	} else if (WT_PREFIX_MATCH(s, "lsm:")) {
+		if (!(flags & UTIL_LSM_OK)) {
+			fprintf(stderr,
+			    "%s: %s: \"lsm\" type not supported\n",
 			    progname, command);
 			return (NULL);
 		}

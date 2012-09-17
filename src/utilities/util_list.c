@@ -8,22 +8,22 @@
 #include "util.h"
 
 static int list_print(WT_SESSION *, const char *, int, int);
-static int list_print_snapshot(WT_SESSION *, const char *);
+static int list_print_checkpoint(WT_SESSION *, const char *);
 static int usage(void);
 
 int
 util_list(WT_SESSION *session, int argc, char *argv[])
 {
 	WT_DECL_RET;
-	int ch, sflag, vflag;
+	int cflag, ch, vflag;
 	char *name;
 
-	sflag = vflag = 0;
+	cflag = vflag = 0;
 	name = NULL;
-	while ((ch = util_getopt(argc, argv, "sv")) != EOF)
+	while ((ch = util_getopt(argc, argv, "cv")) != EOF)
 		switch (ch) {
-		case 's':
-			sflag = 1;
+		case 'c':
+			cflag = 1;
 			break;
 		case 'v':
 			vflag = 1;
@@ -39,15 +39,15 @@ util_list(WT_SESSION *session, int argc, char *argv[])
 	case 0:
 		break;
 	case 1:
-		if ((name = util_name(
-		    *argv, "table", UTIL_FILE_OK | UTIL_TABLE_OK)) == NULL)
+		if ((name = util_name(*argv, "table",
+		    UTIL_FILE_OK | UTIL_LSM_OK | UTIL_TABLE_OK)) == NULL)
 			return (1);
 		break;
 	default:
 		return (usage());
 	}
 
-	ret = list_print(session, name, sflag, vflag);
+	ret = list_print(session, name, cflag, vflag);
 
 	if (name != NULL)
 		free(name);
@@ -60,7 +60,7 @@ util_list(WT_SESSION *session, int argc, char *argv[])
  *	List the high-level objects in the database.
  */
 static int
-list_print(WT_SESSION *session, const char *name, int sflag, int vflag)
+list_print(WT_SESSION *session, const char *name, int cflag, int vflag)
 {
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
@@ -71,12 +71,12 @@ list_print(WT_SESSION *session, const char *name, int sflag, int vflag)
 	 * XXX
 	 * Normally, we don't say anything about the WiredTiger metadata file,
 	 * it's not an "object" in the database.  I'm making an exception for
-	 * -s and -v, the snapshot and verbose options.
+	 * -c and -v, the checkpoint and verbose options.
 	 */
-	if (sflag || vflag) {
+	if (cflag || vflag) {
 		uri = WT_METADATA_URI;
 		printf("%s\n", uri);
-		if (sflag && (ret = list_print_snapshot(session, uri)) != 0)
+		if (cflag && (ret = list_print_checkpoint(session, uri)) != 0)
 			return (ret);
 		if (vflag) {
 			if ((ret =
@@ -102,9 +102,6 @@ list_print(WT_SESSION *session, const char *name, int sflag, int vflag)
 		return (1);
 	}
 
-#define	MATCH(s, tag)							\
-	(strncmp(s, tag, strlen(tag)) == 0)
-
 	found = name == NULL;
 	while ((ret = cursor->next(cursor)) == 0) {
 		/* Get the key. */
@@ -112,22 +109,18 @@ list_print(WT_SESSION *session, const char *name, int sflag, int vflag)
 			return (util_cerr("metadata", "get_key", ret));
 
 		/*
-		 * If no object specified, show top-level objects (files and
-		 * tables).
+		 * If a name is specified, only show objects that match.
 		 */
-		if (name == NULL) {
-			if (!MATCH(key, "file:") && !MATCH(key, "table:"))
-				continue;
-		} else {
-			if (!MATCH(key, name))
+		if (name != NULL) {
+			if (!WT_PREFIX_MATCH(key, name))
 				continue;
 			found = 1;
 		}
 		printf("%s\n", key);
-		if (!sflag && !vflag)
+		if (!cflag && !vflag)
 			continue;
 
-		if (sflag && (ret = list_print_snapshot(session, key)) != 0)
+		if (cflag && (ret = list_print_checkpoint(session, key)) != 0)
 			return (ret);
 		if (vflag) {
 			if ((ret = cursor->get_value(cursor, &value)) != 0)
@@ -147,39 +140,39 @@ list_print(WT_SESSION *session, const char *name, int sflag, int vflag)
 }
 
 /*
- * list_print_snapshot --
- *	List the snapshot information.
+ * list_print_checkpoint --
+ *	List the checkpoint information.
  */
 static int
-list_print_snapshot(WT_SESSION *session, const char *key)
+list_print_checkpoint(WT_SESSION *session, const char *key)
 {
 	WT_DECL_RET;
-	WT_SNAPSHOT *snap, *snapbase;
+	WT_CKPT *ckpt, *ckptbase;
 	size_t len;
 	time_t t;
 	uint64_t v;
 	char buf[256];
 
 	/*
-	 * We may not find any snapshots for this file, in which case we don't
-	 * report an error, and continue our caller's loop.  Otherwise, report
-	 * each snapshot's name and time.
+	 * We may not find any checkpoints for this file, in which case we don't
+	 * report an error, and continue our caller's loop.  Otherwise, read the
+	 * list of checkpoints and print each checkpoint's name and time.
 	 */
-	if ((ret = __wt_metadata_get_snaplist(session, key, &snapbase)) != 0)
+	if ((ret = __wt_metadata_get_ckptlist(session, key, &ckptbase)) != 0)
 		return (ret == WT_NOTFOUND ? 0 : ret);
 
 	/* Find the longest name, so we can pretty-print. */
 	len = 0;
-	WT_SNAPSHOT_FOREACH(snapbase, snap)
-		if (strlen(snap->name) > len)
-			len = strlen(snap->name);
+	WT_CKPT_FOREACH(ckptbase, ckpt)
+		if (strlen(ckpt->name) > len)
+			len = strlen(ckpt->name);
 	++len;
 
-	WT_SNAPSHOT_FOREACH(snapbase, snap) {
-		t = (time_t)snap->sec;
-		printf("\t%*s: %.24s", (int)len, snap->name, ctime_r(&t, buf));
+	WT_CKPT_FOREACH(ckptbase, ckpt) {
+		t = (time_t)ckpt->sec;
+		printf("\t%*s: %.24s", (int)len, ckpt->name, ctime_r(&t, buf));
 
-		v = snap->snapshot_size;
+		v = ckpt->ckpt_size;
 		if (v >= WT_PETABYTE)
 			printf(" (%" PRIu64 " PB)\n", v / WT_PETABYTE);
 		else if (v >= WT_TERABYTE)
@@ -194,7 +187,7 @@ list_print_snapshot(WT_SESSION *session, const char *key)
 			printf(" (%" PRIu64 " B)\n", v);
 	}
 
-	__wt_metadata_free_snaplist(session, snapbase);
+	__wt_metadata_free_ckptlist(session, ckptbase);
 	return (0);
 }
 
@@ -203,7 +196,7 @@ usage(void)
 {
 	(void)fprintf(stderr,
 	    "usage: %s %s "
-	    "list [-sv] [uri]\n",
+	    "list [-cv] [uri]\n",
 	    progname, usage_prefix);
 	return (1);
 }

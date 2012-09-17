@@ -21,8 +21,8 @@ struct __wt_process {
  *******************************************/
 /*
  * WT_BTREE_SESSION --
- *      Per-session cache of btree handles to avoid synchronization when
- *      opening cursors.
+ *	Per-session cache of btree handles to avoid synchronization when
+ * opening cursors.
  */
 struct __wt_btree_session {
 	WT_BTREE *btree;
@@ -69,8 +69,6 @@ struct __wt_session_impl {
 	WT_BTREE *btree;		/* Current file */
 	TAILQ_HEAD(__btrees, __wt_btree_session) btrees;
 
-	WT_BTREE *created_btree;	/* File being created */
-
 	WT_CURSOR *cursor;		/* Current cursor */
 					/* Cursors closed with the session */
 	TAILQ_HEAD(__cursors, __wt_cursor) cursors;
@@ -106,7 +104,9 @@ struct __wt_session_impl {
 	int	wq_sleeping;		/* Thread is blocked */
 	int	wq_ret;			/* Return value */
 
+	WT_TXN_ISOLATION isolation;
 	WT_TXN	txn;			/* Transaction state */
+	u_int	ncursors;		/* Count of active file cursors. */
 
 	void	*reconcile;		/* Reconciliation information */
 
@@ -130,6 +130,7 @@ struct __wt_session_impl {
 	 * easily call a function to clear memory up to, but not including, the
 	 * hazard reference.
 	 */
+	u_int nhazard;
 #define	WT_SESSION_CLEAR(s)	memset(s, 0, WT_PTRDIFF(&(s)->hazard, s))
 	WT_HAZARD *hazard;		/* Hazard reference array */
 };
@@ -143,7 +144,7 @@ struct __wt_session_impl {
  */
 struct __wt_named_collator {
 	const char *name;		/* Name of collator */
-	WT_COLLATOR *collator;	        /* User supplied object */
+	WT_COLLATOR *collator;		/* User supplied object */
 	TAILQ_ENTRY(__wt_named_collator) q;	/* Linked list of collators */
 };
 
@@ -184,12 +185,12 @@ struct __wt_connection_impl {
 	WT_SESSION_IMPL *default_session;
 	WT_SESSION_IMPL  dummy_session;
 
+	WT_SPINLOCK api_lock;		/* Connection API spinlock */
 	WT_SPINLOCK fh_lock;		/* File handle queue spinlock */
 	WT_SPINLOCK schema_lock;	/* Schema operation spinlock */
 	WT_SPINLOCK serial_lock;	/* Serial function call spinlock */
-	WT_SPINLOCK spinlock;		/* General purpose spinlock */
 
-	WT_RWLOCK *ckpt_rwlock;		/* Checkpoint lock */
+	int ckpt_backup;		/* Backup: don't delete checkpoints */
 
 					/* Connection queue */
 	TAILQ_ENTRY(__wt_connection_impl) q;
@@ -200,10 +201,11 @@ struct __wt_connection_impl {
 	WT_FH *lock_fh;			/* Lock file handle */
 
 	pthread_t cache_evict_tid;	/* Cache eviction server thread ID */
-	pthread_t cache_read_tid;	/* Cache read server thread ID */
 
 					/* Locked: btree list */
 	TAILQ_HEAD(__wt_btree_qh, __wt_btree) btqh;
+					/* Locked: LSM handle list. */
+	TAILQ_HEAD(__wt_lsm_qh, __wt_lsm_tree) lsmqh;
 					/* Locked: file list */
 	TAILQ_HEAD(__wt_fh_qh, __wt_fh) fhqh;
 
@@ -229,10 +231,8 @@ struct __wt_connection_impl {
 	uint32_t	 session_cnt;	/* Session count */
 
 	/*
-	 * WiredTiger allocates space for 15 hazard references in each thread of
-	 * control, by default.  There's no code path that requires more than 15
-	 * pages at a time (and if we find one, the right change is to increase
-	 * the default).
+	 * WiredTiger allocates space for a fixed number of hazard references
+	 * in each thread of control.
 	 */
 	uint32_t   hazard_size;		/* Hazard array size */
 
@@ -308,16 +308,16 @@ struct __wt_connection_impl {
 	API_END(s);							\
 	return ((ret) == WT_NOTFOUND ? ENOENT : (ret))
 
+#define	CONNECTION_API_CALL(conn, s, n, cfg, cfgvar)			\
+	s = (conn)->default_session;					\
+	API_CALL(s, connection, n, NULL, NULL, cfg, cfgvar);		\
+
 #define	SESSION_API_CALL(s, n, cfg, cfgvar)				\
 	API_CALL(s, session, n, NULL, NULL, cfg, cfgvar);
 
-#define	CONNECTION_API_CALL(conn, s, n, cfg, cfgvar)			\
-	s = conn->default_session;					\
-	API_CALL(s, connection, n, NULL, NULL, cfg, cfgvar);		\
-
-#define	CURSOR_API_CALL(cur, s, n, bt)					\
+#define	CURSOR_API_CALL_NOCONF(cur, s, n, bt)				\
 	(s) = (WT_SESSION_IMPL *)(cur)->session;			\
-	API_CALL_NOCONF(s, cursor, n, (cur), bt);			\
+	API_CALL_NOCONF(s, cursor, n, cur, bt)
 
 /*******************************************
  * Global variables.
@@ -337,20 +337,21 @@ extern WT_PROCESS __wt_process;
 #define	WT_PAGE_FREE_IGNORE_DISK			0x00000001
 #define	WT_REC_SINGLE					0x00000001
 #define	WT_SERVER_RUN					0x00000001
-#define	WT_SESSION_HAS_CONNLOCK				0x00000004
-#define	WT_SESSION_INTERNAL				0x00000002
-#define	WT_SESSION_SALVAGE_QUIET_ERR			0x00000001
-#define	WT_VERB_block					0x00001000
+#define	WT_SESSION_INTERNAL				0x00000004
+#define	WT_SESSION_SALVAGE_QUIET_ERR			0x00000002
+#define	WT_SESSION_SCHEMA_LOCKED			0x00000001
+#define	WT_VERB_block					0x00002000
+#define	WT_VERB_ckpt					0x00001000
 #define	WT_VERB_evict					0x00000800
 #define	WT_VERB_evictserver				0x00000400
 #define	WT_VERB_fileops					0x00000200
 #define	WT_VERB_hazard					0x00000100
-#define	WT_VERB_mutex					0x00000080
-#define	WT_VERB_read					0x00000040
-#define	WT_VERB_readserver				0x00000020
-#define	WT_VERB_reconcile				0x00000010
-#define	WT_VERB_salvage					0x00000008
-#define	WT_VERB_snapshot				0x00000004
+#define	WT_VERB_lsm					0x00000080
+#define	WT_VERB_mutex					0x00000040
+#define	WT_VERB_read					0x00000020
+#define	WT_VERB_readserver				0x00000010
+#define	WT_VERB_reconcile				0x00000008
+#define	WT_VERB_salvage					0x00000004
 #define	WT_VERB_verify					0x00000002
 #define	WT_VERB_write					0x00000001
 /*

@@ -80,6 +80,7 @@ struct __wt_btree_stats {
 	WT_STATS file_overflow;
 	WT_STATS file_allocsize;
 	WT_STATS rec_page_merge;
+	WT_STATS rec_dictionary;
 	WT_STATS rec_split_intl;
 	WT_STATS rec_split_leaf;
 	WT_STATS rec_ovfl_key;
@@ -90,6 +91,7 @@ struct __wt_btree_stats {
 	WT_STATS file_row_int_pages;
 	WT_STATS file_row_leaf_pages;
 	WT_STATS file_entries;
+	WT_STATS update_conflict;
 	WT_STATS file_write_conflicts;
 };
 
@@ -97,6 +99,7 @@ struct __wt_btree_stats {
  * Statistics entries for CONNECTION handle.
  */
 struct __wt_connection_stats {
+	WT_STATS txn_ancient;
 	WT_STATS block_read;
 	WT_STATS block_write;
 	WT_STATS cache_bytes_inuse;
@@ -107,6 +110,7 @@ struct __wt_connection_stats {
 	WT_STATS cache_pages_inuse;
 	WT_STATS cache_evict_hazard;
 	WT_STATS cache_evict_unmodified;
+	WT_STATS checkpoint;
 	WT_STATS cond_wait;
 	WT_STATS file_open;
 	WT_STATS rwlock_rdlock;
@@ -115,6 +119,9 @@ struct __wt_connection_stats {
 	WT_STATS memfree;
 	WT_STATS total_read_io;
 	WT_STATS total_write_io;
+	WT_STATS txn_begin;
+	WT_STATS txn_commit;
+	WT_STATS txn_rollback;
 };
 
 /* Statistics section: END */

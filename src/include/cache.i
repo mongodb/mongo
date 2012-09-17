@@ -43,10 +43,33 @@ static inline int
 __wt_eviction_page_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_CONNECTION_IMPL *conn;
+	WT_PAGE_MODIFY *mod;
 
 	conn = S2C(session);
+	mod = page->modify;
 
-	return (!WT_PAGE_IS_ROOT(page) && __wt_page_is_modified(page) &&
-	    (((int64_t)page->memory_footprint > conn->cache_size / 2) ||
-	    (page->memory_footprint > 20 * session->btree->maxleafpage)));
+	/*
+	 * Root pages and clean pages are never forcibly evicted.
+	 * Nor are pages from files that are purely cache resident.
+	 */
+	if (WT_PAGE_IS_ROOT(page) ||
+	    !__wt_page_is_modified(page) ||
+	    F_ISSET(session->btree, WT_BTREE_NO_EVICTION))
+		return (0);
+
+	/* Check the page's memory footprint. */
+	if ((int64_t)page->memory_footprint > conn->cache_size / 2 ||
+	    page->memory_footprint > 20 * session->btree->maxleafpage)
+		return (1);
+
+	/*
+	 * If the page's write-generation has wrapped and caught up with the
+	 * page's disk generation (wildly unlikely as it requires 4B updates
+	 * between page reconciliations, but is technically possible), forcibly
+	 * evict the page.
+	 */
+	if (mod != NULL && mod->write_gen + 1 == mod->disk_gen)
+		return (1);
+
+	return (0);
 }

@@ -7,8 +7,6 @@
 
 #include "format.h"
 
-static void wts_sync(void);
-
 static int
 handle_message(WT_EVENT_HANDLER *handler, const char *message)
 {
@@ -105,6 +103,9 @@ wts_open(void)
 		    ",value_format=%dt", g.c_bitcnt);
 		break;
 	case ROW:
+		if (g.c_dictionary)
+			p += snprintf(p, (size_t)(end - p),
+			    ",dictionary=123");
 		if (g.c_huffman_key)
 			p += snprintf(p, (size_t)(end - p),
 			    ",huffman_key=english");
@@ -119,8 +120,8 @@ wts_open(void)
 		break;
 	}
 
-	if ((ret = session->create(session, WT_TABLENAME, config)) != 0)
-		die(ret, "session.create: %s", WT_TABLENAME);
+	if ((ret = session->create(session, g.c_data_source, config)) != 0)
+		die(ret, "session.create: %s", g.c_data_source);
 
 	if ((ret = session->close(session, NULL)) != 0)
 		die(ret, "session.close");
@@ -136,8 +137,6 @@ wts_close()
 
 	conn = g.wts_conn;
 
-	wts_sync();
-
 	if ((ret = conn->close(conn, NULL)) != 0)
 		die(ret, "connection.close");
 }
@@ -145,22 +144,21 @@ wts_close()
 void
 wts_dump(const char *tag, int dump_bdb)
 {
-	int ret;
+	int offset, ret;
 	char cmd[256];
 
 	track("dump files and compare", 0ULL, NULL);
-	switch (g.c_file_type) {
-	case FIX:
-	case VAR:
-		snprintf(cmd, sizeof(cmd),
-		    "sh ./s_dumpcmp%s -c", dump_bdb ? " -b" : "");
-		break;
-	default:
-	case ROW:
-		snprintf(cmd, sizeof(cmd),
-		    "sh ./s_dumpcmp%s", dump_bdb ? " -b" : "");
-		break;
-	}
+	offset = snprintf(cmd, sizeof(cmd), "sh ./s_dumpcmp");
+	if (dump_bdb)
+		offset += snprintf(cmd + offset,
+		    sizeof(cmd) - (size_t)offset, " -b");
+	if (g.c_file_type == FIX || g.c_file_type == VAR)
+		offset += snprintf(cmd + offset,
+		    sizeof(cmd) - (size_t)offset, " -c");
+
+	if (g.c_data_source != NULL)
+		offset += snprintf(cmd + offset,
+		    sizeof(cmd) - (size_t)offset, " -n %s", g.c_data_source);
 	if ((ret = system(cmd)) != 0)
 		die(ret, "%s: dump comparison failed", tag);
 }
@@ -183,33 +181,13 @@ wts_salvage(void)
 	if ((ret = system(
 	    "rm -rf __slvg.copy && "
 	    "mkdir __slvg.copy && "
-	    "cp WiredTiger* __wt __slvg.copy/")) != 0)
+	    "cp WiredTiger* __wt* __slvg.copy/")) != 0)
 		die(ret, "salvage cleanup step failed");
 
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die(ret, "connection.open_session");
-	if ((ret = session->salvage(session, WT_TABLENAME, NULL)) != 0)
-		die(ret, "session.salvage: %s", WT_TABLENAME);
-	if ((ret = session->close(session, NULL)) != 0)
-		die(ret, "session.close");
-}
-
-static void
-wts_sync(void)
-{
-	WT_CONNECTION *conn;
-	WT_SESSION *session;
-	int ret;
-
-	conn = g.wts_conn;
-
-	track("sync", 0ULL, NULL);
-
-	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		die(ret, "connection.open_session");
-	if ((ret = session->sync(
-	    session, WT_TABLENAME, NULL)) != 0 && ret != EBUSY)
-		die(ret, "session.sync: %s", WT_TABLENAME);
+	if ((ret = session->salvage(session, g.c_data_source, NULL)) != 0)
+		die(ret, "session.salvage: %s", g.c_data_source);
 	if ((ret = session->close(session, NULL)) != 0)
 		die(ret, "session.close");
 }
@@ -227,8 +205,8 @@ wts_verify(const char *tag)
 
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die(ret, "connection.open_session");
-	if ((ret = session->verify(session, WT_TABLENAME, NULL)) != 0)
-		die(ret, "session.verify: %s: %s", WT_TABLENAME, tag);
+	if ((ret = session->verify(session, g.c_data_source, NULL)) != 0)
+		die(ret, "session.verify: %s: %s", g.c_data_source, tag);
 	if ((ret = session->close(session, NULL)) != 0)
 		die(ret, "session.close");
 }
@@ -244,6 +222,7 @@ wts_stats(void)
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
 	FILE *fp;
+	char *stat_name;
 	const char *pval, *desc;
 	uint64_t v;
 	int ret;
@@ -258,6 +237,7 @@ wts_stats(void)
 		die(errno, "fopen: __stats");
 
 	/* Connection statistics. */
+	fprintf(fp, "====== Connection statistics:\n");
 	if ((ret = session->open_cursor(session,
 	    "statistics:", NULL, NULL, &cursor)) != 0)
 		die(ret, "session.open_cursor");
@@ -272,10 +252,23 @@ wts_stats(void)
 	if ((ret = cursor->close(cursor)) != 0)
 		die(ret, "cursor.close");
 
+	/*
+	 * XXX
+	 * WiredTiger only supports file object statistics.
+	 */
+	if (strncmp(g.c_data_source, "file:", strlen("file:")) != 0)
+		goto skip;
+
 	/* File statistics. */
-	if ((ret = session->open_cursor(session,
-	    "statistics:" WT_TABLENAME, NULL, NULL, &cursor)) != 0)
+	fprintf(fp, "\n\n====== File statistics:\n");
+	if ((stat_name =
+	    malloc(strlen("statistics:") + strlen(g.c_data_source))) == NULL)
+		die(ret, "malloc");
+	sprintf(stat_name, "statistics:%s", g.c_data_source);
+	if ((ret = session->open_cursor(
+	    session, stat_name, NULL, NULL, &cursor)) != 0)
 		die(ret, "session.open_cursor");
+	free(stat_name);
 
 	while ((ret = cursor->next(cursor)) == 0 &&
 	    (ret = cursor->get_value(cursor, &desc, &pval, &v)) == 0)
@@ -287,7 +280,7 @@ wts_stats(void)
 	if ((ret = cursor->close(cursor)) != 0)
 		die(ret, "cursor.close");
 
-	if ((ret = fclose(fp)) != 0)
+skip:	if ((ret = fclose(fp)) != 0)
 		die(ret, "fclose");
 
 	if ((ret = session->close(session, NULL)) != 0)

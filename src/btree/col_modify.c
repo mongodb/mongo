@@ -77,14 +77,20 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 	 * Else, allocate an insert array as necessary, build a WT_INSERT and
 	 * WT_UPDATE structure pair, and call a serialized function to insert
 	 * the WT_INSERT structure.
+	 *
+	 * The test is slight tricky: we're either coming here after a search
+	 * (in which case we check the search's comparison and the WT_INSERT
+	 * structure), or a truncation (in which case we check the WT_INSERT
+	 * structure, it's a match by definition).
 	 */
-	if (cbt->compare == 0 && cbt->ins != NULL) {
+	if (cbt->ins != NULL && (cbt->compare == 0 || op == 2)) {
+		/* Make sure the update can proceed. */
 		WT_ERR(__wt_update_check(session, page, cbt->ins->upd));
-		WT_ERR(__wt_update_alloc(session, value, &upd, &upd_size));
 
-		/* Insert the WT_UPDATE structure. */
-		ret = __wt_update_serial(session, page,
-		    cbt->write_gen, &cbt->ins->upd, NULL, 0, &upd, upd_size);
+		/* Allocate and insert a WT_UPDATE structure. */
+		WT_ERR(__wt_update_alloc(session, value, &upd, &upd_size));
+		WT_ERR(__wt_update_serial(session, page,
+		    cbt->write_gen, &cbt->ins->upd, NULL, 0, &upd, upd_size));
 	} else {
 		/* There may be no insert list, allocate as necessary. */
 		new_inshead_size = new_inslist_size = 0;
@@ -167,7 +173,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 			    &ins, ins_size, skipdepth));
 	}
 
-	if (ret != 0) {
+	if (0) {
 err:		if (ins != NULL)
 			__wt_free(session, ins);
 		if (upd != NULL) {
@@ -305,4 +311,33 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session)
 		btree->last_recno = recno;
 
 err:	__wt_session_serialize_wrapup(session, page, ret);
+}
+
+/*
+ * __wt_col_leaf_obsolete --
+ *	Discard all obsolete updates on a column-store leaf page.
+ */
+void
+__wt_col_leaf_obsolete(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	WT_INSERT *ins;
+	WT_COL *cip;
+	uint32_t i;
+
+	switch (page->type) {
+	case WT_PAGE_COL_FIX:
+		WT_SKIP_FOREACH(ins, WT_COL_UPDATE_SINGLE(page))
+			__wt_update_obsolete(session, page, ins->upd);
+		break;
+
+	case WT_PAGE_COL_VAR:
+		WT_COL_FOREACH(page, cip, i)
+			WT_SKIP_FOREACH(ins, WT_COL_UPDATE(page, cip))
+				__wt_update_obsolete(session, page, ins->upd);
+		break;
+	}
+
+	/* Walk any append list. */
+	WT_SKIP_FOREACH(ins, WT_COL_APPEND(page))
+		__wt_update_obsolete(session, page, ins->upd);
 }

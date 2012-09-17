@@ -35,7 +35,7 @@
 /* Get a random value between a min/max pair. */
 #define	MMRAND(min, max)	(wts_rand() % (((max) + 1) - (min)) + (min))
 
-#define	WT_TABLENAME	"file:__wt"
+#define	WT_NAME	"__wt"
 
 #define	SINGLETHREADED	(g.c_threads == 1)
 
@@ -65,7 +65,9 @@ typedef struct {
 	uint32_t c_bitcnt;			/* Config values */
 	uint32_t c_bzip;
 	uint32_t c_cache;
+	char *c_data_source;
 	uint32_t c_delete_pct;
+	uint32_t c_dictionary;
 	uint32_t c_file_type;
 	uint32_t c_huffman_key;
 	uint32_t c_huffman_value;

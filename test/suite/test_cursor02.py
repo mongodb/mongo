@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Copyright (c) 2008-2012 WiredTiger, Inc.
+# Public Domain 2008-2012 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
 #
@@ -24,14 +24,12 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-#
-# test_cursor02.py
-# 	Cursor operations on small tables.
-#
 
 import wiredtiger
 from test_cursor_tracker import TestCursorTracker
 
+# test_cursor02.py
+#     Cursor operations on small tables.
 class test_cursor02(TestCursorTracker):
     """
     Cursor operations on small tables of each access method.
@@ -40,13 +38,14 @@ class test_cursor02(TestCursorTracker):
     after inserts and removes.
     """
     scenarios = [
-        ('row', dict(tablekind='row')),
-        ('col', dict(tablekind='col')),
+        ('row', dict(tablekind='row', uri='table')),
+        ('lsm-row', dict(tablekind='row', uri='lsm')),
+        ('col', dict(tablekind='col', uri='table')),
         #('fix', dict(tablekind='fix'))
         ]
 
     def create_session_and_cursor(self, ninitialentries):
-        tablearg = "table:" + self.table_name1
+        tablearg = self.uri + ":" + self.table_name1
         if self.tablekind == 'row':
             keyformat = 'key_format=S'
         else:
@@ -58,7 +57,7 @@ class test_cursor02(TestCursorTracker):
         create_args = keyformat + ',' + valformat + self.config_string()
         self.session_create(tablearg, create_args)
         self.pr('creating cursor')
-        self.cur_initial_conditions(self.table_name1, ninitialentries, self.tablekind, None, None)
+        self.cur_initial_conditions(self.table_name1, ninitialentries, self.tablekind, None, None, self.uri)
         return self.session.open_cursor(tablearg, None, 'append')
 
     def test_multiple_remove(self):

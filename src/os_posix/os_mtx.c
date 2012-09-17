@@ -151,6 +151,10 @@ __wt_rwlock_alloc(
 
 	rwlock->name = name;
 	*rwlockp = rwlock;
+
+	WT_VERBOSE_VOID(session, mutex,
+	    "rwlock: alloc %s (%p)", rwlock->name, rwlock);
+
 	if (0) {
 err:		__wt_free(session, rwlock);
 	}
@@ -167,7 +171,7 @@ __wt_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	WT_DECL_RET;
 
 	WT_VERBOSE_VOID(session, mutex,
-	    "readlock %s rwlock (%p)", rwlock->name, rwlock);
+	    "rwlock: readlock %s (%p)", rwlock->name, rwlock);
 
 	WT_ERR(pthread_rwlock_rdlock(&rwlock->rwlock));
 	WT_CSTAT_INCR(session, rwlock_rdlock);
@@ -188,7 +192,7 @@ __wt_try_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	WT_DECL_RET;
 
 	WT_VERBOSE_VOID(session, mutex,
-	    "try_writelock %s rwlock (%p)", rwlock->name, rwlock);
+	    "rwlock: try_writelock %s (%p)", rwlock->name, rwlock);
 
 	if ((ret = pthread_rwlock_trywrlock(&rwlock->rwlock)) == 0)
 		WT_CSTAT_INCR(session, rwlock_wrlock);
@@ -210,7 +214,7 @@ __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	WT_DECL_RET;
 
 	WT_VERBOSE_VOID(session, mutex,
-	    "writelock %s rwlock (%p)", rwlock->name, rwlock);
+	    "rwlock: writelock %s (%p)", rwlock->name, rwlock);
 
 	WT_ERR(pthread_rwlock_wrlock(&rwlock->rwlock));
 	WT_CSTAT_INCR(session, rwlock_wrlock);
@@ -231,7 +235,7 @@ __wt_rwunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	WT_DECL_RET;
 
 	WT_VERBOSE_VOID(session, mutex,
-	    "unlock %s rwlock (%p)", rwlock->name, rwlock);
+	    "rwlock: unlock %s (%p)", rwlock->name, rwlock);
 
 	WT_ERR(pthread_rwlock_unlock(&rwlock->rwlock));
 
@@ -245,16 +249,19 @@ err:		__wt_err(session, ret, "rwlock unlock failed");
  * __wt_rwlock_destroy --
  *	Destroy a mutex.
  */
-int
-__wt_rwlock_destroy(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
+void
+__wt_rwlock_destroy(WT_SESSION_IMPL *session, WT_RWLOCK **rwlockp)
 {
-	WT_DECL_RET;
+	WT_RWLOCK *rwlock;
 
-	ret = pthread_rwlock_destroy(&rwlock->rwlock);
-	if (ret == EBUSY)
-		ret = 0;
-	WT_ASSERT(session, ret == 0);
+	rwlock = *rwlockp;		/* Clear our caller's reference. */
+	*rwlockp = NULL;
+
+	WT_VERBOSE_VOID(session, mutex,
+	    "rwlock: destroy %s (%p)", rwlock->name, rwlock);
+
+	/* Errors are possible, but we're discarding memory, ignore them. */
+	(void)pthread_rwlock_destroy(&rwlock->rwlock);
+
 	__wt_free(session, rwlock);
-
-	return (ret);
 }

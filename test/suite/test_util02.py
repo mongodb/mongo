@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Copyright (c) 2008-2012 WiredTiger, Inc.
+# Public Domain 2008-2012 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
 #
@@ -24,15 +24,13 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-#
-# test_util02.py
-# 	Utilities: wt load
-#
 
 import string, os
 from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
 
+# test_util02.py
+#    Utilities: wt load
 class test_util02(wttest.WiredTigerTestCase, suite_subprocess):
     """
     Test wt load
@@ -49,27 +47,6 @@ class test_util02(wttest.WiredTigerTestCase, suite_subprocess):
         ('ri', dict(key_format='r',value_format='i')),
         ('ii', dict(key_format='i',value_format='i')),
         ]
-
-    # python has a filecmp.cmp function, but different versions
-    # of python approach file comparison differently.  To make
-    # sure we really get byte for byte comparison, we define it here.
-
-    def compare_files(self, filename1, filename2):
-        bufsize = 4096
-        if os.path.getsize(filename1) != os.path.getsize(filename2):
-            print filename1 + ' size = ' + str(os.path.getsize(filename1))
-            print filename2 + ' size = ' + str(os.path.getsize(filename2))
-            return False
-        with open(filename1, "rb") as fp1:
-            with open(filename2, "rb") as fp2:
-                while True:
-                    b1 = fp1.read(bufsize)
-                    b2 = fp2.read(bufsize)
-                    if b1 != b2:
-                        return False
-                    # files are identical size
-                    if not b1:
-                        return True
 
     def get_string(self, i, len):
         """

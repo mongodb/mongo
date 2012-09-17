@@ -17,10 +17,10 @@
 #define	WT_BLOCK_INVALID_OFFSET		0
 
 /*
- * The block manager maintains three per-snapshot extent lists:
- *	alloc:	 the extents allocated in this snapshot
+ * The block manager maintains three per-checkpoint extent lists:
+ *	alloc:	 the extents allocated in this checkpoint
  *	avail:	 the extents available for allocation
- *	discard: the extents freed in this snapshot
+ *	discard: the extents freed in this checkpoint
  * Each of the extent lists is based on two skiplists: first, a by-offset list
  * linking WT_EXT elements and sorted by file offset (low-to-high), second, a
  * by-size list linking WT_SIZE elements and sorted by chunk size (low-to-high).
@@ -60,7 +60,7 @@ struct __wt_extlist {
 /*
  * WT_EXT --
  *	Encapsulation of an extent, either allocated or freed within the
- * snapshot.
+ * checkpoint.
  */
 struct __wt_ext {
 	off_t	 off;				/* Extent's file offset */
@@ -106,16 +106,16 @@ struct __wt_size {
 	    (skip) != NULL; (skip) = (skip)->next[(skip)->depth])
 
 /*
- * Snapshot cookie: carries a version number as I don't want to rev the schema
- * file version should the default block manager snapshot format change.
+ * Checkpoint cookie: carries a version number as I don't want to rev the schema
+ * file version should the default block manager checkpoint format change.
  *
- * Version #1 snapshot cookie format:
+ * Version #1 checkpoint cookie format:
  *	[1] [root addr] [alloc addr] [avail addr] [discard addr]
- *	    [file size] [snapshot size] [write generation]
+ *	    [file size] [checkpoint size] [write generation]
  */
-#define	WT_BM_SNAPSHOT_VERSION		1	/* Snapshot format version */
+#define	WT_BM_CHECKPOINT_VERSION	1	/* Checkpoint format version */
 #define	WT_BLOCK_EXTLIST_MAGIC		71002	/* Identify a list */
-struct __wt_block_snapshot {
+struct __wt_block_ckpt {
 	uint8_t	 version;			/* Version */
 
 	off_t	 root_offset;			/* The root */
@@ -125,9 +125,9 @@ struct __wt_block_snapshot {
 	WT_EXTLIST avail;			/* Extents available */
 	WT_EXTLIST discard;			/* Extents discarded */
 
-	off_t	   file_size;			/* Snapshot file size */
-	uint64_t   snapshot_size;		/* Snapshot byte count */
-	WT_EXTLIST snapshot_avail;		/* Snapshot free'd extents */
+	off_t	   file_size;			/* Checkpoint file size */
+	uint64_t   ckpt_size;			/* Checkpoint byte count */
+	WT_EXTLIST ckpt_avail;			/* Checkpoint free'd extents */
 
 	uint64_t write_gen;			/* Write generation */
 };
@@ -144,9 +144,9 @@ struct __wt_block {
 	uint32_t allocsize;		/* Allocation size */
 	int	 checksum;		/* If checksums configured */
 
-	WT_SPINLOCK	  live_lock;	/* Lock to protect the live snapshot */
-	WT_BLOCK_SNAPSHOT live;		/* Live snapshot */
-	int		  live_load;	/* Live snapshot loaded */
+	WT_SPINLOCK	live_lock;	/* Live checkpoint lock */
+	WT_BLOCK_CKPT	live;		/* Live checkpoint */
+	int		live_load;	/* Live checkpoint loaded */
 
 	WT_COMPRESSOR *compressor;	/* Page compressor */
 
@@ -156,11 +156,11 @@ struct __wt_block {
 
 				/* Verification support */
 	int	   verify;		/* If performing verification */
-	off_t	   verify_size;		/* Snapshot's file size */
+	off_t	   verify_size;		/* Checkpoint's file size */
 	WT_EXTLIST verify_alloc;	/* Verification allocation list */
 	uint32_t   frags;		/* Maximum frags in the file */
 	uint8_t   *fragfile;		/* Per-file frag tracking list */
-	uint8_t   *fragsnap;		/* Per-snapshot frag tracking list */
+	uint8_t   *fragckpt;		/* Per-checkpoint frag tracking list */
 };
 
 /*

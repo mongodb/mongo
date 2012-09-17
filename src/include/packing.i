@@ -117,8 +117,9 @@ next:	if (pack->cur == pack->end)
 }
 
 #define	WT_PACK_GET(session, pv, ap) do {				\
+	WT_ITEM *__item;						\
 	switch (pv.type) {						\
-	case 'x':                                                       \
+	case 'x':							\
 		break;							\
 	case 's':							\
 	case 'S':							\
@@ -126,7 +127,9 @@ next:	if (pack->cur == pack->end)
 		break;							\
 	case 'U':							\
 	case 'u':							\
-		pv.u.item = *va_arg(ap, WT_ITEM *);			\
+		__item = va_arg(ap, WT_ITEM *);				\
+		pv.u.item.data = __item->data;				\
+		pv.u.item.size = __item->size;				\
 		break;							\
 	case 'b':							\
 	case 'h':							\
@@ -390,8 +393,9 @@ __unpack_read(WT_SESSION_IMPL *session,
 }
 
 #define	WT_UNPACK_PUT(session, pv, ap) do {				\
+	WT_ITEM *__item;						\
 	switch (pv.type) {						\
-	case 'x':                                                       \
+	case 'x':							\
 		break;							\
 	case 's':							\
 	case 'S':							\
@@ -399,7 +403,9 @@ __unpack_read(WT_SESSION_IMPL *session,
 		break;							\
 	case 'U':							\
 	case 'u':							\
-		*va_arg(ap, WT_ITEM *) = pv.u.item;			\
+		__item = va_arg(ap, WT_ITEM *);				\
+		__item->data = pv.u.item.data;				\
+		__item->size = pv.u.item.size;				\
 		break;							\
 	case 'b':							\
 		*va_arg(ap, int8_t *) = (int8_t)pv.u.i;			\

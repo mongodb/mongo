@@ -40,6 +40,22 @@ config_setup(void)
 		}
 	}
 
+	/* Pick a data source type. */
+	cp = config_find("data_source", strlen("data_source"));
+	if (!(cp->flags & C_PERM)) {
+		switch (MMRAND(0, 1)) {
+		case 0:
+			config_single("data_source=file", 0);
+			break;
+		case 1:
+			config_single("data_source=table", 0);
+			break;
+		case 2:
+			config_single("data_source=lsm", 0);
+			break;
+		}
+	}
+
 	/* Reset the key count. */
 	g.key_cnt = 0;
 
@@ -69,6 +85,20 @@ config_setup(void)
 		for (cp = c; cp->name != NULL; ++cp)
 			if (cp->flags & C_OPS)
 				*cp->v = 0;
+
+	/* LSM trees are only compatible with row store tables. */
+	if (g.c_file_type != ROW &&
+	    strncmp(g.c_data_source, "lsm", strlen("lsm")) == 0) {
+		cp = config_find("file_type", strlen("file_type"));
+		if (!(cp->flags & C_PERM))
+			config_single("file_type=row", 0);
+		else {
+			fprintf(stderr,
+	    "%s: LSM data source is only compatible with row file_type\n",
+			    g.progname);
+			exit(EXIT_FAILURE);
+		}
+	}
 
 	/* Multi-threaded runs cannot be replayed. */
 	if (g.replay && g.c_threads != 1) {
@@ -144,10 +174,16 @@ config_print(int error_display)
 		    (g.c_file_type == VAR && !(cp->type_mask & C_VAR))))
 			fprintf(fp,
 			    "# %s not applicable to this run\n", cp->name);
-		else if (strcmp(cp->name, "file_type"))
-			fprintf(fp, "%s=%" PRIu32 "\n", cp->name, *cp->v);
-		else
+		else if (strcmp(cp->name, "data_source") == 0)
+			fprintf(fp, "%s=%.*s\n", cp->name,
+			    (int)(strchr(*cp->vstr, ':') - *cp->vstr),
+			    *cp->vstr);
+		else if (cp->flags & C_STRING)
+			fprintf(fp, "%s=%s\n", cp->name, *cp->vstr);
+		else if (strcmp(cp->name, "file_type") == 0)
 			fprintf(fp, "%s=%s\n", cp->name, config_dtype());
+		else
+			fprintf(fp, "%s=%" PRIu32 "\n", cp->name, *cp->v);
 
 	fprintf(fp, "############################################\n");
 	if (fp != stdout)
@@ -186,7 +222,7 @@ config_clear(void)
 {
 	CONFIG *cp;
 
-	/* Display configuration names. */
+	/* Clear configuration data. */
 	for (cp = c; cp->name != NULL; ++cp)
 		cp->flags &= ~(uint32_t)C_TEMP;
 }
@@ -209,8 +245,28 @@ config_single(const char *s, int perm)
 
 	cp = config_find(s, (size_t)(ep - s));
 	cp->flags |= perm ? C_PERM : C_TEMP;
+	++ep;
 
-	*cp->v = config_translate(ep + 1);
+	if (cp->flags & C_STRING) {
+		/* At the moment there is only one string config. */
+		if (strncmp(s, "data_source", strlen("data_source")) != 0) {
+			fprintf(stderr, "Invalid string configuration\n");
+			exit(EXIT_FAILURE);
+		}
+		if (strncmp("file", ep, strlen("file")) != 0 &&
+		    strncmp("table", ep, strlen("table")) != 0 &&
+		    strncmp("lsm", ep, strlen("lsm")) != 0) {
+		    fprintf(stderr, "Invalid file type option: %s\n", ep);
+		    exit(EXIT_FAILURE);
+		}
+		if ((*cp->vstr =
+		    malloc(strlen(ep) + strlen(WT_NAME) + 2)) == NULL)
+			exit(EXIT_FAILURE);
+		sprintf(*cp->vstr, "%s:%s", ep, WT_NAME);
+		return;
+	}
+
+	*cp->v = config_translate(ep);
 	if (cp->flags & C_BOOL) {
 		if (*cp->v != 0 && *cp->v != 1) {
 			fprintf(stderr, "%s: %s: value of boolean not 0 or 1\n",

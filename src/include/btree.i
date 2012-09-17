@@ -13,12 +13,20 @@ static inline void
 __wt_cache_page_inmem_incr(
     WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 {
-	WT_CACHE *cache;
-
-	cache = S2C(session)->cache;
-
-	WT_ATOMIC_ADD(cache->bytes_inmem, size);
+	WT_ATOMIC_ADD(S2C(session)->cache->bytes_inmem, size);
 	WT_ATOMIC_ADD(page->memory_footprint, WT_STORE_SIZE(size));
+}
+
+/*
+ * __wt_cache_page_inmem_decr --
+ *	Decrement a page's memory footprint in the cache.
+ */
+static inline void
+__wt_cache_page_inmem_decr(
+    WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
+{
+	WT_ATOMIC_SUB(S2C(session)->cache->bytes_inmem, size);
+	WT_ATOMIC_SUB(page->memory_footprint, WT_STORE_SIZE(size));
 }
 
 /*
@@ -165,7 +173,18 @@ static inline int
 __wt_page_write_gen_check(
     WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t write_gen)
 {
-	if (page->modify->write_gen == write_gen)
+	WT_PAGE_MODIFY *mod;
+
+	mod = page->modify;
+
+	/*
+	 * If the page's write generation matches the search generation, we can
+	 * proceed.  Except, if the page's write generation has wrapped and
+	 * caught up with the disk generation (wildly unlikely but technically
+	 * possible as it implies 4B updates between page reconciliations), fail
+	 * the update.
+	 */
+	if (mod->write_gen == write_gen && mod->write_gen + 1 != mod->disk_gen)
 		return (0);
 
 	WT_BSTAT_INCR(session, file_write_conflicts);
@@ -191,6 +210,52 @@ __wt_off_page(WT_PAGE *page, const void *p)
 	return (page->dsk == NULL ||
 	    p < (void *)page->dsk ||
 	    p >= (void *)((uint8_t *)page->dsk + page->dsk->size));
+}
+
+/*
+ * __wt_row_key --
+ *	Set a buffer to reference a key as cheaply as possible.
+ */
+static inline int
+__wt_row_key(WT_SESSION_IMPL *session,
+    WT_PAGE *page, WT_ROW *rip, WT_ITEM *key, int instantiate)
+{
+	WT_BTREE *btree;
+	WT_IKEY *ikey;
+	WT_CELL_UNPACK unpack;
+
+	btree = session->btree;
+
+retry:	ikey = WT_ROW_KEY_COPY(rip);
+
+	/* If the key has been instantiated for any reason, off-page, use it. */
+	if (__wt_off_page(page, ikey)) {
+		key->data = WT_IKEY_DATA(ikey);
+		key->size = ikey->size;
+		return (0);
+	}
+
+	/* If the key isn't compressed or an overflow, take it from the page. */
+	if (btree->huffman_key == NULL)
+		__wt_cell_unpack((WT_CELL *)ikey, &unpack);
+	if (btree->huffman_key == NULL &&
+	    unpack.type == WT_CELL_KEY && unpack.prefix == 0) {
+		key->data = unpack.data;
+		key->size = unpack.size;
+		return (0);
+	}
+
+	/*
+	 * We're going to have to build the key (it's never been instantiated,
+	 * and it's compressed or an overflow key).
+	 *
+	 * If we're instantiating the key on the page, do that, and then look
+	 * it up again, else, we have a copy and we can return.
+	 */
+	WT_RET(__wt_row_key_copy(session, page, rip, instantiate ? NULL : key));
+	if (instantiate)
+		goto retry;
+	return (0);
 }
 
 /*
@@ -270,7 +335,7 @@ __wt_page_hazard_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 /*
  * __wt_skip_choose_depth --
- *      Randomly choose a depth for a skiplist insert.
+ *	Randomly choose a depth for a skiplist insert.
  */
 static inline u_int
 __wt_skip_choose_depth(void)
@@ -318,5 +383,5 @@ __wt_btree_lex_compare(const WT_ITEM *user_item, const WT_ITEM *tree_item)
 #define	WT_BTREE_CMP(s, bt, k1, k2, cmp)				\
 	(((bt)->collator == NULL) ?					\
 	(((cmp) = __wt_btree_lex_compare((k1), (k2))), 0) :		\
-	(bt)->collator->compare((bt)->collator, &(s)->iface,            \
+	(bt)->collator->compare((bt)->collator, &(s)->iface,		\
 	    (k1), (k2), &(cmp)))

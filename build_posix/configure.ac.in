@@ -7,7 +7,7 @@ m4_include([build_posix/aclocal/version-set.m4])
 
 AC_CONFIG_AUX_DIR([build_posix/gnu-support])
 AC_CONFIG_MACRO_DIR([build_posix/aclocal])
-AC_CONFIG_SRCDIR([dist/RELEASE])
+AC_CONFIG_SRCDIR([RELEASE])
 
 AM_INIT_AUTOMAKE([1.10 foreign])
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([no])])
@@ -53,7 +53,8 @@ AM_CONDITIONAL([DEBUG], [test "$wt_cv_enable_debug" = "yes"])
 # Python API
 if test "$wt_cv_enable_python" = "yes"; then
 	AM_PATH_PYTHON([2.6])
-        AC_PATH_PROG([SWIG], [swig], [swig])
+        AX_PKG_SWIG(2.0.4, [],
+	    [ AC_MSG_ERROR([SWIG is required to build Python support.]) ])
 fi
 
 AM_TYPES

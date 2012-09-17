@@ -34,7 +34,7 @@ __wt_curconfig_open(WT_SESSION_IMPL *session,
 		NULL,
 		NULL,
 		NULL,
-		NULL,			/* equals */
+		NULL,			/* compare */
 		__wt_cursor_notsup,	/* next */
 		__wt_cursor_notsup,	/* prev */
 		__wt_cursor_notsup,	/* reset */
@@ -47,7 +47,7 @@ __wt_curconfig_open(WT_SESSION_IMPL *session,
 		__curconfig_close,
 		{ NULL, NULL },		/* TAILQ_ENTRY q */
 		0,			/* recno key */
-		{ 0 },                  /* recno raw buffer */
+		{ 0 },			/* recno raw buffer */
 		{ NULL, 0, 0, NULL, 0 },/* WT_ITEM key */
 		{ NULL, 0, 0, NULL, 0 },/* WT_ITEM value */
 		0,			/* int saved_err */
@@ -66,8 +66,9 @@ __wt_curconfig_open(WT_SESSION_IMPL *session,
 	cursor->session = &session->iface;
 	cursor->key_format = cursor->value_format = "S";
 
+	/* __wt_cursor_init is last so we don't have to clean up on error. */
 	STATIC_ASSERT(offsetof(WT_CURSOR_CONFIG, iface) == 0);
-	WT_ERR(__wt_cursor_init(cursor, uri, 0, cfg, cursorp));
+	WT_ERR(__wt_cursor_init(cursor, uri, NULL, cfg, cursorp));
 
 	if (0) {
 err:		__wt_free(session, cconfig);

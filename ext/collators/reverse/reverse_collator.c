@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Public Domain 2008-2012 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
  *
@@ -25,7 +25,6 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <errno.h>
 #include <string.h>
 
 #include <wiredtiger_ext.h>

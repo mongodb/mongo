@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Copyright (c) 2008-2012 WiredTiger, Inc.
+# Public Domain 2008-2012 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
 #
@@ -24,17 +24,15 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-#
-# test_schema03.py
-# 	Bigger, more 'randomly generated' schemas and data.
-#	This test is complex.  If it fails, rerun with
-#	modified values for SHOW_PYTHON* variables.
-#
 
 import resource
 import suite_random
 import wiredtiger, wtscenario, wttest
 
+# test_schema03.py
+#    Bigger, more 'randomly generated' schemas and data.
+#    This test is complex.  If it fails, rerun with modified values for
+# SHOW_PYTHON* variables.
 def extract_random_from_list(rand, list):
     pos = rand.rand_range(0, len(list))
     result = list[pos]

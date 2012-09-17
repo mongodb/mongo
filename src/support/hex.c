@@ -7,7 +7,7 @@
 
 #include "wt_internal.h"
 
-static const char hex[] = "0123456789abcdef";
+static const u_char hex[] = "0123456789abcdef";
 
 /*
  * __wt_raw_to_hex --
@@ -19,7 +19,7 @@ __wt_raw_to_hex(
 {
 	uint32_t i;
 	const uint8_t *p;
-	char *t;
+	u_char *t;
 
 	/*
 	 * In the worst case, every character takes up 2 spaces, plus a
@@ -47,7 +47,7 @@ __wt_raw_to_esc_hex(
 {
 	size_t i;
 	const uint8_t *p;
-	uint8_t *t;
+	u_char *t;
 
 	/*
 	 * In the worst case, every character takes up 3 spaces, plus a
@@ -79,7 +79,7 @@ __wt_raw_to_esc_hex(
  *	Convert a pair of hex characters into a byte.
  */
 static inline int
-hex2byte(const char *from, uint8_t *to)
+hex2byte(const char *from, u_char *to)
 {
 	uint8_t byte;
 
@@ -153,7 +153,7 @@ __wt_nhex_to_raw(
     WT_SESSION_IMPL *session, const char *from, size_t size, WT_ITEM *to)
 {
 	const char *p;
-	uint8_t *t;
+	u_char *t;
 
 	if (size % 2 != 0)
 		return (__hex_fmterr(session));
@@ -176,7 +176,7 @@ int
 __wt_esc_hex_to_raw(WT_SESSION_IMPL *session, const char *from, WT_ITEM *to)
 {
 	const char *p;
-	uint8_t *t;
+	u_char *t;
 
 	WT_RET(__wt_buf_init(session, to, strlen(from)));
 

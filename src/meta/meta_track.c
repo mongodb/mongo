@@ -23,6 +23,7 @@ typedef struct __wt_meta_track {
 	} op;
 	const char *a, *b;		/* Strings */
 	WT_BTREE *btree;		/* Locked handle */
+	int created;			/* Handle on newly created file */
 } WT_META_TRACK;
 
 /*
@@ -106,16 +107,14 @@ __meta_track_apply(WT_SESSION_IMPL *session, WT_META_TRACK *trk, int unroll)
 		saved_btree = session->btree;
 		session->btree = trk->btree;
 		if (!unroll)
-			WT_TRET(__wt_bm_snapshot_resolve(session, NULL));
-		/* Release the snapshot lock */
-		__wt_rwunlock(session, session->btree->snaplock);
+			WT_TRET(__wt_bm_checkpoint_resolve(session));
 		session->btree = saved_btree;
 		break;
 	case WT_ST_LOCK:	/* Handle lock, see above */
 		saved_btree = session->btree;
 		session->btree = trk->btree;
-		if (session->created_btree == trk->btree)
-			session->created_btree = NULL;
+		if (unroll && trk->created)
+			F_SET(session->btree, WT_BTREE_DISCARD);
 		WT_TRET(__wt_session_release_btree(session));
 		session->btree = saved_btree;
 		break;
@@ -134,11 +133,6 @@ __meta_track_apply(WT_SESSION_IMPL *session, WT_META_TRACK *trk, int unroll)
 			    trk->b, trk->a);
 			WT_TRET(tret);
 		} else if (trk->a == NULL) {
-			saved_btree = session->btree;
-			if ((session->btree = session->created_btree) != NULL)
-				WT_TRET(
-				    __wt_conn_btree_sync_and_close(session));
-			session->btree = saved_btree;
 			if ((tret = __wt_remove(session,
 			    trk->b + strlen("file:"))) != 0) {
 				__wt_err(session, tret,
@@ -331,7 +325,7 @@ __wt_meta_track_fileop(
  *	Track a locked handle.
  */
 int
-__wt_meta_track_handle_lock(WT_SESSION_IMPL *session)
+__wt_meta_track_handle_lock(WT_SESSION_IMPL *session, int created)
 {
 	WT_META_TRACK *trk;
 
@@ -341,5 +335,6 @@ __wt_meta_track_handle_lock(WT_SESSION_IMPL *session)
 
 	trk->op = WT_ST_LOCK;
 	trk->btree = session->btree;
+	trk->created = created;
 	return (0);
 }

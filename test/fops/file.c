@@ -8,6 +8,34 @@
 #include "thread.h"
 
 void
+obj_bulk(void)
+{
+	WT_CURSOR *c;
+	WT_SESSION *session;
+	int ret;
+
+	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
+		die("conn.session", ret);
+
+	if ((ret = session->create(session, uri, NULL)) != 0)
+		if (ret != EEXIST && ret != EBUSY)
+			die("session.create", ret);
+
+	if (ret == 0) {
+		if ((ret = session->open_cursor(
+		    session, uri, NULL, "bulk", &c)) == 0) {
+			/* Yield so that other threads can interfere. */
+			sched_yield();
+			if ((ret = c->close(c)) != 0)
+				die("cursor.close", ret);
+		} else if (ret != ENOENT && ret != EBUSY)
+			die("session.open_cursor", ret);
+	}
+	if ((ret = session->close(session, NULL)) != 0)
+		die("session.close", ret);
+}
+
+void
 obj_create(void)
 {
 	WT_SESSION *session;
@@ -17,7 +45,7 @@ obj_create(void)
 		die("conn.session", ret);
 
 	if ((ret = session->create(session, uri, NULL)) != 0)
-		if (ret != EEXIST)
+		if (ret != EEXIST && ret != EBUSY)
 			die("session.create", ret);
 
 	if ((ret = session->close(session, NULL)) != 0)
@@ -42,7 +70,7 @@ obj_drop(void)
 }
 
 void
-obj_sync(void)
+obj_checkpoint(void)
 {
 	WT_SESSION *session;
 	int ret;
@@ -50,9 +78,13 @@ obj_sync(void)
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die("conn.session", ret);
 
-	if ((ret = session->sync(session, uri, NULL)) != 0)
+	/*
+	 * Name the checkpoint so the checkpoint has to be taken, don't specify
+	 * a target, it might not exist.
+	 */
+	if ((ret = session->checkpoint(session, "name=fops")) != 0)
 		if (ret != ENOENT)
-			die("session.sync", ret);
+			die("session.checkpoint", ret);
 
 	if ((ret = session->close(session, NULL)) != 0)
 		die("session.close", ret);
@@ -68,7 +100,7 @@ obj_upgrade(void)
 		die("conn.session", ret);
 
 	if ((ret = session->upgrade(session, uri, NULL)) != 0)
-		if (ret != ENOENT)
+		if (ret != ENOENT && ret != EBUSY)
 			die("session.upgrade", ret);
 
 	if ((ret = session->close(session, NULL)) != 0)
@@ -85,7 +117,7 @@ obj_verify(void)
 		die("conn.session", ret);
 
 	if ((ret = session->verify(session, uri, NULL)) != 0)
-		if (ret != ENOENT)
+		if (ret != ENOENT && ret != EBUSY)
 			die("session.verify", ret);
 
 	if ((ret = session->close(session, NULL)) != 0)

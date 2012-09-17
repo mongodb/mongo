@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Copyright (c) 2008-2012 WiredTiger, Inc.
+# Public Domain 2008-2012 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
 #
@@ -24,28 +24,16 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-#
-# test_util12.py
-#	Utilities: wt write
-#
 
 import os, struct
 from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
 
+# test_util12.py
+#    Utilities: wt write
 class test_util12(wttest.WiredTigerTestCase, suite_subprocess):
     tablename = 'test_util12.a'
-    nentries = 1000
     session_params = 'key_format=S,value_format=S'
-
-    def populate(self, tablename):
-        """
-        Insert some simple entries into the table
-        """
-        cursor = self.session.open_cursor('table:' + tablename, None, None)
-        cursor.set_key('SOMEKEY')
-        cursor.set_value('SOMEVALUE')
-        cursor.close()
 
     def test_write(self):
         self.session.create('table:' + self.tablename, self.session_params)

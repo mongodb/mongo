@@ -7,6 +7,8 @@
 
 #include "wt_internal.h"
 
+static int __conn_verbose_config(WT_SESSION_IMPL *, const char *[]);
+
 /*
  * api_err_printf --
  *	Extension API call to print to the error stream.
@@ -68,9 +70,9 @@ __conn_load_extension(
 	WT_ERR(entry(&session->iface, &__api, config));
 
 	/* Link onto the environment's list of open libraries. */
-	__wt_spin_lock(session, &conn->spinlock);
+	__wt_spin_lock(session, &conn->api_lock);
 	TAILQ_INSERT_TAIL(&conn->dlhqh, dlh, q);
-	__wt_spin_unlock(session, &conn->spinlock);
+	__wt_spin_unlock(session, &conn->api_lock);
 
 	if (0) {
 err:		if (dlh != NULL)
@@ -102,9 +104,9 @@ __conn_add_collator(WT_CONNECTION *wt_conn,
 	WT_ERR(__wt_strdup(session, name, &ncoll->name));
 	ncoll->collator = collator;
 
-	__wt_spin_lock(session, &conn->spinlock);
+	__wt_spin_lock(session, &conn->api_lock);
 	TAILQ_INSERT_TAIL(&conn->collqh, ncoll, q);
-	__wt_spin_unlock(session, &conn->spinlock);
+	__wt_spin_unlock(session, &conn->api_lock);
 	ncoll = NULL;
 err:	__wt_free(session, ncoll);
 
@@ -155,9 +157,9 @@ __conn_add_compressor(WT_CONNECTION *wt_conn,
 	WT_ERR(__wt_strdup(session, name, &ncomp->name));
 	ncomp->compressor = compressor;
 
-	__wt_spin_lock(session, &conn->spinlock);
+	__wt_spin_lock(session, &conn->api_lock);
 	TAILQ_INSERT_TAIL(&conn->compqh, ncomp, q);
-	__wt_spin_unlock(session, &conn->spinlock);
+	__wt_spin_unlock(session, &conn->api_lock);
 	ncomp = NULL;
 err:	__wt_free(session, ncomp);
 
@@ -208,9 +210,9 @@ __conn_add_data_source(WT_CONNECTION *wt_conn,
 	ndsrc->dsrc = dsrc;
 
 	/* Link onto the environment's list of data sources. */
-	__wt_spin_lock(session, &conn->spinlock);
+	__wt_spin_lock(session, &conn->api_lock);
 	TAILQ_INSERT_TAIL(&conn->dsrcqh, ndsrc, q);
-	__wt_spin_unlock(session, &conn->spinlock);
+	__wt_spin_unlock(session, &conn->api_lock);
 
 	if (0) {
 err:		if (ndsrc != NULL)
@@ -317,6 +319,9 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 		if (!F_ISSET(s, WT_SESSION_INTERNAL))
 			__wt_free(session, s->hazard);
 
+	/* Clean up open LSM handles. */
+	WT_ERR(__wt_lsm_cleanup(&conn->iface));
+
 	/* Close open btree handles. */
 	WT_TRET(__wt_conn_btree_discard(conn));
 
@@ -337,6 +342,34 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 	session = NULL;
 
 err:	API_END_NOTFOUND_MAP(session, ret);
+}
+
+/*
+ * __conn_reconfigure --
+ *	WT_CONNECTION->reconfigure method.
+ */
+static int
+__conn_reconfigure(WT_CONNECTION *wt_conn, const char *config)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+	const char *raw_cfg[] = { config, NULL };
+
+	conn = (WT_CONNECTION_IMPL *)wt_conn;
+
+	CONNECTION_API_CALL(conn, session, reconfigure, config, cfg);
+	WT_UNUSED(cfg);
+
+	/*
+	 * Don't include the default config: only override values the
+	 * application sets explicitly.
+	 */
+	WT_ERR(__wt_cache_config(conn, raw_cfg));
+	WT_ERR(__conn_verbose_config(session, raw_cfg));
+
+err:	API_END(session);
+	return (ret);
 }
 
 /*
@@ -366,16 +399,15 @@ err:	API_END_NOTFOUND_MAP(session, ret);
 }
 
 /*
- * __conn_config --
+ * __conn_config_file --
  *	Read in any WiredTiger_config file in the home directory.
  */
 static int
-__conn_config(WT_CONNECTION_IMPL *conn, const char **cfg, WT_ITEM **cbufp)
+__conn_config_file(WT_SESSION_IMPL *session, const char **cfg, WT_ITEM **cbufp)
 {
+	WT_DECL_ITEM(cbuf);
 	WT_DECL_RET;
 	WT_FH *fh;
-	WT_ITEM *cbuf;
-	WT_SESSION_IMPL *session;
 	off_t size;
 	uint32_t len;
 	int exist, quoted;
@@ -383,9 +415,7 @@ __conn_config(WT_CONNECTION_IMPL *conn, const char **cfg, WT_ITEM **cbufp)
 
 	*cbufp = NULL;				/* Returned buffer */
 
-	cbuf = NULL;
 	fh = NULL;
-	session = conn->default_session;
 
 	/* Check for an optional configuration file. */
 #define	WT_CONFIGFILE	"WiredTiger.config"
@@ -503,8 +533,10 @@ __conn_config(WT_CONNECTION_IMPL *conn, const char **cfg, WT_ITEM **cbufp)
 	 * the wiredtiger_open() configuration, overriding the defaults but not
 	 * overriding the wiredtiger_open() configuration.
 	 */
-	cfg[2] = cfg[1];
-	cfg[1] = cbuf->data;
+	while (cfg[1] != NULL)
+		++cfg;
+	cfg[1] = cfg[0];
+	cfg[0] = cbuf->data;
 
 	*cbufp = cbuf;
 
@@ -518,23 +550,63 @@ err:		if (cbuf != NULL)
 }
 
 /*
+ * __conn_config_env --
+ *	Read configuration from an environment variable, if set.
+ */
+static int
+__conn_config_env(WT_SESSION_IMPL *session, const char **cfg)
+{
+	WT_CONFIG_ITEM cval;
+	const char *env_config;
+
+	if ((env_config = getenv("WIREDTIGER_CONFIG")) == NULL ||
+	    strlen(env_config) == 0)
+		return (0);
+
+	/*
+	 * Security stuff:
+	 *
+	 * If the "use_environment_priv" configuration string is set, use the
+	 * environment variable if the process has appropriate privileges.
+	 */
+	WT_RET(__wt_config_gets(session, cfg, "use_environment_priv", &cval));
+	if (cval.val == 0 && __wt_has_priv())
+		WT_RET_MSG(session, WT_ERROR, "%s",
+		    "WIREDTIGER_CONFIG environment variable set but process "
+		    "lacks privileges to use that environment variable");
+
+	/* Check the configuration string. */
+	WT_RET(__wt_config_check(
+	    session, __wt_confchk_wiredtiger_open, env_config));
+
+	/*
+	 * The environment setting comes second-to-last: it overrides the
+	 * WiredTiger.config file (if any), but not the config passed by the
+	 * application.
+	 */
+	while (cfg[1] != NULL)
+		++cfg;
+	cfg[1] = cfg[0];
+	cfg[0] = env_config;
+
+	return (0);
+}
+
+/*
  * __conn_home --
  *	Set the database home directory.
  */
 static int
-__conn_home(WT_CONNECTION_IMPL *conn, const char *home, const char **cfg)
+__conn_home(WT_SESSION_IMPL *session, const char *home, const char **cfg)
 {
 	WT_CONFIG_ITEM cval;
-	WT_SESSION_IMPL *session;
-
-	session = conn->default_session;
 
 	/* If the application specifies a home directory, use it. */
 	if (home != NULL)
 		goto copy;
 
 	/* If there's no WIREDTIGER_HOME environment variable, use ".". */
-	if ((home = getenv("WIREDTIGER_HOME")) == NULL) {
+	if ((home = getenv("WIREDTIGER_HOME")) == NULL || strlen(home) == 0) {
 		home = ".";
 		goto copy;
 	}
@@ -542,24 +614,11 @@ __conn_home(WT_CONNECTION_IMPL *conn, const char *home, const char **cfg)
 	/*
 	 * Security stuff:
 	 *
-	 * If the "home_environment" configuration string is set, use the
-	 * environment variable for all processes.
+	 * Unless the "use_environment_priv" configuration string is set,
+	 * fail if the process is running with special privileges.
 	 */
-	WT_RET(__wt_config_gets(session, cfg, "home_environment", &cval));
-	if (cval.val != 0)
-		goto copy;
-
-	/*
-	 * If the "home_environment_priv" configuration string is set, use the
-	 * environment variable if the process has appropriate privileges.
-	 */
-	WT_RET(__wt_config_gets(session, cfg, "home_environment_priv", &cval));
-	if (cval.val == 0)
-		WT_RET_MSG(session, WT_ERROR, "%s",
-		    "WIREDTIGER_HOME environment variable set but WiredTiger "
-		    "not configured to use that environment variable");
-
-	if (!__wt_has_priv())
+	WT_RET(__wt_config_gets(session, cfg, "use_environment_priv", &cval));
+	if (cval.val == 0 && __wt_has_priv())
 		WT_RET_MSG(session, WT_ERROR, "%s",
 		    "WIREDTIGER_HOME environment variable set but process "
 		    "lacks privileges to use that environment variable");
@@ -572,20 +631,18 @@ copy:	return (__wt_strdup(session, home, &S2C(session)->home));
  *	Confirm that no other thread of control is using this database.
  */
 static int
-__conn_single(WT_CONNECTION_IMPL *conn, const char **cfg)
+__conn_single(WT_SESSION_IMPL *session, const char **cfg)
 {
 	WT_CONFIG_ITEM cval;
-	WT_CONNECTION_IMPL *t;
+	WT_CONNECTION_IMPL *conn, *t;
 	WT_DECL_RET;
-	WT_SESSION_IMPL *session;
 	off_t size;
 	uint32_t len;
 	int created;
 	char buf[256];
 
-	session = conn->default_session;
+	conn = S2C(session);
 
-#define	WT_FLAGFILE	"WiredTiger"
 	/*
 	 * Optionally create the wiredtiger flag file if it doesn't already
 	 * exist.  We don't actually care if we create it or not, the "am I the
@@ -593,7 +650,7 @@ __conn_single(WT_CONNECTION_IMPL *conn, const char **cfg)
 	 */
 	WT_RET(__wt_config_gets(session, cfg, "create", &cval));
 	WT_RET(__wt_open(session,
-	    WT_FLAGFILE, cval.val == 0 ? 0 : 1, 0, 0, &conn->lock_fh));
+	    WT_SINGLETHREAD, cval.val == 0 ? 0 : 1, 0, 0, &conn->lock_fh));
 
 	/*
 	 * Lock a byte of the file: if we don't get the lock, some other process
@@ -629,7 +686,7 @@ __conn_single(WT_CONNECTION_IMPL *conn, const char **cfg)
 	WT_ERR(__wt_filesize(session, conn->lock_fh, &size));
 	if (size == 0) {
 		len = (uint32_t)snprintf(buf, sizeof(buf), "%s\n%s\n",
-		    WT_FLAGFILE, wiredtiger_version(NULL, NULL, NULL));
+		    WT_SINGLETHREAD, wiredtiger_version(NULL, NULL, NULL));
 		WT_ERR(__wt_write(
 		    session, conn->lock_fh, (off_t)0, (uint32_t)len, buf));
 		created = 1;
@@ -656,6 +713,55 @@ err:	if (conn->lock_fh != NULL) {
 }
 
 /*
+ * __conn_verbose_config --
+ *	Set verbose configuration.
+ */
+static int
+__conn_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
+{
+#ifdef HAVE_VERBOSE
+	WT_CONFIG_ITEM cval, sval;
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+	static struct {
+		const char *name;
+		uint32_t flag;
+	} *ft, verbtypes[] = {
+		{ "block",	WT_VERB_block },
+		{ "ckpt",	WT_VERB_ckpt },
+		{ "evict",	WT_VERB_evict },
+		{ "evictserver",WT_VERB_evictserver },
+		{ "fileops",	WT_VERB_fileops },
+		{ "hazard",	WT_VERB_hazard },
+		{ "lsm",	WT_VERB_lsm },
+		{ "mutex",	WT_VERB_mutex },
+		{ "read",	WT_VERB_read },
+		{ "readserver",	WT_VERB_readserver },
+		{ "reconcile",	WT_VERB_reconcile },
+		{ "salvage",	WT_VERB_salvage },
+		{ "verify",	WT_VERB_verify },
+		{ "write",	WT_VERB_write },
+		{ NULL, 0 }
+	};
+
+	conn = S2C(session);
+
+	WT_RET_NOTFOUND_OK(__wt_config_gets(session, cfg, "verbose", &cval));
+	for (ft = verbtypes; ft->name != NULL; ft++) {
+		if ((ret = __wt_config_subgets(
+		    session, &cval, ft->name, &sval)) == 0 && sval.val != 0)
+			FLD_SET(conn->verbose, ft->flag);
+		else
+			FLD_CLR(conn->verbose, ft->flag);
+
+		WT_RET_NOTFOUND_OK(ret);
+	}
+#endif
+
+	return (0);
+}
+
+/*
  * wiredtiger_open --
  *	Main library entry point: open a new connection to a WiredTiger
  *	database.
@@ -665,35 +771,21 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
     const char *config, WT_CONNECTION **wt_connp)
 {
 	static WT_CONNECTION stdc = {
+		__conn_close,
+		__conn_reconfigure,
+		__conn_get_home,
+		__conn_is_new,
+		__conn_open_session,
 		__conn_load_extension,
 		__conn_add_data_source,
 		__conn_add_collator,
 		__conn_add_compressor,
-		__conn_add_extractor,
-		__conn_close,
-		__conn_get_home,
-		__conn_is_new,
-		__conn_open_session
+		__conn_add_extractor
 	};
 	static struct {
 		const char *name;
 		uint32_t flag;
-	} *ft, verbtypes[] = {
-		{ "block",	WT_VERB_block },
-		{ "evict",	WT_VERB_evict },
-		{ "evictserver",WT_VERB_evictserver },
-		{ "fileops",	WT_VERB_fileops },
-		{ "hazard",	WT_VERB_hazard },
-		{ "mutex",	WT_VERB_mutex },
-		{ "read",	WT_VERB_read },
-		{ "readserver",	WT_VERB_readserver },
-		{ "reconcile",	WT_VERB_reconcile },
-		{ "salvage",	WT_VERB_salvage },
-		{ "verify",	WT_VERB_verify },
-		{ "snapshot",	WT_VERB_snapshot },
-		{ "write",	WT_VERB_write },
-		{ NULL, 0 }
-	}, directio_types[] = {
+	} *ft, directio_types[] = {
 		{ "data",	WT_DIRECTIO_DATA },
 		{ "log",	WT_DIRECTIO_LOG },
 		{ NULL, 0 }
@@ -705,7 +797,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_ITEM *cbuf, expath, exconfig;
 	WT_SESSION_IMPL *session;
 	const char *cfg[] =
-	    { __wt_confdfl_wiredtiger_open, config, NULL, NULL };
+	    { __wt_confdfl_wiredtiger_open, config, NULL, NULL, NULL };
 	int exist;
 
 	*wt_connp = NULL;
@@ -728,7 +820,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	TAILQ_INSERT_TAIL(&__wt_process.connqh, conn, q);
 	__wt_spin_unlock(NULL, &__wt_process.spinlock);
 
-	conn->default_session = session = &conn->dummy_session;
+	session = conn->default_session = &conn->dummy_session;
 	session->iface.connection = &conn->iface;
 	session->name = "wiredtiger_open";
 	__wt_event_handler_set(session, event_handler);
@@ -741,16 +833,17 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	    __wt_config_check(session, __wt_confchk_wiredtiger_open, config));
 
 	/* Get the database home. */
-	WT_ERR(__conn_home(conn, home, cfg));
-
-	/* Read the database-home configuration file. */
-	WT_ERR(__conn_config(conn, cfg, &cbuf));
+	WT_ERR(__conn_home(session, home, cfg));
 
 	/* Make sure no other thread of control already owns this database. */
-	WT_ERR(__conn_single(conn, cfg));
+	WT_ERR(__conn_single(session, cfg));
 
-	WT_ERR(__wt_config_gets(session, cfg, "cache_size", &cval));
-	conn->cache_size = cval.val;
+	/* Read the database-home configuration file. */
+	WT_ERR(__conn_config_file(session, cfg, &cbuf));
+
+	/* Read the environment variable configuration. */
+	WT_ERR(__conn_config_env(session, cfg));
+
 	WT_ERR(__wt_config_gets(session, cfg, "hazard_max", &cval));
 	conn->hazard_size = (uint32_t)cval.val;
 	WT_ERR(__wt_config_gets(session, cfg, "session_max", &cval));
@@ -763,18 +856,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		F_SET(conn, WT_CONN_TRANSACTIONAL);
 
 	/* Configure verbose flags. */
-	conn->verbose = 0;
-#ifdef HAVE_VERBOSE
-	WT_ERR(__wt_config_gets(session, cfg, "verbose", &cval));
-	for (ft = verbtypes; ft->name != NULL; ft++) {
-		ret = __wt_config_subgets(session, &cval, ft->name, &sval);
-		if (ret == 0) {
-			if (sval.val)
-				FLD_SET(conn->verbose, ft->flag);
-		} else if (ret != WT_NOTFOUND)
-			goto err;
-	}
-#endif
+	WT_ERR(__conn_verbose_config(session, cfg));
 
 	WT_ERR(__wt_config_gets(session, cfg, "logging", &cval));
 	if (cval.val != 0)
@@ -815,9 +897,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		WT_ERR(conn->iface.load_extension(&conn->iface,
 		    expath.data, (sval.len > 0) ? exconfig.data : NULL));
 	}
-	if (ret == WT_NOTFOUND)
-		ret = 0;
-	WT_ERR(ret);
+	WT_ERR_NOTFOUND_OK(ret);
 
 	/*
 	 * Open the connection; if that fails, the connection handle has been
@@ -828,18 +908,36 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		WT_ERR(ret);
 	}
 
+	/* Open the default session. */
 	WT_ERR(__wt_open_session(conn, 1, NULL, NULL, &conn->default_session));
 	session = conn->default_session;
 
 	/*
 	 * Check on the turtle and metadata files, creating them if necessary
 	 * (which avoids application threads racing to create the metadata file
-	 * later).  We need a session handle for this, open one.
+	 * later).
 	 */
-	if ((ret = __wt_meta_turtle_init(session, &exist)) == 0 && !exist)
-		ret = __wt_schema_create(session, WT_METADATA_URI, NULL);
-	WT_ERR(ret);
+	WT_ERR(__wt_meta_turtle_init(session, &exist));
+	if (!exist) {
+		/*
+		 * We're single-threaded, but acquire the schema lock
+		 * regardless: the lower level code checks that it is
+		 * appropriately synchronized.
+		 */
+		WT_WITH_SCHEMA_LOCK(session,
+		    ret = __wt_schema_create(session, WT_METADATA_URI, NULL));
+		WT_ERR(ret);
+	}
 	WT_ERR(__wt_metadata_open(session));
+
+	/* If there's a hot-backup file, load it. */
+	WT_ERR(__wt_metadata_load_backup(session));
+
+	/*
+	 * XXX LSM initialization.
+	 * This is structured so that it could be moved to an extension.
+	 */
+	WT_ERR(__wt_lsm_init(&conn->iface, NULL));
 
 	STATIC_ASSERT(offsetof(WT_CONNECTION_IMPL, iface) == 0);
 	*wt_connp = &conn->iface;

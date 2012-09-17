@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Public Domain 2008-2012 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
  *
@@ -65,22 +65,15 @@
 				/* mask for the bit within its byte */
 #define	__bit_mask(bit)	(1 << ((bit) & 0x7))
 
-/*
- * __bitstr_size --
- *	Return the bytes in a bitstring of nbits.
- */
-static inline uint32_t
-__bitstr_size(uint32_t nbits)
-{
-	return (((nbits) + 7) >> 3);
-}
+				/* Bytes in a bitstring of nbits */
+#define	__bitstr_size(nbits) (((nbits) + 7) >> 3)
 
 /*
  * __bit_alloc --
  *	Allocate a bitstring.
  */
 static inline int
-__bit_alloc(WT_SESSION_IMPL *session, uint32_t nbits, void *retp)
+__bit_alloc(WT_SESSION_IMPL *session, uint64_t nbits, void *retp)
 {
 	return (__wt_calloc(
 	    session, (size_t)__bitstr_size(nbits), sizeof(uint8_t), retp));
@@ -91,7 +84,7 @@ __bit_alloc(WT_SESSION_IMPL *session, uint32_t nbits, void *retp)
  *	Test one bit in name.
  */
 static inline int
-__bit_test(uint8_t *bitf, uint32_t bit)
+__bit_test(uint8_t *bitf, uint64_t bit)
 {
 	return (bitf[__bit_byte(bit)] & __bit_mask(bit) ? 1 : 0);
 }
@@ -101,7 +94,7 @@ __bit_test(uint8_t *bitf, uint32_t bit)
  *	Set one bit in name.
  */
 static inline void
-__bit_set(uint8_t *bitf, uint32_t bit)
+__bit_set(uint8_t *bitf, uint64_t bit)
 {
 	bitf[__bit_byte(bit)] |= __bit_mask(bit);
 }
@@ -111,7 +104,7 @@ __bit_set(uint8_t *bitf, uint32_t bit)
  *	Clear one bit in name.
  */
 static inline void
-__bit_clear(uint8_t *bitf, uint32_t bit)
+__bit_clear(uint8_t *bitf, uint64_t bit)
 {
 	bitf[__bit_byte(bit)] &= ~__bit_mask(bit);
 }
@@ -121,9 +114,9 @@ __bit_clear(uint8_t *bitf, uint32_t bit)
  *	Clear bits start-to-stop in name.
  */
 static inline void
-__bit_nclr(uint8_t *bitf, uint32_t start, uint32_t stop)
+__bit_nclr(uint8_t *bitf, uint64_t start, uint64_t stop)
 {
-	uint32_t startbyte, stopbyte;
+	uint64_t startbyte, stopbyte;
 
 	startbyte = __bit_byte(start);
 	stopbyte = __bit_byte(stop);
@@ -145,9 +138,9 @@ __bit_nclr(uint8_t *bitf, uint32_t start, uint32_t stop)
  *	Set bits start-to-stop in name.
  */
 static inline void
-__bit_nset(uint8_t *bitf, uint32_t start, uint32_t stop)
+__bit_nset(uint8_t *bitf, uint64_t start, uint64_t stop)
 {
-	uint32_t startbyte, stopbyte;
+	uint64_t startbyte, stopbyte;
 
 	startbyte = __bit_byte(start);
 	stopbyte = __bit_byte(stop);
@@ -167,12 +160,12 @@ __bit_nset(uint8_t *bitf, uint32_t start, uint32_t stop)
  *	Find first clear bit in name, return 0 on success, -1 on no bit clear.
  */
 static inline int
-__bit_ffc(uint8_t *bitf, uint32_t nbits, uint32_t *retp)
+__bit_ffc(uint8_t *bitf, uint64_t nbits, uint64_t *retp)
 {
 	uint8_t lb;
-	uint32_t byte, stopbyte, value;
+	uint64_t byte, stopbyte, value;
 
-	value = 0;              /* -Wuninitialized */
+	value = 0;		/* -Wuninitialized */
 
 	if (nbits == 0)
 		return (-1);
@@ -198,10 +191,10 @@ __bit_ffc(uint8_t *bitf, uint32_t nbits, uint32_t *retp)
  *	Find first set bit in name, return 0 on success, -1 on no bit set.
  */
 static inline int
-__bit_ffs(uint8_t *bitf, uint32_t nbits, uint32_t *retp)
+__bit_ffs(uint8_t *bitf, uint64_t nbits, uint64_t *retp)
 {
 	uint8_t lb;
-	uint32_t byte, stopbyte, value;
+	uint64_t byte, stopbyte, value;
 
 	value = 0;
 	if (nbits == 0)
@@ -228,10 +221,10 @@ __bit_ffs(uint8_t *bitf, uint32_t nbits, uint32_t *retp)
  *	Return a fixed-length column store bit-field value.
  */
 static inline uint8_t
-__bit_getv(uint8_t *bitf, uint32_t entry, uint8_t width)
+__bit_getv(uint8_t *bitf, uint64_t entry, uint8_t width)
 {
 	uint8_t value;
-	uint32_t bit;
+	uint64_t bit;
 
 #define	__BIT_GET(len, mask)						\
 	case len:							\
@@ -270,7 +263,7 @@ static inline uint8_t
 __bit_getv_recno(WT_PAGE *page, uint64_t recno, uint8_t width)
 {
 	return (__bit_getv(page->u.col_fix.bitf,
-	    (uint32_t)(recno - page->u.col_fix.recno), width));
+	    recno - page->u.col_fix.recno, width));
 }
 
 /*
@@ -278,9 +271,9 @@ __bit_getv_recno(WT_PAGE *page, uint64_t recno, uint8_t width)
  *	Set a fixed-length column store bit-field value.
  */
 static inline void
-__bit_setv(uint8_t *bitf, uint32_t entry, uint8_t width, uint8_t value)
+__bit_setv(uint8_t *bitf, uint64_t entry, uint8_t width, uint8_t value)
 {
-	uint32_t bit;
+	uint64_t bit;
 
 #define	__BIT_SET(len, mask)						\
 	case len:							\
@@ -320,5 +313,5 @@ static inline void
 __bit_setv_recno(WT_PAGE *page, uint64_t recno, uint8_t width, uint8_t value)
 {
 	return (__bit_setv(page->u.col_fix.bitf,
-	    (uint32_t)(recno - page->u.col_fix.recno), width, value));
+	    recno - page->u.col_fix.recno, width, value));
 }

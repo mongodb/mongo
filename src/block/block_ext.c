@@ -471,9 +471,9 @@ __wt_block_off_free(
 	 * locks required to manipulate the extent lists.
 	 *
 	 * We can reuse this extent immediately if it was allocated during this
-	 * snapshot, merge it into the avail list (which slows file growth in
+	 * checkpoint, merge it into the avail list (which slows file growth in
 	 * workloads including repeated overflow record modification).  If this
-	 * extent is referenced in a previous snapshot, merge into the discard
+	 * extent is referenced in a previous checkpoint, merge into the discard
 	 * list.
 	 */
 	if ((ret = __wt_block_off_remove_overlap(
@@ -515,7 +515,7 @@ __wt_block_extlist_check(
 			continue;
 		}
 		WT_RET_MSG(session, EINVAL,
-		    "snapshot merge check: %s list overlaps the %s list",
+		    "checkpoint merge check: %s list overlaps the %s list",
 		    al->name, bl->name);
 	}
 	return (0);
@@ -524,17 +524,17 @@ __wt_block_extlist_check(
 
 /*
  * __wt_block_extlist_overlap --
- *	Review a snapshot's alloc/discard extent lists, move overlaps into the
- * live system's snapshot-avail list.
+ *	Review a checkpoint's alloc/discard extent lists, move overlaps into the
+ * live system's checkpoint-avail list.
  */
 int
 __wt_block_extlist_overlap(
-    WT_SESSION_IMPL *session, WT_BLOCK *block, WT_BLOCK_SNAPSHOT *si)
+    WT_SESSION_IMPL *session, WT_BLOCK *block, WT_BLOCK_CKPT *ci)
 {
 	WT_EXT *alloc, *discard;
 
-	alloc = si->alloc.off[0];
-	discard = si->discard.off[0];
+	alloc = ci->alloc.off[0];
+	discard = ci->discard.off[0];
 
 	/* Walk the lists in parallel, looking for overlaps. */
 	while (alloc != NULL && discard != NULL) {
@@ -553,7 +553,7 @@ __wt_block_extlist_overlap(
 
 		/* Reconcile the overlap. */
 		WT_RET(__block_ext_overlap(session, block,
-		    &si->alloc, &alloc, &si->discard, &discard));
+		    &ci->alloc, &alloc, &ci->discard, &discard));
 	}
 	return (0);
 }
@@ -570,7 +570,7 @@ __block_ext_overlap(WT_SESSION_IMPL *session,
 	WT_EXTLIST *avail, *el;
 	off_t off, size;
 
-	avail = &block->live.snapshot_avail;
+	avail = &block->live.ckpt_avail;
 
 	/*
 	 * The ranges overlap, choose the range we're going to take from each.
@@ -926,7 +926,7 @@ corrupted:		WT_ERR_MSG(session, WT_ERROR,
 		 * We could insert instead of merge, because ranges shouldn't
 		 * overlap, but merge knows how to allocate WT_EXT structures,
 		 * and a little paranoia is a good thing (if we corrupted the
-		 * list and crashed, and rolled back to a corrupted snapshot,
+		 * list and crashed, and rolled back to a corrupted checkpoint,
 		 * this might save us?)
 		 */
 		WT_ERR(__block_merge(session, el, off, size));
