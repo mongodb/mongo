@@ -6,4 +6,3 @@ INPUT			= top license.dox
 EXCLUDE			=
 
 GENERATE_TREEVIEW	= NO
-USE_INLINE_TREES	= NO
