@@ -29,8 +29,8 @@ __curfile_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 		WT_ERR_MSG(session, EINVAL,
 		    "comparison method cursors must reference the same object");
 
-	WT_ERR(WT_CURSOR_NEEDKEY(a));
-	WT_ERR(WT_CURSOR_NEEDKEY(b));
+	WT_CURSOR_NEEDKEY(a);
+	WT_CURSOR_NEEDKEY(b);
 
 	ret = __wt_btcur_compare(
 	    (WT_CURSOR_BTREE *)a, (WT_CURSOR_BTREE *)b, cmpp);
@@ -129,7 +129,7 @@ __curfile_search(WT_CURSOR *cursor)
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL_NOCONF(cursor, session, search, cbt->btree);
-	WT_ERR(WT_CURSOR_NEEDKEY(cursor));
+	WT_CURSOR_NEEDKEY(cursor);
 	ret = __wt_btcur_search(cbt);
 err:	API_END(session);
 
@@ -149,7 +149,7 @@ __curfile_search_near(WT_CURSOR *cursor, int *exact)
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL_NOCONF(cursor, session, search_near, cbt->btree);
-	WT_ERR(WT_CURSOR_NEEDKEY(cursor));
+	WT_CURSOR_NEEDKEY(cursor);
 	ret = __wt_btcur_search_near(cbt, exact);
 err:	API_END(session);
 
@@ -170,8 +170,8 @@ __curfile_insert(WT_CURSOR *cursor)
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL_NOCONF(cursor, session, insert, cbt->btree);
 	if (!F_ISSET(cursor, WT_CURSTD_APPEND))
-		WT_ERR(WT_CURSOR_NEEDKEY(cursor));
-	WT_ERR(WT_CURSOR_NEEDVALUE(cursor));
+		WT_CURSOR_NEEDKEY(cursor);
+	WT_CURSOR_NEEDVALUE(cursor);
 	ret = __wt_btcur_insert((WT_CURSOR_BTREE *)cursor);
 err:	API_END_TXN_ERROR(session, ret);
 
@@ -191,8 +191,8 @@ __curfile_update(WT_CURSOR *cursor)
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL_NOCONF(cursor, session, update, cbt->btree);
-	WT_ERR(WT_CURSOR_NEEDKEY(cursor));
-	WT_ERR(WT_CURSOR_NEEDVALUE(cursor));
+	WT_CURSOR_NEEDKEY(cursor);
+	WT_CURSOR_NEEDVALUE(cursor);
 	ret = __wt_btcur_update((WT_CURSOR_BTREE *)cursor);
 err:	API_END_TXN_ERROR(session, ret);
 
@@ -212,7 +212,7 @@ __curfile_remove(WT_CURSOR *cursor)
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL_NOCONF(cursor, session, remove, cbt->btree);
-	WT_ERR(WT_CURSOR_NEEDKEY(cursor));
+	WT_CURSOR_NEEDKEY(cursor);
 	ret = __wt_btcur_remove((WT_CURSOR_BTREE *)cursor);
 err:	API_END_TXN_ERROR(session, ret);
 

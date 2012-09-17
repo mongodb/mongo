@@ -273,8 +273,8 @@ __clsm_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 		WT_ERR_MSG(session, EINVAL,
 		    "comparison method cursors must reference the same object");
 
-	WT_ERR(WT_CURSOR_NEEDKEY(a));
-	WT_ERR(WT_CURSOR_NEEDKEY(b));
+	WT_CURSOR_NEEDKEY(a);
+	WT_CURSOR_NEEDKEY(b);
 
 	WT_ERR(WT_LSM_CMP(session, alsm->lsm_tree, &a->key, &b->key, cmp));
 	*cmpp = cmp;

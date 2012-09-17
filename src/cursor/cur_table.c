@@ -74,7 +74,7 @@ __wt_curtable_get_value(WT_CURSOR *cursor, ...)
 	ctable = (WT_CURSOR_TABLE *)cursor;
 	primary = *ctable->cg_cursors;
 	CURSOR_API_CALL_NOCONF(cursor, session, get_value, NULL);
-	WT_ERR(WT_CURSOR_NEEDVALUE(primary));
+	WT_CURSOR_NEEDVALUE(primary);
 
 	va_start(ap, cursor);
 	if (F_ISSET(cursor,
@@ -191,8 +191,8 @@ __curtable_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 	if (strcmp(a->uri, b->uri) != 0)
 		WT_ERR_MSG(session, EINVAL,
 		    "comparison method cursors must reference the same object");
-	WT_ERR(WT_CURSOR_NEEDKEY(WT_CURSOR_PRIMARY(a)));
-	WT_ERR(WT_CURSOR_NEEDKEY(WT_CURSOR_PRIMARY(b)));
+	WT_CURSOR_NEEDKEY(WT_CURSOR_PRIMARY(a));
+	WT_CURSOR_NEEDKEY(WT_CURSOR_PRIMARY(b));
 
 	ret = WT_CURSOR_PRIMARY(a)->compare(
 	    WT_CURSOR_PRIMARY(a), WT_CURSOR_PRIMARY(b), cmpp);
