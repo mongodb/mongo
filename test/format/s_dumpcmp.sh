@@ -32,10 +32,12 @@ if test $# -ne 0; then
 	exit 1
 fi
 
-ext="$top/ext/collators/reverse/.libs/reverse_collator.so"
+revext="$top/ext/compressors/bzip2_compress/.libs/bzip2_compress.so"
 bzext="$top/ext/compressors/bzip2_compress/.libs/bzip2_compress.so"
 if test -e $bzext ; then
-        ext="\"$ext\",\"$bzext\""
+        ext="\"$revext\",\"$bzext\""
+else
+        ext="\"$revext\""
 fi
 config='extensions=['$ext']'
 
