@@ -155,7 +155,7 @@ __wt_cursor_get_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 	const char *fmt;
 
 	CURSOR_API_CALL_NOCONF(cursor, session, get_key, NULL);
-	WT_ERR(WT_CURSOR_NEEDKEY(cursor));
+	WT_CURSOR_NEEDKEY(cursor);
 
 	if (WT_CURSOR_RECNO(cursor)) {
 		if (LF_ISSET(WT_CURSTD_RAW)) {
@@ -266,7 +266,7 @@ __wt_cursor_get_value(WT_CURSOR *cursor, ...)
 	va_list ap;
 
 	CURSOR_API_CALL_NOCONF(cursor, session, get_value, NULL);
-	WT_ERR(WT_CURSOR_NEEDVALUE(cursor));
+	WT_CURSOR_NEEDVALUE(cursor);
 
 	va_start(ap, cursor);
 	fmt = F_ISSET(cursor,

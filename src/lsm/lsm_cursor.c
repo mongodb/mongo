@@ -164,12 +164,13 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm)
 	}
 
 	/* The last chunk is our new primary. */
-	WT_ASSERT(session,
-	    !F_ISSET(clsm, WT_CLSM_UPDATED) ||
-	    !F_ISSET(chunk, WT_LSM_CHUNK_ONDISK));
+	if ((clsm->primary_chunk = chunk) != NULL) {
+		WT_ASSERT(session,
+		    !F_ISSET(clsm, WT_CLSM_UPDATED) ||
+		    !F_ISSET(chunk, WT_LSM_CHUNK_ONDISK));
 
-	if ((clsm->primary_chunk = chunk) != NULL)
 		WT_ATOMIC_ADD(clsm->primary_chunk->ncursor, 1);
+	}
 
 	/* Peek into the btree layer to track the in-memory size. */
 	if (lsm_tree->memsizep == NULL)
@@ -209,6 +210,8 @@ __clsm_get_current(
 	int cmp, multiple;
 
 	current = NULL;
+	multiple = 0;
+
 	FORALL_CURSORS(clsm, c, i) {
 		if (!F_ISSET(c, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET))
 			continue;
@@ -270,8 +273,8 @@ __clsm_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 		WT_ERR_MSG(session, EINVAL,
 		    "comparison method cursors must reference the same object");
 
-	WT_ERR(WT_CURSOR_NEEDKEY(a));
-	WT_ERR(WT_CURSOR_NEEDKEY(b));
+	WT_CURSOR_NEEDKEY(a);
+	WT_CURSOR_NEEDKEY(b);
 
 	WT_ERR(WT_LSM_CMP(session, alsm->lsm_tree, &a->key, &b->key, cmp));
 	*cmpp = cmp;
@@ -454,14 +457,19 @@ __clsm_reset(WT_CURSOR *cursor)
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
-	WT_LSM_ENTER(clsm, cursor, session, reset);
+	/*
+	 * Don't use the normal __clsm_enter path: that is wasted work when all
+	 * we want to do is give up our position.
+	 */
+	clsm = (WT_CURSOR_LSM *)cursor;
+	CURSOR_API_CALL_NOCONF(cursor, session, reset, NULL);
 	if ((c = clsm->current) != NULL) {
 		ret = c->reset(c);
 		clsm->current = NULL;
 	}
 	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 	F_CLR(clsm, WT_CLSM_ITERATE_NEXT | WT_CLSM_ITERATE_PREV);
-err:	WT_LSM_END(clsm, session);
+	API_END(session);
 
 	return (ret);
 }

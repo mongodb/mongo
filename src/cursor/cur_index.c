@@ -22,7 +22,7 @@ __curindex_get_value(WT_CURSOR *cursor, ...)
 
 	cindex = (WT_CURSOR_INDEX *)cursor;
 	CURSOR_API_CALL_NOCONF(cursor, session, get_value, NULL);
-	WT_ERR(WT_CURSOR_NEEDVALUE(cursor));
+	WT_CURSOR_NEEDVALUE(cursor);
 
 	va_start(ap, cursor);
 	if (F_ISSET(cursor, WT_CURSTD_RAW)) {

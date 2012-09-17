@@ -30,27 +30,17 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	txn = &session->txn;
 
 	/* Only one checkpoint can be active at a time. */
-	WT_ASSERT(session, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED) &&
+	    !F_ISSET(txn, TXN_RUNNING));
 
 	/*
-	 * Checkpoints require a snapshot to write a transactionally consistent
-	 * snapshot of the data.
-	 *
-	 * We can't use an application's transaction: if it has uncommitted
-	 * changes, they will be written in the checkpoint and may appear after
-	 * a crash.
-	 *
-	 * Use a real snapshot transaction: we don't want any chance of the
-	 * snapshot being updated during the checkpoint.  Eviction is prevented
-	 * from evicting anything newer than this because we track the oldest
-	 * transaction ID in the system that is not visible to all readers.
+	 * Begin a transaction for the checkpoint.  Checkpoints must run in
+	 * the same order as they update the metadata and we are using the
+	 * schema lock to determine that ordering, so we can't move this to
+	 * __session_checkpoint.
 	 */
-	if (F_ISSET(txn, TXN_RUNNING))
-		WT_RET_MSG(session, EINVAL,
-		    "Checkpoint not permitted in a transaction");
-
 	wt_session = &session->iface;
-	WT_RET(wt_session->begin_transaction(wt_session, "isolation=snapshot"));
+	WT_ERR(wt_session->begin_transaction(wt_session, "isolation=snapshot"));
 
 	WT_ERR(__wt_meta_track_on(session));
 	tracking = 1;
@@ -144,8 +134,8 @@ err:	/*
 	if (tracking)
 		WT_TRET(__wt_meta_track_off(session, ret != 0));
 
-	__wt_txn_release(session);
 	__wt_scr_free(&tmp);
+	__wt_txn_release(session);
 	return (ret);
 }
 
@@ -276,6 +266,7 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_TXN *txn;
+	WT_TXN_ISOLATION saved_isolation;
 	const char *name;
 	char *name_alloc;
 	int deleted, is_checkpoint;
@@ -284,6 +275,8 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	btree = session->btree;
 	ckpt = ckptbase = NULL;
 	name_alloc = NULL;
+	txn = &session->txn;
+	saved_isolation = txn->isolation;
 
 	/*
 	 * We're called in two ways: either because a handle is closing or
@@ -464,6 +457,8 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 			    "checkpoints cannot be dropped when in-use");
 		}
 
+	WT_ASSERT(session, txn->isolation = TXN_ISO_SNAPSHOT);
+
 	/*
 	 * Mark the root page dirty to ensure something gets written.
 	 *
@@ -493,17 +488,15 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/* If closing a handle, include everything in the checkpoint. */
 	if (!is_checkpoint)
-		session->txn.isolation = TXN_ISO_READ_UNCOMMITTED;
+		txn->isolation = TXN_ISO_READ_UNCOMMITTED;
 
 	/* Flush the file from the cache, creating the checkpoint. */
 	WT_ERR(__wt_bt_cache_flush(session,
 	    ckptbase, is_checkpoint ? WT_SYNC : WT_SYNC_DISCARD));
 
 	/* Update the object's metadata. */
-	txn = &session->txn;
 	txn->isolation = TXN_ISO_READ_UNCOMMITTED;
 	ret = __wt_meta_ckptlist_set(session, btree->name, ckptbase);
-	txn->isolation = TXN_ISO_SNAPSHOT;
 	WT_ERR(ret);
 
 	/*
@@ -520,9 +513,7 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 err:
 skip:	__wt_meta_ckptlist_free(session, ckptbase);
 	__wt_free(session, name_alloc);
-
-	if (!is_checkpoint)
-		session->txn.isolation = session->isolation;
+	txn->isolation = saved_isolation;
 
 	return (ret);
 }
