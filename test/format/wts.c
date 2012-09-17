@@ -264,7 +264,8 @@ wts_stats(void)
 
 	/* File statistics. */
 	fprintf(fp, "\n\n====== File statistics:\n");
-	if ((stat_name = malloc(strlen("statistics:") + strlen(g.uri))) == NULL)
+	if ((stat_name =
+	    malloc(strlen("statistics:") + strlen(g.uri)) + 1) == NULL)
 		die(ret, "malloc");
 	sprintf(stat_name, "statistics:%s", g.uri);
 	if ((ret = session->open_cursor(
