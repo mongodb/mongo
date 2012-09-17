@@ -39,7 +39,7 @@ maximum file allocation unit is 512MB.  File block offsets are 64-bit
 @section file_formats_compression File formats and compression
 
 Row-stores support four types of compression: prefix compression,
-dictionary compression, Huffman encoding and stream compression.
+dictionary compression, Huffman encoding and block compression.
 
 - Prefix compression reduces the size requirement of both in-memory and
 on-disk objects by storing any identical key prefix only once per page.
@@ -63,15 +63,15 @@ from the in-memory tree and when writing pages to disk.  Note the
 additional CPU cost of Huffman encoding can be high, and should be
 considered.  (See @subpage huffman for details)
 
-- Stream compression reduces the size requirement of on-disk objects by
+- Block compression reduces the size requirement of on-disk objects by
 compressing blocks of the backing object's file.  The cost is additional
 CPU and memory use when reading and writing pages to disk.  Note the
-additional CPU cost of stream compression can be high, and should be
+additional CPU cost of block compression can be high, and should be
 considered.   (See @ref compression for details).
 
 Column-stores with variable-length byte string values support three
 types of compression: run-length encoding, Huffman encoding and block
-stream compression.
+compression.
 
 - Run-length encoding reduces the size requirement of both the in-memory
 and on-disk objects by storing sequential, duplicate values in the store
@@ -86,19 +86,19 @@ tree and when writing pages to disk.  Note the additional CPU cost of
 Huffman encoding can be high, and should be considered.
 (See @ref huffman for details)
 
-- Stream compression reduces the size requirement of on-disk objects by
+- Block compression reduces the size requirement of on-disk objects by
 compressing blocks of the backing object's file.  The cost is additional
 CPU and memory use when reading and writing pages to disk.  Note the
-additional CPU cost of stream compression can be high, and should be
+additional CPU cost of block compression can be high, and should be
 considered.   (See @ref compression for details).
 
 Column-stores with fixed-length byte values support a single type of
-compression: stream compression.
+compression: block compression.
 
-- Stream compression reduces the size requirement of on-disk objects by
+- Block compression reduces the size requirement of on-disk objects by
 compressing blocks of the backing object's file.  The cost is additional
 CPU and memory use when reading and writing pages to disk.  Note the
-additional CPU cost of stream compression can be high, and should be
+additional CPU cost of block compression can be high, and should be
 considered.   (See @ref compression for details).
 
 */
