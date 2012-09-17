@@ -13,7 +13,7 @@ s_dumpcmp: $(srcdir)/s_dumpcmp.sh
 	chmod +x $@
 
 backup:
-	rm -rf BACKUP && mkdir BACKUP && cp -p -r RUNDIR BACKUP/
+	rm -rf BACKUP && cp -p -r RUNDIR BACKUP
 
 clean-local:
 	rm -rf RUNDIR *.core
