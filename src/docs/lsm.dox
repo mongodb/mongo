@@ -11,15 +11,15 @@ With traditional btree variants, inserts are very fast while the data set
 remains in cache, but once the tree overflows the cache, performance drops
 significantly.  There are two factors involved:
 
-1. once the data fills the cache, new inserts have some probability of going
+ -# once the data fills the cache, new inserts have some probability of going
 to a page that is not in cache, requiring a read; and
-2. the cache is full of dirty pages, so pages have to be written to free
+ -# the cache is full of dirty pages, so pages have to be written to free
 space in the cache before the read can be satisfied.
 
 @section lsm_description Description of LSM trees
 
-Log-Structured Merge Trees were described in this paper by Patrick O'Neil1 ,
-Edward Cheng, Dieter Gawlick and Elizabeth O'Neil1:
+Log-Structured Merge Trees are described in this paper by Patrick O'Neil,
+Edward Cheng, Dieter Gawlick and Elizabeth O'Neil:
 http://www.cs.umb.edu/~poneil/lsmtree.pdf
 
 A logical tree is split into several physical pieces so that the
@@ -98,8 +98,9 @@ WT_SESSION::create.
 Reads from an LSM cursor may need to position a cursor in each active chunk.
 The number of chunks depends on the chunk size, and how many chunks have
 been merged.  There must be at least as many hazard references available as
-there are chunks in the tree.  The number of hazard references is configured
-with the \c "hazard_max" configuration key to ::wiredtiger_open.
+there are chunks in the tree for each cursor that is open on the LSM tree.
+The number of hazard references is configured with the \c "hazard_max"
+configuration key to ::wiredtiger_open.
 
 @subsection lsm_schema Creating tables using LSM trees
 
