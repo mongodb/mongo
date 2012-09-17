@@ -276,6 +276,7 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_TXN *txn;
+	WT_TXN_ISOLATION saved_isolation;
 	const char *name;
 	char *name_alloc;
 	int deleted, is_checkpoint;
@@ -284,6 +285,8 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	btree = session->btree;
 	ckpt = ckptbase = NULL;
 	name_alloc = NULL;
+	txn = &session->txn;
+	saved_isolation = txn->isolation;
 
 	/*
 	 * We're called in two ways: either because a handle is closing or
@@ -493,7 +496,7 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/* If closing a handle, include everything in the checkpoint. */
 	if (!is_checkpoint)
-		session->txn.isolation = TXN_ISO_READ_UNCOMMITTED;
+		txn->isolation = TXN_ISO_READ_UNCOMMITTED;
 
 	/* Flush the file from the cache, creating the checkpoint. */
 	WT_ERR(__wt_bt_cache_flush(session,
@@ -503,7 +506,6 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	txn = &session->txn;
 	txn->isolation = TXN_ISO_READ_UNCOMMITTED;
 	ret = __wt_meta_ckptlist_set(session, btree->name, ckptbase);
-	txn->isolation = TXN_ISO_SNAPSHOT;
 	WT_ERR(ret);
 
 	/*
@@ -520,9 +522,7 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 err:
 skip:	__wt_meta_ckptlist_free(session, ckptbase);
 	__wt_free(session, name_alloc);
-
-	if (!is_checkpoint)
-		session->txn.isolation = session->isolation;
+	txn->isolation = saved_isolation;
 
 	return (ret);
 }
