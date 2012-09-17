@@ -1,3 +1,185 @@
+WiredTiger release 1.3.0, 2012-09-17
+------------------------------------
+
+This release contains a number of major new features, including:
+
+* support for LSM trees with Bloom filters;
+* support for hot backups; and
+* support for fast truncation of files.
+
+In addition, there are some critical bug fixes.  We recommend that all users
+upgrade.  Here is the full list of changes:
+
+[#143] Implement random record lookups.
+
+[#168] Add support for LSM trees.
+
+[#168] Add support for Bloom filters in LSM trees.
+
+[#198] Handle page-generation wraparound.
+
+[#236] Implement hot backups.
+
+[#244] Index cursors for column-store objects may not be created using the
+       record number as the index key.
+
+[#247] Add a fast-path for WT_SESSION::truncate that avoids reading most
+       data to be deleted.
+
+[#259] Performance hack for cursor open: don't parse the configuration
+       strings for a default value if the application didn't specify a
+       configuration string.
+
+[#262] Disable dump on child cursors: only the top-level cursor is wrapped
+       in a dump cursor.
+
+[#266] Deal with new / dropped indices in __wt_schema_open_index. 
+
+[#269] Checkpoint handles must not be open when they are overwritten. 
+
+[#271] Add support for a reserved checkpoint name "WiredTigerCheckpoint"
+       that opens the object's last checkpoint.
+
+[#271] Add the ability to access unnamed checkpoints.
+
+[#274] Change cursor.equals to return a standard error value and store the
+       cursor equality result in a separate argument.
+
+[#275] If exclusive handle is required for an operation and it is not
+       available, fail immediately: don't block. 
+
+[#276] Fix methods that return integer parameters from Python.  This
+       includes cursor.equals and cursor.search_near. 
+
+[#277] Acquire the schema lock when creating the metadata file.  We're
+       single-threaded, so it isn't protecting against anything, but the
+       handle management code expects to have the schema lock. 
+
+[#279] Some optimizations for __wt_config_gets_defno.  Specifically, if
+       we're dealing with a simple stack of config strings, just parse the
+       application string rather than the full list of defaults. 
+
+[#279] Split the description string into a set of structures, to reduce the
+       number of string comparisons and manipulation that's required.
+
+[#282] Remove the cursor.reconfigure method, and replace it with
+       documentation showing how to "reconfigure" cursors using the
+       session.open_cursor method to duplicate them with different
+       configuration strings.
+
+[#284] Fix for a hazard reference race, where page eviction races with the
+       creation of the hazard reference, we have to check the pointer
+       itself as well as the state of the pointer.
+
+[#285] We can clear the tree's modified flag on checkpoint, as long as the
+       checkpoint writes all modifications.   Clear the tree's modified
+       flag before we start the checkpoint, but reset it as necessary if
+       reconciliation is unable to write all of the changes in a page.
+
+[#287] Fix __wt_config_check to handle overlapping config values correctly.
+
+[#289] Add support for read-committed isolation, make it the default.  Add
+       a session-level "isolation" setting.
+
+[#294] If txn_commit fails, document the transaction was rolled-back.
+
+[#295] Expand the documentation on using cursors without explicit
+       transactions. 
+
+[#300] Include all changes whenever closing a file, don't check for
+       visibility.  If updates are skipped while evicting a page, give up. 
+
+[#305] Have "wt dump" fail more gracefully if the object doesn't exist.
+
+[#310] When freeing a tracked address in reconcilation, clear it to avoid
+       freeing the same address again on error. 
+
+[#314] Replace cursor.equals with cursor.compare
+
+[#319] Clear the bulk_load_ok flag when closing handles. 
+
+
+* Add an "ancient transaction" statistic so we can find out if they're
+  actually occurring in the field.
+
+* Add an "was object ever modified" flag to the btree handle, and use it to
+  avoid writing read-only objects during internal checkpoints, issue
+
+* Add per-connection statistics counters for transaction checkpoint, begin,
+  commit and rollback.  Add per-btree statistics counters for update
+  conflicts.
+
+* Another fixed-length column-store implicit record fix: if the earliest
+  row in the object is row 10, and it's on an append list, we still must
+  return rows 1-9, they've been implicitly created.
+
+* Bulk cursors: disallow cursor.{equals,next,prev,reset,search,
+  search_near,update,remove}; only close and insert are supported.
+
+* Change session.truncate to support any cursor position for range
+  truncation, not just keys that are known to exist.
+
+* Checkpoint has to flush the metadata file, but only after it's flushed
+  all of the other files.
+
+* Discard obsolete WT_UPDATE structures during updates.
+
+* Document that duplicated cursors are positioned at the same point as the
+  cursor that was duplicated.
+
+* Fix a (very unlikely) deadlock at startup, if an application issues a
+  checkpoint before the eviction server has managed to open its sesssion.
+
+* Fix a core dump if we verify a file that's corrupted such that we are
+  unable to load any checkpoints at all, and the per-checkpoint bit map is
+  never set.
+
+* If a page selected for eviction cannot be freed because it has some
+  recent updates, try instead to free memory by trimming old updates.
+
+* If a thread fails to evict a page, try to bump its snapshot.  This avoids
+  the common case of read-committed threads getting stuck because one
+  thread falls behind (e.g., because we can't evict during a checkpoint).
+
+* If an exclusive table create fails, return EEXIST.
+
+* If we try to remove a file that doesn't exist, don't complain, return
+  success.
+
+* If we're repeatedly taking a checkpoint with the same name, skip the work
+  for read-only objects.
+
+* Instead of flagging the empty tree's leaf page empty as part of creating
+  an empty tree in memory, set the page as modified (to force
+  reconciliation); if the leaf page is still empty at that time, then we'll
+  figure it out during that reconciliation.  This fixes a memory leak where
+  the leaf page of a empty tree wasn't being freed.
+
+* It's not unreasonable to open a cursor on a non-existent table, don't
+  complain, just return not-found.
+
+* Move dist/RELEASE to the top level of the tree.
+
+* Optimization: don't repeatedly look up btree handles for schema
+  operations.
+
+* Return keys from all operations: don't keep pointing to the application's
+  key.
+
+* Update btree usage of 64 bitstring implementation, so it's cleaner.
+
+* Update the bitstring implementation to use 64 bit length strings.
+
+* Updates performed without an active transaction should become visible
+  with the current transaction ID.
+
+* Upgrade to doxygen 1.8.x
+
+* Use a real snapshot transaction for checkpoints.  Otherwise, the snapshot
+  can be updated in between checkpointing multiple files (when updating the
+  metadata).
+
+
 WiredTiger release 1.2.2, 2012-06-20
 ------------------------------------
 
