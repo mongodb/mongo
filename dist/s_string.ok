@@ -155,6 +155,7 @@ RET
 RLE
 RNG
 RPC
+RUNDIR
 Recurse
 Redistributions
 Resize
@@ -256,6 +257,7 @@ bzDecompressInit
 bzip
 calloc
 catfmt
+cd
 cfg
 cfkos
 checkfrag
@@ -575,6 +577,7 @@ schemas
 schematab
 scr
 searchable
+sed
 serializable
 sessionp
 setv
