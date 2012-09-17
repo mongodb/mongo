@@ -457,14 +457,19 @@ __clsm_reset(WT_CURSOR *cursor)
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
-	WT_LSM_ENTER(clsm, cursor, session, reset);
+	/*
+	 * Don't use the normal __clsm_enter path: that is wasted work when all
+	 * we want to do is give up our position.
+	 */
+	clsm = (WT_CURSOR_LSM *)cursor;
+	CURSOR_API_CALL_NOCONF(cursor, session, reset, NULL);
 	if ((c = clsm->current) != NULL) {
 		ret = c->reset(c);
 		clsm->current = NULL;
 	}
 	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 	F_CLR(clsm, WT_CLSM_ITERATE_NEXT | WT_CLSM_ITERATE_PREV);
-err:	WT_LSM_END(clsm, session);
+	API_END(session);
 
 	return (ret);
 }
