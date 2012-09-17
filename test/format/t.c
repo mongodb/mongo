@@ -159,9 +159,7 @@ main(int argc, char *argv[])
 		(void)fclose(g.rand_log);
 
 	config_print(0);
-
-	/* Free memory */
-	free(g.uri);
+	config_clear();
 
 	return (EXIT_SUCCESS);
 }
@@ -209,6 +207,17 @@ onint(int signo)
 	(void)system("cd RUNDIR && rm -rf `ls | sed /rand/d`");
 
 	fprintf(stderr, "\n");
+	exit(EXIT_FAILURE);
+}
+
+/*
+ * syserr --
+ *	Die on a system error.
+ */
+void
+syserr(const char *f)
+{
+	fprintf(stderr, "%s: %s: %s\n", g.progname, f, strerror(errno));
 	exit(EXIT_FAILURE);
 }
 

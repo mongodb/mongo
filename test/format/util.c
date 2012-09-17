@@ -32,7 +32,7 @@ key_gen_setup(uint8_t **keyp)
 	size_t i;
 
 	if ((key = malloc(g.c_key_max)) == NULL)
-		die(errno, "malloc");
+		syserr("malloc");
 	for (i = 0; i < g.c_key_max; ++i)
 		key[i] = (uint8_t)("abcdefghijklmnopqrstuvwxyz"[i % 26]);
 	*keyp = key;
@@ -80,7 +80,7 @@ val_gen_setup(uint8_t **valp)
 	 */
 	len = g.c_value_max + 20;
 	if ((val = malloc(len)) == NULL)
-		die(errno, "malloc");
+		syserr("malloc");
 	for (i = 0; i < len; ++i)
 		val[i] = (uint8_t)("ABCDEFGHIJKLMNOPQRSTUVWXYZ"[i % 26]);
 

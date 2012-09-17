@@ -70,10 +70,10 @@ typedef struct {
 	uint32_t c_bitcnt;			/* Config values */
 	uint32_t c_bzip;
 	uint32_t c_cache;
-	const char *c_data_source;
+	char    *c_data_source;
 	uint32_t c_delete_pct;
 	uint32_t c_dictionary;
-	const char *c_file_type;
+	char    *c_file_type;
 	uint32_t c_huffman_key;
 	uint32_t c_huffman_value;
 	uint32_t c_insert_pct;
@@ -120,6 +120,7 @@ void	 bdb_read(uint64_t, void *, uint32_t *, int *);
 void	 bdb_remove(uint64_t, int *);
 void	 bdb_update(const void *, uint32_t, const void *, uint32_t, int *);
 
+void	 config_clear(void);
 void	 config_error(void);
 void	 config_file(const char *);
 void	 config_print(int);
@@ -129,6 +130,7 @@ void	 die(int, const char *, ...);
 void	 key_len_setup(void);
 void	 key_gen_setup(uint8_t **);
 void	 key_gen(uint8_t *, uint32_t *, uint64_t, int);
+void	 syserr(const char *);
 void	 track(const char *, uint64_t, TINFO *);
 void	 val_gen_setup(uint8_t **);
 void	 value_gen(uint8_t *, uint32_t *, uint64_t);
