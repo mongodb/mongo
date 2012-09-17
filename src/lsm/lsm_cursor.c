@@ -164,12 +164,13 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm)
 	}
 
 	/* The last chunk is our new primary. */
-	WT_ASSERT(session,
-	    !F_ISSET(clsm, WT_CLSM_UPDATED) ||
-	    !F_ISSET(chunk, WT_LSM_CHUNK_ONDISK));
+	if ((clsm->primary_chunk = chunk) != NULL) {
+		WT_ASSERT(session,
+		    !F_ISSET(clsm, WT_CLSM_UPDATED) ||
+		    !F_ISSET(chunk, WT_LSM_CHUNK_ONDISK));
 
-	if ((clsm->primary_chunk = chunk) != NULL)
 		WT_ATOMIC_ADD(clsm->primary_chunk->ncursor, 1);
+	}
 
 	/* Peek into the btree layer to track the in-memory size. */
 	if (lsm_tree->memsizep == NULL)
@@ -209,6 +210,8 @@ __clsm_get_current(
 	int cmp, multiple;
 
 	current = NULL;
+	multiple = 0;
+
 	FORALL_CURSORS(clsm, c, i) {
 		if (!F_ISSET(c, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET))
 			continue;
