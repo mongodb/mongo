@@ -114,12 +114,25 @@ namespace mongo {
     typedef long long NumberVal;
     template <typename Variant>
     Variant getSysctlByName( const char * sysctlName ) {
-        char value[256];
-        size_t len = sizeof(value);
-        if ( sysctlbyname(sysctlName, &value, &len, NULL, 0) < 0 ) {
-            log() << "Unable to resolve sysctl " << sysctlName << " (string) " << endl;
+        string value;
+        size_t len;
+        int status;
+        // NB: sysctlbyname is called once to determine the buffer length, and once to copy
+        //     the sysctl value.  Retry if the buffer length grows between calls.
+        do {
+            status = sysctlbyname(sysctlName, NULL, &len, NULL, 0);
+            if (status == -1)
+                break;
+            value.resize(len);
+            status = sysctlbyname(sysctlName, &*value.begin(), &len, NULL, 0);
+        } while (status == -1 && errno == ENOMEM);
+        if (status == -1) {
+            // unrecoverable error from sysctlbyname
+            log() << sysctlName << " unavailable" << endl;
+            return "";
         }
-        return string(value, len - 1);        
+        value.resize(len);
+        return value;
     }
 
     /**
