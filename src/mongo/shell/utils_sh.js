@@ -341,8 +341,8 @@ sh.removeShardTag = function( shard, tag ) {
 
 sh.addTagRange = function( ns, min, max, tag ) {
     var config = db.getSisterDB( "config" );
-    config.tags.update( { ns : ns , min : min } , 
-                        { ns : ns , min : min , max : max , tag : tag } , 
-                        true );
+    config.tags.update( {_id: { ns : ns , min : min } } , 
+            {_id: { ns : ns , min : min }, ns : ns , min : min , max : max , tag : tag } , 
+            true );
     sh._checkLastError( config );    
 }
