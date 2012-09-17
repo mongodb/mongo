@@ -16,4 +16,4 @@ backup:
 	rm -rf BACKUP && mkdir BACKUP && cp -p -r RUNDIR BACKUP/
 
 clean-local:
-	rm -rf RUNDIR
+	rm -rf RUNDIR *.core
