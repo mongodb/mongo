@@ -17,7 +17,10 @@
 
 namespace mongo {
 
-    const Status& Status::OK = *(new Status(ErrorCodes::OK, ""));
+    Status::ErrorInfo* Status::getOKInfo() {
+        static ErrorInfo* okInfo = new ErrorInfo(ErrorCodes::OK, "", 0);
+        return okInfo;
+    }
 
     Status::ErrorInfo::ErrorInfo(ErrorCodes::Error aCode, const std::string& aReason, int aLocation)
         : code(aCode), reason(aReason), location(aLocation) {}
@@ -30,6 +33,11 @@ namespace mongo {
     Status::Status(ErrorCodes::Error code, const std::string& reason, int location) {
         _error = new ErrorInfo(code, reason, location);
         ref(_error);
+    }
+
+    Status::Status(ErrorInfo* info) {
+        _error = info;
+        ref(info);
     }
 
     Status::Status(const Status& other) {
@@ -74,16 +82,16 @@ namespace mongo {
     }
 
     void Status::ref(ErrorInfo* error) {
-        // OK is never deallocated, so no need to bump ref here.
-        if (error->code == ErrorCodes::OK) {
+        // okInfo is never deallocated, so no need to bump ref here.
+        if (error == getOKInfo()) {
             return;
         }
         error->refs.fetchAndAdd(1);
     }
 
     void Status::unref(ErrorInfo* error) {
-        // OK is never deallocated.
-        if (error->code == ErrorCodes::OK) {
+        // okInfo is never deallocated.
+        if (error == getOKInfo()) {
             return;
         }
 
@@ -99,5 +107,12 @@ namespace mongo {
     std::ostream& operator<<(std::ostream& os, ErrorCodes::Error code) {
         return os << ErrorCodes::errorString(code);
     }
+
+
+namespace {
+    /// Ensure that Status::OK() is called at least once in single threaded context,
+    /// by creating a global variable whose static initializer calls it.
+    Status okStatusInstance = Status::OK();
+}  // namespace
 
 } // namespace mongo

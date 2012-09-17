@@ -26,7 +26,7 @@ namespace mongo {
     /**
      * An InitializerFunction implements the behavior of an initializer operation.
      *
-     * On successful execution, an InitializerFunction returns Status::OK.  It may
+     * On successful execution, an InitializerFunction returns Status::OK().  It may
      * inspect and mutate the supplied InitializerContext.
      */
     typedef boost::function<Status (InitializerContext*)> InitializerFunction;

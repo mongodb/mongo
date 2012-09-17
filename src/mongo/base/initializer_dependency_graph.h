@@ -58,7 +58,7 @@ namespace mongo {
          *
          * If "!fn" (fn is NULL in function pointer parlance), returns status with code
          * ErrorCodes::badValue.  If "name" is a duplicate of a name already present in the graph,
-         * returns "ErrorCodes::duplicateKey".  Otherwise, returns Status::OK and adds the new node
+         * returns "ErrorCodes::duplicateKey".  Otherwise, returns Status::OK() and adds the new node
          * to the graph.  Note that cycles in the dependency graph are not discovered in this phase.
          * Rather, they're discovered by topSort, below.
          */
@@ -75,7 +75,7 @@ namespace mongo {
 
         /**
          * Construct a topological sort of the dependency graph, and store that order into
-         * "sortedNames".  Returns Status::OK on success.
+         * "sortedNames".  Returns Status::OK() on success.
          *
          * If the graph contains a cycle, returns ErrorCodes::graphContainsCycle, and "sortedNames"
          * is an ordered sequence of nodes involved in a cycle.  In this case, the first and last

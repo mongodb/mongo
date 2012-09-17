@@ -39,7 +39,7 @@ namespace mongo {
      *       }
      *
      *       *c = a+b;
-     *       return Status::OK;
+     *       return Status::OK();
      *   }
      *
      * TODO: expand base/error_codes.h to capture common errors in current code
@@ -49,7 +49,7 @@ namespace mongo {
     class Status {
     public:
         // Short-hand for returning an OK status.
-        static const Status& OK;
+        static Status OK() { return Status(getOKInfo()); }
 
         /**
          * Builds an error status given the error code, a textual description of what
@@ -102,6 +102,10 @@ namespace mongo {
 
             ErrorInfo(ErrorCodes::Error aCode, const std::string& aReason, int aLocation);
         };
+
+        static ErrorInfo *getOKInfo();
+
+        explicit Status(ErrorInfo *info);
 
         ErrorInfo* _error;
 

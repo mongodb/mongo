@@ -29,7 +29,7 @@
             MONGO_MAKE_STRING_VECTOR DEPS)
 
 #define ASSERT_ADD_INITIALIZER(GRAPH, NAME, FN, PREREQS, DEPS)  \
-    ASSERT_EQUALS(Status::OK, ADD_INITIALIZER(GRAPH, NAME, FN, PREREQS, DEPS))
+    ASSERT_EQUALS(Status::OK(), ADD_INITIALIZER(GRAPH, NAME, FN, PREREQS, DEPS))
 
 #define ASSERT_EXACTLY_N_IN_CONTAINER(N, CONTAINER, THING)               \
     ASSERT_EQUALS(N, std::count((CONTAINER).begin(), (CONTAINER).end(), (THING)))
@@ -43,7 +43,7 @@
 namespace mongo {
 namespace {
 
-    Status doNothing(InitializerContext*) { return Status::OK; }
+    Status doNothing(InitializerContext*) { return Status::OK(); }
 
     TEST(InitializerDependencyGraphTest, InsertNullFunctionFails) {
         InitializerDependencyGraph graph;
@@ -59,7 +59,7 @@ namespace {
     TEST(InitializerDependencyGraphTest, TopSortEmptyGraph) {
         InitializerDependencyGraph graph;
         std::vector<std::string> nodeNames;
-        ASSERT_EQUALS(Status::OK, graph.topSort(&nodeNames));
+        ASSERT_EQUALS(Status::OK(), graph.topSort(&nodeNames));
         ASSERT_EQUALS(0U, nodeNames.size());
     }
 
@@ -69,7 +69,7 @@ namespace {
         ASSERT_ADD_INITIALIZER(graph, "A", doNothing, (), ());
         ASSERT_ADD_INITIALIZER(graph, "B", doNothing, (), ());
         ASSERT_ADD_INITIALIZER(graph, "C", doNothing, (), ());
-        ASSERT_EQUALS(Status::OK, graph.topSort(&nodeNames));
+        ASSERT_EQUALS(Status::OK(), graph.topSort(&nodeNames));
         ASSERT_EQUALS(3U, nodeNames.size());
         ASSERT_EXACTLY_ONE_IN_CONTAINER(nodeNames, "A");
         ASSERT_EXACTLY_ONE_IN_CONTAINER(nodeNames, "B");
@@ -94,7 +94,7 @@ namespace {
         ASSERT_ADD_INITIALIZER(graph, "D", doNothing, ("B", "C"), ());
         ASSERT_ADD_INITIALIZER(graph, "B", doNothing, ("A"), ());
         ASSERT_ADD_INITIALIZER(graph, "C", doNothing, ("A"), ());
-        ASSERT_EQUALS(Status::OK, graph.topSort(&nodeNames));
+        ASSERT_EQUALS(Status::OK(), graph.topSort(&nodeNames));
         ASSERT_EQUALS(4U, nodeNames.size());
         ASSERT_EXACTLY_ONE_IN_CONTAINER(nodeNames, "A");
         ASSERT_EXACTLY_ONE_IN_CONTAINER(nodeNames, "B");
@@ -122,7 +122,7 @@ namespace {
         ASSERT_ADD_INITIALIZER(graph, "D", doNothing, (), ());
         ASSERT_ADD_INITIALIZER(graph, "B", doNothing, (), ("D"));
         ASSERT_ADD_INITIALIZER(graph, "C", doNothing, (), ("D"));
-        ASSERT_EQUALS(Status::OK, graph.topSort(&nodeNames));
+        ASSERT_EQUALS(Status::OK(), graph.topSort(&nodeNames));
         ASSERT_EQUALS(4U, nodeNames.size());
         ASSERT_EXACTLY_ONE_IN_CONTAINER(nodeNames, "A");
         ASSERT_EXACTLY_ONE_IN_CONTAINER(nodeNames, "B");
@@ -151,7 +151,7 @@ namespace {
         ASSERT_ADD_INITIALIZER(graph, "D", doNothing, (), ());
         ASSERT_ADD_INITIALIZER(graph, "B", doNothing, ("A"), ("D"));
         ASSERT_ADD_INITIALIZER(graph, "C", doNothing, ("A"), ("D"));
-        ASSERT_EQUALS(Status::OK, graph.topSort(&nodeNames));
+        ASSERT_EQUALS(Status::OK(), graph.topSort(&nodeNames));
         ASSERT_EQUALS(4U, nodeNames.size());
         ASSERT_EXACTLY_ONE_IN_CONTAINER(nodeNames, "A");
         ASSERT_EXACTLY_ONE_IN_CONTAINER(nodeNames, "B");
@@ -180,7 +180,7 @@ namespace {
         ASSERT_ADD_INITIALIZER(graph, "D", doNothing, ("C", "B"), ());
         ASSERT_ADD_INITIALIZER(graph, "B", doNothing, (), ());
         ASSERT_ADD_INITIALIZER(graph, "C", doNothing, (), ());
-        ASSERT_EQUALS(Status::OK, graph.topSort(&nodeNames));
+        ASSERT_EQUALS(Status::OK(), graph.topSort(&nodeNames));
         ASSERT_EQUALS(4U, nodeNames.size());
         ASSERT_EXACTLY_ONE_IN_CONTAINER(nodeNames, "A");
         ASSERT_EXACTLY_ONE_IN_CONTAINER(nodeNames, "B");
@@ -209,7 +209,7 @@ namespace {
         ASSERT_ADD_INITIALIZER(graph, "D", doNothing, ("C", "B"), ());
         ASSERT_ADD_INITIALIZER(graph, "B", doNothing, ("A"), ("D"));
         ASSERT_ADD_INITIALIZER(graph, "C", doNothing, ("A"), ("D"));
-        ASSERT_EQUALS(Status::OK, graph.topSort(&nodeNames));
+        ASSERT_EQUALS(Status::OK(), graph.topSort(&nodeNames));
         ASSERT_EQUALS(4U, nodeNames.size());
         ASSERT_EXACTLY_ONE_IN_CONTAINER(nodeNames, "A");
         ASSERT_EXACTLY_ONE_IN_CONTAINER(nodeNames, "B");

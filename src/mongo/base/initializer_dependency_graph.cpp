@@ -45,7 +45,7 @@ namespace mongo {
             _nodes[dependents[i]].prerequisites.insert(name);
         }
 
-        return Status::OK;
+        return Status::OK();
     }
 
     InitializerFunction InitializerDependencyGraph::getInitializerFunction(
@@ -81,10 +81,10 @@ namespace mongo {
                                              &inProgressNodeNames,
                                              &visitedNodeNames,
                                              sortedNames);
-            if (Status::OK != status)
+            if (Status::OK() != status)
                 return status;
         }
-        return Status::OK;
+        return Status::OK();
     }
 
     Status InitializerDependencyGraph::recursiveTopSort(
@@ -106,7 +106,7 @@ namespace mongo {
          */
 
         if ((*visitedNodeNames).count(currentNode.first))
-            return Status::OK;
+            return Status::OK();
 
         if (!currentNode.second.fn)
             return Status(ErrorCodes::BadValue, currentNode.first);
@@ -135,7 +135,7 @@ namespace mongo {
                                              inProgressNodeNames,
                                              visitedNodeNames,
                                              sortedNames);
-            if (Status::OK != status)
+            if (Status::OK() != status)
                 return status;
         }
         sortedNames->push_back(currentNode.first);
@@ -143,7 +143,7 @@ namespace mongo {
             return Status(ErrorCodes::InternalError, "inProgressNodeNames stack corrupt");
         inProgressNodeNames->pop_back();
         visitedNodeNames->insert(currentNode.first);
-        return Status::OK;
+        return Status::OK();
     }
 
 }  // namespace mongo

@@ -30,14 +30,14 @@ namespace {
     }
 
     TEST(Basic, OKIsAValidStatus) {
-        Status status = Status::OK;
+        Status status = Status::OK();
         ASSERT_EQUALS(status.code(), ErrorCodes::OK);
     }
 
     TEST(Basic, Compare) {
         Status errMax(ErrorCodes::MaxError, "error");
         ASSERT_TRUE(errMax.compare(errMax));
-        ASSERT_FALSE(errMax.compare(Status::OK));
+        ASSERT_FALSE(errMax.compare(Status::OK()));
 
         Status errMaxWithLoc(ErrorCodes::MaxError, "error", 9998);
         ASSERT_FALSE(errMaxWithLoc.compare(errMax));
@@ -56,11 +56,11 @@ namespace {
     }
 
     TEST(Cloning, OKIsNotRefCounted) {
-        ASSERT_EQUALS(Status::OK.refCount(), 0);
+        ASSERT_EQUALS(Status::OK().refCount(), 0);
 
-        Status myOk = Status::OK;
+        Status myOk = Status::OK();
         ASSERT_EQUALS(myOk.refCount(), 0);
-        ASSERT_EQUALS(Status::OK.refCount(), 0);
+        ASSERT_EQUALS(Status::OK().refCount(), 0);
     }
 
 } // unnamed namespace
