@@ -3,6 +3,9 @@
 Import("env")
 
 env.StaticLibrary('base', ['configuration_variable_manager.cpp',
+                           'global_initializer.cpp',
+                           'global_initializer_registerer.cpp',
+                           'init.cpp',
                            'initializer.cpp',
                            'initializer_context.cpp',
                            'initializer_dependency_graph.cpp',

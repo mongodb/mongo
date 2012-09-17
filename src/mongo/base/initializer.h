@@ -68,4 +68,25 @@ namespace mongo {
         ConfigurationVariableManager _configVariables;
     };
 
+    /**
+     * Run the global initializers.
+     *
+     * It's a programming error for this to fail, but if it does it will return a status other
+     * than Status::OK.
+     *
+     * This means that the few initializers that might want to terminate the program by failing
+     * should probably arrange to terminate the process themselves.
+     */
+    Status runGlobalInitializers(const InitializerContext::ArgumentVector& args,
+                                 const InitializerContext::EnvironmentMap& env);
+
+    /**
+     * Same as runGlobalInitializers(), except prints a brief message to std::cerr
+     * and terminates the process on failure.
+     */
+    void runGlobalInitializersOrDie(const InitializerContext::ArgumentVector& args,
+                                    const InitializerContext::EnvironmentMap& env);
+
+    void runGlobalInitializersOrDie(int argc, const char* const* argv, const char* const* envp);
+
 }  // namespace mongo
