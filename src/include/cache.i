@@ -58,8 +58,7 @@ __wt_eviction_page_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 		return (0);
 
 	/* Check the page's memory footprint. */
-	if ((int64_t)page->memory_footprint > conn->cache_size / 2 ||
-	    page->memory_footprint > 20 * session->btree->maxleafpage)
+	if ((int64_t)page->memory_footprint > conn->cache_size / 2)
 		return (1);
 
 	/*

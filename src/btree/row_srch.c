@@ -153,9 +153,8 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 		if (cmp != 0)
 			ref = page->u.intl.t + (base - 1);
 
-		/* Swap the parent page for the child page. */
+		/* Move to the child page. */
 		WT_ERR(__wt_page_in(session, page, ref));
-		__wt_page_release(session, page);
 		page = ref->page;
 	}
 
@@ -243,7 +242,7 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 	WT_ERR(__wt_search_insert(session, cbt, cbt->ins_head, srch_key));
 	return (0);
 
-err:	__wt_page_release(session, page);
+err:	__wt_stack_release(session, page);
 	return (ret);
 }
 
@@ -270,7 +269,6 @@ __wt_row_random(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 
 		/* Swap the parent page for the child page. */
 		WT_ERR(__wt_page_in(session, page, ref));
-		__wt_page_release(session, page);
 		page = ref->page;
 	}
 
@@ -311,6 +309,6 @@ __wt_row_random(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 
 	return (0);
 
-err:	__wt_page_release(session, page);
+err:	__wt_stack_release(session, page);
 	return (ret);
 }
