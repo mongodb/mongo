@@ -29,6 +29,7 @@
 namespace DocumentSourceTests {
 
     static const char* const ns = "unittests.documentsourcetests";
+    static BSONObj* shardKey = NULL;
     static DBDirectClient client;
 
     BSONObj toBson( const intrusive_ptr<DocumentSource>& source ) {
@@ -52,7 +53,7 @@ namespace DocumentSourceTests {
         public:
             Base() :
                 CollectionBase(),
-                _ctx( ExpressionContext::create( &InterruptStatusMongod::status ) ) {
+                _ctx( ExpressionContext::create(shardKey, &InterruptStatusMongod::status ) ) {
             }
         protected:
             void createSource() {
@@ -322,16 +323,19 @@ namespace DocumentSourceTests {
         class Base : public DocumentSourceCursor::Base {
         protected:
             void createGroup( const BSONObj &spec, bool inShard = false ) {
-                BSONObj namedSpec = BSON( "$group" << spec );
-                BSONElement specElement = namedSpec.firstElement();
-                intrusive_ptr<ExpressionContext> expressionContext =
-                        ExpressionContext::create( &InterruptStatusMongod::status );
-                if ( inShard ) {
-                    expressionContext->setInShard( true );
-                }
-                _group = DocumentSourceGroup::createFromBson( &specElement, expressionContext );
-                assertRoundTrips( _group );
-                _group->setSource( source() );
+                createGroup(spec, (BSONObj *) NULL, inShard);
+            }
+            void createGroup(const BSONObj &spec, BSONObj* shardKey, bool inShard = false) {
+            	BSONObj namedSpec = BSON( "$group" << spec );
+				BSONElement specElement = namedSpec.firstElement();
+				intrusive_ptr<ExpressionContext> expressionContext =
+						ExpressionContext::create(shardKey, &InterruptStatusMongod::status );
+				if ( inShard ) {
+					expressionContext->setInShard( true );
+				}
+				_group = DocumentSourceGroup::createFromBson( &specElement, expressionContext );
+				assertRoundTrips( _group );
+				_group->setSource( source() );
             }
             DocumentSource* group() { return _group.get(); }
             /** Assert that iterator state accessors consistently report the source is exhausted. */
@@ -767,7 +771,148 @@ namespace DocumentSourceTests {
             virtual string expectedResultSetString() { return "[{_id:0}]"; }            
         };
 
-        /** Simulate merging sharded results in the router. */ 
+		class CheckSplittingBase : public Base {
+		public:
+			virtual ~CheckSplittingBase() {
+			}
+
+			void run() {
+				BSONObj shardingKey(shardKey());
+				createGroup(groupSpec(), &shardingKey, true);
+
+				 // Check if this source is splittable
+				SplittableDocumentSource* splittable =
+					dynamic_cast<SplittableDocumentSource *>(group());
+
+				ASSERT_EQUALS((bool)splittable->getShardSource(), shouldSplitMongod());
+				ASSERT_EQUALS((bool)splittable->getRouterSource(), shouldSplitRouter());
+			}
+		protected:
+			virtual BSONObj shardKey() = 0;
+
+			virtual BSONObj groupSpec() = 0;
+
+			virtual bool shouldSplitMongod() = 0;
+
+			virtual bool shouldSplitRouter() = 0;
+		};
+
+		class FieldPathEqualsShardKey : public CheckSplittingBase {
+		protected:
+			virtual BSONObj shardKey() {
+				return fromjson("{'x.y': 1}");
+			}
+
+			virtual BSONObj groupSpec() {
+				return fromjson( "{ _id: '$x.y', count:{'$sum':1}}");
+			}
+
+			virtual bool shouldSplitMongod() {
+				return true;
+			}
+
+			virtual bool shouldSplitRouter() {
+				return false;
+			}
+ 		};
+
+		class FieldPathNotEqualsShardKey : public CheckSplittingBase {
+		protected:
+			virtual BSONObj shardKey() {
+				return fromjson("{'x.y': 1}");
+			}
+
+			virtual BSONObj groupSpec() {
+				return fromjson( "{ _id: '$x.z', count:{'$sum':1}}");
+			}
+
+			virtual bool shouldSplitMongod() {
+				return true;
+			}
+
+			virtual bool shouldSplitRouter() {
+				return true;
+			}
+		};
+
+		class FieldPathShardKeyMultiple : public CheckSplittingBase {
+		protected:
+			virtual BSONObj shardKey() {
+				return fromjson("{'x.y': 1, 'x.z': 1}");
+			}
+
+			virtual BSONObj groupSpec() {
+				return fromjson( "{ _id: '$x.z', count:{'$sum':1}}");
+			}
+
+			virtual bool shouldSplitMongod() {
+				return true;
+			}
+
+			virtual bool shouldSplitRouter() {
+				return true;
+			}
+		};
+
+		class NullGroupId: public CheckSplittingBase {
+		protected:
+			virtual BSONObj shardKey() {
+				return fromjson("{'x.y': 1}");
+			}
+
+			virtual BSONObj groupSpec() {
+				return fromjson( "{ _id: null, count:{'$sum':1}}");
+			}
+
+			virtual bool shouldSplitMongod() {
+				return true;
+			}
+
+			virtual bool shouldSplitRouter() {
+				return true;
+			}
+		};
+
+		class ObjectGroupIdEqualsShardKey : public CheckSplittingBase {
+		protected:
+			virtual BSONObj shardKey() {
+				return fromjson("{'x': 1, 'y': 1}");
+			}
+
+			virtual BSONObj groupSpec() {
+				return fromjson( "{ _id: {'key1':'$x', 'key2': '$y'}, count:{'$sum':1}}");
+			}
+
+			virtual bool shouldSplitMongod() {
+				return true;
+			}
+
+			virtual bool shouldSplitRouter() {
+				return false;
+			}
+		};
+
+		class ObjectGroupIdNotEqualsShardKey : public CheckSplittingBase {
+		protected:
+			virtual BSONObj shardKey() {
+				return fromjson("{'z': 1, 'y': 1}");
+			}
+
+			virtual BSONObj groupSpec() {
+				return fromjson( "{ _id: {'key1':'$x', 'key2': '$y'}, count:{'$sum':1}}");
+			}
+
+			virtual bool shouldSplitMongod() {
+				return true;
+			}
+
+			virtual bool shouldSplitRouter() {
+				return true;
+			}
+		};
+
+
+        /** Simulate merging sharded results in the router. */
         class RouterMerger : public CheckResultsBase {
         public:
             void run() {
@@ -1734,6 +1879,12 @@ namespace DocumentSourceTests {
             add<DocumentSourceGroup::GroupNullUndefinedIds>();
             //add<DocumentSourceGroup::ComplexId>(); uncomment after 6195
             add<DocumentSourceGroup::UndefinedAccumulatorValue>();
+            add<DocumentSourceGroup::FieldPathEqualsShardKey>();
+            add<DocumentSourceGroup::FieldPathNotEqualsShardKey>();
+            add<DocumentSourceGroup::FieldPathShardKeyMultiple>();
+            add<DocumentSourceGroup::NullGroupId>();
+            add<DocumentSourceGroup::ObjectGroupIdEqualsShardKey>();
+            add<DocumentSourceGroup::ObjectGroupIdNotEqualsShardKey>();
             add<DocumentSourceGroup::RouterMerger>();
             add<DocumentSourceGroup::Dependencies>();
             add<DocumentSourceGroup::StringConstantIdAndAccumulatorExpressions>();

@@ -1564,8 +1564,21 @@ namespace mongo {
                                   BSONObjBuilder &result, bool fromRepl) {
             //const string shardedOutputCollection = getTmpName( collection );
 
-            intrusive_ptr<ExpressionContext> pExpCtx(
-                ExpressionContext::create(&InterruptStatusMongos::status));
+        	string fullns(parseNs(dbName, cmdObj));
+        	intrusive_ptr<ExpressionContext> pExpCtx;
+
+        	DBConfigPtr conf(grid.getDBConfig(dbName, false));
+        	ChunkManagerPtr chunkManager(conf->getChunkManagerIfExists(fullns, false, false));
+        	BSONObj shardKey;
+
+        	if(conf->isSharded(fullns) && chunkManager) {
+        		shardKey = chunkManager->getShardKey().key();
+        		pExpCtx = ExpressionContext::create(&shardKey, &InterruptStatusMongos::status);
+        	}
+        	else {
+        		pExpCtx = ExpressionContext::create((BSONObj*) NULL, &InterruptStatusMongos::status);
+        	}
+
             pExpCtx->setInRouter(true);
 
             /* parse the pipeline specification */
@@ -1574,13 +1587,10 @@ namespace mongo {
             if (!pPipeline.get())
                 return false; // there was some parsing error
 
-            string fullns(dbName + "." + pPipeline->getCollectionName());
-
             /*
               If the system isn't running sharded, or the target collection
               isn't sharded, pass this on to a mongod.
             */
-            DBConfigPtr conf(grid.getDBConfig(dbName , false));
             if (!conf || !conf->isShardingEnabled() || !conf->isSharded(fullns))
                 return passthrough(conf, cmdObj, result);
 

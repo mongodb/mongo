@@ -24,6 +24,7 @@
 #include "db/pipeline/expression.h"
 #include "db/pipeline/expression_context.h"
 #include "db/pipeline/value.h"
+#include "mongo/s/grid.h"
 
 namespace mongo {
     const char DocumentSourceGroup::groupName[] = "$group";
@@ -202,6 +203,7 @@ namespace mongo {
                         Expression::removeFieldPrefix(groupString));
                     intrusive_ptr<ExpressionFieldPath> pFieldPath(
                         ExpressionFieldPath::create(pathString));
+
                     pGroup->setIdExpression(pFieldPath);
                     idSet = true;
                 }
@@ -394,6 +396,47 @@ namespace mongo {
     }
 
     intrusive_ptr<DocumentSource> DocumentSourceGroup::getRouterSource() {
+    	BSONObj* shardKey(pExpCtx->getShardKey());
+
+    	if(shardKey) {
+    		ExpressionObject* objExpression(dynamic_cast<ExpressionObject *>(pIdExpression.get()));
+
+    		if(objExpression) {
+    			BSONObjBuilder objBuilder;
+    			objExpression->documentToBson(&objBuilder, true);
+    			BSONObj groupId = objBuilder.done();
+
+    			//group _id must meet ((shardKey UNION groupId) EQ groupId) so, if groupId has lower fields than the shardKey
+    			//we already know that groupId doesn't meet the requirements.
+    			if(groupId.nFields() >= shardKey->nFields()) {
+					BSONObjIterator iter(groupId);
+					int fieldCount = 0;
+					//group key must be equal that shard key or be a super set which contains the shard key, never can be a subset of it
+					while(iter.more() && fieldCount < shardKey->nFields()) {
+						BSONElement fieldElement(iter.next());
+
+						//there is no need to validate type, since its already done by the Expression parsing process.
+						if(shardKey->hasField(Expression::removeFieldPrefix(fieldElement.String()).c_str())) {
+							fieldCount++;
+						}
+					}
+
+					if(fieldCount == shardKey->nFields()) {
+						return NULL;
+					}
+    			}
+    		}
+    		else {
+    			ExpressionFieldPath* fieldExpression(dynamic_cast<ExpressionFieldPath *>(pIdExpression.get()));
+    			//field path expression can only references one field.
+    			//group _id must meet ((shardKey UNION groupId) EQ groupId)
+    			if(fieldExpression && shardKey->nFields() == 1 &&
+    					shardKey->hasField(fieldExpression->getFieldPath(false).c_str())) {
+					return NULL;
+    			}
+    		}
+    	}
+
         intrusive_ptr<ExpressionContext> pMergerExpCtx = pExpCtx->clone();
         pMergerExpCtx->setDoingMerge(true);
         intrusive_ptr<DocumentSourceGroup> pMerger(DocumentSourceGroup::create(pMergerExpCtx));

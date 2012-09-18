@@ -17,8 +17,8 @@
 #pragma once
 
 #include "mongo/pch.h"
-
 #include "util/intrusive_counter.h"
+#include "bson/bsonobj.h"
 
 namespace mongo {
 
@@ -32,10 +32,12 @@ namespace mongo {
         void setDoingMerge(bool b);
         void setInShard(bool b);
         void setInRouter(bool b);
+        void setShardKey(BSONObj* shardKey);
 
         bool getDoingMerge() const;
         bool getInShard() const;
         bool getInRouter() const;
+        BSONObj* getShardKey();
 
         /**
            Used by a pipeline to check for interrupts so that killOp() works.
@@ -46,15 +48,16 @@ namespace mongo {
 
         ExpressionContext* clone();
 
-        static ExpressionContext *create(InterruptStatus *pStatus);
+        static ExpressionContext *create(BSONObj* shardKey, InterruptStatus *pStatus);
 
     private:
-        ExpressionContext(InterruptStatus *pStatus);
+        ExpressionContext(BSONObj* shardKey, InterruptStatus *pStatus);
         
         bool doingMerge;
         bool inShard;
         bool inRouter;
         unsigned intCheckCounter; // interrupt check counter
+        BSONObj* shardKey;
         InterruptStatus *const pStatus;
     };
 }
@@ -87,5 +90,9 @@ namespace mongo {
     inline bool ExpressionContext::getInRouter() const {
         return inRouter;
     }
+
+    inline BSONObj* ExpressionContext::getShardKey() {
+		return shardKey;
+	}
 
 };

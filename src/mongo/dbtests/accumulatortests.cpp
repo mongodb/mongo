@@ -28,12 +28,15 @@
 
 namespace AccumulatorTests {
 
+	static const char* const ns = "unittests";
+	static BSONObj* shardKey = NULL;
+
     class Base {
     public:
         Base() :
-            _standalone( ExpressionContext::create( &InterruptStatusMongod::status ) ),
-            _shard( ExpressionContext::create( &InterruptStatusMongod::status ) ),
-            _router( ExpressionContext::create( &InterruptStatusMongod::status ) ) {
+            _standalone( ExpressionContext::create(shardKey, &InterruptStatusMongod::status ) ),
+            _shard( ExpressionContext::create(shardKey, &InterruptStatusMongod::status ) ),
+            _router( ExpressionContext::create(shardKey, &InterruptStatusMongod::status ) ) {
                 _standalone->setInShard( false );
                 _standalone->setDoingMerge( false );
                 _shard->setInShard( true );
