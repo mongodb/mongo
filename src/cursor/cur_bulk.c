@@ -69,7 +69,12 @@ __wt_curbulk_init(WT_CURSOR_BULK *cbulk)
 {
 	WT_CURSOR *c = &cbulk->cbt.iface;
 
-	/* Bulk cursors only support insert and close. */
+	/*
+	 * Bulk cursors only support insert and close (reset is a no-op).
+	 * This is slightly tricky because cursor.reset is called during
+	 * checkpoints, which means checkpoints have to handle open bulk
+	 * cursors.
+	 */
 	__wt_cursor_set_notsup(c);
 	c->insert = __curbulk_insert;
 	c->close = __curbulk_close;
