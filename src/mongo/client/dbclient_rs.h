@@ -448,6 +448,12 @@ namespace mongo {
 
         // ---- access raw connections ----
 
+        /**
+         * WARNING: this method is very dangerous - this object can decide to free the
+         *     returned master connection any time.
+         *
+         * @return the reference to the address that points to the master connection.
+         */
         DBClientConnection& masterConn();
         DBClientConnection& slaveConn();
 
