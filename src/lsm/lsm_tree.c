@@ -195,6 +195,11 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	}
 	WT_RET_NOTFOUND_OK(ret);
 
+	WT_RET(__wt_config_gets(session, cfg, "key_format", &cval));
+	if (WT_STRING_MATCH("r", cval.str, cval.len))
+		WT_RET_MSG(session, EINVAL,
+		    "LSM trees cannot be configured as column stores");
+
 	/*
 	 * XXX this call should just insert the metadata: most of this should
 	 * move to __wt_lsm_tree_open.
