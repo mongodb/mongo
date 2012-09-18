@@ -78,7 +78,7 @@ namespace mongo {
                     return runNoDirectClient( ns , 
                                               query , fields , update , 
                                               upsert , returnNew , remove , 
-                                              result );
+                                              result , errmsg );
                 }
                 catch ( PageFaultException& e ) {
                     e.touch();
@@ -108,7 +108,7 @@ namespace mongo {
         bool runNoDirectClient( const string& ns , 
                                 const BSONObj& queryOriginal , const BSONObj& fields , const BSONObj& update , 
                                 bool upsert , bool returnNew , bool remove ,
-                                BSONObjBuilder& result ) {
+                                BSONObjBuilder& result , string& errmsg ) {
             
             
             Lock::DBWrite lk( ns );
@@ -177,11 +177,21 @@ namespace mongo {
                     UpdateResult res = updateObjects( ns.c_str() , update , queryModified , upsert , false , true , cc().curop()->debug() );
                     
                     if ( returnNew ) {
-                        if ( ! res.existing && res.upserted.isSet() ) {
+                        if ( res.upserted.isSet() ) {
                             queryModified = BSON( "_id" << res.upserted );
                         }
-                        log() << "queryModified: " << queryModified << endl;
-                        verify( Helpers::findOne( ns.c_str() , queryModified , doc ) );
+                        else if ( queryModified["_id"].type() ) {
+                            // we do this so that if the update changes the fields, it still matches
+                            queryModified = queryModified["_id"].wrap();
+                        }
+                        if ( ! Helpers::findOne( ns.c_str() , queryModified , doc ) ) {
+                            errmsg = str::stream() << "can't find object after modification  " 
+                                                   << " ns: " << ns 
+                                                   << " queryModified: " << queryModified 
+                                                   << " queryOriginal: " << queryOriginal;
+                            log() << errmsg << endl;
+                            return false;
+                        }
                         _appendHelper( result , doc , true , fields );
                     }
                     
