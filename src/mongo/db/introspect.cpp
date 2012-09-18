@@ -25,10 +25,6 @@
 #include "pdfile.h"
 #include "curop.h"
 
-namespace {
-    const size_t MAX_PROFILE_DOC_SIZE_BYTES = 100*1024;
-}
-
 namespace mongo {
 
     BufBuilder profileBufBuilder; // reused, instead of allocated every time - avoids a malloc/free cycle
@@ -43,23 +39,20 @@ namespace mongo {
         // build object
         profileBufBuilder.reset();
         BSONObjBuilder b(profileBufBuilder);
-
-        const bool isQueryObjTooBig = !currentOp.debug().append(currentOp, b,
-                MAX_PROFILE_DOC_SIZE_BYTES);
-
         b.appendDate("ts", jsTime());
-        b.append("client", c.clientAddress());
+        currentOp.debug().append( currentOp , b );
 
-        if (c.getAuthenticationInfo()) {
-            b.append("user", c.getAuthenticationInfo()->getUser(nsToDatabase(ns)));
-        }
+        b.append("client", c.clientAddress() );
+
+        if ( c.getAuthenticationInfo() )
+            b.append( "user" , c.getAuthenticationInfo()->getUser( nsToDatabase( ns ) ) );
 
         BSONObj p = b.done();
 
-        if (static_cast<size_t>(p.objsize()) > MAX_PROFILE_DOC_SIZE_BYTES || isQueryObjTooBig) {
+        if (p.objsize() > 100*1024){
             string small = p.toString(/*isArray*/false, /*full*/false);
 
-            warning() << "can't add full line to system.profile: " << small << endl;
+            warning() << "can't add full line to system.profile: " << small;
 
             // rebuild with limited info
             BSONObjBuilder b(profileBufBuilder);
@@ -69,9 +62,7 @@ namespace mongo {
                 b.append( "user" , c.getAuthenticationInfo()->getUser( nsToDatabase( ns ) ) );
 
             b.append("err", "profile line too large (max is 100KB)");
-
-            // should be much smaller but if not don't break anything
-            if (small.size() < MAX_PROFILE_DOC_SIZE_BYTES){
+            if (small.size() < 100*1024){ // should be much smaller but if not don't break anything
                 b.append("abbreviated", small);
             }
 
