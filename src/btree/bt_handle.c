@@ -45,12 +45,14 @@ __wt_btree_open(WT_SESSION_IMPL *session,
 {
 	WT_BTREE *btree;
 	WT_CONFIG_ITEM cval;
+	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 	WT_ITEM dsk;
 	const char *filename;
 	int forced_salvage;
 
 	btree = session->btree;
+	dhandle = &btree->dhandle;
 	WT_CLEAR(dsk);
 
 	/* Initialize and configure the WT_BTREE structure. */
@@ -66,12 +68,12 @@ __wt_btree_open(WT_SESSION_IMPL *session,
 	}
 
 	/* Connect to the underlying block manager. */
-	filename = btree->name;
+	filename = dhandle->name;
 	if (!WT_PREFIX_SKIP(filename, "file:"))
 		WT_ERR_MSG(session, EINVAL, "expected a 'file:' URI");
 
 	WT_ERR(__wt_bm_open(
-	    session, filename, btree->config, cfg, forced_salvage));
+	    session, filename, dhandle->config, cfg, forced_salvage));
 
 	/*
 	 * Open the specified checkpoint unless it's a special command (special
@@ -114,12 +116,14 @@ int
 __wt_btree_close(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
+	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 
 	btree = session->btree;
+	dhandle = &btree->dhandle;
 
 	/* Unload the checkpoint, unless it's a special command. */
-	if (F_ISSET(btree, WT_BTREE_OPEN) &&
+	if (F_ISSET(dhandle, WT_DHANDLE_OPEN) &&
 	    !F_ISSET(btree,
 	    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY))
 		WT_TRET(__wt_bm_checkpoint_unload(session));
@@ -157,7 +161,7 @@ __btree_conf(WT_SESSION_IMPL *session)
 
 	btree = session->btree;
 	conn = S2C(session);
-	config = btree->config;
+	config = btree->dhandle.config;
 
 	/* Validate file types and check the data format plan. */
 	WT_RET(__wt_config_getones(session, config, "key_format", &cval));
@@ -209,7 +213,7 @@ __btree_conf(WT_SESSION_IMPL *session)
 	WT_RET(__btree_page_sizes(session, config));
 
 	/* Eviction; the metadata file is never evicted. */
-	if (strcmp(btree->name, WT_METADATA_URI) == 0)
+	if (WT_IS_METADATA(btree))
 		F_SET(btree, WT_BTREE_NO_EVICTION | WT_BTREE_NO_HAZARD);
 	else {
 		WT_RET(__wt_config_getones(
@@ -225,18 +229,18 @@ __btree_conf(WT_SESSION_IMPL *session)
 
 	/* Reconciliation configuration. */
 	WT_RET(__wt_config_getones(
-	    session, btree->config, "dictionary", &cval));
+	    session, config, "dictionary", &cval));
 	btree->dictionary = (u_int)cval.val;
 
 	WT_RET(__wt_config_getones(
-	    session, btree->config, "internal_key_truncate", &cval));
+	    session, config, "internal_key_truncate", &cval));
 	btree->internal_key_truncate = cval.val == 0 ? 0 : 1;
 
 	WT_RET(__wt_config_getones(
-	    session, btree->config, "prefix_compression", &cval));
+	    session, config, "prefix_compression", &cval));
 	btree->prefix_compression = cval.val == 0 ? 0 : 1;
 
-	WT_RET(__wt_config_getones(session, btree->config, "split_pct", &cval));
+	WT_RET(__wt_config_getones(session, config, "split_pct", &cval));
 	btree->split_pct = (u_int)cval.val;
 
 	WT_RET(__wt_stat_alloc_btree_stats(session, &btree->stats));

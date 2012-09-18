@@ -582,7 +582,7 @@ extern int __wt_conn_btree_apply(WT_SESSION_IMPL *session,
     const char *[]),
     const char *cfg[]);
 extern int __wt_conn_btree_close(WT_SESSION_IMPL *session, int locked);
-extern int __wt_conn_btree_close_all(WT_SESSION_IMPL *session,
+extern int __wt_conn_dhandle_close_all(WT_SESSION_IMPL *session,
     const char *name);
 extern int __wt_conn_btree_discard(WT_CONNECTION_IMPL *conn);
 extern int __wt_connection_init(WT_CONNECTION_IMPL *conn);
@@ -1012,7 +1012,7 @@ extern int __wt_open_session(WT_CONNECTION_IMPL *conn,
     const char *config,
     WT_SESSION_IMPL **sessionp);
 extern int __wt_session_add_btree( WT_SESSION_IMPL *session,
-    WT_BTREE_SESSION **btree_sessionp);
+    WT_DATA_HANDLE_CACHE **dhandle_cachep);
 extern int __wt_session_lock_btree(WT_SESSION_IMPL *session, uint32_t flags);
 extern int __wt_session_release_btree(WT_SESSION_IMPL *session);
 extern int __wt_session_get_btree_ckpt(WT_SESSION_IMPL *session,
@@ -1027,7 +1027,7 @@ extern int __wt_session_get_btree(WT_SESSION_IMPL *session,
 extern int __wt_session_lock_checkpoint(WT_SESSION_IMPL *session,
     const char *checkpoint);
 extern int __wt_session_discard_btree( WT_SESSION_IMPL *session,
-    WT_BTREE_SESSION *btree_session);
+    WT_DATA_HANDLE_CACHE *dhandle_cache);
 extern int __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[]);
 extern void __wt_event_handler_set(WT_SESSION_IMPL *session,
     WT_EVENT_HANDLER *handler);

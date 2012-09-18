@@ -414,7 +414,7 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 	cindex->key_plan = idx->key_plan;
 	cindex->value_plan = idx->value_plan;
 
-	cursor->uri = cbt->btree->name;
+	cursor->uri = cbt->btree->dhandle.name;
 	cursor->key_format = idx->idxkey_format;
 	cursor->value_format = table->value_format;
 

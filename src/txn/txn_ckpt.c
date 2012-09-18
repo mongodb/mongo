@@ -18,6 +18,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_BTREE *btree, *saved_btree;
 	WT_CONFIG targetconf;
 	WT_CONFIG_ITEM cval, k, v;
+	WT_DATA_HANDLE *dhandle;
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
 	WT_SESSION *wt_session;
@@ -93,9 +94,12 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	}
 
 	/* Checkpoint the metadata file. */
-	TAILQ_FOREACH(btree, &conn->btqh, q)
-		if (strcmp(btree->name, WT_METADATA_URI) == 0)
+	TAILQ_FOREACH(dhandle, &conn->dhqh, q) {
+		btree = (WT_BTREE *)dhandle;
+		if (WT_IS_METADATA(btree) ||
+		    !WT_PREFIX_MATCH(dhandle->name, "file:"))
 			break;
+	}
 	if (btree == NULL)
 		WT_ERR_MSG(session, EINVAL,
 		    "checkpoint unable to find open meta-data handle");
@@ -264,6 +268,7 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_CONFIG dropconf;
 	WT_CONFIG_ITEM cval, k, v;
 	WT_CONNECTION_IMPL *conn;
+	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 	WT_TXN *txn;
 	WT_TXN_ISOLATION saved_isolation;
@@ -274,6 +279,7 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	conn = S2C(session);
 	btree = session->btree;
 	ckpt = ckptbase = NULL;
+	dhandle = &btree->dhandle;
 	name_alloc = NULL;
 	txn = &session->txn;
 	saved_isolation = txn->isolation;
@@ -289,7 +295,7 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * in checkpoints.   Closing one discards its blocks, otherwise there's
 	 * no work to do.
 	 */
-	if (btree->checkpoint != NULL)
+	if (dhandle->checkpoint != NULL)
 		return (is_checkpoint ? 0 :
 		    __wt_bt_cache_flush(
 		    session, NULL, WT_SYNC_DISCARD_NOWRITE));
@@ -310,7 +316,7 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * the cache without bothering to write any dirty pages.
 	 */
 	if ((ret = __wt_meta_ckptlist_get(
-	    session, btree->name, &ckptbase)) == WT_NOTFOUND)
+	    session, dhandle->name, &ckptbase)) == WT_NOTFOUND)
 		return (__wt_bt_cache_flush(
 		    session, NULL, WT_SYNC_DISCARD_NOWRITE));
 	WT_ERR(ret);
@@ -494,7 +500,7 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/* Update the object's metadata. */
 	txn->isolation = TXN_ISO_READ_UNCOMMITTED;
-	ret = __wt_meta_ckptlist_set(session, btree->name, ckptbase);
+	ret = __wt_meta_ckptlist_set(session, dhandle->name, ckptbase);
 	WT_ERR(ret);
 
 	/*

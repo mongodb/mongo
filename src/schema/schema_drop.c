@@ -25,14 +25,14 @@ __drop_file(
 
 	if (session->btree == NULL &&
 	    (ret = __wt_session_get_btree(session, uri, NULL, cfg,
-	    WT_BTREE_EXCLUSIVE | WT_BTREE_LOCK_ONLY)) != 0) {
+	    WT_DHANDLE_EXCLUSIVE | WT_DHANDLE_LOCK_ONLY)) != 0) {
 		if (ret == WT_NOTFOUND || ret == ENOENT)
 			ret = 0;
 		return (ret);
 	}
 
 	/* Close all btree handles associated with this file. */
-	WT_RET(__wt_conn_btree_close_all(session, uri));
+	WT_RET(__wt_conn_dhandle_close_all(session, uri));
 
 	/* Remove the metadata entry (ignore missing items). */
 	WT_TRET(__wt_metadata_remove(session, uri));
@@ -64,6 +64,7 @@ __drop_tree(
 	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_ITEM *buf;
+	const char *name;
 
 	btree = session->btree;
 	buf = NULL;
@@ -78,9 +79,9 @@ __drop_tree(
 	 * __drop_file closes the WT_BTREE handle, so we copy the
 	 * WT_BTREE->name field to save the URI.
 	 */
+	name = btree->dhandle.name;
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));
-	WT_ERR(__wt_buf_set(
-	    session, buf, btree->name, strlen(btree->name) + 1));
+	WT_ERR(__wt_buf_set(session, buf, name, strlen(name) + 1));
 	WT_ERR(__drop_file(session, buf->data, force, cfg));
 
 err:	__wt_scr_free(&buf);
@@ -116,7 +117,7 @@ __drop_colgroup(
 	 * __wt_conn_btree_close_all.
 	 */
 	if ((ret = __wt_schema_get_btree(session, uri, strlen(uri), cfg,
-	    WT_BTREE_EXCLUSIVE | WT_BTREE_LOCK_ONLY)) != 0) {
+	    WT_DHANDLE_EXCLUSIVE | WT_DHANDLE_LOCK_ONLY)) != 0) {
 		if (ret == WT_NOTFOUND || ret == ENOENT)
 			ret = 0;
 		return (ret);
@@ -159,7 +160,7 @@ __drop_index(
 	 * __wt_conn_btree_close_all.
 	 */
 	if ((ret = __wt_schema_get_btree(session, uri, strlen(uri), cfg,
-	    WT_BTREE_EXCLUSIVE | WT_BTREE_LOCK_ONLY)) != 0) {
+	    WT_DHANDLE_EXCLUSIVE | WT_DHANDLE_LOCK_ONLY)) != 0) {
 		if (ret == WT_NOTFOUND || ret == ENOENT)
 			ret = 0;
 		return (ret);

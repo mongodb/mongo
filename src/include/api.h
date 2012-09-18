@@ -20,14 +20,14 @@ struct __wt_process {
  * Implementation of WT_SESSION
  *******************************************/
 /*
- * WT_BTREE_SESSION --
- *	Per-session cache of btree handles to avoid synchronization when
- * opening cursors.
+ * WT_DATA_HANDLE_CACHE --
+ *	Per-session cache of handles to avoid synchronization when opening
+ *	cursors.
  */
-struct __wt_btree_session {
-	WT_BTREE *btree;
+struct __wt_data_handle_cache {
+	WT_DATA_HANDLE *dhandle;
 
-	TAILQ_ENTRY(__wt_btree_session) q;
+	TAILQ_ENTRY(__wt_data_handle_cache) q;
 };
 
 /*
@@ -67,7 +67,7 @@ struct __wt_session_impl {
 	WT_EVENT_HANDLER *event_handler;/* Application's event handlers */
 
 	WT_BTREE *btree;		/* Current file */
-	TAILQ_HEAD(__btrees, __wt_btree_session) btrees;
+	TAILQ_HEAD(__dhandles, __wt_data_handle_cache) dhandles;
 
 	WT_CURSOR *cursor;		/* Current cursor */
 					/* Cursors closed with the session */
@@ -202,8 +202,8 @@ struct __wt_connection_impl {
 
 	pthread_t cache_evict_tid;	/* Cache eviction server thread ID */
 
-					/* Locked: btree list */
-	TAILQ_HEAD(__wt_btree_qh, __wt_btree) btqh;
+					/* Locked: data handle list */
+	TAILQ_HEAD(__wt_dh_qh, __wt_data_handle) dhqh;
 					/* Locked: LSM handle list. */
 	TAILQ_HEAD(__wt_lsm_qh, __wt_lsm_tree) lsmqh;
 					/* Locked: file list */

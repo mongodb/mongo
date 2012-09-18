@@ -97,7 +97,7 @@ __verify_int(WT_SESSION_IMPL *session, int dumpfile)
 	WT_ERR(__wt_scr_alloc(session, 0, &vs->tmp2));
 
 	/* Get a list of the checkpoints for this file. */
-	WT_ERR(__wt_meta_ckptlist_get(session, btree->name, &ckptbase));
+	WT_ERR(__wt_meta_ckptlist_get(session, btree->dhandle.name, &ckptbase));
 
 	/* Inform the underlying block manager we're verifying. */
 	WT_ERR(__wt_bm_verify_start(session, ckptbase));
@@ -105,7 +105,7 @@ __verify_int(WT_SESSION_IMPL *session, int dumpfile)
 	/* Loop through the file's checkpoints, verifying each one. */
 	WT_CKPT_FOREACH(ckptbase, ckpt) {
 		WT_VERBOSE_ERR(session, verify,
-		    "%s: checkpoint %s", btree->name, ckpt->name);
+		    "%s: checkpoint %s", btree->dhandle.name, ckpt->name);
 
 		/* House-keeping between checkpoints. */
 		__verify_checkpoint_reset(vs);

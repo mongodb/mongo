@@ -710,6 +710,7 @@ __evict_walk(WT_SESSION_IMPL *session)
 	WT_BTREE *btree;
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
+	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 	u_int elem, i;
 
@@ -740,7 +741,12 @@ __evict_walk(WT_SESSION_IMPL *session)
 	 * servicing eviction requests.
 	 */
 	i = WT_EVICT_WALK_BASE;
-	TAILQ_FOREACH(btree, &conn->btqh, q) {
+	TAILQ_FOREACH(dhandle, &conn->dhqh, q) {
+		if (!WT_PREFIX_MATCH(dhandle->name, "file:") ||
+		    !F_ISSET(dhandle, WT_DHANDLE_OPEN))
+			continue;
+		btree = (WT_BTREE *)dhandle;
+
 		/*
 		 * Skip files that aren't open or don't have a root page.
 		 *
@@ -750,8 +756,7 @@ __evict_walk(WT_SESSION_IMPL *session)
 		 * to a bulk-loaded object, and empty trees aren't worth trying
 		 * to evict, anyway.
 		 */
-		if (!F_ISSET(btree, WT_BTREE_OPEN) ||
-		    btree->root_page == NULL ||
+		if (btree->root_page == NULL ||
 		    F_ISSET(btree, WT_BTREE_NO_EVICTION) ||
 		    btree->bulk_load_ok)
 			continue;

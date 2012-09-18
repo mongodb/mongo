@@ -328,7 +328,7 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 	cursor = &cbt->iface;
 	*cursor = iface;
 	cursor->session = &session->iface;
-	cursor->uri = btree->name;
+	cursor->uri = btree->dhandle.name;
 	cursor->key_format = btree->key_format;
 	cursor->value_format = btree->value_format;
 
@@ -378,10 +378,10 @@ __wt_curfile_open(WT_SESSION_IMPL *session, const char *uri,
 	/* Get the handle and lock it while the cursor is using it. */
 	if (WT_PREFIX_MATCH(uri, "colgroup:") || WT_PREFIX_MATCH(uri, "index:"))
 		WT_RET(__wt_schema_get_btree(session, uri, strlen(uri), cfg,
-		    bulk ? WT_BTREE_BULK | WT_BTREE_EXCLUSIVE : 0));
+		    bulk ? WT_BTREE_BULK | WT_DHANDLE_EXCLUSIVE : 0));
 	else if (WT_PREFIX_MATCH(uri, "file:"))
 		WT_RET(__wt_session_get_btree_ckpt(session, uri, cfg,
-		    bulk ? WT_BTREE_BULK | WT_BTREE_EXCLUSIVE : 0));
+		    bulk ? WT_BTREE_BULK | WT_DHANDLE_EXCLUSIVE : 0));
 	else
 		WT_RET(__wt_bad_object_type(session, uri));
 

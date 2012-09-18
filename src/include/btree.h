@@ -60,22 +60,32 @@
 #define	WT_CLEAR_BTREE_IN_SESSION(s)	((s)->btree = NULL)
 
 /*
- * WT_BTREE --
- *	A btree handle.
+ * WT_DATA_HANDLE --
+ *	A handle for a generic named data source.
  */
-struct __wt_btree {
+struct __wt_data_handle {
 	WT_RWLOCK *rwlock;		/* Lock for shared/exclusive ops */
 	uint32_t   refcnt;		/* Sessions using this tree. */
-	TAILQ_ENTRY(__wt_btree) q;	/* Linked list of handles */
+	TAILQ_ENTRY(__wt_data_handle) q;/* Linked list of handles */
 
 	const char *name;		/* Object name as a URI */
 	const char *checkpoint;		/* Checkpoint name (or NULL) */
 	const char *config;		/* Configuration string */
 
-	/*
-	 * XXX Everything above here should move into the session-level
-	 * handle structure.
-	 */
+	/* Flags values over 0xff are reserved for WT_BTREE_* */
+#define	WT_DHANDLE_DISCARD	0x01	/* Discard on release */
+#define	WT_DHANDLE_EXCLUSIVE	0x02	/* Need exclusive access to handle */
+#define	WT_DHANDLE_LOCK_ONLY	0x04	/* Handle is only needed for locking */
+#define	WT_DHANDLE_OPEN		0x08	/* Handle is open */
+	uint32_t flags;
+};
+
+/*
+ * WT_BTREE --
+ *	A btree handle.
+ */
+struct __wt_btree {
+	WT_DATA_HANDLE dhandle;
 
 	WT_CKPT	  *ckpt;		/* Checkpoint information */
 
@@ -121,16 +131,13 @@ struct __wt_btree {
 
 	WT_BTREE_STATS *stats;		/* Btree statistics */
 
-#define	WT_BTREE_BULK		0x0001	/* Bulk-load handle */
-#define	WT_BTREE_DISCARD	0x0002	/* Discard on release */
-#define	WT_BTREE_EXCLUSIVE	0x0004	/* Need exclusive access to handle */
-#define	WT_BTREE_LOCK_ONLY	0x0008	/* Handle is only needed for locking */
-#define	WT_BTREE_NO_EVICTION	0x0010	/* Disable eviction */
-#define	WT_BTREE_NO_HAZARD	0x0020	/* Disable hazard references */
-#define	WT_BTREE_OPEN		0x0040	/* Handle is open */
-#define	WT_BTREE_SALVAGE	0x0080	/* Handle is for salvage */
-#define	WT_BTREE_UPGRADE	0x0100	/* Handle is for upgrade */
-#define	WT_BTREE_VERIFY		0x0200	/* Handle is for verify */
+	/* Flags values up to 0xff are reserved for WT_DHANDLE_* */
+#define	WT_BTREE_BULK		0x00100	/* Bulk-load handle */
+#define	WT_BTREE_NO_EVICTION	0x01000	/* Disable eviction */
+#define	WT_BTREE_NO_HAZARD	0x02000	/* Disable hazard references */
+#define	WT_BTREE_SALVAGE	0x08000	/* Handle is for salvage */
+#define	WT_BTREE_UPGRADE	0x10000	/* Handle is for upgrade */
+#define	WT_BTREE_VERIFY		0x20000	/* Handle is for verify */
 	uint32_t flags;
 };
 

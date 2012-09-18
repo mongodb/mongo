@@ -114,7 +114,7 @@ __meta_track_apply(WT_SESSION_IMPL *session, WT_META_TRACK *trk, int unroll)
 		saved_btree = session->btree;
 		session->btree = trk->btree;
 		if (unroll && trk->created)
-			F_SET(session->btree, WT_BTREE_DISCARD);
+			F_SET(&session->btree->dhandle, WT_DHANDLE_DISCARD);
 		WT_TRET(__wt_session_release_btree(session));
 		session->btree = saved_btree;
 		break;

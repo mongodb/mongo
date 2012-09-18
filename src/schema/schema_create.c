@@ -65,7 +65,7 @@ __create_file(WT_SESSION_IMPL *session,
 	 * call, otherwise we could race with a drop.
 	 */
 	WT_ERR(__wt_conn_btree_get(
-	    session, uri, NULL, cfg, WT_BTREE_EXCLUSIVE));
+	    session, uri, NULL, cfg, WT_DHANDLE_EXCLUSIVE));
 	if (WT_META_TRACKING(session))
 		WT_ERR(__wt_meta_track_handle_lock(session, 1));
 	else
