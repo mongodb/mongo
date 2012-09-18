@@ -232,6 +232,8 @@ namespace mongo {
                << " version: " << version << " manager: " << manager.get()
                << endl;
 
+        const string versionableServerAddress(conn->getServerAddress());
+
         BSONObj result;
         if ( setShardVersion( *conn , ns , version , authoritative , result ) ) {
             // success!
@@ -246,7 +248,9 @@ namespace mongo {
             massert( 10428 ,  "need_authoritative set but in authoritative mode already" , ! authoritative );
 
         if ( ! authoritative ) {
-            checkShardVersion( conn , ns , refManager, 1 , tryNumber + 1 );
+            // use the original connection and get a fresh versionable connection
+            // since conn can be invalidated (or worse, freed) after the failure
+            checkShardVersion(conn_in, ns, refManager, 1, tryNumber + 1);
             return true;
         }
         
@@ -268,13 +272,15 @@ namespace mongo {
         const int maxNumTries = 7;
         if ( tryNumber < maxNumTries ) {
             LOG( tryNumber < ( maxNumTries / 2 ) ? 1 : 0 ) 
-                << "going to retry checkShardVersion host: " << conn->getServerAddress() << " " << result << endl;
+                << "going to retry checkShardVersion host: " << versionableServerAddress << " " << result << endl;
             sleepmillis( 10 * tryNumber );
-            checkShardVersion( conn , ns , refManager, true , tryNumber + 1 );
+            // use the original connection and get a fresh versionable connection
+            // since conn can be invalidated (or worse, freed) after the failure
+            checkShardVersion(conn_in, ns, refManager, true, tryNumber + 1);
             return true;
         }
         
-        string errmsg = str::stream() << "setShardVersion failed host: " << conn->getServerAddress() << " " << result;
+        string errmsg = str::stream() << "setShardVersion failed host: " << versionableServerAddress << " " << result;
         log() << "     " << errmsg << endl;
         massert( 10429 , errmsg , 0 );
         return true;
