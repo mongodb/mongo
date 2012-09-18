@@ -927,7 +927,6 @@ env.Alias( "style" , [] , [ doStyling ] )
 env.AlwaysBuild( "style" )
 
 
-
 #  ----  INSTALL -------
 
 def getSystemInstallName():
@@ -936,19 +935,21 @@ def getSystemInstallName():
         n += "-static"
     if has_option("nostrip"):
         n += "-debugsymbols"
-    if nix and os.uname()[2].startswith( "8." ):
+    if nix and os.uname()[2].startswith("8."):
         n += "-tiger"
+
+    if len(env.get("MONGO_MODULES", None)):
+            n += "-" + "-".join(env["MONGO_MODULES"].keys())
 
     try:
         findSettingsSetup()
         import settings
-        if "distmod" in dir( settings ):
-            n = n + "-" + str( settings.distmod )
+        if "distmod" in dir(settings):
+            n = n + "-" + str(settings.distmod)
     except:
         pass
 
-
-    dn = GetOption( "distmod" )
+    dn = GetOption("distmod")
     if dn and len(dn) > 0:
         n = n + "-" + dn
 
