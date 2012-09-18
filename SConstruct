@@ -861,7 +861,7 @@ def doConfigure(myenv):
 
     # discover modules (subdirectories of db/modules/), and
     # load the (python) module for each module's build.py
-    modules = moduleconfig.discover_modules('.')
+    modules = moduleconfig.discover_modules('src/mongo/')
 
     # ask each module to configure itself, and return a
     # dictionary of name => list_of_sources for each module.
