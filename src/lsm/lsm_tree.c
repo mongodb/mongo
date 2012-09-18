@@ -162,9 +162,11 @@ __lsm_tree_start_worker(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	lsm_tree->worker_session = (WT_SESSION_IMPL *)wt_session;
 	F_SET(lsm_tree->worker_session, WT_SESSION_INTERNAL);
 
+	F_SET(lsm_tree, WT_LSM_TREE_OPEN);
+	/* The new thread will rely on the OPEN value being visible. */
+	WT_FULL_BARRIER();
 	WT_RET(__wt_thread_create(
 	    &lsm_tree->worker_tid, __wt_lsm_worker, lsm_tree));
-	F_SET(lsm_tree, WT_LSM_TREE_OPEN);
 
 	return (0);
 }
