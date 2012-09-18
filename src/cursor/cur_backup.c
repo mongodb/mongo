@@ -471,14 +471,19 @@ __backup_table_element(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb,
 		WT_ERR_TEST(
 		    (fprintf(bfp, "%s\n%s\n", key, value) < 0), __wt_errno());
 
-		/* Save the file name. */
-		WT_ERR(__wt_config_getones(session, value, "filename", &cval));
-		if (cval.len > 0) {
-			WT_ERR(__wt_buf_fmt(
-			    session, tmp, "%.*s", (int)cval.len, cval.str));
+		/* Save the source URI, if it is a file. */
+		WT_ERR(__wt_config_getones(session, value, "source", &cval));
+		if (cval.len > strlen("file:") &&
+		    WT_PREFIX_MATCH(cval.str, "file:")) {
+			WT_ERR(__wt_buf_fmt(session, tmp, "%.*s",
+			    (int)(cval.len - strlen("file:")),
+			    cval.str + strlen("file:")));
 			WT_ERR(__backup_list_append(
 			    session, cb, (char *)tmp->data));
-		}
+		} else
+			WT_ERR_MSG(session, EINVAL,
+			    "%s: unknown data source '%.*s'",
+			    (char *)tmp->data, (int)cval.len, cval.str);
 	}
 
 err:	__wt_scr_free(&tmp);

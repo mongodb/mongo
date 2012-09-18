@@ -77,25 +77,40 @@ err:	__wt_scr_free(&val);
 	return (ret);
 }
 
+int
+__wt_schema_colgroup_source(WT_SESSION_IMPL *session,
+    WT_TABLE *table, const char *cgname, WT_ITEM *buf)
+{
+	const char *tablename;
+
+	tablename = table->name + strlen("table:");
+	if (cgname == NULL)
+		WT_RET(__wt_buf_fmt(session, buf, "file:%s.wt", tablename));
+	else
+		WT_RET(__wt_buf_fmt(session, buf, "file:%s_%s.wt", tablename, cgname));
+
+	return (0);
+}
+
 static int
 __create_colgroup(WT_SESSION_IMPL *session,
     const char *name, int exclusive, const char *config)
 {
 	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
-	WT_ITEM fmt, namebuf, uribuf;
+	WT_ITEM confbuf, fmt, namebuf;
 	WT_TABLE *table;
 	const char *cfg[4] = API_CONF_DEFAULTS(colgroup, meta, config);
-	const char *filecfg[] = { config, NULL, NULL };
+	const char *sourcecfg[] = { config, NULL, NULL };
 	const char **cfgp;
-	const char *cgconf, *cgname, *fileconf, *filename;
-	const char *oldconf, *tablename;
+	const char *cgconf, *cgname, *sourceconf, *oldconf;
+	const char *source, *tablename;
 	size_t tlen;
 
-	cgconf = fileconf = oldconf = NULL;
+	cgconf = sourceconf = oldconf = NULL;
 	WT_CLEAR(fmt);
+	WT_CLEAR(confbuf);
 	WT_CLEAR(namebuf);
-	WT_CLEAR(uribuf);
 
 	tablename = name;
 	if (!WT_PREFIX_SKIP(tablename, "colgroup:"))
@@ -124,24 +139,21 @@ __create_colgroup(WT_SESSION_IMPL *session,
 	for (cfgp = &cfg[1]; *cfgp; cfgp++)
 		;
 
-	/* Add the filename to the colgroup config before collapsing. */
-	if (__wt_config_getones(session, config, "filename", &cval) == 0) {
+	/* Add the source to the colgroup config before collapsing. */
+	if (__wt_config_getones(session, config, "source", &cval) == 0) {
 		WT_ERR(__wt_buf_fmt(
 		    session, &namebuf, "%.*s", (int)cval.len, cval.str));
-		filename = namebuf.data;
+		source = namebuf.data;
 	} else {
-		if (cgname == NULL)
-			WT_ERR(__wt_buf_fmt(session, &namebuf,
-			    "filename=%.*s.wt", (int)tlen, tablename));
-		else
-			WT_ERR(__wt_buf_fmt(session, &namebuf,
-			    "filename=%.*s_%s.wt", (int)tlen, tablename,
-			    cgname));
-		*cfgp++ = filename = namebuf.data;
-		(void)WT_PREFIX_SKIP(filename, "filename=");
+		WT_ERR(__wt_schema_colgroup_source(
+		    session, table, cgname, &namebuf));
+		source = namebuf.data;
+		WT_ERR(__wt_buf_fmt(
+		    session, &confbuf, "source=\"%s\"", source));
+		*cfgp++ = confbuf.data;
 	}
 
-	/* Calculate the key/value formats -- these go into the file config. */
+	/* Calculate the key/value formats: these go into the source config. */
 	WT_ERR(__wt_buf_fmt(session, &fmt, "key_format=%s", table->key_format));
 	if (cgname == NULL)
 		WT_ERR(__wt_buf_catfmt
@@ -154,11 +166,10 @@ __create_colgroup(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_struct_reformat(session,
 		    table, cval.str, cval.len, NULL, 1, &fmt));
 	}
-	filecfg[1] = fmt.data;
-	WT_ERR(__wt_config_concat(session, filecfg, &fileconf));
+	sourcecfg[1] = fmt.data;
+	WT_ERR(__wt_config_concat(session, sourcecfg, &sourceconf));
 
-	WT_ERR(__wt_buf_fmt(session, &uribuf, "file:%s", filename));
-	WT_ERR(__create_file(session, uribuf.data, exclusive, fileconf));
+	WT_ERR(__wt_schema_create(session, source, sourceconf));
 
 	WT_ERR(__wt_config_collapse(session, cfg, &cgconf));
 	if ((ret = __wt_metadata_insert(session, name, cgconf)) != 0) {
@@ -173,12 +184,24 @@ __create_colgroup(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_schema_open_colgroups(session, table));
 
 err:	__wt_free(session, cgconf);
-	__wt_free(session, fileconf);
+	__wt_free(session, sourceconf);
 	__wt_free(session, oldconf);
+	__wt_buf_free(session, &confbuf);
 	__wt_buf_free(session, &fmt);
 	__wt_buf_free(session, &namebuf);
-	__wt_buf_free(session, &uribuf);
 	return (ret);
+}
+
+int
+__wt_schema_index_source(WT_SESSION_IMPL *session,
+    WT_TABLE *table, const char *idxname, WT_ITEM *buf)
+{
+	const char *tablename;
+
+	tablename = table->name + strlen("table:");
+	WT_RET(__wt_buf_fmt(session, buf, "file:%s_%s.wti", tablename, idxname));
+
+	return (0);
 }
 
 static int
@@ -188,21 +211,20 @@ __create_index(WT_SESSION_IMPL *session,
 	WT_CONFIG pkcols;
 	WT_CONFIG_ITEM ckey, cval, icols;
 	WT_DECL_RET;
-	WT_ITEM confbuf, extra_cols, fmt, namebuf, uribuf;
+	WT_ITEM confbuf, extra_cols, fmt, namebuf;
 	WT_TABLE *table;
 	const char *cfg[4] = API_CONF_DEFAULTS(index, meta, NULL);
-	const char *filecfg[] = { config, NULL, NULL };
-	const char *fileconf, *filename, *idxconf, *idxname;
+	const char *sourcecfg[] = { config, NULL, NULL };
+	const char *sourceconf, *source, *idxconf, *idxname;
 	const char *tablename;
 	size_t tlen;
 	int i;
 
-	idxconf = fileconf = NULL;
+	idxconf = sourceconf = NULL;
 	WT_CLEAR(confbuf);
 	WT_CLEAR(fmt);
 	WT_CLEAR(extra_cols);
 	WT_CLEAR(namebuf);
-	WT_CLEAR(uribuf);
 
 	tablename = name;
 	if (!WT_PREFIX_SKIP(tablename, "index:"))
@@ -219,21 +241,18 @@ __create_index(WT_SESSION_IMPL *session,
 		    "Can't create an index for a non-existent table: %.*s",
 		    (int)tlen, tablename);
 
-	if (__wt_config_getones(session, config, "filename", &cval) == 0) {
+	if (__wt_config_getones(session, config, "source", &cval) == 0) {
 		WT_ERR(__wt_buf_fmt(session, &namebuf,
 		    "%.*s", (int)cval.len, cval.str));
-		filename = namebuf.data;
+		source = namebuf.data;
 	} else {
-		WT_ERR(__wt_buf_fmt(session, &namebuf,
-		    "%.*s_%s.wti", (int)tlen, tablename, idxname));
-		filename = namebuf.data;
+		WT_ERR(__wt_schema_index_source(session, table, idxname, &namebuf));
+		source = namebuf.data;
 
-		/* Add the filename to the index config before collapsing. */
+		/* Add the sourcename to the index config before collapsing. */
 		WT_ERR(__wt_buf_catfmt(session, &confbuf,
-		    ",filename=%s", filename));
+		    ",source=\"%s\"", source));
 	}
-
-	(void)WT_PREFIX_SKIP(filename, "filename=");
 
 	/* Calculate the key/value formats. */
 	if (__wt_config_getones(session, config, "columns", &icols) != 0)
@@ -244,7 +263,7 @@ __create_index(WT_SESSION_IMPL *session,
 	 * The key format for an index is somewhat subtle: the application
 	 * specifies a set of columns that it will use for the key, but the
 	 * engine usually adds some hidden columns in order to derive the
-	 * primary key.  These hidden columns are part of the file's
+	 * primary key.  These hidden columns are part of the source's
 	 * key_format, which we are calculating now, but not part of an index
 	 * cursor's key_format.
 	 */
@@ -275,13 +294,12 @@ __create_index(WT_SESSION_IMPL *session,
 		    "column-store index may not use the record number as its "
 		    "index key");
 
-	filecfg[1] = fmt.data;
-	WT_ERR(__wt_config_concat(session, filecfg, &fileconf));
+	sourcecfg[1] = fmt.data;
+	WT_ERR(__wt_config_concat(session, sourcecfg, &sourceconf));
 
-	WT_ERR(__wt_buf_fmt(session, &uribuf, "file:%s", filename));
-	WT_ERR(__create_file(session, uribuf.data, exclusive, fileconf));
+	WT_ERR(__wt_schema_create(session, source, sourceconf));
 
-	cfg[1] = fileconf;
+	cfg[1] = sourceconf;
 	cfg[2] = confbuf.data;
 	WT_ERR(__wt_config_collapse(session, cfg, &idxconf));
 	if ((ret = __wt_metadata_insert(session, name, idxconf)) != 0) {
@@ -294,13 +312,12 @@ __create_index(WT_SESSION_IMPL *session,
 		goto err;
 	}
 
-err:	__wt_free(session, fileconf);
-	__wt_free(session, idxconf);
+err:	__wt_free(session, idxconf);
+	__wt_free(session, sourceconf);
 	__wt_buf_free(session, &confbuf);
 	__wt_buf_free(session, &extra_cols);
 	__wt_buf_free(session, &fmt);
 	__wt_buf_free(session, &namebuf);
-	__wt_buf_free(session, &uribuf);
 	return (ret);
 }
 

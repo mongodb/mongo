@@ -4,12 +4,12 @@
 
 const char *
 __wt_confdfl_colgroup_meta =
-	"columns=,filename=";
+	"columns=,source=";
 
 WT_CONFIG_CHECK
 __wt_confchk_colgroup_meta[] = {
 	{ "columns", "list", NULL },
-	{ "filename", "string", NULL },
+	{ "source", "string", NULL },
 	{ NULL, NULL, NULL }
 };
 
@@ -148,14 +148,14 @@ __wt_confchk_file_meta[] = {
 
 const char *
 __wt_confdfl_index_meta =
-	"columns=,columns=,filename=,key_format=u,value_format=u";
+	"columns=,columns=,key_format=u,source=,value_format=u";
 
 WT_CONFIG_CHECK
 __wt_confchk_index_meta[] = {
 	{ "columns", "list", NULL },
 	{ "columns", "list", NULL },
-	{ "filename", "string", NULL },
 	{ "key_format", "format", NULL },
+	{ "source", "string", NULL },
 	{ "value_format", "format", NULL },
 	{ NULL, NULL, NULL }
 };
@@ -228,7 +228,6 @@ __wt_confchk_session_create[] = {
 	{ "columns", "list", NULL },
 	{ "dictionary", "int", "min=0" },
 	{ "exclusive", "boolean", NULL },
-	{ "filename", "string", NULL },
 	{ "huffman_key", "string", NULL },
 	{ "huffman_value", "string", NULL },
 	{ "internal_item_max", "int", "min=0" },
@@ -243,6 +242,7 @@ __wt_confchk_session_create[] = {
 	{ "lsm_bloom_hash_count", "int", "min=2,max=100" },
 	{ "lsm_chunk_size", "int", "min=512K,max=500MB" },
 	{ "prefix_compression", "boolean", NULL },
+	{ "source", "string", NULL },
 	{ "split_pct", "int", "min=25,max=100" },
 	{ "type", "string", "choices=[\"btree\"]" },
 	{ "value_format", "format", NULL },

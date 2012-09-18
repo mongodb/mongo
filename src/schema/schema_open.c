@@ -55,12 +55,13 @@ __wt_schema_get_btree(WT_SESSION_IMPL *session,
 	WT_ERR(cursor->search(cursor));
 	WT_ERR(cursor->get_value(cursor, &objconf));
 
-	/* Get the filename from the metadata. */
+	/* Get the data source from the metadata. */
 	WT_ERR(__wt_scr_alloc(session, 0, &uribuf));
-	WT_ERR(__wt_config_getones(session, objconf, "filename", &cval));
-	WT_ERR(__wt_buf_fmt(
-	    session, uribuf, "file:%.*s", (int)cval.len, cval.str));
+	WT_ERR(__wt_config_getones(session, objconf, "source", &cval));
+	WT_ERR(__wt_buf_fmt(session, uribuf, "%.*s", (int)cval.len, cval.str));
 	fileuri = uribuf->data;
+	if (!WT_PREFIX_MATCH(fileuri, "file:"))
+		WT_ERR_MSG(session, EINVAL, "Unexpected data source type for '%s': '%s'", objconf, fileuri);
 
 	/* !!! Close the schema cursor first, this overwrites session->btree. */
 	ret = cursor->close(cursor);
@@ -137,8 +138,8 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 		WT_ERR(__wt_config_getones(session,
 		    colgroup->config, "columns", &colgroup->colconf));
 		WT_ERR(__wt_config_getones(
-		    session, colgroup->config, "filename", &cval));
-		WT_ERR(__wt_buf_fmt(session, buf, "file:%.*s",
+		    session, colgroup->config, "source", &cval));
+		WT_ERR(__wt_buf_fmt(session, buf, "%.*s",
 		    (int)cval.len, cval.str));
 		colgroup->source = __wt_buf_steal(session, buf, NULL);
 		table->cgroups[i] = colgroup;
@@ -178,10 +179,10 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table, WT_INDEX *idx)
 
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));
 
-	/* Get the filename from the index config. */
-	WT_ERR(__wt_config_getones(session, idx->config, "filename", &cval));
+	/* Get the data source from the index config. */
+	WT_ERR(__wt_config_getones(session, idx->config, "source", &cval));
 	WT_ERR(__wt_buf_fmt(
-	    session, buf, "file:%.*s", (int)cval.len, cval.str));
+	    session, buf, "%.*s", (int)cval.len, cval.str));
 	idx->source = __wt_buf_steal(session, buf, NULL);
 
 	WT_ERR(__wt_config_getones(session, idx->config, "key_format", &cval));
