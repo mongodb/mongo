@@ -37,7 +37,6 @@ __truncate_file(WT_SESSION_IMPL *session, const char *name)
 static int
 __truncate_table(WT_SESSION_IMPL *session, const char *name)
 {
-	WT_BTREE *btree;
 	WT_DECL_ITEM(namebuf);
 	WT_DECL_RET;
 	WT_TABLE *table;
@@ -56,8 +55,7 @@ __truncate_table(WT_SESSION_IMPL *session, const char *name)
 		WT_ERR(__wt_session_get_btree(session,
 		    table->cgroups[i]->source, NULL, NULL,
 		    WT_DHANDLE_EXCLUSIVE));
-		btree = session->btree;
-		hname = btree->dhandle.name;
+		hname = session->dhandle->name;
 		WT_ERR(
 		    __wt_buf_set(session, namebuf, hname, strlen(hname) + 1));
 		WT_ERR(__truncate_file(session, namebuf->data));
@@ -73,8 +71,7 @@ __truncate_table(WT_SESSION_IMPL *session, const char *name)
 		WT_ERR(__wt_session_get_btree(session,
 		    table->indices[i]->source, NULL, NULL,
 		    WT_DHANDLE_EXCLUSIVE));
-		btree = session->btree;
-		hname = btree->dhandle.name;
+		hname = session->dhandle->name;
 		WT_ERR(__wt_buf_set(
 		    session, namebuf, hname, strlen(hname) + 1));
 		WT_ERR(__truncate_file(session, namebuf->data));

@@ -18,7 +18,7 @@ __wt_cell_unpack_copy(
 	WT_BTREE *btree;
 	void *huffman;
 
-	btree = session->btree;
+	btree = S2BT(session);
 
 	/* Get the cell's data. */
 	switch (unpack->type) {

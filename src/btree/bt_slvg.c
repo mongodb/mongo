@@ -146,7 +146,7 @@ __wt_bt_salvage(
 
 	WT_UNUSED(cfg);
 
-	btree = session->btree;
+	btree = S2BT(session);
 
 	WT_CLEAR(stuff);
 	ss = &stuff;
@@ -451,7 +451,7 @@ __slvg_trk_leaf(WT_SESSION_IMPL *session, WT_PAGE_HEADER *dsk,
 	uint64_t stop_recno;
 	uint32_t i;
 
-	btree = session->btree;
+	btree = S2BT(session);
 	unpack = &_unpack;
 	page = NULL;
 	trk = NULL;
@@ -588,7 +588,7 @@ __slvg_trk_leaf_ovfl(
 	WT_CELL_UNPACK *unpack, _unpack;
 	uint32_t i, ovfl_cnt;
 
-	btree = session->btree;
+	btree = S2BT(session);
 	unpack = &_unpack;
 
 	/*
@@ -1038,7 +1038,7 @@ __slvg_modify_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BTREE *btree;
 
-	btree = session->btree;
+	btree = S2BT(session);
 
 	/* The tree is dirty. */
 	btree->modified = 1;
@@ -1268,7 +1268,7 @@ __slvg_row_range(WT_SESSION_IMPL *session, WT_STUFF *ss)
 	uint32_t i, j;
 	int cmp;
 
-	btree = session->btree;
+	btree = S2BT(session);
 
 	/*
 	 * DO NOT MODIFY THIS CODE WITHOUT REVIEWING THE CORRESPONDING ROW- OR
@@ -1336,7 +1336,7 @@ __slvg_row_range_overlap(
 	 * COLUMN-STORE CODE: THEY ARE IDENTICAL OTHER THAN THE PAGES THAT ARE
 	 * BEING HANDLED.
 	 */
-	btree = session->btree;
+	btree = S2BT(session);
 
 	a_trk = ss->pages[a_slot];
 	b_trk = ss->pages[b_slot];
@@ -1544,7 +1544,7 @@ __slvg_row_trk_update_start(
 	uint32_t i;
 	int cmp, found;
 
-	btree = session->btree;
+	btree = S2BT(session);
 	page = NULL;
 	found = 0;
 
@@ -1714,7 +1714,7 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 	uint32_t i, skip_start, skip_stop;
 	int cmp;
 
-	btree = session->btree;
+	btree = S2BT(session);
 	page = NULL;
 
 	cookie = &_cookie;

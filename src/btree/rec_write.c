@@ -526,7 +526,7 @@ __rec_write_init(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	WT_BTREE *btree;
 	WT_RECONCILE *r;
 
-	btree = session->btree;
+	btree = S2BT(session);
 
 	/* Allocate a reconciliation structure if we don't already have one. */
 	if ((r = session->reconcile) == NULL) {
@@ -817,7 +817,7 @@ __rec_split_init(
 	WT_RECONCILE *r;
 
 	r = session->reconcile;
-	btree = session->btree;
+	btree = S2BT(session);
 
 	/* Ensure the scratch buffer is large enough. */
 	WT_RET(__wt_bm_write_size(session, &max));
@@ -918,7 +918,7 @@ __rec_split(WT_SESSION_IMPL *session)
 	 * times.
 	 */
 	r = session->reconcile;
-	btree = session->btree;
+	btree = S2BT(session);
 	dsk = r->dsk.mem;
 
 	/* Hitting a page boundary resets the dictionary, in all cases. */
@@ -1129,7 +1129,7 @@ __rec_split_fixup(WT_SESSION_IMPL *session)
 	 * the caller's information.
 	 */
 	r = session->reconcile;
-	btree = session->btree;
+	btree = S2BT(session);
 
 	/*
 	 * The data isn't laid out on a page boundary or nul padded; copy it to
@@ -1268,7 +1268,7 @@ __rec_split_row_promote(WT_SESSION_IMPL *session, uint8_t type)
 	const uint8_t *pa, *pb;
 
 	r = session->reconcile;
-	btree = session->btree;
+	btree = S2BT(session);
 	unpack = &_unpack;
 
 	/*
@@ -1349,7 +1349,7 @@ __wt_rec_bulk_init(WT_CURSOR_BULK *cbulk)
 	uint64_t recno;
 
 	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
-	btree = session->btree;
+	btree = S2BT(session);
 	page = cbulk->leaf;
 
 	WT_RET(__rec_write_init(session, page, 0));
@@ -1384,7 +1384,7 @@ __wt_rec_bulk_wrapup(WT_CURSOR_BULK *cbulk)
 
 	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
 	r = session->reconcile;
-	btree = session->btree;
+	btree = S2BT(session);
 
 	switch (btree->type) {
 	case BTREE_COL_FIX:
@@ -1432,7 +1432,7 @@ __wt_rec_row_bulk_insert(WT_CURSOR_BULK *cbulk)
 
 	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
 	r = session->reconcile;
-	btree = session->btree;
+	btree = S2BT(session);
 
 	cursor = &cbulk->cbt.iface;
 	key = &r->k;
@@ -1493,7 +1493,7 @@ __wt_rec_col_fix_bulk_insert(WT_CURSOR_BULK *cbulk)
 
 	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
 	r = session->reconcile;
-	btree = session->btree;
+	btree = S2BT(session);
 	cursor = &cbulk->cbt.iface;
 
 	if (cbulk->entry == cbulk->nrecs) {
@@ -1560,7 +1560,7 @@ __rec_col_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BTREE *btree;
 
-	btree = session->btree;
+	btree = S2BT(session);
 
 	WT_RET(__rec_split_init(
 	    session, page, page->u.intl.recno, btree->maxintlpage));
@@ -1689,7 +1689,7 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 	uint32_t entry, nrecs;
 
 	r = session->reconcile;
-	btree = session->btree;
+	btree = S2BT(session);
 
 	/* Update any changes to the original on-page data items. */
 	WT_SKIP_FOREACH(ins, WT_COL_UPDATE_SINGLE(page)) {
@@ -1777,7 +1777,7 @@ __rec_col_fix_slvg(
 	uint32_t entry, nrecs;
 
 	r = session->reconcile;
-	btree = session->btree;
+	btree = S2BT(session);
 
 	/*
 	 * !!!
@@ -1971,7 +1971,7 @@ __rec_col_var(
 	const void *data;
 
 	r = session->reconcile;
-	btree = session->btree;
+	btree = S2BT(session);
 	last = r->last;
 	unpack = &_unpack;
 
@@ -2336,7 +2336,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	const void *p;
 
 	r = session->reconcile;
-	btree = session->btree;
+	btree = S2BT(session);
 
 	key = &r->k;
 	kpack = &_kpack;
@@ -2825,7 +2825,7 @@ __rec_row_leaf(
 	const void *p;
 
 	r = session->reconcile;
-	btree = session->btree;
+	btree = S2BT(session);
 	slvg_skip = salvage == NULL ? 0 : salvage->skip;
 
 	key = &r->k;
@@ -3162,7 +3162,7 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_INSERT *ins)
 	int ovfl_key;
 
 	r = session->reconcile;
-	btree = session->btree;
+	btree = S2BT(session);
 	key = &r->k;
 	val = &r->v;
 
@@ -3292,7 +3292,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 	uint32_t i;
 
 	r = session->reconcile;
-	btree = session->btree;
+	btree = S2BT(session);
 	mod = page->modify;
 
 	/*
@@ -3663,7 +3663,7 @@ __rec_cell_build_key(WT_SESSION_IMPL *session,
 	const uint8_t *a, *b;
 
 	r = session->reconcile;
-	btree = session->btree;
+	btree = S2BT(session);
 	key = &r->k;
 	*is_ovflp = 0;
 
@@ -3785,7 +3785,7 @@ __rec_cell_build_val(
 	WT_RECONCILE *r;
 
 	r = session->reconcile;
-	btree = session->btree;
+	btree = S2BT(session);
 	val = &r->v;
 
 	/*
@@ -3836,7 +3836,7 @@ __rec_cell_build_ovfl(
 	uint8_t *addr, buf[WT_BTREE_MAX_ADDR_COOKIE];
 
 	r = session->reconcile;
-	btree = session->btree;
+	btree = S2BT(session);
 	page = r->page;
 
 	/* Track the page has overflow items. */

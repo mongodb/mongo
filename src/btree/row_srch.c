@@ -26,7 +26,7 @@ __wt_search_insert(WT_SESSION_IMPL *session,
 		return (0);
 	}
 
-	btree = session->btree;
+	btree = S2BT(session);
 
 	/* Fast-path appends. */
 	insert_key.data = WT_INSERT_KEY(ret_ins);
@@ -104,7 +104,7 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 
 	srch_key = &cbt->iface.key;
 
-	btree = session->btree;
+	btree = S2BT(session);
 	rip = NULL;
 
 	cmp = -1;				/* Assume we don't match. */
@@ -262,7 +262,7 @@ __wt_row_random(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 
 	__cursor_search_clear(cbt);
 
-	btree = session->btree;
+	btree = S2BT(session);
 
 	/* Walk the internal pages of the tree. */
 	for (page = btree->root_page; page->type == WT_PAGE_ROW_INT;) {

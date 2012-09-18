@@ -85,7 +85,7 @@ __verify_int(WT_SESSION_IMPL *session, int dumpfile)
 	WT_ITEM dsk;
 	WT_VSTUFF *vs, _vstuff;
 
-	btree = session->btree;
+	btree = S2BT(session);
 	ckptbase = NULL;
 
 	WT_CLEAR(_vstuff);
@@ -97,7 +97,8 @@ __verify_int(WT_SESSION_IMPL *session, int dumpfile)
 	WT_ERR(__wt_scr_alloc(session, 0, &vs->tmp2));
 
 	/* Get a list of the checkpoints for this file. */
-	WT_ERR(__wt_meta_ckptlist_get(session, btree->dhandle.name, &ckptbase));
+	WT_ERR(
+	    __wt_meta_ckptlist_get(session, btree->dhandle->name, &ckptbase));
 
 	/* Inform the underlying block manager we're verifying. */
 	WT_ERR(__wt_bm_verify_start(session, ckptbase));
@@ -105,7 +106,7 @@ __verify_int(WT_SESSION_IMPL *session, int dumpfile)
 	/* Loop through the file's checkpoints, verifying each one. */
 	WT_CKPT_FOREACH(ckptbase, ckpt) {
 		WT_VERBOSE_ERR(session, verify,
-		    "%s: checkpoint %s", btree->dhandle.name, ckpt->name);
+		    "%s: checkpoint %s", btree->dhandle->name, ckpt->name);
 
 		/* House-keeping between checkpoints. */
 		__verify_checkpoint_reset(vs);
@@ -403,7 +404,7 @@ __verify_row_int_key_order(WT_SESSION_IMPL *session,
 	WT_ITEM item;
 	int cmp;
 
-	btree = session->btree;
+	btree = S2BT(session);
 
 	/* The maximum key is set, we updated it from a leaf page first. */
 	WT_ASSERT(session, vs->max_addr->size != 0);
@@ -443,7 +444,7 @@ __verify_row_leaf_key_order(
 	WT_BTREE *btree;
 	int cmp;
 
-	btree = session->btree;
+	btree = S2BT(session);
 
 	/*
 	 * If a tree is empty (just created), it won't have keys; if there
@@ -505,7 +506,7 @@ __verify_overflow_cell(
 	WT_PAGE_HEADER *dsk;
 	uint32_t cell_num, i;
 
-	btree = session->btree;
+	btree = S2BT(session);
 	unpack = &_unpack;
 	*found = 0;
 

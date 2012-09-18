@@ -401,7 +401,7 @@ __wt_schema_create(
 		ret = dsrc->create(dsrc, &session->iface,
 		    name, exclusive, config);
 
-	session->btree = NULL;
+	session->dhandle = NULL;
 	WT_TRET(__wt_meta_track_off(session, ret != 0));
 
 	return (ret);

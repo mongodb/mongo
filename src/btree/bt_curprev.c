@@ -210,7 +210,7 @@ __cursor_fix_prev(WT_CURSOR_BTREE *cbt, int newpage)
 	WT_UPDATE *upd;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
-	btree = session->btree;
+	btree = S2BT(session);
 	val = &cbt->iface.value;
 
 	/* Initialize for each new page. */
@@ -353,7 +353,7 @@ new_page:	if (cbt->recno < cbt->page->u.col_var.recno)
 			case WT_CELL_DEL:
 				continue;
 			case WT_CELL_VALUE:
-				if (session->btree->huffman_value == NULL) {
+				if (S2BT(session)->huffman_value == NULL) {
 					cbt->tmp.data = unpack.data;
 					cbt->tmp.size = unpack.size;
 					break;

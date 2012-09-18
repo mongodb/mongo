@@ -16,7 +16,7 @@ __cursor_size_chk(WT_SESSION_IMPL *session, WT_ITEM *kv)
 {
 	WT_BTREE *btree;
 
-	btree = session->btree;
+	btree = S2BT(session);
 
 	if (btree->type == BTREE_COL_FIX) {
 		/* Fixed-size column-stores take a single byte. */

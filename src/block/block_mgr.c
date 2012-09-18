@@ -23,7 +23,7 @@ __wt_bm_addr_valid(
 {
 	WT_BLOCK *block;
 
-	if ((block = session->btree->block) == NULL)
+	if ((block = S2BT(session)->block) == NULL)
 		return (__bm_invalid(session));
 
 	return (__wt_block_addr_valid(session, block, addr, addr_size));
@@ -42,7 +42,7 @@ __wt_bm_addr_stderr(
 	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
 
-	if ((block = session->btree->block) == NULL)
+	if ((block = S2BT(session)->block) == NULL)
 		return (__bm_invalid(session));
 
 	WT_RET(__wt_scr_alloc(session, 0, &buf));
@@ -64,7 +64,7 @@ __wt_bm_addr_string(WT_SESSION_IMPL *session,
 {
 	WT_BLOCK *block;
 
-	if ((block = session->btree->block) == NULL)
+	if ((block = S2BT(session)->block) == NULL)
 		return (__bm_invalid(session));
 
 	return (
@@ -91,7 +91,7 @@ __wt_bm_open(WT_SESSION_IMPL *session, const char *filename,
 {
 	WT_BTREE *btree;
 
-	btree = session->btree;
+	btree = S2BT(session);
 
 	WT_RET(__wt_block_open(
 	    session, filename, config, cfg, forced_salvage, &btree->block));
@@ -122,11 +122,11 @@ __wt_bm_close(WT_SESSION_IMPL *session)
 	WT_BLOCK *block;
 	WT_DECL_RET;
 
-	if ((block = session->btree->block) == NULL)
+	if ((block = S2BT(session)->block) == NULL)
 		return (0);
 
 	ret = __wt_block_close(session, block);
-	session->btree->block = NULL;
+	S2BT(session)->block = NULL;
 
 	return (ret);
 }
@@ -140,7 +140,7 @@ __wt_bm_checkpoint(WT_SESSION_IMPL *session, WT_ITEM *buf, WT_CKPT *ckptbase)
 {
 	WT_BLOCK *block;
 
-	if ((block = session->btree->block) == NULL)
+	if ((block = S2BT(session)->block) == NULL)
 		return (__bm_invalid(session));
 
 	return (__wt_block_checkpoint(session, block, buf, ckptbase));
@@ -155,7 +155,7 @@ __wt_bm_checkpoint_resolve(WT_SESSION_IMPL *session)
 {
 	WT_BLOCK *block;
 
-	if ((block = session->btree->block) == NULL)
+	if ((block = S2BT(session)->block) == NULL)
 		return (__bm_invalid(session));
 
 	return (__wt_block_checkpoint_resolve(session, block));
@@ -171,7 +171,7 @@ __wt_bm_checkpoint_load(WT_SESSION_IMPL *session,
 {
 	WT_BLOCK *block;
 
-	if ((block = session->btree->block) == NULL)
+	if ((block = S2BT(session)->block) == NULL)
 		return (__bm_invalid(session));
 
 	return (__wt_block_checkpoint_load(
@@ -187,7 +187,7 @@ __wt_bm_checkpoint_unload(WT_SESSION_IMPL *session)
 {
 	WT_BLOCK *block;
 
-	if ((block = session->btree->block) == NULL)
+	if ((block = S2BT(session)->block) == NULL)
 		return (__bm_invalid(session));
 
 	return (__wt_block_checkpoint_unload(session, block));
@@ -212,7 +212,7 @@ __wt_bm_free(WT_SESSION_IMPL *session, const uint8_t *addr, uint32_t addr_size)
 {
 	WT_BLOCK *block;
 
-	if ((block = session->btree->block) == NULL)
+	if ((block = S2BT(session)->block) == NULL)
 		return (__bm_invalid(session));
 
 	return (__wt_block_free(session, block, addr, addr_size));
@@ -228,7 +228,7 @@ __wt_bm_read(WT_SESSION_IMPL *session,
 {
 	WT_BLOCK *block;
 
-	if ((block = session->btree->block) == NULL)
+	if ((block = S2BT(session)->block) == NULL)
 		return (__bm_invalid(session));
 
 	return (__wt_block_read(session, block, buf, addr, addr_size));
@@ -243,7 +243,7 @@ __wt_bm_write_size(WT_SESSION_IMPL *session, uint32_t *sizep)
 {
 	WT_BLOCK *block;
 
-	if ((block = session->btree->block) == NULL)
+	if ((block = S2BT(session)->block) == NULL)
 		return (__bm_invalid(session));
 
 	return (__wt_block_write_size(session, block, sizep));
@@ -259,7 +259,7 @@ __wt_bm_write(
 {
 	WT_BLOCK *block;
 
-	if ((block = session->btree->block) == NULL)
+	if ((block = S2BT(session)->block) == NULL)
 		return (__bm_invalid(session));
 
 	return (__wt_block_write(session, block, buf, addr, addr_size));
@@ -274,7 +274,7 @@ __wt_bm_stat(WT_SESSION_IMPL *session)
 {
 	WT_BLOCK *block;
 
-	if ((block = session->btree->block) == NULL)
+	if ((block = S2BT(session)->block) == NULL)
 		return (__bm_invalid(session));
 
 	__wt_block_stat(session, block);
@@ -290,7 +290,7 @@ __wt_bm_salvage_start(WT_SESSION_IMPL *session)
 {
 	WT_BLOCK *block;
 
-	if ((block = session->btree->block) == NULL)
+	if ((block = S2BT(session)->block) == NULL)
 		return (__bm_invalid(session));
 
 	return (__wt_block_salvage_start(session, block));
@@ -306,7 +306,7 @@ __wt_bm_salvage_next(WT_SESSION_IMPL *session, WT_ITEM *buf,
 {
 	WT_BLOCK *block;
 
-	if ((block = session->btree->block) == NULL)
+	if ((block = S2BT(session)->block) == NULL)
 		return (__bm_invalid(session));
 
 	return (__wt_block_salvage_next(
@@ -322,7 +322,7 @@ __wt_bm_salvage_end(WT_SESSION_IMPL *session)
 {
 	WT_BLOCK *block;
 
-	if ((block = session->btree->block) == NULL)
+	if ((block = S2BT(session)->block) == NULL)
 		return (__bm_invalid(session));
 
 	return (__wt_block_salvage_end(session, block));
@@ -337,7 +337,7 @@ __wt_bm_verify_start(WT_SESSION_IMPL *session, WT_CKPT *ckptbase)
 {
 	WT_BLOCK *block;
 
-	if ((block = session->btree->block) == NULL)
+	if ((block = S2BT(session)->block) == NULL)
 		return (__bm_invalid(session));
 
 	return (__wt_block_verify_start(session, block, ckptbase));
@@ -352,7 +352,7 @@ __wt_bm_verify_end(WT_SESSION_IMPL *session)
 {
 	WT_BLOCK *block;
 
-	if ((block = session->btree->block) == NULL)
+	if ((block = S2BT(session)->block) == NULL)
 		return (__bm_invalid(session));
 
 	return (__wt_block_verify_end(session, block));
@@ -368,7 +368,7 @@ __wt_bm_verify_addr(
 {
 	WT_BLOCK *block;
 
-	if ((block = session->btree->block) == NULL)
+	if ((block = S2BT(session)->block) == NULL)
 		return (__bm_invalid(session));
 
 	return (__wt_block_verify_addr(session, block, addr, addr_size));

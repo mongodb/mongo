@@ -56,8 +56,8 @@
  * hanging off the application's thread of control.  For now, I'm just making
  * it obvious where that's getting done.
  */
-#define	WT_SET_BTREE_IN_SESSION(s, b)	((s)->btree = (b))
-#define	WT_CLEAR_BTREE_IN_SESSION(s)	((s)->btree = NULL)
+#define	WT_SET_BTREE_IN_SESSION(s, b)	((s)->dhandle = b->dhandle)
+#define	WT_CLEAR_BTREE_IN_SESSION(s)	((s)->dhandle = NULL)
 
 /*
  * WT_DATA_HANDLE --
@@ -72,6 +72,9 @@ struct __wt_data_handle {
 	const char *checkpoint;		/* Checkpoint name (or NULL) */
 	const char *config;		/* Configuration string */
 
+	WT_DATA_SOURCE *dsrc;		/* Data source for this handle */
+	void *handle;			/* Current handle. */
+
 	/* Flags values over 0xff are reserved for WT_BTREE_* */
 #define	WT_DHANDLE_DISCARD	0x01	/* Discard on release */
 #define	WT_DHANDLE_EXCLUSIVE	0x02	/* Need exclusive access to handle */
@@ -85,7 +88,7 @@ struct __wt_data_handle {
  *	A btree handle.
  */
 struct __wt_btree {
-	WT_DATA_HANDLE dhandle;
+	WT_DATA_HANDLE *dhandle;
 
 	WT_CKPT	  *ckpt;		/* Checkpoint information */
 

@@ -175,7 +175,7 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm)
 	/* Peek into the btree layer to track the in-memory size. */
 	if (lsm_tree->memsizep == NULL)
 		(void)__wt_btree_get_memsize(
-		    session, session->btree, &lsm_tree->memsizep);
+		    session, S2BT(session), &lsm_tree->memsizep);
 
 	clsm->dsk_gen = lsm_tree->dsk_gen;
 err:	__wt_spin_unlock(session, &lsm_tree->lock);

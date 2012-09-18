@@ -224,7 +224,7 @@ __wt_row_key(WT_SESSION_IMPL *session,
 	WT_IKEY *ikey;
 	WT_CELL_UNPACK unpack;
 
-	btree = session->btree;
+	btree = S2BT(session);
 
 retry:	ikey = WT_ROW_KEY_COPY(rip);
 

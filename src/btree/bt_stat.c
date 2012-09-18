@@ -22,7 +22,7 @@ __wt_btree_stat_init(WT_SESSION_IMPL *session)
 	WT_DECL_RET;
 	WT_PAGE *page;
 
-	btree = session->btree;
+	btree = S2BT(session);
 
 	WT_RET(__wt_bm_stat(session));
 

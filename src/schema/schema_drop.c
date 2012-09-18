@@ -23,7 +23,7 @@ __drop_file(
 	if (!WT_PREFIX_SKIP(filename, "file:"))
 		return (EINVAL);
 
-	if (session->btree == NULL &&
+	if (session->dhandle == NULL &&
 	    (ret = __wt_session_get_btree(session, uri, NULL, cfg,
 	    WT_DHANDLE_EXCLUSIVE | WT_DHANDLE_LOCK_ONLY)) != 0) {
 		if (ret == WT_NOTFOUND || ret == ENOENT)
@@ -61,12 +61,12 @@ static int
 __drop_tree(
     WT_SESSION_IMPL *session, const char *uri, int force, const char *cfg[])
 {
-	WT_BTREE *btree;
+	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 	WT_ITEM *buf;
 	const char *name;
 
-	btree = session->btree;
+	dhandle = session->dhandle;
 	buf = NULL;
 
 	/* Remove the metadata entry (ignore missing items). */
@@ -76,10 +76,10 @@ __drop_tree(
 
 	/*
 	 * Drop the file.
-	 * __drop_file closes the WT_BTREE handle, so we copy the
-	 * WT_BTREE->name field to save the URI.
+	 * __drop_file closes the btree handle, so we copy the name field to
+	 * save the URI.
 	 */
-	name = btree->dhandle.name;
+	name = dhandle->name;
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));
 	WT_ERR(__wt_buf_set(session, buf, name, strlen(name) + 1));
 	WT_ERR(__drop_file(session, buf->data, force, cfg));

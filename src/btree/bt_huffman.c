@@ -140,7 +140,7 @@ __wt_btree_huffman_open(WT_SESSION_IMPL *session, const char *config)
 	WT_DECL_RET;
 	u_int entries, numbytes;
 
-	btree = session->btree;
+	btree = S2BT(session);
 
 	WT_RET(__wt_config_getones(session, config, "huffman_key", &key_conf));
 	WT_RET(__wt_config_getones(
@@ -315,7 +315,7 @@ __wt_btree_huffman_close(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
 
-	btree = session->btree;
+	btree = S2BT(session);
 
 	if (btree->huffman_key != NULL) {
 		/* Key and data may use the same table, only close it once. */

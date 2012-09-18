@@ -51,6 +51,9 @@ typedef	enum {
 /* Get the connection implementation for a session */
 #define	S2C(session) ((WT_CONNECTION_IMPL *)(session)->iface.connection)
 
+/* Get the btree for a session */
+#define	S2BT(session) ((WT_BTREE *)(session)->dhandle->handle)
+
 /*
  * WT_SESSION_IMPL --
  *	Implementation of WT_SESSION.
@@ -66,7 +69,7 @@ struct __wt_session_impl {
 
 	WT_EVENT_HANDLER *event_handler;/* Application's event handlers */
 
-	WT_BTREE *btree;		/* Current file */
+	WT_DATA_HANDLE *dhandle;	/* Current data handle */
 	TAILQ_HEAD(__dhandles, __wt_data_handle_cache) dhandles;
 
 	WT_CURSOR *cursor;		/* Current cursor */
@@ -270,25 +273,25 @@ struct __wt_connection_impl {
 #define	API_CONF_DEFAULTS(h, n, cfg)					\
 	{ __wt_confdfl_##h##_##n, (cfg), NULL }
 
-#define	API_SESSION_INIT(s, h, n, cur, bt)				\
-	WT_BTREE *__oldbtree = (s)->btree;				\
+#define	API_SESSION_INIT(s, h, n, cur, dh)				\
+	WT_DATA_HANDLE *__olddh = (s)->dhandle;				\
 	const char *__oldname = (s)->name;				\
 	(s)->cursor = (cur);						\
-	(s)->btree = (bt);						\
+	(s)->dhandle = (dh);						\
 	(s)->name = #h "." #n;
 
-#define	API_CALL_NOCONF(s, h, n, cur, bt) do {				\
-	API_SESSION_INIT(s, h, n, cur, bt);
+#define	API_CALL_NOCONF(s, h, n, cur, dh) do {				\
+	API_SESSION_INIT(s, h, n, cur, dh);
 
-#define	API_CALL(s, h, n, cur, bt, cfg, cfgvar) do {			\
+#define	API_CALL(s, h, n, cur, dh, cfg, cfgvar) do {			\
 	const char *cfgvar[] = API_CONF_DEFAULTS(h, n, cfg);		\
-	API_SESSION_INIT(s, h, n, cur, bt);				\
+	API_SESSION_INIT(s, h, n, cur, dh);				\
 	WT_ERR(((cfg) != NULL) ?					\
 	    __wt_config_check((s), __wt_confchk_##h##_##n, (cfg)) : 0)
 
 #define	API_END(s)							\
 	if ((s) != NULL) {						\
-		(s)->btree = __oldbtree;				\
+		(s)->dhandle = __olddh;					\
 		(s)->name = __oldname;					\
 	}								\
 } while (0)
@@ -317,7 +320,8 @@ struct __wt_connection_impl {
 
 #define	CURSOR_API_CALL_NOCONF(cur, s, n, bt)				\
 	(s) = (WT_SESSION_IMPL *)(cur)->session;			\
-	API_CALL_NOCONF(s, cursor, n, cur, bt)
+	API_CALL_NOCONF(s, cursor, n, cur,				\
+	    ((bt) == NULL) ? NULL : ((WT_BTREE *)(bt))->dhandle)
 
 /*******************************************
  * Global variables.

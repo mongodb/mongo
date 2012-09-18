@@ -137,7 +137,7 @@ __eventv(WT_SESSION_IMPL *session, int msg_event, int error,
 	p = s;
 	end = s + sizeof(s);
 
-	dhandle = (session->btree != NULL) ? &session->btree->dhandle : NULL;
+	dhandle = session->dhandle;
 	prefix1 = (dhandle != NULL) ? dhandle->name : NULL;
 	prefix2 = session->name;
 

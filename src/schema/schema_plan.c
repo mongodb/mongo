@@ -164,15 +164,15 @@ int
 __wt_struct_plan(WT_SESSION_IMPL *session, WT_TABLE *table,
     const char *columns, size_t len, int value_only, WT_ITEM *plan)
 {
-	WT_BTREE *saved_btree;
 	WT_CONFIG conf;
 	WT_CONFIG_ITEM k, v;
+	WT_DATA_HANDLE *saved_dhandle;
 	WT_DECL_RET;
 	int cg, col, current_cg, current_col, start_cg, start_col;
 	int i, have_it;
 	char coltype, current_coltype;
 
-	saved_btree = session->btree;
+	saved_dhandle = session->dhandle;
 	start_cg = start_col = -1;		/* -Wuninitialized */
 
 	/* Work through the value columns by skipping over the key columns. */
@@ -241,7 +241,7 @@ __wt_struct_plan(WT_SESSION_IMPL *session, WT_TABLE *table,
 		}
 	}
 
-err:	session->btree = saved_btree;
+err:	session->dhandle = saved_dhandle;
 	return (ret);
 }
 

@@ -18,7 +18,7 @@ __wt_session_add_btree(
 	WT_DATA_HANDLE_CACHE *dhandle_cache;
 
 	WT_RET(__wt_calloc_def(session, 1, &dhandle_cache));
-	dhandle_cache->dhandle = &session->btree->dhandle;
+	dhandle_cache->dhandle = session->dhandle;
 
 	TAILQ_INSERT_HEAD(&session->dhandles, dhandle_cache, q);
 
@@ -39,8 +39,8 @@ __wt_session_lock_btree(WT_SESSION_IMPL *session, uint32_t flags)
 	WT_DATA_HANDLE *dhandle;
 	uint32_t special_flags;
 
-	btree = session->btree;
-	dhandle = &btree->dhandle;
+	btree = S2BT(session);
+	dhandle = session->dhandle;
 
 	/*
 	 * Special operation flags will cause the handle to be reopened.
@@ -104,8 +104,8 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 
-	btree = session->btree;
-	dhandle = &btree->dhandle;
+	btree = S2BT(session);
+	dhandle = session->dhandle;
 
 	/*
 	 * If we had special flags set, close the handle so that future access
@@ -123,7 +123,7 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 		F_CLR(dhandle, WT_DHANDLE_EXCLUSIVE);
 
 	__wt_rwunlock(session, dhandle->rwlock);
-	session->btree = NULL;
+	session->dhandle = NULL;
 
 	return (ret);
 }
@@ -131,7 +131,7 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 /*
  * __wt_session_get_btree_ckpt --
  *	Check the configuration strings for a checkpoint name, get a btree
- * handle for the given name, set session->btree.
+ * handle for the given name, set session->dhandle.
  */
 int
 __wt_session_get_btree_ckpt(WT_SESSION_IMPL *session,
@@ -188,7 +188,7 @@ retry:			WT_RET(__wt_meta_checkpoint_last_name(
 
 /*
  * __wt_session_get_btree --
- *	Get a btree handle for the given name, set session->btree.
+ *	Get a btree handle for the given name, set session->dhandle.
  */
 int
 __wt_session_get_btree(WT_SESSION_IMPL *session,
@@ -211,9 +211,9 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 	}
 
 	if (dhandle_cache == NULL)
-		session->btree = NULL;
+		session->dhandle = NULL;
 	else {
-		session->btree = (WT_BTREE *)dhandle;
+		session->dhandle = dhandle;
 
 		/*
 		 * Try to lock the file; if we succeed, our "exclusive" state
@@ -240,7 +240,7 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 	if (dhandle_cache == NULL)
 		WT_RET(__wt_session_add_btree(session, NULL));
 
-	dhandle = &session->btree->dhandle;
+	dhandle = session->dhandle;
 	WT_ASSERT(session, LF_ISSET(WT_DHANDLE_LOCK_ONLY) ||
 	    F_ISSET(dhandle, WT_DHANDLE_OPEN));
 	WT_ASSERT(session, LF_ISSET(WT_DHANDLE_EXCLUSIVE) ==
@@ -256,28 +256,26 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 int
 __wt_session_lock_checkpoint(WT_SESSION_IMPL *session, const char *checkpoint)
 {
-	WT_BTREE *btree;
-	WT_DATA_HANDLE *dhandle;
+	WT_DATA_HANDLE *dhandle, *saved_dhandle;
 	WT_DECL_RET;
 
-	btree = session->btree;
-	dhandle = &btree->dhandle;
+	saved_dhandle = session->dhandle;
 
-	WT_ERR(__wt_session_get_btree(session, dhandle->name,
+	WT_ERR(__wt_session_get_btree(session, saved_dhandle->name,
 	    checkpoint, NULL, WT_DHANDLE_EXCLUSIVE | WT_DHANDLE_LOCK_ONLY));
 
 	/*
 	 * We lock checkpoint handles that we are overwriting, so the handle
 	 * must be closed when we release it.
 	 */
-	dhandle = &session->btree->dhandle;
+	dhandle = session->dhandle;
 	F_SET(dhandle, WT_DHANDLE_DISCARD);
 
 	WT_ASSERT(session, WT_META_TRACKING(session));
 	WT_ERR(__wt_meta_track_handle_lock(session, 0));
 
 	/* Restore the original btree in the session. */
-err:	session->btree = btree;
+err:	session->dhandle = saved_dhandle;
 
 	return (ret);
 }
@@ -290,18 +288,18 @@ int
 __wt_session_discard_btree(
     WT_SESSION_IMPL *session, WT_DATA_HANDLE_CACHE *dhandle_cache)
 {
-	WT_BTREE *btree;
+	WT_DATA_HANDLE *saved_dhandle;
 	WT_DECL_RET;
 
 	TAILQ_REMOVE(&session->dhandles, dhandle_cache, q);
 
-	btree = session->btree;
-	session->btree = (WT_BTREE *)dhandle_cache->dhandle;
+	saved_dhandle = session->dhandle;
+	session->dhandle = dhandle_cache->dhandle;
 
 	__wt_overwrite_and_free(session, dhandle_cache);
 	ret = __wt_conn_btree_close(session, 0);
 
 	/* Restore the original handle in the session. */
-	session->btree = btree;
+	session->dhandle = saved_dhandle;
 	return (ret);
 }

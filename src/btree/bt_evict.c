@@ -233,7 +233,7 @@ __wt_evict_page_request(WT_SESSION_IMPL *session, WT_PAGE *page)
 	/* Find an empty slot and enter the eviction request. */
 	WT_EVICT_REQ_FOREACH(er, er_end, cache)
 		if (er->page == NULL) {
-			__evict_req_set(er, session->btree, page);
+			__evict_req_set(er, S2BT(session), page);
 			set = 1;
 			break;
 		}
@@ -386,8 +386,8 @@ __evict_clear_tree_walk(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	/* If no page stack specified, clear the standard eviction stack. */
 	if (page == NULL) {
-		page = session->btree->evict_page;
-		session->btree->evict_page = NULL;
+		page = S2BT(session)->evict_page;
+		S2BT(session)->evict_page = NULL;
 	}
 
 	/* Clear the current eviction point. */
@@ -506,7 +506,7 @@ __evict_file_request_walk(WT_SESSION_IMPL *session)
 	 * to reason about sync or forced eviction if we know there are
 	 * no other threads evicting in the tree.
 	 */
-	while (request_session->btree->lru_count > 0) {
+	while (S2BT(request_session)->lru_count > 0) {
 		__wt_spin_unlock(session, &cache->evict_lock);
 		__wt_yield();
 		__wt_spin_lock(session, &cache->evict_lock);
@@ -583,7 +583,7 @@ __evict_file_request(WT_SESSION_IMPL *session, int syncop)
 			 * pointing to freed memory.
 			 */
 			if (WT_PAGE_IS_ROOT(page))
-				session->btree->root_page = NULL;
+				S2BT(session)->root_page = NULL;
 			__wt_page_out(session, &page, 0);
 			break;
 		}
@@ -642,7 +642,7 @@ __evict_page_request_walk(WT_SESSION_IMPL *session)
 		 * to reason about sync or forced eviction if we know there are
 		 * no other threads evicting in the tree.
 		 */
-		while (session->btree->lru_count > 0) {
+		while (S2BT(session)->lru_count > 0) {
 			__wt_spin_unlock(session, &cache->evict_lock);
 			__wt_yield();
 			__wt_spin_lock(session, &cache->evict_lock);
@@ -745,7 +745,7 @@ __evict_walk(WT_SESSION_IMPL *session)
 		if (!WT_PREFIX_MATCH(dhandle->name, "file:") ||
 		    !F_ISSET(dhandle, WT_DHANDLE_OPEN))
 			continue;
-		btree = (WT_BTREE *)dhandle;
+		btree = dhandle->handle;
 
 		/*
 		 * Skip files that aren't open or don't have a root page.
@@ -790,7 +790,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 	WT_PAGE *page;
 	int restarts;
 
-	btree = session->btree;
+	btree = S2BT(session);
 	cache = S2C(session)->cache;
 	start = cache->evict + *slotp;
 	end = start + WT_EVICT_WALK_PER_TABLE;
@@ -940,7 +940,8 @@ __evict_get_page(
 int
 __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app)
 {
-	WT_BTREE *btree, *saved_btree;
+	WT_BTREE *btree;
+	WT_DATA_HANDLE *saved_dhandle;
 	WT_PAGE *page;
 
 	__evict_get_page(session, is_app, &btree, &page);
@@ -950,7 +951,7 @@ __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app)
 	WT_ASSERT(session, page->ref->state == WT_REF_LOCKED);
 
 	/* Reference the correct WT_BTREE handle. */
-	saved_btree = session->btree;
+	saved_dhandle = session->dhandle;
 	WT_SET_BTREE_IN_SESSION(session, btree);
 
 	/*
@@ -963,7 +964,7 @@ __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app)
 	(void)WT_ATOMIC_SUB(btree->lru_count, 1);
 
 	WT_CLEAR_BTREE_IN_SESSION(session);
-	session->btree = saved_btree;
+	session->dhandle = saved_dhandle;
 
 	return (0);
 }

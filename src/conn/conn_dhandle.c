@@ -17,6 +17,10 @@ static int
 __conn_dhandle_open_lock(
     WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle, uint32_t flags)
 {
+	WT_BTREE *btree;
+
+	btree = dhandle->handle;
+
 	/*
 	 * Check that the handle is open.  We've already incremented
 	 * the reference count, so once the handle is open it won't be
@@ -29,7 +33,7 @@ __conn_dhandle_open_lock(
 	 */
 	for (;;) {
 		if (!LF_ISSET(WT_DHANDLE_EXCLUSIVE) &&
-		    F_ISSET((WT_BTREE *)dhandle, WT_BTREE_SPECIAL_FLAGS))
+		    F_ISSET(btree, WT_BTREE_SPECIAL_FLAGS))
 			return (EBUSY);
 
 		if (F_ISSET(dhandle, WT_DHANDLE_OPEN) &&
@@ -99,7 +103,7 @@ __conn_dhandle_get(WT_SESSION_IMPL *session,
 		    (ckpt != NULL && dhandle->checkpoint != NULL &&
 		    strcmp(ckpt, dhandle->checkpoint) == 0))) {
 			++dhandle->refcnt;
-			session->btree = (WT_BTREE *)dhandle;
+			session->dhandle = dhandle;
 			matched = 1;
 			break;
 		}
@@ -112,8 +116,10 @@ __conn_dhandle_get(WT_SESSION_IMPL *session,
 	 * can put the handle into the list.
 	 */
 	btree = NULL;
+	WT_RET(__wt_calloc_def(session, 1, &dhandle));
 	WT_RET(__wt_calloc_def(session, 1, &btree));
-	dhandle = &btree->dhandle;
+	dhandle->handle = btree;
+	btree->dhandle = dhandle;
 	if ((ret = __wt_rwlock_alloc(
 		session, "btree handle", &dhandle->rwlock)) == 0 &&
 	    (ret = __wt_strdup(session, name, &dhandle->name)) == 0 &&
@@ -130,7 +136,7 @@ __conn_dhandle_get(WT_SESSION_IMPL *session,
 	}
 
 	if (ret == 0)
-		session->btree = btree;
+		session->dhandle = dhandle;
 	else {
 		if (dhandle->rwlock != NULL)
 			__wt_rwlock_destroy(session, &dhandle->rwlock);
@@ -153,8 +159,8 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session)
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 
-	btree = session->btree;
-	dhandle = &btree->dhandle;
+	dhandle = session->dhandle;
+	btree = S2BT(session);
 
 	if (!F_ISSET(dhandle, WT_DHANDLE_OPEN))
 		return (0);
@@ -183,8 +189,8 @@ __conn_btree_open(WT_SESSION_IMPL *session,
 	WT_DECL_ITEM(addr);
 	WT_DECL_RET;
 
-	btree = session->btree;
-	dhandle = &btree->dhandle;
+	dhandle = session->dhandle;
+	btree = S2BT(session);
 
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED) &&
 	    F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE) &&
@@ -251,8 +257,8 @@ __wt_conn_btree_get(WT_SESSION_IMPL *session,
 	WT_STAT_INCR(conn->stats, file_open);
 
 	WT_RET(__conn_dhandle_get(session, name, ckpt, flags));
-	btree = session->btree;
-	dhandle = &btree->dhandle;
+	dhandle = session->dhandle;
+	btree = S2BT(session);
 
 	if (!LF_ISSET(WT_DHANDLE_LOCK_ONLY) &&
 	    (!F_ISSET(dhandle, WT_DHANDLE_OPEN) ||
@@ -286,13 +292,12 @@ int
 __wt_conn_btree_apply(WT_SESSION_IMPL *session,
     int (*func)(WT_SESSION_IMPL *, const char *[]), const char *cfg[])
 {
-	WT_BTREE *btree, *saved_btree;
 	WT_CONNECTION_IMPL *conn;
-	WT_DATA_HANDLE *dhandle;
+	WT_DATA_HANDLE *dhandle, *saved_dhandle;
 	WT_DECL_RET;
 
 	conn = S2C(session);
-	saved_btree = session->btree;
+	saved_dhandle = session->dhandle;
 
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
 
@@ -300,8 +305,7 @@ __wt_conn_btree_apply(WT_SESSION_IMPL *session,
 		if (F_ISSET(dhandle, WT_DHANDLE_OPEN) &&
 		    !F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE) &&
 		    WT_PREFIX_MATCH(dhandle->name, "file:")) {
-			btree = (WT_BTREE *)dhandle;
-			if (WT_IS_METADATA(btree))
+			if (WT_IS_METADATA(dhandle))
 				continue;
 			/*
 			 * We have the connection spinlock, which prevents
@@ -309,11 +313,11 @@ __wt_conn_btree_apply(WT_SESSION_IMPL *session,
 			 * for additional handle locking here, or pulling every
 			 * tree into this session's handle cache.
 			 */
-			session->btree = btree;
+			session->dhandle = dhandle;
 			WT_ERR(func(session, cfg));
 		}
 
-err:	session->btree = saved_btree;
+err:	session->dhandle = saved_dhandle;
 	return (ret);
 }
 
@@ -330,9 +334,9 @@ __wt_conn_btree_close(WT_SESSION_IMPL *session, int locked)
 	WT_DECL_RET;
 	int inuse;
 
-	btree = session->btree;
-	dhandle = &btree->dhandle;
+	btree = S2BT(session);
 	conn = S2C(session);
+	dhandle = session->dhandle;
 
 	if (F_ISSET(dhandle, WT_DHANDLE_OPEN))
 		WT_STAT_DECR(conn->stats, file_open);
@@ -377,26 +381,24 @@ __wt_conn_btree_close(WT_SESSION_IMPL *session, int locked)
 int
 __wt_conn_dhandle_close_all(WT_SESSION_IMPL *session, const char *name)
 {
-	WT_BTREE *btree, *saved_btree;
 	WT_CONNECTION_IMPL *conn;
-	WT_DATA_HANDLE *dhandle;
+	WT_DATA_HANDLE *dhandle, *saved_dhandle;
 	WT_DECL_RET;
 
 	conn = S2C(session);
-	saved_btree = session->btree;
+	saved_dhandle = session->dhandle;
 
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
 
 	TAILQ_FOREACH(dhandle, &conn->dhqh, q) {
 		if (strcmp(dhandle->name, name) != 0)
 			continue;
-		btree = (WT_BTREE *)dhandle;
 
 		/*
 		 * The caller may have this tree locked to prevent
 		 * concurrent schema operations.
 		 */
-		if (btree == saved_btree)
+		if (dhandle == saved_dhandle)
 			WT_ASSERT(session,
 			    F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE));
 		else {
@@ -404,7 +406,7 @@ __wt_conn_dhandle_close_all(WT_SESSION_IMPL *session, const char *name)
 			F_SET(dhandle, WT_DHANDLE_EXCLUSIVE);
 		}
 
-		session->btree = btree;
+		session->dhandle = dhandle;
 		if (WT_META_TRACKING(session))
 			WT_ERR(__wt_meta_track_handle_lock(session, 0));
 
@@ -430,7 +432,7 @@ __wt_conn_dhandle_close_all(WT_SESSION_IMPL *session, const char *name)
 
 		if (!WT_META_TRACKING(session))
 			WT_TRET(__wt_session_release_btree(session));
-		session->btree = NULL;
+		session->dhandle = NULL;
 
 		WT_ERR(ret);
 	}
@@ -443,22 +445,20 @@ err:	return (ret);
  *	Discard a single btree file handle structure.
  */
 static int
-__conn_btree_discard(WT_SESSION_IMPL *session, WT_BTREE *btree)
+__conn_dhandle_discard(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle)
 {
-	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 
-	dhandle = &btree->dhandle;
-
 	if (F_ISSET(dhandle, WT_DHANDLE_OPEN)) {
-		WT_SET_BTREE_IN_SESSION(session, btree);
+		session->dhandle = dhandle;
 		WT_TRET(__wt_conn_btree_sync_and_close(session));
-		WT_CLEAR_BTREE_IN_SESSION(session);
+		session->dhandle = NULL;
 	}
 	__wt_rwlock_destroy(session, &dhandle->rwlock);
 	__wt_free(session, dhandle->config);
 	__wt_free(session, dhandle->name);
 	__wt_free(session, dhandle->checkpoint);
+	__wt_free(session, dhandle->handle);
 	__wt_overwrite_and_free(session, dhandle);
 
 	return (ret);
@@ -469,9 +469,8 @@ __conn_btree_discard(WT_SESSION_IMPL *session, WT_BTREE *btree)
  *	Discard the btree file handle structures.
  */
 int
-__wt_conn_btree_discard(WT_CONNECTION_IMPL *conn)
+__wt_conn_dhandle_discard(WT_CONNECTION_IMPL *conn)
 {
-	WT_BTREE *btree;
 	WT_DATA_HANDLE *dhandle;
 	WT_DATA_HANDLE_CACHE *dhandle_cache;
 	WT_DECL_RET;
@@ -483,7 +482,7 @@ __wt_conn_btree_discard(WT_CONNECTION_IMPL *conn)
 	F_SET(session, WT_SESSION_SCHEMA_LOCKED);
 
 	/*
-	 * Close open btree handles: first, everything but the metadata file
+	 * Close open data handles: first, everything but the metadata file
 	 * (as closing a normal file may open and write the metadata file),
 	 * then the metadata file.  This function isn't called often, and I
 	 * don't want to "know" anything about the metadata file's position on
@@ -491,19 +490,18 @@ __wt_conn_btree_discard(WT_CONNECTION_IMPL *conn)
 	 */
 restart:
 	TAILQ_FOREACH(dhandle, &conn->dhqh, q) {
-		btree = (WT_BTREE *)dhandle;
-		if (WT_IS_METADATA(btree))
+		if (WT_IS_METADATA(dhandle))
 			continue;
 
 		TAILQ_REMOVE(&conn->dhqh, dhandle, q);
 		--conn->btqcnt;
-		WT_TRET(__conn_btree_discard(session, btree));
+		WT_TRET(__conn_dhandle_discard(session, dhandle));
 		goto restart;
 	}
 
 	/*
 	 * Closing the files may have resulted in entries on our session's list
-	 * of open btree handles, specifically, we added the metadata file if
+	 * of open data handles, specifically, we added the metadata file if
 	 * any of the files were dirty.  Clean up that list before we shut down
 	 * the metadata entry, for good.
 	 */
@@ -514,8 +512,7 @@ restart:
 	while ((dhandle = TAILQ_FIRST(&conn->dhqh)) != NULL) {
 		TAILQ_REMOVE(&conn->dhqh, dhandle, q);
 		--conn->btqcnt;
-		btree = (WT_BTREE *)dhandle;
-		WT_TRET(__conn_btree_discard(session, btree));
+		WT_TRET(__conn_dhandle_discard(session, dhandle));
 	}
 
 	return (ret);

@@ -154,7 +154,7 @@ __wt_tree_walk(WT_SESSION_IMPL *session, WT_PAGE **pagep, uint32_t flags)
 	uint32_t slot;
 	int discard, eviction, prev, skip;
 
-	btree = session->btree;
+	btree = S2BT(session);
 
 	/* We can currently only do fast-discard on row-store trees. */
 	discard = LF_ISSET(WT_TREE_DISCARD) && btree->type == BTREE_ROW ? 1 : 0;

@@ -142,7 +142,7 @@ __verify_dsk_row(
 	uint8_t *end;
 	int cmp;
 
-	btree = session->btree;
+	btree = S2BT(session);
 	huffman = btree->huffman_key;
 	unpack = &_unpack;
 
@@ -373,7 +373,7 @@ __verify_dsk_col_int(
 	uint32_t cell_num, i;
 	uint8_t *end;
 
-	btree = session->btree;
+	btree = S2BT(session);
 	unpack = &_unpack;
 	end = (uint8_t *)dsk + dsk->size;
 
@@ -410,7 +410,7 @@ __verify_dsk_col_fix(
 	WT_BTREE *btree;
 	uint32_t datalen;
 
-	btree = session->btree;
+	btree = S2BT(session);
 
 	datalen = __bitstr_size(btree->bitcnt * dsk->u.entries);
 	return (__verify_dsk_chunk(session, addr, dsk, datalen));
@@ -432,7 +432,7 @@ __verify_dsk_col_var(
 	const uint8_t *last_data;
 	uint8_t *end;
 
-	btree = session->btree;
+	btree = S2BT(session);
 	unpack = &_unpack;
 	end = (uint8_t *)dsk + dsk->size;
 
@@ -511,7 +511,7 @@ __verify_dsk_chunk(WT_SESSION_IMPL *session,
 	WT_BTREE *btree;
 	uint8_t *p, *end;
 
-	btree = session->btree;
+	btree = S2BT(session);
 	end = (uint8_t *)dsk + dsk->size;
 
 	/*

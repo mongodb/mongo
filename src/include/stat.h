@@ -29,13 +29,13 @@ struct __wt_stats {
 } while (0)
 
 #define	WT_BSTAT_INCR(session, fld)					\
-	WT_STAT_INCR((session)->btree->stats, fld)
+	WT_STAT_INCR(S2BT(session)->stats, fld)
 #define	WT_BSTAT_INCRV(session, fld, v)					\
-	WT_STAT_INCRV((session)->btree->stats, fld, v)
+	WT_STAT_INCRV(S2BT(session)->stats, fld, v)
 #define	WT_BSTAT_DECR(session, fld)					\
-	WT_STAT_DECR((session)->btree->stats, fld)
+	WT_STAT_DECR(S2BT(session)->stats, fld)
 #define	WT_BSTAT_SET(session, fld, v)					\
-	WT_STAT_SET((session)->btree->stats, fld, v)
+	WT_STAT_SET(S2BT(session)->stats, fld, v)
 
 #define	WT_CSTAT_INCR(session, fld)					\
 	WT_STAT_INCR(S2C(session)->stats, fld)

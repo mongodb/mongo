@@ -14,13 +14,11 @@
 int
 __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 {
-	WT_BTREE *btree;
 	WT_CKPT *ckptbase;
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 
-	btree = session->btree;
-	dhandle = &btree->dhandle;
+	dhandle = session->dhandle;
 
 	/*
 	 * XXX

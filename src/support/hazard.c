@@ -26,7 +26,7 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, int *busyp
 	WT_CONNECTION_IMPL *conn;
 	WT_HAZARD *hp;
 
-	btree = session->btree;
+	btree = S2BT(session);
 	conn = S2C(session);
 	*busyp = 0;
 
@@ -117,7 +117,7 @@ __wt_hazard_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_CONNECTION_IMPL *conn;
 	WT_HAZARD *hp;
 
-	btree = session->btree;
+	btree = S2BT(session);
 	conn = S2C(session);
 
 	/* If a file can never be evicted, hazard references aren't required. */

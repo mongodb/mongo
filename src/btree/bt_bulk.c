@@ -20,7 +20,7 @@ __wt_bulk_init(WT_CURSOR_BULK *cbulk)
 	WT_SESSION_IMPL *session;
 
 	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
-	btree = session->btree;
+	btree = S2BT(session);
 
 	if (!btree->bulk_load_ok)
 		WT_RET_MSG(session,
@@ -47,7 +47,7 @@ __wt_bulk_insert(WT_CURSOR_BULK *cbulk)
 	int cmp;
 
 	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
-	btree = session->btree;
+	btree = S2BT(session);
 	cursor = &cbulk->cbt.iface;
 
 	switch (btree->type) {
@@ -87,7 +87,7 @@ __wt_bulk_insert(WT_CURSOR_BULK *cbulk)
 		 * the code.
 		 */
 		if (cbulk->rle != 0) {
-			WT_RET(WT_BTREE_CMP(session, session->btree,
+			WT_RET(WT_BTREE_CMP(session, S2BT(session),
 			    &cursor->key, &cbulk->cmp, cmp));
 			if (cmp <= 0)
 				return (__bulk_row_keycmp_err(cbulk));

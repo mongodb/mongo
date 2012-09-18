@@ -17,7 +17,7 @@ __wt_ovfl_in(
 {
 	WT_BTREE *btree;
 
-	btree = session->btree;
+	btree = S2BT(session);
 
 	WT_BSTAT_INCR(session, overflow_read);
 

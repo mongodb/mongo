@@ -86,14 +86,8 @@ __wt_lsm_worker(void *arg)
 			}
 		}
 
-		/* Clear any state from previous worker thread iterations. */
-		session->btree = NULL;
-
 		if (nchunks > 0 && __wt_lsm_major_merge(session, lsm_tree) == 0)
 			progress = 1;
-
-		/* Clear any state from previous worker thread iterations. */
-		session->btree = NULL;
 
 		if (lsm_tree->nold_chunks != lsm_tree->old_avail &&
 		    __lsm_free_chunks(session, lsm_tree) == 0)

@@ -51,8 +51,8 @@ __wt_btree_open(WT_SESSION_IMPL *session,
 	const char *filename;
 	int forced_salvage;
 
-	btree = session->btree;
-	dhandle = &btree->dhandle;
+	dhandle = session->dhandle;
+	btree = S2BT(session);
 	WT_CLEAR(dsk);
 
 	/* Initialize and configure the WT_BTREE structure. */
@@ -119,8 +119,8 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 
-	btree = session->btree;
-	dhandle = &btree->dhandle;
+	dhandle = session->dhandle;
+	btree = S2BT(session);
 
 	/* Unload the checkpoint, unless it's a special command. */
 	if (F_ISSET(dhandle, WT_DHANDLE_OPEN) &&
@@ -159,9 +159,9 @@ __btree_conf(WT_SESSION_IMPL *session)
 	int fixed;
 	const char *config;
 
-	btree = session->btree;
+	btree = S2BT(session);
 	conn = S2C(session);
-	config = btree->dhandle.config;
+	config = btree->dhandle->config;
 
 	/* Validate file types and check the data format plan. */
 	WT_RET(__wt_config_getones(session, config, "key_format", &cval));
@@ -213,7 +213,7 @@ __btree_conf(WT_SESSION_IMPL *session)
 	WT_RET(__btree_page_sizes(session, config));
 
 	/* Eviction; the metadata file is never evicted. */
-	if (WT_IS_METADATA(btree))
+	if (WT_IS_METADATA(btree->dhandle))
 		F_SET(btree, WT_BTREE_NO_EVICTION | WT_BTREE_NO_HAZARD);
 	else {
 		WT_RET(__wt_config_getones(
@@ -261,7 +261,7 @@ __wt_btree_tree_open(WT_SESSION_IMPL *session, WT_ITEM *dsk)
 	WT_BTREE *btree;
 	WT_PAGE *page;
 
-	btree = session->btree;
+	btree = S2BT(session);
 
 	/* Build the in-memory version of the page. */
 	WT_RET(__wt_page_inmem(session, NULL, NULL, dsk->mem, &page));
@@ -282,7 +282,7 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session)
 	WT_PAGE *root, *leaf;
 	WT_REF *ref;
 
-	btree = session->btree;
+	btree = S2BT(session);
 	root = leaf = NULL;
 
 	/*
@@ -385,7 +385,7 @@ __wt_btree_leaf_create(
 	WT_BTREE *btree;
 	WT_PAGE *leaf;
 
-	btree = session->btree;
+	btree = S2BT(session);
 
 	WT_RET(__wt_calloc_def(session, 1, &leaf));
 	switch (btree->type) {
@@ -455,7 +455,7 @@ __btree_get_last_recno(WT_SESSION_IMPL *session)
 	WT_BTREE *btree;
 	WT_PAGE *page;
 
-	btree = session->btree;
+	btree = S2BT(session);
 
 	page = NULL;
 	WT_RET(__wt_tree_walk(session, &page, WT_TREE_PREV));
@@ -479,7 +479,7 @@ __btree_page_sizes(WT_SESSION_IMPL *session, const char *config)
 	WT_CONFIG_ITEM cval;
 	uint32_t intl_split_size, leaf_split_size, split_pct;
 
-	btree = session->btree;
+	btree = S2BT(session);
 
 	WT_RET(__wt_config_getones(session, config, "allocation_size", &cval));
 	btree->allocsize = (uint32_t)cval.val;

@@ -584,7 +584,7 @@ extern int __wt_conn_btree_apply(WT_SESSION_IMPL *session,
 extern int __wt_conn_btree_close(WT_SESSION_IMPL *session, int locked);
 extern int __wt_conn_dhandle_close_all(WT_SESSION_IMPL *session,
     const char *name);
-extern int __wt_conn_btree_discard(WT_CONNECTION_IMPL *conn);
+extern int __wt_conn_dhandle_discard(WT_CONNECTION_IMPL *conn);
 extern int __wt_connection_init(WT_CONNECTION_IMPL *conn);
 extern void __wt_connection_destroy(WT_CONNECTION_IMPL *conn);
 extern int __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[]);
