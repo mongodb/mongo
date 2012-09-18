@@ -939,6 +939,9 @@ def getSystemInstallName():
     if nix and os.uname()[2].startswith( "8." ):
         n += "-tiger"
 
+    if len(env.get("MONGO_MODULES", None)):
+            n += "-" + "-".join(env["MONGO_MODULES"].keys())
+
     try:
         findSettingsSetup()
         import settings
