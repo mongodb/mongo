@@ -43,6 +43,7 @@ env.StaticLibrary('md5', [
         ])
 
 env.StaticLibrary('bson', [
+        'util/safe_num.cpp',
         'bson/oid.cpp',
         'db/nonce.cpp',
         'db/jsobj.cpp',
@@ -51,6 +52,9 @@ env.StaticLibrary('bson', [
         'md5',
         'stringutils',
         ])
+
+env.CppUnitTest('safe_num_test', ['util/safe_num_test.cpp'],
+                LIBDEPS=['bson'])
 
 commonFiles = [ "pch.cpp",
                 "buildinfo.cpp",
