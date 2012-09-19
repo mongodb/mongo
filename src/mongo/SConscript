@@ -99,12 +99,15 @@ commonFiles = [ "pch.cpp",
                 "client/distlock.cpp",
                 ]
 
+env.StaticLibrary("fail_point", "util/fail_point.cpp", LIBDEPS=["foundation", "bson"])
+
 env.StaticLibrary('mongocommon', commonFiles,
                   LIBDEPS=['bson',
                            'foundation',
                            'md5',
                            'stacktrace',
                            'stringutils',
+                           'fail_point',
                            '$BUILD_DIR/third_party/pcrecpp',
                            '$BUILD_DIR/third_party/murmurhash3/murmurhash3',
                            '$BUILD_DIR/third_party/shim_boost'],)
@@ -352,6 +355,10 @@ env.Library( "mongoscore" , mongosLibraryFiles )
 env.CppUnitTest( "balancer_policy_test" , [ "s/balancer_policy_tests.cpp" ] ,
                  LIBDEPS=["mongoscore", "coreshard","mongocommon","coreserver","coredb","dbcmdline","mongodandmongos"] ,
                  NO_CRUTCH=True)
+
+# Should only need stuff from util, unittest and platform
+env.CppUnitTest("fail_point_test", [ "util/fail_point_test.cpp" ],
+                LIBDEPS=["fail_point"])
 
 serverOnlyFiles += [ "s/d_logic.cpp",
                      "s/d_writeback.cpp",
