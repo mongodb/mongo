@@ -55,7 +55,7 @@ for f in `find examples ext src test -name '*.[chisy]' -o -name '*.in' |
 	fi
 
 	# Early exits from critical loops
-	sed -n -e '/API_CALL/,/API_END/{=;p;}' \
+	sed -n -e '/API_CALL.*;$/,/API_END.*;/{=;p;}' \
 	       -e '/va_start/,/va_end/{=;p;}' $f | \
 		sed 'N;s/\n/:/' | \
 		egrep 'return|WT_RET' | \

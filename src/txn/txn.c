@@ -166,8 +166,6 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 		    WT_STRING_MATCH("read-committed", cval.str, cval.len) ?
 		    TXN_ISO_READ_COMMITTED : TXN_ISO_READ_UNCOMMITTED;
 
-	WT_ASSERT(session, session->ncursors == 0);
-
 	F_SET(txn, TXN_RUNNING);
 
 	do {

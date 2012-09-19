@@ -34,7 +34,7 @@ __curbackup_next(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	cb = (WT_CURSOR_BACKUP *)cursor;
-	CURSOR_API_CALL_NOCONF(cursor, session, next, NULL);
+	CURSOR_API_CALL(cursor, session, next, NULL);
 
 	if (cb->list == NULL || cb->list[cb->next] == NULL) {
 		F_CLR(cursor, WT_CURSTD_KEY_SET);
@@ -62,7 +62,7 @@ __curbackup_reset(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	cb = (WT_CURSOR_BACKUP *)cursor;
-	CURSOR_API_CALL_NOCONF(cursor, session, reset, NULL);
+	CURSOR_API_CALL(cursor, session, reset, NULL);
 
 	cb->next = 0;
 	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
@@ -85,7 +85,7 @@ __curbackup_close(WT_CURSOR *cursor)
 	int tret;
 
 	cb = (WT_CURSOR_BACKUP *)cursor;
-	CURSOR_API_CALL_NOCONF(cursor, session, close, NULL);
+	CURSOR_API_CALL(cursor, session, close, NULL);
 
 	/* Free the list of files. */
 	if (cb->list != NULL) {

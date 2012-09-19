@@ -293,12 +293,6 @@ struct __wt_connection_impl {
 	}								\
 } while (0)
 
-/* If an error is returned, mark that the transaction requires abort. */
-#define	API_END_TXN_ERROR(s, ret)					\
-	API_END(s);							\
-	if ((ret) != 0 && (ret) != WT_NOTFOUND && (ret) != WT_DUPLICATE_KEY) \
-		F_SET(&(s)->txn, TXN_ERROR)
-
 /*
  * If a session or connection method is about to return WT_NOTFOUND (some
  * underlying object was not found), map it to ENOENT, only cursor methods
@@ -315,9 +309,37 @@ struct __wt_connection_impl {
 #define	SESSION_API_CALL(s, n, cfg, cfgvar)				\
 	API_CALL(s, session, n, NULL, NULL, cfg, cfgvar);
 
-#define	CURSOR_API_CALL_NOCONF(cur, s, n, bt)				\
+#define	CURSOR_API_CALL(cur, s, n, bt)					\
 	(s) = (WT_SESSION_IMPL *)(cur)->session;			\
 	API_CALL_NOCONF(s, cursor, n, cur, bt)
+
+/*
+ * When a cursor update starts, wrap in a transaction if necessary.
+ */
+#define	CURSOR_UPDATE_API_CALL(cur, s, n, bt) do {			\
+	int __autotxn = 0;						\
+	CURSOR_API_CALL(cur, s, n, bt);					\
+	__autotxn = F_ISSET(S2C(s), WT_CONN_TRANSACTIONAL) &&		\
+	    !F_ISSET(&(s)->txn, TXN_RUNNING);				\
+	if (__autotxn)							\
+		WT_ERR(__wt_txn_begin((s), NULL))
+
+/*
+ * When a cursor update completes, either auto-commit or check for errors
+ * that require the enclosing transaction to roll back.
+ */
+#define	CURSOR_UPDATE_API_END(s, ret)					\
+	API_END(s);							\
+	if (__autotxn) {						\
+		if (ret == 0)						\
+			ret = __wt_txn_commit((s), NULL);		\
+		else							\
+			(void)__wt_txn_rollback((s), NULL);		\
+	} else if ((ret) != 0 &&					\
+	    (ret) != WT_NOTFOUND &&					\
+	    (ret) != WT_DUPLICATE_KEY)					\
+		F_SET(&(s)->txn, TXN_ERROR);				\
+} while (0)
 
 /*******************************************
  * Global variables.
