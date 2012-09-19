@@ -123,6 +123,30 @@ namespace mongo {
                 // we're going to re-write the query to be more efficient
                 // we have to be a little careful because of positional operators
                 // maybe we can pass this all through eventually, but right now isn't an easy way
+                
+                bool hasPositionalUpdate = false;
+                {
+                    // if the update has a positional piece ($)
+                    // then we need to pull all query parts in
+                    // so here we check for $
+                    // a little hacky
+                    BSONObjIterator i( update );
+                    while ( i.more() ) {
+                        const BSONElement& elem = i.next();
+                        
+                        if ( elem.fieldName()[0] != '$' || elem.type() != Object )
+                            continue;
+
+                        BSONObjIterator j( elem.Obj() );
+                        while ( j.more() ) {
+                            if ( str::contains( j.next().fieldName(), ".$" ) ) {
+                                hasPositionalUpdate = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+
                 BSONObjBuilder b( queryOriginal.objsize() + 10 );
                 b.append( doc["_id"] );
                 
@@ -137,7 +161,7 @@ namespace mongo {
                         continue;
                     }
                     
-                    if ( ! str::contains( elem.fieldName() , '.' ) ) {
+                    if ( ! hasPositionalUpdate ) {
                         // if there is a dotted field, accept we may need more query parts
                         continue;
                     }
