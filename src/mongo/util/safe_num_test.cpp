@@ -15,7 +15,7 @@
 
 #include <limits>
 
-#include "mongo/pch.h" // for malloc/realloc/INFINITY pulled from bson
+#include "mongo/pch.h" // for malloc/realloc pulled from bson
 
 #include "mongo/bson/bsontypes.h"
 #include "mongo/util/safe_num.h"
@@ -142,7 +142,7 @@ namespace {
         const SafeNum doublePlusMax(maxDouble + maxDouble);
         ASSERT_EQUALS(doublePlusMax.type(), mongo::NumberDouble);
 
-        const SafeNum infinity(INFINITY);
+        const SafeNum infinity(std::numeric_limits<double>::infinity());
         ASSERT_EQUALS(doublePlusMax, infinity);
     }
 
