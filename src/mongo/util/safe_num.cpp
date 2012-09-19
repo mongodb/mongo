@@ -112,12 +112,12 @@ namespace mongo {
     //
 
     bool SafeNum::isEquivalent(const SafeNum& rhs) const {
-        if (_type == EOO && rhs._type == EOO) {
+        if (!isValid() && !rhs.isValid()) {
             return true;
         }
 
         // EOO is not equivalent to anything else.
-        if (_type == EOO || rhs._type == EOO) {
+        if (!isValid() || !rhs.isValid()) {
             return false;
         }
 

@@ -110,7 +110,7 @@ namespace mongo {
         //
         // accessors
         //
-
+        bool isValid() const { return _type != EOO; }
         BSONType type() const { return _type; }
         std::string debugString() const;
 

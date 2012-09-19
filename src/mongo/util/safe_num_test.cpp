@@ -39,6 +39,8 @@ namespace {
     TEST(Comparison, EOO) {
         const SafeNum safeNumA;
         const SafeNum safeNumB;
+        ASSERT_FALSE(safeNumA.isValid());
+        ASSERT_FALSE(safeNumB.isValid());
         ASSERT_EQUALS(safeNumA.type(), mongo::EOO);
         ASSERT_EQUALS(safeNumB.type(), mongo::EOO);
         ASSERT_TRUE(safeNumA.isEquivalent(safeNumB));
