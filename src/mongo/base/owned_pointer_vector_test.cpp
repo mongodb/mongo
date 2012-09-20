@@ -40,6 +40,8 @@ namespace {
         static std::vector<string> _destroyedNames;
     };
 
+    std::vector<string> DestructionLogger::_destroyedNames;
+
     TEST(OwnedPointerVectorTest, OwnedPointerDestroyed) {
         DestructionLogger::destroyedNames().clear();
         {
