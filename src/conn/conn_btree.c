@@ -86,7 +86,6 @@ __conn_btree_get(WT_SESSION_IMPL *session,
 	WT_BTREE *btree;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	int matched;
 
 	conn = S2C(session);
 
@@ -94,20 +93,15 @@ __conn_btree_get(WT_SESSION_IMPL *session,
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
 
 	/* Increment the reference count if we already have the btree open. */
-	matched = 0;
-	TAILQ_FOREACH(btree, &conn->btqh, q) {
+	TAILQ_FOREACH(btree, &conn->btqh, q)
 		if (strcmp(name, btree->name) == 0 &&
 		    ((ckpt == NULL && btree->checkpoint == NULL) ||
 		    (ckpt != NULL && btree->checkpoint != NULL &&
 		    strcmp(ckpt, btree->checkpoint) == 0))) {
 			++btree->refcnt;
 			session->btree = btree;
-			matched = 1;
-			break;
+			return (__conn_btree_open_lock(session, flags));
 		}
-	}
-	if (matched)
-		return (__conn_btree_open_lock(session, flags));
 
 	/*
 	 * Allocate the WT_BTREE structure, its lock, and set the name so we
@@ -150,13 +144,36 @@ __conn_btree_get(WT_SESSION_IMPL *session,
 int
 __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session)
 {
-	WT_DECL_RET;
 	WT_BTREE *btree;
+	WT_DECL_RET;
+	int ckpt_lock;
 
 	btree = session->btree;
 
 	if (!F_ISSET(btree, WT_BTREE_OPEN))
 		return (0);
+
+	/*
+	 * Checkpoint to flush out the file's changes.  This usually happens on
+	 * session handle close (which means we're holding the handle lock, so
+	 * this call serializes with any session checkpoint).  Bulk-cursors are
+	 * a special case: they do not hold the handle lock and they still must
+	 * serialize with checkpoints.   Acquire the lower-level checkpoint lock
+	 * and hold it until the handle is closed and the bulk-cursor flag has
+	 * been cleared.
+	 *    We hold the lock so long for two reasons: first, checkpoint uses
+	 * underlying btree handle structures (for example, the meta-tracking
+	 * checkpoint resolution uses the block-manager reference), and because
+	 * checkpoint writes "fake" checkpoint records for bulk-loaded files,
+	 * and a real checkpoint, which we're creating here, can't be followed
+	 * by more fake checkpoints.  In summary, don't let a checkpoint happen
+	 * unless all of the bulk cursor's information has been cleared.
+	 */
+	ckpt_lock = 0;
+	if (F_ISSET(btree, WT_BTREE_BULK)) {
+		ckpt_lock = 1;
+		__wt_spin_lock(session, &S2C(session)->metadata_lock);
+	}
 
 	if (!F_ISSET(btree,
 	    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY))
@@ -164,6 +181,9 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session)
 
 	WT_TRET(__wt_btree_close(session));
 	F_CLR(btree, WT_BTREE_OPEN | WT_BTREE_SPECIAL_FLAGS);
+
+	if (ckpt_lock)
+		__wt_spin_unlock(session, &S2C(session)->metadata_lock);
 
 	return (ret);
 }
@@ -220,7 +240,8 @@ __conn_btree_open(WT_SESSION_IMPL *session,
 	} while (!F_ISSET(btree, WT_BTREE_OPEN));
 
 	if (0) {
-err:		(void)__wt_conn_btree_close(session, 1);
+err:		F_CLR(btree, WT_BTREE_SPECIAL_FLAGS);
+		(void)__wt_conn_btree_close(session, 1);
 	}
 
 	__wt_scr_free(&addr);
@@ -290,13 +311,45 @@ __wt_conn_btree_apply(WT_SESSION_IMPL *session,
 
 	TAILQ_FOREACH(btree, &conn->btqh, q)
 		if (F_ISSET(btree, WT_BTREE_OPEN) &&
-		    !F_ISSET(btree, WT_BTREE_EXCLUSIVE) &&
 		    strcmp(btree->name, WT_METADATA_URI) != 0) {
 			/*
-			 * We have the connection spinlock, which prevents
-			 * handles being opened or closed, so there is no need
-			 * for additional handle locking here, or pulling every
-			 * tree into this session's handle cache.
+			 * We have the schema lock, which prevents handles being
+			 * opened or closed, so there is no need for additional
+			 * handle locking here, or pulling every tree into this
+			 * session's handle cache.
+			 */
+			session->btree = btree;
+			WT_ERR(func(session, cfg));
+		}
+
+err:	session->btree = saved_btree;
+	return (ret);
+}
+
+/*
+ * __wt_conn_btree_apply_single --
+ *	Apply a function to a single btree handle.
+ */
+int
+__wt_conn_btree_apply_single(WT_SESSION_IMPL *session, const char *uri,
+    int (*func)(WT_SESSION_IMPL *, const char *[]), const char *cfg[])
+{
+	WT_BTREE *btree, *saved_btree;
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+
+	conn = S2C(session);
+	saved_btree = session->btree;
+
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
+
+	TAILQ_FOREACH(btree, &conn->btqh, q)
+		if (strcmp(btree->name, uri) == 0) {
+			/*
+			 * We have the schema lock, which prevents handles being
+			 * opened or closed, so there is no need for additional
+			 * handle locking here, or pulling every tree into this
+			 * session's handle cache.
 			 */
 			session->btree = btree;
 			WT_ERR(func(session, cfg));

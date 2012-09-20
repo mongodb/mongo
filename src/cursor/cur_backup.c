@@ -194,9 +194,8 @@ __backup_start(
 	cb->list = NULL;
 
 	/*
-	 * Checkpoints cannot be deleted until the backup finishes; no barrier
-	 * is necessary, we're holding the checkpoint lock, so this write must
-	 * complete before that lock is released.
+	 * Checkpoints cannot be deleted until the backup finishes: set the
+	 * flag while holding the API lock, which blocks any checkpoint calls.
 	 */
 	if (conn->ckpt_backup)
 		WT_ERR_MSG(session, EINVAL,
