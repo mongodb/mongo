@@ -280,9 +280,10 @@ methods = {
 		type='boolean'),
 	Config('bulk', 'false', r'''
 		configure the cursor for bulk loads; bulk-load is a fast
-		load path for empty objects and only empty objects may
-		be bulk-loaded.  Cursors configured for bulk load only
-		support the WT_CURSOR::insert and WT_CURSOR::close methods''',
+		load path for newly created objects and only newly
+		created objects may be bulk-loaded.  Cursors configured
+		for bulk load only support the WT_CURSOR::insert and
+		WT_CURSOR::close methods''',
 		type='boolean'),
 	Config('checkpoint', '', r'''
 		the name of a checkpoint to open; the reserved checkpoint
