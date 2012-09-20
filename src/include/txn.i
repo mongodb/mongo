@@ -17,6 +17,9 @@ __wt_txn_modify(WT_SESSION_IMPL *session, wt_txnid_t *id)
 {
 	WT_TXN *txn;
 
+        if (!F_ISSET(S2C(session), WT_CONN_TRANSACTIONAL))
+                return (0);
+
 	txn = &session->txn;
 	WT_ASSERT(session, F_ISSET(txn, TXN_RUNNING));
 	if (txn->mod_count * sizeof(wt_txnid_t *) == txn->mod_alloc)
@@ -37,6 +40,9 @@ static inline int
 __wt_txn_modify_ref(WT_SESSION_IMPL *session, WT_REF *ref)
 {
 	WT_TXN *txn;
+
+        if (!F_ISSET(S2C(session), WT_CONN_TRANSACTIONAL))
+                return (0);
 
 	txn = &session->txn;
 	WT_ASSERT(session, F_ISSET(txn, TXN_RUNNING));
@@ -61,6 +67,9 @@ static inline void
 __wt_txn_unmodify(WT_SESSION_IMPL *session)
 {
 	WT_TXN *txn;
+
+        if (!F_ISSET(S2C(session), WT_CONN_TRANSACTIONAL))
+                return;
 
 	txn = &session->txn;
 	if (F_ISSET(txn, TXN_RUNNING)) {
