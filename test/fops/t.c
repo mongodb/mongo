@@ -148,6 +148,12 @@ handle_error(WT_EVENT_HANDLER *handler, int error, const char *errmsg)
 	/* Ignore complaints about missing files. */
 	if (error == ENOENT)
 		return (0);
+
+	/* Ignore complaints about failure to open bulk cursors. */
+	if (strstr(
+	    errmsg, "bulk-load is only supported on newly created") != NULL)
+		return (0);
+
 	return (fprintf(stderr, "%s\n", errmsg) < 0 ? -1 : 0);
 }
 
