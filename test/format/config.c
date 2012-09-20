@@ -8,7 +8,6 @@
 #include "format.h"
 #include "config.h"
 
-static void	   config_clear(void);
 static const char *config_file_type(int);
 static CONFIG	  *config_find(const char *, size_t);
 static uint32_t	   config_translate(const char *);
@@ -25,24 +24,11 @@ config_setup(void)
 	/* Clear any temporary values. */
 	config_clear();
 
-	/* Pick a file type next, other items depend on it. */
-	cp = config_find("file_type", strlen("file_type"));
-	if (!(cp->flags & C_PERM)) {
-		switch (MMRAND(0, 2)) {
-		case 0:
-			config_single("file_type=fix", 0);
-			break;
-		case 1:
-			config_single("file_type=var", 0);
-			break;
-		case 2:
-			config_single("file_type=row", 0);
-			break;
-		}
-	}
-	g.type = (int)config_translate(g.c_file_type);
-
-	/* Pick a data source type. */
+	/*
+	 * Choose a data source type and a file type: they're interrelated (LSM
+	 * trees are only compatible with row-store) and other items depend on
+	 * them.
+	 */
 	cp = config_find("data_source", strlen("data_source"));
 	if (!(cp->flags & C_PERM)) {
 		switch (MMRAND(0, 2)) {
@@ -59,6 +45,44 @@ config_setup(void)
 			break;
 		}
 	}
+
+	cp = config_find("file_type", strlen("file_type"));
+	if (!(cp->flags & C_PERM)) {
+		if (strcmp(g.c_data_source, "lsm") == 0)
+			config_single("file_type=row", 0);
+		else
+			switch (MMRAND(0, 2)) {
+			case 0:
+				config_single("file_type=fix", 0);
+				break;
+			case 1:
+				config_single("file_type=var", 0);
+				break;
+			case 2:
+				config_single("file_type=row", 0);
+				break;
+			}
+		}
+	g.type = (int)config_translate(g.c_file_type);
+
+	/*
+	 * If data_source and file_type were both "permanent", we may still
+	 * have a mismatch.
+	 */
+	if (g.type != ROW && strcmp(g.c_data_source, "lsm") == 0) {
+		fprintf(stderr,
+	    "%s: lsm data_source is only compatible with row file_type\n",
+		    g.progname);
+		exit(EXIT_FAILURE);
+	}
+
+	/* Build the object name. */
+	if ((g.uri = malloc(
+	    strlen(g.c_data_source) + strlen(WT_NAME) + 2)) == NULL)
+		syserr("malloc");
+	strcpy(g.uri, g.c_data_source);
+	strcat(g.uri, ":");
+	strcat(g.uri, WT_NAME);
 
 	/* Reset the key count. */
 	g.key_cnt = 0;
@@ -90,21 +114,8 @@ config_setup(void)
 			if (cp->flags & C_OPS)
 				*cp->v = 0;
 
-	/* LSM trees are only compatible with row store tables. */
-	if (g.type != ROW && strcmp(g.c_data_source, "lsm") == 0) {
-		cp = config_find("file_type", strlen("file_type"));
-		if (!(cp->flags & C_PERM))
-			config_single("file_type=row", 0);
-		else {
-			fprintf(stderr,
-	    "%s: LSM data source is only compatible with row file_type\n",
-			    g.progname);
-			exit(EXIT_FAILURE);
-		}
-	}
-
 	/* Multi-threaded runs cannot be replayed. */
-	if (g.replay && g.c_threads != 1) {
+	if (g.replay && !SINGLETHREADED) {
 		fprintf(stderr,
 		    "%s: -r is incompatible with threaded runs\n", g.progname);
 		exit(EXIT_FAILURE);
@@ -115,9 +126,7 @@ config_setup(void)
 	 * as long as the delete percentage isn't nailed down.
 	 */
 	if (!g.replay && g.run_cnt % 10 == 0) {
-		for (cp = c; cp->name != NULL; ++cp)
-			if (strcmp(cp->name, "delete_pct") == 0)
-				break;
+		cp = config_find("delete_pct", strlen("delete_pct"));
 		if (cp->name != NULL &&
 		    !(cp->flags & (C_IGNORE | C_PERM | C_TEMP)))
 			g.c_delete_pct = 0;
@@ -214,14 +223,20 @@ config_file(const char *name)
  * config_clear --
  *	Clear per-run values.
  */
-static void
+void
 config_clear(void)
 {
 	CONFIG *cp;
 
 	/* Clear configuration data. */
-	for (cp = c; cp->name != NULL; ++cp)
+	for (cp = c; cp->name != NULL; ++cp) {
 		cp->flags &= ~(uint32_t)C_TEMP;
+		if (!(cp->flags & C_PERM) &&
+		    cp->flags & C_STRING && cp->vstr != NULL) {
+			free(*cp->vstr);
+			*cp->vstr = NULL;
+		}
+	}
 	free(g.uri);
 	g.uri = NULL;
 }
@@ -255,17 +270,14 @@ config_single(const char *s, int perm)
 				"Invalid file type option: %s\n", ep);
 			    exit(EXIT_FAILURE);
 			}
-			*cp->vstr = ep;
-			if ((g.uri = malloc(
-			    strlen(ep) + strlen(WT_NAME) + 2)) == NULL)
-				exit(EXIT_FAILURE);
-			sprintf(g.uri, "%s:%s", ep, WT_NAME);
-			return;
+			*cp->vstr = strdup(ep);
 		}
-		if (strncmp(s, "file_type", strlen("file_type")) == 0) {
-			*cp->vstr = config_file_type((int)config_translate(ep));
-			return;
-		}
+		else if (strncmp(s, "file_type", strlen("file_type")) == 0)
+			*cp->vstr = strdup(
+			    config_file_type((int)config_translate(ep)));
+		if (*cp->vstr == NULL)
+			syserr("strdup");
+		return;
 	}
 
 	*cp->v = config_translate(ep);

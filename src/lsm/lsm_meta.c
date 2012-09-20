@@ -47,7 +47,7 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		else if (WT_STRING_MATCH("threshold", ck.str, ck.len))
 			lsm_tree->threshold = (uint32_t)cv.val;
 		else if (WT_STRING_MATCH("last", ck.str, ck.len))
-			lsm_tree->last = (uint32_t)cv.val;
+			lsm_tree->last = (int)cv.val;
 		else if (WT_STRING_MATCH("chunks", ck.str, ck.len)) {
 			WT_ERR(__wt_config_subinit(session, &lparser, &cv));
 			chunk_sz = sizeof(*lsm_tree->chunk);

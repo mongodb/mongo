@@ -7,6 +7,8 @@
 
 #include "wt_internal.h"
 
+static int __lsm_tree_open(WT_SESSION_IMPL *, const char *, WT_LSM_TREE **);
+
 /*
  * __lsm_tree_discard --
  *	Free an LSM tree structure.
@@ -17,7 +19,10 @@ __lsm_tree_discard(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	WT_LSM_CHUNK *chunk;
 	int i;
 
-	TAILQ_REMOVE(&S2C(session)->lsmqh, lsm_tree, q);
+	/* We may be destroying an lsm_tree before it was added. */
+	if (F_ISSET(lsm_tree, WT_LSM_TREE_OPEN))
+		TAILQ_REMOVE(&S2C(session)->lsmqh, lsm_tree, q);
+
 	__wt_spin_destroy(session, &lsm_tree->lock);
 
 	__wt_free(session, lsm_tree->name);
@@ -54,8 +59,8 @@ __lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	WT_DECL_RET;
 	WT_SESSION *wt_session;
 
-	if (F_ISSET(lsm_tree, WT_LSM_TREE_OPEN)) {
-		F_CLR(lsm_tree, WT_LSM_TREE_OPEN);
+	if (F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
+		F_CLR(lsm_tree, WT_LSM_TREE_WORKING);
 		WT_TRET(__wt_thread_join(lsm_tree->worker_tid));
 	}
 
@@ -162,9 +167,11 @@ __lsm_tree_start_worker(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	lsm_tree->worker_session = (WT_SESSION_IMPL *)wt_session;
 	F_SET(lsm_tree->worker_session, WT_SESSION_INTERNAL);
 
+	F_SET(lsm_tree, WT_LSM_TREE_WORKING);
+	/* The new thread will rely on the WORKING value being visible. */
+	WT_FULL_BARRIER();
 	WT_RET(__wt_thread_create(
 	    &lsm_tree->worker_tid, __wt_lsm_worker, lsm_tree));
-	F_SET(lsm_tree, WT_LSM_TREE_OPEN);
 
 	return (0);
 }
@@ -195,13 +202,12 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	}
 	WT_RET_NOTFOUND_OK(ret);
 
-	/*
-	 * XXX this call should just insert the metadata: most of this should
-	 * move to __wt_lsm_tree_open.
-	 */
+	WT_RET(__wt_config_gets(session, cfg, "key_format", &cval));
+	if (WT_STRING_MATCH("r", cval.str, cval.len))
+		WT_RET_MSG(session, EINVAL,
+		    "LSM trees cannot be configured as column stores");
+
 	WT_RET(__wt_calloc_def(session, 1, &lsm_tree));
-	__wt_spin_init(session, &lsm_tree->lock);
-	TAILQ_INSERT_HEAD(&S2C(session)->lsmqh, lsm_tree, q);
 
 	WT_RET(__wt_strdup(session, uri, &lsm_tree->name));
 	lsm_tree->filename = lsm_tree->name + strlen("lsm:");
@@ -225,11 +231,15 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	    "%s,key_format=u,value_format=u", config));
 	lsm_tree->file_config = __wt_buf_steal(session, buf, NULL);
 
-	/* Create the initial chunk. */
+	/* Create the first chunk and flush the metadata. */
 	WT_ERR(__wt_lsm_tree_switch(session, lsm_tree));
 
-	/* XXX This should definitely only happen when opening the tree. */
-	WT_ERR(__lsm_tree_start_worker(session, lsm_tree));
+	/* Discard our partially populated handle. */
+	__lsm_tree_discard(session, lsm_tree);
+	lsm_tree = NULL;
+
+	/* Open our new tree and add it to the handle cache. */
+	WT_ERR(__lsm_tree_open(session, uri, &lsm_tree));
 
 	if (0) {
 err:		__lsm_tree_discard(session, lsm_tree);
@@ -239,7 +249,7 @@ err:		__lsm_tree_discard(session, lsm_tree);
 }
 
 /*
- * __wt_lsm_tree_open --
+ * __lsm_tree_open --
  *	Open an LSM tree structure.
  */
 static int
@@ -249,17 +259,26 @@ __lsm_tree_open(
 	WT_DECL_RET;
 	WT_LSM_TREE *lsm_tree;
 
+	/* Make sure no one beat us to it. */
+	TAILQ_FOREACH(lsm_tree, &S2C(session)->lsmqh, q)
+		if (strcmp(uri, lsm_tree->name) == 0) {
+			*treep = lsm_tree;
+			return (0);
+		}
+
 	/* Try to open the tree. */
 	WT_RET(__wt_calloc_def(session, 1, &lsm_tree));
 	__wt_spin_init(session, &lsm_tree->lock);
 	WT_ERR(__wt_strdup(session, uri, &lsm_tree->name));
 	lsm_tree->filename = lsm_tree->name + strlen("lsm:");
-	TAILQ_INSERT_HEAD(&S2C(session)->lsmqh, lsm_tree, q);
-
 	WT_ERR(__wt_lsm_meta_read(session, lsm_tree));
 
 	/* Set the generation number so cursors are opened on first usage. */
 	lsm_tree->dsk_gen = 1;
+
+	/* Now the tree is setup, make it visible to others. */
+	TAILQ_INSERT_HEAD(&S2C(session)->lsmqh, lsm_tree, q);
+	F_SET(lsm_tree, WT_LSM_TREE_OPEN);
 
 	WT_ERR(__lsm_tree_start_worker(session, lsm_tree));
 	*treep = lsm_tree;

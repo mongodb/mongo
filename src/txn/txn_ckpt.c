@@ -457,8 +457,6 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 			    "checkpoints cannot be dropped when in-use");
 		}
 
-	WT_ASSERT(session, txn->isolation = TXN_ISO_SNAPSHOT);
-
 	/*
 	 * Mark the root page dirty to ensure something gets written.
 	 *

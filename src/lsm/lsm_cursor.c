@@ -82,7 +82,7 @@ __clsm_close_cursors(WT_CURSOR_LSM *clsm)
 
 	/* Detach from our old primary. */
 	if (clsm->primary_chunk != NULL) {
-		WT_ATOMIC_SUB(clsm->primary_chunk->ncursor, 1);
+		(void)WT_ATOMIC_SUB(clsm->primary_chunk->ncursor, 1);
 		clsm->primary_chunk = NULL;
 	}
 
@@ -169,7 +169,7 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm)
 		    !F_ISSET(clsm, WT_CLSM_UPDATED) ||
 		    !F_ISSET(chunk, WT_LSM_CHUNK_ONDISK));
 
-		WT_ATOMIC_ADD(clsm->primary_chunk->ncursor, 1);
+		(void)WT_ATOMIC_ADD(clsm->primary_chunk->ncursor, 1);
 	}
 
 	/* Peek into the btree layer to track the in-memory size. */

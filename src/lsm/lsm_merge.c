@@ -178,7 +178,7 @@ __wt_lsm_major_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 
 	chunk->uri = dest_uri;
 	dest_uri = NULL;
-	if (bloom != NULL)
+	if (bbuf != NULL)
 		chunk->bloom_uri = __wt_buf_steal(session, bbuf, 0);
 	chunk->count = insert_count;
 	F_SET(chunk, WT_LSM_CHUNK_ONDISK);

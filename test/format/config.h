@@ -40,7 +40,7 @@ typedef struct {
 	uint32_t	min;			/* Minimum value */
 	uint32_t	max;			/* Maximum value */
 	uint32_t	*v;			/* Value for this run */
-	const char	**vstr;			/* Value for string options */
+	char		**vstr;			/* Value for string options */
 } CONFIG;
 
 /*
