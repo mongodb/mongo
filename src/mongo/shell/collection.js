@@ -162,12 +162,15 @@ DBCollection.prototype.findOne = function( query , fields, options ){
     return ret;
 }
 
-DBCollection.prototype.insert = function( obj , _allow_dot ){
+DBCollection.prototype.insert = function( obj , options, _allow_dot ){
     if ( ! obj )
         throw "no object passed to insert!";
     if ( ! _allow_dot ) {
         this._validateForStorage( obj );
     }
+    
+    if ( typeof( options ) == "undefined" ) options = 0;
+    
     if ( typeof( obj._id ) == "undefined" && ! Array.isArray( obj ) ){
         var tmp = obj; // don't want to modify input
         obj = {_id: new ObjectId()};
@@ -176,7 +179,7 @@ DBCollection.prototype.insert = function( obj , _allow_dot ){
         }
     }
     this._db._initExtraInfo();
-    this._mongo.insert( this._fullName , obj );
+    this._mongo.insert( this._fullName , obj, options );
     this._lastID = obj._id;
     this._db._getExtraInfo("Inserted");
 }
@@ -320,7 +323,7 @@ DBCollection.prototype._indexSpec = function( keys, options ) {
 
 DBCollection.prototype.createIndex = function( keys , options ){
     var o = this._indexSpec( keys, options );
-    this._db.getCollection( "system.indexes" ).insert( o , true );
+    this._db.getCollection( "system.indexes" ).insert( o , 0, true );
 }
 
 DBCollection.prototype.ensureIndex = function( keys , options ){

@@ -479,7 +479,7 @@ namespace mongo {
 
     JSBool mongo_insert(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {
         try {
-            smuassert( cx ,  "mongo_insert needs 2 args" , argc == 2 );
+            smuassert( cx ,  "mongo_insert needs 3 args" , argc == 3 );
             smuassert( cx ,  "2nd param to insert has to be an object" , JSVAL_IS_OBJECT( argv[1] ) );
 
             Convertor c( cx );
@@ -494,6 +494,8 @@ namespace mongo {
             string ns = c.toString( argv[0] );
 
             JSObject * insertObj = JSVAL_TO_OBJECT( argv[1] );
+
+            int flags = static_cast<int>( c.toNumber( argv[2] ) );
 
             if( JS_IsArrayObject( cx, insertObj ) ){
                 vector<BSONObj> bos;
@@ -511,7 +513,7 @@ namespace mongo {
                     bos.push_back( c.toObject( el ) );
                 }
 
-                conn->insert( ns, bos );
+                conn->insert( ns, bos, flags );
             }
             else {
                 BSONObj o = c.toObject( argv[1] );
