@@ -10,5 +10,9 @@ env.CppUnitTest('initializer_dependency_graph_test',
                 ['initializer_dependency_graph_test.cpp'],
                 LIBDEPS=['base'])
 
+env.CppUnitTest('owned_pointer_vector_test',
+                ['owned_pointer_vector_test.cpp'],
+                LIBDEPS=['base'])
+
 env.CppUnitTest('status_test', 'status_test.cpp',
                 LIBDEPS=['base'])
