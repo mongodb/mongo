@@ -429,11 +429,6 @@ namespace mongo {
         void _summarizeAsHtml(stringstream&) const;
         void _summarizeStatus(BSONObjBuilder&) const; // for replSetGetStatus command
 
-        /* throws exception if a problem initializing. */
-        ReplSetImpl(ReplSetCmdline&);
-        // used for testing
-        ReplSetImpl();
-
         /* call afer constructing to start - returns fairly quickly after launching its threads */
         void _go();
 
@@ -446,7 +441,7 @@ namespace mongo {
          * Finds the configuration with the highest version number and attempts
          * load it.
          */
-        bool _loadConfigFinish(vector<ReplSetConfig>& v);
+        bool _loadConfigFinish(vector<ReplSetConfig*>& v);
         /**
          * Gather all possible configs (from command line seeds, our own config
          * doc, and any hosts listed therein) and try to initiate from the most
@@ -464,6 +459,11 @@ namespace mongo {
     protected:
         Member *_self;
         bool _buildIndexes;       // = _self->config().buildIndexes
+
+        ReplSetImpl();
+        /* throws exception if a problem initializing. */
+        void init(ReplSetCmdline&);
+
         void setSelfTo(Member *); // use this as it sets buildIndexes var
     private:
         List1<Member> _members; // all members of the set EXCEPT _self.
@@ -549,8 +549,7 @@ namespace mongo {
 
     class ReplSet : public ReplSetImpl {
     public:
-        ReplSet();
-        ReplSet(ReplSetCmdline& replSetCmdline);
+        static ReplSet* make(ReplSetCmdline& replSetCmdline);
         virtual ~ReplSet() {}
 
         // for the replSetStepDown command
@@ -606,6 +605,9 @@ namespace mongo {
             if( time(0)-_hbmsgTime > 120 ) return "";
             return _hbmsg;
         }
+
+    protected:
+        ReplSet();
     };
 
     /**

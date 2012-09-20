@@ -187,19 +187,21 @@ namespace mongo {
             }
 
             try {
-                ReplSetConfig newConfig(cmdObj["replSetReconfig"].Obj(), force);
+                scoped_ptr<ReplSetConfig> newConfig
+                        (ReplSetConfig::make(cmdObj["replSetReconfig"].Obj(), force));
 
-                log() << "replSet replSetReconfig config object parses ok, " << newConfig.members.size() << " members specified" << rsLog;
+                log() << "replSet replSetReconfig config object parses ok, " <<
+                        newConfig->members.size() << " members specified" << rsLog;
 
-                if( !ReplSetConfig::legalChange(theReplSet->getConfig(), newConfig, errmsg) ) {
+                if( !ReplSetConfig::legalChange(theReplSet->getConfig(), *newConfig, errmsg) ) {
                     return false;
                 }
 
-                checkMembersUpForConfigChange(newConfig, result, false);
+                checkMembersUpForConfigChange(*newConfig, result, false);
 
                 log() << "replSet replSetReconfig [2]" << rsLog;
 
-                theReplSet->haveNewConfig(newConfig, true);
+                theReplSet->haveNewConfig(*newConfig, true);
                 ReplSet::startupStatusMsg.set("replSetReconfig'd");
             }
             catch( DBException& e ) {

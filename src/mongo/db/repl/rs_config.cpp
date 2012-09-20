@@ -566,9 +566,18 @@ namespace mongo {
         uassert(13122, "bad repl set config?", expr);
     }
 
-    ReplSetConfig::ReplSetConfig(BSONObj cfg, bool force) :
-        _ok(false),_majority(-1)
-    {
+    ReplSetConfig::ReplSetConfig() :
+        _ok(false),
+        _majority(-1) {
+    }
+
+    ReplSetConfig* ReplSetConfig::make(BSONObj cfg, bool force) {
+        auto_ptr<ReplSetConfig> ret(new ReplSetConfig());
+        ret->init(cfg, force);
+        return ret.release();
+    }
+
+    void ReplSetConfig::init(BSONObj cfg, bool force) {
         _constructed = false;
         clear();
         from(cfg);
@@ -582,9 +591,13 @@ namespace mongo {
         _constructed = true;
     }
 
-    ReplSetConfig::ReplSetConfig(const HostAndPort& h) :
-      _ok(false),_majority(-1)
-    {
+    ReplSetConfig* ReplSetConfig::make(const HostAndPort& h) {
+        auto_ptr<ReplSetConfig> ret(new ReplSetConfig());
+        ret->init(h);
+        return ret.release();
+    }
+
+    void ReplSetConfig::init(const HostAndPort& h) {
         LOG(2) << "ReplSetConfig load " << h.toString() << rsLog;
 
         _constructed = false;
