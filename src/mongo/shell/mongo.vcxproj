@@ -868,6 +868,7 @@ cscript //Nologo createCPPfromJavaScriptFiles.js "$(ProjectDir).."</Command>
     <ClCompile Include="..\db\dbmessage.cpp" />
     <ClCompile Include="..\scripting\bson_template_evaluator.cpp" />
     <ClCompile Include="..\util\concurrency\mutexdebugger.cpp" />
+    <ClCompile Include="..\util\safe_num.cpp" />
     <ClCompile Include="..\util\time_support.cpp" />
     <ClCompile Include="linenoise_utf8.cpp" />
     <ClCompile Include="mk_wcwidth.cpp" />
@@ -1088,6 +1089,7 @@ cscript //Nologo createCPPfromJavaScriptFiles.js "$(ProjectDir).."</Command>
     <ClInclude Include="..\platform\float_utils.h" />
     <ClInclude Include="..\platform\windows_basic.h" />
     <ClInclude Include="..\scripting\bson_template_evaluator.h" />
+    <ClInclude Include="..\util\safe_num.h" />
     <ClInclude Include="linenoise_utf8.h" />
     <ClInclude Include="mk_wcwidth.h" />
     <ClInclude Include="..\..\third_party\pcre-8.30\config.h" />

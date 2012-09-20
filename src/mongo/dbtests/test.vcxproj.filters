@@ -669,6 +669,9 @@
     <ClInclude Include="..\scripting\engine_spidermonkey.h">
       <Filter>scripting</Filter>
     </ClInclude>
+    <ClInclude Include="..\util\safe_num.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\client\connpool.cpp">
@@ -1533,6 +1536,9 @@
     </ClCompile>
     <ClCompile Include="..\scripting\bson_template_evaluator.cpp">
       <Filter>scripting</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\safe_num.cpp">
+      <Filter>util\Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

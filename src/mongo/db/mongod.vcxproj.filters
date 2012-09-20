@@ -917,6 +917,9 @@
     <ClCompile Include="..\scripting\bson_template_evaluator.cpp">
       <Filter>scripting</Filter>
     </ClCompile>
+    <ClCompile Include="..\util\safe_num.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\targetver.h" />
@@ -1670,6 +1673,9 @@
     </ClInclude>
     <ClInclude Include="..\scripting\bson_template_evaluator.h">
       <Filter>scripting</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\safe_num.h">
+      <Filter>util\Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
