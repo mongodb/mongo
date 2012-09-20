@@ -32,11 +32,11 @@ __wt_lsm_worker(void *arg)
 	chunk_array = NULL;
 	chunk_alloc = 0;
 
-	while (F_ISSET(lsm_tree, WT_LSM_TREE_OPEN)) {
+	while (F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
 		progress = 0;
 
 		__wt_spin_lock(session, &lsm_tree->lock);
-		if (!F_ISSET(lsm_tree, WT_LSM_TREE_OPEN)) {
+		if (!F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
 			__wt_spin_unlock(session, &lsm_tree->lock);
 			break;
 		}
