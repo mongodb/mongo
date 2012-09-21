@@ -249,7 +249,7 @@ __ckpt_process(
     WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase)
 {
 	WT_BLOCK_CKPT *a, *b, *ci;
-	WT_CKPT *ckpt;
+	WT_CKPT *ckpt, *last_ckpt, *next_ckpt;
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
 	uint64_t ckpt_size;
@@ -288,23 +288,29 @@ __ckpt_process(
 	 * To delete a checkpoint, we'll need extent list for it, and we have to
 	 * read that from the disk.
 	 */
+	last_ckpt = NULL;
 	deleting = 0;
 	WT_CKPT_FOREACH(ckptbase, ckpt) {
+		if (F_ISSET(ckpt, WT_CKPT_FAKE))
+			continue;
+
 		/*
 		 * To delete a checkpoint, we'll need checkpoint information for
 		 * it and the subsequent checkpoint.  The test is tricky, load
 		 * the current checkpoint's information if it's marked for
-		 * deletion, or if it follows a checkpoint marked for deletion,
+		 * deletion or if it follows a checkpoint marked for deletion,
 		 * where the boundary cases are the first checkpoint in the list
 		 * and the last checkpoint in the list: if we're deleting the
 		 * last checkpoint in the list, there's no next checkpoint, the
 		 * checkpoint will be merged into the live tree.
 		 */
 		if (!F_ISSET(ckpt, WT_CKPT_DELETE) &&
-		    (ckpt == ckptbase ||
-		    F_ISSET(ckpt, WT_CKPT_ADD) ||
-		    !F_ISSET(ckpt - 1, WT_CKPT_DELETE)))
+		    (F_ISSET(ckpt, WT_CKPT_ADD) ||
+		    last_ckpt == NULL || !F_ISSET(last_ckpt, WT_CKPT_DELETE))) {
+			last_ckpt = ckpt;
 			continue;
+		}
+		last_ckpt = ckpt;
 		deleting = 1;
 
 		/*
@@ -365,14 +371,23 @@ __ckpt_process(
 		}
 
 		/*
+		 * Find the checkpoint into which we'll roll this checkpoint's
+		 * blocks: it's the next real checkpoint in the list, and it
+		 * better have been read in (if it's not the add slot).
+		 */
+		for (next_ckpt = ckpt + 1;; ++next_ckpt)
+			if (!F_ISSET(next_ckpt, WT_CKPT_FAKE))
+				break;
+
+		/*
 		 * Set the from/to checkpoint structures, where the "to" value
 		 * may be the live tree.
 		 */
 		a = ckpt->bpriv;
-		if (F_ISSET(ckpt + 1, WT_CKPT_ADD))
+		if (F_ISSET(next_ckpt, WT_CKPT_ADD))
 			b = &block->live;
 		else
-			b = (ckpt + 1)->bpriv;
+			b = next_ckpt->bpriv;
 
 		/*
 		 * Free the root page: there's nothing special about this free,
@@ -414,7 +429,7 @@ __ckpt_process(
 		 * This means the extent lists may aggregate over a number of
 		 * checkpoints, but that's OK, they're disjoint sets of ranges.
 		 */
-		if (F_ISSET(ckpt + 1, WT_CKPT_DELETE))
+		if (F_ISSET(next_ckpt, WT_CKPT_DELETE))
 			continue;
 
 		/*
@@ -428,7 +443,7 @@ __ckpt_process(
 		/*
 		 * If we're updating the live system's information, we're done.
 		 */
-		if (F_ISSET(ckpt + 1, WT_CKPT_ADD))
+		if (F_ISSET(next_ckpt, WT_CKPT_ADD))
 			continue;
 
 		/*
@@ -443,7 +458,7 @@ __ckpt_process(
 		WT_ERR(__ckpt_extlist_fblocks(session, block, &b->alloc));
 		WT_ERR(__ckpt_extlist_fblocks(session, block, &b->discard));
 
-		F_SET(ckpt + 1, WT_CKPT_UPDATE);
+		F_SET(next_ckpt, WT_CKPT_UPDATE);
 	}
 
 	/* Update checkpoints marked for update. */
@@ -468,18 +483,13 @@ live_update:
 
 			/*
 			 * XXX
-			 * Our caller wants two pieces of information: the time
-			 * the checkpoint was written and the final checkpoint
-			 * size.  This violates layering but the alternative is
-			 * a call for the btree layer to crack the checkpoint
+			 * Our caller wants the final checkpoint size.  Setting
+			 * the size here violates layering, but the alternative
+			 * is a call for the btree layer to crack the checkpoint
 			 * cookie into its components, and that's a fair amount
-			 * of work.  (We could just read the system time in the
-			 * session layer when updating the metadata file, but
-			 * that won't work for the checkpoint size, and so we
-			 * do both here.)
+			 * of work.
 			 */
 			ckpt->ckpt_size = ci->ckpt_size;
-			WT_ERR(__wt_epoch(session, &ckpt->sec, NULL));
 		}
 
 	/*

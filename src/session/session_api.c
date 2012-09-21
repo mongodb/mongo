@@ -94,7 +94,7 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	__wt_hazard_close(session);
 
 	/* Free the reconciliation information. */
-	__wt_rec_destroy(session);
+	__wt_rec_destroy(session, &session->reconcile);
 
 	/* Free the eviction exclusive-lock information. */
 	__wt_free(session, session->excl);

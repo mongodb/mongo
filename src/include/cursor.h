@@ -136,6 +136,8 @@ struct __wt_cursor_bulk {
 	 */
 	uint32_t entry;				/* Entry count */
 	uint32_t nrecs;				/* Max records per chunk */
+
+	void	*reconcile;			/* Reconciliation information */
 };
 
 struct __wt_cursor_config {

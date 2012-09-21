@@ -187,6 +187,7 @@ struct __wt_connection_impl {
 
 	WT_SPINLOCK api_lock;		/* Connection API spinlock */
 	WT_SPINLOCK fh_lock;		/* File handle queue spinlock */
+	WT_SPINLOCK metadata_lock;	/* Metadata spinlock */
 	WT_SPINLOCK schema_lock;	/* Schema operation spinlock */
 	WT_SPINLOCK serial_lock;	/* Serial function call spinlock */
 
