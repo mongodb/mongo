@@ -138,12 +138,6 @@ namespace mongo {
 
     template< class V >
     long long BtreeBucket<V>::fullValidate(const DiskLoc& thisLoc, const BSONObj &order, long long *unusedCount, bool strict, unsigned depth) const {
-        {
-            bool f = false;
-            verify( f = true );
-            massert( 10281 , "verify is misdefined", f);
-        }
-
         killCurrentOp.checkForInterrupt();
         this->assertValid(order, true);
 
