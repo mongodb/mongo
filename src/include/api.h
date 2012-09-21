@@ -315,7 +315,7 @@ struct __wt_connection_impl {
 #define	TXN_API_END(s, ret)						\
 	API_END(s);							\
 	if (__autotxn) {						\
-		if (ret == 0)						\
+		if (ret == 0 && !F_ISSET(&(s)->txn, TXN_ERROR))		\
 			ret = __wt_txn_commit((s), NULL);		\
 		else							\
 			(void)__wt_txn_rollback((s), NULL);		\

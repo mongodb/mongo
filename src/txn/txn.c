@@ -173,7 +173,16 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 		txn->id = txn_global->current;
 		WT_PUBLISH(txn_state->id, txn->id);
 
-		if (txn->isolation == TXN_ISO_SNAPSHOT) {
+		/*
+		 * If we are starting a snapshot isolation transaction, get
+		 * a snapshot of the running transactions.
+		 *
+		 * If we already have a snapshot (e.g., for an auto-commit
+		 * operation), update it so that the newly-allocated ID is
+		 * visible.
+		 */
+		if (txn->isolation == TXN_ISO_SNAPSHOT ||
+		    txn->snap_min != WT_TXN_NONE) {
 			/* Copy the array of concurrent transactions. */
 			WT_ORDERED_READ(session_cnt, conn->session_cnt);
 			for (i = 0, s = txn_global->states;
@@ -236,6 +245,8 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_UNUSED(cfg);
 
 	txn = &session->txn;
+	WT_ASSERT(session, !F_ISSET(txn, TXN_ERROR));
+
 	if (!F_ISSET(txn, TXN_RUNNING))
 		WT_RET_MSG(session, EINVAL, "No transaction is active");
 
