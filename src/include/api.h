@@ -294,11 +294,37 @@ struct __wt_connection_impl {
 	}								\
 } while (0)
 
-/* If an error is returned, mark that the transaction requires abort. */
-#define	API_END_TXN_ERROR(s, ret)					\
+/* An API call wrapped in a transaction if necessary. */
+#define	TXN_API_CALL(s, h, n, cur, bt, cfg, cfgvar) do {		\
+	int __autotxn = 0;						\
+	API_CALL(s, h, n, bt, cur, cfg, cfgvar);			\
+	__autotxn = F_ISSET(S2C(s), WT_CONN_TRANSACTIONAL) &&		\
+	    !F_ISSET(&(s)->txn, TXN_RUNNING);				\
+	if (__autotxn)							\
+		WT_ERR(__wt_txn_begin((s), NULL))
+
+/* An API call wrapped in a transaction if necessary. */
+#define	TXN_API_CALL_NOCONF(s, h, n, cur, bt) do {			\
+	int __autotxn = 0;						\
+	API_CALL_NOCONF(s, h, n, cur, bt);				\
+	__autotxn = F_ISSET(S2C(s), WT_CONN_TRANSACTIONAL) &&		\
+	    !F_ISSET(&(s)->txn, TXN_RUNNING);				\
+	if (__autotxn)							\
+		WT_ERR(__wt_txn_begin((s), NULL))
+
+/* End a transactional API call. */
+#define	TXN_API_END(s, ret)						\
 	API_END(s);							\
-	if ((ret) != 0 && (ret) != WT_NOTFOUND && (ret) != WT_DUPLICATE_KEY) \
-		F_SET(&(s)->txn, TXN_ERROR)
+	if (__autotxn) {						\
+		if (ret == 0 && !F_ISSET(&(s)->txn, TXN_ERROR))		\
+			ret = __wt_txn_commit((s), NULL);		\
+		else							\
+			(void)__wt_txn_rollback((s), NULL);		\
+	} else if ((ret) != 0 &&					\
+	    (ret) != WT_NOTFOUND &&					\
+	    (ret) != WT_DUPLICATE_KEY)					\
+		F_SET(&(s)->txn, TXN_ERROR);				\
+} while (0)
 
 /*
  * If a session or connection method is about to return WT_NOTFOUND (some
@@ -309,16 +335,30 @@ struct __wt_connection_impl {
 	API_END(s);							\
 	return ((ret) == WT_NOTFOUND ? ENOENT : (ret))
 
+#define	TXN_API_END_NOTFOUND_MAP(s, ret)				\
+	TXN_API_END(s, ret);						\
+	return ((ret) == WT_NOTFOUND ? ENOENT : (ret))
+
 #define	CONNECTION_API_CALL(conn, s, n, cfg, cfgvar)			\
 	s = (conn)->default_session;					\
-	API_CALL(s, connection, n, NULL, NULL, cfg, cfgvar);		\
+	API_CALL(s, connection, n, NULL, NULL, cfg, cfgvar)
 
 #define	SESSION_API_CALL(s, n, cfg, cfgvar)				\
-	API_CALL(s, session, n, NULL, NULL, cfg, cfgvar);
+	API_CALL(s, session, n, NULL, NULL, cfg, cfgvar)
 
-#define	CURSOR_API_CALL_NOCONF(cur, s, n, bt)				\
+#define	SESSION_TXN_API_CALL(s, n, cfg, cfgvar)				\
+	TXN_API_CALL(s, session, n, NULL, NULL, cfg, cfgvar)
+
+#define	CURSOR_API_CALL(cur, s, n, bt)					\
 	(s) = (WT_SESSION_IMPL *)(cur)->session;			\
 	API_CALL_NOCONF(s, cursor, n, cur, bt)
+
+#define	CURSOR_UPDATE_API_CALL(cur, s, n, bt)				\
+	(s) = (WT_SESSION_IMPL *)(cur)->session;			\
+	TXN_API_CALL_NOCONF(s, cursor, n, cur, bt)
+
+#define	CURSOR_UPDATE_API_END(s, ret)					\
+	TXN_API_END(s, ret)
 
 /*******************************************
  * Global variables.

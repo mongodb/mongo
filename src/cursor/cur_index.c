@@ -21,7 +21,7 @@ __curindex_get_value(WT_CURSOR *cursor, ...)
 	va_list ap;
 
 	cindex = (WT_CURSOR_INDEX *)cursor;
-	CURSOR_API_CALL_NOCONF(cursor, session, get_value, NULL);
+	CURSOR_API_CALL(cursor, session, get_value, NULL);
 	WT_CURSOR_NEEDVALUE(cursor);
 
 	va_start(ap, cursor);
@@ -53,7 +53,7 @@ __curindex_set_value(WT_CURSOR *cursor, ...)
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
-	CURSOR_API_CALL_NOCONF(cursor, session, set_value, NULL);
+	CURSOR_API_CALL(cursor, session, set_value, NULL);
 	WT_UNUSED(ret);
 	cursor->saved_err = ENOTSUP;
 	F_CLR(cursor, WT_CURSTD_VALUE_SET);
@@ -115,7 +115,7 @@ __curindex_next(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	cindex = (WT_CURSOR_INDEX *)cursor;
-	CURSOR_API_CALL_NOCONF(cursor, session, next, cindex->cbt.btree);
+	CURSOR_API_CALL(cursor, session, next, cindex->cbt.btree);
 	if ((ret = __wt_btcur_next(&cindex->cbt, 0)) == 0)
 		ret = __curindex_move(cindex);
 	API_END(session);
@@ -135,7 +135,7 @@ __curindex_prev(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	cindex = (WT_CURSOR_INDEX *)cursor;
-	CURSOR_API_CALL_NOCONF(cursor, session, prev, cindex->cbt.btree);
+	CURSOR_API_CALL(cursor, session, prev, cindex->cbt.btree);
 	if ((ret = __wt_btcur_prev(&cindex->cbt, 0)) == 0)
 		ret = __curindex_move(cindex);
 	API_END(session);
@@ -157,7 +157,7 @@ __curindex_reset(WT_CURSOR *cursor)
 	int i;
 
 	cindex = (WT_CURSOR_INDEX *)cursor;
-	CURSOR_API_CALL_NOCONF(cursor, session, reset, cindex->cbt.btree);
+	CURSOR_API_CALL(cursor, session, reset, cindex->cbt.btree);
 	WT_TRET(__wt_btcur_reset(&cindex->cbt));
 
 	for (i = 0, cp = cindex->cg_cursors;
@@ -186,7 +186,7 @@ __curindex_search(WT_CURSOR *cursor)
 	int exact;
 
 	cindex = (WT_CURSOR_INDEX *)cursor;
-	CURSOR_API_CALL_NOCONF(cursor, session, search, cindex->cbt.btree);
+	CURSOR_API_CALL(cursor, session, search, cindex->cbt.btree);
 
 	/*
 	 * XXX
@@ -250,7 +250,7 @@ __curindex_search_near(WT_CURSOR *cursor, int *exact)
 	WT_SESSION_IMPL *session;
 
 	cindex = (WT_CURSOR_INDEX *)cursor;
-	CURSOR_API_CALL_NOCONF(cursor, session, search_near, cindex->cbt.btree);
+	CURSOR_API_CALL(cursor, session, search_near, cindex->cbt.btree);
 	if ((ret = __wt_btcur_search_near(&cindex->cbt, exact)) == 0)
 		ret = __curindex_move(cindex);
 	API_END(session);
@@ -277,7 +277,7 @@ __curindex_close(WT_CURSOR *cursor)
 	idx = cindex->index;
 	btree = cindex->cbt.btree;
 
-	CURSOR_API_CALL_NOCONF(cursor, session, close, btree);
+	CURSOR_API_CALL(cursor, session, close, btree);
 
 	for (i = 0, cp = (cindex)->cg_cursors;
 	    i < WT_COLGROUPS(cindex->table); i++, cp++)

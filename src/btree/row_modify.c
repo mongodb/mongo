@@ -24,7 +24,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 	size_t new_inshead_size, new_inslist_size, new_upd_size;
 	uint32_t ins_slot;
 	u_int skipdepth;
-	int i;
+	int i, logged;
 
 	key = &cbt->iface.key;
 	value = is_remove ? NULL : &cbt->iface.value;
@@ -36,6 +36,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 	new_inslist = NULL;
 	new_upd = NULL;
 	upd = NULL;
+	logged = 0;
 
 	/*
 	 * Modify: allocate an update array as necessary, build a WT_UPDATE
@@ -70,6 +71,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 
 		/* Allocate and insert a WT_UPDATE structure. */
 		WT_ERR(__wt_update_alloc(session, value, &upd, &upd_size));
+		logged = 1;
 		WT_ERR(__wt_update_serial(session, page, cbt->write_gen,
 		    upd_entry, &new_upd, new_upd_size, &upd, upd_size));
 	} else {
@@ -87,6 +89,8 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 		 */
 		ins_slot = F_ISSET(
 		    cbt, WT_CBT_SEARCH_SMALLEST) ? page->entries : cbt->slot;
+
+		WT_ERR(__wt_update_check(session, page, NULL));
 
 		new_inshead_size = new_inslist_size = 0;
 		if (page->u.row.ins == NULL) {
@@ -122,8 +126,8 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 		 */
 		WT_ERR(__wt_row_insert_alloc(
 		    session, key, skipdepth, &ins, &ins_size));
-		WT_ERR(__wt_update_check(session, page, NULL));
 		WT_ERR(__wt_update_alloc(session, value, &upd, &upd_size));
+		logged = 1;
 		ins->upd = upd;
 		ins_size += upd_size;
 		cbt->ins = ins;
@@ -137,16 +141,14 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 	}
 
 	if (0) {
-err:		if (ins != NULL)
-			__wt_free(session, ins);
-		if (upd != NULL) {
-			/*
-			 * Remove the update from the current transaction, so we
-			 * don't try to modify it on rollback.
-			 */
+err:		/*
+		 * Remove the update from the current transaction, so we don't
+		 * try to modify it on rollback.
+		 */
+		if (logged)
 			__wt_txn_unmodify(session);
-			__wt_free(session, upd);
-		}
+		__wt_free(session, ins);
+		__wt_free(session, upd);
 	}
 
 	/* Free any insert, update arrays. */
