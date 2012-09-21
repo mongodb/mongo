@@ -312,13 +312,22 @@ struct __wt_connection_impl {
 	if (__autotxn)							\
 		WT_ERR(__wt_txn_begin((s), NULL))
 
-/* End a transactional API call. */
+/*
+ * End a transactional API call.
+ *
+ * If committing and any cursors are positioned, update the read snapshot so
+ * the changes become visible.
+ */
 #define	TXN_API_END(s, ret)						\
 	API_END(s);							\
 	if (__autotxn) {						\
-		if (ret == 0 && !F_ISSET(&(s)->txn, TXN_ERROR))		\
+		if (ret == 0 && !F_ISSET(&(s)->txn, TXN_ERROR)) {	\
+			if ((s)->ncursors != 0) {			\
+				__wt_txn_read_last(session);		\
+				__wt_txn_read_first(session);		\
+			}						\
 			ret = __wt_txn_commit((s), NULL);		\
-		else							\
+		} else							\
 			(void)__wt_txn_rollback((s), NULL);		\
 	} else if ((ret) != 0 &&					\
 	    (ret) != WT_NOTFOUND &&					\
