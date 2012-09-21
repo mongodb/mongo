@@ -119,9 +119,9 @@ file_config = format_meta + lsm_config + [
 		configure custom collation for keys.  Value must be a collator
 		name created with WT_CONNECTION::add_collator'''),
 	Config('dictionary', '0', r'''
-		the number of entries maintained in the Btree row-store leaf
-		page value dictionary; see @ref file_formats_compression for
-		more information''',
+		the maximum number of unique values remembered in the Btree
+		row-store leaf page value dictionary; see
+		@ref file_formats_compression for more information''',
 		min='0'),
 	Config('huffman_key', '', r'''
 		configure Huffman encoding for keys.  Permitted values

@@ -147,12 +147,19 @@ typedef struct {
 	 *	We optionally build a dictionary of row-store values for leaf
 	 * pages.  Where two value cells are identical, only write the value
 	 * once, the second and subsequent copies point to the original cell.
+	 * The dictionary is fixed size, but organized in a skip-list to make
+	 * searches faster.
 	 */
 	struct __rec_dictionary {
 		uint64_t hash;				/* Hash value */
 		uint8_t *cell;				/* Matching cell */
-	} *dictionary;
-	long dictionary_slots;				/* Maximum entries */
+
+		u_int depth;				/* Skiplist */
+		WT_DICTIONARY *next[0];
+	} **dictionary;					/* Dictionary */
+	u_int dictionary_next, dictionary_slots;	/* Next, max entries */
+							/* Skiplist head. */
+	WT_DICTIONARY *dictionary_head[WT_SKIP_MAXDEPTH];
 
 	/*
 	 * WT_KV--
@@ -190,8 +197,6 @@ static int  __rec_col_merge(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_col_var(WT_SESSION_IMPL *, WT_PAGE *, WT_SALVAGE_COOKIE *);
 static int  __rec_col_var_helper(WT_SESSION_IMPL *,
 		WT_SALVAGE_COOKIE *, WT_ITEM *, int, int, uint64_t);
-static WT_DICTIONARY *__rec_dictionary_lookup(WT_SESSION_IMPL *, WT_KV *);
-static void __rec_dictionary_reset(WT_RECONCILE *);
 static int  __rec_page_deleted(WT_SESSION_IMPL *, WT_PAGE *, WT_REF *, int *);
 static int  __rec_page_modified(WT_SESSION_IMPL *, WT_PAGE *, WT_REF *, int *);
 static int  __rec_row_int(WT_SESSION_IMPL *, WT_PAGE *);
@@ -210,6 +215,12 @@ static int  __rec_split_write(WT_SESSION_IMPL *, WT_BOUNDARY *, WT_ITEM *, int);
 static int  __rec_write_init(WT_SESSION_IMPL *, WT_PAGE *, uint32_t);
 static int  __rec_write_wrapup(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_write_wrapup_err(WT_SESSION_IMPL *, WT_PAGE *);
+
+static void __rec_dictionary_free(WT_SESSION_IMPL *, WT_RECONCILE *);
+static int  __rec_dictionary_init(WT_SESSION_IMPL *, WT_RECONCILE *);
+static WT_DICTIONARY *
+	    __rec_dictionary_lookup(WT_SESSION_IMPL *, WT_RECONCILE *, WT_KV *);
+static void __rec_dictionary_reset(WT_RECONCILE *);
 
 /*
  * __rec_page_modified --
@@ -573,15 +584,10 @@ __rec_write_init(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 		 * Sanity check the size: 100 slots is the smallest dictionary
 		 * we use.
 		 */
-		if (btree->dictionary < 100)
-			btree->dictionary = 100;
-		if (r->dictionary != NULL) {
-			r->dictionary_slots = 0;
-			__wt_free(session, r->dictionary);
-		}
-		WT_RET(__wt_calloc_def(
-		    session, btree->dictionary, &r->dictionary));
-		r->dictionary_slots = btree->dictionary;
+		r->dictionary_slots =
+		    btree->dictionary < 100 ? 100 : btree->dictionary;
+
+		WT_RET(__rec_dictionary_init(session, r));
 	}
 
 	/* Per-page reconciliation: reset the dictionary. */
@@ -631,7 +637,7 @@ __wt_rec_destroy(WT_SESSION_IMPL *session)
 	__wt_buf_free(session, &r->_cur);
 	__wt_buf_free(session, &r->_last);
 
-	__wt_free(session, r->dictionary);
+	__rec_dictionary_free(session, r);
 
 	__wt_free(session, session->reconcile);
 }
@@ -712,7 +718,7 @@ __rec_dict_copy_incr(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_KV *kv)
 	 * end of the buffer's memory.
 	 */
 	if (kv->buf.size > WT_INTPACK32_MAXSIZE &&
-	    (dp = __rec_dictionary_lookup(session, kv)) != NULL) {
+	    (dp = __rec_dictionary_lookup(session, r, kv)) != NULL) {
 		/*
 		 * If the dictionary cell reference is not set, we're
 		 * creating a new entry in the dictionary, update it.
@@ -3884,33 +3890,141 @@ err:	__wt_scr_free(&tmp);
 }
 
 /*
+ * The dictionary --
+ *	The rest of this file is support for dictionaries.
+ *
+ * It's difficult to write generic skiplist functions without turning a single
+ * memory allocation into two, or requiring a function call instead of a simple
+ * comparison.  Fortunately, skiplists are relatively simple things and we can
+ * include them in-place.  If you need generic skip-list functions to modify,
+ * this set wouldn't be a bad place to start.
+ *
+ * __rec_dictionary_skip_search --
+ *	Search a dictionary skiplist.
+ */
+static WT_DICTIONARY *
+__rec_dictionary_skip_search(WT_DICTIONARY **head, uint64_t hash)
+{
+	WT_DICTIONARY **e;
+	int i;
+
+	/*
+	 * Start at the highest skip level, then go as far as possible at each
+	 * level before stepping down to the next.
+	 */
+	for (i = WT_SKIP_MAXDEPTH - 1, e = &head[i]; i >= 0;)
+		if (*e == NULL) {
+			--i;
+			--e;
+		} else {
+			if ((*e)->hash == hash)
+				return (*e);
+			if ((*e)->hash > hash)
+				return (NULL);
+			e = &(*e)->next[i];
+		}
+
+	/* NOTREACHED */
+	return (NULL);
+}
+
+/*
+ * __rec_dictionary_skip_search_stack --
+ *	Search a dictionary skiplist, returning an insert/remove stack.
+ */
+static void
+__rec_dictionary_skip_search_stack(
+    WT_DICTIONARY **head, WT_DICTIONARY ***stack, uint64_t hash)
+{
+	WT_DICTIONARY **e;
+	int i;
+
+	/*
+	 * Start at the highest skip level, then go as far as possible at each
+	 * level before stepping down to the next.
+	 */
+	for (i = WT_SKIP_MAXDEPTH - 1, e = &head[i]; i >= 0;)
+		if (*e == NULL || (*e)->hash >= hash)
+			stack[i--] = e--;
+		else
+			e = &(*e)->next[i];
+}
+
+/*
+ * __rec_dictionary_skip_insert --
+ *	Insert an entry into the dictionary skip-list.
+ */
+static void
+__rec_dictionary_skip_insert(
+    WT_DICTIONARY **head, WT_DICTIONARY *e, uint64_t hash)
+{
+	WT_DICTIONARY **stack[WT_SKIP_MAXDEPTH];
+	u_int i;
+
+	/* Insert the new entry into the skiplist. */
+	__rec_dictionary_skip_search_stack(head, stack, hash);
+	for (i = 0; i < e->depth; ++i) {
+		e->next[i] = *stack[i];
+		*stack[i] = e;
+	}
+}
+
+/*
+ * __rec_dictionary_init --
+ *	Allocate and initialize the dictionary.
+ */
+static int
+__rec_dictionary_init(WT_SESSION_IMPL *session, WT_RECONCILE *r)
+{
+	u_int depth, i;
+
+	/* Free any previous dictionary. */
+	__rec_dictionary_free(session, r);
+
+	WT_RET(__wt_calloc(session,
+	    r->dictionary_slots, sizeof(WT_DICTIONARY *), &r->dictionary));
+	for (i = 0; i < r->dictionary_slots; ++i) {
+		depth = __wt_skip_choose_depth();
+		WT_RET(__wt_calloc(session, 1,
+		    sizeof(WT_DICTIONARY) + depth * sizeof(WT_DICTIONARY *),
+		    &r->dictionary[i]));
+		r->dictionary[i]->depth = depth;
+	}
+	return (0);
+}
+
+/*
+ * __rec_dictionary_free --
+ *	Free the dictionary.
+ */
+static void
+__rec_dictionary_free(WT_SESSION_IMPL *session, WT_RECONCILE *r)
+{
+	u_int i;
+
+	if (r->dictionary == NULL)
+		return;
+
+	/*
+	 * We don't correct dictionary_slots when we fail during allocation,
+	 * but that's OK, the value is either NULL or a memory reference to
+	 * be free'd.
+	 */
+	for (i = 0; i < r->dictionary_slots; ++i)
+		__wt_free(session, r->dictionary[i]);
+	__wt_free(session, r->dictionary);
+}
+
+/*
  * __rec_dictionary_reset --
- *	Clear the dictionary when reconciliation restarts and when crossing a
+ *	Reset the dictionary when reconciliation restarts and when crossing a
  * page boundary (a potential split).
  */
 static void
 __rec_dictionary_reset(WT_RECONCILE *r)
 {
-	/*
-	 * Reset the dictionary when starting a new reconciliation or crossing
-	 * a page split boundary.   I'm concerned about the latter: if it's a
-	 * dictionary with 10K slots and a small page size boundary, this is an
-	 * expensive operation we might be calling a lot; if it's a dictionary
-	 * with 100 slots and a large page size boundary it's a cheap operation
-	 * we won't call often.   The alternative is to clear the dictionary
-	 * when starting a new reconciliation and don't clear it when crossing
-	 * a split boundary.  If we don't clear the dictionary when crossing a
-	 * split boundary, then we have to add some way to detect references to
-	 * cells in other chunks of the page.  A simple way is to add the split
-	 * boundary's start address into the WT_DICTIONARY entry and test it
-	 * against the current boundary's start address when doing the lookup.
-	 * That grows the WT_DICTIONARY size by a pointer, of course; it might
-	 * be possible to test the referenced cell's address relationship to
-	 * the current boundary's start address instead, but that's a little
-	 * trickier if we actually split and the boundary moves around.
-	 */
-	memset(r->dictionary,
-	    0, (size_t)r->dictionary_slots * sizeof(r->dictionary[0]));
+	r->dictionary_next = 0;
+	memset(r->dictionary_head, 0, sizeof(r->dictionary_head));
 }
 
 /*
@@ -3918,7 +4032,7 @@ __rec_dictionary_reset(WT_RECONCILE *r)
  *	Check to see if two cells (one in a WT_ITEM, and one laid out
  * in a buffer), match.
  */
-static inline int
+static int
 __rec_dictionary_cell_match(uint8_t *p, WT_KV *val)
 {
 	/*
@@ -3938,27 +4052,21 @@ __rec_dictionary_cell_match(uint8_t *p, WT_KV *val)
  *	Check the dictionary for a matching value on this page.
  */
 static WT_DICTIONARY *
-__rec_dictionary_lookup(WT_SESSION_IMPL *session, WT_KV *val)
+__rec_dictionary_lookup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_KV *val)
 {
-	WT_DICTIONARY *dp, *empty;
-	WT_RECONCILE *r;
-	long i;
+	WT_DICTIONARY *dp, *next;
 	uint64_t hash;
 
-	r = session->reconcile;
-
+	/* Search the dictionary, and return any match we find. */
 	hash = __wt_hash_fnv64(val->buf.data, val->buf.size);
+	for (dp = __rec_dictionary_skip_search(r->dictionary_head, hash);
+	     dp != NULL && dp->hash == hash; dp = dp->next[0])
+		if (__rec_dictionary_cell_match(dp->cell, val)) {
+			WT_BSTAT_INCR(session, rec_dictionary);
+			return (dp);
+		}
 
 	/*
-	 * Walk the dictionary looking for a matching hash value.  We're not
-	 * sorting the dictionary or doing anything to make the lookup fast.
-	 * That's fine for the small dictionaries I expect to see, but bad if
-	 * we see big dictionaries with lots of unique page values.  It's an
-	 * obvious trade-off: this implementation only uses two pointers per
-	 * dictionary slot and building the dictionary takes almost no work,
-	 * vs. more memory and more work to build large dictionaries that we
-	 * can still search quickly.
-	 *
 	 * We're not doing value replacement in the dictionary.  We stop adding
 	 * new entries if we run out of empty dictionary slots (but continue to
 	 * use the existing entries).  I can't think of any reason a leaf page
@@ -3967,30 +4075,17 @@ __rec_dictionary_lookup(WT_SESSION_IMPL *session, WT_KV *val)
 	 * case, it shouldn't be too difficult to maintain a pointer which is
 	 * the next dictionary slot to re-use.
 	 */
-	empty = NULL;
-	for (dp = r->dictionary, i = r->dictionary_slots; i > 0; --i, ++dp) {
-		if (dp->cell == NULL) {
-			empty = dp;
-			break;
-		}
-		if (dp->hash != hash)
-			continue;
-
-		/* If we find a match, replace our cell with a copy cell. */
-		if (__rec_dictionary_cell_match(dp->cell, val)) {
-			WT_BSTAT_INCR(session, rec_dictionary);
-			return (dp);
-		}
-	}
+	if (r->dictionary_next >= r->dictionary_slots)
+		return (NULL);
 
 	/*
 	 * Set the hash value, we'll add this entry into the dictionary when we
-	 * write it into the page's buffer (because that's when we know where
-	 * it will be written).
+	 * write it into the page's disk image buffer (because that's when we
+	 * know where on the page it will be written).
 	 */
-	if (empty != NULL) {
-		empty->cell = NULL;	/* Not necessary, just cautious. */
-		empty->hash = hash;
-	}
-	return (empty);
+	next = r->dictionary[r->dictionary_next++];
+	next->cell = NULL;		/* Not necessary, just cautious. */
+	next->hash = hash;
+	__rec_dictionary_skip_insert(r->dictionary_head, next, hash);
+	return (next);
 }

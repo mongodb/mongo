@@ -50,9 +50,6 @@ tree and when writing pages to disk.
 in-memory and on-disk objects by storing any identical value only once
 per page.  The cost is minor additional CPU and memory use when
 returning values from the in-memory tree and when writing pages to disk.
-Note that dictionary compression in WiredTiger is intended for
-relatively small dictionaries of unique values; configuring dictionaries
-of tens of thousands of values might result in a higher CPU cost.
 
 - Huffman encoding reduces the size requirement of both the in-memory
 and on-disk objects by compressing individual key/value items, and can
