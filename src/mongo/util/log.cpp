@@ -336,10 +336,10 @@ namespace mongo {
                 stringstream sss;
                 sss << "warning: log line attempted (" << msg.size() / 1024 << "k) over max size(" << MAX_LOG_LINE / 1024 << "k)";
                 sss << ", printing beginning and end ... ";
-                b.appendStr( sss.str() );
+                b.appendStr( sss.str(), false );
                 const char * xx = msg.c_str();
                 b.appendBuf( xx , MAX_LOG_LINE / 3 );
-                b.appendStr( " .......... " );
+                b.appendStr( " .......... ", false );
                 b.appendStr( xx + msg.size() - ( MAX_LOG_LINE / 3 ) );
             }
             else {
