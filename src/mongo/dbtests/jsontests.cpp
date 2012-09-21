@@ -158,6 +158,17 @@ namespace JsonTests {
             }
         };
 
+        class SingleUndefinedMember {
+        public:
+            void run() {
+                BSONObjBuilder b;
+                b.appendUndefined( "a" );
+                ASSERT_EQUALS( "{ \"a\" : { \"$undefined\" : true } }", b.done().jsonString( Strict ) );
+                ASSERT_EQUALS( "{ \"a\" : undefined }", b.done().jsonString( JS ) );
+                ASSERT_EQUALS( "{ \"a\" : undefined }", b.done().jsonString( TenGen ) );
+            }
+        };
+
         class SingleObjectMember {
         public:
             void run() {
@@ -1108,6 +1119,7 @@ namespace JsonTests {
             add< JsonStringTests::NegativeNumber >();
             add< JsonStringTests::SingleBoolMember >();
             add< JsonStringTests::SingleNullMember >();
+            add< JsonStringTests::SingleUndefinedMember >();
             add< JsonStringTests::SingleObjectMember >();
             add< JsonStringTests::TwoMembers >();
             add< JsonStringTests::EmptyArray >();
