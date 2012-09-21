@@ -30,6 +30,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bson_builder_base.h"
+#include "mongo/bson/bson_field.h"
 
 #if defined(_DEBUG) && defined(MONGO_EXPOSE_MACROS)
 #include "mongo/util/log.h"
@@ -41,48 +42,6 @@ namespace mongo {
 // warning: 'this' : used in base member initializer list
 #pragma warning( disable : 4355 )
 #endif
-
-    template<typename T>
-    class BSONFieldValue {
-    public:
-        BSONFieldValue( const std::string& name , const T& t ) {
-            _name = name;
-            _t = t;
-        }
-
-        const T& value() const { return _t; }
-        const std::string& name() const { return _name; }
-
-    private:
-        std::string _name;
-        T _t;
-    };
-
-    template<typename T>
-    class BSONField {
-    public:
-        BSONField( const std::string& name , const std::string& longName="" )
-            : _name(name), _longName(longName) {}
-        const std::string& name() const { return _name; }
-        operator std::string() const { return _name; }
-
-        BSONFieldValue<T> make( const T& t ) const {
-            return BSONFieldValue<T>( _name , t );
-        }
-
-        BSONFieldValue<BSONObj> gt( const T& t ) const { return query( "$gt" , t ); }
-        BSONFieldValue<BSONObj> lt( const T& t ) const { return query( "$lt" , t ); }
-
-        BSONFieldValue<BSONObj> query( const char * q , const T& t ) const;
-
-        BSONFieldValue<T> operator()( const T& t ) const {
-            return BSONFieldValue<T>( _name , t );
-        }
-
-    private:
-        std::string _name;
-        std::string _longName;
-    };
 
     /** Utility for creating a BSONObj.
         See also the BSON() and BSON_ARRAY() macros.

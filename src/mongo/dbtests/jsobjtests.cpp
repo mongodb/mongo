@@ -2166,33 +2166,6 @@ namespace JsobjTests {
         }
     };
 
-    class BSONFieldTests {
-    public:
-        void run() {
-            {
-                BSONField<int> x("x");
-                BSONObj o = BSON( x << 5 );
-                ASSERT_EQUALS( BSON( "x" << 5 ) , o );
-            }
-
-            {
-                BSONField<int> x("x");
-                BSONObj o = BSON( x.make(5) );
-                ASSERT_EQUALS( BSON( "x" << 5 ) , o );
-            }
-
-            {
-                BSONField<int> x("x");
-                BSONObj o = BSON( x(5) );
-                ASSERT_EQUALS( BSON( "x" << 5 ) , o );
-
-                o = BSON( x.gt(5) );
-                ASSERT_EQUALS( BSON( "x" << BSON( "$gt" << 5 ) ) , o );
-            }
-
-        }
-    };
-
     class BSONForEachTest {
     public:
         void run() {
@@ -2399,7 +2372,6 @@ namespace JsobjTests {
             add< ElementSetTest >();
             add< EmbeddedNumbers >();
             add< BuilderPartialItearte >();
-            add< BSONFieldTests >();
             add< BSONForEachTest >();
             add< StringDataTest >();
             add< CompareOps >();
