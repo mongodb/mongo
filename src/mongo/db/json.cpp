@@ -1,5 +1,3 @@
-// json.cpp
-
 /*    Copyright 2009 10gen Inc.
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,638 +13,997 @@
  *    limitations under the License.
  */
 
-#include "mongo/pch.h"
-
-#define BOOST_SPIRIT_THREADSAFE
-#if BOOST_VERSION >= 103800
-#define BOOST_SPIRIT_USE_OLD_NAMESPACE
-#include <boost/spirit/include/classic_core.hpp>
-#include <boost/spirit/include/classic_loops.hpp>
-#include <boost/spirit/include/classic_lists.hpp>
-#else
-#include <boost/spirit/core.hpp>
-#include <boost/spirit/utility/loops.hpp>
-#include <boost/spirit/utility/lists.hpp>
-#endif
-
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/util/builder.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
+
+#include "mongo/db/jsobj.h"
+#include "mongo/platform/cstdint.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/hex.h"
-#include "mongo/util/optime.h"
-
-using namespace boost::spirit;
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
-    struct ObjectBuilder : boost::noncopyable {
-        ~ObjectBuilder() {
-            DESTRUCTOR_GUARD(
-                unsigned i = builders.size();
-                if ( i ) {
-                    i--;
-                    for ( ; i>=1; i-- ) {
-                        if ( builders[i] ) {
-                            builders[i]->done();
-                        }
-                    }
-                }
-            );
-        }
-        BSONObjBuilder *back() {
-            return builders.back().get();
-        }
-        // Storage for field names of elements within builders.back().
-        const char *fieldName() {
-            return fieldNames.back().c_str();
-        }
-        bool empty() const {
-            return builders.size() == 0;
-        }
-        void init() {
-            boost::shared_ptr< BSONObjBuilder > b( new BSONObjBuilder() );
-            builders.push_back( b );
-            fieldNames.push_back( "" );
-            indexes.push_back( 0 );
-        }
-        void pushObject( const char *fieldName ) {
-            boost::shared_ptr< BSONObjBuilder > b( new BSONObjBuilder( builders.back()->subobjStart( fieldName ) ) );
-            builders.push_back( b );
-            fieldNames.push_back( "" );
-            indexes.push_back( 0 );
-        }
-        void pushArray( const char *fieldName ) {
-            boost::shared_ptr< BSONObjBuilder > b( new BSONObjBuilder( builders.back()->subarrayStart( fieldName ) ) );
-            builders.push_back( b );
-            fieldNames.push_back( "" );
-            indexes.push_back( 0 );
-        }
-        BSONObj pop() {
-            BSONObj ret;
-            if ( back()->owned() )
-                ret = back()->obj();
-            else
-                ret = back()->done();
-            builders.pop_back();
-            fieldNames.pop_back();
-            indexes.pop_back();
-            return ret;
-        }
-        void nameFromIndex() {
-            fieldNames.back() = BSONObjBuilder::numStr( indexes.back() );
-        }
-        string popString() {
-            string ret = ss.str();
-            ss.str( "" );
-            return ret;
-        }
-        // Cannot use auto_ptr because its copy constructor takes a non const reference.
-        vector< boost::shared_ptr< BSONObjBuilder > > builders;
-        vector< string > fieldNames;
-        vector< int > indexes;
-        stringstream ss;
-        string ns;
-        OID oid;
-        string binData;
-        BinDataType binDataType;
-        string regex;
-        string regexOptions;
-        Date_t date;
-        OpTime timestamp;
+#if 0
+#define MONGO_JSON_DEBUG(message) log() << "JSON DEBUG @ " << __FILE__\
+    << ":" << __LINE__ << " " << __FUNCTION__ << ": " << message << endl;
+#else
+#define MONGO_JSON_DEBUG(message)
+#endif
+
+#define ALPHA "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+#define DIGIT "0123456789"
+#define CONTROL "\a\b\f\n\r\t\v"
+#define JOPTIONS "gims"
+
+    // Size hints given to char vectors
+    enum {
+        ID_RESERVE_SIZE = 64,
+        PAT_RESERVE_SIZE = 4096,
+        OPT_RESERVE_SIZE = 64,
+        FIELD_RESERVE_SIZE = 4096,
+        STRINGVAL_RESERVE_SIZE = 4096,
+        BINDATA_RESERVE_SIZE = 4096,
+        BINDATATYPE_RESERVE_SIZE = 4096,
+        NS_RESERVE_SIZE = 64
     };
 
-    struct objectStart {
-        objectStart( ObjectBuilder &_b ) : b( _b ) {}
-        void operator() ( const char &c ) const {
-            if ( b.empty() )
-                b.init();
-            else
-                b.pushObject( b.fieldName() );
-        }
-        ObjectBuilder &b;
-    };
+    static const char* LBRACE = "{",
+                 *RBRACE = "}",
+                 *LBRACKET = "[",
+                 *RBRACKET = "]",
+                 *LPAREN = "(",
+                 *RPAREN = ")",
+                 *COLON = ":",
+                 *COMMA = ",",
+                 *FORWARDSLASH = "/",
+                 *SINGLEQUOTE = "'",
+                 *DOUBLEQUOTE = "\"";
 
-    struct arrayStart {
-        arrayStart( ObjectBuilder &_b ) : b( _b ) {}
-        void operator() ( const char &c ) const {
-            b.pushArray( b.fieldName() );
-            b.nameFromIndex();
-        }
-        ObjectBuilder &b;
-    };
+    JParse::JParse(const char* str)
+        : _buf(str), _input(str), _input_end(str + strlen(str)) {}
 
-    struct arrayNext {
-        arrayNext( ObjectBuilder &_b ) : b( _b ) {}
-        void operator() ( const char &c ) const {
-            ++b.indexes.back();
-            b.nameFromIndex();
-        }
-        ObjectBuilder &b;
-    };
-
-    struct ch {
-        ch( ObjectBuilder &_b ) : b( _b ) {}
-        void operator() ( const char c ) const {
-            b.ss << c;
-        }
-        ObjectBuilder &b;
-    };
-
-    struct chE {
-        chE( ObjectBuilder &_b ) : b( _b ) {}
-        void operator() ( const char c ) const {
-            char o = '\0';
-            switch ( c ) {
-            case '\"':
-                o = '\"';
-                break;
-            case '\'':
-                o = '\'';
-                break;
-            case '\\':
-                o = '\\';
-                break;
-            case '/':
-                o = '/';
-                break;
-            case 'b':
-                o = '\b';
-                break;
-            case 'f':
-                o = '\f';
-                break;
-            case 'n':
-                o = '\n';
-                break;
-            case 'r':
-                o = '\r';
-                break;
-            case 't':
-                o = '\t';
-                break;
-            case 'v':
-                o = '\v';
-                break;
-            default:
-                verify( false );
-            }
-            b.ss << o;
-        }
-        ObjectBuilder &b;
-    };
-
-    struct chU {
-        chU( ObjectBuilder &_b ) : b( _b ) {}
-        void operator() ( const char *start, const char *end ) const {
-            unsigned char first = fromHex( start );
-            unsigned char second = fromHex( start + 2 );
-            if ( first == 0 && second < 0x80 )
-                b.ss << second;
-            else if ( first < 0x08 ) {
-                b.ss << char( 0xc0 | ( ( first << 2 ) | ( second >> 6 ) ) );
-                b.ss << char( 0x80 | ( ~0xc0 & second ) );
-            }
-            else {
-                b.ss << char( 0xe0 | ( first >> 4 ) );
-                b.ss << char( 0x80 | ( ~0xc0 & ( ( first << 2 ) | ( second >> 6 ) ) ) );
-                b.ss << char( 0x80 | ( ~0xc0 & second ) );
-            }
-        }
-        ObjectBuilder &b;
-    };
-
-    struct chClear {
-        chClear( ObjectBuilder &_b ) : b( _b ) {}
-        void operator() ( const char c ) const {
-            b.popString();
-        }
-        ObjectBuilder &b;
-    };
-
-    struct fieldNameEnd {
-        fieldNameEnd( ObjectBuilder &_b ) : b( _b ) {}
-        void operator() ( const char *start, const char *end ) const {
-            string name = b.popString();
-            massert( 10338 ,  "Invalid use of reserved field name: " + name,
-                     name != "$oid" &&
-                     name != "$binary" &&
-                     name != "$type" &&
-                     name != "$date" &&
-                     name != "$timestamp" &&
-                     name != "$regex" &&
-                     name != "$options" );
-            b.fieldNames.back() = name;
-        }
-        ObjectBuilder &b;
-    };
-
-    struct unquotedFieldNameEnd {
-        unquotedFieldNameEnd( ObjectBuilder &_b ) : b( _b ) {}
-        void operator() ( const char *start, const char *end ) const {
-            string name( start, end );
-            b.fieldNames.back() = name;
-        }
-        ObjectBuilder &b;
-    };
-
-    struct stringEnd {
-        stringEnd( ObjectBuilder &_b ) : b( _b ) {}
-        void operator() ( const char *start, const char *end ) const {
-            b.back()->append( b.fieldName(), b.popString() );
-        }
-        ObjectBuilder &b;
-    };
-
-    struct numberValue {
-        numberValue( ObjectBuilder &_b ) : b( _b ) {}
-        void operator() ( const char *start, const char *end ) const {
-            string raw(start);
-            double val;
-
-            // strtod isn't able to deal with NaN and inf in a portable way.
-            // Correspondingly, we perform the conversions explicitly.
-
-            if ( ! raw.compare(0, 3, "NaN" ) ) {
-                val = std::numeric_limits<double>::quiet_NaN();
-            } 
-            else if ( ! raw.compare(0, 8, "Infinity" ) ) {
-                val = std::numeric_limits<double>::infinity();
-            } 
-            else if ( ! raw.compare(0, 9, "-Infinity" ) ) {
-                val = -std::numeric_limits<double>::infinity();
-            }
-            else {
-                // We re-parse the numeric string here because spirit parsing of strings
-                // to doubles produces different results from strtod in some cases and
-                // we want to use strtod to ensure consistency with other string to
-                // double conversions in our code.
-
-                val = strtod( start, 0 );
-            }
-
-            b.back()->append( b.fieldName(), val );
-        }
-        ObjectBuilder &b;
-    };
-
-    struct intValue {
-        intValue( ObjectBuilder &_b ) : b( _b ) {}
-        void operator() ( long long num ) const {
-            if (num >= numeric_limits<int>::min() && num <= numeric_limits<int>::max())
-                b.back()->append( b.fieldName(), (int)num );
-            else
-                b.back()->append( b.fieldName(), num );
-        }
-        ObjectBuilder &b;
-    };
-
-    struct subobjectEnd {
-        subobjectEnd( ObjectBuilder &_b ) : b( _b ) {}
-        void operator() ( const char *start, const char *end ) const {
-            b.pop();
-        }
-        ObjectBuilder &b;
-    };
-
-    struct arrayEnd {
-        arrayEnd( ObjectBuilder &_b ) : b( _b ) {}
-        void operator() ( const char *start, const char *end ) const {
-            b.pop();
-        }
-        ObjectBuilder &b;
-    };
-
-    struct trueValue {
-        trueValue( ObjectBuilder &_b ) : b( _b ) {}
-        void operator() ( const char *start, const char *end ) const {
-            b.back()->appendBool( b.fieldName(), true );
-        }
-        ObjectBuilder &b;
-    };
-
-    struct falseValue {
-        falseValue( ObjectBuilder &_b ) : b( _b ) {}
-        void operator() ( const char *start, const char *end ) const {
-            b.back()->appendBool( b.fieldName(), false );
-        }
-        ObjectBuilder &b;
-    };
-
-    struct nullValue {
-        nullValue( ObjectBuilder &_b ) : b( _b ) {}
-        void operator() ( const char *start, const char *end ) const {
-            b.back()->appendNull( b.fieldName() );
-        }
-        ObjectBuilder &b;
-    };
-
-    struct undefinedValue {
-        undefinedValue( ObjectBuilder &_b ) : b( _b ) {}
-        void operator() ( const char *start, const char *end ) const {
-            b.back()->appendUndefined( b.fieldName() );
-        }
-        ObjectBuilder &b;
-    };
-    
-    struct dbrefNS {
-        dbrefNS( ObjectBuilder &_b ) : b( _b ) {}
-        void operator() ( const char *start, const char *end ) const {
-            b.ns = b.popString();
-        }
-        ObjectBuilder &b;
-    };
-
-// NOTE s must be 24 characters.
-    OID stringToOid( const char *s ) {
-        OID oid;
-        char *oidP = (char *)( &oid );
-        for ( int i = 0; i < 12; ++i )
-            oidP[ i ] = fromHex( s + ( i * 2 ) );
-        return oid;
+    Status JParse::parseError(const StringData& msg) {
+        std::ostringstream ossmsg;
+        ossmsg << msg;
+        ossmsg << ": offset:";
+        ossmsg << offset();
+        return Status(ErrorCodes::FailedToParse, ossmsg.str());
     }
 
-    struct oidValue {
-        oidValue( ObjectBuilder &_b ) : b( _b ) {}
-        void operator() ( const char *start, const char *end ) const {
-            b.oid = stringToOid( start );
-        }
-        ObjectBuilder &b;
-    };
-
-    struct dbrefEnd {
-        dbrefEnd( ObjectBuilder &_b ) : b( _b ) {}
-        void operator() ( const char *start, const char *end ) const {
-            b.back()->appendDBRef( b.fieldName(), b.ns, b.oid );
-        }
-        ObjectBuilder &b;
-    };
-
-    struct oidEnd {
-        oidEnd( ObjectBuilder &_b ) : b( _b ) {}
-        void operator() ( const char *start, const char *end ) const {
-            b.back()->appendOID( b.fieldName(), &b.oid );
-        }
-        ObjectBuilder &b;
-    };
-
-    struct timestampEnd {
-        timestampEnd( ObjectBuilder &_b ) : b( _b ) {}
-        void operator() ( const char *start, const char *end ) const {
-            b.back()->appendTimestamp( b.fieldName(), b.timestamp.asDate() );
-        }
-        ObjectBuilder &b;
-    };
-
-    struct binDataBinary {
-        binDataBinary( ObjectBuilder &_b ) : b( _b ) {}
-        void operator() ( const char *start, const char *end ) const {
-            massert( 10339 ,  "Badly formatted bindata", ( end - start ) % 4 == 0 );
-            string encoded( start, end );
-            b.binData = base64::decode( encoded );
-        }
-        ObjectBuilder &b;
-    };
-
-    struct binDataType {
-        binDataType( ObjectBuilder &_b ) : b( _b ) {}
-        void operator() ( const char *start, const char *end ) const {
-            b.binDataType = BinDataType( fromHex( start ) );
-        }
-        ObjectBuilder &b;
-    };
-
-    struct binDataEnd {
-        binDataEnd( ObjectBuilder &_b ) : b( _b ) {}
-        void operator() ( const char *start, const char *end ) const {
-            b.back()->appendBinData( b.fieldName(), b.binData.length(),
-                                     b.binDataType, b.binData.data() );
-        }
-        ObjectBuilder &b;
-    };
-
-    struct timestampSecs {
-        timestampSecs( ObjectBuilder &_b ) : b( _b ) {}
-        void operator() ( unsigned long long x) const {
-            b.timestamp = OpTime( (unsigned) (x/1000) , 0);
-        }
-        ObjectBuilder &b;
-    };
-
-    struct timestampInc {
-        timestampInc( ObjectBuilder &_b ) : b( _b ) {}
-        void operator() ( unsigned x) const {
-            b.timestamp = OpTime(b.timestamp.getSecs(), x);
-        }
-        ObjectBuilder &b;
-    };
-
-    struct dateValue {
-        dateValue( ObjectBuilder &_b ) : b( _b ) {}
-        void operator() ( Date_t v ) const {
-            b.date = v;
-        }
-        ObjectBuilder &b;
-    };
-
-    struct dateEnd {
-        dateEnd( ObjectBuilder &_b ) : b( _b ) {}
-        void operator() ( const char *start, const char *end ) const {
-            b.back()->appendDate( b.fieldName(), b.date );
-        }
-        ObjectBuilder &b;
-    };
-
-    struct regexValue {
-        regexValue( ObjectBuilder &_b ) : b( _b ) {}
-        void operator() ( const char *start, const char *end ) const {
-            b.regex = b.popString();
-        }
-        ObjectBuilder &b;
-    };
-
-    struct regexOptions {
-        regexOptions( ObjectBuilder &_b ) : b( _b ) {}
-        void operator() ( const char *start, const char *end ) const {
-            b.regexOptions = string( start, end );
-        }
-        ObjectBuilder &b;
-    };
-
-    struct regexEnd {
-        regexEnd( ObjectBuilder &_b ) : b( _b ) {}
-        void operator() ( const char *start, const char *end ) const {
-            b.back()->appendRegex( b.fieldName(), b.regex, b.regexOptions );
-        }
-        ObjectBuilder &b;
-    };
-
-// One gotcha with this parsing library is probably best illustrated with an
-// example.  Say we have a production like this:
-// z = ( ch_p( 'a' )[ foo ] >> ch_p( 'b' ) ) | ( ch_p( 'a' )[ foo ] >> ch_p( 'c' ) );
-// On input "ac", action foo() will be called twice -- once as the parser tries
-// to match "ab", again as the parser successfully matches "ac".  Sometimes
-// the grammar can be modified to eliminate these situations.  Here, for example:
-// z = ch_p( 'a' )[ foo ] >> ( ch_p( 'b' ) | ch_p( 'c' ) );
-// However, this is not always possible.  In my implementation I've tried to
-// stick to the following pattern: store fields fed to action callbacks
-// temporarily as ObjectBuilder members, then append to a BSONObjBuilder once
-// the parser has completely matched a nonterminal and won't backtrack.  It's
-// worth noting here that this parser follows a short-circuit convention.  So,
-// in the original z example on line 3, if the input was "ab", foo() would only
-// be called once.
-    struct JsonGrammar : public grammar< JsonGrammar > {
-    public:
-        JsonGrammar( ObjectBuilder &_b ) : b( _b ) {}
-
-        template < typename ScannerT >
-        struct definition {
-            definition( JsonGrammar const &self ) {
-                object = ch_p( '{' )[ objectStart( self.b ) ] >> !members >> '}';
-                members = list_p((fieldName >> ':' >> value) , ',');
-                fieldName =
-                    str[ fieldNameEnd( self.b ) ] |
-                    singleQuoteStr[ fieldNameEnd( self.b ) ] |
-                    unquotedFieldName[ unquotedFieldNameEnd( self.b ) ];
-                array = ch_p( '[' )[ arrayStart( self.b ) ] >> !elements >> ']';
-                elements = list_p(value, ch_p(',')[arrayNext( self.b )]);
-                value =
-                    str[ stringEnd( self.b ) ] |
-                    number[ numberValue( self.b ) ] |
-                    integer |
-                    array[ arrayEnd( self.b ) ] |
-                    lexeme_d[ str_p( "true" ) ][ trueValue( self.b ) ] |
-                    lexeme_d[ str_p( "false" ) ][ falseValue( self.b ) ] |
-                    lexeme_d[ str_p( "null" ) ][ nullValue( self.b ) ] |
-                    lexeme_d[ str_p( "undefined" ) ][ undefinedValue( self.b ) ] |
-                    singleQuoteStr[ stringEnd( self.b ) ] |
-                    date[ dateEnd( self.b ) ] |
-                    oid[ oidEnd( self.b ) ] |
-                    bindata[ binDataEnd( self.b ) ] |
-                    dbref[ dbrefEnd( self.b ) ] |
-                    timestamp[ timestampEnd( self.b ) ] |
-                    regex[ regexEnd( self.b ) ] |
-                    object[ subobjectEnd( self.b ) ] ;
-                // NOTE lexeme_d and rules don't mix well, so we have this mess.
-                // NOTE We use range_p rather than cntrl_p, because the latter is locale dependent.
-                str = lexeme_d[ ch_p( '"' )[ chClear( self.b ) ] >>
-                                *( ( ch_p( '\\' ) >>
-                                     (
-                                         ch_p( 'b' )[ chE( self.b ) ] |
-                                         ch_p( 'f' )[ chE( self.b ) ] |
-                                         ch_p( 'n' )[ chE( self.b ) ] |
-                                         ch_p( 'r' )[ chE( self.b ) ] |
-                                         ch_p( 't' )[ chE( self.b ) ] |
-                                         ch_p( 'v' )[ chE( self.b ) ] |
-                                         ( ch_p( 'u' ) >> ( repeat_p( 4 )[ xdigit_p ][ chU( self.b ) ] ) ) |
-                                         ( ~ch_p('x') & (~range_p('0','9'))[ ch( self.b ) ] ) // hex and octal aren't supported
-                                     )
-                                   ) |
-                                   ( ~range_p( 0x00, 0x1f ) & ~ch_p( '"' ) & ( ~ch_p( '\\' ) )[ ch( self.b ) ] ) ) >> '"' ];
-
-                singleQuoteStr = lexeme_d[ ch_p( '\'' )[ chClear( self.b ) ] >>
-                                           *( ( ch_p( '\\' ) >>
-                                                (
-                                                    ch_p( 'b' )[ chE( self.b ) ] |
-                                                    ch_p( 'f' )[ chE( self.b ) ] |
-                                                    ch_p( 'n' )[ chE( self.b ) ] |
-                                                    ch_p( 'r' )[ chE( self.b ) ] |
-                                                    ch_p( 't' )[ chE( self.b ) ] |
-                                                    ch_p( 'v' )[ chE( self.b ) ] |
-                                                    ( ch_p( 'u' ) >> ( repeat_p( 4 )[ xdigit_p ][ chU( self.b ) ] ) ) |
-                                                    ( ~ch_p('x') & (~range_p('0','9'))[ ch( self.b ) ] ) // hex and octal aren't supported
-                                                )
-                                              ) |
-                                              ( ~range_p( 0x00, 0x1f ) & ~ch_p( '\'' ) & ( ~ch_p( '\\' ) )[ ch( self.b ) ] ) ) >> '\'' ];
-
-                // real_p accepts numbers with nonsignificant zero prefixes, which
-                // aren't allowed in JSON.  Oh well.
-                number = strict_real_p | str_p( "NaN" ) | str_p( "Infinity" ) | str_p( "-Infinity" );
-
-                static int_parser<long long, 10,  1, numeric_limits<long long>::digits10 + 1> long_long_p;
-                integer = long_long_p[ intValue(self.b) ];
-
-                // We allow a subset of valid js identifier names here.
-                unquotedFieldName = lexeme_d[ ( alpha_p | ch_p( '$' ) | ch_p( '_' ) ) >> *( ( alnum_p | ch_p( '$' ) | ch_p( '_'  )) ) ];
-
-                dbref = dbrefS | dbrefT;
-                dbrefS = ch_p( '{' ) >> "\"$ref\"" >> ':' >>
-                         str[ dbrefNS( self.b ) ] >> ',' >> "\"$id\"" >> ':' >> quotedOid >> '}';
-                dbrefT = str_p( "Dbref" ) >> '(' >> str[ dbrefNS( self.b ) ] >> ',' >>
-                         quotedOid >> ')';
-
-                timestamp = ch_p( '{' ) >> "\"$timestamp\"" >> ':' >> '{' >>
-                    "\"t\"" >> ':' >> uint_parser<unsigned long long, 10, 1, -1>()[ timestampSecs(self.b) ] >> ',' >>
-                    "\"i\"" >> ':' >> uint_parser<unsigned int, 10, 1, -1>()[ timestampInc(self.b) ] >> '}' >>'}';
-
-                oid = oidS | oidT;
-                oidS = ch_p( '{' ) >> "\"$oid\"" >> ':' >> quotedOid >> '}';
-                oidT = str_p( "ObjectId" ) >> '(' >> quotedOid >> ')';
-
-                quotedOid = lexeme_d[ '"' >> ( repeat_p( 24 )[ xdigit_p ] )[ oidValue( self.b ) ] >> '"' ];
-
-                bindata = ch_p( '{' ) >> "\"$binary\"" >> ':' >>
-                          lexeme_d[ '"' >> ( *( range_p( 'A', 'Z' ) | range_p( 'a', 'z' ) | range_p( '0', '9' ) | ch_p( '+' ) | ch_p( '/' ) ) >> *ch_p( '=' ) )[ binDataBinary( self.b ) ] >> '"' ] >> ',' >> "\"$type\"" >> ':' >>
-                          lexeme_d[ '"' >> ( repeat_p( 2 )[ xdigit_p ] )[ binDataType( self.b ) ] >> '"' ] >> '}';
-
-                // TODO: this will need to use a signed parser at some point
-                date = dateS | dateT;
-                dateS = ch_p( '{' ) >> "\"$date\"" >> ':' >> uint_parser< Date_t >()[ dateValue( self.b ) ] >> '}';
-                dateT = !str_p("new") >> str_p( "Date" ) >> '(' >> uint_parser< Date_t >()[ dateValue( self.b ) ] >> ')';
-
-                regex = regexS | regexT;
-                regexS = ch_p( '{' ) >> "\"$regex\"" >> ':' >> str[ regexValue( self.b ) ] >> ',' >> "\"$options\"" >> ':' >> lexeme_d[ '"' >> ( *( alpha_p ) )[ regexOptions( self.b ) ] >> '"' ] >> '}';
-                // FIXME Obviously it would be nice to unify this with str.
-                regexT = lexeme_d[ ch_p( '/' )[ chClear( self.b ) ] >>
-                                   *( ( ch_p( '\\' ) >>
-                                        ( ch_p( '"' )[ chE( self.b ) ] |
-                                          ch_p( '\\' )[ chE( self.b ) ] |
-                                          ch_p( '/' )[ chE( self.b ) ] |
-                                          ch_p( 'b' )[ chE( self.b ) ] |
-                                          ch_p( 'f' )[ chE( self.b ) ] |
-                                          ch_p( 'n' )[ chE( self.b ) ] |
-                                          ch_p( 'r' )[ chE( self.b ) ] |
-                                          ch_p( 't' )[ chE( self.b ) ] |
-                                          ( ch_p( 'u' ) >> ( repeat_p( 4 )[ xdigit_p ][ chU( self.b ) ] ) ) ) ) |
-                                      ( ~range_p( 0x00, 0x1f ) & ~ch_p( '/' ) & ( ~ch_p( '\\' ) )[ ch( self.b ) ] ) ) >> str_p( "/" )[ regexValue( self.b ) ]
-                                   >> ( *( ch_p( 'i' ) | ch_p( 'g' ) | ch_p( 'm' ) ) )[ regexOptions( self.b ) ] ];
+    Status JParse::value(const StringData& fieldName, BSONObjBuilder& builder) {
+        MONGO_JSON_DEBUG("fieldName: " << fieldName);
+        if (accept(LBRACE, false)) {
+            Status ret = object(fieldName, builder);
+            if (ret != Status::OK()) {
+                return ret;
             }
-            rule< ScannerT > object, members, array, elements, value, str, number, integer,
-                  dbref, dbrefS, dbrefT, timestamp, timestampS, timestampT, oid, oidS, oidT, 
-                  bindata, date, dateS, dateT, regex, regexS, regexT, quotedOid, fieldName, 
-                  unquotedFieldName, singleQuoteStr;
-            const rule< ScannerT > &start() const {
-                return object;
+        }
+        else if (accept(LBRACKET, false)) {
+            Status ret = array(fieldName, builder);
+            if (ret != Status::OK()) {
+                return ret;
             }
-        };
-        ObjectBuilder &b;
-    };
+        }
+        else if (accept("new")) {
+            Status ret = constructor(fieldName, builder);
+            if (ret != Status::OK()) {
+                return ret;
+            }
+        }
+        else if (accept("Date")) {
+            Status ret = date(fieldName, builder);
+            if (ret != Status::OK()) {
+                return ret;
+            }
+        }
+        else if (accept("Timestamp")) {
+            Status ret = timestamp(fieldName, builder);
+            if (ret != Status::OK()) {
+                return ret;
+            }
+        }
+        else if (accept("ObjectId")) {
+            Status ret = objectId(fieldName, builder);
+            if (ret != Status::OK()) {
+                return ret;
+            }
+        }
+        else if (accept("Dbref") || accept("DBRef")) {
+            Status ret = dbRef(fieldName, builder);
+            if (ret != Status::OK()) {
+                return ret;
+            }
+        }
+        else if (accept(FORWARDSLASH, false)) {
+            Status ret = regex(fieldName, builder);
+            if (ret != Status::OK()) {
+                return ret;
+            }
+        }
+        else if (accept(DOUBLEQUOTE, false) || accept(SINGLEQUOTE, false)) {
+            std::string valueString;
+            valueString.reserve(STRINGVAL_RESERVE_SIZE);
+            Status ret = quotedString(&valueString);
+            if (ret != Status::OK()) {
+                return ret;
+            }
+            builder.append(fieldName, valueString);
+        }
+        else if (accept("true")) {
+            builder.append(fieldName, true);
+        }
+        else if (accept("false")) {
+            builder.append(fieldName, false);
+        }
+        else if (accept("null")) {
+            builder.appendNull(fieldName);
+        }
+        else if (accept("undefined")) {
+            builder.appendUndefined(fieldName);
+        }
+        else if (accept("NaN")) {
+            builder.append(fieldName, std::numeric_limits<double>::quiet_NaN());
+        }
+        else if (accept("Infinity")) {
+            builder.append(fieldName, std::numeric_limits<double>::infinity());
+        }
+        else if (accept("-Infinity")) {
+            builder.append(fieldName, -std::numeric_limits<double>::infinity());
+        }
+        else {
+            Status ret = number(fieldName, builder);
+            if (ret != Status::OK()) {
+                return ret;
+            }
+        }
+        return Status::OK();
+    }
 
-    BSONObj fromjson( const char *str , int* len) {
-        if ( str[0] == '\0' ) {
+    Status JParse::object(const StringData& fieldName, BSONObjBuilder& builder, bool subObject) {
+        MONGO_JSON_DEBUG("fieldName: " << fieldName);
+        if (!accept(LBRACE)) {
+            return parseError("Expecting '{'");
+        }
+
+        // Empty object
+        if (accept(RBRACE)) {
+            if (subObject) {
+                BSONObjBuilder empty(builder.subobjStart(fieldName));
+                empty.done();
+            }
+            return Status::OK();
+        }
+
+        // Special object
+        std::string firstField;
+        firstField.reserve(FIELD_RESERVE_SIZE);
+        Status ret = field(&firstField);
+        if (ret != Status::OK()) {
+            return ret;
+        }
+
+        if (firstField == "$oid") {
+            if (!subObject) {
+                return parseError("Reserved field name in base object: $oid");
+            }
+            Status ret = objectIdObject(fieldName, builder);
+            if (ret != Status::OK()) {
+                return ret;
+            }
+        }
+        else if (firstField == "$binary") {
+            if (!subObject) {
+                return parseError("Reserved field name in base object: $binary");
+            }
+            Status ret = binaryObject(fieldName, builder);
+            if (ret != Status::OK()) {
+                return ret;
+            }
+        }
+        else if (firstField == "$date") {
+            if (!subObject) {
+                return parseError("Reserved field name in base object: $date");
+            }
+            Status ret = dateObject(fieldName, builder);
+            if (ret != Status::OK()) {
+                return ret;
+            }
+        }
+        else if (firstField == "$timestamp") {
+            if (!subObject) {
+                return parseError("Reserved field name in base object: $timestamp");
+            }
+            Status ret = timestampObject(fieldName, builder);
+            if (ret != Status::OK()) {
+                return ret;
+            }
+        }
+        else if (firstField == "$regex") {
+            if (!subObject) {
+                return parseError("Reserved field name in base object: $regex");
+            }
+            Status ret = regexObject(fieldName, builder);
+            if (ret != Status::OK()) {
+                return ret;
+            }
+        }
+        else if (firstField == "$ref") {
+            if (!subObject) {
+                return parseError("Reserved field name in base object: $ref");
+            }
+            Status ret = dbRefObject(fieldName, builder);
+            if (ret != Status::OK()) {
+                return ret;
+            }
+        }
+        else if (firstField == "$undefined") {
+            if (!subObject) {
+                return parseError("Reserved field name in base object: $undefined");
+            }
+            Status ret = undefinedObject(fieldName, builder);
+            if (ret != Status::OK()) {
+                return ret;
+            }
+        }
+        else { // firstField != <reserved field name>
+            // Normal object
+
+            // Only create a sub builder if this is not the base object
+            BSONObjBuilder* objBuilder = &builder;
+            scoped_ptr<BSONObjBuilder> subObjBuilder;
+            if (subObject) {
+                subObjBuilder.reset(new BSONObjBuilder(builder.subobjStart(fieldName)));
+                objBuilder = subObjBuilder.get();
+            }
+
+            if (!accept(COLON)) {
+                return parseError("Expecting ':'");
+            }
+            Status valueRet = value(firstField, *objBuilder);
+            if (valueRet != Status::OK()) {
+                return valueRet;
+            }
+            while (accept(COMMA)) {
+                std::string fieldName;
+                fieldName.reserve(FIELD_RESERVE_SIZE);
+                Status fieldRet = field(&fieldName);
+                if (fieldRet != Status::OK()) {
+                    return fieldRet;
+                }
+                if (!accept(COLON)) {
+                    return parseError("Expecting ':'");
+                }
+                Status valueRet = value(fieldName, *objBuilder);
+                if (valueRet != Status::OK()) {
+                    return valueRet;
+                }
+            }
+        }
+        if (!accept(RBRACE)) {
+            return parseError("Expecting '}' or ','");
+        }
+        return Status::OK();
+    }
+
+    Status JParse::objectIdObject(const StringData& fieldName, BSONObjBuilder& builder) {
+        if (!accept(COLON)) {
+            return parseError("Expected ':'");
+        }
+        std::string id;
+        id.reserve(ID_RESERVE_SIZE);
+        Status ret = quotedString(&id);
+        if (ret != Status::OK()) {
+            return ret;
+        }
+        if (id.size() != 24) {
+            return parseError("Expecting 24 hex digits: " + id);
+        }
+        if (!isHexString(id)) {
+            return parseError("Expecting hex digits: " + id);
+        }
+        builder.append(fieldName, OID(id));
+        return Status::OK();
+    }
+
+    Status JParse::binaryObject(const StringData& fieldName, BSONObjBuilder& builder) {
+        if (!accept(COLON)) {
+            return parseError("Expected ':'");
+        }
+        std::string binDataString;
+        binDataString.reserve(BINDATA_RESERVE_SIZE);
+        Status dataRet = quotedString(&binDataString);
+        if (dataRet != Status::OK()) {
+            return dataRet;
+        }
+        if (binDataString.size() % 4 != 0) {
+            return parseError("Invalid length base64 encoded string");
+        }
+        if (!isBase64String(binDataString)) {
+            return parseError("Invalid character in base64 encoded string");
+        }
+        const std::string& binData = base64::decode(binDataString);
+        if (!accept(COMMA)) {
+            return parseError("Expected ','");
+        }
+
+        if (!acceptField("$type")) {
+            return parseError("Expected second field name: \"$type\", in \"$binary\" object");
+        }
+        if (!accept(COLON)) {
+            return parseError("Expected ':'");
+        }
+        std::string binDataType;
+        binDataType.reserve(BINDATATYPE_RESERVE_SIZE);
+        Status typeRet = quotedString(&binDataType);
+        if (typeRet != Status::OK()) {
+            return typeRet;
+        }
+        if ((binDataType.size() != 2) || !isHexString(binDataType)) {
+            return parseError("Argument of $type in $bindata object must be a hex string representation of a single byte");
+        }
+        builder.appendBinData( fieldName, binData.length(),
+                BinDataType(fromHex(binDataType)),
+                binData.data());
+        return Status::OK();
+    }
+
+    Status JParse::dateObject(const StringData& fieldName, BSONObjBuilder& builder) {
+        if (!accept(COLON)) {
+            return parseError("Expected ':'");
+        }
+        errno = 0;
+        char* endptr;
+        int64_t millis = strtoll(_input, &endptr, 10);
+        if (errno == ERANGE) {
+            return parseError("Date milliseconds overflow");
+        }
+        if (_input == endptr) {
+            return parseError("Date expecting integer milliseconds");
+        }
+        _input = endptr;
+        builder.appendDate(fieldName, millis);
+        return Status::OK();
+    }
+
+    Status JParse::timestampObject(const StringData& fieldName, BSONObjBuilder& builder) {
+        if (!accept(COLON)) {
+            return parseError("Expecting ':'");
+        }
+        if (!accept(LBRACE)) {
+            return parseError("Expecting '{' to start \"$timestamp\" object");
+        }
+
+        if (!acceptField("t")) {
+            return parseError("Expected field name \"t\" in \"$timestamp\" sub object");
+        }
+        if (!accept(COLON)) {
+            return parseError("Expecting ':'");
+        }
+        if (accept("-")) {
+            return parseError("Negative seconds in \"$timestamp\"");
+        }
+        errno = 0;
+        char* endptr;
+        uint32_t seconds = strtoul(_input, &endptr, 10);
+        if (errno == ERANGE) {
+            return parseError("Timestamp seconds overflow");
+        }
+        if (_input == endptr) {
+            return parseError("Expecting unsigned integer seconds in \"$timestamp\"");
+        }
+        _input = endptr;
+        if (!accept(COMMA)) {
+            return parseError("Expecting ','");
+        }
+
+        if (!acceptField("i")) {
+            return parseError("Expected field name \"i\" in \"$timestamp\" sub object");
+        }
+        if (!accept(COLON)) {
+            return parseError("Expecting ':'");
+        }
+        if (accept("-")) {
+            return parseError("Negative increment in \"$timestamp\"");
+        }
+        errno = 0;
+        uint32_t count = strtoul(_input, &endptr, 10);
+        if (errno == ERANGE) {
+            return parseError("Timestamp increment overflow");
+        }
+        if (_input == endptr) {
+            return parseError("Expecting unsigned integer increment in \"$timestamp\"");
+        }
+        _input = endptr;
+
+        if (!accept(RBRACE)) {
+            return parseError("Expecting '}'");
+        }
+        builder.appendTimestamp(fieldName, (static_cast<uint64_t>(seconds))*1000, count);
+        return Status::OK();
+    }
+
+    Status JParse::regexObject(const StringData& fieldName, BSONObjBuilder& builder) {
+        if (!accept(COLON)) {
+            return parseError("Expecting ':'");
+        }
+        std::string pat;
+        pat.reserve(PAT_RESERVE_SIZE);
+        Status patRet = quotedString(&pat);
+        if (patRet != Status::OK()) {
+            return patRet;
+        }
+        if (accept(COMMA)) {
+            if (!acceptField("$options")) {
+                return parseError("Expected field name: \"$options\" in \"$regex\" object");
+            }
+            if (!accept(COLON)) {
+                return parseError("Expecting ':'");
+            }
+            std::string opt;
+            opt.reserve(OPT_RESERVE_SIZE);
+            Status optRet = quotedString(&opt);
+            if (optRet != Status::OK()) {
+                return optRet;
+            }
+            Status optCheckRet = regexOptCheck(opt);
+            if (optCheckRet != Status::OK()) {
+                return optCheckRet;
+            }
+            builder.appendRegex(fieldName, pat, opt);
+        }
+        else {
+            builder.appendRegex(fieldName, pat, "");
+        }
+        return Status::OK();
+    }
+
+    Status JParse::dbRefObject(const StringData& fieldName, BSONObjBuilder& builder) {
+        if (!accept(COLON)) {
+            return parseError("Expecting ':'");
+        }
+        std::string ns;
+        ns.reserve(NS_RESERVE_SIZE);
+        Status ret = quotedString(&ns);
+        if (ret != Status::OK()) {
+            return ret;
+        }
+        if (!accept(COMMA)) {
+            return parseError("Expecting ','");
+        }
+
+        if (!acceptField("$id")) {
+            return parseError("Expected field name: \"$id\" in \"$ref\" object");
+        }
+        if (!accept(COLON)) {
+            return parseError("Expecting ':'");
+        }
+        if (accept("ObjectId")) {
+            BSONObjBuilder subBuilder(builder.subobjStart(fieldName));
+            subBuilder.append("$ref", ns);
+            objectId("$id", subBuilder);
+            subBuilder.done();
+        }
+        else if (accept(LBRACE)) {
+            BSONObjBuilder subBuilder(builder.subobjStart(fieldName));
+            subBuilder.append("$ref", ns);
+            if (!acceptField("$oid")) {
+                return parseError("Expected field name: \"$oid\"");
+            }
+            objectIdObject("$id", subBuilder);
+            subBuilder.done();
+            if (!accept(RBRACE)) {
+                return parseError("Expecting '}'");
+            }
+        }
+        else {
+            std::string id;
+            id.reserve(ID_RESERVE_SIZE);
+            Status ret = quotedString(&id);
+            if (ret != Status::OK()) {
+                return ret;
+            }
+            if (id.size() != 24) {
+                return parseError("Expecting 24 hex digits: " + id);
+            }
+            if (!isHexString(id)) {
+                return parseError("Expecting hex digits: " + id);
+            }
+            BSONObjBuilder subBuilder(builder.subobjStart(fieldName));
+            subBuilder.append("$ref", ns);
+            subBuilder.append("$id", OID(id));
+            subBuilder.done();
+        }
+        return Status::OK();
+    }
+
+    Status JParse::undefinedObject(const StringData& fieldName, BSONObjBuilder& builder) {
+        if (!accept(COLON)) {
+            return parseError("Expecting ':'");
+        }
+        if (!accept("true")) {
+            return parseError("Reserved field \"$undefined\" requires value of true");
+        }
+        builder.appendUndefined(fieldName);
+        return Status::OK();
+    }
+
+    Status JParse::array(const StringData& fieldName, BSONObjBuilder& builder) {
+        MONGO_JSON_DEBUG("fieldName: " << fieldName);
+        uint32_t index(0);
+        if (!accept(LBRACKET)) {
+            return parseError("Expecting '['");
+        }
+        BSONObjBuilder subBuilder(builder.subarrayStart(fieldName));
+        if (!accept(RBRACKET, false)) {
+            do {
+                Status ret = value(builder.numStr(index), subBuilder);
+                if (ret != Status::OK()) {
+                    return ret;
+                }
+                index++;
+            } while (accept(COMMA));
+        }
+        subBuilder.done();
+        if (!accept(RBRACKET)) {
+            return parseError("Expecting ']' or ','");
+        }
+        return Status::OK();
+    }
+
+    /* NOTE: this could be easily modified to allow "new" before other
+     * constructors, but for now it only allows "new" before Date().
+     * Also note that unlike the interactive shell "Date(x)" and "new Date(x)"
+     * have the same behavior.  XXX: this may not be desired. */
+    Status JParse::constructor(const StringData& fieldName, BSONObjBuilder& builder) {
+        if (accept("Date")) {
+            date(fieldName, builder);
+        }
+        else {
+            return parseError("\"new\" keyword not followed by Date constructor");
+        }
+        return Status::OK();
+    }
+
+    Status JParse::date(const StringData& fieldName, BSONObjBuilder& builder) {
+        if (!accept(LPAREN)) {
+            return parseError("Expecting '('");
+        }
+        errno = 0;
+        char* endptr;
+        int64_t millis = strtoll(_input, &endptr, 10);
+        if (errno == ERANGE) {
+            return parseError("Date milliseconds overflow");
+        }
+        if (_input == endptr) {
+            return parseError("Date expecting integer milliseconds");
+        }
+        _input = endptr;
+        if (!accept(RPAREN)) {
+            return parseError("Expecting ')'");
+        }
+        builder.appendDate(fieldName, millis);
+        return Status::OK();
+    }
+
+    Status JParse::timestamp(const StringData& fieldName, BSONObjBuilder& builder) {
+        if (!accept(LPAREN)) {
+            return parseError("Expecting '('");
+        }
+        if (accept("-")) {
+            return parseError("Negative seconds in \"$timestamp\"");
+        }
+        errno = 0;
+        char* endptr;
+        uint32_t seconds = strtoul(_input, &endptr, 10);
+        if (errno == ERANGE) {
+            return parseError("Timestamp seconds overflow");
+        }
+        if (_input == endptr) {
+            return parseError("Expecting unsigned integer seconds in \"$timestamp\"");
+        }
+        _input = endptr;
+        if (!accept(COMMA)) {
+            return parseError("Expecting ','");
+        }
+        if (accept("-")) {
+            return parseError("Negative seconds in \"$timestamp\"");
+        }
+        errno = 0;
+        uint32_t count = strtoul(_input, &endptr, 10);
+        if (errno == ERANGE) {
+            return parseError("Timestamp increment overflow");
+        }
+        if (_input == endptr) {
+            return parseError("Expecting unsigned integer increment in \"$timestamp\"");
+        }
+        _input = endptr;
+        if (!accept(RPAREN)) {
+            return parseError("Expecting ')'");
+        }
+        builder.appendTimestamp(fieldName, (static_cast<uint64_t>(seconds))*1000, count);
+        return Status::OK();
+    }
+
+    Status JParse::objectId(const StringData& fieldName, BSONObjBuilder& builder) {
+        if (!accept(LPAREN)) {
+            return parseError("Expecting '('");
+        }
+        std::string id;
+        id.reserve(ID_RESERVE_SIZE);
+        Status ret = quotedString(&id);
+        if (ret != Status::OK()) {
+            return ret;
+        }
+        if (!accept(RPAREN)) {
+            return parseError("Expecting ')'");
+        }
+        if (id.size() != 24) {
+            return parseError("Expecting 24 hex digits: " + id);
+        }
+        if (!isHexString(id)) {
+            return parseError("Expecting hex digits: " + id);
+        }
+        builder.append(fieldName, OID(id));
+        return Status::OK();
+    }
+
+    Status JParse::dbRef(const StringData& fieldName, BSONObjBuilder& builder) {
+        if (!accept(LPAREN)) {
+            return parseError("Expecting '('");
+        }
+        std::string ns;
+        ns.reserve(NS_RESERVE_SIZE);
+        Status refRet = quotedString(&ns);
+        if (refRet != Status::OK()) {
+            return refRet;
+        }
+        if (!accept(COMMA)) {
+            return parseError("Expecting ','");
+        }
+        std::string id;
+        id.reserve(ID_RESERVE_SIZE);
+        Status idRet = quotedString(&id);
+        if (idRet != Status::OK()) {
+            return idRet;
+        }
+        if (id.size() != 24) {
+            return parseError("Expecting 24 hex digits: " + id);
+        }
+        if (!isHexString(id)) {
+            return parseError("Expecting hex digits: " + id);
+        }
+        if (!accept(RPAREN)) {
+            return parseError("Expecting ')'");
+        }
+        BSONObjBuilder subBuilder(builder.subobjStart(fieldName));
+        subBuilder.append("$ref", ns);
+        subBuilder.append("$id", OID(id));
+        subBuilder.done();
+        return Status::OK();
+    }
+
+    Status JParse::regex(const StringData& fieldName, BSONObjBuilder& builder) {
+        if (!accept(FORWARDSLASH)) {
+            return parseError("Expecting '/'");
+        }
+        std::string pat;
+        pat.reserve(PAT_RESERVE_SIZE);
+        Status patRet = regexPat(&pat);
+        if (patRet != Status::OK()) {
+            return patRet;
+        }
+        if (!accept(FORWARDSLASH)) {
+            return parseError("Expecting '/'");
+        }
+        std::string opt;
+        opt.reserve(OPT_RESERVE_SIZE);
+        Status optRet = regexOpt(&opt);
+        if (optRet != Status::OK()) {
+            return optRet;
+        }
+        Status optCheckRet = regexOptCheck(opt);
+        if (optCheckRet != Status::OK()) {
+            return optCheckRet;
+        }
+        builder.appendRegex(fieldName, pat, opt);
+        return Status::OK();
+    }
+
+    Status JParse::regexPat(std::string* result) {
+        MONGO_JSON_DEBUG("");
+        return chars(result, "/");
+    }
+
+    Status JParse::regexOpt(std::string* result) {
+        MONGO_JSON_DEBUG("");
+        return chars(result, "", JOPTIONS);
+    }
+
+    Status JParse::regexOptCheck(const StringData& opt) {
+        MONGO_JSON_DEBUG("opt: " << opt);
+        std::size_t i;
+        for (i = 0; i < opt.size(); i++) {
+            if (!match(opt[i], JOPTIONS)) {
+                return parseError("Bad regex option: " + opt[i]);
+            }
+        }
+        return Status::OK();
+    }
+
+    Status JParse::number(const StringData& fieldName, BSONObjBuilder& builder) {
+        char* endptrll;
+        char* endptrd;
+        long long retll;
+        double retd;
+
+        // reset errno to make sure that we are getting it from strtod
+        errno = 0;
+        retd = strtod(_input, &endptrd);
+        // if pointer does not move, we found no digits
+        if (_input == endptrd) {
+            return parseError("Bad characters in value");
+        }
+        if (errno == ERANGE) {
+            return parseError("Value cannot fit in double");
+        }
+        // reset errno to make sure that we are getting it from strtoll
+        errno = 0;
+        retll = strtoll(_input, &endptrll, 10);
+        if (endptrll < endptrd || errno == ERANGE) {
+            // The number either had characters only meaningful for a double or
+            // could not fit in a 64 bit int
+            MONGO_JSON_DEBUG("Type: double");
+            builder.append(fieldName, retd);
+        }
+        else if (retll == static_cast<int>(retll)) {
+            // The number can fit in a 32 bit int
+            MONGO_JSON_DEBUG("Type: 32 bit int");
+            builder.append(fieldName, static_cast<int>(retll));
+        }
+        else {
+            // The number can fit in a 64 bit int
+            MONGO_JSON_DEBUG("Type: 64 bit int");
+            builder.append(fieldName, retll);
+        }
+        _input = endptrd;
+        if (_input >= _input_end) {
+            return parseError("Trailing number at end of input");
+        }
+        return Status::OK();
+    }
+
+    Status JParse::field(std::string* result) {
+        MONGO_JSON_DEBUG("");
+        if (accept(DOUBLEQUOTE, false) || accept(SINGLEQUOTE, false)) {
+            // Quoted key
+            // TODO: make sure quoted field names cannot contain null characters
+            return quotedString(result);
+        }
+        else {
+            // Unquoted key
+            while (_input < _input_end && isspace(*_input)) ++_input;
+            if (_input >= _input_end) {
+                return parseError("Field name expected");
+            }
+            if (!match(*_input, ALPHA "_$")) {
+                return parseError("First character in field must be [A-Za-z$_]");
+            }
+            return chars(result, "", ALPHA DIGIT "_$");
+        }
+    }
+
+    Status JParse::quotedString(std::string* result) {
+        MONGO_JSON_DEBUG("");
+        if (accept(DOUBLEQUOTE, true)) {
+            Status ret = chars(result, "\"");
+            if (ret != Status::OK()) {
+                return ret;
+            }
+            if (!accept(DOUBLEQUOTE)) {
+                return parseError("Expecting '\"'");
+            }
+        }
+        else if (accept(SINGLEQUOTE, true)) {
+            Status ret = chars(result, "'");
+            if (ret != Status::OK()) {
+                return ret;
+            }
+            if (!accept(SINGLEQUOTE)) {
+                return parseError("Expecting '''");
+            }
+        }
+        else {
+            return parseError("Expecting quoted string");
+        }
+        return Status::OK();
+    }
+
+    /*
+     * terminalSet are characters that signal end of string (e.g.) [ :\0]
+     * allowedSet are the characters that are allowed, if this is set
+     */
+    Status JParse::chars(std::string* result, const char* terminalSet,
+            const char* allowedSet) {
+        MONGO_JSON_DEBUG("terminalSet: " << terminalSet);
+        if (_input >= _input_end) {
+            return parseError("Unexpected end of input");
+        }
+        const char* q = _input;
+        while (q < _input_end && !match(*q, terminalSet)) {
+            MONGO_JSON_DEBUG("q: " << q);
+            if (allowedSet != NULL) {
+                if (!match(*q, allowedSet)) {
+                    _input = q;
+                    return Status::OK();
+                }
+            }
+            if (0x00 <= *q && *q <= 0x1F) {
+                return parseError("Invalid control character");
+            }
+            if (*q == '\\' && q + 1 < _input_end) {
+                switch (*(++q)) {
+                    // Escape characters allowed by the JSON spec
+                    case '"':  result->push_back('"');  break;
+                    case '\'': result->push_back('\''); break;
+                    case '\\': result->push_back('\\'); break;
+                    case '/':  result->push_back('/');  break;
+                    case 'b':  result->push_back('\b'); break;
+                    case 'f':  result->push_back('\f'); break;
+                    case 'n':  result->push_back('\n'); break;
+                    case 'r':  result->push_back('\r'); break;
+                    case 't':  result->push_back('\t'); break;
+                    case 'u': { //expect 4 hexdigits
+                                  // TODO: handle UTF-16 surrogate characters
+                                  ++q;
+                                  if (q + 4 >= _input_end) {
+                                      return parseError("Expecting 4 hex digits");
+                                  }
+                                  if (!isHexString(StringData(q, 4))) {
+                                      return parseError("Expecting 4 hex digits");
+                                  }
+                                  unsigned char first = fromHex(q);
+                                  unsigned char second = fromHex(q += 2);
+                                  const std::string& utf8str = encodeUTF8(first, second);
+                                  for (unsigned int i = 0; i < utf8str.size(); i++) {
+                                      result->push_back(utf8str[i]);
+                                  }
+                                  ++q;
+                                  break;
+                              }
+                               // Vertical tab character.  Not in JSON spec but allowed in
+                               // our implementation according to test suite.
+                    case 'v':  result->push_back('\v'); break;
+                               // Escape characters we explicity disallow
+                    case 'x':  return parseError("Hex escape not supported");
+                    case '0':
+                    case '1':
+                    case '2':
+                    case '3':
+                    case '4':
+                    case '5':
+                    case '6':
+                    case '7':  return parseError("Octal escape not supported");
+                               // By default pass on the unescaped character
+                    default:   result->push_back(*q); break;
+                    // TODO: check for escaped control characters
+                }
+                ++q;
+            }
+            else {
+                result->push_back(*q++);
+            }
+        }
+        if (q < _input_end) {
+            _input = q;
+            return Status::OK();
+        }
+        return parseError("Unexpected end of input");
+    }
+
+    std::string JParse::encodeUTF8(unsigned char first, unsigned char second) const {
+        std::ostringstream oss;
+        if (first == 0 && second < 0x80) {
+            oss << second;
+        }
+        else if (first < 0x08) {
+            oss << char( 0xc0 | (first << 2 | second >> 6) );
+            oss << char( 0x80 | (~0xc0 & second) );
+        }
+        else {
+            oss << char( 0xe0 | (first >> 4) );
+            oss << char( 0x80 | (~0xc0 & (first << 2 | second >> 6) ) );
+            oss << char( 0x80 | (~0xc0 & second) );
+        }
+        return oss.str();
+    }
+
+    bool JParse::accept(const char* token, bool advance) {
+        MONGO_JSON_DEBUG("token: " << token);
+        const char* check = _input;
+        if (token == NULL) {
+            return false;
+        }
+        while (check < _input_end && isspace(*check)) {
+            ++check;
+        }
+        while (*token != '\0') {
+            if (check >= _input_end) {
+                return false;
+            }
+            if (*token++ != *check++) {
+                return false;
+            }
+        }
+        if (advance) { _input = check; }
+        return true;
+    }
+
+    bool JParse::acceptField(const StringData& expectedField) {
+        MONGO_JSON_DEBUG("expectedField: " << expectedField);
+        std::string nextField;
+        nextField.reserve(FIELD_RESERVE_SIZE);
+        Status ret = field(&nextField);
+        if (ret != Status::OK()) {
+            return false;
+        }
+        if (expectedField != nextField) {
+            return false;
+        }
+        return true;
+    }
+
+    inline bool JParse::match(char matchChar, const char* matchSet) const {
+        if (matchSet == NULL) {
+            return true;
+        }
+        if (*matchSet == '\0') {
+            return false;
+        }
+        return (strchr(matchSet, matchChar) != NULL);
+    }
+
+    bool JParse::isHexString(const StringData& str) const {
+        MONGO_JSON_DEBUG("str: " << str);
+        std::size_t i;
+        for (i = 0; i < str.size(); i++) {
+            if (!isxdigit(str[i])) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    bool JParse::isBase64String(const StringData& str) const {
+        MONGO_JSON_DEBUG("str: " << str);
+        std::size_t i;
+        for (i = 0; i < str.size(); i++) {
+            if (!match(str[i], base64::chars)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    BSONObj fromjson(const char* jsonString, int* len) {
+        MONGO_JSON_DEBUG("jsonString: " << jsonString);
+        if (jsonString[0] == '\0') {
             if (len) *len = 0;
             return BSONObj();
         }
-
-        ObjectBuilder b;
-        JsonGrammar parser( b );
-        parse_info<> result = parse( str, parser, space_p );
-        if (len) {
-            *len = result.stop - str;
+        JParse jparse(jsonString);
+        BSONObjBuilder builder;
+        Status ret = jparse.object("UNUSED", builder, false);
+        if (ret != Status::OK()) {
+            ostringstream message;
+            message << "code " << ret.code() << ": " << ret.codeString() << ": " << ret.reason();
+            throw MsgAssertionException(16619, message.str());
         }
-        else if ( !result.full ) {
-            int limit = strnlen(result.stop , 10);
-            if (limit == -1) limit = 10;
-            msgasserted(10340, "Failure parsing JSON string near: " + string( result.stop, limit ));
-        }
-        BSONObj ret = b.pop();
-        verify( b.empty() );
-        return ret;
+        if (len) *len = jparse.offset();
+        return builder.obj();
     }
 
-    BSONObj fromjson( const string &str ) {
+    BSONObj fromjson(const std::string& str) {
         return fromjson( str.c_str() );
     }
 
-} // namespace mongo
+}  /* namespace mongo */

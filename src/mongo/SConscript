@@ -71,6 +71,7 @@ env.StaticLibrary('bson', [
         'db/jsobj.cpp',
         'db/json.cpp'
         ], LIBDEPS=[
+        'base/base',
         'md5',
         'stringutils',
         '$BUILD_DIR/mongo/platform/platform',
