@@ -370,6 +370,43 @@ class test_checkpoint_empty(wttest.WiredTigerTestCase):
         cursor = self.session.open_cursor(
             self.uri, None, "checkpoint=WiredTigerCheckpoint")
 
+    # Check that we can create an empty checkpoint, change the underlying
+    # object, checkpoint again, and still see the original empty tree, for
+    # both named and unnamed checkpoints.
+    def test_checkpoint_empty_five(self):
+        self.session.create(self.uri, "key_format=S,value_format=S")
+        self.session.checkpoint('name=ckpt')
+        cursor = self.session.open_cursor(self.uri, None, "checkpoint=ckpt")
+        self.assertEquals(cursor.next(), wiredtiger.WT_NOTFOUND)
+        cursor.close()
+
+        cursor = self.session.open_cursor(self.uri, None)
+        cursor.set_key("key");
+        cursor.set_value("value");
+        cursor.insert()
+        self.session.checkpoint()
+
+        cursor = self.session.open_cursor(self.uri, None, "checkpoint=ckpt")
+        self.assertEquals(cursor.next(), wiredtiger.WT_NOTFOUND)
+
+    def test_checkpoint_empty_six(self):
+        self.session.create(self.uri, "key_format=S,value_format=S")
+        self.session.checkpoint()
+        cursor = self.session.open_cursor(
+            self.uri, None, "checkpoint=WiredTigerCheckpoint")
+        self.assertEquals(cursor.next(), wiredtiger.WT_NOTFOUND)
+        cursor.close()
+
+        cursor = self.session.open_cursor(self.uri, None)
+        cursor.set_key("key");
+        cursor.set_value("value");
+        cursor.insert()
+        self.session.checkpoint('name=ckpt')
+
+        cursor = self.session.open_cursor(
+            self.uri, None, "checkpoint=WiredTigerCheckpoint")
+        self.assertEquals(cursor.next(), wiredtiger.WT_NOTFOUND)
+
 
 if __name__ == '__main__':
     wttest.run()

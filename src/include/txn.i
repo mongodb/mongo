@@ -9,45 +9,6 @@ static inline void __wt_txn_read_first(WT_SESSION_IMPL *session);
 static inline void __wt_txn_read_last(WT_SESSION_IMPL *session);
 
 /*
- * __wt_txn_getid --
- *	Get a transaction ID for a non-transactional operation.
- */
-static inline void
-__wt_txn_getid(WT_SESSION_IMPL *session)
-{
-	WT_TXN *txn;
-	WT_TXN_GLOBAL *txn_global;
-	wt_txnid_t id;
-
-	txn = &session->txn;
-
-	if (F_ISSET(txn, TXN_RUNNING))
-		return;
-
-	/* If we already have the latest ID, keep using it. */
-	id = txn->id;
-	txn_global = &S2C(session)->txn_global;
-	if (id + 1 == txn_global->current &&
-	    id != WT_TXN_NONE && id != WT_TXN_ABORTED)
-		return;
-
-	do {
-		id = txn_global->current;
-	} while (!WT_ATOMIC_CAS(txn_global->current, id, id + 1) ||
-	    id == WT_TXN_NONE || id == WT_TXN_ABORTED);
-
-	txn->id = id;
-
-	/*
-	 * We allocated a new transaction ID for updates without an explicit
-	 * transaction.  To ensure that our previous updates are visible,
-	 * update our transaction context (if required).
-	 */
-	__wt_txn_read_last(session);
-	__wt_txn_read_first(session);
-}
-
-/*
  * __wt_txn_modify --
  *	Mark a WT_UPDATE object modified by the current transaction.
  */
@@ -56,16 +17,17 @@ __wt_txn_modify(WT_SESSION_IMPL *session, wt_txnid_t *id)
 {
 	WT_TXN *txn;
 
-	txn = &session->txn;
-	if (F_ISSET(txn, TXN_RUNNING)) {
-		if (txn->mod_count * sizeof(wt_txnid_t *) == txn->mod_alloc)
-			WT_RET(__wt_realloc(session, &txn->mod_alloc,
-			    WT_MAX(10, 2 * txn->mod_count) *
-			    sizeof(wt_txnid_t *), &txn->mod));
-		txn->mod[txn->mod_count++] = id;
-	} else
-		__wt_txn_getid(session);
+	if (!F_ISSET(S2C(session), WT_CONN_TRANSACTIONAL))
+		return (0);
 
+	txn = &session->txn;
+	WT_ASSERT(session, F_ISSET(txn, TXN_RUNNING));
+	if (txn->mod_count * sizeof(wt_txnid_t *) == txn->mod_alloc)
+		WT_RET(__wt_realloc(session, &txn->mod_alloc,
+		    WT_MAX(10, 2 * txn->mod_count) *
+		    sizeof(wt_txnid_t *), &txn->mod));
+
+	txn->mod[txn->mod_count++] = id;
 	*id = txn->id;
 	return (0);
 }
@@ -79,17 +41,18 @@ __wt_txn_modify_ref(WT_SESSION_IMPL *session, WT_REF *ref)
 {
 	WT_TXN *txn;
 
-	txn = &session->txn;
-	if (F_ISSET(txn, TXN_RUNNING)) {
-		if (txn->modref_count *
-		    sizeof(WT_REF *) == txn->modref_alloc)
-			WT_RET(__wt_realloc(session, &txn->modref_alloc,
-			    WT_MAX(10, 2 * txn->modref_count) *
-			    sizeof(WT_REF *), &txn->modref));
-		txn->modref[txn->modref_count++] = ref;
-	} else
-		__wt_txn_getid(session);
+	if (!F_ISSET(S2C(session), WT_CONN_TRANSACTIONAL))
+		return (0);
 
+	txn = &session->txn;
+	WT_ASSERT(session, F_ISSET(txn, TXN_RUNNING));
+	if (txn->modref_count *
+	    sizeof(WT_REF *) == txn->modref_alloc)
+		WT_RET(__wt_realloc(session, &txn->modref_alloc,
+		    WT_MAX(10, 2 * txn->modref_count) *
+		    sizeof(WT_REF *), &txn->modref));
+
+	txn->modref[txn->modref_count++] = ref;
 	ref->txnid = txn->id;
 	return (0);
 }
@@ -104,6 +67,9 @@ static inline void
 __wt_txn_unmodify(WT_SESSION_IMPL *session)
 {
 	WT_TXN *txn;
+
+	if (!F_ISSET(S2C(session), WT_CONN_TRANSACTIONAL))
+		return;
 
 	txn = &session->txn;
 	if (F_ISSET(txn, TXN_RUNNING)) {

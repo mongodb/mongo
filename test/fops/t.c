@@ -148,6 +148,12 @@ handle_error(WT_EVENT_HANDLER *handler, int error, const char *errmsg)
 	/* Ignore complaints about missing files. */
 	if (error == ENOENT)
 		return (0);
+
+	/* Ignore complaints about failure to open bulk cursors. */
+	if (strstr(
+	    errmsg, "bulk-load is only supported on newly created") != NULL)
+		return (0);
+
 	return (fprintf(stderr, "%s\n", errmsg) < 0 ? -1 : 0);
 }
 
@@ -197,8 +203,7 @@ usage(void)
 {
 	fprintf(stderr,
 	    "usage: %s "
-	    "[-S] [-C wiredtiger-config] [-k keys] [-l log]\n\t"
-	    "[-n ops] [-R readers] [-r runs] [-t f|r|v] [-W writers]\n",
+	    "[-C wiredtiger-config] [-l log] [-n ops] [-r runs] [-t threads]\n",
 	    progname);
 	fprintf(stderr, "%s",
 	    "\t-C specify wiredtiger_open configuration arguments\n"
