@@ -207,7 +207,13 @@ namespace mongo {
         const int threshold;
     public:
         ReplSetHealthPollTask(const HostAndPort& hh, const HeartbeatInfo& mm)
-            : h(hh), m(mm), tries(s_try_offset), threshold(15), _timeout(10) {
+            : h(hh), m(mm), tries(s_try_offset), threshold(15),
+              _timeout(ReplSetConfig::DEFAULT_HB_TIMEOUT) {
+
+            if (theReplSet) {
+                _timeout = theReplSet->config().getHeartbeatTimeout();
+            }
+
             // doesn't need protection, all health tasks are created in a single thread
             s_try_offset += 7;
         }
@@ -287,9 +293,12 @@ namespace mongo {
         }
 
         bool _requestHeartbeat(HeartbeatInfo& mem, BSONObj& info, int& theirConfigVersion) {
-            if (tries++ % threshold == (threshold - 1)) {
+            {
                 ScopedConn conn(h.toString());
-                conn.reconnect();
+                conn.setTimeout(_timeout);
+                if (tries++ % threshold == (threshold - 1)) {
+                    conn.reconnect();
+                }
             }
 
             Timer timer;

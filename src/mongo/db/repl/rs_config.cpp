@@ -32,6 +32,7 @@ using namespace bson;
 namespace mongo {
 
     mongo::mutex ReplSetConfig::groupMx("RS tag group");
+    const int ReplSetConfig::DEFAULT_HB_TIMEOUT = 10;
 
     void logOpInitiate(const bo&);
 
@@ -130,6 +131,9 @@ namespace mongo {
             }
             if( !getLastErrorDefaults.isEmpty() )
                 settings << "getLastErrorDefaults" << getLastErrorDefaults;
+            if (_heartbeatTimeout != DEFAULT_HB_TIMEOUT) {
+                settings << "heartbeatTimeoutSecs" << _heartbeatTimeout;
+            }
             b << "settings" << settings.obj();
         }
 
@@ -556,10 +560,20 @@ namespace mongo {
             ho.check();
             try { getLastErrorDefaults = settings["getLastErrorDefaults"].Obj().copy(); }
             catch(...) { }
+
+            if (settings.hasField("heartbeatTimeoutSecs")) {
+                int timeout = settings["heartbeatTimeoutSecs"].numberInt();
+                uassert(16438, "Heartbeat timeout must be non-negative", timeout >= 0);
+                _heartbeatTimeout = timeout;
+            }
         }
 
         // figure out the majority for this config
         setMajority();
+    }
+
+    int ReplSetConfig::getHeartbeatTimeout() const {
+        return _heartbeatTimeout;
     }
 
     static inline void configAssert(bool expr) {
@@ -568,7 +582,8 @@ namespace mongo {
 
     ReplSetConfig::ReplSetConfig() :
         _ok(false),
-        _majority(-1) {
+        _majority(-1),
+        _heartbeatTimeout(DEFAULT_HB_TIMEOUT) {
     }
 
     ReplSetConfig* ReplSetConfig::make(BSONObj cfg, bool force) {

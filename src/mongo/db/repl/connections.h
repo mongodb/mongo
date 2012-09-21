@@ -47,7 +47,7 @@ namespace mongo {
             // conLock releases...
         }
         void reconnect() {
-            connInfo->cc.reset(new DBClientConnection(true, 0, 10));
+            connInfo->cc.reset(new DBClientConnection(true, 0, connInfo->getTimeout()));
             connInfo->cc->_logLevel = 2;
             connInfo->connected = false;
             connect();
@@ -83,9 +83,10 @@ namespace mongo {
             scoped_ptr<DBClientConnection> cc;
             bool connected;
             ConnectionInfo() : lock("ConnectionInfo"),
-                               cc(new DBClientConnection(/*reconnect*/ true, 0, /*timeout*/ 10.0)),
-                               connected(false),
-                               _timeout(10) {
+                cc(new DBClientConnection(/*reconnect*/ true,
+                                          /*replicaSet*/ 0,
+                                          /*timeout*/ ReplSetConfig::DEFAULT_HB_TIMEOUT)),
+                connected(false) {
                 cc->_logLevel = 2;
             }
 
@@ -94,8 +95,12 @@ namespace mongo {
                 cc->setSoTimeout(_timeout);
             }
 
+            int getTimeout() {
+                return _timeout;
+            }
+
         private:
-            time_t _timeout;
+            int _timeout;
         } *connInfo;
         typedef map<string,ScopedConn::ConnectionInfo*> M;
         static M& _map;

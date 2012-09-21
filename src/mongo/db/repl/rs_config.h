@@ -154,6 +154,16 @@ namespace mongo {
 
         bool _constructed;
 
+        /**
+         * Get the timeout to use for heartbeats.
+         */
+        int getHeartbeatTimeout() const;
+
+        /**
+         * Default timeout: 10 seconds
+         */
+        static const int DEFAULT_HB_TIMEOUT;
+
     private:
         ReplSetConfig();
         void init(const HostAndPort& h);
@@ -166,6 +176,11 @@ namespace mongo {
         void clear();
 
         struct TagClause;
+
+        /**
+         * The timeout to use for heartbeats
+         */
+        int _heartbeatTimeout;
 
         /**
          * This is a logical grouping of servers.  It is pointed to by a set of
