@@ -309,8 +309,10 @@ namespace mongo {
         static ClientCursor* find_inlock(CursorId id, bool warn = true) {
             CCById::iterator it = clientCursorsById.find(id);
             if ( it == clientCursorsById.end() ) {
-                if ( warn )
-                    OCCASIONALLY out() << "ClientCursor::find(): cursor not found in map " << id << " (ok after a drop)\n";
+                if ( warn ) {
+                    OCCASIONALLY out() << "ClientCursor::find(): cursor not found in map '" << id
+                                       << "' (ok after a drop)" << endl;
+                }
                 return 0;
             }
             return it->second;
