@@ -63,10 +63,7 @@ namespace mongo {
 
     // need to move to bson/, but has dependency on base64 so move that to bson/util/ first.
     inline string BSONElement::jsonString( JsonStringFormat format, bool includeFieldNames, int pretty ) const {
-        BSONType t = type();
         int sign;
-        if ( t == Undefined )
-            return "undefined";
 
         stringstream s;
         if ( includeFieldNames )
@@ -104,6 +101,14 @@ namespace mongo {
             break;
         case jstNULL:
             s << "null";
+            break;
+        case Undefined:
+            if ( format == Strict ) {
+                s << "{ \"$undefined\" : true }";
+            }
+            else {
+                s << "undefined";
+            }
             break;
         case Object:
             s << embeddedObject().jsonString( format, pretty );
