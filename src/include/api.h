@@ -293,42 +293,26 @@ struct __wt_connection_impl {
 	}								\
 } while (0)
 
-/*
- * If a session or connection method is about to return WT_NOTFOUND (some
- * underlying object was not found), map it to ENOENT, only cursor methods
- * return WT_NOTFOUND.
- */
-#define	API_END_NOTFOUND_MAP(s, ret)					\
-	API_END(s);							\
-	return ((ret) == WT_NOTFOUND ? ENOENT : (ret))
-
-#define	CONNECTION_API_CALL(conn, s, n, cfg, cfgvar)			\
-	s = (conn)->default_session;					\
-	API_CALL(s, connection, n, NULL, NULL, cfg, cfgvar);		\
-
-#define	SESSION_API_CALL(s, n, cfg, cfgvar)				\
-	API_CALL(s, session, n, NULL, NULL, cfg, cfgvar);
-
-#define	CURSOR_API_CALL(cur, s, n, bt)					\
-	(s) = (WT_SESSION_IMPL *)(cur)->session;			\
-	API_CALL_NOCONF(s, cursor, n, cur, bt)
-
-/*
- * When a cursor update starts, wrap in a transaction if necessary.
- */
-#define	CURSOR_UPDATE_API_CALL(cur, s, n, bt) do {			\
+/* An API call wrapped in a transaction if necessary. */
+#define	TXN_API_CALL(s, h, n, cur, bt, cfg, cfgvar) do {		\
 	int __autotxn = 0;						\
-	CURSOR_API_CALL(cur, s, n, bt);					\
+	API_CALL(s, h, n, bt, cur, cfg, cfgvar);			\
 	__autotxn = F_ISSET(S2C(s), WT_CONN_TRANSACTIONAL) &&		\
 	    !F_ISSET(&(s)->txn, TXN_RUNNING);				\
 	if (__autotxn)							\
 		WT_ERR(__wt_txn_begin((s), NULL))
 
-/*
- * When a cursor update completes, either auto-commit or check for errors
- * that require the enclosing transaction to roll back.
- */
-#define	CURSOR_UPDATE_API_END(s, ret)					\
+/* An API call wrapped in a transaction if necessary. */
+#define	TXN_API_CALL_NOCONF(s, h, n, cur, bt) do {			\
+	int __autotxn = 0;						\
+	API_CALL_NOCONF(s, h, n, cur, bt);				\
+	__autotxn = F_ISSET(S2C(s), WT_CONN_TRANSACTIONAL) &&		\
+	    !F_ISSET(&(s)->txn, TXN_RUNNING);				\
+	if (__autotxn)							\
+		WT_ERR(__wt_txn_begin((s), NULL))
+
+/* End a transactional API call. */
+#define	TXN_API_END(s, ret)						\
 	API_END(s);							\
 	if (__autotxn) {						\
 		if (ret == 0)						\
@@ -340,6 +324,40 @@ struct __wt_connection_impl {
 	    (ret) != WT_DUPLICATE_KEY)					\
 		F_SET(&(s)->txn, TXN_ERROR);				\
 } while (0)
+
+/*
+ * If a session or connection method is about to return WT_NOTFOUND (some
+ * underlying object was not found), map it to ENOENT, only cursor methods
+ * return WT_NOTFOUND.
+ */
+#define	API_END_NOTFOUND_MAP(s, ret)					\
+	API_END(s);							\
+	return ((ret) == WT_NOTFOUND ? ENOENT : (ret))
+
+#define	TXN_API_END_NOTFOUND_MAP(s, ret)				\
+	TXN_API_END(s, ret);						\
+	return ((ret) == WT_NOTFOUND ? ENOENT : (ret))
+
+#define	CONNECTION_API_CALL(conn, s, n, cfg, cfgvar)			\
+	s = (conn)->default_session;					\
+	API_CALL(s, connection, n, NULL, NULL, cfg, cfgvar)
+
+#define	SESSION_API_CALL(s, n, cfg, cfgvar)				\
+	API_CALL(s, session, n, NULL, NULL, cfg, cfgvar)
+
+#define	SESSION_TXN_API_CALL(s, n, cfg, cfgvar)				\
+	TXN_API_CALL(s, session, n, NULL, NULL, cfg, cfgvar)
+
+#define	CURSOR_API_CALL(cur, s, n, bt)					\
+	(s) = (WT_SESSION_IMPL *)(cur)->session;			\
+	API_CALL_NOCONF(s, cursor, n, cur, bt)
+
+#define	CURSOR_UPDATE_API_CALL(cur, s, n, bt)				\
+	(s) = (WT_SESSION_IMPL *)(cur)->session;			\
+	TXN_API_CALL_NOCONF(s, cursor, n, cur, bt)
+
+#define	CURSOR_UPDATE_API_END(s, ret)					\
+	TXN_API_END(s, ret)
 
 /*******************************************
  * Global variables.

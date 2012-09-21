@@ -353,7 +353,7 @@ __session_truncate(WT_SESSION *wt_session,
 
 	session = (WT_SESSION_IMPL *)wt_session;
 
-	SESSION_API_CALL(session, truncate, config, cfg);
+	SESSION_TXN_API_CALL(session, truncate, config, cfg);
 	/*
 	 * If the URI is specified, we don't need a start/stop, if start/stop
 	 * is specified, we don't need a URI.
@@ -434,7 +434,7 @@ __session_truncate(WT_SESSION *wt_session,
 		WT_ERR(__wt_curtable_truncate(session, start, stop));
 
 done:
-err:	API_END_NOTFOUND_MAP(session, ret);
+err:	TXN_API_END_NOTFOUND_MAP(session, ret);
 }
 
 /*
