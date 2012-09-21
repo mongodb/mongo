@@ -72,7 +72,6 @@ __wt_txn_get_snapshot(WT_SESSION_IMPL *session, wt_txnid_t max_id)
 	uint32_t i, n, session_cnt;
 
 	conn = S2C(session);
-	n = 0;
 	txn = &session->txn;
 	txn_global = &conn->txn_global;
 	oldest_snap_min = WT_TXN_ABORTED;
@@ -83,7 +82,9 @@ __wt_txn_get_snapshot(WT_SESSION_IMPL *session, wt_txnid_t max_id)
 
 		/* Copy the array of concurrent transactions. */
 		WT_ORDERED_READ(session_cnt, conn->session_cnt);
-		for (i = 0, s = txn_global->states; i < session_cnt; i++, s++) {
+		for (i = n = 0, s = txn_global->states;
+		    i < session_cnt;
+		    i++, s++) {
 			if ((id = s->snap_min) != WT_TXN_NONE)
 				if (TXNID_LT(id, oldest_snap_min))
 					oldest_snap_min = id;
@@ -148,7 +149,6 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 	uint32_t i, n, session_cnt;
 
 	conn = S2C(session);
-	n = 0;
 	txn = &session->txn;
 	txn_global = &conn->txn_global;
 	txn_state = &txn_global->states[session->id];
@@ -181,11 +181,10 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 		 * operation), update it so that the newly-allocated ID is
 		 * visible.
 		 */
-		if (txn->isolation == TXN_ISO_SNAPSHOT ||
-		    txn->snap_min != WT_TXN_NONE) {
+		if (txn->isolation == TXN_ISO_SNAPSHOT) {
 			/* Copy the array of concurrent transactions. */
 			WT_ORDERED_READ(session_cnt, conn->session_cnt);
-			for (i = 0, s = txn_global->states;
+			for (i = n = 0, s = txn_global->states;
 			    i < session_cnt;
 			    i++, s++) {
 				if ((id = s->snap_min) != WT_TXN_NONE)
