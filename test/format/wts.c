@@ -110,7 +110,7 @@ wts_open(void)
 	case ROW:
 		if (g.c_dictionary)
 			p += snprintf(p, (size_t)(end - p),
-			    ",dictionary=123");
+			    ",dictionary=%d", MMRAND(123, 517));
 		if (g.c_huffman_key)
 			p += snprintf(p, (size_t)(end - p),
 			    ",huffman_key=english");
