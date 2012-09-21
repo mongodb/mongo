@@ -4,6 +4,7 @@ Import("env")
 
 env.StaticLibrary('base', ['initializer_dependency_graph.cpp',
                            'make_string_vector.cpp',
+                           'parse_number.cpp',
                            'status.cpp'])
 
 env.CppUnitTest('initializer_dependency_graph_test',
@@ -16,3 +17,6 @@ env.CppUnitTest('owned_pointer_vector_test',
 
 env.CppUnitTest('status_test', 'status_test.cpp',
                 LIBDEPS=['base'])
+
+env.CppUnitTest('parse_number_test', ['parse_number_test.cpp'], LIBDEPS=['base'])
+
