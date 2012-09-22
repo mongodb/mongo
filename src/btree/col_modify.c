@@ -78,13 +78,8 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 	 * Else, allocate an insert array as necessary, build a WT_INSERT and
 	 * WT_UPDATE structure pair, and call a serialized function to insert
 	 * the WT_INSERT structure.
-	 *
-	 * The test is slight tricky: we're either coming here after a search
-	 * (in which case we check the search's comparison and the WT_INSERT
-	 * structure), or a truncation (in which case we check the WT_INSERT
-	 * structure, it's a match by definition).
 	 */
-	if (cbt->ins != NULL && (cbt->compare == 0 || op == 2)) {
+	if (cbt->compare == 0 && cbt->ins != NULL) {
 		/* Make sure the update can proceed. */
 		WT_ERR(__wt_update_check(session, page, cbt->ins->upd));
 
