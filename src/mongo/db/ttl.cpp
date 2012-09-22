@@ -38,7 +38,7 @@ namespace mongo {
         static string secondsExpireField;
         
         void doTTLForDB( const string& dbName ) {
-            
+
             Client::GodScope god;
 
             vector<BSONObj> indexes;
@@ -116,6 +116,10 @@ namespace mongo {
                     LOG(3) << " locked for writing" << endl;
                     continue;
                 }
+
+                // if part of replSet but not in a readable state (e.g. during initial sync), skip.
+                if ( theReplSet && !theReplSet->state().readable() )
+                    continue;
 
                 set<string> dbs;
                 {

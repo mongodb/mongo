@@ -36,6 +36,8 @@ namespace mongo {
 
     bool waitForReplication( OpTime op , int w , int maxSecondsToWait );
 
+    std::vector<std::string> getHostsReplicatedTo(OpTime& op);
+
     void resetSlaveCache();
     unsigned getSlaveCount();
 }

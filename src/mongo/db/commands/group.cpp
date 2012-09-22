@@ -47,11 +47,17 @@ namespace mongo {
             return obj.extractFields( keyPattern , true ).getOwned();
         }
 
-        bool group( string realdbname , const string& ns , const BSONObj& query ,
-                    BSONObj keyPattern , string keyFunctionCode , string reduceCode , const char * reduceScope ,
-                    BSONObj initial , string finalize ,
-                    string& errmsg , BSONObjBuilder& result ) {
-
+        bool group( const std::string& realdbname,
+                    const std::string& ns,
+                    const BSONObj& query,
+                    BSONObj keyPattern,
+                    const std::string& keyFunctionCode,
+                    const std::string& reduceCode,
+                    const char * reduceScope,
+                    BSONObj initial,
+                    const std::string& finalize,
+                    string& errmsg,
+                    BSONObjBuilder& result ) {
 
             auto_ptr<Scope> s = globalScriptEngine->getPooledScope( realdbname );
             s->localConnect( realdbname.c_str() );

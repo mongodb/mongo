@@ -25,7 +25,7 @@ namespace mongo {
 
     using namespace mongoutils;
 
-    RamLog::RamLog( string name ) : _name(name), _lastWrite(0) {
+    RamLog::RamLog( const std::string& name ) : _name(name), _lastWrite(0) {
         h = 0; n = 0;
         for( int i = 0; i < N; i++ )
             lines[i][C-1] = 0;
@@ -47,7 +47,7 @@ namespace mongo {
         
     }
 
-    void RamLog::write(LogLevel ll, const string& str) {
+    void RamLog::write(LogLevel ll, const std::string& str) {
         _lastWrite = time(0);
 
         char *p = lines[(h+n)%N];
@@ -96,7 +96,7 @@ namespace mongo {
         return v[i];
     }
 
-    string RamLog::color(string line) {
+    string RamLog::color(const std::string& line) {
         string s = str::after(line, "replSet ");
         if( str::startsWith(s, "warning") || startsWith(s, "error") )
             return html::red(line);
@@ -161,7 +161,7 @@ namespace mongo {
     // static things
     // ---------------
 
-    RamLog* RamLog::get( string name ) {
+    RamLog* RamLog::get( const std::string& name ) {
         if ( ! _named )
             return 0;
 

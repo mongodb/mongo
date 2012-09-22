@@ -162,35 +162,26 @@ namespace mongo {
                     pipeElement.type() == Object);
             BSONObj bsonObj(pipeElement.Obj());
 
-            intrusive_ptr<DocumentSource> pSource;
+            // Parse a pipeline stage from 'bsonObj'.
+            uassert(16435, "A pipeline stage specification object must contain exactly one field.",
+                    bsonObj.nFields() == 1);
+            BSONElement stageSpec = bsonObj.firstElement();
+            const char* stageName = stageSpec.fieldName();
 
-            /* use the object to add a DocumentSource to the processing chain */
-            BSONObjIterator bsonIterator(bsonObj);
-            while(bsonIterator.more()) {
-                BSONElement bsonElement(bsonIterator.next());
-                const char *pFieldName = bsonElement.fieldName();
-
-                /* select the appropriate operation and instantiate */
-                StageDesc key;
-                key.pName = pFieldName;
-                const StageDesc *pDesc = (const StageDesc *)
+            // Create a DocumentSource pipeline stage from 'stageSpec'.
+            StageDesc key;
+            key.pName = stageName;
+            const StageDesc* pDesc = (const StageDesc*)
                     bsearch(&key, stageDesc, nStageDesc, sizeof(StageDesc),
                             stageDescCmp);
-                if (pDesc) {
-                    pSource = (*pDesc->pFactory)(&bsonElement, pCtx);
-                    pSource->setPipelineStep(iStep);
-                }
-                else {
-                    ostringstream sb;
-                    sb <<
-                       "Pipeline::run(): unrecognized pipeline op \"" <<
-                       pFieldName;
-                    errmsg = sb.str();
-                    return intrusive_ptr<Pipeline>();
-                }
-            }
 
-            pSourceVector->push_back(pSource);
+            uassert(16436,
+                    str::stream() << "Unrecognized pipeline stage name: '" << stageName << "'",
+                    pDesc);
+            intrusive_ptr<DocumentSource> stage = (*pDesc->pFactory)(&stageSpec, pCtx);
+            verify(stage);
+            stage->setPipelineStep(iStep);
+            pSourceVector->push_back(stage);
         }
 
         /* if there aren't any pipeline stages, there's nothing more to do */
@@ -258,10 +249,7 @@ namespace mongo {
             */
             intrusive_ptr<DocumentSource> &pLastSource = pSourceVector->back();
             intrusive_ptr<DocumentSource> &pTemp = tempVector.at(tempi);
-            if (!pTemp || !pLastSource) {
-                errmsg = "Pipeline received empty document as argument";
-                return intrusive_ptr<Pipeline>();
-            }
+            verify(pTemp && pLastSource);
             if (!pLastSource->coalesce(pTemp))
                 pSourceVector->push_back(pTemp);
         }

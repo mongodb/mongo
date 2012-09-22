@@ -34,7 +34,6 @@ namespace po = boost::program_options;
 class OplogTool : public Tool {
 public:
     OplogTool() : Tool( "oplog" ) {
-        addFieldOptions();
         add_options()
         ("seconds,s" , po::value<int>() , "seconds to go back default:86400" )
         ("from", po::value<string>() , "host to pull from" )

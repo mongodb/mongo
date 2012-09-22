@@ -21,6 +21,8 @@
 
 #include <boost/utility.hpp>
 
+#include "mongo/platform/windows_basic.h"
+
 namespace mongo {
 
     /**

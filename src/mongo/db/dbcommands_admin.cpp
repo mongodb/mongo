@@ -332,13 +332,13 @@ namespace mongo {
                                     break;
                                 }
 
-                                if ( loc.a() <= 0 || strstr(ns, "hudsonSmall") == 0 ) {
-                                    string err (str::stream() << "bad deleted loc: " << loc.toString() << " bucket:" << i << " k:" << k);
-                                    errors << err;
-
-                                    valid = false;
-                                    break;
-                                }
+                                string err( str::stream() << "bad pointer in deleted record list: "
+                                                          << loc.toString()
+                                                          << " bucket: " << i
+                                                          << " k: " << k );
+                                errors << err;
+                                valid = false;
+                                break;
                             }
 
                             DeletedRecord *d = loc.drec();

@@ -147,7 +147,7 @@ namespace mongo {
 
     NOINLINE_DECL void msgasserted(int msgid, const char *msg) {
         assertionCount.condrollover( ++assertionCount.warning );
-        tlog() << "Assertion: " << msgid << ":" << msg << endl;
+        log() << "Assertion: " << msgid << ":" << msg << endl;
         setLastError(msgid,msg && *msg ? msg : "massert failure");
         //breakpoint();
         logContext();
@@ -161,7 +161,7 @@ namespace mongo {
         throw MsgAssertionException(msgid, msg);
     }
 
-    NOINLINE_DECL void streamNotGood( int code , string msg , std::ios& myios ) {
+    NOINLINE_DECL void streamNotGood( int code , const std::string& msg , std::ios& myios ) {
         stringstream ss;
         // errno might not work on all systems for streams
         // if it doesn't for a system should deal with here

@@ -33,6 +33,13 @@ namespace mongo {
 
     class RegexMatcher {
     public:
+        /**
+         * Maximum pattern size which pcre v8.3 can do matches correctly with
+         * LINK_SIZE define macro set to 2 @ pcre's config.h (based on
+         * experiments)
+         */
+        static const size_t MaxPatternSize = 32764;
+
         const char *_fieldName;
         const char *_regex;
         const char *_flags;

@@ -44,7 +44,7 @@ namespace mongo {
     /* Create. Must not exist.
     @param zero fill file with zeros when true
     */
-    void* MemoryMappedFile::create(string filename, unsigned long long len, bool zero) {
+    void* MemoryMappedFile::create(const std::string& filename, unsigned long long len, bool zero) {
         uassert( 13468, string("can't create file already exists ") + filename, ! boost::filesystem::exists(filename) );
         void *p = map(filename.c_str(), len);
         if( p && zero ) {
@@ -190,7 +190,7 @@ namespace mongo {
         mmfiles.insert(this);
     }
 
-    void MongoFile::setFilename(string fn) {
+    void MongoFile::setFilename(const std::string& fn) {
         LockMongoFilesExclusive lk;
         verify( _filename.empty() );
         _filename = fn;

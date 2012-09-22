@@ -127,12 +127,30 @@ namespace mongo {
             if( v > cmdObj["v"].Int() )
                 result << "config" << theReplSet->config().asBson();
 
+            Member *from = theReplSet->findByName(cmdObj.getStringField("from"));
+            if (!from) {
+                return true;
+            }
+
+            // if we thought that this node is down, let it know
+            if (!from->hbinfo().up()) {
+                result.append("stateDisagreement", true);
+            }
+
+            // note that we got a heartbeat from this node
+            from->get_hbinfo().recvHeartbeat();
+
             return true;
         }
     } cmdReplSetHeartbeat;
 
-    bool requestHeartbeat(string setName, string from, string memberFullName, BSONObj& result,
-                          int myCfgVersion, int& theirCfgVersion, bool checkEmpty) {
+    bool requestHeartbeat(const std::string& setName,
+                          const std::string& from,
+                          const std::string& memberFullName,
+                          BSONObj& result,
+                          int myCfgVersion,
+                          int& theirCfgVersion,
+                          bool checkEmpty) {
         if( replSetBlind ) {
             return false;
         }
@@ -189,7 +207,13 @@ namespace mongo {
         const int threshold;
     public:
         ReplSetHealthPollTask(const HostAndPort& hh, const HeartbeatInfo& mm)
-            : h(hh), m(mm), tries(s_try_offset), threshold(15) {
+            : h(hh), m(mm), tries(s_try_offset), threshold(15),
+              _timeout(ReplSetConfig::DEFAULT_HB_TIMEOUT) {
+
+            if (theReplSet) {
+                _timeout = theReplSet->config().getHeartbeatTimeout();
+            }
+
             // doesn't need protection, all health tasks are created in a single thread
             s_try_offset += 7;
         }
@@ -253,23 +277,64 @@ namespace mongo {
         }
 
     private:
+        bool tryHeartbeat(BSONObj* info, int* theirConfigVersion) {
+            bool ok = false;
+
+            try {
+                ok = requestHeartbeat(theReplSet->name(), theReplSet->selfFullName(),
+                                      h.toString(), *info, theReplSet->config().version,
+                                      *theirConfigVersion);
+            }
+            catch (DBException&) {
+                // don't do anything, ok is already false
+            }
+
+            return ok;
+        }
+
         bool _requestHeartbeat(HeartbeatInfo& mem, BSONObj& info, int& theirConfigVersion) {
-            if (tries++ % threshold == (threshold - 1)) {
+            {
                 ScopedConn conn(h.toString());
-                conn.reconnect();
+                conn.setTimeout(_timeout);
+                if (tries++ % threshold == (threshold - 1)) {
+                    conn.reconnect();
+                }
             }
 
             Timer timer;
             time_t before = curTimeMicros64() / 1000000;
 
-            bool ok = requestHeartbeat(theReplSet->name(), theReplSet->selfFullName(),
-                                       h.toString(), info, theReplSet->config().version, theirConfigVersion);
+            bool ok = tryHeartbeat(&info, &theirConfigVersion);
 
-            mem.ping = (unsigned int)timer.millis();
+            mem.ping = static_cast<unsigned int>(timer.millis());
+            time_t totalSecs = mem.ping / 1000;
+
+            // if that didn't work and we have more time, lower timeout and try again
+            if (!ok && totalSecs < _timeout) {
+                log() << "replset info " << h.toString() << " heartbeat failed, retrying" << rsLog;
+
+                // lower timeout to remaining ping time
+                {
+                    ScopedConn conn(h.toString());
+                    conn.setTimeout(_timeout - totalSecs);
+                }
+
+                int checkpoint = timer.millis();
+                timer.reset();
+                tryHeartbeat(&info, &theirConfigVersion);
+                mem.ping = static_cast<unsigned int>(timer.millis());
+                totalSecs = (checkpoint + mem.ping)/1000;
+
+                // set timeout back to default
+                {
+                    ScopedConn conn(h.toString());
+                    conn.setTimeout(_timeout);
+                }
+            }
 
             // we set this on any response - we don't get this far if
             // couldn't connect because exception is thrown
-            time_t after = mem.lastHeartbeat = before + (mem.ping / 1000);
+            time_t after = mem.lastHeartbeat = before + totalSecs;
 
             if ( info["time"].isNumber() ) {
                 long long t = info["time"].numberLong();
@@ -291,6 +356,10 @@ namespace mongo {
                     mem.hbstate = MemberState(state.Int());
             }
 
+            if (info.hasField("stateDisagreement") && info["stateDisagreement"].trueValue()) {
+                log() << "replset info " << h.toString() << " thinks that we are down" << endl;
+            }
+
             return ok;
         }
 
@@ -304,6 +373,18 @@ namespace mongo {
         }
 
         void down(HeartbeatInfo& mem, string msg) {
+            // if we've received a heartbeat from this member within the last two seconds, don't
+            // change its state to down (if it's already down, leave it down since we don't have
+            // any info about it other than it's heartbeating us)
+            if (m.lastHeartbeatRecv+2 >= time(0)) {
+                LOG(1) << "replset info " << h.toString()
+                       << " just heartbeated us, but our heartbeat failed: " << msg
+                       << ", not changing state" << rsLog;
+                // we don't update any of the heartbeat info, though, since we didn't get any info
+                // other than "not down" from having it heartbeat us
+                return;
+            }
+
             mem.authIssue = false;
             mem.health = 0.0;
             mem.ping = 0;
@@ -362,7 +443,14 @@ namespace mongo {
                 theReplSet->mgr->send(f);
             }
         }
+
+        // Heartbeat timeout
+        time_t _timeout;
     };
+
+    void HeartbeatInfo::recvHeartbeat() {
+        lastHeartbeatRecv = time(0);
+    }
 
     int ReplSetHealthPollTask::s_try_offset = 0;
 

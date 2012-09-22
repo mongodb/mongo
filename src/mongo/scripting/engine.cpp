@@ -158,7 +158,7 @@ namespace mongo {
     }
 
     void Scope::validateObjectIdString( const string &str ) {
-        massert( 10448 , "invalid object id: length", str.size() == 24 );
+        uassert( 10448 , "invalid object id: length", str.size() == 24 );
 
         for ( string::size_type i=0; i<str.size(); i++ ) {
             char c = str[i];
@@ -167,7 +167,7 @@ namespace mongo {
                     ( c >= 'A' && c <= 'F' ) ) {
                 continue;
             }
-            massert( 10430 ,  "invalid object id: not hex", false );
+            uassert( 10430 ,  "invalid object id: not hex", false );
         }
     }
 
@@ -342,7 +342,7 @@ namespace mongo {
 
     class PooledScope : public Scope {
     public:
-        PooledScope( const string pool , Scope * real ) : _pool( pool ) , _real( real ) {
+        PooledScope( const std::string& pool , Scope * real ) : _pool( pool ) , _real( real ) {
             _real->loadStored( true );
         };
         virtual ~PooledScope() {

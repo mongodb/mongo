@@ -152,7 +152,7 @@ namespace mongo {
         DBClientBase* _finishCreate( const string& ident , double socketTimeout, DBClientBase* conn );
         
         struct PoolKey {
-            PoolKey( string i , double t ) : ident( i ) , timeout( t ) {}
+            PoolKey( const std::string& i , double t ) : ident( i ) , timeout( t ) {}
             string ident;
             double timeout;
         };

@@ -625,7 +625,7 @@ namespace mongo {
           @param pAccumulatorFactory used to create the accumulator for the
                 group field
          */
-        void addAccumulator(string fieldName,
+        void addAccumulator(const std::string& fieldName,
                             intrusive_ptr<Accumulator> (*pAccumulatorFactory)(
                             const intrusive_ptr<ExpressionContext> &),
                             const intrusive_ptr<Expression> &pExpression);

@@ -36,7 +36,8 @@ namespace mongo {
     // from d_migrate.cpp
     void logOpForSharding( const char * opstr , const char * ns , const BSONObj& obj , BSONObj * patt );
 
-    int __findingStartInitialTimeout = 5; // configurable for testing
+    // Configurable for testing.
+    int FindingStartCursor::_initialTimeout = 5;
 
     // cached copies of these...so don't rename them, drop them, etc.!!!
     static NamespaceDetails *localOplogMainDetails = 0;
@@ -367,13 +368,13 @@ namespace mongo {
             sz = (double)cmdLine.oplogSize;
         else {
             /* not specified. pick a default size */
-            sz = 50.0 * 1000 * 1000;
+            sz = 50.0 * 1024 * 1024;
             if ( sizeof(int *) >= 8 ) {
 #if defined(__APPLE__)
                 // typically these are desktops (dev machines), so keep it smallish
-                sz = (256-64) * 1000 * 1000;
+                sz = (256-64) * 1024 * 1024;
 #else
-                sz = 990.0 * 1000 * 1000;
+                sz = 990.0 * 1024 * 1024;
                 boost::intmax_t free = File::freeSpace(dbpath); //-1 if call not supported.
                 double fivePct = free * 0.05;
                 if ( fivePct > sz )
@@ -432,7 +433,7 @@ namespace mongo {
                 }
                 _findingStartCursor->advance();
                 RARELY {
-                    if ( _findingStartTimer.seconds() >= __findingStartInitialTimeout ) {
+                    if ( _findingStartTimer.seconds() >= _initialTimeout ) {
                         // If we've scanned enough, switch to find extent mode.
                         createClientCursor( extentFirstLoc( _findingStartCursor->currLoc() ) );
                         _findingStartMode = FindExtent;
@@ -486,33 +487,40 @@ namespace mongo {
         return _qp.nsd()->capFirstNewRecord;
     }
     
-    void wassertExtentNonempty( const Extent *e ) {
-        // TODO ensure this requirement is clearly enforced, or fix.
-        wassert( !e->firstRecord.isNull() );
-    }
-    
-    DiskLoc FindingStartCursor::prevExtentFirstLoc( const DiskLoc &rec ) {
+    DiskLoc FindingStartCursor::prevExtentFirstLoc( const DiskLoc& rec ) const {
         Extent *e = rec.rec()->myExtent( rec );
         if ( _qp.nsd()->capLooped() ) {
-            if ( e->xprev.isNull() ) {
-                e = _qp.nsd()->lastExtent.ext();
-            }
-            else {
-                e = e->xprev.ext();
-            }
-            if ( e->myLoc != _qp.nsd()->capExtent ) {
-                wassertExtentNonempty( e );
-                return e->firstRecord;
+            while( true ) {
+                // Advance e to preceding extent (looping to lastExtent if necessary).
+                if ( e->xprev.isNull() ) {
+                    e = _qp.nsd()->lastExtent.ext();
+                }
+                else {
+                    e = e->xprev.ext();
+                }
+                if ( e->myLoc == _qp.nsd()->capExtent ) {
+                    // Reached the extent containing the oldest data in the collection.
+                    return DiskLoc();
+                }
+                if ( !e->firstRecord.isNull() ) {
+                    // Return the first record of the first non empty extent encountered.
+                    return e->firstRecord;
+                }
             }
         }
         else {
-            if ( !e->xprev.isNull() ) {
+            while( true ) {
+                if ( e->xprev.isNull() ) {
+                    // Reached the beginning of the collection.
+                    return DiskLoc();
+                }
                 e = e->xprev.ext();
-                wassertExtentNonempty( e );
-                return e->firstRecord;
+                if ( !e->firstRecord.isNull() ) {
+                    // Return the first record of the first non empty extent encountered.
+                    return e->firstRecord;
+                }
             }
         }
-        return DiskLoc(); // reached beginning of collection
     }
     
     void FindingStartCursor::createClientCursor( const DiskLoc &startLoc ) {

@@ -63,6 +63,8 @@ namespace mongo {
 
         virtual ~MessagingPort();
 
+        void setSocketTimeout(double timeout);
+
         void shutdown();
 
         /* it's assumed if you reuse a message object, that it doesn't cross MessagingPort's.

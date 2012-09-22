@@ -46,7 +46,7 @@ namespace mongo {
          */
         bool hit( int n = 1 );
 
-        void setUnits( std::string units ) { _units = units; }
+        void setUnits( const std::string& units ) { _units = units; }
         std::string getUnit() const { return _units; }
 
         void setTotalWhileRunning( unsigned long long total ) {

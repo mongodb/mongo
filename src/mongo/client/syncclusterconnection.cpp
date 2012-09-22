@@ -42,19 +42,19 @@ namespace mongo {
             _connect( i->toString() );
     }
 
-    SyncClusterConnection::SyncClusterConnection( string commaSeperated, double socketTimeout)  : _mutex("SyncClusterConnection"), _socketTimeout( socketTimeout ) {
-        _address = commaSeperated;
+    SyncClusterConnection::SyncClusterConnection( string commaSeparated, double socketTimeout)  : _mutex("SyncClusterConnection"), _socketTimeout( socketTimeout ) {
+        _address = commaSeparated;
         string::size_type idx;
-        while ( ( idx = commaSeperated.find( ',' ) ) != string::npos ) {
-            string h = commaSeperated.substr( 0 , idx );
-            commaSeperated = commaSeperated.substr( idx + 1 );
+        while ( ( idx = commaSeparated.find( ',' ) ) != string::npos ) {
+            string h = commaSeparated.substr( 0 , idx );
+            commaSeparated = commaSeparated.substr( idx + 1 );
             _connect( h );
         }
-        _connect( commaSeperated );
+        _connect( commaSeparated );
         uassert( 8004 ,  "SyncClusterConnection needs 3 servers" , _conns.size() == 3 );
     }
 
-    SyncClusterConnection::SyncClusterConnection( string a , string b , string c, double socketTimeout)  : _mutex("SyncClusterConnection"), _socketTimeout( socketTimeout ) {
+    SyncClusterConnection::SyncClusterConnection( const std::string& a , const std::string& b , const std::string& c, double socketTimeout)  : _mutex("SyncClusterConnection"), _socketTimeout( socketTimeout ) {
         _address = a + "," + b + "," + c;
         // connect to all even if not working
         _connect( a );
@@ -146,7 +146,7 @@ namespace mongo {
         return DBClientBase::getLastErrorDetailed(fsync,j,w,wtimeout);
     }
 
-    void SyncClusterConnection::_connect( string host ) {
+    void SyncClusterConnection::_connect( const std::string& host ) {
         log() << "SyncClusterConnection connecting to [" << host << "]" << endl;
         DBClientConnection * c = new DBClientConnection( true );
         c->setSoTimeout( _socketTimeout );

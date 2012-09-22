@@ -995,6 +995,10 @@ namespace mongo {
             if ( str::equals( matchFieldName, "$where" ) ) {
                 return;
             }
+
+            if ( str::equals( matchFieldName, "$atomic" ) ) {
+                return;
+            }
         }
         
         bool equality =

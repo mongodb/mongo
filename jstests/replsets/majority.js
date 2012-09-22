@@ -42,7 +42,10 @@ replTest.stop(5);
 replTest.remove(5);
 
 print("should still be able to write to a majority");
-assert.eq(testInsert().err, null);
+var result = testInsert();
+assert.eq(result.err, null);
+// majority should be primary + 2 secondaries
+assert.eq(result.replicatedTo.length, 2);
 
 print("start up some of the arbiters again");
 replTest.restart(3);
@@ -71,7 +74,9 @@ testInsert();
 replTest.awaitReplication();
 
 print("makes sure majority works");
-assert.eq(testInsert().err, null);
+result = testInsert();
+assert.eq(result.err, null);
+assert.eq(result.replicatedTo.length, 2);
 
 print("setup: 0,1 | 2,3,4");
 replTest.partition(0,2);
@@ -84,7 +89,9 @@ replTest.partition(1,4);
 print("make sure majority doesn't work");
 // primary should now be 2
 master = replTest.getMaster();
-assert.eq(testInsert().err, "timeout");
+result = testInsert();
+assert.eq(result.err, "timeout");
+assert.eq(result.replicatedTo.length, 1);
 
 print("bring set back together");
 replTest.unPartition(0,2);
@@ -94,7 +101,9 @@ replTest.unPartition(1,4);
 master = replTest.getMaster();
 
 print("make sure majority works");
-assert.eq(testInsert().err, null);
+result = testInsert();
+assert.eq(result.err, null);
+assert.eq(result.replicatedTo.length, 2);
 
 replTest.stopSet();
 }

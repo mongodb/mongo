@@ -194,6 +194,9 @@ namespace mongo {
                 _myregex->push_back( RegexMatcher() );
                 RegexMatcher &rm = _myregex->back();
                 rm._re.reset( new pcrecpp::RE( ie.regex(), flags2options( ie.regexFlags() ) ) );
+                uassert(16431, "Regular expression is too long",
+                        rm._re->pattern().size() <= RegexMatcher::MaxPatternSize);
+
                 rm._fieldName = 0; // no need for field name
                 rm._regex = ie.regex();
                 rm._flags = ie.regexFlags();
@@ -261,6 +264,9 @@ namespace mongo {
 
         RegexMatcher rm;
         rm._re.reset( new pcrecpp::RE(regex, flags2options(flags)) );
+        uassert(16432, "Regular expression is too long",
+                rm._re->pattern().size() <= RegexMatcher::MaxPatternSize);
+
         rm._fieldName = fieldName;
         rm._regex = regex;
         rm._flags = flags;

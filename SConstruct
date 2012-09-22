@@ -555,12 +555,12 @@ elif "win32" == os.sys.platform:
         env.Append( CPPDEFINES=[ "MONGO_USE_SRW_ON_WINDOWS" ] )
 
     for pathdir in env['ENV']['PATH'].split(os.pathsep):
-	if os.path.exists(os.path.join(pathdir, 'cl.exe')):
+        if os.path.exists(os.path.join(pathdir, 'cl.exe')):
             print( "found visual studio at " + pathdir )
-	    break
+            break
     else:
-	#use current environment
-	env['ENV'] = dict(os.environ)
+        #use current environment
+        env['ENV'] = dict(os.environ)
 
     env.Append( CPPDEFINES=[ "_UNICODE" ] )
     env.Append( CPPDEFINES=[ "UNICODE" ] )
@@ -861,7 +861,7 @@ def doConfigure(myenv):
 
     # discover modules (subdirectories of db/modules/), and
     # load the (python) module for each module's build.py
-    modules = moduleconfig.discover_modules('.')
+    modules = moduleconfig.discover_modules('src/mongo/')
 
     # ask each module to configure itself, and return a
     # dictionary of name => list_of_sources for each module.
@@ -927,7 +927,6 @@ env.Alias( "style" , [] , [ doStyling ] )
 env.AlwaysBuild( "style" )
 
 
-
 #  ----  INSTALL -------
 
 def getSystemInstallName():
@@ -936,19 +935,21 @@ def getSystemInstallName():
         n += "-static"
     if has_option("nostrip"):
         n += "-debugsymbols"
-    if nix and os.uname()[2].startswith( "8." ):
+    if nix and os.uname()[2].startswith("8."):
         n += "-tiger"
+
+    if len(env.get("MONGO_MODULES", None)):
+            n += "-" + "-".join(env["MONGO_MODULES"].keys())
 
     try:
         findSettingsSetup()
         import settings
-        if "distmod" in dir( settings ):
-            n = n + "-" + str( settings.distmod )
+        if "distmod" in dir(settings):
+            n = n + "-" + str(settings.distmod)
     except:
         pass
 
-
-    dn = GetOption( "distmod" )
+    dn = GetOption("distmod")
     if dn and len(dn) > 0:
         n = n + "-" + dn
 

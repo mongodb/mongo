@@ -94,7 +94,7 @@ namespace mongo {
             return LabeledLevel( _label + string("::") + label, _level );
         }
 
-        LabeledLevel operator+( string& label ) const {
+        LabeledLevel operator+( const std::string& label ) const {
             return LabeledLevel( _label + string("::") + label, _level );
         }
 

@@ -1625,7 +1625,7 @@ namespace mongo {
         }
     }
 
-    void dropDatabase(string db) {
+    void dropDatabase(const std::string& db) {
         log(1) << "dropDatabase " << db << endl;
         Lock::assertWriteLocked(db);
         Database *d = cc().database();

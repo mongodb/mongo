@@ -48,7 +48,7 @@ namespace mongo {
     class Cursor;
     class OpDebug;
 
-    void dropDatabase(string db);
+    void dropDatabase(const std::string& db);
     bool repairDatabase(string db, string &errmsg, bool preserveClonedFilesOnFailure = false, bool backupOriginalFiles = false);
 
     /* low level - only drops this ns */

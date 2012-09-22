@@ -218,7 +218,7 @@ namespace mongo {
     	    return *this;
     	}
 
-        dist_lock_try( DistributedLock * lock , string why )
+        dist_lock_try( DistributedLock * lock , const std::string& why )
             : _lock(lock), _why(why) {
             _got = _lock->lock_try( why , false , &_other );
         }

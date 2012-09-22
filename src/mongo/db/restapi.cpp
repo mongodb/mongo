@@ -49,7 +49,7 @@ namespace mongo {
                 url.find_last_of( '/' ) > 0;
         }
 
-        virtual void handle( const char *rq, string url, BSONObj params,
+        virtual void handle( const char *rq, const std::string& url, BSONObj params,
                              string& responseMsg, int& responseCode,
                              vector<string>& headers,  const SockAddr &from ) {
 
@@ -110,7 +110,11 @@ namespace mongo {
             responseMsg = ss.str();
         }
 
-        bool handleRESTQuery( string ns , string action , BSONObj & params , int & responseCode , stringstream & out ) {
+        bool handleRESTQuery( const std::string& ns,
+                              const std::string& action,
+                              BSONObj & params,
+                              int & responseCode,
+                              stringstream & out ) {
             Timer t;
 
             int html = _getOption( params["html"] , 0 );
@@ -208,7 +212,11 @@ namespace mongo {
         }
 
         // TODO Generate id and revision per couch POST spec
-        void handlePost( string ns, const char *body, BSONObj& params, int & responseCode, stringstream & out ) {
+        void handlePost( const std::string& ns,
+                         const char *body,
+                         BSONObj& params,
+                         int & responseCode,
+                         stringstream & out ) {
             try {
                 BSONObj obj = fromjson( body );
                 db.insert( ns.c_str(), obj );

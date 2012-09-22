@@ -78,7 +78,7 @@ namespace mongo {
         public:
             FileCreatedOp(BufReader& log);
             /** param f filename to create with path */
-            FileCreatedOp(string f, unsigned long long l);
+            FileCreatedOp(const std::string& f, unsigned long long l);
             virtual void replay();
             virtual string toString();
             virtual bool needFilesClosed();
@@ -93,7 +93,7 @@ namespace mongo {
         class DropDbOp : public DurOp {
         public:
             DropDbOp(BufReader& log);
-            DropDbOp(string db) :
+            DropDbOp(const std::string& db) :
                 DurOp(JEntry::OpCode_DropDb), _db(db) { }
             virtual void replay();
             virtual string toString() { return string("DropDbOp ") + _db; }

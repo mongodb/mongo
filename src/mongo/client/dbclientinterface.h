@@ -1123,7 +1123,7 @@ namespace mongo {
         virtual void checkResponse( const char *data, int nReturned, bool* retry = NULL, string* host = NULL );
         virtual bool call( Message &toSend, Message &response, bool assertOk = true , string * actualServer = 0 );
         virtual ConnectionString::ConnectionType type() const { return ConnectionString::MASTER; }
-        void setSoTimeout(double to) { _so_timeout = to; }
+        void setSoTimeout(double timeout);
         double getSoTimeout() const { return _so_timeout; }
 
         virtual bool lazySupported() const { return true; }
@@ -1131,10 +1131,10 @@ namespace mongo {
         static int getNumConnections() {
             return _numConnections;
         }
-        
+
         static void setLazyKillCursor( bool lazy ) { _lazyKillCursor = lazy; }
         static bool getLazyKillCursor() { return _lazyKillCursor; }
-        
+
     protected:
         friend class SyncClusterConnection;
         virtual void sayPiggyBack( Message &toSend );

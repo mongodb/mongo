@@ -37,7 +37,7 @@ namespace mongo {
 
         AtomicUInt Config::JOB_NUMBER;
 
-        JSFunction::JSFunction( string type , const BSONElement& e ) {
+        JSFunction::JSFunction( const std::string& type , const BSONElement& e ) {
             _type = type;
             _code = e._asCode();
 
@@ -1307,7 +1307,8 @@ namespace mongo {
 
                     // reduce from each shard for a chunk
                     BSONObj sortKey = BSON( "_id" << 1 );
-                    ParallelSortClusteredCursor cursor( servers , inputNS , Query( query ).sort( sortKey ) );
+                    ParallelSortClusteredCursor cursor(servers, inputNS,
+                            Query(query).sort(sortKey), QueryOption_NoCursorTimeout);
                     cursor.init();
                     int chunkSize = 0;
 

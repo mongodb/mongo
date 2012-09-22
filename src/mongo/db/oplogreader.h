@@ -34,7 +34,7 @@ namespace mongo {
         }
 
         /* ok to call if already connected */
-        bool connect(string hostname);
+        bool connect(const std::string& hostname);
 
         bool connect(const BSONObj& rid, const int from, const string& to);
 

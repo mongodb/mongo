@@ -82,7 +82,7 @@ namespace mongo {
             _deleteDataFiles(_db.c_str());
         }
 
-        FileCreatedOp::FileCreatedOp(string f, unsigned long long l) :
+        FileCreatedOp::FileCreatedOp(const std::string& f, unsigned long long l) :
             DurOp(JEntry::OpCode_FileCreated) {
             _p = RelativePath::fromFullPath(f);
             _len = l;

@@ -243,7 +243,7 @@ void setupSignals() {
     set_terminate( myterminate );
 }
 
-string fixHost( string url , string host , string port ) {
+string fixHost( const std::string& url, const std::string& host, const std::string& port ) {
     //cout << "fixHost url: " << url << " host: " << host << " port: " << port << endl;
 
     if ( host.size() == 0 && port.size() == 0 ) {
@@ -264,10 +264,7 @@ string fixHost( string url , string host , string port ) {
         ::_exit(-1);
     }
 
-    if ( host.size() == 0 )
-        host = "127.0.0.1";
-
-    string newurl = host;
+    string newurl( ( host.size() == 0 ) ? "127.0.0.1" : host );
     if ( port.size() > 0 )
         newurl += ":" + port;
     else if ( host.find(':') == string::npos ) {
@@ -288,14 +285,14 @@ bool isOpSymbol( char c ) {
     return false;
 }
 
-bool isUseCmd( string code ) {
+bool isUseCmd( const std::string& code ) {
     string cmd = code;
     if ( cmd.find( " " ) > 0 )
         cmd = cmd.substr( 0 , cmd.find( " " ) );
     return cmd == "use";
 }
 
-bool isBalanced( string code ) {
+bool isBalanced( const std::string& code ) {
     if (isUseCmd( code ))
         return true;  // don't balance "use <dbname>" in case dbname contains special chars
     int curlyBrackets = 0;

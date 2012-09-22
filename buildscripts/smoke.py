@@ -67,6 +67,7 @@ mongod_port = None
 shell_executable = None
 continue_on_failure = None
 file_of_commands_mode = False
+start_mongod = True
 
 tests = []
 winners = []
@@ -325,20 +326,29 @@ def ternary( b , l="true", r="false" ):
 # Blech.
 def skipTest(path):
     basename = os.path.basename(path)
-    parentDir = os.path.basename(os.path.dirname(path))
+    parentPath = os.path.dirname(path)
+    parentDir = os.path.basename(parentPath)
     if small_oplog: # For tests running in parallel
         if basename in ["cursor8.js", "indexh.js", "dropdb.js"]:
             return True
     if auth or keyFile: # For tests running with auth
         # Skip any tests that run with auth explicitly
-        if parentDir == "auth" or "auth" in basename or parentDir == "tool": # SERVER-6368
+        if parentDir == "auth" or "auth" in basename:
             return True
         # These tests don't pass with authentication due to limitations of the test infrastructure,
         # not due to actual bugs.
+        if parentDir == "tool": # SERVER-6368
+            return True
+        if parentPath == mongo_repo: # Skip client tests
+            return True
+        # SERVER-6388
         if os.path.join(parentDir,basename) in ["sharding/sync3.js", "sharding/sync6.js", "sharding/parallel.js", "jstests/bench_test1.js", "jstests/bench_test2.js", "jstests/bench_test3.js"]:
             return True
+        # SERVER-6972
+        if os.path.join(parentDir,basename) == "sharding/read_pref_rs_client.js":
+            return True
         # These tests fail due to bugs
-        if os.path.join(parentDir,basename) in ["sharding/sync_conn_cmd.js"]:
+        if os.path.join(parentDir,basename) in ["sharding/sync_conn_cmd.js"]: # SERVER-6327
             return True
 
     return False
@@ -441,10 +451,11 @@ def runTest(test):
     if r != 0:
         raise TestExitFailure(path, r)
     
-    try:
-        c = Connection( "127.0.0.1" , int(mongod_port) )
-    except Exception,e:
-        raise TestServerFailure(path)
+    if start_mongod:
+        try:
+            c = Connection( "127.0.0.1" , int(mongod_port) )
+        except Exception,e:
+            raise TestServerFailure(path)
 
     print ""
 
@@ -457,7 +468,10 @@ def run_tests(tests):
     # The reason we want to use "with" is so that we get __exit__ semantics
     # but "with" is only supported on Python 2.5+
 
-    master = mongod(small_oplog_rs=small_oplog_rs,small_oplog=small_oplog,no_journal=no_journal,no_preallocj=no_preallocj,auth=auth).__enter__()
+    if start_mongod:
+        master = mongod(small_oplog_rs=small_oplog_rs,small_oplog=small_oplog,no_journal=no_journal,no_preallocj=no_preallocj,auth=auth).__enter__()
+    else:
+        master = Nothing()
     try:
         if small_oplog:
             slave = mongod(slave=True).__enter__()
@@ -628,8 +642,9 @@ def add_exe(e):
     return e
 
 def set_globals(options, tests):
-    global mongod_executable, mongod_port, shell_executable, continue_on_failure, small_oplog, small_oplog_rs, no_journal, no_preallocj, auth, keyFile, smoke_db_prefix, test_path
+    global mongod_executable, mongod_port, shell_executable, continue_on_failure, small_oplog, small_oplog_rs, no_journal, no_preallocj, auth, keyFile, smoke_db_prefix, test_path, start_mongod
     global file_of_commands_mode
+    start_mongod = options.start_mongod
     #Careful, this can be called multiple times
     test_path = options.test_path
 
@@ -789,6 +804,8 @@ def main():
     parser.add_option('--with-cleanbb', dest='with_cleanbb', default=False,
                       action="store_true",
                       help='Clear database files from previous smoke.py runs')
+    parser.add_option(
+        '--dont-start-mongod', dest='start_mongod', default=True, action='store_false')
 
     # Buildlogger invocation from command line
     parser.add_option('--buildlogger-builder', dest='buildlogger_builder', default=None,

@@ -52,8 +52,9 @@ var s6045p4 = db.runCommand({aggregate:"aggtype", pipeline: [
                            ]});
 // Expected result
 var a6045 = {
-	"errmsg" : "Pipeline received empty document as argument",
-	"ok" : 0
+    "errmsg" : "exception: A pipeline stage specification object must contain exactly one field.",
+    "code" : 16435,
+    "ok" : 0
 };
 
 // Asserts

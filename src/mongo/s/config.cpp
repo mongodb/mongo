@@ -427,7 +427,7 @@ namespace mongo {
         return ci.getCM();
     }
 
-    void DBConfig::setPrimary( string s ) {
+    void DBConfig::setPrimary( const std::string& s ) {
         scoped_lock lk( _lock );
         _primary.reset( s );
         _save();
@@ -711,7 +711,7 @@ namespace mongo {
     ConfigServer::~ConfigServer() {
     }
 
-    bool ConfigServer::init( string s ) {
+    bool ConfigServer::init( const std::string& s ) {
         vector<string> configdbs;
         splitStringDelim( s, &configdbs, ',' );
         return init( configdbs );
@@ -963,7 +963,7 @@ namespace mongo {
         }
     }
 
-    string ConfigServer::getHost( string name , bool withPort ) {
+    string ConfigServer::getHost( const std::string& name , bool withPort ) {
         if ( name.find( ":" ) != string::npos ) {
             if ( withPort )
                 return name;

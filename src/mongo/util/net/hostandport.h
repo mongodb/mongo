@@ -33,10 +33,10 @@ namespace mongo {
         /** From a string hostname[:portnumber]
             Throws user assertion if bad config string or bad port #.
         */
-        HostAndPort(string s);
+        HostAndPort(const std::string& s);
 
         /** @param p port number. -1 is ok to use default. */
-        HostAndPort(string h, int p /*= -1*/) : _host(h), _port(p) { 
+        HostAndPort(const std::string& h, int p /*= -1*/) : _host(h), _port(p) { 
             verify( !str::startsWith(h, '#') );
         }
 
@@ -172,7 +172,7 @@ namespace mongo {
         }
     }
 
-    inline HostAndPort::HostAndPort(string s) {
+    inline HostAndPort::HostAndPort(const std::string& s) {
         init(s.c_str());
     }
 

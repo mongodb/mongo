@@ -661,8 +661,10 @@ printShardingStatus = function( configDB , verbose ){
                     RegExp.escape(db._id) + "\\." ) } ).
                     sort( { _id : 1 } ).forEach( function( coll ){
                         if ( coll.dropped == false ){
-                            output("\t\t" + coll._id + " chunks:");
-                            
+                            output( "\t\t" + coll._id );
+                            output( "\t\t\tshard key: " + tojson(coll.key) );
+                            output( "\t\t\tchunks:" );
+
                             res = configDB.chunks.group( { cond : { ns : coll._id } , key : { shard : 1 },
                                 reduce : function( doc , out ){ out.nChunks++; } , initial : { nChunks : 0 } } );
                             var totalChunks = 0;

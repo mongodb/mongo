@@ -72,7 +72,7 @@ namespace mongo {
             /**
              * @param type (map|reduce|finalize)
              */
-            JSFunction( string type , const BSONElement& e );
+            JSFunction( const std::string& type , const BSONElement& e );
             virtual ~JSFunction() {}
 
             virtual void init( State * state );

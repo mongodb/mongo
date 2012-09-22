@@ -112,12 +112,14 @@ assert.eq( primaryNode.name, explain.server );
 assert.eq( 1, explain.n );
 
 // Kill all members except one
+var stoppedNodes = [];
 for ( var x = 0; x < NODES - 1; x++ ){
     replTest.stop( x );
+    stoppedNodes.push( replTest.nodes[x] );
 }
 
 // Wait for ReplicaSetMonitor to realize nodes are down
-ReplSetTest.awaitRSClientHosts( conn, replTest.nodes[0], { ok: false }, replTest.name );
+ReplSetTest.awaitRSClientHosts( conn, stoppedNodes, { ok: false }, replTest.name );
 
 // Wait for the last node to be in steady state -> secondary (not recovering)
 var lastNode = replTest.nodes[NODES - 1];

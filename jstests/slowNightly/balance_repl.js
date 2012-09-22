@@ -1,7 +1,7 @@
 
 
 s = new ShardingTest( "rs1" , 2 /* numShards */, 1 /* verboseLevel */, 1 /* numMongos */, { rs : true , numReplicas : 2 , chunksize : 1 , nopreallocj : true } )
-s.config.settings.update( { _id: "balancer" }, { $set : { stopped: true, _nosleep: true, replThrottle : true } } , true );
+s.config.settings.update( { _id: "balancer" }, { $set : { stopped: true, _nosleep: true, _secondaryThrottle : true } } , true );
 
 
 db = s.getDB( "test" );

@@ -260,7 +260,7 @@ namespace mongo {
 
     // -----------------------------------
 
-    BSONObjExternalSorter::FileIterator::FileIterator( string file ) {
+    BSONObjExternalSorter::FileIterator::FileIterator( const std::string& file ) {
 #ifdef _WIN32
         _file = ::_open( file.c_str(), _O_BINARY | _O_RDWR | _O_CREAT , _S_IREAD | _S_IWRITE );
 #else

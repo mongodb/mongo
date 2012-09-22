@@ -46,7 +46,8 @@ sh.help = function() {
 
     print( "\tsh.addShardTag(shard,tag)                 adds the tag to the shard" );
     print( "\tsh.removeShardTag(shard,tag)              removes the tag from the shard" );
-    
+    print( "\tsh.addTagRange(fullName,min,max,tag)      tags the specified range of the given collection" );
+
     print( "\tsh.status()                               prints a general overview of the cluster" )
 }
 
@@ -341,8 +342,8 @@ sh.removeShardTag = function( shard, tag ) {
 
 sh.addTagRange = function( ns, min, max, tag ) {
     var config = db.getSisterDB( "config" );
-    config.tags.update( { ns : ns , min : min } , 
-                        { ns : ns , min : min , max : max , tag : tag } , 
-                        true );
+    config.tags.update( {_id: { ns : ns , min : min } } , 
+            {_id: { ns : ns , min : min }, ns : ns , min : min , max : max , tag : tag } , 
+            true );
     sh._checkLastError( config );    
 }

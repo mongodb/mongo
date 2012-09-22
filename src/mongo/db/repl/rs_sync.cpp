@@ -279,7 +279,7 @@ namespace replset {
         while( ts < minValid ) {
             OpQueue ops;
 
-            while (ops.getSize() < replBatchSizeBytes) {
+            while (ops.getSize() < replBatchLimitBytes) {
                 if (tryPopAndWaitForMore(&ops)) {
                     break;
                 }
@@ -314,22 +314,30 @@ namespace replset {
     void SyncTail::oplogApplication() {
         while( 1 ) {
             OpQueue ops;
-            time_t lastTimeChecked = time(0);
 
             verify( !Lock::isLocked() );
 
+            Timer batchTimer;
+            int lastTimeChecked = 0;
+
             // always fetch a few ops first
-            
             // tryPopAndWaitForMore returns true when we need to end a batch early
             while (!tryPopAndWaitForMore(&ops) && 
-                   (ops.getSize() < replBatchSizeBytes)) {
+                   (ops.getSize() < replBatchLimitBytes)) {
 
                 if (theReplSet->isPrimary()) {
                     return;
                 }
 
-                time_t now = time(0);
+                int now = batchTimer.seconds();
 
+                // apply replication batch limits
+                if (!ops.empty()) {
+                    if (now > replBatchLimitSeconds)
+                        break;
+                    if (ops.getDeque().size() > replBatchLimitOperations)
+                        break;
+                }
                 // occasionally check some things
                 if (ops.empty() || now > lastTimeChecked) {
                     lastTimeChecked = now;
@@ -363,7 +371,7 @@ namespace replset {
                     // on, we can get ops that are way ahead of the delay and this will
                     // make this thread sleep longer when handleSlaveDelay is called
                     // and apply ops much sooner than we like.
-                    if (opTimestampSecs > (now - slaveDelaySecs)) {
+                    if (opTimestampSecs > static_cast<unsigned int>(time(0) - slaveDelaySecs)) {
                         break;
                     }
                 }
@@ -375,10 +383,8 @@ namespace replset {
             // Set minValid to the last op to be applied in this next batch.
             // This will cause this node to go into RECOVERING state
             // if we should crash and restart before updating the oplog
-            { 
-                Client::WriteContext cx( "local" );
-                Helpers::putSingleton("local.replset.minvalid", lastOp);
-            }
+            theReplSet->setMinValid(lastOp);
+
             multiApply(ops.getDeque(), multiSyncApply);
 
             applyOpsToOplog(&ops.getDeque());
@@ -538,14 +544,14 @@ namespace replset {
             errmsg = "arbiters don't sync";
             return false;
         }
-	if (box.getState().primary()) {
-	    errmsg = "primaries don't sync";
-	    return false;
-	}
-	if (_self != NULL && host == _self->fullName()) {
-	    errmsg = "I cannot sync from myself";
-	    return false;
-	}
+        if (box.getState().primary()) {
+            errmsg = "primaries don't sync";
+            return false;
+        }
+        if (_self != NULL && host == _self->fullName()) {
+            errmsg = "I cannot sync from myself";
+            return false;
+        }
 
         // find the member we want to sync from
         Member *newTarget = 0;
@@ -766,6 +772,11 @@ namespace replset {
                     return;
                 }
                 slave->reader.ghostQueryGTE(rsoplog, last);
+                // if we lose the connection between connecting and querying, the cursor may not
+                // exist so we have to check again before using it.
+                if (!slave->reader.haveCursor()) {
+                    return;
+                }
             }
 
             LOG(1) << "replSet last: " << slave->last.toString() << " to " << last.toString() << rsLog;

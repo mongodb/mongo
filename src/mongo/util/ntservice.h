@@ -32,7 +32,7 @@ namespace mongo {
     typedef bool ( *ServiceCallback )( void );
     bool serviceParamsCheck(
             boost::program_options::variables_map& params,
-            const std::string dbpath,
+            const std::string& dbpath,
             const ntServiceDefaultStrings& defaultStrings,
             const vector<string>& disallowedOptions,
             int argc,
@@ -50,7 +50,7 @@ namespace mongo {
                 const std::wstring& serviceDesc,
                 const std::wstring& serviceUser,
                 const std::wstring& servicePassword,
-                const std::string dbpath,
+                const std::string& dbpath,
                 int argc,
                 char* argv[]
         );

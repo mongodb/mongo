@@ -208,10 +208,12 @@ dodouble:
     inline NOINLINE_DECL void BSONObj::_assertInvalid() const {
         StringBuilder ss;
         int os = objsize();
-        ss << "Invalid BSONObj size: " << os << " (0x" << toHex( &os, 4 ) << ')';
+        ss << "BSONObj size: " << os << " (0x" << toHex( &os, 4 ) << ") is invalid. "
+           << "Size must be between 0 and " << BSONObjMaxInternalSize
+           << "(" << ( BSONObjMaxInternalSize/(1024*1024) ) << "MB)";
         try {
             BSONElement e = firstElement();
-            ss << " first element: " << e.toString();
+            ss << " First element: " << e.toString();
         }
         catch ( ... ) { }
         massert( 10334 , ss.str() , 0 );
@@ -916,9 +918,9 @@ dodouble:
     }
 
     // used by jsonString()
-    inline std::string escape( std::string s , bool escape_slash=false) {
+    inline std::string escape( const std::string& s , bool escape_slash=false) {
         StringBuilder ret;
-        for ( std::string::iterator i = s.begin(); i != s.end(); ++i ) {
+        for ( std::string::const_iterator i = s.begin(); i != s.end(); ++i ) {
             switch ( *i ) {
             case '"':
                 ret << "\\\"";

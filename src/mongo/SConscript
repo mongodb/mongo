@@ -13,7 +13,8 @@ Import("usesm usev8")
 Import("installSetup")
 Import("darwin windows solaris linux nix")
 
-env.SConscript(['platform/SConscript',
+env.SConscript(['base/SConscript',
+                'platform/SConscript',
                 'unittest/SConscript'])
 
 def add_exe( v ):
@@ -42,6 +43,7 @@ env.StaticLibrary('md5', [
         ])
 
 env.StaticLibrary('bson', [
+        'util/safe_num.cpp',
         'bson/oid.cpp',
         'db/nonce.cpp',
         'db/jsobj.cpp',
@@ -50,6 +52,9 @@ env.StaticLibrary('bson', [
         'md5',
         'stringutils',
         ])
+
+env.CppUnitTest('safe_num_test', ['util/safe_num_test.cpp'],
+                LIBDEPS=['bson'])
 
 commonFiles = [ "pch.cpp",
                 "buildinfo.cpp",
@@ -440,11 +445,22 @@ if has_option( "sharedclient" ):
 
 # dbtests test binary
 env.StaticLibrary('testframework', ['dbtests/framework.cpp'], LIBDEPS=['unittest/unittest'])
+env.StaticLibrary('mocklib', [f for f in Glob( "dbtests/mock/*.cpp" )],
+  LIBDEPS=['unittest/unittest', 'mongocommon'])
 
 test = testEnv.Install(
     '#/',
-    testEnv.Program( "test", [ f for f in Glob( "dbtests/*.cpp" ) if not str( f ).endswith( 'framework.cpp' ) ],
-                     LIBDEPS=["mongocommon", "serveronly", "coreserver", "coredb", "testframework", "gridfs", "notmongodormongos" ] ) )
+    testEnv.Program("test",
+                    [ f for f in Glob("dbtests/*.cpp") if not str(f).endswith('framework.cpp') ],
+                    LIBDEPS = [
+                       "mongocommon",
+                       "serveronly",
+                       "coreserver",
+                       "coredb",
+                       "testframework",
+                       "gridfs",
+                       "notmongodormongos",
+                       "mocklib"]))
 
 if len(testEnv.subst('$PROGSUFFIX')):
     testEnv.Alias( "test", "#/${PROGPREFIX}test${PROGSUFFIX}" )
