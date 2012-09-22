@@ -198,13 +198,18 @@ __wt_cell_pack_data(WT_CELL *cell, uint64_t rle, uint32_t size)
  *	Write a copy value cell.
  */
 static inline uint32_t
-__wt_cell_pack_copy(WT_CELL *cell, uint64_t v)
+__wt_cell_pack_copy(WT_CELL *cell, uint64_t rle, uint64_t v)
 {
 	uint8_t *p;
 
 	p = cell->__chunk + 1;
-						/* Type + copy offset */
-	cell->__chunk[0] = WT_CELL_VALUE_COPY | WT_CELL_64V;
+
+	if (rle < 2)				/* Type + copy offset */
+		cell->__chunk[0] = WT_CELL_VALUE_COPY;
+	else {					/* Type + RLE + copy offset */
+		cell->__chunk[0] = WT_CELL_VALUE_COPY | WT_CELL_64V;
+		(void)__wt_vpack_uint(&p, 0, rle);
+	}
 	(void)__wt_vpack_uint(&p, 0, v);
 
 	return (WT_PTRDIFF32(p, cell));
@@ -371,6 +376,7 @@ __wt_cell_unpack_safe(WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
 	uint64_t v;
 	const uint8_t *p;
 	uint32_t saved_len;
+	uint64_t saved_v;
 
 	/*
 	 * The verification code specifies an end argument, a pointer to 1 past
@@ -464,15 +470,21 @@ __wt_cell_unpack_safe(WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
 	switch (unpack->raw) {
 	case WT_CELL_VALUE_COPY:
 		/*
-		 * The cell's value is an offset to a cell written earlier in
-		 * the page.  Save and restore the length of this cell, we need
-		 * it to step through the set of cells on the page.
+		 * The cell is followed by an offset to a cell written earlier
+		 * in the page.  Save/restore the length and RLE of this cell,
+		 * we need the length to step through the set of cells on the
+		 * page and this RLE is probably different from the RLE of the
+		 * earlier cell.
 		 */
+		WT_RET(__wt_vunpack_uint(
+		    &p, end == NULL ? 0 : (size_t)(end - p), &v));
 		saved_len = WT_PTRDIFF32(p, cell);
-		cell = (WT_CELL *)((uint8_t *)cell - unpack->v);
+		saved_v = unpack->v;
+		cell = (WT_CELL *)((uint8_t *)cell - v);
 		ret = __wt_cell_unpack_safe(cell, unpack, end);
 		unpack->raw = WT_CELL_VALUE_COPY;
 		unpack->__len = saved_len;
+		unpack->v = saved_v;
 		return (ret);
 
 	case WT_CELL_KEY_OVFL:

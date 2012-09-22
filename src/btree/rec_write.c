@@ -744,7 +744,7 @@ __rec_dict_copy_incr(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_KV *kv)
 		else {
 			offset = WT_PTRDIFF32(r->first_free, dp->cell);
 			kv->len = kv->cell_len =
-			   __wt_cell_pack_copy(&kv->cell, offset);
+			   __wt_cell_pack_copy(&kv->cell, 0, offset);
 			kv->buf.data = NULL;
 			kv->buf.size = 0;
 		}
