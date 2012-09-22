@@ -32,6 +32,7 @@ using namespace mongo;
 using namespace bson;
 
 int dummy;
+unsigned recSizeKB;
 LogFile *lf = 0;
 MemoryMappedFile *mmfFile;
 char *mmf = 0;
@@ -75,29 +76,38 @@ unsigned long long rrand() {
 void workerThread() {
     bool r = options["r"].trueValue();
     bool w = options["w"].trueValue();
-    //cout << "read:" << r << " write:" << w << endl;
+    cout << "read:" << r << " write:" << w << endl;
     long long su = options["sleepMicros"].numberLong();
     Aligned a;
     while( 1 ) { 
         unsigned long long rofs = (rrand() * PG) % len;
         unsigned long long wofs = (rrand() * PG) % len;
+        const unsigned P = PG/1024;
         if( mmf ) { 
             if( r ) {
-                dummy += mmf[rofs];
+                for( unsigned p = P; p <= recSizeKB; p += P ) {
+                    if( rofs < len ) 
+                        dummy += mmf[rofs];
+                    rofs += PG;
+                }
                 iops++;
             }
             if( w ) {
-                mmf[wofs] = 3;
+                for( unsigned p = P; p <= recSizeKB; p += P ) {
+                    if( rofs < len ) 
+                        mmf[wofs] = 3;
+                    wofs += PG;
+                }
                 iops++;
             }
         }
         else {
             if( r ) {
-                lf->readAt(rofs, a.addr(), PG);
+                lf->readAt(rofs, a.addr(), recSizeKB * 1024);
                 iops++;
             }
             if( w ) {
-                lf->writeAt(wofs, a.addr(), PG);
+                lf->writeAt(wofs, a.addr(), recSizeKB * 1024);
                 iops++;
             }
         }
@@ -110,6 +120,12 @@ void workerThread() {
 
 void go() {
     verify( options["r"].trueValue() || options["w"].trueValue() );
+
+    recSizeKB = options["recSizeKB"].numberInt();
+    if( recSizeKB == 0 )
+        recSizeKB = 4;
+    verify( recSizeKB <= 64000 && recSizeKB > 0 );
+
     MemoryMappedFile f;
     cout << "creating test file size:";
     len = options["fileSizeMB"].numberLong();
@@ -157,7 +173,13 @@ void go() {
 
     cout << "testing..."<< endl;
 
-    unsigned wthr = (unsigned) o["nThreads"].Int();
+    cout << "optoins:" << o.toString() << endl;
+    unsigned wthr = 1;
+    if( !o["nThreads"].eoo() ) {
+        wthr = (unsigned) o["nThreads"].Int();
+    }
+    cout << "wthr " << wthr << endl;
+
     if( wthr < 1 ) { 
         cout << "bad threads field value" << endl;
         return;
@@ -208,6 +230,7 @@ cout <<
 "    mmf:<bool>,       // if true do i/o's via memory mapped files (default false)\n"
 "    r:<bool>,         // do reads (default false)\n"
 "    w:<bool>,         // do writes (default false)\n"
+"    recSizeKB:<n>,    // size of each write (default 4KB)\n"
 "    syncDelay:<n>     // secs between fsyncs, like --syncdelay in mongod. (default 0/never)\n"
 "  }\n"
 "\n"
@@ -245,29 +268,6 @@ cout <<
         cout << "parsed options:\n" << options.toString() << endl;
 
         go();
-#if 0
-        cout << "connecting to localhost..." << endl;
-        DBClientConnection c;
-        c.connect("localhost");
-        cout << "connected ok" << endl;
-        unsigned long long count = c.count("test.foo");
-        cout << "count of exiting documents in collection test.foo : " << count << endl;
-
-        bo o = BSON( "hello" << "world" );
-        c.insert("test.foo", o);
-
-        string e = c.getLastError();
-        if( !e.empty() ) { 
-            cout << "insert #1 failed: " << e << endl;
-        }
-
-        // make an index with a unique key constraint
-        c.ensureIndex("test.foo", BSON("hello"<<1), /*unique*/true);
-
-        c.insert("test.foo", o); // will cause a dup key error on "hello" field
-        cout << "we expect a dup key error here:" << endl;
-        cout << "  " << c.getLastErrorDetailed().toString() << endl;
-#endif
     } 
     catch(DBException& e) { 
         cout << "caught DBException " << e.toString() << endl;
