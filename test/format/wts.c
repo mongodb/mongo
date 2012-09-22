@@ -108,9 +108,6 @@ wts_open(void)
 		    ",value_format=%dt", g.c_bitcnt);
 		break;
 	case ROW:
-		if (g.c_dictionary)
-			p += snprintf(p, (size_t)(end - p),
-			    ",dictionary=%d", MMRAND(123, 517));
 		if (g.c_huffman_key)
 			p += snprintf(p, (size_t)(end - p),
 			    ",huffman_key=english");
@@ -122,6 +119,9 @@ wts_open(void)
 		if (g.c_huffman_value)
 			p += snprintf(p, (size_t)(end - p),
 			    ",huffman_value=english");
+		if (g.c_dictionary)
+			p += snprintf(p, (size_t)(end - p),
+			    ",dictionary=%d", MMRAND(123, 517));
 		break;
 	}
 

@@ -66,15 +66,20 @@ CPU and memory use when reading and writing pages to disk.  Note the
 additional CPU cost of block compression can be high, and should be
 considered.   (See @ref compression for details).
 
-Column-stores with variable-length byte string values support three
-types of compression: run-length encoding, Huffman encoding and block
-compression.
+Column-stores with variable-length byte string values support four
+types of compression: run-length encoding, dictionary compression,
+Huffman encoding and block compression.
 
 - Run-length encoding reduces the size requirement of both the in-memory
 and on-disk objects by storing sequential, duplicate values in the store
 only a single time (with an associated count).  The cost is minor
 additional CPU and memory use when returning values from the in-memory
 tree and when writing pages to disk.
+
+- Dictionary compression reduces the size requirement of both the
+in-memory and on-disk objects by storing any identical value only once
+per page.  The cost is minor additional CPU and memory use when
+returning values from the in-memory tree and when writing pages to disk.
 
 - Huffman encoding reduces the size requirement of both the in-memory
 and on-disk objects by compressing individual value items.  The cost is

@@ -152,7 +152,7 @@ typedef struct {
 	 */
 	struct __rec_dictionary {
 		uint64_t hash;				/* Hash value */
-		uint8_t *cell;				/* Matching cell */
+		void	*cell;				/* Matching cell */
 
 		u_int depth;				/* Skiplist */
 		WT_DICTIONARY *next[0];
@@ -229,8 +229,8 @@ static int  __rec_write_wrapup_err(
 
 static void __rec_dictionary_free(WT_SESSION_IMPL *, WT_RECONCILE *);
 static int  __rec_dictionary_init(WT_SESSION_IMPL *, WT_RECONCILE *);
-static WT_DICTIONARY *
-	    __rec_dictionary_lookup(WT_SESSION_IMPL *, WT_RECONCILE *, WT_KV *);
+static int  __rec_dictionary_lookup(
+		WT_SESSION_IMPL *, WT_RECONCILE *, WT_KV *, WT_DICTIONARY **);
 static void __rec_dictionary_reset(WT_RECONCILE *);
 
 /*
@@ -590,6 +590,8 @@ __rec_write_init(
 	 * Dictionary compression only writes repeated values once.  We grow
 	 * the dictionary as necessary, always using the largest size we've
 	 * seen.
+	 *
+	 * Per-page reconciliation: reset the dictionary.
 	 */
 	if (btree->dictionary != 0 && btree->dictionary > r->dictionary_slots) {
 		/*
@@ -601,8 +603,6 @@ __rec_write_init(
 
 		WT_RET(__rec_dictionary_init(session, r));
 	}
-
-	/* Per-page reconciliation: reset the dictionary. */
 	if (btree->dictionary)
 		__rec_dictionary_reset(r);
 
@@ -706,12 +706,12 @@ __rec_copy_incr(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_KV *kv)
 }
 
 /*
- * __rec_dict_copy_incr --
- *	Check for a dictionary match, and then copy a key/value cell and buffer
- * pair into the new image.
+ * __rec_dict_replace --
+ *	Check for a dictionary match.
  */
-static void
-__rec_dict_copy_incr(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_KV *kv)
+static int
+__rec_dict_replace(
+    WT_SESSION_IMPL *session, WT_RECONCILE *r, uint64_t rle, WT_KV *kv)
 {
 	WT_DICTIONARY *dp;
 	uint64_t offset;
@@ -730,26 +730,29 @@ __rec_dict_copy_incr(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_KV *kv)
 	 * if we grow the cell after that test we'll potentially write off the
 	 * end of the buffer's memory.
 	 */
-	if (kv->buf.size > WT_INTPACK32_MAXSIZE &&
-	    (dp = __rec_dictionary_lookup(session, r, kv)) != NULL) {
-		/*
-		 * If the dictionary cell reference is not set, we're
-		 * creating a new entry in the dictionary, update it.
-		 *
-		 * If the dictionary cell reference is set, we have a
-		 * matching value.  Create a copy cell instead.
-		 */
-		if (dp->cell == NULL)
-			dp->cell = r->first_free;
-		else {
-			offset = WT_PTRDIFF32(r->first_free, dp->cell);
-			kv->len = kv->cell_len =
-			   __wt_cell_pack_copy(&kv->cell, 0, offset);
-			kv->buf.data = NULL;
-			kv->buf.size = 0;
-		}
+	if (kv->buf.size <= WT_INTPACK32_MAXSIZE)
+		return (0);
+	WT_RET(__rec_dictionary_lookup(session, r, kv, &dp));
+	if (dp == NULL)
+		return (0);
+
+	/*
+	 * If the dictionary cell reference is not set, we're creating a new
+	 * entry in the dictionary, update it's location.
+	 *
+	 * If the dictionary cell reference is set, we have a matching value.
+	 * Create a copy cell instead.
+	 */
+	if (dp->cell == NULL)
+		dp->cell = r->first_free;
+	else {
+		offset = WT_PTRDIFF32(r->first_free, dp->cell);
+		kv->len = kv->cell_len =
+		   __wt_cell_pack_copy(&kv->cell, rle, offset);
+		kv->buf.data = NULL;
+		kv->buf.size = 0;
 	}
-	__rec_copy_incr(session, r, kv);
+	return (0);
 }
 
 /*
@@ -802,7 +805,7 @@ __rec_key_state_update(WT_RECONCILE *r, int ovfl_key)
  * __rec_split_bnd_grow --
  *	Grow the boundary array as necessary.
  */
-static inline int
+static int
 __rec_split_bnd_grow(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 {
 	/*
@@ -1429,7 +1432,6 @@ __wt_rec_bulk_wrapup(WT_CURSOR_BULK *cbulk)
 int
 __wt_rec_row_bulk_insert(WT_CURSOR_BULK *cbulk)
 {
-	WT_BTREE *btree;
 	WT_CURSOR *cursor;
 	WT_KV *key, *val;
 	WT_RECONCILE *r;
@@ -1438,7 +1440,6 @@ __wt_rec_row_bulk_insert(WT_CURSOR_BULK *cbulk)
 
 	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
 	r = cbulk->reconcile;
-	btree = session->btree;
 
 	cursor = &cbulk->cbt.iface;
 	key = &r->k;
@@ -1473,10 +1474,9 @@ __wt_rec_row_bulk_insert(WT_CURSOR_BULK *cbulk)
 	/* Copy the key/value pair onto the page. */
 	__rec_copy_incr(session, r, key);
 	if (val->len != 0) {
-		if (btree->dictionary)
-			__rec_dict_copy_incr(session, r, val);
-		else
-			__rec_copy_incr(session, r, val);
+		if (r->dictionary != NULL)
+			WT_RET(__rec_dict_replace(session, r, 0, val));
+		__rec_copy_incr(session, r, val);
 	}
 
 	/* Update compression state. */
@@ -1549,6 +1549,8 @@ __wt_rec_col_var_bulk_insert(WT_CURSOR_BULK *cbulk)
 		WT_RET(__rec_split(session, r));
 
 	/* Copy the value onto the page. */
+	if (r->dictionary != NULL)
+		WT_RET(__rec_dict_replace(session, r, cbulk->rle, val));
 	__rec_copy_incr(session, r, val);
 
 	/* Update the starting record number in case we split. */
@@ -1896,6 +1898,8 @@ __rec_col_var_helper(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		WT_RET(__rec_split(session, r));
 
 	/* Copy the value onto the page. */
+	if (!deleted && !ovfl && r->dictionary != NULL)
+		WT_RET(__rec_dict_replace(session, r, rle, val));
 	__rec_copy_incr(session, r, val);
 
 	/* Update the starting record number in case we split. */
@@ -3119,10 +3123,9 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 		/* Copy the key/value pair onto the page. */
 		__rec_copy_incr(session, r, key);
 		if (val->len != 0) {
-			if (dictionary)
-				__rec_dict_copy_incr(session, r, val);
-			else
-				__rec_copy_incr(session, r, val);
+			if (dictionary && r->dictionary != NULL)
+				WT_ERR(__rec_dict_replace(session, r, 0, val));
+			__rec_copy_incr(session, r, val);
 		}
 
 		/* Update compression state. */
@@ -3196,10 +3199,9 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
 		/* Copy the key/value pair onto the page. */
 		__rec_copy_incr(session, r, key);
 		if (val->len != 0) {
-			if (btree->dictionary)
-				__rec_dict_copy_incr(session, r, val);
-			else
-				__rec_copy_incr(session, r, val);
+			if (r->dictionary != NULL)
+				WT_RET(__rec_dict_replace(session, r, 0, val));
+			__rec_copy_incr(session, r, val);
 		}
 
 		/* Update compression state. */
@@ -3998,43 +4000,31 @@ __rec_dictionary_reset(WT_RECONCILE *r)
 }
 
 /*
- * __rec_dictionary_cell_match --
- *	Check to see if two cells (one in a WT_ITEM, and one laid out
- * in a buffer), match.
- */
-static int
-__rec_dictionary_cell_match(uint8_t *p, WT_KV *val)
-{
-	/*
-	 * We don't have to worry about crossing into garbage at the end of
-	 * the cell.  If the cell itself matches, the size of what follows
-	 * must match as well.
-	 */
-	if (memcmp(p, &val->cell, val->cell_len) != 0)
-		return (0);
-	if (memcmp(p + val->cell_len, val->buf.data, val->buf.size) != 0)
-		return (0);
-	return (1);
-}
-
-/*
  * __rec_dictionary_lookup --
  *	Check the dictionary for a matching value on this page.
  */
-static WT_DICTIONARY *
-__rec_dictionary_lookup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_KV *val)
+static int
+__rec_dictionary_lookup(
+    WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_KV *val, WT_DICTIONARY **dpp)
 {
 	WT_DICTIONARY *dp, *next;
 	uint64_t hash;
+	int match;
+
+	*dpp = NULL;
 
 	/* Search the dictionary, and return any match we find. */
 	hash = __wt_hash_fnv64(val->buf.data, val->buf.size);
 	for (dp = __rec_dictionary_skip_search(r->dictionary_head, hash);
-	     dp != NULL && dp->hash == hash; dp = dp->next[0])
-		if (__rec_dictionary_cell_match(dp->cell, val)) {
+	     dp != NULL && dp->hash == hash; dp = dp->next[0]) {
+		WT_RET(__wt_cell_pack_data_match(
+		    dp->cell, &val->cell, val->buf.data, &match));
+		if (match) {
 			WT_BSTAT_INCR(session, rec_dictionary);
-			return (dp);
+			*dpp = dp;
+			return (0);
 		}
+	}
 
 	/*
 	 * We're not doing value replacement in the dictionary.  We stop adding
@@ -4046,7 +4036,7 @@ __rec_dictionary_lookup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_KV *val)
 	 * the next dictionary slot to re-use.
 	 */
 	if (r->dictionary_next >= r->dictionary_slots)
-		return (NULL);
+		return (0);
 
 	/*
 	 * Set the hash value, we'll add this entry into the dictionary when we
@@ -4057,5 +4047,6 @@ __rec_dictionary_lookup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_KV *val)
 	next->cell = NULL;		/* Not necessary, just cautious. */
 	next->hash = hash;
 	__rec_dictionary_skip_insert(r->dictionary_head, next, hash);
-	return (next);
+	*dpp = next;
+	return (0);
 }
