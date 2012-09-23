@@ -203,11 +203,13 @@ namespace mongo {
                 while( !el.isNull() ) {
                     Extent *e = el.ext();
                     e->assertOk();
-                    el = e->xnext;
-                    ne++;
                     if ( full )
                         extentData << e->dump();
-                    
+                    if (!e->validates(el, &errors)) {
+                        valid = false;
+                    }
+                    el = e->xnext;
+                    ne++;
                     killCurrentOp.checkForInterrupt();
                 }
                 result.append("extentCount", ne);
@@ -231,9 +233,13 @@ namespace mongo {
 
                 try {
                     result.append("firstExtentDetails", d->firstExtent.ext()->dump());
-
-                    valid = valid && d->firstExtent.ext()->validates() && 
-                        d->firstExtent.ext()->xprev.isNull();
+                    if (!d->firstExtent.ext()->xprev.isNull()) {
+                        StringBuilder sb;
+                        sb << "'xprev' pointer in first extent " << d->firstExtent.toString()
+                           << " is not null";
+                        errors << sb.str();
+                        valid=false;
+                    }
                 }
                 catch (...) {
                     errors << "exception firstextent";

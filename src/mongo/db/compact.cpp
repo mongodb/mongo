@@ -63,7 +63,7 @@ namespace mongo {
 
         Extent *e = diskloc.ext();
         e->assertOk();
-        verify( e->validates() );
+        verify( e->validates(diskloc) );
         unsigned skipped = 0;
 
         {

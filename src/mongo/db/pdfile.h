@@ -330,10 +330,7 @@ namespace mongo {
 
         static int HeaderSize() { return sizeof(Extent)-4; }
 
-        bool validates() {
-            return !(firstRecord.isNull() ^ lastRecord.isNull()) &&
-                   length >= 0 && !myLoc.isNull();
-        }
+        bool validates(const DiskLoc diskLoc, BSONArrayBuilder* errors = NULL);
 
         BSONObj dump() {
             return BSON( "loc" << myLoc.toString() << "xnext" << xnext.toString() << "xprev" << xprev.toString()
