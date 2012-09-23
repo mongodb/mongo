@@ -700,6 +700,45 @@ namespace mongo {
         return emptyLoc;
     }
 
+        bool Extent::validates(const DiskLoc diskLoc, BSONArrayBuilder* errors) {
+            bool extentOk = true;
+            if (myLoc != diskLoc) {
+                if (errors) {
+                    StringBuilder sb;
+                    sb << "extent " << diskLoc.toString()
+                       << " self-pointer is " << myLoc.toString();
+                    *errors << sb.str();
+                }
+                extentOk = false;
+            }
+            if (firstRecord.isNull() != lastRecord.isNull()) {
+                if (errors) {
+                    StringBuilder sb;
+                    if (firstRecord.isNull()) {
+                        sb << "in extent " << diskLoc.toString()
+                           << ", firstRecord is null but lastRecord is "
+                           << lastRecord.toString();
+                    }
+                    else {
+                        sb << "in extent " << diskLoc.toString()
+                           << ", firstRecord is " << firstRecord.toString()
+                           << " but lastRecord is null";
+                    }
+                    *errors << sb.str();
+                }
+                extentOk = false;
+            }
+            if (length < 0) {
+                if (errors) {
+                    StringBuilder sb;
+                    sb << "negative length extent " << diskLoc.toString();
+                    *errors << sb.str();
+                }
+                extentOk = false;
+            }
+            return extentOk;
+        }
+
     /*
       Record* Extent::newRecord(int len) {
       if( firstEmptyRegion.isNull() )8
