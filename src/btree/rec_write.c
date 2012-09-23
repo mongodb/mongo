@@ -3151,12 +3151,10 @@ err:	__wt_scr_free(&tmpkey);
 static int
 __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
 {
-	WT_BTREE *btree;
 	WT_KV *key, *val;
 	WT_UPDATE *upd;
 	int ovfl_key;
 
-	btree = session->btree;
 	key = &r->k;
 	val = &r->v;
 
