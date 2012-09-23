@@ -329,7 +329,7 @@ __wt_meta_ckptlist_get(
 	 * checkpoint).  All of that cooperation is handled in the WT_CKPT
 	 * structure referenced from the WT_BTREE structure.
 	 */
-	if ((slot + 2) * sizeof(WT_CKPT) >= allocated)
+	if ((slot + 2) * sizeof(WT_CKPT) > allocated)
 		WT_ERR(__wt_realloc(session, &allocated,
 		    (slot + 2) * sizeof(WT_CKPT), &ckptbase));
 
