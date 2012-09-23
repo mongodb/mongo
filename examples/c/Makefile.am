@@ -11,7 +11,6 @@ noinst_PROGRAMS = \
 	ex_hello \
 	ex_pack \
 	ex_process \
-	ex_rand_read \
 	ex_schema \
 	ex_stat \
 	ex_thread
