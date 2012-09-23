@@ -580,13 +580,10 @@ __err_cell_type(WT_SESSION_IMPL *session,
 		    dsk_type == WT_PAGE_ROW_LEAF)
 			return (0);
 		break;
-	case WT_CELL_VALUE_COPY:
-		if (dsk_type == WT_PAGE_ROW_LEAF)
-			return (0);
-		break;
 	case WT_CELL_VALUE:
-	case WT_CELL_VALUE_SHORT:
+	case WT_CELL_VALUE_COPY:
 	case WT_CELL_VALUE_OVFL:
+	case WT_CELL_VALUE_SHORT:
 		if (dsk_type == WT_PAGE_COL_VAR ||
 		    dsk_type == WT_PAGE_ROW_LEAF)
 			return (0);
