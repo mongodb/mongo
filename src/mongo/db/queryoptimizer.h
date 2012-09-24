@@ -99,6 +99,7 @@ namespace mongo {
         const FieldRangeSet &multikeyFrs() const { return _frsMulti; }
         
         shared_ptr<Projection::KeyOnly> keyFieldsOnly() const { return _keyFieldsOnly; }
+        const ParsedQuery* parsedQuery() const { return _parsedQuery.get(); }
 
         /** @return a shared, lazily initialized matcher for the query plan. */
         shared_ptr<CoveredIndexMatcher> matcher() const;

@@ -162,9 +162,10 @@ namespace mongo {
     protected:
         /**
          * Return the document for the current iterate.  Implements the $returnKey option.
-         * @param allowCovered - enable covered index support.
+         * @param allowCovered enable covered index support.
+         * @param resultDetails details of how the result is loaded.
          */
-        BSONObj current( bool allowCovered ) const;
+        BSONObj current( bool allowCovered, ResultDetails* resultDetails ) const;
         const ParsedQuery &_parsedQuery;
         shared_ptr<Cursor> _cursor;
         shared_ptr<QueryOptimizerCursor> _queryOptimizerCursor;
@@ -194,7 +195,7 @@ namespace mongo {
                                            const QueryPlanSummary& queryPlan );
         virtual bool handleMatch( ResultDetails* resultDetails );
         /** Handle a match without performing deduping. */
-        void _handleMatchNoDedup();
+        void _handleMatchNoDedup( ResultDetails* resultDetails );
         virtual int rewriteMatches();
         virtual int bufferedMatches() const { return _bufferedMatches; }
     private:
@@ -288,7 +289,15 @@ namespace mongo {
         ( const QueryPlanSummary &queryPlan, const BSONObj &oldPlan ) const;
         shared_ptr<ResponseBuildStrategy> newResponseBuildStrategy
         ( const QueryPlanSummary &queryPlan );
+        /**
+         * @return true if the cursor's document matches the query.
+         * @param resultDetails describes how the document was matched and loaded.
+         */
         bool currentMatches( ResultDetails* resultDetails );
+        /**
+         * @return true if the cursor's document is in a valid chunk range.
+         * @param resultDetails describes how the document was matched and loaded.
+         */
         bool chunkMatches( ResultDetails* resultDetails );
         const ParsedQuery &_parsedQuery;
         shared_ptr<Cursor> _cursor;
