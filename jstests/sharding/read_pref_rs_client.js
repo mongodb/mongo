@@ -180,12 +180,7 @@ function noPriSecOkTest() {
         coll.find().readPref('primary').explain();
     });
 
-    // Needs to restart server, otherwise the js Mongo constructor
-    // would throw because it can't find the primary
-    replTest.start(0, {}, true);
-    replTest.awaitSecondaryNodes();
     replConn = new Mongo(replTest.getURL());
-    replTest.stop(0);
     coll = replConn.getDB('test').user;
     var dest = coll.find().readPref('primaryPreferred').explain().server;
     assert.eq(SEC_HOST, dest);
