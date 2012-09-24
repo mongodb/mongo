@@ -101,7 +101,8 @@ namespace mongo {
             return true;
         }
 
-        uassert( 9517 , "writeback" , ( d.reservedField() & Reserved_FromWriteback ) == 0 );
+        uassert(9517, "cannot queue a writeback operation to the writeback queue",
+                (d.reservedField() & Reserved_FromWriteback) == 0);
 
         OID writebackID;
         writebackID.initSequential();
