@@ -43,7 +43,7 @@ function basicTest() {
 }
 
 function noPriNoSecTest() {
-    var replTest = new ReplSetTest({ name: 'priOnlyNoPri', useHostName: true,
+    var replTest = new ReplSetTest({ name: 'noPriNoSec', useHostName: true,
         nodes: [{}, { arbiter: true }, { arbiter: true }]});
     replTest.startSet({ oplogSize: 1 });
     replTest.initiate();
@@ -102,7 +102,7 @@ function noPriNoSecTest() {
 }
 
 function priOkNoSecTest() {
-    var replTest = new ReplSetTest({ name: 'secOnlyNoSec', useHostName: true,
+    var replTest = new ReplSetTest({ name: 'priOkNoSec', useHostName: true,
         nodes: [{}, { arbiter: true }, {}]});
     replTest.startSet({ oplogSize: 1 });
     replTest.initiate();
@@ -147,7 +147,7 @@ function priOkNoSecTest() {
 }
 
 function noPriSecOkTest() {
-    var replTest = new ReplSetTest({ name: 'priPrefNoPri', useHostName: true,
+    var replTest = new ReplSetTest({ name: 'noPriSecOk', useHostName: true,
         nodes: [{ }, { arbiter: true }, { }]});
     replTest.startSet({ oplogSize: 1 });
     replTest.initiate();
