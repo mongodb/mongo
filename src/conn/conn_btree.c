@@ -436,6 +436,8 @@ __wt_conn_btree_close_all(WT_SESSION_IMPL *session, const char *name)
 		if (strcmp(btree->name, name) != 0)
 			continue;
 
+		WT_SET_BTREE_IN_SESSION(session, btree);
+
 		/*
 		 * The caller may have this tree locked to prevent
 		 * concurrent schema operations.
@@ -445,7 +447,6 @@ __wt_conn_btree_close_all(WT_SESSION_IMPL *session, const char *name)
 		else {
 			WT_ERR(__wt_try_writelock(session, btree->rwlock));
 			F_SET(btree, WT_BTREE_EXCLUSIVE);
-			session->btree = btree;
 			if (WT_META_TRACKING(session))
 				WT_ERR(__wt_meta_track_handle_lock(session, 0));
 		}
@@ -472,12 +473,13 @@ __wt_conn_btree_close_all(WT_SESSION_IMPL *session, const char *name)
 
 		if (!WT_META_TRACKING(session))
 			WT_TRET(__wt_session_release_btree(session));
-		session->btree = NULL;
 
+		WT_CLEAR_BTREE_IN_SESSION(session);
 		WT_ERR(ret);
 	}
 
-err:	return (ret);
+err:	WT_CLEAR_BTREE_IN_SESSION(session);
+	return (ret);
 }
 
 /*
