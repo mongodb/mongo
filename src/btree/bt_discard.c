@@ -25,7 +25,6 @@ void
 __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep, uint32_t flags)
 {
 	WT_PAGE *page;
-	WT_PAGE_MODIFY *mod;
 
 	/*
 	 * When a page is discarded, it's been disconnected from its parent and
@@ -57,17 +56,9 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep, uint32_t flags)
 	if (page->memory_footprint != 0)
 		__wt_cache_page_evict(session, page);
 
-	/* Clean up page modifications. */
-	if ((mod = page->modify) != NULL) {
-		/*
-		 * If the page split, there may one or more pages linked from
-		 * the page; walk the list, discarding pages.
-		 */
-		if (F_ISSET(mod, WT_PM_REC_MASK) == WT_PM_REC_SPLIT)
-			__wt_page_out(session, &mod->u.split, 0);
-
+	/* Free the page modification information. */
+	if (page->modify != NULL)
 		__free_page_modify(session, page);
-	}
 
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
@@ -103,6 +94,25 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_PAGE_MODIFY *mod;
 
 	mod = page->modify;
+
+	switch (F_ISSET(mod, WT_PM_REC_MASK)) {
+	case WT_PM_REC_SPLIT:
+		/*
+		 * If the page split, there may one or more pages linked from
+		 * the page; walk the list, discarding pages.
+		 */
+		__wt_page_out(session, &mod->u.split, 0);
+		break;
+	case WT_PM_REC_REPLACE:
+		/*
+		 * Discard any replacement address: this memory is usually moved
+		 * into the parent's WT_REF, but at the root that can't happen.
+		 */
+		__wt_free(session, mod->u.replace.addr);
+		break;
+	default:
+		break;
+	}
 
 	/* Free the append array. */
 	if ((append = WT_COL_APPEND(page)) != NULL) {

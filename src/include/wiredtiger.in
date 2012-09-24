@@ -610,8 +610,8 @@ struct __wt_session {
 	 * value_format.  For colgroups and indices\, all column names must
 	 * appear in the list of columns for the table.,a list of strings;
 	 * default empty.}
-	 * @config{dictionary, the number of entries maintained in the Btree
-	 * row-store leaf page value dictionary; see @ref
+	 * @config{dictionary, the maximum number of unique values remembered in
+	 * the Btree row-store leaf page value dictionary; see @ref
 	 * file_formats_compression for more information.,an integer greater
 	 * than or equal to 0; default \c 0.}
 	 * @config{exclusive, fail if the object exists.  When false (the

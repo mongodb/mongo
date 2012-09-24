@@ -143,6 +143,8 @@ __rec_page_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 */
 		WT_RET(__wt_calloc(session, 1, sizeof(WT_ADDR), &addr));
 		*addr = mod->u.replace;
+		mod->u.replace.addr = NULL;
+		mod->u.replace.size = 0;
 
 		parent_ref->page = NULL;
 		parent_ref->addr = addr;

@@ -416,10 +416,9 @@ __evict_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 *  (b) is committed more recently than an in-progress checkpoint.
 	 *
 	 * We handle both of these cases by setting up the transaction context
-	 * before evicting.  If a checkpoint is in progress, copy the
-	 * checkpoint's transaction.  Otherwise, we need a snapshot to avoid
-	 * uncommitted changes.  If a transaction is in progress in the
-	 * evicting session, we save and restore its state.
+	 * before evicting, using the oldest reading ID in the system to create
+	 * the snapshot.  If a transaction is in progress in the evicting
+	 * session, we save and restore its state.
 	 */
 	txn = &session->txn;
 	saved_txn = *txn;
@@ -438,7 +437,7 @@ __evict_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 		__wt_txn_destroy(session);
 	}
 
-	session->txn = saved_txn;
+	*txn = saved_txn;
 	return (ret);
 }
 
