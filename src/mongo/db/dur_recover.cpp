@@ -214,9 +214,51 @@ namespace mongo {
             _mmfs.clear();
         }
 
-        void RecoveryJob::write(const ParsedJournalEntry& entry, MongoMMF* mmf) {
+        RecoveryJob::Last::Last() { 
+            // we are keeping invariants so we need to be sure things aren't disappearing out from under us:
+            LockMongoFilesShared::assertAtLeastReadLocked();
+        }
+
+        MongoMMF* RecoveryJob::Last::newEntry(const dur::ParsedJournalEntry& entry, RecoveryJob& rj) {
+            int num = entry.e->getFileNo();
+            if( num == fileNo && entry.dbName == dbName )
+                return mmf;
+
+            string fn = fileName(entry.dbName, num);
+            MongoFile *file;
+            {
+                MongoFileFinder finder; // must release lock before creating new MongoMMF
+                file = finder.findByPath(fn);
+            }
+
+            if (file) {
+                verify(file->isMongoMMF());
+                mmf = (MongoMMF*)file;
+            }
+            else {
+                if( !rj._recovering ) {
+                    log() << "journal error applying writes, file " << fn << " is not open" << endl;
+                    verify(false);
+                }
+                boost::shared_ptr<MongoMMF> sp (new MongoMMF);
+                verify(sp->open(fn, false));
+                rj._mmfs.push_back(sp);
+                mmf = sp.get();
+            }
+
+            // we do this last so that if an exception were thrown, there isn't any wrong memory
+            dbName = entry.dbName;
+            fileNo = num;
+            return mmf;
+        }
+
+        void RecoveryJob::write(Last& last, const ParsedJournalEntry& entry) {
             //TODO(mathias): look into making some of these dasserts
             verify(entry.e);
+            verify(entry.dbName);
+            verify(strnlen(entry.dbName, MaxDatabaseNameLen) < MaxDatabaseNameLen);
+
+            MongoMMF *mmf = last.newEntry(entry, *this);
 
             if ((entry.e->ofs + entry.e->len) <= mmf->length()) {
                 verify(mmf->view_write());
@@ -231,7 +273,7 @@ namespace mongo {
             }
         }
 
-        void RecoveryJob::applyEntry(const ParsedJournalEntry& entry, bool apply, bool dump, MongoMMF* mmf) {
+        void RecoveryJob::applyEntry(Last& last, const ParsedJournalEntry& entry, bool apply, bool dump) {
             if( entry.e ) {
                 if( dump ) {
                     stringstream ss;
@@ -245,8 +287,8 @@ namespace mongo {
                     log() << ss.str() << endl;
                 }
                 if( apply ) {
-                    write(entry, mmf);
-                }
+                    write(last, entry);
+              }
             }
             else if(entry.op) {
                 // a DurOp subclass operation
@@ -298,18 +340,9 @@ namespace mongo {
             if( dump )
                 log() << "BEGIN section" << endl;
 
-            const char* lastDbName = NULL;
-            int lastFileNo = 0;
-            MongoMMF* mmf = NULL;
+            Last last;
             for( vector<ParsedJournalEntry>::const_iterator i = entries.begin(); i != entries.end(); ++i ) {
-                if (i->e && (i->dbName != lastDbName || i->e->getFileNo() != lastFileNo)) {
-                    mmf = getMongoMMF(*i);
-                    lastDbName = i->dbName;
-                    lastFileNo = i->e->getFileNo();
-                }
-                fassert(16429, !i->e || mmf);
-
-                applyEntry(*i, apply, dump, mmf);
+                applyEntry(last, *i, apply, dump);
             }
 
             if( dump )
@@ -317,6 +350,7 @@ namespace mongo {
         }
 
         void RecoveryJob::processSection(const JSectHeader *h, const void *p, unsigned len, const JSectFooter *f) {
+            LockMongoFilesShared lkFiles; // for RecoveryJob::Last
             scoped_lock lk(_mx);
             RACECHECK
 
@@ -468,6 +502,7 @@ namespace mongo {
         /** @param files all the j._0 style files we need to apply for recovery */
         void RecoveryJob::go(vector<boost::filesystem::path>& files) {
             log() << "recover begin" << endl;
+            LockMongoFilesExclusive lkFiles; // for RecoveryJob::Last
             _recovering = true;
 
             // load the last sequence number synced to the datafiles on disk before the last crash
