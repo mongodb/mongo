@@ -93,15 +93,18 @@ __conn_btree_get(WT_SESSION_IMPL *session,
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
 
 	/* Increment the reference count if we already have the btree open. */
-	TAILQ_FOREACH(btree, &conn->btqh, q)
-		if (strcmp(name, btree->name) == 0 &&
-		    ((ckpt == NULL && btree->checkpoint == NULL) ||
-		    (ckpt != NULL && btree->checkpoint != NULL &&
-		    strcmp(ckpt, btree->checkpoint) == 0))) {
-			++btree->refcnt;
-			session->btree = btree;
-			return (__conn_btree_open_lock(session, flags));
+	if (!LF_ISSET(WT_BTREE_NO_CACHE)) {
+		TAILQ_FOREACH(btree, &conn->btqh, q) {
+			if (strcmp(name, btree->name) == 0 &&
+			    ((ckpt == NULL && btree->checkpoint == NULL) ||
+			    (ckpt != NULL && btree->checkpoint != NULL &&
+			    strcmp(ckpt, btree->checkpoint) == 0))) {
+				++btree->refcnt;
+				session->btree = btree;
+				return (__conn_btree_open_lock(session, flags));
+			}
 		}
+	}
 
 	/*
 	 * Allocate the WT_BTREE structure, its lock, and set the name so we
@@ -118,10 +121,12 @@ __conn_btree_get(WT_SESSION_IMPL *session,
 		__wt_writelock(session, btree->rwlock);
 		F_SET(btree, WT_BTREE_EXCLUSIVE);
 
-		/* Add to the connection list. */
-		btree->refcnt = 1;
-		TAILQ_INSERT_TAIL(&conn->btqh, btree, q);
-		++conn->btqcnt;
+		if (!LF_ISSET(WT_BTREE_NO_CACHE)) {
+			/* Add to the connection list. */
+			btree->refcnt = 1;
+			TAILQ_INSERT_TAIL(&conn->btqh, btree, q);
+			++conn->btqcnt;
+		}
 	}
 
 	if (ret == 0)
@@ -476,11 +481,11 @@ err:	return (ret);
 }
 
 /*
- * __conn_btree_discard --
+ * __wt_conn_btree_discard_single --
  *	Discard a single btree file handle structure.
  */
-static int
-__conn_btree_discard(WT_SESSION_IMPL *session, WT_BTREE *btree)
+int
+__wt_conn_btree_discard_single(WT_SESSION_IMPL *session, WT_BTREE *btree)
 {
 	WT_DECL_RET;
 
@@ -529,7 +534,7 @@ restart:
 
 		TAILQ_REMOVE(&conn->btqh, btree, q);
 		--conn->btqcnt;
-		WT_TRET(__conn_btree_discard(session, btree));
+		WT_TRET(__wt_conn_btree_discard_single(session, btree));
 		goto restart;
 	}
 
@@ -546,7 +551,7 @@ restart:
 	while ((btree = TAILQ_FIRST(&conn->btqh)) != NULL) {
 		TAILQ_REMOVE(&conn->btqh, btree, q);
 		--conn->btqcnt;
-		WT_TRET(__conn_btree_discard(session, btree));
+		WT_TRET(__wt_conn_btree_discard_single(session, btree));
 	}
 
 	return (ret);

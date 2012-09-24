@@ -382,8 +382,10 @@ __wt_curfile_open(WT_SESSION_IMPL *session, const char *uri,
 	uint32_t flags;
 
 	/*
-	 * Bulk and no-cache handles are exclusive and may not be used
-	 * by more than a single thread.
+	 * Bulk and no cache handles are exclusive and may not be used by more
+	 * than a single thread.
+	 * Additionally set the discard flag on no cache handles so they are
+	 * destroyed on close.
 	 */
 	flags = 0;
 	WT_RET(__wt_config_gets_defno(session, cfg, "bulk", &cval));

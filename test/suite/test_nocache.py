@@ -63,14 +63,6 @@ class test_no_cache(wttest.WiredTigerTestCase):
             self.assertEqual(val, value_populate(cursor, i))
         cursor.close()
 
-    # Uncached cursors are exclusive objects, other opens must fail.
-    def test_no_cache_handle_block(self):
-        uri = self.type + self.name
-        simple_populate(self, uri, 'key_format=S', 100)
-        cursor = self.session.open_cursor(uri, None, "no_cache")
-        self.assertRaises(wiredtiger.WiredTigerError,
-            lambda: self.session.open_cursor(uri, None))
-
 
 if __name__ == '__main__':
     wttest.run()

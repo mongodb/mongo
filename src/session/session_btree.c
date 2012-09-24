@@ -103,20 +103,29 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 	btree = session->btree;
 
 	/*
-	 * If we had special flags set, close the handle so that future access
-	 * can get a handle without special flags.
+	 * If we had no cache flag set, close and free the btree handle. It was
+	 * never added to the handle cache.
 	 */
-	if (F_ISSET(btree, WT_BTREE_DISCARD | WT_BTREE_SPECIAL_FLAGS)) {
-		WT_ASSERT(session, F_ISSET(btree, WT_BTREE_EXCLUSIVE));
-		F_CLR(btree, WT_BTREE_DISCARD);
+	if (F_ISSET(btree, WT_BTREE_NO_CACHE))
+		WT_RET(__wt_conn_btree_discard_single(session, btree));
+	else {
 
-		WT_RET(__wt_conn_btree_sync_and_close(session));
+		/*
+		 * If we had special flags set, close the handle so that future
+		 * access can get a handle without special flags.
+		 */
+		if (F_ISSET(btree, WT_BTREE_DISCARD | WT_BTREE_SPECIAL_FLAGS)) {
+			WT_ASSERT(session, F_ISSET(btree, WT_BTREE_EXCLUSIVE));
+			F_CLR(btree, WT_BTREE_DISCARD);
+
+			WT_RET(__wt_conn_btree_sync_and_close(session));
+		}
+
+		if (F_ISSET(btree, WT_BTREE_EXCLUSIVE))
+			F_CLR(btree, WT_BTREE_EXCLUSIVE);
+
+		__wt_rwunlock(session, btree->rwlock);
 	}
-
-	if (F_ISSET(btree, WT_BTREE_EXCLUSIVE))
-		F_CLR(btree, WT_BTREE_EXCLUSIVE);
-
-	__wt_rwunlock(session, btree->rwlock);
 	session->btree = NULL;
 
 	return (ret);
@@ -193,34 +202,42 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 
 	btree = NULL;
+	btree_session = NULL;
 
-	TAILQ_FOREACH(btree_session, &session->btrees, q) {
-		btree = btree_session->btree;
-		if (strcmp(uri, btree->name) != 0)
-			continue;
-		if ((checkpoint == NULL && btree->checkpoint == NULL) ||
-		    (checkpoint != NULL && btree->checkpoint != NULL &&
-		    strcmp(checkpoint, btree->checkpoint) == 0))
-			break;
-	}
-
-	if (btree_session == NULL)
-		session->btree = NULL;
-	else {
-		session->btree = btree;
-
-		/*
-		 * Try and lock the file; if we succeed, our "exclusive" state
-		 * must match.
-		 */
-		if ((ret =
-		    __wt_session_lock_btree(session, flags)) != WT_NOTFOUND) {
-			WT_ASSERT(session, ret != 0 ||
-			    LF_ISSET(WT_BTREE_EXCLUSIVE) ==
-			    F_ISSET(session->btree, WT_BTREE_EXCLUSIVE));
-			return (ret);
+	/*
+	 * If the no cache flag is set, we never use the handle cache to
+	 * store or retrieve the handle.
+	 */
+	if (!LF_ISSET(WT_BTREE_NO_CACHE)) {
+		TAILQ_FOREACH(btree_session, &session->btrees, q) {
+			btree = btree_session->btree;
+			if (F_ISSET(btree, WT_BTREE_NO_CACHE) ||
+			    strcmp(uri, btree->name) != 0)
+				continue;
+			if ((checkpoint == NULL && btree->checkpoint == NULL) ||
+			    (checkpoint != NULL && btree->checkpoint != NULL &&
+			    strcmp(checkpoint, btree->checkpoint) == 0))
+				break;
 		}
-		ret = 0;
+
+		if (btree_session == NULL)
+			session->btree = NULL;
+		else {
+			session->btree = btree;
+
+			/*
+			 * Try and lock the file; if we succeed, our "exclusive"
+			 * state must match.
+			 */
+			if ((ret = __wt_session_lock_btree(
+			    session, flags)) != WT_NOTFOUND) {
+				WT_ASSERT(session, ret != 0 ||
+				    LF_ISSET(WT_BTREE_EXCLUSIVE) ==
+				    F_ISSET(session->btree, WT_BTREE_EXCLUSIVE));
+				return (ret);
+			}
+			ret = 0;
+		}
 	}
 
 	/*
@@ -231,7 +248,7 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 	    ret = __wt_conn_btree_get(session, uri, checkpoint, cfg, flags));
 	WT_RET(ret);
 
-	if (btree_session == NULL)
+	if (btree_session == NULL && !LF_ISSET(WT_BTREE_NO_CACHE))
 		WT_RET(__wt_session_add_btree(session, NULL));
 
 	WT_ASSERT(session, LF_ISSET(WT_BTREE_LOCK_ONLY) ||
