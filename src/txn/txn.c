@@ -314,6 +314,8 @@ __wt_txn_destroy(WT_SESSION_IMPL *session)
 	WT_TXN *txn;
 
 	txn = &session->txn;
+	__wt_free(session, txn->mod);
+	__wt_free(session, txn->modref);
 	__wt_free(session, txn->snapshot);
 }
 
