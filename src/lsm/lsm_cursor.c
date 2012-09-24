@@ -113,7 +113,8 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm)
 	WT_LSM_CHUNK *chunk;
 	WT_LSM_TREE *lsm_tree;
 	WT_SESSION_IMPL *session;
-	const char *ckpt_cfg[] = { "checkpoint=WiredTigerCheckpoint", NULL };
+	const char *ckpt_cfg[] = API_CONF_DEFAULTS(session, open_cursor,
+	    "checkpoint=WiredTigerCheckpoint");
 	int i, nchunks;
 
 	session = (WT_SESSION_IMPL *)clsm->iface.session;
