@@ -113,7 +113,8 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm)
 	WT_LSM_CHUNK *chunk;
 	WT_LSM_TREE *lsm_tree;
 	WT_SESSION_IMPL *session;
-	const char *ckpt_cfg[] = { "checkpoint=WiredTigerCheckpoint", NULL };
+	const char *ckpt_cfg[] = API_CONF_DEFAULTS(session, open_cursor,
+	    "checkpoint=WiredTigerCheckpoint");
 	int i, nchunks;
 
 	session = (WT_SESSION_IMPL *)clsm->iface.session;
@@ -152,9 +153,20 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm)
 		 * Once all cursors switch, the in-memory tree can be evicted.
 		 */
 		chunk = lsm_tree->chunk[i];
-		WT_ERR(__wt_curfile_open(session,
+		ret = __wt_curfile_open(session,
 		    chunk->uri, &clsm->iface,
-		    F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) ? ckpt_cfg : NULL, cp));
+		    F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) ? ckpt_cfg : NULL, cp);
+
+		/*
+		 * XXX kludge: we may have an empty chunk where no checkpoint
+		 * was written.  If so, try to open the ordinary handle on that
+		 * chunk instead.
+		 */
+		if (ret == WT_NOTFOUND && F_ISSET(chunk, WT_LSM_CHUNK_ONDISK))
+			ret = __wt_curfile_open(session,
+			    chunk->uri, &clsm->iface, NULL, cp);
+		WT_ERR(ret);
+
 		if (chunk->bloom_uri != NULL && !F_ISSET(clsm, WT_CLSM_MERGE))
 			WT_ERR(__wt_bloom_open(session, chunk->bloom_uri,
 			    lsm_tree->bloom_bit_count,

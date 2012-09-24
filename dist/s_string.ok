@@ -226,6 +226,7 @@ argc
 args
 argv
 async
+autocommit
 bdb
 bigram
 bitcnt
