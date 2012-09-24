@@ -1163,6 +1163,19 @@ namespace mongo {
         _check(true);
     }
 
+    bool ReplicaSetMonitor::isAnyNodeOk() const {
+        scoped_lock lock(_lock);
+
+        for (vector<Node>::const_iterator iter = _nodes.begin();
+                iter != _nodes.end(); ++iter) {
+            if (iter->ok) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     bool ReplicaSetMonitor::Node::matchesTag(const BSONObj& tag) const {
         if (tag.isEmpty()) {
             return true;
@@ -1347,19 +1360,7 @@ namespace mongo {
     }
 
     bool DBClientReplicaSet::connect() {
-        try {
-            checkMaster();
-        }
-        catch (AssertionException&) {
-            // Can't use _getMonitor because that will create a new monitor from the cached seed if
-            // the monitor doesn't exist.
-            ReplicaSetMonitorPtr monitor = ReplicaSetMonitor::get(_setName);
-            if (_master && monitor ) {
-                monitor->notifyFailure(_masterHost);
-            }
-            return false;
-        }
-        return true;
+        return _getMonitor()->isAnyNodeOk();
     }
 
     bool DBClientReplicaSet::auth(const string &dbname, const string &username, const string &pwd, string& errmsg, bool digestPassword, Auth::Level * level) {

@@ -262,6 +262,14 @@ namespace mongo {
         bool isHostCompatible(const HostAndPort& host, ReadPreference readPreference,
                 const TagSet* tagSet) const;
 
+        /**
+         * Performs a quick check if at least one node is up based on the cached
+         * view of the set.
+         *
+         * @return true if any node is ok
+         */
+        bool isAnyNodeOk() const;
+
     private:
         /**
          * This populates a list of hosts from the list of seeds (discarding the
@@ -405,10 +413,10 @@ namespace mongo {
         DBClientReplicaSet( const string& name , const vector<HostAndPort>& servers, double so_timeout=0 );
         virtual ~DBClientReplicaSet();
 
-        /** Returns false if nomember of the set were reachable, or neither is
-         * master, although,
-         * when false returned, you can still try to use this connection object, it will
-         * try reconnects.
+        /**
+         * Returns false if no member of the set were reachable. This object
+         * can still be used even when false was returned as it will try to
+         * reconnect when you use it later.
          */
         bool connect();
 
