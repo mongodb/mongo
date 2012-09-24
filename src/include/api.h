@@ -301,7 +301,7 @@ struct __wt_connection_impl {
 	__autotxn = F_ISSET(S2C(s), WT_CONN_TRANSACTIONAL) &&		\
 	    !F_ISSET(&(s)->txn, TXN_RUNNING);				\
 	if (__autotxn)							\
-		WT_ERR(__wt_txn_begin((s), NULL))
+		F_SET(&(s)->txn, TXN_AUTOCOMMIT)
 
 /* An API call wrapped in a transaction if necessary. */
 #define	TXN_API_CALL_NOCONF(s, h, n, cur, bt) do {			\
@@ -310,7 +310,7 @@ struct __wt_connection_impl {
 	__autotxn = F_ISSET(S2C(s), WT_CONN_TRANSACTIONAL) &&		\
 	    !F_ISSET(&(s)->txn, TXN_RUNNING);				\
 	if (__autotxn)							\
-		WT_ERR(__wt_txn_begin((s), NULL))
+		F_SET(&(s)->txn, TXN_AUTOCOMMIT)
 
 /*
  * End a transactional API call.
@@ -321,7 +321,9 @@ struct __wt_connection_impl {
 #define	TXN_API_END(s, ret)						\
 	API_END(s);							\
 	if (__autotxn) {						\
-		if (ret == 0 && !F_ISSET(&(s)->txn, TXN_ERROR)) {	\
+		if (F_ISSET(&(s)->txn, TXN_AUTOCOMMIT))			\
+			F_CLR(&(s)->txn, TXN_AUTOCOMMIT);		\
+		else if (ret == 0 && !F_ISSET(&(s)->txn, TXN_ERROR)) {	\
 			if ((s)->ncursors != 0) {			\
 				__wt_txn_read_last(session);		\
 				__wt_txn_read_first(session);		\

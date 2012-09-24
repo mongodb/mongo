@@ -125,7 +125,7 @@ __wt_txn_visible(WT_SESSION_IMPL *session, wt_txnid_t id)
 /*
  * __wt_txn_visible_all --
  *	Check if a given transaction ID is "globally visible".  This is, if
- *      all sessions in the system will see the transaction ID.
+ *	all sessions in the system will see the transaction ID.
  */
 static inline int
 __wt_txn_visible_all(WT_SESSION_IMPL *session, wt_txnid_t id)
@@ -219,6 +219,24 @@ __wt_txn_ancient(WT_SESSION_IMPL *session, wt_txnid_t id)
 		WT_CSTAT_INCR(session, txn_ancient);
 		return (1);
 	}
+	return (0);
+}
+
+/*
+ * __wt_txn_autocommit_check --
+ *	If an auto-commit transaction is required, start one.
+ */
+static inline int
+__wt_txn_autocommit_check(WT_SESSION_IMPL *session)
+{
+	WT_TXN *txn;
+
+	txn = &session->txn;
+	if (F_ISSET(txn, TXN_AUTOCOMMIT)) {
+		F_CLR(txn, TXN_AUTOCOMMIT);
+		return (__wt_txn_begin(session, NULL));
+	}
+
 	return (0);
 }
 
