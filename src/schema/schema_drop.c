@@ -31,6 +31,12 @@ __drop_file(
 		return (ret);
 	}
 
+	if (WT_META_TRACKING(session) &&
+	    (ret = __wt_meta_track_handle_lock(session, 0)) != 0) {
+		(void)__wt_session_release_btree(session);
+		return (ret);
+	}
+
 	/* Close all btree handles associated with this file. */
 	WT_RET(__wt_conn_btree_close_all(session, uri));
 
@@ -122,6 +128,12 @@ __drop_colgroup(
 		return (ret);
 	}
 
+	if (WT_META_TRACKING(session) &&
+	    (ret = __wt_meta_track_handle_lock(session, 0)) != 0) {
+		(void)__wt_session_release_btree(session);
+		return (ret);
+	}
+
 	/* If we can get the table, detach the colgroup from it. */
 	if ((ret = __wt_schema_get_table(
 	    session, tablename, tlen, 1, &table)) == 0)
@@ -162,6 +174,12 @@ __drop_index(
 	    WT_BTREE_EXCLUSIVE | WT_BTREE_LOCK_ONLY)) != 0) {
 		if (ret == WT_NOTFOUND || ret == ENOENT)
 			ret = 0;
+		return (ret);
+	}
+
+	if (WT_META_TRACKING(session) &&
+	    (ret = __wt_meta_track_handle_lock(session, 0)) != 0) {
+		(void)__wt_session_release_btree(session);
 		return (ret);
 	}
 
