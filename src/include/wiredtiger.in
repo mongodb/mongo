@@ -523,7 +523,7 @@ struct __wt_session {
 	 * record number key; valid only for cursors with record number keys.,a
 	 * boolean flag; default \c false.}
 	 * @config{bulk, configure the cursor for bulk loads\, a fast load path
-	 * that may only be used for just created objects.  Cursors configured
+	 * that may only be used for newly created objects. Cursors configured
 	 * for bulk load only support the WT_CURSOR::insert and WT_CURSOR::close
 	 * methods.,a boolean flag; default \c false.}
 	 * @config{checkpoint, the name of a checkpoint to open (the reserved

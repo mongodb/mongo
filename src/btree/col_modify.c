@@ -27,11 +27,12 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 	size_t ins_size, new_inshead_size, new_inslist_size, upd_size;
 	uint64_t recno;
 	u_int skipdepth;
-	int i;
+	int i, logged;
 
 	btree = cbt->btree;
 	page = cbt->page;
 	recno = cbt->iface.recno;
+	logged = 0;
 
 	WT_ASSERT(session, op != 1);
 
@@ -89,6 +90,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 
 		/* Allocate and insert a WT_UPDATE structure. */
 		WT_ERR(__wt_update_alloc(session, value, &upd, &upd_size));
+		logged = 1;
 		WT_ERR(__wt_update_serial(session, page,
 		    cbt->write_gen, &cbt->ins->upd, NULL, 0, &upd, upd_size));
 	} else {
@@ -142,6 +144,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 		    session, recno, skipdepth, &ins, &ins_size));
 		WT_ERR(__wt_update_check(session, page, NULL));
 		WT_ERR(__wt_update_alloc(session, value, &upd, &upd_size));
+		logged = 1;
 		ins->upd = upd;
 		ins_size += upd_size;
 		cbt->ins = ins;
@@ -174,16 +177,14 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 	}
 
 	if (0) {
-err:		if (ins != NULL)
-			__wt_free(session, ins);
-		if (upd != NULL) {
-			/*
-			 * Remove the update from the current transaction, so we
-			 * don't try to modify it on rollback.
-			 */
+err:		/*
+		 * Remove the update from the current transaction, so we don't
+		 * try to modify it on rollback.
+		 */
+		if (logged)
 			__wt_txn_unmodify(session);
-			__wt_free(session, upd);
-		}
+		__wt_free(session, ins);
+		__wt_free(session, upd);
 	}
 
 	__wt_free(session, new_inslist);

@@ -21,15 +21,17 @@
 	WT_LSM_CMP(s, lsm_tree, &(c1)->key, &(c2)->key, cmp)
 
 /*
- * LSM API enter/leave: check that the cursor is in sync with the tree.
+ * LSM API enter: check that the cursor is in sync with the tree.
  */
 #define	WT_LSM_ENTER(clsm, cursor, session, n)				\
 	clsm = (WT_CURSOR_LSM *)cursor;					\
-	CURSOR_API_CALL_NOCONF(cursor, session, n, NULL);		\
+	CURSOR_API_CALL(cursor, session, n, NULL);			\
 	WT_ERR(__clsm_enter(clsm))
 
-#define	WT_LSM_END(clsm, session)					\
-	API_END(session)
+#define	WT_LSM_UPDATE_ENTER(clsm, cursor, session, n)			\
+	clsm = (WT_CURSOR_LSM *)cursor;					\
+	CURSOR_UPDATE_API_CALL(cursor, session, n, NULL);		\
+	WT_ERR(__clsm_enter(clsm))
 
 static int __clsm_open_cursors(WT_CURSOR_LSM *);
 static int __clsm_search(WT_CURSOR *);
@@ -263,7 +265,7 @@ __clsm_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 
 	/* There's no need to sync with the LSM tree, avoid WT_LSM_ENTER. */
 	alsm = (WT_CURSOR_LSM *)a;
-	CURSOR_API_CALL_NOCONF(a, session, compare, NULL);
+	CURSOR_API_CALL(a, session, compare, NULL);
 
 	/*
 	 * Confirm both cursors refer to the same source and have keys, then
@@ -359,7 +361,7 @@ retry:		/*
 	if ((ret = __clsm_get_current(session, clsm, 1, &deleted)) == 0 &&
 	    deleted)
 		goto retry;
-err:	WT_LSM_END(clsm, session);
+err:	API_END(session);
 
 	return (ret);
 }
@@ -440,7 +442,7 @@ retry:		/*
 	if ((ret = __clsm_get_current(session, clsm, 0, &deleted)) == 0 &&
 	    deleted)
 		goto retry;
-err:	WT_LSM_END(clsm, session);
+err:	API_END(session);
 
 	return (ret);
 }
@@ -462,7 +464,7 @@ __clsm_reset(WT_CURSOR *cursor)
 	 * we want to do is give up our position.
 	 */
 	clsm = (WT_CURSOR_LSM *)cursor;
-	CURSOR_API_CALL_NOCONF(cursor, session, reset, NULL);
+	CURSOR_API_CALL(cursor, session, reset, NULL);
 	if ((c = clsm->current) != NULL) {
 		ret = c->reset(c);
 		clsm->current = NULL;
@@ -512,7 +514,7 @@ __clsm_search(WT_CURSOR *cursor)
 	ret = WT_NOTFOUND;
 
 done:
-err:	WT_LSM_END(clsm, session);
+err:	API_END(session);
 	if (ret == 0)
 		F_SET(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 	else
@@ -616,7 +618,7 @@ __clsm_search_near(WT_CURSOR *cursor, int *exactp)
 		ret = WT_NOTFOUND;
 
 done:
-err:	WT_LSM_END(clsm, session);
+err:	API_END(session);
 	if (ret == 0) {
 		c = clsm->current;
 		WT_TRET(c->get_key(c, &cursor->key));
@@ -722,7 +724,7 @@ __clsm_insert(WT_CURSOR *cursor)
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
-	WT_LSM_ENTER(clsm, cursor, session, insert);
+	WT_LSM_UPDATE_ENTER(clsm, cursor, session, insert);
 	WT_CURSOR_NEEDKEY(cursor);
 	WT_LSM_NEEDVALUE(cursor);
 
@@ -735,8 +737,7 @@ __clsm_insert(WT_CURSOR *cursor)
 
 	ret = __clsm_put(session, clsm, &cursor->key, &cursor->value);
 
-err:	WT_LSM_END(clsm, session);
-
+err:	CURSOR_UPDATE_API_END(session, ret);
 	return (ret);
 }
 
@@ -751,7 +752,7 @@ __clsm_update(WT_CURSOR *cursor)
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
-	WT_LSM_ENTER(clsm, cursor, session, update);
+	WT_LSM_UPDATE_ENTER(clsm, cursor, session, update);
 	WT_CURSOR_NEEDKEY(cursor);
 	WT_LSM_NEEDVALUE(cursor);
 
@@ -759,8 +760,7 @@ __clsm_update(WT_CURSOR *cursor)
 	    (ret = __clsm_search(cursor)) == 0)
 		ret = __clsm_put(session, clsm, &cursor->key, &cursor->value);
 
-err:	WT_LSM_END(clsm, session);
-
+err:	CURSOR_UPDATE_API_END(session, ret);
 	return (ret);
 }
 
@@ -775,15 +775,14 @@ __clsm_remove(WT_CURSOR *cursor)
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
-	WT_LSM_ENTER(clsm, cursor, session, remove);
+	WT_LSM_UPDATE_ENTER(clsm, cursor, session, remove);
 	WT_CURSOR_NEEDKEY(cursor);
 
 	if (F_ISSET(cursor, WT_CURSTD_OVERWRITE) ||
 	    (ret = __clsm_search(cursor)) == 0)
 		ret = __clsm_put(session, clsm, &cursor->key, &__lsm_tombstone);
 
-err:	WT_LSM_END(clsm, session);
-
+err:	CURSOR_UPDATE_API_END(session, ret);
 	return (ret);
 }
 
@@ -803,7 +802,7 @@ __clsm_close(WT_CURSOR *cursor)
 	 * closing, and the cursor may never have been used.
 	 */
 	clsm = (WT_CURSOR_LSM *)cursor;
-	CURSOR_API_CALL_NOCONF(cursor, session, close, NULL);
+	CURSOR_API_CALL(cursor, session, close, NULL);
 	WT_TRET(__clsm_close_cursors(clsm));
 	__wt_free(session, clsm->blooms);
 	__wt_free(session, clsm->cursors);

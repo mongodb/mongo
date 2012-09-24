@@ -154,7 +154,8 @@ print_stats(u_int nthreads)
 	s = run_stats;
 	for (id = 0; id < nthreads; ++id, ++s)
 		printf(
-		    "%3d: create %6d, drop %6d, ckpt %6d, upgrade %6d, "
-		    "verify %6d\n",
-		    id, s->create, s->drop, s->ckpt, s->upgrade, s->verify);
+		    "%2d: bulk %4d, create %4d, drop %4d, ckpt %4d, "
+		    "upgrade %4d, verify %4d\n",
+		    id, s->bulk,
+		    s->create, s->drop, s->ckpt, s->upgrade, s->verify);
 }

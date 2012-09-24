@@ -28,7 +28,7 @@ obj_bulk(void)
 			sched_yield();
 			if ((ret = c->close(c)) != 0)
 				die("cursor.close", ret);
-		} else if (ret != ENOENT && ret != EBUSY)
+		} else if (ret != ENOENT && ret != EBUSY && ret != EINVAL)
 			die("session.open_cursor", ret);
 	}
 	if ((ret = session->close(session, NULL)) != 0)

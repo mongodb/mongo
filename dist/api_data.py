@@ -280,9 +280,9 @@ methods = {
 		type='boolean'),
 	Config('bulk', 'false', r'''
 		configure the cursor for bulk loads, a fast load path
-		that may only be used for just created objects.  Cursors
-		configured for bulk load only support the
-		WT_CURSOR::insert and WT_CURSOR::close methods''',
+		that may only be used for newly created objects. Cursors
+		configured for bulk load only support the WT_CURSOR::insert
+		and WT_CURSOR::close methods''',
 		type='boolean'),
 	Config('checkpoint', '', r'''
 		the name of a checkpoint to open (the reserved name

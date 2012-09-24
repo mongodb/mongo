@@ -51,7 +51,7 @@ class test_bulk_load_not_empty(wttest.WiredTigerTestCase):
         cursor.insert()
         # Close the insert cursor, else we'll get EBUSY.
         cursor.close()
-        msg = '/bulk-load is only possible for empty trees/'
+        msg = '/bulk-load is only supported on newly created objects/'
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.open_cursor(uri, None, "bulk"), msg)
 
