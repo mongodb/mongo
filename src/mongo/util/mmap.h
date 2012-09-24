@@ -51,6 +51,7 @@ namespace mongo {
         static unsigned getEra() { return era; }
 
         static void assertExclusivelyLocked() { mmmutex.assertExclusivelyLocked(); }
+        static void assertAtLeastReadLocked() { mmmutex.assertAtLeastReadLocked(); }
     };
 
     class LockMongoFilesExclusive { 
