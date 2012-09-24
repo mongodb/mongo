@@ -422,9 +422,15 @@ __wt_conn_btree_close_all(WT_SESSION_IMPL *session, const char *name)
 	WT_DECL_RET;
 
 	conn = S2C(session);
-	saved_btree = session->btree;
 
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
+
+	/*
+	 * Make sure the caller's handle is tracked, so it will be unlocked
+	 * even if we failed to get all of the remaining handles we need.
+	 */
+	if ((saved_btree = session->btree) != NULL && WT_META_TRACKING(session))
+		WT_ERR(__wt_meta_track_handle_lock(session, 0));
 
 	TAILQ_FOREACH(btree, &conn->btqh, q) {
 		if (strcmp(btree->name, name) != 0)
@@ -439,11 +445,10 @@ __wt_conn_btree_close_all(WT_SESSION_IMPL *session, const char *name)
 		else {
 			WT_ERR(__wt_try_writelock(session, btree->rwlock));
 			F_SET(btree, WT_BTREE_EXCLUSIVE);
+			session->btree = btree;
+			if (WT_META_TRACKING(session))
+				WT_ERR(__wt_meta_track_handle_lock(session, 0));
 		}
-
-		session->btree = btree;
-		if (WT_META_TRACKING(session))
-			WT_ERR(__wt_meta_track_handle_lock(session, 0));
 
 		/*
 		 * We have an exclusive lock, which means there are no

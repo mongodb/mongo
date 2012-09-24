@@ -31,12 +31,6 @@ __drop_file(
 		return (ret);
 	}
 
-	if (WT_META_TRACKING(session) &&
-	    (ret = __wt_meta_track_handle_lock(session, 0)) != 0) {
-		(void)__wt_session_release_btree(session);
-		return (ret);
-	}
-
 	/* Close all btree handles associated with this file. */
 	WT_RET(__wt_conn_btree_close_all(session, uri));
 
@@ -87,9 +81,13 @@ __drop_tree(
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));
 	WT_ERR(__wt_buf_set(
 	    session, buf, btree->name, strlen(btree->name) + 1));
-	WT_ERR(__drop_file(session, buf->data, force, cfg));
+	WT_TRET(__drop_file(session, buf->data, force, cfg));
 
-err:	__wt_scr_free(&buf);
+	if (0) {
+err:		session->btree = btree;
+		(void)__wt_session_release_btree(session);
+	}
+	__wt_scr_free(&buf);
 
 	return (ret);
 }
@@ -125,12 +123,6 @@ __drop_colgroup(
 	    WT_BTREE_EXCLUSIVE | WT_BTREE_LOCK_ONLY)) != 0) {
 		if (ret == WT_NOTFOUND || ret == ENOENT)
 			ret = 0;
-		return (ret);
-	}
-
-	if (WT_META_TRACKING(session) &&
-	    (ret = __wt_meta_track_handle_lock(session, 0)) != 0) {
-		(void)__wt_session_release_btree(session);
 		return (ret);
 	}
 
@@ -174,12 +166,6 @@ __drop_index(
 	    WT_BTREE_EXCLUSIVE | WT_BTREE_LOCK_ONLY)) != 0) {
 		if (ret == WT_NOTFOUND || ret == ENOENT)
 			ret = 0;
-		return (ret);
-	}
-
-	if (WT_META_TRACKING(session) &&
-	    (ret = __wt_meta_track_handle_lock(session, 0)) != 0) {
-		(void)__wt_session_release_btree(session);
 		return (ret);
 	}
 
