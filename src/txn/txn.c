@@ -298,6 +298,13 @@ __wt_txn_init(WT_SESSION_IMPL *session)
 	WT_RET(__wt_calloc_def(session,
 	    S2C(session)->session_size, &txn->snapshot));
 
+	/*
+	 * Take care to clean these out in case we are reusing the transaction
+	 * for eviction.
+	 */
+	txn->mod = NULL;
+	txn->modref = NULL;
+
 	/* The default isolation level is read-committed. */
 	txn->isolation = session->isolation = TXN_ISO_READ_COMMITTED;
 
