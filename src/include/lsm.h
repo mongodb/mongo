@@ -57,6 +57,8 @@ struct __wt_lsm_tree {
 
 	WT_SESSION_IMPL *worker_session;/* Passed to thread_create */
 	pthread_t worker_tid;		/* LSM worker thread */
+	WT_SESSION_IMPL *worker_session2;/* For checkpoint worker */
+	pthread_t worker_tid2;		/* LSM checkpoint worker thread */
 
 	int nchunks;			/* Number of active chunks */
 	int last;			/* Last allocated ID. */

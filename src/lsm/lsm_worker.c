@@ -31,6 +31,7 @@ __wt_lsm_worker(void *arg)
 
 	chunk_array = NULL;
 	chunk_alloc = 0;
+	WT_VERBOSE_ERR(session, lsm, "LSM worker thread started.");
 
 	while (F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
 		progress = 0;
@@ -49,6 +50,10 @@ __wt_lsm_worker(void *arg)
 		    nchunks > 0 && lsm_tree->chunk[nchunks - 1]->ncursor > 0;
 		    --nchunks)
 			;
+		WT_VERBOSE_ERR(session, lsm,
+		    "LSM worker %d chunks out of %d, being merged",
+		    nchunks, lsm_tree->nchunks);
+
 		if (chunk_alloc < lsm_tree->chunk_alloc)
 			ret = __wt_realloc(session,
 			    &chunk_alloc, lsm_tree->chunk_alloc,
@@ -85,11 +90,12 @@ __wt_lsm_worker(void *arg)
 				progress = 1;
 			}
 		}
+		WT_VERBOSE_ERR(session, lsm, "LSM worker calling merge.");
 
 		/* Clear any state from previous worker thread iterations. */
 		session->btree = NULL;
 
-		if (nchunks > 0 && __wt_lsm_major_merge(session, lsm_tree) == 0)
+		if (__wt_lsm_major_merge(session, lsm_tree) == 0)
 			progress = 1;
 
 		/* Clear any state from previous worker thread iterations. */
@@ -103,6 +109,85 @@ __wt_lsm_worker(void *arg)
 			__wt_sleep(0, 10);
 	}
 
+	WT_VERBOSE_ERR(session, lsm, "LSM worker thread stop.");
+err:	__wt_free(session, chunk_array);
+
+	return (NULL);
+}
+
+/*
+ * __wt_lsm_checkpoint_worker --
+ *	A worker thread for an LSM tree, responsible for checkpointing chunks
+ *	once they become read only.
+ *	TODO: Share the logic about finding nchunks.
+ *	TODO: Update the session and worker handles to be an array in LSM_TREE
+ *	structure.
+ */
+void *
+__wt_lsm_checkpoint_worker(void *arg)
+{
+	WT_DECL_RET;
+	WT_LSM_CHUNK *chunk, **chunk_array;
+	WT_LSM_TREE *lsm_tree;
+	WT_SESSION_IMPL *session;
+	const char *cfg[] = { "name=,drop=", NULL };
+	size_t chunk_alloc;
+	int i, j, nchunks;
+
+	lsm_tree = arg;
+	session = lsm_tree->worker_session2;
+
+	chunk_array = NULL;
+	chunk_alloc = 0;
+
+	while (F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
+		__wt_spin_lock(session, &lsm_tree->lock);
+		if (!F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
+			__wt_spin_unlock(session, &lsm_tree->lock);
+			break;
+		}
+		/*
+		 * Take a copy of the current state of the LSM tree. Skip
+		 * the last chunk - since it is the active one and should not
+		 * be checkpointed.
+		 */
+		nchunks = lsm_tree->nchunks - 1;
+		if (chunk_alloc < lsm_tree->chunk_alloc)
+			ret = __wt_realloc(session,
+			    &chunk_alloc, lsm_tree->chunk_alloc,
+			    &chunk_array);
+		if (ret == 0 && nchunks > 0)
+			memcpy(chunk_array, lsm_tree->chunk,
+			    nchunks * sizeof(*lsm_tree->chunk));
+		__wt_spin_unlock(session, &lsm_tree->lock);
+		WT_ERR(ret);
+
+		/* Write checkpoints in all completed files. */
+		for (i = 0, j = 0; i < nchunks; i++) {
+			chunk = chunk_array[i];
+			if (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK))
+				continue;
+			++j;
+
+			/*
+			 * NOTE: we pass a non-NULL config, because otherwise
+			 * __wt_checkpoint thinks we're closing the file.
+			 */
+			WT_WITH_SCHEMA_LOCK(session, ret =
+			    __wt_schema_worker(session, chunk->uri,
+			    __wt_checkpoint, cfg, 0));
+			if (ret == 0) {
+				__wt_spin_lock(session, &lsm_tree->lock);
+				F_SET(lsm_tree->chunk[i], WT_LSM_CHUNK_ONDISK);
+				lsm_tree->dsk_gen++;
+				__wt_spin_unlock(session, &lsm_tree->lock);
+			}
+		}
+		if (j != 0)
+			WT_VERBOSE_ERR(session, lsm,
+			     "LSM worker checkpointed %d.", j);
+		__wt_sleep(0, 10);
+	}
 err:	__wt_free(session, chunk_array);
 
 	return (NULL);
@@ -137,6 +222,10 @@ __lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 				chunk->bloom_uri = NULL;
 			} else if (ret != EBUSY)
 				goto err;
+			if (ret == EBUSY)
+				WT_VERBOSE_ERR(session, lsm,
+				    "LSM worker bloom drop busy: %s.",
+				    chunk->bloom_uri);
 		}
 		if (chunk->uri != NULL) {
 			WT_WITH_SCHEMA_LOCK(session, ret =

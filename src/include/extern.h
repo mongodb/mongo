@@ -724,6 +724,7 @@ extern int __wt_lsm_tree_worker(WT_SESSION_IMPL *session,
     const char *cfg[],
     uint32_t open_flags);
 extern void *__wt_lsm_worker(void *arg);
+extern void *__wt_lsm_checkpoint_worker(void *arg);
 extern int __wt_metadata_get(WT_SESSION *session,
     const char *uri,
     const char **valuep);
