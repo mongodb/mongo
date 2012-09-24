@@ -76,6 +76,4 @@ struct __wt_lsm_data_source {
 	WT_DATA_SOURCE iface;
 
 	WT_RWLOCK *rwlock;
-
-	TAILQ_HEAD(__trees, __wt_lsm_tree) trees;
 };
