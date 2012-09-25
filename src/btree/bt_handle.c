@@ -10,7 +10,7 @@
 static int __btree_conf(WT_SESSION_IMPL *);
 static int __btree_get_last_recno(WT_SESSION_IMPL *);
 static int __btree_page_sizes(WT_SESSION_IMPL *, const char *);
-static int __btree_tree_open_empty(WT_SESSION_IMPL *);
+static int __btree_tree_open_empty(WT_SESSION_IMPL *, int);
 
 static int pse1(WT_SESSION_IMPL *, const char *, uint32_t, uint32_t);
 static int pse2(WT_SESSION_IMPL *, const char *, uint32_t, uint32_t, uint32_t);
@@ -49,7 +49,7 @@ __wt_btree_open(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_ITEM dsk;
 	const char *filename;
-	int forced_salvage;
+	int created, forced_salvage;
 
 	dhandle = session->dhandle;
 	btree = S2BT(session);
@@ -58,6 +58,21 @@ __wt_btree_open(WT_SESSION_IMPL *session,
 	/* Initialize and configure the WT_BTREE structure. */
 	WT_ERR(__btree_conf(session));
 
+	/*
+	 * Bulk-load is only permitted on newly created files, not any empty
+	 * file.  The reason is because deleting a checkpoint requires writing
+	 * the file, and a fake checkpoint can't write the file.  So, if you
+	 * have a named checkpoint in the file, then, because tree is empty,
+	 * you start bulk-loading it, then you enter another checkpoint with
+	 * the same name, you end up using a fake checkpoint to delete a real
+	 * checkpoint, and that's going to end in tears.
+	 */
+	created = addr == NULL || addr_size == 0;
+	if (!created && F_ISSET(btree, WT_BTREE_BULK))
+		WT_ERR_MSG(session, EINVAL,
+		    "bulk-load is only supported on newly created objects");
+
+	/* Handle salvage configuration. */
 	forced_salvage = 0;
 	if (F_ISSET(btree, WT_BTREE_SALVAGE)) {
 		ret = __wt_config_gets(session, cfg, "force", &cval);
@@ -90,8 +105,8 @@ __wt_btree_open(WT_SESSION_IMPL *session,
 	 */
 	WT_ERR(
 	    __wt_bm_checkpoint_load(session, &dsk, addr, addr_size, readonly));
-	if (addr == NULL || addr_size == 0 || dsk.size == 0)
-		WT_ERR(__btree_tree_open_empty(session));
+	if (created || dsk.size == 0)
+		WT_ERR(__btree_tree_open_empty(session, created));
 	else {
 		WT_ERR(__wt_btree_tree_open(session, &dsk));
 
@@ -275,7 +290,7 @@ __wt_btree_tree_open(WT_SESSION_IMPL *session, WT_ITEM *dsk)
  *	Create an empty in-memory tree.
  */
 static int
-__btree_tree_open_empty(WT_SESSION_IMPL *session)
+__btree_tree_open_empty(WT_SESSION_IMPL *session, int created)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
@@ -286,10 +301,12 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session)
 	root = leaf = NULL;
 
 	/*
-	 * Empty objects can be used for cursor inserts or for bulk loads; set
-	 * a flag that's cleared when a row is inserted into the tree.
+	 * Newly created objects can be used for cursor inserts or for bulk
+	 * loads; set a flag that's cleared when a row is inserted into the
+	 * tree.
 	 */
-	btree->bulk_load_ok = 1;
+	if (created)
+		btree->bulk_load_ok = 1;
 
 	/*
 	 * A note about empty trees: the initial tree is a root page and a leaf

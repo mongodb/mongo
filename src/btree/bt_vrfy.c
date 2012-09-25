@@ -108,6 +108,10 @@ __verify_int(WT_SESSION_IMPL *session, int dumpfile)
 		WT_VERBOSE_ERR(session, verify,
 		    "%s: checkpoint %s", btree->dhandle->name, ckpt->name);
 
+		/* Fake checkpoints require no work. */
+		if (F_ISSET(ckpt, WT_CKPT_FAKE))
+			continue;
+
 		/* House-keeping between checkpoints. */
 		__verify_checkpoint_reset(vs);
 

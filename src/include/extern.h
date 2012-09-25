@@ -411,7 +411,7 @@ extern int __wt_rec_write(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     WT_SALVAGE_COOKIE *salvage,
     uint32_t flags);
-extern void __wt_rec_destroy(WT_SESSION_IMPL *session);
+extern void __wt_rec_destroy(WT_SESSION_IMPL *session, void *retp);
 extern int __wt_rec_bulk_init(WT_CURSOR_BULK *cbulk);
 extern int __wt_rec_bulk_wrapup(WT_CURSOR_BULK *cbulk);
 extern int __wt_rec_row_bulk_insert(WT_CURSOR_BULK *cbulk);
@@ -581,6 +581,11 @@ extern int __wt_conn_btree_apply(WT_SESSION_IMPL *session,
     int (*func)(WT_SESSION_IMPL *,
     const char *[]),
     const char *cfg[]);
+extern int __wt_conn_btree_apply_single(WT_SESSION_IMPL *session,
+    const char *uri,
+    int (*func)(WT_SESSION_IMPL *,
+    const char *[]),
+    const char *cfg[]);
 extern int __wt_conn_btree_close(WT_SESSION_IMPL *session, int locked);
 extern int __wt_conn_dhandle_close_all(WT_SESSION_IMPL *session,
     const char *name);
@@ -729,8 +734,7 @@ extern void __wt_metadata_free_ckptlist(WT_SESSION *session, WT_CKPT *ckptbase);
 extern int __wt_meta_btree_apply(WT_SESSION_IMPL *session,
     int (*func)(WT_SESSION_IMPL *,
     const char *[]),
-    const char *cfg[],
-    uint32_t flags);
+    const char *cfg[]);
 extern int __wt_meta_checkpoint_addr(WT_SESSION_IMPL *session,
     const char *fname,
     const char *checkpoint,

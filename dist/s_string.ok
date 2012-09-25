@@ -226,6 +226,7 @@ argc
 args
 argv
 async
+autocommit
 bdb
 bigram
 bitcnt
@@ -642,6 +643,7 @@ tempty
 th
 thazard
 tid
+timestamp
 tinsert
 tlist
 tload

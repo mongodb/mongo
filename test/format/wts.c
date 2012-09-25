@@ -75,12 +75,15 @@ wts_open(void)
 		die(ret, "connection.open_session");
 
 	maxintlpage = 1U << g.c_intl_page_max;
+	/* Make sure at least 2 internal page per thread can fix in cache. */
+	while (2 * g.c_threads * maxintlpage > g.c_cache << 20)
+		maxintlpage >>= 1;
 	maxintlitem = MMRAND(maxintlpage / 50, maxintlpage / 40);
 	if (maxintlitem < 40)
 		maxintlitem = 40;
 	maxleafpage = 1U << g.c_leaf_page_max;
-	/* Make sure at least 3 leaf pages can fix in cache. */
-	while (3 * maxleafpage > g.c_cache << 20)
+	/* Make sure at least one leaf page per thread can fix in cache. */
+	while (g.c_threads * (maxintlpage + maxleafpage) > g.c_cache << 20)
 		maxleafpage >>= 1;
 	maxleafitem = MMRAND(maxleafpage / 50, maxleafpage / 40);
 	if (maxleafitem < 40)
@@ -105,9 +108,6 @@ wts_open(void)
 		    ",value_format=%dt", g.c_bitcnt);
 		break;
 	case ROW:
-		if (g.c_dictionary)
-			p += snprintf(p, (size_t)(end - p),
-			    ",dictionary=123");
 		if (g.c_huffman_key)
 			p += snprintf(p, (size_t)(end - p),
 			    ",huffman_key=english");
@@ -119,6 +119,9 @@ wts_open(void)
 		if (g.c_huffman_value)
 			p += snprintf(p, (size_t)(end - p),
 			    ",huffman_value=english");
+		if (g.c_dictionary)
+			p += snprintf(p, (size_t)(end - p),
+			    ",dictionary=%d", MMRAND(123, 517));
 		break;
 	}
 

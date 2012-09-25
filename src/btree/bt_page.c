@@ -26,6 +26,7 @@ __wt_page_in_func(
 #endif
     )
 {
+	WT_DECL_RET;
 	WT_PAGE *page;
 	int busy, read_lockout, wake;
 
@@ -89,6 +90,12 @@ __wt_page_in_func(
 				__wt_hazard_clear(session, page);
 				__wt_evict_server_wake(session);
 				break;
+			}
+
+			/* Check if we need an autocommit transaction. */
+			if ((ret = __wt_txn_autocommit_check(session)) != 0) {
+				__wt_hazard_clear(session, page);
+				return (ret);
 			}
 
 			page->read_gen = __wt_cache_read_gen(session);

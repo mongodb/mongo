@@ -44,6 +44,7 @@ struct __wt_ckpt {
 
 #define	WT_CKPT_ADD	0x01			/* Checkpoint to be added */
 #define	WT_CKPT_DELETE	0x02			/* Checkpoint to be deleted */
-#define	WT_CKPT_UPDATE	0x04			/* Checkpoint requires update */
+#define	WT_CKPT_FAKE	0x04			/* Checkpoint is a fake */
+#define	WT_CKPT_UPDATE	0x08			/* Checkpoint requires update */
 	uint32_t flags;
 };

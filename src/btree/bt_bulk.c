@@ -23,8 +23,8 @@ __wt_bulk_init(WT_CURSOR_BULK *cbulk)
 	btree = S2BT(session);
 
 	if (!btree->bulk_load_ok)
-		WT_RET_MSG(session,
-		    EINVAL, "bulk-load is only possible for empty trees");
+		WT_RET_MSG(session, EINVAL,
+		    "bulk-load is only possible for newly created trees");
 
 	/* Set a reference to the empty leaf page. */
 	cbulk->leaf = btree->root_page->u.intl.t->page;

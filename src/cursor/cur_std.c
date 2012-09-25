@@ -154,7 +154,7 @@ __wt_cursor_get_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 	size_t size;
 	const char *fmt;
 
-	CURSOR_API_CALL_NOCONF(cursor, session, get_key, NULL);
+	CURSOR_API_CALL(cursor, session, get_key, NULL);
 	WT_CURSOR_NEEDKEY(cursor);
 
 	if (WT_CURSOR_RECNO(cursor)) {
@@ -195,7 +195,7 @@ __wt_cursor_set_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 	va_list ap_copy;
 	const char *fmt, *str;
 
-	CURSOR_API_CALL_NOCONF(cursor, session, set_key, NULL);
+	CURSOR_API_CALL(cursor, session, set_key, NULL);
 
 	/* Fast path some common cases: single strings or byte arrays. */
 	if (WT_CURSOR_RECNO(cursor)) {
@@ -265,7 +265,7 @@ __wt_cursor_get_value(WT_CURSOR *cursor, ...)
 	const char *fmt;
 	va_list ap;
 
-	CURSOR_API_CALL_NOCONF(cursor, session, get_value, NULL);
+	CURSOR_API_CALL(cursor, session, get_value, NULL);
 	WT_CURSOR_NEEDVALUE(cursor);
 
 	va_start(ap, cursor);
@@ -294,7 +294,7 @@ __wt_cursor_set_value(WT_CURSOR *cursor, ...)
 	size_t sz;
 	va_list ap;
 
-	CURSOR_API_CALL_NOCONF(cursor, session, set_value, NULL);
+	CURSOR_API_CALL(cursor, session, set_value, NULL);
 
 	va_start(ap, cursor);
 	fmt = F_ISSET(cursor,
@@ -354,7 +354,7 @@ __wt_cursor_close(WT_CURSOR *cursor)
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
-	CURSOR_API_CALL_NOCONF(cursor, session, close, NULL);
+	CURSOR_API_CALL(cursor, session, close, NULL);
 
 	__wt_buf_free(session, &cursor->key);
 	__wt_buf_free(session, &cursor->value);

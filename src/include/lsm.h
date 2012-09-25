@@ -67,7 +67,8 @@ struct __wt_lsm_tree {
 	int nold_chunks;		/* Number of old chunks */
 	int old_avail;			/* Available old chunk slots */
 
-#define	WT_LSM_TREE_OPEN	0x01
+#define	WT_LSM_TREE_WORKING	0x01
+#define	WT_LSM_TREE_OPEN	0x02
 	uint32_t flags;
 };
 
@@ -75,6 +76,4 @@ struct __wt_lsm_data_source {
 	WT_DATA_SOURCE iface;
 
 	WT_RWLOCK *rwlock;
-
-	TAILQ_HEAD(__trees, __wt_lsm_tree) trees;
 };

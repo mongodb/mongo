@@ -25,14 +25,13 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_regress.py
+# test_bug001.py
 #       Regression tests.
-#
 
 import wiredtiger, wttest
 
 # Regression tests.
-class test_regression(wttest.WiredTigerTestCase):
+class test_bug001(wttest.WiredTigerTestCase):
 
     def create_implicit(self, uri, initial, middle, trailing):
         self.session.create(uri, 'key_format=r,value_format=8t')
@@ -53,7 +52,7 @@ class test_regression(wttest.WiredTigerTestCase):
         return (cursor)
 
     # Test a bug where cursor movement inside implicit records failed.
-    def test_regression_0001(self):
+    def test_implicit_record_cursor_movement(self):
         uri = 'file:xxx'
         cursor = self.create_implicit(uri, 0, 50, 20)
 
@@ -112,7 +111,7 @@ class test_regression(wttest.WiredTigerTestCase):
 
 
     # Test a bug where cursor remove inside implicit records looped infinitely.
-    def test_regression_0002(self):
+    def test_implicit_record_cursor_remove(self):
         uri='file:xxx'
         cursor = self.create_implicit(uri, 0, 50, 20)
 

@@ -29,16 +29,19 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	target_list = tracking = 0;
 	txn = &session->txn;
 
-	/* Only one checkpoint can be active at a time. */
-	WT_ASSERT(session, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED) &&
-	    !F_ISSET(txn, TXN_RUNNING));
-
 	/*
-	 * Begin a transaction for the checkpoint.  Checkpoints must run in
-	 * the same order as they update the metadata and we are using the
+	 * Only one checkpoint can be active at a time, and checkpoints must
+	 * run in the same order as they update the metadata; we are using the
 	 * schema lock to determine that ordering, so we can't move this to
 	 * __session_checkpoint.
+	 *
+	 * Begin a transaction for the checkpoint.
 	 */
+	WT_ASSERT(session,
+	    F_ISSET(session, WT_SESSION_SCHEMA_LOCKED) &&
+	    !F_ISSET(txn, TXN_RUNNING));
+	__wt_spin_lock(session, &conn->metadata_lock);
+
 	wt_session = &session->iface;
 	WT_ERR(wt_session->begin_transaction(wt_session, "isolation=snapshot"));
 
@@ -88,7 +91,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 		if (cval.len != 0)
 			ckpt_closed = 1;
 		WT_ERR(ckpt_closed ?
-		    __wt_meta_btree_apply(session, __wt_checkpoint, cfg, 0) :
+		    __wt_meta_btree_apply(session, __wt_checkpoint, cfg) :
 		    __wt_conn_btree_apply(session, __wt_checkpoint, cfg));
 	}
 
@@ -136,8 +139,10 @@ err:	/*
 	if (tracking)
 		WT_TRET(__wt_meta_track_off(session, ret != 0));
 
-	__wt_scr_free(&tmp);
 	__wt_txn_release(session);
+	__wt_spin_unlock(session, &conn->metadata_lock);
+
+	__wt_scr_free(&tmp);
 	return (ret);
 }
 
@@ -271,8 +276,8 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_TXN *txn;
 	WT_TXN_ISOLATION saved_isolation;
 	const char *name;
+	int deleted, is_checkpoint, track_ckpt;
 	char *name_alloc;
-	int deleted, is_checkpoint;
 
 	conn = S2C(session);
 	btree = S2BT(session);
@@ -281,6 +286,7 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	name_alloc = NULL;
 	txn = &session->txn;
 	saved_isolation = txn->isolation;
+	track_ckpt = 1;
 
 	/*
 	 * We're called in two ways: either because a handle is closing or
@@ -380,7 +386,7 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * reason to repeat the checkpoint for clean objects.  The test is if
 	 * the only checkpoint we're deleting is the last one in the list and
 	 * it has the same name as the checkpoint we're about to take, skip the
-	 * work.  (We can skip checkpoints that delete more than the last
+	 * work.  (We can't skip checkpoints that delete more than the last
 	 * checkpoint because deleting those checkpoints might free up space in
 	 * the file.)  This means an application toggling between two (or more)
 	 * checkpoint names will repeatedly take empty checkpoints, but that's
@@ -438,7 +444,7 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 					continue;
 				}
 				WT_ERR_MSG(session, EBUSY,
-				    "checkpoints cannot be dropped when "
+				    "named checkpoints cannot be created if "
 				    "backup cursors are open");
 			}
 
@@ -459,6 +465,54 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 			}
 			WT_ERR_MSG(session, ret,
 			    "checkpoints cannot be dropped when in-use");
+		}
+
+	/*
+	 * There are special files: those being bulk-loaded, salvaged, upgraded
+	 * or verified during the checkpoint.  We have to do something for those
+	 * objects because a checkpoint is an external name the application can
+	 * reference and the name must exist no matter what's happening during
+	 * the checkpoint.  For bulk-loaded files, we could block until the load
+	 * completes, checkpoint the partial load, or magic up an empty-file
+	 * checkpoint.  The first is too slow, the second is insane, so do the
+	 * third.
+	 *    Salvage, upgrade and verify don't currently require any work, all
+	 * three hold the schema lock, blocking checkpoints. If we ever want to
+	 * fix that (and I bet we eventually will, at least for verify), we can
+	 * copy the last checkpoint the file has.  That works if we guarantee
+	 * salvage, upgrade and verify act on objects with previous checkpoints
+	 * (true if handles are closed/re-opened between object creation and a
+	 * subsequent salvage, upgrade or verify operation).  Presumably,
+	 * salvage and upgrade will discard all previous checkpoints when they
+	 * complete, which is fine with us.  This change will require reference
+	 * counting checkpoints, and once that's done, we should use checkpoint
+	 * copy instead of forcing checkpoints on clean objects to associate
+	 * names with checkpoints.
+	 */
+	if (is_checkpoint)
+		switch (F_ISSET(btree, WT_BTREE_SPECIAL_FLAGS)) {
+		case 0:
+			break;
+		case WT_BTREE_BULK:
+			/*
+			 * The only checkpoints a bulk-loaded file should have
+			 * are fake ones we created without the underlying block
+			 * manager.  I'm leaving this code here because it's a
+			 * cheap test and a nasty race.
+			 */
+			WT_CKPT_FOREACH(ckptbase, ckpt)
+				if (!F_ISSET(ckpt, WT_CKPT_ADD | WT_CKPT_FAKE))
+					WT_ERR_MSG(session, ret,
+					    "block-manager checkpoint found "
+					    "for a bulk-loaded file");
+			track_ckpt = 0;
+			goto fake;
+		case WT_BTREE_SALVAGE:
+		case WT_BTREE_UPGRADE:
+		case WT_BTREE_VERIFY:
+			WT_ERR_MSG(session, EINVAL,
+			    "checkpoints are blocked during salvage, upgrade "
+			    "or verify operations");
 		}
 
 	/*
@@ -496,21 +550,25 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_ERR(__wt_bt_cache_flush(session,
 	    ckptbase, is_checkpoint ? WT_SYNC : WT_SYNC_DISCARD));
 
+fake:
 	/* Update the object's metadata. */
 	txn->isolation = TXN_ISO_READ_UNCOMMITTED;
 	ret = __wt_meta_ckptlist_set(session, dhandle->name, ckptbase);
 	WT_ERR(ret);
 
 	/*
-	 * If tracking enabled, defer making pages available until transaction
-	 * end.  The exception is if the handle is being discarded, in which
-	 * case the handle will be gone by the time we try to apply or unroll
-	 * the meta tracking event.
+	 * If we wrote a checkpoint (rather than faking one), pages may be
+	 * available for re-use.  If tracking enabled, defer making pages
+	 * available until transaction end.  The exception is if the handle
+	 * is being discarded, in which case the handle will be gone by the
+	 * time we try to apply or unroll the meta tracking event.
 	 */
-	if (WT_META_TRACKING(session) && is_checkpoint)
-		WT_ERR(__wt_meta_track_checkpoint(session));
-	else
-		WT_ERR(__wt_bm_checkpoint_resolve(session));
+	if (track_ckpt) {
+		if (WT_META_TRACKING(session) && is_checkpoint)
+			WT_ERR(__wt_meta_track_checkpoint(session));
+		else
+			WT_ERR(__wt_bm_checkpoint_resolve(session));
+	}
 
 err:
 skip:	__wt_meta_ckptlist_free(session, ckptbase);

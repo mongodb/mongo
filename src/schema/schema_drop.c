@@ -82,9 +82,13 @@ __drop_tree(
 	name = dhandle->name;
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));
 	WT_ERR(__wt_buf_set(session, buf, name, strlen(name) + 1));
-	WT_ERR(__drop_file(session, buf->data, force, cfg));
+	WT_TRET(__drop_file(session, buf->data, force, cfg));
 
-err:	__wt_scr_free(&buf);
+	if (0) {
+err:		session->dhandle = dhandle;
+		(void)__wt_session_release_btree(session);
+	}
+	__wt_scr_free(&buf);
 
 	return (ret);
 }
@@ -241,6 +245,9 @@ __wt_schema_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 	WT_RET(__wt_schema_name_check(session, uri));
 
 	WT_RET(__wt_meta_track_on(session));
+
+	/* Be careful to ignore any btree handle in our caller. */
+	WT_CLEAR_BTREE_IN_SESSION(session);
 
 	if (WT_PREFIX_MATCH(uri, "colgroup:"))
 		ret = __drop_colgroup(session, uri, force, cfg);
