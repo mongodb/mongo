@@ -231,8 +231,8 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 			if ((ret = __wt_session_lock_btree(
 			    session, flags)) != WT_NOTFOUND) {
 				WT_ASSERT(session, ret != 0 ||
-				    LF_ISSET(WT_BTREE_EXCLUSIVE) ==
-				    F_ISSET(session->btree, WT_BTREE_EXCLUSIVE));
+				    LF_ISSET(WT_BTREE_EXCLUSIVE) == F_ISSET(
+				    session->btree, WT_BTREE_EXCLUSIVE));
 				return (ret);
 			}
 			ret = 0;

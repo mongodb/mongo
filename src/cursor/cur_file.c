@@ -338,7 +338,7 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 
 	/*
 	 * no_cache
-	 * Uncached cursors are read-only.
+	 * No cache cursors are read-only.
 	 */
 	WT_ERR(__wt_config_gets_defno(session, cfg, "no_cache", &cval));
 	if (cval.val != 0) {

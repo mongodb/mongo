@@ -306,7 +306,7 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_PAGE *page)
 	if (page == NULL || WT_PAGE_IS_ROOT(page))
 		return;
 
-	/* If this is an uncached page, discard it. */
+	/* If this is a non cached page, discard it. */
 	if (F_ISSET(btree, WT_BTREE_NO_CACHE)) {
 		page->ref->page = NULL;
 		page->ref->state = WT_REF_DISK;
