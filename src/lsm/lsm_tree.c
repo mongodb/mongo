@@ -500,7 +500,7 @@ __wt_lsm_tree_truncate(
 
 	/* Mark all chunks old. */
 	WT_ERR(__wt_lsm_merge_update_tree(
-	    session, lsm_tree, lsm_tree->nchunks, &chunk));
+	    session, lsm_tree, 0, lsm_tree->nchunks, &chunk));
 
 	/* Create the new chunk. */
 	WT_ERR(__wt_lsm_tree_create_chunk(
