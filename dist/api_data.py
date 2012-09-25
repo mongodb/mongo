@@ -306,7 +306,7 @@ methods = {
 	Config('no_cache', 'false', r'''
 		do not cache pages from the underlying object.  The cursor
 		does not support data modification''',
-		type='boolean'),
+		type='boolean', undoc=True),
 	Config('overwrite', 'false', r'''
 		change the behavior of the cursor's insert method to overwrite
 		previously existing values''',

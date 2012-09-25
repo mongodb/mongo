@@ -541,9 +541,6 @@ struct __wt_session {
 	 * configured with next_random only support the WT_CURSOR::next and
 	 * WT_CURSOR::close methods.  See @ref cursor_random for details.,a
 	 * boolean flag; default \c false.}
-	 * @config{no_cache, do not cache pages from the underlying object.  The
-	 * cursor does not support data modification.,a boolean flag; default \c
-	 * false.}
 	 * @config{overwrite, change the behavior of the cursor's insert method
 	 * to overwrite previously existing values.,a boolean flag; default \c
 	 * false.}
