@@ -25,6 +25,12 @@ __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	WT_ERR(__wt_calloc(session,
 	    conn->session_size, sizeof(WT_SESSION_IMPL), &conn->sessions));
 
+	/*
+	 * Set an initial size for the hazard array. It will be grown as
+	 * required up to hazard_max.
+	 */
+	conn->hazard_size = WT_HAZARD_INCR;
+
 	/* Create the cache. */
 	WT_ERR(__wt_cache_create(conn, cfg));
 

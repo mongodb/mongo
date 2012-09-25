@@ -382,7 +382,7 @@ const char *
 __wt_confdfl_wiredtiger_open =
 	"buffer_alignment=-1,cache_size=100MB,create=0,direct_io=,"
 	"error_prefix=,eviction_target=80,eviction_trigger=95,extensions=,"
-	"hazard_max=30,logging=0,multiprocess=0,session_max=50,sync=,"
+	"hazard_max=1000,logging=0,multiprocess=0,session_max=50,sync=,"
 	"transactional=,use_environment_priv=0,verbose=";
 
 WT_CONFIG_CHECK

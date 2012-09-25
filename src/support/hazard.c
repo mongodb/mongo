@@ -48,8 +48,16 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, int *busyp
 	 * state to WT_REF_LOCKED, then flushes memory and checks the hazard
 	 * references).
 	 */
-	for (hp = session->hazard;
-	    hp < session->hazard + conn->hazard_size; ++hp) {
+	for (hp = session->hazard; ; ++hp) {
+		/* Expand the number of hazard references if available.*/
+		if (hp >= session->hazard + conn->hazard_size) {
+			if (conn->hazard_size >= conn->hazard_max)
+				break;
+			WT_PUBLISH(conn->hazard_size,
+			    WT_MIN(conn->hazard_size + WT_HAZARD_INCR,
+			    conn->hazard_max));
+		}
+
 		if (hp->page != NULL)
 			continue;
 

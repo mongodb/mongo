@@ -702,7 +702,7 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
 	 * first time we open this session.
 	 */
 	if (session_ret->hazard == NULL)
-		WT_ERR(__wt_calloc(session, conn->hazard_size,
+		WT_ERR(__wt_calloc(session, conn->hazard_max,
 		    sizeof(WT_HAZARD), &session_ret->hazard));
 
 	/*

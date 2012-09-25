@@ -413,8 +413,8 @@ methods = {
 		paths may need quoting, for example,
 		<code>extensions=("/path/to/ext.so"="entry=my_entry")</code>''',
 		type='list'),
-	Config('hazard_max', '30', r'''
-		number of simultaneous hazard references per session handle''',
+	Config('hazard_max', '1000', r'''
+		maximum number of simultaneous hazard references per session handle''',
 		min='15'),
 	Config('logging', 'false', r'''
 		enable logging''',

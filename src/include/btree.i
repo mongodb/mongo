@@ -360,6 +360,7 @@ __wt_page_hazard_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 	for (s = conn->sessions, i = 0; i < session_cnt; ++s, ++i) {
 		if (!s->active)
 			continue;
+		WT_ORDERED_READ(session_cnt, conn->hazard_size);
 		for (hp = s->hazard; hp < s->hazard + conn->hazard_size; ++hp)
 			if (hp->page == page)
 				return (hp);

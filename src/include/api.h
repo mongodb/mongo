@@ -235,7 +235,8 @@ struct __wt_connection_impl {
 	 * WiredTiger allocates space for a fixed number of hazard references
 	 * in each thread of control.
 	 */
-	uint32_t   hazard_size;		/* Hazard array size */
+	uint32_t   hazard_size;		/* Count of used hazard references */
+	uint32_t   hazard_max;		/* Hazard array size */
 
 	WT_CACHE  *cache;		/* Page cache */
 	uint64_t   cache_size;
