@@ -740,7 +740,7 @@ namespace mongo {
                 }
 
                 ChunkManagerPtr info = config->getChunkManager( ns );
-                ChunkPtr chunk = info->findChunk( find );
+                ChunkPtr chunk = info->findChunkForDoc( find );
                 BSONObj middle = cmdObj.getObjectField( "middle" );
 
                 verify( chunk.get() );
@@ -835,7 +835,7 @@ namespace mongo {
                 tlog() << "CMD: movechunk: " << cmdObj << endl;
 
                 ChunkManagerPtr info = config->getChunkManager( ns );
-                ChunkPtr c = info->findChunk( find );
+                ChunkPtr c = info->findChunkForDoc( find );
                 const Shard& from = c->getShard();
 
                 if ( from == to ) {

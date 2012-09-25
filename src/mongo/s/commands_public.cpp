@@ -706,7 +706,7 @@ namespace mongo {
                 BSONObj filter = cmdObj.getObjectField("query");
                 uassert(13343,  "query for sharded findAndModify must have shardkey", cm->hasShardKey(filter));
 
-                ChunkPtr chunk = cm->findChunk(filter);
+                ChunkPtr chunk = cm->findChunkForDoc(filter);
                 ShardConnection conn( chunk->getShard() , fullns );
                 BSONObj res;
                 bool ok = conn->runCommand( conf->getName() , cmdObj , res );
@@ -1140,7 +1140,7 @@ namespace mongo {
             ChunkPtr insertSharded( ChunkManagerPtr manager, const char* ns, BSONObj& o, int flags, bool safe ) {
                 // note here, the MR output process requires no splitting / migration during process, hence StaleConfigException should not happen
                 Strategy* s = SHARDED;
-                ChunkPtr c = manager->findChunk( o );
+                ChunkPtr c = manager->findChunkForDoc( o );
                 LOG(4) << "  server:" << c->getShard().toString() << " " << o << endl;
                 s->insert( c->getShard() , ns , o , flags, safe);
                 return c;
@@ -1451,7 +1451,7 @@ namespace mongo {
                         verify( size < 0x7fffffff );
 
                         // key reported should be the chunk's minimum
-                        ChunkPtr c =  cm->findChunk(key);
+                        ChunkPtr c =  cm->findIntersectingChunk(key);
                         if ( !c ) {
                             warning() << "Mongod reported " << size << " bytes inserted for key " << key << " but can't find chunk" << endl;
                         } else {

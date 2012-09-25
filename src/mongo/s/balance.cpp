@@ -52,13 +52,13 @@ namespace mongo {
             ChunkManagerPtr cm = cfg->getChunkManager( chunkInfo.ns );
             verify( cm );
 
-            ChunkPtr c = cm->findChunk( chunkInfo.chunk.min );
+            ChunkPtr c = cm->findIntersectingChunk( chunkInfo.chunk.min );
             if ( c->getMin().woCompare( chunkInfo.chunk.min ) || c->getMax().woCompare( chunkInfo.chunk.max ) ) {
                 // likely a split happened somewhere
                 cm = cfg->getChunkManager( chunkInfo.ns , true /* reload */);
                 verify( cm );
 
-                c = cm->findChunk( chunkInfo.chunk.min );
+                c = cm->findIntersectingChunk( chunkInfo.chunk.min );
                 if ( c->getMin().woCompare( chunkInfo.chunk.min ) || c->getMax().woCompare( chunkInfo.chunk.max ) ) {
                     log() << "chunk mismatch after reload, ignoring will retry issue " << chunkInfo.chunk.toString() << endl;
                     continue;
@@ -79,7 +79,7 @@ namespace mongo {
                 // reload just to be safe
                 cm = cfg->getChunkManager( chunkInfo.ns );
                 verify( cm );
-                c = cm->findChunk( chunkInfo.chunk.min );
+                c = cm->findIntersectingChunk( chunkInfo.chunk.min );
                 
                 log() << "forcing a split because migrate failed for size reasons" << endl;
                 

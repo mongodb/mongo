@@ -42,16 +42,6 @@ namespace mongo {
         gMax = max.obj();
     }
 
-    int ShardKeyPattern::compare( const BSONObj& lObject , const BSONObj& rObject ) const {
-        BSONObj L = extractKey(lObject);
-        uassert( 10198 , str::stream() << "left object ("  << lObject << ") doesn't have full shard key (" << pattern << ')',
-                L.nFields() == (int)patternfields.size());
-        BSONObj R = extractKey(rObject);
-        uassert( 10199 , str::stream() << "right object (" << rObject << ") doesn't have full shard key (" << pattern << ')',
-                R.nFields() == (int)patternfields.size());
-        return L.woCompare(R);
-    }
-
     bool ShardKeyPattern::hasShardKey( const BSONObj& obj ) const {
         /* this is written s.t. if obj has lots of fields, if the shard key fields are early,
            it is fast.  so a bit more work to try to be semi-fast.
@@ -229,10 +219,9 @@ namespace mongo {
 
             BSONObj k1 = BSON( "key" << 5 );
 
-            verify( k.compare( min , max ) < 0 );
-            verify( k.compare( min , k1 ) < 0 );
-            verify( k.compare( max , min ) > 0 );
-            verify( k.compare( min , min ) == 0 );
+            verify( min < max );
+            verify( min < k.extractKey( k1 ) );
+            verify( max > min );
 
             hasshardkeytest();
             verify( k.hasShardKey( k1 ) );
@@ -241,7 +230,7 @@ namespace mongo {
             BSONObj a = k1;
             BSONObj b = BSON( "key" << 999 );
 
-            verify( k.compare(a,b) < 0 );
+            verify( k.extractKey( a ) <  k.extractKey( b ) );
 
             // add middle multitype tests
 

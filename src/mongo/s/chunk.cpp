@@ -90,17 +90,13 @@ namespace mongo {
         return _manager->getns();
     }
 
-    bool Chunk::contains( const BSONObj& obj ) const {
-        return
-            _manager->getShardKey().compare( getMin() , obj ) <= 0 &&
-            _manager->getShardKey().compare( obj , getMax() ) < 0;
+    bool Chunk::containsPoint( const BSONObj& point ) const {
+        return getMin().woCompare( point ) <= 0 && point.woCompare( getMax() ) < 0;
     }
 
-    bool ChunkRange::contains(const BSONObj& obj) const {
+    bool ChunkRange::containsPoint( const BSONObj& point ) const {
         // same as Chunk method
-        return
-            _manager->getShardKey().compare( getMin() , obj ) <= 0 &&
-            _manager->getShardKey().compare( obj , getMax() ) < 0;
+        return getMin().woCompare( point ) <= 0 && point.woCompare( getMax() ) < 0;
     }
 
     bool Chunk::minIsInf() const {
@@ -410,7 +406,7 @@ namespace mongo {
                 }
 
                 ChunkManagerPtr cm = _manager->reload(false/*just reloaded in mulitsplit*/);
-                ChunkPtr toMove = cm->findChunk(min);
+                ChunkPtr toMove = cm->findIntersectingChunk(min);
 
                 if ( ! (toMove->getMin() == min && toMove->getMax() == max) ){
                     LOG(1) << "recently split chunk: " << range << " modified before we could migrate " << toMove << endl;
@@ -472,10 +468,7 @@ namespace mongo {
     }
 
     bool Chunk::operator==( const Chunk& s ) const {
-        return
-            _manager->getShardKey().compare( _min , s._min ) == 0 &&
-            _manager->getShardKey().compare( _max , s._max ) == 0
-            ;
+        return _min.woCompare( s._min ) == 0 && _max.woCompare( s._max ) == 0;
     }
 
     void Chunk::serialize(BSONObjBuilder& to,ShardChunkVersion myLastMod) {
@@ -1028,14 +1021,12 @@ namespace mongo {
         _version = ShardChunkVersion( 0, version.epoch() );
     }
 
-    ChunkPtr ChunkManager::findChunk( const BSONObj & obj ) const {
-        BSONObj key = _key.extractKey(obj);
-
+    ChunkPtr ChunkManager::findIntersectingChunk( const BSONObj& point ) const {
         {
             BSONObj foo;
             ChunkPtr c;
             {
-                ChunkMap::const_iterator it = _chunkMap.upper_bound(key);
+                ChunkMap::const_iterator it = _chunkMap.upper_bound( point );
                 if (it != _chunkMap.end()) {
                     foo = it->first;
                     c = it->second;
@@ -1043,14 +1034,14 @@ namespace mongo {
             }
 
             if ( c ) {
-                if ( c->contains( key ) ){
-                    dassert(c->contains(key)); // doesn't use fast-path in extractKey
+                if ( c->containsPoint( point ) ){
+                    dassert( c->containsPoint( point ) ); // doesn't use fast-path in extractKey
                     return c;
                 }
 
                 PRINT(foo);
                 PRINT(*c);
-                PRINT(key);
+                PRINT( point );
 
                 reload();
                 massert(13141, "Chunk map pointed to incorrect chunk", false);
@@ -1058,7 +1049,12 @@ namespace mongo {
         }
 
         msgasserted( 8070 ,
-                     str::stream() << "couldn't find a chunk which should be impossible: " << key );
+                     str::stream() << "couldn't find a chunk which should be impossible: " << point );
+    }
+
+    ChunkPtr ChunkManager::findChunkForDoc( const BSONObj& doc ) const {
+        BSONObj key = _key.extractKey( doc );
+        return findIntersectingChunk( key );
     }
 
     ChunkPtr ChunkManager::findChunkOnServer( const Shard& shard ) const {
@@ -1165,11 +1161,11 @@ namespace mongo {
 
     bool ChunkManager::compatibleWith( const Chunk& other ) const {
 
-        // Do this first, b/c findChunk asserts if the key isn't similar
+        // Do this first, b/c findIntersectingChunk asserts if the key isn't similar
         if( ! this->_key.hasShardKey( other.getMin() ) ) return false;
         // We assume here that chunks will have consistent fields in min/max
 
-        ChunkPtr myChunk = this->findChunk( other.getMin() );
+        ChunkPtr myChunk = this->findIntersectingChunk( other.getMin() );
 
         if( other.getMin() != myChunk->getMin() ) return false;
         if( other.getMax() != myChunk->getMax() ) return false;
@@ -1320,8 +1316,8 @@ namespace mongo {
                 verify(max != _ranges.end());
                 verify(min == max);
                 verify(min->second->getShard() == chunk->getShard());
-                verify(min->second->contains( chunk->getMin() ));
-                verify(min->second->contains( chunk->getMax() ) || (min->second->getMax() == chunk->getMax()));
+                verify(min->second->containsPoint( chunk->getMin() ));
+                verify(min->second->containsPoint( chunk->getMax() ) || (min->second->getMax() == chunk->getMax()));
             }
 
         }

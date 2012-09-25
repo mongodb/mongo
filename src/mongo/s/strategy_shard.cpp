@@ -397,7 +397,7 @@ namespace mongo {
                 // Many operations benefit from having the shard key early in the object
                 if( manager ){
                     o = manager->getShardKey().moveToFront(o);
-                    insertsForChunks[manager->findChunk(o)].push_back(o);
+                    insertsForChunks[manager->findChunkForDoc(o)].push_back(o);
                 }
                 else{
                     insertsForChunks[ empty ].push_back(o);
@@ -711,7 +711,7 @@ namespace mongo {
             verify( manager );
             if( ! shardKey.isEmpty() ){
 
-                chunk = manager->findChunk( shardKey );
+                chunk = manager->findIntersectingChunk( shardKey );
                 shard = ShardPtr( new Shard( chunk->getShard() ) );
                 return;
             }

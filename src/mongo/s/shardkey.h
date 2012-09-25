@@ -52,13 +52,6 @@ namespace mongo {
             return isGlobalMin( k ) || isGlobalMax( k );
         }
 
-        /** compare shard keys from the objects specified
-           l < r negative
-           l == r 0
-           l > r positive
-         */
-        int compare( const BSONObj& l , const BSONObj& r ) const;
-
         /**
            @return whether or not obj has all fields in this shard key pattern
            e.g.
