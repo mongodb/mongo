@@ -32,13 +32,14 @@ else:
     env.SConscript('snappy/SConscript')
     env.StaticLibrary('shim_snappy', ['shim_snappy.cpp'], LIBDEPS=['snappy/snappy'])
 
+if windows:
+    env.Append(CPPDEFINES=['XP_WIN'])
+else:
+    env.Append(CPPDEFINES=['XP_UNIX'])
+
 if use_system_version_of_library("sm"):
     env.StaticLibrary("shim_spidermonkey", ['shim_spidermonkey.cpp'], SYSLIBDEPS=['js'])
 else:
-    if windows:
-        env.Append(CPPDEFINES=['XP_WIN'])
-    else:
-        env.Append(CPPDEFINES=['XP_UNIX'])
     env.Append(CPPPATH='$BUILD_DIR/third_party/js-1.7')
     env.SConscript('js-1.7/SConscript')
     env.StaticLibrary('shim_spidermonkey', ['shim_spidermonkey.cpp'], LIBDEPS=['js-1.7/js'])
