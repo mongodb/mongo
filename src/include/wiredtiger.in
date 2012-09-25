@@ -523,10 +523,10 @@ struct __wt_session {
 	 * record number key; valid only for cursors with record number keys.,a
 	 * boolean flag; default \c false.}
 	 * @config{bulk, configure the cursor for bulk loads; bulk-load is a
-	 * fast load path for empty objects and only empty objects may be
-	 * bulk-loaded.  Cursors configured for bulk load only support the
-	 * WT_CURSOR::insert and WT_CURSOR::close methods.,a boolean flag;
-	 * default \c false.}
+	 * fast load path for newly created objects and only newly created
+	 * objects may be bulk-loaded.  Cursors configured for bulk load only
+	 * support the WT_CURSOR::insert and WT_CURSOR::close methods.,a boolean
+	 * flag; default \c false.}
 	 * @config{checkpoint, the name of a checkpoint to open; the reserved
 	 * checkpoint name "WiredTigerCheckpoint" opens a cursor on the most
 	 * recent internal checkpoint taken for the object.,a string; default
@@ -608,8 +608,8 @@ struct __wt_session {
 	 * value_format.  For colgroups and indices\, all column names must
 	 * appear in the list of columns for the table.,a list of strings;
 	 * default empty.}
-	 * @config{dictionary, the number of entries maintained in the Btree
-	 * row-store leaf page value dictionary; see @ref
+	 * @config{dictionary, the maximum number of unique values remembered in
+	 * the Btree row-store leaf page value dictionary; see @ref
 	 * file_formats_compression for more information.,an integer greater
 	 * than or equal to 0; default \c 0.}
 	 * @config{exclusive, fail if the object exists.  When false (the

@@ -72,7 +72,6 @@ __wt_txn_get_snapshot(WT_SESSION_IMPL *session, wt_txnid_t max_id)
 	uint32_t i, n, session_cnt;
 
 	conn = S2C(session);
-	n = 0;
 	txn = &session->txn;
 	txn_global = &conn->txn_global;
 	oldest_snap_min = WT_TXN_ABORTED;
@@ -83,7 +82,9 @@ __wt_txn_get_snapshot(WT_SESSION_IMPL *session, wt_txnid_t max_id)
 
 		/* Copy the array of concurrent transactions. */
 		WT_ORDERED_READ(session_cnt, conn->session_cnt);
-		for (i = 0, s = txn_global->states; i < session_cnt; i++, s++) {
+		for (i = n = 0, s = txn_global->states;
+		    i < session_cnt;
+		    i++, s++) {
 			if ((id = s->snap_min) != WT_TXN_NONE)
 				if (TXNID_LT(id, oldest_snap_min))
 					oldest_snap_min = id;
@@ -148,7 +149,6 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 	uint32_t i, n, session_cnt;
 
 	conn = S2C(session);
-	n = 0;
 	txn = &session->txn;
 	txn_global = &conn->txn_global;
 	txn_state = &txn_global->states[session->id];
@@ -166,8 +166,6 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 		    WT_STRING_MATCH("read-committed", cval.str, cval.len) ?
 		    TXN_ISO_READ_COMMITTED : TXN_ISO_READ_UNCOMMITTED;
 
-	WT_ASSERT(session, session->ncursors == 0);
-
 	F_SET(txn, TXN_RUNNING);
 
 	do {
@@ -175,10 +173,18 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 		txn->id = txn_global->current;
 		WT_PUBLISH(txn_state->id, txn->id);
 
+		/*
+		 * If we are starting a snapshot isolation transaction, get
+		 * a snapshot of the running transactions.
+		 *
+		 * If we already have a snapshot (e.g., for an auto-commit
+		 * operation), update it so that the newly-allocated ID is
+		 * visible.
+		 */
 		if (txn->isolation == TXN_ISO_SNAPSHOT) {
 			/* Copy the array of concurrent transactions. */
 			WT_ORDERED_READ(session_cnt, conn->session_cnt);
-			for (i = 0, s = txn_global->states;
+			for (i = n = 0, s = txn_global->states;
 			    i < session_cnt;
 			    i++, s++) {
 				if ((id = s->snap_min) != WT_TXN_NONE)
@@ -238,6 +244,8 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_UNUSED(cfg);
 
 	txn = &session->txn;
+	WT_ASSERT(session, !F_ISSET(txn, TXN_ERROR));
+
 	if (!F_ISSET(txn, TXN_RUNNING))
 		WT_RET_MSG(session, EINVAL, "No transaction is active");
 
@@ -290,6 +298,13 @@ __wt_txn_init(WT_SESSION_IMPL *session)
 	WT_RET(__wt_calloc_def(session,
 	    S2C(session)->session_size, &txn->snapshot));
 
+	/*
+	 * Take care to clean these out in case we are reusing the transaction
+	 * for eviction.
+	 */
+	txn->mod = NULL;
+	txn->modref = NULL;
+
 	/* The default isolation level is read-committed. */
 	txn->isolation = session->isolation = TXN_ISO_READ_COMMITTED;
 
@@ -306,6 +321,8 @@ __wt_txn_destroy(WT_SESSION_IMPL *session)
 	WT_TXN *txn;
 
 	txn = &session->txn;
+	__wt_free(session, txn->mod);
+	__wt_free(session, txn->modref);
 	__wt_free(session, txn->snapshot);
 }
 

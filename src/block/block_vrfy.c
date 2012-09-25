@@ -498,9 +498,9 @@ __verify_ckptfrag_add(
 	for (f = frag, i = 0; i < frags; ++f, ++i)
 		if (!__bit_test(block->fragckpt, f))
 			WT_RET_MSG(session, WT_ERROR,
-			    "checkpoint fragment at %" PRIuMAX " referenced "
-			    "multiple times in a single checkpoint or found in "
-			    "the checkpoint but not listed in the checkpoint's "
+			    "fragment at %" PRIuMAX " referenced multiple "
+			    "times in a single checkpoint or found in the "
+			    "checkpoint but not listed in the checkpoint's "
 			    "allocation list",
 			    (uintmax_t)offset);
 

@@ -89,7 +89,8 @@ struct __wt_txn {
 	size_t		modref_alloc;
 	u_int		modref_count;
 
-#define	TXN_ERROR	0x01
-#define	TXN_RUNNING	0x02
+#define	TXN_AUTOCOMMIT	0x01
+#define	TXN_ERROR	0x02
+#define	TXN_RUNNING	0x04
 	uint32_t flags;
 };

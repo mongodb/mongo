@@ -28,7 +28,7 @@
  *
  * WT_PAGE_ROW_LEAF (row-store leaf page):
  *	Keys with optional data cells (a WT_CELL_KEY or WT_CELL_KEY_OVFL cell,
- *	optionally followed by a WT_CELL_VALUE or WT_CELL_VALUE_OVFL cell).
+ *	optionally followed by a WT_CELL_{VALUE,VALUE_COPY,VALUE_OVFL} cell).
  *
  * Both WT_PAGE_ROW_INT and WT_PAGE_ROW_LEAF pages prefix compress keys, using
  * a single byte immediately following the cell.
@@ -37,7 +37,7 @@
  *	Off-page references (a WT_CELL_{ADDR,ADDR_LNO} cell).
  *
  * WT_PAGE_COL_VAR (Column-store leaf page storing variable-length cells):
- *	Data cells (a WT_CELL_VALUE or WT_CELL_VALUE_OVFL cell), and deleted
+ *	Data cells (a WT_CELL_{VALUE,VALUE_COPY,VALUE_OVFL} cell), or deleted
  * cells (a WT_CELL_DEL cell).
  *
  * Cell descriptor byte:
@@ -64,8 +64,8 @@
 #define	WT_CELL_KEY_SHORT	0x002		/* Short key */
 
 /*
- * Cell types can have an associated, 64-bit packed value: an RLE count, a
- * record number, or a copy-cell page offset.
+ * Cell types can have an associated, 64-bit packed value: an RLE count or a
+ * record number.
  */
 #define	WT_CELL_64V		0x004		/* Associated value */
 
@@ -76,6 +76,10 @@
  * the additional information that the address is for a leaf page without any
  * overflow items.  The goal is to speed up data truncation since we don't have
  * to read leaf pages without overflow items in order to delete them.
+ *
+ * WT_CELL_VALUE_COPY is a reference to a previous cell on the page, supporting
+ * value dictionaries: if the two values are the same, we only store them once
+ * and have the second and subsequent use reference the original.
  */
 #define	WT_CELL_ADDR		(0 << 4)	/* Block location */
 #define	WT_CELL_ADDR_DEL	(1 << 4)	/* Block location (deleted) */
@@ -98,10 +102,10 @@ struct __wt_cell {
 	 * 1: type + 64V flag (recno/rle)
 	 * 1: prefix compression count
 	 * 9: associated 64-bit value	(uint64_t encoding, max 9 bytes)
-	 * 5: optional data length	(uint32_t encoding, max 5 bytes)
+	 * 5: data length		(uint32_t encoding, max 5 bytes)
 	 *
-	 * The prefix compression count and 64V value overlap, this calculation
-	 * is pessimistic, but it isn't worth optimizing.
+	 * This calculation is pessimistic: the prefix compression count and
+	 * 64V value overlap, the data length is optional.
 	 */
 	uint8_t __chunk[1 + 1 + WT_INTPACK64_MAXSIZE + WT_INTPACK32_MAXSIZE];
 };
@@ -194,17 +198,74 @@ __wt_cell_pack_data(WT_CELL *cell, uint64_t rle, uint32_t size)
 }
 
 /*
+ * __wt_cell_pack_data_match --
+ *	Return if two items would have identical WT_CELLs (except for any RLE).
+ */
+static inline int
+__wt_cell_pack_data_match(
+    WT_CELL *page_cell, WT_CELL *val_cell, const uint8_t *val_data, int *matchp)
+{
+	const uint8_t *a, *b;
+	uint64_t av, bv;
+	int rle;
+
+	*matchp = 0;				/* Default to no-match */
+
+	/*
+	 * This is a special-purpose function used by reconciliation to support
+	 * dictionary lookups.  We're passed an on-page cell and a created cell
+	 * plus a chunk of data we're about to write on the page, and we return
+	 * if they would match on the page.  The column-store comparison ignores
+	 * the RLE because the copied cell will have its own RLE.
+	 */
+	a = (uint8_t *)page_cell;
+	b = (uint8_t *)val_cell;
+	if (*a != *b)				/* Type + value flag */
+		return (0);
+
+	if (a[0] & WT_CELL_VALUE_SHORT) {
+		av = a[0] >> 1;
+		++a;
+		++b;
+	} else {
+		rle = a[0] & WT_CELL_64V ? 1 : 0;	/* Value */
+		++a;
+		++b;
+		if (rle) {				/* Skip RLE */
+			WT_RET(__wt_vunpack_uint(&a, 0, &av));
+			WT_RET(__wt_vunpack_uint(&b, 0, &bv));
+		}
+		WT_RET(__wt_vunpack_uint(&a, 0, &av));	/* Length */
+		WT_RET(__wt_vunpack_uint(&b, 0, &bv));
+		if (av != bv)
+			return (0);
+	}
+
+	/*
+	 * This is safe, we know the length of the value's data because it was
+	 * was encoded in the value cell.
+	 */
+	*matchp = memcmp(a, val_data, av) == 0 ? 1 : 0;
+	return (0);
+}
+
+/*
  * __wt_cell_pack_copy --
  *	Write a copy value cell.
  */
 static inline uint32_t
-__wt_cell_pack_copy(WT_CELL *cell, uint64_t v)
+__wt_cell_pack_copy(WT_CELL *cell, uint64_t rle, uint64_t v)
 {
 	uint8_t *p;
 
 	p = cell->__chunk + 1;
-						/* Type + copy offset */
-	cell->__chunk[0] = WT_CELL_VALUE_COPY | WT_CELL_64V;
+
+	if (rle < 2)				/* Type + copy offset */
+		cell->__chunk[0] = WT_CELL_VALUE_COPY;
+	else {					/* Type + RLE + copy offset */
+		cell->__chunk[0] = WT_CELL_VALUE_COPY | WT_CELL_64V;
+		(void)__wt_vpack_uint(&p, 0, rle);
+	}
 	(void)__wt_vpack_uint(&p, 0, v);
 
 	return (WT_PTRDIFF32(p, cell));
@@ -371,6 +432,7 @@ __wt_cell_unpack_safe(WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
 	uint64_t v;
 	const uint8_t *p;
 	uint32_t saved_len;
+	uint64_t saved_v;
 
 	/*
 	 * The verification code specifies an end argument, a pointer to 1 past
@@ -464,15 +526,21 @@ __wt_cell_unpack_safe(WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
 	switch (unpack->raw) {
 	case WT_CELL_VALUE_COPY:
 		/*
-		 * The cell's value is an offset to a cell written earlier in
-		 * the page.  Save and restore the length of this cell, we need
-		 * it to step through the set of cells on the page.
+		 * The cell is followed by an offset to a cell written earlier
+		 * in the page.  Save/restore the length and RLE of this cell,
+		 * we need the length to step through the set of cells on the
+		 * page and this RLE is probably different from the RLE of the
+		 * earlier cell.
 		 */
+		WT_RET(__wt_vunpack_uint(
+		    &p, end == NULL ? 0 : (size_t)(end - p), &v));
 		saved_len = WT_PTRDIFF32(p, cell);
-		cell = (WT_CELL *)((uint8_t *)cell - unpack->v);
+		saved_v = unpack->v;
+		cell = (WT_CELL *)((uint8_t *)cell - v);
 		ret = __wt_cell_unpack_safe(cell, unpack, end);
 		unpack->raw = WT_CELL_VALUE_COPY;
 		unpack->__len = saved_len;
+		unpack->v = saved_v;
 		return (ret);
 
 	case WT_CELL_KEY_OVFL:

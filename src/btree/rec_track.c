@@ -503,6 +503,8 @@ __wt_track_string(WT_PAGE_TRACK *track, char *buf, size_t len)
 	char *p, *end;
 	const char *sep;
 
+	buf[0] = 0;
+
 	p = buf;
 	end = buf + len;
 

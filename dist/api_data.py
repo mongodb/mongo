@@ -123,9 +123,9 @@ file_config = format_meta + lsm_config + [
 		configure custom collation for keys.  Value must be a collator
 		name created with WT_CONNECTION::add_collator'''),
 	Config('dictionary', '0', r'''
-		the number of entries maintained in the Btree row-store leaf
-		page value dictionary; see @ref file_formats_compression for
-		more information''',
+		the maximum number of unique values remembered in the Btree
+		row-store leaf page value dictionary; see
+		@ref file_formats_compression for more information''',
 		min='0'),
 	Config('format', 'btree', r'''
 		the file format''',
@@ -284,9 +284,10 @@ methods = {
 		type='boolean'),
 	Config('bulk', 'false', r'''
 		configure the cursor for bulk loads; bulk-load is a fast
-		load path for empty objects and only empty objects may
-		be bulk-loaded.  Cursors configured for bulk load only
-		support the WT_CURSOR::insert and WT_CURSOR::close methods''',
+		load path for newly created objects and only newly
+		created objects may be bulk-loaded.  Cursors configured
+		for bulk load only support the WT_CURSOR::insert and
+		WT_CURSOR::close methods''',
 		type='boolean'),
 	Config('checkpoint', '', r'''
 		the name of a checkpoint to open; the reserved checkpoint
