@@ -211,8 +211,7 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 	if (!LF_ISSET(WT_BTREE_NO_CACHE)) {
 		TAILQ_FOREACH(btree_session, &session->btrees, q) {
 			btree = btree_session->btree;
-			if (F_ISSET(btree, WT_BTREE_NO_CACHE) ||
-			    strcmp(uri, btree->name) != 0)
+			if (strcmp(uri, btree->name) != 0)
 				continue;
 			if ((checkpoint == NULL && btree->checkpoint == NULL) ||
 			    (checkpoint != NULL && btree->checkpoint != NULL &&
