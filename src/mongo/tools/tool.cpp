@@ -423,8 +423,10 @@ namespace mongo {
         }
 
         string errmsg;
-        if ( _conn->auth( dbname , _username , _password , errmsg, true, level ) ) {
-            return;
+        if (dbname.size()) {
+            if ( _conn->auth( dbname , _username , _password , errmsg, true, level ) ) {
+                return;
+            }
         }
 
         // try against the admin db
