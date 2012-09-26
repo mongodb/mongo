@@ -3,7 +3,7 @@
 
 #include <string>
 
-#include "mongo/bson/stringdata.h"
+#include "mongo/base/string_data.h"
 
 namespace mongo {
     struct BSONArray;

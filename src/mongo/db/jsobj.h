@@ -40,6 +40,6 @@
 #include "../bson/bsonobjiterator.h"
 #include "../bson/bson-inl.h"
 #include "../bson/ordering.h"
-#include "../bson/stringdata.h"
+#include "mongo/base/string_data.h"
 #include "../bson/bson_db.h"
 

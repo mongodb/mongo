@@ -121,7 +121,7 @@
     <ClInclude Include="..\..\util\logfile.h">
       <Filter>includes</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\bson\stringdata.h">
+    <ClInclude Include="..\..\base\string_data.h">
       <Filter>includes</Filter>
     </ClInclude>
     <ClInclude Include="..\..\bson\oid.h">

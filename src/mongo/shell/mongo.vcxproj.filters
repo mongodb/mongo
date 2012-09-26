@@ -727,8 +727,8 @@
     <ClInclude Include="..\util\mongoutils\str.h">
       <Filter>util\mongoutils</Filter>
     </ClInclude>
-    <ClInclude Include="..\bson\stringdata.h">
-      <Filter>bson</Filter>
+    <ClInclude Include="..\base\string_data.h">
+      <Filter>base</Filter>
     </ClInclude>
     <ClInclude Include="..\client\syncclusterconnection.h">
       <Filter>client</Filter>

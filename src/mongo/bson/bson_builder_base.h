@@ -15,7 +15,7 @@
 
 #pragma once
 
-#include "mongo/bson/stringdata.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
 
 namespace mongo {
