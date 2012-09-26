@@ -251,7 +251,7 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	lsm_tree->file_config = __wt_buf_steal(session, buf, NULL);
 
 	/* Create the first chunk and flush the metadata. */
-	WT_ERR(__wt_lsm_tree_switch(session, lsm_tree));
+	WT_ERR(__wt_lsm_meta_write(session, lsm_tree));
 
 	/* Discard our partially populated handle. */
 	__lsm_tree_discard(session, lsm_tree);
@@ -291,6 +291,9 @@ __lsm_tree_open(
 	WT_ERR(__wt_strdup(session, uri, &lsm_tree->name));
 	lsm_tree->filename = lsm_tree->name + strlen("lsm:");
 	WT_ERR(__wt_lsm_meta_read(session, lsm_tree));
+
+	if (lsm_tree->nchunks == 0)
+		WT_ERR(__wt_lsm_tree_switch(session, lsm_tree));
 
 	/* Set the generation number so cursors are opened on first usage. */
 	lsm_tree->dsk_gen = 1;

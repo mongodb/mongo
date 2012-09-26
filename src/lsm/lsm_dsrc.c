@@ -100,7 +100,7 @@ int
 __wt_lsm_init(WT_CONNECTION *wt_conn, const char *config)
 {
 	WT_CONNECTION_IMPL *conn;
-	static WT_LSM_DATA_SOURCE *lsm_dsrc;
+	WT_LSM_DATA_SOURCE *lsm_dsrc;
 	WT_SESSION_IMPL *session;
 	static WT_DATA_SOURCE iface = {
 		__lsm_create,
@@ -118,7 +118,6 @@ __wt_lsm_init(WT_CONNECTION *wt_conn, const char *config)
 	lsm_dsrc->iface = iface;
 	WT_RET(
 	    __wt_rwlock_alloc(session, "lsm data source", &lsm_dsrc->rwlock));
-	TAILQ_INIT(&lsm_dsrc->trees);
 
 	return (wt_conn->add_data_source(wt_conn,
 	    "lsm:", &lsm_dsrc->iface, config));
@@ -132,10 +131,22 @@ int
 __wt_lsm_cleanup(WT_CONNECTION *wt_conn)
 {
 	WT_CONNECTION_IMPL *conn;
+	WT_DATA_SOURCE *dsrc;
+	WT_DECL_RET;
+	WT_LSM_DATA_SOURCE *lsm_dsrc;
 	WT_SESSION_IMPL *session;
 
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 	session = conn->default_session;
 
-	return (__wt_lsm_tree_close_all(session));
+	if ((ret = __wt_schema_get_source(session, "lsm:", &dsrc)) == 0) {
+		lsm_dsrc = (WT_LSM_DATA_SOURCE *)dsrc;
+		__wt_rwlock_destroy(session, &lsm_dsrc->rwlock);
+		__wt_free(session, dsrc);
+	}
+	if (ret == WT_NOTFOUND)
+		ret = 0;
+
+	WT_TRET(__wt_lsm_tree_close_all(session));
+	return (ret);
 }

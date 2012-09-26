@@ -22,7 +22,7 @@ __wt_lsm_worker(void *arg)
 	WT_LSM_CHUNK *chunk, **chunk_array;
 	WT_LSM_TREE *lsm_tree;
 	WT_SESSION_IMPL *session;
-	const char *cfg[] = { "name=,drop=", NULL };
+	const char *cfg[] = API_CONF_DEFAULTS(session, checkpoint, NULL);
 	size_t chunk_alloc;
 	int i, nchunks, progress;
 
