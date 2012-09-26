@@ -130,6 +130,7 @@ struct __wt_session_impl {
 	 * easily call a function to clear memory up to, but not including, the
 	 * hazard reference.
 	 */
+	uint32_t   hazard_size;		/* Count of used hazard references */
 	u_int nhazard;
 #define	WT_SESSION_CLEAR(s)	memset(s, 0, WT_PTRDIFF(&(s)->hazard, s))
 	WT_HAZARD *hazard;		/* Hazard reference array */
@@ -235,7 +236,6 @@ struct __wt_connection_impl {
 	 * WiredTiger allocates space for a fixed number of hazard references
 	 * in each thread of control.
 	 */
-	uint32_t   hazard_size;		/* Count of used hazard references */
 	uint32_t   hazard_max;		/* Hazard array size */
 
 	WT_CACHE  *cache;		/* Page cache */

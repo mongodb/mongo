@@ -704,6 +704,13 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
 	if (session_ret->hazard == NULL)
 		WT_ERR(__wt_calloc(session, conn->hazard_max,
 		    sizeof(WT_HAZARD), &session_ret->hazard));
+	/*
+	 * Set an initial size for the hazard array. It will be grown as
+	 * required up to hazard_max. The hazard_size is reset on close, since
+	 * __wt_hazard_close ensures the array is cleared - so it is safe to
+	 * reset the starting size on each open.
+	 */
+	session_ret->hazard_size = WT_HAZARD_INCR;
 
 	/*
 	 * Public sessions are automatically closed during WT_CONNECTION->close.
