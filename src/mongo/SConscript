@@ -314,7 +314,8 @@ env.Library( "dbcmdline", "db/cmdline.cpp" )
 env.Library('stacktrace', 'util/stacktrace.cpp')
 
 env.Program('lame_stacktrace_test', 'util/lame_stacktrace_test.cpp',
-            LIBDEPS=['stacktrace'])
+            LIBDEPS=['stacktrace',
+                     '$BUILD_DIR/mongo/base/base'])
 
 serverOnlyFiles += mmapFiles
 
