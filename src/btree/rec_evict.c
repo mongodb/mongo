@@ -238,7 +238,10 @@ __rec_review(WT_SESSION_IMPL *session,
 {
 	WT_DECL_RET;
 	WT_PAGE_MODIFY *mod;
+	WT_TXN *txn;
 	uint32_t i;
+
+	txn = &session->txn;
 
 	/*
 	 * Get exclusive access to the page if our caller doesn't have the tree
@@ -327,11 +330,19 @@ __rec_review(WT_SESSION_IMPL *session,
 			WT_VERBOSE_RET(session, evict,
 			    "page %p written but not clean", page);
 
+			if (F_ISSET(txn, TXN_RUNNING) &&
+			    ++txn->eviction_fails >= 100) {
+				txn->eviction_fails = 0;
+				ret = WT_DEADLOCK;
+				WT_STAT_INCR(
+				    S2C(session)->stats, txn_fail_cache);
+			}
+
 			/*
-			 * If there is only a single cursor open, there are no
-			 * consistency issues: try to bump our snapshot.
+			 * If no pages are referenced, there are no consistency
+			 * issues: try to bump our snapshot.
 			 */
-			if (session->ncursors <= 1) {
+			if (session->nhazard == 0) {
 				__wt_txn_read_last(session);
 				__wt_txn_read_first(session);
 			}
@@ -347,6 +358,8 @@ __rec_review(WT_SESSION_IMPL *session,
 			}
 		}
 		WT_RET(ret);
+
+		txn->eviction_fails = 0;
 	}
 
 	/*

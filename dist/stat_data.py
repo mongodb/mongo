@@ -40,6 +40,7 @@ connection_stats = [
 	Stat('txn_ancient', 'ancient transactions'),
 	Stat('txn_begin', 'transactions'),
 	Stat('txn_commit', 'transactions committed'),
+	Stat('txn_fail_cache', 'transaction failures due to cache overflow'),
 	Stat('txn_rollback', 'transactions rolled-back'),
 ]
 
