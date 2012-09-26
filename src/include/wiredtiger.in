@@ -1669,12 +1669,14 @@ extern int wiredtiger_extension_init(WT_SESSION *session,
 #define	WT_STAT_total_read_io				18
 /*! total write I/Os */
 #define	WT_STAT_total_write_io				19
+/*! transaction failures due to cache overflow */
+#define	WT_STAT_txn_fail_cache				20
 /*! transactions */
-#define	WT_STAT_txn_begin				20
+#define	WT_STAT_txn_begin				21
 /*! transactions committed */
-#define	WT_STAT_txn_commit				21
+#define	WT_STAT_txn_commit				22
 /*! transactions rolled-back */
-#define	WT_STAT_txn_rollback				22
+#define	WT_STAT_txn_rollback				23
 
 /*!
  * @}

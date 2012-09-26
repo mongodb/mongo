@@ -329,8 +329,10 @@ struct __wt_connection_impl {
 				__wt_txn_read_first(session);		\
 			}						\
 			ret = __wt_txn_commit((s), NULL);		\
-		} else							\
+		} else {						\
+			WT_TRET(WT_DEADLOCK);				\
 			(void)__wt_txn_rollback((s), NULL);		\
+		}							\
 	} else if ((ret) != 0 &&					\
 	    (ret) != WT_NOTFOUND &&					\
 	    (ret) != WT_DUPLICATE_KEY)					\
