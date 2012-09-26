@@ -52,9 +52,10 @@ struct __wt_lsm_tree {
 	uint32_t *memsizep;
 
 	/* Configuration parameters */
-	uint32_t threshold;
 	uint32_t bloom_bit_count;
 	uint32_t bloom_hash_count;
+	uint32_t chunk_size;
+	uint32_t merge_max;
 
 	WT_SESSION_IMPL *worker_session;/* Passed to thread_create */
 	pthread_t worker_tid;		/* LSM worker thread */
@@ -63,6 +64,7 @@ struct __wt_lsm_tree {
 	int last;			/* Last allocated ID. */
 	WT_LSM_CHUNK **chunk;		/* Array of active LSM chunks */
 	size_t chunk_alloc;		/* Space allocated for chunks */
+
 	WT_LSM_CHUNK **old_chunks;	/* Array of old LSM chunks */
 	size_t old_alloc;		/* Space allocated for old chunks */
 	int nold_chunks;		/* Number of old chunks */

@@ -131,11 +131,9 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	} else
 		start_chunk = 0;
 
-	/*
-	 * We have a limited number of hazard references, and we want to bound
-	 * the amount of work in the merge.
-	 */
-	nchunks = WT_MIN((int)S2C(session)->hazard_size / 2, nchunks);
+	/* Respect the configured limit on the number of chunks to merge. */
+	if (nchunks > (int)lsm_tree->merge_max)
+		nchunks = (int)lsm_tree->merge_max;
 
 	for (record_count = 0, i = start_chunk; i < nchunks; i++)
 		record_count += lsm_tree->chunk[i]->count;

@@ -113,8 +113,8 @@ __wt_confdfl_file_meta =
 	"huffman_value=,internal_item_max=0,internal_key_truncate=,"
 	"internal_page_max=2KB,key_format=u,key_gap=10,leaf_item_max=0,"
 	"leaf_page_max=1MB,lsm_bloom_bit_count=8,lsm_bloom_hash_count=4,"
-	"lsm_chunk_size=2MB,prefix_compression=,split_pct=75,type=btree,"
-	"value_format=u,version=(major=0,minor=0)";
+	"lsm_chunk_size=2MB,lsm_merge_max=15,prefix_compression=,split_pct=75"
+	",type=btree,value_format=u,version=(major=0,minor=0)";
 
 WT_CONFIG_CHECK
 __wt_confchk_file_meta[] = {
@@ -138,6 +138,7 @@ __wt_confchk_file_meta[] = {
 	{ "lsm_bloom_bit_count", "int", "min=2,max=1000" },
 	{ "lsm_bloom_hash_count", "int", "min=2,max=100" },
 	{ "lsm_chunk_size", "int", "min=512K,max=500MB" },
+	{ "lsm_merge_max", "int", "min=2,max=100" },
 	{ "prefix_compression", "boolean", NULL },
 	{ "split_pct", "int", "min=25,max=100" },
 	{ "type", "string", "choices=[\"btree\"]" },
@@ -213,8 +214,8 @@ __wt_confdfl_session_create =
 	"internal_key_truncate=,internal_page_max=2KB,key_format=u,"
 	"key_format=u,key_gap=10,leaf_item_max=0,leaf_page_max=1MB,"
 	"lsm_bloom_bit_count=8,lsm_bloom_hash_count=4,lsm_chunk_size=2MB,"
-	"prefix_compression=,split_pct=75,type=btree,value_format=u,"
-	"value_format=u";
+	"lsm_merge_max=15,prefix_compression=,split_pct=75,type=btree,"
+	"value_format=u,value_format=u";
 
 WT_CONFIG_CHECK
 __wt_confchk_session_create[] = {
@@ -242,6 +243,7 @@ __wt_confchk_session_create[] = {
 	{ "lsm_bloom_bit_count", "int", "min=2,max=1000" },
 	{ "lsm_bloom_hash_count", "int", "min=2,max=100" },
 	{ "lsm_chunk_size", "int", "min=512K,max=500MB" },
+	{ "lsm_merge_max", "int", "min=2,max=100" },
 	{ "prefix_compression", "boolean", NULL },
 	{ "split_pct", "int", "min=25,max=100" },
 	{ "type", "string", "choices=[\"btree\"]" },
