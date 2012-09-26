@@ -125,7 +125,6 @@ __conn_btree_get(WT_SESSION_IMPL *session,
 			/* Add to the connection list. */
 			btree->refcnt = 1;
 			TAILQ_INSERT_TAIL(&conn->btqh, btree, q);
-			++conn->btqcnt;
 		}
 	}
 
@@ -157,6 +156,9 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session)
 
 	if (!F_ISSET(btree, WT_BTREE_OPEN))
 		return (0);
+
+	if (btree->checkpoint == NULL)
+		--S2C(session)->open_btree_count;
 
 	/*
 	 * Checkpoint to flush out the file's changes.  This usually happens on
@@ -235,6 +237,12 @@ __conn_btree_open(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_btree_open(session, addr->data, addr->size, cfg,
 		    btree->checkpoint == NULL ? 0 : 1));
 		F_SET(btree, WT_BTREE_OPEN);
+		/*
+		 * Checkpoint handles are read only, so eviction calculations
+		 * based on the number of btrees are better to ignore them.
+		 */
+		if (btree->checkpoint == NULL)
+			++S2C(session)->open_btree_count;
 
 		/* Drop back to a readlock if that is all that was needed. */
 		if (!LF_ISSET(WT_BTREE_EXCLUSIVE)) {
@@ -540,7 +548,6 @@ restart:
 			continue;
 
 		TAILQ_REMOVE(&conn->btqh, btree, q);
-		--conn->btqcnt;
 		WT_TRET(__wt_conn_btree_discard_single(session, btree));
 		goto restart;
 	}
@@ -557,7 +564,6 @@ restart:
 	/* Close the metadata file handle. */
 	while ((btree = TAILQ_FIRST(&conn->btqh)) != NULL) {
 		TAILQ_REMOVE(&conn->btqh, btree, q);
-		--conn->btqcnt;
 		WT_TRET(__wt_conn_btree_discard_single(session, btree));
 	}
 

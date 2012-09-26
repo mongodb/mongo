@@ -214,7 +214,7 @@ struct __wt_connection_impl {
 					/* Locked: library list */
 	TAILQ_HEAD(__wt_dlh_qh, __wt_dlh) dlhqh;
 
-	u_int btqcnt;			/* Locked: btree count */
+	u_int open_btree_count;		/* Locked: open writable btree count */
 	u_int next_file_id;		/* Locked: file ID counter */
 
 	/*
