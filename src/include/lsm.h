@@ -82,3 +82,12 @@ struct __wt_lsm_data_source {
 
 	WT_RWLOCK *rwlock;
 };
+
+struct __wt_lsm_worker_cookie {
+    WT_LSM_CHUNK **chunk_array;
+    size_t chunk_alloc;
+    int nchunks;
+#define	WT_LSM_WORKER_MERGE		0x01
+#define	WT_LSM_WORKER_CHECKPOINT	0x01
+    int flags;
+};
