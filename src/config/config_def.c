@@ -280,8 +280,8 @@ __wt_confchk_session_log_printf[] = {
 
 const char *
 __wt_confdfl_session_open_cursor =
-	"append=0,bulk=0,checkpoint=,dump=,next_random=0,overwrite=0,raw=0,"
-	"statistics=0,statistics_clear=0,target=";
+	"append=0,bulk=0,checkpoint=,dump=,next_random=0,no_cache=0,"
+	"overwrite=0,raw=0,statistics=0,statistics_clear=0,target=";
 
 WT_CONFIG_CHECK
 __wt_confchk_session_open_cursor[] = {
@@ -290,6 +290,7 @@ __wt_confchk_session_open_cursor[] = {
 	{ "checkpoint", "string", NULL },
 	{ "dump", "string", "choices=[\"hex\",\"print\"]" },
 	{ "next_random", "boolean", NULL },
+	{ "no_cache", "boolean", NULL },
 	{ "overwrite", "boolean", NULL },
 	{ "raw", "boolean", NULL },
 	{ "statistics", "boolean", NULL },
@@ -381,7 +382,7 @@ const char *
 __wt_confdfl_wiredtiger_open =
 	"buffer_alignment=-1,cache_size=100MB,create=0,direct_io=,"
 	"error_prefix=,eviction_target=80,eviction_trigger=95,extensions=,"
-	"hazard_max=30,logging=0,multiprocess=0,session_max=50,sync=,"
+	"hazard_max=1000,logging=0,multiprocess=0,session_max=50,sync=,"
 	"transactional=,use_environment_priv=0,verbose=";
 
 WT_CONFIG_CHECK

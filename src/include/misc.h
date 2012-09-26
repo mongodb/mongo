@@ -52,6 +52,9 @@
 #define	WT_SKIP_MAXDEPTH	10
 #define	WT_SKIP_PROBABILITY	(UINT32_MAX >> 2)
 
+/* The number of hazard references that can be in use is grown dynamically. */
+#define	WT_HAZARD_INCR		10
+
 /*
  * Quiet compiler warnings about unused parameters.
  */

@@ -522,15 +522,14 @@ struct __wt_session {
 	 * @config{append, append the value as a new record\, creating a new
 	 * record number key; valid only for cursors with record number keys.,a
 	 * boolean flag; default \c false.}
-	 * @config{bulk, configure the cursor for bulk loads; bulk-load is a
-	 * fast load path for newly created objects and only newly created
-	 * objects may be bulk-loaded.  Cursors configured for bulk load only
-	 * support the WT_CURSOR::insert and WT_CURSOR::close methods.,a boolean
-	 * flag; default \c false.}
-	 * @config{checkpoint, the name of a checkpoint to open; the reserved
-	 * checkpoint name "WiredTigerCheckpoint" opens a cursor on the most
-	 * recent internal checkpoint taken for the object.,a string; default
-	 * empty.}
+	 * @config{bulk, configure the cursor for bulk loads\, a fast load path
+	 * that may only be used for newly created objects. Cursors configured
+	 * for bulk load only support the WT_CURSOR::insert and WT_CURSOR::close
+	 * methods.,a boolean flag; default \c false.}
+	 * @config{checkpoint, the name of a checkpoint to open (the reserved
+	 * name "WiredTigerCheckpoint" opens the most recent internal checkpoint
+	 * taken for the object).  The cursor does not support data
+	 * modification.,a string; default empty.}
 	 * @config{dump, configure the cursor for dump format inputs and
 	 * outputs: "hex" selects a simple hexadecimal format\, "print" selects
 	 * a format where only non-printing characters are hexadecimal encoded.
@@ -1146,8 +1145,8 @@ struct __wt_connection {
  * may need quoting\, for example\,
  * <code>extensions=("/path/to/ext.so"="entry=my_entry")</code>.,a list of
  * strings; default empty.}
- * @config{hazard_max, number of simultaneous hazard references per session
- * handle.,an integer greater than or equal to 15; default \c 30.}
+ * @config{hazard_max, maximum number of simultaneous hazard references per
+ * session handle.,an integer greater than or equal to 15; default \c 1000.}
  * @config{logging, enable logging.,a boolean flag; default \c false.}
  * @config{multiprocess, permit sharing between processes (will automatically
  * start an RPC server for primary processes and use RPC for secondary

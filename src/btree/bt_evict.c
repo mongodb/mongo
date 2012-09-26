@@ -724,7 +724,8 @@ __evict_walk(WT_SESSION_IMPL *session)
 	 * get some pages from each underlying file.  In practice, a realloc
 	 * is rarely needed, so it is worth avoiding the LRU lock.
 	 */
-	elem = WT_EVICT_WALK_BASE + (conn->btqcnt * WT_EVICT_WALK_PER_TABLE);
+	elem = WT_EVICT_WALK_BASE +
+	    (conn->open_btree_count * WT_EVICT_WALK_PER_TABLE);
 	if (elem > cache->evict_entries) {
 		__wt_spin_lock(session, &cache->evict_lock);
 		/* Save the offset of the eviction point. */

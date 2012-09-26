@@ -101,7 +101,7 @@ __wt_lsm_major_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	 * avoid holding it while the merge is in progress: that may take a
 	 * long time.
 	 */
-	nchunks = WT_MIN((int)S2C(session)->hazard_size / 2, nchunks);
+	nchunks = WT_MIN((int)session->hazard_size / 2, nchunks);
 	__wt_spin_lock(session, &lsm_tree->lock);
 	while (nchunks > 1 &&
 	    (!F_ISSET(lsm_tree->chunk[nchunks - 1], WT_LSM_CHUNK_ONDISK) ||
