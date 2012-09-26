@@ -33,7 +33,7 @@
 	CURSOR_UPDATE_API_CALL(cursor, session, n, NULL);		\
 	WT_ERR(__clsm_enter(clsm))
 
-static int __clsm_open_cursors(WT_CURSOR_LSM *);
+static int __clsm_open_cursors(WT_CURSOR_LSM *, int);
 static int __clsm_search(WT_CURSOR *);
 
 static inline int
@@ -41,7 +41,7 @@ __clsm_enter(WT_CURSOR_LSM *clsm)
 {
 	if (!F_ISSET(clsm, WT_CLSM_MERGE) &&
 	    clsm->dsk_gen != clsm->lsm_tree->dsk_gen)
-		WT_RET(__clsm_open_cursors(clsm));
+		WT_RET(__clsm_open_cursors(clsm, 0));
 
 	return (0);
 }
@@ -54,7 +54,7 @@ static WT_ITEM __lsm_tombstone = { "", 0, 0, NULL, 0 };
 
 #define	WT_LSM_NEEDVALUE(c) do {					\
 	WT_CURSOR_NEEDVALUE(c);						\
-	if (__clsm_deleted(&(c)->value))				\
+	if (__clsm_deleted((WT_CURSOR_LSM *)(c), &(c)->value))		\
 		WT_ERR(__wt_cursor_kv_not_set(cursor, 0));		\
 } while (0)
 
@@ -63,9 +63,9 @@ static WT_ITEM __lsm_tombstone = { "", 0, 0, NULL, 0 };
  *	Check whether the current value is a tombstone.
  */
 static inline int
-__clsm_deleted(WT_ITEM *item)
+__clsm_deleted(WT_CURSOR_LSM *clsm, WT_ITEM *item)
 {
-	return (item->size == 0);
+	return (!F_ISSET(clsm, WT_CLSM_MINOR_MERGE) && item->size == 0);
 }
 
 /*
@@ -106,7 +106,7 @@ __clsm_close_cursors(WT_CURSOR_LSM *clsm)
  *	Open cursors for the current set of files.
  */
 static int
-__clsm_open_cursors(WT_CURSOR_LSM *clsm)
+__clsm_open_cursors(WT_CURSOR_LSM *clsm, int start_chunk)
 {
 	WT_CURSOR *c, **cp;
 	WT_DECL_RET;
@@ -154,7 +154,7 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm)
 		 * Read from the checkpoint if the file has been written.
 		 * Once all cursors switch, the in-memory tree can be evicted.
 		 */
-		chunk = lsm_tree->chunk[i];
+		chunk = lsm_tree->chunk[i + start_chunk];
 		ret = __wt_curfile_open(session,
 		    chunk->uri, &clsm->iface,
 		    !F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) ? NULL :
@@ -203,15 +203,17 @@ err:	__wt_spin_unlock(session, &lsm_tree->lock);
  *	Initialize an LSM cursor for a (major) merge.
  */
 int
-__wt_clsm_init_merge(WT_CURSOR *cursor, int nchunks)
+__wt_clsm_init_merge(WT_CURSOR *cursor, int start_chunk, int nchunks)
 {
 	WT_CURSOR_LSM *clsm;
 
 	clsm = (WT_CURSOR_LSM *)cursor;
 	F_SET(clsm, WT_CLSM_MERGE);
+	if (start_chunk != 0)
+		F_SET(clsm, WT_CLSM_MINOR_MERGE);
 	clsm->nchunks = nchunks;
 
-	return (__clsm_open_cursors(clsm));
+	return (__clsm_open_cursors(clsm, start_chunk));
 }
 
 /*
@@ -258,7 +260,7 @@ __clsm_get_current(
 	WT_RET(current->get_key(current, &c->key));
 	WT_RET(current->get_value(current, &c->value));
 
-	if ((*deletedp = __clsm_deleted(&c->value)) == 0)
+	if ((*deletedp = __clsm_deleted(clsm, &c->value)) == 0)
 		F_SET(c, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 	else
 		F_CLR(c, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
@@ -520,7 +522,7 @@ __clsm_search(WT_CURSOR *cursor)
 			WT_ERR(c->get_key(c, &cursor->key));
 			WT_ERR(c->get_value(c, &cursor->value));
 			clsm->current = c;
-			if (__clsm_deleted(&cursor->value))
+			if (__clsm_deleted(clsm, &cursor->value))
 				ret = WT_NOTFOUND;
 			goto done;
 		} else if (ret != WT_NOTFOUND)
@@ -576,7 +578,7 @@ __clsm_search_near(WT_CURSOR *cursor, int *exactp)
 			goto err;
 
 		WT_ERR(c->get_value(c, &v));
-		deleted = __clsm_deleted(&v);
+		deleted = __clsm_deleted(clsm, &v);
 
 		if (cmp == 0 && !deleted) {
 			clsm->current = c;
@@ -591,13 +593,13 @@ __clsm_search_near(WT_CURSOR *cursor, int *exactp)
 		while (deleted && (ret = c->next(c)) == 0) {
 			cmp = 1;
 			WT_ERR(c->get_value(c, &v));
-			deleted = __clsm_deleted(&v);
+			deleted = __clsm_deleted(clsm, &v);
 		}
 		WT_ERR_NOTFOUND_OK(ret);
 		while (deleted && (ret = c->prev(c)) == 0) {
 			cmp = -1;
 			WT_ERR(c->get_value(c, &v));
-			deleted = __clsm_deleted(&v);
+			deleted = __clsm_deleted(clsm, &v);
 		}
 		WT_ERR_NOTFOUND_OK(ret);
 		if (deleted)
@@ -701,7 +703,7 @@ __clsm_put(
 	clsm->current = primary;
 
 	if ((memsizep = lsm_tree->memsizep) != NULL &&
-	    *memsizep > lsm_tree->threshold) {
+	    *memsizep > lsm_tree->chunk_size) {
 		/*
 		 * Close our cursors: if we are the only open cursor, this
 		 * means the btree handle is unlocked.

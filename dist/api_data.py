@@ -80,15 +80,18 @@ format_meta = column_meta + [
 ]
 
 lsm_config = [
-	Config('lsm_chunk_size', '2MB', r'''
-		the maximum size of the in-memory chunk of an LSM tree''',
-		min='512K',max='500MB'),
 	Config('lsm_bloom_hash_count', '4', r'''
 		the number of hash values per item used for LSM bloom filters.''',
-		min='2',max='100'),
+		min='2', max='100'),
 	Config('lsm_bloom_bit_count', '8', r'''
 		the number of bits used per item for LSM bloom filters.''',
-		min='2',max='1000'),
+		min='2', max='1000'),
+	Config('lsm_chunk_size', '2MB', r'''
+		the maximum size of the in-memory chunk of an LSM tree''',
+		min='512K', max='500MB'),
+	Config('lsm_merge_max', '15', r'''
+		the maximum number of chunks to include in a merge operation''',
+		min='2', max='100'),
 ]
 
 # Per-file configuration
