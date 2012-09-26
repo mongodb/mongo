@@ -1155,8 +1155,8 @@
     <ClInclude Include="..\bson\ordering.h">
       <Filter>bson</Filter>
     </ClInclude>
-    <ClInclude Include="..\bson\stringdata.h">
-      <Filter>bson</Filter>
+    <ClInclude Include="..\base\string_data.h">
+      <Filter>base</Filter>
     </ClInclude>
     <ClInclude Include="..\bson\util\atomic_int.h">
       <Filter>bson\util</Filter>
