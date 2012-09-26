@@ -110,6 +110,12 @@
     <Filter Include="third_party\MurmurHash3">
       <UniqueIdentifier>{d2669cd3-de27-4ff1-9be1-8a32191e91a8}</UniqueIdentifier>
     </Filter>
+    <Filter Include="base">
+      <UniqueIdentifier>{70563c52-a2d3-43da-bfd3-07cb2fb43138}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="bson\util">
+      <UniqueIdentifier>{00c41b76-f23e-439a-bea5-4b2fd714ab70}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\client\connpool.h">
@@ -671,6 +677,75 @@
     </ClInclude>
     <ClInclude Include="..\util\safe_num.h">
       <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\bson\util\atomic_int.h">
+      <Filter>bson\util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\bson\util\builder.h">
+      <Filter>bson\util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\bson\util\misc.h">
+      <Filter>bson\util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\bson\bson_builder_base.h">
+      <Filter>bson</Filter>
+    </ClInclude>
+    <ClInclude Include="..\bson\bson_field.h">
+      <Filter>bson</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\bits.h">
+      <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\strtoll.h">
+      <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\unordered_map.h">
+      <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\unordered_set.h">
+      <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\base\configuration_variable_manager.h">
+      <Filter>base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\base\disallow_copying.h">
+      <Filter>base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\base\error_codes.h">
+      <Filter>base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\base\global_initializer.h">
+      <Filter>base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\base\global_initializer_registerer.h">
+      <Filter>base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\base\init.h">
+      <Filter>base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\base\initializer.h">
+      <Filter>base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\base\initializer_context.h">
+      <Filter>base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\base\initializer_dependency_graph.h">
+      <Filter>base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\base\initializer_function.h">
+      <Filter>base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\base\make_string_vector.h">
+      <Filter>base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\base\owned_pointer_vector.h">
+      <Filter>base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\base\parse_number.h">
+      <Filter>base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\base\status.h">
+      <Filter>base</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -1539,6 +1614,36 @@
     </ClCompile>
     <ClCompile Include="..\util\safe_num.cpp">
       <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\base\configuration_variable_manager.cpp">
+      <Filter>base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\base\global_initializer.cpp">
+      <Filter>base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\base\global_initializer_registerer.cpp">
+      <Filter>base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\base\init.cpp">
+      <Filter>base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\base\initializer.cpp">
+      <Filter>base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\base\initializer_context.cpp">
+      <Filter>base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\base\initializer_dependency_graph.cpp">
+      <Filter>base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\base\make_string_vector.cpp">
+      <Filter>base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\base\parse_number.cpp">
+      <Filter>base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\base\status.cpp">
+      <Filter>base</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
