@@ -18,6 +18,7 @@
 #pragma once
 
 #include "mongo/pch.h"
+#include "mongo/base/fast_string_key.h"
 #include "jsobj.h"
 
 namespace mongo {
@@ -140,7 +141,7 @@ namespace mongo {
         bool _special; // true if this level can't be skipped or included without recursing
 
         //TODO: benchmark vector<pair> vs map
-        typedef map<string, boost::shared_ptr<Projection> > FieldMap;
+        typedef map<FastStringKey, boost::shared_ptr<Projection> > FieldMap;
         FieldMap _fields;
         BSONObj _source;
         bool _includeID;
@@ -150,7 +151,7 @@ namespace mongo {
         int _limit;
 
         // used for $elemMatch and positional operator ($)
-        typedef map<string, shared_ptr<Matcher> > Matchers;
+        typedef map<FastStringKey, shared_ptr<Matcher> > Matchers;
         Matchers _matchers;
         ArrayOpType _arrayOpType;
 

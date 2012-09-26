@@ -176,8 +176,8 @@ namespace mongo {
                     MatchDetails arrayDetails;
                     arrayDetails.requestElemMatchKey();
                     if ( matcher->second->matches( in, &arrayDetails ) ) {
-                        log(4) << "Matched array on field: " << matcher->first  << endl
-                               << " from array: " << in.getField( matcher->first ) << endl
+                        log(4) << "Matched array on field: " << matcher->first.c_str() << endl
+                               << " from array: " << in.getField( matcher->first.c_str() ) << endl
                                << " in object: " << in << endl
                                << " at position: " << arrayDetails.elemMatchKey() << endl;
                         FieldMap::const_iterator field = _fields.find( e.fieldName()  );
@@ -192,7 +192,7 @@ namespace mongo {
                                         arrayDetails.elemMatchKey() ).eoo() );
                         a.append( in.getField( e.fieldName() ).Obj()
                                     .getField( arrayDetails.elemMatchKey() ) );
-                        o.appendArray( matcher->first, a.arr() );
+                        o.appendArray( matcher->first.c_str(), a.arr() );
                         append( b, o.done().firstElement(), details, arrayOpType );
                     }
                 }
