@@ -115,6 +115,9 @@ __verify_start_filesize(WT_SESSION_IMPL *session,
 	 */
 	file_size = 0;
 	WT_CKPT_FOREACH(ckptbase, ckpt) {
+		/* Skip empty checkpoints. */
+		if (ckpt->raw.size == 0)
+			continue;
 		WT_RET(__wt_block_buffer_to_ckpt(
 		    session, block, ckpt->raw.data, ci));
 		if (ci->file_size > file_size)
