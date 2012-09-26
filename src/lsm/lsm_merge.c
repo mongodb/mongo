@@ -109,7 +109,18 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	    lsm_tree->chunk[nchunks - 1]->ncursor > 0))
 		--nchunks;
 
-	/* Prefer a minor merge, if enough unmerged chunks are available. */
+	/*
+	 * Look for a minor merge to do in preference to a major merge.
+	 *
+	 * The difference is whether the oldest chunk is involved: if it is, we
+	 * can discard tombstones, because there can be no older record to
+	 * marked deleted.
+	 *
+	 * We look at the Bloom URI to decide whether a chunk is the result of
+	 * an earlier merge.  In a minor merge, we take as many chunks as we
+	 * can that have not yet been merged.  If there are less than 2 "new"
+	 * chunks, fall back to a major merge.
+	 */
 	for (i = 0; i < nchunks; i++)
 		if (lsm_tree->chunk[i]->bloom_uri == NULL)
 			break;
