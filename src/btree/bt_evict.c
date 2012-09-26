@@ -428,6 +428,7 @@ __evict_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 		WT_RET(__wt_txn_init(session));
 
 	__wt_txn_get_evict_snapshot(session);
+	saved_txn.eviction_fails = txn->eviction_fails;
 	saved_txn.oldest_snap_min = txn->oldest_snap_min;
 	txn->isolation = TXN_ISO_READ_COMMITTED;
 	ret = __wt_rec_evict(session, page, 0);
