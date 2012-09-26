@@ -7,8 +7,8 @@
 
 #include "wt_internal.h"
 
-static int
-__lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree);
+static int __lsm_free_chunks(WT_SESSION_IMPL *, WT_LSM_TREE *);
+static int __lsm_copy_chunks(WT_LSM_TREE *, size_t *, WT_LSM_CHUNK ***, int);
 
 /*
  * __wt_lsm_worker --
@@ -31,38 +31,12 @@ __wt_lsm_worker(void *arg)
 
 	chunk_array = NULL;
 	chunk_alloc = 0;
-	WT_VERBOSE_ERR(session, lsm, "LSM worker thread started.");
 
 	while (F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
 		progress = 0;
 
-		__wt_spin_lock(session, &lsm_tree->lock);
-		if (!F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
-			__wt_spin_unlock(session, &lsm_tree->lock);
-			break;
-		}
-		/*
-		 * Take a copy of the current state of the LSM tree. Skip
-		 * the last chunk - since it is the active one and not relevant
-		 * to merge operations.
-		 */
-		for (nchunks = lsm_tree->nchunks - 1;
-		    nchunks > 0 && lsm_tree->chunk[nchunks - 1]->ncursor > 0;
-		    --nchunks)
-			;
-		WT_VERBOSE_ERR(session, lsm,
-		    "LSM worker %d chunks out of %d, being merged",
-		    nchunks, lsm_tree->nchunks);
-
-		if (chunk_alloc < lsm_tree->chunk_alloc)
-			ret = __wt_realloc(session,
-			    &chunk_alloc, lsm_tree->chunk_alloc,
-			    &chunk_array);
-		if (ret == 0 && nchunks > 0)
-			memcpy(chunk_array, lsm_tree->chunk,
-			    nchunks * sizeof(*lsm_tree->chunk));
-		__wt_spin_unlock(session, &lsm_tree->lock);
-		WT_ERR(ret);
+		WT_ERR(__lsm_copy_chunks(
+		    lsm_tree, &chunk_alloc, &chunk_array, 0));
 
 		/*
 		 * Write checkpoints in all completed files, then find
@@ -90,7 +64,6 @@ __wt_lsm_worker(void *arg)
 				progress = 1;
 			}
 		}
-		WT_VERBOSE_ERR(session, lsm, "LSM worker calling merge.");
 
 		/* Clear any state from previous worker thread iterations. */
 		session->btree = NULL;
@@ -109,7 +82,6 @@ __wt_lsm_worker(void *arg)
 			__wt_sleep(0, 10);
 	}
 
-	WT_VERBOSE_ERR(session, lsm, "LSM worker thread stop.");
 err:	__wt_free(session, chunk_array);
 
 	return (NULL);
@@ -119,9 +91,6 @@ err:	__wt_free(session, chunk_array);
  * __wt_lsm_checkpoint_worker --
  *	A worker thread for an LSM tree, responsible for checkpointing chunks
  *	once they become read only.
- *	TODO: Share the logic about finding nchunks.
- *	TODO: Update the session and worker handles to be an array in LSM_TREE
- *	structure.
  */
 void *
 __wt_lsm_checkpoint_worker(void *arg)
@@ -135,32 +104,14 @@ __wt_lsm_checkpoint_worker(void *arg)
 	int i, j, nchunks;
 
 	lsm_tree = arg;
-	session = lsm_tree->worker_session2;
+	session = lsm_tree->ckpt_session;
 
 	chunk_array = NULL;
 	chunk_alloc = 0;
 
 	while (F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
-		__wt_spin_lock(session, &lsm_tree->lock);
-		if (!F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
-			__wt_spin_unlock(session, &lsm_tree->lock);
-			break;
-		}
-		/*
-		 * Take a copy of the current state of the LSM tree. Skip
-		 * the last chunk - since it is the active one and should not
-		 * be checkpointed.
-		 */
-		nchunks = lsm_tree->nchunks - 1;
-		if (chunk_alloc < lsm_tree->chunk_alloc)
-			ret = __wt_realloc(session,
-			    &chunk_alloc, lsm_tree->chunk_alloc,
-			    &chunk_array);
-		if (ret == 0 && nchunks > 0)
-			memcpy(chunk_array, lsm_tree->chunk,
-			    nchunks * sizeof(*lsm_tree->chunk));
-		__wt_spin_unlock(session, &lsm_tree->lock);
-		WT_ERR(ret);
+		WT_ERR(__lsm_copy_chunks(
+		    lsm_tree, &chunk_alloc, &chunk_array, 1));
 
 		/* Write checkpoints in all completed files. */
 		for (i = 0, j = 0; i < nchunks; i++) {
@@ -191,6 +142,61 @@ __wt_lsm_checkpoint_worker(void *arg)
 err:	__wt_free(session, chunk_array);
 
 	return (NULL);
+}
+
+static int
+__lsm_copy_chunks(WT_LSM_TREE *lsm_tree,
+    size_t *allocp, WT_LSM_CHUNK ***chunkp, int checkpoint)
+{
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+	WT_LSM_CHUNK **chunk_array;
+	size_t chunk_alloc;
+	int nchunks;
+
+	if (checkpoint == 1)
+		session = lsm_tree->ckpt_session;
+	else
+		session = lsm_tree->worker_session;
+	chunk_array = *chunkp;
+	chunk_alloc = *allocp;
+
+	__wt_spin_lock(session, &lsm_tree->lock);
+	if (!F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
+		__wt_spin_unlock(session, &lsm_tree->lock);
+		/* The actual error value is ignored. */
+		return (WT_ERROR);
+	}
+	/*
+	 * Take a copy of the current state of the LSM tree. Skip
+	 * the last chunk - since it is the active one and not relevant
+	 * to merge operations.
+	 */
+	nchunks = lsm_tree->nchunks - 1;
+	/* Checkpoint doesn't care if there are active cursors, merge does. */
+	if (checkpoint == 0) {
+		for (; nchunks > 0 && lsm_tree->chunk[nchunks - 1]->ncursor > 0;
+		    --nchunks)
+			;
+	}
+	/*
+	 * If the tree array of active chunks is larger than our current buffer,
+	 * increase the size of our current buffer to match.
+	 */
+	if (chunk_alloc < lsm_tree->chunk_alloc)
+		ret = __wt_realloc(session,
+		    &chunk_alloc, lsm_tree->chunk_alloc,
+		    &chunk_array);
+	if (ret == 0 && nchunks > 0)
+		memcpy(chunk_array, lsm_tree->chunk,
+		    nchunks * sizeof(*lsm_tree->chunk));
+	__wt_spin_unlock(session, &lsm_tree->lock);
+
+	if (ret == 0) {
+		*chunkp = chunk_array;
+		*allocp = chunk_alloc;
+	}
+	return (ret);
 }
 
 static int
