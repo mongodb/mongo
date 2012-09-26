@@ -62,11 +62,13 @@ __lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	if (F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
 		F_CLR(lsm_tree, WT_LSM_TREE_WORKING);
 		WT_TRET(__wt_thread_join(lsm_tree->worker_tid));
+		WT_TRET(__wt_thread_join(lsm_tree->ckpt_tid));
 	}
 
 	/*
-	 * Close the session and free its hazard array (necessary because
-	 * we set WT_SESSION_INTERNAL to simplify shutdown ordering.
+	 * Close the worker thread sessions and free their hazard arrays
+	 * (necessary because we set WT_SESSION_INTERNAL to simplify shutdown
+	 * ordering.
 	 *
 	 * Do this in the main thread to avoid deadlocks.
 	 */
@@ -82,6 +84,19 @@ __lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		 * not freed, but are managed by the connection.
 		 */
 		__wt_free(NULL, lsm_tree->worker_session->hazard);
+	}
+	if (lsm_tree->ckpt_session != NULL) {
+		F_SET(lsm_tree->ckpt_session,
+		    F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
+
+		wt_session = &lsm_tree->ckpt_session->iface;
+		WT_TRET(wt_session->close(wt_session, NULL));
+
+		/*
+		 * This is safe after the close because session handles are
+		 * not freed, but are managed by the connection.
+		 */
+		__wt_free(NULL, lsm_tree->ckpt_session->hazard);
 	}
 
 	return (ret);
@@ -167,11 +182,17 @@ __lsm_tree_start_worker(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	lsm_tree->worker_session = (WT_SESSION_IMPL *)wt_session;
 	F_SET(lsm_tree->worker_session, WT_SESSION_INTERNAL);
 
+	WT_RET(wt_conn->open_session(wt_conn, NULL, NULL, &wt_session));
+	lsm_tree->ckpt_session = (WT_SESSION_IMPL *)wt_session;
+	F_SET(lsm_tree->ckpt_session, WT_SESSION_INTERNAL);
+
 	F_SET(lsm_tree, WT_LSM_TREE_WORKING);
 	/* The new thread will rely on the WORKING value being visible. */
 	WT_FULL_BARRIER();
 	WT_RET(__wt_thread_create(
 	    &lsm_tree->worker_tid, __wt_lsm_worker, lsm_tree));
+	WT_RET(__wt_thread_create(
+	    &lsm_tree->ckpt_tid, __wt_lsm_checkpoint_worker, lsm_tree));
 
 	return (0);
 }
