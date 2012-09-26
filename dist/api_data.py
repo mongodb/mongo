@@ -282,16 +282,16 @@ methods = {
 		number key; valid only for cursors with record number keys''',
 		type='boolean'),
 	Config('bulk', 'false', r'''
-		configure the cursor for bulk loads; bulk-load is a fast
-		load path for newly created objects and only newly
-		created objects may be bulk-loaded.  Cursors configured
-		for bulk load only support the WT_CURSOR::insert and
-		WT_CURSOR::close methods''',
+		configure the cursor for bulk loads, a fast load path
+		that may only be used for newly created objects. Cursors
+		configured for bulk load only support the WT_CURSOR::insert
+		and WT_CURSOR::close methods''',
 		type='boolean'),
 	Config('checkpoint', '', r'''
-		the name of a checkpoint to open; the reserved checkpoint
-		name "WiredTigerCheckpoint" opens a cursor on the most recent
-		internal checkpoint taken for the object'''),
+		the name of a checkpoint to open (the reserved name
+		"WiredTigerCheckpoint" opens the most recent internal
+		checkpoint taken for the object).  The cursor does not
+		support data modification'''),
 	Config('dump', '', r'''
 		configure the cursor for dump format inputs and outputs:
 		"hex" selects a simple hexadecimal format, "print"
@@ -306,6 +306,10 @@ methods = {
 		and WT_CURSOR::close methods.  See @ref cursor_random for
 		details''',
 		type='boolean'),
+	Config('no_cache', 'false', r'''
+		do not cache pages from the underlying object.  The cursor
+		does not support data modification''',
+		type='boolean', undoc=True),
 	Config('overwrite', 'false', r'''
 		change the behavior of the cursor's insert method to overwrite
 		previously existing values''',
@@ -412,8 +416,8 @@ methods = {
 		paths may need quoting, for example,
 		<code>extensions=("/path/to/ext.so"="entry=my_entry")</code>''',
 		type='list'),
-	Config('hazard_max', '30', r'''
-		number of simultaneous hazard references per session handle''',
+	Config('hazard_max', '1000', r'''
+		maximum number of simultaneous hazard references per session handle''',
 		min='15'),
 	Config('logging', 'false', r'''
 		enable logging''',

@@ -82,8 +82,8 @@ wts_open(void)
 	if (maxintlitem < 40)
 		maxintlitem = 40;
 	maxleafpage = 1U << g.c_leaf_page_max;
-	/* Make sure at least 4 leaf page per thread can fit in cache. */
-	while (4 * g.c_threads * (maxintlpage + maxleafpage) > g.c_cache << 20)
+	/* Make sure at least one leaf page per thread can fit in cache. */
+	while (g.c_threads * (maxintlpage + maxleafpage) > g.c_cache << 20)
 		maxleafpage >>= 1;
 	maxleafitem = MMRAND(maxleafpage / 50, maxleafpage / 40);
 	if (maxleafitem < 40)

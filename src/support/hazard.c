@@ -23,11 +23,9 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, int *busyp
     )
 {
 	WT_BTREE *btree;
-	WT_CONNECTION_IMPL *conn;
 	WT_HAZARD *hp;
 
 	btree = session->btree;
-	conn = S2C(session);
 	*busyp = 0;
 
 	/* If a file can never be evicted, hazard references aren't required. */
@@ -48,8 +46,16 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, int *busyp
 	 * state to WT_REF_LOCKED, then flushes memory and checks the hazard
 	 * references).
 	 */
-	for (hp = session->hazard;
-	    hp < session->hazard + conn->hazard_size; ++hp) {
+	for (hp = session->hazard; ; ++hp) {
+		/* Expand the number of hazard references if available.*/
+		if (hp >= session->hazard + session->hazard_size) {
+			if (session->hazard_size >= S2C(session)->hazard_max)
+				break;
+			WT_PUBLISH(session->hazard_size,
+			    WT_MIN(session->hazard_size + WT_HAZARD_INCR,
+			    S2C(session)->hazard_max));
+		}
+
 		if (hp->page != NULL)
 			continue;
 
@@ -114,11 +120,9 @@ void
 __wt_hazard_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BTREE *btree;
-	WT_CONNECTION_IMPL *conn;
 	WT_HAZARD *hp;
 
 	btree = session->btree;
-	conn = S2C(session);
 
 	/* If a file can never be evicted, hazard references aren't required. */
 	if (F_ISSET(btree, WT_BTREE_NO_HAZARD))
@@ -132,7 +136,7 @@ __wt_hazard_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	/* Clear the caller's hazard pointer. */
 	for (hp = session->hazard;
-	    hp < session->hazard + conn->hazard_size; ++hp)
+	    hp < session->hazard + session->hazard_size; ++hp)
 		if (hp->page == page) {
 			/*
 			 * Check to see if the page has grown too big and force
@@ -180,15 +184,12 @@ __wt_hazard_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
 void
 __wt_hazard_close(WT_SESSION_IMPL *session)
 {
-	WT_CONNECTION_IMPL *conn;
 	WT_HAZARD *hp;
 	int found;
 
-	conn = S2C(session);
-
 	/* Check for a set hazard reference and complain if we find one. */
 	for (found = 0, hp = session->hazard;
-	    hp < session->hazard + conn->hazard_size; ++hp)
+	    hp < session->hazard + session->hazard_size; ++hp)
 		if (hp->page != NULL) {
 			__wt_errx(session,
 			    "session %p: hazard reference table not empty: "
@@ -212,7 +213,7 @@ __wt_hazard_close(WT_SESSION_IMPL *session)
 	 * evicted.
 	 */
 	for (hp = session->hazard;
-	    hp < session->hazard + conn->hazard_size; ++hp)
+	    hp < session->hazard + session->hazard_size; ++hp)
 		if (hp->page != NULL)
 			__wt_hazard_clear(session, hp->page);
 
@@ -230,13 +231,10 @@ __wt_hazard_close(WT_SESSION_IMPL *session)
 static void
 __hazard_dump(WT_SESSION_IMPL *session)
 {
-	WT_CONNECTION_IMPL *conn;
 	WT_HAZARD *hp;
 
-	conn = S2C(session);
-
 	for (hp = session->hazard;
-	    hp < session->hazard + conn->hazard_size; ++hp)
+	    hp < session->hazard + session->hazard_size; ++hp)
 		if (hp->page != NULL)
 			__wt_errx(session,
 			    "session %p: hazard reference %p: %s, line %d",

@@ -130,6 +130,7 @@ struct __wt_session_impl {
 	 * easily call a function to clear memory up to, but not including, the
 	 * hazard reference.
 	 */
+	uint32_t   hazard_size;		/* Count of used hazard references */
 	u_int nhazard;
 #define	WT_SESSION_CLEAR(s)	memset(s, 0, WT_PTRDIFF(&(s)->hazard, s))
 	WT_HAZARD *hazard;		/* Hazard reference array */
@@ -213,7 +214,7 @@ struct __wt_connection_impl {
 					/* Locked: library list */
 	TAILQ_HEAD(__wt_dlh_qh, __wt_dlh) dlhqh;
 
-	u_int btqcnt;			/* Locked: btree count */
+	u_int open_btree_count;		/* Locked: open writable btree count */
 	u_int next_file_id;		/* Locked: file ID counter */
 
 	/*
@@ -235,7 +236,7 @@ struct __wt_connection_impl {
 	 * WiredTiger allocates space for a fixed number of hazard references
 	 * in each thread of control.
 	 */
-	uint32_t   hazard_size;		/* Hazard array size */
+	uint32_t   hazard_max;		/* Hazard array size */
 
 	WT_CACHE  *cache;		/* Page cache */
 	uint64_t   cache_size;
@@ -329,8 +330,10 @@ struct __wt_connection_impl {
 				__wt_txn_read_first(session);		\
 			}						\
 			ret = __wt_txn_commit((s), NULL);		\
-		} else							\
+		} else {						\
+			WT_TRET(WT_DEADLOCK);				\
 			(void)__wt_txn_rollback((s), NULL);		\
+		}							\
 	} else if ((ret) != 0 &&					\
 	    (ret) != WT_NOTFOUND &&					\
 	    (ret) != WT_DUPLICATE_KEY)					\
