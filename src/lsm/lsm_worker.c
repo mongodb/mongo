@@ -8,7 +8,8 @@
 #include "wt_internal.h"
 
 static int __lsm_free_chunks(WT_SESSION_IMPL *, WT_LSM_TREE *);
-static int __lsm_copy_chunks(WT_LSM_TREE *, size_t *, WT_LSM_CHUNK ***, int);
+static int __lsm_copy_chunks(
+    WT_LSM_TREE *, size_t *, WT_LSM_CHUNK ***, int *, int);
 
 /*
  * __wt_lsm_worker --
@@ -36,7 +37,7 @@ __wt_lsm_worker(void *arg)
 		progress = 0;
 
 		WT_ERR(__lsm_copy_chunks(
-		    lsm_tree, &chunk_alloc, &chunk_array, 0));
+		    lsm_tree, &chunk_alloc, &chunk_array, &nchunks, 0));
 
 		/*
 		 * Write checkpoints in all completed files, then find
@@ -111,7 +112,7 @@ __wt_lsm_checkpoint_worker(void *arg)
 
 	while (F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
 		WT_ERR(__lsm_copy_chunks(
-		    lsm_tree, &chunk_alloc, &chunk_array, 1));
+		    lsm_tree, &chunk_alloc, &chunk_array, &nchunks, 1));
 
 		/* Write checkpoints in all completed files. */
 		for (i = 0, j = 0; i < nchunks; i++) {
@@ -146,7 +147,7 @@ err:	__wt_free(session, chunk_array);
 
 static int
 __lsm_copy_chunks(WT_LSM_TREE *lsm_tree,
-    size_t *allocp, WT_LSM_CHUNK ***chunkp, int checkpoint)
+    size_t *allocp, WT_LSM_CHUNK ***chunkp, int *nchunkp, int checkpoint)
 {
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
@@ -195,6 +196,7 @@ __lsm_copy_chunks(WT_LSM_TREE *lsm_tree,
 	if (ret == 0) {
 		*chunkp = chunk_array;
 		*allocp = chunk_alloc;
+		*nchunkp = nchunks;
 	}
 	return (ret);
 }
