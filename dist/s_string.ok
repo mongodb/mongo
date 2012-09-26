@@ -247,6 +247,7 @@ btcur
 btdsk
 btmem
 btree
+btrees
 buf
 builtin
 bytelock
