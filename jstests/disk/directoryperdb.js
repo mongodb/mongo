@@ -3,7 +3,7 @@ var baseName = "directoryperdb"
 port = allocatePorts( 1 )[ 0 ];
 dbpath = "/data/db/" + baseDir + "/";
 
-var m = startMongod( "--directoryperdb", "--port", port, "--dbpath", dbpath, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
+var m = startMongodTest(port, baseDir, false, {directoryperdb : "", nohttpinterface : "", bind_ip : "127.0.0.1"});
 db = m.getDB( baseName );
 db[ baseName ].save( {} );
 assert.eq( 1, db[ baseName ].count() , "A : " + tojson( db[baseName].find().toArray() ) );
@@ -52,7 +52,7 @@ externalPath = "/data/db/" + baseDir + "_external/";
 runMongoProgram( "mongodump", "--dbpath", dbpath, "--directoryperdb", "--out", externalPath );
 resetDbpath( dbpath );
 runMongoProgram( "mongorestore", "--dbpath", dbpath, "--directoryperdb", "--dir", externalPath );
-m = startMongoProgram( "mongod", "--directoryperdb", "--port", port, "--dbpath", dbpath, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
+m = startMongodTest(port, baseDir, true, {directoryperdb : "", nohttpinterface : "", bind_ip : "127.0.0.1"});
 db = m.getDB( baseName );
 checkDir( dbpath );
 assert.eq( 1, db[ baseName ].count() , "C" );
