@@ -589,6 +589,8 @@ extern int __wt_conn_btree_apply_single(WT_SESSION_IMPL *session,
 extern int __wt_conn_btree_close(WT_SESSION_IMPL *session, int locked);
 extern int __wt_conn_btree_close_all(WT_SESSION_IMPL *session,
     const char *name);
+extern int __wt_conn_btree_discard_single(WT_SESSION_IMPL *session,
+    WT_BTREE *btree);
 extern int __wt_conn_btree_discard(WT_CONNECTION_IMPL *conn);
 extern int __wt_connection_init(WT_CONNECTION_IMPL *conn);
 extern void __wt_connection_destroy(WT_CONNECTION_IMPL *conn);
@@ -670,7 +672,9 @@ extern int __wt_log_printf(WT_SESSION_IMPL *session,
     2,
     3)));
 extern WT_LOGREC_DESC __wt_logdesc_debug;
-extern int __wt_clsm_init_merge(WT_CURSOR *cursor, int nchunks);
+extern int __wt_clsm_init_merge(WT_CURSOR *cursor,
+    int start_chunk,
+    int nchunks);
 extern int __wt_clsm_open(WT_SESSION_IMPL *session,
     const char *uri,
     const char *cfg[],
@@ -679,10 +683,10 @@ extern int __wt_lsm_init(WT_CONNECTION *wt_conn, const char *config);
 extern int __wt_lsm_cleanup(WT_CONNECTION *wt_conn);
 extern int __wt_lsm_merge_update_tree(WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree,
+    int start_chunk,
     int nchunks,
     WT_LSM_CHUNK **chunkp);
-extern int __wt_lsm_major_merge(WT_SESSION_IMPL *session,
-    WT_LSM_TREE *lsm_tree);
+extern int __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree);
 extern int __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree);
 extern int __wt_lsm_meta_write(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree);
 extern int __wt_lsm_tree_close_all(WT_SESSION_IMPL *session);

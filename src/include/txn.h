@@ -89,6 +89,12 @@ struct __wt_txn {
 	size_t		modref_alloc;
 	u_int		modref_count;
 
+	/*
+	 * Count of unsuccessful eviction attempts, used to abort if the cache
+	 * is full and no progress can be made.
+	 */
+	u_int		eviction_fails;
+
 #define	TXN_AUTOCOMMIT	0x01
 #define	TXN_ERROR	0x02
 #define	TXN_RUNNING	0x04

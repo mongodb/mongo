@@ -119,6 +119,7 @@ struct __wt_connection_stats {
 	WT_STATS memfree;
 	WT_STATS total_read_io;
 	WT_STATS total_write_io;
+	WT_STATS txn_fail_cache;
 	WT_STATS txn_begin;
 	WT_STATS txn_commit;
 	WT_STATS txn_rollback;

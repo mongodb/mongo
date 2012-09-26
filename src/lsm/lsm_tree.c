@@ -238,12 +238,14 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_strndup(session, cval.str, cval.len,
 	    &lsm_tree->value_format));
 
-	WT_ERR(__wt_config_gets(session, cfg, "lsm_chunk_size", &cval));
-	lsm_tree->threshold = (uint32_t)cval.val;
 	WT_ERR(__wt_config_gets(session, cfg, "lsm_bloom_bit_count", &cval));
 	lsm_tree->bloom_bit_count = (uint32_t)cval.val;
 	WT_ERR(__wt_config_gets(session, cfg, "lsm_bloom_hash_count", &cval));
 	lsm_tree->bloom_hash_count = (uint32_t)cval.val;
+	WT_ERR(__wt_config_gets(session, cfg, "lsm_chunk_size", &cval));
+	lsm_tree->chunk_size = (uint32_t)cval.val;
+	WT_ERR(__wt_config_gets(session, cfg, "lsm_merge_max", &cval));
+	lsm_tree->merge_max = (uint32_t)cval.val;
 
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));
 	WT_ERR(__wt_buf_fmt(session, buf,
@@ -351,7 +353,7 @@ __wt_lsm_tree_switch(
 	WT_VERBOSE_RET(session, lsm,
 	    "Tree switch to: %d because %d > %d", lsm_tree->last + 1,
 	    (lsm_tree->memsizep == NULL ? 0 : (int)*lsm_tree->memsizep),
-	    (int)lsm_tree->threshold);
+	    (int)lsm_tree->chunk_size);
 
 	lsm_tree->memsizep = NULL;
 
@@ -519,7 +521,7 @@ __wt_lsm_tree_truncate(
 
 	/* Mark all chunks old. */
 	WT_ERR(__wt_lsm_merge_update_tree(
-	    session, lsm_tree, lsm_tree->nchunks, &chunk));
+	    session, lsm_tree, 0, lsm_tree->nchunks, &chunk));
 
 	/* Create the new chunk. */
 	WT_ERR(__wt_lsm_tree_create_chunk(

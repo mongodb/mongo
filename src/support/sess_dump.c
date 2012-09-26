@@ -35,12 +35,9 @@ __wt_session_dump_all(WT_SESSION_IMPL *session)
 void
 __wt_session_dump(WT_SESSION_IMPL *session)
 {
-	WT_CONNECTION_IMPL *conn;
 	WT_CURSOR *cursor;
 	WT_HAZARD *hp;
 	int first;
-
-	conn = S2C(session);
 
 	(void)__wt_msg(session, "session: %s%s%p",
 	    session->name == NULL ? "" : session->name,
@@ -55,7 +52,7 @@ __wt_session_dump(WT_SESSION_IMPL *session)
 
 	first = 0;
 	for (hp = session->hazard;
-	    hp < session->hazard + conn->hazard_size; ++hp) {
+	    hp < session->hazard + session->hazard_size; ++hp) {
 		if (hp->page == NULL)
 			continue;
 		if (++first == 1)

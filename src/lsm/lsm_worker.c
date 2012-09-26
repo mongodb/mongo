@@ -95,7 +95,7 @@ __wt_lsm_worker(void *arg)
 		/* Clear any state from previous worker thread iterations. */
 		session->btree = NULL;
 
-		if (__wt_lsm_major_merge(session, lsm_tree) == 0)
+		if (__wt_lsm_merge(session, lsm_tree) == 0)
 			progress = 1;
 
 		/* Clear any state from previous worker thread iterations. */

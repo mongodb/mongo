@@ -428,8 +428,12 @@ __evict_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 		WT_RET(__wt_txn_init(session));
 
 	__wt_txn_get_evict_snapshot(session);
+	saved_txn.oldest_snap_min = txn->oldest_snap_min;
 	txn->isolation = TXN_ISO_READ_COMMITTED;
 	ret = __wt_rec_evict(session, page, 0);
+
+	/* Keep count of any failures. */
+	saved_txn.eviction_fails = txn->eviction_fails;
 
 	if (was_running) {
 		WT_ASSERT(session, txn->snapshot == NULL ||
@@ -720,7 +724,8 @@ __evict_walk(WT_SESSION_IMPL *session)
 	 * get some pages from each underlying file.  In practice, a realloc
 	 * is rarely needed, so it is worth avoiding the LRU lock.
 	 */
-	elem = WT_EVICT_WALK_BASE + (conn->btqcnt * WT_EVICT_WALK_PER_TABLE);
+	elem = WT_EVICT_WALK_BASE +
+	    (conn->open_btree_count * WT_EVICT_WALK_PER_TABLE);
 	if (elem > cache->evict_entries) {
 		__wt_spin_lock(session, &cache->evict_lock);
 		/* Save the offset of the eviction point. */
