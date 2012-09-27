@@ -263,6 +263,8 @@ cd
 cfg
 cfkos
 checkfrag
+checkpointed
+checkpointing
 checksum
 checksums
 chk
