@@ -93,15 +93,18 @@ __conn_btree_get(WT_SESSION_IMPL *session,
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
 
 	/* Increment the reference count if we already have the btree open. */
-	TAILQ_FOREACH(btree, &conn->btqh, q)
-		if (strcmp(name, btree->name) == 0 &&
-		    ((ckpt == NULL && btree->checkpoint == NULL) ||
-		    (ckpt != NULL && btree->checkpoint != NULL &&
-		    strcmp(ckpt, btree->checkpoint) == 0))) {
-			++btree->refcnt;
-			session->btree = btree;
-			return (__conn_btree_open_lock(session, flags));
+	if (!LF_ISSET(WT_BTREE_NO_CACHE)) {
+		TAILQ_FOREACH(btree, &conn->btqh, q) {
+			if (strcmp(name, btree->name) == 0 &&
+			    ((ckpt == NULL && btree->checkpoint == NULL) ||
+			    (ckpt != NULL && btree->checkpoint != NULL &&
+			    strcmp(ckpt, btree->checkpoint) == 0))) {
+				++btree->refcnt;
+				session->btree = btree;
+				return (__conn_btree_open_lock(session, flags));
+			}
 		}
+	}
 
 	/*
 	 * Allocate the WT_BTREE structure, its lock, and set the name so we
@@ -118,10 +121,11 @@ __conn_btree_get(WT_SESSION_IMPL *session,
 		__wt_writelock(session, btree->rwlock);
 		F_SET(btree, WT_BTREE_EXCLUSIVE);
 
-		/* Add to the connection list. */
-		btree->refcnt = 1;
-		TAILQ_INSERT_TAIL(&conn->btqh, btree, q);
-		++conn->btqcnt;
+		if (!LF_ISSET(WT_BTREE_NO_CACHE)) {
+			/* Add to the connection list. */
+			btree->refcnt = 1;
+			TAILQ_INSERT_TAIL(&conn->btqh, btree, q);
+		}
 	}
 
 	if (ret == 0)
@@ -152,6 +156,9 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session)
 
 	if (!F_ISSET(btree, WT_BTREE_OPEN))
 		return (0);
+
+	if (btree->checkpoint == NULL)
+		--S2C(session)->open_btree_count;
 
 	/*
 	 * Checkpoint to flush out the file's changes.  This usually happens on
@@ -230,6 +237,12 @@ __conn_btree_open(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_btree_open(session, addr->data, addr->size, cfg,
 		    btree->checkpoint == NULL ? 0 : 1));
 		F_SET(btree, WT_BTREE_OPEN);
+		/*
+		 * Checkpoint handles are read only, so eviction calculations
+		 * based on the number of btrees are better to ignore them.
+		 */
+		if (btree->checkpoint == NULL)
+			++S2C(session)->open_btree_count;
 
 		/* Drop back to a readlock if that is all that was needed. */
 		if (!LF_ISSET(WT_BTREE_EXCLUSIVE)) {
@@ -483,11 +496,11 @@ err:	WT_CLEAR_BTREE_IN_SESSION(session);
 }
 
 /*
- * __conn_btree_discard --
+ * __wt_conn_btree_discard_single --
  *	Discard a single btree file handle structure.
  */
-static int
-__conn_btree_discard(WT_SESSION_IMPL *session, WT_BTREE *btree)
+int
+__wt_conn_btree_discard_single(WT_SESSION_IMPL *session, WT_BTREE *btree)
 {
 	WT_DECL_RET;
 
@@ -535,8 +548,7 @@ restart:
 			continue;
 
 		TAILQ_REMOVE(&conn->btqh, btree, q);
-		--conn->btqcnt;
-		WT_TRET(__conn_btree_discard(session, btree));
+		WT_TRET(__wt_conn_btree_discard_single(session, btree));
 		goto restart;
 	}
 
@@ -552,8 +564,7 @@ restart:
 	/* Close the metadata file handle. */
 	while ((btree = TAILQ_FIRST(&conn->btqh)) != NULL) {
 		TAILQ_REMOVE(&conn->btqh, btree, q);
-		--conn->btqcnt;
-		WT_TRET(__conn_btree_discard(session, btree));
+		WT_TRET(__wt_conn_btree_discard_single(session, btree));
 	}
 
 	return (ret);

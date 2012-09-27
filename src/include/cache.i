@@ -57,9 +57,13 @@ __wt_eviction_page_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 	    F_ISSET(session->btree, WT_BTREE_NO_EVICTION))
 		return (0);
 
-	/* Check the page's memory footprint. */
-	if ((int64_t)page->memory_footprint > conn->cache_size / 2 ||
-	    page->memory_footprint > 20 * session->btree->maxleafpage)
+	/*
+	 * Check the page's memory footprint - evict pages that take up more
+	 * than their fair share of the cache. We define a fair share as
+	 * approximately half the cache size per open writable btree handle.
+	 */
+	if ((int64_t)page->memory_footprint >
+	    conn->cache_size / (2 * (conn->open_btree_count + 1)))
 		return (1);
 
 	/*

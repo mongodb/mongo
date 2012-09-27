@@ -113,8 +113,8 @@ __wt_confdfl_file_meta =
 	"huffman_value=,internal_item_max=0,internal_key_truncate=,"
 	"internal_page_max=2KB,key_format=u,key_gap=10,leaf_item_max=0,"
 	"leaf_page_max=1MB,lsm_bloom_bit_count=8,lsm_bloom_hash_count=4,"
-	"lsm_chunk_size=2MB,prefix_compression=,split_pct=75,type=btree,"
-	"value_format=u,version=(major=0,minor=0)";
+	"lsm_chunk_size=2MB,lsm_merge_max=15,prefix_compression=,split_pct=75"
+	",type=btree,value_format=u,version=(major=0,minor=0)";
 
 WT_CONFIG_CHECK
 __wt_confchk_file_meta[] = {
@@ -138,6 +138,7 @@ __wt_confchk_file_meta[] = {
 	{ "lsm_bloom_bit_count", "int", "min=2,max=1000" },
 	{ "lsm_bloom_hash_count", "int", "min=2,max=100" },
 	{ "lsm_chunk_size", "int", "min=512K,max=500MB" },
+	{ "lsm_merge_max", "int", "min=2,max=100" },
 	{ "prefix_compression", "boolean", NULL },
 	{ "split_pct", "int", "min=25,max=100" },
 	{ "type", "string", "choices=[\"btree\"]" },
@@ -213,8 +214,8 @@ __wt_confdfl_session_create =
 	"internal_key_truncate=,internal_page_max=2KB,key_format=u,"
 	"key_format=u,key_gap=10,leaf_item_max=0,leaf_page_max=1MB,"
 	"lsm_bloom_bit_count=8,lsm_bloom_hash_count=4,lsm_chunk_size=2MB,"
-	"prefix_compression=,split_pct=75,type=btree,value_format=u,"
-	"value_format=u";
+	"lsm_merge_max=15,prefix_compression=,split_pct=75,type=btree,"
+	"value_format=u,value_format=u";
 
 WT_CONFIG_CHECK
 __wt_confchk_session_create[] = {
@@ -241,6 +242,7 @@ __wt_confchk_session_create[] = {
 	{ "lsm_bloom_bit_count", "int", "min=2,max=1000" },
 	{ "lsm_bloom_hash_count", "int", "min=2,max=100" },
 	{ "lsm_chunk_size", "int", "min=512K,max=500MB" },
+	{ "lsm_merge_max", "int", "min=2,max=100" },
 	{ "prefix_compression", "boolean", NULL },
 	{ "source", "string", NULL },
 	{ "split_pct", "int", "min=25,max=100" },
@@ -280,8 +282,8 @@ __wt_confchk_session_log_printf[] = {
 
 const char *
 __wt_confdfl_session_open_cursor =
-	"append=0,bulk=0,checkpoint=,dump=,next_random=0,overwrite=0,raw=0,"
-	"statistics=0,statistics_clear=0,target=";
+	"append=0,bulk=0,checkpoint=,dump=,next_random=0,no_cache=0,"
+	"overwrite=0,raw=0,statistics=0,statistics_clear=0,target=";
 
 WT_CONFIG_CHECK
 __wt_confchk_session_open_cursor[] = {
@@ -290,6 +292,7 @@ __wt_confchk_session_open_cursor[] = {
 	{ "checkpoint", "string", NULL },
 	{ "dump", "string", "choices=[\"hex\",\"print\"]" },
 	{ "next_random", "boolean", NULL },
+	{ "no_cache", "boolean", NULL },
 	{ "overwrite", "boolean", NULL },
 	{ "raw", "boolean", NULL },
 	{ "statistics", "boolean", NULL },
@@ -381,7 +384,7 @@ const char *
 __wt_confdfl_wiredtiger_open =
 	"buffer_alignment=-1,cache_size=100MB,create=0,direct_io=,"
 	"error_prefix=,eviction_target=80,eviction_trigger=95,extensions=,"
-	"hazard_max=30,logging=0,multiprocess=0,session_max=50,sync=,"
+	"hazard_max=1000,logging=0,multiprocess=0,session_max=50,sync=,"
 	"transactional=,use_environment_priv=0,verbose=";
 
 WT_CONFIG_CHECK
