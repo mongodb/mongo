@@ -74,11 +74,10 @@ __wt_txn_get_snapshot(WT_SESSION_IMPL *session, wt_txnid_t max_id)
 	conn = S2C(session);
 	txn = &session->txn;
 	txn_global = &conn->txn_global;
-	oldest_snap_min = WT_TXN_ABORTED;
 
 	do {
 		/* Take a copy of the current session ID. */
-		current_id = txn_global->current;
+		current_id = oldest_snap_min = txn_global->current;
 
 		/* Copy the array of concurrent transactions. */
 		WT_ORDERED_READ(session_cnt, conn->session_cnt);
@@ -116,11 +115,10 @@ __wt_txn_get_evict_snapshot(WT_SESSION_IMPL *session)
 
 	conn = S2C(session);
 	txn_global = &conn->txn_global;
-	oldest_snap_min = WT_TXN_ABORTED;
 
 	do {
 		/* Take a copy of the current session ID. */
-		current_id = txn_global->current;
+		current_id = oldest_snap_min = txn_global->current;
 
 		/* Walk the array of concurrent transactions. */
 		WT_ORDERED_READ(session_cnt, conn->session_cnt);
