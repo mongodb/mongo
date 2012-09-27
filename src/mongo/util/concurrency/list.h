@@ -87,7 +87,7 @@ namespace mongo {
             }
             prev = t->_next;
             if( ++_orphans > 500 )
-                log() << "warning List1 orphans=" << _orphans << '\n';
+                log() << "warning List1 orphans=" << _orphans << endl;
         }
 
     private:

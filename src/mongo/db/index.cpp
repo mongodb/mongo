@@ -349,7 +349,7 @@ namespace mongo {
             stringstream ss;
             ss << "add index fails, too many indexes for " << sourceNS << " key:" << key.toString();
             string s = ss.str();
-            log() << s << '\n';
+            log() << s << endl;
             uasserted(12505,s);
         }
 

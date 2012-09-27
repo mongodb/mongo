@@ -203,7 +203,7 @@ namespace mongo {
         Database *db = cc().database();
         CCByLoc& bl = db->ccByLoc;
         RARELY if ( bl.size() > 70 ) {
-            log() << "perf warning: byLoc.size=" << bl.size() << " in aboutToDeleteBucket\n";
+            log() << "perf warning: byLoc.size=" << bl.size() << " in aboutToDeleteBucket" << endl;
         }
         for ( CCByLoc::iterator i = bl.begin(); i != bl.end(); i++ )
             i->second->_c->aboutToDeleteBucket(b);
@@ -459,7 +459,7 @@ namespace mongo {
         _c->prepareToYield();
         DiskLoc cl = _c->refLoc();
         if ( lastLoc() == cl ) {
-            //log() << "info: lastloc==curloc " << ns << '\n';
+            //log() << "info: lastloc==curloc " << ns << endl;
         }
         else {
             recursive_scoped_lock lock(ccmutex);

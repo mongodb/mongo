@@ -893,7 +893,7 @@ namespace mongo {
 
             }
             else {
-                log() << "repl:   " << ns << " oplog is empty\n";
+                log() << "repl:   " << ns << " oplog is empty" << endl;
             }
             {
                 Lock::GlobalWrite lk;
@@ -1072,7 +1072,7 @@ namespace mongo {
             return true;
         }
         if( ! cc().isAdmin() ) {
-            log() << "replauthenticate: requires admin permissions, failing\n";
+            log() << "replauthenticate: requires admin permissions, failing" << endl;
             return false;
         }
 
@@ -1090,7 +1090,7 @@ namespace mongo {
                 if( !Helpers::findOne("local.system.users", userReplQuery, user) ||
                         // try the first user in local
                         !Helpers::getSingleton("local.system.users", user) ) {
-                    log() << "replauthenticate: no user in local.system.users to use for authentication\n";
+                    log() << "replauthenticate: no user in local.system.users to use for authentication" << endl;
                     return false;
                 }
             }
@@ -1328,7 +1328,7 @@ namespace mongo {
                     return 60;
                 }
                 else {
-                    log() << "repl: AssertionException " << e.what() << '\n';
+                    log() << "repl: AssertionException " << e.what() << endl;
                 }
                 replInfo = "replMain caught AssertionException";
             }

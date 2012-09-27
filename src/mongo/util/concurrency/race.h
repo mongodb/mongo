@@ -38,7 +38,7 @@ namespace mongo {
             const string file;
             const unsigned line;
             void fail() { 
-                log() << "\n\n\nrace: synchronization (race condition) failure\ncurrent locks this thread (" << getThreadName() << "):\n"
+                log() << "\n\n\nrace: synchronization (race condition) failure\ncurrent locks this thread (" << getThreadName() << "):" << endl
                     << mutexDebugger.currentlyLocked() << endl;
                 printStackTrace();
                 ::abort();

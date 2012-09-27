@@ -90,7 +90,7 @@ namespace mongo {
                 //++_nscanned;
             }
             if ( u > 10 )
-                OCCASIONALLY log() << "btree unused skipped:" << u << '\n';
+                OCCASIONALLY log() << "btree unused skipped:" << u << endl;
             return u;
         }
 
