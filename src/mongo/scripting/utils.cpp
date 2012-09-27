@@ -39,10 +39,7 @@ namespace mongo {
     }
 
     static BSONObj native_version( const BSONObj& args, void* data ) {
-        cout << "version: " << versionString << endl;
-        if ( strstr( versionString , "+" ) )
-            printGitVersion();
-        return BSONObj();
+        return BSON("" << versionString);
     }
 
     static BSONObj native_sleep( const mongo::BSONObj& args, void* data ) {
