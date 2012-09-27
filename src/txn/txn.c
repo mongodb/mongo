@@ -167,8 +167,10 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 	F_SET(txn, TXN_RUNNING);
 
 	do {
-		/* Take a copy of the current session ID. */
-		txn->id = txn_global->current;
+		/* Allocate a transaction ID. */
+		do {
+			txn->id = WT_ATOMIC_ADD(txn_global->current, 1);
+		} while (txn->id == WT_TXN_NONE || txn->id == WT_TXN_ABORTED);
 		WT_PUBLISH(txn_state->id, txn->id);
 
 		/*
@@ -198,8 +200,7 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 			    session, n, txn->id, oldest_snap_min);
 			txn_state->snap_min = txn->snap_min;
 		}
-	} while (!WT_ATOMIC_CAS(txn_global->current, txn->id, txn->id + 1) ||
-	    txn->id == WT_TXN_NONE || txn->id == WT_TXN_ABORTED);
+	} while (txn->id != txn_global->current);
 
 	return (0);
 }
@@ -221,7 +222,8 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 	/* Clear the transaction's ID from the global table. */
 	WT_ASSERT(session, txn_state->id != WT_TXN_NONE &&
 	    txn->id != WT_TXN_NONE);
-	txn_state->id = txn_state->snap_min = WT_TXN_NONE;
+	WT_PUBLISH(txn_state->id, WT_TXN_NONE);
+	txn_state->snap_min = WT_TXN_NONE;
 
 	/* Reset the transaction state to not running. */
 	txn->id = WT_TXN_NONE;

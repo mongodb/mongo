@@ -43,8 +43,8 @@ typedef uint32_t wt_txnid_t;
 	((t1) != (t2) && TXNID_LE(t1, t2))
 
 struct __wt_txn_state {
-	wt_txnid_t id;
-	wt_txnid_t snap_min;
+	volatile wt_txnid_t id;
+	volatile wt_txnid_t snap_min;
 };
 
 struct __wt_txn_global {
