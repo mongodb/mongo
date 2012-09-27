@@ -940,6 +940,7 @@ int
 __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app)
 {
 	WT_BTREE *btree, *saved_btree;
+	WT_DECL_RET;
 	WT_PAGE *page;
 
 	__evict_get_page(session, is_app, &btree, &page);
@@ -952,19 +953,14 @@ __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app)
 	saved_btree = session->btree;
 	WT_SET_BTREE_IN_SESSION(session, btree);
 
-	/*
-	 * We don't care why eviction failed (maybe the page was dirty and
-	 * we're out of disk space, or the page had an in-memory subtree
-	 * already being evicted).
-	 */
-	(void)__evict_page(session, page);
+	ret = __evict_page(session, page);
 
 	(void)WT_ATOMIC_SUB(btree->lru_count, 1);
 
 	WT_CLEAR_BTREE_IN_SESSION(session);
 	session->btree = saved_btree;
 
-	return (0);
+	return (ret);
 }
 
 /*

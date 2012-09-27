@@ -331,14 +331,18 @@ struct __wt_connection_impl {
 			}						\
 			ret = __wt_txn_commit((s), NULL);		\
 		} else {						\
-			WT_TRET(WT_DEADLOCK);				\
 			(void)__wt_txn_rollback((s), NULL);		\
+			if (ret == 0 || ret == WT_DEADLOCK) {		\
+				ret = 0;				\
+				continue;				\
+			}						\
 		}							\
 	} else if ((ret) != 0 &&					\
 	    (ret) != WT_NOTFOUND &&					\
 	    (ret) != WT_DUPLICATE_KEY)					\
 		F_SET(&(s)->txn, TXN_ERROR);				\
-} while (0)
+	break;								\
+} while (1)
 
 /*
  * If a session or connection method is about to return WT_NOTFOUND (some
