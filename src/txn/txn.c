@@ -167,7 +167,23 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 	F_SET(txn, TXN_RUNNING);
 
 	do {
-		/* Allocate a transaction ID. */
+		/*
+		 * Allocate a transaction ID.
+		 *
+		 * We use an atomic increment to ensure that we get a unique
+		 * ID, then publish that to the global state table.
+		 *
+		 * If two threads race to allocate an ID, only the latest ID
+		 * will be proceed.  The winning thread can be sure that its
+		 * snapshot contains all of the earler active IDs.  Threads
+		 * that race and get an earlier ID may not appear in the
+		 * snapshot, but they will loop and allocate a new ID before
+		 * proceeding to make any updates.
+		 *
+		 * This potentially wastes transaction IDs when threads race to
+		 * begin transactions, but that is the price we pay to keep
+		 * this path latch free.
+		 */
 		do {
 			txn->id = WT_ATOMIC_ADD(txn_global->current, 1);
 		} while (txn->id == WT_TXN_NONE || txn->id == WT_TXN_ABORTED);
