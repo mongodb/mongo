@@ -127,7 +127,7 @@ __wt_lsm_checkpoint_worker(void *arg)
 			    __wt_checkpoint, cfg, 0));
 			if (ret == 0) {
 				__wt_spin_lock(session, &lsm_tree->lock);
-				F_SET(lsm_tree->chunk[i], WT_LSM_CHUNK_ONDISK);
+				F_SET(chunk, WT_LSM_CHUNK_ONDISK);
 				lsm_tree->dsk_gen++;
 				__wt_spin_unlock(session, &lsm_tree->lock);
 			}
