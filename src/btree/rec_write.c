@@ -1965,7 +1965,7 @@ __rec_col_var(WT_SESSION_IMPL *session,
 	WT_INSERT *ins;
 	WT_INSERT_HEAD *append;
 	WT_ITEM *last;
-	WT_UPDATE *next_upd, *upd;
+	WT_UPDATE *upd;
 	uint64_t n, nrepeat, repeat_count, rle, slvg_missing, src_recno;
 	uint32_t i, size;
 	int deleted, last_deleted, orig_deleted, update_no_copy;
@@ -2016,21 +2016,13 @@ __rec_col_var(WT_SESSION_IMPL *session,
 	WT_COL_FOREACH(page, cip, i) {
 		ovfl_state = OVFL_IGNORE;
 		if ((cell = WT_COL_PTR(page, cip)) == NULL) {
-			ins = NULL;
 			nrepeat = 1;
+			ins = NULL;
 			orig_deleted = 1;
 		} else {
 			__wt_cell_unpack(cell, unpack);
 			nrepeat = __wt_cell_rle(unpack);
-
 			ins = WT_SKIP_FIRST(WT_COL_UPDATE(page, cip));
-			while (ins != NULL) {
-				WT_ERR(
-				    __rec_txn_read(session, r, ins->upd, &upd));
-				if (upd != NULL)
-					break;
-				ins = WT_SKIP_NEXT(ins);
-			}
 
 			/*
 			 * If the original value is "deleted", there's no value
@@ -2090,19 +2082,13 @@ record_loop:	/*
 		 */
 		for (n = 0;
 		    n < nrepeat; n += repeat_count, src_recno += repeat_count) {
-			if (ins != NULL &&
-			    WT_INSERT_RECNO(ins) == src_recno) {
+			upd = NULL;
+			if (ins != NULL && WT_INSERT_RECNO(ins) == src_recno) {
 				WT_ERR(
 				    __rec_txn_read(session, r, ins->upd, &upd));
-				WT_ASSERT(session, upd != NULL);
-				do {
-					ins = WT_SKIP_NEXT(ins);
-					if (ins == NULL)
-						break;
-					WT_ERR(__rec_txn_read(
-					    session, r, ins->upd, &next_upd));
-				} while (next_upd == NULL);
-
+				ins = WT_SKIP_NEXT(ins);
+			}
+			if (upd != NULL) {
 				update_no_copy = 1;	/* No data copy */
 
 				repeat_count = 1;
