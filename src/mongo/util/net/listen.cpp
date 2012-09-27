@@ -19,7 +19,6 @@
 #include "pch.h"
 #include "listen.h"
 #include "message_port.h"
-#include "mongo/platform/atomic_word.h"
 
 #ifndef _WIN32
 
@@ -52,9 +51,6 @@
 namespace mongo {
 
 
-    void checkTicketNumbers();
-
-    
     // ----- Listener -------
 
     const Listener* Listener::_timeTracker;
@@ -239,7 +235,6 @@ namespace mongo {
         _logListen( _port , false );
 #endif
 
-        static AtomicInt64 connNumber;
         struct timeval maxSelectTime;
         while ( ! inShutdown() ) {
             fd_set fds[1];
@@ -315,10 +310,10 @@ namespace mongo {
                 setsockopt( s , SOL_SOCKET, SO_NOSIGPIPE, &one, sizeof(int));
 #endif
 
-                long long myConnectionNumber = connNumber.addAndFetch(1);
+                long long myConnectionNumber = globalConnectionNumber.addAndFetch(1);
 
                 if ( _logConnect && ! cmdLine.quiet ){
-                    int conns = connTicketHolder.used()+1;
+                    int conns = globalTicketHolder.used()+1;
                     const char* word = (conns == 1 ? " connection" : " connections");
                     log() << "connection accepted from " << from.toString() << " #" << myConnectionNumber << " (" << conns << word << " now open)" << endl;
                 }
@@ -381,9 +376,9 @@ namespace mongo {
 #endif
     }
 
-    void checkTicketNumbers() {
+    void Listener::checkTicketNumbers() {
         int want = getMaxConnections();
-        int current = connTicketHolder.outof();
+        int current = globalTicketHolder.outof();
         if ( current != DEFAULT_MAX_CONN ) {
             if ( current < want ) {
                 // they want fewer than they can handle
@@ -395,9 +390,10 @@ namespace mongo {
                 log() << " --maxConns too high, can only handle " << want << endl;
             }
         }
-        connTicketHolder.resize( want );
+        globalTicketHolder.resize( want );
     }
 
-    TicketHolder connTicketHolder(DEFAULT_MAX_CONN);
 
+    TicketHolder Listener::globalTicketHolder(DEFAULT_MAX_CONN);
+    AtomicInt64 Listener::globalConnectionNumber;
 }

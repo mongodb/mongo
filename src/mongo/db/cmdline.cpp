@@ -264,7 +264,7 @@ namespace mongo {
                 out() << "maxConns can't be greater than 10000000" << endl;
                 ::_exit( EXIT_BADOPTIONS );
             }
-            connTicketHolder.resize( newSize );
+            Listener::globalTicketHolder.resize( newSize );
         }
 
         if (params.count("objcheck")) {

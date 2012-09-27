@@ -18,6 +18,7 @@
 #pragma once
 
 #include "sock.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/concurrency/ticketholder.h"
 
 namespace mongo {
@@ -94,6 +95,16 @@ namespace mongo {
         static const Listener* _timeTracker;
         
         virtual bool useUnixSockets() const { return false; }
+
+    public:
+        /** the "next" connection number.  every connection to this process has a unique number */
+        static AtomicInt64 globalConnectionNumber;
+
+        /** keeps track of how many allowed connections there are and how many are being used*/
+        static TicketHolder globalTicketHolder;
+
+        /** makes sure user input is sane */
+        static void checkTicketNumbers();
     };
 
     /**
@@ -191,8 +202,5 @@ namespace mongo {
         set<string>* _socketPaths; // for unix domain sockets
         static ListeningSockets* _instance;
     };
-
-
-    extern TicketHolder connTicketHolder;
 
 }

@@ -741,7 +741,7 @@ namespace mongo {
                     else {
                         log() << " mapped:" << totalMapped;
                     }
-                    log() << " connections:" << connTicketHolder.used();
+                    log() << " connections:" << Listener::globalTicketHolder.used();
                     if (theReplSet) {
                         log() << " replication threads:" << 
                             ReplSetImpl::replWriterThreadCount + 

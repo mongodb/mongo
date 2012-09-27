@@ -146,8 +146,9 @@ namespace mongo {
 
                 {
                     BSONObjBuilder bb( result.subobjStart( "connections" ) );
-                    bb.append( "current" , connTicketHolder.used() );
-                    bb.append( "available" , connTicketHolder.available() );
+                    bb.append( "current" , Listener::globalTicketHolder.used() );
+                    bb.append( "available" , Listener::globalTicketHolder.available() );
+                    bb.append( "totalCreated" , Listener::globalConnectionNumber.load() );
                     bb.done();
                 }
 
