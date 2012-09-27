@@ -150,7 +150,6 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 	txn = &session->txn;
 	txn_global = &conn->txn_global;
 	txn_state = &txn_global->states[session->id];
-	oldest_snap_min = WT_TXN_ABORTED;
 
 	WT_ASSERT(session, txn_state->id == WT_TXN_NONE);
 
@@ -188,6 +187,7 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 			txn->id = WT_ATOMIC_ADD(txn_global->current, 1);
 		} while (txn->id == WT_TXN_NONE || txn->id == WT_TXN_ABORTED);
 		WT_PUBLISH(txn_state->id, txn->id);
+		oldest_snap_min = txn->id;
 
 		/*
 		 * If we are starting a snapshot isolation transaction, get
