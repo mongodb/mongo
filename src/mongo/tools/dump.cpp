@@ -137,33 +137,32 @@ public:
                             map<string, BSONObj> options, multimap<string, BSONObj> indexes ) {
         log() << "\tMetadata for " << coll << " to " << outputFile.string() << endl;
 
-        ofstream file (outputFile.string().c_str());
-        uassert(15933, "Couldn't open file: " + outputFile.string(), file.is_open());
-
         bool hasOptions = options.count(coll) > 0;
         bool hasIndexes = indexes.count(coll) > 0;
 
-        if (hasOptions) {
-            file << "{options : " << options.find(coll)->second.jsonString();
+        BSONObjBuilder metadata;
 
-            if (hasIndexes) {
-                file << ", ";
-            }
-        } else {
-            file << "{";
+        if (hasOptions) {
+            metadata << "options" << options.find(coll)->second;
         }
 
         if (hasIndexes) {
-            file << "indexes:[";
-            for (multimap<string, BSONObj>::iterator it=indexes.equal_range(coll).first; it!=indexes.equal_range(coll).second; ++it) {
-                if (it != indexes.equal_range(coll).first) {
-                    file << ", ";
-                }
-                file << (*it).second.jsonString();
+            BSONArrayBuilder indexesOutput (metadata.subarrayStart("indexes"));
+
+            // I'd kill for C++11 auto here...
+            const pair<multimap<string, BSONObj>::iterator, multimap<string, BSONObj>::iterator>
+                range = indexes.equal_range(coll);
+
+            for (multimap<string, BSONObj>::iterator it=range.first; it!=range.second; ++it) {
+                 indexesOutput << it->second;
             }
-            file << "]";
+
+            indexesOutput.done();
         }
-        file << "}";
+
+        ofstream file (outputFile.string().c_str());
+        uassert(15933, "Couldn't open file: " + outputFile.string(), file.is_open());
+        file << metadata.done().jsonString();
     }
 
 
@@ -196,7 +195,7 @@ public:
             BSONObj obj = cursor->nextSafe();
             const string name = obj.getField( "name" ).valuestr();
             if (obj.hasField("options")) {
-                collectionOptions.insert( pair<string,BSONObj> (name, obj.getField("options").embeddedObject()) );
+                collectionOptions[name] = obj.getField("options").embeddedObject().getOwned();
             }
 
             // skip namespaces with $ in them only if we don't specify a collection to dump
