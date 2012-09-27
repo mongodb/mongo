@@ -174,11 +174,11 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 		 * ID, then publish that to the global state table.
 		 *
 		 * If two threads race to allocate an ID, only the latest ID
-		 * will be proceed.  The winning thread can be sure that its
-		 * snapshot contains all of the earlier active IDs.  Threads
-		 * that race and get an earlier ID may not appear in the
-		 * snapshot, but they will loop and allocate a new ID before
-		 * proceeding to make any updates.
+		 * will proceed.  The winning thread can be sure its snapshot
+		 * contains all of the earlier active IDs.  Threads that race
+		 * race and get an earlier ID may not appear in the snapshot,
+		 * but they will loop and allocate a new ID before proceeding
+		 * to make any updates.
 		 *
 		 * This potentially wastes transaction IDs when threads race to
 		 * begin transactions, but that is the price we pay to keep
