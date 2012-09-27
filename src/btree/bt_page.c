@@ -103,13 +103,13 @@ __wt_page_in_func(
 		WT_ILLEGAL_VALUE(session);
 		}
 
-		/*
-		 * Find a page to evict -- if that fails, we don't care why,
-		 * but we may need to wake the eviction server again if the
-		 * cache is still full.
-		 */
-		if (__wt_evict_lru_page(session, 1) != 0)
+		/* Find a page to evict -- if the page is busy, keep trying. */
+		if ((ret = __wt_evict_lru_page(session, 1)) == EBUSY)
+			__wt_yield();
+		else if (ret == WT_NOTFOUND)
 			wake = 1;
+		else
+			WT_RET(ret);
 	}
 }
 

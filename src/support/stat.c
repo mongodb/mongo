@@ -146,6 +146,8 @@ __wt_stat_alloc_connection_stats(WT_SESSION_IMPL *session, WT_CONNECTION_STATS *
 	stats->txn_ancient.desc = "ancient transactions";
 	stats->txn_begin.desc = "transactions";
 	stats->txn_commit.desc = "transactions committed";
+	stats->txn_fail_cache.desc =
+	    "transaction failures due to cache overflow";
 	stats->txn_rollback.desc = "transactions rolled-back";
 
 	*statsp = stats;
@@ -177,5 +179,6 @@ __wt_stat_clear_connection_stats(WT_STATS *stats_arg)
 	stats->txn_ancient.v = 0;
 	stats->txn_begin.v = 0;
 	stats->txn_commit.v = 0;
+	stats->txn_fail_cache.v = 0;
 	stats->txn_rollback.v = 0;
 }

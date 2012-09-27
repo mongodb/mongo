@@ -337,6 +337,17 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_curbulk_init((WT_CURSOR_BULK *)cbt));
 
 	/*
+	 * no_cache
+	 * No cache cursors are read-only.
+	 */
+	WT_ERR(__wt_config_gets_defno(session, cfg, "no_cache", &cval));
+	if (cval.val != 0) {
+		cursor->insert = __wt_cursor_notsup;
+		cursor->update = __wt_cursor_notsup;
+		cursor->remove = __wt_cursor_notsup;
+	}
+
+	/*
 	 * random_retrieval
 	 * Random retrieval cursors only support next, reset and close.
 	 */
@@ -368,20 +379,30 @@ __wt_curfile_open(WT_SESSION_IMPL *session, const char *uri,
 {
 	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
-	int bulk;
+	uint32_t flags;
 
+	/*
+	 * Bulk and no cache handles are exclusive and may not be used by more
+	 * than a single thread.
+	 * Additionally set the discard flag on no cache handles so they are
+	 * destroyed on close.
+	 */
+	flags = 0;
 	WT_RET(__wt_config_gets_defno(session, cfg, "bulk", &cval));
-	bulk = (cval.val != 0);
+	if (cval.val != 0)
+		LF_SET(WT_DHANDLE_EXCLUSIVE | WT_BTREE_BULK);
+	WT_RET(__wt_config_gets_defno(session, cfg, "no_cache", &cval));
+	if (cval.val != 0)
+		LF_SET(WT_DHANDLE_EXCLUSIVE | WT_BTREE_NO_CACHE);
 
 	/* TODO: handle projections. */
 
 	/* Get the handle and lock it while the cursor is using it. */
 	if (WT_PREFIX_MATCH(uri, "colgroup:") || WT_PREFIX_MATCH(uri, "index:"))
-		WT_RET(__wt_schema_get_btree(session, uri, strlen(uri), cfg,
-		    bulk ? WT_BTREE_BULK | WT_DHANDLE_EXCLUSIVE : 0));
+		WT_RET(__wt_schema_get_btree(
+		    session, uri, strlen(uri), cfg, flags));
 	else if (WT_PREFIX_MATCH(uri, "file:"))
-		WT_RET(__wt_session_get_btree_ckpt(session, uri, cfg,
-		    bulk ? WT_BTREE_BULK | WT_DHANDLE_EXCLUSIVE : 0));
+		WT_RET(__wt_session_get_btree_ckpt(session, uri, cfg, flags));
 	else
 		WT_RET(__wt_bad_object_type(session, uri));
 

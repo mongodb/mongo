@@ -56,11 +56,9 @@ __cursor_leave(WT_CURSOR_BTREE *cbt)
 	cursor = &cbt->iface;
 	session = (WT_SESSION_IMPL *)cursor->session;
 
-	/* Optionally release any page references we're holding. */
-	if (cbt->page != NULL) {
-		__wt_page_release(session, cbt->page);
-		cbt->page = NULL;
-	}
+	/* Release any page references we're holding. */
+	__wt_stack_release(session, cbt->page);
+	cbt->page = NULL;
 
 	/* Reset the returned key/value state. */
 	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);

@@ -1,3 +1,50 @@
+WiredTiger release 1.3.1, 2012-09-25
+------------------------------------
+
+This is a bugfix release, primarily related to LSM trees.  The changes are
+as follows:
+
+[#309] Implement auto-commit of transactions at the API.  As well as
+       ensuring the atomicity of complex operations, this change simplified
+       code that simulated auto-commit internally and fixed a number of
+       bugs.
+
+[#321] Bulk-cursors no longer block checkpoints.  We can't write files that
+       are being bulk-loaded, so change checkpoint to create checkpoints in
+       the metadata that, if accessed, look like empty files.
+
+       Tighten down the requirements for bulk-load, the only thing that can
+       be bulk-loaded now is a newly created tree, not any empty file.
+
+[#329] Add dictionary support to variable-length column store objects.
+       Support large row-store reconciliation dictionaries: add a skiplist
+       as the indexing mechanism.
+
+[#333] Fix a leak of the in-memory transaction log structure and the LSM
+       data source handle.
+
+[#334] Fix a memory leak where a page's replacement address wasn't being
+       freed.
+
+* Check that LSM trees are not configured as column stores.
+
+* Fix a race when starting the LSM worker thread. It was possible for the
+  thread to exit immediately if it started fast enough.
+
+* Two fixes for LSM, one to ensure that cursors read from a checkpoint if
+  one is available. The other to reduce the number of empty chunks that can
+  be created initially.
+
+* Fix a bug that disabled bloom filters.
+
+* The configure script checks for Python support in SWIG.
+
+* If a drop operation fails to acquire all of the handle locks it needs,
+  make sure it releases the primary handle lock.
+
+* Fix a number of other minor bugs and memory leaks.
+
+
 WiredTiger release 1.3.0, 2012-09-17
 ------------------------------------
 

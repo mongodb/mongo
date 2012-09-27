@@ -68,9 +68,8 @@ __wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 			ref = page->u.intl.t + (base - 1);
 		}
 
-		/* Swap the parent page for the child page. */
+		/* Move to the child page. */
 		WT_ERR(__wt_page_in(session, page, ref));
-		__wt_page_release(session, page);
 		page = ref->page;
 	}
 
@@ -159,6 +158,6 @@ past_end:
 		F_SET(cbt, WT_CBT_MAX_RECORD);
 	return (0);
 
-err:	__wt_page_release(session, page);
+err:	__wt_stack_release(session, page);
 	return (ret);
 }

@@ -148,7 +148,6 @@ int
 __wt_tree_walk(WT_SESSION_IMPL *session, WT_PAGE **pagep, uint32_t flags)
 {
 	WT_BTREE *btree;
-	WT_DECL_RET;
 	WT_PAGE *page, *t;
 	WT_REF *ref;
 	uint32_t slot;
@@ -184,30 +183,14 @@ __wt_tree_walk(WT_SESSION_IMPL *session, WT_PAGE **pagep, uint32_t flags)
 	t = page->parent;
 	slot = (uint32_t)(page->ref - t->u.intl.t);
 
-	/*
-	 * Swap our hazard reference for the hazard reference of our parent,
-	 * if it's not the root page (we could access it directly because we
-	 * know it's in memory, but we need a hazard reference).  Don't leave
-	 * a hazard reference dangling on error.
-	 *
-	 * We're hazard-reference coupling up the tree and that's OK: first,
-	 * hazard references can't deadlock, so there's none of the usual
-	 * problems found when logically locking up a Btree; second, we don't
-	 * release our current hazard reference until we have our parent's
-	 * hazard reference.  If the eviction thread tries to evict the active
-	 * page, that fails because of our hazard reference.  If eviction tries
-	 * to evict our parent, that fails because the parent has a child page
-	 * that can't be discarded.
-	 */
+	/* If not the eviction thread, release the page's hazard reference. */
 	if (eviction) {
 		if (page->ref->state == WT_REF_EVICT_WALK)
 			page->ref->state = WT_REF_MEM;
-	} else {
-		if (!WT_PAGE_IS_ROOT(t))
-			ret = __wt_page_in(session, t, t->ref);
+	} else
 		__wt_page_release(session, page);
-		WT_RET(ret);
-	}
+
+	/* Switch to the parent. */
 	page = t;
 
 	/*
@@ -283,14 +266,7 @@ descend:	for (;;) {
 						break;
 				}
 
-				/*
-				 * Swap hazard references at each level (but
-				 * don't leave a hazard reference dangling on
-				 * error).
-				 */
-				ret = __wt_page_in(session, page, ref);
-				__wt_page_release(session, page);
-				WT_RET(ret);
+				WT_RET(__wt_page_in(session, page, ref));
 			}
 
 			page = ref->page;

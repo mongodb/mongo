@@ -94,6 +94,9 @@ for line in open(f, 'r'):
 		if name == lastname:
 			continue
 		lastname = name
+		if 'undoc' in c.flags:
+			continue
+
 		desc = textwrap.dedent(c.desc) + '.'
 		desc = desc.replace(',', '\\,')
 		default = '\\c ' + str(c.default) if c.default or gettype(c) == 'int' \

@@ -7,7 +7,7 @@
 
 #include "wt_internal.h"
 
-static int __btree_conf(WT_SESSION_IMPL *);
+static int __btree_conf(WT_SESSION_IMPL *, const char *[]);
 static int __btree_get_last_recno(WT_SESSION_IMPL *);
 static int __btree_page_sizes(WT_SESSION_IMPL *, const char *);
 static int __btree_tree_open_empty(WT_SESSION_IMPL *, int);
@@ -56,7 +56,7 @@ __wt_btree_open(WT_SESSION_IMPL *session,
 	WT_CLEAR(dsk);
 
 	/* Initialize and configure the WT_BTREE structure. */
-	WT_ERR(__btree_conf(session));
+	WT_ERR(__btree_conf(session, cfg));
 
 	/*
 	 * Bulk-load is only permitted on newly created files, not any empty
@@ -74,11 +74,11 @@ __wt_btree_open(WT_SESSION_IMPL *session,
 
 	/* Handle salvage configuration. */
 	forced_salvage = 0;
-	if (F_ISSET(btree, WT_BTREE_SALVAGE)) {
+	if (F_ISSET(btree, WT_BTREE_SALVAGE) && cfg != NULL) {
 		ret = __wt_config_gets(session, cfg, "force", &cval);
 		if (ret != 0 && ret != WT_NOTFOUND)
 			WT_ERR(ret);
-		if (cval.val != 0)
+		if (ret == 0 && cval.val != 0)
 			forced_salvage = 1;
 	}
 
@@ -164,11 +164,12 @@ __wt_btree_close(WT_SESSION_IMPL *session)
  *	Configure a WT_BTREE structure.
  */
 static int
-__btree_conf(WT_SESSION_IMPL *session)
+__btree_conf(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_BTREE *btree;
 	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
 	WT_NAMED_COLLATOR *ncoll;
 	uint32_t bitcnt;
 	int fixed;
@@ -192,8 +193,7 @@ __btree_conf(WT_SESSION_IMPL *session)
 
 	/* Row-store key comparison and key gap for prefix compression. */
 	if (btree->type == BTREE_ROW) {
-		WT_RET(__wt_config_getones(
-		    session, config, "collator", &cval));
+		WT_RET(__wt_config_getones(session, config, "collator", &cval));
 		if (cval.len > 0) {
 			TAILQ_FOREACH(ncoll, &conn->collqh, q) {
 				if (WT_STRING_MATCH(
@@ -239,20 +239,29 @@ __btree_conf(WT_SESSION_IMPL *session)
 			F_CLR(btree, WT_BTREE_NO_EVICTION);
 	}
 
+	/* No-cache files are never evicted or cached. */
+	if (cfg != NULL) {
+		ret = __wt_config_gets(session, cfg, "no_cache", &cval);
+		if (ret != 0 && ret != WT_NOTFOUND)
+			WT_RET(ret);
+		if (ret == 0 && cval.val != 0)
+			F_SET(btree, WT_BTREE_NO_CACHE |
+			    WT_BTREE_NO_EVICTION | WT_BTREE_NO_HAZARD);
+	}
+
 	/* Huffman encoding */
 	WT_RET(__wt_btree_huffman_open(session, config));
 
 	/* Reconciliation configuration. */
-	WT_RET(__wt_config_getones(
-	    session, config, "dictionary", &cval));
+	WT_RET(__wt_config_getones(session, config, "dictionary", &cval));
 	btree->dictionary = (u_int)cval.val;
 
 	WT_RET(__wt_config_getones(
 	    session, config, "internal_key_truncate", &cval));
 	btree->internal_key_truncate = cval.val == 0 ? 0 : 1;
 
-	WT_RET(__wt_config_getones(
-	    session, config, "prefix_compression", &cval));
+	WT_RET(
+	    __wt_config_getones(session, config, "prefix_compression", &cval));
 	btree->prefix_compression = cval.val == 0 ? 0 : 1;
 
 	WT_RET(__wt_config_getones(session, config, "split_pct", &cval));
@@ -480,7 +489,7 @@ __btree_get_last_recno(WT_SESSION_IMPL *session)
 		return (WT_NOTFOUND);
 
 	btree->last_recno = __col_last_recno(page);
-	__wt_page_release(session, page);
+	__wt_stack_release(session, page);
 
 	return (0);
 }

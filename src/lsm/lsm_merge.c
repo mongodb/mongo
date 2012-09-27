@@ -14,7 +14,7 @@
  */
 int
 __wt_lsm_merge_update_tree(WT_SESSION_IMPL *session,
-    WT_LSM_TREE *lsm_tree, int nchunks, WT_LSM_CHUNK **chunkp)
+    WT_LSM_TREE *lsm_tree, int start_chunk, int nchunks, WT_LSM_CHUNK **chunkp)
 {
 	WT_LSM_CHUNK *chunk;
 	size_t chunk_sz;
@@ -34,7 +34,9 @@ __wt_lsm_merge_update_tree(WT_SESSION_IMPL *session,
 	/* Copy entries one at a time, so we can reuse gaps in the list. */
 	for (i = j = 0; j < nchunks && i < lsm_tree->nold_chunks; i++) {
 		if (lsm_tree->old_chunks[i] == NULL) {
-			lsm_tree->old_chunks[i] = lsm_tree->chunk[j++];
+			lsm_tree->old_chunks[i] =
+			    lsm_tree->chunk[start_chunk + j];
+			++j;
 			--lsm_tree->old_avail;
 		}
 	}
@@ -42,13 +44,14 @@ __wt_lsm_merge_update_tree(WT_SESSION_IMPL *session,
 	WT_ASSERT(session, j == nchunks);
 
 	/* Update the current chunk list. */
-	memmove(lsm_tree->chunk + 1, lsm_tree->chunk + nchunks,
+	memmove(lsm_tree->chunk + start_chunk + 1,
+	    lsm_tree->chunk + start_chunk + nchunks,
 	    (lsm_tree->nchunks - nchunks) * sizeof(*lsm_tree->chunk));
 	lsm_tree->nchunks -= nchunks - 1;
 	memset(lsm_tree->chunk + lsm_tree->nchunks, 0,
 	    (nchunks - 1) * sizeof(*lsm_tree->chunk));
 	WT_RET(__wt_calloc_def(session, 1, &chunk));
-	lsm_tree->chunk[0] = chunk;
+	lsm_tree->chunk[start_chunk] = chunk;
 	lsm_tree->dsk_gen++;
 
 	*chunkp = chunk;
@@ -56,11 +59,11 @@ __wt_lsm_merge_update_tree(WT_SESSION_IMPL *session,
 }
 
 /*
- * __wt_lsm_major_merge --
- *	Merge a set of chunks of an LSM tree including the oldest.
+ * __wt_lsm_merge --
+ *	Merge a set of chunks of an LSM tree.
  */
 int
-__wt_lsm_major_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
+__wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
 	WT_BLOOM *bloom;
 	WT_CURSOR *src, *dest;
@@ -71,7 +74,7 @@ __wt_lsm_major_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	WT_SESSION *wt_session;
 	const char *dest_uri;
 	uint64_t insert_count, record_count;
-	int dest_id, i, nchunks;
+	int dest_id, i, nchunks, start_chunk;
 
 	src = dest = NULL;
 	dest_uri = NULL;
@@ -94,20 +97,45 @@ __wt_lsm_major_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		return (WT_NOTFOUND);
 
 	/*
-	 * We have a limited number of hazard references, and we want to bound
-	 * the amount of work in the merge.
-	 *
 	 * Use the lsm_tree lock to read the chunks (so no switches occur), but
 	 * avoid holding it while the merge is in progress: that may take a
 	 * long time.
 	 */
-	nchunks = WT_MIN((int)S2C(session)->hazard_size / 2, nchunks);
 	__wt_spin_lock(session, &lsm_tree->lock);
+
+	/* Only include chunks that are on disk */
 	while (nchunks > 1 &&
 	    (!F_ISSET(lsm_tree->chunk[nchunks - 1], WT_LSM_CHUNK_ONDISK) ||
 	    lsm_tree->chunk[nchunks - 1]->ncursor > 0))
 		--nchunks;
-	for (record_count = 0, i = 0; i < nchunks; i++)
+
+	/*
+	 * Look for a minor merge to do in preference to a major merge.
+	 *
+	 * The difference is whether the oldest chunk is involved: if it is, we
+	 * can discard tombstones, because there can be no older record to
+	 * marked deleted.
+	 *
+	 * We look at the Bloom URI to decide whether a chunk is the result of
+	 * an earlier merge.  In a minor merge, we take as many chunks as we
+	 * can that have not yet been merged.  If there are less than 2 "new"
+	 * chunks, fall back to a major merge.
+	 */
+	for (i = 0; i < nchunks; i++)
+		if (lsm_tree->chunk[i]->bloom_uri == NULL)
+			break;
+
+	if (i < nchunks - 2) {
+		start_chunk = i;
+		nchunks -= i;
+	} else
+		start_chunk = 0;
+
+	/* Respect the configured limit on the number of chunks to merge. */
+	if (nchunks > (int)lsm_tree->merge_max)
+		nchunks = (int)lsm_tree->merge_max;
+
+	for (record_count = 0, i = start_chunk; i < nchunks; i++)
 		record_count += lsm_tree->chunk[i]->count;
 	__wt_spin_unlock(session, &lsm_tree->lock);
 
@@ -118,7 +146,8 @@ __wt_lsm_major_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	dest_id = WT_ATOMIC_ADD(lsm_tree->last, 1);
 
 	WT_VERBOSE_RET(session, lsm,
-	    "Merging first %d chunks into %d\n", nchunks, dest_id);
+	    "Merging chunks %d-%d into %d\n",
+	    start_chunk, start_chunk + nchunks, dest_id);
 
 	if (record_count != 0) {
 		WT_RET(__wt_scr_alloc(session, 0, &bbuf));
@@ -140,7 +169,7 @@ __wt_lsm_major_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	WT_ERR(wt_session->open_cursor(
 	    wt_session, lsm_tree->name, NULL, NULL, &src));
 	F_SET(src, WT_CURSTD_RAW);
-	WT_ERR(__wt_clsm_init_merge(src, nchunks));
+	WT_ERR(__wt_clsm_init_merge(src, start_chunk, nchunks));
 
 	WT_WITH_SCHEMA_LOCK(session, ret = __wt_lsm_tree_create_chunk(
 	    session, lsm_tree, dest_id, &dest_uri));
@@ -174,7 +203,8 @@ __wt_lsm_major_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	WT_ERR(ret);
 
 	__wt_spin_lock(session, &lsm_tree->lock);
-	ret = __wt_lsm_merge_update_tree(session, lsm_tree, nchunks, &chunk);
+	ret = __wt_lsm_merge_update_tree(
+	    session, lsm_tree, start_chunk, nchunks, &chunk);
 
 	chunk->uri = dest_uri;
 	dest_uri = NULL;

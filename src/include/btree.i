@@ -295,9 +295,43 @@ __wt_get_addr(
 static inline void
 __wt_page_release(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	/* We never acquired a hazard reference on the root page. */
-	if (page != NULL && !WT_PAGE_IS_ROOT(page))
-		__wt_hazard_clear(session, page);
+	WT_BTREE *btree;
+
+	btree = S2BT(session);
+
+	/*
+	 * Fast-track pages we don't have and the root page, which sticks
+	 * in memory, regardless.
+	 */
+	if (page == NULL || WT_PAGE_IS_ROOT(page))
+		return;
+
+	/* If this is a non cached page, discard it. */
+	if (F_ISSET(btree, WT_BTREE_NO_CACHE)) {
+		page->ref->page = NULL;
+		page->ref->state = WT_REF_DISK;
+		__wt_page_out(session, &page, 0);
+		return;
+	}
+
+	/* Discard our hazard reference. */
+	__wt_hazard_clear(session, page);
+}
+
+/*
+ * __wt_stack_release --
+ *	Release references to a page stack.
+ */
+static inline void
+__wt_stack_release(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	WT_PAGE *next;
+
+	while (page != NULL && !WT_PAGE_IS_ROOT(page)) {
+		next = page->parent;
+		__wt_page_release(session, page);
+		page = next;
+	}
 }
 
 /*
@@ -310,7 +344,7 @@ __wt_page_hazard_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_CONNECTION_IMPL *conn;
 	WT_HAZARD *hp;
 	WT_SESSION_IMPL *s;
-	uint32_t i, session_cnt;
+	uint32_t i, hazard_size, session_cnt;
 
 	conn = S2C(session);
 
@@ -326,7 +360,8 @@ __wt_page_hazard_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 	for (s = conn->sessions, i = 0; i < session_cnt; ++s, ++i) {
 		if (!s->active)
 			continue;
-		for (hp = s->hazard; hp < s->hazard + conn->hazard_size; ++hp)
+		WT_ORDERED_READ(hazard_size, s->hazard_size);
+		for (hp = s->hazard; hp < s->hazard + hazard_size; ++hp)
 			if (hp->page == page)
 				return (hp);
 	}

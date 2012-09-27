@@ -247,6 +247,7 @@ btcur
 btdsk
 btmem
 btree
+btrees
 buf
 builtin
 bytelock
@@ -688,6 +689,7 @@ uninstantiated
 unix
 unjams
 unlinked
+unmerged
 unmodify
 unpackv
 unreferenced
