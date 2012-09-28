@@ -253,8 +253,7 @@ __lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		}
 	}
 	if (found) {
-err:		WT_WITH_SCHEMA_LOCK(session,
-		    ret = __wt_lsm_meta_write(session, lsm_tree));
+err:		ret = __wt_lsm_meta_write(session, lsm_tree);
 		__wt_spin_unlock(session, &lsm_tree->lock);
 	}
 	/* Returning non-zero means there is no work to do. */
