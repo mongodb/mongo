@@ -141,7 +141,7 @@ namespace mongo {
     }
 
     BSONObj SyncClusterConnection::getLastErrorDetailed(bool fsync, bool j, int w, int wtimeout) {
-        getLastErrorDetailed("admin", fsync, j, w, wtimeout);
+        return getLastErrorDetailed("admin", fsync, j, w, wtimeout);
     }
 
     BSONObj SyncClusterConnection::getLastErrorDetailed(const std::string& db,
