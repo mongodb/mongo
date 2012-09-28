@@ -403,6 +403,7 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, int discard)
 		LF_SET(WT_TREE_DISCARD);
 
 	__cursor_func_init(cbt, 0);
+	__cursor_position_clear(cbt);
 
 	/*
 	 * If we aren't already iterating in the right direction, there's
@@ -507,6 +508,7 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
 	WT_BSTAT_INCR(session, cursor_read_next);
 
 	__cursor_func_init(cbt, 1);
+	__cursor_position_clear(cbt);
 
 	/*
 	 * Only supports row-store: applications can trivially select a random

@@ -17,6 +17,16 @@ __cursor_set_recno(WT_CURSOR_BTREE *cbt, uint64_t v)
 }
 
 /*
+ * __cursor_position_clear --
+ *	Forget the current key and value in a cursor.
+ */
+static inline void
+__cursor_position_clear(WT_CURSOR_BTREE *cbt)
+{
+        F_CLR(&cbt->iface, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+}
+
+/*
  * __cursor_search_clear --
  *	Reset the cursor's state for a search.
  */
@@ -59,9 +69,6 @@ __cursor_leave(WT_CURSOR_BTREE *cbt)
 	/* Release any page references we're holding. */
 	__wt_stack_release(session, cbt->page);
 	cbt->page = NULL;
-
-	/* Reset the returned key/value state. */
-	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
 	if (F_ISSET(cbt, WT_CBT_ACTIVE)) {
 		WT_ASSERT(session, session->ncursors > 0);

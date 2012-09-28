@@ -339,10 +339,10 @@ __rec_review(WT_SESSION_IMPL *session,
 			}
 
 			/*
-			 * If no pages are referenced, there are no consistency
-			 * issues: try to bump our snapshot.
+			 * If there aren't multiple cursors active, there
+			 * are no consistency issues: try to bump our snapshot.
 			 */
-			if (session->nhazard == 0) {
+			if (session->ncursors <= 1) {
 				__wt_txn_read_last(session);
 				__wt_txn_read_first(session);
 			}

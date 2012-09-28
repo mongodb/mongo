@@ -8,8 +8,7 @@
 #include "wt_internal.h"
 
 static int __lsm_free_chunks(WT_SESSION_IMPL *, WT_LSM_TREE *);
-static int __lsm_copy_chunks(
-    WT_LSM_TREE *, size_t *, WT_LSM_CHUNK ***, int *, int);
+static int __lsm_copy_chunks(WT_LSM_TREE *, WT_LSM_WORKER_COOKIE *);
 
 /*
  * __wt_lsm_worker --
@@ -20,31 +19,30 @@ void *
 __wt_lsm_worker(void *arg)
 {
 	WT_DECL_RET;
-	WT_LSM_CHUNK *chunk, **chunk_array;
+	WT_LSM_CHUNK *chunk;
 	WT_LSM_TREE *lsm_tree;
+	WT_LSM_WORKER_COOKIE cookie;
 	WT_SESSION_IMPL *session;
 	const char *cfg[] = API_CONF_DEFAULTS(session, checkpoint, NULL);
-	size_t chunk_alloc;
-	int i, nchunks, progress;
+	int i, progress;
 
 	lsm_tree = arg;
 	session = lsm_tree->worker_session;
 
-	chunk_array = NULL;
-	chunk_alloc = 0;
+	memset(&cookie, 0, sizeof(cookie));
+	F_SET(&cookie, WT_LSM_WORKER_MERGE);
 
 	while (F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
 		progress = 0;
 
-		WT_ERR(__lsm_copy_chunks(
-		    lsm_tree, &chunk_alloc, &chunk_array, &nchunks, 0));
+		WT_ERR(__lsm_copy_chunks(lsm_tree, &cookie));
 
 		/*
 		 * Write checkpoints in all completed files, then find
 		 * something to merge.
 		 */
-		for (i = 0; i < nchunks; i++) {
-			chunk = chunk_array[i];
+		for (i = 0; i < cookie.nchunks; i++) {
+			chunk = cookie.chunk_array[i];
 			if (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) ||
 			    chunk->ncursor > 0)
 				continue;
@@ -54,8 +52,8 @@ __wt_lsm_worker(void *arg)
 			 * NOTE: we pass a non-NULL config, because otherwise
 			 * __wt_checkpoint thinks we're closing the file.
 			 */
-			WT_WITH_SCHEMA_LOCK(session, ret =
-			    __wt_schema_worker(session, chunk->uri,
+			WT_WITH_SCHEMA_LOCK(session,
+			    ret =__wt_schema_worker(session, chunk->uri,
 			    __wt_checkpoint, cfg, 0));
 			if (ret == 0) {
 				__wt_spin_lock(session, &lsm_tree->lock);
@@ -80,7 +78,7 @@ __wt_lsm_worker(void *arg)
 			__wt_sleep(0, 10);
 	}
 
-err:	__wt_free(session, chunk_array);
+err:	__wt_free(session, cookie.chunk_array);
 
 	return (NULL);
 }
@@ -94,26 +92,25 @@ void *
 __wt_lsm_checkpoint_worker(void *arg)
 {
 	WT_DECL_RET;
-	WT_LSM_CHUNK *chunk, **chunk_array;
+	WT_LSM_CHUNK *chunk;
 	WT_LSM_TREE *lsm_tree;
+	WT_LSM_WORKER_COOKIE cookie;
 	WT_SESSION_IMPL *session;
 	const char *cfg[] = { "name=,drop=", NULL };
-	size_t chunk_alloc;
-	int i, j, nchunks;
+	int i, j;
 
 	lsm_tree = arg;
 	session = lsm_tree->ckpt_session;
 
-	chunk_array = NULL;
-	chunk_alloc = 0;
+	memset(&cookie, 0, sizeof(cookie));
+	F_SET(&cookie, WT_LSM_WORKER_CHECKPOINT);
 
 	while (F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
-		WT_ERR(__lsm_copy_chunks(
-		    lsm_tree, &chunk_alloc, &chunk_array, &nchunks, 1));
+		WT_ERR(__lsm_copy_chunks(lsm_tree, &cookie));
 
 		/* Write checkpoints in all completed files. */
-		for (i = 0, j = 0; i < nchunks; i++) {
-			chunk = chunk_array[i];
+		for (i = 0, j = 0; i < cookie.nchunks; i++) {
+			chunk = cookie.chunk_array[i];
 			if (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK))
 				continue;
 			++j;
@@ -122,12 +119,12 @@ __wt_lsm_checkpoint_worker(void *arg)
 			 * NOTE: we pass a non-NULL config, because otherwise
 			 * __wt_checkpoint thinks we're closing the file.
 			 */
-			WT_WITH_SCHEMA_LOCK(session, ret =
-			    __wt_schema_worker(session, chunk->uri,
+			WT_WITH_SCHEMA_LOCK(session,
+			    ret = __wt_schema_worker(session, chunk->uri,
 			    __wt_checkpoint, cfg, 0));
 			if (ret == 0) {
 				__wt_spin_lock(session, &lsm_tree->lock);
-				F_SET(lsm_tree->chunk[i], WT_LSM_CHUNK_ONDISK);
+				F_SET(chunk, WT_LSM_CHUNK_ONDISK);
 				lsm_tree->dsk_gen++;
 				__wt_spin_unlock(session, &lsm_tree->lock);
 			}
@@ -137,27 +134,29 @@ __wt_lsm_checkpoint_worker(void *arg)
 			     "LSM worker checkpointed %d.", j);
 		__wt_sleep(0, 10);
 	}
-err:	__wt_free(session, chunk_array);
+err:	__wt_free(session, cookie.chunk_array);
 
 	return (NULL);
 }
 
+/*
+ * Take a copy of part of the LSM tree chunk array so that we can work on
+ * the contents without holding the LSM tree handle lock long term.
+ */
 static int
-__lsm_copy_chunks(WT_LSM_TREE *lsm_tree,
-    size_t *allocp, WT_LSM_CHUNK ***chunkp, int *nchunkp, int checkpoint)
+__lsm_copy_chunks(WT_LSM_TREE *lsm_tree, WT_LSM_WORKER_COOKIE *cookie)
 {
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	WT_LSM_CHUNK **chunk_array;
-	size_t chunk_alloc;
 	int nchunks;
 
-	if (checkpoint == 1)
+	/* Always return zero chunks on error. */
+	cookie->nchunks = 0;
+
+	if (F_ISSET(cookie, WT_LSM_WORKER_CHECKPOINT))
 		session = lsm_tree->ckpt_session;
 	else
 		session = lsm_tree->worker_session;
-	chunk_array = *chunkp;
-	chunk_alloc = *allocp;
 
 	__wt_spin_lock(session, &lsm_tree->lock);
 	if (!F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
@@ -172,7 +171,7 @@ __lsm_copy_chunks(WT_LSM_TREE *lsm_tree,
 	 */
 	nchunks = lsm_tree->nchunks - 1;
 	/* Checkpoint doesn't care if there are active cursors, merge does. */
-	if (checkpoint == 0) {
+	if (F_ISSET(cookie, WT_LSM_WORKER_MERGE)) {
 		for (; nchunks > 0 && lsm_tree->chunk[nchunks - 1]->ncursor > 0;
 		    --nchunks)
 			;
@@ -181,20 +180,17 @@ __lsm_copy_chunks(WT_LSM_TREE *lsm_tree,
 	 * If the tree array of active chunks is larger than our current buffer,
 	 * increase the size of our current buffer to match.
 	 */
-	if (chunk_alloc < lsm_tree->chunk_alloc)
+	if (cookie->chunk_alloc < lsm_tree->chunk_alloc)
 		ret = __wt_realloc(session,
-		    &chunk_alloc, lsm_tree->chunk_alloc,
-		    &chunk_array);
+		    &cookie->chunk_alloc, lsm_tree->chunk_alloc,
+		    &cookie->chunk_array);
 	if (ret == 0 && nchunks > 0)
-		memcpy(chunk_array, lsm_tree->chunk,
+		memcpy(cookie->chunk_array, lsm_tree->chunk,
 		    nchunks * sizeof(*lsm_tree->chunk));
 	__wt_spin_unlock(session, &lsm_tree->lock);
 
-	if (ret == 0) {
-		*chunkp = chunk_array;
-		*allocp = chunk_alloc;
-		*nchunkp = nchunks;
-	}
+	if (ret == 0)
+		cookie->nchunks = nchunks;
 	return (ret);
 }
 

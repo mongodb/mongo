@@ -74,11 +74,10 @@ __wt_txn_get_snapshot(WT_SESSION_IMPL *session, wt_txnid_t max_id)
 	conn = S2C(session);
 	txn = &session->txn;
 	txn_global = &conn->txn_global;
-	oldest_snap_min = WT_TXN_ABORTED;
 
 	do {
 		/* Take a copy of the current session ID. */
-		current_id = txn_global->current;
+		current_id = oldest_snap_min = txn_global->current;
 
 		/* Copy the array of concurrent transactions. */
 		WT_ORDERED_READ(session_cnt, conn->session_cnt);
@@ -93,6 +92,12 @@ __wt_txn_get_snapshot(WT_SESSION_IMPL *session, wt_txnid_t max_id)
 			else if (max_id == WT_TXN_NONE || TXNID_LT(id, max_id))
 				txn->snapshot[n++] = id;
 		}
+
+		/*
+		 * Ensure the snapshot reads are scheduled before re-checking
+		 * the global current ID.
+		 */
+		WT_READ_BARRIER();
 	} while (current_id != txn_global->current);
 
 	__txn_sort_snapshot(session, n,
@@ -116,11 +121,10 @@ __wt_txn_get_evict_snapshot(WT_SESSION_IMPL *session)
 
 	conn = S2C(session);
 	txn_global = &conn->txn_global;
-	oldest_snap_min = WT_TXN_ABORTED;
 
 	do {
 		/* Take a copy of the current session ID. */
-		current_id = txn_global->current;
+		current_id = oldest_snap_min = txn_global->current;
 
 		/* Walk the array of concurrent transactions. */
 		WT_ORDERED_READ(session_cnt, conn->session_cnt);
@@ -128,6 +132,12 @@ __wt_txn_get_evict_snapshot(WT_SESSION_IMPL *session)
 			if ((id = s->snap_min) != WT_TXN_NONE &&
 			    TXNID_LT(id, oldest_snap_min))
 				oldest_snap_min = id;
+
+		/*
+		 * Ensure the snapshot reads are scheduled before re-checking
+		 * the global current ID.
+		 */
+		WT_READ_BARRIER();
 	} while (current_id != txn_global->current);
 
 	__txn_sort_snapshot(session, 0, oldest_snap_min, oldest_snap_min);
@@ -169,8 +179,26 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 	F_SET(txn, TXN_RUNNING);
 
 	do {
-		/* Take a copy of the current session ID. */
-		txn->id = txn_global->current;
+		/*
+		 * Allocate a transaction ID.
+		 *
+		 * We use an atomic increment to ensure that we get a unique
+		 * ID, then publish that to the global state table.
+		 *
+		 * If two threads race to allocate an ID, only the latest ID
+		 * will proceed.  The winning thread can be sure its snapshot
+		 * contains all of the earlier active IDs.  Threads that race
+		 * race and get an earlier ID may not appear in the snapshot,
+		 * but they will loop and allocate a new ID before proceeding
+		 * to make any updates.
+		 *
+		 * This potentially wastes transaction IDs when threads race to
+		 * begin transactions, but that is the price we pay to keep
+		 * this path latch free.
+		 */
+		do {
+			txn->id = WT_ATOMIC_ADD(txn_global->current, 1);
+		} while (txn->id == WT_TXN_NONE || txn->id == WT_TXN_ABORTED);
 		WT_PUBLISH(txn_state->id, txn->id);
 
 		/*
@@ -200,8 +228,13 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 			    session, n, txn->id, oldest_snap_min);
 			txn_state->snap_min = txn->snap_min;
 		}
-	} while (!WT_ATOMIC_CAS(txn_global->current, txn->id, txn->id + 1) ||
-	    txn->id == WT_TXN_NONE || txn->id == WT_TXN_ABORTED);
+
+		/*
+		 * Ensure the snapshot reads are scheduled before re-checking
+		 * the global current ID.
+		 */
+		WT_READ_BARRIER();
+	} while (txn->id != txn_global->current);
 
 	return (0);
 }
@@ -223,7 +256,8 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 	/* Clear the transaction's ID from the global table. */
 	WT_ASSERT(session, txn_state->id != WT_TXN_NONE &&
 	    txn->id != WT_TXN_NONE);
-	txn_state->id = txn_state->snap_min = WT_TXN_NONE;
+	WT_PUBLISH(txn_state->id, WT_TXN_NONE);
+	txn_state->snap_min = WT_TXN_NONE;
 
 	/* Reset the transaction state to not running. */
 	txn->id = WT_TXN_NONE;

@@ -137,6 +137,8 @@ struct __wt_lsm_data_source;
     typedef struct __wt_lsm_data_source WT_LSM_DATA_SOURCE;
 struct __wt_lsm_tree;
     typedef struct __wt_lsm_tree WT_LSM_TREE;
+struct __wt_lsm_worker_cookie;
+    typedef struct __wt_lsm_worker_cookie WT_LSM_WORKER_COOKIE;
 struct __wt_named_collator;
     typedef struct __wt_named_collator WT_NAMED_COLLATOR;
 struct __wt_named_compressor;
