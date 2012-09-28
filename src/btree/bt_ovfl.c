@@ -109,7 +109,7 @@ __wt_ovfl_in_cache(WT_SESSION_IMPL *session,
 	 *  (b) another thread installed a new update and decided the
 	 *      WT_UPDATE we are pointing to in "upd" is obsolete;
 	 *  (c) we try to append our new item to a freed update node.
-	 * 
+	 *
 	 * This doesn't seem to be firing in practice (it hasn't been found in
 	 * test/format), but it seems like a possibility.
 	 *
