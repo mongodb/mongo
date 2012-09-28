@@ -35,8 +35,8 @@ typedef uint32_t wt_txnid_t;
  * compared with current transaction ID.
  */
 #define	TXNID_LE(t1, t2)						\
-	(((t1) == WT_TXN_ABORTED || (t2) == WT_TXN_NONE) ? 0 :	\
-	 ((t1) == WT_TXN_NONE || (t2) == WT_TXN_ABORTED) ? 1 :	\
+	(((t1) == WT_TXN_ABORTED || (t2) == WT_TXN_NONE) ? 0 :		\
+	 ((t1) == WT_TXN_NONE || (t2) == WT_TXN_ABORTED) ? 1 :		\
 	 (t2) - (t1) < (UINT32_MAX / 2))
 
 #define	TXNID_LT(t1, t2)						\
