@@ -52,8 +52,8 @@ __wt_lsm_worker(void *arg)
 			 * NOTE: we pass a non-NULL config, because otherwise
 			 * __wt_checkpoint thinks we're closing the file.
 			 */
-			WT_WITH_SCHEMA_LOCK(session, ret =
-			    __wt_schema_worker(session, chunk->uri,
+			WT_WITH_SCHEMA_LOCK(session,
+			    ret =__wt_schema_worker(session, chunk->uri,
 			    __wt_checkpoint, cfg, 0));
 			if (ret == 0) {
 				__wt_spin_lock(session, &lsm_tree->lock);
@@ -122,8 +122,8 @@ __wt_lsm_checkpoint_worker(void *arg)
 			 * NOTE: we pass a non-NULL config, because otherwise
 			 * __wt_checkpoint thinks we're closing the file.
 			 */
-			WT_WITH_SCHEMA_LOCK(session, ret =
-			    __wt_schema_worker(session, chunk->uri,
+			WT_WITH_SCHEMA_LOCK(session,
+			    ret = __wt_schema_worker(session, chunk->uri,
 			    __wt_checkpoint, cfg, 0));
 			if (ret == 0) {
 				__wt_spin_lock(session, &lsm_tree->lock);
