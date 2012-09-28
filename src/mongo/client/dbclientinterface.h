@@ -631,16 +631,30 @@ namespace mongo {
         bool createCollection(const string &ns, long long size = 0, bool capped = false, int max = 0, BSONObj *info = 0);
 
         /** Get error result from the last write operation (insert/update/delete) on this connection.
+            db doesn't change the command's behavior - it is just for auth checks.
             @return error message text, or empty string if no error.
         */
+        string getLastError(const std::string& db,
+                            bool fsync = false,
+                            bool j = false,
+                            int w = 0,
+                            int wtimeout = 0);
+        // Same as above but defaults to using admin DB
         string getLastError(bool fsync = false, bool j = false, int w = 0, int wtimeout = 0);
 
         /** Get error result from the last write operation (insert/update/delete) on this connection.
+            db doesn't change the command's behavior - it is just for auth checks.
             @return full error object.
 
             If "w" is -1, wait for propagation to majority of nodes.
             If "wtimeout" is 0, the operation will block indefinitely if needed.
         */
+        virtual BSONObj getLastErrorDetailed(const std::string& db,
+                                             bool fsync = false,
+                                             bool j = false,
+                                             int w = 0,
+                                             int wtimeout = 0);
+        // Same as above but defaults to using admin DB
         virtual BSONObj getLastErrorDetailed(bool fsync = false, bool j = false, int w = 0, int wtimeout = 0);
 
         /** Can be called with the returned value from getLastErrorDetailed to extract an error string. 

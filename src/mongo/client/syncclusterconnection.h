@@ -91,6 +91,11 @@ namespace mongo {
         virtual bool isFailed() const { return false; }
         virtual string toString() { return _toString(); }
 
+        virtual BSONObj getLastErrorDetailed(const std::string& db,
+                                             bool fsync=false,
+                                             bool j=false,
+                                             int w=0,
+                                             int wtimeout=0);
         virtual BSONObj getLastErrorDetailed(bool fsync=false, bool j=false, int w=0, int wtimeout=0);
 
         virtual bool callRead( Message& toSend , Message& response );
