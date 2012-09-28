@@ -28,6 +28,7 @@
 #include "mongo/db/namespace_details.h"
 #include "mongo/db/pdfile_private.h"
 #include "mongo/db/replutil.h"
+#include "mongo/db/repl/rs.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/startup_test.h"
 
@@ -126,7 +127,7 @@ namespace mongo {
             BSONObjSet keys;
             for ( int i = 0; i < n; i++ ) {
                 // this call throws on unique constraint violation.  we haven't done any writes yet so that is fine.
-                fetchIndexInserters(/*out*/keys, inserter, d, i, obj, loc);
+                fetchIndexInserters(/*out*/keys, inserter, d, i, obj, loc, ignoreUniqueIndexes());
                 if( keys.size() > 1 ) {
                     multi.push_back(i);
                     multiKeys.push_back(BSONObjSet());

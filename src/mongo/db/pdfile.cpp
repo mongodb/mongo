@@ -1451,7 +1451,10 @@ namespace mongo {
 
         // If the collection is capped, check if the new object will violate a unique index
         // constraint before allocating space.
-        if ( d->nIndexes && d->isCapped() && !god ) {
+        if (d->nIndexes && 
+            d->isCapped() && 
+            !god &&
+            !ignoreUniqueIndexes()) {
             checkNoIndexConflicts( d, BSONObj( reinterpret_cast<const char *>( obuf ) ) );
         }
 

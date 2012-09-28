@@ -434,4 +434,15 @@ namespace mongo {
         _init();
     }
 
+    void IndexChanges::dupCheck(IndexDetails& idx, DiskLoc curObjLoc) {
+        if (added.empty() || 
+            !idx.unique() || 
+            ignoreUniqueIndexes()) {
+            return;
+        }
+        const Ordering ordering = Ordering::make(idx.keyPattern());
+
+        // "E11001 duplicate key on update"
+        idx.idxInterface().uassertIfDups(idx, added, idx.head, curObjLoc, ordering);
+    }
 }

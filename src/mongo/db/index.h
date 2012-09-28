@@ -249,12 +249,7 @@ namespace mongo {
         /** @curObjLoc - the object we want to add's location.  if it is already in the
                          index, that is allowed here (for bg indexing case).
         */
-        void dupCheck(IndexDetails& idx, DiskLoc curObjLoc) {
-            if( added.empty() || !idx.unique() )
-                return;
-            const Ordering ordering = Ordering::make(idx.keyPattern());
-            idx.idxInterface().uassertIfDups(idx, added, idx.head, curObjLoc, ordering); // "E11001 duplicate key on update"
-        }
+        void dupCheck(IndexDetails& idx, DiskLoc curObjLoc);
     };
 
     class NamespaceDetails;
