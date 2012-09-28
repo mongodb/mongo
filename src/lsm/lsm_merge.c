@@ -213,7 +213,8 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	chunk->count = insert_count;
 	F_SET(chunk, WT_LSM_CHUNK_ONDISK);
 
-	ret = __wt_lsm_meta_write(session, lsm_tree);
+	WT_WITH_SCHEMA_LOCK(session,
+	    ret = __wt_lsm_meta_write(session, lsm_tree));
 	__wt_spin_unlock(session, &lsm_tree->lock);
 
 err:	if (src != NULL)
