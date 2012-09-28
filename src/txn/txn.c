@@ -92,6 +92,12 @@ __wt_txn_get_snapshot(WT_SESSION_IMPL *session, wt_txnid_t max_id)
 			else if (max_id == WT_TXN_NONE || TXNID_LT(id, max_id))
 				txn->snapshot[n++] = id;
 		}
+
+		/*
+		 * Ensure the snapshot reads are scheduled before re-checking
+		 * the global current ID.
+		 */
+		WT_READ_BARRIER();
 	} while (current_id != txn_global->current);
 
 	__txn_sort_snapshot(session, n,
@@ -126,6 +132,12 @@ __wt_txn_get_evict_snapshot(WT_SESSION_IMPL *session)
 			if ((id = s->snap_min) != WT_TXN_NONE &&
 			    TXNID_LT(id, oldest_snap_min))
 				oldest_snap_min = id;
+
+		/*
+		 * Ensure the snapshot reads are scheduled before re-checking
+		 * the global current ID.
+		 */
+		WT_READ_BARRIER();
 	} while (current_id != txn_global->current);
 
 	__txn_sort_snapshot(session, 0, oldest_snap_min, oldest_snap_min);
@@ -216,6 +228,12 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 			    session, n, txn->id, oldest_snap_min);
 			txn_state->snap_min = txn->snap_min;
 		}
+
+		/*
+		 * Ensure the snapshot reads are scheduled before re-checking
+		 * the global current ID.
+		 */
+		WT_READ_BARRIER();
 	} while (txn->id != txn_global->current);
 
 	return (0);
