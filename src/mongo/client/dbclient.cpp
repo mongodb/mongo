@@ -389,6 +389,14 @@ namespace mongo {
     }
 
     BSONObj DBClientWithCommands::getLastErrorDetailed(bool fsync, bool j, int w, int wtimeout) {
+        return getLastErrorDetailed("admin", fsync, j, w, wtimeout);
+    }
+
+    BSONObj DBClientWithCommands::getLastErrorDetailed(const std::string& db,
+                                                       bool fsync,
+                                                       bool j,
+                                                       int w,
+                                                       int wtimeout) {
         BSONObj info;
         BSONObjBuilder b;
         b.append( "getlasterror", 1 );
@@ -407,13 +415,21 @@ namespace mongo {
         if ( wtimeout > 0 )
             b.append( "wtimeout", wtimeout );
 
-        runCommand("admin", b.obj(), info);
+        runCommand(db, b.obj(), info);
 
         return info;
     }
 
     string DBClientWithCommands::getLastError(bool fsync, bool j, int w, int wtimeout) {
-        BSONObj info = getLastErrorDetailed(fsync, j, w, wtimeout);
+        return getLastError("admin", fsync, j, w, wtimeout);
+    }
+
+    string DBClientWithCommands::getLastError(const std::string& db,
+                                              bool fsync,
+                                              bool j,
+                                              int w,
+                                              int wtimeout) {
+        BSONObj info = getLastErrorDetailed(db, fsync, j, w, wtimeout);
         return getLastErrorString( info );
     }
 
