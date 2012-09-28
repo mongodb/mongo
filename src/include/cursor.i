@@ -60,11 +60,6 @@ __cursor_leave(WT_CURSOR_BTREE *cbt)
 	__wt_stack_release(session, cbt->page);
 	cbt->page = NULL;
 
-#if 0
-	/* Reset the returned key/value state. */
-	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
-#endif
-
 	if (F_ISSET(cbt, WT_CBT_ACTIVE)) {
 		WT_ASSERT(session, session->ncursors > 0);
 		if (--session->ncursors == 0)
