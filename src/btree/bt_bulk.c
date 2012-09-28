@@ -22,6 +22,10 @@ __wt_bulk_init(WT_CURSOR_BULK *cbulk)
 	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
 	btree = session->btree;
 
+	/*
+	 * Bulk-load is only permitted on newly created files, not any empty
+	 * file -- see the checkpoint code for a discussion.
+	 */
 	if (!btree->bulk_load_ok)
 		WT_RET_MSG(session, EINVAL,
 		    "bulk-load is only possible for newly created trees");

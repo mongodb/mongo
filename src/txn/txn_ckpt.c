@@ -512,6 +512,25 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 		}
 
 	/*
+	 * If an object has never been used (in other words, if it could become
+	 * a bulk-loaded file), then we must fake the checkpoint.  This is good
+	 * because we don't write physical checkpoint blocks for just-created
+	 * files, but it's not just a good idea.  The reason is because deleting
+	 * a physical checkpoint requires writing the file, and fake checkpoints
+	 * can't write the file.  If you (1) create a physical checkpoint for an
+	 * empty file which writes blocks, (2) start bulk-loading records into
+	 * the file, (3) during the bulk-load perform another checkpoint with
+	 * the same name; in order to keep from having two checkpoints with the
+	 * same name you would have to use the bulk-load's fake checkpoint to
+	 * delete a physical checkpoint, and that will end in tears.
+	 */
+	if (is_checkpoint)
+		if (btree->bulk_load_ok) {
+			track_ckpt = 0;
+			goto fake;
+		}
+
+	/*
 	 * Mark the root page dirty to ensure something gets written.
 	 *
 	 * Don't test the tree modify flag first: if the tree is modified,
