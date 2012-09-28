@@ -331,7 +331,7 @@ extern int __wt_ovfl_in( WT_SESSION_IMPL *session,
     uint32_t len);
 extern int __wt_ovfl_in_cache(WT_SESSION_IMPL *session,
     WT_PAGE *page,
-    WT_UPDATE *upd,
+    WT_UPDATE *upd_arg,
     const uint8_t *addr,
     uint32_t len);
 extern int
@@ -1184,6 +1184,7 @@ extern int __wt_stat_alloc_connection_stats(WT_SESSION_IMPL *session,
 extern void __wt_stat_clear_connection_stats(WT_STATS *stats_arg);
 extern int __wt_txnid_cmp(const void *v1, const void *v2);
 extern void __wt_txn_release_snapshot(WT_SESSION_IMPL *session);
+extern void __wt_txn_get_oldest(WT_SESSION_IMPL *session);
 extern void __wt_txn_get_snapshot(WT_SESSION_IMPL *session, wt_txnid_t max_id);
 extern void __wt_txn_get_evict_snapshot(WT_SESSION_IMPL *session);
 extern int __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[]);

@@ -112,6 +112,7 @@ __wt_btcur_reset(WT_CURSOR_BTREE *cbt)
 
 	__cursor_leave(cbt);
 	__cursor_search_clear(cbt);
+	__cursor_position_clear(cbt);
 
 	return (0);
 }

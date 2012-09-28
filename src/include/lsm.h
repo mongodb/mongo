@@ -88,6 +88,6 @@ struct __wt_lsm_worker_cookie {
     size_t chunk_alloc;
     int nchunks;
 #define	WT_LSM_WORKER_MERGE		0x01
-#define	WT_LSM_WORKER_CHECKPOINT	0x01
-    int flags;
+#define	WT_LSM_WORKER_CHECKPOINT	0x02
+    uint32_t flags;
 };
