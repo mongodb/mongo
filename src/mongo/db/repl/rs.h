@@ -675,7 +675,8 @@ namespace mongo {
             // see SERVER-6671
             MemberState ms = theReplSet->state();
             if ((ms == MemberState::RS_STARTUP2) ||
-                (ms == MemberState::RS_RECOVERING)) {
+                (ms == MemberState::RS_RECOVERING) ||
+                (ms == MemberState::RS_ROLLBACK)) {
                 return true;
             }
         }
