@@ -670,4 +670,16 @@ namespace mongo {
             _hbinfo.health = 1.0;
     }
 
+    inline bool ignoreUniqueIndexes() {
+        if (theReplSet) {
+            // see SERVER-6671
+            MemberState ms = theReplSet->state();
+            if ((ms == MemberState::RS_STARTUP2) ||
+                (ms == MemberState::RS_RECOVERING)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
 }
