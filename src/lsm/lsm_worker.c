@@ -52,10 +52,9 @@ __wt_lsm_worker(void *arg)
 			 * NOTE: we pass a non-NULL config, because otherwise
 			 * __wt_checkpoint thinks we're closing the file.
 			 */
-			__wt_spin_lock(session, &S2C(session)->metadata_lock);
-			ret =__wt_schema_worker(session, chunk->uri,
-			    __wt_checkpoint, cfg, 0);
-			__wt_spin_unlock(session, &S2C(session)->metadata_lock);
+			WT_WITH_SCHEMA_LOCK(session,
+			    ret =__wt_schema_worker(session, chunk->uri,
+			    __wt_checkpoint, cfg, 0));
 			if (ret == 0) {
 				__wt_spin_lock(session, &lsm_tree->lock);
 				F_SET(lsm_tree->chunk[i], WT_LSM_CHUNK_ONDISK);
@@ -123,10 +122,9 @@ __wt_lsm_checkpoint_worker(void *arg)
 			 * NOTE: we pass a non-NULL config, because otherwise
 			 * __wt_checkpoint thinks we're closing the file.
 			 */
-			__wt_spin_lock(session, &S2C(session)->metadata_lock);
-			ret = __wt_schema_worker(session, chunk->uri,
-			    __wt_checkpoint, cfg, 0);
-			__wt_spin_unlock(session, &S2C(session)->metadata_lock);
+			WT_WITH_SCHEMA_LOCK(session,
+			    ret = __wt_schema_worker(session, chunk->uri,
+			    __wt_checkpoint, cfg, 0));
 			if (ret == 0) {
 				__wt_spin_lock(session, &lsm_tree->lock);
 				F_SET(chunk, WT_LSM_CHUNK_ONDISK);
