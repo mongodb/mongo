@@ -133,9 +133,7 @@ __wt_txn_visible_all(WT_SESSION_IMPL *session, wt_txnid_t id)
 	WT_TXN *txn;
 
 	txn = &session->txn;
-	if (TXNID_LT(txn->oldest_snap_min, id))
-		return (0);
-	return (1);
+	return (TXNID_LT(id, txn->oldest_snap_min));
 }
 
 /*

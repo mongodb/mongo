@@ -101,8 +101,14 @@ To remove existing data using a cursor, use the WT_CURSOR::remove method:
 @section cursor_error Cursor position after error
 
 After any cursor handle method failure, the cursor's position is
-undetermined.  Applications that cannot re-position the cursor after
-failure must duplicate the cursor before calling a cursor method that will
+undetermined.  For cursor operations that expect a key to be set before the
+operation begins (including WT_CURSOR::search, WT_CURSOR::insert,
+WT_CURSOR::update and WT_CURSOR::remove), the application's key and value
+will not be cleared by an error.
+
+Applications that cannot re-position the cursor after failure must
+duplicate the cursor by calling WT_SESSION::open_cursor and passing the
+cursor as the \c to_dup parameter before calling a cursor method that will
 attempt to re-position the cursor.
 
  */
