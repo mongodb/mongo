@@ -17,7 +17,7 @@ __wt_lsm_merge_update_tree(WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree, int start_chunk, int nchunks, WT_LSM_CHUNK **chunkp)
 {
 	WT_LSM_CHUNK *chunk;
-	size_t chunk_sz;
+	size_t chunk_sz, chunks_after_merge;
 	int i, j;
 
 	/* Setup the array of obsolete chunks. */
@@ -44,9 +44,10 @@ __wt_lsm_merge_update_tree(WT_SESSION_IMPL *session,
 	WT_ASSERT(session, j == nchunks);
 
 	/* Update the current chunk list. */
+	chunks_after_merge = lsm_tree->nchunks - (nchunks + start_chunk);
 	memmove(lsm_tree->chunk + start_chunk + 1,
 	    lsm_tree->chunk + start_chunk + nchunks,
-	    (lsm_tree->nchunks - nchunks) * sizeof(*lsm_tree->chunk));
+	    chunks_after_merge * sizeof(*lsm_tree->chunk));
 	lsm_tree->nchunks -= nchunks - 1;
 	memset(lsm_tree->chunk + lsm_tree->nchunks, 0,
 	    (nchunks - 1) * sizeof(*lsm_tree->chunk));
