@@ -19,6 +19,12 @@
 namespace mongo {
     namespace unittest {
 
+        template <typename Test>
+        TemplateSuiteRegistrationAgent<Test>::TemplateSuiteRegistrationAgent() {
+            Suite::getSuite(Test::suite())->add(Test::test(), Test::run);
+
+        }
+
         template <typename T>
         Test::RegistrationAgent<T>::RegistrationAgent(const std::string& suiteName,
                                                       const std::string& testName) {
