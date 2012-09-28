@@ -72,6 +72,11 @@ updating the same value will fail with ::WT_DEADLOCK.  Some applications
 may benefit from application-level synchronization to avoid repeated
 attempts to rollback and update the same value.
 
+Operations in transactions may also fail with the ::WT_DEADLOCK error if
+some resource cannot be allocated after repeated attempts.  For example, if
+the cache is not large enough to hold the updates required to satisfy
+transactional readers, an operation may fail and return ::WT_DEADLOCK.
+
 @section transaction_isolation Isolation levels
 
 WiredTiger supports <code>read-uncommitted</code>,
