@@ -17,6 +17,16 @@ __cursor_set_recno(WT_CURSOR_BTREE *cbt, uint64_t v)
 }
 
 /*
+ * __cursor_position_clear --
+ *	Forget the current key and value in a cursor.
+ */
+static inline void
+__cursor_position_clear(WT_CURSOR_BTREE *cbt)
+{
+        F_CLR(&cbt->iface, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+}
+
+/*
  * __cursor_search_clear --
  *	Reset the cursor's state for a search.
  */

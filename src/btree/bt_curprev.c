@@ -491,6 +491,7 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, int discard)
 		LF_SET(WT_TREE_DISCARD);
 
 	__cursor_func_init(cbt, 0);
+	__cursor_position_clear(cbt);
 
 	/*
 	 * If we aren't already iterating in the right direction, there's
