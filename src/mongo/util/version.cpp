@@ -144,9 +144,12 @@ namespace mongo {
 
         if ( sizeof(int*) == 4 ) {
             log() << startupWarningsLog;
-            log() << "** NOTE: when using MongoDB 32 bit, you are limited to about 2 gigabytes of data" << startupWarningsLog;
-            log() << "**       see http://blog.mongodb.org/post/137788967/32-bit-limitations" << startupWarningsLog;
-            log() << "**       with --journal, the limit is lower" << startupWarningsLog;
+            log() << "** NOTE: This is a 32 bit MongoDB binary." << startupWarningsLog;
+            log() << "**       32 bit builds are limited to less than 2GB of data (or less with --journal)." << startupWarningsLog;
+            if( !cmdLine.dur ) { 
+                log() << "**       Note that journaling defaults to off for 32 bit and is currently off." << startupWarningsLog;
+            }
+            log() << "**       See http://www.mongodb.org/display/DOCS/32+bit" << startupWarningsLog;
             warned = true;
         }
 
