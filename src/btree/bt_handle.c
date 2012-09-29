@@ -58,12 +58,7 @@ __wt_btree_open(WT_SESSION_IMPL *session,
 
 	/*
 	 * Bulk-load is only permitted on newly created files, not any empty
-	 * file.  The reason is because deleting a checkpoint requires writing
-	 * the file, and a fake checkpoint can't write the file.  So, if you
-	 * have a named checkpoint in the file, then, because tree is empty,
-	 * you start bulk-loading it, then you enter another checkpoint with
-	 * the same name, you end up using a fake checkpoint to delete a real
-	 * checkpoint, and that's going to end in tears.
+	 * file -- see the checkpoint code for a discussion.
 	 */
 	created = addr == NULL || addr_size == 0;
 	if (!created && F_ISSET(btree, WT_BTREE_BULK))
