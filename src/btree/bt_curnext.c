@@ -402,7 +402,7 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, int discard)
 	if (discard)
 		LF_SET(WT_TREE_DISCARD);
 
-	__cursor_func_init(cbt, 0);
+retry:	__cursor_func_init(cbt, 0);
 	__cursor_position_clear(cbt);
 
 	/*
@@ -488,7 +488,9 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, int discard)
 		}
 	}
 
-err:	__cursor_func_resolve(cbt, ret);
+err:	if (ret == WT_RESTART)
+		goto retry;
+	__cursor_func_resolve(cbt, ret);
 	return (ret);
 }
 
@@ -507,7 +509,7 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
 	btree = cbt->btree;
 	WT_BSTAT_INCR(session, cursor_read_next);
 
-	__cursor_func_init(cbt, 1);
+retry:	__cursor_func_init(cbt, 1);
 	__cursor_position_clear(cbt);
 
 	/*
@@ -519,7 +521,8 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
 	ret = cbt->compare == 0 ?
 	    __wt_kv_return(session, cbt) : WT_NOTFOUND;
 
-err:	__cursor_func_resolve(cbt, ret);
-
+err:	if (ret == WT_RESTART)
+		goto retry;
+	__cursor_func_resolve(cbt, ret);
 	return (ret);
 }

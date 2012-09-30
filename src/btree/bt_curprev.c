@@ -490,7 +490,7 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, int discard)
 	if (discard)
 		LF_SET(WT_TREE_DISCARD);
 
-	__cursor_func_init(cbt, 0);
+retry:	__cursor_func_init(cbt, 0);
 	__cursor_position_clear(cbt);
 
 	/*
@@ -576,6 +576,8 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, int discard)
 			F_SET(cbt, WT_CBT_ITERATE_APPEND);
 	}
 
-err:	__cursor_func_resolve(cbt, ret);
+err:	if (ret == WT_RESTART)
+		goto retry;
+	__cursor_func_resolve(cbt, ret);
 	return (ret);
 }
