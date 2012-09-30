@@ -201,7 +201,7 @@
       <LargeAddressAware>true</LargeAddressAware>
     </Link>
     <PreBuildEvent>
-      <Command>"$(ProjectDir)..\..\third_party\js-1.7\jskwgen.exe" "$(ProjectDir)..\..\third_party\js-1.7\jsautokw.h"
+      <Command>cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\..\third_party\js-1.7" /input:"jskwgen.exe" /output:"jsautokw.h" /command:"jskwgen jsautokw.h"
 cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
 </Command>
       <Message>Build jsautokw.h for SpiderMonkey, create mongo.cpp and mongo-server.cpp from JavaScript source files</Message>
@@ -233,7 +233,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
       <LargeAddressAware>true</LargeAddressAware>
     </Link>
     <PreBuildEvent>
-      <Command>"$(ProjectDir)..\..\third_party\js-1.7\jskwgen.exe" "$(ProjectDir)..\..\third_party\js-1.7\jsautokw.h"
+      <Command>cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\..\third_party\js-1.7" /input:"jskwgen.exe" /output:"jsautokw.h" /command:"jskwgen jsautokw.h"
 cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
 </Command>
       <Message>Build jsautokw.h for SpiderMonkey, create mongo.cpp and mongo-server.cpp from JavaScript source files</Message>
@@ -262,7 +262,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
       <SubSystem>Console</SubSystem>
     </Link>
     <PreBuildEvent>
-      <Command>"$(ProjectDir)..\..\third_party\js-1.7\jskwgen.exe" "$(ProjectDir)..\..\third_party\js-1.7\jsautokw.h"
+      <Command>cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\..\third_party\js-1.7" /input:"jskwgen.exe" /output:"jsautokw.h" /command:"jskwgen jsautokw.h"
 cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
 </Command>
       <Message>Build jsautokw.h for SpiderMonkey, create mongo.cpp and mongo-server.cpp from JavaScript source files</Message>
@@ -291,7 +291,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
       <SubSystem>Console</SubSystem>
     </Link>
     <PreBuildEvent>
-      <Command>"$(ProjectDir)..\..\third_party\js-1.7\jskwgen.exe" "$(ProjectDir)..\..\third_party\js-1.7\jsautokw.h"
+      <Command>cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\..\third_party\js-1.7" /input:"jskwgen.exe" /output:"jsautokw.h" /command:"jskwgen jsautokw.h"
 cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
 </Command>
       <Message>Build jsautokw.h for SpiderMonkey, create mongo.cpp and mongo-server.cpp from JavaScript source files</Message>
@@ -323,7 +323,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
       <LargeAddressAware>true</LargeAddressAware>
     </Link>
     <PreBuildEvent>
-      <Command>"$(ProjectDir)..\..\third_party\js-1.7\jskwgen.exe" "$(ProjectDir)..\..\third_party\js-1.7\jsautokw.h"
+      <Command>cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\..\third_party\js-1.7" /input:"jskwgen.exe" /output:"jsautokw.h" /command:"jskwgen jsautokw.h"
 cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
 </Command>
       <Message>Build jsautokw.h for SpiderMonkey, create mongo.cpp and mongo-server.cpp from JavaScript source files</Message>
@@ -355,7 +355,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
       <LargeAddressAware>true</LargeAddressAware>
     </Link>
     <PreBuildEvent>
-      <Command>"$(ProjectDir)..\..\third_party\js-1.7\jskwgen.exe" "$(ProjectDir)..\..\third_party\js-1.7\jsautokw.h"
+      <Command>cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\..\third_party\js-1.7" /input:"jskwgen.exe" /output:"jsautokw.h" /command:"jskwgen jsautokw.h"
 cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
 </Command>
       <Message>Build jsautokw.h for SpiderMonkey, create mongo.cpp and mongo-server.cpp from JavaScript source files</Message>
@@ -385,7 +385,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(ProjectDir)..\..\third_party\js-1.7\jskwgen.exe" "$(ProjectDir)..\..\third_party\js-1.7\jsautokw.h"
+      <Command>cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\..\third_party\js-1.7" /input:"jskwgen.exe" /output:"jsautokw.h" /command:"jskwgen jsautokw.h"
 cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
 </Command>
       <Message>Build jsautokw.h for SpiderMonkey, create mongo.cpp and mongo-server.cpp from JavaScript source files</Message>
@@ -415,7 +415,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(ProjectDir)..\..\third_party\js-1.7\jskwgen.exe" "$(ProjectDir)..\..\third_party\js-1.7\jsautokw.h"
+      <Command>cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\..\third_party\js-1.7" /input:"jskwgen.exe" /output:"jsautokw.h" /command:"jskwgen jsautokw.h"
 cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
 </Command>
       <Message>Build jsautokw.h for SpiderMonkey, create mongo.cpp and mongo-server.cpp from JavaScript source files</Message>
