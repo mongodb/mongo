@@ -107,6 +107,8 @@ struct __wt_btree {
 	int   prefix_compression;	/* Reconcile: key prefix compression */
 	u_int split_pct;		/* Reconcile: split page percent */
 
+	WT_RWLOCK *ovfl_lock;		/* Overflow value lock */
+
 	uint64_t last_recno;		/* Column-store last record number */
 
 	WT_PAGE *root_page;		/* Root page */

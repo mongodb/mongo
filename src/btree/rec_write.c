@@ -2233,12 +2233,9 @@ compare:		/*
 		 * on-disk version if there's a transaction in the system that
 		 * might read the original value.
 		 */
-		if (ovfl_state == OVFL_UNUSED) {
+		if (ovfl_state == OVFL_UNUSED)
 			WT_ERR(__wt_ovfl_in_cache(
 			    session, page, upd, unpack->data, unpack->size));
-			WT_ERR(__wt_rec_track_onpage_addr(
-			    session, page, unpack->data, unpack->size));
-		}
 	}
 
 	/* Walk any append list. */
@@ -2915,20 +2912,14 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 		} else {
 			/*
 			 * If the original value was an overflow and we've not
-			 * already done so, discard it.   We don't save a copy
-			 * of the overflow value in case it is re-used -- we'd
-			 * have to read it to get a copy, and that implies disk
-			 * I/O for little reason.  One complication: we must
-			 * cache a copy before discarding the on-disk version
-			 * if there's a transaction in the system that might
-			 * read the original value.
+			 * already done so, discard it.  One complication: we
+			 * must cache a copy before discarding the on-disk
+			 * version if there's a transaction in the system that
+			 * might read the original value.
 			 */
-			if (val_cell != NULL && unpack->ovfl) {
+			if (val_cell != NULL && unpack->ovfl)
 				WT_ERR(__wt_ovfl_in_cache(session,
 				    page, upd, unpack->data, unpack->size));
-				WT_ERR(__wt_rec_track_onpage_addr(
-				    session, page, unpack->data, unpack->size));
-			}
 
 			/* If this key/value pair was deleted, we're done. */
 			if (WT_UPDATE_DELETED_ISSET(upd)) {
