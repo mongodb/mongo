@@ -85,9 +85,9 @@ print("GLE correctly returned error...")
 assert.eq(3, collA.find().itcount())
 assert.eq(3, collB.find().itcount())
 
-var data8MB = data8MB;
-for ( var i = 0; i < 1024 * 1024; i++) {
-    data8MB += "x"
+var data8MB = "";
+for ( var i = 0; i < 8; i++) {
+    data8MB += data1MB;
 }
 
 print("Object size is: " + Object.bsonsize([{_id : 0,
