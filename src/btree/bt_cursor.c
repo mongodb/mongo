@@ -290,12 +290,11 @@ retry:	__cursor_func_init(cbt, 1);
 		 */
 		if (!F_ISSET(cursor, WT_CURSTD_OVERWRITE) &&
 		    ((cbt->compare == 0 && !__cursor_invalid(cbt)) ||
-		    (cbt->compare != 0 && __cursor_fix_implicit(btree, cbt)))) {
-			ret = WT_DUPLICATE_KEY;
-			break;
-		}
-		ret = __wt_col_modify(session, cbt, 3);
-		if (ret == 0 && F_ISSET(cursor, WT_CURSTD_APPEND))
+		    (cbt->compare != 0 && __cursor_fix_implicit(btree, cbt))))
+			WT_ERR(WT_DUPLICATE_KEY);
+
+		WT_ERR(__wt_col_modify(session, cbt, 3));
+		if (F_ISSET(cursor, WT_CURSTD_APPEND))
 			cbt->iface.recno = cbt->recno;
 		break;
 	case BTREE_ROW:
@@ -308,10 +307,9 @@ retry:	__cursor_func_init(cbt, 1);
 		WT_ERR(__wt_row_search(session, cbt, 1));
 		if (cbt->compare == 0 &&
 		    !__cursor_invalid(cbt) &&
-		    !F_ISSET(cursor, WT_CURSTD_OVERWRITE)) {
-			ret = WT_DUPLICATE_KEY;
-			break;
-		}
+		    !F_ISSET(cursor, WT_CURSTD_OVERWRITE))
+			WT_ERR(WT_DUPLICATE_KEY);
+
 		ret = __wt_row_modify(session, cbt, 0);
 		break;
 	WT_ILLEGAL_VALUE_ERR(session);
@@ -372,7 +370,8 @@ retry:	__cursor_func_init(cbt, 1);
 		/* Remove the record if it exists. */
 		WT_ERR(__wt_row_search(session, cbt, 1));
 		if (cbt->compare != 0 || __cursor_invalid(cbt))
-			ret = WT_NOTFOUND;
+			WT_ERR(WT_NOTFOUND);
+
 		ret = __wt_row_modify(session, cbt, 1);
 		break;
 	WT_ILLEGAL_VALUE_ERR(session);
@@ -426,14 +425,14 @@ retry:	__cursor_func_init(cbt, 1);
 		 */
 		if ((cbt->compare != 0 || __cursor_invalid(cbt)) &&
 		    !__cursor_fix_implicit(btree, cbt))
-			ret = WT_NOTFOUND;
+			WT_ERR(WT_NOTFOUND);
 		ret = __wt_col_modify(session, cbt, 3);
 		break;
 	case BTREE_ROW:
 		/* Update the record it it exists. */
 		WT_ERR(__wt_row_search(session, cbt, 1));
 		if (cbt->compare != 0 || __cursor_invalid(cbt))
-			ret = WT_NOTFOUND;
+			WT_ERR(WT_NOTFOUND);
 		ret = __wt_row_modify(session, cbt, 0);
 		break;
 	WT_ILLEGAL_VALUE_ERR(session);
