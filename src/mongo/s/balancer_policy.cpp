@@ -82,12 +82,12 @@ namespace mongo {
         for ( ShardInfoMap::const_iterator i = _shardInfo.begin(); i != _shardInfo.end(); ++i ) {
             
             if ( i->second.isSizeMaxed() || i->second.isDraining() || i->second.hasOpsQueued() ) {
-                log() << i->first << " is unavailable" << endl;
+                LOG(1) << i->first << " is unavailable" << endl;
                 continue;
             }
             
             if ( ! i->second.hasTag( tag ) ) {
-                log() << i->first << " doesn't have right tag" << endl;
+                LOG(1) << i->first << " doesn't have right tag" << endl;
                 continue;
             }
 
