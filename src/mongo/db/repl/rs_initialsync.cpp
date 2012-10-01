@@ -254,7 +254,9 @@ namespace mongo {
      * @param syncer either initial sync (can reclone missing docs) or "normal" sync (no recloning)
      * @param r      the oplog reader
      * @param source the sync target
-     * @param lastOp the op to start syncing at (inclusive)
+     * @param lastOp the op to start syncing at.  replset::InitialSync writes this and then moves to
+     *               the queue.  replset::SyncTail does not write this, it moves directly to the
+     *               queue.
      * @param minValid populated by this function. The most recent op on the sync target's oplog,
      *                 this function syncs to this value (inclusive)
      * @return if applying the oplog succeeded
@@ -372,6 +374,9 @@ namespace mongo {
             return;
         }
 
+        // written by applyToHead calls
+        BSONObj minValid;
+
         if (replSettings.fastsync) {
             log() << "fastsync: skipping database clone" << rsLog;
 
@@ -394,8 +399,7 @@ namespace mongo {
             }
 
             sethbmsg("initial sync data copy, starting syncup",0);
-            
-            BSONObj minValid;
+
             log() << "oplog sync 1 of 3" << endl;
             if ( ! _syncDoInitialSync_applyToHead( init, &r , source , lastOp , minValid ) ) {
                 return;
@@ -414,22 +418,6 @@ namespace mongo {
 
             lastOp = minValid;
 
-            // its currently important that lastOp is equal to the last op we actually pulled
-            // this is because the background thread only pulls each op once now
-            // so if its now, we'll be waiting forever
-            {
-                // this takes whatever the last op the we got is
-                // and stores it locally before we wipe it out below
-                Lock::DBRead lk(rsoplog);
-                Helpers::getLast(rsoplog, lastOp);
-                lastOp = lastOp.getOwned();
-            }
-
-            // reset state, as that "didn't count"
-            emptyOplog(); 
-            lastOpTimeWritten = OpTime();
-            lastH = 0;
-
             sethbmsg("initial sync building indexes",0);
             if ( ! _syncDoInitialSync_clone( sourceHostname.c_str(), dbs, false ) ) {
                 veto(source->fullName(), 600);
@@ -438,9 +426,6 @@ namespace mongo {
             }
         }
 
-        sethbmsg("initial sync query minValid",0);
-
-        BSONObj minValid;
         log() << "oplog sync 3 of 3" << endl;
         if (!_syncDoInitialSync_applyToHead(tail, &r, source, lastOp, minValid)) {
             return;
