@@ -7,7 +7,8 @@ jsTest.log("Starting sharded cluster...")
 var st = new ShardingTest({shards : 1,
                            mongos : 3,
                            verbose : 2,
-                           separateConfig : 1})
+                           other : {separateConfig : true,
+                                    mongosOptions : {noAutoSplit : ""}}})
 
 st.stopBalancer()
 
@@ -25,7 +26,7 @@ var collB = mongosB.getCollection("" + collA)
 collB.insert({hello : "world"})
 assert.eq(null, collB.getDB().getLastError())
 
-var collC = mongosB.getCollection("" + collA)
+var collC = mongosC.getCollection("" + collA)
 collC.insert({hello : "world"})
 assert.eq(null, collC.getDB().getLastError())
 
@@ -38,8 +39,6 @@ printjson(mongosA.getDB("admin").runCommand({shardCollection : collA + "",
 
 // MongoD doesn't know about the config shard version *until* MongoS tells it
 collA.findOne()
-
-// Preparing insert of exactly 16MB
 
 jsTest.log("Preparing bulk insert...")
 
@@ -57,7 +56,8 @@ print("7MB object size is : " + Object.bsonsize({_id : 0,
 
 var dataCloseTo8MB = data7MB;
 // WARNING - MAGIC NUMBERS HERE
-// The idea is to exceed the 16MB limit by just enough so that the message gets passed in the
+// The idea is to exceed the 16MB limit by just enough so that the message gets
+// passed in the
 // shell, but adding additional writeback information fails.
 for ( var i = 0; i < 1031 * 1024 + 862; i++) {
     dataCloseTo8MB += "x"
@@ -102,7 +102,7 @@ collC.insert([{_id : 0,
               {_id : 1,
                d : data8MB}])
 
-// Should succeed since our insert size is 16MB (plus very small overhead)              
+// Should succeed since our insert size is 16MB (plus very small overhead)
 jsTest.log("Waiting for GLE...")
 
 assert.eq(null, collC.getDB().getLastError())
@@ -111,5 +111,6 @@ print("GLE Successful...")
 
 assert.eq(5, collA.find().itcount())
 assert.eq(5, collB.find().itcount())
+assert.eq(5, collC.find().itcount())
 
 st.stop()
