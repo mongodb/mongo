@@ -245,10 +245,6 @@ namespace replset {
         OpTime applyGTE = applyGTEObj["ts"]._opTime();
         OpTime minValid = minValidObj["ts"]._opTime();
 
-        syncApply(applyGTEObj);
-        _logOpObjRS(applyGTEObj);
-
-
         // if there were no writes during the initial sync, there will be nothing in the queue so
         // just go live
         if (minValid == applyGTE) {
@@ -301,6 +297,10 @@ namespace replset {
             replSetForceInitialSyncFailure--;
             throw DBException("forced error",0);
         }
+
+        // create the initial oplog entry
+        syncApply(applyGTEObj);
+        _logOpObjRS(applyGTEObj);
 
         oplogApplySegment(applyGTEObj, minValidObj, multiInitialSyncApply);
     }
