@@ -39,6 +39,9 @@ namespace replset {
         SyncTail(BackgroundSyncInterface *q);
         virtual ~SyncTail();
         virtual bool syncApply(const BSONObj &o, bool convertUpdateToUpsert = false);
+        void oplogApplySegment(const BSONObj& applyGTEObj, const BSONObj& minValidObj,
+                               MultiSyncApplyFunc func);
+        virtual void oplogApplication(const BSONObj& applyGTEObj, const BSONObj& minValidObj);
         void oplogApplication();
         bool peek(BSONObj* obj);
 
