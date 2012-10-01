@@ -40,15 +40,13 @@
 namespace mongo {
 namespace {
 
-    // MakeUnique argument is to allow testing types that are aliases like int and int32_t
-    template <typename _NumberType, int MakeUnique = 0>
+    template <typename _NumberType>
     class CommonNumberParsingTests {
-        TEMPLATE_SUITE_BOILERPLATE;
-
+    public:
         typedef _NumberType NumberType;
         typedef std::numeric_limits<NumberType> Limits;
 
-        TEMPLATE_SUITE_TEST(CommonNumberParsingTests, TestRejectingBadBases) {
+        static void TestRejectingBadBases() {
             NumberType ignored;
             ASSERT_EQUALS(ErrorCodes::BadValue, parseNumberFromStringWithBase("0", -1, &ignored));
             ASSERT_EQUALS(ErrorCodes::BadValue, parseNumberFromStringWithBase("10", 1, &ignored));
@@ -58,14 +56,14 @@ namespace {
             ASSERT_EQUALS(ErrorCodes::BadValue, parseNumberFromStringWithBase("^%", -1, &ignored));
         }
 
-        TEMPLATE_SUITE_TEST(CommonNumberParsingTests, TestParsingNonNegatives) {
+        static void TestParsingNonNegatives() {
             ASSERT_PARSES(NumberType, "10", 10);
             ASSERT_PARSES(NumberType, "0", 0);
             ASSERT_PARSES(NumberType, "0xff", 0xff);
             ASSERT_PARSES(NumberType, "077", 077);
         }
 
-        TEMPLATE_SUITE_TEST(CommonNumberParsingTests, TestParsingNegatives) {
+        static void TestParsingNegatives() {
             if (Limits::is_signed) {
                 ASSERT_PARSES(NumberType, "-10", -10);
                 ASSERT_PARSES(NumberType, "-0xff", -0xff);
@@ -79,7 +77,7 @@ namespace {
             }
         }
 
-        TEMPLATE_SUITE_TEST(CommonNumberParsingTests, TestParsingGarbage) {
+        static void TestParsingGarbage() {
             NumberType ignored;
             ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromString("", &ignored));
             ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromString(" ", &ignored));
@@ -87,7 +85,7 @@ namespace {
             ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromString("15b", &ignored));
         }
 
-        TEMPLATE_SUITE_TEST(CommonNumberParsingTests, TestParsingWithExplicitBase) {
+        static void TestParsingWithExplicitBase() {
             NumberType ignored;
             ASSERT_PARSES_WITH_BASE(NumberType, "15b", 16, 0x15b);
             ASSERT_PARSES_WITH_BASE(NumberType, "77", 8, 077);
@@ -96,7 +94,7 @@ namespace {
             ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromStringWithBase("80", 8, &ignored));
         }
 
-        TEMPLATE_SUITE_TEST(CommonNumberParsingTests, TestParsingLimits) {
+        static void TestParsingLimits() {
             using namespace mongoutils;
             NumberType ignored;
             ASSERT_PARSES(NumberType, (str::stream() << Limits::max()), Limits::max());
@@ -111,20 +109,44 @@ namespace {
         }
     };
 
-    TEMPLATE_SUITE_INSTANCE(CommonNumberParsingTests, short);
-    TEMPLATE_SUITE_INSTANCE(CommonNumberParsingTests, int);
-    TEMPLATE_SUITE_INSTANCE(CommonNumberParsingTests, long);
-    TEMPLATE_SUITE_INSTANCE(CommonNumberParsingTests, long long);
-    TEMPLATE_SUITE_INSTANCE(CommonNumberParsingTests, unsigned short);
-    TEMPLATE_SUITE_INSTANCE(CommonNumberParsingTests, unsigned int);
-    TEMPLATE_SUITE_INSTANCE(CommonNumberParsingTests, unsigned long);
-    TEMPLATE_SUITE_INSTANCE(CommonNumberParsingTests, unsigned long long);
-    TEMPLATE_SUITE_INSTANCE(CommonNumberParsingTests, int16_t, 1);
-    TEMPLATE_SUITE_INSTANCE(CommonNumberParsingTests, int32_t, 1);
-    TEMPLATE_SUITE_INSTANCE(CommonNumberParsingTests, int64_t, 1);
-    TEMPLATE_SUITE_INSTANCE(CommonNumberParsingTests, uint16_t, 1);
-    TEMPLATE_SUITE_INSTANCE(CommonNumberParsingTests, uint32_t, 1);
-    TEMPLATE_SUITE_INSTANCE(CommonNumberParsingTests, uint64_t, 1);
+#define GENERAL_NUMBER_TESTS(SHORT_NAME, TYPE)                          \
+    class ParseNumberTests##SHORT_NAME : public unittest::Test {        \
+    public:                                                             \
+        typedef CommonNumberParsingTests<TYPE> TestFns;                 \
+    };                                                                  \
+    TEST_F(ParseNumberTests##SHORT_NAME, RejectBadBases) {              \
+        TestFns::TestRejectingBadBases();                               \
+    }                                                                   \
+    TEST_F(ParseNumberTests##SHORT_NAME, ParseNonNegatives) {           \
+        TestFns::TestParsingNonNegatives();                             \
+    }                                                                   \
+    TEST_F(ParseNumberTests##SHORT_NAME, ParseNegatives) {              \
+        TestFns::TestParsingNegatives();                                \
+    }                                                                   \
+    TEST_F(ParseNumberTests##SHORT_NAME, ParseGarbage) {                \
+        TestFns::TestParsingGarbage();                                  \
+    }                                                                   \
+    TEST_F(ParseNumberTests##SHORT_NAME, ParseWithExplicitBase) {       \
+        TestFns::TestParsingWithExplicitBase();                         \
+    }                                                                   \
+    TEST_F(ParseNumberTests##SHORT_NAME, TestParsingLimits) {           \
+        TestFns::TestParsingLimits();                                   \
+    }
+
+    GENERAL_NUMBER_TESTS(Short, short)
+    GENERAL_NUMBER_TESTS(Int, int)
+    GENERAL_NUMBER_TESTS(Long, long)
+    GENERAL_NUMBER_TESTS(LongLong, long long)
+    GENERAL_NUMBER_TESTS(UnsignedShort, unsigned short)
+    GENERAL_NUMBER_TESTS(UnsignedInt, unsigned int)
+    GENERAL_NUMBER_TESTS(UnsignedLong, unsigned long)
+    GENERAL_NUMBER_TESTS(UnsignedLongLong, unsigned long long)
+    GENERAL_NUMBER_TESTS(Int16, int16_t);
+    GENERAL_NUMBER_TESTS(Int32, int32_t);
+    GENERAL_NUMBER_TESTS(Int64, int64_t);
+    GENERAL_NUMBER_TESTS(UInt16, uint16_t);
+    GENERAL_NUMBER_TESTS(UInt32, uint32_t);
+    GENERAL_NUMBER_TESTS(UInt64, uint64_t);
 
 }  // namespace
 }  // namespace mongo
