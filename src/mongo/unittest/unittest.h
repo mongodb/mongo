@@ -27,8 +27,6 @@
 #include <boost/bind.hpp>
 #include <boost/function.hpp>
 #include <boost/noncopyable.hpp>
-#include <boost/preprocessor/cat.hpp>
-#include <boost/preprocessor/stringize.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 
@@ -110,35 +108,6 @@
     const ::mongo::unittest::Test::RegistrationAgent<_TEST_TYPE_NAME(CASE_NAME, TEST_NAME) > \
             _TEST_TYPE_NAME(CASE_NAME, TEST_NAME)::_agent(#CASE_NAME, #TEST_NAME); \
     void _TEST_TYPE_NAME(CASE_NAME, TEST_NAME)::_doTest()
-
-/** Define a templated test. The template<...> portion goes above.
- *
- *  Usage:
- *
- *  template<int a, int b>
- *  TEMPLATE_TEST(Silly, Example) {
- *      ASSERT_EQUALS(a, b);
- *  }
- *
- *  TEMPLATE_TEST_INSTANCE(Silly, Example, 1, 1); // passes
- *  TEMPLATE_TEST_INSTANCE(Silly, Example, 1, 2); // fails
- *
- *  Note this must be used with TEMPLATE_TEST_INSTANCE
- */
-#define TEMPLATE_TEST(CASE_NAME, TEST_NAME) \
-    void _TEST_TYPE_NAME(CASE_NAME, TEST_NAME)()
-
-/** Instantiate and register a template test with specified template arguments.
- *
- *  Usage: see TEMPLATE_TEST
- */
-#define TEMPLATE_TEST_INSTANCE(CASE_NAME, TEST_NAME, ...) \
-    static bool BOOST_PP_CAT(runCode_, __LINE__) = \
-        (::mongo::unittest::Suite::getSuite(#CASE_NAME) \
-            ->add((#TEST_NAME  BOOST_PP_STRINGIZE((__VA_ARGS__))), \
-                ::mongo::unittest::TestFunction( \
-                    _TEST_TYPE_NAME(CASE_NAME, TEST_NAME)<__VA_ARGS__>)) \
-        , &BOOST_PP_CAT(runCode_, __LINE__))  /* makes run_code not be considered unused */
 
 /**
  * Construct a single test named TEST_NAME that has access to a common class (a "fixture")
