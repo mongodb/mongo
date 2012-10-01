@@ -31,5 +31,3 @@ env.CppUnitTest('parse_number_test', ['parse_number_test.cpp'], LIBDEPS=['base']
 
 env.CppUnitTest('initializer_test', ['initializer_test.cpp'], LIBDEPS=['base'])
 
-env.CppUnitTest('fast_string_key_test', ['fast_string_key_test.cpp'], LIBDEPS=[])
-
