@@ -144,12 +144,13 @@ namespace mongo {
             unsigned i = multi[j];
             BSONObjSet& keys = multiKeys[j];
             IndexDetails& idx = d->idx(i);
+            bool dupsAllowed = !idx.unique() || ignoreUniqueIndexes();
             IndexInterface& ii = idx.idxInterface();
             Ordering ordering = Ordering::make(idx.keyPattern());
             d->setIndexIsMultikey(ns, i);
             for( BSONObjSet::iterator k = ++keys.begin()/*skip 1*/; k != keys.end(); k++ ) {
                 try {
-                    ii.bt_insert(idx.head, loc, *k, ordering, !idx.unique(), idx);
+                    ii.bt_insert(idx.head, loc, *k, ordering, dupsAllowed, idx);
                 } catch (AssertionException& e) {
                     if( e.getCode() == 10287 && (int) i == d->nIndexes ) {
                         DEV log() << "info: caught key already in index on bg indexing (ok)" << endl;
@@ -270,7 +271,7 @@ namespace mongo {
 
         tlog(1) << "fastBuildIndex " << ns << " idxNo:" << idxNo << ' ' << idx.info.obj().toString() << endl;
 
-        bool dupsAllowed = !idx.unique();
+        bool dupsAllowed = !idx.unique() || ignoreUniqueIndexes();
         bool dropDups = idx.dropDups() || inDBRepair;
         BSONObj order = idx.keyPattern();
 
