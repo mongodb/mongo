@@ -248,8 +248,19 @@ namespace mongo {
         _veto[host] = time(0)+secs;
     }
 
-    bool ReplSetImpl::_syncDoInitialSync_applyToHead( replset::InitialSync& init, OplogReader* r, 
-                                                      const Member* source, const BSONObj& lastOp , 
+    /**
+     * Replays the sync target's oplog from lastOp to the latest op on the sync target.
+     *
+     * @param syncer either initial sync (can reclone missing docs) or "normal" sync (no recloning)
+     * @param r      the oplog reader
+     * @param source the sync target
+     * @param lastOp the op to start syncing at (inclusive)
+     * @param minValid populated by this function. The most recent op on the sync target's oplog,
+     *                 this function syncs to this value (inclusive)
+     * @return if applying the oplog succeeded
+     */
+    bool ReplSetImpl::_syncDoInitialSync_applyToHead( replset::SyncTail& syncer, OplogReader* r,
+                                                      const Member* source, const BSONObj& lastOp ,
                                                       BSONObj& minValid ) {
         /* our cloned copy will be strange until we apply oplog events that occurred
            through the process.  we note that time point here. */
@@ -282,7 +293,7 @@ namespace mongo {
         // apply startingTS..mvoptime portion of the oplog
         {
             try {
-                init.oplogApplication(lastOp, minValid);
+                syncer.oplogApplication(lastOp, minValid);
             }
             catch (const DBException&) {
                 log() << "replSet initial sync failed during oplog application phase" << rsLog;
@@ -329,6 +340,7 @@ namespace mongo {
      */
     void ReplSetImpl::_syncDoInitialSync() {
         replset::InitialSync init(replset::BackgroundSync::get());
+        replset::SyncTail tail(replset::BackgroundSync::get());
         sethbmsg("initial sync pending",0);
 
         // if this is the first node, it may have already become primary
@@ -395,7 +407,7 @@ namespace mongo {
             // that were "from the future" compared with minValid. During this second application,
             // nothing should need to be recloned.
             log() << "oplog sync 2 of 3" << endl;
-            if (!_syncDoInitialSync_applyToHead(init, &r , source , lastOp , minValid)) {
+            if (!_syncDoInitialSync_applyToHead(tail, &r , source , lastOp , minValid)) {
                 return;
             }
             // data should now be consistent
@@ -430,7 +442,7 @@ namespace mongo {
 
         BSONObj minValid;
         log() << "oplog sync 3 of 3" << endl;
-        if ( ! _syncDoInitialSync_applyToHead( init, &r, source, lastOp, minValid ) ) {
+        if (!_syncDoInitialSync_applyToHead(tail, &r, source, lastOp, minValid)) {
             return;
         }
         

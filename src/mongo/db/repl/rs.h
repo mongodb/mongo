@@ -498,8 +498,8 @@ namespace mongo {
 
     private:
         bool _syncDoInitialSync_clone( const char *master, const list<string>& dbs , bool dataPass );
-        bool _syncDoInitialSync_applyToHead( replset::InitialSync& init, OplogReader* r , 
-                                             const Member* source, const BSONObj& lastOp, 
+        bool _syncDoInitialSync_applyToHead( replset::SyncTail& syncer, OplogReader* r ,
+                                             const Member* source, const BSONObj& lastOp,
                                              BSONObj& minValidOut);
         void _syncDoInitialSync();
         void syncDoInitialSync();

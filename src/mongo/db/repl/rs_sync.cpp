@@ -240,18 +240,10 @@ namespace replset {
 
     InitialSync::~InitialSync() {}
 
-
-    /* initial oplog application, during initial sync, after cloning.
-    */
-    void InitialSync::oplogApplication(const BSONObj& applyGTEObj, const BSONObj& minValidObj) {
+    void SyncTail::oplogApplySegment(const BSONObj& applyGTEObj, const BSONObj& minValidObj,
+                                     MultiSyncApplyFunc func) {
         OpTime applyGTE = applyGTEObj["ts"]._opTime();
         OpTime minValid = minValidObj["ts"]._opTime();
-
-        if (replSetForceInitialSyncFailure > 0) {
-            log() << "replSet test code invoked, forced InitialSync failure: " << replSetForceInitialSyncFailure << rsLog;
-            replSetForceInitialSyncFailure--;
-            throw DBException("forced error",0);
-        }
 
         syncApply(applyGTEObj);
         _logOpObjRS(applyGTEObj);
@@ -266,7 +258,7 @@ namespace replset {
         OpTime ts;
         time_t start = time(0);
         unsigned long long n = 0, lastN = 0;
-        
+
         while( ts < minValid ) {
             OpQueue ops;
 
@@ -276,8 +268,8 @@ namespace replset {
                 }
             }
 
-            
-            multiApply(ops.getDeque(), multiInitialSyncApply);
+
+            multiApply(ops.getDeque(), func);
 
             n += ops.getDeque().size();
 
@@ -299,6 +291,22 @@ namespace replset {
 
             ts = tempTs;
         }
+    }
+
+    /* initial oplog application, during initial sync, after cloning.
+    */
+    void InitialSync::oplogApplication(const BSONObj& applyGTEObj, const BSONObj& minValidObj) {
+        if (replSetForceInitialSyncFailure > 0) {
+            log() << "replSet test code invoked, forced InitialSync failure: " << replSetForceInitialSyncFailure << rsLog;
+            replSetForceInitialSyncFailure--;
+            throw DBException("forced error",0);
+        }
+
+        oplogApplySegment(applyGTEObj, minValidObj, multiInitialSyncApply);
+    }
+
+    void SyncTail::oplogApplication(const BSONObj& applyGTEObj, const BSONObj& minValidObj) {
+        oplogApplySegment(applyGTEObj, minValidObj, multiSyncApply);
     }
 
     /* tail an oplog.  ok to return, will be re-called. */
