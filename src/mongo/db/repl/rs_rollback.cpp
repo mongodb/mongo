@@ -573,6 +573,23 @@ namespace mongo {
     }
 
     void ReplSetImpl::syncRollback(OplogReader&r) {
+        // check that we are at minvalid, otherwise we cannot rollback as we may be in an
+        // inconsistent state
+        {
+            Lock::DBRead lk("local.replset.minvalid");
+            BSONObj mv;
+            if( Helpers::getSingleton("local.replset.minvalid", mv) ) {
+                OpTime minvalid = mv["ts"]._opTime();
+                if( minvalid > lastOpTimeWritten ) {
+                    log() << "replSet need to rollback, but in inconsistent state" << endl;
+                    log() << "minvalid: " << minvalid.toString() << " our last optime: "
+                          << lastOpTimeWritten.toString() << endl;
+                    changeState(MemberState::RS_FATAL);
+                    return;
+                }
+            }
+        }
+
         unsigned s = _syncRollback(r);
         if( s )
             sleepsecs(s);
