@@ -1450,7 +1450,8 @@ namespace mongo {
         }
 
         int lenWHdr = d->getRecordAllocationSize( len + Record::HeaderSize );
-
+        fassert( 16440, lenWHdr >= ( len + Record::HeaderSize ) );
+        
         // If the collection is capped, check if the new object will violate a unique index
         // constraint before allocating space.
         if (d->nIndexes && 
