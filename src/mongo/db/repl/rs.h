@@ -19,6 +19,7 @@
 #pragma once
 
 #include "mongo/db/commands.h"
+#include "mongo/db/index.h"
 #include "mongo/db/oplog.h"
 #include "mongo/db/oplogreader.h"
 #include "mongo/db/repl/rs_config.h"
@@ -670,13 +671,16 @@ namespace mongo {
             _hbinfo.health = 1.0;
     }
 
-    inline bool ignoreUniqueIndexes() {
-        if (theReplSet) {
-            // see SERVER-6671
-            MemberState ms = theReplSet->state();
-            if ((ms == MemberState::RS_STARTUP2) ||
-                (ms == MemberState::RS_RECOVERING) ||
-                (ms == MemberState::RS_ROLLBACK)) {
+    inline bool ignoreUniqueIndex(IndexDetails& idx) {
+        if (!idx.unique()) return false;
+        if (!theReplSet) return false;
+        // see SERVER-6671
+        MemberState ms = theReplSet->state();
+        if ((ms == MemberState::RS_STARTUP2) ||
+            (ms == MemberState::RS_RECOVERING) ||
+            (ms == MemberState::RS_ROLLBACK)) {
+            // Never ignore _id index
+            if (!idx.isIdIndex()) {
                 return true;
             }
         }

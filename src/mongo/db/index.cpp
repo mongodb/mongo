@@ -437,7 +437,7 @@ namespace mongo {
     void IndexChanges::dupCheck(IndexDetails& idx, DiskLoc curObjLoc) {
         if (added.empty() || 
             !idx.unique() || 
-            ignoreUniqueIndexes()) {
+            ignoreUniqueIndex(idx)) {
             return;
         }
         const Ordering ordering = Ordering::make(idx.keyPattern());
