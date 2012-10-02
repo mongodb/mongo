@@ -797,16 +797,22 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 		end = cache->evict + cache->evict_entries;
 
 	/*
-	 * Get the next WT_EVICT_WALK_PER_TABLE entries.
-	 *
-	 * We can't evict the page just returned to us, it marks our place in
-	 * the tree.  So, always stay one page ahead of the page being returned.
+	 * Get some more eviction candidate pages.
 	 */
 	for (evict = start, restarts = 0;
-	    evict < end && restarts <= 1 && ret == 0;
+	    evict < end && ret == 0;
 	    ret = __wt_tree_walk(session, &btree->evict_page, WT_TREE_EVICT)) {
 		if ((page = btree->evict_page) == NULL) {
-			++restarts;
+			/*
+			 * Take care with terminating this loop.
+			 *
+			 * Don't make an extra call to __wt_tree_walk: that
+			 * will leave a page in the WT_REF_EVICT_WALK state,
+			 * unable to be evicted, which may prevent any work
+			 * from being done.
+			 */
+			if (++restarts == 2)
+				break;
 			continue;
 		}
 
