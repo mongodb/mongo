@@ -127,7 +127,13 @@ namespace mongo {
             BSONObjSet keys;
             for ( int i = 0; i < n; i++ ) {
                 // this call throws on unique constraint violation.  we haven't done any writes yet so that is fine.
-                fetchIndexInserters(/*out*/keys, inserter, d, i, obj, loc, ignoreUniqueIndexes());
+                fetchIndexInserters(/*out*/keys, 
+                                    inserter, 
+                                    d, 
+                                    i, 
+                                    obj, 
+                                    loc, 
+                                    ignoreUniqueIndex(d->idx(i)));
                 if( keys.size() > 1 ) {
                     multi.push_back(i);
                     multiKeys.push_back(BSONObjSet());
@@ -144,7 +150,7 @@ namespace mongo {
             unsigned i = multi[j];
             BSONObjSet& keys = multiKeys[j];
             IndexDetails& idx = d->idx(i);
-            bool dupsAllowed = !idx.unique() || ignoreUniqueIndexes();
+            bool dupsAllowed = !idx.unique() || ignoreUniqueIndex(idx);
             IndexInterface& ii = idx.idxInterface();
             Ordering ordering = Ordering::make(idx.keyPattern());
             d->setIndexIsMultikey(ns, i);
@@ -271,7 +277,7 @@ namespace mongo {
 
         tlog(1) << "fastBuildIndex " << ns << " idxNo:" << idxNo << ' ' << idx.info.obj().toString() << endl;
 
-        bool dupsAllowed = !idx.unique() || ignoreUniqueIndexes();
+        bool dupsAllowed = !idx.unique() || ignoreUniqueIndex(idx);
         bool dropDups = idx.dropDups() || inDBRepair;
         BSONObj order = idx.keyPattern();
 
