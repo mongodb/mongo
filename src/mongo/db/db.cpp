@@ -1290,9 +1290,8 @@ namespace mongo {
             return TRUE;
 
         case CTRL_LOGOFF_EVENT:
-            rawOut( "CTRL_LOGOFF_EVENT signal" );
-            consoleTerminate( "CTRL_LOGOFF_EVENT" );
-            return TRUE;
+            // only sent to services, and only in pre-Vista Windows; FALSE means ignore
+            return FALSE;
 
         case CTRL_SHUTDOWN_EVENT:
             rawOut( "CTRL_SHUTDOWN_EVENT signal" );
