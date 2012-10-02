@@ -261,8 +261,12 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	__lsm_tree_discard(session, lsm_tree);
 	lsm_tree = NULL;
 
-	/* Open our new tree and add it to the handle cache. */
-	WT_ERR(__lsm_tree_open(session, uri, &lsm_tree));
+	/*
+	 * Open our new tree and add it to the handle cache. Don't discard on
+	 * error the returned handle is NULL on error, and the metadata tracking
+	 *  macros handle cleaning up on failure.
+	 */
+	ret = __lsm_tree_open(session, uri, &lsm_tree);
 
 	if (0) {
 err:		__lsm_tree_discard(session, lsm_tree);
