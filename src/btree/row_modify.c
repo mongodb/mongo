@@ -287,7 +287,8 @@ __wt_update_check(WT_SESSION_IMPL *session, WT_PAGE *page, WT_UPDATE *next)
 	for (;;) {
 		__wt_eviction_check(session, &lockout, wake);
 		wake = 0;
-		if (!lockout)
+		if (!lockout ||
+		    F_ISSET(session, WT_SESSION_SCHEMA_LOCKED))
 			break;
 		if ((ret = __wt_evict_lru_page(session, 1)) == EBUSY)
 			__wt_yield();
