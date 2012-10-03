@@ -285,8 +285,8 @@ __wt_cursor_set_value(WT_CURSOR *cursor, ...)
 	WT_ITEM *buf, *item;
 	WT_SESSION_IMPL *session;
 	const char *fmt, *str;
-	va_list ap;
 	size_t sz;
+	va_list ap;
 
 	CURSOR_API_CALL(cursor, session, set_value, NULL);
 
