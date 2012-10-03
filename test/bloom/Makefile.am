@@ -1,4 +1,4 @@
-INCLUDES = -I$(top_builddir) -I$(top_srcdir)/src/include
+AM_CPPFLAGS = -I$(top_builddir) -I$(top_srcdir)/src/include
 
 noinst_PROGRAMS = t
 t_SOURCES = test_bloom.c

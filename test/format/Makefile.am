@@ -1,5 +1,5 @@
 BDB = $(top_builddir)/db
-INCLUDES = -I$(top_builddir) -I$(BDB)
+AM_CPPFLAGS = -I$(top_builddir) -I$(BDB)
 
 noinst_PROGRAMS = t
 noinst_SCRIPTS = s_dumpcmp
