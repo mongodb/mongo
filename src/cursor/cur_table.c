@@ -77,8 +77,7 @@ __wt_curtable_get_value(WT_CURSOR *cursor, ...)
 	WT_CURSOR_NEEDVALUE(primary);
 
 	va_start(ap, cursor);
-	if (F_ISSET(cursor,
-	    WT_CURSTD_DUMP_HEX | WT_CURSTD_DUMP_PRINT | WT_CURSTD_RAW)) {
+	if (F_ISSET(cursor, WT_CURSOR_RAW_OK)) {
 		ret = __wt_schema_project_merge(session,
 		    ctable->cg_cursors, ctable->plan,
 		    cursor->value_format, &cursor->value);
@@ -147,8 +146,7 @@ __wt_curtable_set_value(WT_CURSOR *cursor, ...)
 	CURSOR_API_CALL(cursor, session, set_value, NULL);
 
 	va_start(ap, cursor);
-	if (F_ISSET(cursor,
-	    WT_CURSTD_DUMP_HEX | WT_CURSTD_DUMP_PRINT | WT_CURSTD_RAW)) {
+	if (F_ISSET(cursor, WT_CURSOR_RAW_OK)) {
 		item = va_arg(ap, WT_ITEM *);
 		cursor->value.data = item->data;
 		cursor->value.size = item->size;

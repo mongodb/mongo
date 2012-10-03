@@ -170,8 +170,7 @@ __wt_cursor_get_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 			*va_arg(ap, uint64_t *) = cursor->recno;
 	} else {
 		fmt = cursor->key_format;
-		if (LF_ISSET(
-		    WT_CURSTD_DUMP_HEX | WT_CURSTD_DUMP_PRINT | WT_CURSTD_RAW))
+		if (LF_ISSET(WT_CURSOR_RAW_OK))
 			fmt = "u";
 		ret = __wt_struct_unpackv(
 		    session, cursor->key.data, cursor->key.size, fmt, ap);
@@ -212,17 +211,14 @@ __wt_cursor_set_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 		sz = sizeof(cursor->recno);
 	} else {
 		fmt = cursor->key_format;
-		if (LF_ISSET(
-		    WT_CURSTD_DUMP_HEX | WT_CURSTD_DUMP_PRINT | WT_CURSTD_RAW))
-			fmt = "u";
-		if (strcmp(fmt, "S") == 0) {
-			str = va_arg(ap, const char *);
-			sz = strlen(str) + 1;
-			cursor->key.data = (void *)str;
-		} else if (strcmp(fmt, "u") == 0) {
+		if (LF_ISSET(WT_CURSOR_RAW_OK) || strcmp(fmt, "u") == 0) {
 			item = va_arg(ap, WT_ITEM *);
 			sz = item->size;
 			cursor->key.data = (void *)item->data;
+		} else if (strcmp(fmt, "S") == 0) {
+			str = va_arg(ap, const char *);
+			sz = strlen(str) + 1;
+			cursor->key.data = (void *)str;
 		} else {
 			buf = &cursor->key;
 
@@ -269,9 +265,7 @@ __wt_cursor_get_value(WT_CURSOR *cursor, ...)
 	WT_CURSOR_NEEDVALUE(cursor);
 
 	va_start(ap, cursor);
-	fmt = F_ISSET(cursor,
-	    WT_CURSTD_DUMP_HEX | WT_CURSTD_DUMP_PRINT | WT_CURSTD_RAW) ?
-	    "u" : cursor->value_format;
+	fmt = F_ISSET(cursor, WT_CURSOR_RAW_OK) ? "u" : cursor->value_format;
 	ret = __wt_struct_unpackv(session,
 	    cursor->value.data, cursor->value.size, fmt, ap);
 	va_end(ap);
@@ -297,9 +291,7 @@ __wt_cursor_set_value(WT_CURSOR *cursor, ...)
 	CURSOR_API_CALL(cursor, session, set_value, NULL);
 
 	va_start(ap, cursor);
-	fmt = F_ISSET(cursor,
-	    WT_CURSTD_DUMP_HEX | WT_CURSTD_DUMP_PRINT | WT_CURSTD_RAW) ?
-	    "u" : cursor->value_format;
+	fmt = F_ISSET(cursor, WT_CURSOR_RAW_OK) ? "u" : cursor->value_format;
 	/* Fast path some common cases: single strings or byte arrays. */
 	if (strcmp(fmt, "S") == 0) {
 		str = va_arg(ap, const char *);
